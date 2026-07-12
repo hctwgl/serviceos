@@ -1,0 +1,70 @@
+# ServiceOS Architecture Book
+
+ServiceOS 是面向新能源充电设施现场服务的履约平台。本仓库是产品、业务、研发、测试和运维共同使用的架构事实源。
+
+首个落地行业是新能源汽车家充勘测、安装、维修和拆装；平台边界面向可复用的现场履约能力，而不是为每家车企复制业务代码。
+
+## 阅读顺序
+
+1. [产品宪法](architecture/00-product-constitution.md)
+2. [业务领域](architecture/01-business-domain.md)
+3. [业务能力地图](architecture/02-capability-map.md)
+4. [核心领域模型](architecture/03-domain-model.md)
+5. [履约事实、计价与结算](architecture/04-fulfillment-pricing-settlement.md)
+6. [配置资产与版本中心](architecture/05-configuration-version-center.md)
+7. [工单、任务与流程执行内核](architecture/06-work-order-task-execution-kernel.md)
+8. [核心命令与事件契约](api/01-command-event-contracts.md)
+9. [工单与任务 HTTP API](api/02-work-order-task-http-api.md)
+10. [配置与执行内核逻辑数据模型](data/01-execution-logical-model.md)
+11. [身份、授权与审计](architecture/07-identity-authorization-audit.md)
+12. [预约与现场作业](architecture/08-appointment-field-operations.md)
+13. [动态表单与字段引擎](architecture/09-dynamic-form-field-engine.md)
+14. [资料、审核与整改闭环](architecture/10-evidence-review-correction.md)
+15. [现场作业 HTTP API](api/03-field-operations-http-api.md)
+16. [现场作业逻辑数据模型](data/03-field-operations-logical-model.md)
+17. [授权与审计逻辑数据模型](data/02-authorization-audit-logical-model.md)
+18. [M2 执行内核验收矩阵](testing/01-m2-execution-acceptance-matrix.md)
+19. [M3 现场作业验收矩阵](testing/02-m3-field-operations-acceptance-matrix.md)
+20. [MVP 与实施路线](roadmap/00-mvp-roadmap.md)
+21. [已确认业务事实](research/00-confirmed-business-facts.md)
+22. [M1 业务资产基线填写手册](research/01-m1-business-asset-pack.md)
+23. [术语表](docs/glossary.md)
+
+## 仓库结构
+
+```text
+serviceos-architecture/
+├── architecture/    # 产品与领域架构
+├── decisions/       # 架构决策记录（ADR）
+├── docs/            # 术语、规范和索引
+├── product/         # 后续 PRD、应用与交互设计
+├── research/        # 已确认事实、待验证假设和调研材料
+├── roadmap/         # MVP、里程碑与交付计划
+├── api/             # 后续 API 与事件契约
+├── data/            # 后续逻辑数据模型与数据字典
+├── diagrams/        # 独立 Mermaid/PlantUML 源文件
+└── testing/         # 架构验收矩阵与故障恢复场景
+```
+
+## 文档状态
+
+文档头部使用以下状态：
+
+- `Draft`：正在形成，不可作为研发承诺；
+- `Proposed`：可评审的完整提案；
+- `Accepted`：已通过决策，可指导实现；
+- `Superseded`：已被新文档或 ADR 替代。
+
+## 变更纪律
+
+- 业务事实与架构建议必须分开记录；
+- 会影响长期边界的选择必须写 ADR；
+- 流程、表单、资料、规则、SLA、派单策略和价格方案必须版本化；
+- 新车企或新品牌默认通过配置接入，不新增车企专属核心表或核心分支；
+- MVP 只实现已验证的共性能力，通用平台能力按明确扩展点预留，不提前铺满。
+
+## 当前基线
+
+当前版本为 `0.4.0`，包含架构基线、M1 业务资产模板、M2 履约内核，以及 M3 预约、现场作业、动态表单、资料审核和离线同步基线。它不是完整 PRD，也不直接承诺微服务数量、数据库表数量或具体中间件。
+
+核心业务编码前，必须使用 `research/templates/` 中的模板完成首个试点项目基线，并用真实脱敏工单完成桌面演练。
