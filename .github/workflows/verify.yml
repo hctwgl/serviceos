@@ -54,8 +54,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          mkdir -p target/ci-diagnostics
-          runtime_log="target/ci-diagnostics/serviceos-verify-runtime.log"
+          runtime_log="${RUNNER_TEMP}/serviceos-verify-runtime.log"
           ./mvnw --batch-mode --no-transfer-progress clean verify 2>&1 | tee "${runtime_log}"
           serviceos-deploy/observability/verify-sensitive-output.sh "${runtime_log}"
       - name: Retain Maven verification diagnostics
@@ -63,8 +62,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: serviceos-maven-verify-log-${{ github.sha }}
-          path: target/ci-diagnostics/serviceos-verify-runtime.log
-          if-no-files-found: warn
+          path: ${{ runner.temp }}/serviceos-verify-runtime.log
+          if-no-files-found: error
           retention-days: 7
       - name: Verify repeatable generated TypeScript client
         run: serviceos-contracts/scripts/verify-client-generation-reproducibility.sh
