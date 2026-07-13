@@ -3,6 +3,7 @@ package com.serviceos.workorder.application;
 import com.serviceos.workorder.api.ReceiveExternalWorkOrderCommand;
 import com.serviceos.workorder.api.WorkOrderCommandService;
 import com.serviceos.workorder.api.WorkOrderReceipt;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +17,7 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
     private final JdbcClient jdbc;
     private final Clock clock;
 
+    @Autowired
     JdbcWorkOrderCommandService(JdbcClient jdbc) {
         this(jdbc, Clock.systemUTC());
     }
