@@ -11,6 +11,8 @@ import java.time.Clock;
 import java.util.Map;
 import java.util.UUID;
 
+import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timestamptz;
+
 @Repository
 final class JdbcInboxService implements InboxService {
     private final JdbcClient jdbc;
@@ -45,7 +47,7 @@ final class JdbcInboxService implements InboxService {
                         "eventId", eventId,
                         "schemaVersion", schemaVersion,
                         "payloadDigest", payloadDigest,
-                        "startedAt", clock.instant()))
+                        "startedAt", timestamptz(clock.instant())))
                 .update();
         if (inserted == 1) {
             return InboxDecision.newEvent();
@@ -89,7 +91,7 @@ final class JdbcInboxService implements InboxService {
                         """)
                 .params(Map.of(
                         "resultDigest", resultDigest,
-                        "completedAt", clock.instant(),
+                        "completedAt", timestamptz(clock.instant()),
                         "tenantId", tenantId,
                         "consumerName", consumerName,
                         "eventId", eventId))

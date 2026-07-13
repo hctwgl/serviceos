@@ -19,6 +19,8 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
+import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timestamptz;
+
 /**
  * PostgreSQL 文件事实存储。所有查询都带 tenant_id，避免仅凭全局 UUID 穿透租户边界。
  */
@@ -56,9 +58,9 @@ final class JdbcFileLifecycleStore implements FileLifecycleStore {
                 .param("size", session.expectedSize())
                 .param("sha256", session.expectedSha256())
                 .param("status", session.status())
-                .param("expiresAt", session.expiresAt())
+                .param("expiresAt", timestamptz(session.expiresAt()))
                 .param("createdBy", session.createdBy())
-                .param("createdAt", session.createdAt())
+                .param("createdAt", timestamptz(session.createdAt()))
                 .update();
     }
 
@@ -100,7 +102,7 @@ final class JdbcFileLifecycleStore implements FileLifecycleStore {
                                    finalizing_started_at = NULL, updated_at = :now
                              WHERE tenant_id = :tenantId AND upload_session_id = :sessionId
                             """)
-                    .param("now", now)
+                    .param("now", timestamptz(now))
                     .param("tenantId", tenantId)
                     .param("sessionId", sessionId)
                     .update();
@@ -133,7 +135,7 @@ final class JdbcFileLifecycleStore implements FileLifecycleStore {
                 .param("requestDigest", requestDigest)
                 .param("commandId", finalizeCommandId)
                 .param("token", token)
-                .param("now", now)
+                .param("now", timestamptz(now))
                 .param("tenantId", tenantId)
                 .param("sessionId", sessionId)
                 .update();
@@ -169,7 +171,7 @@ final class JdbcFileLifecycleStore implements FileLifecycleStore {
                 .param("sha256", metadata.checksumSha256())
                 .param("size", metadata.size())
                 .param("detectedMime", metadata.detectedMimeType())
-                .param("now", now)
+                .param("now", timestamptz(now))
                 .param("tenantId", session.tenantId())
                 .param("sessionId", session.sessionId())
                 .param("token", token)
@@ -182,7 +184,7 @@ final class JdbcFileLifecycleStore implements FileLifecycleStore {
                          WHERE tenant_id = :tenantId AND upload_session_id = :sessionId
                            AND status = 'FINALIZING' AND finalization_token = :token
                         """)
-                .param("now", now)
+                .param("now", timestamptz(now))
                 .param("tenantId", session.tenantId())
                 .param("sessionId", session.sessionId())
                 .param("token", token)
@@ -204,7 +206,7 @@ final class JdbcFileLifecycleStore implements FileLifecycleStore {
                            AND status = 'FINALIZING' AND finalization_token = :token
                         """)
                 .param("errorCode", errorCode)
-                .param("now", now)
+                .param("now", timestamptz(now))
                 .param("tenantId", tenantId)
                 .param("sessionId", sessionId)
                 .param("token", token)
@@ -221,7 +223,7 @@ final class JdbcFileLifecycleStore implements FileLifecycleStore {
                            AND status = 'FINALIZING' AND finalization_token = :token
                         """)
                 .param("errorCode", errorCode)
-                .param("now", now)
+                .param("now", timestamptz(now))
                 .param("tenantId", tenantId)
                 .param("sessionId", sessionId)
                 .param("token", token)
@@ -283,7 +285,7 @@ final class JdbcFileLifecycleStore implements FileLifecycleStore {
                 .param("scannerName", outcome.scannerName())
                 .param("scannerVersion", outcome.scannerVersion())
                 .param("reasonCode", outcome.reasonCode(), java.sql.Types.VARCHAR)
-                .param("now", now)
+                .param("now", timestamptz(now))
                 .update();
 
         String status = outcome.result() == ScanOutcome.Result.CLEAN ? "AVAILABLE" : "QUARANTINED";
@@ -297,7 +299,7 @@ final class JdbcFileLifecycleStore implements FileLifecycleStore {
                         """)
                 .param("status", status)
                 .param("reason", reason, java.sql.Types.VARCHAR)
-                .param("now", now)
+                .param("now", timestamptz(now))
                 .param("tenantId", tenantId)
                 .param("fileId", fileId)
                 .update();
@@ -329,8 +331,8 @@ final class JdbcFileLifecycleStore implements FileLifecycleStore {
                 .param("principalId", principalId)
                 .param("purpose", purpose)
                 .param("correlationId", correlationId)
-                .param("issuedAt", issuedAt)
-                .param("expiresAt", expiresAt)
+                .param("issuedAt", timestamptz(issuedAt))
+                .param("expiresAt", timestamptz(expiresAt))
                 .update();
     }
 

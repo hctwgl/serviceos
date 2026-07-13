@@ -13,6 +13,8 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
 
+import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timestamptz;
+
 /**
  * PostgreSQL 幂等实现。
  *
@@ -46,8 +48,8 @@ final class JdbcIdempotencyService implements IdempotencyService {
                         "idempotencyKey", context.idempotencyKey(),
                         "requestDigest", requestDigest,
                         "actorId", context.actorId(),
-                        "startedAt", now,
-                        "expiresAt", now.plus(30, ChronoUnit.DAYS)))
+                        "startedAt", timestamptz(now),
+                        "expiresAt", timestamptz(now.plus(30, ChronoUnit.DAYS))))
                 .update();
 
         if (inserted == 1) {
@@ -96,7 +98,7 @@ final class JdbcIdempotencyService implements IdempotencyService {
                 .params(Map.of(
                         "resourceId", resourceId,
                         "responseDigest", responseDigest,
-                        "completedAt", clock.instant(),
+                        "completedAt", timestamptz(clock.instant()),
                         "tenantId", context.tenantId(),
                         "operationType", operationType,
                         "idempotencyKey", context.idempotencyKey()))

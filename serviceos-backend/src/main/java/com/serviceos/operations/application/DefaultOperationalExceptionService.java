@@ -19,6 +19,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
+import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timestamptz;
+
 /**
  * 最终失败消费者：Inbox、异常记录和人工处理 Task 在同一事务提交。
  */
@@ -75,7 +77,7 @@ final class DefaultOperationalExceptionService implements OperationalExceptionSe
                         "sourceTaskType", command.sourceTaskType(),
                         "errorCode", truncate(command.errorCode(), 100),
                         "correlationId", command.correlationId(),
-                        "openedAt", now))
+                        "openedAt", timestamptz(now)))
                 .update();
 
         OperationalExceptionView opened = findBySource(

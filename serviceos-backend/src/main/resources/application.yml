@@ -1,6 +1,10 @@
 spring:
   application:
     name: serviceos-backend
+  aop:
+    # 事务与 Repository 异常翻译优先代理稳定接口，实现类可以继续保持包内 final。
+    # 没有接口但需要事务的协作者必须允许 CGLIB 子类化，并由数据库 IT 真实装配验证。
+    proxy-target-class: false
   datasource:
     url: ${SERVICEOS_DB_URL:jdbc:postgresql://localhost:5432/serviceos}
     username: ${SERVICEOS_DB_USERNAME:serviceos_app}

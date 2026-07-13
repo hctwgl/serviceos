@@ -9,6 +9,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timestamptz;
+
 /**
  * RoleGrant 权威查询。有效期、撤销与 tenant scope 在同一 SQL 中实时判定，不能只信缓存/JWT。
  */
@@ -54,7 +56,7 @@ final class JdbcAuthorizationPolicyStore implements AuthorizationPolicyStore {
                         "tenantId", tenantId,
                         "principalId", principalId,
                         "capability", capability,
-                        "evaluatedAt", evaluatedAt))
+                        "evaluatedAt", timestamptz(evaluatedAt)))
                 .query(String.class)
                 .list();
         return grantIds.isEmpty()

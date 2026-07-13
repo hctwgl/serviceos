@@ -7,6 +7,8 @@ import org.springframework.stereotype.Repository;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
+import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timestamptz;
+
 @Repository
 final class JdbcAuditAppender implements AuditAppender {
     private final JdbcClient jdbc;
@@ -46,7 +48,7 @@ final class JdbcAuditAppender implements AuditAppender {
                 .param("errorCode", entry.errorCode(), java.sql.Types.VARCHAR)
                 .param("requestDigest", entry.requestDigest())
                 .param("correlationId", entry.correlationId())
-                .param("occurredAt", entry.occurredAt())
+                .param("occurredAt", timestamptz(entry.occurredAt()))
                 .update();
     }
 

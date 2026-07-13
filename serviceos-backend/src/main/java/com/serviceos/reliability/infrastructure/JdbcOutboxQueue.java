@@ -18,6 +18,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timestamptz;
+
 /**
  * PostgreSQL SKIP LOCKED Outbox 队列。claim、成功和失败各自使用独立短事务。
  */
@@ -60,9 +62,9 @@ final class JdbcOutboxQueue implements OutboxQueue {
                         RETURNING event.*
                         """)
                 .params(Map.of(
-                        "now", now,
+                        "now", timestamptz(now),
                         "workerId", workerId,
-                        "claimUntil", now.plus(leaseDuration)))
+                        "claimUntil", timestamptz(now.plus(leaseDuration))))
                 .query(this::mapMessage)
                 .optional();
     }
@@ -79,7 +81,7 @@ final class JdbcOutboxQueue implements OutboxQueue {
                            AND claim_owner = :workerId
                         """)
                 .params(Map.of(
-                        "finishedAt", clock.instant(),
+                        "finishedAt", timestamptz(clock.instant()),
                         "outboxId", message.outboxId(),
                         "workerId", workerId))
                 .update();
@@ -112,7 +114,7 @@ final class JdbcOutboxQueue implements OutboxQueue {
                         """)
                 .params(Map.of(
                         "nextStatus", dead ? "DEAD" : "FAILED",
-                        "availableAt", nextAttempt,
+                        "availableAt", timestamptz(nextAttempt),
                         "errorCode", truncate(errorCode, 100),
                         "outboxId", message.outboxId(),
                         "workerId", workerId))
@@ -141,8 +143,8 @@ final class JdbcOutboxQueue implements OutboxQueue {
                 .param("outboxId", message.outboxId())
                 .param("attemptNo", message.attemptNo())
                 .param("workerId", workerId)
-                .param("startedAt", startedAt)
-                .param("finishedAt", clock.instant())
+                .param("startedAt", timestamptz(startedAt))
+                .param("finishedAt", timestamptz(clock.instant()))
                 .param("result", result)
                 .param("errorCode", errorCode == null ? null : truncate(errorCode, 100), java.sql.Types.VARCHAR)
                 .update();

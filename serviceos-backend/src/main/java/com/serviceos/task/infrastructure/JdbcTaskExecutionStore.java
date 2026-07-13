@@ -29,6 +29,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timestamptz;
+
 /**
  * PostgreSQL 任务存储。行锁只覆盖认领/落结果短事务，真实执行绝不占用数据库事务。
  */
@@ -69,10 +71,10 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
                 .param("payloadRef", command.payloadRef(), java.sql.Types.VARCHAR)
                 .param("payloadDigest", command.payloadDigest())
                 .param("priority", command.priority())
-                .param("nextRunAt", command.nextRunAt())
+                .param("nextRunAt", timestamptz(command.nextRunAt()))
                 .param("maxAttempts", command.maxAttempts())
                 .param("correlationId", command.correlationId())
-                .param("now", now)
+                .param("now", timestamptz(now))
                 .update();
 
         StoredTask stored = findByBusinessKey(command.tenantId(), command.taskType(), command.businessKey());
@@ -107,9 +109,9 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
                 .param("payloadRef", command.payloadRef(), java.sql.Types.VARCHAR)
                 .param("payloadDigest", command.payloadDigest())
                 .param("priority", command.priority())
-                .param("readyAt", command.readyAt())
+                .param("readyAt", timestamptz(command.readyAt()))
                 .param("correlationId", command.correlationId())
-                .param("now", now)
+                .param("now", timestamptz(now))
                 .update();
         StoredTask stored = findByBusinessKey(command.tenantId(), command.taskType(), command.businessKey());
         if (inserted == 0 && !stored.payloadDigest().equals(command.payloadDigest())) {
@@ -136,7 +138,7 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
                          FOR UPDATE SKIP LOCKED
                          LIMIT 1
                         """)
-                .param("now", now)
+                .param("now", timestamptz(now))
                 .query(this::mapCandidate)
                 .optional();
         if (selected.isEmpty()) {
@@ -152,7 +154,7 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
                                version = version + 1, updated_at = :now
                          WHERE task_id = :taskId AND status = 'CLAIMED'
                         """)
-                .params(Map.of("now", now, "taskId", candidate.taskId()))
+                .params(Map.of("now", timestamptz(now), "taskId", candidate.taskId()))
                 .update();
         requireLease(updated);
         ClaimedTask exhausted = new ClaimedTask(
@@ -183,7 +185,7 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
                          FOR UPDATE SKIP LOCKED
                          LIMIT 1
                         """)
-                .param("now", now)
+                .param("now", timestamptz(now))
                 .query(this::mapCandidate)
                 .optional();
         if (selected.isEmpty()) {
@@ -206,10 +208,10 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
                         """)
                 .params(Map.of(
                         "workerId", workerId,
-                        "claimUntil", now.plus(leaseDuration),
+                        "claimUntil", timestamptz(now.plus(leaseDuration)),
                         "attemptId", attemptId,
                         "attemptNo", attemptNo,
-                        "now", now,
+                        "now", timestamptz(now),
                         "taskId", candidate.taskId()))
                 .update();
         jdbc.sql("""
@@ -224,7 +226,7 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
                         "taskId", candidate.taskId(),
                         "attemptNo", attemptNo,
                         "workerId", workerId,
-                        "now", now))
+                        "now", timestamptz(now)))
                 .update();
 
         return Optional.of(new ClaimedTask(
@@ -266,9 +268,9 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
                            AND claim_owner = :workerId AND current_attempt_id = :attemptId
                         """)
                 .params(Map.of(
-                        "retryAt", outcome.retryAt(),
+                        "retryAt", timestamptz(outcome.retryAt()),
                         "errorCode", truncate(outcome.errorCode(), 100),
-                        "now", now,
+                        "now", timestamptz(now),
                         "taskId", task.taskId(),
                         "workerId", workerId,
                         "attemptId", task.attemptId()))
@@ -313,8 +315,8 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
                         """)
                 .param("status", status)
                 .param("errorCode", errorCode, java.sql.Types.VARCHAR)
-                .param("completedAt", completedAt, java.sql.Types.TIMESTAMP_WITH_TIMEZONE)
-                .param("now", now)
+                .param("completedAt", timestamptz(completedAt))
+                .param("now", timestamptz(now))
                 .param("taskId", task.taskId())
                 .param("workerId", workerId)
                 .param("attemptId", task.attemptId())
@@ -336,11 +338,11 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
                                next_retry_at = :nextRetryAt
                          WHERE attempt_id = :attemptId AND result_code = 'RUNNING'
                         """)
-                .param("finishedAt", finishedAt)
+                .param("finishedAt", timestamptz(finishedAt))
                 .param("resultCode", resultCode)
                 .param("errorCode", errorCode, java.sql.Types.VARCHAR)
                 .param("resultRef", resultRef, java.sql.Types.VARCHAR)
-                .param("nextRetryAt", nextRetryAt, java.sql.Types.TIMESTAMP_WITH_TIMEZONE)
+                .param("nextRetryAt", timestamptz(nextRetryAt))
                 .param("attemptId", task.attemptId())
                 .update();
         requireLease(updated);
@@ -353,7 +355,7 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
                                error_code = 'TASK_LEASE_EXPIRED'
                          WHERE attempt_id = :attemptId AND result_code = 'RUNNING'
                         """)
-                .params(Map.of("now", now, "attemptId", attemptId))
+                .params(Map.of("now", timestamptz(now), "attemptId", attemptId))
                 .update();
         if (updated != 1) {
             throw new IllegalStateException("Expired task claim has no running attempt");

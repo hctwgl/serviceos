@@ -7,6 +7,8 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Map;
 
+import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timestamptz;
+
 /**
  * Outbox 只冻结并追加事件，不负责网络发布。发布 worker 后续按租约认领并至少一次投递。
  */
@@ -49,7 +51,7 @@ final class JdbcOutboxAppender implements OutboxAppender {
                         Map.entry("partitionKey", event.partitionKey()),
                         Map.entry("payload", event.payload()),
                         Map.entry("payloadDigest", event.payloadDigest()),
-                        Map.entry("occurredAt", event.occurredAt())))
+                        Map.entry("occurredAt", timestamptz(event.occurredAt()))))
                 .update();
     }
 }

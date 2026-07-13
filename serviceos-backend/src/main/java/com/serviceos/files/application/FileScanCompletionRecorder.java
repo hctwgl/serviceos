@@ -16,7 +16,7 @@ import java.util.UUID;
 
 /** 扫描状态和下游事件在同一本地事务提交，避免“文件可用但资料模块永远收不到事件”。 */
 @Service
-final class FileScanCompletionRecorder {
+class FileScanCompletionRecorder {
     private final FileLifecycleStore store;
     private final OutboxAppender outbox;
     private final ObjectMapper objectMapper;

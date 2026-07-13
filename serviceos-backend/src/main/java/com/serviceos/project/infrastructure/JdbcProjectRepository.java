@@ -8,6 +8,8 @@ import org.springframework.stereotype.Repository;
 import java.util.Optional;
 import java.util.UUID;
 
+import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timestamptz;
+
 @Repository
 final class JdbcProjectRepository implements ProjectRepository {
     private final JdbcClient jdbc;
@@ -36,7 +38,7 @@ final class JdbcProjectRepository implements ProjectRepository {
                 .param("endsOn", project.endsOn(), java.sql.Types.DATE)
                 .param("status", project.status().name())
                 .param("version", project.version())
-                .param("createdAt", project.createdAt())
+                .param("createdAt", timestamptz(project.createdAt()))
                 .update();
     }
 
