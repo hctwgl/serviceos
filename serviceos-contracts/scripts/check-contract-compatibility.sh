@@ -3,7 +3,7 @@ set -euo pipefail
 
 script_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repository_root="${CONTRACT_REPOSITORY_ROOT:-$(cd "${script_directory}/../.." && pwd)}"
-openapi_path="serviceos-contracts/src/main/resources/openapi/serviceos-core-v1.yaml"
+openapi_directory="serviceos-contracts/src/main/resources/openapi"
 event_schema_directory="serviceos-contracts/src/main/resources/events"
 
 base_ref="${1:-${CONTRACT_BASE_REF:-}}"
@@ -24,25 +24,43 @@ fi
 temporary_directory="$(mktemp -d "${TMPDIR:-/tmp}/serviceos-contract-base.XXXXXX")"
 trap 'rm -rf "${temporary_directory}"' EXIT
 
-if git -C "${repository_root}" cat-file -e "${base_ref}:${openapi_path}" 2>/dev/null; then
-  oasdiff_binary="${OASDIFF_BIN:-}"
-  if [[ -z "${oasdiff_binary}" ]]; then
-    oasdiff_binary="$(command -v oasdiff || true)"
-  fi
-  if [[ -z "${oasdiff_binary}" || ! -x "${oasdiff_binary}" ]]; then
-    echo "oasdiff is required. Run serviceos-contracts/scripts/install-oasdiff.sh and set OASDIFF_BIN." >&2
-    exit 2
+oasdiff_binary="${OASDIFF_BIN:-}"
+if [[ -z "${oasdiff_binary}" ]]; then
+  oasdiff_binary="$(command -v oasdiff || true)"
+fi
+if [[ -z "${oasdiff_binary}" || ! -x "${oasdiff_binary}" ]]; then
+  echo "oasdiff is required. Run serviceos-contracts/scripts/install-oasdiff.sh and set OASDIFF_BIN." >&2
+  exit 2
+fi
+
+# 所有已经在基线中发布的 OpenAPI 都必须保持向后兼容；新增文档由 Maven 解析门禁验证。
+openapi_failure=0
+while IFS= read -r published_openapi; do
+  [[ -z "${published_openapi}" ]] && continue
+  current_openapi="${repository_root}/${published_openapi}"
+  if [[ ! -f "${current_openapi}" ]]; then
+    echo "Published OpenAPI document was deleted: ${published_openapi}" >&2
+    openapi_failure=1
+    continue
   fi
 
-  git -C "${repository_root}" show "${base_ref}:${openapi_path}" > "${temporary_directory}/base-openapi.yaml"
-  "${oasdiff_binary}" breaking \
-    --fail-on WARN \
-    --format text \
-    --color never \
-    "${temporary_directory}/base-openapi.yaml" \
-    "${repository_root}/${openapi_path}"
-else
-  echo "OpenAPI compatibility bootstrap: ${openapi_path} did not exist at ${base_ref}."
+  base_file="${temporary_directory}/$(basename "${published_openapi}")"
+  git -C "${repository_root}" show "${base_ref}:${published_openapi}" > "${base_file}"
+  if ! "${oasdiff_binary}" breaking \
+      --fail-on WARN \
+      --format text \
+      --color never \
+      "${base_file}" \
+      "${current_openapi}"; then
+    echo "Breaking OpenAPI change detected: ${published_openapi}" >&2
+    openapi_failure=1
+  fi
+done < <(git -C "${repository_root}" ls-tree -r --name-only "${base_ref}" -- "${openapi_directory}" \
+  | LC_ALL=C sort \
+  | grep -E '\.ya?ml$' || true)
+
+if [[ "${openapi_failure}" -ne 0 ]]; then
+  exit 1
 fi
 
 # 已发布事件版本是不可变资产：删除或原地修改都必须失败；兼容演进只能新增 vN 文件。
