@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.local/schemas/configuration-bundle.schema.json",
+  "title": "ServiceOS Configuration Bundle",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "bundleId",
+    "bundleKey",
+    "bundleVersion",
+    "tenantId",
+    "projectId",
+    "businessType",
+    "status",
+    "assets"
+  ],
+  "properties": {
+    "bundleId": {"type": "string", "minLength": 1, "maxLength": 100},
+    "bundleKey": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$", "maxLength": 160},
+    "bundleVersion": {"type": "integer", "minimum": 1},
+    "tenantId": {"type": "string", "minLength": 1, "maxLength": 100},
+    "projectId": {"type": "string", "minLength": 1, "maxLength": 100},
+    "businessType": {"type": "string", "minLength": 1, "maxLength": 80},
+    "brandCodes": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1, "maxLength": 80},
+      "uniqueItems": true,
+      "default": []
+    },
+    "regionScopes": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1, "maxLength": 100},
+      "uniqueItems": true,
+      "default": []
+    },
+    "status": {
+      "enum": ["DRAFT", "VALIDATING", "REVIEW", "APPROVED", "PUBLISHED", "SUPERSEDED", "DEPRECATED", "RETIRED"]
+    },
+    "effectiveFrom": {"type": ["string", "null"], "format": "date-time"},
+    "effectiveTo": {"type": ["string", "null"], "format": "date-time"},
+    "assets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/assetReference"}
+    },
+    "metadata": {"$ref": "#/$defs/metadata"}
+  },
+  "$defs": {
+    "assetReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assetType", "assetId", "versionId", "semanticVersion"],
+      "properties": {
+        "assetType": {
+          "enum": ["WORKFLOW", "FORM", "EVIDENCE", "RULE", "SLA", "DISPATCH", "PRICING", "INTEGRATION", "ASSIGNEE_POLICY", "NOTIFICATION"]
+        },
+        "assetId": {"type": "string", "minLength": 1, "maxLength": 100},
+        "versionId": {"type": "string", "minLength": 1, "maxLength": 100},
+        "semanticVersion": {"type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?$"},
+        "checksum": {"type": ["string", "null"], "maxLength": 128}
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "owner": {"type": "string", "maxLength": 100},
+        "changeReason": {"type": "string", "maxLength": 1000},
+        "approvedBy": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "publishedAt": {"type": ["string", "null"], "format": "date-time"}
+      }
+    }
+  }
+}
