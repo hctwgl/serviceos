@@ -79,6 +79,7 @@ status: Proposed
 | M7-ADM-019 | P0 | 指标口径与下钻 | 查看周期/通过率并下钻 | metricVersion/分子分母/窗口/asOf 一致，列表同口径且受权 |
 | M7-ADM-020 | P0 | 指标范围隔离 | 区域运营查看其他区域/共享视图 | 聚合和下钻均拒绝，无计数侧信道 |
 | M7-ADM-021 | P0 | SHADOW 财务隔离 | FORMAL_SETTLEMENT 未启用 | 正式财务指标不可用；试算汇总明确 direction+SHADOW |
+| M7-ADM-022 | P0 | 项目身份与配置分离 | 修改 Project/创建 ProjectProfile | 稳定 Project/Brand/Product 只由 project 拥有；配置仅引用并版本化运行参数 |
 
 ## 6. Network Portal
 

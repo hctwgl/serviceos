@@ -8,7 +8,7 @@ status: Proposed
 
 ## 1. 目标
 
-本文件定义面向 Admin、Network 和 Technician Portal 的只读组合查询与个人偏好契约。它不创建第二套领域命令；所有写业务动作仍调用 API-02～05 的领域命令和 allowed-actions。
+本文件定义面向 Admin、Network 和 Technician Portal 的只读组合查询与个人偏好契约。它不创建第二套领域命令；所有写业务动作仍调用 API-02～05/API-07 的领域命令和 allowed-actions。本文件的 SavedView/UI Preference 写入只修改用户展示偏好，不推进履约业务。
 
 ## 2. 通用查询元数据
 

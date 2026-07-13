@@ -117,6 +117,8 @@ Preview 不创建可被工单引用的 Bundle，除非明确 `purpose=CREATE_WOR
 
 Explain 需要专用能力并增强审计。它返回匹配 grant/policy/obligations 摘要，不泄露其他主体敏感授权或策略内部 secret。
 
+`type` 必须命中服务端受控资源目录并映射到显式授权适配器；不允许通过反射、表名或类名访问任意资源。
+
 ## 10. 审计查询与导出
 
 | 方法与路径 | 用途 |
