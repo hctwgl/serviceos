@@ -16,3 +16,4 @@
 - [M12 契约兼容 CI 与客户端生成验收矩阵](10-m12-contract-ci-acceptance.md)
 - [M13 可观测性、健康探针与日志脱敏验收矩阵](11-m13-observability-acceptance.md)
 - [M14 容器、迁移、staging 与回滚验收矩阵](12-m14-container-staging-deployment-acceptance.md)
+- [M16 配置发布解析与 BYD 工单接入验收矩阵](13-m16-configuration-byd-work-order-intake-acceptance.md)

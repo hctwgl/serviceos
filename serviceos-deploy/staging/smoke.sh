@@ -34,7 +34,7 @@ migration_count="$(compose "${env_file}" exec -T database \
 [[ "${migration_count}" == "${SERVICEOS_EXPECTED_MIGRATION_COUNT}" ]]
 migration_version="$(compose "${env_file}" exec -T database \
   psql -U serviceos_bootstrap -d serviceos -Atc \
-  "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1")"
+  "SELECT version FROM flyway_schema_history WHERE success AND version IS NOT NULL ORDER BY installed_rank DESC LIMIT 1")"
 [[ "${migration_version}" == "${SERVICEOS_EXPECTED_MIGRATION_VERSION}" ]]
 
 # 运行账号必须能读取业务表，但不能执行 DDL。

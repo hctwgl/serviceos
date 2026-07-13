@@ -20,6 +20,7 @@ spring:
       - classpath:db/migration/task
       - classpath:db/migration/operations
       - classpath:db/migration/files
+      - classpath:db/migration/configuration
       - classpath:db/migration/integration
       - classpath:db/migration/workorder
     validate-migration-naming: true
@@ -110,6 +111,8 @@ serviceos:
         app-key: ${SERVICEOS_BYD_CPIM_APP_KEY:local-byd-app-key}
         app-secret: ${SERVICEOS_BYD_CPIM_APP_SECRET:local-byd-app-secret-change-me}
         allowed-clock-skew: ${SERVICEOS_BYD_CPIM_ALLOWED_CLOCK_SKEW:PT5M}
+        tenant-id: ${SERVICEOS_BYD_CPIM_TENANT_ID:tenant-byd-pilot}
+        project-code: ${SERVICEOS_BYD_CPIM_PROJECT_CODE:BYD-OCEAN-SD-PILOT}
   files:
     # 参考工程默认使用私有本地沙箱；生产部署必须切换为受管对象存储适配器和专业扫描服务。
     storage: ${SERVICEOS_FILE_STORAGE:local-private}

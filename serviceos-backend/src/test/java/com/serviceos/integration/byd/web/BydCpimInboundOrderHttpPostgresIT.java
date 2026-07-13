@@ -1,7 +1,12 @@
 package com.serviceos.integration.byd.web;
 
 import com.serviceos.ServiceOsApplication;
+import com.serviceos.configuration.api.ConfigurationAssetType;
+import com.serviceos.configuration.api.ConfigurationService;
+import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
+import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
 import com.serviceos.integration.byd.infrastructure.BydCpimSignatureVerifier;
+import com.serviceos.shared.Sha256;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,10 +26,13 @@ import tools.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -36,6 +44,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class BydCpimInboundOrderHttpPostgresIT {
     private static final String APP_KEY = "byd-http-test-key";
     private static final String APP_SECRET = "byd-http-test-secret";
+    private static final String TENANT_ID = "tenant-byd-http-test";
+    private static final String PROJECT_CODE = "BYD-OCEAN-SD-HTTP";
     private static final String ENDPOINT = "/api/v1/integrations/byd/cpim/v7.3.1/install-orders";
 
     @Container
@@ -53,6 +63,8 @@ class BydCpimInboundOrderHttpPostgresIT {
         registry.add("serviceos.integration.byd.cpim.app-key", () -> APP_KEY);
         registry.add("serviceos.integration.byd.cpim.app-secret", () -> APP_SECRET);
         registry.add("serviceos.integration.byd.cpim.allowed-clock-skew", () -> "PT10M");
+        registry.add("serviceos.integration.byd.cpim.tenant-id", () -> TENANT_ID);
+        registry.add("serviceos.integration.byd.cpim.project-code", () -> PROJECT_CODE);
     }
 
     @Autowired
@@ -64,9 +76,35 @@ class BydCpimInboundOrderHttpPostgresIT {
     @Autowired
     JdbcClient jdbc;
 
+    @Autowired
+    ConfigurationService configurations;
+
+    UUID projectId;
+
     @BeforeEach
     void clean() {
-        jdbc.sql("TRUNCATE TABLE int_inbound_replay_guard").update();
+        jdbc.sql("""
+                TRUNCATE TABLE wo_work_order, cfg_configuration_bundle_item,
+                    cfg_configuration_bundle, cfg_configuration_asset_version,
+                    prj_project, int_inbound_replay_guard CASCADE
+                """).update();
+        projectId = UUID.randomUUID();
+        jdbc.sql("""
+                INSERT INTO prj_project (
+                    project_id, tenant_id, project_code, client_id, project_name,
+                    starts_on, ends_on, project_status, aggregate_version, created_at
+                ) VALUES (
+                    :projectId, :tenantId, :projectCode, 'BYD', '比亚迪海洋山东试点',
+                    :startsOn, NULL, 'ACTIVE', 1, :createdAt
+                )
+                """)
+                .param("projectId", projectId)
+                .param("tenantId", TENANT_ID)
+                .param("projectCode", PROJECT_CODE)
+                .param("startsOn", LocalDate.now().minusDays(1))
+                .param("createdAt", java.time.OffsetDateTime.now())
+                .update();
+        publishPilotBundle();
     }
 
     @Test
@@ -91,6 +129,26 @@ class BydCpimInboundOrderHttpPostgresIT {
                 .andExpect(jsonPath("$.replay").value(true));
 
         assertThat(jdbc.sql("SELECT count(*) FROM int_inbound_replay_guard")
+                .query(Long.class).single()).isEqualTo(1);
+        assertThat(jdbc.sql("SELECT count(*) FROM wo_work_order")
+                .query(Long.class).single()).isEqualTo(1);
+        assertThat(jdbc.sql("""
+                SELECT tenant_id, project_id, configuration_bundle_code,
+                       configuration_bundle_version, status
+                  FROM wo_work_order WHERE external_order_code = 'BYD-SD-HTTP-001'
+                """).query().singleRow())
+                .containsEntry("tenant_id", TENANT_ID)
+                .containsEntry("project_id", projectId)
+                .containsEntry("configuration_bundle_code", "BYD-OCEAN-SD-PILOT")
+                .containsEntry("configuration_bundle_version", "1.0.0")
+                .containsEntry("status", "RECEIVED");
+
+        // 业务幂等不依赖 Nonce；新 Nonce 的同一载荷仍返回原工单，不得重复创建。
+        String secondNonce = "nonce-http-001-second";
+        perform(payload, secondNonce, currentTime, sign(secondNonce, currentTime, payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("REPLAYED"));
+        assertThat(jdbc.sql("SELECT count(*) FROM wo_work_order")
                 .query(Long.class).single()).isEqualTo(1);
     }
 
@@ -123,6 +181,8 @@ class BydCpimInboundOrderHttpPostgresIT {
                 .andExpect(jsonPath("$.code").value("INVALID_ORDER"));
         assertThat(jdbc.sql("SELECT count(*) FROM int_inbound_replay_guard")
                 .query(Long.class).single()).isZero();
+        assertThat(jdbc.sql("SELECT count(*) FROM wo_work_order")
+                .query(Long.class).single()).isZero();
 
         Map<String, Object> corrected = validPayload();
         perform(corrected, nonce, currentTime, sign(nonce, currentTime, corrected))
@@ -141,6 +201,88 @@ class BydCpimInboundOrderHttpPostgresIT {
                 .andExpect(jsonPath("$.code").value("SIGNATURE_MISMATCH"));
         assertThat(jdbc.sql("SELECT count(*) FROM int_inbound_replay_guard")
                 .query(Long.class).single()).isZero();
+        assertThat(jdbc.sql("SELECT count(*) FROM wo_work_order")
+                .query(Long.class).single()).isZero();
+    }
+
+    @Test
+    void rejectsSameBusinessKeyWithDifferentPayloadAndKeepsOriginalWorkOrder() throws Exception {
+        Map<String, Object> original = validPayload();
+        long currentTime = Instant.now().getEpochSecond();
+        String firstNonce = "nonce-http-order-conflict-1";
+        perform(original, firstNonce, currentTime, sign(firstNonce, currentTime, original))
+                .andExpect(jsonPath("$.code").value("ACCEPTED"));
+
+        Map<String, Object> changed = new LinkedHashMap<>(original);
+        changed.put("contactAddress", "山东省济南市历下区冲突地址2号");
+        String secondNonce = "nonce-http-order-conflict-2";
+        perform(changed, secondNonce, currentTime, sign(secondNonce, currentTime, changed))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("REPLAY_CONFLICT"))
+                .andExpect(jsonPath("$.message").value(
+                        org.hamcrest.Matchers.startsWith("ORDER_CONFLICT:")));
+
+        assertThat(jdbc.sql("SELECT count(*) FROM wo_work_order")
+                .query(Long.class).single()).isEqualTo(1);
+        assertThat(jdbc.sql("SELECT service_address FROM wo_work_order")
+                .query(String.class).single()).isEqualTo(original.get("contactAddress"));
+    }
+
+    @Test
+    void rejectsValidOrderBeforeReplayReservationWhenNoBundleMatches() throws Exception {
+        jdbc.sql("TRUNCATE TABLE wo_work_order, cfg_configuration_bundle_item, "
+                + "cfg_configuration_bundle, cfg_configuration_asset_version CASCADE").update();
+        Map<String, Object> payload = validPayload();
+        long currentTime = Instant.now().getEpochSecond();
+        String nonce = "nonce-http-no-config";
+
+        perform(payload, nonce, currentTime, sign(nonce, currentTime, payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("INVALID_ORDER"))
+                .andExpect(jsonPath("$.message").value(
+                        org.hamcrest.Matchers.startsWith("CONFIGURATION_NO_MATCH:")));
+
+        assertThat(jdbc.sql("SELECT count(*) FROM int_inbound_replay_guard")
+                .query(Long.class).single()).isZero();
+        assertThat(jdbc.sql("SELECT count(*) FROM wo_work_order")
+                .query(Long.class).single()).isZero();
+    }
+
+    @Test
+    void rollsBackReplayReservationWhenWorkOrderPersistenceFails() {
+        jdbc.sql("""
+                CREATE OR REPLACE FUNCTION wo_test_reject_insert()
+                RETURNS trigger LANGUAGE plpgsql AS $$
+                BEGIN
+                    RAISE EXCEPTION 'forced work order failure';
+                END;
+                $$
+                """).update();
+        jdbc.sql("""
+                CREATE TRIGGER trg_wo_test_reject_insert
+                    BEFORE INSERT ON wo_work_order
+                    FOR EACH ROW EXECUTE FUNCTION wo_test_reject_insert()
+                """).update();
+        try {
+            Map<String, Object> payload = validPayload();
+            long currentTime = Instant.now().getEpochSecond();
+            String nonce = "nonce-http-transaction-rollback";
+
+            assertThatThrownBy(() -> perform(
+                    payload, nonce, currentTime, sign(nonce, currentTime, payload)).andReturn())
+                    .rootCause()
+                    .hasMessageContaining("forced work order failure");
+
+            assertThat(jdbc.sql("SELECT count(*) FROM int_inbound_replay_guard")
+                    .query(Long.class).single()).isZero();
+            assertThat(jdbc.sql("SELECT count(*) FROM wo_work_order")
+                    .query(Long.class).single()).isZero();
+        } finally {
+            jdbc.sql("DROP TRIGGER IF EXISTS trg_wo_test_reject_insert ON wo_work_order").update();
+            jdbc.sql("DROP FUNCTION IF EXISTS wo_test_reject_insert()").update();
+        }
     }
 
     private org.springframework.test.web.servlet.ResultActions perform(
@@ -157,6 +299,29 @@ class BydCpimInboundOrderHttpPostgresIT {
     private String sign(String nonce, long currentTime, Map<String, Object> payload) {
         return new BydCpimSignatureVerifier(APP_KEY, APP_SECRET, Clock.systemUTC(), Duration.ofMinutes(10))
                 .sign(APP_KEY, nonce, currentTime, payload);
+    }
+
+    private void publishPilotBundle() {
+        String workflow = "{\"workflowCode\":\"BYD_SURVEY_INSTALL_V1\"}";
+        var asset = configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT_ID,
+                ConfigurationAssetType.WORKFLOW,
+                "BYD_SURVEY_INSTALL",
+                "1.0.0",
+                "1.0.0",
+                workflow,
+                Sha256.digest(workflow)));
+        configurations.publishBundle(new PublishConfigurationBundleCommand(
+                TENANT_ID,
+                projectId,
+                "BYD-OCEAN-SD-PILOT",
+                "1.0.0",
+                "BYD_OCEAN",
+                "HOME_CHARGING_SURVEY_INSTALL",
+                "370000",
+                Instant.now().minusSeconds(3600),
+                null,
+                java.util.List.of(asset.versionId())));
     }
 
     private static Map<String, Object> validPayload() {

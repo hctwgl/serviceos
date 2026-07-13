@@ -22,6 +22,20 @@ OIDC/JWT 身份解析
 
 JWT 中的 `capabilities` 只是上游声明，不是授权事实。命令必须命中 ServiceOS 当前有效且未撤销的 RoleGrant；撤权后即使旧 token 仍声明能力也会被拒绝。
 
+## BYD 工单接入事务切片
+
+BYD CPIM 入站端点当前执行：
+
+```text
+验签/载荷摘要/试点 DTO 校验
+→ configuration 按 tenant/project/brand/service/region/time 解析唯一 Published Bundle
+→ Nonce 防重放
+→ workorder 按 tenant/client/externalOrderCode 创建或业务重放
+→ 同一事务保存响应摘要
+```
+
+`wo_work_order` 通过复合外键锁定 tenant、project 与 bundle 的一致引用。配置零/多命中、签名或载荷失败不会占用 Nonce；同业务键冲突载荷不会覆盖原工单。
+
 ## 自动 Task 执行
 
 `task` 模块拥有自动任务的唯一重试时钟和执行尝试：
@@ -63,6 +77,8 @@ BeginUpload（幂等会话 + 服务端 object key）
 | `SERVICEOS_OIDC_JWK_SET_URI` | 本地 Keycloak JWK 地址 | 受信 OIDC 公钥集合；生产必须外置 |
 | `SERVICEOS_OIDC_ISSUER_URI` | 本地 ServiceOS realm | JWT `iss` 允许值 |
 | `SERVICEOS_OIDC_AUDIENCE` | `serviceos-api` | JWT `aud` 必须包含的 API audience |
+| `SERVICEOS_BYD_CPIM_TENANT_ID` | `tenant-byd-pilot` | BYD 连接所属租户，生产必须来自连接配置 |
+| `SERVICEOS_BYD_CPIM_PROJECT_CODE` | `BYD-OCEAN-SD-PILOT` | BYD 连接绑定项目，不接受请求体覆盖 |
 | `SERVICEOS_FILE_STORAGE` | `local-private` | 文件存储适配器；生产禁止使用本地沙箱 |
 | `SERVICEOS_FILE_SCANNER` | `local-eicar` | 内容扫描适配器；生产必须使用专业扫描服务 |
 | `SERVICEOS_FILE_MAXIMUM_SIZE` | `52428800` | 单文件最大字节数 |
@@ -85,3 +101,6 @@ BeginUpload（幂等会话 + 服务端 object key）
 - `DefaultFileCommandServiceTest`：身份来源、Finalize 校验、隔离文件与扫描任务原子编排；
 - `LocalPrivateObjectStorageGatewayTest`：短期签名、路径、大小/MIME、一次性 PUT 和下载；
 - `FileLifecyclePostgresIT`：真实 PostgreSQL 的 Begin/Finalize/Scan/Download、恶意隔离和 V010 迁移。
+- `ConfigurationPublicationPostgresIT`：Published 配置幂等、不可变、作用域优先和重叠拒绝；
+- `WorkOrderCommandPostgresIT`：租户级业务幂等、冲突载荷和 tenant/project/bundle 复合外键；
+- `BydCpimInboundOrderHttpPostgresIT`：BYD HTTP 到配置锁定与工单落库的端到端事务。

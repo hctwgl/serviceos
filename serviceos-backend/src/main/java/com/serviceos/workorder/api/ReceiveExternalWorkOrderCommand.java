@@ -2,17 +2,21 @@ package com.serviceos.workorder.api;
 
 import java.time.LocalDateTime;
 import java.util.Objects;
+import java.util.UUID;
 
 /**
  * 外部车企订单进入 ServiceOS 的统一命令。payloadDigest 用于业务幂等冲突检测，
  * configurationBundleVersion 必须是接单时解析出的精确版本，历史工单默认不漂移。
  */
 public record ReceiveExternalWorkOrderCommand(
+        String tenantId,
+        UUID projectId,
         String clientCode,
         String brandCode,
         String serviceProductCode,
         String externalOrderCode,
         String payloadDigest,
+        UUID configurationBundleId,
         String configurationBundleCode,
         String configurationBundleVersion,
         String provinceCode,
@@ -25,6 +29,8 @@ public record ReceiveExternalWorkOrderCommand(
         LocalDateTime externalDispatchedAt
 ) {
     public ReceiveExternalWorkOrderCommand {
+        tenantId = text(tenantId, "tenantId", 64);
+        projectId = Objects.requireNonNull(projectId, "projectId");
         clientCode = text(clientCode, "clientCode", 64);
         brandCode = text(brandCode, "brandCode", 64);
         serviceProductCode = text(serviceProductCode, "serviceProductCode", 96);
@@ -33,6 +39,7 @@ public record ReceiveExternalWorkOrderCommand(
         if (!payloadDigest.matches("[0-9a-f]{64}")) {
             throw new IllegalArgumentException("payloadDigest must be SHA-256 hex");
         }
+        configurationBundleId = Objects.requireNonNull(configurationBundleId, "configurationBundleId");
         configurationBundleCode = text(configurationBundleCode, "configurationBundleCode", 128);
         configurationBundleVersion = text(configurationBundleVersion, "configurationBundleVersion", 64);
         provinceCode = text(provinceCode, "provinceCode", 16);

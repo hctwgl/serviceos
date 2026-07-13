@@ -14,6 +14,7 @@ paths:
       summary: 接收比亚迪海洋山东试点安装订单
       description: >-
         首期只接受 carBrand=40、provinceCode=370000、provinceName=山东省。
+        验签和业务校验通过后，服务端必须唯一解析已发布配置包并创建或重放同一工单。
         协议级或业务级拒绝均返回 HTTP 200，并通过响应中的 success 与 code 表达结果。
       security: []
       parameters:

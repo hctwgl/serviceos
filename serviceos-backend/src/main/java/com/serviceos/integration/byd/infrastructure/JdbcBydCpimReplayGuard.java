@@ -32,7 +32,7 @@ public class JdbcBydCpimReplayGuard {
         this.retention = retention;
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = BydCpimReplayConflictException.class)
     public BydCpimReplayDecision register(
             String appKey,
             String nonce,

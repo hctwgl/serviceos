@@ -18,7 +18,10 @@ public final class DatabaseMigrationMain {
             "classpath:db/migration/project",
             "classpath:db/migration/task",
             "classpath:db/migration/operations",
-            "classpath:db/migration/files"
+            "classpath:db/migration/files",
+            "classpath:db/migration/configuration",
+            "classpath:db/migration/integration",
+            "classpath:db/migration/workorder"
     };
 
     private DatabaseMigrationMain() {

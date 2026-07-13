@@ -109,3 +109,5 @@ Feature gate/authority: if applicable
 | M12 | Git 基线 OpenAPI diff、事件版本不可变门禁、固定 TypeScript 客户端生成与来源清单 | Parser/Schema/Generator JUnit + Shell 正负向门禁 + 生成树重现性 + 根仓库 22 个 PostgreSQL IT | Portal 消费/编译、npm 发布签名/SBOM、多语言 SDK、远端 workflow 绿色结果 |
 | M13 | correlation 上下文、W3C Outbox Trace、探针、Prometheus 指标、ECS JSON 脱敏、本地可观测性栈 | Unit/Web + PostgreSQL IT + in-memory Span + Shell 泄露门禁 + Compose/组件 smoke | 生产 HA/告警/容量、集中日志、跨服务完整 Trace、远端 workflow 绿色结果 |
 | M14 | 单一非 root OCI 镜像、独立 Flyway 迁移、runtime 最小数据库权限、失败关闭发布、应用回滚/恢复 | Docker build/inspect + PostgreSQL 18 空库迁移 + HTTP/security smoke + rollback/negative rehearsal | 正式 registry/SBOM/签名、真实 orchestrator 滚动、PITR/对象恢复、容量、生产审批、远端 workflow 绿色结果 |
+| M15 | tenant/project/region/network RoleGrant 解析、scope 解释、FieldPolicy 缺省隐藏与显式拒绝优先 | Authorization Unit + PostgreSQL IT | organization/relation scope、读模型/导出/文件全入口接线、配置发布 UI |
+| M16 | Published Asset/Bundle 最小发布解析、tenant/project/bundle 工单锁定、BYD CPIM 入站创建工单 | Modulith + Configuration/WorkOrder/BYD HTTP PostgreSQL IT + V014 fail-closed migration | Stage/Task/Workflow、Audit/Outbox、完整配置审批、真实 CPIM sandbox 与全勘安链路 |

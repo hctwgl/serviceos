@@ -1,0 +1,170 @@
+package com.serviceos.workorder;
+
+import com.serviceos.ServiceOsApplication;
+import com.serviceos.configuration.api.ConfigurationAssetType;
+import com.serviceos.configuration.api.ConfigurationBundleReference;
+import com.serviceos.configuration.api.ConfigurationService;
+import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
+import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
+import com.serviceos.shared.Sha256;
+import com.serviceos.workorder.api.ExternalWorkOrderConflictException;
+import com.serviceos.workorder.api.ReceiveExternalWorkOrderCommand;
+import com.serviceos.workorder.api.WorkOrderCommandService;
+import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
+
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+@Testcontainers(disabledWithoutDocker = true)
+@SpringBootTest(classes = ServiceOsApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE)
+class WorkOrderCommandPostgresIT {
+    @Container
+    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(
+            DockerImageName.parse("postgres:18-alpine"))
+            .withDatabaseName("serviceos")
+            .withUsername("serviceos_test")
+            .withPassword("serviceos_test");
+
+    @org.springframework.test.context.DynamicPropertySource
+    static void properties(org.springframework.test.context.DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
+        registry.add("spring.datasource.username", POSTGRES::getUsername);
+        registry.add("spring.datasource.password", POSTGRES::getPassword);
+    }
+
+    @Autowired
+    WorkOrderCommandService workOrders;
+
+    @Autowired
+    ConfigurationService configurations;
+
+    @Autowired
+    JdbcClient jdbc;
+
+    @Autowired
+    Flyway flyway;
+
+    @BeforeEach
+    void clean() {
+        jdbc.sql("""
+                TRUNCATE TABLE wo_work_order, cfg_configuration_bundle_item,
+                    cfg_configuration_bundle, cfg_configuration_asset_version,
+                    prj_project CASCADE
+                """).update();
+    }
+
+    @Test
+    void businessIdempotencyIsTenantScopedAndConflictingPayloadFailsClosed() {
+        Scope tenantA = scope("tenant-a", "PROJECT-A", "BUNDLE-A");
+        Scope tenantB = scope("tenant-b", "PROJECT-B", "BUNDLE-B");
+        ReceiveExternalWorkOrderCommand firstCommand = command(tenantA, "a".repeat(64));
+
+        var first = workOrders.receive(firstCommand);
+        var replay = workOrders.receive(firstCommand);
+        var otherTenant = workOrders.receive(command(tenantB, "b".repeat(64)));
+
+        assertThat(replay.workOrderId()).isEqualTo(first.workOrderId());
+        assertThat(replay.replay()).isTrue();
+        assertThat(otherTenant.workOrderId()).isNotEqualTo(first.workOrderId());
+        assertThat(jdbc.sql("SELECT count(*) FROM wo_work_order")
+                .query(Long.class).single()).isEqualTo(2);
+
+        assertThatThrownBy(() -> workOrders.receive(command(tenantA, "c".repeat(64))))
+                .isInstanceOf(ExternalWorkOrderConflictException.class)
+                .hasMessageContaining("different payload");
+        assertThat(jdbc.sql("SELECT count(*) FROM wo_work_order")
+                .query(Long.class).single()).isEqualTo(2);
+    }
+
+    @Test
+    void databaseRejectsCrossTenantProjectOrBundleReference() {
+        Scope tenantA = scope("tenant-a", "PROJECT-A", "BUNDLE-A");
+        Scope tenantB = scope("tenant-b", "PROJECT-B", "BUNDLE-B");
+        ReceiveExternalWorkOrderCommand invalid = new ReceiveExternalWorkOrderCommand(
+                tenantA.tenantId(),
+                tenantB.projectId(),
+                "BYD",
+                "BYD_OCEAN",
+                "HOME_CHARGING_SURVEY_INSTALL",
+                "BYD-SD-WO-001",
+                "d".repeat(64),
+                tenantA.bundle().bundleId(),
+                tenantA.bundle().bundleCode(),
+                tenantA.bundle().bundleVersion(),
+                "370000", "370100", "370102", "测试用户", "13800000000",
+                "山东省济南市历下区测试路1号", "LGXCE6CD0RA123456",
+                LocalDateTime.of(2026, 7, 13, 10, 0));
+
+        assertThatThrownBy(() -> workOrders.receive(invalid))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThat(jdbc.sql("SELECT count(*) FROM wo_work_order")
+                .query(Long.class).single()).isZero();
+    }
+
+    @Test
+    void migrationSetIsCurrentAndRepeatable() {
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("014");
+        assertThat(flyway.info().applied()).hasSize(16);
+        assertThat(flyway.migrate().migrationsExecuted).isZero();
+    }
+
+    private Scope scope(String tenantId, String projectCode, String bundleCode) {
+        UUID projectId = UUID.randomUUID();
+        jdbc.sql("""
+                INSERT INTO prj_project (
+                    project_id, tenant_id, project_code, client_id, project_name,
+                    starts_on, ends_on, project_status, aggregate_version, created_at
+                ) VALUES (
+                    :projectId, :tenantId, :projectCode, 'BYD', :projectName,
+                    :startsOn, NULL, 'ACTIVE', 1, :createdAt
+                )
+                """)
+                .param("projectId", projectId)
+                .param("tenantId", tenantId)
+                .param("projectCode", projectCode)
+                .param("projectName", "项目 " + projectCode)
+                .param("startsOn", LocalDate.now().minusDays(1))
+                .param("createdAt", OffsetDateTime.now())
+                .update();
+        String definition = "{\"workflowCode\":\"" + projectCode + "\"}";
+        UUID assetId = configurations.publishAsset(new PublishConfigurationAssetCommand(
+                tenantId, ConfigurationAssetType.WORKFLOW, projectCode + "-WORKFLOW", "1.0.0",
+                "1.0.0", definition, Sha256.digest(definition))).versionId();
+        ConfigurationBundleReference bundle = configurations.publishBundle(
+                new PublishConfigurationBundleCommand(
+                        tenantId, projectId, bundleCode, "1.0.0", "BYD_OCEAN",
+                        "HOME_CHARGING_SURVEY_INSTALL", "370000",
+                        Instant.now().minusSeconds(3600), null, List.of(assetId)));
+        return new Scope(tenantId, projectId, bundle);
+    }
+
+    private static ReceiveExternalWorkOrderCommand command(Scope scope, String payloadDigest) {
+        return new ReceiveExternalWorkOrderCommand(
+                scope.tenantId(), scope.projectId(), "BYD", "BYD_OCEAN",
+                "HOME_CHARGING_SURVEY_INSTALL", "BYD-SD-WO-001", payloadDigest,
+                scope.bundle().bundleId(), scope.bundle().bundleCode(), scope.bundle().bundleVersion(),
+                "370000", "370100", "370102", "测试用户", "13800000000",
+                "山东省济南市历下区测试路1号", "LGXCE6CD0RA123456",
+                LocalDateTime.of(2026, 7, 13, 10, 0));
+    }
+
+    private record Scope(String tenantId, UUID projectId, ConfigurationBundleReference bundle) {
+    }
+}

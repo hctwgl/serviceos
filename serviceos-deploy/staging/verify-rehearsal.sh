@@ -3,9 +3,9 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "${script_dir}/../.." && pwd)"
-current_image="${1:-serviceos-backend:m14-rehearsal}"
+current_image="${1:-serviceos-backend:m16-rehearsal}"
 rollback_ref="${2:-HEAD^}"
-rollback_image="${3:-serviceos-backend:m14-rollback-rehearsal}"
+rollback_image="${3:-serviceos-backend:m16-rollback-rehearsal}"
 env_file="$(mktemp)"
 bad_env_file="$(mktemp)"
 evidence_dir="${repo_root}/target/staging-rehearsal"
@@ -67,7 +67,7 @@ fi
 after_container="$(docker compose --env-file "${env_file}" \
   -f "${repo_root}/serviceos-deploy/compose.staging.yaml" ps -q backend)"
 [[ "${before_container}" == "${after_container}" ]]
-rg -q 'migration version mismatch: expected=999 actual=012' "${evidence_dir}/fail-closed.log"
+rg -q 'migration version mismatch: expected=999 actual=014' "${evidence_dir}/fail-closed.log"
 curl --fail --silent --show-error "http://127.0.0.1:18080/readyz" \
   | jq -e '.status == "UP"' >/dev/null
 
