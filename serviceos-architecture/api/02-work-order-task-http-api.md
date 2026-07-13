@@ -14,6 +14,7 @@ status: Proposed
 - JSON 使用 UTF-8，时间使用带时区 ISO 8601；
 - 写请求必须携带 `Idempotency-Key`；
 - 更新已有聚合必须携带 `If-Match: "<aggregateVersion>"`；
+- 已分配权威系统的工单及其子域写命令必须携带 `X-Work-Order-Authority-Version`；
 - 响应返回 `ETag`、`X-Correlation-Id`；
 - 身份来自服务端认证上下文，不接受请求体自报角色；
 - `202 Accepted` 仅用于真正异步且提供 operation 资源的命令；其余成功命令返回最终业务结果。
@@ -55,11 +56,17 @@ status: Proposed
 | `POST /work-orders/{id}:resume` | ResumeWorkOrder | reason、resumeAt? | 200 |
 | `POST /work-orders/{id}:confirm-fulfillment` | ConfirmFulfillment | acceptanceRef、factSetVersion | 200 |
 | `POST /work-orders/{id}:close` | CloseWorkOrder | reasonCode | 200 |
+| `POST /work-orders/{id}:force-close` | ForceCloseWorkOrder | reasonCode、note、impactAcknowledgement、approvalRef | 200/202 |
 | `POST /work-orders/{id}:cancel` | CancelWorkOrder | reasonCode、note | 200/202 |
 | `POST /work-orders/{id}:reopen` | ReopenWorkOrder | mode、reason、recoveryPoint、approvalRef | 200/202 |
 | `POST /work-orders/{id}:migrate-configuration` | MigrateConfiguration | migrationPlanId、approvalRef | 202 |
+| `POST /work-orders/{id}/data-corrections` | CorrectWorkOrderData | fieldChanges、reason、evidenceRefs?、approvalRef? | 200/202 |
 
 `mode` 枚举：`CORRECTION`、`RESTORE_CANCELLED`、`AUTHORIZED_CLOSED_REOPEN`。不同 mode 使用独立授权能力。
+
+ForceCloseWorkOrder 不跳过补偿和影响分析：服务端计算未完成 Task、预约、ServiceAssignment、Delivery、资料/审核和试算影响；无法同步完成时返回 operation。它需要专用 capability、原因、影响确认和审批，不能复用普通 CloseWorkOrder 按钮。
+
+CorrectWorkOrderData 仅更正由 workorder 拥有的基础字段，按 fieldCode 校验当前阶段、FieldPolicy、expectedValueDigest 和影响。表单提交、资料、审核、履约事实、预约和责任字段必须调用其拥有模块的更正命令；不能借此接口跨模块覆盖。更正只追加 WorkOrderDataCorrection，并触发派单/SLA/事实/投影影响分析。
 
 ### 3.1 创建工单载荷
 
@@ -84,6 +91,8 @@ status: Proposed
 ```
 
 成功响应必须包含 `workOrderId`、`configurationBundleId`、生命周期和聚合版本。流程初始化通过 Outbox 异步启动，因此响应不承诺首批任务已经创建；返回 `initializationOperationId` 和任务查询链接。客户端可查询 operation 或工单任务列表，不能把“201 已创建工单”误解为“流程初始化已完成”。
+
+进入 CreateWorkOrder 事务前，服务端依据 `tenant + source + external order + service product` 形成 creationBusinessKey，并通过 authority 模块幂等 ReserveCreationAuthority。只有 SERVICEOS authority 才创建权威工单；事务重新锁定并复核 assignment/version，成功响应同时返回 `authorityAssignmentId/authorityVersion`。LEGACY/SHADOW_ONLY 路由不在 ServiceOS 创建可写工单，返回/记录明确路由结果，不能双主写入。
 
 ## 4. 任务命令 API
 
@@ -127,6 +136,7 @@ status: Proposed
 | `GET /work-orders/{id}/stages` | 阶段实例 |
 | `GET /work-orders/{id}/tasks` | 工单任务与历史实例 |
 | `GET /work-orders/{id}/timeline` | 用户时间线 |
+| `GET /work-orders/{id}/data-corrections` | 基础字段更正版本和影响 |
 | `GET /work-orders/{id}/allowed-actions` | 当前主体的工单动作及 obligations |
 | `GET /tasks/{id}` | 任务详情、责任人、SLA 和结果引用 |
 | `GET /tasks/{id}/allowed-actions` | 当前主体可执行动作及输入 Schema |

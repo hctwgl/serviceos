@@ -12,7 +12,7 @@ status: Proposed
 
 | 模块 | 拥有实体 | 不拥有 |
 |---|---|---|
-| 服务网络 | ServiceNetwork、Coverage、Capability、Qualification | WorkOrder、用户身份 |
+| 服务网络 | ServiceNetwork、Coverage、Capability、TechnicianProfile、NetworkTechnicianMembership、Qualification | WorkOrder、登录用户身份 |
 | 派单 | DispatchRequest、Attempt、Decision、Evaluation、ServiceAssignment、CapacityReservation | TaskAssignment 和 SLA |
 | SLA | SlaInstance、ClockSegment、Pause、MilestoneTrigger、Recalculation | Task 状态和处罚金额 |
 | 集成 | ConnectorVersion、InboundEnvelope、OutboundDelivery、Attempt、Acknowledgement | 领域对象状态 |
@@ -37,9 +37,19 @@ status: Proposed
 
 保存业务产品、桩型/设备品牌、技能、人员数量和资质要求。
 
+### technician_profile
+
+保存 technicianId、principal/person 引用、显示名、服务状态（ACTIVE/SUSPENDED/RETIRED）、联系方式引用、能力摘要投影和聚合版本。登录凭据、密码和会话不属于本表。
+
+### network_technician_membership
+
+保存 network、technician、关系类型、有效区间、状态（PENDING/ACTIVE/SUSPENDED/ENDED）、来源/审批和结束原因。`network + technician + validity_business_key` 唯一；派单引用精确 membershipId/version。
+
+停用/结束前必须评估未完成 Task、Appointment 和 ServiceAssignment，并产生重新分配计划；不能只把状态改为 ENDED。
+
 ### qualification
 
-保存网点/师傅资质类型、编号摘要、签发机构、有效期、状态和附件资料引用。敏感证书按字段/资料权限保护。
+保存 ownerType（NETWORK/TECHNICIAN）/ownerId、资质类型、编号摘要、签发机构、有效期、状态（PENDING_VERIFICATION/VERIFIED/REJECTED/EXPIRED/REVOKED）、验证策略/决定和附件资料引用。敏感证书按字段/资料权限保护；上传材料本身不自动成为 VERIFIED。
 
 ### network_metric_snapshot
 

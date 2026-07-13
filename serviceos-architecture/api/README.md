@@ -9,3 +9,5 @@
 - [预约、现场作业、表单、资料与审核 HTTP API](03-field-operations-http-api.md)
 - [派单、SLA、集成、通知与异常 HTTP API](04-automation-integration-http-api.md)
 - [履约事实、试算、结算、迁移与试点 HTTP API](05-pricing-migration-pilot-http-api.md)
+- [应用工作区、队列与用户偏好 HTTP API](06-application-query-preference-http-api.md)
+- [项目、配置、授权与审计治理 HTTP API](07-project-configuration-access-governance-http-api.md)

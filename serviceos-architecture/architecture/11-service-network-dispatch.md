@@ -22,6 +22,8 @@ status: Proposed
 | `ServiceNetwork` | 服务网点及其状态、组织和结算关系 |
 | `ServiceCoverage` | 品牌、区域、业务类型和地理范围授权 |
 | `ServiceCapability` | 桩型、业务类型、技能和资质能力 |
+| `TechnicianProfile` | 师傅现场服务身份、状态和能力摘要，不等同登录账号 |
+| `NetworkTechnicianMembership` | 师傅与网点之间带有效期的服务关系 |
 | `CapacityPolicy` | 在途量以及日/周/月承接上限 |
 | `NetworkMetricSnapshot` | 履约率、评分、质量、负荷等指标快照 |
 | `DispatchRequest` | 一次待分配网点或师傅的请求 |
@@ -46,6 +48,8 @@ flowchart LR
 ```
 
 网点和师傅使用同一决策框架，但候选数据、策略和权限不同。网点派单属于总部/项目能力，师傅派单可以由系统或当前网点负责人执行。
+
+师傅候选必须同时具备有效 TechnicianProfile、当前网点 Membership、所需能力/资质和可用状态。登录 User/Principal 由身份模块拥有，服务网络只保存稳定主体引用；一名师傅可在政策允许时拥有多个有效网点关系，但每次派单明确使用哪一个 membership。
 
 ## 4. 网点准入
 

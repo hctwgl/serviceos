@@ -110,12 +110,14 @@ com.company.serviceos.<module>
 | `authorization` | capability、数据范围、字段权限和策略判定 | Authorize、ScopePredicate |
 | `audit` | 增强审计、敏感导出和配置发布审计 | AppendAudit、AuditQuery |
 | `organization` | 公司、区域、网点组织关系 | OrganizationQuery |
+| `project` | Client、Brand、Project、ServiceProduct 和有效绑定目录 | ProjectQuery、ServiceProductQuery |
 | `authority` | 工单/计价唯一权威版本和 SideEffectFence 运行时判定 | CheckCommandAuthority、CheckSideEffectFence |
 | `configuration` | 业务资产草稿、校验、发布、Bundle 锁定 | ResolveBundle、PublishAsset |
 | `files` | 上传会话、对象摘要、扫描、访问授权 | BeginUpload、FinalizeFile、FileRef |
 | `reliability` | 幂等、Outbox/Inbox、AsyncOperation、通用 scheduled execution | BeginIdempotency、PublishEvent、ClaimExecution |
 | `automation` | 自动 Task 的定时 claim、业务重试和执行器注册 | ScheduleTaskExecution、ExecuteTask |
 | `operations` | OperationalException、人工接管和 runbook 引用 | OpenException、ResolveException |
+| `readmodel` | 工作区、队列、搜索、SavedView、UI 偏好和投影运行时 | WorkspaceQuery、QueueQuery、SavedViewCommand |
 
 ### 5.2 履约内核模块
 
@@ -155,13 +157,15 @@ com.company.serviceos.<module>
 | organization | shared-kernel、identity.api |
 | authorization | shared-kernel、identity、organization |
 | audit | shared-kernel |
+| project | shared-kernel、organization.api、authorization.api、audit.api |
 | authority | shared-kernel、audit.api |
-| configuration | shared-kernel、audit、authorization |
+| configuration | shared-kernel、project.api、audit、authorization |
 | files | shared-kernel、authorization、audit |
 | reliability | shared-kernel |
 | automation | shared-kernel、task.api、audit.api |
 | operations | shared-kernel、task.api、authorization.api、audit.api |
-| workorder | shared-kernel、configuration、authorization、authority、audit |
+| readmodel | 各业务模块 event API、authorization.api、identity.api、organization.api |
+| workorder | shared-kernel、project.api、configuration、authorization、authority、audit |
 | task | shared-kernel、workorder.api、authorization、authority、audit |
 | workflow | task.api、workorder.api、authority.api |
 | appointment | task.api、workorder.api、authorization、authority |
@@ -169,7 +173,7 @@ com.company.serviceos.<module>
 | forms | task.api、configuration.api、files.api、authorization、authority |
 | evidence | task.api、configuration.api、files.api、authorization、authority |
 | review | task.api、evidence.api、forms.api、authorization、authority |
-| network | organization.api、files.api、authorization、audit |
+| network | organization.api、project.api、files.api、authorization、audit |
 | dispatch | task.api、workorder.api、network.api、configuration.api、authorization、authority |
 | sla | task.api、workorder.api、configuration.api、authority.api |
 | integration | workorder.api、task.api、configuration.api、files.api、operations.api、authority.api |
@@ -185,6 +189,8 @@ com.company.serviceos.<module>
 表中未带 `.api` 的模块名也只表示其公开接口；任何情况下都不允许依赖目标模块 internal 包。除表中业务依赖外，每个需要提交命令/事件的模块均可依赖根模块 `reliability.api`；reliability 不依赖任何业务模块，因此不会形成反向循环。
 
 `authority` 不依赖 workorder，只保存稳定 WorkOrderId/业务路由键并执行版本门禁；`rollout` 读取工单投影、生成治理决定，再通过 authority 公开命令发布新权威版本。该方向避免 `workorder ↔ rollout` 循环。
+
+`readmodel` 是依赖图的只读汇聚终点：消费各模块公开事件并提供组合查询，任何业务模块不得反向依赖 readmodel 来决定领域命令；命令必须读取权威 API/聚合和实时授权。
 
 ## 7. 应用服务模板
 

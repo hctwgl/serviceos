@@ -17,10 +17,20 @@ status: Proposed
 | `POST /service-networks/{id}:suspend-dispatch` | SuspendNetworkDispatch | scope、reason、effectiveWindow、approvalRef? | 200 |
 | `POST /service-networks/{id}:resume-dispatch` | ResumeNetworkDispatch | scope、reason | 200 |
 | `POST /service-networks/{id}/qualifications` | RegisterQualification | type、validity、evidenceRef | 201 |
+| `GET /service-networks/{id}/technician-memberships` | 本网点师傅关系 | status、capability、qualification | 200 |
+| `POST /service-networks/{id}/technician-memberships` | RequestNetworkTechnicianMembership | technician/principalRef、validity、reason | 201/202 |
+| `POST /network-technician-memberships/{id}:activate` | ActivateMembership | approvalRef? | 200 |
+| `POST /network-technician-memberships/{id}:suspend` | SuspendMembership | reason、effectiveAt | 200/202 |
+| `POST /network-technician-memberships/{id}:end` | EndMembership | reason、effectiveAt、reassignmentPlanRef? | 200/202 |
+| `GET /technicians/{id}` | 师傅状态、网点关系、能力和资质摘要 | — | 200 |
+| `POST /technicians/{id}/qualifications` | RegisterTechnicianQualification | type、validity、evidenceRef | 201 |
+| `POST /technicians/{id}/capability-versions` | PublishTechnicianCapability | items、effectiveAt、approvalRef? | 201 |
 | `POST /dispatch-policy-adjustments` | RequestDispatchPolicyAdjustment | network、scope、changes、window、reason | 202 |
 | `POST /dispatch-policy-adjustments/{id}:approve` | ApproveAdjustment | decision、note | 200 |
 
 停派和恢复使用适用范围与生效区间，不直接更新简单布尔字段。
+
+师傅 membership 不创建登录密码，只绑定身份系统 Principal/Person 引用。Activate 前校验身份绑定、网点状态和必要资料。RegisterQualification 只登记待验证材料；除非已发布政策允许可信来源自动确认，否则不能直接把资质标为 VERIFIED。Suspend/End 必须先完成未结 Task/Appointment/ServiceAssignment 影响分析，必要时返回异步 operation。
 
 ## 2. 派单
 

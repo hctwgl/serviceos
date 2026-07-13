@@ -69,6 +69,8 @@ data.exportSensitive
 
 能力编码是稳定安全契约；菜单和按钮可变化，但不能改变能力语义。
 
+Portal 页面与首批动作的更完整 capability 建议、数据范围和 obligations 见[页面、动作、能力与数据范围矩阵](../product/07-page-action-permission-matrix.md)。其中角色模板仅是默认授权建议，服务端仍按本章模型判定。
+
 ## 5. 数据范围
 
 数据范围由多个维度组合：

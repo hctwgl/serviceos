@@ -86,6 +86,13 @@ status: Draft
 | 模块公开接口 | Module API | 一个逻辑模块允许其他模块编译依赖的命令、查询、事件和模型 | Controller 或 internal 类 |
 | 作用域谓词 | ScopePredicate | 授权引擎根据主体和策略编译出的数据库查询约束 | 查询后内存过滤 |
 | Portal | Portal | 面向一类用户旅程、权限和发布责任的独立应用入口 | 按角色隐藏菜单的单一万能 App |
+| 页面标识 | PageId | 跨设计、代码、埋点和帮助文档稳定定位页面的编码 | 授权能力或 URL 本身 |
+| 允许动作 | AllowedAction | 服务端针对主体、资源版本和策略返回的当前可执行命令描述 | 可长期复用的授权令牌 |
+| 工作队列 | WorkQueue | 按任务、异常和时效组织的可下钻处理集合 | 模糊工单状态统计 |
+| 投影新鲜度 | FreshnessStatus | 查询投影相对来源事件水位的 FRESH/LAGGING/UNKNOWN/REBUILDING 状态 | 业务对象状态 |
+| 保存视图 | SavedView | 用户保存的受控筛选、列和排序定义 | 数据权限或任意 SQL |
+| 资料上传队列 | UploadQueue | 移动端管理本地文件、分片、Finalize、校验和冲突的持久队列 | EvidenceRevision 本身 |
+| Feed 撤权标记 | FeedTombstone | 通知离线客户端任务已失效并应清理敏感工作包的增量记录 | 删除领域 Task |
 | 发布证据包 | Release Evidence Pack | 关联提交、镜像、迁移、配置、测试和签署的可审计发布材料 | 一张上线截图 |
 | 业务能力权限 | Capability | 稳定的业务操作授权编码 | 菜单或按钮名称 |
 | 数据范围策略 | DataScopePolicy | 对品牌、项目、区域、网点和工单关系的访问约束 | 任意 SQL 条件 |

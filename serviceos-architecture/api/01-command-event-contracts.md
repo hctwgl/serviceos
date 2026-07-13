@@ -77,6 +77,8 @@ status: Proposed
 | `CancelWorkOrder` | WorkOrder | 允许取消、补偿计划有效 | `WorkOrderCancelled` |
 | `ReopenWorkOrder` | WorkOrder | 高风险授权、恢复点有效 | `WorkOrderReopened` |
 | `MigrateConfiguration` | WorkOrder | 迁移计划审批通过 | `WorkOrderConfigurationMigrated` |
+| `CorrectWorkOrderData` | WorkOrder | 字段归属/阶段/FieldPolicy/影响满足 | `WorkOrderDataCorrected` |
+| `ForceCloseWorkOrder` | WorkOrder | 专用授权、影响/补偿/审批满足 | `WorkOrderForceClosed` |
 
 ## 5. 通用事件信封
 
@@ -117,6 +119,8 @@ status: Proposed
 | `WorkOrderResumed` | 流程适配器、SLA、时间线 | 工单、恢复原因和时间 |
 | `WorkOrderClosed` | 投影、集成、审计 | 工单、关闭原因、最终版本 |
 | `WorkOrderReopened` | 流程适配器、审计 | 工单、模式、恢复点、审批引用 |
+| `WorkOrderDataCorrected` | 派单、SLA、事实、投影、审计 | fieldCode、old/new digest、correction/impact ref |
+| `WorkOrderForceClosed` | 流程、任务、预约、派单、集成、审计 | 原状态、原因、补偿/影响 refs、审批 |
 
 ## 7. 兼容规则
 

@@ -46,7 +46,7 @@ MVP 成功不是“旧系统功能全部迁移”，而是证明：
 - 全自动 AI 审核与智能派单；
 - 通用页面设计器和跨行业模板市场。
 
-## 3. 七个里程碑
+## 3. 八个里程碑
 
 | 里程碑 | 核心输出 | 退出条件 |
 |---|---|---|
@@ -57,6 +57,7 @@ MVP 成功不是“旧系统功能全部迁移”，而是证明：
 | M4 自动化闭环 | 派单、SLA、回传、重试、人工兜底 | 典型失败场景全部可恢复 |
 | M5 试算与试点 | 履约事实、双向试算、迁移、灰度 | 真实项目并行运行并核对 |
 | M6 研发实施基线 | 工程模块、事务消息、安全/NFR、部署和交付计划 | 工程就绪 Gate 与首个纵向切片计划通过 |
+| M7 多 Portal 应用基线 | Admin、Network、Technician 页面、交互、查询和体验门禁 | 首切片跨端正常/异常/恢复旅程通过 |
 
 M1 的填写说明和模板见 [M1 业务资产基线填写手册](../research/01-m1-business-asset-pack.md)。M1 不是一次普通访谈：每个口径必须关联合同、接口、历史工单或负责人确认，并使用真实样本进行桌面演练。
 
@@ -94,6 +95,8 @@ M4 的架构输入见 [服务网络与派单引擎](../architecture/11-service-n
 M5 的架构输入见 [履约事实提取与双向试算运行时](../architecture/15-fulfillment-fact-calculation-runtime.md)、[对账、结算、争议与调整边界](../architecture/16-reconciliation-settlement-boundary.md)、[历史数据迁移、双轨与切换](../architecture/17-data-migration-cutover.md)、[试点、灰度发布与可观测性](../architecture/18-pilot-rollout-observability.md)、[M5 HTTP API](../api/05-pricing-migration-pilot-http-api.md)、[M5 逻辑数据模型](../data/05-pricing-migration-pilot-logical-model.md)和[M5 验收矩阵](../testing/04-m5-pricing-migration-pilot-acceptance.md)。M5 开工前必须完成 M1-05/M1-08、试点项目选择、历史金额样本、迁移盘点和切换/回退职责确认。
 
 M6 的工程输入见 [研发工程、模块与应用服务实施蓝图](../architecture/19-engineering-module-blueprint.md)、[事务、消息、幂等、并发与后台执行实施蓝图](../architecture/20-transaction-messaging-concurrency-blueprint.md)、[安全、非功能、部署与运维实施蓝图](../architecture/21-security-nfr-deployment-blueprint.md)、[M6 研发交付计划](01-m6-engineering-delivery-plan.md)和[M6 工程就绪验收矩阵](../testing/05-m6-engineering-readiness-acceptance.md)。M6 允许先搭建不依赖业务口径的工程基础，但进入核心业务编码仍受 M1 真实样本阻塞。
+
+M7 的应用输入见 [跨 Portal 信息架构](../product/01-cross-portal-information-architecture.md)、[总部后台](../product/02-admin-operations-portal-spec.md)、[网点 Portal](../product/03-network-portal-spec.md)、[师傅移动端](../product/04-technician-mobile-app-spec.md)、[跨端交互](../product/05-cross-portal-interaction-state-spec.md)、[设计系统](../product/06-design-system-accessibility-spec.md)、[页面动作权限矩阵](../product/07-page-action-permission-matrix.md)、[应用查询 API](../api/06-application-query-preference-http-api.md)、[应用投影数据模型](../data/06-application-projection-preference-logical-model.md)、[M7 交付计划](02-m7-application-delivery-plan.md)和[M7 验收矩阵](../testing/06-m7-application-experience-acceptance.md)。进入现场页面开发前仍需真实设备、弱网和资料样本。
 
 ## 6. 首批待决策事项
 

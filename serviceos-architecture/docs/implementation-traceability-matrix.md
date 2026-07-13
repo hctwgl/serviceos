@@ -16,12 +16,14 @@ status: Proposed
 |---|---|---|---|---|---|
 | identity | ARCH-07、ARCH-21 | API-01/02 通用身份上下文 | DATA-02 | M2 AUTH、M6 SEC | E1 |
 | organization | ARCH-01、ARCH-07、ARCH-11 | API-02/04 | DATA-02/04 | M2 AUTH、M4 DSP | E1/E4 |
+| project | ARCH-01/03/05 | API-07 | DATA-01 | M2 CFG/WO、M7 ADM | E0/E2 |
 | authorization | ARCH-07、ARCH-21 | API-01/02 | DATA-02 | M2 AUTH、M6 SEC | E1 |
 | audit | ARCH-07、ARCH-21 | 所有高风险命令 | DATA-02 | M2 AUD、M6 SEC/OPS | E1 |
 | authority | ARCH-17、ARCH-20 | API-01/05 authority/fence | DATA-05 | M5 CUT、M6 TX | E1/E5 |
 | configuration | ARCH-05 | API-01/02 | DATA-01 | M2 CFG | E2 |
 | files | ARCH-10、ARCH-21 | API-03 文件会话 | DATA-03 | M3 FILE、M6 SEC | E1/E3 |
 | reliability | ARCH-20、ADR-014 | API-01 通用命令/事件 | DATA-01 | M6 TX | E1 |
+| readmodel | PRODUCT-01～07、ARCH-19 | API-06 | DATA-06 | M7 WO/QRY | U0/U1 |
 | automation | ARCH-06、ARCH-20 | API-01 事件 | DATA-01 | M2 TASK、M6 TX | E1 |
 | operations | ARCH-14、ARCH-20 | API-04 exception | DATA-04 | M4 OPS、M6 TX | E1/E4 |
 | workorder | ARCH-03/06 | API-01/02 | DATA-01 | M2 WO | E2 |
