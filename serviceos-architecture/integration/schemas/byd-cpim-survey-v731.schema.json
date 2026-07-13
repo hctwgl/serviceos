@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.local/schemas/byd-cpim-survey-v731.schema.json",
+  "title": "BYD CPIM V7.3.1 Survey Payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["operatePerson", "orderCode", "surveyCompletedTime", "selfPick"],
+  "properties": {
+    "operatePerson": {"type": "string", "minLength": 1, "maxLength": 50},
+    "orderCode": {"type": "string", "minLength": 1, "maxLength": 50},
+    "plotName": {"type": "string", "maxLength": 50},
+    "publicChargingStation": {"type": "string", "maxLength": 200},
+    "propertyName": {"type": "string", "maxLength": 50},
+    "propertyContact": {"type": "string", "maxLength": 50},
+    "propertyTelephone": {"type": "string", "maxLength": 50},
+    "needStake": {"type": "string", "enum": ["0", "1"]},
+    "carportStatus": {"type": "string", "enum": ["1", "2", "3", "4", "5", "10"]},
+    "housingType": {"type": "string", "enum": ["1", "2", "3", "4", "5", "100"]},
+    "emeterRequestProgress": {"type": "string", "enum": ["0", "1"]},
+    "emeterRequestCompletedTime": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$"},
+    "surveyCompletedTime": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$"},
+    "surveyResult": {"type": "string", "enum": ["1", "2"]},
+    "surveyRemark": {"type": "string", "maxLength": 200},
+    "agreementImage": {"type": "string", "maxLength": 200},
+    "selfPick": {"type": "string", "enum": ["0", "1"]},
+    "wallboxCode": {"type": "string", "maxLength": 50},
+    "selfPickImage": {"type": "string", "maxLength": 200},
+    "pileSequenceImage": {"type": "string", "maxLength": 200},
+    "drivingLicenseImage": {"type": "string", "maxLength": 200}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"selfPick": {"const": "0"}}, "required": ["selfPick"]},
+      "then": {"required": ["housingType", "emeterRequestProgress", "surveyResult"]}
+    },
+    {
+      "if": {"properties": {"selfPick": {"const": "1"}}, "required": ["selfPick"]},
+      "then": {"required": ["wallboxCode", "selfPickImage", "pileSequenceImage", "drivingLicenseImage"]}
+    },
+    {
+      "if": {"properties": {"surveyResult": {"const": "2"}}, "required": ["surveyResult"]},
+      "then": {"required": ["surveyRemark"]}
+    }
+  ]
+}
