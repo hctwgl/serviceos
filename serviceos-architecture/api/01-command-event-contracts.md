@@ -25,6 +25,7 @@ status: Proposed
   "idempotencyKey": "client-generated-key",
   "aggregateId": "TASK-2026-0001",
   "expectedVersion": 12,
+  "authorityVersion": 7,
   "actorContextRef": "SERVER-AUTH-CONTEXT",
   "correlationId": "TRACE-...",
   "occurredAt": "2026-07-12T10:00:00+08:00",
@@ -33,6 +34,8 @@ status: Proposed
 ```
 
 `actorContextRef` 由服务端网关/应用层注入，不由客户端提交。用户、组织、角色和授权决策从可信认证上下文解析。
+
+`authorityVersion` 适用于已经分配权威系统的工单及其子域命令。外部 HTTP 客户端通过 `X-Work-Order-Authority-Version` 提交等价值；内部消息由可信 envelope 注入。应用服务在事务提交前与当前 WorkOrderAuthorityAssignment 复核，版本过期、SHADOW/READ_ONLY 或非权威系统请求不得写业务表和 Outbox。
 
 ## 3. 通用结果
 

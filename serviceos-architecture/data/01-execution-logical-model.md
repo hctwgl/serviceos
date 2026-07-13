@@ -16,7 +16,7 @@ status: Proposed
 | 工单 | WorkOrder、StageInstance、OwnerAssignment | 工单应用服务/事件 |
 | 任务 | Task、TaskAssignment、TaskExecutionAttempt | 任务应用服务/事件 |
 | 流程适配 | ProcessInstanceLink、CorrelationInbox | 仅适配器内部 |
-| 可靠消息 | OutboxEvent、ConsumerInbox | 事件发布/消费框架 |
+| 可靠性运行时 | OutboxEvent、ConsumerInbox、CommandIdempotencyRecord、AsyncOperation、ScheduledExecution | 可靠消息/幂等/调度框架 API |
 | 查询投影 | WorkOrderSummary、UserTodo、TimelineProjection | 只读查询 API |
 
 ## 2. 配置实体
@@ -156,7 +156,7 @@ Task 的 claim/start/complete 等命令必须检查不存在阻断性 ACTIVE gua
 
 ### task_execution_attempt
 
-每次自动执行保存尝试号、幂等键、开始/结束时间、结果、错误分类、外部调用引用和下次重试时间。
+每次自动执行保存 attemptNo、业务幂等键、claimOwner/claimUntil、开始/结束时间、结果、错误分类、外部调用引用和 nextRetryAt。业务重试时间只由任务模块拥有；外部 DeliveryAttempt 不再维护另一套退避时钟。
 
 ### task_block_record
 
@@ -182,21 +182,33 @@ Task 的 claim/start/complete 等命令必须检查不存在阻断性 ACTIVE gua
 
 | 字段 | 说明 |
 |---|---|
-| event_id | 全局事件标识 |
+| event_id / outbox_id | 稳定事件和记录标识 |
+| tenant_id / project_id / work_order_id / task_id | 数据范围与业务追踪 |
 | aggregate_type / aggregate_id / aggregate_version | 来源聚合 |
-| event_type / event_version | 契约 |
-| payload | 最小事件载荷 |
+| event_type / event_version | Schema 注册表契约 |
+| payload_ref / payload_digest | 最小事件载荷或受控引用 |
 | correlation_id / causation_id | 追踪 |
-| occurred_at / published_at | 时间 |
-| publish_attempts / last_error | 投递状态 |
+| partition_key | 需要聚合顺序时的稳定键 |
+| status | PENDING/CLAIMED/PUBLISHED/FAILED/DEAD |
+| available_at / claim_owner / claim_until | claim 与崩溃恢复 |
+| publish_attempts / last_error_code | 投递诊断 |
+| occurred_at / created_at / published_at | 时间 |
+
+Worker 使用短事务和 `FOR UPDATE SKIP LOCKED`（或等价机制）claim。发布成功但 PUBLISHED 保存失败时允许按同一 eventId 重发，因此消费者必须幂等。
 
 ### consumer_inbox
 
-以 `consumer_name + event_id` 唯一，保存处理状态和时间。业务处理结果与 inbox 去重记录应在同一数据库事务内提交。
+以 `consumer_name + event_id` 唯一，保存 eventVersion、payloadDigest、状态（RECEIVED/PROCESSING/SUCCEEDED/FAILED_FINAL）、attempt、处理结果摘要和时间。业务处理结果、消费者自己的 Outbox 与 inbox SUCCEEDED 在同一数据库事务内提交。同 eventId 不同 digest 拒绝并进入安全/契约异常。
 
 ### command_idempotency_record
 
-以 `tenant_id + command_scope + idempotency_key` 唯一，保存请求摘要、命令类型、处理状态、聚合 ID、首次响应摘要和过期策略。相同键且摘要相同返回首次结果；摘要不同返回幂等冲突。记录创建与领域命令的首次业务写入必须在同一事务边界内协调。
+以 `tenant_id + command_scope + idempotency_key` 唯一，保存请求摘要、actor、命令类型、状态（IN_PROGRESS/SUCCEEDED/FAILED_RETRYABLE/FAILED_FINAL）、聚合/operation ID、首次响应状态/摘要、开始/完成和过期时间。相同键且摘要相同返回首次结果；摘要不同返回幂等冲突。记录创建、领域命令首次业务写入和 SUCCEEDED 结果必须在同一事务边界内协调。
+
+### scheduled_execution
+
+保存 executionType、业务 sourceRef、priority、availableAt、状态（PENDING/CLAIMED/SUCCEEDED/RETRY_WAIT/FAILED_FINAL/CANCELLED）、claimOwner/claimUntil、attemptCount、关联 Task/TaskExecutionAttempt 和最后错误。`execution_type + source_business_key` 保证同一业务调度唯一。
+
+Scheduler 只 claim 到期 execution；真正的重试政策、nextRetryAt 和人工接管仍由对应业务 Task 拥有。无 Task 的基础设施清理类 execution 必须有独立保留/失败策略，不能静默丢弃。
 
 ### async_operation
 

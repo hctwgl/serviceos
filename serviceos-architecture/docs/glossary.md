@@ -79,6 +79,14 @@ status: Draft
 | 任务定义 | TaskDefinition | 已发布流程中任务的责任、输入、动作、SLA 和失败策略 | 运行时待办 |
 | 任务实例 | Task | 具有实际责任人、状态、SLA 和结果引用的执行单元 | 流程引擎内部节点 |
 | Outbox | OutboxEvent | 与聚合事务一起写入、随后可靠投递的领域事件记录 | 普通应用日志 |
+| Inbox | InboxRecord | 消费者按 eventId 去重并保存处理结果的可靠消费记录 | Broker ack 状态 |
+| 幂等记录 | IdempotencyRecord | 按操作和请求摘要稳定返回同一业务结果的记录 | 领域业务唯一约束 |
+| 事实资格锁 | FactEligibilityGuard | 事实更正与试算/结算写入共享的排他并发锁点 | 可计价布尔投影 |
+| 工作单权威版本 | AuthorityVersion | 普通领域命令提交前必须匹配的唯一写入权威版本 | 入口路由缓存 |
+| 模块公开接口 | Module API | 一个逻辑模块允许其他模块编译依赖的命令、查询、事件和模型 | Controller 或 internal 类 |
+| 作用域谓词 | ScopePredicate | 授权引擎根据主体和策略编译出的数据库查询约束 | 查询后内存过滤 |
+| Portal | Portal | 面向一类用户旅程、权限和发布责任的独立应用入口 | 按角色隐藏菜单的单一万能 App |
+| 发布证据包 | Release Evidence Pack | 关联提交、镜像、迁移、配置、测试和签署的可审计发布材料 | 一张上线截图 |
 | 业务能力权限 | Capability | 稳定的业务操作授权编码 | 菜单或按钮名称 |
 | 数据范围策略 | DataScopePolicy | 对品牌、项目、区域、网点和工单关系的访问约束 | 任意 SQL 条件 |
 | 角色授权 | RoleGrant | 主体在明确组织、时间和数据范围获得角色的记录 | 永久静态角色字段 |

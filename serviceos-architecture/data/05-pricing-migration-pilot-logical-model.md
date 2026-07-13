@@ -18,6 +18,8 @@ status: Proposed
 | 迁移 | Plan、Snapshot、Batch、Record、IdMapping、Lineage、Validation | 旧系统原始数据所有权 |
 | 试点 | CutoverCohort、WorkOrder/PricingAuthorityAssignment、GateEvaluation、CutoverDecision、RollbackPlan | 业务对象本身 |
 
+实现时该逻辑组拆成两个单体模块：`authority` 拥有 WorkOrder/PricingAuthorityAssignment 与 SideEffectFenceDecision 的高频运行时判定；`rollout` 拥有 Cohort、Gate、CutoverDecision 和 RollbackPlan 治理。rollout 只能通过 authority 公开 API 发布权威变更，authority 不依赖 workorder/rollout 内部实现。
+
 ## 2. 履约事实
 
 ### fact_definition_version
