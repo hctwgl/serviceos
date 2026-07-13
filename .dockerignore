@@ -1,0 +1,14 @@
+.git
+.github
+.idea
+.vscode
+**/target
+serviceos-architecture
+serviceos-contracts/src
+serviceos-deploy/keycloak
+serviceos-deploy/observability
+*.pdf
+*.log
+.env
+.env.*
+!.env.example

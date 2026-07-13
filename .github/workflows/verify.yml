@@ -67,3 +67,35 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 14
+
+  container-staging:
+    needs: java-contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Validate staging deployment sources
+        shell: bash
+        run: |
+          bash -n serviceos-deploy/staging/*.sh serviceos-deploy/staging/init/*.sh
+          serviceos-deploy/staging/generate-local-env.sh "${RUNNER_TEMP}/serviceos-staging.env"
+          docker compose --env-file "${RUNNER_TEMP}/serviceos-staging.env" \
+            -f serviceos-deploy/compose.staging.yaml config --quiet
+          rm -f "${RUNNER_TEMP}/serviceos-staging.env"
+      - name: Build once, migrate, smoke, rollback and restore
+        run: serviceos-deploy/staging/verify-rehearsal.sh
+      - name: Retain staging release evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: serviceos-staging-evidence-${{ github.sha }}
+          path: target/staging-rehearsal/
+          if-no-files-found: error
+          retention-days: 14

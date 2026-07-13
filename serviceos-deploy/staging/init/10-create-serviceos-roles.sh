@@ -1,0 +1,26 @@
+#!/bin/sh
+set -eu
+
+: "${SERVICEOS_MIGRATOR_DB_PASSWORD:?SERVICEOS_MIGRATOR_DB_PASSWORD is required}"
+: "${SERVICEOS_RUNTIME_DB_PASSWORD:?SERVICEOS_RUNTIME_DB_PASSWORD is required}"
+
+psql --set=ON_ERROR_STOP=1 \
+  --username "${POSTGRES_USER}" \
+  --dbname "${POSTGRES_DB}" \
+  --set=migrator_password="${SERVICEOS_MIGRATOR_DB_PASSWORD}" \
+  --set=runtime_password="${SERVICEOS_RUNTIME_DB_PASSWORD}" <<'SQL'
+CREATE ROLE serviceos_migrator LOGIN PASSWORD :'migrator_password'
+  NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION;
+CREATE ROLE serviceos_runtime LOGIN PASSWORD :'runtime_password'
+  NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION;
+
+REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+GRANT CONNECT ON DATABASE serviceos TO serviceos_migrator, serviceos_runtime;
+GRANT USAGE, CREATE ON SCHEMA public TO serviceos_migrator;
+GRANT USAGE ON SCHEMA public TO serviceos_runtime;
+
+ALTER DEFAULT PRIVILEGES FOR ROLE serviceos_migrator IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO serviceos_runtime;
+ALTER DEFAULT PRIVILEGES FOR ROLE serviceos_migrator IN SCHEMA public
+  GRANT USAGE, SELECT ON SEQUENCES TO serviceos_runtime;
+SQL

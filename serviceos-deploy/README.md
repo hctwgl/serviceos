@@ -106,3 +106,24 @@ docker compose -f serviceos-deploy/compose.yaml stop \
 ```
 
 不要为普通停止执行 `down -v`，否则会删除本地 PostgreSQL、Tempo、Prometheus 和 Grafana 数据卷。
+
+## 隔离的 staging 发布与回滚演练
+
+`compose.staging.yaml` 使用独立 project/volume，不会复用上面的本地开发数据库。一次完整演练包含镜像构建、空库迁移、发布、权限/健康 smoke、旧应用回滚、当前版本恢复和失败关闭负向门禁：
+
+```bash
+serviceos-deploy/staging/verify-rehearsal.sh
+```
+
+分步执行：
+
+```bash
+serviceos-deploy/staging/generate-local-env.sh /tmp/serviceos-staging.env serviceos-backend:m14-local
+serviceos-deploy/staging/build-image.sh serviceos-backend:m14-local
+serviceos-deploy/staging/deploy.sh /tmp/serviceos-staging.env
+serviceos-deploy/staging/smoke.sh /tmp/serviceos-staging.env
+serviceos-deploy/staging/cleanup.sh /tmp/serviceos-staging.env
+rm -f /tmp/serviceos-staging.env
+```
+
+本地生成的 env 文件权限为 `0600` 且不得提交。正式 staging/production 必须把 `SERVICEOS_IMAGE` 设置为 registry digest（`name@sha256:...`），由 Secret Manager 注入凭据，并使用部署平台完成签名验证、滚动发布、审批和证据留存；不得把本地 mutable-image override 带入正式环境。

@@ -70,6 +70,8 @@ BeginUpload（幂等会话 + 服务端 object key）
 | `SERVICEOS_FILE_LOCAL_SIGNING_KEY` | 本地开发密钥 | 本地短期 URL HMAC；生产必须外置轮换 |
 | `SERVICEOS_FILE_TRANSFER_BASE_URL` | `http://localhost:8080/api/v1/file-transfers` | 本地数据面公开基址 |
 
+容器发布额外使用 `SERVICEOS_EXPECTED_MIGRATION_VERSION` 作为发布清单门禁。迁移容器使用 `serviceos_migrator`，业务容器设置 `SPRING_FLYWAY_ENABLED=false` 并使用无 DDL 的 `serviceos_runtime`；两个模式必须来自同一 image digest。参考实现与完整演练见 `serviceos-deploy/staging/`。
+
 ## 测试层次
 
 - `ArchitectureTest`：模块循环、未声明依赖和 internal 访问；

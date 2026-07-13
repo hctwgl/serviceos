@@ -1,0 +1,74 @@
+name: serviceos-staging
+
+services:
+  database:
+    image: postgres:18-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+    environment:
+      POSTGRES_DB: serviceos
+      POSTGRES_USER: serviceos_bootstrap
+      POSTGRES_PASSWORD: ${SERVICEOS_BOOTSTRAP_DB_PASSWORD:?bootstrap database password is required}
+      SERVICEOS_MIGRATOR_DB_PASSWORD: ${SERVICEOS_MIGRATOR_DB_PASSWORD:?migrator database password is required}
+      SERVICEOS_RUNTIME_DB_PASSWORD: ${SERVICEOS_RUNTIME_DB_PASSWORD:?runtime database password is required}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U serviceos_bootstrap -d serviceos"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    volumes:
+      - ./staging/init:/docker-entrypoint-initdb.d:ro
+      - serviceos-staging-postgres:/var/lib/postgresql
+    security_opt:
+      - no-new-privileges:true
+
+  migrate:
+    image: ${SERVICEOS_IMAGE:?immutable ServiceOS image reference is required}
+    command: ["migrate"]
+    restart: "no"
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      SERVICEOS_DB_URL: jdbc:postgresql://database:5432/serviceos
+      SERVICEOS_DB_USERNAME: serviceos_migrator
+      SERVICEOS_DB_PASSWORD: ${SERVICEOS_MIGRATOR_DB_PASSWORD:?migrator database password is required}
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,uid=10001,gid=10001
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+
+  backend:
+    image: ${SERVICEOS_IMAGE:?immutable ServiceOS image reference is required}
+    command: ["server"]
+    restart: unless-stopped
+    depends_on:
+      database:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      SERVICEOS_DB_URL: jdbc:postgresql://database:5432/serviceos
+      SERVICEOS_DB_USERNAME: serviceos_runtime
+      SERVICEOS_DB_PASSWORD: ${SERVICEOS_RUNTIME_DB_PASSWORD:?runtime database password is required}
+      SPRING_FLYWAY_ENABLED: "false"
+      SERVICEOS_ENVIRONMENT: staging-rehearsal
+      SERVICEOS_LOG_FORMAT: ecs
+      SERVICEOS_OTLP_TRACING_ENABLED: "false"
+      SERVICEOS_OTLP_METRICS_ENABLED: "false"
+      SERVICEOS_ALLOW_ANONYMOUS_METRICS: "false"
+      SERVICEOS_FILE_LOCAL_SIGNING_KEY: ${SERVICEOS_FILE_SIGNING_KEY:?file signing key is required}
+      SERVICEOS_OIDC_ISSUER_URI: https://staging-idp.invalid/realms/serviceos
+      SERVICEOS_OIDC_JWK_SET_URI: https://staging-idp.invalid/realms/serviceos/protocol/openid-connect/certs
+    ports:
+      - "127.0.0.1:${SERVICEOS_STAGING_PORT:-18080}:8080"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=256m,uid=10001,gid=10001
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 35s
+
+volumes:
+  serviceos-staging-postgres:
