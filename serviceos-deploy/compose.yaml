@@ -1,0 +1,21 @@
+name: serviceos-local
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: serviceos
+      POSTGRES_USER: serviceos_app
+      POSTGRES_PASSWORD: serviceos_app
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U serviceos_app -d serviceos"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - serviceos-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  serviceos-postgres-data:

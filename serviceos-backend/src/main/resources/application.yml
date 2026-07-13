@@ -1,0 +1,31 @@
+spring:
+  application:
+    name: serviceos-backend
+  datasource:
+    url: ${SERVICEOS_DB_URL:jdbc:postgresql://localhost:5432/serviceos}
+    username: ${SERVICEOS_DB_USERNAME:serviceos_app}
+    password: ${SERVICEOS_DB_PASSWORD:serviceos_app}
+    hikari:
+      maximum-pool-size: ${SERVICEOS_DB_POOL_SIZE:10}
+  flyway:
+    locations:
+      - classpath:db/migration/reliability
+      - classpath:db/migration/audit
+      - classpath:db/migration/project
+    validate-migration-naming: true
+  threads:
+    virtual:
+      enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+server:
+  shutdown: graceful

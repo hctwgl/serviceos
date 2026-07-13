@@ -5,3 +5,9 @@
 *.swp
 site/
 dist/
+target/
+**/target/
+*.log
+.env
+.env.*
+!.env.example

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/project-created-v1.schema.json",
+  "title": "ProjectCreatedV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId",
+    "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"
+  ],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": { "const": "project.created" },
+    "schemaVersion": { "const": 1 },
+    "tenantId": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "correlationId": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "causationId": { "type": "string", "minLength": 1, "maxLength": 160 },
+    "aggregateType": { "const": "Project" },
+    "aggregateId": { "type": "string", "format": "uuid" },
+    "aggregateVersion": { "type": "integer", "minimum": 1 },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "projectId", "tenantId", "code", "clientId", "name", "startsOn",
+        "status", "aggregateVersion", "occurredAt"
+      ],
+      "properties": {
+        "projectId": { "type": "string", "format": "uuid" },
+        "tenantId": { "type": "string" },
+        "code": { "type": "string", "maxLength": 64 },
+        "clientId": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 200 },
+        "startsOn": { "type": "string", "format": "date" },
+        "endsOn": { "type": ["string", "null"], "format": "date" },
+        "status": { "enum": ["DRAFT", "ACTIVE", "SUSPENDED", "CLOSED"] },
+        "aggregateVersion": { "type": "integer", "minimum": 1 },
+        "occurredAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

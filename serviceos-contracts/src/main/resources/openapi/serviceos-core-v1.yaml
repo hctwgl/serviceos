@@ -1,0 +1,136 @@
+openapi: 3.1.0
+info:
+  title: ServiceOS Core API
+  version: 0.1.0
+  description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
+servers:
+  - url: /api/v1
+paths:
+  /projects:
+    post:
+      operationId: createProject
+      summary: 创建运营项目
+      description: 同一租户、操作和 Idempotency-Key 下，相同请求返回同一资源；不同请求返回冲突。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/ActorId'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProjectRequest'
+      responses:
+        '201':
+          description: 项目创建成功或幂等重放成功
+          headers:
+            Location:
+              schema: { type: string }
+            X-Correlation-Id:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+components:
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 160
+    TenantId:
+      name: X-Tenant-Id
+      in: header
+      required: true
+      description: E1 阶段由受信网关注入；OIDC 完成后不得接受公网自报值。
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 64
+    ActorId:
+      name: X-Actor-Id
+      in: header
+      required: true
+      description: E1 阶段由受信网关注入；OIDC 完成后改由 CurrentPrincipal 提供。
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+    CorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      schema:
+        type: string
+        maxLength: 128
+  schemas:
+    CreateProjectRequest:
+      type: object
+      additionalProperties: false
+      required: [code, clientId, name, startsOn]
+      properties:
+        code:
+          type: string
+          pattern: '^[A-Za-z0-9][A-Za-z0-9_-]*$'
+          maxLength: 64
+        clientId:
+          type: string
+          minLength: 1
+          maxLength: 128
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        startsOn:
+          type: string
+          format: date
+        endsOn:
+          type: [string, 'null']
+          format: date
+    Project:
+      type: object
+      additionalProperties: false
+      required: [id, tenantId, code, clientId, name, startsOn, status, version, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        tenantId: { type: string }
+        code: { type: string }
+        clientId: { type: string }
+        name: { type: string }
+        startsOn: { type: string, format: date }
+        endsOn: { type: [string, 'null'], format: date }
+        status:
+          type: string
+          enum: [DRAFT, ACTIVE, SUSPENDED, CLOSED]
+        version: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+    Problem:
+      type: object
+      required: [type, title, status, errorCode]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        errorCode: { type: string }
+        correlationId: { type: [string, 'null'] }
+  responses:
+    Problem:
+      description: RFC 9457 Problem Details
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
