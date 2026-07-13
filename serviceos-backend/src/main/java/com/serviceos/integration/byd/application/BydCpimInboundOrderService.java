@@ -62,8 +62,11 @@ public class BydCpimInboundOrderService {
             BydCpimInstallOrderPayload payload = objectMapper.convertValue(
                     rawParameters, BydCpimInstallOrderPayload.class);
             mapped = mapper.map(payload);
-        } catch (IllegalArgumentException exception) {
-            return BydCpimInboundOrderResponse.rejected("INVALID_ORDER", exception.getMessage());
+        } catch (RuntimeException exception) {
+            if (!isPayloadMappingFailure(exception)) {
+                throw exception;
+            }
+            return BydCpimInboundOrderResponse.rejected("INVALID_ORDER", safeMessage(exception));
         }
 
         try {
@@ -83,6 +86,16 @@ public class BydCpimInboundOrderService {
             return BydCpimInboundOrderResponse.rejected(
                     "REPLAY_CONFLICT", "nonce was already used with a different payload");
         }
+    }
+
+    private static boolean isPayloadMappingFailure(RuntimeException exception) {
+        return exception instanceof IllegalArgumentException
+                || exception.getClass().getName().startsWith("tools.jackson.databind.");
+    }
+
+    private static String safeMessage(RuntimeException exception) {
+        String message = exception.getMessage();
+        return message == null || message.isBlank() ? "request payload cannot be mapped" : message;
     }
 
     private static String responseDigest(BydCpimInboundOrderResponse response) {
