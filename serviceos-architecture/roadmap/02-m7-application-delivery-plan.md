@@ -84,6 +84,7 @@ status: Proposed
 | U5-04 | 异常/集成工作区 | UNKNOWN/replay/恢复验证 |
 | U5-05 | 事实/影子试算 | 血缘/解释/方向/SHADOW |
 | U5-06 | 配置发布最小工作流 | draft/validate/replay/approve/publish |
+| U5-07 | 受控运营分析 | metric definition、范围、下钻、SHADOW 隔离 |
 
 ### U6：跨端硬化与试点
 

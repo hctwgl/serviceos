@@ -175,7 +175,20 @@ Feed 支持 `sinceCursor` 增量；删除/撤权使用 tombstone，仅含 taskId
 
 创建批量动作由对应领域 API 定义。本查询投影不能修改 item 结果。
 
-## 13. 分页与过滤
+## 13. 受控运营分析
+
+| 方法与路径 | 用途 |
+|---|---|
+| `GET /api/v1/analytics/metric-definitions` | 当前可见指标目录、版本和口径 |
+| `POST /api/v1/analytics/queries:execute` | 使用 metricCode、维度、窗口、受控 filters 查询 |
+| `POST /api/v1/analytics/queries:drill-down` | 生成同口径资源队列/列表查询 |
+| `POST /api/v1/analytics/exports` | 异步受控导出 |
+
+AnalyticsQuery 不接受表达式或 SQL，只接受已发布 metric/dimension/filter 目录。响应返回 metricVersion、window、timezone、value、numerator/denominator（允许时）、sampleSize、qualityFlags、asOf 和 drillDownQueryRef。
+
+MVP 不从 SHADOW CalculationRun 推断正式收入/成本/毛利；试算汇总必须携带 `mode=SHADOW` 和方向，Finance 指标在 FORMAL_SETTLEMENT 启用前不可用。
+
+## 14. 分页与过滤
 
 - 默认使用 opaque cursor；
 - sort 必须来自端点允许目录并包含稳定 tie-breaker；
@@ -184,7 +197,7 @@ Feed 支持 `sinceCursor` 增量；删除/撤权使用 tombstone，仅含 taskId
 - count 可以是 EXACT/ESTIMATED/UNAVAILABLE，并明确类型；
 - 查询 URL 长度超限时使用 `POST /queries:execute` 的只读受控 QuerySpec，不接受 SQL。
 
-## 14. 缓存
+## 15. 缓存
 
 - ETag/If-None-Match 用于只读资源；
 - `Cache-Control: private`，敏感页面默认 no-store；
@@ -192,7 +205,7 @@ Feed 支持 `sinceCursor` 增量；删除/撤权使用 tombstone，仅含 taskId
 - 权限/改派变化后服务端实时查询仍必须拒绝，不能信任旧缓存；
 - CDN 不缓存用户工单/资料/金额响应。
 
-## 15. 错误码
+## 16. 错误码
 
 | 错误码 | HTTP | 含义 |
 |---|---:|---|
@@ -202,8 +215,10 @@ Feed 支持 `sinceCursor` 增量；删除/撤权使用 tombstone，仅含 taskId
 | `PROJECTION_REBUILDING` | 200/503 | 可返回降级数据或暂不可用 |
 | `SEARCH_TERM_NOT_ALLOWED` | 422 | 敏感/过宽搜索不允许 |
 | `WORK_PACKAGE_INVALIDATED` | 409 | assignment/authority/config 已变化 |
+| `METRIC_NOT_AVAILABLE` | 404/422 | 指标未发布、无权限或 feature 未启用 |
+| `ANALYTICS_DIMENSION_NOT_ALLOWED` | 422 | 指标不允许该维度/筛选 |
 
-## 16. 安全
+## 17. 安全
 
 - 所有投影在查询时应用当前 ScopePredicate/FieldPolicy；
 - 投影中的 assignee/network/permission 摘要不是执行授权真相；

@@ -31,6 +31,7 @@ status: Proposed
 | 网点/师傅 | ADMIN | `network.read`、`technician.read` | 风控/项目/区域范围 |
 | 配置 | ADMIN | `configuration.read` | 资产 owner/项目范围 |
 | 平台治理 | ADMIN | 对应治理 capability | 租户/组织和职责分离 |
+| 运营分析 | ADMIN | `analytics.read*` | 指标目录 + 项目/区域/网点范围 |
 | 本网点工单 | NETWORK | `workOrder.readAssigned` | 当前 ACTIVE 网点责任 |
 | 本网点任务 | NETWORK | `networkTask.read` | 当前网点 Task/Assignment |
 | 本网点人员 | NETWORK | `technician.readOwnNetwork` | 当前 NetworkMembership |
@@ -146,6 +147,17 @@ status: Proposed
 | 敏感导出 | ADMIN | `data.exportSensitive` | purpose、approval、MFA |
 | 创建/扩大 cohort | ADMIN | `rollout.manage` | Gate report、approval、MFA |
 | 切换/回退 | ADMIN | `rollout.cutover` / `rollout.rollback` | watermarks、side-effect inventory、多人签署 |
+
+## 9.1 运营分析
+
+| 动作 | Portal | Capability | 条件/Obligations |
+|---|---|---|---|
+| 查看运营指标 | ADMIN | `analytics.readOperations` | 项目/品牌/区域 scope |
+| 查看网点指标 | ADMIN | `analytics.readNetwork` | 区域/网点 scope；商业字段策略 |
+| 查看质量指标 | ADMIN | `analytics.readQuality` | 项目 scope；资料原件另授权 |
+| 下钻 | ADMIN | 同指标 read capability + 资源 read | 重新应用 ScopePredicate |
+| 导出指标 | ADMIN | `analytics.export` | purpose、FieldPolicy、行数、增强审计 |
+| 查看正式财务指标 | ADMIN | `analytics.readFinance` | FORMAL_SETTLEMENT + 金额范围/职责分离 |
 
 ## 10. 角色模板建议
 

@@ -76,6 +76,9 @@ status: Proposed
 | M7-ADM-016 | P0 | 配置预演无副作用 | 对真实样本 preview/replay | 无派单激活、通知、回传或结算，差异可解释 |
 | M7-ADM-017 | P0 | 角色授权升级 | 申请人自批或授予超出自身范围 | 职责分离/范围拒绝，grant 历史和审计完整 |
 | M7-ADM-018 | P0 | 审计查询/导出 | 普通/授权主体操作 | 普通拒绝；授权按字段/范围/purpose，查询本身被审计 |
+| M7-ADM-019 | P0 | 指标口径与下钻 | 查看周期/通过率并下钻 | metricVersion/分子分母/窗口/asOf 一致，列表同口径且受权 |
+| M7-ADM-020 | P0 | 指标范围隔离 | 区域运营查看其他区域/共享视图 | 聚合和下钻均拒绝，无计数侧信道 |
+| M7-ADM-021 | P0 | SHADOW 财务隔离 | FORMAL_SETTLEMENT 未启用 | 正式财务指标不可用；试算汇总明确 direction+SHADOW |
 
 ## 6. Network Portal
 
