@@ -43,6 +43,8 @@ public class SecurityConfiguration {
                     }
                     // 本地对象存储数据面使用 HMAC 短期能力 token；公网业务 API 仍要求 OIDC JWT。
                     authorize.requestMatchers("/api/v1/file-transfers/**").permitAll();
+                    // 车企回调使用各自协议签名认证，不使用 OIDC JWT；业务验签必须在适配器服务内完成。
+                    authorize.requestMatchers("/api/v1/integrations/byd/cpim/v7.3.1/install-orders").permitAll();
                     authorize.anyRequest().authenticated();
                 })
                 .oauth2ResourceServer(oauth2 -> oauth2
