@@ -11,6 +11,8 @@
 
 迁移以不可变 SourceSnapshot、版本化转换、IdMapping 和 MigrationLineage 记录来源；每个工单/创建路由键通过 CutoverCohort 获得唯一 authoritySystem。影子系统只计算和比较，SideEffectFence 阻止真实副作用。
 
+单一写入权威适用于所有领域命令，而不仅是入口路由和外部副作用：命令在领域事务提交前必须校验 authorityAssignment/version。切换先把旧版本置为 DRAINING 并排空/对账在途副作用；Delivery、Notification、AssignmentActivation 和 Settlement 保存最终 fence/authority 决策引用。
+
 ## 约束
 
 - 迁移重跑幂等；
@@ -18,6 +20,8 @@
 - 在途只迁移到批准恢复点；
 - 已锁定历史金额不重算覆盖；
 - cohort 改变默认只影响新工单；
+- 后台 Task、批处理、回放和管理员命令不得绕过 authorityVersion 校验；
+- ALLOW fence decision 不是长期令牌，真正副作用前必须重新校验；
 - 回退先同步权威增量，不能简单恢复旧备份；
 - 无法安全反向同步时禁止回退并向前修复。
 

@@ -11,6 +11,8 @@
 
 试点先使用历史回放和实时影子试算，与旧系统/人工对账结果逐项比较。影子运行受 SideEffectFence 保护，不能创建锁定结算或财务交接。只有差异完成分类、阈值经业务财务签署并通过门禁后，明确 cohort 才可以把 ServiceOS 结果作为权威依据。
 
+每个 CalculationRun 强制标记 `SHADOW` 或 `AUTHORITATIVE`，并保存方向级 authorityAssignment/version。普通请求由服务端从工单锁定配置、有效合同和取价日期事实解析价格上下文；客户端显式候选 override 只能产生 SHADOW run。
+
 ## 约束
 
 - 比较锁定双方输入与版本；
@@ -18,6 +20,8 @@
 - 未解释差异不计为通过；
 - 对上和对下分别门禁；
 - 权威切换按 cohort，不全局瞬时切换；
+- SHADOW、候选 override 或旧 authorityVersion run 永远不能进入正式 Statement；
+- 正式结算还需独立 `FORMAL_SETTLEMENT` feature gate，M5 默认只试算导出；
 - 切换后旧系统只读/影子，不能双主结算。
 
 ## 后果

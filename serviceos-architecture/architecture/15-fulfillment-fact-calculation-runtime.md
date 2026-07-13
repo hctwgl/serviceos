@@ -21,6 +21,7 @@ status: Proposed
 | `FactExtractionRun` | 一次提取执行及完整输入/输出/错误 |
 | `FulfillmentFact` | 某个事实编码的一次不可变断言版本 |
 | `FactCorrection` | 对既有事实的更正、失效或替代依据 |
+| `CalculationEligibilityHold` | 更正提交后立即冻结受影响试算的结算资格，阻断异步影响分析竞态 |
 | `FactSetSnapshot` | 某次试算使用的不可变事实版本集合 |
 | `PricingPlanVersion` | 某方向已发布且不可变的计价规则 |
 | `PricingContextSnapshot` | 项目、区域、合同、日期、税和方向上下文 |
@@ -175,6 +176,20 @@ contentDigest
 
 运行时不能临时读取“项目当前合同”或“当前区域”。
 
+### 10.1 服务端取价上下文解析
+
+普通试算请求不得由调用方选择价格方案、合同、结算对象或取价日期。`PricingContextResolver` 必须依据以下锁定输入确定唯一上下文：
+
+1. 工单创建时锁定的 `ConfigurationBundle` 与项目/服务产品；
+2. 方向对应的有效合同和结算对象关系；
+3. 区域、品牌和业务范围；
+4. 由已确认履约事实确定的取价日期；
+5. 当前工单的 authority assignment 与计价权威模式。
+
+解析结果保存 resolver 版本、候选集合、命中原因和输入摘要；零命中返回 `PRICING_CONTEXT_NOT_FOUND`，多命中返回 `PRICING_CONTEXT_AMBIGUOUS`。
+
+只有拥有 `pricing.shadowOverride` 的主体，才可在 `SHADOW`/`COMPARISON` 模式显式选择候选价格版本。该覆盖必须关联审批/实验说明并增强审计，生成的 run 永远不能进入正式 Statement。
+
 ## 11. CalculationRun
 
 ```mermaid
@@ -198,9 +213,14 @@ pricingPlanVersionId
 calculationEngineVersion
 functionLibraryVersion
 requestId/idempotencyKey
+mode（SHADOW/AUTHORITATIVE）
+pricingAuthorityAssignmentId/pricingAuthorityVersion
+pricingContextResolverVersion
 ```
 
 同一业务幂等键与相同输入摘要返回同一运行；相同键不同输入拒绝。
+
+`SHADOW` run 只能比较和导出；只有方向级 `PricingAuthorityAssignment` 已经对该 cohort 生效、且运行时再次校验 pricingAuthorityVersion 的 `AUTHORITATIVE` run，才可能通过 SettlementEligibility。候选版本、显式 override 或旧 pricingAuthorityVersion 生成的 run 一律不具备正式结算资格。
 
 ## 12. 规则执行
 
@@ -234,7 +254,7 @@ ruleVersionId / ruleNodeId
 explanation
 ```
 
-ChargeItem 不允许人工原地改金额。商务特批、核减或补差生成独立 Adjustment/ChargeItem，并关联审批。
+ChargeItem 不允许人工原地改金额。商务特批、核减或补差只创建独立 `Adjustment` 并关联审批；Adjustment 可直接成为 StatementLine 的唯一金额来源。若报表需要按费用编码展示调整，可生成不具备独立结算资格的派生投影，不能再生成一个可被 StatementLine 引用的 ChargeItem，避免同一调整重复计入。
 
 ## 14. 对上与对下
 
@@ -259,6 +279,22 @@ ChargeItem 不允许人工原地改金额。商务特批、核减或补差生成
 - 通知和人工 Task。
 
 未锁定 run 可标记 `STALE` 并重算；已锁定结算只通过调整单处理。
+
+### 15.1 更正提交与结算资格的原子冻结
+
+事实更正是异步命令，但不能等异步影响分析完成后才阻止旧金额入账。`CorrectFact` 接受请求的同一事务必须：
+
+1. 创建 `FactCorrection` 请求；
+2. 为所有直接引用旧事实的 `CalculationRun` 创建有效 `CalculationEligibilityHold`；
+3. 写出更正已提交事件和 Outbox 记录。
+
+SettlementEligibility、批次 collect 和 StatementLine 写入都必须检查有效 hold；存在 hold 时返回 `FACT_CORRECTION_PENDING`。异步影响分析完成后：
+
+- 更正被拒绝：记录原因并释放 hold；
+- 更正获批：旧 run 标记 STALE/产生 CalculationImpact，只有新事实与新 run 验证完成后才能释放对应阻断；
+- 原结果已 LOCKED：保留锁定行，hold 转换为 Adjustment 处理要求，不修改原行。
+
+hold 的创建与更正请求、hold 的消费与结算行写入都使用数据库事务和排他约束，不能依赖最终一致投影防竞态。
 
 ## 16. 影子试算与比较
 

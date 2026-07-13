@@ -38,6 +38,7 @@ status: Proposed
 | `ValidationResult` | 结构、关系、业务和金额核对结果 |
 | `CutoverCohort` | 一组由新系统或旧系统权威处理的业务范围 |
 | `CutoverDecision` | Go/No-go、扩大、暂停或回退决策 |
+| `RollbackPlan` | 回退水位、副作用清单、反向同步、阻塞、审批和验证的可执行计划 |
 
 ## 4. 迁移流水线
 
@@ -135,6 +136,17 @@ flowchart LR
 
 ## 12. 双轨模式
 
+### 12.0 普通领域命令的权威门禁
+
+单一写入权威不仅约束外部副作用。每个会改变工单及其任务、预约、Visit、表单、资料、审核、事实、派单或结算状态的普通领域命令，都必须携带路由层解析出的 `authorityAssignmentId + authorityVersion`，并在领域事务提交前再次校验：
+
+- 当前系统是该工单的 authoritySystem；
+- authorityVersion 与数据库当前版本一致；
+- 命令模式允许写入，而非 SHADOW/READ_ONLY；
+- cohort 和配置未被暂停。
+
+校验失败返回 `WORK_ORDER_AUTHORITY_CHANGED` 或 `SHADOW_WRITE_FORBIDDEN`，不写业务表和 Outbox。后台 Task、批处理、连接器回放和管理员命令同样适用，不能因“内部调用”豁免。
+
 ### 12.1 影子读取/计算
 
 旧系统保持权威写入，变更通过 CDC/事件/批次复制到 ServiceOS；ServiceOS 可以执行流程模拟、派单建议和试算，但禁止外部副作用。
@@ -163,6 +175,14 @@ flowchart LR
 
 测试配置错误也不能越过 fence。
 
+### 13.1 权威切换与在途副作用
+
+Fence 的 ALLOW 结果不是可长期复用令牌。OutboundDelivery、NotificationDelivery、ServiceAssignment 激活和正式结算动作必须保存 fenceDecisionId、authorityAssignmentId、authorityVersion 与 fencePolicyVersion，并在真正提交外部请求/激活/锁定的最后一个本地事务中再次校验当前 authorityVersion。
+
+切换操作必须先把旧 authorityVersion 标记为 `DRAINING`，停止产生新副作用，等待或取消尚未越过最终门禁的 delivery/notification/activation/settlement 动作；对已发送但结果未知的动作先完成对账，不能直接切换。排空清单和结果进入 CutoverDecision 证据。只有无未决副作用或经批准进入向前修复时，才发布新 authorityVersion。
+
+执行器在最终校验后到外部调用之间仍可能失去权威，因此外部请求必须使用包含 authorityVersion 的稳定业务幂等键；回执若属于旧 authorityVersion，只能完成原 delivery 的结果对账，不能触发新的业务推进。
+
 ## 14. 切换步骤
 
 1. 冻结目标 cohort 的配置和迁移映射；
@@ -187,6 +207,27 @@ flowchart LR
 - 保留 ServiceOS 数据和审计，不删除失败现场。
 
 如果某外部副作用无法安全反向同步，超过回退窗口后采用向前修复，不冒险双写。
+
+### 15.1 RollbackPlan
+
+PrepareRollback 创建可审计 `RollbackPlan`，状态为：
+
+```text
+DRAFT -> ANALYZING -> BLOCKED/READY -> APPROVED -> EXECUTING -> VERIFYING -> VERIFIED
+                                      \-> CANCELLED                 \-> FAILED
+```
+
+计划必须保存：
+
+- cohort、当前/目标 authority、关联 CutoverDecision；
+- 目标 watermark、ServiceOS 权威增量起止水位和摘要；
+- 已发生、发送中、结果未知和可取消的副作用逐项清单；
+- 每类领域增量的反向映射/同步版本、目标业务键和幂等键；
+- 无法反向同步的阻塞项、风险所有人和向前修复决定；
+- 执行检查点、反向同步回执、数量/关系/金额/文件核对；
+- 申请、审批、执行、验证和最终路由切换证据。
+
+只有状态 `READY` 且审批完成的计划可执行。任一结果未知副作用或阻塞项未处置时保持 `BLOCKED`；执行失败不能自动恢复双主写入。
 
 ## 16. 权限与隐私
 

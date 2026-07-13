@@ -75,7 +75,7 @@ status: Proposed
 
 ### service_assignment
 
-保存层级（NETWORK/TECHNICIAN）、assignee、生效区间、来源 decision、状态（PENDING_ACTIVATION/ACTIVE/ENDED/FAILED_ACTIVATION）、被替代 service assignment、preparedTaskAssignmentRef 和改派原因。同工单/任务/层级同一时刻最多一个 ACTIVE。
+保存层级（NETWORK/TECHNICIAN）、assignee、生效区间、来源 decision、状态（PENDING_ACTIVATION/ACTIVE/ENDED/FAILED_ACTIVATION）、被替代 service assignment、preparedTaskAssignmentRef、改派原因，以及激活时的 fenceDecisionId、authorityAssignmentId、authorityVersion 和 fencePolicyVersion。同工单/任务/层级同一时刻最多一个 ACTIVE；激活事务必须再次校验 authorityVersion。
 
 ### service_assignment_activation_saga
 
@@ -147,7 +147,7 @@ status: Proposed
 
 ### outbound_delivery
 
-保存连接器/映射版本、消息类型、业务键、源对象精确版本、payload 快照、外部幂等键、失败策略、executionTaskId 和状态。业务重试由该 Task 唯一调度。
+保存连接器/映射版本、消息类型、业务键、源对象精确版本、payload 快照、外部幂等键、失败策略、executionTaskId、fenceDecisionId、authorityAssignmentId、authorityVersion、fencePolicyVersion 和状态。业务重试由该 Task 唯一调度；真正发送前 authorityVersion 变化必须重新判定，外部幂等键包含该版本。
 
 ### delivery_attempt
 
@@ -179,7 +179,7 @@ status: Proposed
 
 ### notification_delivery / notification_attempt / delivery_receipt
 
-delivery 以 intent + recipient + channel 唯一并保存 executionTaskId；attempt 关联 TaskExecutionAttempt 且只追加；receipt 保存供应商送达/阅读事实。通知域不自行调度业务重试。
+delivery 以 intent + recipient + channel 唯一并保存 executionTaskId、fenceDecisionId、authorityAssignmentId、authorityVersion 和 fencePolicyVersion；attempt 关联 TaskExecutionAttempt 且只追加；receipt 保存供应商送达/阅读事实。通知域不自行调度业务重试，真正发送前必须重新校验 authorityVersion。
 
 ## 7. 运营异常
 
