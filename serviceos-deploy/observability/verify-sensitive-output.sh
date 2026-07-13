@@ -6,6 +6,16 @@ if [[ "$#" -eq 0 ]]; then
   exit 2
 fi
 
+# 门禁必须 fail closed：缺工具时不能把“扫不了”当成安全（if rg 会把 command-not-found 当成未命中）。
+if ! command -v rg >/dev/null 2>&1; then
+  echo "sensitive output gate failed: ripgrep (rg) is required" >&2
+  exit 2
+fi
+if ! rg --pcre2 -q 'x' <<<'x' 2>/dev/null; then
+  echo "sensitive output gate failed: ripgrep with --pcre2 support is required" >&2
+  exit 2
+fi
+
 # 门禁必须 fail closed：路径拼错或 clean 删除日志时，不能把“没有扫描到内容”当成安全。
 for input_file in "$@"; do
   if [[ ! -f "${input_file}" || ! -r "${input_file}" ]]; then
