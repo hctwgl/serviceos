@@ -7,9 +7,11 @@ INSERT INTO auth_role (
 ) ON CONFLICT (tenant_id, role_code) DO NOTHING;
 
 INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
-VALUES (
-    'bf64aa35-11cb-40bc-b301-10b5853049b3', 'project.create', now()
-) ON CONFLICT (role_id, capability_code) DO NOTHING;
+VALUES
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'project.create', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'file.upload', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'file.download', now())
+ON CONFLICT (role_id, capability_code) DO NOTHING;
 
 INSERT INTO auth_role_grant (
     grant_id, tenant_id, principal_id, role_id, scope_type, scope_ref,

@@ -7,6 +7,8 @@
   "roles": {
     "realm": [
       { "name": "project.create", "description": "Create ServiceOS operation projects" },
+      { "name": "file.upload", "description": "Create and finalize private file uploads" },
+      { "name": "file.download", "description": "Create short-lived private file download grants" },
       { "name": "workOrder.read", "description": "Read authorized work orders" }
     ]
   },
@@ -81,7 +83,7 @@
       "credentials": [
         { "type": "password", "value": "local-dev-change-me", "temporary": false }
       ],
-      "realmRoles": ["project.create", "workOrder.read"]
+      "realmRoles": ["project.create", "workOrder.read", "file.upload", "file.download"]
     }
   ]
 }

@@ -10,7 +10,7 @@ docker compose -f serviceos-deploy/compose.yaml up -d
 
 本地 Portal 使用 `serviceos-local-cli` 客户端走 Authorization Code + PKCE（S256），回调地址为 `http://localhost:5173/*`。开发用户为 `developer`，首次联调密码为 `local-dev-change-me`。
 
-后端首次启动并完成 Flyway 后，为该本地用户建立 ServiceOS RoleGrant：
+后端首次启动并完成 Flyway 后，为该本地用户建立 Project 与 File capability 的 ServiceOS RoleGrant：
 
 ```bash
 docker compose -f serviceos-deploy/compose.yaml exec -T postgres \

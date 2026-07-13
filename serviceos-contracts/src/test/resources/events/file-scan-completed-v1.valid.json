@@ -1,0 +1,25 @@
+{
+  "eventId": "e56846be-91d2-4fb3-8219-648b47d9f65d",
+  "eventType": "file.scan-completed",
+  "schemaVersion": 1,
+  "tenantId": "tenant-demo",
+  "correlationId": "corr-file-scan-001",
+  "causationId": "bddfb591-d180-44cf-bf38-b4632fd381f2",
+  "aggregateType": "StoredFile",
+  "aggregateId": "3f25bbd4-00d9-412d-8a79-ab20917b73ed",
+  "aggregateVersion": 2,
+  "occurredAt": "2026-07-13T06:30:00Z",
+  "payload": {
+    "fileId": "3f25bbd4-00d9-412d-8a79-ab20917b73ed",
+    "tenantId": "tenant-demo",
+    "checksumSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "detectedMimeType": "image/jpeg",
+    "lifecycleStatus": "AVAILABLE",
+    "quarantineReason": null,
+    "scannerName": "managed-antivirus",
+    "scannerVersion": "2026.07.13",
+    "reasonCode": null,
+    "aggregateVersion": 2,
+    "occurredAt": "2026-07-13T06:30:00Z"
+  }
+}

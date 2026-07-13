@@ -21,7 +21,7 @@ status: Proposed
 | audit | ARCH-07、ARCH-21 | 所有高风险命令 | DATA-02 | M2 AUD、M6 SEC/OPS | E1 |
 | authority | ARCH-17、ARCH-20 | API-01/05 authority/fence | DATA-05 | M5 CUT、M6 TX | E1/E5 |
 | configuration | ARCH-05 | API-01/02 | DATA-01 | M2 CFG | E2 |
-| files | ARCH-10、ARCH-21 | API-03 文件会话 | DATA-03 | M3 FILE、M6 SEC | E1/E3 |
+| files | ARCH-10、ARCH-21、ARCH-25 | API-03 资料引用、API-08 文件控制面 | DATA-03、V010 物理迁移 | M3 FILE、M6 SEC、M11 | E1/E3 |
 | reliability | ARCH-20、ADR-014 | API-01 通用命令/事件 | DATA-01 | M6 TX | E1 |
 | readmodel | PRODUCT-01～07、ARCH-19 | API-06 | DATA-06 | M7 WO/QRY | U0/U1 |
 | automation | ARCH-06、ARCH-20 | API-01 事件 | DATA-01 | M2 TASK、M6 TX | E1 |
@@ -105,3 +105,4 @@ Feature gate/authority: if applicable
 | M8 | Project、Audit、Idempotency、Outbox 事务切片 | Modulith、Domain、Contract、PostgreSQL IT | 完整 E1/履约链路 |
 | M9 | OIDC principal、tenant/capability 授权、Inbox、Outbox worker/attempt | Identity/Auth/Web MVC/Worker Unit + PostgreSQL IT | RoleGrant/ScopePredicate/FieldPolicy、正式 IdP/Broker、Outbox DEAD 异常 Task |
 | M10 | 自动 Task、ExecutionAttempt、claim/lease、重试时钟、OperationalException、HUMAN handling Task | Task worker Unit + PostgreSQL IT + Event Schema | automation 模块提取、正式 Broker 路由、通用 Task 动作/负责人、authority fence、运行指标 |
+| M11 | UploadSession、私有短期传输、Finalize 校验、StoredFile 隔离、扫描 Task、授权下载 | File Unit/Web/Contract + PostgreSQL IT + Event Schema | 正式对象存储/反病毒、multipart/清理、EvidenceSlot 关系、OCR/质量/保留销毁、真实环境 SLO |

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.1.0
+  version: 0.2.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -44,6 +44,109 @@ paths:
           $ref: '#/components/responses/Problem'
         '422':
           $ref: '#/components/responses/Problem'
+  /files/upload-sessions:
+    post:
+      operationId: beginFileUpload
+      summary: 创建受限文件上传会话
+      description: >-
+        服务端生成私有 object key，返回绑定精确大小、声明 MIME 和有效期的短期上传授权；
+        相同 Idempotency-Key 与请求会返回同一 uploadSessionId。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BeginUploadRequest'
+      responses:
+        '201':
+          description: 上传会话创建或幂等重放成功
+          headers:
+            Location:
+              schema: { type: string }
+            X-Correlation-Id:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadSession'
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /files/upload-sessions/{uploadSessionId}:finalize:
+    post:
+      operationId: finalizeFileUpload
+      summary: 校验对象并创建不可变文件
+      description: >-
+        事务外重新读取对象的真实大小、SHA-256 与魔数 MIME；通过后创建 QUARANTINED/PENDING_SCAN
+        文件并在同一事务调度扫描任务。对象存储回调不能调用此能力。
+      parameters:
+        - name: uploadSessionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FinalizeUploadRequest'
+      responses:
+        '201':
+          description: 文件已创建或 finalize 幂等重放成功；扫描通过前仍不可下载
+          headers:
+            Location:
+              schema: { type: string }
+            X-Correlation-Id:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StoredFile'
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '410': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /files/{fileId}/download-authorizations:
+    post:
+      operationId: authorizeFileDownload
+      summary: 申请文件短期下载授权
+      description: 每次实时校验 RoleGrant；仅 AVAILABLE 文件可获得短期私有下载 URL，目的写入审计。
+      parameters:
+        - name: fileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthorizeDownloadRequest'
+      responses:
+        '201':
+          description: 短期下载授权已签发
+          headers:
+            Location:
+              schema: { type: string }
+            X-Correlation-Id:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadAuthorization'
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
 components:
   securitySchemes:
     bearerAuth:
@@ -108,6 +211,83 @@ components:
           enum: [DRAFT, ACTIVE, SUSPENDED, CLOSED]
         version: { type: integer, format: int64, minimum: 1 }
         createdAt: { type: string, format: date-time }
+    BeginUploadRequest:
+      type: object
+      additionalProperties: false
+      required:
+        [businessContextType, businessContextId, originalFileName, declaredMimeType, expectedSize, expectedSha256]
+      properties:
+        businessContextType:
+          type: string
+          pattern: '^[A-Za-z][A-Za-z0-9_.-]*$'
+          maxLength: 80
+        businessContextId: { type: string, minLength: 1, maxLength: 160 }
+        originalFileName: { type: string, minLength: 1, maxLength: 255 }
+        declaredMimeType: { type: string, minLength: 3, maxLength: 255 }
+        expectedSize: { type: integer, format: int64, minimum: 1 }
+        expectedSha256: { type: string, pattern: '^[0-9A-Fa-f]{64}$' }
+    FinalizeUploadRequest:
+      type: object
+      additionalProperties: false
+      required: [actualSha256, finalizeCommandId]
+      properties:
+        actualSha256: { type: string, pattern: '^[0-9A-Fa-f]{64}$' }
+        finalizeCommandId: { type: string, minLength: 1, maxLength: 160 }
+    AuthorizeDownloadRequest:
+      type: object
+      additionalProperties: false
+      required: [purpose]
+      properties:
+        purpose: { type: string, minLength: 1, maxLength: 500 }
+    UploadSession:
+      type: object
+      additionalProperties: false
+      required:
+        [uploadSessionId, fileId, status, uploadMethod, uploadUrl, requiredHeaders,
+         uploadAuthorizationExpiresAt, sessionExpiresAt]
+      properties:
+        uploadSessionId: { type: string, format: uuid }
+        fileId: { type: string, format: uuid }
+        status:
+          enum: [CREATED, UPLOADING, FINALIZING, COMPLETED, EXPIRED, FAILED]
+        uploadMethod: { type: [string, 'null'], enum: [PUT, null] }
+        uploadUrl: { type: [string, 'null'], format: uri }
+        requiredHeaders:
+          type: object
+          additionalProperties: { type: string }
+        uploadAuthorizationExpiresAt: { type: [string, 'null'], format: date-time }
+        sessionExpiresAt: { type: string, format: date-time }
+    StoredFile:
+      type: object
+      additionalProperties: false
+      required:
+        [fileId, tenantId, originalFileName, checksumSha256, size, declaredMimeType,
+         detectedMimeType, lifecycleStatus, quarantineReason, createdAt, version]
+      properties:
+        fileId: { type: string, format: uuid }
+        tenantId: { type: string, minLength: 1, maxLength: 64 }
+        originalFileName: { type: string, minLength: 1, maxLength: 255 }
+        checksumSha256: { type: string, pattern: '^[0-9a-f]{64}$' }
+        size: { type: integer, format: int64, minimum: 1 }
+        declaredMimeType: { type: string }
+        detectedMimeType: { type: string }
+        lifecycleStatus: { enum: [QUARANTINED, AVAILABLE, INVALIDATED] }
+        quarantineReason: { type: [string, 'null'] }
+        createdAt: { type: string, format: date-time }
+        version: { type: integer, format: int64, minimum: 1 }
+    DownloadAuthorization:
+      type: object
+      additionalProperties: false
+      required: [authorizationId, fileId, method, downloadUrl, requiredHeaders, expiresAt]
+      properties:
+        authorizationId: { type: string, format: uuid }
+        fileId: { type: string, format: uuid }
+        method: { type: string, const: GET }
+        downloadUrl: { type: string, format: uri }
+        requiredHeaders:
+          type: object
+          additionalProperties: { type: string }
+        expiresAt: { type: string, format: date-time }
     Problem:
       type: object
       required: [type, title, status, errorCode]

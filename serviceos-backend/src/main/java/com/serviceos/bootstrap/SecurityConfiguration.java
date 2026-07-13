@@ -28,6 +28,8 @@ public class SecurityConfiguration {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        // 本地对象存储数据面使用 HMAC 短期能力 token；公网业务 API 仍要求 OIDC JWT。
+                        .requestMatchers("/api/v1/file-transfers/**").permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(Customizer.withDefaults())

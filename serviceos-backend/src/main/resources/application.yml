@@ -15,6 +15,7 @@ spring:
       - classpath:db/migration/project
       - classpath:db/migration/task
       - classpath:db/migration/operations
+      - classpath:db/migration/files
     validate-migration-naming: true
   security:
     oauth2:
@@ -40,3 +41,18 @@ management:
 
 server:
   shutdown: graceful
+
+serviceos:
+  files:
+    # 参考工程默认使用私有本地沙箱；生产部署必须切换为受管对象存储适配器和专业扫描服务。
+    storage: ${SERVICEOS_FILE_STORAGE:local-private}
+    scanner: ${SERVICEOS_FILE_SCANNER:local-eicar}
+    maximum-size-bytes: ${SERVICEOS_FILE_MAXIMUM_SIZE:52428800}
+    upload-session-lifetime: ${SERVICEOS_FILE_SESSION_LIFETIME:PT1H}
+    upload-authorization-lifetime: ${SERVICEOS_FILE_UPLOAD_AUTH_LIFETIME:PT15M}
+    download-authorization-lifetime: ${SERVICEOS_FILE_DOWNLOAD_AUTH_LIFETIME:PT5M}
+    finalization-lease: ${SERVICEOS_FILE_FINALIZATION_LEASE:PT2M}
+    local:
+      root: ${SERVICEOS_FILE_LOCAL_ROOT:${java.io.tmpdir}/serviceos-private-files}
+      signing-key: ${SERVICEOS_FILE_LOCAL_SIGNING_KEY:local-development-key-change-before-production-32bytes}
+      transfer-base-url: ${SERVICEOS_FILE_TRANSFER_BASE_URL:http://localhost:8080/api/v1/file-transfers}

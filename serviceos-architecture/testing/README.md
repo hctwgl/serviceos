@@ -12,3 +12,4 @@
 - [M7 多 Portal 应用与交互验收矩阵](06-m7-application-experience-acceptance.md)
 - [M9 身份授权与可靠消息验收矩阵](07-m9-security-reliability-acceptance.md)
 - [M10 Task/Scheduler 与人工接管验收矩阵](08-m10-task-scheduler-acceptance.md)
+- [M11 安全文件生命周期验收矩阵](09-m11-secure-file-acceptance.md)

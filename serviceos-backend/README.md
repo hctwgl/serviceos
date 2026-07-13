@@ -37,6 +37,21 @@ schedule（业务键 + payloadDigest 幂等）
 
 `operations` 模块可靠消费人工接管事件，在同一事务中写入 Inbox、OperationalException，并创建一个 `READY` 的 HUMAN handling Task。正式 Broker 适配器尚未包含在参考实现中。
 
+## 安全文件生命周期
+
+`files` 模块实现：
+
+```text
+BeginUpload（幂等会话 + 服务端 object key）
+→ 短期大小/MIME 受限 PUT
+→ Finalize（真实 size/SHA-256/魔数 MIME）
+→ QUARANTINED/PENDING_SCAN + file.content-scan Task
+→ CLEAN=AVAILABLE / MALICIOUS=MALWARE 隔离
+→ 实时 RoleGrant + purpose 审计 + 短期 GET
+```
+
+默认 `local-private` 是可运行开发沙箱，目录不公开并使用 HMAC 短期能力 URL；默认 `local-eicar` 只证明恶意路径协议。生产必须替换为受管对象存储和专业内容安全服务。
+
 ## 环境变量
 
 | 变量 | 默认值 | 说明 |
@@ -48,6 +63,12 @@ schedule（业务键 + payloadDigest 幂等）
 | `SERVICEOS_OIDC_JWK_SET_URI` | 本地 Keycloak JWK 地址 | 受信 OIDC 公钥集合；生产必须外置 |
 | `SERVICEOS_OIDC_ISSUER_URI` | 本地 ServiceOS realm | JWT `iss` 允许值 |
 | `SERVICEOS_OIDC_AUDIENCE` | `serviceos-api` | JWT `aud` 必须包含的 API audience |
+| `SERVICEOS_FILE_STORAGE` | `local-private` | 文件存储适配器；生产禁止使用本地沙箱 |
+| `SERVICEOS_FILE_SCANNER` | `local-eicar` | 内容扫描适配器；生产必须使用专业扫描服务 |
+| `SERVICEOS_FILE_MAXIMUM_SIZE` | `52428800` | 单文件最大字节数 |
+| `SERVICEOS_FILE_LOCAL_ROOT` | 系统临时目录 | 本地私有存储根目录 |
+| `SERVICEOS_FILE_LOCAL_SIGNING_KEY` | 本地开发密钥 | 本地短期 URL HMAC；生产必须外置轮换 |
+| `SERVICEOS_FILE_TRANSFER_BASE_URL` | `http://localhost:8080/api/v1/file-transfers` | 本地数据面公开基址 |
 
 ## 测试层次
 
@@ -59,3 +80,6 @@ schedule（业务键 + payloadDigest 幂等）
 - `OutboxWorkerTest`：租约消息发布与失败回退。
 - `TaskExecutionWorkerTest`：成功、受控重试、UNKNOWN、未分类异常和租约耗尽恢复；
 - `TaskExecutionPostgresIT`：真实 PostgreSQL 的任务幂等、排他 claim、过期租约、attempt/Outbox 和异常人工闭环。
+- `DefaultFileCommandServiceTest`：身份来源、Finalize 校验、隔离文件与扫描任务原子编排；
+- `LocalPrivateObjectStorageGatewayTest`：短期签名、路径、大小/MIME、一次性 PUT 和下载；
+- `FileLifecyclePostgresIT`：真实 PostgreSQL 的 Begin/Finalize/Scan/Download、恶意隔离和 V010 迁移。

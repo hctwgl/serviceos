@@ -29,7 +29,8 @@ class ContractValidationTest {
 
         assertThat(result.getMessages()).as("OpenAPI parser messages").isEmpty();
         assertThat(result.getOpenAPI()).isNotNull();
-        assertThat(result.getOpenAPI().getPaths()).containsKey("/projects");
+        assertThat(result.getOpenAPI().getPaths())
+                .containsKeys("/projects", "/files/upload-sessions");
     }
 
     @Test
@@ -57,6 +58,13 @@ class ContractValidationTest {
         assertValidEvent(
                 "/events/task-manual-intervention-required-v1.schema.json",
                 "/events/task-manual-intervention-required-v1.valid.json");
+    }
+
+    @Test
+    void fileScanCompletedExampleMustMatchPublishedSchema() throws Exception {
+        assertValidEvent(
+                "/events/file-scan-completed-v1.schema.json",
+                "/events/file-scan-completed-v1.valid.json");
     }
 
     private void assertValidEvent(String schemaPath, String eventPath) throws Exception {

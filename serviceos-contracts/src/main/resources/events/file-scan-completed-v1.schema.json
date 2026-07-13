@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/file-scan-completed-v1.schema.json",
+  "title": "FileScanCompletedV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId",
+    "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"
+  ],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": { "const": "file.scan-completed" },
+    "schemaVersion": { "const": 1 },
+    "tenantId": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "correlationId": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "causationId": { "type": "string", "format": "uuid" },
+    "aggregateType": { "const": "StoredFile" },
+    "aggregateId": { "type": "string", "format": "uuid" },
+    "aggregateVersion": { "type": "integer", "minimum": 2 },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fileId", "tenantId", "checksumSha256", "detectedMimeType", "lifecycleStatus",
+        "scannerName", "scannerVersion", "aggregateVersion", "occurredAt"
+      ],
+      "properties": {
+        "fileId": { "type": "string", "format": "uuid" },
+        "tenantId": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "checksumSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "detectedMimeType": { "type": "string", "minLength": 3, "maxLength": 120 },
+        "lifecycleStatus": { "enum": ["AVAILABLE", "QUARANTINED"] },
+        "quarantineReason": { "type": ["string", "null"] },
+        "scannerName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "scannerVersion": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "reasonCode": { "type": ["string", "null"] },
+        "aggregateVersion": { "type": "integer", "minimum": 2 },
+        "occurredAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}
