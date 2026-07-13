@@ -1,0 +1,18 @@
+{
+  "operatePerson": "张师傅",
+  "orderCode": "BYD-SD-OCEAN-20260713-0001",
+  "wallboxCode": "BYD-WB-20260713-0001",
+  "installationCompletedTime": "2026-07-14 15:30:00",
+  "installationCode": "952731",
+  "powerSupplyMethod": "1",
+  "cableBrand": "1",
+  "cableType": "3x6mm²",
+  "cableLength": 28,
+  "breakerBrand": "示例品牌",
+  "breakerType": "2P 40A",
+  "installStake": "1",
+  "installProtectingBox": "1",
+  "groundElectrode": "2",
+  "frontEndCable": "1",
+  "attachmentSource": "1"
+}

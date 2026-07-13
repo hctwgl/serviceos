@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.local/schemas/byd-cpim-accessories-v731.schema.json",
+  "title": "BYD CPIM V7.3.1 Installation Accessories Payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "operatePerson", "orderCode", "constructionImage", "sequenceImage", "zeroVoltageImage",
+    "lineStartImage", "lineEndImage", "fireZeroResistanceImage", "zeroGroundVoltageImage",
+    "groundWireImage", "manPileImage", "confirmationImage", "trialChargeImage", "pileNameplateImage"
+  ],
+  "properties": {
+    "operatePerson": {"type": "string", "minLength": 1, "maxLength": 50},
+    "orderCode": {"type": "string", "minLength": 1, "maxLength": 50},
+    "constructionImage": {"$ref": "#/$defs/url200"},
+    "sequenceImage": {"$ref": "#/$defs/url200"},
+    "zeroVoltageImage": {"$ref": "#/$defs/url200"},
+    "disclaimersImage": {"$ref": "#/$defs/url200"},
+    "loadConfirmationImage": {"$ref": "#/$defs/url200"},
+    "lineStartImage": {"$ref": "#/$defs/url200"},
+    "lineEndImage": {"$ref": "#/$defs/url200"},
+    "fireZeroResistanceImage": {"$ref": "#/$defs/url200"},
+    "zeroGroundVoltageImage": {"$ref": "#/$defs/url200"},
+    "groundWireImage": {"$ref": "#/$defs/url200"},
+    "manPileImage": {"$ref": "#/$defs/url200"},
+    "increaseChargeImage": {"$ref": "#/$defs/url200"},
+    "confirmationImage": {"$ref": "#/$defs/url200"},
+    "trialChargeImage": {"$ref": "#/$defs/url200"},
+    "image1": {
+      "type": "string",
+      "maxLength": 1000,
+      "pattern": "^[^,]+(,[^,]+){0,2}$"
+    },
+    "pileNameplateImage": {"$ref": "#/$defs/url200"}
+  },
+  "$defs": {
+    "url200": {"type": "string", "minLength": 1, "maxLength": 200}
+  },
+  "$comment": "Conditional requirements for disclaimersImage, loadConfirmationImage and increaseChargeImage require installation context and are validated by cross-payload business rules, not by this isolated schema."
+}

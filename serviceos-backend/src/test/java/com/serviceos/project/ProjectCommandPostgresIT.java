@@ -91,7 +91,8 @@ class ProjectCommandPostgresIT {
                         TRUNCATE TABLE prj_project, aud_audit_record,
                             rel_outbox_publish_attempt, rel_outbox_event,
                             rel_inbox_record, rel_idempotency_record,
-                            auth_role_grant, auth_role_capability, auth_role
+                            auth_role_field_policy, auth_role_grant,
+                            auth_role_capability, auth_role
                         """)
                 .update();
         seedProjectCreateGrant("actor-test");
@@ -115,7 +116,7 @@ class ProjectCommandPostgresIT {
         assertThat(jdbc.sql("SELECT jsonb_array_length(matched_grant_ids) FROM aud_audit_record")
                 .query(Integer.class).single()).isEqualTo(1);
         assertThat(jdbc.sql("SELECT authorization_policy_version FROM aud_audit_record")
-                .query(String.class).single()).isEqualTo("role-grant-v1");
+                .query(String.class).single()).isEqualTo("role-grant-v2");
     }
 
     @Test

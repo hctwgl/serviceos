@@ -1,0 +1,17 @@
+{
+  "operatePerson": "张师傅",
+  "orderCode": "BYD-SD-OCEAN-20260713-0001",
+  "plotName": "示例小区",
+  "propertyName": "示例物业",
+  "propertyContact": "王经理",
+  "propertyTelephone": "13800000000",
+  "needStake": "1",
+  "carportStatus": "1",
+  "housingType": "2",
+  "emeterRequestProgress": "1",
+  "emeterRequestCompletedTime": "2026-07-12 16:30:00",
+  "surveyCompletedTime": "2026-07-13 10:20:00",
+  "surveyResult": "1",
+  "surveyRemark": "具备安装条件",
+  "selfPick": "0"
+}
