@@ -113,7 +113,7 @@ flowchart LR
 |---|---|---|
 | E2-01 | Configuration Asset/Bundle 最小发布链 | 多命中、缺版本、发布冲突 |
 | E2-02 | InboundEnvelope 与 CanonicalMessage | 重复、同 key 不同 payload、签名失败 |
-| E2-03 | WorkOrder/Stage/Timeline | 配置锁定、外部键唯一、乐观锁 |
+| E2-03 | CreationAuthority reservation + WorkOrder/Stage/Timeline | 配置锁定、外部键唯一、Create/Bind 崩溃恢复、乐观锁 |
 | E2-04 | Task/Action/Assignment/Guard | 非法动作、重复完成、旧负责人 |
 | E2-05 | Workflow adapter | 引擎重试、停机恢复、事件重复 |
 | E2-06 | Admin 工单列表/详情/任务动作 | 数据范围、字段脱敏、并发提示 |

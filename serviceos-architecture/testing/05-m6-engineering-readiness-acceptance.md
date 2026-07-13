@@ -14,6 +14,8 @@ status: Proposed
 - 故障场景应验证最终业务状态、重复副作用和恢复任务，而不只验证 HTTP 状态码；
 - 本矩阵不替代 M2～M5 业务验收，二者必须同时满足。
 
+“适用”必须由 release manifest 中实际部署的组件、Portal、依赖和 cohort 推导；跳过 P0 需要写明未部署/不可触达证据并由测试与架构签署，不能由开发者自行标记不适用。
+
 ## 2. 工程与模块边界
 
 | ID | Priority | 场景 | 操作 | 预期证据 |
@@ -56,6 +58,7 @@ status: Proposed
 | TX-010 | P0 | authority 切换 | 旧 worker 已取得执行信号 | 最终 fence 拒绝，无旧权威副作用 |
 | TX-011 | P0 | 流程引擎不可用 | 停止引擎后提交领域命令 | 领域事务不丢，恢复后继续且不重复 Task |
 | TX-012 | P1 | Broker 不可用 | 停止 Broker | Outbox 积压受监控，恢复后有序排空 |
+| TX-013 | P0 | 新工单权威引导 | Reserve 后在 Create/Bind 各阶段崩溃，并发 expiry 后重试 | 同 creationBusinessKey 一个 assignment/工单；已引用 reservation 不被过期；LEGACY 不创建权威工单；真孤儿可恢复 |
 
 ## 5. 身份、授权与隐私
 

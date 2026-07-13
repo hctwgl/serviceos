@@ -191,7 +191,11 @@ Settlement submit/lock/handoff 等副作用对象还必须保存 `fence_decision
 
 ### work_order_authority_assignment
 
-保存 workOrder 或创建路由键、authoritySystem（LEGACY/SERVICEOS）、cohortVersion、effectiveAt、sideEffectMode、authorityVersion、状态（ACTIVE/DRAINING/RETIRED）和变更历史。同一工单同一时刻一个有效权威系统。
+保存 workOrder 或 creationBusinessKey、authoritySystem（LEGACY/SERVICEOS）、cohortVersion、effectiveAt、sideEffectMode、authorityVersion、状态（ACTIVE/DRAINING/RETIRED）、绑定状态（RESERVED/BOUND/EXPIRED）和变更历史。同一工单同一时刻一个有效权威系统。
+
+`tenant + creation_business_key` 唯一。CreateWorkOrder 前先创建/复用 RESERVED assignment；工单事务重新行锁并复核 assignment 状态/version，保存 assignmentId/version 后，由 WorkOrderCreated 幂等地填充 workOrderId 并置 BOUND。
+
+过期扫描取得同一 assignment 行锁后，必须通过 workorder 公开查询复核不存在 assignmentId 引用，才可释放孤儿 reservation；不能释放已被工单引用但绑定事件延迟的 assignment。
 
 ### pricing_authority_assignment
 

@@ -55,6 +55,14 @@ sequenceDiagram
 
 跨模块同时写入必须使用事件/saga。只有不这样做就无法保持已批准业务不变量、且双方位于同一数据库时，才可通过单独 ADR 允许同步强一致命令；ADR 必须列出锁顺序、失败原子性、未来拆分代价和模块依赖，不能把“调用方便”作为理由。
 
+以下是已批准的跨切面事务参与者，不视为第二个业务聚合：
+
+- `reliability.api` 追加 Idempotency/Outbox/AsyncOperation；
+- `audit.api` 追加 AuditRecord；
+- `authority.api` 锁定并追加命令/副作用门禁决定。
+
+它们只能追加调用上下文和判定记录，不能反向调用业务模块、推进业务状态或在事务中执行外部副作用。其他例外仍必须单独 ADR。
+
 ### 3.2 事务内禁止
 
 - HTTP/RPC、短信、车企 API、OCR、地图或对象存储请求；
@@ -239,6 +247,22 @@ Scheduler 只 claim 到期工作，不直接拥有业务状态。执行器按 `e
 5. Outbox 发布可执行信号。
 
 执行器发送前再次读取 authorityVersion。版本变化则不发送并返回 `AUTHORITY_CHANGED_BEFORE_SEND`。外部幂等键包含稳定业务键和 authorityVersion，避免权威切换窗口重复执行。
+
+### 11.1 新工单权威引导
+
+CreateWorkOrder 发生前尚无 workOrderId，不能让 workorder 与 authority 在一个跨模块事务中互相创建。入口使用稳定 `creationBusinessKey`（tenant/sourceSystem/externalOrderNo/businessType）执行：
+
+```text
+1. authority.ReserveCreationAuthority(creationBusinessKey)
+2. 若 authority=LEGACY/SHADOW_ONLY，ServiceOS 不创建权威工单
+3. 若 authority=SERVICEOS，返回 assignmentId/version/短期 reservation
+4. CreateWorkOrder 保存 assignmentId/version 与 creationBusinessKey
+5. WorkOrderCreated 事件幂等绑定 assignment 到 workOrderId
+```
+
+ReserveCreationAuthority 按 creationBusinessKey 唯一且可重试。CreateWorkOrder 事务通过 authority.api 重新锁定 assignment 并复核 ACTIVE + RESERVED + version 后才提交。
+
+工单创建失败时 reservation 可由恢复任务释放；过期扫描先锁定 assignment，再通过 workorder 公开查询检查是否已有对象引用该 assignmentId，因此会等待并看见并发 CreateWorkOrder 的已提交结果。工单已创建但绑定事件延迟时，后续命令仍可用保存的 assignmentId/version 校验。绑定不得生成第二个 assignment，也不得改变已锁定 authority。
 
 ## 12. 文件上传事务
 
