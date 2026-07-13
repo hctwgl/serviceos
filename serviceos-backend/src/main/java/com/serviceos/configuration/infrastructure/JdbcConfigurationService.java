@@ -1,6 +1,7 @@
 package com.serviceos.configuration.infrastructure;
 
 import com.serviceos.configuration.api.ConfigurationAssetType;
+import com.serviceos.configuration.api.ConfigurationAssetDefinition;
 import com.serviceos.configuration.api.ConfigurationAssetVersionReference;
 import com.serviceos.configuration.api.ConfigurationBundleReference;
 import com.serviceos.configuration.api.ConfigurationPublicationException;
@@ -219,6 +220,56 @@ final class JdbcConfigurationService implements ConfigurationService {
         return preferred.getFirst().reference();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public ConfigurationAssetDefinition requireBundleAsset(
+            String tenantId,
+            UUID bundleId,
+            String expectedManifestDigest,
+            ConfigurationAssetType assetType
+    ) {
+        String requiredTenant = requiredText(tenantId, "tenantId", 64);
+        UUID requiredBundle = java.util.Objects.requireNonNull(bundleId, "bundleId");
+        String requiredManifestDigest = requiredText(expectedManifestDigest, "expectedManifestDigest", 64);
+        ConfigurationAssetType requiredType = java.util.Objects.requireNonNull(assetType, "assetType");
+        return jdbc.sql("""
+                SELECT asset.version_id, asset.asset_type, asset.asset_key,
+                       asset.semantic_version, asset.schema_version,
+                       asset.definition::text AS definition_json, asset.content_digest
+                  FROM cfg_configuration_bundle bundle
+                  JOIN cfg_configuration_bundle_item item
+                    ON item.tenant_id = bundle.tenant_id
+                   AND item.bundle_id = bundle.bundle_id
+                  JOIN cfg_configuration_asset_version asset
+                    ON asset.tenant_id = item.tenant_id
+                   AND asset.version_id = item.asset_version_id
+                   AND asset.asset_type = item.asset_type
+                   AND asset.content_digest = item.content_digest
+                 WHERE bundle.tenant_id = :tenantId
+                   AND bundle.bundle_id = :bundleId
+                   AND bundle.manifest_digest = :manifestDigest
+                   AND bundle.status = 'PUBLISHED'
+                   AND item.asset_type = :assetType
+                   AND asset.status = 'PUBLISHED'
+                """)
+                .param("tenantId", requiredTenant)
+                .param("bundleId", requiredBundle)
+                .param("manifestDigest", requiredManifestDigest)
+                .param("assetType", requiredType.name())
+                .query((rs, rowNum) -> new ConfigurationAssetDefinition(
+                        rs.getObject("version_id", UUID.class),
+                        ConfigurationAssetType.valueOf(rs.getString("asset_type")),
+                        rs.getString("asset_key"),
+                        rs.getString("semantic_version"),
+                        rs.getString("schema_version"),
+                        rs.getString("definition_json"),
+                        rs.getString("content_digest")))
+                .optional()
+                .orElseThrow(() -> new ConfigurationResolutionException(
+                        ConfigurationResolutionException.Reason.NO_MATCH,
+                        "published configuration bundle does not contain the required asset type"));
+    }
+
     private AssetRow findAsset(PublishConfigurationAssetCommand command) {
         return jdbc.sql("""
                 SELECT version_id, asset_type, asset_key, semantic_version,
@@ -351,6 +402,17 @@ final class JdbcConfigurationService implements ConfigurationService {
 
     private static String nullToEmpty(String value) {
         return value == null ? "" : value;
+    }
+
+    private static String requiredText(String value, String field, int maxLength) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(field + " must not be blank");
+        }
+        String normalized = value.trim();
+        if (normalized.length() > maxLength) {
+            throw new IllegalArgumentException(field + " exceeds max length " + maxLength);
+        }
+        return normalized;
     }
 
     private record AssetRow(

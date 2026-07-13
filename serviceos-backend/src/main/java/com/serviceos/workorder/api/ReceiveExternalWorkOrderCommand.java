@@ -19,6 +19,7 @@ public record ReceiveExternalWorkOrderCommand(
         UUID configurationBundleId,
         String configurationBundleCode,
         String configurationBundleVersion,
+        String configurationBundleDigest,
         String provinceCode,
         String cityCode,
         String districtCode,
@@ -26,7 +27,9 @@ public record ReceiveExternalWorkOrderCommand(
         String customerMobile,
         String serviceAddress,
         String vehicleVin,
-        LocalDateTime externalDispatchedAt
+        LocalDateTime externalDispatchedAt,
+        String correlationId,
+        String causationId
 ) {
     public ReceiveExternalWorkOrderCommand {
         tenantId = text(tenantId, "tenantId", 64);
@@ -42,6 +45,12 @@ public record ReceiveExternalWorkOrderCommand(
         configurationBundleId = Objects.requireNonNull(configurationBundleId, "configurationBundleId");
         configurationBundleCode = text(configurationBundleCode, "configurationBundleCode", 128);
         configurationBundleVersion = text(configurationBundleVersion, "configurationBundleVersion", 64);
+        configurationBundleDigest = text(
+                configurationBundleDigest, "configurationBundleDigest", 64)
+                .toLowerCase(java.util.Locale.ROOT);
+        if (!configurationBundleDigest.matches("[0-9a-f]{64}")) {
+            throw new IllegalArgumentException("configurationBundleDigest must be SHA-256 hex");
+        }
         provinceCode = text(provinceCode, "provinceCode", 16);
         cityCode = text(cityCode, "cityCode", 16);
         districtCode = text(districtCode, "districtCode", 16);
@@ -50,6 +59,8 @@ public record ReceiveExternalWorkOrderCommand(
         serviceAddress = text(serviceAddress, "serviceAddress", 512);
         vehicleVin = text(vehicleVin, "vehicleVin", 32).toUpperCase(java.util.Locale.ROOT);
         Objects.requireNonNull(externalDispatchedAt, "externalDispatchedAt");
+        correlationId = text(correlationId, "correlationId", 128);
+        causationId = text(causationId, "causationId", 160);
     }
 
     private static String text(String value, String field, int maxLength) {

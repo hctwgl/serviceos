@@ -65,7 +65,9 @@ public class BydCpimInboundOrderService {
     @Transactional
     public BydCpimInboundOrderResponse receive(
             BydCpimSignatureHeaders headers,
-            Map<String, Object> rawParameters) {
+            Map<String, Object> rawParameters,
+            String correlationId) {
+        String safeCorrelationId = requiredText(correlationId, "correlationId");
         var verification = signatureVerifier.verify(headers, rawParameters);
         if (!verification.valid()) {
             return BydCpimInboundOrderResponse.rejected(
@@ -120,6 +122,7 @@ public class BydCpimInboundOrderService {
                     bundle.bundleId(),
                     bundle.bundleCode(),
                     bundle.bundleVersion(),
+                    bundle.manifestDigest(),
                     mapped.provinceCode(),
                     mapped.cityCode(),
                     mapped.districtCode(),
@@ -127,7 +130,11 @@ public class BydCpimInboundOrderService {
                     mapped.customerMobile(),
                     mapped.serviceAddress(),
                     mapped.vehicleVin(),
-                    mapped.dispatchedAt()));
+                    mapped.dispatchedAt(),
+                    safeCorrelationId,
+                    "byd-cpim:" + com.serviceos.shared.Sha256.digest(
+                            headers.appKey() + "|" + headers.nonce() + "|"
+                                    + headers.currentTime().getEpochSecond())));
 
             BydCpimInboundOrderResponse response = BydCpimInboundOrderResponse.accepted(
                     mapped.externalOrderCode(),

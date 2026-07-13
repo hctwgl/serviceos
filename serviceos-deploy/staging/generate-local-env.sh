@@ -2,7 +2,7 @@
 set -euo pipefail
 
 output_file="${1:-}"
-image_ref="${2:-serviceos-backend:m16-local}"
+image_ref="${2:-serviceos-backend:m17-local}"
 if [[ -z "${output_file}" ]]; then
   echo "usage: $0 <output-env-file> [image-ref]" >&2
   exit 64
@@ -18,8 +18,8 @@ cat > "${output_file}" <<EOF
 SERVICEOS_IMAGE=${image_ref}
 SERVICEOS_ALLOW_MUTABLE_IMAGE=true
 SERVICEOS_STAGING_PORT=18080
-SERVICEOS_EXPECTED_MIGRATION_VERSION=014
-SERVICEOS_EXPECTED_MIGRATION_COUNT=16
+SERVICEOS_EXPECTED_MIGRATION_VERSION=017
+SERVICEOS_EXPECTED_MIGRATION_COUNT=19
 SERVICEOS_BOOTSTRAP_DB_PASSWORD=$(random_secret)
 SERVICEOS_MIGRATOR_DB_PASSWORD=$(random_secret)
 SERVICEOS_RUNTIME_DB_PASSWORD=$(random_secret)

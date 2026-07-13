@@ -41,7 +41,8 @@ final class BydCpimInboundOrderController {
         try {
             response = service.receive(
                     new BydCpimSignatureHeaders(appKey, nonce, Instant.ofEpochSecond(currentTime), signature),
-                    rawParameters);
+                    rawParameters,
+                    correlationId);
         } catch (IllegalArgumentException exception) {
             response = BydCpimInboundOrderResponse.rejected("INVALID_HEADERS", exception.getMessage());
         }

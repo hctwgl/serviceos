@@ -21,7 +21,8 @@ public final class DatabaseMigrationMain {
             "classpath:db/migration/files",
             "classpath:db/migration/configuration",
             "classpath:db/migration/integration",
-            "classpath:db/migration/workorder"
+            "classpath:db/migration/workorder",
+            "classpath:db/migration/workflow"
     };
 
     private DatabaseMigrationMain() {

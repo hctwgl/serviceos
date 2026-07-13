@@ -64,7 +64,8 @@ class WorkOrderCommandPostgresIT {
     @BeforeEach
     void clean() {
         jdbc.sql("""
-                TRUNCATE TABLE wo_work_order, cfg_configuration_bundle_item,
+                TRUNCATE TABLE rel_outbox_publish_attempt, rel_outbox_event, wo_work_order,
+                    cfg_configuration_bundle_item,
                     cfg_configuration_bundle, cfg_configuration_asset_version,
                     prj_project CASCADE
                 """).update();
@@ -84,6 +85,10 @@ class WorkOrderCommandPostgresIT {
         assertThat(replay.replay()).isTrue();
         assertThat(otherTenant.workOrderId()).isNotEqualTo(first.workOrderId());
         assertThat(jdbc.sql("SELECT count(*) FROM wo_work_order")
+                .query(Long.class).single()).isEqualTo(2);
+        assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event")
+                .query(Long.class).single()).isEqualTo(2);
+        assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type = 'workorder.received'")
                 .query(Long.class).single()).isEqualTo(2);
 
         assertThatThrownBy(() -> workOrders.receive(command(tenantA, "c".repeat(64))))
@@ -108,9 +113,10 @@ class WorkOrderCommandPostgresIT {
                 tenantA.bundle().bundleId(),
                 tenantA.bundle().bundleCode(),
                 tenantA.bundle().bundleVersion(),
+                tenantA.bundle().manifestDigest(),
                 "370000", "370100", "370102", "测试用户", "13800000000",
                 "山东省济南市历下区测试路1号", "LGXCE6CD0RA123456",
-                LocalDateTime.of(2026, 7, 13, 10, 0));
+                LocalDateTime.of(2026, 7, 13, 10, 0), "corr-invalid", "cause-invalid");
 
         assertThatThrownBy(() -> workOrders.receive(invalid))
                 .isInstanceOf(DataIntegrityViolationException.class);
@@ -120,8 +126,8 @@ class WorkOrderCommandPostgresIT {
 
     @Test
     void migrationSetIsCurrentAndRepeatable() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("014");
-        assertThat(flyway.info().applied()).hasSize(16);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("017");
+        assertThat(flyway.info().applied()).hasSize(19);
         assertThat(flyway.migrate().migrationsExecuted).isZero();
     }
 
@@ -160,9 +166,10 @@ class WorkOrderCommandPostgresIT {
                 scope.tenantId(), scope.projectId(), "BYD", "BYD_OCEAN",
                 "HOME_CHARGING_SURVEY_INSTALL", "BYD-SD-WO-001", payloadDigest,
                 scope.bundle().bundleId(), scope.bundle().bundleCode(), scope.bundle().bundleVersion(),
+                scope.bundle().manifestDigest(),
                 "370000", "370100", "370102", "测试用户", "13800000000",
                 "山东省济南市历下区测试路1号", "LGXCE6CD0RA123456",
-                LocalDateTime.of(2026, 7, 13, 10, 0));
+                LocalDateTime.of(2026, 7, 13, 10, 0), "corr-work-order-it", "cause-work-order-it");
     }
 
     private record Scope(String tenantId, UUID projectId, ConfigurationBundleReference bundle) {

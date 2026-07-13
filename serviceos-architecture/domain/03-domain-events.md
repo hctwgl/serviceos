@@ -26,8 +26,8 @@ status: Proposed
 ```json
 {
   "eventId": "uuid",
-  "eventType": "work-order.received",
-  "eventVersion": 1,
+  "eventType": "workorder.received",
+  "schemaVersion": 1,
   "aggregateType": "WorkOrder",
   "aggregateId": "uuid",
   "tenantId": "tenant-code",
@@ -46,7 +46,7 @@ status: Proposed
 - `correlationId`：同一业务链路的关联标识；
 - `causationId`：直接触发本事件的命令或前序事件 ID；
 - `aggregateId`：产生事件的聚合根 ID；
-- `eventVersion`：事件载荷 Schema 版本，不是聚合版本。
+- `schemaVersion`：事件载荷 Schema 版本，不是聚合版本。
 
 ## 3. WorkOrder 事件
 
@@ -64,7 +64,21 @@ status: Proposed
 
 `WorkOrderReceptionReplayed` 默认是应用观测事件，不推进流程，也不得再次创建任务。
 
-## 4. Task 事件
+## 4. Workflow 与 Stage 事件
+
+| 事件 | 触发条件 |
+|---|---|
+| `WorkflowStarted` | 精确流程定义版本已锁定且流程实例成功启动 |
+| `WorkflowCompleted` | 所有必要终止条件满足 |
+| `WorkflowSuspended` | 流程级暂停策略生效 |
+| `WorkflowCancelled` | 工单取消或分支补偿导致流程终止 |
+| `StageActivated` | 一个业务阶段进入 ACTIVE |
+| `StageCompleted` | 阶段内必要任务和退出条件全部满足 |
+| `StageBlocked` | 阶段依赖或人工异常阻塞 |
+
+Workflow/Stage 事件表达编排事实，不复制 WorkOrder、Task 或具体履约结果。
+
+## 5. Task 事件
 
 | 事件 | 触发条件 |
 |---|---|
@@ -81,9 +95,9 @@ status: Proposed
 
 任务事件只表达执行外壳事实。勘测结果、审核决定、派单结论等业务事实必须由对应聚合发布。
 
-## 5. Evidence 与 Review 事件
+## 6. Evidence 与 Review 事件
 
-### 5.1 Evidence
+### 6.1 Evidence
 
 - `EvidenceSlotActivated`
 - `EvidenceSubmitted`
@@ -94,7 +108,7 @@ status: Proposed
 
 `EvidenceSubmitted` 必须指向明确 revision；补传产生新 revision，不覆盖旧版本。
 
-### 5.2 Review
+### 6.2 Review
 
 - `ReviewCaseOpened`
 - `ReviewDecisionRecorded`
@@ -106,9 +120,9 @@ status: Proposed
 
 `ReviewForceApproved` 必须携带授权依据、操作者和原因，禁止与普通通过共用事件语义。
 
-## 6. Dispatch、SLA、Integration 与 Settlement 事件
+## 7. Dispatch、SLA、Integration 与 Settlement 事件
 
-### 6.1 Dispatch
+### 7.1 Dispatch
 
 - `DispatchRequested`
 - `DispatchCandidatesEvaluated`
@@ -117,7 +131,7 @@ status: Proposed
 - `DispatchFailed`
 - `ServiceAssignmentRevoked`
 
-### 6.2 SLA
+### 7.2 SLA
 
 - `SlaStarted`
 - `SlaPaused`
@@ -127,7 +141,7 @@ status: Proposed
 - `SlaEscalated`
 - `SlaStopped`
 
-### 6.3 Integration
+### 7.3 Integration
 
 - `InboundMessageAccepted`
 - `InboundMessageRejected`
@@ -137,7 +151,7 @@ status: Proposed
 - `OutboundDeliveryFailed`
 - `ExternalCallbackReceived`
 
-### 6.4 Pricing 与 Settlement
+### 7.4 Pricing 与 Settlement
 
 - `FulfillmentFactRecorded`
 - `FactSetSnapshotted`
@@ -148,18 +162,18 @@ status: Proposed
 - `SettlementStatementConfirmed`
 - `SettlementAdjustmentRecorded`
 
-## 7. 事件版本策略
+## 8. 事件版本策略
 
 兼容性原则：
 
 - 增加可选字段：通常保持当前版本；
 - 删除字段、修改含义、修改类型、修改必填性：发布新版本；
-- 新版本事件采用同一逻辑事件名和递增 `eventVersion`；
+- 新版本事件采用同一逻辑事件名和递增 `schemaVersion`；
 - 消费者必须明确支持的版本范围；
 - 旧版本在保留期内继续发布或通过转换器兼容，禁止静默切换；
 - 事件 Schema 必须进入契约兼容 CI。
 
-## 8. 事务与失败处理
+## 9. 事务与失败处理
 
 ```text
 Command
@@ -180,7 +194,7 @@ Command
 - 用消息队列投递成功代替业务成功；
 - 通过事件修改另一个上下文的内部表。
 
-## 9. 测试要求
+## 10. 测试要求
 
 每个正式事件至少需要：
 

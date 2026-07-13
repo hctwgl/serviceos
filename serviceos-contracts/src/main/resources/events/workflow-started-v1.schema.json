@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/workflow-started-v1.schema.json",
+  "title": "WorkflowStartedV1", "type": "object", "additionalProperties": false,
+  "required": ["eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId", "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"}, "eventType": {"const": "workflow.started"}, "schemaVersion": {"const": 1},
+    "tenantId": {"type": "string"}, "correlationId": {"type": "string"}, "causationId": {"type": "string"},
+    "aggregateType": {"const": "Workflow"}, "aggregateId": {"type": "string", "format": "uuid"}, "aggregateVersion": {"const": 1},
+    "occurredAt": {"type": "string", "format": "date-time"},
+    "payload": {"type": "object", "additionalProperties": false,
+      "required": ["workflowInstanceId", "projectId", "workOrderId", "configurationBundleId", "workflowDefinitionVersionId", "workflowKey", "workflowVersion", "definitionDigest", "startedAt"],
+      "properties": {
+        "workflowInstanceId": {"type": "string", "format": "uuid"}, "projectId": {"type": "string", "format": "uuid"},
+        "workOrderId": {"type": "string", "format": "uuid"}, "configurationBundleId": {"type": "string", "format": "uuid"},
+        "workflowDefinitionVersionId": {"type": "string", "format": "uuid"}, "workflowKey": {"type": "string"},
+        "workflowVersion": {"type": "string"}, "definitionDigest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "startedAt": {"type": "string", "format": "date-time"}
+      }}
+  }
+}

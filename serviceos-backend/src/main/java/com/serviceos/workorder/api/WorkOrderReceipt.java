@@ -12,6 +12,7 @@ public record WorkOrderReceipt(
         UUID configurationBundleId,
         String configurationBundleCode,
         String configurationBundleVersion,
+        String configurationBundleDigest,
         boolean replay,
         Instant receivedAt
 ) {

@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/work-order-received-v1.schema.json",
+  "title": "WorkOrderReceivedV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId", "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"},
+    "eventType": {"const": "workorder.received"},
+    "schemaVersion": {"const": 1},
+    "tenantId": {"type": "string", "minLength": 1, "maxLength": 64},
+    "correlationId": {"type": "string", "minLength": 1, "maxLength": 128},
+    "causationId": {"type": "string", "minLength": 1, "maxLength": 160},
+    "aggregateType": {"const": "WorkOrder"},
+    "aggregateId": {"type": "string", "format": "uuid"},
+    "aggregateVersion": {"const": 1},
+    "occurredAt": {"type": "string", "format": "date-time"},
+    "payload": {
+      "type": "object", "additionalProperties": false,
+      "required": ["workOrderId", "projectId", "externalOrderCode", "clientCode", "brandCode", "serviceProductCode", "bundleRef", "receivedAt"],
+      "properties": {
+        "workOrderId": {"type": "string", "format": "uuid"},
+        "projectId": {"type": "string", "format": "uuid"},
+        "externalOrderCode": {"type": "string"}, "clientCode": {"type": "string"},
+        "brandCode": {"type": "string"}, "serviceProductCode": {"type": "string"},
+        "receivedAt": {"type": "string", "format": "date-time"},
+        "bundleRef": {
+          "type": "object", "additionalProperties": false,
+          "required": ["bundleId", "bundleCode", "bundleVersion", "manifestDigest"],
+          "properties": {
+            "bundleId": {"type": "string", "format": "uuid"}, "bundleCode": {"type": "string"},
+            "bundleVersion": {"type": "string"}, "manifestDigest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+          }
+        }
+      }
+    }
+  }
+}

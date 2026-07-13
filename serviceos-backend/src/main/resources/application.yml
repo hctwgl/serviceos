@@ -23,6 +23,7 @@ spring:
       - classpath:db/migration/configuration
       - classpath:db/migration/integration
       - classpath:db/migration/workorder
+      - classpath:db/migration/workflow
     validate-migration-naming: true
   security:
     oauth2:
@@ -101,6 +102,9 @@ server:
   shutdown: graceful
 
 serviceos:
+  outbox:
+    # 模块化单体默认由本地可靠消费者处理；生产切换 Broker 时必须提供真实 Publisher/Consumer。
+    publisher: ${SERVICEOS_OUTBOX_PUBLISHER:local}
   observability:
     # 生产默认 false；仅当 Prometheus 位于受控私网且入口层已隔离时才允许匿名抓取。
     allow-anonymous-metrics: ${SERVICEOS_ALLOW_ANONYMOUS_METRICS:false}

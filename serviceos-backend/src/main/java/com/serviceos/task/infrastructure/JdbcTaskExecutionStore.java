@@ -5,9 +5,12 @@ import com.serviceos.reliability.api.OutboxEvent;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.shared.Sha256;
-import com.serviceos.task.api.ScheduleAutomatedTaskCommand;
 import com.serviceos.task.api.CreateHandlingTaskCommand;
+import com.serviceos.task.api.CreateWorkflowTaskCommand;
+import com.serviceos.task.api.ScheduleAutomatedTaskCommand;
 import com.serviceos.task.api.ScheduledTaskView;
+import com.serviceos.task.api.TaskCreatedPayload;
+import com.serviceos.task.api.WorkflowTaskKind;
 import com.serviceos.task.application.ClaimedTask;
 import com.serviceos.task.application.TaskExecutionOutcome;
 import com.serviceos.task.application.TaskExecutionQueue;
@@ -120,6 +123,85 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
                     "The handling task business key is already bound to a different payload digest");
         }
         return stored.toView();
+    }
+
+    @Override
+    public ScheduledTaskView createWorkflowTask(CreateWorkflowTaskCommand command) {
+        Instant now = clock.instant();
+        UUID taskId = UUID.randomUUID();
+        String status = command.taskKind() == WorkflowTaskKind.AUTOMATED
+                ? "PENDING" : "READY";
+        int inserted = jdbc.sql("""
+                        INSERT INTO tsk_task (
+                            task_id, tenant_id, task_type, task_kind, business_key,
+                            payload_ref, payload_digest, priority, status, next_run_at,
+                            attempt_count, max_attempts, correlation_id, version, created_at, updated_at,
+                            project_id, work_order_id, workflow_instance_id, stage_instance_id,
+                            workflow_node_instance_id, workflow_node_id,
+                            workflow_definition_version_id, workflow_definition_digest
+                        ) VALUES (
+                            :taskId, :tenantId, :taskType, :taskKind, :businessKey,
+                            :payloadRef, :payloadDigest, :priority, :status, :readyAt,
+                            0, :maxAttempts, :correlationId, 1, :now, :now,
+                            :projectId, :workOrderId, :workflowInstanceId, :stageInstanceId,
+                            :workflowNodeInstanceId, :workflowNodeId,
+                            :workflowDefinitionVersionId, :workflowDefinitionDigest
+                        )
+                        ON CONFLICT (tenant_id, task_type, business_key) DO NOTHING
+                        """)
+                .param("taskId", taskId)
+                .param("tenantId", command.tenantId())
+                .param("taskType", command.taskType())
+                .param("taskKind", command.taskKind().name())
+                .param("businessKey", command.workflowNodeInstanceId().toString())
+                .param("payloadRef", command.payloadRef(), java.sql.Types.VARCHAR)
+                .param("payloadDigest", command.payloadDigest())
+                .param("priority", command.priority())
+                .param("status", status)
+                .param("readyAt", timestamptz(command.readyAt()))
+                .param("maxAttempts", command.maxAttempts())
+                .param("correlationId", command.correlationId())
+                .param("now", timestamptz(now))
+                .param("projectId", command.projectId())
+                .param("workOrderId", command.workOrderId())
+                .param("workflowInstanceId", command.workflowInstanceId())
+                .param("stageInstanceId", command.stageInstanceId())
+                .param("workflowNodeInstanceId", command.workflowNodeInstanceId())
+                .param("workflowNodeId", command.workflowNodeId())
+                .param("workflowDefinitionVersionId", command.workflowDefinitionVersionId())
+                .param("workflowDefinitionDigest", command.workflowDefinitionDigest())
+                .update();
+
+        StoredTask stored = findByBusinessKey(
+                command.tenantId(), command.taskType(), command.workflowNodeInstanceId().toString());
+        if (inserted == 0 && !stored.payloadDigest().equals(command.payloadDigest())) {
+            throw new BusinessProblem(
+                    ProblemCode.TASK_SCHEDULE_CONFLICT,
+                    "The workflow node instance is already bound to a different task payload");
+        }
+        if (inserted == 1) {
+            appendTaskCreated(command, taskId, status, now);
+        }
+        return stored.toView();
+    }
+
+    private void appendTaskCreated(
+            CreateWorkflowTaskCommand command, UUID taskId, String status, Instant occurredAt) {
+        TaskCreatedPayload event = new TaskCreatedPayload(
+                taskId, command.projectId(), command.workOrderId(), command.workflowInstanceId(),
+                command.stageInstanceId(), command.workflowNodeInstanceId(), command.workflowNodeId(),
+                command.taskType(), command.taskKind(), status, command.workflowDefinitionVersionId(),
+                command.workflowDefinitionDigest(), occurredAt);
+        String payload;
+        try {
+            payload = objectMapper.writeValueAsString(event);
+        } catch (JacksonException exception) {
+            throw new IllegalStateException("TaskCreated event serialization failed", exception);
+        }
+        outbox.append(new OutboxEvent(
+                UUID.randomUUID(), UUID.randomUUID(), "task", "task.created", 1,
+                "Task", taskId.toString(), 1, command.tenantId(), command.correlationId(),
+                command.causationId(), taskId.toString(), payload, Sha256.digest(payload), occurredAt));
     }
 
     @Override

@@ -84,7 +84,8 @@ class BydCpimInboundOrderHttpPostgresIT {
     @BeforeEach
     void clean() {
         jdbc.sql("""
-                TRUNCATE TABLE wo_work_order, cfg_configuration_bundle_item,
+                TRUNCATE TABLE rel_outbox_publish_attempt, rel_outbox_event, wo_work_order,
+                    cfg_configuration_bundle_item,
                     cfg_configuration_bundle, cfg_configuration_asset_version,
                     prj_project, int_inbound_replay_guard CASCADE
                 """).update();
@@ -231,7 +232,7 @@ class BydCpimInboundOrderHttpPostgresIT {
 
     @Test
     void rejectsValidOrderBeforeReplayReservationWhenNoBundleMatches() throws Exception {
-        jdbc.sql("TRUNCATE TABLE wo_work_order, cfg_configuration_bundle_item, "
+        jdbc.sql("TRUNCATE TABLE rel_outbox_publish_attempt, rel_outbox_event, wo_work_order, cfg_configuration_bundle_item, "
                 + "cfg_configuration_bundle, cfg_configuration_asset_version CASCADE").update();
         Map<String, Object> payload = validPayload();
         long currentTime = Instant.now().getEpochSecond();

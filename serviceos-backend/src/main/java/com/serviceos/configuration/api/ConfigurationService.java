@@ -6,4 +6,10 @@ public interface ConfigurationService {
     ConfigurationBundleReference publishBundle(PublishConfigurationBundleCommand command);
 
     ConfigurationBundleReference resolve(ResolveConfigurationBundleQuery query);
+
+    ConfigurationAssetDefinition requireBundleAsset(
+            String tenantId,
+            java.util.UUID bundleId,
+            String expectedManifestDigest,
+            ConfigurationAssetType assetType);
 }

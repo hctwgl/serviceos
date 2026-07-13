@@ -48,6 +48,7 @@
         },
         "name": {"type": "string", "minLength": 1, "maxLength": 200},
         "taskType": {"type": ["string", "null"], "maxLength": 100},
+        "stageCode": {"type": ["string", "null"], "pattern": "^[A-Z0-9][A-Z0-9_-]*$", "maxLength": 100},
         "assigneePolicyRef": {"type": ["string", "null"], "maxLength": 120},
         "formRef": {"type": ["string", "null"], "maxLength": 120},
         "evidenceRef": {"type": ["string", "null"], "maxLength": 120},

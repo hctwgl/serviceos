@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/work-order-activated-v1.schema.json",
+  "title": "WorkOrderActivatedV1", "type": "object", "additionalProperties": false,
+  "required": ["eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId", "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"}, "eventType": {"const": "workorder.activated"}, "schemaVersion": {"const": 1},
+    "tenantId": {"type": "string"}, "correlationId": {"type": "string"}, "causationId": {"type": "string"},
+    "aggregateType": {"const": "WorkOrder"}, "aggregateId": {"type": "string", "format": "uuid"},
+    "aggregateVersion": {"type": "integer", "minimum": 2}, "occurredAt": {"type": "string", "format": "date-time"},
+    "payload": {"type": "object", "additionalProperties": false, "required": ["workOrderId", "activatedAt"], "properties": {
+      "workOrderId": {"type": "string", "format": "uuid"}, "activatedAt": {"type": "string", "format": "date-time"}
+    }}
+  }
+}

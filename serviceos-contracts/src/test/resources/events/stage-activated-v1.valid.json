@@ -1,0 +1,7 @@
+{
+  "eventId": "11111111-1111-4111-8111-111111111114", "eventType": "stage.activated", "schemaVersion": 1,
+  "tenantId": "tenant-byd", "correlationId": "corr-m17", "causationId": "11111111-1111-4111-8111-111111111111",
+  "aggregateType": "Stage", "aggregateId": "77777777-7777-4777-8777-777777777777", "aggregateVersion": 1,
+  "occurredAt": "2026-07-14T01:00:01Z",
+  "payload": {"stageInstanceId": "77777777-7777-4777-8777-777777777777", "workflowInstanceId": "55555555-5555-4555-8555-555555555555", "workOrderId": "22222222-2222-4222-8222-222222222222", "stageCode": "INTAKE", "sequenceNo": 1, "activatedAt": "2026-07-14T01:00:01Z"}
+}

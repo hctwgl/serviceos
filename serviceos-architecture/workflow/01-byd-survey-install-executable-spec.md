@@ -96,7 +96,10 @@ flowchart TD
 
 ```text
 CreateWorkOrder
-→ WorkOrderCreated
+→ WorkOrderReceived
+→ WorkflowStarted
+→ StageActivated(INTAKE)
+→ TaskCreated(ASSIGN_COORDINATORS)
 → ConfigurationBundleLocked
 ```
 

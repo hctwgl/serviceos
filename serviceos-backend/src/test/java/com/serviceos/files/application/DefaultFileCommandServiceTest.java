@@ -210,6 +210,12 @@ class DefaultFileCommandServiceTest {
         public ScheduledTaskView createHandlingTask(CreateHandlingTaskCommand command) {
             throw new UnsupportedOperationException();
         }
+
+        @Override
+        public ScheduledTaskView createWorkflowTask(
+                com.serviceos.task.api.CreateWorkflowTaskCommand command) {
+            throw new UnsupportedOperationException();
+        }
     }
 
     private static final class FakeStorage implements ObjectStorageGateway {

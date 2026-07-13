@@ -41,7 +41,12 @@ migration_version="$(compose "${env_file}" exec -T database \
 compose "${env_file}" exec -T database sh -ceu '
   PGPASSWORD="$SERVICEOS_RUNTIME_DB_PASSWORD" \
     psql -h 127.0.0.1 -U serviceos_runtime -d serviceos -Atc \
-      "SELECT count(*) FROM rel_outbox_event" >/dev/null
+      "SELECT
+          (SELECT count(*) FROM rel_outbox_event)
+        + (SELECT count(*) FROM wo_work_order)
+        + (SELECT count(*) FROM wfl_workflow_instance)
+        + (SELECT count(*) FROM wfl_stage_instance)
+        + (SELECT count(*) FROM tsk_task)" >/dev/null
 '
 if compose "${env_file}" exec -T database sh -ceu '
   PGPASSWORD="$SERVICEOS_RUNTIME_DB_PASSWORD" \
