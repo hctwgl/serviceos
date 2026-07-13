@@ -91,7 +91,8 @@ class ProjectCommandPostgresIT {
                         TRUNCATE TABLE prj_project, aud_audit_record,
                             rel_outbox_publish_attempt, rel_outbox_event,
                             rel_inbox_record, rel_idempotency_record,
-                            auth_role_grant, auth_role_capability, auth_role
+                            auth_role_field_policy, auth_role_grant,
+                            auth_role_capability, auth_role
                         """)
                 .update();
         seedProjectCreateGrant("actor-test");
