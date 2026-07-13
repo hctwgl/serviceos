@@ -102,6 +102,13 @@ serviceos:
   observability:
     # 生产默认 false；仅当 Prometheus 位于受控私网且入口层已隔离时才允许匿名抓取。
     allow-anonymous-metrics: ${SERVICEOS_ALLOW_ANONYMOUS_METRICS:false}
+  integration:
+    byd:
+      cpim:
+        # 生产必须由 Secret Manager/环境变量注入，禁止把真实车企密钥提交到仓库。
+        app-key: ${SERVICEOS_BYD_CPIM_APP_KEY:local-byd-app-key}
+        app-secret: ${SERVICEOS_BYD_CPIM_APP_SECRET:local-byd-app-secret-change-me}
+        allowed-clock-skew: ${SERVICEOS_BYD_CPIM_ALLOWED_CLOCK_SKEW:PT5M}
   files:
     # 参考工程默认使用私有本地沙箱；生产部署必须切换为受管对象存储适配器和专业扫描服务。
     storage: ${SERVICEOS_FILE_STORAGE:local-private}
