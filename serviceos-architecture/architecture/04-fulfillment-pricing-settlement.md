@@ -56,7 +56,7 @@ effectiveAt
 status
 ```
 
-事实状态建议为：`OBSERVED`、`CONFIRMED`、`INVALIDATED`。只有满足项目验收条件的事实才能标记为可计价。
+事实状态建议为：`OBSERVED`、`CONFIRMED`、`SUPERSEDED`、`INVALIDATED`。只有满足项目验收条件的事实才能进入可计价 FactSetSnapshot。完整运行时见[履约事实提取与双向试算运行时](15-fulfillment-fact-calculation-runtime.md)。
 
 ## 4. 对上与对下独立
 
@@ -132,11 +132,14 @@ flowchart TB
 ### 9.1 CalculationRun
 
 ```text
-DRAFT -> CALCULATED -> VALIDATED -> SUPERSEDED
-                  \-> FAILED
+REQUESTED -> VALIDATING -> CALCULATING -> CALCULATED -> VALIDATED
+                      \-> NOT_CALCULABLE            \-> STALE/SUPERSEDED
+                      \-> FAILED
 ```
 
 重新试算新增一条运行记录，并将旧记录标记为被替代；不得覆盖旧结果。
+
+完整状态、FactSetSnapshot、PricingContextSnapshot 与确定性约束以[履约事实提取与双向试算运行时](15-fulfillment-fact-calculation-runtime.md)为准。
 
 ### 9.2 SettlementStatement
 
@@ -147,6 +150,8 @@ LOCKED -> ADJUSTED
 ```
 
 `LOCKED` 后不得修改原费用项。补差、核减、红冲必须创建关联调整单，并保留原结算单。
+
+详细对账、StatementLine、防重复、争议和财务交接边界见[对账、结算、争议与调整边界](16-reconciliation-settlement-boundary.md)。
 
 ## 10. 审核与冻结
 

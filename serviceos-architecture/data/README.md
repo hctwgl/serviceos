@@ -8,3 +8,4 @@
 - [授权与审计逻辑数据模型](02-authorization-audit-logical-model.md)
 - [现场作业、表单、资料与审核逻辑数据模型](03-field-operations-logical-model.md)
 - [派单、SLA、集成、通知与异常逻辑数据模型](04-automation-integration-logical-model.md)
+- [履约事实、试算、结算、迁移与试点逻辑数据模型](05-pricing-migration-pilot-logical-model.md)

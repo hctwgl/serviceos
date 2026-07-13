@@ -51,11 +51,24 @@ status: Draft
 | 通知意图 | NotificationIntent | 由领域事件和通知计划生成的一次业务通知目的 | 单条供应商短信请求 |
 | 运营异常 | OperationalException | 自动流程无法继续且需要恢复验证的运营问题 | 工单生命周期状态 |
 | 履约事实 | FulfillmentFact | 经确认、可用于计价的标准事实 | 原始表单 JSON |
+| 事实提取运行 | FactExtractionRun | 按明确来源和策略生成事实的一次可追踪执行 | 直接读取当前表单值 |
+| 事实集合快照 | FactSetSnapshot | 某次试算冻结使用的不可变事实版本集合 | 动态“当前事实”查询 |
 | 费用明细 | ChargeItem | 规则对履约事实计算的可解释金额项 | 结算单总额 |
 | 试算运行 | CalculationRun | 使用明确事实和价格版本执行的一次可重现计算 | 已确认结算单 |
 | 价格方案版本 | PricingPlanVersion | 已发布且不可变的一组适用范围与计价规则 | 可直接修改的报价表 |
+| 价格上下文快照 | PricingContextSnapshot | 锁定方向、对象、合同、取价日期、税和舍入的一次试算上下文 | 项目当前配置 |
+| 对账批次 | SettlementBatch | 按方向、对象、项目、周期组织的对账集合 | 单张工单金额 |
 | 结算单 | SettlementStatement | 对账周期内提交确认的一组费用项 | 单次试算结果 |
+| 结算行 | StatementLine | 精确引用 ChargeItem 或 Adjustment 的不可变对账明细 | 可直接修改的金额字段 |
 | 调整单 | Adjustment | 对既有费用或结算结果进行补差、核减或红冲的独立记录 | 修改原费用项 |
+| 结算锁 | SettlementLock | 对已确认 Statement 版本和行摘要的不可变锁定 | 数据库行锁 |
+| 财务交接 | FinanceHandoff | 将锁定业务应收/应付交给财务系统的幂等批次 | ServiceOS 总账 |
+| 源快照 | SourceSnapshot | 迁移时旧系统某一一致性水位的不可变数据清单和摘要 | 随时变化的源表 |
+| 迁移血缘 | MigrationLineage | 新对象/字段到源快照、记录和转换版本的可追溯关系 | 只有旧新 ID 对照 |
+| 切换群组 | CutoverCohort | 按确定性规则划分权威系统和副作用权限的一组业务 | 临时随机流量 |
+| 权威系统分配 | WorkOrderAuthorityAssignment | 指定工单当前唯一写入事实源的记录 | 双系统同时可写 |
+| 副作用围栏 | SideEffectFence | 在派单、通知、回传和结算前校验环境与权威归属的强制策略 | 普通功能开关 |
+| 发布门禁 | RolloutGate | 用指标、阈值和证据决定试点扩大或暂停的规则 | 仅按日期推进计划 |
 | 配置包 | ConfigurationBundle | 工单锁定的一组发布版本引用 | 可变的项目当前配置 |
 | 配置资产 | ConfigurationAsset | 具有稳定编码、所有者和版本生命周期的业务配置 | 任意键值参数 |
 | 草稿修订 | DraftRevision | 尚未发布、可继续编辑的一次配置修订 | 生产运行版本 |

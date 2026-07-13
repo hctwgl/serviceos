@@ -39,8 +39,13 @@ classDiagram
   class OutboundDelivery
   class OperationalException
   class FulfillmentFact
+  class FactSetSnapshot
+  class PricingContextSnapshot
+  class CalculationRun
   class ChargeItem
   class SettlementStatement
+  class StatementLine
+  class Adjustment
 
   Client "1" --> "many" Brand
   Client "1" --> "many" Project
@@ -72,8 +77,14 @@ classDiagram
   WorkOrder "1" --> "many" OutboundDelivery
   WorkOrder "1" --> "many" OperationalException
   WorkOrder "1" --> "many" FulfillmentFact
-  FulfillmentFact "many" --> "many" ChargeItem
-  SettlementStatement "1" --> "many" ChargeItem
+  WorkOrder "1" --> "many" FactSetSnapshot
+  FactSetSnapshot "many" --> "many" FulfillmentFact : freezes
+  CalculationRun "many" --> "1" FactSetSnapshot
+  CalculationRun "many" --> "1" PricingContextSnapshot
+  CalculationRun "1" --> "many" ChargeItem
+  SettlementStatement "1" --> "many" StatementLine
+  StatementLine "many" --> "zero or one" ChargeItem
+  StatementLine "many" --> "zero or one" Adjustment
 ```
 
 ## 2. 聚合边界
@@ -169,6 +180,8 @@ PENDING -> READY -> CLAIMED/RUNNING -> COMPLETED
 `FulfillmentFact` 是已标准化且可追溯的履约事实，例如实际线缆米数、二次上门次数、偏远区域、安装立柱数量。事实何时可用于计价，由项目的验收条件决定；在需要车企审核的项目中，车企驳回必须冻结或撤销相关事实的“可计价”资格。
 
 `ChargeItem` 是某一计价方案版本对事实计算后的结果。对上与对下分别生成，不共享金额，只共享事实。
+
+试算通过 FactSetSnapshot 冻结事实版本，并使用独立 PricingContextSnapshot 与 CalculationRun。SettlementStatement 不直接包含可变“当前费用”，而由 StatementLine 精确引用 ChargeItem 或 Adjustment。
 
 ## 3. 配置包
 

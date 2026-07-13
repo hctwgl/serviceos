@@ -90,6 +90,8 @@ M3 的架构输入见 [预约与现场作业](../architecture/08-appointment-fie
 
 M4 的架构输入见 [服务网络与派单引擎](../architecture/11-service-network-dispatch.md)、[SLA 时钟、预警与升级](../architecture/12-sla-clock-escalation.md)、[车企集成、回传与可靠交付](../architecture/13-integration-reliability.md)、[通知与运营异常中心](../architecture/14-notification-operational-exception.md)、[M4 HTTP API](../api/04-automation-integration-http-api.md)、[M4 逻辑数据模型](../data/04-automation-integration-logical-model.md)和[M4 验收矩阵](../testing/03-m4-automation-integration-acceptance.md)。M4 开工前必须填写 M1-04/M1-06，确认签约比例口径、SLA 数值/日历和至少一家试点车企的真实脱敏接口报文。
 
+M5 的架构输入见 [履约事实提取与双向试算运行时](../architecture/15-fulfillment-fact-calculation-runtime.md)、[对账、结算、争议与调整边界](../architecture/16-reconciliation-settlement-boundary.md)、[历史数据迁移、双轨与切换](../architecture/17-data-migration-cutover.md)、[试点、灰度发布与可观测性](../architecture/18-pilot-rollout-observability.md)、[M5 HTTP API](../api/05-pricing-migration-pilot-http-api.md)、[M5 逻辑数据模型](../data/05-pricing-migration-pilot-logical-model.md)和[M5 验收矩阵](../testing/04-m5-pricing-migration-pilot-acceptance.md)。M5 开工前必须完成 M1-05/M1-08、试点项目选择、历史金额样本、迁移盘点和切换/回退职责确认。
+
 ## 6. 首批待决策事项
 
 1. MVP 首个车企与第二对照项目；
