@@ -20,6 +20,7 @@ classDiagram
   class StageInstance
   class Task
   class DispatchRequest
+  class DispatchAttempt
   class DispatchDecision
   class CandidateEvaluation
   class ServiceAssignment
@@ -50,6 +51,7 @@ classDiagram
   WorkOrder "1" --> "many" StageInstance
   StageInstance "1" --> "many" Task
   Task "1" --> "many" DispatchRequest
+  DispatchRequest "1" --> "many" DispatchAttempt
   DispatchRequest "1" --> "many" DispatchDecision
   DispatchDecision "1" --> "many" CandidateEvaluation
   DispatchDecision "1" --> "zero or one" ServiceAssignment : activates

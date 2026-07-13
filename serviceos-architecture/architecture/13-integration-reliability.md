@@ -21,7 +21,7 @@ status: Proposed
 | `OutboundDelivery` | 一次待向外部系统交付的业务意图 |
 | `DeliveryAttempt` | 一次网络/文件交付尝试 |
 | `ExternalAcknowledgement` | 外部技术或业务确认 |
-| `IntegrationException` | 无法自动闭环的集成异常 |
+| `OperationalException` | 无法自动闭环的集成异常，类型为 INTEGRATION |
 | `ReplayRequest` | 受审计的重放/补发请求 |
 
 ## 3. 接入分层
@@ -115,7 +115,7 @@ stateDiagram-v2
   [*] --> PENDING
   PENDING --> SENDING: start attempt
   SENDING --> DELIVERED: technical success
-  SENDING --> RETRY_WAIT: retryable failure
+  SENDING --> RETRY_WAIT: Task schedules retry
   SENDING --> FAILED_FINAL: permanent failure
   RETRY_WAIT --> SENDING: retry due
   DELIVERED --> ACKNOWLEDGED: business acknowledgement
@@ -135,7 +135,7 @@ stateDiagram-v2
 - 端点/文件路径引用；
 - 响应状态、错误分类和响应正文引用；
 - 连接、读取和总超时；
-- 下次重试时间；
+- 关联的 TaskExecutionAttempt；
 - 实际 connector credential version（不保存密钥）。
 
 不能只保留“最后一次错误”。
@@ -153,7 +153,7 @@ stateDiagram-v2
 | `DUPLICATE_ACCEPTED` | 外部已存在 | 查询并核对，视为幂等成功或冲突 |
 | `UNKNOWN` | 未分类错误 | 少量重试后人工 |
 
-重试次数、退避和人工接管由失败策略版本定义。任务模块是业务重试唯一调度者；连接器库内部只能重试明确无副作用的低层连接动作。
+重试次数、退避、nextRetryAt 和人工接管由关联自动 Task/TaskExecutionAttempt 唯一拥有。OutboundDelivery 的 `RETRY_WAIT` 是根据 Task 状态形成的投影，DeliveryAttempt 只记录实际网络尝试。连接器库内部只能重试尚未向外部产生可观察副作用的低层连接动作。
 
 ## 11. 外部幂等
 
@@ -181,7 +181,7 @@ mappingVersionId
 affectedObjectRefs[]
 ```
 
-重复回执幂等；相互矛盾的回执进入异常，不覆盖旧结果。
+重复回执幂等；相互矛盾的回执创建 `type=INTEGRATION` 的 OperationalException，不覆盖旧结果。
 
 ## 13. 人工修复与重放
 

@@ -112,7 +112,7 @@ status: Proposed
 | `POST /replay-requests` | RequestReplay | deliveryIds、mode、reason | 202 |
 | `POST /replay-requests/{id}:approve` | ApproveReplay | decision、limits | 200 |
 
-人工重试不接受客户端修改原 payload。对象版本变化时创建新 delivery，并显式关联原 delivery。
+人工重试不接受客户端修改原 payload。`RetryDelivery` 是便利入口，鉴权后委托执行内核对 `executionTaskId` 执行 RetryTask，不由集成模块另行安排 nextRetryAt。对象版本变化时创建新 delivery，并显式关联原 delivery。
 
 ## 6. 外部回执
 
@@ -130,7 +130,7 @@ status: Proposed
 }
 ```
 
-连接器按外部回执 ID 和业务键幂等。冲突回执创建 IntegrationException，不覆盖旧 acknowledgement。
+连接器按外部回执 ID 和业务键幂等。冲突回执创建 `type=INTEGRATION` 的 OperationalException，不覆盖旧 acknowledgement。
 
 ## 7. 通知
 
@@ -144,6 +144,8 @@ status: Proposed
 | `PUT /notification-preferences/me` | 更新非必要渠道偏好 | preferences | 200 |
 
 关键事务通知是否可关闭由合规策略决定，不能仅以用户偏好绕过。
+
+`RetryNotification` 和备用渠道动作均委托关联自动 Task 执行；NotificationDelivery/Attempt 不拥有独立业务重试调度。
 
 ## 8. 运营异常
 

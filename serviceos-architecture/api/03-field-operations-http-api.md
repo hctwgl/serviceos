@@ -130,7 +130,7 @@ UploadSession 返回受限上传地址、允许分片、过期时间和最大字
 | `POST /review-cases/{id}:reopen` | ReopenReview | reason、triggerRef、approvalRef? | 201 |
 | `GET /correction-cases/{id}` | 整改项与轮次 | — | 200 |
 | `POST /correction-cases/{id}:resubmit` | ResubmitCorrection | correctedTargetRefs | 200 |
-| `POST /external-review-receipts` | RecordExternalReviewReceipt | reviewCaseRef、externalKey、callbackBatchRef、mappingVersionId、result、affectedTargets、payloadRef | 200 |
+| `POST /internal/external-review-receipts` | RecordExternalReviewReceipt（仅适配层服务主体） | inboundEnvelopeId、canonicalMessageId、reviewCaseRef、externalKey、callbackBatchRef、mappingVersionId、result、affectedTargets、payloadRef | 200 |
 
 整改分配通过关联整改 Task 的责任人策略、领取或任务分配命令完成；CorrectionCase 不维护自己的 assignee 或 SLA。
 
@@ -177,7 +177,7 @@ UploadSession 返回受限上传地址、允许分片、过期时间和最大字
 }
 ```
 
-适配器必须校验回传批次、映射版本和受影响对象确实属于该 ReviewCase；随后追加 ReviewDecision 并触发客服协调，不直接修改师傅 Task。
+该端点不对车企或普通用户开放。车企请求必须先经过 Connector 的验签、原文留存、入站幂等和 CanonicalMessage 映射；适配层使用服务主体调用，并强制关联 inboundEnvelopeId/canonicalMessageId。适配器校验回传批次、映射版本和受影响对象确实属于该 ReviewCase；随后追加 ReviewDecision 并触发客服协调，不直接修改师傅 Task。
 
 ## 6. 移动工作包与离线同步
 

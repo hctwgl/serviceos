@@ -20,12 +20,17 @@ status: Proposed
 | DSP-008 | P1 | 策略调整到期 | 临时增加容量 | 到期调度 | 自动恢复基础策略且历史解释不变 |
 | TECH-001 | P0 | 网点人工派师傅 | 多名合格师傅 | 网点选择 | Decision 和 ServiceAssignment 完整 |
 | TECH-002 | P0 | 师傅资质过期 | 当前师傅资格失效 | 自动/人工选择 | 硬过滤拒绝 |
+| TECH-003 | P0 | 自动派师傅 | 多名合格师傅且策略启用 | 自动决策 | 可解释选择、ServiceAssignment 与 TaskAssignment 同步 |
+| TECH-004 | P0 | 师傅改派同步 | 原师傅 Task 可执行 | 改派新师傅 | 新责任激活后旧师傅立即不能执行 |
+| TECH-005 | P0 | 改派握手中断 | TaskAssignment 准备后进程中断 | 恢复 saga | Task 保持不可执行，重试后单一新责任生效 |
 | SLA-001 | P0 | 工作日历截止 | 跨周末和节假日 | 启动 SLA | deadline 与锁定日历样例一致 |
 | SLA-002 | P0 | 暂停恢复片段 | 用户延期 | pause→resume | segments 无重叠，deadline 正确顺延 |
 | SLA-003 | P0 | 重复 milestone | 调度消息重复 | 触发预警/超时 | milestone、通知和升级各一次 |
 | SLA-004 | P0 | 重启补偿扫描 | 调度器停机跨过 deadline | 恢复服务 | reconciliation 触发 breach 且保留实际延迟 |
 | SLA-005 | P0 | 超时后完成 | 已 BREACHED | 完成任务 | 状态 MET_LATE，breach 历史保留 |
 | SLA-006 | P1 | 日历更正重算 | 历史节假日配置错误 | 审批重算 | 新旧 deadline、原因和认可结果完整 |
+| SLA-007 | P0 | 派单失败提前预警 | 24h 人工处理 SLA | 达到预警阈值 | 项目经理收到一次预警且 milestone 可追溯 |
+| SLA-008 | P0 | 派单失败超时升级 | 项目经理 24h 未处理 | deadline 到达 | 标记 BREACHED 并升级当前品牌负责人 |
 | INT-001 | P0 | 入站重复 | 相同消息和摘要 | 并发推送 | 一个 CanonicalMessage/领域结果 |
 | INT-002 | P0 | 入站冲突 | 相同业务键不同摘要 | 推送 | 冲突异常，不覆盖首次数据 |
 | INT-003 | P0 | 回传超时但已接收 | 外部处理成功、响应丢失 | 自动恢复 | 查询/幂等确认，不产生重复业务结果 |
@@ -34,6 +39,9 @@ status: Proposed
 | INT-006 | P0 | 重试耗尽 | 持续 5xx/验证错误 | 执行失败策略 | 可重试按策略，最终人工异常 Task |
 | INT-007 | P1 | 批量重放保护 | 1000 条失败 delivery | 申请重放 | 预演、审批、限流和逐条结果 |
 | INT-008 | P1 | 文件渠道部分失败 | Excel 100 行中 3 行错误 | 导入 | 97 成功、3 行错误可修复，整批可追溯 |
+| INT-009 | P0 | 车企审核统一入站 | 外部审核回调 | 调用连接器入口 | Envelope→CanonicalMessage→内部审核命令链完整，不能绕过 |
+| AUTO-001 | P0 | 单一业务重试调度 | Delivery/Notification 失败 | 进入 RETRY_WAIT | 只有 TaskExecutionAttempt 保存 nextRetryAt 并触发下一次 |
+| AUTO-002 | P0 | 派单尝试历史 | 依赖失败两次后成功 | 自动重试 | 三个 DispatchAttempt 均可追溯且无覆盖 |
 | NTF-001 | P0 | 通知去重 | 同领域事件重复 | 消费 | 单一 Intent/Delivery |
 | NTF-002 | P0 | 预约修订 | 预约已改约 | 发送提醒 | 使用当前确认 revision，不发旧时间 |
 | NTF-003 | P0 | 非关键通知失败 | 普通提醒供应商失败 | 重试耗尽 | 业务不回滚，失败可查 |

@@ -92,6 +92,8 @@ NotificationDelivery: PENDING -> SENDING -> SENT -> DELIVERED/READ
 - 非关键营销/提醒：记录失败，不阻塞履约；
 - 渠道故障时可按计划使用备用渠道，但必须避免重复扰民。
 
+每个 NotificationDelivery 关联一个自动 Task。业务重试次数、退避和 nextRetryAt 只由 TaskExecutionAttempt 管理；NotificationAttempt 只记录实际供应商调用。通知域的 `RETRY_WAIT` 是任务状态投影，不是第二调度器。
+
 ## 9. 用户偏好和合规
 
 事务通知与营销通知分离。用户偏好可以关闭非必要渠道，但合同、安全、预约变更等必要事务通知按合规规则处理。
