@@ -40,11 +40,11 @@ public class JdbcBydCpimReplayGuard {
         Instant now = clock.instant();
         int inserted = jdbc.sql("""
                         INSERT INTO int_inbound_replay_guard (
-                            app_key, nonce, current_time, payload_digest, first_seen_at, expires_at
+                            app_key, nonce, request_time_epoch, payload_digest, first_seen_at, expires_at
                         ) VALUES (
                             :appKey, :nonce, :currentTime, :payloadDigest, :firstSeenAt, :expiresAt
                         )
-                        ON CONFLICT (app_key, nonce, current_time) DO NOTHING
+                        ON CONFLICT (app_key, nonce, request_time_epoch) DO NOTHING
                         """)
                 .param("appKey", appKey)
                 .param("nonce", nonce)
@@ -63,7 +63,7 @@ public class JdbcBydCpimReplayGuard {
                           FROM int_inbound_replay_guard
                          WHERE app_key = :appKey
                            AND nonce = :nonce
-                           AND current_time = :currentTime
+                           AND request_time_epoch = :currentTime
                         """)
                 .param("appKey", appKey)
                 .param("nonce", nonce)
@@ -86,7 +86,7 @@ public class JdbcBydCpimReplayGuard {
                            SET result_digest = :resultDigest
                          WHERE app_key = :appKey
                            AND nonce = :nonce
-                           AND current_time = :currentTime
+                           AND request_time_epoch = :currentTime
                         """)
                 .param("resultDigest", resultDigest)
                 .param("appKey", appKey)
