@@ -1,19 +1,24 @@
 ---
 title: ServiceOS 领域语言与边界索引
-version: 0.1.1
+version: 0.2.0
 status: Proposed
 ---
 
 # ServiceOS 领域语言与边界
 
-本目录冻结 ServiceOS 的一级领域语言、限界上下文和聚合边界。它不是现有架构文档的替代品，而是跨产品、研发、测试、数据和集成团队共同使用的命名权威。
+本目录冻结 ServiceOS 的一级领域语言、限界上下文、聚合边界、事件、值对象、领域策略和状态机。它不是现有架构文档的替代品，而是跨产品、研发、测试、数据和集成团队共同使用的领域权威。
 
 ## 阅读顺序
 
 1. [统一领域语言](00-ubiquitous-language.md)
 2. [限界上下文地图](01-context-map.md)
 3. [聚合目录](02-aggregate-catalog.md)
-4. [ADR-020：核心领域命名与边界稳定策略](../decisions/ADR-020-canonical-domain-language.md)
+4. [领域事件目录与发布规则](03-domain-events.md)
+5. [值对象目录](04-value-objects.md)
+6. [领域策略目录](05-domain-policies.md)
+7. [聚合状态机基线](06-state-machines.md)
+8. [ADR-020：核心领域命名与边界稳定策略](../decisions/ADR-020-canonical-domain-language.md)
+9. [ADR-021：领域事件发布、版本与消费边界](../decisions/ADR-021-domain-event-publication-versioning.md)
 
 ## 权威关系
 
@@ -29,7 +34,7 @@ Accepted ADR
 
 如果代码、数据库、OpenAPI 或页面术语与本目录冲突，必须先修正文档或通过新 ADR 变更领域语言，禁止在实现层自行创造同义词。
 
-## 本批基线的关键结论
+## 当前基线的关键结论
 
 - `WorkOrder`（工单）保持为核心履约实例的统一名称，不改名为 `Fulfillment`；
 - `Fulfillment` 只用于“履约行为、履约事实和履约结果”等语义，不作为工单聚合的替代名称；
@@ -37,7 +42,11 @@ Accepted ADR
 - `Evidence` 统一表示照片、视频、文件、签字、OCR/GPS 等履约证据；
 - `ReviewCase` 保持为审核案例的领域名称，自动校验能力称为 Validation，但不以 Validation 替换人工审核与车企审核的业务概念；
 - `ConfigurationBundle` 是工单创建时锁定的精确配置资产集合；
-- 聚合之间只通过稳定标识和不可变快照引用，不直接持有另一个聚合对象图。
+- 聚合之间只通过稳定标识和不可变快照引用，不直接持有另一个聚合对象图；
+- 领域事件由事实源聚合产生，并与聚合写入通过 Outbox 原子提交；
+- 领域事件用于异步副作用、集成、审计和投影，不默认采用事件溯源；
+- 状态变更必须通过命令、校验不变量并产生明确事件；
+- 运营页面状态优先由 Stage 与 Task 投影得出，不扩张 WorkOrder 主状态。
 
 ## 实现追踪规则
 
@@ -47,6 +56,8 @@ Accepted ADR
 - 所属限界上下文与事实源所有者；
 - 被修改的聚合根；
 - 新增或消费的领域事件；
+- 使用的值对象与领域策略；
+- 状态迁移及非法迁移测试；
 - 数据库迁移、OpenAPI 或事件 Schema 的对应路径；
 - 覆盖核心不变量的测试类。
 
@@ -61,4 +72,7 @@ Accepted ADR
 - 限界上下文拆分或合并；
 - 事实源所有权迁移；
 - 已发布事件语义改变；
-- 跨上下文同步事务边界扩大。
+- 事件版本或投递语义改变；
+- 聚合稳定状态机发生破坏性变化；
+- 跨上下文同步事务边界扩大；
+- 引入事件溯源或 exactly-once 平台承诺。
