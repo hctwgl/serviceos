@@ -7,7 +7,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Duration;
-import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 
 /**
  * PostgreSQL 反重放存储。
@@ -37,7 +38,7 @@ public class JdbcBydCpimReplayGuard {
             String nonce,
             long currentTime,
             String payloadDigest) {
-        Instant now = clock.instant();
+        OffsetDateTime now = clock.instant().atOffset(ZoneOffset.UTC);
         int inserted = jdbc.sql("""
                         INSERT INTO int_inbound_replay_guard (
                             app_key, nonce, request_time_epoch, payload_digest, first_seen_at, expires_at
