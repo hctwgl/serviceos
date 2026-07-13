@@ -20,6 +20,7 @@ spring:
       - classpath:db/migration/task
       - classpath:db/migration/operations
       - classpath:db/migration/files
+      - classpath:db/migration/integration
     validate-migration-naming: true
   security:
     oauth2:
