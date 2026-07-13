@@ -40,19 +40,19 @@ public final class BydCpimSignatureVerifier {
         if (!MessageDigest.isEqual(
                 appKey.getBytes(StandardCharsets.UTF_8),
                 headers.appKey().getBytes(StandardCharsets.UTF_8))) {
-            return Verification.invalid(Reason.UNKNOWN_APP_KEY);
+            return Verification.rejected(Reason.UNKNOWN_APP_KEY);
         }
 
         Duration skew = Duration.between(headers.currentTime(), clock.instant()).abs();
         if (skew.compareTo(allowedSkew) > 0) {
-            return Verification.invalid(Reason.TIMESTAMP_OUT_OF_WINDOW);
+            return Verification.rejected(Reason.TIMESTAMP_OUT_OF_WINDOW);
         }
 
         String expected = sign(headers.appKey(), headers.nonce(), headers.currentTime().getEpochSecond(), businessParameters);
         boolean matches = MessageDigest.isEqual(
                 expected.getBytes(StandardCharsets.US_ASCII),
                 headers.signature().getBytes(StandardCharsets.US_ASCII));
-        return matches ? Verification.valid() : Verification.invalid(Reason.SIGNATURE_MISMATCH);
+        return matches ? Verification.accepted() : Verification.rejected(Reason.SIGNATURE_MISMATCH);
     }
 
     public String sign(String requestAppKey, String nonce, long epochSecond, Map<String, ?> businessParameters) {
@@ -98,11 +98,11 @@ public final class BydCpimSignatureVerifier {
     }
 
     public record Verification(boolean valid, Reason reason) {
-        static Verification valid() {
+        public static Verification accepted() {
             return new Verification(true, Reason.NONE);
         }
 
-        static Verification invalid(Reason reason) {
+        public static Verification rejected(Reason reason) {
             return new Verification(false, reason);
         }
     }
