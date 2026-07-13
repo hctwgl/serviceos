@@ -11,6 +11,7 @@ require_env_file "${env_file}"
 load_env_file "${env_file}"
 require_immutable_image_or_local_override
 : "${SERVICEOS_EXPECTED_MIGRATION_VERSION:?SERVICEOS_EXPECTED_MIGRATION_VERSION is required}"
+: "${SERVICEOS_EXPECTED_MIGRATION_COUNT:?SERVICEOS_EXPECTED_MIGRATION_COUNT is required}"
 
 port="${SERVICEOS_STAGING_PORT:-18080}"
 mkdir -p "${output_dir}"
@@ -30,7 +31,7 @@ metrics_status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
 migration_count="$(compose "${env_file}" exec -T database \
   psql -U serviceos_bootstrap -d serviceos -Atc \
   "SELECT count(*) FROM flyway_schema_history WHERE success")"
-[[ "${migration_count}" == "11" ]]
+[[ "${migration_count}" == "${SERVICEOS_EXPECTED_MIGRATION_COUNT}" ]]
 migration_version="$(compose "${env_file}" exec -T database \
   psql -U serviceos_bootstrap -d serviceos -Atc \
   "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1")"

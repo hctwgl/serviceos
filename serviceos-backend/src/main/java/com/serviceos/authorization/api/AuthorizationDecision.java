@@ -6,13 +6,15 @@ public record AuthorizationDecision(
         Effect effect,
         List<String> reasonCodes,
         List<String> matchedGrantIds,
+        List<String> dataScopeExplanations,
         List<String> obligations,
         String policyVersion
 ) {
     public enum Effect { ALLOW, DENY }
 
     public static AuthorizationDecision allow() {
-        return new AuthorizationDecision(Effect.ALLOW, List.of(), List.of(), List.of(), "unspecified");
+        return new AuthorizationDecision(
+                Effect.ALLOW, List.of(), List.of(), List.of(), List.of(), "unspecified");
     }
 
     public static AuthorizationDecision deny(String reasonCode) {
@@ -21,6 +23,6 @@ public record AuthorizationDecision(
 
     public static AuthorizationDecision deny(String reasonCode, String policyVersion) {
         return new AuthorizationDecision(
-                Effect.DENY, List.of(reasonCode), List.of(), List.of(), policyVersion);
+                Effect.DENY, List.of(reasonCode), List.of(), List.of(), List.of(), policyVersion);
     }
 }

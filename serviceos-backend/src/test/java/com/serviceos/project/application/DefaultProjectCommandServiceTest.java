@@ -62,7 +62,8 @@ class DefaultProjectCommandServiceTest {
     private static AuthorizationService allowAuthorization() {
         AuthorizationDecision allowed = new AuthorizationDecision(
                 AuthorizationDecision.Effect.ALLOW,
-                List.of(), List.of("grant-1"), List.of(), "policy-v1");
+                List.of(), List.of("grant-1"), List.of("TENANT:trusted-tenant"),
+                List.of(), "policy-v1");
         return new AuthorizationService() {
             @Override
             public AuthorizationDecision authorize(

@@ -25,8 +25,8 @@ class DefaultAuthorizationServiceTest {
     private final Clock clock = Clock.fixed(Instant.parse("2026-07-13T03:30:00Z"), ZoneOffset.UTC);
     private final AuthorizationDenialAuditWriter writer = new AuthorizationDenialAuditWriter(audit, clock);
     private CapabilityGrantMatch grantMatch = new CapabilityGrantMatch(
-            true, List.of("grant-1"), "test-policy-v1");
-    private final AuthorizationPolicyStore policyStore = (tenant, principal, capability, evaluatedAt) -> grantMatch;
+            true, List.of("grant-1"), List.of("TENANT:tenant-a"), "test-policy-v1");
+    private final AuthorizationPolicyStore policyStore = (tenant, principal, request, evaluatedAt) -> grantMatch;
     private final DefaultAuthorizationService service = new DefaultAuthorizationService(writer, policyStore, clock);
 
     @Test
@@ -35,6 +35,7 @@ class DefaultAuthorizationServiceTest {
                 principal(Set.of("project.create")), request("tenant-a"), "corr-1");
 
         assertThat(decision.effect()).isEqualTo(AuthorizationDecision.Effect.ALLOW);
+        assertThat(decision.dataScopeExplanations()).containsExactly("TENANT:tenant-a");
         assertThat(entries).isEmpty();
     }
 

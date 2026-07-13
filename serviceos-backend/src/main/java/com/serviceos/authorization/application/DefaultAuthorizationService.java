@@ -11,8 +11,7 @@ import org.springframework.stereotype.Service;
 import java.time.Clock;
 
 /**
- * E1 授权基线：先实施租户硬边界和稳定 capability。
- * 项目、区域、网点、参与关系和字段策略将在相同接口下逐步接入权威 grant/policy 数据。
+ * E1 授权内核：租户是不可跨越的硬边界；有效 RoleGrant 再按租户、项目、区域或网点范围匹配。
  */
 @Service
 final class DefaultAuthorizationService implements AuthorizationService {
@@ -42,14 +41,15 @@ final class DefaultAuthorizationService implements AuthorizationService {
         if (!principal.tenantId().equals(request.tenantId())) {
             return AuthorizationDecision.deny(TENANT_SCOPE_MISMATCH, "tenant-boundary-v1");
         }
-        CapabilityGrantMatch grants = policyStore.findTenantCapabilityGrants(
-                request.tenantId(), principal.principalId(), request.capability(), clock.instant());
+        CapabilityGrantMatch grants = policyStore.findCapabilityGrants(
+                request.tenantId(), principal.principalId(), request, clock.instant());
         if (!grants.allowed()) {
             return AuthorizationDecision.deny(CAPABILITY_MISSING, grants.policyVersion());
         }
         return new AuthorizationDecision(
                 AuthorizationDecision.Effect.ALLOW,
-                java.util.List.of(), grants.matchedGrantIds(), java.util.List.of(), grants.policyVersion());
+                java.util.List.of(), grants.matchedGrantIds(), grants.matchedScopeExplanations(),
+                java.util.List.of(), grants.policyVersion());
     }
 
     @Override

@@ -142,7 +142,8 @@ class DefaultFileCommandServiceTest {
     private static AuthorizationService allowAuthorization() {
         AuthorizationDecision allowed = new AuthorizationDecision(
                 AuthorizationDecision.Effect.ALLOW,
-                List.of(), List.of("grant-file-1"), List.of(), "policy-file-v1");
+                List.of(), List.of("grant-file-1"), List.of("TENANT:tenant-trusted"),
+                List.of(), "policy-file-v1");
         return new AuthorizationService() {
             @Override
             public AuthorizationDecision authorize(

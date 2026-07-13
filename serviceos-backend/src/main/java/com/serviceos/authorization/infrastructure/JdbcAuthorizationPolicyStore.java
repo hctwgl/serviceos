@@ -2,12 +2,12 @@ package com.serviceos.authorization.infrastructure;
 
 import com.serviceos.authorization.application.AuthorizationPolicyStore;
 import com.serviceos.authorization.application.CapabilityGrantMatch;
+import com.serviceos.authorization.api.AuthorizationRequest;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 
 import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timestamptz;
 
@@ -16,7 +16,7 @@ import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timesta
  */
 @Repository
 final class JdbcAuthorizationPolicyStore implements AuthorizationPolicyStore {
-    private static final String POLICY_VERSION = "role-grant-v1";
+    private static final String POLICY_VERSION = "role-grant-v2";
 
     private final JdbcClient jdbc;
 
@@ -25,14 +25,14 @@ final class JdbcAuthorizationPolicyStore implements AuthorizationPolicyStore {
     }
 
     @Override
-    public CapabilityGrantMatch findTenantCapabilityGrants(
+    public CapabilityGrantMatch findCapabilityGrants(
             String tenantId,
             String principalId,
-            String capability,
+            AuthorizationRequest request,
             Instant evaluatedAt
     ) {
-        List<String> grantIds = jdbc.sql("""
-                        SELECT g.grant_id::text
+        List<MatchedGrantRow> grants = jdbc.sql("""
+                        SELECT g.grant_id::text, g.scope_type, g.scope_ref
                           FROM auth_role_grant g
                           JOIN auth_role r
                             ON r.role_id = g.role_id
@@ -45,22 +45,41 @@ final class JdbcAuthorizationPolicyStore implements AuthorizationPolicyStore {
                            AND c.capability_code = :capability
                            AND r.tenant_id = :tenantId
                            AND r.role_status = 'ACTIVE'
-                           AND g.scope_type = 'TENANT'
-                           AND g.scope_ref = :tenantId
+                           AND (
+                                (g.scope_type = 'TENANT' AND g.scope_ref = :tenantId)
+                             OR (g.scope_type = 'PROJECT' AND g.scope_ref = :projectId)
+                             OR (g.scope_type = 'REGION' AND g.scope_ref = :regionCode)
+                             OR (g.scope_type = 'NETWORK' AND g.scope_ref = :networkId)
+                           )
                            AND g.valid_from <= :evaluatedAt
                            AND (g.valid_to IS NULL OR g.valid_to > :evaluatedAt)
                            AND g.revoked_at IS NULL
                          ORDER BY g.grant_id
                         """)
-                .params(Map.of(
-                        "tenantId", tenantId,
-                        "principalId", principalId,
-                        "capability", capability,
-                        "evaluatedAt", timestamptz(evaluatedAt)))
-                .query(String.class)
+                .param("tenantId", tenantId)
+                .param("principalId", principalId)
+                .param("capability", request.capability())
+                // 空串不是合法 scope_ref，用作 null-safe sentinel，避免 JDBC 参数类型推断歧义。
+                .param("projectId", nullSafeScope(request.projectId()))
+                .param("regionCode", nullSafeScope(request.regionCode()))
+                .param("networkId", nullSafeScope(request.networkId()))
+                .param("evaluatedAt", timestamptz(evaluatedAt))
+                .query((rs, rowNum) -> new MatchedGrantRow(
+                        rs.getString("grant_id"), rs.getString("scope_type"), rs.getString("scope_ref")))
                 .list();
-        return grantIds.isEmpty()
+        return grants.isEmpty()
                 ? CapabilityGrantMatch.denied(POLICY_VERSION)
-                : new CapabilityGrantMatch(true, List.copyOf(grantIds), POLICY_VERSION);
+                : new CapabilityGrantMatch(
+                        true,
+                        grants.stream().map(MatchedGrantRow::grantId).toList(),
+                        grants.stream().map(row -> row.scopeType() + ":" + row.scopeRef()).toList(),
+                        POLICY_VERSION);
+    }
+
+    private static String nullSafeScope(String value) {
+        return value == null ? "" : value;
+    }
+
+    private record MatchedGrantRow(String grantId, String scopeType, String scopeRef) {
     }
 }
