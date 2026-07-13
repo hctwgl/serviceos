@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/task-manual-intervention-required-v1.schema.json",
+  "title": "TaskManualInterventionRequiredV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId",
+    "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"
+  ],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": { "const": "task.execution.manual-intervention-required" },
+    "schemaVersion": { "const": 1 },
+    "tenantId": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "correlationId": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "causationId": { "type": "string", "format": "uuid" },
+    "aggregateType": { "const": "Task" },
+    "aggregateId": { "type": "string", "format": "uuid" },
+    "aggregateVersion": { "type": "integer", "minimum": 1 },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "taskId", "attemptId", "taskType", "businessKey", "attemptNo", "status", "errorCode"
+      ],
+      "properties": {
+        "taskId": { "type": "string", "format": "uuid" },
+        "attemptId": { "type": "string", "format": "uuid" },
+        "taskType": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "businessKey": { "type": "string", "minLength": 1, "maxLength": 180 },
+        "attemptNo": { "type": "integer", "minimum": 1 },
+        "status": { "const": "MANUAL_INTERVENTION" },
+        "errorCode": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "resultRef": { "type": ["string", "null"], "maxLength": 500 }
+      }
+    }
+  }
+}

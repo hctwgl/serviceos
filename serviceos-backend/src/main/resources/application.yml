@@ -13,6 +13,8 @@ spring:
       - classpath:db/migration/audit
       - classpath:db/migration/authorization
       - classpath:db/migration/project
+      - classpath:db/migration/task
+      - classpath:db/migration/operations
     validate-migration-naming: true
   security:
     oauth2:

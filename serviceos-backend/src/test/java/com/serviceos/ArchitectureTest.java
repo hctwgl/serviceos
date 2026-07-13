@@ -21,6 +21,6 @@ class ArchitectureTest {
         assertThat(modules.stream().map(module -> module.getIdentifier().toString()).toList())
                 .contains(
                         "shared", "bootstrap", "identity", "authorization",
-                        "reliability", "audit", "project");
+                        "reliability", "audit", "project", "task", "operations");
     }
 }

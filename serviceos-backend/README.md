@@ -22,6 +22,21 @@ OIDC/JWT 身份解析
 
 JWT 中的 `capabilities` 只是上游声明，不是授权事实。命令必须命中 ServiceOS 当前有效且未撤销的 RoleGrant；撤权后即使旧 token 仍声明能力也会被拒绝。
 
+## 自动 Task 执行
+
+`task` 模块拥有自动任务的唯一重试时钟和执行尝试：
+
+```text
+schedule（业务键 + payloadDigest 幂等）
+→ 短事务 SKIP LOCKED claim + lease + attempt
+→ 事务外 AutomatedTaskHandler
+→ 短事务 SUCCEEDED / RETRY_WAIT / MANUAL_INTERVENTION + Outbox
+```
+
+只有执行器显式抛出的 `RETRYABLE` 错误才会重试；`UNKNOWN`、`FINAL`、缺处理器和未分类异常全部转人工，避免重复外部副作用。最后一次执行崩溃后，过期租约会被恢复为人工接管，不会永久卡在 `CLAIMED`。
+
+`operations` 模块可靠消费人工接管事件，在同一事务中写入 Inbox、OperationalException，并创建一个 `READY` 的 HUMAN handling Task。正式 Broker 适配器尚未包含在参考实现中。
+
 ## 环境变量
 
 | 变量 | 默认值 | 说明 |
@@ -42,3 +57,5 @@ JWT 中的 `capabilities` 只是上游声明，不是授权事实。命令必须
 - `SecurityContextCurrentPrincipalProviderTest`：JWT claim 的唯一映射；
 - `DefaultAuthorizationServiceTest`：capability/tenant 拒绝及审计；
 - `OutboxWorkerTest`：租约消息发布与失败回退。
+- `TaskExecutionWorkerTest`：成功、受控重试、UNKNOWN、未分类异常和租约耗尽恢复；
+- `TaskExecutionPostgresIT`：真实 PostgreSQL 的任务幂等、排他 claim、过期租约、attempt/Outbox 和异常人工闭环。

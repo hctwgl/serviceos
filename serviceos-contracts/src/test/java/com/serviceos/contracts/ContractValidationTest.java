@@ -47,8 +47,21 @@ class ContractValidationTest {
 
     @Test
     void projectCreatedExampleMustMatchPublishedSchema() throws Exception {
-        JsonNode schemaNode = objectMapper.readTree(resource("/events/project-created-v1.schema.json"));
-        JsonNode eventNode = objectMapper.readTree(resource("/events/project-created-v1.valid.json"));
+        assertValidEvent(
+                "/events/project-created-v1.schema.json",
+                "/events/project-created-v1.valid.json");
+    }
+
+    @Test
+    void taskManualInterventionExampleMustMatchPublishedSchema() throws Exception {
+        assertValidEvent(
+                "/events/task-manual-intervention-required-v1.schema.json",
+                "/events/task-manual-intervention-required-v1.valid.json");
+    }
+
+    private void assertValidEvent(String schemaPath, String eventPath) throws Exception {
+        JsonNode schemaNode = objectMapper.readTree(resource(schemaPath));
+        JsonNode eventNode = objectMapper.readTree(resource(eventPath));
         JsonSchemaFactory factory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012);
         JsonSchema schema = factory.getSchema(schemaNode);
 

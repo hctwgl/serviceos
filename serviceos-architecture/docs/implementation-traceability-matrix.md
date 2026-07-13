@@ -56,7 +56,7 @@ status: Proposed
 | 资料版本不可覆盖 | Evidence finalize/submit | revision append-only、snapshot member 固定 | M3 EVD |
 | 审核决定不可覆盖 | Review command | decision version append-only | M3 REV/COR |
 | 改派责任原子切换 | Assignment saga | ACTIVE 排他、capacity reservation、task guard | M4 ASN |
-| 业务重试唯一调度 | Task executor | nextRetryAt 仅 TaskExecutionAttempt | M4 DLV/NTF、M6 TX |
+| 业务重试唯一调度 | Task executor | Task.nextRunAt 是调度事实，Attempt 记录本次选定值；Delivery 不拥有重试钟 | M4 DLV/NTF、M6 TX |
 | 对上/对下隔离 | Pricing context resolver | direction-specific run/items | M5 CALC |
 | 缺失不等于零 | Fact/Pricing validation | typed fact state | M5 FACT/CALC |
 | 事实更正不穿透结算 | CorrectFact/eligibility/collect | FactEligibilityGuard + run hold | M5 FACT-004A/B |
@@ -103,4 +103,5 @@ Feature gate/authority: if applicable
 | 里程碑 | 代码/迁移 | 自动化测试 | 仍未证明 |
 |---|---|---|---|
 | M8 | Project、Audit、Idempotency、Outbox 事务切片 | Modulith、Domain、Contract、PostgreSQL IT | 完整 E1/履约链路 |
-| M9 | OIDC principal、tenant/capability 授权、Inbox、Outbox worker/attempt | Identity/Auth/Web MVC/Worker Unit + PostgreSQL IT | RoleGrant/ScopePredicate/FieldPolicy、正式 IdP/Broker、异常 Task |
+| M9 | OIDC principal、tenant/capability 授权、Inbox、Outbox worker/attempt | Identity/Auth/Web MVC/Worker Unit + PostgreSQL IT | RoleGrant/ScopePredicate/FieldPolicy、正式 IdP/Broker、Outbox DEAD 异常 Task |
+| M10 | 自动 Task、ExecutionAttempt、claim/lease、重试时钟、OperationalException、HUMAN handling Task | Task worker Unit + PostgreSQL IT + Event Schema | automation 模块提取、正式 Broker 路由、通用 Task 动作/负责人、authority fence、运行指标 |

@@ -1,0 +1,22 @@
+{
+  "eventId": "944395c7-910e-4cc2-b470-f2778da510dd",
+  "eventType": "task.execution.manual-intervention-required",
+  "schemaVersion": 1,
+  "tenantId": "tenant-test",
+  "correlationId": "corr-task-1",
+  "causationId": "0c445bc4-3f58-441d-b67d-d5ea347054e2",
+  "aggregateType": "Task",
+  "aggregateId": "1788b919-242e-45e8-a919-73ecde224abd",
+  "aggregateVersion": 3,
+  "occurredAt": "2026-07-13T04:00:00Z",
+  "payload": {
+    "taskId": "1788b919-242e-45e8-a919-73ecde224abd",
+    "attemptId": "0c445bc4-3f58-441d-b67d-d5ea347054e2",
+    "taskType": "integration.push-status",
+    "businessKey": "work-order-100/status-completed",
+    "attemptNo": 3,
+    "status": "MANUAL_INTERVENTION",
+    "errorCode": "REMOTE_RESULT_UNKNOWN",
+    "resultRef": null
+  }
+}
