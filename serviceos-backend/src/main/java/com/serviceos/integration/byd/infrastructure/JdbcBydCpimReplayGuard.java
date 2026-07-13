@@ -1,5 +1,6 @@
 package com.serviceos.integration.byd.infrastructure;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,7 @@ public class JdbcBydCpimReplayGuard {
     private final Clock clock;
     private final Duration retention;
 
+    @Autowired
     public JdbcBydCpimReplayGuard(JdbcClient jdbc) {
         this(jdbc, Clock.systemUTC(), Duration.ofHours(48));
     }
