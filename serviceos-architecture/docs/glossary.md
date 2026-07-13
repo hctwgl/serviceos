@@ -36,6 +36,20 @@ status: Draft
 | 表单版本 | FormVersion | 已发布、不可变的节点表单 Schema 和规则集合 | 可编辑草稿 |
 | 表单提交 | FormSubmission | 一次不可变的任务表单提交版本 | 核心领域对象全部事实 |
 | 移动工作包 | MobileWorkPackage | 为设备和任务签发的最小离线配置与数据快照 | 完整工单数据库副本 |
+| 服务覆盖 | ServiceCoverage | 网点可承接的品牌、项目、业务类型和区域范围版本 | 当前工单分配 |
+| 派单请求 | DispatchRequest | 一次需要为工单/任务选择网点或师傅的执行请求 | 最终责任关系 |
+| 派单决定 | DispatchDecision | 一次不可变候选过滤、评分和选择结果 | 直接修改网点字段 |
+| 候选评估 | CandidateEvaluation | 单个候选的硬规则、指标、得分和排除解释 | 只有最终总分 |
+| 服务责任分配 | ServiceAssignment | 网点或师傅在明确生效区间承担工单/任务的关系 | TaskAssignment 或派单算法结果本身 |
+| SLA 策略 | SlaPolicyVersion | 已发布的目标、日历、暂停、预警和升级规则 | 单一预计完成时间 |
+| SLA 实例 | SlaInstance | 针对具体工单/任务运行的版本化业务时钟 | 流程引擎定时器 |
+| SLA 时间片 | SlaClockSegment | RUNNING 或 PAUSED 的不可变时间区间 | 一个 paused 布尔字段 |
+| SLA 升级 | SlaEscalation | SLA 里程碑触发的一次收件人解析和通知记录 | 人工异常处理案例 |
+| 出站交付 | OutboundDelivery | 锁定业务对象版本和 payload 的一次外部交付意图 | 单次 HTTP 请求 |
+| 交付尝试 | DeliveryAttempt | OutboundDelivery 的一次网络或文件发送尝试 | 新的业务交付 |
+| 外部确认 | ExternalAcknowledgement | 外部系统对交付返回的技术或业务结果 | 本地发送成功 |
+| 通知意图 | NotificationIntent | 由领域事件和通知计划生成的一次业务通知目的 | 单条供应商短信请求 |
+| 运营异常 | OperationalException | 自动流程无法继续且需要恢复验证的运营问题 | 工单生命周期状态 |
 | 履约事实 | FulfillmentFact | 经确认、可用于计价的标准事实 | 原始表单 JSON |
 | 费用明细 | ChargeItem | 规则对履约事实计算的可解释金额项 | 结算单总额 |
 | 试算运行 | CalculationRun | 使用明确事实和价格版本执行的一次可重现计算 | 已确认结算单 |

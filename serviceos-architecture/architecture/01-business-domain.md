@@ -17,7 +17,7 @@ status: Proposed
 | 履约编排 | 核心域 | 一项服务如何被拆成阶段和任务并可靠执行 | WorkOrder、Stage、Task、Action |
 | 现场作业 | 核心域 | 师傅如何预约、到场、勘测、施工和整改 | Appointment、Visit、Survey、Installation |
 | 资料与审核 | 核心域 | 需要哪些证据、如何采集和逐版审核 | EvidenceRequirement、EvidenceItem、EvidenceRevision、ReviewCase |
-| 派单与服务网络 | 核心域 | 哪个网点/师傅有资格且适合承接 | ServiceNetwork、DispatchPolicy、Assignment |
+| 派单与服务网络 | 核心域 | 哪个网点/师傅有资格且适合承接 | ServiceNetwork、DispatchPolicy、ServiceAssignment |
 | 履约计价与结算 | 核心域 | 从履约事实计算应收与应付 | FulfillmentFact、ChargeItem、SettlementStatement |
 | 项目与业务产品 | 支撑域 | 哪个合同/品牌/业务使用哪些配置版本 | Client、Brand、Project、ServiceProduct |
 | 资产与物料协同 | 支撑域 | 设备和物料在履约过程中的去向 | Asset、Material、InventoryMovement |

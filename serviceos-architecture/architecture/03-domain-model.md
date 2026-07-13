@@ -19,8 +19,10 @@ classDiagram
   class WorkOrder
   class StageInstance
   class Task
+  class DispatchRequest
   class DispatchDecision
-  class Assignment
+  class CandidateEvaluation
+  class ServiceAssignment
   class Appointment
   class Visit
   class FieldOperation
@@ -32,6 +34,9 @@ classDiagram
   class ReviewCase
   class ReviewDecision
   class CorrectionCase
+  class SlaInstance
+  class OutboundDelivery
+  class OperationalException
   class FulfillmentFact
   class ChargeItem
   class SettlementStatement
@@ -44,8 +49,12 @@ classDiagram
   ConfigurationBundle "1" <-- "many" WorkOrder : locks
   WorkOrder "1" --> "many" StageInstance
   StageInstance "1" --> "many" Task
-  Task "1" --> "zero or one" DispatchDecision
-  Task "1" --> "many" Assignment
+  Task "1" --> "many" DispatchRequest
+  DispatchRequest "1" --> "many" DispatchDecision
+  DispatchDecision "1" --> "many" CandidateEvaluation
+  DispatchDecision "1" --> "zero or one" ServiceAssignment : activates
+  Task "1" --> "many" ServiceAssignment
+  Task "1" --> "many" SlaInstance
   Task "1" --> "many" Appointment
   Appointment "1" --> "many" Visit
   Visit "1" --> "many" FieldOperation
@@ -58,6 +67,8 @@ classDiagram
   Task "1" --> "many" ReviewCase : executes/reviews
   ReviewCase "1" --> "many" ReviewDecision
   ReviewCase "1" --> "zero or many" CorrectionCase
+  WorkOrder "1" --> "many" OutboundDelivery
+  WorkOrder "1" --> "many" OperationalException
   WorkOrder "1" --> "many" FulfillmentFact
   FulfillmentFact "many" --> "many" ChargeItem
   SettlementStatement "1" --> "many" ChargeItem
@@ -138,7 +149,7 @@ PENDING -> READY -> CLAIMED/RUNNING -> COMPLETED
 
 `ReviewCase` 不保存任务责任人和 SLA；这些属于关联的 `Task`。审核案例可以包含多次 `ReviewDecision`，以保留驳回、补传、复审和强制通过的完整历史。
 
-### 2.5 DispatchDecision 聚合
+### 2.5 DispatchRequest 与 DispatchDecision 聚合
 
 派单不是简单修改 `network_id`，而是一轮可解释的决策：
 
@@ -146,8 +157,10 @@ PENDING -> READY -> CLAIMED/RUNNING -> COMPLETED
 2. 执行停派、黑名单、区域、业务能力、资质和产能硬过滤；
 3. 对候选网点按履约、评分、签约比例偏差等评分；
 4. 生成候选快照和选择理由；
-5. 创建 Assignment；
+5. 创建 ServiceAssignment；
 6. 失败时创建人工处理任务。
+
+一次请求因容量竞争、重算或人工介入可以产生多次不可变 DispatchDecision；只有成功激活的决定产生 ServiceAssignment。
 
 ### 2.6 FulfillmentFact 与 SettlementStatement 聚合
 

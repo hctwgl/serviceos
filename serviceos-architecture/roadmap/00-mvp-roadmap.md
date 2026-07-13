@@ -88,6 +88,8 @@ M2 的架构输入见 [配置资产与版本中心](../architecture/05-configura
 
 M3 的架构输入见 [预约与现场作业](../architecture/08-appointment-field-operations.md)、[动态表单与字段引擎](../architecture/09-dynamic-form-field-engine.md)、[资料、审核与整改闭环](../architecture/10-evidence-review-correction.md)、[现场作业 HTTP API](../api/03-field-operations-http-api.md)、[现场作业逻辑数据模型](../data/03-field-operations-logical-model.md)和[M3 验收矩阵](../testing/02-m3-field-operations-acceptance-matrix.md)。M3 开工前必须用首个试点项目填写 M1-02/M1-03，并提供真实脱敏表单、资料示例、驳回原因和移动端弱网约束。
 
+M4 的架构输入见 [服务网络与派单引擎](../architecture/11-service-network-dispatch.md)、[SLA 时钟、预警与升级](../architecture/12-sla-clock-escalation.md)、[车企集成、回传与可靠交付](../architecture/13-integration-reliability.md)、[通知与运营异常中心](../architecture/14-notification-operational-exception.md)、[M4 HTTP API](../api/04-automation-integration-http-api.md)、[M4 逻辑数据模型](../data/04-automation-integration-logical-model.md)和[M4 验收矩阵](../testing/03-m4-automation-integration-acceptance.md)。M4 开工前必须填写 M1-04/M1-06，确认签约比例口径、SLA 数值/日历和至少一家试点车企的真实脱敏接口报文。
+
 ## 6. 首批待决策事项
 
 1. MVP 首个车企与第二对照项目；

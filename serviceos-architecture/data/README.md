@@ -7,3 +7,4 @@
 - [配置与执行内核逻辑数据模型](01-execution-logical-model.md)
 - [授权与审计逻辑数据模型](02-authorization-audit-logical-model.md)
 - [现场作业、表单、资料与审核逻辑数据模型](03-field-operations-logical-model.md)
+- [派单、SLA、集成、通知与异常逻辑数据模型](04-automation-integration-logical-model.md)
