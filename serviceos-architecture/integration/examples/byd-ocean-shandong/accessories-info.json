@@ -1,0 +1,17 @@
+{
+  "operatePerson": "张师傅",
+  "orderCode": "BYD-SD-OCEAN-20260713-0001",
+  "constructionImage": "https://files.example.com/byd/construction-cable.jpg",
+  "sequenceImage": "https://files.example.com/byd/wallbox-sequence.jpg",
+  "zeroVoltageImage": "https://files.example.com/byd/zero-voltage.jpg",
+  "lineStartImage": "https://files.example.com/byd/line-start.jpg",
+  "lineEndImage": "https://files.example.com/byd/line-end.jpg",
+  "fireZeroResistanceImage": "https://files.example.com/byd/fire-zero-resistance.jpg",
+  "zeroGroundVoltageImage": "https://files.example.com/byd/zero-ground-voltage.jpg",
+  "groundWireImage": "https://files.example.com/byd/ground-wire.jpg",
+  "manPileImage": "https://files.example.com/byd/person-wallbox.jpg",
+  "increaseChargeImage": "https://files.example.com/byd/no-extra-charge-placeholder.jpg",
+  "confirmationImage": "https://files.example.com/byd/confirmation.jpg",
+  "trialChargeImage": "https://files.example.com/byd/trial-charge.jpg",
+  "pileNameplateImage": "https://files.example.com/byd/nameplate.jpg"
+}
