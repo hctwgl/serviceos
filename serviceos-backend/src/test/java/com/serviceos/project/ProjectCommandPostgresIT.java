@@ -9,6 +9,7 @@ import com.serviceos.reliability.api.InboxDecision;
 import com.serviceos.reliability.api.InboxService;
 import com.serviceos.reliability.application.OutboxQueue;
 import com.serviceos.reliability.application.OutboxWorker;
+import com.serviceos.reliability.spi.OutboxTelemetry;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.ProblemCode;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.micrometer.tracing.test.autoconfigure.AutoConfigureTracing;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -24,6 +26,9 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
+import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.context.Scope;
 
 import java.time.LocalDate;
 import java.time.Duration;
@@ -42,6 +47,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * 没有 Docker/兼容容器运行时时由 Testcontainers 明确跳过。</p>
  */
 @Testcontainers(disabledWithoutDocker = true)
+@AutoConfigureTracing
 @SpringBootTest(classes = ServiceOsApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE)
 class ProjectCommandPostgresIT {
     @Container
@@ -72,6 +78,12 @@ class ProjectCommandPostgresIT {
 
     @Autowired
     OutboxQueue outboxQueue;
+
+    @Autowired
+    OutboxTelemetry outboxTelemetry;
+
+    @Autowired
+    OpenTelemetry openTelemetry;
 
     @BeforeEach
     void cleanBusinessTables() {
@@ -136,8 +148,29 @@ class ProjectCommandPostgresIT {
 
     @Test
     void repeatedMigrationIsNoOp() {
-        assertThat(flyway.info().applied().length).isEqualTo(10);
+        assertThat(flyway.info().applied().length).isEqualTo(11);
         assertThat(flyway.migrate().migrationsExecuted).isZero();
+    }
+
+    @Test
+    void outboxPersistsTheCurrentW3cTraceContextForWorkerContinuation() {
+        Span apiSpan = openTelemetry.getTracer("integration-test")
+                .spanBuilder("POST /api/v1/projects")
+                .startSpan();
+        try (Scope ignored = apiSpan.makeCurrent()) {
+            commands.create(principal(), context("idem-trace-context-001"),
+                    command("TRACE-2026", "Trace 上下文测试"));
+        } finally {
+            apiSpan.end();
+        }
+
+        String traceParent = jdbc.sql("SELECT trace_parent FROM rel_outbox_event")
+                .query(String.class).single();
+        assertThat(traceParent)
+                .startsWith("00-" + apiSpan.getSpanContext().getTraceId() + "-")
+                .contains(apiSpan.getSpanContext().getSpanId());
+        assertThat(outboxQueue.claimNext("trace-worker", Duration.ofSeconds(30)).orElseThrow().traceParent())
+                .isEqualTo(traceParent);
     }
 
     @Test
@@ -200,7 +233,7 @@ class ProjectCommandPostgresIT {
         List<UUID> published = new ArrayList<>();
         OutboxWorker worker = new OutboxWorker(
                 outboxQueue, message -> published.add(message.eventId()), Clock.systemUTC(),
-                "integration-worker", Duration.ofSeconds(30), 8);
+                "integration-worker", Duration.ofSeconds(30), 8, outboxTelemetry);
 
         assertThat(worker.runOnce()).isEqualTo(OutboxWorker.RunResult.PUBLISHED);
         assertThat(published).hasSize(1);

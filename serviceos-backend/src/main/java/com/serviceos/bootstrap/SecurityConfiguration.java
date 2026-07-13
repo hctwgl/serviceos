@@ -1,6 +1,8 @@
 package com.serviceos.bootstrap;
 
+import com.serviceos.shared.CorrelationIds;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
@@ -9,6 +11,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.LinkedHashMap;
@@ -22,15 +25,26 @@ import java.util.Map;
 public class SecurityConfiguration {
 
     @Bean
-    SecurityFilterChain apiSecurity(HttpSecurity http, ObjectMapper objectMapper) throws Exception {
+    SecurityFilterChain apiSecurity(
+            HttpSecurity http,
+            ObjectMapper objectMapper,
+            CorrelationContextFilter correlationContextFilter,
+            @Value("${serviceos.observability.allow-anonymous-metrics:false}") boolean allowAnonymousMetrics
+    ) throws Exception {
         return http
+                .addFilterBefore(correlationContextFilter, SecurityContextHolderFilter.class)
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
-                        // 本地对象存储数据面使用 HMAC 短期能力 token；公网业务 API 仍要求 OIDC JWT。
-                        .requestMatchers("/api/v1/file-transfers/**").permitAll()
-                        .anyRequest().authenticated())
+                .authorizeHttpRequests(authorize -> {
+                    authorize.requestMatchers("/actuator/health", "/actuator/health/**").permitAll();
+                    authorize.requestMatchers("/livez", "/readyz").permitAll();
+                    if (allowAnonymousMetrics) {
+                        authorize.requestMatchers("/actuator/prometheus").permitAll();
+                    }
+                    // 本地对象存储数据面使用 HMAC 短期能力 token；公网业务 API 仍要求 OIDC JWT。
+                    authorize.requestMatchers("/api/v1/file-transfers/**").permitAll();
+                    authorize.anyRequest().authenticated();
+                })
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(Customizer.withDefaults())
                         .authenticationEntryPoint((request, response, exception) -> {
@@ -42,9 +56,15 @@ public class SecurityConfiguration {
                             body.put("status", HttpServletResponse.SC_UNAUTHORIZED);
                             body.put("detail", "A valid bearer token is required");
                             body.put("errorCode", "UNAUTHENTICATED");
-                            body.put("correlationId", request.getHeader("X-Correlation-Id"));
+                            body.put("correlationId", CorrelationIds.fromRequestAttribute(
+                                    request.getAttribute(CorrelationIds.REQUEST_ATTRIBUTE)));
                             objectMapper.writeValue(response.getOutputStream(), body);
                         }))
                 .build();
+    }
+
+    @Bean
+    CorrelationContextFilter correlationContextFilter() {
+        return new CorrelationContextFilter();
     }
 }

@@ -13,3 +13,5 @@
 - [M9 身份授权与可靠消息验收矩阵](07-m9-security-reliability-acceptance.md)
 - [M10 Task/Scheduler 与人工接管验收矩阵](08-m10-task-scheduler-acceptance.md)
 - [M11 安全文件生命周期验收矩阵](09-m11-secure-file-acceptance.md)
+- [M12 契约兼容 CI 与客户端生成验收矩阵](10-m12-contract-ci-acceptance.md)
+- [M13 可观测性、健康探针与日志脱敏验收矩阵](11-m13-observability-acceptance.md)

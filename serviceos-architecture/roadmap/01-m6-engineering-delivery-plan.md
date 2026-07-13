@@ -93,6 +93,8 @@ flowchart LR
 | E1-10 | OTel、健康、看板和日志脱敏 | trace 串联示例命令，敏感扫描通过 |
 | E1-11 | 容器与 staging 部署 | 同一镜像部署、迁移、smoke、回滚 |
 
+E1-10 已由 [M13 参考实现](../architecture/27-observability-health-redaction-implementation.md)及其[验收矩阵](../testing/11-m13-observability-acceptance.md)提供本仓库证据；E1-11 与 Foundation P0 总退出门禁仍未完成。
+
 退出：通过 [M6 工程就绪验收矩阵](../testing/05-m6-engineering-readiness-acceptance.md) 的 Foundation P0。
 
 ## 7. E2：收单与履约内核纵向切片

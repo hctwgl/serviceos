@@ -45,8 +45,16 @@ jobs:
         run: |
           docker compose -f serviceos-deploy/compose.yaml config --quiet
           jq empty serviceos-deploy/keycloak/realm-serviceos.json
+          jq empty serviceos-deploy/observability/grafana/dashboards/serviceos-foundation.json
+          bash -n serviceos-deploy/observability/*.sh
+          serviceos-deploy/observability/test-sensitive-output-gate.sh
       - name: Verify modules, contracts, migrations and transaction slice
-        run: ./mvnw --batch-mode --no-transfer-progress clean verify
+        shell: bash
+        run: |
+          set -o pipefail
+          runtime_log="${RUNNER_TEMP}/serviceos-verify-runtime.log"
+          ./mvnw --batch-mode --no-transfer-progress clean verify 2>&1 | tee "${runtime_log}"
+          serviceos-deploy/observability/verify-sensitive-output.sh "${runtime_log}"
       - name: Verify repeatable generated TypeScript client
         run: serviceos-contracts/scripts/verify-client-generation-reproducibility.sh
       - name: Retain generated TypeScript client and provenance manifest

@@ -10,11 +10,13 @@ import com.serviceos.files.api.UploadSessionView;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
 import com.serviceos.shared.CommandMetadata;
+import com.serviceos.shared.CorrelationIds;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -39,62 +41,55 @@ final class FileController {
     @PostMapping("/upload-sessions")
     ResponseEntity<UploadSessionView> beginUpload(
             @RequestHeader("Idempotency-Key") String idempotencyKey,
-            @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
             @Valid @RequestBody BeginUploadRequest request
     ) {
-        String correlation = correlation(correlationId);
         CurrentPrincipal principal = principals.current();
         UploadSessionView result = files.beginUpload(
                 principal,
-                new CommandMetadata(correlation, idempotencyKey),
+                new CommandMetadata(correlationId, idempotencyKey),
                 new BeginUploadCommand(
                         request.businessContextType(), request.businessContextId(),
                         request.originalFileName(), request.declaredMimeType(),
                         request.expectedSize(), request.expectedSha256()));
         return ResponseEntity
                 .created(URI.create("/api/v1/files/upload-sessions/" + result.uploadSessionId()))
-                .header("X-Correlation-Id", correlation)
+                .header(CorrelationIds.HEADER_NAME, correlationId)
                 .body(result);
     }
 
     @PostMapping("/upload-sessions/{uploadSessionId}:finalize")
     ResponseEntity<StoredFileView> finalizeUpload(
             @PathVariable UUID uploadSessionId,
-            @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
             @Valid @RequestBody FinalizeUploadRequest request
     ) {
-        String correlation = correlation(correlationId);
         CurrentPrincipal principal = principals.current();
         StoredFileView result = files.finalizeUpload(
                 principal,
                 // finalizeCommandId 同时作为传输层和离线设备幂等键，避免维护两套相互矛盾的键。
-                new CommandMetadata(correlation, request.finalizeCommandId()),
+                new CommandMetadata(correlationId, request.finalizeCommandId()),
                 uploadSessionId,
                 new FinalizeUploadCommand(request.actualSha256(), request.finalizeCommandId()));
         return ResponseEntity
                 .created(URI.create("/api/v1/files/" + result.fileId()))
-                .header("X-Correlation-Id", correlation)
+                .header(CorrelationIds.HEADER_NAME, correlationId)
                 .body(result);
     }
 
     @PostMapping("/{fileId}/download-authorizations")
     ResponseEntity<DownloadAuthorizationView> authorizeDownload(
             @PathVariable UUID fileId,
-            @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
             @Valid @RequestBody AuthorizeDownloadRequest request
     ) {
-        String correlation = correlation(correlationId);
         CurrentPrincipal principal = principals.current();
         DownloadAuthorizationView result = files.authorizeDownload(
-                principal, correlation, fileId, new AuthorizeDownloadCommand(request.purpose()));
+                principal, correlationId, fileId, new AuthorizeDownloadCommand(request.purpose()));
         return ResponseEntity
                 .created(URI.create("/api/v1/files/" + fileId + "/download-authorizations/"
                         + result.authorizationId()))
-                .header("X-Correlation-Id", correlation)
+                .header(CorrelationIds.HEADER_NAME, correlationId)
                 .body(result);
-    }
-
-    private static String correlation(String supplied) {
-        return supplied == null || supplied.isBlank() ? UUID.randomUUID().toString() : supplied;
     }
 }

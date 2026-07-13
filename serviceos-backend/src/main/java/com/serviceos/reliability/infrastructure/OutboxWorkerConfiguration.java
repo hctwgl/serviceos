@@ -3,6 +3,7 @@ package com.serviceos.reliability.infrastructure;
 import com.serviceos.reliability.application.OutboxQueue;
 import com.serviceos.reliability.application.OutboxWorker;
 import com.serviceos.reliability.spi.OutboxPublisher;
+import com.serviceos.reliability.spi.OutboxTelemetry;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -27,6 +28,7 @@ class OutboxWorkerConfiguration {
             OutboxQueue queue,
             OutboxPublisher publisher,
             Clock clock,
+            OutboxTelemetry telemetry,
             @Value("${serviceos.outbox.worker-id:}") String configuredWorkerId,
             @Value("${serviceos.outbox.lease:PT30S}") Duration lease,
             @Value("${serviceos.outbox.max-attempts:8}") int maxAttempts
@@ -34,7 +36,7 @@ class OutboxWorkerConfiguration {
         String workerId = configuredWorkerId == null || configuredWorkerId.isBlank()
                 ? "worker-" + UUID.randomUUID()
                 : configuredWorkerId;
-        return new OutboxWorker(queue, publisher, clock, workerId, lease, maxAttempts);
+        return new OutboxWorker(queue, publisher, clock, workerId, lease, maxAttempts, telemetry);
     }
 
     @Configuration(proxyBeanMethods = false)

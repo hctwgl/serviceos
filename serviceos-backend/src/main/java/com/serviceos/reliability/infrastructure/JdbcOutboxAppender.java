@@ -2,6 +2,8 @@ package com.serviceos.reliability.infrastructure;
 
 import com.serviceos.reliability.api.OutboxAppender;
 import com.serviceos.reliability.api.OutboxEvent;
+import com.serviceos.reliability.spi.OutboxTelemetry;
+import com.serviceos.reliability.spi.OutboxTraceHeaders;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
@@ -15,24 +17,28 @@ import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timesta
 @Repository
 final class JdbcOutboxAppender implements OutboxAppender {
     private final JdbcClient jdbc;
+    private final OutboxTelemetry telemetry;
 
-    JdbcOutboxAppender(JdbcClient jdbc) {
+    JdbcOutboxAppender(JdbcClient jdbc, OutboxTelemetry telemetry) {
         this.jdbc = jdbc;
+        this.telemetry = telemetry;
     }
 
     @Override
     public void append(OutboxEvent event) {
+        OutboxTraceHeaders trace = telemetry.capture();
         jdbc.sql("""
                         INSERT INTO rel_outbox_event (
                             outbox_id, event_id, module_name, event_type, schema_version,
                             aggregate_type, aggregate_id, aggregate_version,
                             tenant_id, correlation_id, causation_id, partition_key,
-                            payload, payload_digest, status, occurred_at, available_at, created_at
+                            payload, payload_digest, trace_parent, trace_state,
+                            status, occurred_at, available_at, created_at
                         ) VALUES (
                             :outboxId, :eventId, :module, :eventType, :schemaVersion,
                             :aggregateType, :aggregateId, :aggregateVersion,
                             :tenantId, :correlationId, :causationId, :partitionKey,
-                            CAST(:payload AS jsonb), :payloadDigest, 'PENDING',
+                            CAST(:payload AS jsonb), :payloadDigest, :traceParent, :traceState, 'PENDING',
                             :occurredAt, :occurredAt, :occurredAt
                         )
                         """)
@@ -52,6 +58,8 @@ final class JdbcOutboxAppender implements OutboxAppender {
                         Map.entry("payload", event.payload()),
                         Map.entry("payloadDigest", event.payloadDigest()),
                         Map.entry("occurredAt", timestamptz(event.occurredAt()))))
+                .param("traceParent", trace.traceParent(), java.sql.Types.VARCHAR)
+                .param("traceState", trace.traceState(), java.sql.Types.VARCHAR)
                 .update();
     }
 }

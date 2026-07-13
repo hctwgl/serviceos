@@ -32,21 +32,75 @@ spring:
   threads:
     virtual:
       enabled: true
+  lifecycle:
+    timeout-per-shutdown-phase: ${SERVICEOS_SHUTDOWN_TIMEOUT:30s}
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,prometheus
   endpoint:
     health:
+      show-details: never
       probes:
         enabled: true
+        add-additional-paths: true
+      group:
+        # 存活仅判断进程自身，绝不能因数据库或外部依赖故障触发级联重启。
+        liveness:
+          include: livenessState
+        # 就绪包含数据库；不可服务时先摘流量，再由运维处置依赖故障。
+        readiness:
+          include: readinessState,db
+  tracing:
+    sampling:
+      probability: ${SERVICEOS_TRACE_SAMPLING_PROBABILITY:0.10}
+    propagation:
+      type: W3C
+    baggage:
+      remote-fields: serviceos.correlation_id
+      correlation:
+        fields: serviceos.correlation_id
+    export:
+      otlp:
+        # 本地与测试默认不尝试网络导出；部署环境显式开启并配置 Collector。
+        enabled: ${SERVICEOS_OTLP_TRACING_ENABLED:false}
+  opentelemetry:
+    resource-attributes:
+      service.namespace: serviceos
+      deployment.environment.name: ${SERVICEOS_ENVIRONMENT:local}
+    tracing:
+      export:
+        otlp:
+          endpoint: ${SERVICEOS_OTLP_TRACING_ENDPOINT:http://localhost:4318/v1/traces}
+  otlp:
+    metrics:
+      export:
+        # OTel starter 同时提供 OTLP metrics registry；未部署 Collector 时禁止后台推送线程。
+        enabled: ${SERVICEOS_OTLP_METRICS_ENABLED:false}
+
+logging:
+  structured:
+    format:
+      console: ${SERVICEOS_LOG_FORMAT:ecs}
+    ecs:
+      service:
+        environment: ${SERVICEOS_ENVIRONMENT:local}
+        node-name: ${SERVICEOS_NODE_NAME:local}
+    json:
+      customizer: com.serviceos.bootstrap.SensitiveLogJsonCustomizer
+      stacktrace:
+        max-length: 8192
+        max-throwable-depth: 20
 
 server:
   shutdown: graceful
 
 serviceos:
+  observability:
+    # 生产默认 false；仅当 Prometheus 位于受控私网且入口层已隔离时才允许匿名抓取。
+    allow-anonymous-metrics: ${SERVICEOS_ALLOW_ANONYMOUS_METRICS:false}
   files:
     # 参考工程默认使用私有本地沙箱；生产部署必须切换为受管对象存储适配器和专业扫描服务。
     storage: ${SERVICEOS_FILE_STORAGE:local-private}

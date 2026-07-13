@@ -1,6 +1,7 @@
 package com.serviceos.bootstrap;
 
 import com.serviceos.shared.BusinessProblem;
+import com.serviceos.shared.CorrelationIds;
 import com.serviceos.shared.ProblemCode;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.dao.DuplicateKeyException;
@@ -56,7 +57,8 @@ final class GlobalProblemHandler {
         problem.setType(URI.create("https://serviceos.example/problems/" + code.name().toLowerCase()));
         problem.setTitle(code.name());
         problem.setProperty("errorCode", code.name());
-        problem.setProperty("correlationId", request.getHeader("X-Correlation-Id"));
+        problem.setProperty("correlationId", CorrelationIds.fromRequestAttribute(
+                request.getAttribute(CorrelationIds.REQUEST_ATTRIBUTE)));
         return problem;
     }
 }

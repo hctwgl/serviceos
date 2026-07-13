@@ -22,6 +22,33 @@ public record OutboxMessage(
         String payload,
         String payloadDigest,
         Instant occurredAt,
-        int attemptNo
+        int attemptNo,
+        String traceParent,
+        String traceState
 ) {
+    /**
+     * 兼容不需要追踪上下文的纯单元测试和内部调用；生产消息由数据库映射完整构造器。
+     */
+    public OutboxMessage(
+            UUID outboxId,
+            UUID eventId,
+            String module,
+            String eventType,
+            int schemaVersion,
+            String aggregateType,
+            String aggregateId,
+            long aggregateVersion,
+            String tenantId,
+            String correlationId,
+            String causationId,
+            String partitionKey,
+            String payload,
+            String payloadDigest,
+            Instant occurredAt,
+            int attemptNo
+    ) {
+        this(outboxId, eventId, module, eventType, schemaVersion, aggregateType, aggregateId,
+                aggregateVersion, tenantId, correlationId, causationId, partitionKey, payload,
+                payloadDigest, occurredAt, attemptNo, null, null);
+    }
 }

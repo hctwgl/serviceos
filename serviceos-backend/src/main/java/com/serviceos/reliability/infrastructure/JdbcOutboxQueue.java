@@ -167,7 +167,9 @@ final class JdbcOutboxQueue implements OutboxQueue {
                 rs.getString("payload"),
                 rs.getString("payload_digest"),
                 rs.getTimestamp("occurred_at").toInstant(),
-                rs.getInt("attempt_count"));
+                rs.getInt("attempt_count"),
+                rs.getString("trace_parent"),
+                rs.getString("trace_state"));
     }
 
     private static Duration backoff(int attemptNo) {

@@ -2,6 +2,7 @@ package com.serviceos.reliability.application;
 
 import com.serviceos.reliability.spi.OutboxMessage;
 import com.serviceos.reliability.spi.OutboxPublisher;
+import com.serviceos.reliability.spi.OutboxTelemetry;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -23,6 +24,7 @@ public final class OutboxWorker {
     private final String workerId;
     private final Duration leaseDuration;
     private final int maxAttempts;
+    private final OutboxTelemetry telemetry;
 
     public OutboxWorker(
             OutboxQueue queue,
@@ -31,6 +33,18 @@ public final class OutboxWorker {
             String workerId,
             Duration leaseDuration,
             int maxAttempts
+    ) {
+        this(queue, publisher, clock, workerId, leaseDuration, maxAttempts, OutboxTelemetry.NOOP);
+    }
+
+    public OutboxWorker(
+            OutboxQueue queue,
+            OutboxPublisher publisher,
+            Clock clock,
+            String workerId,
+            Duration leaseDuration,
+            int maxAttempts,
+            OutboxTelemetry telemetry
     ) {
         this.queue = Objects.requireNonNull(queue);
         this.publisher = Objects.requireNonNull(publisher);
@@ -44,6 +58,7 @@ public final class OutboxWorker {
             throw new IllegalArgumentException("maxAttempts must be positive");
         }
         this.maxAttempts = maxAttempts;
+        this.telemetry = Objects.requireNonNull(telemetry);
     }
 
     public RunResult runOnce() {
@@ -53,6 +68,10 @@ public final class OutboxWorker {
     }
 
     private RunResult publishClaimed(OutboxMessage message) {
+        return telemetry.observePublish(message, () -> publishWithinTrace(message));
+    }
+
+    private RunResult publishWithinTrace(OutboxMessage message) {
         Instant startedAt = clock.instant();
         try {
             publisher.publish(message);

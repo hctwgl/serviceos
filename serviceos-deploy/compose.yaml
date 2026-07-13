@@ -30,5 +30,59 @@ services:
     volumes:
       - ./keycloak/realm-serviceos.json:/opt/keycloak/data/import/realm-serviceos.json:ro
 
+  tempo:
+    image: grafana/tempo:2.10.5
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    ports:
+      - "127.0.0.1:3200:3200"
+    volumes:
+      - ./observability/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - serviceos-tempo-data:/var/tempo
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.153.0
+    command: ["--config=/etc/otelcol/config.yaml"]
+    depends_on:
+      - tempo
+    ports:
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
+    volumes:
+      - ./observability/otel-collector.yaml:/etc/otelcol/config.yaml:ro
+
+  prometheus:
+    image: prom/prometheus:v3.10.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yaml
+      - --storage.tsdb.path=/prometheus
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./observability/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
+      - serviceos-prometheus-data:/prometheus
+
+  grafana:
+    image: grafana/grafana:13.0.2
+    depends_on:
+      - prometheus
+      - tempo
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: local-observability-change-me
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      # 本地基线不在启动时联网安装可选插件，确保启动可重复且日志无权限噪声。
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - serviceos-grafana-data:/var/lib/grafana
+
 volumes:
   serviceos-postgres-data:
+  serviceos-tempo-data:
+  serviceos-prometheus-data:
+  serviceos-grafana-data:

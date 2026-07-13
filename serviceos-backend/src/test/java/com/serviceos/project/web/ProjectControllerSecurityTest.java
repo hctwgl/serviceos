@@ -19,6 +19,7 @@ import java.time.LocalDate;
 import java.util.Set;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -44,12 +45,22 @@ class ProjectControllerSecurityTest {
 
     @Test
     void unauthenticatedRequestIsRejectedByResourceServer() throws Exception {
-        mvc.perform(post("/api/v1/projects")
+        var result = mvc.perform(post("/api/v1/projects")
                         .header("Idempotency-Key", "idem-1")
+                        // 空格和凭据形态不允许成为 correlationId，更不能被原样写回日志或响应。
+                        .header("X-Correlation-Id", "Bearer top-secret-token-value")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validRequest()))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.errorCode").value("UNAUTHENTICATED"));
+                .andExpect(jsonPath("$.errorCode").value("UNAUTHENTICATED"))
+                .andExpect(header().exists("X-Correlation-Id"))
+                .andReturn();
+
+        String correlationId = result.getResponse().getHeader("X-Correlation-Id");
+        assertThat(correlationId).matches("[0-9a-f-]{36}");
+        assertThat(result.getResponse().getContentAsString())
+                .contains(correlationId)
+                .doesNotContain("top-secret-token-value");
     }
 
     @Test

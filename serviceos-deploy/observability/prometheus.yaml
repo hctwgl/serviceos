@@ -1,0 +1,13 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: serviceos-backend
+    metrics_path: /actuator/prometheus
+    static_configs:
+      # 后端在宿主机运行；仅本地联调时开启 SERVICEOS_ALLOW_ANONYMOUS_METRICS=true。
+      - targets: [host.docker.internal:8080]
+        labels:
+          environment: local
+          service: serviceos-backend
