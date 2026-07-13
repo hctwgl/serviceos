@@ -23,6 +23,9 @@ status: Proposed
 | TECH-003 | P0 | 自动派师傅 | 多名合格师傅且策略启用 | 自动决策 | 可解释选择、ServiceAssignment 与 TaskAssignment 同步 |
 | TECH-004 | P0 | 师傅改派同步 | 原师傅 Task 可执行 | 改派新师傅 | 新责任激活后旧师傅立即不能执行 |
 | TECH-005 | P0 | 改派握手中断 | TaskAssignment 准备后进程中断 | 恢复 saga | Task 保持不可执行，重试后单一新责任生效 |
+| TECH-006 | P0 | 激活前永久失败补偿 | TaskAssignment 已 PREPARED、服务未切换 | 授权放弃 | prepared 撤销、guard 解除、新预占释放、旧责任保持 |
+| TECH-007 | P0 | 激活后无法恢复 | ServiceAssignment 已切换、Task 激活持续失败且旧责任不可恢复 | 放弃尝试 | Task 保持 guard，高严重度异常创建，不虚假完成 |
+| TECH-008 | P0 | 激活后安全补偿 | ServiceAssignment 已切换、旧责任仍合格可恢复 | 审批补偿 | 新责任结束、旧责任/TaskAssignment 对齐、guard 解除、容量一致 |
 | SLA-001 | P0 | 工作日历截止 | 跨周末和节假日 | 启动 SLA | deadline 与锁定日历样例一致 |
 | SLA-002 | P0 | 暂停恢复片段 | 用户延期 | pause→resume | segments 无重叠，deadline 正确顺延 |
 | SLA-003 | P0 | 重复 milestone | 调度消息重复 | 触发预警/超时 | milestone、通知和升级各一次 |

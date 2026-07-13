@@ -32,6 +32,7 @@ status: Proposed
 | `POST /dispatch-requests/{id}:select-candidate` | SelectDispatchCandidate | candidateId、reason、approvalRef? | 200 |
 | `POST /service-assignments/{id}:reassign` | Reassign | targetCandidateId、reason、approvalRef? | 202 |
 | `GET /work-orders/{id}/service-assignments` | 网点/师傅责任历史 | — | 200 |
+| `POST /internal/service-assignment-activations/{sagaId}:abort` | AbortActivation（仅编排/授权修复） | reason、approvalRef?、expectedSagaStage | 202 |
 
 ### 2.1 人工选择
 
@@ -45,6 +46,8 @@ status: Proposed
 ```
 
 服务端重新校验硬过滤与容量。客户端不能提交分数或声称候选合格。
+
+激活中断由 saga 自动重试。内部 abort 端点要求服务主体；当已进入 `SERVICE_SWITCHED` 时必须提供业务审批，并按安全补偿流程执行，不能直接清除 Task guard。
 
 ### 2.2 决策解释响应
 

@@ -77,6 +77,10 @@ status: Proposed
 
 保存层级（NETWORK/TECHNICIAN）、assignee、生效区间、来源 decision、状态（PENDING_ACTIVATION/ACTIVE/ENDED/FAILED_ACTIVATION）、被替代 service assignment、preparedTaskAssignmentRef 和改派原因。同工单/任务/层级同一时刻最多一个 ACTIVE。
 
+### service_assignment_activation_saga
+
+保存 sagaId、旧/新 ServiceAssignment、Task、阶段（PENDING/TASK_PREPARED/SERVICE_SWITCHED/TASK_ACTIVATED/COMPLETED/ABORTING/ABORTED）、preparedTaskAssignmentRef、guardRef、attempts、超时、补偿审批和最后错误。`new_service_assignment_id` 唯一。
+
 ### capacity_policy_version / capacity_counter / capacity_reservation
 
 - policy 定义业务类型和周期上限；
@@ -206,6 +210,7 @@ delivery 以 intent + recipient + channel 唯一并保存 executionTaskId；atte
 - 硬过滤结果和评分组成均可追溯到策略/指标版本；
 - ServiceAssignment 与容量预占保持一致；
 - 可执行师傅 Task 的 ACTIVE ServiceAssignment 与当前 TaskAssignment 一致；同步窗口必须有不可执行 guard；
+- 激活 saga 的每个状态转换幂等；ABORTED 时不存在遗留容量预占和 PREPARED TaskAssignment；
 - SLA segment 不重叠，milestone 幂等；
 - OutboundDelivery payload 创建后不可变；
 - 派单、外部交付和通知的业务重试时间只由 TaskExecutionAttempt 拥有；
