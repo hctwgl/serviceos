@@ -13,7 +13,7 @@ status: Proposed
 | 模块 | 拥有实体 | 其他模块访问方式 |
 |---|---|---|
 | 项目目录 | Client、Brand、ServiceProduct、Project、ProjectServiceProductBinding | 项目查询/命令 API |
-| 配置版本 | Asset、DraftRevision、PublishedVersion、Release、Bundle | 配置查询 API |
+| 配置版本 | Asset、DraftRevision、Validation/ReplayRun、ReleaseCandidate、Approval、PublishedVersion、Release、Bundle | 配置查询/命令 API |
 | 工单 | WorkOrder、StageInstance、OwnerAssignment | 工单应用服务/事件 |
 | 任务 | Task、TaskAssignment、TaskExecutionAttempt | 任务应用服务/事件 |
 | 流程适配 | ProcessInstanceLink、CorrelationInbox | 仅适配器内部 |
@@ -93,6 +93,18 @@ Client 保存签约/对接商业主体稳定身份、编码和状态；Brand 保
 | published_at / published_by / approved_by | 发布审计 |
 
 发布版本业务内容、摘要和依赖不可更新。停止新引用不修改本实体。
+
+### configuration_validation_run / configuration_replay_run
+
+validation 保存 draft/candidate 精确 contentDigest、profile、Schema/引用/依赖/安全/覆盖检查、样本 refs、错误和解释器版本；replay 保存 sampleSet、baseline、逐样本结果、差异分类和 SideEffectFence 决定。内容 digest 改变后旧运行不能用于发布 Gate。
+
+### configuration_release_candidate / candidate_item
+
+candidate 保存拟发布范围、effectiveWindow、manifest/contentDigest、整组验证/回放/影响引用、状态（DRAFT/VALIDATING/REVIEW_PENDING/APPROVED/REJECTED/PUBLISHED）和 aggregateVersion；item 精确引用 approved draft revision/contentDigest。
+
+### configuration_approval / approval_decision
+
+保存 targetType/targetId/targetDigest、审批策略/步骤、提交人、决定人、决定、条件、MFA/职责分离证据和时间。审批绑定精确 digest；target 改变后状态投影为 STALE，不能用于 publish。
 
 ### configuration_release / configuration_release_item
 

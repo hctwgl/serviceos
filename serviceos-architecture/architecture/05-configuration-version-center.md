@@ -34,6 +34,8 @@ status: Proposed
 | `IntegrationMapping` | 外部字段、枚举、状态和回执映射 | 集成域 |
 | `PermissionProfile` | 动作与字段权限模板 | 授权能力 |
 
+Client、Brand、Project、ServiceProduct 的稳定身份、生命周期和有效绑定由 project 模块拥有。`ProjectProfile` 只引用这些 ID，并保存需要随 ConfigurationRelease 版本化的运行时选择维度、默认策略和外部映射；不能复制一套可独立修改的项目/品牌主数据。
+
 ## 3. 核心模型
 
 ```mermaid

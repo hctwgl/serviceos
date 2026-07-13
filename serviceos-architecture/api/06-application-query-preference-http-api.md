@@ -41,6 +41,8 @@ status: Proposed
 
 Navigation 只改善体验，不作为路由或 API 授权凭证。客户端不能提交 role name 选择菜单。
 
+Navigation 返回 `navigationCatalogVersion` 和已注册 pageId；route 只从客户端/服务端共同发布的目录解析，不接受服务端下发任意外部 URL 或可执行组件名。客户端未知 pageId 安全忽略并记录兼容性指标。
+
 ## 4. 工作台与队列
 
 | 方法与路径 | 用途 | 关键参数 |

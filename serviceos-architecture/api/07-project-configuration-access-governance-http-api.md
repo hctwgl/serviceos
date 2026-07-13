@@ -60,13 +60,16 @@ SaveDraft 只保存草稿；不能直接影响运行工单。服务端使用 ass
 | `POST /api/v1/configuration-drafts/{id}:submit-approval` | SubmitConfigurationApproval | validationRunId、replayRunId?、note | 202 |
 | `GET /api/v1/configuration-approvals/{id}` | 审批链与决定 | — | 200 |
 | `POST /api/v1/configuration-approvals/{id}:decide` | DecideConfigurationApproval | decision、note、conditions? | 200 |
-| `POST /api/v1/configuration-releases` | CreateConfigurationRelease | approvedDraftRefs、manifest、effectiveWindow | 201 |
-| `POST /api/v1/configuration-releases/{id}:publish` | PublishConfigurationRelease | approvalRefs、impactAcknowledgement、MFARef? | 202 |
+| `POST /api/v1/configuration-release-candidates` | CreateReleaseCandidate | approvedDraftRefs、manifest、effectiveWindow | 201 |
+| `GET /api/v1/configuration-release-candidates/{id}` | 候选 manifest、整组校验/回放/差异 | — | 200 |
+| `POST /api/v1/configuration-release-candidates/{id}:submit-approval` | SubmitReleaseApproval | validationRefs、impactRef、note | 202 |
+| `POST /api/v1/configuration-release-candidates/{id}:decide` | DecideReleaseApproval | decision、note、conditions? | 200 |
+| `POST /api/v1/configuration-release-candidates/{id}:publish` | PublishConfigurationRelease | impactAcknowledgement、MFARef? | 202 |
 | `GET /api/v1/configuration-releases/{id}` | manifest、versions、验证、状态 | — | 200 |
 | `POST /api/v1/configuration-releases/{id}:stop-new-bindings` | StopNewBindings | reason、effectiveAt | 200 |
 | `POST /api/v1/configuration-releases/{id}:replace` | ReplaceRelease | replacementReleaseId、effectiveAt、reason | 200 |
 
-Publish 原子生成不可变 PublishedVersions/Release manifest。失败不产生部分可绑定 release。已绑定工单不随 stop/replace 漂移；迁移走 MigrateConfiguration。
+ReleaseCandidate 可继续整组校验/审批，但一旦审批后内容 digest 变化，审批失效。Publish 从已批准 candidate 原子生成不可变 PublishedVersions 与 ConfigurationRelease；失败不产生部分可绑定 release。已绑定工单不随 stop/replace 漂移；迁移走 MigrateConfiguration。
 
 ## 6. 配置解析与 Bundle 预览
 
