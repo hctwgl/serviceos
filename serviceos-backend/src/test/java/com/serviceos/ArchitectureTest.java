@@ -19,6 +19,8 @@ class ArchitectureTest {
     @Test
     void firstEngineeringSliceMustExposeExpectedModules() {
         assertThat(modules.stream().map(module -> module.getIdentifier().toString()).toList())
-                .contains("shared", "bootstrap", "reliability", "audit", "project");
+                .contains(
+                        "shared", "bootstrap", "identity", "authorization",
+                        "reliability", "audit", "project");
     }
 }

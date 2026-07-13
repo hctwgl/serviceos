@@ -22,12 +22,12 @@ final class JdbcOutboxAppender implements OutboxAppender {
     public void append(OutboxEvent event) {
         jdbc.sql("""
                         INSERT INTO rel_outbox_event (
-                            outbox_id, module_name, event_type, schema_version,
+                            outbox_id, event_id, module_name, event_type, schema_version,
                             aggregate_type, aggregate_id, aggregate_version,
                             tenant_id, correlation_id, causation_id, partition_key,
                             payload, payload_digest, status, occurred_at, available_at, created_at
                         ) VALUES (
-                            :eventId, :module, :eventType, :schemaVersion,
+                            :outboxId, :eventId, :module, :eventType, :schemaVersion,
                             :aggregateType, :aggregateId, :aggregateVersion,
                             :tenantId, :correlationId, :causationId, :partitionKey,
                             CAST(:payload AS jsonb), :payloadDigest, 'PENDING',
@@ -35,6 +35,7 @@ final class JdbcOutboxAppender implements OutboxAppender {
                         )
                         """)
                 .params(Map.ofEntries(
+                        Map.entry("outboxId", event.outboxId()),
                         Map.entry("eventId", event.eventId()),
                         Map.entry("module", event.module()),
                         Map.entry("eventType", event.eventType()),

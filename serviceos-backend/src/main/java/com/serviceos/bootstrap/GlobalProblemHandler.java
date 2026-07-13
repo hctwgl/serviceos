@@ -21,6 +21,8 @@ final class GlobalProblemHandler {
     @ExceptionHandler(BusinessProblem.class)
     ProblemDetail handleBusinessProblem(BusinessProblem exception, HttpServletRequest request) {
         HttpStatus status = switch (exception.code()) {
+            case UNAUTHENTICATED -> HttpStatus.UNAUTHORIZED;
+            case ACCESS_DENIED -> HttpStatus.FORBIDDEN;
             case IDEMPOTENCY_KEY_REUSED, IDEMPOTENCY_IN_PROGRESS -> HttpStatus.CONFLICT;
             case RESOURCE_NOT_FOUND -> HttpStatus.NOT_FOUND;
             case VALIDATION_FAILED -> HttpStatus.BAD_REQUEST;

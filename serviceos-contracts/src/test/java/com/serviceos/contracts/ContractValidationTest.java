@@ -33,6 +33,19 @@ class ContractValidationTest {
     }
 
     @Test
+    void writeApiMustUseBearerIdentityAndMustNotAcceptSpoofableActorHeaders() throws Exception {
+        String yaml = resourceText("/openapi/serviceos-core-v1.yaml");
+        SwaggerParseResult result = new OpenAPIV3Parser().readContents(yaml, null, null);
+        var openApi = result.getOpenAPI();
+        var operation = openApi.getPaths().get("/projects").getPost();
+
+        assertThat(openApi.getComponents().getSecuritySchemes()).containsKey("bearerAuth");
+        assertThat(operation.getParameters())
+                .extracting(parameter -> parameter.getName())
+                .doesNotContain("X-Tenant-Id", "X-Actor-Id");
+    }
+
+    @Test
     void projectCreatedExampleMustMatchPublishedSchema() throws Exception {
         JsonNode schemaNode = objectMapper.readTree(resource("/events/project-created-v1.schema.json"));
         JsonNode eventNode = objectMapper.readTree(resource("/events/project-created-v1.valid.json"));

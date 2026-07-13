@@ -2,6 +2,10 @@ package com.serviceos.project.application;
 
 import com.serviceos.audit.api.AuditAppender;
 import com.serviceos.audit.api.AuditEntry;
+import com.serviceos.authorization.api.AuthorizationRequest;
+import com.serviceos.authorization.api.AuthorizationDecision;
+import com.serviceos.authorization.api.AuthorizationService;
+import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.project.api.CreateProjectCommand;
 import com.serviceos.project.api.ProjectCommandService;
 import com.serviceos.project.api.ProjectView;
@@ -11,6 +15,8 @@ import com.serviceos.reliability.api.IdempotencyService;
 import com.serviceos.reliability.api.OutboxAppender;
 import com.serviceos.reliability.api.OutboxEvent;
 import com.serviceos.shared.CommandContext;
+import com.serviceos.shared.CommandMetadata;
+import com.serviceos.shared.Sha256;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
@@ -18,12 +24,8 @@ import tools.jackson.databind.MapperFeature;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.HexFormat;
 import java.util.UUID;
 
 /**
@@ -42,6 +44,7 @@ final class DefaultProjectCommandService implements ProjectCommandService {
             .build();
 
     private final ProjectRepository projects;
+    private final AuthorizationService authorization;
     private final IdempotencyService idempotency;
     private final AuditAppender audit;
     private final OutboxAppender outbox;
@@ -49,12 +52,14 @@ final class DefaultProjectCommandService implements ProjectCommandService {
 
     DefaultProjectCommandService(
             ProjectRepository projects,
+            AuthorizationService authorization,
             IdempotencyService idempotency,
             AuditAppender audit,
             OutboxAppender outbox,
             Clock clock
     ) {
         this.projects = projects;
+        this.authorization = authorization;
         this.idempotency = idempotency;
         this.audit = audit;
         this.outbox = outbox;
@@ -63,8 +68,17 @@ final class DefaultProjectCommandService implements ProjectCommandService {
 
     @Override
     @Transactional
-    public ProjectView create(CommandContext context, CreateProjectCommand command) {
-        String requestDigest = digest(canonicalJson(command));
+    public ProjectView create(CurrentPrincipal principal, CommandMetadata metadata, CreateProjectCommand command) {
+        CommandContext context = new CommandContext(
+                principal.tenantId(), principal.principalId(),
+                metadata.correlationId(), metadata.idempotencyKey());
+        AuthorizationDecision authorizationDecision = authorization.require(
+                principal,
+                AuthorizationRequest.tenantCapability(
+                        "project.create", context.tenantId(), "Project", command.code()),
+                context.correlationId());
+
+        String requestDigest = Sha256.digest(canonicalJson(command));
         IdempotencyDecision decision = idempotency.begin(context, OPERATION_TYPE, requestDigest);
 
         if (decision.kind() == IdempotencyDecision.Kind.REPLAY) {
@@ -83,21 +97,23 @@ final class DefaultProjectCommandService implements ProjectCommandService {
                 project.id(), project.tenantId(), project.code(), project.clientId(),
                 project.name(), project.startsOn(), project.endsOn(), project.status().name(),
                 project.version(), project.createdAt()));
-        String payloadDigest = digest(eventPayload);
+        String payloadDigest = Sha256.digest(eventPayload);
+        UUID outboxId = UUID.randomUUID();
         UUID eventId = UUID.randomUUID();
 
         audit.append(new AuditEntry(
-                UUID.randomUUID(), context.tenantId(), context.actorId(), "PROJECT_CREATED",
-                "Project", project.id().toString(), "SUCCEEDED", requestDigest,
+                UUID.randomUUID(), context.tenantId(), context.actorId(), "PROJECT_CREATED", "project.create",
+                "Project", project.id().toString(), "ALLOW", authorizationDecision.matchedGrantIds(),
+                authorizationDecision.policyVersion(), "SUCCEEDED", null, requestDigest,
                 context.correlationId(), now));
         outbox.append(new OutboxEvent(
-                eventId, "project", "project.created", 1,
+                outboxId, eventId, "project", "project.created", 1,
                 "Project", project.id().toString(), project.version(), context.tenantId(),
                 context.correlationId(), context.idempotencyKey(), project.id().toString(),
                 eventPayload, payloadDigest, now));
 
         ProjectView result = project.toView();
-        idempotency.complete(context, OPERATION_TYPE, project.id().toString(), digest(canonicalJson(result)));
+        idempotency.complete(context, OPERATION_TYPE, project.id().toString(), Sha256.digest(canonicalJson(result)));
         return result;
     }
 
@@ -106,16 +122,6 @@ final class DefaultProjectCommandService implements ProjectCommandService {
             return CANONICAL_JSON.writeValueAsString(value);
         } catch (JacksonException exception) {
             throw new IllegalArgumentException("Command cannot be serialized", exception);
-        }
-    }
-
-    private static String digest(String value) {
-        try {
-            byte[] bytes = MessageDigest.getInstance("SHA-256")
-                    .digest(value.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(bytes);
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256 is not available", exception);
         }
     }
 

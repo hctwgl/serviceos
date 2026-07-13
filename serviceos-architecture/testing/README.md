@@ -10,3 +10,4 @@
 - [M5 事实、试算、迁移与试点验收矩阵](04-m5-pricing-migration-pilot-acceptance.md)
 - [M6 工程、部署、安全与运行就绪验收矩阵](05-m6-engineering-readiness-acceptance.md)
 - [M7 多 Portal 应用与交互验收矩阵](06-m7-application-experience-acceptance.md)
+- [M9 身份授权与可靠消息验收矩阵](07-m9-security-reliability-acceptance.md)

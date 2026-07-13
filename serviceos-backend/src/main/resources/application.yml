@@ -11,8 +11,17 @@ spring:
     locations:
       - classpath:db/migration/reliability
       - classpath:db/migration/audit
+      - classpath:db/migration/authorization
       - classpath:db/migration/project
     validate-migration-naming: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # issuer + audience 校验 token 归属；同时给出 JWK 地址以避免启动依赖 OIDC discovery。
+          issuer-uri: ${SERVICEOS_OIDC_ISSUER_URI:http://localhost:8081/realms/serviceos}
+          jwk-set-uri: ${SERVICEOS_OIDC_JWK_SET_URI:http://localhost:8081/realms/serviceos/protocol/openid-connect/certs}
+          audiences: ${SERVICEOS_OIDC_AUDIENCE:serviceos-api}
   threads:
     virtual:
       enabled: true

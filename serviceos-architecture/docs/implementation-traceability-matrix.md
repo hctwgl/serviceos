@@ -97,3 +97,10 @@ Feature gate/authority: if applicable
 - 已知风险与债务。
 
 存在通用代码或某个样例通过，不得推断所有服务类型、项目或异常已经闭环。
+
+## 6. 当前参考实现证据
+
+| 里程碑 | 代码/迁移 | 自动化测试 | 仍未证明 |
+|---|---|---|---|
+| M8 | Project、Audit、Idempotency、Outbox 事务切片 | Modulith、Domain、Contract、PostgreSQL IT | 完整 E1/履约链路 |
+| M9 | OIDC principal、tenant/capability 授权、Inbox、Outbox worker/attempt | Identity/Auth/Web MVC/Worker Unit + PostgreSQL IT | RoleGrant/ScopePredicate/FieldPolicy、正式 IdP/Broker、异常 Task |

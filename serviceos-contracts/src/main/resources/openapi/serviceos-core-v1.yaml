@@ -5,6 +5,8 @@ info:
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
+security:
+  - bearerAuth: []
 paths:
   /projects:
     post:
@@ -13,8 +15,6 @@ paths:
       description: 同一租户、操作和 Idempotency-Key 下，相同请求返回同一资源；不同请求返回冲突。
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
-        - $ref: '#/components/parameters/TenantId'
-        - $ref: '#/components/parameters/ActorId'
         - $ref: '#/components/parameters/CorrelationId'
       requestBody:
         required: true
@@ -36,11 +36,21 @@ paths:
                 $ref: '#/components/schemas/Project'
         '400':
           $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
         '409':
           $ref: '#/components/responses/Problem'
         '422':
           $ref: '#/components/responses/Problem'
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 由受信 OIDC 提供方签发，必须包含 subject、tenant_id；token 中的能力声明不能替代 ServiceOS RoleGrant。
   parameters:
     IdempotencyKey:
       name: Idempotency-Key
@@ -50,24 +60,6 @@ components:
         type: string
         minLength: 1
         maxLength: 160
-    TenantId:
-      name: X-Tenant-Id
-      in: header
-      required: true
-      description: E1 阶段由受信网关注入；OIDC 完成后不得接受公网自报值。
-      schema:
-        type: string
-        minLength: 1
-        maxLength: 64
-    ActorId:
-      name: X-Actor-Id
-      in: header
-      required: true
-      description: E1 阶段由受信网关注入；OIDC 完成后改由 CurrentPrincipal 提供。
-      schema:
-        type: string
-        minLength: 1
-        maxLength: 128
     CorrelationId:
       name: X-Correlation-Id
       in: header

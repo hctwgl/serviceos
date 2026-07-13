@@ -18,5 +18,11 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
+      - name: Require container runtime for PostgreSQL P0 tests
+        run: docker info
+      - name: Validate local infrastructure descriptors
+        run: |
+          docker compose -f serviceos-deploy/compose.yaml config --quiet
+          jq empty serviceos-deploy/keycloak/realm-serviceos.json
       - name: Verify modules, contracts, migrations and transaction slice
         run: ./mvnw --batch-mode --no-transfer-progress clean verify

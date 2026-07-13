@@ -1,7 +1,8 @@
 package com.serviceos.project.api;
 
-import com.serviceos.shared.CommandContext;
+import com.serviceos.identity.api.CurrentPrincipal;
+import com.serviceos.shared.CommandMetadata;
 
 public interface ProjectCommandService {
-    ProjectView create(CommandContext context, CreateProjectCommand command);
+    ProjectView create(CurrentPrincipal principal, CommandMetadata metadata, CreateProjectCommand command);
 }

@@ -3,6 +3,9 @@
  */
 @org.springframework.modulith.ApplicationModule(
         displayName = "Project Directory",
-        allowedDependencies = {"shared", "reliability::api", "audit::api"}
+        allowedDependencies = {
+                "shared", "identity::api", "authorization::api",
+                "reliability::api", "audit::api"
+        }
 )
 package com.serviceos.project;

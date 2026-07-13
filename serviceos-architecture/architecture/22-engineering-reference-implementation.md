@@ -84,6 +84,8 @@ sequenceDiagram
 
 ## 7. 尚未完成，禁止误判
 
+> 本节记录 M8 退出时的缺口；其中 OIDC、租户/capability 授权、Inbox 和 Outbox worker 已在 [M9 参考实现](23-identity-authorization-reliable-worker-implementation.md)形成首版，其余门禁仍未完成。
+
 - M6 E1 的 OIDC、授权/数据范围/字段策略；
 - Inbox、Outbox worker、claim/lease、崩溃恢复与 Broker；
 - 失败/拒绝审计的独立提交策略；
