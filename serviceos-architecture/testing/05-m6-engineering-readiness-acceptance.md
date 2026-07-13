@@ -64,30 +64,30 @@ status: Proposed
 
 | ID | Priority | 场景 | 主体/操作 | 预期证据 |
 |---|---|---|---|---|
-| SEC-001 | P0 | 跨租户 IDOR | 已知其他租户 UUID 直查 | 404/403，无存在性泄露，审计 |
-| SEC-002 | P0 | 跨区域/网点 | 网点访问其他网点工单 | 拒绝，列表/详情/导出一致 |
-| SEC-003 | P0 | 旧参与人 | 改派后原网点/师傅执行 | 实时拒绝，不依赖缓存撤销完成 |
-| SEC-004 | P0 | 金额隔离 | 客服查询对下价格 | 拒绝/脱敏，trace 不泄露 |
-| SEC-005 | P0 | 字段权限 | 普通用户读取手机号/VIN/签字 | 按策略掩码或拒绝 |
-| SEC-006 | P0 | 导出 | 无 export capability/超范围导出 | 拒绝；合法导出带字段策略和审计 |
-| SEC-007 | P0 | token 过期/撤销 | 使用旧 access/refresh token | 拒绝，refresh rotation 生效 |
-| SEC-008 | P0 | 高风险 MFA | 发布价格/切换/大批导出 | 未满足 MFA/审批时拒绝 |
-| SEC-009 | P0 | 恶意文件 | 病毒、伪 MIME、超大/压缩炸弹 | 隔离/拒绝，不可业务引用 |
-| SEC-010 | P0 | 预签名 URL | 过期、改 object key、跨租户 | 拒绝，桶无公共访问 |
-| SEC-011 | P0 | 日志敏感信息 | 执行全链路并扫描 logs/traces | 无 token、手机号、地址、VIN、价格 payload |
-| SEC-012 | P0 | secret 扫描 | 在代码/镜像注入测试 secret | CI 阻止，运行凭据来自 secret manager |
-| SEC-013 | P1 | break-glass | 激活紧急账号 | 双人审批、短期、告警、完整审计 |
+| M6-SEC-001 | P0 | 跨租户 IDOR | 已知其他租户 UUID 直查 | 404/403，无存在性泄露，审计 |
+| M6-SEC-002 | P0 | 跨区域/网点 | 网点访问其他网点工单 | 拒绝，列表/详情/导出一致 |
+| M6-SEC-003 | P0 | 旧参与人 | 改派后原网点/师傅执行 | 实时拒绝，不依赖缓存撤销完成 |
+| M6-SEC-004 | P0 | 金额隔离 | 客服查询对下价格 | 拒绝/脱敏，trace 不泄露 |
+| M6-SEC-005 | P0 | 字段权限 | 普通用户读取手机号/VIN/签字 | 按策略掩码或拒绝 |
+| M6-SEC-006 | P0 | 导出 | 无 export capability/超范围导出 | 拒绝；合法导出带字段策略和审计 |
+| M6-SEC-007 | P0 | token 过期/撤销 | 使用旧 access/refresh token | 拒绝，refresh rotation 生效 |
+| M6-SEC-008 | P0 | 高风险 MFA | 发布价格/切换/大批导出 | 未满足 MFA/审批时拒绝 |
+| M6-SEC-009 | P0 | 恶意文件 | 病毒、伪 MIME、超大/压缩炸弹 | 隔离/拒绝，不可业务引用 |
+| M6-SEC-010 | P0 | 预签名 URL | 过期、改 object key、跨租户 | 拒绝，桶无公共访问 |
+| M6-SEC-011 | P0 | 日志敏感信息 | 执行全链路并扫描 logs/traces | 无 token、手机号、地址、VIN、价格 payload |
+| M6-SEC-012 | P0 | secret 扫描 | 在代码/镜像注入测试 secret | CI 阻止，运行凭据来自 secret manager |
+| M6-SEC-013 | P1 | break-glass | 激活紧急账号 | 双人审批、短期、告警、完整审计 |
 
 ## 6. API 与契约
 
 | ID | Priority | 场景 | 操作 | 预期证据 |
 |---|---|---|---|---|
-| API-001 | P0 | OpenAPI 实现一致 | contract test 调用所有首切片端点 | 状态、Schema、错误码一致 |
-| API-002 | P0 | 事件 Schema 兼容 | 删除/改变必需字段 | CI 阻止破坏性变更 |
-| API-003 | P0 | Problem Details | 触发 validation/auth/concurrency | 稳定 errorCode/correlation，无内部泄露 |
-| API-004 | P0 | 限流 | 用户/连接器突发 | 429/退避契约，无全局雪崩 |
-| API-005 | P0 | 分页/导出边界 | 无界 page/大范围请求 | 上限、异步 operation 和授权生效 |
-| API-006 | P1 | 旧客户端兼容 | 上一发布客户端调用 | 兼容窗口内工作或明确版本拒绝 |
+| M6-API-001 | P0 | OpenAPI 实现一致 | contract test 调用所有首切片端点 | 状态、Schema、错误码一致 |
+| M6-API-002 | P0 | 事件 Schema 兼容 | 删除/改变必需字段 | CI 阻止破坏性变更 |
+| M6-API-003 | P0 | Problem Details | 触发 validation/auth/concurrency | 稳定 errorCode/correlation，无内部泄露 |
+| M6-API-004 | P0 | 限流 | 用户/连接器突发 | 429/退避契约，无全局雪崩 |
+| M6-API-005 | P0 | 分页/导出边界 | 无界 page/大范围请求 | 上限、异步 operation 和授权生效 |
+| M6-API-006 | P1 | 旧客户端兼容 | 上一发布客户端调用 | 兼容窗口内工作或明确版本拒绝 |
 
 ## 7. 性能与韧性
 

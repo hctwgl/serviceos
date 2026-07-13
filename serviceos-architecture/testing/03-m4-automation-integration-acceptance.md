@@ -43,8 +43,8 @@ status: Proposed
 | INT-007 | P1 | 批量重放保护 | 1000 条失败 delivery | 申请重放 | 预演、审批、限流和逐条结果 |
 | INT-008 | P1 | 文件渠道部分失败 | Excel 100 行中 3 行错误 | 导入 | 97 成功、3 行错误可修复，整批可追溯 |
 | INT-009 | P0 | 车企审核统一入站 | 外部审核回调 | 调用连接器入口 | Envelope→CanonicalMessage→内部审核命令链完整，不能绕过 |
-| AUTO-001 | P0 | 单一业务重试调度 | Delivery/Notification 失败 | 进入 RETRY_WAIT | 只有 TaskExecutionAttempt 保存 nextRetryAt 并触发下一次 |
-| AUTO-002 | P0 | 派单尝试历史 | 依赖失败两次后成功 | 自动重试 | 三个 DispatchAttempt 均可追溯且无覆盖 |
+| M4-AUTO-001 | P0 | 单一业务重试调度 | Delivery/Notification 失败 | 进入 RETRY_WAIT | 只有 TaskExecutionAttempt 保存 nextRetryAt 并触发下一次 |
+| M4-AUTO-002 | P0 | 派单尝试历史 | 依赖失败两次后成功 | 自动重试 | 三个 DispatchAttempt 均可追溯且无覆盖 |
 | NTF-001 | P0 | 通知去重 | 同领域事件重复 | 消费 | 单一 Intent/Delivery |
 | NTF-002 | P0 | 预约修订 | 预约已改约 | 发送提醒 | 使用当前确认 revision，不发旧时间 |
 | NTF-003 | P0 | 非关键通知失败 | 普通提醒供应商失败 | 重试耗尽 | 业务不回滚，失败可查 |
@@ -54,7 +54,7 @@ status: Proposed
 | EXC-002 | P0 | 原领域命令恢复 | 派单异常 | 人工选择网点 | 先派单成功，再 resolve/verify close |
 | EXC-003 | P0 | 禁止虚假解决 | 无恢复动作 | 直接 resolve | 422，状态不变并审计 |
 | EXC-004 | P0 | 自动恢复 | 连接器恢复且重试成功 | 消费成功事件 | Exception resolved/closed，Task 合法取消 |
-| SEC-001 | P0 | 报文与指标权限 | 普通客服 | 查看原始报文/完整商业分 | 脱敏或拒绝，访问审计 |
+| M4-SEC-001 | P0 | 报文与指标权限 | 普通客服 | 查看原始报文/完整商业分 | 脱敏或拒绝，访问审计 |
 
 ## 2. 确定性回放
 
