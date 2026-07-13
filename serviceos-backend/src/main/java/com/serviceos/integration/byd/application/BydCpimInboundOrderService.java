@@ -18,8 +18,8 @@ import java.util.Map;
 /**
  * BYD CPIM 安装订单入站安全边界。
  *
- * <p>处理顺序固定为：验签 → 摘要 → 防重放 → DTO 校验 → 反腐层映射。
- * 当前阶段只确认外部订单可安全接收，不在此服务中直接创建 WorkOrder。</p>
+ * <p>处理顺序固定为：验签 → 摘要 → DTO/试点校验 → 防重放 → 反腐层映射。
+ * 非法业务载荷不得提前占用 Nonce，避免修正报文被错误判定为重放冲突。</p>
  */
 @Service
 public class BydCpimInboundOrderService {
@@ -57,13 +57,21 @@ public class BydCpimInboundOrderService {
             return BydCpimInboundOrderResponse.rejected("INVALID_PAYLOAD", exception.getMessage());
         }
 
+        final BydCpimMappedOrder mapped;
+        try {
+            BydCpimInstallOrderPayload payload = objectMapper.convertValue(
+                    rawParameters, BydCpimInstallOrderPayload.class);
+            mapped = mapper.map(payload);
+        } catch (RuntimeException exception) {
+            if (!isPayloadMappingFailure(exception)) {
+                throw exception;
+            }
+            return BydCpimInboundOrderResponse.rejected("INVALID_ORDER", safeMessage(exception));
+        }
+
         try {
             var replayDecision = replayGuard.register(
                     headers.appKey(), headers.nonce(), headers.currentTime().getEpochSecond(), payloadDigest);
-
-            BydCpimInstallOrderPayload payload = objectMapper.convertValue(
-                    rawParameters, BydCpimInstallOrderPayload.class);
-            BydCpimMappedOrder mapped = mapper.map(payload);
             BydCpimInboundOrderResponse response = BydCpimInboundOrderResponse.accepted(
                     mapped.externalOrderCode(),
                     mapped.adapterVersion(),
@@ -77,9 +85,17 @@ public class BydCpimInboundOrderService {
         } catch (BydCpimReplayConflictException exception) {
             return BydCpimInboundOrderResponse.rejected(
                     "REPLAY_CONFLICT", "nonce was already used with a different payload");
-        } catch (IllegalArgumentException exception) {
-            return BydCpimInboundOrderResponse.rejected("INVALID_ORDER", exception.getMessage());
         }
+    }
+
+    private static boolean isPayloadMappingFailure(RuntimeException exception) {
+        return exception instanceof IllegalArgumentException
+                || exception.getClass().getName().startsWith("tools.jackson.databind.");
+    }
+
+    private static String safeMessage(RuntimeException exception) {
+        String message = exception.getMessage();
+        return message == null || message.isBlank() ? "request payload cannot be mapped" : message;
     }
 
     private static String responseDigest(BydCpimInboundOrderResponse response) {

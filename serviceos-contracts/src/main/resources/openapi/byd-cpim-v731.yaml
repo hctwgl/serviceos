@@ -1,0 +1,184 @@
+openapi: 3.1.0
+info:
+  title: ServiceOS BYD CPIM Adapter API
+  version: 0.1.0
+  description: >-
+    BYD CPIM V7.3.1 入站安装订单协议契约。该端点不使用 ServiceOS OIDC Bearer Token，
+    而使用 APP_KEY、Nonce、Cur_Time、Sign 四个协议头完成签名认证与防重放。
+servers:
+  - url: /api/v1
+paths:
+  /integrations/byd/cpim/v7.3.1/install-orders:
+    post:
+      operationId: receiveBydCpimInstallOrder
+      summary: 接收比亚迪海洋山东试点安装订单
+      description: >-
+        首期只接受 carBrand=40、provinceCode=370000、provinceName=山东省。
+        协议级或业务级拒绝均返回 HTTP 200，并通过响应中的 success 与 code 表达结果。
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/AppKey'
+        - $ref: '#/components/parameters/Nonce'
+        - $ref: '#/components/parameters/CurrentTime'
+        - $ref: '#/components/parameters/Signature'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BydCpimInstallOrderRequest'
+      responses:
+        '200':
+          description: 请求已接收、幂等重放或被协议/业务规则拒绝
+          headers:
+            X-Correlation-Id:
+              schema:
+                type: string
+                maxLength: 128
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BydCpimInboundOrderResponse'
+        '400':
+          description: HTTP 载荷无法被解析，例如无效 JSON 或请求头类型错误
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+components:
+  parameters:
+    AppKey:
+      name: APP_KEY
+      in: header
+      required: true
+      description: BYD CPIM 分配给服务商的应用标识
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+    Nonce:
+      name: Nonce
+      in: header
+      required: true
+      description: 单次请求随机串；相同 Nonce、请求时间和载荷允许安全重放
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+    CurrentTime:
+      name: Cur_Time
+      in: header
+      required: true
+      description: Unix epoch 秒，必须位于服务端允许的时间窗口内
+      schema:
+        type: integer
+        format: int64
+        minimum: 0
+    Signature:
+      name: Sign
+      in: header
+      required: true
+      description: 按 CPIM V7.3.1 规则生成的 SHA-256 十六进制签名
+      schema:
+        type: string
+        pattern: '^[0-9A-Fa-f]{64}$'
+    CorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      schema:
+        type: string
+        maxLength: 128
+  schemas:
+    BydCpimInstallOrderRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - orderCode
+        - contactName
+        - contactMobile
+        - contactAddress
+        - provinceCode
+        - provinceName
+        - cityCode
+        - cityName
+        - areaCode
+        - areaName
+        - wallboxName
+        - wallboxPower
+        - bringWallbox
+        - dispatchTime
+        - carOwnerType
+        - type
+        - carBrand
+        - carSeries
+        - carModel
+        - vin
+        - dealerName
+        - rightCode
+        - orderAmount
+        - source
+        - channel
+      properties:
+        orderCode: { type: string, minLength: 1, maxLength: 64 }
+        contactName: { type: string, minLength: 1, maxLength: 64 }
+        contactMobile: { type: string, minLength: 1, maxLength: 32 }
+        contactAddress: { type: string, minLength: 1, maxLength: 512 }
+        provinceCode: { type: string, const: '370000' }
+        provinceName: { type: string, const: '山东省' }
+        cityCode: { type: string, minLength: 1, maxLength: 16 }
+        cityName: { type: string, minLength: 1, maxLength: 32 }
+        areaCode: { type: string, minLength: 1, maxLength: 16 }
+        areaName: { type: string, minLength: 1, maxLength: 32 }
+        wallboxName: { type: string, minLength: 1, maxLength: 128 }
+        wallboxPower: { type: string, minLength: 1, maxLength: 32 }
+        bringWallbox: { type: string, minLength: 1, maxLength: 8 }
+        dispatchTime: { type: string, format: date-time }
+        carOwnerType: { type: string, minLength: 1, maxLength: 8 }
+        type: { type: string, minLength: 1, maxLength: 8 }
+        carBrand: { type: string, const: '40' }
+        carSeries: { type: string, minLength: 1, maxLength: 64 }
+        carModel: { type: string, minLength: 1, maxLength: 128 }
+        vin:
+          type: string
+          pattern: '^[A-HJ-NPR-Z0-9]{17}$'
+        dealerName: { type: string, minLength: 1, maxLength: 128 }
+        rightCode: { type: string, minLength: 1, maxLength: 64 }
+        orderAmount: { type: number, minimum: 0 }
+        source: { type: string, minLength: 1, maxLength: 8 }
+        channel: { type: string, minLength: 1, maxLength: 32 }
+    BydCpimInboundOrderResponse:
+      type: object
+      additionalProperties: false
+      required: [success, code, message, replay]
+      properties:
+        success: { type: boolean }
+        code:
+          type: string
+          enum:
+            - ACCEPTED
+            - REPLAYED
+            - UNKNOWN_APP_KEY
+            - TIMESTAMP_OUT_OF_WINDOW
+            - SIGNATURE_MISMATCH
+            - INVALID_HEADERS
+            - INVALID_PAYLOAD
+            - INVALID_ORDER
+            - REPLAY_CONFLICT
+        message: { type: string }
+        orderCode: { type: [string, 'null'] }
+        adapterVersion: { type: [string, 'null'] }
+        mappingVersion: { type: [string, 'null'] }
+        replay: { type: boolean }
+    Problem:
+      type: object
+      required: [type, title, status, errorCode]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        errorCode: { type: string }
+        correlationId: { type: [string, 'null'] }
