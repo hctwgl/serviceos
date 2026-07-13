@@ -18,7 +18,7 @@ M5 默认 feature set 为 `FACTS + SHADOW_PRICING + CALCULATION_EXPORT + MIGRATI
 | `GET /fact-extraction-runs/{id}` | 输入、trace、事实和错误 | — | 200 |
 | `GET /work-orders/{id}/fulfillment-facts` | 当前/历史事实 | factCode、status、asOf? | 200 |
 | `POST /fulfillment-facts/{id}:confirm` | ConfirmFact | reason?、evidenceRefs? | 200 |
-| `POST /fulfillment-facts/{id}:correct` | CorrectFact | newValue/sourceRefs、reason、approvalRef | 202（同步创建 eligibility holds） |
+| `POST /fulfillment-facts/{id}:correct` | CorrectFact | newValue/sourceRefs、reason、approvalRef | 202（同步激活 fact guard 与 run holds） |
 | `POST /work-orders/{id}/fact-set-snapshots` | CreateFactSetSnapshot | purpose、memberFactIds? | 201 |
 | `GET /fact-set-snapshots/{id}` | 成员、资格与摘要 | — | 200 |
 
@@ -47,6 +47,8 @@ M5 默认 feature set 为 `FACTS + SHADOW_PRICING + CALCULATION_EXPORT + MIGRATI
 ```
 
 服务端依据工单锁定的 ConfigurationBundle、方向、有效合同、结算关系、区域和取价日期事实，解析唯一 PricingPlanVersion 与 PricingContextSnapshot；普通调用方不能提交或覆盖这些字段。解析零命中/多命中分别失败并保留候选解释。运行模式也由服务端依据方向级计价权威和 feature gate 决定，M5 默认生成 `SHADOW`，客户端不能自行声明 `AUTHORITATIVE`。缺失必需事实返回一个 `NOT_CALCULABLE` run 及原因，不创建零金额“成功”结果。
+
+创建 run 前服务端锁定并检查 FactSetSnapshot 全部成员的 `FactEligibilityGuard`。存在更正 pending 时普通请求返回 `FACT_CORRECTION_PENDING`；受权影子分析即使继续，也只能生成 `PENDING_FACT_INPUT` 的 SHADOW run。
 
 候选价格实验只能通过 `POST /calculation-comparisons` 引用已批准的候选版本，由具备 `pricing.shadowOverride` 的主体发起。由候选 override 产生的 run 强制标记 `SHADOW`，保存 override 审批和审计，永远不具备正式结算资格。
 

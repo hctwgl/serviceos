@@ -15,6 +15,7 @@ status: Proposed
 | FACT-003 | P0 | 零与缺失 | 一个真实 0，一个无来源 | 建 snapshot/试算 | 0 可计价，缺失按策略 NOT_CALCULABLE |
 | FACT-004 | P0 | 事实更正 | 已确认线缆长度错误 | 审批更正 | 旧事实保留、新事实替代、影响分析创建 |
 | FACT-004A | P0 | 更正与结算收集竞态 | validated run 可被收集 | 并发提交更正与 collect | 更正事务先建 hold；旧 run 不可能新增有效 line，释放/转换有审计 |
+| FACT-004B | P0 | 更正期间新建试算竞态 | 旧 FactSetSnapshot 可用、更正 pending | 并发 RequestCalculation/eligibility/line 写入 | 共享 fact guard 串行化；无新 AUTHORITATIVE run/line，受权 SHADOW 标 PENDING_FACT_INPUT |
 | FACT-005 | P0 | 事实集合冻结 | S1 已用于试算 | 新事实产生 | S1 不变，新试算使用 S2 |
 | FACT-006 | P0 | 资料失效影响 | 可计价事实依赖资料 V1 | V1 被受控作废 | 事实/试算影响可追踪，不静默改金额 |
 | CALC-001 | P0 | 确定性试算 | 相同 fact set/context/plan/engine | 重复执行 | 金额、明细、trace 摘要一致 |

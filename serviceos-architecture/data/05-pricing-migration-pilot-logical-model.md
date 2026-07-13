@@ -12,7 +12,7 @@ status: Proposed
 
 | 模块 | 拥有实体 | 不拥有 |
 |---|---|---|
-| 履约事实 | FactDefinition、ExtractionPolicy/Run、FulfillmentFact、FactSetSnapshot、EligibilityHold | FormSubmission/Evidence 原数据 |
+| 履约事实 | FactDefinition、ExtractionPolicy/Run、FulfillmentFact、FactSetSnapshot、FactEligibilityGuard、EligibilityHold | FormSubmission/Evidence 原数据 |
 | 计价 | PricingPlanVersion、ContextSnapshot、CalculationRun、ChargeItem、Comparison | 结算确认和财务支付 |
 | 对账结算 | Batch、Statement、Line、Response、Dispute、Adjustment、Lock | 总账、银行和法定发票系统 |
 | 迁移 | Plan、Snapshot、Batch、Record、IdMapping、Lineage、Validation | 旧系统原始数据所有权 |
@@ -57,6 +57,12 @@ status: Proposed
 
 `correction_request_id + calculation_run_id` 唯一。CorrectFact 接受请求与 ACTIVE hold 在同一事务创建；SettlementEligibility、collect 和 StatementLine 写入均以排他检查拒绝 ACTIVE hold，不能只读取异步投影。
 
+### fact_eligibility_guard
+
+以 `fact_id` 为主键，保存 factVersion、状态（CLEAR/CORRECTION_PENDING）、correctionRequestId、guardVersion 和更新时间。更正提交先以 `SELECT ... FOR UPDATE`（或等价悲观锁）按 factId 排序锁定并置 pending，再扫描已有 runs。
+
+RequestCalculation、SettlementEligibility、collect 和 StatementLine 插入在写事务中按同一顺序锁定所有成员事实 guard 并复查状态。这样 pending 更正前已开始的 line 事务与更正提交串行化；更正提交后开始的新 run/line 无法越过 guard。SHADOW 分析如获准继续，必须保存 `PENDING_FACT_INPUT` 且不具备结算资格。
+
 ### fact_set_snapshot / fact_set_member
 
 snapshot 保存工单、purpose、资格策略、成员数和集合摘要；member 精确引用 factId/version。成员不可更新。
@@ -83,6 +89,7 @@ snapshot 保存工单、purpose、资格策略、成员数和集合摘要；memb
 | pricing_context_resolver_version / configuration_bundle_id | 服务端取价解析和工单锁定配置 |
 | pricing_authority_assignment_id / pricing_authority_version | 创建时的方向级计价权威门禁 |
 | pricing_override_approval_ref | 仅 SHADOW 候选实验可用 |
+| input_eligibility | ELIGIBLE/PENDING_FACT_INPUT |
 | engine/function_library_version | 执行版本 |
 | status | REQUESTED/VALIDATING/NOT_CALCULABLE/CALCULATING/CALCULATED/VALIDATED/STALE/SUPERSEDED/FAILED |
 | idempotency_key / input_digest | 幂等 |
@@ -226,7 +233,7 @@ definition 保存指标、窗口、阈值和数据源；evaluation 保存 cohort
 - MISSING 不等于零；
 - CalculationRun 明确方向、事实集合、上下文和价格版本；
 - 普通取价上下文由服务端解析，客户端 override 只能生成 SHADOW run；
-- 事实更正提交与相关 eligibility hold 原子创建；
+- 事实更正提交、FactEligibilityGuard pending 与相关 run hold 原子创建；
 - SHADOW/旧 pricingAuthorityVersion run 永不具备正式结算资格；
 - 对上/对下不共享 run、charge、statement 和 adjustment；
 - LOCKED Statement 不被普通重算替换；

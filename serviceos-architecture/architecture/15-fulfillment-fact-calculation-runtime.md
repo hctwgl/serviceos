@@ -21,6 +21,7 @@ status: Proposed
 | `FactExtractionRun` | 一次提取执行及完整输入/输出/错误 |
 | `FulfillmentFact` | 某个事实编码的一次不可变断言版本 |
 | `FactCorrection` | 对既有事实的更正、失效或替代依据 |
+| `FactEligibilityGuard` | 事实更正与新试算/结算写入之间的统一并发锁点 |
 | `CalculationEligibilityHold` | 更正提交后立即冻结受影响试算的结算资格，阻断异步影响分析竞态 |
 | `FactSetSnapshot` | 某次试算使用的不可变事实版本集合 |
 | `PricingPlanVersion` | 某方向已发布且不可变的计价规则 |
@@ -284,17 +285,20 @@ ChargeItem 不允许人工原地改金额。商务特批、核减或补差只创
 
 事实更正是异步命令，但不能等异步影响分析完成后才阻止旧金额入账。`CorrectFact` 接受请求的同一事务必须：
 
-1. 创建 `FactCorrection` 请求；
-2. 为所有直接引用旧事实的 `CalculationRun` 创建有效 `CalculationEligibilityHold`；
-3. 写出更正已提交事件和 Outbox 记录。
+1. 按 factId 排序锁定对应 `FactEligibilityGuard` 行并置为 `CORRECTION_PENDING`；
+2. 创建 `FactCorrection` 请求；
+3. 为所有直接引用旧事实的 `CalculationRun` 创建有效 `CalculationEligibilityHold`；
+4. 写出更正已提交事件和 Outbox 记录。
 
-SettlementEligibility、批次 collect 和 StatementLine 写入都必须检查有效 hold；存在 hold 时返回 `FACT_CORRECTION_PENDING`。异步影响分析完成后：
+RequestCalculation 创建 run 前必须按成员 factId 的稳定顺序锁定并检查所有 guard；任一 guard pending 时不得创建 `AUTHORITATIVE` run，默认返回 `FACT_CORRECTION_PENDING`。受权影子分析若确需继续，只能生成带 `PENDING_FACT_INPUT` 标记的 SHADOW run，且永久不具备正式结算资格。
+
+SettlementEligibility、批次 collect 和 StatementLine 写入必须在各自写事务中按相同顺序锁定相关 fact guard，并同时检查有效 run hold；存在 pending guard 或 hold 时返回 `FACT_CORRECTION_PENDING`。因此更正扫描既有 runs 与并发创建新 run/line 共享同一数据库锁点，而非依赖先后读取或最终一致投影。异步影响分析完成后：
 
 - 更正被拒绝：记录原因并释放 hold；
 - 更正获批：旧 run 标记 STALE/产生 CalculationImpact，只有新事实与新 run 验证完成后才能释放对应阻断；
 - 原结果已 LOCKED：保留锁定行，hold 转换为 Adjustment 处理要求，不修改原行。
 
-hold 的创建与更正请求、hold 的消费与结算行写入都使用数据库事务和排他约束，不能依赖最终一致投影防竞态。
+更正被拒绝或新事实完成替代后，guard 在完成 run 影响处置的同一事务释放/迁移到新事实版本。hold 的创建与更正请求、guard 的检查与 run/line 写入都使用数据库事务和排他约束，不能依赖最终一致投影防竞态。
 
 ## 16. 影子试算与比较
 
