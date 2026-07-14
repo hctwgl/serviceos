@@ -160,6 +160,16 @@ class CorrectionCasePostgresIT {
                     assertThat(row.get("business_key")).isEqualTo(correctionId.toString());
                     assertThat(row.get("status")).isEqualTo("READY");
                 });
+        assertThat(jdbc.sql("""
+                SELECT principal_id, source_type, source_id
+                  FROM tsk_task_assignment
+                 WHERE task_id = :task AND assignment_kind = 'CANDIDATE' AND status = 'ACTIVE'
+                """).param("task", opened.correctionTaskId()).query().singleRow())
+                .satisfies(row -> {
+                    assertThat(row.get("principal_id")).isEqualTo(TECHNICIAN);
+                    assertThat(row.get("source_type")).isEqualTo("SYSTEM");
+                    assertThat(row.get("source_id")).isEqualTo("CORRECTION_AUTO_CANDIDATE");
+                });
         assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type='evidence.correction-case-created'")
                 .query(Long.class).single()).isOne();
 

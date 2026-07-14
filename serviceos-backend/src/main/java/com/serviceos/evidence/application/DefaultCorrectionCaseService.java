@@ -18,6 +18,7 @@ import com.serviceos.reliability.api.OutboxAppender;
 import com.serviceos.reliability.api.OutboxEvent;
 import com.serviceos.task.api.CreateHandlingTaskCommand;
 import com.serviceos.task.api.ScheduledTaskView;
+import com.serviceos.task.api.TaskResponsibilityQuery;
 import com.serviceos.task.api.TaskSchedulingService;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.CommandContext;
@@ -48,6 +49,7 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
     private final CorrectionCaseRepository corrections;
     private final EvidenceSetSnapshotRepository snapshots;
     private final TaskSchedulingService tasks;
+    private final TaskResponsibilityQuery responsibilities;
     private final AuthorizationService authorization;
     private final IdempotencyService idempotency;
     private final AuditAppender audit;
@@ -59,6 +61,7 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
             CorrectionCaseRepository corrections,
             EvidenceSetSnapshotRepository snapshots,
             TaskSchedulingService tasks,
+            TaskResponsibilityQuery responsibilities,
             AuthorizationService authorization,
             IdempotencyService idempotency,
             AuditAppender audit,
@@ -69,6 +72,7 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
         this.corrections = corrections;
         this.snapshots = snapshots;
         this.tasks = tasks;
+        this.responsibilities = responsibilities;
         this.authorization = authorization;
         this.idempotency = idempotency;
         this.audit = audit;
@@ -111,10 +115,13 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
 
         String payloadDigest = Sha256.digest(
                 correctionCaseId + "|" + reviewDecisionId + "|" + evidenceSetSnapshotId);
+        List<String> candidates = responsibilities.findActiveResponsibleUser(tenantId, taskId)
+                .map(List::of)
+                .orElse(List.of());
         ScheduledTaskView correctionTask = tasks.createHandlingTask(new CreateHandlingTaskCommand(
                 tenantId, CORRECTION_TASK_TYPE, correctionCaseId.toString(),
                 "correction-case:" + correctionCaseId, payloadDigest,
-                800, now, correlationId));
+                800, now, correlationId, candidates));
         int linked = corrections.linkCorrectionTask(
                 tenantId, correctionCaseId, correctionTask.taskId());
         if (linked != 1) {

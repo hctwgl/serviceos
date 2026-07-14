@@ -50,3 +50,4 @@
 - [M47 整改 Task 验收](44-m47-correction-task-acceptance.md)
 - [M48 强制通过与重开验收](45-m48-review-force-approve-reopen-acceptance.md)
 - [M49 外部审核回执验收](46-m49-external-review-receipt-acceptance.md)
+- [M50 自动候选人验收](47-m50-correction-auto-candidate-acceptance.md)

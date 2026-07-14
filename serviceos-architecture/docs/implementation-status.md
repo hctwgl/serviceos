@@ -4,7 +4,7 @@ version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-14
 baselineCommit: fb786a73e0997aa95c45a836b0de2882fdf839d7
-latestMilestone: M49
+latestMilestone: M50
 ---
 
 # ServiceOS 实施状态总览
@@ -39,12 +39,12 @@ latestMilestone: M49
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M49 ExternalReviewReceipt |
+| 最新实施里程碑 | M50 整改 Task 自动候选人 |
 | 基线提交 | `fb786a73e0997aa95c45a836b0de2882fdf839d7` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
 | 前端工程 | 尚未建立；已有 Admin、Network、Technician 产品与交互规格 |
-| 数据库 | PostgreSQL + Flyway（当前版本 049 / 51） |
+| 数据库 | PostgreSQL + Flyway（当前版本 050 / 52） |
 | 契约 | OpenAPI 0.24.0 + 事件 JSON Schema |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
@@ -68,7 +68,7 @@ latestMilestone: M49
 | 动态表单 | 资产、冻结版本、不可变提交和 Task 完成门禁 | `PARTIAL` | 固定 required、基础类型校验、精确版本提交和完成引用 | 条件表达式、复杂 validator、草稿、冲突、更正和审核 | M33～M35 |
 | 资料 Evidence | 资产、槽位、Item/Revision、机器校验、Snapshot、完成门禁、作废、Review、Correction | `PARTIAL` | 固定槽位、安全文件 Finalize/Invalidate 联动、确定性机器校验、TASK_SUBMISSION Snapshot、完成门禁、作废、Review/Correction/整改 Task、强制通过/重开 | 条件槽位、OCR/CV | M36～M49 |
 | 安全文件 | Begin/Finalize/隔离/扫描/授权下载/作废 | `IMPLEMENTED` | 独立安全文件生命周期；Evidence 编排 Begin/Finalize/Invalidate 联动 | 正式对象存储、专业扫描服务、物理删除 | M11、M38、M46 |
-| 审核整改 | ReviewCase、ReviewDecision、CorrectionCase | `PARTIAL` | Review + Correction + 整改 Task + 强制通过/重开 + 车企回执；补传轮次只追加 | 自动指派、前端、CLIENT Case 自动创建 | M44～M49 |
+| 审核整改 | ReviewCase、ReviewDecision、CorrectionCase | `PARTIAL` | Review + Correction + 整改 Task + 强制通过/重开 + 车企回执；补传轮次只追加 | 多候选人策略、前端、CLIENT Case 自动创建 | M44～M50 |
 | SLA | 时钟、预警、升级 | `PROPOSED` | 已有总体设计 | 完整运行时和验收尚未实施 | `architecture/12-*` |
 | 通知 | 通知与运营异常中心 | `PROPOSED` | 已有总体设计 | 通知通道、模板、可靠发送和 UI | `architecture/14-*` |
 | 履约事实与试算 | 事实提取和双向试算 | `PROPOSED` | 已有设计、API 和数据规划 | 运行时、投影和前端工作区 | M5 设计 |
@@ -114,20 +114,21 @@ latestMilestone: M49
 - Evidence invalidate 同事务联动 StoredFile AVAILABLE→INVALIDATED（M46）；
 - CorrectionCase 打开时自动创建 evidence.correction Task 并进入 IN_PROGRESS（M47）；
 - OPEN 强制通过 FORCE_APPROVED；APPROVED/FORCE_APPROVED 重开产生新 OPEN 案例（M48）；
-- 适配层记录 ExternalReviewReceipt 并追加 EXTERNAL 决定；驳回开客服协调 Task（M49）。
+- 适配层记录 ExternalReviewReceipt 并追加 EXTERNAL 决定；驳回开客服协调 Task（M49）；
+- 整改 Task 自动写入源责任人 CANDIDATE（M50）。
 
 未实现：
 
 - `requiredWhen` 条件解析和可审计重解析；
 - OCR / 图像 CV / GPS 权威距离；
-- 整改候选人自动指派。
+- 多候选人策略评分与自动 claim。
 
 ## 5. 下一实施方向
 
 在没有更新事实源或新批准决策的情况下，建议下一可靠纵向切片是：
 
 ```text
-M50 条件槽位 requiredWhen（需接受 ADR-018）或整改候选人自动指派
+M51 条件槽位 requiredWhen（需接受 ADR-018）或 CorrectionCase WAIVED
 ```
 
 接手 Agent 必须先检查仓库是否已有更新的里程碑文档、ADR 或提交。

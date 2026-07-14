@@ -127,6 +127,45 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
                     ProblemCode.TASK_SCHEDULE_CONFLICT,
                     "The handling task business key is already bound to a different payload digest");
         }
+        if (inserted == 1 && !command.candidatePrincipalIds().isEmpty()) {
+            Instant assignedAt = command.readyAt() == null ? now : command.readyAt();
+            UUID batchId = UUID.randomUUID();
+            jdbc.sql("""
+                            INSERT INTO tsk_task_assignment_batch (
+                                assignment_batch_id, tenant_id, task_id, source_type, source_id,
+                                candidate_count, task_version, assigned_by, assigned_at
+                            ) VALUES (
+                                :batchId, :tenantId, :taskId, 'SYSTEM', 'CORRECTION_AUTO_CANDIDATE',
+                                :candidateCount, 1, 'system', :assignedAt
+                            )
+                            """)
+                    .param("batchId", batchId)
+                    .param("tenantId", command.tenantId())
+                    .param("taskId", stored.taskId())
+                    .param("candidateCount", command.candidatePrincipalIds().size())
+                    .param("assignedAt", timestamptz(assignedAt))
+                    .update();
+            for (String candidateId : command.candidatePrincipalIds()) {
+                jdbc.sql("""
+                                INSERT INTO tsk_task_assignment (
+                                    task_assignment_id, tenant_id, task_id, assignment_batch_id,
+                                    assignment_kind, principal_type, principal_id, status,
+                                    source_type, source_id, effective_from, created_by, created_at
+                                ) VALUES (
+                                    :assignmentId, :tenantId, :taskId, :batchId,
+                                    'CANDIDATE', 'USER', :candidateId, 'ACTIVE',
+                                    'SYSTEM', 'CORRECTION_AUTO_CANDIDATE', :assignedAt, 'system', :assignedAt
+                                )
+                                """)
+                        .param("assignmentId", UUID.randomUUID())
+                        .param("tenantId", command.tenantId())
+                        .param("taskId", stored.taskId())
+                        .param("batchId", batchId)
+                        .param("candidateId", candidateId)
+                        .param("assignedAt", timestamptz(assignedAt))
+                        .update();
+            }
+        }
         return stored.toView();
     }
 
