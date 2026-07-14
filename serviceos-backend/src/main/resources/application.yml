@@ -24,6 +24,7 @@ spring:
       - classpath:db/migration/integration
       - classpath:db/migration/workorder
       - classpath:db/migration/workflow
+      - classpath:db/migration/dispatch
     validate-migration-naming: true
   security:
     oauth2:

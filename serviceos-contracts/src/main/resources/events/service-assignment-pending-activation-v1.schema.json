@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://serviceos.example/schemas/events/service-assignment-pending-activation-v1.schema.json",
+  "title": "ServiceAssignmentPendingActivationV1", "type": "object", "additionalProperties": false,
+  "required": ["eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId", "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"],
+  "properties": {"eventId": {"type": "string", "format": "uuid"}, "eventType": {"const": "service.assignment.pending-activation"}, "schemaVersion": {"const": 1}, "tenantId": {"type": "string"}, "correlationId": {"type": "string"}, "causationId": {"type": "string"}, "aggregateType": {"const": "ServiceAssignment"}, "aggregateId": {"type": "string", "format": "uuid"}, "aggregateVersion": {"const": 1}, "occurredAt": {"type": "string", "format": "date-time"}, "payload": {"$ref": "#/$defs/payload"}},
+  "$defs": {"payload": {"$ref": "#/$defs/serviceAssignment"}, "serviceAssignment": {"type": "object", "additionalProperties": false,
+    "required": ["serviceAssignmentId", "sagaId", "workOrderId", "taskId", "responsibilityLevel", "assigneeId", "businessType", "status", "capacityReservationId", "occurredAt"],
+    "properties": {"serviceAssignmentId": {"type": "string", "format": "uuid"}, "sagaId": {"type": "string", "format": "uuid"}, "workOrderId": {"type": "string", "format": "uuid"}, "taskId": {"type": "string", "format": "uuid"}, "responsibilityLevel": {"enum": ["NETWORK", "TECHNICIAN"]}, "assigneeId": {"type": "string"}, "businessType": {"type": "string"}, "status": {"const": "PENDING_ACTIVATION"}, "supersedesServiceAssignmentId": {"type": ["string", "null"], "format": "uuid"}, "capacityReservationId": {"type": "string", "format": "uuid"}, "guardId": {"type": ["string", "null"], "format": "uuid"}, "preparedTaskAssignmentId": {"type": ["string", "null"], "format": "uuid"}, "reasonCode": {"type": ["string", "null"]}, "occurredAt": {"type": "string", "format": "date-time"}}
+  }}
+}

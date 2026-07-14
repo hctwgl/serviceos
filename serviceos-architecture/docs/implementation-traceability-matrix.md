@@ -118,3 +118,4 @@ Feature gate/authority: if applicable
 | M21 | USER 候选快照、唯一 ACTIVE RESPONSIBLE、claim 门禁与 release/reclaim | MVC Security + Event/OpenAPI Contract + TaskAssignment/HumanTask/Workflow PostgreSQL IT + V021 | 策略解析、ServiceAssignment/容量/改派 saga、Task guard、SLA、离线撤权、完整勘安链路 |
 | M22 | REASSIGNMENT TaskExecutionGuard、精确解除、人工命令与候选替换失败关闭 | Event Schema + TaskExecutionGuard/TaskAssignment/HumanTask PostgreSQL IT + V022 | PREPARED TaskAssignment、ServiceAssignment/容量/改派 saga、超时补偿、SLA、离线撤权、完整勘安链路 |
 | M23 | guard + PREPARED 责任原子准备、激活切换、切换前 abort | Event Schema + TaskReassignment/HumanTask PostgreSQL IT + V023 | Dispatch/ServiceAssignment/容量、跨模块 Inbox saga、切换后补偿、SLA、完整勘安链路 |
+| M24 | ServiceAssignment、容量预留、切换前 abort 与本地激活 saga | Event Schema + DispatchServiceAssignment PostgreSQL IT + V024 | 跨模块 Inbox saga、派单策略、切换后补偿、SLA、完整勘安链路 |

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/dispatch-capacity-configured-v1.schema.json",
+  "title": "DispatchCapacityConfiguredV1", "type": "object", "additionalProperties": false,
+  "required": ["eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId", "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"}, "eventType": {"const": "dispatch.capacity-configured"}, "schemaVersion": {"const": 1},
+    "tenantId": {"type": "string"}, "correlationId": {"type": "string"}, "causationId": {"type": "string"},
+    "aggregateType": {"const": "CapacityCounter"}, "aggregateId": {"type": "string", "format": "uuid"},
+    "aggregateVersion": {"type": "integer", "minimum": 1}, "occurredAt": {"type": "string", "format": "date-time"},
+    "payload": {"$ref": "#/$defs/payload"}
+  },
+  "$defs": {"payload": {"type": "object", "additionalProperties": false,
+    "required": ["capacityCounterId", "responsibilityLevel", "assigneeId", "businessType", "maxUnits", "occupiedUnits", "version", "configuredAt"],
+    "properties": {
+      "capacityCounterId": {"type": "string", "format": "uuid"}, "responsibilityLevel": {"enum": ["NETWORK", "TECHNICIAN"]},
+      "assigneeId": {"type": "string", "minLength": 1, "maxLength": 128}, "businessType": {"type": "string", "minLength": 1, "maxLength": 100},
+      "maxUnits": {"type": "integer", "minimum": 1}, "occupiedUnits": {"type": "integer", "minimum": 0},
+      "version": {"type": "integer", "minimum": 1}, "configuredAt": {"type": "string", "format": "date-time"}
+    }
+  }}
+}

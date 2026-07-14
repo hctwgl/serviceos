@@ -24,3 +24,4 @@
 - [M21 TaskAssignment 候选与责任验收矩阵](18-m21-task-assignment-acceptance.md)
 - [M22 TaskExecutionGuard 验收矩阵](19-m22-task-execution-guard-acceptance.md)
 - [M23 PREPARED TaskAssignment 验收矩阵](20-m23-prepared-task-assignment-acceptance.md)
+- [M24 ServiceAssignment 与容量权威验收矩阵](21-m24-service-assignment-capacity-acceptance.md)
