@@ -3,7 +3,7 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-14
-baselineCommit: 47cc8b8
+baselineCommit: b5280bc2508e2cc97c721c0b5794180b231597cf
 latestMilestone: M41
 ---
 
@@ -40,7 +40,7 @@ latestMilestone: M41
 | 项目 | 当前值 |
 |---|---|
 | 最新实施里程碑 | M41 EvidenceSetSnapshot Task 完成门禁 |
-| 基线提交 | 以本里程碑提交为准（提交后回填） |
+| 基线提交 | `b5280bc2508e2cc97c721c0b5794180b231597cf` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
 | 前端工程 | 尚未建立；已有 Admin、Network、Technician 产品与交互规格 |
