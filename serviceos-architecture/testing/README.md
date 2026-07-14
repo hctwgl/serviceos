@@ -43,3 +43,4 @@
 - [M40 EvidenceSetSnapshot 验收](37-m40-evidence-set-snapshot-acceptance.md)
 - [M41 EvidenceSetSnapshot Task 完成门禁验收](38-m41-evidence-task-completion-gate-acceptance.md)
 - [M42 EvidenceRevision 作废验收](39-m42-evidence-invalidate-acceptance.md)
+- [M43 表单+资料双引用完成门禁验收](40-m43-dual-input-task-completion-acceptance.md)

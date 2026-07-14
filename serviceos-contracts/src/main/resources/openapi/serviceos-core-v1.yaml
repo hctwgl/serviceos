@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.17.0
+  version: 0.18.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -111,12 +111,11 @@ paths:
       operationId: completeHumanTask
       summary: 当前执行人完成人工工作流任务
       description: >-
-        formRef 非空的表单 Task 必须引用 form-submission://{submissionId}，且 resultDigest
-        精确匹配同 Task、Project、冻结 FormVersion 的 VALIDATED submission contentDigest。
-        无 formRef 且已解析出 EvidenceSlot 的资料 Task 必须引用
-        evidence-set-snapshot://{snapshotId}，且 resultDigest 精确匹配同 Task、Project、
-        purpose=TASK_SUBMISSION 的 EvidenceSetSnapshot contentDigest。
-        表单与资料双引用完成条件尚未实现。
+        formRef 非空且无非空 EvidenceSlot 的表单 Task：resultRef=form-submission://{submissionId}。
+        无 formRef 且有非空 EvidenceSlot 的资料 Task：resultRef=evidence-set-snapshot://{snapshotId}。
+        同时具备 formRef 与非空 EvidenceSlot 时：resultRef 仍为 FormSubmission；必须提供
+        inputVersionRefs，恰好包含 FORM_SUBMISSION（与 resultRef/digest 一致）与
+        EVIDENCE_SET_SNAPSHOT（同 Task/Project、purpose=TASK_SUBMISSION）。
       parameters:
         - $ref: '#/components/parameters/TaskId'
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -981,15 +980,29 @@ components:
           minLength: 1
           maxLength: 500
           description: >-
-            表单 Task 使用 form-submission://{submissionId}；
+            表单或双引用 Task 使用 form-submission://{submissionId}；
             无 formRef 的资料 Task 使用 evidence-set-snapshot://{snapshotId}；
             其他非表单/资料 Task 使用所属领域稳定引用
         resultDigest:
           type: string
           pattern: '^[0-9a-f]{64}$'
           description: >-
-            表单 Task 必须等于 FormSubmission contentDigest；
-            资料 Task 必须等于 EvidenceSetSnapshot contentDigest
+            表单或双引用 Task 必须等于 FormSubmission contentDigest；
+            资料-only Task 必须等于 EvidenceSetSnapshot contentDigest
+        inputVersionRefs:
+          type: array
+          maxItems: 8
+          description: 双引用 Task 必填；表单-only / 资料-only 必须省略或为空
+          items:
+            $ref: '#/components/schemas/InputVersionRef'
+    InputVersionRef:
+      type: object
+      additionalProperties: false
+      required: [kind, ref, digest]
+      properties:
+        kind: { enum: [FORM_SUBMISSION, EVIDENCE_SET_SNAPSHOT] }
+        ref: { type: string, minLength: 1, maxLength: 500 }
+        digest: { type: string, pattern: '^[0-9a-f]{64}$' }
     AssignTaskCandidatesRequest:
       type: object
       additionalProperties: false

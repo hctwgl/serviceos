@@ -104,7 +104,8 @@ final class DefaultHumanTaskCommandService implements HumanTaskCommandService {
     public HumanTaskCommandReceipt complete(
             CurrentPrincipal principal, CommandMetadata metadata, CompleteHumanTaskCommand command) {
         String digest = Sha256.digest(command.taskId() + "|" + command.expectedVersion()
-                + "|" + command.resultRef() + "|" + command.resultDigest());
+                + "|" + command.resultRef() + "|" + command.resultDigest()
+                + "|" + serialize(command.inputVersionRefs()));
         return execute(principal, metadata, COMPLETE, "task.complete", command.taskId(),
                 command.expectedVersion(), "RUNNING", command, null, digest);
     }
@@ -200,7 +201,9 @@ final class DefaultHumanTaskCommandService implements HumanTaskCommandService {
             return jdbc.sql("""
                             UPDATE tsk_task
                                SET status = 'COMPLETED', result_ref = :resultRef,
-                                   result_digest = :resultDigest, completed_at = :now,
+                                   result_digest = :resultDigest,
+                                   input_version_refs = CAST(:inputVersionRefs AS jsonb),
+                                   completed_at = :now,
                                    version = version + 1, updated_at = :now
                              WHERE tenant_id = :tenantId AND task_id = :taskId
                                AND task_kind = 'HUMAN' AND status = :expectedStatus
@@ -224,6 +227,7 @@ final class DefaultHumanTaskCommandService implements HumanTaskCommandService {
                             """)
                     .param("resultRef", completion.resultRef())
                     .param("resultDigest", completion.resultDigest())
+                    .param("inputVersionRefs", serialize(completion.inputVersionRefs()))
                     .param("now", timestamptz(now))
                     .param("tenantId", context.tenantId())
                     .param("taskId", taskId)
@@ -386,15 +390,17 @@ final class DefaultHumanTaskCommandService implements HumanTaskCommandService {
                     task.taskId(), task.projectId(), task.workOrderId(), task.workflowInstanceId(),
                     task.stageInstanceId(), task.workflowNodeInstanceId(), task.workflowNodeId(),
                     task.taskType(), task.workflowDefinitionVersionId(), task.workflowDefinitionDigest(),
-                    completion.resultRef(), completion.resultDigest(), occurredAt);
+                    completion.resultRef(), completion.resultDigest(), occurredAt,
+                    completion.inputVersionRefs());
         } else {
             eventType = "task.released";
             payload = new TaskReleasedPayload(
                     task.taskId(), context.actorId(), release.reasonCode(), occurredAt);
         }
         String json = serialize(payload);
+        int schemaVersion = COMPLETE.equals(operation) ? 2 : 1;
         outbox.append(new OutboxEvent(
-                UUID.randomUUID(), UUID.randomUUID(), "task", eventType, 1,
+                UUID.randomUUID(), UUID.randomUUID(), "task", eventType, schemaVersion,
                 "Task", task.taskId().toString(), task.version(), context.tenantId(),
                 context.correlationId(), context.idempotencyKey(), task.taskId().toString(),
                 json, Sha256.digest(json), occurredAt));

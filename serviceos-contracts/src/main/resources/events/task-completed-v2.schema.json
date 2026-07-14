@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/task-completed-v2.schema.json",
+  "title": "TaskCompletedV2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId", "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"},
+    "eventType": {"const": "task.completed"},
+    "schemaVersion": {"const": 2},
+    "tenantId": {"type": "string"},
+    "correlationId": {"type": "string"},
+    "causationId": {"type": "string"},
+    "aggregateType": {"const": "Task"},
+    "aggregateId": {"type": "string", "format": "uuid"},
+    "aggregateVersion": {"type": "integer", "minimum": 1},
+    "occurredAt": {"type": "string", "format": "date-time"},
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["taskId", "projectId", "workOrderId", "workflowInstanceId", "stageInstanceId", "workflowNodeInstanceId", "workflowNodeId", "taskType", "workflowDefinitionVersionId", "workflowDefinitionDigest", "resultRef", "resultDigest", "completedAt"],
+      "properties": {
+        "taskId": {"type": "string", "format": "uuid"},
+        "projectId": {"type": "string", "format": "uuid"},
+        "workOrderId": {"type": "string", "format": "uuid"},
+        "workflowInstanceId": {"type": "string", "format": "uuid"},
+        "stageInstanceId": {"type": "string", "format": "uuid"},
+        "workflowNodeInstanceId": {"type": "string", "format": "uuid"},
+        "workflowNodeId": {"type": "string"},
+        "taskType": {"type": "string"},
+        "workflowDefinitionVersionId": {"type": "string", "format": "uuid"},
+        "workflowDefinitionDigest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "resultRef": {"type": ["string", "null"]},
+        "resultDigest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "completedAt": {"type": "string", "format": "date-time"},
+        "inputVersionRefs": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "ref", "digest"],
+            "properties": {
+              "kind": {"enum": ["FORM_SUBMISSION", "EVIDENCE_SET_SNAPSHOT"]},
+              "ref": {"type": "string", "minLength": 1, "maxLength": 500},
+              "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+            }
+          }
+        }
+      }
+    }
+  }
+}

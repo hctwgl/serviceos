@@ -79,7 +79,12 @@ final class HumanTaskController {
                 principal, new CommandMetadata(correlationId, idempotencyKey),
                 new CompleteHumanTaskCommand(
                         taskId, TaskHttpPreconditions.version(ifMatch),
-                        request.resultRef(), request.resultDigest()));
+                        request.resultRef(), request.resultDigest(),
+                        request.inputVersionRefs() == null
+                                ? java.util.List.of()
+                                : request.inputVersionRefs().stream()
+                                .map(CompleteHumanTaskRequest.InputVersionRefRequest::toApi)
+                                .toList()));
         return response(receipt, correlationId);
     }
 

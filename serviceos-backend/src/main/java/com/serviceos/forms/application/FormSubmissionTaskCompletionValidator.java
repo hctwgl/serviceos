@@ -9,6 +9,7 @@ import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.task.api.CompleteHumanTaskCommand;
 import com.serviceos.task.api.HumanTaskCompletionValidator;
+import com.serviceos.task.api.InputVersionRef;
 import com.serviceos.task.api.TaskFulfillmentContext;
 import com.serviceos.task.api.TaskFulfillmentContextService;
 import org.springframework.stereotype.Component;
@@ -42,6 +43,11 @@ final class FormSubmissionTaskCompletionValidator implements HumanTaskCompletion
         if (task.formRef() == null) {
             return;
         }
+        if (!command.inputVersionRefs().isEmpty()
+                && command.inputVersionRefs().stream()
+                .noneMatch(ref -> InputVersionRef.FORM_SUBMISSION.equals(ref.kind()))) {
+            throw notValidated();
+        }
 
         UUID submissionId = submissionId(command.resultRef());
         FormSubmissionView submission = submissions.find(principal.tenantId(), submissionId)
@@ -55,6 +61,15 @@ final class FormSubmissionTaskCompletionValidator implements HumanTaskCompletion
                 || !submission.contentDigest().equals(command.resultDigest())) {
             throw notValidated();
         }
+
+        command.inputVersionRefs().stream()
+                .filter(ref -> InputVersionRef.FORM_SUBMISSION.equals(ref.kind()))
+                .forEach(ref -> {
+                    if (!command.resultRef().equals(ref.ref())
+                            || !command.resultDigest().equals(ref.digest())) {
+                        throw notValidated();
+                    }
+                });
     }
 
     private ConfigurationAssetDefinition lockedForm(String tenantId, TaskFulfillmentContext task) {

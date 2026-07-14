@@ -73,7 +73,7 @@ final class WorkflowTaskCompletedHandler implements OutboxMessageHandler {
 
     @Override
     public boolean supports(String eventType, int schemaVersion) {
-        return "task.completed".equals(eventType) && schemaVersion == 1;
+        return "task.completed".equals(eventType) && (schemaVersion == 1 || schemaVersion == 2);
     }
 
     @Override
