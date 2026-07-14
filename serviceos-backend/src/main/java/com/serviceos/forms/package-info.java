@@ -2,6 +2,7 @@
 @org.springframework.modulith.ApplicationModule(
         displayName = "Forms",
         allowedDependencies = {
-                "authorization::api", "configuration::api", "identity::api", "shared", "task::api"
+                "audit::api", "authorization::api", "configuration::api", "identity::api",
+                "reliability::api", "shared", "task::api"
         })
 package com.serviceos.forms;

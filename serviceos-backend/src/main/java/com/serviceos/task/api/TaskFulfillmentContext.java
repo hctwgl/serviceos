@@ -14,6 +14,7 @@ public record TaskFulfillmentContext(
         String formRef,
         String status,
         String responsiblePrincipalId,
+        boolean executionGuarded,
         long version
 ) {
 }

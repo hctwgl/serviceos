@@ -7,7 +7,12 @@
                t.configuration_bundle_id AS "configurationBundleId",
                t.configuration_bundle_digest AS "configurationBundleDigest",
                t.task_kind AS "taskKind", t.form_ref AS "formRef", t.status, t.version,
-               a.principal_id AS "responsiblePrincipalId"
+               a.principal_id AS "responsiblePrincipalId",
+               EXISTS (
+                   SELECT 1 FROM tsk_task_execution_guard g
+                    WHERE g.tenant_id = t.tenant_id AND g.task_id = t.task_id
+                      AND g.status = 'ACTIVE'
+               ) AS "executionGuarded"
           FROM tsk_task t
           LEFT JOIN tsk_task_assignment a
             ON a.tenant_id = t.tenant_id

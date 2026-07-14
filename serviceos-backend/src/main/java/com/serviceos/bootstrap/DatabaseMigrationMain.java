@@ -4,6 +4,8 @@ import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationInfo;
 import org.flywaydb.core.api.output.MigrateResult;
 
+import java.util.List;
+
 /**
  * 与服务端共用同一可执行镜像的数据库迁移入口。
  *
@@ -26,10 +28,15 @@ public final class DatabaseMigrationMain {
             // 部署迁移入口必须与 Spring Flyway locations 同步，否则运行时会引用尚未建表的调度能力。
             "classpath:db/migration/dispatch",
             "classpath:db/migration/appointment",
-            "classpath:db/migration/fieldwork"
+            "classpath:db/migration/fieldwork",
+            "classpath:db/migration/forms"
     };
 
     private DatabaseMigrationMain() {
+    }
+
+    static List<String> locations() {
+        return List.of(LOCATIONS);
     }
 
     public static void main(String[] args) {

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.9.0
+  version: 0.10.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -370,6 +370,53 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /tasks/{taskId}/form-submissions:
+    post:
+      operationId: submitTaskForm
+      summary: 向任务锁定的精确表单版本提交不可变值文档
+      description: >-
+        仅当前责任人的 RUNNING HUMAN Task 可提交；提交不隐式完成 Task。
+        表达式、validator 与预填冲突策略未获批时返回 422，不猜测执行语义。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SubmitFormRequest' }
+      responses:
+        '201':
+          description: 首次不可变提交或首次幂等冻结响应；INVALID 不能用于完成任务
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FormSubmission' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /form-submissions/{submissionId}:
+    get:
+      operationId: getFormSubmission
+      summary: 查询不可变表单提交及权威验证快照
+      parameters:
+        - name: submissionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 租户和项目范围内的提交版本
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FormSubmission' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
   /tasks/{taskId}/contact-attempts:
     get:
       operationId: listTaskContactAttempts
@@ -1056,6 +1103,47 @@ components:
         schemaVersion: { type: string, minLength: 1, maxLength: 64 }
         definition: { type: object, additionalProperties: true }
         contentDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
+    SubmitFormRequest:
+      type: object
+      additionalProperties: false
+      required: [formVersionId, values]
+      properties:
+        formVersionId: { type: string, format: uuid }
+        values: { type: object, additionalProperties: true }
+        prefillVersion: { type: [string, 'null'], minLength: 1, maxLength: 160 }
+    FormValidationIssue:
+      type: object
+      additionalProperties: false
+      required: [fieldKey, code, message]
+      properties:
+        fieldKey: { type: string }
+        code: { enum: [FIELD_REQUIRED, FIELD_UNKNOWN, FIELD_TYPE_INVALID] }
+        message: { type: string }
+    FormSubmission:
+      type: object
+      additionalProperties: false
+      required: [submissionId, taskId, projectId, formVersionId, formKey, submissionVersion,
+                 values, contentDigest, validationStatus, errors, warnings, prefillVersion,
+                 submittedBy, submittedAt]
+      properties:
+        submissionId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        formVersionId: { type: string, format: uuid }
+        formKey: { type: string, minLength: 1, maxLength: 120 }
+        submissionVersion: { type: integer, minimum: 1 }
+        values: { type: object, additionalProperties: true }
+        contentDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
+        validationStatus: { enum: [VALIDATED, INVALID] }
+        errors:
+          type: array
+          items: { $ref: '#/components/schemas/FormValidationIssue' }
+        warnings:
+          type: array
+          items: { $ref: '#/components/schemas/FormValidationIssue' }
+        prefillVersion: { type: [string, 'null'] }
+        submittedBy: { type: string }
+        submittedAt: { type: string, format: date-time }
     VisitLocation:
       type: object
       additionalProperties: false

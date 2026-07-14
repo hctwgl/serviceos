@@ -27,6 +27,7 @@ spring:
       - classpath:db/migration/dispatch
       - classpath:db/migration/appointment
       - classpath:db/migration/fieldwork
+      - classpath:db/migration/forms
     validate-migration-naming: true
   security:
     oauth2:

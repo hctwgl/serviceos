@@ -23,5 +23,6 @@ status: Implemented
 - `GET /api/v1/tasks/{taskId}/forms` 按 `form.read` 和 Task Project Scope 实时授权，返回发布定义和摘要；
 - Task 无 `formRef` 返回空数组，缺失或歧义匹配失败关闭，不回退到最新 FormVersion。
 
-ADR-018 仍为 Proposed，因此本切片不猜测表达式语义。规则静态类型、样本回放、草稿、不可变提交、
-预填冲突和服务端校验仍待后续实现；FORM 已发布或可查询都不等于表达式可执行。
+ADR-018 仍为 Proposed，因此本切片不猜测表达式语义。M34 已在
+[不可变表单提交运行时](47-form-submission-runtime.md)实现不依赖表达式的提交与基础服务端校验；
+规则静态类型、样本回放、草稿和预填冲突仍待后续实现。FORM 已发布或可查询都不等于表达式可执行。

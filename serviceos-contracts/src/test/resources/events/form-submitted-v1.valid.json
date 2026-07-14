@@ -1,0 +1,26 @@
+{
+  "eventId": "36000000-0000-4000-8000-000000000021",
+  "eventType": "form.submitted",
+  "schemaVersion": 1,
+  "tenantId": "tenant-form",
+  "correlationId": "corr-form-036",
+  "causationId": "submit-form-036",
+  "aggregateType": "FormSubmission",
+  "aggregateId": "36000000-0000-4000-8000-000000000022",
+  "aggregateVersion": 1,
+  "occurredAt": "2026-07-14T07:00:00Z",
+  "payload": {
+    "submissionId": "36000000-0000-4000-8000-000000000022",
+    "taskId": "36000000-0000-4000-8000-000000000023",
+    "projectId": "36000000-0000-4000-8000-000000000024",
+    "formVersionId": "36000000-0000-4000-8000-000000000025",
+    "formKey": "survey.execution",
+    "submissionVersion": 1,
+    "contentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "validationStatus": "VALIDATED",
+    "errorCount": 0,
+    "warningCount": 0,
+    "occurredAt": "2026-07-14T07:00:00Z",
+    "eventType": "form.submitted"
+  }
+}

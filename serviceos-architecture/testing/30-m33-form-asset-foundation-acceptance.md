@@ -19,4 +19,5 @@ status: Implemented
 | M33-FORM-002 | P0 | 表单查询要求 `form.read` 和 Task Project Scope | `WorkflowBootstrapPostgresIT` |
 | M33-FORM-003 | P1 | HTTP 拒绝匿名请求且定义保持 JSON 对象 | `TaskFormControllerSecurityTest`、OpenAPI 0.9.0 |
 
-本矩阵不替代 M3 FORM-001～FORM-005；表达式与 FormSubmission 完成后才能关闭这些场景。
+本矩阵不替代 M3 FORM-001～FORM-005；M34 只补齐不依赖表达式的 FormSubmission 内核，
+完整表达式、草稿、预填冲突、更正和任务完成引用后才能关闭这些场景。

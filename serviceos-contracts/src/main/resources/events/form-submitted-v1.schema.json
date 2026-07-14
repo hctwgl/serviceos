@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/form-submitted-v1.schema.json",
+  "title": "FormSubmittedV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId", "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"},
+    "eventType": {"const": "form.submitted"},
+    "schemaVersion": {"const": 1},
+    "tenantId": {"type": "string"},
+    "correlationId": {"type": "string"},
+    "causationId": {"type": "string"},
+    "aggregateType": {"const": "FormSubmission"},
+    "aggregateId": {"type": "string", "format": "uuid"},
+    "aggregateVersion": {"const": 1},
+    "occurredAt": {"type": "string", "format": "date-time"},
+    "payload": {"$ref": "#/$defs/payload"}
+  },
+  "$defs": {
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["submissionId", "taskId", "projectId", "formVersionId", "formKey", "submissionVersion", "contentDigest", "validationStatus", "errorCount", "warningCount", "occurredAt", "eventType"],
+      "properties": {
+        "submissionId": {"type": "string", "format": "uuid"},
+        "taskId": {"type": "string", "format": "uuid"},
+        "projectId": {"type": "string", "format": "uuid"},
+        "formVersionId": {"type": "string", "format": "uuid"},
+        "formKey": {"type": "string"},
+        "submissionVersion": {"type": "integer", "minimum": 1},
+        "contentDigest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "validationStatus": {"enum": ["VALIDATED", "INVALID"]},
+        "errorCount": {"type": "integer", "minimum": 0},
+        "warningCount": {"type": "integer", "minimum": 0},
+        "occurredAt": {"type": "string", "format": "date-time"},
+        "eventType": {"const": "form.submitted"}
+      }
+    }
+  }
+}

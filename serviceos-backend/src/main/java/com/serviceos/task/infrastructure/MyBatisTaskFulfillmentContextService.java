@@ -27,7 +27,8 @@ final class MyBatisTaskFulfillmentContextService implements TaskFulfillmentConte
                 uuid(row, "taskId"), uuid(row, "projectId"), uuid(row, "workOrderId"),
                 uuid(row, "configurationBundleId"), text(row, "configurationBundleDigest"),
                 text(row, "taskType"), text(row, "taskKind"), text(row, "formRef"), text(row, "status"),
-                text(row, "responsiblePrincipalId"), ((Number) row.get("version")).longValue());
+                text(row, "responsiblePrincipalId"), Boolean.TRUE.equals(row.get("executionGuarded")),
+                ((Number) row.get("version")).longValue());
     }
 
     private static String text(Map<String, Object> row, String key) {
