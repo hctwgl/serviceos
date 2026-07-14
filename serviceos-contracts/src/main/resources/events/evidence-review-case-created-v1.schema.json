@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/evidence-review-case-created-v1.schema.json",
+  "title": "EvidenceReviewCaseCreatedV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId",
+    "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"
+  ],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"},
+    "eventType": {"const": "evidence.review-case-created"},
+    "schemaVersion": {"const": 1},
+    "tenantId": {"type": "string"},
+    "correlationId": {"type": "string"},
+    "causationId": {"type": "string"},
+    "aggregateType": {"const": "ReviewCase"},
+    "aggregateId": {"type": "string", "format": "uuid"},
+    "aggregateVersion": {"type": "integer", "minimum": 1},
+    "occurredAt": {"type": "string", "format": "date-time"},
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reviewCaseId", "evidenceSetSnapshotId", "taskId", "projectId",
+        "snapshotContentDigest", "policyVersion", "createdAt"
+      ],
+      "properties": {
+        "reviewCaseId": {"type": "string", "format": "uuid"},
+        "evidenceSetSnapshotId": {"type": "string", "format": "uuid"},
+        "taskId": {"type": "string", "format": "uuid"},
+        "projectId": {"type": "string", "format": "uuid"},
+        "snapshotContentDigest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "policyVersion": {"type": "string", "minLength": 1, "maxLength": 80},
+        "createdAt": {"type": "string", "format": "date-time"}
+      }
+    }
+  }
+}

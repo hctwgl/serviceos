@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.18.0
+  version: 0.19.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -586,6 +586,87 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+
+  /review-cases:
+    post:
+      operationId: createReviewCase
+      summary: 为 TASK_SUBMISSION EvidenceSetSnapshot 创建审核案例
+      description: |
+        同一 Snapshot 仅允许一个 ReviewCase。初始状态 OPEN。
+        需要 evidence.review 能力与项目 Scope。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateReviewCaseRequest' }
+      responses:
+        '201':
+          description: 创建成功或幂等重放
+          headers:
+            Location: { schema: { type: string } }
+            X-Correlation-Id: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReviewCase' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /review-cases/{reviewCaseId}:
+    get:
+      operationId: getReviewCase
+      summary: 查询审核案例与决定历史
+      parameters:
+        - name: reviewCaseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: ReviewCase
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReviewCase' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /review-cases/{reviewCaseId}:decide:
+    post:
+      operationId: decideReviewCase
+      summary: 对 OPEN ReviewCase 追加 APPROVED/REJECTED 决定
+      description: |
+        决定只追加；Case 状态投影写为 APPROVED 或 REJECTED。
+        REJECTED 至少需要一个 reasonCode。已裁决案例不可再裁决。
+      parameters:
+        - name: reviewCaseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DecideReviewCaseRequest' }
+      responses:
+        '200':
+          description: 裁决成功或幂等重放
+          headers:
+            X-Correlation-Id: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReviewCase' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
 
   /tasks/{taskId}/form-submissions:
     post:
@@ -1476,6 +1557,62 @@ components:
         invalidatedAt: { type: [string, 'null'], format: date-time }
         invalidationReasonCode: { type: [string, 'null'], maxLength: 80 }
         invalidationApprovalRef: { type: [string, 'null'], maxLength: 160 }
+
+    CreateReviewCaseRequest:
+      type: object
+      additionalProperties: false
+      required: [evidenceSetSnapshotId]
+      properties:
+        evidenceSetSnapshotId: { type: string, format: uuid }
+        policyVersion: { type: [string, 'null'], maxLength: 80 }
+    DecideReviewCaseRequest:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties:
+        decision: { enum: [APPROVED, REJECTED] }
+        reasonCodes:
+          type: array
+          maxItems: 20
+          items: { type: string, minLength: 1, maxLength: 80 }
+        note: { type: [string, 'null'], maxLength: 1000 }
+    ReviewDecision:
+      type: object
+      additionalProperties: false
+      required: [reviewDecisionId, reviewCaseId, decisionOrdinal, decision, reasonCodes, decidedBy, decidedAt]
+      properties:
+        reviewDecisionId: { type: string, format: uuid }
+        reviewCaseId: { type: string, format: uuid }
+        decisionOrdinal: { type: integer, minimum: 1 }
+        decision: { enum: [APPROVED, REJECTED] }
+        reasonCodes:
+          type: array
+          maxItems: 20
+          items: { type: string, minLength: 1, maxLength: 80 }
+        note: { type: [string, 'null'], maxLength: 1000 }
+        decidedBy: { type: string, minLength: 1, maxLength: 128 }
+        decidedAt: { type: string, format: date-time }
+    ReviewCase:
+      type: object
+      additionalProperties: false
+      required: [reviewCaseId, projectId, taskId, evidenceSetSnapshotId, snapshotContentDigest,
+                 scopeType, policyVersion, status, createdBy, createdAt, decisions]
+      properties:
+        reviewCaseId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        evidenceSetSnapshotId: { type: string, format: uuid }
+        snapshotContentDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
+        scopeType: { enum: [EVIDENCE_SET_SNAPSHOT] }
+        policyVersion: { type: string, minLength: 1, maxLength: 80 }
+        status: { enum: [OPEN, APPROVED, REJECTED] }
+        createdBy: { type: string, minLength: 1, maxLength: 128 }
+        createdAt: { type: string, format: date-time }
+        decidedAt: { type: [string, 'null'], format: date-time }
+        decisions:
+          type: array
+          items: { $ref: '#/components/schemas/ReviewDecision' }
+
     InvalidateEvidenceRevisionRequest:
       type: object
       additionalProperties: false

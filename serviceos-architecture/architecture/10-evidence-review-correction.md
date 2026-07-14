@@ -1,10 +1,13 @@
 ---
 title: 资料、审核与整改闭环设计
 version: 0.1.0
-status: Proposed
+status: Accepted
 ---
 
 # 资料、审核与整改闭环设计
+
+> M44 已实现 ReviewCase/ReviewDecision 最小运行时（见 `architecture/57-review-case-decision-runtime.md`）。
+> CorrectionCase、强制通过、重开、车企回执仍未实现；本章其余内容仍为指导设计。
 
 ## 1. 目标
 

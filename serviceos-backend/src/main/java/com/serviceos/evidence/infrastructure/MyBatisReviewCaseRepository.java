@@ -1,0 +1,168 @@
+package com.serviceos.evidence.infrastructure;
+
+import com.serviceos.evidence.api.ReviewCaseView;
+import com.serviceos.evidence.api.ReviewDecisionView;
+import com.serviceos.evidence.application.ReviewCaseRepository;
+import org.springframework.stereotype.Repository;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
+
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+
+@Repository
+final class MyBatisReviewCaseRepository implements ReviewCaseRepository {
+    private final ReviewCaseMapper mapper;
+    private final ObjectMapper objectMapper;
+
+    MyBatisReviewCaseRepository(ReviewCaseMapper mapper, ObjectMapper objectMapper) {
+        this.mapper = mapper;
+        this.objectMapper = objectMapper;
+    }
+
+    @Override
+    public void insertCase(String tenantId, ReviewCaseView reviewCase) {
+        Map<String, Object> values = new HashMap<>();
+        values.put("reviewCaseId", reviewCase.reviewCaseId().toString());
+        values.put("tenantId", tenantId);
+        values.put("projectId", reviewCase.projectId().toString());
+        values.put("taskId", reviewCase.taskId().toString());
+        values.put("evidenceSetSnapshotId", reviewCase.evidenceSetSnapshotId().toString());
+        values.put("snapshotContentDigest", reviewCase.snapshotContentDigest());
+        values.put("scopeType", reviewCase.scopeType());
+        values.put("policyVersion", reviewCase.policyVersion());
+        values.put("status", reviewCase.status());
+        values.put("createdBy", reviewCase.createdBy());
+        values.put("createdAt", reviewCase.createdAt());
+        values.put("decidedAt", reviewCase.decidedAt());
+        mapper.insertCase(values);
+    }
+
+    @Override
+    public int markDecided(
+            String tenantId, UUID reviewCaseId, String expectedStatus, String status, Instant decidedAt
+    ) {
+        return mapper.markDecided(
+                tenantId, reviewCaseId.toString(), expectedStatus, status, decidedAt);
+    }
+
+    @Override
+    public void insertDecision(String tenantId, UUID projectId, ReviewDecisionView decision) {
+        Map<String, Object> values = new HashMap<>();
+        values.put("reviewDecisionId", decision.reviewDecisionId().toString());
+        values.put("tenantId", tenantId);
+        values.put("projectId", projectId.toString());
+        values.put("reviewCaseId", decision.reviewCaseId().toString());
+        values.put("decisionOrdinal", decision.decisionOrdinal());
+        values.put("decision", decision.decision());
+        values.put("reasonCodes", writeJson(decision.reasonCodes()));
+        values.put("note", decision.note());
+        values.put("decidedBy", decision.decidedBy());
+        values.put("decidedAt", decision.decidedAt());
+        mapper.insertDecision(values);
+    }
+
+    @Override
+    public Optional<ReviewCaseView> find(String tenantId, UUID reviewCaseId) {
+        Map<String, Object> row = mapper.findCase(tenantId, reviewCaseId.toString());
+        if (row == null) {
+            return Optional.empty();
+        }
+        List<ReviewDecisionView> decisions = mapper.listDecisions(tenantId, reviewCaseId.toString())
+                .stream().map(this::decisionView).toList();
+        return Optional.of(caseView(row, decisions));
+    }
+
+    @Override
+    public Optional<UUID> findBySnapshot(String tenantId, UUID snapshotId) {
+        String id = mapper.findCaseIdBySnapshot(tenantId, snapshotId.toString());
+        return id == null ? Optional.empty() : Optional.of(UUID.fromString(id));
+    }
+
+    @Override
+    public Optional<UUID> findCommandResult(String tenantId, String operationType, String idempotencyKey) {
+        String id = mapper.findCommandResult(tenantId, operationType, idempotencyKey);
+        return id == null ? Optional.empty() : Optional.of(UUID.fromString(id));
+    }
+
+    @Override
+    public void saveCommandResult(String tenantId, String operationType, String idempotencyKey, UUID resultId) {
+        Map<String, Object> values = new HashMap<>();
+        values.put("tenantId", tenantId);
+        values.put("operationType", operationType);
+        values.put("idempotencyKey", idempotencyKey);
+        values.put("resultId", resultId.toString());
+        mapper.saveCommandResult(values);
+    }
+
+    @Override
+    public int nextDecisionOrdinal(String tenantId, UUID reviewCaseId) {
+        Integer max = mapper.maxDecisionOrdinal(tenantId, reviewCaseId.toString());
+        return (max == null ? 0 : max) + 1;
+    }
+
+    private ReviewCaseView caseView(Map<String, Object> row, List<ReviewDecisionView> decisions) {
+        return new ReviewCaseView(
+                uuid(row, "reviewCaseId"), uuid(row, "projectId"), uuid(row, "taskId"),
+                uuid(row, "evidenceSetSnapshotId"), text(row, "snapshotContentDigest"),
+                text(row, "scopeType"), text(row, "policyVersion"), text(row, "status"),
+                text(row, "createdBy"), instant(row.get("createdAt")),
+                row.get("decidedAt") == null ? null : instant(row.get("decidedAt")),
+                decisions);
+    }
+
+    private ReviewDecisionView decisionView(Map<String, Object> row) {
+        return new ReviewDecisionView(
+                uuid(row, "reviewDecisionId"), uuid(row, "reviewCaseId"),
+                ((Number) row.get("decisionOrdinal")).intValue(), text(row, "decision"),
+                readCodes(text(row, "reasonCodes")),
+                row.get("note") == null ? null : text(row, "note"),
+                text(row, "decidedBy"), instant(row.get("decidedAt")));
+    }
+
+    private List<String> readCodes(String json) {
+        try {
+            return objectMapper.readValue(json, new TypeReference<>() {
+            });
+        } catch (JacksonException exception) {
+            throw new IllegalStateException("reasonCodes are invalid", exception);
+        }
+    }
+
+    private String writeJson(Object value) {
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (JacksonException exception) {
+            throw new IllegalStateException("JSON serialization failed", exception);
+        }
+    }
+
+    private static UUID uuid(Map<String, Object> row, String key) {
+        Object value = row.get(key);
+        return value instanceof UUID id ? id : UUID.fromString(value.toString());
+    }
+
+    private static String text(Map<String, Object> row, String key) {
+        return row.get(key).toString();
+    }
+
+    private static Instant instant(Object value) {
+        if (value instanceof Instant instant) {
+            return instant;
+        }
+        if (value instanceof OffsetDateTime offsetDateTime) {
+            return offsetDateTime.toInstant();
+        }
+        if (value instanceof Timestamp timestamp) {
+            return timestamp.toInstant();
+        }
+        throw new IllegalArgumentException("unsupported time type: " + value.getClass().getName());
+    }
+}

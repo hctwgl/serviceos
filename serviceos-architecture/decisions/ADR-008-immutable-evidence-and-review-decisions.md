@@ -1,7 +1,9 @@
 # ADR-008：资料版本和审核决定只追加
 
-- 状态：Proposed
+- 状态：Accepted
 - 日期：2026-07-12
+- 接受日期：2026-07-14
+- 接受范围：M44 ReviewCase/ReviewDecision 最小运行时（不含 CorrectionCase/强制通过/重开）
 
 ## 背景
 

@@ -4,7 +4,7 @@ version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-14
 baselineCommit: c28c030b5d7731ab5db4ffc840b7cd2d56b1da77
-latestMilestone: M43
+latestMilestone: M44
 ---
 
 # ServiceOS 实施状态总览
@@ -39,13 +39,13 @@ latestMilestone: M43
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M43 表单+资料双引用 Task 完成门禁 |
+| 最新实施里程碑 | M44 ReviewCase / ReviewDecision 最小运行时（已实现：绑定 TASK_SUBMISSION Snapshot；只追加 APPROVED/REJECTED） |
 | 基线提交 | `c28c030b5d7731ab5db4ffc840b7cd2d56b1da77` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
 | 前端工程 | 尚未建立；已有 Admin、Network、Technician 产品与交互规格 |
-| 数据库 | PostgreSQL + Flyway（当前版本 043 / 45） |
-| 契约 | OpenAPI 0.18.0 + 事件 JSON Schema |
+| 数据库 | PostgreSQL + Flyway（当前版本 044 / 46） |
+| 契约 | OpenAPI 0.19.0 + 事件 JSON Schema |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -66,9 +66,9 @@ latestMilestone: M43
 | 预约 | 预约修订、联系终态动作 | `PARTIAL` | Revision、并发和终态动作基础 | 用户确认渠道、完整日程和跨端协作 | M30～M31 |
 | 现场作业 | Visit 生命周期 | `PARTIAL` | Visit 运行时基础 | GPS 策略、完整现场提交、离线同步和师傅端 | M32 |
 | 动态表单 | 资产、冻结版本、不可变提交和 Task 完成门禁 | `PARTIAL` | 固定 required、基础类型校验、精确版本提交和完成引用 | 条件表达式、复杂 validator、草稿、冲突、更正和审核 | M33～M35 |
-| 资料 Evidence | 资产、槽位、Item/Revision、机器校验、Snapshot、完成门禁、作废 | `PARTIAL` | 固定槽位、安全文件 Finalize、确定性机器校验、TASK_SUBMISSION Snapshot、无 formRef 和 form+evidence 双引用完成、VALIDATED→INVALIDATED | 条件槽位、OCR/CV、files 作废联动、Review/Correction | M36～M43 |
+| 资料 Evidence | 资产、槽位、Item/Revision、机器校验、Snapshot、完成门禁、作废、Review | `PARTIAL` | 固定槽位、安全文件 Finalize、确定性机器校验、TASK_SUBMISSION Snapshot、无 formRef 和 form+evidence 双引用完成、VALIDATED→INVALIDATED、ReviewCase APPROVED/REJECTED | 条件槽位、OCR/CV、files 作废联动、CorrectionCase | M36～M44 |
 | 安全文件 | Begin/Finalize/隔离/扫描/授权下载基础 | `IMPLEMENTED` | 独立安全文件生命周期；Evidence 已编排 Begin/Finalize | 正式对象存储、专业扫描服务、与 Evidence 作废联动 | M11、M38 |
-| 审核整改 | ReviewCase、ReviewDecision、CorrectionCase | `PROPOSED` | 已有完整领域和交互设计 | 运行时、API、迁移、测试和前端均未完成 | `architecture/10-*` |
+| 审核整改 | ReviewCase、ReviewDecision、CorrectionCase | `PARTIAL` | ReviewCase 绑定 Snapshot；只追加 APPROVED/REJECTED | CorrectionCase、强制通过、重开、车企回执、前端 | M44 |
 | SLA | 时钟、预警、升级 | `PROPOSED` | 已有总体设计 | 完整运行时和验收尚未实施 | `architecture/12-*` |
 | 通知 | 通知与运营异常中心 | `PROPOSED` | 已有总体设计 | 通知通道、模板、可靠发送和 UI | `architecture/14-*` |
 | 履约事实与试算 | 事实提取和双向试算 | `PROPOSED` | 已有设计、API 和数据规划 | 运行时、投影和前端工作区 | M5 设计 |
@@ -97,7 +97,7 @@ latestMilestone: M43
 - 草稿、预填冲突和更正；
 - 表单审核闭环。
 
-### M36～M43：Evidence
+### M36～M44：Evidence
 
 已实现：
 
@@ -108,27 +108,22 @@ latestMilestone: M43
 - 无 formRef 资料 Task 完成仅接受精确 Snapshot 引用与 digest（M41）；
 - 授权 `VALIDATED → INVALIDATED`、槽位投影刷新、历史 Snapshot 不可改写（M42）。
 - formRef 且非空 EvidenceSlot Task 以精确 FormSubmission 和 TASK_SUBMISSION Snapshot
-  的 `inputVersionRefs` 双引用完成，并同事务持久化（M43）。
+  的 `inputVersionRefs` 双引用完成，并同事务持久化（M43）；
+- ReviewCase 绑定 TASK_SUBMISSION Snapshot；只追加 APPROVED/REJECTED ReviewDecision（M44）。
 
 未实现：
 
 - `requiredWhen` 条件解析和可审计重解析；
 - OCR / 图像 CV / GPS 权威距离；
 - files StoredFile 作废/下载语义联动；
-- ReviewCase、ReviewDecision、CorrectionCase 和多轮补传。
+- CorrectionCase、强制通过、重开和多轮补传。
 
 ## 5. 下一实施方向
 
 在没有更新事实源或新批准决策的情况下，建议下一可靠纵向切片是：
 
 ```text
-M44 ReviewCase / ReviewDecision 最小运行时
-```
-
-或：
-
-```text
-M44 files 作废联动或 Evidence Review/Correction
+M45 CorrectionCase 或 files StoredFile 作废联动
 ```
 
 接手 Agent 必须先检查仓库是否已有更新的里程碑文档、ADR 或提交。
