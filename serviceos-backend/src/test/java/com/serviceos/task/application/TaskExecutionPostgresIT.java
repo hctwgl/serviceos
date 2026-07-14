@@ -2,6 +2,7 @@ package com.serviceos.task.application;
 
 import com.serviceos.ServiceOsApplication;
 import com.serviceos.operations.api.OpenTaskFailureCommand;
+import com.serviceos.operations.api.OpenServiceAssignmentTimeoutCommand;
 import com.serviceos.operations.api.OperationalExceptionService;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
@@ -183,6 +184,32 @@ class TaskExecutionPostgresIT {
                         "test.task", "MUTATED", "corr-final-failure")))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.EVENT_PAYLOAD_MISMATCH));
+    }
+
+    @Test
+    void repeatedSagaTimeoutsAggregateOccurrencesAndReuseOneHandlingTask() {
+        UUID sagaId = UUID.randomUUID();
+        UUID assignmentId = UUID.randomUUID();
+        UUID workOrderId = UUID.randomUUID();
+        UUID taskId = UUID.randomUUID();
+        OpenServiceAssignmentTimeoutCommand first = new OpenServiceAssignmentTimeoutCommand(
+                "tenant-test", UUID.randomUUID(), 1, "3".repeat(64), UUID.randomUUID(),
+                sagaId, assignmentId, workOrderId, taskId, "TASK_PREPARED", 2,
+                "ACTIVATION_SAGA_TIMEOUT", Instant.parse("2026-07-14T01:00:00Z"), "corr-timeout");
+        OpenServiceAssignmentTimeoutCommand second = new OpenServiceAssignmentTimeoutCommand(
+                "tenant-test", UUID.randomUUID(), 1, "4".repeat(64), UUID.randomUUID(),
+                sagaId, assignmentId, workOrderId, taskId, "SERVICE_SWITCHED", 3,
+                "ACTIVATION_SAGA_TIMEOUT", Instant.parse("2026-07-14T01:15:00Z"), "corr-timeout");
+
+        var opened = operationalExceptions.openFromServiceAssignmentTimeout(first);
+        var repeated = operationalExceptions.openFromServiceAssignmentTimeout(second);
+
+        assertThat(repeated.exceptionId()).isEqualTo(opened.exceptionId());
+        assertThat(repeated.handlingTaskId()).isEqualTo(opened.handlingTaskId());
+        assertThat(jdbc.sql("SELECT occurrence_count FROM ops_operational_exception")
+                .query(Integer.class).single()).isEqualTo(2);
+        assertThat(count("tsk_task")).isEqualTo(1);
+        assertThat(count("rel_inbox_record")).isEqualTo(2);
     }
 
     private static ScheduleAutomatedTaskCommand command(String businessKey, String digest, int maxAttempts) {

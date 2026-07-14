@@ -3,6 +3,6 @@
  */
 @org.springframework.modulith.ApplicationModule(
         displayName = "Operational Exception",
-        allowedDependencies = {"shared", "reliability::api", "task::api"}
+        allowedDependencies = {"shared", "reliability::api", "reliability::spi", "task::api"}
 )
 package com.serviceos.operations;

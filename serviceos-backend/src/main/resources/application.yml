@@ -106,6 +106,12 @@ serviceos:
   outbox:
     # 模块化单体默认由本地可靠消费者处理；生产切换 Broker 时必须提供真实 Publisher/Consumer。
     publisher: ${SERVICEOS_OUTBOX_PUBLISHER:local}
+  dispatch:
+    # 每个激活阶段独立续期；定时扫描默认关闭，部署环境在异常中心消费者就绪后显式开启。
+    activation-stage-timeout: ${SERVICEOS_DISPATCH_ACTIVATION_STAGE_TIMEOUT:PT15M}
+    activation-timeout-scheduling-enabled: ${SERVICEOS_DISPATCH_TIMEOUT_SCHEDULING_ENABLED:false}
+    activation-timeout-poll-delay: ${SERVICEOS_DISPATCH_TIMEOUT_POLL_DELAY:PT30S}
+    activation-timeout-batch-size: ${SERVICEOS_DISPATCH_TIMEOUT_BATCH_SIZE:100}
   observability:
     # 生产默认 false；仅当 Prometheus 位于受控私网且入口层已隔离时才允许匿名抓取。
     allow-anonymous-metrics: ${SERVICEOS_ALLOW_ANONYMOUS_METRICS:false}

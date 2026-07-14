@@ -57,6 +57,10 @@ services:
       SERVICEOS_OTLP_TRACING_ENABLED: "false"
       SERVICEOS_OTLP_METRICS_ENABLED: "false"
       SERVICEOS_ALLOW_ANONYMOUS_METRICS: "false"
+      # staging 必须运行可靠消费者与超时补偿扫描，不能只验证可启动而留下业务队列无人处理。
+      SERVICEOS_OUTBOX_SCHEDULING_ENABLED: "true"
+      SERVICEOS_TASK_SCHEDULING_ENABLED: "true"
+      SERVICEOS_DISPATCH_TIMEOUT_SCHEDULING_ENABLED: "true"
       SERVICEOS_FILE_LOCAL_SIGNING_KEY: ${SERVICEOS_FILE_SIGNING_KEY:?file signing key is required}
       SERVICEOS_OIDC_ISSUER_URI: https://staging-idp.invalid/realms/serviceos
       SERVICEOS_OIDC_JWK_SET_URI: https://staging-idp.invalid/realms/serviceos/protocol/openid-connect/certs

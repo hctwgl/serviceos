@@ -25,6 +25,7 @@ import com.serviceos.shared.CommandContext;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.shared.Sha256;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +33,7 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -60,6 +62,7 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
     private final OutboxAppender outbox;
     private final ObjectMapper objectMapper;
     private final Clock clock;
+    private final Duration activationStageTimeout;
 
     DefaultServiceAssignmentService(
             JdbcClient jdbc,
@@ -68,7 +71,8 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
             AuditAppender audit,
             OutboxAppender outbox,
             ObjectMapper objectMapper,
-            Clock clock
+            Clock clock,
+            @Value("${serviceos.dispatch.activation-stage-timeout:PT15M}") Duration activationStageTimeout
     ) {
         this.jdbc = jdbc;
         this.authorization = authorization;
@@ -77,6 +81,11 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
         this.outbox = outbox;
         this.objectMapper = objectMapper;
         this.clock = clock;
+        if (activationStageTimeout == null || activationStageTimeout.isZero()
+                || activationStageTimeout.isNegative()) {
+            throw new IllegalArgumentException("activationStageTimeout must be positive");
+        }
+        this.activationStageTimeout = activationStageTimeout;
     }
 
     @Override
@@ -151,16 +160,17 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
         jdbc.sql("""
                         INSERT INTO dsp_service_assignment_activation_saga (
                             activation_saga_id, tenant_id, task_id, new_service_assignment_id,
-                            old_service_assignment_id, stage, version, started_at, updated_at
+                            old_service_assignment_id, stage, version, started_at, updated_at, deadline_at
                         ) VALUES (
                             :sagaId, :tenantId, :taskId, :assignmentId,
-                            :oldAssignmentId, 'PENDING', 1, :now, :now
+                            :oldAssignmentId, 'PENDING', 1, :now, :now, :deadlineAt
                         )
                         """)
                 .param("sagaId", command.sagaId()).param("tenantId", context.tenantId())
                 .param("taskId", command.taskId()).param("assignmentId", assignmentId)
                 .param("oldAssignmentId", command.supersedesServiceAssignmentId())
-                .param("now", timestamptz(now)).update();
+                .param("now", timestamptz(now))
+                .param("deadlineAt", timestamptz(deadline(now))).update();
 
         ServiceAssignmentReceipt receipt = new ServiceAssignmentReceipt(
                 assignmentId, command.sagaId(), command.taskId(), reservationId,
@@ -192,13 +202,15 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
                         UPDATE dsp_service_assignment_activation_saga
                            SET stage = 'TASK_PREPARED', version = version + 1,
                                prepared_task_assignment_id = :preparedId,
-                               task_execution_guard_id = :guardId, updated_at = :now
+                               task_execution_guard_id = :guardId, updated_at = :now,
+                               deadline_at = :deadlineAt
                          WHERE tenant_id = :tenantId AND activation_saga_id = :sagaId
                            AND new_service_assignment_id = :assignmentId AND task_id = :taskId
                            AND stage = 'PENDING' AND version = :expectedVersion
                         """)
                 .param("preparedId", command.preparedTaskAssignmentId())
                 .param("guardId", command.guardId()).param("now", timestamptz(now))
+                .param("deadlineAt", timestamptz(deadline(now)))
                 .param("tenantId", context.tenantId()).param("sagaId", command.sagaId())
                 .param("assignmentId", command.serviceAssignmentId()).param("taskId", command.taskId())
                 .param("expectedVersion", command.expectedSagaVersion()).update();
@@ -257,12 +269,14 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
         Instant now = clock.instant();
         int sagaUpdated = jdbc.sql("""
                         UPDATE dsp_service_assignment_activation_saga
-                           SET stage = 'SERVICE_SWITCHED', version = version + 1, updated_at = :now
+                           SET stage = 'SERVICE_SWITCHED', version = version + 1,
+                               updated_at = :now, deadline_at = :deadlineAt
                          WHERE tenant_id = :tenantId AND activation_saga_id = :sagaId
                            AND new_service_assignment_id = :assignmentId
                            AND stage = 'TASK_PREPARED' AND version = :expectedVersion
                         """)
-                .param("now", timestamptz(now)).param("tenantId", context.tenantId())
+                .param("now", timestamptz(now)).param("deadlineAt", timestamptz(deadline(now)))
+                .param("tenantId", context.tenantId())
                 .param("sagaId", command.sagaId()).param("assignmentId", command.serviceAssignmentId())
                 .param("expectedVersion", command.expectedSagaVersion()).update();
         if (sagaUpdated != 1) {
@@ -354,6 +368,10 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
                                completed_at = CASE
                                    WHEN :requiresTaskAck THEN NULL
                                    ELSE :now
+                               END,
+                               deadline_at = CASE
+                                   WHEN :requiresTaskAck THEN :deadlineAt
+                                   ELSE NULL
                                END
                          WHERE tenant_id = :tenantId AND activation_saga_id = :sagaId
                            AND new_service_assignment_id = :assignmentId
@@ -361,6 +379,7 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
                            AND version = :expectedVersion
                         """)
                 .param("reasonCode", command.reasonCode()).param("now", timestamptz(now))
+                .param("deadlineAt", timestamptz(deadline(now)))
                 .param("requiresTaskAck", requiresTaskAck)
                 .param("tenantId", context.tenantId()).param("sagaId", command.sagaId())
                 .param("assignmentId", command.serviceAssignmentId())
@@ -417,7 +436,7 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
         int sagaUpdated = jdbc.sql("""
                         UPDATE dsp_service_assignment_activation_saga
                            SET stage = 'ABORTED', version = version + 1,
-                               updated_at = :now, completed_at = :now
+                               updated_at = :now, completed_at = :now, deadline_at = NULL
                          WHERE tenant_id = :tenantId AND activation_saga_id = :sagaId
                            AND new_service_assignment_id = :assignmentId
                            AND prepared_task_assignment_id = :preparedId
@@ -463,7 +482,7 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
         int sagaUpdated = jdbc.sql("""
                         UPDATE dsp_service_assignment_activation_saga
                            SET stage = 'COMPLETED', version = version + 1,
-                               updated_at = :now, completed_at = :now
+                               updated_at = :now, completed_at = :now, deadline_at = NULL
                          WHERE tenant_id = :tenantId AND activation_saga_id = :sagaId
                            AND new_service_assignment_id = :assignmentId
                            AND prepared_task_assignment_id = :preparedId
@@ -489,6 +508,10 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
     private CommandContext context(CurrentPrincipal principal, CommandMetadata metadata) {
         return new CommandContext(principal.tenantId(), principal.principalId(),
                 metadata.correlationId(), metadata.idempotencyKey());
+    }
+
+    private Instant deadline(Instant stageStartedAt) {
+        return stageStartedAt.plus(activationStageTimeout);
     }
 
     private AuthorizationDecision authorize(CurrentPrincipal principal, CommandContext context, UUID taskId) {

@@ -121,3 +121,4 @@ Feature gate/authority: if applicable
 | M24 | ServiceAssignment、容量预留、切换前 abort 与本地激活 saga | Event Schema + DispatchServiceAssignment PostgreSQL IT + V024 | 跨模块 Inbox saga、派单策略、切换后补偿、SLA、完整勘安链路 |
 | M25 | Dispatch/Task 四段 Inbox 改派握手、实时授权复核、失败后向前重试 | Event Schema + DispatchTaskReassignmentSaga PostgreSQL IT + V025 | 初派握手、Network 双级派单、策略、自动 abort/补偿、SLA、完整勘安链路 |
 | M26 | TASK_PREPARED 持久检查点、切换前 ABORTING/ABORTED 可靠终止、过期 checkpoint 抑制 | Event Schema + DispatchTaskReassignmentSaga PostgreSQL IT + V026 | 超时自动决策、初派握手、Network 双级派单、策略、切换后补偿、SLA、完整勘安链路 |
+| M27 | 激活逐阶段 deadline、并发安全超时 occurrence、可靠异常事件、去重 OperationalException 与 HUMAN handling Task | Event Schema + DispatchTaskReassignmentSaga/TaskExecution PostgreSQL IT + V027 | 超时后的策略化 abort/继续/补偿、异常自动恢复关单、初派握手、Network 双级派单、候选策略、SLA、完整勘安链路 |

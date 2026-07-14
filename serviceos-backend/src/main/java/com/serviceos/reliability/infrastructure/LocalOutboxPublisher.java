@@ -30,7 +30,8 @@ final class LocalOutboxPublisher implements OutboxPublisher {
             "service.assignment.activated@v2",
             "task.assignment-activated@v1",
             "service.assignment.activation-aborted@v2",
-            "task.assignment-aborted@v1");
+            "task.assignment-aborted@v1",
+            "service.assignment.activation-timed-out@v1");
     private final List<OutboxMessageHandler> handlers;
 
     LocalOutboxPublisher(List<OutboxMessageHandler> handlers) {

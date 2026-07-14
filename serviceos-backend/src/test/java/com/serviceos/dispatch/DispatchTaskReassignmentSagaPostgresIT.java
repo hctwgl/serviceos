@@ -11,6 +11,7 @@ import com.serviceos.dispatch.api.PrepareServiceAssignmentCommand;
 import com.serviceos.dispatch.api.ResponsibilityLevel;
 import com.serviceos.dispatch.api.ServiceAssignmentReceipt;
 import com.serviceos.dispatch.api.ServiceAssignmentService;
+import com.serviceos.dispatch.api.ServiceAssignmentTimeoutScanner;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.reliability.application.OutboxWorker;
 import com.serviceos.shared.CommandMetadata;
@@ -26,6 +27,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -38,6 +40,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** M25/M26：验证师傅改派的正常推进、持久检查点与切换前可靠终止。 */
 @Testcontainers(disabledWithoutDocker = true)
@@ -67,6 +70,7 @@ class DispatchTaskReassignmentSagaPostgresIT {
     @Autowired TaskAssignmentService taskAssignments;
     @Autowired HumanTaskCommandService humanTasks;
     @Autowired OutboxWorker outboxWorker;
+    @Autowired ServiceAssignmentTimeoutScanner timeoutScanner;
     @Autowired JdbcClient jdbc;
 
     @BeforeEach
@@ -76,9 +80,13 @@ class DispatchTaskReassignmentSagaPostgresIT {
                 DROP FUNCTION IF EXISTS test_fail_m25_activation();
                 DROP TRIGGER IF EXISTS trg_test_fail_m26_task_abort ON rel_outbox_event;
                 DROP FUNCTION IF EXISTS test_fail_m26_task_abort();
+                DROP TRIGGER IF EXISTS trg_test_fail_m27_timeout ON rel_outbox_event;
+                DROP FUNCTION IF EXISTS test_fail_m27_timeout();
                 TRUNCATE TABLE dsp_assignment_command_result, dsp_capacity_command_result,
-                    dsp_service_assignment_activation_saga, dsp_capacity_reservation,
+                    dsp_service_assignment_saga_timeout, dsp_service_assignment_activation_saga,
+                    dsp_capacity_reservation,
                     dsp_service_assignment, dsp_capacity_counter,
+                    ops_operational_exception,
                     tsk_task_reassignment_command_result, tsk_task_execution_guard,
                     tsk_task_assignment, tsk_task_assignment_batch,
                     tsk_human_task_command_result, tsk_task_execution_attempt, tsk_task,
@@ -339,6 +347,93 @@ class DispatchTaskReassignmentSagaPostgresIT {
                 """).query(Long.class).single()).isZero();
     }
 
+    @Test
+    void expiredPreparedStageOpensOneOperationalExceptionAndKeepsTaskGuarded() {
+        Baseline baseline = baseline("timeout");
+        ServiceAssignmentReceipt pending = prepareReliableReassignment(baseline, "timeout");
+        advanceToTaskPrepared(pending);
+        stallPreparedCheckpointAndExpire(pending);
+
+        assertThat(timeoutScanner.detectNextTimeout()).isTrue();
+        assertThat(timeoutScanner.detectNextTimeout()).isFalse();
+
+        assertThat(jdbc.sql("""
+                SELECT stage || ':' || version || ':' || last_error_code
+                  FROM dsp_service_assignment_activation_saga
+                 WHERE activation_saga_id = :sagaId
+                """).param("sagaId", pending.sagaId()).query(String.class).single())
+                .isEqualTo("TASK_PREPARED:2:ACTIVATION_SAGA_TIMEOUT");
+        assertThat(jdbc.sql("SELECT count(*) FROM dsp_service_assignment_saga_timeout")
+                .query(Long.class).single()).isEqualTo(1);
+        assertThat(jdbc.sql("""
+                SELECT status FROM tsk_task_execution_guard WHERE guard_key = :sagaId
+                """).param("sagaId", pending.sagaId().toString())
+                .query(String.class).single()).isEqualTo("ACTIVE");
+        assertThat(jdbc.sql("""
+                SELECT status FROM dsp_capacity_reservation
+                 WHERE service_assignment_id = :assignmentId
+                """).param("assignmentId", pending.serviceAssignmentId())
+                .query(String.class).single()).isEqualTo("HELD");
+
+        publishUntilOperationalException();
+        assertThat(jdbc.sql("""
+                SELECT category_code || ':' || severity_code || ':' || status || ':' || occurrence_count
+                  FROM ops_operational_exception
+                 WHERE source_id = :sagaId
+                """).param("sagaId", pending.sagaId().toString())
+                .query(String.class).single()).isEqualTo("DISPATCH:P1:OPEN:1");
+        assertThat(jdbc.sql("""
+                SELECT task_kind || ':' || status || ':' || task_type
+                  FROM tsk_task
+                 WHERE task_type = 'operations.resolve-dispatch-timeout'
+                """).query(String.class).single())
+                .isEqualTo("HUMAN:READY:operations.resolve-dispatch-timeout");
+        assertThat(jdbc.sql("""
+                SELECT consumer_name || ':' || status FROM rel_inbox_record
+                 WHERE consumer_name = 'operations.service-assignment-timeout.v1'
+                """).query(String.class).single())
+                .isEqualTo("operations.service-assignment-timeout.v1:SUCCEEDED");
+    }
+
+    @Test
+    void timeoutOutboxFailureRollsBackOccurrenceAndCanBeRetried() {
+        Baseline baseline = baseline("timeout-rollback");
+        ServiceAssignmentReceipt pending = prepareReliableReassignment(baseline, "timeout-rollback");
+        advanceToTaskPrepared(pending);
+        stallPreparedCheckpointAndExpire(pending);
+        jdbc.sql("""
+                CREATE FUNCTION test_fail_m27_timeout() RETURNS trigger LANGUAGE plpgsql AS $$
+                BEGIN
+                    IF NEW.event_type = 'service.assignment.activation-timed-out' THEN
+                        RAISE EXCEPTION 'injected M27 timeout Outbox failure';
+                    END IF;
+                    RETURN NEW;
+                END;
+                $$;
+                CREATE TRIGGER trg_test_fail_m27_timeout
+                    BEFORE INSERT ON rel_outbox_event
+                    FOR EACH ROW EXECUTE FUNCTION test_fail_m27_timeout();
+                """).update();
+
+        assertThatThrownBy(timeoutScanner::detectNextTimeout)
+                .isInstanceOf(DataAccessException.class);
+        assertThat(jdbc.sql("SELECT count(*) FROM dsp_service_assignment_saga_timeout")
+                .query(Long.class).single()).isZero();
+        assertThat(jdbc.sql("""
+                SELECT last_error_code FROM dsp_service_assignment_activation_saga
+                 WHERE activation_saga_id = :sagaId
+                """).param("sagaId", pending.sagaId()).query(String.class).optional())
+                .isEmpty();
+
+        jdbc.sql("""
+                DROP TRIGGER trg_test_fail_m27_timeout ON rel_outbox_event;
+                DROP FUNCTION test_fail_m27_timeout();
+                """).update();
+        assertThat(timeoutScanner.detectNextTimeout()).isTrue();
+        assertThat(jdbc.sql("SELECT count(*) FROM dsp_service_assignment_saga_timeout")
+                .query(Long.class).single()).isEqualTo(1);
+    }
+
     private Baseline baseline(String key) {
         configure("technician-a", "capacity-a-" + key);
         configure("technician-b", "capacity-b-" + key);
@@ -403,6 +498,31 @@ class DispatchTaskReassignmentSagaPostgresIT {
             assertThat(outboxWorker.runOnce()).isEqualTo(OutboxWorker.RunResult.PUBLISHED);
         }
         throw new AssertionError("M26 saga did not reach TASK_PREPARED checkpoint");
+    }
+
+    private void stallPreparedCheckpointAndExpire(ServiceAssignmentReceipt pending) {
+        int stalled = jdbc.sql("""
+                UPDATE rel_outbox_event SET status = 'PUBLISHED', published_at = now()
+                 WHERE tenant_id = :tenantId
+                   AND event_type = 'service.assignment.task-prepared'
+                   AND aggregate_id = :assignmentId AND status = 'PENDING'
+                """).param("tenantId", TENANT)
+                .param("assignmentId", pending.serviceAssignmentId().toString()).update();
+        assertThat(stalled).isEqualTo(1);
+        jdbc.sql("""
+                UPDATE dsp_service_assignment_activation_saga
+                   SET deadline_at = now() - interval '1 second'
+                 WHERE activation_saga_id = :sagaId
+                """).param("sagaId", pending.sagaId()).update();
+    }
+
+    private void publishUntilOperationalException() {
+        for (int iteration = 0; iteration < 20; iteration++) {
+            if (jdbc.sql("SELECT count(*) FROM ops_operational_exception")
+                    .query(Long.class).single() == 1) return;
+            assertThat(outboxWorker.runOnce()).isEqualTo(OutboxWorker.RunResult.PUBLISHED);
+        }
+        throw new AssertionError("M27 timeout event did not open an OperationalException");
     }
 
     private void assertCompletedAlignment(Baseline baseline, ServiceAssignmentReceipt pending) {
