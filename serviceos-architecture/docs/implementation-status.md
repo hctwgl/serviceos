@@ -3,7 +3,7 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-14
-baselineCommit: 0ce601e2c7647782c9c189e3279037a2aac99b57
+baselineCommit: c28c030b5d7731ab5db4ffc840b7cd2d56b1da77
 latestMilestone: M43
 ---
 
@@ -40,7 +40,7 @@ latestMilestone: M43
 | 项目 | 当前值 |
 |---|---|
 | 最新实施里程碑 | M43 表单+资料双引用 Task 完成门禁 |
-| 基线提交 | pending（未提交） |
+| 基线提交 | `c28c030b5d7731ab5db4ffc840b7cd2d56b1da77` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
 | 前端工程 | 尚未建立；已有 Admin、Network、Technician 产品与交互规格 |
@@ -119,7 +119,7 @@ latestMilestone: M43
 
 ## 5. 下一实施方向
 
-M43 的基线提交待本变更提交后补齐。在没有更新事实源或新批准决策的情况下，建议下一可靠纵向切片是：
+在没有更新事实源或新批准决策的情况下，建议下一可靠纵向切片是：
 
 ```text
 M44 ReviewCase / ReviewDecision 最小运行时
