@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -28,6 +29,9 @@ import java.util.Set;
 @Component
 final class ConfigurationAssetSchemaValidator {
     private static final String FORM_SCHEMA_VERSION = "1.0.0";
+    private static final String EVIDENCE_SCHEMA_VERSION = "1.0.0";
+    private static final Set<ConfigurationAssetType> SCHEMA_GOVERNED_TYPES = Set.of(
+            ConfigurationAssetType.FORM, ConfigurationAssetType.EVIDENCE);
 
     private final ObjectMapper objectMapper;
     private final Map<SchemaKey, JsonSchema> schemas;
@@ -41,17 +45,19 @@ final class ConfigurationAssetSchemaValidator {
         this.objectMapper = objectMapper;
         this.schemas = Map.of(
                 new SchemaKey(ConfigurationAssetType.FORM, FORM_SCHEMA_VERSION),
-                loadSchema("configuration-schemas/form-v1.schema.json"));
+                loadSchema("configuration-schemas/form-v1.schema.json"),
+                new SchemaKey(ConfigurationAssetType.EVIDENCE, EVIDENCE_SCHEMA_VERSION),
+                loadSchema("configuration-schemas/evidence-v1.schema.json"));
     }
 
     void validate(PublishConfigurationAssetCommand command) {
-        if (command.assetType() != ConfigurationAssetType.FORM) {
+        if (!SCHEMA_GOVERNED_TYPES.contains(command.assetType())) {
             return;
         }
         JsonSchema schema = schemas.get(new SchemaKey(command.assetType(), command.schemaVersion()));
         if (schema == null) {
             throw new ConfigurationPublicationException(
-                    "unsupported FORM schemaVersion: " + command.schemaVersion());
+                    "unsupported " + command.assetType() + " schemaVersion: " + command.schemaVersion());
         }
 
         JsonNode definition = parse(command.definitionJson());
@@ -63,16 +69,47 @@ final class ConfigurationAssetSchemaValidator {
                     .map(ValidationMessage::getMessage)
                     .reduce((left, right) -> left + "; " + right)
                     .orElse("unknown schema violation");
-            throw new ConfigurationPublicationException("FORM definition violates schema: " + summary);
+            throw new ConfigurationPublicationException(
+                    command.assetType() + " definition violates schema: " + summary);
         }
 
         // 命令身份与定义身份必须完全一致，防止同一内容被伪装成另一稳定资产或版本。
-        if (!command.assetKey().equals(definition.path("formKey").asText())) {
-            throw new ConfigurationPublicationException("FORM assetKey must equal definition formKey");
+        String identityField = switch (command.assetType()) {
+            case FORM -> "formKey";
+            case EVIDENCE -> "templateKey";
+            default -> throw new IllegalStateException("schema-governed asset type has no identity field");
+        };
+        if (!command.assetKey().equals(definition.path(identityField).asText())) {
+            throw new ConfigurationPublicationException(
+                    command.assetType() + " assetKey must equal definition " + identityField);
         }
         if (!command.semanticVersion().equals(definition.path("version").asText())) {
             throw new ConfigurationPublicationException(
-                    "FORM semanticVersion must equal definition version");
+                    command.assetType() + " semanticVersion must equal definition version");
+        }
+        if (command.assetType() == ConfigurationAssetType.EVIDENCE) {
+            validateEvidenceSemantics(definition);
+        }
+    }
+
+    /**
+     * JSON Schema 无法比较同一对象内的两个数值，也不能按业务键判断数组重复；这些仍属于
+     * 确定性的发布期结构语义，不依赖尚未批准的条件表达式运行时。
+     */
+    private void validateEvidenceSemantics(JsonNode definition) {
+        Set<String> evidenceKeys = new HashSet<>();
+        for (JsonNode item : definition.path("items")) {
+            String evidenceKey = item.path("evidenceKey").asText();
+            if (!evidenceKeys.add(evidenceKey)) {
+                throw new ConfigurationPublicationException(
+                        "EVIDENCE evidenceKey must be unique: " + evidenceKey);
+            }
+            JsonNode capture = item.path("capture");
+            if (capture.has("minCount") && capture.has("maxCount")
+                    && capture.path("minCount").asInt() > capture.path("maxCount").asInt()) {
+                throw new ConfigurationPublicationException(
+                        "EVIDENCE capture minCount must not exceed maxCount: " + evidenceKey);
+            }
         }
     }
 
@@ -80,7 +117,7 @@ final class ConfigurationAssetSchemaValidator {
         try {
             return objectMapper.readTree(definitionJson);
         } catch (JsonProcessingException exception) {
-            throw new ConfigurationPublicationException("FORM definition is not valid JSON");
+            throw new ConfigurationPublicationException("configuration definition is not valid JSON");
         }
     }
 

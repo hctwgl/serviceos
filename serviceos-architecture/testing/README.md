@@ -36,3 +36,4 @@
 - [M33 表单资产发布基础验收](30-m33-form-asset-foundation-acceptance.md)
 - [M34 不可变表单提交运行时验收](31-m34-form-submission-runtime-acceptance.md)
 - [M35 表单任务完成引用门禁验收](32-m35-form-task-completion-gate-acceptance.md)
+- [M36 Evidence 资产发布基础验收](33-m36-evidence-asset-foundation-acceptance.md)

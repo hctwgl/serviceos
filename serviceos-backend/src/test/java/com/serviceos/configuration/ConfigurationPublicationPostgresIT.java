@@ -225,6 +225,90 @@ class ConfigurationPublicationPostgresIT {
     }
 
     @Test
+    void publishesOnlySchemaValidEvidenceTemplateWithMatchingImmutableIdentity() {
+        String valid = evidenceDefinition("survey.site", "SURVEY", "site.panorama");
+
+        var published = configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.EVIDENCE, "survey.site", "1.0.0",
+                "1.0.0", valid, Sha256.digest(valid)));
+
+        assertThat(published.assetKey()).isEqualTo("survey.site");
+        assertThatThrownBy(() -> configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.EVIDENCE, "another.evidence", "1.0.0",
+                "1.0.0", valid, Sha256.digest(valid))))
+                .isInstanceOf(ConfigurationPublicationException.class)
+                .hasMessageContaining("assetKey");
+        assertThatThrownBy(() -> configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.EVIDENCE, "survey.site", "2.0.0",
+                "1.0.0", valid, Sha256.digest(valid))))
+                .isInstanceOf(ConfigurationPublicationException.class)
+                .hasMessageContaining("semanticVersion");
+    }
+
+    @Test
+    void rejectsMalformedUnknownOrSemanticallyAmbiguousEvidenceBeforePersistence() {
+        String malformed = """
+                {"templateKey":"survey.site","version":"1.0.0","items":[]}
+                """.trim();
+        String duplicateEvidenceKey = """
+                {
+                  "templateKey":"survey.site","version":"1.0.0","stage":"SURVEY",
+                  "items":[
+                    {"evidenceKey":"site.panorama","name":"全景图","mediaType":"PHOTO","required":true},
+                    {"evidenceKey":"site.panorama","name":"重复全景图","mediaType":"PHOTO","required":false}
+                  ]
+                }
+                """.trim();
+        String invertedCount = """
+                {
+                  "templateKey":"survey.site","version":"1.0.0","stage":"SURVEY",
+                  "items":[
+                    {"evidenceKey":"site.panorama","name":"全景图","mediaType":"PHOTO","required":true,
+                     "capture":{"minCount":2,"maxCount":1}}
+                  ]
+                }
+                """.trim();
+
+        assertThatThrownBy(() -> publishEvidence(malformed, "1.0.0"))
+                .isInstanceOf(ConfigurationPublicationException.class)
+                .hasMessageContaining("violates schema");
+        assertThatThrownBy(() -> publishEvidence(malformed, "2.0.0"))
+                .isInstanceOf(ConfigurationPublicationException.class)
+                .hasMessageContaining("unsupported EVIDENCE schemaVersion");
+        assertThatThrownBy(() -> publishEvidence(duplicateEvidenceKey, "1.0.0"))
+                .isInstanceOf(ConfigurationPublicationException.class)
+                .hasMessageContaining("evidenceKey must be unique");
+        assertThatThrownBy(() -> publishEvidence(invertedCount, "1.0.0"))
+                .isInstanceOf(ConfigurationPublicationException.class)
+                .hasMessageContaining("capture minCount must not exceed maxCount");
+        assertThat(jdbc.sql("SELECT count(*) FROM cfg_configuration_asset_version WHERE asset_type = 'EVIDENCE'")
+                .query(Long.class).single()).isZero();
+    }
+
+    @Test
+    void bundleLocksMultipleEvidenceTemplatesInDeterministicOrder() {
+        UUID survey = publishEvidenceAsset("survey.site", "SURVEY", "site.panorama");
+        UUID installation = publishEvidenceAsset(
+                "installation.completion", "INSTALLATION", "charger.nameplate");
+        var command = new PublishConfigurationBundleCommand(
+                TENANT, projectId, "BYD-OCEAN-MULTI-EVIDENCE", "1.0.0", "BYD_OCEAN",
+                "HOME_CHARGING_SURVEY_INSTALL", "370000", validFrom, null,
+                List.of(workflowVersionId, survey, installation));
+
+        ConfigurationBundleReference bundle = configurations.publishBundle(command);
+
+        assertThat(configurations.listBundleAssets(TENANT, bundle.bundleId(),
+                bundle.manifestDigest(), ConfigurationAssetType.EVIDENCE))
+                .extracting(asset -> asset.assetKey())
+                .containsExactly("installation.completion", "survey.site");
+        assertThatThrownBy(() -> configurations.requireBundleAsset(TENANT, bundle.bundleId(),
+                bundle.manifestDigest(), ConfigurationAssetType.EVIDENCE))
+                .isInstanceOfSatisfying(ConfigurationResolutionException.class,
+                        exception -> assertThat(exception.reason()).isEqualTo(
+                                ConfigurationResolutionException.Reason.AMBIGUOUS_MATCH));
+    }
+
+    @Test
     void failsClosedWhenLegacyOrManualRowsCreateAnAmbiguousMatch() {
         insertBundleRow("AMBIGUOUS-A", "a".repeat(64));
         insertBundleRow("AMBIGUOUS-B", "b".repeat(64));
@@ -314,6 +398,35 @@ class ConfigurationPublicationPostgresIT {
         return configurations.publishAsset(new PublishConfigurationAssetCommand(
                 TENANT, ConfigurationAssetType.FORM, formKey, "1.0.0", "1.0.0",
                 definition, Sha256.digest(definition))).versionId();
+    }
+
+    private UUID publishEvidenceAsset(String assetKey, String stage, String evidenceKey) {
+        String definition = evidenceDefinition(assetKey, stage, evidenceKey);
+        return configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.EVIDENCE, assetKey, "1.0.0", "1.0.0",
+                definition, Sha256.digest(definition))).versionId();
+    }
+
+    private void publishEvidence(String definition, String schemaVersion) {
+        configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.EVIDENCE, "survey.site", "1.0.0", schemaVersion,
+                definition, Sha256.digest(definition)));
+    }
+
+    private String evidenceDefinition(String assetKey, String stage, String evidenceKey) {
+        return ("""
+                {
+                  "templateKey":"%s","version":"1.0.0","title":"现场资料","stage":"%s",
+                  "items":[{
+                    "evidenceKey":"%s","name":"现场照片","mediaType":"PHOTO","required":true,
+                    "capture":{"allowCamera":true,"allowGallery":false,"requireRealtimeCapture":true,
+                      "requireGps":true,"watermarkFields":["TIME","GPS","WORK_ORDER_NO"],
+                      "minCount":1,"maxCount":3,"maxSizeBytes":10485760},
+                    "qualityChecks":[{"checkType":"BLUR","severity":"BLOCK"}],
+                    "reviewPolicy":{"reviewRequired":true,"allowItemLevelReject":true}
+                  }]
+                }
+                """).formatted(assetKey, stage, evidenceKey).trim();
     }
 
     private ResolveConfigurationBundleQuery query(String province, Instant at) {
