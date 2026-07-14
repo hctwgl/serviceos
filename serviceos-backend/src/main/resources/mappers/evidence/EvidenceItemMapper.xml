@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.serviceos.evidence.infrastructure.EvidenceItemMapper">
+    <sql id="slotColumns">
+        slot_id AS "slotId", resolution_id AS "resolutionId", task_id AS "taskId",
+        project_id AS "projectId", template_version_id AS "templateVersionId",
+        template_key AS "templateKey", template_version AS "templateVersion",
+        template_digest AS "templateDigest", requirement_code AS "requirementCode",
+        occurrence_key AS "occurrenceKey", requirement_name AS "requirementName",
+        media_type AS "mediaType", required_flag AS "required", min_count AS "minCount",
+        max_count AS "maxCount", condition_input_digest AS "conditionInputDigest",
+        resolution_explanation::text AS "explanation",
+        requirement_definition::text AS "definition", requirement_digest AS "requirementDigest",
+        status_projection AS "status", resolved_at AS "resolvedAt"
+    </sql>
+
+    <sql id="revisionColumns">
+        evidence_revision_id AS "evidenceRevisionId", evidence_item_id AS "evidenceItemId",
+        slot_id AS "slotId", task_id AS "taskId", project_id AS "projectId",
+        revision_number AS "revisionNumber", file_object_id AS "fileObjectId",
+        content_digest AS "contentDigest", mime_type AS "mimeType", size_bytes AS "sizeBytes",
+        capture_metadata::text AS "captureMetadata", status AS "status",
+        source_upload_session_id AS "sourceUploadSessionId",
+        finalize_command_id AS "finalizeCommandId", created_by AS "createdBy",
+        created_at AS "createdAt"
+    </sql>
+
+    <select id="findSlot" resultType="map">
+        SELECT <include refid="slotColumns"/>
+          FROM evd_evidence_slot
+         WHERE tenant_id = #{tenantId}
+           AND task_id = CAST(#{taskId} AS uuid)
+           AND slot_id = CAST(#{slotId} AS uuid)
+    </select>
+
+    <select id="lockSlot" resultType="map">
+        SELECT <include refid="slotColumns"/>
+          FROM evd_evidence_slot
+         WHERE tenant_id = #{tenantId} AND slot_id = CAST(#{slotId} AS uuid)
+         FOR UPDATE
+    </select>
+
+    <insert id="insertUploadBinding" parameterType="map">
+        INSERT INTO evd_evidence_upload_session (
+            upload_session_id, tenant_id, project_id, task_id, slot_id, file_id, evidence_item_id,
+            expected_sha256, declared_mime_type, expected_size_bytes, original_file_name,
+            capture_metadata, status, created_by, created_at)
+        VALUES (
+            CAST(#{uploadSessionId} AS uuid), #{tenantId}, CAST(#{projectId} AS uuid),
+            CAST(#{taskId} AS uuid), CAST(#{slotId} AS uuid), CAST(#{fileId} AS uuid),
+            <choose>
+                <when test="evidenceItemId != null">CAST(#{evidenceItemId} AS uuid)</when>
+                <otherwise>NULL</otherwise>
+            </choose>,
+            #{expectedSha256}, #{declaredMimeType}, #{expectedSizeBytes}, #{originalFileName},
+            CAST(#{captureMetadata} AS jsonb), #{status}, #{createdBy}, #{createdAt})
+    </insert>
+
+    <select id="findUploadBinding" resultType="map">
+        SELECT upload_session_id AS "uploadSessionId", tenant_id AS "tenantId",
+               project_id AS "projectId", task_id AS "taskId", slot_id AS "slotId",
+               file_id AS "fileId", evidence_item_id AS "evidenceItemId",
+               expected_sha256 AS "expectedSha256", declared_mime_type AS "declaredMimeType",
+               expected_size_bytes AS "expectedSizeBytes", original_file_name AS "originalFileName",
+               capture_metadata::text AS "captureMetadata", status AS "status",
+               created_by AS "createdBy", created_at AS "createdAt"
+          FROM evd_evidence_upload_session
+         WHERE tenant_id = #{tenantId}
+           AND upload_session_id = CAST(#{uploadSessionId} AS uuid)
+    </select>
+
+    <select id="findUploadBindingByFileId" resultType="map">
+        SELECT upload_session_id AS "uploadSessionId", tenant_id AS "tenantId",
+               project_id AS "projectId", task_id AS "taskId", slot_id AS "slotId",
+               file_id AS "fileId", evidence_item_id AS "evidenceItemId",
+               expected_sha256 AS "expectedSha256", declared_mime_type AS "declaredMimeType",
+               expected_size_bytes AS "expectedSizeBytes", original_file_name AS "originalFileName",
+               capture_metadata::text AS "captureMetadata", status AS "status",
+               created_by AS "createdBy", created_at AS "createdAt"
+          FROM evd_evidence_upload_session
+         WHERE tenant_id = #{tenantId}
+           AND file_id = CAST(#{fileId} AS uuid)
+    </select>
+
+    <update id="markUploadFinalized">
+        UPDATE evd_evidence_upload_session
+           SET status = 'FINALIZED'
+         WHERE tenant_id = #{tenantId}
+           AND upload_session_id = CAST(#{uploadSessionId} AS uuid)
+           AND status = 'PENDING'
+    </update>
+
+    <select id="findItem" resultType="map">
+        SELECT evidence_item_id AS "evidenceItemId", task_id AS "taskId", project_id AS "projectId",
+               slot_id AS "slotId", item_ordinal AS "itemOrdinal", status AS "status",
+               created_by AS "createdBy", created_at AS "createdAt"
+          FROM evd_evidence_item
+         WHERE tenant_id = #{tenantId}
+           AND evidence_item_id = CAST(#{evidenceItemId} AS uuid)
+    </select>
+
+    <select id="listItems" resultType="map">
+        SELECT evidence_item_id AS "evidenceItemId", task_id AS "taskId", project_id AS "projectId",
+               slot_id AS "slotId", item_ordinal AS "itemOrdinal", status AS "status",
+               created_by AS "createdBy", created_at AS "createdAt"
+          FROM evd_evidence_item
+         WHERE tenant_id = #{tenantId} AND task_id = CAST(#{taskId} AS uuid)
+         ORDER BY slot_id, item_ordinal
+    </select>
+
+    <select id="listRevisionsForTask" resultType="map">
+        SELECT <include refid="revisionColumns"/>
+          FROM evd_evidence_revision
+         WHERE tenant_id = #{tenantId} AND task_id = CAST(#{taskId} AS uuid)
+         ORDER BY evidence_item_id, revision_number
+    </select>
+
+    <select id="listRevisionsForItem" resultType="map">
+        SELECT <include refid="revisionColumns"/>
+          FROM evd_evidence_revision
+         WHERE tenant_id = #{tenantId}
+           AND evidence_item_id = CAST(#{evidenceItemId} AS uuid)
+         ORDER BY revision_number
+    </select>
+
+    <select id="findCommandResult" resultType="string">
+        SELECT result_id::text
+          FROM evd_evidence_command_result
+         WHERE tenant_id = #{tenantId}
+           AND operation_type = #{operationType}
+           AND idempotency_key = #{idempotencyKey}
+    </select>
+
+    <insert id="saveCommandResult" parameterType="map">
+        INSERT INTO evd_evidence_command_result (
+            tenant_id, operation_type, idempotency_key, result_id)
+        VALUES (#{tenantId}, #{operationType}, #{idempotencyKey}, CAST(#{resultId} AS uuid))
+        ON CONFLICT (tenant_id, operation_type, idempotency_key) DO NOTHING
+    </insert>
+
+    <select id="maxItemOrdinal" resultType="int">
+        SELECT COALESCE(MAX(item_ordinal), 0)
+          FROM evd_evidence_item
+         WHERE tenant_id = #{tenantId} AND slot_id = CAST(#{slotId} AS uuid)
+    </select>
+
+    <select id="countItems" resultType="int">
+        SELECT count(*)
+          FROM evd_evidence_item
+         WHERE tenant_id = #{tenantId} AND slot_id = CAST(#{slotId} AS uuid)
+    </select>
+
+    <select id="countCountingItems" resultType="int">
+        SELECT count(*)
+          FROM evd_evidence_item i
+         WHERE i.tenant_id = #{tenantId}
+           AND i.slot_id = CAST(#{slotId} AS uuid)
+           AND EXISTS (
+                SELECT 1 FROM evd_evidence_revision r
+                 WHERE r.tenant_id = i.tenant_id
+                   AND r.evidence_item_id = i.evidence_item_id
+                   AND r.status IN ('STORED', 'VALIDATING', 'VALIDATED')
+           )
+    </select>
+
+    <insert id="insertItem" parameterType="map">
+        INSERT INTO evd_evidence_item (
+            evidence_item_id, tenant_id, project_id, task_id, slot_id,
+            item_ordinal, status, created_by, created_at)
+        VALUES (
+            CAST(#{evidenceItemId} AS uuid), #{tenantId}, CAST(#{projectId} AS uuid),
+            CAST(#{taskId} AS uuid), CAST(#{slotId} AS uuid),
+            #{itemOrdinal}, #{status}, #{createdBy}, #{createdAt})
+    </insert>
+
+    <select id="maxRevisionNumber" resultType="int">
+        SELECT COALESCE(MAX(revision_number), 0)
+          FROM evd_evidence_revision
+         WHERE tenant_id = #{tenantId}
+           AND evidence_item_id = CAST(#{evidenceItemId} AS uuid)
+    </select>
+
+    <insert id="insertRevision" parameterType="map">
+        INSERT INTO evd_evidence_revision (
+            evidence_revision_id, tenant_id, project_id, task_id, slot_id, evidence_item_id,
+            revision_number, file_object_id, content_digest, mime_type, size_bytes,
+            capture_metadata, status, source_upload_session_id, finalize_command_id,
+            created_by, created_at)
+        VALUES (
+            CAST(#{evidenceRevisionId} AS uuid), #{tenantId}, CAST(#{projectId} AS uuid),
+            CAST(#{taskId} AS uuid), CAST(#{slotId} AS uuid), CAST(#{evidenceItemId} AS uuid),
+            #{revisionNumber}, CAST(#{fileObjectId} AS uuid), #{contentDigest}, #{mimeType},
+            #{sizeBytes}, CAST(#{captureMetadata} AS jsonb), #{status},
+            CAST(#{sourceUploadSessionId} AS uuid), #{finalizeCommandId},
+            #{createdBy}, #{createdAt})
+    </insert>
+
+    <update id="updateRevisionStatus">
+        UPDATE evd_evidence_revision
+           SET status = #{status}
+         WHERE tenant_id = #{tenantId}
+           AND evidence_revision_id = CAST(#{revisionId} AS uuid)
+    </update>
+
+    <update id="updateSlotStatus">
+        UPDATE evd_evidence_slot
+           SET status_projection = #{status}
+         WHERE tenant_id = #{tenantId}
+           AND slot_id = CAST(#{slotId} AS uuid)
+    </update>
+
+    <select id="findRevisionByFileObjectId" resultType="map">
+        SELECT <include refid="revisionColumns"/>
+          FROM evd_evidence_revision
+         WHERE tenant_id = #{tenantId}
+           AND file_object_id = CAST(#{fileObjectId} AS uuid)
+    </select>
+
+    <select id="findRevisionByUploadSession" resultType="map">
+        SELECT <include refid="revisionColumns"/>
+          FROM evd_evidence_revision
+         WHERE tenant_id = #{tenantId}
+           AND source_upload_session_id = CAST(#{uploadSessionId} AS uuid)
+    </select>
+</mapper>

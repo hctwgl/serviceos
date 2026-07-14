@@ -38,3 +38,4 @@
 - [M35 表单任务完成引用门禁验收](32-m35-form-task-completion-gate-acceptance.md)
 - [M36 Evidence 资产发布基础验收](33-m36-evidence-asset-foundation-acceptance.md)
 - [M37 固定 EvidenceSlot 运行时验收](34-m37-fixed-evidence-slot-runtime-acceptance.md)
+- [M38 EvidenceItem 与不可变 EvidenceRevision 验收](35-m38-evidence-item-revision-acceptance.md)

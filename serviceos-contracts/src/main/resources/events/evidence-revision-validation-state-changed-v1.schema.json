@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/evidence-revision-validation-state-changed-v1.schema.json",
+  "title": "EvidenceRevisionValidationStateChangedV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId",
+    "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"
+  ],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"},
+    "eventType": {"const": "evidence.revision-validation-state-changed"},
+    "schemaVersion": {"const": 1},
+    "tenantId": {"type": "string"},
+    "correlationId": {"type": "string"},
+    "causationId": {"type": "string", "format": "uuid"},
+    "aggregateType": {"const": "EvidenceRevision"},
+    "aggregateId": {"type": "string", "format": "uuid"},
+    "aggregateVersion": {"type": "integer", "minimum": 1},
+    "occurredAt": {"type": "string", "format": "date-time"},
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidenceRevisionId", "evidenceItemId", "evidenceSlotId", "taskId", "projectId",
+        "previousStatus", "status", "fileLifecycleStatus", "changedAt"
+      ],
+      "properties": {
+        "evidenceRevisionId": {"type": "string", "format": "uuid"},
+        "evidenceItemId": {"type": "string", "format": "uuid"},
+        "evidenceSlotId": {"type": "string", "format": "uuid"},
+        "taskId": {"type": "string", "format": "uuid"},
+        "projectId": {"type": "string", "format": "uuid"},
+        "previousStatus": {"enum": ["STORED", "VALIDATING", "VALIDATED", "VALIDATION_FAILED", "QUARANTINED", "INVALIDATED"]},
+        "status": {"enum": ["STORED", "VALIDATING", "VALIDATED", "VALIDATION_FAILED", "QUARANTINED", "INVALIDATED"]},
+        "fileLifecycleStatus": {"enum": ["AVAILABLE", "QUARANTINED"]},
+        "changedAt": {"type": "string", "format": "date-time"}
+      }
+    }
+  }
+}

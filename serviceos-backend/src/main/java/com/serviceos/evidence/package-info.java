@@ -2,7 +2,7 @@
 @org.springframework.modulith.ApplicationModule(
         displayName = "Evidence",
         allowedDependencies = {
-                "audit::api", "authorization::api", "configuration::api", "identity::api",
-                "reliability::api", "reliability::spi", "shared", "task::api"
+                "audit::api", "authorization::api", "configuration::api", "files::api",
+                "identity::api", "reliability::api", "reliability::spi", "shared", "task::api"
         })
 package com.serviceos.evidence;

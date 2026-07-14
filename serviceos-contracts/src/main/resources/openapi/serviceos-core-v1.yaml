@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.12.0
+  version: 0.13.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -395,6 +395,112 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /tasks/{taskId}/evidence-slots/{slotId}/upload-sessions:
+    post:
+      operationId: beginEvidenceUpload
+      summary: 为资料槽位创建受限上传会话
+      description: >-
+        evidence 编排 files BeginUpload；要求 evidence.submit、file.upload、当前责任人与未 Guard 的
+        RUNNING HUMAN Task。CaptureMetadata 由服务端规范化；onBehalfOf 在 M38 失败关闭。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - name: slotId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BeginEvidenceUploadRequest' }
+      responses:
+        '201':
+          description: 上传会话创建或幂等重放成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EvidenceUploadSession' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /tasks/{taskId}/evidence-slots/{slotId}/upload-sessions/{uploadSessionId}:finalize:
+    post:
+      operationId: finalizeEvidenceUpload
+      summary: Finalize 资料上传并创建 EvidenceItem/Revision
+      description: >-
+        先通过 files Finalize 创建隔离文件，再在资料事务中写入不可变 EvidenceRevision。
+        相同 finalizeCommandId 重试不重复创建 Revision。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - name: slotId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: uploadSessionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FinalizeEvidenceUploadRequest' }
+      responses:
+        '201':
+          description: EvidenceItem 与首个或后续 Revision 已创建或幂等重放
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EvidenceItem' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '410': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /tasks/{taskId}/evidence-items:
+    get:
+      operationId: listTaskEvidenceItems
+      summary: 查询任务资料项与版本投影
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 任务下全部 EvidenceItem
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/EvidenceItem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /evidence-items/{itemId}:
+    get:
+      operationId: getEvidenceItem
+      summary: 查询逻辑资料项及全部不可变版本
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: EvidenceItem 与 Revisions
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EvidenceItem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
   /tasks/{taskId}/form-submissions:
     post:
       operationId: submitTaskForm
@@ -1164,6 +1270,99 @@ components:
         requirementDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
         status: { enum: [MISSING, PARTIAL, SATISFIED, INVALIDATED] }
         resolvedAt: { type: string, format: date-time }
+
+    BeginEvidenceUploadRequest:
+      type: object
+      additionalProperties: false
+      required: [originalFileName, declaredMimeType, expectedSize, expectedSha256, captureMetadata]
+      properties:
+        evidenceItemId: { type: [string, 'null'], format: uuid }
+        originalFileName: { type: string, minLength: 1, maxLength: 255 }
+        declaredMimeType: { type: string, minLength: 3, maxLength: 255 }
+        expectedSize: { type: integer, format: int64, minimum: 1 }
+        expectedSha256: { type: string, pattern: '^[0-9A-Fa-f]{64}$' }
+        captureMetadata: { $ref: '#/components/schemas/CaptureMetadata' }
+    FinalizeEvidenceUploadRequest:
+      type: object
+      additionalProperties: false
+      required: [actualSha256, finalizeCommandId]
+      properties:
+        actualSha256: { type: string, pattern: '^[0-9A-Fa-f]{64}$' }
+        finalizeCommandId: { type: string, minLength: 1, maxLength: 160 }
+    CaptureMetadata:
+      type: object
+      additionalProperties: true
+      required: [capturedAt]
+      properties:
+        captureSource: { enum: [CAMERA, GALLERY, FILE, GENERATED, EXTERNAL] }
+        source: { enum: [CAMERA, GALLERY, FILE, GENERATED, EXTERNAL] }
+        capturedAt: { type: string, format: date-time }
+        deviceId: { type: [string, 'null'], maxLength: 128 }
+        appVersion: { type: [string, 'null'], maxLength: 64 }
+        offlineFlag: { type: [boolean, 'null'] }
+        offline: { type: [boolean, 'null'] }
+        checksum: { type: [string, 'null'], pattern: '^[0-9A-Fa-f]{64}$' }
+        location:
+          type: [object, 'null']
+          additionalProperties: true
+    EvidenceUploadSession:
+      type: object
+      additionalProperties: false
+      required: [uploadSessionId, fileId, taskId, evidenceSlotId, status, uploadMethod, uploadUrl,
+                 requiredHeaders, uploadAuthorizationExpiresAt, sessionExpiresAt]
+      properties:
+        uploadSessionId: { type: string, format: uuid }
+        fileId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        evidenceSlotId: { type: string, format: uuid }
+        evidenceItemId: { type: [string, 'null'], format: uuid }
+        status: { enum: [CREATED, UPLOADING, FINALIZING, COMPLETED, EXPIRED, FAILED] }
+        uploadMethod: { type: [string, 'null'], enum: [PUT, null] }
+        uploadUrl: { type: [string, 'null'], format: uri }
+        requiredHeaders:
+          type: object
+          additionalProperties: { type: string }
+        uploadAuthorizationExpiresAt: { type: string, format: date-time }
+        sessionExpiresAt: { type: string, format: date-time }
+    EvidenceRevision:
+      type: object
+      additionalProperties: false
+      required: [evidenceRevisionId, evidenceItemId, evidenceSlotId, taskId, projectId,
+                 revisionNumber, fileObjectId, contentDigest, mimeType, sizeBytes,
+                 captureMetadata, status, sourceUploadSessionId, createdBy, createdAt]
+      properties:
+        evidenceRevisionId: { type: string, format: uuid }
+        evidenceItemId: { type: string, format: uuid }
+        evidenceSlotId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        revisionNumber: { type: integer, minimum: 1 }
+        fileObjectId: { type: string, format: uuid }
+        contentDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
+        mimeType: { type: string, minLength: 3, maxLength: 120 }
+        sizeBytes: { type: integer, format: int64, minimum: 1 }
+        captureMetadata: { type: object, additionalProperties: true }
+        status: { enum: [STORED, VALIDATING, VALIDATED, VALIDATION_FAILED, QUARANTINED, INVALIDATED] }
+        sourceUploadSessionId: { type: string, format: uuid }
+        createdBy: { type: string, minLength: 1, maxLength: 128 }
+        createdAt: { type: string, format: date-time }
+    EvidenceItem:
+      type: object
+      additionalProperties: false
+      required: [evidenceItemId, taskId, projectId, evidenceSlotId, itemOrdinal, status,
+                 createdBy, createdAt, revisions]
+      properties:
+        evidenceItemId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        evidenceSlotId: { type: string, format: uuid }
+        itemOrdinal: { type: integer, minimum: 1 }
+        status: { enum: [OPEN, SUBMITTED, UNDER_REVIEW, ACCEPTED, REJECTED, LOCKED] }
+        createdBy: { type: string, minLength: 1, maxLength: 128 }
+        createdAt: { type: string, format: date-time }
+        revisions:
+          type: array
+          items: { $ref: '#/components/schemas/EvidenceRevision' }
     SubmitFormRequest:
       type: object
       additionalProperties: false

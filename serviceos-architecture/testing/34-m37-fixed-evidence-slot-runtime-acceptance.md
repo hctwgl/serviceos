@@ -21,5 +21,5 @@ status: Implemented
 | M37-BOUNDARY-001 | P0 | evidence 不访问 task/workflow/configuration 内部包 | `ArchitectureTest` |
 | M37-DEP-001 | P0 | staging 正向迁移至 038/40，旧版本负向门禁及回滚演练通过 | staging rehearsal |
 
-本矩阵仅证明固定 EvidenceSlot 和权威空解析。条件切换、文件上传、Revision、Snapshot、审核与整改仍由
-M3 EVD-001～EVD-009 后续里程碑验收。
+本矩阵仅证明固定 EvidenceSlot 和权威空解析。M38 已覆盖安全文件 Finalize 与 EvidenceItem/Revision；
+条件切换、OCR、Snapshot、审核与整改仍由 M3 EVD-001～EVD-009 后续里程碑验收。
