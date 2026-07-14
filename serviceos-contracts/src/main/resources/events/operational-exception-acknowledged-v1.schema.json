@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/operational-exception-acknowledged-v1.schema.json",
+  "title": "OperationalExceptionAcknowledgedV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId", "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"},
+    "eventType": {"const": "operational.exception.acknowledged"},
+    "schemaVersion": {"const": 1},
+    "tenantId": {"type": "string"},
+    "correlationId": {"type": "string"},
+    "causationId": {"type": "string"},
+    "aggregateType": {"const": "OperationalException"},
+    "aggregateId": {"type": "string", "format": "uuid"},
+    "aggregateVersion": {"type": "integer", "minimum": 2},
+    "occurredAt": {"type": "string", "format": "date-time"},
+    "payload": {"$ref": "#/$defs/payload"}
+  },
+  "$defs": {
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exceptionId", "status", "aggregateVersion", "acknowledgedAt", "acknowledgedBy"],
+      "properties": {
+        "exceptionId": {"type": "string", "format": "uuid"},
+        "status": {"const": "ACKNOWLEDGED"},
+        "aggregateVersion": {"type": "integer", "minimum": 2},
+        "acknowledgedAt": {"type": "string", "format": "date-time"},
+        "acknowledgedBy": {"type": "string", "minLength": 1, "maxLength": 128}
+      }
+    }
+  }
+}

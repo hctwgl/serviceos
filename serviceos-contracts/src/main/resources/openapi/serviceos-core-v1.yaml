@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.4.0
+  version: 0.5.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -251,6 +251,66 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '423': { $ref: '#/components/responses/Problem' }
+  /operational-exceptions:
+    get:
+      operationId: listOperationalExceptions
+      summary: 查询当前租户的运营异常工作台
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [OPEN, ACKNOWLEDGED, RESOLVED] } }
+        - { name: category, in: query, schema: { type: string } }
+        - { name: severity, in: query, schema: { type: string, enum: [P0, P1, P2, P3] } }
+        - { name: workOrderId, in: query, schema: { type: string, format: uuid } }
+        - { name: taskId, in: query, schema: { type: string, format: uuid } }
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 按 openedAt、exceptionId 倒序返回的稳定游标页
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OperationalExceptionPage' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /operational-exceptions/{exceptionId}:
+    get:
+      operationId: getOperationalException
+      summary: 查询当前租户的运营异常详情
+      parameters:
+        - $ref: '#/components/parameters/OperationalExceptionId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 异常详情
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OperationalException' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /operational-exceptions/{exceptionId}:acknowledge:
+    post:
+      operationId: acknowledgeOperationalException
+      summary: 确认 OPEN 运营异常
+      description: 仅记录人工已接管事实；不伪造领域解决动作。相同幂等键返回首次冻结响应。
+      parameters:
+        - $ref: '#/components/parameters/OperationalExceptionId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AcknowledgeOperationalExceptionRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/OperationalExceptionAcknowledgement' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
 components:
   securitySchemes:
     bearerAuth:
@@ -261,6 +321,11 @@ components:
   parameters:
     TaskId:
       name: taskId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    OperationalExceptionId:
+      name: exceptionId
       in: path
       required: true
       schema: { type: string, format: uuid }
@@ -283,7 +348,7 @@ components:
       name: If-Match
       in: header
       required: true
-      description: 双引号包裹的正整数 Task 聚合版本，例如 `"3"`。
+      description: 双引号包裹的正整数聚合版本，例如 `"3"`。
       schema:
         type: string
         pattern: '^"[1-9][0-9]*"$'
@@ -460,6 +525,61 @@ components:
           type: object
           additionalProperties: { type: string }
         expiresAt: { type: string, format: date-time }
+    OperationalExceptionPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/OperationalException' }
+        nextCursor: { type: [string, 'null'] }
+    OperationalException:
+      type: object
+      additionalProperties: false
+      required: [exceptionId, sourceType, sourceId, sourceAttemptId, sourceTaskType, category,
+                 severity, errorCode, status, occurrenceCount, aggregateVersion, openedAt,
+                 lastDetectedAt, allowedActions]
+      properties:
+        exceptionId: { type: string, format: uuid }
+        sourceType: { type: string }
+        sourceId: { type: string }
+        sourceAttemptId: { type: string, format: uuid }
+        sourceTaskType: { type: string }
+        category: { type: string }
+        severity: { enum: [P0, P1, P2, P3] }
+        errorCode: { type: string }
+        status: { enum: [OPEN, ACKNOWLEDGED, RESOLVED] }
+        workOrderId: { type: [string, 'null'], format: uuid }
+        taskId: { type: [string, 'null'], format: uuid }
+        handlingTaskId: { type: [string, 'null'], format: uuid }
+        occurrenceCount: { type: integer, format: int64, minimum: 1 }
+        aggregateVersion: { type: integer, format: int64, minimum: 1 }
+        openedAt: { type: string, format: date-time }
+        lastDetectedAt: { type: string, format: date-time }
+        acknowledgedAt: { type: [string, 'null'], format: date-time }
+        acknowledgedBy: { type: [string, 'null'] }
+        acknowledgementNote: { type: [string, 'null'] }
+        resolvedAt: { type: [string, 'null'], format: date-time }
+        resolutionCode: { type: [string, 'null'] }
+        allowedActions:
+          type: array
+          items: { enum: [ACKNOWLEDGE] }
+    AcknowledgeOperationalExceptionRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        note: { type: [string, 'null'], maxLength: 500 }
+    OperationalExceptionAcknowledgement:
+      type: object
+      additionalProperties: false
+      required: [exceptionId, status, aggregateVersion, acknowledgedAt, acknowledgedBy]
+      properties:
+        exceptionId: { type: string, format: uuid }
+        status: { const: ACKNOWLEDGED }
+        aggregateVersion: { type: integer, format: int64, minimum: 2 }
+        acknowledgedAt: { type: string, format: date-time }
+        acknowledgedBy: { type: string, minLength: 1, maxLength: 128 }
     Problem:
       type: object
       required: [type, title, status, errorCode]
@@ -472,6 +592,18 @@ components:
         errorCode: { type: string }
         correlationId: { type: [string, 'null'] }
   responses:
+    OperationalExceptionAcknowledgement:
+      description: 确认成功或幂等重放成功
+      headers:
+        ETag:
+          required: true
+          schema: { type: string }
+        X-Correlation-Id:
+          required: true
+          schema: { type: string }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/OperationalExceptionAcknowledgement' }
     HumanTaskCommandReceipt:
       description: 命令成功或幂等重放成功
       headers:

@@ -70,7 +70,7 @@ class TaskExecutionPostgresIT {
     @BeforeEach
     void cleanTables() {
         jdbc.sql("""
-                        TRUNCATE TABLE ops_operational_exception,
+                        TRUNCATE TABLE ops_exception_ack_result, ops_operational_exception,
                             tsk_task_reassignment_command_result,
                             tsk_task_execution_guard, tsk_task_assignment, tsk_task_assignment_batch,
                             tsk_human_task_command_result, tsk_task_execution_attempt, tsk_task,
@@ -293,6 +293,39 @@ class TaskExecutionPostgresIT {
                 .query(String.class).single()).isEqualTo("READY");
         assertThat(count("rel_inbox_record")).isEqualTo(1);
         assertThat(count("rel_outbox_event")).isZero();
+    }
+
+    @Test
+    void automaticRecoveryCanResolveAcknowledgedExceptionAndPreservesAcknowledgement() {
+        UUID sagaId = UUID.randomUUID();
+        UUID assignmentId = UUID.randomUUID();
+        UUID workOrderId = UUID.randomUUID();
+        UUID taskId = UUID.randomUUID();
+        var opened = operationalExceptions.openFromServiceAssignmentTimeout(
+                timeoutCommand(sagaId, assignmentId, workOrderId, taskId));
+        Instant acknowledgedAt = Instant.parse("2026-07-14T01:30:00Z");
+        jdbc.sql("""
+                        UPDATE ops_operational_exception
+                           SET status = 'ACKNOWLEDGED', acknowledged_at = :acknowledgedAt,
+                               acknowledged_by = 'operator-1', aggregate_version = 2
+                         WHERE exception_id = :exceptionId
+                        """).param("acknowledgedAt", timestamptz(acknowledgedAt))
+                .param("exceptionId", opened.exceptionId()).update();
+
+        operationalExceptions.resolveServiceAssignmentTimeout(new ResolveServiceAssignmentTimeoutCommand(
+                "tenant-test", UUID.randomUUID(), 1, "f".repeat(64), sagaId, assignmentId,
+                workOrderId, taskId, 4, Instant.parse("2026-07-14T02:00:00Z"),
+                "corr-acknowledged-recovery"));
+
+        assertThat(jdbc.sql("""
+                        SELECT status || ':' || acknowledged_by || ':' || aggregate_version
+                          FROM ops_operational_exception WHERE exception_id = :exceptionId
+                        """).param("exceptionId", opened.exceptionId()).query(String.class).single())
+                .isEqualTo("RESOLVED:operator-1:3");
+        assertThat(jdbc.sql("""
+                        SELECT aggregate_version FROM rel_outbox_event
+                         WHERE event_type = 'operational.exception.resolved'
+                        """).query(Long.class).single()).isEqualTo(3);
     }
 
     @Test

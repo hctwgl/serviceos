@@ -156,9 +156,13 @@ final class DefaultOperationalExceptionService implements OperationalExceptionSe
                                           EXCLUDED.last_detected_at),
                                       error_code = EXCLUDED.error_code,
                                       status = 'OPEN', resolved_at = NULL,
+                                      acknowledged_at = NULL,
+                                      acknowledged_by = NULL,
+                                      acknowledgement_note = NULL,
                                       resolution_code = NULL,
                                       resolution_action_ref = NULL,
-                                      resolution_event_id = NULL
+                                      resolution_event_id = NULL,
+                                      aggregate_version = ops_operational_exception.aggregate_version + 1
                         """)
                 .param("exceptionId", exceptionId).param("tenantId", command.tenantId())
                 .param("sourceId", command.sagaId().toString())
@@ -205,7 +209,7 @@ final class DefaultOperationalExceptionService implements OperationalExceptionSe
 
         SagaTimeoutException state = jdbc.sql("""
                         SELECT exception_id, work_order_id, task_id, handling_task_id,
-                               status, occurrence_count, resolution_event_id
+                               status, occurrence_count, aggregate_version, resolution_event_id
                           FROM ops_operational_exception
                          WHERE tenant_id = :tenantId
                            AND source_type = 'SERVICE_ASSIGNMENT_ACTIVATION_SAGA'
@@ -248,8 +252,9 @@ final class DefaultOperationalExceptionService implements OperationalExceptionSe
                            SET status = 'RESOLVED', resolved_at = :resolvedAt,
                                resolution_code = :resolutionCode,
                                resolution_action_ref = :actionRef,
-                               resolution_event_id = :resolutionEventId
-                         WHERE exception_id = :exceptionId AND status = 'OPEN'
+                               resolution_event_id = :resolutionEventId,
+                               aggregate_version = aggregate_version + 1
+                         WHERE exception_id = :exceptionId AND status IN ('OPEN', 'ACKNOWLEDGED')
                         """)
                 .param("resolvedAt", timestamptz(command.completedAt()))
                 .param("resolutionCode", resolutionCode).param("actionRef", actionRef)
@@ -266,7 +271,7 @@ final class DefaultOperationalExceptionService implements OperationalExceptionSe
         String json = serialize(payload);
         outbox.append(new OutboxEvent(
                 UUID.randomUUID(), UUID.randomUUID(), "operations", "operational.exception.resolved", 1,
-                "OperationalException", state.exceptionId().toString(), state.occurrenceCount() + 1L,
+                "OperationalException", state.exceptionId().toString(), state.aggregateVersion() + 1L,
                 command.tenantId(), command.correlationId(), command.eventId().toString(),
                 state.exceptionId().toString(), json, Sha256.digest(json), command.completedAt()));
         inbox.complete(command.tenantId(), SAGA_RECOVERY_CONSUMER, command.eventId(),
@@ -404,6 +409,7 @@ final class DefaultOperationalExceptionService implements OperationalExceptionSe
             UUID handlingTaskId,
             String status,
             int occurrenceCount,
+            long aggregateVersion,
             UUID resolutionEventId
     ) {
     }

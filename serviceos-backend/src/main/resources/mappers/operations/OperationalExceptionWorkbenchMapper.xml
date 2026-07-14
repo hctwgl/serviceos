@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.serviceos.operations.infrastructure.OperationalExceptionWorkbenchMapper">
+    <sql id="workbenchColumns">
+        exception_id AS "exceptionId", source_type AS "sourceType", source_id AS "sourceId",
+        source_attempt_id AS "sourceAttemptId", source_task_type AS "sourceTaskType",
+        category_code AS "category", severity_code AS "severity", error_code AS "errorCode",
+        status, work_order_id AS "workOrderId", task_id AS "taskId",
+        handling_task_id AS "handlingTaskId", occurrence_count AS "occurrenceCount",
+        aggregate_version AS "aggregateVersion", opened_at AS "openedAt",
+        last_detected_at AS "lastDetectedAt", acknowledged_at AS "acknowledgedAt",
+        acknowledged_by AS "acknowledgedBy", acknowledgement_note AS "acknowledgementNote",
+        resolved_at AS "resolvedAt", resolution_code AS "resolutionCode"
+    </sql>
+
+    <select id="findPage" resultType="map">
+        SELECT <include refid="workbenchColumns"/>
+          FROM ops_operational_exception
+         WHERE tenant_id = #{tenantId}
+        <if test="status != null">AND status = #{status}</if>
+        <if test="category != null">AND category_code = #{category}</if>
+        <if test="severity != null">AND severity_code = #{severity}</if>
+        <if test="workOrderId != null">AND work_order_id = #{workOrderId}</if>
+        <if test="taskId != null">AND task_id = #{taskId}</if>
+        <if test="cursorOpenedAt != null">
+            AND (opened_at, exception_id) &lt; (#{cursorOpenedAt}, #{cursorId})
+        </if>
+         ORDER BY opened_at DESC, exception_id DESC
+         LIMIT #{fetchSize}
+    </select>
+
+    <select id="findById" resultType="map">
+        SELECT <include refid="workbenchColumns"/>
+          FROM ops_operational_exception
+         WHERE tenant_id = #{tenantId} AND exception_id = #{exceptionId}
+    </select>
+
+    <update id="acknowledge">
+        UPDATE ops_operational_exception
+           SET status = 'ACKNOWLEDGED', acknowledged_at = #{acknowledgedAt},
+               acknowledged_by = #{actorId}, acknowledgement_note = #{note},
+               aggregate_version = aggregate_version + 1
+         WHERE tenant_id = #{tenantId} AND exception_id = #{exceptionId}
+           AND status = 'OPEN' AND aggregate_version = #{expectedVersion}
+    </update>
+
+    <insert id="insertAcknowledgement">
+        INSERT INTO ops_exception_ack_result (
+            tenant_id, idempotency_key, exception_id, aggregate_version,
+            acknowledged_at, acknowledged_by
+        ) VALUES (
+            #{tenantId}, #{idempotencyKey}, #{exceptionId}, #{aggregateVersion},
+            #{acknowledgedAt}, #{acknowledgedBy}
+        )
+    </insert>
+
+    <select id="findAcknowledgement" resultType="map">
+        SELECT exception_id AS "exceptionId", aggregate_version AS "aggregateVersion",
+               acknowledged_at AS "acknowledgedAt", acknowledged_by AS "acknowledgedBy"
+          FROM ops_exception_ack_result
+         WHERE tenant_id = #{tenantId} AND idempotency_key = #{idempotencyKey}
+    </select>
+</mapper>
