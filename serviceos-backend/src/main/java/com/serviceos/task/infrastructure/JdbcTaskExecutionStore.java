@@ -6,10 +6,13 @@ import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.shared.Sha256;
 import com.serviceos.task.api.CreateHandlingTaskCommand;
+import com.serviceos.task.api.CancelHandlingTaskCommand;
 import com.serviceos.task.api.CreateWorkflowTaskCommand;
+import com.serviceos.task.api.HandlingTaskCancellationReceipt;
 import com.serviceos.task.api.ScheduleAutomatedTaskCommand;
 import com.serviceos.task.api.ScheduledTaskView;
 import com.serviceos.task.api.TaskCompletedPayload;
+import com.serviceos.task.api.TaskCancelledPayload;
 import com.serviceos.task.api.TaskCreatedPayload;
 import com.serviceos.task.api.WorkflowTaskKind;
 import com.serviceos.task.application.ClaimedTask;
@@ -124,6 +127,101 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
                     "The handling task business key is already bound to a different payload digest");
         }
         return stored.toView();
+    }
+
+    @Override
+    public HandlingTaskCancellationReceipt cancelHandlingTask(CancelHandlingTaskCommand command) {
+        CancellationState state = jdbc.sql("""
+                        SELECT task_id, task_type, business_key, task_kind, status, version,
+                               cancellation_source_event_id, cancelled_at
+                          FROM tsk_task
+                         WHERE tenant_id = :tenantId AND task_id = :taskId
+                         FOR UPDATE
+                        """)
+                .param("tenantId", command.tenantId()).param("taskId", command.taskId())
+                .query(CancellationState.class).optional()
+                .orElseThrow(() -> new BusinessProblem(
+                        ProblemCode.RESOURCE_NOT_FOUND, "Handling task does not exist"));
+        if (!"HUMAN".equals(state.taskKind())
+                || !command.taskType().equals(state.taskType())
+                || !command.businessKey().equals(state.businessKey())) {
+            throw new BusinessProblem(
+                    ProblemCode.TASK_SCHEDULE_CONFLICT,
+                    "Task identity does not match the handling task cancellation command");
+        }
+        // 人工已经提交的事实不可被自动恢复覆盖；异常仍可引用恢复事件独立关单。
+        if ("COMPLETED".equals(state.status())) {
+            return new HandlingTaskCancellationReceipt(
+                    state.taskId(), state.status(), state.version(),
+                    command.sourceEventId(), command.cancelledAt());
+        }
+        if ("CANCELLED".equals(state.status())) {
+            return new HandlingTaskCancellationReceipt(
+                    state.taskId(), state.status(), state.version(),
+                    state.cancellationSourceEventId(), state.cancelledAt());
+        }
+        if (!java.util.Set.of("READY", "CLAIMED", "RUNNING", "MANUAL_INTERVENTION")
+                .contains(state.status())) {
+            throw new BusinessProblem(
+                    ProblemCode.TASK_SCHEDULE_CONFLICT,
+                    "Handling task cannot be cancelled from status " + state.status());
+        }
+
+        int updated = jdbc.sql("""
+                        UPDATE tsk_task
+                           SET status = 'CANCELLED', claimed_by = NULL, claimed_at = NULL,
+                               started_at = NULL, claim_owner = NULL, claim_until = NULL,
+                               current_attempt_id = NULL, completed_at = NULL,
+                               cancelled_at = :cancelledAt,
+                               cancellation_reason_code = :reasonCode,
+                               cancellation_source_event_id = :sourceEventId,
+                               version = version + 1, updated_at = :cancelledAt
+                         WHERE tenant_id = :tenantId AND task_id = :taskId
+                           AND version = :version AND status = :status
+                        """)
+                .param("cancelledAt", timestamptz(command.cancelledAt()))
+                .param("reasonCode", command.reasonCode())
+                .param("sourceEventId", command.sourceEventId())
+                .param("tenantId", command.tenantId()).param("taskId", command.taskId())
+                .param("version", state.version()).param("status", state.status()).update();
+        if (updated != 1) {
+            throw new BusinessProblem(
+                    ProblemCode.TASK_SCHEDULE_CONFLICT,
+                    "Handling task changed concurrently during cancellation");
+        }
+        // 取消即撤权；未来即使接管任务增加候选/责任分配，也不能留下活动访问关系。
+        jdbc.sql("""
+                        UPDATE tsk_task_assignment
+                           SET status = 'REVOKED', effective_to = :cancelledAt,
+                               revoked_by = 'SYSTEM_RECOVERY', revoke_reason_code = :reasonCode
+                         WHERE tenant_id = :tenantId AND task_id = :taskId AND status = 'ACTIVE'
+                        """)
+                .param("cancelledAt", timestamptz(command.cancelledAt()))
+                .param("reasonCode", command.reasonCode())
+                .param("tenantId", command.tenantId()).param("taskId", command.taskId()).update();
+
+        long nextVersion = state.version() + 1;
+        appendTaskCancelled(command, nextVersion);
+        return new HandlingTaskCancellationReceipt(
+                state.taskId(), "CANCELLED", nextVersion,
+                command.sourceEventId(), command.cancelledAt());
+    }
+
+    private void appendTaskCancelled(CancelHandlingTaskCommand command, long taskVersion) {
+        TaskCancelledPayload event = new TaskCancelledPayload(
+                command.taskId(), command.taskType(), command.businessKey(), command.reasonCode(),
+                command.sourceEventId(), command.cancelledAt());
+        String payload;
+        try {
+            payload = objectMapper.writeValueAsString(event);
+        } catch (JacksonException exception) {
+            throw new IllegalStateException("TaskCancelled event serialization failed", exception);
+        }
+        outbox.append(new OutboxEvent(
+                UUID.randomUUID(), UUID.randomUUID(), "task", "task.cancelled", 1,
+                "Task", command.taskId().toString(), taskVersion,
+                command.tenantId(), command.correlationId(), command.sourceEventId().toString(),
+                command.taskId().toString(), payload, Sha256.digest(payload), command.cancelledAt()));
     }
 
     @Override
@@ -560,6 +658,18 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
                     taskId, tenantId, taskType, businessKey, status,
                     nextRunAt, attemptCount, maxAttempts, version);
         }
+    }
+
+    private record CancellationState(
+            UUID taskId,
+            String taskType,
+            String businessKey,
+            String taskKind,
+            String status,
+            long version,
+            UUID cancellationSourceEventId,
+            Instant cancelledAt
+    ) {
     }
 
     private record TaskExecutionEventPayload(

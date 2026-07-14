@@ -2,17 +2,24 @@ package com.serviceos.operations.application;
 
 import com.serviceos.operations.api.OpenTaskFailureCommand;
 import com.serviceos.operations.api.OpenServiceAssignmentTimeoutCommand;
+import com.serviceos.operations.api.ResolveServiceAssignmentTimeoutCommand;
 import com.serviceos.operations.api.OperationalExceptionService;
+import com.serviceos.operations.api.OperationalExceptionResolvedPayload;
 import com.serviceos.operations.api.OperationalExceptionView;
 import com.serviceos.reliability.api.InboxDecision;
 import com.serviceos.reliability.api.InboxService;
+import com.serviceos.reliability.api.OutboxAppender;
+import com.serviceos.reliability.api.OutboxEvent;
 import com.serviceos.shared.Sha256;
+import com.serviceos.task.api.CancelHandlingTaskCommand;
 import com.serviceos.task.api.CreateHandlingTaskCommand;
 import com.serviceos.task.api.ScheduledTaskView;
 import com.serviceos.task.api.TaskSchedulingService;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -29,6 +36,8 @@ import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timesta
 final class DefaultOperationalExceptionService implements OperationalExceptionService {
     private static final String CONSUMER_NAME = "operations.task-final-failure.v1";
     private static final String SAGA_TIMEOUT_CONSUMER = "operations.service-assignment-timeout.v1";
+    private static final String SAGA_RECOVERY_CONSUMER =
+            "operations.service-assignment-activation-completed.v1";
     private static final String HANDLING_TASK_TYPE = "operations.resolve-exception";
     private static final String DISPATCH_TIMEOUT_TASK_TYPE = "operations.resolve-dispatch-timeout";
 
@@ -36,17 +45,23 @@ final class DefaultOperationalExceptionService implements OperationalExceptionSe
     private final TaskSchedulingService tasks;
     private final JdbcClient jdbc;
     private final Clock clock;
+    private final OutboxAppender outbox;
+    private final ObjectMapper objectMapper;
 
     DefaultOperationalExceptionService(
             InboxService inbox,
             TaskSchedulingService tasks,
             JdbcClient jdbc,
-            Clock clock
+            Clock clock,
+            OutboxAppender outbox,
+            ObjectMapper objectMapper
     ) {
         this.inbox = inbox;
         this.tasks = tasks;
         this.jdbc = jdbc;
         this.clock = clock;
+        this.outbox = outbox;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -140,7 +155,10 @@ final class DefaultOperationalExceptionService implements OperationalExceptionSe
                                           ops_operational_exception.last_detected_at,
                                           EXCLUDED.last_detected_at),
                                       error_code = EXCLUDED.error_code,
-                                      status = 'OPEN', resolved_at = NULL
+                                      status = 'OPEN', resolved_at = NULL,
+                                      resolution_code = NULL,
+                                      resolution_action_ref = NULL,
+                                      resolution_event_id = NULL
                         """)
                 .param("exceptionId", exceptionId).param("tenantId", command.tenantId())
                 .param("sourceId", command.sagaId().toString())
@@ -172,6 +190,87 @@ final class DefaultOperationalExceptionService implements OperationalExceptionSe
                 Sha256.digest(opened.exceptionId() + "|" + handlingTask.taskId()
                         + "|" + command.timeoutId()));
         return findSagaTimeout(command.tenantId(), command.sagaId());
+    }
+
+    @Override
+    @Transactional
+    public void resolveServiceAssignmentTimeout(ResolveServiceAssignmentTimeoutCommand command) {
+        validate(command);
+        InboxDecision decision = inbox.begin(
+                command.tenantId(), SAGA_RECOVERY_CONSUMER, command.eventId(),
+                command.schemaVersion(), command.payloadDigest());
+        if (decision.kind() == InboxDecision.Kind.REPLAY) {
+            return;
+        }
+
+        SagaTimeoutException state = jdbc.sql("""
+                        SELECT exception_id, work_order_id, task_id, handling_task_id,
+                               status, occurrence_count, resolution_event_id
+                          FROM ops_operational_exception
+                         WHERE tenant_id = :tenantId
+                           AND source_type = 'SERVICE_ASSIGNMENT_ACTIVATION_SAGA'
+                           AND source_id = :sourceId AND source_attempt_id = :sourceAttemptId
+                         FOR UPDATE
+                        """)
+                .param("tenantId", command.tenantId()).param("sourceId", command.sagaId().toString())
+                .param("sourceAttemptId", command.sagaId())
+                .query(SagaTimeoutException.class).optional().orElse(null);
+        // 未发生过超时是合法正常路径；仍冻结 Inbox，阻止同一恢复事件被变造重放。
+        if (state == null) {
+            inbox.complete(command.tenantId(), SAGA_RECOVERY_CONSUMER, command.eventId(),
+                    Sha256.digest("NO_TIMEOUT_EXCEPTION|" + command.sagaId()));
+            return;
+        }
+        if (!command.workOrderId().equals(state.workOrderId())
+                || !command.taskId().equals(state.taskId())) {
+            throw new IllegalArgumentException("ServiceAssignment recovery source identity mismatch");
+        }
+        if ("RESOLVED".equals(state.status())) {
+            if (!command.eventId().equals(state.resolutionEventId())) {
+                throw new IllegalStateException("OperationalException was resolved by another action");
+            }
+            inbox.complete(command.tenantId(), SAGA_RECOVERY_CONSUMER, command.eventId(),
+                    Sha256.digest(state.exceptionId() + "|ALREADY_RESOLVED"));
+            return;
+        }
+        if (state.handlingTaskId() == null) {
+            throw new IllegalStateException("Open saga timeout exception has no handling task");
+        }
+
+        String resolutionCode = "SERVICE_ASSIGNMENT_ACTIVATION_RECOVERED";
+        String actionRef = "event:service.assignment.activation-completed:" + command.eventId();
+        var cancellation = tasks.cancelHandlingTask(new CancelHandlingTaskCommand(
+                command.tenantId(), state.handlingTaskId(), DISPATCH_TIMEOUT_TASK_TYPE,
+                state.exceptionId().toString(), resolutionCode,
+                command.eventId(), command.completedAt(), command.correlationId()));
+        int updated = jdbc.sql("""
+                        UPDATE ops_operational_exception
+                           SET status = 'RESOLVED', resolved_at = :resolvedAt,
+                               resolution_code = :resolutionCode,
+                               resolution_action_ref = :actionRef,
+                               resolution_event_id = :resolutionEventId
+                         WHERE exception_id = :exceptionId AND status = 'OPEN'
+                        """)
+                .param("resolvedAt", timestamptz(command.completedAt()))
+                .param("resolutionCode", resolutionCode).param("actionRef", actionRef)
+                .param("resolutionEventId", command.eventId())
+                .param("exceptionId", state.exceptionId()).update();
+        if (updated != 1) {
+            throw new IllegalStateException("OperationalException changed during automatic recovery");
+        }
+
+        OperationalExceptionResolvedPayload payload = new OperationalExceptionResolvedPayload(
+                state.exceptionId(), command.sagaId(), command.serviceAssignmentId(),
+                state.handlingTaskId(), cancellation.status(), resolutionCode, actionRef,
+                command.eventId(), command.completedAt());
+        String json = serialize(payload);
+        outbox.append(new OutboxEvent(
+                UUID.randomUUID(), UUID.randomUUID(), "operations", "operational.exception.resolved", 1,
+                "OperationalException", state.exceptionId().toString(), state.occurrenceCount() + 1L,
+                command.tenantId(), command.correlationId(), command.eventId().toString(),
+                state.exceptionId().toString(), json, Sha256.digest(json), command.completedAt()));
+        inbox.complete(command.tenantId(), SAGA_RECOVERY_CONSUMER, command.eventId(),
+                Sha256.digest(state.exceptionId() + "|" + cancellation.status() + "|" + actionRef));
     }
 
     private OperationalExceptionView findBySource(
@@ -261,6 +360,33 @@ final class DefaultOperationalExceptionService implements OperationalExceptionSe
         }
     }
 
+    private static void validate(ResolveServiceAssignmentTimeoutCommand command) {
+        Objects.requireNonNull(command, "command must not be null");
+        requireText(command.tenantId(), "tenantId");
+        Objects.requireNonNull(command.eventId(), "eventId must not be null");
+        Objects.requireNonNull(command.sagaId(), "sagaId must not be null");
+        Objects.requireNonNull(command.serviceAssignmentId(), "serviceAssignmentId must not be null");
+        Objects.requireNonNull(command.workOrderId(), "workOrderId must not be null");
+        Objects.requireNonNull(command.taskId(), "taskId must not be null");
+        Objects.requireNonNull(command.completedAt(), "completedAt must not be null");
+        requireText(command.payloadDigest(), "payloadDigest");
+        requireText(command.correlationId(), "correlationId");
+        if (!command.payloadDigest().matches("[0-9a-f]{64}")) {
+            throw new IllegalArgumentException("payloadDigest must be a SHA-256 hex digest");
+        }
+        if (command.schemaVersion() != 1 || command.sagaVersion() < 1) {
+            throw new IllegalArgumentException("unsupported recovery schema or saga version");
+        }
+    }
+
+    private String serialize(Object value) {
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (JacksonException exception) {
+            throw new IllegalStateException("OperationalException event serialization failed", exception);
+        }
+    }
+
     private static void requireText(String value, String field) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(field + " must not be blank");
@@ -269,5 +395,16 @@ final class DefaultOperationalExceptionService implements OperationalExceptionSe
 
     private static String truncate(String value, int maxLength) {
         return value.length() <= maxLength ? value : value.substring(0, maxLength);
+    }
+
+    private record SagaTimeoutException(
+            UUID exceptionId,
+            UUID workOrderId,
+            UUID taskId,
+            UUID handlingTaskId,
+            String status,
+            int occurrenceCount,
+            UUID resolutionEventId
+    ) {
     }
 }

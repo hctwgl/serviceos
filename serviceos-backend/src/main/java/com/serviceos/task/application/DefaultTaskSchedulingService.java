@@ -1,7 +1,9 @@
 package com.serviceos.task.application;
 
 import com.serviceos.task.api.ScheduleAutomatedTaskCommand;
+import com.serviceos.task.api.CancelHandlingTaskCommand;
 import com.serviceos.task.api.CreateHandlingTaskCommand;
+import com.serviceos.task.api.HandlingTaskCancellationReceipt;
 import com.serviceos.task.api.ScheduledTaskView;
 import com.serviceos.task.api.TaskSchedulingService;
 import com.serviceos.task.api.CreateWorkflowTaskCommand;
@@ -62,6 +64,21 @@ final class DefaultTaskSchedulingService implements TaskSchedulingService {
             throw new IllegalArgumentException("readyAt must not be null");
         }
         return store.createHandlingTask(command);
+    }
+
+    @Override
+    @Transactional
+    public HandlingTaskCancellationReceipt cancelHandlingTask(CancelHandlingTaskCommand command) {
+        Objects.requireNonNull(command, "command must not be null");
+        requireText(command.tenantId(), "tenantId");
+        Objects.requireNonNull(command.taskId(), "taskId must not be null");
+        requireText(command.taskType(), "taskType");
+        requireText(command.businessKey(), "businessKey");
+        requireText(command.reasonCode(), "reasonCode");
+        Objects.requireNonNull(command.sourceEventId(), "sourceEventId must not be null");
+        Objects.requireNonNull(command.cancelledAt(), "cancelledAt must not be null");
+        requireText(command.correlationId(), "correlationId");
+        return store.cancelHandlingTask(command);
     }
 
     @Override

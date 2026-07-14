@@ -28,3 +28,4 @@
 - [M25 Dispatch 与 Task 改派 Saga 验收矩阵](22-m25-dispatch-task-reassignment-saga-acceptance.md)
 - [M26 切换前可靠终止验收矩阵](23-m26-pre-switch-abort-saga-acceptance.md)
 - [M27 ServiceAssignment 激活超时对账验收矩阵](24-m27-assignment-saga-timeout-acceptance.md)
+- [M28 ServiceAssignment 超时异常自动恢复验收矩阵](25-m28-assignment-timeout-auto-recovery-acceptance.md)

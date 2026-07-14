@@ -35,6 +35,9 @@ class LocalOutboxPublisherTest {
         assertThatThrownBy(() -> publisher.publish(message("task.completed")))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("No local outbox handler");
+        assertThatThrownBy(() -> publisher.publish(message("service.assignment.activation-completed")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("No local outbox handler");
     }
 
     @Test
