@@ -44,7 +44,7 @@ class WorkflowDefinitionParserTest {
 
     @Test
     void resolvesTheOnlyUnconditionalNextTaskFromTheFrozenDefinition() {
-        var result = parser.nextTask(asset(linearDefinition()), "ASSIGN_COORDINATORS");
+        var result = parser.progression(asset(linearDefinition()), "ASSIGN_COORDINATORS");
 
         assertThat(result.nodeId()).isEqualTo("INITIAL_REVIEW");
         assertThat(result.stageCode()).isEqualTo("INTAKE");
@@ -57,11 +57,11 @@ class WorkflowDefinitionParserTest {
         String conditional = linearDefinition().replace(
                 "\"from\":\"ASSIGN_COORDINATORS\",\"to\":\"INITIAL_REVIEW\"",
                 "\"from\":\"ASSIGN_COORDINATORS\",\"to\":\"INITIAL_REVIEW\",\"condition\":\"approved\"");
-        assertThatThrownBy(() -> parser.nextTask(asset(conditional), "ASSIGN_COORDINATORS"))
+        assertThatThrownBy(() -> parser.progression(asset(conditional), "ASSIGN_COORDINATORS"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("exactly one unconditional");
 
-        assertThatThrownBy(() -> parser.nextTask(asset(validDefinition()), "ASSIGN_COORDINATORS"))
+        assertThatThrownBy(() -> parser.progression(asset(validDefinition()), "ASSIGN_COORDINATORS"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("exactly one unconditional");
     }

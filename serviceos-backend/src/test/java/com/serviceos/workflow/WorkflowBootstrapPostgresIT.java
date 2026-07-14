@@ -143,10 +143,11 @@ class WorkflowBootstrapPostgresIT {
                 .param("projectId", projectId).param("tenantId", TENANT)
                 .param("startsOn", LocalDate.now().minusDays(1)).param("createdAt", OffsetDateTime.now())
                 .update();
-        String digest = Sha256.digest(workflowDefinition);
+        String normalizedDefinition = workflowDefinition.trim();
+        String digest = Sha256.digest(normalizedDefinition);
         UUID assetId = configurations.publishAsset(new PublishConfigurationAssetCommand(
                 TENANT, ConfigurationAssetType.WORKFLOW, "BYD-WORKFLOW", "1.0.0", "1.0.0",
-                workflowDefinition, digest)).versionId();
+                normalizedDefinition, digest)).versionId();
         ConfigurationBundleReference bundle = configurations.publishBundle(
                 new PublishConfigurationBundleCommand(
                         TENANT, projectId, "BYD-WORKFLOW-BUNDLE", "1.0.0", "BYD_OCEAN",

@@ -16,8 +16,8 @@ import java.util.Set;
 /**
  * 受控 JSON 工作流的最小可执行解释器。
  *
- * <p>M17 负责 START 到首任务，M18 增加任务到下一任务的线性推进。条件网关、并行、
- * 跨阶段和 END 仍然失败关闭，绝不把尚未实现的语义猜成顺序流。</p>
+ * <p>M17 负责 START 到首任务，M18 增加同阶段线性推进，M19 增加唯一无条件跨阶段
+ * 与 END 推进。条件网关和并行仍然失败关闭，绝不猜测尚未实现的分支语义。</p>
  */
 @Component
 final class WorkflowDefinitionParser {
@@ -43,7 +43,7 @@ final class WorkflowDefinitionParser {
                 task.stageCode(), task.taskType(), task.taskKind());
     }
 
-    NextTaskDefinition nextTask(ConfigurationAssetDefinition asset, String completedNodeId) {
+    ProgressionDefinition progression(ConfigurationAssetDefinition asset, String completedNodeId) {
         Graph graph = parseGraph(asset);
         String requiredNodeId = requiredValue(completedNodeId, "completedNodeId");
         JsonNode completed = graph.nodes().get(requiredNodeId);
@@ -55,10 +55,11 @@ final class WorkflowDefinitionParser {
         JsonNode target = requireSingleUnconditionalTarget(graph, requiredNodeId, "completed task node");
         String targetType = requiredText(target, "nodeType");
         if ("END".equals(targetType)) {
-            throw new IllegalArgumentException("END progression is not supported by M18");
+            return ProgressionDefinition.end(requiredText(target, "nodeId"));
         }
         TaskNode next = requireTaskNode(target, "next executable node");
-        return new NextTaskDefinition(next.nodeId(), next.stageCode(), next.taskType(), next.taskKind());
+        return ProgressionDefinition.task(
+                next.nodeId(), next.stageCode(), next.taskType(), next.taskKind());
     }
 
     private Graph parseGraph(ConfigurationAssetDefinition asset) {
@@ -151,12 +152,21 @@ final class WorkflowDefinitionParser {
     ) {
     }
 
-    record NextTaskDefinition(
+    record ProgressionDefinition(
             String nodeId,
             String stageCode,
             String taskType,
-            WorkflowTaskKind taskKind
+            WorkflowTaskKind taskKind,
+            boolean end
     ) {
+        static ProgressionDefinition task(
+                String nodeId, String stageCode, String taskType, WorkflowTaskKind taskKind) {
+            return new ProgressionDefinition(nodeId, stageCode, taskType, taskKind, false);
+        }
+
+        static ProgressionDefinition end(String nodeId) {
+            return new ProgressionDefinition(nodeId, null, null, null, true);
+        }
     }
 
     private record Graph(

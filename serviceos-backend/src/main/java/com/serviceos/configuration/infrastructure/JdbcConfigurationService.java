@@ -12,6 +12,7 @@ import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
 import com.serviceos.configuration.api.ResolveConfigurationBundleQuery;
 import com.serviceos.shared.Sha256;
 import com.serviceos.shared.infrastructure.PostgresJdbcParameters;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +34,7 @@ final class JdbcConfigurationService implements ConfigurationService {
     private final JdbcClient jdbc;
     private final Clock clock;
 
+    @Autowired
     JdbcConfigurationService(JdbcClient jdbc) {
         this(jdbc, Clock.systemUTC());
     }

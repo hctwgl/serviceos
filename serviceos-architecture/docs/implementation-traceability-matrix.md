@@ -113,3 +113,4 @@ Feature gate/authority: if applicable
 | M16 | Published Asset/Bundle 最小发布解析、tenant/project/bundle 工单锁定、BYD CPIM 入站创建工单 | Modulith + Configuration/WorkOrder/BYD HTTP PostgreSQL IT + V014 fail-closed migration | Stage/Task/Workflow、Audit/Outbox、完整配置审批、真实 CPIM sandbox 与全勘安链路 |
 | M17 | WorkOrderReceived Outbox、Inbox 幂等、精确 Workflow 启动、首 Stage/Task 与 WorkOrder 激活 | Modulith + Parser/Dispatcher Unit + Event Schema + WorkflowBootstrap PostgreSQL IT + V015～V017 | 后续节点推进、网关/并行/等待、负责人/SLA 绑定、正式 Broker、完整勘安链路 |
 | M18 | TaskCompleted 领域事件、冻结定义解析、NodeInstance 与同阶段唯一无条件下一任务推进 | Parser/Dispatcher Unit + Event Schema + WorkflowLinearProgression PostgreSQL IT + V018 | 跨阶段/END、网关/并行/等待、人工任务动作、负责人/SLA、正式 Broker、完整勘安链路 |
+| M19 | 唯一无条件跨阶段、END、Stage/Workflow 完结与 WorkOrder FULFILLED | Parser/Dispatcher Unit + Event Schema + WorkflowLinearProgression PostgreSQL IT + V019 | 网关/并行/等待、人工任务动作、负责人/SLA、取消/重开、正式 Broker、完整勘安链路 |

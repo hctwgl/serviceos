@@ -118,21 +118,81 @@ class WorkflowLinearProgressionPostgresIT {
     }
 
     @Test
-    void unsupportedCrossStageTransitionFailsClosedWithoutPartialProgression() {
+    void completedTaskActivatesTheOnlyUnconditionalNextStageAtomically() {
         Scope scope = scope(linearWorkflow("REVIEW"));
         workOrders.receive(command(scope));
         assertThat(outboxWorker.runOnce()).isEqualTo(OutboxWorker.RunResult.PUBLISHED);
         drainOutbox();
         assertThat(taskWorker().runOnce()).isEqualTo(TaskExecutionWorker.RunResult.SUCCEEDED);
 
-        publishUntilAttempted("task.completed");
+        publishUntil("task.completed");
+
+        assertThat(jdbc.sql("SELECT stage_code || ':' || status FROM wfl_stage_instance ORDER BY sequence_no")
+                .query(String.class).list()).containsExactly("INTAKE:COMPLETED", "REVIEW:ACTIVE");
+        assertThat(jdbc.sql("SELECT node_id || ':' || status FROM wfl_node_instance ORDER BY activated_at")
+                .query(String.class).list())
+                .containsExactly("ASSIGN_COORDINATORS:COMPLETED", "INITIAL_REVIEW:ACTIVE");
+        assertThat(count("tsk_task")).isEqualTo(2);
+        assertThat(jdbc.sql("""
+                SELECT event_type FROM rel_outbox_event
+                 WHERE event_type IN ('stage.completed', 'stage.activated') ORDER BY event_type
+                """).query(String.class).list())
+                .containsExactly("stage.activated", "stage.activated", "stage.completed");
+    }
+
+    @Test
+    void completedTaskReachingEndCompletesStageAndWorkflowWithoutCreatingAnotherTask() {
+        Scope scope = scope(endWorkflow());
+        workOrders.receive(command(scope));
+        assertThat(outboxWorker.runOnce()).isEqualTo(OutboxWorker.RunResult.PUBLISHED);
+        drainOutbox();
+        assertThat(taskWorker().runOnce()).isEqualTo(TaskExecutionWorker.RunResult.SUCCEEDED);
+
+        publishUntil("task.completed");
 
         assertThat(jdbc.sql("SELECT status FROM wfl_node_instance")
-                .query(String.class).single()).isEqualTo("ACTIVE");
+                .query(String.class).single()).isEqualTo("COMPLETED");
+        assertThat(jdbc.sql("SELECT status FROM wfl_stage_instance")
+                .query(String.class).single()).isEqualTo("COMPLETED");
+        assertThat(jdbc.sql("SELECT status FROM wfl_workflow_instance")
+                .query(String.class).single()).isEqualTo("COMPLETED");
+        assertThat(jdbc.sql("SELECT status FROM wo_work_order")
+                .query(String.class).single()).isEqualTo("FULFILLED");
         assertThat(count("tsk_task")).isEqualTo(1);
+        assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type = 'workflow.completed'")
+                .query(Long.class).single()).isEqualTo(1);
+        assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type = 'workorder.fulfilled'")
+                .query(Long.class).single()).isEqualTo(1);
+    }
+
+    @Test
+    void endProgressionRollsBackAllWorkflowFactsWhenWorkOrderCannotBeFulfilled() {
+        Scope scope = scope(endWorkflow());
+        workOrders.receive(command(scope));
+        assertThat(outboxWorker.runOnce()).isEqualTo(OutboxWorker.RunResult.PUBLISHED);
+        drainOutbox();
+        assertThat(taskWorker().runOnce()).isEqualTo(TaskExecutionWorker.RunResult.SUCCEEDED);
+
+        // 模拟任务完成前工单已被其他业务路径取消，验证 END 推进与履约必须保持同一事务边界。
+        jdbc.sql("UPDATE wo_work_order SET status = 'CANCELLED' WHERE tenant_id = :tenantId")
+                .param("tenantId", TENANT)
+                .update();
+        publishUntilAttempted("task.completed");
+
+        assertThat(jdbc.sql("SELECT status FROM rel_outbox_event WHERE event_type = 'task.completed'")
+                .query(String.class).single()).isEqualTo("FAILED");
+        assertThat(jdbc.sql("SELECT status FROM wfl_node_instance")
+                .query(String.class).single()).isEqualTo("ACTIVE");
+        assertThat(jdbc.sql("SELECT status FROM wfl_stage_instance")
+                .query(String.class).single()).isEqualTo("ACTIVE");
+        assertThat(jdbc.sql("SELECT status FROM wfl_workflow_instance")
+                .query(String.class).single()).isEqualTo("ACTIVE");
+        assertThat(jdbc.sql("SELECT status FROM wo_work_order")
+                .query(String.class).single()).isEqualTo("CANCELLED");
         assertThat(jdbc.sql("""
-                SELECT status FROM rel_outbox_event WHERE event_type = 'task.completed'
-                """).query(String.class).single()).isEqualTo("FAILED");
+                SELECT count(*) FROM rel_outbox_event
+                 WHERE event_type IN ('stage.completed', 'workflow.completed', 'workorder.fulfilled')
+                """).query(Long.class).single()).isZero();
         assertThat(jdbc.sql("""
                 SELECT count(*) FROM rel_inbox_record
                  WHERE consumer_name = 'workflow.task-completed.v1'
@@ -205,10 +265,11 @@ class WorkflowLinearProgressionPostgresIT {
                 .param("startsOn", LocalDate.now().minusDays(1))
                 .param("createdAt", OffsetDateTime.now())
                 .update();
-        String digest = Sha256.digest(workflowDefinition);
+        String normalizedDefinition = workflowDefinition.trim();
+        String digest = Sha256.digest(normalizedDefinition);
         UUID assetId = configurations.publishAsset(new PublishConfigurationAssetCommand(
                 TENANT, ConfigurationAssetType.WORKFLOW, "BYD-WORKFLOW-M18", "1.0.0", "1.0.0",
-                workflowDefinition, digest)).versionId();
+                normalizedDefinition, digest)).versionId();
         ConfigurationBundleReference bundle = configurations.publishBundle(
                 new PublishConfigurationBundleCommand(
                         TENANT, projectId, "BYD-WORKFLOW-M18-BUNDLE", "1.0.0", "BYD_OCEAN",
@@ -260,6 +321,20 @@ class WorkflowLinearProgressionPostgresIT {
                    {"transitionId":"t1","from":"START","to":"ASSIGN_COORDINATORS"},
                    {"transitionId":"t2","from":"ASSIGN_COORDINATORS","to":"INITIAL_REVIEW"}]}
                 """.formatted(nextStage);
+    }
+
+    private static String endWorkflow() {
+        return """
+                {"workflowKey":"byd.survey-install","semanticVersion":"1.0.0","startNodeId":"START",
+                 "nodes":[
+                   {"nodeId":"START","nodeType":"START","name":"开始"},
+                   {"nodeId":"ASSIGN_COORDINATORS","nodeType":"SERVICE_TASK","name":"分配跟进人",
+                    "stageCode":"INTAKE","taskType":"ASSIGN_COORDINATORS"},
+                   {"nodeId":"END","nodeType":"END","name":"结束"}],
+                 "transitions":[
+                   {"transitionId":"t1","from":"START","to":"ASSIGN_COORDINATORS"},
+                   {"transitionId":"t2","from":"ASSIGN_COORDINATORS","to":"END"}]}
+                """;
     }
 
     private record Scope(UUID projectId, ConfigurationBundleReference bundle) {

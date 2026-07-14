@@ -92,7 +92,7 @@ class ProjectCommandPostgresIT {
                             rel_outbox_publish_attempt, rel_outbox_event,
                             rel_inbox_record, rel_idempotency_record,
                             auth_role_field_policy, auth_role_grant,
-                            auth_role_capability, auth_role
+                            auth_role_capability, auth_role CASCADE
                         """)
                 .update();
         seedProjectCreateGrant("actor-test");
@@ -149,7 +149,7 @@ class ProjectCommandPostgresIT {
 
     @Test
     void repeatedMigrationIsNoOp() {
-        assertThat(flyway.info().applied().length).isEqualTo(20);
+        assertThat(flyway.info().applied().length).isEqualTo(21);
         assertThat(flyway.migrate().migrationsExecuted).isZero();
     }
 

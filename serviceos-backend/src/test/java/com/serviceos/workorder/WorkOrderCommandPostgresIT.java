@@ -7,7 +7,9 @@ import com.serviceos.configuration.api.ConfigurationService;
 import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
 import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
 import com.serviceos.shared.Sha256;
+import com.serviceos.workorder.api.ActivateWorkOrderCommand;
 import com.serviceos.workorder.api.ExternalWorkOrderConflictException;
+import com.serviceos.workorder.api.FulfillWorkOrderCommand;
 import com.serviceos.workorder.api.ReceiveExternalWorkOrderCommand;
 import com.serviceos.workorder.api.WorkOrderCommandService;
 import org.flywaydb.core.Flyway;
@@ -125,9 +127,50 @@ class WorkOrderCommandPostgresIT {
     }
 
     @Test
+    void fulfillmentIsIdempotentAndPublishesExactlyOneDomainEvent() {
+        Scope scope = scope("tenant-a", "PROJECT-A", "BUNDLE-A");
+        var received = workOrders.receive(command(scope, "e".repeat(64)));
+        UUID activationEventId = UUID.randomUUID();
+        workOrders.activate(new ActivateWorkOrderCommand(
+                scope.tenantId(), received.workOrderId(), activationEventId, "corr-activate"));
+
+        UUID workflowInstanceId = UUID.randomUUID();
+        FulfillWorkOrderCommand command = new FulfillWorkOrderCommand(
+                scope.tenantId(), received.workOrderId(), workflowInstanceId,
+                UUID.randomUUID(), "corr-fulfill", List.of("INTAKE", "REVIEW"));
+        var fulfilled = workOrders.fulfill(command);
+        var replay = workOrders.fulfill(command);
+
+        assertThat(fulfilled.replay()).isFalse();
+        assertThat(replay.replay()).isTrue();
+        assertThat(replay.workOrderId()).isEqualTo(fulfilled.workOrderId());
+        assertThat(replay.fulfilledAt()).isEqualTo(fulfilled.fulfilledAt());
+        assertThat(jdbc.sql("SELECT status FROM wo_work_order WHERE id = :id")
+                .param("id", received.workOrderId()).query(String.class).single()).isEqualTo("FULFILLED");
+        assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type = 'workorder.fulfilled'")
+                .query(Long.class).single()).isEqualTo(1);
+    }
+
+    @Test
+    void fulfillmentFailsClosedUnlessWorkOrderIsActive() {
+        Scope scope = scope("tenant-a", "PROJECT-A", "BUNDLE-A");
+        var received = workOrders.receive(command(scope, "f".repeat(64)));
+
+        assertThatThrownBy(() -> workOrders.fulfill(new FulfillWorkOrderCommand(
+                scope.tenantId(), received.workOrderId(), UUID.randomUUID(),
+                UUID.randomUUID(), "corr-invalid-fulfill", List.of("INTAKE"))))
+                .isInstanceOf(ExternalWorkOrderConflictException.class)
+                .hasMessageContaining("cannot be fulfilled from status RECEIVED");
+        assertThat(jdbc.sql("SELECT status FROM wo_work_order WHERE id = :id")
+                .param("id", received.workOrderId()).query(String.class).single()).isEqualTo("RECEIVED");
+        assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type = 'workorder.fulfilled'")
+                .query(Long.class).single()).isZero();
+    }
+
+    @Test
     void migrationSetIsCurrentAndRepeatable() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("018");
-        assertThat(flyway.info().applied()).hasSize(20);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("019");
+        assertThat(flyway.info().applied()).hasSize(21);
         assertThat(flyway.migrate().migrationsExecuted).isZero();
     }
 

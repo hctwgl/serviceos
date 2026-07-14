@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/stage-completed-v1.schema.json",
+  "title": "StageCompletedV1", "type": "object", "additionalProperties": false,
+  "required": ["eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId", "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"}, "eventType": {"const": "stage.completed"}, "schemaVersion": {"const": 1},
+    "tenantId": {"type": "string"}, "correlationId": {"type": "string"}, "causationId": {"type": "string"},
+    "aggregateType": {"const": "Stage"}, "aggregateId": {"type": "string", "format": "uuid"},
+    "aggregateVersion": {"type": "integer", "minimum": 2}, "occurredAt": {"type": "string", "format": "date-time"},
+    "payload": {"type": "object", "additionalProperties": false,
+      "required": ["stageInstanceId", "workflowInstanceId", "workOrderId", "stageCode", "sequenceNo", "completedAt"],
+      "properties": {
+        "stageInstanceId": {"type": "string", "format": "uuid"}, "workflowInstanceId": {"type": "string", "format": "uuid"},
+        "workOrderId": {"type": "string", "format": "uuid"}, "stageCode": {"type": "string"},
+        "sequenceNo": {"type": "integer", "minimum": 1}, "completedAt": {"type": "string", "format": "date-time"}
+      }}
+  }
+}

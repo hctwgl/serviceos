@@ -5,12 +5,16 @@ import com.serviceos.reliability.api.OutboxEvent;
 import com.serviceos.shared.Sha256;
 import com.serviceos.workorder.api.ActivateWorkOrderCommand;
 import com.serviceos.workorder.api.ExternalWorkOrderConflictException;
+import com.serviceos.workorder.api.FulfillWorkOrderCommand;
 import com.serviceos.workorder.api.ReceiveExternalWorkOrderCommand;
 import com.serviceos.workorder.api.WorkOrderActivatedPayload;
 import com.serviceos.workorder.api.WorkOrderActivationReceipt;
 import com.serviceos.workorder.api.WorkOrderCommandService;
+import com.serviceos.workorder.api.WorkOrderFulfilledPayload;
+import com.serviceos.workorder.api.WorkOrderFulfillmentReceipt;
 import com.serviceos.workorder.api.WorkOrderReceipt;
 import com.serviceos.workorder.api.WorkOrderReceivedPayload;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,12 +30,14 @@ import java.util.UUID;
 final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
     private static final String RECEIVED_EVENT = "workorder.received";
     private static final String ACTIVATED_EVENT = "workorder.activated";
+    private static final String FULFILLED_EVENT = "workorder.fulfilled";
 
     private final JdbcClient jdbc;
     private final OutboxAppender outbox;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
+    @Autowired
     JdbcWorkOrderCommandService(JdbcClient jdbc, OutboxAppender outbox, ObjectMapper objectMapper) {
         this(jdbc, outbox, objectMapper, Clock.systemUTC());
     }
@@ -151,6 +157,42 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
                 row.workOrderId(), row.status(), row.version(), false, row.activatedAt());
     }
 
+    @Override
+    @Transactional
+    public WorkOrderFulfillmentReceipt fulfill(FulfillWorkOrderCommand command) {
+        Instant fulfilledAt = clock.instant();
+        int updated = jdbc.sql("""
+                UPDATE wo_work_order
+                   SET status = 'FULFILLED', fulfilled_at = :fulfilledAt,
+                       version = version + 1
+                 WHERE tenant_id = :tenantId AND id = :workOrderId
+                   AND status = 'ACTIVE'
+                """)
+                .param("fulfilledAt", java.sql.Timestamp.from(fulfilledAt))
+                .param("tenantId", command.tenantId())
+                .param("workOrderId", command.workOrderId())
+                .update();
+
+        FulfillmentRow row = findFulfillment(command.tenantId(), command.workOrderId());
+        if (updated == 0) {
+            if (!"FULFILLED".equals(row.status())) {
+                throw new ExternalWorkOrderConflictException(
+                        "work order cannot be fulfilled from status " + row.status());
+            }
+            return new WorkOrderFulfillmentReceipt(
+                    row.workOrderId(), row.status(), row.version(), true, row.fulfilledAt());
+        }
+
+        WorkOrderFulfilledPayload payload = new WorkOrderFulfilledPayload(
+                row.workOrderId(), command.workflowInstanceId(),
+                command.completedStageCodes(), row.fulfilledAt());
+        appendEvent(
+                command.tenantId(), row.workOrderId(), row.version(), FULFILLED_EVENT,
+                command.correlationId(), command.triggerEventId().toString(), payload, fulfilledAt);
+        return new WorkOrderFulfillmentReceipt(
+                row.workOrderId(), row.status(), row.version(), false, row.fulfilledAt());
+    }
+
     private void appendReceivedEvent(
             UUID workOrderId,
             ReceiveExternalWorkOrderCommand command,
@@ -243,6 +285,23 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
                 .single();
     }
 
+    private FulfillmentRow findFulfillment(String tenantId, UUID workOrderId) {
+        return jdbc.sql("""
+                SELECT id, status, version, fulfilled_at
+                  FROM wo_work_order
+                 WHERE tenant_id = :tenantId AND id = :workOrderId
+                """)
+                .param("tenantId", tenantId)
+                .param("workOrderId", workOrderId)
+                .query((rs, rowNum) -> new FulfillmentRow(
+                        rs.getObject("id", UUID.class),
+                        rs.getString("status"),
+                        rs.getLong("version"),
+                        rs.getTimestamp("fulfilled_at") == null
+                                ? null : rs.getTimestamp("fulfilled_at").toInstant()))
+                .single();
+    }
+
     private static WorkOrderReceipt receipt(
             UUID id,
             ReceiveExternalWorkOrderCommand command,
@@ -274,6 +333,14 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
             String status,
             long version,
             Instant activatedAt
+    ) {
+    }
+
+    private record FulfillmentRow(
+            UUID workOrderId,
+            String status,
+            long version,
+            Instant fulfilledAt
     ) {
     }
 }
