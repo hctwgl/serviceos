@@ -141,3 +141,4 @@ Feature gate/authority: if applicable
 | M44 | ReviewCase 绑定 TASK_SUBMISSION Snapshot；只追加 APPROVED/REJECTED 决定 | OpenAPI 0.19.0 + Evidence PostgreSQL/MVC/Event Contract + V044 | CorrectionCase、强制通过、重开、车企回执 |
 | M45 | REJECTED 同事务创建 CorrectionCase；补传轮次只追加；RESUBMITTED→CLOSED | OpenAPI 0.20.0 + Evidence PostgreSQL/MVC/Event Contract + V045 | 整改 Task、IN_PROGRESS/WAIVED、强制通过、重开、车企回执 |
 | M46 | Evidence invalidate 同事务联动 StoredFile AVAILABLE→INVALIDATED；禁止下载授权 | OpenAPI 0.21.0 + Files/Evidence PostgreSQL IT + V046 | 物理删除、Retention、对象存储厂商切换 |
+| M47 | CorrectionCase 打开时自动创建 evidence.correction HUMAN Task；IN_PROGRESS 投影 | OpenAPI 0.22.0 + Evidence PostgreSQL IT + V047 | 自动指派、WAIVED、强制通过、重开、条件槽位 |

@@ -14,6 +14,7 @@ public record CorrectionCaseView(
         UUID sourceEvidenceSetSnapshotId,
         String sourceSnapshotContentDigest,
         List<String> reasonCodes,
+        UUID correctionTaskId,
         String status,
         String createdBy,
         Instant createdAt,

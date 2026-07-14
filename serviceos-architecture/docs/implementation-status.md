@@ -4,7 +4,7 @@ version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-14
 baselineCommit: 41dba014d6859debebb70e19fd4cab2d7f225007
-latestMilestone: M46
+latestMilestone: M47
 ---
 
 # ServiceOS 实施状态总览
@@ -39,13 +39,13 @@ latestMilestone: M46
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M46 files StoredFile 作废联动 |
+| 最新实施里程碑 | M47 CorrectionCase 整改 Task 自动创建 |
 | 基线提交 | `41dba014d6859debebb70e19fd4cab2d7f225007` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
 | 前端工程 | 尚未建立；已有 Admin、Network、Technician 产品与交互规格 |
-| 数据库 | PostgreSQL + Flyway（当前版本 046 / 48） |
-| 契约 | OpenAPI 0.21.0 + 事件 JSON Schema |
+| 数据库 | PostgreSQL + Flyway（当前版本 047 / 49） |
+| 契约 | OpenAPI 0.22.0 + 事件 JSON Schema |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -66,9 +66,9 @@ latestMilestone: M46
 | 预约 | 预约修订、联系终态动作 | `PARTIAL` | Revision、并发和终态动作基础 | 用户确认渠道、完整日程和跨端协作 | M30～M31 |
 | 现场作业 | Visit 生命周期 | `PARTIAL` | Visit 运行时基础 | GPS 策略、完整现场提交、离线同步和师傅端 | M32 |
 | 动态表单 | 资产、冻结版本、不可变提交和 Task 完成门禁 | `PARTIAL` | 固定 required、基础类型校验、精确版本提交和完成引用 | 条件表达式、复杂 validator、草稿、冲突、更正和审核 | M33～M35 |
-| 资料 Evidence | 资产、槽位、Item/Revision、机器校验、Snapshot、完成门禁、作废、Review、Correction | `PARTIAL` | 固定槽位、安全文件 Finalize/Invalidate 联动、确定性机器校验、TASK_SUBMISSION Snapshot、无 formRef 和 form+evidence 双引用完成、VALIDATED→INVALIDATED、ReviewCase APPROVED/REJECTED、CorrectionCase 补传关闭 | 条件槽位、OCR/CV、整改 Task | M36～M46 |
+| 资料 Evidence | 资产、槽位、Item/Revision、机器校验、Snapshot、完成门禁、作废、Review、Correction | `PARTIAL` | 固定槽位、安全文件 Finalize/Invalidate 联动、确定性机器校验、TASK_SUBMISSION Snapshot、完成门禁、作废、Review/Correction/整改 Task | 条件槽位、OCR/CV、强制通过/重开 | M36～M47 |
 | 安全文件 | Begin/Finalize/隔离/扫描/授权下载/作废 | `IMPLEMENTED` | 独立安全文件生命周期；Evidence 编排 Begin/Finalize/Invalidate 联动 | 正式对象存储、专业扫描服务、物理删除 | M11、M38、M46 |
-| 审核整改 | ReviewCase、ReviewDecision、CorrectionCase | `PARTIAL` | ReviewCase + REJECTED 自动 CorrectionCase；补传轮次只追加；RESUBMITTED→CLOSED | 整改 Task、强制通过、重开、车企回执、前端 | M44～M45 |
+| 审核整改 | ReviewCase、ReviewDecision、CorrectionCase | `PARTIAL` | Review + Correction + 整改 Task 自动创建与 IN_PROGRESS；补传轮次只追加 | 强制通过、重开、车企回执、自动指派、前端 | M44～M47 |
 | SLA | 时钟、预警、升级 | `PROPOSED` | 已有总体设计 | 完整运行时和验收尚未实施 | `architecture/12-*` |
 | 通知 | 通知与运营异常中心 | `PROPOSED` | 已有总体设计 | 通知通道、模板、可靠发送和 UI | `architecture/14-*` |
 | 履约事实与试算 | 事实提取和双向试算 | `PROPOSED` | 已有设计、API 和数据规划 | 运行时、投影和前端工作区 | M5 设计 |
@@ -97,7 +97,7 @@ latestMilestone: M46
 - 草稿、预填冲突和更正；
 - 表单审核闭环。
 
-### M36～M46：Evidence
+### M36～M47：Evidence
 
 已实现：
 
@@ -111,20 +111,21 @@ latestMilestone: M46
   的 `inputVersionRefs` 双引用完成，并同事务持久化（M43）；
 - ReviewCase 绑定 TASK_SUBMISSION Snapshot；只追加 APPROVED/REJECTED ReviewDecision（M44）；
 - REJECTED 同事务创建 CorrectionCase；补传轮次只追加；RESUBMITTED→CLOSED（M45）；
-- Evidence invalidate 同事务联动 StoredFile AVAILABLE→INVALIDATED（M46）。
+- Evidence invalidate 同事务联动 StoredFile AVAILABLE→INVALIDATED（M46）；
+- CorrectionCase 打开时自动创建 evidence.correction Task 并进入 IN_PROGRESS（M47）。
 
 未实现：
 
 - `requiredWhen` 条件解析和可审计重解析；
 - OCR / 图像 CV / GPS 权威距离；
-- 整改 Task 自动创建、强制通过、重开和车企回执。
+- 强制通过、重开、车企回执和整改候选人自动指派。
 
 ## 5. 下一实施方向
 
 在没有更新事实源或新批准决策的情况下，建议下一可靠纵向切片是：
 
 ```text
-M47 整改 Task 自动创建或条件槽位
+M48 条件槽位 requiredWhen 或强制通过/重开
 ```
 
 接手 Agent 必须先检查仓库是否已有更新的里程碑文档、ADR 或提交。

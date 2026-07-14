@@ -24,7 +24,7 @@
       "additionalProperties": false,
       "required": [
         "correctionCaseId", "sourceReviewCaseId", "sourceReviewDecisionId",
-        "sourceEvidenceSetSnapshotId", "taskId", "projectId", "reasonCodes", "createdAt"
+        "sourceEvidenceSetSnapshotId", "taskId", "projectId", "correctionTaskId", "reasonCodes", "createdAt"
       ],
       "properties": {
         "correctionCaseId": {"type": "string", "format": "uuid"},
@@ -33,6 +33,7 @@
         "sourceEvidenceSetSnapshotId": {"type": "string", "format": "uuid"},
         "taskId": {"type": "string", "format": "uuid"},
         "projectId": {"type": "string", "format": "uuid"},
+        "correctionTaskId": {"type": "string", "format": "uuid"},
         "reasonCodes": {
           "type": "array",
           "maxItems": 20,

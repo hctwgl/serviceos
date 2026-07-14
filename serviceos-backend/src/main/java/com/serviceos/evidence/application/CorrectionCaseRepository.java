@@ -11,6 +11,10 @@ import java.util.UUID;
 public interface CorrectionCaseRepository {
     void insertCase(String tenantId, CorrectionCaseView correctionCase);
 
+    int linkCorrectionTask(String tenantId, UUID correctionCaseId, UUID correctionTaskId);
+
+    int markInProgress(String tenantId, UUID correctionCaseId, String expectedStatus);
+
     void insertResubmission(String tenantId, UUID projectId, CorrectionResubmissionView resubmission);
 
     int markResubmitted(

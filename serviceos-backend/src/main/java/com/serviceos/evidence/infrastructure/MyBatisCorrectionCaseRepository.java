@@ -47,7 +47,21 @@ final class MyBatisCorrectionCaseRepository implements CorrectionCaseRepository 
                         ? null : correctionCase.latestResubmissionSnapshotId().toString());
         values.put("closedBy", correctionCase.closedBy());
         values.put("closedAt", correctionCase.closedAt());
+        values.put("correctionTaskId",
+                correctionCase.correctionTaskId() == null
+                        ? null : correctionCase.correctionTaskId().toString());
         mapper.insertCase(values);
+    }
+
+    @Override
+    public int linkCorrectionTask(String tenantId, UUID correctionCaseId, UUID correctionTaskId) {
+        return mapper.linkCorrectionTask(
+                tenantId, correctionCaseId.toString(), correctionTaskId.toString());
+    }
+
+    @Override
+    public int markInProgress(String tenantId, UUID correctionCaseId, String expectedStatus) {
+        return mapper.markInProgress(tenantId, correctionCaseId.toString(), expectedStatus);
     }
 
     @Override
@@ -125,7 +139,8 @@ final class MyBatisCorrectionCaseRepository implements CorrectionCaseRepository 
                 uuid(row, "correctionCaseId"), uuid(row, "projectId"), uuid(row, "taskId"),
                 uuid(row, "sourceReviewCaseId"), uuid(row, "sourceReviewDecisionId"),
                 uuid(row, "sourceEvidenceSetSnapshotId"), text(row, "sourceSnapshotContentDigest"),
-                readCodes(text(row, "reasonCodes")), text(row, "status"), text(row, "createdBy"),
+                readCodes(text(row, "reasonCodes")),
+                nullableUuid(row.get("correctionTaskId")), text(row, "status"), text(row, "createdBy"),
                 instant(row.get("createdAt")),
                 nullableUuid(row.get("latestResubmissionSnapshotId")),
                 nullableText(row.get("closedBy")), nullableInstant(row.get("closedAt")),

@@ -16,6 +16,9 @@ import com.serviceos.reliability.api.IdempotencyDecision;
 import com.serviceos.reliability.api.IdempotencyService;
 import com.serviceos.reliability.api.OutboxAppender;
 import com.serviceos.reliability.api.OutboxEvent;
+import com.serviceos.task.api.CreateHandlingTaskCommand;
+import com.serviceos.task.api.ScheduledTaskView;
+import com.serviceos.task.api.TaskSchedulingService;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.CommandContext;
 import com.serviceos.shared.CommandMetadata;
@@ -40,9 +43,11 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
     private static final String REVIEW = "evidence.review";
     private static final String RESUBMIT_OPERATION = "evidence.correction.resubmit";
     private static final String CLOSE_OPERATION = "evidence.correction.close";
+    private static final String CORRECTION_TASK_TYPE = "evidence.correction";
 
     private final CorrectionCaseRepository corrections;
     private final EvidenceSetSnapshotRepository snapshots;
+    private final TaskSchedulingService tasks;
     private final AuthorizationService authorization;
     private final IdempotencyService idempotency;
     private final AuditAppender audit;
@@ -53,6 +58,7 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
     DefaultCorrectionCaseService(
             CorrectionCaseRepository corrections,
             EvidenceSetSnapshotRepository snapshots,
+            TaskSchedulingService tasks,
             AuthorizationService authorization,
             IdempotencyService idempotency,
             AuditAppender audit,
@@ -62,6 +68,7 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
     ) {
         this.corrections = corrections;
         this.snapshots = snapshots;
+        this.tasks = tasks;
         this.authorization = authorization;
         this.idempotency = idempotency;
         this.audit = audit;
@@ -90,20 +97,43 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
         CorrectionCaseView created = new CorrectionCaseView(
                 correctionCaseId, projectId, taskId, reviewCaseId, reviewDecisionId,
                 evidenceSetSnapshotId, snapshotContentDigest, List.copyOf(reasonCodes),
-                "OPEN", actorId, now, null, null, null, List.of());
+                null, "OPEN", actorId, now, null, null, null, List.of());
         try {
             corrections.insertCase(tenantId, created);
         } catch (DuplicateKeyException exception) {
             return corrections.findBySourceDecision(tenantId, reviewDecisionId)
                     .flatMap(id -> corrections.find(tenantId, id))
+                    
                     .orElseThrow(() -> new BusinessProblem(
                             ProblemCode.CORRECTION_CASE_CONFLICT,
                             "CorrectionCase already exists for this ReviewDecision"));
         }
 
+        String payloadDigest = Sha256.digest(
+                correctionCaseId + "|" + reviewDecisionId + "|" + evidenceSetSnapshotId);
+        ScheduledTaskView correctionTask = tasks.createHandlingTask(new CreateHandlingTaskCommand(
+                tenantId, CORRECTION_TASK_TYPE, correctionCaseId.toString(),
+                "correction-case:" + correctionCaseId, payloadDigest,
+                800, now, correlationId));
+        int linked = corrections.linkCorrectionTask(
+                tenantId, correctionCaseId, correctionTask.taskId());
+        if (linked != 1) {
+            throw new BusinessProblem(ProblemCode.INTERNAL_ERROR,
+                    "Failed to link CorrectionCase to correction Task");
+        }
+        int progressed = corrections.markInProgress(tenantId, correctionCaseId, "OPEN");
+        String status = progressed == 1 ? "IN_PROGRESS" : "OPEN";
+        created = new CorrectionCaseView(
+                created.correctionCaseId(), created.projectId(), created.taskId(),
+                created.sourceReviewCaseId(), created.sourceReviewDecisionId(),
+                created.sourceEvidenceSetSnapshotId(), created.sourceSnapshotContentDigest(),
+                created.reasonCodes(), correctionTask.taskId(), status,
+                created.createdBy(), created.createdAt(), created.latestResubmissionSnapshotId(),
+                created.closedBy(), created.closedAt(), created.resubmissions());
+
         String payload = serialize(new CorrectionCreatedPayload(
                 correctionCaseId, reviewCaseId, reviewDecisionId, evidenceSetSnapshotId,
-                taskId, projectId, reasonCodes, now));
+                taskId, projectId, correctionTask.taskId(), reasonCodes, now));
         outbox.append(new OutboxEvent(
                 UUID.randomUUID(), UUID.randomUUID(), "evidence", "evidence.correction-case-created", 1,
                 "CorrectionCase", correctionCaseId.toString(), 1L,
@@ -112,7 +142,7 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
         audit.append(new AuditEntry(
                 UUID.randomUUID(), tenantId, actorId,
                 "CORRECTION_CASE_CREATED", REVIEW, "CorrectionCase", correctionCaseId.toString(),
-                "ALLOW", List.of(), "review-reject-v1", "OPEN", null,
+                "ALLOW", List.of(), "review-reject-v1", created.status(), null,
                 Sha256.digest(reviewDecisionId + "|" + evidenceSetSnapshotId), correlationId, now));
         return created;
     }
@@ -309,6 +339,7 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
             UUID sourceEvidenceSetSnapshotId,
             UUID taskId,
             UUID projectId,
+            UUID correctionTaskId,
             List<String> reasonCodes,
             Instant createdAt
     ) {

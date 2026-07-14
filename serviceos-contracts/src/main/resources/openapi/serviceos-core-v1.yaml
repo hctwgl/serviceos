@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.21.0
+  version: 0.22.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1761,7 +1761,8 @@ components:
           type: array
           maxItems: 20
           items: { type: string, minLength: 1, maxLength: 80 }
-        status: { type: string, enum: [OPEN, RESUBMITTED, CLOSED] }
+        correctionTaskId: { type: string, format: uuid, nullable: true }
+        status: { type: string, enum: [OPEN, IN_PROGRESS, RESUBMITTED, CLOSED] }
         createdBy: { type: string }
         createdAt: { type: string, format: date-time }
         latestResubmissionSnapshotId: { type: string, format: uuid, nullable: true }

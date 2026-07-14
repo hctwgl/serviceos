@@ -8,7 +8,8 @@ status: Accepted
 
 > M44 已实现 ReviewCase/ReviewDecision 最小运行时（见 `architecture/57-review-case-decision-runtime.md`）。
 > M45 已实现 CorrectionCase 最小运行时（见 `architecture/58-correction-case-runtime.md`）。
-> 强制通过、重开、车企回执、整改 Task 自动创建仍未实现；本章其余内容仍为指导设计。
+> M47 已实现整改 Task 自动创建（见 `architecture/60-correction-task-runtime.md`）。
+> 强制通过、重开、车企回执仍未实现；本章其余内容仍为指导设计。
 
 ## 1. 目标
 

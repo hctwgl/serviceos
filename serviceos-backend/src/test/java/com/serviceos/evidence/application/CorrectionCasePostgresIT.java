@@ -147,8 +147,19 @@ class CorrectionCasePostgresIT {
                  WHERE source_review_case_id = :review
                 """).param("review", review.reviewCaseId()).query(UUID.class).single();
         CorrectionCaseView opened = corrections.get(reviewer(), "corr-get", correctionId);
-        assertThat(opened.status()).isEqualTo("OPEN");
+        assertThat(opened.status()).isEqualTo("IN_PROGRESS");
+        assertThat(opened.correctionTaskId()).isNotNull();
         assertThat(opened.reasonCodes()).containsExactly("IMAGE.BLUR");
+        assertThat(jdbc.sql("""
+                SELECT task_type, task_kind, business_key, status
+                  FROM tsk_task WHERE task_id = :task
+                """).param("task", opened.correctionTaskId()).query().singleRow())
+                .satisfies(row -> {
+                    assertThat(row.get("task_type")).isEqualTo("evidence.correction");
+                    assertThat(row.get("task_kind")).isEqualTo("HUMAN");
+                    assertThat(row.get("business_key")).isEqualTo(correctionId.toString());
+                    assertThat(row.get("status")).isEqualTo("READY");
+                });
         assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type='evidence.correction-case-created'")
                 .query(Long.class).single()).isOne();
 

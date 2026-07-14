@@ -73,7 +73,8 @@ final class CorrectionCaseController {
                 correction.correctionCaseId(), correction.projectId(), correction.taskId(),
                 correction.sourceReviewCaseId(), correction.sourceReviewDecisionId(),
                 correction.sourceEvidenceSetSnapshotId(), correction.sourceSnapshotContentDigest(),
-                correction.reasonCodes(), correction.status(), correction.createdBy(),
+                correction.reasonCodes(), correction.correctionTaskId(), correction.status(),
+                correction.createdBy(),
                 correction.createdAt(), correction.latestResubmissionSnapshotId(),
                 correction.closedBy(), correction.closedAt(),
                 correction.resubmissions().stream().map(this::round).toList());
@@ -101,6 +102,7 @@ final class CorrectionCaseController {
             UUID sourceEvidenceSetSnapshotId,
             String sourceSnapshotContentDigest,
             List<String> reasonCodes,
+            UUID correctionTaskId,
             String status,
             String createdBy,
             Instant createdAt,

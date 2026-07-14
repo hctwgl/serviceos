@@ -9,14 +9,15 @@
             source_review_case_id, source_review_decision_id,
             source_evidence_set_snapshot_id, source_snapshot_content_digest,
             reason_codes, status, created_by, created_at,
-            latest_resubmission_snapshot_id, closed_by, closed_at)
+            latest_resubmission_snapshot_id, closed_by, closed_at, correction_task_id)
         VALUES (
             CAST(#{correctionCaseId} AS uuid), #{tenantId}, CAST(#{projectId} AS uuid),
             CAST(#{taskId} AS uuid), CAST(#{sourceReviewCaseId} AS uuid),
             CAST(#{sourceReviewDecisionId} AS uuid),
             CAST(#{sourceEvidenceSetSnapshotId} AS uuid), #{sourceSnapshotContentDigest},
             CAST(#{reasonCodes} AS jsonb), #{status}, #{createdBy}, #{createdAt},
-            CAST(#{latestResubmissionSnapshotId} AS uuid), #{closedBy}, #{closedAt})
+            CAST(#{latestResubmissionSnapshotId} AS uuid), #{closedBy}, #{closedAt},
+            CAST(#{correctionTaskId} AS uuid))
     </insert>
 
     <insert id="insertResubmission" parameterType="map">
@@ -30,6 +31,22 @@
             CAST(#{evidenceSetSnapshotId} AS uuid), #{snapshotContentDigest},
             #{submittedBy}, #{submittedAt})
     </insert>
+
+    <update id="linkCorrectionTask">
+        UPDATE evd_correction_case
+           SET correction_task_id = CAST(#{correctionTaskId} AS uuid)
+         WHERE tenant_id = #{tenantId}
+           AND correction_case_id = CAST(#{correctionCaseId} AS uuid)
+           AND correction_task_id IS NULL
+    </update>
+
+    <update id="markInProgress">
+        UPDATE evd_correction_case
+           SET status = 'IN_PROGRESS'
+         WHERE tenant_id = #{tenantId}
+           AND correction_case_id = CAST(#{correctionCaseId} AS uuid)
+           AND status = #{expectedStatus}
+    </update>
 
     <update id="markResubmitted">
         UPDATE evd_correction_case
@@ -54,7 +71,8 @@
                source_review_decision_id AS "sourceReviewDecisionId",
                source_evidence_set_snapshot_id AS "sourceEvidenceSetSnapshotId",
                source_snapshot_content_digest AS "sourceSnapshotContentDigest",
-               reason_codes::text AS "reasonCodes", status AS "status",
+               reason_codes::text AS "reasonCodes",
+               correction_task_id AS "correctionTaskId", status AS "status",
                created_by AS "createdBy", created_at AS "createdAt",
                latest_resubmission_snapshot_id AS "latestResubmissionSnapshotId",
                closed_by AS "closedBy", closed_at AS "closedAt"

@@ -10,6 +10,16 @@ import java.util.Map;
 interface CorrectionCaseMapper {
     void insertCase(Map<String, Object> values);
 
+    int linkCorrectionTask(
+            @Param("tenantId") String tenantId,
+            @Param("correctionCaseId") String correctionCaseId,
+            @Param("correctionTaskId") String correctionTaskId);
+
+    int markInProgress(
+            @Param("tenantId") String tenantId,
+            @Param("correctionCaseId") String correctionCaseId,
+            @Param("expectedStatus") String expectedStatus);
+
     void insertResubmission(Map<String, Object> values);
 
     int markResubmitted(

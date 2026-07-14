@@ -49,7 +49,7 @@ class CorrectionCaseControllerSecurityTest {
         when(principals.current()).thenReturn(principal);
         when(corrections.get(eq(principal), anyString(), eq(CASE_ID))).thenReturn(new CorrectionCaseView(
                 CASE_ID, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
-                UUID.randomUUID(), "a".repeat(64), List.of("IMAGE.BLUR"), "OPEN",
+                UUID.randomUUID(), "a".repeat(64), List.of("IMAGE.BLUR"), UUID.randomUUID(), "OPEN",
                 "reviewer-1", Instant.parse("2026-07-14T15:00:00Z"), null, null, null, List.of()));
 
         mvc.perform(get("/api/v1/correction-cases/{id}", CASE_ID)
