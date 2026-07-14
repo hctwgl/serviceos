@@ -25,3 +25,4 @@
 - [M22 TaskExecutionGuard 验收矩阵](19-m22-task-execution-guard-acceptance.md)
 - [M23 PREPARED TaskAssignment 验收矩阵](20-m23-prepared-task-assignment-acceptance.md)
 - [M24 ServiceAssignment 与容量权威验收矩阵](21-m24-service-assignment-capacity-acceptance.md)
+- [M25 Dispatch 与 Task 改派 Saga 验收矩阵](22-m25-dispatch-task-reassignment-saga-acceptance.md)

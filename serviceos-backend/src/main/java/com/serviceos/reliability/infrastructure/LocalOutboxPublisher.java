@@ -23,7 +23,11 @@ import java.util.Set;
         matchIfMissing = true)
 final class LocalOutboxPublisher implements OutboxPublisher {
     private static final Set<String> REQUIRED_LOCAL_DELIVERY = Set.of(
-            "workorder.received@v1", "task.completed@v1");
+            "workorder.received@v1", "task.completed@v1",
+            "service.assignment.pending-activation@v2",
+            "task.assignment-prepared@v1",
+            "service.assignment.activated@v2",
+            "task.assignment-activated@v1");
     private final List<OutboxMessageHandler> handlers;
 
     LocalOutboxPublisher(List<OutboxMessageHandler> handlers) {

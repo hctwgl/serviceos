@@ -1,0 +1,349 @@
+package com.serviceos.dispatch;
+
+import com.serviceos.ServiceOsApplication;
+import com.serviceos.dispatch.api.ActivateServiceAssignmentCommand;
+import com.serviceos.dispatch.api.CapacityAuthorityService;
+import com.serviceos.dispatch.api.CompleteServiceAssignmentActivationCommand;
+import com.serviceos.dispatch.api.ConfigureCapacityCommand;
+import com.serviceos.dispatch.api.ConfirmTaskAssignmentPreparedCommand;
+import com.serviceos.dispatch.api.PrepareServiceAssignmentCommand;
+import com.serviceos.dispatch.api.ResponsibilityLevel;
+import com.serviceos.dispatch.api.ServiceAssignmentReceipt;
+import com.serviceos.dispatch.api.ServiceAssignmentService;
+import com.serviceos.identity.api.CurrentPrincipal;
+import com.serviceos.reliability.application.OutboxWorker;
+import com.serviceos.shared.CommandMetadata;
+import com.serviceos.task.api.AssignTaskCandidatesCommand;
+import com.serviceos.task.api.AssignmentSourceType;
+import com.serviceos.task.api.ClaimHumanTaskCommand;
+import com.serviceos.task.api.CreateWorkflowTaskCommand;
+import com.serviceos.task.api.HumanTaskCommandService;
+import com.serviceos.task.api.TaskAssignmentService;
+import com.serviceos.task.api.TaskSchedulingService;
+import com.serviceos.task.api.WorkflowTaskKind;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/** M25：验证 Dispatch 与 Task 通过四段 Outbox/Inbox 事件完成师傅改派闭环。 */
+@Testcontainers(disabledWithoutDocker = true)
+@SpringBootTest(classes = ServiceOsApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE)
+class DispatchTaskReassignmentSagaPostgresIT {
+    private static final String TENANT = "tenant-dispatch-task-saga-it";
+    private static final String MANAGER = "dispatch-manager";
+    private static final String BUSINESS_TYPE = "SITE_SURVEY";
+
+    @Container
+    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(
+            DockerImageName.parse("postgres:18-alpine"))
+            .withDatabaseName("serviceos")
+            .withUsername("serviceos_test")
+            .withPassword("serviceos_test");
+
+    @org.springframework.test.context.DynamicPropertySource
+    static void properties(org.springframework.test.context.DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
+        registry.add("spring.datasource.username", POSTGRES::getUsername);
+        registry.add("spring.datasource.password", POSTGRES::getPassword);
+    }
+
+    @Autowired CapacityAuthorityService capacities;
+    @Autowired ServiceAssignmentService serviceAssignments;
+    @Autowired TaskSchedulingService tasks;
+    @Autowired TaskAssignmentService taskAssignments;
+    @Autowired HumanTaskCommandService humanTasks;
+    @Autowired OutboxWorker outboxWorker;
+    @Autowired JdbcClient jdbc;
+
+    @BeforeEach
+    void clean() {
+        jdbc.sql("""
+                DROP TRIGGER IF EXISTS trg_test_fail_m25_activation ON rel_outbox_event;
+                DROP FUNCTION IF EXISTS test_fail_m25_activation();
+                TRUNCATE TABLE dsp_assignment_command_result, dsp_capacity_command_result,
+                    dsp_service_assignment_activation_saga, dsp_capacity_reservation,
+                    dsp_service_assignment, dsp_capacity_counter,
+                    tsk_task_reassignment_command_result, tsk_task_execution_guard,
+                    tsk_task_assignment, tsk_task_assignment_batch,
+                    tsk_human_task_command_result, tsk_task_execution_attempt, tsk_task,
+                    aud_audit_record, rel_outbox_publish_attempt, rel_outbox_event,
+                    rel_inbox_record, rel_idempotency_record,
+                    auth_role_field_policy, auth_role_grant,
+                    auth_role_capability, auth_role CASCADE
+                """).update();
+        seedGrant(MANAGER, Set.of(
+                "dispatch.capacity.configure", "dispatch.assignment.manage",
+                "task.assign", "task.reassignment.manage"));
+        seedGrant("technician-a", Set.of("task.claim"));
+    }
+
+    @Test
+    void reliableInboxChainCompletesReassignmentAndAlignsBothAuthorities() {
+        Baseline baseline = baseline("normal");
+        ServiceAssignmentReceipt pending = prepareReliableReassignment(baseline, "normal");
+
+        drainOutbox();
+
+        assertCompletedAlignment(baseline, pending);
+        assertThat(jdbc.sql("""
+                SELECT consumer_name || ':' || status FROM rel_inbox_record
+                 WHERE consumer_name LIKE 'task.service-assignment-%'
+                    OR consumer_name LIKE 'dispatch.task-assignment-%'
+                 ORDER BY consumer_name
+                """).query(String.class).list())
+                .containsExactly(
+                        "dispatch.task-assignment-activated.v1:SUCCEEDED",
+                        "dispatch.task-assignment-prepared.v1:SUCCEEDED",
+                        "task.service-assignment-activated.v2:SUCCEEDED",
+                        "task.service-assignment-pending.v2:SUCCEEDED");
+    }
+
+    @Test
+    void dispatchActivationFailureRollsBackInboxThenRetriesForwardToCompletion() {
+        Baseline baseline = baseline("retry");
+        ServiceAssignmentReceipt pending = prepareReliableReassignment(baseline, "retry");
+        jdbc.sql("""
+                CREATE FUNCTION test_fail_m25_activation() RETURNS trigger LANGUAGE plpgsql AS $$
+                BEGIN
+                    IF NEW.event_type = 'service.assignment.activated' AND NEW.schema_version = 2 THEN
+                        RAISE EXCEPTION 'injected M25 activation failure';
+                    END IF;
+                    RETURN NEW;
+                END;
+                $$;
+                CREATE TRIGGER trg_test_fail_m25_activation
+                    BEFORE INSERT ON rel_outbox_event
+                    FOR EACH ROW EXECUTE FUNCTION test_fail_m25_activation();
+                """).update();
+
+        drainUntilFailure();
+
+        assertThat(jdbc.sql("""
+                SELECT stage || ':' || version FROM dsp_service_assignment_activation_saga
+                 WHERE activation_saga_id = :sagaId
+                """).param("sagaId", pending.sagaId()).query(String.class).single())
+                .isEqualTo("PENDING:1");
+        assertThat(jdbc.sql("""
+                SELECT status FROM dsp_service_assignment
+                 WHERE service_assignment_id = :assignmentId
+                """).param("assignmentId", pending.serviceAssignmentId()).query(String.class).single())
+                .isEqualTo("PENDING_ACTIVATION");
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM rel_inbox_record
+                 WHERE consumer_name = 'dispatch.task-assignment-prepared.v1'
+                """).query(Long.class).single()).isZero();
+        assertThat(jdbc.sql("""
+                SELECT status FROM tsk_task_assignment
+                 WHERE source_id = :assignmentId AND assignment_kind = 'RESPONSIBLE'
+                """).param("assignmentId", pending.serviceAssignmentId().toString())
+                .query(String.class).single()).isEqualTo("PREPARED");
+
+        jdbc.sql("""
+                DROP TRIGGER trg_test_fail_m25_activation ON rel_outbox_event;
+                DROP FUNCTION test_fail_m25_activation();
+                UPDATE rel_outbox_event
+                 SET status = 'PENDING', available_at = now(),
+                       claim_owner = NULL, claim_until = NULL
+                 WHERE event_type = 'task.assignment-prepared' AND status = 'FAILED'
+                """).update();
+        drainOutbox();
+
+        assertCompletedAlignment(baseline, pending);
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM rel_outbox_publish_attempt
+                 WHERE result_code = 'FAILED'
+                """).query(Long.class).single()).isEqualTo(1);
+    }
+
+    @Test
+    void revokedInitiatorAuthorizationFailsClosedBeforeTaskPreparation() {
+        Baseline baseline = baseline("revoked");
+        ServiceAssignmentReceipt pending = prepareReliableReassignment(baseline, "revoked");
+        jdbc.sql("""
+                UPDATE auth_role_grant SET valid_to = now() - interval '1 second'
+                 WHERE tenant_id = :tenantId AND principal_id = :principalId
+                """).param("tenantId", TENANT).param("principalId", MANAGER).update();
+
+        drainUntilFailure();
+
+        assertThat(jdbc.sql("""
+                SELECT stage || ':' || version FROM dsp_service_assignment_activation_saga
+                 WHERE activation_saga_id = :sagaId
+                """).param("sagaId", pending.sagaId()).query(String.class).single())
+                .isEqualTo("PENDING:1");
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM tsk_task_execution_guard
+                 WHERE guard_key = :sagaId
+                """).param("sagaId", pending.sagaId().toString()).query(Long.class).single())
+                .isZero();
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM rel_inbox_record
+                 WHERE consumer_name = 'task.service-assignment-pending.v2'
+                """).query(Long.class).single()).isZero();
+        assertThat(jdbc.sql("""
+                SELECT status FROM dsp_capacity_reservation
+                 WHERE service_assignment_id = :assignmentId
+                """).param("assignmentId", pending.serviceAssignmentId())
+                .query(String.class).single()).isEqualTo("HELD");
+    }
+
+    private Baseline baseline(String key) {
+        configure("technician-a", "capacity-a-" + key);
+        configure("technician-b", "capacity-b-" + key);
+        UUID workOrderId = UUID.randomUUID();
+        UUID taskId = tasks.createWorkflowTask(new CreateWorkflowTaskCommand(
+                TENANT, UUID.randomUUID(), workOrderId, UUID.randomUUID(), UUID.randomUUID(),
+                UUID.randomUUID(), "SITE_SURVEY", UUID.randomUUID(), "a".repeat(64),
+                BUSINESS_TYPE, WorkflowTaskKind.HUMAN, "work-order:m25-" + key, "b".repeat(64),
+                500, Instant.now(), 1, "corr-task-" + key, "cause-task-" + key)).taskId();
+        taskAssignments.assignCandidates(
+                manager(), metadata("assign-a-" + key),
+                new AssignTaskCandidatesCommand(taskId, 1, List.of("technician-a"),
+                        AssignmentSourceType.MANUAL, "manual://m25-initial"));
+        humanTasks.claim(
+                principal("technician-a", "task.claim"), metadata("claim-a-" + key),
+                new ClaimHumanTaskCommand(taskId, 2));
+
+        ServiceAssignmentReceipt pending = serviceAssignments.prepare(
+                manager(), metadata("service-a-prepare-" + key),
+                new PrepareServiceAssignmentCommand(
+                        UUID.randomUUID(), workOrderId, taskId, ResponsibilityLevel.TECHNICIAN,
+                        "technician-a", BUSINESS_TYPE, "decision://initial-a-" + key,
+                        null, null, 1));
+        UUID preparedId = UUID.randomUUID();
+        serviceAssignments.confirmTaskPrepared(
+                manager(), metadata("service-a-confirm-" + key),
+                new ConfirmTaskAssignmentPreparedCommand(
+                        pending.sagaId(), pending.serviceAssignmentId(), taskId,
+                        UUID.randomUUID(), preparedId, 1));
+        serviceAssignments.activate(
+                manager(), metadata("service-a-activate-" + key),
+                new ActivateServiceAssignmentCommand(
+                        pending.sagaId(), pending.serviceAssignmentId(), 2,
+                        "authority://a", 1, "fence://a", "policy-1"));
+        serviceAssignments.complete(
+                manager(), metadata("service-a-complete-" + key),
+                new CompleteServiceAssignmentActivationCommand(
+                        pending.sagaId(), pending.serviceAssignmentId(), preparedId, 3));
+        drainOutbox();
+        return new Baseline(workOrderId, taskId, pending.serviceAssignmentId());
+    }
+
+    private ServiceAssignmentReceipt prepareReliableReassignment(Baseline baseline, String key) {
+        return serviceAssignments.prepare(
+                manager(), metadata("service-b-prepare-" + key),
+                new PrepareServiceAssignmentCommand(
+                        UUID.randomUUID(), baseline.workOrderId(), baseline.taskId(),
+                        ResponsibilityLevel.TECHNICIAN, "technician-b", BUSINESS_TYPE,
+                        "decision://reassign-b-" + key, baseline.serviceAssignmentId(),
+                        "MANUAL_REASSIGNMENT", 1,
+                        "authority://b-" + key, 7,
+                        "fence://b-" + key, "policy-2026-07"));
+    }
+
+    private void assertCompletedAlignment(Baseline baseline, ServiceAssignmentReceipt pending) {
+        assertThat(jdbc.sql("""
+                SELECT stage || ':' || version FROM dsp_service_assignment_activation_saga
+                 WHERE activation_saga_id = :sagaId
+                """).param("sagaId", pending.sagaId()).query(String.class).single())
+                .isEqualTo("COMPLETED:4");
+        assertThat(jdbc.sql("""
+                SELECT assignee_id || ':' || status FROM dsp_service_assignment
+                 WHERE task_id = :taskId ORDER BY created_at
+                """).param("taskId", baseline.taskId()).query(String.class).list())
+                .containsExactly("technician-a:ENDED", "technician-b:ACTIVE");
+        assertThat(jdbc.sql("SELECT claimed_by FROM tsk_task WHERE task_id = :taskId")
+                .param("taskId", baseline.taskId()).query(String.class).single())
+                .isEqualTo("technician-b");
+        assertThat(jdbc.sql("""
+                SELECT principal_id || ':' || status FROM tsk_task_assignment
+                 WHERE task_id = :taskId AND assignment_kind = 'RESPONSIBLE'
+                 ORDER BY created_at
+                """).param("taskId", baseline.taskId()).query(String.class).list())
+                .containsExactly("technician-a:REVOKED", "technician-b:ACTIVE");
+        assertThat(jdbc.sql("""
+                SELECT status FROM tsk_task_execution_guard
+                 WHERE guard_key = :sagaId
+                """).param("sagaId", pending.sagaId().toString()).query(String.class).single())
+                .isEqualTo("RELEASED");
+    }
+
+    private void drainOutbox() {
+        for (int iteration = 0; iteration < 100; iteration++) {
+            OutboxWorker.RunResult result = outboxWorker.runOnce();
+            if (result == OutboxWorker.RunResult.EMPTY) return;
+            assertThat(result).isEqualTo(OutboxWorker.RunResult.PUBLISHED);
+        }
+        throw new AssertionError("M25 outbox chain did not drain");
+    }
+
+    private void drainUntilFailure() {
+        for (int iteration = 0; iteration < 100; iteration++) {
+            OutboxWorker.RunResult result = outboxWorker.runOnce();
+            if (result == OutboxWorker.RunResult.FAILED) return;
+            assertThat(result).isNotEqualTo(OutboxWorker.RunResult.EMPTY);
+        }
+        throw new AssertionError("injected M25 failure was not reached");
+    }
+
+    private void configure(String assigneeId, String key) {
+        capacities.configure(manager(), metadata(key), new ConfigureCapacityCommand(
+                ResponsibilityLevel.TECHNICIAN, assigneeId, BUSINESS_TYPE, 1, 0));
+    }
+
+    private void seedGrant(String actorId, Set<String> capabilities) {
+        UUID roleId = UUID.randomUUID();
+        jdbc.sql("""
+                INSERT INTO auth_role (role_id, tenant_id, role_code, role_name, role_status, created_at)
+                VALUES (:roleId, :tenantId, :roleCode, 'M25 测试角色', 'ACTIVE', now())
+                """).param("roleId", roleId).param("tenantId", TENANT)
+                .param("roleCode", "m25-" + actorId).update();
+        for (String capability : capabilities) {
+            jdbc.sql("""
+                    INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
+                    VALUES (:roleId, :capability, now())
+                    """).param("roleId", roleId).param("capability", capability).update();
+        }
+        jdbc.sql("""
+                INSERT INTO auth_role_grant (
+                    grant_id, tenant_id, principal_id, role_id, scope_type, scope_ref,
+                    valid_from, source_code, approval_ref, created_at
+                ) VALUES (
+                    :grantId, :tenantId, :actorId, :roleId, 'TENANT', :tenantId,
+                    now() - interval '1 day', 'TEST_FIXTURE', 'M25-TEST', now()
+                )
+                """).param("grantId", UUID.randomUUID()).param("tenantId", TENANT)
+                .param("actorId", actorId).param("roleId", roleId).update();
+    }
+
+    private static CurrentPrincipal manager() {
+        return principal(MANAGER,
+                "dispatch.capacity.configure", "dispatch.assignment.manage",
+                "task.assign", "task.reassignment.manage");
+    }
+
+    private static CurrentPrincipal principal(String actorId, String... capabilities) {
+        return new CurrentPrincipal(actorId, TENANT, CurrentPrincipal.PrincipalType.USER,
+                "m25-it", Set.of(capabilities));
+    }
+
+    private static CommandMetadata metadata(String key) {
+        return new CommandMetadata("corr-" + key, key);
+    }
+
+    private record Baseline(UUID workOrderId, UUID taskId, UUID serviceAssignmentId) {
+    }
+}

@@ -14,7 +14,11 @@ public record PrepareServiceAssignmentCommand(
         String sourceDecisionId,
         UUID supersedesServiceAssignmentId,
         String reasonCode,
-        long expectedCapacityVersion
+        long expectedCapacityVersion,
+        String authorityAssignmentId,
+        long authorityVersion,
+        String fenceDecisionId,
+        String fencePolicyVersion
 ) {
     public PrepareServiceAssignmentCommand {
         sagaId = Objects.requireNonNull(sagaId, "sagaId");
@@ -34,6 +38,35 @@ public record PrepareServiceAssignmentCommand(
         if (expectedCapacityVersion < 1) {
             throw new IllegalArgumentException("expectedCapacityVersion must be positive");
         }
+        boolean hasAuthorityProof = authorityAssignmentId != null || authorityVersion != 0
+                || fenceDecisionId != null || fencePolicyVersion != null;
+        if (hasAuthorityProof) {
+            authorityAssignmentId = text(authorityAssignmentId, "authorityAssignmentId", 160);
+            if (authorityVersion < 1) {
+                throw new IllegalArgumentException("authorityVersion must be positive");
+            }
+            fenceDecisionId = text(fenceDecisionId, "fenceDecisionId", 160);
+            fencePolicyVersion = text(fencePolicyVersion, "fencePolicyVersion", 160);
+            if (supersedesServiceAssignmentId == null) {
+                throw new IllegalArgumentException("v2 activation proof is only supported for reassignment");
+            }
+        }
+    }
+
+    /** M24 兼容构造器：由调用方显式执行后续握手，不启用 M25 Inbox 协议。 */
+    public PrepareServiceAssignmentCommand(
+            UUID sagaId, UUID workOrderId, UUID taskId,
+            ResponsibilityLevel responsibilityLevel, String assigneeId, String businessType,
+            String sourceDecisionId, UUID supersedesServiceAssignmentId, String reasonCode,
+            long expectedCapacityVersion
+    ) {
+        this(sagaId, workOrderId, taskId, responsibilityLevel, assigneeId, businessType,
+                sourceDecisionId, supersedesServiceAssignmentId, reasonCode, expectedCapacityVersion,
+                null, 0, null, null);
+    }
+
+    public boolean usesReliableReassignmentProtocol() {
+        return authorityAssignmentId != null;
     }
 
     private static String text(String value, String name, int max) {

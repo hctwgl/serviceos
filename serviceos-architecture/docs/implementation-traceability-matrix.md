@@ -119,3 +119,4 @@ Feature gate/authority: if applicable
 | M22 | REASSIGNMENT TaskExecutionGuard、精确解除、人工命令与候选替换失败关闭 | Event Schema + TaskExecutionGuard/TaskAssignment/HumanTask PostgreSQL IT + V022 | PREPARED TaskAssignment、ServiceAssignment/容量/改派 saga、超时补偿、SLA、离线撤权、完整勘安链路 |
 | M23 | guard + PREPARED 责任原子准备、激活切换、切换前 abort | Event Schema + TaskReassignment/HumanTask PostgreSQL IT + V023 | Dispatch/ServiceAssignment/容量、跨模块 Inbox saga、切换后补偿、SLA、完整勘安链路 |
 | M24 | ServiceAssignment、容量预留、切换前 abort 与本地激活 saga | Event Schema + DispatchServiceAssignment PostgreSQL IT + V024 | 跨模块 Inbox saga、派单策略、切换后补偿、SLA、完整勘安链路 |
+| M25 | Dispatch/Task 四段 Inbox 改派握手、实时授权复核、失败后向前重试 | Event Schema + DispatchTaskReassignmentSaga PostgreSQL IT + V025 | 初派握手、Network 双级派单、策略、自动 abort/补偿、SLA、完整勘安链路 |

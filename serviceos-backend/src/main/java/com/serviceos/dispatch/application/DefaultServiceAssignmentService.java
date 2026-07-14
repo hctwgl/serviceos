@@ -11,6 +11,7 @@ import com.serviceos.dispatch.api.CompleteServiceAssignmentActivationCommand;
 import com.serviceos.dispatch.api.ConfirmTaskAssignmentPreparedCommand;
 import com.serviceos.dispatch.api.PrepareServiceAssignmentCommand;
 import com.serviceos.dispatch.api.ServiceAssignmentChangedPayload;
+import com.serviceos.dispatch.api.ServiceAssignmentHandshakePayload;
 import com.serviceos.dispatch.api.ServiceAssignmentReceipt;
 import com.serviceos.dispatch.api.ServiceAssignmentService;
 import com.serviceos.identity.api.CurrentPrincipal;
@@ -88,7 +89,9 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
                 + command.taskId() + "|" + command.responsibilityLevel() + "|"
                 + command.assigneeId() + "|" + command.businessType() + "|"
                 + command.sourceDecisionId() + "|" + command.supersedesServiceAssignmentId()
-                + "|" + command.reasonCode() + "|" + command.expectedCapacityVersion());
+                + "|" + command.reasonCode() + "|" + command.expectedCapacityVersion()
+                + "|" + command.authorityAssignmentId() + "|" + command.authorityVersion()
+                + "|" + command.fenceDecisionId() + "|" + command.fencePolicyVersion());
         AuthorizationDecision authorizationDecision = authorize(principal, context, command.taskId());
         IdempotencyDecision decision = idempotency.begin(context, PREPARE, digest);
         if (decision.kind() == IdempotencyDecision.Kind.REPLAY) {
@@ -105,12 +108,17 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
                             service_assignment_id, tenant_id, work_order_id, task_id,
                             responsibility_level, assignee_id, business_type, source_decision_id,
                             status, activation_saga_id, supersedes_service_assignment_id,
-                            reassignment_reason_code, created_by, created_at
+                            reassignment_reason_code, created_by, created_at,
+                            activation_protocol_version, pending_authority_assignment_id,
+                            pending_authority_version, pending_fence_decision_id,
+                            pending_fence_policy_version
                         ) VALUES (
                             :assignmentId, :tenantId, :workOrderId, :taskId,
                             :level, :assigneeId, :businessType, :decisionId,
                             'PENDING_ACTIVATION', :sagaId, :supersedesId,
-                            :reasonCode, :actorId, :now
+                            :reasonCode, :actorId, :now,
+                            :protocolVersion, :authorityAssignmentId,
+                            :authorityVersion, :fenceDecisionId, :fencePolicyVersion
                         )
                         """)
                 .param("assignmentId", assignmentId).param("tenantId", context.tenantId())
@@ -120,6 +128,11 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
                 .param("decisionId", command.sourceDecisionId()).param("sagaId", command.sagaId())
                 .param("supersedesId", command.supersedesServiceAssignmentId())
                 .param("reasonCode", command.reasonCode()).param("actorId", context.actorId())
+                .param("protocolVersion", command.usesReliableReassignmentProtocol() ? 2 : 1)
+                .param("authorityAssignmentId", command.authorityAssignmentId())
+                .param("authorityVersion", command.authorityVersion() == 0 ? null : command.authorityVersion())
+                .param("fenceDecisionId", command.fenceDecisionId())
+                .param("fencePolicyVersion", command.fencePolicyVersion())
                 .param("now", timestamptz(now)).update();
         jdbc.sql("""
                         INSERT INTO dsp_capacity_reservation (
@@ -587,6 +600,12 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
                                assignment.supersedes_service_assignment_id,
                                assignment.task_execution_guard_id AS guard_id,
                                assignment.prepared_task_assignment_id,
+                               assignment.created_by,
+                               assignment.activation_protocol_version AS protocol_version,
+                               assignment.pending_authority_assignment_id,
+                               assignment.pending_authority_version,
+                               assignment.pending_fence_decision_id,
+                               assignment.pending_fence_policy_version,
                                reservation.capacity_reservation_id,
                                reservation.capacity_counter_id, reservation.units AS reservation_units
                           FROM dsp_service_assignment assignment
@@ -698,15 +717,25 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
             String reasonCode
     ) {
         AssignmentState state = assignment(context.tenantId(), receipt.serviceAssignmentId());
-        ServiceAssignmentChangedPayload payload = new ServiceAssignmentChangedPayload(
-                state.serviceAssignmentId(), state.sagaId(), state.workOrderId(), state.taskId(),
-                state.responsibilityLevel(), state.assigneeId(), state.businessType(),
-                receipt.assignmentStatus(), state.supersedesServiceAssignmentId(),
-                state.capacityReservationId(), state.guardId(), state.preparedTaskAssignmentId(),
-                reasonCode, receipt.occurredAt());
+        boolean handshakeEvent = state.protocolVersion() == 2
+                && ("service.assignment.pending-activation".equals(eventType)
+                || "service.assignment.activated".equals(eventType));
+        Object payload = handshakeEvent
+                ? new ServiceAssignmentHandshakePayload(
+                        state.serviceAssignmentId(), state.sagaId(), state.workOrderId(), state.taskId(),
+                        state.responsibilityLevel(), state.assigneeId(), state.businessType(),
+                        receipt.assignmentStatus(), state.supersedesServiceAssignmentId(),
+                        state.capacityReservationId(), state.guardId(), state.preparedTaskAssignmentId(),
+                        reasonCode, state.createdBy(), state.protocolVersion(), receipt.occurredAt())
+                : new ServiceAssignmentChangedPayload(
+                        state.serviceAssignmentId(), state.sagaId(), state.workOrderId(), state.taskId(),
+                        state.responsibilityLevel(), state.assigneeId(), state.businessType(),
+                        receipt.assignmentStatus(), state.supersedesServiceAssignmentId(),
+                        state.capacityReservationId(), state.guardId(), state.preparedTaskAssignmentId(),
+                        reasonCode, receipt.occurredAt());
         String json = serialize(payload);
         outbox.append(new OutboxEvent(
-                UUID.randomUUID(), UUID.randomUUID(), "dispatch", eventType, 1,
+                UUID.randomUUID(), UUID.randomUUID(), "dispatch", eventType, handshakeEvent ? 2 : 1,
                 "ServiceAssignment", receipt.serviceAssignmentId().toString(),
                 receipt.sagaVersion(), context.tenantId(), context.correlationId(),
                 context.idempotencyKey(), state.taskId().toString(), json,
@@ -750,6 +779,12 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
             UUID supersedesServiceAssignmentId,
             UUID guardId,
             UUID preparedTaskAssignmentId,
+            String createdBy,
+            int protocolVersion,
+            String pendingAuthorityAssignmentId,
+            Long pendingAuthorityVersion,
+            String pendingFenceDecisionId,
+            String pendingFencePolicyVersion,
             UUID capacityReservationId,
             UUID capacityCounterId,
             int reservationUnits
