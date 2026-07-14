@@ -7,6 +7,7 @@ import com.serviceos.shared.CommandMetadata;
 import com.serviceos.task.api.ClaimHumanTaskCommand;
 import com.serviceos.task.api.HumanTaskCommandReceipt;
 import com.serviceos.task.api.HumanTaskCommandService;
+import com.serviceos.task.api.ReleaseHumanTaskCommand;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -86,5 +87,34 @@ class HumanTaskControllerSecurityTest {
                         .header("If-Match", "1"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    void releaseUsesTrustedPrincipalVersionAndStableReasonCode() throws Exception {
+        CurrentPrincipal principal = new CurrentPrincipal(
+                "actor-trusted", "tenant-trusted", CurrentPrincipal.PrincipalType.USER,
+                "admin-web", Set.of("task.release"));
+        HumanTaskCommandReceipt receipt = new HumanTaskCommandReceipt(
+                TASK_ID, "READY", "actor-trusted", 4,
+                Instant.parse("2026-07-14T04:30:00Z"));
+        when(principals.current()).thenReturn(principal);
+        when(commands.release(eq(principal), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any())).thenReturn(receipt);
+
+        mvc.perform(post("/api/v1/tasks/{taskId}:release", TASK_ID)
+                        .with(jwt().jwt(token -> token.subject("actor-trusted")
+                                .claim("tenant_id", "tenant-trusted")))
+                        .header("Idempotency-Key", "release-1")
+                        .header("If-Match", "\"3\"")
+                        .contentType("application/json")
+                        .content("{\"reasonCode\":\"CUSTOMER_RESCHEDULE\"}"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("ETag", "\"4\""));
+
+        verify(commands).release(
+                eq(principal), org.mockito.ArgumentMatchers.any(),
+                argThat((ReleaseHumanTaskCommand command) ->
+                        command.expectedVersion() == 3
+                                && command.reasonCode().equals("CUSTOMER_RESCHEDULE")));
     }
 }

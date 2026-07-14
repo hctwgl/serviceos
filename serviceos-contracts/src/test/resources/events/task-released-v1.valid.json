@@ -1,0 +1,7 @@
+{
+  "eventId": "51111111-1111-4111-8111-111111111111", "eventType": "task.released", "schemaVersion": 1,
+  "tenantId": "tenant-byd", "correlationId": "corr-m21-release", "causationId": "idem-m21-release",
+  "aggregateType": "Task", "aggregateId": "58888888-8888-4888-8888-888888888888", "aggregateVersion": 4,
+  "occurredAt": "2026-07-14T04:30:00Z",
+  "payload": {"taskId": "58888888-8888-4888-8888-888888888888", "actorId": "technician-001", "reasonCode": "CUSTOMER_RESCHEDULE", "releasedAt": "2026-07-14T04:30:00Z"}
+}

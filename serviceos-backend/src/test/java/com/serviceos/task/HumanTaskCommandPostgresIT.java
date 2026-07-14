@@ -7,11 +7,14 @@ import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.shared.Sha256;
 import com.serviceos.task.api.ClaimHumanTaskCommand;
+import com.serviceos.task.api.AssignTaskCandidatesCommand;
+import com.serviceos.task.api.AssignmentSourceType;
 import com.serviceos.task.api.CompleteHumanTaskCommand;
 import com.serviceos.task.api.CreateWorkflowTaskCommand;
 import com.serviceos.task.api.HumanTaskCommandService;
 import com.serviceos.task.api.StartHumanTaskCommand;
 import com.serviceos.task.api.TaskSchedulingService;
+import com.serviceos.task.api.TaskAssignmentService;
 import com.serviceos.task.api.WorkflowTaskKind;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,6 +56,7 @@ class HumanTaskCommandPostgresIT {
     }
 
     @Autowired HumanTaskCommandService commands;
+    @Autowired TaskAssignmentService assignments;
     @Autowired TaskSchedulingService tasks;
     @Autowired JdbcClient jdbc;
     @Autowired Flyway flyway;
@@ -62,7 +66,8 @@ class HumanTaskCommandPostgresIT {
         jdbc.sql("""
                 DROP TRIGGER IF EXISTS trg_test_fail_task_completed ON rel_outbox_event;
                 DROP FUNCTION IF EXISTS test_fail_task_completed();
-                TRUNCATE TABLE tsk_human_task_command_result, tsk_task_execution_attempt, tsk_task,
+                TRUNCATE TABLE tsk_task_assignment, tsk_task_assignment_batch,
+                    tsk_human_task_command_result, tsk_task_execution_attempt, tsk_task,
                     aud_audit_record, rel_outbox_publish_attempt, rel_outbox_event,
                     rel_idempotency_record, auth_role_field_policy,
                     auth_role_grant, auth_role_capability, auth_role CASCADE;
@@ -77,75 +82,79 @@ class HumanTaskCommandPostgresIT {
         CurrentPrincipal actor = principal("actor-a");
         CommandMetadata claimMetadata = metadata("claim-001");
 
-        var claimed = commands.claim(actor, claimMetadata, new ClaimHumanTaskCommand(taskId, 1));
+        var claimed = commands.claim(actor, claimMetadata, new ClaimHumanTaskCommand(taskId, 2));
         var claimReplayBeforeStart = commands.claim(
-                actor, claimMetadata, new ClaimHumanTaskCommand(taskId, 1));
+                actor, claimMetadata, new ClaimHumanTaskCommand(taskId, 2));
         var started = commands.start(
-                actor, metadata("start-001"), new StartHumanTaskCommand(taskId, 2));
+                actor, metadata("start-001"), new StartHumanTaskCommand(taskId, 3));
         var claimReplayAfterStart = commands.claim(
-                actor, claimMetadata, new ClaimHumanTaskCommand(taskId, 1));
+                actor, claimMetadata, new ClaimHumanTaskCommand(taskId, 2));
         var completed = commands.complete(
                 actor, metadata("complete-001"),
                 new CompleteHumanTaskCommand(
-                        taskId, 3, "form-submission://SUB-001/3", "d".repeat(64)));
+                        taskId, 4, "form-submission://SUB-001/3", "d".repeat(64)));
         var completeReplay = commands.complete(
                 actor, metadata("complete-001"),
                 new CompleteHumanTaskCommand(
-                        taskId, 3, "form-submission://SUB-001/3", "d".repeat(64)));
+                        taskId, 4, "form-submission://SUB-001/3", "d".repeat(64)));
 
         assertThat(claimReplayBeforeStart).isEqualTo(claimed);
         assertThat(claimReplayAfterStart).isEqualTo(claimed);
         assertThat(completeReplay).isEqualTo(completed);
         assertThat(started.status()).isEqualTo("RUNNING");
         assertThat(completed.status()).isEqualTo("COMPLETED");
-        assertThat(completed.version()).isEqualTo(4);
+        assertThat(completed.version()).isEqualTo(5);
         assertThat(jdbc.sql("""
                 SELECT status || ':' || claimed_by || ':' || version FROM tsk_task WHERE task_id = :taskId
                 """).param("taskId", taskId).query(String.class).single())
-                .isEqualTo("COMPLETED:actor-a:4");
+                .isEqualTo("COMPLETED:actor-a:5");
         assertThat(jdbc.sql("SELECT result_digest FROM tsk_task WHERE task_id = :taskId")
                 .param("taskId", taskId).query(String.class).single()).isEqualTo("d".repeat(64));
         assertThat(jdbc.sql("SELECT event_type FROM rel_outbox_event ORDER BY aggregate_version")
                 .query(String.class).list())
-                .containsExactly("task.created", "task.claimed", "task.started", "task.completed");
-        assertThat(count("aud_audit_record")).isEqualTo(3);
-        assertThat(count("rel_idempotency_record")).isEqualTo(3);
+                .containsExactly("task.created", "task.assigned", "task.claimed", "task.started", "task.completed");
+        assertThat(count("aud_audit_record")).isEqualTo(4);
+        assertThat(count("rel_idempotency_record")).isEqualTo(4);
         assertThat(count("tsk_human_task_command_result")).isEqualTo(3);
         assertThat(count("tsk_task_execution_attempt")).isZero();
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM tsk_task_assignment
+                 WHERE task_id = :taskId AND status = 'ACTIVE'
+                """).param("taskId", taskId).query(Long.class).single()).isZero();
     }
 
     @Test
     void staleVersionWrongOwnerAndIdempotencyMutationFailClosed() {
         UUID taskId = workflowHumanTask();
         CurrentPrincipal actorA = principal("actor-a");
-        commands.claim(actorA, metadata("claim-002"), new ClaimHumanTaskCommand(taskId, 1));
+        commands.claim(actorA, metadata("claim-002"), new ClaimHumanTaskCommand(taskId, 2));
 
         assertThatThrownBy(() -> commands.claim(
-                actorA, metadata("claim-stale"), new ClaimHumanTaskCommand(taskId, 1)))
+                actorA, metadata("claim-stale"), new ClaimHumanTaskCommand(taskId, 2)))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VERSION_CONFLICT));
         assertThatThrownBy(() -> commands.start(
                 principal("actor-b"), metadata("start-wrong-owner"),
-                new StartHumanTaskCommand(taskId, 2)))
+                new StartHumanTaskCommand(taskId, 3)))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.TASK_STATE_CONFLICT));
         assertThatThrownBy(() -> commands.claim(
-                actorA, metadata("claim-002"), new ClaimHumanTaskCommand(taskId, 2)))
+                actorA, metadata("claim-002"), new ClaimHumanTaskCommand(taskId, 3)))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.IDEMPOTENCY_KEY_REUSED));
 
         assertThat(jdbc.sql("SELECT status FROM tsk_task WHERE task_id = :taskId")
                 .param("taskId", taskId).query(String.class).single()).isEqualTo("CLAIMED");
-        assertThat(count("aud_audit_record")).isEqualTo(1);
-        assertThat(count("rel_idempotency_record")).isEqualTo(1);
+        assertThat(count("aud_audit_record")).isEqualTo(2);
+        assertThat(count("rel_idempotency_record")).isEqualTo(2);
     }
 
     @Test
     void completionOutboxFailureRollsBackTaskAuditIdempotencyAndFrozenReceipt() {
         UUID taskId = workflowHumanTask();
         CurrentPrincipal actor = principal("actor-a");
-        commands.claim(actor, metadata("claim-003"), new ClaimHumanTaskCommand(taskId, 1));
-        commands.start(actor, metadata("start-003"), new StartHumanTaskCommand(taskId, 2));
+        commands.claim(actor, metadata("claim-003"), new ClaimHumanTaskCommand(taskId, 2));
+        commands.start(actor, metadata("start-003"), new StartHumanTaskCommand(taskId, 3));
         jdbc.sql("""
                 CREATE FUNCTION test_fail_task_completed() RETURNS trigger LANGUAGE plpgsql AS $$
                 BEGIN
@@ -162,22 +171,22 @@ class HumanTaskCommandPostgresIT {
 
         assertThatThrownBy(() -> commands.complete(
                 actor, metadata("complete-rollback"),
-                new CompleteHumanTaskCommand(taskId, 3, "result://rollback", "e".repeat(64))))
+                new CompleteHumanTaskCommand(taskId, 4, "result://rollback", "e".repeat(64))))
                 .isInstanceOf(DataAccessException.class);
 
         assertThat(jdbc.sql("SELECT status || ':' || version FROM tsk_task WHERE task_id = :taskId")
-                .param("taskId", taskId).query(String.class).single()).isEqualTo("RUNNING:3");
+                .param("taskId", taskId).query(String.class).single()).isEqualTo("RUNNING:4");
         assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type = 'task.completed'")
                 .query(Long.class).single()).isZero();
-        assertThat(count("aud_audit_record")).isEqualTo(2);
-        assertThat(count("rel_idempotency_record")).isEqualTo(2);
+        assertThat(count("aud_audit_record")).isEqualTo(3);
+        assertThat(count("rel_idempotency_record")).isEqualTo(3);
         assertThat(count("tsk_human_task_command_result")).isEqualTo(2);
     }
 
     @Test
     void migrationSetIsCurrentAndRepeatable() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("020");
-        assertThat(flyway.info().applied()).hasSize(22);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("021");
+        assertThat(flyway.info().applied()).hasSize(23);
         assertThat(flyway.migrate().migrationsExecuted).isZero();
     }
 
@@ -187,6 +196,11 @@ class HumanTaskCommandPostgresIT {
                 UUID.randomUUID(), "SITE_SURVEY", UUID.randomUUID(), "a".repeat(64),
                 "SITE_SURVEY", WorkflowTaskKind.HUMAN, "work-order:test", "b".repeat(64),
                 500, Instant.now(), 1, "corr-task-create", "cause-task-create")).taskId();
+        assignments.assignCandidates(
+                principal("actor-a"), metadata("assign-" + taskId),
+                new AssignTaskCandidatesCommand(
+                        taskId, 1, java.util.List.of("actor-a", "actor-b"),
+                        AssignmentSourceType.ASSIGNEE_POLICY, "policy://m21/test"));
         return taskId;
     }
 
@@ -197,7 +211,8 @@ class HumanTaskCommandPostgresIT {
                 VALUES (:roleId, :tenantId, :roleCode, '人工任务执行人', 'ACTIVE', now())
                 """).param("roleId", roleId).param("tenantId", TENANT)
                 .param("roleCode", "human-worker-" + actorId).update();
-        for (String capability : Set.of("task.claim", "task.start", "task.complete")) {
+        for (String capability : Set.of(
+                "task.assign", "task.claim", "task.start", "task.complete", "task.release")) {
             jdbc.sql("""
                     INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
                     VALUES (:roleId, :capability, now())
@@ -218,7 +233,7 @@ class HumanTaskCommandPostgresIT {
     private static CurrentPrincipal principal(String actorId) {
         return new CurrentPrincipal(
                 actorId, TENANT, CurrentPrincipal.PrincipalType.USER, "m20-it",
-                Set.of("task.claim", "task.start", "task.complete"));
+                Set.of("task.assign", "task.claim", "task.start", "task.complete", "task.release"));
     }
 
     private static CommandMetadata metadata(String key) {

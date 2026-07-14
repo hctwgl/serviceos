@@ -14,9 +14,12 @@ import com.serviceos.task.application.TaskExecutionQueue;
 import com.serviceos.task.application.TaskExecutionWorker;
 import com.serviceos.task.application.TaskHandlerRegistry;
 import com.serviceos.task.api.ClaimHumanTaskCommand;
+import com.serviceos.task.api.AssignTaskCandidatesCommand;
+import com.serviceos.task.api.AssignmentSourceType;
 import com.serviceos.task.api.CompleteHumanTaskCommand;
 import com.serviceos.task.api.HumanTaskCommandService;
 import com.serviceos.task.api.StartHumanTaskCommand;
+import com.serviceos.task.api.TaskAssignmentService;
 import com.serviceos.task.spi.AutomatedTaskHandler;
 import com.serviceos.task.spi.TaskExecutionContext;
 import com.serviceos.task.spi.TaskExecutionResult;
@@ -69,6 +72,7 @@ class WorkflowLinearProgressionPostgresIT {
 
     @Autowired WorkOrderCommandService workOrders;
     @Autowired HumanTaskCommandService humanTasks;
+    @Autowired TaskAssignmentService taskAssignments;
     @Autowired ConfigurationService configurations;
     @Autowired TaskExecutionQueue taskQueue;
     @Autowired OutboxWorker outboxWorker;
@@ -219,13 +223,18 @@ class WorkflowLinearProgressionPostgresIT {
 
         CurrentPrincipal actor = new CurrentPrincipal(
                 "human-actor", TENANT, CurrentPrincipal.PrincipalType.USER, "m20-workflow-it",
-                java.util.Set.of("task.claim", "task.start", "task.complete"));
+                java.util.Set.of("task.assign", "task.claim", "task.start", "task.complete"));
+        taskAssignments.assignCandidates(
+                actor, new CommandMetadata("corr-human-assign", "idem-human-assign"),
+                new AssignTaskCandidatesCommand(
+                        taskId, 1, java.util.List.of("human-actor"),
+                        AssignmentSourceType.ASSIGNEE_POLICY, "policy://workflow/human"));
         humanTasks.claim(actor, new CommandMetadata("corr-human-claim", "idem-human-claim"),
-                new ClaimHumanTaskCommand(taskId, 1));
+                new ClaimHumanTaskCommand(taskId, 2));
         humanTasks.start(actor, new CommandMetadata("corr-human-start", "idem-human-start"),
-                new StartHumanTaskCommand(taskId, 2));
+                new StartHumanTaskCommand(taskId, 3));
         humanTasks.complete(actor, new CommandMetadata("corr-human-complete", "idem-human-complete"),
-                new CompleteHumanTaskCommand(taskId, 3, "survey://submission/1", "f".repeat(64)));
+                new CompleteHumanTaskCommand(taskId, 4, "survey://submission/1", "f".repeat(64)));
         publishUntil("task.completed");
 
         assertThat(jdbc.sql("SELECT status FROM tsk_task")
@@ -416,7 +425,8 @@ class WorkflowLinearProgressionPostgresIT {
                 INSERT INTO auth_role (role_id, tenant_id, role_code, role_name, role_status, created_at)
                 VALUES (:roleId, :tenantId, 'workflow-human-worker', '流程人工执行人', 'ACTIVE', now())
                 """).param("roleId", roleId).param("tenantId", TENANT).update();
-        for (String capability : java.util.Set.of("task.claim", "task.start", "task.complete")) {
+        for (String capability : java.util.Set.of(
+                "task.assign", "task.claim", "task.start", "task.complete", "task.release")) {
             jdbc.sql("""
                     INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
                     VALUES (:roleId, :capability, now())

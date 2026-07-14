@@ -31,7 +31,8 @@ class ContractValidationTest {
         assertThat(result.getOpenAPI()).isNotNull();
         assertThat(result.getOpenAPI().getPaths())
                 .containsKeys("/projects", "/files/upload-sessions",
-                        "/tasks/{taskId}:claim", "/tasks/{taskId}:start", "/tasks/{taskId}:complete");
+                        "/tasks/{taskId}:assign-candidates", "/tasks/{taskId}:claim",
+                        "/tasks/{taskId}:start", "/tasks/{taskId}:complete", "/tasks/{taskId}:release");
     }
 
     @Test

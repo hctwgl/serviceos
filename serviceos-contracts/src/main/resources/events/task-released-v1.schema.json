@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/task-released-v1.schema.json",
+  "title": "TaskReleasedV1", "type": "object", "additionalProperties": false,
+  "required": ["eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId", "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"}, "eventType": {"const": "task.released"}, "schemaVersion": {"const": 1},
+    "tenantId": {"type": "string"}, "correlationId": {"type": "string"}, "causationId": {"type": "string"},
+    "aggregateType": {"const": "Task"}, "aggregateId": {"type": "string", "format": "uuid"},
+    "aggregateVersion": {"type": "integer", "minimum": 4}, "occurredAt": {"type": "string", "format": "date-time"},
+    "payload": {"type": "object", "additionalProperties": false,
+      "required": ["taskId", "actorId", "reasonCode", "releasedAt"],
+      "properties": {
+        "taskId": {"type": "string", "format": "uuid"},
+        "actorId": {"type": "string", "minLength": 1, "maxLength": 128},
+        "reasonCode": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{1,99}$"},
+        "releasedAt": {"type": "string", "format": "date-time"}
+      }}
+  }
+}

@@ -8,4 +8,5 @@ public interface HumanTaskCommandService {
     HumanTaskCommandReceipt claim(CurrentPrincipal principal, CommandMetadata metadata, ClaimHumanTaskCommand command);
     HumanTaskCommandReceipt start(CurrentPrincipal principal, CommandMetadata metadata, StartHumanTaskCommand command);
     HumanTaskCommandReceipt complete(CurrentPrincipal principal, CommandMetadata metadata, CompleteHumanTaskCommand command);
+    HumanTaskCommandReceipt release(CurrentPrincipal principal, CommandMetadata metadata, ReleaseHumanTaskCommand command);
 }

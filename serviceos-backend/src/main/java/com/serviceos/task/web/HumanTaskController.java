@@ -8,6 +8,7 @@ import com.serviceos.task.api.ClaimHumanTaskCommand;
 import com.serviceos.task.api.CompleteHumanTaskCommand;
 import com.serviceos.task.api.HumanTaskCommandReceipt;
 import com.serviceos.task.api.HumanTaskCommandService;
+import com.serviceos.task.api.ReleaseHumanTaskCommand;
 import com.serviceos.task.api.StartHumanTaskCommand;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -47,7 +48,7 @@ final class HumanTaskController {
         CurrentPrincipal principal = principals.current();
         HumanTaskCommandReceipt receipt = commands.claim(
                 principal, new CommandMetadata(correlationId, idempotencyKey),
-                new ClaimHumanTaskCommand(taskId, version(ifMatch)));
+                new ClaimHumanTaskCommand(taskId, TaskHttpPreconditions.version(ifMatch)));
         return response(receipt, correlationId);
     }
 
@@ -61,7 +62,7 @@ final class HumanTaskController {
         CurrentPrincipal principal = principals.current();
         HumanTaskCommandReceipt receipt = commands.start(
                 principal, new CommandMetadata(correlationId, idempotencyKey),
-                new StartHumanTaskCommand(taskId, version(ifMatch)));
+                new StartHumanTaskCommand(taskId, TaskHttpPreconditions.version(ifMatch)));
         return response(receipt, correlationId);
     }
 
@@ -77,7 +78,24 @@ final class HumanTaskController {
         HumanTaskCommandReceipt receipt = commands.complete(
                 principal, new CommandMetadata(correlationId, idempotencyKey),
                 new CompleteHumanTaskCommand(
-                        taskId, version(ifMatch), request.resultRef(), request.resultDigest()));
+                        taskId, TaskHttpPreconditions.version(ifMatch),
+                        request.resultRef(), request.resultDigest()));
+        return response(receipt, correlationId);
+    }
+
+    @PostMapping("/{taskId}:release")
+    ResponseEntity<HumanTaskCommandReceipt> release(
+            @PathVariable UUID taskId,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestHeader("If-Match") String ifMatch,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @Valid @RequestBody ReleaseHumanTaskRequest request
+    ) {
+        CurrentPrincipal principal = principals.current();
+        HumanTaskCommandReceipt receipt = commands.release(
+                principal, new CommandMetadata(correlationId, idempotencyKey),
+                new ReleaseHumanTaskCommand(
+                        taskId, TaskHttpPreconditions.version(ifMatch), request.reasonCode()));
         return response(receipt, correlationId);
     }
 
@@ -89,14 +107,4 @@ final class HumanTaskController {
                 .body(receipt);
     }
 
-    private static long version(String ifMatch) {
-        if (ifMatch == null || !ifMatch.matches("\"[1-9][0-9]*\"")) {
-            throw new IllegalArgumentException("If-Match must contain one quoted positive aggregate version");
-        }
-        try {
-            return Long.parseLong(ifMatch.substring(1, ifMatch.length() - 1));
-        } catch (NumberFormatException exception) {
-            throw new IllegalArgumentException("If-Match aggregate version is too large", exception);
-        }
-    }
 }
