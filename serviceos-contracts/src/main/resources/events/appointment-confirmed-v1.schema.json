@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/appointment-confirmed-v1.schema.json",
+  "title": "AppointmentConfirmedV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId", "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"},
+    "eventType": {"const": "appointment.confirmed"},
+    "schemaVersion": {"const": 1},
+    "tenantId": {"type": "string"},
+    "correlationId": {"type": "string"},
+    "causationId": {"type": "string"},
+    "aggregateType": {"const": "Appointment"},
+    "aggregateId": {"type": "string", "format": "uuid"},
+    "aggregateVersion": {"type": "integer", "minimum": 2},
+    "occurredAt": {"type": "string", "format": "date-time"},
+    "payload": {"$ref": "#/$defs/payload"}
+  },
+  "$defs": {
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["appointmentId", "revisionId", "revisionNo", "projectId", "workOrderId", "taskId", "appointmentType", "status", "aggregateVersion", "occurredAt", "eventType"],
+      "properties": {
+        "appointmentId": {"type": "string", "format": "uuid"},
+        "revisionId": {"type": "string", "format": "uuid"},
+        "revisionNo": {"type": "integer", "minimum": 2},
+        "projectId": {"type": "string", "format": "uuid"},
+        "workOrderId": {"type": "string", "format": "uuid"},
+        "taskId": {"type": "string", "format": "uuid"},
+        "appointmentType": {"enum": ["SURVEY", "INSTALLATION", "REPAIR", "CORRECTION", "SECOND_VISIT"]},
+        "status": {"const": "CONFIRMED"},
+        "aggregateVersion": {"type": "integer", "minimum": 2},
+        "occurredAt": {"type": "string", "format": "date-time"},
+        "eventType": {"const": "appointment.confirmed"}
+      }
+    }
+  }
+}

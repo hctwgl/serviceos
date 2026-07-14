@@ -1,0 +1,25 @@
+{
+  "eventId": "a1000000-0000-4000-8000-000000000001",
+  "eventType": "appointment.proposed",
+  "schemaVersion": 1,
+  "tenantId": "tenant-field",
+  "correlationId": "corr-m30-propose",
+  "causationId": "propose-m30-001",
+  "aggregateType": "Appointment",
+  "aggregateId": "a2000000-0000-4000-8000-000000000001",
+  "aggregateVersion": 1,
+  "occurredAt": "2026-07-14T10:00:00Z",
+  "payload": {
+    "appointmentId": "a2000000-0000-4000-8000-000000000001",
+    "revisionId": "a3000000-0000-4000-8000-000000000001",
+    "revisionNo": 1,
+    "projectId": "a4000000-0000-4000-8000-000000000001",
+    "workOrderId": "a5000000-0000-4000-8000-000000000001",
+    "taskId": "a6000000-0000-4000-8000-000000000001",
+    "appointmentType": "SURVEY",
+    "status": "PROPOSED",
+    "aggregateVersion": 1,
+    "occurredAt": "2026-07-14T10:00:00Z",
+    "eventType": "appointment.proposed"
+  }
+}

@@ -24,7 +24,8 @@ public final class DatabaseMigrationMain {
             "classpath:db/migration/workorder",
             "classpath:db/migration/workflow",
             // 部署迁移入口必须与 Spring Flyway locations 同步，否则运行时会引用尚未建表的调度能力。
-            "classpath:db/migration/dispatch"
+            "classpath:db/migration/dispatch",
+            "classpath:db/migration/appointment"
     };
 
     private DatabaseMigrationMain() {

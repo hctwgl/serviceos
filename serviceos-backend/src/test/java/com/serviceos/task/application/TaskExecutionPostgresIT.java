@@ -74,7 +74,7 @@ class TaskExecutionPostgresIT {
                             tsk_task_reassignment_command_result,
                             tsk_task_execution_guard, tsk_task_assignment, tsk_task_assignment_batch,
                             tsk_human_task_command_result, tsk_task_execution_attempt, tsk_task,
-                            rel_outbox_publish_attempt, rel_outbox_event
+                            rel_outbox_publish_attempt, rel_outbox_event CASCADE
                         """).update();
         jdbc.sql("TRUNCATE TABLE rel_inbox_record").update();
     }

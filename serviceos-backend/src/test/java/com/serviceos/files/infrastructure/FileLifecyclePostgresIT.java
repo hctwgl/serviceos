@@ -91,7 +91,7 @@ class FileLifecyclePostgresIT {
                             aud_audit_record, rel_outbox_publish_attempt, rel_outbox_event,
                             rel_idempotency_record,
                             auth_role_field_policy, auth_role_grant,
-                            auth_role_capability, auth_role
+                            auth_role_capability, auth_role CASCADE
                         """).update();
         deleteRecursively(STORAGE_ROOT);
         Files.createDirectories(STORAGE_ROOT);
@@ -223,7 +223,7 @@ class FileLifecyclePostgresIT {
 
     @Test
     void migrationIsRepeatableNoOpAtCurrentVersion() {
-        assertThat(flyway.info().applied()).hasSize(31);
+        assertThat(flyway.info().applied()).hasSize(32);
         assertThat(flyway.migrate().migrationsExecuted).isZero();
     }
 

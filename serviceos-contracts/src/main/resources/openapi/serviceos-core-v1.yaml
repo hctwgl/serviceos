@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.5.0
+  version: 0.6.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -311,6 +311,107 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /tasks/{taskId}/appointments:
+    get:
+      operationId: listTaskAppointments
+      summary: 查询任务的预约修订链
+      description: 实时按 Task 的 project/network scope 授权；allowedActions 只返回当前主体可执行动作。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 当前租户下该任务的预约列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Appointment' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: proposeAppointment
+      summary: 为人工履约任务提议预约
+      description: project/work order/network/technician 快照均由服务端实时责任链解析，不接受客户端代填。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProposeAppointmentRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/AppointmentCommandReceipt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /appointments/{appointmentId}:
+    get:
+      operationId: getAppointment
+      summary: 查询预约及完整不可变修订链
+      parameters:
+        - $ref: '#/components/parameters/AppointmentId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 预约详情
+          headers:
+            ETag: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Appointment' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /appointments/{appointmentId}:confirm:
+    post:
+      operationId: confirmAppointment
+      summary: 确认当前预约提议
+      description: 确认事实以新修订追加；原提议修订不可覆盖。
+      parameters:
+        - $ref: '#/components/parameters/AppointmentId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConfirmAppointmentRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/AppointmentCommandReceipt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /appointments/{appointmentId}:reschedule:
+    post:
+      operationId: rescheduleAppointment
+      summary: 改约已确认预约
+      description: 改约总是追加 PROPOSED 修订并要求重新确认，不沿用旧确认事实。
+      parameters:
+        - $ref: '#/components/parameters/AppointmentId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RescheduleAppointmentRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/AppointmentCommandReceipt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
 components:
   securitySchemes:
     bearerAuth:
@@ -326,6 +427,11 @@ components:
       schema: { type: string, format: uuid }
     OperationalExceptionId:
       name: exceptionId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    AppointmentId:
+      name: appointmentId
       in: path
       required: true
       schema: { type: string, format: uuid }
@@ -580,6 +686,98 @@ components:
         aggregateVersion: { type: integer, format: int64, minimum: 2 }
         acknowledgedAt: { type: string, format: date-time }
         acknowledgedBy: { type: string, minLength: 1, maxLength: 128 }
+    AppointmentWindow:
+      type: object
+      additionalProperties: false
+      required: [start, end, timezone, estimatedDurationMinutes]
+      properties:
+        start: { type: string, format: date-time }
+        end: { type: string, format: date-time }
+        timezone: { type: string, minLength: 1, maxLength: 80 }
+        estimatedDurationMinutes: { type: integer, minimum: 1, maximum: 1440 }
+    ProposeAppointmentRequest:
+      type: object
+      additionalProperties: false
+      required: [type, window, addressRef, addressVersion]
+      properties:
+        type: { enum: [SURVEY, INSTALLATION, REPAIR, CORRECTION, SECOND_VISIT] }
+        window: { $ref: '#/components/schemas/AppointmentWindow' }
+        addressRef: { type: string, minLength: 1, maxLength: 200 }
+        addressVersion: { type: string, minLength: 1, maxLength: 100 }
+    ConfirmAppointmentRequest:
+      type: object
+      additionalProperties: false
+      required: [confirmedPartyType, confirmedPartyRef, confirmationChannel]
+      properties:
+        confirmedPartyType: { type: string, minLength: 1, maxLength: 80 }
+        confirmedPartyRef: { type: string, minLength: 1, maxLength: 200 }
+        confirmationChannel: { type: string, minLength: 1, maxLength: 80 }
+    RescheduleAppointmentRequest:
+      type: object
+      additionalProperties: false
+      required: [newWindow, reasonCode]
+      properties:
+        newWindow: { $ref: '#/components/schemas/AppointmentWindow' }
+        reasonCode: { type: string, minLength: 1, maxLength: 100 }
+        note: { type: [string, 'null'], maxLength: 500 }
+    AppointmentRevision:
+      type: object
+      additionalProperties: false
+      required: [revisionId, revisionNo, previousRevisionId, window, addressRef, addressVersion,
+                 confirmedPartyType, confirmedPartyRef, confirmationChannel, confirmedAt,
+                 reasonCode, note, createdBy, createdAt]
+      properties:
+        revisionId: { type: string, format: uuid }
+        revisionNo: { type: integer, minimum: 1 }
+        previousRevisionId: { type: [string, 'null'], format: uuid }
+        window: { $ref: '#/components/schemas/AppointmentWindow' }
+        addressRef: { type: string }
+        addressVersion: { type: string }
+        confirmedPartyType: { type: [string, 'null'] }
+        confirmedPartyRef: { type: [string, 'null'] }
+        confirmationChannel: { type: [string, 'null'] }
+        confirmedAt: { type: [string, 'null'], format: date-time }
+        reasonCode: { type: [string, 'null'] }
+        note: { type: [string, 'null'] }
+        createdBy: { type: string }
+        createdAt: { type: string, format: date-time }
+    Appointment:
+      type: object
+      additionalProperties: false
+      required: [appointmentId, projectId, workOrderId, taskId, type, status,
+                 assignedNetworkId, technicianId, aggregateVersion, currentRevisionNo,
+                 createdAt, createdBy, revisions, allowedActions]
+      properties:
+        appointmentId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        workOrderId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        type: { enum: [SURVEY, INSTALLATION, REPAIR, CORRECTION, SECOND_VISIT] }
+        status: { enum: [PROPOSED, CONFIRMED] }
+        assignedNetworkId: { type: [string, 'null'] }
+        technicianId: { type: [string, 'null'] }
+        aggregateVersion: { type: integer, format: int64, minimum: 1 }
+        currentRevisionNo: { type: integer, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        createdBy: { type: string }
+        revisions:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/AppointmentRevision' }
+        allowedActions:
+          type: array
+          items: { enum: [CONFIRM, RESCHEDULE] }
+    AppointmentCommandReceipt:
+      type: object
+      additionalProperties: false
+      required: [appointmentId, revisionId, status, revisionNo, aggregateVersion, occurredAt]
+      properties:
+        appointmentId: { type: string, format: uuid }
+        revisionId: { type: string, format: uuid }
+        status: { enum: [PROPOSED, CONFIRMED] }
+        revisionNo: { type: integer, minimum: 1 }
+        aggregateVersion: { type: integer, format: int64, minimum: 1 }
+        occurredAt: { type: string, format: date-time }
     Problem:
       type: object
       required: [type, title, status, errorCode]
@@ -592,6 +790,18 @@ components:
         errorCode: { type: string }
         correlationId: { type: [string, 'null'] }
   responses:
+    AppointmentCommandReceipt:
+      description: 命令成功或返回首次幂等冻结响应
+      headers:
+        ETag:
+          required: true
+          schema: { type: string }
+        X-Correlation-Id:
+          required: true
+          schema: { type: string }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AppointmentCommandReceipt' }
     OperationalExceptionAcknowledgement:
       description: 确认成功或幂等重放成功
       headers:

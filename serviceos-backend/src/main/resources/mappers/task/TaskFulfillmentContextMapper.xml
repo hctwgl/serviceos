@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.serviceos.task.infrastructure.TaskFulfillmentContextMapper">
+    <select id="find" resultType="map">
+        SELECT t.task_id AS "taskId", t.project_id AS "projectId",
+               t.work_order_id AS "workOrderId", t.task_type AS "taskType",
+               t.task_kind AS "taskKind", t.status, t.version,
+               a.principal_id AS "responsiblePrincipalId"
+          FROM tsk_task t
+          LEFT JOIN tsk_task_assignment a
+            ON a.tenant_id = t.tenant_id
+           AND a.task_id = t.task_id
+           AND a.assignment_kind = 'RESPONSIBLE'
+           AND a.status = 'ACTIVE'
+         WHERE t.tenant_id = #{tenantId} AND t.task_id = #{taskId}
+    </select>
+</mapper>

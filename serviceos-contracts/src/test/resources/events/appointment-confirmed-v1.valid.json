@@ -1,0 +1,25 @@
+{
+  "eventId": "a1000000-0000-4000-8000-000000000002",
+  "eventType": "appointment.confirmed",
+  "schemaVersion": 1,
+  "tenantId": "tenant-field",
+  "correlationId": "corr-m30-confirm",
+  "causationId": "confirm-m30-001",
+  "aggregateType": "Appointment",
+  "aggregateId": "a2000000-0000-4000-8000-000000000001",
+  "aggregateVersion": 2,
+  "occurredAt": "2026-07-14T10:05:00Z",
+  "payload": {
+    "appointmentId": "a2000000-0000-4000-8000-000000000001",
+    "revisionId": "a3000000-0000-4000-8000-000000000002",
+    "revisionNo": 2,
+    "projectId": "a4000000-0000-4000-8000-000000000001",
+    "workOrderId": "a5000000-0000-4000-8000-000000000001",
+    "taskId": "a6000000-0000-4000-8000-000000000001",
+    "appointmentType": "SURVEY",
+    "status": "CONFIRMED",
+    "aggregateVersion": 2,
+    "occurredAt": "2026-07-14T10:05:00Z",
+    "eventType": "appointment.confirmed"
+  }
+}

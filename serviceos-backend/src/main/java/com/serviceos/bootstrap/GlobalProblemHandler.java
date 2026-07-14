@@ -29,7 +29,7 @@ final class GlobalProblemHandler {
                  TASK_STATE_CONFLICT, TASK_ASSIGNMENT_CONFLICT,
                  TASK_EXECUTION_GUARDED,
                  DISPATCH_CAPACITY_CONFLICT, SERVICE_ASSIGNMENT_CONFLICT,
-                 VERSION_CONFLICT -> HttpStatus.CONFLICT;
+                 APPOINTMENT_VERSION_CONFLICT, VERSION_CONFLICT -> HttpStatus.CONFLICT;
             case FILE_UPLOAD_EXPIRED -> HttpStatus.GONE;
             case FILE_NOT_AVAILABLE -> HttpStatus.LOCKED;
             case RESOURCE_NOT_FOUND -> HttpStatus.NOT_FOUND;

@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.serviceos.appointment.infrastructure.AppointmentMapper">
+    <sql id="appointmentColumns">
+        a.appointment_id AS "appointmentId", a.tenant_id AS "tenantId",
+        a.project_id AS "projectId", a.work_order_id AS "workOrderId", a.task_id AS "taskId",
+        a.appointment_type AS "appointmentType", a.status,
+        a.assigned_network_id AS "assignedNetworkId", a.technician_id AS "technicianId",
+        a.aggregate_version AS "aggregateVersion", a.current_revision_no AS "currentRevisionNo",
+        a.created_at AS "appointmentCreatedAt", a.created_by AS "appointmentCreatedBy",
+        r.revision_id AS "revisionId", r.revision_no AS "revisionNo",
+        r.previous_revision_id AS "previousRevisionId", r.window_start AS "windowStart",
+        r.window_end AS "windowEnd", r.timezone,
+        r.estimated_duration_minutes AS "estimatedDurationMinutes",
+        r.address_ref AS "addressRef", r.address_version AS "addressVersion",
+        r.confirmed_party_type AS "confirmedPartyType", r.confirmed_party_ref AS "confirmedPartyRef",
+        r.confirmation_channel AS "confirmationChannel", r.confirmed_at AS "confirmedAt",
+        r.reason_code AS "reasonCode", r.note,
+        r.created_by AS "revisionCreatedBy", r.created_at AS "revisionCreatedAt"
+    </sql>
+
+    <select id="findById" resultType="map">
+        SELECT <include refid="appointmentColumns"/>
+          FROM apt_appointment a
+          JOIN apt_appointment_revision r ON r.revision_id = a.current_revision_id
+         WHERE a.tenant_id = #{tenantId} AND a.appointment_id = #{appointmentId}
+    </select>
+
+    <select id="findByTask" resultType="map">
+        SELECT <include refid="appointmentColumns"/>
+          FROM apt_appointment a
+          JOIN apt_appointment_revision r ON r.revision_id = a.current_revision_id
+         WHERE a.tenant_id = #{tenantId} AND a.task_id = #{taskId}
+         ORDER BY a.created_at, a.appointment_id
+    </select>
+
+    <select id="findRevisions" resultType="map">
+        SELECT revision_id AS "revisionId", revision_no AS "revisionNo",
+               previous_revision_id AS "previousRevisionId", window_start AS "windowStart",
+               window_end AS "windowEnd", timezone,
+               estimated_duration_minutes AS "estimatedDurationMinutes",
+               address_ref AS "addressRef", address_version AS "addressVersion",
+               confirmed_party_type AS "confirmedPartyType",
+               confirmed_party_ref AS "confirmedPartyRef",
+               confirmation_channel AS "confirmationChannel", confirmed_at AS "confirmedAt",
+               reason_code AS "reasonCode", note,
+               created_by AS "revisionCreatedBy", created_at AS "revisionCreatedAt"
+          FROM apt_appointment_revision
+         WHERE tenant_id = #{tenantId} AND appointment_id = #{appointmentId}
+         ORDER BY revision_no
+    </select>
+
+    <insert id="insertAppointment" parameterType="map">
+        INSERT INTO apt_appointment (
+            appointment_id, tenant_id, project_id, work_order_id, task_id,
+            appointment_type, status, current_revision_id, current_revision_no,
+            assigned_network_id, technician_id, aggregate_version, created_by, created_at
+        ) VALUES (
+            #{appointmentId}, #{tenantId}, #{projectId}, #{workOrderId}, #{taskId},
+            #{appointmentType}, #{status}, #{currentRevisionId}, #{currentRevisionNo},
+            #{assignedNetworkId}, #{technicianId}, #{aggregateVersion}, #{createdBy}, #{createdAt}
+        )
+    </insert>
+
+    <insert id="insertRevision" parameterType="map">
+        INSERT INTO apt_appointment_revision (
+            revision_id, tenant_id, appointment_id, revision_no, previous_revision_id,
+            window_start, window_end, timezone, estimated_duration_minutes,
+            address_ref, address_version, confirmed_party_type, confirmed_party_ref,
+            confirmation_channel, confirmed_at, reason_code, note, created_by, created_at
+        ) VALUES (
+            #{revisionId}, #{tenantId}, #{appointmentId}, #{revisionNo}, #{previousRevisionId},
+            #{windowStart}, #{windowEnd}, #{timezone}, #{estimatedDurationMinutes},
+            #{addressRef}, #{addressVersion}, #{confirmedPartyType}, #{confirmedPartyRef},
+            #{confirmationChannel}, #{confirmedAt}, #{reasonCode}, #{note}, #{createdBy}, #{createdAt}
+        )
+    </insert>
+
+    <update id="advance" parameterType="map">
+        UPDATE apt_appointment
+           SET status = #{newStatus}, current_revision_id = #{newRevisionId},
+               current_revision_no = #{newRevisionNo}, aggregate_version = aggregate_version + 1
+         WHERE tenant_id = #{tenantId} AND appointment_id = #{appointmentId}
+           AND status = #{expectedStatus} AND aggregate_version = #{expectedVersion}
+    </update>
+
+    <insert id="insertHistory" parameterType="map">
+        INSERT INTO apt_appointment_status_history (
+            history_id, tenant_id, appointment_id, aggregate_version, from_status, to_status,
+            command_code, actor_id, reason_code, revision_id, occurred_at
+        ) VALUES (
+            #{historyId}, #{tenantId}, #{appointmentId}, #{aggregateVersion}, #{fromStatus}, #{toStatus},
+            #{commandCode}, #{actorId}, #{reasonCode}, #{revisionId}, #{occurredAt}
+        )
+    </insert>
+
+    <insert id="insertResult" parameterType="map">
+        INSERT INTO apt_appointment_command_result (
+            tenant_id, operation_type, idempotency_key, appointment_id, revision_id,
+            status, revision_no, aggregate_version, occurred_at
+        ) VALUES (
+            #{tenantId}, #{operationType}, #{idempotencyKey}, #{appointmentId}, #{revisionId},
+            #{status}, #{revisionNo}, #{aggregateVersion}, #{occurredAt}
+        )
+    </insert>
+
+    <select id="findResult" resultType="map">
+        SELECT appointment_id AS "appointmentId", revision_id AS "revisionId", status,
+               revision_no AS "revisionNo", aggregate_version AS "aggregateVersion",
+               occurred_at AS "occurredAt"
+          FROM apt_appointment_command_result
+         WHERE tenant_id = #{tenantId} AND operation_type = #{operationType}
+           AND idempotency_key = #{idempotencyKey}
+    </select>
+</mapper>
