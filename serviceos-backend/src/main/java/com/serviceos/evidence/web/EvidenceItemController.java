@@ -128,9 +128,25 @@ final class EvidenceItemController {
                     revision.revisionNumber(), revision.fileObjectId(), revision.contentDigest(),
                     revision.mimeType(), revision.sizeBytes(),
                     objectMapper.readTree(revision.captureMetadataJson()), revision.status(),
-                    revision.sourceUploadSessionId(), revision.createdBy(), revision.createdAt());
+                    revision.sourceUploadSessionId(), revision.createdBy(), revision.createdAt(),
+                    revision.validations().stream().map(this::validationResponse).toList());
         } catch (JacksonException exception) {
             throw new IllegalStateException("EvidenceRevision captureMetadata is invalid", exception);
+        }
+    }
+
+    private EvidenceValidationResponse validationResponse(
+            com.serviceos.evidence.api.EvidenceValidationView validation
+    ) {
+        try {
+            return new EvidenceValidationResponse(
+                    validation.validationId(), validation.evidenceRevisionId(),
+                    validation.checkType(), validation.severity(), validation.result(),
+                    validation.reasonCode(), validation.message(),
+                    objectMapper.readTree(validation.detailsJson() == null ? "{}" : validation.detailsJson()),
+                    validation.validatorName(), validation.validatorVersion(), validation.createdAt());
+        } catch (JacksonException exception) {
+            throw new IllegalStateException("EvidenceValidation details are invalid", exception);
         }
     }
 
@@ -198,6 +214,22 @@ final class EvidenceItemController {
             String status,
             UUID sourceUploadSessionId,
             String createdBy,
+            Instant createdAt,
+            List<EvidenceValidationResponse> validations
+    ) {
+    }
+
+    record EvidenceValidationResponse(
+            UUID validationId,
+            UUID evidenceRevisionId,
+            String checkType,
+            String severity,
+            String result,
+            String reasonCode,
+            String message,
+            JsonNode details,
+            String validatorName,
+            String validatorVersion,
             Instant createdAt
     ) {
     }

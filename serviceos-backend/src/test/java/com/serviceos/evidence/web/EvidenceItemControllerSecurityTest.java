@@ -130,7 +130,7 @@ class EvidenceItemControllerSecurityTest {
                 "b".repeat(64), "image/png", 12,
                 "{\"captureSource\":\"CAMERA\",\"capturedAt\":\"2026-07-14T08:00:00Z\"}",
                 "STORED", UUID.randomUUID(), "cmd-1", "technician-evidence",
-                Instant.parse("2026-07-14T08:01:00Z"));
+                Instant.parse("2026-07-14T08:01:00Z"), List.of());
         return new EvidenceItemView(
                 ITEM, TASK, UUID.randomUUID(), SLOT, 1, "OPEN", "technician-evidence",
                 Instant.parse("2026-07-14T08:01:00Z"), List.of(revision));

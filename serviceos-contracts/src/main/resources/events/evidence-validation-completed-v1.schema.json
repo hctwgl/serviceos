@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/evidence-validation-completed-v1.schema.json",
+  "title": "EvidenceValidationCompletedV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId",
+    "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"
+  ],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"},
+    "eventType": {"const": "evidence.validation-completed"},
+    "schemaVersion": {"const": 1},
+    "tenantId": {"type": "string"},
+    "correlationId": {"type": "string"},
+    "causationId": {"type": "string", "format": "uuid"},
+    "aggregateType": {"const": "EvidenceRevision"},
+    "aggregateId": {"type": "string", "format": "uuid"},
+    "aggregateVersion": {"type": "integer", "minimum": 1},
+    "occurredAt": {"type": "string", "format": "date-time"},
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidenceRevisionId", "evidenceItemId", "evidenceSlotId", "taskId", "projectId",
+        "status", "blockedFailureCount", "warningCount", "completedAt"
+      ],
+      "properties": {
+        "evidenceRevisionId": {"type": "string", "format": "uuid"},
+        "evidenceItemId": {"type": "string", "format": "uuid"},
+        "evidenceSlotId": {"type": "string", "format": "uuid"},
+        "taskId": {"type": "string", "format": "uuid"},
+        "projectId": {"type": "string", "format": "uuid"},
+        "status": {"enum": ["VALIDATED", "VALIDATION_FAILED"]},
+        "blockedFailureCount": {"type": "integer", "minimum": 0},
+        "warningCount": {"type": "integer", "minimum": 0},
+        "completedAt": {"type": "string", "format": "date-time"}
+      }
+    }
+  }
+}

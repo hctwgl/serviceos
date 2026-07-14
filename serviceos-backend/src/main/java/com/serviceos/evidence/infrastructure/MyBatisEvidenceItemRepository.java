@@ -3,6 +3,7 @@ package com.serviceos.evidence.infrastructure;
 import com.serviceos.evidence.api.EvidenceItemView;
 import com.serviceos.evidence.api.EvidenceRevisionView;
 import com.serviceos.evidence.api.EvidenceSlotView;
+import com.serviceos.evidence.api.EvidenceValidationView;
 import com.serviceos.evidence.application.EvidenceItemRepository;
 import com.serviceos.evidence.application.EvidenceUploadBinding;
 import com.serviceos.shared.BusinessProblem;
@@ -88,18 +89,22 @@ final class MyBatisEvidenceItemRepository implements EvidenceItemRepository {
         if (row == null) {
             return Optional.empty();
         }
+        Map<UUID, List<EvidenceValidationView>> validations = validationsByRevision(
+                mapper.listValidationsForItem(tenantId, evidenceItemId.toString()));
         List<EvidenceRevisionView> revisions = mapper.listRevisionsForItem(
                         tenantId, evidenceItemId.toString()).stream()
-                .map(this::revisionView).toList();
+                .map(revision -> revisionView(revision, validations)).toList();
         return Optional.of(itemView(row, revisions));
     }
 
     @Override
     public List<EvidenceItemView> listItems(String tenantId, UUID taskId) {
         List<Map<String, Object>> items = mapper.listItems(tenantId, taskId.toString());
+        Map<UUID, List<EvidenceValidationView>> validations = validationsByRevision(
+                mapper.listValidationsForTask(tenantId, taskId.toString()));
         Map<UUID, List<EvidenceRevisionView>> byItem = new LinkedHashMap<>();
         for (Map<String, Object> revision : mapper.listRevisionsForTask(tenantId, taskId.toString())) {
-            EvidenceRevisionView view = revisionView(revision);
+            EvidenceRevisionView view = revisionView(revision, validations);
             byItem.computeIfAbsent(view.evidenceItemId(), key -> new ArrayList<>()).add(view);
         }
         return items.stream()
@@ -184,8 +189,9 @@ final class MyBatisEvidenceItemRepository implements EvidenceItemRepository {
     }
 
     @Override
-    public void updateRevisionStatus(String tenantId, UUID revisionId, String status) {
-        mapper.updateRevisionStatus(tenantId, revisionId.toString(), status);
+    public int updateRevisionStatus(String tenantId, UUID revisionId, String expectedStatus, String status) {
+        return mapper.updateRevisionStatus(
+                tenantId, revisionId.toString(), expectedStatus, status);
     }
 
     @Override
@@ -194,16 +200,68 @@ final class MyBatisEvidenceItemRepository implements EvidenceItemRepository {
     }
 
     @Override
+    public Optional<EvidenceRevisionView> findRevision(String tenantId, UUID revisionId) {
+        return Optional.ofNullable(mapper.findRevision(tenantId, revisionId.toString()))
+                .map(row -> revisionView(row, Map.of(
+                        revisionId, listValidations(tenantId, revisionId))));
+    }
+
+    @Override
     public Optional<EvidenceRevisionView> findRevisionByFileObjectId(String tenantId, UUID fileObjectId) {
         return Optional.ofNullable(mapper.findRevisionByFileObjectId(tenantId, fileObjectId.toString()))
-                .map(this::revisionView);
+                .map(row -> {
+                    UUID revisionId = uuid(row, "evidenceRevisionId");
+                    return revisionView(row, Map.of(revisionId, listValidations(tenantId, revisionId)));
+                });
     }
 
     @Override
     public Optional<EvidenceRevisionView> findRevisionByUploadSession(String tenantId, UUID uploadSessionId) {
         return Optional.ofNullable(
                         mapper.findRevisionByUploadSession(tenantId, uploadSessionId.toString()))
-                .map(this::revisionView);
+                .map(row -> {
+                    UUID revisionId = uuid(row, "evidenceRevisionId");
+                    return revisionView(row, Map.of(revisionId, listValidations(tenantId, revisionId)));
+                });
+    }
+
+    @Override
+    public boolean existsOtherCountingDigest(
+            String tenantId, UUID projectId, String contentDigest, UUID excludeRevisionId
+    ) {
+        return mapper.countOtherCountingDigest(
+                tenantId, projectId.toString(), contentDigest, excludeRevisionId.toString()) > 0;
+    }
+
+    @Override
+    public List<EvidenceValidationView> listValidations(String tenantId, UUID revisionId) {
+        return mapper.listValidations(tenantId, revisionId.toString()).stream()
+                .map(this::validationView).toList();
+    }
+
+    @Override
+    public void insertValidation(
+            String tenantId, UUID projectId, UUID taskId, UUID slotId,
+            UUID evidenceItemId, EvidenceValidationView validation
+    ) {
+        Map<String, Object> values = new HashMap<>();
+        values.put("validationId", validation.validationId().toString());
+        values.put("tenantId", tenantId);
+        values.put("projectId", projectId.toString());
+        values.put("taskId", taskId.toString());
+        values.put("slotId", slotId.toString());
+        values.put("evidenceItemId", evidenceItemId.toString());
+        values.put("evidenceRevisionId", validation.evidenceRevisionId().toString());
+        values.put("checkType", validation.checkType());
+        values.put("severity", validation.severity());
+        values.put("result", validation.result());
+        values.put("reasonCode", validation.reasonCode());
+        values.put("message", validation.message());
+        values.put("details", validation.detailsJson());
+        values.put("validatorName", validation.validatorName());
+        values.put("validatorVersion", validation.validatorVersion());
+        values.put("createdAt", validation.createdAt());
+        mapper.insertValidation(values);
     }
 
     private EvidenceUploadBinding binding(Map<String, Object> row) {
@@ -238,14 +296,38 @@ final class MyBatisEvidenceItemRepository implements EvidenceItemRepository {
                 text(row, "createdBy"), instant(row.get("createdAt")), revisions);
     }
 
-    private EvidenceRevisionView revisionView(Map<String, Object> row) {
+    private EvidenceRevisionView revisionView(
+            Map<String, Object> row, Map<UUID, List<EvidenceValidationView>> validations
+    ) {
+        UUID revisionId = uuid(row, "evidenceRevisionId");
         return new EvidenceRevisionView(
-                uuid(row, "evidenceRevisionId"), uuid(row, "evidenceItemId"), uuid(row, "slotId"),
+                revisionId, uuid(row, "evidenceItemId"), uuid(row, "slotId"),
                 uuid(row, "taskId"), uuid(row, "projectId"), number(row, "revisionNumber").intValue(),
                 uuid(row, "fileObjectId"), text(row, "contentDigest"), text(row, "mimeType"),
                 number(row, "sizeBytes").longValue(), text(row, "captureMetadata"), text(row, "status"),
                 uuid(row, "sourceUploadSessionId"), text(row, "finalizeCommandId"),
-                text(row, "createdBy"), instant(row.get("createdAt")));
+                text(row, "createdBy"), instant(row.get("createdAt")),
+                validations.getOrDefault(revisionId, List.of()));
+    }
+
+    private EvidenceValidationView validationView(Map<String, Object> row) {
+        return new EvidenceValidationView(
+                uuid(row, "validationId"), uuid(row, "evidenceRevisionId"),
+                text(row, "checkType"), text(row, "severity"), text(row, "result"),
+                text(row, "reasonCode"), text(row, "message"), text(row, "details"),
+                text(row, "validatorName"), text(row, "validatorVersion"),
+                instant(row.get("createdAt")));
+    }
+
+    private Map<UUID, List<EvidenceValidationView>> validationsByRevision(
+            List<Map<String, Object>> rows
+    ) {
+        Map<UUID, List<EvidenceValidationView>> byRevision = new LinkedHashMap<>();
+        for (Map<String, Object> row : rows) {
+            EvidenceValidationView view = validationView(row);
+            byRevision.computeIfAbsent(view.evidenceRevisionId(), key -> new ArrayList<>()).add(view);
+        }
+        return byRevision;
     }
 
     private static String text(Map<String, Object> row, String key) {

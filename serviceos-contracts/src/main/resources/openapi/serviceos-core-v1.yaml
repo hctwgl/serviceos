@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.13.0
+  version: 0.14.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1324,12 +1324,30 @@ components:
           additionalProperties: { type: string }
         uploadAuthorizationExpiresAt: { type: string, format: date-time }
         sessionExpiresAt: { type: string, format: date-time }
+    EvidenceValidation:
+      type: object
+      additionalProperties: false
+      required: [validationId, evidenceRevisionId, checkType, severity, result,
+                 details, validatorName, validatorVersion, createdAt]
+      properties:
+        validationId: { type: string, format: uuid }
+        evidenceRevisionId: { type: string, format: uuid }
+        checkType: { type: string, minLength: 1, maxLength: 40 }
+        severity: { enum: [WARN, BLOCK] }
+        result: { enum: [PASSED, FAILED, SKIPPED] }
+        reasonCode: { type: [string, 'null'], maxLength: 80 }
+        message: { type: [string, 'null'], maxLength: 500 }
+        details: { type: object, additionalProperties: true }
+        validatorName: { type: string, minLength: 1, maxLength: 80 }
+        validatorVersion: { type: string, minLength: 1, maxLength: 40 }
+        createdAt: { type: string, format: date-time }
     EvidenceRevision:
       type: object
       additionalProperties: false
       required: [evidenceRevisionId, evidenceItemId, evidenceSlotId, taskId, projectId,
                  revisionNumber, fileObjectId, contentDigest, mimeType, sizeBytes,
-                 captureMetadata, status, sourceUploadSessionId, createdBy, createdAt]
+                 captureMetadata, status, sourceUploadSessionId, createdBy, createdAt,
+                 validations]
       properties:
         evidenceRevisionId: { type: string, format: uuid }
         evidenceItemId: { type: string, format: uuid }
@@ -1346,6 +1364,9 @@ components:
         sourceUploadSessionId: { type: string, format: uuid }
         createdBy: { type: string, minLength: 1, maxLength: 128 }
         createdAt: { type: string, format: date-time }
+        validations:
+          type: array
+          items: { $ref: '#/components/schemas/EvidenceValidation' }
     EvidenceItem:
       type: object
       additionalProperties: false

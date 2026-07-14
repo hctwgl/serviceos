@@ -300,7 +300,7 @@ final class DefaultEvidenceCommandService implements EvidenceCommandService {
                 stored.detectedMimeType() == null ? stored.declaredMimeType() : stored.detectedMimeType(),
                 stored.size(), binding.captureMetadataJson(), "STORED",
                 binding.uploadSessionId(), command.finalizeCommandId(),
-                principal.principalId(), now);
+                principal.principalId(), now, List.of());
         repository.insertRevision(principal.tenantId(), revision);
         repository.markUploadFinalized(principal.tenantId(), binding.uploadSessionId());
         refreshSlotProjection(principal.tenantId(), locked);

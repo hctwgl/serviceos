@@ -3,6 +3,7 @@ package com.serviceos.evidence.application;
 import com.serviceos.evidence.api.EvidenceItemView;
 import com.serviceos.evidence.api.EvidenceRevisionView;
 import com.serviceos.evidence.api.EvidenceSlotView;
+import com.serviceos.evidence.api.EvidenceValidationView;
 
 import java.util.List;
 import java.util.Optional;
@@ -42,11 +43,21 @@ public interface EvidenceItemRepository {
 
     void insertRevision(String tenantId, EvidenceRevisionView revision);
 
-    void updateRevisionStatus(String tenantId, UUID revisionId, String status);
+    int updateRevisionStatus(String tenantId, UUID revisionId, String expectedStatus, String status);
 
     void updateSlotStatus(String tenantId, UUID slotId, String status);
+
+    Optional<EvidenceRevisionView> findRevision(String tenantId, UUID revisionId);
 
     Optional<EvidenceRevisionView> findRevisionByFileObjectId(String tenantId, UUID fileObjectId);
 
     Optional<EvidenceRevisionView> findRevisionByUploadSession(String tenantId, UUID uploadSessionId);
+
+    boolean existsOtherCountingDigest(
+            String tenantId, UUID projectId, String contentDigest, UUID excludeRevisionId);
+
+    List<EvidenceValidationView> listValidations(String tenantId, UUID revisionId);
+
+    void insertValidation(String tenantId, UUID projectId, UUID taskId, UUID slotId,
+                          UUID evidenceItemId, EvidenceValidationView validation);
 }

@@ -1,6 +1,7 @@
 package com.serviceos.evidence.api;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 /** 一次不可变资料版本；不含 object key、URL 或完整敏感原图元数据。 */
@@ -20,6 +21,7 @@ public record EvidenceRevisionView(
         UUID sourceUploadSessionId,
         String finalizeCommandId,
         String createdBy,
-        Instant createdAt
+        Instant createdAt,
+        List<EvidenceValidationView> validations
 ) {
 }

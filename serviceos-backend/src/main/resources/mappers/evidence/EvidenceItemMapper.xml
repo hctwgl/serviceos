@@ -200,6 +200,7 @@
            SET status = #{status}
          WHERE tenant_id = #{tenantId}
            AND evidence_revision_id = CAST(#{revisionId} AS uuid)
+           AND status = #{expectedStatus}
     </update>
 
     <update id="updateSlotStatus">
@@ -208,6 +209,13 @@
          WHERE tenant_id = #{tenantId}
            AND slot_id = CAST(#{slotId} AS uuid)
     </update>
+
+    <select id="findRevision" resultType="map">
+        SELECT <include refid="revisionColumns"/>
+          FROM evd_evidence_revision
+         WHERE tenant_id = #{tenantId}
+           AND evidence_revision_id = CAST(#{revisionId} AS uuid)
+    </select>
 
     <select id="findRevisionByFileObjectId" resultType="map">
         SELECT <include refid="revisionColumns"/>
@@ -222,4 +230,60 @@
          WHERE tenant_id = #{tenantId}
            AND source_upload_session_id = CAST(#{uploadSessionId} AS uuid)
     </select>
+
+    <select id="countOtherCountingDigest" resultType="int">
+        SELECT count(*)
+          FROM evd_evidence_revision
+         WHERE tenant_id = #{tenantId}
+           AND project_id = CAST(#{projectId} AS uuid)
+           AND content_digest = #{contentDigest}
+           AND evidence_revision_id &lt;&gt; CAST(#{excludeRevisionId} AS uuid)
+           AND status IN ('STORED', 'VALIDATING', 'VALIDATED')
+    </select>
+
+    <sql id="validationColumns">
+        validation_id AS "validationId", evidence_revision_id AS "evidenceRevisionId",
+        check_type AS "checkType", severity AS "severity", result AS "result",
+        reason_code AS "reasonCode", message AS "message", details::text AS "details",
+        validator_name AS "validatorName", validator_version AS "validatorVersion",
+        created_at AS "createdAt"
+    </sql>
+
+    <select id="listValidations" resultType="map">
+        SELECT <include refid="validationColumns"/>
+          FROM evd_evidence_validation
+         WHERE tenant_id = #{tenantId}
+           AND evidence_revision_id = CAST(#{revisionId} AS uuid)
+         ORDER BY created_at, check_type
+    </select>
+
+    <select id="listValidationsForTask" resultType="map">
+        SELECT <include refid="validationColumns"/>
+          FROM evd_evidence_validation
+         WHERE tenant_id = #{tenantId}
+           AND task_id = CAST(#{taskId} AS uuid)
+         ORDER BY evidence_revision_id, created_at, check_type
+    </select>
+
+    <select id="listValidationsForItem" resultType="map">
+        SELECT <include refid="validationColumns"/>
+          FROM evd_evidence_validation
+         WHERE tenant_id = #{tenantId}
+           AND evidence_item_id = CAST(#{evidenceItemId} AS uuid)
+         ORDER BY evidence_revision_id, created_at, check_type
+    </select>
+
+    <insert id="insertValidation" parameterType="map">
+        INSERT INTO evd_evidence_validation (
+            validation_id, tenant_id, project_id, task_id, slot_id, evidence_item_id,
+            evidence_revision_id, check_type, severity, result, reason_code, message,
+            details, validator_name, validator_version, created_at)
+        VALUES (
+            CAST(#{validationId} AS uuid), #{tenantId}, CAST(#{projectId} AS uuid),
+            CAST(#{taskId} AS uuid), CAST(#{slotId} AS uuid), CAST(#{evidenceItemId} AS uuid),
+            CAST(#{evidenceRevisionId} AS uuid), #{checkType}, #{severity}, #{result},
+            #{reasonCode}, #{message}, CAST(#{details} AS jsonb),
+            #{validatorName}, #{validatorVersion}, #{createdAt})
+        ON CONFLICT (tenant_id, evidence_revision_id, check_type) DO NOTHING
+    </insert>
 </mapper>

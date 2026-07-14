@@ -62,6 +62,7 @@ interface EvidenceItemMapper {
     int updateRevisionStatus(
             @Param("tenantId") String tenantId,
             @Param("revisionId") String revisionId,
+            @Param("expectedStatus") String expectedStatus,
             @Param("status") String status);
 
     int updateSlotStatus(
@@ -69,9 +70,29 @@ interface EvidenceItemMapper {
             @Param("slotId") String slotId,
             @Param("status") String status);
 
+    Map<String, Object> findRevision(
+            @Param("tenantId") String tenantId, @Param("revisionId") String revisionId);
+
     Map<String, Object> findRevisionByFileObjectId(
             @Param("tenantId") String tenantId, @Param("fileObjectId") String fileObjectId);
 
     Map<String, Object> findRevisionByUploadSession(
             @Param("tenantId") String tenantId, @Param("uploadSessionId") String uploadSessionId);
+
+    int countOtherCountingDigest(
+            @Param("tenantId") String tenantId,
+            @Param("projectId") String projectId,
+            @Param("contentDigest") String contentDigest,
+            @Param("excludeRevisionId") String excludeRevisionId);
+
+    List<Map<String, Object>> listValidations(
+            @Param("tenantId") String tenantId, @Param("revisionId") String revisionId);
+
+    List<Map<String, Object>> listValidationsForTask(
+            @Param("tenantId") String tenantId, @Param("taskId") String taskId);
+
+    List<Map<String, Object>> listValidationsForItem(
+            @Param("tenantId") String tenantId, @Param("evidenceItemId") String evidenceItemId);
+
+    void insertValidation(Map<String, Object> values);
 }

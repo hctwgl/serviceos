@@ -11,6 +11,8 @@ import com.serviceos.reliability.api.OutboxEvent;
 import com.serviceos.reliability.spi.OutboxMessage;
 import com.serviceos.reliability.spi.OutboxMessageHandler;
 import com.serviceos.shared.Sha256;
+import com.serviceos.task.api.ScheduleAutomatedTaskCommand;
+import com.serviceos.task.api.TaskSchedulingService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
@@ -22,16 +24,19 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * 消费 file.scan-completed@v1：CLEAN → VALIDATING，MALWARE → QUARANTINED，并刷新槽位数量投影。
+ * 消费 file.scan-completed@v1：CLEAN → VALIDATING 并调度机器校验；MALWARE → QUARANTINED。
  * 非 Evidence 绑定的文件扫描事件直接成功跳过。
  */
 @Service
 final class EvidenceFileScanCompletedHandler implements OutboxMessageHandler {
+    static final String VALIDATION_TASK_TYPE = "evidence.machine-validation";
+
     private static final String CONSUMER = "evidence.file-scan-completed.revision-state.v1";
     private static final String SYSTEM_ACTOR = "system:evidence-scan-projection";
 
     private final InboxService inbox;
     private final EvidenceItemRepository repository;
+    private final TaskSchedulingService tasks;
     private final AuditAppender audit;
     private final OutboxAppender outbox;
     private final ObjectMapper objectMapper;
@@ -40,6 +45,7 @@ final class EvidenceFileScanCompletedHandler implements OutboxMessageHandler {
     EvidenceFileScanCompletedHandler(
             InboxService inbox,
             EvidenceItemRepository repository,
+            TaskSchedulingService tasks,
             AuditAppender audit,
             OutboxAppender outbox,
             ObjectMapper objectMapper,
@@ -47,6 +53,7 @@ final class EvidenceFileScanCompletedHandler implements OutboxMessageHandler {
     ) {
         this.inbox = inbox;
         this.repository = repository;
+        this.tasks = tasks;
         this.audit = audit;
         this.outbox = outbox;
         this.objectMapper = objectMapper;
@@ -75,7 +82,6 @@ final class EvidenceFileScanCompletedHandler implements OutboxMessageHandler {
         var revision = repository.findRevisionByFileObjectId(message.tenantId(), payload.fileId());
         if (revision.isEmpty()) {
             if (repository.findUploadBindingByFileId(message.tenantId(), payload.fileId()).isPresent()) {
-                // Finalize 资料写入与扫描完成存在竞态：绑定已存在则稍后重试，避免丢状态。
                 throw new IllegalStateException(
                         "EvidenceRevision not yet created for scanned evidence file");
             }
@@ -88,8 +94,11 @@ final class EvidenceFileScanCompletedHandler implements OutboxMessageHandler {
         String nextStatus = mapStatus(payload.lifecycleStatus(), current.status());
         Instant now = clock.instant();
         if (!nextStatus.equals(current.status())) {
-            repository.updateRevisionStatus(
-                    message.tenantId(), current.evidenceRevisionId(), nextStatus);
+            int updated = repository.updateRevisionStatus(
+                    message.tenantId(), current.evidenceRevisionId(), current.status(), nextStatus);
+            if (updated != 1) {
+                throw new IllegalStateException("EvidenceRevision status changed concurrently");
+            }
             EvidenceSlotView slot = repository.lockSlot(message.tenantId(), current.evidenceSlotId());
             int counting = repository.countCountingItems(message.tenantId(), slot.slotId());
             String projection = EvidenceSlotStatusProjector.project(
@@ -114,6 +123,15 @@ final class EvidenceFileScanCompletedHandler implements OutboxMessageHandler {
                     "FILE_SCAN_V1", nextStatus, null,
                     Sha256.digest(payload.fileId() + "|" + nextStatus),
                     message.correlationId(), now));
+
+            if ("VALIDATING".equals(nextStatus)) {
+                String digest = Sha256.digest(current.evidenceRevisionId() + "|VALIDATING");
+                tasks.schedule(new ScheduleAutomatedTaskCommand(
+                        message.tenantId(), VALIDATION_TASK_TYPE,
+                        current.evidenceRevisionId().toString(),
+                        current.evidenceRevisionId().toString(), digest, 800,
+                        now, 5, message.correlationId()));
+            }
         }
         inbox.complete(message.tenantId(), CONSUMER, message.eventId(),
                 Sha256.digest(current.evidenceRevisionId() + "|" + nextStatus));
@@ -121,7 +139,8 @@ final class EvidenceFileScanCompletedHandler implements OutboxMessageHandler {
 
     private static String mapStatus(String fileLifecycleStatus, String currentStatus) {
         if ("AVAILABLE".equals(fileLifecycleStatus)) {
-            if ("QUARANTINED".equals(currentStatus) || "INVALIDATED".equals(currentStatus)) {
+            if ("QUARANTINED".equals(currentStatus) || "INVALIDATED".equals(currentStatus)
+                    || "VALIDATED".equals(currentStatus) || "VALIDATION_FAILED".equals(currentStatus)) {
                 return currentStatus;
             }
             return "VALIDATING";

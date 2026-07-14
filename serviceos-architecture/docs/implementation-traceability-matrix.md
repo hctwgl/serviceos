@@ -132,4 +132,5 @@ Feature gate/authority: if applicable
 | M35 | 表单 Task 完成仅接受同 Task/Project/冻结 FormVersion 的 VALIDATED submission 与 contentDigest | OpenAPI 0.11.0 + FormSubmission/HumanTask PostgreSQL IT + Modulith | EvidenceSet/审核完成条件、整改 supersede、领域映射和完整 FORM-001～005 |
 | M36 | EVIDENCE Schema 发布门禁、身份/数量语义校验、多模板 Bundle 锁定与漂移保护 | Configuration PostgreSQL IT + Schema Drift Test | ADR-008/018、EvidenceSlot/Revision/Snapshot、审核整改和 EVD-001～009 |
 | M37 | Task 冻结 Stage、固定 EvidenceSlot 可靠解析、权威空结果与授权只读投影 | OpenAPI 0.12.0 + Evidence PostgreSQL/MVC/Event Contract + V037～V038 | ADR-018 条件重解析、EvidenceSetSnapshot、完成门禁、审核整改和完整 EVD-001～009 |
-| M38 | Evidence 编排安全文件 Begin/Finalize、EvidenceItem/不可变 Revision、扫描状态投影与授权查询 | OpenAPI 0.13.0 + Evidence PostgreSQL/MVC/Event Contract + V039 | OCR/业务 VALIDATED、代办上传、invalidate、Snapshot、审核整改、完成门禁和完整 EVD-001～009 |
+| M38 | Evidence 编排安全文件 Begin/Finalize、EvidenceItem/不可变 Revision、扫描状态投影与授权查询 | OpenAPI 0.13.0 + Evidence PostgreSQL/MVC/Event Contract + V039 | OCR/图像业务校验实现、代办上传、invalidate、Snapshot、审核整改、完成门禁和完整 EVD-001～009 |
+| M39 | 扫描后确定性机器校验、EvidenceValidation 事实、VALIDATED/VALIDATION_FAILED | OpenAPI 0.14.0 + Evidence PostgreSQL/Event Contract + V040 | OCR/图像 CV 实现、GPS 权威距离、invalidate、Snapshot、审核整改、完成门禁 |
