@@ -48,3 +48,4 @@
 - [M45 CorrectionCase 验收](42-m45-correction-case-acceptance.md)
 - [M46 files 作废联动验收](43-m46-files-invalidation-linkage-acceptance.md)
 - [M47 整改 Task 验收](44-m47-correction-task-acceptance.md)
+- [M48 强制通过与重开验收](45-m48-review-force-approve-reopen-acceptance.md)

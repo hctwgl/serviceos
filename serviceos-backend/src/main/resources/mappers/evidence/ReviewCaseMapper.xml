@@ -7,12 +7,14 @@
         INSERT INTO evd_review_case (
             review_case_id, tenant_id, project_id, task_id, evidence_set_snapshot_id,
             snapshot_content_digest, scope_type, policy_version, status,
-            created_by, created_at, decided_at)
+            created_by, created_at, decided_at,
+            reopened_from_review_case_id, reopen_trigger_ref)
         VALUES (
             CAST(#{reviewCaseId} AS uuid), #{tenantId}, CAST(#{projectId} AS uuid),
             CAST(#{taskId} AS uuid), CAST(#{evidenceSetSnapshotId} AS uuid),
             #{snapshotContentDigest}, #{scopeType}, #{policyVersion}, #{status},
-            #{createdBy}, #{createdAt}, #{decidedAt})
+            #{createdBy}, #{createdAt}, #{decidedAt},
+            CAST(#{reopenedFromReviewCaseId} AS uuid), #{reopenTriggerRef})
     </insert>
 
     <update id="markDecided">
@@ -23,14 +25,22 @@
            AND status = #{expectedStatus}
     </update>
 
+    <update id="markReopened">
+        UPDATE evd_review_case
+           SET status = 'REOPENED'
+         WHERE tenant_id = #{tenantId}
+           AND review_case_id = CAST(#{reviewCaseId} AS uuid)
+           AND status = #{expectedStatus}
+    </update>
+
     <insert id="insertDecision" parameterType="map">
         INSERT INTO evd_review_decision (
             review_decision_id, tenant_id, project_id, review_case_id, decision_ordinal,
-            decision, reason_codes, note, decided_by, decided_at)
+            decision, reason_codes, note, approval_ref, decided_by, decided_at)
         VALUES (
             CAST(#{reviewDecisionId} AS uuid), #{tenantId}, CAST(#{projectId} AS uuid),
             CAST(#{reviewCaseId} AS uuid), #{decisionOrdinal}, #{decision},
-            CAST(#{reasonCodes} AS jsonb), #{note}, #{decidedBy}, #{decidedAt})
+            CAST(#{reasonCodes} AS jsonb), #{note}, #{approvalRef}, #{decidedBy}, #{decidedAt})
     </insert>
 
     <select id="findCase" resultType="map">
@@ -39,23 +49,29 @@
                snapshot_content_digest AS "snapshotContentDigest",
                scope_type AS "scopeType", policy_version AS "policyVersion",
                status AS "status", created_by AS "createdBy", created_at AS "createdAt",
-               decided_at AS "decidedAt"
+               decided_at AS "decidedAt",
+               reopened_from_review_case_id AS "reopenedFromReviewCaseId",
+               reopen_trigger_ref AS "reopenTriggerRef"
           FROM evd_review_case
          WHERE tenant_id = #{tenantId}
            AND review_case_id = CAST(#{reviewCaseId} AS uuid)
     </select>
 
-    <select id="findCaseIdBySnapshot" resultType="string">
+    <select id="findActiveCaseIdBySnapshot" resultType="string">
         SELECT review_case_id::text
           FROM evd_review_case
          WHERE tenant_id = #{tenantId}
            AND evidence_set_snapshot_id = CAST(#{snapshotId} AS uuid)
+           AND status != 'REOPENED'
+         ORDER BY created_at DESC
+         LIMIT 1
     </select>
 
     <select id="listDecisions" resultType="map">
         SELECT review_decision_id AS "reviewDecisionId", review_case_id AS "reviewCaseId",
                decision_ordinal AS "decisionOrdinal", decision AS "decision",
                reason_codes::text AS "reasonCodes", note AS "note",
+               approval_ref AS "approvalRef",
                decided_by AS "decidedBy", decided_at AS "decidedAt"
           FROM evd_review_decision
          WHERE tenant_id = #{tenantId}

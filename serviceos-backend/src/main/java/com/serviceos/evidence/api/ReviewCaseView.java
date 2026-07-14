@@ -17,6 +17,8 @@ public record ReviewCaseView(
         String createdBy,
         Instant createdAt,
         Instant decidedAt,
+        UUID reopenedFromReviewCaseId,
+        String reopenTriggerRef,
         List<ReviewDecisionView> decisions
 ) {
 }

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.22.0
+  version: 0.23.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -621,7 +621,7 @@ paths:
       operationId: createReviewCase
       summary: 为 TASK_SUBMISSION EvidenceSetSnapshot 创建审核案例
       description: |
-        同一 Snapshot 仅允许一个 ReviewCase。初始状态 OPEN。
+        同一 Snapshot 至多一个非 REOPENED 活跃案例，且至多一个 OPEN。初始状态 OPEN。
         需要 evidence.review 能力与项目 Scope。
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -687,6 +687,71 @@ paths:
         '200':
           description: 裁决成功或幂等重放
           headers:
+            X-Correlation-Id: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReviewCase' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /review-cases/{reviewCaseId}:force-approve:
+    post:
+      operationId: forceApproveReviewCase
+      summary: 对 OPEN ReviewCase 强制通过
+      description: |
+        追加 FORCE_APPROVED 决定，不伪装为 APPROVED，不打开 CorrectionCase。
+        需要 evidence.forceApprove；必须提供 reasonCodes 与 approvalRef。
+      parameters:
+        - name: reviewCaseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ForceApproveReviewCaseRequest' }
+      responses:
+        '200':
+          description: 强制通过成功或幂等重放
+          headers:
+            X-Correlation-Id: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReviewCase' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /review-cases/{reviewCaseId}:reopen:
+    post:
+      operationId: reopenReviewCase
+      summary: 重开已通过审核案例并创建新 OPEN 案例
+      description: |
+        仅 APPROVED/FORCE_APPROVED 可重开。旧案例标记 REOPENED，同 Snapshot 新建 OPEN 案例。
+        需要 review.reopen；必须提供 reason 与 triggerRef。
+      parameters:
+        - name: reviewCaseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReopenReviewCaseRequest' }
+      responses:
+        '201':
+          description: 新 OPEN ReviewCase 创建成功或幂等重放
+          headers:
+            Location: { schema: { type: string } }
             X-Correlation-Id: { schema: { type: string } }
           content:
             application/json:
@@ -1687,6 +1752,26 @@ components:
           maxItems: 20
           items: { type: string, minLength: 1, maxLength: 80 }
         note: { type: [string, 'null'], maxLength: 1000 }
+    ForceApproveReviewCaseRequest:
+      type: object
+      additionalProperties: false
+      required: [reasonCodes, approvalRef]
+      properties:
+        reasonCodes:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items: { type: string, minLength: 1, maxLength: 80 }
+        approvalRef: { type: string, minLength: 1, maxLength: 160 }
+        note: { type: [string, 'null'], maxLength: 1000 }
+    ReopenReviewCaseRequest:
+      type: object
+      additionalProperties: false
+      required: [reason, triggerRef]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 1000 }
+        triggerRef: { type: string, minLength: 1, maxLength: 160 }
+        approvalRef: { type: [string, 'null'], maxLength: 160 }
     ReviewDecision:
       type: object
       additionalProperties: false
@@ -1695,12 +1780,13 @@ components:
         reviewDecisionId: { type: string, format: uuid }
         reviewCaseId: { type: string, format: uuid }
         decisionOrdinal: { type: integer, minimum: 1 }
-        decision: { enum: [APPROVED, REJECTED] }
+        decision: { enum: [APPROVED, REJECTED, FORCE_APPROVED] }
         reasonCodes:
           type: array
           maxItems: 20
           items: { type: string, minLength: 1, maxLength: 80 }
         note: { type: [string, 'null'], maxLength: 1000 }
+        approvalRef: { type: [string, 'null'], maxLength: 160 }
         decidedBy: { type: string, minLength: 1, maxLength: 128 }
         decidedAt: { type: string, format: date-time }
     ResubmitCorrectionCaseRequest:
@@ -1785,10 +1871,12 @@ components:
         snapshotContentDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
         scopeType: { enum: [EVIDENCE_SET_SNAPSHOT] }
         policyVersion: { type: string, minLength: 1, maxLength: 80 }
-        status: { enum: [OPEN, APPROVED, REJECTED] }
+        status: { enum: [OPEN, APPROVED, REJECTED, FORCE_APPROVED, REOPENED] }
         createdBy: { type: string, minLength: 1, maxLength: 128 }
         createdAt: { type: string, format: date-time }
         decidedAt: { type: [string, 'null'], format: date-time }
+        reopenedFromReviewCaseId: { type: [string, 'null'], format: uuid }
+        reopenTriggerRef: { type: [string, 'null'], maxLength: 160 }
         decisions:
           type: array
           items: { $ref: '#/components/schemas/ReviewDecision' }

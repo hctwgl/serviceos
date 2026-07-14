@@ -9,6 +9,8 @@ import com.serviceos.evidence.api.CorrectionCaseService;
 import com.serviceos.evidence.api.CreateReviewCaseCommand;
 import com.serviceos.evidence.api.DecideReviewCaseCommand;
 import com.serviceos.evidence.api.EvidenceSetSnapshotView;
+import com.serviceos.evidence.api.ForceApproveReviewCaseCommand;
+import com.serviceos.evidence.api.ReopenReviewCaseCommand;
 import com.serviceos.evidence.api.ReviewCaseService;
 import com.serviceos.evidence.api.ReviewCaseView;
 import com.serviceos.evidence.api.ReviewDecisionView;
@@ -38,9 +40,13 @@ import java.util.UUID;
 @Service
 final class DefaultReviewCaseService implements ReviewCaseService {
     private static final String REVIEW = "evidence.review";
+    private static final String FORCE_APPROVE = "evidence.forceApprove";
+    private static final String REOPEN = "review.reopen";
     private static final String READ = "evidence.read";
     private static final String CREATE_OPERATION = "evidence.review.create";
     private static final String DECIDE_OPERATION = "evidence.review.decide";
+    private static final String FORCE_OPERATION = "evidence.review.forceApprove";
+    private static final String REOPEN_OPERATION = "evidence.review.reopen";
     private static final String DEFAULT_POLICY = "REVIEW_POLICY_V1";
 
     private final ReviewCaseRepository reviews;
@@ -105,6 +111,10 @@ final class DefaultReviewCaseService implements ReviewCaseService {
                     .orElseThrow(() -> new BusinessProblem(
                             ProblemCode.INTERNAL_ERROR, "ReviewCase replay result missing"));
         }
+        if (reviews.findActiveBySnapshot(principal.tenantId(), snapshot.evidenceSetSnapshotId()).isPresent()) {
+            throw new BusinessProblem(ProblemCode.REVIEW_CASE_CONFLICT,
+                    "A ReviewCase already exists for this EvidenceSetSnapshot");
+        }
 
         Instant now = clock.instant();
         UUID reviewCaseId = UUID.randomUUID();
@@ -112,7 +122,7 @@ final class DefaultReviewCaseService implements ReviewCaseService {
                 reviewCaseId, snapshot.projectId(), snapshot.taskId(),
                 snapshot.evidenceSetSnapshotId(), snapshot.contentDigest(),
                 "EVIDENCE_SET_SNAPSHOT", policyVersion, "OPEN",
-                principal.principalId(), now, null, List.of());
+                principal.principalId(), now, null, null, null, List.of());
         try {
             reviews.insertCase(principal.tenantId(), created);
         } catch (DuplicateKeyException exception) {
@@ -181,7 +191,7 @@ final class DefaultReviewCaseService implements ReviewCaseService {
         int ordinal = reviews.nextDecisionOrdinal(principal.tenantId(), current.reviewCaseId());
         ReviewDecisionView decisionView = new ReviewDecisionView(
                 UUID.randomUUID(), current.reviewCaseId(), ordinal, decision,
-                reasonCodes, note, principal.principalId(), now);
+                reasonCodes, note, null, principal.principalId(), now);
         reviews.insertDecision(principal.tenantId(), current.projectId(), decisionView);
         reviews.saveCommandResult(
                 principal.tenantId(), DECIDE_OPERATION, context.idempotencyKey(), current.reviewCaseId());
@@ -196,7 +206,8 @@ final class DefaultReviewCaseService implements ReviewCaseService {
 
         String payload = serialize(new ReviewDecidedPayload(
                 current.reviewCaseId(), decisionView.reviewDecisionId(), current.evidenceSetSnapshotId(),
-                current.taskId(), current.projectId(), decision, reasonCodes, principal.principalId(), now));
+                current.taskId(), current.projectId(), decision, reasonCodes, null,
+                principal.principalId(), now));
         outbox.append(new OutboxEvent(
                 UUID.randomUUID(), UUID.randomUUID(), "evidence", "evidence.review-decided", 1,
                 "ReviewCase", current.reviewCaseId().toString(), ordinal,
@@ -213,6 +224,150 @@ final class DefaultReviewCaseService implements ReviewCaseService {
         idempotency.complete(context, DECIDE_OPERATION, current.reviewCaseId().toString(),
                 Sha256.digest(serialize(decided)));
         return decided;
+    }
+
+    @Override
+    @Transactional
+    public ReviewCaseView forceApprove(
+            CurrentPrincipal principal, CommandMetadata metadata, ForceApproveReviewCaseCommand command
+    ) {
+        ReviewCaseView current = reviews.find(principal.tenantId(), command.reviewCaseId())
+                .orElseThrow(() -> new BusinessProblem(
+                        ProblemCode.RESOURCE_NOT_FOUND, "ReviewCase does not exist"));
+        AuthorizationDecision auth = authorization.require(principal,
+                AuthorizationRequest.projectCapability(FORCE_APPROVE, principal.tenantId(), "ReviewCase",
+                        current.reviewCaseId().toString(), current.projectId().toString()),
+                metadata.correlationId());
+        List<String> reasonCodes = normalizeReasons(command.reasonCodes(), "FORCE_APPROVED");
+        String approvalRef = normalizeApprovalRef(command.approvalRef());
+        String note = normalizeNote(command.note());
+        String requestDigest = Sha256.digest(
+                current.reviewCaseId() + "|FORCE_APPROVED|" + serialize(reasonCodes)
+                        + "|" + approvalRef + "|" + nullToEmpty(note));
+        CommandContext context = new CommandContext(
+                principal.tenantId(), principal.principalId(),
+                metadata.correlationId(), metadata.idempotencyKey());
+        IdempotencyDecision idempotencyDecision = idempotency.begin(context, FORCE_OPERATION, requestDigest);
+        if (idempotencyDecision.kind() == IdempotencyDecision.Kind.REPLAY) {
+            return reviews.findCommandResult(context.tenantId(), FORCE_OPERATION, context.idempotencyKey())
+                    .flatMap(id -> reviews.find(context.tenantId(), id))
+                    .orElseThrow(() -> new BusinessProblem(
+                            ProblemCode.INTERNAL_ERROR, "ForceApprove replay result missing"));
+        }
+        if (!"OPEN".equals(current.status())) {
+            throw new BusinessProblem(ProblemCode.REVIEW_CASE_ALREADY_DECIDED,
+                    "ReviewCase has already been decided");
+        }
+
+        Instant now = clock.instant();
+        int updated = reviews.markDecided(
+                principal.tenantId(), current.reviewCaseId(), "OPEN", "FORCE_APPROVED", now);
+        if (updated != 1) {
+            throw new BusinessProblem(ProblemCode.REVIEW_CASE_ALREADY_DECIDED,
+                    "ReviewCase has already been decided");
+        }
+        int ordinal = reviews.nextDecisionOrdinal(principal.tenantId(), current.reviewCaseId());
+        ReviewDecisionView decisionView = new ReviewDecisionView(
+                UUID.randomUUID(), current.reviewCaseId(), ordinal, "FORCE_APPROVED",
+                reasonCodes, note, approvalRef, principal.principalId(), now);
+        reviews.insertDecision(principal.tenantId(), current.projectId(), decisionView);
+        reviews.saveCommandResult(
+                principal.tenantId(), FORCE_OPERATION, context.idempotencyKey(), current.reviewCaseId());
+
+        String payload = serialize(new ReviewDecidedPayload(
+                current.reviewCaseId(), decisionView.reviewDecisionId(), current.evidenceSetSnapshotId(),
+                current.taskId(), current.projectId(), "FORCE_APPROVED", reasonCodes, approvalRef,
+                principal.principalId(), now));
+        outbox.append(new OutboxEvent(
+                UUID.randomUUID(), UUID.randomUUID(), "evidence", "evidence.review-decided", 1,
+                "ReviewCase", current.reviewCaseId().toString(), ordinal,
+                principal.tenantId(), metadata.correlationId(), metadata.idempotencyKey(),
+                current.taskId().toString(), payload, Sha256.digest(payload), now));
+        audit.append(new AuditEntry(
+                UUID.randomUUID(), principal.tenantId(), principal.principalId(),
+                "REVIEW_CASE_FORCE_APPROVED", FORCE_APPROVE, "ReviewCase",
+                current.reviewCaseId().toString(), "ALLOW", auth.matchedGrantIds(), auth.policyVersion(),
+                "FORCE_APPROVED", null, requestDigest, metadata.correlationId(), now));
+        ReviewCaseView decided = reviews.find(principal.tenantId(), current.reviewCaseId())
+                .orElseThrow(() -> new BusinessProblem(
+                        ProblemCode.INTERNAL_ERROR, "Force-approved ReviewCase missing"));
+        idempotency.complete(context, FORCE_OPERATION, current.reviewCaseId().toString(),
+                Sha256.digest(serialize(decided)));
+        return decided;
+    }
+
+    @Override
+    @Transactional
+    public ReviewCaseView reopen(
+            CurrentPrincipal principal, CommandMetadata metadata, ReopenReviewCaseCommand command
+    ) {
+        ReviewCaseView current = reviews.find(principal.tenantId(), command.reviewCaseId())
+                .orElseThrow(() -> new BusinessProblem(
+                        ProblemCode.RESOURCE_NOT_FOUND, "ReviewCase does not exist"));
+        AuthorizationDecision auth = authorization.require(principal,
+                AuthorizationRequest.projectCapability(REOPEN, principal.tenantId(), "ReviewCase",
+                        current.reviewCaseId().toString(), current.projectId().toString()),
+                metadata.correlationId());
+        String reason = normalizeRequiredText(command.reason(), "reason", 1000);
+        String triggerRef = normalizeRequiredText(command.triggerRef(), "triggerRef", 160);
+        String approvalRef = command.approvalRef() == null || command.approvalRef().isBlank()
+                ? null : normalizeRequiredText(command.approvalRef(), "approvalRef", 160);
+        String requestDigest = Sha256.digest(
+                current.reviewCaseId() + "|REOPEN|" + reason + "|" + triggerRef + "|"
+                        + nullToEmpty(approvalRef));
+        CommandContext context = new CommandContext(
+                principal.tenantId(), principal.principalId(),
+                metadata.correlationId(), metadata.idempotencyKey());
+        IdempotencyDecision idempotencyDecision = idempotency.begin(context, REOPEN_OPERATION, requestDigest);
+        if (idempotencyDecision.kind() == IdempotencyDecision.Kind.REPLAY) {
+            return reviews.findCommandResult(context.tenantId(), REOPEN_OPERATION, context.idempotencyKey())
+                    .flatMap(id -> reviews.find(context.tenantId(), id))
+                    .orElseThrow(() -> new BusinessProblem(
+                            ProblemCode.INTERNAL_ERROR, "Reopen replay result missing"));
+        }
+        if (!"APPROVED".equals(current.status()) && !"FORCE_APPROVED".equals(current.status())) {
+            throw new BusinessProblem(ProblemCode.REVIEW_CASE_STATE_CONFLICT,
+                    "Only APPROVED or FORCE_APPROVED ReviewCase can be reopened");
+        }
+
+        Instant now = clock.instant();
+        int updated = reviews.markReopened(principal.tenantId(), current.reviewCaseId(), current.status());
+        if (updated != 1) {
+            throw new BusinessProblem(ProblemCode.REVIEW_CASE_STATE_CONFLICT,
+                    "ReviewCase could not be reopened");
+        }
+
+        UUID newCaseId = UUID.randomUUID();
+        String note = approvalRef == null ? reason : reason + " | approvalRef=" + approvalRef;
+        ReviewCaseView created = new ReviewCaseView(
+                newCaseId, current.projectId(), current.taskId(),
+                current.evidenceSetSnapshotId(), current.snapshotContentDigest(),
+                current.scopeType(), current.policyVersion(), "OPEN",
+                principal.principalId(), now, null, current.reviewCaseId(), triggerRef, List.of());
+        try {
+            reviews.insertCase(principal.tenantId(), created);
+        } catch (DuplicateKeyException exception) {
+            throw new BusinessProblem(ProblemCode.REVIEW_CASE_CONFLICT,
+                    "An OPEN ReviewCase already exists for this EvidenceSetSnapshot");
+        }
+        reviews.saveCommandResult(principal.tenantId(), REOPEN_OPERATION, context.idempotencyKey(), newCaseId);
+
+        String payload = serialize(new ReviewCaseReopenedPayload(
+                current.reviewCaseId(), newCaseId, current.evidenceSetSnapshotId(),
+                current.taskId(), current.projectId(), triggerRef, reason, principal.principalId(), now));
+        outbox.append(new OutboxEvent(
+                UUID.randomUUID(), UUID.randomUUID(), "evidence", "evidence.review-case-reopened", 1,
+                "ReviewCase", newCaseId.toString(), 1L,
+                principal.tenantId(), metadata.correlationId(), metadata.idempotencyKey(),
+                current.taskId().toString(), payload, Sha256.digest(payload), now));
+        audit.append(new AuditEntry(
+                UUID.randomUUID(), principal.tenantId(), principal.principalId(),
+                "REVIEW_CASE_REOPENED", REOPEN, "ReviewCase", newCaseId.toString(),
+                "ALLOW", auth.matchedGrantIds(), auth.policyVersion(), note, null,
+                requestDigest, metadata.correlationId(), now));
+        idempotency.complete(context, REOPEN_OPERATION, newCaseId.toString(),
+                Sha256.digest(serialize(created)));
+        return created;
     }
 
     @Override
@@ -255,9 +410,9 @@ final class DefaultReviewCaseService implements ReviewCaseService {
                 .map(code -> code == null ? "" : code.trim())
                 .filter(code -> !code.isEmpty())
                 .toList();
-        if ("REJECTED".equals(decision) && codes.isEmpty()) {
+        if (("REJECTED".equals(decision) || "FORCE_APPROVED".equals(decision)) && codes.isEmpty()) {
             throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
-                    "REJECTED decision requires at least one reasonCode");
+                    decision + " decision requires at least one reasonCode");
         }
         if (codes.size() > 20) {
             throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, "reasonCodes exceeds max size 20");
@@ -277,6 +432,22 @@ final class DefaultReviewCaseService implements ReviewCaseService {
         String trimmed = note.trim();
         if (trimmed.length() > 1000) {
             throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, "note exceeds 1000 characters");
+        }
+        return trimmed;
+    }
+
+    private static String normalizeApprovalRef(String approvalRef) {
+        return normalizeRequiredText(approvalRef, "approvalRef", 160);
+    }
+
+    private static String normalizeRequiredText(String value, String field, int maxLength) {
+        if (value == null || value.isBlank()) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, field + " is required");
+        }
+        String trimmed = value.trim();
+        if (trimmed.length() > maxLength) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                    field + " exceeds " + maxLength + " characters");
         }
         return trimmed;
     }
@@ -312,8 +483,22 @@ final class DefaultReviewCaseService implements ReviewCaseService {
             UUID projectId,
             String decision,
             List<String> reasonCodes,
+            String approvalRef,
             String decidedBy,
             Instant decidedAt
+    ) {
+    }
+
+    private record ReviewCaseReopenedPayload(
+            UUID sourceReviewCaseId,
+            UUID reviewCaseId,
+            UUID evidenceSetSnapshotId,
+            UUID taskId,
+            UUID projectId,
+            String triggerRef,
+            String reason,
+            String reopenedBy,
+            Instant reopenedAt
     ) {
     }
 }

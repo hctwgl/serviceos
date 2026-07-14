@@ -17,12 +17,17 @@ interface ReviewCaseMapper {
             @Param("status") String status,
             @Param("decidedAt") Object decidedAt);
 
+    int markReopened(
+            @Param("tenantId") String tenantId,
+            @Param("reviewCaseId") String reviewCaseId,
+            @Param("expectedStatus") String expectedStatus);
+
     void insertDecision(Map<String, Object> values);
 
     Map<String, Object> findCase(
             @Param("tenantId") String tenantId, @Param("reviewCaseId") String reviewCaseId);
 
-    String findCaseIdBySnapshot(
+    String findActiveCaseIdBySnapshot(
             @Param("tenantId") String tenantId, @Param("snapshotId") String snapshotId);
 
     List<Map<String, Object>> listDecisions(

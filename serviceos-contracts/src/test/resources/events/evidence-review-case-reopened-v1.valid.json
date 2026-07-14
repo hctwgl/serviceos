@@ -1,0 +1,23 @@
+{
+  "eventId": "48000000-0000-4000-8000-000000000001",
+  "eventType": "evidence.review-case-reopened",
+  "schemaVersion": 1,
+  "tenantId": "tenant-demo",
+  "correlationId": "corr-reopen-1",
+  "causationId": "cause-reopen-1",
+  "aggregateType": "ReviewCase",
+  "aggregateId": "48000000-0000-4000-8000-000000000002",
+  "aggregateVersion": 1,
+  "occurredAt": "2026-07-14T16:00:00Z",
+  "payload": {
+    "sourceReviewCaseId": "48000000-0000-4000-8000-000000000003",
+    "reviewCaseId": "48000000-0000-4000-8000-000000000002",
+    "evidenceSetSnapshotId": "48000000-0000-4000-8000-000000000004",
+    "taskId": "48000000-0000-4000-8000-000000000005",
+    "projectId": "48000000-0000-4000-8000-000000000006",
+    "triggerRef": "OEM_REJECTION:batch-9",
+    "reason": "车企驳回后重新审核",
+    "reopenedBy": "admin-1",
+    "reopenedAt": "2026-07-14T16:00:00Z"
+  }
+}

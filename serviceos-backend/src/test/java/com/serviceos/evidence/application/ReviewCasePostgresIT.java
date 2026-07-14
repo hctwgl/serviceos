@@ -14,6 +14,8 @@ import com.serviceos.evidence.api.EvidenceCommandService;
 import com.serviceos.evidence.api.EvidenceSetSnapshotService;
 import com.serviceos.evidence.api.EvidenceSetSnapshotView;
 import com.serviceos.evidence.api.FinalizeEvidenceUploadCommand;
+import com.serviceos.evidence.api.ForceApproveReviewCaseCommand;
+import com.serviceos.evidence.api.ReopenReviewCaseCommand;
 import com.serviceos.evidence.api.ReviewCaseService;
 import com.serviceos.evidence.api.ReviewCaseView;
 import com.serviceos.files.infrastructure.LocalObjectTransferService;
@@ -60,6 +62,7 @@ class ReviewCasePostgresIT {
     private static final String TENANT = "tenant-review-case-it";
     private static final String TECHNICIAN = "technician-evidence-044";
     private static final String REVIEWER = "reviewer-evidence-044";
+    private static final String FORCE_ADMIN = "force-admin-evidence-048";
     private static final Path STORAGE_ROOT = temporaryStorageRoot();
 
     @Container
@@ -124,6 +127,7 @@ class ReviewCasePostgresIT {
                 .param("startsOn", LocalDate.now().minusDays(1)).update();
         grant(TECHNICIAN, "evidence.submit", "evidence.read", "file.upload", "file.download");
         grant(REVIEWER, "evidence.review", "evidence.read");
+        grant(FORCE_ADMIN, "evidence.forceApprove", "review.reopen", "evidence.read", "evidence.review");
         seedResolvedSlot();
     }
 
@@ -220,6 +224,98 @@ class ReviewCasePostgresIT {
         assertThat(jdbc.sql("SELECT count(*) FROM evd_review_case").query(Long.class).single()).isZero();
         assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type='evidence.review-case-created'")
                 .query(Long.class).single()).isZero();
+    }
+
+    @Test
+    void forceApproveRequiresCapabilityReasonsAndApprovalRef() throws Exception {
+        EvidenceSetSnapshotView snapshot = createSnapshot("force");
+        ReviewCaseView created = reviews.create(reviewer(), metadata("create-force"),
+                new CreateReviewCaseCommand(snapshot.evidenceSetSnapshotId(), null));
+
+        assertThatThrownBy(() -> reviews.forceApprove(reviewer(), metadata("force-denied"),
+                new ForceApproveReviewCaseCommand(
+                        created.reviewCaseId(), List.of("UNMET_OCR"), "APR-1", "no")))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.ACCESS_DENIED));
+
+        assertThatThrownBy(() -> reviews.forceApprove(forceAdmin(), metadata("force-empty"),
+                new ForceApproveReviewCaseCommand(created.reviewCaseId(), List.of(), "APR-1", null)))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
+
+        assertThatThrownBy(() -> reviews.forceApprove(forceAdmin(), metadata("force-no-ref"),
+                new ForceApproveReviewCaseCommand(
+                        created.reviewCaseId(), List.of("UNMET_OCR"), "  ", null)))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
+
+        ReviewCaseView forced = reviews.forceApprove(forceAdmin(), metadata("force-ok"),
+                new ForceApproveReviewCaseCommand(
+                        created.reviewCaseId(), List.of("UNMET_OCR"), "APR-FORCE-1", "override"));
+        ReviewCaseView replay = reviews.forceApprove(forceAdmin(), metadata("force-ok"),
+                new ForceApproveReviewCaseCommand(
+                        created.reviewCaseId(), List.of("UNMET_OCR"), "APR-FORCE-1", "override"));
+
+        assertThat(replay.reviewCaseId()).isEqualTo(forced.reviewCaseId());
+        assertThat(forced.status()).isEqualTo("FORCE_APPROVED");
+        assertThat(forced.decisions()).hasSize(1);
+        assertThat(forced.decisions().getFirst().decision()).isEqualTo("FORCE_APPROVED");
+        assertThat(forced.decisions().getFirst().approvalRef()).isEqualTo("APR-FORCE-1");
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM rel_outbox_event
+                 WHERE event_type='evidence.review-decided'
+                   AND payload::text LIKE '%FORCE_APPROVED%'
+                """).query(Long.class).single()).isOne();
+        assertThat(jdbc.sql("SELECT count(*) FROM evd_correction_case").query(Long.class).single()).isZero();
+        assertThat(jdbc.sql("SELECT count(*) FROM aud_audit_record WHERE action_name='REVIEW_CASE_FORCE_APPROVED'")
+                .query(Long.class).single()).isOne();
+    }
+
+    @Test
+    void reopenCreatesSuccessorOpenCaseAndPreservesPriorDecisions() throws Exception {
+        EvidenceSetSnapshotView snapshot = createSnapshot("reopen");
+        ReviewCaseView created = reviews.create(reviewer(), metadata("create-reopen"),
+                new CreateReviewCaseCommand(snapshot.evidenceSetSnapshotId(), null));
+        ReviewCaseView approved = reviews.decide(reviewer(), metadata("approve-reopen"),
+                new DecideReviewCaseCommand(created.reviewCaseId(), "APPROVED", List.of(), "ok"));
+
+        assertThatThrownBy(() -> reviews.reopen(reviewer(), metadata("reopen-denied"),
+                new ReopenReviewCaseCommand(approved.reviewCaseId(), "oem reject", "OEM-1", null)))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.ACCESS_DENIED));
+
+        ReviewCaseView reopened = reviews.reopen(forceAdmin(), metadata("reopen-ok"),
+                new ReopenReviewCaseCommand(
+                        approved.reviewCaseId(), "车企驳回", "OEM_REJECTION:batch-1", "APR-RO-1"));
+        ReviewCaseView reopenReplay = reviews.reopen(forceAdmin(), metadata("reopen-ok"),
+                new ReopenReviewCaseCommand(
+                        approved.reviewCaseId(), "车企驳回", "OEM_REJECTION:batch-1", "APR-RO-1"));
+
+        assertThat(reopenReplay.reviewCaseId()).isEqualTo(reopened.reviewCaseId());
+        assertThat(reopened.reviewCaseId()).isNotEqualTo(approved.reviewCaseId());
+        assertThat(reopened.status()).isEqualTo("OPEN");
+        assertThat(reopened.reopenedFromReviewCaseId()).isEqualTo(approved.reviewCaseId());
+        assertThat(reopened.reopenTriggerRef()).isEqualTo("OEM_REJECTION:batch-1");
+        assertThat(reopened.decisions()).isEmpty();
+
+        ReviewCaseView source = reviews.get(forceAdmin(), "corr-get-source", approved.reviewCaseId());
+        assertThat(source.status()).isEqualTo("REOPENED");
+        assertThat(source.decisions()).hasSize(1);
+        assertThat(source.decisions().getFirst().decision()).isEqualTo("APPROVED");
+
+        ReviewCaseView decidedAgain = reviews.decide(reviewer(), metadata("decide-after-reopen"),
+                new DecideReviewCaseCommand(reopened.reviewCaseId(), "REJECTED",
+                        List.of("FAKE_PHOTO"), "again"));
+        assertThat(decidedAgain.status()).isEqualTo("REJECTED");
+        assertThat(jdbc.sql("SELECT count(*) FROM evd_review_case").query(Long.class).single()).isEqualTo(2);
+        assertThat(jdbc.sql("SELECT count(*) FROM evd_review_decision").query(Long.class).single()).isEqualTo(2);
+        assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type='evidence.review-case-reopened'")
+                .query(Long.class).single()).isOne();
+    }
+
+    private CurrentPrincipal forceAdmin() {
+        return new CurrentPrincipal(
+                FORCE_ADMIN, TENANT, CurrentPrincipal.PrincipalType.USER, "ops-web", Set.of());
     }
 
     private EvidenceSetSnapshotView createSnapshot(String marker) throws Exception {

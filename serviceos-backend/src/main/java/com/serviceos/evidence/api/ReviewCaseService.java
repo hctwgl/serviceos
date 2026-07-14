@@ -11,5 +11,10 @@ public interface ReviewCaseService {
 
     ReviewCaseView decide(CurrentPrincipal principal, CommandMetadata metadata, DecideReviewCaseCommand command);
 
+    ReviewCaseView forceApprove(
+            CurrentPrincipal principal, CommandMetadata metadata, ForceApproveReviewCaseCommand command);
+
+    ReviewCaseView reopen(CurrentPrincipal principal, CommandMetadata metadata, ReopenReviewCaseCommand command);
+
     ReviewCaseView get(CurrentPrincipal principal, String correlationId, UUID reviewCaseId);
 }

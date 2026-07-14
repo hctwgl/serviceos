@@ -2,6 +2,8 @@ package com.serviceos.evidence.web;
 
 import com.serviceos.evidence.api.CreateReviewCaseCommand;
 import com.serviceos.evidence.api.DecideReviewCaseCommand;
+import com.serviceos.evidence.api.ForceApproveReviewCaseCommand;
+import com.serviceos.evidence.api.ReopenReviewCaseCommand;
 import com.serviceos.evidence.api.ReviewCaseService;
 import com.serviceos.evidence.api.ReviewCaseView;
 import com.serviceos.evidence.api.ReviewDecisionView;
@@ -73,19 +75,52 @@ final class ReviewCaseController {
                         reviewCaseId, request.decision(), request.reasonCodes(), request.note())));
     }
 
+    @PostMapping("/review-cases/{reviewCaseId}:force-approve")
+    ReviewCaseResponse forceApprove(
+            @PathVariable UUID reviewCaseId,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestBody ForceApproveReviewCaseRequest request
+    ) {
+        return response(reviews.forceApprove(
+                principals.current(),
+                new CommandMetadata(correlationId, idempotencyKey),
+                new ForceApproveReviewCaseCommand(
+                        reviewCaseId, request.reasonCodes(), request.approvalRef(), request.note())));
+    }
+
+    @PostMapping("/review-cases/{reviewCaseId}:reopen")
+    ResponseEntity<ReviewCaseResponse> reopen(
+            @PathVariable UUID reviewCaseId,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestBody ReopenReviewCaseRequest request
+    ) {
+        ReviewCaseView reviewCase = reviews.reopen(
+                principals.current(),
+                new CommandMetadata(correlationId, idempotencyKey),
+                new ReopenReviewCaseCommand(
+                        reviewCaseId, request.reason(), request.triggerRef(), request.approvalRef()));
+        return ResponseEntity
+                .created(URI.create("/api/v1/review-cases/" + reviewCase.reviewCaseId()))
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(response(reviewCase));
+    }
+
     private ReviewCaseResponse response(ReviewCaseView reviewCase) {
         return new ReviewCaseResponse(
                 reviewCase.reviewCaseId(), reviewCase.projectId(), reviewCase.taskId(),
                 reviewCase.evidenceSetSnapshotId(), reviewCase.snapshotContentDigest(),
                 reviewCase.scopeType(), reviewCase.policyVersion(), reviewCase.status(),
                 reviewCase.createdBy(), reviewCase.createdAt(), reviewCase.decidedAt(),
+                reviewCase.reopenedFromReviewCaseId(), reviewCase.reopenTriggerRef(),
                 reviewCase.decisions().stream().map(this::decision).toList());
     }
 
     private ReviewDecisionResponse decision(ReviewDecisionView decision) {
         return new ReviewDecisionResponse(
                 decision.reviewDecisionId(), decision.reviewCaseId(), decision.decisionOrdinal(),
-                decision.decision(), decision.reasonCodes(), decision.note(),
+                decision.decision(), decision.reasonCodes(), decision.note(), decision.approvalRef(),
                 decision.decidedBy(), decision.decidedAt());
     }
 
@@ -93,6 +128,12 @@ final class ReviewCaseController {
     }
 
     record DecideReviewCaseRequest(String decision, List<String> reasonCodes, String note) {
+    }
+
+    record ForceApproveReviewCaseRequest(List<String> reasonCodes, String approvalRef, String note) {
+    }
+
+    record ReopenReviewCaseRequest(String reason, String triggerRef, String approvalRef) {
     }
 
     record ReviewCaseResponse(
@@ -107,6 +148,8 @@ final class ReviewCaseController {
             String createdBy,
             Instant createdAt,
             Instant decidedAt,
+            UUID reopenedFromReviewCaseId,
+            String reopenTriggerRef,
             List<ReviewDecisionResponse> decisions
     ) {
     }
@@ -118,6 +161,7 @@ final class ReviewCaseController {
             String decision,
             List<String> reasonCodes,
             String note,
+            String approvalRef,
             String decidedBy,
             Instant decidedAt
     ) {

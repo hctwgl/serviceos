@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://serviceos.example/schemas/events/evidence-review-decided-v1.schema.json",
-  "title": "EvidenceReviewDecidedV1",
+  "$id": "https://serviceos.example/schemas/events/evidence-review-case-reopened-v1.schema.json",
+  "title": "EvidenceReviewCaseReopenedV1",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -10,7 +10,7 @@
   ],
   "properties": {
     "eventId": {"type": "string", "format": "uuid"},
-    "eventType": {"const": "evidence.review-decided"},
+    "eventType": {"const": "evidence.review-case-reopened"},
     "schemaVersion": {"const": 1},
     "tenantId": {"type": "string"},
     "correlationId": {"type": "string"},
@@ -23,24 +23,19 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "reviewCaseId", "reviewDecisionId", "evidenceSetSnapshotId", "taskId", "projectId",
-        "decision", "reasonCodes", "decidedBy", "decidedAt"
+        "sourceReviewCaseId", "reviewCaseId", "evidenceSetSnapshotId", "taskId", "projectId",
+        "triggerRef", "reason", "reopenedBy", "reopenedAt"
       ],
       "properties": {
+        "sourceReviewCaseId": {"type": "string", "format": "uuid"},
         "reviewCaseId": {"type": "string", "format": "uuid"},
-        "reviewDecisionId": {"type": "string", "format": "uuid"},
         "evidenceSetSnapshotId": {"type": "string", "format": "uuid"},
         "taskId": {"type": "string", "format": "uuid"},
         "projectId": {"type": "string", "format": "uuid"},
-        "decision": {"enum": ["APPROVED", "REJECTED", "FORCE_APPROVED"]},
-        "approvalRef": {"type": ["string", "null"], "maxLength": 160},
-        "reasonCodes": {
-          "type": "array",
-          "maxItems": 20,
-          "items": {"type": "string", "minLength": 1, "maxLength": 80}
-        },
-        "decidedBy": {"type": "string", "minLength": 1, "maxLength": 128},
-        "decidedAt": {"type": "string", "format": "date-time"}
+        "triggerRef": {"type": "string", "minLength": 1, "maxLength": 160},
+        "reason": {"type": "string", "minLength": 1, "maxLength": 1000},
+        "reopenedBy": {"type": "string", "minLength": 1, "maxLength": 128},
+        "reopenedAt": {"type": "string", "format": "date-time"}
       }
     }
   }

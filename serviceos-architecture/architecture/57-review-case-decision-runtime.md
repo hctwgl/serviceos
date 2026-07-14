@@ -38,4 +38,4 @@ status: Implemented
 
 ## 5. 未实现
 
-CorrectionCase、强制通过、重开、车企回执、字段级审核、OCR/CV、files 作废联动。
+CorrectionCase（M45）、files 作废联动（M46）、强制通过/重开（M48）已另切片实现；车企回执、字段级审核、OCR/CV 仍未实现。

@@ -12,6 +12,7 @@ public record ReviewDecisionView(
         String decision,
         List<String> reasonCodes,
         String note,
+        String approvalRef,
         String decidedBy,
         Instant decidedAt
 ) {

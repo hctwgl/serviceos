@@ -57,7 +57,7 @@ class ReviewCaseControllerSecurityTest {
         when(reviews.create(eq(principal), any(), any())).thenReturn(new ReviewCaseView(
                 CASE_ID, PROJECT, TASK, SNAPSHOT, "a".repeat(64),
                 "EVIDENCE_SET_SNAPSHOT", "REVIEW_POLICY_V1", "OPEN", "reviewer-1",
-                Instant.parse("2026-07-14T14:00:00Z"), null, List.of()));
+                Instant.parse("2026-07-14T14:00:00Z"), null, null, null, List.of()));
 
         mvc.perform(post("/api/v1/review-cases")
                         .with(jwt().jwt(token -> token.subject("reviewer-1")
@@ -71,5 +71,23 @@ class ReviewCaseControllerSecurityTest {
                 .andExpect(jsonPath("$.status").value("OPEN"));
 
         verify(reviews).create(eq(principal), any(), any());
+    }
+
+    @Test
+    void anonymousForceApproveIsRejected() throws Exception {
+        mvc.perform(post("/api/v1/review-cases/%s:force-approve".formatted(CASE_ID))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("Idempotency-Key", "idem-fa")
+                        .content("{\"reasonCodes\":[\"UNMET\"],\"approvalRef\":\"APR-1\"}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void anonymousReopenIsRejected() throws Exception {
+        mvc.perform(post("/api/v1/review-cases/%s:reopen".formatted(CASE_ID))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("Idempotency-Key", "idem-ro")
+                        .content("{\"reason\":\"oem\",\"triggerRef\":\"OEM-1\"}"))
+                .andExpect(status().isUnauthorized());
     }
 }

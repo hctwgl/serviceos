@@ -4,7 +4,6 @@ import com.serviceos.evidence.api.ReviewCaseView;
 import com.serviceos.evidence.api.ReviewDecisionView;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -20,11 +19,13 @@ public interface ReviewCaseRepository {
             Instant decidedAt
     );
 
+    int markReopened(String tenantId, UUID reviewCaseId, String expectedStatus);
+
     void insertDecision(String tenantId, UUID projectId, ReviewDecisionView decision);
 
     Optional<ReviewCaseView> find(String tenantId, UUID reviewCaseId);
 
-    Optional<UUID> findBySnapshot(String tenantId, UUID snapshotId);
+    Optional<UUID> findActiveBySnapshot(String tenantId, UUID snapshotId);
 
     Optional<UUID> findCommandResult(String tenantId, String operationType, String idempotencyKey);
 

@@ -42,6 +42,9 @@ final class MyBatisReviewCaseRepository implements ReviewCaseRepository {
         values.put("createdBy", reviewCase.createdBy());
         values.put("createdAt", reviewCase.createdAt());
         values.put("decidedAt", reviewCase.decidedAt());
+        values.put("reopenedFromReviewCaseId", reviewCase.reopenedFromReviewCaseId() == null
+                ? null : reviewCase.reopenedFromReviewCaseId().toString());
+        values.put("reopenTriggerRef", reviewCase.reopenTriggerRef());
         mapper.insertCase(values);
     }
 
@@ -51,6 +54,11 @@ final class MyBatisReviewCaseRepository implements ReviewCaseRepository {
     ) {
         return mapper.markDecided(
                 tenantId, reviewCaseId.toString(), expectedStatus, status, decidedAt);
+    }
+
+    @Override
+    public int markReopened(String tenantId, UUID reviewCaseId, String expectedStatus) {
+        return mapper.markReopened(tenantId, reviewCaseId.toString(), expectedStatus);
     }
 
     @Override
@@ -64,6 +72,7 @@ final class MyBatisReviewCaseRepository implements ReviewCaseRepository {
         values.put("decision", decision.decision());
         values.put("reasonCodes", writeJson(decision.reasonCodes()));
         values.put("note", decision.note());
+        values.put("approvalRef", decision.approvalRef());
         values.put("decidedBy", decision.decidedBy());
         values.put("decidedAt", decision.decidedAt());
         mapper.insertDecision(values);
@@ -81,8 +90,8 @@ final class MyBatisReviewCaseRepository implements ReviewCaseRepository {
     }
 
     @Override
-    public Optional<UUID> findBySnapshot(String tenantId, UUID snapshotId) {
-        String id = mapper.findCaseIdBySnapshot(tenantId, snapshotId.toString());
+    public Optional<UUID> findActiveBySnapshot(String tenantId, UUID snapshotId) {
+        String id = mapper.findActiveCaseIdBySnapshot(tenantId, snapshotId.toString());
         return id == null ? Optional.empty() : Optional.of(UUID.fromString(id));
     }
 
@@ -115,6 +124,8 @@ final class MyBatisReviewCaseRepository implements ReviewCaseRepository {
                 text(row, "scopeType"), text(row, "policyVersion"), text(row, "status"),
                 text(row, "createdBy"), instant(row.get("createdAt")),
                 row.get("decidedAt") == null ? null : instant(row.get("decidedAt")),
+                row.get("reopenedFromReviewCaseId") == null ? null : uuid(row, "reopenedFromReviewCaseId"),
+                row.get("reopenTriggerRef") == null ? null : text(row, "reopenTriggerRef"),
                 decisions);
     }
 
@@ -124,6 +135,7 @@ final class MyBatisReviewCaseRepository implements ReviewCaseRepository {
                 ((Number) row.get("decisionOrdinal")).intValue(), text(row, "decision"),
                 readCodes(text(row, "reasonCodes")),
                 row.get("note") == null ? null : text(row, "note"),
+                row.get("approvalRef") == null ? null : text(row, "approvalRef"),
                 text(row, "decidedBy"), instant(row.get("decidedAt")));
     }
 
