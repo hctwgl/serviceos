@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.7.0
+  version: 0.8.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -499,6 +499,96 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /work-orders/{workOrderId}/visits:
+    get:
+      operationId: listWorkOrderVisits
+      summary: 查询工单的完整上门历史
+      description: 按签到采集时间排序；每次实际上门均为独立 Visit，不覆盖历史事实。
+      parameters:
+        - $ref: '#/components/parameters/WorkOrderId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 当前租户和授权范围内的 Visit 历史
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Visit' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /appointments/{appointmentId}/visits:check-in:
+    post:
+      operationId: checkInVisit
+      summary: 当前责任技师按有效预约签到
+      description: Idempotency-Key 必须等于 deviceCommandId；服务器同时保存 capturedAt 和 receivedAt。
+      parameters:
+        - $ref: '#/components/parameters/AppointmentId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CheckInVisitRequest' }
+      responses:
+        '201':
+          description: Visit 已创建或返回首次幂等冻结响应
+          headers:
+            Location: { required: true, schema: { type: string } }
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VisitCommandReceipt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /visits/{visitId}:check-out:
+    post:
+      operationId: checkOutVisit
+      summary: 当前责任技师完成现场作业并签退
+      parameters:
+        - $ref: '#/components/parameters/VisitId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CheckOutVisitRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/VisitCommandReceipt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /visits/{visitId}:interrupt:
+    post:
+      operationId: interruptVisit
+      summary: 以受控异常码中断现场作业
+      parameters:
+        - $ref: '#/components/parameters/VisitId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InterruptVisitRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/VisitCommandReceipt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
 components:
   securitySchemes:
     bearerAuth:
@@ -519,6 +609,16 @@ components:
       schema: { type: string, format: uuid }
     AppointmentId:
       name: appointmentId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    WorkOrderId:
+      name: workOrderId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    VisitId:
+      name: visitId
       in: path
       required: true
       schema: { type: string, format: uuid }
@@ -899,7 +999,7 @@ components:
         workOrderId: { type: string, format: uuid }
         taskId: { type: string, format: uuid }
         type: { enum: [SURVEY, INSTALLATION, REPAIR, CORRECTION, SECOND_VISIT] }
-        status: { enum: [PROPOSED, CONFIRMED, CANCELLED, NO_SHOW] }
+        status: { enum: [PROPOSED, CONFIRMED, CANCELLED, NO_SHOW, IN_PROGRESS, COMPLETED, INTERRUPTED] }
         assignedNetworkId: { type: [string, 'null'] }
         technicianId: { type: [string, 'null'] }
         aggregateVersion: { type: integer, format: int64, minimum: 1 }
@@ -920,10 +1020,103 @@ components:
       properties:
         appointmentId: { type: string, format: uuid }
         revisionId: { type: string, format: uuid }
-        status: { enum: [PROPOSED, CONFIRMED, CANCELLED, NO_SHOW] }
+        status: { enum: [PROPOSED, CONFIRMED, CANCELLED, NO_SHOW, IN_PROGRESS, COMPLETED, INTERRUPTED] }
         revisionNo: { type: integer, minimum: 1 }
         aggregateVersion: { type: integer, format: int64, minimum: 1 }
         occurredAt: { type: string, format: date-time }
+    VisitLocation:
+      type: object
+      additionalProperties: false
+      required: [latitude, longitude, accuracyMeters]
+      properties:
+        latitude: { type: number, minimum: -90, maximum: 90 }
+        longitude: { type: number, minimum: -180, maximum: 180 }
+        accuracyMeters: { type: number, exclusiveMinimum: 0, maximum: 10000 }
+    CheckInVisitRequest:
+      type: object
+      additionalProperties: false
+      required: [capturedAt, deviceCommandId, deviceId, location, offline]
+      properties:
+        capturedAt: { type: string, format: date-time }
+        deviceCommandId: { type: string, minLength: 1, maxLength: 160 }
+        deviceId: { type: string, minLength: 1, maxLength: 160 }
+        location: { $ref: '#/components/schemas/VisitLocation' }
+        offline: { type: boolean }
+    CheckOutVisitRequest:
+      type: object
+      additionalProperties: false
+      required: [capturedAt, resultCode, operationRefs]
+      properties:
+        capturedAt: { type: string, format: date-time }
+        resultCode: { type: string, pattern: '^[A-Z][A-Z0-9_]{1,99}$' }
+        operationRefs:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: { type: string, minLength: 1, maxLength: 500 }
+    InterruptVisitRequest:
+      type: object
+      additionalProperties: false
+      required: [capturedAt, exceptionCode, evidenceRefs]
+      properties:
+        capturedAt: { type: string, format: date-time }
+        exceptionCode: { type: string, pattern: '^[A-Z][A-Z0-9_]{1,99}$' }
+        note: { type: [string, 'null'], maxLength: 500 }
+        evidenceRefs:
+          type: array
+          maxItems: 50
+          items: { type: string, minLength: 1, maxLength: 500 }
+    VisitCommandReceipt:
+      type: object
+      additionalProperties: false
+      required: [visitId, status, aggregateVersion, geofenceResult, policyDecision, occurredAt]
+      properties:
+        visitId: { type: string, format: uuid }
+        status: { enum: [IN_PROGRESS, COMPLETED, INTERRUPTED] }
+        aggregateVersion: { type: integer, format: int64, minimum: 1 }
+        geofenceResult: { enum: [WITHIN_GEOFENCE, OUTSIDE_GEOFENCE, LOCATION_UNAVAILABLE, LOW_ACCURACY] }
+        policyDecision: { enum: [ACCEPTED, WARNING] }
+        occurredAt: { type: string, format: date-time }
+    Visit:
+      type: object
+      additionalProperties: false
+      required: [visitId, projectId, workOrderId, taskId, appointmentId, visitSequence,
+                 technicianId, networkId, status, checkInCapturedAt, checkInReceivedAt,
+                 checkInLocation, geofenceResult, geofenceDistanceMeters, geofencePolicyVersion,
+                 policyDecision, deviceId, deviceCommandId, offline, checkOutCapturedAt,
+                 checkOutReceivedAt, resultCode, exceptionCode, note, operationRefs,
+                 evidenceRefs, aggregateVersion, allowedActions]
+      properties:
+        visitId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        workOrderId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        appointmentId: { type: string, format: uuid }
+        visitSequence: { type: integer, minimum: 1 }
+        technicianId: { type: string, minLength: 1, maxLength: 128 }
+        networkId: { type: [string, 'null'] }
+        status: { enum: [IN_PROGRESS, COMPLETED, INTERRUPTED] }
+        checkInCapturedAt: { type: string, format: date-time }
+        checkInReceivedAt: { type: string, format: date-time }
+        checkInLocation: { $ref: '#/components/schemas/VisitLocation' }
+        geofenceResult: { enum: [WITHIN_GEOFENCE, OUTSIDE_GEOFENCE, LOCATION_UNAVAILABLE, LOW_ACCURACY] }
+        geofenceDistanceMeters: { type: [number, 'null'], minimum: 0 }
+        geofencePolicyVersion: { type: [string, 'null'] }
+        policyDecision: { enum: [ACCEPTED, WARNING] }
+        deviceId: { type: string }
+        deviceCommandId: { type: string }
+        offline: { type: boolean }
+        checkOutCapturedAt: { type: [string, 'null'], format: date-time }
+        checkOutReceivedAt: { type: [string, 'null'], format: date-time }
+        resultCode: { type: [string, 'null'] }
+        exceptionCode: { type: [string, 'null'] }
+        note: { type: [string, 'null'] }
+        operationRefs: { type: array, items: { type: string } }
+        evidenceRefs: { type: array, items: { type: string } }
+        aggregateVersion: { type: integer, format: int64, minimum: 1 }
+        allowedActions:
+          type: array
+          items: { enum: [visit.checkOut, visit.interrupt] }
     Problem:
       type: object
       required: [type, title, status, errorCode]
@@ -936,6 +1129,14 @@ components:
         errorCode: { type: string }
         correlationId: { type: [string, 'null'] }
   responses:
+    VisitCommandReceipt:
+      description: Visit 命令成功或返回首次幂等冻结响应
+      headers:
+        ETag: { required: true, schema: { type: string } }
+        X-Correlation-Id: { required: true, schema: { type: string } }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/VisitCommandReceipt' }
     AppointmentCommandReceipt:
       description: 命令成功或返回首次幂等冻结响应
       headers:

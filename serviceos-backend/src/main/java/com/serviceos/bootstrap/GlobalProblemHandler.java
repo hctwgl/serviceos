@@ -30,6 +30,8 @@ final class GlobalProblemHandler {
                  TASK_EXECUTION_GUARDED,
                  DISPATCH_CAPACITY_CONFLICT, SERVICE_ASSIGNMENT_CONFLICT,
                  APPOINTMENT_VERSION_CONFLICT, APPOINTMENT_WINDOW_NOT_ENDED,
+                 TECHNICIAN_ASSIGNMENT_CHANGED, VISIT_VERSION_CONFLICT,
+                 VISIT_GEOFENCE_REJECTED,
                  VERSION_CONFLICT -> HttpStatus.CONFLICT;
             case FILE_UPLOAD_EXPIRED -> HttpStatus.GONE;
             case FILE_NOT_AVAILABLE -> HttpStatus.LOCKED;

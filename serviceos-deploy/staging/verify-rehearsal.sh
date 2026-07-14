@@ -67,7 +67,7 @@ fi
 after_container="$(docker compose --env-file "${env_file}" \
   -f "${repo_root}/serviceos-deploy/compose.staging.yaml" ps -q backend)"
 [[ "${before_container}" == "${after_container}" ]]
-rg -q 'migration version mismatch: expected=999 actual=031' "${evidence_dir}/fail-closed.log"
+rg -q 'migration version mismatch: expected=999 actual=032' "${evidence_dir}/fail-closed.log"
 curl --fail --silent --show-error "http://127.0.0.1:18080/readyz" \
   | jq -e '.status == "UP"' >/dev/null
 

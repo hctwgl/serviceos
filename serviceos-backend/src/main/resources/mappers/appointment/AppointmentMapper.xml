@@ -134,6 +134,13 @@
            AND status = #{expectedStatus} AND aggregate_version = #{expectedVersion}
     </update>
 
+    <update id="advanceStatus" parameterType="map">
+        UPDATE apt_appointment
+           SET status = #{newStatus}, aggregate_version = aggregate_version + 1
+         WHERE tenant_id = #{tenantId} AND appointment_id = #{appointmentId}
+           AND status = #{expectedStatus} AND aggregate_version = #{expectedVersion}
+    </update>
+
     <insert id="insertHistory" parameterType="map">
         INSERT INTO apt_appointment_status_history (
             history_id, tenant_id, appointment_id, aggregate_version, from_status, to_status,

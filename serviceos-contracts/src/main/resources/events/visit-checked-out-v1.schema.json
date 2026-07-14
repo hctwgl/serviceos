@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/visit-checked-out-v1.schema.json",
+  "title": "VisitCheckedOutV1", "type": "object", "additionalProperties": false,
+  "required": ["eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId", "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"}, "eventType": {"const": "visit.checked-out"}, "schemaVersion": {"const": 1},
+    "tenantId": {"type": "string"}, "correlationId": {"type": "string"}, "causationId": {"type": "string"},
+    "aggregateType": {"const": "Visit"}, "aggregateId": {"type": "string", "format": "uuid"},
+    "aggregateVersion": {"type": "integer", "minimum": 2}, "occurredAt": {"type": "string", "format": "date-time"}, "payload": {"$ref": "#/$defs/payload"}
+  },
+  "$defs": {"payload": {
+    "type": "object", "additionalProperties": false,
+    "required": ["visitId", "appointmentId", "projectId", "workOrderId", "taskId", "visitSequence", "technicianId", "networkId", "status", "capturedAt", "receivedAt", "geofenceResult", "policyDecision", "resultCode", "exceptionCode", "operationRefs", "evidenceRefs", "aggregateVersion", "occurredAt", "eventType"],
+    "properties": {
+      "visitId": {"type": "string", "format": "uuid"}, "appointmentId": {"type": "string", "format": "uuid"}, "projectId": {"type": "string", "format": "uuid"},
+      "workOrderId": {"type": "string", "format": "uuid"}, "taskId": {"type": "string", "format": "uuid"}, "visitSequence": {"type": "integer", "minimum": 1},
+      "technicianId": {"type": "string"}, "networkId": {"type": ["string", "null"]}, "status": {"const": "COMPLETED"},
+      "capturedAt": {"type": "string", "format": "date-time"}, "receivedAt": {"type": "string", "format": "date-time"},
+      "geofenceResult": {"enum": ["WITHIN_GEOFENCE", "OUTSIDE_GEOFENCE", "LOCATION_UNAVAILABLE", "LOW_ACCURACY"]}, "policyDecision": {"enum": ["ACCEPTED", "WARNING"]},
+      "resultCode": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{1,99}$"}, "exceptionCode": {"type": "null"},
+      "operationRefs": {"type": "array", "minItems": 1, "items": {"type": "string"}}, "evidenceRefs": {"type": "array", "maxItems": 0},
+      "aggregateVersion": {"type": "integer", "minimum": 2}, "occurredAt": {"type": "string", "format": "date-time"}, "eventType": {"const": "visit.checked-out"}
+    }
+  }}
+}

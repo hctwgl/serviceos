@@ -36,6 +36,8 @@ interface AppointmentMapper {
 
     int advance(Map<String, Object> parameters);
 
+    int advanceStatus(Map<String, Object> parameters);
+
     void insertHistory(Map<String, Object> parameters);
 
     void insertResult(Map<String, Object> parameters);

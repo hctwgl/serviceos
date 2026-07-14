@@ -29,3 +29,7 @@
 - [M26 切换前可靠终止验收矩阵](23-m26-pre-switch-abort-saga-acceptance.md)
 - [M27 ServiceAssignment 激活超时对账验收矩阵](24-m27-assignment-saga-timeout-acceptance.md)
 - [M28 ServiceAssignment 超时异常自动恢复验收矩阵](25-m28-assignment-timeout-auto-recovery-acceptance.md)
+- [M29 运营异常工作台验收矩阵](26-m29-operational-exception-workbench-acceptance.md)
+- [M30 预约修订验收矩阵](27-m30-appointment-revision-acceptance.md)
+- [M31 预约联系与终态验收矩阵](28-m31-appointment-contact-terminal-acceptance.md)
+- [M32 Visit 现场生命周期验收矩阵](29-m32-visit-lifecycle-acceptance.md)

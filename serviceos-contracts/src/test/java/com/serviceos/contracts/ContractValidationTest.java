@@ -34,7 +34,10 @@ class ContractValidationTest {
                         "/tasks/{taskId}:assign-candidates", "/tasks/{taskId}:claim",
                         "/tasks/{taskId}:start", "/tasks/{taskId}:complete", "/tasks/{taskId}:release",
                         "/tasks/{taskId}/contact-attempts", "/appointments/{appointmentId}:cancel",
-                        "/appointments/{appointmentId}:mark-no-show");
+                        "/appointments/{appointmentId}:mark-no-show",
+                        "/work-orders/{workOrderId}/visits",
+                        "/appointments/{appointmentId}/visits:check-in",
+                        "/visits/{visitId}:check-out", "/visits/{visitId}:interrupt");
     }
 
     @Test

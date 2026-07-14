@@ -31,6 +31,10 @@ public interface AppointmentRepository {
             String tenantId, UUID appointmentId, long expectedVersion, String expectedStatus,
             String newStatus, int newRevisionNo, UUID newRevisionId);
 
+    boolean advanceStatus(
+            String tenantId, UUID appointmentId, long expectedVersion,
+            String expectedStatus, String newStatus);
+
     void appendRevision(String tenantId, UUID appointmentId, AppointmentRevisionView revision);
 
     void appendHistory(

@@ -112,6 +112,20 @@ final class MyBatisAppointmentRepository implements AppointmentRepository {
     }
 
     @Override
+    public boolean advanceStatus(
+            String tenantId, UUID appointmentId, long expectedVersion,
+            String expectedStatus, String newStatus
+    ) {
+        Map<String, Object> values = new HashMap<>();
+        values.put("tenantId", tenantId);
+        values.put("appointmentId", appointmentId);
+        values.put("expectedVersion", expectedVersion);
+        values.put("expectedStatus", expectedStatus);
+        values.put("newStatus", newStatus);
+        return mapper.advanceStatus(values) == 1;
+    }
+
+    @Override
     public void appendRevision(String tenantId, UUID appointmentId, AppointmentRevisionView revision) {
         mapper.insertRevision(revisionValues(tenantId, appointmentId, revision));
     }

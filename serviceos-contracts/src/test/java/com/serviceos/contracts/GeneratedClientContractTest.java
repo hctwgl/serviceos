@@ -42,6 +42,10 @@ class GeneratedClientContractTest {
                 .contains("startHumanTask")
                 .contains("recordTaskContactAttempt")
                 .contains("cancelAppointment")
-                .contains("markAppointmentNoShow");
+                .contains("markAppointmentNoShow")
+                .contains("listWorkOrderVisits")
+                .contains("checkInVisit")
+                .contains("checkOutVisit")
+                .contains("interruptVisit");
     }
 }

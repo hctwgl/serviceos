@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.serviceos.fieldwork.infrastructure.VisitMapper">
+    <sql id="visitColumns">
+        visit_id AS "visitId", tenant_id AS "tenantId", project_id AS "projectId",
+        work_order_id AS "workOrderId", task_id AS "taskId", appointment_id AS "appointmentId",
+        visit_sequence AS "visitSequence", technician_id AS "technicianId", network_id AS "networkId",
+        status, check_in_captured_at AS "checkInCapturedAt", check_in_received_at AS "checkInReceivedAt",
+        check_in_latitude AS "checkInLatitude", check_in_longitude AS "checkInLongitude",
+        check_in_accuracy_meters AS "checkInAccuracyMeters", geofence_result AS "geofenceResult",
+        geofence_distance_meters AS "geofenceDistanceMeters",
+        geofence_policy_version AS "geofencePolicyVersion", policy_decision AS "policyDecision",
+        device_id AS "deviceId", device_command_id AS "deviceCommandId", offline_flag AS "offlineFlag",
+        check_out_captured_at AS "checkOutCapturedAt", check_out_received_at AS "checkOutReceivedAt",
+        result_code AS "resultCode", exception_code AS "exceptionCode", note,
+        operation_refs::text AS "operationRefs", evidence_refs::text AS "evidenceRefs",
+        aggregate_version AS "aggregateVersion", created_by AS "createdBy", created_at AS "createdAt",
+        updated_at AS "updatedAt"
+    </sql>
+
+    <select id="findById" resultType="map">
+        SELECT <include refid="visitColumns"/> FROM fld_visit
+        WHERE tenant_id = #{tenantId} AND visit_id = #{visitId}
+    </select>
+
+    <select id="findByWorkOrder" resultType="map">
+        SELECT <include refid="visitColumns"/> FROM fld_visit
+        WHERE tenant_id = #{tenantId} AND work_order_id = #{workOrderId}
+        ORDER BY check_in_captured_at, visit_id
+    </select>
+
+    <select id="findGeofencePolicy" resultType="map">
+        SELECT project_id AS "projectId", target_latitude AS "targetLatitude",
+               target_longitude AS "targetLongitude", radius_meters AS "radiusMeters",
+               max_accuracy_meters AS "maxAccuracyMeters", exception_action AS "exceptionAction",
+               policy_version AS "policyVersion"
+        FROM fld_geofence_policy WHERE tenant_id = #{tenantId} AND project_id = #{projectId}
+    </select>
+
+    <select id="nextSequence" resultType="int">
+        SELECT COALESCE(MAX(visit_sequence), 0) + 1 FROM fld_visit
+        WHERE tenant_id = #{tenantId} AND task_id = #{taskId}
+    </select>
+
+    <select id="lockTask" resultType="long">
+        SELECT version FROM tsk_task
+        WHERE tenant_id = #{tenantId} AND task_id = #{taskId}
+        FOR UPDATE
+    </select>
+
+    <insert id="insertVisit" parameterType="map">
+        INSERT INTO fld_visit (
+            visit_id, tenant_id, project_id, work_order_id, task_id, appointment_id,
+            visit_sequence, technician_id, network_id, status,
+            check_in_captured_at, check_in_received_at, check_in_latitude,
+            check_in_longitude, check_in_accuracy_meters, geofence_result,
+            geofence_distance_meters, geofence_policy_version, policy_decision,
+            device_id, device_command_id, offline_flag, aggregate_version,
+            created_by, created_at, updated_at)
+        VALUES (
+            #{visitId}, #{tenantId}, #{projectId}, #{workOrderId}, #{taskId}, #{appointmentId},
+            #{visitSequence}, #{technicianId}, #{networkId}, #{status},
+            #{checkInCapturedAt}, #{checkInReceivedAt}, #{latitude}, #{longitude},
+            #{accuracyMeters}, #{geofenceResult}, #{geofenceDistanceMeters},
+            #{geofencePolicyVersion}, #{policyDecision}, #{deviceId}, #{deviceCommandId},
+            #{offline}, #{aggregateVersion}, #{createdBy}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <update id="terminate" parameterType="map">
+        UPDATE fld_visit
+        SET status = #{newStatus}, check_out_captured_at = #{capturedAt},
+            check_out_received_at = #{receivedAt}, result_code = #{resultCode},
+            exception_code = #{exceptionCode}, note = #{note},
+            operation_refs = CAST(#{operationRefs} AS jsonb),
+            evidence_refs = CAST(#{evidenceRefs} AS jsonb),
+            aggregate_version = aggregate_version + 1, updated_at = #{receivedAt}
+        WHERE tenant_id = #{tenantId} AND visit_id = #{visitId}
+          AND aggregate_version = #{expectedVersion} AND status = 'IN_PROGRESS'
+    </update>
+
+    <insert id="insertFact" parameterType="map">
+        INSERT INTO fld_visit_fact (
+            visit_fact_id, tenant_id, visit_id, aggregate_version, fact_type,
+            captured_at, received_at, latitude, longitude, accuracy_meters,
+            geofence_result, result_code, exception_code, note, reference_list,
+            actor_id, device_id, offline_flag)
+        VALUES (
+            #{visitFactId}, #{tenantId}, #{visitId}, #{aggregateVersion}, #{factType},
+            #{capturedAt}, #{receivedAt}, #{latitude}, #{longitude}, #{accuracyMeters},
+            #{geofenceResult}, #{resultCode}, #{exceptionCode}, #{note},
+            CAST(#{referenceList} AS jsonb), #{actorId}, #{deviceId}, #{offline})
+    </insert>
+
+    <insert id="insertResult" parameterType="map">
+        INSERT INTO fld_visit_command_result (
+            tenant_id, operation_type, idempotency_key, visit_id, status,
+            aggregate_version, geofence_result, policy_decision, occurred_at)
+        VALUES (#{tenantId}, #{operationType}, #{idempotencyKey}, #{visitId}, #{status},
+                #{aggregateVersion}, #{geofenceResult}, #{policyDecision}, #{occurredAt})
+    </insert>
+
+    <select id="findResult" resultType="map">
+        SELECT visit_id AS "visitId", status, aggregate_version AS "aggregateVersion",
+               geofence_result AS "geofenceResult", policy_decision AS "policyDecision",
+               occurred_at AS "occurredAt"
+        FROM fld_visit_command_result
+        WHERE tenant_id = #{tenantId} AND operation_type = #{operationType}
+          AND idempotency_key = #{idempotencyKey}
+    </select>
+</mapper>
