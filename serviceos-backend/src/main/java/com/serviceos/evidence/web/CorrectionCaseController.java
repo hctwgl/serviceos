@@ -5,6 +5,7 @@ import com.serviceos.evidence.api.CorrectionCaseService;
 import com.serviceos.evidence.api.CorrectionCaseView;
 import com.serviceos.evidence.api.CorrectionResubmissionView;
 import com.serviceos.evidence.api.ResubmitCorrectionCaseCommand;
+import com.serviceos.evidence.api.WaiveCorrectionCaseCommand;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.CorrelationIds;
@@ -68,6 +69,20 @@ final class CorrectionCaseController {
                 new CloseCorrectionCaseCommand(correctionCaseId, note)));
     }
 
+    @PostMapping("/correction-cases/{correctionCaseId}:waive")
+    CorrectionCaseResponse waive(
+            @PathVariable UUID correctionCaseId,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestBody WaiveCorrectionCaseRequest request
+    ) {
+        return response(corrections.waive(
+                principals.current(),
+                new CommandMetadata(correlationId, idempotencyKey),
+                new WaiveCorrectionCaseCommand(
+                        correctionCaseId, request.reason(), request.approvalRef())));
+    }
+
     private CorrectionCaseResponse response(CorrectionCaseView correction) {
         return new CorrectionCaseResponse(
                 correction.correctionCaseId(), correction.projectId(), correction.taskId(),
@@ -77,6 +92,8 @@ final class CorrectionCaseController {
                 correction.createdBy(),
                 correction.createdAt(), correction.latestResubmissionSnapshotId(),
                 correction.closedBy(), correction.closedAt(),
+                correction.waivedBy(), correction.waivedAt(),
+                correction.waiveApprovalRef(), correction.waiveNote(),
                 correction.resubmissions().stream().map(this::round).toList());
     }
 
@@ -91,6 +108,9 @@ final class CorrectionCaseController {
     }
 
     record CloseCorrectionCaseRequest(String note) {
+    }
+
+    record WaiveCorrectionCaseRequest(String reason, String approvalRef) {
     }
 
     record CorrectionCaseResponse(
@@ -109,6 +129,10 @@ final class CorrectionCaseController {
             UUID latestResubmissionSnapshotId,
             String closedBy,
             Instant closedAt,
+            String waivedBy,
+            Instant waivedAt,
+            String waiveApprovalRef,
+            String waiveNote,
             List<CorrectionResubmissionResponse> resubmissions
     ) {
     }

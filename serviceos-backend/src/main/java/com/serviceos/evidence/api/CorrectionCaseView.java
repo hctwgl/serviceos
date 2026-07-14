@@ -21,6 +21,10 @@ public record CorrectionCaseView(
         UUID latestResubmissionSnapshotId,
         String closedBy,
         Instant closedAt,
+        String waivedBy,
+        Instant waivedAt,
+        String waiveApprovalRef,
+        String waiveNote,
         List<CorrectionResubmissionView> resubmissions
 ) {
 }

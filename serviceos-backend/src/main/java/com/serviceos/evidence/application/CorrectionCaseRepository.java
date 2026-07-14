@@ -33,6 +33,16 @@ public interface CorrectionCaseRepository {
             Instant closedAt
     );
 
+    int markWaived(
+            String tenantId,
+            UUID correctionCaseId,
+            String expectedStatus,
+            String waivedBy,
+            Instant waivedAt,
+            String approvalRef,
+            String note
+    );
+
     Optional<CorrectionCaseView> find(String tenantId, UUID correctionCaseId);
 
     Optional<UUID> findBySourceDecision(String tenantId, UUID reviewDecisionId);

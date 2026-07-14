@@ -20,6 +20,7 @@ import com.serviceos.evidence.api.FinalizeEvidenceUploadCommand;
 import com.serviceos.evidence.api.ResubmitCorrectionCaseCommand;
 import com.serviceos.evidence.api.ReviewCaseService;
 import com.serviceos.evidence.api.ReviewCaseView;
+import com.serviceos.evidence.api.WaiveCorrectionCaseCommand;
 import com.serviceos.files.infrastructure.LocalObjectTransferService;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.reliability.spi.OutboxMessage;
@@ -64,6 +65,7 @@ class CorrectionCasePostgresIT {
     private static final String TENANT = "tenant-correction-case-it";
     private static final String TECHNICIAN = "technician-evidence-045";
     private static final String REVIEWER = "reviewer-evidence-045";
+    private static final String WAIVER = "waiver-evidence-051";
     private static final Path STORAGE_ROOT = temporaryStorageRoot();
 
     @Container
@@ -129,6 +131,7 @@ class CorrectionCasePostgresIT {
                 .param("startsOn", LocalDate.now().minusDays(1)).update();
         grant(TECHNICIAN, "evidence.submit", "evidence.read", "file.upload", "file.download");
         grant(REVIEWER, "evidence.review", "evidence.read");
+        grant(WAIVER, "evidence.waiveCorrection", "evidence.read");
         seedResolvedSlot();
     }
 
@@ -203,6 +206,73 @@ class CorrectionCasePostgresIT {
 
         assertThatThrownBy(() -> corrections.resubmit(technician(), metadata("resubmit-after-close"),
                 new ResubmitCorrectionCaseCommand(correctionId, second.evidenceSetSnapshotId())))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code())
+                                .isEqualTo(ProblemCode.CORRECTION_CASE_STATE_CONFLICT));
+    }
+
+    @Test
+    void waiveMarksTerminalAndCancelsCorrectionTask() throws Exception {
+        EvidenceSetSnapshotView first = createSnapshot("waive-first");
+        ReviewCaseView review = reviews.create(reviewer(), metadata("waive-review-create"),
+                new CreateReviewCaseCommand(first.evidenceSetSnapshotId(), null));
+        reviews.decide(reviewer(), metadata("waive-review-reject"),
+                new DecideReviewCaseCommand(review.reviewCaseId(), "REJECTED",
+                        List.of("IMAGE.BLUR"), "blurry"));
+        UUID correctionId = jdbc.sql("""
+                SELECT correction_case_id FROM evd_correction_case
+                 WHERE source_review_case_id = :review
+                """).param("review", review.reviewCaseId()).query(UUID.class).single();
+        CorrectionCaseView opened = corrections.get(reviewer(), "waive-get", correctionId);
+        assertThat(opened.status()).isEqualTo("IN_PROGRESS");
+        UUID correctionTaskId = opened.correctionTaskId();
+        assertThat(correctionTaskId).isNotNull();
+
+        assertThatThrownBy(() -> corrections.waive(reviewer(), metadata("waive-denied"),
+                new WaiveCorrectionCaseCommand(correctionId, "skip", "APR-1")))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.ACCESS_DENIED));
+
+        assertThatThrownBy(() -> corrections.waive(waiver(), metadata("waive-empty"),
+                new WaiveCorrectionCaseCommand(correctionId, " ", "APR-1")))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
+
+        assertThatThrownBy(() -> corrections.waive(waiver(), metadata("waive-no-ref"),
+                new WaiveCorrectionCaseCommand(correctionId, "authorized skip", null)))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
+
+        CorrectionCaseView waived = corrections.waive(waiver(), metadata("waive-ok"),
+                new WaiveCorrectionCaseCommand(correctionId, "authorized skip", "APR-WAIVE-1"));
+        CorrectionCaseView replay = corrections.waive(waiver(), metadata("waive-ok"),
+                new WaiveCorrectionCaseCommand(correctionId, "authorized skip", "APR-WAIVE-1"));
+        assertThat(replay.status()).isEqualTo("WAIVED");
+        assertThat(waived.status()).isEqualTo("WAIVED");
+        assertThat(waived.waivedBy()).isEqualTo(WAIVER);
+        assertThat(waived.waiveApprovalRef()).isEqualTo("APR-WAIVE-1");
+        assertThat(waived.waiveNote()).isEqualTo("authorized skip");
+        assertThat(waived.closedBy()).isNull();
+        assertThat(jdbc.sql("""
+                SELECT status FROM tsk_task WHERE task_id = :task
+                """).param("task", correctionTaskId).query(String.class).single())
+                .isEqualTo("CANCELLED");
+        assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type='evidence.correction-waived'")
+                .query(Long.class).single()).isOne();
+
+        EvidenceSetSnapshotView second = createSnapshot("waive-second");
+        assertThatThrownBy(() -> corrections.resubmit(technician(), metadata("resubmit-after-waive"),
+                new ResubmitCorrectionCaseCommand(correctionId, second.evidenceSetSnapshotId())))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code())
+                                .isEqualTo(ProblemCode.CORRECTION_CASE_STATE_CONFLICT));
+        assertThatThrownBy(() -> corrections.close(reviewer(), metadata("close-after-waive"),
+                new CloseCorrectionCaseCommand(correctionId, "nope")))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code())
+                                .isEqualTo(ProblemCode.CORRECTION_CASE_STATE_CONFLICT));
+        assertThatThrownBy(() -> corrections.waive(waiver(), metadata("waive-again"),
+                new WaiveCorrectionCaseCommand(correctionId, "again", "APR-2")))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code())
                                 .isEqualTo(ProblemCode.CORRECTION_CASE_STATE_CONFLICT));
@@ -385,6 +455,11 @@ class CorrectionCasePostgresIT {
     private CurrentPrincipal reviewer() {
         return new CurrentPrincipal(
                 REVIEWER, TENANT, CurrentPrincipal.PrincipalType.USER, "ops-web", Set.of());
+    }
+
+    private CurrentPrincipal waiver() {
+        return new CurrentPrincipal(
+                WAIVER, TENANT, CurrentPrincipal.PrincipalType.USER, "ops-web", Set.of());
     }
 
     private static CommandMetadata metadata(String suffix) {

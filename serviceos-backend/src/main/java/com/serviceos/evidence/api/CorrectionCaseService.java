@@ -16,6 +16,9 @@ public interface CorrectionCaseService {
     CorrectionCaseView close(
             CurrentPrincipal principal, CommandMetadata metadata, CloseCorrectionCaseCommand command);
 
+    CorrectionCaseView waive(
+            CurrentPrincipal principal, CommandMetadata metadata, WaiveCorrectionCaseCommand command);
+
     /** 由 Review REJECTED 同事务调用；不单独对外暴露。 */
     CorrectionCaseView openFromRejectedDecision(
             String tenantId,

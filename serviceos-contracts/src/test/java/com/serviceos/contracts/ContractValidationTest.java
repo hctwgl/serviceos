@@ -110,6 +110,13 @@ class ContractValidationTest {
     }
 
     @Test
+    void evidenceCorrectionWaivedExampleMustMatchPublishedSchema() throws Exception {
+        assertValidEvent(
+                "/events/evidence-correction-waived-v1.schema.json",
+                "/events/evidence-correction-waived-v1.valid.json");
+    }
+
+    @Test
     void evidenceReviewCaseCreatedExampleMustMatchPublishedSchema() throws Exception {
         assertValidEvent(
                 "/events/evidence-review-case-created-v1.schema.json",

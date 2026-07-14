@@ -21,8 +21,10 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -50,7 +52,8 @@ class CorrectionCaseControllerSecurityTest {
         when(corrections.get(eq(principal), anyString(), eq(CASE_ID))).thenReturn(new CorrectionCaseView(
                 CASE_ID, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
                 UUID.randomUUID(), "a".repeat(64), List.of("IMAGE.BLUR"), UUID.randomUUID(), "OPEN",
-                "reviewer-1", Instant.parse("2026-07-14T15:00:00Z"), null, null, null, List.of()));
+                "reviewer-1", Instant.parse("2026-07-14T15:00:00Z"), null, null, null,
+                null, null, null, null, List.of()));
 
         mvc.perform(get("/api/v1/correction-cases/{id}", CASE_ID)
                         .with(jwt().jwt(token -> token.subject("reviewer-1")
@@ -61,5 +64,16 @@ class CorrectionCaseControllerSecurityTest {
                 .andExpect(jsonPath("$.status").value("OPEN"));
 
         verify(corrections).get(eq(principal), anyString(), eq(CASE_ID));
+    }
+
+    @Test
+    void anonymousWaiveIsRejected() throws Exception {
+        mvc.perform(post("/api/v1/correction-cases/{id}:waive", CASE_ID)
+                        .contentType(APPLICATION_JSON)
+                        .header("Idempotency-Key", "waive-anon")
+                        .content("""
+                                {"reason":"skip","approvalRef":"APR-1"}
+                                """))
+                .andExpect(status().isUnauthorized());
     }
 }

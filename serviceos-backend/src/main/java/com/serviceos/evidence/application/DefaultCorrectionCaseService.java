@@ -11,11 +11,13 @@ import com.serviceos.evidence.api.CorrectionCaseView;
 import com.serviceos.evidence.api.CorrectionResubmissionView;
 import com.serviceos.evidence.api.EvidenceSetSnapshotView;
 import com.serviceos.evidence.api.ResubmitCorrectionCaseCommand;
+import com.serviceos.evidence.api.WaiveCorrectionCaseCommand;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.reliability.api.IdempotencyDecision;
 import com.serviceos.reliability.api.IdempotencyService;
 import com.serviceos.reliability.api.OutboxAppender;
 import com.serviceos.reliability.api.OutboxEvent;
+import com.serviceos.task.api.CancelHandlingTaskCommand;
 import com.serviceos.task.api.CreateHandlingTaskCommand;
 import com.serviceos.task.api.ScheduledTaskView;
 import com.serviceos.task.api.TaskResponsibilityQuery;
@@ -42,8 +44,10 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
     private static final String READ = "evidence.read";
     private static final String SUBMIT = "evidence.submit";
     private static final String REVIEW = "evidence.review";
+    private static final String WAIVE = "evidence.waiveCorrection";
     private static final String RESUBMIT_OPERATION = "evidence.correction.resubmit";
     private static final String CLOSE_OPERATION = "evidence.correction.close";
+    private static final String WAIVE_OPERATION = "evidence.correction.waive";
     private static final String CORRECTION_TASK_TYPE = "evidence.correction";
 
     private final CorrectionCaseRepository corrections;
@@ -101,7 +105,7 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
         CorrectionCaseView created = new CorrectionCaseView(
                 correctionCaseId, projectId, taskId, reviewCaseId, reviewDecisionId,
                 evidenceSetSnapshotId, snapshotContentDigest, List.copyOf(reasonCodes),
-                null, "OPEN", actorId, now, null, null, null, List.of());
+                null, "OPEN", actorId, now, null, null, null, null, null, null, null, List.of());
         try {
             corrections.insertCase(tenantId, created);
         } catch (DuplicateKeyException exception) {
@@ -136,7 +140,9 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
                 created.sourceEvidenceSetSnapshotId(), created.sourceSnapshotContentDigest(),
                 created.reasonCodes(), correctionTask.taskId(), status,
                 created.createdBy(), created.createdAt(), created.latestResubmissionSnapshotId(),
-                created.closedBy(), created.closedAt(), created.resubmissions());
+                created.closedBy(), created.closedAt(),
+                created.waivedBy(), created.waivedAt(), created.waiveApprovalRef(), created.waiveNote(),
+                created.resubmissions());
 
         String payload = serialize(new CorrectionCreatedPayload(
                 correctionCaseId, reviewCaseId, reviewDecisionId, evidenceSetSnapshotId,
@@ -178,9 +184,9 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
                 AuthorizationRequest.projectCapability(SUBMIT, principal.tenantId(), "CorrectionCase",
                         current.correctionCaseId().toString(), current.projectId().toString()),
                 metadata.correlationId());
-        if ("CLOSED".equals(current.status())) {
+        if ("CLOSED".equals(current.status()) || "WAIVED".equals(current.status())) {
             throw new BusinessProblem(ProblemCode.CORRECTION_CASE_STATE_CONFLICT,
-                    "Closed CorrectionCase cannot accept resubmission");
+                    "Terminal CorrectionCase cannot accept resubmission");
         }
         EvidenceSetSnapshotView snapshot = snapshots.find(
                         principal.tenantId(), command.evidenceSetSnapshotId())
@@ -316,6 +322,78 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
         return closed;
     }
 
+
+    @Override
+    @Transactional
+    public CorrectionCaseView waive(
+            CurrentPrincipal principal, CommandMetadata metadata, WaiveCorrectionCaseCommand command
+    ) {
+        CorrectionCaseView current = corrections.find(principal.tenantId(), command.correctionCaseId())
+                .orElseThrow(() -> new BusinessProblem(
+                        ProblemCode.RESOURCE_NOT_FOUND, "CorrectionCase does not exist"));
+        AuthorizationDecision auth = authorization.require(principal,
+                AuthorizationRequest.projectCapability(WAIVE, principal.tenantId(), "CorrectionCase",
+                        current.correctionCaseId().toString(), current.projectId().toString()),
+                metadata.correlationId());
+        String reason = normalizeRequiredText(command.reason(), "reason", 1000);
+        String approvalRef = normalizeRequiredText(command.approvalRef(), "approvalRef", 160);
+        String requestDigest = Sha256.digest(
+                current.correctionCaseId() + "|WAIVE|" + reason + "|" + approvalRef);
+        CommandContext context = new CommandContext(
+                principal.tenantId(), principal.principalId(),
+                metadata.correlationId(), metadata.idempotencyKey());
+        IdempotencyDecision decision = idempotency.begin(context, WAIVE_OPERATION, requestDigest);
+        if (decision.kind() == IdempotencyDecision.Kind.REPLAY) {
+            return corrections.findCommandResult(context.tenantId(), WAIVE_OPERATION, context.idempotencyKey())
+                    .flatMap(id -> corrections.find(context.tenantId(), id))
+                    .orElseThrow(() -> new BusinessProblem(
+                            ProblemCode.INTERNAL_ERROR, "Correction waive replay result missing"));
+        }
+        if (!java.util.Set.of("OPEN", "IN_PROGRESS", "RESUBMITTED").contains(current.status())) {
+            throw new BusinessProblem(ProblemCode.CORRECTION_CASE_STATE_CONFLICT,
+                    "Only open CorrectionCase can be waived");
+        }
+        Instant now = clock.instant();
+        UUID waiveEventId = UUID.randomUUID();
+        int updated = corrections.markWaived(
+                principal.tenantId(), current.correctionCaseId(), current.status(),
+                principal.principalId(), now, approvalRef, reason);
+        if (updated != 1) {
+            throw new BusinessProblem(ProblemCode.CORRECTION_CASE_STATE_CONFLICT,
+                    "CorrectionCase status changed concurrently");
+        }
+        if (current.correctionTaskId() != null) {
+            tasks.cancelHandlingTask(new CancelHandlingTaskCommand(
+                    principal.tenantId(), current.correctionTaskId(), CORRECTION_TASK_TYPE,
+                    current.correctionCaseId().toString(), "CORRECTION_WAIVED",
+                    waiveEventId, now, metadata.correlationId()));
+        }
+        corrections.saveCommandResult(
+                principal.tenantId(), WAIVE_OPERATION, context.idempotencyKey(), current.correctionCaseId());
+
+        String payload = serialize(new CorrectionWaivedPayload(
+                current.correctionCaseId(), current.correctionTaskId(),
+                current.taskId(), current.projectId(), principal.principalId(),
+                approvalRef, reason, now));
+        outbox.append(new OutboxEvent(
+                UUID.randomUUID(), waiveEventId, "evidence", "evidence.correction-waived", 1,
+                "CorrectionCase", current.correctionCaseId().toString(), 1L,
+                principal.tenantId(), metadata.correlationId(), metadata.idempotencyKey(),
+                current.taskId().toString(), payload, Sha256.digest(payload), now));
+        audit.append(new AuditEntry(
+                UUID.randomUUID(), principal.tenantId(), principal.principalId(),
+                "CORRECTION_CASE_WAIVED", WAIVE, "CorrectionCase",
+                current.correctionCaseId().toString(),
+                "ALLOW", auth.matchedGrantIds(), auth.policyVersion(), "WAIVED", null,
+                requestDigest, metadata.correlationId(), now));
+        CorrectionCaseView waived = corrections.find(principal.tenantId(), current.correctionCaseId())
+                .orElseThrow(() -> new BusinessProblem(
+                        ProblemCode.INTERNAL_ERROR, "Waived CorrectionCase missing"));
+        idempotency.complete(context, WAIVE_OPERATION, current.correctionCaseId().toString(),
+                Sha256.digest(serialize(waived)));
+        return waived;
+    }
+
     private static String normalizeNote(String note) {
         if (note == null || note.isBlank()) {
             return null;
@@ -323,6 +401,18 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
         String trimmed = note.trim();
         if (trimmed.length() > 1000) {
             throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, "note exceeds 1000 characters");
+        }
+        return trimmed;
+    }
+
+    private static String normalizeRequiredText(String value, String field, int maxLength) {
+        if (value == null || value.isBlank()) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, field + " is required");
+        }
+        String trimmed = value.trim();
+        if (trimmed.length() > maxLength) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                    field + " exceeds " + maxLength + " characters");
         }
         return trimmed;
     }
@@ -373,6 +463,18 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
             String closedBy,
             String note,
             Instant closedAt
+    ) {
+    }
+
+    private record CorrectionWaivedPayload(
+            UUID correctionCaseId,
+            UUID correctionTaskId,
+            UUID taskId,
+            UUID projectId,
+            String waivedBy,
+            String approvalRef,
+            String reason,
+            Instant waivedAt
     ) {
     }
 }

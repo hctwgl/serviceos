@@ -35,6 +35,15 @@ interface CorrectionCaseMapper {
             @Param("closedBy") String closedBy,
             @Param("closedAt") Object closedAt);
 
+    int markWaived(
+            @Param("tenantId") String tenantId,
+            @Param("correctionCaseId") String correctionCaseId,
+            @Param("expectedStatus") String expectedStatus,
+            @Param("waivedBy") String waivedBy,
+            @Param("waivedAt") Object waivedAt,
+            @Param("approvalRef") String approvalRef,
+            @Param("note") String note);
+
     Map<String, Object> findCase(
             @Param("tenantId") String tenantId, @Param("correctionCaseId") String correctionCaseId);
 

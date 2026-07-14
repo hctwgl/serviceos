@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.24.0
+  version: 0.25.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -878,6 +878,36 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/CorrectionCase' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /correction-cases/{correctionCaseId}:waive:
+    post:
+      operationId: waiveCorrectionCase
+      summary: 高风险豁免 CorrectionCase（终态 WAIVED，不等于 CLOSED）
+      description: >-
+        需要 evidence.waiveCorrection；必须提供 reason 与 approvalRef。
+        同事务取消关联整改 Task；不伪装为审核通过或关闭。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: correctionCaseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WaiveCorrectionCaseRequest' }
+      responses:
+        '200':
+          description: 已豁免的 CorrectionCase
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CorrectionCase' }
+        '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
@@ -1903,6 +1933,13 @@ components:
       additionalProperties: false
       properties:
         note: { type: string, maxLength: 1000 }
+    WaiveCorrectionCaseRequest:
+      type: object
+      additionalProperties: false
+      required: [reason, approvalRef]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 1000 }
+        approvalRef: { type: string, minLength: 1, maxLength: 160 }
     CorrectionResubmission:
       type: object
       additionalProperties: false
@@ -1951,12 +1988,16 @@ components:
           maxItems: 20
           items: { type: string, minLength: 1, maxLength: 80 }
         correctionTaskId: { type: string, format: uuid, nullable: true }
-        status: { type: string, enum: [OPEN, IN_PROGRESS, RESUBMITTED, CLOSED] }
+        status: { type: string, enum: [OPEN, IN_PROGRESS, RESUBMITTED, CLOSED, WAIVED] }
         createdBy: { type: string }
         createdAt: { type: string, format: date-time }
         latestResubmissionSnapshotId: { type: string, format: uuid, nullable: true }
         closedBy: { type: string, nullable: true }
         closedAt: { type: string, format: date-time, nullable: true }
+        waivedBy: { type: string, nullable: true }
+        waivedAt: { type: string, format: date-time, nullable: true }
+        waiveApprovalRef: { type: string, nullable: true, maxLength: 160 }
+        waiveNote: { type: string, nullable: true, maxLength: 1000 }
         resubmissions:
           type: array
           items: { $ref: '#/components/schemas/CorrectionResubmission' }

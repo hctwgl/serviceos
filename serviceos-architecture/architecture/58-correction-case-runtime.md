@@ -34,4 +34,4 @@ status: Implemented
 
 ## 5. 未实现
 
-~~整改 Task 自动创建 / IN_PROGRESS~~（M47）；`WAIVED`、强制通过、重开、车企回执。
+~~整改 Task 自动创建 / IN_PROGRESS~~（M47）；~~`WAIVED`~~（M51）；强制通过、重开、车企回执已在后续里程碑。

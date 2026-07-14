@@ -65,6 +65,18 @@
            AND status = #{expectedStatus}
     </update>
 
+    <update id="markWaived">
+        UPDATE evd_correction_case
+           SET status = 'WAIVED',
+               waived_by = #{waivedBy},
+               waived_at = #{waivedAt},
+               waive_approval_ref = #{approvalRef},
+               waive_note = #{note}
+         WHERE tenant_id = #{tenantId}
+           AND correction_case_id = CAST(#{correctionCaseId} AS uuid)
+           AND status = #{expectedStatus}
+    </update>
+
     <select id="findCase" resultType="map">
         SELECT correction_case_id AS "correctionCaseId", project_id AS "projectId",
                task_id AS "taskId", source_review_case_id AS "sourceReviewCaseId",
@@ -75,7 +87,9 @@
                correction_task_id AS "correctionTaskId", status AS "status",
                created_by AS "createdBy", created_at AS "createdAt",
                latest_resubmission_snapshot_id AS "latestResubmissionSnapshotId",
-               closed_by AS "closedBy", closed_at AS "closedAt"
+               closed_by AS "closedBy", closed_at AS "closedAt",
+               waived_by AS "waivedBy", waived_at AS "waivedAt",
+               waive_approval_ref AS "waiveApprovalRef", waive_note AS "waiveNote"
           FROM evd_correction_case
          WHERE tenant_id = #{tenantId}
            AND correction_case_id = CAST(#{correctionCaseId} AS uuid)

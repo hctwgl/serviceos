@@ -96,6 +96,21 @@ final class MyBatisCorrectionCaseRepository implements CorrectionCaseRepository 
     }
 
     @Override
+    public int markWaived(
+            String tenantId,
+            UUID correctionCaseId,
+            String expectedStatus,
+            String waivedBy,
+            Instant waivedAt,
+            String approvalRef,
+            String note
+    ) {
+        return mapper.markWaived(
+                tenantId, correctionCaseId.toString(), expectedStatus, waivedBy, waivedAt,
+                approvalRef, note);
+    }
+
+    @Override
     public Optional<CorrectionCaseView> find(String tenantId, UUID correctionCaseId) {
         Map<String, Object> row = mapper.findCase(tenantId, correctionCaseId.toString());
         if (row == null) {
@@ -144,6 +159,8 @@ final class MyBatisCorrectionCaseRepository implements CorrectionCaseRepository 
                 instant(row.get("createdAt")),
                 nullableUuid(row.get("latestResubmissionSnapshotId")),
                 nullableText(row.get("closedBy")), nullableInstant(row.get("closedAt")),
+                nullableText(row.get("waivedBy")), nullableInstant(row.get("waivedAt")),
+                nullableText(row.get("waiveApprovalRef")), nullableText(row.get("waiveNote")),
                 rounds);
     }
 
