@@ -15,6 +15,8 @@ status: Implemented
 | M33-CFG-005 | P1 | 架构 Schema 与运行时资源无漂移 | `ConfigurationSchemaDriftTest` |
 | M33-TASK-001 | P0 | Workflow 首任务和后续任务均冻结节点 `formRef` | `WorkflowDefinitionParserTest`、`WorkflowBootstrapPostgresIT`、`WorkflowLinearProgressionPostgresIT` |
 | M33-TASK-002 | P0 | Task 公开上下文按租户读取已冻结 `formRef` | `HumanTaskCommandPostgresIT` |
+| M33-FORM-001 | P0 | Task 通过冻结 Bundle 摘要精确解析 FormVersion，不读取最新配置 | `WorkflowBootstrapPostgresIT`、V035 |
+| M33-FORM-002 | P0 | 表单查询要求 `form.read` 和 Task Project Scope | `WorkflowBootstrapPostgresIT` |
+| M33-FORM-003 | P1 | HTTP 拒绝匿名请求且定义保持 JSON 对象 | `TaskFormControllerSecurityTest`、OpenAPI 0.9.0 |
 
-本矩阵不替代 M3 FORM-001～FORM-005；精确 FormVersion 解析、表达式与 FormSubmission 完成后
-才能关闭这些场景。
+本矩阵不替代 M3 FORM-001～FORM-005；表达式与 FormSubmission 完成后才能关闭这些场景。

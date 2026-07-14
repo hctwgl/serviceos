@@ -6,10 +6,14 @@ import com.serviceos.configuration.api.ConfigurationBundleReference;
 import com.serviceos.configuration.api.ConfigurationService;
 import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
 import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
+import com.serviceos.forms.api.TaskFormQueryService;
+import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.reliability.application.OutboxWorker;
 import com.serviceos.reliability.spi.OutboxMessage;
 import com.serviceos.reliability.spi.OutboxPublisher;
 import com.serviceos.shared.Sha256;
+import com.serviceos.shared.BusinessProblem;
+import com.serviceos.shared.ProblemCode;
 import com.serviceos.workorder.api.ReceiveExternalWorkOrderCommand;
 import com.serviceos.workorder.api.WorkOrderCommandService;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,9 +33,11 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = ServiceOsApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE)
@@ -57,6 +63,7 @@ class WorkflowBootstrapPostgresIT {
     @Autowired ConfigurationService configurations;
     @Autowired OutboxWorker worker;
     @Autowired OutboxPublisher publisher;
+    @Autowired TaskFormQueryService taskForms;
     @Autowired JdbcClient jdbc;
 
     @BeforeEach
@@ -66,7 +73,8 @@ class WorkflowBootstrapPostgresIT {
                     tsk_task_execution_attempt, tsk_task, wfl_node_instance,
                     wfl_stage_instance, wfl_workflow_instance,
                     wo_work_order, cfg_configuration_bundle_item, cfg_configuration_bundle,
-                    cfg_configuration_asset_version, prj_project CASCADE
+                    cfg_configuration_asset_version, prj_project,
+                    auth_role_field_policy, auth_role_grant, auth_role_capability, auth_role CASCADE
                 """).update();
     }
 
@@ -92,6 +100,17 @@ class WorkflowBootstrapPostgresIT {
                 .query(String.class).single()).isEqualTo(scope.workflowDigest());
         assertThat(jdbc.sql("SELECT form_ref FROM tsk_task")
                 .query(String.class).single()).isEqualTo("intake.form");
+        UUID taskId = jdbc.sql("SELECT task_id FROM tsk_task").query(UUID.class).single();
+        assertThatThrownBy(() -> taskForms.listForTask(principal(), "corr-form-denied", taskId))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.ACCESS_DENIED));
+        seedFormReadGrant(scope.projectId());
+        assertThat(taskForms.listForTask(principal(), "corr-form-read", taskId)).singleElement()
+                .satisfies(form -> {
+                    assertThat(form.formKey()).isEqualTo("intake.form");
+                    assertThat(form.semanticVersion()).isEqualTo("1.0.0");
+                    assertThat(form.definitionJson()).contains("result.value");
+                });
         assertThat(jdbc.sql("SELECT status FROM rel_inbox_record")
                 .query(String.class).single()).isEqualTo("SUCCEEDED");
         assertThat(jdbc.sql("SELECT event_type FROM rel_outbox_event ORDER BY event_type")
@@ -150,11 +169,20 @@ class WorkflowBootstrapPostgresIT {
         UUID assetId = configurations.publishAsset(new PublishConfigurationAssetCommand(
                 TENANT, ConfigurationAssetType.WORKFLOW, "BYD-WORKFLOW", "1.0.0", "1.0.0",
                 normalizedDefinition, digest)).versionId();
+        String formDefinition = """
+                {"formKey":"intake.form","version":"1.0.0","stage":"INTAKE",
+                 "sections":[{"sectionKey":"base","title":"基础","fields":[{
+                   "fieldKey":"result.value","label":"结果","dataType":"STRING",
+                   "binding":"task.input.result.value"}]}]}
+                """.trim();
+        UUID formAssetId = configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.FORM, "intake.form", "1.0.0", "1.0.0",
+                formDefinition, Sha256.digest(formDefinition))).versionId();
         ConfigurationBundleReference bundle = configurations.publishBundle(
                 new PublishConfigurationBundleCommand(
                         TENANT, projectId, "BYD-WORKFLOW-BUNDLE", "1.0.0", "BYD_OCEAN",
                         "HOME_CHARGING_SURVEY_INSTALL", "370000", Instant.now().minusSeconds(60),
-                        null, List.of(assetId)));
+                        null, List.of(assetId, formAssetId)));
         return new Scope(projectId, bundle, digest);
     }
 
@@ -185,6 +213,31 @@ class WorkflowBootstrapPostgresIT {
 
     private long count(String table) {
         return jdbc.sql("SELECT count(*) FROM " + table).query(Long.class).single();
+    }
+
+    private void seedFormReadGrant(UUID projectId) {
+        UUID roleId = UUID.randomUUID();
+        jdbc.sql("""
+                INSERT INTO auth_role (role_id, tenant_id, role_code, role_name, role_status, created_at)
+                VALUES (:roleId, :tenantId, 'workflow-form-reader', '任务表单读取人', 'ACTIVE', now())
+                """).param("roleId", roleId).param("tenantId", TENANT).update();
+        jdbc.sql("""
+                INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
+                VALUES (:roleId, 'form.read', now())
+                """).param("roleId", roleId).update();
+        jdbc.sql("""
+                INSERT INTO auth_role_grant (
+                    grant_id, tenant_id, principal_id, role_id, scope_type, scope_ref,
+                    valid_from, source_code, approval_ref, created_at)
+                VALUES (:grantId, :tenantId, 'form-reader', :roleId, 'PROJECT', :projectId,
+                    now() - interval '1 day', 'TEST_FIXTURE', 'M33-TASK-FORM', now())
+                """).param("grantId", UUID.randomUUID()).param("tenantId", TENANT)
+                .param("roleId", roleId).param("projectId", projectId.toString()).update();
+    }
+
+    private CurrentPrincipal principal() {
+        return new CurrentPrincipal(
+                "form-reader", TENANT, CurrentPrincipal.PrincipalType.USER, "workflow-it", Set.of());
     }
 
     private static String validWorkflow() {

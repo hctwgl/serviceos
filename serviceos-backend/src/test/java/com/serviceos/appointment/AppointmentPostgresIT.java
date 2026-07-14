@@ -331,20 +331,21 @@ class AppointmentPostgresIT {
                     correlation_id, version, created_at, updated_at,
                     project_id, work_order_id, workflow_instance_id, stage_instance_id,
                     workflow_node_instance_id, workflow_node_id,
-                    workflow_definition_version_id, workflow_definition_digest
+                    workflow_definition_version_id, workflow_definition_digest,
+                    configuration_bundle_id, configuration_bundle_digest
                 ) VALUES (
                     :taskId, :tenant, :taskType, 'HUMAN', :businessKey, :digest,
                     100, 'READY', now(), 0, 1,
                     'corr-fixture', 1, now(), now(),
                     :projectId, :workOrderId, :workflowId, :stageId,
-                    :nodeInstanceId, :nodeId, :definitionId, :digest
+                    :nodeInstanceId, :nodeId, :definitionId, :digest, :bundleId, :digest
                 )
                 """).param("taskId", taskId).param("tenant", tenant).param("taskType", taskType)
                 .param("businessKey", taskId.toString()).param("digest", "a".repeat(64))
                 .param("projectId", PROJECT).param("workOrderId", WORK_ORDER)
                 .param("workflowId", UUID.randomUUID()).param("stageId", UUID.randomUUID())
                 .param("nodeInstanceId", UUID.randomUUID()).param("nodeId", taskType)
-                .param("definitionId", UUID.randomUUID()).update();
+                .param("definitionId", UUID.randomUUID()).param("bundleId", UUID.randomUUID()).update();
         if (responsible != null) {
             jdbc.sql("""
                     INSERT INTO tsk_task_assignment (

@@ -4,6 +4,8 @@
     <select id="find" resultType="map">
         SELECT t.task_id AS "taskId", t.project_id AS "projectId",
                t.work_order_id AS "workOrderId", t.task_type AS "taskType",
+               t.configuration_bundle_id AS "configurationBundleId",
+               t.configuration_bundle_digest AS "configurationBundleDigest",
                t.task_kind AS "taskKind", t.form_ref AS "formRef", t.status, t.version,
                a.principal_id AS "responsiblePrincipalId"
           FROM tsk_task t

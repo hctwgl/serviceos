@@ -441,6 +441,7 @@ class DispatchTaskReassignmentSagaPostgresIT {
         UUID taskId = tasks.createWorkflowTask(new CreateWorkflowTaskCommand(
                 TENANT, UUID.randomUUID(), workOrderId, UUID.randomUUID(), UUID.randomUUID(),
                 UUID.randomUUID(), "SITE_SURVEY", UUID.randomUUID(), "a".repeat(64),
+                UUID.randomUUID(), "c".repeat(64),
                 BUSINESS_TYPE, WorkflowTaskKind.HUMAN, null, "work-order:m25-" + key, "b".repeat(64),
                 500, Instant.now(), 1, "corr-task-" + key, "cause-task-" + key)).taskId();
         taskAssignments.assignCandidates(

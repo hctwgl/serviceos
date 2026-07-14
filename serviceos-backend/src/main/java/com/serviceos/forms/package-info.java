@@ -1,0 +1,7 @@
+/** 动态表单模块：只解析 Task 冻结的精确配置版本，不读取当前最新配置。 */
+@org.springframework.modulith.ApplicationModule(
+        displayName = "Forms",
+        allowedDependencies = {
+                "authorization::api", "configuration::api", "identity::api", "shared", "task::api"
+        })
+package com.serviceos.forms;

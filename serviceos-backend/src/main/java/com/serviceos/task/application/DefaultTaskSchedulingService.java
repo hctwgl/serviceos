@@ -93,6 +93,7 @@ final class DefaultTaskSchedulingService implements TaskSchedulingService {
         }
         requireText(command.payloadDigest(), "payloadDigest");
         requireText(command.workflowDefinitionDigest(), "workflowDefinitionDigest");
+        requireText(command.configurationBundleDigest(), "configurationBundleDigest");
         requireText(command.correlationId(), "correlationId");
         requireText(command.causationId(), "causationId");
         Objects.requireNonNull(command.projectId(), "projectId must not be null");
@@ -101,9 +102,11 @@ final class DefaultTaskSchedulingService implements TaskSchedulingService {
         Objects.requireNonNull(command.stageInstanceId(), "stageInstanceId must not be null");
         Objects.requireNonNull(command.workflowNodeInstanceId(), "workflowNodeInstanceId must not be null");
         Objects.requireNonNull(command.workflowDefinitionVersionId(), "workflowDefinitionVersionId must not be null");
+        Objects.requireNonNull(command.configurationBundleId(), "configurationBundleId must not be null");
         Objects.requireNonNull(command.taskKind(), "taskKind must not be null");
         Objects.requireNonNull(command.readyAt(), "readyAt must not be null");
-        if (!isSha256(command.payloadDigest()) || !isSha256(command.workflowDefinitionDigest())) {
+        if (!isSha256(command.payloadDigest()) || !isSha256(command.workflowDefinitionDigest())
+                || !isSha256(command.configurationBundleDigest())) {
             throw new IllegalArgumentException("workflow task digests must be SHA-256 hex digests");
         }
         if (command.priority() < 0 || command.priority() > 1000 || command.maxAttempts() < 1) {

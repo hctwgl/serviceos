@@ -16,6 +16,8 @@ public record CreateWorkflowTaskCommand(
         String workflowNodeId,
         UUID workflowDefinitionVersionId,
         String workflowDefinitionDigest,
+        UUID configurationBundleId,
+        String configurationBundleDigest,
         String taskType,
         WorkflowTaskKind taskKind,
         String formRef,

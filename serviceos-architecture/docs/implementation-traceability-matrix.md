@@ -127,4 +127,4 @@ Feature gate/authority: if applicable
 | M30 | 预约提议/确认/改约、不可变修订链、责任快照、实时 scope 授权与 ETag 并发控制 | MVC Security + OpenAPI/Event Contract + Appointment PostgreSQL IT + V030 | 取消/爽约、上门签到、现场执行、离线同步、完整勘安链路 |
 | M31 | 联系尝试追加历史、首次联系 SLA 事实、预约取消/爽约终态、终态修订与可靠通知 | MVC Security + OpenAPI/Event Contract + Appointment PostgreSQL IT + V031 | 上门签到、Visit 现场执行、离线同步、下游取消/爽约任务策略 |
 | M32 | Visit 签到/签退/中断、围栏 WARN/BLOCK、captured/received 双时间、重复上门序号、改派后离线撤权 | MVC Security + OpenAPI/Event Contract + Visit PostgreSQL IT + V032 | FieldOperation 结构化结果、表单/资料完整性、离线工作包有效期与人工合并 |
-| M33-FOUNDATION | FORM Schema 发布门禁、定义身份一致性、多表单 Bundle 锁定与 Workflow Task `formRef` 冻结 | Configuration Schema Drift + Workflow/Task PostgreSQL IT + V033/V034 | 锁定 FormVersion 解析、SERVICEOS_EXPR_V1、草稿、提交、预填冲突和 M3 FORM-001～005 |
+| M33-FOUNDATION | FORM 发布门禁、多表单 Bundle、Task `formRef`/Bundle 冻结及授权只读解析 | OpenAPI 0.9.0 + Configuration/Workflow/Task PostgreSQL IT + V033～V035 | SERVICEOS_EXPR_V1、草稿、提交、预填冲突和 M3 FORM-001～005 |

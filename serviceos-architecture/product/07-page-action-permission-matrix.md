@@ -88,6 +88,7 @@ status: Proposed
 
 | 动作 | Portal | Capability | 条件 | Obligations | API |
 |---|---|---|---|---|---|
+| 查看任务表单定义 | 三 Portal | `form.read` | Task Project Scope | — | task forms GET |
 | 保存本人草稿 | TECHNICIAN | `form.saveDraft` | 当前 TaskAssignment | — | form draft PUT |
 | 提交表单 | TECHNICIAN | `form.submit` | FormVersion/Task 有效 | validation | form submission POST |
 | 更正已提交表单 | TECHNICIAN/授权人员 | `form.correctSubmission` | Correction Task | reason、source review | supersede |

@@ -90,12 +90,13 @@ final class WorkflowWorkOrderReceivedHandler implements OutboxMessageHandler {
         jdbc.sql("""
                 INSERT INTO wfl_workflow_instance (
                     workflow_instance_id, tenant_id, project_id, work_order_id,
-                    configuration_bundle_id, workflow_definition_version_id,
+                    configuration_bundle_id, configuration_bundle_digest,
+                    workflow_definition_version_id,
                     workflow_key, workflow_version, definition_digest, status,
                     start_event_id, correlation_id, version, started_at
                 ) VALUES (
                     :workflowId, :tenantId, :projectId, :workOrderId,
-                    :bundleId, :definitionVersionId, :workflowKey, :workflowVersion,
+                    :bundleId, :bundleDigest, :definitionVersionId, :workflowKey, :workflowVersion,
                     :definitionDigest, 'ACTIVE', :startEventId, :correlationId, 1, :startedAt
                 )
                 """)
@@ -104,6 +105,7 @@ final class WorkflowWorkOrderReceivedHandler implements OutboxMessageHandler {
                 .param("projectId", received.projectId())
                 .param("workOrderId", received.workOrderId())
                 .param("bundleId", received.bundleRef().bundleId())
+                .param("bundleDigest", received.bundleRef().manifestDigest())
                 .param("definitionVersionId", asset.versionId())
                 .param("workflowKey", definition.workflowKey())
                 .param("workflowVersion", definition.workflowVersion())
@@ -130,6 +132,7 @@ final class WorkflowWorkOrderReceivedHandler implements OutboxMessageHandler {
         ScheduledTaskView firstTask = tasks.createWorkflowTask(new CreateWorkflowTaskCommand(
                 message.tenantId(), received.projectId(), received.workOrderId(), workflowId, stageId,
                 nodeInstanceId, definition.firstNodeId(), asset.versionId(), asset.contentDigest(),
+                received.bundleRef().bundleId(), received.bundleRef().manifestDigest(),
                 definition.firstTaskType(), definition.firstTaskKind(),
                 definition.firstFormRef(),
                 "work-order:" + received.workOrderId(), message.payloadDigest(), 100, now, 3,

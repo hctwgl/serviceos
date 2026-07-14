@@ -18,7 +18,10 @@ status: Implemented
 - Workflow 解析首任务和后续任务时保留节点 `formRef`；
 - V034 将该引用固化到 `tsk_task.form_ref`，Task 公开只读上下文同步暴露此快照；
 - `formRef` 来自工单锁定的 WorkflowVersion，后续表单解析不得改读最新 Workflow 或最新 FORM。
+- V035 同步冻结 Task 的 `configurationBundleId + manifestDigest`，并对存量 Workflow Task 从工单事实回填；
+- `forms` 模块只依赖 `task.api + configuration.api` 完成精确解析，不跨模块读取 WorkOrder/Workflow 表；
+- `GET /api/v1/tasks/{taskId}/forms` 按 `form.read` 和 Task Project Scope 实时授权，返回发布定义和摘要；
+- Task 无 `formRef` 返回空数组，缺失或歧义匹配失败关闭，不回退到最新 FormVersion。
 
-ADR-018 仍为 Proposed，因此本切片不猜测表达式语义。规则静态类型、样本回放、`formRef` 到
-锁定 Bundle 内精确 FormVersion 的解析、草稿、不可变提交、预填冲突和服务端校验仍待后续实现；
-FORM 已发布或 Task 已冻结引用都不等于表单可执行。
+ADR-018 仍为 Proposed，因此本切片不猜测表达式语义。规则静态类型、样本回放、草稿、不可变提交、
+预填冲突和服务端校验仍待后续实现；FORM 已发布或可查询都不等于表达式可执行。

@@ -188,8 +188,8 @@ class HumanTaskCommandPostgresIT {
 
     @Test
     void migrationSetIsCurrentAndRepeatable() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("034");
-        assertThat(flyway.info().applied()).hasSize(36);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("035");
+        assertThat(flyway.info().applied()).hasSize(37);
         assertThat(flyway.migrate().migrationsExecuted).isZero();
     }
 
@@ -197,9 +197,11 @@ class HumanTaskCommandPostgresIT {
     void freezesFormReferenceInTaskAndExposesItThroughThePublicContext() {
         UUID taskId = workflowHumanTask();
 
-        assertThat(fulfillmentContexts.find(TENANT, taskId)).get()
-                .extracting(context -> context.formRef())
-                .isEqualTo("survey.form");
+        assertThat(fulfillmentContexts.find(TENANT, taskId)).get().satisfies(context -> {
+            assertThat(context.formRef()).isEqualTo("survey.form");
+            assertThat(context.configurationBundleId()).isNotNull();
+            assertThat(context.configurationBundleDigest()).isEqualTo("c".repeat(64));
+        });
         assertThat(jdbc.sql("SELECT form_ref FROM tsk_task WHERE task_id = :taskId")
                 .param("taskId", taskId).query(String.class).single()).isEqualTo("survey.form");
     }
@@ -232,6 +234,7 @@ class HumanTaskCommandPostgresIT {
         return new CreateWorkflowTaskCommand(
                 TENANT, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
                 nodeInstanceId, "SITE_SURVEY", UUID.randomUUID(), "a".repeat(64),
+                UUID.randomUUID(), "c".repeat(64),
                 "SITE_SURVEY", WorkflowTaskKind.HUMAN, formRef, "work-order:test", "b".repeat(64),
                 500, Instant.now(), 1, "corr-task-create", "cause-task-create");
     }

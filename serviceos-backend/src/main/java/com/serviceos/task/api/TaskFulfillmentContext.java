@@ -7,6 +7,8 @@ public record TaskFulfillmentContext(
         UUID taskId,
         UUID projectId,
         UUID workOrderId,
+        UUID configurationBundleId,
+        String configurationBundleDigest,
         String taskType,
         String taskKind,
         String formRef,

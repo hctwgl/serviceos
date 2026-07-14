@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.8.0
+  version: 0.9.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -346,6 +346,26 @@ paths:
       responses:
         '201': { $ref: '#/components/responses/AppointmentCommandReceipt' }
         '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /tasks/{taskId}/forms:
+    get:
+      operationId: listTaskForms
+      summary: 查询任务锁定的表单版本
+      description: 按 form.read 与 Task 项目范围实时授权，只解析 Task 冻结 Bundle 内的精确 FormVersion。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 当前任务锁定的表单；无 formRef 时返回空数组
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/TaskForm' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
@@ -1024,6 +1044,18 @@ components:
         revisionNo: { type: integer, minimum: 1 }
         aggregateVersion: { type: integer, format: int64, minimum: 1 }
         occurredAt: { type: string, format: date-time }
+    TaskForm:
+      type: object
+      additionalProperties: false
+      required: [taskId, formVersionId, formKey, semanticVersion, schemaVersion, definition, contentDigest]
+      properties:
+        taskId: { type: string, format: uuid }
+        formVersionId: { type: string, format: uuid }
+        formKey: { type: string, minLength: 1, maxLength: 120 }
+        semanticVersion: { type: string, minLength: 1, maxLength: 64 }
+        schemaVersion: { type: string, minLength: 1, maxLength: 64 }
+        definition: { type: object, additionalProperties: true }
+        contentDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
     VisitLocation:
       type: object
       additionalProperties: false
