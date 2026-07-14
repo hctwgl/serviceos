@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/task-assignment-aborted-v1.schema.json",
+  "title": "TaskAssignmentAbortedV1", "type": "object", "additionalProperties": false,
+  "required": ["eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId", "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"}, "eventType": {"const": "task.assignment-aborted"}, "schemaVersion": {"const": 1},
+    "tenantId": {"type": "string"}, "correlationId": {"type": "string"}, "causationId": {"type": "string"},
+    "aggregateType": {"const": "Task"}, "aggregateId": {"type": "string", "format": "uuid"},
+    "aggregateVersion": {"type": "integer", "minimum": 3}, "occurredAt": {"type": "string", "format": "date-time"},
+    "payload": {"$ref": "#/$defs/payload"}
+  },
+  "$defs": {"payload": {"type": "object", "additionalProperties": false,
+    "required": ["taskId", "guardId", "taskAssignmentId", "preparationKey", "principalId", "status", "serviceAssignmentId", "reasonCode", "occurredAt"],
+    "properties": {
+      "taskId": {"type": "string", "format": "uuid"}, "guardId": {"type": "string", "format": "uuid"},
+      "taskAssignmentId": {"type": "string", "format": "uuid"},
+      "preparationKey": {"type": "string", "minLength": 1, "maxLength": 160},
+      "principalId": {"type": "string", "minLength": 1, "maxLength": 128}, "status": {"const": "ABORTED"},
+      "serviceAssignmentId": {"type": "string", "minLength": 1, "maxLength": 160},
+      "reasonCode": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{1,99}$"},
+      "occurredAt": {"type": "string", "format": "date-time"}
+    }
+  }}
+}

@@ -117,3 +117,4 @@ Feature gate/authority: if applicable
 | M20 | 人工工作流 Task claim/start/complete、HTTP、授权审计、幂等冻结响应 | MVC Security + Event/OpenAPI Contract + HumanTask/Workflow PostgreSQL IT + V020 | Assignment/候选人、release/block/cancel、SLA、离线同步、动态表单完成条件、完整勘安链路 |
 | M21 | USER 候选快照、唯一 ACTIVE RESPONSIBLE、claim 门禁与 release/reclaim | MVC Security + Event/OpenAPI Contract + TaskAssignment/HumanTask/Workflow PostgreSQL IT + V021 | 策略解析、ServiceAssignment/容量/改派 saga、Task guard、SLA、离线撤权、完整勘安链路 |
 | M22 | REASSIGNMENT TaskExecutionGuard、精确解除、人工命令与候选替换失败关闭 | Event Schema + TaskExecutionGuard/TaskAssignment/HumanTask PostgreSQL IT + V022 | PREPARED TaskAssignment、ServiceAssignment/容量/改派 saga、超时补偿、SLA、离线撤权、完整勘安链路 |
+| M23 | guard + PREPARED 责任原子准备、激活切换、切换前 abort | Event Schema + TaskReassignment/HumanTask PostgreSQL IT + V023 | Dispatch/ServiceAssignment/容量、跨模块 Inbox saga、切换后补偿、SLA、完整勘安链路 |

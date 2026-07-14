@@ -164,6 +164,13 @@ final class DefaultTaskExecutionGuardService implements TaskExecutionGuardServic
                                   AND guard_row.task_execution_guard_id = :guardId
                                   AND guard_row.status = 'ACTIVE'
                            )
+                           AND NOT EXISTS (
+                               SELECT 1 FROM tsk_task_assignment prepared
+                                WHERE prepared.tenant_id = tsk_task.tenant_id
+                                  AND prepared.task_id = tsk_task.task_id
+                                  AND prepared.task_execution_guard_id = :guardId
+                                  AND prepared.status = 'PREPARED'
+                           )
                         """)
                 .param("now", timestamptz(now)).param("tenantId", context.tenantId())
                 .param("taskId", command.taskId()).param("guardId", command.guardId())
@@ -222,6 +229,20 @@ final class DefaultTaskExecutionGuardService implements TaskExecutionGuardServic
         GuardedTask task = task(tenantId, taskId);
         if (task.version() != expectedVersion) {
             throw new BusinessProblem(ProblemCode.VERSION_CONFLICT, "Task version changed");
+        }
+        boolean prepared = jdbc.sql("""
+                        SELECT EXISTS (
+                            SELECT 1 FROM tsk_task_assignment
+                             WHERE tenant_id = :tenantId AND task_id = :taskId
+                               AND task_execution_guard_id = :guardId AND status = 'PREPARED'
+                        )
+                        """)
+                .param("tenantId", tenantId).param("taskId", taskId).param("guardId", guardId)
+                .query(Boolean.class).single();
+        if (prepared) {
+            throw new BusinessProblem(
+                    ProblemCode.TASK_ASSIGNMENT_CONFLICT,
+                    "A guard with PREPARED responsibility must be closed by activate or abort");
         }
         boolean active = jdbc.sql("""
                         SELECT EXISTS (

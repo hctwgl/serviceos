@@ -23,3 +23,4 @@
 - [M20 人工工作流 Task 命令验收矩阵](17-m20-human-task-command-acceptance.md)
 - [M21 TaskAssignment 候选与责任验收矩阵](18-m21-task-assignment-acceptance.md)
 - [M22 TaskExecutionGuard 验收矩阵](19-m22-task-execution-guard-acceptance.md)
+- [M23 PREPARED TaskAssignment 验收矩阵](20-m23-prepared-task-assignment-acceptance.md)

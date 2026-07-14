@@ -66,7 +66,8 @@ class HumanTaskCommandPostgresIT {
         jdbc.sql("""
                 DROP TRIGGER IF EXISTS trg_test_fail_task_completed ON rel_outbox_event;
                 DROP FUNCTION IF EXISTS test_fail_task_completed();
-                TRUNCATE TABLE tsk_task_execution_guard, tsk_task_assignment, tsk_task_assignment_batch,
+                TRUNCATE TABLE tsk_task_reassignment_command_result,
+                    tsk_task_execution_guard, tsk_task_assignment, tsk_task_assignment_batch,
                     tsk_human_task_command_result, tsk_task_execution_attempt, tsk_task,
                     aud_audit_record, rel_outbox_publish_attempt, rel_outbox_event,
                     rel_idempotency_record, auth_role_field_policy,
@@ -185,8 +186,8 @@ class HumanTaskCommandPostgresIT {
 
     @Test
     void migrationSetIsCurrentAndRepeatable() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("022");
-        assertThat(flyway.info().applied()).hasSize(24);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("023");
+        assertThat(flyway.info().applied()).hasSize(25);
         assertThat(flyway.migrate().migrationsExecuted).isZero();
     }
 
