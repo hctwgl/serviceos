@@ -1,0 +1,185 @@
+---
+title: ServiceOS 实施状态总览
+version: 0.1.0
+status: Implemented
+lastUpdated: 2026-07-14
+baselineCommit: 3e1d9ffc4867fa52c5258339be5657e0bc900978
+latestMilestone: M37
+---
+
+# ServiceOS 实施状态总览
+
+本文件是 ServiceOS 面向项目负责人、开发者和 Agent 的统一实施进度入口，用于回答：
+
+1. 当前已经实施了什么；
+2. 每项能力由哪些代码、迁移、契约和测试证明；
+3. 哪些能力只完成了部分纵向切片；
+4. 哪些能力仍停留在设计阶段；
+5. 下一阶段应从哪里继续。
+
+本文件不替代架构设计、里程碑实现文档和验收矩阵。发生冲突时，以已接受 ADR、机器契约、测试证据和对应里程碑文档为准。
+
+## 1. 状态定义
+
+| 状态 | 含义 |
+|---|---|
+| `IMPLEMENTED` | 已有代码、数据库迁移、机器契约和适用自动化验收证据 |
+| `PARTIAL` | 已完成一个或多个可靠纵向切片，但该业务能力整体尚未闭环 |
+| `ACCEPTED` | 设计已经接受，可指导实现，但尚无完整工程证据 |
+| `PROPOSED` | 已形成可评审设计，但尚未被接受或实施 |
+| `BLOCKED` | 依赖外部业务确认、ADR 或基础设施决定，暂不能可靠实施 |
+
+注意：
+
+- `Accepted` 不等于已经开发；
+- `Implemented` 只表示对应里程碑声明的范围已经实现，不代表整个领域完成；
+- 判断完成范围时必须同时阅读实现文档中的“明确未实现”和对应验收矩阵。
+
+## 2. 当前基线
+
+| 项目 | 当前值 |
+|---|---|
+| 最新实施里程碑 | M37 固定 EvidenceSlot 运行时 |
+| 基线提交 | `3e1d9ffc4867fa52c5258339be5657e0bc900978` |
+| 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
+| 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
+| 前端工程 | 尚未建立；已有 Admin、Network、Technician 产品与交互规格 |
+| 数据库 | PostgreSQL + Flyway |
+| 契约 | OpenAPI + 事件 JSON Schema |
+
+每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
+
+## 3. 能力实施总览
+
+| 领域 | 能力 | 状态 | 已完成范围 | 主要未完成范围 | 最近证据 |
+|---|---|---|---|---|---|
+| 工程基础 | 构建、测试、契约、可观测性、容器发布 | `IMPLEMENTED` | Maven、PostgreSQL IT、契约门禁、Trace/指标、单镜像迁移和回滚演练 | 正式 K8s、多故障域、PITR、SBOM/签名、正式 Secret Manager | M8～M14 |
+| 身份授权 | OIDC/JWT、Capability、Tenant/Project Scope、拒绝审计 | `IMPLEMENTED` | 后端认证授权和范围校验基线 | 正式企业 IdP、完整组织治理 UI | M9 |
+| 可靠消息 | Inbox、Outbox、Worker claim/lease/retry | `IMPLEMENTED` | 本地可靠发布消费、恢复和人工接管基础 | 正式 Broker 和跨服务运行 | M9～M10 |
+| 配置中心 | 不可变配置资产、Bundle 发布和版本锁定 | `PARTIAL` | FORM、EVIDENCE 等资产发布基础和工单/任务冻结引用 | ADR-018 表达式运行时、完整审批和依赖闭包 | M16、M33、M36 |
+| 外部接入 | BYD CPIM V7.3.1 入站安全与工单接入 | `PARTIAL` | 验签、防重放、映射、幂等收单、配置锁定 | 全量车企接口、完整回传和正式生产确认项 | M16 |
+| 工单 | WorkOrder 接收、激活、履约完成 | `IMPLEMENTED` | 权威工单、工作流启动、跨阶段和 END 完结 | 完整取消、暂停、恢复和全部业务分支 | M16～M19 |
+| 工作流 | 线性 Stage/Task 运行时 | `PARTIAL` | 精确版本启动、线性推进、唯一跨阶段推进、完成事件 | 并行/汇聚网关、完整条件表达式和复杂流程语义 | M17～M19 |
+| 人工任务 | claim/start/complete、责任和执行保护 | `IMPLEMENTED` | 人工命令、候选领取、唯一责任、release/reclaim、执行保护 | 与后续 Evidence/Review 完整完成条件整合 | M20～M23 |
+| 服务分配 | 网点分配、容量、改派 Saga、超时恢复 | `IMPLEMENTED` | ServiceAssignment、容量权威、改派、终止、对账和自动恢复 | 完整策略评分、全部异常分支和 UI | M24～M28 |
+| 运营异常 | 异常工作台基础 | `PARTIAL` | 异常记录和恢复入口基础 | 完整通知、运营中心前端和跨域异常目录 | M29 |
+| 预约 | 预约修订、联系终态动作 | `PARTIAL` | Revision、并发和终态动作基础 | 用户确认渠道、完整日程和跨端协作 | M30～M31 |
+| 现场作业 | Visit 生命周期 | `PARTIAL` | Visit 运行时基础 | GPS 策略、完整现场提交、离线同步和师傅端 | M32 |
+| 动态表单 | 资产、冻结版本、不可变提交和 Task 完成门禁 | `PARTIAL` | 固定 required、基础类型校验、精确版本提交和完成引用 | 条件表达式、复杂 validator、草稿、冲突、更正和审核 | M33～M35 |
+| 资料 Evidence | 资产发布和固定 EvidenceSlot | `PARTIAL` | EVIDENCE 资产门禁、Task 冻结 Stage、固定槽位可靠解析、权威空解析和只读查询 | 条件槽位、EvidenceItem、EvidenceRevision、Snapshot、完整性门禁、审核整改 | M36～M37 |
+| 安全文件 | Begin/Finalize/隔离/扫描/授权下载基础 | `IMPLEMENTED` | 独立安全文件生命周期参考实现 | 正式对象存储、专业扫描服务、与 EvidenceRevision 业务闭环 | M11 |
+| 审核整改 | ReviewCase、ReviewDecision、CorrectionCase | `PROPOSED` | 已有完整领域和交互设计 | 运行时、API、迁移、测试和前端均未完成 | `architecture/10-*` |
+| SLA | 时钟、预警、升级 | `PROPOSED` | 已有总体设计 | 完整运行时和验收尚未实施 | `architecture/12-*` |
+| 通知 | 通知与运营异常中心 | `PROPOSED` | 已有总体设计 | 通知通道、模板、可靠发送和 UI | `architecture/14-*` |
+| 履约事实与试算 | 事实提取和双向试算 | `PROPOSED` | 已有设计、API 和数据规划 | 运行时、投影和前端工作区 | M5 设计 |
+| 对账结算 | 对账、结算、争议与调整 | `PROPOSED` | 已有边界设计 | 正式运行时和页面 | `architecture/16-*` |
+| Admin Portal | 总部运营后台 | `PROPOSED` | 信息架构、Page ID、路由、权限和页面规格 | 前端代码、设计系统实现和 E2E | M7 设计 |
+| Network Portal | 网点协作端 | `PROPOSED` | 页面和跨端协作规格 | 前端代码和 E2E | M7 设计 |
+| Technician App | 师傅移动端 | `PROPOSED` | 弱网、离线工作包、上传队列和页面规格 | 移动端工程、真机和离线运行时 | M7 设计 |
+| External Portal | 用户/车企受控页面 | `PROPOSED` | 最小边界规划 | 二期页面和工程实现 | M7 设计 |
+
+## 4. 最近里程碑
+
+### M33～M35：动态表单
+
+已实现：
+
+- FORM 配置资产发布基础；
+- Task 冻结精确 FormVersion；
+- 不可变 FormSubmission；
+- 固定 required 和基础类型验证；
+- Task 完成只接受同 Task、同项目、同冻结版本的有效提交。
+
+未实现：
+
+- ADR-018 条件表达式；
+- 复杂 validator；
+- 草稿、预填冲突和更正；
+- 表单审核闭环。
+
+### M36～M37：Evidence
+
+已实现：
+
+- EVIDENCE 1.0.0 资产结构和发布门禁；
+- `evidenceKey` 唯一性和数量区间校验；
+- Task 冻结 `stageCode`、Bundle ID 和 Digest；
+- `task.created@v1` 可靠消费；
+- 固定 EvidenceSlot 解析；
+- 无匹配要求时保存权威零槽位 Resolution；
+- Resolution、Slot、审计、Outbox、Inbox 同事务；
+- `GET /api/v1/tasks/{taskId}/evidence-slots` 授权查询。
+
+未实现：
+
+- `requiredWhen` 条件解析和可审计重解析；
+- EvidenceItem 和不可变 EvidenceRevision；
+- 与安全文件 Begin/Finalize/隔离/扫描的业务关联；
+- 数量、拍摄约束和机器校验；
+- Task 完成 Evidence 完整性门禁；
+- EvidenceSetSnapshot；
+- ReviewCase、ReviewDecision、CorrectionCase 和多轮补传。
+
+## 5. 下一实施方向
+
+在没有更新事实源或新批准决策的情况下，建议下一可靠纵向切片是：
+
+```text
+M38 EvidenceItem 与不可变 EvidenceRevision 运行时
+```
+
+建议范围：
+
+1. 复用 M11 安全文件 Begin/Finalize/隔离/扫描能力；
+2. 建立 EvidenceItem 逻辑资料身份；
+3. Finalize 成功后创建不可变 EvidenceRevision；
+4. 实现幂等、并发数量门禁、租户/项目/Task/Slot 归属校验；
+5. 更新 EvidenceSlot 当前数量投影；
+6. 提供最小授权查询；
+7. 暂不扩大到条件表达式、Snapshot、审核和整改。
+
+该建议不是自动批准的新架构。接手 Agent 必须先检查仓库是否已有更新的 M38 文档、ADR 或提交。
+
+## 6. 证据阅读方法
+
+判断某项能力是否完成时，按以下顺序检查：
+
+```text
+本文件中的状态
+→ 对应 architecture/Mxx 实现文档
+→ 对应 testing/Mxx 验收矩阵
+→ implementation-traceability-matrix.md
+→ OpenAPI / 事件 Schema / Flyway
+→ 自动化测试和提交记录
+```
+
+只有总体设计文档而没有实现文档和验收证据时，不得标记为 `IMPLEMENTED`。
+
+## 7. 强制维护规则
+
+每次里程碑或已实现范围发生变化，负责该变更的 Agent 必须在同一提交或同一 PR 中同步更新本文件，至少包括：
+
+1. `lastUpdated`；
+2. `baselineCommit`，若提交 SHA 在提交前未知，可在 PR 合并后由后续维护提交补齐，变更说明中必须明确；
+3. `latestMilestone`；
+4. 能力实施总览中的状态、已完成范围、未完成范围和证据；
+5. 最近里程碑章节；
+6. 下一实施方向；
+7. 与 `implementation-traceability-matrix.md`、里程碑实现文档和验收矩阵保持一致。
+
+以下情况视为文档门禁失败：
+
+- 新里程碑标记为 Implemented，但本文件未更新；
+- 本文件声称完成，但没有对应代码、迁移、机器契约或测试证据；
+- 删除或隐藏“未实现范围”；
+- 使用模糊的“基本完成”“差不多完成”替代可验证范围；
+- 最新基线和实际仓库进度明显不一致且没有说明。
+
+## 8. 相关入口
+
+- `serviceos-architecture/README.md`
+- `serviceos-architecture/docs/implementation-traceability-matrix.md`
+- `serviceos-architecture/roadmap/00-mvp-roadmap.md`
+- `serviceos-architecture/roadmap/02-m7-application-delivery-plan.md`
+- `serviceos-architecture/architecture/50-fixed-evidence-slot-runtime.md`
+- `serviceos-architecture/testing/34-m37-fixed-evidence-slot-runtime-acceptance.md`
