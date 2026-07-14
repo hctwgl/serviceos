@@ -8,6 +8,7 @@ public record AppointmentRevisionView(
         UUID revisionId,
         int revisionNo,
         UUID previousRevisionId,
+        String revisionKind,
         AppointmentWindow window,
         String addressRef,
         String addressVersion,
@@ -17,6 +18,9 @@ public record AppointmentRevisionView(
         Instant confirmedAt,
         String reasonCode,
         String note,
+        String noShowPartyType,
+        String noShowPartyRef,
+        java.util.List<String> noShowEvidenceRefs,
         String createdBy,
         Instant createdAt
 ) {

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/contact-attempt-recorded-v1.schema.json",
+  "title": "ContactAttemptRecordedV1", "type": "object", "additionalProperties": false,
+  "required": ["eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId", "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"}, "eventType": {"const": "contact.attempt.recorded"},
+    "schemaVersion": {"const": 1}, "tenantId": {"type": "string"}, "correlationId": {"type": "string"},
+    "causationId": {"type": "string"}, "aggregateType": {"const": "ContactAttempt"},
+    "aggregateId": {"type": "string", "format": "uuid"}, "aggregateVersion": {"const": 1},
+    "occurredAt": {"type": "string", "format": "date-time"}, "payload": {"$ref": "#/$defs/payload"}
+  },
+  "$defs": {"payload": {
+    "type": "object", "additionalProperties": false,
+    "required": ["contactAttemptId", "projectId", "workOrderId", "taskId", "channel", "contactedPartyRef", "startedAt", "endedAt", "resultCode", "nextContactAt", "actorId", "occurredAt", "eventType"],
+    "properties": {
+      "contactAttemptId": {"type": "string", "format": "uuid"}, "projectId": {"type": "string", "format": "uuid"},
+      "workOrderId": {"type": "string", "format": "uuid"}, "taskId": {"type": "string", "format": "uuid"},
+      "channel": {"type": "string"}, "contactedPartyRef": {"type": "string"},
+      "startedAt": {"type": "string", "format": "date-time"}, "endedAt": {"type": "string", "format": "date-time"},
+      "resultCode": {"enum": ["CONNECTED", "NO_ANSWER", "BUSY", "WRONG_NUMBER", "USER_REQUESTED_LATER", "INVALID_CONTACT"]},
+      "nextContactAt": {"type": ["string", "null"], "format": "date-time"}, "actorId": {"type": "string"},
+      "occurredAt": {"type": "string", "format": "date-time"}, "eventType": {"const": "contact.attempt.recorded"}
+    }
+  }}
+}

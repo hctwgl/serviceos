@@ -39,6 +39,9 @@ class GeneratedClientContractTest {
                 .contains("createProject")
                 .contains("finalizeFileUpload")
                 .contains("releaseHumanTask")
-                .contains("startHumanTask");
+                .contains("startHumanTask")
+                .contains("recordTaskContactAttempt")
+                .contains("cancelAppointment")
+                .contains("markAppointmentNoShow");
     }
 }

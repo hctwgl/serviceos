@@ -18,6 +18,18 @@ interface AppointmentMapper {
     List<Map<String, Object>> findRevisions(
             @Param("tenantId") String tenantId, @Param("appointmentId") UUID appointmentId);
 
+    List<Map<String, Object>> findContactAttempts(
+            @Param("tenantId") String tenantId, @Param("taskId") UUID taskId);
+
+    void insertContactAttempt(Map<String, Object> parameters);
+
+    void insertContactResult(Map<String, Object> parameters);
+
+    Map<String, Object> findContactResult(
+            @Param("tenantId") String tenantId,
+            @Param("operationType") String operationType,
+            @Param("idempotencyKey") String idempotencyKey);
+
     void insertAppointment(Map<String, Object> parameters);
 
     void insertRevision(Map<String, Object> parameters);

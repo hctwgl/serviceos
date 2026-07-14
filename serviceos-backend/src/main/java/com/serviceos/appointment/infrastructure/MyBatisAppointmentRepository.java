@@ -4,9 +4,14 @@ import com.serviceos.appointment.api.AppointmentCommandReceipt;
 import com.serviceos.appointment.api.AppointmentRevisionView;
 import com.serviceos.appointment.api.AppointmentType;
 import com.serviceos.appointment.api.AppointmentWindow;
+import com.serviceos.appointment.api.ContactAttemptView;
+import com.serviceos.appointment.api.ContactResultCode;
 import com.serviceos.appointment.application.AppointmentAggregate;
 import com.serviceos.appointment.application.AppointmentRepository;
 import org.springframework.stereotype.Repository;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -20,9 +25,11 @@ import java.util.UUID;
 @Repository
 final class MyBatisAppointmentRepository implements AppointmentRepository {
     private final AppointmentMapper mapper;
+    private final ObjectMapper objectMapper;
 
-    MyBatisAppointmentRepository(AppointmentMapper mapper) {
+    MyBatisAppointmentRepository(AppointmentMapper mapper, ObjectMapper objectMapper) {
         this.mapper = mapper;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -38,6 +45,46 @@ final class MyBatisAppointmentRepository implements AppointmentRepository {
     @Override
     public List<AppointmentRevisionView> findRevisions(String tenantId, UUID appointmentId) {
         return mapper.findRevisions(tenantId, appointmentId).stream().map(this::revision).toList();
+    }
+
+    @Override
+    public List<ContactAttemptView> findContactAttempts(String tenantId, UUID taskId) {
+        return mapper.findContactAttempts(tenantId, taskId).stream().map(this::contactAttempt).toList();
+    }
+
+    @Override
+    public void appendContactAttempt(String tenantId, ContactAttemptView attempt) {
+        Map<String, Object> values = new HashMap<>();
+        values.put("tenantId", tenantId);
+        values.put("contactAttemptId", attempt.contactAttemptId());
+        values.put("projectId", attempt.projectId());
+        values.put("workOrderId", attempt.workOrderId());
+        values.put("taskId", attempt.taskId());
+        values.put("channel", attempt.channel());
+        values.put("contactedPartyRef", attempt.contactedPartyRef());
+        values.put("startedAt", postgresTime(attempt.startedAt()));
+        values.put("endedAt", postgresTime(attempt.endedAt()));
+        values.put("resultCode", attempt.resultCode().name());
+        values.put("note", attempt.note());
+        values.put("nextContactAt", postgresTime(attempt.nextContactAt()));
+        values.put("recordingRef", attempt.recordingRef());
+        values.put("actorId", attempt.actorId());
+        values.put("createdAt", postgresTime(attempt.createdAt()));
+        mapper.insertContactAttempt(values);
+    }
+
+    @Override
+    public void saveContactResult(String tenantId, String operationType, String idempotencyKey, UUID attemptId) {
+        mapper.insertContactResult(Map.of(
+                "tenantId", tenantId, "operationType", operationType,
+                "idempotencyKey", idempotencyKey, "contactAttemptId", attemptId));
+    }
+
+    @Override
+    public ContactAttemptView findContactResult(String tenantId, String operationType, String idempotencyKey) {
+        Map<String, Object> row = mapper.findContactResult(tenantId, operationType, idempotencyKey);
+        if (row == null) throw new IllegalStateException("Frozen contact-attempt result is missing");
+        return contactAttempt(row);
     }
 
     @Override
@@ -132,14 +179,26 @@ final class MyBatisAppointmentRepository implements AppointmentRepository {
     private AppointmentRevisionView revision(Map<String, Object> row) {
         return new AppointmentRevisionView(
                 uuid(row, "revisionId"), integer(row, "revisionNo"), uuid(row, "previousRevisionId"),
+                text(row, "revisionKind"),
                 new AppointmentWindow(
                         instant(row, "windowStart"), instant(row, "windowEnd"),
                         text(row, "timezone"), integer(row, "estimatedDurationMinutes")),
                 text(row, "addressRef"), text(row, "addressVersion"),
                 text(row, "confirmedPartyType"), text(row, "confirmedPartyRef"),
                 text(row, "confirmationChannel"), instant(row, "confirmedAt"),
-                text(row, "reasonCode"), text(row, "note"), text(row, "revisionCreatedBy"),
+                text(row, "reasonCode"), text(row, "note"), text(row, "noShowPartyType"),
+                text(row, "noShowPartyRef"), jsonStrings(row, "noShowEvidenceRefs"), text(row, "revisionCreatedBy"),
                 instant(row, "revisionCreatedAt"));
+    }
+
+    private ContactAttemptView contactAttempt(Map<String, Object> row) {
+        return new ContactAttemptView(
+                uuid(row, "contactAttemptId"), uuid(row, "projectId"), uuid(row, "workOrderId"),
+                uuid(row, "taskId"), text(row, "channel"), text(row, "contactedPartyRef"),
+                instant(row, "startedAt"), instant(row, "endedAt"),
+                ContactResultCode.valueOf(text(row, "resultCode")), text(row, "note"),
+                instant(row, "nextContactAt"), text(row, "recordingRef"), text(row, "actorId"),
+                instant(row, "contactCreatedAt"));
     }
 
     private static Map<String, Object> appointmentValues(AppointmentAggregate appointment) {
@@ -161,7 +220,7 @@ final class MyBatisAppointmentRepository implements AppointmentRepository {
         return values;
     }
 
-    private static Map<String, Object> revisionValues(
+    private Map<String, Object> revisionValues(
             String tenantId, UUID appointmentId, AppointmentRevisionView revision
     ) {
         Map<String, Object> values = new HashMap<>();
@@ -170,6 +229,7 @@ final class MyBatisAppointmentRepository implements AppointmentRepository {
         values.put("appointmentId", appointmentId);
         values.put("revisionNo", revision.revisionNo());
         values.put("previousRevisionId", revision.previousRevisionId());
+        values.put("revisionKind", revision.revisionKind());
         values.put("windowStart", postgresTime(revision.window().start()));
         values.put("windowEnd", postgresTime(revision.window().end()));
         values.put("timezone", revision.window().timezone());
@@ -182,6 +242,9 @@ final class MyBatisAppointmentRepository implements AppointmentRepository {
         values.put("confirmedAt", postgresTime(revision.confirmedAt()));
         values.put("reasonCode", revision.reasonCode());
         values.put("note", revision.note());
+        values.put("noShowPartyType", revision.noShowPartyType());
+        values.put("noShowPartyRef", revision.noShowPartyRef());
+        values.put("noShowEvidenceRefs", toJson(revision.noShowEvidenceRefs()));
         values.put("createdBy", revision.createdBy());
         values.put("createdAt", postgresTime(revision.createdAt()));
         return values;
@@ -216,5 +279,26 @@ final class MyBatisAppointmentRepository implements AppointmentRepository {
 
     private static OffsetDateTime postgresTime(Instant value) {
         return value == null ? null : value.atOffset(ZoneOffset.UTC);
+    }
+
+    private String toJson(List<String> values) {
+        try {
+            return objectMapper.writeValueAsString(values == null ? List.of() : values);
+        } catch (JacksonException exception) {
+            throw new IllegalStateException("No-show evidence reference serialization failed", exception);
+        }
+    }
+
+    private List<String> jsonStrings(Map<String, Object> row, String key) {
+        Object value = row.get(key);
+        if (value == null) return List.of();
+        try {
+            JsonNode node = objectMapper.readTree(value.toString());
+            java.util.ArrayList<String> result = new java.util.ArrayList<>();
+            node.forEach(item -> result.add(item.asText()));
+            return List.copyOf(result);
+        } catch (JacksonException exception) {
+            throw new IllegalStateException("Stored no-show evidence references are invalid", exception);
+        }
     }
 }

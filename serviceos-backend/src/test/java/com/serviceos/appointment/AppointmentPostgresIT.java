@@ -5,8 +5,12 @@ import com.serviceos.appointment.api.AppointmentService;
 import com.serviceos.appointment.api.AppointmentType;
 import com.serviceos.appointment.api.AppointmentWindow;
 import com.serviceos.appointment.api.ConfirmAppointmentCommand;
+import com.serviceos.appointment.api.CancelAppointmentCommand;
+import com.serviceos.appointment.api.ContactResultCode;
+import com.serviceos.appointment.api.MarkAppointmentNoShowCommand;
 import com.serviceos.appointment.api.ProposeAppointmentCommand;
 import com.serviceos.appointment.api.RescheduleAppointmentCommand;
+import com.serviceos.appointment.api.RecordContactAttemptCommand;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.CommandMetadata;
@@ -31,7 +35,7 @@ import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timesta
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** M30：真实 PostgreSQL 验证预约隔离、不可变修订、幂等与多角色并发控制。 */
+/** M30-M31：真实 PostgreSQL 验证预约修订、联系事实、终态、幂等与权限隔离。 */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = ServiceOsApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE)
 class AppointmentPostgresIT {
@@ -57,7 +61,8 @@ class AppointmentPostgresIT {
     @BeforeEach
     void clean() {
         jdbc.sql("""
-                TRUNCATE TABLE apt_appointment_command_result, apt_appointment_status_history,
+                TRUNCATE TABLE apt_contact_attempt_command_result, apt_contact_attempt,
+                    apt_appointment_command_result, apt_appointment_status_history,
                     apt_appointment_revision, apt_appointment, dsp_service_assignment,
                     tsk_task_assignment, tsk_task_assignment_batch, tsk_task,
                     aud_audit_record, rel_outbox_publish_attempt, rel_outbox_event,
@@ -215,6 +220,90 @@ class AppointmentPostgresIT {
                 .isInstanceOf(RuntimeException.class);
     }
 
+    @Test
+    void repeatedContactAttemptsRemainOrderedImmutableAndReplaySafe() {
+        UUID taskId = seedTask("SURVEY_TASK", "tech-contact");
+        seedServiceResponsibility(taskId, "network-a", "tech-contact");
+        Instant first = Instant.parse("2026-07-14T01:00:00Z");
+
+        for (int index = 0; index < 4; index++) {
+            ContactResultCode result = index == 3 ? ContactResultCode.CONNECTED : ContactResultCode.NO_ANSWER;
+            RecordContactAttemptCommand command = new RecordContactAttemptCommand(
+                    taskId, "PHONE", "customer-ref", first.plusSeconds(index * 600L),
+                    first.plusSeconds(index * 600L + 60), result, null,
+                    result == ContactResultCode.NO_ANSWER ? first.plusSeconds((index + 1) * 600L) : null,
+                    index == 3 ? "recording://call-4" : null);
+            var created = appointments.recordContactAttempt(principal(), metadata("contact-" + index), command);
+            if (index == 0) {
+                assertThat(appointments.recordContactAttempt(principal(), metadata("contact-0"), command))
+                        .isEqualTo(created);
+            }
+        }
+
+        var history = appointments.listContactAttempts(principal(), "corr-contact-history", taskId);
+        assertThat(history).hasSize(4);
+        assertThat(history).extracting(attempt -> attempt.resultCode())
+                .containsExactly(ContactResultCode.NO_ANSWER, ContactResultCode.NO_ANSWER,
+                        ContactResultCode.NO_ANSWER, ContactResultCode.CONNECTED);
+        assertThat(history.getFirst().startedAt()).isEqualTo(first);
+        assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type = 'contact.attempt.recorded'")
+                .query(Long.class).single()).isEqualTo(4);
+        assertThatThrownBy(() -> jdbc.sql("UPDATE apt_contact_attempt SET note = 'tampered'").update())
+                .isInstanceOf(RuntimeException.class);
+    }
+
+    @Test
+    void cancellationCreatesTerminalRevisionAndFrozenNotificationEvent() {
+        UUID taskId = seedTask("SURVEY_TASK", null);
+        var proposed = propose(taskId, AppointmentType.SURVEY, "cancel-propose");
+        CancelAppointmentCommand command = new CancelAppointmentCommand(
+                proposed.appointmentId(), 1, "CUSTOMER_CANCELLED", "客户取消");
+
+        var cancelled = appointments.cancel(principal(), metadata("cancel-command"), command);
+        var replay = appointments.cancel(principal(), metadata("cancel-command"), command);
+
+        assertThat(replay).isEqualTo(cancelled);
+        assertThat(cancelled.status()).isEqualTo("CANCELLED");
+        var view = appointments.get(principal(), "corr-cancelled", proposed.appointmentId());
+        assertThat(view.allowedActions()).isEmpty();
+        assertThat(view.revisions().getLast().revisionKind()).isEqualTo("CANCEL");
+        assertThat(view.revisions().getLast().reasonCode()).isEqualTo("CUSTOMER_CANCELLED");
+        assertThat(jdbc.sql("SELECT event_type FROM rel_outbox_event WHERE event_type = 'appointment.cancelled'")
+                .query(String.class).single()).isEqualTo("appointment.cancelled");
+    }
+
+    @Test
+    void noShowRequiresEndedConfirmedWindowAndPersistsEvidenceReferences() {
+        UUID futureTask = seedTask("SURVEY_TASK", null);
+        var future = propose(futureTask, AppointmentType.SURVEY, "future-no-show-propose");
+        var futureConfirmed = appointments.confirm(principal(), metadata("future-no-show-confirm"),
+                new ConfirmAppointmentCommand(future.appointmentId(), 1, "CUSTOMER", "customer-ref", "PHONE"));
+        assertThatThrownBy(() -> appointments.markNoShow(principal(), metadata("future-no-show"),
+                new MarkAppointmentNoShowCommand(future.appointmentId(), futureConfirmed.aggregateVersion(),
+                        "CUSTOMER", "customer-ref", "CUSTOMER_ABSENT", java.util.List.of("file-ref-1"))))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.APPOINTMENT_WINDOW_NOT_ENDED));
+
+        UUID pastTask = seedTask("SURVEY_TASK", null);
+        var past = appointments.propose(principal(), metadata("past-no-show-propose"),
+                new ProposeAppointmentCommand(pastTask, AppointmentType.SURVEY,
+                        window("2026-07-01T01:00:00Z"), "address-ref", "address-v1"));
+        var confirmed = appointments.confirm(principal(), metadata("past-no-show-confirm"),
+                new ConfirmAppointmentCommand(past.appointmentId(), 1, "CUSTOMER", "customer-ref", "PHONE"));
+        var noShow = appointments.markNoShow(principal(), metadata("past-no-show"),
+                new MarkAppointmentNoShowCommand(past.appointmentId(), confirmed.aggregateVersion(),
+                        "CUSTOMER", "customer-ref", "CUSTOMER_ABSENT",
+                        java.util.List.of("file-ref-1", "file-ref-2")));
+
+        assertThat(noShow.status()).isEqualTo("NO_SHOW");
+        var revision = appointments.get(principal(), "corr-no-show", past.appointmentId())
+                .revisions().getLast();
+        assertThat(revision.revisionKind()).isEqualTo("NO_SHOW");
+        assertThat(revision.noShowEvidenceRefs()).containsExactly("file-ref-1", "file-ref-2");
+        assertThat(jdbc.sql("SELECT event_type FROM rel_outbox_event WHERE event_type = 'appointment.no-show-marked'")
+                .query(String.class).single()).isEqualTo("appointment.no-show-marked");
+    }
+
     private com.serviceos.appointment.api.AppointmentCommandReceipt propose(
             UUID taskId, AppointmentType type, String key
     ) {
@@ -306,7 +395,8 @@ class AppointmentPostgresIT {
                 INSERT INTO auth_role (role_id, tenant_id, role_code, role_name, role_status, created_at)
                 VALUES (:role, :tenant, 'appointment-manager', '预约协同', 'ACTIVE', now())
                 """).param("role", roleId).param("tenant", TENANT).update();
-        for (String capability : Set.of("appointment.read", "appointment.propose", "appointment.manage")) {
+        for (String capability : Set.of("appointment.read", "appointment.propose", "appointment.manage",
+                "appointment.recordContact", "appointment.cancel")) {
             jdbc.sql("""
                     INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
                     VALUES (:role, :capability, now())

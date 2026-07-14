@@ -12,6 +12,11 @@ public interface AppointmentService {
 
     AppointmentView get(CurrentPrincipal principal, String correlationId, UUID appointmentId);
 
+    List<ContactAttemptView> listContactAttempts(CurrentPrincipal principal, String correlationId, UUID taskId);
+
+    ContactAttemptView recordContactAttempt(
+            CurrentPrincipal principal, CommandMetadata metadata, RecordContactAttemptCommand command);
+
     AppointmentCommandReceipt propose(
             CurrentPrincipal principal, CommandMetadata metadata, ProposeAppointmentCommand command);
 
@@ -20,4 +25,10 @@ public interface AppointmentService {
 
     AppointmentCommandReceipt reschedule(
             CurrentPrincipal principal, CommandMetadata metadata, RescheduleAppointmentCommand command);
+
+    AppointmentCommandReceipt cancel(
+            CurrentPrincipal principal, CommandMetadata metadata, CancelAppointmentCommand command);
+
+    AppointmentCommandReceipt markNoShow(
+            CurrentPrincipal principal, CommandMetadata metadata, MarkAppointmentNoShowCommand command);
 }

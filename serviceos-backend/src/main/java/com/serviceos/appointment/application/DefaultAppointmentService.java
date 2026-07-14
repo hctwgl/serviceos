@@ -4,8 +4,12 @@ import com.serviceos.appointment.api.AppointmentCommandReceipt;
 import com.serviceos.appointment.api.AppointmentRevisionView;
 import com.serviceos.appointment.api.AppointmentService;
 import com.serviceos.appointment.api.AppointmentView;
+import com.serviceos.appointment.api.CancelAppointmentCommand;
 import com.serviceos.appointment.api.ConfirmAppointmentCommand;
+import com.serviceos.appointment.api.ContactAttemptView;
+import com.serviceos.appointment.api.MarkAppointmentNoShowCommand;
 import com.serviceos.appointment.api.ProposeAppointmentCommand;
+import com.serviceos.appointment.api.RecordContactAttemptCommand;
 import com.serviceos.appointment.api.RescheduleAppointmentCommand;
 import com.serviceos.audit.api.AuditAppender;
 import com.serviceos.audit.api.AuditEntry;
@@ -45,9 +49,14 @@ final class DefaultAppointmentService implements AppointmentService {
     private static final String READ = "appointment.read";
     private static final String PROPOSE = "appointment.propose";
     private static final String MANAGE = "appointment.manage";
+    private static final String RECORD_CONTACT = "appointment.recordContact";
+    private static final String CANCEL = "appointment.cancel";
     private static final String OP_PROPOSE = "appointment.propose";
     private static final String OP_CONFIRM = "appointment.confirm";
     private static final String OP_RESCHEDULE = "appointment.reschedule";
+    private static final String OP_RECORD_CONTACT = "appointment.record-contact";
+    private static final String OP_CANCEL = "appointment.cancel";
+    private static final String OP_NO_SHOW = "appointment.mark-no-show";
     private static final Set<String> APPOINTABLE_TASK_STATES = Set.of("READY", "CLAIMED", "RUNNING");
 
     private final AppointmentRepository repository;
@@ -93,8 +102,10 @@ final class DefaultAppointmentService implements AppointmentService {
                 correlationId);
         boolean canManage = can(principal, MANAGE, task.projectId(), responsibility.networkId(),
                 "Task", taskId.toString(), correlationId);
+        boolean canCancel = can(principal, CANCEL, task.projectId(), responsibility.networkId(),
+                "Task", taskId.toString(), correlationId);
         return repository.findByTask(principal.tenantId(), taskId).stream()
-                .map(appointment -> view(appointment, canManage)).toList();
+                .map(appointment -> view(appointment, canManage, canCancel)).toList();
     }
 
     @Override
@@ -107,7 +118,62 @@ final class DefaultAppointmentService implements AppointmentService {
                 "Appointment", appointmentId.toString(), correlationId);
         boolean canManage = can(principal, MANAGE, appointment.projectId(), appointment.assignedNetworkId(),
                 "Appointment", appointmentId.toString(), correlationId);
-        return view(appointment, canManage);
+        boolean canCancel = can(principal, CANCEL, appointment.projectId(), appointment.assignedNetworkId(),
+                "Appointment", appointmentId.toString(), correlationId);
+        return view(appointment, canManage, canCancel);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ContactAttemptView> listContactAttempts(
+            CurrentPrincipal principal, String correlationId, UUID taskId
+    ) {
+        TaskFulfillmentContext task = task(principal.tenantId(), taskId);
+        ActiveServiceResponsibility responsibility = responsibility(principal.tenantId(), taskId);
+        require(principal, READ, task.projectId(), responsibility.networkId(),
+                "Task", taskId.toString(), correlationId);
+        return repository.findContactAttempts(principal.tenantId(), taskId);
+    }
+
+    @Override
+    @Transactional
+    public ContactAttemptView recordContactAttempt(
+            CurrentPrincipal principal, CommandMetadata metadata, RecordContactAttemptCommand command
+    ) {
+        TaskFulfillmentContext task = task(principal.tenantId(), command.taskId());
+        validateTask(task);
+        ActiveServiceResponsibility responsibility = responsibility(principal.tenantId(), command.taskId());
+        AuthorizationDecision auth = require(principal, RECORD_CONTACT, task.projectId(), responsibility.networkId(),
+                "Task", command.taskId().toString(), metadata.correlationId());
+        String digest = Sha256.digest(command.toString());
+        CommandContext context = context(principal, metadata);
+        IdempotencyDecision decision = idempotency.begin(context, OP_RECORD_CONTACT, digest);
+        if (decision.kind() == IdempotencyDecision.Kind.REPLAY) {
+            return repository.findContactResult(context.tenantId(), OP_RECORD_CONTACT, context.idempotencyKey());
+        }
+
+        Instant now = clock.instant();
+        ContactAttemptView attempt = new ContactAttemptView(
+                UUID.randomUUID(), task.projectId(), task.workOrderId(), task.taskId(), command.channel(),
+                command.contactedPartyRef(), command.startedAt(), command.endedAt(), command.resultCode(),
+                command.note(), command.nextContactAt(), command.recordingRef(), context.actorId(), now);
+        repository.appendContactAttempt(context.tenantId(), attempt);
+        repository.saveContactResult(context.tenantId(), OP_RECORD_CONTACT, context.idempotencyKey(),
+                attempt.contactAttemptId());
+        String payload = contactEventPayload(attempt);
+        outbox.append(new OutboxEvent(
+                UUID.randomUUID(), UUID.randomUUID(), "appointment", "contact.attempt.recorded", 1,
+                "ContactAttempt", attempt.contactAttemptId().toString(), 1,
+                context.tenantId(), context.correlationId(), context.idempotencyKey(),
+                attempt.contactAttemptId().toString(), payload, Sha256.digest(payload), now));
+        audit.append(new AuditEntry(
+                UUID.randomUUID(), context.tenantId(), context.actorId(), "CONTACT_ATTEMPT_RECORD",
+                OP_RECORD_CONTACT, "Task", command.taskId().toString(), "ALLOW",
+                auth.matchedGrantIds(), auth.policyVersion(), "SUCCEEDED", null,
+                digest, context.correlationId(), now));
+        idempotency.complete(context, OP_RECORD_CONTACT, attempt.contactAttemptId().toString(),
+                Sha256.digest(serialize(attempt)));
+        return attempt;
     }
 
     @Override
@@ -133,8 +199,8 @@ final class DefaultAppointmentService implements AppointmentService {
         UUID appointmentId = UUID.randomUUID();
         UUID revisionId = UUID.randomUUID();
         AppointmentRevisionView revision = new AppointmentRevisionView(
-                revisionId, 1, null, command.window(), command.addressRef(), command.addressVersion(),
-                null, null, null, null, null, null, context.actorId(), now);
+                revisionId, 1, null, "PROPOSE", command.window(), command.addressRef(), command.addressVersion(),
+                null, null, null, null, null, null, null, null, List.of(), context.actorId(), now);
         AppointmentAggregate appointment = new AppointmentAggregate(
                 appointmentId, context.tenantId(), task.projectId(), task.workOrderId(), task.taskId(),
                 command.type(), "PROPOSED", responsibility.networkId(), technicianId,
@@ -171,10 +237,10 @@ final class DefaultAppointmentService implements AppointmentService {
         UUID revisionId = UUID.randomUUID();
         AppointmentRevisionView previous = current.currentRevision();
         AppointmentRevisionView revision = new AppointmentRevisionView(
-                revisionId, revisionNo, previous.revisionId(), previous.window(),
+                revisionId, revisionNo, previous.revisionId(), "CONFIRM", previous.window(),
                 previous.addressRef(), previous.addressVersion(), command.confirmedPartyType(),
                 command.confirmedPartyRef(), command.confirmationChannel(), now,
-                null, null, context.actorId(), now);
+                null, null, null, null, List.of(), context.actorId(), now);
         if (!repository.advance(context.tenantId(), command.appointmentId(), command.expectedVersion(),
                 "PROPOSED", "CONFIRMED", revisionNo, revisionId)) {
             conflict(appointment(context.tenantId(), command.appointmentId()), command.expectedVersion());
@@ -213,9 +279,9 @@ final class DefaultAppointmentService implements AppointmentService {
         UUID revisionId = UUID.randomUUID();
         AppointmentRevisionView previous = current.currentRevision();
         AppointmentRevisionView revision = new AppointmentRevisionView(
-                revisionId, revisionNo, previous.revisionId(), command.newWindow(),
+                revisionId, revisionNo, previous.revisionId(), "RESCHEDULE", command.newWindow(),
                 previous.addressRef(), previous.addressVersion(), null, null, null, null,
-                command.reasonCode(), command.note(), context.actorId(), now);
+                command.reasonCode(), command.note(), null, null, List.of(), context.actorId(), now);
         if (!repository.advance(context.tenantId(), command.appointmentId(), command.expectedVersion(),
                 "CONFIRMED", "PROPOSED", revisionNo, revisionId)) {
             conflict(appointment(context.tenantId(), command.appointmentId()), command.expectedVersion());
@@ -232,17 +298,110 @@ final class DefaultAppointmentService implements AppointmentService {
         return receipt;
     }
 
-    private AppointmentView view(AppointmentAggregate appointment, boolean canManage) {
-        List<String> actions = !canManage ? List.of()
-                : "PROPOSED".equals(appointment.status()) ? List.of("CONFIRM")
-                : "CONFIRMED".equals(appointment.status()) ? List.of("RESCHEDULE") : List.of();
+    @Override
+    @Transactional
+    public AppointmentCommandReceipt cancel(
+            CurrentPrincipal principal, CommandMetadata metadata, CancelAppointmentCommand command
+    ) {
+        AppointmentAggregate current = appointment(principal.tenantId(), command.appointmentId());
+        AuthorizationDecision auth = require(principal, CANCEL, current.projectId(), current.assignedNetworkId(),
+                "Appointment", command.appointmentId().toString(), metadata.correlationId());
+        return terminate(principal, metadata, current, command.expectedVersion(), "CANCELLED",
+                "CANCEL", command.reasonCode(), command.note(), null, null, List.of(),
+                OP_CANCEL, "APPOINTMENT_CANCEL", "appointment.cancelled", auth);
+    }
+
+    @Override
+    @Transactional
+    public AppointmentCommandReceipt markNoShow(
+            CurrentPrincipal principal, CommandMetadata metadata, MarkAppointmentNoShowCommand command
+    ) {
+        AppointmentAggregate current = appointment(principal.tenantId(), command.appointmentId());
+        AuthorizationDecision auth = require(principal, MANAGE, current.projectId(), current.assignedNetworkId(),
+                "Appointment", command.appointmentId().toString(), metadata.correlationId());
+        return terminate(principal, metadata, current, command.expectedVersion(), "NO_SHOW",
+                "NO_SHOW", command.reasonCode(), null, command.noShowPartyType(), command.noShowPartyRef(),
+                command.evidenceRefs(), OP_NO_SHOW, "APPOINTMENT_MARK_NO_SHOW",
+                "appointment.no-show-marked", auth);
+    }
+
+    private AppointmentCommandReceipt terminate(
+            CurrentPrincipal principal, CommandMetadata metadata, AppointmentAggregate current,
+            long expectedVersion, String newStatus, String revisionKind, String reasonCode, String note,
+            String noShowPartyType, String noShowPartyRef, List<String> evidenceRefs,
+            String operation, String auditAction, String eventType, AuthorizationDecision auth
+    ) {
+        String digest = Sha256.digest(List.of(current.appointmentId(), expectedVersion, newStatus,
+                reasonCode, note == null ? "" : note, noShowPartyType == null ? "" : noShowPartyType,
+                noShowPartyRef == null ? "" : noShowPartyRef, evidenceRefs).toString());
+        CommandContext context = context(principal, metadata);
+        IdempotencyDecision decision = idempotency.begin(context, operation, digest);
+        if (decision.kind() == IdempotencyDecision.Kind.REPLAY) {
+            return repository.findResult(context.tenantId(), operation, context.idempotencyKey());
+        }
+        if (current.aggregateVersion() != expectedVersion) conflict(current, expectedVersion);
+        if ("NO_SHOW".equals(newStatus)) {
+            if (!"CONFIRMED".equals(current.status())) conflict(current, expectedVersion);
+            if (current.currentRevision().window().end().isAfter(clock.instant())) {
+                throw new BusinessProblem(ProblemCode.APPOINTMENT_WINDOW_NOT_ENDED,
+                        "Appointment window has not ended");
+            }
+        } else if (!("PROPOSED".equals(current.status()) || "CONFIRMED".equals(current.status()))) {
+            conflict(current, expectedVersion);
+        }
+
+        Instant now = clock.instant();
+        int revisionNo = current.currentRevisionNo() + 1;
+        UUID revisionId = UUID.randomUUID();
+        AppointmentRevisionView previous = current.currentRevision();
+        AppointmentRevisionView revision = new AppointmentRevisionView(
+                revisionId, revisionNo, previous.revisionId(), revisionKind, previous.window(),
+                previous.addressRef(), previous.addressVersion(), previous.confirmedPartyType(),
+                previous.confirmedPartyRef(), previous.confirmationChannel(), previous.confirmedAt(),
+                reasonCode, note, noShowPartyType, noShowPartyRef, evidenceRefs, context.actorId(), now);
+        if (!repository.advance(context.tenantId(), current.appointmentId(), expectedVersion,
+                current.status(), newStatus, revisionNo, revisionId)) {
+            conflict(appointment(context.tenantId(), current.appointmentId()), expectedVersion);
+        }
+        repository.appendRevision(context.tenantId(), current.appointmentId(), revision);
+        repository.appendHistory(context.tenantId(), current.appointmentId(), expectedVersion + 1,
+                current.status(), newStatus, auditAction, context.actorId(), reasonCode, revisionId, now);
+        AppointmentCommandReceipt receipt = new AppointmentCommandReceipt(
+                current.appointmentId(), revisionId, newStatus, revisionNo, expectedVersion + 1, now);
+        repository.saveResult(context.tenantId(), operation, context.idempotencyKey(), receipt);
+        String payload = terminalEventPayload(eventType, current, receipt, revision);
+        outbox.append(new OutboxEvent(
+                UUID.randomUUID(), UUID.randomUUID(), "appointment", eventType, 1,
+                "Appointment", receipt.appointmentId().toString(), receipt.aggregateVersion(),
+                context.tenantId(), context.correlationId(), context.idempotencyKey(),
+                receipt.appointmentId().toString(), payload, Sha256.digest(payload), now));
+        audit.append(new AuditEntry(
+                UUID.randomUUID(), context.tenantId(), context.actorId(), auditAction,
+                operation, "Appointment", receipt.appointmentId().toString(), "ALLOW",
+                auth.matchedGrantIds(), auth.policyVersion(), "SUCCEEDED", null,
+                digest, context.correlationId(), now));
+        idempotency.complete(context, operation, receipt.appointmentId().toString(),
+                Sha256.digest(serialize(receipt)));
+        return receipt;
+    }
+
+    private AppointmentView view(AppointmentAggregate appointment, boolean canManage, boolean canCancel) {
+        java.util.ArrayList<String> actions = new java.util.ArrayList<>();
+        if (canManage && "PROPOSED".equals(appointment.status())) actions.add("CONFIRM");
+        if (canManage && "CONFIRMED".equals(appointment.status())) {
+            actions.add("RESCHEDULE");
+            if (!appointment.currentRevision().window().end().isAfter(clock.instant())) actions.add("MARK_NO_SHOW");
+        }
+        if (canCancel && ("PROPOSED".equals(appointment.status()) || "CONFIRMED".equals(appointment.status()))) {
+            actions.add("CANCEL");
+        }
         return new AppointmentView(
                 appointment.appointmentId(), appointment.projectId(), appointment.workOrderId(),
                 appointment.taskId(), appointment.type(), appointment.status(),
                 appointment.assignedNetworkId(), appointment.technicianId(),
                 appointment.aggregateVersion(), appointment.currentRevisionNo(),
                 appointment.createdAt(), appointment.createdBy(),
-                repository.findRevisions(appointment.tenantId(), appointment.appointmentId()), actions);
+                repository.findRevisions(appointment.tenantId(), appointment.appointmentId()), List.copyOf(actions));
     }
 
     private void finish(
@@ -278,6 +437,47 @@ final class DefaultAppointmentService implements AppointmentService {
         payload.put("taskId", appointment.taskId());
         payload.put("appointmentType", appointment.type());
         payload.put("status", receipt.status());
+        payload.put("aggregateVersion", receipt.aggregateVersion());
+        payload.put("occurredAt", receipt.occurredAt());
+        payload.put("eventType", eventType);
+        return serialize(payload);
+    }
+
+    private String contactEventPayload(ContactAttemptView attempt) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("contactAttemptId", attempt.contactAttemptId());
+        payload.put("projectId", attempt.projectId());
+        payload.put("workOrderId", attempt.workOrderId());
+        payload.put("taskId", attempt.taskId());
+        payload.put("channel", attempt.channel());
+        payload.put("contactedPartyRef", attempt.contactedPartyRef());
+        payload.put("startedAt", attempt.startedAt());
+        payload.put("endedAt", attempt.endedAt());
+        payload.put("resultCode", attempt.resultCode());
+        payload.put("nextContactAt", attempt.nextContactAt());
+        payload.put("actorId", attempt.actorId());
+        payload.put("occurredAt", attempt.createdAt());
+        payload.put("eventType", "contact.attempt.recorded");
+        return serialize(payload);
+    }
+
+    private String terminalEventPayload(
+            String eventType, AppointmentAggregate appointment,
+            AppointmentCommandReceipt receipt, AppointmentRevisionView revision
+    ) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("appointmentId", receipt.appointmentId());
+        payload.put("revisionId", receipt.revisionId());
+        payload.put("revisionNo", receipt.revisionNo());
+        payload.put("projectId", appointment.projectId());
+        payload.put("workOrderId", appointment.workOrderId());
+        payload.put("taskId", appointment.taskId());
+        payload.put("appointmentType", appointment.type());
+        payload.put("status", receipt.status());
+        payload.put("reasonCode", revision.reasonCode());
+        payload.put("noShowPartyType", revision.noShowPartyType());
+        payload.put("noShowPartyRef", revision.noShowPartyRef());
+        payload.put("evidenceRefs", revision.noShowEvidenceRefs());
         payload.put("aggregateVersion", receipt.aggregateVersion());
         payload.put("occurredAt", receipt.occurredAt());
         payload.put("eventType", eventType);

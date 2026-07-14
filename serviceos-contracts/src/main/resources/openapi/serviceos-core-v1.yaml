@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.6.0
+  version: 0.7.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -350,6 +350,51 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /tasks/{taskId}/contact-attempts:
+    get:
+      operationId: listTaskContactAttempts
+      summary: 查询任务的不可变联系历史
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 按实际联系开始时间排序的完整历史
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ContactAttempt' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: recordTaskContactAttempt
+      summary: 追加一次联系事实
+      description: 不接受电话号码副本；contactedPartyRef 必须指向受治理的联系对象。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecordContactAttemptRequest' }
+      responses:
+        '201':
+          description: 联系事实已追加或返回首次幂等冻结响应
+          headers:
+            Location: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContactAttempt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
   /appointments/{appointmentId}:
     get:
       operationId: getAppointment
@@ -405,6 +450,48 @@ paths:
         content:
           application/json:
             schema: { $ref: '#/components/schemas/RescheduleAppointmentRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/AppointmentCommandReceipt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /appointments/{appointmentId}:cancel:
+    post:
+      operationId: cancelAppointment
+      summary: 取消提议中或已确认预约
+      parameters:
+        - $ref: '#/components/parameters/AppointmentId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CancelAppointmentRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/AppointmentCommandReceipt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /appointments/{appointmentId}:mark-no-show:
+    post:
+      operationId: markAppointmentNoShow
+      summary: 将已确认且窗口已结束的预约标记为爽约
+      parameters:
+        - $ref: '#/components/parameters/AppointmentId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MarkAppointmentNoShowRequest' }
       responses:
         '200': { $ref: '#/components/responses/AppointmentCommandReceipt' }
         '400': { $ref: '#/components/responses/Problem' }
@@ -720,16 +807,69 @@ components:
         newWindow: { $ref: '#/components/schemas/AppointmentWindow' }
         reasonCode: { type: string, minLength: 1, maxLength: 100 }
         note: { type: [string, 'null'], maxLength: 500 }
+    RecordContactAttemptRequest:
+      type: object
+      additionalProperties: false
+      required: [channel, contactedPartyRef, startedAt, endedAt, resultCode]
+      properties:
+        channel: { type: string, minLength: 1, maxLength: 80 }
+        contactedPartyRef: { type: string, minLength: 1, maxLength: 200 }
+        startedAt: { type: string, format: date-time }
+        endedAt: { type: string, format: date-time }
+        resultCode: { enum: [CONNECTED, NO_ANSWER, BUSY, WRONG_NUMBER, USER_REQUESTED_LATER, INVALID_CONTACT] }
+        note: { type: [string, 'null'], maxLength: 500 }
+        nextContactAt: { type: [string, 'null'], format: date-time }
+        recordingRef: { type: [string, 'null'], maxLength: 500 }
+    ContactAttempt:
+      type: object
+      additionalProperties: false
+      required: [contactAttemptId, projectId, workOrderId, taskId, channel, contactedPartyRef,
+                 startedAt, endedAt, resultCode, note, nextContactAt, recordingRef, actorId, createdAt]
+      properties:
+        contactAttemptId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        workOrderId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        channel: { type: string }
+        contactedPartyRef: { type: string }
+        startedAt: { type: string, format: date-time }
+        endedAt: { type: string, format: date-time }
+        resultCode: { enum: [CONNECTED, NO_ANSWER, BUSY, WRONG_NUMBER, USER_REQUESTED_LATER, INVALID_CONTACT] }
+        note: { type: [string, 'null'] }
+        nextContactAt: { type: [string, 'null'], format: date-time }
+        recordingRef: { type: [string, 'null'] }
+        actorId: { type: string }
+        createdAt: { type: string, format: date-time }
+    CancelAppointmentRequest:
+      type: object
+      additionalProperties: false
+      required: [reasonCode]
+      properties:
+        reasonCode: { type: string, pattern: '^[A-Z][A-Z0-9_]{1,99}$' }
+        note: { type: [string, 'null'], maxLength: 500 }
+    MarkAppointmentNoShowRequest:
+      type: object
+      additionalProperties: false
+      required: [noShowPartyType, noShowPartyRef, reasonCode, evidenceRefs]
+      properties:
+        noShowPartyType: { type: string, minLength: 1, maxLength: 80 }
+        noShowPartyRef: { type: string, minLength: 1, maxLength: 200 }
+        reasonCode: { type: string, pattern: '^[A-Z][A-Z0-9_]{1,99}$' }
+        evidenceRefs:
+          type: array
+          maxItems: 20
+          items: { type: string, minLength: 1, maxLength: 500 }
     AppointmentRevision:
       type: object
       additionalProperties: false
-      required: [revisionId, revisionNo, previousRevisionId, window, addressRef, addressVersion,
+      required: [revisionId, revisionNo, previousRevisionId, revisionKind, window, addressRef, addressVersion,
                  confirmedPartyType, confirmedPartyRef, confirmationChannel, confirmedAt,
-                 reasonCode, note, createdBy, createdAt]
+                 reasonCode, note, noShowPartyType, noShowPartyRef, noShowEvidenceRefs, createdBy, createdAt]
       properties:
         revisionId: { type: string, format: uuid }
         revisionNo: { type: integer, minimum: 1 }
         previousRevisionId: { type: [string, 'null'], format: uuid }
+        revisionKind: { enum: [PROPOSE, CONFIRM, RESCHEDULE, CANCEL, NO_SHOW] }
         window: { $ref: '#/components/schemas/AppointmentWindow' }
         addressRef: { type: string }
         addressVersion: { type: string }
@@ -739,6 +879,12 @@ components:
         confirmedAt: { type: [string, 'null'], format: date-time }
         reasonCode: { type: [string, 'null'] }
         note: { type: [string, 'null'] }
+        noShowPartyType: { type: [string, 'null'] }
+        noShowPartyRef: { type: [string, 'null'] }
+        noShowEvidenceRefs:
+          type: array
+          maxItems: 20
+          items: { type: string }
         createdBy: { type: string }
         createdAt: { type: string, format: date-time }
     Appointment:
@@ -753,7 +899,7 @@ components:
         workOrderId: { type: string, format: uuid }
         taskId: { type: string, format: uuid }
         type: { enum: [SURVEY, INSTALLATION, REPAIR, CORRECTION, SECOND_VISIT] }
-        status: { enum: [PROPOSED, CONFIRMED] }
+        status: { enum: [PROPOSED, CONFIRMED, CANCELLED, NO_SHOW] }
         assignedNetworkId: { type: [string, 'null'] }
         technicianId: { type: [string, 'null'] }
         aggregateVersion: { type: integer, format: int64, minimum: 1 }
@@ -766,7 +912,7 @@ components:
           items: { $ref: '#/components/schemas/AppointmentRevision' }
         allowedActions:
           type: array
-          items: { enum: [CONFIRM, RESCHEDULE] }
+          items: { enum: [CONFIRM, RESCHEDULE, CANCEL, MARK_NO_SHOW] }
     AppointmentCommandReceipt:
       type: object
       additionalProperties: false
@@ -774,7 +920,7 @@ components:
       properties:
         appointmentId: { type: string, format: uuid }
         revisionId: { type: string, format: uuid }
-        status: { enum: [PROPOSED, CONFIRMED] }
+        status: { enum: [PROPOSED, CONFIRMED, CANCELLED, NO_SHOW] }
         revisionNo: { type: integer, minimum: 1 }
         aggregateVersion: { type: integer, format: int64, minimum: 1 }
         occurredAt: { type: string, format: date-time }

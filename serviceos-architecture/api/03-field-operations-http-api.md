@@ -13,6 +13,7 @@ status: Proposed
 | 方法与路径 | 命令/用途 | 必需载荷 | 成功 |
 |---|---|---|---|
 | `POST /tasks/{taskId}/contact-attempts` | RecordContactAttempt | channel、partyRef、resultCode、timestamps | 201 |
+| `GET /tasks/{taskId}/contact-attempts` | 查询不可变联系历史 | — | 200 |
 | `POST /tasks/{taskId}/appointments` | ProposeAppointment | type、window、addressRef、participants | 201 |
 | `POST /appointments/{id}:confirm` | ConfirmAppointment | revision、confirmedByParty、channel | 200 |
 | `POST /appointments/{id}:reschedule` | RescheduleAppointment | newWindow、reasonCode、note? | 200 |
@@ -196,6 +197,9 @@ UploadSession 返回受限上传地址、允许分片、过期时间和最大字
 | 事件 | 关键载荷 |
 |---|---|
 | `AppointmentConfirmed` | appointment、revision、window、participants |
+| `ContactAttemptRecorded` | contact attempt、task、channel、result、business timestamps |
+| `AppointmentCancelled` | appointment、terminal revision、reason |
+| `AppointmentNoShowMarked` | appointment、party ref、reason、evidence refs |
 | `VisitCheckedIn` | visit、appointment、captured/received time、geofence result |
 | `FormSubmitted` | task、form version、submission version、validation status |
 | `EvidenceStored` | slot、item、revision、checksum、capture summary |
@@ -212,6 +216,7 @@ UploadSession 返回受限上传地址、允许分片、过期时间和最大字
 | 错误码 | HTTP | 含义 |
 |---|---:|---|
 | `APPOINTMENT_VERSION_CONFLICT` | 409 | 预约已被他人改约 |
+| `APPOINTMENT_WINDOW_NOT_ENDED` | 409 | 预约窗口尚未结束，不能标记爽约 |
 | `TECHNICIAN_ASSIGNMENT_CHANGED` | 409 | 离线期间任务已改派 |
 | `FORM_VERSION_NOT_ALLOWED` | 409/422 | 表单版本不再允许当前提交 |
 | `FORM_VALIDATION_FAILED` | 422 | 服务端字段校验失败 |

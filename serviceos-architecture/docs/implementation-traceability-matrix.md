@@ -125,3 +125,4 @@ Feature gate/authority: if applicable
 | M28 | 激活完成事件驱动异常自动解决、Task 精确取消/撤权、恢复证据约束与解决事件 | Handler Unit + Event Schema + TaskExecution PostgreSQL IT + V028 | 超时后的策略化 abort/继续/补偿、初派握手、Network 双级派单、候选策略、SLA、完整勘安链路 |
 | M29 | 租户隔离运营异常列表/详情、动态筛选、稳定游标、OPEN 确认与来源自动解决兼容 | MVC Security + OpenAPI/Event Contract + OperationalExceptionWorkbench PostgreSQL IT + V029 | 领域专属处置动作、通用处理任务编排、通知升级、完整运营工作台前端 |
 | M30 | 预约提议/确认/改约、不可变修订链、责任快照、实时 scope 授权与 ETag 并发控制 | MVC Security + OpenAPI/Event Contract + Appointment PostgreSQL IT + V030 | 取消/爽约、上门签到、现场执行、离线同步、完整勘安链路 |
+| M31 | 联系尝试追加历史、首次联系 SLA 事实、预约取消/爽约终态、终态修订与可靠通知 | MVC Security + OpenAPI/Event Contract + Appointment PostgreSQL IT + V031 | 上门签到、Visit 现场执行、离线同步、下游取消/爽约任务策略 |

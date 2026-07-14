@@ -5,9 +5,14 @@ import com.serviceos.appointment.api.AppointmentService;
 import com.serviceos.appointment.api.AppointmentType;
 import com.serviceos.appointment.api.AppointmentView;
 import com.serviceos.appointment.api.AppointmentWindow;
+import com.serviceos.appointment.api.CancelAppointmentCommand;
 import com.serviceos.appointment.api.ConfirmAppointmentCommand;
+import com.serviceos.appointment.api.ContactAttemptView;
+import com.serviceos.appointment.api.ContactResultCode;
+import com.serviceos.appointment.api.MarkAppointmentNoShowCommand;
 import com.serviceos.appointment.api.ProposeAppointmentCommand;
 import com.serviceos.appointment.api.RescheduleAppointmentCommand;
+import com.serviceos.appointment.api.RecordContactAttemptCommand;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
 import com.serviceos.shared.CommandMetadata;
@@ -62,6 +67,32 @@ final class AppointmentController {
         return ResponseEntity.ok().eTag(Long.toString(appointment.aggregateVersion())).body(appointment);
     }
 
+    @GetMapping("/tasks/{taskId}/contact-attempts")
+    List<ContactAttemptView> listContactAttempts(
+            @PathVariable UUID taskId,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        return appointments.listContactAttempts(principals.current(), correlationId, taskId);
+    }
+
+    @PostMapping("/tasks/{taskId}/contact-attempts")
+    ResponseEntity<ContactAttemptView> recordContactAttempt(
+            @PathVariable UUID taskId,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @Valid @RequestBody ContactAttemptRequest request
+    ) {
+        ContactAttemptView attempt = appointments.recordContactAttempt(
+                principals.current(), new CommandMetadata(correlationId, idempotencyKey),
+                new RecordContactAttemptCommand(
+                        taskId, request.channel(), request.contactedPartyRef(), request.startedAt(),
+                        request.endedAt(), request.resultCode(), request.note(), request.nextContactAt(),
+                        request.recordingRef()));
+        return ResponseEntity.created(URI.create("/api/v1/tasks/" + taskId + "/contact-attempts/"
+                        + attempt.contactAttemptId()))
+                .header(CorrelationIds.HEADER_NAME, correlationId).body(attempt);
+    }
+
     @PostMapping("/tasks/{taskId}/appointments")
     ResponseEntity<AppointmentCommandReceipt> propose(
             @PathVariable UUID taskId,
@@ -109,6 +140,36 @@ final class AppointmentController {
                 new RescheduleAppointmentCommand(
                         appointmentId, version(ifMatch), request.newWindow().toWindow(),
                         request.reasonCode(), request.note()));
+        return response(receipt, correlationId);
+    }
+
+    @PostMapping("/appointments/{appointmentId}:cancel")
+    ResponseEntity<AppointmentCommandReceipt> cancel(
+            @PathVariable UUID appointmentId,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestHeader("If-Match") String ifMatch,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @Valid @RequestBody CancelRequest request
+    ) {
+        AppointmentCommandReceipt receipt = appointments.cancel(
+                principals.current(), new CommandMetadata(correlationId, idempotencyKey),
+                new CancelAppointmentCommand(appointmentId, version(ifMatch), request.reasonCode(), request.note()));
+        return response(receipt, correlationId);
+    }
+
+    @PostMapping("/appointments/{appointmentId}:mark-no-show")
+    ResponseEntity<AppointmentCommandReceipt> markNoShow(
+            @PathVariable UUID appointmentId,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestHeader("If-Match") String ifMatch,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @Valid @RequestBody MarkNoShowRequest request
+    ) {
+        AppointmentCommandReceipt receipt = appointments.markNoShow(
+                principals.current(), new CommandMetadata(correlationId, idempotencyKey),
+                new MarkAppointmentNoShowCommand(
+                        appointmentId, version(ifMatch), request.noShowPartyType(),
+                        request.noShowPartyRef(), request.reasonCode(), request.evidenceRefs()));
         return response(receipt, correlationId);
     }
 
@@ -160,6 +221,32 @@ final class AppointmentController {
             @NotNull @Valid WindowRequest newWindow,
             @NotBlank @Size(max = 100) String reasonCode,
             @Size(max = 500) String note
+    ) {
+    }
+
+    record ContactAttemptRequest(
+            @NotBlank @Size(max = 80) String channel,
+            @NotBlank @Size(max = 200) String contactedPartyRef,
+            @NotNull Instant startedAt,
+            @NotNull Instant endedAt,
+            @NotNull ContactResultCode resultCode,
+            @Size(max = 500) String note,
+            Instant nextContactAt,
+            @Size(max = 500) String recordingRef
+    ) {
+    }
+
+    record CancelRequest(
+            @NotBlank @Size(max = 100) String reasonCode,
+            @Size(max = 500) String note
+    ) {
+    }
+
+    record MarkNoShowRequest(
+            @NotBlank @Size(max = 80) String noShowPartyType,
+            @NotBlank @Size(max = 200) String noShowPartyRef,
+            @NotBlank @Size(max = 100) String reasonCode,
+            @NotNull @Size(max = 20) List<@NotBlank @Size(max = 500) String> evidenceRefs
     ) {
     }
 }

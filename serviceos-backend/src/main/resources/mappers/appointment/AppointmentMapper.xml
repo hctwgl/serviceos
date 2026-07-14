@@ -9,6 +9,7 @@
         a.aggregate_version AS "aggregateVersion", a.current_revision_no AS "currentRevisionNo",
         a.created_at AS "appointmentCreatedAt", a.created_by AS "appointmentCreatedBy",
         r.revision_id AS "revisionId", r.revision_no AS "revisionNo",
+        r.revision_kind AS "revisionKind",
         r.previous_revision_id AS "previousRevisionId", r.window_start AS "windowStart",
         r.window_end AS "windowEnd", r.timezone,
         r.estimated_duration_minutes AS "estimatedDurationMinutes",
@@ -16,6 +17,8 @@
         r.confirmed_party_type AS "confirmedPartyType", r.confirmed_party_ref AS "confirmedPartyRef",
         r.confirmation_channel AS "confirmationChannel", r.confirmed_at AS "confirmedAt",
         r.reason_code AS "reasonCode", r.note,
+        r.no_show_party_type AS "noShowPartyType", r.no_show_party_ref AS "noShowPartyRef",
+        r.no_show_evidence_refs AS "noShowEvidenceRefs",
         r.created_by AS "revisionCreatedBy", r.created_at AS "revisionCreatedAt"
     </sql>
 
@@ -36,6 +39,7 @@
 
     <select id="findRevisions" resultType="map">
         SELECT revision_id AS "revisionId", revision_no AS "revisionNo",
+               revision_kind AS "revisionKind",
                previous_revision_id AS "previousRevisionId", window_start AS "windowStart",
                window_end AS "windowEnd", timezone,
                estimated_duration_minutes AS "estimatedDurationMinutes",
@@ -44,10 +48,54 @@
                confirmed_party_ref AS "confirmedPartyRef",
                confirmation_channel AS "confirmationChannel", confirmed_at AS "confirmedAt",
                reason_code AS "reasonCode", note,
+               no_show_party_type AS "noShowPartyType", no_show_party_ref AS "noShowPartyRef",
+               no_show_evidence_refs AS "noShowEvidenceRefs",
                created_by AS "revisionCreatedBy", created_at AS "revisionCreatedAt"
           FROM apt_appointment_revision
          WHERE tenant_id = #{tenantId} AND appointment_id = #{appointmentId}
          ORDER BY revision_no
+    </select>
+
+    <sql id="contactColumns">
+        c.contact_attempt_id AS "contactAttemptId", c.project_id AS "projectId",
+        c.work_order_id AS "workOrderId", c.task_id AS "taskId", c.channel,
+        c.contacted_party_ref AS "contactedPartyRef", c.started_at AS "startedAt",
+        c.ended_at AS "endedAt", c.result_code AS "resultCode", c.note,
+        c.next_contact_at AS "nextContactAt", c.recording_ref AS "recordingRef",
+        c.actor_id AS "actorId", c.created_at AS "contactCreatedAt"
+    </sql>
+
+    <select id="findContactAttempts" resultType="map">
+        SELECT <include refid="contactColumns"/>
+          FROM apt_contact_attempt c
+         WHERE c.tenant_id = #{tenantId} AND c.task_id = #{taskId}
+         ORDER BY c.started_at, c.contact_attempt_id
+    </select>
+
+    <insert id="insertContactAttempt" parameterType="map">
+        INSERT INTO apt_contact_attempt (
+            contact_attempt_id, tenant_id, project_id, work_order_id, task_id, channel,
+            contacted_party_ref, started_at, ended_at, result_code, note, next_contact_at,
+            recording_ref, actor_id, created_at
+        ) VALUES (
+            #{contactAttemptId}, #{tenantId}, #{projectId}, #{workOrderId}, #{taskId}, #{channel},
+            #{contactedPartyRef}, #{startedAt}, #{endedAt}, #{resultCode}, #{note}, #{nextContactAt},
+            #{recordingRef}, #{actorId}, #{createdAt}
+        )
+    </insert>
+
+    <insert id="insertContactResult" parameterType="map">
+        INSERT INTO apt_contact_attempt_command_result (
+            tenant_id, operation_type, idempotency_key, contact_attempt_id
+        ) VALUES (#{tenantId}, #{operationType}, #{idempotencyKey}, #{contactAttemptId})
+    </insert>
+
+    <select id="findContactResult" resultType="map">
+        SELECT <include refid="contactColumns"/>
+          FROM apt_contact_attempt_command_result r
+          JOIN apt_contact_attempt c ON c.contact_attempt_id = r.contact_attempt_id
+         WHERE r.tenant_id = #{tenantId} AND r.operation_type = #{operationType}
+           AND r.idempotency_key = #{idempotencyKey}
     </select>
 
     <insert id="insertAppointment" parameterType="map">
@@ -64,15 +112,17 @@
 
     <insert id="insertRevision" parameterType="map">
         INSERT INTO apt_appointment_revision (
-            revision_id, tenant_id, appointment_id, revision_no, previous_revision_id,
+            revision_id, tenant_id, appointment_id, revision_no, previous_revision_id, revision_kind,
             window_start, window_end, timezone, estimated_duration_minutes,
             address_ref, address_version, confirmed_party_type, confirmed_party_ref,
-            confirmation_channel, confirmed_at, reason_code, note, created_by, created_at
+            confirmation_channel, confirmed_at, reason_code, note, no_show_party_type,
+            no_show_party_ref, no_show_evidence_refs, created_by, created_at
         ) VALUES (
-            #{revisionId}, #{tenantId}, #{appointmentId}, #{revisionNo}, #{previousRevisionId},
+            #{revisionId}, #{tenantId}, #{appointmentId}, #{revisionNo}, #{previousRevisionId}, #{revisionKind},
             #{windowStart}, #{windowEnd}, #{timezone}, #{estimatedDurationMinutes},
             #{addressRef}, #{addressVersion}, #{confirmedPartyType}, #{confirmedPartyRef},
-            #{confirmationChannel}, #{confirmedAt}, #{reasonCode}, #{note}, #{createdBy}, #{createdAt}
+            #{confirmationChannel}, #{confirmedAt}, #{reasonCode}, #{note}, #{noShowPartyType},
+            #{noShowPartyRef}, CAST(#{noShowEvidenceRefs} AS jsonb), #{createdBy}, #{createdAt}
         )
     </insert>
 
