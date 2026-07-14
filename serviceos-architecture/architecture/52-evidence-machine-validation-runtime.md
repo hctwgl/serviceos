@@ -60,5 +60,5 @@ M39 在 M38 扫描投影之上补齐确定性机器校验：`VALIDATING → VALI
 
 1. OCR / SN / VIN / 模糊 / 光照等图像或业务字段校验实现；
 2. GPS 权威距离核验（仅要求客户端 `locationClaim` 存在）；
-3. `evidence.invalidate`、EvidenceSetSnapshot、Review/Correction；
+3. `evidence.invalidate`、Review/Correction（EvidenceSetSnapshot 见 M40）；
 4. Task 完成 Evidence 完整性门禁与 ADR-018 条件槽位。

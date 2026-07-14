@@ -134,3 +134,4 @@ Feature gate/authority: if applicable
 | M37 | Task 冻结 Stage、固定 EvidenceSlot 可靠解析、权威空结果与授权只读投影 | OpenAPI 0.12.0 + Evidence PostgreSQL/MVC/Event Contract + V037～V038 | ADR-018 条件重解析、EvidenceSetSnapshot、完成门禁、审核整改和完整 EVD-001～009 |
 | M38 | Evidence 编排安全文件 Begin/Finalize、EvidenceItem/不可变 Revision、扫描状态投影与授权查询 | OpenAPI 0.13.0 + Evidence PostgreSQL/MVC/Event Contract + V039 | OCR/图像业务校验实现、代办上传、invalidate、Snapshot、审核整改、完成门禁和完整 EVD-001～009 |
 | M39 | 扫描后确定性机器校验、EvidenceValidation 事实、VALIDATED/VALIDATION_FAILED | OpenAPI 0.14.0 + Evidence PostgreSQL/Event Contract + V040 | OCR/图像 CV 实现、GPS 权威距离、invalidate、Snapshot、审核整改、完成门禁 |
+| M40 | 不可变 EvidenceSetSnapshot、TASK_SUBMISSION 成员资格与 EVD-008/009 | OpenAPI 0.15.0 + Evidence PostgreSQL/MVC/Event Contract + V041 | REVIEW/REPORT purpose、自动选版、invalidate、Review/Correction、完成门禁 |

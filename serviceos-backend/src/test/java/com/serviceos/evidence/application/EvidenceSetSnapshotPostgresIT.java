@@ -7,14 +7,18 @@ import com.serviceos.configuration.api.ConfigurationService;
 import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
 import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
 import com.serviceos.evidence.api.BeginEvidenceUploadCommand;
+import com.serviceos.evidence.api.CreateEvidenceSetSnapshotCommand;
 import com.serviceos.evidence.api.EvidenceCommandService;
-import com.serviceos.evidence.api.EvidenceItemView;
+import com.serviceos.evidence.api.EvidenceSetSnapshotService;
+import com.serviceos.evidence.api.EvidenceSetSnapshotView;
 import com.serviceos.evidence.api.FinalizeEvidenceUploadCommand;
 import com.serviceos.files.infrastructure.LocalObjectTransferService;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.reliability.spi.OutboxMessage;
 import com.serviceos.reliability.spi.OutboxMessageHandler;
+import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.CommandMetadata;
+import com.serviceos.shared.ProblemCode;
 import com.serviceos.shared.Sha256;
 import com.serviceos.task.application.TaskExecutionWorker;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,9 +53,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = ServiceOsApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE)
-class EvidenceMachineValidationPostgresIT {
-    private static final String TENANT = "tenant-evidence-validation-it";
-    private static final String TECHNICIAN = "technician-evidence-040";
+class EvidenceSetSnapshotPostgresIT {
+    private static final String TENANT = "tenant-evidence-snapshot-it";
+    private static final String TECHNICIAN = "technician-evidence-041";
     private static final Path STORAGE_ROOT = temporaryStorageRoot();
 
     @Container
@@ -68,12 +72,13 @@ class EvidenceMachineValidationPostgresIT {
         registry.add("spring.datasource.password", POSTGRES::getPassword);
         registry.add("serviceos.files.local.root", STORAGE_ROOT::toString);
         registry.add("serviceos.files.local.signing-key",
-                () -> "evidence-validation-it-signing-key-with-thirty-two-bytes");
+                () -> "evidence-snapshot-it-signing-key-with-thirty-two-bytes");
         registry.add("serviceos.task.scheduling-enabled", () -> "false");
     }
 
     @Autowired ConfigurationService configurations;
     @Autowired EvidenceCommandService evidence;
+    @Autowired EvidenceSetSnapshotService snapshots;
     @Autowired LocalObjectTransferService transfers;
     @Autowired TaskExecutionWorker worker;
     @Autowired List<OutboxMessageHandler> handlers;
@@ -106,136 +111,119 @@ class EvidenceMachineValidationPostgresIT {
                 INSERT INTO prj_project (
                     project_id, tenant_id, project_code, client_id, project_name,
                     starts_on, project_status, aggregate_version, created_at)
-                VALUES (:projectId, :tenantId, 'EVD-VAL-IT', 'BYD', '资料校验测试项目',
+                VALUES (:projectId, :tenantId, 'EVD-SNAP-IT', 'BYD', '资料快照测试项目',
                     :startsOn, 'ACTIVE', 1, now())
                 """).param("projectId", projectId).param("tenantId", TENANT)
                 .param("startsOn", LocalDate.now().minusDays(1)).update();
         grant(TECHNICIAN, "evidence.submit", "evidence.read", "file.upload", "file.download");
-        seedResolvedSlot("""
-                {"evidenceKey":"site.photo","name":"现场照片","mediaType":"PHOTO","required":true,
-                 "capture":{"minCount":1,"maxCount":2,"maxSizeBytes":1048576,"allowGallery":true}}
-                """);
+        seedResolvedSlot();
     }
 
     @Test
-    void cleanScanRunsMachineValidationToValidated() throws Exception {
-        EvidenceItemView item = uploadAndFinalize(pngBytes("ok"), "begin-ok", "cmd-ok");
-        assertThat(worker.runOnce()).isEqualTo(TaskExecutionWorker.RunResult.SUCCEEDED);
-        handlers.stream().filter(handler -> handler.supports("file.scan-completed", 1))
-                .forEach(handler -> handler.handle(scanCompletedEvent()));
-        assertThat(jdbc.sql("SELECT status FROM evd_evidence_revision").query(String.class).single())
-                .isEqualTo("VALIDATING");
-        assertThat(worker.runOnce()).isEqualTo(TaskExecutionWorker.RunResult.SUCCEEDED);
+    void createsImmutableSnapshotReplaysAndRejectsIllegalMembers() throws Exception {
+        UUID firstRevision = uploadScanAndValidate(pngBytes("s1"), "begin-s1", "cmd-s1");
+        EvidenceSetSnapshotView first = snapshots.create(principal(), metadata("snap-1"),
+                new CreateEvidenceSetSnapshotCommand(
+                        taskId, "TASK_SUBMISSION", List.of(firstRevision)));
+        EvidenceSetSnapshotView replay = snapshots.create(principal(), metadata("snap-1"),
+                new CreateEvidenceSetSnapshotCommand(
+                        taskId, "TASK_SUBMISSION", List.of(firstRevision)));
 
-        assertThat(jdbc.sql("SELECT status FROM evd_evidence_revision").query(String.class).single())
-                .isEqualTo("VALIDATED");
-        assertThat(jdbc.sql("SELECT count(*) FROM evd_evidence_validation").query(Long.class).single())
-                .isGreaterThanOrEqualTo(2);
-        assertThat(jdbc.sql("""
-                SELECT count(*) FROM rel_outbox_event WHERE event_type='evidence.validation-completed'
-                """).query(Long.class).single()).isOne();
-        assertThat(evidence.get(principal(), "corr-get", item.evidenceItemId()).revisions().getFirst()
-                .validations()).isNotEmpty();
-        assertThat(jdbc.sql("SELECT status_projection FROM evd_evidence_slot WHERE slot_id=:slot")
-                .param("slot", slotId).query(String.class).single()).isEqualTo("SATISFIED");
+        assertThat(replay.evidenceSetSnapshotId()).isEqualTo(first.evidenceSetSnapshotId());
+        assertThat(first.members()).hasSize(1);
+        assertThat(first.members().getFirst().revisionStatus()).isEqualTo("VALIDATED");
+        assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type='evidence.set-snapshotted'")
+                .query(Long.class).single()).isOne();
 
-        assertThat(worker.runOnce()).isEqualTo(TaskExecutionWorker.RunResult.EMPTY);
-        assertThatThrownBy(() -> jdbc.sql("DELETE FROM evd_evidence_validation").update())
+        UUID secondRevision = uploadScanAndValidate(pngBytes("s2"), "begin-s2", "cmd-s2");
+        assertThat(snapshots.get(principal(), "corr-get", first.evidenceSetSnapshotId())
+                .members().getFirst().evidenceRevisionId()).isEqualTo(firstRevision);
+
+        EvidenceSetSnapshotView second = snapshots.create(principal(), metadata("snap-2"),
+                new CreateEvidenceSetSnapshotCommand(
+                        taskId, "TASK_SUBMISSION", List.of(firstRevision, secondRevision)));
+        assertThat(second.evidenceSetSnapshotId()).isNotEqualTo(first.evidenceSetSnapshotId());
+        assertThat(second.members()).hasSize(2);
+
+        assertThatThrownBy(() -> snapshots.create(principal(), metadata("snap-bad-status"),
+                new CreateEvidenceSetSnapshotCommand(
+                        taskId, "TASK_SUBMISSION", List.of(UUID.randomUUID()))))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.RESOURCE_NOT_FOUND));
+        assertThat(jdbc.sql("SELECT count(*) FROM evd_evidence_set_snapshot").query(Long.class).single())
+                .isEqualTo(2);
+
+        assertThatThrownBy(() -> jdbc.sql("DELETE FROM evd_evidence_set_member").update())
+                .isInstanceOf(DataAccessException.class)
+                .hasMessageContaining("immutable");
+        assertThatThrownBy(() -> jdbc.sql("DELETE FROM evd_evidence_set_snapshot").update())
                 .isInstanceOf(DataAccessException.class)
                 .hasMessageContaining("immutable");
     }
 
     @Test
-    void capturePolicyFailureMarksValidationFailedAndDropsProjectionCount() throws Exception {
-        seedResolvedSlot("""
-                {"evidenceKey":"site.photo","name":"现场照片","mediaType":"PHOTO","required":true,
-                 "capture":{"minCount":1,"maxCount":2,"allowGallery":false,"requireRealtimeCapture":true}}
-                """);
-        uploadAndFinalize(pngBytes("gallery"), "begin-fail", "cmd-fail",
-                "{\"captureSource\":\"GALLERY\",\"capturedAt\":\"2026-07-14T08:00:00Z\",\"deviceId\":\"DEV-1\"}");
-        assertThat(worker.runOnce()).isEqualTo(TaskExecutionWorker.RunResult.SUCCEEDED);
-        handlers.stream().filter(handler -> handler.supports("file.scan-completed", 1))
-                .forEach(handler -> handler.handle(scanCompletedEvent()));
-        assertThat(worker.runOnce()).isEqualTo(TaskExecutionWorker.RunResult.SUCCEEDED);
+    void rejectsNonValidatedRevisionWithoutPersistingPartialSnapshot() throws Exception {
+        byte[] content = pngBytes("stored-only");
+        String checksum = sha256(content);
+        var session = evidence.beginUpload(principal(), metadata("begin-stored"),
+                new BeginEvidenceUploadCommand(
+                        taskId, slotId, null, "site.png", "image/png",
+                        content.length, checksum, captureJson()));
+        transfers.upload(token(session.uploadUrl()), "image/png", content.length,
+                new ByteArrayInputStream(content));
+        var item = evidence.finalizeUpload(principal(), metadata("fin-stored"),
+                new FinalizeEvidenceUploadCommand(
+                        taskId, slotId, session.uploadSessionId(), checksum, "cmd-stored"));
+        UUID revisionId = item.revisions().getFirst().evidenceRevisionId();
 
-        assertThat(jdbc.sql("SELECT status FROM evd_evidence_revision").query(String.class).single())
-                .isEqualTo("VALIDATION_FAILED");
-        assertThat(jdbc.sql("SELECT status_projection FROM evd_evidence_slot WHERE slot_id=:slot")
-                .param("slot", slotId).query(String.class).single()).isEqualTo("MISSING");
-        assertThat(jdbc.sql("""
-                SELECT reason_code FROM evd_evidence_validation
-                 WHERE check_type='CAPTURE_POLICY' AND result='FAILED'
-                """).query(String.class).single()).isEqualTo("GALLERY_NOT_ALLOWED");
+        assertThatThrownBy(() -> snapshots.create(principal(), metadata("snap-stored"),
+                new CreateEvidenceSetSnapshotCommand(
+                        taskId, "TASK_SUBMISSION", List.of(revisionId))))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code())
+                                .isEqualTo(ProblemCode.EVIDENCE_NOT_READY_FOR_REVIEW));
+        assertThat(jdbc.sql("SELECT count(*) FROM evd_evidence_set_snapshot").query(Long.class).single())
+                .isZero();
+        assertThat(jdbc.sql("SELECT count(*) FROM evd_evidence_set_member").query(Long.class).single())
+                .isZero();
     }
 
-    @Test
-    void duplicateDigestBlocksWhenConfigured() throws Exception {
-        seedResolvedSlot("""
-                {"evidenceKey":"site.photo","name":"现场照片","mediaType":"PHOTO","required":true,
-                 "capture":{"minCount":1,"maxCount":2},
-                 "qualityChecks":[{"checkType":"DUPLICATE","severity":"BLOCK"}]}
-                """);
-        byte[] content = pngBytes("same");
-        uploadAndFinalize(content, "begin-dup-1", "cmd-dup-1");
-        assertThat(worker.runOnce()).isEqualTo(TaskExecutionWorker.RunResult.SUCCEEDED);
-        handlers.stream().filter(handler -> handler.supports("file.scan-completed", 1))
-                .forEach(handler -> handler.handle(scanCompletedEvent()));
-        assertThat(worker.runOnce()).isEqualTo(TaskExecutionWorker.RunResult.SUCCEEDED);
-        assertThat(jdbc.sql("SELECT status FROM evd_evidence_revision ORDER BY created_at")
-                .query(String.class).list()).containsExactly("VALIDATED");
-
-        uploadAndFinalize(content, "begin-dup-2", "cmd-dup-2");
-        assertThat(worker.runOnce()).isEqualTo(TaskExecutionWorker.RunResult.SUCCEEDED);
-        handlers.stream().filter(handler -> handler.supports("file.scan-completed", 1))
-                .forEach(handler -> handler.handle(latestScanCompletedEvent()));
-        assertThat(worker.runOnce()).isEqualTo(TaskExecutionWorker.RunResult.SUCCEEDED);
-
-        assertThat(jdbc.sql("SELECT status FROM evd_evidence_revision ORDER BY created_at")
-                .query(String.class).list()).containsExactly("VALIDATED", "VALIDATION_FAILED");
-    }
-
-    private EvidenceItemView uploadAndFinalize(byte[] content, String beginKey, String commandId)
+    private UUID uploadScanAndValidate(byte[] content, String beginKey, String commandId)
             throws Exception {
-        return uploadAndFinalize(content, beginKey, commandId, captureJson());
-    }
-
-    private EvidenceItemView uploadAndFinalize(
-            byte[] content, String beginKey, String commandId, String capture
-    ) throws Exception {
         String checksum = sha256(content);
         var session = evidence.beginUpload(principal(), metadata(beginKey),
                 new BeginEvidenceUploadCommand(
                         taskId, slotId, null, "site.png", "image/png",
-                        content.length, checksum, capture));
+                        content.length, checksum, captureJson()));
         transfers.upload(token(session.uploadUrl()), "image/png", content.length,
                 new ByteArrayInputStream(content));
-        return evidence.finalizeUpload(principal(), metadata("fin-" + beginKey),
+        var item = evidence.finalizeUpload(principal(), metadata("fin-" + beginKey),
                 new FinalizeEvidenceUploadCommand(
                         taskId, slotId, session.uploadSessionId(), checksum, commandId));
+        assertThat(worker.runOnce()).isEqualTo(TaskExecutionWorker.RunResult.SUCCEEDED);
+        handlers.stream().filter(handler -> handler.supports("file.scan-completed", 1))
+                .forEach(handler -> handler.handle(latestScanCompletedEvent()));
+        assertThat(worker.runOnce()).isEqualTo(TaskExecutionWorker.RunResult.SUCCEEDED);
+        UUID revisionId = item.revisions().getFirst().evidenceRevisionId();
+        assertThat(jdbc.sql("""
+                SELECT status FROM evd_evidence_revision
+                 WHERE evidence_revision_id=:id
+                """).param("id", revisionId).query(String.class).single()).isEqualTo("VALIDATED");
+        return revisionId;
     }
 
-    private void seedResolvedSlot(String itemDefinition) {
-        jdbc.sql("""
-                TRUNCATE TABLE
-                    evd_evidence_set_member, evd_evidence_set_snapshot,
-                    evd_evidence_validation, evd_evidence_command_result, evd_evidence_revision,
-                    evd_evidence_item, evd_evidence_upload_session, evd_evidence_slot,
-                    evd_task_evidence_resolution, tsk_task_execution_guard, tsk_task_assignment, tsk_task,
-                    cfg_configuration_bundle_item, cfg_configuration_bundle,
-                    cfg_configuration_asset_version,
-                    fil_download_authorization, fil_scan_result, fil_stored_file, fil_upload_session,
-                    aud_audit_record, rel_outbox_publish_attempt, rel_outbox_event,
-                    rel_inbox_record, rel_idempotency_record CASCADE
-                """).update();
+    private void seedResolvedSlot() {
         String definition = """
-                {"templateKey":"survey.site","version":"1.0.0","stage":"SURVEY","items":[%s]}
-                """.formatted(itemDefinition.trim());
+                {"templateKey":"survey.site","version":"1.0.0","stage":"SURVEY",
+                 "items":[{"evidenceKey":"site.photo","name":"现场照片","mediaType":"PHOTO","required":true,
+                   "capture":{"minCount":1,"maxCount":2}}]}
+                """;
         UUID assetId = configurations.publishAsset(new PublishConfigurationAssetCommand(
                 TENANT, ConfigurationAssetType.EVIDENCE, "survey.site", "1.0.0", "1.0.0",
                 definition.trim(), Sha256.digest(definition.trim()))).versionId();
         ConfigurationBundleReference bundle = configurations.publishBundle(
                 new PublishConfigurationBundleCommand(
-                        TENANT, projectId, "EVD-VAL-BUNDLE", "1.0.0", "BYD", "HOME",
+                        TENANT, projectId, "EVD-SNAP-BUNDLE", "1.0.0", "BYD", "HOME",
                         null, Instant.now().minusSeconds(60), null, List.of(assetId)));
         taskId = UUID.randomUUID();
         jdbc.sql("""
@@ -248,7 +236,7 @@ class EvidenceMachineValidationPostgresIT {
                     workflow_definition_digest, configuration_bundle_id, configuration_bundle_digest,
                     stage_code)
                 VALUES (:task, :tenant, 'SITE_SURVEY', 'HUMAN', :businessKey, :digest,
-                    100, 'RUNNING', now(), 0, 1, 'corr-evd-040', 1, now(), now(),
+                    100, 'RUNNING', now(), 0, 1, 'corr-evd-041', 1, now(), now(),
                     :actor, now(), now(), :project, :workOrder, :workflow, :stage,
                     :nodeInstance, 'SITE_SURVEY', :definitionId, :digest, :bundle, :bundleDigest,
                     'SURVEY')
@@ -264,12 +252,16 @@ class EvidenceMachineValidationPostgresIT {
                     task_assignment_id, tenant_id, task_id, assignment_kind, principal_type,
                     principal_id, status, source_type, source_id, effective_from, created_by, created_at)
                 VALUES (:id, :tenant, :task, 'RESPONSIBLE', 'USER', :actor, 'ACTIVE',
-                    'MANUAL', 'M39-FIXTURE', now(), 'fixture', now())
+                    'MANUAL', 'M40-FIXTURE', now(), 'fixture', now())
                 """).param("id", UUID.randomUUID()).param("tenant", TENANT).param("task", taskId)
                 .param("actor", TECHNICIAN).update();
 
         UUID resolutionId = UUID.randomUUID();
         slotId = UUID.randomUUID();
+        String itemDefinition = """
+                {"evidenceKey":"site.photo","name":"现场照片","mediaType":"PHOTO","required":true,
+                 "capture":{"minCount":1,"maxCount":2}}
+                """;
         jdbc.sql("""
                 INSERT INTO evd_task_evidence_resolution (
                     resolution_id, tenant_id, project_id, task_id, configuration_bundle_id,
@@ -301,30 +293,15 @@ class EvidenceMachineValidationPostgresIT {
                 .param("reqDigest", Sha256.digest(itemDefinition.trim())).update();
     }
 
-    private OutboxMessage scanCompletedEvent() {
-        return outboxMessage("""
-                SELECT outbox_id, event_id, module_name, event_type, schema_version,
-                       aggregate_type, aggregate_id, aggregate_version, tenant_id,
-                       correlation_id, causation_id, partition_key, payload::text AS payload,
-                       payload_digest, occurred_at
-                  FROM rel_outbox_event WHERE event_type='file.scan-completed'
-                 ORDER BY occurred_at LIMIT 1
-                """);
-    }
-
     private OutboxMessage latestScanCompletedEvent() {
-        return outboxMessage("""
+        Map<String, Object> row = jdbc.sql("""
                 SELECT outbox_id, event_id, module_name, event_type, schema_version,
                        aggregate_type, aggregate_id, aggregate_version, tenant_id,
                        correlation_id, causation_id, partition_key, payload::text AS payload,
                        payload_digest, occurred_at
                   FROM rel_outbox_event WHERE event_type='file.scan-completed'
                  ORDER BY occurred_at DESC LIMIT 1
-                """);
-    }
-
-    private OutboxMessage outboxMessage(String sql) {
-        Map<String, Object> row = jdbc.sql(sql).query().singleRow();
+                """).query().singleRow();
         return new OutboxMessage(
                 uuid(row, "outbox_id"), uuid(row, "event_id"),
                 text(row, "module_name"), text(row, "event_type"),
@@ -341,7 +318,7 @@ class EvidenceMachineValidationPostgresIT {
         UUID role = UUID.randomUUID();
         jdbc.sql("""
                 INSERT INTO auth_role (role_id, tenant_id, role_code, role_name, role_status, created_at)
-                VALUES (:role, :tenant, 'evidence-executor-040', '资料执行人', 'ACTIVE', now())
+                VALUES (:role, :tenant, 'evidence-executor-041', '资料执行人', 'ACTIVE', now())
                 """).param("role", role).param("tenant", TENANT).update();
         for (String capability : capabilities) {
             jdbc.sql("INSERT INTO auth_role_capability (role_id, capability_code, granted_at) VALUES (:role,:cap,now())")
@@ -352,7 +329,7 @@ class EvidenceMachineValidationPostgresIT {
                     grant_id, tenant_id, principal_id, role_id, scope_type, scope_ref,
                     valid_from, source_code, approval_ref, created_at)
                 VALUES (:grant, :tenant, :principal, :role, 'PROJECT', :project,
-                    now() - interval '1 day', 'TEST_FIXTURE', 'M39-EVIDENCE-VAL', now())
+                    now() - interval '1 day', 'TEST_FIXTURE', 'M40-EVIDENCE-SNAP', now())
                 """).param("grant", UUID.randomUUID()).param("tenant", TENANT)
                 .param("principal", principalId).param("role", role)
                 .param("project", projectId.toString()).update();
@@ -361,7 +338,7 @@ class EvidenceMachineValidationPostgresIT {
                     grant_id, tenant_id, principal_id, role_id, scope_type, scope_ref,
                     valid_from, source_code, approval_ref, created_at)
                 VALUES (:grant, :tenant, :principal, :role, 'TENANT', :tenant,
-                    now() - interval '1 day', 'TEST_FIXTURE', 'M39-FILE', now())
+                    now() - interval '1 day', 'TEST_FIXTURE', 'M40-FILE', now())
                 """).param("grant", UUID.randomUUID()).param("tenant", TENANT)
                 .param("principal", principalId).param("role", role).update();
     }
@@ -425,7 +402,7 @@ class EvidenceMachineValidationPostgresIT {
 
     private static Path temporaryStorageRoot() {
         try {
-            return Files.createTempDirectory("serviceos-evidence-validation-it");
+            return Files.createTempDirectory("serviceos-evidence-snapshot-it");
         } catch (Exception exception) {
             throw new IllegalStateException(exception);
         }

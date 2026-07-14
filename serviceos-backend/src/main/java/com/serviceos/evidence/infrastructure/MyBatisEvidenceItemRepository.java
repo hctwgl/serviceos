@@ -226,6 +226,22 @@ final class MyBatisEvidenceItemRepository implements EvidenceItemRepository {
     }
 
     @Override
+    public List<EvidenceRevisionView> findRevisionsByIds(
+            String tenantId, UUID taskId, List<UUID> revisionIds
+    ) {
+        if (revisionIds == null || revisionIds.isEmpty()) {
+            return List.of();
+        }
+        List<String> ids = revisionIds.stream().map(UUID::toString).toList();
+        return mapper.findRevisionsByIds(tenantId, taskId.toString(), ids).stream()
+                .map(row -> {
+                    UUID revisionId = uuid(row, "evidenceRevisionId");
+                    return revisionView(row, Map.of(revisionId, List.of()));
+                })
+                .toList();
+    }
+
+    @Override
     public boolean existsOtherCountingDigest(
             String tenantId, UUID projectId, String contentDigest, UUID excludeRevisionId
     ) {

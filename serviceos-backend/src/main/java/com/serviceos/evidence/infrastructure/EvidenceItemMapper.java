@@ -79,6 +79,11 @@ interface EvidenceItemMapper {
     Map<String, Object> findRevisionByUploadSession(
             @Param("tenantId") String tenantId, @Param("uploadSessionId") String uploadSessionId);
 
+    List<Map<String, Object>> findRevisionsByIds(
+            @Param("tenantId") String tenantId,
+            @Param("taskId") String taskId,
+            @Param("revisionIds") List<String> revisionIds);
+
     int countOtherCountingDigest(
             @Param("tenantId") String tenantId,
             @Param("projectId") String projectId,

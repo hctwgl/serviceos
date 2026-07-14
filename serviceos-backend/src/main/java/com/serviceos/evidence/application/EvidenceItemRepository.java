@@ -53,6 +53,8 @@ public interface EvidenceItemRepository {
 
     Optional<EvidenceRevisionView> findRevisionByUploadSession(String tenantId, UUID uploadSessionId);
 
+    List<EvidenceRevisionView> findRevisionsByIds(String tenantId, UUID taskId, List<UUID> revisionIds);
+
     boolean existsOtherCountingDigest(
             String tenantId, UUID projectId, String contentDigest, UUID excludeRevisionId);
 

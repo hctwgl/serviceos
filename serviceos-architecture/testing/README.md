@@ -40,3 +40,4 @@
 - [M37 固定 EvidenceSlot 运行时验收](34-m37-fixed-evidence-slot-runtime-acceptance.md)
 - [M38 EvidenceItem 与不可变 EvidenceRevision 验收](35-m38-evidence-item-revision-acceptance.md)
 - [M39 Evidence 机器校验验收](36-m39-evidence-machine-validation-acceptance.md)
+- [M40 EvidenceSetSnapshot 验收](37-m40-evidence-set-snapshot-acceptance.md)

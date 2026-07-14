@@ -231,6 +231,17 @@
            AND source_upload_session_id = CAST(#{uploadSessionId} AS uuid)
     </select>
 
+    <select id="findRevisionsByIds" resultType="map">
+        SELECT <include refid="revisionColumns"/>
+          FROM evd_evidence_revision
+         WHERE tenant_id = #{tenantId}
+           AND task_id = CAST(#{taskId} AS uuid)
+           AND evidence_revision_id IN
+        <foreach collection="revisionIds" item="revisionId" open="(" separator="," close=")">
+            CAST(#{revisionId} AS uuid)
+        </foreach>
+    </select>
+
     <select id="countOtherCountingDigest" resultType="int">
         SELECT count(*)
           FROM evd_evidence_revision

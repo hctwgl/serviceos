@@ -95,6 +95,7 @@ class EvidenceItemRevisionPostgresIT {
     void setUp() throws Exception {
         jdbc.sql("""
                 TRUNCATE TABLE
+                    evd_evidence_set_member, evd_evidence_set_snapshot,
                     evd_evidence_validation, evd_evidence_command_result, evd_evidence_revision,
                     evd_evidence_item, evd_evidence_upload_session, evd_evidence_slot,
                     evd_task_evidence_resolution,

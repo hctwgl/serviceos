@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/evidence-set-snapshotted-v1.schema.json",
+  "title": "EvidenceSetSnapshottedV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId",
+    "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"
+  ],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"},
+    "eventType": {"const": "evidence.set-snapshotted"},
+    "schemaVersion": {"const": 1},
+    "tenantId": {"type": "string"},
+    "correlationId": {"type": "string"},
+    "causationId": {"type": "string"},
+    "aggregateType": {"const": "EvidenceSetSnapshot"},
+    "aggregateId": {"type": "string", "format": "uuid"},
+    "aggregateVersion": {"type": "integer", "minimum": 1},
+    "occurredAt": {"type": "string", "format": "date-time"},
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidenceSetSnapshotId", "taskId", "projectId", "purpose", "resolutionId",
+        "memberCount", "contentDigest", "createdAt"
+      ],
+      "properties": {
+        "evidenceSetSnapshotId": {"type": "string", "format": "uuid"},
+        "taskId": {"type": "string", "format": "uuid"},
+        "projectId": {"type": "string", "format": "uuid"},
+        "purpose": {"const": "TASK_SUBMISSION"},
+        "resolutionId": {"type": "string", "format": "uuid"},
+        "memberCount": {"type": "integer", "minimum": 0},
+        "contentDigest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "createdAt": {"type": "string", "format": "date-time"}
+      }
+    }
+  }
+}
