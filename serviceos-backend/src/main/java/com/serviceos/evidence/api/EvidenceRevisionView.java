@@ -22,6 +22,10 @@ public record EvidenceRevisionView(
         String finalizeCommandId,
         String createdBy,
         Instant createdAt,
-        List<EvidenceValidationView> validations
+        List<EvidenceValidationView> validations,
+        String invalidatedBy,
+        Instant invalidatedAt,
+        String invalidationReasonCode,
+        String invalidationApprovalRef
 ) {
 }

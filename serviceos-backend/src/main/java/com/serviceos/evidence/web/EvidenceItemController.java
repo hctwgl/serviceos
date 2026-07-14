@@ -6,6 +6,7 @@ import com.serviceos.evidence.api.EvidenceItemView;
 import com.serviceos.evidence.api.EvidenceRevisionView;
 import com.serviceos.evidence.api.EvidenceUploadSessionView;
 import com.serviceos.evidence.api.FinalizeEvidenceUploadCommand;
+import com.serviceos.evidence.api.InvalidateEvidenceRevisionCommand;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.CorrelationIds;
@@ -105,6 +106,21 @@ final class EvidenceItemController {
         return itemResponse(evidence.get(principals.current(), correlationId, itemId));
     }
 
+    @PostMapping("/evidence-revisions/{revisionId}:invalidate")
+    EvidenceRevisionResponse invalidate(
+            @PathVariable UUID revisionId,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestBody InvalidateEvidenceRevisionRequest request
+    ) {
+        EvidenceRevisionView revision = evidence.invalidate(
+                principals.current(),
+                new CommandMetadata(correlationId, idempotencyKey),
+                new InvalidateEvidenceRevisionCommand(
+                        revisionId, request.reasonCode(), request.approvalRef()));
+        return revisionResponse(revision);
+    }
+
     private EvidenceUploadSessionResponse sessionResponse(EvidenceUploadSessionView session) {
         return new EvidenceUploadSessionResponse(
                 session.uploadSessionId(), session.fileId(), session.taskId(),
@@ -129,7 +145,9 @@ final class EvidenceItemController {
                     revision.mimeType(), revision.sizeBytes(),
                     objectMapper.readTree(revision.captureMetadataJson()), revision.status(),
                     revision.sourceUploadSessionId(), revision.createdBy(), revision.createdAt(),
-                    revision.validations().stream().map(this::validationResponse).toList());
+                    revision.validations().stream().map(this::validationResponse).toList(),
+                    revision.invalidatedBy(), revision.invalidatedAt(),
+                    revision.invalidationReasonCode(), revision.invalidationApprovalRef());
         } catch (JacksonException exception) {
             throw new IllegalStateException("EvidenceRevision captureMetadata is invalid", exception);
         }
@@ -169,6 +187,9 @@ final class EvidenceItemController {
     }
 
     record FinalizeEvidenceUploadRequest(String actualSha256, String finalizeCommandId) {
+    }
+
+    record InvalidateEvidenceRevisionRequest(String reasonCode, String approvalRef) {
     }
 
     record EvidenceUploadSessionResponse(
@@ -215,7 +236,11 @@ final class EvidenceItemController {
             UUID sourceUploadSessionId,
             String createdBy,
             Instant createdAt,
-            List<EvidenceValidationResponse> validations
+            List<EvidenceValidationResponse> validations,
+            String invalidatedBy,
+            Instant invalidatedAt,
+            String invalidationReasonCode,
+            String invalidationApprovalRef
     ) {
     }
 

@@ -92,6 +92,7 @@ class EvidenceSetSnapshotValidatorTest {
                 revisionId, UUID.randomUUID(), slotId, taskId, UUID.randomUUID(), 1,
                 UUID.randomUUID(), "a".repeat(64), "image/png", 12,
                 "{\"captureSource\":\"CAMERA\"}", status, UUID.randomUUID(), "cmd",
-                "tech", Instant.parse("2026-07-14T09:00:00Z"), List.of());
+                "tech", Instant.parse("2026-07-14T09:00:00Z"), List.of(),
+                null, null, null, null);
     }
 }

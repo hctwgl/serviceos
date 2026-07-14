@@ -12,6 +12,7 @@ import com.serviceos.evidence.api.EvidenceRevisionView;
 import com.serviceos.evidence.api.EvidenceSlotView;
 import com.serviceos.evidence.api.EvidenceUploadSessionView;
 import com.serviceos.evidence.api.FinalizeEvidenceUploadCommand;
+import com.serviceos.evidence.api.InvalidateEvidenceRevisionCommand;
 import com.serviceos.files.api.BeginUploadCommand;
 import com.serviceos.files.api.FileCommandService;
 import com.serviceos.files.api.FinalizeUploadCommand;
@@ -50,8 +51,10 @@ import java.util.UUID;
 @Service
 final class DefaultEvidenceCommandService implements EvidenceCommandService {
     private static final String SUBMIT = "evidence.submit";
+    private static final String INVALIDATE = "evidence.invalidate";
     private static final String READ = "evidence.read";
     private static final String FINALIZE_OPERATION = "evidence.upload.finalize";
+    private static final String INVALIDATE_OPERATION = "evidence.revision.invalidate";
     private static final String BUSINESS_CONTEXT = "EvidenceSlot";
 
     private final EvidenceItemRepository repository;
@@ -300,7 +303,7 @@ final class DefaultEvidenceCommandService implements EvidenceCommandService {
                 stored.detectedMimeType() == null ? stored.declaredMimeType() : stored.detectedMimeType(),
                 stored.size(), binding.captureMetadataJson(), "STORED",
                 binding.uploadSessionId(), command.finalizeCommandId(),
-                principal.principalId(), now, List.of());
+                principal.principalId(), now, List.of(), null, null, null, null);
         repository.insertRevision(principal.tenantId(), revision);
         repository.markUploadFinalized(principal.tenantId(), binding.uploadSessionId());
         refreshSlotProjection(principal.tenantId(), locked);
@@ -325,6 +328,74 @@ final class DefaultEvidenceCommandService implements EvidenceCommandService {
         idempotency.complete(context, FINALIZE_OPERATION, itemId.toString(),
                 Sha256.digest(itemId + "|" + revision.evidenceRevisionId()));
         return repository.findItem(principal.tenantId(), itemId).orElseThrow();
+    }
+
+    @Override
+    @Transactional
+    public EvidenceRevisionView invalidate(
+            CurrentPrincipal principal, CommandMetadata metadata, InvalidateEvidenceRevisionCommand command
+    ) {
+        EvidenceRevisionView revision = repository.findRevision(
+                        principal.tenantId(), command.evidenceRevisionId())
+                .orElseThrow(() -> new BusinessProblem(
+                        ProblemCode.RESOURCE_NOT_FOUND, "EvidenceRevision does not exist"));
+        AuthorizationDecision auth = authorization.require(principal,
+                AuthorizationRequest.projectCapability(INVALIDATE, principal.tenantId(), "EvidenceRevision",
+                        revision.evidenceRevisionId().toString(), revision.projectId().toString()),
+                metadata.correlationId());
+        String reasonCode = requireReasonCode(command.reasonCode());
+        String approvalRef = normalizeApprovalRef(command.approvalRef());
+        String requestDigest = Sha256.digest(
+                revision.evidenceRevisionId() + "|" + reasonCode + "|" + nullToEmpty(approvalRef));
+        CommandContext context = new CommandContext(
+                principal.tenantId(), principal.principalId(),
+                metadata.correlationId(), metadata.idempotencyKey());
+        IdempotencyDecision decision = idempotency.begin(context, INVALIDATE_OPERATION, requestDigest);
+        if (decision.kind() == IdempotencyDecision.Kind.REPLAY) {
+            return repository.findCommandResult(
+                            context.tenantId(), INVALIDATE_OPERATION, context.idempotencyKey())
+                    .flatMap(id -> repository.findRevision(context.tenantId(), id))
+                    .orElseThrow(() -> new BusinessProblem(
+                            ProblemCode.INTERNAL_ERROR, "Invalidate replay result missing"));
+        }
+
+        Instant now = clock.instant();
+        int updated = repository.invalidateRevision(
+                principal.tenantId(), revision.evidenceRevisionId(), reasonCode, approvalRef,
+                principal.principalId(), now);
+        if (updated != 1) {
+            throw new BusinessProblem(ProblemCode.EVIDENCE_REVISION_NOT_INVALIDATABLE,
+                    "Only VALIDATED EvidenceRevision can be invalidated");
+        }
+
+        EvidenceSlotView locked = repository.lockSlot(principal.tenantId(), revision.evidenceSlotId());
+        refreshSlotProjection(principal.tenantId(), locked);
+        repository.saveCommandResult(principal.tenantId(), INVALIDATE_OPERATION,
+                context.idempotencyKey(), revision.evidenceRevisionId());
+
+        String payload = serialize(new EvidenceRevisionInvalidatedPayload(
+                revision.evidenceRevisionId(), revision.evidenceItemId(), revision.evidenceSlotId(),
+                revision.taskId(), revision.projectId(), "VALIDATED", "INVALIDATED",
+                reasonCode, approvalRef, principal.principalId(), now));
+        outbox.append(new OutboxEvent(
+                UUID.randomUUID(), UUID.randomUUID(), "evidence", "evidence.revision-invalidated", 1,
+                "EvidenceRevision", revision.evidenceRevisionId().toString(),
+                revision.revisionNumber() + 1L,
+                principal.tenantId(), metadata.correlationId(), metadata.idempotencyKey(),
+                revision.taskId().toString(), payload, Sha256.digest(payload), now));
+        audit.append(new AuditEntry(
+                UUID.randomUUID(), principal.tenantId(), principal.principalId(),
+                "EVIDENCE_REVISION_INVALIDATED", INVALIDATE, "EvidenceRevision",
+                revision.evidenceRevisionId().toString(), "ALLOW", auth.matchedGrantIds(),
+                auth.policyVersion(), reasonCode, null, requestDigest,
+                metadata.correlationId(), now));
+        EvidenceRevisionView invalidated = repository.findRevision(
+                        principal.tenantId(), revision.evidenceRevisionId())
+                .orElseThrow(() -> new BusinessProblem(
+                        ProblemCode.INTERNAL_ERROR, "Invalidated EvidenceRevision missing"));
+        idempotency.complete(context, INVALIDATE_OPERATION, revision.evidenceRevisionId().toString(),
+                Sha256.digest(serialize(invalidated)));
+        return invalidated;
     }
 
     private void softCheckMaxCount(String tenantId, EvidenceSlotView slot) {
@@ -387,6 +458,30 @@ final class DefaultEvidenceCommandService implements EvidenceCommandService {
         return value.toLowerCase(Locale.ROOT);
     }
 
+    private static String requireReasonCode(String reasonCode) {
+        if (reasonCode == null || reasonCode.isBlank() || reasonCode.length() > 80) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                    "invalidation reasonCode is required and must be at most 80 characters");
+        }
+        return reasonCode.trim();
+    }
+
+    private static String normalizeApprovalRef(String approvalRef) {
+        if (approvalRef == null || approvalRef.isBlank()) {
+            return null;
+        }
+        String trimmed = approvalRef.trim();
+        if (trimmed.length() > 160) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                    "invalidation approvalRef must be at most 160 characters");
+        }
+        return trimmed;
+    }
+
+    private static String nullToEmpty(String value) {
+        return value == null ? "" : value;
+    }
+
     private tools.jackson.databind.JsonNode readTree(String json) {
         try {
             return objectMapper.readTree(json);
@@ -414,6 +509,21 @@ final class DefaultEvidenceCommandService implements EvidenceCommandService {
             String contentDigest,
             String status,
             Instant createdAt
+    ) {
+    }
+
+    private record EvidenceRevisionInvalidatedPayload(
+            UUID evidenceRevisionId,
+            UUID evidenceItemId,
+            UUID evidenceSlotId,
+            UUID taskId,
+            UUID projectId,
+            String previousStatus,
+            String status,
+            String reasonCode,
+            String approvalRef,
+            String invalidatedBy,
+            Instant invalidatedAt
     ) {
     }
 }

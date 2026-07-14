@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-14
-baselineCommit: b5280bc2508e2cc97c721c0b5794180b231597cf
-latestMilestone: M41
+baselineCommit: pending-m42
+latestMilestone: M42
 ---
 
 # ServiceOS 实施状态总览
@@ -39,13 +39,13 @@ latestMilestone: M41
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M41 EvidenceSetSnapshot Task 完成门禁 |
-| 基线提交 | `b5280bc2508e2cc97c721c0b5794180b231597cf` |
+| 最新实施里程碑 | M42 EvidenceRevision 作废运行时 |
+| 基线提交 | 以本里程碑提交为准（提交后回填） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
 | 前端工程 | 尚未建立；已有 Admin、Network、Technician 产品与交互规格 |
-| 数据库 | PostgreSQL + Flyway（当前版本 041 / 43） |
-| 契约 | OpenAPI 0.16.0 + 事件 JSON Schema |
+| 数据库 | PostgreSQL + Flyway（当前版本 042 / 44） |
+| 契约 | OpenAPI 0.17.0 + 事件 JSON Schema |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -66,8 +66,8 @@ latestMilestone: M41
 | 预约 | 预约修订、联系终态动作 | `PARTIAL` | Revision、并发和终态动作基础 | 用户确认渠道、完整日程和跨端协作 | M30～M31 |
 | 现场作业 | Visit 生命周期 | `PARTIAL` | Visit 运行时基础 | GPS 策略、完整现场提交、离线同步和师傅端 | M32 |
 | 动态表单 | 资产、冻结版本、不可变提交和 Task 完成门禁 | `PARTIAL` | 固定 required、基础类型校验、精确版本提交和完成引用 | 条件表达式、复杂 validator、草稿、冲突、更正和审核 | M33～M35 |
-| 资料 Evidence | 资产、槽位、Item/Revision、机器校验、Snapshot、完成门禁 | `PARTIAL` | 固定槽位、安全文件 Finalize、确定性机器校验、TASK_SUBMISSION Snapshot、无 formRef 完成引用 | 条件槽位、OCR/CV、invalidate、Review/Correction、双引用完成 | M36～M41 |
-| 安全文件 | Begin/Finalize/隔离/扫描/授权下载基础 | `IMPLEMENTED` | 独立安全文件生命周期；Evidence 已编排 Begin/Finalize | 正式对象存储、专业扫描服务 | M11、M38 |
+| 资料 Evidence | 资产、槽位、Item/Revision、机器校验、Snapshot、完成门禁、作废 | `PARTIAL` | 固定槽位、安全文件 Finalize、确定性机器校验、TASK_SUBMISSION Snapshot、无 formRef 完成引用、VALIDATED→INVALIDATED | 条件槽位、OCR/CV、files 作废联动、Review/Correction、双引用完成 | M36～M42 |
+| 安全文件 | Begin/Finalize/隔离/扫描/授权下载基础 | `IMPLEMENTED` | 独立安全文件生命周期；Evidence 已编排 Begin/Finalize | 正式对象存储、专业扫描服务、与 Evidence 作废联动 | M11、M38 |
 | 审核整改 | ReviewCase、ReviewDecision、CorrectionCase | `PROPOSED` | 已有完整领域和交互设计 | 运行时、API、迁移、测试和前端均未完成 | `architecture/10-*` |
 | SLA | 时钟、预警、升级 | `PROPOSED` | 已有总体设计 | 完整运行时和验收尚未实施 | `architecture/12-*` |
 | 通知 | 通知与运营异常中心 | `PROPOSED` | 已有总体设计 | 通知通道、模板、可靠发送和 UI | `architecture/14-*` |
@@ -97,7 +97,7 @@ latestMilestone: M41
 - 草稿、预填冲突和更正；
 - 表单审核闭环。
 
-### M36～M41：Evidence
+### M36～M42：Evidence
 
 已实现：
 
@@ -105,13 +105,14 @@ latestMilestone: M41
 - EvidenceItem / 不可变 EvidenceRevision 与安全文件 Begin/Finalize（M38）；
 - 确定性机器校验与 VALIDATED / VALIDATION_FAILED（M39）；
 - 不可变 EvidenceSetSnapshot（TASK_SUBMISSION）（M40）；
-- 无 formRef 资料 Task 完成仅接受精确 Snapshot 引用与 digest（M41）。
+- 无 formRef 资料 Task 完成仅接受精确 Snapshot 引用与 digest（M41）；
+- 授权 `VALIDATED → INVALIDATED`、槽位投影刷新、历史 Snapshot 不可改写（M42）。
 
 未实现：
 
 - `requiredWhen` 条件解析和可审计重解析；
 - OCR / 图像 CV / GPS 权威距离；
-- `evidence.invalidate`；
+- files StoredFile 作废/下载语义联动；
 - 表单+资料双引用 `inputVersionRefs`；
 - ReviewCase、ReviewDecision、CorrectionCase 和多轮补传。
 
@@ -120,17 +121,16 @@ latestMilestone: M41
 在没有更新事实源或新批准决策的情况下，建议下一可靠纵向切片是：
 
 ```text
-M42 evidence.invalidate 命令运行时
+M43 ReviewCase / ReviewDecision 最小运行时
 ```
 
-建议范围：
+或：
 
-1. 授权作废 `VALIDATED` Revision → `INVALIDATED`；
-2. 刷新槽位数量投影与审计/Outbox；
-3. 已引用 Snapshot 的版本不得静默改写历史 Snapshot；
-4. 暂不扩大到 Review/Correction 或双引用完成条件。
+```text
+M43 表单+资料双引用 inputVersionRefs 完成条件
+```
 
-该建议不是自动批准的新架构。接手 Agent 必须先检查仓库是否已有更新的 M42 文档、ADR 或提交。
+接手 Agent 必须先检查仓库是否已有更新的里程碑文档、ADR 或提交。
 
 ## 6. 证据阅读方法
 
@@ -173,5 +173,5 @@ M42 evidence.invalidate 命令运行时
 - `serviceos-architecture/docs/implementation-traceability-matrix.md`
 - `serviceos-architecture/roadmap/00-mvp-roadmap.md`
 - `serviceos-architecture/roadmap/02-m7-application-delivery-plan.md`
-- `serviceos-architecture/architecture/50-fixed-evidence-slot-runtime.md`
-- `serviceos-architecture/testing/34-m37-fixed-evidence-slot-runtime-acceptance.md`
+- `serviceos-architecture/architecture/55-evidence-invalidate-runtime.md`
+- `serviceos-architecture/testing/39-m42-evidence-invalidate-acceptance.md`

@@ -195,6 +195,25 @@ final class MyBatisEvidenceItemRepository implements EvidenceItemRepository {
     }
 
     @Override
+    public int invalidateRevision(
+            String tenantId,
+            UUID revisionId,
+            String reasonCode,
+            String approvalRef,
+            String invalidatedBy,
+            Instant invalidatedAt
+    ) {
+        Map<String, Object> values = new HashMap<>();
+        values.put("tenantId", tenantId);
+        values.put("revisionId", revisionId.toString());
+        values.put("reasonCode", reasonCode);
+        values.put("approvalRef", approvalRef);
+        values.put("invalidatedBy", invalidatedBy);
+        values.put("invalidatedAt", invalidatedAt);
+        return mapper.invalidateRevision(values);
+    }
+
+    @Override
     public void updateSlotStatus(String tenantId, UUID slotId, String status) {
         mapper.updateSlotStatus(tenantId, slotId.toString(), status);
     }
@@ -323,7 +342,11 @@ final class MyBatisEvidenceItemRepository implements EvidenceItemRepository {
                 number(row, "sizeBytes").longValue(), text(row, "captureMetadata"), text(row, "status"),
                 uuid(row, "sourceUploadSessionId"), text(row, "finalizeCommandId"),
                 text(row, "createdBy"), instant(row.get("createdAt")),
-                validations.getOrDefault(revisionId, List.of()));
+                validations.getOrDefault(revisionId, List.of()),
+                row.get("invalidatedBy") == null ? null : text(row, "invalidatedBy"),
+                row.get("invalidatedAt") == null ? null : instant(row.get("invalidatedAt")),
+                row.get("invalidationReasonCode") == null ? null : text(row, "invalidationReasonCode"),
+                row.get("invalidationApprovalRef") == null ? null : text(row, "invalidationApprovalRef"));
     }
 
     private EvidenceValidationView validationView(Map<String, Object> row) {

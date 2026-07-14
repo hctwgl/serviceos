@@ -47,7 +47,8 @@ Capability：创建用 `evidence.submit`，查询用 `evidence.read`。主体必
 
 1. purpose=`REVIEW`/`REPORT`/`EXTERNAL_DELIVERY`；
 2. 服务端自动挑选最新 VALIDATED Revision；
-3. ReviewCase / CorrectionCase / invalidate；
+3. ReviewCase / CorrectionCase；
 4. 内容摘要完全相同的 Snapshot ID 复用。
 
-Task 完成门禁引用 Snapshot 已由 [M41](54-evidence-task-completion-gate.md) 实现，不在本里程碑未实现清单中。
+Task 完成门禁引用 Snapshot 已由 [M41](54-evidence-task-completion-gate.md) 实现。
+`evidence.invalidate` 已由 [M42](55-evidence-invalidate-runtime.md) 实现；作废不得改写本里程碑 Snapshot。

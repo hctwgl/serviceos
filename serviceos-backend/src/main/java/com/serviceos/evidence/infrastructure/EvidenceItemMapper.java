@@ -65,6 +65,8 @@ interface EvidenceItemMapper {
             @Param("expectedStatus") String expectedStatus,
             @Param("status") String status);
 
+    int invalidateRevision(Map<String, Object> values);
+
     int updateSlotStatus(
             @Param("tenantId") String tenantId,
             @Param("slotId") String slotId,

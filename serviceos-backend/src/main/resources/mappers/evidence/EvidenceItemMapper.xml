@@ -22,7 +22,10 @@
         capture_metadata::text AS "captureMetadata", status AS "status",
         source_upload_session_id AS "sourceUploadSessionId",
         finalize_command_id AS "finalizeCommandId", created_by AS "createdBy",
-        created_at AS "createdAt"
+        created_at AS "createdAt",
+        invalidated_by AS "invalidatedBy", invalidated_at AS "invalidatedAt",
+        invalidation_reason_code AS "invalidationReasonCode",
+        invalidation_approval_ref AS "invalidationApprovalRef"
     </sql>
 
     <select id="findSlot" resultType="map">
@@ -201,6 +204,18 @@
          WHERE tenant_id = #{tenantId}
            AND evidence_revision_id = CAST(#{revisionId} AS uuid)
            AND status = #{expectedStatus}
+    </update>
+
+    <update id="invalidateRevision" parameterType="map">
+        UPDATE evd_evidence_revision
+           SET status = 'INVALIDATED',
+               invalidated_by = #{invalidatedBy},
+               invalidated_at = #{invalidatedAt},
+               invalidation_reason_code = #{reasonCode},
+               invalidation_approval_ref = #{approvalRef}
+         WHERE tenant_id = #{tenantId}
+           AND evidence_revision_id = CAST(#{revisionId} AS uuid)
+           AND status = 'VALIDATED'
     </update>
 
     <update id="updateSlotStatus">

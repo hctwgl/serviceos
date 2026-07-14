@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/evidence-revision-invalidated-v1.schema.json",
+  "title": "EvidenceRevisionInvalidatedV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId",
+    "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"
+  ],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"},
+    "eventType": {"const": "evidence.revision-invalidated"},
+    "schemaVersion": {"const": 1},
+    "tenantId": {"type": "string"},
+    "correlationId": {"type": "string"},
+    "causationId": {"type": "string"},
+    "aggregateType": {"const": "EvidenceRevision"},
+    "aggregateId": {"type": "string", "format": "uuid"},
+    "aggregateVersion": {"type": "integer", "minimum": 1},
+    "occurredAt": {"type": "string", "format": "date-time"},
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidenceRevisionId", "evidenceItemId", "evidenceSlotId", "taskId", "projectId",
+        "previousStatus", "status", "reasonCode", "invalidatedBy", "invalidatedAt"
+      ],
+      "properties": {
+        "evidenceRevisionId": {"type": "string", "format": "uuid"},
+        "evidenceItemId": {"type": "string", "format": "uuid"},
+        "evidenceSlotId": {"type": "string", "format": "uuid"},
+        "taskId": {"type": "string", "format": "uuid"},
+        "projectId": {"type": "string", "format": "uuid"},
+        "previousStatus": {"const": "VALIDATED"},
+        "status": {"const": "INVALIDATED"},
+        "reasonCode": {"type": "string", "minLength": 1, "maxLength": 80},
+        "approvalRef": {"type": ["string", "null"], "maxLength": 160},
+        "invalidatedBy": {"type": "string", "minLength": 1, "maxLength": 128},
+        "invalidatedAt": {"type": "string", "format": "date-time"}
+      }
+    }
+  }
+}

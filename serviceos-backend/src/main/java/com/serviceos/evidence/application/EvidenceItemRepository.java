@@ -5,6 +5,7 @@ import com.serviceos.evidence.api.EvidenceRevisionView;
 import com.serviceos.evidence.api.EvidenceSlotView;
 import com.serviceos.evidence.api.EvidenceValidationView;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -44,6 +45,15 @@ public interface EvidenceItemRepository {
     void insertRevision(String tenantId, EvidenceRevisionView revision);
 
     int updateRevisionStatus(String tenantId, UUID revisionId, String expectedStatus, String status);
+
+    int invalidateRevision(
+            String tenantId,
+            UUID revisionId,
+            String reasonCode,
+            String approvalRef,
+            String invalidatedBy,
+            Instant invalidatedAt
+    );
 
     void updateSlotStatus(String tenantId, UUID slotId, String status);
 

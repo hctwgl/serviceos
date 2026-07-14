@@ -60,6 +60,17 @@ class EvidenceItemControllerSecurityTest {
     }
 
     @Test
+    void anonymousInvalidateIsRejected() throws Exception {
+        mvc.perform(post("/api/v1/evidence-revisions/{revisionId}:invalidate", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("Idempotency-Key", "idem-invalidate")
+                        .content("""
+                                {"reasonCode":"DUPLICATE_EVIDENCE"}
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void trustedPrincipalCanBeginUploadWithoutClientTenantAuthority() throws Exception {
         CurrentPrincipal principal = principal();
         when(principals.current()).thenReturn(principal);
@@ -130,7 +141,7 @@ class EvidenceItemControllerSecurityTest {
                 "b".repeat(64), "image/png", 12,
                 "{\"captureSource\":\"CAMERA\",\"capturedAt\":\"2026-07-14T08:00:00Z\"}",
                 "STORED", UUID.randomUUID(), "cmd-1", "technician-evidence",
-                Instant.parse("2026-07-14T08:01:00Z"), List.of());
+                Instant.parse("2026-07-14T08:01:00Z"), List.of(), null, null, null, null);
         return new EvidenceItemView(
                 ITEM, TASK, UUID.randomUUID(), SLOT, 1, "OPEN", "technician-evidence",
                 Instant.parse("2026-07-14T08:01:00Z"), List.of(revision));

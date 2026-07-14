@@ -83,7 +83,7 @@ class EvidenceMachineValidatorTest {
                 UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
                 UUID.randomUUID(), 1, UUID.randomUUID(), "a".repeat(64), mime, size, capture,
                 "VALIDATING", UUID.randomUUID(), "cmd", "tech", Instant.parse("2026-07-14T09:00:00Z"),
-                List.of());
+                List.of(), null, null, null, null);
     }
 
     private static EvidenceSlotView slot(String definition) {

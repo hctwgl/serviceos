@@ -20,6 +20,12 @@ public interface EvidenceCommandService {
             FinalizeEvidenceUploadCommand command
     );
 
+    EvidenceRevisionView invalidate(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            InvalidateEvidenceRevisionCommand command
+    );
+
     List<EvidenceItemView> listForTask(CurrentPrincipal principal, String correlationId, UUID taskId);
 
     EvidenceItemView get(CurrentPrincipal principal, String correlationId, UUID evidenceItemId);
