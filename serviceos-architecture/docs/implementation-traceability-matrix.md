@@ -143,3 +143,4 @@ Feature gate/authority: if applicable
 | M46 | Evidence invalidate 同事务联动 StoredFile AVAILABLE→INVALIDATED；禁止下载授权 | OpenAPI 0.21.0 + Files/Evidence PostgreSQL IT + V046 | 物理删除、Retention、对象存储厂商切换 |
 | M47 | CorrectionCase 打开时自动创建 evidence.correction HUMAN Task；IN_PROGRESS 投影 | OpenAPI 0.22.0 + Evidence PostgreSQL IT + V047 | 自动指派、WAIVED、强制通过、重开、条件槽位 |
 | M48 | OPEN 强制通过 FORCE_APPROVED；APPROVED/FORCE_APPROVED 重开新 OPEN 案例 | OpenAPI 0.23.0 + Evidence PostgreSQL/MVC/Event Contract + V048 | 车企回执、二级审批/MFA、条件槽位 |
+| M49 | 适配层记录 ExternalReviewReceipt；追加 EXTERNAL 决定；驳回开客服协调 Task | OpenAPI 0.24.0 + Evidence PostgreSQL/MVC/Event Contract + V049 | Connector 入站表、CLIENT Case 自动创建、affectedTargets 强校验 |

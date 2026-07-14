@@ -1,0 +1,25 @@
+{
+  "eventId": "49000000-0000-4000-8000-000000000001",
+  "eventType": "evidence.external-review-receipt-recorded",
+  "schemaVersion": 1,
+  "tenantId": "tenant-demo",
+  "correlationId": "corr-ext-1",
+  "causationId": "cause-ext-1",
+  "aggregateType": "ExternalReviewReceipt",
+  "aggregateId": "49000000-0000-4000-8000-000000000002",
+  "aggregateVersion": 1,
+  "occurredAt": "2026-07-14T17:00:00Z",
+  "payload": {
+    "receiptId": "49000000-0000-4000-8000-000000000002",
+    "reviewCaseId": "49000000-0000-4000-8000-000000000003",
+    "reviewDecisionId": "49000000-0000-4000-8000-000000000004",
+    "projectId": "49000000-0000-4000-8000-000000000005",
+    "inboundEnvelopeId": "ENV-991",
+    "canonicalMessageId": "CAN-991",
+    "externalKey": "CLIENT-REVIEW-8899",
+    "result": "REJECTED",
+    "coordinationTaskId": "49000000-0000-4000-8000-000000000006",
+    "receivedBy": "byd-adapter",
+    "receivedAt": "2026-07-14T17:00:00Z"
+  }
+}

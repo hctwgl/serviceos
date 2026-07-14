@@ -70,6 +70,7 @@ final class MyBatisReviewCaseRepository implements ReviewCaseRepository {
         values.put("reviewCaseId", decision.reviewCaseId().toString());
         values.put("decisionOrdinal", decision.decisionOrdinal());
         values.put("decision", decision.decision());
+        values.put("decisionSource", decision.decisionSource());
         values.put("reasonCodes", writeJson(decision.reasonCodes()));
         values.put("note", decision.note());
         values.put("approvalRef", decision.approvalRef());
@@ -133,6 +134,7 @@ final class MyBatisReviewCaseRepository implements ReviewCaseRepository {
         return new ReviewDecisionView(
                 uuid(row, "reviewDecisionId"), uuid(row, "reviewCaseId"),
                 ((Number) row.get("decisionOrdinal")).intValue(), text(row, "decision"),
+                text(row, "decisionSource"),
                 readCodes(text(row, "reasonCodes")),
                 row.get("note") == null ? null : text(row, "note"),
                 row.get("approvalRef") == null ? null : text(row, "approvalRef"),

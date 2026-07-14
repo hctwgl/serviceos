@@ -10,7 +10,8 @@ status: Accepted
 > M45 已实现 CorrectionCase 最小运行时（见 `architecture/58-correction-case-runtime.md`）。
 > M47 已实现整改 Task 自动创建（见 `architecture/60-correction-task-runtime.md`）。
 > M48 已实现强制通过与重开（见 `architecture/61-review-force-approve-reopen-runtime.md`）。
-> 车企回执仍未实现；本章其余内容仍为指导设计。
+> M49 已实现 ExternalReviewReceipt 最小运行时（见 `architecture/62-external-review-receipt-runtime.md`）。
+> 完整 Connector/CLIENT Case 自动创建仍未实现；本章其余内容仍为指导设计。
 
 ## 1. 目标
 

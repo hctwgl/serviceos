@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.serviceos.evidence.infrastructure.ExternalReviewReceiptMapper">
+
+    <insert id="insert" parameterType="map">
+        INSERT INTO evd_external_review_receipt (
+            receipt_id, tenant_id, project_id, review_case_id, review_decision_id,
+            inbound_envelope_id, canonical_message_id, external_key, callback_batch_ref,
+            mapping_version_id, result, reason_codes, affected_targets, payload_ref,
+            coordination_task_id, received_by, received_at)
+        VALUES (
+            CAST(#{receiptId} AS uuid), #{tenantId}, CAST(#{projectId} AS uuid),
+            CAST(#{reviewCaseId} AS uuid), CAST(#{reviewDecisionId} AS uuid),
+            #{inboundEnvelopeId}, #{canonicalMessageId}, #{externalKey}, #{callbackBatchRef},
+            #{mappingVersionId}, #{result}, CAST(#{reasonCodes} AS jsonb),
+            CAST(#{affectedTargets} AS jsonb), #{payloadRef},
+            CAST(#{coordinationTaskId} AS uuid), #{receivedBy}, #{receivedAt})
+    </insert>
+
+    <select id="find" resultType="map">
+        SELECT receipt_id AS "receiptId", project_id AS "projectId",
+               review_case_id AS "reviewCaseId", review_decision_id AS "reviewDecisionId",
+               inbound_envelope_id AS "inboundEnvelopeId",
+               canonical_message_id AS "canonicalMessageId",
+               external_key AS "externalKey", callback_batch_ref AS "callbackBatchRef",
+               mapping_version_id AS "mappingVersionId", result AS "result",
+               reason_codes::text AS "reasonCodes", affected_targets::text AS "affectedTargets",
+               payload_ref AS "payloadRef", coordination_task_id AS "coordinationTaskId",
+               received_by AS "receivedBy", received_at AS "receivedAt"
+          FROM evd_external_review_receipt
+         WHERE tenant_id = #{tenantId}
+           AND receipt_id = CAST(#{receiptId} AS uuid)
+    </select>
+
+    <select id="findByInboundEnvelope" resultType="string">
+        SELECT receipt_id::text
+          FROM evd_external_review_receipt
+         WHERE tenant_id = #{tenantId}
+           AND inbound_envelope_id = #{inboundEnvelopeId}
+    </select>
+
+    <select id="findCommandResult" resultType="string">
+        SELECT result_id::text
+          FROM evd_external_receipt_command_result
+         WHERE tenant_id = #{tenantId}
+           AND operation_type = #{operationType}
+           AND idempotency_key = #{idempotencyKey}
+    </select>
+
+    <insert id="saveCommandResult" parameterType="map">
+        INSERT INTO evd_external_receipt_command_result (
+            tenant_id, operation_type, idempotency_key, result_id)
+        VALUES (#{tenantId}, #{operationType}, #{idempotencyKey}, CAST(#{resultId} AS uuid))
+        ON CONFLICT (tenant_id, operation_type, idempotency_key) DO NOTHING
+    </insert>
+</mapper>

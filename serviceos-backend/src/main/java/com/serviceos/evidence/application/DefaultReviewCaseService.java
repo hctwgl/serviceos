@@ -190,7 +190,7 @@ final class DefaultReviewCaseService implements ReviewCaseService {
         }
         int ordinal = reviews.nextDecisionOrdinal(principal.tenantId(), current.reviewCaseId());
         ReviewDecisionView decisionView = new ReviewDecisionView(
-                UUID.randomUUID(), current.reviewCaseId(), ordinal, decision,
+                UUID.randomUUID(), current.reviewCaseId(), ordinal, decision, "INTERNAL",
                 reasonCodes, note, null, principal.principalId(), now);
         reviews.insertDecision(principal.tenantId(), current.projectId(), decisionView);
         reviews.saveCommandResult(
@@ -268,7 +268,7 @@ final class DefaultReviewCaseService implements ReviewCaseService {
         }
         int ordinal = reviews.nextDecisionOrdinal(principal.tenantId(), current.reviewCaseId());
         ReviewDecisionView decisionView = new ReviewDecisionView(
-                UUID.randomUUID(), current.reviewCaseId(), ordinal, "FORCE_APPROVED",
+                UUID.randomUUID(), current.reviewCaseId(), ordinal, "FORCE_APPROVED", "INTERNAL",
                 reasonCodes, note, approvalRef, principal.principalId(), now);
         reviews.insertDecision(principal.tenantId(), current.projectId(), decisionView);
         reviews.saveCommandResult(

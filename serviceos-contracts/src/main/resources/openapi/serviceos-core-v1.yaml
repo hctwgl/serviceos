@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.23.0
+  version: 0.24.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -761,6 +761,54 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+
+  /internal/external-review-receipts:
+    post:
+      operationId: recordExternalReviewReceipt
+      summary: 适配层记录车企外部审核回执
+      description: |
+        仅 SERVICE 主体；需要 evidence.recordExternalReceipt。
+        对 OPEN ReviewCase 追加 EXTERNAL ReviewDecision；REJECTED 创建客服协调 Task。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecordExternalReviewReceiptRequest' }
+      responses:
+        '200':
+          description: 记录成功或幂等重放
+          headers:
+            X-Correlation-Id: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExternalReviewReceipt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /internal/external-review-receipts/{receiptId}:
+    get:
+      operationId: getExternalReviewReceipt
+      summary: 查询外部审核回执
+      parameters:
+        - name: receiptId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: ExternalReviewReceipt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExternalReviewReceipt' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
 
   /correction-cases/{correctionCaseId}:
     get:
@@ -1764,6 +1812,60 @@ components:
           items: { type: string, minLength: 1, maxLength: 80 }
         approvalRef: { type: string, minLength: 1, maxLength: 160 }
         note: { type: [string, 'null'], maxLength: 1000 }
+
+    RecordExternalReviewReceiptRequest:
+      type: object
+      additionalProperties: false
+      required: [reviewCaseId, inboundEnvelopeId, canonicalMessageId, externalKey,
+                 callbackBatchRef, mappingVersionId, result]
+      properties:
+        reviewCaseId: { type: string, format: uuid }
+        inboundEnvelopeId: { type: string, minLength: 1, maxLength: 160 }
+        canonicalMessageId: { type: string, minLength: 1, maxLength: 160 }
+        externalKey: { type: string, minLength: 1, maxLength: 160 }
+        callbackBatchRef: { type: string, minLength: 1, maxLength: 160 }
+        mappingVersionId: { type: string, minLength: 1, maxLength: 160 }
+        result: { enum: [APPROVED, REJECTED] }
+        reasonCodes:
+          type: array
+          maxItems: 20
+          items: { type: string, minLength: 1, maxLength: 80 }
+        affectedTargets:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        payloadRef: { type: [string, 'null'], maxLength: 160 }
+    ExternalReviewReceipt:
+      type: object
+      additionalProperties: false
+      required: [receiptId, projectId, reviewCaseId, reviewDecisionId, inboundEnvelopeId,
+                 canonicalMessageId, externalKey, callbackBatchRef, mappingVersionId,
+                 result, reasonCodes, affectedTargets, receivedBy, receivedAt]
+      properties:
+        receiptId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        reviewCaseId: { type: string, format: uuid }
+        reviewDecisionId: { type: string, format: uuid }
+        inboundEnvelopeId: { type: string, minLength: 1, maxLength: 160 }
+        canonicalMessageId: { type: string, minLength: 1, maxLength: 160 }
+        externalKey: { type: string, minLength: 1, maxLength: 160 }
+        callbackBatchRef: { type: string, minLength: 1, maxLength: 160 }
+        mappingVersionId: { type: string, minLength: 1, maxLength: 160 }
+        result: { enum: [APPROVED, REJECTED] }
+        reasonCodes:
+          type: array
+          items: { type: string }
+        affectedTargets:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        payloadRef: { type: [string, 'null'], maxLength: 160 }
+        coordinationTaskId: { type: [string, 'null'], format: uuid }
+        receivedBy: { type: string, minLength: 1, maxLength: 128 }
+        receivedAt: { type: string, format: date-time }
+
     ReopenReviewCaseRequest:
       type: object
       additionalProperties: false
@@ -1781,6 +1883,7 @@ components:
         reviewCaseId: { type: string, format: uuid }
         decisionOrdinal: { type: integer, minimum: 1 }
         decision: { enum: [APPROVED, REJECTED, FORCE_APPROVED] }
+        decisionSource: { enum: [INTERNAL, EXTERNAL], default: INTERNAL }
         reasonCodes:
           type: array
           maxItems: 20

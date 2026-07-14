@@ -14,7 +14,10 @@ import com.serviceos.evidence.api.EvidenceCommandService;
 import com.serviceos.evidence.api.EvidenceSetSnapshotService;
 import com.serviceos.evidence.api.EvidenceSetSnapshotView;
 import com.serviceos.evidence.api.FinalizeEvidenceUploadCommand;
+import com.serviceos.evidence.api.ExternalReviewReceiptService;
+import com.serviceos.evidence.api.ExternalReviewReceiptView;
 import com.serviceos.evidence.api.ForceApproveReviewCaseCommand;
+import com.serviceos.evidence.api.RecordExternalReviewReceiptCommand;
 import com.serviceos.evidence.api.ReopenReviewCaseCommand;
 import com.serviceos.evidence.api.ReviewCaseService;
 import com.serviceos.evidence.api.ReviewCaseView;
@@ -63,6 +66,7 @@ class ReviewCasePostgresIT {
     private static final String TECHNICIAN = "technician-evidence-044";
     private static final String REVIEWER = "reviewer-evidence-044";
     private static final String FORCE_ADMIN = "force-admin-evidence-048";
+    private static final String ADAPTER = "byd-adapter-evidence-049";
     private static final Path STORAGE_ROOT = temporaryStorageRoot();
 
     @Container
@@ -87,6 +91,7 @@ class ReviewCasePostgresIT {
     @Autowired EvidenceCommandService evidence;
     @Autowired EvidenceSetSnapshotService snapshots;
     @Autowired ReviewCaseService reviews;
+    @Autowired ExternalReviewReceiptService receipts;
     @Autowired LocalObjectTransferService transfers;
     @Autowired TaskExecutionWorker worker;
     @Autowired List<OutboxMessageHandler> handlers;
@@ -100,6 +105,7 @@ class ReviewCasePostgresIT {
     void setUp() throws Exception {
         jdbc.sql("""
                 TRUNCATE TABLE
+                    evd_external_review_receipt, evd_external_receipt_command_result,
                     evd_correction_resubmission, evd_correction_case, evd_correction_command_result,
                     evd_review_decision, evd_review_case, evd_review_command_result,
                     evd_evidence_set_member, evd_evidence_set_snapshot,
@@ -128,6 +134,7 @@ class ReviewCasePostgresIT {
         grant(TECHNICIAN, "evidence.submit", "evidence.read", "file.upload", "file.download");
         grant(REVIEWER, "evidence.review", "evidence.read");
         grant(FORCE_ADMIN, "evidence.forceApprove", "review.reopen", "evidence.read", "evidence.review");
+        grant(ADAPTER, "evidence.recordExternalReceipt", "evidence.read");
         seedResolvedSlot();
     }
 
@@ -311,6 +318,63 @@ class ReviewCasePostgresIT {
         assertThat(jdbc.sql("SELECT count(*) FROM evd_review_decision").query(Long.class).single()).isEqualTo(2);
         assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type='evidence.review-case-reopened'")
                 .query(Long.class).single()).isOne();
+    }
+
+
+    @Test
+    void recordsExternalReceiptAndOpensCoordinationTaskOnReject() throws Exception {
+        EvidenceSetSnapshotView snapshot = createSnapshot("ext-receipt");
+        ReviewCaseView created = reviews.create(reviewer(), metadata("create-ext"),
+                new CreateReviewCaseCommand(snapshot.evidenceSetSnapshotId(), null));
+
+        assertThatThrownBy(() -> receipts.record(reviewer(), metadata("ext-user"),
+                new RecordExternalReviewReceiptCommand(
+                        created.reviewCaseId(), "ENV-1", "CAN-1", "EXT-1", "BATCH-1", "MAP-1",
+                        "REJECTED", List.of("CLIENT.IMAGE.BLUR"), List.of(), null)))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.ACCESS_DENIED));
+
+        ExternalReviewReceiptView recorded = receipts.record(adapter(), metadata("ext-ok"),
+                new RecordExternalReviewReceiptCommand(
+                        created.reviewCaseId(), "ENV-1", "CAN-1", "EXT-1", "BATCH-1", "MAP-1",
+                        "REJECTED", List.of("CLIENT.IMAGE.BLUR"),
+                        List.of(java.util.Map.of("type", "EvidenceRevision", "id", "EVD-1")),
+                        "PAYLOAD-1"));
+        ExternalReviewReceiptView replay = receipts.record(adapter(), metadata("ext-ok"),
+                new RecordExternalReviewReceiptCommand(
+                        created.reviewCaseId(), "ENV-1", "CAN-1", "EXT-1", "BATCH-1", "MAP-1",
+                        "REJECTED", List.of("CLIENT.IMAGE.BLUR"),
+                        List.of(java.util.Map.of("type", "EvidenceRevision", "id", "EVD-1")),
+                        "PAYLOAD-1"));
+        ExternalReviewReceiptView envelopeReplay = receipts.record(adapter(), metadata("ext-env-replay"),
+                new RecordExternalReviewReceiptCommand(
+                        created.reviewCaseId(), "ENV-1", "CAN-1", "EXT-1", "BATCH-1", "MAP-1",
+                        "REJECTED", List.of("CLIENT.IMAGE.BLUR"),
+                        List.of(java.util.Map.of("type", "EvidenceRevision", "id", "EVD-1")),
+                        "PAYLOAD-1"));
+
+        assertThat(replay.receiptId()).isEqualTo(recorded.receiptId());
+        assertThat(envelopeReplay.receiptId()).isEqualTo(recorded.receiptId());
+        assertThat(recorded.result()).isEqualTo("REJECTED");
+        assertThat(recorded.coordinationTaskId()).isNotNull();
+        ReviewCaseView decided = reviews.get(reviewer(), "corr-ext-get", created.reviewCaseId());
+        assertThat(decided.status()).isEqualTo("REJECTED");
+        assertThat(decided.decisions()).hasSize(1);
+        assertThat(decided.decisions().getFirst().decisionSource()).isEqualTo("EXTERNAL");
+        assertThat(jdbc.sql("SELECT count(*) FROM evd_correction_case").query(Long.class).single()).isZero();
+        assertThat(jdbc.sql("""
+                SELECT task_type FROM tsk_task WHERE task_id=:id
+                """).param("id", recorded.coordinationTaskId()).query(String.class).single())
+                .isEqualTo("evidence.external-coordination");
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM rel_outbox_event
+                 WHERE event_type='evidence.external-review-receipt-recorded'
+                """).query(Long.class).single()).isOne();
+    }
+
+    private CurrentPrincipal adapter() {
+        return new CurrentPrincipal(
+                ADAPTER, TENANT, CurrentPrincipal.PrincipalType.SERVICE, "byd-adapter", Set.of());
     }
 
     private CurrentPrincipal forceAdmin() {

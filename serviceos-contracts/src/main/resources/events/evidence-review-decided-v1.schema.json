@@ -33,6 +33,7 @@
         "taskId": {"type": "string", "format": "uuid"},
         "projectId": {"type": "string", "format": "uuid"},
         "decision": {"enum": ["APPROVED", "REJECTED", "FORCE_APPROVED"]},
+        "decisionSource": {"enum": ["INTERNAL", "EXTERNAL"]},
         "approvalRef": {"type": ["string", "null"], "maxLength": 160},
         "reasonCodes": {
           "type": "array",

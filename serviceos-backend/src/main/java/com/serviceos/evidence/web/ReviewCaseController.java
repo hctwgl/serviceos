@@ -120,8 +120,8 @@ final class ReviewCaseController {
     private ReviewDecisionResponse decision(ReviewDecisionView decision) {
         return new ReviewDecisionResponse(
                 decision.reviewDecisionId(), decision.reviewCaseId(), decision.decisionOrdinal(),
-                decision.decision(), decision.reasonCodes(), decision.note(), decision.approvalRef(),
-                decision.decidedBy(), decision.decidedAt());
+                decision.decision(), decision.decisionSource(), decision.reasonCodes(), decision.note(),
+                decision.approvalRef(), decision.decidedBy(), decision.decidedAt());
     }
 
     record CreateReviewCaseRequest(UUID evidenceSetSnapshotId, String policyVersion) {
@@ -159,6 +159,7 @@ final class ReviewCaseController {
             UUID reviewCaseId,
             int decisionOrdinal,
             String decision,
+            String decisionSource,
             List<String> reasonCodes,
             String note,
             String approvalRef,

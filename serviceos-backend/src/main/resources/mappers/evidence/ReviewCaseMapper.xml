@@ -36,10 +36,10 @@
     <insert id="insertDecision" parameterType="map">
         INSERT INTO evd_review_decision (
             review_decision_id, tenant_id, project_id, review_case_id, decision_ordinal,
-            decision, reason_codes, note, approval_ref, decided_by, decided_at)
+            decision, decision_source, reason_codes, note, approval_ref, decided_by, decided_at)
         VALUES (
             CAST(#{reviewDecisionId} AS uuid), #{tenantId}, CAST(#{projectId} AS uuid),
-            CAST(#{reviewCaseId} AS uuid), #{decisionOrdinal}, #{decision},
+            CAST(#{reviewCaseId} AS uuid), #{decisionOrdinal}, #{decision}, #{decisionSource},
             CAST(#{reasonCodes} AS jsonb), #{note}, #{approvalRef}, #{decidedBy}, #{decidedAt})
     </insert>
 
@@ -70,6 +70,7 @@
     <select id="listDecisions" resultType="map">
         SELECT review_decision_id AS "reviewDecisionId", review_case_id AS "reviewCaseId",
                decision_ordinal AS "decisionOrdinal", decision AS "decision",
+               decision_source AS "decisionSource",
                reason_codes::text AS "reasonCodes", note AS "note",
                approval_ref AS "approvalRef",
                decided_by AS "decidedBy", decided_at AS "decidedAt"

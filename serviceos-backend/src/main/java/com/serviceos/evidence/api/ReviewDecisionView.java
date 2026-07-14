@@ -10,6 +10,7 @@ public record ReviewDecisionView(
         UUID reviewCaseId,
         int decisionOrdinal,
         String decision,
+        String decisionSource,
         List<String> reasonCodes,
         String note,
         String approvalRef,
