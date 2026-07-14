@@ -28,4 +28,10 @@ public interface FileCommandService {
             UUID fileId,
             AuthorizeDownloadCommand command
     );
+
+    StoredFileView invalidate(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            InvalidateStoredFileCommand command
+    );
 }

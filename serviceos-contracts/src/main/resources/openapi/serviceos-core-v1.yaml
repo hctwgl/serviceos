@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.20.0
+  version: 0.21.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -257,6 +257,35 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '423': { $ref: '#/components/responses/Problem' }
+  /files/{fileId}:invalidate:
+    post:
+      operationId: invalidateStoredFile
+      summary: 作废 AVAILABLE StoredFile
+      parameters:
+        - name: fileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InvalidateStoredFileRequest' }
+      responses:
+        '200':
+          description: 作废成功或幂等重放
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StoredFile' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
+
   /operational-exceptions:
     get:
       operationId: listOperationalExceptions
@@ -1251,6 +1280,15 @@ components:
           additionalProperties: { type: string }
         uploadAuthorizationExpiresAt: { type: [string, 'null'], format: date-time }
         sessionExpiresAt: { type: string, format: date-time }
+    InvalidateStoredFileRequest:
+      type: object
+      additionalProperties: false
+      required: [reasonCode, sourceType, sourceId]
+      properties:
+        reasonCode: { type: string, minLength: 1, maxLength: 80 }
+        sourceType: { type: string, minLength: 1, maxLength: 80 }
+        sourceId: { type: string, minLength: 1, maxLength: 128 }
+
     StoredFile:
       type: object
       additionalProperties: false

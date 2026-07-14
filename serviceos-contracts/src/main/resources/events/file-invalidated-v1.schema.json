@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/file-invalidated-v1.schema.json",
+  "title": "FileInvalidatedV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId",
+    "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"
+  ],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"},
+    "eventType": {"const": "file.invalidated"},
+    "schemaVersion": {"const": 1},
+    "tenantId": {"type": "string"},
+    "correlationId": {"type": "string"},
+    "causationId": {"type": "string"},
+    "aggregateType": {"const": "StoredFile"},
+    "aggregateId": {"type": "string", "format": "uuid"},
+    "aggregateVersion": {"type": "integer", "minimum": 1},
+    "occurredAt": {"type": "string", "format": "date-time"},
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fileId", "reasonCode", "sourceType", "sourceId", "invalidatedBy", "invalidatedAt"],
+      "properties": {
+        "fileId": {"type": "string", "format": "uuid"},
+        "reasonCode": {"type": "string", "minLength": 1, "maxLength": 80},
+        "sourceType": {"type": "string", "minLength": 1, "maxLength": 80},
+        "sourceId": {"type": "string", "minLength": 1, "maxLength": 128},
+        "invalidatedBy": {"type": "string"},
+        "invalidatedAt": {"type": "string", "format": "date-time"}
+      }
+    }
+  }
+}

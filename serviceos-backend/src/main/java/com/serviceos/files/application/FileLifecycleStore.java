@@ -54,4 +54,6 @@ public interface FileLifecycleStore {
             Instant issuedAt,
             Instant expiresAt
     );
+
+    int invalidateFile(String tenantId, UUID fileId, String expectedStatus, Instant now);
 }

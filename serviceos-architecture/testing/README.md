@@ -46,3 +46,4 @@
 - [M43 表单+资料双引用完成门禁验收](40-m43-dual-input-task-completion-acceptance.md)
 - [M44 ReviewCase / ReviewDecision 验收](41-m44-review-case-decision-acceptance.md)
 - [M45 CorrectionCase 验收](42-m45-correction-case-acceptance.md)
+- [M46 files 作废联动验收](43-m46-files-invalidation-linkage-acceptance.md)

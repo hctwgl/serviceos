@@ -123,7 +123,8 @@ class DefaultFileCommandServiceTest {
             CapturingIdempotency idempotency
     ) {
         return new DefaultFileCommandService(
-                store, storage, allowAuthorization(), audits::add, idempotency, tasks,
+                store, storage, allowAuthorization(), audits::add, idempotency,
+                event -> { }, new tools.jackson.databind.ObjectMapper(), tasks,
                 new TransactionTemplate(noOpTransactions()),
                 Clock.fixed(NOW, ZoneOffset.UTC), 1024,
                 Duration.ofHours(1), Duration.ofMinutes(15), Duration.ofMinutes(5), Duration.ofMinutes(2));
@@ -329,6 +330,11 @@ class DefaultFileCommandServiceTest {
                 UUID authorizationId, StoredFileRecord file, String principalId,
                 String purpose, String correlationId, Instant issuedAt, Instant expiresAt
         ) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public int invalidateFile(String tenantId, UUID fileId, String expectedStatus, Instant now) {
             throw new UnsupportedOperationException();
         }
     }

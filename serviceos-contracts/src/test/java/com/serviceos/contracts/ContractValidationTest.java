@@ -82,6 +82,13 @@ class ContractValidationTest {
     }
 
     @Test
+    void fileInvalidatedExampleMustMatchPublishedSchema() throws Exception {
+        assertValidEvent(
+                "/events/file-invalidated-v1.schema.json",
+                "/events/file-invalidated-v1.valid.json");
+    }
+
+    @Test
     void evidenceCorrectionCaseCreatedExampleMustMatchPublishedSchema() throws Exception {
         assertValidEvent(
                 "/events/evidence-correction-case-created-v1.schema.json",

@@ -10,6 +10,7 @@ import com.serviceos.files.api.BeginUploadCommand;
 import com.serviceos.files.api.DownloadAuthorizationView;
 import com.serviceos.files.api.FileCommandService;
 import com.serviceos.files.api.FinalizeUploadCommand;
+import com.serviceos.files.api.InvalidateStoredFileCommand;
 import com.serviceos.files.api.StoredFileView;
 import com.serviceos.files.api.UploadSessionView;
 import com.serviceos.files.spi.ObjectMetadata;
@@ -18,6 +19,8 @@ import com.serviceos.files.spi.ObjectTransferAuthorization;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.reliability.api.IdempotencyDecision;
 import com.serviceos.reliability.api.IdempotencyService;
+import com.serviceos.reliability.api.OutboxAppender;
+import com.serviceos.reliability.api.OutboxEvent;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.CommandContext;
 import com.serviceos.shared.CommandMetadata;
@@ -27,7 +30,10 @@ import com.serviceos.task.api.ScheduleAutomatedTaskCommand;
 import com.serviceos.task.api.TaskSchedulingService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.time.Clock;
@@ -50,6 +56,8 @@ final class DefaultFileCommandService implements FileCommandService {
     private static final String BEGIN_OPERATION = "file.upload.begin";
     private static final String UPLOAD_CAPABILITY = "file.upload";
     private static final String DOWNLOAD_CAPABILITY = "file.download";
+    private static final String INVALIDATE_CAPABILITY = "file.invalidate";
+    private static final String INVALIDATE_OPERATION = "file.invalidate";
     private static final Pattern SHA_256 = Pattern.compile("[0-9a-f]{64}");
     private static final Pattern MIME = Pattern.compile(
             "[a-z0-9][a-z0-9!#$&^_.+-]{0,126}/[a-z0-9][a-z0-9!#$&^_.+-]{0,126}");
@@ -59,6 +67,8 @@ final class DefaultFileCommandService implements FileCommandService {
     private final AuthorizationService authorization;
     private final AuditAppender audit;
     private final IdempotencyService idempotency;
+    private final OutboxAppender outbox;
+    private final ObjectMapper objectMapper;
     private final TaskSchedulingService tasks;
     private final TransactionTemplate transactions;
     private final Clock clock;
@@ -74,6 +84,8 @@ final class DefaultFileCommandService implements FileCommandService {
             AuthorizationService authorization,
             AuditAppender audit,
             IdempotencyService idempotency,
+            OutboxAppender outbox,
+            ObjectMapper objectMapper,
             TaskSchedulingService tasks,
             TransactionTemplate transactions,
             Clock clock,
@@ -88,6 +100,8 @@ final class DefaultFileCommandService implements FileCommandService {
         this.authorization = authorization;
         this.audit = audit;
         this.idempotency = idempotency;
+        this.outbox = outbox;
+        this.objectMapper = objectMapper;
         this.tasks = tasks;
         this.transactions = transactions;
         this.clock = clock;
@@ -314,6 +328,72 @@ final class DefaultFileCommandService implements FileCommandService {
                 contextType, contextId, fileName, mime, command.expectedSize(), sha256);
     }
 
+
+    @Override
+    @Transactional
+    public StoredFileView invalidate(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            InvalidateStoredFileCommand rawCommand
+    ) {
+        Objects.requireNonNull(principal, "principal must not be null");
+        Objects.requireNonNull(metadata, "metadata must not be null");
+        Objects.requireNonNull(rawCommand, "command must not be null");
+        UUID fileId = Objects.requireNonNull(rawCommand.fileId(), "fileId must not be null");
+        String reasonCode = requireText(rawCommand.reasonCode(), "reasonCode", 80);
+        String sourceType = requireText(rawCommand.sourceType(), "sourceType", 80);
+        String sourceId = requireText(rawCommand.sourceId(), "sourceId", 128);
+        AuthorizationDecision decision = authorization.require(
+                principal,
+                AuthorizationRequest.tenantCapability(
+                        INVALIDATE_CAPABILITY, principal.tenantId(), "StoredFile", fileId.toString()),
+                metadata.correlationId());
+        StoredFileRecord file = store.findFile(principal.tenantId(), fileId)
+                .orElseThrow(() -> new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "File was not found"));
+        String requestDigest = Sha256.digest(
+                fileId + "|" + reasonCode + "|" + sourceType + "|" + sourceId);
+        CommandContext context = new CommandContext(
+                principal.tenantId(), principal.principalId(),
+                metadata.correlationId(), metadata.idempotencyKey());
+        IdempotencyDecision idempotencyDecision = idempotency.begin(context, INVALIDATE_OPERATION, requestDigest);
+        if (idempotencyDecision.kind() == IdempotencyDecision.Kind.REPLAY) {
+            return store.findFile(principal.tenantId(), fileId)
+                    .orElseThrow(() -> new BusinessProblem(
+                            ProblemCode.INTERNAL_ERROR, "Invalidate file replay result missing"))
+                    .toView();
+        }
+        if ("INVALIDATED".equals(file.lifecycleStatus())) {
+            idempotency.complete(context, INVALIDATE_OPERATION, fileId.toString(), requestDigest);
+            return file.toView();
+        }
+        if (!"AVAILABLE".equals(file.lifecycleStatus())) {
+            throw new BusinessProblem(ProblemCode.FILE_NOT_AVAILABLE,
+                    "Only AVAILABLE StoredFile can be invalidated");
+        }
+        Instant now = clock.instant();
+        int updated = store.invalidateFile(principal.tenantId(), fileId, "AVAILABLE", now);
+        if (updated != 1) {
+            throw new BusinessProblem(ProblemCode.FILE_NOT_AVAILABLE,
+                    "Only AVAILABLE StoredFile can be invalidated");
+        }
+        StoredFileRecord invalidated = store.findFile(principal.tenantId(), fileId)
+                .orElseThrow(() -> new BusinessProblem(ProblemCode.INTERNAL_ERROR, "Invalidated file missing"));
+        String payload = json(new FileInvalidatedPayload(
+                fileId, reasonCode, sourceType, sourceId, principal.principalId(), now));
+        outbox.append(new OutboxEvent(
+                UUID.randomUUID(), UUID.randomUUID(), "files", "file.invalidated", 1,
+                "StoredFile", fileId.toString(), invalidated.version(),
+                principal.tenantId(), metadata.correlationId(), metadata.idempotencyKey(),
+                fileId.toString(), payload, Sha256.digest(payload), now));
+        audit.append(new AuditEntry(
+                UUID.randomUUID(), principal.tenantId(), principal.principalId(),
+                "FILE_INVALIDATED", INVALIDATE_CAPABILITY, "StoredFile", fileId.toString(),
+                "ALLOW", decision.matchedGrantIds(), decision.policyVersion(), "INVALIDATED", null,
+                requestDigest, metadata.correlationId(), now));
+        idempotency.complete(context, INVALIDATE_OPERATION, fileId.toString(), requestDigest);
+        return invalidated.toView();
+    }
+
     private BeginUploadCommand validateWithMaximum(BeginUploadCommand command) {
         BeginUploadCommand validated = validate(command);
         if (validated.expectedSize() > maximumFileSize) {
@@ -413,4 +493,23 @@ final class DefaultFileCommandService implements FileCommandService {
         }
         return value;
     }
+
+    private String json(Object value) {
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (JacksonException exception) {
+            throw new IllegalArgumentException("File invalidate payload cannot be serialized", exception);
+        }
+    }
+
+    private record FileInvalidatedPayload(
+            UUID fileId,
+            String reasonCode,
+            String sourceType,
+            String sourceId,
+            String invalidatedBy,
+            Instant invalidatedAt
+    ) {
+    }
+
 }

@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -375,6 +376,25 @@ final class JdbcFileLifecycleStore implements FileLifecycleStore {
                         ? null : rs.getTimestamp("finalizing_started_at").toInstant(),
                 rs.getString("created_by"),
                 rs.getTimestamp("created_at").toInstant());
+    }
+
+
+    @Override
+    public int invalidateFile(String tenantId, UUID fileId, String expectedStatus, Instant now) {
+        return jdbc.sql("""
+                UPDATE fil_stored_file
+                   SET lifecycle_status = 'INVALIDATED',
+                       updated_at = :now,
+                       version = version + 1
+                 WHERE tenant_id = :tenantId
+                   AND file_id = :fileId
+                   AND lifecycle_status = :expectedStatus
+                """)
+                .param("now", timestamptz(now))
+                .param("tenantId", tenantId)
+                .param("fileId", fileId)
+                .param("expectedStatus", expectedStatus)
+                .update();
     }
 
     private static StoredFileRecord mapFile(ResultSet rs, int rowNum) throws SQLException {

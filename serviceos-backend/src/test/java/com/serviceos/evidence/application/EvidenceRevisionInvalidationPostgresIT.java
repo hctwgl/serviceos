@@ -115,7 +115,7 @@ class EvidenceRevisionInvalidationPostgresIT {
                 """).param("projectId", projectId).param("tenantId", TENANT)
                 .param("startsOn", LocalDate.now().minusDays(1)).update();
         grant(TECHNICIAN, "evidence.submit", "evidence.invalidate", "evidence.read",
-                "file.upload", "file.download", "task.complete");
+                "file.upload", "file.download", "file.invalidate", "task.complete");
         seedResolvedSlot();
     }
 

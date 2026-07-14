@@ -27,7 +27,7 @@ M42 实现授权作废命令，使 `VALIDATED` EvidenceRevision 进入 `INVALIDA
 
 ## 3. 未实现范围
 
-1. files StoredFile 作废/下载语义联动；
+1. ~~files StoredFile 作废/下载语义联动~~（已由 M46 实现）；
 2. ReviewCase / CorrectionCase / 多轮补传编排；
 3. 已完成 Task 的自动重开或 Snapshot 替换；
 4. ADR-018 条件槽位重解析；

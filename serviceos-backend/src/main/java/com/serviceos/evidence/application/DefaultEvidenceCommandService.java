@@ -16,6 +16,7 @@ import com.serviceos.evidence.api.InvalidateEvidenceRevisionCommand;
 import com.serviceos.files.api.BeginUploadCommand;
 import com.serviceos.files.api.FileCommandService;
 import com.serviceos.files.api.FinalizeUploadCommand;
+import com.serviceos.files.api.InvalidateStoredFileCommand;
 import com.serviceos.files.api.StoredFileView;
 import com.serviceos.files.api.UploadSessionView;
 import com.serviceos.identity.api.CurrentPrincipal;
@@ -367,6 +368,9 @@ final class DefaultEvidenceCommandService implements EvidenceCommandService {
             throw new BusinessProblem(ProblemCode.EVIDENCE_REVISION_NOT_INVALIDATABLE,
                     "Only VALIDATED EvidenceRevision can be invalidated");
         }
+        files.invalidate(principal, metadata, new InvalidateStoredFileCommand(
+                revision.fileObjectId(), reasonCode, "EvidenceRevision",
+                revision.evidenceRevisionId().toString()));
 
         EvidenceSlotView locked = repository.lockSlot(principal.tenantId(), revision.evidenceSlotId());
         refreshSlotProjection(principal.tenantId(), locked);

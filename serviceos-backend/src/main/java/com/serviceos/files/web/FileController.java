@@ -5,6 +5,7 @@ import com.serviceos.files.api.BeginUploadCommand;
 import com.serviceos.files.api.DownloadAuthorizationView;
 import com.serviceos.files.api.FileCommandService;
 import com.serviceos.files.api.FinalizeUploadCommand;
+import com.serviceos.files.api.InvalidateStoredFileCommand;
 import com.serviceos.files.api.StoredFileView;
 import com.serviceos.files.api.UploadSessionView;
 import com.serviceos.identity.api.CurrentPrincipal;
@@ -77,6 +78,24 @@ final class FileController {
                 .body(result);
     }
 
+    @PostMapping("/{fileId}:invalidate")
+    ResponseEntity<StoredFileView> invalidate(
+            @PathVariable UUID fileId,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @Valid @RequestBody InvalidateFileRequest request
+    ) {
+        CurrentPrincipal principal = principals.current();
+        StoredFileView result = files.invalidate(
+                principal,
+                new CommandMetadata(correlationId, idempotencyKey),
+                new InvalidateStoredFileCommand(
+                        fileId, request.reasonCode(), request.sourceType(), request.sourceId()));
+        return ResponseEntity.ok()
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(result);
+    }
+
     @PostMapping("/{fileId}/download-authorizations")
     ResponseEntity<DownloadAuthorizationView> authorizeDownload(
             @PathVariable UUID fileId,
@@ -91,5 +110,8 @@ final class FileController {
                         + result.authorizationId()))
                 .header(CorrelationIds.HEADER_NAME, correlationId)
                 .body(result);
+    }
+
+    record InvalidateFileRequest(String reasonCode, String sourceType, String sourceId) {
     }
 }
