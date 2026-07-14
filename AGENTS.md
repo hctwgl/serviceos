@@ -2,116 +2,82 @@
 
 本文件是 ServiceOS 仓库级开发入口。任何在本仓库中分析、生成、修改、测试或评审代码的 Agent 与开发者，都必须先阅读本文件，并按照 `serviceos-architecture/` 中的事实源实施。
 
-`AGENTS.md` 不替代详细架构文档。它负责规定开发顺序、事实源优先级、全局工程约束和变更完成标准；具体领域规则、数据模型、API、事件、部署和验收要求以 `serviceos-architecture/` 下对应文档为准。
+`AGENTS.md` 不替代详细架构文档。它负责规定开发顺序、事实源优先级、全局工程约束、实施状态维护和变更完成标准。
 
 ---
 
 ## 1. 项目定位
 
-ServiceOS 是面向新能源充电设施现场服务的可配置履约平台。
+ServiceOS 是面向新能源充电设施现场服务的可配置履约平台。当前采用 Java 21、Spring Boot、Spring Modulith、PostgreSQL、Flyway、OpenAPI、事件 Schema、Inbox/Outbox、OIDC/JWT、Capability 和 Tenant/Project Scope。
 
-当前工程采用：
-
-- Java 21；
-- Spring Boot；
-- Spring Modulith 模块化单体；
-- PostgreSQL + Flyway；
-- OpenAPI 与事件 Schema 契约治理；
-- Inbox / Outbox、幂等、审计和可靠 Worker；
-- OIDC / JWT、Capability、Tenant / Project Scope；
-- 单一 OCI 镜像、独立数据库迁移和失败关闭发布。
-
-当前阶段的目标是建立边界清晰、事务可靠、可验证、可演进的履约内核。不得为了追求形式上的“微服务”“统一框架”或短期 CRUD 速度，破坏领域边界、事务一致性和可测试性。
+当前目标是建立边界清晰、事务可靠、可验证、可演进的履约内核。不得为了形式上的微服务、框架统一或短期 CRUD 速度，破坏领域边界、事务一致性和可测试性。
 
 ---
 
-## 2. 架构事实源
+## 2. 架构与实施事实源
 
-`serviceos-architecture/` 是本项目产品、领域、架构、API、数据、测试、部署和路线图的事实源。
+`serviceos-architecture/` 是产品、领域、架构、API、数据、测试、部署和路线图的事实源。
 
-Agent 开始开发前，必须先定位并阅读与任务相关的文档，而不是只根据现有代码、类名或用户一句描述直接实现。
+关键入口：
 
-主要目录职责：
+- `serviceos-architecture/README.md`：Architecture Book 导航；
+- `serviceos-architecture/docs/implementation-status.md`：统一实施状态总览；
+- `serviceos-architecture/docs/implementation-traceability-matrix.md`：能力到代码、契约和测试的追踪；
+- `serviceos-architecture/architecture/`：总体设计、工程规范和 Mxx 实现文档；
+- `serviceos-architecture/testing/`：Mxx 验收矩阵；
+- `serviceos-architecture/decisions/`：ADR；
+- `serviceos-contracts/`：OpenAPI 和事件 Schema；
+- `serviceos-backend/src/main/resources/db/migration/`：数据库迁移事实。
 
-```text
-serviceos-architecture/
-├── product/         产品目标、角色、范围和业务能力
-├── architecture/    系统架构、模块设计、实现切片和工程规范
-├── decisions/       已批准的架构决策记录 ADR
-├── api/             API 设计和接口约束
-├── data/            数据模型、表和数据治理
-├── testing/         验收矩阵、测试范围和质量门禁
-└── roadmap/         里程碑、实施顺序和完成状态
-```
+Agent 开始开发前必须定位并阅读相关文档，不得只根据现有代码、类名或一句需求直接实现。
 
-实际目录发生变化时，以仓库当前结构和 README 导航为准。
+### 实施状态判断
+
+- `Draft`：正在形成，不可作为研发承诺；
+- `Proposed`：完整提案，尚未接受或实施；
+- `Accepted`：设计已接受，可指导实现，但不代表代码完成；
+- `Implemented`：对应里程碑声明范围已有代码、契约、迁移和适用自动化证据。
+
+`Implemented` 不代表整个领域完成。必须同时阅读对应实现文档的“明确未实现”和验收矩阵。
 
 ---
 
 ## 3. 事实优先级
 
-发生描述冲突时，按以下顺序判断：
+发生冲突时按以下顺序判断：
 
 1. 当前任务中用户明确批准的最新决策；
-2. 已接受的 ADR；
-3. `serviceos-architecture/` 中状态为 Approved / Implemented 的架构与验收文档；
-4. OpenAPI、事件 Schema、数据库迁移等机器可读契约；
-5. 当前测试所证明的行为；
+2. 已接受 ADR；
+3. 状态为 Accepted/Implemented 的架构与验收文档；
+4. OpenAPI、事件 Schema、Flyway 等机器契约；
+5. 自动化测试证明的行为；
 6. 当前实现代码；
 7. README、注释和历史说明。
 
-不得因为现有代码与文档不一致，就默认代码是正确事实。必须先判断：
-
-- 文档尚未实现；
-- 代码已经偏离架构；
-- 文档已经过期；
-- 当前任务正在批准新的架构变更。
-
-无法确定时，不得静默选择。应在变更说明中明确冲突、采用的判断和后续需要补充的决策。
+不得因为代码与文档不一致就默认代码正确。无法判断时，必须在变更说明中明确冲突、判断依据和待决事项。
 
 ---
 
-## 4. 开发前必须完成的工作
+## 4. 开发前必须完成
 
-Agent 在修改代码前必须完成以下步骤：
+修改代码前必须：
 
-1. 明确任务属于哪个产品能力、领域模块和里程碑；
-2. 阅读相关产品、架构、ADR、API、数据和测试文档；
-3. 检查现有模块边界、公共 API 和依赖方向；
-4. 检查是否已有 OpenAPI、事件 Schema、Flyway 迁移和验收矩阵；
-5. 判断本次修改是：
-   - 实现既有设计；
-   - 修复偏离设计的代码；
-   - 变更架构或产品事实；
-6. 对照验收文档列出必须通过的测试和门禁；
-7. 只在完成上述判断后开始编码。
+1. 明确产品能力、领域模块和里程碑；
+2. 阅读相关产品、架构、ADR、API、数据、测试和实施状态文档；
+3. 检查模块公共 API 和依赖方向；
+4. 检查 OpenAPI、事件 Schema、Flyway、验收矩阵和追踪矩阵；
+5. 判断本次是实现既有设计、修复架构偏离，还是变更产品/架构事实；
+6. 列出适用验收项和验证命令；
+7. 确认 `implementation-status.md` 中当前已完成和未完成边界；
+8. 然后才能编码。
 
-禁止“先写代码，再寻找文档为实现背书”。
+禁止先写代码，再寻找文档为实现背书。
 
 ---
 
-## 5. 模块与依赖边界
+## 5. 模块、领域与分层
 
-ServiceOS 当前是模块化单体，不是无边界单体。
-
-必须遵守：
-
-- 业务能力按 Spring Modulith 模块边界组织；
-- 模块只能通过公开 API、领域事件或明确允许的接口协作；
-- 禁止跨模块直接访问内部包、内部 Repository 或数据库实现；
-- 禁止为了复用少量代码建立反向依赖或循环依赖；
-- `shared` 只允许放稳定、无业务归属的最小公共能力；
-- 不得把业务概念、万能工具类和跨模块 DTO 随意放入 `shared`；
-- 新增模块或调整模块职责前，必须更新架构文档；
-- 涉及重大边界变化时，必须新增或更新 ADR。
-
-模块边界测试失败属于阻断问题，不得通过放宽验证规则绕过。
-
----
-
-## 6. 领域与应用设计约束
-
-必须保持以下职责分离：
+ServiceOS 是模块化单体，不是无边界单体。
 
 ```text
 Interface / Adapter
@@ -121,232 +87,181 @@ Interface / Adapter
     -> Infrastructure Adapter
 ```
 
-基本规则：
-
-- Controller 只负责协议适配、认证上下文和输入输出转换；
-- Application Service 负责编排用例和事务边界；
-- Domain 负责业务规则、状态迁移和不变量；
-- Infrastructure 负责数据库、消息、文件、第三方服务等技术实现；
-- 领域模型不得依赖 Web、MyBatis、JDBC、消息客户端或外部 SDK；
-- 状态变更必须通过有业务语义的命令或领域方法完成；
-- 禁止使用通用 CRUD 绕过状态机、授权、审计、幂等或版本检查；
-- 不得把数据库 Record、DO 或外部协议 DTO 当作领域模型在核心业务中传播。
-
----
-
-## 7. 事务、幂等与可靠消息
-
-以下原则是 ServiceOS 的全局可靠性基线：
-
-- 聚合修改、审计记录、幂等结果和 Outbox 事件必须在同一数据库事务中提交；
-- 外部请求、消息消费和回调必须有明确的幂等键与重复处理语义；
-- Inbox / Outbox 不得被普通异步调用或“事务提交后再发送消息”替代；
-- Worker 必须使用可恢复的 claim / lease / retry 模型；
-- 并发状态迁移必须包含状态、版本号或等价条件，并检查受影响行数；
-- 外部网络调用不得放在持有数据库行锁的长事务中；
-- 自动重试必须有上限、退避和最终人工接管路径；
-- 不得吞掉异常后伪造成功状态；
-- 不得为了测试通过而关闭幂等、审计、授权或可靠性门禁。
-
----
-
-## 8. 持久化约束
-
-持久化详细规范见：
-
-- `serviceos-architecture/architecture/36-persistence-engineering-guideline.md`
-
-仓库级摘要如下：
-
-- 普通业务持久化默认使用 MyBatis；
-- 复杂列表、动态筛选、分页、统计和报表查询默认使用 MyBatis XML；
-- Spring JDBC 仅用于确实需要直接控制 SQL 执行语义的可靠性或并发内核；
-- Domain / Application 不得直接依赖 Mapper、`JdbcTemplate` 或 `JdbcClient`；
-- 必须通过领域 Repository 接口和 Infrastructure Adapter 隔离持久化框架；
-- 默认禁止核心业务使用 MyBatis-Plus 的 `BaseMapper`、`IService`、`ServiceImpl` 和通用 CRUD 模式；
-- 选择 JDBC 例外时，必须在变更说明中写明 MyBatis 不适合的具体数据库语义。
-
----
-
-## 9. 数据库与 Flyway
-
 必须遵守：
 
-- 所有数据库结构变化必须通过 Flyway；
-- 禁止运行时自动创建、修改或猜测表结构；
-- 迁移必须兼容当前发布和回滚策略；
-- 数据库演进默认采用 expand / contract；
-- 应用运行账号不得拥有 DDL 权限；
-- 表、索引、唯一约束和外键必须体现业务不变量与查询模式；
-- 多租户业务数据必须显式包含 tenant / project scope；
-- 所有涉及锁、claim、lease、并发更新、PostgreSQL 特性的 SQL，都必须有真实 PostgreSQL 集成测试；
+- 模块只能通过公开 API、领域事件或明确 SPI 协作；
+- 禁止跨模块访问内部包、内部 Repository 或内部表；
+- Controller 只负责协议适配和输入输出转换；
+- Application Service 负责编排用例和事务；
+- Domain 负责规则、状态迁移和不变量；
+- Infrastructure 负责数据库、消息、文件和第三方技术实现；
+- 领域模型不得依赖 Web、MyBatis、JDBC、消息客户端或外部 SDK；
+- 禁止通用 CRUD 绕过状态机、授权、审计、幂等和版本检查；
+- `shared` 只允许稳定、无业务归属的最小公共能力；
+- 新增模块或调整职责必须更新架构文档，重大变化必须更新 ADR。
+
+模块边界测试失败属于阻断问题。
+
+---
+
+## 6. 事务、幂等与可靠消息
+
+- 聚合修改、审计、幂等结果和 Outbox 必须在同一数据库事务中提交；
+- 外部请求、消息和回调必须定义幂等键及重复语义；
+- Inbox/Outbox 不得被普通异步调用或提交后再发消息替代；
+- Worker 必须使用可恢复的 claim/lease/retry；
+- 并发状态迁移必须包含状态、版本或等价条件并检查影响行数；
+- 外部网络调用不得位于持有数据库行锁的长事务；
+- 自动重试必须有上限、退避和人工接管；
+- 不得吞掉异常或伪造成功。
+
+---
+
+## 7. 持久化与数据库
+
+详细规范见 `serviceos-architecture/architecture/36-persistence-engineering-guideline.md`。
+
+- 普通业务持久化默认使用 MyBatis；
+- 复杂查询默认使用 MyBatis XML；
+- Domain/Application 不得直接依赖 Mapper、JdbcTemplate 或 JdbcClient；
+- 必须通过 Repository 端口和 Infrastructure Adapter 隔离框架；
+- 核心业务默认禁止 MyBatis-Plus BaseMapper/IService/ServiceImpl 通用 CRUD；
+- Spring JDBC 仅用于确需直接控制底层 SQL 语义的可靠性或并发内核，采用时必须说明理由；
+- 所有结构变化必须通过连续 Flyway 迁移；
+- 数据库演进默认 expand/contract；
+- runtime 账号不得拥有 DDL 权限；
+- 多租户数据必须显式包含 tenant/project scope；
+- 锁、claim、lease、并发更新、唯一约束和 PostgreSQL 特性必须由真实 PostgreSQL Testcontainers 测试证明；
 - 禁止仅使用 H2 或 Mock 证明 PostgreSQL 行为。
 
 ---
 
-## 10. API 与事件契约
+## 8. API、事件、身份与安全
 
-修改 HTTP API 或事件时必须：
-
-- 先检查 `serviceos-contracts/` 和架构 API 文档；
-- OpenAPI 是外部 HTTP 契约事实源；
-- JSON Schema 是领域事件和集成事件契约事实源；
-- 不得只修改 Controller 或 Java DTO 而不同步契约；
-- 不得在已发布事件 Schema 中重定义既有字段语义；
-- 破坏性 API 变更必须通过兼容性门禁并获得明确批准；
-- 新增字段优先采用向后兼容方式；
-- 事件消费者必须具备 Inbox 去重；
-- 契约变更必须验证客户端生成可重复性。
-
----
-
-## 11. 身份、授权与多租户
-
-必须遵守：
-
-- 身份来源为 OIDC / JWT，不自行实现另一套账号密码认证；
-- 后端授权必须基于 Capability 和 Tenant / Project Scope；
+- OpenAPI 是 HTTP 契约事实源；
+- JSON Schema 是领域和集成事件契约事实源；
+- 不得只修改 Controller/DTO 而不同步契约；
+- 已发布事件不得原地破坏字段语义；
+- 破坏性 API 变更必须获批并通过兼容门禁；
+- 事件消费者必须使用 Inbox 去重；
+- 契约变更必须验证客户端生成可重复性；
+- 身份来源为 OIDC/JWT；
+- 后端授权基于 Capability 与 Tenant/Project Scope；
+- 不得信任客户端 tenant、project、operator 或权限结果；
 - 前端隐藏按钮不能替代后端授权；
-- 所有多租户查询和命令必须验证数据范围；
-- 拒绝访问必须按既定规则产生审计事实；
-- 不得信任客户端直接提交的 tenant、project、operator 或权限结果；
-- 车企接入必须执行签名、时间窗、防重放和幂等验证；
+- 车企接入必须执行签名、时间窗、防重放和幂等；
 - Secret 不得提交到仓库或写入镜像。
 
 授权绕过、租户越权和审计缺失属于阻断问题。
 
 ---
 
-## 12. 文件与外部集成
+## 9. 文件、集成与可观测性
 
-文件处理必须保持：
+文件生命周期必须保持：
 
 ```text
-Begin
--> 受限上传
--> Finalize
--> 隔离
--> 扫描
--> 授权下载
+Begin -> 受限上传 -> Finalize -> 隔离 -> 扫描 -> 授权下载
 ```
 
-禁止：
+禁止未扫描文件直接下载、公共静态暴露私有文件、数据库长期保存大文件正文、永久暴露对象存储 URL，或在领域模块直接耦合云厂商 SDK。
 
-- 未扫描文件直接进入可下载状态；
-- 通过公共静态目录暴露私有文件；
-- 在数据库中长期保存大文件正文；
-- 将外部对象存储地址直接作为永久授权链接；
-- 在领域模块中直接耦合某个云厂商 SDK。
+外部系统必须通过 integration 适配层完成协议转换、鉴权、防重放、错误映射和可观测性。
 
-第三方系统接入必须通过 integration 适配层，统一完成协议转换、鉴权、防重放、错误映射和可观测性。
+新增链路必须保持 W3C Trace Context、correlation ID、结构化日志、敏感字段脱敏、业务审计、正确的 liveness/readiness。日志、指标和 Trace 不得泄露凭据或敏感信息。
 
 ---
 
-## 13. 可观测性与日志
+## 10. 测试与验收
 
-新增链路必须保持：
-
-- W3C Trace Context；
-- correlation ID 跨 API、Outbox、Worker 和外部调用传播；
-- 结构化日志；
-- 敏感字段脱敏；
-- 关键业务状态、失败原因和重试结果可审计；
-- liveness 只反映进程生存；
-- readiness 反映是否可以接收流量；
-- 指标、Trace 和日志中不得泄露 token、密码、密钥、完整身份证件或其他敏感信息。
-
-禁止用普通日志代替领域审计，也禁止用领域审计代替技术日志。
-
----
-
-## 14. 测试与验收
-
-每次变更必须根据风险选择测试层级：
+根据风险选择：
 
 - 领域规则：单元测试；
-- 模块边界：Spring Modulith 验证；
-- 数据库行为：PostgreSQL Testcontainers 集成测试；
-- 安全授权：认证、Capability、Scope 和拒绝审计测试；
-- API：契约兼容与接口测试；
+- 模块边界：Spring Modulith；
+- 数据库：PostgreSQL Testcontainers；
+- 安全：认证、Capability、Scope 和拒绝审计测试；
+- API：接口和兼容性测试；
 - 事件：Schema 与幂等消费测试；
 - Worker：claim、lease、重试、恢复和并发测试；
 - 部署：迁移、readiness、smoke 和回滚演练。
 
-Agent 必须读取对应验收矩阵，并把其中适用于本次变更的条目实现为自动化测试或明确说明尚未满足的条件。
+Agent 必须读取对应验收矩阵，将适用条目实现为自动化证据，或明确说明未满足原因。
 
-不得通过以下方式让构建变绿：
-
-- 删除或跳过失败测试；
-- 放宽核心断言；
-- 将 CI 必须执行的测试改为默认跳过；
-- 使用 Mock 代替必须验证的真实数据库或安全行为；
-- 捕获异常后忽略失败。
+禁止删除/跳过失败测试、放宽核心断言、将 CI 必跑测试改为跳过、用 Mock 替代必须验证的真实数据库/安全行为，或捕获异常后忽略失败。
 
 ---
 
-## 15. 文档同步规则
+## 11. 文档与实施状态同步
 
-以下变化必须同步更新 `serviceos-architecture/`：
+产品范围、领域规则、模块职责、聚合、状态机、API、事件、数据模型、安全、部署、验收或里程碑状态发生变化时，必须同步更新 `serviceos-architecture/`。
 
-- 产品范围、业务规则或角色变化；
-- 模块职责或依赖变化；
-- 聚合、状态机或工作流语义变化；
-- API、事件或数据模型变化；
-- 安全、授权、多租户或审计规则变化；
-- 部署拓扑、运行角色或基础设施变化；
-- 引入新的基础框架或替换关键技术；
-- 验收标准、里程碑状态或已实现范围变化。
+每个新里程碑或已实现范围变化，必须在同一提交或同一 PR 中同步更新：
 
-重大决策必须新增或更新 ADR。不得只在代码注释或 PR 描述中保存长期架构决策。
+1. `serviceos-architecture/README.md`；
+2. 对应 `architecture/Mxx` 实现文档；
+3. 对应 `testing/Mxx` 验收矩阵；
+4. `serviceos-architecture/docs/implementation-traceability-matrix.md`；
+5. `serviceos-architecture/docs/implementation-status.md`；
+6. 根 README 的当前可运行基线；
+7. 相关总体设计文档中的已实现和未实现边界；
+8. 适用的 OpenAPI、事件 Schema、Flyway 和部署迁移清单。
 
-实现完成后，相关文档的状态、已实现范围和未实现边界必须与代码一致。
+`implementation-status.md` 必须至少维护：
+
+- `lastUpdated`；
+- `baselineCommit`；
+- `latestMilestone`；
+- 能力状态；
+- 已完成范围；
+- 明确未完成范围；
+- 证据入口；
+- 下一实施方向。
+
+以下情况视为文档门禁失败：
+
+- 新里程碑标记为 Implemented，但未更新 `implementation-status.md`；
+- 状态总览声称完成，但没有代码、迁移、机器契约或测试证据；
+- 删除、隐藏或模糊化未实现范围；
+- 状态总览与实现文档、验收矩阵或仓库基线明显不一致且没有说明。
+
+重大长期决策必须通过 ADR 保存，不得只写在注释或 PR 描述中。
 
 ---
 
-## 16. Agent 变更流程
-
-Agent 应按以下顺序执行任务：
+## 12. Agent 变更流程
 
 ```text
-1. 定位产品能力和模块
-2. 阅读相关事实源与 ADR
-3. 检查契约、迁移和验收矩阵
-4. 说明实现方案及边界
-5. 修改代码与文档
-6. 补充测试
+1. 定位能力、模块和里程碑
+2. 阅读事实源、实施状态与 ADR
+3. 检查契约、迁移、追踪矩阵和验收矩阵
+4. 说明实现方案与明确边界
+5. 修改代码、契约、迁移和文档
+6. 补充自动化测试
 7. 运行相关验证
-8. 检查架构和契约是否同步
-9. 汇报已完成、未完成和风险
+8. 更新 implementation-status.md
+9. 检查所有事实源是否一致
+10. 汇报已完成、未完成、验证结果和风险
 ```
 
-Agent 的最终变更说明至少应包含：
-
-- 本次实现对应的架构或产品文档；
-- 修改了哪些模块和契约；
-- 保持了哪些事务、授权和幂等保证；
-- 执行了哪些测试；
-- 尚未实现或无法验证的内容；
-- 是否需要新的 ADR 或后续迁移。
+最终说明至少包含：对应文档、修改模块和契约、事务/授权/幂等保证、测试结果、未实现内容、工作区/提交状态，以及是否需要 ADR 或后续迁移。
 
 ---
 
-## 17. 例外与架构变更
+## 13. 例外与架构变更
 
-确需偏离现有规范时，不得静默实施。
+偏离规范时不得静默实施，必须：
 
-必须：
-
-1. 明确指出冲突的文档或规则；
-2. 解释现有规则为什么不再适用；
-3. 评估对领域、数据、契约、安全、部署和回滚的影响；
+1. 指出冲突规则；
+2. 解释不再适用的原因；
+3. 评估领域、数据、契约、安全、部署和回滚影响；
 4. 提供迁移与回退方案；
 5. 新增或更新 ADR；
-6. 同步更新相关事实源和验收矩阵；
-7. 获得用户或架构负责人明确批准后实施。
+6. 同步事实源、实施状态和验收矩阵；
+7. 获得用户或架构负责人明确批准。
 
 ---
 
-## 18. 完成定义
+## 14. 完成定义
 
 一个任务只有同时满足以下条件才算完成：
 
@@ -355,7 +270,12 @@ Agent 的最终变更说明至少应包含：
 - 数据库、API 和事件契约已同步；
 - 事务、幂等、授权、审计和多租户规则得到保持；
 - 必要测试和验收门禁通过；
-- 文档准确描述已实现与未实现范围；
+- 里程碑实现文档和验收矩阵准确；
+- `implementation-traceability-matrix.md` 已同步；
+- `implementation-status.md` 已同步更新最新里程碑、能力状态、已完成范围、未实现范围、证据和下一方向；
+- 根 README 与 Architecture Book 导航已同步；
 - 没有隐藏失败、临时绕过或未说明的架构偏离。
 
-任何安全越权、租户泄露、事务不一致、消息丢失风险、状态机绕过、契约破坏或测试门禁规避，均属于阻断问题。
+未更新 `implementation-status.md` 的里程碑不得宣称完成或标记为 Implemented。
+
+任何安全越权、租户泄露、事务不一致、消息丢失风险、状态机绕过、契约破坏、测试门禁规避或虚假进度声明，均属于阻断问题。
