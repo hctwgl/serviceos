@@ -41,3 +41,4 @@
 - [M38 EvidenceItem 与不可变 EvidenceRevision 验收](35-m38-evidence-item-revision-acceptance.md)
 - [M39 Evidence 机器校验验收](36-m39-evidence-machine-validation-acceptance.md)
 - [M40 EvidenceSetSnapshot 验收](37-m40-evidence-set-snapshot-acceptance.md)
+- [M41 EvidenceSetSnapshot Task 完成门禁验收](38-m41-evidence-task-completion-gate-acceptance.md)

@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-14
-baselineCommit: 3e1d9ffc4867fa52c5258339be5657e0bc900978
-latestMilestone: M37
+baselineCommit: 47cc8b8
+latestMilestone: M41
 ---
 
 # ServiceOS 实施状态总览
@@ -39,13 +39,13 @@ latestMilestone: M37
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M37 固定 EvidenceSlot 运行时 |
-| 基线提交 | `3e1d9ffc4867fa52c5258339be5657e0bc900978` |
+| 最新实施里程碑 | M41 EvidenceSetSnapshot Task 完成门禁 |
+| 基线提交 | 以本里程碑提交为准（提交后回填） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
 | 前端工程 | 尚未建立；已有 Admin、Network、Technician 产品与交互规格 |
-| 数据库 | PostgreSQL + Flyway |
-| 契约 | OpenAPI + 事件 JSON Schema |
+| 数据库 | PostgreSQL + Flyway（当前版本 041 / 43） |
+| 契约 | OpenAPI 0.16.0 + 事件 JSON Schema |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -60,14 +60,14 @@ latestMilestone: M37
 | 外部接入 | BYD CPIM V7.3.1 入站安全与工单接入 | `PARTIAL` | 验签、防重放、映射、幂等收单、配置锁定 | 全量车企接口、完整回传和正式生产确认项 | M16 |
 | 工单 | WorkOrder 接收、激活、履约完成 | `IMPLEMENTED` | 权威工单、工作流启动、跨阶段和 END 完结 | 完整取消、暂停、恢复和全部业务分支 | M16～M19 |
 | 工作流 | 线性 Stage/Task 运行时 | `PARTIAL` | 精确版本启动、线性推进、唯一跨阶段推进、完成事件 | 并行/汇聚网关、完整条件表达式和复杂流程语义 | M17～M19 |
-| 人工任务 | claim/start/complete、责任和执行保护 | `IMPLEMENTED` | 人工命令、候选领取、唯一责任、release/reclaim、执行保护 | 与后续 Evidence/Review 完整完成条件整合 | M20～M23 |
+| 人工任务 | claim/start/complete、责任和执行保护 | `IMPLEMENTED` | 人工命令、候选领取、唯一责任、release/reclaim、执行保护；表单/资料完成门禁扩展点 | 表单+资料双引用、Review 完成条件 | M20～M23、M35、M41 |
 | 服务分配 | 网点分配、容量、改派 Saga、超时恢复 | `IMPLEMENTED` | ServiceAssignment、容量权威、改派、终止、对账和自动恢复 | 完整策略评分、全部异常分支和 UI | M24～M28 |
 | 运营异常 | 异常工作台基础 | `PARTIAL` | 异常记录和恢复入口基础 | 完整通知、运营中心前端和跨域异常目录 | M29 |
 | 预约 | 预约修订、联系终态动作 | `PARTIAL` | Revision、并发和终态动作基础 | 用户确认渠道、完整日程和跨端协作 | M30～M31 |
 | 现场作业 | Visit 生命周期 | `PARTIAL` | Visit 运行时基础 | GPS 策略、完整现场提交、离线同步和师傅端 | M32 |
 | 动态表单 | 资产、冻结版本、不可变提交和 Task 完成门禁 | `PARTIAL` | 固定 required、基础类型校验、精确版本提交和完成引用 | 条件表达式、复杂 validator、草稿、冲突、更正和审核 | M33～M35 |
-| 资料 Evidence | 资产发布和固定 EvidenceSlot | `PARTIAL` | EVIDENCE 资产门禁、Task 冻结 Stage、固定槽位可靠解析、权威空解析和只读查询 | 条件槽位、EvidenceItem、EvidenceRevision、Snapshot、完整性门禁、审核整改 | M36～M37 |
-| 安全文件 | Begin/Finalize/隔离/扫描/授权下载基础 | `IMPLEMENTED` | 独立安全文件生命周期参考实现 | 正式对象存储、专业扫描服务、与 EvidenceRevision 业务闭环 | M11 |
+| 资料 Evidence | 资产、槽位、Item/Revision、机器校验、Snapshot、完成门禁 | `PARTIAL` | 固定槽位、安全文件 Finalize、确定性机器校验、TASK_SUBMISSION Snapshot、无 formRef 完成引用 | 条件槽位、OCR/CV、invalidate、Review/Correction、双引用完成 | M36～M41 |
+| 安全文件 | Begin/Finalize/隔离/扫描/授权下载基础 | `IMPLEMENTED` | 独立安全文件生命周期；Evidence 已编排 Begin/Finalize | 正式对象存储、专业扫描服务 | M11、M38 |
 | 审核整改 | ReviewCase、ReviewDecision、CorrectionCase | `PROPOSED` | 已有完整领域和交互设计 | 运行时、API、迁移、测试和前端均未完成 | `architecture/10-*` |
 | SLA | 时钟、预警、升级 | `PROPOSED` | 已有总体设计 | 完整运行时和验收尚未实施 | `architecture/12-*` |
 | 通知 | 通知与运营异常中心 | `PROPOSED` | 已有总体设计 | 通知通道、模板、可靠发送和 UI | `architecture/14-*` |
@@ -97,27 +97,22 @@ latestMilestone: M37
 - 草稿、预填冲突和更正；
 - 表单审核闭环。
 
-### M36～M37：Evidence
+### M36～M41：Evidence
 
 已实现：
 
-- EVIDENCE 1.0.0 资产结构和发布门禁；
-- `evidenceKey` 唯一性和数量区间校验；
-- Task 冻结 `stageCode`、Bundle ID 和 Digest；
-- `task.created@v1` 可靠消费；
-- 固定 EvidenceSlot 解析；
-- 无匹配要求时保存权威零槽位 Resolution；
-- Resolution、Slot、审计、Outbox、Inbox 同事务；
-- `GET /api/v1/tasks/{taskId}/evidence-slots` 授权查询。
+- EVIDENCE 资产发布门禁与固定 EvidenceSlot 解析（M36～M37）；
+- EvidenceItem / 不可变 EvidenceRevision 与安全文件 Begin/Finalize（M38）；
+- 确定性机器校验与 VALIDATED / VALIDATION_FAILED（M39）；
+- 不可变 EvidenceSetSnapshot（TASK_SUBMISSION）（M40）；
+- 无 formRef 资料 Task 完成仅接受精确 Snapshot 引用与 digest（M41）。
 
 未实现：
 
 - `requiredWhen` 条件解析和可审计重解析；
-- EvidenceItem 和不可变 EvidenceRevision；
-- 与安全文件 Begin/Finalize/隔离/扫描的业务关联；
-- 数量、拍摄约束和机器校验；
-- Task 完成 Evidence 完整性门禁；
-- EvidenceSetSnapshot；
+- OCR / 图像 CV / GPS 权威距离；
+- `evidence.invalidate`；
+- 表单+资料双引用 `inputVersionRefs`；
 - ReviewCase、ReviewDecision、CorrectionCase 和多轮补传。
 
 ## 5. 下一实施方向
@@ -125,20 +120,17 @@ latestMilestone: M37
 在没有更新事实源或新批准决策的情况下，建议下一可靠纵向切片是：
 
 ```text
-M38 EvidenceItem 与不可变 EvidenceRevision 运行时
+M42 evidence.invalidate 命令运行时
 ```
 
 建议范围：
 
-1. 复用 M11 安全文件 Begin/Finalize/隔离/扫描能力；
-2. 建立 EvidenceItem 逻辑资料身份；
-3. Finalize 成功后创建不可变 EvidenceRevision；
-4. 实现幂等、并发数量门禁、租户/项目/Task/Slot 归属校验；
-5. 更新 EvidenceSlot 当前数量投影；
-6. 提供最小授权查询；
-7. 暂不扩大到条件表达式、Snapshot、审核和整改。
+1. 授权作废 `VALIDATED` Revision → `INVALIDATED`；
+2. 刷新槽位数量投影与审计/Outbox；
+3. 已引用 Snapshot 的版本不得静默改写历史 Snapshot；
+4. 暂不扩大到 Review/Correction 或双引用完成条件。
 
-该建议不是自动批准的新架构。接手 Agent 必须先检查仓库是否已有更新的 M38 文档、ADR 或提交。
+该建议不是自动批准的新架构。接手 Agent 必须先检查仓库是否已有更新的 M42 文档、ADR 或提交。
 
 ## 6. 证据阅读方法
 

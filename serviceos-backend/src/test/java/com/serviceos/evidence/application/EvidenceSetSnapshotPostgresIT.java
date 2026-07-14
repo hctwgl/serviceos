@@ -20,6 +20,8 @@ import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.shared.Sha256;
+import com.serviceos.task.api.CompleteHumanTaskCommand;
+import com.serviceos.task.api.HumanTaskCommandService;
 import com.serviceos.task.application.TaskExecutionWorker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -79,6 +81,7 @@ class EvidenceSetSnapshotPostgresIT {
     @Autowired ConfigurationService configurations;
     @Autowired EvidenceCommandService evidence;
     @Autowired EvidenceSetSnapshotService snapshots;
+    @Autowired HumanTaskCommandService humanTasks;
     @Autowired LocalObjectTransferService transfers;
     @Autowired TaskExecutionWorker worker;
     @Autowired List<OutboxMessageHandler> handlers;
@@ -115,7 +118,8 @@ class EvidenceSetSnapshotPostgresIT {
                     :startsOn, 'ACTIVE', 1, now())
                 """).param("projectId", projectId).param("tenantId", TENANT)
                 .param("startsOn", LocalDate.now().minusDays(1)).update();
-        grant(TECHNICIAN, "evidence.submit", "evidence.read", "file.upload", "file.download");
+        grant(TECHNICIAN, "evidence.submit", "evidence.read", "file.upload", "file.download",
+                "task.complete");
         seedResolvedSlot();
     }
 
@@ -188,6 +192,62 @@ class EvidenceSetSnapshotPostgresIT {
                 .isZero();
     }
 
+    @Test
+    void completesEvidenceTaskOnlyWithExactSnapshotReferenceAndDigest() throws Exception {
+        UUID revisionId = uploadScanAndValidate(pngBytes("complete"), "begin-complete", "cmd-complete");
+        EvidenceSetSnapshotView snapshot = snapshots.create(principal(), metadata("snap-complete"),
+                new CreateEvidenceSetSnapshotCommand(
+                        taskId, "TASK_SUBMISSION", List.of(revisionId)));
+
+        var completed = humanTasks.complete(principal(), metadata("complete-with-snapshot"),
+                new CompleteHumanTaskCommand(taskId, 3,
+                        "evidence-set-snapshot://" + snapshot.evidenceSetSnapshotId(),
+                        snapshot.contentDigest()));
+
+        assertThat(completed.status()).isEqualTo("COMPLETED");
+        assertThat(jdbc.sql("SELECT result_ref FROM tsk_task WHERE task_id=:task")
+                .param("task", taskId).query(String.class).single())
+                .isEqualTo("evidence-set-snapshot://" + snapshot.evidenceSetSnapshotId());
+        assertThat(jdbc.sql("SELECT result_digest FROM tsk_task WHERE task_id=:task")
+                .param("task", taskId).query(String.class).single())
+                .isEqualTo(snapshot.contentDigest());
+        assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type='task.completed'")
+                .query(Long.class).single()).isOne();
+    }
+
+    @Test
+    void rejectsWrongDigestAndCrossTaskSnapshotWithoutCompletionPollution() throws Exception {
+        UUID revisionId = uploadScanAndValidate(pngBytes("gate"), "begin-gate", "cmd-gate");
+        EvidenceSetSnapshotView snapshot = snapshots.create(principal(), metadata("snap-gate"),
+                new CreateEvidenceSetSnapshotCommand(
+                        taskId, "TASK_SUBMISSION", List.of(revisionId)));
+
+        assertThatThrownBy(() -> humanTasks.complete(principal(), metadata("complete-wrong-digest"),
+                new CompleteHumanTaskCommand(taskId, 3,
+                        "evidence-set-snapshot://" + snapshot.evidenceSetSnapshotId(),
+                        "0".repeat(64))))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code())
+                                .isEqualTo(ProblemCode.EVIDENCE_SET_NOT_VALIDATED));
+
+        assertThatThrownBy(() -> humanTasks.complete(principal(), metadata("complete-wrong-ref"),
+                new CompleteHumanTaskCommand(taskId, 3,
+                        "evidence-set-snapshot://" + UUID.randomUUID(),
+                        snapshot.contentDigest())))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code())
+                                .isEqualTo(ProblemCode.EVIDENCE_SET_NOT_VALIDATED));
+
+        assertThat(jdbc.sql("SELECT count(*) FROM tsk_task WHERE status='COMPLETED'")
+                .query(Long.class).single()).isZero();
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM rel_idempotency_record
+                 WHERE operation_type='task.human.complete'
+                """).query(Long.class).single()).isZero();
+        assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type='task.completed'")
+                .query(Long.class).single()).isZero();
+    }
+
     private UUID uploadScanAndValidate(byte[] content, String beginKey, String commandId)
             throws Exception {
         String checksum = sha256(content);
@@ -236,7 +296,7 @@ class EvidenceSetSnapshotPostgresIT {
                     workflow_definition_digest, configuration_bundle_id, configuration_bundle_digest,
                     stage_code)
                 VALUES (:task, :tenant, 'SITE_SURVEY', 'HUMAN', :businessKey, :digest,
-                    100, 'RUNNING', now(), 0, 1, 'corr-evd-041', 1, now(), now(),
+                    100, 'RUNNING', now(), 0, 1, 'corr-evd-041', 3, now(), now(),
                     :actor, now(), now(), :project, :workOrder, :workflow, :stage,
                     :nodeInstance, 'SITE_SURVEY', :definitionId, :digest, :bundle, :bundleDigest,
                     'SURVEY')
@@ -253,6 +313,14 @@ class EvidenceSetSnapshotPostgresIT {
                     principal_id, status, source_type, source_id, effective_from, created_by, created_at)
                 VALUES (:id, :tenant, :task, 'RESPONSIBLE', 'USER', :actor, 'ACTIVE',
                     'MANUAL', 'M40-FIXTURE', now(), 'fixture', now())
+                """).param("id", UUID.randomUUID()).param("tenant", TENANT).param("task", taskId)
+                .param("actor", TECHNICIAN).update();
+        jdbc.sql("""
+                INSERT INTO tsk_task_assignment (
+                    task_assignment_id, tenant_id, task_id, assignment_kind, principal_type,
+                    principal_id, status, source_type, source_id, effective_from, created_by, created_at)
+                VALUES (:id, :tenant, :task, 'CANDIDATE', 'USER', :actor, 'ACTIVE',
+                    'MANUAL', 'M41-COMPLETION-FIXTURE', now(), 'fixture', now())
                 """).param("id", UUID.randomUUID()).param("tenant", TENANT).param("task", taskId)
                 .param("actor", TECHNICIAN).update();
 
