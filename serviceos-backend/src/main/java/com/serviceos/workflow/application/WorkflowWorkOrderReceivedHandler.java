@@ -133,7 +133,7 @@ final class WorkflowWorkOrderReceivedHandler implements OutboxMessageHandler {
                 message.tenantId(), received.projectId(), received.workOrderId(), workflowId, stageId,
                 nodeInstanceId, definition.firstNodeId(), asset.versionId(), asset.contentDigest(),
                 received.bundleRef().bundleId(), received.bundleRef().manifestDigest(),
-                definition.firstTaskType(), definition.firstTaskKind(),
+                definition.firstStageCode(), definition.firstTaskType(), definition.firstTaskKind(),
                 definition.firstFormRef(),
                 "work-order:" + received.workOrderId(), message.payloadDigest(), 100, now, 3,
                 message.correlationId(), message.eventId().toString()));

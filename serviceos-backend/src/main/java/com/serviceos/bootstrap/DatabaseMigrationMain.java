@@ -29,7 +29,8 @@ public final class DatabaseMigrationMain {
             "classpath:db/migration/dispatch",
             "classpath:db/migration/appointment",
             "classpath:db/migration/fieldwork",
-            "classpath:db/migration/forms"
+            "classpath:db/migration/forms",
+            "classpath:db/migration/evidence"
     };
 
     private DatabaseMigrationMain() {

@@ -224,12 +224,12 @@ class VisitPostgresIT {
                     project_id, work_order_id, workflow_instance_id, stage_instance_id,
                     workflow_node_instance_id, workflow_node_id,
                     workflow_definition_version_id, workflow_definition_digest,
-                    configuration_bundle_id, configuration_bundle_digest
+                    configuration_bundle_id, configuration_bundle_digest, stage_code
                 ) VALUES (
                     :taskId, :tenant, 'SURVEY_TASK', 'HUMAN', :businessKey, :digest,
                     100, 'READY', now(), 0, 1, 'corr-fixture', 1, now(), now(),
                     :projectId, :workOrderId, :workflowId, :stageId, :nodeInstanceId,
-                    'SURVEY_TASK', :definitionId, :digest, :bundleId, :digest)
+                    'SURVEY_TASK', :definitionId, :digest, :bundleId, :digest, 'SURVEY')
                 """).param("taskId", taskId).param("tenant", TENANT)
                 .param("businessKey", taskId.toString()).param("digest", "a".repeat(64))
                 .param("projectId", PROJECT).param("workOrderId", WORK_ORDER)

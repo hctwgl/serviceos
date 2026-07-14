@@ -121,16 +121,18 @@ class WorkflowBootstrapPostgresIT {
         for (int index = 0; index < 4; index++) {
             assertThat(worker.runOnce()).isEqualTo(OutboxWorker.RunResult.PUBLISHED);
         }
+        // task.created 还会可靠解析权威空 EvidenceSlot 结果，并产生一条解析完成事件。
+        assertThat(worker.runOnce()).isEqualTo(OutboxWorker.RunResult.PUBLISHED);
         assertThat(worker.runOnce()).isEqualTo(OutboxWorker.RunResult.EMPTY);
         assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE status = 'PUBLISHED'")
-                .query(Long.class).single()).isEqualTo(5);
+                .query(Long.class).single()).isEqualTo(6);
 
         publisher.publish(received);
         assertThat(count("wfl_workflow_instance")).isEqualTo(1);
         assertThat(count("wfl_stage_instance")).isEqualTo(1);
         assertThat(count("wfl_node_instance")).isEqualTo(1);
         assertThat(count("tsk_task")).isEqualTo(1);
-        assertThat(count("rel_outbox_event")).isEqualTo(5);
+        assertThat(count("rel_outbox_event")).isEqualTo(6);
     }
 
     @Test

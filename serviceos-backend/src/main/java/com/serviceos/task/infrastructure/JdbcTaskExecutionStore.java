@@ -239,7 +239,7 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
                             project_id, work_order_id, workflow_instance_id, stage_instance_id,
                             workflow_node_instance_id, workflow_node_id,
                             workflow_definition_version_id, workflow_definition_digest,
-                            configuration_bundle_id, configuration_bundle_digest, form_ref
+                            configuration_bundle_id, configuration_bundle_digest, stage_code, form_ref
                         ) VALUES (
                             :taskId, :tenantId, :taskType, :taskKind, :businessKey,
                             :payloadRef, :payloadDigest, :priority, :status, :readyAt,
@@ -247,7 +247,7 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
                             :projectId, :workOrderId, :workflowInstanceId, :stageInstanceId,
                             :workflowNodeInstanceId, :workflowNodeId,
                             :workflowDefinitionVersionId, :workflowDefinitionDigest,
-                            :configurationBundleId, :configurationBundleDigest, :formRef
+                            :configurationBundleId, :configurationBundleDigest, :stageCode, :formRef
                         )
                         ON CONFLICT (tenant_id, task_type, business_key) DO NOTHING
                         """)
@@ -274,6 +274,7 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
                 .param("workflowDefinitionDigest", command.workflowDefinitionDigest())
                 .param("configurationBundleId", command.configurationBundleId())
                 .param("configurationBundleDigest", command.configurationBundleDigest())
+                .param("stageCode", command.stageCode())
                 .param("formRef", command.formRef(), java.sql.Types.VARCHAR)
                 .update();
 
@@ -281,6 +282,7 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
                 command.tenantId(), command.taskType(), command.workflowNodeInstanceId().toString());
         if (inserted == 0 && (!stored.payloadDigest().equals(command.payloadDigest())
                 || !Objects.equals(stored.formRef(), command.formRef())
+                || !Objects.equals(stored.stageCode(), command.stageCode())
                 || !Objects.equals(stored.configurationBundleId(), command.configurationBundleId())
                 || !Objects.equals(stored.configurationBundleDigest(), command.configurationBundleDigest()))) {
             throw new BusinessProblem(
@@ -619,7 +621,7 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
     private StoredTask findByBusinessKey(String tenantId, String taskType, String businessKey) {
         return jdbc.sql("""
                         SELECT task_id, tenant_id, task_type, business_key, payload_digest, form_ref,
-                               configuration_bundle_id, configuration_bundle_digest,
+                               configuration_bundle_id, configuration_bundle_digest, stage_code,
                                status, next_run_at, attempt_count, max_attempts, version
                           FROM tsk_task
                          WHERE tenant_id = :tenantId AND task_type = :taskType AND business_key = :businessKey
@@ -661,7 +663,7 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
 
     private record StoredTask(
             UUID taskId, String tenantId, String taskType, String businessKey, String payloadDigest, String formRef,
-            UUID configurationBundleId, String configurationBundleDigest,
+            UUID configurationBundleId, String configurationBundleDigest, String stageCode,
             String status, Instant nextRunAt, int attemptCount, int maxAttempts, long version
     ) {
         ScheduledTaskView toView() {

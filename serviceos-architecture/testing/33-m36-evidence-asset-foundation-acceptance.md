@@ -15,5 +15,5 @@ status: Implemented
 | M36-CFG-005 | P0 | 多版本误用单例读取时失败关闭 | `ConfigurationPublicationPostgresIT` |
 | M36-CFG-006 | P1 | 架构 Schema 与运行时资源逐字节无漂移 | `ConfigurationSchemaDriftTest` |
 
-本矩阵只证明发布期配置基础，不替代 M3 EVD-001～EVD-009。条件表达式、资料槽位、上传、
-Revision、Snapshot、审核和整改仍未实现。
+本矩阵只证明发布期配置基础，不替代 M3 EVD-001～EVD-009。固定资料槽位已由 M37 补齐；条件表达式、
+上传、Revision、Snapshot、审核和整改仍未实现。

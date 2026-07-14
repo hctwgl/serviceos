@@ -268,6 +268,15 @@ class ConfigurationPublicationPostgresIT {
                   ]
                 }
                 """.trim();
+        String requiredWithZeroCount = """
+                {
+                  "templateKey":"survey.site","version":"1.0.0","stage":"SURVEY",
+                  "items":[
+                    {"evidenceKey":"site.panorama","name":"全景图","mediaType":"PHOTO","required":true,
+                     "capture":{"minCount":0,"maxCount":1}}
+                  ]
+                }
+                """.trim();
 
         assertThatThrownBy(() -> publishEvidence(malformed, "1.0.0"))
                 .isInstanceOf(ConfigurationPublicationException.class)
@@ -281,6 +290,9 @@ class ConfigurationPublicationPostgresIT {
         assertThatThrownBy(() -> publishEvidence(invertedCount, "1.0.0"))
                 .isInstanceOf(ConfigurationPublicationException.class)
                 .hasMessageContaining("capture minCount must not exceed maxCount");
+        assertThatThrownBy(() -> publishEvidence(requiredWithZeroCount, "1.0.0"))
+                .isInstanceOf(ConfigurationPublicationException.class)
+                .hasMessageContaining("required item minCount must be greater than zero");
         assertThat(jdbc.sql("SELECT count(*) FROM cfg_configuration_asset_version WHERE asset_type = 'EVIDENCE'")
                 .query(Long.class).single()).isZero();
     }

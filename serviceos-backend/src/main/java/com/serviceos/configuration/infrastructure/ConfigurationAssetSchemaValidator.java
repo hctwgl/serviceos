@@ -105,6 +105,11 @@ final class ConfigurationAssetSchemaValidator {
                         "EVIDENCE evidenceKey must be unique: " + evidenceKey);
             }
             JsonNode capture = item.path("capture");
+            if (item.path("required").asBoolean()
+                    && capture.has("minCount") && capture.path("minCount").asInt() == 0) {
+                throw new ConfigurationPublicationException(
+                        "EVIDENCE required item minCount must be greater than zero: " + evidenceKey);
+            }
             if (capture.has("minCount") && capture.has("maxCount")
                     && capture.path("minCount").asInt() > capture.path("maxCount").asInt()) {
                 throw new ConfigurationPublicationException(

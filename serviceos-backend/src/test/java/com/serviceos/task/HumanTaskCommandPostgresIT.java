@@ -188,8 +188,8 @@ class HumanTaskCommandPostgresIT {
 
     @Test
     void migrationSetIsCurrentAndRepeatable() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("036");
-        assertThat(flyway.info().applied()).hasSize(38);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("038");
+        assertThat(flyway.info().applied()).hasSize(40);
         assertThat(flyway.migrate().migrationsExecuted).isZero();
     }
 
@@ -236,7 +236,8 @@ class HumanTaskCommandPostgresIT {
                 TENANT, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
                 nodeInstanceId, "SITE_SURVEY", UUID.randomUUID(), "a".repeat(64),
                 UUID.randomUUID(), "c".repeat(64),
-                "SITE_SURVEY", WorkflowTaskKind.HUMAN, formRef, "work-order:test", "b".repeat(64),
+                "SURVEY", "SITE_SURVEY", WorkflowTaskKind.HUMAN, formRef,
+                "work-order:test", "b".repeat(64),
                 500, Instant.now(), 1, "corr-task-create", "cause-task-create");
     }
 

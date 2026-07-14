@@ -162,5 +162,6 @@ configuration_migration
 
 - M33 已实现 FORM 1.0.0 的结构、身份和不可变 Bundle 发布门禁；
 - M36 已实现 EVIDENCE 1.0.0 的结构、身份、`evidenceKey` 唯一性、数量区间和多模板 Bundle 门禁；
+- M37 已基于 Task 冻结 Bundle 与 Stage 实现不含条件表达式的 EvidenceSlot 运行时解析；
 - 表达式静态类型、样本回放、依赖闭包与完整审批生命周期仍未实现；
 - Proposed 状态和 ADR-018 未获批部分不因上述局部实现自动转为 Accepted。

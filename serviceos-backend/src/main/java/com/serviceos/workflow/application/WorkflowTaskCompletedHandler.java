@@ -141,7 +141,8 @@ final class WorkflowTaskCompletedHandler implements OutboxMessageHandler {
                 current.workflowInstanceId(), nextStageInstanceId, nextNodeInstanceId,
                 progression.nodeId(), current.workflowDefinitionVersionId(),
                 current.workflowDefinitionDigest(), current.configurationBundleId(),
-                current.configurationBundleDigest(), progression.taskType(), progression.taskKind(),
+                current.configurationBundleDigest(), progression.stageCode(),
+                progression.taskType(), progression.taskKind(),
                 progression.formRef(),
                 "work-order:" + current.workOrderId(), message.payloadDigest(), 100, activatedAt, 3,
                 message.correlationId(), message.eventId().toString()));

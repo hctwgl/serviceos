@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.11.0
+  version: 0.12.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -369,6 +369,28 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/TaskForm' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /tasks/{taskId}/evidence-slots:
+    get:
+      operationId: listTaskEvidenceSlots
+      summary: 查询任务从冻结配置解析的资料槽位
+      description: >-
+        按 evidence.read 与 Task 项目范围实时授权。task.created 的可靠解析尚未完成时返回 409，
+        不把暂时空结果解释为无需资料；M37 仅返回无 requiredWhen 的固定槽位。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 权威固定槽位；无匹配阶段模板时返回已解析的空数组
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/EvidenceSlot' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
@@ -1113,6 +1135,35 @@ components:
         schemaVersion: { type: string, minLength: 1, maxLength: 64 }
         definition: { type: object, additionalProperties: true }
         contentDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
+    EvidenceSlot:
+      type: object
+      additionalProperties: false
+      required: [slotId, resolutionId, taskId, projectId, templateVersionId, templateKey,
+                 templateVersion, templateDigest, requirementCode, occurrenceKey, requirementName,
+                 mediaType, required, minCount, maxCount, conditionInputDigest,
+                 resolutionExplanation, requirement, requirementDigest, status, resolvedAt]
+      properties:
+        slotId: { type: string, format: uuid }
+        resolutionId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        templateVersionId: { type: string, format: uuid }
+        templateKey: { type: string, minLength: 1, maxLength: 128 }
+        templateVersion: { type: string, minLength: 1, maxLength: 64 }
+        templateDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
+        requirementCode: { type: string, minLength: 1, maxLength: 128 }
+        occurrenceKey: { type: string, minLength: 1, maxLength: 64 }
+        requirementName: { type: string, minLength: 1, maxLength: 200 }
+        mediaType: { enum: [PHOTO, VIDEO, DOCUMENT, SIGNATURE, GENERATED_REPORT] }
+        required: { type: boolean }
+        minCount: { type: integer, minimum: 0 }
+        maxCount: { type: [integer, 'null'], minimum: 1 }
+        conditionInputDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
+        resolutionExplanation: { type: object, additionalProperties: true }
+        requirement: { type: object, additionalProperties: true }
+        requirementDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
+        status: { enum: [MISSING, PARTIAL, SATISFIED, INVALIDATED] }
+        resolvedAt: { type: string, format: date-time }
     SubmitFormRequest:
       type: object
       additionalProperties: false

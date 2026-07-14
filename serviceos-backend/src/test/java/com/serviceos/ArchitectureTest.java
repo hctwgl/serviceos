@@ -22,6 +22,7 @@ class ArchitectureTest {
                 .contains(
                         "shared", "bootstrap", "identity", "authorization",
                         "reliability", "audit", "project", "configuration", "task",
-                        "operations", "files", "integration", "workorder", "workflow");
+                        "operations", "files", "integration", "workorder", "workflow",
+                        "evidence");
     }
 }

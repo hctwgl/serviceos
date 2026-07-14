@@ -332,13 +332,13 @@ class AppointmentPostgresIT {
                     project_id, work_order_id, workflow_instance_id, stage_instance_id,
                     workflow_node_instance_id, workflow_node_id,
                     workflow_definition_version_id, workflow_definition_digest,
-                    configuration_bundle_id, configuration_bundle_digest
+                    configuration_bundle_id, configuration_bundle_digest, stage_code
                 ) VALUES (
                     :taskId, :tenant, :taskType, 'HUMAN', :businessKey, :digest,
                     100, 'READY', now(), 0, 1,
                     'corr-fixture', 1, now(), now(),
                     :projectId, :workOrderId, :workflowId, :stageId,
-                    :nodeInstanceId, :nodeId, :definitionId, :digest, :bundleId, :digest
+                    :nodeInstanceId, :nodeId, :definitionId, :digest, :bundleId, :digest, 'SURVEY'
                 )
                 """).param("taskId", taskId).param("tenant", tenant).param("taskType", taskType)
                 .param("businessKey", taskId.toString()).param("digest", "a".repeat(64))

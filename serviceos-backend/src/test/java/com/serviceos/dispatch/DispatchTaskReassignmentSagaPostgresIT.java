@@ -437,12 +437,14 @@ class DispatchTaskReassignmentSagaPostgresIT {
     private Baseline baseline(String key) {
         configure("technician-a", "capacity-a-" + key);
         configure("technician-b", "capacity-b-" + key);
+        EvidenceContext evidence = seedEvidenceContext(key);
         UUID workOrderId = UUID.randomUUID();
         UUID taskId = tasks.createWorkflowTask(new CreateWorkflowTaskCommand(
-                TENANT, UUID.randomUUID(), workOrderId, UUID.randomUUID(), UUID.randomUUID(),
+                TENANT, evidence.projectId(), workOrderId, UUID.randomUUID(), UUID.randomUUID(),
                 UUID.randomUUID(), "SITE_SURVEY", UUID.randomUUID(), "a".repeat(64),
-                UUID.randomUUID(), "c".repeat(64),
-                BUSINESS_TYPE, WorkflowTaskKind.HUMAN, null, "work-order:m25-" + key, "b".repeat(64),
+                evidence.bundleId(), "c".repeat(64),
+                "SURVEY", BUSINESS_TYPE, WorkflowTaskKind.HUMAN, null,
+                "work-order:m25-" + key, "b".repeat(64),
                 500, Instant.now(), 1, "corr-task-" + key, "cause-task-" + key)).taskId();
         taskAssignments.assignCandidates(
                 manager(), metadata("assign-a-" + key),
@@ -475,6 +477,31 @@ class DispatchTaskReassignmentSagaPostgresIT {
                         pending.sagaId(), pending.serviceAssignmentId(), preparedId, 3));
         drainOutbox();
         return new Baseline(workOrderId, taskId, pending.serviceAssignmentId());
+    }
+
+    private EvidenceContext seedEvidenceContext(String key) {
+        UUID projectId = UUID.randomUUID();
+        UUID bundleId = UUID.randomUUID();
+        jdbc.sql("""
+                INSERT INTO prj_project (
+                    project_id, tenant_id, project_code, client_id, project_name,
+                    starts_on, project_status, aggregate_version, created_at)
+                VALUES (:projectId, :tenantId, :projectCode, 'client-m25', 'M25 测试项目',
+                    current_date, 'ACTIVE', 1, now())
+                """).param("projectId", projectId).param("tenantId", TENANT)
+                .param("projectCode", "M25-" + key + "-" + projectId).update();
+        jdbc.sql("""
+                INSERT INTO cfg_configuration_bundle (
+                    bundle_id, tenant_id, project_id, bundle_code, bundle_version,
+                    brand_code, service_product_code, effective_from,
+                    manifest_digest, status, published_at)
+                VALUES (:bundleId, :tenantId, :projectId, :bundleCode, '1.0.0',
+                    'TEST', 'SITE_SURVEY', now() - interval '1 day',
+                    :digest, 'PUBLISHED', now())
+                """).param("bundleId", bundleId).param("tenantId", TENANT)
+                .param("projectId", projectId).param("bundleCode", "M25-" + key + "-" + bundleId)
+                .param("digest", "c".repeat(64)).update();
+        return new EvidenceContext(projectId, bundleId);
     }
 
     private ServiceAssignmentReceipt prepareReliableReassignment(Baseline baseline, String key) {
@@ -650,5 +677,8 @@ class DispatchTaskReassignmentSagaPostgresIT {
     }
 
     private record Baseline(UUID workOrderId, UUID taskId, UUID serviceAssignmentId) {
+    }
+
+    private record EvidenceContext(UUID projectId, UUID bundleId) {
     }
 }

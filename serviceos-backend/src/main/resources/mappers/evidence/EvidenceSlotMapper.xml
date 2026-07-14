@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.serviceos.evidence.infrastructure.EvidenceSlotMapper">
+    <insert id="insertResolution" parameterType="map">
+        INSERT INTO evd_task_evidence_resolution (
+            resolution_id, tenant_id, project_id, task_id,
+            configuration_bundle_id, configuration_bundle_digest, stage_code,
+            source_event_id, source_event_digest, resolver_version, slot_count, resolved_at)
+        VALUES (#{resolutionId}, #{tenantId}, #{projectId}, #{taskId},
+            #{bundleId}, #{bundleDigest}, #{stageCode},
+            #{sourceEventId}, #{sourceEventDigest}, #{resolverVersion}, #{slotCount}, #{resolvedAt})
+    </insert>
+
+    <insert id="insertSlots">
+        INSERT INTO evd_evidence_slot (
+            slot_id, tenant_id, project_id, task_id, resolution_id,
+            template_version_id, template_key, template_version, template_digest,
+            requirement_code, occurrence_key, requirement_name, media_type, required_flag,
+            min_count, max_count, condition_input_digest, resolution_explanation,
+            requirement_definition, requirement_digest, status_projection, resolved_at)
+        VALUES
+        <foreach collection="slots" item="slot" separator=",">
+            (CAST(#{slot.slotId} AS uuid), #{slot.tenantId}, CAST(#{slot.projectId} AS uuid),
+             CAST(#{slot.taskId} AS uuid), CAST(#{slot.resolutionId} AS uuid),
+             CAST(#{slot.templateVersionId} AS uuid), #{slot.templateKey}, #{slot.templateVersion}, #{slot.templateDigest},
+             #{slot.requirementCode}, #{slot.occurrenceKey}, #{slot.requirementName}, #{slot.mediaType},
+             #{slot.required}, #{slot.minCount}, #{slot.maxCount}, #{slot.conditionInputDigest},
+             CAST(#{slot.explanation} AS jsonb), CAST(#{slot.definition} AS jsonb),
+             #{slot.requirementDigest}, #{slot.status}, #{slot.resolvedAt})
+        </foreach>
+    </insert>
+
+    <select id="countResolution" resultType="int">
+        SELECT count(*)
+         FROM evd_task_evidence_resolution
+         WHERE tenant_id = #{tenantId} AND task_id = CAST(#{taskId} AS uuid)
+    </select>
+
+    <select id="listSlots" resultType="map">
+        SELECT slot_id AS "slotId", resolution_id AS "resolutionId", task_id AS "taskId",
+               project_id AS "projectId", template_version_id AS "templateVersionId",
+               template_key AS "templateKey", template_version AS "templateVersion",
+               template_digest AS "templateDigest", requirement_code AS "requirementCode",
+               occurrence_key AS "occurrenceKey", requirement_name AS "requirementName",
+               media_type AS "mediaType", required_flag AS "required", min_count AS "minCount",
+               max_count AS "maxCount", condition_input_digest AS "conditionInputDigest",
+               resolution_explanation::text AS "explanation",
+               requirement_definition::text AS "definition", requirement_digest AS "requirementDigest",
+               status_projection AS "status", resolved_at AS "resolvedAt"
+         FROM evd_evidence_slot
+         WHERE tenant_id = #{tenantId} AND task_id = CAST(#{taskId} AS uuid)
+         ORDER BY template_key, template_version, requirement_code, occurrence_key, slot_id
+    </select>
+</mapper>

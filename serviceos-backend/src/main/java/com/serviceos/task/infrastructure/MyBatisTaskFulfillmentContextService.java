@@ -26,7 +26,8 @@ final class MyBatisTaskFulfillmentContextService implements TaskFulfillmentConte
         return new TaskFulfillmentContext(
                 uuid(row, "taskId"), uuid(row, "projectId"), uuid(row, "workOrderId"),
                 uuid(row, "configurationBundleId"), text(row, "configurationBundleDigest"),
-                text(row, "taskType"), text(row, "taskKind"), text(row, "formRef"), text(row, "status"),
+                text(row, "stageCode"), text(row, "taskType"), text(row, "taskKind"),
+                text(row, "formRef"), text(row, "status"),
                 text(row, "responsiblePrincipalId"), Boolean.TRUE.equals(row.get("executionGuarded")),
                 ((Number) row.get("version")).longValue());
     }

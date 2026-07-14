@@ -9,6 +9,7 @@ public record TaskFulfillmentContext(
         UUID workOrderId,
         UUID configurationBundleId,
         String configurationBundleDigest,
+        String stageCode,
         String taskType,
         String taskKind,
         String formRef,
