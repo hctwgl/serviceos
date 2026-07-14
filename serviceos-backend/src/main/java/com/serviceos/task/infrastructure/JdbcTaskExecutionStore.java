@@ -9,6 +9,7 @@ import com.serviceos.task.api.CreateHandlingTaskCommand;
 import com.serviceos.task.api.CreateWorkflowTaskCommand;
 import com.serviceos.task.api.ScheduleAutomatedTaskCommand;
 import com.serviceos.task.api.ScheduledTaskView;
+import com.serviceos.task.api.TaskCompletedPayload;
 import com.serviceos.task.api.TaskCreatedPayload;
 import com.serviceos.task.api.WorkflowTaskKind;
 import com.serviceos.task.application.ClaimedTask;
@@ -332,6 +333,7 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
         requireLease(updateTaskTerminal(task, workerId, "SUCCEEDED", null, now, now));
         finishAttempt(task, "SUCCEEDED", null, outcome.resultRef(), null, now);
         appendEvent(task, "task.execution.succeeded", "SUCCEEDED", null, outcome.resultRef(), now);
+        appendWorkflowTaskCompleted(task, outcome.resultRef(), now);
         return new TaskResolution(TaskResolution.Status.SUCCEEDED);
     }
 
@@ -468,6 +470,45 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
                 task.taskId().toString(), payload, Sha256.digest(payload), occurredAt));
     }
 
+    /**
+     * 技术执行成功只描述 worker 结果；工作流推进必须依赖稳定的 TaskCompleted 领域事实。
+     * 非工作流后台任务没有流程上下文，因此不会伪造该事件。
+     */
+    private void appendWorkflowTaskCompleted(ClaimedTask task, String resultRef, Instant completedAt) {
+        WorkflowTaskContext context = jdbc.sql("""
+                        SELECT project_id, work_order_id, workflow_instance_id, stage_instance_id,
+                               workflow_node_instance_id, workflow_node_id,
+                               workflow_definition_version_id, workflow_definition_digest
+                          FROM tsk_task
+                         WHERE tenant_id = :tenantId AND task_id = :taskId
+                        """)
+                .param("tenantId", task.tenantId())
+                .param("taskId", task.taskId())
+                .query(WorkflowTaskContext.class)
+                .single();
+        if (context.workflowNodeInstanceId() == null) {
+            return;
+        }
+
+        String resultDigest = Sha256.digest(resultRef == null ? "" : resultRef);
+        TaskCompletedPayload event = new TaskCompletedPayload(
+                task.taskId(), context.projectId(), context.workOrderId(), context.workflowInstanceId(),
+                context.stageInstanceId(), context.workflowNodeInstanceId(), context.workflowNodeId(),
+                task.taskType(), context.workflowDefinitionVersionId(),
+                context.workflowDefinitionDigest(), resultRef, resultDigest, completedAt);
+        String payload;
+        try {
+            payload = objectMapper.writeValueAsString(event);
+        } catch (JacksonException exception) {
+            throw new IllegalStateException("TaskCompleted event serialization failed", exception);
+        }
+        outbox.append(new OutboxEvent(
+                UUID.randomUUID(), UUID.randomUUID(), "task", "task.completed", 1,
+                "Task", task.taskId().toString(), task.taskVersion() + 1,
+                task.tenantId(), task.correlationId(), task.attemptId().toString(),
+                task.taskId().toString(), payload, Sha256.digest(payload), completedAt));
+    }
+
     private StoredTask findByBusinessKey(String tenantId, String taskType, String businessKey) {
         return jdbc.sql("""
                         SELECT task_id, tenant_id, task_type, business_key, payload_digest,
@@ -530,6 +571,18 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
             String status,
             String errorCode,
             String resultRef
+    ) {
+    }
+
+    private record WorkflowTaskContext(
+            UUID projectId,
+            UUID workOrderId,
+            UUID workflowInstanceId,
+            UUID stageInstanceId,
+            UUID workflowNodeInstanceId,
+            String workflowNodeId,
+            UUID workflowDefinitionVersionId,
+            String workflowDefinitionDigest
     ) {
     }
 }

@@ -22,7 +22,8 @@ import java.util.Set;
         havingValue = "local",
         matchIfMissing = true)
 final class LocalOutboxPublisher implements OutboxPublisher {
-    private static final Set<String> REQUIRED_LOCAL_DELIVERY = Set.of("workorder.received@v1");
+    private static final Set<String> REQUIRED_LOCAL_DELIVERY = Set.of(
+            "workorder.received@v1", "task.completed@v1");
     private final List<OutboxMessageHandler> handlers;
 
     LocalOutboxPublisher(List<OutboxMessageHandler> handlers) {

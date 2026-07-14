@@ -10,6 +10,7 @@ import com.serviceos.reliability.spi.OutboxMessage;
 import com.serviceos.reliability.spi.OutboxMessageHandler;
 import com.serviceos.shared.Sha256;
 import com.serviceos.task.api.CreateWorkflowTaskCommand;
+import com.serviceos.task.api.ScheduledTaskView;
 import com.serviceos.task.api.TaskSchedulingService;
 import com.serviceos.workflow.api.StageActivatedPayload;
 import com.serviceos.workflow.api.WorkflowStartedPayload;
@@ -126,12 +127,31 @@ final class WorkflowWorkOrderReceivedHandler implements OutboxMessageHandler {
                         "activationEventId", message.eventId(), "activatedAt", java.sql.Timestamp.from(now)))
                 .update();
 
-        tasks.createWorkflowTask(new CreateWorkflowTaskCommand(
+        ScheduledTaskView firstTask = tasks.createWorkflowTask(new CreateWorkflowTaskCommand(
                 message.tenantId(), received.projectId(), received.workOrderId(), workflowId, stageId,
                 nodeInstanceId, definition.firstNodeId(), asset.versionId(), asset.contentDigest(),
                 definition.firstTaskType(), definition.firstTaskKind(),
                 "work-order:" + received.workOrderId(), message.payloadDigest(), 100, now, 3,
                 message.correlationId(), message.eventId().toString()));
+        jdbc.sql("""
+                INSERT INTO wfl_node_instance (
+                    workflow_node_instance_id, tenant_id, workflow_instance_id, stage_instance_id,
+                    work_order_id, node_id, task_id, status, activation_event_id, version, activated_at
+                ) VALUES (
+                    :nodeInstanceId, :tenantId, :workflowId, :stageId,
+                    :workOrderId, :nodeId, :taskId, 'ACTIVE', :activationEventId, 1, :activatedAt
+                )
+                """)
+                .param("nodeInstanceId", nodeInstanceId)
+                .param("tenantId", message.tenantId())
+                .param("workflowId", workflowId)
+                .param("stageId", stageId)
+                .param("workOrderId", received.workOrderId())
+                .param("nodeId", definition.firstNodeId())
+                .param("taskId", firstTask.taskId())
+                .param("activationEventId", message.eventId())
+                .param("activatedAt", java.sql.Timestamp.from(now))
+                .update();
         workOrders.activate(new ActivateWorkOrderCommand(
                 message.tenantId(), received.workOrderId(), message.eventId(), message.correlationId()));
 

@@ -270,6 +270,42 @@ final class JdbcConfigurationService implements ConfigurationService {
                         "published configuration bundle does not contain the required asset type"));
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public ConfigurationAssetDefinition requireAssetVersion(
+            String tenantId,
+            UUID versionId,
+            ConfigurationAssetType assetType,
+            String expectedContentDigest
+    ) {
+        String requiredTenant = requiredText(tenantId, "tenantId", 64);
+        UUID requiredVersion = java.util.Objects.requireNonNull(versionId, "versionId");
+        ConfigurationAssetType requiredType = java.util.Objects.requireNonNull(assetType, "assetType");
+        String requiredDigest = requiredText(expectedContentDigest, "expectedContentDigest", 64);
+        return jdbc.sql("""
+                SELECT version_id, asset_type, asset_key, semantic_version, schema_version,
+                       definition::text AS definition_json, content_digest
+                  FROM cfg_configuration_asset_version
+                 WHERE tenant_id = :tenantId AND version_id = :versionId
+                   AND asset_type = :assetType AND content_digest = :contentDigest
+                   AND status = 'PUBLISHED'
+                """)
+                .param("tenantId", requiredTenant)
+                .param("versionId", requiredVersion)
+                .param("assetType", requiredType.name())
+                .param("contentDigest", requiredDigest)
+                .query((rs, rowNum) -> new ConfigurationAssetDefinition(
+                        rs.getObject("version_id", UUID.class),
+                        ConfigurationAssetType.valueOf(rs.getString("asset_type")),
+                        rs.getString("asset_key"), rs.getString("semantic_version"),
+                        rs.getString("schema_version"), rs.getString("definition_json"),
+                        rs.getString("content_digest")))
+                .optional()
+                .orElseThrow(() -> new ConfigurationResolutionException(
+                        ConfigurationResolutionException.Reason.NO_MATCH,
+                        "published configuration asset version does not match the frozen identity"));
+    }
+
     private AssetRow findAsset(PublishConfigurationAssetCommand command) {
         return jdbc.sql("""
                 SELECT version_id, asset_type, asset_key, semantic_version,

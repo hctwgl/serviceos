@@ -63,7 +63,8 @@ class WorkflowBootstrapPostgresIT {
     void clean() {
         jdbc.sql("""
                 TRUNCATE TABLE rel_outbox_publish_attempt, rel_outbox_event, rel_inbox_record,
-                    tsk_task_execution_attempt, tsk_task, wfl_stage_instance, wfl_workflow_instance,
+                    tsk_task_execution_attempt, tsk_task, wfl_node_instance,
+                    wfl_stage_instance, wfl_workflow_instance,
                     wo_work_order, cfg_configuration_bundle_item, cfg_configuration_bundle,
                     cfg_configuration_asset_version, prj_project CASCADE
                 """).update();
@@ -83,6 +84,7 @@ class WorkflowBootstrapPostgresIT {
                 .param("id", receipt.workOrderId()).query(String.class).single()).isEqualTo("ACTIVE");
         assertThat(count("wfl_workflow_instance")).isEqualTo(1);
         assertThat(count("wfl_stage_instance")).isEqualTo(1);
+        assertThat(count("wfl_node_instance")).isEqualTo(1);
         assertThat(count("tsk_task")).isEqualTo(1);
         assertThat(jdbc.sql("SELECT status FROM tsk_task")
                 .query(String.class).single()).isEqualTo("PENDING");
@@ -105,6 +107,7 @@ class WorkflowBootstrapPostgresIT {
         publisher.publish(received);
         assertThat(count("wfl_workflow_instance")).isEqualTo(1);
         assertThat(count("wfl_stage_instance")).isEqualTo(1);
+        assertThat(count("wfl_node_instance")).isEqualTo(1);
         assertThat(count("tsk_task")).isEqualTo(1);
         assertThat(count("rel_outbox_event")).isEqualTo(5);
     }
@@ -119,6 +122,7 @@ class WorkflowBootstrapPostgresIT {
                 .param("id", receipt.workOrderId()).query(String.class).single()).isEqualTo("RECEIVED");
         assertThat(count("wfl_workflow_instance")).isZero();
         assertThat(count("wfl_stage_instance")).isZero();
+        assertThat(count("wfl_node_instance")).isZero();
         assertThat(count("tsk_task")).isZero();
         assertThat(count("rel_inbox_record")).isZero();
         assertThat(jdbc.sql("SELECT status FROM rel_outbox_event")

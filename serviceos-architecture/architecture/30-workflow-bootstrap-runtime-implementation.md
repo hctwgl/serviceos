@@ -12,7 +12,7 @@ approved_at:
 related_adrs:
   - decisions/ADR-002-versioned-configuration-bundle.md
   - decisions/ADR-014-local-transaction-outbox-inbox.md
-  - decisions/ADR-017-workflow-runtime-semantics.md
+  - decisions/ADR-017-workflow-runtime-selection.md
 ---
 
 # M17 工作流可靠启动事务切片

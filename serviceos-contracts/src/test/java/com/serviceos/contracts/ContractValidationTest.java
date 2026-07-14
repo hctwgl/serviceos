@@ -67,6 +67,13 @@ class ContractValidationTest {
                 "/events/file-scan-completed-v1.valid.json");
     }
 
+    @Test
+    void taskCompletedExampleMustMatchPublishedSchema() throws Exception {
+        assertValidEvent(
+                "/events/task-completed-v1.schema.json",
+                "/events/task-completed-v1.valid.json");
+    }
+
     private void assertValidEvent(String schemaPath, String eventPath) throws Exception {
         JsonNode schemaNode = objectMapper.readTree(resource(schemaPath));
         JsonNode eventNode = objectMapper.readTree(resource(eventPath));

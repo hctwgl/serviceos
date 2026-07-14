@@ -42,6 +42,30 @@ class WorkflowDefinitionParserTest {
                 .hasMessageContaining("does not match");
     }
 
+    @Test
+    void resolvesTheOnlyUnconditionalNextTaskFromTheFrozenDefinition() {
+        var result = parser.nextTask(asset(linearDefinition()), "ASSIGN_COORDINATORS");
+
+        assertThat(result.nodeId()).isEqualTo("INITIAL_REVIEW");
+        assertThat(result.stageCode()).isEqualTo("INTAKE");
+        assertThat(result.taskType()).isEqualTo("INITIAL_REVIEW");
+        assertThat(result.taskKind()).isEqualTo(WorkflowTaskKind.AUTOMATED);
+    }
+
+    @Test
+    void rejectsConditionalAmbiguousAndCrossSemanticShortcuts() {
+        String conditional = linearDefinition().replace(
+                "\"from\":\"ASSIGN_COORDINATORS\",\"to\":\"INITIAL_REVIEW\"",
+                "\"from\":\"ASSIGN_COORDINATORS\",\"to\":\"INITIAL_REVIEW\",\"condition\":\"approved\"");
+        assertThatThrownBy(() -> parser.nextTask(asset(conditional), "ASSIGN_COORDINATORS"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("exactly one unconditional");
+
+        assertThatThrownBy(() -> parser.nextTask(asset(validDefinition()), "ASSIGN_COORDINATORS"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("exactly one unconditional");
+    }
+
     private static ConfigurationAssetDefinition asset(String definition) {
         return new ConfigurationAssetDefinition(
                 UUID.randomUUID(), ConfigurationAssetType.WORKFLOW, "wf", "1.0.0", "1.0.0",
@@ -56,6 +80,21 @@ class WorkflowDefinitionParserTest {
                    {"nodeId":"ASSIGN_COORDINATORS","nodeType":"SERVICE_TASK","name":"分配跟进人",
                     "stageCode":"INTAKE","taskType":"ASSIGN_COORDINATORS"}],
                  "transitions":[{"transitionId":"t1","from":"START","to":"ASSIGN_COORDINATORS"}]}
+                """;
+    }
+
+    private static String linearDefinition() {
+        return """
+                {"workflowKey":"byd.survey-install","semanticVersion":"1.0.0","startNodeId":"START",
+                 "nodes":[
+                   {"nodeId":"START","nodeType":"START","name":"开始"},
+                   {"nodeId":"ASSIGN_COORDINATORS","nodeType":"SERVICE_TASK","name":"分配跟进人",
+                    "stageCode":"INTAKE","taskType":"ASSIGN_COORDINATORS"},
+                   {"nodeId":"INITIAL_REVIEW","nodeType":"SERVICE_TASK","name":"工单初审",
+                    "stageCode":"INTAKE","taskType":"INITIAL_REVIEW"}],
+                 "transitions":[
+                   {"transitionId":"t1","from":"START","to":"ASSIGN_COORDINATORS"},
+                   {"transitionId":"t2","from":"ASSIGN_COORDINATORS","to":"INITIAL_REVIEW"}]}
                 """;
     }
 }
