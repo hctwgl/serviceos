@@ -98,6 +98,12 @@ final class DefaultTaskAssignmentService implements TaskAssignmentService {
                          WHERE tenant_id = :tenantId AND task_id = :taskId
                            AND task_kind = 'HUMAN' AND status = 'READY'
                            AND version = :expectedVersion
+                           AND NOT EXISTS (
+                               SELECT 1 FROM tsk_task_execution_guard guard_row
+                                WHERE guard_row.tenant_id = tsk_task.tenant_id
+                                  AND guard_row.task_id = tsk_task.task_id
+                                  AND guard_row.status = 'ACTIVE'
+                           )
                         """)
                 .param("assignedAt", timestamptz(assignedAt))
                 .param("tenantId", context.tenantId())
@@ -181,12 +187,24 @@ final class DefaultTaskAssignmentService implements TaskAssignmentService {
 
     private void throwAssignmentConflict(String tenantId, UUID taskId, long expectedVersion) {
         TaskState state = jdbc.sql("""
-                        SELECT task_kind, status, version FROM tsk_task
+                        SELECT task_kind, status, version,
+                               EXISTS (
+                                   SELECT 1 FROM tsk_task_execution_guard guard_row
+                                    WHERE guard_row.tenant_id = tsk_task.tenant_id
+                                      AND guard_row.task_id = tsk_task.task_id
+                                      AND guard_row.status = 'ACTIVE'
+                               ) AS active_guard
+                          FROM tsk_task
                          WHERE tenant_id = :tenantId AND task_id = :taskId
                         """)
                 .param("tenantId", tenantId).param("taskId", taskId)
                 .query(TaskState.class).optional()
                 .orElseThrow(() -> new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "Task does not exist"));
+        if (state.activeGuard()) {
+            throw new BusinessProblem(
+                    ProblemCode.TASK_EXECUTION_GUARDED,
+                    "Candidate assignment is disabled while an execution guard is ACTIVE");
+        }
         if (state.version() != expectedVersion) {
             throw new BusinessProblem(ProblemCode.VERSION_CONFLICT, "Task version changed");
         }
@@ -215,6 +233,6 @@ final class DefaultTaskAssignmentService implements TaskAssignmentService {
         }
     }
 
-    private record TaskState(String taskKind, String status, long version) {
+    private record TaskState(String taskKind, String status, long version, boolean activeGuard) {
     }
 }

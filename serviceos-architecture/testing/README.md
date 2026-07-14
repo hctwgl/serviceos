@@ -22,3 +22,4 @@
 - [M19 跨阶段、END 与工单履约完成验收矩阵](16-m19-workflow-stage-completion-acceptance.md)
 - [M20 人工工作流 Task 命令验收矩阵](17-m20-human-task-command-acceptance.md)
 - [M21 TaskAssignment 候选与责任验收矩阵](18-m21-task-assignment-acceptance.md)
+- [M22 TaskExecutionGuard 验收矩阵](19-m22-task-execution-guard-acceptance.md)

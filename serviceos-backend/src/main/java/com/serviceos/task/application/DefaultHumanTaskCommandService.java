@@ -198,6 +198,12 @@ final class DefaultHumanTaskCommandService implements HumanTaskCommandService {
                                AND task_kind = 'HUMAN' AND status = :expectedStatus
                                AND claimed_by = :actorId AND version = :expectedVersion
                                AND workflow_node_instance_id IS NOT NULL
+                               AND NOT EXISTS (
+                                   SELECT 1 FROM tsk_task_execution_guard guard_row
+                                    WHERE guard_row.tenant_id = tsk_task.tenant_id
+                                      AND guard_row.task_id = tsk_task.task_id
+                                      AND guard_row.status = 'ACTIVE'
+                               )
                                AND EXISTS (
                                    SELECT 1 FROM tsk_task_assignment assignment
                                     WHERE assignment.tenant_id = tsk_task.tenant_id
@@ -226,6 +232,12 @@ final class DefaultHumanTaskCommandService implements HumanTaskCommandService {
                              WHERE tenant_id = :tenantId AND task_id = :taskId
                                AND task_kind = 'HUMAN' AND status = :expectedStatus
                                AND claimed_by = :actorId AND version = :expectedVersion
+                               AND NOT EXISTS (
+                                   SELECT 1 FROM tsk_task_execution_guard guard_row
+                                    WHERE guard_row.tenant_id = tsk_task.tenant_id
+                                      AND guard_row.task_id = tsk_task.task_id
+                                      AND guard_row.status = 'ACTIVE'
+                               )
                                AND EXISTS (
                                    SELECT 1 FROM tsk_task_assignment assignment
                                     WHERE assignment.tenant_id = tsk_task.tenant_id
@@ -248,6 +260,12 @@ final class DefaultHumanTaskCommandService implements HumanTaskCommandService {
                              WHERE tenant_id = :tenantId AND task_id = :taskId
                                AND task_kind = 'HUMAN' AND status = :expectedStatus
                                AND version = :expectedVersion
+                               AND NOT EXISTS (
+                                   SELECT 1 FROM tsk_task_execution_guard guard_row
+                                    WHERE guard_row.tenant_id = tsk_task.tenant_id
+                                      AND guard_row.task_id = tsk_task.task_id
+                                      AND guard_row.status = 'ACTIVE'
+                               )
                                AND EXISTS (
                                    SELECT 1 FROM tsk_task_assignment assignment
                                     WHERE assignment.tenant_id = tsk_task.tenant_id
@@ -270,6 +288,12 @@ final class DefaultHumanTaskCommandService implements HumanTaskCommandService {
                          WHERE tenant_id = :tenantId AND task_id = :taskId
                            AND task_kind = 'HUMAN' AND status = :expectedStatus
                            AND claimed_by = :actorId AND version = :expectedVersion
+                           AND NOT EXISTS (
+                               SELECT 1 FROM tsk_task_execution_guard guard_row
+                                WHERE guard_row.tenant_id = tsk_task.tenant_id
+                                  AND guard_row.task_id = tsk_task.task_id
+                                  AND guard_row.status = 'ACTIVE'
+                           )
                            AND EXISTS (
                                SELECT 1 FROM tsk_task_assignment assignment
                                 WHERE assignment.tenant_id = tsk_task.tenant_id
@@ -296,6 +320,11 @@ final class DefaultHumanTaskCommandService implements HumanTaskCommandService {
         HumanTaskRow current = findTask(tenantId, taskId, actorId);
         if (!"HUMAN".equals(current.taskKind())) {
             throw new BusinessProblem(ProblemCode.TASK_STATE_CONFLICT, "Only HUMAN tasks accept human commands");
+        }
+        if (current.activeGuard()) {
+            throw new BusinessProblem(
+                    ProblemCode.TASK_EXECUTION_GUARDED,
+                    "Task commands are disabled while an execution guard is ACTIVE");
         }
         if (current.version() != expectedVersion) {
             throw new BusinessProblem(ProblemCode.VERSION_CONFLICT,
@@ -370,6 +399,12 @@ final class DefaultHumanTaskCommandService implements HumanTaskCommandService {
                                project_id, work_order_id, workflow_instance_id, stage_instance_id,
                                workflow_node_instance_id, workflow_node_id,
                                workflow_definition_version_id, workflow_definition_digest,
+                               EXISTS (
+                                   SELECT 1 FROM tsk_task_execution_guard guard_row
+                                    WHERE guard_row.tenant_id = task.tenant_id
+                                      AND guard_row.task_id = task.task_id
+                                      AND guard_row.status = 'ACTIVE'
+                               ) AS active_guard,
                                EXISTS (
                                    SELECT 1 FROM tsk_task_assignment candidate
                                     WHERE candidate.tenant_id = task.tenant_id
@@ -501,7 +536,7 @@ final class DefaultHumanTaskCommandService implements HumanTaskCommandService {
             UUID projectId, UUID workOrderId, UUID workflowInstanceId, UUID stageInstanceId,
             UUID workflowNodeInstanceId, String workflowNodeId,
             UUID workflowDefinitionVersionId, String workflowDefinitionDigest,
-            boolean actorCandidate, boolean actorResponsible
+            boolean activeGuard, boolean actorCandidate, boolean actorResponsible
     ) {
     }
 

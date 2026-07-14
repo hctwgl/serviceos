@@ -1,0 +1,7 @@
+{
+  "eventId": "51111111-1111-4111-8111-111111111111", "eventType": "task.execution-guard.activated", "schemaVersion": 1,
+  "tenantId": "tenant-byd", "correlationId": "corr-m22-guard", "causationId": "idem-m22-guard",
+  "aggregateType": "Task", "aggregateId": "58888888-8888-4888-8888-888888888888", "aggregateVersion": 4,
+  "occurredAt": "2026-07-14T06:00:00Z",
+  "payload": {"taskId": "58888888-8888-4888-8888-888888888888", "guardId": "59999999-9999-4999-8999-999999999999", "guardType": "REASSIGNMENT", "guardKey": "saga://reassignment/001", "status": "ACTIVE", "reasonCode": "TECHNICIAN_REASSIGNMENT", "occurredAt": "2026-07-14T06:00:00Z"}
+}

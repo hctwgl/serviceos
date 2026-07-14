@@ -67,7 +67,7 @@ class TaskExecutionPostgresIT {
     void cleanTables() {
         jdbc.sql("""
                         TRUNCATE TABLE ops_operational_exception,
-                            tsk_task_assignment, tsk_task_assignment_batch,
+                            tsk_task_execution_guard, tsk_task_assignment, tsk_task_assignment_batch,
                             tsk_human_task_command_result, tsk_task_execution_attempt, tsk_task,
                             rel_outbox_publish_attempt, rel_outbox_event
                         """).update();
