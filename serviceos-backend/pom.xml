@@ -61,6 +61,12 @@
             <artifactId>spring-modulith-starter-core</artifactId>
         </dependency>
         <dependency>
+            <!-- 配置资产在发布事务开始前按版本化 JSON Schema 失败关闭，运行期不接受未治理 JSON。 -->
+            <groupId>com.networknt</groupId>
+            <artifactId>json-schema-validator</artifactId>
+            <version>${json-schema-validator.version}</version>
+        </dependency>
+        <dependency>
             <!-- Spring Boot 4 将 Flyway 自动配置拆为独立模块；仅引入 flyway-core 不会创建 Flyway bean。 -->
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-flyway</artifactId>

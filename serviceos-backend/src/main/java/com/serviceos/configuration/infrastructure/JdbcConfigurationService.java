@@ -33,20 +33,32 @@ import java.util.UUID;
 final class JdbcConfigurationService implements ConfigurationService {
     private final JdbcClient jdbc;
     private final Clock clock;
+    private final ConfigurationAssetSchemaValidator schemaValidator;
 
     @Autowired
-    JdbcConfigurationService(JdbcClient jdbc) {
-        this(jdbc, Clock.systemUTC());
+    JdbcConfigurationService(JdbcClient jdbc, ConfigurationAssetSchemaValidator schemaValidator) {
+        this(jdbc, Clock.systemUTC(), schemaValidator);
     }
 
     JdbcConfigurationService(JdbcClient jdbc, Clock clock) {
+        this(jdbc, clock, new ConfigurationAssetSchemaValidator(
+                new com.fasterxml.jackson.databind.ObjectMapper()));
+    }
+
+    JdbcConfigurationService(
+            JdbcClient jdbc,
+            Clock clock,
+            ConfigurationAssetSchemaValidator schemaValidator
+    ) {
         this.jdbc = jdbc;
         this.clock = clock;
+        this.schemaValidator = schemaValidator;
     }
 
     @Override
     @Transactional
     public ConfigurationAssetVersionReference publishAsset(PublishConfigurationAssetCommand command) {
+        schemaValidator.validate(command);
         String actualDigest = Sha256.digest(command.definitionJson());
         if (!actualDigest.equals(command.contentDigest())) {
             throw new ConfigurationPublicationException("asset content digest does not match definition");
@@ -94,10 +106,6 @@ final class JdbcConfigurationService implements ConfigurationService {
         if (assets.size() != command.assetVersionIds().size()) {
             throw new ConfigurationPublicationException(
                     "every bundle item must reference a published asset in the same tenant");
-        }
-        long distinctTypes = assets.stream().map(AssetRow::assetType).distinct().count();
-        if (distinctTypes != assets.size()) {
-            throw new ConfigurationPublicationException("a bundle may contain only one version per asset type");
         }
         String actualManifestDigest = bundleDigest(command, assets);
 
@@ -230,6 +238,26 @@ final class JdbcConfigurationService implements ConfigurationService {
             String expectedManifestDigest,
             ConfigurationAssetType assetType
     ) {
+        List<ConfigurationAssetDefinition> assets = listBundleAssets(
+                tenantId, bundleId, expectedManifestDigest, assetType);
+        if (assets.size() != 1) {
+            throw new ConfigurationResolutionException(
+                    assets.isEmpty()
+                            ? ConfigurationResolutionException.Reason.NO_MATCH
+                            : ConfigurationResolutionException.Reason.AMBIGUOUS_MATCH,
+                    "published configuration bundle must contain exactly one required asset type");
+        }
+        return assets.getFirst();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ConfigurationAssetDefinition> listBundleAssets(
+            String tenantId,
+            UUID bundleId,
+            String expectedManifestDigest,
+            ConfigurationAssetType assetType
+    ) {
         String requiredTenant = requiredText(tenantId, "tenantId", 64);
         UUID requiredBundle = java.util.Objects.requireNonNull(bundleId, "bundleId");
         String requiredManifestDigest = requiredText(expectedManifestDigest, "expectedManifestDigest", 64);
@@ -253,6 +281,7 @@ final class JdbcConfigurationService implements ConfigurationService {
                    AND bundle.status = 'PUBLISHED'
                    AND item.asset_type = :assetType
                    AND asset.status = 'PUBLISHED'
+                 ORDER BY asset.asset_key, asset.semantic_version, asset.version_id
                 """)
                 .param("tenantId", requiredTenant)
                 .param("bundleId", requiredBundle)
@@ -266,10 +295,7 @@ final class JdbcConfigurationService implements ConfigurationService {
                         rs.getString("schema_version"),
                         rs.getString("definition_json"),
                         rs.getString("content_digest")))
-                .optional()
-                .orElseThrow(() -> new ConfigurationResolutionException(
-                        ConfigurationResolutionException.Reason.NO_MATCH,
-                        "published configuration bundle does not contain the required asset type"));
+                .list();
     }
 
     @Override
@@ -427,7 +453,10 @@ final class JdbcConfigurationService implements ConfigurationService {
 
     private static String bundleDigest(PublishConfigurationBundleCommand command, List<AssetRow> assets) {
         String itemDigest = assets.stream()
-                .sorted(Comparator.comparing(asset -> asset.assetType().name()))
+                .sorted(Comparator.comparing((AssetRow asset) -> asset.assetType().name())
+                        .thenComparing(AssetRow::assetKey)
+                        .thenComparing(AssetRow::semanticVersion)
+                        .thenComparing(AssetRow::versionId))
                 .map(asset -> asset.assetType().name() + ":" + asset.versionId() + ":" + asset.contentDigest())
                 .reduce((left, right) -> left + "|" + right)
                 .orElseThrow();

@@ -13,6 +13,12 @@ public interface ConfigurationService {
             String expectedManifestDigest,
             ConfigurationAssetType assetType);
 
+    java.util.List<ConfigurationAssetDefinition> listBundleAssets(
+            String tenantId,
+            java.util.UUID bundleId,
+            String expectedManifestDigest,
+            ConfigurationAssetType assetType);
+
     ConfigurationAssetDefinition requireAssetVersion(
             String tenantId,
             java.util.UUID versionId,

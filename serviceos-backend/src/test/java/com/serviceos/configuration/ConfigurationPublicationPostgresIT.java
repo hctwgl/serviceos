@@ -150,6 +150,81 @@ class ConfigurationPublicationPostgresIT {
     }
 
     @Test
+    void publishesOnlySchemaValidFormWithMatchingImmutableIdentity() {
+        String valid = """
+                {
+                  "formKey": "survey.basic",
+                  "version": "1.0.0",
+                  "stage": "SURVEY",
+                  "sections": [{
+                    "sectionKey": "site",
+                    "title": "现场信息",
+                    "fields": [{
+                      "fieldKey": "survey.conclusion",
+                      "label": "勘测结论",
+                      "dataType": "STRING",
+                      "binding": "task.input.survey.conclusion",
+                      "required": true
+                    }]
+                  }]
+                }
+                """.trim();
+
+        var published = configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.FORM, "survey.basic", "1.0.0",
+                "1.0.0", valid, Sha256.digest(valid)));
+
+        assertThat(published.assetKey()).isEqualTo("survey.basic");
+        assertThatThrownBy(() -> configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.FORM, "another.form", "1.0.0",
+                "1.0.0", valid, Sha256.digest(valid))))
+                .isInstanceOf(ConfigurationPublicationException.class)
+                .hasMessageContaining("assetKey");
+    }
+
+    @Test
+    void bundleLocksMultipleFormVersionsWhileSingletonReadFailsClosed() {
+        UUID survey = publishForm("survey.basic", "SURVEY");
+        UUID installation = publishForm("installation.basic", "INSTALLATION");
+        var command = new PublishConfigurationBundleCommand(
+                TENANT, projectId, "BYD-OCEAN-MULTI-FORM", "1.0.0", "BYD_OCEAN",
+                "HOME_CHARGING_SURVEY_INSTALL", "370000", validFrom, null,
+                List.of(workflowVersionId, survey, installation));
+
+        ConfigurationBundleReference bundle = configurations.publishBundle(command);
+
+        assertThat(configurations.listBundleAssets(TENANT, bundle.bundleId(),
+                bundle.manifestDigest(), ConfigurationAssetType.FORM))
+                .extracting(asset -> asset.assetKey())
+                .containsExactly("installation.basic", "survey.basic");
+        assertThatThrownBy(() -> configurations.requireBundleAsset(TENANT, bundle.bundleId(),
+                bundle.manifestDigest(), ConfigurationAssetType.FORM))
+                .isInstanceOfSatisfying(ConfigurationResolutionException.class,
+                        exception -> assertThat(exception.reason()).isEqualTo(
+                                ConfigurationResolutionException.Reason.AMBIGUOUS_MATCH));
+    }
+
+    @Test
+    void rejectsMalformedOrUnknownFormSchemaBeforePersistence() {
+        String malformed = """
+                {"formKey":"survey.basic","version":"1.0.0","sections":[]}
+                """.trim();
+
+        assertThatThrownBy(() -> configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.FORM, "survey.basic", "1.0.0",
+                "1.0.0", malformed, Sha256.digest(malformed))))
+                .isInstanceOf(ConfigurationPublicationException.class)
+                .hasMessageContaining("violates schema");
+        assertThatThrownBy(() -> configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.FORM, "survey.basic", "1.0.0",
+                "2.0.0", malformed, Sha256.digest(malformed))))
+                .isInstanceOf(ConfigurationPublicationException.class)
+                .hasMessageContaining("unsupported FORM schemaVersion");
+        assertThat(jdbc.sql("SELECT count(*) FROM cfg_configuration_asset_version WHERE asset_type = 'FORM'")
+                .query(Long.class).single()).isZero();
+    }
+
+    @Test
     void failsClosedWhenLegacyOrManualRowsCreateAnAmbiguousMatch() {
         insertBundleRow("AMBIGUOUS-A", "a".repeat(64));
         insertBundleRow("AMBIGUOUS-B", "b".repeat(64));
@@ -182,9 +257,24 @@ class ConfigurationPublicationPostgresIT {
     void databaseRejectsCrossTenantBundleItems() {
         ConfigurationBundleReference bundle = configurations.publishBundle(bundle(
                 "BYD-OCEAN-SD", "1.0.0", "370000", validFrom, null));
-        String definition = "{\"formCode\":\"FOREIGN_FORM\"}";
+        String definition = """
+                {
+                  "formKey": "foreign.form",
+                  "version": "1.0.0",
+                  "sections": [{
+                    "sectionKey": "base",
+                    "title": "基础",
+                    "fields": [{
+                      "fieldKey": "survey.result",
+                      "label": "结果",
+                      "dataType": "STRING",
+                      "binding": "task.input.survey.result"
+                    }]
+                  }]
+                }
+                """.trim();
         var foreignAsset = configurations.publishAsset(new PublishConfigurationAssetCommand(
-                "another-tenant", ConfigurationAssetType.FORM, "FOREIGN_FORM", "1.0.0",
+                "another-tenant", ConfigurationAssetType.FORM, "foreign.form", "1.0.0",
                 "1.0.0", definition, Sha256.digest(definition)));
 
         assertThatThrownBy(() -> jdbc.sql("""
@@ -209,6 +299,21 @@ class ConfigurationPublicationPostgresIT {
                 TENANT, projectId, code, version, "BYD_OCEAN",
                 "HOME_CHARGING_SURVEY_INSTALL", province, from, until,
                 List.of(workflowVersionId));
+    }
+
+    private UUID publishForm(String formKey, String stage) {
+        String definition = ("""
+                {
+                  "formKey":"%s","version":"1.0.0","stage":"%s",
+                  "sections":[{"sectionKey":"base","title":"基础","fields":[{
+                    "fieldKey":"result.value","label":"结果","dataType":"STRING",
+                    "binding":"task.input.result.value"
+                  }]}]
+                }
+                """).formatted(formKey, stage).trim();
+        return configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.FORM, formKey, "1.0.0", "1.0.0",
+                definition, Sha256.digest(definition))).versionId();
     }
 
     private ResolveConfigurationBundleQuery query(String province, Instant at) {
