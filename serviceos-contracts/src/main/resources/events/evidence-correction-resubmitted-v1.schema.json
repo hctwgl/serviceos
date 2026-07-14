@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/evidence-correction-resubmitted-v1.schema.json",
+  "title": "EvidenceCorrectionResubmittedV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId",
+    "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"
+  ],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"},
+    "eventType": {"const": "evidence.correction-resubmitted"},
+    "schemaVersion": {"const": 1},
+    "tenantId": {"type": "string"},
+    "correlationId": {"type": "string"},
+    "causationId": {"type": "string"},
+    "aggregateType": {"const": "CorrectionCase"},
+    "aggregateId": {"type": "string", "format": "uuid"},
+    "aggregateVersion": {"type": "integer", "minimum": 1},
+    "occurredAt": {"type": "string", "format": "date-time"},
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "correctionCaseId", "correctionResubmissionId", "evidenceSetSnapshotId",
+        "snapshotContentDigest", "taskId", "projectId", "resubmissionOrdinal",
+        "submittedBy", "submittedAt"
+      ],
+      "properties": {
+        "correctionCaseId": {"type": "string", "format": "uuid"},
+        "correctionResubmissionId": {"type": "string", "format": "uuid"},
+        "evidenceSetSnapshotId": {"type": "string", "format": "uuid"},
+        "snapshotContentDigest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "taskId": {"type": "string", "format": "uuid"},
+        "projectId": {"type": "string", "format": "uuid"},
+        "resubmissionOrdinal": {"type": "integer", "minimum": 1},
+        "submittedBy": {"type": "string"},
+        "submittedAt": {"type": "string", "format": "date-time"}
+      }
+    }
+  }
+}

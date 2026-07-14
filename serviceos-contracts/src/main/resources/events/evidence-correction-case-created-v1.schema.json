@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/evidence-correction-case-created-v1.schema.json",
+  "title": "EvidenceCorrectionCaseCreatedV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId",
+    "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"
+  ],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"},
+    "eventType": {"const": "evidence.correction-case-created"},
+    "schemaVersion": {"const": 1},
+    "tenantId": {"type": "string"},
+    "correlationId": {"type": "string"},
+    "causationId": {"type": "string"},
+    "aggregateType": {"const": "CorrectionCase"},
+    "aggregateId": {"type": "string", "format": "uuid"},
+    "aggregateVersion": {"type": "integer", "minimum": 1},
+    "occurredAt": {"type": "string", "format": "date-time"},
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "correctionCaseId", "sourceReviewCaseId", "sourceReviewDecisionId",
+        "sourceEvidenceSetSnapshotId", "taskId", "projectId", "reasonCodes", "createdAt"
+      ],
+      "properties": {
+        "correctionCaseId": {"type": "string", "format": "uuid"},
+        "sourceReviewCaseId": {"type": "string", "format": "uuid"},
+        "sourceReviewDecisionId": {"type": "string", "format": "uuid"},
+        "sourceEvidenceSetSnapshotId": {"type": "string", "format": "uuid"},
+        "taskId": {"type": "string", "format": "uuid"},
+        "projectId": {"type": "string", "format": "uuid"},
+        "reasonCodes": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {"type": "string", "minLength": 1, "maxLength": 80}
+        },
+        "createdAt": {"type": "string", "format": "date-time"}
+      }
+    }
+  }
+}

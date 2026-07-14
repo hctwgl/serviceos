@@ -5,6 +5,7 @@ import com.serviceos.audit.api.AuditEntry;
 import com.serviceos.authorization.api.AuthorizationDecision;
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
+import com.serviceos.evidence.api.CorrectionCaseService;
 import com.serviceos.evidence.api.CreateReviewCaseCommand;
 import com.serviceos.evidence.api.DecideReviewCaseCommand;
 import com.serviceos.evidence.api.EvidenceSetSnapshotView;
@@ -44,6 +45,7 @@ final class DefaultReviewCaseService implements ReviewCaseService {
 
     private final ReviewCaseRepository reviews;
     private final EvidenceSetSnapshotRepository snapshots;
+    private final CorrectionCaseService corrections;
     private final AuthorizationService authorization;
     private final IdempotencyService idempotency;
     private final AuditAppender audit;
@@ -54,6 +56,7 @@ final class DefaultReviewCaseService implements ReviewCaseService {
     DefaultReviewCaseService(
             ReviewCaseRepository reviews,
             EvidenceSetSnapshotRepository snapshots,
+            CorrectionCaseService corrections,
             AuthorizationService authorization,
             IdempotencyService idempotency,
             AuditAppender audit,
@@ -63,6 +66,7 @@ final class DefaultReviewCaseService implements ReviewCaseService {
     ) {
         this.reviews = reviews;
         this.snapshots = snapshots;
+        this.corrections = corrections;
         this.authorization = authorization;
         this.idempotency = idempotency;
         this.audit = audit;
@@ -181,6 +185,14 @@ final class DefaultReviewCaseService implements ReviewCaseService {
         reviews.insertDecision(principal.tenantId(), current.projectId(), decisionView);
         reviews.saveCommandResult(
                 principal.tenantId(), DECIDE_OPERATION, context.idempotencyKey(), current.reviewCaseId());
+        if ("REJECTED".equals(decision)) {
+            corrections.openFromRejectedDecision(
+                    principal.tenantId(), principal.principalId(),
+                    metadata.correlationId(), metadata.idempotencyKey(),
+                    current.projectId(), current.taskId(), current.reviewCaseId(),
+                    decisionView.reviewDecisionId(), current.evidenceSetSnapshotId(),
+                    current.snapshotContentDigest(), reasonCodes);
+        }
 
         String payload = serialize(new ReviewDecidedPayload(
                 current.reviewCaseId(), decisionView.reviewDecisionId(), current.evidenceSetSnapshotId(),

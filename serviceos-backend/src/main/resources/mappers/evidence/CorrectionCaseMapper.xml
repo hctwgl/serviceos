@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.serviceos.evidence.infrastructure.CorrectionCaseMapper">
+
+    <insert id="insertCase" parameterType="map">
+        INSERT INTO evd_correction_case (
+            correction_case_id, tenant_id, project_id, task_id,
+            source_review_case_id, source_review_decision_id,
+            source_evidence_set_snapshot_id, source_snapshot_content_digest,
+            reason_codes, status, created_by, created_at,
+            latest_resubmission_snapshot_id, closed_by, closed_at)
+        VALUES (
+            CAST(#{correctionCaseId} AS uuid), #{tenantId}, CAST(#{projectId} AS uuid),
+            CAST(#{taskId} AS uuid), CAST(#{sourceReviewCaseId} AS uuid),
+            CAST(#{sourceReviewDecisionId} AS uuid),
+            CAST(#{sourceEvidenceSetSnapshotId} AS uuid), #{sourceSnapshotContentDigest},
+            CAST(#{reasonCodes} AS jsonb), #{status}, #{createdBy}, #{createdAt},
+            CAST(#{latestResubmissionSnapshotId} AS uuid), #{closedBy}, #{closedAt})
+    </insert>
+
+    <insert id="insertResubmission" parameterType="map">
+        INSERT INTO evd_correction_resubmission (
+            correction_resubmission_id, tenant_id, project_id, correction_case_id,
+            resubmission_ordinal, evidence_set_snapshot_id, snapshot_content_digest,
+            submitted_by, submitted_at)
+        VALUES (
+            CAST(#{correctionResubmissionId} AS uuid), #{tenantId}, CAST(#{projectId} AS uuid),
+            CAST(#{correctionCaseId} AS uuid), #{resubmissionOrdinal},
+            CAST(#{evidenceSetSnapshotId} AS uuid), #{snapshotContentDigest},
+            #{submittedBy}, #{submittedAt})
+    </insert>
+
+    <update id="markResubmitted">
+        UPDATE evd_correction_case
+           SET status = 'RESUBMITTED',
+               latest_resubmission_snapshot_id = CAST(#{latestSnapshotId} AS uuid)
+         WHERE tenant_id = #{tenantId}
+           AND correction_case_id = CAST(#{correctionCaseId} AS uuid)
+           AND status = #{expectedStatus}
+    </update>
+
+    <update id="markClosed">
+        UPDATE evd_correction_case
+           SET status = 'CLOSED', closed_by = #{closedBy}, closed_at = #{closedAt}
+         WHERE tenant_id = #{tenantId}
+           AND correction_case_id = CAST(#{correctionCaseId} AS uuid)
+           AND status = #{expectedStatus}
+    </update>
+
+    <select id="findCase" resultType="map">
+        SELECT correction_case_id AS "correctionCaseId", project_id AS "projectId",
+               task_id AS "taskId", source_review_case_id AS "sourceReviewCaseId",
+               source_review_decision_id AS "sourceReviewDecisionId",
+               source_evidence_set_snapshot_id AS "sourceEvidenceSetSnapshotId",
+               source_snapshot_content_digest AS "sourceSnapshotContentDigest",
+               reason_codes::text AS "reasonCodes", status AS "status",
+               created_by AS "createdBy", created_at AS "createdAt",
+               latest_resubmission_snapshot_id AS "latestResubmissionSnapshotId",
+               closed_by AS "closedBy", closed_at AS "closedAt"
+          FROM evd_correction_case
+         WHERE tenant_id = #{tenantId}
+           AND correction_case_id = CAST(#{correctionCaseId} AS uuid)
+    </select>
+
+    <select id="findCaseIdBySourceDecision" resultType="string">
+        SELECT correction_case_id::text
+          FROM evd_correction_case
+         WHERE tenant_id = #{tenantId}
+           AND source_review_decision_id = CAST(#{reviewDecisionId} AS uuid)
+    </select>
+
+    <select id="listResubmissions" resultType="map">
+        SELECT correction_resubmission_id AS "correctionResubmissionId",
+               correction_case_id AS "correctionCaseId",
+               resubmission_ordinal AS "resubmissionOrdinal",
+               evidence_set_snapshot_id AS "evidenceSetSnapshotId",
+               snapshot_content_digest AS "snapshotContentDigest",
+               submitted_by AS "submittedBy", submitted_at AS "submittedAt"
+          FROM evd_correction_resubmission
+         WHERE tenant_id = #{tenantId}
+           AND correction_case_id = CAST(#{correctionCaseId} AS uuid)
+         ORDER BY resubmission_ordinal
+    </select>
+
+    <select id="maxResubmissionOrdinal" resultType="int">
+        SELECT COALESCE(MAX(resubmission_ordinal), 0)
+          FROM evd_correction_resubmission
+         WHERE tenant_id = #{tenantId}
+           AND correction_case_id = CAST(#{correctionCaseId} AS uuid)
+    </select>
+
+    <select id="findCommandResult" resultType="string">
+        SELECT result_id::text
+          FROM evd_correction_command_result
+         WHERE tenant_id = #{tenantId}
+           AND operation_type = #{operationType}
+           AND idempotency_key = #{idempotencyKey}
+    </select>
+
+    <insert id="saveCommandResult" parameterType="map">
+        INSERT INTO evd_correction_command_result (
+            tenant_id, operation_type, idempotency_key, result_id)
+        VALUES (#{tenantId}, #{operationType}, #{idempotencyKey}, CAST(#{resultId} AS uuid))
+    </insert>
+</mapper>

@@ -82,6 +82,27 @@ class ContractValidationTest {
     }
 
     @Test
+    void evidenceCorrectionCaseCreatedExampleMustMatchPublishedSchema() throws Exception {
+        assertValidEvent(
+                "/events/evidence-correction-case-created-v1.schema.json",
+                "/events/evidence-correction-case-created-v1.valid.json");
+    }
+
+    @Test
+    void evidenceCorrectionResubmittedExampleMustMatchPublishedSchema() throws Exception {
+        assertValidEvent(
+                "/events/evidence-correction-resubmitted-v1.schema.json",
+                "/events/evidence-correction-resubmitted-v1.valid.json");
+    }
+
+    @Test
+    void evidenceCorrectionClosedExampleMustMatchPublishedSchema() throws Exception {
+        assertValidEvent(
+                "/events/evidence-correction-closed-v1.schema.json",
+                "/events/evidence-correction-closed-v1.valid.json");
+    }
+
+    @Test
     void evidenceReviewCaseCreatedExampleMustMatchPublishedSchema() throws Exception {
         assertValidEvent(
                 "/events/evidence-review-case-created-v1.schema.json",

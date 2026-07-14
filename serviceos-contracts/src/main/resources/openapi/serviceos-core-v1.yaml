@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.19.0
+  version: 0.20.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -663,6 +663,79 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ReviewCase' }
         '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+
+  /correction-cases/{correctionCaseId}:
+    get:
+      operationId: getCorrectionCase
+      summary: 查询整改案例与补传轮次
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - name: correctionCaseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: CorrectionCase
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CorrectionCase' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /correction-cases/{correctionCaseId}:resubmit:
+    post:
+      operationId: resubmitCorrectionCase
+      summary: 追加整改补传 Snapshot 轮次
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: correctionCaseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResubmitCorrectionCaseRequest' }
+      responses:
+        '200':
+          description: 已补传的 CorrectionCase
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CorrectionCase' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /correction-cases/{correctionCaseId}:close:
+    post:
+      operationId: closeCorrectionCase
+      summary: 关闭已补传的 CorrectionCase（不等于审核通过）
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: correctionCaseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CloseCorrectionCaseRequest' }
+      responses:
+        '200':
+          description: 已关闭的 CorrectionCase
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CorrectionCase' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
@@ -1592,6 +1665,74 @@ components:
         note: { type: [string, 'null'], maxLength: 1000 }
         decidedBy: { type: string, minLength: 1, maxLength: 128 }
         decidedAt: { type: string, format: date-time }
+    ResubmitCorrectionCaseRequest:
+      type: object
+      additionalProperties: false
+      required: [evidenceSetSnapshotId]
+      properties:
+        evidenceSetSnapshotId: { type: string, format: uuid }
+    CloseCorrectionCaseRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        note: { type: string, maxLength: 1000 }
+    CorrectionResubmission:
+      type: object
+      additionalProperties: false
+      required:
+        - correctionResubmissionId
+        - correctionCaseId
+        - resubmissionOrdinal
+        - evidenceSetSnapshotId
+        - snapshotContentDigest
+        - submittedBy
+        - submittedAt
+      properties:
+        correctionResubmissionId: { type: string, format: uuid }
+        correctionCaseId: { type: string, format: uuid }
+        resubmissionOrdinal: { type: integer, minimum: 1 }
+        evidenceSetSnapshotId: { type: string, format: uuid }
+        snapshotContentDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
+        submittedBy: { type: string }
+        submittedAt: { type: string, format: date-time }
+    CorrectionCase:
+      type: object
+      additionalProperties: false
+      required:
+        - correctionCaseId
+        - projectId
+        - taskId
+        - sourceReviewCaseId
+        - sourceReviewDecisionId
+        - sourceEvidenceSetSnapshotId
+        - sourceSnapshotContentDigest
+        - reasonCodes
+        - status
+        - createdBy
+        - createdAt
+        - resubmissions
+      properties:
+        correctionCaseId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        sourceReviewCaseId: { type: string, format: uuid }
+        sourceReviewDecisionId: { type: string, format: uuid }
+        sourceEvidenceSetSnapshotId: { type: string, format: uuid }
+        sourceSnapshotContentDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
+        reasonCodes:
+          type: array
+          maxItems: 20
+          items: { type: string, minLength: 1, maxLength: 80 }
+        status: { type: string, enum: [OPEN, RESUBMITTED, CLOSED] }
+        createdBy: { type: string }
+        createdAt: { type: string, format: date-time }
+        latestResubmissionSnapshotId: { type: string, format: uuid, nullable: true }
+        closedBy: { type: string, nullable: true }
+        closedAt: { type: string, format: date-time, nullable: true }
+        resubmissions:
+          type: array
+          items: { $ref: '#/components/schemas/CorrectionResubmission' }
+
     ReviewCase:
       type: object
       additionalProperties: false

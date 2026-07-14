@@ -3,7 +3,7 @@
 - 状态：Accepted
 - 日期：2026-07-12
 - 接受日期：2026-07-14
-- 接受范围：M44 ReviewCase/ReviewDecision 最小运行时（不含 CorrectionCase/强制通过/重开）
+- 接受范围：M44 ReviewCase/ReviewDecision；M45 CorrectionCase 最小运行时（不含强制通过/重开/车企回执）
 
 ## 背景
 

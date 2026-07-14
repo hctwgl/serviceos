@@ -7,6 +7,9 @@ import com.serviceos.configuration.api.ConfigurationService;
 import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
 import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
 import com.serviceos.evidence.api.BeginEvidenceUploadCommand;
+import com.serviceos.evidence.api.CloseCorrectionCaseCommand;
+import com.serviceos.evidence.api.CorrectionCaseService;
+import com.serviceos.evidence.api.CorrectionCaseView;
 import com.serviceos.evidence.api.CreateEvidenceSetSnapshotCommand;
 import com.serviceos.evidence.api.CreateReviewCaseCommand;
 import com.serviceos.evidence.api.DecideReviewCaseCommand;
@@ -14,6 +17,7 @@ import com.serviceos.evidence.api.EvidenceCommandService;
 import com.serviceos.evidence.api.EvidenceSetSnapshotService;
 import com.serviceos.evidence.api.EvidenceSetSnapshotView;
 import com.serviceos.evidence.api.FinalizeEvidenceUploadCommand;
+import com.serviceos.evidence.api.ResubmitCorrectionCaseCommand;
 import com.serviceos.evidence.api.ReviewCaseService;
 import com.serviceos.evidence.api.ReviewCaseView;
 import com.serviceos.files.infrastructure.LocalObjectTransferService;
@@ -56,10 +60,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = ServiceOsApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE)
-class ReviewCasePostgresIT {
-    private static final String TENANT = "tenant-review-case-it";
-    private static final String TECHNICIAN = "technician-evidence-044";
-    private static final String REVIEWER = "reviewer-evidence-044";
+class CorrectionCasePostgresIT {
+    private static final String TENANT = "tenant-correction-case-it";
+    private static final String TECHNICIAN = "technician-evidence-045";
+    private static final String REVIEWER = "reviewer-evidence-045";
     private static final Path STORAGE_ROOT = temporaryStorageRoot();
 
     @Container
@@ -76,7 +80,7 @@ class ReviewCasePostgresIT {
         registry.add("spring.datasource.password", POSTGRES::getPassword);
         registry.add("serviceos.files.local.root", STORAGE_ROOT::toString);
         registry.add("serviceos.files.local.signing-key",
-                () -> "evidence-review-it-signing-key-with-thirty-two-bytes");
+                () -> "evidence-correction-it-signing-key-with-thirty-two-b");
         registry.add("serviceos.task.scheduling-enabled", () -> "false");
     }
 
@@ -84,6 +88,7 @@ class ReviewCasePostgresIT {
     @Autowired EvidenceCommandService evidence;
     @Autowired EvidenceSetSnapshotService snapshots;
     @Autowired ReviewCaseService reviews;
+    @Autowired CorrectionCaseService corrections;
     @Autowired LocalObjectTransferService transfers;
     @Autowired TaskExecutionWorker worker;
     @Autowired List<OutboxMessageHandler> handlers;
@@ -118,7 +123,7 @@ class ReviewCasePostgresIT {
                 INSERT INTO prj_project (
                     project_id, tenant_id, project_code, client_id, project_name,
                     starts_on, project_status, aggregate_version, created_at)
-                VALUES (:projectId, :tenantId, 'EVD-REV-IT', 'BYD', '资料审核测试项目',
+                VALUES (:projectId, :tenantId, 'EVD-COR-IT', 'BYD', '资料整改测试项目',
                     :startsOn, 'ACTIVE', 1, now())
                 """).param("projectId", projectId).param("tenantId", TENANT)
                 .param("startsOn", LocalDate.now().minusDays(1)).update();
@@ -128,97 +133,69 @@ class ReviewCasePostgresIT {
     }
 
     @Test
-    void createsApprovesAndReplaysWithoutDuplicateDecisions() throws Exception {
-        EvidenceSetSnapshotView snapshot = createSnapshot("approve");
+    void rejectOpensCorrectionThenResubmitAndClose() throws Exception {
+        EvidenceSetSnapshotView first = createSnapshot("first");
+        ReviewCaseView review = reviews.create(reviewer(), metadata("review-create"),
+                new CreateReviewCaseCommand(first.evidenceSetSnapshotId(), null));
+        ReviewCaseView rejected = reviews.decide(reviewer(), metadata("review-reject"),
+                new DecideReviewCaseCommand(review.reviewCaseId(), "REJECTED",
+                        List.of("IMAGE.BLUR"), "blurry"));
+        assertThat(rejected.status()).isEqualTo("REJECTED");
 
-        ReviewCaseView created = reviews.create(reviewer(), metadata("create-1"),
-                new CreateReviewCaseCommand(snapshot.evidenceSetSnapshotId(), null));
-        ReviewCaseView replay = reviews.create(reviewer(), metadata("create-1"),
-                new CreateReviewCaseCommand(snapshot.evidenceSetSnapshotId(), null));
-
-        assertThat(replay.reviewCaseId()).isEqualTo(created.reviewCaseId());
-        assertThat(created.status()).isEqualTo("OPEN");
-        assertThat(created.decisions()).isEmpty();
-        assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type='evidence.review-case-created'")
-                .query(Long.class).single()).isOne();
-        assertThat(jdbc.sql("SELECT count(*) FROM aud_audit_record WHERE action_name='REVIEW_CASE_CREATED'")
-                .query(Long.class).single()).isOne();
-
-        assertThatThrownBy(() -> reviews.create(reviewer(), metadata("create-dup"),
-                new CreateReviewCaseCommand(snapshot.evidenceSetSnapshotId(), null)))
-                .isInstanceOfSatisfying(BusinessProblem.class,
-                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.REVIEW_CASE_CONFLICT));
-
-        ReviewCaseView decided = reviews.decide(reviewer(), metadata("decide-approve"),
-                new DecideReviewCaseCommand(created.reviewCaseId(), "APPROVED", List.of(), "ok"));
-        ReviewCaseView decideReplay = reviews.decide(reviewer(), metadata("decide-approve"),
-                new DecideReviewCaseCommand(created.reviewCaseId(), "APPROVED", List.of(), "ok"));
-
-        assertThat(decideReplay.reviewCaseId()).isEqualTo(created.reviewCaseId());
-        assertThat(decided.status()).isEqualTo("APPROVED");
-        assertThat(decided.decidedAt()).isNotNull();
-        assertThat(decided.decisions()).hasSize(1);
-        assertThat(decided.decisions().getFirst().decision()).isEqualTo("APPROVED");
-        assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type='evidence.review-decided'")
-                .query(Long.class).single()).isOne();
-        assertThat(jdbc.sql("SELECT count(*) FROM aud_audit_record WHERE action_name='REVIEW_CASE_DECIDED'")
+        UUID correctionId = jdbc.sql("""
+                SELECT correction_case_id FROM evd_correction_case
+                 WHERE source_review_case_id = :review
+                """).param("review", review.reviewCaseId()).query(UUID.class).single();
+        CorrectionCaseView opened = corrections.get(reviewer(), "corr-get", correctionId);
+        assertThat(opened.status()).isEqualTo("OPEN");
+        assertThat(opened.reasonCodes()).containsExactly("IMAGE.BLUR");
+        assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type='evidence.correction-case-created'")
                 .query(Long.class).single()).isOne();
 
-        assertThatThrownBy(() -> reviews.decide(reviewer(), metadata("decide-again"),
-                new DecideReviewCaseCommand(created.reviewCaseId(), "REJECTED",
-                        List.of("MISSING_PHOTO"), "late")))
+        assertThatThrownBy(() -> corrections.close(reviewer(), metadata("close-too-early"),
+                new CloseCorrectionCaseCommand(correctionId, "early")))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code())
-                                .isEqualTo(ProblemCode.REVIEW_CASE_ALREADY_DECIDED));
-        assertThat(jdbc.sql("SELECT count(*) FROM evd_review_decision").query(Long.class).single()).isOne();
+                                .isEqualTo(ProblemCode.CORRECTION_CASE_STATE_CONFLICT));
+
+        EvidenceSetSnapshotView second = createSnapshot("second");
+        CorrectionCaseView resubmitted = corrections.resubmit(technician(), metadata("resubmit-1"),
+                new ResubmitCorrectionCaseCommand(correctionId, second.evidenceSetSnapshotId()));
+        CorrectionCaseView resubmitReplay = corrections.resubmit(technician(), metadata("resubmit-1"),
+                new ResubmitCorrectionCaseCommand(correctionId, second.evidenceSetSnapshotId()));
+        assertThat(resubmitReplay.correctionCaseId()).isEqualTo(correctionId);
+        assertThat(resubmitted.status()).isEqualTo("RESUBMITTED");
+        assertThat(resubmitted.resubmissions()).hasSize(1);
+        assertThat(resubmitted.latestResubmissionSnapshotId()).isEqualTo(second.evidenceSetSnapshotId());
+        assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type='evidence.correction-resubmitted'")
+                .query(Long.class).single()).isOne();
+
+        CorrectionCaseView closed = corrections.close(reviewer(), metadata("close-1"),
+                new CloseCorrectionCaseCommand(correctionId, "verified close"));
+        CorrectionCaseView closeReplay = corrections.close(reviewer(), metadata("close-1"),
+                new CloseCorrectionCaseCommand(correctionId, "verified close"));
+        assertThat(closeReplay.status()).isEqualTo("CLOSED");
+        assertThat(closed.status()).isEqualTo("CLOSED");
+        assertThat(closed.closedBy()).isEqualTo(REVIEWER);
+        assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type='evidence.correction-closed'")
+                .query(Long.class).single()).isOne();
+
+        assertThatThrownBy(() -> corrections.resubmit(technician(), metadata("resubmit-after-close"),
+                new ResubmitCorrectionCaseCommand(correctionId, second.evidenceSetSnapshotId())))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code())
+                                .isEqualTo(ProblemCode.CORRECTION_CASE_STATE_CONFLICT));
     }
 
     @Test
-    void rejectRequiresReasonCodesAndEnforcesProjectScope() throws Exception {
-        EvidenceSetSnapshotView snapshot = createSnapshot("reject");
-        ReviewCaseView created = reviews.create(reviewer(), metadata("create-reject"),
-                new CreateReviewCaseCommand(snapshot.evidenceSetSnapshotId(), "POLICY_A"));
-
-        assertThatThrownBy(() -> reviews.decide(reviewer(), metadata("reject-empty"),
-                new DecideReviewCaseCommand(created.reviewCaseId(), "REJECTED", List.of(), "no")))
-                .isInstanceOfSatisfying(BusinessProblem.class,
-                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
-
-        ReviewCaseView rejected = reviews.decide(reviewer(), metadata("reject-ok"),
-                new DecideReviewCaseCommand(
-                        created.reviewCaseId(), "REJECTED", List.of("MISSING_PHOTO", "BLURRY"), "fix"));
-        assertThat(rejected.status()).isEqualTo("REJECTED");
-        assertThat(rejected.decisions().getFirst().reasonCodes())
-                .containsExactly("MISSING_PHOTO", "BLURRY");
-
-        UUID otherProject = UUID.randomUUID();
-        jdbc.sql("""
-                INSERT INTO prj_project (
-                    project_id, tenant_id, project_code, client_id, project_name,
-                    starts_on, project_status, aggregate_version, created_at)
-                VALUES (:projectId, :tenantId, 'EVD-REV-OTHER', 'BYD', '其他项目',
-                    :startsOn, 'ACTIVE', 1, now())
-                """).param("projectId", otherProject).param("tenantId", TENANT)
-                .param("startsOn", LocalDate.now().minusDays(1)).update();
-        grantOnProject("reviewer-other", otherProject, false, "evidence.review", "evidence.read");
-
-        assertThatThrownBy(() -> reviews.get(
-                new CurrentPrincipal("reviewer-other", TENANT, CurrentPrincipal.PrincipalType.USER,
-                        "ops-web", Set.of()),
-                "corr-scope",
-                created.reviewCaseId()))
-                .isInstanceOfSatisfying(BusinessProblem.class,
-                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.ACCESS_DENIED));
-    }
-
-    @Test
-    void missingSnapshotIsRejectedWithoutCasePollution() {
-        assertThatThrownBy(() -> reviews.create(reviewer(), metadata("missing-snap"),
-                new CreateReviewCaseCommand(UUID.randomUUID(), null)))
-                .isInstanceOfSatisfying(BusinessProblem.class,
-                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.RESOURCE_NOT_FOUND));
-        assertThat(jdbc.sql("SELECT count(*) FROM evd_review_case").query(Long.class).single()).isZero();
-        assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type='evidence.review-case-created'")
+    void approveDoesNotCreateCorrectionCase() throws Exception {
+        EvidenceSetSnapshotView snapshot = createSnapshot("approve-only");
+        ReviewCaseView review = reviews.create(reviewer(), metadata("approve-create"),
+                new CreateReviewCaseCommand(snapshot.evidenceSetSnapshotId(), null));
+        reviews.decide(reviewer(), metadata("approve-decide"),
+                new DecideReviewCaseCommand(review.reviewCaseId(), "APPROVED", List.of(), "ok"));
+        assertThat(jdbc.sql("SELECT count(*) FROM evd_correction_case").query(Long.class).single()).isZero();
+        assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type='evidence.correction-case-created'")
                 .query(Long.class).single()).isZero();
     }
 
@@ -244,12 +221,7 @@ class ReviewCasePostgresIT {
         handlers.stream().filter(handler -> handler.supports("file.scan-completed", 1))
                 .forEach(handler -> handler.handle(latestScanCompletedEvent()));
         assertThat(worker.runOnce()).isEqualTo(TaskExecutionWorker.RunResult.SUCCEEDED);
-        UUID revisionId = item.revisions().getFirst().evidenceRevisionId();
-        assertThat(jdbc.sql("""
-                SELECT status FROM evd_evidence_revision
-                 WHERE evidence_revision_id=:id
-                """).param("id", revisionId).query(String.class).single()).isEqualTo("VALIDATED");
-        return revisionId;
+        return item.revisions().getFirst().evidenceRevisionId();
     }
 
     private void seedResolvedSlot() {
@@ -263,7 +235,7 @@ class ReviewCasePostgresIT {
                 definition.trim(), Sha256.digest(definition.trim()))).versionId();
         ConfigurationBundleReference bundle = configurations.publishBundle(
                 new PublishConfigurationBundleCommand(
-                        TENANT, projectId, "EVD-REV-BUNDLE", "1.0.0", "BYD", "HOME",
+                        TENANT, projectId, "EVD-COR-BUNDLE", "1.0.0", "BYD", "HOME",
                         null, Instant.now().minusSeconds(60), null, List.of(assetId)));
         taskId = UUID.randomUUID();
         jdbc.sql("""
@@ -276,7 +248,7 @@ class ReviewCasePostgresIT {
                     workflow_definition_digest, configuration_bundle_id, configuration_bundle_digest,
                     stage_code)
                 VALUES (:task, :tenant, 'SITE_SURVEY', 'HUMAN', :businessKey, :digest,
-                    100, 'RUNNING', now(), 0, 1, 'corr-evd-044', 3, now(), now(),
+                    100, 'RUNNING', now(), 0, 1, 'corr-evd-045', 3, now(), now(),
                     :actor, now(), now(), :project, :workOrder, :workflow, :stage,
                     :nodeInstance, 'SITE_SURVEY', :definitionId, :digest, :bundle, :bundleDigest,
                     'SURVEY')
@@ -292,7 +264,7 @@ class ReviewCasePostgresIT {
                     task_assignment_id, tenant_id, task_id, assignment_kind, principal_type,
                     principal_id, status, source_type, source_id, effective_from, created_by, created_at)
                 VALUES (:id, :tenant, :task, 'RESPONSIBLE', 'USER', :actor, 'ACTIVE',
-                    'MANUAL', 'M44-FIXTURE', now(), 'fixture', now())
+                    'MANUAL', 'M45-FIXTURE', now(), 'fixture', now())
                 """).param("id", UUID.randomUUID()).param("tenant", TENANT).param("task", taskId)
                 .param("actor", TECHNICIAN).update();
 
@@ -355,22 +327,12 @@ class ReviewCasePostgresIT {
     }
 
     private void grant(String principalId, String... capabilities) {
-        grantOnProject(principalId, projectId, capabilities);
-    }
-
-    private void grantOnProject(String principalId, UUID project, String... capabilities) {
-        grantOnProject(principalId, project, true, capabilities);
-    }
-
-    private void grantOnProject(
-            String principalId, UUID project, boolean includeTenantScope, String... capabilities
-    ) {
         UUID role = UUID.randomUUID();
         jdbc.sql("""
                 INSERT INTO auth_role (role_id, tenant_id, role_code, role_name, role_status, created_at)
-                VALUES (:role, :tenant, :code, '资料审核角色', 'ACTIVE', now())
+                VALUES (:role, :tenant, :code, '资料整改角色', 'ACTIVE', now())
                 """).param("role", role).param("tenant", TENANT)
-                .param("code", "review-role-" + role).update();
+                .param("code", "correction-role-" + role).update();
         for (String capability : capabilities) {
             jdbc.sql("INSERT INTO auth_role_capability (role_id, capability_code, granted_at) VALUES (:role,:cap,now())")
                     .param("role", role).param("cap", capability).update();
@@ -380,20 +342,18 @@ class ReviewCasePostgresIT {
                     grant_id, tenant_id, principal_id, role_id, scope_type, scope_ref,
                     valid_from, source_code, approval_ref, created_at)
                 VALUES (:grant, :tenant, :principal, :role, 'PROJECT', :project,
-                    now() - interval '1 day', 'TEST_FIXTURE', 'M44-REVIEW', now())
+                    now() - interval '1 day', 'TEST_FIXTURE', 'M45-CORRECTION', now())
                 """).param("grant", UUID.randomUUID()).param("tenant", TENANT)
                 .param("principal", principalId).param("role", role)
-                .param("project", project.toString()).update();
-        if (includeTenantScope) {
-            jdbc.sql("""
-                    INSERT INTO auth_role_grant (
-                        grant_id, tenant_id, principal_id, role_id, scope_type, scope_ref,
-                        valid_from, source_code, approval_ref, created_at)
-                    VALUES (:grant, :tenant, :principal, :role, 'TENANT', :tenant,
-                        now() - interval '1 day', 'TEST_FIXTURE', 'M44-REVIEW', now())
-                    """).param("grant", UUID.randomUUID()).param("tenant", TENANT)
-                    .param("principal", principalId).param("role", role).update();
-        }
+                .param("project", projectId.toString()).update();
+        jdbc.sql("""
+                INSERT INTO auth_role_grant (
+                    grant_id, tenant_id, principal_id, role_id, scope_type, scope_ref,
+                    valid_from, source_code, approval_ref, created_at)
+                VALUES (:grant, :tenant, :principal, :role, 'TENANT', :tenant,
+                    now() - interval '1 day', 'TEST_FIXTURE', 'M45-CORRECTION', now())
+                """).param("grant", UUID.randomUUID()).param("tenant", TENANT)
+                .param("principal", principalId).param("role", role).update();
     }
 
     private CurrentPrincipal technician() {
@@ -460,7 +420,7 @@ class ReviewCasePostgresIT {
 
     private static Path temporaryStorageRoot() {
         try {
-            return Files.createTempDirectory("serviceos-evidence-review-it");
+            return Files.createTempDirectory("serviceos-evidence-correction-it");
         } catch (Exception exception) {
             throw new IllegalStateException(exception);
         }
@@ -475,7 +435,6 @@ class ReviewCasePostgresIT {
                 try {
                     Files.deleteIfExists(path);
                 } catch (Exception ignored) {
-                    // best-effort cleanup between tests
                 }
             });
         }

@@ -139,3 +139,4 @@ Feature gate/authority: if applicable
 | M42 | 授权 VALIDATED→INVALIDATED、槽位投影刷新、历史 Snapshot 不可改写 | OpenAPI 0.17.0 + Evidence PostgreSQL/MVC/Event Contract + V042 | files 文件作废联动、Review/Correction、双引用完成 |
 | M43 | formRef 且非空 EvidenceSlot 的 HUMAN Task 仅接受精确 FormSubmission + TASK_SUBMISSION Snapshot 双引用，并在同一完成事务冻结 inputVersionRefs | OpenAPI 0.18.0 + HumanTask/Evidence/Form PostgreSQL IT + V043 | files 文件作废联动、Review/Correction、条件槽位重解析 |
 | M44 | ReviewCase 绑定 TASK_SUBMISSION Snapshot；只追加 APPROVED/REJECTED 决定 | OpenAPI 0.19.0 + Evidence PostgreSQL/MVC/Event Contract + V044 | CorrectionCase、强制通过、重开、车企回执 |
+| M45 | REJECTED 同事务创建 CorrectionCase；补传轮次只追加；RESUBMITTED→CLOSED | OpenAPI 0.20.0 + Evidence PostgreSQL/MVC/Event Contract + V045 | 整改 Task、IN_PROGRESS/WAIVED、强制通过、重开、车企回执 |
