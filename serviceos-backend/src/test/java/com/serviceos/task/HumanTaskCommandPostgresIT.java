@@ -195,7 +195,8 @@ class HumanTaskCommandPostgresIT {
 
     @Test
     void freezesFormReferenceInTaskAndExposesItThroughThePublicContext() {
-        UUID taskId = workflowHumanTask();
+        UUID taskId = tasks.createWorkflowTask(
+                workflowTaskCommand(UUID.randomUUID(), "survey.form")).taskId();
 
         assertThat(fulfillmentContexts.find(TENANT, taskId)).get().satisfies(context -> {
             assertThat(context.formRef()).isEqualTo("survey.form");
@@ -221,7 +222,7 @@ class HumanTaskCommandPostgresIT {
     }
 
     private UUID workflowHumanTask() {
-        UUID taskId = tasks.createWorkflowTask(workflowTaskCommand(UUID.randomUUID(), "survey.form")).taskId();
+        UUID taskId = tasks.createWorkflowTask(workflowTaskCommand(UUID.randomUUID(), null)).taskId();
         assignments.assignCandidates(
                 principal("actor-a"), metadata("assign-" + taskId),
                 new AssignTaskCandidatesCommand(

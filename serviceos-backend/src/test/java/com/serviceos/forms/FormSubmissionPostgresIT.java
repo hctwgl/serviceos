@@ -13,6 +13,8 @@ import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.shared.Sha256;
+import com.serviceos.task.api.CompleteHumanTaskCommand;
+import com.serviceos.task.api.HumanTaskCommandService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,7 +36,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** M34：真实 PostgreSQL 验证精确版本提交、不可变验证、幂等、授权和执行保护窗。 */
+/** M34/M35：真实 PostgreSQL 验证不可变提交及 Task 完成对权威提交的精确引用。 */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = ServiceOsApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE)
 class FormSubmissionPostgresIT {
@@ -57,6 +59,7 @@ class FormSubmissionPostgresIT {
 
     @Autowired ConfigurationService configurations;
     @Autowired FormSubmissionService submissions;
+    @Autowired HumanTaskCommandService humanTasks;
     @Autowired JdbcClient jdbc;
 
     UUID formVersionId;
@@ -87,7 +90,7 @@ class FormSubmissionPostgresIT {
         bundle = configurations.publishBundle(new PublishConfigurationBundleCommand(
                 TENANT, PROJECT, "FORM-SUBMIT-BUNDLE", "1.0.0", "BYD", "SURVEY",
                 null, Instant.now().minusSeconds(60), null, List.of(formVersionId)));
-        grant(TECHNICIAN, "form.submit", "form.read");
+        grant(TECHNICIAN, "form.submit", "form.read", "task.complete");
     }
 
     @Test
@@ -137,6 +140,60 @@ class FormSubmissionPostgresIT {
                         "FIELD_TYPE_INVALID", "FIELD_UNKNOWN");
         assertThat(valid.submissionVersion()).isEqualTo(2);
         assertThat(valid.validationStatus()).isEqualTo("VALIDATED");
+    }
+
+    @Test
+    void completesFormTaskOnlyWithExactValidatedSubmissionAndDigest() {
+        UUID taskId = runningTask(TECHNICIAN, "survey.execution", bundle, formVersionId);
+        var submission = submissions.submit(principal(), metadata("submit-for-completion"),
+                new SubmitFormCommand(taskId, formVersionId,
+                        "{\"survey.conclusion\":\"PASS\"}", null));
+
+        var completed = humanTasks.complete(principal(), metadata("complete-with-form"),
+                new CompleteHumanTaskCommand(taskId, 3,
+                        "form-submission://" + submission.submissionId(), submission.contentDigest()));
+
+        assertThat(completed.status()).isEqualTo("COMPLETED");
+        assertThat(jdbc.sql("SELECT result_ref FROM tsk_task WHERE task_id=:task")
+                .param("task", taskId).query(String.class).single())
+                .isEqualTo("form-submission://" + submission.submissionId());
+        assertThat(jdbc.sql("SELECT result_digest FROM tsk_task WHERE task_id=:task")
+                .param("task", taskId).query(String.class).single()).isEqualTo(submission.contentDigest());
+        assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type='task.completed'")
+                .query(Long.class).single()).isOne();
+    }
+
+    @Test
+    void rejectsInvalidWrongTaskAndDigestSubmissionWithoutCompletionPollution() {
+        UUID taskId = runningTask(TECHNICIAN, "survey.execution", bundle, formVersionId);
+        var invalid = submissions.submit(principal(), metadata("submit-invalid-completion"),
+                new SubmitFormCommand(taskId, formVersionId, "{}", null));
+        assertProblem(ProblemCode.FORM_SUBMISSION_NOT_VALIDATED, () -> humanTasks.complete(
+                principal(), metadata("complete-invalid"), new CompleteHumanTaskCommand(
+                        taskId, 3, "form-submission://" + invalid.submissionId(), invalid.contentDigest())));
+
+        var valid = submissions.submit(principal(), metadata("submit-valid-completion"),
+                new SubmitFormCommand(taskId, formVersionId,
+                        "{\"survey.conclusion\":\"PASS\"}", null));
+        assertProblem(ProblemCode.FORM_SUBMISSION_NOT_VALIDATED, () -> humanTasks.complete(
+                principal(), metadata("complete-wrong-digest"), new CompleteHumanTaskCommand(
+                        taskId, 3, "form-submission://" + valid.submissionId(), "0".repeat(64))));
+
+        UUID otherTaskId = runningTask(TECHNICIAN, "survey.execution", bundle, formVersionId);
+        var otherSubmission = submissions.submit(principal(), metadata("submit-other-task"),
+                new SubmitFormCommand(otherTaskId, formVersionId,
+                        "{\"survey.conclusion\":\"PASS\"}", null));
+        assertProblem(ProblemCode.FORM_SUBMISSION_NOT_VALIDATED, () -> humanTasks.complete(
+                principal(), metadata("complete-wrong-task"), new CompleteHumanTaskCommand(
+                        taskId, 3, "form-submission://" + otherSubmission.submissionId(),
+                        otherSubmission.contentDigest())));
+
+        assertThat(jdbc.sql("SELECT count(*) FROM tsk_task WHERE status='COMPLETED'")
+                .query(Long.class).single()).isZero();
+        assertThat(jdbc.sql("SELECT count(*) FROM rel_idempotency_record WHERE operation_type='task.human.complete'")
+                .query(Long.class).single()).isZero();
+        assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type='task.completed'")
+                .query(Long.class).single()).isZero();
     }
 
     @Test
@@ -237,6 +294,14 @@ class FormSubmissionPostgresIT {
                     'MANUAL', 'M34-FIXTURE', now(), 'fixture', now())
                 """).param("id", UUID.randomUUID()).param("tenant", TENANT).param("task", taskId)
                 .param("responsible", responsible).update();
+        jdbc.sql("""
+                INSERT INTO tsk_task_assignment (
+                    task_assignment_id, tenant_id, task_id, assignment_kind, principal_type,
+                    principal_id, status, source_type, source_id, effective_from, created_by, created_at)
+                VALUES (:id, :tenant, :task, 'CANDIDATE', 'USER', :responsible, 'ACTIVE',
+                    'MANUAL', 'M35-COMPLETION-FIXTURE', now(), 'fixture', now())
+                """).param("id", UUID.randomUUID()).param("tenant", TENANT).param("task", taskId)
+                .param("responsible", responsible).update();
         return taskId;
     }
 
@@ -258,6 +323,14 @@ class FormSubmissionPostgresIT {
                     now() - interval '1 day', 'TEST_FIXTURE', 'M34-FORM-SUBMIT', now())
                 """).param("grant", UUID.randomUUID()).param("tenant", TENANT).param("principal", principalId)
                 .param("role", role).param("project", PROJECT.toString()).update();
+        jdbc.sql("""
+                INSERT INTO auth_role_grant (
+                    grant_id, tenant_id, principal_id, role_id, scope_type, scope_ref,
+                    valid_from, source_code, approval_ref, created_at)
+                VALUES (:grant, :tenant, :principal, :role, 'TENANT', :tenant,
+                    now() - interval '1 day', 'TEST_FIXTURE', 'M35-FORM-COMPLETE', now())
+                """).param("grant", UUID.randomUUID()).param("tenant", TENANT).param("principal", principalId)
+                .param("role", role).update();
     }
 
     private CurrentPrincipal principal() {

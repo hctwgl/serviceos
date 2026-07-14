@@ -128,4 +128,5 @@ Feature gate/authority: if applicable
 | M31 | 联系尝试追加历史、首次联系 SLA 事实、预约取消/爽约终态、终态修订与可靠通知 | MVC Security + OpenAPI/Event Contract + Appointment PostgreSQL IT + V031 | 上门签到、Visit 现场执行、离线同步、下游取消/爽约任务策略 |
 | M32 | Visit 签到/签退/中断、围栏 WARN/BLOCK、captured/received 双时间、重复上门序号、改派后离线撤权 | MVC Security + OpenAPI/Event Contract + Visit PostgreSQL IT + V032 | FieldOperation 结构化结果、表单/资料完整性、离线工作包有效期与人工合并 |
 | M33-FOUNDATION | FORM 发布门禁、多表单 Bundle、Task `formRef`/Bundle 冻结及授权只读解析 | OpenAPI 0.9.0 + Configuration/Workflow/Task PostgreSQL IT + V033～V035 | SERVICEOS_EXPR_V1、草稿、预填冲突和 M3 FORM-001～005 |
-| M34 | 精确 FormVersion 不可变提交、固定 required/基础类型验证、责任/guard 门禁、幂等审计事件闭环 | OpenAPI 0.10.0 + FormSubmission PostgreSQL/MVC/Event Contract + V036 | ADR-018 表达式/validator、草稿、预填冲突、更正审核、Task 完成引用和完整 FORM-001～005 |
+| M34 | 精确 FormVersion 不可变提交、固定 required/基础类型验证、责任/guard 门禁、幂等审计事件闭环 | OpenAPI 0.10.0 + FormSubmission PostgreSQL/MVC/Event Contract + V036 | ADR-018 表达式/validator、草稿、预填冲突、更正审核和完整 FORM-001～005 |
+| M35 | 表单 Task 完成仅接受同 Task/Project/冻结 FormVersion 的 VALIDATED submission 与 contentDigest | OpenAPI 0.11.0 + FormSubmission/HumanTask PostgreSQL IT + Modulith | EvidenceSet/审核完成条件、整改 supersede、领域映射和完整 FORM-001～005 |

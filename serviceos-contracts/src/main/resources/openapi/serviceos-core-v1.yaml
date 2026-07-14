@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.10.0
+  version: 0.11.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -110,6 +110,9 @@ paths:
     post:
       operationId: completeHumanTask
       summary: 当前执行人完成人工工作流任务
+      description: >-
+        formRef 非空的表单 Task 必须引用 form-submission://{submissionId}，且 resultDigest
+        精确匹配同 Task、Project、冻结 FormVersion 的 VALIDATED submission contentDigest。
       parameters:
         - $ref: '#/components/parameters/TaskId'
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -758,8 +761,15 @@ components:
       additionalProperties: false
       required: [resultRef, resultDigest]
       properties:
-        resultRef: { type: string, minLength: 1, maxLength: 500 }
-        resultDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
+        resultRef:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: 表单 Task 使用 form-submission://{submissionId}；非表单 Task 使用所属领域稳定引用
+        resultDigest:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+          description: 表单 Task 必须等于 FormSubmission contentDigest
     AssignTaskCandidatesRequest:
       type: object
       additionalProperties: false

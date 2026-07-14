@@ -46,10 +46,10 @@ V036 创建：
 
 ## 4. 尚未关闭的 M3 范围
 
-M34 仍不宣称 M3 FORM-001～FORM-005 完成。后续至少需要：
+M34 仍不宣称 M3 FORM-001～FORM-005 完成。Task 完成引用门禁已由
+[M35 表单任务完成引用门禁](48-form-task-completion-gate.md)补齐；后续至少需要：
 
 - ADR-018 获批后的共享表达式规范、静态类型、样本回放和资源限制；
 - FormDraft、prefillSnapshot 与离线冲突；
 - supersede/整改链和审核引用；
-- Task 完成时只接受精确 `VALIDATED` submission；
 - 受控领域映射与 FulfillmentFact 提取。

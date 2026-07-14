@@ -19,6 +19,7 @@ import com.serviceos.task.api.ClaimHumanTaskCommand;
 import com.serviceos.task.api.CompleteHumanTaskCommand;
 import com.serviceos.task.api.HumanTaskCommandReceipt;
 import com.serviceos.task.api.HumanTaskCommandService;
+import com.serviceos.task.api.HumanTaskCompletionValidator;
 import com.serviceos.task.api.ReleaseHumanTaskCommand;
 import com.serviceos.task.api.StartHumanTaskCommand;
 import com.serviceos.task.api.TaskClaimedPayload;
@@ -33,6 +34,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timestamptz;
@@ -55,6 +57,7 @@ final class DefaultHumanTaskCommandService implements HumanTaskCommandService {
     private final IdempotencyService idempotency;
     private final AuditAppender audit;
     private final OutboxAppender outbox;
+    private final List<HumanTaskCompletionValidator> completionValidators;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
@@ -64,6 +67,7 @@ final class DefaultHumanTaskCommandService implements HumanTaskCommandService {
             IdempotencyService idempotency,
             AuditAppender audit,
             OutboxAppender outbox,
+            List<HumanTaskCompletionValidator> completionValidators,
             ObjectMapper objectMapper,
             Clock clock
     ) {
@@ -72,6 +76,7 @@ final class DefaultHumanTaskCommandService implements HumanTaskCommandService {
         this.idempotency = idempotency;
         this.audit = audit;
         this.outbox = outbox;
+        this.completionValidators = List.copyOf(completionValidators);
         this.objectMapper = objectMapper;
         this.clock = clock;
     }
@@ -137,6 +142,9 @@ final class DefaultHumanTaskCommandService implements HumanTaskCommandService {
         IdempotencyDecision decision = idempotency.begin(context, operation, requestDigest);
         if (decision.kind() == IdempotencyDecision.Kind.REPLAY) {
             return frozenReceipt(context, operation);
+        }
+        if (completion != null) {
+            completionValidators.forEach(validator -> validator.validate(principal, completion));
         }
 
         Instant occurredAt = clock.instant();

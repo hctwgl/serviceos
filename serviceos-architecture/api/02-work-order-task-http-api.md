@@ -127,6 +127,12 @@ CorrectWorkOrderData 仅更正由 workorder 拥有的基础字段，按 fieldCod
 }
 ```
 
+当前已实现的 OpenAPI 核心切片仍使用字符串 `resultRef + resultDigest`。对于 `formRef` 非空的
+表单 Task，M35 规定 `resultRef=form-submission://{submissionId}`，`resultDigest` 必须等于该
+`VALIDATED` submission 的 `contentDigest`；服务端同时复核 tenant、Task、Project、formKey 和
+冻结 FormVersion。上述结构化 `inputVersionRefs` 是 EvidenceSet 等完成条件接入后的目标契约，
+不得在客户端先行假设已经实现。
+
 ## 5. 查询 API
 
 | 方法与路径 | 用途 |
