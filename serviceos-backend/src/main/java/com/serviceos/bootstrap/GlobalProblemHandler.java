@@ -25,7 +25,8 @@ final class GlobalProblemHandler {
             case UNAUTHENTICATED -> HttpStatus.UNAUTHORIZED;
             case ACCESS_DENIED -> HttpStatus.FORBIDDEN;
             case IDEMPOTENCY_KEY_REUSED, IDEMPOTENCY_IN_PROGRESS,
-                 FILE_UPLOAD_CONFLICT, FILE_FINALIZE_IN_PROGRESS -> HttpStatus.CONFLICT;
+                 FILE_UPLOAD_CONFLICT, FILE_FINALIZE_IN_PROGRESS,
+                 TASK_STATE_CONFLICT, VERSION_CONFLICT -> HttpStatus.CONFLICT;
             case FILE_UPLOAD_EXPIRED -> HttpStatus.GONE;
             case FILE_NOT_AVAILABLE -> HttpStatus.LOCKED;
             case RESOURCE_NOT_FOUND -> HttpStatus.NOT_FOUND;

@@ -27,13 +27,16 @@ class GeneratedClientContractTest {
 
         JsonNode packageNode = objectMapper.readTree(packageJson.toFile());
         assertThat(packageNode.path("name").asText()).isEqualTo("@serviceos/core-client");
-        assertThat(packageNode.path("version").asText()).isEqualTo("0.2.0");
+        assertThat(packageNode.path("version").asText()).isEqualTo("0.3.0");
 
         String apiSource = Files.readString(defaultApi);
         assertThat(apiSource)
                 .contains("authorizeFileDownload")
                 .contains("beginFileUpload")
+                .contains("claimHumanTask")
+                .contains("completeHumanTask")
                 .contains("createProject")
-                .contains("finalizeFileUpload");
+                .contains("finalizeFileUpload")
+                .contains("startHumanTask");
     }
 }

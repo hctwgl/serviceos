@@ -13,11 +13,17 @@ import com.serviceos.shared.Sha256;
 import com.serviceos.task.application.TaskExecutionQueue;
 import com.serviceos.task.application.TaskExecutionWorker;
 import com.serviceos.task.application.TaskHandlerRegistry;
+import com.serviceos.task.api.ClaimHumanTaskCommand;
+import com.serviceos.task.api.CompleteHumanTaskCommand;
+import com.serviceos.task.api.HumanTaskCommandService;
+import com.serviceos.task.api.StartHumanTaskCommand;
 import com.serviceos.task.spi.AutomatedTaskHandler;
 import com.serviceos.task.spi.TaskExecutionContext;
 import com.serviceos.task.spi.TaskExecutionResult;
 import com.serviceos.workorder.api.ReceiveExternalWorkOrderCommand;
 import com.serviceos.workorder.api.WorkOrderCommandService;
+import com.serviceos.identity.api.CurrentPrincipal;
+import com.serviceos.shared.CommandMetadata;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -62,6 +68,7 @@ class WorkflowLinearProgressionPostgresIT {
     }
 
     @Autowired WorkOrderCommandService workOrders;
+    @Autowired HumanTaskCommandService humanTasks;
     @Autowired ConfigurationService configurations;
     @Autowired TaskExecutionQueue taskQueue;
     @Autowired OutboxWorker outboxWorker;
@@ -75,8 +82,10 @@ class WorkflowLinearProgressionPostgresIT {
                     tsk_task_execution_attempt, tsk_task, wfl_node_instance,
                     wfl_stage_instance, wfl_workflow_instance, wo_work_order,
                     cfg_configuration_bundle_item, cfg_configuration_bundle,
-                    cfg_configuration_asset_version, prj_project CASCADE
+                    cfg_configuration_asset_version, prj_project,
+                    auth_role_field_policy, auth_role_grant, auth_role_capability, auth_role CASCADE
                 """).update();
+        seedHumanTaskGrant();
     }
 
     @Test
@@ -199,6 +208,47 @@ class WorkflowLinearProgressionPostgresIT {
                 """).query(Long.class).single()).isZero();
     }
 
+    @Test
+    void humanTaskClaimStartCompleteDrivesTheSameReliableEndProgression() {
+        Scope scope = scope(humanEndWorkflow());
+        workOrders.receive(command(scope));
+        assertThat(outboxWorker.runOnce()).isEqualTo(OutboxWorker.RunResult.PUBLISHED);
+        drainOutbox();
+        UUID taskId = jdbc.sql("SELECT task_id FROM tsk_task")
+                .query(UUID.class).single();
+
+        CurrentPrincipal actor = new CurrentPrincipal(
+                "human-actor", TENANT, CurrentPrincipal.PrincipalType.USER, "m20-workflow-it",
+                java.util.Set.of("task.claim", "task.start", "task.complete"));
+        humanTasks.claim(actor, new CommandMetadata("corr-human-claim", "idem-human-claim"),
+                new ClaimHumanTaskCommand(taskId, 1));
+        humanTasks.start(actor, new CommandMetadata("corr-human-start", "idem-human-start"),
+                new StartHumanTaskCommand(taskId, 2));
+        humanTasks.complete(actor, new CommandMetadata("corr-human-complete", "idem-human-complete"),
+                new CompleteHumanTaskCommand(taskId, 3, "survey://submission/1", "f".repeat(64)));
+        publishUntil("task.completed");
+
+        assertThat(jdbc.sql("SELECT status FROM tsk_task")
+                .query(String.class).single()).isEqualTo("COMPLETED");
+        assertThat(jdbc.sql("SELECT status FROM wfl_node_instance")
+                .query(String.class).single()).isEqualTo("COMPLETED");
+        assertThat(jdbc.sql("SELECT status FROM wfl_stage_instance")
+                .query(String.class).single()).isEqualTo("COMPLETED");
+        assertThat(jdbc.sql("SELECT status FROM wfl_workflow_instance")
+                .query(String.class).single()).isEqualTo("COMPLETED");
+        assertThat(jdbc.sql("SELECT status FROM wo_work_order")
+                .query(String.class).single()).isEqualTo("FULFILLED");
+        assertThat(jdbc.sql("""
+                SELECT event_type FROM rel_outbox_event
+                 WHERE event_type IN ('task.claimed', 'task.started', 'task.completed',
+                                      'workflow.completed', 'workorder.fulfilled')
+                 ORDER BY created_at, event_type
+                """).query(String.class).list())
+                .containsExactlyInAnyOrder(
+                        "task.claimed", "task.started", "task.completed",
+                        "workflow.completed", "workorder.fulfilled");
+    }
+
     private TaskExecutionWorker taskWorker() {
         AutomatedTaskHandler handler = new AutomatedTaskHandler() {
             @Override
@@ -232,7 +282,16 @@ class WorkflowLinearProgressionPostgresIT {
             if ("PUBLISHED".equals(status)) {
                 return;
             }
-            assertThat(outboxWorker.runOnce()).isNotEqualTo(OutboxWorker.RunResult.EMPTY);
+            OutboxWorker.RunResult result = outboxWorker.runOnce();
+            if (result == OutboxWorker.RunResult.EMPTY) {
+                String diagnostic = jdbc.sql("""
+                                SELECT status || ':' || COALESCE(last_error_code, 'none')
+                                  FROM rel_outbox_event
+                                 WHERE event_type = :eventType
+                                """)
+                        .param("eventType", eventType).query(String.class).single();
+                throw new AssertionError(eventType + " cannot be published: " + diagnostic);
+            }
         }
         throw new AssertionError(eventType + " was not published");
     }
@@ -335,6 +394,44 @@ class WorkflowLinearProgressionPostgresIT {
                    {"transitionId":"t1","from":"START","to":"ASSIGN_COORDINATORS"},
                    {"transitionId":"t2","from":"ASSIGN_COORDINATORS","to":"END"}]}
                 """;
+    }
+
+    private static String humanEndWorkflow() {
+        return """
+                {"workflowKey":"byd.human-survey","semanticVersion":"1.0.0","startNodeId":"START",
+                 "nodes":[
+                   {"nodeId":"START","nodeType":"START","name":"开始"},
+                   {"nodeId":"SITE_SURVEY","nodeType":"USER_TASK","name":"现场勘测",
+                    "stageCode":"SURVEY","taskType":"SITE_SURVEY"},
+                   {"nodeId":"END","nodeType":"END","name":"结束"}],
+                 "transitions":[
+                   {"transitionId":"t1","from":"START","to":"SITE_SURVEY"},
+                   {"transitionId":"t2","from":"SITE_SURVEY","to":"END"}]}
+                """;
+    }
+
+    private void seedHumanTaskGrant() {
+        UUID roleId = UUID.randomUUID();
+        jdbc.sql("""
+                INSERT INTO auth_role (role_id, tenant_id, role_code, role_name, role_status, created_at)
+                VALUES (:roleId, :tenantId, 'workflow-human-worker', '流程人工执行人', 'ACTIVE', now())
+                """).param("roleId", roleId).param("tenantId", TENANT).update();
+        for (String capability : java.util.Set.of("task.claim", "task.start", "task.complete")) {
+            jdbc.sql("""
+                    INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
+                    VALUES (:roleId, :capability, now())
+                    """).param("roleId", roleId).param("capability", capability).update();
+        }
+        jdbc.sql("""
+                INSERT INTO auth_role_grant (
+                    grant_id, tenant_id, principal_id, role_id, scope_type, scope_ref,
+                    valid_from, source_code, approval_ref, created_at
+                ) VALUES (
+                    :grantId, :tenantId, 'human-actor', :roleId, 'TENANT', :tenantId,
+                    now() - interval '1 day', 'TEST_FIXTURE', 'M20-WORKFLOW-IT', now()
+                )
+                """).param("grantId", UUID.randomUUID()).param("tenantId", TENANT)
+                .param("roleId", roleId).update();
     }
 
     private record Scope(UUID projectId, ConfigurationBundleReference bundle) {

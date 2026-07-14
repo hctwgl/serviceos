@@ -163,7 +163,7 @@ class AuthorizationPolicyPostgresIT {
         assertThat(decision.fields().get("settlementAmount").permission())
                 .isEqualTo(FieldPermission.HIDDEN);
         assertThat(decision.matchedGrantIds()).hasSize(2);
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("019");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("020");
     }
 
     private UUID seedRoleGrant(String roleCode, String principalId, String scopeType, String scopeRef) {

@@ -85,7 +85,7 @@ class FileLifecyclePostgresIT {
         jdbc.sql("""
                         TRUNCATE TABLE
                             fil_download_authorization, fil_scan_result, fil_stored_file, fil_upload_session,
-                            tsk_task_execution_attempt, tsk_task,
+                            tsk_human_task_command_result, tsk_task_execution_attempt, tsk_task,
                             aud_audit_record, rel_outbox_publish_attempt, rel_outbox_event,
                             rel_idempotency_record,
                             auth_role_field_policy, auth_role_grant,
@@ -221,7 +221,7 @@ class FileLifecyclePostgresIT {
 
     @Test
     void migrationIsRepeatableNoOpAtCurrentVersion() {
-        assertThat(flyway.info().applied()).hasSize(21);
+        assertThat(flyway.info().applied()).hasSize(22);
         assertThat(flyway.migrate().migrationsExecuted).isZero();
     }
 

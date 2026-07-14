@@ -20,3 +20,4 @@
 - [M17 工作流可靠启动验收矩阵](14-m17-workflow-bootstrap-acceptance.md)
 - [M18 TaskCompleted 与工作流线性推进验收矩阵](15-m18-workflow-linear-progression-acceptance.md)
 - [M19 跨阶段、END 与工单履约完成验收矩阵](16-m19-workflow-stage-completion-acceptance.md)
+- [M20 人工工作流 Task 命令验收矩阵](17-m20-human-task-command-acceptance.md)

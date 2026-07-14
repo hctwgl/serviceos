@@ -291,7 +291,9 @@ final class WorkflowTaskCompletedHandler implements OutboxMessageHandler {
                                workflow.version AS workflow_version,
                                workflow.workflow_definition_version_id,
                                workflow.definition_digest AS workflow_definition_digest,
-                               task.task_type, task.status AS task_status,
+                               task.task_type, task.task_kind, task.status AS task_status,
+                               task.result_ref AS task_result_ref,
+                               task.result_digest AS task_result_digest,
                                task.workflow_definition_version_id AS task_definition_version_id,
                                task.workflow_definition_digest AS task_definition_digest
                           FROM wfl_node_instance node
@@ -316,10 +318,15 @@ final class WorkflowTaskCompletedHandler implements OutboxMessageHandler {
     }
 
     private static void validateFrozenContext(TaskCompletedPayload completed, NodeRuntime current) {
+        boolean taskCompleted = switch (current.taskKind()) {
+            case "AUTOMATED" -> "SUCCEEDED".equals(current.taskStatus());
+            case "HUMAN" -> "COMPLETED".equals(current.taskStatus());
+            default -> false;
+        };
         if (!"ACTIVE".equals(current.nodeStatus())
                 || !"ACTIVE".equals(current.stageStatus())
                 || !"ACTIVE".equals(current.workflowStatus())
-                || !"SUCCEEDED".equals(current.taskStatus())) {
+                || !taskCompleted) {
             throw new IllegalStateException("TaskCompleted does not reference an active completed workflow task");
         }
         if (!completed.taskId().equals(current.taskId())
@@ -336,10 +343,19 @@ final class WorkflowTaskCompletedHandler implements OutboxMessageHandler {
                 || !current.taskDefinitionDigest().equals(current.workflowDefinitionDigest())) {
             throw new IllegalArgumentException("TaskCompleted context does not match frozen workflow runtime");
         }
-        String expectedResultDigest = Sha256.digest(
-                completed.resultRef() == null ? "" : completed.resultRef());
-        if (!expectedResultDigest.equals(completed.resultDigest())) {
-            throw new IllegalArgumentException("TaskCompleted result digest does not match resultRef");
+        if ("HUMAN".equals(current.taskKind())) {
+            // 人工任务的摘要属于外部表单/业务结果内容，不能错误地当作 resultRef 字符串的摘要。
+            // 命令事务已经把引用和摘要冻结到 Task，此处必须与持久化事实逐字段一致。
+            if (!Objects.equals(completed.resultRef(), current.taskResultRef())
+                    || !Objects.equals(completed.resultDigest(), current.taskResultDigest())) {
+                throw new IllegalArgumentException("TaskCompleted result does not match frozen human task result");
+            }
+        } else {
+            String expectedResultDigest = Sha256.digest(
+                    completed.resultRef() == null ? "" : completed.resultRef());
+            if (!expectedResultDigest.equals(completed.resultDigest())) {
+                throw new IllegalArgumentException("TaskCompleted result digest does not match resultRef");
+            }
         }
     }
 
@@ -382,7 +398,10 @@ final class WorkflowTaskCompletedHandler implements OutboxMessageHandler {
             UUID workflowDefinitionVersionId,
             String workflowDefinitionDigest,
             String taskType,
+            String taskKind,
             String taskStatus,
+            String taskResultRef,
+            String taskResultDigest,
             UUID taskDefinitionVersionId,
             String taskDefinitionDigest
     ) {

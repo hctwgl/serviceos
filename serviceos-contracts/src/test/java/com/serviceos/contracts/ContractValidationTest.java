@@ -30,7 +30,8 @@ class ContractValidationTest {
         assertThat(result.getMessages()).as("OpenAPI parser messages").isEmpty();
         assertThat(result.getOpenAPI()).isNotNull();
         assertThat(result.getOpenAPI().getPaths())
-                .containsKeys("/projects", "/files/upload-sessions");
+                .containsKeys("/projects", "/files/upload-sessions",
+                        "/tasks/{taskId}:claim", "/tasks/{taskId}:start", "/tasks/{taskId}:complete");
     }
 
     @Test
