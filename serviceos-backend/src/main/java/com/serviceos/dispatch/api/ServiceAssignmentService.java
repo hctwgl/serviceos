@@ -25,6 +25,11 @@ public interface ServiceAssignmentService {
             CommandMetadata metadata,
             AbortServiceAssignmentActivationCommand command);
 
+    ServiceAssignmentReceipt completeAbort(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            CompleteServiceAssignmentAbortCommand command);
+
     ServiceAssignmentReceipt complete(
             CurrentPrincipal principal,
             CommandMetadata metadata,

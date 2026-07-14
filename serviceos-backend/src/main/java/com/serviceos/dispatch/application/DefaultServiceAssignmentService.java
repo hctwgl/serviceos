@@ -8,6 +8,7 @@ import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.dispatch.api.AbortServiceAssignmentActivationCommand;
 import com.serviceos.dispatch.api.ActivateServiceAssignmentCommand;
 import com.serviceos.dispatch.api.CompleteServiceAssignmentActivationCommand;
+import com.serviceos.dispatch.api.CompleteServiceAssignmentAbortCommand;
 import com.serviceos.dispatch.api.ConfirmTaskAssignmentPreparedCommand;
 import com.serviceos.dispatch.api.PrepareServiceAssignmentCommand;
 import com.serviceos.dispatch.api.ServiceAssignmentChangedPayload;
@@ -48,6 +49,7 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
     private static final String CONFIRM_TASK = "dispatch.assignment.confirm-task-prepared";
     private static final String ACTIVATE = "dispatch.assignment.activate";
     private static final String ABORT = "dispatch.assignment.abort";
+    private static final String COMPLETE_ABORT = "dispatch.assignment.complete-abort";
     private static final String COMPLETE = "dispatch.assignment.complete";
     private static final String CAPABILITY = "dispatch.assignment.manage";
 
@@ -339,16 +341,27 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
         }
 
         Instant now = clock.instant();
+        boolean requiresTaskAck = state.protocolVersion() == 2
+                && state.preparedTaskAssignmentId() != null;
         int sagaUpdated = jdbc.sql("""
                         UPDATE dsp_service_assignment_activation_saga
-                           SET stage = 'ABORTED', version = version + 1,
-                               last_error_code = :reasonCode, updated_at = :now
+                           SET stage = CASE
+                                   WHEN :requiresTaskAck THEN 'ABORTING'
+                                   ELSE 'ABORTED'
+                               END,
+                               version = version + 1,
+                               last_error_code = :reasonCode, updated_at = :now,
+                               completed_at = CASE
+                                   WHEN :requiresTaskAck THEN NULL
+                                   ELSE :now
+                               END
                          WHERE tenant_id = :tenantId AND activation_saga_id = :sagaId
                            AND new_service_assignment_id = :assignmentId
                            AND stage IN ('PENDING', 'TASK_PREPARED')
                            AND version = :expectedVersion
                         """)
                 .param("reasonCode", command.reasonCode()).param("now", timestamptz(now))
+                .param("requiresTaskAck", requiresTaskAck)
                 .param("tenantId", context.tenantId()).param("sagaId", command.sagaId())
                 .param("assignmentId", command.serviceAssignmentId())
                 .param("expectedVersion", command.expectedSagaVersion()).update();
@@ -373,12 +386,59 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
         }
         releaseReservationAndCapacity(context, state, command.reasonCode(), now);
 
+        String nextStage = requiresTaskAck ? "ABORTING" : "ABORTED";
+        ServiceAssignmentReceipt receipt = new ServiceAssignmentReceipt(
+                state.serviceAssignmentId(), command.sagaId(), state.taskId(),
+                state.capacityReservationId(), "FAILED_ACTIVATION", nextStage,
+                command.expectedSagaVersion() + 1, now);
+        finish(context, authorizationDecision, ABORT, "SERVICE_ASSIGNMENT_ABORT",
+                digest, receipt, "service.assignment.activation-aborted", command.reasonCode());
+        return receipt;
+    }
+
+    @Override
+    @Transactional
+    public ServiceAssignmentReceipt completeAbort(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            CompleteServiceAssignmentAbortCommand command
+    ) {
+        CommandContext context = context(principal, metadata);
+        AssignmentState state = assignment(context.tenantId(), command.serviceAssignmentId());
+        String digest = Sha256.digest(command.sagaId() + "|" + command.serviceAssignmentId()
+                + "|" + command.preparedTaskAssignmentId() + "|" + command.expectedSagaVersion());
+        AuthorizationDecision authorizationDecision = authorize(principal, context, state.taskId());
+        IdempotencyDecision decision = idempotency.begin(context, COMPLETE_ABORT, digest);
+        if (decision.kind() == IdempotencyDecision.Kind.REPLAY) {
+            return frozenReceipt(context, COMPLETE_ABORT);
+        }
+
+        Instant now = clock.instant();
+        int sagaUpdated = jdbc.sql("""
+                        UPDATE dsp_service_assignment_activation_saga
+                           SET stage = 'ABORTED', version = version + 1,
+                               updated_at = :now, completed_at = :now
+                         WHERE tenant_id = :tenantId AND activation_saga_id = :sagaId
+                           AND new_service_assignment_id = :assignmentId
+                           AND prepared_task_assignment_id = :preparedId
+                           AND stage = 'ABORTING' AND version = :expectedVersion
+                        """)
+                .param("now", timestamptz(now)).param("tenantId", context.tenantId())
+                .param("sagaId", command.sagaId()).param("assignmentId", command.serviceAssignmentId())
+                .param("preparedId", command.preparedTaskAssignmentId())
+                .param("expectedVersion", command.expectedSagaVersion()).update();
+        if (sagaUpdated != 1) {
+            throwSagaConflict(context.tenantId(), command.sagaId(), command.serviceAssignmentId(),
+                    command.expectedSagaVersion(), "ABORTING");
+        }
+
         ServiceAssignmentReceipt receipt = new ServiceAssignmentReceipt(
                 state.serviceAssignmentId(), command.sagaId(), state.taskId(),
                 state.capacityReservationId(), "FAILED_ACTIVATION", "ABORTED",
                 command.expectedSagaVersion() + 1, now);
-        finish(context, authorizationDecision, ABORT, "SERVICE_ASSIGNMENT_ABORT",
-                digest, receipt, "service.assignment.activation-aborted", command.reasonCode());
+        finish(context, authorizationDecision, COMPLETE_ABORT, "SERVICE_ASSIGNMENT_ABORT_COMPLETE",
+                digest, receipt, "service.assignment.activation-abort-completed",
+                "TASK_ASSIGNMENT_ABORTED");
         return receipt;
     }
 
@@ -719,7 +779,9 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
         AssignmentState state = assignment(context.tenantId(), receipt.serviceAssignmentId());
         boolean handshakeEvent = state.protocolVersion() == 2
                 && ("service.assignment.pending-activation".equals(eventType)
-                || "service.assignment.activated".equals(eventType));
+                || "service.assignment.task-prepared".equals(eventType)
+                || "service.assignment.activated".equals(eventType)
+                || "service.assignment.activation-aborted".equals(eventType));
         Object payload = handshakeEvent
                 ? new ServiceAssignmentHandshakePayload(
                         state.serviceAssignmentId(), state.sagaId(), state.workOrderId(), state.taskId(),

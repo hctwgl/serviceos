@@ -2,6 +2,7 @@ package com.serviceos.dispatch;
 
 import com.serviceos.ServiceOsApplication;
 import com.serviceos.dispatch.api.ActivateServiceAssignmentCommand;
+import com.serviceos.dispatch.api.AbortServiceAssignmentActivationCommand;
 import com.serviceos.dispatch.api.CapacityAuthorityService;
 import com.serviceos.dispatch.api.CompleteServiceAssignmentActivationCommand;
 import com.serviceos.dispatch.api.ConfigureCapacityCommand;
@@ -38,7 +39,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** M25：验证 Dispatch 与 Task 通过四段 Outbox/Inbox 事件完成师傅改派闭环。 */
+/** M25/M26：验证师傅改派的正常推进、持久检查点与切换前可靠终止。 */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = ServiceOsApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE)
 class DispatchTaskReassignmentSagaPostgresIT {
@@ -73,6 +74,8 @@ class DispatchTaskReassignmentSagaPostgresIT {
         jdbc.sql("""
                 DROP TRIGGER IF EXISTS trg_test_fail_m25_activation ON rel_outbox_event;
                 DROP FUNCTION IF EXISTS test_fail_m25_activation();
+                DROP TRIGGER IF EXISTS trg_test_fail_m26_task_abort ON rel_outbox_event;
+                DROP FUNCTION IF EXISTS test_fail_m26_task_abort();
                 TRUNCATE TABLE dsp_assignment_command_result, dsp_capacity_command_result,
                     dsp_service_assignment_activation_saga, dsp_capacity_reservation,
                     dsp_service_assignment, dsp_capacity_counter,
@@ -101,10 +104,12 @@ class DispatchTaskReassignmentSagaPostgresIT {
         assertThat(jdbc.sql("""
                 SELECT consumer_name || ':' || status FROM rel_inbox_record
                  WHERE consumer_name LIKE 'task.service-assignment-%'
+                    OR consumer_name LIKE 'dispatch.service-assignment-%'
                     OR consumer_name LIKE 'dispatch.task-assignment-%'
                  ORDER BY consumer_name
                 """).query(String.class).list())
                 .containsExactly(
+                        "dispatch.service-assignment-task-prepared.v2:SUCCEEDED",
                         "dispatch.task-assignment-activated.v1:SUCCEEDED",
                         "dispatch.task-assignment-prepared.v1:SUCCEEDED",
                         "task.service-assignment-activated.v2:SUCCEEDED",
@@ -135,7 +140,7 @@ class DispatchTaskReassignmentSagaPostgresIT {
                 SELECT stage || ':' || version FROM dsp_service_assignment_activation_saga
                  WHERE activation_saga_id = :sagaId
                 """).param("sagaId", pending.sagaId()).query(String.class).single())
-                .isEqualTo("PENDING:1");
+                .isEqualTo("TASK_PREPARED:2");
         assertThat(jdbc.sql("""
                 SELECT status FROM dsp_service_assignment
                  WHERE service_assignment_id = :assignmentId
@@ -144,6 +149,10 @@ class DispatchTaskReassignmentSagaPostgresIT {
         assertThat(jdbc.sql("""
                 SELECT count(*) FROM rel_inbox_record
                  WHERE consumer_name = 'dispatch.task-assignment-prepared.v1'
+                """).query(Long.class).single()).isEqualTo(1);
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM rel_inbox_record
+                 WHERE consumer_name = 'dispatch.service-assignment-task-prepared.v2'
                 """).query(Long.class).single()).isZero();
         assertThat(jdbc.sql("""
                 SELECT status FROM tsk_task_assignment
@@ -155,9 +164,9 @@ class DispatchTaskReassignmentSagaPostgresIT {
                 DROP TRIGGER trg_test_fail_m25_activation ON rel_outbox_event;
                 DROP FUNCTION test_fail_m25_activation();
                 UPDATE rel_outbox_event
-                 SET status = 'PENDING', available_at = now(),
+                 SET status = 'PENDING', available_at = now() - interval '1 second',
                        claim_owner = NULL, claim_until = NULL
-                 WHERE event_type = 'task.assignment-prepared' AND status = 'FAILED'
+                 WHERE event_type = 'service.assignment.task-prepared' AND status = 'FAILED'
                 """).update();
         drainOutbox();
 
@@ -198,6 +207,136 @@ class DispatchTaskReassignmentSagaPostgresIT {
                  WHERE service_assignment_id = :assignmentId
                 """).param("assignmentId", pending.serviceAssignmentId())
                 .query(String.class).single()).isEqualTo("HELD");
+    }
+
+    @Test
+    void preSwitchAbortWithdrawsPreparedTaskAndCompletesSaga() {
+        Baseline baseline = baseline("abort");
+        ServiceAssignmentReceipt pending = prepareReliableReassignment(baseline, "abort");
+        advanceToTaskPrepared(pending);
+
+        serviceAssignments.abort(
+                manager(), metadata("abort-b"),
+                new AbortServiceAssignmentActivationCommand(
+                        pending.sagaId(), pending.serviceAssignmentId(), 2, "ACTIVATION_TIMEOUT"));
+        drainOutbox();
+
+        assertAbortedAlignment(baseline, pending);
+        assertThat(jdbc.sql("""
+                SELECT consumer_name || ':' || status FROM rel_inbox_record
+                 WHERE consumer_name IN (
+                    'dispatch.service-assignment-task-prepared.v2',
+                    'task.service-assignment-aborted.v2',
+                    'dispatch.task-assignment-aborted.v1')
+                 ORDER BY consumer_name
+                """).query(String.class).list())
+                .containsExactly(
+                        "dispatch.service-assignment-task-prepared.v2:SUCCEEDED",
+                        "dispatch.task-assignment-aborted.v1:SUCCEEDED",
+                        "task.service-assignment-aborted.v2:SUCCEEDED");
+    }
+
+    @Test
+    void taskAbortOutboxFailureRollsBackThenRetriesToCompletion() {
+        Baseline baseline = baseline("abort-retry");
+        ServiceAssignmentReceipt pending = prepareReliableReassignment(baseline, "abort-retry");
+        advanceToTaskPrepared(pending);
+        serviceAssignments.abort(
+                manager(), metadata("abort-retry-b"),
+                new AbortServiceAssignmentActivationCommand(
+                        pending.sagaId(), pending.serviceAssignmentId(), 2, "ACTIVATION_TIMEOUT"));
+        jdbc.sql("""
+                CREATE FUNCTION test_fail_m26_task_abort() RETURNS trigger LANGUAGE plpgsql AS $$
+                BEGIN
+                    IF NEW.event_type = 'task.assignment-aborted' THEN
+                        RAISE EXCEPTION 'injected M26 Task abort Outbox failure';
+                    END IF;
+                    RETURN NEW;
+                END;
+                $$;
+                CREATE TRIGGER trg_test_fail_m26_task_abort
+                    BEFORE INSERT ON rel_outbox_event
+                    FOR EACH ROW EXECUTE FUNCTION test_fail_m26_task_abort();
+                """).update();
+
+        drainUntilFailure();
+
+        assertThat(jdbc.sql("""
+                SELECT stage || ':' || version FROM dsp_service_assignment_activation_saga
+                 WHERE activation_saga_id = :sagaId
+                """).param("sagaId", pending.sagaId()).query(String.class).single())
+                .isEqualTo("ABORTING:3");
+        assertThat(jdbc.sql("""
+                SELECT status FROM tsk_task_assignment
+                 WHERE source_id = :assignmentId AND assignment_kind = 'RESPONSIBLE'
+                """).param("assignmentId", pending.serviceAssignmentId().toString())
+                .query(String.class).single()).isEqualTo("PREPARED");
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM rel_inbox_record
+                 WHERE consumer_name = 'task.service-assignment-aborted.v2'
+                """).query(Long.class).single()).isZero();
+
+        jdbc.sql("""
+                DROP TRIGGER trg_test_fail_m26_task_abort ON rel_outbox_event;
+                DROP FUNCTION test_fail_m26_task_abort();
+                """).update();
+        int reset = jdbc.sql("""
+                UPDATE rel_outbox_event
+                   SET status = 'PENDING', available_at = now() - interval '1 second',
+                       claim_owner = NULL, claim_until = NULL
+                 WHERE event_type = 'service.assignment.activation-aborted' AND status = 'FAILED'
+                """).update();
+        assertThat(reset).isEqualTo(1);
+        drainOutbox();
+
+        assertThat(jdbc.sql("""
+                SELECT consumer_name || ':' || status FROM rel_inbox_record
+                 WHERE consumer_name IN (
+                    'task.service-assignment-aborted.v2',
+                    'dispatch.task-assignment-aborted.v1')
+                 ORDER BY consumer_name
+                """).query(String.class).list())
+                .containsExactly(
+                        "dispatch.task-assignment-aborted.v1:SUCCEEDED",
+                        "task.service-assignment-aborted.v2:SUCCEEDED");
+
+        assertAbortedAlignment(baseline, pending);
+    }
+
+    @Test
+    void revokedInitiatorAuthorizationBlocksTaskAbortAndKeepsGuard() {
+        Baseline baseline = baseline("abort-revoked");
+        ServiceAssignmentReceipt pending = prepareReliableReassignment(baseline, "abort-revoked");
+        advanceToTaskPrepared(pending);
+        serviceAssignments.abort(
+                manager(), metadata("abort-revoked-b"),
+                new AbortServiceAssignmentActivationCommand(
+                        pending.sagaId(), pending.serviceAssignmentId(), 2, "ACTIVATION_TIMEOUT"));
+        jdbc.sql("""
+                UPDATE auth_role_grant SET valid_to = now() - interval '1 second'
+                 WHERE tenant_id = :tenantId AND principal_id = :principalId
+                """).param("tenantId", TENANT).param("principalId", MANAGER).update();
+
+        drainUntilFailure();
+
+        assertThat(jdbc.sql("""
+                SELECT stage || ':' || version FROM dsp_service_assignment_activation_saga
+                 WHERE activation_saga_id = :sagaId
+                """).param("sagaId", pending.sagaId()).query(String.class).single())
+                .isEqualTo("ABORTING:3");
+        assertThat(jdbc.sql("""
+                SELECT status FROM tsk_task_assignment
+                 WHERE source_id = :assignmentId AND assignment_kind = 'RESPONSIBLE'
+                """).param("assignmentId", pending.serviceAssignmentId().toString())
+                .query(String.class).single()).isEqualTo("PREPARED");
+        assertThat(jdbc.sql("""
+                SELECT status FROM tsk_task_execution_guard WHERE guard_key = :sagaId
+                """).param("sagaId", pending.sagaId().toString())
+                .query(String.class).single()).isEqualTo("ACTIVE");
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM rel_inbox_record
+                 WHERE consumer_name = 'task.service-assignment-aborted.v2'
+                """).query(Long.class).single()).isZero();
     }
 
     private Baseline baseline(String key) {
@@ -254,6 +393,18 @@ class DispatchTaskReassignmentSagaPostgresIT {
                         "fence://b-" + key, "policy-2026-07"));
     }
 
+    private void advanceToTaskPrepared(ServiceAssignmentReceipt pending) {
+        for (int iteration = 0; iteration < 20; iteration++) {
+            String state = jdbc.sql("""
+                    SELECT stage || ':' || version FROM dsp_service_assignment_activation_saga
+                     WHERE activation_saga_id = :sagaId
+                    """).param("sagaId", pending.sagaId()).query(String.class).single();
+            if ("TASK_PREPARED:2".equals(state)) return;
+            assertThat(outboxWorker.runOnce()).isEqualTo(OutboxWorker.RunResult.PUBLISHED);
+        }
+        throw new AssertionError("M26 saga did not reach TASK_PREPARED checkpoint");
+    }
+
     private void assertCompletedAlignment(Baseline baseline, ServiceAssignmentReceipt pending) {
         assertThat(jdbc.sql("""
                 SELECT stage || ':' || version FROM dsp_service_assignment_activation_saga
@@ -279,6 +430,39 @@ class DispatchTaskReassignmentSagaPostgresIT {
                  WHERE guard_key = :sagaId
                 """).param("sagaId", pending.sagaId().toString()).query(String.class).single())
                 .isEqualTo("RELEASED");
+    }
+
+    private void assertAbortedAlignment(Baseline baseline, ServiceAssignmentReceipt pending) {
+        assertThat(jdbc.sql("""
+                SELECT stage || ':' || version || ':' || (completed_at IS NOT NULL)
+                  FROM dsp_service_assignment_activation_saga
+                 WHERE activation_saga_id = :sagaId
+                """).param("sagaId", pending.sagaId()).query(String.class).single())
+                .isEqualTo("ABORTED:4:true");
+        assertThat(jdbc.sql("""
+                SELECT assignee_id || ':' || status FROM dsp_service_assignment
+                 WHERE task_id = :taskId ORDER BY created_at
+                """).param("taskId", baseline.taskId()).query(String.class).list())
+                .containsExactly("technician-a:ACTIVE", "technician-b:FAILED_ACTIVATION");
+        assertThat(jdbc.sql("SELECT claimed_by FROM tsk_task WHERE task_id = :taskId")
+                .param("taskId", baseline.taskId()).query(String.class).single())
+                .isEqualTo("technician-a");
+        assertThat(jdbc.sql("""
+                SELECT principal_id || ':' || status FROM tsk_task_assignment
+                 WHERE task_id = :taskId AND assignment_kind = 'RESPONSIBLE'
+                 ORDER BY created_at
+                """).param("taskId", baseline.taskId()).query(String.class).list())
+                .containsExactly("technician-a:ACTIVE", "technician-b:ABORTED");
+        assertThat(jdbc.sql("""
+                SELECT status FROM tsk_task_execution_guard
+                 WHERE guard_key = :sagaId
+                """).param("sagaId", pending.sagaId().toString()).query(String.class).single())
+                .isEqualTo("RELEASED");
+        assertThat(jdbc.sql("""
+                SELECT status FROM dsp_capacity_reservation
+                 WHERE service_assignment_id = :assignmentId
+                """).param("assignmentId", pending.serviceAssignmentId())
+                .query(String.class).single()).isEqualTo("RELEASED");
     }
 
     private void drainOutbox() {

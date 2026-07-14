@@ -8,6 +8,7 @@ import com.serviceos.reliability.spi.OutboxMessageHandler;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.Sha256;
 import com.serviceos.task.api.ActivatePreparedTaskAssignmentCommand;
+import com.serviceos.task.api.AbortPreparedTaskAssignmentCommand;
 import com.serviceos.task.api.PrepareTaskReassignmentCommand;
 import com.serviceos.task.api.TaskReassignmentReceipt;
 import com.serviceos.task.api.TaskReassignmentService;
@@ -31,6 +32,7 @@ import java.util.UUID;
 final class ServiceAssignmentHandshakeHandler implements OutboxMessageHandler {
     private static final String PREPARE_CONSUMER = "task.service-assignment-pending.v2";
     private static final String ACTIVATE_CONSUMER = "task.service-assignment-activated.v2";
+    private static final String ABORT_CONSUMER = "task.service-assignment-aborted.v2";
 
     private final JdbcClient jdbc;
     private final InboxService inbox;
@@ -53,7 +55,8 @@ final class ServiceAssignmentHandshakeHandler implements OutboxMessageHandler {
     public boolean supports(String eventType, int schemaVersion) {
         return schemaVersion == 2 && (
                 "service.assignment.pending-activation".equals(eventType)
-                        || "service.assignment.activated".equals(eventType));
+                        || "service.assignment.activated".equals(eventType)
+                        || "service.assignment.activation-aborted".equals(eventType));
     }
 
     @Override
@@ -64,8 +67,10 @@ final class ServiceAssignmentHandshakeHandler implements OutboxMessageHandler {
         validatePayload(message, payload);
         if ("service.assignment.pending-activation".equals(message.eventType())) {
             prepare(message, payload);
-        } else {
+        } else if ("service.assignment.activated".equals(message.eventType())) {
             activate(message, payload);
+        } else {
+            abort(message, payload);
         }
     }
 
@@ -105,6 +110,25 @@ final class ServiceAssignmentHandshakeHandler implements OutboxMessageHandler {
                         payload.taskId(), payload.guardId(), payload.preparedTaskAssignmentId(),
                         taskVersion, payload.serviceAssignmentId().toString()));
         inbox.complete(message.tenantId(), ACTIVATE_CONSUMER, message.eventId(), digest(receipt));
+    }
+
+    private void abort(OutboxMessage message, HandshakePayload payload) {
+        InboxDecision decision = inbox.begin(
+                message.tenantId(), ABORT_CONSUMER, message.eventId(),
+                message.schemaVersion(), message.payloadDigest());
+        if (decision.kind() == InboxDecision.Kind.REPLAY) return;
+        if (!"FAILED_ACTIVATION".equals(payload.status())
+                || payload.guardId() == null || payload.preparedTaskAssignmentId() == null
+                || payload.reasonCode() == null) {
+            throw new IllegalArgumentException("v2 aborted event lacks prepared Task references");
+        }
+        long taskVersion = taskVersion(message.tenantId(), payload.taskId());
+        TaskReassignmentReceipt receipt = reassignments.abort(
+                principal(message, payload.initiatedBy()), metadata(message, "abort"),
+                new AbortPreparedTaskAssignmentCommand(
+                        payload.taskId(), payload.guardId(), payload.preparedTaskAssignmentId(),
+                        taskVersion, payload.reasonCode()));
+        inbox.complete(message.tenantId(), ABORT_CONSUMER, message.eventId(), digest(receipt));
     }
 
     private long taskVersion(String tenantId, UUID taskId) {

@@ -26,8 +26,11 @@ final class LocalOutboxPublisher implements OutboxPublisher {
             "workorder.received@v1", "task.completed@v1",
             "service.assignment.pending-activation@v2",
             "task.assignment-prepared@v1",
+            "service.assignment.task-prepared@v2",
             "service.assignment.activated@v2",
-            "task.assignment-activated@v1");
+            "task.assignment-activated@v1",
+            "service.assignment.activation-aborted@v2",
+            "task.assignment-aborted@v1");
     private final List<OutboxMessageHandler> handlers;
 
     LocalOutboxPublisher(List<OutboxMessageHandler> handlers) {

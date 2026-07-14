@@ -1,6 +1,6 @@
 package com.serviceos.dispatch.application;
 
-import com.serviceos.dispatch.api.ActivateServiceAssignmentCommand;
+import com.serviceos.dispatch.api.CompleteServiceAssignmentAbortCommand;
 import com.serviceos.dispatch.api.CompleteServiceAssignmentActivationCommand;
 import com.serviceos.dispatch.api.ConfirmTaskAssignmentPreparedCommand;
 import com.serviceos.dispatch.api.ServiceAssignmentReceipt;
@@ -25,13 +25,14 @@ import java.util.UUID;
 /**
  * M25 Dispatch 侧 TaskAssignment Inbox 编排器。
  *
- * <p>Task prepared 后在同一消费者事务内记录握手证明并切换服务责任；Task activated 后完成 saga。
- * 任一 Outbox/审计/状态写入失败都会连同 Inbox begin 一起回滚，消息可按同一 eventId 向前重试。</p>
+ * <p>M26 将 Task prepared 固化为独立检查点，再由 ServiceAssignmentTaskPrepared 事件推进责任切换；
+ * Task activated 完成正常 saga，Task aborted 则完成切换前终止 saga。</p>
  */
 @Service
 final class TaskAssignmentHandshakeHandler implements OutboxMessageHandler {
     private static final String PREPARED_CONSUMER = "dispatch.task-assignment-prepared.v1";
     private static final String ACTIVATED_CONSUMER = "dispatch.task-assignment-activated.v1";
+    private static final String ABORTED_CONSUMER = "dispatch.task-assignment-aborted.v1";
 
     private final JdbcClient jdbc;
     private final InboxService inbox;
@@ -54,7 +55,8 @@ final class TaskAssignmentHandshakeHandler implements OutboxMessageHandler {
     public boolean supports(String eventType, int schemaVersion) {
         return schemaVersion == 1 && (
                 "task.assignment-prepared".equals(eventType)
-                        || "task.assignment-activated".equals(eventType));
+                        || "task.assignment-activated".equals(eventType)
+                        || "task.assignment-aborted".equals(eventType));
     }
 
     @Override
@@ -74,13 +76,15 @@ final class TaskAssignmentHandshakeHandler implements OutboxMessageHandler {
         OrchestrationState state = state(message.tenantId(), serviceAssignmentId);
         validateLink(payload, state);
         if ("task.assignment-prepared".equals(message.eventType())) {
-            switchService(message, payload, state);
-        } else {
+            recordPrepared(message, payload, state);
+        } else if ("task.assignment-activated".equals(message.eventType())) {
             complete(message, payload, state);
+        } else {
+            completeAbort(message, payload, state);
         }
     }
 
-    private void switchService(
+    private void recordPrepared(
             OutboxMessage message,
             TaskAssignmentPayload payload,
             OrchestrationState state
@@ -93,19 +97,12 @@ final class TaskAssignmentHandshakeHandler implements OutboxMessageHandler {
                 || !"PENDING".equals(state.stage()) || state.sagaVersion() != 1) {
             throw new IllegalArgumentException("TaskAssignmentPrepared does not match a pending v2 saga");
         }
-        CurrentPrincipal principal = principal(message, state.createdBy());
         ServiceAssignmentReceipt prepared = assignments.confirmTaskPrepared(
-                principal, metadata(message, "confirm"),
+                principal(message, state.createdBy()), metadata(message, "confirm"),
                 new ConfirmTaskAssignmentPreparedCommand(
                         state.sagaId(), state.serviceAssignmentId(), state.taskId(),
                         payload.guardId(), payload.taskAssignmentId(), 1));
-        ServiceAssignmentReceipt activated = assignments.activate(
-                principal, metadata(message, "activate"),
-                new ActivateServiceAssignmentCommand(
-                        state.sagaId(), state.serviceAssignmentId(), prepared.sagaVersion(),
-                        state.authorityAssignmentId(), state.authorityVersion(),
-                        state.fenceDecisionId(), state.fencePolicyVersion()));
-        inbox.complete(message.tenantId(), PREPARED_CONSUMER, message.eventId(), digest(activated));
+        inbox.complete(message.tenantId(), PREPARED_CONSUMER, message.eventId(), digest(prepared));
     }
 
     private void complete(
@@ -130,15 +127,33 @@ final class TaskAssignmentHandshakeHandler implements OutboxMessageHandler {
         inbox.complete(message.tenantId(), ACTIVATED_CONSUMER, message.eventId(), digest(completed));
     }
 
+    private void completeAbort(
+            OutboxMessage message,
+            TaskAssignmentPayload payload,
+            OrchestrationState state
+    ) {
+        InboxDecision decision = inbox.begin(
+                message.tenantId(), ABORTED_CONSUMER, message.eventId(),
+                message.schemaVersion(), message.payloadDigest());
+        if (decision.kind() == InboxDecision.Kind.REPLAY) return;
+        if (!"ABORTED".equals(payload.status())
+                || !"ABORTING".equals(state.stage()) || state.sagaVersion() != 3
+                || !payload.taskAssignmentId().equals(state.preparedTaskAssignmentId())) {
+            throw new IllegalArgumentException("TaskAssignmentAborted does not match aborting v2 saga");
+        }
+        ServiceAssignmentReceipt completed = assignments.completeAbort(
+                principal(message, state.createdBy()), metadata(message, "complete-abort"),
+                new CompleteServiceAssignmentAbortCommand(
+                        state.sagaId(), state.serviceAssignmentId(),
+                        payload.taskAssignmentId(), state.sagaVersion()));
+        inbox.complete(message.tenantId(), ABORTED_CONSUMER, message.eventId(), digest(completed));
+    }
+
     private OrchestrationState state(String tenantId, UUID serviceAssignmentId) {
         return jdbc.sql("""
                         SELECT assignment.service_assignment_id,
                                assignment.activation_saga_id AS saga_id,
                                assignment.task_id, assignment.created_by,
-                               assignment.pending_authority_assignment_id AS authority_assignment_id,
-                               assignment.pending_authority_version AS authority_version,
-                               assignment.pending_fence_decision_id AS fence_decision_id,
-                               assignment.pending_fence_policy_version AS fence_policy_version,
                                assignment.prepared_task_assignment_id,
                                saga.stage, saga.version AS saga_version
                           FROM dsp_service_assignment assignment
@@ -196,10 +211,6 @@ final class TaskAssignmentHandshakeHandler implements OutboxMessageHandler {
             UUID sagaId,
             UUID taskId,
             String createdBy,
-            String authorityAssignmentId,
-            long authorityVersion,
-            String fenceDecisionId,
-            String fencePolicyVersion,
             UUID preparedTaskAssignmentId,
             String stage,
             long sagaVersion
