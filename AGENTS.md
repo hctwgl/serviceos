@@ -164,7 +164,6 @@ Interface / Adapter
 - Domain / Application 不得直接依赖 Mapper、`JdbcTemplate` 或 `JdbcClient`；
 - 必须通过领域 Repository 接口和 Infrastructure Adapter 隔离持久化框架；
 - 默认禁止核心业务使用 MyBatis-Plus 的 `BaseMapper`、`IService`、`ServiceImpl` 和通用 CRUD 模式；
-- 不得为了技术统一重写已经稳定且有完整并发测试覆盖的 JDBC 内核；
 - 选择 JDBC 例外时，必须在变更说明中写明 MyBatis 不适合的具体数据库语义。
 
 ---
