@@ -90,6 +90,8 @@ class WorkflowBootstrapPostgresIT {
                 .query(String.class).single()).isEqualTo("PENDING");
         assertThat(jdbc.sql("SELECT workflow_definition_digest FROM tsk_task")
                 .query(String.class).single()).isEqualTo(scope.workflowDigest());
+        assertThat(jdbc.sql("SELECT form_ref FROM tsk_task")
+                .query(String.class).single()).isEqualTo("intake.form");
         assertThat(jdbc.sql("SELECT status FROM rel_inbox_record")
                 .query(String.class).single()).isEqualTo("SUCCEEDED");
         assertThat(jdbc.sql("SELECT event_type FROM rel_outbox_event ORDER BY event_type")
@@ -192,7 +194,7 @@ class WorkflowBootstrapPostgresIT {
                  "nodes":[
                    {"nodeId":"START","nodeType":"START","name":"开始"},
                    {"nodeId":"ASSIGN_COORDINATORS","nodeType":"SERVICE_TASK","name":"分配跟进人",
-                    "stageCode":"INTAKE","taskType":"ASSIGN_COORDINATORS"},
+                    "stageCode":"INTAKE","taskType":"ASSIGN_COORDINATORS","formRef":"intake.form"},
                    {"nodeId":"END","nodeType":"END","name":"结束"}],
                  "transitions":[{"transitionId":"t1","from":"START","to":"ASSIGN_COORDINATORS"}]}
                 """;

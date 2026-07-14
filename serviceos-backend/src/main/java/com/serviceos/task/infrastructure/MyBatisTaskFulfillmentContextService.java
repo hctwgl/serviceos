@@ -25,7 +25,7 @@ final class MyBatisTaskFulfillmentContextService implements TaskFulfillmentConte
     private TaskFulfillmentContext context(Map<String, Object> row) {
         return new TaskFulfillmentContext(
                 uuid(row, "taskId"), uuid(row, "projectId"), uuid(row, "workOrderId"),
-                text(row, "taskType"), text(row, "taskKind"), text(row, "status"),
+                text(row, "taskType"), text(row, "taskKind"), text(row, "formRef"), text(row, "status"),
                 text(row, "responsiblePrincipalId"), ((Number) row.get("version")).longValue());
     }
 

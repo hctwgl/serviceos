@@ -88,6 +88,9 @@ final class DefaultTaskSchedulingService implements TaskSchedulingService {
         requireText(command.tenantId(), "tenantId");
         requireText(command.workflowNodeId(), "workflowNodeId");
         requireText(command.taskType(), "taskType");
+        if (command.formRef() != null && (command.formRef().isBlank() || command.formRef().length() > 120)) {
+            throw new IllegalArgumentException("formRef must be null or non-blank text up to 120 characters");
+        }
         requireText(command.payloadDigest(), "payloadDigest");
         requireText(command.workflowDefinitionDigest(), "workflowDefinitionDigest");
         requireText(command.correlationId(), "correlationId");

@@ -13,5 +13,8 @@ status: Implemented
 | M33-CFG-003 | P0 | 勘测与安装 FormVersion 同 Bundle 锁定 | `ConfigurationPublicationPostgresIT` |
 | M33-CFG-004 | P0 | 多版本误用单例读取时失败关闭 | `ConfigurationPublicationPostgresIT` |
 | M33-CFG-005 | P1 | 架构 Schema 与运行时资源无漂移 | `ConfigurationSchemaDriftTest` |
+| M33-TASK-001 | P0 | Workflow 首任务和后续任务均冻结节点 `formRef` | `WorkflowDefinitionParserTest`、`WorkflowBootstrapPostgresIT`、`WorkflowLinearProgressionPostgresIT` |
+| M33-TASK-002 | P0 | Task 公开上下文按租户读取已冻结 `formRef` | `HumanTaskCommandPostgresIT` |
 
-本矩阵不替代 M3 FORM-001～FORM-005；表达式与 FormSubmission 完成后才能关闭这些场景。
+本矩阵不替代 M3 FORM-001～FORM-005；精确 FormVersion 解析、表达式与 FormSubmission 完成后
+才能关闭这些场景。

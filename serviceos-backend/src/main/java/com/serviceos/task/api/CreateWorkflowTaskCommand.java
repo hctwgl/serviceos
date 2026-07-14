@@ -18,6 +18,7 @@ public record CreateWorkflowTaskCommand(
         String workflowDefinitionDigest,
         String taskType,
         WorkflowTaskKind taskKind,
+        String formRef,
         String payloadRef,
         String payloadDigest,
         int priority,

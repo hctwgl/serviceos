@@ -15,6 +15,10 @@ status: Implemented
 - Bundle 可锁定多个同类型资产，使勘测与安装 FormVersion 共存；
 - 单例读取仍要求恰好一个版本，多版本时明确报告歧义；
 - V033 使用 `bundle + assetVersion` 标识 BundleItem，保留租户、摘要外键和不可变触发器。
+- Workflow 解析首任务和后续任务时保留节点 `formRef`；
+- V034 将该引用固化到 `tsk_task.form_ref`，Task 公开只读上下文同步暴露此快照；
+- `formRef` 来自工单锁定的 WorkflowVersion，后续表单解析不得改读最新 Workflow 或最新 FORM。
 
-ADR-018 仍为 Proposed，因此本切片不猜测表达式语义。规则静态类型、样本回放、Task 表单解析、
-草稿、不可变提交、预填冲突和服务端校验仍待后续实现；FORM 已发布不等于可执行。
+ADR-018 仍为 Proposed，因此本切片不猜测表达式语义。规则静态类型、样本回放、`formRef` 到
+锁定 Bundle 内精确 FormVersion 的解析、草稿、不可变提交、预填冲突和服务端校验仍待后续实现；
+FORM 已发布或 Task 已冻结引用都不等于表单可执行。

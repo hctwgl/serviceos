@@ -117,6 +117,8 @@ class WorkflowLinearProgressionPostgresIT {
                 SELECT task_type || ':' || status FROM tsk_task ORDER BY created_at, task_type
                 """).query(String.class).list())
                 .containsExactly("ASSIGN_COORDINATORS:SUCCEEDED", "INITIAL_REVIEW:PENDING");
+        assertThat(jdbc.sql("SELECT form_ref FROM tsk_task ORDER BY created_at, task_type")
+                .query(String.class).list()).containsExactly("intake.form", "review.form");
         assertThat(jdbc.sql("""
                 SELECT count(*) FROM rel_inbox_record
                  WHERE consumer_name = 'workflow.task-completed.v1' AND status = 'SUCCEEDED'
@@ -382,9 +384,9 @@ class WorkflowLinearProgressionPostgresIT {
                  "nodes":[
                    {"nodeId":"START","nodeType":"START","name":"开始"},
                    {"nodeId":"ASSIGN_COORDINATORS","nodeType":"SERVICE_TASK","name":"分配跟进人",
-                    "stageCode":"INTAKE","taskType":"ASSIGN_COORDINATORS"},
+                    "stageCode":"INTAKE","taskType":"ASSIGN_COORDINATORS","formRef":"intake.form"},
                    {"nodeId":"INITIAL_REVIEW","nodeType":"SERVICE_TASK","name":"工单初审",
-                    "stageCode":"%s","taskType":"INITIAL_REVIEW"}],
+                    "stageCode":"%s","taskType":"INITIAL_REVIEW","formRef":"review.form"}],
                  "transitions":[
                    {"transitionId":"t1","from":"START","to":"ASSIGN_COORDINATORS"},
                    {"transitionId":"t2","from":"ASSIGN_COORDINATORS","to":"INITIAL_REVIEW"}]}

@@ -131,6 +131,7 @@ final class WorkflowWorkOrderReceivedHandler implements OutboxMessageHandler {
                 message.tenantId(), received.projectId(), received.workOrderId(), workflowId, stageId,
                 nodeInstanceId, definition.firstNodeId(), asset.versionId(), asset.contentDigest(),
                 definition.firstTaskType(), definition.firstTaskKind(),
+                definition.firstFormRef(),
                 "work-order:" + received.workOrderId(), message.payloadDigest(), 100, now, 3,
                 message.correlationId(), message.eventId().toString()));
         jdbc.sql("""

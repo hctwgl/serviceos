@@ -33,6 +33,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -237,14 +238,14 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
                             attempt_count, max_attempts, correlation_id, version, created_at, updated_at,
                             project_id, work_order_id, workflow_instance_id, stage_instance_id,
                             workflow_node_instance_id, workflow_node_id,
-                            workflow_definition_version_id, workflow_definition_digest
+                            workflow_definition_version_id, workflow_definition_digest, form_ref
                         ) VALUES (
                             :taskId, :tenantId, :taskType, :taskKind, :businessKey,
                             :payloadRef, :payloadDigest, :priority, :status, :readyAt,
                             0, :maxAttempts, :correlationId, 1, :now, :now,
                             :projectId, :workOrderId, :workflowInstanceId, :stageInstanceId,
                             :workflowNodeInstanceId, :workflowNodeId,
-                            :workflowDefinitionVersionId, :workflowDefinitionDigest
+                            :workflowDefinitionVersionId, :workflowDefinitionDigest, :formRef
                         )
                         ON CONFLICT (tenant_id, task_type, business_key) DO NOTHING
                         """)
@@ -269,14 +270,16 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
                 .param("workflowNodeId", command.workflowNodeId())
                 .param("workflowDefinitionVersionId", command.workflowDefinitionVersionId())
                 .param("workflowDefinitionDigest", command.workflowDefinitionDigest())
+                .param("formRef", command.formRef(), java.sql.Types.VARCHAR)
                 .update();
 
         StoredTask stored = findByBusinessKey(
                 command.tenantId(), command.taskType(), command.workflowNodeInstanceId().toString());
-        if (inserted == 0 && !stored.payloadDigest().equals(command.payloadDigest())) {
+        if (inserted == 0 && (!stored.payloadDigest().equals(command.payloadDigest())
+                || !Objects.equals(stored.formRef(), command.formRef()))) {
             throw new BusinessProblem(
                     ProblemCode.TASK_SCHEDULE_CONFLICT,
-                    "The workflow node instance is already bound to a different task payload");
+                    "The workflow node instance is already bound to a different task payload or form reference");
         }
         if (inserted == 1) {
             appendTaskCreated(command, taskId, status, now);
@@ -609,7 +612,7 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
 
     private StoredTask findByBusinessKey(String tenantId, String taskType, String businessKey) {
         return jdbc.sql("""
-                        SELECT task_id, tenant_id, task_type, business_key, payload_digest,
+                        SELECT task_id, tenant_id, task_type, business_key, payload_digest, form_ref,
                                status, next_run_at, attempt_count, max_attempts, version
                           FROM tsk_task
                          WHERE tenant_id = :tenantId AND task_type = :taskType AND business_key = :businessKey
@@ -650,7 +653,7 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
     }
 
     private record StoredTask(
-            UUID taskId, String tenantId, String taskType, String businessKey, String payloadDigest,
+            UUID taskId, String tenantId, String taskType, String businessKey, String payloadDigest, String formRef,
             String status, Instant nextRunAt, int attemptCount, int maxAttempts, long version
     ) {
         ScheduledTaskView toView() {

@@ -211,7 +211,7 @@ class TaskExecutionGuardPostgresIT {
         return tasks.createWorkflowTask(new CreateWorkflowTaskCommand(
                 TENANT, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
                 UUID.randomUUID(), "SITE_SURVEY", UUID.randomUUID(), "a".repeat(64),
-                "SITE_SURVEY", WorkflowTaskKind.HUMAN, "work-order:guard-test", "b".repeat(64),
+                "SITE_SURVEY", WorkflowTaskKind.HUMAN, null, "work-order:guard-test", "b".repeat(64),
                 500, Instant.now(), 1, "corr-task-create", "cause-task-create")).taskId();
     }
 

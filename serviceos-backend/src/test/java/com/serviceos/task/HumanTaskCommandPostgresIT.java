@@ -15,6 +15,7 @@ import com.serviceos.task.api.HumanTaskCommandService;
 import com.serviceos.task.api.StartHumanTaskCommand;
 import com.serviceos.task.api.TaskSchedulingService;
 import com.serviceos.task.api.TaskAssignmentService;
+import com.serviceos.task.api.TaskFulfillmentContextService;
 import com.serviceos.task.api.WorkflowTaskKind;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,6 +59,7 @@ class HumanTaskCommandPostgresIT {
     @Autowired HumanTaskCommandService commands;
     @Autowired TaskAssignmentService assignments;
     @Autowired TaskSchedulingService tasks;
+    @Autowired TaskFulfillmentContextService fulfillmentContexts;
     @Autowired JdbcClient jdbc;
     @Autowired Flyway flyway;
 
@@ -186,23 +188,52 @@ class HumanTaskCommandPostgresIT {
 
     @Test
     void migrationSetIsCurrentAndRepeatable() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("033");
-        assertThat(flyway.info().applied()).hasSize(35);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("034");
+        assertThat(flyway.info().applied()).hasSize(36);
         assertThat(flyway.migrate().migrationsExecuted).isZero();
     }
 
+    @Test
+    void freezesFormReferenceInTaskAndExposesItThroughThePublicContext() {
+        UUID taskId = workflowHumanTask();
+
+        assertThat(fulfillmentContexts.find(TENANT, taskId)).get()
+                .extracting(context -> context.formRef())
+                .isEqualTo("survey.form");
+        assertThat(jdbc.sql("SELECT form_ref FROM tsk_task WHERE task_id = :taskId")
+                .param("taskId", taskId).query(String.class).single()).isEqualTo("survey.form");
+    }
+
+    @Test
+    void replayingTheSameWorkflowNodeWithADifferentFormReferenceFailsClosed() {
+        UUID nodeInstanceId = UUID.randomUUID();
+        CreateWorkflowTaskCommand original = workflowTaskCommand(nodeInstanceId, "survey.form");
+        tasks.createWorkflowTask(original);
+
+        CreateWorkflowTaskCommand drifted = workflowTaskCommand(nodeInstanceId, "installation.form");
+        assertThatThrownBy(() -> tasks.createWorkflowTask(drifted))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.TASK_SCHEDULE_CONFLICT));
+        assertThat(jdbc.sql("SELECT form_ref FROM tsk_task WHERE workflow_node_instance_id = :nodeId")
+                .param("nodeId", nodeInstanceId).query(String.class).single()).isEqualTo("survey.form");
+    }
+
     private UUID workflowHumanTask() {
-        UUID taskId = tasks.createWorkflowTask(new CreateWorkflowTaskCommand(
-                TENANT, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
-                UUID.randomUUID(), "SITE_SURVEY", UUID.randomUUID(), "a".repeat(64),
-                "SITE_SURVEY", WorkflowTaskKind.HUMAN, "work-order:test", "b".repeat(64),
-                500, Instant.now(), 1, "corr-task-create", "cause-task-create")).taskId();
+        UUID taskId = tasks.createWorkflowTask(workflowTaskCommand(UUID.randomUUID(), "survey.form")).taskId();
         assignments.assignCandidates(
                 principal("actor-a"), metadata("assign-" + taskId),
                 new AssignTaskCandidatesCommand(
                         taskId, 1, java.util.List.of("actor-a", "actor-b"),
                         AssignmentSourceType.ASSIGNEE_POLICY, "policy://m21/test"));
         return taskId;
+    }
+
+    private CreateWorkflowTaskCommand workflowTaskCommand(UUID nodeInstanceId, String formRef) {
+        return new CreateWorkflowTaskCommand(
+                TENANT, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                nodeInstanceId, "SITE_SURVEY", UUID.randomUUID(), "a".repeat(64),
+                "SITE_SURVEY", WorkflowTaskKind.HUMAN, formRef, "work-order:test", "b".repeat(64),
+                500, Instant.now(), 1, "corr-task-create", "cause-task-create");
     }
 
     private void seedGrant(String actorId) {

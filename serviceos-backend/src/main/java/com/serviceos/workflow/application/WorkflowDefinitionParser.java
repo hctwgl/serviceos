@@ -40,7 +40,7 @@ final class WorkflowDefinitionParser {
         TaskNode task = requireTaskNode(first, "the first executable node");
         return new BootstrapDefinition(
                 graph.workflowKey(), graph.semanticVersion(), task.nodeId(),
-                task.stageCode(), task.taskType(), task.taskKind());
+                task.stageCode(), task.taskType(), task.taskKind(), task.formRef());
     }
 
     ProgressionDefinition progression(ConfigurationAssetDefinition asset, String completedNodeId) {
@@ -59,7 +59,7 @@ final class WorkflowDefinitionParser {
         }
         TaskNode next = requireTaskNode(target, "next executable node");
         return ProgressionDefinition.task(
-                next.nodeId(), next.stageCode(), next.taskType(), next.taskKind());
+                next.nodeId(), next.stageCode(), next.taskType(), next.taskKind(), next.formRef());
     }
 
     private Graph parseGraph(ConfigurationAssetDefinition asset) {
@@ -119,7 +119,8 @@ final class WorkflowDefinitionParser {
         return new TaskNode(
                 requiredText(node, "nodeId"), requiredText(node, "stageCode"),
                 requiredText(node, "taskType"),
-                "SERVICE_TASK".equals(nodeType) ? WorkflowTaskKind.AUTOMATED : WorkflowTaskKind.HUMAN);
+                "SERVICE_TASK".equals(nodeType) ? WorkflowTaskKind.AUTOMATED : WorkflowTaskKind.HUMAN,
+                optionalText(node, "formRef"));
     }
 
     private static boolean isUnconditional(JsonNode condition) {
@@ -142,13 +143,25 @@ final class WorkflowDefinitionParser {
         return value.trim();
     }
 
+    private static String optionalText(JsonNode node, String field) {
+        JsonNode value = node.get(field);
+        if (value == null || value.isNull()) {
+            return null;
+        }
+        if (!value.isTextual() || value.asText().isBlank()) {
+            throw new IllegalArgumentException("workflow " + field + " must be null or non-blank text");
+        }
+        return value.asText().trim();
+    }
+
     record BootstrapDefinition(
             String workflowKey,
             String workflowVersion,
             String firstNodeId,
             String firstStageCode,
             String firstTaskType,
-            WorkflowTaskKind firstTaskKind
+            WorkflowTaskKind firstTaskKind,
+            String firstFormRef
     ) {
     }
 
@@ -157,15 +170,16 @@ final class WorkflowDefinitionParser {
             String stageCode,
             String taskType,
             WorkflowTaskKind taskKind,
+            String formRef,
             boolean end
     ) {
         static ProgressionDefinition task(
-                String nodeId, String stageCode, String taskType, WorkflowTaskKind taskKind) {
-            return new ProgressionDefinition(nodeId, stageCode, taskType, taskKind, false);
+                String nodeId, String stageCode, String taskType, WorkflowTaskKind taskKind, String formRef) {
+            return new ProgressionDefinition(nodeId, stageCode, taskType, taskKind, formRef, false);
         }
 
         static ProgressionDefinition end(String nodeId) {
-            return new ProgressionDefinition(nodeId, null, null, null, true);
+            return new ProgressionDefinition(nodeId, null, null, null, null, true);
         }
     }
 
@@ -185,7 +199,8 @@ final class WorkflowDefinitionParser {
             String nodeId,
             String stageCode,
             String taskType,
-            WorkflowTaskKind taskKind
+            WorkflowTaskKind taskKind,
+            String formRef
     ) {
     }
 }

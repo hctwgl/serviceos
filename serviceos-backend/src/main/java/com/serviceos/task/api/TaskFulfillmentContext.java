@@ -9,6 +9,7 @@ public record TaskFulfillmentContext(
         UUID workOrderId,
         String taskType,
         String taskKind,
+        String formRef,
         String status,
         String responsiblePrincipalId,
         long version
