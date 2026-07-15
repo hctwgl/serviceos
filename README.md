@@ -67,14 +67,22 @@ IdP/Broker/对象存储/扫描服务，以及完整 Admin/Network/Technician Por
 
 ## 快速验证
 
+先运行无需启动 JVM、PostgreSQL 或镜像构建的里程碑预检：
+
+```bash
+bash scripts/verify-milestone-preflight.sh
+```
+
+预检通过且已形成稳定的最终候选 HEAD 后，再执行完整门禁：
+
 ```bash
 ./mvnw clean verify
 ```
 
-里程碑提交前可先运行机械一致性门禁，尽早发现状态、导航、追踪矩阵和 Flyway 数量漂移：
+Flyway 当前版本与迁移数量由迁移目录自动推导；需要查看时执行：
 
 ```bash
-bash scripts/check-milestone-consistency.sh M134 084 86
+bash scripts/migration-baseline.sh
 ```
 
 契约变更还必须相对目标 Git 基线执行兼容门禁，并验证客户端可重复生成：
@@ -118,5 +126,6 @@ serviceos-deploy/        本地/环境部署入口
 
 完整实施状态与每个里程碑的代码、迁移、契约和测试证据见
 [实施状态总览](serviceos-architecture/docs/implementation-status.md) 与
-[Architecture Book](serviceos-architecture/README.md)。最新切片见
+[Architecture Book](serviceos-architecture/README.md)。验证阶段划分、CI 去重和最终候选规则见
+[验证执行策略](serviceos-architecture/docs/verification-execution-policy.md)。最新切片见
 [M134 Admin 工单权威投影与核心时间线](serviceos-architecture/architecture/147-m134-admin-work-order-authority-projections.md)。
