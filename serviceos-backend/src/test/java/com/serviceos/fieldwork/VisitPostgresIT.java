@@ -28,6 +28,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -80,7 +81,7 @@ class VisitPostgresIT {
         seedResponsibility(taskId, "network-a", TECHNICIAN);
         seedGeofence("WARN", 100, 50);
         UUID appointmentId = confirmedAppointment(taskId, "normal");
-        Instant captured = Instant.now().minusSeconds(30);
+        Instant captured = Instant.now().truncatedTo(ChronoUnit.MICROS).minusSeconds(30);
         CheckInVisitCommand checkIn = new CheckInVisitCommand(
                 appointmentId, captured, "device-command-normal", "device-032",
                 new VisitLocation(31.230400, 121.473700, 8), false);
