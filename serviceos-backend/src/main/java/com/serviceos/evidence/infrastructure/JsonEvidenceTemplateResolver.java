@@ -58,7 +58,7 @@ final class JsonEvidenceTemplateResolver implements EvidenceTemplateResolver {
                 ExpressionEvaluation evaluation = expressions.evaluate(expression, conditionInput);
                 // false 也必须固化为解析级事实，否则省略槽位后将无法解释为何没有创建要求。
                 conditions.add(new ResolvedEvidenceCondition(
-                        template.assetKey(), template.semanticVersion(), template.contentDigest(),
+                        template.versionId(), template.assetKey(), template.semanticVersion(), template.contentDigest(),
                         evidenceKey, expression, evaluation.result(), evaluation.bindings()));
                 if (!evaluation.result()) {
                     continue;

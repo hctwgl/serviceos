@@ -2,16 +2,20 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.serviceos.evidence.infrastructure.EvidenceItemMapper">
     <sql id="slotColumns">
-        slot_id AS "slotId", resolution_id AS "resolutionId", task_id AS "taskId",
-        project_id AS "projectId", template_version_id AS "templateVersionId",
-        template_key AS "templateKey", template_version AS "templateVersion",
-        template_digest AS "templateDigest", requirement_code AS "requirementCode",
-        occurrence_key AS "occurrenceKey", requirement_name AS "requirementName",
-        media_type AS "mediaType", required_flag AS "required", min_count AS "minCount",
-        max_count AS "maxCount", condition_input_digest AS "conditionInputDigest",
-        resolution_explanation::text AS "explanation",
-        requirement_definition::text AS "definition", requirement_digest AS "requirementDigest",
-        status_projection AS "status", resolved_at AS "resolvedAt"
+        slot.slot_id AS "slotId", slot.resolution_id AS "resolutionId", slot.task_id AS "taskId",
+        slot.project_id AS "projectId", slot.template_version_id AS "templateVersionId",
+        slot.template_key AS "templateKey", slot.template_version AS "templateVersion",
+        slot.template_digest AS "templateDigest", slot.requirement_code AS "requirementCode",
+        slot.occurrence_key AS "occurrenceKey", slot.requirement_name AS "requirementName",
+        slot.media_type AS "mediaType", slot.required_flag AS "required", slot.min_count AS "minCount",
+        slot.max_count AS "maxCount", member.condition_input_digest AS "conditionInputDigest",
+        member.resolution_explanation::text AS "explanation",
+        slot.requirement_definition::text AS "definition", slot.requirement_digest AS "requirementDigest",
+        slot.status_projection AS "status", slot.resolved_at AS "resolvedAt",
+        slot.slot_generation AS "slotGeneration", slot.supersedes_slot_id AS "supersedesSlotId",
+        member.resolution_id AS "currentResolutionId", latest.generation_no AS "resolutionGeneration",
+        true AS "active", member.transition AS "transition",
+        member.required_disposition AS "requiredDisposition"
     </sql>
 
     <sql id="revisionColumns">
@@ -29,18 +33,40 @@
     </sql>
 
     <select id="findSlot" resultType="map">
+        WITH latest AS (
+            SELECT resolution_id, generation_no
+              FROM evd_task_evidence_resolution
+             WHERE tenant_id = #{tenantId} AND task_id = CAST(#{taskId} AS uuid)
+             ORDER BY generation_no DESC LIMIT 1
+        )
         SELECT <include refid="slotColumns"/>
-          FROM evd_evidence_slot
-         WHERE tenant_id = #{tenantId}
-           AND task_id = CAST(#{taskId} AS uuid)
-           AND slot_id = CAST(#{slotId} AS uuid)
+          FROM latest
+          JOIN evd_evidence_resolution_member member
+            ON member.tenant_id = #{tenantId} AND member.resolution_id = latest.resolution_id
+           AND member.condition_result = true
+          JOIN evd_evidence_slot slot
+            ON slot.tenant_id = member.tenant_id AND slot.slot_id = member.active_slot_id
+         WHERE slot.slot_id = CAST(#{slotId} AS uuid)
     </select>
 
     <select id="lockSlot" resultType="map">
+        WITH latest AS (
+            SELECT resolution_id, generation_no, task_id
+              FROM evd_task_evidence_resolution
+             WHERE tenant_id = #{tenantId}
+               AND task_id = (SELECT task_id FROM evd_evidence_slot
+                               WHERE tenant_id = #{tenantId} AND slot_id = CAST(#{slotId} AS uuid))
+             ORDER BY generation_no DESC LIMIT 1
+        )
         SELECT <include refid="slotColumns"/>
-          FROM evd_evidence_slot
-         WHERE tenant_id = #{tenantId} AND slot_id = CAST(#{slotId} AS uuid)
-         FOR UPDATE
+          FROM latest
+          JOIN evd_evidence_resolution_member member
+            ON member.tenant_id = #{tenantId} AND member.resolution_id = latest.resolution_id
+           AND member.condition_result = true
+          JOIN evd_evidence_slot slot
+            ON slot.tenant_id = member.tenant_id AND slot.slot_id = member.active_slot_id
+         WHERE slot.slot_id = CAST(#{slotId} AS uuid)
+         FOR UPDATE OF slot
     </select>
 
     <insert id="insertUploadBinding" parameterType="map">
@@ -255,6 +281,15 @@
         <foreach collection="revisionIds" item="revisionId" open="(" separator="," close=")">
             CAST(#{revisionId} AS uuid)
         </foreach>
+    </select>
+
+    <select id="listCountingRevisionsForSlot" resultType="map">
+        SELECT <include refid="revisionColumns"/>
+          FROM evd_evidence_revision
+         WHERE tenant_id = #{tenantId}
+           AND slot_id = CAST(#{slotId} AS uuid)
+           AND status IN ('STORED', 'VALIDATING', 'VALIDATED')
+         ORDER BY evidence_item_id, revision_number
     </select>
 
     <select id="countOtherCountingDigest" resultType="int">

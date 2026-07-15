@@ -8,6 +8,7 @@ import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.configuration.api.ConfigurationAssetDefinition;
 import com.serviceos.configuration.api.ConfigurationAssetType;
 import com.serviceos.configuration.api.ConfigurationService;
+import com.serviceos.configuration.api.ExpressionContext;
 import com.serviceos.forms.api.FormSubmissionService;
 import com.serviceos.forms.api.FormSubmissionView;
 import com.serviceos.forms.api.SubmitFormCommand;
@@ -23,6 +24,8 @@ import com.serviceos.shared.ProblemCode;
 import com.serviceos.shared.Sha256;
 import com.serviceos.task.api.TaskFulfillmentContext;
 import com.serviceos.task.api.TaskFulfillmentContextService;
+import com.serviceos.workorder.api.WorkOrderExpressionContext;
+import com.serviceos.workorder.api.WorkOrderExpressionContextQuery;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
@@ -43,6 +46,7 @@ final class DefaultFormSubmissionService implements FormSubmissionService {
     private final FormSubmissionRepository repository;
     private final TaskFulfillmentContextService tasks;
     private final ConfigurationService configurations;
+    private final WorkOrderExpressionContextQuery workOrders;
     private final FormValueValidator validator;
     private final AuthorizationService authorization;
     private final IdempotencyService idempotency;
@@ -53,13 +57,15 @@ final class DefaultFormSubmissionService implements FormSubmissionService {
 
     DefaultFormSubmissionService(
             FormSubmissionRepository repository, TaskFulfillmentContextService tasks,
-            ConfigurationService configurations, FormValueValidator validator,
+            ConfigurationService configurations, WorkOrderExpressionContextQuery workOrders,
+            FormValueValidator validator,
             AuthorizationService authorization, IdempotencyService idempotency,
             AuditAppender audit, OutboxAppender outbox, ObjectMapper objectMapper, Clock clock
     ) {
         this.repository = repository;
         this.tasks = tasks;
         this.configurations = configurations;
+        this.workOrders = workOrders;
         this.validator = validator;
         this.authorization = authorization;
         this.idempotency = idempotency;
@@ -89,8 +95,10 @@ final class DefaultFormSubmissionService implements FormSubmissionService {
                     "Prefill conflict policy is not approved for execution");
         }
 
-        FormValueValidator.ValidationResult validation =
-                validator.validate(form.definitionJson(), command.valuesJson());
+        ExpressionContext expressionContext = validator.requiresExpressionContext(form.definitionJson())
+                ? expressionContext(principal.tenantId(), task) : null;
+        FormValueValidator.ValidationResult validation = validator.validate(
+                form.definitionJson(), command.valuesJson(), expressionContext);
         String requestDigest = Sha256.digest(command.taskId() + "|" + command.formVersionId()
                 + "|" + validation.normalizedValuesJson() + "|" + command.prefillVersion());
         CommandContext context = context(principal, metadata);
@@ -193,6 +201,19 @@ final class DefaultFormSubmissionService implements FormSubmissionService {
         catch (JacksonException exception) {
             throw new IllegalStateException("Form submission serialization failed", exception);
         }
+    }
+
+    private ExpressionContext expressionContext(String tenantId, TaskFulfillmentContext task) {
+        WorkOrderExpressionContext workOrder = workOrders.find(tenantId, task.workOrderId())
+                .orElseThrow(() -> new BusinessProblem(
+                        ProblemCode.RESOURCE_NOT_FOUND,
+                        "表单表达式上下文缺少权威工单: " + task.workOrderId()));
+        return new ExpressionContext(
+                new ExpressionContext.WorkOrderContext(
+                        workOrder.clientCode(), workOrder.brandCode(), workOrder.serviceProductCode()),
+                new ExpressionContext.RegionContext(
+                        workOrder.provinceCode(), workOrder.cityCode(), workOrder.districtCode()),
+                new ExpressionContext.TaskContext(task.stageCode(), task.taskType()));
     }
 
     private record FormSubmittedPayload(

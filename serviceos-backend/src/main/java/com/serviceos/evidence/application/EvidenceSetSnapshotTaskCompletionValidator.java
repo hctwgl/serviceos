@@ -48,6 +48,11 @@ final class EvidenceSetSnapshotTaskCompletionValidator implements HumanTaskCompl
         if (!slots.resolutionExists(principal.tenantId(), command.taskId())) {
             return;
         }
+        // 即便最新活动集合为空，尚未处置的历史资料也必须阻断完成，避免把条件变化解释成自动删除。
+        if (slots.hasPendingDisposition(principal.tenantId(), command.taskId())) {
+            throw new BusinessProblem(ProblemCode.TASK_STATE_CONFLICT,
+                    "Task 存在未处置的资料条件变化，不能完成任务");
+        }
         List<EvidenceSlotView> taskSlots = slots.listSlots(principal.tenantId(), command.taskId());
         if (taskSlots.isEmpty()) {
             return;
@@ -100,7 +105,10 @@ final class EvidenceSetSnapshotTaskCompletionValidator implements HumanTaskCompl
         if (!"TASK_SUBMISSION".equals(snapshot.purpose())
                 || !taskId.equals(snapshot.taskId())
                 || !task.projectId().equals(snapshot.projectId())
-                || !snapshot.contentDigest().equals(digest)) {
+                || !snapshot.contentDigest().equals(digest)
+                // Snapshot 只能冻结当前解析代次；表单再次提交后，旧 Snapshot 即使摘要匹配也必须失效关闭。
+                || !slots.latestResolutionId(principal.tenantId(), taskId)
+                .filter(snapshot.resolutionId()::equals).isPresent()) {
             throw notValidated();
         }
     }

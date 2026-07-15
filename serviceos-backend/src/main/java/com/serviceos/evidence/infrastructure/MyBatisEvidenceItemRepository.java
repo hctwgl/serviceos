@@ -261,6 +261,20 @@ final class MyBatisEvidenceItemRepository implements EvidenceItemRepository {
     }
 
     @Override
+    public List<EvidenceRevisionView> listCountingRevisionsForSlot(String tenantId, UUID slotId) {
+        List<Map<String, Object>> rows = mapper.listCountingRevisionsForSlot(
+                tenantId, slotId.toString());
+        // 处置是低频高风险命令，按精确 revision 加载校验事实，避免跨 Task 的宽查询与虚构占位参数。
+        return rows.stream().map(row -> {
+            UUID revisionId = uuid(row, "evidenceRevisionId");
+            Map<UUID, List<EvidenceValidationView>> validations = Map.of(
+                    revisionId, mapper.listValidations(tenantId, revisionId.toString()).stream()
+                            .map(this::validationView).toList());
+            return revisionView(row, validations);
+        }).toList();
+    }
+
+    @Override
     public boolean existsOtherCountingDigest(
             String tenantId, UUID projectId, String contentDigest, UUID excludeRevisionId
     ) {
@@ -321,7 +335,10 @@ final class MyBatisEvidenceItemRepository implements EvidenceItemRepository {
                 row.get("maxCount") == null ? null : number(row, "maxCount").intValue(),
                 text(row, "conditionInputDigest"), text(row, "explanation"),
                 text(row, "definition"), text(row, "requirementDigest"), text(row, "status"),
-                instant(row.get("resolvedAt")));
+                instant(row.get("resolvedAt")), number(row, "slotGeneration").intValue(),
+                nullableUuid(row, "supersedesSlotId"), uuid(row, "currentResolutionId"),
+                number(row, "resolutionGeneration").intValue(), true,
+                text(row, "transition"), text(row, "requiredDisposition"));
     }
 
     private EvidenceItemView itemView(Map<String, Object> row, List<EvidenceRevisionView> revisions) {
@@ -377,6 +394,11 @@ final class MyBatisEvidenceItemRepository implements EvidenceItemRepository {
     private static UUID uuid(Map<String, Object> row, String key) {
         Object value = row.get(key);
         return value instanceof UUID id ? id : UUID.fromString(value.toString());
+    }
+
+    private static UUID nullableUuid(Map<String, Object> row, String key) {
+        Object value = row.get(key);
+        return value == null ? null : value instanceof UUID id ? id : UUID.fromString(value.toString());
     }
 
     private static Number number(Map<String, Object> row, String key) {

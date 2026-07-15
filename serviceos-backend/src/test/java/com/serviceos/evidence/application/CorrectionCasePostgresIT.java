@@ -370,12 +370,13 @@ class CorrectionCasePostgresIT {
                     resolution_id, tenant_id, project_id, task_id, configuration_bundle_id,
                     configuration_bundle_digest, stage_code, source_event_id, source_event_digest,
                     resolver_version, condition_input_digest, resolution_explanation,
+                    generation_no, condition_fact_type, condition_fact_ref, condition_fact_revision,
                     slot_count, resolved_at)
                 VALUES (:id, :tenant, :project, :task, :bundle, :digest, 'SURVEY', :event,
                     :eventDigest, 'FIXED_EVIDENCE_V1',
                     '44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a',
                     CAST('{"kind":"TEST_FIXED_CONTEXT","resolverVersion":"FIXED_EVIDENCE_V1"}' AS jsonb),
-                    1, now())
+                    1, 'TASK_CREATED', CAST(:event AS varchar), 0, 1, now())
                 """).param("id", resolutionId).param("tenant", TENANT).param("project", projectId)
                 .param("task", taskId).param("bundle", bundle.bundleId())
                 .param("digest", bundle.manifestDigest()).param("event", UUID.randomUUID())
@@ -386,18 +387,30 @@ class CorrectionCasePostgresIT {
                     template_key, template_version, template_digest, requirement_code, occurrence_key,
                     requirement_name, media_type, required_flag, min_count, max_count,
                     condition_input_digest, resolution_explanation, requirement_definition,
-                    requirement_digest, status_projection, resolved_at)
+                    requirement_digest, status_projection, resolved_at, slot_generation)
                 VALUES (:slot, :tenant, :project, :task, :resolution, :template,
                     'survey.site', '1.0.0', :templateDigest, 'site.photo', 'default',
                     '现场照片', 'PHOTO', true, 1, 2, :conditionDigest,
                     CAST('{"kind":"FIXED"}' AS jsonb), CAST(:definition AS jsonb),
-                    :reqDigest, 'MISSING', now())
+                    :reqDigest, 'MISSING', now(), 1)
                 """).param("slot", slotId).param("tenant", TENANT).param("project", projectId)
                 .param("task", taskId).param("resolution", resolutionId).param("template", assetId)
                 .param("templateDigest", Sha256.digest(definition.trim()))
                 .param("conditionDigest", "f".repeat(64))
                 .param("definition", itemDefinition.trim())
                 .param("reqDigest", Sha256.digest(itemDefinition.trim())).update();
+        jdbc.sql("""
+                INSERT INTO evd_evidence_resolution_member (
+                    member_id, tenant_id, project_id, task_id, resolution_id, template_version_id,
+                    requirement_code, occurrence_key, condition_result, active_slot_id,
+                    previous_slot_id, transition, required_disposition, counting_item_count,
+                    condition_input_digest, resolution_explanation, created_at)
+                VALUES (:slot, :tenant, :project, :task, :resolution, :template,
+                    'site.photo', 'default', true, :slot, NULL, 'ACTIVATED', 'NONE', 0,
+                    :conditionDigest, CAST(:definition AS jsonb), now())
+                """).param("slot", slotId).param("tenant", TENANT).param("project", projectId)
+                .param("task", taskId).param("resolution", resolutionId).param("template", assetId)
+                .param("conditionDigest", "f".repeat(64)).param("definition", itemDefinition.trim()).update();
     }
 
     private OutboxMessage latestScanCompletedEvent() {

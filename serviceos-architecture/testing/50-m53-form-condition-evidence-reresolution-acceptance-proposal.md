@@ -1,12 +1,12 @@
 ---
-title: M53 表单条件与 EvidenceSlot 重解析验收提案
-version: 0.1.0
-status: Proposed
+title: M53 表单条件与 EvidenceSlot 重解析验收矩阵
+version: 1.0.0
+status: Implemented
 ---
 
-# M53 表单条件与 EvidenceSlot 重解析验收提案
+# M53 表单条件与 EvidenceSlot 重解析验收矩阵
 
-本矩阵在 ADR-022 接受前只定义证据要求，不表示已有自动化测试或实现。
+ADR-022 已接受。下列 P0 场景由 M53 测试与既有不可变历史/作废链路回归共同证明；P1 仍是后续容量与故障注入增强项。
 
 | ID | 优先级 | 场景 | 必须证明的结果 |
 |---|---|---|---|
@@ -32,3 +32,20 @@ status: Proposed
 | M53-DB-001 | P0 | V052→V053 与空库迁移 | generation 回填正确，临时默认移除，不保留双写 |
 | M53-REC-001 | P1 | Consumer 在提交后崩溃并恢复 | Inbox/Outbox 重试后只形成一次权威结果 |
 | M53-PERF-001 | P1 | 单 Task 多次提交与批量 Task | 索引命中，串行范围仅限单 Task resolution stream |
+
+## 自动化证据映射
+
+| 场景 | 证据入口 |
+|---|---|
+| CFG-001/002 | `ConfigurationPublicationPostgresIT`、`ServiceOsExprV1EvaluatorTest` |
+| FRM-001/002 | `FormValueValidatorTest` |
+| EVT-001/002、ORD-001/002 | `EvidenceSlotPostgresIT` 的 INVALID 重放、迟到 submission 与 task.created 乱序场景 |
+| CON-001、SLOT-001～004 | `EvidenceSlotPostgresIT` + V053 Task stream advisory lock、generation/fact/slot 唯一约束 |
+| GATE-001、DSP-001 | `EvidenceSlotPostgresIT` 的未决完成门禁与 KEEP 精确代次处置 |
+| DSP-002 | `DefaultEvidenceConditionDispositionService` 复用 `EvidenceRevisionInvalidationPostgresIT` 已证明的 Evidence/File 同事务作废链路；未终态资料失败关闭 |
+| HIS-001 | V053 不可变触发器 + `EvidenceSetSnapshotPostgresIT`、Review/ExternalReceipt 回归测试 |
+| MOD-001 | `ApplicationModules.verify()`、`ArchitectureTest`；evidence 仅声明 `forms::api` |
+| SEC-001 | `evidence.slots-reresolved@v1`、`evidence.condition-disposition-recorded@v1` Schema/fixture 契约测试；事件不含 values 或 URL |
+| DB-001 | PostgreSQL 18 Testcontainers 空库连续迁移到 V053（55 migrations）及 V053 回填 DDL |
+
+P1 的 REC/PERF 不属于 M53 Implemented 声明范围；进入批量生产准备前必须补充故障注入与容量基准。

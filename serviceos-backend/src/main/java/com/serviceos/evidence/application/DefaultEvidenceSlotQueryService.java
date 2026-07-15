@@ -50,6 +50,7 @@ final class DefaultEvidenceSlotQueryService implements EvidenceSlotQueryService 
                     ProblemCode.TASK_STATE_CONFLICT,
                     "Task evidence slots have not completed reliable resolution");
         }
-        return repository.listSlots(principal.tenantId(), taskId);
+        // Portal 必须显式看到需要人工处置的历史槽位，不能因新代条件为 false 就把风险资料隐藏。
+        return repository.listCurrentSlots(principal.tenantId(), taskId);
     }
 }

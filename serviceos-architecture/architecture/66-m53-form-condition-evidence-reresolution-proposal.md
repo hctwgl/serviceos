@@ -1,21 +1,18 @@
 ---
-title: M53 表单条件与 EvidenceSlot 重解析实施提案
-version: 0.1.0
-status: Proposed
+title: M53 表单条件与 EvidenceSlot 重解析运行时
+version: 1.0.0
+status: Implemented
 ---
 
-# M53 表单条件与 EvidenceSlot 重解析实施提案
+# M53 表单条件与 EvidenceSlot 重解析运行时
 
-## 1. 前置门禁
+## 1. 决策基线
 
 本文件把 [ADR-022](../decisions/ADR-022-conditional-fact-version-and-evidence-reresolution.md)
-转换为可执行切片，但不会替代决策批准。ADR-022 的三项待确认规则未被明确接受前：
+转换为已实现切片。ADR-022 已于 2026-07-15 接受；M53 严格采用“最新 VALIDATED 表单事实、
+true→false 人工处置、false→true 新槽位世代”三项语义。
 
-- 不修改 `FormValueValidator`、Evidence 状态机或数据库；
-- 不把本文标记为 Implemented；
-- 不更新 `implementation-status.md` 的最新里程碑。
-
-## 2. 接受后的目标范围
+## 2. 已实现范围
 
 1. FORM 发布期编译 `requiredWhen`、`visibleWhen` 和 validation rule 中的表单字段引用；
 2. SubmitForm 使用相同 `SERVICEOS_EXPR_V1` 规范执行条件必填和已批准布尔断言；
@@ -54,9 +51,9 @@ status: Proposed
 - 已提交槽位的保留/作废由显式处置命令完成，作废仍复用 M42/M46 的授权与文件联动；
 - 历史 ReviewCase 与 Snapshot 不改写，新 Review/Disposition 精确引用条件变化 generation。
 
-## 4. 数据迁移草案
+## 4. 数据迁移
 
-建议使用连续 Flyway `V053`，最终 DDL 在 ADR 接受后定稿：
+连续 Flyway `V053__create_evidence_reresolution_generation.sql` 已实现：
 
 - 把现有 M37～M52 resolution 解释为 generation 1、事实 revision 0；
 - 解除一个 Task 只能有一条 resolution 的约束，改为 `tenant + task + generation_no` 唯一；
@@ -69,10 +66,11 @@ status: Proposed
 
 迁移必须从空库和真实 V052 数据基线分别验证；回填后立即删除临时默认值。
 
-## 5. API 与事件草案
+## 5. API 与事件
 
 - `GET /tasks/{taskId}/evidence-slots` 返回最新 generationId、factRef、活动状态和待处置摘要；
-- 新增受控的 condition disposition 命令，必须携带 expected generation、reason、审批/Review 引用；
+- 新增 `POST /tasks/{taskId}/evidence-slots/{slotId}:resolve-condition-change`，必须携带
+  `expectedResolutionId`、decision、reasonCode 与 reviewRef；
 - 新增 `evidence.slots-reresolved@v1`，只携带 generation、事实摘要和 transition 计数；
 - 事件不得携带完整表单值或资料 URL；
 - 破坏现有响应字段时必须提升 OpenAPI 版本并通过客户端可重复生成门禁。
@@ -86,8 +84,17 @@ status: Proposed
 - true→false 且已有资料：标记待处置并阻断 Snapshot/CompleteTask，不自动成功；
 - 任一审计、Outbox 或 Inbox 写入失败：整个重解析事务回滚。
 
-## 7. 完成定义
+## 7. 明确未实现
 
-只有 [M53 验收提案](../testing/50-m53-form-condition-evidence-reresolution-acceptance-proposal.md)
-全部 P0 项存在自动化证据，且文档、OpenAPI、事件 Schema、Flyway、状态总览和部署迁移清单同步后，
-M53 才能标记 Implemented。
+- 任意函数、计算字段、脚本与决策表；
+- 草稿/预填冲突、客户端表达式执行与离线合并；
+- OCR/CV、GPS 权威距离；
+- 自动替用户决定 KEEP/INVALIDATE；
+- 历史资料物理删除与长期归档策略。
+
+## 8. 自动化证据
+
+证据见 [M53 验收矩阵](../testing/50-m53-form-condition-evidence-reresolution-acceptance-proposal.md)。
+核心入口为 `ConfigurationPublicationPostgresIT`、`FormValueValidatorTest`、
+`EvidenceSlotPostgresIT`、`EvidenceConditionDispositionControllerSecurityTest`、契约测试、
+Spring Modulith/ArchUnit 与全仓 `./mvnw clean verify`。

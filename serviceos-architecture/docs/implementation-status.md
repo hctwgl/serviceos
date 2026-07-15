@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-15
-baselineCommit: a8a5271
-latestMilestone: M52
+baselineCommit: pending-M53-commit
+latestMilestone: M53
 ---
 
 # ServiceOS 实施状态总览
@@ -39,13 +39,13 @@ latestMilestone: M52
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M52 条件 EvidenceSlot requiredWhen 运行时 |
-| 基线提交 | `a8a5271` |
+| 最新实施里程碑 | M53 表单条件与 EvidenceSlot 只追加重解析运行时 |
+| 基线提交 | `pending-M53-commit`（功能提交后由紧随的状态提交固化） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
 | 前端工程 | 尚未建立；已有 Admin、Network、Technician 产品与交互规格 |
-| 数据库 | PostgreSQL + Flyway（当前版本 052 / 54） |
-| 契约 | OpenAPI 0.25.0 + 事件 JSON Schema |
+| 数据库 | PostgreSQL + Flyway（当前版本 053 / 55） |
+| 契约 | OpenAPI 0.26.0 + 事件 JSON Schema |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -56,7 +56,7 @@ latestMilestone: M52
 | 工程基础 | 构建、测试、契约、可观测性、容器发布 | `IMPLEMENTED` | Maven、PostgreSQL IT、契约门禁、Trace/指标、单镜像迁移和回滚演练 | 正式 K8s、多故障域、PITR、SBOM/签名、正式 Secret Manager | M8～M14 |
 | 身份授权 | OIDC/JWT、Capability、Tenant/Project Scope、拒绝审计 | `IMPLEMENTED` | 后端认证授权和范围校验基线 | 正式企业 IdP、完整组织治理 UI | M9 |
 | 可靠消息 | Inbox、Outbox、Worker claim/lease/retry | `IMPLEMENTED` | 本地可靠发布消费、恢复和人工接管基础 | 正式 Broker 和跨服务运行 | M9～M10 |
-| 配置中心 | 不可变配置资产、Bundle 发布和版本锁定 | `PARTIAL` | FORM、EVIDENCE 等资产发布基础、工单/任务冻结引用、SERVICEOS_EXPR_V1 布尔条件子集 | 决策表/公式/脚本、完整审批和依赖闭包 | M16、M33、M36、M52 |
+| 配置中心 | 不可变配置资产、Bundle 发布和版本锁定 | `PARTIAL` | FORM、EVIDENCE 等资产发布基础、工单/任务冻结引用、SERVICEOS_EXPR_V1 布尔/类型比较子集与 FORM/EVIDENCE 字段依赖闭包 | 决策表/公式/脚本、完整审批和通用依赖图 | M16、M33、M36、M52～M53 |
 | 外部接入 | BYD CPIM V7.3.1 入站安全与工单接入 | `PARTIAL` | 验签、防重放、映射、幂等收单、配置锁定 | 全量车企接口、完整回传和正式生产确认项 | M16 |
 | 工单 | WorkOrder 接收、激活、履约完成 | `IMPLEMENTED` | 权威工单、工作流启动、跨阶段和 END 完结 | 完整取消、暂停、恢复和全部业务分支 | M16～M19 |
 | 工作流 | 线性 Stage/Task 运行时 | `PARTIAL` | 精确版本启动、线性推进、唯一跨阶段推进、完成事件 | 并行/汇聚网关、流程条件表达式和复杂流程语义 | M17～M19 |
@@ -65,8 +65,8 @@ latestMilestone: M52
 | 运营异常 | 异常工作台基础 | `PARTIAL` | 异常记录和恢复入口基础 | 完整通知、运营中心前端和跨域异常目录 | M29 |
 | 预约 | 预约修订、联系终态动作 | `PARTIAL` | Revision、并发和终态动作基础 | 用户确认渠道、完整日程和跨端协作 | M30～M31 |
 | 现场作业 | Visit 生命周期 | `PARTIAL` | Visit 运行时基础 | GPS 策略、完整现场提交、离线同步和师傅端 | M32 |
-| 动态表单 | 资产、冻结版本、不可变提交和 Task 完成门禁 | `PARTIAL` | 固定 required、基础类型校验、精确版本提交和完成引用 | 条件表达式、复杂 validator、草稿、冲突、更正和审核 | M33～M35 |
-| 资料 Evidence | 资产、槽位、Item/Revision、机器校验、Snapshot、完成门禁、作废、Review、Correction | `PARTIAL` | 固定/条件槽位初次解析、安全文件 Finalize/Invalidate 联动、确定性机器校验、TASK_SUBMISSION Snapshot、完成门禁、作废、Review/Correction/整改 Task、强制通过/重开/车企回执/WAIVED | 条件字段变化后的重解析、OCR/CV | M36～M52 |
+| 动态表单 | 资产、冻结版本、不可变提交和 Task 完成门禁 | `PARTIAL` | 固定/条件 required、visible 与布尔 validation rule，基础类型校验、精确版本提交和完成引用 | 复杂 validator、计算字段、草稿、冲突、更正和审核 | M33～M35、M53 |
+| 资料 Evidence | 资产、槽位、Item/Revision、机器校验、Snapshot、完成门禁、作废、Review、Correction | `PARTIAL` | 固定/条件槽位、VALIDATED 表单触发只追加重解析、槽位世代/lineage、REVIEW_REQUIRED 与显式 KEEP/INVALIDATE、安全文件联动、Snapshot/完成门禁及审核整改链路 | OCR/CV、GPS 权威距离、长期归档 | M36～M53 |
 | 安全文件 | Begin/Finalize/隔离/扫描/授权下载/作废 | `IMPLEMENTED` | 独立安全文件生命周期；Evidence 编排 Begin/Finalize/Invalidate 联动 | 正式对象存储、专业扫描服务、物理删除 | M11、M38、M46 |
 | 审核整改 | ReviewCase、ReviewDecision、CorrectionCase | `PARTIAL` | Review + Correction + 整改 Task + 强制通过/重开 + 车企回执 + WAIVED；补传轮次只追加 | 多候选人策略、前端、CLIENT Case 自动创建 | M44～M51 |
 | SLA | 时钟、预警、升级 | `PROPOSED` | 已有总体设计 | 完整运行时和验收尚未实施 | `architecture/12-*` |
@@ -97,7 +97,7 @@ latestMilestone: M52
 - 草稿、预填冲突和更正；
 - 表单审核闭环。
 
-### M36～M52：Evidence
+### M36～M53：Evidence
 
 已实现：
 
@@ -119,27 +119,33 @@ latestMilestone: M52
 - CorrectionCase 高风险豁免进入 WAIVED 并取消整改 Task（M51）。
 - SERVICEOS_EXPR_V1 白名单布尔条件驱动 EvidenceSlot 初次解析；true/false 决策、输入摘要与
   命中解释不可变审计，复杂度和非法配置失败关闭（M52）。
+- 同一锁定 FormVersion 的最新 VALIDATED submission 作为权威条件事实；`formValues[...]`
+  发布期类型检查与服务端表单条件验证（M53）；
+- `form.submitted@v1` 通过 Inbox 触发单 Task 串行、只追加 resolution generation；重复、迟到和
+  task.created 乱序不回退事实版本（M53）；
+- true→false 保留已提交资料并进入精确代次 REVIEW_REQUIRED；false→true 创建新槽位世代，
+  不恢复旧槽位；KEEP/INVALIDATE 处置具备 capability、审计、幂等与 Outbox（M53）；
+- Portal 槽位投影、Snapshot 与 CompleteTask 读取同一最新代次，并跨历史代次阻断未决处置（M53）。
 
 未实现：
 
-- 表单条件求值，以及条件字段变化后的 EvidenceSlot 可审计重解析；
 - OCR / 图像 CV / GPS 权威距离；
+- 计算字段、脚本/决策表、草稿冲突与离线表达式合并；
 - 多候选人策略评分与自动 claim；
 - CLIENT origin ReviewCase 自动创建与完整 OEM Connector 入站表。
 
 ## 5. 下一实施方向
 
-Evidence / Review / Correction 可靠纵向切片已推进到 **M52**。M52 只接受 ADR-018 条件层最小
-子集，不代表表达式平台或整个现场履约平台完成。下一步优先方向为 M53：在明确条件事实版本与
-槽位保留/作废规则后，实现表单条件求值和字段变化后的可审计重解析。
+Evidence / Review / Correction 可靠纵向切片已推进到 **M53**。ADR-022 已接受并实现；M53 只覆盖
+锁定表单事实驱动的资料要求重解析和显式处置，不代表表达式平台或整个现场履约平台完成。
 
 ```text
-BLOCKED — 需用户/架构决策后才能启动：
-1. M53：条件事实版本、重解析触发点，以及已提交槽位在条件变更后的保留/作废/复审规则
-2. 产品策略确认后：多候选人评分、自动 claim、网点容量联动
-3. OEM 映射与 Connector 设计确认后：CLIENT origin ReviewCase 自动创建、回传批次权威校验、affectedTargets 强校验
-4. 能力选型后：OCR/CV、GPS 权威距离、二级审批/MFA、报告 GENERATED 资料包
-5. 前端立项后：Admin/Network/Technician Portal 工程
+候选下一方向（需对应产品/架构决策后启动）：
+1. 多候选人评分、自动 claim、网点容量联动；
+2. OEM 映射与 Connector：CLIENT origin ReviewCase 自动创建、回传批次权威校验、affectedTargets 强校验；
+3. OCR/CV、GPS 权威距离、二级审批/MFA、报告 GENERATED 资料包；
+4. 表达式计算字段、决策表/脚本、草稿冲突与离线合并；
+5. Admin/Network/Technician Portal 工程。
 ```
 
 接手 Agent 必须先检查仓库是否已有更新的里程碑文档、ADR 或提交；在收到明确批准前不得猜测业务策略并实现上述候选项。

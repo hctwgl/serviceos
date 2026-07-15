@@ -31,8 +31,8 @@ status: Proposed
 | workflow | ARCH-06/20、ADR-006 | API-01 领域事件 | DATA-01 process link | M2 WF、M6 TX-011 | E2 |
 | appointment | ARCH-08 | API-03 | DATA-03 | M3 APT | E3 |
 | fieldwork | ARCH-08 | API-03 | DATA-03 | M3 VISIT/FIELD | E3 |
-| forms | ARCH-09 | API-03 | DATA-03 | M3 FORM | E3 |
-| evidence | ARCH-10 | API-03 | DATA-03 | M3 EVD/FILE | E3 |
+| forms | ARCH-09、ADR-018/022 | API-03、form.submitted@v1 | DATA-03、V053 | M3 FORM、M53 FRM | E3 |
+| evidence | ARCH-10、ADR-008/018/022 | API-03、evidence.slots-reresolved@v1 | DATA-03、V053 | M3 EVD/FILE、M53 | E3 |
 | review | ARCH-10 | API-03 | DATA-03 | M3 REV/COR | E3 |
 | network | ARCH-11 | API-04 | DATA-04 | M4 NET | E4 |
 | dispatch | ARCH-11、ADR-009 | API-04 | DATA-04 | M4 DSP/ASN | E4 |
@@ -147,3 +147,4 @@ Feature gate/authority: if applicable
 | M50 | 整改 Task 自动写入源 Evidence Task RESPONSIBLE 为 SYSTEM CANDIDATE | V050 + CorrectionCase PostgreSQL IT | 多候选人策略、自动 claim、条件槽位 |
 | M51 | CorrectionCase 高风险豁免进入 WAIVED；取消整改 Task | OpenAPI 0.25.0 + Evidence PostgreSQL/MVC/Event Contract + V051 | 条件槽位、OCR/CV、多候选人策略、自动 claim |
 | M52 | SERVICEOS_EXPR_V1 条件 EvidenceSlot；true/false 决策与输入摘要不可变审计；复杂度失败关闭 | ADR-018 + Expression/Modulith Unit + Evidence PostgreSQL IT + V052 | 表单条件求值、字段变化重解析、决策表/公式/脚本、OCR/CV |
+| M53 | VALIDATED 表单事实驱动只追加 Evidence resolution generation；槽位世代/lineage；REVIEW_REQUIRED 与显式 KEEP/INVALIDATE | ADR-022 + OpenAPI 0.26.0 + Expression/Form/Evidence/MVC/Contract/PostgreSQL IT + V053 | 计算字段、决策表/脚本、草稿离线合并、OCR/CV、GPS 权威距离 |

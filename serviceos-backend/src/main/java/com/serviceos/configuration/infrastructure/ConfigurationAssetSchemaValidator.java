@@ -8,6 +8,7 @@ import com.networknt.schema.JsonSchemaFactory;
 import com.networknt.schema.SpecVersion;
 import com.networknt.schema.ValidationMessage;
 import com.serviceos.configuration.api.ConfigurationAssetType;
+import com.serviceos.configuration.api.ConfigurationAssetDefinition;
 import com.serviceos.configuration.api.ConfigurationPublicationException;
 import com.serviceos.configuration.api.ExpressionDefinition;
 import com.serviceos.configuration.api.ExpressionEvaluationException;
@@ -18,6 +19,8 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -98,6 +101,51 @@ final class ConfigurationAssetSchemaValidator {
         }
         if (command.assetType() == ConfigurationAssetType.EVIDENCE) {
             validateEvidenceSemantics(definition);
+        } else if (command.assetType() == ConfigurationAssetType.FORM) {
+            validateFormSemantics(definition);
+        }
+    }
+
+    /**
+     * EVIDENCE 对表单字段的引用只能在 Bundle 依赖闭包中证明。以 stage 作为当前 Schema 中唯一
+     * 明确关联键；同一 stage 没有 FORM 或存在多个 FORM 时拒绝含 formValues 的资料条件，避免
+     * 运行时猜测应该读取哪个表单版本。
+     */
+    void validateBundle(List<ConfigurationAssetDefinition> assets) {
+        Map<String, List<JsonNode>> formsByStage = new LinkedHashMap<>();
+        for (ConfigurationAssetDefinition asset : assets) {
+            if (asset.assetType() == ConfigurationAssetType.FORM) {
+                JsonNode form = parse(asset.definitionJson());
+                formsByStage.computeIfAbsent(form.path("stage").asText(), ignored -> new java.util.ArrayList<>())
+                        .add(form);
+            }
+        }
+        for (ConfigurationAssetDefinition asset : assets) {
+            if (asset.assetType() != ConfigurationAssetType.EVIDENCE) {
+                continue;
+            }
+            JsonNode evidence = parse(asset.definitionJson());
+            String stage = evidence.path("stage").asText();
+            List<JsonNode> stageForms = formsByStage.getOrDefault(stage, List.of());
+            for (JsonNode item : evidence.path("items")) {
+                JsonNode requiredWhen = item.path("requiredWhen");
+                if (!item.has("requiredWhen") || requiredWhen.isNull()) {
+                    continue;
+                }
+                ExpressionDefinition expression = expression(requiredWhen);
+                if (expression.source().contains("formValues")) {
+                    if (stageForms.size() != 1) {
+                        throw new ConfigurationPublicationException(
+                                "EVIDENCE 表单条件要求同一 stage 恰好一个 FORM: "
+                                        + stage + "; 实际=" + stageForms.size());
+                    }
+                    validateExpression(expression, fieldTypes(stageForms.getFirst()),
+                            "EVIDENCE requiredWhen", item.path("evidenceKey").asText());
+                } else {
+                    validateExpression(expression, Map.of(),
+                            "EVIDENCE requiredWhen", item.path("evidenceKey").asText());
+                }
+            }
         }
     }
 
@@ -118,9 +166,7 @@ final class ConfigurationAssetSchemaValidator {
             boolean conditional = item.has("requiredWhen") && !requiredWhen.isNull();
             if (conditional) {
                 try {
-                    expressions.validate(new ExpressionDefinition(
-                            requiredWhen.path("language").asText(),
-                            requiredWhen.path("source").asText()));
+                    expressions.validate(expression(requiredWhen));
                 } catch (ExpressionEvaluationException exception) {
                     throw new ConfigurationPublicationException(
                             "EVIDENCE requiredWhen 表达式无效: " + evidenceKey
@@ -143,6 +189,82 @@ final class ConfigurationAssetSchemaValidator {
                         "EVIDENCE capture minCount must not exceed maxCount: " + evidenceKey);
             }
         }
+    }
+
+    private void validateFormSemantics(JsonNode definition) {
+        Map<String, String> types = fieldTypes(definition);
+        for (JsonNode section : definition.path("sections")) {
+            validateOptionalExpression(section, "visibility", types,
+                    "FORM section visibility", section.path("sectionKey").asText());
+            for (JsonNode field : section.path("fields")) {
+                String fieldKey = field.path("fieldKey").asText();
+                validateOptionalExpression(field, "requiredWhen", types,
+                        "FORM requiredWhen", fieldKey);
+                validateOptionalExpression(field, "visibleWhen", types,
+                        "FORM visibleWhen", fieldKey);
+                if (present(field, "editableWhen") || present(field, "defaultExpression")) {
+                    throw new ConfigurationPublicationException(
+                            "FORM 尚未接受 editableWhen/defaultExpression 运行时: " + fieldKey);
+                }
+                if (field.path("validators").isArray() && !field.path("validators").isEmpty()) {
+                    throw new ConfigurationPublicationException(
+                            "FORM validators 参数语义尚未接受: " + fieldKey);
+                }
+            }
+        }
+        for (JsonNode rule : definition.path("validationRules")) {
+            String ruleKey = rule.path("ruleKey").asText();
+            validateExpression(expression(rule.path("assert")), types,
+                    "FORM validationRule", ruleKey);
+        }
+    }
+
+    private Map<String, String> fieldTypes(JsonNode definition) {
+        Map<String, String> result = new LinkedHashMap<>();
+        for (JsonNode section : definition.path("sections")) {
+            for (JsonNode field : section.path("fields")) {
+                String key = field.path("fieldKey").asText();
+                if (result.putIfAbsent(key, field.path("dataType").asText()) != null) {
+                    throw new ConfigurationPublicationException("FORM fieldKey 必须唯一: " + key);
+                }
+            }
+        }
+        return Map.copyOf(result);
+    }
+
+    private void validateOptionalExpression(
+            JsonNode parent,
+            String field,
+            Map<String, String> types,
+            String kind,
+            String ownerKey
+    ) {
+        if (present(parent, field)) {
+            validateExpression(expression(parent.path(field)), types, kind, ownerKey);
+        }
+    }
+
+    private void validateExpression(
+            ExpressionDefinition expression,
+            Map<String, String> types,
+            String kind,
+            String ownerKey
+    ) {
+        try {
+            expressions.validate(expression, types);
+        } catch (ExpressionEvaluationException exception) {
+            throw new ConfigurationPublicationException(
+                    kind + " 表达式无效: " + ownerKey + "; " + exception.getMessage());
+        }
+    }
+
+    private static ExpressionDefinition expression(JsonNode node) {
+        return new ExpressionDefinition(
+                node.path("language").asText(), node.path("source").asText());
+    }
+
+    private static boolean present(JsonNode parent, String field) {
+        return parent.has(field) && !parent.path(field).isNull();
     }
 
     private JsonNode parse(String definitionJson) {

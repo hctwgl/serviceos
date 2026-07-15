@@ -11,7 +11,8 @@ status: Accepted
 > M47 已实现整改 Task 自动创建（见 `architecture/60-correction-task-runtime.md`）。
 > M48 已实现强制通过与重开（见 `architecture/61-review-force-approve-reopen-runtime.md`）。
 > M49 已实现 ExternalReviewReceipt 最小运行时（见 `architecture/62-external-review-receipt-runtime.md`）。
-> M52 已实现工单/区域/任务白名单事实驱动的条件槽位初次解析；条件字段变化后的重解析仍未实现。
+> M52 已实现工单/区域/任务白名单事实驱动的条件槽位初次解析；M53 已实现锁定表单事实驱动的
+> 只追加重解析、槽位世代/lineage 与条件变化人工处置。
 > 完整 Connector/CLIENT Case 自动创建仍未实现；本章其余内容仍为指导设计。
 
 ## 1. 目标
@@ -53,12 +54,13 @@ status: Accepted
 
 ## 4. 条件解析
 
-任务进入资料采集阶段时，根据锁定配置和当时已确认字段生成 `EvidenceSlot`。之后条件字段变化时：
+任务进入资料采集阶段时，根据锁定配置和当时已确认字段生成 `EvidenceSlot`。M53 对表单条件变化采用：
 
-- 尚未提交的槽位可重新解析；
-- 已提交槽位不直接删除，标记条件变化并要求规则决定保留、作废或复审；
-- 任务完成时重新使用权威字段版本校验必需槽位；
-- 解析过程保存输入字段版本、规则版本和命中解释。
+- 最新 VALIDATED FormSubmission 是同一锁定 FormVersion 的权威条件事实；
+- false→true 创建新槽位世代，true→true 沿用活动槽位；
+- true→false 不删除已提交资料，而是进入 `REVIEW_REQUIRED`，由授权命令 KEEP/INVALIDATE；
+- Portal、Snapshot 和任务完成门禁使用同一最新 resolution generation，同时保留历史未决处置；
+- 解析过程只追加保存事实版本、输入摘要、规则版本、命中解释与槽位 lineage。
 
 ## 5. 文件上传流程
 

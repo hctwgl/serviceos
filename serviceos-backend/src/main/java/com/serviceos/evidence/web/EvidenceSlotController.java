@@ -54,7 +54,10 @@ final class EvidenceSlotController {
                     slot.maxCount(), slot.conditionInputDigest(),
                     objectMapper.readTree(slot.resolutionExplanationJson()),
                     objectMapper.readTree(slot.requirementDefinitionJson()),
-                    slot.requirementDigest(), slot.status(), slot.resolvedAt());
+                    slot.requirementDigest(), slot.status(), slot.resolvedAt(),
+                    slot.slotGeneration(), slot.supersedesSlotId(), slot.currentResolutionId(),
+                    slot.resolutionGeneration(), slot.active(), slot.transition(),
+                    slot.requiredDisposition());
         } catch (JacksonException exception) {
             // 发布与解析门禁已保证 JSON 合法；存量损坏必须失败关闭，不能返回伪造空约束。
             throw new IllegalStateException("EvidenceSlot frozen JSON is invalid", exception);
@@ -82,7 +85,14 @@ final class EvidenceSlotController {
             JsonNode requirement,
             String requirementDigest,
             String status,
-            Instant resolvedAt
+            Instant resolvedAt,
+            int slotGeneration,
+            UUID supersedesSlotId,
+            UUID currentResolutionId,
+            int resolutionGeneration,
+            boolean active,
+            String transition,
+            String requiredDisposition
     ) {
     }
 }

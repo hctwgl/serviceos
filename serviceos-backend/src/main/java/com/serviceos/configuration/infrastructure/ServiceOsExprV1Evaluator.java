@@ -7,13 +7,14 @@ import com.serviceos.configuration.api.ExpressionEvaluationException;
 import com.serviceos.configuration.api.ExpressionEvaluator;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
 /**
- * SERVICEOS_EXPR_V1 布尔子集：字面量、白名单路径、==/!=/&&/||/! 与括号。
- * 不访问数据库、不调用函数、不解析未声明属性。
+ * SERVICEOS_EXPR_V1 布尔子集：强类型字面量、静态白名单路径、精确表单字段访问、
+ * ==/!=/&&/||/! 与括号。不访问数据库、不调用函数、不解析未声明属性。
  */
 @Component
 final class ServiceOsExprV1Evaluator implements ExpressionEvaluator {
@@ -27,30 +28,73 @@ final class ServiceOsExprV1Evaluator implements ExpressionEvaluator {
 
     @Override
     public ExpressionEvaluation evaluate(ExpressionDefinition expression, ExpressionContext context) {
-        if (expression.source().length() > MAX_SOURCE_LENGTH) {
-            throw new ExpressionEvaluationException(
-                    "表达式长度超过 SERVICEOS_EXPR_V1 上限: " + expression.source().length());
-        }
-        Parser parser = new Parser(expression.source(), context);
+        checkLength(expression);
+        Parser parser = Parser.runtime(expression.source(), context);
         boolean result = parser.parseOr();
         parser.expectEnd();
         return new ExpressionEvaluation(result, parser.bindings(), expression);
     }
 
+    @Override
+    public void validate(ExpressionDefinition expression) {
+        checkLength(expression);
+        Parser parser = Parser.looseValidation(expression.source());
+        parser.parseOr();
+        parser.expectEnd();
+    }
+
+    @Override
+    public void validate(ExpressionDefinition expression, Map<String, String> formFieldTypes) {
+        checkLength(expression);
+        Parser parser = Parser.strictValidation(expression.source(), formFieldTypes);
+        parser.parseOr();
+        parser.expectEnd();
+    }
+
+    private static void checkLength(ExpressionDefinition expression) {
+        if (expression.source().length() > MAX_SOURCE_LENGTH) {
+            throw new ExpressionEvaluationException(
+                    "表达式长度超过 SERVICEOS_EXPR_V1 上限: " + expression.source().length());
+        }
+    }
+
     private static final class Parser {
         private final String input;
         private final ExpressionContext context;
-        private final Map<String, String> bindings = new LinkedHashMap<>();
+        private final Map<String, ValueType> declaredFormTypes;
+        private final ValidationMode validationMode;
+        private final Map<String, Object> bindings = new LinkedHashMap<>();
         private int index;
         private int nestingDepth;
         private int operatorCount;
 
-        private Parser(String input, ExpressionContext context) {
+        private Parser(
+                String input,
+                ExpressionContext context,
+                Map<String, ValueType> declaredFormTypes,
+                ValidationMode validationMode
+        ) {
             this.input = input;
             this.context = context;
+            this.declaredFormTypes = declaredFormTypes;
+            this.validationMode = validationMode;
         }
 
-        Map<String, String> bindings() {
+        static Parser runtime(String input, ExpressionContext context) {
+            return new Parser(input, context, Map.of(), ValidationMode.RUNTIME);
+        }
+
+        static Parser looseValidation(String input) {
+            return new Parser(input, null, Map.of(), ValidationMode.LOOSE);
+        }
+
+        static Parser strictValidation(String input, Map<String, String> formFieldTypes) {
+            Map<String, ValueType> types = new LinkedHashMap<>();
+            formFieldTypes.forEach((key, type) -> types.put(key, ValueType.fromFormType(key, type)));
+            return new Parser(input, null, Map.copyOf(types), ValidationMode.STRICT);
+        }
+
+        Map<String, Object> bindings() {
             return Map.copyOf(bindings);
         }
 
@@ -105,47 +149,58 @@ final class ServiceOsExprV1Evaluator implements ExpressionEvaluator {
         }
 
         boolean parseComparison() {
-            Object left = parseValue();
+            Value left = parseValue();
             skipWhitespace();
             if (match("==")) {
                 countOperator();
-                Object right = parseValue();
+                Value right = parseValue();
                 return compareEquals(left, right);
             }
             if (match("!=")) {
                 countOperator();
-                Object right = parseValue();
+                Value right = parseValue();
                 return !compareEquals(left, right);
             }
-            if (left instanceof Boolean bool) {
-                return bool;
+            if (left.type() == ValueType.BOOLEAN) {
+                return validationMode == ValidationMode.RUNTIME
+                        ? (Boolean) left.value() : true;
             }
             throw error("独立值必须是布尔字面量");
         }
 
-        private static boolean compareEquals(Object left, Object right) {
-            if (left.getClass() != right.getClass()) {
+        private boolean compareEquals(Value left, Value right) {
+            if (left.type() != ValueType.UNKNOWN && right.type() != ValueType.UNKNOWN
+                    && left.type() != right.type()) {
                 throw new ExpressionEvaluationException(
                         "表达式比较两侧必须是相同类型");
             }
-            return left.equals(right);
+            if (validationMode != ValidationMode.RUNTIME) {
+                return true;
+            }
+            return left.value().equals(right.value());
         }
 
-        private Object parseValue() {
+        private Value parseValue() {
             skipWhitespace();
             if (matchKeyword("true")) {
-                return Boolean.TRUE;
+                return new Value(Boolean.TRUE, ValueType.BOOLEAN);
             }
             if (matchKeyword("false")) {
-                return Boolean.FALSE;
+                return new Value(Boolean.FALSE, ValueType.BOOLEAN);
             }
             if (peek() == '"') {
-                return readString();
+                return new Value(readString(), ValueType.STRING);
+            }
+            if (peek() == '-' || Character.isDigit(peek())) {
+                return readNumber();
+            }
+            if (input.startsWith("formValues", index)) {
+                return readFormValue();
             }
             return readPath();
         }
 
-        private String readPath() {
+        private Value readPath() {
             skipWhitespace();
             int start = index;
             if (!isIdentifierStart(peek())) {
@@ -159,9 +214,72 @@ final class ServiceOsExprV1Evaluator implements ExpressionEvaluator {
             if (!ALLOWED_PATHS.contains(path)) {
                 throw new ExpressionEvaluationException("表达式路径不在白名单中: " + path);
             }
+            if (validationMode != ValidationMode.RUNTIME) {
+                return new Value("__STATIC_VALIDATION__", ValueType.STRING);
+            }
             String value = resolvePath(path);
             bindings.putIfAbsent(path, value);
+            return new Value(value, ValueType.STRING);
+        }
+
+        private Value readFormValue() {
+            match("formValues");
+            if (!match("[")) {
+                throw error("formValues 后必须使用方括号字段访问");
+            }
+            skipWhitespace();
+            String fieldKey = readString();
+            if (!match("]")) {
+                throw error("表单字段访问缺少右方括号 ']'");
+            }
+            if (validationMode == ValidationMode.LOOSE) {
+                return new Value(null, ValueType.UNKNOWN);
+            }
+            if (validationMode == ValidationMode.STRICT) {
+                ValueType type = declaredFormTypes.get(fieldKey);
+                if (type == null) {
+                    throw new ExpressionEvaluationException("表达式引用未声明的表单字段: " + fieldKey);
+                }
+                return new Value(null, type);
+            }
+            if (!context.formValues().containsKey(fieldKey)) {
+                throw new ExpressionEvaluationException("表达式上下文缺少权威表单值: " + fieldKey);
+            }
+            Object raw = context.formValues().get(fieldKey);
+            Value value = Value.runtime(fieldKey, raw);
+            bindings.putIfAbsent("formValues[\"" + fieldKey + "\"]", value.value());
             return value;
+        }
+
+        private Value readNumber() {
+            int start = index;
+            if (peek() == '-') {
+                index++;
+            }
+            if (!Character.isDigit(peek())) {
+                throw error("数值字面量格式无效");
+            }
+            while (Character.isDigit(peek())) {
+                index++;
+            }
+            boolean decimal = false;
+            if (peek() == '.') {
+                decimal = true;
+                index++;
+                if (!Character.isDigit(peek())) {
+                    throw error("小数点后必须包含数字");
+                }
+                while (Character.isDigit(peek())) {
+                    index++;
+                }
+            }
+            BigDecimal number;
+            try {
+                number = new BigDecimal(input.substring(start, index));
+            } catch (NumberFormatException exception) {
+                throw error("数值字面量格式无效");
+            }
+            return new Value(number, decimal ? ValueType.DECIMAL : ValueType.INTEGER);
         }
 
         private String resolvePath(String path) {
@@ -284,6 +402,46 @@ final class ServiceOsExprV1Evaluator implements ExpressionEvaluator {
 
         private ExpressionEvaluationException error(String message) {
             return new ExpressionEvaluationException(message + "，位置 " + index);
+        }
+    }
+
+    private enum ValidationMode { RUNTIME, LOOSE, STRICT }
+
+    private enum ValueType {
+        BOOLEAN, STRING, INTEGER, DECIMAL, UNKNOWN;
+
+        static ValueType fromFormType(String fieldKey, String dataType) {
+            return switch (dataType) {
+                case "BOOLEAN" -> BOOLEAN;
+                case "INTEGER" -> INTEGER;
+                case "DECIMAL" -> DECIMAL;
+                case "STRING", "TEXT", "DATE", "DATETIME", "ENUM", "SIGNATURE", "FILE_REF" -> STRING;
+                default -> throw new ExpressionEvaluationException(
+                        "表单字段类型不能用于 SERVICEOS_EXPR_V1 标量比较: "
+                                + fieldKey + " (" + dataType + ")");
+            };
+        }
+    }
+
+    private record Value(Object value, ValueType type) {
+        static Value runtime(String fieldKey, Object raw) {
+            if (raw == null) {
+                throw new ExpressionEvaluationException("表达式上下文表单值不能为 null: " + fieldKey);
+            }
+            if (raw instanceof Boolean value) {
+                return new Value(value, ValueType.BOOLEAN);
+            }
+            if (raw instanceof Byte || raw instanceof Short || raw instanceof Integer || raw instanceof Long) {
+                return new Value(new BigDecimal(raw.toString()), ValueType.INTEGER);
+            }
+            if (raw instanceof Number value) {
+                return new Value(new BigDecimal(value.toString()), ValueType.DECIMAL);
+            }
+            if (raw instanceof String value) {
+                return new Value(value, ValueType.STRING);
+            }
+            throw new ExpressionEvaluationException(
+                    "表单字段不是可比较的标量值: " + fieldKey);
         }
     }
 }

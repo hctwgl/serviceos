@@ -3,7 +3,7 @@
         displayName = "Evidence",
         allowedDependencies = {
                 "audit::api", "authorization::api", "configuration::api", "files::api",
-                "identity::api", "reliability::api", "reliability::spi", "shared",
+                "forms::api", "identity::api", "reliability::api", "reliability::spi", "shared",
                 "task::api", "task::spi", "workorder::api"
         })
 package com.serviceos.evidence;

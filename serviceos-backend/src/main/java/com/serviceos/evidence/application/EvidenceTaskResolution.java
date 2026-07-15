@@ -20,10 +20,17 @@ public record EvidenceTaskResolution(
         String resolverVersion,
         String conditionInputDigest,
         String resolutionExplanationJson,
+        int generationNo,
+        String conditionFactType,
+        String conditionFactRef,
+        int conditionFactRevision,
+        UUID previousResolutionId,
         Instant resolvedAt,
-        List<EvidenceSlotView> slots
+        List<EvidenceSlotView> slots,
+        List<EvidenceResolutionMember> members
 ) {
     public EvidenceTaskResolution {
         slots = List.copyOf(slots);
+        members = List.copyOf(members);
     }
 }

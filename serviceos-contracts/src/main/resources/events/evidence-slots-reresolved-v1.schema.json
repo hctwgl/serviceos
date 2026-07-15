@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/evidence-slots-reresolved-v1.schema.json",
+  "title": "EvidenceSlotsReresolvedV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId",
+    "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"
+  ],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"},
+    "eventType": {"const": "evidence.slots-reresolved"},
+    "schemaVersion": {"const": 1},
+    "tenantId": {"type": "string"},
+    "correlationId": {"type": "string"},
+    "causationId": {"type": "string", "format": "uuid"},
+    "aggregateType": {"const": "EvidenceTaskResolution"},
+    "aggregateId": {"type": "string", "format": "uuid"},
+    "aggregateVersion": {"type": "integer", "minimum": 1},
+    "occurredAt": {"type": "string", "format": "date-time"},
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resolutionId", "previousResolutionId", "taskId", "projectId", "generationNo",
+        "conditionFactType", "conditionFactRef", "conditionFactRevision", "activeSlotCount",
+        "activatedCount", "deactivatedCount", "reviewRequiredCount", "occurredAt"
+      ],
+      "properties": {
+        "resolutionId": {"type": "string", "format": "uuid"},
+        "previousResolutionId": {"type": ["string", "null"], "format": "uuid"},
+        "taskId": {"type": "string", "format": "uuid"},
+        "projectId": {"type": "string", "format": "uuid"},
+        "generationNo": {"type": "integer", "minimum": 1},
+        "conditionFactType": {"const": "FORM_SUBMISSION"},
+        "conditionFactRef": {"type": "string", "format": "uuid"},
+        "conditionFactRevision": {"type": "integer", "minimum": 1},
+        "activeSlotCount": {"type": "integer", "minimum": 0},
+        "activatedCount": {"type": "integer", "minimum": 0},
+        "deactivatedCount": {"type": "integer", "minimum": 0},
+        "reviewRequiredCount": {"type": "integer", "minimum": 0},
+        "occurredAt": {"type": "string", "format": "date-time"}
+      }
+    }
+  }
+}

@@ -346,6 +346,65 @@ class ConfigurationPublicationPostgresIT {
     }
 
     @Test
+    void bundleValidatesEvidenceFormValueReferencesAgainstTheExactSameStageForm() {
+        String formDefinition = """
+                {
+                  "formKey":"survey.condition","version":"1.0.0","stage":"SURVEY",
+                  "sections":[{"sectionKey":"base","title":"基础","fields":[{
+                    "fieldKey":"site.has-parking-space","label":"是否有车位","dataType":"BOOLEAN",
+                    "binding":"task.input.site.has-parking-space"
+                  }]}]
+                }
+                """.trim();
+        UUID form = configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.FORM, "survey.condition", "1.0.0", "1.0.0",
+                formDefinition, Sha256.digest(formDefinition))).versionId();
+        String validEvidenceDefinition = """
+                {
+                  "templateKey":"survey.conditional","version":"1.0.0","stage":"SURVEY",
+                  "items":[{
+                    "evidenceKey":"site.panorama","name":"车位全景","mediaType":"PHOTO","required":false,
+                    "requiredWhen":{"language":"SERVICEOS_EXPR_V1",
+                      "source":"formValues[\\\"site.has-parking-space\\\"] == true"},
+                    "capture":{"minCount":1,"maxCount":3}
+                  }]
+                }
+                """.trim();
+        UUID validEvidence = configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.EVIDENCE, "survey.conditional", "1.0.0", "1.0.0",
+                validEvidenceDefinition, Sha256.digest(validEvidenceDefinition))).versionId();
+
+        ConfigurationBundleReference bundle = configurations.publishBundle(
+                new PublishConfigurationBundleCommand(
+                        TENANT, projectId, "BYD-OCEAN-FORM-CONDITION", "1.0.0", "BYD_OCEAN",
+                        "HOME_CHARGING_SURVEY_INSTALL", "370000", validFrom, null,
+                        List.of(workflowVersionId, form, validEvidence)));
+
+        assertThat(bundle.bundleCode()).isEqualTo("BYD-OCEAN-FORM-CONDITION");
+
+        String unknownFieldDefinition = validEvidenceDefinition
+                .replace("site.has-parking-space", "site.unknown-field")
+                .replace("survey.conditional", "survey.unknown-field");
+        UUID unknownFieldEvidence = configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.EVIDENCE, "survey.unknown-field", "1.0.0", "1.0.0",
+                unknownFieldDefinition, Sha256.digest(unknownFieldDefinition))).versionId();
+
+        assertThatThrownBy(() -> configurations.publishBundle(new PublishConfigurationBundleCommand(
+                TENANT, projectId, "BYD-OCEAN-UNKNOWN-FIELD", "1.0.0", "BYD_OCEAN",
+                "HOME_CHARGING_SURVEY_INSTALL", "320000", validFrom, null,
+                List.of(workflowVersionId, form, unknownFieldEvidence))))
+                .isInstanceOf(ConfigurationPublicationException.class)
+                .hasMessageContaining("未声明的表单字段");
+
+        assertThatThrownBy(() -> configurations.publishBundle(new PublishConfigurationBundleCommand(
+                TENANT, projectId, "BYD-OCEAN-MISSING-FORM", "1.0.0", "BYD_OCEAN",
+                "HOME_CHARGING_SURVEY_INSTALL", "440000", validFrom, null,
+                List.of(workflowVersionId, validEvidence))))
+                .isInstanceOf(ConfigurationPublicationException.class)
+                .hasMessageContaining("同一 stage 恰好一个 FORM");
+    }
+
+    @Test
     void failsClosedWhenLegacyOrManualRowsCreateAnAmbiguousMatch() {
         insertBundleRow("AMBIGUOUS-A", "a".repeat(64));
         insertBundleRow("AMBIGUOUS-B", "b".repeat(64));

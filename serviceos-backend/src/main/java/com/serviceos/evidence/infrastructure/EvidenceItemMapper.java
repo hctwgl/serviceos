@@ -86,6 +86,9 @@ interface EvidenceItemMapper {
             @Param("taskId") String taskId,
             @Param("revisionIds") List<String> revisionIds);
 
+    List<Map<String, Object>> listCountingRevisionsForSlot(
+            @Param("tenantId") String tenantId, @Param("slotId") String slotId);
+
     int countOtherCountingDigest(
             @Param("tenantId") String tenantId,
             @Param("projectId") String projectId,

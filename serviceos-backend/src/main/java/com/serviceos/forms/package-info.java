@@ -3,6 +3,6 @@
         displayName = "Forms",
         allowedDependencies = {
                 "audit::api", "authorization::api", "configuration::api", "identity::api",
-                "reliability::api", "shared", "task::api"
+                "reliability::api", "shared", "task::api", "workorder::api"
         })
 package com.serviceos.forms;

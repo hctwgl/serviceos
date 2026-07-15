@@ -65,6 +65,9 @@ public interface EvidenceItemRepository {
 
     List<EvidenceRevisionView> findRevisionsByIds(String tenantId, UUID taskId, List<UUID> revisionIds);
 
+    /** 人工 INVALIDATE 处置检查并处理该历史槽位仍在计数的精确资料版本。 */
+    List<EvidenceRevisionView> listCountingRevisionsForSlot(String tenantId, UUID slotId);
+
     boolean existsOtherCountingDigest(
             String tenantId, UUID projectId, String contentDigest, UUID excludeRevisionId);
 

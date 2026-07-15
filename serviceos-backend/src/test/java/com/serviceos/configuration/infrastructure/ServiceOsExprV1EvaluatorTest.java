@@ -6,6 +6,9 @@ import com.serviceos.configuration.api.ExpressionEvaluation;
 import com.serviceos.configuration.api.ExpressionEvaluationException;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -81,6 +84,40 @@ class ServiceOsExprV1EvaluatorTest {
                 sampleContext("BYD_OCEAN")))
                 .isInstanceOf(ExpressionEvaluationException.class)
                 .hasMessageContaining("操作符数量超过上限");
+    }
+
+    @Test
+    void evaluatesTypedFormFieldWithComplexStableKey() {
+        ExpressionContext context = sampleContext("BYD_OCEAN").withFormValues(Map.of(
+                "pole.height-mm", 1800L,
+                "needs.photo", true));
+
+        ExpressionEvaluation evaluation = evaluator.evaluate(
+                new ExpressionDefinition(ExpressionDefinition.SERVICEOS_EXPR_V1,
+                        "formValues[\"pole.height-mm\"] == 1800 && formValues[\"needs.photo\"] == true"),
+                context);
+
+        assertThat(evaluation.result()).isTrue();
+        assertThat(evaluation.bindings())
+                .containsEntry("formValues[\"pole.height-mm\"]", new BigDecimal("1800"))
+                .containsEntry("formValues[\"needs.photo\"]", true);
+    }
+
+    @Test
+    void strictPublicationRejectsUnknownOrIncompatibleFormField() {
+        ExpressionDefinition unknown = new ExpressionDefinition(
+                ExpressionDefinition.SERVICEOS_EXPR_V1,
+                "formValues[\"missing\"] == true");
+        ExpressionDefinition wrongType = new ExpressionDefinition(
+                ExpressionDefinition.SERVICEOS_EXPR_V1,
+                "formValues[\"count\"] == \"one\"");
+
+        assertThatThrownBy(() -> evaluator.validate(unknown, Map.of("count", "INTEGER")))
+                .isInstanceOf(ExpressionEvaluationException.class)
+                .hasMessageContaining("未声明");
+        assertThatThrownBy(() -> evaluator.validate(wrongType, Map.of("count", "INTEGER")))
+                .isInstanceOf(ExpressionEvaluationException.class)
+                .hasMessageContaining("类型");
     }
 
     private static ExpressionContext sampleContext(String brandCode) {

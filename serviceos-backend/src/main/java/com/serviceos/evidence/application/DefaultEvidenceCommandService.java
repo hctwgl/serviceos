@@ -372,8 +372,10 @@ final class DefaultEvidenceCommandService implements EvidenceCommandService {
                 revision.fileObjectId(), reasonCode, "EvidenceRevision",
                 revision.evidenceRevisionId().toString()));
 
-        EvidenceSlotView locked = repository.lockSlot(principal.tenantId(), revision.evidenceSlotId());
-        refreshSlotProjection(principal.tenantId(), locked);
+        // 历史停用槽位仍允许通过显式作废链路处理；只有仍属最新活动集合时才刷新活动投影。
+        repository.findSlot(principal.tenantId(), revision.taskId(), revision.evidenceSlotId())
+                .ifPresent(active -> refreshSlotProjection(
+                        principal.tenantId(), repository.lockSlot(principal.tenantId(), active.slotId())));
         repository.saveCommandResult(principal.tenantId(), INVALIDATE_OPERATION,
                 context.idempotencyKey(), revision.evidenceRevisionId());
 

@@ -94,6 +94,11 @@ final class DefaultEvidenceSetSnapshotService implements EvidenceSetSnapshotServ
             throw new BusinessProblem(ProblemCode.TASK_STATE_CONFLICT,
                     "Task evidence slots have not completed reliable resolution");
         }
+        // 条件从 true 变为 false 且已有计数资料时，必须先人工决定保留或失效；Snapshot 不得越过该门禁。
+        if (slots.hasPendingDisposition(principal.tenantId(), task.taskId())) {
+            throw new BusinessProblem(ProblemCode.TASK_STATE_CONFLICT,
+                    "Task 存在未处置的资料条件变化，不能创建资料快照");
+        }
 
         List<EvidenceSlotView> taskSlots = slots.listSlots(principal.tenantId(), task.taskId());
         List<UUID> revisionIds = command.memberRevisionIds() == null

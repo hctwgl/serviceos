@@ -88,7 +88,7 @@ final class JdbcConfigurationService implements ConfigurationService {
 
         AssetRow row = inserted == 1
                 ? new AssetRow(versionId, command.assetType(), command.assetKey(),
-                command.semanticVersion(), command.schemaVersion(), command.contentDigest())
+                command.semanticVersion(), command.schemaVersion(), command.definitionJson(), command.contentDigest())
                 : findAsset(command);
         if (!row.schemaVersion().equals(command.schemaVersion())
                 || !row.contentDigest().equals(command.contentDigest())) {
@@ -107,6 +107,7 @@ final class JdbcConfigurationService implements ConfigurationService {
             throw new ConfigurationPublicationException(
                     "every bundle item must reference a published asset in the same tenant");
         }
+        schemaValidator.validateBundle(assets.stream().map(AssetRow::definition).toList());
         String actualManifestDigest = bundleDigest(command, assets);
 
         String scopeKey = String.join("|", command.tenantId(), command.projectId().toString(),
@@ -337,7 +338,7 @@ final class JdbcConfigurationService implements ConfigurationService {
     private AssetRow findAsset(PublishConfigurationAssetCommand command) {
         return jdbc.sql("""
                 SELECT version_id, asset_type, asset_key, semantic_version,
-                       schema_version, content_digest
+                       schema_version, definition::text AS definition_json, content_digest
                   FROM cfg_configuration_asset_version
                  WHERE tenant_id = :tenantId AND asset_type = :assetType
                    AND asset_key = :assetKey AND semantic_version = :semanticVersion
@@ -353,7 +354,7 @@ final class JdbcConfigurationService implements ConfigurationService {
     private List<AssetRow> findAssets(String tenantId, List<UUID> versionIds) {
         return jdbc.sql("""
                 SELECT version_id, asset_type, asset_key, semantic_version,
-                       schema_version, content_digest
+                       schema_version, definition::text AS definition_json, content_digest
                   FROM cfg_configuration_asset_version
                  WHERE tenant_id = :tenantId AND status = 'PUBLISHED'
                    AND version_id IN (:versionIds)
@@ -371,6 +372,7 @@ final class JdbcConfigurationService implements ConfigurationService {
                 rs.getString("asset_key"),
                 rs.getString("semantic_version"),
                 rs.getString("schema_version"),
+                rs.getString("definition_json"),
                 rs.getString("content_digest"));
     }
 
@@ -488,11 +490,18 @@ final class JdbcConfigurationService implements ConfigurationService {
             String assetKey,
             String semanticVersion,
             String schemaVersion,
+            String definitionJson,
             String contentDigest
     ) {
         ConfigurationAssetVersionReference reference() {
             return new ConfigurationAssetVersionReference(
                     versionId, assetType, assetKey, semanticVersion, contentDigest);
+        }
+
+        ConfigurationAssetDefinition definition() {
+            return new ConfigurationAssetDefinition(
+                    versionId, assetType, assetKey, semanticVersion,
+                    schemaVersion, definitionJson, contentDigest);
         }
     }
 

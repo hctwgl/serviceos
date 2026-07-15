@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/evidence-condition-disposition-recorded-v1.schema.json",
+  "title": "EvidenceConditionDispositionRecordedV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId",
+    "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"
+  ],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"},
+    "eventType": {"const": "evidence.condition-disposition-recorded"},
+    "schemaVersion": {"const": 1},
+    "tenantId": {"type": "string"},
+    "correlationId": {"type": "string"},
+    "causationId": {"type": "string"},
+    "aggregateType": {"const": "EvidenceConditionDisposition"},
+    "aggregateId": {"type": "string", "format": "uuid"},
+    "aggregateVersion": {"const": 1},
+    "occurredAt": {"type": "string", "format": "date-time"},
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dispositionId", "taskId", "projectId", "resolutionId", "slotId", "decision",
+        "reasonCode", "reviewRef", "affectedRevisionCount", "decidedAt"
+      ],
+      "properties": {
+        "dispositionId": {"type": "string", "format": "uuid"},
+        "taskId": {"type": "string", "format": "uuid"},
+        "projectId": {"type": "string", "format": "uuid"},
+        "resolutionId": {"type": "string", "format": "uuid"},
+        "slotId": {"type": "string", "format": "uuid"},
+        "decision": {"enum": ["KEEP", "INVALIDATE"]},
+        "reasonCode": {"type": "string", "minLength": 1, "maxLength": 100},
+        "reviewRef": {"type": "string", "minLength": 1, "maxLength": 200},
+        "affectedRevisionCount": {"type": "integer", "minimum": 0},
+        "decidedAt": {"type": "string", "format": "date-time"}
+      }
+    }
+  }
+}

@@ -2,11 +2,6 @@ package com.serviceos.evidence.application;
 
 import com.serviceos.audit.api.AuditAppender;
 import com.serviceos.audit.api.AuditEntry;
-import com.serviceos.configuration.api.ConfigurationAssetDefinition;
-import com.serviceos.configuration.api.ConfigurationAssetType;
-import com.serviceos.configuration.api.ConfigurationService;
-import com.serviceos.configuration.api.ExpressionContext;
-import com.serviceos.evidence.api.EvidenceSlotView;
 import com.serviceos.reliability.api.InboxDecision;
 import com.serviceos.reliability.api.InboxService;
 import com.serviceos.reliability.api.OutboxAppender;
@@ -17,8 +12,6 @@ import com.serviceos.shared.Sha256;
 import com.serviceos.task.api.TaskCreatedPayload;
 import com.serviceos.task.api.TaskFulfillmentContext;
 import com.serviceos.task.api.TaskFulfillmentContextService;
-import com.serviceos.workorder.api.WorkOrderExpressionContext;
-import com.serviceos.workorder.api.WorkOrderExpressionContextQuery;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
@@ -26,15 +19,11 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Supplier;
 import java.util.UUID;
 
-/** task.created@v1 的可靠消费者，在一个事务中冻结 slot、审计、事件和 Inbox 结果。 */
+/** task.created@v1 的可靠消费者；所有 generation 写入统一委托给单一解析服务。 */
 @Service
 final class EvidenceTaskCreatedHandler implements OutboxMessageHandler {
     private static final String CONSUMER = "evidence.task-created.fixed-slots.v1";
@@ -42,10 +31,7 @@ final class EvidenceTaskCreatedHandler implements OutboxMessageHandler {
 
     private final InboxService inbox;
     private final TaskFulfillmentContextService tasks;
-    private final WorkOrderExpressionContextQuery workOrders;
-    private final ConfigurationService configurations;
-    private final EvidenceTemplateResolver resolver;
-    private final EvidenceSlotRepository repository;
+    private final EvidenceResolutionGenerationService generations;
     private final AuditAppender audit;
     private final OutboxAppender outbox;
     private final ObjectMapper objectMapper;
@@ -54,10 +40,7 @@ final class EvidenceTaskCreatedHandler implements OutboxMessageHandler {
     EvidenceTaskCreatedHandler(
             InboxService inbox,
             TaskFulfillmentContextService tasks,
-            WorkOrderExpressionContextQuery workOrders,
-            ConfigurationService configurations,
-            EvidenceTemplateResolver resolver,
-            EvidenceSlotRepository repository,
+            EvidenceResolutionGenerationService generations,
             AuditAppender audit,
             OutboxAppender outbox,
             ObjectMapper objectMapper,
@@ -65,10 +48,7 @@ final class EvidenceTaskCreatedHandler implements OutboxMessageHandler {
     ) {
         this.inbox = inbox;
         this.tasks = tasks;
-        this.workOrders = workOrders;
-        this.configurations = configurations;
-        this.resolver = resolver;
-        this.repository = repository;
+        this.generations = generations;
         this.audit = audit;
         this.outbox = outbox;
         this.objectMapper = objectMapper;
@@ -93,126 +73,56 @@ final class EvidenceTaskCreatedHandler implements OutboxMessageHandler {
 
         TaskCreatedPayload created = read(message.payload());
         if (!created.taskId().toString().equals(message.aggregateId())) {
-            throw new IllegalArgumentException("TaskCreated aggregateId does not match payload");
+            throw new IllegalArgumentException("TaskCreated aggregateId 与 payload 不一致");
         }
         TaskFulfillmentContext task = tasks.find(message.tenantId(), created.taskId())
-                .orElseThrow(() -> new IllegalStateException("TaskCreated task does not exist"));
+                .orElseThrow(() -> new IllegalStateException("TaskCreated 对应 Task 不存在"));
         validateContext(created, task);
-        List<ConfigurationAssetDefinition> templates = configurations.listBundleAssets(
-                message.tenantId(), task.configurationBundleId(), task.configurationBundleDigest(),
-                ConfigurationAssetType.EVIDENCE);
-        Supplier<ExpressionContext> expressionContext = memoizedExpressionContext(message.tenantId(), task);
-        List<ResolvedEvidenceTemplate> resolvedTemplates = templates.stream()
-                .map(template -> resolver.resolve(template, task.stageCode(), expressionContext))
-                .toList();
-        List<ResolvedEvidenceRequirement> requirements = resolvedTemplates.stream()
-                .flatMap(result -> result.requirements().stream()).toList();
-        List<ResolvedEvidenceCondition> conditions = resolvedTemplates.stream()
-                .flatMap(result -> result.conditions().stream()).toList();
-        ExpressionContext resolvedConditionInput = conditions.isEmpty() ? null : expressionContext.get();
-        String conditionInputJson = resolvedConditionInput == null ? "{}" : write(resolvedConditionInput);
-        String conditionInputDigest = Sha256.digest(conditionInputJson);
-        Map<String, Object> resolutionExplanation = new LinkedHashMap<>();
-        resolutionExplanation.put("resolverVersion", EvidenceTemplateResolver.VERSION);
-        if (resolvedConditionInput != null) {
-            resolutionExplanation.put("conditionInput", resolvedConditionInput);
-        }
-        resolutionExplanation.put("conditions", conditions);
-        resolutionExplanation.put("createdSlotCount", requirements.size());
-        String resolutionExplanationJson = write(resolutionExplanation);
 
+        EvidenceResolutionApplyResult result = generations.apply(
+                message.tenantId(), task, message.eventId(), message.payloadDigest(),
+                "TASK_CREATED", message.eventId().toString(), 0, Map.of());
         Instant now = clock.instant();
-        UUID resolutionId = UUID.randomUUID();
-        List<EvidenceSlotView> slots = new ArrayList<>();
-        for (ResolvedEvidenceRequirement requirement : requirements) {
-            slots.add(new EvidenceSlotView(
-                    UUID.randomUUID(), resolutionId, task.taskId(), task.projectId(),
-                    requirement.templateVersionId(), requirement.templateKey(),
-                    requirement.templateVersion(), requirement.templateDigest(),
-                    requirement.requirementCode(), "default", requirement.requirementName(),
-                    requirement.mediaType(), requirement.required(), requirement.minCount(),
-                    requirement.maxCount(), requirement.conditionInputDigest(),
-                    requirement.resolutionExplanationJson(), requirement.requirementDefinitionJson(),
-                    requirement.requirementDigest(),
-                    requirement.minCount() > 0 ? "MISSING" : "SATISFIED", now));
-        }
-
-        EvidenceTaskResolution resolution = new EvidenceTaskResolution(
-                resolutionId, message.tenantId(), task.projectId(), task.taskId(),
-                task.configurationBundleId(), task.configurationBundleDigest(), task.stageCode(),
-                message.eventId(), message.payloadDigest(), EvidenceTemplateResolver.VERSION,
-                conditionInputDigest, resolutionExplanationJson,
-                now, slots);
-        repository.insert(resolution);
-
         String requestDigest = Sha256.digest(message.payloadDigest() + "|"
-                + task.configurationBundleDigest() + "|"
-                + conditionInputDigest + "|"
-                + templates.stream().map(ConfigurationAssetDefinition::contentDigest)
-                .reduce((left, right) -> left + "|" + right).orElse(""));
-        String eventPayload = write(new EvidenceSlotsResolvedPayload(
-                resolutionId, task.taskId(), task.projectId(), task.configurationBundleId(),
-                task.configurationBundleDigest(), task.stageCode(), slots.size(), now));
-        outbox.append(new OutboxEvent(
-                UUID.randomUUID(), UUID.randomUUID(), "evidence", "evidence.slots-resolved", 1,
-                "EvidenceTaskResolution", resolutionId.toString(), 1,
-                message.tenantId(), message.correlationId(), message.eventId().toString(),
-                task.taskId().toString(), eventPayload, Sha256.digest(eventPayload), now));
+                + task.configurationBundleDigest() + "|" + result.outcome());
+        if (result.applied()) {
+            EvidenceTaskResolution resolution = result.resolution();
+            String eventPayload = write(new EvidenceSlotsResolvedPayload(
+                    resolution.resolutionId(), task.taskId(), task.projectId(),
+                    task.configurationBundleId(), task.configurationBundleDigest(), task.stageCode(),
+                    result.activeSlotCount(), now));
+            outbox.append(new OutboxEvent(
+                    UUID.randomUUID(), UUID.randomUUID(), "evidence", "evidence.slots-resolved", 1,
+                    "EvidenceTaskResolution", resolution.resolutionId().toString(),
+                    resolution.generationNo(), message.tenantId(), message.correlationId(),
+                    message.eventId().toString(), task.taskId().toString(),
+                    eventPayload, Sha256.digest(eventPayload), now));
+        }
         audit.append(new AuditEntry(
                 UUID.randomUUID(), message.tenantId(), SYSTEM_ACTOR, "EVIDENCE_SLOTS_RESOLVED", null,
                 "Task", task.taskId().toString(), "SYSTEM", List.of(),
-                EvidenceTemplateResolver.VERSION, "RESOLVED", null, requestDigest,
+                EvidenceTemplateResolver.VERSION, result.outcome(), null, requestDigest,
                 message.correlationId(), now));
+        String resultRef = result.applied()
+                ? result.resolution().resolutionId().toString() : result.outcome();
         inbox.complete(message.tenantId(), CONSUMER, message.eventId(),
-                Sha256.digest(resolutionId + "|" + slots.size() + "|" + requestDigest));
-    }
-
-    private ExpressionContext expressionContext(String tenantId, TaskFulfillmentContext task) {
-        WorkOrderExpressionContext workOrder = workOrders.find(tenantId, task.workOrderId())
-                .orElseThrow(() -> new IllegalStateException(
-                        "WorkOrder does not exist for expression context: " + task.workOrderId()));
-        return new ExpressionContext(
-                new ExpressionContext.WorkOrderContext(
-                        workOrder.clientCode(), workOrder.brandCode(), workOrder.serviceProductCode()),
-                new ExpressionContext.RegionContext(
-                        workOrder.provinceCode(), workOrder.cityCode(), workOrder.districtCode()),
-                new ExpressionContext.TaskContext(task.stageCode(), task.taskType()));
-    }
-
-    /**
-     * 大多数 Task 没有条件资料；只有解释器真正遇到 requiredWhen 时才读取 WorkOrder。
-     * 同一任务可能包含多个条件模板，因此在当前事务内缓存一次权威上下文，避免重复查询和
-     * 条件之间读到不同快照。固定槽位与无 Evidence 模板任务完全不触发该跨模块读取。
-     */
-    private Supplier<ExpressionContext> memoizedExpressionContext(
-            String tenantId, TaskFulfillmentContext task
-    ) {
-        AtomicReference<ExpressionContext> cached = new AtomicReference<>();
-        return () -> {
-            ExpressionContext current = cached.get();
-            if (current != null) {
-                return current;
-            }
-            ExpressionContext loaded = expressionContext(tenantId, task);
-            cached.compareAndSet(null, loaded);
-            return cached.get();
-        };
+                Sha256.digest(resultRef + "|" + result.activeSlotCount() + "|" + requestDigest));
     }
 
     private static void validateEnvelope(OutboxMessage message) {
         if (!"task".equals(message.module()) || !"Task".equals(message.aggregateType())) {
-            throw new IllegalArgumentException("unsupported TaskCreated envelope");
+            throw new IllegalArgumentException("不支持的 TaskCreated 事件信封");
         }
     }
 
     private static void validateContext(TaskCreatedPayload created, TaskFulfillmentContext task) {
         if (!created.projectId().equals(task.projectId())
                 || !created.workOrderId().equals(task.workOrderId())) {
-            throw new IllegalArgumentException("TaskCreated ownership does not match Task context");
+            throw new IllegalArgumentException("TaskCreated 所有权与 Task 上下文不一致");
         }
         if (task.configurationBundleId() == null || task.configurationBundleDigest() == null
                 || task.stageCode() == null) {
-            throw new IllegalStateException("Workflow Task has incomplete frozen evidence context");
+            throw new IllegalStateException("Workflow Task 缺少冻结的资料解析上下文");
         }
     }
 
@@ -220,7 +130,7 @@ final class EvidenceTaskCreatedHandler implements OutboxMessageHandler {
         try {
             return objectMapper.readValue(payload, TaskCreatedPayload.class);
         } catch (JacksonException exception) {
-            throw new IllegalArgumentException("TaskCreated payload cannot be decoded", exception);
+            throw new IllegalArgumentException("TaskCreated payload 无法解析", exception);
         }
     }
 
@@ -228,7 +138,7 @@ final class EvidenceTaskCreatedHandler implements OutboxMessageHandler {
         try {
             return objectMapper.writeValueAsString(value);
         } catch (JacksonException exception) {
-            throw new IllegalStateException("Evidence event serialization failed", exception);
+            throw new IllegalStateException("Evidence 事件无法序列化", exception);
         }
     }
 
