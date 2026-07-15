@@ -53,3 +53,4 @@
 - [M50 自动候选人验收](47-m50-correction-auto-candidate-acceptance.md)
 - [M51 CorrectionCase WAIVED 验收](48-m51-correction-waive-acceptance.md)
 - [M52 条件 EvidenceSlot 验收](49-m52-conditional-evidence-slot-acceptance.md)
+- [M53 表单条件与 EvidenceSlot 重解析验收提案](50-m53-form-condition-evidence-reresolution-acceptance-proposal.md)
