@@ -19,7 +19,7 @@ versions=()
 declare -A seen_versions=()
 for file in "${versioned_files[@]}"; do
   name="$(basename "${file}")"
-  if [[ ! "${name}" =~ ^V([0-9]+)__.\.sql$ ]]; then
+  if [[ ! "${name}" =~ ^V([0-9]+)__.+'\.sql'$ ]]; then
     fail "版本化迁移文件名不合法: ${name}"
   fi
   version="${BASH_REMATCH[1]}"
