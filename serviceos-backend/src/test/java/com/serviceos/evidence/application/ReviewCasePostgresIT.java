@@ -25,6 +25,12 @@ import com.serviceos.evidence.api.ReviewCaseService;
 import com.serviceos.evidence.api.ReviewCaseView;
 import com.serviceos.files.infrastructure.LocalObjectTransferService;
 import com.serviceos.identity.api.CurrentPrincipal;
+import com.serviceos.integration.api.ExternalReviewRouteService;
+import com.serviceos.integration.api.RegisterExternalReviewRouteCommand;
+import com.serviceos.integration.byd.api.BydCpimReviewCallbackResponse;
+import com.serviceos.integration.byd.api.BydCpimSignatureHeaders;
+import com.serviceos.integration.byd.application.BydCpimReviewCallbackService;
+import com.serviceos.integration.byd.infrastructure.BydCpimSignatureVerifier;
 import com.serviceos.reliability.spi.OutboxMessage;
 import com.serviceos.reliability.spi.OutboxMessageHandler;
 import com.serviceos.shared.BusinessProblem;
@@ -52,6 +58,8 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.Clock;
+import java.time.ZoneId;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
@@ -69,6 +77,8 @@ class ReviewCasePostgresIT {
     private static final String REVIEWER = "reviewer-evidence-044";
     private static final String FORCE_ADMIN = "force-admin-evidence-048";
     private static final String ADAPTER = "byd-adapter-evidence-049";
+    private static final String CPIM_APP_KEY = "review-callback-app-key";
+    private static final String CPIM_APP_SECRET = "review-callback-app-secret";
     private static final Path STORAGE_ROOT = temporaryStorageRoot();
 
     @Container
@@ -87,6 +97,11 @@ class ReviewCasePostgresIT {
         registry.add("serviceos.files.local.signing-key",
                 () -> "evidence-review-it-signing-key-with-thirty-two-bytes");
         registry.add("serviceos.task.scheduling-enabled", () -> "false");
+        registry.add("serviceos.integration.byd.cpim.app-key", () -> CPIM_APP_KEY);
+        registry.add("serviceos.integration.byd.cpim.app-secret", () -> CPIM_APP_SECRET);
+        registry.add("serviceos.integration.byd.cpim.zone-id", () -> "Asia/Shanghai");
+        registry.add("serviceos.integration.byd.cpim.tenant-id", () -> TENANT);
+        registry.add("serviceos.integration.byd.cpim.adapter-principal-id", () -> ADAPTER);
     }
 
     @Autowired ConfigurationService configurations;
@@ -94,6 +109,9 @@ class ReviewCasePostgresIT {
     @Autowired EvidenceSetSnapshotService snapshots;
     @Autowired ReviewCaseService reviews;
     @Autowired ExternalReviewReceiptService receipts;
+    @Autowired ExternalReviewRouteService reviewRoutes;
+    @Autowired BydCpimReviewCallbackService reviewCallbacks;
+    @Autowired Clock clock;
     @Autowired LocalObjectTransferService transfers;
     @Autowired TaskExecutionWorker worker;
     @Autowired List<OutboxMessageHandler> handlers;
@@ -107,6 +125,8 @@ class ReviewCasePostgresIT {
     void setUp() throws Exception {
         jdbc.sql("""
                 TRUNCATE TABLE
+                    int_inbound_item_result, int_external_review_route,
+                    int_canonical_message, int_inbound_envelope, int_inbound_replay_guard,
                     evd_external_review_receipt, evd_external_receipt_command_result,
                     evd_correction_resubmission, evd_correction_case, evd_correction_command_result,
                     evd_review_decision, evd_review_case, evd_review_command_result,
@@ -136,8 +156,165 @@ class ReviewCasePostgresIT {
         grant(TECHNICIAN, "evidence.submit", "evidence.read", "file.upload", "file.download");
         grant(REVIEWER, "evidence.review", "evidence.read");
         grant(FORCE_ADMIN, "evidence.forceApprove", "review.reopen", "evidence.read", "evidence.review");
-        grant(ADAPTER, "evidence.createClientReviewCase", "evidence.recordExternalReceipt", "evidence.read");
+        grant(ADAPTER, "evidence.createClientReviewCase", "evidence.recordExternalReceipt",
+                "evidence.read", "integration.registerExternalReviewRoute");
         seedResolvedSlot();
+    }
+
+    @Test
+    void bydReviewCallbackProcessesRegisteredOrderAndPersistsPartialFailure() throws Exception {
+        ReviewCaseView routedCase = createClientCase(
+                createSnapshot("callback-routed"), "callback-routed", "BATCH-CB-1", "MAP-CB-1");
+        reviewRoutes.register(adapter(), metadata("route-callback-routed"),
+                new RegisterExternalReviewRouteCommand(
+                        "ORDER-CB-1", routedCase.reviewCaseId(), routedCase.externalSubmissionRef(),
+                        routedCase.callbackBatchRef(), routedCase.mappingVersionId()));
+
+        Map<String, Object> payload = Map.of(
+                "orderCode", "ORDER-CB-1,ORDER-NO-ROUTE",
+                "result", "1",
+                "remark", "厂端审核通过",
+                "examinePerson", "比亚迪审核员",
+                "examineDate", "2026-07-15 09:30:00");
+        LocalDate protocolDate = LocalDate.now(clock.withZone(ZoneId.of("Asia/Shanghai")));
+        String nonce = "review-callback-nonce-1";
+        String signature = new BydCpimSignatureVerifier(
+                CPIM_APP_KEY, CPIM_APP_SECRET, clock, ZoneId.of("Asia/Shanghai"))
+                .sign(nonce, protocolDate, payload);
+
+        BydCpimReviewCallbackResponse response = reviewCallbacks.receive(
+                new BydCpimSignatureHeaders(CPIM_APP_KEY, nonce, protocolDate, signature),
+                new tools.jackson.databind.ObjectMapper().writeValueAsBytes(payload), "corr-review-callback");
+
+        assertThat(response.message()).isEqualTo("partially success");
+        assertThat(response.data()).singleElement().satisfies(failure -> {
+            assertThat(failure.orderCode()).isEqualTo("ORDER-NO-ROUTE");
+            assertThat(failure.reason()).isEqualTo("ROUTE_NOT_FOUND");
+        });
+        assertThat(reviews.get(adapter(), "callback-result", routedCase.reviewCaseId()).status())
+                .isEqualTo("APPROVED");
+        assertThat(jdbc.sql("SELECT count(*) FROM evd_external_review_receipt")
+                .query(Long.class).single()).isOne();
+        assertThat(jdbc.sql("SELECT count(*) FROM evd_review_decision WHERE decision_source='EXTERNAL'")
+                .query(Long.class).single()).isOne();
+        assertThat(jdbc.sql("SELECT count(*) FROM int_inbound_item_result")
+                .query(Long.class).single()).isEqualTo(2);
+        assertThat(jdbc.sql("SELECT count(*) FROM tsk_task WHERE task_type='integration.external-review-manual'")
+                .query(Long.class).single()).isOne();
+        assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type="
+                        + "'integration.external-review-callback-processed'")
+                .query(Long.class).single()).isOne();
+
+        BydCpimReviewCallbackResponse replay = reviewCallbacks.receive(
+                new BydCpimSignatureHeaders(CPIM_APP_KEY, nonce, protocolDate, signature),
+                new tools.jackson.databind.ObjectMapper().writeValueAsBytes(payload), "corr-review-callback-replay");
+        assertThat(replay).isEqualTo(response);
+        assertThat(jdbc.sql("SELECT count(*) FROM evd_external_review_receipt")
+                .query(Long.class).single()).isOne();
+        assertThat(jdbc.sql("SELECT count(*) FROM int_inbound_envelope")
+                .query(Long.class).single()).isOne();
+
+        String secondNonce = "review-callback-nonce-2";
+        String secondSignature = new BydCpimSignatureVerifier(
+                CPIM_APP_KEY, CPIM_APP_SECRET, clock, ZoneId.of("Asia/Shanghai"))
+                .sign(secondNonce, protocolDate, payload);
+        BydCpimReviewCallbackResponse businessReplay = reviewCallbacks.receive(
+                new BydCpimSignatureHeaders(CPIM_APP_KEY, secondNonce, protocolDate, secondSignature),
+                new tools.jackson.databind.ObjectMapper().writeValueAsBytes(payload), "corr-review-business-replay");
+        assertThat(businessReplay).isEqualTo(response);
+        assertThat(jdbc.sql("SELECT count(*) FROM int_inbound_envelope")
+                .query(Long.class).single()).isEqualTo(2);
+        assertThat(jdbc.sql("SELECT count(*) FROM int_canonical_message")
+                .query(Long.class).single()).isEqualTo(2);
+        assertThat(jdbc.sql("SELECT count(*) FROM evd_external_review_receipt")
+                .query(Long.class).single()).isOne();
+
+        Map<String, Object> conflictingPayload = Map.of(
+                "orderCode", "ORDER-CB-1,ORDER-NO-ROUTE",
+                "result", "1",
+                "remark", "同一审核事实被改写",
+                "examinePerson", "比亚迪审核员",
+                "examineDate", "2026-07-15 09:30:00");
+        String conflictNonce = "review-callback-nonce-3";
+        String conflictSignature = new BydCpimSignatureVerifier(
+                CPIM_APP_KEY, CPIM_APP_SECRET, clock, ZoneId.of("Asia/Shanghai"))
+                .sign(conflictNonce, protocolDate, conflictingPayload);
+        BydCpimReviewCallbackResponse conflict = reviewCallbacks.receive(
+                new BydCpimSignatureHeaders(CPIM_APP_KEY, conflictNonce, protocolDate, conflictSignature),
+                new tools.jackson.databind.ObjectMapper().writeValueAsBytes(conflictingPayload),
+                "corr-review-business-conflict");
+
+        assertThat(conflict.message()).isEqualTo("partially success");
+        assertThat(conflict.data()).hasSize(2).allSatisfy(failure ->
+                assertThat(failure.reason()).isEqualTo("CANONICAL_CONFLICT"));
+        assertThat(jdbc.sql("SELECT count(*) FROM int_inbound_envelope")
+                .query(Long.class).single()).isEqualTo(3);
+        assertThat(jdbc.sql("SELECT count(*) FROM int_canonical_message")
+                .query(Long.class).single()).isEqualTo(2);
+        assertThat(jdbc.sql("SELECT count(*) FROM evd_external_review_receipt")
+                .query(Long.class).single()).isOne();
+        assertThat(jdbc.sql("SELECT count(*) FROM tsk_task WHERE task_type='integration.external-review-manual'")
+                .query(Long.class).single()).isEqualTo(3);
+    }
+
+    @Test
+    void bydReviewCallbackRejectsClientCaseAndKeepsPrivateRemarkOutOfDomainFacts() throws Exception {
+        ReviewCaseView client = createClientCase(
+                createSnapshot("callback-reject"), "callback-reject", "BATCH-CB-REJECT", "MAP-CB-REJECT");
+        reviewRoutes.register(adapter(), metadata("route-callback-reject"),
+                new RegisterExternalReviewRouteCommand(
+                        "ORDER-CB-REJECT", client.reviewCaseId(), client.externalSubmissionRef(),
+                        client.callbackBatchRef(), client.mappingVersionId()));
+
+        BydCpimReviewCallbackResponse response = receiveReviewCallback(
+                "review-callback-reject", Map.of(
+                        "orderCode", "ORDER-CB-REJECT", "result", "2", "remark", "厂端资料不完整",
+                        "examinePerson", "比亚迪审核员", "examineDate", "2026-07-15 10:00:00"));
+
+        assertThat(response.message()).isEqualTo("success");
+        assertThat(reviews.get(adapter(), "callback-rejected-case", client.reviewCaseId()).status())
+                .isEqualTo("REJECTED");
+        assertThat(jdbc.sql("SELECT reason_codes::text FROM evd_review_decision WHERE decision_source='EXTERNAL'")
+                .query(String.class).single()).contains("BYD.REVIEW.REJECTED").doesNotContain("厂端资料不完整");
+        assertThat(jdbc.sql("SELECT count(*) FROM tsk_task WHERE task_type='evidence.external-coordination'")
+                .query(Long.class).single()).isOne();
+    }
+
+    @Test
+    void bydReviewCallbackLeavesEnvelopeReceivedUntilAuthorizationFailureIsRepaired() throws Exception {
+        ReviewCaseView client = createClientCase(
+                createSnapshot("callback-recovery"), "callback-recovery", "BATCH-CB-REC", "MAP-CB-REC");
+        reviewRoutes.register(adapter(), metadata("route-callback-recovery"),
+                new RegisterExternalReviewRouteCommand(
+                        "ORDER-CB-REC", client.reviewCaseId(), client.externalSubmissionRef(),
+                        client.callbackBatchRef(), client.mappingVersionId()));
+        UUID adapterRole = jdbc.sql("""
+                SELECT arc.role_id FROM auth_role_capability arc
+                JOIN auth_role_grant arg ON arg.role_id=arc.role_id
+                WHERE arg.principal_id=:principal AND arc.capability_code='evidence.recordExternalReceipt'
+                LIMIT 1
+                """).param("principal", ADAPTER).query(UUID.class).single();
+        jdbc.sql("DELETE FROM auth_role_capability WHERE role_id=:role AND capability_code='evidence.recordExternalReceipt'")
+                .param("role", adapterRole).update();
+        Map<String, Object> payload = Map.of(
+                "orderCode", "ORDER-CB-REC", "result", "1", "remark", "通过",
+                "examinePerson", "比亚迪审核员", "examineDate", "2026-07-15 10:30:00");
+
+        assertThatThrownBy(() -> receiveReviewCallback("review-callback-recovery", payload))
+                .isInstanceOf(BusinessProblem.class);
+        assertThat(jdbc.sql("SELECT processing_status FROM int_inbound_envelope")
+                .query(String.class).single()).isEqualTo("RECEIVED");
+        assertThat(jdbc.sql("SELECT count(*) FROM int_canonical_message")
+                .query(Long.class).single()).isZero();
+
+        jdbc.sql("INSERT INTO auth_role_capability(role_id, capability_code, granted_at) VALUES (:role,'evidence.recordExternalReceipt',now())")
+                .param("role", adapterRole).update();
+        BydCpimReviewCallbackResponse recovered = receiveReviewCallback("review-callback-recovery", payload);
+        assertThat(recovered.message()).isEqualTo("success");
+        assertThat(jdbc.sql("SELECT processing_status FROM int_inbound_envelope")
+                .query(String.class).single()).isEqualTo("COMPLETED");
+        assertThat(jdbc.sql("SELECT count(*) FROM evd_external_review_receipt")
+                .query(Long.class).single()).isOne();
     }
 
     @Test
@@ -519,6 +696,17 @@ class ReviewCasePostgresIT {
     private CurrentPrincipal adapter() {
         return new CurrentPrincipal(
                 ADAPTER, TENANT, CurrentPrincipal.PrincipalType.SERVICE, "byd-adapter", Set.of());
+    }
+
+    private BydCpimReviewCallbackResponse receiveReviewCallback(String nonce, Map<String, Object> payload)
+            throws Exception {
+        LocalDate protocolDate = LocalDate.now(clock.withZone(ZoneId.of("Asia/Shanghai")));
+        String signature = new BydCpimSignatureVerifier(
+                CPIM_APP_KEY, CPIM_APP_SECRET, clock, ZoneId.of("Asia/Shanghai"))
+                .sign(nonce, protocolDate, payload);
+        return reviewCallbacks.receive(
+                new BydCpimSignatureHeaders(CPIM_APP_KEY, nonce, protocolDate, signature),
+                new tools.jackson.databind.ObjectMapper().writeValueAsBytes(payload), "corr-" + nonce);
     }
 
     private CurrentPrincipal forceAdmin() {

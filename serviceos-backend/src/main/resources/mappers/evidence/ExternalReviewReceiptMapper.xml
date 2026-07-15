@@ -33,11 +33,11 @@
            AND receipt_id = CAST(#{receiptId} AS uuid)
     </select>
 
-    <select id="findByInboundEnvelope" resultType="string">
+    <select id="findByCanonicalMessage" resultType="string">
         SELECT receipt_id::text
           FROM evd_external_review_receipt
          WHERE tenant_id = #{tenantId}
-           AND inbound_envelope_id = #{inboundEnvelopeId}
+           AND canonical_message_id = #{canonicalMessageId}
     </select>
 
     <select id="findCommandResult" resultType="string">

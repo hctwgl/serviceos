@@ -1,13 +1,43 @@
 openapi: 3.1.0
 info:
   title: ServiceOS BYD CPIM Adapter API
-  version: 0.1.0
+  version: 0.2.0
   description: >-
-    BYD CPIM V7.3.1 入站安装订单协议契约。该端点不使用 ServiceOS OIDC Bearer Token，
+    BYD CPIM V7.3.1 入站安装订单与厂端审核回调协议契约。端点不使用 ServiceOS OIDC Bearer Token，
     而使用 APP_KEY、Nonce、Cur_Time、Sign 四个协议头完成签名认证与防重放。
 servers:
   - url: /api/v1
 paths:
+  /integrations/byd/cpim/v7.3.1/review-results:
+    post:
+      operationId: receiveBydCpimReviewResult
+      summary: 接收 BYD 厂端审核结果
+      description: >-
+        orderCode 可包含最多 100 个逗号分隔订单号且总长度不超过 200。只有已显式登记的
+        OPEN CLIENT ReviewCase 路由会进入领域裁决；其余订单逐项失败关闭并返回部分成功。
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/AppKey'
+        - $ref: '#/components/parameters/Nonce'
+        - $ref: '#/components/parameters/CurrentTime'
+        - $ref: '#/components/parameters/Signature'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BydCpimReviewCallbackRequest' }
+      responses:
+        '200':
+          description: 全部成功、部分成功或协议级拒绝
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BydCpimReviewCallbackResponse' }
+        '400':
+          description: HTTP 请求头或 JSON 无法解析
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
   /integrations/byd/cpim/v7.3.1/install-orders:
     post:
       operationId: receiveBydCpimInstallOrder
@@ -71,11 +101,10 @@ components:
       name: Cur_Time
       in: header
       required: true
-      description: Unix epoch 秒，必须位于服务端允许的时间窗口内
+      description: CPIM 协议日期，格式 yyyy-MM-dd；必须等于服务端协议时区的当前日期
       schema:
-        type: integer
-        format: int64
-        minimum: 0
+        type: string
+        format: date
     Signature:
       name: Sign
       in: header
@@ -149,6 +178,45 @@ components:
         orderAmount: { type: number, minimum: 0 }
         source: { type: string, minLength: 1, maxLength: 8 }
         channel: { type: string, minLength: 1, maxLength: 32 }
+    BydCpimReviewCallbackRequest:
+      type: object
+      additionalProperties: false
+      required: [orderCode, result, examinePerson, examineDate]
+      properties:
+        orderCode:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: 最多 100 个不重复订单号，以英文逗号分隔
+        result:
+          type: string
+          enum: ['1', '2']
+          description: 1 审核通过，2 审核不通过
+        remark:
+          type: string
+          maxLength: 200
+          description: 审核不通过时必须为非空文本
+        examinePerson: { type: string, minLength: 1, maxLength: 50 }
+        examineDate:
+          type: string
+          pattern: '^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$'
+    BydCpimReviewCallbackResponse:
+      type: object
+      additionalProperties: false
+      required: [message, data]
+      properties:
+        message:
+          type: string
+          description: success、partially success 或稳定协议拒绝码
+        data:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [orderCode, reason]
+            properties:
+              orderCode: { type: string }
+              reason: { type: string }
     BydCpimInboundOrderResponse:
       type: object
       additionalProperties: false

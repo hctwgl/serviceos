@@ -1,6 +1,7 @@
 package com.serviceos.integration.infrastructure;
 
 import com.serviceos.integration.api.CanonicalMessageView;
+import com.serviceos.integration.api.ExternalReviewRouteView;
 import com.serviceos.integration.api.InboundEnvelopeView;
 import com.serviceos.integration.application.InboundMessageRepository;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -9,6 +10,7 @@ import org.springframework.stereotype.Repository;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -197,6 +199,175 @@ final class JdbcInboundMessageRepository implements InboundMessageRepository {
                 .query(this::canonical).optional();
     }
 
+    @Override
+    public Optional<CanonicalMessageRecord> findCanonicalByBusinessKey(
+            String tenantId,
+            String connectorVersionId,
+            String messageType,
+            String businessKey
+    ) {
+        return jdbc.sql(CANONICAL_SELECT + """
+                 WHERE tenant_id=:tenant AND connector_version_id=:connector
+                   AND message_type=:messageType AND business_key=:businessKey
+                """)
+                .param("tenant", tenantId).param("connector", connectorVersionId)
+                .param("messageType", messageType).param("businessKey", businessKey)
+                .query(this::canonical).optional();
+    }
+
+    @Override
+    public ExternalReviewRouteRegistration registerExternalReviewRoute(NewExternalReviewRoute route) {
+        int inserted = jdbc.sql("""
+                INSERT INTO int_external_review_route (
+                    review_route_id, tenant_id, project_id, connector_version_id,
+                    external_order_code, review_case_id, external_submission_ref,
+                    callback_batch_ref, mapping_version_id, status, created_by, created_at)
+                VALUES (:id, :tenant, :projectId, :connector, :orderCode, :reviewCaseId,
+                    :submissionRef, :batchRef, :mappingVersion, 'ACTIVE', :createdBy, :createdAt)
+                ON CONFLICT DO NOTHING
+                """)
+                .param("id", route.reviewRouteId()).param("tenant", route.tenantId())
+                .param("projectId", route.projectId()).param("connector", route.connectorVersionId())
+                .param("orderCode", route.externalOrderCode()).param("reviewCaseId", route.reviewCaseId())
+                .param("submissionRef", route.externalSubmissionRef())
+                .param("batchRef", route.callbackBatchRef()).param("mappingVersion", route.mappingVersionId())
+                .param("createdBy", route.createdBy()).param("createdAt", timestamptz(route.createdAt()))
+                .update();
+        ExternalReviewRouteView current = jdbc.sql(REVIEW_ROUTE_SELECT + """
+                 WHERE tenant_id=:tenant AND review_case_id=:reviewCaseId
+                """)
+                .param("tenant", route.tenantId()).param("reviewCaseId", route.reviewCaseId())
+                .query(this::reviewRoute).optional()
+                .orElseGet(() -> jdbc.sql(REVIEW_ROUTE_SELECT + """
+                         WHERE tenant_id=:tenant AND connector_version_id=:connector
+                           AND external_order_code=:orderCode AND status='ACTIVE'
+                        """)
+                        .param("tenant", route.tenantId()).param("connector", route.connectorVersionId())
+                        .param("orderCode", route.externalOrderCode())
+                        .query(this::reviewRoute).single());
+        return new ExternalReviewRouteRegistration(current, inserted == 1);
+    }
+
+    @Override
+    public Optional<ExternalReviewRouteView> findActiveExternalReviewRoute(
+            String tenantId,
+            String connectorVersionId,
+            String externalOrderCode
+    ) {
+        return jdbc.sql(REVIEW_ROUTE_SELECT + """
+                 WHERE tenant_id=:tenant AND connector_version_id=:connector
+                   AND external_order_code=:orderCode AND status='ACTIVE'
+                """)
+                .param("tenant", tenantId).param("connector", connectorVersionId)
+                .param("orderCode", externalOrderCode)
+                .query(this::reviewRoute).optional();
+    }
+
+    @Override
+    public Optional<ExternalReviewRouteView> findExternalReviewRoute(String tenantId, UUID reviewRouteId) {
+        return jdbc.sql(REVIEW_ROUTE_SELECT + """
+                 WHERE tenant_id=:tenant AND review_route_id=:id
+                """)
+                .param("tenant", tenantId).param("id", reviewRouteId)
+                .query(this::reviewRoute).optional();
+    }
+
+    @Override
+    public void completeExternalReviewRoute(
+            String tenantId,
+            UUID reviewRouteId,
+            UUID canonicalMessageId,
+            Instant completedAt
+    ) {
+        int updated = jdbc.sql("""
+                UPDATE int_external_review_route
+                   SET status='COMPLETED', canonical_message_id=:canonicalId, completed_at=:completedAt
+                 WHERE tenant_id=:tenant AND review_route_id=:id AND status='ACTIVE'
+                """)
+                .param("canonicalId", canonicalMessageId).param("completedAt", timestamptz(completedAt))
+                .param("tenant", tenantId).param("id", reviewRouteId).update();
+        if (updated == 0) {
+            ExternalReviewRouteView current = jdbc.sql(REVIEW_ROUTE_SELECT + """
+                     WHERE tenant_id=:tenant AND review_route_id=:id
+                    """)
+                    .param("tenant", tenantId).param("id", reviewRouteId)
+                    .query(this::reviewRoute).single();
+            if (!"COMPLETED".equals(current.status())
+                    || !canonicalMessageId.equals(current.canonicalMessageId())) {
+                throw new IllegalStateException("External review route completion conflicts with existing result");
+            }
+        }
+    }
+
+    @Override
+    public InboundItemResult insertItemResult(InboundItemResult result) {
+        jdbc.sql("""
+                INSERT INTO int_inbound_item_result (
+                    inbound_envelope_id, tenant_id, item_key, canonical_message_id,
+                    processing_result, result_code, result_type, result_id, completed_at)
+                SELECT :envelopeId, tenant_id, :itemKey, :canonicalId,
+                       :processingResult, :resultCode, :resultType, :resultId, :completedAt
+                  FROM int_inbound_envelope
+                 WHERE inbound_envelope_id=:envelopeId
+                ON CONFLICT (inbound_envelope_id, item_key) DO NOTHING
+                """)
+                .param("envelopeId", result.inboundEnvelopeId()).param("itemKey", result.itemKey())
+                .param("canonicalId", result.canonicalMessageId())
+                .param("processingResult", result.processingResult()).param("resultCode", result.resultCode())
+                .param("resultType", result.resultType()).param("resultId", result.resultId())
+                .param("completedAt", timestamptz(result.completedAt())).update();
+        return jdbc.sql(ITEM_RESULT_SELECT + """
+                 WHERE tenant_id=(SELECT tenant_id FROM int_inbound_envelope WHERE inbound_envelope_id=:envelopeId)
+                   AND inbound_envelope_id=:envelopeId AND item_key=:itemKey
+                """)
+                .param("envelopeId", result.inboundEnvelopeId()).param("itemKey", result.itemKey())
+                .query(this::itemResult).single();
+    }
+
+    @Override
+    public List<InboundItemResult> findItemResults(String tenantId, UUID inboundEnvelopeId) {
+        return jdbc.sql(ITEM_RESULT_SELECT + """
+                 WHERE tenant_id=:tenant AND inbound_envelope_id=:envelopeId ORDER BY item_key
+                """)
+                .param("tenant", tenantId).param("envelopeId", inboundEnvelopeId)
+                .query(this::itemResult).list();
+    }
+
+    @Override
+    public void completeBatchEnvelope(
+            String tenantId,
+            UUID envelopeId,
+            UUID projectId,
+            String canonicalPayloadDigest,
+            String mappingVersionId,
+            String resultCode,
+            String resultId,
+            Instant completedAt
+    ) {
+        int updated = jdbc.sql("""
+                UPDATE int_inbound_envelope
+                   SET project_id=:projectId, canonical_payload_digest=:canonicalDigest,
+                       mapping_version_id=:mappingVersion, processing_status='COMPLETED',
+                       result_code=:resultCode, result_type='REVIEW_CALLBACK_BATCH',
+                       result_id=:resultId, completed_at=:completedAt
+                 WHERE tenant_id=:tenant AND inbound_envelope_id=:id AND processing_status='RECEIVED'
+                """)
+                .param("projectId", projectId).param("canonicalDigest", canonicalPayloadDigest)
+                .param("mappingVersion", mappingVersionId).param("resultCode", resultCode)
+                .param("resultId", resultId).param("completedAt", timestamptz(completedAt))
+                .param("tenant", tenantId).param("id", envelopeId).update();
+        if (updated == 0) {
+            InboundEnvelopeView current = findEnvelope(tenantId, envelopeId)
+                    .map(InboundEnvelopeRecord::view)
+                    .orElseThrow(() -> new IllegalStateException("InboundEnvelope disappeared"));
+            if (!"COMPLETED".equals(current.processingStatus())
+                    || !resultCode.equals(current.resultCode())
+                    || !resultId.equals(current.resultId())) {
+                throw new IllegalStateException("Batch Envelope completion conflicts with existing result");
+            }
+        }
+    }
+
     private InboundEnvelopeRecord envelope(ResultSet rs, int row) throws SQLException {
         UUID projectId = rs.getObject("project_id", UUID.class);
         UUID canonicalId = rs.getObject("canonical_message_id", UUID.class);
@@ -225,6 +396,26 @@ final class JdbcInboundMessageRepository implements InboundMessageRepository {
                 rs.getObject("source_envelope_id", UUID.class));
     }
 
+    private ExternalReviewRouteView reviewRoute(ResultSet rs, int row) throws SQLException {
+        return new ExternalReviewRouteView(
+                rs.getObject("review_route_id", UUID.class), rs.getObject("project_id", UUID.class),
+                rs.getString("connector_version_id"), rs.getString("external_order_code"),
+                rs.getObject("review_case_id", UUID.class), rs.getString("external_submission_ref"),
+                rs.getString("callback_batch_ref"), rs.getString("mapping_version_id"),
+                rs.getString("status"), rs.getObject("canonical_message_id", UUID.class),
+                rs.getString("created_by"),
+                rs.getObject("created_at", java.time.OffsetDateTime.class).toInstant(),
+                instant(rs, "completed_at"));
+    }
+
+    private InboundItemResult itemResult(ResultSet rs, int row) throws SQLException {
+        return new InboundItemResult(
+                rs.getObject("inbound_envelope_id", UUID.class), rs.getString("item_key"),
+                rs.getObject("canonical_message_id", UUID.class), rs.getString("processing_result"),
+                rs.getString("result_code"), rs.getString("result_type"), rs.getString("result_id"),
+                rs.getObject("completed_at", java.time.OffsetDateTime.class).toInstant());
+    }
+
     private static Instant instant(ResultSet rs, String column) throws SQLException {
         java.time.OffsetDateTime value = rs.getObject(column, java.time.OffsetDateTime.class);
         return value == null ? null : value.toInstant();
@@ -246,5 +437,19 @@ final class JdbcInboundMessageRepository implements InboundMessageRepository {
                    mapping_version_id, processing_status, result_code, result_type,
                    result_id, source_envelope_id, created_at, processed_at
               FROM int_canonical_message
+            """;
+
+    private static final String REVIEW_ROUTE_SELECT = """
+            SELECT review_route_id, tenant_id, project_id, connector_version_id,
+                   external_order_code, review_case_id, external_submission_ref,
+                   callback_batch_ref, mapping_version_id, status, canonical_message_id,
+                   created_by, created_at, completed_at
+              FROM int_external_review_route
+            """;
+
+    private static final String ITEM_RESULT_SELECT = """
+            SELECT inbound_envelope_id, tenant_id, item_key, canonical_message_id,
+                   processing_result, result_code, result_type, result_id, completed_at
+              FROM int_inbound_item_result
             """;
 }

@@ -1,9 +1,11 @@
 package com.serviceos.integration.application;
 
 import com.serviceos.integration.api.CanonicalMessageView;
+import com.serviceos.integration.api.ExternalReviewRouteView;
 import com.serviceos.integration.api.InboundEnvelopeView;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -53,10 +55,40 @@ public interface InboundMessageRepository {
 
     Optional<CanonicalMessageRecord> findCanonical(String tenantId, UUID canonicalMessageId);
 
+    Optional<CanonicalMessageRecord> findCanonicalByBusinessKey(
+            String tenantId, String connectorVersionId, String messageType, String businessKey);
+
+    ExternalReviewRouteRegistration registerExternalReviewRoute(NewExternalReviewRoute route);
+
+    Optional<ExternalReviewRouteView> findActiveExternalReviewRoute(
+            String tenantId, String connectorVersionId, String externalOrderCode);
+
+    Optional<ExternalReviewRouteView> findExternalReviewRoute(String tenantId, UUID reviewRouteId);
+
+    void completeExternalReviewRoute(
+            String tenantId, UUID reviewRouteId, UUID canonicalMessageId, Instant completedAt);
+
+    InboundItemResult insertItemResult(InboundItemResult result);
+
+    List<InboundItemResult> findItemResults(String tenantId, UUID inboundEnvelopeId);
+
+    void completeBatchEnvelope(
+            String tenantId,
+            UUID envelopeId,
+            UUID projectId,
+            String canonicalPayloadDigest,
+            String mappingVersionId,
+            String resultCode,
+            String resultId,
+            Instant completedAt);
+
     record EnvelopeRegistration(InboundEnvelopeRecord envelope, boolean created) {
     }
 
     record CanonicalRegistration(CanonicalMessageRecord message, boolean created) {
+    }
+
+    record ExternalReviewRouteRegistration(ExternalReviewRouteView route, boolean created) {
     }
 
     record NewInboundEnvelope(
@@ -88,6 +120,21 @@ public interface InboundMessageRepository {
     ) {
     }
 
+    record NewExternalReviewRoute(
+            UUID reviewRouteId,
+            String tenantId,
+            UUID projectId,
+            String connectorVersionId,
+            String externalOrderCode,
+            UUID reviewCaseId,
+            String externalSubmissionRef,
+            String callbackBatchRef,
+            String mappingVersionId,
+            String createdBy,
+            Instant createdAt
+    ) {
+    }
+
     record InboundEnvelopeRecord(
             InboundEnvelopeView view,
             String rawPayloadObjectRef,
@@ -99,6 +146,18 @@ public interface InboundMessageRepository {
             CanonicalMessageView view,
             String payloadObjectRef,
             UUID sourceEnvelopeId
+    ) {
+    }
+
+    record InboundItemResult(
+            UUID inboundEnvelopeId,
+            String itemKey,
+            UUID canonicalMessageId,
+            String processingResult,
+            String resultCode,
+            String resultType,
+            String resultId,
+            Instant completedAt
     ) {
     }
 }

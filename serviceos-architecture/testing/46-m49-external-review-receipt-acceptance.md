@@ -10,7 +10,7 @@ status: Implemented
 |---|---|---|---|
 | M49-REC-001 | P0 | OPEN Case 记录通过回执并追加 EXTERNAL 决定 | `ReviewCasePostgresIT` |
 | M49-REC-002 | P0 | REJECTED 创建客服协调 Task，不创建 CorrectionCase | `ReviewCasePostgresIT` |
-| M49-REC-003 | P0 | inboundEnvelopeId 幂等重放 | `ReviewCasePostgresIT` |
+| M49-REC-003 | P0 | canonicalMessageId 幂等重放（M57/V056 后权威键） | `ReviewCasePostgresIT` |
 | M49-REC-004 | P0 | USER 主体或缺少能力拒绝 | `ReviewCasePostgresIT` |
 | M49-SEC-001 | P0 | 匿名调用 401 | `ExternalReviewReceiptControllerSecurityTest` |
 

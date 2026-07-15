@@ -11,7 +11,7 @@ public interface ExternalReviewReceiptRepository {
 
     Optional<ExternalReviewReceiptView> find(String tenantId, UUID receiptId);
 
-    Optional<UUID> findByInboundEnvelope(String tenantId, String inboundEnvelopeId);
+    Optional<UUID> findByCanonicalMessage(String tenantId, String canonicalMessageId);
 
     Optional<UUID> findCommandResult(String tenantId, String operationType, String idempotencyKey);
 

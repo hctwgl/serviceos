@@ -33,8 +33,8 @@ import tools.jackson.databind.ObjectMapper;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -83,7 +83,7 @@ public class BydCpimInboundOrderService {
             Clock clock,
             @Value("${serviceos.integration.byd.cpim.app-key:local-byd-app-key}") String appKey,
             @Value("${serviceos.integration.byd.cpim.app-secret:local-byd-app-secret-change-me}") String appSecret,
-            @Value("${serviceos.integration.byd.cpim.allowed-clock-skew:PT5M}") Duration allowedClockSkew,
+            @Value("${serviceos.integration.byd.cpim.zone-id}") ZoneId protocolZone,
             @Value("${serviceos.integration.byd.cpim.tenant-id:tenant-byd-pilot}") String tenantId,
             @Value("${serviceos.integration.byd.cpim.project-code:BYD-OCEAN-SD-PILOT}") String projectCode
     ) {
@@ -99,7 +99,7 @@ public class BydCpimInboundOrderService {
         this.clock = clock;
         this.mapper = new BydCpimOrderMapper();
         this.signatureVerifier = new BydCpimSignatureVerifier(
-                appKey, appSecret, clock, allowedClockSkew);
+                appKey, appSecret, clock, protocolZone);
         this.tenantId = requiredText(tenantId, "tenantId");
         this.projectCode = requiredText(projectCode, "projectCode");
     }
@@ -133,7 +133,7 @@ public class BydCpimInboundOrderService {
         }
         String rawPayloadDigest = Sha256.digest(rawPayload);
         String transportDedupKey = Sha256.digest(
-                headers.appKey() + "|" + headers.nonce() + "|" + headers.currentTime().getEpochSecond());
+                headers.appKey() + "|" + headers.nonce() + "|" + headers.currentDate());
         String tenantObjectPrefix = Sha256.digest(tenantId).substring(0, 16);
         String rawObjectRef = "integration/inbound/" + tenantObjectPrefix
                 + "/byd-cpim/raw/" + rawPayloadDigest + ".json";
@@ -148,7 +148,7 @@ public class BydCpimInboundOrderService {
                         transportDedupKey, headers.nonce(), receivedAt, rawObjectRef,
                         rawPayloadDigest, safeCorrelationId));
                 var replay = replayGuard.register(
-                        headers.appKey(), headers.nonce(), headers.currentTime().getEpochSecond(),
+                        headers.appKey(), headers.nonce(), headers.currentDate().toEpochDay(),
                         canonicalRequestDigest, registered.envelope().view().inboundEnvelopeId());
                 if (replay.inboundEnvelopeId() == null
                         || !replay.inboundEnvelopeId().equals(
@@ -189,7 +189,7 @@ public class BydCpimInboundOrderService {
         try {
             bundle = configurationService.resolve(new ResolveConfigurationBundleQuery(
                     tenantId, projectCode, mapped.brandCode(), mapped.serviceProductCode(),
-                    mapped.provinceCode(), headers.currentTime()));
+                    mapped.provinceCode(), receivedAt));
         } catch (ConfigurationResolutionException exception) {
             String code = "CONFIGURATION_" + exception.reason().name();
             return rejectEnvelope(
@@ -240,7 +240,7 @@ public class BydCpimInboundOrderService {
                     "REPLAY_CONFLICT",
                     "ORDER_CONFLICT: business key was already used with a different payload");
             replayGuard.complete(
-                    headers.appKey(), headers.nonce(), headers.currentTime().getEpochSecond(),
+                    headers.appKey(), headers.nonce(), headers.currentDate().toEpochDay(),
                     responseDigest(response));
             return response;
         }
@@ -253,7 +253,7 @@ public class BydCpimInboundOrderService {
                     canonical.mappingVersionId(), canonical.canonicalMessageId(), canonical.resultCode(),
                     canonical.resultType(), canonical.resultId(), now);
             replayGuard.complete(
-                    headers.appKey(), headers.nonce(), headers.currentTime().getEpochSecond(),
+                    headers.appKey(), headers.nonce(), headers.currentDate().toEpochDay(),
                     responseDigest(BydCpimInboundOrderResponse.accepted(
                             canonical.businessKey(), CONNECTOR_VERSION, canonical.mappingVersionId(), true)));
             return BydCpimInboundOrderResponse.accepted(
@@ -283,7 +283,7 @@ public class BydCpimInboundOrderService {
         BydCpimInboundOrderResponse response = BydCpimInboundOrderResponse.accepted(
                 mapped.externalOrderCode(), mapped.adapterVersion(), mapped.mappingVersion(), receipt.replay());
         replayGuard.complete(
-                headers.appKey(), headers.nonce(), headers.currentTime().getEpochSecond(),
+                headers.appKey(), headers.nonce(), headers.currentDate().toEpochDay(),
                 responseDigest(response));
         return response;
     }
@@ -305,7 +305,7 @@ public class BydCpimInboundOrderService {
                     envelope, projectId, canonicalDigest, mappingVersion, code,
                     requestDigest, headers, now);
             replayGuard.complete(
-                    headers.appKey(), headers.nonce(), headers.currentTime().getEpochSecond(),
+                    headers.appKey(), headers.nonce(), headers.currentDate().toEpochDay(),
                     responseDigest(response));
         });
         return response;

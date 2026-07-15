@@ -8,7 +8,7 @@
         allowedDependencies = {
                 "shared", "reliability::api", "audit::api", "authorization::api",
                 "identity::api", "files::spi", "project::api", "configuration::api",
-                "workorder::api"
+                "workorder::api", "evidence::api", "task::api"
         }
 )
 package com.serviceos.integration;

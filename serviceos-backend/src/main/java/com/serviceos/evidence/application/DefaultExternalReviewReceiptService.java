@@ -134,7 +134,7 @@ final class DefaultExternalReviewReceiptService implements ExternalReviewReceipt
         }
 
         Instant now = clock.instant();
-        var existing = receipts.findByInboundEnvelope(principal.tenantId(), inboundEnvelopeId)
+        var existing = receipts.findByCanonicalMessage(principal.tenantId(), canonicalMessageId)
                 .flatMap(id -> receipts.find(principal.tenantId(), id));
         if (existing.isPresent()) {
             ExternalReviewReceiptView replayed = existing.get();
@@ -181,7 +181,7 @@ final class DefaultExternalReviewReceiptService implements ExternalReviewReceipt
         try {
             receipts.insert(principal.tenantId(), created);
         } catch (DuplicateKeyException exception) {
-            return receipts.findByInboundEnvelope(principal.tenantId(), inboundEnvelopeId)
+            return receipts.findByCanonicalMessage(principal.tenantId(), canonicalMessageId)
                     .flatMap(id -> receipts.find(principal.tenantId(), id))
                     .orElseThrow(() -> new BusinessProblem(
                             ProblemCode.REVIEW_CASE_CONFLICT, "ExternalReviewReceipt already exists"));

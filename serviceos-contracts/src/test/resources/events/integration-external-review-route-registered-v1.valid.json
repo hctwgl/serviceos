@@ -1,0 +1,22 @@
+{
+  "eventId": "57000000-0000-4000-8000-000000000001",
+  "eventType": "integration.external-review-route-registered",
+  "schemaVersion": 1,
+  "tenantId": "tenant-m57",
+  "correlationId": "corr-m57-route",
+  "causationId": "idem-m57-route",
+  "aggregateType": "ExternalReviewRoute",
+  "aggregateId": "57000000-0000-4000-8000-000000000002",
+  "aggregateVersion": 1,
+  "occurredAt": "2026-07-15T08:00:00Z",
+  "payload": {
+    "reviewRouteId": "57000000-0000-4000-8000-000000000002",
+    "projectId": "57000000-0000-4000-8000-000000000003",
+    "externalOrderCode": "BYD-M57-001",
+    "reviewCaseId": "57000000-0000-4000-8000-000000000004",
+    "externalSubmissionRef": "submission-m57-001",
+    "callbackBatchRef": "batch-m57-001",
+    "mappingVersionId": "byd-review-submit-v1",
+    "registeredAt": "2026-07-15T08:00:00Z"
+  }
+}

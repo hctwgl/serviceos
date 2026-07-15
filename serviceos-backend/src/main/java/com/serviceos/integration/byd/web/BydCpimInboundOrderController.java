@@ -12,7 +12,8 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.Instant;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 
 /**
  * BYD CPIM V7.3.1 安装订单入站端点。
@@ -32,17 +33,17 @@ final class BydCpimInboundOrderController {
     ResponseEntity<BydCpimInboundOrderResponse> receive(
             @RequestHeader("APP_KEY") String appKey,
             @RequestHeader("Nonce") String nonce,
-            @RequestHeader("Cur_Time") long currentTime,
+            @RequestHeader("Cur_Time") String currentTime,
             @RequestHeader("Sign") String signature,
             @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
             @RequestBody byte[] rawPayload) {
         BydCpimInboundOrderResponse response;
         try {
             response = service.receive(
-                    new BydCpimSignatureHeaders(appKey, nonce, Instant.ofEpochSecond(currentTime), signature),
+                    new BydCpimSignatureHeaders(appKey, nonce, LocalDate.parse(currentTime), signature),
                     rawPayload,
                     correlationId);
-        } catch (IllegalArgumentException exception) {
+        } catch (IllegalArgumentException | DateTimeParseException exception) {
             response = BydCpimInboundOrderResponse.rejected("INVALID_HEADERS", exception.getMessage());
         }
         return ResponseEntity.ok()

@@ -37,23 +37,23 @@ public class JdbcBydCpimReplayGuard {
     public BydCpimReplayDecision register(
             String appKey,
             String nonce,
-            long currentTime,
+            long requestDateEpochDay,
             String payloadDigest,
             UUID inboundEnvelopeId) {
         OffsetDateTime now = clock.instant().atOffset(ZoneOffset.UTC);
         int inserted = jdbc.sql("""
                         INSERT INTO int_inbound_replay_guard (
-                            app_key, nonce, request_time_epoch, payload_digest, first_seen_at,
+                            app_key, nonce, request_date_epoch_day, payload_digest, first_seen_at,
                             expires_at, inbound_envelope_id
                         ) VALUES (
-                            :appKey, :nonce, :currentTime, :payloadDigest, :firstSeenAt,
+                            :appKey, :nonce, :requestDateEpochDay, :payloadDigest, :firstSeenAt,
                             :expiresAt, :inboundEnvelopeId
                         )
-                        ON CONFLICT (app_key, nonce, request_time_epoch) DO NOTHING
+                        ON CONFLICT (app_key, nonce, request_date_epoch_day) DO NOTHING
                         """)
                 .param("appKey", appKey)
                 .param("nonce", nonce)
-                .param("currentTime", currentTime)
+                .param("requestDateEpochDay", requestDateEpochDay)
                 .param("payloadDigest", payloadDigest)
                 .param("inboundEnvelopeId", inboundEnvelopeId)
                 .param("firstSeenAt", now)
@@ -69,11 +69,11 @@ public class JdbcBydCpimReplayGuard {
                           FROM int_inbound_replay_guard
                          WHERE app_key = :appKey
                            AND nonce = :nonce
-                           AND request_time_epoch = :currentTime
+                           AND request_date_epoch_day = :requestDateEpochDay
                         """)
                 .param("appKey", appKey)
                 .param("nonce", nonce)
-                .param("currentTime", currentTime)
+                .param("requestDateEpochDay", requestDateEpochDay)
                 .query((rs, rowNum) -> new Existing(
                         rs.getString("payload_digest"),
                         rs.getObject("inbound_envelope_id", UUID.class),
@@ -87,18 +87,18 @@ public class JdbcBydCpimReplayGuard {
     }
 
     @Transactional
-    public void complete(String appKey, String nonce, long currentTime, String resultDigest) {
+    public void complete(String appKey, String nonce, long requestDateEpochDay, String resultDigest) {
         jdbc.sql("""
                         UPDATE int_inbound_replay_guard
                            SET result_digest = :resultDigest
                          WHERE app_key = :appKey
                            AND nonce = :nonce
-                           AND request_time_epoch = :currentTime
+                           AND request_date_epoch_day = :requestDateEpochDay
                         """)
                 .param("resultDigest", resultDigest)
                 .param("appKey", appKey)
                 .param("nonce", nonce)
-                .param("currentTime", currentTime)
+                .param("requestDateEpochDay", requestDateEpochDay)
                 .update();
     }
 

@@ -1,6 +1,6 @@
 package com.serviceos.integration.byd.api;
 
-import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Objects;
 
 /**
@@ -9,13 +9,13 @@ import java.util.Objects;
 public record BydCpimSignatureHeaders(
         String appKey,
         String nonce,
-        Instant currentTime,
+        LocalDate currentDate,
         String signature
 ) {
     public BydCpimSignatureHeaders {
         appKey = requireText(appKey, "appKey");
         nonce = requireText(nonce, "nonce");
-        Objects.requireNonNull(currentTime, "currentTime");
+        Objects.requireNonNull(currentDate, "currentDate");
         signature = requireText(signature, "signature").toLowerCase(java.util.Locale.ROOT);
         if (!signature.matches("[0-9a-f]{64}")) {
             throw new IllegalArgumentException("signature must be a 64-character SHA-256 hex string");

@@ -45,6 +45,7 @@ public class SecurityConfiguration {
                     authorize.requestMatchers("/api/v1/file-transfers/**").permitAll();
                     // 车企回调使用各自协议签名认证，不使用 OIDC JWT；业务验签必须在适配器服务内完成。
                     authorize.requestMatchers("/api/v1/integrations/byd/cpim/v7.3.1/install-orders").permitAll();
+                    authorize.requestMatchers("/api/v1/integrations/byd/cpim/v7.3.1/review-results").permitAll();
                     authorize.anyRequest().authenticated();
                 })
                 .oauth2ResourceServer(oauth2 -> oauth2

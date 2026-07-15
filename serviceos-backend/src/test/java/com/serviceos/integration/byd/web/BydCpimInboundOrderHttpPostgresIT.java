@@ -24,8 +24,9 @@ import org.testcontainers.utility.DockerImageName;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.LocalDate;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -67,7 +68,7 @@ class BydCpimInboundOrderHttpPostgresIT {
         registry.add("spring.datasource.password", POSTGRES::getPassword);
         registry.add("serviceos.integration.byd.cpim.app-key", () -> APP_KEY);
         registry.add("serviceos.integration.byd.cpim.app-secret", () -> APP_SECRET);
-        registry.add("serviceos.integration.byd.cpim.allowed-clock-skew", () -> "PT10M");
+        registry.add("serviceos.integration.byd.cpim.zone-id", () -> "Asia/Shanghai");
         registry.add("serviceos.integration.byd.cpim.tenant-id", () -> TENANT_ID);
         registry.add("serviceos.integration.byd.cpim.project-code", () -> PROJECT_CODE);
         registry.add("serviceos.files.local.root", STORAGE_ROOT::toString);
@@ -123,7 +124,7 @@ class BydCpimInboundOrderHttpPostgresIT {
     @Test
     void acceptsValidRequestAndSafelyReplaysSamePayload() throws Exception {
         Map<String, Object> payload = validPayload();
-        long currentTime = Instant.now().getEpochSecond();
+        String currentTime = protocolDate();
         String nonce = "nonce-http-001";
         String sign = sign(nonce, currentTime, payload);
 
@@ -192,7 +193,7 @@ class BydCpimInboundOrderHttpPostgresIT {
     @Test
     void rejectsPayloadMutationForPreviouslyUsedNonce() throws Exception {
         Map<String, Object> original = validPayload();
-        long currentTime = Instant.now().getEpochSecond();
+        String currentTime = protocolDate();
         String nonce = "nonce-http-002";
         perform(original, nonce, currentTime, sign(nonce, currentTime, original))
                 .andExpect(jsonPath("$.code").value("ACCEPTED"));
@@ -211,7 +212,7 @@ class BydCpimInboundOrderHttpPostgresIT {
     void authenticatedInvalidBusinessPayloadIsRetainedAndConsumesNonce() throws Exception {
         Map<String, Object> invalid = validPayload();
         invalid.put("carBrand", "10");
-        long currentTime = Instant.now().getEpochSecond();
+        String currentTime = protocolDate();
         String nonce = "nonce-http-003";
 
         perform(invalid, nonce, currentTime, sign(nonce, currentTime, invalid))
@@ -234,7 +235,7 @@ class BydCpimInboundOrderHttpPostgresIT {
     @Test
     void rejectsInvalidSignatureWithoutWritingReplayState() throws Exception {
         Map<String, Object> payload = validPayload();
-        long currentTime = Instant.now().getEpochSecond();
+        String currentTime = protocolDate();
 
         perform(payload, "nonce-http-004", currentTime, "0".repeat(64))
                 .andExpect(status().isOk())
@@ -251,7 +252,7 @@ class BydCpimInboundOrderHttpPostgresIT {
     @Test
     void rejectsSameBusinessKeyWithDifferentPayloadAndKeepsOriginalWorkOrder() throws Exception {
         Map<String, Object> original = validPayload();
-        long currentTime = Instant.now().getEpochSecond();
+        String currentTime = protocolDate();
         String firstNonce = "nonce-http-order-conflict-1";
         perform(original, firstNonce, currentTime, sign(firstNonce, currentTime, original))
                 .andExpect(jsonPath("$.code").value("ACCEPTED"));
@@ -283,7 +284,7 @@ class BydCpimInboundOrderHttpPostgresIT {
         jdbc.sql("TRUNCATE TABLE rel_outbox_publish_attempt, rel_outbox_event, wo_work_order, cfg_configuration_bundle_item, "
                 + "cfg_configuration_bundle, cfg_configuration_asset_version CASCADE").update();
         Map<String, Object> payload = validPayload();
-        long currentTime = Instant.now().getEpochSecond();
+        String currentTime = protocolDate();
         String nonce = "nonce-http-no-config";
 
         perform(payload, nonce, currentTime, sign(nonce, currentTime, payload))
@@ -317,7 +318,7 @@ class BydCpimInboundOrderHttpPostgresIT {
                     FOR EACH ROW EXECUTE FUNCTION wo_test_reject_insert()
                 """).update();
         Map<String, Object> payload = validPayload();
-        long currentTime = Instant.now().getEpochSecond();
+        String currentTime = protocolDate();
         String nonce = "nonce-http-transaction-rollback";
         try {
 
@@ -351,7 +352,7 @@ class BydCpimInboundOrderHttpPostgresIT {
     }
 
     private org.springframework.test.web.servlet.ResultActions perform(
-            Map<String, Object> payload, String nonce, long currentTime, String sign) throws Exception {
+            Map<String, Object> payload, String nonce, String currentTime, String sign) throws Exception {
         return mvc.perform(post(ENDPOINT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .header("APP_KEY", APP_KEY)
@@ -361,9 +362,14 @@ class BydCpimInboundOrderHttpPostgresIT {
                 .content(objectMapper.writeValueAsString(payload)));
     }
 
-    private String sign(String nonce, long currentTime, Map<String, Object> payload) {
-        return new BydCpimSignatureVerifier(APP_KEY, APP_SECRET, Clock.systemUTC(), Duration.ofMinutes(10))
-                .sign(APP_KEY, nonce, currentTime, payload);
+    private String sign(String nonce, String currentTime, Map<String, Object> payload) {
+        return new BydCpimSignatureVerifier(
+                APP_KEY, APP_SECRET, Clock.systemUTC(), ZoneId.of("Asia/Shanghai"))
+                .sign(nonce, LocalDate.parse(currentTime), payload);
+    }
+
+    private static String protocolDate() {
+        return LocalDate.now(ZoneId.of("Asia/Shanghai")).toString();
     }
 
     private void publishPilotBundle() {

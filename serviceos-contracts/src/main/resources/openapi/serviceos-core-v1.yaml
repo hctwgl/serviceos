@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.29.0
+  version: 0.30.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1284,6 +1284,32 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+  /internal/integration/byd/review-routes:
+    post:
+      operationId: registerBydExternalReviewRoute
+      summary: 登记 BYD 订单到 CLIENT ReviewCase 的权威回调路由
+      description: >-
+        仅允许获权 SERVICE principal 调用。请求中的提交引用、回调批次和映射版本必须与
+        OPEN CLIENT ReviewCase 冻结事实完全一致；不得从订单号猜测 ReviewCase。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterExternalReviewRouteRequest' }
+      responses:
+        '201':
+          description: 路由登记成功或幂等重放成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExternalReviewRoute' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
   /canonical-messages/{messageId}:
     get:
       operationId: getCanonicalMessage
@@ -1372,7 +1398,7 @@ components:
         inboundEnvelopeId: { type: string, format: uuid }
         projectId: { type: [string, 'null'], format: uuid }
         connectorVersionId: { type: string, minLength: 1, maxLength: 120 }
-        messageType: { enum: [CREATE_WORK_ORDER] }
+        messageType: { enum: [CREATE_WORK_ORDER, RECORD_CLIENT_REVIEW_RESULT] }
         externalMessageId: { type: string, minLength: 1, maxLength: 160 }
         rawPayloadDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
         canonicalPayloadDigest: { type: [string, 'null'], pattern: '^[0-9a-f]{64}$' }
@@ -1394,9 +1420,9 @@ components:
                  resultCode, resultType, resultId, createdAt, processedAt]
       properties:
         canonicalMessageId: { type: string, format: uuid }
-        projectId: { type: string, format: uuid }
+        projectId: { type: [string, 'null'], format: uuid }
         connectorVersionId: { type: string, minLength: 1, maxLength: 120 }
-        messageType: { enum: [CREATE_WORK_ORDER] }
+        messageType: { enum: [CREATE_WORK_ORDER, RECORD_CLIENT_REVIEW_RESULT] }
         businessKey: { type: string, minLength: 1, maxLength: 200 }
         payloadDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
         mappingVersionId: { type: string, minLength: 1, maxLength: 120 }
@@ -1406,6 +1432,36 @@ components:
         resultId: { type: [string, 'null'], maxLength: 160 }
         createdAt: { type: string, format: date-time }
         processedAt: { type: [string, 'null'], format: date-time }
+    RegisterExternalReviewRouteRequest:
+      type: object
+      additionalProperties: false
+      required: [externalOrderCode, reviewCaseId, externalSubmissionRef, callbackBatchRef, mappingVersionId]
+      properties:
+        externalOrderCode: { type: string, minLength: 1, maxLength: 50 }
+        reviewCaseId: { type: string, format: uuid }
+        externalSubmissionRef: { type: string, minLength: 1, maxLength: 160 }
+        callbackBatchRef: { type: string, minLength: 1, maxLength: 160 }
+        mappingVersionId: { type: string, minLength: 1, maxLength: 120 }
+    ExternalReviewRoute:
+      type: object
+      additionalProperties: false
+      required: [reviewRouteId, projectId, connectorVersionId, externalOrderCode, reviewCaseId,
+                 externalSubmissionRef, callbackBatchRef, mappingVersionId, status,
+                 canonicalMessageId, createdBy, createdAt, completedAt]
+      properties:
+        reviewRouteId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        connectorVersionId: { type: string, const: byd-cpim-v7.3.1 }
+        externalOrderCode: { type: string, minLength: 1, maxLength: 50 }
+        reviewCaseId: { type: string, format: uuid }
+        externalSubmissionRef: { type: string, minLength: 1, maxLength: 160 }
+        callbackBatchRef: { type: string, minLength: 1, maxLength: 160 }
+        mappingVersionId: { type: string, minLength: 1, maxLength: 120 }
+        status: { enum: [ACTIVE, COMPLETED] }
+        canonicalMessageId: { type: [string, 'null'], format: uuid }
+        createdBy: { type: string, minLength: 1, maxLength: 128 }
+        createdAt: { type: string, format: date-time }
+        completedAt: { type: [string, 'null'], format: date-time }
     CreateProjectRequest:
       type: object
       additionalProperties: false

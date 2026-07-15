@@ -19,7 +19,7 @@ owner: Integration Architecture
 | `byd-cpim-survey-v731.schema.json` | `/jumpto/openapi/sp/pushSurveyInfo` | ServiceOS → CPIM |
 | `byd-cpim-installation-v731.schema.json` | `/jumpto/openapi/sp/pushInstallationInfo` | ServiceOS → CPIM |
 | `byd-cpim-accessories-v731.schema.json` | `/jumpto/openapi/sp/pushAccessoriesInfo` | ServiceOS → CPIM |
-| `byd-cpim-review-callback-v731.schema.json` | 厂端审核结果回调 | CPIM → ServiceOS |
+| `serviceos-contracts/.../external/byd-cpim-review-callback-v731.schema.json` | 厂端审核结果回调 | CPIM → ServiceOS |
 
 ## 3. 必测结构场景
 
@@ -54,8 +54,8 @@ owner: Integration Architecture
 ## 5. 安全与签名测试
 
 - APP_KEY 不存在或未授权时拒绝；
-- Nonce 重复时拒绝重放；
-- Cur_Time 超过允许窗口时拒绝；
+- 同 APP_KEY/Nonce/Cur_Time 且同载荷时返回首次结果，不重复领域副作用；不同载荷拒绝；
+- `Cur_Time` 不是 `yyyy-MM-dd` 或不等于协议时区当前日期时拒绝；
 - 参数排序或签名不一致时拒绝；
 - 日志不得记录 AppSecret、完整手机号、详细地址和可长期访问的附件 URL；
 - 原始报文加密留存并设置保留期和访问审计。
@@ -77,4 +77,4 @@ owner: Integration Architecture
 - 安装附件是否已统一切换到短链接机制；
 - 厂端驳回后需要增量补传还是全量重新提交；
 - 山东省正式省、市、区编码版本；
-- 签名时间窗口和 Nonce 保留时长。
+- 生产 Nonce 保留期与凭据轮换方案（当前工程保留 48 小时 replay 事实）。

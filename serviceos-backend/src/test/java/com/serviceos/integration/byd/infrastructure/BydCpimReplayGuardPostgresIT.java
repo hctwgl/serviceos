@@ -14,12 +14,15 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
+import java.time.LocalDate;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = ServiceOsApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE)
 class BydCpimReplayGuardPostgresIT {
+    private static final long REQUEST_DATE = LocalDate.parse("2026-07-15").toEpochDay();
     @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(
             DockerImageName.parse("postgres:18-alpine"))
@@ -50,9 +53,9 @@ class BydCpimReplayGuardPostgresIT {
 
     @Test
     void firstRequestIsNewAndSamePayloadIsReplayable() {
-        var first = guard.register("app-key", "nonce-001", 1783929600L, "a".repeat(64), null);
-        guard.complete("app-key", "nonce-001", 1783929600L, "b".repeat(64));
-        var replay = guard.register("app-key", "nonce-001", 1783929600L, "a".repeat(64), null);
+        var first = guard.register("app-key", "nonce-001", REQUEST_DATE, "a".repeat(64), null);
+        guard.complete("app-key", "nonce-001", REQUEST_DATE, "b".repeat(64));
+        var replay = guard.register("app-key", "nonce-001", REQUEST_DATE, "a".repeat(64), null);
 
         assertThat(first.kind()).isEqualTo(BydCpimReplayDecision.Kind.NEW);
         assertThat(replay.kind()).isEqualTo(BydCpimReplayDecision.Kind.REPLAY);
@@ -63,16 +66,16 @@ class BydCpimReplayGuardPostgresIT {
 
     @Test
     void sameNonceWithDifferentPayloadIsRejected() {
-        guard.register("app-key", "nonce-002", 1783929600L, "a".repeat(64), null);
+        guard.register("app-key", "nonce-002", REQUEST_DATE, "a".repeat(64), null);
 
         assertThatThrownBy(() -> guard.register(
-                "app-key", "nonce-002", 1783929600L, "c".repeat(64), null))
+                "app-key", "nonce-002", REQUEST_DATE, "c".repeat(64), null))
                 .isInstanceOf(BydCpimReplayConflictException.class);
     }
 
     @Test
     void migrationIsRepeatableAtCurrentVersion() {
-        assertThat(flyway.info().applied()).hasSize(57);
+        assertThat(flyway.info().applied()).hasSize(59);
         assertThat(flyway.migrate().migrationsExecuted).isZero();
     }
 }

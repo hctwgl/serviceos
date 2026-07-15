@@ -58,8 +58,8 @@ final class MyBatisExternalReviewReceiptRepository implements ExternalReviewRece
     }
 
     @Override
-    public Optional<UUID> findByInboundEnvelope(String tenantId, String inboundEnvelopeId) {
-        String id = mapper.findByInboundEnvelope(tenantId, inboundEnvelopeId);
+    public Optional<UUID> findByCanonicalMessage(String tenantId, String canonicalMessageId) {
+        String id = mapper.findByCanonicalMessage(tenantId, canonicalMessageId);
         return id == null ? Optional.empty() : Optional.of(UUID.fromString(id));
     }
 

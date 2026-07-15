@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://serviceos.local/schemas/byd-cpim-review-callback-v731.schema.json",
+  "$id": "https://serviceos.example/schemas/external/byd-cpim-review-callback-v731.schema.json",
   "title": "BYD CPIM V7.3.1 Review Callback",
   "type": "object",
   "additionalProperties": false,

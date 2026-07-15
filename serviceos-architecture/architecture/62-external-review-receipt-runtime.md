@@ -12,7 +12,8 @@ status: Implemented
 2. 必须关联 `inboundEnvelopeId`、`canonicalMessageId`、`reviewCaseId`、`externalKey`、`callbackBatchRef`、`mappingVersionId`、`result`；
 3. 仅允许对 **OPEN** ReviewCase 记录；同事务追加 `ReviewDecision`（`decisionSource=EXTERNAL`）并投影 Case 状态；
 4. `REJECTED` 同事务创建客服协调 HUMAN Task（`taskType=evidence.external-coordination`），**不**直接改师傅 Task，**不**自动打开 CorrectionCase；
-5. 幂等键：`tenant + inboundEnvelopeId`；能力 `evidence.recordExternalReceipt`；仅 `SERVICE` 主体；
+5. M49 初始幂等键为 `tenant + inboundEnvelopeId`；M57 为支持一个批次 Envelope 拆分多个订单，
+   已由 V056 收紧为 `tenant + canonicalMessageId`。能力仍为 `evidence.recordExternalReceipt`，仅 `SERVICE` 主体；
 6. OpenAPI **0.24.0**；Flyway **V049**；staging **049/51**。
 
 ## 2. 未实现

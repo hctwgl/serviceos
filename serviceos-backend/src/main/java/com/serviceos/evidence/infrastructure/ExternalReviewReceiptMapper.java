@@ -12,8 +12,8 @@ interface ExternalReviewReceiptMapper {
     Map<String, Object> find(
             @Param("tenantId") String tenantId, @Param("receiptId") String receiptId);
 
-    String findByInboundEnvelope(
-            @Param("tenantId") String tenantId, @Param("inboundEnvelopeId") String inboundEnvelopeId);
+    String findByCanonicalMessage(
+            @Param("tenantId") String tenantId, @Param("canonicalMessageId") String canonicalMessageId);
 
     String findCommandResult(
             @Param("tenantId") String tenantId,

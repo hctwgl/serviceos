@@ -5,7 +5,8 @@ import com.serviceos.integration.byd.api.BydCpimSignatureHeaders;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Clock;
-import java.time.Duration;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.HexFormat;
 import java.util.Map;
 import java.util.Objects;
@@ -14,23 +15,21 @@ import java.util.TreeMap;
 /**
  * CPIM V7.3.1 SHA-256 签名校验。
  *
- * <p>签名原文由 APP_KEY、Nonce、Cur_Time、业务参数和 AppSecret 按 key ASCII 升序拼接。
- * 当前只接受标量参数；嵌套对象必须先由具体协议适配器转换为车企规定的字符串。</p>
+ * <p>签名原文严格采用 {@code AppSecret&Nonce&Cur_Time&Params}；Params 中业务参数按 key
+ * ASCII 升序拼接。APP_KEY 仅用于识别调用方，不进入签名原文。当前只接受标量参数；嵌套对象
+ * 必须先由具体协议适配器转换为车企规定的字符串。</p>
  */
 public final class BydCpimSignatureVerifier {
     private final String appKey;
     private final String appSecret;
     private final Clock clock;
-    private final Duration allowedSkew;
+    private final ZoneId protocolZone;
 
-    public BydCpimSignatureVerifier(String appKey, String appSecret, Clock clock, Duration allowedSkew) {
+    public BydCpimSignatureVerifier(String appKey, String appSecret, Clock clock, ZoneId protocolZone) {
         this.appKey = requireText(appKey, "appKey");
         this.appSecret = requireText(appSecret, "appSecret");
         this.clock = Objects.requireNonNull(clock, "clock");
-        this.allowedSkew = Objects.requireNonNull(allowedSkew, "allowedSkew");
-        if (allowedSkew.isNegative() || allowedSkew.isZero()) {
-            throw new IllegalArgumentException("allowedSkew must be positive");
-        }
+        this.protocolZone = Objects.requireNonNull(protocolZone, "protocolZone");
     }
 
     public Verification verify(BydCpimSignatureHeaders headers, Map<String, ?> businessParameters) {
@@ -43,23 +42,19 @@ public final class BydCpimSignatureVerifier {
             return Verification.rejected(Reason.UNKNOWN_APP_KEY);
         }
 
-        Duration skew = Duration.between(headers.currentTime(), clock.instant()).abs();
-        if (skew.compareTo(allowedSkew) > 0) {
+        if (!headers.currentDate().equals(LocalDate.now(clock.withZone(protocolZone)))) {
             return Verification.rejected(Reason.TIMESTAMP_OUT_OF_WINDOW);
         }
 
-        String expected = sign(headers.appKey(), headers.nonce(), headers.currentTime().getEpochSecond(), businessParameters);
+        String expected = sign(headers.nonce(), headers.currentDate(), businessParameters);
         boolean matches = MessageDigest.isEqual(
                 expected.getBytes(StandardCharsets.US_ASCII),
                 headers.signature().getBytes(StandardCharsets.US_ASCII));
         return matches ? Verification.accepted() : Verification.rejected(Reason.SIGNATURE_MISMATCH);
     }
 
-    public String sign(String requestAppKey, String nonce, long epochSecond, Map<String, ?> businessParameters) {
+    public String sign(String nonce, LocalDate currentDate, Map<String, ?> businessParameters) {
         TreeMap<String, String> values = new TreeMap<>();
-        values.put("APP_KEY", requireText(requestAppKey, "requestAppKey"));
-        values.put("Cur_Time", Long.toString(epochSecond));
-        values.put("Nonce", requireText(nonce, "nonce"));
         businessParameters.forEach((key, value) -> {
             String normalizedKey = requireText(key, "parameter key");
             if (value != null) {
@@ -69,14 +64,16 @@ public final class BydCpimSignatureVerifier {
                 values.put(normalizedKey, String.valueOf(value));
             }
         });
-        values.put("AppSecret", appSecret);
-
-        StringBuilder source = new StringBuilder();
-        values.forEach((key, value) -> source.append(key).append('=').append(value).append('&'));
-        source.setLength(source.length() - 1);
+        StringBuilder parameters = new StringBuilder();
+        values.forEach((key, value) -> parameters.append(key).append('=').append(value).append('&'));
+        if (!parameters.isEmpty()) {
+            parameters.setLength(parameters.length() - 1);
+        }
+        String source = appSecret + "&" + requireText(nonce, "nonce") + "&"
+                + Objects.requireNonNull(currentDate, "currentDate") + "&" + parameters;
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256")
-                    .digest(source.toString().getBytes(StandardCharsets.UTF_8));
+                    .digest(source.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(digest);
         } catch (java.security.NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 is unavailable", exception);

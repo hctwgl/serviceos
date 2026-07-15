@@ -38,7 +38,19 @@ class ContractValidationTest {
                         "/work-orders/{workOrderId}/visits",
                         "/appointments/{appointmentId}/visits:check-in",
                         "/visits/{visitId}:check-out", "/visits/{visitId}:interrupt",
+                        "/internal/integration/byd/review-routes",
                         "/inbound-envelopes/{envelopeId}", "/canonical-messages/{messageId}");
+    }
+
+    @Test
+    void bydCpimOpenApiMustParseAndExposeReviewCallback() throws Exception {
+        String yaml = resourceText("/openapi/byd-cpim-v731.yaml");
+        SwaggerParseResult result = new OpenAPIV3Parser().readContents(yaml, null, null);
+
+        assertThat(result.getMessages()).as("BYD OpenAPI parser messages").isEmpty();
+        assertThat(result.getOpenAPI().getPaths())
+                .containsKeys("/integrations/byd/cpim/v7.3.1/install-orders",
+                        "/integrations/byd/cpim/v7.3.1/review-results");
     }
 
     @Test
@@ -136,6 +148,27 @@ class ContractValidationTest {
         assertValidEvent(
                 "/events/integration-canonical-message-processed-v1.schema.json",
                 "/events/integration-canonical-message-processed-v1.valid.json");
+    }
+
+    @Test
+    void integrationExternalReviewRouteRegisteredExampleMustMatchPublishedSchema() throws Exception {
+        assertValidEvent(
+                "/events/integration-external-review-route-registered-v1.schema.json",
+                "/events/integration-external-review-route-registered-v1.valid.json");
+    }
+
+    @Test
+    void integrationExternalReviewCallbackProcessedExampleMustMatchPublishedSchema() throws Exception {
+        assertValidEvent(
+                "/events/integration-external-review-callback-processed-v1.schema.json",
+                "/events/integration-external-review-callback-processed-v1.valid.json");
+    }
+
+    @Test
+    void bydReviewCallbackExampleMustMatchExternalSchema() throws Exception {
+        assertValidEvent(
+                "/external/byd-cpim-review-callback-v731.schema.json",
+                "/external/byd-cpim-review-callback-v731.valid.json");
     }
 
     @Test

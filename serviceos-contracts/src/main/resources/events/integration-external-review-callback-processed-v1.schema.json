@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/integration-external-review-callback-processed-v1.schema.json",
+  "title": "IntegrationExternalReviewCallbackProcessedV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId", "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"},
+    "eventType": {"const": "integration.external-review-callback-processed"},
+    "schemaVersion": {"const": 1},
+    "tenantId": {"type": "string"},
+    "correlationId": {"type": "string"},
+    "causationId": {"type": "string", "format": "uuid"},
+    "aggregateType": {"const": "CanonicalMessage"},
+    "aggregateId": {"type": "string", "format": "uuid"},
+    "aggregateVersion": {"const": 1},
+    "occurredAt": {"type": "string", "format": "date-time"},
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["canonicalMessageId", "inboundEnvelopeId", "reviewRouteId", "reviewCaseId", "externalReviewReceiptId", "projectId", "businessKey", "payloadDigest", "mappingVersionId", "reviewResult", "processedAt"],
+      "properties": {
+        "canonicalMessageId": {"type": "string", "format": "uuid"},
+        "inboundEnvelopeId": {"type": "string", "format": "uuid"},
+        "reviewRouteId": {"type": "string", "format": "uuid"},
+        "reviewCaseId": {"type": "string", "format": "uuid"},
+        "externalReviewReceiptId": {"type": "string", "format": "uuid"},
+        "projectId": {"type": "string", "format": "uuid"},
+        "businessKey": {"type": "string", "minLength": 1, "maxLength": 200},
+        "payloadDigest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "mappingVersionId": {"type": "string", "minLength": 1, "maxLength": 120},
+        "reviewResult": {"enum": ["APPROVED", "REJECTED"]},
+        "processedAt": {"type": "string", "format": "date-time"}
+      }
+    }
+  }
+}

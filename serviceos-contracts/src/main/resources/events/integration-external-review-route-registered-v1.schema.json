@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/integration-external-review-route-registered-v1.schema.json",
+  "title": "IntegrationExternalReviewRouteRegisteredV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId", "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"},
+    "eventType": {"const": "integration.external-review-route-registered"},
+    "schemaVersion": {"const": 1},
+    "tenantId": {"type": "string"},
+    "correlationId": {"type": "string"},
+    "causationId": {"type": "string"},
+    "aggregateType": {"const": "ExternalReviewRoute"},
+    "aggregateId": {"type": "string", "format": "uuid"},
+    "aggregateVersion": {"const": 1},
+    "occurredAt": {"type": "string", "format": "date-time"},
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reviewRouteId", "projectId", "externalOrderCode", "reviewCaseId", "externalSubmissionRef", "callbackBatchRef", "mappingVersionId", "registeredAt"],
+      "properties": {
+        "reviewRouteId": {"type": "string", "format": "uuid"},
+        "projectId": {"type": "string", "format": "uuid"},
+        "externalOrderCode": {"type": "string", "minLength": 1, "maxLength": 50},
+        "reviewCaseId": {"type": "string", "format": "uuid"},
+        "externalSubmissionRef": {"type": "string", "minLength": 1, "maxLength": 160},
+        "callbackBatchRef": {"type": "string", "minLength": 1, "maxLength": 160},
+        "mappingVersionId": {"type": "string", "minLength": 1, "maxLength": 120},
+        "registeredAt": {"type": "string", "format": "date-time"}
+      }
+    }
+  }
+}

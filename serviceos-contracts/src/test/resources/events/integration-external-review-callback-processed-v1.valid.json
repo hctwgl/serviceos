@@ -1,0 +1,25 @@
+{
+  "eventId": "57000000-0000-4000-8000-000000000011",
+  "eventType": "integration.external-review-callback-processed",
+  "schemaVersion": 1,
+  "tenantId": "tenant-m57",
+  "correlationId": "corr-m57-callback",
+  "causationId": "57000000-0000-4000-8000-000000000012",
+  "aggregateType": "CanonicalMessage",
+  "aggregateId": "57000000-0000-4000-8000-000000000013",
+  "aggregateVersion": 1,
+  "occurredAt": "2026-07-15T08:30:00Z",
+  "payload": {
+    "canonicalMessageId": "57000000-0000-4000-8000-000000000013",
+    "inboundEnvelopeId": "57000000-0000-4000-8000-000000000012",
+    "reviewRouteId": "57000000-0000-4000-8000-000000000014",
+    "reviewCaseId": "57000000-0000-4000-8000-000000000015",
+    "externalReviewReceiptId": "57000000-0000-4000-8000-000000000016",
+    "projectId": "57000000-0000-4000-8000-000000000017",
+    "businessKey": "BYD:REVIEW:BYD-M57-001:1:2026-07-15 16:30:00",
+    "payloadDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "mappingVersionId": "byd-review-submit-v1",
+    "reviewResult": "APPROVED",
+    "processedAt": "2026-07-15T08:30:00Z"
+  }
+}
