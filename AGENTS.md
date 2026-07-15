@@ -235,7 +235,15 @@ ArchitectureTest 适用时显式运行仓库中的真实测试类，例如：
 
 ### L3：里程碑门禁
 
-R3 或准备标记 `Implemented` 前至少运行一次：
+R3 或准备标记 `Implemented` 前至少运行一次。
+
+在 Apple Silicon（M 系列）且使用 OrbStack/Docker 的本地环境，必须通过仓库脚本执行，使 Testcontainers 使用宿主机原生 PostgreSQL 镜像：
+
+```bash
+bash scripts/verify-local.sh
+```
+
+其他本地环境在脚本可用时也应优先使用同一入口；CI 环境可继续直接执行：
 
 ```bash
 ./mvnw --no-transfer-progress verify
@@ -245,10 +253,36 @@ R3 或准备标记 `Implemented` 前至少运行一次：
 
 ### L4：干净构建/发布
 
-仅发布候选、主分支/PR CI、构建机制变化、从零可复现验证、怀疑缓存污染或用户明确要求时执行：
+仅发布候选、主分支/PR CI、构建机制变化、从零可复现验证、怀疑缓存污染或用户明确要求时执行。
+
+Apple Silicon + OrbStack/Docker 本地环境必须执行：
+
+```bash
+bash scripts/verify-local.sh clean verify
+```
+
+CI 或架构已由流水线明确控制的环境可执行：
 
 ```bash
 ./mvnw --no-transfer-progress clean verify
+```
+
+### 10.1 Apple Silicon / OrbStack 强制约束
+
+- 不得在本地验证中设置 `DOCKER_DEFAULT_PLATFORM=linux/amd64`；
+- 不得在 Testcontainers 创建命令中强制 `linux/amd64`；
+- 不得绕过 `scripts/verify-local.sh` 后继续接受 OrbStack 的跨架构模拟结果；
+- 脚本只修正当前验证子进程的架构环境，不得擅自修改用户永久 shell 配置；
+- 脚本用于选择原生镜像，不得借此跳过 PostgreSQL、Flyway、事务、并发、授权或 Spring Modulith 门禁；
+- 如确有跨架构测试要求，必须有明确技术依据、ADR、独立验证任务和退出计划，不能作为日常默认路径。
+
+精准 PostgreSQL 测试也应通过脚本透传 Maven 参数，例如：
+
+```bash
+bash scripts/verify-local.sh \
+  -pl serviceos-backend \
+  -Dtest=RelevantPostgresIT \
+  test
 ```
 
 测试禁令：不得删除或跳过失败测试、放宽核心断言、默认跳过 CI 门禁、用 Mock 替代必须证明的 PostgreSQL/安全行为，或捕获异常后忽略失败。
