@@ -19,8 +19,9 @@ bash -n "${scripts[@]}"
 
 context_output="$(bash scripts/plan-context.sh CTX-001)"
 grep -q 'Context Pack: CTX-001' <<< "${context_output}"
-grep -q '风险等级: R1' <<< "${context_output}"
+grep -q '风险等级: R2' <<< "${context_output}"
 grep -q 'agent-context' <<< "${context_output}"
+grep -q 'bootstrap' <<< "${context_output}"
 grep -q '必须验证' <<< "${context_output}"
 
 catalog="serviceos-architecture/context/modules/catalog.tsv"
