@@ -29,7 +29,9 @@ jobs:
       - name: Install ripgrep
         run: sudo apt-get update && sudo apt-get install -y ripgrep
       - name: Fail fast on milestone and migration drift
-        run: bash scripts/verify-milestone-preflight.sh
+        run: |
+          bash scripts/test-verification-preflight.sh
+          bash scripts/verify-milestone-preflight.sh
       - name: Resolve immutable contract comparison base
         shell: bash
         env:
