@@ -13,3 +13,4 @@ target/
 !.env.example
 !*.env.example
 /tmp/
+.agent/session-state.md
