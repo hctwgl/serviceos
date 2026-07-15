@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.serviceos.task.infrastructure.WorkOrderTaskQueryMapper">
+ <select id="findPage" resultType="map">SELECT task_id AS "id",project_id AS "projectId",work_order_id AS "workOrderId",workflow_instance_id AS "workflowInstanceId",stage_instance_id AS "stageInstanceId",workflow_node_instance_id AS "workflowNodeInstanceId",workflow_node_id AS "workflowNodeId",stage_code AS "stageCode",task_type AS "taskType",task_kind AS "taskKind",priority,status,next_run_at AS "nextRunAt",claimed_by AS "claimedBy",claimed_at AS "claimedAt",started_at AS "startedAt",completed_at AS "completedAt",version,created_at AS "createdAt",updated_at AS "updatedAt" FROM tsk_task WHERE tenant_id=#{tenantId} AND work_order_id=#{workOrderId}<if test="cursorCreatedAt != null"> AND (created_at,task_id)&gt;(#{cursorCreatedAt},#{cursorId})</if> ORDER BY created_at,task_id LIMIT #{fetchSize}</select>
+</mapper>

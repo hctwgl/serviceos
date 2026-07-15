@@ -69,3 +69,4 @@
 - [M66 项目范围关系整组修订验收矩阵](63-m66-project-scope-relation-revision-acceptance.md)
 - [M67 项目授权目录与范围历史查询验收矩阵](64-m67-authorized-project-directory-query-acceptance.md)
 - [M68 授权工单目录与详情查询验收矩阵](65-m68-authorized-work-order-query-acceptance.md)
+- [M69 授权工单执行工作区投影验收矩阵](66-m69-authorized-work-order-execution-projection-acceptance.md)

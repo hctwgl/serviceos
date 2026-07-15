@@ -20,11 +20,14 @@ import com.serviceos.task.api.CompleteHumanTaskCommand;
 import com.serviceos.task.api.HumanTaskCommandService;
 import com.serviceos.task.api.StartHumanTaskCommand;
 import com.serviceos.task.api.TaskAssignmentService;
+import com.serviceos.task.api.WorkOrderTaskQueryService;
+import com.serviceos.task.api.WorkOrderTaskSummary;
 import com.serviceos.task.spi.AutomatedTaskHandler;
 import com.serviceos.task.spi.TaskExecutionContext;
 import com.serviceos.task.spi.TaskExecutionResult;
 import com.serviceos.workorder.api.ReceiveExternalWorkOrderCommand;
 import com.serviceos.workorder.api.WorkOrderCommandService;
+import com.serviceos.workflow.api.WorkflowExecutionQueryService;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.shared.CommandMetadata;
 import org.junit.jupiter.api.BeforeEach;
@@ -78,6 +81,8 @@ class WorkflowLinearProgressionPostgresIT {
     @Autowired OutboxWorker outboxWorker;
     @Autowired OutboxPublisher publisher;
     @Autowired JdbcClient jdbc;
+    @Autowired WorkflowExecutionQueryService workflowQueries;
+    @Autowired WorkOrderTaskQueryService taskQueries;
 
     @BeforeEach
     void clean() {
@@ -135,7 +140,7 @@ class WorkflowLinearProgressionPostgresIT {
     @Test
     void completedTaskActivatesTheOnlyUnconditionalNextStageAtomically() {
         Scope scope = scope(linearWorkflow("REVIEW"));
-        workOrders.receive(command(scope));
+        var received = workOrders.receive(command(scope));
         assertThat(outboxWorker.runOnce()).isEqualTo(OutboxWorker.RunResult.PUBLISHED);
         drainOutbox();
         assertThat(taskWorker().runOnce()).isEqualTo(TaskExecutionWorker.RunResult.SUCCEEDED);
@@ -153,6 +158,30 @@ class WorkflowLinearProgressionPostgresIT {
                  WHERE event_type IN ('stage.completed', 'stage.activated') ORDER BY event_type
                 """).query(String.class).list())
                 .containsExactly("stage.activated", "stage.activated", "stage.completed");
+
+        CurrentPrincipal reader = reader();
+        var execution = workflowQueries.get(reader, "corr-m69-stages", received.workOrderId());
+        assertThat(execution.workflow().status()).isEqualTo("ACTIVE");
+        assertThat(execution.stages()).extracting(stage -> stage.stageCode() + ":" + stage.status())
+                .containsExactly("INTAKE:COMPLETED", "REVIEW:ACTIVE");
+        var first = taskQueries.list(reader, "corr-m69-tasks-1", received.workOrderId(), null, 1);
+        var second = taskQueries.list(reader, "corr-m69-tasks-2", received.workOrderId(), first.nextCursor(), 1);
+        assertThat(first.items()).extracting(WorkOrderTaskSummary::taskType).containsExactly("ASSIGN_COORDINATORS");
+        assertThat(second.items()).extracting(WorkOrderTaskSummary::taskType).containsExactly("INITIAL_REVIEW");
+        assertThat(second.nextCursor()).isNull();
+    }
+
+    @Test
+    void receivedWorkOrderBeforeAsyncInitializationExposesExplicitEmptyExecutionProjection() {
+        Scope scope = scope(linearWorkflow("REVIEW"));
+        var received = workOrders.receive(command(scope));
+
+        var execution = workflowQueries.get(reader(), "corr-m69-not-initialized", received.workOrderId());
+
+        assertThat(execution.workflow()).isNull();
+        assertThat(execution.stages()).isEmpty();
+        assertThat(taskQueries.list(reader(), "corr-m69-no-tasks", received.workOrderId(), null, 20).items())
+                .isEmpty();
     }
 
     @Test
@@ -428,7 +457,7 @@ class WorkflowLinearProgressionPostgresIT {
                 VALUES (:roleId, :tenantId, 'workflow-human-worker', '流程人工执行人', 'ACTIVE', now())
                 """).param("roleId", roleId).param("tenantId", TENANT).update();
         for (String capability : java.util.Set.of(
-                "task.assign", "task.claim", "task.start", "task.complete", "task.release")) {
+                "task.assign", "task.claim", "task.start", "task.complete", "task.release", "workOrder.read")) {
             jdbc.sql("""
                     INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
                     VALUES (:roleId, :capability, now())
@@ -447,5 +476,10 @@ class WorkflowLinearProgressionPostgresIT {
     }
 
     private record Scope(UUID projectId, ConfigurationBundleReference bundle) {
+    }
+
+    private static CurrentPrincipal reader() {
+        return new CurrentPrincipal("human-actor", TENANT, CurrentPrincipal.PrincipalType.USER,
+                "m69-workspace-it", java.util.Set.of());
     }
 }

@@ -5,7 +5,7 @@
         displayName = "Workflow Runtime",
         allowedDependencies = {
                 "shared", "reliability::api", "reliability::spi",
-                "configuration::api", "workorder::api", "task::api"
+                "configuration::api", "workorder::api", "task::api", "identity::api"
         }
 )
 package com.serviceos.workflow;

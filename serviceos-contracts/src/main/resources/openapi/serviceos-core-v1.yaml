@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.39.0
+  version: 0.40.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -42,6 +42,41 @@ paths:
             ETag: { required: true, schema: { type: string } }
             X-Correlation-Id: { required: true, schema: { type: string } }
           content: { application/json: { schema: { $ref: '#/components/schemas/WorkOrderDetail' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /work-orders/{workOrderId}/stages:
+    get:
+      operationId: getAuthorizedWorkOrderStages
+      summary: 读取工单 Workflow 与 Stage 当前权威投影
+      description: 复用工单 tenant 隔离与 workOrder.read 实时项目鉴权；尚未初始化时显式返回空投影。
+      parameters:
+        - { name: workOrderId, in: path, required: true, schema: { type: string, format: uuid } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Workflow 和 sequenceNo 正序 Stage 投影
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/WorkflowExecutionProjection' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /work-orders/{workOrderId}/tasks:
+    get:
+      operationId: listAuthorizedWorkOrderTasks
+      summary: 分页读取工单 Task 执行摘要
+      description: createdAt/taskId 正序稳定分页；cursor 绑定 workOrderId，不返回载荷或结果引用。
+      parameters:
+        - { name: workOrderId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: cursor, in: query, schema: { type: string, minLength: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 工单 Task 执行摘要页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/WorkOrderTaskPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
@@ -1739,6 +1774,80 @@ components:
       required: [workOrder, asOf]
       properties:
         workOrder: { $ref: '#/components/schemas/WorkOrder' }
+        asOf: { type: string, format: date-time }
+    WorkflowInstance:
+      type: object
+      additionalProperties: false
+      required: [id, projectId, workOrderId, configurationBundleId, workflowDefinitionVersionId,
+        workflowKey, workflowVersion, definitionDigest, status, version, startedAt]
+      properties:
+        id: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        workOrderId: { type: string, format: uuid }
+        configurationBundleId: { type: string, format: uuid }
+        workflowDefinitionVersionId: { type: string, format: uuid }
+        workflowKey: { type: string }
+        workflowVersion: { type: string }
+        definitionDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
+        status: { enum: [ACTIVE, COMPLETED, SUSPENDED, CANCELLED, FAILED] }
+        version: { type: integer, format: int64, minimum: 1 }
+        startedAt: { type: string, format: date-time }
+        completedAt: { type: [string, 'null'], format: date-time }
+    StageInstance:
+      type: object
+      additionalProperties: false
+      required: [id, workflowInstanceId, workOrderId, stageCode, sequenceNo, status, version, activatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        workflowInstanceId: { type: string, format: uuid }
+        workOrderId: { type: string, format: uuid }
+        stageCode: { type: string }
+        sequenceNo: { type: integer, minimum: 1 }
+        status: { enum: [PENDING, ACTIVE, BLOCKED, COMPLETED, SKIPPED, CANCELLED] }
+        version: { type: integer, format: int64, minimum: 1 }
+        activatedAt: { type: string, format: date-time }
+        completedAt: { type: [string, 'null'], format: date-time }
+    WorkflowExecutionProjection:
+      type: object
+      additionalProperties: false
+      required: [workflow, stages, asOf]
+      properties:
+        workflow: { oneOf: [{ $ref: '#/components/schemas/WorkflowInstance' }, { type: 'null' }] }
+        stages: { type: array, items: { $ref: '#/components/schemas/StageInstance' } }
+        asOf: { type: string, format: date-time }
+    WorkOrderTaskSummary:
+      type: object
+      additionalProperties: false
+      required: [id, projectId, workOrderId, taskType, taskKind, priority, status,
+        nextRunAt, version, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        projectId: { type: [string, 'null'], format: uuid }
+        workOrderId: { type: string, format: uuid }
+        workflowInstanceId: { type: [string, 'null'], format: uuid }
+        stageInstanceId: { type: [string, 'null'], format: uuid }
+        workflowNodeInstanceId: { type: [string, 'null'], format: uuid }
+        workflowNodeId: { type: [string, 'null'] }
+        stageCode: { type: [string, 'null'] }
+        taskType: { type: string }
+        taskKind: { enum: [AUTOMATED, HUMAN] }
+        priority: { type: integer, minimum: 0, maximum: 1000 }
+        status: { enum: [READY, PENDING, CLAIMED, RUNNING, RETRY_WAIT, SUCCEEDED, COMPLETED, MANUAL_INTERVENTION, CANCELLED] }
+        nextRunAt: { type: string, format: date-time }
+        claimedBy: { type: [string, 'null'] }
+        claimedAt: { type: [string, 'null'], format: date-time }
+        startedAt: { type: [string, 'null'], format: date-time }
+        completedAt: { type: [string, 'null'], format: date-time }
+        version: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    WorkOrderTaskPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/WorkOrderTaskSummary' } }
+        nextCursor: { type: [string, 'null'] }
         asOf: { type: string, format: date-time }
     SlaInstancePage:
       type: object
