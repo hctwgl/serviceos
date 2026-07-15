@@ -76,4 +76,25 @@ class ProjectTest {
         assertThatThrownBy(() -> Project.create("tenant-1", whitespace, UUID.randomUUID(), Instant.now()))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("invalid stable reference");
     }
+
+    @Test
+    void scopeRevisionValidatesSortsAndAdvancesVersionWithoutMutatingIdentity() {
+        Project project = Project.create(
+                "tenant-1",
+                new CreateProjectCommand(
+                        "BYD-2026", "client-byd", "比亚迪家充", LocalDate.of(2026, 1, 1), null,
+                        java.util.List.of("CN-3702"), java.util.List.of("network-qingdao-a")),
+                UUID.fromString("1fa0cbe4-4b86-48b6-a495-6c86c7d1e901"),
+                Instant.parse("2026-07-13T03:30:00Z"));
+
+        Project revised = project.reviseScopeRelations(
+                java.util.List.of("CN-4403", "CN-3100"),
+                java.util.List.of("network-shenzhen-a", "network-huangpu"));
+
+        assertThat(revised.id()).isEqualTo(project.id());
+        assertThat(revised.version()).isEqualTo(2);
+        assertThat(revised.regionCodes()).containsExactly("CN-3100", "CN-4403");
+        assertThat(revised.networkIds()).containsExactly("network-huangpu", "network-shenzhen-a");
+        assertThat(project.version()).isEqualTo(1);
+    }
 }

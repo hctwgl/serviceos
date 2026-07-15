@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/project-scope-relations-revised-v1.schema.json",
+  "title": "ProjectScopeRelationsRevisedV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId",
+    "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"
+  ],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": { "const": "project.scope-relations-revised" },
+    "schemaVersion": { "const": 1 },
+    "tenantId": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "correlationId": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "causationId": { "type": "string", "minLength": 1, "maxLength": 160 },
+    "aggregateType": { "const": "Project" },
+    "aggregateId": { "type": "string", "format": "uuid" },
+    "aggregateVersion": { "type": "integer", "minimum": 2 },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revisionId", "projectId", "tenantId", "regionCodes", "networkIds",
+        "addedRegionCodes", "removedRegionCodes", "addedNetworkIds", "removedNetworkIds",
+        "reason", "aggregateVersion", "occurredAt"
+      ],
+      "properties": {
+        "revisionId": { "type": "string", "format": "uuid" },
+        "projectId": { "type": "string", "format": "uuid" },
+        "tenantId": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "regionCodes": { "$ref": "#/$defs/stableReferences" },
+        "networkIds": { "$ref": "#/$defs/stableReferences" },
+        "addedRegionCodes": { "$ref": "#/$defs/stableReferences" },
+        "removedRegionCodes": { "$ref": "#/$defs/stableReferences" },
+        "addedNetworkIds": { "$ref": "#/$defs/stableReferences" },
+        "removedNetworkIds": { "$ref": "#/$defs/stableReferences" },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "aggregateVersion": { "type": "integer", "minimum": 2 },
+        "occurredAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "$defs": {
+    "stableReferences": {
+      "type": "array",
+      "maxItems": 100,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 128 }
+    }
+  }
+}

@@ -4,6 +4,8 @@ import com.serviceos.bootstrap.SecurityConfiguration;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
 import com.serviceos.project.api.ProjectCommandService;
+import com.serviceos.project.api.ProjectScopeRelationRevisionView;
+import com.serviceos.project.api.ReviseProjectScopeRelationsCommand;
 import com.serviceos.project.api.ProjectView;
 import com.serviceos.shared.CommandMetadata;
 import org.junit.jupiter.api.Test;
@@ -95,6 +97,78 @@ class ProjectControllerSecurityTest {
                         metadata.correlationId().equals("corr-2")
                                 && metadata.idempotencyKey().equals("idem-2")),
                 any());
+    }
+
+    @Test
+    void reviseScopeRelationsUsesTrustedPrincipalIfMatchAndExplicitSets() throws Exception {
+        UUID projectId = UUID.fromString("19dac447-73fd-4f24-8178-a9eac8d9ed34");
+        CurrentPrincipal principal = new CurrentPrincipal(
+                "user-1", "tenant-trusted", CurrentPrincipal.PrincipalType.USER,
+                "admin-web", Set.of("project.reviseScopeRelations"));
+        ProjectScopeRelationRevisionView result = new ProjectScopeRelationRevisionView(
+                UUID.fromString("0999d4b6-070a-4a54-870d-43a252302b61"), projectId,
+                java.util.List.of("CN-4403"), java.util.List.of("network-shenzhen-a"),
+                java.util.List.of("CN-4403"), java.util.List.of("CN-3702"),
+                java.util.List.of("network-shenzhen-a"), java.util.List.of("network-qingdao-a"),
+                "项目服务范围调整", 2, Instant.parse("2026-07-15T06:30:00Z"));
+        when(principals.current()).thenReturn(principal);
+        when(commands.reviseScopeRelations(eq(principal), any(), any())).thenReturn(result);
+
+        mvc.perform(post("/api/v1/projects/{projectId}:revise-scope-relations", projectId)
+                        .with(jwt().jwt(token -> token.subject("user-1").claim("tenant_id", "tenant-trusted")))
+                        .header("Idempotency-Key", "idem-m66-http-001")
+                        .header("If-Match", "\"1\"")
+                        .header("X-Correlation-Id", "corr-m66-http-001")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "regionCodes": ["CN-4403"],
+                                  "networkIds": ["network-shenzhen-a"],
+                                  "reason": "项目服务范围调整"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(header().string("ETag", "\"2\""))
+                .andExpect(header().string("X-Correlation-Id", "corr-m66-http-001"))
+                .andExpect(jsonPath("$.aggregateVersion").value(2));
+
+        verify(commands).reviseScopeRelations(
+                eq(principal),
+                argThat((CommandMetadata metadata) ->
+                        metadata.correlationId().equals("corr-m66-http-001")
+                                && metadata.idempotencyKey().equals("idem-m66-http-001")),
+                argThat((ReviseProjectScopeRelationsCommand command) ->
+                        command.projectId().equals(projectId)
+                                && command.expectedVersion() == 1
+                                && command.regionCodes().equals(java.util.List.of("CN-4403"))
+                                && command.networkIds().equals(java.util.List.of("network-shenzhen-a"))));
+    }
+
+    @Test
+    void reviseScopeRelationsRejectsMissingExplicitSetAndUnquotedIfMatch() throws Exception {
+        UUID projectId = UUID.fromString("19dac447-73fd-4f24-8178-a9eac8d9ed34");
+
+        mvc.perform(post("/api/v1/projects/{projectId}:revise-scope-relations", projectId)
+                        .with(jwt())
+                        .header("Idempotency-Key", "idem-m66-http-002")
+                        .header("If-Match", "1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"regionCodes": [], "reason": "缺少 networkIds"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"));
+
+        mvc.perform(post("/api/v1/projects/{projectId}:revise-scope-relations", projectId)
+                        .with(jwt())
+                        .header("Idempotency-Key", "idem-m66-http-003")
+                        .header("If-Match", "\"1\"")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"regionCodes": [], "reason": "缺少 networkIds"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"));
     }
 
     private static String validRequest() {

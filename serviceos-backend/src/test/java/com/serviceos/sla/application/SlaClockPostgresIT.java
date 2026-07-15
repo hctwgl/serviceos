@@ -7,8 +7,11 @@ import com.serviceos.configuration.api.ConfigurationService;
 import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
 import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
 import com.serviceos.identity.api.CurrentPrincipal;
+import com.serviceos.project.api.ProjectCommandService;
+import com.serviceos.project.api.ReviseProjectScopeRelationsCommand;
 import com.serviceos.reliability.spi.OutboxMessage;
 import com.serviceos.shared.BusinessProblem;
+import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.Sha256;
 import com.serviceos.sla.api.SlaClockService;
 import com.serviceos.sla.api.SlaInstanceQuery;
@@ -76,6 +79,7 @@ class SlaClockPostgresIT {
     @Autowired TaskSlaEventHandler handler;
     @Autowired SlaClockService clocks;
     @Autowired SlaQueryService queries;
+    @Autowired ProjectCommandService projectCommands;
     @Autowired ObjectMapper objectMapper;
     @Autowired MutableClock clock;
 
@@ -485,15 +489,15 @@ class SlaClockPostgresIT {
                 """).param("projectId", newlyScopedProject).param("tenantId", TENANT)
                 .param("startsOn", LocalDate.of(2026, 7, 1))
                 .param("createdAt", OffsetDateTime.ofInstant(BASE_TIME, ZoneOffset.UTC)).update();
-        jdbc.sql("""
-                INSERT INTO prj_project_network (
-                    project_network_id, tenant_id, project_id, network_id,
-                    valid_from, created_by, created_at)
-                VALUES (:id, :tenantId, :projectId, 'network-qingdao-a', :validFrom, 'sla-it', :createdAt)
-                """).param("id", UUID.randomUUID()).param("tenantId", TENANT)
-                .param("projectId", newlyScopedProject)
-                .param("validFrom", OffsetDateTime.ofInstant(BASE_TIME.minusSeconds(60), ZoneOffset.UTC))
-                .param("createdAt", OffsetDateTime.ofInstant(BASE_TIME, ZoneOffset.UTC)).update();
+        seedProjectScopeRevisionGrant();
+        CurrentPrincipal scopeAdmin = new CurrentPrincipal(
+                "scope-admin", TENANT, CurrentPrincipal.PrincipalType.USER, "sla-it",
+                Set.of("project.reviseScopeRelations"));
+        projectCommands.reviseScopeRelations(
+                scopeAdmin, new CommandMetadata("corr-m66-sla-scope", "idem-m66-sla-scope"),
+                new ReviseProjectScopeRelationsCommand(
+                        newlyScopedProject, 1, List.of(), List.of("network-qingdao-a"),
+                        "新增网点授权项目关系"));
 
         assertThatThrownBy(() -> queries.list(networkReader, "corr-network-stale",
                 new SlaInstanceQuery(null, "RUNNING", page.nextCursor(), 1)))
@@ -626,6 +630,27 @@ class SlaClockPostgresIT {
                 VALUES (
                     :grantId, :tenantId, 'sla-network-reader', :roleId, 'NETWORK', 'network-qingdao-a',
                     now() - interval '1 day', 'TEST_FIXTURE', 'M65-TEST', now())
+                """).param("grantId", UUID.randomUUID()).param("tenantId", TENANT)
+                .param("roleId", roleId).update();
+    }
+
+    private void seedProjectScopeRevisionGrant() {
+        UUID roleId = UUID.randomUUID();
+        jdbc.sql("""
+                INSERT INTO auth_role (role_id, tenant_id, role_code, role_name, role_status, created_at)
+                VALUES (:roleId, :tenantId, 'project-scope-admin', '项目范围管理员', 'ACTIVE', now())
+                """).param("roleId", roleId).param("tenantId", TENANT).update();
+        jdbc.sql("""
+                INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
+                VALUES (:roleId, 'project.reviseScopeRelations', now())
+                """).param("roleId", roleId).update();
+        jdbc.sql("""
+                INSERT INTO auth_role_grant (
+                    grant_id, tenant_id, principal_id, role_id, scope_type, scope_ref,
+                    valid_from, source_code, approval_ref, created_at)
+                VALUES (
+                    :grantId, :tenantId, 'scope-admin', :roleId, 'TENANT', :tenantId,
+                    now() - interval '1 day', 'TEST_FIXTURE', 'M66-TEST', now())
                 """).param("grantId", UUID.randomUUID()).param("tenantId", TENANT)
                 .param("roleId", roleId).update();
     }

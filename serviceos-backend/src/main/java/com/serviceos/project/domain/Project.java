@@ -53,6 +53,16 @@ public record Project(
                 status.name(), version, createdAt);
     }
 
+    /**
+     * 校验并冻结新的整组范围关系。关系的有效期追加由应用层事务完成，聚合只决定新版本与目标集合。
+     */
+    public Project reviseScopeRelations(List<String> newRegionCodes, List<String> newNetworkIds) {
+        List<String> regions = requireRegionCodes(newRegionCodes);
+        List<String> networks = requireStableReferences(newNetworkIds, "networkIds");
+        return new Project(id, tenantId, code, clientId, name, startsOn, endsOn, regions, networks,
+                status, version + 1, createdAt);
+    }
+
     private static List<String> requireRegionCodes(List<String> values) {
         return requireStableReferences(values, "regionCodes");
     }

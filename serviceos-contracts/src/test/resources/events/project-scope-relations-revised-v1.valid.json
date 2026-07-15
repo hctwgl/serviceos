@@ -1,0 +1,26 @@
+{
+  "eventId": "e07ab334-b22d-4ea0-824c-b9c405ca091d",
+  "eventType": "project.scope-relations-revised",
+  "schemaVersion": 1,
+  "tenantId": "tenant-demo",
+  "correlationId": "corr-m66-revise-001",
+  "causationId": "idem-m66-revise-001",
+  "aggregateType": "Project",
+  "aggregateId": "51e255f4-4a35-44cb-9549-85451148b1cc",
+  "aggregateVersion": 2,
+  "occurredAt": "2026-07-15T06:30:00Z",
+  "payload": {
+    "revisionId": "e6fc09ee-628c-4246-80e1-3a30ba005476",
+    "projectId": "51e255f4-4a35-44cb-9549-85451148b1cc",
+    "tenantId": "tenant-demo",
+    "regionCodes": ["CN-3100", "CN-4403"],
+    "networkIds": ["network-huangpu", "network-shenzhen-a"],
+    "addedRegionCodes": ["CN-4403"],
+    "removedRegionCodes": ["CN-3702"],
+    "addedNetworkIds": ["network-shenzhen-a"],
+    "removedNetworkIds": ["network-qingdao-a"],
+    "reason": "项目服务范围调整",
+    "aggregateVersion": 2,
+    "occurredAt": "2026-07-15T06:30:00Z"
+  }
+}

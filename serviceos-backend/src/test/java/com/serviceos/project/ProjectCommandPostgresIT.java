@@ -2,8 +2,11 @@ package com.serviceos.project;
 
 import com.serviceos.ServiceOsApplication;
 import com.serviceos.identity.api.CurrentPrincipal;
+import com.serviceos.authorization.api.ProjectNetworkScopeResolver;
+import com.serviceos.authorization.api.ProjectRegionScopeResolver;
 import com.serviceos.project.api.CreateProjectCommand;
 import com.serviceos.project.api.ProjectCommandService;
+import com.serviceos.project.api.ReviseProjectScopeRelationsCommand;
 import com.serviceos.project.api.ProjectView;
 import com.serviceos.reliability.api.InboxDecision;
 import com.serviceos.reliability.api.InboxService;
@@ -31,6 +34,7 @@ import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.context.Scope;
 
 import java.time.LocalDate;
+import java.time.Instant;
 import java.time.Duration;
 import java.time.Clock;
 import java.util.ArrayList;
@@ -66,6 +70,12 @@ class ProjectCommandPostgresIT {
 
     @Autowired
     ProjectCommandService commands;
+
+    @Autowired
+    ProjectRegionScopeResolver regionScopeResolver;
+
+    @Autowired
+    ProjectNetworkScopeResolver networkScopeResolver;
 
     @Autowired
     JdbcClient jdbc;
@@ -181,8 +191,177 @@ class ProjectCommandPostgresIT {
     }
 
     @Test
+    void reviseScopeRelationsAppendsHistoryUpdatesResolversAndReplaysFrozenReceipt() {
+        ProjectView project = commands.create(
+                principal(), context("idem-m66-create-001"), command("M66-PROJECT", "M66 范围修订"));
+        ReviseProjectScopeRelationsCommand command = new ReviseProjectScopeRelationsCommand(
+                project.id(), project.version(), List.of("CN-4403", "CN-3100"),
+                List.of("network-shenzhen-a", "network-huangpu"), "项目服务范围调整");
+
+        var first = commands.reviseScopeRelations(principal(), context("idem-m66-revise-001"), command);
+        var replay = commands.reviseScopeRelations(principal(), context("idem-m66-revise-001"), command);
+
+        assertThat(replay).isEqualTo(first);
+        assertThat(first.aggregateVersion()).isEqualTo(2);
+        assertThat(first.regionCodes()).containsExactly("CN-3100", "CN-4403");
+        assertThat(first.networkIds()).containsExactly("network-huangpu", "network-shenzhen-a");
+        assertThat(first.addedRegionCodes()).containsExactly("CN-4403");
+        assertThat(first.removedRegionCodes()).containsExactly("CN-3702");
+        assertThat(first.addedNetworkIds()).containsExactly("network-shenzhen-a");
+        assertThat(first.removedNetworkIds()).containsExactly("network-qingdao-a");
+        assertThat(jdbc.sql("SELECT aggregate_version FROM prj_project WHERE project_id = :projectId")
+                .param("projectId", project.id()).query(Long.class).single()).isEqualTo(2);
+        assertThat(jdbc.sql("""
+                        SELECT region_code FROM prj_project_region
+                         WHERE project_id = :projectId AND valid_to IS NULL ORDER BY region_code
+                        """).param("projectId", project.id()).query(String.class).list())
+                .containsExactly("CN-3100", "CN-4403");
+        assertThat(jdbc.sql("""
+                        SELECT network_id FROM prj_project_network
+                         WHERE project_id = :projectId AND valid_to IS NULL ORDER BY network_id
+                        """).param("projectId", project.id()).query(String.class).list())
+                .containsExactly("network-huangpu", "network-shenzhen-a");
+        assertThat(jdbc.sql("""
+                        SELECT ended_by FROM prj_project_region
+                         WHERE project_id = :projectId AND region_code = 'CN-3702'
+                        """).param("projectId", project.id()).query(String.class).single())
+                .isEqualTo("actor-test");
+        assertThat(jdbc.sql("""
+                        SELECT ended_by FROM prj_project_network
+                         WHERE project_id = :projectId AND network_id = 'network-qingdao-a'
+                        """).param("projectId", project.id()).query(String.class).single())
+                .isEqualTo("actor-test");
+        assertThat(count("prj_project_scope_revision")).isEqualTo(1);
+        assertThat(count("aud_audit_record")).isEqualTo(2);
+        assertThat(count("rel_outbox_event")).isEqualTo(2);
+        assertThat(jdbc.sql("""
+                        SELECT payload ->> 'revisionId' FROM rel_outbox_event
+                         WHERE event_type = 'project.scope-relations-revised'
+                        """).query(String.class).single()).isEqualTo(first.revisionId().toString());
+
+        Instant effectiveAt = first.revisedAt().plusMillis(1);
+        assertThat(regionScopeResolver.resolve("tenant-test", java.util.Set.of("CN-3702"), effectiveAt)).isEmpty();
+        assertThat(regionScopeResolver.resolve("tenant-test", java.util.Set.of("CN-4403"), effectiveAt))
+                .containsExactly(project.id());
+        assertThat(networkScopeResolver.resolve(
+                "tenant-test", java.util.Set.of("network-qingdao-a"), effectiveAt)).isEmpty();
+        assertThat(networkScopeResolver.resolve(
+                "tenant-test", java.util.Set.of("network-shenzhen-a"), effectiveAt))
+                .containsExactly(project.id());
+
+        assertThatThrownBy(() -> commands.reviseScopeRelations(
+                principal(), context("idem-m66-revise-001"),
+                new ReviseProjectScopeRelationsCommand(
+                        project.id(), 1, List.of("CN-4403"), List.of("network-shenzhen-a"), "改变载荷")))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.IDEMPOTENCY_KEY_REUSED));
+    }
+
+    @Test
+    void staleUnchangedAndInvalidRevisionsRollBackIdempotencyAndAllScopeWrites() {
+        ProjectView project = commands.create(
+                principal(), context("idem-m66-create-002"), command("M66-CONFLICT", "M66 冲突"));
+
+        assertThatThrownBy(() -> commands.reviseScopeRelations(
+                principal(), context("idem-m66-stale-001"),
+                new ReviseProjectScopeRelationsCommand(
+                        project.id(), 99, List.of(), List.of(), "陈旧修订")))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VERSION_CONFLICT));
+        assertThatThrownBy(() -> commands.reviseScopeRelations(
+                principal(), context("idem-m66-noop-001"),
+                new ReviseProjectScopeRelationsCommand(
+                        project.id(), 1, project.regionCodes(), project.networkIds(), "无变化修订")))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VERSION_CONFLICT));
+        assertThatThrownBy(() -> commands.reviseScopeRelations(
+                principal(), context("idem-m66-invalid-001"),
+                new ReviseProjectScopeRelationsCommand(
+                        project.id(), 1, List.of(" CN-4403"), List.of(), "非法引用")))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        assertThat(jdbc.sql("SELECT aggregate_version FROM prj_project WHERE project_id = :projectId")
+                .param("projectId", project.id()).query(Long.class).single()).isEqualTo(1);
+        assertThat(count("prj_project_scope_revision")).isZero();
+        assertThat(count("rel_idempotency_record")).isEqualTo(1);
+        assertThat(count("aud_audit_record")).isEqualTo(1);
+        assertThat(count("rel_outbox_event")).isEqualTo(1);
+    }
+
+    @Test
+    void emptyScopeSetsExplicitlyTerminateEveryOpenBinding() {
+        ProjectView project = commands.create(
+                principal(), context("idem-m66-create-003"), command("M66-CLEAR", "M66 清空关系"));
+
+        var result = commands.reviseScopeRelations(
+                principal(), context("idem-m66-clear-001"),
+                new ReviseProjectScopeRelationsCommand(
+                        project.id(), 1, List.of(), List.of(), "项目退出全部区域与网点"));
+
+        assertThat(result.regionCodes()).isEmpty();
+        assertThat(result.networkIds()).isEmpty();
+        assertThat(jdbc.sql("SELECT count(*) FROM prj_project_region WHERE valid_to IS NULL")
+                .query(Long.class).single()).isZero();
+        assertThat(jdbc.sql("SELECT count(*) FROM prj_project_network WHERE valid_to IS NULL")
+                .query(Long.class).single()).isZero();
+    }
+
+    @Test
+    void revokedGrantRejectsScopeRevisionWithoutBusinessSideEffects() {
+        ProjectView project = commands.create(
+                principal(), context("idem-m66-create-004"), command("M66-DENIED", "M66 拒绝"));
+        jdbc.sql("""
+                        UPDATE auth_role_grant
+                           SET revoked_at = now(), revoked_by = 'security-admin',
+                               revoke_reason = 'test revocation'
+                        """).update();
+
+        assertThatThrownBy(() -> commands.reviseScopeRelations(
+                principal(), context("idem-m66-denied-001"),
+                new ReviseProjectScopeRelationsCommand(
+                        project.id(), 1, List.of(), List.of(), "无权修订")))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.ACCESS_DENIED));
+
+        assertThat(jdbc.sql("SELECT aggregate_version FROM prj_project WHERE project_id = :projectId")
+                .param("projectId", project.id()).query(Long.class).single()).isEqualTo(1);
+        assertThat(count("prj_project_scope_revision")).isZero();
+        assertThat(count("rel_idempotency_record")).isEqualTo(1);
+        assertThat(count("rel_outbox_event")).isEqualTo(1);
+        assertThat(jdbc.sql("SELECT decision_code FROM aud_audit_record ORDER BY occurred_at DESC LIMIT 1")
+                .query(String.class).single()).isEqualTo("DENY");
+    }
+
+    @Test
+    void databaseRejectsDuplicateOpenBindingAndMutationOfRevisionReceipt() {
+        ProjectView project = commands.create(
+                principal(), context("idem-m66-create-005"), command("M66-DB", "M66 数据约束"));
+
+        assertThatThrownBy(() -> jdbc.sql("""
+                        INSERT INTO prj_project_region (
+                            project_region_id, tenant_id, project_id, region_code,
+                            valid_from, created_by, created_at
+                        ) VALUES (
+                            :bindingId, 'tenant-test', :projectId, 'CN-3702',
+                            now(), 'actor-test', now()
+                        )
+                        """).param("bindingId", UUID.randomUUID()).param("projectId", project.id()).update())
+                .isInstanceOf(org.springframework.dao.DuplicateKeyException.class);
+
+        var revision = commands.reviseScopeRelations(
+                principal(), context("idem-m66-db-revise-001"),
+                new ReviseProjectScopeRelationsCommand(
+                        project.id(), 1, List.of("CN-3100"), List.of("network-huangpu"), "约束验证"));
+        assertThatThrownBy(() -> jdbc.sql("""
+                        UPDATE prj_project_scope_revision SET reason = '篡改'
+                         WHERE revision_id = :revisionId
+                        """).param("revisionId", revision.revisionId()).update())
+                .isInstanceOf(org.springframework.dao.DataAccessException.class);
+    }
+
+    @Test
     void repeatedMigrationIsNoOp() {
-        assertThat(flyway.info().applied().length).isEqualTo(67);
+        assertThat(flyway.info().applied().length).isEqualTo(68);
         assertThat(flyway.migrate().migrationsExecuted).isZero();
     }
 
@@ -211,7 +390,7 @@ class ProjectCommandPostgresIT {
     void deniedCommandPersistsSecurityAuditOutsideRolledBackBusinessTransaction() {
         CurrentPrincipal noCapability = new CurrentPrincipal(
                 "actor-no-grant", "tenant-test", CurrentPrincipal.PrincipalType.USER,
-                "test-client", java.util.Set.of("project.create"));
+                "test-client", java.util.Set.of("project.create", "project.reviseScopeRelations"));
 
         assertThatThrownBy(() -> commands.create(
                 noCapability, context("idem-denied-001"), command("DENIED-2026", "无权限项目")))
@@ -355,6 +534,10 @@ class ProjectCommandPostgresIT {
         jdbc.sql("""
                         INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
                         VALUES (:roleId, 'project.create', now())
+                        """).param("roleId", roleId).update();
+        jdbc.sql("""
+                        INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
+                        VALUES (:roleId, 'project.reviseScopeRelations', now())
                         """).param("roleId", roleId).update();
         jdbc.sql("""
                         INSERT INTO auth_role_grant (

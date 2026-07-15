@@ -5,4 +5,10 @@ import com.serviceos.shared.CommandMetadata;
 
 public interface ProjectCommandService {
     ProjectView create(CurrentPrincipal principal, CommandMetadata metadata, CreateProjectCommand command);
+
+    ProjectScopeRelationRevisionView reviseScopeRelations(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            ReviseProjectScopeRelationsCommand command
+    );
 }

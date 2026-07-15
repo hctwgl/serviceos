@@ -109,6 +109,43 @@ class DefaultProjectCommandServiceTest {
                     .filter(candidate -> candidate.tenantId().equals(tenantId))
                     .filter(candidate -> candidate.id().equals(projectId));
         }
+
+        @Override
+        public Optional<Project> findByIdForUpdate(String tenantId, UUID projectId) {
+            return findById(tenantId, projectId);
+        }
+
+        @Override
+        public boolean advanceVersion(String tenantId, UUID projectId, long expectedVersion) {
+            return project != null && project.tenantId().equals(tenantId)
+                    && project.id().equals(projectId) && project.version() == expectedVersion;
+        }
+
+        @Override
+        public void reviseRegionBindings(
+                String tenantId, UUID projectId, List<String> removed, List<String> added,
+                String actorId, Instant revisedAt
+        ) {
+            // 本测试只覆盖创建命令。
+        }
+
+        @Override
+        public void reviseNetworkBindings(
+                String tenantId, UUID projectId, List<String> removed, List<String> added,
+                String actorId, Instant revisedAt
+        ) {
+            // 本测试只覆盖创建命令。
+        }
+
+        @Override
+        public void insertScopeRevision(ProjectScopeRevision revision) {
+            // 本测试只覆盖创建命令。
+        }
+
+        @Override
+        public Optional<ProjectScopeRevision> findScopeRevision(String tenantId, UUID revisionId) {
+            return Optional.empty();
+        }
     }
 
     private static final class CapturingIdempotency implements IdempotencyService {
