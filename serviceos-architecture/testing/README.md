@@ -70,3 +70,4 @@
 - [M67 项目授权目录与范围历史查询验收矩阵](64-m67-authorized-project-directory-query-acceptance.md)
 - [M68 授权工单目录与详情查询验收矩阵](65-m68-authorized-work-order-query-acceptance.md)
 - [M69 授权工单执行工作区投影验收矩阵](66-m69-authorized-work-order-execution-projection-acceptance.md)
+- [M70 授权任务队列与详情验收矩阵](67-m70-authorized-task-directory-detail-acceptance.md)

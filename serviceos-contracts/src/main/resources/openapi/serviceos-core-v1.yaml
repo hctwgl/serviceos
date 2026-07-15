@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.40.0
+  version: 0.41.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -238,6 +238,44 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /tasks:
+    get:
+      operationId: listAuthorizedTasks
+      summary: 查询当前主体有权读取的任务队列
+      description: task.read 实时项目范围在 SQL 中收敛；assignee 仅接受 me；cursor 绑定范围和筛选。
+      parameters:
+        - { name: projectId, in: query, schema: { type: string, format: uuid } }
+        - { name: taskKind, in: query, schema: { enum: [HUMAN, AUTOMATED] } }
+        - { name: status, in: query, schema: { enum: [READY, PENDING, CLAIMED, RUNNING, RETRY_WAIT, SUCCEEDED, COMPLETED, MANUAL_INTERVENTION, CANCELLED] } }
+        - { name: assignee, in: query, schema: { enum: [me] } }
+        - { name: cursor, in: query, schema: { type: string, minLength: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: priority DESC/nextRunAt/createdAt/taskId 稳定任务页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/TaskDirectoryPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /tasks/{taskId}:
+    get:
+      operationId: getAuthorizedTask
+      summary: 读取任务当前事实、责任和冻结引用
+      parameters:
+        - { name: taskId, in: path, required: true, schema: { type: string, format: uuid } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 任务详情
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/TaskDetail' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
   /tasks/{taskId}:claim:
     post:
       operationId: claimHumanTask
@@ -1732,6 +1770,62 @@ components:
         type: string
         pattern: '^"[1-9][0-9]*"$'
   schemas:
+    TaskDirectoryItem:
+      type: object
+      additionalProperties: false
+      required: [id, projectId, workOrderId, taskType, taskKind, stageCode, priority, status,
+        nextRunAt, claimedBy, attemptCount, maxAttempts, version, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        projectId: { type: [string, 'null'], format: uuid }
+        workOrderId: { type: [string, 'null'], format: uuid }
+        taskType: { type: string }
+        taskKind: { enum: [HUMAN, AUTOMATED] }
+        stageCode: { type: [string, 'null'] }
+        priority: { type: integer, minimum: 0, maximum: 1000 }
+        status: { enum: [READY, PENDING, CLAIMED, RUNNING, RETRY_WAIT, SUCCEEDED, COMPLETED, MANUAL_INTERVENTION, CANCELLED] }
+        nextRunAt: { type: string, format: date-time }
+        claimedBy: { type: [string, 'null'] }
+        attemptCount: { type: integer, minimum: 0 }
+        maxAttempts: { type: integer, minimum: 1 }
+        version: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    TaskDirectoryPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/TaskDirectoryItem' } }
+        nextCursor: { type: [string, 'null'] }
+        asOf: { type: string, format: date-time }
+    TaskDetail:
+      type: object
+      additionalProperties: false
+      required: [task, workflowInstanceId, stageInstanceId, workflowNodeInstanceId, workflowNodeId,
+        workflowDefinitionVersionId, workflowDefinitionDigest, configurationBundleId,
+        configurationBundleDigest, formRef, responsibleUserId, candidateUserIds, claimedAt,
+        startedAt, completedAt, resultRef, resultDigest, inputVersionRefs, asOf]
+      properties:
+        task: { $ref: '#/components/schemas/TaskDirectoryItem' }
+        workflowInstanceId: { type: [string, 'null'], format: uuid }
+        stageInstanceId: { type: [string, 'null'], format: uuid }
+        workflowNodeInstanceId: { type: [string, 'null'], format: uuid }
+        workflowNodeId: { type: [string, 'null'] }
+        workflowDefinitionVersionId: { type: [string, 'null'], format: uuid }
+        workflowDefinitionDigest: { type: [string, 'null'], pattern: '^[0-9a-f]{64}$' }
+        configurationBundleId: { type: [string, 'null'], format: uuid }
+        configurationBundleDigest: { type: [string, 'null'], pattern: '^[0-9a-f]{64}$' }
+        formRef: { type: [string, 'null'] }
+        responsibleUserId: { type: [string, 'null'] }
+        candidateUserIds: { type: array, items: { type: string } }
+        claimedAt: { type: [string, 'null'], format: date-time }
+        startedAt: { type: [string, 'null'], format: date-time }
+        completedAt: { type: [string, 'null'], format: date-time }
+        resultRef: { type: [string, 'null'] }
+        resultDigest: { type: [string, 'null'], pattern: '^[0-9a-f]{64}$' }
+        inputVersionRefs: { type: array, items: { $ref: '#/components/schemas/InputVersionRef' } }
+        asOf: { type: string, format: date-time }
     WorkOrder:
       type: object
       additionalProperties: false
