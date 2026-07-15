@@ -75,7 +75,7 @@ class BydCpimReplayGuardPostgresIT {
 
     @Test
     void migrationIsRepeatableAtCurrentVersion() {
-        assertThat(flyway.info().applied()).hasSize(66);
+        assertThat(flyway.info().applied()).hasSize(67);
         assertThat(flyway.migrate().migrationsExecuted).isZero();
     }
 }

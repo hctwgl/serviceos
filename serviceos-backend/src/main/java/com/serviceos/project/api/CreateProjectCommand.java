@@ -12,6 +12,7 @@ public record CreateProjectCommand(
         String name,
         LocalDate startsOn,
         LocalDate endsOn,
-        List<String> regionCodes
+        List<String> regionCodes,
+        List<String> networkIds
 ) {
 }

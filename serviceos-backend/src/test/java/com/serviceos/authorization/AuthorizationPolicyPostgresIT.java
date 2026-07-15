@@ -70,7 +70,7 @@ class AuthorizationPolicyPostgresIT {
     @BeforeEach
     void cleanAuthorizationTables() {
         jdbc.sql("""
-                TRUNCATE TABLE prj_project_region, prj_project, aud_audit_record,
+                TRUNCATE TABLE prj_project_network, prj_project_region, prj_project, aud_audit_record,
                     auth_role_field_policy, auth_field_policy_rule, auth_field_policy,
                     auth_role_grant, auth_role_capability, auth_role CASCADE
                 """).update();
@@ -170,7 +170,7 @@ class AuthorizationPolicyPostgresIT {
         assertThat(decision.fields().get("settlementAmount").permission())
                 .isEqualTo(FieldPermission.HIDDEN);
         assertThat(decision.matchedGrantIds()).hasSize(2);
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("064");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("065");
     }
 
     @Test
@@ -217,14 +217,27 @@ class AuthorizationPolicyPostgresIT {
     }
 
     @Test
-    void networkScopeStillFailsClosedWithoutAnAuthoritativeDirectory() {
+    void networkScopeResolvesOnlyEffectiveTenantProjectsAndMissingMappingFailsClosed() {
+        Instant now = Instant.now();
+        UUID matching = seedProjectNetwork(TENANT, "network-qingdao-a", now.minusSeconds(3600), null);
+        seedProjectNetwork(TENANT, "network-jinan-a", now.minusSeconds(3600), null);
+        seedProjectNetwork("tenant-other", "network-qingdao-a", now.minusSeconds(3600), null);
+        seedProjectNetwork(TENANT, "network-qingdao-a", now.plusSeconds(3600), null);
         seedRoleGrant("scope-network", "network-only", "NETWORK", "network-qingdao-a");
+        UUID explicitProject = UUID.randomUUID();
+        seedRoleGrant("scope-network-project", "network-only", "PROJECT", explicitProject.toString());
 
+        var scope = projectScopes.require(
+                principal("network-only"), "project.create", "Project", "corr-network-scope");
+        assertThat(scope.tenantWide()).isFalse();
+        assertThat(scope.projectIds()).containsExactlyInAnyOrder(matching, explicitProject);
+
+        seedRoleGrant("scope-empty-network", "empty-network", "NETWORK", "network-missing");
         assertThatThrownBy(() -> projectScopes.require(
-                principal("network-only"), "project.create", "Project", "corr-network-scope"))
+                principal("empty-network"), "project.create", "Project", "corr-empty-network"))
                 .isInstanceOf(com.serviceos.shared.BusinessProblem.class);
         assertThat(jdbc.sql("SELECT error_code FROM aud_audit_record WHERE action_name='AUTHORIZATION_DENIED'")
-                .query(String.class).single()).isEqualTo("PROJECT_SCOPE_UNRESOLVED");
+                .query(String.class).single()).isEqualTo("PROJECT_SCOPE_MISSING");
     }
 
     @Test
@@ -243,6 +256,16 @@ class AuthorizationPolicyPostgresIT {
                             project_region_id, tenant_id, project_id, region_code,
                             valid_from, created_by, created_at)
                         VALUES (:id, :tenantId, :projectId, 'CN-3702', now(), 'test', now())
+                        """)
+                .param("id", UUID.randomUUID()).param("tenantId", TENANT)
+                .param("projectId", otherTenantProject).update())
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+
+        assertThatThrownBy(() -> jdbc.sql("""
+                        INSERT INTO prj_project_network (
+                            project_network_id, tenant_id, project_id, network_id,
+                            valid_from, created_by, created_at)
+                        VALUES (:id, :tenantId, :projectId, 'network-qingdao-a', now(), 'test', now())
                         """)
                 .param("id", UUID.randomUUID()).param("tenantId", TENANT)
                 .param("projectId", otherTenantProject).update())
@@ -277,6 +300,42 @@ class AuthorizationPolicyPostgresIT {
                 .param("tenantId", tenantId)
                 .param("projectId", projectId)
                 .param("regionCode", regionCode)
+                .param("validFrom", java.time.OffsetDateTime.ofInstant(validFrom, java.time.ZoneOffset.UTC))
+                .param("validTo", validTo == null ? null
+                        : java.time.OffsetDateTime.ofInstant(validTo, java.time.ZoneOffset.UTC),
+                        java.sql.Types.TIMESTAMP_WITH_TIMEZONE)
+                .update();
+        return projectId;
+    }
+
+    private UUID seedProjectNetwork(String tenantId, String networkId, Instant validFrom, Instant validTo) {
+        UUID projectId = UUID.randomUUID();
+        jdbc.sql("""
+                        INSERT INTO prj_project (
+                            project_id, tenant_id, project_code, client_id, project_name,
+                            starts_on, project_status, aggregate_version, created_at
+                        ) VALUES (
+                            :projectId, :tenantId, :projectCode, 'client', 'network project',
+                            current_date, 'DRAFT', 1, now()
+                        )
+                        """)
+                .param("projectId", projectId)
+                .param("tenantId", tenantId)
+                .param("projectCode", "NETWORK-" + projectId)
+                .update();
+        jdbc.sql("""
+                        INSERT INTO prj_project_network (
+                            project_network_id, tenant_id, project_id, network_id,
+                            valid_from, valid_to, created_by, created_at
+                        ) VALUES (
+                            :bindingId, :tenantId, :projectId, :networkId,
+                            :validFrom, :validTo, 'test', now()
+                        )
+                        """)
+                .param("bindingId", UUID.randomUUID())
+                .param("tenantId", tenantId)
+                .param("projectId", projectId)
+                .param("networkId", networkId)
                 .param("validFrom", java.time.OffsetDateTime.ofInstant(validFrom, java.time.ZoneOffset.UTC))
                 .param("validTo", validTo == null ? null
                         : java.time.OffsetDateTime.ofInstant(validTo, java.time.ZoneOffset.UTC),

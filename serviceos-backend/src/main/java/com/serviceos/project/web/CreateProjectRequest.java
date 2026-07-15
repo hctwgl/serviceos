@@ -14,6 +14,7 @@ record CreateProjectRequest(
         @NotBlank @Size(max = 200) String name,
         @NotNull LocalDate startsOn,
         LocalDate endsOn,
-        @Size(max = 100) List<@NotBlank @Size(max = 128) String> regionCodes
+        @Size(max = 100) List<@NotBlank @Size(max = 128) String> regionCodes,
+        @Size(max = 100) List<@NotBlank @Size(max = 128) String> networkIds
 ) {
 }

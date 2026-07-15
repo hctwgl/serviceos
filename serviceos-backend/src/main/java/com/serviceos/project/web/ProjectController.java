@@ -44,7 +44,8 @@ final class ProjectController {
         CommandMetadata metadata = new CommandMetadata(correlationId, idempotencyKey);
         ProjectView result = commands.create(principal, metadata, new CreateProjectCommand(
                 request.code(), request.clientId(), request.name(), request.startsOn(), request.endsOn(),
-                request.regionCodes() == null ? List.of() : request.regionCodes()));
+                request.regionCodes() == null ? List.of() : request.regionCodes(),
+                request.networkIds() == null ? List.of() : request.networkIds()));
         return ResponseEntity
                 .created(URI.create("/api/v1/projects/" + result.id()))
                 .header(CorrelationIds.HEADER_NAME, correlationId)

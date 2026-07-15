@@ -2,6 +2,7 @@ package com.serviceos.authorization.application;
 
 import com.serviceos.authorization.api.AuthorizedProjectScope;
 import com.serviceos.authorization.api.AuthorizationRequest;
+import com.serviceos.authorization.api.ProjectNetworkScopeResolver;
 import com.serviceos.authorization.api.ProjectRegionScopeResolver;
 import com.serviceos.authorization.api.ProjectScopeAuthorizationService;
 import com.serviceos.identity.api.CurrentPrincipal;
@@ -17,27 +18,28 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * RoleGrant 项目集合解析器。TENANT 表示租户内全部项目；PROJECT 与 REGION 权威映射取并集。
- * NETWORK 尚无权威项目映射，因此只有该范围时不能猜测或扩大权限，必须拒绝并保留审计。
+ * RoleGrant 项目集合解析器。TENANT 表示租户内全部项目；PROJECT、REGION 与 NETWORK 权威映射取并集。
  */
 @Service
 final class DefaultProjectScopeAuthorizationService implements ProjectScopeAuthorizationService {
     static final String PROJECT_SCOPE_MISSING = "PROJECT_SCOPE_MISSING";
-    static final String PROJECT_SCOPE_UNRESOLVED = "PROJECT_SCOPE_UNRESOLVED";
 
     private final ProjectScopePolicyStore policyStore;
     private final ProjectRegionScopeResolver regionScopes;
+    private final ProjectNetworkScopeResolver networkScopes;
     private final AuthorizationDenialAuditWriter denialAudit;
     private final Clock clock;
 
     DefaultProjectScopeAuthorizationService(
             ProjectScopePolicyStore policyStore,
             ProjectRegionScopeResolver regionScopes,
+            ProjectNetworkScopeResolver networkScopes,
             AuthorizationDenialAuditWriter denialAudit,
             Clock clock
     ) {
         this.policyStore = policyStore;
         this.regionScopes = regionScopes;
+        this.networkScopes = networkScopes;
         this.denialAudit = denialAudit;
         this.clock = clock;
     }
@@ -49,9 +51,9 @@ final class DefaultProjectScopeAuthorizationService implements ProjectScopeAutho
         ProjectScopeGrantMatch match = policyStore.findProjectScopeGrants(
                 principal.tenantId(), principal.principalId(), capability, clock.instant());
         boolean tenantWide = false;
-        boolean unresolved = false;
         Set<UUID> projects = new LinkedHashSet<>();
         Set<String> regions = new LinkedHashSet<>();
+        Set<String> networks = new LinkedHashSet<>();
         for (String scope : match.scopeTypesAndRefs()) {
             int separator = scope.indexOf(':');
             if (separator < 1 || separator == scope.length() - 1) {
@@ -63,7 +65,7 @@ final class DefaultProjectScopeAuthorizationService implements ProjectScopeAutho
                 case "TENANT" -> tenantWide = true;
                 case "PROJECT" -> projects.add(parseProject(reference));
                 case "REGION" -> regions.add(reference);
-                case "NETWORK" -> unresolved = true;
+                case "NETWORK" -> networks.add(reference);
                 default -> throw new IllegalStateException("RoleGrant scope type is unsupported: " + type);
             }
         }
@@ -73,13 +75,15 @@ final class DefaultProjectScopeAuthorizationService implements ProjectScopeAutho
         if (!regions.isEmpty()) {
             projects.addAll(regionScopes.resolve(principal.tenantId(), regions, clock.instant()));
         }
+        if (!networks.isEmpty()) {
+            projects.addAll(networkScopes.resolve(principal.tenantId(), networks, clock.instant()));
+        }
         if (!projects.isEmpty()) {
             String canonical = projects.stream().sorted(Comparator.comparing(UUID::toString))
                     .map(UUID::toString).reduce((left, right) -> left + "," + right).orElseThrow();
             return new AuthorizedProjectScope(false, projects, Sha256.digest("PROJECTS:" + canonical));
         }
-        deny(principal, capability, resourceType, correlationId,
-                unresolved ? PROJECT_SCOPE_UNRESOLVED : PROJECT_SCOPE_MISSING, match.policyVersion());
+        deny(principal, capability, resourceType, correlationId, PROJECT_SCOPE_MISSING, match.policyVersion());
         throw new IllegalStateException("unreachable");
     }
 

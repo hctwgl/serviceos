@@ -67,6 +67,29 @@ final class JdbcProjectRepository implements ProjectRepository {
     }
 
     @Override
+    public void insertNetworkBindings(Project project, String createdBy) {
+        for (String networkId : project.networkIds()) {
+            jdbc.sql("""
+                            INSERT INTO prj_project_network (
+                                project_network_id, tenant_id, project_id, network_id,
+                                valid_from, created_by, created_at
+                            ) VALUES (
+                                :bindingId, :tenantId, :projectId, :networkId,
+                                :validFrom, :createdBy, :createdAt
+                            )
+                            """)
+                    .param("bindingId", UUID.randomUUID())
+                    .param("tenantId", project.tenantId())
+                    .param("projectId", project.id())
+                    .param("networkId", networkId)
+                    .param("validFrom", timestamptz(project.createdAt()))
+                    .param("createdBy", createdBy)
+                    .param("createdAt", timestamptz(project.createdAt()))
+                    .update();
+        }
+    }
+
+    @Override
     public Optional<Project> findById(String tenantId, UUID projectId) {
         return jdbc.sql("""
                         SELECT project_id, tenant_id, project_code, client_id, project_name,
@@ -85,6 +108,7 @@ final class JdbcProjectRepository implements ProjectRepository {
                         rs.getObject("starts_on", java.time.LocalDate.class),
                         rs.getObject("ends_on", java.time.LocalDate.class),
                         findActiveRegions(tenantId, projectId),
+                        findOpenNetworkBindings(tenantId, projectId),
                         Project.Status.valueOf(rs.getString("project_status")),
                         rs.getLong("aggregate_version"),
                         rs.getTimestamp("created_at").toInstant()))
@@ -97,6 +121,19 @@ final class JdbcProjectRepository implements ProjectRepository {
                          WHERE tenant_id = :tenantId AND project_id = :projectId
                            AND valid_to IS NULL
                          ORDER BY region_code
+                        """)
+                .param("tenantId", tenantId)
+                .param("projectId", projectId)
+                .query(String.class)
+                .list();
+    }
+
+    private List<String> findOpenNetworkBindings(String tenantId, UUID projectId) {
+        return jdbc.sql("""
+                        SELECT network_id FROM prj_project_network
+                         WHERE tenant_id = :tenantId AND project_id = :projectId
+                           AND valid_to IS NULL
+                         ORDER BY network_id
                         """)
                 .param("tenantId", tenantId)
                 .param("projectId", projectId)

@@ -93,10 +93,12 @@ final class DefaultProjectCommandService implements ProjectCommandService {
         Project project = Project.create(context.tenantId(), command, UUID.randomUUID(), now);
         projects.insert(project);
         projects.insertRegionBindings(project, context.actorId());
+        projects.insertNetworkBindings(project, context.actorId());
 
         String eventPayload = canonicalJson(new ProjectCreatedPayload(
                 project.id(), project.tenantId(), project.code(), project.clientId(),
-                project.name(), project.startsOn(), project.endsOn(), project.regionCodes(), project.status().name(),
+                project.name(), project.startsOn(), project.endsOn(), project.regionCodes(), project.networkIds(),
+                project.status().name(),
                 project.version(), project.createdAt()));
         String payloadDigest = Sha256.digest(eventPayload);
         UUID outboxId = UUID.randomUUID();
@@ -108,7 +110,7 @@ final class DefaultProjectCommandService implements ProjectCommandService {
                 authorizationDecision.policyVersion(), "SUCCEEDED", null, requestDigest,
                 context.correlationId(), now));
         outbox.append(new OutboxEvent(
-                outboxId, eventId, "project", "project.created", 2,
+                outboxId, eventId, "project", "project.created", 3,
                 "Project", project.id().toString(), project.version(), context.tenantId(),
                 context.correlationId(), context.idempotencyKey(), project.id().toString(),
                 eventPayload, payloadDigest, now));
@@ -135,6 +137,7 @@ final class DefaultProjectCommandService implements ProjectCommandService {
             java.time.LocalDate startsOn,
             java.time.LocalDate endsOn,
             java.util.List<String> regionCodes,
+            java.util.List<String> networkIds,
             String status,
             long aggregateVersion,
             Instant occurredAt

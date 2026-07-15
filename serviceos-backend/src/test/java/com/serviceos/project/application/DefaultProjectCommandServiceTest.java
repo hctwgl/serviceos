@@ -46,7 +46,7 @@ class DefaultProjectCommandServiceTest {
                 new CommandMetadata("corr-1", "idem-1"),
                 new CreateProjectCommand(
                         "BYD-2026", "client-byd", "比亚迪项目",
-                        LocalDate.of(2026, 1, 1), null, List.of("CN-3702")));
+                        LocalDate.of(2026, 1, 1), null, List.of("CN-3702"), List.of("network-a")));
 
         assertThat(result.tenantId()).isEqualTo("trusted-tenant");
         assertThat(idempotency.context.tenantId()).isEqualTo("trusted-tenant");
@@ -95,6 +95,11 @@ class DefaultProjectCommandServiceTest {
 
         @Override
         public void insertRegionBindings(Project project, String createdBy) {
+            // 单元测试内存仓库；绑定已包含在聚合中，无额外持久化动作。
+        }
+
+        @Override
+        public void insertNetworkBindings(Project project, String createdBy) {
             // 单元测试内存仓库；绑定已包含在聚合中，无额外持久化动作。
         }
 

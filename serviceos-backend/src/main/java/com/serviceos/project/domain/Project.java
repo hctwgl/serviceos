@@ -22,6 +22,7 @@ public record Project(
         LocalDate startsOn,
         LocalDate endsOn,
         List<String> regionCodes,
+        List<String> networkIds,
         Status status,
         long version,
         Instant createdAt
@@ -42,29 +43,34 @@ public record Project(
             throw new IllegalArgumentException("endsOn must not be before startsOn");
         }
         List<String> regionCodes = requireRegionCodes(command.regionCodes());
+        List<String> networkIds = requireStableReferences(command.networkIds(), "networkIds");
         return new Project(id, tenantId, code, clientId, name, command.startsOn(), command.endsOn(), regionCodes,
-                Status.DRAFT, 1L, now);
+                networkIds, Status.DRAFT, 1L, now);
     }
 
     public ProjectView toView() {
-        return new ProjectView(id, tenantId, code, clientId, name, startsOn, endsOn, regionCodes,
+        return new ProjectView(id, tenantId, code, clientId, name, startsOn, endsOn, regionCodes, networkIds,
                 status.name(), version, createdAt);
     }
 
     private static List<String> requireRegionCodes(List<String> values) {
+        return requireStableReferences(values, "regionCodes");
+    }
+
+    private static List<String> requireStableReferences(List<String> values, String field) {
         if (values == null) {
-            throw new IllegalArgumentException("regionCodes must not be null");
+            throw new IllegalArgumentException(field + " must not be null");
         }
         if (values.size() > 100) {
-            throw new IllegalArgumentException("regionCodes exceeds 100 items");
+            throw new IllegalArgumentException(field + " exceeds 100 items");
         }
         Set<String> unique = new HashSet<>();
         for (String value : values) {
             if (value == null || value.isBlank() || !value.equals(value.trim()) || value.length() > 128) {
-                throw new IllegalArgumentException("regionCodes contains an invalid stable reference");
+                throw new IllegalArgumentException(field + " contains an invalid stable reference");
             }
             if (!unique.add(value)) {
-                throw new IllegalArgumentException("regionCodes contains duplicate references");
+                throw new IllegalArgumentException(field + " contains duplicate references");
             }
         }
         return values.stream().sorted().toList();

@@ -14,6 +14,7 @@ public record ProjectView(
         LocalDate startsOn,
         LocalDate endsOn,
         List<String> regionCodes,
+        List<String> networkIds,
         String status,
         long version,
         Instant createdAt
