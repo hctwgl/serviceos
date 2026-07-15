@@ -1,22 +1,178 @@
 package com.serviceos.task.infrastructure;
 
-import com.serviceos.task.api.*;
+import com.serviceos.task.api.InputVersionRef;
+import com.serviceos.task.api.TaskDetail;
+import com.serviceos.task.api.TaskDirectoryItem;
 import com.serviceos.task.application.TaskDirectoryQueryRepository;
 import org.springframework.stereotype.Repository;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.json.JsonMapper;
-import java.time.*;
-import java.util.*;
+
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 
 @Repository
 final class MyBatisTaskDirectoryQueryRepository implements TaskDirectoryQueryRepository {
- private static final JsonMapper JSON=JsonMapper.builder().build();private final TaskDirectoryQueryMapper mapper;
- MyBatisTaskDirectoryQueryRepository(TaskDirectoryQueryMapper mapper){this.mapper=mapper;}
- public List<TaskDirectoryItem> findPage(String tenant,boolean wide,List<UUID> projects,UUID project,String kind,String status,String assignee,Integer priority,Instant next,Instant created,UUID id,int size){return mapper.findPage(tenant,wide,projects.stream().map(UUID::toString).toList(),project,kind,status,assignee,priority,next,created,id,size).stream().map(MyBatisTaskDirectoryQueryRepository::item).toList();}
- public Optional<TaskDetail> findDetail(String tenant,UUID id,Instant asOf){return Optional.ofNullable(mapper.findDetail(tenant,id)).map(r->detail(r,asOf));}
- private static TaskDirectoryItem item(Map<String,Object> r){return new TaskDirectoryItem(u(r,"id"),u(r,"projectId"),u(r,"workOrderId"),s(r,"taskType"),s(r,"taskKind"),s(r,"stageCode"),num(r,"priority").intValue(),s(r,"status"),i(r,"nextRunAt"),s(r,"claimedBy"),num(r,"attemptCount").intValue(),num(r,"maxAttempts").intValue(),num(r,"version").longValue(),i(r,"createdAt"),i(r,"updatedAt"));}
- private static TaskDetail detail(Map<String,Object> r,Instant asOf){return new TaskDetail(item(r),u(r,"workflowInstanceId"),u(r,"stageInstanceId"),u(r,"workflowNodeInstanceId"),s(r,"workflowNodeId"),u(r,"workflowDefinitionVersionId"),s(r,"workflowDefinitionDigest"),u(r,"configurationBundleId"),s(r,"configurationBundleDigest"),s(r,"formRef"),s(r,"responsibleUserId"),strings(r,"candidateUserIds"),i(r,"claimedAt"),i(r,"startedAt"),i(r,"completedAt"),s(r,"resultRef"),s(r,"resultDigest"),refs(r,"inputVersionRefs"),asOf);}
- private static List<String> strings(Map<String,Object> r,String k){try{return List.of(JSON.readValue(s(r,k),String[].class));}catch(JacksonException e){throw new IllegalStateException("任务详情包含非法候选人 JSON",e);}}
- private static List<InputVersionRef> refs(Map<String,Object> r,String k){try{return List.of(JSON.readValue(s(r,k),InputVersionRef[].class));}catch(JacksonException e){throw new IllegalStateException("任务详情包含非法输入版本 JSON",e);}}
- private static String s(Map<String,Object> r,String k){Object v=r.get(k);return v==null?null:v.toString();}private static UUID u(Map<String,Object> r,String k){Object v=r.get(k);return v==null?null:v instanceof UUID x?x:UUID.fromString(v.toString());}private static Number num(Map<String,Object> r,String k){return (Number)r.get(k);}private static Instant i(Map<String,Object> r,String k){Object v=r.get(k);if(v==null)return null;if(v instanceof Instant x)return x;if(v instanceof OffsetDateTime x)return x.toInstant();if(v instanceof java.sql.Timestamp x)return x.toInstant();return Instant.parse(v.toString());}
+    private static final JsonMapper JSON = JsonMapper.builder().build();
+
+    private final TaskDirectoryQueryMapper mapper;
+
+    MyBatisTaskDirectoryQueryRepository(TaskDirectoryQueryMapper mapper) {
+        this.mapper = mapper;
+    }
+
+    @Override
+    public List<TaskDirectoryItem> findPage(
+            String tenantId,
+            boolean tenantWide,
+            List<UUID> projectIds,
+            UUID projectId,
+            String taskKind,
+            String status,
+            String assigneeId,
+            Integer cursorPriority,
+            Instant cursorNextRunAt,
+            Instant cursorCreatedAt,
+            UUID cursorId,
+            int fetchSize
+    ) {
+        return mapper.findPage(
+                        tenantId,
+                        tenantWide,
+                        projectIds.stream().map(UUID::toString).toList(),
+                        projectId,
+                        taskKind,
+                        status,
+                        assigneeId,
+                        cursorPriority,
+                        cursorNextRunAt,
+                        cursorCreatedAt,
+                        cursorId,
+                        fetchSize)
+                .stream()
+                .map(MyBatisTaskDirectoryQueryRepository::item)
+                .toList();
+    }
+
+    @Override
+    public Optional<TaskDetail> findDetail(String tenantId, UUID taskId, Instant asOf) {
+        return Optional.ofNullable(mapper.findDetail(tenantId, taskId))
+                .map(row -> detail(row, asOf));
+    }
+
+    @Override
+    public Optional<AllowedActionState> findAllowedActionState(
+            String tenantId, UUID taskId, String principalId) {
+        return Optional.ofNullable(mapper.findAllowedActionState(tenantId, taskId, principalId))
+                .map(row -> new AllowedActionState(
+                        string(row, "taskKind"),
+                        string(row, "status"),
+                        number(row, "version").longValue(),
+                        string(row, "claimedBy"),
+                        uuid(row, "workflowNodeInstanceId"),
+                        bool(row, "actorCandidate"),
+                        bool(row, "actorResponsible"),
+                        bool(row, "activeGuard")));
+    }
+
+    private static TaskDirectoryItem item(Map<String, Object> row) {
+        return new TaskDirectoryItem(
+                uuid(row, "id"),
+                uuid(row, "projectId"),
+                uuid(row, "workOrderId"),
+                string(row, "taskType"),
+                string(row, "taskKind"),
+                string(row, "stageCode"),
+                number(row, "priority").intValue(),
+                string(row, "status"),
+                instant(row, "nextRunAt"),
+                string(row, "claimedBy"),
+                number(row, "attemptCount").intValue(),
+                number(row, "maxAttempts").intValue(),
+                number(row, "version").longValue(),
+                instant(row, "createdAt"),
+                instant(row, "updatedAt"));
+    }
+
+    private static TaskDetail detail(Map<String, Object> row, Instant asOf) {
+        return new TaskDetail(
+                item(row),
+                uuid(row, "workflowInstanceId"),
+                uuid(row, "stageInstanceId"),
+                uuid(row, "workflowNodeInstanceId"),
+                string(row, "workflowNodeId"),
+                uuid(row, "workflowDefinitionVersionId"),
+                string(row, "workflowDefinitionDigest"),
+                uuid(row, "configurationBundleId"),
+                string(row, "configurationBundleDigest"),
+                string(row, "formRef"),
+                string(row, "responsibleUserId"),
+                strings(row, "candidateUserIds"),
+                instant(row, "claimedAt"),
+                instant(row, "startedAt"),
+                instant(row, "completedAt"),
+                string(row, "resultRef"),
+                string(row, "resultDigest"),
+                inputVersionRefs(row, "inputVersionRefs"),
+                asOf);
+    }
+
+    private static List<String> strings(Map<String, Object> row, String key) {
+        try {
+            return List.of(JSON.readValue(string(row, key), String[].class));
+        } catch (JacksonException exception) {
+            throw new IllegalStateException("任务详情包含非法候选人 JSON", exception);
+        }
+    }
+
+    private static List<InputVersionRef> inputVersionRefs(Map<String, Object> row, String key) {
+        try {
+            return List.of(JSON.readValue(string(row, key), InputVersionRef[].class));
+        } catch (JacksonException exception) {
+            throw new IllegalStateException("任务详情包含非法输入版本 JSON", exception);
+        }
+    }
+
+    private static String string(Map<String, Object> row, String key) {
+        Object value = row.get(key);
+        return value == null ? null : value.toString();
+    }
+
+    private static UUID uuid(Map<String, Object> row, String key) {
+        Object value = row.get(key);
+        if (value == null) {
+            return null;
+        }
+        return value instanceof UUID uuid ? uuid : UUID.fromString(value.toString());
+    }
+
+    private static Number number(Map<String, Object> row, String key) {
+        return (Number) row.get(key);
+    }
+
+    private static Instant instant(Map<String, Object> row, String key) {
+        Object value = row.get(key);
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Instant instant) {
+            return instant;
+        }
+        if (value instanceof OffsetDateTime offsetDateTime) {
+            return offsetDateTime.toInstant();
+        }
+        if (value instanceof java.sql.Timestamp timestamp) {
+            return timestamp.toInstant();
+        }
+        return Instant.parse(value.toString());
+    }
+
+    private static boolean bool(Map<String, Object> row, String key) {
+        Object value = row.get(key);
+        return value instanceof Boolean bool ? bool : Boolean.parseBoolean(String.valueOf(value));
+    }
 }

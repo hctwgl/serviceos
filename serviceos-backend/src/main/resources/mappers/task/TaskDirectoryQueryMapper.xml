@@ -9,4 +9,12 @@
   <if test="cursorPriority != null">AND (t.priority &lt; #{cursorPriority} OR (t.priority=#{cursorPriority} AND (t.next_run_at,t.created_at,t.task_id)&gt;(#{cursorNextRunAt},#{cursorCreatedAt},#{cursorId})))</if>
   ORDER BY t.priority DESC,t.next_run_at,t.created_at,t.task_id LIMIT #{fetchSize}</select>
  <select id="findDetail" resultType="map">SELECT <include refid="itemColumns"/>,t.workflow_instance_id AS "workflowInstanceId",t.stage_instance_id AS "stageInstanceId",t.workflow_node_instance_id AS "workflowNodeInstanceId",t.workflow_node_id AS "workflowNodeId",t.workflow_definition_version_id AS "workflowDefinitionVersionId",t.workflow_definition_digest AS "workflowDefinitionDigest",t.configuration_bundle_id AS "configurationBundleId",t.configuration_bundle_digest AS "configurationBundleDigest",t.form_ref AS "formRef",t.claimed_at AS "claimedAt",t.started_at AS "startedAt",t.completed_at AS "completedAt",t.result_ref AS "resultRef",t.result_digest AS "resultDigest",COALESCE(t.input_version_refs,'[]'::jsonb)::text AS "inputVersionRefs",(SELECT a.principal_id FROM tsk_task_assignment a WHERE a.tenant_id=t.tenant_id AND a.task_id=t.task_id AND a.assignment_kind='RESPONSIBLE' AND a.status='ACTIVE' ORDER BY a.effective_from DESC LIMIT 1) AS "responsibleUserId",COALESCE((SELECT jsonb_agg(a.principal_id ORDER BY a.principal_id) FROM tsk_task_assignment a WHERE a.tenant_id=t.tenant_id AND a.task_id=t.task_id AND a.assignment_kind='CANDIDATE' AND a.status='ACTIVE'),'[]'::jsonb)::text AS "candidateUserIds" FROM tsk_task t WHERE t.tenant_id=#{tenantId} AND t.task_id=#{taskId}</select>
+ <select id="findAllowedActionState" resultType="map">
+  SELECT t.task_kind AS "taskKind",t.status,t.version,t.claimed_by AS "claimedBy",
+         t.workflow_node_instance_id AS "workflowNodeInstanceId",
+         EXISTS(SELECT 1 FROM tsk_task_assignment a WHERE a.tenant_id=t.tenant_id AND a.task_id=t.task_id AND a.assignment_kind='CANDIDATE' AND a.principal_type='USER' AND a.principal_id=#{principalId} AND a.status='ACTIVE') AS "actorCandidate",
+         EXISTS(SELECT 1 FROM tsk_task_assignment a WHERE a.tenant_id=t.tenant_id AND a.task_id=t.task_id AND a.assignment_kind='RESPONSIBLE' AND a.principal_type='USER' AND a.principal_id=#{principalId} AND a.status='ACTIVE') AS "actorResponsible",
+         EXISTS(SELECT 1 FROM tsk_task_execution_guard g WHERE g.tenant_id=t.tenant_id AND g.task_id=t.task_id AND g.status='ACTIVE') AS "activeGuard"
+    FROM tsk_task t WHERE t.tenant_id=#{tenantId} AND t.task_id=#{taskId}
+ </select>
 </mapper>

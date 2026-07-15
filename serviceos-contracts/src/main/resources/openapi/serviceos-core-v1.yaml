@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.41.0
+  version: 0.42.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -273,6 +273,27 @@ paths:
             ETag: { required: true, schema: { type: string } }
             X-Correlation-Id: { required: true, schema: { type: string } }
           content: { application/json: { schema: { $ref: '#/components/schemas/TaskDetail' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /tasks/{taskId}/allowed-actions:
+    get:
+      operationId: getTaskAllowedActions
+      summary: 查询当前主体可渲染的 Task 动作
+      description: >-
+        先执行 task.read tenant/scope 鉴权，再按与写命令相同的 capability、Task 状态、
+        ACTIVE CANDIDATE/RESPONSIBLE 和 execution guard 实时投影。响应不是授权凭证，
+        后续命令仍必须携带 If-Match 和 Idempotency-Key 并重新校验全部前置条件。
+      parameters:
+        - { name: taskId, in: path, required: true, schema: { type: string, format: uuid } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Task 当前版本上的稳定动作集合
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/TaskAllowedActions' } } }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
@@ -1825,6 +1846,35 @@ components:
         resultRef: { type: [string, 'null'] }
         resultDigest: { type: [string, 'null'], pattern: '^[0-9a-f]{64}$' }
         inputVersionRefs: { type: array, items: { $ref: '#/components/schemas/InputVersionRef' } }
+        asOf: { type: string, format: date-time }
+    TaskAllowedAction:
+      type: object
+      additionalProperties: false
+      required: [code, label, inputSchemaRef, obligations]
+      properties:
+        code: { enum: [task.claim, task.start, task.complete, task.release] }
+        label: { type: string, minLength: 1, maxLength: 80 }
+        inputSchemaRef:
+          type: [string, 'null']
+          enum:
+            - null
+            - '#/components/schemas/CompleteHumanTaskRequest'
+            - '#/components/schemas/ReleaseHumanTaskRequest'
+        obligations:
+          type: array
+          uniqueItems: true
+          maxItems: 4
+          items: { enum: [REQUIRE_REASON, REQUIRE_RESULT] }
+    TaskAllowedActions:
+      type: object
+      additionalProperties: false
+      required: [resourceVersion, actions, asOf]
+      properties:
+        resourceVersion: { type: integer, format: int64, minimum: 1 }
+        actions:
+          type: array
+          maxItems: 4
+          items: { $ref: '#/components/schemas/TaskAllowedAction' }
         asOf: { type: string, format: date-time }
     WorkOrder:
       type: object
