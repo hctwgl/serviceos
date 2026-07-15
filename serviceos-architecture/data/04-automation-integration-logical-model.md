@@ -11,6 +11,8 @@ status: Proposed
 > ExternalAcknowledgement 最小子集。ReplayRequest、通用 Connector 和本文其余模型仍为 Proposed。
 > M62 只为 M61 `sla_instance` 增加 project/workOrder 稳定游标索引和 `sla.read` capability；没有新增
 > SLA 业务状态、默认 deadline、日历或暂停数据结构。
+> M65 的 `prj_project_network` 由项目目录拥有，只为 NETWORK RoleGrant 提供项目范围；它不是本章
+> `service_network`、Coverage、Capability 或停派模型的替代实现。
 
 本文件定义 M4 逻辑实体和关键约束，不是最终 DDL。
 

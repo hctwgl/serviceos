@@ -25,9 +25,9 @@ status: Proposed
 
 项目/服务产品稳定身份与可变运营配置分离。车企/品牌不创建专属核心表或代码分支。
 
-> M64 已在 Core OpenAPI 0.35.0 实现 `POST /api/v1/projects` 的 `regionCodes` 子集：省略/空数组
-> 表示不建立 REGION 关系；非空值与项目、审计、Outbox、幂等结果同事务写入有效期关系。
-> owners、关系独立修订/终止、项目列表/详情/激活/退役仍未实现。
+> M64～M65 已在 Core OpenAPI 0.36.0 实现 `POST /api/v1/projects` 的 `regionCodes`/`networkIds` 子集：
+> 省略/空数组表示不建立对应关系；非空值与项目、审计、Outbox、幂等结果同事务写入有效期关系。
+> owners、关系独立修订/终止、项目列表/详情/激活/退役仍未实现；networkIds 不替代 ServiceNetwork 目录。
 
 ## 3. 配置资产与草稿
 
