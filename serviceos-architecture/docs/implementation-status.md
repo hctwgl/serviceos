@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-15
-baselineCommit: fa72e57
-latestMilestone: M62
+baselineCommit: PENDING_M63_FEATURE_COMMIT
+latestMilestone: M63
 ---
 
 # ServiceOS 实施状态总览
@@ -39,13 +39,13 @@ latestMilestone: M62
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M62 SLA 授权查询与工作台投影 |
-| 基线提交 | `fa72e57` |
+| 最新实施里程碑 | M63 授权项目集合与跨项目 SLA 队列 |
+| 基线提交 | `PENDING_M63_FEATURE_COMMIT` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
 | 前端工程 | 尚未建立；已有 Admin、Network、Technician 产品与交互规格 |
-| 数据库 | PostgreSQL + Flyway（当前版本 062 / 64） |
-| 契约 | Core OpenAPI 0.33.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 recovered/resolved 与 SLA started/breached/met@v1） |
+| 数据库 | PostgreSQL + Flyway（当前版本 063 / 65） |
+| 契约 | Core OpenAPI 0.34.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 recovered/resolved 与 SLA started/breached/met@v1） |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -54,7 +54,7 @@ latestMilestone: M62
 | 领域 | 能力 | 状态 | 已完成范围 | 主要未完成范围 | 最近证据 |
 |---|---|---|---|---|---|
 | 工程基础 | 构建、测试、契约、可观测性、容器发布 | `IMPLEMENTED` | Maven、PostgreSQL IT、契约门禁、Trace/指标、单镜像迁移和回滚演练 | 正式 K8s、多故障域、PITR、SBOM/签名、正式 Secret Manager | M8～M14 |
-| 身份授权 | OIDC/JWT、Capability、Tenant/Project Scope、拒绝审计 | `IMPLEMENTED` | 后端认证授权和范围校验基线 | 正式企业 IdP、完整组织治理 UI | M9 |
+| 身份授权 | OIDC/JWT、Capability、Tenant/Project Scope、拒绝审计 | `IMPLEMENTED` | 后端认证授权和范围校验基线；实时 TENANT/PROJECT 授权项目集合端口 | REGION/NETWORK/组织关系到项目的权威投影、正式企业 IdP、完整组织治理 UI | M9、M63 |
 | 可靠消息 | Inbox、Outbox、Worker claim/lease/retry | `IMPLEMENTED` | 本地可靠发布消费、恢复和人工接管基础 | 正式 Broker 和跨服务运行 | M9～M10 |
 | 配置中心 | 不可变配置资产、Bundle 发布和版本锁定 | `PARTIAL` | FORM、EVIDENCE、SLA v1 资产发布基础；工单/任务冻结引用；SERVICEOS_EXPR_V1 布尔/类型比较子集；FORM/EVIDENCE 字段及 WORKFLOW/SLA 依赖闭包 | 决策表/公式/脚本、完整审批和通用依赖图 | M16、M33、M36、M52～M53、M61 |
 | 外部接入 | BYD CPIM V7.3.1 入站、提审与审核回调 | `PARTIAL` | 协议日期验签、防重放、私有原文、Envelope/Canonical、工单创建；显式审核路由与逐订单回调；不可变 OutboundDelivery/Attempt/Acknowledgement、Task 可靠执行、UNKNOWN 人工接管与授权人工重发；重发严格 ACK 后发布恢复事实 | 其他 CPIM 消息、人工标记已送达/放弃、通用 Connector、生产凭据/对象存储和真实 sandbox | M16、M56～M60 |
@@ -69,7 +69,7 @@ latestMilestone: M62
 | 资料 Evidence | 资产、槽位、Item/Revision、机器校验、Snapshot、完成门禁、作废、Review、Correction | `PARTIAL` | 固定/条件槽位、VALIDATED 表单触发只追加重解析、槽位世代/lineage、REVIEW_REQUIRED 与显式 KEEP/INVALIDATE、安全文件联动、Snapshot/完成门禁及审核整改链路 | OCR/CV、GPS 权威距离、长期归档 | M36～M53 |
 | 安全文件 | Begin/Finalize/隔离/扫描/授权下载/作废 | `IMPLEMENTED` | 独立安全文件生命周期；Evidence 编排 Begin/Finalize/Invalidate 联动 | 正式对象存储、专业扫描服务、物理删除 | M11、M38、M46 |
 | 审核整改 | ReviewCase、ReviewDecision、CorrectionCase | `PARTIAL` | Review + Correction + 整改 Task + 强制通过/重开 + 车企回执 + WAIVED；CLIENT Case 来源、批次/mapping 冻结；交付明确成功后自动创建 CLIENT Case/Route，UNKNOWN 可授权人工重发并在严格 ACK 后闭环异常 | 多候选人策略、前端、人工标记已送达/放弃、自动 Evidence target 映射 | M44～M60 |
-| SLA | 时钟、预警、升级 | `PARTIAL` | Task `TASK_CREATED→TASK_COMPLETED` ELAPSED 时钟；显式策略版本/摘要锁定；TARGET_DUE 对账；RUNNING/BREACHED/MET/MET_LATE；Inbox/Outbox 与不可变 segment/milestone；`sla.read` + Project Scope 的工作台、工单时间线与详情查询 | BUSINESS 日历、暂停/恢复、免责/重算、预警/升级/通知、其他 subject、跨项目范围投影、Portal 前端、考核结算 | M61～M62 |
+| SLA | 时钟、预警、升级 | `PARTIAL` | Task `TASK_CREATED→TASK_COMPLETED` ELAPSED 时钟；显式策略版本/摘要锁定；TARGET_DUE 对账；RUNNING/BREACHED/MET/MET_LATE；Inbox/Outbox 与不可变 segment/milestone；`sla.read` + 实时 TENANT/PROJECT 授权集合的跨项目工作台、工单时间线与详情查询 | BUSINESS 日历、暂停/恢复、免责/重算、预警/升级/通知、其他 subject、REGION/NETWORK 关系投影、Portal 前端、考核结算 | M61～M63 |
 | 通知 | 通知与运营异常中心 | `PROPOSED` | 已有总体设计 | 通知通道、模板、可靠发送和 UI | `architecture/14-*` |
 | 履约事实与试算 | 事实提取和双向试算 | `PROPOSED` | 已有设计、API 和数据规划 | 运行时、投影和前端工作区 | M5 设计 |
 | 对账结算 | 对账、结算、争议与调整 | `PROPOSED` | 已有边界设计 | 正式运行时和页面 | `architecture/16-*` |
@@ -329,14 +329,31 @@ latestMilestone: M62
 - Admin/Network/Technician Portal 前端、考核与结算读取；
 - 其他 subject/start/stop 组合。
 
+### M63：授权项目集合与跨项目 SLA 队列
+
+已实现：
+
+- authorization 公共端口按实时有效 RoleGrant 解析 TENANT 全项目或多个 PROJECT UUID 集合；
+- Core OpenAPI 0.34.0 将 SLA 工作台 projectId 改为可选，省略时一次解析范围并执行单条范围化 SQL；
+- REGION/NETWORK 尚无权威项目关系时返回 403 并写拒绝审计，不猜测、不扩大、不静默返回空；
+- 游标绑定排序后的授权集合摘要，grant 新增、撤销或过期后旧游标失败关闭；
+- V063 tenant 游标索引、Authorization/SLA PostgreSQL IT、MVC Security 与 Modulith 门禁形成工程证据。
+
+明确未实现：
+
+- REGION/NETWORK/组织关系到项目的权威关系投影；
+- 授权范围缓存、导出和运营分析；
+- BUSINESS 日历、暂停/恢复、免责/重算、预警/升级/通知；
+- Portal 前端、考核与结算读取、其他 SLA subject/start/stop 组合。
+
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M62**。M61～M62 只实现显式 Task ELAPSED 时钟及其安全只读投影，
+ServiceOS 可靠纵向切片已推进到 **M63**。M61～M63 只实现显式 Task ELAPSED 时钟及其安全授权只读投影，
 没有猜测项目默认时长、日历、暂停或升级策略，也没有实现完整 SLA/通知或整个现场履约平台。
 
 ```text
 候选下一方向（优先从已确认文档中选择最小可靠切片）：
-1. 建立授权项目集合/范围投影，支持跨项目 SLA 队列而不逐行鉴权；
+1. 建立 REGION/NETWORK/组织关系到 Project 的权威关系投影，再扩展对应数据范围；
 2. 在试点确认日历/暂停/预警规则后扩展 BUSINESS 时钟、暂停和升级；
 3. 多候选人评分、自动 claim、网点容量联动；
 4. OCR/CV、GPS 权威距离、二级审批/MFA、报告 GENERATED 资料包；

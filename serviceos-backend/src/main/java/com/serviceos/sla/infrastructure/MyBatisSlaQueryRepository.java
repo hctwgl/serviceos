@@ -24,10 +24,11 @@ final class MyBatisSlaQueryRepository implements SlaQueryRepository {
 
     @Override
     public List<SlaStoredInstance> findPage(
-            String tenantId, UUID projectId, UUID workOrderId, String status,
+            String tenantId, boolean tenantWide, List<UUID> projectIds, UUID workOrderId, String status,
             Instant cursorDeadlineAt, UUID cursorId, int fetchSize
     ) {
-        return mapper.findPage(tenantId, projectId, workOrderId, status,
+        return mapper.findPage(tenantId, tenantWide,
+                projectIds.stream().map(UUID::toString).toList(), workOrderId, status,
                 postgresTime(cursorDeadlineAt), cursorId, fetchSize).stream().map(this::instance).toList();
     }
 

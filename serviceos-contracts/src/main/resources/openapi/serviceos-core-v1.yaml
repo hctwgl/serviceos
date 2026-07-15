@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.33.0
+  version: 0.34.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -289,14 +289,16 @@ paths:
   /sla-instances:
     get:
       operationId: listSlaInstances
-      summary: 查询显式项目范围内的 SLA 工作台
+      summary: 查询实时授权项目范围内的 SLA 工作台
       description: >-
-        projectId 必填并由服务端按 sla.read + Project Scope 实时鉴权；动态秒数只使用响应 asOf，
-        客户端不得自行改变 SLA 状态。按 deadlineAt、slaInstanceId 正序稳定翻页。
+        projectId 存在时按 sla.read + Project Scope 实时鉴权；省略时一次性解析当前有效
+        TENANT/PROJECT RoleGrant 并以单条范围化 SQL 查询。仅有 REGION/NETWORK 授权且尚无权威
+        项目映射时失败关闭。授权集合变化会令旧游标失效。动态秒数只使用响应 asOf，客户端不得
+        自行改变 SLA 状态。按 deadlineAt、slaInstanceId 正序稳定翻页。
       parameters:
         - name: projectId
           in: query
-          required: true
+          required: false
           schema: { type: string, format: uuid }
         - name: status
           in: query

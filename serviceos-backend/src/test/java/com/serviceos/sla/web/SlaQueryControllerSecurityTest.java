@@ -26,7 +26,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** M62：SLA HTTP 边界只接受 JWT 主体和显式 Project Scope，不信任 tenant header。 */
+/** M63：SLA HTTP 边界只接受 JWT 主体；project 为空时由应用层实时解析授权集合。 */
 @WebMvcTest(SlaQueryController.class)
 @Import(SecurityConfiguration.class)
 class SlaQueryControllerSecurityTest {
@@ -70,15 +70,21 @@ class SlaQueryControllerSecurityTest {
     }
 
     @Test
-    void missingProjectAndInvalidLimitFailBeforeQueryExecution() throws Exception {
-        when(principals.current()).thenReturn(new CurrentPrincipal(
+    void omittedProjectReachesAuthorizedCollectionAndInvalidLimitFailsEarly() throws Exception {
+        CurrentPrincipal principal = new CurrentPrincipal(
                 "sla-reader", "tenant-trusted", CurrentPrincipal.PrincipalType.USER,
-                "admin-web", Set.of()));
+                "admin-web", Set.of());
+        when(principals.current()).thenReturn(principal);
+        when(queries.list(eq(principal), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any())).thenReturn(
+                new SlaInstancePage(List.of(), null, Instant.parse("2026-07-15T12:00:00Z")));
         var authenticated = jwt().jwt(token -> token.subject("sla-reader")
                 .claim("tenant_id", "tenant-trusted"));
 
         mvc.perform(get("/api/v1/sla-instances").with(authenticated))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isOk());
+        verify(queries).list(eq(principal), org.mockito.ArgumentMatchers.anyString(),
+                argThat(query -> query.projectId() == null));
         mvc.perform(get("/api/v1/sla-instances").with(authenticated)
                         .queryParam("projectId", PROJECT_ID.toString()).queryParam("limit", "0"))
                 .andExpect(status().isBadRequest())

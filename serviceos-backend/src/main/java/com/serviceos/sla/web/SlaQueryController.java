@@ -29,7 +29,7 @@ final class SlaQueryController {
 
     @GetMapping("/sla-instances")
     SlaInstancePage list(
-            @RequestParam UUID projectId,
+            @RequestParam(required = false) UUID projectId,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String cursor,
             @RequestParam(defaultValue = "50") int limit,

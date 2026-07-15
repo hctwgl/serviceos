@@ -2,9 +2,12 @@ package com.serviceos.sla.application;
 
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
+import com.serviceos.authorization.api.AuthorizedProjectScope;
+import com.serviceos.authorization.api.ProjectScopeAuthorizationService;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
+import com.serviceos.shared.Sha256;
 import com.serviceos.sla.api.SlaClockSegmentItem;
 import com.serviceos.sla.api.SlaInstanceDetail;
 import com.serviceos.sla.api.SlaInstanceItem;
@@ -42,17 +45,20 @@ final class DefaultSlaQueryService implements SlaQueryService {
     private final SlaQueryRepository repository;
     private final WorkOrderScopeQuery workOrders;
     private final AuthorizationService authorization;
+    private final ProjectScopeAuthorizationService projectScopes;
     private final Clock clock;
 
     DefaultSlaQueryService(
             SlaQueryRepository repository,
             WorkOrderScopeQuery workOrders,
             AuthorizationService authorization,
+            ProjectScopeAuthorizationService projectScopes,
             Clock clock
     ) {
         this.repository = repository;
         this.workOrders = workOrders;
         this.authorization = authorization;
+        this.projectScopes = projectScopes;
         this.clock = clock;
     }
 
@@ -63,8 +69,10 @@ final class DefaultSlaQueryService implements SlaQueryService {
     ) {
         Objects.requireNonNull(query, "query must not be null");
         String status = normalizeStatus(query.status());
-        requireRead(principal, correlationId, query.projectId(), "collection");
-        return page(principal.tenantId(), query.projectId(), null, status, query.cursor(), query.limit());
+        QueryScope scope = query.projectId() == null
+                ? collectionScope(principal, correlationId)
+                : projectScope(principal, correlationId, query.projectId(), "collection");
+        return page(principal.tenantId(), scope, null, status, query.cursor(), query.limit());
     }
 
     @Override
@@ -81,8 +89,9 @@ final class DefaultSlaQueryService implements SlaQueryService {
         WorkOrderScope scope = workOrders.find(principal.tenantId(), workOrderId)
                 .orElseThrow(() -> new BusinessProblem(
                         ProblemCode.RESOURCE_NOT_FOUND, "WorkOrder does not exist"));
-        requireRead(principal, correlationId, scope.projectId(), workOrderId.toString());
-        return page(principal.tenantId(), scope.projectId(), workOrderId, null, cursor, limit);
+        QueryScope queryScope = projectScope(
+                principal, correlationId, scope.projectId(), workOrderId.toString());
+        return page(principal.tenantId(), queryScope, workOrderId, null, cursor, limit);
     }
 
     @Override
@@ -113,15 +122,15 @@ final class DefaultSlaQueryService implements SlaQueryService {
 
     private SlaInstancePage page(
             String tenantId,
-            UUID projectId,
+            QueryScope scope,
             UUID workOrderId,
             String status,
             String cursorValue,
             int limit
     ) {
-        Cursor cursor = decode(cursorValue, projectId, workOrderId, status);
+        Cursor cursor = decode(cursorValue, scope.digest(), workOrderId, status);
         List<SlaStoredInstance> fetched = repository.findPage(
-                tenantId, projectId, workOrderId, status,
+                tenantId, scope.tenantWide(), scope.projectIds(), workOrderId, status,
                 cursor == null ? null : cursor.deadlineAt(),
                 cursor == null ? null : cursor.slaInstanceId(), limit + 1);
         boolean more = fetched.size() > limit;
@@ -130,7 +139,7 @@ final class DefaultSlaQueryService implements SlaQueryService {
         List<SlaInstanceItem> items = selected.stream().map(row -> item(row, asOf)).toList();
         SlaStoredInstance last = more ? selected.getLast() : null;
         return new SlaInstancePage(items, last == null ? null : encode(
-                projectId, workOrderId, status, last.deadlineAt(), last.slaInstanceId()), asOf);
+                scope.digest(), workOrderId, status, last.deadlineAt(), last.slaInstanceId()), asOf);
     }
 
     private SlaInstanceItem item(SlaStoredInstance row, Instant asOf) {
@@ -161,6 +170,20 @@ final class DefaultSlaQueryService implements SlaQueryService {
                 READ, principal.tenantId(), "SlaInstance", resourceId, projectId.toString()), correlationId);
     }
 
+    private QueryScope projectScope(
+            CurrentPrincipal principal, String correlationId, UUID projectId, String resourceId
+    ) {
+        requireRead(principal, correlationId, projectId, resourceId);
+        return new QueryScope(false, List.of(projectId), Sha256.digest("PROJECTS:" + projectId));
+    }
+
+    private QueryScope collectionScope(CurrentPrincipal principal, String correlationId) {
+        AuthorizedProjectScope scope = projectScopes.require(
+                principal, READ, "SlaInstance", correlationId);
+        return new QueryScope(scope.tenantWide(), scope.projectIds().stream()
+                .sorted(java.util.Comparator.comparing(UUID::toString)).toList(), scope.scopeDigest());
+    }
+
     private static String normalizeStatus(String status) {
         if (status == null || status.isBlank()) return null;
         String normalized = status.trim().toUpperCase();
@@ -177,22 +200,22 @@ final class DefaultSlaQueryService implements SlaQueryService {
     }
 
     private static String encode(
-            UUID projectId, UUID workOrderId, String status, Instant deadlineAt, UUID instanceId
+            String scopeDigest, UUID workOrderId, String status, Instant deadlineAt, UUID instanceId
     ) {
-        String raw = projectId + "|" + nullable(workOrderId) + "|" + nullable(status)
+        String raw = scopeDigest + "|" + nullable(workOrderId) + "|" + nullable(status)
                 + "|" + deadlineAt + "|" + instanceId;
         return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
     }
 
     private static Cursor decode(
-            String value, UUID projectId, UUID workOrderId, String status
+            String value, String scopeDigest, UUID workOrderId, String status
     ) {
         if (value == null || value.isBlank()) return null;
         try {
             String decoded = new String(Base64.getUrlDecoder().decode(value), StandardCharsets.UTF_8);
             String[] parts = decoded.split("\\|", -1);
             if (parts.length != 5
-                    || !projectId.equals(UUID.fromString(parts[0]))
+                    || !scopeDigest.equals(parts[0])
                     || !nullable(workOrderId).equals(parts[1])
                     || !nullable(status).equals(parts[2])) {
                 throw new IllegalArgumentException();
@@ -208,5 +231,11 @@ final class DefaultSlaQueryService implements SlaQueryService {
     }
 
     private record Cursor(Instant deadlineAt, UUID slaInstanceId) {
+    }
+
+    private record QueryScope(boolean tenantWide, List<UUID> projectIds, String digest) {
+        private QueryScope {
+            projectIds = List.copyOf(projectIds);
+        }
     }
 }

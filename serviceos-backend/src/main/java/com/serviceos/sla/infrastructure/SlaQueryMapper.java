@@ -13,7 +13,8 @@ import java.util.UUID;
 interface SlaQueryMapper {
     List<Map<String, Object>> findPage(
             @Param("tenantId") String tenantId,
-            @Param("projectId") UUID projectId,
+            @Param("tenantWide") boolean tenantWide,
+            @Param("projectIds") List<String> projectIds,
             @Param("workOrderId") UUID workOrderId,
             @Param("status") String status,
             @Param("cursorDeadlineAt") OffsetDateTime cursorDeadlineAt,

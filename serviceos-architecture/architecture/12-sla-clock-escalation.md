@@ -8,8 +8,8 @@ status: Proposed
 
 > M61 已实现 Task `TASK_CREATED → TASK_COMPLETED` 的 ELAPSED 自然时长子集：Workflow 显式
 > `slaRef`、SLA Version/摘要冻结、RUNNING/BREACHED/MET/MET_LATE、单一 TARGET_DUE milestone、
-> Inbox/Outbox 和 PostgreSQL 对账。M62 已实现 `sla.read` + Project Scope 的工作台、工单时间线和
-> segment/milestone 详情查询。本文其余 BUSINESS 日历、暂停、预警、升级、通知、重算和多 subject
+> Inbox/Outbox 和 PostgreSQL 对账。M62 已实现 `sla.read` 查询，M63 已实现 TENANT/PROJECT
+> RoleGrant 授权项目集合与跨项目工作台；REGION/NETWORK 映射仍失败关闭。本文其余 BUSINESS 日历、暂停、预警、升级、通知、重算和多 subject
 > 仍为 Proposed，不得从 M61 外推为完整 SLA 平台。
 
 ## 1. 目标

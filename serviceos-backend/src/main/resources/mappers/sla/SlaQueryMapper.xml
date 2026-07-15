@@ -15,7 +15,18 @@
     <select id="findPage" resultType="map">
         SELECT <include refid="instanceColumns"/>
           FROM sla_instance
-         WHERE tenant_id=#{tenantId} AND project_id=#{projectId}
+         WHERE tenant_id=#{tenantId}
+        <if test="!tenantWide">
+            <choose>
+                <when test="projectIds != null and !projectIds.isEmpty()">
+                    AND project_id IN
+                    <foreach collection="projectIds" item="projectId" open="(" separator="," close=")">
+                        CAST(#{projectId} AS uuid)
+                    </foreach>
+                </when>
+                <otherwise>AND FALSE</otherwise>
+            </choose>
+        </if>
         <if test="workOrderId != null">AND work_order_id=#{workOrderId}</if>
         <if test="status != null">AND status=#{status}</if>
         <if test="cursorDeadlineAt != null">

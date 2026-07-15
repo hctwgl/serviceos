@@ -7,6 +7,7 @@ import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.authorization.api.FieldAuthorizationRequest;
 import com.serviceos.authorization.api.FieldAuthorizationService;
 import com.serviceos.authorization.api.FieldPermission;
+import com.serviceos.authorization.api.ProjectScopeAuthorizationService;
 import com.serviceos.identity.api.CurrentPrincipal;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,6 +26,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * E1-05、M6-SEC-001/002 的真实 PostgreSQL 权威授权证据。
@@ -54,6 +56,9 @@ class AuthorizationPolicyPostgresIT {
 
     @Autowired
     FieldAuthorizationService fields;
+
+    @Autowired
+    ProjectScopeAuthorizationService projectScopes;
 
     @Autowired
     JdbcClient jdbc;
@@ -163,7 +168,44 @@ class AuthorizationPolicyPostgresIT {
         assertThat(decision.fields().get("settlementAmount").permission())
                 .isEqualTo(FieldPermission.HIDDEN);
         assertThat(decision.matchedGrantIds()).hasSize(2);
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("062");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("063");
+    }
+
+    @Test
+    void projectCollectionUnionsLiveProjectsAndTenantGrantOverridesTheSet() {
+        UUID first = UUID.randomUUID();
+        UUID second = UUID.randomUUID();
+        seedRoleGrant("scope-first", PRINCIPAL, "PROJECT", first.toString());
+        seedRoleGrant("scope-second", PRINCIPAL, "PROJECT", second.toString());
+
+        var explicit = projectScopes.require(
+                principal(PRINCIPAL), "project.create", "Project", "corr-project-scope");
+        assertThat(explicit.tenantWide()).isFalse();
+        assertThat(explicit.projectIds()).containsExactlyInAnyOrder(first, second);
+
+        seedRoleGrant("scope-tenant", PRINCIPAL, "TENANT", TENANT);
+        var tenantWide = projectScopes.require(
+                principal(PRINCIPAL), "project.create", "Project", "corr-tenant-scope");
+        assertThat(tenantWide.tenantWide()).isTrue();
+        assertThat(tenantWide.projectIds()).isEmpty();
+        assertThat(tenantWide.scopeDigest()).isNotEqualTo(explicit.scopeDigest());
+    }
+
+    @Test
+    void unmappableRegionScopeAndMissingGrantFailClosedWithDenialAudit() {
+        seedRoleGrant("scope-region", "region-only", "REGION", "CN-3702");
+
+        assertThatThrownBy(() -> projectScopes.require(
+                principal("region-only"), "project.create", "Project", "corr-region-scope"))
+                .isInstanceOf(com.serviceos.shared.BusinessProblem.class);
+        assertThatThrownBy(() -> projectScopes.require(
+                principal("missing"), "project.create", "Project", "corr-missing-scope"))
+                .isInstanceOf(com.serviceos.shared.BusinessProblem.class);
+        assertThat(jdbc.sql("""
+                SELECT error_code FROM aud_audit_record
+                 WHERE action_name='AUTHORIZATION_DENIED' ORDER BY occurred_at
+                """).query(String.class).list())
+                .containsExactly("PROJECT_SCOPE_UNRESOLVED", "PROJECT_SCOPE_MISSING");
     }
 
     private UUID seedRoleGrant(String roleCode, String principalId, String scopeType, String scopeRef) {

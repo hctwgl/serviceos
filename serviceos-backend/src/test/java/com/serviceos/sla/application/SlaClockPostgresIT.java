@@ -362,6 +362,37 @@ class SlaClockPostgresIT {
                 .hasMessageContaining("cursor is invalid");
     }
 
+    @Test
+    void authorizedProjectCollectionUsesOneScopedQueryAndGrantChangesInvalidateCursor() {
+        ScheduledTaskView firstTask = createTask("sla-collection-first");
+        ScheduledTaskView secondTask = createTask("sla-collection-second");
+        handler.handle(taskCreated(firstTask.taskId()));
+        handler.handle(taskCreated(secondTask.taskId()));
+
+        var firstPage = queries.list(principal(), "corr-collection", new SlaInstanceQuery(
+                null, "RUNNING", null, 1));
+        assertThat(firstPage.items()).hasSize(1);
+        assertThat(firstPage.nextCursor()).isNotBlank();
+
+        UUID readerRole = jdbc.sql("""
+                SELECT role_id FROM auth_role
+                 WHERE tenant_id=:tenantId AND role_code='sla-reader'
+                """).param("tenantId", TENANT).query(UUID.class).single();
+        jdbc.sql("""
+                INSERT INTO auth_role_grant (
+                    grant_id, tenant_id, principal_id, role_id, scope_type, scope_ref,
+                    valid_from, source_code, approval_ref, created_at)
+                VALUES (:grantId, :tenantId, 'sla-reader', :roleId, 'PROJECT', :projectId,
+                    now() - interval '1 day', 'TEST_FIXTURE', 'M63-TEST', now())
+                """).param("grantId", UUID.randomUUID()).param("tenantId", TENANT)
+                .param("roleId", readerRole).param("projectId", UUID.randomUUID().toString()).update();
+
+        assertThatThrownBy(() -> queries.list(principal(), "corr-collection-stale",
+                new SlaInstanceQuery(null, "RUNNING", firstPage.nextCursor(), 1)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cursor is invalid");
+    }
+
     private void publishBundle() {
         workflowDigest = Sha256.digest(workflowDefinition());
         workflowVersionId = configurations.publishAsset(new PublishConfigurationAssetCommand(
