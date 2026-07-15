@@ -29,7 +29,8 @@ patterns=(
   '(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}(?![A-Za-z0-9_-])'
   '(?i)(authorization|access[_-]?token|refresh[_-]?token|id[_-]?token|password|client[_-]?secret|signature)\s*[:=]\s*(?!\[REDACTED\])[^,;[:space:]}]+'
   '(?<![0-9])1[3-9][0-9]{9}(?![0-9])'
-  '(?i)(?<![A-HJ-NPR-Z0-9])[A-HJ-NPR-Z0-9]{17}(?![A-HJ-NPR-Z0-9])'
+  # VIN 为 17 位且第 9 位是校验位（数字或 X），避免把生成客户端的类名/文件名误报为 VIN。
+  '(?i)(?<![A-HJ-NPR-Z0-9])[A-HJ-NPR-Z0-9]{8}[0-9X][A-HJ-NPR-Z0-9]{8}(?![A-HJ-NPR-Z0-9])'
   '(?i)(address|customerAddress|installationAddress|用户地址|安装地址)\s*[:=]\s*(?!\[REDACTED\])[^,;}]+'
   '(?i)(price|amount|unitPrice|totalAmount|对上金额|对下金额|结算金额)\s*[:=]\s*(?!\[REDACTED\])-?[0-9]+([.][0-9]+)?'
 )
