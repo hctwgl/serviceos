@@ -34,13 +34,25 @@ rg -qx "SERVICEOS_EXPECTED_MIGRATION_VERSION=${flyway_version}" "${generated_env
 rg -qx "SERVICEOS_EXPECTED_MIGRATION_COUNT=${migration_count}" "${generated_env}" \
   || fail "staging 迁移数量未从当前迁移目录生成"
 
-# 当前迁移终点只能由测试辅助类从 classpath 迁移资源推导，禁止测试重新引入数字常量。
-hardcoded_assertions="$(rg -n --glob '*.java' \
-  'flyway\.info\(\)\.current\(\).*isEqualTo\("[0-9]+"\)|flyway\.info\(\)\.applied\(\)\)\.hasSize\([0-9]+\)' \
+# 允许测试证明明确的当前终点，但任何旧数字必须在启动 Maven/Testcontainers 前失败。
+version_assertions="$(rg -n --glob '*.java' \
+  'flyway\.info\(\)\.current\(\).*isEqualTo\("[0-9]+"\)' \
   serviceos-backend/src/test/java || true)"
-if [[ -n "${hardcoded_assertions}" ]]; then
-  printf '%s\n' "${hardcoded_assertions}" >&2
-  fail "测试中存在 Flyway 当前版本或迁移数量硬编码；请使用 MigrationBaselineAssertions"
+stale_versions="$(printf '%s\n' "${version_assertions}" \
+  | rg -v "isEqualTo\\(\\\"${flyway_version}\\\"\\)" || true)"
+if [[ -n "${stale_versions}" ]]; then
+  printf '%s\n' "${stale_versions}" >&2
+  fail "测试仍断言旧 Flyway 版本；当前版本为 ${flyway_version}"
+fi
+
+count_assertions="$(rg -n --glob '*.java' \
+  'flyway\.info\(\)\.applied\(\)\)\.hasSize\([0-9]+\)' \
+  serviceos-backend/src/test/java || true)"
+stale_counts="$(printf '%s\n' "${count_assertions}" \
+  | rg -v "hasSize\\(${migration_count}\\)" || true)"
+if [[ -n "${stale_counts}" ]]; then
+  printf '%s\n' "${stale_counts}" >&2
+  fail "测试仍断言旧迁移数量；当前数量为 ${migration_count}"
 fi
 
 if rg -n '^SERVICEOS_EXPECTED_MIGRATION_(VERSION|COUNT)=[0-9]+$' \
