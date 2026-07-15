@@ -9,14 +9,14 @@ readmodel|-|serviceos-architecture/product/01-cross-portal-information-architect
 operations|-|serviceos-architecture/architecture/14-notification-operational-exception.md|OperationalException|task,integration,notification
 workorder|-|serviceos-architecture/architecture/06-work-order-task-execution-kernel.md|WorkOrder|configuration,workflow,task
 workflow|serviceos-architecture/context/modules/workflow.md|serviceos-architecture/architecture/06-work-order-task-execution-kernel.md|Workflow|configuration,workorder,task
- task|serviceos-architecture/context/modules/task.md|serviceos-architecture/architecture/06-work-order-task-execution-kernel.md|Task|workflow,authorization,sla,operations
+task|serviceos-architecture/context/modules/task.md|serviceos-architecture/architecture/06-work-order-task-execution-kernel.md|Task|workflow,authorization,sla,operations
 appointment|-|serviceos-architecture/architecture/08-appointment-field-operations.md|Appointment|task,fieldwork,notification
 fieldwork|-|serviceos-architecture/architecture/08-appointment-field-operations.md|Visit|appointment,forms,evidence
 forms|-|serviceos-architecture/architecture/09-dynamic-form-field-engine.md|Form|configuration,task,evidence
- evidence|serviceos-architecture/context/modules/evidence.md|serviceos-architecture/architecture/10-evidence-review-correction.md|Evidence|files,forms,review,task
+evidence|serviceos-architecture/context/modules/evidence.md|serviceos-architecture/architecture/10-evidence-review-correction.md|Evidence|files,forms,review,task
 review|-|serviceos-architecture/architecture/10-evidence-review-correction.md|Review|evidence,task,integration
 network|-|serviceos-architecture/architecture/11-service-network-dispatch.md|Network|dispatch,organization
- dispatch|-|serviceos-architecture/architecture/11-service-network-dispatch.md|Dispatch|network,task,operations
+dispatch|-|serviceos-architecture/architecture/11-service-network-dispatch.md|Dispatch|network,task,operations
 sla|serviceos-architecture/context/modules/sla.md|serviceos-architecture/architecture/12-sla-clock-escalation.md|Sla|task,configuration,notification,operations
 integration|serviceos-architecture/context/modules/integration.md|serviceos-architecture/architecture/13-integration-reliability.md|BydCpim|reliability,review,operations,workorder
 notification|-|serviceos-architecture/architecture/14-notification-operational-exception.md|Notification|operations,sla
