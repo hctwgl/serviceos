@@ -3,6 +3,7 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 migration_root="${root}/serviceos-backend/src/main/resources/db/migration"
+versioned_pattern='^V([0-9]+)__.+\.sql$'
 
 fail() {
   echo "迁移基线解析失败: $1" >&2
@@ -19,7 +20,7 @@ versions=()
 declare -A seen_versions=()
 for file in "${versioned_files[@]}"; do
   name="$(basename "${file}")"
-  if [[ ! "${name}" =~ ^V([0-9]+)__.+'\.sql'$ ]]; then
+  if [[ ! "${name}" =~ ${versioned_pattern} ]]; then
     fail "版本化迁移文件名不合法: ${name}"
   fi
   version="${BASH_REMATCH[1]}"
