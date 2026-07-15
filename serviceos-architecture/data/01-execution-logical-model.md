@@ -50,7 +50,8 @@ Client 保存签约/对接商业主体稳定身份、编码和状态；Brand 保
 > M64 已落地 `prj_project_region` 的创建时写入与实时授权读取：复合外键约束 tenant/project 一致，
 > `valid_from/valid_to` 决定当前关系，`regionCodes` 仅作为 API 输入/输出，不替代关系表事实。
 > M65 以 `prj_project_network` 和 `networkIds` 落地同等约束；该关系不替代 ServiceNetwork 目录、
-> Coverage、Capability 或停派事实。
+> Coverage、Capability 或停派事实。M66 以有效期结束/追加、开放关系唯一索引和不可变
+> `prj_project_scope_revision` 收据实现即时整组修订。
 
 ### project_service_product_binding
 

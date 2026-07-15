@@ -16,7 +16,7 @@ status: Proposed
 > `sla.read` + 实时 Project Scope，动态时间以服务端 `asOf` 为准。
 > M63 在 Core OpenAPI 0.34.0 将工作台 `projectId` 放宽为可选；省略时实时合并 TENANT/PROJECT
 > RoleGrant，并以单条范围化 SQL 查询。M64～M65 通过 Project 有效期关系补充精确 REGION/NETWORK
-> 项目映射；ServiceNetwork 目录、生命周期与本章服务网络治理接口仍未实现。
+> 项目映射；M66 已支持显式即时整组修订这些关系。ServiceNetwork 目录、生命周期与本章服务网络治理接口仍未实现。
 > 通用 Connector/CreateOutboundDelivery、其他人工处置、批量 Replay 与其余本章接口仍为 Proposed。
 
 沿用既有 API 的认证、幂等、`If-Match`、Problem Details、correlation 和审计约定。自动任务内部接口使用专用服务主体，不向普通用户令牌开放。

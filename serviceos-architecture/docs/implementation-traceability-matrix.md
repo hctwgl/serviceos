@@ -16,8 +16,8 @@ status: Proposed
 |---|---|---|---|---|---|
 | identity | ARCH-07、ARCH-21 | API-01/02 通用身份上下文 | DATA-02 | M2 AUTH、M6 SEC | E1 |
 | organization | ARCH-01、ARCH-07、ARCH-11 | API-02/04 | DATA-02/04 | M2 AUTH、M4 DSP | E1/E4 |
-| project | ARCH-01/03/05、M64～M65 | API-07、OpenAPI Core 0.36.0、project.created@v3 | DATA-01、V064～V065 | M2 CFG/WO、M7 ADM、M64～M65 | E0/E2 |
-| authorization | ARCH-07、ARCH-21、M63～M65 | API-01/02、ProjectRegionScopeResolver、ProjectNetworkScopeResolver | DATA-02、V064～V065 | M2 AUTH、M6 SEC、M63～M65 | E1/E4 |
+| project | ARCH-01/03/05、M64～M66 | API-07、OpenAPI Core 0.37.0、project.created@v3、project.scope-relations-revised@v1 | DATA-01、V064～V066 | M2 CFG/WO、M7 ADM、M64～M66 | E0/E2 |
+| authorization | ARCH-07、ARCH-21、M63～M66 | API-01/02、ProjectRegionScopeResolver、ProjectNetworkScopeResolver | DATA-02、V064～V066 | M2 AUTH、M6 SEC、M63～M66 | E1/E4 |
 | audit | ARCH-07、ARCH-21 | 所有高风险命令 | DATA-02 | M2 AUD、M6 SEC/OPS | E1 |
 | authority | ARCH-17、ARCH-20 | API-01/05 authority/fence | DATA-05 | M5 CUT、M6 TX | E1/E5 |
 | configuration | ARCH-05 | API-01/02 | DATA-01 | M2 CFG | E2 |
@@ -36,7 +36,7 @@ status: Proposed
 | review | ARCH-10 | API-03、OpenAPI 0.30.0、client-review-case-created@v1 | DATA-03、V049/V054/V056 | M3 REV/COR、M55/M57 | E3 |
 | network | ARCH-11 | API-04 | DATA-04 | M4 NET | E4 |
 | dispatch | ARCH-11、ADR-009 | API-04 | DATA-04 | M4 DSP/ASN | E4 |
-| sla | ARCH-12、M61～M65 | sla.started/breached/met@v1；API-04、OpenAPI Core 0.36.0 | DATA-04、V061～V065 | M4 SLA、M61～M65 | E4 |
+| sla | ARCH-12、M61～M66 | sla.started/breached/met@v1；API-04、OpenAPI Core 0.37.0 | DATA-04、V061～V066 | M4 SLA、M61～M66 | E4 |
 | integration | ARCH-13、ADR-010/014、M57～M60 | API-04、OpenAPI Core 0.32.0、BYD CPIM 0.3.0、outbound-delivery-created/acknowledged/replay-requested/recovered@v1、route/callback 事件 | DATA-04、V055～V060 | M4 INT/DLV、M56～M60 | E2/E4 |
 | notification | ARCH-14 | API-04 | DATA-04 | M4 NTF | E4 |
 | facts | ARCH-04/15 | API-05 | DATA-05 | M5 FACT | E5 |
@@ -160,3 +160,4 @@ Feature gate/authority: if applicable
 | M63 | 实时 TENANT/PROJECT RoleGrant 解析为授权项目集合；省略 projectId 的 SLA 队列以单条范围化 SQL 查询；授权集合摘要绑定游标；REGION/NETWORK 无映射时拒绝审计 | ARCH-07/12 + API-04 + OpenAPI Core 0.34.0 + V063 + Authorization/SLA PostgreSQL/MVC/Contract/Client/ArchitectureTest | REGION/NETWORK/组织关系投影、授权缓存/导出、BUSINESS 日历、暂停/预警/通知、Portal、考核结算 |
 | M64 | Project 创建原子写入有效期 REGION 关系；REGION RoleGrant 经公开解析端口形成精确项目集合并复用跨项目 SLA 队列；关系变化使游标失败关闭；NETWORK 继续拒绝 | ARCH-07/12 + API-07/API-04 + OpenAPI Core 0.35.0 + project.created@v2 + V064 + Project/Authorization/SLA PostgreSQL/MVC/Contract/Client/ArchitectureTest | NETWORK/组织关系、Region 层级后代、关系修订命令、授权缓存/导出、BUSINESS 日历、暂停/预警/通知、Portal、考核结算 |
 | M65 | Project 创建原子写入有效期 NETWORK 关系；NETWORK RoleGrant 经公开解析端口形成精确项目集合并复用跨项目 SLA 队列；关系变化使游标失败关闭 | ARCH-07/11/12 + API-07/API-04 + OpenAPI Core 0.36.0 + project.created@v3 + V065 + Project/Authorization/SLA PostgreSQL/MVC/Contract/Client/ArchitectureTest | ServiceNetwork 生命周期/覆盖/能力/停派、组织层级、关系修订、授权缓存/导出、派单策略、BUSINESS SLA、Portal、结算 |
+| M66 | Project REGION/NETWORK 当前关系以显式完整集合即时修订；结束/追加历史、Project 版本、不可变收据、审计、Outbox 与幂等同事务；授权映射即时变化且旧 SLA 游标失败关闭 | ARCH-07/11/12 + API-07/API-04 + OpenAPI Core 0.37.0 + project.scope-relations-revised@v1 + V066 + Project/Authorization/SLA PostgreSQL/MVC/Contract/Client/ArchitectureTest | ServiceNetwork/Region/Organization 目录与生命周期、计划生效和审批、项目生命周期、授权缓存/导出、派单策略、BUSINESS SLA、Portal、结算 |

@@ -97,7 +97,8 @@ Portal 页面与首批动作的更完整 capability 建议、数据范围和 obl
 > M64 已实现首个精确 REGION 子集：Project 创建时原子写入带有效期的 `project_region` 关系，
 > authorization 通过公开端口按 tenant、稳定 regionCode 和有效时刻解析项目集合。该实现不包含区域目录或
 > 下级展开。M65 以同样的失败关闭规则新增显式 `project_network` 关系和 NETWORK 项目集合解析；
-> ServiceNetwork/组织目录、关系修订及组织层级仍未实现。
+> M66 新增显式完整集合的 REGION/NETWORK 即时修订，提交后授权解析即时变化且旧游标失败关闭；
+> ServiceNetwork/组织目录、计划生效/审批及组织层级仍未实现。
 
 ## 6. 动作授权
 

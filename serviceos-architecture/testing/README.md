@@ -66,3 +66,4 @@
 - [M63 授权项目集合与跨项目 SLA 队列验收矩阵](60-m63-authorized-project-scope-sla-queue-acceptance.md)
 - [M64 项目区域关系与 REGION SLA 队列验收矩阵](61-m64-project-region-scope-sla-queue-acceptance.md)
 - [M65 项目网点关系与 NETWORK SLA 队列验收矩阵](62-m65-project-network-scope-sla-queue-acceptance.md)
+- [M66 项目范围关系整组修订验收矩阵](63-m66-project-scope-relation-revision-acceptance.md)
