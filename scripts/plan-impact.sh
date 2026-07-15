@@ -82,6 +82,10 @@ while IFS= read -r path; do
       add_module contracts
       raise_risk 2 "机器契约：${path}"
       ;;
+    AGENTS.md|agent-rules/*|serviceos-architecture/context/*|scripts/plan-context.sh|scripts/plan-impact.sh|scripts/init-agent-session.sh|scripts/test-context-tools.sh)
+      add_module agent-context
+      raise_risk 1 "Agent 路由规则：${path}"
+      ;;
     serviceos-architecture/decisions/*|serviceos-architecture/domain/*)
       add_module documentation
       raise_risk 3 "ADR/领域语义：${path}"
@@ -90,13 +94,13 @@ while IFS= read -r path; do
       add_module documentation
       raise_risk 0 "架构或产品文档：${path}"
       ;;
-    AGENTS.md|agent-rules/*|serviceos-architecture/context/*|scripts/plan-context.sh|scripts/plan-impact.sh|scripts/init-agent-session.sh|scripts/test-context-tools.sh)
-      add_module agent-context
-      raise_risk 1 "Agent 路由规则：${path}"
-      ;;
     .github/workflows/*|pom.xml|*/pom.xml|mvnw|.mvn/*)
       add_module build
       raise_risk 2 "构建/CI：${path}"
+      ;;
+    .gitignore)
+      add_module build
+      raise_risk 0 "仓库忽略规则：${path}"
       ;;
     *)
       raise_risk 0 "其他文件：${path}"
