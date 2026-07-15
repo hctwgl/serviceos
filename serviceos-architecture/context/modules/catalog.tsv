@@ -2,9 +2,13 @@
 identity|-|serviceos-architecture/architecture/07-identity-authorization-audit.md|Identity|authorization,audit
 organization|-|serviceos-architecture/architecture/07-identity-authorization-audit.md|Organization|identity,project,authorization
 project|-|serviceos-architecture/architecture/05-configuration-version-center.md|Project|configuration,authorization
+authorization|-|serviceos-architecture/architecture/07-identity-authorization-audit.md|Authorization|identity,organization,audit
+audit|-|serviceos-architecture/architecture/07-identity-authorization-audit.md|Audit|authorization,operations
+authority|-|serviceos-architecture/architecture/17-data-migration-cutover.md|Authority|migration,rollout,reliability
 configuration|serviceos-architecture/context/modules/configuration.md|serviceos-architecture/architecture/05-configuration-version-center.md|Configuration|project,workorder,workflow,forms,evidence,sla
 files|-|serviceos-architecture/architecture/25-secure-file-lifecycle-implementation.md|File|evidence,authorization
 reliability|-|serviceos-architecture/architecture/20-transaction-messaging-concurrency-blueprint.md|Inbox|task,integration,operations
+automation|-|serviceos-architecture/architecture/24-task-scheduler-manual-intervention-implementation.md|ExecutionAttempt|task,operations,reliability
 readmodel|-|serviceos-architecture/product/01-cross-portal-information-architecture.md|Projection|workorder,task,operations
 operations|-|serviceos-architecture/architecture/14-notification-operational-exception.md|OperationalException|task,integration,notification
 workorder|-|serviceos-architecture/architecture/06-work-order-task-execution-kernel.md|WorkOrder|configuration,workflow,task
@@ -26,6 +30,8 @@ settlement|-|serviceos-architecture/architecture/16-reconciliation-settlement-bo
 migration|-|serviceos-architecture/architecture/17-data-migration-cutover.md|Migration|authority,rollout
 rollout|-|serviceos-architecture/architecture/18-pilot-rollout-observability.md|Rollout|migration,operations
 contracts|-|serviceos-contracts/README.md|Contract|build,documentation
+shared|-|AGENTS.md|ArchitectureTest|build
+bootstrap|-|AGENTS.md|ArchitectureTest|build
 agent-context|-|serviceos-architecture/context/README.md|Context|documentation,build
-build|-|AGENTS.md|ArchitectureTest|agent-context,documentation,contracts
 documentation|-|agent-rules/documentation.md|Context|agent-context,build
+build|-|AGENTS.md|ArchitectureTest|agent-context,documentation,contracts
