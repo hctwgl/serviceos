@@ -1,28 +1,41 @@
 package com.serviceos.bootstrap;
 
+import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
 
 import java.time.Clock;
 import java.time.Duration;
 
 /**
- * 为所有进入 PostgreSQL 事务的业务时间提供可无损持久化的系统时钟。
+ * 让生产 {@code systemClock} 只产生 PostgreSQL 可无损保存的微秒时间。
  *
  * <p>PostgreSQL {@code timestamp/timestamptz} 只保存微秒精度。若命令首次返回 JDK 系统时钟的
- * 纳秒值，而幂等重放从数据库读取微秒值，同一个已冻结结果会出现时间字段不相等。这里在产生业务
- * 事实前统一到微秒刻度，使首次响应、Outbox、审计、幂等摘要和数据库重放使用完全相同的时间。</p>
+ * 纳秒值，而幂等重放从数据库读取微秒值，同一个已冻结结果会出现时间字段不相等，并可能进一步造成
+ * 摘要或恢复身份冲突。</p>
  *
- * <p>{@link Primary} 只负责选择生产系统时钟；显式传入构造器的固定测试时钟不经过该 Bean。</p>
+ * <p>这里不注册第二个 {@link Clock}，而是在 Spring 完成既有 {@code systemClock} 初始化时原位包装。
+ * 因此生产注入仍只有原来的 Bean，测试中显式声明的 {@code mutableClock} 或构造器固定时钟也不会被
+ * 替换。</p>
  */
 @Configuration(proxyBeanMethods = false)
 public class PostgresClockConfiguration {
     static final Duration POSTGRES_TIMESTAMP_TICK = Duration.ofNanos(1_000);
 
     @Bean
-    @Primary
-    Clock postgresClock() {
-        return Clock.tick(Clock.systemUTC(), POSTGRES_TIMESTAMP_TICK);
+    static BeanPostProcessor postgresClockPrecisionPostProcessor() {
+        return new BeanPostProcessor() {
+            @Override
+            public Object postProcessAfterInitialization(Object bean, String beanName) {
+                if ("systemClock".equals(beanName) && bean instanceof Clock clock) {
+                    return postgresSafeClock(clock);
+                }
+                return bean;
+            }
+        };
+    }
+
+    static Clock postgresSafeClock(Clock source) {
+        return Clock.tick(source, POSTGRES_TIMESTAMP_TICK);
     }
 }
