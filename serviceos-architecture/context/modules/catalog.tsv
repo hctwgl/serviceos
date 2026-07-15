@@ -1,0 +1,30 @@
+# module|card|primaryAuthority|testHint|neighbors
+identity|-|serviceos-architecture/architecture/07-identity-authorization-audit.md|Identity|authorization,audit
+organization|-|serviceos-architecture/architecture/07-identity-authorization-audit.md|Organization|identity,project,authorization
+project|-|serviceos-architecture/architecture/05-configuration-version-center.md|Project|configuration,authorization
+configuration|serviceos-architecture/context/modules/configuration.md|serviceos-architecture/architecture/05-configuration-version-center.md|Configuration|project,workorder,workflow,forms,evidence,sla
+files|-|serviceos-architecture/architecture/25-secure-file-lifecycle-implementation.md|File|evidence,authorization
+reliability|-|serviceos-architecture/architecture/20-transaction-messaging-concurrency-blueprint.md|Inbox|task,integration,operations
+readmodel|-|serviceos-architecture/product/01-cross-portal-information-architecture.md|Projection|workorder,task,operations
+operations|-|serviceos-architecture/architecture/14-notification-operational-exception.md|OperationalException|task,integration,notification
+workorder|-|serviceos-architecture/architecture/06-work-order-task-execution-kernel.md|WorkOrder|configuration,workflow,task
+workflow|serviceos-architecture/context/modules/workflow.md|serviceos-architecture/architecture/06-work-order-task-execution-kernel.md|Workflow|configuration,workorder,task
+ task|serviceos-architecture/context/modules/task.md|serviceos-architecture/architecture/06-work-order-task-execution-kernel.md|Task|workflow,authorization,sla,operations
+appointment|-|serviceos-architecture/architecture/08-appointment-field-operations.md|Appointment|task,fieldwork,notification
+fieldwork|-|serviceos-architecture/architecture/08-appointment-field-operations.md|Visit|appointment,forms,evidence
+forms|-|serviceos-architecture/architecture/09-dynamic-form-field-engine.md|Form|configuration,task,evidence
+ evidence|serviceos-architecture/context/modules/evidence.md|serviceos-architecture/architecture/10-evidence-review-correction.md|Evidence|files,forms,review,task
+review|-|serviceos-architecture/architecture/10-evidence-review-correction.md|Review|evidence,task,integration
+network|-|serviceos-architecture/architecture/11-service-network-dispatch.md|Network|dispatch,organization
+ dispatch|-|serviceos-architecture/architecture/11-service-network-dispatch.md|Dispatch|network,task,operations
+sla|serviceos-architecture/context/modules/sla.md|serviceos-architecture/architecture/12-sla-clock-escalation.md|Sla|task,configuration,notification,operations
+integration|serviceos-architecture/context/modules/integration.md|serviceos-architecture/architecture/13-integration-reliability.md|BydCpim|reliability,review,operations,workorder
+notification|-|serviceos-architecture/architecture/14-notification-operational-exception.md|Notification|operations,sla
+facts|-|serviceos-architecture/architecture/15-fulfillment-fact-calculation-runtime.md|Fact|workorder,pricing,evidence
+pricing|-|serviceos-architecture/architecture/15-fulfillment-fact-calculation-runtime.md|Pricing|facts,settlement
+settlement|-|serviceos-architecture/architecture/16-reconciliation-settlement-boundary.md|Settlement|pricing,facts
+migration|-|serviceos-architecture/architecture/17-data-migration-cutover.md|Migration|authority,rollout
+rollout|-|serviceos-architecture/architecture/18-pilot-rollout-observability.md|Rollout|migration,operations
+agent-context|-|serviceos-architecture/context/README.md|Context|documentation,build
+build|-|AGENTS.md|ArchitectureTest|agent-context,documentation
+documentation|-|agent-rules/documentation.md|Context|agent-context,build
