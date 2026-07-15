@@ -9,7 +9,8 @@ status: Proposed
 > M56～M57 已为 BYD 创建工单与审核回调实现 `InboundEnvelope`/`CanonicalMessage`。
 > M58 已实现 BYD 提审的不可变 `OutboundDelivery`/`DeliveryAttempt`/
 > `ExternalAcknowledgement`、Task 唯一重试时钟和 UNKNOWN 人工接管的最小纵向切片。
-> 其他 CPIM 消息、通用 Connector、人工重放命令和批量重放仍未实现；本章其余 Proposed 设计不能据此视为已完成。
+> M59 已实现 UNKNOWN Delivery 的单笔授权人工重发、不可变 ReplayRequest 与版本/审批门禁。
+> 其他人工处置、其他 CPIM 消息、通用 Connector 和批量重放仍未实现；本章其余 Proposed 设计不能据此视为已完成。
 
 ## 1. 目标
 
@@ -193,7 +194,7 @@ affectedObjectRefs[]
 
 ## 13. 人工修复与重放
 
-人工处理不能直接把 delivery 状态改为成功。允许动作：
+人工处理不能直接把 delivery 状态改为成功。M59 已实现下列第一项的单笔 BYD 提审切片；其余仍未实现：
 
 - 修复配置后重试原 payload；
 - 基于新对象版本创建新的 delivery；

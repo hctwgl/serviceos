@@ -30,6 +30,7 @@ import com.serviceos.integration.api.OutboundDeliveryService;
 import com.serviceos.integration.api.OutboundDeliveryView;
 import com.serviceos.integration.api.CreateReviewSubmissionCommand;
 import com.serviceos.integration.api.RegisterExternalReviewRouteCommand;
+import com.serviceos.integration.api.RetryOutboundDeliveryCommand;
 import com.serviceos.integration.byd.api.BydCpimReviewCallbackResponse;
 import com.serviceos.integration.byd.api.BydCpimSignatureHeaders;
 import com.serviceos.integration.byd.application.BydCpimReviewCallbackService;
@@ -87,6 +88,7 @@ class ReviewCasePostgresIT {
     private static final String REVIEWER = "reviewer-evidence-044";
     private static final String FORCE_ADMIN = "force-admin-evidence-048";
     private static final String ADAPTER = "byd-adapter-evidence-049";
+    private static final String OPS_USER = "integration-ops-user-059";
     private static final String CPIM_APP_KEY = "review-callback-app-key";
     private static final String CPIM_APP_SECRET = "review-callback-app-secret";
     private static final Path STORAGE_ROOT = temporaryStorageRoot();
@@ -138,7 +140,8 @@ class ReviewCasePostgresIT {
     void setUp() throws Exception {
         jdbc.sql("""
                 TRUNCATE TABLE
-                    int_external_acknowledgement, int_delivery_attempt, int_outbound_delivery,
+                    int_delivery_replay_request, int_external_acknowledgement,
+                    int_delivery_attempt, int_outbound_delivery,
                     int_inbound_item_result, int_external_review_route,
                     int_canonical_message, int_inbound_envelope, int_inbound_replay_guard,
                     evd_external_review_receipt, evd_external_receipt_command_result,
@@ -174,6 +177,7 @@ class ReviewCasePostgresIT {
         grant(ADAPTER, "evidence.createClientReviewCase", "evidence.recordExternalReceipt",
                 "evidence.read", "integration.registerExternalReviewRoute",
                 "integration.submitClientReview", "integration.readOutbound");
+        grant(OPS_USER, "integration.retryUnknownDelivery", "integration.readOutbound");
         seedResolvedSlot();
     }
 
@@ -240,7 +244,9 @@ class ReviewCasePostgresIT {
 
         jdbc.sql("INSERT INTO auth_role_capability(role_id, capability_code, granted_at) VALUES (:role,'evidence.createClientReviewCase',now())")
                 .param("role", adapterRole).update();
-        jdbc.sql("UPDATE tsk_task SET next_run_at=now() WHERE task_id=:id")
+        jdbc.sql("UPDATE tsk_task SET next_run_at=:nextRunAt WHERE task_id=:id")
+                .param("nextRunAt", java.time.OffsetDateTime.ofInstant(
+                        clock.instant().minusSeconds(1), ZoneId.of("UTC")))
                 .param("id", created.executionTaskId()).update();
         assertThat(worker.runOnce()).isEqualTo(TaskExecutionWorker.RunResult.SUCCEEDED);
         assertThat(outboundDeliveries.get(adapter(), "corr-ack-after-retry", created.deliveryId()).status())
@@ -270,6 +276,162 @@ class ReviewCasePostgresIT {
         assertThat(jdbc.sql("SELECT count(*) FROM tsk_task WHERE task_type='operations.resolve-exception'")
                 .query(Long.class).single()).isOne();
         assertThat(worker.runOnce()).isEqualTo(TaskExecutionWorker.RunResult.EMPTY);
+        verify(submitReviewGateway, times(1)).send(any());
+    }
+
+    @Test
+    void authorizedManualReplayPreservesUnknownAttemptAndFrozenPayload() throws Exception {
+        ReviewCaseView source = createApprovedInternalWithBydLineage("outbound-replay", "ORDER-OUT-4");
+        when(submitReviewGateway.send(any()))
+                .thenThrow(new BydCpimSubmitReviewGateway.TransportException(
+                        BydCpimSubmitReviewGateway.TransportException.Kind.UNKNOWN,
+                        "BYD_TRANSPORT_UNKNOWN", new IOException("response lost")))
+                .thenReturn(new BydCpimSubmitReviewGateway.Response(
+                        200, "{\"errno\":0,\"errmsg\":\"成功\",\"data\":null}"
+                                .getBytes(StandardCharsets.UTF_8)));
+        OutboundDeliveryView created = outboundDeliveries.createReviewSubmission(
+                adapter(), metadata("outbound-replay-create"),
+                new CreateReviewSubmissionCommand(source.reviewCaseId()));
+        assertThat(worker.runOnce()).isEqualTo(TaskExecutionWorker.RunResult.MANUAL_INTERVENTION);
+        OutboundDeliveryView unknown = outboundDeliveries.get(
+                opsUser(), "corr-replay-unknown", created.deliveryId());
+        assertThat(unknown.status()).isEqualTo("UNKNOWN");
+        assertThatThrownBy(() -> jdbc.sql("""
+                UPDATE int_outbound_delivery SET status='SENDING', aggregate_version=aggregate_version+1
+                 WHERE delivery_id=:id
+                """).param("id", created.deliveryId()).update())
+                .isInstanceOf(org.springframework.dao.DataAccessException.class);
+
+        var replay = outboundDeliveries.retryUnknown(
+                opsUser(), metadata("outbound-replay-request"),
+                new RetryOutboundDeliveryCommand(
+                        created.deliveryId(), unknown.aggregateVersion(),
+                        "已核对车企侧未收到原请求，批准复用冻结报文重发",
+                        "approval://integration/059/1"));
+        var idempotentReplay = outboundDeliveries.retryUnknown(
+                opsUser(), metadata("outbound-replay-request"),
+                new RetryOutboundDeliveryCommand(
+                        created.deliveryId(), unknown.aggregateVersion(),
+                        "已核对车企侧未收到原请求，批准复用冻结报文重发",
+                        "approval://integration/059/1"));
+        assertThat(idempotentReplay.replayRequestId()).isEqualTo(replay.replayRequestId());
+        assertThat(replay.status()).isEqualTo("REQUESTED");
+        assertThatThrownBy(() -> outboundDeliveries.retryUnknown(
+                opsUser(), metadata("outbound-replay-concurrent"),
+                new RetryOutboundDeliveryCommand(
+                        created.deliveryId(), unknown.aggregateVersion(),
+                        "另一个并发重发请求", "approval://integration/059/2")))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VERSION_CONFLICT));
+        UUID adapterRole = jdbc.sql("""
+                SELECT arc.role_id FROM auth_role_capability arc
+                JOIN auth_role_grant arg ON arg.role_id=arc.role_id
+                WHERE arg.principal_id=:principal AND arc.capability_code='evidence.createClientReviewCase'
+                LIMIT 1
+                """).param("principal", ADAPTER).query(UUID.class).single();
+        jdbc.sql("DELETE FROM auth_role_capability WHERE role_id=:role AND capability_code='evidence.createClientReviewCase'")
+                .param("role", adapterRole).update();
+        assertThat(worker.runOnce()).isEqualTo(TaskExecutionWorker.RunResult.RETRY_SCHEDULED);
+        assertThat(outboundDeliveries.get(
+                opsUser(), "corr-replay-delivered", created.deliveryId()).status()).isEqualTo("DELIVERED");
+        verify(submitReviewGateway, times(2)).send(any());
+
+        jdbc.sql("INSERT INTO auth_role_capability(role_id, capability_code, granted_at) VALUES (:role,'evidence.createClientReviewCase',now())")
+                .param("role", adapterRole).update();
+        jdbc.sql("UPDATE tsk_task SET next_run_at=:nextRunAt WHERE task_id=:id")
+                .param("nextRunAt", java.time.OffsetDateTime.ofInstant(
+                        clock.instant().minusSeconds(1), ZoneId.of("UTC")))
+                .param("id", replay.executionTaskId()).update();
+        assertThat(worker.runOnce()).isEqualTo(TaskExecutionWorker.RunResult.SUCCEEDED);
+
+        OutboundDeliveryView completed = outboundDeliveries.get(
+                opsUser(), "corr-replay-completed", created.deliveryId());
+        assertThat(completed.status()).isEqualTo("ACKNOWLEDGED");
+        assertThat(completed.payloadDigest()).isEqualTo(created.payloadDigest());
+        assertThat(completed.externalIdempotencyKey()).isEqualTo(created.externalIdempotencyKey());
+        assertThat(completed.attempts()).hasSize(2);
+        assertThat(completed.attempts().get(0).status()).isEqualTo("UNKNOWN");
+        assertThat(completed.attempts().get(1).status()).isEqualTo("DELIVERED");
+        assertThat(completed.replayRequests()).singleElement().satisfies(result -> {
+            assertThat(result.replayRequestId()).isEqualTo(replay.replayRequestId());
+            assertThat(result.status()).isEqualTo("DELIVERED");
+            assertThat(result.resultCode()).isEqualTo("BYD_ERRNO_0");
+            assertThat(result.approvalRef()).isEqualTo("approval://integration/059/1");
+        });
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM rel_outbox_event
+                 WHERE event_type='integration.outbound-delivery-replay-requested'
+                """).query(Long.class).single()).isOne();
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM aud_audit_record
+                 WHERE action_name='OUTBOUND_DELIVERY_REPLAY_REQUESTED' AND actor_id=:actor
+                """).param("actor", OPS_USER).query(Long.class).single()).isOne();
+        verify(submitReviewGateway, times(2)).send(any());
+    }
+
+    @Test
+    void manualReplayThatIsStillUnknownReturnsToManualInterventionWithoutAutomaticThirdSend() throws Exception {
+        ReviewCaseView source = createApprovedInternalWithBydLineage(
+                "outbound-replay-unknown", "ORDER-OUT-6");
+        when(submitReviewGateway.send(any())).thenThrow(new BydCpimSubmitReviewGateway.TransportException(
+                BydCpimSubmitReviewGateway.TransportException.Kind.UNKNOWN,
+                "BYD_TRANSPORT_UNKNOWN", new IOException("response lost")));
+        OutboundDeliveryView created = outboundDeliveries.createReviewSubmission(
+                adapter(), metadata("outbound-replay-unknown-create"),
+                new CreateReviewSubmissionCommand(source.reviewCaseId()));
+        assertThat(worker.runOnce()).isEqualTo(TaskExecutionWorker.RunResult.MANUAL_INTERVENTION);
+        OutboundDeliveryView firstUnknown = outboundDeliveries.get(
+                opsUser(), "corr-first-unknown", created.deliveryId());
+        outboundDeliveries.retryUnknown(
+                opsUser(), metadata("outbound-replay-still-unknown"),
+                new RetryOutboundDeliveryCommand(
+                        created.deliveryId(), firstUnknown.aggregateVersion(),
+                        "已审批重发但网络结果仍可能已送达", "approval://integration/059/unknown"));
+
+        assertThat(worker.runOnce()).isEqualTo(TaskExecutionWorker.RunResult.MANUAL_INTERVENTION);
+        OutboundDeliveryView secondUnknown = outboundDeliveries.get(
+                opsUser(), "corr-second-unknown", created.deliveryId());
+        assertThat(secondUnknown.status()).isEqualTo("UNKNOWN");
+        assertThat(secondUnknown.attempts()).hasSize(2).allMatch(attempt -> "UNKNOWN".equals(attempt.status()));
+        assertThat(secondUnknown.replayRequests()).singleElement()
+                .satisfies(replay -> assertThat(replay.status()).isEqualTo("UNKNOWN"));
+        assertThat(worker.runOnce()).isEqualTo(TaskExecutionWorker.RunResult.EMPTY);
+        verify(submitReviewGateway, times(2)).send(any());
+    }
+
+    @Test
+    void manualReplayFailsClosedForServicePrincipalMissingApprovalAndStaleVersion() throws Exception {
+        ReviewCaseView source = createApprovedInternalWithBydLineage("outbound-replay-deny", "ORDER-OUT-5");
+        when(submitReviewGateway.send(any())).thenThrow(new BydCpimSubmitReviewGateway.TransportException(
+                BydCpimSubmitReviewGateway.TransportException.Kind.UNKNOWN,
+                "BYD_TRANSPORT_UNKNOWN", new IOException("response lost")));
+        OutboundDeliveryView created = outboundDeliveries.createReviewSubmission(
+                adapter(), metadata("outbound-replay-deny-create"),
+                new CreateReviewSubmissionCommand(source.reviewCaseId()));
+        assertThat(worker.runOnce()).isEqualTo(TaskExecutionWorker.RunResult.MANUAL_INTERVENTION);
+        OutboundDeliveryView unknown = outboundDeliveries.get(
+                opsUser(), "corr-replay-deny-unknown", created.deliveryId());
+
+        assertThatThrownBy(() -> outboundDeliveries.retryUnknown(
+                adapter(), metadata("outbound-replay-service-denied"),
+                new RetryOutboundDeliveryCommand(created.deliveryId(), unknown.aggregateVersion(),
+                        "人工重发", "approval://integration/059/deny")))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.ACCESS_DENIED));
+        assertThatThrownBy(() -> outboundDeliveries.retryUnknown(
+                opsUser(), metadata("outbound-replay-approval-missing"),
+                new RetryOutboundDeliveryCommand(created.deliveryId(), unknown.aggregateVersion(),
+                        "人工重发", " ")))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
+        assertThatThrownBy(() -> outboundDeliveries.retryUnknown(
+                opsUser(), metadata("outbound-replay-stale"),
+                new RetryOutboundDeliveryCommand(created.deliveryId(), unknown.aggregateVersion() - 1,
+                        "人工重发", "approval://integration/059/stale")))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VERSION_CONFLICT));
+        assertThat(jdbc.sql("SELECT count(*) FROM int_delivery_replay_request")
+                .query(Long.class).single()).isZero();
         verify(submitReviewGateway, times(1)).send(any());
     }
 
@@ -808,6 +970,11 @@ class ReviewCasePostgresIT {
     private CurrentPrincipal adapter() {
         return new CurrentPrincipal(
                 ADAPTER, TENANT, CurrentPrincipal.PrincipalType.SERVICE, "byd-adapter", Set.of());
+    }
+
+    private CurrentPrincipal opsUser() {
+        return new CurrentPrincipal(
+                OPS_USER, TENANT, CurrentPrincipal.PrincipalType.USER, "operations", Set.of());
     }
 
     private BydCpimReviewCallbackResponse receiveReviewCallback(String nonce, Map<String, Object> payload)

@@ -9,7 +9,8 @@ status: Proposed
 > M56～M57 已实现 BYD 入站与授权摘要。M58 在 Core OpenAPI 0.31.0 实现
 > `POST /api/v1/internal/integration/byd/review-submissions` 与
 > `GET /api/v1/outbound-deliveries/{id}`，并在 BYD OpenAPI 0.3.0 固定外发提审协议。
-> 通用 Connector/CreateOutboundDelivery、Replay 与其余本章接口仍为 Proposed。
+> M59 在 Core OpenAPI 0.32.0 实现单笔 UNKNOWN Delivery 人工重发。
+> 通用 Connector/CreateOutboundDelivery、其他人工处置、批量 Replay 与其余本章接口仍为 Proposed。
 
 沿用既有 API 的认证、幂等、`If-Match`、Problem Details、correlation 和审计约定。自动任务内部接口使用专用服务主体，不向普通用户令牌开放。
 
@@ -125,15 +126,16 @@ status: Proposed
 | `POST /outbound-deliveries` | CreateOutboundDelivery（内部编排） | connector、messageType、sourceRefs、mappingVersion | 201 |
 | `GET /outbound-deliveries/{id}` | payload 摘要、attempts、acknowledgements | — | 200 |
 | `POST /internal/integration/byd/review-submissions` | M58 已实现的 BYD 专用提审创建 | sourceReviewCaseId | 201 |
-| `POST /outbound-deliveries/{id}:retry` | RetryDelivery | repairNote?、approvalRef? | 202 |
+| `POST /outbound-deliveries/{id}:retry` | M59 单笔 UNKNOWN 人工重发 | expectedAggregateVersion、reason、approvalRef | 202 |
 | `POST /outbound-deliveries/{id}:query-remote-status` | QueryRemoteStatus | reason | 202 |
 | `POST /outbound-deliveries/{id}:record-manual-ack` | RecordManualAcknowledgement | result、externalRef、evidenceRefs、reason | 200 |
 | `POST /replay-requests` | RequestReplay | deliveryIds、mode、reason | 202 |
 | `POST /replay-requests/{id}:approve` | ApproveReplay | decision、limits | 200 |
 
-人工重试不接受客户端修改原 payload。`RetryDelivery` 仍为 Proposed；M58 不实现该入口，
-且 BYD 提审 UNKNOWN 在没有新的高风险人工决定时绝不重发。后续重试命令仍必须鉴权并委托
-`executionTaskId`，不由集成模块另行安排 nextRetryAt。
+人工重试不接受客户端修改原 payload。M59 仅实现单笔 BYD 提审 UNKNOWN 重发：USER principal
+必须通过 HIGH capability、project scope、原因、审批引用和预期聚合版本门禁；服务端创建不可变
+ReplayRequest 与新 Task，复用冻结 payload/external key，并保留旧 UNKNOWN Attempt。Task 仍唯一拥有
+重试时钟，集成模块不另行安排 nextRetryAt。批量 ReplayRequest、人工确认/放弃仍为 Proposed。
 
 ## 6. 外部回执
 

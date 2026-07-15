@@ -12,5 +12,10 @@ public interface OutboundDeliveryService {
             CommandMetadata metadata,
             CreateReviewSubmissionCommand command);
 
+    DeliveryReplayRequestView retryUnknown(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            RetryOutboundDeliveryCommand command);
+
     OutboundDeliveryView get(CurrentPrincipal principal, String correlationId, UUID deliveryId);
 }

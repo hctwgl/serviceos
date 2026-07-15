@@ -1,6 +1,7 @@
 package com.serviceos.integration.application;
 
 import com.serviceos.integration.api.OutboundDeliveryView;
+import com.serviceos.integration.api.DeliveryReplayRequestView;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -22,11 +23,17 @@ public interface OutboundDeliveryRepository {
     Optional<DeliveryRecord> findBySourceReview(
             String tenantId, UUID sourceReviewCaseId, String businessMessageType);
 
+    Optional<DeliveryReplayRequestView> findReplay(String tenantId, UUID replayRequestId);
+
+    DeliveryReplayRequestView registerReplay(NewReplayRequest replayRequest);
+
+    boolean isAuthorizedExecutionTask(String tenantId, UUID deliveryId, UUID taskId);
+
     AttemptStart startAttempt(
             String tenantId,
             UUID deliveryId,
+            UUID taskId,
             UUID taskExecutionAttemptId,
-            int attemptNo,
             String nonce,
             LocalDate requestDate,
             String requestDigest,
@@ -75,7 +82,8 @@ public interface OutboundDeliveryRepository {
             String resultCode,
             Instant finishedAt);
 
-    void failPending(String tenantId, UUID deliveryId, String resultCode, Instant failedAt);
+    void failBeforeAttempt(
+            String tenantId, UUID deliveryId, UUID taskId, String resultCode, Instant failedAt);
 
     void acknowledge(
             String tenantId,
@@ -123,6 +131,19 @@ public interface OutboundDeliveryRepository {
             String failurePolicyVersionId,
             String createdBy,
             Instant createdAt
+    ) {
+    }
+
+    record NewReplayRequest(
+            UUID replayRequestId,
+            UUID deliveryId,
+            String tenantId,
+            long expectedDeliveryVersion,
+            String reason,
+            String approvalRef,
+            String requestedBy,
+            UUID executionTaskId,
+            Instant requestedAt
     ) {
     }
 }

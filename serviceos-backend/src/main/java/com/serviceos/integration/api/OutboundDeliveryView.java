@@ -30,6 +30,7 @@ public record OutboundDeliveryView(
         Instant deliveredAt,
         Instant acknowledgedAt,
         List<DeliveryAttemptView> attempts,
-        List<ExternalAcknowledgementView> acknowledgements
+        List<ExternalAcknowledgementView> acknowledgements,
+        List<DeliveryReplayRequestView> replayRequests
 ) {
 }

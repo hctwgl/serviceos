@@ -182,6 +182,13 @@ class ContractValidationTest {
     }
 
     @Test
+    void integrationOutboundDeliveryReplayRequestedExampleMustMatchPublishedSchema() throws Exception {
+        assertValidEvent(
+                "/events/integration-outbound-delivery-replay-requested-v1.schema.json",
+                "/events/integration-outbound-delivery-replay-requested-v1.valid.json");
+    }
+
+    @Test
     void bydReviewCallbackExampleMustMatchExternalSchema() throws Exception {
         assertValidEvent(
                 "/external/byd-cpim-review-callback-v731.schema.json",

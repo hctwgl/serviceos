@@ -1,0 +1,24 @@
+{
+  "eventId": "91000000-0000-0000-0000-000000000001",
+  "eventType": "integration.outbound-delivery-replay-requested",
+  "schemaVersion": 1,
+  "tenantId": "tenant-byd",
+  "correlationId": "corr-replay-1",
+  "causationId": "idem-replay-1",
+  "aggregateType": "OutboundDelivery",
+  "aggregateId": "91000000-0000-0000-0000-000000000002",
+  "aggregateVersion": 3,
+  "occurredAt": "2026-07-15T09:00:00Z",
+  "payload": {
+    "replayRequestId": "91000000-0000-0000-0000-000000000003",
+    "deliveryId": "91000000-0000-0000-0000-000000000002",
+    "projectId": "91000000-0000-0000-0000-000000000004",
+    "executionTaskId": "91000000-0000-0000-0000-000000000005",
+    "payloadDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "externalIdempotencyKey": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "reason": "已核对外部系统未收到原请求，批准人工重发",
+    "approvalRef": "approval://ops/2026/0715/001",
+    "requestedBy": "ops-user-1",
+    "requestedAt": "2026-07-15T09:00:00Z"
+  }
+}

@@ -2,12 +2,17 @@ package com.serviceos.integration.web;
 
 import com.serviceos.identity.api.CurrentPrincipalProvider;
 import com.serviceos.integration.api.CreateReviewSubmissionCommand;
+import com.serviceos.integration.api.DeliveryReplayRequestView;
 import com.serviceos.integration.api.OutboundDeliveryService;
 import com.serviceos.integration.api.OutboundDeliveryView;
+import com.serviceos.integration.api.RetryOutboundDeliveryCommand;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.CorrelationIds;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -52,6 +57,28 @@ final class OutboundDeliveryController {
         return deliveries.get(principals.current(), correlationId, deliveryId);
     }
 
+    @PostMapping("/outbound-deliveries/{deliveryId}:retry")
+    ResponseEntity<DeliveryReplayRequestView> retry(
+            @PathVariable UUID deliveryId,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @Valid @RequestBody RetryRequest request
+    ) {
+        DeliveryReplayRequestView replay = deliveries.retryUnknown(
+                principals.current(), new CommandMetadata(correlationId, idempotencyKey),
+                new RetryOutboundDeliveryCommand(
+                        deliveryId, request.expectedAggregateVersion(),
+                        request.reason(), request.approvalRef()));
+        return ResponseEntity.accepted().body(replay);
+    }
+
     record CreateRequest(@NotNull UUID sourceReviewCaseId) {
+    }
+
+    record RetryRequest(
+            @Positive long expectedAggregateVersion,
+            @NotBlank @Size(max = 1000) String reason,
+            @NotBlank @Size(max = 160) String approvalRef
+    ) {
     }
 }

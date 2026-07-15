@@ -1,9 +1,12 @@
 package com.serviceos.integration.infrastructure;
 
 import com.serviceos.integration.api.DeliveryAttemptView;
+import com.serviceos.integration.api.DeliveryReplayRequestView;
 import com.serviceos.integration.api.ExternalAcknowledgementView;
 import com.serviceos.integration.api.OutboundDeliveryView;
 import com.serviceos.integration.application.OutboundDeliveryRepository;
+import com.serviceos.shared.BusinessProblem;
+import com.serviceos.shared.ProblemCode;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
@@ -111,33 +114,97 @@ final class JdbcOutboundDeliveryRepository implements OutboundDeliveryRepository
     }
 
     @Override
+    public Optional<DeliveryReplayRequestView> findReplay(String tenantId, UUID replayRequestId) {
+        return jdbc.sql("""
+                SELECT replay_request_id, delivery_id, execution_task_id, status, reason,
+                       approval_ref, requested_by, result_code, requested_at, started_at, finished_at
+                  FROM int_delivery_replay_request
+                 WHERE tenant_id=:tenant AND replay_request_id=:id
+                """).param("tenant", tenantId).param("id", replayRequestId)
+                .query(this::replayRequest).optional();
+    }
+
+    @Override
+    public DeliveryReplayRequestView registerReplay(NewReplayRequest replay) {
+        int inserted = jdbc.sql("""
+                INSERT INTO int_delivery_replay_request (
+                    replay_request_id, delivery_id, tenant_id, expected_delivery_version,
+                    reason, approval_ref, requested_by, execution_task_id, status, requested_at)
+                SELECT :replayId, delivery_id, tenant_id, :expectedVersion, :reason,
+                       :approvalRef, :requestedBy, :taskId, 'REQUESTED', :requestedAt
+                  FROM int_outbound_delivery
+                 WHERE tenant_id=:tenant AND delivery_id=:deliveryId
+                   AND status='UNKNOWN' AND aggregate_version=:expectedVersion
+                ON CONFLICT DO NOTHING
+                """).param("replayId", replay.replayRequestId()).param("deliveryId", replay.deliveryId())
+                .param("tenant", replay.tenantId()).param("expectedVersion", replay.expectedDeliveryVersion())
+                .param("reason", replay.reason()).param("approvalRef", replay.approvalRef())
+                .param("requestedBy", replay.requestedBy()).param("taskId", replay.executionTaskId())
+                .param("requestedAt", timestamptz(replay.requestedAt())).update();
+        if (inserted != 1) {
+            throw new BusinessProblem(ProblemCode.VERSION_CONFLICT,
+                    "UNKNOWN OutboundDelivery changed or already has an active replay request");
+        }
+        return findReplay(replay.tenantId(), replay.replayRequestId())
+                .orElseThrow(() -> new IllegalStateException("Delivery replay request missing after insert"));
+    }
+
+    @Override
+    public boolean isAuthorizedExecutionTask(String tenantId, UUID deliveryId, UUID taskId) {
+        return jdbc.sql("""
+                SELECT EXISTS (
+                    SELECT 1 FROM int_outbound_delivery delivery
+                     WHERE delivery.tenant_id=:tenant AND delivery.delivery_id=:deliveryId
+                       AND (delivery.execution_task_id=:taskId OR EXISTS (
+                           SELECT 1 FROM int_delivery_replay_request replay
+                            WHERE replay.tenant_id=delivery.tenant_id
+                              AND replay.delivery_id=delivery.delivery_id
+                              AND replay.execution_task_id=:taskId
+                              AND replay.status IN ('REQUESTED','EXECUTING','DELIVERED'))))
+                """).param("tenant", tenantId).param("deliveryId", deliveryId)
+                .param("taskId", taskId).query(Boolean.class).single();
+    }
+
+    @Override
     public AttemptStart startAttempt(
-            String tenantId, UUID deliveryId, UUID taskExecutionAttemptId, int attemptNo,
+            String tenantId, UUID deliveryId, UUID taskId, UUID taskExecutionAttemptId,
             String nonce, LocalDate requestDate, String requestDigest,
             String credentialVersionId, Instant startedAt
     ) {
+        jdbc.sql("""
+                UPDATE int_delivery_replay_request
+                   SET status='EXECUTING', started_at=:startedAt
+                 WHERE tenant_id=:tenant AND delivery_id=:deliveryId
+                   AND execution_task_id=:taskId AND status='REQUESTED'
+                """).param("startedAt", timestamptz(startedAt)).param("tenant", tenantId)
+                .param("deliveryId", deliveryId).param("taskId", taskId).update();
         UUID attemptId = UUID.randomUUID();
         int inserted = jdbc.sql("""
                 INSERT INTO int_delivery_attempt (
                     delivery_attempt_id, delivery_id, tenant_id, task_execution_attempt_id,
                     attempt_no, nonce, request_date, request_digest, credential_version_id,
                     status, started_at)
-                SELECT :attemptId, delivery_id, tenant_id, :taskAttempt, :attemptNo, :nonce,
+                SELECT :attemptId, delivery_id, tenant_id, :taskAttempt, attempt_count + 1, :nonce,
                        :requestDate, :requestDigest, :credentialVersion, 'SENDING', :startedAt
                   FROM int_outbound_delivery
-                 WHERE tenant_id=:tenant AND delivery_id=:deliveryId AND status='PENDING'
+                 WHERE tenant_id=:tenant AND delivery_id=:deliveryId
+                   AND ((status='PENDING' AND execution_task_id=:taskId)
+                     OR (status='UNKNOWN' AND EXISTS (
+                         SELECT 1 FROM int_delivery_replay_request replay
+                          WHERE replay.tenant_id=:tenant AND replay.delivery_id=:deliveryId
+                            AND replay.execution_task_id=:taskId AND replay.status='EXECUTING')))
                 ON CONFLICT DO NOTHING
                 """).param("attemptId", attemptId).param("taskAttempt", taskExecutionAttemptId)
-                .param("attemptNo", attemptNo).param("nonce", nonce).param("requestDate", requestDate)
+                .param("nonce", nonce).param("requestDate", requestDate)
                 .param("requestDigest", requestDigest).param("credentialVersion", credentialVersionId)
                 .param("startedAt", timestamptz(startedAt)).param("tenant", tenantId)
-                .param("deliveryId", deliveryId).update();
+                .param("deliveryId", deliveryId).param("taskId", taskId).update();
         if (inserted == 1) {
             int transitioned = jdbc.sql("""
                     UPDATE int_outbound_delivery
                        SET status='SENDING', attempt_count=attempt_count+1,
                            aggregate_version=aggregate_version+1
-                     WHERE tenant_id=:tenant AND delivery_id=:id AND status='PENDING'
+                     WHERE tenant_id=:tenant AND delivery_id=:id AND status IN ('PENDING','UNKNOWN')
                     """).param("tenant", tenantId).param("id", deliveryId).update();
             if (transitioned != 1) {
                 throw new IllegalStateException("OutboundDelivery lost PENDING state before network attempt");
@@ -221,13 +288,26 @@ final class JdbcOutboundDeliveryRepository implements OutboundDeliveryRepository
     }
 
     @Override
-    public void failPending(String tenantId, UUID deliveryId, String resultCode, Instant failedAt) {
+    public void failBeforeAttempt(
+            String tenantId, UUID deliveryId, UUID taskId, String resultCode, Instant failedAt
+    ) {
         int updated = jdbc.sql("""
                 UPDATE int_outbound_delivery
                    SET status='FAILED_FINAL', aggregate_version=aggregate_version+1
                  WHERE tenant_id=:tenant AND delivery_id=:id AND status='PENDING'
-                """).param("tenant", tenantId).param("id", deliveryId).update();
-        requireOne(updated, "OutboundDelivery preflight failure lost PENDING state");
+                   AND execution_task_id=:taskId
+                """).param("tenant", tenantId).param("id", deliveryId).param("taskId", taskId).update();
+        if (updated == 0) {
+            updated = jdbc.sql("""
+                    UPDATE int_delivery_replay_request
+                       SET status='FAILED_FINAL', result_code=:resultCode,
+                           finished_at=:failedAt
+                     WHERE tenant_id=:tenant AND delivery_id=:id
+                       AND execution_task_id=:taskId AND status='REQUESTED'
+                    """).param("resultCode", resultCode).param("failedAt", timestamptz(failedAt))
+                    .param("tenant", tenantId).param("id", deliveryId).param("taskId", taskId).update();
+        }
+        requireOne(updated, "OutboundDelivery preflight failure has no authorized execution");
     }
 
     @Override
@@ -292,6 +372,16 @@ final class JdbcOutboundDeliveryRepository implements OutboundDeliveryRepository
                 .param("tenant", tenantId).param("deliveryId", deliveryId)
                 .param("taskAttempt", taskExecutionAttemptId).update();
         requireOne(updated, "DeliveryAttempt terminal transition lost SENDING state");
+        jdbc.sql("""
+                UPDATE int_delivery_replay_request replay
+                   SET status=:status, result_code=:resultCode, finished_at=:finishedAt
+                  FROM tsk_task_execution_attempt task_attempt
+                 WHERE task_attempt.attempt_id=:taskAttempt
+                   AND replay.tenant_id=:tenant AND replay.delivery_id=:deliveryId
+                   AND replay.execution_task_id=task_attempt.task_id AND replay.status='EXECUTING'
+                """).param("status", status).param("resultCode", resultCode)
+                .param("finishedAt", timestamptz(finishedAt)).param("taskAttempt", taskExecutionAttemptId)
+                .param("tenant", tenantId).param("deliveryId", deliveryId).update();
     }
 
     private void insertAcknowledgement(
@@ -328,6 +418,12 @@ final class JdbcOutboundDeliveryRepository implements OutboundDeliveryRepository
                        response_digest, mapping_version_id, received_at
                   FROM int_external_acknowledgement WHERE delivery_id=:id ORDER BY received_at
                 """).param("id", deliveryId).query(this::acknowledgement).list();
+        List<DeliveryReplayRequestView> replayRequests = jdbc.sql("""
+                SELECT replay_request_id, delivery_id, execution_task_id, status, reason,
+                       approval_ref, requested_by, result_code, requested_at, started_at, finished_at
+                  FROM int_delivery_replay_request
+                 WHERE delivery_id=:id ORDER BY requested_at, replay_request_id
+                """).param("id", deliveryId).query(this::replayRequest).list();
         OutboundDeliveryView view = new OutboundDeliveryView(
                 deliveryId, rs.getObject("project_id", UUID.class),
                 rs.getString("connector_version_id"), rs.getString("mapping_version_id"),
@@ -342,7 +438,7 @@ final class JdbcOutboundDeliveryRepository implements OutboundDeliveryRepository
                 rs.getObject("client_review_case_id", UUID.class), rs.getObject("review_route_id", UUID.class),
                 rs.getLong("aggregate_version"), instant(rs, "created_at"),
                 instant(rs, "delivered_at"), instant(rs, "acknowledged_at"),
-                attempts, acknowledgements);
+                attempts, acknowledgements, replayRequests);
         return new DeliveryRecord(view, rs.getString("operator_display_value"),
                 rs.getString("payload_object_ref"), rs.getString("failure_policy_version_id"));
     }
@@ -362,6 +458,15 @@ final class JdbcOutboundDeliveryRepository implements OutboundDeliveryRepository
                 rs.getObject("acknowledgement_id", UUID.class), rs.getString("acknowledgement_type"),
                 rs.getString("result"), rs.getString("reason_code"), rs.getString("response_digest"),
                 rs.getString("mapping_version_id"), instant(rs, "received_at"));
+    }
+
+    private DeliveryReplayRequestView replayRequest(ResultSet rs, int row) throws SQLException {
+        return new DeliveryReplayRequestView(
+                rs.getObject("replay_request_id", UUID.class), rs.getObject("delivery_id", UUID.class),
+                rs.getObject("execution_task_id", UUID.class), rs.getString("status"),
+                rs.getString("reason"), rs.getString("approval_ref"), rs.getString("requested_by"),
+                rs.getString("result_code"), instant(rs, "requested_at"),
+                instant(rs, "started_at"), instant(rs, "finished_at"));
     }
 
     private static Instant instant(ResultSet rs, String column) throws SQLException {

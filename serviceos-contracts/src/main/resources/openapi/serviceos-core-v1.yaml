@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.31.0
+  version: 0.32.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1378,6 +1378,37 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+  /outbound-deliveries/{deliveryId}:retry:
+    post:
+      operationId: retryUnknownOutboundDelivery
+      summary: 高风险人工重发 UNKNOWN 外部交付
+      description: >-
+        仅允许具备 integration.retryUnknownDelivery 的 USER principal 调用。必须携带原因、
+        审批引用和预期聚合版本；复用同一不可变 payload 与外部幂等键，由新 Task 执行，
+        不覆盖原 UNKNOWN attempt。
+      parameters:
+        - name: deliveryId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RetryUnknownOutboundDeliveryRequest' }
+      responses:
+        '202':
+          description: 人工重发请求及执行 Task 已原子登记
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeliveryReplayRequest' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
 components:
   securitySchemes:
     bearerAuth:
@@ -1479,7 +1510,7 @@ components:
                  sourceWorkOrderId, sourceSnapshotId, sourceSnapshotDigest,
                  externalOrderCode, operatorPrincipalId, payloadDigest,
                  externalIdempotencyKey, executionTaskId, status, aggregateVersion,
-                 createdAt, attempts, acknowledgements]
+                 createdAt, attempts, acknowledgements, replayRequests]
       properties:
         deliveryId: { type: string, format: uuid }
         projectId: { type: string, format: uuid }
@@ -1510,6 +1541,34 @@ components:
         acknowledgements:
           type: array
           items: { $ref: '#/components/schemas/ExternalAcknowledgement' }
+        replayRequests:
+          type: array
+          items: { $ref: '#/components/schemas/DeliveryReplayRequest' }
+    RetryUnknownOutboundDeliveryRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedAggregateVersion, reason, approvalRef]
+      properties:
+        expectedAggregateVersion: { type: integer, format: int64, minimum: 1 }
+        reason: { type: string, minLength: 1, maxLength: 1000 }
+        approvalRef: { type: string, minLength: 1, maxLength: 160 }
+    DeliveryReplayRequest:
+      type: object
+      additionalProperties: false
+      required: [replayRequestId, deliveryId, executionTaskId, status, reason,
+                 approvalRef, requestedBy, requestedAt]
+      properties:
+        replayRequestId: { type: string, format: uuid }
+        deliveryId: { type: string, format: uuid }
+        executionTaskId: { type: string, format: uuid }
+        status: { enum: [REQUESTED, EXECUTING, DELIVERED, REJECTED, FAILED_FINAL, UNKNOWN] }
+        reason: { type: string, minLength: 1, maxLength: 1000 }
+        approvalRef: { type: string, minLength: 1, maxLength: 160 }
+        requestedBy: { type: string, minLength: 1, maxLength: 160 }
+        resultCode: { type: [string, 'null'], maxLength: 100 }
+        requestedAt: { type: string, format: date-time }
+        startedAt: { type: [string, 'null'], format: date-time }
+        finishedAt: { type: [string, 'null'], format: date-time }
     InboundEnvelope:
       type: object
       additionalProperties: false

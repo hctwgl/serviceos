@@ -37,7 +37,7 @@ status: Proposed
 | network | ARCH-11 | API-04 | DATA-04 | M4 NET | E4 |
 | dispatch | ARCH-11、ADR-009 | API-04 | DATA-04 | M4 DSP/ASN | E4 |
 | sla | ARCH-12 | API-04 | DATA-04 | M4 SLA | E4 |
-| integration | ARCH-13、ADR-010/014、M57/M58 | API-04、OpenAPI Core 0.31.0、BYD CPIM 0.3.0、outbound-delivery-created/acknowledged@v1、route/callback 事件 | DATA-04、V055～V058 | M4 INT/DLV、M56～M58 | E2/E4 |
+| integration | ARCH-13、ADR-010/014、M57～M59 | API-04、OpenAPI Core 0.32.0、BYD CPIM 0.3.0、outbound-delivery-created/acknowledged/replay-requested@v1、route/callback 事件 | DATA-04、V055～V059 | M4 INT/DLV、M56～M59 | E2/E4 |
 | notification | ARCH-14 | API-04 | DATA-04 | M4 NTF | E4 |
 | facts | ARCH-04/15 | API-05 | DATA-05 | M5 FACT | E5 |
 | pricing | ARCH-04/15、ADR-011 | API-05 | DATA-05 | M5 CALC | E5 |
@@ -153,3 +153,4 @@ Feature gate/authority: if applicable
 | M56 | BYD 创建工单验签后登记不可变 Envelope/Canonical；私有原文；transport/业务键幂等；崩溃恢复；授权摘要查询 | ARCH-13 + OpenAPI 0.29.0 + `integration.canonical-message-processed@v1` + V055 + BYD/Replay PostgreSQL IT + Object Storage/Query/Security/Contract/Client/ArchitectureTest | 其他 CPIM messageType、外部审核回调标准化、OutboundDelivery、网络 Connector、自动重试/重放、生产对象存储和 Portal |
 | M57 | BYD 厂端审核回调按显式订单路由拆分 Canonical/item；M49 外部决定；部分成功、transport/业务幂等与故障恢复 | ARCH-10/13 + OpenAPI Core 0.30.0/BYD 0.2.0 + route/callback 事件 Schema + V056/V057 + ReviewCase/Signature/Mapper/Security/Contract/Client/ArchitectureTest | OutboundDelivery、自动创建 CLIENT Case、其他 CPIM 消息、自动 Evidence target 映射、生产 Connector/对象存储和 Portal |
 | M58 | 已通过 INTERNAL Case 派生不可变 BYD 提审 Delivery；Attempt/Acknowledgement 分离；Task 唯一重试时钟；UNKNOWN 不重发并进入人工异常；成功自动创建 CLIENT Case/Route | ARCH-13 + ADR-010/014 的 M58 已批准子集 + OpenAPI Core 0.31.0/BYD 0.3.0 + outbound delivery 事件/外部 Schema + V058 + ReviewCase/Gateway/Security/PostgreSQL/Contract/Client/ArchitectureTest | UNKNOWN 人工处置命令、其他 CPIM 消息、通用 Connector、生产凭据/对象存储/sandbox、自动 Evidence target 映射和 Portal |
+| M59 | UNKNOWN Delivery 经 USER/HIGH capability、原因、审批引用和预期版本授权人工重发；复用冻结 payload/external key；ReplayRequest/Task/Audit/Outbox 原子登记；旧 UNKNOWN Attempt 保留 | ARCH-13 + ADR-010/014 的 M59 已批准子集 + OpenAPI Core 0.32.0 + replay-requested@v1 + V059 + ReviewCase/MVC/PostgreSQL/Contract/Client/ArchitectureTest | 人工标记已送达/放弃、远端查询、异常自动闭环、批量审批、其他 CPIM、通用 Connector、生产基础设施和 Portal |

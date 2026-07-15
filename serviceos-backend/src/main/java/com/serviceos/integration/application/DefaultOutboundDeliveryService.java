@@ -12,8 +12,10 @@ import com.serviceos.files.spi.ObjectStorageGateway;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.integration.api.CanonicalMessageView;
 import com.serviceos.integration.api.CreateReviewSubmissionCommand;
+import com.serviceos.integration.api.DeliveryReplayRequestView;
 import com.serviceos.integration.api.OutboundDeliveryService;
 import com.serviceos.integration.api.OutboundDeliveryView;
+import com.serviceos.integration.api.RetryOutboundDeliveryCommand;
 import com.serviceos.reliability.api.IdempotencyDecision;
 import com.serviceos.reliability.api.IdempotencyService;
 import com.serviceos.reliability.api.OutboxAppender;
@@ -54,7 +56,9 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
     static final String FAILURE_POLICY = "byd-submit-review-fail-closed-v1";
     static final String CLIENT_POLICY = "byd-client-review-v1";
     private static final String CREATE = "integration.outboundDelivery.createReviewSubmission";
+    private static final String RETRY = "integration.outboundDelivery.retryUnknown";
     private static final String SUBMIT_CAPABILITY = "integration.submitClientReview";
+    private static final String RETRY_CAPABILITY = "integration.retryUnknownDelivery";
     private static final String READ_CAPABILITY = "integration.readOutbound";
     private static final String INSTALL_BUSINESS_PREFIX = "BYD:INSTALL:";
     private static final DateTimeFormatter CPIM_DATE_TIME = DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm:ss");
@@ -245,6 +249,81 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
         return view;
     }
 
+    @Override
+    public DeliveryReplayRequestView retryUnknown(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            RetryOutboundDeliveryCommand command
+    ) {
+        if (principal.principalType() != CurrentPrincipal.PrincipalType.USER) {
+            throw new BusinessProblem(ProblemCode.ACCESS_DENIED,
+                    "UNKNOWN delivery replay requires a USER principal");
+        }
+        if (command.deliveryId() == null || command.expectedAggregateVersion() < 1) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                    "deliveryId and positive expectedAggregateVersion are required");
+        }
+        String reason = requiredText(command.reason(), "reason", 1000);
+        String approvalRef = requiredText(command.approvalRef(), "approvalRef", 160);
+        OutboundDeliveryView delivery = deliveries.find(principal.tenantId(), command.deliveryId())
+                .map(OutboundDeliveryRepository.DeliveryRecord::view)
+                .orElseThrow(() -> new BusinessProblem(
+                        ProblemCode.RESOURCE_NOT_FOUND, "OutboundDelivery does not exist"));
+        AuthorizationDecision auth = authorization.require(principal,
+                AuthorizationRequest.projectCapability(
+                        RETRY_CAPABILITY, principal.tenantId(), "OutboundDelivery",
+                        delivery.deliveryId().toString(), delivery.projectId().toString()),
+                metadata.correlationId());
+        if (!"UNKNOWN".equals(delivery.status())) {
+            throw new BusinessProblem(ProblemCode.VERSION_CONFLICT,
+                    "Only UNKNOWN OutboundDelivery can be replayed");
+        }
+        if (delivery.aggregateVersion() != command.expectedAggregateVersion()) {
+            throw new BusinessProblem(ProblemCode.VERSION_CONFLICT,
+                    "OutboundDelivery aggregate version changed");
+        }
+
+        String requestDigest = Sha256.digest(delivery.deliveryId() + "|"
+                + command.expectedAggregateVersion() + "|" + reason + "|" + approvalRef);
+        return Objects.requireNonNull(transactions.execute(status -> {
+            CommandContext context = new CommandContext(
+                    principal.tenantId(), principal.principalId(),
+                    metadata.correlationId(), metadata.idempotencyKey());
+            IdempotencyDecision decision = idempotency.begin(context, RETRY, requestDigest);
+            if (decision.kind() == IdempotencyDecision.Kind.REPLAY) {
+                UUID replayId = decision.resourceId().map(UUID::fromString)
+                        .orElseThrow(() -> new BusinessProblem(
+                                ProblemCode.INTERNAL_ERROR, "Delivery replay id missing"));
+                return deliveries.findReplay(principal.tenantId(), replayId)
+                        .orElseThrow(() -> new BusinessProblem(
+                                ProblemCode.INTERNAL_ERROR, "Delivery replay result missing"));
+            }
+
+            UUID replayId = UUID.randomUUID();
+            Instant requestedAt = clock.instant();
+            String replayBusinessKey = delivery.deliveryId() + ":replay:" + replayId;
+            ScheduledTaskView task = tasks.schedule(new ScheduleAutomatedTaskCommand(
+                    principal.tenantId(), TASK_TYPE, replayBusinessKey,
+                    "outbound-delivery:" + replayBusinessKey, delivery.payloadDigest(),
+                    900, requestedAt, 3, metadata.correlationId()));
+            DeliveryReplayRequestView replay = deliveries.registerReplay(
+                    new OutboundDeliveryRepository.NewReplayRequest(
+                            replayId, delivery.deliveryId(), principal.tenantId(),
+                            command.expectedAggregateVersion(), reason, approvalRef,
+                            principal.principalId(), task.taskId(), requestedAt));
+            appendReplayRequestedEvent(principal, metadata, delivery, replay);
+            audit.append(new AuditEntry(
+                    UUID.randomUUID(), principal.tenantId(), principal.principalId(),
+                    "OUTBOUND_DELIVERY_REPLAY_REQUESTED", RETRY_CAPABILITY,
+                    "OutboundDelivery", delivery.deliveryId().toString(), "ALLOW",
+                    auth.matchedGrantIds(), auth.policyVersion(), "REQUESTED", null,
+                    requestDigest, metadata.correlationId(), requestedAt));
+            idempotency.complete(context, RETRY, replay.replayRequestId().toString(),
+                    Sha256.digest(json(replay)));
+            return replay;
+        }));
+    }
+
     private static void requireApprovedInternal(ReviewCaseView source) {
         if (!"INTERNAL".equals(source.origin())) {
             throw new BusinessProblem(ProblemCode.REVIEW_CASE_STATE_CONFLICT,
@@ -271,6 +350,17 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
         return value;
     }
 
+    private static String requiredText(String value, String field, int maximum) {
+        if (value == null || value.isBlank()) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, field + " is required");
+        }
+        String normalized = value.trim();
+        if (normalized.length() > maximum) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, field + " is too long");
+        }
+        return normalized;
+    }
+
     private void appendCreatedEvent(
             CurrentPrincipal principal, CommandMetadata metadata,
             OutboundDeliveryView delivery, Instant createdAt
@@ -286,6 +376,24 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
                 "OutboundDelivery", delivery.deliveryId().toString(), delivery.aggregateVersion(),
                 principal.tenantId(), metadata.correlationId(), metadata.idempotencyKey(),
                 delivery.sourceReviewCaseId().toString(), payload, Sha256.digest(payload), createdAt));
+    }
+
+    private void appendReplayRequestedEvent(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            OutboundDeliveryView delivery,
+            DeliveryReplayRequestView replay
+    ) {
+        String payload = json(new DeliveryReplayRequestedPayload(
+                replay.replayRequestId(), replay.deliveryId(), delivery.projectId(),
+                replay.executionTaskId(), delivery.payloadDigest(), delivery.externalIdempotencyKey(),
+                replay.reason(), replay.approvalRef(), replay.requestedBy(), replay.requestedAt()));
+        outbox.append(new OutboxEvent(
+                UUID.randomUUID(), UUID.randomUUID(), "integration",
+                "integration.outbound-delivery-replay-requested", 1,
+                "OutboundDelivery", delivery.deliveryId().toString(), delivery.aggregateVersion(),
+                principal.tenantId(), metadata.correlationId(), metadata.idempotencyKey(),
+                delivery.deliveryId().toString(), payload, Sha256.digest(payload), replay.requestedAt()));
     }
 
     private void store(String objectRef, byte[] content, String digest) {
@@ -329,6 +437,20 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
             String externalIdempotencyKey,
             UUID executionTaskId,
             Instant createdAt
+    ) {
+    }
+
+    private record DeliveryReplayRequestedPayload(
+            UUID replayRequestId,
+            UUID deliveryId,
+            UUID projectId,
+            UUID executionTaskId,
+            String payloadDigest,
+            String externalIdempotencyKey,
+            String reason,
+            String approvalRef,
+            String requestedBy,
+            Instant requestedAt
     ) {
     }
 }

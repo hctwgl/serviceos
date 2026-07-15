@@ -101,18 +101,16 @@ final class BydReviewSubmissionTaskHandler implements AutomatedTaskHandler {
         if ("DELIVERED".equals(delivery.status())) {
             return finalizeLocally(context, deliveryId);
         }
-        if ("UNKNOWN".equals(delivery.status())) {
-            throw TaskExecutionException.unknown("BYD_SUBMISSION_RESULT_UNKNOWN", null);
-        }
         if ("REJECTED".equals(delivery.status()) || "FAILED_FINAL".equals(delivery.status())) {
             throw TaskExecutionException.finalFailure("BYD_SUBMISSION_FINAL_FAILURE", null);
         }
-        if (!"PENDING".equals(delivery.status())) {
+        if (!"PENDING".equals(delivery.status()) && !"UNKNOWN".equals(delivery.status())) {
             throw TaskExecutionException.unknown("BYD_SUBMISSION_CONCURRENT_ATTEMPT", null);
         }
         if (credentialVersionId.isBlank()) {
-            transactions.executeWithoutResult(status -> deliveries.failPending(
-                    context.tenantId(), deliveryId, "BYD_CREDENTIAL_VERSION_NOT_CONFIGURED", clock.instant()));
+            transactions.executeWithoutResult(status -> deliveries.failBeforeAttempt(
+                    context.tenantId(), deliveryId, context.taskId(),
+                    "BYD_CREDENTIAL_VERSION_NOT_CONFIGURED", clock.instant()));
             throw TaskExecutionException.finalFailure("BYD_CREDENTIAL_VERSION_NOT_CONFIGURED", null);
         }
 
@@ -122,8 +120,9 @@ final class BydReviewSubmissionTaskHandler implements AutomatedTaskHandler {
             payload = loadPayload(record);
             parameters = objectMapper.readValue(payload, new TypeReference<>() { });
         } catch (IOException | RuntimeException exception) {
-            transactions.executeWithoutResult(status -> deliveries.failPending(
-                    context.tenantId(), deliveryId, "BYD_DELIVERY_PAYLOAD_UNREADABLE", clock.instant()));
+            transactions.executeWithoutResult(status -> deliveries.failBeforeAttempt(
+                    context.tenantId(), deliveryId, context.taskId(),
+                    "BYD_DELIVERY_PAYLOAD_UNREADABLE", clock.instant()));
             throw TaskExecutionException.finalFailure("BYD_DELIVERY_PAYLOAD_UNREADABLE", exception);
         }
 
@@ -133,13 +132,14 @@ final class BydReviewSubmissionTaskHandler implements AutomatedTaskHandler {
         try {
             signature = signer.sign(nonce, requestDate, parameters);
         } catch (RuntimeException exception) {
-            transactions.executeWithoutResult(status -> deliveries.failPending(
-                    context.tenantId(), deliveryId, "BYD_DELIVERY_SIGNING_FAILED", clock.instant()));
+            transactions.executeWithoutResult(status -> deliveries.failBeforeAttempt(
+                    context.tenantId(), deliveryId, context.taskId(),
+                    "BYD_DELIVERY_SIGNING_FAILED", clock.instant()));
             throw TaskExecutionException.finalFailure("BYD_DELIVERY_SIGNING_FAILED", exception);
         }
         OutboundDeliveryRepository.AttemptStart attempt = transactions.execute(status ->
                 deliveries.startAttempt(
-                        context.tenantId(), deliveryId, context.attemptId(), context.attemptNo(),
+                        context.tenantId(), deliveryId, context.taskId(), context.attemptId(),
                         nonce, requestDate, delivery.payloadDigest(), credentialVersionId, clock.instant()));
         if (attempt == null || !attempt.created() || !"SENDING".equals(attempt.status())) {
             throw TaskExecutionException.unknown("BYD_ATTEMPT_ALREADY_EXISTS", null);
@@ -273,15 +273,20 @@ final class BydReviewSubmissionTaskHandler implements AutomatedTaskHandler {
             throw TaskExecutionException.finalFailure("OUTBOUND_DELIVERY_TASK_IDENTITY_MISMATCH", null);
         }
         try {
-            return UUID.fromString(context.businessKey());
+            int replaySeparator = context.businessKey().indexOf(":replay:");
+            String deliveryId = replaySeparator < 0
+                    ? context.businessKey()
+                    : context.businessKey().substring(0, replaySeparator);
+            return UUID.fromString(deliveryId);
         } catch (IllegalArgumentException exception) {
             throw TaskExecutionException.finalFailure("OUTBOUND_DELIVERY_ID_INVALID", exception);
         }
     }
 
-    private static void requireTaskIdentity(TaskExecutionContext context, OutboundDeliveryView delivery)
+    private void requireTaskIdentity(TaskExecutionContext context, OutboundDeliveryView delivery)
             throws TaskExecutionException {
-        if (!context.taskId().equals(delivery.executionTaskId())
+        if (!deliveries.isAuthorizedExecutionTask(
+                    context.tenantId(), delivery.deliveryId(), context.taskId())
                 || !context.payloadDigest().equals(delivery.payloadDigest())) {
             throw TaskExecutionException.finalFailure("OUTBOUND_DELIVERY_TASK_IDENTITY_MISMATCH", null);
         }

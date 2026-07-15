@@ -35,6 +35,14 @@ class OutboundDeliveryControllerSecurityTest {
                 .andExpect(status().isUnauthorized());
         mvc.perform(get("/api/v1/outbound-deliveries/{id}", id))
                 .andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/v1/outbound-deliveries/{id}:retry", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("Idempotency-Key", "idem-retry")
+                        .content("""
+                                {"expectedAggregateVersion":2,"reason":"人工重发",
+                                 "approvalRef":"approval://ops/1"}
+                                """))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -46,6 +54,19 @@ class OutboundDeliveryControllerSecurityTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("Idempotency-Key", "idem-submit")
                         .content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void authenticatedRetryRequiresReasonApprovalAndPositiveVersion() throws Exception {
+        mvc.perform(post("/api/v1/outbound-deliveries/{id}:retry", UUID.randomUUID())
+                        .with(jwt().jwt(token -> token.subject("ops-user")
+                                .claim("tenant_id", "tenant-1")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("Idempotency-Key", "idem-retry-invalid")
+                        .content("""
+                                {"expectedAggregateVersion":0,"reason":" ","approvalRef":" "}
+                                """))
                 .andExpect(status().isBadRequest());
     }
 }

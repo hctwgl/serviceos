@@ -48,6 +48,7 @@ class GeneratedClientContractTest {
                 .contains("checkOutVisit")
                 .contains("interruptVisit")
                 .contains("createBydReviewSubmission")
-                .contains("getOutboundDelivery");
+                .contains("getOutboundDelivery")
+                .contains("retryUnknownOutboundDelivery");
     }
 }
