@@ -6,10 +6,13 @@ import com.serviceos.configuration.api.ConfigurationBundleReference;
 import com.serviceos.configuration.api.ConfigurationService;
 import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
 import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
+import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.reliability.spi.OutboxMessage;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.Sha256;
 import com.serviceos.sla.api.SlaClockService;
+import com.serviceos.sla.api.SlaInstanceQuery;
+import com.serviceos.sla.api.SlaQueryService;
 import com.serviceos.task.api.CreateWorkflowTaskCommand;
 import com.serviceos.task.api.ScheduledTaskView;
 import com.serviceos.task.api.TaskCompletedPayload;
@@ -38,6 +41,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -71,6 +75,7 @@ class SlaClockPostgresIT {
     @Autowired TaskSchedulingService tasks;
     @Autowired TaskSlaEventHandler handler;
     @Autowired SlaClockService clocks;
+    @Autowired SlaQueryService queries;
     @Autowired ObjectMapper objectMapper;
     @Autowired MutableClock clock;
 
@@ -88,6 +93,8 @@ class SlaClockPostgresIT {
                     tsk_task_reassignment_command_result, tsk_task_execution_guard,
                     tsk_task_assignment, tsk_task_assignment_batch,
                     tsk_human_task_command_result, tsk_task_execution_attempt, tsk_task,
+                    wo_work_order, aud_audit_record,
+                    auth_role_grant, auth_role_capability, auth_role,
                     rel_inbox_record, rel_outbox_publish_attempt, rel_outbox_event,
                     cfg_configuration_bundle_item, cfg_configuration_bundle,
                     cfg_configuration_asset_version, prj_project CASCADE
@@ -105,6 +112,7 @@ class SlaClockPostgresIT {
                 .param("startsOn", LocalDate.of(2026, 7, 1))
                 .param("createdAt", OffsetDateTime.ofInstant(BASE_TIME, ZoneOffset.UTC)).update();
         publishBundle();
+        seedSlaReadGrant();
     }
 
     @Test
@@ -249,6 +257,111 @@ class SlaClockPostgresIT {
                 .update()).isInstanceOf(DataAccessException.class);
     }
 
+    @Test
+    void authorizedProjectionUsesStableCursorServerClockAndCompleteDetail() {
+        ScheduledTaskView firstTask = createTask("sla-query-first");
+        ScheduledTaskView secondTask = createTask("sla-query-second");
+        handler.handle(taskCreated(firstTask.taskId()));
+        handler.handle(taskCreated(secondTask.taskId()));
+        clock.set(BASE_TIME.plusSeconds(30));
+
+        var firstPage = queries.list(principal(), "corr-query-1",
+                new SlaInstanceQuery(projectId, "running", null, 1));
+        var secondPage = queries.list(principal(), "corr-query-2",
+                new SlaInstanceQuery(projectId, "RUNNING", firstPage.nextCursor(), 1));
+        assertThat(firstPage.items()).hasSize(1);
+        assertThat(secondPage.items()).hasSize(1);
+        assertThat(secondPage.nextCursor()).isNull();
+        assertThat(List.of(firstPage.items().getFirst().taskId(), secondPage.items().getFirst().taskId()))
+                .containsExactlyInAnyOrder(firstTask.taskId(), secondTask.taskId());
+        assertThat(firstPage.asOf()).isEqualTo(clock.instant());
+        assertThat(firstPage.items().getFirst().remainingSeconds()).isEqualTo(30);
+        assertThat(firstPage.items().getFirst().overdueSeconds()).isNull();
+        assertThat(firstPage.items().getFirst().allowedActions()).isEmpty();
+
+        UUID instanceId = firstPage.items().getFirst().slaInstanceId();
+        var detail = queries.get(principal(), "corr-query-detail", instanceId);
+        assertThat(detail.instance().slaInstanceId()).isEqualTo(instanceId);
+        assertThat(detail.segments()).singleElement().satisfies(segment -> {
+            assertThat(segment.segmentNo()).isEqualTo(1);
+            assertThat(segment.endedAt()).isNull();
+        });
+        assertThat(detail.milestones()).singleElement().satisfies(milestone -> {
+            assertThat(milestone.milestoneType()).isEqualTo("TARGET_DUE");
+            assertThat(milestone.status()).isEqualTo("PENDING");
+        });
+
+        UUID workOrderId = detail.instance().workOrderId();
+        assertThat(queries.listForWorkOrder(
+                principal(), "corr-query-work-order", workOrderId, null, 50).items())
+                .extracting(item -> item.taskId()).containsExactly(detail.instance().taskId());
+
+        clock.set(BASE_TIME.plusSeconds(61));
+        var overdueButUnreconciled = queries.get(principal(), "corr-query-overdue", instanceId).instance();
+        assertThat(overdueButUnreconciled.status()).isEqualTo("RUNNING");
+        assertThat(overdueButUnreconciled.remainingSeconds()).isZero();
+        assertThat(overdueButUnreconciled.overdueSeconds()).isEqualTo(1);
+        assertThat(jdbc.sql("SELECT status FROM sla_instance WHERE sla_instance_id=:instanceId")
+                .param("instanceId", instanceId).query(String.class).single()).isEqualTo("RUNNING");
+    }
+
+    @Test
+    void terminalProjectionUsesFrozenCompletionFactsInsteadOfCurrentClock() {
+        ScheduledTaskView lateTask = createTask("sla-query-terminal-late");
+        OutboxMessage lateCreated = taskCreated(lateTask.taskId());
+        handler.handle(lateCreated);
+        handler.handle(completed(lateTask.taskId(), lateCreated.occurredAt().plusSeconds(75)));
+
+        ScheduledTaskView metTask = createTask("sla-query-terminal-met");
+        OutboxMessage metCreated = taskCreated(metTask.taskId());
+        handler.handle(metCreated);
+        handler.handle(completed(metTask.taskId(), metCreated.occurredAt().plusSeconds(40)));
+        clock.set(BASE_TIME.plusSeconds(600));
+
+        var page = queries.list(principal(), "corr-query-terminal",
+                new SlaInstanceQuery(projectId, null, null, 10));
+        var late = page.items().stream().filter(item -> item.taskId().equals(lateTask.taskId()))
+                .findFirst().orElseThrow();
+        var met = page.items().stream().filter(item -> item.taskId().equals(metTask.taskId()))
+                .findFirst().orElseThrow();
+        assertThat(late.status()).isEqualTo("MET_LATE");
+        assertThat(late.overdueSeconds()).isEqualTo(15);
+        assertThat(late.remainingSeconds()).isNull();
+        assertThat(met.status()).isEqualTo("MET");
+        assertThat(met.remainingSeconds()).isNull();
+        assertThat(met.overdueSeconds()).isNull();
+    }
+
+    @Test
+    void projectionRejectsMissingProjectGrantCrossTenantAndCursorScopeMutation() {
+        ScheduledTaskView task = createTask("sla-query-security");
+        ScheduledTaskView secondTask = createTask("sla-query-security-second");
+        handler.handle(taskCreated(task.taskId()));
+        handler.handle(taskCreated(secondTask.taskId()));
+        UUID instanceId = clocks.findByTask(TENANT, task.taskId()).orElseThrow().slaInstanceId();
+        var page = queries.list(principal(), "corr-cursor-source",
+                new SlaInstanceQuery(projectId, null, null, 1));
+
+        assertThatThrownBy(() -> queries.get(new CurrentPrincipal(
+                "ungranted-user", TENANT, CurrentPrincipal.PrincipalType.USER, "sla-it", Set.of()),
+                "corr-denied", instanceId))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(com.serviceos.shared.ProblemCode.ACCESS_DENIED));
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM aud_audit_record
+                 WHERE action_name='AUTHORIZATION_DENIED' AND capability_code='sla.read'
+                """).query(Long.class).single()).isEqualTo(1);
+        assertThatThrownBy(() -> queries.get(new CurrentPrincipal(
+                "sla-reader", "tenant-sla-other", CurrentPrincipal.PrincipalType.USER, "sla-it", Set.of()),
+                "corr-cross-tenant", instanceId))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(com.serviceos.shared.ProblemCode.RESOURCE_NOT_FOUND));
+        assertThatThrownBy(() -> queries.list(principal(), "corr-cursor-mutated",
+                new SlaInstanceQuery(projectId, "RUNNING", page.nextCursor(), 1)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cursor is invalid");
+    }
+
     private void publishBundle() {
         workflowDigest = Sha256.digest(workflowDefinition());
         workflowVersionId = configurations.publishAsset(new PublishConfigurationAssetCommand(
@@ -280,13 +393,65 @@ class SlaClockPostgresIT {
     }
 
     private ScheduledTaskView createTask(String businessKey) {
+        UUID workOrderId = createWorkOrder(businessKey);
         return tasks.createWorkflowTask(new CreateWorkflowTaskCommand(
-                TENANT, projectId, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                TENANT, projectId, workOrderId, UUID.randomUUID(), UUID.randomUUID(),
                 UUID.randomUUID(), "survey", workflowVersionId, workflowDigest,
                 bundle.bundleId(), bundle.manifestDigest(), "SURVEY", "SURVEY_RESPONSE",
                 WorkflowTaskKind.HUMAN, null, "survey.response.sla",
                 "work-order://" + businessKey, Sha256.digest(businessKey),
                 500, clock.instant(), 1, "corr-" + businessKey, "cause-" + businessKey));
+    }
+
+    private UUID createWorkOrder(String businessKey) {
+        UUID workOrderId = UUID.randomUUID();
+        jdbc.sql("""
+                INSERT INTO wo_work_order (
+                    id, tenant_id, project_id, client_code, brand_code, service_product_code,
+                    external_order_code, payload_digest, status, configuration_bundle_id,
+                    configuration_bundle_code, configuration_bundle_version,
+                    configuration_bundle_digest, province_code, city_code, district_code,
+                    customer_name, customer_mobile, service_address, vehicle_vin,
+                    external_dispatched_at, received_at, version)
+                VALUES (
+                    :id, :tenantId, :projectId, 'BYD', 'BYD_OCEAN', 'HOME_CHARGING',
+                    :externalOrderCode, :payloadDigest, 'RECEIVED', :bundleId,
+                    'SLA-IT-BUNDLE', '1.0.0', :bundleDigest, '370000', '370100', '370102',
+                    '测试用户', '13800000000', '测试地址', 'LSLQUERY123456789',
+                    :dispatchedAt, :receivedAt, 1)
+                """)
+                .param("id", workOrderId).param("tenantId", TENANT).param("projectId", projectId)
+                .param("externalOrderCode", businessKey).param("payloadDigest", Sha256.digest(businessKey))
+                .param("bundleId", bundle.bundleId()).param("bundleDigest", bundle.manifestDigest())
+                .param("dispatchedAt", java.time.LocalDateTime.ofInstant(BASE_TIME, ZoneOffset.UTC))
+                .param("receivedAt", OffsetDateTime.ofInstant(BASE_TIME, ZoneOffset.UTC)).update();
+        return workOrderId;
+    }
+
+    private void seedSlaReadGrant() {
+        UUID roleId = UUID.randomUUID();
+        jdbc.sql("""
+                INSERT INTO auth_role (role_id, tenant_id, role_code, role_name, role_status, created_at)
+                VALUES (:roleId, :tenantId, 'sla-reader', 'SLA 查看人', 'ACTIVE', now())
+                """).param("roleId", roleId).param("tenantId", TENANT).update();
+        jdbc.sql("""
+                INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
+                VALUES (:roleId, 'sla.read', now())
+                """).param("roleId", roleId).update();
+        jdbc.sql("""
+                INSERT INTO auth_role_grant (
+                    grant_id, tenant_id, principal_id, role_id, scope_type, scope_ref,
+                    valid_from, source_code, approval_ref, created_at)
+                VALUES (
+                    :grantId, :tenantId, 'sla-reader', :roleId, 'PROJECT', :projectId,
+                    now() - interval '1 day', 'TEST_FIXTURE', 'M62-TEST', now())
+                """).param("grantId", UUID.randomUUID()).param("tenantId", TENANT)
+                .param("roleId", roleId).param("projectId", projectId.toString()).update();
+    }
+
+    private CurrentPrincipal principal() {
+        return new CurrentPrincipal(
+                "sla-reader", TENANT, CurrentPrincipal.PrincipalType.USER, "sla-it", Set.of());
     }
 
     private OutboxMessage taskCreated(UUID taskId) {

@@ -36,7 +36,7 @@ status: Proposed
 | review | ARCH-10 | API-03、OpenAPI 0.30.0、client-review-case-created@v1 | DATA-03、V049/V054/V056 | M3 REV/COR、M55/M57 | E3 |
 | network | ARCH-11 | API-04 | DATA-04 | M4 NET | E4 |
 | dispatch | ARCH-11、ADR-009 | API-04 | DATA-04 | M4 DSP/ASN | E4 |
-| sla | ARCH-12、M61 | sla.started/breached/met@v1；API-04 仍未发布 | DATA-04、V061 | M4 SLA、M61 | E4 |
+| sla | ARCH-12、M61～M62 | sla.started/breached/met@v1；API-04、OpenAPI Core 0.33.0 | DATA-04、V061/V062 | M4 SLA、M61～M62 | E4 |
 | integration | ARCH-13、ADR-010/014、M57～M60 | API-04、OpenAPI Core 0.32.0、BYD CPIM 0.3.0、outbound-delivery-created/acknowledged/replay-requested/recovered@v1、route/callback 事件 | DATA-04、V055～V060 | M4 INT/DLV、M56～M60 | E2/E4 |
 | notification | ARCH-14 | API-04 | DATA-04 | M4 NTF | E4 |
 | facts | ARCH-04/15 | API-05 | DATA-05 | M5 FACT | E5 |
@@ -156,3 +156,4 @@ Feature gate/authority: if applicable
 | M59 | UNKNOWN Delivery 经 USER/HIGH capability、原因、审批引用和预期版本授权人工重发；复用冻结 payload/external key；ReplayRequest/Task/Audit/Outbox 原子登记；旧 UNKNOWN Attempt 保留 | ARCH-13 + ADR-010/014 的 M59 已批准子集 + OpenAPI Core 0.32.0 + replay-requested@v1 + V059 + ReviewCase/MVC/PostgreSQL/Contract/Client/ArchitectureTest | M59 当时未实现异常自动闭环（后由 M60 补齐）；人工标记已送达/放弃、远端查询、批量审批、其他 CPIM、通用 Connector、生产基础设施和 Portal仍未实现 |
 | M60 | M59 重发取得严格 ACK 后发布恢复事实；Operations 幂等关闭同 Delivery 历次 UNKNOWN Task 异常；恢复先到时以不可变 marker 抑制迟到失败 HUMAN Task | M28/M58/M59 + ADR-010/014 的 M60 已批准子集 + recovered@v1/resolved@v2 + V060 + ReviewCase/TaskExecution/Handler/Contract/PostgreSQL/ArchitectureTest | 人工标记已送达/放弃、远端查询、完整通知、批量审批、其他 CPIM、通用 Connector、生产基础设施和 Portal |
 | M61 | Workflow 显式 `slaRef` 精确命中同 Bundle SLA v1；Task 创建/完成驱动 ELAPSED 时钟；到期对账形成 BREACHED，按时/逾期完成形成 MET/MET_LATE 并保留超时历史 | ARCH-12 的 M61 确定性子集 + SLA config schema v1 + started/breached/met@v1 + V061 + Configuration/SLA PostgreSQL IT + Contract/Event Governance/ArchitectureTest | BUSINESS 日历、暂停/恢复、免责/重算、预警/升级/通知、其他 subject、SLA HTTP/Portal、考核结算 |
+| M62 | `sla.read` + 实时 Project Scope 暴露项目 SLA 工作台、工单时间线和实例/segment/milestone 详情；服务端 asOf 计算动态秒数；游标绑定查询范围 | ARCH-12 + API-04 + OpenAPI Core 0.33.0 + V062 + SLA PostgreSQL/MVC/Contract/Client/ArchitectureTest | BUSINESS 日历、暂停/恢复、免责/重算、预警/升级/通知、跨项目范围投影、Portal 前端、考核结算 |

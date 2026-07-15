@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-15
-baselineCommit: f0d4d31
-latestMilestone: M61
+baselineCommit: PENDING_M62_FEATURE_COMMIT
+latestMilestone: M62
 ---
 
 # ServiceOS 实施状态总览
@@ -39,13 +39,13 @@ latestMilestone: M61
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M61 Task 自然时长 SLA 时钟 |
-| 基线提交 | `f0d4d31` |
+| 最新实施里程碑 | M62 SLA 授权查询与工作台投影 |
+| 基线提交 | `PENDING_M62_FEATURE_COMMIT`（功能提交后独立回填） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
 | 前端工程 | 尚未建立；已有 Admin、Network、Technician 产品与交互规格 |
-| 数据库 | PostgreSQL + Flyway（当前版本 061 / 63） |
-| 契约 | Core OpenAPI 0.32.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 recovered/resolved 与 SLA started/breached/met@v1） |
+| 数据库 | PostgreSQL + Flyway（当前版本 062 / 64） |
+| 契约 | Core OpenAPI 0.33.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 recovered/resolved 与 SLA started/breached/met@v1） |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -69,7 +69,7 @@ latestMilestone: M61
 | 资料 Evidence | 资产、槽位、Item/Revision、机器校验、Snapshot、完成门禁、作废、Review、Correction | `PARTIAL` | 固定/条件槽位、VALIDATED 表单触发只追加重解析、槽位世代/lineage、REVIEW_REQUIRED 与显式 KEEP/INVALIDATE、安全文件联动、Snapshot/完成门禁及审核整改链路 | OCR/CV、GPS 权威距离、长期归档 | M36～M53 |
 | 安全文件 | Begin/Finalize/隔离/扫描/授权下载/作废 | `IMPLEMENTED` | 独立安全文件生命周期；Evidence 编排 Begin/Finalize/Invalidate 联动 | 正式对象存储、专业扫描服务、物理删除 | M11、M38、M46 |
 | 审核整改 | ReviewCase、ReviewDecision、CorrectionCase | `PARTIAL` | Review + Correction + 整改 Task + 强制通过/重开 + 车企回执 + WAIVED；CLIENT Case 来源、批次/mapping 冻结；交付明确成功后自动创建 CLIENT Case/Route，UNKNOWN 可授权人工重发并在严格 ACK 后闭环异常 | 多候选人策略、前端、人工标记已送达/放弃、自动 Evidence target 映射 | M44～M60 |
-| SLA | 时钟、预警、升级 | `PARTIAL` | Task `TASK_CREATED→TASK_COMPLETED` ELAPSED 时钟；显式策略版本/摘要锁定；TARGET_DUE 对账；RUNNING/BREACHED/MET/MET_LATE；Inbox/Outbox 与不可变 segment/milestone | BUSINESS 日历、暂停/恢复、免责/重算、预警/升级/通知、其他 subject、HTTP/Portal、考核结算 | M61 |
+| SLA | 时钟、预警、升级 | `PARTIAL` | Task `TASK_CREATED→TASK_COMPLETED` ELAPSED 时钟；显式策略版本/摘要锁定；TARGET_DUE 对账；RUNNING/BREACHED/MET/MET_LATE；Inbox/Outbox 与不可变 segment/milestone；`sla.read` + Project Scope 的工作台、工单时间线与详情查询 | BUSINESS 日历、暂停/恢复、免责/重算、预警/升级/通知、其他 subject、跨项目范围投影、Portal 前端、考核结算 | M61～M62 |
 | 通知 | 通知与运营异常中心 | `PROPOSED` | 已有总体设计 | 通知通道、模板、可靠发送和 UI | `architecture/14-*` |
 | 履约事实与试算 | 事实提取和双向试算 | `PROPOSED` | 已有设计、API 和数据规划 | 运行时、投影和前端工作区 | M5 设计 |
 | 对账结算 | 对账、结算、争议与调整 | `PROPOSED` | 已有边界设计 | 正式运行时和页面 | `architecture/16-*` |
@@ -309,16 +309,34 @@ latestMilestone: M61
 - BUSINESS 工作日历、节假日和跨日班次；
 - 暂停/恢复、免责、重算和取消；
 - 预警、升级、通知、OperationalException 联动及收件人解析；
-- 其他 subject/start/stop 组合、SLA HTTP/Portal、考核与结算读取。
+- 其他 subject/start/stop 组合；M61 时尚无 SLA HTTP，已由 M62 补齐只读查询，但 Portal 前端、考核与结算读取仍未实现。
+
+### M62：SLA 授权查询与工作台投影
+
+已实现：
+
+- Core OpenAPI 0.33.0 发布项目 SLA 工作台、工单 SLA 时间线和实例/segment/milestone 详情三个 GET；
+- `sla.read` capability 与 RoleGrant 实时 Project Scope 复核；tenant 只来自 JWT，跨 tenant 保持 404；
+- 工作台强制显式 projectId；工单查询通过 `workorder::api` 最小 Scope 端口解析 project，不跨模块读表；
+- `(deadlineAt, slaInstanceId)` 稳定游标绑定 project/workOrder/status，不能跨筛选条件复用；
+- `asOf`、remaining 和 overdue 只按服务端 Clock 计算；已过期但未对账的 RUNNING 不伪造 BREACHED；
+- V062 查询索引、PostgreSQL IT、MVC Security、契约兼容/客户端生成与 Modulith 门禁形成工程证据。
+
+明确未实现：
+
+- BUSINESS 日历、暂停/恢复、免责/重算、预警/升级/通知；
+- 跨项目/区域/网点的数据范围投影、导出和运营分析；
+- Admin/Network/Technician Portal 前端、考核与结算读取；
+- 其他 subject/start/stop 组合。
 
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M61**。M61 只实现显式 Task ELAPSED 时钟，没有猜测项目默认
-时长、日历、暂停或升级策略，也没有实现完整 SLA/通知或整个现场履约平台。
+ServiceOS 可靠纵向切片已推进到 **M62**。M61～M62 只实现显式 Task ELAPSED 时钟及其安全只读投影，
+没有猜测项目默认时长、日历、暂停或升级策略，也没有实现完整 SLA/通知或整个现场履约平台。
 
 ```text
 候选下一方向（优先从已确认文档中选择最小可靠切片）：
-1. SLA 授权只读查询与工作台投影，不引入暂停或阈值猜测；
+1. 建立授权项目集合/范围投影，支持跨项目 SLA 队列而不逐行鉴权；
 2. 在试点确认日历/暂停/预警规则后扩展 BUSINESS 时钟、暂停和升级；
 3. 多候选人评分、自动 claim、网点容量联动；
 4. OCR/CV、GPS 权威距离、二级审批/MFA、报告 GENERATED 资料包；

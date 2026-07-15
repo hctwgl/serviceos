@@ -41,6 +41,8 @@ class ContractValidationTest {
                         "/internal/integration/byd/review-routes",
                         "/internal/integration/byd/review-submissions",
                         "/outbound-deliveries/{deliveryId}",
+                        "/sla-instances", "/sla-instances/{slaInstanceId}",
+                        "/work-orders/{workOrderId}/sla-instances",
                         "/inbound-envelopes/{envelopeId}", "/canonical-messages/{messageId}");
     }
 
