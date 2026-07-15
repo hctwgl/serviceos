@@ -12,6 +12,16 @@ set -euo pipefail
 repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${repository_root}"
 
+if [[ "$#" -eq 0 ]]; then
+  set -- verify
+fi
+
+# 只有里程碑/全量 verify 才先执行机械预检；精准 test 保持快速反馈，不重复扩大验证范围。
+if [[ " $* " == *" verify "* ]]; then
+  bash scripts/test-verification-preflight.sh
+  bash scripts/verify-milestone-preflight.sh
+fi
+
 postgres_image="${SERVICEOS_TEST_POSTGRES_IMAGE:-postgres:18-alpine}"
 refresh_image="${SERVICEOS_TEST_REFRESH_IMAGE:-false}"
 host_arch="$(uname -m)"
@@ -94,10 +104,6 @@ if [[ -n "${expected_image_arch}" && "${image_arch}" != "${expected_image_arch}"
   echo "PostgreSQL 镜像架构 ${actual_platform} 与宿主机期望 ${native_platform} 不一致。" >&2
   echo "请删除错误架构镜像后重试：docker image rm ${postgres_image}" >&2
   exit 1
-fi
-
-if [[ "$#" -eq 0 ]]; then
-  set -- verify
 fi
 
 echo "执行 Maven 验证：./mvnw --no-transfer-progress $*"
