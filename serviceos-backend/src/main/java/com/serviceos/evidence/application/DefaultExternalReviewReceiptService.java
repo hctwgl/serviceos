@@ -5,6 +5,9 @@ import com.serviceos.audit.api.AuditEntry;
 import com.serviceos.authorization.api.AuthorizationDecision;
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
+import com.serviceos.evidence.api.EvidenceSetSnapshotMemberView;
+import com.serviceos.evidence.api.EvidenceSetSnapshotView;
+import com.serviceos.evidence.api.ExternalReviewAffectedTarget;
 import com.serviceos.evidence.api.ExternalReviewReceiptService;
 import com.serviceos.evidence.api.ExternalReviewReceiptView;
 import com.serviceos.evidence.api.RecordExternalReviewReceiptCommand;
@@ -33,7 +36,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
+import java.util.HashSet;
 import java.util.UUID;
 
 /** 适配层外部审核回执：只追加 EXTERNAL 决定，驳回只开客服协调 Task。 */
@@ -46,6 +49,7 @@ final class DefaultExternalReviewReceiptService implements ExternalReviewReceipt
 
     private final ExternalReviewReceiptRepository receipts;
     private final ReviewCaseRepository reviews;
+    private final EvidenceSetSnapshotRepository snapshots;
     private final TaskSchedulingService tasks;
     private final AuthorizationService authorization;
     private final IdempotencyService idempotency;
@@ -57,6 +61,7 @@ final class DefaultExternalReviewReceiptService implements ExternalReviewReceipt
     DefaultExternalReviewReceiptService(
             ExternalReviewReceiptRepository receipts,
             ReviewCaseRepository reviews,
+            EvidenceSetSnapshotRepository snapshots,
             TaskSchedulingService tasks,
             AuthorizationService authorization,
             IdempotencyService idempotency,
@@ -67,6 +72,7 @@ final class DefaultExternalReviewReceiptService implements ExternalReviewReceipt
     ) {
         this.receipts = receipts;
         this.reviews = reviews;
+        this.snapshots = snapshots;
         this.tasks = tasks;
         this.authorization = authorization;
         this.idempotency = idempotency;
@@ -100,8 +106,8 @@ final class DefaultExternalReviewReceiptService implements ExternalReviewReceipt
         String mappingVersionId = requireText(command.mappingVersionId(), "mappingVersionId", 160);
         String result = normalizeResult(command.result());
         List<String> reasonCodes = normalizeReasons(command.reasonCodes(), result);
-        List<Map<String, Object>> targets = command.affectedTargets() == null
-                ? List.of() : List.copyOf(command.affectedTargets());
+        List<ExternalReviewAffectedTarget> targets = validateTargets(
+                principal.tenantId(), current, command.affectedTargets());
         String payloadRef = normalizeOptional(command.payloadRef(), "payloadRef", 160);
 
         String requestDigest = Sha256.digest(
@@ -243,6 +249,57 @@ final class DefaultExternalReviewReceiptService implements ExternalReviewReceipt
             }
         }
         return List.copyOf(codes);
+    }
+
+    /**
+     * 外部适配器只能声明 ReviewCase 冻结 Snapshot 中已经存在的精确成员。
+     *
+     * <p>这里同时比较 slot/item/revision 三元组，防止调用方拿一个合法 revisionId 配上其他槽位，
+     * 也防止跨 Snapshot 或跨租户引用。Snapshot 与成员本身由数据库触发器保证不可变，因此校验通过后
+     * 可与回执、决定、审计和 Outbox 在同一事务内安全冻结。</p>
+     */
+    private List<ExternalReviewAffectedTarget> validateTargets(
+            String tenantId,
+            ReviewCaseView reviewCase,
+            List<ExternalReviewAffectedTarget> affectedTargets
+    ) {
+        if (affectedTargets == null || affectedTargets.isEmpty()) {
+            return List.of();
+        }
+        if (affectedTargets.size() > 100) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                    "affectedTargets exceeds max size 100");
+        }
+        EvidenceSetSnapshotView snapshot = snapshots.find(tenantId, reviewCase.evidenceSetSnapshotId())
+                .orElseThrow(() -> new BusinessProblem(
+                        ProblemCode.INTERNAL_ERROR, "ReviewCase EvidenceSetSnapshot does not exist"));
+        var authoritativeMembers = snapshot.members().stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        EvidenceSetSnapshotMemberView::evidenceRevisionId,
+                        member -> member));
+        var seenRevisionIds = new HashSet<UUID>();
+        for (ExternalReviewAffectedTarget target : affectedTargets) {
+            if (target == null
+                    || !"EVIDENCE_REVISION".equals(target.targetType())
+                    || target.evidenceSlotId() == null
+                    || target.evidenceItemId() == null
+                    || target.evidenceRevisionId() == null) {
+                throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                        "affectedTarget must be an exact EVIDENCE_REVISION reference");
+            }
+            EvidenceSetSnapshotMemberView member = authoritativeMembers.get(target.evidenceRevisionId());
+            if (member == null
+                    || !member.evidenceSlotId().equals(target.evidenceSlotId())
+                    || !member.evidenceItemId().equals(target.evidenceItemId())) {
+                throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                        "affectedTarget is not a member of the ReviewCase EvidenceSetSnapshot");
+            }
+            if (!seenRevisionIds.add(target.evidenceRevisionId())) {
+                throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                        "affectedTargets contains a duplicate evidenceRevisionId");
+            }
+        }
+        return List.copyOf(affectedTargets);
     }
 
     private static String requireText(String value, String field, int maxLength) {

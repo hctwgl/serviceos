@@ -1,5 +1,6 @@
 package com.serviceos.evidence.infrastructure;
 
+import com.serviceos.evidence.api.ExternalReviewAffectedTarget;
 import com.serviceos.evidence.api.ExternalReviewReceiptView;
 import com.serviceos.evidence.application.ExternalReviewReceiptRepository;
 import org.springframework.stereotype.Repository;
@@ -100,7 +101,7 @@ final class MyBatisExternalReviewReceiptRepository implements ExternalReviewRece
         }
     }
 
-    private List<Map<String, Object>> readTargets(String json) {
+    private List<ExternalReviewAffectedTarget> readTargets(String json) {
         try {
             return objectMapper.readValue(json, new TypeReference<>() {
             });

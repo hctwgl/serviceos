@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.26.0
+  version: 0.27.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1929,9 +1929,8 @@ components:
           items: { type: string, minLength: 1, maxLength: 80 }
         affectedTargets:
           type: array
-          items:
-            type: object
-            additionalProperties: true
+          maxItems: 100
+          items: { $ref: '#/components/schemas/ExternalReviewAffectedTarget' }
         payloadRef: { type: [string, 'null'], maxLength: 160 }
     ExternalReviewReceipt:
       type: object
@@ -1955,13 +1954,22 @@ components:
           items: { type: string }
         affectedTargets:
           type: array
-          items:
-            type: object
-            additionalProperties: true
+          maxItems: 100
+          items: { $ref: '#/components/schemas/ExternalReviewAffectedTarget' }
         payloadRef: { type: [string, 'null'], maxLength: 160 }
         coordinationTaskId: { type: [string, 'null'], format: uuid }
         receivedBy: { type: string, minLength: 1, maxLength: 128 }
         receivedAt: { type: string, format: date-time }
+
+    ExternalReviewAffectedTarget:
+      type: object
+      additionalProperties: false
+      required: [targetType, evidenceSlotId, evidenceItemId, evidenceRevisionId]
+      properties:
+        targetType: { const: EVIDENCE_REVISION }
+        evidenceSlotId: { type: string, format: uuid }
+        evidenceItemId: { type: string, format: uuid }
+        evidenceRevisionId: { type: string, format: uuid }
 
     ReopenReviewCaseRequest:
       type: object

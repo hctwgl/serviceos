@@ -33,7 +33,7 @@ status: Proposed
 | fieldwork | ARCH-08 | API-03 | DATA-03 | M3 VISIT/FIELD | E3 |
 | forms | ARCH-09、ADR-018/022 | API-03、form.submitted@v1 | DATA-03、V053 | M3 FORM、M53 FRM | E3 |
 | evidence | ARCH-10、ADR-008/018/022 | API-03、evidence.slots-reresolved@v1 | DATA-03、V053 | M3 EVD/FILE、M53 | E3 |
-| review | ARCH-10 | API-03 | DATA-03 | M3 REV/COR | E3 |
+| review | ARCH-10 | API-03、OpenAPI 0.27.0 | DATA-03、V049 | M3 REV/COR、M54 | E3 |
 | network | ARCH-11 | API-04 | DATA-04 | M4 NET | E4 |
 | dispatch | ARCH-11、ADR-009 | API-04 | DATA-04 | M4 DSP/ASN | E4 |
 | sla | ARCH-12 | API-04 | DATA-04 | M4 SLA | E4 |
@@ -148,3 +148,4 @@ Feature gate/authority: if applicable
 | M51 | CorrectionCase 高风险豁免进入 WAIVED；取消整改 Task | OpenAPI 0.25.0 + Evidence PostgreSQL/MVC/Event Contract + V051 | 条件槽位、OCR/CV、多候选人策略、自动 claim |
 | M52 | SERVICEOS_EXPR_V1 条件 EvidenceSlot；true/false 决策与输入摘要不可变审计；复杂度失败关闭 | ADR-018 + Expression/Modulith Unit + Evidence PostgreSQL IT + V052 | 表单条件求值、字段变化重解析、决策表/公式/脚本、OCR/CV |
 | M53 | VALIDATED 表单事实驱动只追加 Evidence resolution generation；槽位世代/lineage；REVIEW_REQUIRED 与显式 KEEP/INVALIDATE | ADR-022 + OpenAPI 0.26.0 + Expression/Form/Evidence/MVC/Contract/PostgreSQL IT + V053 | 计算字段、决策表/脚本、草稿离线合并、OCR/CV、GPS 权威距离 |
+| M54 | ExternalReviewReceipt 目标以 slot/item/revision 三元组精确命中 ReviewCase 冻结 SnapshotMember；跨 Snapshot、错配和重复失败关闭 | ARCH-10 + OpenAPI 0.27.0 + ReviewCase PostgreSQL IT + MVC Security + Contract/Client Generation + ArchitectureTest；无新迁移 | 完整 Connector 入站、CLIENT Case 自动创建、外部批次权威登记、其他 targetType 与自动整改映射 |

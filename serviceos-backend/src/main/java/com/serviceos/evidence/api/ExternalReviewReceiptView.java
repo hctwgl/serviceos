@@ -2,7 +2,6 @@ package com.serviceos.evidence.api;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 /** 不可变外部审核回执投影。 */
@@ -18,7 +17,7 @@ public record ExternalReviewReceiptView(
         String mappingVersionId,
         String result,
         List<String> reasonCodes,
-        List<Map<String, Object>> affectedTargets,
+        List<ExternalReviewAffectedTarget> affectedTargets,
         String payloadRef,
         UUID coordinationTaskId,
         String receivedBy,

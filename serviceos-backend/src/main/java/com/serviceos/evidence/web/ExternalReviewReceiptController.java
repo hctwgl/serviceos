@@ -1,5 +1,6 @@
 package com.serviceos.evidence.web;
 
+import com.serviceos.evidence.api.ExternalReviewAffectedTarget;
 import com.serviceos.evidence.api.ExternalReviewReceiptService;
 import com.serviceos.evidence.api.ExternalReviewReceiptView;
 import com.serviceos.evidence.api.RecordExternalReviewReceiptCommand;
@@ -18,7 +19,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 /** 外部审核回执 HTTP 边界；仅适配层服务主体调用。 */
@@ -83,7 +83,7 @@ final class ExternalReviewReceiptController {
             String mappingVersionId,
             String result,
             List<String> reasonCodes,
-            List<Map<String, Object>> affectedTargets,
+            List<ExternalReviewAffectedTarget> affectedTargets,
             String payloadRef
     ) {
     }
@@ -100,7 +100,7 @@ final class ExternalReviewReceiptController {
             String mappingVersionId,
             String result,
             List<String> reasonCodes,
-            List<Map<String, Object>> affectedTargets,
+            List<ExternalReviewAffectedTarget> affectedTargets,
             String payloadRef,
             UUID coordinationTaskId,
             String receivedBy,

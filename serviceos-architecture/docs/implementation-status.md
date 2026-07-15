@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-15
-baselineCommit: 55e9aed
-latestMilestone: M53
+baselineCommit: PENDING_M54_COMMIT
+latestMilestone: M54
 ---
 
 # ServiceOS 实施状态总览
@@ -39,13 +39,13 @@ latestMilestone: M53
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M53 表单条件与 EvidenceSlot 只追加重解析运行时 |
-| 基线提交 | `55e9aed` |
+| 最新实施里程碑 | M54 车企回执影响对象权威校验 |
+| 基线提交 | `PENDING_M54_COMMIT`（功能提交后立即独立回填） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
 | 前端工程 | 尚未建立；已有 Admin、Network、Technician 产品与交互规格 |
 | 数据库 | PostgreSQL + Flyway（当前版本 053 / 55） |
-| 契约 | OpenAPI 0.26.0 + 事件 JSON Schema |
+| 契约 | OpenAPI 0.27.0 + 事件 JSON Schema |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -68,7 +68,7 @@ latestMilestone: M53
 | 动态表单 | 资产、冻结版本、不可变提交和 Task 完成门禁 | `PARTIAL` | 固定/条件 required、visible 与布尔 validation rule，基础类型校验、精确版本提交和完成引用 | 复杂 validator、计算字段、草稿、冲突、更正和审核 | M33～M35、M53 |
 | 资料 Evidence | 资产、槽位、Item/Revision、机器校验、Snapshot、完成门禁、作废、Review、Correction | `PARTIAL` | 固定/条件槽位、VALIDATED 表单触发只追加重解析、槽位世代/lineage、REVIEW_REQUIRED 与显式 KEEP/INVALIDATE、安全文件联动、Snapshot/完成门禁及审核整改链路 | OCR/CV、GPS 权威距离、长期归档 | M36～M53 |
 | 安全文件 | Begin/Finalize/隔离/扫描/授权下载/作废 | `IMPLEMENTED` | 独立安全文件生命周期；Evidence 编排 Begin/Finalize/Invalidate 联动 | 正式对象存储、专业扫描服务、物理删除 | M11、M38、M46 |
-| 审核整改 | ReviewCase、ReviewDecision、CorrectionCase | `PARTIAL` | Review + Correction + 整改 Task + 强制通过/重开 + 车企回执 + WAIVED；补传轮次只追加 | 多候选人策略、前端、CLIENT Case 自动创建 | M44～M51 |
+| 审核整改 | ReviewCase、ReviewDecision、CorrectionCase | `PARTIAL` | Review + Correction + 整改 Task + 强制通过/重开 + 车企回执 + WAIVED；补传轮次只追加；外部回执目标精确绑定冻结 SnapshotMember | 多候选人策略、前端、CLIENT Case 自动创建、完整 Connector 与批次权威校验 | M44～M54 |
 | SLA | 时钟、预警、升级 | `PROPOSED` | 已有总体设计 | 完整运行时和验收尚未实施 | `architecture/12-*` |
 | 通知 | 通知与运营异常中心 | `PROPOSED` | 已有总体设计 | 通知通道、模板、可靠发送和 UI | `architecture/14-*` |
 | 履约事实与试算 | 事实提取和双向试算 | `PROPOSED` | 已有设计、API 和数据规划 | 运行时、投影和前端工作区 | M5 设计 |
@@ -92,7 +92,7 @@ latestMilestone: M53
 
 未实现：
 
-- ADR-018 条件表达式；
+- 任意函数、计算字段、脚本/决策表（M52～M53 已实现白名单布尔/类型比较条件子集）；
 - 复杂 validator；
 - 草稿、预填冲突和更正；
 - 表单审核闭环。
@@ -134,15 +134,38 @@ latestMilestone: M53
 - 多候选人策略评分与自动 claim；
 - CLIENT origin ReviewCase 自动创建与完整 OEM Connector 入站表。
 
+### M54：车企回执影响对象权威校验
+
+已实现：
+
+- OpenAPI 0.27.0 将 `affectedTargets` 从任意 object 收紧为强类型
+  `ExternalReviewAffectedTarget`；
+- 该收紧相对 0.26.0 是经项目负责人于 2026-07-15 明确批准的版本化破坏性变更；兼容门禁准确
+  报告四个新增必填属性，未加入旧结构兜底、宽松解析或双轨模型；
+- 每个目标必须以 slot/item/revision 三元组精确命中 ReviewCase 绑定的不可变
+  EvidenceSetSnapshotMember；
+- 跨 Snapshot、错配三元组、重复目标、未知类型和超限目标失败关闭；
+- 目标校验发生在 ReviewCase 状态迁移前，失败时不产生 ReviewDecision、客服协调 Task、审计或
+  Outbox 副作用；
+- 合法回执继续保持幂等、不可变和同事务决定/协调 Task/审计/Outbox。
+
+明确未实现：
+
+- 完整 Connector 验签与标准化入站表；
+- CLIENT origin ReviewCase 自动创建；
+- callbackBatchRef / mappingVersionId 外部权威登记与批次校验；
+- 字段、表单、报告等其他 targetType 及自动整改对象映射。
+
 ## 5. 下一实施方向
 
-Evidence / Review / Correction 可靠纵向切片已推进到 **M53**。ADR-022 已接受并实现；M53 只覆盖
-锁定表单事实驱动的资料要求重解析和显式处置，不代表表达式平台或整个现场履约平台完成。
+Evidence / Review / Correction 可靠纵向切片已推进到 **M54**。M54 只关闭车企回执已声明
+`affectedTargets` 的权威引用缺口，没有重做 M53 Evidence 主线，也不代表完整 Connector 或整个
+现场履约平台完成。
 
 ```text
 候选下一方向（需对应产品/架构决策后启动）：
 1. 多候选人评分、自动 claim、网点容量联动；
-2. OEM 映射与 Connector：CLIENT origin ReviewCase 自动创建、回传批次权威校验、affectedTargets 强校验；
+2. OEM 映射与 Connector：CLIENT origin ReviewCase 自动创建、回传批次权威登记与校验；
 3. OCR/CV、GPS 权威距离、二级审批/MFA、报告 GENERATED 资料包；
 4. 表达式计算字段、决策表/脚本、草稿冲突与离线合并；
 5. Admin/Network/Technician Portal 工程。
@@ -195,3 +218,5 @@ Evidence / Review / Correction 可靠纵向切片已推进到 **M53**。ADR-022 
 - `serviceos-architecture/testing/39-m42-evidence-invalidate-acceptance.md`
 - `serviceos-architecture/architecture/54-evidence-task-completion-gate.md`
 - `serviceos-architecture/testing/40-m43-dual-input-task-completion-acceptance.md`
+- `serviceos-architecture/architecture/67-m54-external-review-affected-target-validation.md`
+- `serviceos-architecture/testing/51-m54-external-review-affected-target-validation-acceptance.md`

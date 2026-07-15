@@ -11,6 +11,7 @@ import com.serviceos.evidence.api.CreateEvidenceSetSnapshotCommand;
 import com.serviceos.evidence.api.CreateReviewCaseCommand;
 import com.serviceos.evidence.api.DecideReviewCaseCommand;
 import com.serviceos.evidence.api.EvidenceCommandService;
+import com.serviceos.evidence.api.ExternalReviewAffectedTarget;
 import com.serviceos.evidence.api.EvidenceSetSnapshotService;
 import com.serviceos.evidence.api.EvidenceSetSnapshotView;
 import com.serviceos.evidence.api.FinalizeEvidenceUploadCommand;
@@ -338,19 +339,19 @@ class ReviewCasePostgresIT {
                 new RecordExternalReviewReceiptCommand(
                         created.reviewCaseId(), "ENV-1", "CAN-1", "EXT-1", "BATCH-1", "MAP-1",
                         "REJECTED", List.of("CLIENT.IMAGE.BLUR"),
-                        List.of(java.util.Map.of("type", "EvidenceRevision", "id", "EVD-1")),
+                        List.of(target(snapshot)),
                         "PAYLOAD-1"));
         ExternalReviewReceiptView replay = receipts.record(adapter(), metadata("ext-ok"),
                 new RecordExternalReviewReceiptCommand(
                         created.reviewCaseId(), "ENV-1", "CAN-1", "EXT-1", "BATCH-1", "MAP-1",
                         "REJECTED", List.of("CLIENT.IMAGE.BLUR"),
-                        List.of(java.util.Map.of("type", "EvidenceRevision", "id", "EVD-1")),
+                        List.of(target(snapshot)),
                         "PAYLOAD-1"));
         ExternalReviewReceiptView envelopeReplay = receipts.record(adapter(), metadata("ext-env-replay"),
                 new RecordExternalReviewReceiptCommand(
                         created.reviewCaseId(), "ENV-1", "CAN-1", "EXT-1", "BATCH-1", "MAP-1",
                         "REJECTED", List.of("CLIENT.IMAGE.BLUR"),
-                        List.of(java.util.Map.of("type", "EvidenceRevision", "id", "EVD-1")),
+                        List.of(target(snapshot)),
                         "PAYLOAD-1"));
 
         assertThat(replay.receiptId()).isEqualTo(recorded.receiptId());
@@ -372,6 +373,46 @@ class ReviewCasePostgresIT {
                 """).query(Long.class).single()).isOne();
     }
 
+    @Test
+    void rejectsExternalTargetsOutsideAuthoritativeReviewSnapshotWithoutSideEffects() throws Exception {
+        EvidenceSetSnapshotView authoritative = createSnapshot("ext-authoritative");
+        EvidenceSetSnapshotView other = createSnapshot("ext-other");
+        ReviewCaseView created = reviews.create(reviewer(), metadata("create-ext-authoritative"),
+                new CreateReviewCaseCommand(authoritative.evidenceSetSnapshotId(), null));
+
+        assertThatThrownBy(() -> receipts.record(adapter(), metadata("ext-cross-snapshot"),
+                new RecordExternalReviewReceiptCommand(
+                        created.reviewCaseId(), "ENV-X", "CAN-X", "EXT-X", "BATCH-X", "MAP-X",
+                        "REJECTED", List.of("CLIENT.WRONG_TARGET"), List.of(target(other)), null)))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
+
+        ExternalReviewAffectedTarget exact = target(authoritative);
+        ExternalReviewAffectedTarget mismatchedSlot = new ExternalReviewAffectedTarget(
+                exact.targetType(), UUID.randomUUID(), exact.evidenceItemId(), exact.evidenceRevisionId());
+        assertThatThrownBy(() -> receipts.record(adapter(), metadata("ext-mismatched-triple"),
+                new RecordExternalReviewReceiptCommand(
+                        created.reviewCaseId(), "ENV-Y", "CAN-Y", "EXT-Y", "BATCH-Y", "MAP-Y",
+                        "REJECTED", List.of("CLIENT.WRONG_TARGET"), List.of(mismatchedSlot), null)))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
+
+        assertThatThrownBy(() -> receipts.record(adapter(), metadata("ext-duplicate-target"),
+                new RecordExternalReviewReceiptCommand(
+                        created.reviewCaseId(), "ENV-Z", "CAN-Z", "EXT-Z", "BATCH-Z", "MAP-Z",
+                        "REJECTED", List.of("CLIENT.DUPLICATE_TARGET"), List.of(exact, exact), null)))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
+
+        assertThat(reviews.get(reviewer(), "ext-still-open", created.reviewCaseId()).status()).isEqualTo("OPEN");
+        assertThat(jdbc.sql("SELECT count(*) FROM evd_external_review_receipt")
+                .query(Long.class).single()).isZero();
+        assertThat(jdbc.sql("SELECT count(*) FROM evd_review_decision")
+                .query(Long.class).single()).isZero();
+        assertThat(jdbc.sql("SELECT count(*) FROM tsk_task WHERE task_type='evidence.external-coordination'")
+                .query(Long.class).single()).isZero();
+    }
+
     private CurrentPrincipal adapter() {
         return new CurrentPrincipal(
                 ADAPTER, TENANT, CurrentPrincipal.PrincipalType.SERVICE, "byd-adapter", Set.of());
@@ -386,6 +427,13 @@ class ReviewCasePostgresIT {
         UUID revisionId = uploadScanAndValidate(pngBytes(marker), "begin-" + marker, "cmd-" + marker);
         return snapshots.create(technician(), metadata("snap-" + marker),
                 new CreateEvidenceSetSnapshotCommand(taskId, "TASK_SUBMISSION", List.of(revisionId)));
+    }
+
+    private ExternalReviewAffectedTarget target(EvidenceSetSnapshotView snapshot) {
+        var member = snapshot.members().getFirst();
+        return new ExternalReviewAffectedTarget(
+                "EVIDENCE_REVISION", member.evidenceSlotId(),
+                member.evidenceItemId(), member.evidenceRevisionId());
     }
 
     private UUID uploadScanAndValidate(byte[] content, String beginKey, String commandId)
