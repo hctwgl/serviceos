@@ -31,7 +31,7 @@ patterns=(
   '(?<![0-9])1[3-9][0-9]{9}(?![0-9])'
   # VIN 为 17 位且第 9 位是校验位（数字或 X）。固定校验位可避免把类名/文件名中的连续字母误报为 VIN。
   '(?i)(?<![A-HJ-NPR-Z0-9])[A-HJ-NPR-Z0-9]{8}[0-9X][A-HJ-NPR-Z0-9]{8}(?![A-HJ-NPR-Z0-9])'
-  '(?i)(address|customerAddress|installationAddress|用户地址|安装地址)\s*[:=]\s*(?!\[REDACTED\])[^,;} ]+'
+  '(?i)(address|customerAddress|installationAddress|用户地址|安装地址)\s*[:=]\s*(?!\[REDACTED\])[^,;}]+'
   '(?i)(price|amount|unitPrice|totalAmount|对上金额|对下金额|结算金额)\s*[:=]\s*(?!\[REDACTED\])-?[0-9]+([.][0-9]+)?'
 )
 
