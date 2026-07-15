@@ -47,6 +47,9 @@ Client 保存签约/对接商业主体稳定身份、编码和状态；Brand 保
 
 使用带有效区间的关联记录表达项目适用品牌和区域；变更保留历史，不在 project 中存可覆盖数组作为唯一事实源。
 
+> M64 已落地 `prj_project_region` 的创建时写入与实时授权读取：复合外键约束 tenant/project 一致，
+> `valid_from/valid_to` 决定当前关系，`regionCodes` 仅作为 API 输入/输出，不替代关系表事实。
+
 ### project_service_product_binding
 
 保存 project、serviceProduct、适用 brand/region/桩型/车型等受控 scope、有效区间、状态和来源审批。`project + service_product + scope_business_key + effective_from` 唯一。
