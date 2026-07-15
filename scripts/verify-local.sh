@@ -6,13 +6,14 @@ set -euo pipefail
 # Apple Silicon + OrbStack 场景下，如果用户环境中设置了
 # DOCKER_DEFAULT_PLATFORM=linux/amd64，Testcontainers 会拉起 x86 PostgreSQL，
 # 进而通过模拟器运行，导致真实 PostgreSQL 集成测试显著变慢。
-# 本脚本只在当前 Maven 子进程中移除该环境变量，并预拉、校验宿主机原生架构镜像；
-# 不修改用户 shell 配置，也不跳过任何测试。
+# 本脚本只在当前 Maven 子进程中移除该环境变量，并校验宿主机原生架构镜像；
+# 本地已有正确架构镜像时直接复用，不访问远端镜像仓库，也不跳过任何测试。
 
 repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${repository_root}"
 
 postgres_image="${SERVICEOS_TEST_POSTGRES_IMAGE:-postgres:18-alpine}"
+refresh_image="${SERVICEOS_TEST_REFRESH_IMAGE:-false}"
 host_arch="$(uname -m)"
 
 case "${host_arch}" in
@@ -56,12 +57,26 @@ if [[ -n "${configured_platform}" ]]; then
   fi
 fi
 
-if [[ -n "${native_platform}" ]]; then
-  echo "正在准备原生 PostgreSQL 测试镜像：${postgres_image} (${native_platform})"
-  env -u DOCKER_DEFAULT_PLATFORM docker pull --platform "${native_platform}" "${postgres_image}" >/dev/null
+pull_postgres_image() {
+  if [[ -n "${native_platform}" ]]; then
+    echo "正在拉取原生 PostgreSQL 测试镜像：${postgres_image} (${native_platform})"
+    env -u DOCKER_DEFAULT_PLATFORM docker pull --platform "${native_platform}" "${postgres_image}" >/dev/null
+  else
+    echo "正在拉取 PostgreSQL 测试镜像：${postgres_image}"
+    env -u DOCKER_DEFAULT_PLATFORM docker pull "${postgres_image}" >/dev/null
+  fi
+}
+
+# 默认只在本地缺少镜像时拉取，避免每次验证都访问远端 registry。
+# 需要主动检查并刷新镜像时，显式设置 SERVICEOS_TEST_REFRESH_IMAGE=true。
+if [[ "${refresh_image}" == "true" ]]; then
+  echo "已请求刷新 PostgreSQL 测试镜像。"
+  pull_postgres_image
+elif docker image inspect "${postgres_image}" >/dev/null 2>&1; then
+  echo "复用本地 PostgreSQL 测试镜像：${postgres_image}"
 else
-  echo "正在准备 PostgreSQL 测试镜像：${postgres_image}"
-  env -u DOCKER_DEFAULT_PLATFORM docker pull "${postgres_image}" >/dev/null
+  echo "本地不存在 PostgreSQL 测试镜像，执行首次拉取。"
+  pull_postgres_image
 fi
 
 image_os="$(docker image inspect "${postgres_image}" --format '{{.Os}}' 2>/dev/null || true)"
@@ -88,7 +103,7 @@ fi
 echo "执行 Maven 验证：./mvnw --no-transfer-progress $*"
 
 # 只影响当前命令，不修改用户的永久环境变量。
-# Testcontainers 将继承已经清理的平台环境，并使用上方校验过的原生镜像。
+# Testcontainers 将继承已经清理的平台环境，并使用上方校验过的本地原生镜像。
 env -u DOCKER_DEFAULT_PLATFORM \
   SERVICEOS_TEST_POSTGRES_IMAGE="${postgres_image}" \
   ./mvnw --no-transfer-progress "$@"
