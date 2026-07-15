@@ -3,9 +3,9 @@ package com.serviceos.project.application;
 import com.serviceos.project.domain.Project;
 
 import java.util.Optional;
-import java.util.List;
 import java.util.UUID;
 import java.time.Instant;
+import java.util.List;
 
 /**
  * project 模块内部持久化端口，不允许暴露到 project.api。
@@ -34,4 +34,5 @@ public interface ProjectRepository {
     void insertScopeRevision(ProjectScopeRevision revision);
 
     Optional<ProjectScopeRevision> findScopeRevision(String tenantId, UUID revisionId);
+
 }

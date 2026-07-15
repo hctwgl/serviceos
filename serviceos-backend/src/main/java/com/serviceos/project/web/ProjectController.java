@@ -4,6 +4,11 @@ import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
 import com.serviceos.project.api.CreateProjectCommand;
 import com.serviceos.project.api.ProjectCommandService;
+import com.serviceos.project.api.ProjectDetail;
+import com.serviceos.project.api.ProjectPage;
+import com.serviceos.project.api.ProjectQuery;
+import com.serviceos.project.api.ProjectQueryService;
+import com.serviceos.project.api.ProjectScopeRelationRevisionPage;
 import com.serviceos.project.api.ProjectScopeRelationRevisionView;
 import com.serviceos.project.api.ProjectView;
 import com.serviceos.project.api.ReviseProjectScopeRelationsCommand;
@@ -11,15 +16,19 @@ import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.CorrelationIds;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -31,11 +40,60 @@ import java.util.UUID;
 @RequestMapping("/api/v1/projects")
 final class ProjectController {
     private final ProjectCommandService commands;
+    private final ProjectQueryService queries;
     private final CurrentPrincipalProvider principals;
 
-    ProjectController(ProjectCommandService commands, CurrentPrincipalProvider principals) {
+    ProjectController(
+            ProjectCommandService commands,
+            ProjectQueryService queries,
+            CurrentPrincipalProvider principals
+    ) {
         this.commands = commands;
+        this.queries = queries;
         this.principals = principals;
+    }
+
+    @GetMapping
+    ResponseEntity<ProjectPage> list(
+            @RequestParam(required = false) String clientId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate activeOn,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(defaultValue = "50") int limit,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        ProjectPage page = queries.list(principals.current(), correlationId,
+                new ProjectQuery(clientId, status, activeOn, cursor, limit));
+        return ResponseEntity.ok()
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(page);
+    }
+
+    @GetMapping("/{projectId}")
+    ResponseEntity<ProjectDetail> get(
+            @PathVariable UUID projectId,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        ProjectDetail detail = queries.get(principals.current(), correlationId, projectId);
+        return ResponseEntity.ok()
+                .eTag(Long.toString(detail.project().version()))
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(detail);
+    }
+
+    @GetMapping("/{projectId}/scope-revisions")
+    ResponseEntity<ProjectScopeRelationRevisionPage> listScopeRevisions(
+            @PathVariable UUID projectId,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(defaultValue = "50") int limit,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        ProjectScopeRelationRevisionPage page = queries.listScopeRevisions(
+                principals.current(), correlationId, projectId, cursor, limit);
+        return ResponseEntity.ok()
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(page);
     }
 
     @PostMapping

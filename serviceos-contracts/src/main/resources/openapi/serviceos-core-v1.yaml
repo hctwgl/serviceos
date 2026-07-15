@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.37.0
+  version: 0.38.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -9,6 +9,40 @@ security:
   - bearerAuth: []
 paths:
   /projects:
+    get:
+      operationId: listAuthorizedProjects
+      summary: 查询当前主体有权读取的项目目录
+      description: >-
+        project.read 的实时 TENANT/PROJECT/REGION/NETWORK RoleGrant 范围在 SQL 中收敛；
+        cursor 绑定范围摘要与全部筛选条件，授权或筛选变化后失败关闭。
+      parameters:
+        - name: clientId
+          in: query
+          schema: { type: string, minLength: 1, maxLength: 128 }
+        - name: status
+          in: query
+          schema: { enum: [DRAFT, ACTIVE, SUSPENDED, CLOSED] }
+        - name: activeOn
+          in: query
+          schema: { type: string, format: date }
+        - name: cursor
+          in: query
+          schema: { type: string, minLength: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: projectCode/projectId 正序的授权项目页
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectPage' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
     post:
       operationId: createProject
       summary: 创建运营项目
@@ -44,6 +78,58 @@ paths:
           $ref: '#/components/responses/Problem'
         '422':
           $ref: '#/components/responses/Problem'
+  /projects/{projectId}:
+    get:
+      operationId: getAuthorizedProject
+      summary: 读取项目当前事实与当前范围关系
+      description: 先按 JWT tenant 隔离读取，再按实时 project.read 范围授权；跨租户统一返回 404。
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 项目当前事实
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectDetail' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /projects/{projectId}/scope-revisions:
+    get:
+      operationId: listAuthorizedProjectScopeRevisions
+      summary: 查询项目范围关系不可变修订历史
+      description: aggregateVersion 倒序分页；cursor 绑定 projectId，不能跨项目重放。
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: cursor
+          in: query
+          schema: { type: string, minLength: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 项目范围关系修订历史页
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectScopeRelationRevisionPage' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
   /projects/{projectId}:revise-scope-relations:
     post:
       operationId: reviseProjectScopeRelations
@@ -1893,6 +1979,23 @@ components:
           enum: [DRAFT, ACTIVE, SUSPENDED, CLOSED]
         version: { type: integer, format: int64, minimum: 1 }
         createdAt: { type: string, format: date-time }
+    ProjectPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor, asOf]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Project' }
+        nextCursor: { type: [string, 'null'] }
+        asOf: { type: string, format: date-time }
+    ProjectDetail:
+      type: object
+      additionalProperties: false
+      required: [project, asOf]
+      properties:
+        project: { $ref: '#/components/schemas/Project' }
+        asOf: { type: string, format: date-time }
     ReviseProjectScopeRelationsRequest:
       type: object
       additionalProperties: false
@@ -1930,6 +2033,16 @@ components:
         reason: { type: string, minLength: 1, maxLength: 500 }
         aggregateVersion: { type: integer, format: int64, minimum: 2 }
         revisedAt: { type: string, format: date-time }
+    ProjectScopeRelationRevisionPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor, asOf]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ProjectScopeRelationRevision' }
+        nextCursor: { type: [string, 'null'] }
+        asOf: { type: string, format: date-time }
     StableProjectScopeReferences:
       type: array
       maxItems: 100

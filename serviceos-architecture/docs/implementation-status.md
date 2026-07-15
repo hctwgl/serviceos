@@ -4,7 +4,7 @@ version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-15
 baselineCommit: 18a06a2
-latestMilestone: M66
+latestMilestone: M67
 ---
 
 # ServiceOS 实施状态总览
@@ -39,13 +39,13 @@ latestMilestone: M66
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M66 项目范围关系整组修订 |
+| 最新实施里程碑 | M67 项目授权目录与范围历史查询 |
 | 基线提交 | `18a06a2` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
 | 前端工程 | 尚未建立；已有 Admin、Network、Technician 产品与交互规格 |
-| 数据库 | PostgreSQL + Flyway（当前版本 066 / 68） |
-| 契约 | Core OpenAPI 0.37.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、recovered/resolved 与 SLA started/breached/met@v1） |
+| 数据库 | PostgreSQL + Flyway（当前版本 067 / 69） |
+| 契约 | Core OpenAPI 0.38.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、recovered/resolved 与 SLA started/breached/met@v1） |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -54,7 +54,8 @@ latestMilestone: M66
 | 领域 | 能力 | 状态 | 已完成范围 | 主要未完成范围 | 最近证据 |
 |---|---|---|---|---|---|
 | 工程基础 | 构建、测试、契约、可观测性、容器发布 | `IMPLEMENTED` | Maven、PostgreSQL IT、契约门禁、Trace/指标、单镜像迁移和回滚演练 | 正式 K8s、多故障域、PITR、SBOM/签名、正式 Secret Manager | M8～M14 |
-| 身份授权 | OIDC/JWT、Capability、Tenant/Project/REGION/NETWORK Scope、拒绝审计 | `IMPLEMENTED` | 后端认证授权和范围校验基线；实时 TENANT/PROJECT 集合；Project 有效期 REGION/NETWORK 关系、整组修订与精确映射 | 组织关系、Region 层级后代、计划修订/审批、正式企业 IdP、完整组织治理 UI | M9、M63～M66 |
+| 身份授权 | OIDC/JWT、Capability、Tenant/Project/REGION/NETWORK Scope、拒绝审计 | `IMPLEMENTED` | 后端认证授权和范围校验基线；实时 TENANT/PROJECT/REGION/NETWORK 集合；Project 有效期关系、整组修订与授权目录读取 | 组织关系、Region 层级后代、计划修订/审批、正式企业 IdP、完整组织治理 UI | M9、M63～M67 |
+| 项目治理 | Project 核心事实、范围关系与授权目录 | `PARTIAL` | 项目创建；REGION/NETWORK 当前关系整组修订和不可变历史；`project.read` 授权目录、详情及历史查询 | owners、品牌/服务产品/配置绑定、生命周期、计划修订审批、目录治理 UI | M8、M64～M67 |
 | 可靠消息 | Inbox、Outbox、Worker claim/lease/retry | `IMPLEMENTED` | 本地可靠发布消费、恢复和人工接管基础 | 正式 Broker 和跨服务运行 | M9～M10 |
 | 配置中心 | 不可变配置资产、Bundle 发布和版本锁定 | `PARTIAL` | FORM、EVIDENCE、SLA v1 资产发布基础；工单/任务冻结引用；SERVICEOS_EXPR_V1 布尔/类型比较子集；FORM/EVIDENCE 字段及 WORKFLOW/SLA 依赖闭包 | 决策表/公式/脚本、完整审批和通用依赖图 | M16、M33、M36、M52～M53、M61 |
 | 外部接入 | BYD CPIM V7.3.1 入站、提审与审核回调 | `PARTIAL` | 协议日期验签、防重放、私有原文、Envelope/Canonical、工单创建；显式审核路由与逐订单回调；不可变 OutboundDelivery/Attempt/Acknowledgement、Task 可靠执行、UNKNOWN 人工接管与授权人工重发；重发严格 ACK 后发布恢复事实 | 其他 CPIM 消息、人工标记已送达/放弃、通用 Connector、生产凭据/对象存储和真实 sandbox | M16、M56～M60 |
@@ -405,10 +406,29 @@ latestMilestone: M66
 - 项目 owners、生命周期、服务产品绑定修订；
 - 授权缓存/导出、Portal、完整派单、BUSINESS SLA、通知、试算和结算。
 
+### M67：项目授权目录与范围历史查询
+
+已实现：
+
+- `GET /api/v1/projects` 按实时 TENANT/PROJECT/REGION/NETWORK `project.read` RoleGrant 查询授权目录；
+- `clientId/status/activeOn` 精确筛选和 `projectCode/projectId` keyset 分页，cursor 绑定范围及筛选摘要；
+- 项目详情返回当前核心事实、当前 REGION/NETWORK 关系、聚合 ETag 与服务端 `asOf`；
+- 范围修订历史按 `aggregateVersion` 倒序读取 M66 不可变收据，cursor 绑定 projectId；
+- 详情与历史先 tenant 隔离后实时鉴权；撤权/越权失败关闭并审计，跨租户资源统一 404；
+- V067、Core OpenAPI 0.38.0、PostgreSQL 18、MVC、契约兼容/客户端、ArchitectureTest 与全量 L3
+  形成工程证据。
+
+明确未实现：
+
+- Project owners、品牌/服务产品/配置绑定和项目生命周期命令；
+- ServiceNetwork/Region/Organization 目录、层级、生命周期与治理 API；
+- 计划生效的范围修订、审批/双人复核、导出分析与 Portal 前端；
+- 完整派单策略、BUSINESS SLA、通知、试算和结算。
+
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M66**。M61～M66 只实现显式 Task ELAPSED 时钟、其安全授权只读投影
-及 Project REGION/NETWORK 关系即时整组修订，
+ServiceOS 可靠纵向切片已推进到 **M67**。M61～M67 只实现显式 Task ELAPSED 时钟、其安全授权只读投影、
+Project REGION/NETWORK 关系即时整组修订，以及当前授权项目目录/详情/历史查询，
 没有猜测项目默认时长、日历、暂停或升级策略，也没有实现完整 SLA/通知或整个现场履约平台。
 
 ```text
@@ -482,3 +502,5 @@ ServiceOS 可靠纵向切片已推进到 **M66**。M61～M66 只实现显式 Tas
 - `serviceos-architecture/testing/62-m65-project-network-scope-sla-queue-acceptance.md`
 - `serviceos-architecture/architecture/79-m66-project-scope-relation-revision.md`
 - `serviceos-architecture/testing/63-m66-project-scope-relation-revision-acceptance.md`
+- `serviceos-architecture/architecture/80-m67-authorized-project-directory-query.md`
+- `serviceos-architecture/testing/64-m67-authorized-project-directory-query-acceptance.md`

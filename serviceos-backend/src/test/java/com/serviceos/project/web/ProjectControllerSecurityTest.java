@@ -4,6 +4,10 @@ import com.serviceos.bootstrap.SecurityConfiguration;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
 import com.serviceos.project.api.ProjectCommandService;
+import com.serviceos.project.api.ProjectDetail;
+import com.serviceos.project.api.ProjectPage;
+import com.serviceos.project.api.ProjectQuery;
+import com.serviceos.project.api.ProjectQueryService;
 import com.serviceos.project.api.ProjectScopeRelationRevisionView;
 import com.serviceos.project.api.ReviseProjectScopeRelationsCommand;
 import com.serviceos.project.api.ProjectView;
@@ -28,6 +32,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -41,6 +46,9 @@ class ProjectControllerSecurityTest {
 
     @MockitoBean
     ProjectCommandService commands;
+
+    @MockitoBean
+    ProjectQueryService queries;
 
     @MockitoBean
     CurrentPrincipalProvider principals;
@@ -97,6 +105,48 @@ class ProjectControllerSecurityTest {
                         metadata.correlationId().equals("corr-2")
                                 && metadata.idempotencyKey().equals("idem-2")),
                 any());
+    }
+
+    @Test
+    void projectQueriesUseTrustedPrincipalAndReturnStableEtag() throws Exception {
+        UUID projectId = UUID.fromString("19dac447-73fd-4f24-8178-a9eac8d9ed34");
+        CurrentPrincipal principal = new CurrentPrincipal(
+                "reader-1", "tenant-trusted", CurrentPrincipal.PrincipalType.USER,
+                "admin-web", Set.of("project.read"));
+        ProjectView project = new ProjectView(
+                projectId, "tenant-trusted", "BYD-2026", "client-byd", "比亚迪项目",
+                LocalDate.of(2026, 1, 1), null, java.util.List.of("CN-3702"),
+                java.util.List.of("network-qingdao-a"), "DRAFT", 3,
+                Instant.parse("2026-07-13T03:30:00Z"));
+        when(principals.current()).thenReturn(principal);
+        when(queries.list(eq(principal), eq("corr-m67-list"), any()))
+                .thenReturn(new ProjectPage(java.util.List.of(project), null,
+                        Instant.parse("2026-07-15T10:00:00Z")));
+        when(queries.get(principal, "corr-m67-get", projectId))
+                .thenReturn(new ProjectDetail(project, Instant.parse("2026-07-15T10:00:00Z")));
+
+        mvc.perform(get("/api/v1/projects")
+                        .with(jwt().jwt(token -> token.subject("reader-1").claim("tenant_id", "tenant-trusted")))
+                        .header("X-Correlation-Id", "corr-m67-list")
+                        .queryParam("clientId", "client-byd")
+                        .queryParam("status", "DRAFT")
+                        .queryParam("activeOn", "2026-07-15")
+                        .queryParam("limit", "20"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("X-Correlation-Id", "corr-m67-list"))
+                .andExpect(jsonPath("$.items[0].id").value(projectId.toString()));
+
+        mvc.perform(get("/api/v1/projects/{projectId}", projectId)
+                        .with(jwt().jwt(token -> token.subject("reader-1").claim("tenant_id", "tenant-trusted")))
+                        .header("X-Correlation-Id", "corr-m67-get"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("ETag", "\"3\""))
+                .andExpect(jsonPath("$.project.id").value(projectId.toString()));
+
+        verify(queries).list(eq(principal), eq("corr-m67-list"), argThat((ProjectQuery query) ->
+                "client-byd".equals(query.clientId()) && "DRAFT".equals(query.status())
+                        && LocalDate.of(2026, 7, 15).equals(query.activeOn()) && query.limit() == 20));
+        verify(queries).get(principal, "corr-m67-get", projectId);
     }
 
     @Test

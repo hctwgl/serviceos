@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.serviceos.project.infrastructure.ProjectQueryMapper">
+    <select id="findPage" resultType="map">
+        SELECT p.project_id AS "projectId", p.tenant_id AS "tenantId",
+               p.project_code AS "projectCode", p.client_id AS "clientId",
+               p.project_name AS "projectName", p.starts_on AS "startsOn", p.ends_on AS "endsOn",
+               p.project_status AS "projectStatus", p.aggregate_version AS "aggregateVersion",
+               p.created_at AS "createdAt",
+               COALESCE((SELECT jsonb_agg(r.region_code ORDER BY r.region_code)
+                           FROM prj_project_region r
+                          WHERE r.tenant_id=p.tenant_id AND r.project_id=p.project_id
+                            AND r.valid_to IS NULL), '[]'::jsonb)::text AS "regionCodes",
+               COALESCE((SELECT jsonb_agg(n.network_id ORDER BY n.network_id)
+                           FROM prj_project_network n
+                          WHERE n.tenant_id=p.tenant_id AND n.project_id=p.project_id
+                            AND n.valid_to IS NULL), '[]'::jsonb)::text AS "networkIds"
+          FROM prj_project p
+         WHERE p.tenant_id=#{tenantId}
+        <if test="!tenantWide">
+            <choose>
+                <when test="projectIds != null and !projectIds.isEmpty()">
+                    AND p.project_id IN
+                    <foreach collection="projectIds" item="projectId" open="(" separator="," close=")">
+                        CAST(#{projectId} AS uuid)
+                    </foreach>
+                </when>
+                <otherwise>AND FALSE</otherwise>
+            </choose>
+        </if>
+        <if test="clientId != null">AND p.client_id=#{clientId}</if>
+        <if test="status != null">AND p.project_status=#{status}</if>
+        <if test="activeOn != null">
+            AND p.starts_on &lt;=#{activeOn} AND (p.ends_on IS NULL OR p.ends_on &gt;=#{activeOn})
+        </if>
+        <if test="cursorCode != null">
+            AND (p.project_code, p.project_id) &gt; (#{cursorCode}, #{cursorId})
+        </if>
+         ORDER BY p.project_code, p.project_id
+         LIMIT #{fetchSize}
+    </select>
+
+    <select id="findScopeRevisionPage" resultType="map">
+        SELECT revision_id AS "revisionId", tenant_id AS "tenantId", project_id AS "projectId",
+               expected_version AS "expectedVersion", aggregate_version AS "aggregateVersion",
+               region_codes::text AS "regionCodes", network_ids::text AS "networkIds",
+               added_region_codes::text AS "addedRegionCodes",
+               removed_region_codes::text AS "removedRegionCodes",
+               added_network_ids::text AS "addedNetworkIds",
+               removed_network_ids::text AS "removedNetworkIds",
+               reason, revised_by AS "revisedBy", revised_at AS "revisedAt"
+          FROM prj_project_scope_revision
+         WHERE tenant_id=#{tenantId} AND project_id=#{projectId}
+        <if test="cursorVersion != null">AND aggregate_version &lt; #{cursorVersion}</if>
+         ORDER BY aggregate_version DESC
+         LIMIT #{fetchSize}
+    </select>
+</mapper>
