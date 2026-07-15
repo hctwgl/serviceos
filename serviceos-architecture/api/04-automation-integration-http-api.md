@@ -10,6 +10,8 @@ status: Proposed
 > `POST /api/v1/internal/integration/byd/review-submissions` 与
 > `GET /api/v1/outbound-deliveries/{id}`，并在 BYD OpenAPI 0.3.0 固定外发提审协议。
 > M59 在 Core OpenAPI 0.32.0 实现单笔 UNKNOWN Delivery 人工重发。
+> M60 未新增 HTTP API；严格 ACK 后由 recovered@v1 驱动 Operations 自动解决对应异常，保持
+> “API 不直接标记业务成功”的边界。
 > 通用 Connector/CreateOutboundDelivery、其他人工处置、批量 Replay 与其余本章接口仍为 Proposed。
 
 沿用既有 API 的认证、幂等、`If-Match`、Problem Details、correlation 和审计约定。自动任务内部接口使用专用服务主体，不向普通用户令牌开放。

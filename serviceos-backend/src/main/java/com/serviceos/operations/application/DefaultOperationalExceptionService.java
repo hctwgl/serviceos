@@ -6,6 +6,8 @@ import com.serviceos.operations.api.ResolveServiceAssignmentTimeoutCommand;
 import com.serviceos.operations.api.OperationalExceptionService;
 import com.serviceos.operations.api.OperationalExceptionResolvedPayload;
 import com.serviceos.operations.api.OperationalExceptionView;
+import com.serviceos.operations.api.ResolveTaskFailureExceptionsCommand;
+import com.serviceos.operations.api.TaskFailureExceptionResolvedPayload;
 import com.serviceos.reliability.api.InboxDecision;
 import com.serviceos.reliability.api.InboxService;
 import com.serviceos.reliability.api.OutboxAppender;
@@ -23,6 +25,9 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -38,6 +43,8 @@ final class DefaultOperationalExceptionService implements OperationalExceptionSe
     private static final String SAGA_TIMEOUT_CONSUMER = "operations.service-assignment-timeout.v1";
     private static final String SAGA_RECOVERY_CONSUMER =
             "operations.service-assignment-activation-completed.v1";
+    private static final String TASK_RECOVERY_CONSUMER =
+            "operations.outbound-delivery-recovered.v1";
     private static final String HANDLING_TASK_TYPE = "operations.resolve-exception";
     private static final String DISPATCH_TIMEOUT_TASK_TYPE = "operations.resolve-dispatch-timeout";
 
@@ -75,7 +82,17 @@ final class DefaultOperationalExceptionService implements OperationalExceptionSe
             return findBySource(command.tenantId(), command.sourceTaskId(), command.sourceAttemptId());
         }
 
-        Instant now = clock.instant();
+        lockTaskFailureStream(command.tenantId(), command.sourceTaskId());
+        TaskFailureRecovery recovery = findTaskFailureRecovery(
+                command.tenantId(), command.sourceTaskId());
+        if (recovery != null) {
+            if (!command.sourceTaskType().equals(recovery.sourceTaskType())) {
+                throw new IllegalArgumentException("Task failure recovery source type mismatch");
+            }
+            return recordLateRecoveredFailure(command, recovery);
+        }
+
+        Instant now = command.detectedAt();
         UUID exceptionId = UUID.randomUUID();
         jdbc.sql("""
                         INSERT INTO ops_operational_exception (
@@ -121,6 +138,73 @@ final class DefaultOperationalExceptionService implements OperationalExceptionSe
                 command.tenantId(), CONSUMER_NAME, command.eventId(),
                 Sha256.digest(opened.exceptionId() + "|" + handlingTask.taskId()));
         return findBySource(command.tenantId(), command.sourceTaskId(), command.sourceAttemptId());
+    }
+
+    @Override
+    @Transactional
+    public void resolveTaskFailures(ResolveTaskFailureExceptionsCommand command) {
+        validate(command);
+        InboxDecision decision = inbox.begin(
+                command.tenantId(), TASK_RECOVERY_CONSUMER, command.eventId(),
+                command.schemaVersion(), command.payloadDigest());
+        if (decision.kind() == InboxDecision.Kind.REPLAY) {
+            return;
+        }
+
+        List<UUID> orderedTaskIds = command.sourceTaskIds().stream()
+                .sorted(Comparator.comparing(UUID::toString)).toList();
+        List<String> results = new ArrayList<>();
+        for (UUID sourceTaskId : orderedTaskIds) {
+            // 每个 Task 使用固定 advisory lock；恢复与失败事件无论谁先到，都在同一流上串行判定。
+            lockTaskFailureStream(command.tenantId(), sourceTaskId);
+            registerTaskFailureRecovery(command, sourceTaskId);
+            List<TaskFailureExceptionState> states = findTaskFailureExceptions(
+                    command.tenantId(), sourceTaskId, command.sourceTaskType());
+            if (states.isEmpty()) {
+                results.add(sourceTaskId + ":MARKED");
+                continue;
+            }
+            for (TaskFailureExceptionState state : states) {
+                if ("RESOLVED".equals(state.status())) {
+                    results.add(state.exceptionId() + ":ALREADY_RESOLVED");
+                    continue;
+                }
+                if (state.handlingTaskId() == null) {
+                    throw new IllegalStateException("Open Task failure exception has no handling Task");
+                }
+                String resolutionCode = "OUTBOUND_DELIVERY_RECOVERED";
+                String actionRef = recoveryActionRef(command.eventId());
+                var cancellation = tasks.cancelHandlingTask(new CancelHandlingTaskCommand(
+                        command.tenantId(), state.handlingTaskId(), HANDLING_TASK_TYPE,
+                        state.exceptionId().toString(), resolutionCode,
+                        command.eventId(), command.recoveredAt(), command.correlationId()));
+                int updated = jdbc.sql("""
+                                UPDATE ops_operational_exception
+                                   SET status='RESOLVED', resolved_at=:resolvedAt,
+                                       resolution_code=:resolutionCode,
+                                       resolution_action_ref=:actionRef,
+                                       resolution_event_id=:resolutionEventId,
+                                       aggregate_version=aggregate_version+1
+                                 WHERE exception_id=:exceptionId
+                                   AND status IN ('OPEN','ACKNOWLEDGED')
+                                """)
+                        .param("resolvedAt", timestamptz(command.recoveredAt()))
+                        .param("resolutionCode", resolutionCode).param("actionRef", actionRef)
+                        .param("resolutionEventId", command.eventId())
+                        .param("exceptionId", state.exceptionId()).update();
+                if (updated != 1) {
+                    throw new IllegalStateException("Task failure exception changed during recovery");
+                }
+                appendTaskFailureResolvedEvent(
+                        command.tenantId(), command.correlationId(), state.exceptionId(),
+                        sourceTaskId, command.sourceTaskType(), command.recoveryType(),
+                        command.recoveryRef(), state.handlingTaskId(), cancellation.status(),
+                        state.aggregateVersion() + 1, command.eventId(), command.recoveredAt());
+                results.add(state.exceptionId() + ":" + cancellation.status());
+            }
+        }
+        inbox.complete(command.tenantId(), TASK_RECOVERY_CONSUMER, command.eventId(),
+                Sha256.digest(String.join("|", results)));
     }
 
     @Override
@@ -278,6 +362,161 @@ final class DefaultOperationalExceptionService implements OperationalExceptionSe
                 Sha256.digest(state.exceptionId() + "|" + cancellation.status() + "|" + actionRef));
     }
 
+    private OperationalExceptionView recordLateRecoveredFailure(
+            OpenTaskFailureCommand command,
+            TaskFailureRecovery recovery
+    ) {
+        UUID exceptionId = UUID.randomUUID();
+        String resolutionCode = "OUTBOUND_DELIVERY_RECOVERED";
+        String actionRef = recoveryActionRef(recovery.recoveryEventId());
+        int inserted = jdbc.sql("""
+                        INSERT INTO ops_operational_exception (
+                            exception_id, tenant_id, source_type, source_id, source_attempt_id,
+                            source_task_type, category_code, severity_code, error_code, status,
+                            correlation_id, opened_at, last_detected_at, resolved_at,
+                            resolution_code, resolution_action_ref, resolution_event_id)
+                        VALUES (
+                            :exceptionId, :tenantId, 'TASK', :sourceId, :sourceAttemptId,
+                            :sourceTaskType, 'AUTOMATION_FINAL_FAILURE', 'P1', :errorCode, 'RESOLVED',
+                            :correlationId, :detectedAt, :detectedAt, :resolvedAt,
+                            :resolutionCode, :actionRef, :resolutionEventId)
+                        ON CONFLICT (tenant_id, source_type, source_id, source_attempt_id) DO NOTHING
+                        """)
+                .param("exceptionId", exceptionId).param("tenantId", command.tenantId())
+                .param("sourceId", command.sourceTaskId().toString())
+                .param("sourceAttemptId", command.sourceAttemptId())
+                .param("sourceTaskType", command.sourceTaskType())
+                .param("errorCode", truncate(command.errorCode(), 100))
+                .param("correlationId", command.correlationId())
+                .param("detectedAt", timestamptz(command.detectedAt()))
+                .param("resolvedAt", timestamptz(recovery.recoveredAt()))
+                .param("resolutionCode", resolutionCode).param("actionRef", actionRef)
+                .param("resolutionEventId", recovery.recoveryEventId()).update();
+        OperationalExceptionView resolved = findBySource(
+                command.tenantId(), command.sourceTaskId(), command.sourceAttemptId());
+        if (inserted == 1) {
+            appendTaskFailureResolvedEvent(
+                    command.tenantId(), command.correlationId(), resolved.exceptionId(),
+                    command.sourceTaskId(), command.sourceTaskType(), recovery.recoveryType(),
+                    recovery.recoveryRef(), null, "NOT_CREATED", 1,
+                    recovery.recoveryEventId(), recovery.recoveredAt());
+        }
+        inbox.complete(command.tenantId(), CONSUMER_NAME, command.eventId(),
+                Sha256.digest(resolved.exceptionId() + "|RECOVERED_BEFORE_FAILURE"));
+        return resolved;
+    }
+
+    private void registerTaskFailureRecovery(
+            ResolveTaskFailureExceptionsCommand command,
+            UUID sourceTaskId
+    ) {
+        int inserted = jdbc.sql("""
+                        INSERT INTO ops_task_failure_recovery (
+                            tenant_id, source_task_id, source_task_type, recovery_type,
+                            recovery_ref, recovery_event_id, recovered_at, correlation_id)
+                        VALUES (
+                            :tenantId, :sourceTaskId, :sourceTaskType, :recoveryType,
+                            :recoveryRef, :recoveryEventId, :recoveredAt, :correlationId)
+                        ON CONFLICT (tenant_id, source_task_id) DO NOTHING
+                        """)
+                .param("tenantId", command.tenantId()).param("sourceTaskId", sourceTaskId)
+                .param("sourceTaskType", command.sourceTaskType())
+                .param("recoveryType", command.recoveryType()).param("recoveryRef", command.recoveryRef())
+                .param("recoveryEventId", command.eventId())
+                .param("recoveredAt", timestamptz(command.recoveredAt()))
+                .param("correlationId", command.correlationId()).update();
+        TaskFailureRecovery stored = findTaskFailureRecovery(command.tenantId(), sourceTaskId);
+        if (stored == null) {
+            throw new IllegalStateException("Task failure recovery marker was not persisted");
+        }
+        if (inserted == 0 && (!command.sourceTaskType().equals(stored.sourceTaskType())
+                || !command.recoveryType().equals(stored.recoveryType())
+                || !command.recoveryRef().equals(stored.recoveryRef())
+                || !command.eventId().equals(stored.recoveryEventId())
+                || !command.recoveredAt().equals(stored.recoveredAt()))) {
+            throw new IllegalStateException("Task failure was already bound to another recovery fact");
+        }
+    }
+
+    private TaskFailureRecovery findTaskFailureRecovery(String tenantId, UUID sourceTaskId) {
+        return jdbc.sql("""
+                        SELECT source_task_type, recovery_type, recovery_ref,
+                               recovery_event_id, recovered_at
+                          FROM ops_task_failure_recovery
+                         WHERE tenant_id=:tenantId AND source_task_id=:sourceTaskId
+                        """)
+                .param("tenantId", tenantId).param("sourceTaskId", sourceTaskId)
+                .query((rs, row) -> new TaskFailureRecovery(
+                        rs.getString("source_task_type"), rs.getString("recovery_type"),
+                        rs.getString("recovery_ref"), rs.getObject("recovery_event_id", UUID.class),
+                        rs.getObject("recovered_at", java.time.OffsetDateTime.class).toInstant()))
+                .optional().orElse(null);
+    }
+
+    private List<TaskFailureExceptionState> findTaskFailureExceptions(
+            String tenantId,
+            UUID sourceTaskId,
+            String sourceTaskType
+    ) {
+        return jdbc.sql("""
+                        SELECT exception_id, handling_task_id, status, aggregate_version
+                          FROM ops_operational_exception
+                         WHERE tenant_id=:tenantId AND source_type='TASK'
+                           AND source_id=:sourceId AND source_task_type=:sourceTaskType
+                         ORDER BY opened_at, exception_id
+                         FOR UPDATE
+                        """)
+                .param("tenantId", tenantId).param("sourceId", sourceTaskId.toString())
+                .param("sourceTaskType", sourceTaskType)
+                .query((rs, row) -> new TaskFailureExceptionState(
+                        rs.getObject("exception_id", UUID.class),
+                        rs.getObject("handling_task_id", UUID.class),
+                        rs.getString("status"), rs.getLong("aggregate_version")))
+                .list();
+    }
+
+    private void lockTaskFailureStream(String tenantId, UUID sourceTaskId) {
+        jdbc.sql("""
+                        SELECT 1
+                          FROM (SELECT pg_advisory_xact_lock(
+                                   hashtextextended(:lockKey, 0))) AS acquired
+                        """)
+                .param("lockKey", tenantId + "|TASK_FAILURE|" + sourceTaskId)
+                .query(Integer.class).single();
+    }
+
+    private void appendTaskFailureResolvedEvent(
+            String tenantId,
+            String correlationId,
+            UUID exceptionId,
+            UUID sourceTaskId,
+            String sourceTaskType,
+            String recoveryType,
+            String recoveryRef,
+            UUID handlingTaskId,
+            String handlingTaskStatus,
+            long aggregateVersion,
+            UUID recoveryEventId,
+            Instant resolvedAt
+    ) {
+        String resolutionCode = "OUTBOUND_DELIVERY_RECOVERED";
+        String actionRef = recoveryActionRef(recoveryEventId);
+        String payload = serialize(new TaskFailureExceptionResolvedPayload(
+                exceptionId, sourceTaskId, sourceTaskType, recoveryType, recoveryRef,
+                handlingTaskId, handlingTaskStatus, resolutionCode, actionRef,
+                recoveryEventId, resolvedAt));
+        outbox.append(new OutboxEvent(
+                UUID.randomUUID(), UUID.randomUUID(), "operations",
+                "operational.exception.resolved", 2,
+                "OperationalException", exceptionId.toString(), aggregateVersion,
+                tenantId, correlationId, recoveryEventId.toString(), exceptionId.toString(),
+                payload, Sha256.digest(payload), resolvedAt));
+    }
+
+    private static String recoveryActionRef(UUID recoveryEventId) {
+        return "event:integration.outbound-delivery-recovered:" + recoveryEventId;
+    }
+
     private OperationalExceptionView findBySource(
             String tenantId,
             UUID sourceTaskId,
@@ -334,6 +573,7 @@ final class DefaultOperationalExceptionService implements OperationalExceptionSe
         requireText(command.payloadDigest(), "payloadDigest");
         requireText(command.sourceTaskType(), "sourceTaskType");
         requireText(command.errorCode(), "errorCode");
+        Objects.requireNonNull(command.detectedAt(), "detectedAt must not be null");
         requireText(command.correlationId(), "correlationId");
         if (!command.payloadDigest().matches("[0-9a-f]{64}")) {
             throw new IllegalArgumentException("payloadDigest must be a SHA-256 hex digest");
@@ -384,6 +624,32 @@ final class DefaultOperationalExceptionService implements OperationalExceptionSe
         }
     }
 
+    private static void validate(ResolveTaskFailureExceptionsCommand command) {
+        Objects.requireNonNull(command, "command must not be null");
+        requireText(command.tenantId(), "tenantId");
+        Objects.requireNonNull(command.eventId(), "eventId must not be null");
+        requireText(command.payloadDigest(), "payloadDigest");
+        requireText(command.sourceTaskType(), "sourceTaskType");
+        Objects.requireNonNull(command.sourceTaskIds(), "sourceTaskIds must not be null");
+        requireText(command.recoveryType(), "recoveryType");
+        requireText(command.recoveryRef(), "recoveryRef");
+        Objects.requireNonNull(command.recoveredAt(), "recoveredAt must not be null");
+        requireText(command.correlationId(), "correlationId");
+        if (command.schemaVersion() != 1
+                || !command.payloadDigest().matches("[0-9a-f]{64}")) {
+            throw new IllegalArgumentException("unsupported recovery schema or payload digest");
+        }
+        if (!"integration.byd.submit-review".equals(command.sourceTaskType())
+                || !"OUTBOUND_DELIVERY_ACKNOWLEDGED".equals(command.recoveryType())) {
+            throw new IllegalArgumentException("unsupported Task failure recovery type");
+        }
+        if (command.sourceTaskIds().isEmpty()
+                || command.sourceTaskIds().stream().anyMatch(Objects::isNull)
+                || command.sourceTaskIds().stream().distinct().count() != command.sourceTaskIds().size()) {
+            throw new IllegalArgumentException("sourceTaskIds must be non-empty and unique");
+        }
+    }
+
     private String serialize(Object value) {
         try {
             return objectMapper.writeValueAsString(value);
@@ -411,6 +677,23 @@ final class DefaultOperationalExceptionService implements OperationalExceptionSe
             int occurrenceCount,
             long aggregateVersion,
             UUID resolutionEventId
+    ) {
+    }
+
+    private record TaskFailureRecovery(
+            String sourceTaskType,
+            String recoveryType,
+            String recoveryRef,
+            UUID recoveryEventId,
+            Instant recoveredAt
+    ) {
+    }
+
+    private record TaskFailureExceptionState(
+            UUID exceptionId,
+            UUID handlingTaskId,
+            String status,
+            long aggregateVersion
     ) {
     }
 }

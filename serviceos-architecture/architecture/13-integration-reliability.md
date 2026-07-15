@@ -10,6 +10,7 @@ status: Proposed
 > M58 已实现 BYD 提审的不可变 `OutboundDelivery`/`DeliveryAttempt`/
 > `ExternalAcknowledgement`、Task 唯一重试时钟和 UNKNOWN 人工接管的最小纵向切片。
 > M59 已实现 UNKNOWN Delivery 的单笔授权人工重发、不可变 ReplayRequest 与版本/审批门禁。
+> M60 已在该重发取得严格 ACK 后发布恢复事实，并幂等闭环对应运营异常及处理乱序事件。
 > 其他人工处置、其他 CPIM 消息、通用 Connector 和批量重放仍未实现；本章其余 Proposed 设计不能据此视为已完成。
 
 ## 1. 目标
@@ -191,6 +192,8 @@ affectedObjectRefs[]
 ```
 
 重复回执幂等；相互矛盾的回执创建 `type=INTEGRATION` 的 OperationalException，不覆盖旧结果。
+M60 的 BYD 提审重发只有在严格 ACK 落账后才发布恢复事件；发送成功、超时或本地猜测均不能触发
+异常闭环。
 
 ## 13. 人工修复与重放
 

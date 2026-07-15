@@ -5,6 +5,7 @@ import com.serviceos.operations.api.OpenTaskFailureCommand;
 import com.serviceos.operations.api.OperationalExceptionService;
 import com.serviceos.operations.api.OperationalExceptionView;
 import com.serviceos.operations.api.ResolveServiceAssignmentTimeoutCommand;
+import com.serviceos.operations.api.ResolveTaskFailureExceptionsCommand;
 import com.serviceos.reliability.spi.OutboxMessage;
 import com.serviceos.shared.Sha256;
 import org.junit.jupiter.api.Test;
@@ -88,6 +89,11 @@ class ServiceAssignmentRecoveryHandlerTest {
         @Override
         public void resolveServiceAssignmentTimeout(ResolveServiceAssignmentTimeoutCommand command) {
             recovery = command;
+        }
+
+        @Override
+        public void resolveTaskFailures(ResolveTaskFailureExceptionsCommand command) {
+            throw new UnsupportedOperationException();
         }
     }
 }

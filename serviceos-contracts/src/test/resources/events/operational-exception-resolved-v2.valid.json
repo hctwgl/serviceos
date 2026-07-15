@@ -1,0 +1,25 @@
+{
+  "eventId": "93000000-0000-4000-8000-000000000001",
+  "eventType": "operational.exception.resolved",
+  "schemaVersion": 2,
+  "tenantId": "tenant-byd",
+  "correlationId": "corr-delivery-recovered",
+  "causationId": "93000000-0000-4000-8000-000000000002",
+  "aggregateType": "OperationalException",
+  "aggregateId": "93000000-0000-4000-8000-000000000003",
+  "aggregateVersion": 2,
+  "occurredAt": "2026-07-15T10:00:00Z",
+  "payload": {
+    "exceptionId": "93000000-0000-4000-8000-000000000003",
+    "sourceTaskId": "93000000-0000-4000-8000-000000000004",
+    "sourceTaskType": "integration.byd.submit-review",
+    "recoveryType": "OUTBOUND_DELIVERY_ACKNOWLEDGED",
+    "recoveryRef": "93000000-0000-4000-8000-000000000005",
+    "handlingTaskId": "93000000-0000-4000-8000-000000000006",
+    "handlingTaskStatus": "CANCELLED",
+    "resolutionCode": "OUTBOUND_DELIVERY_RECOVERED",
+    "resolutionActionRef": "event:integration.outbound-delivery-recovered:93000000-0000-4000-8000-000000000002",
+    "resolutionEventId": "93000000-0000-4000-8000-000000000002",
+    "resolvedAt": "2026-07-15T10:00:00Z"
+  }
+}

@@ -1,5 +1,6 @@
 package com.serviceos.operations.api;
 
+import java.time.Instant;
 import java.util.UUID;
 
 /**
@@ -14,6 +15,7 @@ public record OpenTaskFailureCommand(
         UUID sourceAttemptId,
         String sourceTaskType,
         String errorCode,
+        Instant detectedAt,
         String correlationId
 ) {
 }

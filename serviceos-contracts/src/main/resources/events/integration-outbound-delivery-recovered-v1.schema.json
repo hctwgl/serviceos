@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/integration-outbound-delivery-recovered-v1.schema.json",
+  "title": "IntegrationOutboundDeliveryRecoveredV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId", "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"},
+    "eventType": {"const": "integration.outbound-delivery-recovered"},
+    "schemaVersion": {"const": 1},
+    "tenantId": {"type": "string", "minLength": 1},
+    "correlationId": {"type": "string", "minLength": 1},
+    "causationId": {"type": "string", "format": "uuid"},
+    "aggregateType": {"const": "OutboundDelivery"},
+    "aggregateId": {"type": "string", "format": "uuid"},
+    "aggregateVersion": {"type": "integer", "minimum": 1},
+    "occurredAt": {"type": "string", "format": "date-time"},
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deliveryId", "successfulExecutionTaskId", "recoveredTaskIds", "acknowledgedAt"],
+      "properties": {
+        "deliveryId": {"type": "string", "format": "uuid"},
+        "successfulExecutionTaskId": {"type": "string", "format": "uuid"},
+        "recoveredTaskIds": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {"type": "string", "format": "uuid"}
+        },
+        "acknowledgedAt": {"type": "string", "format": "date-time"}
+      }
+    }
+  }
+}

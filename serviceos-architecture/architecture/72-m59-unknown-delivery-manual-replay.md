@@ -49,7 +49,8 @@ M59 延续 M58、ARCH-13、ADR-010/014 和 API-04。项目负责人于 2026-07-1
 ## 4. 明确非目标
 
 - 不实现“人工标记已送达”“放弃交付”或远端状态查询；
-- 不自动关闭 M58 创建的 OperationalException/HUMAN Task；
+- M59 本身不自动关闭 M58 创建的 OperationalException/HUMAN Task；该后续能力已由 M60 在严格 ACK
+  恢复事实驱动下实现；
 - 不实现批量 ReplayRequest 审批、二级审批/MFA 或通用 Connector；
 - 不实现其他 CPIM 消息、生产凭据/对象存储、真实 sandbox、Portal 或通知中心；
 - 不重新实现 Evidence 主线，不改变 ReviewCase 状态机。

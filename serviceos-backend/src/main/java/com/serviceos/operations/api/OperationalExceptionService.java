@@ -6,4 +6,6 @@ public interface OperationalExceptionService {
     OperationalExceptionView openFromServiceAssignmentTimeout(OpenServiceAssignmentTimeoutCommand command);
 
     void resolveServiceAssignmentTimeout(ResolveServiceAssignmentTimeoutCommand command);
+
+    void resolveTaskFailures(ResolveTaskFailureExceptionsCommand command);
 }

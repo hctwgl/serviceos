@@ -6,6 +6,8 @@
 > M58 范围内的 Delivery/Attempt/Acknowledgement 分离已于 2026-07-15 获项目负责人明确批准并实现。
 > M59 范围内同一 Delivery 的单笔 UNKNOWN 人工重发、冻结 payload/external key 复用、
 > ReplayRequest 审批/版本门禁已于 2026-07-15 获项目负责人明确批准并实现。
+> M60 仅在获权重发取得严格 ACK 后发布恢复事实并闭环对应运营异常；不引入人工猜测结果，
+> 该子集已于 2026-07-15 获明确批准并实现。
 > ADR 的其余通用 Connector 范围仍保持 Proposed，不因局部落地外推为全局 Accepted。
 
 ## 背景

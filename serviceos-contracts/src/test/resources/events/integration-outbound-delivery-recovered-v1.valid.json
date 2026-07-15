@@ -1,0 +1,21 @@
+{
+  "eventId": "92000000-0000-4000-8000-000000000001",
+  "eventType": "integration.outbound-delivery-recovered",
+  "schemaVersion": 1,
+  "tenantId": "tenant-byd",
+  "correlationId": "corr-delivery-recovered",
+  "causationId": "92000000-0000-4000-8000-000000000002",
+  "aggregateType": "OutboundDelivery",
+  "aggregateId": "92000000-0000-4000-8000-000000000003",
+  "aggregateVersion": 7,
+  "occurredAt": "2026-07-15T10:00:00Z",
+  "payload": {
+    "deliveryId": "92000000-0000-4000-8000-000000000003",
+    "successfulExecutionTaskId": "92000000-0000-4000-8000-000000000005",
+    "recoveredTaskIds": [
+      "92000000-0000-4000-8000-000000000004",
+      "92000000-0000-4000-8000-000000000005"
+    ],
+    "acknowledgedAt": "2026-07-15T10:00:00Z"
+  }
+}

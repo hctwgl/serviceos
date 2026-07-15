@@ -44,7 +44,7 @@ final class TaskFailureOperationalExceptionHandler implements OutboxMessageHandl
         exceptions.openFromTaskFailure(new OpenTaskFailureCommand(
                 message.tenantId(), message.eventId(), message.schemaVersion(), message.payloadDigest(),
                 payload.taskId(), payload.attemptId(), payload.taskType(), payload.errorCode(),
-                message.correlationId()));
+                message.occurredAt(), message.correlationId()));
     }
 
     private Payload read(String payload) {

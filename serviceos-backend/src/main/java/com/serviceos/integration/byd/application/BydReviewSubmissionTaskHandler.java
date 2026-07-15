@@ -205,7 +205,8 @@ final class BydReviewSubmissionTaskHandler implements AutomatedTaskHandler {
     private TaskExecutionResult finalizeLocally(TaskExecutionContext context, UUID deliveryId)
             throws TaskExecutionException {
         try {
-            completion.finalizeDelivered(context.tenantId(), deliveryId, context.correlationId());
+            completion.finalizeDelivered(
+                    context.tenantId(), deliveryId, context.taskId(), context.correlationId());
             return TaskExecutionResult.succeeded("outbound-delivery:" + deliveryId);
         } catch (RuntimeException exception) {
             // 外部已明确接受，后续重试只执行本地幂等 Case/Route 落账，不会再次发 HTTP。

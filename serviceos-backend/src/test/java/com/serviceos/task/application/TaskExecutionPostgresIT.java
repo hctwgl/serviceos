@@ -5,6 +5,7 @@ import com.serviceos.operations.api.OpenTaskFailureCommand;
 import com.serviceos.operations.api.OpenServiceAssignmentTimeoutCommand;
 import com.serviceos.operations.api.OperationalExceptionService;
 import com.serviceos.operations.api.ResolveServiceAssignmentTimeoutCommand;
+import com.serviceos.operations.api.ResolveTaskFailureExceptionsCommand;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.task.api.ScheduleAutomatedTaskCommand;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -70,7 +72,8 @@ class TaskExecutionPostgresIT {
     @BeforeEach
     void cleanTables() {
         jdbc.sql("""
-                        TRUNCATE TABLE ops_exception_ack_result, ops_operational_exception,
+                        TRUNCATE TABLE ops_task_failure_recovery,
+                            ops_exception_ack_result, ops_operational_exception,
                             tsk_task_reassignment_command_result,
                             tsk_task_execution_guard, tsk_task_assignment, tsk_task_assignment_batch,
                             tsk_human_task_command_result, tsk_task_execution_attempt, tsk_task,
@@ -166,7 +169,8 @@ class TaskExecutionPostgresIT {
         UUID sourceAttemptId = UUID.randomUUID();
         OpenTaskFailureCommand command = new OpenTaskFailureCommand(
                 "tenant-test", eventId, 1, "1".repeat(64), sourceTaskId, sourceAttemptId,
-                "test.task", "REMOTE_RESULT_UNKNOWN", "corr-final-failure");
+                "test.task", "REMOTE_RESULT_UNKNOWN", Instant.parse("2026-07-14T00:10:00Z"),
+                "corr-final-failure");
 
         var first = operationalExceptions.openFromTaskFailure(command);
         var replay = operationalExceptions.openFromTaskFailure(command);
@@ -184,9 +188,92 @@ class TaskExecutionPostgresIT {
         assertThatThrownBy(() -> operationalExceptions.openFromTaskFailure(
                 new OpenTaskFailureCommand(
                         "tenant-test", eventId, 1, "2".repeat(64), sourceTaskId, sourceAttemptId,
-                        "test.task", "MUTATED", "corr-final-failure")))
+                        "test.task", "MUTATED", Instant.parse("2026-07-14T00:10:00Z"),
+                        "corr-final-failure")))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.EVENT_PAYLOAD_MISMATCH));
+    }
+
+    @Test
+    void recoveryBeforeFailureEventCreatesResolvedHistoryWithoutHandlingTask() {
+        ScheduledTaskView sourceTask = scheduling.schedule(new ScheduleAutomatedTaskCommand(
+                "tenant-test", "integration.byd.submit-review", "delivery-recovery-ordering",
+                "outbound-delivery:ordering", "7".repeat(64), 700,
+                Instant.parse("2026-07-14T00:00:00Z"), 1, "corr-recovery-ordering"));
+        UUID recoveryEventId = UUID.randomUUID();
+        UUID deliveryId = UUID.randomUUID();
+        Instant recoveredAt = Instant.parse("2026-07-14T00:20:00Z");
+        ResolveTaskFailureExceptionsCommand recovery = new ResolveTaskFailureExceptionsCommand(
+                "tenant-test", recoveryEventId, 1, "8".repeat(64),
+                "integration.byd.submit-review", List.of(sourceTask.taskId()),
+                "OUTBOUND_DELIVERY_ACKNOWLEDGED", deliveryId.toString(),
+                recoveredAt, "corr-recovery-ordering");
+
+        operationalExceptions.resolveTaskFailures(recovery);
+        operationalExceptions.resolveTaskFailures(recovery);
+        assertThatThrownBy(() -> operationalExceptions.resolveTaskFailures(
+                new ResolveTaskFailureExceptionsCommand(
+                        recovery.tenantId(), recovery.eventId(), recovery.schemaVersion(), "a".repeat(64),
+                        recovery.sourceTaskType(), recovery.sourceTaskIds(), recovery.recoveryType(),
+                        recovery.recoveryRef(), recovery.recoveredAt(), recovery.correlationId())))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.EVENT_PAYLOAD_MISMATCH));
+        UUID failureEventId = UUID.randomUUID();
+        var resolved = operationalExceptions.openFromTaskFailure(new OpenTaskFailureCommand(
+                "tenant-test", failureEventId, 1, "9".repeat(64), sourceTask.taskId(),
+                UUID.randomUUID(), "integration.byd.submit-review", "REMOTE_RESULT_UNKNOWN",
+                Instant.parse("2026-07-14T00:10:00Z"), "corr-recovery-ordering"));
+
+        assertThat(resolved.status()).isEqualTo("RESOLVED");
+        assertThat(resolved.handlingTaskId()).isNull();
+        assertThat(jdbc.sql("SELECT count(*) FROM ops_task_failure_recovery")
+                .query(Long.class).single()).isOne();
+        assertThat(jdbc.sql("SELECT count(*) FROM tsk_task WHERE task_kind='HUMAN'")
+                .query(Long.class).single()).isZero();
+        assertThat(jdbc.sql("""
+                SELECT concat(schema_version, ':', (payload::jsonb)->>'handlingTaskStatus')
+                  FROM rel_outbox_event WHERE event_type='operational.exception.resolved'
+                """).query(String.class).single()).isEqualTo("2:NOT_CREATED");
+        assertThat(count("rel_inbox_record")).isEqualTo(2);
+        assertThatThrownBy(() -> jdbc.sql(
+                        "DELETE FROM ops_task_failure_recovery WHERE source_task_id=:taskId")
+                .param("taskId", sourceTask.taskId()).update())
+                .isInstanceOf(DataAccessException.class)
+                .hasMessageContaining("task failure recovery fact is immutable");
+    }
+
+    @Test
+    void taskFailureRecoveryRollsBackMarkerWhenHandlingTaskCancellationFails() {
+        ScheduledTaskView sourceTask = scheduling.schedule(new ScheduleAutomatedTaskCommand(
+                "tenant-test", "integration.byd.submit-review", "delivery-recovery-rollback",
+                "outbound-delivery:rollback", "b".repeat(64), 700,
+                Instant.parse("2026-07-14T00:00:00Z"), 1, "corr-recovery-rollback"));
+        var opened = operationalExceptions.openFromTaskFailure(new OpenTaskFailureCommand(
+                "tenant-test", UUID.randomUUID(), 1, "c".repeat(64), sourceTask.taskId(),
+                UUID.randomUUID(), "integration.byd.submit-review", "REMOTE_RESULT_UNKNOWN",
+                Instant.parse("2026-07-14T00:10:00Z"), "corr-recovery-rollback"));
+        jdbc.sql("UPDATE tsk_task SET business_key='mutated' WHERE task_id=:taskId")
+                .param("taskId", opened.handlingTaskId()).update();
+
+        assertThatThrownBy(() -> operationalExceptions.resolveTaskFailures(
+                new ResolveTaskFailureExceptionsCommand(
+                        "tenant-test", UUID.randomUUID(), 1, "d".repeat(64),
+                        "integration.byd.submit-review", List.of(sourceTask.taskId()),
+                        "OUTBOUND_DELIVERY_ACKNOWLEDGED", UUID.randomUUID().toString(),
+                        Instant.parse("2026-07-14T00:20:00Z"), "corr-recovery-rollback")))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.TASK_SCHEDULE_CONFLICT));
+
+        assertThat(jdbc.sql("SELECT count(*) FROM ops_task_failure_recovery")
+                .query(Long.class).single()).isZero();
+        assertThat(jdbc.sql("SELECT status FROM ops_operational_exception")
+                .query(String.class).single()).isEqualTo("OPEN");
+        assertThat(jdbc.sql("SELECT count(*) FROM rel_inbox_record")
+                .query(Long.class).single()).isOne();
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM rel_outbox_event
+                 WHERE event_type='operational.exception.resolved' AND schema_version=2
+                """).query(Long.class).single()).isZero();
     }
 
     @Test

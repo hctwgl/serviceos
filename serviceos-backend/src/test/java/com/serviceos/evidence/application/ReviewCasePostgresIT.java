@@ -152,7 +152,7 @@ class ReviewCasePostgresIT {
                     evd_evidence_item, evd_evidence_upload_session, evd_evidence_slot,
                     evd_task_evidence_resolution,
                     fil_download_authorization, fil_scan_result, fil_stored_file, fil_upload_session,
-                    ops_exception_ack_result, ops_operational_exception,
+                    ops_task_failure_recovery, ops_exception_ack_result, ops_operational_exception,
                     tsk_task_execution_guard, tsk_task_assignment, tsk_task,
                     cfg_configuration_bundle_item, cfg_configuration_bundle,
                     cfg_configuration_asset_version, prj_project,
@@ -296,6 +296,11 @@ class ReviewCasePostgresIT {
         OutboundDeliveryView unknown = outboundDeliveries.get(
                 opsUser(), "corr-replay-unknown", created.deliveryId());
         assertThat(unknown.status()).isEqualTo("UNKNOWN");
+        OutboxMessage originalFailure = latestEvent("task.execution.manual-intervention-required");
+        handlers.stream()
+                .filter(handler -> handler.supports(
+                        originalFailure.eventType(), originalFailure.schemaVersion()))
+                .forEach(handler -> handler.handle(originalFailure));
         assertThatThrownBy(() -> jdbc.sql("""
                 UPDATE int_outbound_delivery SET status='SENDING', aggregate_version=aggregate_version+1
                  WHERE delivery_id=:id
@@ -358,6 +363,26 @@ class ReviewCasePostgresIT {
             assertThat(result.resultCode()).isEqualTo("BYD_ERRNO_0");
             assertThat(result.approvalRef()).isEqualTo("approval://integration/059/1");
         });
+        OutboxMessage recovery = latestEvent("integration.outbound-delivery-recovered");
+        handlers.stream()
+                .filter(handler -> handler.supports(recovery.eventType(), recovery.schemaVersion()))
+                .forEach(handler -> handler.handle(recovery));
+        assertThat(jdbc.sql("""
+                SELECT status || ':' || resolution_code
+                  FROM ops_operational_exception WHERE source_id=:sourceTaskId
+                """).param("sourceTaskId", created.executionTaskId().toString())
+                .query(String.class).single())
+                .isEqualTo("RESOLVED:OUTBOUND_DELIVERY_RECOVERED");
+        assertThat(jdbc.sql("""
+                SELECT status FROM tsk_task
+                 WHERE task_type='operations.resolve-exception'
+                """).query(String.class).single()).isEqualTo("CANCELLED");
+        assertThat(jdbc.sql("SELECT count(*) FROM ops_task_failure_recovery")
+                .query(Long.class).single()).isEqualTo(2);
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM rel_outbox_event
+                 WHERE event_type='operational.exception.resolved' AND schema_version=2
+                """).query(Long.class).single()).isOne();
         assertThat(jdbc.sql("""
                 SELECT count(*) FROM rel_outbox_event
                  WHERE event_type='integration.outbound-delivery-replay-requested'

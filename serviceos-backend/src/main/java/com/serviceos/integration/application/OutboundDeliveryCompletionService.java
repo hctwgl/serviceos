@@ -22,7 +22,9 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -61,7 +63,13 @@ public class OutboundDeliveryCompletionService {
     }
 
     @Transactional
-    public OutboundDeliveryView finalizeDelivered(String tenantId, UUID deliveryId, String correlationId) {
+    public OutboundDeliveryView finalizeDelivered(
+            String tenantId,
+            UUID deliveryId,
+            UUID successfulExecutionTaskId,
+            String correlationId
+    ) {
+        Objects.requireNonNull(successfulExecutionTaskId, "successfulExecutionTaskId must not be null");
         OutboundDeliveryRepository.DeliveryRecord record = deliveries.find(tenantId, deliveryId)
                 .orElseThrow(() -> new IllegalStateException("Delivered OutboundDelivery disappeared"));
         OutboundDeliveryView delivery = record.view();
@@ -96,12 +104,16 @@ public class OutboundDeliveryCompletionService {
                 acknowledged.deliveryId(), acknowledged.projectId(), acknowledged.sourceReviewCaseId(),
                 clientCase.reviewCaseId(), route.reviewRouteId(), acknowledged.externalOrderCode(),
                 acknowledged.payloadDigest(), acknowledged.mappingVersionId(), now));
+        UUID acknowledgedEventId = UUID.randomUUID();
         outbox.append(new OutboxEvent(
-                UUID.randomUUID(), UUID.randomUUID(), "integration",
+                UUID.randomUUID(), acknowledgedEventId, "integration",
                 "integration.outbound-delivery-acknowledged", 1,
                 "OutboundDelivery", acknowledged.deliveryId().toString(), acknowledged.aggregateVersion(),
-                tenantId, correlationId, acknowledged.executionTaskId().toString(),
+                tenantId, correlationId, successfulExecutionTaskId.toString(),
                 acknowledged.sourceReviewCaseId().toString(), payload, Sha256.digest(payload), now));
+        appendRecoveryEventIfRequired(
+                tenantId, acknowledged, successfulExecutionTaskId,
+                acknowledgedEventId, correlationId, now);
         audit.append(new AuditEntry(
                 UUID.randomUUID(), tenantId, adapterPrincipalId,
                 "OUTBOUND_REVIEW_SUBMISSION_ACKNOWLEDGED", AUTH_POLICY,
@@ -110,6 +122,36 @@ public class OutboundDeliveryCompletionService {
                 Sha256.digest(acknowledged.payloadDigest() + "|" + clientCase.reviewCaseId()),
                 correlationId, now));
         return acknowledged;
+    }
+
+    private void appendRecoveryEventIfRequired(
+            String tenantId,
+            OutboundDeliveryView acknowledged,
+            UUID successfulExecutionTaskId,
+            UUID acknowledgedEventId,
+            String correlationId,
+            Instant acknowledgedAt
+    ) {
+        if (acknowledged.replayRequests().isEmpty()) {
+            return;
+        }
+        // 同一 Delivery 的 UNKNOWN 历史可能跨越多个重发 Task；明确 ACK 后它们都已失去人工处理必要性。
+        LinkedHashSet<UUID> recoveredTaskIds = new LinkedHashSet<>();
+        recoveredTaskIds.add(acknowledged.executionTaskId());
+        acknowledged.replayRequests().forEach(replay -> recoveredTaskIds.add(replay.executionTaskId()));
+        if (!recoveredTaskIds.contains(successfulExecutionTaskId)) {
+            throw new IllegalStateException("Successful replay Task is not bound to OutboundDelivery");
+        }
+        String recoveryPayload = json(new DeliveryRecoveredPayload(
+                acknowledged.deliveryId(), successfulExecutionTaskId,
+                List.copyOf(recoveredTaskIds), acknowledgedAt));
+        outbox.append(new OutboxEvent(
+                UUID.randomUUID(), UUID.randomUUID(), "integration",
+                "integration.outbound-delivery-recovered", 1,
+                "OutboundDelivery", acknowledged.deliveryId().toString(), acknowledged.aggregateVersion(),
+                tenantId, correlationId, acknowledgedEventId.toString(),
+                acknowledged.deliveryId().toString(), recoveryPayload,
+                Sha256.digest(recoveryPayload), acknowledgedAt));
     }
 
     private String json(Object value) {
@@ -136,6 +178,14 @@ public class OutboundDeliveryCompletionService {
             String externalOrderCode,
             String payloadDigest,
             String mappingVersionId,
+            Instant acknowledgedAt
+    ) {
+    }
+
+    private record DeliveryRecoveredPayload(
+            UUID deliveryId,
+            UUID successfulExecutionTaskId,
+            List<UUID> recoveredTaskIds,
             Instant acknowledgedAt
     ) {
     }

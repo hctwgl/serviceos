@@ -57,3 +57,7 @@
 - [M54 车企回执影响对象权威校验验收矩阵](51-m54-external-review-affected-target-validation-acceptance.md)
 - [M55 CLIENT ReviewCase 来源与回执批次门禁验收矩阵](52-m55-client-review-case-origin-acceptance.md)
 - [M56 BYD CPIM InboundEnvelope 与 CanonicalMessage 验收矩阵](53-m56-inbound-envelope-canonical-message-acceptance.md)
+- [M57 BYD 厂端审核回调验收矩阵](54-m57-byd-review-callback-acceptance.md)
+- [M58 BYD 提审 OutboundDelivery 验收矩阵](55-m58-byd-review-submission-outbound-delivery-acceptance.md)
+- [M59 UNKNOWN 外部交付人工重发验收矩阵](56-m59-unknown-delivery-manual-replay-acceptance.md)
+- [M60 外部交付恢复异常自动闭环验收矩阵](57-m60-outbound-delivery-exception-auto-closure-acceptance.md)
