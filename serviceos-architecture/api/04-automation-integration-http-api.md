@@ -97,6 +97,9 @@ status: Proposed
 
 ## 3. SLA
 
+> M61 未新增 HTTP API；当前仅通过内部 `SlaClockService` 查询 Task SLA，并由 Task 事件驱动时钟。
+> 下表查询、暂停、恢复和重算端点仍为 Proposed，不能视为已发布契约。
+
 | 方法与路径 | 用途/命令 | 关键载荷 | 成功 |
 |---|---|---|---|
 | `GET /work-orders/{id}/sla-instances` | 工单/任务 SLA | — | 200 |

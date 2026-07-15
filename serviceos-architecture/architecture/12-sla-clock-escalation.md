@@ -6,6 +6,11 @@ status: Proposed
 
 # SLA 时钟、预警与升级设计
 
+> M61 已实现 Task `TASK_CREATED → TASK_COMPLETED` 的 ELAPSED 自然时长子集：Workflow 显式
+> `slaRef`、SLA Version/摘要冻结、RUNNING/BREACHED/MET/MET_LATE、单一 TARGET_DUE milestone、
+> Inbox/Outbox 和 PostgreSQL 对账。本文其余 BUSINESS 日历、暂停、预警、升级、通知、重算和多 subject
+> 仍为 Proposed，不得从 M61 外推为完整 SLA 平台。
+
 ## 1. 目标
 
 SLA 能力用于项目、业务和节点时效，不只是工单上的预计完成时间。它必须支持不同车企、业务类型、风险等级、工作日历、暂停原因、预警阈值和多级升级，并保留可重算的时钟历史。

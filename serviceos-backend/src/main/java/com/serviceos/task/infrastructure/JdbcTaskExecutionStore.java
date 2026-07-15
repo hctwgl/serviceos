@@ -278,7 +278,7 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
                             project_id, work_order_id, workflow_instance_id, stage_instance_id,
                             workflow_node_instance_id, workflow_node_id,
                             workflow_definition_version_id, workflow_definition_digest,
-                            configuration_bundle_id, configuration_bundle_digest, stage_code, form_ref
+                            configuration_bundle_id, configuration_bundle_digest, stage_code, form_ref, sla_ref
                         ) VALUES (
                             :taskId, :tenantId, :taskType, :taskKind, :businessKey,
                             :payloadRef, :payloadDigest, :priority, :status, :readyAt,
@@ -286,7 +286,7 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
                             :projectId, :workOrderId, :workflowInstanceId, :stageInstanceId,
                             :workflowNodeInstanceId, :workflowNodeId,
                             :workflowDefinitionVersionId, :workflowDefinitionDigest,
-                            :configurationBundleId, :configurationBundleDigest, :stageCode, :formRef
+                            :configurationBundleId, :configurationBundleDigest, :stageCode, :formRef, :slaRef
                         )
                         ON CONFLICT (tenant_id, task_type, business_key) DO NOTHING
                         """)
@@ -315,18 +315,20 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
                 .param("configurationBundleDigest", command.configurationBundleDigest())
                 .param("stageCode", command.stageCode())
                 .param("formRef", command.formRef(), java.sql.Types.VARCHAR)
+                .param("slaRef", command.slaRef(), java.sql.Types.VARCHAR)
                 .update();
 
         StoredTask stored = findByBusinessKey(
                 command.tenantId(), command.taskType(), command.workflowNodeInstanceId().toString());
         if (inserted == 0 && (!stored.payloadDigest().equals(command.payloadDigest())
                 || !Objects.equals(stored.formRef(), command.formRef())
+                || !Objects.equals(stored.slaRef(), command.slaRef())
                 || !Objects.equals(stored.stageCode(), command.stageCode())
                 || !Objects.equals(stored.configurationBundleId(), command.configurationBundleId())
                 || !Objects.equals(stored.configurationBundleDigest(), command.configurationBundleDigest()))) {
             throw new BusinessProblem(
                     ProblemCode.TASK_SCHEDULE_CONFLICT,
-                    "The workflow node instance is already bound to a different task payload or form reference");
+                    "The workflow node instance is already bound to different payload or frozen references");
         }
         if (inserted == 1) {
             appendTaskCreated(command, taskId, status, now);
@@ -659,7 +661,7 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
 
     private StoredTask findByBusinessKey(String tenantId, String taskType, String businessKey) {
         return jdbc.sql("""
-                        SELECT task_id, tenant_id, task_type, business_key, payload_digest, form_ref,
+                        SELECT task_id, tenant_id, task_type, business_key, payload_digest, form_ref, sla_ref,
                                configuration_bundle_id, configuration_bundle_digest, stage_code,
                                status, next_run_at, attempt_count, max_attempts, version
                           FROM tsk_task
@@ -701,7 +703,8 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
     }
 
     private record StoredTask(
-            UUID taskId, String tenantId, String taskType, String businessKey, String payloadDigest, String formRef,
+            UUID taskId, String tenantId, String taskType, String businessKey, String payloadDigest,
+            String formRef, String slaRef,
             UUID configurationBundleId, String configurationBundleDigest, String stageCode,
             String status, Instant nextRunAt, int attemptCount, int maxAttempts, long version
     ) {

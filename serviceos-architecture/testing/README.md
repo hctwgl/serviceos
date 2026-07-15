@@ -61,3 +61,4 @@
 - [M58 BYD 提审 OutboundDelivery 验收矩阵](55-m58-byd-review-submission-outbound-delivery-acceptance.md)
 - [M59 UNKNOWN 外部交付人工重发验收矩阵](56-m59-unknown-delivery-manual-replay-acceptance.md)
 - [M60 外部交付恢复异常自动闭环验收矩阵](57-m60-outbound-delivery-exception-auto-closure-acceptance.md)
+- [M61 Task 自然时长 SLA 时钟验收矩阵](58-m61-task-elapsed-sla-clock-acceptance.md)

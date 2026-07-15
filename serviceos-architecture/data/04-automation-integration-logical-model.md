@@ -109,6 +109,9 @@ status: Proposed
 
 ## 4. SLA
 
+> M61 物理实现仅包含 Task ELAPSED 子集：`sla_instance`、单一 RUNNING `sla_clock_segment` 与
+> TARGET_DUE `sla_milestone`。以下业务日历、暂停、升级和重算对象仍是逻辑规划。
+
 ### business_calendar_version / calendar_interval / calendar_exception
 
 保存时区、周工作时段、节假日、调休和特殊停工日。版本内容不可变。

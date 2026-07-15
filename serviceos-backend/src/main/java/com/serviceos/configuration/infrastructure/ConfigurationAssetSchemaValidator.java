@@ -36,8 +36,9 @@ import java.util.Set;
 final class ConfigurationAssetSchemaValidator {
     private static final String FORM_SCHEMA_VERSION = "1.0.0";
     private static final String EVIDENCE_SCHEMA_VERSION = "1.0.0";
+    private static final String SLA_SCHEMA_VERSION = "1.0.0";
     private static final Set<ConfigurationAssetType> SCHEMA_GOVERNED_TYPES = Set.of(
-            ConfigurationAssetType.FORM, ConfigurationAssetType.EVIDENCE);
+            ConfigurationAssetType.FORM, ConfigurationAssetType.EVIDENCE, ConfigurationAssetType.SLA);
 
     private final ObjectMapper objectMapper;
     private final Map<SchemaKey, JsonSchema> schemas;
@@ -59,7 +60,9 @@ final class ConfigurationAssetSchemaValidator {
                 new SchemaKey(ConfigurationAssetType.FORM, FORM_SCHEMA_VERSION),
                 loadSchema("configuration-schemas/form-v1.schema.json"),
                 new SchemaKey(ConfigurationAssetType.EVIDENCE, EVIDENCE_SCHEMA_VERSION),
-                loadSchema("configuration-schemas/evidence-v1.schema.json"));
+                loadSchema("configuration-schemas/evidence-v1.schema.json"),
+                new SchemaKey(ConfigurationAssetType.SLA, SLA_SCHEMA_VERSION),
+                loadSchema("configuration-schemas/sla-v1.schema.json"));
     }
 
     void validate(PublishConfigurationAssetCommand command) {
@@ -89,6 +92,7 @@ final class ConfigurationAssetSchemaValidator {
         String identityField = switch (command.assetType()) {
             case FORM -> "formKey";
             case EVIDENCE -> "templateKey";
+            case SLA -> "policyKey";
             default -> throw new IllegalStateException("schema-governed asset type has no identity field");
         };
         if (!command.assetKey().equals(definition.path(identityField).asText())) {
@@ -144,6 +148,44 @@ final class ConfigurationAssetSchemaValidator {
                 } else {
                     validateExpression(expression, Map.of(),
                             "EVIDENCE requiredWhen", item.path("evidenceKey").asText());
+                }
+            }
+        }
+        validateWorkflowSlaReferences(assets);
+    }
+
+    /** Workflow 的 slaRef 必须在同一冻结 Bundle 中精确命中 SLA，并显式覆盖该节点 taskType。 */
+    private void validateWorkflowSlaReferences(List<ConfigurationAssetDefinition> assets) {
+        Map<String, List<JsonNode>> slaByKey = new LinkedHashMap<>();
+        assets.stream().filter(asset -> asset.assetType() == ConfigurationAssetType.SLA).forEach(asset ->
+                slaByKey.computeIfAbsent(asset.assetKey(), ignored -> new java.util.ArrayList<>())
+                        .add(parse(asset.definitionJson())));
+        for (ConfigurationAssetDefinition asset : assets) {
+            if (asset.assetType() != ConfigurationAssetType.WORKFLOW) {
+                continue;
+            }
+            JsonNode workflow = parse(asset.definitionJson());
+            for (JsonNode node : workflow.path("nodes")) {
+                if (!present(node, "slaRef")) {
+                    continue;
+                }
+                String slaRef = node.path("slaRef").asText();
+                List<JsonNode> matches = slaByKey.getOrDefault(slaRef, List.of());
+                if (matches.size() != 1) {
+                    throw new ConfigurationPublicationException(
+                            "WORKFLOW slaRef 必须在同一 Bundle 精确命中一个 SLA: " + slaRef);
+                }
+                String taskType = node.path("taskType").asText();
+                boolean applies = false;
+                for (JsonNode configuredTaskType : matches.getFirst().path("taskTypes")) {
+                    if (taskType.equals(configuredTaskType.asText())) {
+                        applies = true;
+                        break;
+                    }
+                }
+                if (!applies) {
+                    throw new ConfigurationPublicationException(
+                            "WORKFLOW slaRef 未显式覆盖 taskType: " + slaRef + "/" + taskType);
                 }
             }
         }

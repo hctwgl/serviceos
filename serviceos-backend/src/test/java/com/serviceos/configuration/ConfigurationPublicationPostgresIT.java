@@ -323,6 +323,59 @@ class ConfigurationPublicationPostgresIT {
     }
 
     @Test
+    void publishesOnlyExplicitElapsedTaskSlaWithoutDefaultDurationGuessing() {
+        String valid = slaDefinition("survey.response.sla", "SURVEY", 3600);
+
+        var published = configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.SLA, "survey.response.sla", "1.0.0",
+                "1.0.0", valid, Sha256.digest(valid)));
+
+        assertThat(published.assetKey()).isEqualTo("survey.response.sla");
+        String missingDuration = valid.replace(",\"targetDurationSeconds\":3600", "");
+        assertThatThrownBy(() -> configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.SLA, "survey.response.missing", "1.0.0",
+                "1.0.0", missingDuration.replace("survey.response.sla", "survey.response.missing"),
+                Sha256.digest(missingDuration.replace("survey.response.sla", "survey.response.missing")))))
+                .isInstanceOf(ConfigurationPublicationException.class)
+                .hasMessageContaining("violates schema");
+        assertThatThrownBy(() -> configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.SLA, "survey.response.unknown", "1.0.0",
+                "2.0.0", valid.replace("survey.response.sla", "survey.response.unknown"),
+                Sha256.digest(valid.replace("survey.response.sla", "survey.response.unknown")))))
+                .isInstanceOf(ConfigurationPublicationException.class)
+                .hasMessageContaining("unsupported SLA schemaVersion");
+    }
+
+    @Test
+    void bundleRequiresWorkflowSlaRefToResolveAndCoverTaskType() {
+        UUID sla = publishSla("survey.response.sla", "SURVEY", 3600);
+        UUID workflow = publishWorkflowWithSla("survey.response.sla", "SURVEY");
+
+        ConfigurationBundleReference bundle = configurations.publishBundle(
+                new PublishConfigurationBundleCommand(
+                        TENANT, projectId, "BYD-OCEAN-SLA", "1.0.0", "BYD_OCEAN",
+                        "HOME_CHARGING_SURVEY_INSTALL", "370000", validFrom, null,
+                        List.of(workflow, sla)));
+
+        assertThat(bundle.bundleCode()).isEqualTo("BYD-OCEAN-SLA");
+        UUID missingPolicyWorkflow = publishWorkflowWithSla("installation.response.sla", "SURVEY");
+        assertThatThrownBy(() -> configurations.publishBundle(new PublishConfigurationBundleCommand(
+                TENANT, projectId, "BYD-OCEAN-MISSING-SLA", "1.0.0", "BYD_OCEAN",
+                "HOME_CHARGING_SURVEY_INSTALL", "320000", validFrom, null,
+                List.of(missingPolicyWorkflow))))
+                .isInstanceOf(ConfigurationPublicationException.class)
+                .hasMessageContaining("精确命中一个 SLA");
+
+        UUID mismatchedSla = publishSla("installation.response.sla", "INSTALLATION", 3600);
+        assertThatThrownBy(() -> configurations.publishBundle(new PublishConfigurationBundleCommand(
+                TENANT, projectId, "BYD-OCEAN-MISMATCHED-SLA", "1.0.0", "BYD_OCEAN",
+                "HOME_CHARGING_SURVEY_INSTALL", "440000", validFrom, null,
+                List.of(missingPolicyWorkflow, mismatchedSla))))
+                .isInstanceOf(ConfigurationPublicationException.class)
+                .hasMessageContaining("未显式覆盖 taskType");
+    }
+
+    @Test
     void bundleLocksMultipleEvidenceTemplatesInDeterministicOrder() {
         UUID survey = publishEvidenceAsset("survey.site", "SURVEY", "site.panorama");
         UUID installation = publishEvidenceAsset(
@@ -500,6 +553,37 @@ class ConfigurationPublicationPostgresIT {
         String definition = evidenceDefinition(assetKey, stage, evidenceKey);
         return configurations.publishAsset(new PublishConfigurationAssetCommand(
                 TENANT, ConfigurationAssetType.EVIDENCE, assetKey, "1.0.0", "1.0.0",
+                definition, Sha256.digest(definition))).versionId();
+    }
+
+    private UUID publishSla(String policyKey, String taskType, long durationSeconds) {
+        String definition = slaDefinition(policyKey, taskType, durationSeconds);
+        return configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.SLA, policyKey, "1.0.0", "1.0.0",
+                definition, Sha256.digest(definition))).versionId();
+    }
+
+    private String slaDefinition(String policyKey, String taskType, long durationSeconds) {
+        return ("""
+                {"policyKey":"%s","version":"1.0.0","subjectType":"TASK",
+                 "taskTypes":["%s"],"startEvent":"TASK_CREATED","stopEvent":"TASK_COMPLETED",
+                 "clockMode":"ELAPSED","targetDurationSeconds":%d}
+                """).formatted(policyKey, taskType, durationSeconds).trim();
+    }
+
+    private UUID publishWorkflowWithSla(String slaRef, String taskType) {
+        String workflowKey = "workflow." + slaRef;
+        String definition = ("""
+                {"workflowKey":"%s","semanticVersion":"1.0.0","startNodeId":"start",
+                 "nodes":[
+                   {"nodeId":"start","nodeType":"START"},
+                   {"nodeId":"task","nodeType":"HUMAN_TASK","stageCode":"SURVEY",
+                    "taskType":"%s","slaRef":"%s"},
+                   {"nodeId":"end","nodeType":"END"}],
+                 "transitions":[{"from":"start","to":"task"},{"from":"task","to":"end"}]}
+                """).formatted(workflowKey, taskType, slaRef).trim();
+        return configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.WORKFLOW, workflowKey, "1.0.0", "1.0.0",
                 definition, Sha256.digest(definition))).versionId();
     }
 

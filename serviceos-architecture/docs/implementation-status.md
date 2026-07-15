@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-15
-baselineCommit: 2b67e54
-latestMilestone: M60
+baselineCommit: PENDING_M61_FEATURE_COMMIT
+latestMilestone: M61
 ---
 
 # ServiceOS 实施状态总览
@@ -39,13 +39,13 @@ latestMilestone: M60
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M60 外部交付恢复异常自动闭环 |
-| 基线提交 | `2b67e54` |
+| 最新实施里程碑 | M61 Task 自然时长 SLA 时钟 |
+| 基线提交 | `PENDING_M61_FEATURE_COMMIT`（功能提交后独立回填） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
 | 前端工程 | 尚未建立；已有 Admin、Network、Technician 产品与交互规格 |
-| 数据库 | PostgreSQL + Flyway（当前版本 060 / 62） |
-| 契约 | Core OpenAPI 0.32.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 recovered@v1、operational exception resolved@v2） |
+| 数据库 | PostgreSQL + Flyway（当前版本 061 / 63） |
+| 契约 | Core OpenAPI 0.32.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 recovered/resolved 与 SLA started/breached/met@v1） |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -56,10 +56,10 @@ latestMilestone: M60
 | 工程基础 | 构建、测试、契约、可观测性、容器发布 | `IMPLEMENTED` | Maven、PostgreSQL IT、契约门禁、Trace/指标、单镜像迁移和回滚演练 | 正式 K8s、多故障域、PITR、SBOM/签名、正式 Secret Manager | M8～M14 |
 | 身份授权 | OIDC/JWT、Capability、Tenant/Project Scope、拒绝审计 | `IMPLEMENTED` | 后端认证授权和范围校验基线 | 正式企业 IdP、完整组织治理 UI | M9 |
 | 可靠消息 | Inbox、Outbox、Worker claim/lease/retry | `IMPLEMENTED` | 本地可靠发布消费、恢复和人工接管基础 | 正式 Broker 和跨服务运行 | M9～M10 |
-| 配置中心 | 不可变配置资产、Bundle 发布和版本锁定 | `PARTIAL` | FORM、EVIDENCE 等资产发布基础、工单/任务冻结引用、SERVICEOS_EXPR_V1 布尔/类型比较子集与 FORM/EVIDENCE 字段依赖闭包 | 决策表/公式/脚本、完整审批和通用依赖图 | M16、M33、M36、M52～M53 |
+| 配置中心 | 不可变配置资产、Bundle 发布和版本锁定 | `PARTIAL` | FORM、EVIDENCE、SLA v1 资产发布基础；工单/任务冻结引用；SERVICEOS_EXPR_V1 布尔/类型比较子集；FORM/EVIDENCE 字段及 WORKFLOW/SLA 依赖闭包 | 决策表/公式/脚本、完整审批和通用依赖图 | M16、M33、M36、M52～M53、M61 |
 | 外部接入 | BYD CPIM V7.3.1 入站、提审与审核回调 | `PARTIAL` | 协议日期验签、防重放、私有原文、Envelope/Canonical、工单创建；显式审核路由与逐订单回调；不可变 OutboundDelivery/Attempt/Acknowledgement、Task 可靠执行、UNKNOWN 人工接管与授权人工重发；重发严格 ACK 后发布恢复事实 | 其他 CPIM 消息、人工标记已送达/放弃、通用 Connector、生产凭据/对象存储和真实 sandbox | M16、M56～M60 |
 | 工单 | WorkOrder 接收、激活、履约完成 | `IMPLEMENTED` | 权威工单、工作流启动、跨阶段和 END 完结 | 完整取消、暂停、恢复和全部业务分支 | M16～M19 |
-| 工作流 | 线性 Stage/Task 运行时 | `PARTIAL` | 精确版本启动、线性推进、唯一跨阶段推进、完成事件 | 并行/汇聚网关、流程条件表达式和复杂流程语义 | M17～M19 |
+| 工作流 | 线性 Stage/Task 运行时 | `PARTIAL` | 精确版本启动、线性推进、唯一跨阶段推进、完成事件；节点 `slaRef` 传递并冻结到首个/后续 Task | 并行/汇聚网关、流程条件表达式和复杂流程语义 | M17～M19、M61 |
 | 人工任务 | claim/start/complete、责任和执行保护 | `IMPLEMENTED` | 人工命令、候选领取、唯一责任、release/reclaim、执行保护；表单、资料和双引用完成门禁 | Review 完成条件 | M20～M23、M35、M41、M43 |
 | 服务分配 | 网点分配、容量、改派 Saga、超时恢复 | `IMPLEMENTED` | ServiceAssignment、容量权威、改派、终止、对账和自动恢复 | 完整策略评分、全部异常分支和 UI | M24～M28 |
 | 运营异常 | 异常工作台基础 | `PARTIAL` | 异常记录和恢复入口；M58 将外发 UNKNOWN 与 Task 最终人工事件汇入 OperationalException + HUMAN Task；M59 提供高风险人工重发事实；M60 在严格 ACK 后幂等闭环对应异常并处理事件乱序 | 人工标记已送达/放弃、其他异常类型自动闭环、完整通知、运营中心前端和跨域异常目录 | M29、M58～M60 |
@@ -69,7 +69,7 @@ latestMilestone: M60
 | 资料 Evidence | 资产、槽位、Item/Revision、机器校验、Snapshot、完成门禁、作废、Review、Correction | `PARTIAL` | 固定/条件槽位、VALIDATED 表单触发只追加重解析、槽位世代/lineage、REVIEW_REQUIRED 与显式 KEEP/INVALIDATE、安全文件联动、Snapshot/完成门禁及审核整改链路 | OCR/CV、GPS 权威距离、长期归档 | M36～M53 |
 | 安全文件 | Begin/Finalize/隔离/扫描/授权下载/作废 | `IMPLEMENTED` | 独立安全文件生命周期；Evidence 编排 Begin/Finalize/Invalidate 联动 | 正式对象存储、专业扫描服务、物理删除 | M11、M38、M46 |
 | 审核整改 | ReviewCase、ReviewDecision、CorrectionCase | `PARTIAL` | Review + Correction + 整改 Task + 强制通过/重开 + 车企回执 + WAIVED；CLIENT Case 来源、批次/mapping 冻结；交付明确成功后自动创建 CLIENT Case/Route，UNKNOWN 可授权人工重发并在严格 ACK 后闭环异常 | 多候选人策略、前端、人工标记已送达/放弃、自动 Evidence target 映射 | M44～M60 |
-| SLA | 时钟、预警、升级 | `PROPOSED` | 已有总体设计 | 完整运行时和验收尚未实施 | `architecture/12-*` |
+| SLA | 时钟、预警、升级 | `PARTIAL` | Task `TASK_CREATED→TASK_COMPLETED` ELAPSED 时钟；显式策略版本/摘要锁定；TARGET_DUE 对账；RUNNING/BREACHED/MET/MET_LATE；Inbox/Outbox 与不可变 segment/milestone | BUSINESS 日历、暂停/恢复、免责/重算、预警/升级/通知、其他 subject、HTTP/Portal、考核结算 | M61 |
 | 通知 | 通知与运营异常中心 | `PROPOSED` | 已有总体设计 | 通知通道、模板、可靠发送和 UI | `architecture/14-*` |
 | 履约事实与试算 | 事实提取和双向试算 | `PROPOSED` | 已有设计、API 和数据规划 | 运行时、投影和前端工作区 | M5 设计 |
 | 对账结算 | 对账、结算、争议与调整 | `PROPOSED` | 已有边界设计 | 正式运行时和页面 | `architecture/16-*` |
@@ -287,19 +287,43 @@ latestMilestone: M60
 - 其他异常类型自动闭环、完整通知通道、运营中心前端和跨域异常目录；
 - 批量重放审批、二级审批/MFA、通用 Connector 和生产基础设施。
 
+### M61：Task 自然时长 SLA 时钟
+
+已实现：
+
+- SLA v1 配置只接受显式 TASK/ELAPSED、开始/停止事件和目标秒数；未知版本、缺失时长或身份错配
+  失败关闭；
+- Workflow `slaRef` 必须在同一 Bundle 精确命中唯一 SLA 且覆盖节点 taskType；首个和后续 Task 均
+  冻结该引用；
+- task.created@v1 原子创建 RUNNING instance、RUNNING segment、TARGET_DUE milestone 与
+  sla.started@v1；
+- task.completed@v1/v2 按业务发生时间形成 MET 或 BREACHED→MET_LATE；breach/met 事件版本严格递增，
+  超时历史不被擦除；
+- 到期对账以 `FOR UPDATE ... SKIP LOCKED` 锁定实例、里程碑和 Task；Task 已完成但完成事件尚未消费
+  时不误报；
+- Inbox、SLA 事实和 Outbox 同事务；V061 保护冻结身份、状态迁移、版本、唯一运行 segment 和唯一
+  milestone；PostgreSQL IT、事件契约与 Modulith 门禁形成工程证据。
+
+明确未实现：
+
+- BUSINESS 工作日历、节假日和跨日班次；
+- 暂停/恢复、免责、重算和取消；
+- 预警、升级、通知、OperationalException 联动及收件人解析；
+- 其他 subject/start/stop 组合、SLA HTTP/Portal、考核与结算读取。
+
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M60**。M60 只在 M59 获权重发取得严格 ACK 后自动闭环对应异常，
-没有猜测人工送达/放弃语义，也没有实现其他 CPIM 消息或整个现场履约平台。
+ServiceOS 可靠纵向切片已推进到 **M61**。M61 只实现显式 Task ELAPSED 时钟，没有猜测项目默认
+时长、日历、暂停或升级策略，也没有实现完整 SLA/通知或整个现场履约平台。
 
 ```text
 候选下一方向（优先从已确认文档中选择最小可靠切片）：
-1. 在明确批准业务后实现 UNKNOWN 的“标记已送达/放弃”事实及其业务后果；
-2. 多候选人评分、自动 claim、网点容量联动；
-3. OCR/CV、GPS 权威距离、二级审批/MFA、报告 GENERATED 资料包；
-4. 表达式计算字段、决策表/脚本、草稿冲突与离线合并；
-5. Admin/Network/Technician Portal 工程；
-6. SLA/通知或履约事实试算的下一条最小可靠纵向切片。
+1. SLA 授权只读查询与工作台投影，不引入暂停或阈值猜测；
+2. 在试点确认日历/暂停/预警规则后扩展 BUSINESS 时钟、暂停和升级；
+3. 多候选人评分、自动 claim、网点容量联动；
+4. OCR/CV、GPS 权威距离、二级审批/MFA、报告 GENERATED 资料包；
+5. 表达式计算字段、决策表/脚本、草稿冲突与离线合并；
+6. Admin/Network/Technician Portal、履约事实试算与结算运行时。
 ```
 
 接手 Agent 必须先检查仓库是否已有更新的里程碑文档、ADR 或提交；在收到明确批准前不得猜测业务策略并实现上述候选项。

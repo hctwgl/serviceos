@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/sla-started-v1.schema.json",
+  "title": "SlaStartedV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId", "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"},
+    "eventType": {"const": "sla.started"},
+    "schemaVersion": {"const": 1},
+    "tenantId": {"type": "string", "minLength": 1},
+    "correlationId": {"type": "string", "minLength": 1},
+    "causationId": {"type": "string", "format": "uuid"},
+    "aggregateType": {"const": "SlaInstance"},
+    "aggregateId": {"type": "string", "format": "uuid"},
+    "aggregateVersion": {"const": 1},
+    "occurredAt": {"type": "string", "format": "date-time"},
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["slaInstanceId", "taskId", "projectId", "workOrderId", "slaRef", "policyVersionId", "policySemanticVersion", "policyContentDigest", "clockMode", "targetDurationSeconds", "startedAt", "deadlineAt"],
+      "properties": {
+        "slaInstanceId": {"type": "string", "format": "uuid"},
+        "taskId": {"type": "string", "format": "uuid"},
+        "projectId": {"type": "string", "format": "uuid"},
+        "workOrderId": {"type": "string", "format": "uuid"},
+        "slaRef": {"type": "string", "minLength": 1, "maxLength": 120},
+        "policyVersionId": {"type": "string", "format": "uuid"},
+        "policySemanticVersion": {"type": "string", "minLength": 1},
+        "policyContentDigest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "clockMode": {"const": "ELAPSED"},
+        "targetDurationSeconds": {"type": "integer", "minimum": 1, "maximum": 31536000},
+        "startedAt": {"type": "string", "format": "date-time"},
+        "deadlineAt": {"type": "string", "format": "date-time"}
+      }
+    }
+  }
+}

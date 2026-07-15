@@ -25,6 +25,7 @@ class WorkflowDefinitionParserTest {
         assertThat(result.firstStageCode()).isEqualTo("INTAKE");
         assertThat(result.firstTaskKind()).isEqualTo(WorkflowTaskKind.AUTOMATED);
         assertThat(result.firstFormRef()).isEqualTo("survey.form");
+        assertThat(result.firstSlaRef()).isEqualTo("intake.assignment.sla");
     }
 
     @Test
@@ -52,6 +53,7 @@ class WorkflowDefinitionParserTest {
         assertThat(result.taskType()).isEqualTo("INITIAL_REVIEW");
         assertThat(result.taskKind()).isEqualTo(WorkflowTaskKind.AUTOMATED);
         assertThat(result.formRef()).isEqualTo("review.form");
+        assertThat(result.slaRef()).isEqualTo("intake.review.sla");
     }
 
     @Test
@@ -80,7 +82,8 @@ class WorkflowDefinitionParserTest {
                  "nodes":[
                    {"nodeId":"START","nodeType":"START","name":"开始"},
                    {"nodeId":"ASSIGN_COORDINATORS","nodeType":"SERVICE_TASK","name":"分配跟进人",
-                    "stageCode":"INTAKE","taskType":"ASSIGN_COORDINATORS","formRef":"survey.form"}],
+                    "stageCode":"INTAKE","taskType":"ASSIGN_COORDINATORS","formRef":"survey.form",
+                    "slaRef":"intake.assignment.sla"}],
                  "transitions":[{"transitionId":"t1","from":"START","to":"ASSIGN_COORDINATORS"}]}
                 """;
     }
@@ -93,7 +96,8 @@ class WorkflowDefinitionParserTest {
                    {"nodeId":"ASSIGN_COORDINATORS","nodeType":"SERVICE_TASK","name":"分配跟进人",
                     "stageCode":"INTAKE","taskType":"ASSIGN_COORDINATORS"},
                    {"nodeId":"INITIAL_REVIEW","nodeType":"SERVICE_TASK","name":"工单初审",
-                    "stageCode":"INTAKE","taskType":"INITIAL_REVIEW","formRef":"review.form"}],
+                    "stageCode":"INTAKE","taskType":"INITIAL_REVIEW","formRef":"review.form",
+                    "slaRef":"intake.review.sla"}],
                  "transitions":[
                    {"transitionId":"t1","from":"START","to":"ASSIGN_COORDINATORS"},
                    {"transitionId":"t2","from":"ASSIGN_COORDINATORS","to":"INITIAL_REVIEW"}]}

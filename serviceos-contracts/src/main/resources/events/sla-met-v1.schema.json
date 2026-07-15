@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/sla-met-v1.schema.json",
+  "title": "SlaMetV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId", "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"},
+    "eventType": {"const": "sla.met"},
+    "schemaVersion": {"const": 1},
+    "tenantId": {"type": "string", "minLength": 1},
+    "correlationId": {"type": "string", "minLength": 1},
+    "causationId": {"type": "string", "format": "uuid"},
+    "aggregateType": {"const": "SlaInstance"},
+    "aggregateId": {"type": "string", "format": "uuid"},
+    "aggregateVersion": {"type": "integer", "minimum": 2},
+    "occurredAt": {"type": "string", "format": "date-time"},
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["slaInstanceId", "taskId", "status", "startedAt", "deadlineAt", "breachedAt", "completedAt", "elapsedSeconds", "breachEventId"],
+      "properties": {
+        "slaInstanceId": {"type": "string", "format": "uuid"},
+        "taskId": {"type": "string", "format": "uuid"},
+        "status": {"enum": ["MET", "MET_LATE"]},
+        "startedAt": {"type": "string", "format": "date-time"},
+        "deadlineAt": {"type": "string", "format": "date-time"},
+        "breachedAt": {"type": ["string", "null"], "format": "date-time"},
+        "completedAt": {"type": "string", "format": "date-time"},
+        "elapsedSeconds": {"type": "integer", "minimum": 0},
+        "breachEventId": {"type": ["string", "null"], "format": "uuid"}
+      }
+    }
+  }
+}

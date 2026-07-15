@@ -143,7 +143,7 @@ final class WorkflowTaskCompletedHandler implements OutboxMessageHandler {
                 current.workflowDefinitionDigest(), current.configurationBundleId(),
                 current.configurationBundleDigest(), progression.stageCode(),
                 progression.taskType(), progression.taskKind(),
-                progression.formRef(),
+                progression.formRef(), progression.slaRef(),
                 "work-order:" + current.workOrderId(), message.payloadDigest(), 100, activatedAt, 3,
                 message.correlationId(), message.eventId().toString()));
         jdbc.sql("""

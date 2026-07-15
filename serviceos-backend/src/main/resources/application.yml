@@ -29,6 +29,7 @@ spring:
       - classpath:db/migration/fieldwork
       - classpath:db/migration/forms
       - classpath:db/migration/evidence
+      - classpath:db/migration/sla
     validate-migration-naming: true
   security:
     oauth2:
@@ -121,6 +122,10 @@ serviceos:
     activation-timeout-scheduling-enabled: ${SERVICEOS_DISPATCH_TIMEOUT_SCHEDULING_ENABLED:false}
     activation-timeout-poll-delay: ${SERVICEOS_DISPATCH_TIMEOUT_POLL_DELAY:PT30S}
     activation-timeout-batch-size: ${SERVICEOS_DISPATCH_TIMEOUT_BATCH_SIZE:100}
+  sla:
+    scheduling-enabled: ${SERVICEOS_SLA_SCHEDULING_ENABLED:false}
+    batch-size: ${SERVICEOS_SLA_BATCH_SIZE:100}
+    poll-delay: ${SERVICEOS_SLA_POLL_DELAY:PT30S}
   observability:
     # 生产默认 false；仅当 Prometheus 位于受控私网且入口层已隔离时才允许匿名抓取。
     allow-anonymous-metrics: ${SERVICEOS_ALLOW_ANONYMOUS_METRICS:false}

@@ -203,6 +203,27 @@ class ContractValidationTest {
     }
 
     @Test
+    void slaStartedExampleMustMatchPublishedSchema() throws Exception {
+        assertValidEvent(
+                "/events/sla-started-v1.schema.json",
+                "/events/sla-started-v1.valid.json");
+    }
+
+    @Test
+    void slaBreachedExampleMustMatchPublishedSchema() throws Exception {
+        assertValidEvent(
+                "/events/sla-breached-v1.schema.json",
+                "/events/sla-breached-v1.valid.json");
+    }
+
+    @Test
+    void slaMetExampleMustMatchPublishedSchema() throws Exception {
+        assertValidEvent(
+                "/events/sla-met-v1.schema.json",
+                "/events/sla-met-v1.valid.json");
+    }
+
+    @Test
     void bydReviewCallbackExampleMustMatchExternalSchema() throws Exception {
         assertValidEvent(
                 "/external/byd-cpim-review-callback-v731.schema.json",

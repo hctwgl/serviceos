@@ -40,7 +40,7 @@ final class WorkflowDefinitionParser {
         TaskNode task = requireTaskNode(first, "the first executable node");
         return new BootstrapDefinition(
                 graph.workflowKey(), graph.semanticVersion(), task.nodeId(),
-                task.stageCode(), task.taskType(), task.taskKind(), task.formRef());
+                task.stageCode(), task.taskType(), task.taskKind(), task.formRef(), task.slaRef());
     }
 
     ProgressionDefinition progression(ConfigurationAssetDefinition asset, String completedNodeId) {
@@ -59,7 +59,8 @@ final class WorkflowDefinitionParser {
         }
         TaskNode next = requireTaskNode(target, "next executable node");
         return ProgressionDefinition.task(
-                next.nodeId(), next.stageCode(), next.taskType(), next.taskKind(), next.formRef());
+                next.nodeId(), next.stageCode(), next.taskType(), next.taskKind(),
+                next.formRef(), next.slaRef());
     }
 
     private Graph parseGraph(ConfigurationAssetDefinition asset) {
@@ -120,7 +121,7 @@ final class WorkflowDefinitionParser {
                 requiredText(node, "nodeId"), requiredText(node, "stageCode"),
                 requiredText(node, "taskType"),
                 "SERVICE_TASK".equals(nodeType) ? WorkflowTaskKind.AUTOMATED : WorkflowTaskKind.HUMAN,
-                optionalText(node, "formRef"));
+                optionalText(node, "formRef"), optionalText(node, "slaRef"));
     }
 
     private static boolean isUnconditional(JsonNode condition) {
@@ -161,7 +162,8 @@ final class WorkflowDefinitionParser {
             String firstStageCode,
             String firstTaskType,
             WorkflowTaskKind firstTaskKind,
-            String firstFormRef
+            String firstFormRef,
+            String firstSlaRef
     ) {
     }
 
@@ -171,15 +173,17 @@ final class WorkflowDefinitionParser {
             String taskType,
             WorkflowTaskKind taskKind,
             String formRef,
+            String slaRef,
             boolean end
     ) {
         static ProgressionDefinition task(
-                String nodeId, String stageCode, String taskType, WorkflowTaskKind taskKind, String formRef) {
-            return new ProgressionDefinition(nodeId, stageCode, taskType, taskKind, formRef, false);
+                String nodeId, String stageCode, String taskType, WorkflowTaskKind taskKind,
+                String formRef, String slaRef) {
+            return new ProgressionDefinition(nodeId, stageCode, taskType, taskKind, formRef, slaRef, false);
         }
 
         static ProgressionDefinition end(String nodeId) {
-            return new ProgressionDefinition(nodeId, null, null, null, null, true);
+            return new ProgressionDefinition(nodeId, null, null, null, null, null, true);
         }
     }
 
@@ -200,7 +204,8 @@ final class WorkflowDefinitionParser {
             String stageCode,
             String taskType,
             WorkflowTaskKind taskKind,
-            String formRef
+            String formRef,
+            String slaRef
     ) {
     }
 }

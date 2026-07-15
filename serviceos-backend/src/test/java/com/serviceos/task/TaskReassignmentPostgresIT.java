@@ -246,7 +246,7 @@ class TaskReassignmentPostgresIT {
                 TENANT, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
                 UUID.randomUUID(), "SITE_SURVEY", UUID.randomUUID(), "a".repeat(64),
                 UUID.randomUUID(), "c".repeat(64),
-                "SURVEY", "SITE_SURVEY", WorkflowTaskKind.HUMAN, null,
+                "SURVEY", "SITE_SURVEY", WorkflowTaskKind.HUMAN, null, null,
                 "work-order:reassignment-test", "b".repeat(64),
                 500, Instant.now(), 1, "corr-task-create", "cause-task-create")).taskId();
         assignments.assignCandidates(

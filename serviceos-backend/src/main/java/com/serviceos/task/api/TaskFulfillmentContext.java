@@ -13,6 +13,7 @@ public record TaskFulfillmentContext(
         String taskType,
         String taskKind,
         String formRef,
+        String slaRef,
         String status,
         String responsiblePrincipalId,
         boolean executionGuarded,
