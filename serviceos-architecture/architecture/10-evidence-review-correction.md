@@ -11,6 +11,7 @@ status: Accepted
 > M47 已实现整改 Task 自动创建（见 `architecture/60-correction-task-runtime.md`）。
 > M48 已实现强制通过与重开（见 `architecture/61-review-force-approve-reopen-runtime.md`）。
 > M49 已实现 ExternalReviewReceipt 最小运行时（见 `architecture/62-external-review-receipt-runtime.md`）。
+> M52 已实现工单/区域/任务白名单事实驱动的条件槽位初次解析；条件字段变化后的重解析仍未实现。
 > 完整 Connector/CLIENT Case 自动创建仍未实现；本章其余内容仍为指导设计。
 
 ## 1. 目标

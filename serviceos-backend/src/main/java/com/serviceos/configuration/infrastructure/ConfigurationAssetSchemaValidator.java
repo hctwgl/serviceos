@@ -9,6 +9,9 @@ import com.networknt.schema.SpecVersion;
 import com.networknt.schema.ValidationMessage;
 import com.serviceos.configuration.api.ConfigurationAssetType;
 import com.serviceos.configuration.api.ConfigurationPublicationException;
+import com.serviceos.configuration.api.ExpressionDefinition;
+import com.serviceos.configuration.api.ExpressionEvaluationException;
+import com.serviceos.configuration.api.ExpressionEvaluator;
 import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
@@ -35,14 +38,20 @@ final class ConfigurationAssetSchemaValidator {
 
     private final ObjectMapper objectMapper;
     private final Map<SchemaKey, JsonSchema> schemas;
+    private final ExpressionEvaluator expressions;
 
     ConfigurationAssetSchemaValidator() {
         // networknt 1.x 使用 Jackson 2；与 Spring Boot 4 的 Jackson 3 HTTP 映射保持隔离。
-        this(new ObjectMapper());
+        this(new ObjectMapper(), new ServiceOsExprV1Evaluator());
     }
 
     ConfigurationAssetSchemaValidator(ObjectMapper objectMapper) {
+        this(objectMapper, new ServiceOsExprV1Evaluator());
+    }
+
+    ConfigurationAssetSchemaValidator(ObjectMapper objectMapper, ExpressionEvaluator expressions) {
         this.objectMapper = objectMapper;
+        this.expressions = expressions;
         this.schemas = Map.of(
                 new SchemaKey(ConfigurationAssetType.FORM, FORM_SCHEMA_VERSION),
                 loadSchema("configuration-schemas/form-v1.schema.json"),
@@ -105,10 +114,28 @@ final class ConfigurationAssetSchemaValidator {
                         "EVIDENCE evidenceKey must be unique: " + evidenceKey);
             }
             JsonNode capture = item.path("capture");
+            JsonNode requiredWhen = item.path("requiredWhen");
+            boolean conditional = item.has("requiredWhen") && !requiredWhen.isNull();
+            if (conditional) {
+                try {
+                    expressions.validate(new ExpressionDefinition(
+                            requiredWhen.path("language").asText(),
+                            requiredWhen.path("source").asText()));
+                } catch (ExpressionEvaluationException exception) {
+                    throw new ConfigurationPublicationException(
+                            "EVIDENCE requiredWhen 表达式无效: " + evidenceKey
+                                    + "; " + exception.getMessage());
+                }
+            }
             if (item.path("required").asBoolean()
                     && capture.has("minCount") && capture.path("minCount").asInt() == 0) {
                 throw new ConfigurationPublicationException(
                         "EVIDENCE required item minCount must be greater than zero: " + evidenceKey);
+            }
+            // 条件命中后该要求会成为必填，因此显式 minCount=0 同样是自相矛盾配置。
+            if (conditional && capture.has("minCount") && capture.path("minCount").asInt() == 0) {
+                throw new ConfigurationPublicationException(
+                        "EVIDENCE conditional item minCount must be greater than zero: " + evidenceKey);
             }
             if (capture.has("minCount") && capture.has("maxCount")
                     && capture.path("minCount").asInt() > capture.path("maxCount").asInt()) {

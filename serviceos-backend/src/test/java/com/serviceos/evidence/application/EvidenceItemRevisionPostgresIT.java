@@ -286,9 +286,13 @@ class EvidenceItemRevisionPostgresIT {
                 INSERT INTO evd_task_evidence_resolution (
                     resolution_id, tenant_id, project_id, task_id, configuration_bundle_id,
                     configuration_bundle_digest, stage_code, source_event_id, source_event_digest,
-                    resolver_version, slot_count, resolved_at)
+                    resolver_version, condition_input_digest, resolution_explanation,
+                    slot_count, resolved_at)
                 VALUES (:id, :tenant, :project, :task, :bundle, :digest, 'SURVEY', :event,
-                    :eventDigest, 'FIXED_EVIDENCE_V1', 1, now())
+                    :eventDigest, 'FIXED_EVIDENCE_V1',
+                    '44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a',
+                    CAST('{"kind":"TEST_FIXED_CONTEXT","resolverVersion":"FIXED_EVIDENCE_V1"}' AS jsonb),
+                    1, now())
                 """).param("id", resolutionId).param("tenant", TENANT).param("project", projectId)
                 .param("task", taskId).param("bundle", bundle.bundleId())
                 .param("digest", bundle.manifestDigest()).param("event", UUID.randomUUID())

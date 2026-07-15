@@ -13,6 +13,8 @@ import com.serviceos.evidence.api.EvidenceSetSnapshotService;
 import com.serviceos.evidence.api.FinalizeEvidenceUploadCommand;
 import com.serviceos.evidence.api.InvalidateEvidenceRevisionCommand;
 import com.serviceos.files.infrastructure.LocalObjectTransferService;
+import com.serviceos.files.api.AuthorizeDownloadCommand;
+import com.serviceos.files.api.FileCommandService;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.reliability.spi.OutboxMessage;
 import com.serviceos.reliability.spi.OutboxMessageHandler;
@@ -78,6 +80,7 @@ class EvidenceRevisionInvalidationPostgresIT {
     @Autowired ConfigurationService configurations;
     @Autowired EvidenceCommandService evidence;
     @Autowired EvidenceSetSnapshotService snapshots;
+    @Autowired FileCommandService files;
     @Autowired LocalObjectTransferService transfers;
     @Autowired TaskExecutionWorker worker;
     @Autowired List<OutboxMessageHandler> handlers;
@@ -134,6 +137,17 @@ class EvidenceRevisionInvalidationPostgresIT {
         assertThat(invalidated.invalidatedBy()).isEqualTo(TECHNICIAN);
         assertThat(invalidated.invalidatedAt()).isNotNull();
         assertThat(replay).isEqualTo(invalidated);
+        UUID fileId = jdbc.sql("""
+                SELECT file_object_id FROM evd_evidence_revision WHERE evidence_revision_id=:revisionId
+                """).param("revisionId", revisionId).query(UUID.class).single();
+        assertThat(jdbc.sql("SELECT lifecycle_status FROM fil_stored_file WHERE file_id=:fileId")
+                .param("fileId", fileId).query(String.class).single()).isEqualTo("INVALIDATED");
+        // Evidence 与 files 在同一事务中作废；文件状态一旦失效，下载授权必须失败关闭。
+        assertThatThrownBy(() -> files.authorizeDownload(
+                principal(), "corr-download-invalidated", fileId,
+                new AuthorizeDownloadCommand("核对已作废资料")))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.FILE_NOT_AVAILABLE));
         assertThat(jdbc.sql("SELECT status_projection FROM evd_evidence_slot WHERE slot_id=:slot")
                 .param("slot", slotId).query(String.class).single()).isEqualTo("MISSING");
         assertThat(jdbc.sql("""
@@ -260,9 +274,13 @@ class EvidenceRevisionInvalidationPostgresIT {
                 INSERT INTO evd_task_evidence_resolution (
                     resolution_id, tenant_id, project_id, task_id, configuration_bundle_id,
                     configuration_bundle_digest, stage_code, source_event_id, source_event_digest,
-                    resolver_version, slot_count, resolved_at)
+                    resolver_version, condition_input_digest, resolution_explanation,
+                    slot_count, resolved_at)
                 VALUES (:id, :tenant, :project, :task, :bundle, :digest, 'SURVEY', :event,
-                    :eventDigest, 'FIXED_EVIDENCE_V1', 1, now())
+                    :eventDigest, 'FIXED_EVIDENCE_V1',
+                    '44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a',
+                    CAST('{"kind":"TEST_FIXED_CONTEXT","resolverVersion":"FIXED_EVIDENCE_V1"}' AS jsonb),
+                    1, now())
                 """).param("id", resolutionId).param("tenant", TENANT).param("project", projectId)
                 .param("task", taskId).param("bundle", bundle.bundleId())
                 .param("digest", bundle.manifestDigest()).param("event", UUID.randomUUID())

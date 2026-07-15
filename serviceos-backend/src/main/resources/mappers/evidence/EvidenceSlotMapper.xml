@@ -5,10 +5,12 @@
         INSERT INTO evd_task_evidence_resolution (
             resolution_id, tenant_id, project_id, task_id,
             configuration_bundle_id, configuration_bundle_digest, stage_code,
-            source_event_id, source_event_digest, resolver_version, slot_count, resolved_at)
+            source_event_id, source_event_digest, resolver_version,
+            condition_input_digest, resolution_explanation, slot_count, resolved_at)
         VALUES (#{resolutionId}, #{tenantId}, #{projectId}, #{taskId},
             #{bundleId}, #{bundleDigest}, #{stageCode},
-            #{sourceEventId}, #{sourceEventDigest}, #{resolverVersion}, #{slotCount}, #{resolvedAt})
+            #{sourceEventId}, #{sourceEventDigest}, #{resolverVersion},
+            #{conditionInputDigest}, CAST(#{resolutionExplanation} AS jsonb), #{slotCount}, #{resolvedAt})
     </insert>
 
     <insert id="insertSlots">

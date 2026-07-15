@@ -52,3 +52,4 @@
 - [M49 外部审核回执验收](46-m49-external-review-receipt-acceptance.md)
 - [M50 自动候选人验收](47-m50-correction-auto-candidate-acceptance.md)
 - [M51 CorrectionCase WAIVED 验收](48-m51-correction-waive-acceptance.md)
+- [M52 条件 EvidenceSlot 验收](49-m52-conditional-evidence-slot-acceptance.md)

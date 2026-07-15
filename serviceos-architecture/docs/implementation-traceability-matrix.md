@@ -146,3 +146,4 @@ Feature gate/authority: if applicable
 | M49 | 适配层记录 ExternalReviewReceipt；追加 EXTERNAL 决定；驳回开客服协调 Task | OpenAPI 0.24.0 + Evidence PostgreSQL/MVC/Event Contract + V049 | Connector 入站表、CLIENT Case 自动创建、affectedTargets 强校验 |
 | M50 | 整改 Task 自动写入源 Evidence Task RESPONSIBLE 为 SYSTEM CANDIDATE | V050 + CorrectionCase PostgreSQL IT | 多候选人策略、自动 claim、条件槽位 |
 | M51 | CorrectionCase 高风险豁免进入 WAIVED；取消整改 Task | OpenAPI 0.25.0 + Evidence PostgreSQL/MVC/Event Contract + V051 | 条件槽位、OCR/CV、多候选人策略、自动 claim |
+| M52 | SERVICEOS_EXPR_V1 条件 EvidenceSlot；true/false 决策与输入摘要不可变审计；复杂度失败关闭 | ADR-018 + Expression/Modulith Unit + Evidence PostgreSQL IT + V052 | 表单条件求值、字段变化重解析、决策表/公式/脚本、OCR/CV |

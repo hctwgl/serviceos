@@ -60,6 +60,7 @@ awk '
 chmod 600 "${bad_env_file}"
 before_container="$(docker compose --env-file "${env_file}" \
   -f "${repo_root}/serviceos-deploy/compose.staging.yaml" ps -q backend)"
+expected_actual_version="$(sed -n 's/^SERVICEOS_EXPECTED_MIGRATION_VERSION=//p' "${env_file}")"
 if "${script_dir}/deploy.sh" "${bad_env_file}" >"${evidence_dir}/fail-closed.log" 2>&1; then
   echo "deployment unexpectedly accepted a mismatched migration version" >&2
   exit 1
@@ -67,7 +68,8 @@ fi
 after_container="$(docker compose --env-file "${env_file}" \
   -f "${repo_root}/serviceos-deploy/compose.staging.yaml" ps -q backend)"
 [[ "${before_container}" == "${after_container}" ]]
-rg -q 'migration version mismatch: expected=999 actual=038' "${evidence_dir}/fail-closed.log"
+rg -Fq "migration version mismatch: expected=999 actual=${expected_actual_version}" \
+  "${evidence_dir}/fail-closed.log"
 curl --fail --silent --show-error "http://127.0.0.1:18080/readyz" \
   | jq -e '.status == "UP"' >/dev/null
 

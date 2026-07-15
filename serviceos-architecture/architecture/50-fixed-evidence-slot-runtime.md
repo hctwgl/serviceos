@@ -41,7 +41,7 @@ EvidenceItem/Revision 和机器校验事实。
 
 ## 3. 失败关闭边界
 
-ADR-018 仍为 Proposed，M37 不解释 `requiredWhen`。只要当前 Stage 的任一 requirement 带条件表达式，
+M37 实施时 ADR-018 尚未接受，因此不解释 `requiredWhen`。只要当前 Stage 的任一 requirement 带条件表达式，
 整个解析事务失败并回滚，不能静默省略条件槽位，也不能把它当作固定必填。缺失 Stage、Stage 格式非法、
 Bundle/Digest 不一致或模板解析失败同样失败关闭。
 
@@ -63,7 +63,7 @@ Bundle/Digest 不一致或模板解析失败同样失败关闭。
 M37 只覆盖 EVD-001 中“固定槽位始终存在”的运行时基础，不宣称 EVD-001 条件切换或 EVD-002～009
 完成。后续至少需要：
 
-1. ADR-018 获批后的条件解析、字段版本冻结和可审计重解析；
+1. 条件初次解析已由 M52 实现；字段版本冻结和条件变化后的可审计重解析仍未实现；
 2. M38 已对接安全文件 Begin/Finalize/隔离/扫描链路，创建 EvidenceItem 与不可变 EvidenceRevision；
 3. OCR/业务机器校验、代办上传、作废命令和 Task 完成完整性门禁；
 4. EvidenceSetSnapshot、审核决定、整改与多轮补传闭环。

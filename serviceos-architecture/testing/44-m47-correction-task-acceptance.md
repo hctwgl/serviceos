@@ -1,7 +1,7 @@
 ---
 title: M47 整改 Task 验收
 version: 0.1.0
-status: Accepted
+status: Implemented
 ---
 
 # M47 整改 Task 验收

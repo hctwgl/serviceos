@@ -4,6 +4,7 @@ import com.serviceos.ServiceOsApplication;
 import com.serviceos.configuration.api.ConfigurationAssetType;
 import com.serviceos.configuration.api.ConfigurationBundleReference;
 import com.serviceos.configuration.api.ConfigurationService;
+import com.serviceos.configuration.api.ExpressionEvaluationException;
 import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
 import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
 import com.serviceos.evidence.api.EvidenceSlotQueryService;
@@ -70,7 +71,7 @@ class EvidenceSlotPostgresIT {
                 TRUNCATE TABLE evd_evidence_slot, evd_task_evidence_resolution,
                     rel_inbox_record, rel_outbox_event, aud_audit_record,
                     auth_role_grant, auth_role_capability, auth_role,
-                    tsk_task, cfg_configuration_bundle_item, cfg_configuration_bundle,
+                    tsk_task, wo_work_order, cfg_configuration_bundle_item, cfg_configuration_bundle,
                     cfg_configuration_asset_version, prj_project CASCADE
                 """).update();
         projectId = UUID.randomUUID();
@@ -138,18 +139,69 @@ class EvidenceSlotPostgresIT {
     }
 
     @Test
-    void conditionalRequirementFailsClosedAndRollsBackEveryConsumerFact() {
+    void conditionalRequirementCreatesSlotWhenBrandMatches() {
         UUID conditional = publishEvidence("survey.conditional", """
                 {"templateKey":"survey.conditional","version":"1.0.0","stage":"SURVEY",
                  "items":[{"evidenceKey":"pole.photo","name":"立柱照片","mediaType":"PHOTO",
-                   "required":false,"requiredWhen":{"language":"SERVICEOS_EXPR_V1","source":"pole == true"}}]}
+                   "required":false,"requiredWhen":{"language":"SERVICEOS_EXPR_V1",
+                     "source":"workOrder.brandCode == \\"BYD_OCEAN\\""}}]}
                 """);
         ConfigurationBundleReference bundle = publishBundle(List.of(conditional));
-        UUID taskId = createTask(bundle, "SURVEY");
+        UUID taskId = createTask(bundle, "SURVEY", "BYD_OCEAN");
+
+        handler().handle(taskCreated(taskId));
+
+        assertThat(jdbc.sql("""
+                SELECT requirement_code || ':' || required_flag || ':' || min_count
+                  FROM evd_evidence_slot WHERE tenant_id = :tenantId AND task_id = :taskId
+                """).param("tenantId", TENANT).param("taskId", taskId)
+                .query(String.class).list())
+                .containsExactly("pole.photo:true:1");
+        assertThat(jdbc.sql("""
+                SELECT resolver_version FROM evd_task_evidence_resolution WHERE task_id = :taskId
+                """).param("taskId", taskId).query(String.class).single())
+                .isEqualTo("CONDITIONAL_EVIDENCE_V1");
+    }
+
+    @Test
+    void conditionalRequirementOmitsSlotWhenBrandDoesNotMatch() {
+        UUID conditional = publishEvidence("survey.conditional", """
+                {"templateKey":"survey.conditional","version":"1.0.0","stage":"SURVEY",
+                 "items":[{"evidenceKey":"pole.photo","name":"立柱照片","mediaType":"PHOTO",
+                   "required":false,"requiredWhen":{"language":"SERVICEOS_EXPR_V1",
+                     "source":"workOrder.brandCode == \\"BYD_OCEAN\\""}}]}
+                """);
+        ConfigurationBundleReference bundle = publishBundle(List.of(conditional));
+        UUID taskId = createTask(bundle, "SURVEY", "OTHER_BRAND");
+
+        handler().handle(taskCreated(taskId));
+
+        assertThat(jdbc.sql("SELECT count(*) FROM evd_evidence_slot WHERE task_id = :taskId")
+                .param("taskId", taskId).query(Long.class).single()).isZero();
+        assertThat(jdbc.sql("SELECT slot_count FROM evd_task_evidence_resolution WHERE task_id = :taskId")
+                .param("taskId", taskId).query(Integer.class).single()).isZero();
+        // false 条件不会生成槽位，因此必须在解析级不可变事实中保留输入摘要与决策解释。
+        assertThat(jdbc.sql("""
+                SELECT condition_input_digest || ':' || (resolution_explanation #>> '{conditions,0,result}')
+                  FROM evd_task_evidence_resolution WHERE task_id = :taskId
+                """).param("taskId", taskId).query(String.class).single())
+                .matches("[0-9a-f]{64}:false");
+    }
+
+    @Test
+    void missingAuthoritativeConditionalContextFailsClosedAndRollsBackEveryConsumerFact() {
+        UUID conditional = publishEvidence("survey.conditional", """
+                {"templateKey":"survey.conditional","version":"1.0.0","stage":"SURVEY",
+                 "items":[{"evidenceKey":"pole.photo","name":"立柱照片","mediaType":"PHOTO",
+                   "required":false,"requiredWhen":{"language":"SERVICEOS_EXPR_V1",
+                     "source":"region.districtCode == \\\"370102\\\""}}]}
+                """);
+        ConfigurationBundleReference bundle = publishBundle(List.of(conditional));
+        UUID taskId = createTask(bundle, "SURVEY", "BYD_OCEAN", "");
 
         assertThatThrownBy(() -> handler().handle(taskCreated(taskId)))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("unsupported SERVICEOS_EXPR_V1");
+                .isInstanceOf(ExpressionEvaluationException.class)
+                .hasMessageContaining("缺少权威值");
         assertThat(jdbc.sql("SELECT count(*) FROM evd_task_evidence_resolution")
                 .query(Long.class).single()).isZero();
         assertThat(jdbc.sql("SELECT count(*) FROM evd_evidence_slot")
@@ -195,13 +247,60 @@ class EvidenceSlotPostgresIT {
     }
 
     private UUID createTask(ConfigurationBundleReference bundle, String stageCode) {
+        return createTask(bundle, stageCode, "BYD_OCEAN");
+    }
+
+    private UUID createTask(ConfigurationBundleReference bundle, String stageCode, String brandCode) {
+        return createTask(bundle, stageCode, brandCode, "370102");
+    }
+
+    private UUID createTask(
+            ConfigurationBundleReference bundle, String stageCode, String brandCode, String districtCode
+    ) {
+        UUID workOrderId = seedWorkOrder(bundle, brandCode, districtCode);
         return tasks.createWorkflowTask(new CreateWorkflowTaskCommand(
-                TENANT, projectId, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                TENANT, projectId, workOrderId, UUID.randomUUID(), UUID.randomUUID(),
                 UUID.randomUUID(), "SITE_SURVEY", UUID.randomUUID(), "a".repeat(64),
                 bundle.bundleId(), bundle.manifestDigest(), stageCode,
                 "SITE_SURVEY", WorkflowTaskKind.HUMAN, null, "work-order:evidence-slot",
                 "b".repeat(64), 100, Instant.now(), 1,
                 "corr-evidence-slot", "cause-evidence-slot")).taskId();
+    }
+
+    private UUID seedWorkOrder(
+            ConfigurationBundleReference bundle, String brandCode, String districtCode
+    ) {
+        UUID workOrderId = UUID.randomUUID();
+        jdbc.sql("""
+                INSERT INTO wo_work_order (
+                    id, tenant_id, project_id, client_code, brand_code, service_product_code,
+                    external_order_code, payload_digest, status,
+                    configuration_bundle_id, configuration_bundle_code, configuration_bundle_version,
+                    configuration_bundle_digest, province_code, city_code, district_code,
+                    customer_name, customer_mobile, service_address, vehicle_vin,
+                    external_dispatched_at, received_at, activated_at, version
+                ) VALUES (
+                    :id, :tenantId, :projectId, 'BYD', :brandCode, 'HOME_CHARGING',
+                    :externalOrderCode, :payloadDigest, 'ACTIVE',
+                    :bundleId, :bundleCode, :bundleVersion, :bundleDigest,
+                    '370000', '370100', :districtCode,
+                    '测试客户', '13800000000', '测试地址', 'VIN123456789012345',
+                    now(), now(), now(), 1
+                )
+                """)
+                .param("id", workOrderId)
+                .param("tenantId", TENANT)
+                .param("projectId", projectId)
+                .param("brandCode", brandCode)
+                .param("districtCode", districtCode)
+                .param("externalOrderCode", "EVD-SLOT-" + workOrderId)
+                .param("payloadDigest", "c".repeat(64))
+                .param("bundleId", bundle.bundleId())
+                .param("bundleCode", bundle.bundleCode())
+                .param("bundleVersion", bundle.bundleVersion())
+                .param("bundleDigest", bundle.manifestDigest())
+                .update();
+        return workOrderId;
     }
 
     private OutboxMessageHandler handler() {

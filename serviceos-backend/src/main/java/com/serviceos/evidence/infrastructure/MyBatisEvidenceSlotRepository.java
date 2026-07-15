@@ -35,6 +35,8 @@ final class MyBatisEvidenceSlotRepository implements EvidenceSlotRepository {
         values.put("sourceEventId", resolution.sourceEventId());
         values.put("sourceEventDigest", resolution.sourceEventDigest());
         values.put("resolverVersion", resolution.resolverVersion());
+        values.put("conditionInputDigest", resolution.conditionInputDigest());
+        values.put("resolutionExplanation", resolution.resolutionExplanationJson());
         values.put("slotCount", resolution.slots().size());
         values.put("resolvedAt", resolution.resolvedAt());
         mapper.insertResolution(values);

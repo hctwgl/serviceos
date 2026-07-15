@@ -277,6 +277,25 @@ class ConfigurationPublicationPostgresIT {
                   ]
                 }
                 """.trim();
+        String invalidCondition = """
+                {
+                  "templateKey":"survey.site","version":"1.0.0","stage":"SURVEY",
+                  "items":[
+                    {"evidenceKey":"site.panorama","name":"全景图","mediaType":"PHOTO","required":false,
+                     "requiredWhen":{"language":"SERVICEOS_EXPR_V1","source":"unknown.path == true"}}
+                  ]
+                }
+                """.trim();
+        String conditionalWithZeroCount = """
+                {
+                  "templateKey":"survey.site","version":"1.0.0","stage":"SURVEY",
+                  "items":[
+                    {"evidenceKey":"site.panorama","name":"全景图","mediaType":"PHOTO","required":false,
+                     "requiredWhen":{"language":"SERVICEOS_EXPR_V1","source":"task.stageCode == \\\"SURVEY\\\""},
+                     "capture":{"minCount":0,"maxCount":1}}
+                  ]
+                }
+                """.trim();
 
         assertThatThrownBy(() -> publishEvidence(malformed, "1.0.0"))
                 .isInstanceOf(ConfigurationPublicationException.class)
@@ -293,6 +312,12 @@ class ConfigurationPublicationPostgresIT {
         assertThatThrownBy(() -> publishEvidence(requiredWithZeroCount, "1.0.0"))
                 .isInstanceOf(ConfigurationPublicationException.class)
                 .hasMessageContaining("required item minCount must be greater than zero");
+        assertThatThrownBy(() -> publishEvidence(invalidCondition, "1.0.0"))
+                .isInstanceOf(ConfigurationPublicationException.class)
+                .hasMessageContaining("requiredWhen 表达式无效");
+        assertThatThrownBy(() -> publishEvidence(conditionalWithZeroCount, "1.0.0"))
+                .isInstanceOf(ConfigurationPublicationException.class)
+                .hasMessageContaining("conditional item minCount must be greater than zero");
         assertThat(jdbc.sql("SELECT count(*) FROM cfg_configuration_asset_version WHERE asset_type = 'EVIDENCE'")
                 .query(Long.class).single()).isZero();
     }

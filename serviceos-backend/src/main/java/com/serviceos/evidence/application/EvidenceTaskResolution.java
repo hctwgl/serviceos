@@ -18,6 +18,8 @@ public record EvidenceTaskResolution(
         UUID sourceEventId,
         String sourceEventDigest,
         String resolverVersion,
+        String conditionInputDigest,
+        String resolutionExplanationJson,
         Instant resolvedAt,
         List<EvidenceSlotView> slots
 ) {
