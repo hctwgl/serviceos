@@ -6,9 +6,9 @@ status: Proposed
 
 # 派单、SLA、集成、通知与异常逻辑数据模型
 
-> M56 已以 Flyway V055 落地 BYD 创建工单所需的 `int_inbound_envelope`、
-> `int_canonical_message` 及 replay guard Envelope 外键；仅该纵向切片为已实现事实。
-> OutboundDelivery、DeliveryAttempt、Ack、Replay 和其他 Connector 数据仍为 Proposed。
+> M56～M57 以 V055～V057 落地 BYD 创建工单/审核回调的 Envelope、Canonical 和路由数据。
+> M58 以 V058 落地 BYD 提审所需的 OutboundDelivery、DeliveryAttempt 和
+> ExternalAcknowledgement 最小子集。ReplayRequest、通用 Connector 和本文其余模型仍为 Proposed。
 
 本文件定义 M4 逻辑实体和关键约束，不是最终 DDL。
 

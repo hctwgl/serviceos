@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/external/byd-cpim-submit-review-v731.schema.json",
+  "title": "BYD CPIM V7.3.1 Submit Review Payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["operatePerson", "orderCode", "commitDate"],
+  "properties": {
+    "operatePerson": {"type": "string", "minLength": 1, "maxLength": 50},
+    "orderCode": {"type": "string", "minLength": 1, "maxLength": 50},
+    "commitDate": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$"}
+  }
+}

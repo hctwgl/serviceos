@@ -1,0 +1,26 @@
+{
+  "eventId": "58000000-0000-4000-8000-000000000001",
+  "eventType": "integration.outbound-delivery-created",
+  "schemaVersion": 1,
+  "tenantId": "tenant-m58",
+  "correlationId": "corr-m58-create",
+  "causationId": "idem-m58-create",
+  "aggregateType": "OutboundDelivery",
+  "aggregateId": "58000000-0000-4000-8000-000000000002",
+  "aggregateVersion": 2,
+  "occurredAt": "2026-07-15T08:00:00Z",
+  "payload": {
+    "deliveryId": "58000000-0000-4000-8000-000000000002",
+    "projectId": "58000000-0000-4000-8000-000000000003",
+    "sourceReviewCaseId": "58000000-0000-4000-8000-000000000004",
+    "sourceTaskId": "58000000-0000-4000-8000-000000000005",
+    "sourceWorkOrderId": "58000000-0000-4000-8000-000000000006",
+    "sourceSnapshotId": "58000000-0000-4000-8000-000000000007",
+    "externalOrderCode": "BYD-M58-001",
+    "mappingVersionId": "byd-ocean-shandong-submit-review-v1",
+    "payloadDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "externalIdempotencyKey": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "executionTaskId": "58000000-0000-4000-8000-000000000008",
+    "createdAt": "2026-07-15T08:00:00Z"
+  }
+}

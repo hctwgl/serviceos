@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/integration-outbound-delivery-created-v1.schema.json",
+  "title": "IntegrationOutboundDeliveryCreatedV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId", "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"},
+    "eventType": {"const": "integration.outbound-delivery-created"},
+    "schemaVersion": {"const": 1},
+    "tenantId": {"type": "string"},
+    "correlationId": {"type": "string"},
+    "causationId": {"type": "string"},
+    "aggregateType": {"const": "OutboundDelivery"},
+    "aggregateId": {"type": "string", "format": "uuid"},
+    "aggregateVersion": {"type": "integer", "minimum": 1},
+    "occurredAt": {"type": "string", "format": "date-time"},
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deliveryId", "projectId", "sourceReviewCaseId", "sourceTaskId", "sourceWorkOrderId", "sourceSnapshotId", "externalOrderCode", "mappingVersionId", "payloadDigest", "externalIdempotencyKey", "executionTaskId", "createdAt"],
+      "properties": {
+        "deliveryId": {"type": "string", "format": "uuid"},
+        "projectId": {"type": "string", "format": "uuid"},
+        "sourceReviewCaseId": {"type": "string", "format": "uuid"},
+        "sourceTaskId": {"type": "string", "format": "uuid"},
+        "sourceWorkOrderId": {"type": "string", "format": "uuid"},
+        "sourceSnapshotId": {"type": "string", "format": "uuid"},
+        "externalOrderCode": {"type": "string", "minLength": 1, "maxLength": 50},
+        "mappingVersionId": {"type": "string", "minLength": 1, "maxLength": 120},
+        "payloadDigest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "externalIdempotencyKey": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "executionTaskId": {"type": "string", "format": "uuid"},
+        "createdAt": {"type": "string", "format": "date-time"}
+      }
+    }
+  }
+}

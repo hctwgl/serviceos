@@ -6,9 +6,9 @@
 @org.springframework.modulith.ApplicationModule(
         displayName = "External Integration",
         allowedDependencies = {
-                "shared", "reliability::api", "audit::api", "authorization::api",
+                "shared", "reliability::api", "reliability::spi", "audit::api", "authorization::api",
                 "identity::api", "files::spi", "project::api", "configuration::api",
-                "workorder::api", "evidence::api", "task::api"
+                "workorder::api", "evidence::api", "task::api", "task::spi"
         }
 )
 package com.serviceos.integration;

@@ -37,7 +37,7 @@ status: Proposed
 | network | ARCH-11 | API-04 | DATA-04 | M4 NET | E4 |
 | dispatch | ARCH-11、ADR-009 | API-04 | DATA-04 | M4 DSP/ASN | E4 |
 | sla | ARCH-12 | API-04 | DATA-04 | M4 SLA | E4 |
-| integration | ARCH-13、ADR-010/014、M57 | API-04、OpenAPI Core 0.30.0、BYD CPIM 0.2.0、external-review-route-registered@v1、external-review-callback-processed@v1 | DATA-04、V055/V057 | M4 INT/DLV、M56/M57 | E2/E4 |
+| integration | ARCH-13、ADR-010/014、M57/M58 | API-04、OpenAPI Core 0.31.0、BYD CPIM 0.3.0、outbound-delivery-created/acknowledged@v1、route/callback 事件 | DATA-04、V055～V058 | M4 INT/DLV、M56～M58 | E2/E4 |
 | notification | ARCH-14 | API-04 | DATA-04 | M4 NTF | E4 |
 | facts | ARCH-04/15 | API-05 | DATA-05 | M5 FACT | E5 |
 | pricing | ARCH-04/15、ADR-011 | API-05 | DATA-05 | M5 CALC | E5 |
@@ -152,3 +152,4 @@ Feature gate/authority: if applicable
 | M55 | INTERNAL/CLIENT ReviewCase 来源分离；已通过总部审核后显式登记 CLIENT Case；回执批次与 mapping 匹配冻结值 | ARCH-10 + OpenAPI 0.28.0 + `client-review-case-created@v1` + V054 + ReviewCase PostgreSQL/MVC/Contract/Client/ArchitectureTest | Connector 验签与通用入站、OutboundDelivery、交付成功事件自动创建、integration 域批次权威登记、其他 targetType |
 | M56 | BYD 创建工单验签后登记不可变 Envelope/Canonical；私有原文；transport/业务键幂等；崩溃恢复；授权摘要查询 | ARCH-13 + OpenAPI 0.29.0 + `integration.canonical-message-processed@v1` + V055 + BYD/Replay PostgreSQL IT + Object Storage/Query/Security/Contract/Client/ArchitectureTest | 其他 CPIM messageType、外部审核回调标准化、OutboundDelivery、网络 Connector、自动重试/重放、生产对象存储和 Portal |
 | M57 | BYD 厂端审核回调按显式订单路由拆分 Canonical/item；M49 外部决定；部分成功、transport/业务幂等与故障恢复 | ARCH-10/13 + OpenAPI Core 0.30.0/BYD 0.2.0 + route/callback 事件 Schema + V056/V057 + ReviewCase/Signature/Mapper/Security/Contract/Client/ArchitectureTest | OutboundDelivery、自动创建 CLIENT Case、其他 CPIM 消息、自动 Evidence target 映射、生产 Connector/对象存储和 Portal |
+| M58 | 已通过 INTERNAL Case 派生不可变 BYD 提审 Delivery；Attempt/Acknowledgement 分离；Task 唯一重试时钟；UNKNOWN 不重发并进入人工异常；成功自动创建 CLIENT Case/Route | ARCH-13 + ADR-010/014 的 M58 已批准子集 + OpenAPI Core 0.31.0/BYD 0.3.0 + outbound delivery 事件/外部 Schema + V058 + ReviewCase/Gateway/Security/PostgreSQL/Contract/Client/ArchitectureTest | UNKNOWN 人工处置命令、其他 CPIM 消息、通用 Connector、生产凭据/对象存储/sandbox、自动 Evidence target 映射和 Portal |

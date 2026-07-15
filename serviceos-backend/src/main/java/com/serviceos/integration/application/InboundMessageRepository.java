@@ -58,6 +58,14 @@ public interface InboundMessageRepository {
     Optional<CanonicalMessageRecord> findCanonicalByBusinessKey(
             String tenantId, String connectorVersionId, String messageType, String businessKey);
 
+    /** 由 integration 自己的领域结果引用反查原始入站业务键，避免跨模块读取工单表。 */
+    Optional<CanonicalMessageRecord> findCanonicalByResult(
+            String tenantId,
+            String connectorVersionId,
+            String messageType,
+            String resultType,
+            String resultId);
+
     ExternalReviewRouteRegistration registerExternalReviewRoute(NewExternalReviewRoute route);
 
     Optional<ExternalReviewRouteView> findActiveExternalReviewRoute(

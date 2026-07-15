@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-15
-baselineCommit: 7256418
-latestMilestone: M57
+baselineCommit: PENDING_M58_FEATURE_COMMIT
+latestMilestone: M58
 ---
 
 # ServiceOS 实施状态总览
@@ -39,13 +39,13 @@ latestMilestone: M57
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M57 BYD 厂端审核回调权威入站运行时 |
-| 基线提交 | `7256418` |
+| 最新实施里程碑 | M58 BYD 提审 OutboundDelivery 可靠运行时 |
+| 基线提交 | `PENDING_M58_FEATURE_COMMIT`（功能提交后立即独立回填） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
 | 前端工程 | 尚未建立；已有 Admin、Network、Technician 产品与交互规格 |
-| 数据库 | PostgreSQL + Flyway（当前版本 057 / 59） |
-| 契约 | Core OpenAPI 0.30.0 + BYD CPIM OpenAPI 0.2.0 + 事件 JSON Schema |
+| 数据库 | PostgreSQL + Flyway（当前版本 058 / 60） |
+| 契约 | Core OpenAPI 0.31.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -57,18 +57,18 @@ latestMilestone: M57
 | 身份授权 | OIDC/JWT、Capability、Tenant/Project Scope、拒绝审计 | `IMPLEMENTED` | 后端认证授权和范围校验基线 | 正式企业 IdP、完整组织治理 UI | M9 |
 | 可靠消息 | Inbox、Outbox、Worker claim/lease/retry | `IMPLEMENTED` | 本地可靠发布消费、恢复和人工接管基础 | 正式 Broker 和跨服务运行 | M9～M10 |
 | 配置中心 | 不可变配置资产、Bundle 发布和版本锁定 | `PARTIAL` | FORM、EVIDENCE 等资产发布基础、工单/任务冻结引用、SERVICEOS_EXPR_V1 布尔/类型比较子集与 FORM/EVIDENCE 字段依赖闭包 | 决策表/公式/脚本、完整审批和通用依赖图 | M16、M33、M36、M52～M53 |
-| 外部接入 | BYD CPIM V7.3.1 入站安全、工单与审核回调 | `PARTIAL` | 协议日期验签、防重放、私有原文、Envelope/Canonical、transport/业务键幂等、工单创建；显式审核路由、逐订单结果、部分成功和故障恢复 | 其他 CPIM 消息、OutboundDelivery、网络 Connector/自动重试、生产对象存储和正式生产确认 | M16、M56～M57 |
+| 外部接入 | BYD CPIM V7.3.1 入站、提审与审核回调 | `PARTIAL` | 协议日期验签、防重放、私有原文、Envelope/Canonical、工单创建；显式审核路由与逐订单回调；不可变 OutboundDelivery/Attempt/Acknowledgement、Task 可靠执行、UNKNOWN 人工接管 | 其他 CPIM 消息、UNKNOWN 人工处置命令、通用 Connector、生产凭据/对象存储和真实 sandbox | M16、M56～M58 |
 | 工单 | WorkOrder 接收、激活、履约完成 | `IMPLEMENTED` | 权威工单、工作流启动、跨阶段和 END 完结 | 完整取消、暂停、恢复和全部业务分支 | M16～M19 |
 | 工作流 | 线性 Stage/Task 运行时 | `PARTIAL` | 精确版本启动、线性推进、唯一跨阶段推进、完成事件 | 并行/汇聚网关、流程条件表达式和复杂流程语义 | M17～M19 |
 | 人工任务 | claim/start/complete、责任和执行保护 | `IMPLEMENTED` | 人工命令、候选领取、唯一责任、release/reclaim、执行保护；表单、资料和双引用完成门禁 | Review 完成条件 | M20～M23、M35、M41、M43 |
 | 服务分配 | 网点分配、容量、改派 Saga、超时恢复 | `IMPLEMENTED` | ServiceAssignment、容量权威、改派、终止、对账和自动恢复 | 完整策略评分、全部异常分支和 UI | M24～M28 |
-| 运营异常 | 异常工作台基础 | `PARTIAL` | 异常记录和恢复入口基础 | 完整通知、运营中心前端和跨域异常目录 | M29 |
+| 运营异常 | 异常工作台基础 | `PARTIAL` | 异常记录和恢复入口；M58 将外发 UNKNOWN 与 Task 最终人工事件汇入 OperationalException + HUMAN Task | UNKNOWN 人工处置命令、完整通知、运营中心前端和跨域异常目录 | M29、M58 |
 | 预约 | 预约修订、联系终态动作 | `PARTIAL` | Revision、并发和终态动作基础 | 用户确认渠道、完整日程和跨端协作 | M30～M31 |
 | 现场作业 | Visit 生命周期 | `PARTIAL` | Visit 运行时基础 | GPS 策略、完整现场提交、离线同步和师傅端 | M32 |
 | 动态表单 | 资产、冻结版本、不可变提交和 Task 完成门禁 | `PARTIAL` | 固定/条件 required、visible 与布尔 validation rule，基础类型校验、精确版本提交和完成引用 | 复杂 validator、计算字段、草稿、冲突、更正和审核 | M33～M35、M53 |
 | 资料 Evidence | 资产、槽位、Item/Revision、机器校验、Snapshot、完成门禁、作废、Review、Correction | `PARTIAL` | 固定/条件槽位、VALIDATED 表单触发只追加重解析、槽位世代/lineage、REVIEW_REQUIRED 与显式 KEEP/INVALIDATE、安全文件联动、Snapshot/完成门禁及审核整改链路 | OCR/CV、GPS 权威距离、长期归档 | M36～M53 |
 | 安全文件 | Begin/Finalize/隔离/扫描/授权下载/作废 | `IMPLEMENTED` | 独立安全文件生命周期；Evidence 编排 Begin/Finalize/Invalidate 联动 | 正式对象存储、专业扫描服务、物理删除 | M11、M38、M46 |
-| 审核整改 | ReviewCase、ReviewDecision、CorrectionCase | `PARTIAL` | Review + Correction + 整改 Task + 强制通过/重开 + 车企回执 + WAIVED；CLIENT Case 来源、批次/mapping 冻结；BYD 回调 Canonical 与显式订单路由 | 多候选人策略、前端、OutboundDelivery 与交付成功自动创建 CLIENT Case、自动 Evidence target 映射 | M44～M57 |
+| 审核整改 | ReviewCase、ReviewDecision、CorrectionCase | `PARTIAL` | Review + Correction + 整改 Task + 强制通过/重开 + 车企回执 + WAIVED；CLIENT Case 来源、批次/mapping 冻结；M58 在交付明确成功后自动创建 CLIENT Case 与回调路由 | 多候选人策略、前端、UNKNOWN 人工处置命令、自动 Evidence target 映射 | M44～M58 |
 | SLA | 时钟、预警、升级 | `PROPOSED` | 已有总体设计 | 完整运行时和验收尚未实施 | `architecture/12-*` |
 | 通知 | 通知与运营异常中心 | `PROPOSED` | 已有总体设计 | 通知通道、模板、可靠发送和 UI | `architecture/14-*` |
 | 履约事实与试算 | 事实提取和双向试算 | `PROPOSED` | 已有设计、API 和数据规划 | 运行时、投影和前端工作区 | M5 设计 |
@@ -132,8 +132,9 @@ latestMilestone: M57
 - OCR / 图像 CV / GPS 权威距离；
 - 计算字段、脚本/决策表、草稿冲突与离线表达式合并；
 - 多候选人策略评分与自动 claim；
-- CLIENT origin ReviewCase 已可在总部审核通过后由适配层显式登记（M55）；M57 已将 BYD 厂端审核回调
-  标准化并关联显式订单路由；OutboundDelivery、交付成功事件自动创建与自动 target 映射仍未实现。
+- CLIENT origin ReviewCase 已可在总部审核通过后显式登记（M55）；M57 已将 BYD 厂端回调
+  标准化并关联显式订单路由；M58 已在提审明确成功后自动创建 CLIENT Case 和路由；
+  remark/Evidence target 自动映射仍未实现。
 
 ### M54：车企回执影响对象权威校验
 
@@ -220,20 +221,41 @@ latestMilestone: M57
 
 明确未实现：
 
-- BYD 提审 OutboundDelivery、远端状态查询、自动重试和交付成功自动创建 CLIENT Case；
+- BYD 提审 OutboundDelivery 已由 M58 实现；协议未提供的远端状态查询不得猜测，
+  UNKNOWN 的人工再发/标记处置命令尚未实现；
 - 取消/暂停/恢复等其他 CPIM messageType，文件批次/SFTP 与生产凭据轮换；
 - remark 到 EvidenceRevision 的自动 target 映射、完整 OperationalException 聚合和 Portal；
 - 正式对象存储、生产 sandbox/凭据和脱敏真实流量演练。
 
+### M58：BYD 提审 OutboundDelivery 可靠运行时
+
+已实现：
+
+- 从已通过 INTERNAL ReviewCase、冻结 Snapshot/Task 和 M56 Canonical lineage 派生不可变提审意图；
+- Delivery/Attempt/Acknowledgement 分离持久化，Task 作为唯一重试时钟，网络调用位于数据库事务外；
+- 严格按 BYD V7.3.1 2.5 节发送 `operatePerson/orderCode/commitDate`，冻结私有 payload/response 及 digest；
+- `errno=0` 后幂等创建 CLIENT ReviewCase 和 M57 回调路由；本地落账重试不二次发 HTTP；
+- 明确业务拒绝、发送前最终失败与 UNKNOWN 分开；UNKNOWN 绝不自动重发，并进入
+  OperationalException + HUMAN Task；
+- V058、Core OpenAPI 0.31.0、BYD OpenAPI 0.3.0、外部 payload 与两个事件 Schema、PostgreSQL IT、
+  HTTP/MVC Security、契约/客户端与 Modulith 门禁形成工程证据。
+
+明确未实现：
+
+- UNKNOWN 的人工再发、标记已送达或放弃处置命令；
+- 取消/暂停/恢复等其他 CPIM 消息、文件批次/SFTP 和通用 Connector SDK；
+- 生产 Secret Manager/凭据轮换、正式对象存储、真实 sandbox 和脱敏流量演练；
+- Evidence target 自动映射、Portal 和完整通知中心。
+
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M57**。M57 在 M56 入站事实边界内贯通 BYD 厂端审核结果与
-CLIENT ReviewCase，没有实现可靠外部提审、其他 CPIM 消息或整个现场履约平台。
+ServiceOS 可靠纵向切片已推进到 **M58**。M58 贯通 BYD 提审的不可变交付意图、网络尝试、
+外部确认、CLIENT Case/回调路由与 UNKNOWN 人工异常，但没有实现其他 CPIM 消息或整个现场履约平台。
 
 ```text
-候选下一方向（需对应产品/架构决策后启动）：
-1. 多候选人评分、自动 claim、网点容量联动；
-2. 待真实外发协议、端点、凭据与重试策略获批后，实现 OutboundDelivery、交付事件自动创建 CLIENT Case；
+候选下一方向（优先从已确认文档中选择最小可靠切片）：
+1. 实现 UNKNOWN 的授权人工处置命令，明确“重发/标记已送达/放弃”各自事实和高风险门禁；
+2. 多候选人评分、自动 claim、网点容量联动；
 3. OCR/CV、GPS 权威距离、二级审批/MFA、报告 GENERATED 资料包；
 4. 表达式计算字段、决策表/脚本、草稿冲突与离线合并；
 5. Admin/Network/Technician Portal 工程；
@@ -293,3 +315,5 @@ CLIENT ReviewCase，没有实现可靠外部提审、其他 CPIM 消息或整个
 - `serviceos-architecture/testing/52-m55-client-review-case-origin-acceptance.md`
 - `serviceos-architecture/architecture/70-m57-byd-review-callback-runtime.md`
 - `serviceos-architecture/testing/54-m57-byd-review-callback-acceptance.md`
+- `serviceos-architecture/architecture/71-m58-byd-review-submission-outbound-delivery.md`
+- `serviceos-architecture/testing/55-m58-byd-review-submission-outbound-delivery-acceptance.md`

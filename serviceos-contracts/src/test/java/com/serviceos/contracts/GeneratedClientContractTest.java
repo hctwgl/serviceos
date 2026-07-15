@@ -46,6 +46,8 @@ class GeneratedClientContractTest {
                 .contains("listWorkOrderVisits")
                 .contains("checkInVisit")
                 .contains("checkOutVisit")
-                .contains("interruptVisit");
+                .contains("interruptVisit")
+                .contains("createBydReviewSubmission")
+                .contains("getOutboundDelivery");
     }
 }

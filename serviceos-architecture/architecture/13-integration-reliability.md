@@ -6,9 +6,10 @@ status: Proposed
 
 # 车企集成、回传与可靠交付设计
 
-> M56 已为现有 BYD CPIM 创建工单入口实现本章 `InboundEnvelope`、`CanonicalMessage`、私有原文留存、
-> transport/业务键幂等、授权摘要查询和成功事件的最小纵向切片。其他 CPIM 消息、OutboundDelivery、
-> 网络 Connector、自动重试和批量重放仍未实现；本章其余 Proposed 设计不能据此视为已完成。
+> M56～M57 已为 BYD 创建工单与审核回调实现 `InboundEnvelope`/`CanonicalMessage`。
+> M58 已实现 BYD 提审的不可变 `OutboundDelivery`/`DeliveryAttempt`/
+> `ExternalAcknowledgement`、Task 唯一重试时钟和 UNKNOWN 人工接管的最小纵向切片。
+> 其他 CPIM 消息、通用 Connector、人工重放命令和批量重放仍未实现；本章其余 Proposed 设计不能据此视为已完成。
 
 ## 1. 目标
 
@@ -146,6 +147,9 @@ stateDiagram-v2
 
 ## 10. 错误分类与重试
 
+M58 的 BYD 提审协议无外部幂等键和状态查询，因此不套用下表的通用“网络/
+5xx 自动重试”建议：任何可能已发送的不确定结果直接为 UNKNOWN 并人工接管。
+
 | 分类 | 示例 | 默认处理 |
 |---|---|---|
 | `TRANSIENT_NETWORK` | 连接超时、DNS 临时错误 | 指数退避重试 |
@@ -155,7 +159,7 @@ stateDiagram-v2
 | `VALIDATION` | 外部必填缺失 | 不自动重试，人工修复 |
 | `BUSINESS_REJECTED` | 资料不合格 | 进入客服协调/整改 |
 | `DUPLICATE_ACCEPTED` | 外部已存在 | 查询并核对，视为幂等成功或冲突 |
-| `UNKNOWN` | 未分类错误 | 少量重试后人工 |
+| `UNKNOWN` | 未分类错误 | 按连接器是否具备幂等/查询能力决策；M58 BYD 提审直接人工，不自动重发 |
 
 重试次数、退避、nextRetryAt 和人工接管由关联自动 Task/TaskExecutionAttempt 唯一拥有。OutboundDelivery 的 `RETRY_WAIT` 是根据 Task 状态形成的投影，DeliveryAttempt 只记录实际网络尝试。连接器库内部只能重试尚未向外部产生可观察副作用的低层连接动作。
 

@@ -3,6 +3,9 @@
 - 状态：Proposed
 - 日期：2026-07-13
 
+> M58 范围内的 Delivery/Attempt/Acknowledgement 分离已于 2026-07-15 获项目负责人明确批准并实现。
+> ADR 的其余通用 Connector 范围仍保持 Proposed，不因局部落地外推为全局 Accepted。
+
 ## 背景
 
 车企回传可能超时、重试或先技术成功后业务驳回。若每次 HTTP 请求都被视为一次独立业务回传，会重复完成、取消、收费或资料提交。

@@ -136,6 +136,11 @@ serviceos:
         project-code: ${SERVICEOS_BYD_CPIM_PROJECT_CODE:BYD-OCEAN-SD-PILOT}
         # 必须在 authorization 中为该 SERVICE 主体显式授予 evidence.recordExternalReceipt。
         adapter-principal-id: ${SERVICEOS_BYD_CPIM_ADAPTER_PRINCIPAL_ID:service-byd-cpim-adapter}
+        # 出站地址和凭据版本没有安全默认值；未显式配置时 Delivery 失败关闭并转人工。
+        outbound-base-url: ${SERVICEOS_BYD_CPIM_OUTBOUND_BASE_URL:}
+        credential-version-id: ${SERVICEOS_BYD_CPIM_CREDENTIAL_VERSION_ID:}
+        connect-timeout: ${SERVICEOS_BYD_CPIM_CONNECT_TIMEOUT:PT5S}
+        request-timeout: ${SERVICEOS_BYD_CPIM_REQUEST_TIMEOUT:PT15S}
   files:
     # 参考工程默认使用私有本地沙箱；生产部署必须切换为受管对象存储适配器和专业扫描服务。
     storage: ${SERVICEOS_FILE_STORAGE:local-private}

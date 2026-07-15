@@ -26,11 +26,15 @@ import com.serviceos.evidence.api.ReviewCaseView;
 import com.serviceos.files.infrastructure.LocalObjectTransferService;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.integration.api.ExternalReviewRouteService;
+import com.serviceos.integration.api.OutboundDeliveryService;
+import com.serviceos.integration.api.OutboundDeliveryView;
+import com.serviceos.integration.api.CreateReviewSubmissionCommand;
 import com.serviceos.integration.api.RegisterExternalReviewRouteCommand;
 import com.serviceos.integration.byd.api.BydCpimReviewCallbackResponse;
 import com.serviceos.integration.byd.api.BydCpimSignatureHeaders;
 import com.serviceos.integration.byd.application.BydCpimReviewCallbackService;
 import com.serviceos.integration.byd.infrastructure.BydCpimSignatureVerifier;
+import com.serviceos.integration.byd.spi.BydCpimSubmitReviewGateway;
 import com.serviceos.reliability.spi.OutboxMessage;
 import com.serviceos.reliability.spi.OutboxMessageHandler;
 import com.serviceos.shared.BusinessProblem;
@@ -45,12 +49,14 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -68,6 +74,10 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = ServiceOsApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE)
@@ -102,6 +112,7 @@ class ReviewCasePostgresIT {
         registry.add("serviceos.integration.byd.cpim.zone-id", () -> "Asia/Shanghai");
         registry.add("serviceos.integration.byd.cpim.tenant-id", () -> TENANT);
         registry.add("serviceos.integration.byd.cpim.adapter-principal-id", () -> ADAPTER);
+        registry.add("serviceos.integration.byd.cpim.credential-version-id", () -> "cred-review-it-v1");
     }
 
     @Autowired ConfigurationService configurations;
@@ -111,6 +122,8 @@ class ReviewCasePostgresIT {
     @Autowired ExternalReviewReceiptService receipts;
     @Autowired ExternalReviewRouteService reviewRoutes;
     @Autowired BydCpimReviewCallbackService reviewCallbacks;
+    @Autowired OutboundDeliveryService outboundDeliveries;
+    @MockitoBean BydCpimSubmitReviewGateway submitReviewGateway;
     @Autowired Clock clock;
     @Autowired LocalObjectTransferService transfers;
     @Autowired TaskExecutionWorker worker;
@@ -125,6 +138,7 @@ class ReviewCasePostgresIT {
     void setUp() throws Exception {
         jdbc.sql("""
                 TRUNCATE TABLE
+                    int_external_acknowledgement, int_delivery_attempt, int_outbound_delivery,
                     int_inbound_item_result, int_external_review_route,
                     int_canonical_message, int_inbound_envelope, int_inbound_replay_guard,
                     evd_external_review_receipt, evd_external_receipt_command_result,
@@ -135,6 +149,7 @@ class ReviewCasePostgresIT {
                     evd_evidence_item, evd_evidence_upload_session, evd_evidence_slot,
                     evd_task_evidence_resolution,
                     fil_download_authorization, fil_scan_result, fil_stored_file, fil_upload_session,
+                    ops_exception_ack_result, ops_operational_exception,
                     tsk_task_execution_guard, tsk_task_assignment, tsk_task,
                     cfg_configuration_bundle_item, cfg_configuration_bundle,
                     cfg_configuration_asset_version, prj_project,
@@ -157,8 +172,105 @@ class ReviewCasePostgresIT {
         grant(REVIEWER, "evidence.review", "evidence.read");
         grant(FORCE_ADMIN, "evidence.forceApprove", "review.reopen", "evidence.read", "evidence.review");
         grant(ADAPTER, "evidence.createClientReviewCase", "evidence.recordExternalReceipt",
-                "evidence.read", "integration.registerExternalReviewRoute");
+                "evidence.read", "integration.registerExternalReviewRoute",
+                "integration.submitClientReview", "integration.readOutbound");
         seedResolvedSlot();
+    }
+
+    @Test
+    void bydReviewSubmissionCreatesImmutableDeliveryAndClientReviewRouteAfterErrnoZero() throws Exception {
+        ReviewCaseView source = createApprovedInternalWithBydLineage("outbound-success", "ORDER-OUT-1");
+        when(submitReviewGateway.send(any())).thenReturn(new BydCpimSubmitReviewGateway.Response(
+                200, "{\"errno\":0,\"errmsg\":\"成功\",\"data\":null}".getBytes(StandardCharsets.UTF_8)));
+
+        OutboundDeliveryView created = outboundDeliveries.createReviewSubmission(
+                adapter(), metadata("outbound-success"),
+                new CreateReviewSubmissionCommand(source.reviewCaseId()));
+
+        assertThat(created.status()).isEqualTo("PENDING");
+        assertThat(created.executionTaskId()).isNotNull();
+        assertThat(worker.runOnce()).isEqualTo(TaskExecutionWorker.RunResult.SUCCEEDED);
+
+        OutboundDeliveryView completed = outboundDeliveries.get(
+                adapter(), "corr-outbound-query", created.deliveryId());
+        assertThat(completed.status()).isEqualTo("ACKNOWLEDGED");
+        assertThat(completed.clientReviewCaseId()).isNotNull();
+        assertThat(completed.reviewRouteId()).isNotNull();
+        assertThat(completed.attempts()).singleElement().satisfies(attempt -> {
+            assertThat(attempt.status()).isEqualTo("DELIVERED");
+            assertThat(attempt.resultCode()).isEqualTo("BYD_ERRNO_0");
+        });
+        assertThat(completed.acknowledgements()).singleElement().satisfies(ack -> {
+            assertThat(ack.result()).isEqualTo("ACCEPTED");
+            assertThat(ack.reasonCode()).isEqualTo("BYD_ACCEPTED");
+        });
+        assertThat(reviews.get(adapter(), "corr-client-after-delivery", completed.clientReviewCaseId()).origin())
+                .isEqualTo("CLIENT");
+        assertThat(jdbc.sql("SELECT status FROM int_external_review_route WHERE review_route_id=:id")
+                .param("id", completed.reviewRouteId()).query(String.class).single()).isEqualTo("ACTIVE");
+
+        OutboundDeliveryView replay = outboundDeliveries.createReviewSubmission(
+                adapter(), metadata("outbound-business-replay"),
+                new CreateReviewSubmissionCommand(source.reviewCaseId()));
+        assertThat(replay.deliveryId()).isEqualTo(created.deliveryId());
+        assertThat(jdbc.sql("SELECT count(*) FROM int_outbound_delivery").query(Long.class).single()).isOne();
+        verify(submitReviewGateway, times(1)).send(any());
+    }
+
+    @Test
+    void bydReviewSubmissionRetriesOnlyKnownDeliveredLocalFinalizationWithoutSecondHttpCall() throws Exception {
+        ReviewCaseView source = createApprovedInternalWithBydLineage("outbound-local-retry", "ORDER-OUT-2");
+        UUID adapterRole = jdbc.sql("""
+                SELECT arc.role_id FROM auth_role_capability arc
+                JOIN auth_role_grant arg ON arg.role_id=arc.role_id
+                WHERE arg.principal_id=:principal AND arc.capability_code='evidence.createClientReviewCase'
+                LIMIT 1
+                """).param("principal", ADAPTER).query(UUID.class).single();
+        jdbc.sql("DELETE FROM auth_role_capability WHERE role_id=:role AND capability_code='evidence.createClientReviewCase'")
+                .param("role", adapterRole).update();
+        when(submitReviewGateway.send(any())).thenReturn(new BydCpimSubmitReviewGateway.Response(
+                200, "{\"errno\":0,\"errmsg\":\"成功\",\"data\":null}".getBytes(StandardCharsets.UTF_8)));
+        OutboundDeliveryView created = outboundDeliveries.createReviewSubmission(
+                adapter(), metadata("outbound-local-retry"),
+                new CreateReviewSubmissionCommand(source.reviewCaseId()));
+
+        assertThat(worker.runOnce()).isEqualTo(TaskExecutionWorker.RunResult.RETRY_SCHEDULED);
+        assertThat(outboundDeliveries.get(adapter(), "corr-delivered", created.deliveryId()).status())
+                .isEqualTo("DELIVERED");
+
+        jdbc.sql("INSERT INTO auth_role_capability(role_id, capability_code, granted_at) VALUES (:role,'evidence.createClientReviewCase',now())")
+                .param("role", adapterRole).update();
+        jdbc.sql("UPDATE tsk_task SET next_run_at=now() WHERE task_id=:id")
+                .param("id", created.executionTaskId()).update();
+        assertThat(worker.runOnce()).isEqualTo(TaskExecutionWorker.RunResult.SUCCEEDED);
+        assertThat(outboundDeliveries.get(adapter(), "corr-ack-after-retry", created.deliveryId()).status())
+                .isEqualTo("ACKNOWLEDGED");
+        verify(submitReviewGateway, times(1)).send(any());
+    }
+
+    @Test
+    void bydReviewSubmissionUnknownNeverResendsAndOpensOperationalException() throws Exception {
+        ReviewCaseView source = createApprovedInternalWithBydLineage("outbound-unknown", "ORDER-OUT-3");
+        when(submitReviewGateway.send(any())).thenThrow(new BydCpimSubmitReviewGateway.TransportException(
+                BydCpimSubmitReviewGateway.TransportException.Kind.UNKNOWN,
+                "BYD_TRANSPORT_UNKNOWN", new IOException("response lost")));
+        OutboundDeliveryView created = outboundDeliveries.createReviewSubmission(
+                adapter(), metadata("outbound-unknown"),
+                new CreateReviewSubmissionCommand(source.reviewCaseId()));
+
+        assertThat(worker.runOnce()).isEqualTo(TaskExecutionWorker.RunResult.MANUAL_INTERVENTION);
+        assertThat(outboundDeliveries.get(adapter(), "corr-unknown", created.deliveryId()).status())
+                .isEqualTo("UNKNOWN");
+        OutboxMessage failure = latestEvent("task.execution.manual-intervention-required");
+        handlers.stream().filter(handler -> handler.supports(failure.eventType(), failure.schemaVersion()))
+                .forEach(handler -> handler.handle(failure));
+
+        assertThat(jdbc.sql("SELECT count(*) FROM ops_operational_exception WHERE source_id=:task")
+                .param("task", created.executionTaskId().toString()).query(Long.class).single()).isOne();
+        assertThat(jdbc.sql("SELECT count(*) FROM tsk_task WHERE task_type='operations.resolve-exception'")
+                .query(Long.class).single()).isOne();
+        assertThat(worker.runOnce()).isEqualTo(TaskExecutionWorker.RunResult.EMPTY);
+        verify(submitReviewGateway, times(1)).send(any());
     }
 
     @Test
@@ -709,6 +821,47 @@ class ReviewCasePostgresIT {
                 new tools.jackson.databind.ObjectMapper().writeValueAsBytes(payload), "corr-" + nonce);
     }
 
+    private ReviewCaseView createApprovedInternalWithBydLineage(String marker, String orderCode) throws Exception {
+        EvidenceSetSnapshotView snapshot = createSnapshot(marker);
+        ReviewCaseView internal = reviews.create(reviewer(), metadata("create-internal-" + marker),
+                new CreateReviewCaseCommand(snapshot.evidenceSetSnapshotId(), null));
+        ReviewCaseView approved = reviews.decide(reviewer(), metadata("approve-internal-" + marker),
+                new DecideReviewCaseCommand(internal.reviewCaseId(), "APPROVED", List.of(), "send to BYD"));
+        UUID workOrderId = jdbc.sql("SELECT work_order_id FROM tsk_task WHERE task_id=:task")
+                .param("task", taskId).query(UUID.class).single();
+        UUID envelopeId = UUID.randomUUID();
+        String digest = Sha256.digest("canonical-" + marker);
+        jdbc.sql("""
+                INSERT INTO int_inbound_envelope (
+                    inbound_envelope_id, tenant_id, project_id, connector_version_id,
+                    message_type, transport_dedup_key, external_message_id, received_at,
+                    raw_payload_object_ref, raw_payload_digest, canonical_payload_digest,
+                    signature_status, processing_status, mapping_version_id, result_code,
+                    result_type, result_id, correlation_id, completed_at)
+                VALUES (:id, :tenant, :project, 'byd-cpim-v7.3.1', 'CREATE_WORK_ORDER',
+                    :dedup, :externalId, now(), :objectRef, :digest, :digest, 'VALID',
+                    'COMPLETED', 'byd-ocean-shandong-install-v1', 'ACCEPTED',
+                    'WORK_ORDER', :workOrder, :correlation, now())
+                """).param("id", envelopeId).param("tenant", TENANT).param("project", projectId)
+                .param("dedup", Sha256.digest("transport-" + marker)).param("externalId", "nonce-" + marker)
+                .param("objectRef", "test/inbound/" + marker + ".json").param("digest", digest)
+                .param("workOrder", workOrderId.toString()).param("correlation", "corr-" + marker).update();
+        jdbc.sql("""
+                INSERT INTO int_canonical_message (
+                    canonical_message_id, tenant_id, project_id, connector_version_id,
+                    message_type, business_key, payload_object_ref, payload_digest,
+                    mapping_version_id, processing_status, result_code, result_type,
+                    result_id, source_envelope_id, created_at, processed_at)
+                VALUES (:id, :tenant, :project, 'byd-cpim-v7.3.1', 'CREATE_WORK_ORDER',
+                    :businessKey, :objectRef, :digest, 'byd-ocean-shandong-install-v1',
+                    'COMPLETED', 'ACCEPTED', 'WORK_ORDER', :workOrder, :envelope, now(), now())
+                """).param("id", UUID.randomUUID()).param("tenant", TENANT).param("project", projectId)
+                .param("businessKey", "BYD:INSTALL:" + orderCode)
+                .param("objectRef", "test/canonical/" + marker + ".json").param("digest", digest)
+                .param("workOrder", workOrderId.toString()).param("envelope", envelopeId).update();
+        return approved;
+    }
+
     private CurrentPrincipal forceAdmin() {
         return new CurrentPrincipal(
                 FORCE_ADMIN, TENANT, CurrentPrincipal.PrincipalType.USER, "ops-web", Set.of());
@@ -863,14 +1016,18 @@ class ReviewCasePostgresIT {
     }
 
     private OutboxMessage latestScanCompletedEvent() {
+        return latestEvent("file.scan-completed");
+    }
+
+    private OutboxMessage latestEvent(String eventType) {
         Map<String, Object> row = jdbc.sql("""
                 SELECT outbox_id, event_id, module_name, event_type, schema_version,
                        aggregate_type, aggregate_id, aggregate_version, tenant_id,
                        correlation_id, causation_id, partition_key, payload::text AS payload,
                        payload_digest, occurred_at
-                  FROM rel_outbox_event WHERE event_type='file.scan-completed'
+                  FROM rel_outbox_event WHERE event_type=:eventType
                  ORDER BY occurred_at DESC LIMIT 1
-                """).query().singleRow();
+                """).param("eventType", eventType).query().singleRow();
         return new OutboxMessage(
                 uuid(row, "outbox_id"), uuid(row, "event_id"),
                 text(row, "module_name"), text(row, "event_type"),

@@ -216,6 +216,23 @@ final class JdbcInboundMessageRepository implements InboundMessageRepository {
     }
 
     @Override
+    public Optional<CanonicalMessageRecord> findCanonicalByResult(
+            String tenantId,
+            String connectorVersionId,
+            String messageType,
+            String resultType,
+            String resultId
+    ) {
+        return jdbc.sql(CANONICAL_SELECT + """
+                 WHERE tenant_id=:tenant AND connector_version_id=:connector
+                   AND message_type=:messageType AND result_type=:resultType AND result_id=:resultId
+                """)
+                .param("tenant", tenantId).param("connector", connectorVersionId)
+                .param("messageType", messageType).param("resultType", resultType)
+                .param("resultId", resultId).query(this::canonical).optional();
+    }
+
+    @Override
     public ExternalReviewRouteRegistration registerExternalReviewRoute(NewExternalReviewRoute route) {
         int inserted = jdbc.sql("""
                 INSERT INTO int_external_review_route (

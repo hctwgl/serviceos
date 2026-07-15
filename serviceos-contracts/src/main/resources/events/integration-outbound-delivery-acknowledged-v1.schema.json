@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/integration-outbound-delivery-acknowledged-v1.schema.json",
+  "title": "IntegrationOutboundDeliveryAcknowledgedV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId", "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"},
+    "eventType": {"const": "integration.outbound-delivery-acknowledged"},
+    "schemaVersion": {"const": 1},
+    "tenantId": {"type": "string"},
+    "correlationId": {"type": "string"},
+    "causationId": {"type": "string"},
+    "aggregateType": {"const": "OutboundDelivery"},
+    "aggregateId": {"type": "string", "format": "uuid"},
+    "aggregateVersion": {"type": "integer", "minimum": 1},
+    "occurredAt": {"type": "string", "format": "date-time"},
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deliveryId", "projectId", "sourceReviewCaseId", "clientReviewCaseId", "reviewRouteId", "externalOrderCode", "payloadDigest", "mappingVersionId", "acknowledgedAt"],
+      "properties": {
+        "deliveryId": {"type": "string", "format": "uuid"},
+        "projectId": {"type": "string", "format": "uuid"},
+        "sourceReviewCaseId": {"type": "string", "format": "uuid"},
+        "clientReviewCaseId": {"type": "string", "format": "uuid"},
+        "reviewRouteId": {"type": "string", "format": "uuid"},
+        "externalOrderCode": {"type": "string", "minLength": 1, "maxLength": 50},
+        "payloadDigest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "mappingVersionId": {"type": "string", "minLength": 1, "maxLength": 120},
+        "acknowledgedAt": {"type": "string", "format": "date-time"}
+      }
+    }
+  }
+}

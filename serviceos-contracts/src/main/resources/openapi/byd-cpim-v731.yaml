@@ -1,13 +1,43 @@
 openapi: 3.1.0
 info:
   title: ServiceOS BYD CPIM Adapter API
-  version: 0.2.0
+  version: 0.3.0
   description: >-
-    BYD CPIM V7.3.1 入站安装订单与厂端审核回调协议契约。端点不使用 ServiceOS OIDC Bearer Token，
+    BYD CPIM V7.3.1 入站安装订单、提审与厂端审核回调协议契约。端点不使用 ServiceOS OIDC Bearer Token，
     而使用 APP_KEY、Nonce、Cur_Time、Sign 四个协议头完成签名认证与防重放。
 servers:
   - url: /api/v1
 paths:
+  /jumpto/openapi/sp/pushSubmitReviewInfo:
+    post:
+      operationId: pushSubmitReviewInfo
+      summary: 向 BYD CPIM 提交审核资料
+      description: >-
+        每个 Delivery 的 payload 固化后才能发送。CPIM 协议不提供幂等键或状态查询；
+        因此只有明确未送达时才能终止，未知结果必须转人工处理且不得自动重发。
+      servers:
+        - url: '{bydCpimBaseUrl}'
+          variables:
+            bydCpimBaseUrl:
+              default: https://cpim.example.invalid
+              description: 由部署环境显式配置的 BYD CPIM 基础地址
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/AppKey'
+        - $ref: '#/components/parameters/Nonce'
+        - $ref: '#/components/parameters/CurrentTime'
+        - $ref: '#/components/parameters/Signature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BydCpimSubmitReviewRequest' }
+      responses:
+        '200':
+          description: CPIM 已明确返回接收或业务拒绝
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BydCpimSubmitReviewResponse' }
   /integrations/byd/cpim/v7.3.1/review-results:
     post:
       operationId: receiveBydCpimReviewResult
@@ -121,6 +151,24 @@ components:
         type: string
         maxLength: 128
   schemas:
+    BydCpimSubmitReviewRequest:
+      type: object
+      additionalProperties: false
+      required: [operatePerson, orderCode, commitDate]
+      properties:
+        operatePerson: { type: string, minLength: 1, maxLength: 50 }
+        orderCode: { type: string, minLength: 1, maxLength: 50 }
+        commitDate:
+          type: string
+          pattern: '^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$'
+    BydCpimSubmitReviewResponse:
+      type: object
+      additionalProperties: false
+      required: [errno, errmsg, data]
+      properties:
+        errno: { type: integer }
+        errmsg: { type: string }
+        data: { type: 'null' }
     BydCpimInstallOrderRequest:
       type: object
       additionalProperties: false

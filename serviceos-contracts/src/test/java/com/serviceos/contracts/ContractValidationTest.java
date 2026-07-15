@@ -39,18 +39,21 @@ class ContractValidationTest {
                         "/appointments/{appointmentId}/visits:check-in",
                         "/visits/{visitId}:check-out", "/visits/{visitId}:interrupt",
                         "/internal/integration/byd/review-routes",
+                        "/internal/integration/byd/review-submissions",
+                        "/outbound-deliveries/{deliveryId}",
                         "/inbound-envelopes/{envelopeId}", "/canonical-messages/{messageId}");
     }
 
     @Test
-    void bydCpimOpenApiMustParseAndExposeReviewCallback() throws Exception {
+    void bydCpimOpenApiMustParseAndExposeReviewSubmissionAndCallback() throws Exception {
         String yaml = resourceText("/openapi/byd-cpim-v731.yaml");
         SwaggerParseResult result = new OpenAPIV3Parser().readContents(yaml, null, null);
 
         assertThat(result.getMessages()).as("BYD OpenAPI parser messages").isEmpty();
         assertThat(result.getOpenAPI().getPaths())
                 .containsKeys("/integrations/byd/cpim/v7.3.1/install-orders",
-                        "/integrations/byd/cpim/v7.3.1/review-results");
+                        "/integrations/byd/cpim/v7.3.1/review-results",
+                        "/jumpto/openapi/sp/pushSubmitReviewInfo");
     }
 
     @Test
@@ -165,10 +168,31 @@ class ContractValidationTest {
     }
 
     @Test
+    void integrationOutboundDeliveryCreatedExampleMustMatchPublishedSchema() throws Exception {
+        assertValidEvent(
+                "/events/integration-outbound-delivery-created-v1.schema.json",
+                "/events/integration-outbound-delivery-created-v1.valid.json");
+    }
+
+    @Test
+    void integrationOutboundDeliveryAcknowledgedExampleMustMatchPublishedSchema() throws Exception {
+        assertValidEvent(
+                "/events/integration-outbound-delivery-acknowledged-v1.schema.json",
+                "/events/integration-outbound-delivery-acknowledged-v1.valid.json");
+    }
+
+    @Test
     void bydReviewCallbackExampleMustMatchExternalSchema() throws Exception {
         assertValidEvent(
                 "/external/byd-cpim-review-callback-v731.schema.json",
                 "/external/byd-cpim-review-callback-v731.valid.json");
+    }
+
+    @Test
+    void bydSubmitReviewExampleMustMatchExternalSchema() throws Exception {
+        assertValidEvent(
+                "/external/byd-cpim-submit-review-v731.schema.json",
+                "/external/byd-cpim-submit-review-v731.valid.json");
     }
 
     @Test
