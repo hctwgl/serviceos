@@ -29,4 +29,4 @@ if "${script_dir}/verify-sensitive-output.sh" "${work_dir}/missing.jsonl" >/dev/
   exit 1
 fi
 
-echo "sensitive output gate safe, leak and missing-file probes passed"
+echo "sensitive output gate safe, phone/VIN leak and missing-file probes passed"
