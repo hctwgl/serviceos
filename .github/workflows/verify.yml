@@ -2,7 +2,13 @@ name: verify
 
 on:
   push:
+    branches:
+      - master
   pull_request:
+
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -40,6 +46,8 @@ jobs:
           cache: maven
       - name: Install ripgrep
         run: sudo apt-get update && sudo apt-get install -y ripgrep
+      - name: Fail fast on milestone and migration drift
+        run: bash scripts/verify-milestone-preflight.sh
       - name: Resolve immutable contract comparison base
         shell: bash
         env:
