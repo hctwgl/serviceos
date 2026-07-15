@@ -66,7 +66,7 @@ latestMilestone: M51
 | 预约 | 预约修订、联系终态动作 | `PARTIAL` | Revision、并发和终态动作基础 | 用户确认渠道、完整日程和跨端协作 | M30～M31 |
 | 现场作业 | Visit 生命周期 | `PARTIAL` | Visit 运行时基础 | GPS 策略、完整现场提交、离线同步和师傅端 | M32 |
 | 动态表单 | 资产、冻结版本、不可变提交和 Task 完成门禁 | `PARTIAL` | 固定 required、基础类型校验、精确版本提交和完成引用 | 条件表达式、复杂 validator、草稿、冲突、更正和审核 | M33～M35 |
-| 资料 Evidence | 资产、槽位、Item/Revision、机器校验、Snapshot、完成门禁、作废、Review、Correction | `PARTIAL` | 固定槽位、安全文件 Finalize/Invalidate 联动、确定性机器校验、TASK_SUBMISSION Snapshot、完成门禁、作废、Review/Correction/整改 Task、强制通过/重开 | 条件槽位、OCR/CV | M36～M49 |
+| 资料 Evidence | 资产、槽位、Item/Revision、机器校验、Snapshot、完成门禁、作废、Review、Correction | `PARTIAL` | 固定槽位、安全文件 Finalize/Invalidate 联动、确定性机器校验、TASK_SUBMISSION Snapshot、完成门禁、作废、Review/Correction/整改 Task、强制通过/重开/车企回执/WAIVED | 条件槽位、OCR/CV | M36～M51 |
 | 安全文件 | Begin/Finalize/隔离/扫描/授权下载/作废 | `IMPLEMENTED` | 独立安全文件生命周期；Evidence 编排 Begin/Finalize/Invalidate 联动 | 正式对象存储、专业扫描服务、物理删除 | M11、M38、M46 |
 | 审核整改 | ReviewCase、ReviewDecision、CorrectionCase | `PARTIAL` | Review + Correction + 整改 Task + 强制通过/重开 + 车企回执 + WAIVED；补传轮次只追加 | 多候选人策略、前端、CLIENT Case 自动创建 | M44～M51 |
 | SLA | 时钟、预警、升级 | `PROPOSED` | 已有总体设计 | 完整运行时和验收尚未实施 | `architecture/12-*` |
@@ -127,13 +127,18 @@ latestMilestone: M51
 
 ## 5. 下一实施方向
 
-在没有更新事实源或新批准决策的情况下，建议下一可靠纵向切片是：
+Evidence / Review / Correction 可靠纵向切片已推进到 **M51**。在没有更新事实源或新批准决策的情况下，**当前没有可继续实施的工程切片**；后续候选项均被外部依赖阻塞：
 
 ```text
-M52 多候选人策略评分（需产品策略）或 CLIENT ReviewCase 自动创建（需 OEM 映射）
+BLOCKED — 需用户/架构决策后才能启动：
+1. ADR-018 接受后：条件槽位 requiredWhen / 表单条件表达式
+2. 产品策略确认后：多候选人评分、自动 claim、网点容量联动
+3. OEM 映射与 Connector 设计确认后：CLIENT origin ReviewCase 自动创建、回传批次权威校验、affectedTargets 强校验
+4. 能力选型后：OCR/CV、GPS 权威距离、二级审批/MFA、报告 GENERATED 资料包
+5. 前端立项后：Admin/Network/Technician Portal 工程
 ```
 
-接手 Agent 必须先检查仓库是否已有更新的里程碑文档、ADR 或提交。
+接手 Agent 必须先检查仓库是否已有更新的里程碑文档、ADR 或提交；在收到明确批准前不得猜测业务策略并实现上述候选项。
 
 ## 6. 证据阅读方法
 

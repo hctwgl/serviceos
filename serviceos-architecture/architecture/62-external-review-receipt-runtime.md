@@ -17,4 +17,4 @@ status: Implemented
 
 ## 2. 未实现
 
-完整车企 Connector 验签/入站表、CLIENT origin ReviewCase 自动创建、回传批次权威校验、affectedTargets 强校验、二级审批、条件槽位、`WAIVED`。
+完整车企 Connector 验签/入站表、CLIENT origin ReviewCase 自动创建、回传批次权威校验、affectedTargets 强校验、二级审批、条件槽位。`WAIVED` 见 M51。

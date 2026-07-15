@@ -15,4 +15,4 @@ status: Implemented
 
 ## 2. 未实现
 
-策略评分多候选人、网点容量、自动 claim、条件槽位、`WAIVED`。
+策略评分多候选人、网点容量、自动 claim、条件槽位。`WAIVED` 见 M51。
