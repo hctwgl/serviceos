@@ -10,7 +10,7 @@ if [[ -z "${output_file}" ]]; then
   exit 64
 fi
 
-read -r migration_version migration_count < <("${repo_root}/scripts/migration-baseline.sh")
+read -r migration_version migration_count < <(bash "${repo_root}/scripts/migration-baseline.sh")
 
 umask 077
 mkdir -p "$(dirname "${output_file}")"
