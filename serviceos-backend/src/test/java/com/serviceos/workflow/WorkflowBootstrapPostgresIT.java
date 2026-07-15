@@ -111,7 +111,10 @@ class WorkflowBootstrapPostgresIT {
                     assertThat(form.semanticVersion()).isEqualTo("1.0.0");
                     assertThat(form.definitionJson()).contains("result.value");
                 });
-        assertThat(jdbc.sql("SELECT status FROM rel_inbox_record")
+        assertThat(jdbc.sql("""
+                SELECT status FROM rel_inbox_record
+                 WHERE consumer_name = 'workflow.work-order-received.v1'
+                """)
                 .query(String.class).single()).isEqualTo("SUCCEEDED");
         assertThat(jdbc.sql("SELECT event_type FROM rel_outbox_event ORDER BY event_type")
                 .query(String.class).list()).containsExactlyInAnyOrder(
@@ -147,7 +150,10 @@ class WorkflowBootstrapPostgresIT {
         assertThat(count("wfl_stage_instance")).isZero();
         assertThat(count("wfl_node_instance")).isZero();
         assertThat(count("tsk_task")).isZero();
-        assertThat(count("rel_inbox_record")).isZero();
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM rel_inbox_record
+                 WHERE consumer_name = 'workflow.work-order-received.v1'
+                """).query(Long.class).single()).isZero();
         assertThat(jdbc.sql("SELECT status FROM rel_outbox_event")
                 .query(String.class).single()).isEqualTo("FAILED");
     }

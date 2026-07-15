@@ -439,6 +439,7 @@ class DispatchTaskReassignmentSagaPostgresIT {
         configure("technician-b", "capacity-b-" + key);
         EvidenceContext evidence = seedEvidenceContext(key);
         UUID workOrderId = UUID.randomUUID();
+        seedWorkOrder(evidence, workOrderId, key);
         UUID taskId = tasks.createWorkflowTask(new CreateWorkflowTaskCommand(
                 TENANT, evidence.projectId(), workOrderId, UUID.randomUUID(), UUID.randomUUID(),
                 UUID.randomUUID(), "SITE_SURVEY", UUID.randomUUID(), "a".repeat(64),
@@ -502,6 +503,34 @@ class DispatchTaskReassignmentSagaPostgresIT {
                 .param("projectId", projectId).param("bundleCode", "M25-" + key + "-" + bundleId)
                 .param("digest", "c".repeat(64)).update();
         return new EvidenceContext(projectId, bundleId);
+    }
+
+    /**
+     * 时间线消费者会校验 Task 引用的权威工单范围。测试任务属于真实工作流任务，夹具必须同时建立工单，
+     * 不能依赖一个悬空 workOrderId 来绕过跨聚合身份不变量。
+     */
+    private void seedWorkOrder(EvidenceContext evidence, UUID workOrderId, String key) {
+        jdbc.sql("""
+                INSERT INTO wo_work_order (
+                    id, tenant_id, project_id, client_code, brand_code, service_product_code,
+                    external_order_code, payload_digest, status, configuration_bundle_id,
+                    configuration_bundle_code, configuration_bundle_version,
+                    configuration_bundle_digest, province_code, city_code, district_code,
+                    customer_name, customer_mobile, service_address, vehicle_vin,
+                    external_dispatched_at, received_at, activated_at, version)
+                VALUES (
+                    :id, :tenantId, :projectId, 'TEST', 'TEST', 'SITE_SURVEY',
+                    :externalOrderCode, :payloadDigest, 'ACTIVE', :bundleId,
+                    :bundleCode, '1.0.0', :bundleDigest, '370000', '370100', '370102',
+                    'M25 测试用户', '13800000000', 'M25 测试地址', 'LSLM25TEST12345678',
+                    now(), now(), now(), 1)
+                """)
+                .param("id", workOrderId).param("tenantId", TENANT)
+                .param("projectId", evidence.projectId()).param("bundleId", evidence.bundleId())
+                .param("externalOrderCode", "M25-" + key + "-" + workOrderId)
+                .param("payloadDigest", "b".repeat(64))
+                .param("bundleCode", "M25-" + key + "-" + evidence.bundleId())
+                .param("bundleDigest", "c".repeat(64)).update();
     }
 
     private ServiceAssignmentReceipt prepareReliableReassignment(Baseline baseline, String key) {

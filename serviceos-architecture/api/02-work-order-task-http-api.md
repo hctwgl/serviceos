@@ -151,6 +151,9 @@ CorrectWorkOrderData 仅更正由 workorder 拥有的基础字段，按 fieldCod
 
 列表分页使用稳定排序和游标。数据范围在服务端应用；返回总数是否精确由查询场景决定并在响应中声明。
 
+M73 已实现 `/work-orders/{id}/timeline` 的 WorkOrder/Workflow/Stage/Task 核心事件子集。Appointment、
+Visit、Evidence/Review、Delivery、SLA、异常、试算与结算尚未合并，客户端不得把该子集标成完整跨域时间线。
+
 ## 6. 允许动作响应
 
 ```json

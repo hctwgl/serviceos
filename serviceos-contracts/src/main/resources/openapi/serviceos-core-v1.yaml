@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.43.0
+  version: 0.44.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -76,6 +76,29 @@ paths:
           description: 工单 Task 执行摘要页
           headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
           content: { application/json: { schema: { $ref: '#/components/schemas/WorkOrderTaskPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /work-orders/{workOrderId}/timeline:
+    get:
+      operationId: listWorkOrderCoreTimeline
+      summary: 查询工单核心执行时间线
+      description: >-
+        每页复用 workOrder.read 实时 Project Scope 鉴权；返回由公开领域事件构建的
+        WorkOrder/Workflow/Stage/Task 核心时间线，不读取 Outbox、审计或领域内部表拼接。
+      parameters:
+        - { name: workOrderId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: cursor, in: query, schema: { type: string, minLength: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: occurredAt/timelineEntryId 倒序的核心执行时间线页
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/WorkOrderTimelinePage' } } }
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
@@ -1967,6 +1990,45 @@ components:
       properties:
         workOrder: { $ref: '#/components/schemas/WorkOrder' }
         asOf: { type: string, format: date-time }
+    WorkOrderTimelineItem:
+      type: object
+      additionalProperties: false
+      required: [id, category, eventType, schemaVersion, occurredAt, receivedAt, actorId,
+        resourceType, resourceId, resourceVersion, resourceCode, outcomeCode, correlationId,
+        displayTemplateCode, displayTemplateVersion]
+      properties:
+        id: { type: string, format: uuid }
+        category: { enum: [WORK_ORDER, WORKFLOW, STAGE, TASK] }
+        eventType:
+          enum: [workorder.received, workorder.activated, workorder.fulfilled,
+            workflow.started, workflow.completed, stage.activated, stage.completed,
+            task.created, task.claimed, task.started, task.released, task.cancelled, task.completed]
+        schemaVersion: { type: integer, minimum: 1, maximum: 2 }
+        occurredAt: { type: string, format: date-time }
+        receivedAt: { type: string, format: date-time }
+        actorId: { type: [string, 'null'], minLength: 1, maxLength: 128 }
+        resourceType: { enum: [WorkOrder, Workflow, Stage, Task] }
+        resourceId: { type: string, format: uuid }
+        resourceVersion: { type: integer, format: int64, minimum: 1 }
+        resourceCode: { type: [string, 'null'], minLength: 1, maxLength: 160 }
+        outcomeCode: { type: [string, 'null'], minLength: 1, maxLength: 100 }
+        correlationId: { type: string, minLength: 1, maxLength: 128 }
+        displayTemplateCode: { type: string, pattern: '^[A-Z][A-Z0-9_]{1,119}$' }
+        displayTemplateVersion: { type: integer, minimum: 1 }
+    WorkOrderTimelinePage:
+      type: object
+      additionalProperties: false
+      required: [resourceVersion, items, nextCursor, asOf, lastProjectedAt, freshnessStatus]
+      properties:
+        resourceVersion: { type: integer, format: int64, minimum: 1 }
+        items:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderTimelineItem' }
+        nextCursor: { type: [string, 'null'] }
+        asOf: { type: string, format: date-time }
+        lastProjectedAt: { type: [string, 'null'], format: date-time }
+        freshnessStatus: { enum: [UNKNOWN] }
     WorkflowInstance:
       type: object
       additionalProperties: false

@@ -28,4 +28,10 @@
    ORDER BY a.attempt_no DESC
    LIMIT #{fetchSize}
  </select>
+ <select id="findTimelineContext" resultType="map">
+  SELECT task_id AS "taskId",project_id AS "projectId",work_order_id AS "workOrderId",
+         task_type AS "taskType",task_kind AS "taskKind"
+    FROM tsk_task
+   WHERE tenant_id=#{tenantId} AND task_id=#{taskId}
+ </select>
 </mapper>

@@ -30,6 +30,7 @@ spring:
       - classpath:db/migration/forms
       - classpath:db/migration/evidence
       - classpath:db/migration/sla
+      - classpath:db/migration/readmodel
     validate-migration-naming: true
   security:
     oauth2:

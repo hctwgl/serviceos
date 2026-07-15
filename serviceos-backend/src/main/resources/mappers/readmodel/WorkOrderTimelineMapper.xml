@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.serviceos.readmodel.infrastructure.WorkOrderTimelineMapper">
+ <insert id="append">
+  INSERT INTO rdm_work_order_timeline_entry (
+   timeline_entry_id,tenant_id,project_id,work_order_id,source_event_id,source_module,
+   event_type,schema_version,category,resource_type,resource_id,resource_version,
+   resource_code,outcome_code,actor_id,correlation_id,display_template_code,
+   display_template_version,occurred_at,received_at
+  ) VALUES (
+   #{timelineEntryId},#{tenantId},#{projectId},#{workOrderId},#{sourceEventId},#{sourceModule},
+   #{eventType},#{schemaVersion},#{category},#{resourceType},#{resourceId},#{resourceVersion},
+   #{resourceCode},#{outcomeCode},#{actorId},#{correlationId},#{displayTemplateCode},
+   #{displayTemplateVersion},#{occurredAt},#{receivedAt}
+  ) ON CONFLICT (tenant_id,source_event_id) DO NOTHING
+ </insert>
+ <select id="findPage" resultType="map">
+  SELECT timeline_entry_id AS "id",category,event_type AS "eventType",
+         schema_version AS "schemaVersion",occurred_at AS "occurredAt",received_at AS "receivedAt",
+         actor_id AS "actorId",resource_type AS "resourceType",resource_id AS "resourceId",
+         resource_version AS "resourceVersion",resource_code AS "resourceCode",
+         outcome_code AS "outcomeCode",correlation_id AS "correlationId",
+         display_template_code AS "displayTemplateCode",
+         display_template_version AS "displayTemplateVersion"
+    FROM rdm_work_order_timeline_entry
+   WHERE tenant_id=#{tenantId} AND work_order_id=#{workOrderId}
+   <if test="beforeOccurredAt != null">
+    AND (occurred_at,timeline_entry_id) &lt; (#{beforeOccurredAt},#{beforeEntryId})
+   </if>
+   ORDER BY occurred_at DESC,timeline_entry_id DESC
+   LIMIT #{fetchSize}
+ </select>
+ <select id="findLastProjectedAt" resultType="java.time.Instant">
+  SELECT max(received_at) FROM rdm_work_order_timeline_entry
+   WHERE tenant_id=#{tenantId} AND work_order_id=#{workOrderId}
+ </select>
+</mapper>

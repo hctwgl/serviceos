@@ -38,4 +38,8 @@ interface TaskDirectoryQueryMapper {
             @Param("taskId") UUID taskId,
             @Param("beforeAttemptNo") Integer beforeAttemptNo,
             @Param("fetchSize") int fetchSize);
+
+    Map<String, Object> findTimelineContext(
+            @Param("tenantId") String tenantId,
+            @Param("taskId") UUID taskId);
 }

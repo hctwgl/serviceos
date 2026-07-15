@@ -3,6 +3,7 @@ package com.serviceos.task.application;
 import com.serviceos.task.api.TaskDetail;
 import com.serviceos.task.api.TaskDirectoryItem;
 import com.serviceos.task.api.TaskExecutionAttemptView;
+import com.serviceos.task.api.TaskTimelineContext;
 
 import java.time.Instant;
 import java.util.List;
@@ -34,6 +35,8 @@ public interface TaskDirectoryQueryRepository {
             UUID taskId,
             Integer beforeAttemptNo,
             int fetchSize);
+
+    Optional<TaskTimelineContext> findTimelineContext(String tenantId, UUID taskId);
 
     record AllowedActionState(
             String taskKind,

@@ -4,6 +4,7 @@ import com.serviceos.task.api.InputVersionRef;
 import com.serviceos.task.api.TaskDetail;
 import com.serviceos.task.api.TaskDirectoryItem;
 import com.serviceos.task.api.TaskExecutionAttemptView;
+import com.serviceos.task.api.TaskTimelineContext;
 import com.serviceos.task.application.TaskDirectoryQueryRepository;
 import org.springframework.stereotype.Repository;
 import tools.jackson.core.JacksonException;
@@ -99,6 +100,17 @@ final class MyBatisTaskDirectoryQueryRepository implements TaskDirectoryQueryRep
                         instant(row, "startedAt"),
                         instant(row, "finishedAt")))
                 .toList();
+    }
+
+    @Override
+    public Optional<TaskTimelineContext> findTimelineContext(String tenantId, UUID taskId) {
+        return Optional.ofNullable(mapper.findTimelineContext(tenantId, taskId))
+                .map(row -> new TaskTimelineContext(
+                        uuid(row, "taskId"),
+                        uuid(row, "projectId"),
+                        uuid(row, "workOrderId"),
+                        string(row, "taskType"),
+                        string(row, "taskKind")));
     }
 
     private static TaskDirectoryItem item(Map<String, Object> row) {

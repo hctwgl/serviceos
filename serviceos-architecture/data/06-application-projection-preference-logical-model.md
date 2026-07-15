@@ -53,6 +53,9 @@ status: Proposed
 
 保存 normalized timeline item：event/type、occurred/received time、actorRef、resourceRef/version、correlation、display template version 和敏感字段 refs。技术 attempt 可折叠关联。
 
+M73 以 `rdm_work_order_timeline_entry` 实现 WorkOrder/Workflow/Stage/Task 核心事件子集，显式保留
+occurred/received 双时间且不保存自由文本、payload 或 PII。跨域合并、checkpoint 和重建作业仍是未实现边界。
+
 ## 4. 队列投影
 
 ### work_queue_definition_version
