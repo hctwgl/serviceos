@@ -273,7 +273,9 @@ CI 或架构已由流水线明确控制的环境可执行：
 - 不得在 Testcontainers 创建命令中强制 `linux/amd64`；
 - 不得绕过 `scripts/verify-local.sh` 后继续接受 OrbStack 的跨架构模拟结果；
 - 脚本只修正当前验证子进程的架构环境，不得擅自修改用户永久 shell 配置；
-- 脚本用于选择原生镜像，不得借此跳过 PostgreSQL、Flyway、事务、并发、授权或 Spring Modulith 门禁；
+- 本地已有正确架构的 PostgreSQL 测试镜像时必须直接复用，不得每次验证都执行 `docker pull`、删除镜像或强制刷新；
+- 只有本地首次缺少镜像，或明确设置 `SERVICEOS_TEST_REFRESH_IMAGE=true` 时才允许访问远端镜像仓库；
+- 脚本用于选择原生镜像和复用本地缓存，不得借此跳过 PostgreSQL、Flyway、事务、并发、授权或 Spring Modulith 门禁；
 - 如确有跨架构测试要求，必须有明确技术依据、ADR、独立验证任务和退出计划，不能作为日常默认路径。
 
 精准 PostgreSQL 测试也应通过脚本透传 Maven 参数，例如：
