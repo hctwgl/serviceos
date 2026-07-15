@@ -14,6 +14,8 @@ status: Accepted
 > M54 已实现外部回执 `affectedTargets` 对 ReviewCase 冻结 SnapshotMember 的精确权威校验。
 > M55 已实现 INTERNAL/CLIENT ReviewCase 来源分离、已通过总部审核后的 CLIENT Case 显式登记，
 > 以及回执批次和 mappingVersion 对 Case 冻结值的匹配门禁。
+> M56 已为 BYD 创建工单实现 InboundEnvelope/CanonicalMessage 权威入站，但尚未把外部审核回调接入该
+> 通用入站事实，也未实现 OutboundDelivery 或交付成功自动创建 CLIENT ReviewCase。
 > M52 已实现工单/区域/任务白名单事实驱动的条件槽位初次解析；M53 已实现锁定表单事实驱动的
 > 只追加重解析、槽位世代/lineage 与条件变化人工处置。
 > 完整 Connector、交付成功事件自动创建 CLIENT Case 与 integration 域批次权威登记仍未实现；

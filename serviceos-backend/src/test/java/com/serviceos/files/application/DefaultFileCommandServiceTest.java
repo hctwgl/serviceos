@@ -253,6 +253,17 @@ class DefaultFileCommandServiceTest {
         }
 
         @Override
+        public ObjectMetadata storeInternal(
+                String objectKey,
+                InputStream content,
+                long exactSize,
+                String checksumSha256,
+                String contentType
+        ) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public ObjectTransferAuthorization authorizeDownload(
                 String objectKey, String responseMimeType, Duration lifetime
         ) {

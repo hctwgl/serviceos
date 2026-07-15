@@ -90,6 +90,28 @@ class LocalPrivateObjectStorageGatewayTest {
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.FILE_UPLOAD_EXPIRED));
     }
 
+    @Test
+    void internalStoreIsContentImmutableAndIdempotent() throws Exception {
+        LocalPrivateObjectStorageGateway storage = storage();
+        byte[] content = "{\"message\":\"m56\"}".getBytes(StandardCharsets.UTF_8);
+        String digest = com.serviceos.shared.Sha256.digest(content);
+
+        ObjectMetadata first = storage.storeInternal(
+                "integration/inbound/raw.json", new ByteArrayInputStream(content),
+                content.length, digest, "application/json");
+        ObjectMetadata replay = storage.storeInternal(
+                "integration/inbound/raw.json", new ByteArrayInputStream(content),
+                content.length, digest, "application/json");
+
+        assertThat(replay).isEqualTo(first);
+        assertThatThrownBy(() -> storage.storeInternal(
+                "integration/inbound/raw.json",
+                new ByteArrayInputStream("different".getBytes(StandardCharsets.UTF_8)),
+                9, com.serviceos.shared.Sha256.digest("different"), "application/json"))
+                .isInstanceOf(java.io.IOException.class)
+                .hasMessageContaining("different content");
+    }
+
     private LocalPrivateObjectStorageGateway storage() {
         return new LocalPrivateObjectStorageGateway(
                 root.toString(), SIGNING_KEY, "http://localhost/api/v1/file-transfers",

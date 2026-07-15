@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.28.0
+  version: 0.29.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1264,6 +1264,46 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /inbound-envelopes/{envelopeId}:
+    get:
+      operationId: getInboundEnvelope
+      summary: 查询入站消息安全摘要
+      description: 需要 integration.readInbound 与实时 tenant/project scope；不返回原文对象引用、签名或传输凭据。
+      parameters:
+        - name: envelopeId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 入站消息摘要
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InboundEnvelope' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /canonical-messages/{messageId}:
+    get:
+      operationId: getCanonicalMessage
+      summary: 查询标准消息与领域命令结果摘要
+      description: 需要 integration.readInbound 与实时 project scope；不返回包含个人信息的标准消息正文。
+      parameters:
+        - name: messageId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 标准消息摘要
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CanonicalMessage' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
 components:
   securitySchemes:
     bearerAuth:
@@ -1321,6 +1361,51 @@ components:
         type: string
         pattern: '^"[1-9][0-9]*"$'
   schemas:
+    InboundEnvelope:
+      type: object
+      additionalProperties: false
+      required: [inboundEnvelopeId, projectId, connectorVersionId, messageType,
+                 externalMessageId, rawPayloadDigest, canonicalPayloadDigest,
+                 signatureStatus, processingStatus, mappingVersionId, canonicalMessageId,
+                 resultCode, resultType, resultId, receivedAt, completedAt, correlationId]
+      properties:
+        inboundEnvelopeId: { type: string, format: uuid }
+        projectId: { type: [string, 'null'], format: uuid }
+        connectorVersionId: { type: string, minLength: 1, maxLength: 120 }
+        messageType: { enum: [CREATE_WORK_ORDER] }
+        externalMessageId: { type: string, minLength: 1, maxLength: 160 }
+        rawPayloadDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
+        canonicalPayloadDigest: { type: [string, 'null'], pattern: '^[0-9a-f]{64}$' }
+        signatureStatus: { enum: [VALID] }
+        processingStatus: { enum: [RECEIVED, COMPLETED, REJECTED] }
+        mappingVersionId: { type: [string, 'null'], maxLength: 120 }
+        canonicalMessageId: { type: [string, 'null'], format: uuid }
+        resultCode: { type: [string, 'null'], maxLength: 80 }
+        resultType: { type: [string, 'null'], maxLength: 80 }
+        resultId: { type: [string, 'null'], maxLength: 160 }
+        receivedAt: { type: string, format: date-time }
+        completedAt: { type: [string, 'null'], format: date-time }
+        correlationId: { type: string, minLength: 1, maxLength: 128 }
+    CanonicalMessage:
+      type: object
+      additionalProperties: false
+      required: [canonicalMessageId, projectId, connectorVersionId, messageType,
+                 businessKey, payloadDigest, mappingVersionId, processingStatus,
+                 resultCode, resultType, resultId, createdAt, processedAt]
+      properties:
+        canonicalMessageId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        connectorVersionId: { type: string, minLength: 1, maxLength: 120 }
+        messageType: { enum: [CREATE_WORK_ORDER] }
+        businessKey: { type: string, minLength: 1, maxLength: 200 }
+        payloadDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
+        mappingVersionId: { type: string, minLength: 1, maxLength: 120 }
+        processingStatus: { enum: [PROCESSING, COMPLETED] }
+        resultCode: { type: [string, 'null'], maxLength: 80 }
+        resultType: { type: [string, 'null'], maxLength: 80 }
+        resultId: { type: [string, 'null'], maxLength: 160 }
+        createdAt: { type: string, format: date-time }
+        processedAt: { type: [string, 'null'], format: date-time }
     CreateProjectRequest:
       type: object
       additionalProperties: false

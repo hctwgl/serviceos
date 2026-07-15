@@ -49,8 +49,8 @@ INSERT 都必须显式写 origin，不留下长期默认猜测。
 
 ## 5. 明确未实现
 
-- 车企专属 Connector 验签、时间窗、防重放和原文留存；
-- 通用 InboundEnvelope / CanonicalMessage / OutboundDelivery 运行时；
+- 外部审核回调的 Connector 验签、时间窗、防重放、原文留存与 CanonicalMessage；M56 仅实现 BYD 创建工单消息；
+- OutboundDelivery 运行时；
 - callbackBatchRef、mappingVersionId 对 integration 域登记记录的跨模块权威校验；
 - 自动监听交付成功事件创建 CLIENT Case；当前由已认证适配层显式登记；
 - 字段、FormSubmission、报告等其他外部审核 targetType；

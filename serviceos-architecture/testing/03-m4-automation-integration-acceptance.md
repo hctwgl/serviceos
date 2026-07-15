@@ -34,8 +34,8 @@ status: Proposed
 | SLA-006 | P1 | 日历更正重算 | 历史节假日配置错误 | 审批重算 | 新旧 deadline、原因和认可结果完整 |
 | SLA-007 | P0 | 派单失败提前预警 | 24h 人工处理 SLA | 达到预警阈值 | 项目经理收到一次预警且 milestone 可追溯 |
 | SLA-008 | P0 | 派单失败超时升级 | 项目经理 24h 未处理 | deadline 到达 | 标记 BREACHED 并升级当前品牌负责人 |
-| INT-001 | P0 | 入站重复 | 相同消息和摘要 | 并发推送 | 一个 CanonicalMessage/领域结果 |
-| INT-002 | P0 | 入站冲突 | 相同业务键不同摘要 | 推送 | 冲突异常，不覆盖首次数据 |
+| INT-001 | P0 | 入站重复 | 相同消息和摘要 | 并发推送 | 一个 CanonicalMessage/领域结果；M56 已证明 BYD 创建工单子集 |
+| INT-002 | P0 | 入站冲突 | 相同业务键不同摘要 | 推送 | 冲突异常，不覆盖首次数据；M56 已证明 BYD 创建工单子集 |
 | INT-003 | P0 | 回传超时但已接收 | 外部处理成功、响应丢失 | 自动恢复 | 查询/幂等确认，不产生重复业务结果 |
 | INT-004 | P0 | 技术成功业务驳回 | API 2xx 后收到驳回 | 处理回执 | DELIVERED→REJECTED，客服整改 Task |
 | INT-005 | P0 | payload 版本冻结 | 创建 delivery 后资料补传 | 重试原 delivery | payload 摘要不变；新资料需新 delivery |

@@ -54,3 +54,6 @@
 - [M51 CorrectionCase WAIVED 验收](48-m51-correction-waive-acceptance.md)
 - [M52 条件 EvidenceSlot 验收](49-m52-conditional-evidence-slot-acceptance.md)
 - [M53 表单条件与 EvidenceSlot 重解析验收矩阵](50-m53-form-condition-evidence-reresolution-acceptance-proposal.md)
+- [M54 车企回执影响对象权威校验验收矩阵](51-m54-external-review-affected-target-validation-acceptance.md)
+- [M55 CLIENT ReviewCase 来源与回执批次门禁验收矩阵](52-m55-client-review-case-origin-acceptance.md)
+- [M56 BYD CPIM InboundEnvelope 与 CanonicalMessage 验收矩阵](53-m56-inbound-envelope-canonical-message-acceptance.md)

@@ -13,7 +13,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
-import java.util.Map;
 
 /**
  * BYD CPIM V7.3.1 安装订单入站端点。
@@ -36,12 +35,12 @@ final class BydCpimInboundOrderController {
             @RequestHeader("Cur_Time") long currentTime,
             @RequestHeader("Sign") String signature,
             @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
-            @RequestBody Map<String, Object> rawParameters) {
+            @RequestBody byte[] rawPayload) {
         BydCpimInboundOrderResponse response;
         try {
             response = service.receive(
                     new BydCpimSignatureHeaders(appKey, nonce, Instant.ofEpochSecond(currentTime), signature),
-                    rawParameters,
+                    rawPayload,
                     correlationId);
         } catch (IllegalArgumentException exception) {
             response = BydCpimInboundOrderResponse.rejected("INVALID_HEADERS", exception.getMessage());

@@ -27,6 +27,9 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -47,6 +50,8 @@ class BydCpimInboundOrderHttpPostgresIT {
     private static final String TENANT_ID = "tenant-byd-http-test";
     private static final String PROJECT_CODE = "BYD-OCEAN-SD-HTTP";
     private static final String ENDPOINT = "/api/v1/integrations/byd/cpim/v7.3.1/install-orders";
+    private static final Path STORAGE_ROOT = Path.of(
+            System.getProperty("java.io.tmpdir"), "serviceos-m56-byd-inbound-it");
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(
@@ -65,6 +70,9 @@ class BydCpimInboundOrderHttpPostgresIT {
         registry.add("serviceos.integration.byd.cpim.allowed-clock-skew", () -> "PT10M");
         registry.add("serviceos.integration.byd.cpim.tenant-id", () -> TENANT_ID);
         registry.add("serviceos.integration.byd.cpim.project-code", () -> PROJECT_CODE);
+        registry.add("serviceos.files.local.root", STORAGE_ROOT::toString);
+        registry.add("serviceos.files.local.signing-key",
+                () -> "m56-byd-inbound-private-storage-signing-key");
     }
 
     @Autowired
@@ -82,13 +90,17 @@ class BydCpimInboundOrderHttpPostgresIT {
     UUID projectId;
 
     @BeforeEach
-    void clean() {
+    void clean() throws IOException {
         jdbc.sql("""
                 TRUNCATE TABLE rel_outbox_publish_attempt, rel_outbox_event, wo_work_order,
                     cfg_configuration_bundle_item,
                     cfg_configuration_bundle, cfg_configuration_asset_version,
-                    prj_project, int_inbound_replay_guard CASCADE
+                    prj_project, int_inbound_replay_guard,
+                    int_canonical_message, int_inbound_envelope,
+                    aud_audit_record CASCADE
                 """).update();
+        deleteRecursively(STORAGE_ROOT);
+        Files.createDirectories(STORAGE_ROOT);
         projectId = UUID.randomUUID();
         jdbc.sql("""
                 INSERT INTO prj_project (
@@ -131,8 +143,24 @@ class BydCpimInboundOrderHttpPostgresIT {
 
         assertThat(jdbc.sql("SELECT count(*) FROM int_inbound_replay_guard")
                 .query(Long.class).single()).isEqualTo(1);
+        assertThat(jdbc.sql("SELECT count(*) FROM int_inbound_envelope")
+                .query(Long.class).single()).isEqualTo(1);
+        assertThat(jdbc.sql("SELECT count(*) FROM int_canonical_message")
+                .query(Long.class).single()).isEqualTo(1);
         assertThat(jdbc.sql("SELECT count(*) FROM wo_work_order")
                 .query(Long.class).single()).isEqualTo(1);
+        String rawObjectRef = jdbc.sql("SELECT raw_payload_object_ref FROM int_inbound_envelope")
+                .query(String.class).single();
+        assertThat(Files.readString(STORAGE_ROOT.resolve(rawObjectRef)))
+                .isEqualTo(objectMapper.writeValueAsString(payload));
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM rel_outbox_event
+                 WHERE event_type='integration.canonical-message-processed'
+                """).query(Long.class).single()).isOne();
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM aud_audit_record
+                 WHERE action_name='INBOUND_MESSAGE_PROCESSED'
+                """).query(Long.class).single()).isOne();
         assertThat(jdbc.sql("""
                 SELECT tenant_id, project_id, configuration_bundle_code,
                        configuration_bundle_version, status
@@ -151,6 +179,14 @@ class BydCpimInboundOrderHttpPostgresIT {
                 .andExpect(jsonPath("$.code").value("REPLAYED"));
         assertThat(jdbc.sql("SELECT count(*) FROM wo_work_order")
                 .query(Long.class).single()).isEqualTo(1);
+        assertThat(jdbc.sql("SELECT count(*) FROM int_inbound_envelope")
+                .query(Long.class).single()).isEqualTo(2);
+        assertThat(jdbc.sql("SELECT count(*) FROM int_canonical_message")
+                .query(Long.class).single()).isEqualTo(1);
+        assertThat(jdbc.sql("""
+                SELECT count(DISTINCT canonical_message_id)
+                  FROM int_inbound_envelope WHERE processing_status='COMPLETED'
+                """).query(Long.class).single()).isEqualTo(1);
     }
 
     @Test
@@ -167,10 +203,12 @@ class BydCpimInboundOrderHttpPostgresIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.code").value("REPLAY_CONFLICT"));
+        assertThat(jdbc.sql("SELECT count(*) FROM int_inbound_envelope")
+                .query(Long.class).single()).isOne();
     }
 
     @Test
-    void invalidBusinessPayloadDoesNotReserveNonce() throws Exception {
+    void authenticatedInvalidBusinessPayloadIsRetainedAndConsumesNonce() throws Exception {
         Map<String, Object> invalid = validPayload();
         invalid.put("carBrand", "10");
         long currentTime = Instant.now().getEpochSecond();
@@ -181,14 +219,16 @@ class BydCpimInboundOrderHttpPostgresIT {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.code").value("INVALID_ORDER"));
         assertThat(jdbc.sql("SELECT count(*) FROM int_inbound_replay_guard")
-                .query(Long.class).single()).isZero();
+                .query(Long.class).single()).isOne();
+        assertThat(jdbc.sql("SELECT processing_status FROM int_inbound_envelope")
+                .query(String.class).single()).isEqualTo("REJECTED");
         assertThat(jdbc.sql("SELECT count(*) FROM wo_work_order")
                 .query(Long.class).single()).isZero();
 
         Map<String, Object> corrected = validPayload();
         perform(corrected, nonce, currentTime, sign(nonce, currentTime, corrected))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value("ACCEPTED"));
+                .andExpect(jsonPath("$.code").value("REPLAY_CONFLICT"));
     }
 
     @Test
@@ -201,6 +241,8 @@ class BydCpimInboundOrderHttpPostgresIT {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.code").value("SIGNATURE_MISMATCH"));
         assertThat(jdbc.sql("SELECT count(*) FROM int_inbound_replay_guard")
+                .query(Long.class).single()).isZero();
+        assertThat(jdbc.sql("SELECT count(*) FROM int_inbound_envelope")
                 .query(Long.class).single()).isZero();
         assertThat(jdbc.sql("SELECT count(*) FROM wo_work_order")
                 .query(Long.class).single()).isZero();
@@ -226,12 +268,18 @@ class BydCpimInboundOrderHttpPostgresIT {
 
         assertThat(jdbc.sql("SELECT count(*) FROM wo_work_order")
                 .query(Long.class).single()).isEqualTo(1);
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM int_inbound_envelope
+                 WHERE processing_status='REJECTED' AND result_code='REPLAY_CONFLICT'
+                """).query(Long.class).single()).isOne();
+        assertThat(jdbc.sql("SELECT count(*) FROM int_canonical_message")
+                .query(Long.class).single()).isOne();
         assertThat(jdbc.sql("SELECT service_address FROM wo_work_order")
                 .query(String.class).single()).isEqualTo(original.get("contactAddress"));
     }
 
     @Test
-    void rejectsValidOrderBeforeReplayReservationWhenNoBundleMatches() throws Exception {
+    void retainsAuthenticatedOrderAsRejectedWhenNoBundleMatches() throws Exception {
         jdbc.sql("TRUNCATE TABLE rel_outbox_publish_attempt, rel_outbox_event, wo_work_order, cfg_configuration_bundle_item, "
                 + "cfg_configuration_bundle, cfg_configuration_asset_version CASCADE").update();
         Map<String, Object> payload = validPayload();
@@ -246,13 +294,15 @@ class BydCpimInboundOrderHttpPostgresIT {
                         org.hamcrest.Matchers.startsWith("CONFIGURATION_NO_MATCH:")));
 
         assertThat(jdbc.sql("SELECT count(*) FROM int_inbound_replay_guard")
-                .query(Long.class).single()).isZero();
+                .query(Long.class).single()).isOne();
+        assertThat(jdbc.sql("SELECT processing_status FROM int_inbound_envelope")
+                .query(String.class).single()).isEqualTo("REJECTED");
         assertThat(jdbc.sql("SELECT count(*) FROM wo_work_order")
                 .query(Long.class).single()).isZero();
     }
 
     @Test
-    void rollsBackReplayReservationWhenWorkOrderPersistenceFails() {
+    void retainsReceivedEnvelopeAndRecoversAfterWorkOrderPersistenceFailure() throws Exception {
         jdbc.sql("""
                 CREATE OR REPLACE FUNCTION wo_test_reject_insert()
                 RETURNS trigger LANGUAGE plpgsql AS $$
@@ -266,10 +316,10 @@ class BydCpimInboundOrderHttpPostgresIT {
                     BEFORE INSERT ON wo_work_order
                     FOR EACH ROW EXECUTE FUNCTION wo_test_reject_insert()
                 """).update();
+        Map<String, Object> payload = validPayload();
+        long currentTime = Instant.now().getEpochSecond();
+        String nonce = "nonce-http-transaction-rollback";
         try {
-            Map<String, Object> payload = validPayload();
-            long currentTime = Instant.now().getEpochSecond();
-            String nonce = "nonce-http-transaction-rollback";
 
             assertThatThrownBy(() -> perform(
                     payload, nonce, currentTime, sign(nonce, currentTime, payload)).andReturn())
@@ -277,6 +327,10 @@ class BydCpimInboundOrderHttpPostgresIT {
                     .hasMessageContaining("forced work order failure");
 
             assertThat(jdbc.sql("SELECT count(*) FROM int_inbound_replay_guard")
+                    .query(Long.class).single()).isOne();
+            assertThat(jdbc.sql("SELECT processing_status FROM int_inbound_envelope")
+                    .query(String.class).single()).isEqualTo("RECEIVED");
+            assertThat(jdbc.sql("SELECT count(*) FROM int_canonical_message")
                     .query(Long.class).single()).isZero();
             assertThat(jdbc.sql("SELECT count(*) FROM wo_work_order")
                     .query(Long.class).single()).isZero();
@@ -284,6 +338,16 @@ class BydCpimInboundOrderHttpPostgresIT {
             jdbc.sql("DROP TRIGGER IF EXISTS trg_wo_test_reject_insert ON wo_work_order").update();
             jdbc.sql("DROP FUNCTION IF EXISTS wo_test_reject_insert()").update();
         }
+
+        perform(payload, nonce, currentTime, sign(nonce, currentTime, payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("ACCEPTED"));
+        assertThat(jdbc.sql("SELECT processing_status FROM int_inbound_envelope")
+                .query(String.class).single()).isEqualTo("COMPLETED");
+        assertThat(jdbc.sql("SELECT count(*) FROM int_canonical_message")
+                .query(Long.class).single()).isOne();
+        assertThat(jdbc.sql("SELECT count(*) FROM wo_work_order")
+                .query(Long.class).single()).isOne();
     }
 
     private org.springframework.test.web.servlet.ResultActions perform(
@@ -353,5 +417,16 @@ class BydCpimInboundOrderHttpPostgresIT {
         payload.put("source", "1");
         payload.put("channel", "CPIM");
         return payload;
+    }
+
+    private static void deleteRecursively(Path root) throws IOException {
+        if (!Files.exists(root)) {
+            return;
+        }
+        try (var paths = Files.walk(root)) {
+            for (Path path : paths.sorted(java.util.Comparator.reverseOrder()).toList()) {
+                Files.deleteIfExists(path);
+            }
+        }
     }
 }

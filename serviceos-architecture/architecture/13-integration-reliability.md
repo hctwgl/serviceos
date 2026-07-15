@@ -6,6 +6,10 @@ status: Proposed
 
 # 车企集成、回传与可靠交付设计
 
+> M56 已为现有 BYD CPIM 创建工单入口实现本章 `InboundEnvelope`、`CanonicalMessage`、私有原文留存、
+> transport/业务键幂等、授权摘要查询和成功事件的最小纵向切片。其他 CPIM 消息、OutboundDelivery、
+> 网络 Connector、自动重试和批量重放仍未实现；本章其余 Proposed 设计不能据此视为已完成。
+
 ## 1. 目标
 
 集成能力将车企 API、主动拉取、Excel、SFTP、Webhook 等外部差异隔离在适配层，并保证重复请求不重复创建工单、回传超时不重复产生外部副作用、失败可以自动重试或转人工修复。

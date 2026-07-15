@@ -111,6 +111,51 @@ final class LocalPrivateObjectStorageGateway implements ObjectStorageGateway, Lo
     }
 
     @Override
+    public ObjectMetadata storeInternal(
+            String objectKey,
+            InputStream content,
+            long exactSize,
+            String checksumSha256,
+            String contentType
+    ) throws IOException {
+        if (exactSize < 0 || content == null || checksumSha256 == null
+                || !checksumSha256.matches("[0-9a-f]{64}")) {
+            throw new IllegalArgumentException("Internal object size, content and SHA-256 are required");
+        }
+        String normalizedContentType = normalizeContentType(contentType);
+        Path destination = safePath(objectKey);
+        if (Files.isRegularFile(destination)) {
+            ObjectMetadata existing = inspect(destination, normalizedContentType);
+            if (existing.size() != exactSize || !existing.checksumSha256().equals(checksumSha256)) {
+                throw new IOException("Internal object key already contains different content");
+            }
+            return existing;
+        }
+
+        Files.createDirectories(destination.getParent());
+        Path temporary = destination.getParent().resolve(
+                "." + destination.getFileName() + ".internal." + UUID.randomUUID());
+        try {
+            long copied = copyExactly(content, temporary, exactSize);
+            if (copied != exactSize || !sha256(temporary).equals(checksumSha256)) {
+                throw new IOException("Internal object content does not match declared size or digest");
+            }
+            try {
+                moveWithoutReplace(temporary, destination);
+            } catch (java.nio.file.FileAlreadyExistsException exception) {
+                ObjectMetadata existing = inspect(destination, normalizedContentType);
+                if (existing.size() != exactSize || !existing.checksumSha256().equals(checksumSha256)) {
+                    throw new IOException("Concurrent internal object write used different content", exception);
+                }
+                return existing;
+            }
+            return new ObjectMetadata(exactSize, checksumSha256, normalizedContentType);
+        } finally {
+            Files.deleteIfExists(temporary);
+        }
+    }
+
+    @Override
     public ObjectTransferAuthorization authorizeDownload(
             String objectKey,
             String responseMimeType,
@@ -292,6 +337,10 @@ final class LocalPrivateObjectStorageGateway implements ObjectStorageGateway, Lo
             }
         }
         return java.util.HexFormat.of().formatHex(digest.digest());
+    }
+
+    private static ObjectMetadata inspect(Path path, String contentType) throws IOException {
+        return new ObjectMetadata(Files.size(path), sha256(path), contentType);
     }
 
     private static String normalizeContentType(String contentType) {

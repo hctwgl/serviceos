@@ -9,6 +9,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.UUID;
 
 /**
  * PostgreSQL 反重放存储。
@@ -37,13 +38,16 @@ public class JdbcBydCpimReplayGuard {
             String appKey,
             String nonce,
             long currentTime,
-            String payloadDigest) {
+            String payloadDigest,
+            UUID inboundEnvelopeId) {
         OffsetDateTime now = clock.instant().atOffset(ZoneOffset.UTC);
         int inserted = jdbc.sql("""
                         INSERT INTO int_inbound_replay_guard (
-                            app_key, nonce, request_time_epoch, payload_digest, first_seen_at, expires_at
+                            app_key, nonce, request_time_epoch, payload_digest, first_seen_at,
+                            expires_at, inbound_envelope_id
                         ) VALUES (
-                            :appKey, :nonce, :currentTime, :payloadDigest, :firstSeenAt, :expiresAt
+                            :appKey, :nonce, :currentTime, :payloadDigest, :firstSeenAt,
+                            :expiresAt, :inboundEnvelopeId
                         )
                         ON CONFLICT (app_key, nonce, request_time_epoch) DO NOTHING
                         """)
@@ -51,16 +55,17 @@ public class JdbcBydCpimReplayGuard {
                 .param("nonce", nonce)
                 .param("currentTime", currentTime)
                 .param("payloadDigest", payloadDigest)
+                .param("inboundEnvelopeId", inboundEnvelopeId)
                 .param("firstSeenAt", now)
                 .param("expiresAt", now.plus(retention))
                 .update();
 
         if (inserted == 1) {
-            return BydCpimReplayDecision.newRequest();
+            return BydCpimReplayDecision.newRequest(inboundEnvelopeId);
         }
 
         Existing existing = jdbc.sql("""
-                        SELECT payload_digest, result_digest
+                        SELECT payload_digest, inbound_envelope_id, result_digest
                           FROM int_inbound_replay_guard
                          WHERE app_key = :appKey
                            AND nonce = :nonce
@@ -71,13 +76,14 @@ public class JdbcBydCpimReplayGuard {
                 .param("currentTime", currentTime)
                 .query((rs, rowNum) -> new Existing(
                         rs.getString("payload_digest"),
+                        rs.getObject("inbound_envelope_id", UUID.class),
                         rs.getString("result_digest")))
                 .single();
 
         if (!existing.payloadDigest().equals(payloadDigest)) {
             throw new BydCpimReplayConflictException();
         }
-        return BydCpimReplayDecision.replay(existing.resultDigest());
+        return BydCpimReplayDecision.replay(existing.inboundEnvelopeId(), existing.resultDigest());
     }
 
     @Transactional
@@ -96,6 +102,6 @@ public class JdbcBydCpimReplayGuard {
                 .update();
     }
 
-    private record Existing(String payloadDigest, String resultDigest) {
+    private record Existing(String payloadDigest, UUID inboundEnvelopeId, String resultDigest) {
     }
 }

@@ -1,0 +1,25 @@
+{
+  "eventId": "56000000-0000-4000-8000-000000000001",
+  "eventType": "integration.canonical-message-processed",
+  "schemaVersion": 1,
+  "tenantId": "tenant-m56",
+  "correlationId": "corr-m56",
+  "causationId": "56000000-0000-4000-8000-000000000002",
+  "aggregateType": "CanonicalMessage",
+  "aggregateId": "56000000-0000-4000-8000-000000000003",
+  "aggregateVersion": 1,
+  "occurredAt": "2026-07-15T15:00:00Z",
+  "payload": {
+    "canonicalMessageId": "56000000-0000-4000-8000-000000000003",
+    "inboundEnvelopeId": "56000000-0000-4000-8000-000000000002",
+    "projectId": "56000000-0000-4000-8000-000000000004",
+    "connectorVersionId": "byd-cpim-v7.3.1",
+    "messageType": "CREATE_WORK_ORDER",
+    "businessKey": "BYD-SD-M56-001",
+    "payloadDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "mappingVersionId": "byd-ocean-shandong-install-order-v1",
+    "resultType": "WORK_ORDER",
+    "resultId": "56000000-0000-4000-8000-000000000005",
+    "processedAt": "2026-07-15T15:00:00Z"
+  }
+}

@@ -19,6 +19,20 @@ public interface ObjectStorageGateway {
 
     InputStream openForScan(String objectKey) throws IOException;
 
+    /**
+     * 服务端把已经完成协议校验的不可变内容写入私有对象存储。
+     *
+     * <p>该入口不签发客户端上传凭证；实现必须原子写入，并在同一 objectKey 已存在时只接受
+     * 完全相同的大小与摘要。它用于入站原文、生成报告等服务端事实，不能作为覆盖对象的通道。</p>
+     */
+    ObjectMetadata storeInternal(
+            String objectKey,
+            InputStream content,
+            long exactSize,
+            String checksumSha256,
+            String contentType
+    ) throws IOException;
+
     ObjectTransferAuthorization authorizeDownload(
             String objectKey,
             String responseMimeType,

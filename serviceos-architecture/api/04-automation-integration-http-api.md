@@ -6,6 +6,10 @@ status: Proposed
 
 # 派单、SLA、集成、通知与异常 HTTP API
 
+> M56 已在 OpenAPI 0.29.0 实现 `GET /api/v1/inbound-envelopes/{id}` 与
+> `GET /api/v1/canonical-messages/{id}` 的授权摘要，以及既有 BYD CPIM 创建工单专属入站入口。
+> 通用 Connector、OutboundDelivery、Replay 与其余本章接口仍为 Proposed。
+
 沿用既有 API 的认证、幂等、`If-Match`、Problem Details、correlation 和审计约定。自动任务内部接口使用专用服务主体，不向普通用户令牌开放。
 
 ## 1. 服务网络

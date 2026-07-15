@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-15
-baselineCommit: 65321df
-latestMilestone: M55
+baselineCommit: PENDING_M56_COMMIT
+latestMilestone: M56
 ---
 
 # ServiceOS 实施状态总览
@@ -39,13 +39,13 @@ latestMilestone: M55
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M55 CLIENT ReviewCase 来源与回执批次门禁 |
-| 基线提交 | `65321df` |
+| 最新实施里程碑 | M56 BYD CPIM InboundEnvelope 与 CanonicalMessage 权威入站事实 |
+| 基线提交 | `PENDING_M56_COMMIT` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
 | 前端工程 | 尚未建立；已有 Admin、Network、Technician 产品与交互规格 |
-| 数据库 | PostgreSQL + Flyway（当前版本 054 / 56） |
-| 契约 | OpenAPI 0.28.0 + 事件 JSON Schema |
+| 数据库 | PostgreSQL + Flyway（当前版本 055 / 57） |
+| 契约 | OpenAPI 0.29.0 + 事件 JSON Schema |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -57,7 +57,7 @@ latestMilestone: M55
 | 身份授权 | OIDC/JWT、Capability、Tenant/Project Scope、拒绝审计 | `IMPLEMENTED` | 后端认证授权和范围校验基线 | 正式企业 IdP、完整组织治理 UI | M9 |
 | 可靠消息 | Inbox、Outbox、Worker claim/lease/retry | `IMPLEMENTED` | 本地可靠发布消费、恢复和人工接管基础 | 正式 Broker 和跨服务运行 | M9～M10 |
 | 配置中心 | 不可变配置资产、Bundle 发布和版本锁定 | `PARTIAL` | FORM、EVIDENCE 等资产发布基础、工单/任务冻结引用、SERVICEOS_EXPR_V1 布尔/类型比较子集与 FORM/EVIDENCE 字段依赖闭包 | 决策表/公式/脚本、完整审批和通用依赖图 | M16、M33、M36、M52～M53 |
-| 外部接入 | BYD CPIM V7.3.1 入站安全与工单接入 | `PARTIAL` | 验签、防重放、映射、幂等收单、配置锁定 | 全量车企接口、完整回传和正式生产确认项 | M16 |
+| 外部接入 | BYD CPIM V7.3.1 入站安全与工单接入 | `PARTIAL` | 验签、时间窗、防重放、私有原文、InboundEnvelope、CanonicalMessage、transport/业务键幂等、配置锁定、工单结果与崩溃恢复 | 其他 CPIM 消息、外部审核标准化、OutboundDelivery、网络 Connector/自动重试、生产对象存储和正式生产确认 | M16、M56 |
 | 工单 | WorkOrder 接收、激活、履约完成 | `IMPLEMENTED` | 权威工单、工作流启动、跨阶段和 END 完结 | 完整取消、暂停、恢复和全部业务分支 | M16～M19 |
 | 工作流 | 线性 Stage/Task 运行时 | `PARTIAL` | 精确版本启动、线性推进、唯一跨阶段推进、完成事件 | 并行/汇聚网关、流程条件表达式和复杂流程语义 | M17～M19 |
 | 人工任务 | claim/start/complete、责任和执行保护 | `IMPLEMENTED` | 人工命令、候选领取、唯一责任、release/reclaim、执行保护；表单、资料和双引用完成门禁 | Review 完成条件 | M20～M23、M35、M41、M43 |
@@ -68,7 +68,7 @@ latestMilestone: M55
 | 动态表单 | 资产、冻结版本、不可变提交和 Task 完成门禁 | `PARTIAL` | 固定/条件 required、visible 与布尔 validation rule，基础类型校验、精确版本提交和完成引用 | 复杂 validator、计算字段、草稿、冲突、更正和审核 | M33～M35、M53 |
 | 资料 Evidence | 资产、槽位、Item/Revision、机器校验、Snapshot、完成门禁、作废、Review、Correction | `PARTIAL` | 固定/条件槽位、VALIDATED 表单触发只追加重解析、槽位世代/lineage、REVIEW_REQUIRED 与显式 KEEP/INVALIDATE、安全文件联动、Snapshot/完成门禁及审核整改链路 | OCR/CV、GPS 权威距离、长期归档 | M36～M53 |
 | 安全文件 | Begin/Finalize/隔离/扫描/授权下载/作废 | `IMPLEMENTED` | 独立安全文件生命周期；Evidence 编排 Begin/Finalize/Invalidate 联动 | 正式对象存储、专业扫描服务、物理删除 | M11、M38、M46 |
-| 审核整改 | ReviewCase、ReviewDecision、CorrectionCase | `PARTIAL` | Review + Correction + 整改 Task + 强制通过/重开 + 车企回执 + WAIVED；补传轮次只追加；CLIENT Case 来源、Snapshot、批次和 mapping 冻结 | 多候选人策略、前端、完整 Connector/OutboundDelivery 与 integration 域批次权威 | M44～M55 |
+| 审核整改 | ReviewCase、ReviewDecision、CorrectionCase | `PARTIAL` | Review + Correction + 整改 Task + 强制通过/重开 + 车企回执 + WAIVED；补传轮次只追加；CLIENT Case 来源、Snapshot、批次和 mapping 冻结 | 多候选人策略、前端、外部审核回调的 CanonicalMessage/批次权威、OutboundDelivery 与自动创建 | M44～M55 |
 | SLA | 时钟、预警、升级 | `PROPOSED` | 已有总体设计 | 完整运行时和验收尚未实施 | `architecture/12-*` |
 | 通知 | 通知与运营异常中心 | `PROPOSED` | 已有总体设计 | 通知通道、模板、可靠发送和 UI | `architecture/14-*` |
 | 履约事实与试算 | 事实提取和双向试算 | `PROPOSED` | 已有设计、API 和数据规划 | 运行时、投影和前端工作区 | M5 设计 |
@@ -132,8 +132,8 @@ latestMilestone: M55
 - OCR / 图像 CV / GPS 权威距离；
 - 计算字段、脚本/决策表、草稿冲突与离线表达式合并；
 - 多候选人策略评分与自动 claim；
-- CLIENT origin ReviewCase 已可在总部审核通过后由适配层显式登记（M55）；完整 OEM Connector、
-  OutboundDelivery 与交付成功事件自动创建仍未实现。
+- CLIENT origin ReviewCase 已可在总部审核通过后由适配层显式登记（M55）；M56 的权威入站仅覆盖 BYD
+  创建工单消息，外部审核回调标准化、OutboundDelivery 与交付成功事件自动创建仍未实现。
 
 ### M54：车企回执影响对象权威校验
 
@@ -173,24 +173,44 @@ latestMilestone: M55
 
 明确未实现：
 
-- 车企 Connector 验签、时间窗、防重放、原文留存和通用 InboundEnvelope/CanonicalMessage；
+- 外部审核回调的 Connector 验签、时间窗、防重放、原文留存和 CanonicalMessage；M56 仅覆盖 BYD 创建工单；
 - OutboundDelivery、交付成功事件自动创建 CLIENT Case；
 - callbackBatchRef / mappingVersionId 对 integration 域登记事实的跨模块权威校验；
 - 其他 targetType、自动整改映射、Portal 和二级审批/MFA。
 
+### M56：BYD CPIM InboundEnvelope 与 CanonicalMessage 权威入站事实
+
+已实现：
+
+- 通过 BYD 签名/时间窗校验后，Envelope 与 replay guard 在首个事务登记；无效签名不留入站事实；
+- HTTP 原始字节按长度与 SHA-256 写入服务端私有对象存储，普通 API 不暴露对象引用、签名或凭据；
+- 映射后的 CanonicalMessage 冻结 connector、消息类型、业务键、规范摘要、mappingVersion 和源 Envelope；
+- transport 重放只返回首次结果；新 nonce 的同业务键同摘要复用一个 Canonical/WorkOrder，不同摘要失败关闭；
+- Canonical/WorkOrder/Envelope 完成、审计、`integration.canonical-message-processed@v1` Outbox 和响应摘要
+  同事务提交；首事务后崩溃可由相同 transport 请求继续 RECEIVED Envelope；
+- OpenAPI 0.29.0 提供受 tenant/project scope 与 `integration.readInbound` 保护的 Envelope/Canonical 摘要；
+- V055 建立权威表、唯一约束、FK、不可变 trigger 与 replay Envelope 关联。
+
+明确未实现：
+
+- 其他 CPIM messageType，尤其外部审核回调的 Envelope/Canonical 标准化与 M55 批次权威关联；
+- OutboundDelivery、网络 Connector、凭据轮换、自动重试、远端状态查询和人工重放；
+- 文件批次/SFTP、Ack/Replay 聚合、原文授权下载；
+- 正式对象存储、生产 sandbox/凭据、脱敏真实流量演练与 Portal。
+
 ## 5. 下一实施方向
 
-Evidence / Review / Correction 可靠纵向切片已推进到 **M55**。M55 建立 INTERNAL→CLIENT 审核
-来源和回执批次/mapping 冻结门禁，没有实现完整 Connector、可靠外部交付或整个现场履约平台。
+ServiceOS 可靠纵向切片已推进到 **M56**。M56 为既有 BYD 创建工单入口建立 Envelope/Canonical
+权威事实和恢复边界，没有实现其他入站消息、可靠外部交付或整个现场履约平台。
 
 ```text
 候选下一方向（需对应产品/架构决策后启动）：
 1. 多候选人评分、自动 claim、网点容量联动；
-2. OEM 映射与 Connector：InboundEnvelope/CanonicalMessage、OutboundDelivery、交付事件自动创建
-   CLIENT Case，以及 integration 域批次权威登记；
-3. OCR/CV、GPS 权威距离、二级审批/MFA、报告 GENERATED 资料包；
-4. 表达式计算字段、决策表/脚本、草稿冲突与离线合并；
-5. Admin/Network/Technician Portal 工程。
+2. 在已有 M56 边界内标准化外部审核回调，并把 callbackBatchRef/mappingVersionId 关联到 M55 CLIENT Case；
+3. 待真实外发协议、端点、凭据与重试策略获批后，实现 OutboundDelivery、交付事件自动创建 CLIENT Case；
+4. OCR/CV、GPS 权威距离、二级审批/MFA、报告 GENERATED 资料包；
+5. 表达式计算字段、决策表/脚本、草稿冲突与离线合并；
+6. Admin/Network/Technician Portal 工程。
 ```
 
 接手 Agent 必须先检查仓库是否已有更新的里程碑文档、ADR 或提交；在收到明确批准前不得猜测业务策略并实现上述候选项。

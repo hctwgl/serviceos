@@ -37,7 +37,7 @@ status: Proposed
 | network | ARCH-11 | API-04 | DATA-04 | M4 NET | E4 |
 | dispatch | ARCH-11、ADR-009 | API-04 | DATA-04 | M4 DSP/ASN | E4 |
 | sla | ARCH-12 | API-04 | DATA-04 | M4 SLA | E4 |
-| integration | ARCH-13、ADR-010/014 | API-04 | DATA-04 | M4 INT/DLV | E2/E4 |
+| integration | ARCH-13、ADR-010/014 | API-04、OpenAPI 0.29.0、canonical-message-processed@v1 | DATA-04、V055 | M4 INT/DLV、M56 | E2/E4 |
 | notification | ARCH-14 | API-04 | DATA-04 | M4 NTF | E4 |
 | facts | ARCH-04/15 | API-05 | DATA-05 | M5 FACT | E5 |
 | pricing | ARCH-04/15、ADR-011 | API-05 | DATA-05 | M5 CALC | E5 |
@@ -150,3 +150,4 @@ Feature gate/authority: if applicable
 | M53 | VALIDATED 表单事实驱动只追加 Evidence resolution generation；槽位世代/lineage；REVIEW_REQUIRED 与显式 KEEP/INVALIDATE | ADR-022 + OpenAPI 0.26.0 + Expression/Form/Evidence/MVC/Contract/PostgreSQL IT + V053 | 计算字段、决策表/脚本、草稿离线合并、OCR/CV、GPS 权威距离 |
 | M54 | ExternalReviewReceipt 目标以 slot/item/revision 三元组精确命中 ReviewCase 冻结 SnapshotMember；跨 Snapshot、错配和重复失败关闭 | ARCH-10 + OpenAPI 0.27.0 + ReviewCase PostgreSQL IT + MVC Security + Contract/Client Generation + ArchitectureTest；无新迁移 | 完整 Connector 入站、CLIENT Case 自动创建、外部批次权威登记、其他 targetType 与自动整改映射 |
 | M55 | INTERNAL/CLIENT ReviewCase 来源分离；已通过总部审核后显式登记 CLIENT Case；回执批次与 mapping 匹配冻结值 | ARCH-10 + OpenAPI 0.28.0 + `client-review-case-created@v1` + V054 + ReviewCase PostgreSQL/MVC/Contract/Client/ArchitectureTest | Connector 验签与通用入站、OutboundDelivery、交付成功事件自动创建、integration 域批次权威登记、其他 targetType |
+| M56 | BYD 创建工单验签后登记不可变 Envelope/Canonical；私有原文；transport/业务键幂等；崩溃恢复；授权摘要查询 | ARCH-13 + OpenAPI 0.29.0 + `integration.canonical-message-processed@v1` + V055 + BYD/Replay PostgreSQL IT + Object Storage/Query/Security/Contract/Client/ArchitectureTest | 其他 CPIM messageType、外部审核回调标准化、OutboundDelivery、网络 Connector、自动重试/重放、生产对象存储和 Portal |

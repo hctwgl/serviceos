@@ -50,9 +50,9 @@ class BydCpimReplayGuardPostgresIT {
 
     @Test
     void firstRequestIsNewAndSamePayloadIsReplayable() {
-        var first = guard.register("app-key", "nonce-001", 1783929600L, "a".repeat(64));
+        var first = guard.register("app-key", "nonce-001", 1783929600L, "a".repeat(64), null);
         guard.complete("app-key", "nonce-001", 1783929600L, "b".repeat(64));
-        var replay = guard.register("app-key", "nonce-001", 1783929600L, "a".repeat(64));
+        var replay = guard.register("app-key", "nonce-001", 1783929600L, "a".repeat(64), null);
 
         assertThat(first.kind()).isEqualTo(BydCpimReplayDecision.Kind.NEW);
         assertThat(replay.kind()).isEqualTo(BydCpimReplayDecision.Kind.REPLAY);
@@ -63,16 +63,16 @@ class BydCpimReplayGuardPostgresIT {
 
     @Test
     void sameNonceWithDifferentPayloadIsRejected() {
-        guard.register("app-key", "nonce-002", 1783929600L, "a".repeat(64));
+        guard.register("app-key", "nonce-002", 1783929600L, "a".repeat(64), null);
 
         assertThatThrownBy(() -> guard.register(
-                "app-key", "nonce-002", 1783929600L, "c".repeat(64)))
+                "app-key", "nonce-002", 1783929600L, "c".repeat(64), null))
                 .isInstanceOf(BydCpimReplayConflictException.class);
     }
 
     @Test
     void migrationIsRepeatableAtCurrentVersion() {
-        assertThat(flyway.info().applied()).hasSize(56);
+        assertThat(flyway.info().applied()).hasSize(57);
         assertThat(flyway.migrate().migrationsExecuted).isZero();
     }
 }

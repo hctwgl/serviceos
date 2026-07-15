@@ -37,7 +37,8 @@ class ContractValidationTest {
                         "/appointments/{appointmentId}:mark-no-show",
                         "/work-orders/{workOrderId}/visits",
                         "/appointments/{appointmentId}/visits:check-in",
-                        "/visits/{visitId}:check-out", "/visits/{visitId}:interrupt");
+                        "/visits/{visitId}:check-out", "/visits/{visitId}:interrupt",
+                        "/inbound-envelopes/{envelopeId}", "/canonical-messages/{messageId}");
     }
 
     @Test
@@ -128,6 +129,13 @@ class ContractValidationTest {
         assertValidEvent(
                 "/events/evidence-client-review-case-created-v1.schema.json",
                 "/events/evidence-client-review-case-created-v1.valid.json");
+    }
+
+    @Test
+    void integrationCanonicalMessageProcessedExampleMustMatchPublishedSchema() throws Exception {
+        assertValidEvent(
+                "/events/integration-canonical-message-processed-v1.schema.json",
+                "/events/integration-canonical-message-processed-v1.valid.json");
     }
 
     @Test
