@@ -108,8 +108,14 @@ class ProjectCommandPostgresIT {
 
         assertThat(replay.id()).isEqualTo(first.id());
         assertThat(count("prj_project")).isEqualTo(1);
+        assertThat(count("prj_project_region")).isEqualTo(2);
+        assertThat(first.regionCodes()).containsExactly("CN-3100", "CN-3702");
+        assertThat(jdbc.sql("SELECT region_code FROM prj_project_region ORDER BY region_code")
+                .query(String.class).list()).containsExactly("CN-3100", "CN-3702");
         assertThat(count("aud_audit_record")).isEqualTo(1);
         assertThat(count("rel_outbox_event")).isEqualTo(1);
+        assertThat(jdbc.sql("SELECT schema_version FROM rel_outbox_event")
+                .query(Integer.class).single()).isEqualTo(2);
         assertThat(count("rel_idempotency_record")).isEqualTo(1);
         assertThat(jdbc.sql("SELECT status FROM rel_idempotency_record")
                 .query(String.class).single()).isEqualTo("SUCCEEDED");
@@ -149,7 +155,7 @@ class ProjectCommandPostgresIT {
 
     @Test
     void repeatedMigrationIsNoOp() {
-        assertThat(flyway.info().applied().length).isEqualTo(65);
+        assertThat(flyway.info().applied().length).isEqualTo(66);
         assertThat(flyway.migrate().migrationsExecuted).isZero();
     }
 
@@ -300,7 +306,8 @@ class ProjectCommandPostgresIT {
     }
 
     private static CreateProjectCommand command(String code, String name) {
-        return new CreateProjectCommand(code, "client-demo", name, LocalDate.of(2026, 1, 1), null);
+        return new CreateProjectCommand(code, "client-demo", name, LocalDate.of(2026, 1, 1), null,
+                List.of("CN-3702", "CN-3100"));
     }
 
     private static CurrentPrincipal principal() {

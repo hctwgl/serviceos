@@ -2,6 +2,7 @@ package com.serviceos.project.api;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 public record ProjectView(
@@ -12,6 +13,7 @@ public record ProjectView(
         String name,
         LocalDate startsOn,
         LocalDate endsOn,
+        List<String> regionCodes,
         String status,
         long version,
         Instant createdAt

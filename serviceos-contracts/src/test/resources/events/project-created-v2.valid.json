@@ -1,0 +1,25 @@
+{
+  "eventId": "8d9699bd-5a7d-48d8-b7e8-070ec7d4e11d",
+  "eventType": "project.created",
+  "schemaVersion": 2,
+  "tenantId": "tenant-demo",
+  "correlationId": "corr-20260715-001",
+  "causationId": "idem-project-region-001",
+  "aggregateType": "Project",
+  "aggregateId": "51e255f4-4a35-44cb-9549-85451148b1cc",
+  "aggregateVersion": 1,
+  "occurredAt": "2026-07-15T03:30:00Z",
+  "payload": {
+    "projectId": "51e255f4-4a35-44cb-9549-85451148b1cc",
+    "tenantId": "tenant-demo",
+    "code": "BYD-2026",
+    "clientId": "client-byd",
+    "name": "比亚迪家充履约项目 2026",
+    "startsOn": "2026-01-01",
+    "endsOn": null,
+    "regionCodes": ["CN-3702"],
+    "status": "DRAFT",
+    "aggregateVersion": 1,
+    "occurredAt": "2026-07-15T03:30:00Z"
+  }
+}

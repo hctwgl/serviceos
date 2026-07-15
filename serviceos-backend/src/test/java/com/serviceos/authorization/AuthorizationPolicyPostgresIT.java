@@ -24,6 +24,7 @@ import org.testcontainers.utility.DockerImageName;
 
 import java.util.Set;
 import java.util.UUID;
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -69,8 +70,9 @@ class AuthorizationPolicyPostgresIT {
     @BeforeEach
     void cleanAuthorizationTables() {
         jdbc.sql("""
-                TRUNCATE TABLE auth_role_field_policy, auth_field_policy_rule, auth_field_policy,
-                    auth_role_grant, auth_role_capability, auth_role
+                TRUNCATE TABLE prj_project_region, prj_project, aud_audit_record,
+                    auth_role_field_policy, auth_field_policy_rule, auth_field_policy,
+                    auth_role_grant, auth_role_capability, auth_role CASCADE
                 """).update();
     }
 
@@ -168,7 +170,7 @@ class AuthorizationPolicyPostgresIT {
         assertThat(decision.fields().get("settlementAmount").permission())
                 .isEqualTo(FieldPermission.HIDDEN);
         assertThat(decision.matchedGrantIds()).hasSize(2);
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("063");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("064");
     }
 
     @Test
@@ -192,12 +194,18 @@ class AuthorizationPolicyPostgresIT {
     }
 
     @Test
-    void unmappableRegionScopeAndMissingGrantFailClosedWithDenialAudit() {
+    void regionScopeResolvesOnlyEffectiveTenantProjectsAndMissingGrantFailsClosed() {
+        Instant now = Instant.now();
+        UUID matching = seedProjectRegion(TENANT, "CN-3702", now.minusSeconds(3600), null);
+        seedProjectRegion(TENANT, "CN-3703", now.minusSeconds(3600), null);
+        seedProjectRegion("tenant-other", "CN-3702", now.minusSeconds(3600), null);
+        seedProjectRegion(TENANT, "CN-3702", now.plusSeconds(3600), null);
         seedRoleGrant("scope-region", "region-only", "REGION", "CN-3702");
 
-        assertThatThrownBy(() -> projectScopes.require(
-                principal("region-only"), "project.create", "Project", "corr-region-scope"))
-                .isInstanceOf(com.serviceos.shared.BusinessProblem.class);
+        var scope = projectScopes.require(
+                principal("region-only"), "project.create", "Project", "corr-region-scope");
+        assertThat(scope.tenantWide()).isFalse();
+        assertThat(scope.projectIds()).containsExactly(matching);
         assertThatThrownBy(() -> projectScopes.require(
                 principal("missing"), "project.create", "Project", "corr-missing-scope"))
                 .isInstanceOf(com.serviceos.shared.BusinessProblem.class);
@@ -205,7 +213,76 @@ class AuthorizationPolicyPostgresIT {
                 SELECT error_code FROM aud_audit_record
                  WHERE action_name='AUTHORIZATION_DENIED' ORDER BY occurred_at
                 """).query(String.class).list())
-                .containsExactly("PROJECT_SCOPE_UNRESOLVED", "PROJECT_SCOPE_MISSING");
+                .containsExactly("PROJECT_SCOPE_MISSING");
+    }
+
+    @Test
+    void networkScopeStillFailsClosedWithoutAnAuthoritativeDirectory() {
+        seedRoleGrant("scope-network", "network-only", "NETWORK", "network-qingdao-a");
+
+        assertThatThrownBy(() -> projectScopes.require(
+                principal("network-only"), "project.create", "Project", "corr-network-scope"))
+                .isInstanceOf(com.serviceos.shared.BusinessProblem.class);
+        assertThat(jdbc.sql("SELECT error_code FROM aud_audit_record WHERE action_name='AUTHORIZATION_DENIED'")
+                .query(String.class).single()).isEqualTo("PROJECT_SCOPE_UNRESOLVED");
+    }
+
+    @Test
+    void regionWithoutMatchingProjectFailsClosedAndCrossTenantBindingIsRejected() {
+        seedRoleGrant("scope-empty-region", "empty-region", "REGION", "CN-9999");
+
+        assertThatThrownBy(() -> projectScopes.require(
+                principal("empty-region"), "project.create", "Project", "corr-empty-region"))
+                .isInstanceOf(com.serviceos.shared.BusinessProblem.class);
+        assertThat(jdbc.sql("SELECT error_code FROM aud_audit_record WHERE action_name='AUTHORIZATION_DENIED'")
+                .query(String.class).single()).isEqualTo("PROJECT_SCOPE_MISSING");
+
+        UUID otherTenantProject = seedProjectRegion("tenant-other", "CN-3702", Instant.now(), null);
+        assertThatThrownBy(() -> jdbc.sql("""
+                        INSERT INTO prj_project_region (
+                            project_region_id, tenant_id, project_id, region_code,
+                            valid_from, created_by, created_at)
+                        VALUES (:id, :tenantId, :projectId, 'CN-3702', now(), 'test', now())
+                        """)
+                .param("id", UUID.randomUUID()).param("tenantId", TENANT)
+                .param("projectId", otherTenantProject).update())
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+    }
+
+    private UUID seedProjectRegion(String tenantId, String regionCode, Instant validFrom, Instant validTo) {
+        UUID projectId = UUID.randomUUID();
+        jdbc.sql("""
+                        INSERT INTO prj_project (
+                            project_id, tenant_id, project_code, client_id, project_name,
+                            starts_on, project_status, aggregate_version, created_at
+                        ) VALUES (
+                            :projectId, :tenantId, :projectCode, 'client', 'region project',
+                            current_date, 'DRAFT', 1, now()
+                        )
+                        """)
+                .param("projectId", projectId)
+                .param("tenantId", tenantId)
+                .param("projectCode", "REGION-" + projectId)
+                .update();
+        jdbc.sql("""
+                        INSERT INTO prj_project_region (
+                            project_region_id, tenant_id, project_id, region_code,
+                            valid_from, valid_to, created_by, created_at
+                        ) VALUES (
+                            :bindingId, :tenantId, :projectId, :regionCode,
+                            :validFrom, :validTo, 'test', now()
+                        )
+                        """)
+                .param("bindingId", UUID.randomUUID())
+                .param("tenantId", tenantId)
+                .param("projectId", projectId)
+                .param("regionCode", regionCode)
+                .param("validFrom", java.time.OffsetDateTime.ofInstant(validFrom, java.time.ZoneOffset.UTC))
+                .param("validTo", validTo == null ? null
+                        : java.time.OffsetDateTime.ofInstant(validTo, java.time.ZoneOffset.UTC),
+                        java.sql.Types.TIMESTAMP_WITH_TIMEZONE)
+                .update();
+        return projectId;
     }
 
     private UUID seedRoleGrant(String roleCode, String principalId, String scopeType, String scopeRef) {

@@ -5,6 +5,9 @@ import com.serviceos.project.api.ProjectView;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -18,6 +21,7 @@ public record Project(
         String name,
         LocalDate startsOn,
         LocalDate endsOn,
+        List<String> regionCodes,
         Status status,
         long version,
         Instant createdAt
@@ -37,13 +41,33 @@ public record Project(
         if (command.endsOn() != null && command.endsOn().isBefore(command.startsOn())) {
             throw new IllegalArgumentException("endsOn must not be before startsOn");
         }
-        return new Project(id, tenantId, code, clientId, name, command.startsOn(), command.endsOn(),
+        List<String> regionCodes = requireRegionCodes(command.regionCodes());
+        return new Project(id, tenantId, code, clientId, name, command.startsOn(), command.endsOn(), regionCodes,
                 Status.DRAFT, 1L, now);
     }
 
     public ProjectView toView() {
-        return new ProjectView(id, tenantId, code, clientId, name, startsOn, endsOn,
+        return new ProjectView(id, tenantId, code, clientId, name, startsOn, endsOn, regionCodes,
                 status.name(), version, createdAt);
+    }
+
+    private static List<String> requireRegionCodes(List<String> values) {
+        if (values == null) {
+            throw new IllegalArgumentException("regionCodes must not be null");
+        }
+        if (values.size() > 100) {
+            throw new IllegalArgumentException("regionCodes exceeds 100 items");
+        }
+        Set<String> unique = new HashSet<>();
+        for (String value : values) {
+            if (value == null || value.isBlank() || !value.equals(value.trim()) || value.length() > 128) {
+                throw new IllegalArgumentException("regionCodes contains an invalid stable reference");
+            }
+            if (!unique.add(value)) {
+                throw new IllegalArgumentException("regionCodes contains duplicate references");
+            }
+        }
+        return values.stream().sorted().toList();
     }
 
     private static String requireText(String value, String name, int maxLength) {

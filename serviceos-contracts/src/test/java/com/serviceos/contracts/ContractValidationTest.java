@@ -79,6 +79,13 @@ class ContractValidationTest {
     }
 
     @Test
+    void projectCreatedV2RegionExampleMustMatchPublishedSchema() throws Exception {
+        assertValidEvent(
+                "/events/project-created-v2.schema.json",
+                "/events/project-created-v2.valid.json");
+    }
+
+    @Test
     void taskManualInterventionExampleMustMatchPublishedSchema() throws Exception {
         assertValidEvent(
                 "/events/task-manual-intervention-required-v1.schema.json",

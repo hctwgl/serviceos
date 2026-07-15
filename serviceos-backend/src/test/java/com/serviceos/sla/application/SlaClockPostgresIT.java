@@ -111,6 +111,17 @@ class SlaClockPostgresIT {
                 .param("projectId", projectId).param("tenantId", TENANT)
                 .param("startsOn", LocalDate.of(2026, 7, 1))
                 .param("createdAt", OffsetDateTime.ofInstant(BASE_TIME, ZoneOffset.UTC)).update();
+        jdbc.sql("""
+                INSERT INTO prj_project_region (
+                    project_region_id, tenant_id, project_id, region_code,
+                    valid_from, created_by, created_at)
+                VALUES (:bindingId, :tenantId, :projectId, 'CN-3702',
+                    :validFrom, 'sla-it', :createdAt)
+                """)
+                .param("bindingId", UUID.randomUUID()).param("tenantId", TENANT)
+                .param("projectId", projectId)
+                .param("validFrom", OffsetDateTime.ofInstant(BASE_TIME.minusSeconds(60), ZoneOffset.UTC))
+                .param("createdAt", OffsetDateTime.ofInstant(BASE_TIME, ZoneOffset.UTC)).update();
         publishBundle();
         seedSlaReadGrant();
     }
@@ -393,6 +404,49 @@ class SlaClockPostgresIT {
                 .hasMessageContaining("cursor is invalid");
     }
 
+    @Test
+    void regionRoleGrantResolvesProjectBindingIntoTheCrossProjectSlaQueue() {
+        ScheduledTaskView task = createTask("sla-region-scope");
+        ScheduledTaskView secondTask = createTask("sla-region-scope-second");
+        handler.handle(taskCreated(task.taskId()));
+        handler.handle(taskCreated(secondTask.taskId()));
+        seedSlaRegionReadGrant();
+
+        CurrentPrincipal regionReader = new CurrentPrincipal(
+                "sla-region-reader", TENANT, CurrentPrincipal.PrincipalType.USER, "sla-it", Set.of());
+        var page = queries.list(regionReader, "corr-region-collection",
+                new SlaInstanceQuery(null, "RUNNING", null, 1));
+
+        assertThat(page.items()).singleElement()
+                .satisfies(item -> assertThat(item.projectId()).isEqualTo(projectId));
+        assertThat(page.nextCursor()).isNotBlank();
+
+        UUID newlyScopedProject = UUID.randomUUID();
+        jdbc.sql("""
+                INSERT INTO prj_project (
+                    project_id, tenant_id, project_code, client_id, project_name,
+                    starts_on, project_status, aggregate_version, created_at)
+                VALUES (:projectId, :tenantId, 'SLA-REGION-SECOND', 'BYD', '区域新增项目',
+                    :startsOn, 'ACTIVE', 1, :createdAt)
+                """).param("projectId", newlyScopedProject).param("tenantId", TENANT)
+                .param("startsOn", LocalDate.of(2026, 7, 1))
+                .param("createdAt", OffsetDateTime.ofInstant(BASE_TIME, ZoneOffset.UTC)).update();
+        jdbc.sql("""
+                INSERT INTO prj_project_region (
+                    project_region_id, tenant_id, project_id, region_code,
+                    valid_from, created_by, created_at)
+                VALUES (:id, :tenantId, :projectId, 'CN-3702', :validFrom, 'sla-it', :createdAt)
+                """).param("id", UUID.randomUUID()).param("tenantId", TENANT)
+                .param("projectId", newlyScopedProject)
+                .param("validFrom", OffsetDateTime.ofInstant(BASE_TIME.minusSeconds(60), ZoneOffset.UTC))
+                .param("createdAt", OffsetDateTime.ofInstant(BASE_TIME, ZoneOffset.UTC)).update();
+
+        assertThatThrownBy(() -> queries.list(regionReader, "corr-region-stale",
+                new SlaInstanceQuery(null, "RUNNING", page.nextCursor(), 1)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cursor is invalid");
+    }
+
     private void publishBundle() {
         workflowDigest = Sha256.digest(workflowDefinition());
         workflowVersionId = configurations.publishAsset(new PublishConfigurationAssetCommand(
@@ -478,6 +532,27 @@ class SlaClockPostgresIT {
                     now() - interval '1 day', 'TEST_FIXTURE', 'M62-TEST', now())
                 """).param("grantId", UUID.randomUUID()).param("tenantId", TENANT)
                 .param("roleId", roleId).param("projectId", projectId.toString()).update();
+    }
+
+    private void seedSlaRegionReadGrant() {
+        UUID roleId = UUID.randomUUID();
+        jdbc.sql("""
+                INSERT INTO auth_role (role_id, tenant_id, role_code, role_name, role_status, created_at)
+                VALUES (:roleId, :tenantId, 'sla-region-reader', '区域 SLA 查看人', 'ACTIVE', now())
+                """).param("roleId", roleId).param("tenantId", TENANT).update();
+        jdbc.sql("""
+                INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
+                VALUES (:roleId, 'sla.read', now())
+                """).param("roleId", roleId).update();
+        jdbc.sql("""
+                INSERT INTO auth_role_grant (
+                    grant_id, tenant_id, principal_id, role_id, scope_type, scope_ref,
+                    valid_from, source_code, approval_ref, created_at)
+                VALUES (
+                    :grantId, :tenantId, 'sla-region-reader', :roleId, 'REGION', 'CN-3702',
+                    now() - interval '1 day', 'TEST_FIXTURE', 'M64-TEST', now())
+                """).param("grantId", UUID.randomUUID()).param("tenantId", TENANT)
+                .param("roleId", roleId).update();
     }
 
     private CurrentPrincipal principal() {
