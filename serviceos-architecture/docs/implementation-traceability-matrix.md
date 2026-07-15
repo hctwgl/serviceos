@@ -16,7 +16,7 @@ status: Proposed
 |---|---|---|---|---|---|
 | identity | ARCH-07、ARCH-21 | API-01/02 通用身份上下文 | DATA-02 | M2 AUTH、M6 SEC | E1 |
 | organization | ARCH-01、ARCH-07、ARCH-11 | API-02/04 | DATA-02/04 | M2 AUTH、M4 DSP | E1/E4 |
-| project | ARCH-01/03/05、M64～M67 | API-07、OpenAPI Core 0.38.0、project.created@v3、project.scope-relations-revised@v1 | DATA-01、V064～V067 | M2 CFG/WO、M7 ADM、M64～M67 | E0/E2 |
+| project/workorder query | ARCH-01/03/05、M64～M68 | API-02/07、OpenAPI Core 0.39.0、project.created@v3、project.scope-relations-revised@v1 | DATA-01、V064～V068 | M2 CFG/WO、M7 ADM、M64～M68 | E0/E2 |
 | authorization | ARCH-07、ARCH-21、M63～M67 | API-01/02、ProjectScopeAuthorizationService、ProjectRegionScopeResolver、ProjectNetworkScopeResolver | DATA-02、V064～V067 | M2 AUTH、M6 SEC、M63～M67 | E1/E4 |
 | audit | ARCH-07、ARCH-21 | 所有高风险命令 | DATA-02 | M2 AUD、M6 SEC/OPS | E1 |
 | authority | ARCH-17、ARCH-20 | API-01/05 authority/fence | DATA-05 | M5 CUT、M6 TX | E1/E5 |
@@ -162,3 +162,4 @@ Feature gate/authority: if applicable
 | M65 | Project 创建原子写入有效期 NETWORK 关系；NETWORK RoleGrant 经公开解析端口形成精确项目集合并复用跨项目 SLA 队列；关系变化使游标失败关闭 | ARCH-07/11/12 + API-07/API-04 + OpenAPI Core 0.36.0 + project.created@v3 + V065 + Project/Authorization/SLA PostgreSQL/MVC/Contract/Client/ArchitectureTest | ServiceNetwork 生命周期/覆盖/能力/停派、组织层级、关系修订、授权缓存/导出、派单策略、BUSINESS SLA、Portal、结算 |
 | M66 | Project REGION/NETWORK 当前关系以显式完整集合即时修订；结束/追加历史、Project 版本、不可变收据、审计、Outbox 与幂等同事务；授权映射即时变化且旧 SLA 游标失败关闭 | ARCH-07/11/12 + API-07/API-04 + OpenAPI Core 0.37.0 + project.scope-relations-revised@v1 + V066 + Project/Authorization/SLA PostgreSQL/MVC/Contract/Client/ArchitectureTest | ServiceNetwork/Region/Organization 目录与生命周期、计划生效和审批、项目生命周期、授权缓存/导出、派单策略、BUSINESS SLA、Portal、结算 |
 | M67 | `project.read` 实时 TENANT/PROJECT/REGION/NETWORK 范围驱动项目目录、详情和 M66 不可变范围历史；SQL 范围收敛；cursor 绑定授权与筛选；撤权审计和跨租户 404 | ARCH-01/07 + API-07 + OpenAPI Core 0.38.0 + V067 + Project PostgreSQL/MVC/Contract/Client/ArchitectureTest | owners、品牌/服务产品/配置绑定、项目生命周期、ServiceNetwork/Region/Organization 目录、计划修订审批、导出分析、Portal、派单/BUSINESS SLA/结算 |
+| M68 | `workOrder.read` 实时项目范围驱动不含客户 PII 的工单目录和详情；SQL 范围收敛；cursor 绑定授权与筛选；拒绝审计与跨租户 404 | ARCH-01/07 + API-02 + OpenAPI Core 0.39.0 + V068 + WorkOrder PostgreSQL/MVC/Contract/Client/ArchitectureTest | 客户敏感详情及增强读取审计、阶段/任务/时间线/动作、派单/SLA 风险筛选、Portal、完整生命周期 |

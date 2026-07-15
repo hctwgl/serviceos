@@ -1,13 +1,50 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.38.0
+  version: 0.39.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
 security:
   - bearerAuth: []
 paths:
+  /work-orders:
+    get:
+      operationId: listAuthorizedWorkOrders
+      summary: 查询当前主体有权读取的工单目录
+      description: workOrder.read 实时项目范围在 SQL 中收敛；cursor 绑定范围摘要和全部筛选条件。
+      parameters:
+        - { name: clientCode, in: query, schema: { type: string, minLength: 1, maxLength: 128 } }
+        - { name: projectId, in: query, schema: { type: string, format: uuid } }
+        - { name: status, in: query, schema: { enum: [RECEIVED, ACTIVE, FULFILLED] } }
+        - { name: cursor, in: query, schema: { type: string, minLength: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: receivedAt/id 倒序的授权工单页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/WorkOrderPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /work-orders/{workOrderId}:
+    get:
+      operationId: getAuthorizedWorkOrder
+      summary: 读取不含客户 PII 的工单当前权威事实
+      parameters:
+        - { name: workOrderId, in: path, required: true, schema: { type: string, format: uuid } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 工单当前事实
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/WorkOrderDetail' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
   /projects:
     get:
       operationId: listAuthorizedProjects
@@ -1660,6 +1697,49 @@ components:
         type: string
         pattern: '^"[1-9][0-9]*"$'
   schemas:
+    WorkOrder:
+      type: object
+      additionalProperties: false
+      required: [id, tenantId, projectId, clientCode, brandCode, serviceProductCode, externalOrderCode,
+        status, configurationBundleId, configurationBundleCode, configurationBundleVersion,
+        configurationBundleDigest, provinceCode, cityCode, districtCode, externalDispatchedAt,
+        receivedAt, version]
+      properties:
+        id: { type: string, format: uuid }
+        tenantId: { type: string }
+        projectId: { type: string, format: uuid }
+        clientCode: { type: string }
+        brandCode: { type: string }
+        serviceProductCode: { type: string }
+        externalOrderCode: { type: string }
+        status: { enum: [RECEIVED, ACTIVE, FULFILLED] }
+        configurationBundleId: { type: string, format: uuid }
+        configurationBundleCode: { type: string }
+        configurationBundleVersion: { type: string }
+        configurationBundleDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
+        provinceCode: { type: string }
+        cityCode: { type: string }
+        districtCode: { type: string }
+        externalDispatchedAt: { type: string, format: date-time }
+        receivedAt: { type: string, format: date-time }
+        activatedAt: { type: [string, 'null'], format: date-time }
+        fulfilledAt: { type: [string, 'null'], format: date-time }
+        version: { type: integer, format: int64, minimum: 1 }
+    WorkOrderPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/WorkOrder' } }
+        nextCursor: { type: [string, 'null'] }
+        asOf: { type: string, format: date-time }
+    WorkOrderDetail:
+      type: object
+      additionalProperties: false
+      required: [workOrder, asOf]
+      properties:
+        workOrder: { $ref: '#/components/schemas/WorkOrder' }
+        asOf: { type: string, format: date-time }
     SlaInstancePage:
       type: object
       additionalProperties: false

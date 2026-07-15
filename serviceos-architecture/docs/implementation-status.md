@@ -4,7 +4,7 @@ version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-15
 baselineCommit: 7d02679
-latestMilestone: M67
+latestMilestone: M68
 ---
 
 # ServiceOS 实施状态总览
@@ -39,13 +39,13 @@ latestMilestone: M67
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M67 项目授权目录与范围历史查询 |
-| 基线提交 | `7d02679` |
+| 最新实施里程碑 | M68 授权工单目录与详情查询 |
+| 基线提交 | `7d02679`（M68 功能提交后立即回填） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
 | 前端工程 | 尚未建立；已有 Admin、Network、Technician 产品与交互规格 |
-| 数据库 | PostgreSQL + Flyway（当前版本 067 / 69） |
-| 契约 | Core OpenAPI 0.38.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、recovered/resolved 与 SLA started/breached/met@v1） |
+| 数据库 | PostgreSQL + Flyway（当前版本 068 / 70） |
+| 契约 | Core OpenAPI 0.39.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、recovered/resolved 与 SLA started/breached/met@v1） |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -59,7 +59,7 @@ latestMilestone: M67
 | 可靠消息 | Inbox、Outbox、Worker claim/lease/retry | `IMPLEMENTED` | 本地可靠发布消费、恢复和人工接管基础 | 正式 Broker 和跨服务运行 | M9～M10 |
 | 配置中心 | 不可变配置资产、Bundle 发布和版本锁定 | `PARTIAL` | FORM、EVIDENCE、SLA v1 资产发布基础；工单/任务冻结引用；SERVICEOS_EXPR_V1 布尔/类型比较子集；FORM/EVIDENCE 字段及 WORKFLOW/SLA 依赖闭包 | 决策表/公式/脚本、完整审批和通用依赖图 | M16、M33、M36、M52～M53、M61 |
 | 外部接入 | BYD CPIM V7.3.1 入站、提审与审核回调 | `PARTIAL` | 协议日期验签、防重放、私有原文、Envelope/Canonical、工单创建；显式审核路由与逐订单回调；不可变 OutboundDelivery/Attempt/Acknowledgement、Task 可靠执行、UNKNOWN 人工接管与授权人工重发；重发严格 ACK 后发布恢复事实 | 其他 CPIM 消息、人工标记已送达/放弃、通用 Connector、生产凭据/对象存储和真实 sandbox | M16、M56～M60 |
-| 工单 | WorkOrder 接收、激活、履约完成 | `IMPLEMENTED` | 权威工单、工作流启动、跨阶段和 END 完结 | 完整取消、暂停、恢复和全部业务分支 | M16～M19 |
+| 工单 | WorkOrder 接收、激活、履约完成与授权只读投影 | `PARTIAL` | 权威工单、工作流启动、跨阶段和 END 完结；`workOrder.read` 授权目录与不含客户 PII 的详情 | 完整取消、暂停、恢复、客户敏感详情审计、阶段/任务/时间线/动作与全部业务分支 | M16～M19、M68 |
 | 工作流 | 线性 Stage/Task 运行时 | `PARTIAL` | 精确版本启动、线性推进、唯一跨阶段推进、完成事件；节点 `slaRef` 传递并冻结到首个/后续 Task | 并行/汇聚网关、流程条件表达式和复杂流程语义 | M17～M19、M61 |
 | 人工任务 | claim/start/complete、责任和执行保护 | `IMPLEMENTED` | 人工命令、候选领取、唯一责任、release/reclaim、执行保护；表单、资料和双引用完成门禁 | Review 完成条件 | M20～M23、M35、M41、M43 |
 | 服务分配 | 网点分配、容量、改派 Saga、超时恢复 | `IMPLEMENTED` | ServiceAssignment、容量权威、改派、终止、对账和自动恢复 | 完整策略评分、全部异常分支和 UI | M24～M28 |
@@ -425,10 +425,22 @@ latestMilestone: M67
 - 计划生效的范围修订、审批/双人复核、导出分析与 Portal 前端；
 - 完整派单策略、BUSINESS SLA、通知、试算和结算。
 
+### M68：授权工单目录与详情查询
+
+已实现：
+
+- `GET /api/v1/work-orders` 以实时 `workOrder.read` TENANT/PROJECT/REGION/NETWORK 范围执行单条范围化 SQL；
+- client/project/status 精确筛选，receivedAt/id 倒序游标绑定授权范围与筛选摘要；
+- 详情先 tenant 隔离再按所属 project 鉴权，越权拒绝审计、跨租户 404；
+- 返回生命周期、冻结配置包与区域等现有权威事实，显式排除客户姓名、手机号、地址和 VIN；
+- V068、Core OpenAPI 0.39.0、PostgreSQL 18、MVC、契约与 ArchitectureTest 形成工程证据。
+
+明确未实现：客户敏感详情及增强读取审计、阶段/任务/时间线/允许动作、派单与 SLA 风险筛选、Portal。
+
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M67**。M61～M67 只实现显式 Task ELAPSED 时钟、其安全授权只读投影、
-Project REGION/NETWORK 关系即时整组修订，以及当前授权项目目录/详情/历史查询，
+ServiceOS 可靠纵向切片已推进到 **M68**。M61～M68 只实现显式 Task ELAPSED 时钟、其安全授权只读投影、
+Project REGION/NETWORK 关系即时整组修订、授权项目目录/历史，以及不含客户 PII 的授权工单目录/详情，
 没有猜测项目默认时长、日历、暂停或升级策略，也没有实现完整 SLA/通知或整个现场履约平台。
 
 ```text
