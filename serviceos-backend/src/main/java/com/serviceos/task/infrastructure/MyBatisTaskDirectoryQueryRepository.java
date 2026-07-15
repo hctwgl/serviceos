@@ -3,6 +3,7 @@ package com.serviceos.task.infrastructure;
 import com.serviceos.task.api.InputVersionRef;
 import com.serviceos.task.api.TaskDetail;
 import com.serviceos.task.api.TaskDirectoryItem;
+import com.serviceos.task.api.TaskExecutionAttemptView;
 import com.serviceos.task.application.TaskDirectoryQueryRepository;
 import org.springframework.stereotype.Repository;
 import tools.jackson.core.JacksonException;
@@ -77,6 +78,27 @@ final class MyBatisTaskDirectoryQueryRepository implements TaskDirectoryQueryRep
                         bool(row, "actorCandidate"),
                         bool(row, "actorResponsible"),
                         bool(row, "activeGuard")));
+    }
+
+    @Override
+    public List<TaskExecutionAttemptView> findExecutionAttempts(
+            String tenantId,
+            UUID taskId,
+            Integer beforeAttemptNo,
+            int fetchSize
+    ) {
+        return mapper.findExecutionAttempts(tenantId, taskId, beforeAttemptNo, fetchSize)
+                .stream()
+                .map(row -> new TaskExecutionAttemptView(
+                        uuid(row, "attemptId"),
+                        number(row, "attemptNo").intValue(),
+                        string(row, "resultCode"),
+                        string(row, "errorCode"),
+                        string(row, "resultRef"),
+                        instant(row, "nextRetryAt"),
+                        instant(row, "startedAt"),
+                        instant(row, "finishedAt")))
+                .toList();
     }
 
     private static TaskDirectoryItem item(Map<String, Object> row) {

@@ -2,6 +2,7 @@ package com.serviceos.task.application;
 
 import com.serviceos.task.api.TaskDetail;
 import com.serviceos.task.api.TaskDirectoryItem;
+import com.serviceos.task.api.TaskExecutionAttemptView;
 
 import java.time.Instant;
 import java.util.List;
@@ -27,6 +28,12 @@ public interface TaskDirectoryQueryRepository {
 
     Optional<AllowedActionState> findAllowedActionState(
             String tenantId, UUID taskId, String principalId);
+
+    List<TaskExecutionAttemptView> findExecutionAttempts(
+            String tenantId,
+            UUID taskId,
+            Integer beforeAttemptNo,
+            int fetchSize);
 
     record AllowedActionState(
             String taskKind,

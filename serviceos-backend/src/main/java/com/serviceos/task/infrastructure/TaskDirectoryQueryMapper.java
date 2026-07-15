@@ -32,4 +32,10 @@ interface TaskDirectoryQueryMapper {
             @Param("tenantId") String tenantId,
             @Param("taskId") UUID taskId,
             @Param("principalId") String principalId);
+
+    List<Map<String, Object>> findExecutionAttempts(
+            @Param("tenantId") String tenantId,
+            @Param("taskId") UUID taskId,
+            @Param("beforeAttemptNo") Integer beforeAttemptNo,
+            @Param("fetchSize") int fetchSize);
 }

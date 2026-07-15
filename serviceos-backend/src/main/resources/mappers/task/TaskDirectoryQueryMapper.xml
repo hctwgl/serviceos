@@ -17,4 +17,15 @@
          EXISTS(SELECT 1 FROM tsk_task_execution_guard g WHERE g.tenant_id=t.tenant_id AND g.task_id=t.task_id AND g.status='ACTIVE') AS "activeGuard"
     FROM tsk_task t WHERE t.tenant_id=#{tenantId} AND t.task_id=#{taskId}
  </select>
+ <select id="findExecutionAttempts" resultType="map">
+  SELECT a.attempt_id AS "attemptId",a.attempt_no AS "attemptNo",a.result_code AS "resultCode",
+         a.error_code AS "errorCode",a.result_ref AS "resultRef",a.next_retry_at AS "nextRetryAt",
+         a.started_at AS "startedAt",a.finished_at AS "finishedAt"
+    FROM tsk_task_execution_attempt a
+    JOIN tsk_task t ON t.task_id=a.task_id AND t.tenant_id=#{tenantId}
+   WHERE a.task_id=#{taskId}
+   <if test="beforeAttemptNo != null">AND a.attempt_no &lt; #{beforeAttemptNo}</if>
+   ORDER BY a.attempt_no DESC
+   LIMIT #{fetchSize}
+ </select>
 </mapper>

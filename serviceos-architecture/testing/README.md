@@ -72,3 +72,4 @@
 - [M69 授权工单执行工作区投影验收矩阵](66-m69-authorized-work-order-execution-projection-acceptance.md)
 - [M70 授权任务队列与详情验收矩阵](67-m70-authorized-task-directory-detail-acceptance.md)
 - [M71 Task 服务端允许动作投影验收矩阵](68-m71-task-server-driven-allowed-actions-acceptance.md)
+- [M72 Task 执行 Attempt 历史查询验收矩阵](69-m72-task-execution-attempt-history-acceptance.md)
