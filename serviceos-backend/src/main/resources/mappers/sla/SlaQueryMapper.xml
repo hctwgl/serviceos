@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.serviceos.sla.infrastructure.SlaQueryMapper">
+    <sql id="instanceColumns">
+        sla_instance_id AS "slaInstanceId", project_id AS "projectId",
+        work_order_id AS "workOrderId", task_id AS "taskId", sla_ref AS "slaRef",
+        policy_version_id AS "policyVersionId", policy_semantic_version AS "policySemanticVersion",
+        policy_content_digest AS "policyContentDigest", clock_mode AS "clockMode",
+        target_duration_seconds AS "targetDurationSeconds", started_at AS "startedAt",
+        deadline_at AS "deadlineAt", status, breached_at AS "breachedAt",
+        breach_detected_at AS "breachDetectedAt", completed_at AS "completedAt",
+        elapsed_seconds AS "elapsedSeconds", aggregate_version AS "aggregateVersion"
+    </sql>
+
+    <select id="findPage" resultType="map">
+        SELECT <include refid="instanceColumns"/>
+          FROM sla_instance
+         WHERE tenant_id=#{tenantId}
+        <if test="!tenantWide">
+            <choose>
+                <when test="projectIds != null and !projectIds.isEmpty()">
+                    AND project_id IN
+                    <foreach collection="projectIds" item="projectId" open="(" separator="," close=")">
+                        CAST(#{projectId} AS uuid)
+                    </foreach>
+                </when>
+                <otherwise>AND FALSE</otherwise>
+            </choose>
+        </if>
+        <if test="workOrderId != null">AND work_order_id=#{workOrderId}</if>
+        <if test="status != null">AND status=#{status}</if>
+        <if test="cursorDeadlineAt != null">
+            AND (deadline_at, sla_instance_id) &gt; (#{cursorDeadlineAt}, #{cursorId})
+        </if>
+         ORDER BY deadline_at, sla_instance_id
+         LIMIT #{fetchSize}
+    </select>
+
+    <select id="findById" resultType="map">
+        SELECT <include refid="instanceColumns"/>
+          FROM sla_instance
+         WHERE tenant_id=#{tenantId} AND sla_instance_id=#{slaInstanceId}
+    </select>
+
+    <select id="findSegments" resultType="map">
+        SELECT segment_id AS "segmentId", segment_no AS "segmentNo", segment_type AS "segmentType",
+               started_at AS "startedAt", ended_at AS "endedAt", elapsed_seconds AS "elapsedSeconds",
+               start_event_id AS "startEventId", end_event_id AS "endEventId"
+          FROM sla_clock_segment
+         WHERE tenant_id=#{tenantId} AND sla_instance_id=#{slaInstanceId}
+         ORDER BY segment_no
+    </select>
+
+    <select id="findMilestones" resultType="map">
+        SELECT milestone_id AS "milestoneId", milestone_type AS "milestoneType",
+               scheduled_at AS "scheduledAt", status, triggered_at AS "triggeredAt",
+               detected_at AS "detectedAt", trigger_event_id AS "triggerEventId"
+          FROM sla_milestone
+         WHERE tenant_id=#{tenantId} AND sla_instance_id=#{slaInstanceId}
+         ORDER BY scheduled_at, milestone_id
+    </select>
+</mapper>

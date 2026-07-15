@@ -50,5 +50,9 @@ class GeneratedClientContractTest {
                 .contains("createBydReviewSubmission")
                 .contains("getOutboundDelivery")
                 .contains("retryUnknownOutboundDelivery");
+        assertThat(apiSource)
+                .contains("listSlaInstances")
+                .contains("listWorkOrderSlaInstances")
+                .contains("getSlaInstance");
     }
 }

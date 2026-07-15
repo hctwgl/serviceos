@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
+import java.util.List;
 
 /**
  * 项目写 API。tenant/actor 只从已验证 JWT 映射的 CurrentPrincipal 获取，
@@ -42,7 +43,9 @@ final class ProjectController {
         CurrentPrincipal principal = principals.current();
         CommandMetadata metadata = new CommandMetadata(correlationId, idempotencyKey);
         ProjectView result = commands.create(principal, metadata, new CreateProjectCommand(
-                request.code(), request.clientId(), request.name(), request.startsOn(), request.endsOn()));
+                request.code(), request.clientId(), request.name(), request.startsOn(), request.endsOn(),
+                request.regionCodes() == null ? List.of() : request.regionCodes(),
+                request.networkIds() == null ? List.of() : request.networkIds()));
         return ResponseEntity
                 .created(URI.create("/api/v1/projects/" + result.id()))
                 .header(CorrelationIds.HEADER_NAME, correlationId)

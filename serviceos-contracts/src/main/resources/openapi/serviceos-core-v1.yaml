@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.32.0
+  version: 0.36.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -285,6 +285,73 @@ paths:
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
         '423': { $ref: '#/components/responses/Problem' }
+
+  /sla-instances:
+    get:
+      operationId: listSlaInstances
+      summary: 查询实时授权项目范围内的 SLA 工作台
+      description: >-
+        projectId 存在时按 sla.read + Project Scope 实时鉴权；省略时一次性解析当前有效
+        TENANT/PROJECT RoleGrant 并以单条范围化 SQL 查询。仅有 REGION/NETWORK 授权且尚无权威
+        项目映射时失败关闭。授权集合变化会令旧游标失效。动态秒数只使用响应 asOf，客户端不得
+        自行改变 SLA 状态。按 deadlineAt、slaInstanceId 正序稳定翻页。
+      parameters:
+        - name: projectId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: status
+          in: query
+          required: false
+          schema: { type: string, enum: [RUNNING, BREACHED, MET, MET_LATE] }
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 授权项目的 SLA 稳定游标页
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SlaInstancePage' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /work-orders/{workOrderId}/sla-instances:
+    get:
+      operationId: listWorkOrderSlaInstances
+      summary: 查询工单冻结的全部 SLA 时钟
+      description: 先从 WorkOrder 权威事实解析 project，再实时复核 sla.read Project Scope。
+      parameters:
+        - $ref: '#/components/parameters/WorkOrderId'
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 工单 SLA 时间线
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SlaInstancePage' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /sla-instances/{slaInstanceId}:
+    get:
+      operationId: getSlaInstance
+      summary: 查询 SLA 实例、时钟片段和里程碑详情
+      parameters:
+        - $ref: '#/components/parameters/SlaInstanceId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: SLA 权威详情
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SlaInstanceDetail' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
 
   /operational-exceptions:
     get:
@@ -1427,6 +1494,11 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    SlaInstanceId:
+      name: slaInstanceId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     AppointmentId:
       name: appointmentId
       in: path
@@ -1466,6 +1538,89 @@ components:
         type: string
         pattern: '^"[1-9][0-9]*"$'
   schemas:
+    SlaInstancePage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor, asOf]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/SlaInstanceItem' }
+        nextCursor: { type: [string, 'null'] }
+        asOf: { type: string, format: date-time }
+    SlaInstanceItem:
+      type: object
+      additionalProperties: false
+      required: [slaInstanceId, projectId, workOrderId, taskId, slaRef,
+                 policyVersionId, policySemanticVersion, policyContentDigest,
+                 clockMode, targetDurationSeconds, startedAt, deadlineAt, status,
+                 breachedAt, breachDetectedAt, completedAt, elapsedSeconds,
+                 remainingSeconds, overdueSeconds, aggregateVersion, allowedActions]
+      properties:
+        slaInstanceId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        workOrderId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        slaRef: { type: string, minLength: 1, maxLength: 120 }
+        policyVersionId: { type: string, format: uuid }
+        policySemanticVersion: { type: string, minLength: 1, maxLength: 64 }
+        policyContentDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
+        clockMode: { const: ELAPSED }
+        targetDurationSeconds: { type: integer, format: int64, minimum: 1, maximum: 31536000 }
+        startedAt: { type: string, format: date-time }
+        deadlineAt: { type: string, format: date-time }
+        status: { enum: [RUNNING, BREACHED, MET, MET_LATE] }
+        breachedAt: { type: [string, 'null'], format: date-time }
+        breachDetectedAt: { type: [string, 'null'], format: date-time }
+        completedAt: { type: [string, 'null'], format: date-time }
+        elapsedSeconds: { type: [integer, 'null'], format: int64, minimum: 0 }
+        remainingSeconds: { type: [integer, 'null'], format: int64, minimum: 0 }
+        overdueSeconds: { type: [integer, 'null'], format: int64, minimum: 0 }
+        aggregateVersion: { type: integer, format: int64, minimum: 1 }
+        allowedActions:
+          type: array
+          maxItems: 0
+          items: { type: string }
+    SlaClockSegment:
+      type: object
+      additionalProperties: false
+      required: [segmentId, segmentNo, segmentType, startedAt, endedAt,
+                 elapsedSeconds, startEventId, endEventId]
+      properties:
+        segmentId: { type: string, format: uuid }
+        segmentNo: { type: integer, minimum: 1 }
+        segmentType: { const: RUNNING }
+        startedAt: { type: string, format: date-time }
+        endedAt: { type: [string, 'null'], format: date-time }
+        elapsedSeconds: { type: [integer, 'null'], format: int64, minimum: 0 }
+        startEventId: { type: string, format: uuid }
+        endEventId: { type: [string, 'null'], format: uuid }
+    SlaMilestone:
+      type: object
+      additionalProperties: false
+      required: [milestoneId, milestoneType, scheduledAt, status,
+                 triggeredAt, detectedAt, triggerEventId]
+      properties:
+        milestoneId: { type: string, format: uuid }
+        milestoneType: { const: TARGET_DUE }
+        scheduledAt: { type: string, format: date-time }
+        status: { enum: [PENDING, TRIGGERED, CANCELLED] }
+        triggeredAt: { type: [string, 'null'], format: date-time }
+        detectedAt: { type: [string, 'null'], format: date-time }
+        triggerEventId: { type: [string, 'null'], format: uuid }
+    SlaInstanceDetail:
+      type: object
+      additionalProperties: false
+      required: [instance, segments, milestones, asOf]
+      properties:
+        instance: { $ref: '#/components/schemas/SlaInstanceItem' }
+        segments:
+          type: array
+          items: { $ref: '#/components/schemas/SlaClockSegment' }
+        milestones:
+          type: array
+          items: { $ref: '#/components/schemas/SlaMilestone' }
+        asOf: { type: string, format: date-time }
     CreateBydReviewSubmissionRequest:
       type: object
       additionalProperties: false
@@ -1667,6 +1822,16 @@ components:
         endsOn:
           type: [string, 'null']
           format: date
+        regionCodes:
+          type: array
+          maxItems: 100
+          description: 项目当前 REGION 权威绑定；省略或空数组表示不建立 REGION 关系
+          items: { type: string, minLength: 1, maxLength: 128 }
+        networkIds:
+          type: array
+          maxItems: 100
+          description: 项目当前 NETWORK 权威绑定；省略或空数组表示不建立 NETWORK 关系
+          items: { type: string, minLength: 1, maxLength: 128 }
     Project:
       type: object
       additionalProperties: false
@@ -1679,6 +1844,14 @@ components:
         name: { type: string }
         startsOn: { type: string, format: date }
         endsOn: { type: [string, 'null'], format: date }
+        regionCodes:
+          type: array
+          maxItems: 100
+          items: { type: string, minLength: 1, maxLength: 128 }
+        networkIds:
+          type: array
+          maxItems: 100
+          items: { type: string, minLength: 1, maxLength: 128 }
         status:
           type: string
           enum: [DRAFT, ACTIVE, SUSPENDED, CLOSED]

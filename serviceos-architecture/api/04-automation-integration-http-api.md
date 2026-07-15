@@ -12,6 +12,11 @@ status: Proposed
 > M59 在 Core OpenAPI 0.32.0 实现单笔 UNKNOWN Delivery 人工重发。
 > M60 未新增 HTTP API；严格 ACK 后由 recovered@v1 驱动 Operations 自动解决对应异常，保持
 > “API 不直接标记业务成功”的边界。
+> M62 在 Core OpenAPI 0.33.0 实现 SLA 项目工作台、工单时间线和实例详情三个只读查询；全部要求
+> `sla.read` + 实时 Project Scope，动态时间以服务端 `asOf` 为准。
+> M63 在 Core OpenAPI 0.34.0 将工作台 `projectId` 放宽为可选；省略时实时合并 TENANT/PROJECT
+> RoleGrant，并以单条范围化 SQL 查询。M64～M65 通过 Project 有效期关系补充精确 REGION/NETWORK
+> 项目映射；ServiceNetwork 目录、生命周期与本章服务网络治理接口仍未实现。
 > 通用 Connector/CreateOutboundDelivery、其他人工处置、批量 Replay 与其余本章接口仍为 Proposed。
 
 沿用既有 API 的认证、幂等、`If-Match`、Problem Details、correlation 和审计约定。自动任务内部接口使用专用服务主体，不向普通用户令牌开放。
@@ -97,8 +102,8 @@ status: Proposed
 
 ## 3. SLA
 
-> M61 未新增 HTTP API；当前仅通过内部 `SlaClockService` 查询 Task SLA，并由 Task 事件驱动时钟。
-> 下表查询、暂停、恢复和重算端点仍为 Proposed，不能视为已发布契约。
+> M62 已发布前三个 GET 查询；M63 支持工作台显式 projectId 或省略后解析授权项目集合，工单查询
+> 仍从 WorkOrder 权威事实解析 Project Scope；暂停、恢复、重算和 escalation 查询仍为 Proposed。
 
 | 方法与路径 | 用途/命令 | 关键载荷 | 成功 |
 |---|---|---|---|

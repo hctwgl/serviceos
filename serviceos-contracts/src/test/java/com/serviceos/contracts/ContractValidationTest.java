@@ -41,6 +41,8 @@ class ContractValidationTest {
                         "/internal/integration/byd/review-routes",
                         "/internal/integration/byd/review-submissions",
                         "/outbound-deliveries/{deliveryId}",
+                        "/sla-instances", "/sla-instances/{slaInstanceId}",
+                        "/work-orders/{workOrderId}/sla-instances",
                         "/inbound-envelopes/{envelopeId}", "/canonical-messages/{messageId}");
     }
 
@@ -74,6 +76,20 @@ class ContractValidationTest {
         assertValidEvent(
                 "/events/project-created-v1.schema.json",
                 "/events/project-created-v1.valid.json");
+    }
+
+    @Test
+    void projectCreatedV2RegionExampleMustMatchPublishedSchema() throws Exception {
+        assertValidEvent(
+                "/events/project-created-v2.schema.json",
+                "/events/project-created-v2.valid.json");
+    }
+
+    @Test
+    void projectCreatedV3NetworkExampleMustMatchPublishedSchema() throws Exception {
+        assertValidEvent(
+                "/events/project-created-v3.schema.json",
+                "/events/project-created-v3.valid.json");
     }
 
     @Test

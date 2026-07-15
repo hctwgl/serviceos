@@ -2,6 +2,8 @@ package com.serviceos.authorization.infrastructure;
 
 import com.serviceos.authorization.application.AuthorizationPolicyStore;
 import com.serviceos.authorization.application.CapabilityGrantMatch;
+import com.serviceos.authorization.application.ProjectScopeGrantMatch;
+import com.serviceos.authorization.application.ProjectScopePolicyStore;
 import com.serviceos.authorization.api.AuthorizationRequest;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
@@ -15,7 +17,7 @@ import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timesta
  * RoleGrant 权威查询。有效期、撤销与 tenant scope 在同一 SQL 中实时判定，不能只信缓存/JWT。
  */
 @Repository
-final class JdbcAuthorizationPolicyStore implements AuthorizationPolicyStore {
+final class JdbcAuthorizationPolicyStore implements AuthorizationPolicyStore, ProjectScopePolicyStore {
     private static final String POLICY_VERSION = "role-grant-v2";
 
     private final JdbcClient jdbc;
@@ -74,6 +76,34 @@ final class JdbcAuthorizationPolicyStore implements AuthorizationPolicyStore {
                         grants.stream().map(MatchedGrantRow::grantId).toList(),
                         grants.stream().map(row -> row.scopeType() + ":" + row.scopeRef()).toList(),
                         POLICY_VERSION);
+    }
+
+    @Override
+    public ProjectScopeGrantMatch findProjectScopeGrants(
+            String tenantId, String principalId, String capability, Instant evaluatedAt
+    ) {
+        List<String> scopes = jdbc.sql("""
+                        SELECT g.scope_type || ':' || g.scope_ref
+                          FROM auth_role_grant g
+                          JOIN auth_role r ON r.role_id = g.role_id
+                          JOIN auth_role_capability rc ON rc.role_id = g.role_id
+                         WHERE g.tenant_id = :tenantId
+                           AND g.principal_id = :principalId
+                           AND rc.capability_code = :capability
+                           AND r.tenant_id = :tenantId
+                           AND r.role_status = 'ACTIVE'
+                           AND g.valid_from <= :evaluatedAt
+                           AND (g.valid_to IS NULL OR g.valid_to > :evaluatedAt)
+                           AND g.revoked_at IS NULL
+                         ORDER BY g.scope_type, g.scope_ref, g.grant_id
+                        """)
+                .param("tenantId", tenantId)
+                .param("principalId", principalId)
+                .param("capability", capability)
+                .param("evaluatedAt", timestamptz(evaluatedAt))
+                .query(String.class)
+                .list();
+        return new ProjectScopeGrantMatch(scopes, POLICY_VERSION);
     }
 
     private static String nullSafeScope(String value) {

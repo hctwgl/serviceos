@@ -11,5 +11,9 @@ import java.util.UUID;
 public interface ProjectRepository {
     void insert(Project project);
 
+    void insertRegionBindings(Project project, String createdBy);
+
+    void insertNetworkBindings(Project project, String createdBy);
+
     Optional<Project> findById(String tenantId, UUID projectId);
 }

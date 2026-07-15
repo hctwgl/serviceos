@@ -62,3 +62,7 @@
 - [M59 UNKNOWN 外部交付人工重发验收矩阵](56-m59-unknown-delivery-manual-replay-acceptance.md)
 - [M60 外部交付恢复异常自动闭环验收矩阵](57-m60-outbound-delivery-exception-auto-closure-acceptance.md)
 - [M61 Task 自然时长 SLA 时钟验收矩阵](58-m61-task-elapsed-sla-clock-acceptance.md)
+- [M62 SLA 授权查询与工作台投影验收矩阵](59-m62-sla-authorized-query-acceptance.md)
+- [M63 授权项目集合与跨项目 SLA 队列验收矩阵](60-m63-authorized-project-scope-sla-queue-acceptance.md)
+- [M64 项目区域关系与 REGION SLA 队列验收矩阵](61-m64-project-region-scope-sla-queue-acceptance.md)
+- [M65 项目网点关系与 NETWORK SLA 队列验收矩阵](62-m65-project-network-scope-sla-queue-acceptance.md)

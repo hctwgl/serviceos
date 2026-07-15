@@ -71,7 +71,8 @@ class ProjectControllerSecurityTest {
         ProjectView result = new ProjectView(
                 UUID.fromString("19dac447-73fd-4f24-8178-a9eac8d9ed34"),
                 "tenant-trusted", "BYD-2026", "client-byd", "比亚迪项目",
-                LocalDate.of(2026, 1, 1), null, "DRAFT", 1,
+                LocalDate.of(2026, 1, 1), null, java.util.List.of("CN-3702"),
+                java.util.List.of("network-qingdao-a"), "DRAFT", 1,
                 Instant.parse("2026-07-13T03:30:00Z"));
         when(principals.current()).thenReturn(principal);
         when(commands.create(eq(principal), any(), any())).thenReturn(result);
@@ -102,7 +103,9 @@ class ProjectControllerSecurityTest {
                   "code": "BYD-2026",
                   "clientId": "client-byd",
                   "name": "比亚迪项目",
-                  "startsOn": "2026-01-01"
+                  "startsOn": "2026-01-01",
+                  "regionCodes": ["CN-3702"],
+                  "networkIds": ["network-qingdao-a"]
                 }
                 """;
     }

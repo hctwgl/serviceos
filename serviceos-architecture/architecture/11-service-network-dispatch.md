@@ -6,6 +6,9 @@ status: Proposed
 
 # 服务网络与派单引擎设计
 
+> M65 只实现 Project 创建时显式 `networkIds` 有效期关系及 NETWORK RoleGrant 的项目范围解析；
+> 本文 ServiceNetwork 生命周期、Coverage、Capability、停派、资质、候选过滤、评分和初派仍为 Proposed。
+
 ## 1. 目标
 
 派单引擎回答两个不同问题：

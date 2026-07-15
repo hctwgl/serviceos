@@ -108,8 +108,23 @@ class ProjectCommandPostgresIT {
 
         assertThat(replay.id()).isEqualTo(first.id());
         assertThat(count("prj_project")).isEqualTo(1);
+        assertThat(count("prj_project_region")).isEqualTo(2);
+        assertThat(count("prj_project_network")).isEqualTo(2);
+        assertThat(first.regionCodes()).containsExactly("CN-3100", "CN-3702");
+        assertThat(first.networkIds()).containsExactly("network-huangpu", "network-qingdao-a");
+        assertThat(jdbc.sql("SELECT region_code FROM prj_project_region ORDER BY region_code")
+                .query(String.class).list()).containsExactly("CN-3100", "CN-3702");
+        assertThat(jdbc.sql("SELECT network_id FROM prj_project_network ORDER BY network_id")
+                .query(String.class).list()).containsExactly("network-huangpu", "network-qingdao-a");
         assertThat(count("aud_audit_record")).isEqualTo(1);
         assertThat(count("rel_outbox_event")).isEqualTo(1);
+        assertThat(jdbc.sql("SELECT schema_version FROM rel_outbox_event")
+                .query(Integer.class).single()).isEqualTo(3);
+        assertThat(jdbc.sql("""
+                SELECT jsonb_array_elements_text(payload -> 'networkIds')
+                  FROM rel_outbox_event
+                """).query(String.class).list())
+                .containsExactly("network-huangpu", "network-qingdao-a");
         assertThat(count("rel_idempotency_record")).isEqualTo(1);
         assertThat(jdbc.sql("SELECT status FROM rel_idempotency_record")
                 .query(String.class).single()).isEqualTo("SUCCEEDED");
@@ -148,8 +163,26 @@ class ProjectCommandPostgresIT {
     }
 
     @Test
+    void invalidNetworkReferenceRollsBackIdempotencyAndAllBusinessWrites() {
+        CreateProjectCommand invalid = new CreateProjectCommand(
+                "INVALID-NETWORK", "client-demo", "非法网点引用", LocalDate.of(2026, 1, 1), null,
+                List.of(), List.of(" network-qingdao-a"));
+
+        assertThatThrownBy(() -> commands.create(
+                principal(), context("idem-invalid-network-001"), invalid))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("networkIds");
+
+        assertThat(count("prj_project")).isZero();
+        assertThat(count("prj_project_network")).isZero();
+        assertThat(count("aud_audit_record")).isZero();
+        assertThat(count("rel_outbox_event")).isZero();
+        assertThat(count("rel_idempotency_record")).isZero();
+    }
+
+    @Test
     void repeatedMigrationIsNoOp() {
-        assertThat(flyway.info().applied().length).isEqualTo(63);
+        assertThat(flyway.info().applied().length).isEqualTo(67);
         assertThat(flyway.migrate().migrationsExecuted).isZero();
     }
 
@@ -300,7 +333,8 @@ class ProjectCommandPostgresIT {
     }
 
     private static CreateProjectCommand command(String code, String name) {
-        return new CreateProjectCommand(code, "client-demo", name, LocalDate.of(2026, 1, 1), null);
+        return new CreateProjectCommand(code, "client-demo", name, LocalDate.of(2026, 1, 1), null,
+                List.of("CN-3702", "CN-3100"), List.of("network-qingdao-a", "network-huangpu"));
     }
 
     private static CurrentPrincipal principal() {

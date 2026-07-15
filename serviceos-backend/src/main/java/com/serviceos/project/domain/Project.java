@@ -5,6 +5,9 @@ import com.serviceos.project.api.ProjectView;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -18,6 +21,8 @@ public record Project(
         String name,
         LocalDate startsOn,
         LocalDate endsOn,
+        List<String> regionCodes,
+        List<String> networkIds,
         Status status,
         long version,
         Instant createdAt
@@ -37,13 +42,38 @@ public record Project(
         if (command.endsOn() != null && command.endsOn().isBefore(command.startsOn())) {
             throw new IllegalArgumentException("endsOn must not be before startsOn");
         }
-        return new Project(id, tenantId, code, clientId, name, command.startsOn(), command.endsOn(),
-                Status.DRAFT, 1L, now);
+        List<String> regionCodes = requireRegionCodes(command.regionCodes());
+        List<String> networkIds = requireStableReferences(command.networkIds(), "networkIds");
+        return new Project(id, tenantId, code, clientId, name, command.startsOn(), command.endsOn(), regionCodes,
+                networkIds, Status.DRAFT, 1L, now);
     }
 
     public ProjectView toView() {
-        return new ProjectView(id, tenantId, code, clientId, name, startsOn, endsOn,
+        return new ProjectView(id, tenantId, code, clientId, name, startsOn, endsOn, regionCodes, networkIds,
                 status.name(), version, createdAt);
+    }
+
+    private static List<String> requireRegionCodes(List<String> values) {
+        return requireStableReferences(values, "regionCodes");
+    }
+
+    private static List<String> requireStableReferences(List<String> values, String field) {
+        if (values == null) {
+            throw new IllegalArgumentException(field + " must not be null");
+        }
+        if (values.size() > 100) {
+            throw new IllegalArgumentException(field + " exceeds 100 items");
+        }
+        Set<String> unique = new HashSet<>();
+        for (String value : values) {
+            if (value == null || value.isBlank() || !value.equals(value.trim()) || value.length() > 128) {
+                throw new IllegalArgumentException(field + " contains an invalid stable reference");
+            }
+            if (!unique.add(value)) {
+                throw new IllegalArgumentException(field + " contains duplicate references");
+            }
+        }
+        return values.stream().sorted().toList();
     }
 
     private static String requireText(String value, String name, int maxLength) {

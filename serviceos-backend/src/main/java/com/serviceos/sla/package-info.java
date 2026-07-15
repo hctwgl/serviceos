@@ -2,7 +2,8 @@
 @org.springframework.modulith.ApplicationModule(
         displayName = "SLA Clock",
         allowedDependencies = {
-                "shared", "configuration::api", "task::api",
+                "shared", "configuration::api", "task::api", "workorder::api",
+                "identity::api", "authorization::api",
                 "reliability::api", "reliability::spi"
         }
 )
