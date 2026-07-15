@@ -28,7 +28,13 @@ interface ReviewCaseMapper {
             @Param("tenantId") String tenantId, @Param("reviewCaseId") String reviewCaseId);
 
     String findActiveCaseIdBySnapshot(
-            @Param("tenantId") String tenantId, @Param("snapshotId") String snapshotId);
+            @Param("tenantId") String tenantId,
+            @Param("snapshotId") String snapshotId,
+            @Param("origin") String origin);
+
+    String findClientCaseIdByExternalSubmissionRef(
+            @Param("tenantId") String tenantId,
+            @Param("externalSubmissionRef") String externalSubmissionRef);
 
     List<Map<String, Object>> listDecisions(
             @Param("tenantId") String tenantId, @Param("reviewCaseId") String reviewCaseId);

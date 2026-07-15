@@ -1,0 +1,25 @@
+{
+  "eventId": "55000000-0000-4000-8000-000000000001",
+  "eventType": "evidence.client-review-case-created",
+  "schemaVersion": 1,
+  "tenantId": "tenant-m55",
+  "correlationId": "corr-m55",
+  "causationId": "idem-m55",
+  "aggregateType": "ReviewCase",
+  "aggregateId": "55000000-0000-4000-8000-000000000002",
+  "aggregateVersion": 1,
+  "occurredAt": "2026-07-15T12:00:00Z",
+  "payload": {
+    "reviewCaseId": "55000000-0000-4000-8000-000000000002",
+    "sourceReviewCaseId": "55000000-0000-4000-8000-000000000003",
+    "evidenceSetSnapshotId": "55000000-0000-4000-8000-000000000004",
+    "taskId": "55000000-0000-4000-8000-000000000005",
+    "projectId": "55000000-0000-4000-8000-000000000006",
+    "snapshotContentDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "externalSubmissionRef": "BYD-SUBMISSION-55",
+    "callbackBatchRef": "BYD-CALLBACK-BATCH-55",
+    "mappingVersionId": "BYD-MAPPING-55",
+    "policyVersion": "CLIENT-REVIEW-POLICY-55",
+    "createdAt": "2026-07-15T12:00:00Z"
+  }
+}

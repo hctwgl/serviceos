@@ -34,3 +34,6 @@ status: Implemented
 M54 没有数据库结构变化，因此不新增 Flyway；PostgreSQL 18 Testcontainers 仍用于证明不可变
 SnapshotMember 权威读取与事务无副作用。完整 Connector 入站、CLIENT Case 自动创建、外部批次权威
 登记和其他 targetType 不属于本矩阵。
+
+M55 后本矩阵场景先创建具备冻结 lineage 的 CLIENT Case；这不会改变 M54 的 target 校验语义，
+只增加回执进入 M54 校验前的 origin、批次和 mapping 门禁。

@@ -56,8 +56,9 @@ class ReviewCaseControllerSecurityTest {
         when(principals.current()).thenReturn(principal);
         when(reviews.create(eq(principal), any(), any())).thenReturn(new ReviewCaseView(
                 CASE_ID, PROJECT, TASK, SNAPSHOT, "a".repeat(64),
-                "EVIDENCE_SET_SNAPSHOT", "REVIEW_POLICY_V1", "OPEN", "reviewer-1",
-                Instant.parse("2026-07-14T14:00:00Z"), null, null, null, List.of()));
+                "EVIDENCE_SET_SNAPSHOT", "INTERNAL", "REVIEW_POLICY_V1", "OPEN", "reviewer-1",
+                Instant.parse("2026-07-14T14:00:00Z"), null,
+                null, null, null, null, null, null, List.of()));
 
         mvc.perform(post("/api/v1/review-cases")
                         .with(jwt().jwt(token -> token.subject("reviewer-1")
@@ -71,6 +72,19 @@ class ReviewCaseControllerSecurityTest {
                 .andExpect(jsonPath("$.status").value("OPEN"));
 
         verify(reviews).create(eq(principal), any(), any());
+    }
+
+    @Test
+    void anonymousClientReviewCreateIsRejected() throws Exception {
+        mvc.perform(post("/api/v1/internal/client-review-cases")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("Idempotency-Key", "idem-client")
+                        .content("""
+                                {"sourceReviewCaseId":"%s","externalSubmissionRef":"SUB-1",
+                                 "callbackBatchRef":"BATCH-1","mappingVersionId":"MAP-1",
+                                 "policyVersion":"CLIENT-POLICY-1"}
+                                """.formatted(CASE_ID)))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

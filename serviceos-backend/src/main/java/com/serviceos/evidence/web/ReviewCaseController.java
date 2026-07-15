@@ -1,6 +1,7 @@
 package com.serviceos.evidence.web;
 
 import com.serviceos.evidence.api.CreateReviewCaseCommand;
+import com.serviceos.evidence.api.CreateClientReviewCaseCommand;
 import com.serviceos.evidence.api.DecideReviewCaseCommand;
 import com.serviceos.evidence.api.ForceApproveReviewCaseCommand;
 import com.serviceos.evidence.api.ReopenReviewCaseCommand;
@@ -47,6 +48,24 @@ final class ReviewCaseController {
                 principals.current(),
                 new CommandMetadata(correlationId, idempotencyKey),
                 new CreateReviewCaseCommand(request.evidenceSetSnapshotId(), request.policyVersion()));
+        return ResponseEntity
+                .created(URI.create("/api/v1/review-cases/" + reviewCase.reviewCaseId()))
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(response(reviewCase));
+    }
+
+    @PostMapping("/internal/client-review-cases")
+    ResponseEntity<ReviewCaseResponse> createClient(
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestBody CreateClientReviewCaseRequest request
+    ) {
+        ReviewCaseView reviewCase = reviews.createClient(
+                principals.current(),
+                new CommandMetadata(correlationId, idempotencyKey),
+                new CreateClientReviewCaseCommand(
+                        request.sourceReviewCaseId(), request.externalSubmissionRef(),
+                        request.callbackBatchRef(), request.mappingVersionId(), request.policyVersion()));
         return ResponseEntity
                 .created(URI.create("/api/v1/review-cases/" + reviewCase.reviewCaseId()))
                 .header(CorrelationIds.HEADER_NAME, correlationId)
@@ -111,8 +130,10 @@ final class ReviewCaseController {
         return new ReviewCaseResponse(
                 reviewCase.reviewCaseId(), reviewCase.projectId(), reviewCase.taskId(),
                 reviewCase.evidenceSetSnapshotId(), reviewCase.snapshotContentDigest(),
-                reviewCase.scopeType(), reviewCase.policyVersion(), reviewCase.status(),
+                reviewCase.scopeType(), reviewCase.origin(), reviewCase.policyVersion(), reviewCase.status(),
                 reviewCase.createdBy(), reviewCase.createdAt(), reviewCase.decidedAt(),
+                reviewCase.sourceReviewCaseId(), reviewCase.externalSubmissionRef(),
+                reviewCase.callbackBatchRef(), reviewCase.mappingVersionId(),
                 reviewCase.reopenedFromReviewCaseId(), reviewCase.reopenTriggerRef(),
                 reviewCase.decisions().stream().map(this::decision).toList());
     }
@@ -125,6 +146,15 @@ final class ReviewCaseController {
     }
 
     record CreateReviewCaseRequest(UUID evidenceSetSnapshotId, String policyVersion) {
+    }
+
+    record CreateClientReviewCaseRequest(
+            UUID sourceReviewCaseId,
+            String externalSubmissionRef,
+            String callbackBatchRef,
+            String mappingVersionId,
+            String policyVersion
+    ) {
     }
 
     record DecideReviewCaseRequest(String decision, List<String> reasonCodes, String note) {
@@ -143,11 +173,16 @@ final class ReviewCaseController {
             UUID evidenceSetSnapshotId,
             String snapshotContentDigest,
             String scopeType,
+            String origin,
             String policyVersion,
             String status,
             String createdBy,
             Instant createdAt,
             Instant decidedAt,
+            UUID sourceReviewCaseId,
+            String externalSubmissionRef,
+            String callbackBatchRef,
+            String mappingVersionId,
             UUID reopenedFromReviewCaseId,
             String reopenTriggerRef,
             List<ReviewDecisionResponse> decisions

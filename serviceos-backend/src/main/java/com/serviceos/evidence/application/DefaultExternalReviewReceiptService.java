@@ -98,12 +98,21 @@ final class DefaultExternalReviewReceiptService implements ExternalReviewReceipt
                 AuthorizationRequest.projectCapability(CAPABILITY, principal.tenantId(), "ReviewCase",
                         current.reviewCaseId().toString(), current.projectId().toString()),
                 metadata.correlationId());
+        if (!"CLIENT".equals(current.origin())) {
+            throw new BusinessProblem(ProblemCode.REVIEW_CASE_STATE_CONFLICT,
+                    "ExternalReviewReceipt requires a CLIENT ReviewCase");
+        }
 
         String inboundEnvelopeId = requireText(command.inboundEnvelopeId(), "inboundEnvelopeId", 160);
         String canonicalMessageId = requireText(command.canonicalMessageId(), "canonicalMessageId", 160);
         String externalKey = requireText(command.externalKey(), "externalKey", 160);
         String callbackBatchRef = requireText(command.callbackBatchRef(), "callbackBatchRef", 160);
         String mappingVersionId = requireText(command.mappingVersionId(), "mappingVersionId", 160);
+        if (!callbackBatchRef.equals(current.callbackBatchRef())
+                || !mappingVersionId.equals(current.mappingVersionId())) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                    "ExternalReviewReceipt batch and mapping version must match the CLIENT ReviewCase");
+        }
         String result = normalizeResult(command.result());
         List<String> reasonCodes = normalizeReasons(command.reasonCodes(), result);
         List<ExternalReviewAffectedTarget> targets = validateTargets(

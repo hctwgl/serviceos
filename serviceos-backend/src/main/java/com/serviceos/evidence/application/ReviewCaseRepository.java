@@ -25,7 +25,9 @@ public interface ReviewCaseRepository {
 
     Optional<ReviewCaseView> find(String tenantId, UUID reviewCaseId);
 
-    Optional<UUID> findActiveBySnapshot(String tenantId, UUID snapshotId);
+    Optional<UUID> findActiveBySnapshot(String tenantId, UUID snapshotId, String origin);
+
+    Optional<UUID> findClientByExternalSubmissionRef(String tenantId, String externalSubmissionRef);
 
     Optional<UUID> findCommandResult(String tenantId, String operationType, String idempotencyKey);
 

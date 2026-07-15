@@ -9,6 +9,9 @@ import java.util.UUID;
 public interface ReviewCaseService {
     ReviewCaseView create(CurrentPrincipal principal, CommandMetadata metadata, CreateReviewCaseCommand command);
 
+    ReviewCaseView createClient(
+            CurrentPrincipal principal, CommandMetadata metadata, CreateClientReviewCaseCommand command);
+
     ReviewCaseView decide(CurrentPrincipal principal, CommandMetadata metadata, DecideReviewCaseCommand command);
 
     ReviewCaseView forceApprove(

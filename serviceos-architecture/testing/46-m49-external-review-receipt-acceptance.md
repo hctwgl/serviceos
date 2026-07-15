@@ -15,3 +15,4 @@ status: Implemented
 | M49-SEC-001 | P0 | 匿名调用 401 | `ExternalReviewReceiptControllerSecurityTest` |
 
 M49 只证明最小回执链路；`affectedTargets` 权威 SnapshotMember 校验见 M54 验收矩阵。
+CLIENT ReviewCase 来源、外部提交 lineage 及回执批次/mapping 冻结匹配见 M55 验收矩阵。

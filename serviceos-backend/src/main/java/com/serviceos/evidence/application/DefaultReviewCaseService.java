@@ -6,6 +6,7 @@ import com.serviceos.authorization.api.AuthorizationDecision;
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.evidence.api.CorrectionCaseService;
+import com.serviceos.evidence.api.CreateClientReviewCaseCommand;
 import com.serviceos.evidence.api.CreateReviewCaseCommand;
 import com.serviceos.evidence.api.DecideReviewCaseCommand;
 import com.serviceos.evidence.api.EvidenceSetSnapshotView;
@@ -40,10 +41,12 @@ import java.util.UUID;
 @Service
 final class DefaultReviewCaseService implements ReviewCaseService {
     private static final String REVIEW = "evidence.review";
+    private static final String CREATE_CLIENT = "evidence.createClientReviewCase";
     private static final String FORCE_APPROVE = "evidence.forceApprove";
     private static final String REOPEN = "review.reopen";
     private static final String READ = "evidence.read";
     private static final String CREATE_OPERATION = "evidence.review.create";
+    private static final String CREATE_CLIENT_OPERATION = "evidence.review.createClient";
     private static final String DECIDE_OPERATION = "evidence.review.decide";
     private static final String FORCE_OPERATION = "evidence.review.forceApprove";
     private static final String REOPEN_OPERATION = "evidence.review.reopen";
@@ -111,7 +114,8 @@ final class DefaultReviewCaseService implements ReviewCaseService {
                     .orElseThrow(() -> new BusinessProblem(
                             ProblemCode.INTERNAL_ERROR, "ReviewCase replay result missing"));
         }
-        if (reviews.findActiveBySnapshot(principal.tenantId(), snapshot.evidenceSetSnapshotId()).isPresent()) {
+        if (reviews.findActiveBySnapshot(
+                principal.tenantId(), snapshot.evidenceSetSnapshotId(), "INTERNAL").isPresent()) {
             throw new BusinessProblem(ProblemCode.REVIEW_CASE_CONFLICT,
                     "A ReviewCase already exists for this EvidenceSetSnapshot");
         }
@@ -121,8 +125,10 @@ final class DefaultReviewCaseService implements ReviewCaseService {
         ReviewCaseView created = new ReviewCaseView(
                 reviewCaseId, snapshot.projectId(), snapshot.taskId(),
                 snapshot.evidenceSetSnapshotId(), snapshot.contentDigest(),
-                "EVIDENCE_SET_SNAPSHOT", policyVersion, "OPEN",
-                principal.principalId(), now, null, null, null, List.of());
+                "EVIDENCE_SET_SNAPSHOT", "INTERNAL", policyVersion, "OPEN",
+                principal.principalId(), now, null,
+                null, null, null, null,
+                null, null, List.of());
         try {
             reviews.insertCase(principal.tenantId(), created);
         } catch (DuplicateKeyException exception) {
@@ -151,6 +157,107 @@ final class DefaultReviewCaseService implements ReviewCaseService {
 
     @Override
     @Transactional
+    public ReviewCaseView createClient(
+            CurrentPrincipal principal, CommandMetadata metadata, CreateClientReviewCaseCommand command
+    ) {
+        if (principal.principalType() != CurrentPrincipal.PrincipalType.SERVICE) {
+            throw new BusinessProblem(
+                    ProblemCode.ACCESS_DENIED, "CLIENT ReviewCase requires a SERVICE principal");
+        }
+        if (command.sourceReviewCaseId() == null) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, "sourceReviewCaseId is required");
+        }
+        ReviewCaseView source = reviews.find(principal.tenantId(), command.sourceReviewCaseId())
+                .orElseThrow(() -> new BusinessProblem(
+                        ProblemCode.RESOURCE_NOT_FOUND, "Source ReviewCase does not exist"));
+        AuthorizationDecision auth = authorization.require(principal,
+                AuthorizationRequest.projectCapability(
+                        CREATE_CLIENT, principal.tenantId(), "ReviewCase",
+                        source.reviewCaseId().toString(), source.projectId().toString()),
+                metadata.correlationId());
+        if (!"INTERNAL".equals(source.origin())) {
+            throw new BusinessProblem(ProblemCode.REVIEW_CASE_STATE_CONFLICT,
+                    "CLIENT ReviewCase source must be INTERNAL");
+        }
+        if (!"APPROVED".equals(source.status()) && !"FORCE_APPROVED".equals(source.status())) {
+            throw new BusinessProblem(ProblemCode.REVIEW_CASE_STATE_CONFLICT,
+                    "CLIENT ReviewCase source must be APPROVED or FORCE_APPROVED");
+        }
+
+        String externalSubmissionRef = normalizeRequiredText(
+                command.externalSubmissionRef(), "externalSubmissionRef", 160);
+        String callbackBatchRef = normalizeRequiredText(
+                command.callbackBatchRef(), "callbackBatchRef", 160);
+        String mappingVersionId = normalizeRequiredText(
+                command.mappingVersionId(), "mappingVersionId", 160);
+        String policyVersion = normalizeRequiredText(command.policyVersion(), "policyVersion", 80);
+        String requestDigest = Sha256.digest(
+                source.reviewCaseId() + "|" + source.evidenceSetSnapshotId() + "|"
+                        + source.snapshotContentDigest() + "|" + externalSubmissionRef + "|"
+                        + callbackBatchRef + "|" + mappingVersionId + "|" + policyVersion);
+        CommandContext context = new CommandContext(
+                principal.tenantId(), principal.principalId(),
+                metadata.correlationId(), metadata.idempotencyKey());
+        IdempotencyDecision decision = idempotency.begin(context, CREATE_CLIENT_OPERATION, requestDigest);
+        if (decision.kind() == IdempotencyDecision.Kind.REPLAY) {
+            return reviews.findCommandResult(
+                            context.tenantId(), CREATE_CLIENT_OPERATION, context.idempotencyKey())
+                    .flatMap(id -> reviews.find(context.tenantId(), id))
+                    .orElseThrow(() -> new BusinessProblem(
+                            ProblemCode.INTERNAL_ERROR, "CLIENT ReviewCase replay result missing"));
+        }
+        if (reviews.findClientByExternalSubmissionRef(
+                principal.tenantId(), externalSubmissionRef).isPresent()) {
+            throw new BusinessProblem(ProblemCode.REVIEW_CASE_CONFLICT,
+                    "externalSubmissionRef already belongs to a CLIENT ReviewCase");
+        }
+        if (reviews.findActiveBySnapshot(
+                principal.tenantId(), source.evidenceSetSnapshotId(), "CLIENT").isPresent()) {
+            throw new BusinessProblem(ProblemCode.REVIEW_CASE_CONFLICT,
+                    "A CLIENT ReviewCase already exists for this EvidenceSetSnapshot");
+        }
+
+        Instant now = clock.instant();
+        UUID reviewCaseId = UUID.randomUUID();
+        ReviewCaseView created = new ReviewCaseView(
+                reviewCaseId, source.projectId(), source.taskId(),
+                source.evidenceSetSnapshotId(), source.snapshotContentDigest(),
+                source.scopeType(), "CLIENT", policyVersion, "OPEN",
+                principal.principalId(), now, null,
+                source.reviewCaseId(), externalSubmissionRef, callbackBatchRef, mappingVersionId,
+                null, null, List.of());
+        // CLIENT 来源、幂等结果、审计和 Outbox 必须同事务落库；否则外部回执可能命中一个
+        // 无法证明已完成车企提交的孤立 Case，或消费方收到尚不可查询的来源事实。
+        try {
+            reviews.insertCase(principal.tenantId(), created);
+        } catch (DuplicateKeyException exception) {
+            throw new BusinessProblem(ProblemCode.REVIEW_CASE_CONFLICT,
+                    "CLIENT ReviewCase already exists for this submission or Snapshot");
+        }
+        reviews.saveCommandResult(
+                principal.tenantId(), CREATE_CLIENT_OPERATION, context.idempotencyKey(), reviewCaseId);
+
+        String payload = serialize(new ClientReviewCaseCreatedPayload(
+                reviewCaseId, source.reviewCaseId(), source.evidenceSetSnapshotId(), source.taskId(),
+                source.projectId(), source.snapshotContentDigest(), externalSubmissionRef,
+                callbackBatchRef, mappingVersionId, policyVersion, now));
+        outbox.append(new OutboxEvent(
+                UUID.randomUUID(), UUID.randomUUID(), "evidence", "evidence.client-review-case-created", 1,
+                "ReviewCase", reviewCaseId.toString(), 1L,
+                principal.tenantId(), metadata.correlationId(), metadata.idempotencyKey(),
+                source.taskId().toString(), payload, Sha256.digest(payload), now));
+        audit.append(new AuditEntry(
+                UUID.randomUUID(), principal.tenantId(), principal.principalId(),
+                "CLIENT_REVIEW_CASE_CREATED", CREATE_CLIENT, "ReviewCase", reviewCaseId.toString(),
+                "ALLOW", auth.matchedGrantIds(), auth.policyVersion(), "OPEN", null,
+                requestDigest, metadata.correlationId(), now));
+        idempotency.complete(context, CREATE_CLIENT_OPERATION, reviewCaseId.toString(),
+                Sha256.digest(serialize(created)));
+        return created;
+    }
+
+    @Override
+    @Transactional
     public ReviewCaseView decide(
             CurrentPrincipal principal, CommandMetadata metadata, DecideReviewCaseCommand command
     ) {
@@ -161,6 +268,10 @@ final class DefaultReviewCaseService implements ReviewCaseService {
                 AuthorizationRequest.projectCapability(REVIEW, principal.tenantId(), "ReviewCase",
                         current.reviewCaseId().toString(), current.projectId().toString()),
                 metadata.correlationId());
+        if (!"INTERNAL".equals(current.origin())) {
+            throw new BusinessProblem(ProblemCode.REVIEW_CASE_STATE_CONFLICT,
+                    "CLIENT ReviewCase can only be decided by an external receipt");
+        }
         String decision = normalizeDecision(command.decision());
         List<String> reasonCodes = normalizeReasons(command.reasonCodes(), decision);
         String note = normalizeNote(command.note());
@@ -238,6 +349,10 @@ final class DefaultReviewCaseService implements ReviewCaseService {
                 AuthorizationRequest.projectCapability(FORCE_APPROVE, principal.tenantId(), "ReviewCase",
                         current.reviewCaseId().toString(), current.projectId().toString()),
                 metadata.correlationId());
+        if (!"INTERNAL".equals(current.origin())) {
+            throw new BusinessProblem(ProblemCode.REVIEW_CASE_STATE_CONFLICT,
+                    "CLIENT ReviewCase cannot be force-approved internally");
+        }
         List<String> reasonCodes = normalizeReasons(command.reasonCodes(), "FORCE_APPROVED");
         String approvalRef = normalizeApprovalRef(command.approvalRef());
         String note = normalizeNote(command.note());
@@ -308,6 +423,10 @@ final class DefaultReviewCaseService implements ReviewCaseService {
                 AuthorizationRequest.projectCapability(REOPEN, principal.tenantId(), "ReviewCase",
                         current.reviewCaseId().toString(), current.projectId().toString()),
                 metadata.correlationId());
+        if (!"INTERNAL".equals(current.origin())) {
+            throw new BusinessProblem(ProblemCode.REVIEW_CASE_STATE_CONFLICT,
+                    "CLIENT ReviewCase cannot be reopened by the internal review command");
+        }
         String reason = normalizeRequiredText(command.reason(), "reason", 1000);
         String triggerRef = normalizeRequiredText(command.triggerRef(), "triggerRef", 160);
         String approvalRef = command.approvalRef() == null || command.approvalRef().isBlank()
@@ -342,8 +461,11 @@ final class DefaultReviewCaseService implements ReviewCaseService {
         ReviewCaseView created = new ReviewCaseView(
                 newCaseId, current.projectId(), current.taskId(),
                 current.evidenceSetSnapshotId(), current.snapshotContentDigest(),
-                current.scopeType(), current.policyVersion(), "OPEN",
-                principal.principalId(), now, null, current.reviewCaseId(), triggerRef, List.of());
+                current.scopeType(), current.origin(), current.policyVersion(), "OPEN",
+                principal.principalId(), now, null,
+                current.sourceReviewCaseId(), current.externalSubmissionRef(),
+                current.callbackBatchRef(), current.mappingVersionId(),
+                current.reviewCaseId(), triggerRef, List.of());
         try {
             reviews.insertCase(principal.tenantId(), created);
         } catch (DuplicateKeyException exception) {
@@ -470,6 +592,21 @@ final class DefaultReviewCaseService implements ReviewCaseService {
             UUID taskId,
             UUID projectId,
             String snapshotContentDigest,
+            String policyVersion,
+            Instant createdAt
+    ) {
+    }
+
+    private record ClientReviewCaseCreatedPayload(
+            UUID reviewCaseId,
+            UUID sourceReviewCaseId,
+            UUID evidenceSetSnapshotId,
+            UUID taskId,
+            UUID projectId,
+            String snapshotContentDigest,
+            String externalSubmissionRef,
+            String callbackBatchRef,
+            String mappingVersionId,
             String policyVersion,
             Instant createdAt
     ) {

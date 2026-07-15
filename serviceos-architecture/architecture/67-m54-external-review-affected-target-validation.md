@@ -56,8 +56,8 @@ M54 不新增 Flyway。权威关系已由以下不可变数据提供：
 ## 6. 明确未实现
 
 - 完整车企 Connector 验签与标准化入站表；
-- CLIENT origin ReviewCase 自动创建；
-- callbackBatchRef / mappingVersionId 的外部权威登记与批次校验；
+- CLIENT origin ReviewCase 显式登记和 Case 冻结批次/mapping 匹配已由 M55 实现；交付成功事件自动
+  创建与 integration 域外部权威登记仍未实现；
 - 字段、FormSubmission、报告等其他 targetType；
 - 外部驳回到 CorrectionCase 的自动映射；
 - OCR/CV、GPS 权威距离、多候选人评分与自动 claim。

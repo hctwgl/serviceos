@@ -129,6 +129,7 @@ UploadSession 返回受限上传地址、允许分片、过期时间和最大字
 | `POST /review-cases/{id}:decide` | DecideReview | targetDecisions、note? | 200 |
 | `POST /review-cases/{id}:force-approve` | ForceApprove | reason、approvalRef | 200 |
 | `POST /review-cases/{id}:reopen` | ReopenReview | reason、triggerRef、approvalRef? | 201 |
+| `POST /internal/client-review-cases` | 登记已回传车企并创建 CLIENT ReviewCase（仅适配层服务主体） | sourceReviewCaseId、externalSubmissionRef、callbackBatchRef、mappingVersionId、policyVersion | 201 |
 | `GET /correction-cases/{id}` | 整改项与轮次 | — | 200 |
 | `POST /correction-cases/{id}:resubmit` | ResubmitCorrection | correctedTargetRefs | 200 |
 | `POST /internal/external-review-receipts` | RecordExternalReviewReceipt（仅适配层服务主体） | inboundEnvelopeId、canonicalMessageId、reviewCaseRef、externalKey、callbackBatchRef、mappingVersionId、result、affectedTargets、payloadRef | 200 |
@@ -178,7 +179,7 @@ UploadSession 返回受限上传地址、允许分片、过期时间和最大字
 }
 ```
 
-该端点不对车企或普通用户开放。车企请求必须先经过 Connector 的验签、原文留存、入站幂等和 CanonicalMessage 映射；适配层使用服务主体调用，并强制关联 inboundEnvelopeId/canonicalMessageId。适配器校验回传批次、映射版本和受影响对象确实属于该 ReviewCase；随后追加 ReviewDecision 并触发客服协调，不直接修改师傅 Task。
+该端点不对车企或普通用户开放。车企请求必须先经过 Connector 的验签、原文留存、入站幂等和 CanonicalMessage 映射；适配层使用服务主体调用，并强制关联 inboundEnvelopeId/canonicalMessageId。M55 起，回执只接受 CLIENT ReviewCase，且 callbackBatchRef、mappingVersionId 必须精确匹配 Case 冻结值；M54 继续校验受影响对象属于冻结 Snapshot。随后追加 ReviewDecision 并触发客服协调，不直接修改师傅 Task。
 
 ## 6. 移动工作包与离线同步
 

@@ -37,11 +37,17 @@ final class MyBatisReviewCaseRepository implements ReviewCaseRepository {
         values.put("evidenceSetSnapshotId", reviewCase.evidenceSetSnapshotId().toString());
         values.put("snapshotContentDigest", reviewCase.snapshotContentDigest());
         values.put("scopeType", reviewCase.scopeType());
+        values.put("origin", reviewCase.origin());
         values.put("policyVersion", reviewCase.policyVersion());
         values.put("status", reviewCase.status());
         values.put("createdBy", reviewCase.createdBy());
         values.put("createdAt", reviewCase.createdAt());
         values.put("decidedAt", reviewCase.decidedAt());
+        values.put("sourceReviewCaseId", reviewCase.sourceReviewCaseId() == null
+                ? null : reviewCase.sourceReviewCaseId().toString());
+        values.put("externalSubmissionRef", reviewCase.externalSubmissionRef());
+        values.put("callbackBatchRef", reviewCase.callbackBatchRef());
+        values.put("mappingVersionId", reviewCase.mappingVersionId());
         values.put("reopenedFromReviewCaseId", reviewCase.reopenedFromReviewCaseId() == null
                 ? null : reviewCase.reopenedFromReviewCaseId().toString());
         values.put("reopenTriggerRef", reviewCase.reopenTriggerRef());
@@ -91,8 +97,14 @@ final class MyBatisReviewCaseRepository implements ReviewCaseRepository {
     }
 
     @Override
-    public Optional<UUID> findActiveBySnapshot(String tenantId, UUID snapshotId) {
-        String id = mapper.findActiveCaseIdBySnapshot(tenantId, snapshotId.toString());
+    public Optional<UUID> findActiveBySnapshot(String tenantId, UUID snapshotId, String origin) {
+        String id = mapper.findActiveCaseIdBySnapshot(tenantId, snapshotId.toString(), origin);
+        return id == null ? Optional.empty() : Optional.of(UUID.fromString(id));
+    }
+
+    @Override
+    public Optional<UUID> findClientByExternalSubmissionRef(String tenantId, String externalSubmissionRef) {
+        String id = mapper.findClientCaseIdByExternalSubmissionRef(tenantId, externalSubmissionRef);
         return id == null ? Optional.empty() : Optional.of(UUID.fromString(id));
     }
 
@@ -122,9 +134,13 @@ final class MyBatisReviewCaseRepository implements ReviewCaseRepository {
         return new ReviewCaseView(
                 uuid(row, "reviewCaseId"), uuid(row, "projectId"), uuid(row, "taskId"),
                 uuid(row, "evidenceSetSnapshotId"), text(row, "snapshotContentDigest"),
-                text(row, "scopeType"), text(row, "policyVersion"), text(row, "status"),
+                text(row, "scopeType"), text(row, "origin"), text(row, "policyVersion"), text(row, "status"),
                 text(row, "createdBy"), instant(row.get("createdAt")),
                 row.get("decidedAt") == null ? null : instant(row.get("decidedAt")),
+                nullableUuid(row, "sourceReviewCaseId"),
+                nullableText(row, "externalSubmissionRef"),
+                nullableText(row, "callbackBatchRef"),
+                nullableText(row, "mappingVersionId"),
                 row.get("reopenedFromReviewCaseId") == null ? null : uuid(row, "reopenedFromReviewCaseId"),
                 row.get("reopenTriggerRef") == null ? null : text(row, "reopenTriggerRef"),
                 decisions);
@@ -161,6 +177,14 @@ final class MyBatisReviewCaseRepository implements ReviewCaseRepository {
     private static UUID uuid(Map<String, Object> row, String key) {
         Object value = row.get(key);
         return value instanceof UUID id ? id : UUID.fromString(value.toString());
+    }
+
+    private static UUID nullableUuid(Map<String, Object> row, String key) {
+        return row.get(key) == null ? null : uuid(row, key);
+    }
+
+    private static String nullableText(Map<String, Object> row, String key) {
+        return row.get(key) == null ? null : text(row, key);
     }
 
     private static String text(Map<String, Object> row, String key) {

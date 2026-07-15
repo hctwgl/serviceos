@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.27.0
+  version: 0.28.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -801,7 +801,8 @@ paths:
       summary: 适配层记录车企外部审核回执
       description: |
         仅 SERVICE 主体；需要 evidence.recordExternalReceipt。
-        对 OPEN ReviewCase 追加 EXTERNAL ReviewDecision；REJECTED 创建客服协调 Task。
+        只接受 OPEN CLIENT ReviewCase，且批次和映射版本必须命中该案例冻结值。
+        追加 EXTERNAL ReviewDecision；REJECTED 创建客服协调 Task。
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/CorrelationId'
@@ -818,6 +819,37 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ExternalReviewReceipt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+
+  /internal/client-review-cases:
+    post:
+      operationId: createClientReviewCase
+      summary: 登记已回传车企并创建 CLIENT ReviewCase
+      description: |
+        仅 SERVICE 主体；需要 evidence.createClientReviewCase。
+        sourceReviewCaseId 必须指向已 APPROVED/FORCE_APPROVED 的 INTERNAL ReviewCase。
+        同事务冻结 Snapshot、外部提交引用、回执批次和映射版本；不代表 Connector 已实现。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateClientReviewCaseRequest' }
+      responses:
+        '201':
+          description: 创建成功或幂等重放
+          headers:
+            Location: { schema: { type: string } }
+            X-Correlation-Id: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReviewCase' }
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
@@ -1886,6 +1918,17 @@ components:
       properties:
         evidenceSetSnapshotId: { type: string, format: uuid }
         policyVersion: { type: [string, 'null'], maxLength: 80 }
+    CreateClientReviewCaseRequest:
+      type: object
+      additionalProperties: false
+      required: [sourceReviewCaseId, externalSubmissionRef, callbackBatchRef,
+                 mappingVersionId, policyVersion]
+      properties:
+        sourceReviewCaseId: { type: string, format: uuid }
+        externalSubmissionRef: { type: string, minLength: 1, maxLength: 160 }
+        callbackBatchRef: { type: string, minLength: 1, maxLength: 160 }
+        mappingVersionId: { type: string, minLength: 1, maxLength: 160 }
+        policyVersion: { type: string, minLength: 1, maxLength: 80 }
     DecideReviewCaseRequest:
       type: object
       additionalProperties: false
@@ -2081,7 +2124,7 @@ components:
       type: object
       additionalProperties: false
       required: [reviewCaseId, projectId, taskId, evidenceSetSnapshotId, snapshotContentDigest,
-                 scopeType, policyVersion, status, createdBy, createdAt, decisions]
+                 scopeType, origin, policyVersion, status, createdBy, createdAt, decisions]
       properties:
         reviewCaseId: { type: string, format: uuid }
         projectId: { type: string, format: uuid }
@@ -2089,11 +2132,16 @@ components:
         evidenceSetSnapshotId: { type: string, format: uuid }
         snapshotContentDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
         scopeType: { enum: [EVIDENCE_SET_SNAPSHOT] }
+        origin: { enum: [INTERNAL, CLIENT] }
         policyVersion: { type: string, minLength: 1, maxLength: 80 }
         status: { enum: [OPEN, APPROVED, REJECTED, FORCE_APPROVED, REOPENED] }
         createdBy: { type: string, minLength: 1, maxLength: 128 }
         createdAt: { type: string, format: date-time }
         decidedAt: { type: [string, 'null'], format: date-time }
+        sourceReviewCaseId: { type: [string, 'null'], format: uuid }
+        externalSubmissionRef: { type: [string, 'null'], maxLength: 160 }
+        callbackBatchRef: { type: [string, 'null'], maxLength: 160 }
+        mappingVersionId: { type: [string, 'null'], maxLength: 160 }
         reopenedFromReviewCaseId: { type: [string, 'null'], format: uuid }
         reopenTriggerRef: { type: [string, 'null'], maxLength: 160 }
         decisions:

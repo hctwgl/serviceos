@@ -17,5 +17,6 @@ status: Implemented
 
 ## 2. 未实现
 
-完整车企 Connector 验签/入站表、CLIENT origin ReviewCase 自动创建、回传批次权威校验、二级审批。
+完整车企 Connector 验签/入站表、交付成功事件自动创建 CLIENT Case、integration 域批次权威登记、
+二级审批。CLIENT Case 显式登记和 Case 冻结批次/mapping 匹配已由 M55 实现。
 `affectedTargets` 强校验已由 M54 实现，条件槽位重解析已由 M52～M53 实现，`WAIVED` 见 M51。

@@ -8,6 +8,7 @@ import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
 import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
 import com.serviceos.evidence.api.BeginEvidenceUploadCommand;
 import com.serviceos.evidence.api.CreateEvidenceSetSnapshotCommand;
+import com.serviceos.evidence.api.CreateClientReviewCaseCommand;
 import com.serviceos.evidence.api.CreateReviewCaseCommand;
 import com.serviceos.evidence.api.DecideReviewCaseCommand;
 import com.serviceos.evidence.api.EvidenceCommandService;
@@ -135,7 +136,7 @@ class ReviewCasePostgresIT {
         grant(TECHNICIAN, "evidence.submit", "evidence.read", "file.upload", "file.download");
         grant(REVIEWER, "evidence.review", "evidence.read");
         grant(FORCE_ADMIN, "evidence.forceApprove", "review.reopen", "evidence.read", "evidence.review");
-        grant(ADAPTER, "evidence.recordExternalReceipt", "evidence.read");
+        grant(ADAPTER, "evidence.createClientReviewCase", "evidence.recordExternalReceipt", "evidence.read");
         seedResolvedSlot();
     }
 
@@ -321,12 +322,107 @@ class ReviewCasePostgresIT {
                 .query(Long.class).single()).isOne();
     }
 
+    @Test
+    void createsClientCaseOnlyFromApprovedInternalCaseAndFreezesExternalLineage() throws Exception {
+        EvidenceSetSnapshotView snapshot = createSnapshot("client-origin");
+        ReviewCaseView source = reviews.create(reviewer(), metadata("create-client-source"),
+                new CreateReviewCaseCommand(snapshot.evidenceSetSnapshotId(), null));
+        CreateClientReviewCaseCommand command = new CreateClientReviewCaseCommand(
+                source.reviewCaseId(), "SUBMISSION-55", "BATCH-55", "MAP-55", "CLIENT-POLICY-55");
+
+        assertThatThrownBy(() -> reviews.createClient(reviewer(), metadata("client-user"), command))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.ACCESS_DENIED));
+        assertThatThrownBy(() -> reviews.createClient(adapter(), metadata("client-before-approval"), command))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.REVIEW_CASE_STATE_CONFLICT));
+
+        ReviewCaseView approved = reviews.decide(reviewer(), metadata("approve-client-source"),
+                new DecideReviewCaseCommand(source.reviewCaseId(), "APPROVED", List.of(), "send to client"));
+        CurrentPrincipal ungrantedAdapter = new CurrentPrincipal(
+                "ungranted-adapter", TENANT, CurrentPrincipal.PrincipalType.SERVICE,
+                "ungranted-adapter", Set.of());
+        assertThatThrownBy(() -> reviews.createClient(
+                ungrantedAdapter, metadata("client-missing-capability"), command))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.ACCESS_DENIED));
+        ReviewCaseView client = reviews.createClient(adapter(), metadata("create-client"), command);
+        ReviewCaseView replay = reviews.createClient(adapter(), metadata("create-client"), command);
+
+        assertThat(replay.reviewCaseId()).isEqualTo(client.reviewCaseId());
+        assertThat(client.origin()).isEqualTo("CLIENT");
+        assertThat(client.sourceReviewCaseId()).isEqualTo(approved.reviewCaseId());
+        assertThat(client.evidenceSetSnapshotId()).isEqualTo(snapshot.evidenceSetSnapshotId());
+        assertThat(client.snapshotContentDigest()).isEqualTo(snapshot.contentDigest());
+        assertThat(client.externalSubmissionRef()).isEqualTo("SUBMISSION-55");
+        assertThat(client.callbackBatchRef()).isEqualTo("BATCH-55");
+        assertThat(client.mappingVersionId()).isEqualTo("MAP-55");
+        assertThat(client.policyVersion()).isEqualTo("CLIENT-POLICY-55");
+        assertThatThrownBy(() -> reviews.decide(reviewer(), metadata("client-internal-decision"),
+                new DecideReviewCaseCommand(client.reviewCaseId(), "APPROVED", List.of(), null)))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.REVIEW_CASE_STATE_CONFLICT));
+        assertThatThrownBy(() -> reviews.forceApprove(forceAdmin(), metadata("client-force-decision"),
+                new ForceApproveReviewCaseCommand(
+                        client.reviewCaseId(), List.of("CLIENT_OVERRIDE"), "APR-CLIENT", null)))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.REVIEW_CASE_STATE_CONFLICT));
+        assertThatThrownBy(() -> reviews.reopen(forceAdmin(), metadata("client-reopen"),
+                new ReopenReviewCaseCommand(
+                        client.reviewCaseId(), "invalid internal reopen", "CLIENT-REOPEN", null)))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.REVIEW_CASE_STATE_CONFLICT));
+        assertThatThrownBy(() -> reviews.createClient(adapter(), metadata("client-from-client"),
+                new CreateClientReviewCaseCommand(
+                        client.reviewCaseId(), "SUBMISSION-CLIENT", "BATCH-CLIENT",
+                        "MAP-CLIENT", "CLIENT-POLICY-55")))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.REVIEW_CASE_STATE_CONFLICT));
+        assertThatThrownBy(() -> reviews.createClient(adapter(), metadata("client-same-snapshot"),
+                new CreateClientReviewCaseCommand(
+                        approved.reviewCaseId(), "SUBMISSION-OTHER", "BATCH-OTHER",
+                        "MAP-OTHER", "CLIENT-POLICY-55")))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.REVIEW_CASE_CONFLICT));
+        assertThatThrownBy(() -> receipts.record(adapter(), metadata("receipt-for-internal"),
+                new RecordExternalReviewReceiptCommand(
+                        approved.reviewCaseId(), "ENV-INTERNAL", "CAN-INTERNAL", "EXT-INTERNAL",
+                        "BATCH-55", "MAP-55", "APPROVED", List.of(), List.of(), null)))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.REVIEW_CASE_STATE_CONFLICT));
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM rel_outbox_event
+                 WHERE event_type='evidence.client-review-case-created'
+                """).query(Long.class).single()).isOne();
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM aud_audit_record
+                 WHERE action_name='CLIENT_REVIEW_CASE_CREATED'
+                """).query(Long.class).single()).isOne();
+
+        assertThatThrownBy(() -> reviews.createClient(
+                adapter(), metadata("client-duplicate"), command))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.REVIEW_CASE_CONFLICT));
+
+        EvidenceSetSnapshotView rejectedSnapshot = createSnapshot("client-rejected-source");
+        ReviewCaseView rejectedSource = reviews.create(reviewer(), metadata("create-rejected-source"),
+                new CreateReviewCaseCommand(rejectedSnapshot.evidenceSetSnapshotId(), null));
+        ReviewCaseView rejected = reviews.decide(reviewer(), metadata("reject-client-source"),
+                new DecideReviewCaseCommand(
+                        rejectedSource.reviewCaseId(), "REJECTED", List.of("CLIENT.NOT_READY"), null));
+        assertThatThrownBy(() -> reviews.createClient(adapter(), metadata("client-from-rejected"),
+                new CreateClientReviewCaseCommand(
+                        rejected.reviewCaseId(), "SUBMISSION-REJECTED", "BATCH-REJECTED",
+                        "MAP-REJECTED", "CLIENT-POLICY-55")))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.REVIEW_CASE_STATE_CONFLICT));
+    }
+
 
     @Test
     void recordsExternalReceiptAndOpensCoordinationTaskOnReject() throws Exception {
         EvidenceSetSnapshotView snapshot = createSnapshot("ext-receipt");
-        ReviewCaseView created = reviews.create(reviewer(), metadata("create-ext"),
-                new CreateReviewCaseCommand(snapshot.evidenceSetSnapshotId(), null));
+        ReviewCaseView created = createClientCase(snapshot, "ext", "BATCH-1", "MAP-1");
 
         assertThatThrownBy(() -> receipts.record(reviewer(), metadata("ext-user"),
                 new RecordExternalReviewReceiptCommand(
@@ -377,12 +473,19 @@ class ReviewCasePostgresIT {
     void rejectsExternalTargetsOutsideAuthoritativeReviewSnapshotWithoutSideEffects() throws Exception {
         EvidenceSetSnapshotView authoritative = createSnapshot("ext-authoritative");
         EvidenceSetSnapshotView other = createSnapshot("ext-other");
-        ReviewCaseView created = reviews.create(reviewer(), metadata("create-ext-authoritative"),
-                new CreateReviewCaseCommand(authoritative.evidenceSetSnapshotId(), null));
+        ReviewCaseView created = createClientCase(
+                authoritative, "ext-authoritative", "BATCH-AUTH", "MAP-AUTH");
+
+        assertThatThrownBy(() -> receipts.record(adapter(), metadata("ext-wrong-batch"),
+                new RecordExternalReviewReceiptCommand(
+                        created.reviewCaseId(), "ENV-B", "CAN-B", "EXT-B", "BATCH-WRONG", "MAP-AUTH",
+                        "REJECTED", List.of("CLIENT.WRONG_BATCH"), List.of(target(authoritative)), null)))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
 
         assertThatThrownBy(() -> receipts.record(adapter(), metadata("ext-cross-snapshot"),
                 new RecordExternalReviewReceiptCommand(
-                        created.reviewCaseId(), "ENV-X", "CAN-X", "EXT-X", "BATCH-X", "MAP-X",
+                        created.reviewCaseId(), "ENV-X", "CAN-X", "EXT-X", "BATCH-AUTH", "MAP-AUTH",
                         "REJECTED", List.of("CLIENT.WRONG_TARGET"), List.of(target(other)), null)))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
@@ -392,14 +495,14 @@ class ReviewCasePostgresIT {
                 exact.targetType(), UUID.randomUUID(), exact.evidenceItemId(), exact.evidenceRevisionId());
         assertThatThrownBy(() -> receipts.record(adapter(), metadata("ext-mismatched-triple"),
                 new RecordExternalReviewReceiptCommand(
-                        created.reviewCaseId(), "ENV-Y", "CAN-Y", "EXT-Y", "BATCH-Y", "MAP-Y",
+                        created.reviewCaseId(), "ENV-Y", "CAN-Y", "EXT-Y", "BATCH-AUTH", "MAP-AUTH",
                         "REJECTED", List.of("CLIENT.WRONG_TARGET"), List.of(mismatchedSlot), null)))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
 
         assertThatThrownBy(() -> receipts.record(adapter(), metadata("ext-duplicate-target"),
                 new RecordExternalReviewReceiptCommand(
-                        created.reviewCaseId(), "ENV-Z", "CAN-Z", "EXT-Z", "BATCH-Z", "MAP-Z",
+                        created.reviewCaseId(), "ENV-Z", "CAN-Z", "EXT-Z", "BATCH-AUTH", "MAP-AUTH",
                         "REJECTED", List.of("CLIENT.DUPLICATE_TARGET"), List.of(exact, exact), null)))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
@@ -407,7 +510,7 @@ class ReviewCasePostgresIT {
         assertThat(reviews.get(reviewer(), "ext-still-open", created.reviewCaseId()).status()).isEqualTo("OPEN");
         assertThat(jdbc.sql("SELECT count(*) FROM evd_external_review_receipt")
                 .query(Long.class).single()).isZero();
-        assertThat(jdbc.sql("SELECT count(*) FROM evd_review_decision")
+        assertThat(jdbc.sql("SELECT count(*) FROM evd_review_decision WHERE decision_source='EXTERNAL'")
                 .query(Long.class).single()).isZero();
         assertThat(jdbc.sql("SELECT count(*) FROM tsk_task WHERE task_type='evidence.external-coordination'")
                 .query(Long.class).single()).isZero();
@@ -434,6 +537,19 @@ class ReviewCasePostgresIT {
         return new ExternalReviewAffectedTarget(
                 "EVIDENCE_REVISION", member.evidenceSlotId(),
                 member.evidenceItemId(), member.evidenceRevisionId());
+    }
+
+    private ReviewCaseView createClientCase(
+            EvidenceSetSnapshotView snapshot, String marker, String callbackBatchRef, String mappingVersionId
+    ) {
+        ReviewCaseView internal = reviews.create(reviewer(), metadata("create-internal-" + marker),
+                new CreateReviewCaseCommand(snapshot.evidenceSetSnapshotId(), null));
+        reviews.decide(reviewer(), metadata("approve-internal-" + marker),
+                new DecideReviewCaseCommand(internal.reviewCaseId(), "APPROVED", List.of(), "send"));
+        return reviews.createClient(adapter(), metadata("create-client-" + marker),
+                new CreateClientReviewCaseCommand(
+                        internal.reviewCaseId(), "SUB-" + marker,
+                        callbackBatchRef, mappingVersionId, "CLIENT-POLICY-1"));
     }
 
     private UUID uploadScanAndValidate(byte[] content, String beginKey, String commandId)
