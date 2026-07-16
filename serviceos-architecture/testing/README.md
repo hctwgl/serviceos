@@ -97,3 +97,4 @@
 - [M94 工单工作区联系尝试摘要验收矩阵](91-m94-work-order-workspace-contact-attempts-acceptance.md)
 - [M95 工单工作区表单提交与资料项安全元数据验收矩阵](92-m95-work-order-workspace-forms-evidence-metadata-acceptance.md)
 - [M96 工单工作区审核血缘元数据验收矩阵](93-m96-work-order-workspace-review-lineage-acceptance.md)
+- [M97 授权审核案例队列验收矩阵](94-m97-authorized-review-case-queue-acceptance.md)

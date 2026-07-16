@@ -22,6 +22,8 @@ import com.serviceos.evidence.api.ForceApproveReviewCaseCommand;
 import com.serviceos.evidence.api.RecordExternalReviewReceiptCommand;
 import com.serviceos.evidence.api.ReopenReviewCaseCommand;
 import com.serviceos.evidence.api.ReviewCaseService;
+import com.serviceos.evidence.api.ReviewCaseQueryService;
+import com.serviceos.evidence.api.ReviewCaseQueueQuery;
 import com.serviceos.evidence.api.ReviewCaseView;
 import com.serviceos.files.infrastructure.LocalObjectTransferService;
 import com.serviceos.identity.api.CurrentPrincipal;
@@ -121,6 +123,7 @@ class ReviewCasePostgresIT {
     @Autowired EvidenceCommandService evidence;
     @Autowired EvidenceSetSnapshotService snapshots;
     @Autowired ReviewCaseService reviews;
+    @Autowired ReviewCaseQueryService reviewQueries;
     @Autowired ExternalReviewReceiptService receipts;
     @Autowired ExternalReviewRouteService reviewRoutes;
     @Autowired BydCpimReviewCallbackService reviewCallbacks;
@@ -662,6 +665,51 @@ class ReviewCasePostgresIT {
                         problem -> assertThat(problem.code())
                                 .isEqualTo(ProblemCode.REVIEW_CASE_ALREADY_DECIDED));
         assertThat(jdbc.sql("SELECT count(*) FROM evd_review_decision").query(Long.class).single()).isOne();
+    }
+
+    @Test
+    void authorizedReviewQueueDefaultsOpenFiltersAndUsesScopeBoundCursor() throws Exception {
+        ReviewCaseView firstCase = reviews.create(
+                reviewer(), metadata("queue-create-1"),
+                new CreateReviewCaseCommand(createSnapshot("queue-1").evidenceSetSnapshotId(), null));
+        ReviewCaseView secondCase = reviews.create(
+                reviewer(), metadata("queue-create-2"),
+                new CreateReviewCaseCommand(createSnapshot("queue-2").evidenceSetSnapshotId(), "POLICY_QUEUE"));
+
+        var firstPage = reviewQueries.list(
+                reviewer(), "corr-review-queue-1",
+                new ReviewCaseQueueQuery(projectId, null, "INTERNAL", null, null, 1));
+        assertThat(firstPage.items()).hasSize(1);
+        assertThat(firstPage.nextCursor()).isNotBlank();
+        var secondPage = reviewQueries.list(
+                reviewer(), "corr-review-queue-2",
+                new ReviewCaseQueueQuery(
+                        projectId, "OPEN", "INTERNAL", null, firstPage.nextCursor(), 1));
+        assertThat(secondPage.items()).hasSize(1);
+        assertThat(List.of(
+                firstPage.items().getFirst().reviewCaseId(),
+                secondPage.items().getFirst().reviewCaseId()))
+                .containsExactlyInAnyOrder(firstCase.reviewCaseId(), secondCase.reviewCaseId());
+        assertThat(secondPage.items().getFirst().latestDecisionId()).isNull();
+        assertThat(secondPage.toString()).doesNotContain(
+                "snapshotContentDigest", "createdBy", "note", "approvalRef", "decidedBy");
+        assertThat(reviewQueries.list(
+                reviewer(), "corr-review-queue-scope",
+                new ReviewCaseQueueQuery(null, "OPEN", null, null, null, 20)).items())
+                .extracting(item -> item.reviewCaseId())
+                .containsExactlyInAnyOrder(firstCase.reviewCaseId(), secondCase.reviewCaseId());
+
+        assertThatThrownBy(() -> reviewQueries.list(
+                reviewer(), "corr-review-queue-cursor",
+                new ReviewCaseQueueQuery(
+                        projectId, "APPROVED", "INTERNAL", null, firstPage.nextCursor(), 1)))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
+        assertThatThrownBy(() -> reviewQueries.list(
+                reviewer(), "corr-review-queue-status",
+                new ReviewCaseQueueQuery(projectId, "UNKNOWN", null, null, null, 20)))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
     }
 
     @Test

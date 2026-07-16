@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.66.0
+  version: 0.67.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1091,6 +1091,31 @@ paths:
         '404': { $ref: '#/components/responses/Problem' }
 
   /review-cases:
+    get:
+      operationId: listAuthorizedReviewCases
+      summary: 查询当前主体有权审核的案例队列
+      description: >-
+        API-06 §6 窄切片；默认 OPEN，按 createdAt/reviewCaseId 正序稳定分页。
+        需要 evidence.review，游标绑定实时项目范围和全部筛选。
+      parameters:
+        - { name: projectId, in: query, schema: { type: string, format: uuid } }
+        - { name: status, in: query, schema: { enum: [OPEN, APPROVED, REJECTED, FORCE_APPROVED, REOPENED], default: OPEN } }
+        - { name: origin, in: query, schema: { enum: [INTERNAL, CLIENT] } }
+        - { name: taskId, in: query, schema: { type: string, format: uuid } }
+        - { name: cursor, in: query, schema: { type: string, minLength: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 审核案例队列页
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReviewCaseQueuePage' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
     post:
       operationId: createReviewCase
       summary: 为 TASK_SUBMISSION EvidenceSetSnapshot 创建审核案例
@@ -3901,6 +3926,50 @@ components:
           type: array
           items: { $ref: '#/components/schemas/CorrectionResubmission' }
 
+    ReviewCaseQueueItem:
+      type: object
+      additionalProperties: false
+      required: [reviewCaseId, projectId, taskId, evidenceSetSnapshotId, scopeType, origin,
+        policyVersion, status, createdAt, decidedAt, sourceReviewCaseId, externalSubmissionRef,
+        callbackBatchRef, mappingVersionId, reopenedFromReviewCaseId, reopenTriggerRef,
+        latestDecisionId, latestDecision, latestDecisionSource, latestReasonCodes,
+        latestDecisionAt]
+      properties:
+        reviewCaseId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        evidenceSetSnapshotId: { type: string, format: uuid }
+        scopeType: { const: EVIDENCE_SET_SNAPSHOT }
+        origin: { enum: [INTERNAL, CLIENT] }
+        policyVersion: { type: string, minLength: 1, maxLength: 80 }
+        status: { enum: [OPEN, APPROVED, REJECTED, FORCE_APPROVED, REOPENED] }
+        createdAt: { type: string, format: date-time }
+        decidedAt: { type: [string, 'null'], format: date-time }
+        sourceReviewCaseId: { type: [string, 'null'], format: uuid }
+        externalSubmissionRef: { type: [string, 'null'], maxLength: 160 }
+        callbackBatchRef: { type: [string, 'null'], maxLength: 160 }
+        mappingVersionId: { type: [string, 'null'], maxLength: 160 }
+        reopenedFromReviewCaseId: { type: [string, 'null'], format: uuid }
+        reopenTriggerRef: { type: [string, 'null'], maxLength: 160 }
+        latestDecisionId: { type: [string, 'null'], format: uuid }
+        latestDecision: { type: [string, 'null'], enum: [APPROVED, REJECTED, FORCE_APPROVED, null] }
+        latestDecisionSource: { type: [string, 'null'], enum: [INTERNAL, EXTERNAL, null] }
+        latestReasonCodes:
+          type: array
+          maxItems: 20
+          items: { type: string, minLength: 1, maxLength: 80 }
+        latestDecisionAt: { type: [string, 'null'], format: date-time }
+    ReviewCaseQueuePage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor, asOf]
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/ReviewCaseQueueItem' }
+        nextCursor: { type: [string, 'null'] }
+        asOf: { type: string, format: date-time }
     ReviewCase:
       type: object
       additionalProperties: false
