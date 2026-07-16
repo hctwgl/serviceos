@@ -35,7 +35,8 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * 把已发布的核心执行事件规范化为工单时间线。Inbox 与投影写入同事务，任何身份错配都会整体回滚。
+ * 把已发布的核心执行与现场履约事件规范化为工单时间线。
+ * Inbox 与投影写入同事务，任何身份错配都会整体回滚；不保存 PII、自由文本或 GPS。
  */
 @Service
 final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
@@ -45,7 +46,11 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             "workflow.started", "workflow.completed",
             "stage.activated", "stage.completed",
             "task.created", "task.claimed", "task.started", "task.released",
-            "task.cancelled", "task.completed");
+            "task.cancelled", "task.completed",
+            "contact.attempt.recorded",
+            "appointment.proposed", "appointment.confirmed", "appointment.rescheduled",
+            "appointment.cancelled", "appointment.no-show-marked",
+            "visit.checked-in", "visit.checked-out", "visit.interrupted");
 
     private final InboxService inbox;
     private final WorkOrderTimelineRepository timelines;
@@ -147,6 +152,15 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             case "task.started" -> taskStarted(message);
             case "task.released" -> taskReleased(message);
             case "task.cancelled" -> taskCancelled(message);
+            case "contact.attempt.recorded" -> Optional.of(contactAttemptRecorded(message));
+            case "appointment.proposed" -> Optional.of(appointmentProposed(message));
+            case "appointment.confirmed" -> Optional.of(appointmentConfirmed(message));
+            case "appointment.rescheduled" -> Optional.of(appointmentRescheduled(message));
+            case "appointment.cancelled" -> Optional.of(appointmentCancelled(message));
+            case "appointment.no-show-marked" -> Optional.of(appointmentNoShowMarked(message));
+            case "visit.checked-in" -> Optional.of(visitCheckedIn(message));
+            case "visit.checked-out" -> Optional.of(visitCheckedOut(message));
+            case "visit.interrupted" -> Optional.of(visitInterrupted(message));
             default -> throw new IllegalArgumentException("unsupported work order timeline event");
         };
     }
@@ -238,6 +252,93 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
                 null, payload.cancelledAt());
     }
 
+    private TimelineFact contactAttemptRecorded(OutboxMessage message) {
+        ContactAttemptRecordedPayload payload = read(message, ContactAttemptRecordedPayload.class);
+        requireEnvelope(message, "appointment", "ContactAttempt", payload.contactAttemptId());
+        return fact(payload.workOrderId(), payload.projectId(), "CONTACT_ATTEMPT", "ContactAttempt",
+                payload.contactAttemptId(), payload.channel(), payload.resultCode(),
+                payload.actorId(), payload.occurredAt());
+    }
+
+    private TimelineFact appointmentProposed(OutboxMessage message) {
+        AppointmentLifecyclePayload payload = read(message, AppointmentLifecyclePayload.class);
+        requireEnvelope(message, "appointment", "Appointment", payload.appointmentId());
+        return appointmentFact(payload, payload.status(), null);
+    }
+
+    private TimelineFact appointmentConfirmed(OutboxMessage message) {
+        AppointmentLifecyclePayload payload = read(message, AppointmentLifecyclePayload.class);
+        requireEnvelope(message, "appointment", "Appointment", payload.appointmentId());
+        return appointmentFact(payload, payload.status(), null);
+    }
+
+    private TimelineFact appointmentRescheduled(OutboxMessage message) {
+        AppointmentLifecyclePayload payload = read(message, AppointmentLifecyclePayload.class);
+        requireEnvelope(message, "appointment", "Appointment", payload.appointmentId());
+        // 改约后状态回到 PROPOSED，时间线用稳定 RESCHEDULED 区分“首次提出”与“改约后再提出”。
+        return appointmentFact(payload, "RESCHEDULED", null);
+    }
+
+    private TimelineFact appointmentCancelled(OutboxMessage message) {
+        AppointmentTerminalPayload payload = read(message, AppointmentTerminalPayload.class);
+        requireEnvelope(message, "appointment", "Appointment", payload.appointmentId());
+        return appointmentTerminalFact(payload);
+    }
+
+    private TimelineFact appointmentNoShowMarked(OutboxMessage message) {
+        AppointmentTerminalPayload payload = read(message, AppointmentTerminalPayload.class);
+        requireEnvelope(message, "appointment", "Appointment", payload.appointmentId());
+        // noShowPartyRef / evidenceRefs 仅留在权威聚合与审计，时间线不得投影敏感引用。
+        return appointmentTerminalFact(payload);
+    }
+
+    private TimelineFact visitCheckedIn(OutboxMessage message) {
+        VisitLifecyclePayload payload = read(message, VisitLifecyclePayload.class);
+        requireEnvelope(message, "fieldwork", "Visit", payload.visitId());
+        return visitFact(payload, payload.status());
+    }
+
+    private TimelineFact visitCheckedOut(OutboxMessage message) {
+        VisitLifecyclePayload payload = read(message, VisitLifecyclePayload.class);
+        requireEnvelope(message, "fieldwork", "Visit", payload.visitId());
+        return visitFact(payload, requireCode(payload.resultCode(), "visit checkout resultCode"));
+    }
+
+    private TimelineFact visitInterrupted(OutboxMessage message) {
+        VisitLifecyclePayload payload = read(message, VisitLifecyclePayload.class);
+        requireEnvelope(message, "fieldwork", "Visit", payload.visitId());
+        return visitFact(payload, requireCode(payload.exceptionCode(), "visit interrupt exceptionCode"));
+    }
+
+    private static TimelineFact appointmentFact(
+            AppointmentLifecyclePayload payload,
+            String outcomeCode,
+            String actorId
+    ) {
+        return fact(payload.workOrderId(), payload.projectId(), "APPOINTMENT", "Appointment",
+                payload.appointmentId(), payload.appointmentType(), outcomeCode, actorId,
+                payload.occurredAt());
+    }
+
+    private static TimelineFact appointmentTerminalFact(AppointmentTerminalPayload payload) {
+        return fact(payload.workOrderId(), payload.projectId(), "APPOINTMENT", "Appointment",
+                payload.appointmentId(), payload.appointmentType(),
+                requireCode(payload.reasonCode(), "appointment reasonCode"), null,
+                payload.occurredAt());
+    }
+
+    private static TimelineFact visitFact(VisitLifecyclePayload payload, String outcomeCode) {
+        return fact(payload.workOrderId(), payload.projectId(), "VISIT", "Visit",
+                payload.visitId(), null, outcomeCode, payload.technicianId(), payload.occurredAt());
+    }
+
+    private static String requireCode(String code, String fieldName) {
+        if (code == null || code.isBlank()) {
+            throw new IllegalArgumentException("时间线事件缺少 " + fieldName);
+        }
+        return code;
+    }
+
     private Optional<TimelineFact> taskContextFact(
             OutboxMessage message,
             UUID taskId,
@@ -311,6 +412,57 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             String resourceCode,
             String outcomeCode,
             String actorId,
+            Instant occurredAt
+    ) {
+    }
+
+    /**
+     * 仅用于按已发布 Schema 解码 Outbox payload；字段保持最小，不含 partyRef / note。
+     */
+    private record ContactAttemptRecordedPayload(
+            UUID contactAttemptId,
+            UUID projectId,
+            UUID workOrderId,
+            UUID taskId,
+            String channel,
+            String resultCode,
+            String actorId,
+            Instant occurredAt
+    ) {
+    }
+
+    private record AppointmentLifecyclePayload(
+            UUID appointmentId,
+            UUID projectId,
+            UUID workOrderId,
+            UUID taskId,
+            String appointmentType,
+            String status,
+            Instant occurredAt
+    ) {
+    }
+
+    private record AppointmentTerminalPayload(
+            UUID appointmentId,
+            UUID projectId,
+            UUID workOrderId,
+            UUID taskId,
+            String appointmentType,
+            String status,
+            String reasonCode,
+            Instant occurredAt
+    ) {
+    }
+
+    private record VisitLifecyclePayload(
+            UUID visitId,
+            UUID projectId,
+            UUID workOrderId,
+            UUID taskId,
+            String technicianId,
+            String status,
+            String resultCode,
+            String exceptionCode,
             Instant occurredAt
     ) {
     }

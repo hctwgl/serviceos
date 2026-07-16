@@ -74,3 +74,4 @@
 - [M71 Task 服务端允许动作投影验收矩阵](68-m71-task-server-driven-allowed-actions-acceptance.md)
 - [M72 Task 执行 Attempt 历史查询验收矩阵](69-m72-task-execution-attempt-history-acceptance.md)
 - [M73 工单核心执行时间线投影验收矩阵](70-m73-work-order-core-execution-timeline-acceptance.md)
+- [M74 工单现场履约时间线事件合并验收矩阵](71-m74-work-order-field-ops-timeline-acceptance.md)

@@ -40,13 +40,14 @@ import tools.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** M73：真实 PostgreSQL 证明跨模块事件投影、Inbox、乱序、授权与稳定分页。 */
+/** M73/M74：真实 PostgreSQL 证明跨模块事件投影、现场履约合并、Inbox、乱序、授权与稳定分页。 */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = ServiceOsApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE)
 class WorkOrderTimelinePostgresIT {
@@ -249,8 +250,145 @@ class WorkOrderTimelinePostgresIT {
                 "corr-cross", workOrderId, null, 10))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.RESOURCE_NOT_FOUND));
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("071");
-        assertThat(flyway.info().applied()).hasSize(73);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("072");
+        assertThat(flyway.info().applied()).hasSize(74);
+    }
+
+    @Test
+    void projectsFieldOpsEventsWithoutSensitivePayloadAndRejectsMismatch() {
+        Instant t0 = Instant.parse("2026-07-16T04:00:00Z");
+        UUID appointmentId = UUID.randomUUID();
+        UUID visitId = UUID.randomUUID();
+        UUID contactId = UUID.randomUUID();
+
+        OutboxMessage contact = message(
+                "appointment", "contact.attempt.recorded", 1, "ContactAttempt", contactId, 1,
+                Map.of(
+                        "contactAttemptId", contactId,
+                        "projectId", projectId,
+                        "workOrderId", workOrderId,
+                        "taskId", taskId,
+                        "channel", "PHONE",
+                        "resultCode", "NO_ANSWER",
+                        "actorId", "csr-1",
+                        "occurredAt", t0),
+                t0);
+        handler.handle(contact);
+        handler.handle(contact);
+
+        handler.handle(message(
+                "appointment", "appointment.proposed", 1, "Appointment", appointmentId, 1,
+                Map.of(
+                        "appointmentId", appointmentId,
+                        "projectId", projectId,
+                        "workOrderId", workOrderId,
+                        "taskId", taskId,
+                        "appointmentType", "SURVEY",
+                        "status", "PROPOSED",
+                        "occurredAt", t0.plusSeconds(10)),
+                t0.plusSeconds(10)));
+        handler.handle(message(
+                "appointment", "appointment.rescheduled", 1, "Appointment", appointmentId, 3,
+                Map.of(
+                        "appointmentId", appointmentId,
+                        "projectId", projectId,
+                        "workOrderId", workOrderId,
+                        "taskId", taskId,
+                        "appointmentType", "SURVEY",
+                        "status", "PROPOSED",
+                        "occurredAt", t0.plusSeconds(20)),
+                t0.plusSeconds(20)));
+        handler.handle(message(
+                "appointment", "appointment.cancelled", 1, "Appointment", appointmentId, 4,
+                Map.of(
+                        "appointmentId", appointmentId,
+                        "projectId", projectId,
+                        "workOrderId", workOrderId,
+                        "taskId", taskId,
+                        "appointmentType", "SURVEY",
+                        "status", "CANCELLED",
+                        "reasonCode", "USER_CANCELLED",
+                        "occurredAt", t0.plusSeconds(30)),
+                t0.plusSeconds(30)));
+        handler.handle(message(
+                "fieldwork", "visit.checked-in", 1, "Visit", visitId, 1,
+                Map.of(
+                        "visitId", visitId,
+                        "projectId", projectId,
+                        "workOrderId", workOrderId,
+                        "taskId", taskId,
+                        "technicianId", "tech-9",
+                        "status", "IN_PROGRESS",
+                        "resultCode", null,
+                        "exceptionCode", null,
+                        "occurredAt", t0.plusSeconds(40)),
+                t0.plusSeconds(40)));
+        handler.handle(message(
+                "fieldwork", "visit.checked-out", 1, "Visit", visitId, 2,
+                Map.of(
+                        "visitId", visitId,
+                        "projectId", projectId,
+                        "workOrderId", workOrderId,
+                        "taskId", taskId,
+                        "technicianId", "tech-9",
+                        "status", "COMPLETED",
+                        "resultCode", "JOB_DONE",
+                        "exceptionCode", null,
+                        "occurredAt", t0.plusSeconds(50)),
+                t0.plusSeconds(50)));
+
+        var page = timelines.list(principal("reader", TENANT), "corr-field-ops", workOrderId, null, 20);
+        assertThat(page.items()).extracting(WorkOrderTimelineItem::eventType)
+                .containsExactly(
+                        "visit.checked-out",
+                        "visit.checked-in",
+                        "appointment.cancelled",
+                        "appointment.rescheduled",
+                        "appointment.proposed",
+                        "contact.attempt.recorded");
+        assertThat(page.items()).extracting(WorkOrderTimelineItem::category)
+                .containsExactly(
+                        "VISIT", "VISIT", "APPOINTMENT", "APPOINTMENT", "APPOINTMENT", "CONTACT_ATTEMPT");
+        assertThat(page.items().get(0).outcomeCode()).isEqualTo("JOB_DONE");
+        assertThat(page.items().get(0).actorId()).isEqualTo("tech-9");
+        assertThat(page.items().get(1).outcomeCode()).isEqualTo("IN_PROGRESS");
+        assertThat(page.items().get(2).outcomeCode()).isEqualTo("USER_CANCELLED");
+        assertThat(page.items().get(3).outcomeCode()).isEqualTo("RESCHEDULED");
+        assertThat(page.items().get(3).resourceCode()).isEqualTo("SURVEY");
+        assertThat(page.items().get(5).outcomeCode()).isEqualTo("NO_ANSWER");
+        assertThat(page.items().get(5).resourceCode()).isEqualTo("PHONE");
+        assertThat(count("rdm_work_order_timeline_entry")).isEqualTo(6);
+        assertThat(count("rel_inbox_record")).isEqualTo(6);
+
+        UUID wrongVisit = UUID.randomUUID();
+        assertThatThrownBy(() -> handler.handle(message(
+                "fieldwork", "visit.interrupted", 1, "Visit", wrongVisit, 2,
+                Map.of(
+                        "visitId", wrongVisit,
+                        "projectId", UUID.randomUUID(),
+                        "workOrderId", workOrderId,
+                        "taskId", taskId,
+                        "technicianId", "tech-9",
+                        "status", "INTERRUPTED",
+                        "resultCode", null,
+                        "exceptionCode", "PARTS_MISSING",
+                        "occurredAt", t0.plusSeconds(60)),
+                t0.plusSeconds(60))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Project");
+        assertThat(count("rdm_work_order_timeline_entry")).isEqualTo(6);
+        assertThat(count("rel_inbox_record")).isEqualTo(6);
+
+        OutboxMessage changedDigest = new OutboxMessage(
+                contact.outboxId(), contact.eventId(), contact.module(), contact.eventType(),
+                contact.schemaVersion(), contact.aggregateType(), contact.aggregateId(),
+                contact.aggregateVersion(), contact.tenantId(), contact.correlationId(),
+                contact.causationId(), contact.partitionKey(), contact.payload(),
+                "e".repeat(64), contact.occurredAt(), 2);
+        assertThatThrownBy(() -> handler.handle(changedDigest))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code())
+                                .isEqualTo(ProblemCode.EVENT_PAYLOAD_MISMATCH));
     }
 
     private OutboxMessage message(

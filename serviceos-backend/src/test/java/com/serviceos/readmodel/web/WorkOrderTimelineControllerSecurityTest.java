@@ -48,9 +48,9 @@ class WorkOrderTimelineControllerSecurityTest {
                 "reader", "tenant", CurrentPrincipal.PrincipalType.USER, "m73", Set.of());
         Instant occurredAt = Instant.parse("2026-07-16T01:00:00Z");
         WorkOrderTimelineItem item = new WorkOrderTimelineItem(
-                UUID.randomUUID(), "TASK", "task.released", 1, occurredAt,
-                occurredAt.plusSeconds(2), "technician", "Task", UUID.randomUUID(), 3,
-                "SITE_SURVEY", "SHIFT_ENDED", "corr-event", "TASK_RELEASED", 1);
+                UUID.randomUUID(), "APPOINTMENT", "appointment.rescheduled", 1, occurredAt,
+                occurredAt.plusSeconds(2), null, "Appointment", UUID.randomUUID(), 3,
+                "SURVEY", "RESCHEDULED", "corr-event", "APPOINTMENT_RESCHEDULED", 1);
         WorkOrderTimelinePage page = new WorkOrderTimelinePage(
                 7, List.of(item), "next", occurredAt.plusSeconds(3),
                 occurredAt.plusSeconds(2), "UNKNOWN");
@@ -66,10 +66,13 @@ class WorkOrderTimelineControllerSecurityTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string("ETag", "\"7\""))
                 .andExpect(header().string("X-Correlation-Id", "corr-m73"))
-                .andExpect(jsonPath("$.items[0].eventType").value("task.released"))
-                .andExpect(jsonPath("$.items[0].outcomeCode").value("SHIFT_ENDED"))
+                .andExpect(jsonPath("$.items[0].eventType").value("appointment.rescheduled"))
+                .andExpect(jsonPath("$.items[0].outcomeCode").value("RESCHEDULED"))
+                .andExpect(jsonPath("$.items[0].category").value("APPOINTMENT"))
                 .andExpect(jsonPath("$.freshnessStatus").value("UNKNOWN"))
                 .andExpect(jsonPath("$.items[0].payload").doesNotExist())
+                .andExpect(jsonPath("$.items[0].contactedPartyRef").doesNotExist())
+                .andExpect(jsonPath("$.items[0].noShowPartyRef").doesNotExist())
                 .andExpect(jsonPath("$.items[0].resultRef").doesNotExist())
                 .andExpect(jsonPath("$.items[0].errorMessage").doesNotExist());
         verify(timelines).list(principal, "corr-m73", workOrderId, "cursor", 20);
