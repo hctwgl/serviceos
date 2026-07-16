@@ -17,7 +17,7 @@ lastUpdated: 2026-07-16
 | Admin CI | GitHub Actions 使用 Node 22 执行不可变安装与生产构建；独立 `admin-pilot-e2e` job 安装 Chrome 并运行真实写链路，staging 等待 Java、Admin build 与 Admin E2E 三个门禁 |
 | 本地身份 | Vite 开发模式显式开启 Keycloak Authorization Code + PKCE；无 client secret、无硬编码 token、无生产手工 JWT 入口 |
 | 后端授权 | JWT 只提供身份声明；ServiceOS 继续从数据库 RoleGrant 实时校验 tenant/project/capability，401 清理本机会话并失败关闭 |
-| 真实 E2E | 固定可释放夹具 + 每轮新建终态夹具 + Playwright/Google Chrome 验证登录、权威只读投影、Task MANUAL assign-candidates/claim/release，以及独立 Task assign/claim/start/complete 到 WorkOrder FULFILLED |
+| 真实 E2E | 固定可释放夹具 + 每轮新建终态夹具 + Playwright/Google Chrome 验证登录、权威只读投影、Task MANUAL assign-candidates/claim/release，以及独立 Task assign/claim/start、锁定表单提交、complete 到 WorkOrder FULFILLED |
 | 数据库 | 使用 `serviceos-deploy/compose.yaml` 的 PostgreSQL 18，后端启动时执行当前 86 个 Flyway 迁移 |
 
 ## 2. P0 根因与修复
@@ -48,8 +48,10 @@ serviceos-deploy/admin-pilot/verify-admin-smoke.sh
 E2E 脚本不执行 `down -v`，不会删除开发者的 PostgreSQL 数据卷。可释放夹具使用固定 UUID 和
 `ON CONFLICT DO NOTHING`；每轮先关闭上轮 ACTIVE 候选但不回退 Task version，再由页面创建新的
 MANUAL 候选批次。终态夹具每轮创建全新的 WorkOrder/Workflow/Stage/Node/Task UUID，完成后保留
-不可变历史，不通过 SQL 回退终态。脚本显式启用真实 Outbox worker，并检查
-`task.completed` 的 Inbox 成功消费、候选/责任 EXPIRED、Node/Stage/Workflow COMPLETED 与
+不可变历史，不通过 SQL 回退终态。终态 Task 锁定最小 FormVersion，浏览器提交 VALIDATED
+FormSubmission 后由页面自动回填 `form-submission://` 引用和权威 content digest；资料槽位未解析
+只降级资料子能力，不阻断表单。脚本显式启用真实 Outbox worker，并检查精确提交引用、
+`task.completed` Inbox 成功消费、候选/责任 EXPIRED、Node/Stage/Workflow COMPLETED 与
 WorkOrder FULFILLED。夹具只允许本地开发数据库使用。
 GitHub Actions 使用同一脚本阻断 PR，并保留 Backend、Admin 与 Playwright 诊断产物；该 job
 通过后才启动容器化 staging 发布、回滚和恢复演练。
@@ -65,9 +67,9 @@ GitHub Actions 使用同一脚本阻断 PR，并保留 Backend、Admin 与 Playw
 - Admin 通过真实 MANUAL assign-candidates 创建候选快照，再按服务端 allowed-actions 执行
   Task claim/release；全链路由 PostgreSQL 候选/责任事实、`If-Match` 与幂等键保护，
   release 后回到 READY，可重复验证。
-- Admin 对每轮新建的 Workflow-backed HUMAN Task 执行 assign/claim/start/complete；
-  `task.completed` 经 Outbox/Inbox 可靠消费后推进 Node、Stage、Workflow，并将独立 WorkOrder
-  置为 FULFILLED。
+- Admin 对每轮新建的 Workflow-backed HUMAN Task 执行 assign/claim/start，提交精确锁定的
+  FormVersion，并使用 VALIDATED FormSubmission 的不可变引用和摘要 complete；`task.completed`
+  经 Outbox/Inbox 可靠消费后推进 Node、Stage、Workflow，并将独立 WorkOrder 置为 FULFILLED。
 
 尚未证明：
 
