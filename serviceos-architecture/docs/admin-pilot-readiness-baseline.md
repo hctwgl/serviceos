@@ -1,13 +1,13 @@
 ---
-title: Admin 试点可运行基线（含 M135 正常整改补传）
+title: Admin 试点可运行基线（含 M136 预约上门）
 status: Implemented
 lastUpdated: 2026-07-16
 ---
 
-# Admin 试点可运行基线（含 M135 正常整改补传）
+# Admin 试点可运行基线（含 M136 预约上门）
 
-本基线覆盖 M101～M135 已有 Admin 表面的可重复构建、登录、真实后端/数据库试点入口，并明确
-完整业务链尚未证明的边界。M135 在既有局部读写基线上追加正常补传/关闭/复审/完结证明，
+本基线覆盖 M101～M136 已有 Admin 表面的可重复构建、登录、真实后端/数据库试点入口，并明确
+完整业务链尚未证明的边界。M135～M136 追加正常补传/复审完结与预约上门写路径证明，
 不宣称完整 `ADMIN-PILOT-09`。
 
 ## 1. 已建立的基线
@@ -18,7 +18,7 @@ lastUpdated: 2026-07-16
 | Admin CI | GitHub Actions 使用 Node 22 执行不可变安装与生产构建；独立 `admin-pilot-e2e` job 安装 Chrome 并运行真实写链路，staging 等待 Java、Admin build 与 Admin E2E 三个门禁 |
 | 本地身份 | Vite 开发模式显式开启 Keycloak Authorization Code + PKCE；无 client secret、无硬编码 token、无生产手工 JWT 入口 |
 | 后端授权 | JWT 只提供身份声明；ServiceOS 继续从数据库 RoleGrant 实时校验 tenant/project/capability，401 清理本机会话并失败关闭 |
-| 真实 E2E | 固定可释放夹具 + 每轮新建终态/整改豁免/重开/正常补传夹具 + Playwright/Google Chrome；正常 Task 覆盖表单、资料、APPROVED、双引用 complete 到 FULFILLED；独立 Task 覆盖 REJECTED→WAIVED/CANCELLED、FORCE_APPROVED→reopen，以及 REJECTED→resubmit→close→复审 APPROVED→FULFILLED |
+| 真实 E2E | 固定可释放夹具 + 每轮新建终态/整改豁免/重开/正常补传/现场履约夹具 + Playwright/Google Chrome；覆盖表单资料审核完结、WAIVE、reopen、补传复审，以及 propose→confirm→check-in→check-out |
 | 数据库 | 使用 `serviceos-deploy/compose.yaml` 的 PostgreSQL 18，后端启动时执行当前 86 个 Flyway 迁移 |
 
 ## 2. P0 根因与修复
@@ -105,14 +105,20 @@ GitHub Actions 使用同一脚本阻断 PR，并保留 Backend、Admin 与 Playw
   并普通 APPROVED；随后以 FormSubmission + 补传 Snapshot 双引用 complete，Outbox/Inbox 推进
   至 WorkOrder FULFILLED。不使用 WAIVE 或同 Snapshot reopen 冒充正常补传复审。
 
+已追加证明（M136）：
+
+- 本地 RoleGrant 具备预约/上门写能力；第五套夹具注入 ACTIVE ServiceAssignment；
+- Admin 对独立动态 Task 执行 proposeAppointment→confirm→check-in→check-out，Appointment 与
+  Visit 终态均为 COMPLETED，审计与 Outbox/Inbox 完整。
+
 尚未证明：
 
 - 正式企业 IdP、MFA、生产回调地址、BFF/token renewal/logout 协议；
-- 从外部接单或项目创建开始，经派单、预约、上门、表单、资料、审核、整改、外发到完结的完整写链路；
+- 从外部接单开始，经派单、表单、资料、审核、整改、外发到完结的完整写链路（预约上门局部已证）；
 - Network/Technician Portal 与跨端协作；
 - 正式 sandbox、对象存储、专业扫描服务、Broker、通知和 SLA BUSINESS 日历；
 - 外部提审与回执在同一浏览器写链路中的端到端证明；
 - SavedView、设计系统、可访问性与多浏览器矩阵。
 
-因此当前交付只能称为“Admin 试点可运行局部读写基线（含正常整改补传）”，不能称为
+因此当前交付只能称为“Admin 试点可运行局部读写基线（含补传与预约上门）”，不能称为
 “完整现场履约平台已交付”。

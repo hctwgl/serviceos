@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-16
-baselineCommit: bbe340171777dbe8a2c7a13bf12633f48b333779
-latestMilestone: M135
+baselineCommit: c02a59f
+latestMilestone: M136
 ---
 
 # ServiceOS 实施状态总览
@@ -39,11 +39,11 @@ latestMilestone: M135
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M135 Admin 正常整改补传 / 关闭 / 复审写链路 E2E |
-| 基线提交 | `bbe340171777dbe8a2c7a13bf12633f48b333779` |
+| 最新实施里程碑 | M136 Admin 预约 / 上门写链路 E2E |
+| 基线提交 | `c02a59f` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
-| 前端工程 | `serviceos-admin-web`（Vue+TS+Vite）已纳入 CI 构建，具备开发态 Keycloak PKCE，以及真实只读、Task MANUAL assign-candidates/claim/release、锁定表单提交、资料上传/校验/Snapshot、INTERNAL APPROVED、REJECTED→WAIVED、FORCE_APPROVED→reopen，以及正常补传/关闭/复审 APPROVED 后双引用 complete 至 WorkOrder FULFILLED 的局部写链路 PR 阻断 E2E；Network/Technician 尚未建立 |
+| 前端工程 | `serviceos-admin-web`（Vue+TS+Vite）已纳入 CI 构建，具备开发态 Keycloak PKCE，以及真实只读、Task MANUAL assign-candidates/claim/release、表单/资料/审核/整改/完结、正常补传复审，以及预约 propose→confirm→上门 check-in/check-out 的局部写链路 PR 阻断 E2E；Network/Technician 尚未建立 |
 | 数据库 | PostgreSQL + Flyway（当前版本 084 / 86） |
 | 契约 | Core OpenAPI 0.70.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、recovered/resolved 与 SLA started/breached/met@v1） |
 
@@ -65,8 +65,8 @@ latestMilestone: M135
 | 应用只读投影 | 工作区、队列、时间线和投影运行时 | `PARTIAL` | 独立 readmodel 模块；核心执行、现场履约、SLA、资料/审核/整改（含外部回执与条件 KEEP/INVALIDATE 处置）、外发交付全链路、异常确认/闭环、ServiceAssignment 与 Task 指派/Guard/人工接管 Inbox 投影；授权时间线与稳定分页及最近活动摘要；时间线 checkpoint/dead letter/generation 重建与 FRESH/LAGGING/UNKNOWN/REBUILDING freshness；definition 登记、dead letter 幂等重放与旧/孤儿 generation 清理；工单工作区顶层实时组合、当前 ACTIVE 服务责任摘要与 TASKS/TIMELINE_AUDIT/APPOINTMENTS_VISITS（含联系尝试）/FORMS_EVIDENCE（含提交与资料项安全元数据）/REVIEWS_CORRECTIONS（含 CLIENT/重开血缘）/INTEGRATION 按需区块（敏感字段最小化；缺权次级区块降级）；授权跨项目 ReviewCase/CorrectionCase/OutboundDelivery 专项队列 | 试算合并、revision/slots 技术噪声、表单值与资料版本详情、FACTS_CALCULATIONS、关键事件 taxonomy/过滤、通用 work-queues、SavedView、搜索、多投影平台、Broker offset、Portal、Admin 重建/重放 HTTP | M73～M99 |
 | 服务分配 | 网点分配、容量、改派 Saga、超时恢复 | `IMPLEMENTED` | ServiceAssignment、容量权威、改派、终止、对账和自动恢复 | 完整策略评分、全部异常分支和 UI | M24～M28 |
 | 运营异常 | 异常工作台基础 | `PARTIAL` | 异常记录和恢复入口；M58 将外发 UNKNOWN 与 Task 最终人工事件汇入 OperationalException + HUMAN Task；M59 提供高风险人工重发事实；M60 在严格 ACK 后幂等闭环对应异常并处理事件乱序；列表/详情/确认已硬化为实时项目范围 | 人工标记已送达/放弃、其他异常类型自动闭环、完整通知、运营中心前端和跨域异常目录 | M29、M58～M60、M100 |
-| 预约 | 预约修订、联系终态动作 | `PARTIAL` | Revision、并发和终态动作基础；公开事件已并入工单时间线 | 用户确认渠道、完整日程和跨端协作 | M30～M31、M74 |
-| 现场作业 | Visit 生命周期 | `PARTIAL` | Visit 运行时基础；签到/签退/中断事件已并入工单时间线 | GPS 策略增强、完整现场提交、离线同步和师傅端 | M32、M74 |
+| 预约 | 预约修订、联系终态动作 | `PARTIAL` | Revision、并发和终态动作基础；公开事件已并入工单时间线；Admin propose/confirm E2E | 用户确认渠道、完整日程和跨端协作 | M30～M31、M74、M136 |
+| 现场作业 | Visit 生命周期 | `PARTIAL` | Visit 运行时基础；签到/签退/中断事件已并入工单时间线；Admin check-in/check-out E2E | GPS 策略增强、完整现场提交、离线同步和师傅端 | M32、M74、M136 |
 | 动态表单 | 资产、冻结版本、不可变提交和 Task 完成门禁 | `PARTIAL` | 固定/条件 required、visible 与布尔 validation rule，基础类型校验、精确版本提交和完成引用；form.submitted 已并入工单时间线 | 复杂 validator、计算字段、草稿、冲突、更正和审核 | M33～M35、M53、M76 |
 | 资料 Evidence | 资产、槽位、Item/Revision、机器校验、Snapshot、完成门禁、作废、Review、Correction | `PARTIAL` | 固定/条件槽位、VALIDATED 表单触发只追加重解析、槽位世代/lineage、REVIEW_REQUIRED 与显式 KEEP/INVALIDATE（处置已并入工单时间线）、安全文件联动、Snapshot/完成门禁及审核整改链路 | OCR/CV、GPS 权威距离、长期归档 | M36～M53、M76、M82～M83 |
 | 安全文件 | Begin/Finalize/隔离/扫描/授权下载/作废 | `IMPLEMENTED` | 独立安全文件生命周期；Evidence 编排 Begin/Finalize/Invalidate 联动 | 正式对象存储、专业扫描服务、物理删除 | M11、M38、M46 |
@@ -75,7 +75,7 @@ latestMilestone: M135
 | 通知 | 通知与运营异常中心 | `PROPOSED` | 已有总体设计 | 通知通道、模板、可靠发送和 UI | `architecture/14-*` |
 | 履约事实与试算 | 事实提取和双向试算 | `PROPOSED` | 已有设计、API 和数据规划 | 运行时、投影和前端工作区 | M5 设计 |
 | 对账结算 | 对账、结算、争议与调整 | `PROPOSED` | 已有边界设计 | 正式运行时和页面 | `architecture/16-*` |
-| Admin Portal | 总部运营后台 | `PARTIAL` | M101～M135：队列/任务/SLA/异常/外发/工单/项目目录、工作区、allowed-actions 命令面板；CI 阻断构建；开发态 Keycloak PKCE；真实只读、Task MANUAL assign-candidates/claim/release、表单/资料/APPROVED/双引用 complete 至 WorkOrder FULFILLED、REJECTED→自动整改→授权 WAIVED/Task CANCELLED、FORCE_APPROVED→重开后继 Case，以及正常补传/关闭/复审 APPROVED→FULFILLED 的局部写链路 PR 阻断 E2E | 设计系统、SavedView、正式企业 OIDC/BFF、生产对象存储/专业扫描、外部提审、完整履约写链路 E2E（含接单/预约/上门/外发） | M7 设计、M101～M135、Admin 试点基线 |
+| Admin Portal | 总部运营后台 | `PARTIAL` | M101～M136：队列/任务/SLA/异常/外发/工单/项目目录、工作区、allowed-actions；CI 阻断构建；开发态 Keycloak PKCE；真实只读与局部写链路 PR 阻断 E2E（含补传复审完结与预约上门） | 设计系统、SavedView、正式企业 OIDC/BFF、生产对象存储/专业扫描、外部提审、完整履约写链路 E2E（含接单/派单/外发） | M7 设计、M101～M136、Admin 试点基线 |
 | Network Portal | 网点协作端 | `PROPOSED` | 页面和跨端协作规格 | 前端代码和 E2E | M7 设计 |
 | Technician App | 师傅移动端 | `PROPOSED` | 弱网、离线工作包、上传队列和页面规格 | 移动端工程、真机和离线运行时 | M7 设计 |
 | External Portal | 用户/车企受控页面 | `PROPOSED` | 最小边界规划 | 二期页面和工程实现 | M7 设计 |
@@ -1017,23 +1017,34 @@ WAIVE、FORCE_APPROVED/reopen）的 PR 阻断 E2E。详见 `docs/admin-pilot-rea
 - `verify-admin-smoke.sh` SQL 断言补传轮次、CLOSED、复审 APPROVED、完结与审计/Inbox；
 - 无 uuidgen 环境使用 python3 生成夹具 UUID。
 
-明确未实现：外部提审与回执同一浏览器链、预约/上门 E2E、ServiceAssignment Admin 写表面、
+明确未实现：外部提审与回执同一浏览器链、ServiceAssignment Admin 写表面、
 从入站接单开始的完整 `ADMIN-PILOT-09`、正式企业 IdP/BFF、生产对象存储/专业扫描；详见
 `docs/admin-pilot-readiness-baseline.md` 与
 `architecture/148-m135-admin-correction-resubmit-rereview-e2e.md`。
 
+### M136：Admin 预约 / 上门写链路 E2E
+
+已实现：
+
+- 本地 RoleGrant 追加预约/上门写能力；
+- 第五套动态夹具注入 ACTIVE NETWORK/TECHNICIAN ServiceAssignment，对齐 Visit 责任；
+- Playwright 证明 propose→confirm→check-in→check-out；
+- SQL 断言 Appointment/Visit COMPLETED、四类审计与四条事件 Inbox。
+
+明确未实现：用户确认渠道、GPS BLOCK 策略演练、派单 Admin HTTP、外部提审 stub/回调、完整
+`ADMIN-PILOT-09`；详见 `architecture/149-m136-admin-appointment-visit-e2e.md`。
+
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M135**。M61～M135 在授权只读、时间线投影、工作区组合、
-审核/整改专项队列与 Admin 局部写链路（含正常补传复审完结）上继续收敛；没有实现完整 SLA/通知
-策略、通用队列/SavedView 或整个现场履约平台。
+ServiceOS 可靠纵向切片已推进到 **M136**。Admin 局部写链路已覆盖补传复审完结与预约上门；
+没有实现完整 SLA/通知策略、通用队列/SavedView 或整个现场履约平台。
 
 ```text
 候选下一方向（优先从已确认文档中选择最小可靠切片）：
 1. 正式企业 OIDC/BFF、MFA 与设计系统；SavedView 仍需再接受 API-06 章节；
-2. 用真实脱敏试点业务数据验证接单至完结的完整履约写链路；当前 Admin 基线已证明正常补传/
-   关闭/复审/完结，以及 WAIVE 与 FORCE_APPROVED/reopen；尚未证明外部提审回执，也尚未从
-   外部接单串联预约/上门/外发（试点业务基线仍为 Draft，不得当作 Accepted 数据包）；
+2. 本地 BYD stub 外发 ACK + 回调 Admin E2E，再视试点数据接受情况串联入站接单；
+   当前已证明预约上门与补传复审完结，尚未证明外部提审回执与从入站接单开始的完整链
+   （试点业务基线仍为 Draft）；
 3. 在接受 ServiceNetwork 状态语义后建立目录与准入/启用/清退生命周期；当前相关文档仍为 Proposed，
    不得猜测状态值或转换规则；
 4. 建立 Organization/Region 目录、层级后代与组织到 Project 的权威关系；

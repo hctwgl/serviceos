@@ -1,10 +1,10 @@
 ---
-title: Admin 试点可运行基线验收（含 M135）
+title: Admin 试点可运行基线验收（含 M136）
 status: Implemented
 lastUpdated: 2026-07-16
 ---
 
-# Admin 试点可运行基线验收（含 M135）
+# Admin 试点可运行基线验收（含 M136）
 
 | ID | 场景 | 证据 | 结果 |
 |---|---|---|---|
@@ -25,13 +25,11 @@ lastUpdated: 2026-07-16
 | ADMIN-PILOT-08C | 真实驳回与整改豁免 | 独立 Snapshot → 普通 REJECTED → 自动 IN_PROGRESS CorrectionCase/整改 Task → 授权队列/详情 → CRITICAL WAIVED → 整改 Task CANCELLED；三类审计与四条审核/整改事件 Inbox 成功 | PASS |
 | ADMIN-PILOT-08X | 真实强制通过与重开 | 独立 OPEN Case → CRITICAL FORCE_APPROVED → 原 Case REOPENED + 同 Snapshot 后继 OPEN；页面导航/刷新保持后继身份，三类审计与三条事件 Inbox 成功，无 CorrectionCase | PASS |
 | ADMIN-PILOT-08S | 真实正常补传关闭复审完结 | 独立 Task：REJECTED → 源 Task 补传 Snapshot → resubmit → close → 新 ReviewCase APPROVED → 双引用 complete → FULFILLED；审计与 Inbox 成功 | PASS |
+| ADMIN-PILOT-08V | 真实预约上门写路径 | 独立 Task：propose→confirm→check-in→check-out；Appointment/Visit COMPLETED；审计与 Inbox 成功 | PASS |
 | ADMIN-PILOT-08CI | 真实写链路 CI 阻断 | GitHub Actions `admin-pilot-e2e` 运行同一 OIDC/Backend/PostgreSQL/Chrome smoke；通过后才启动 staging | PASS |
 | ADMIN-PILOT-09 | 完整履约写链路 | 接单→派单→预约→上门→表单/资料→审核/整改→外发→完结 | NOT PROVEN |
 
-`ADMIN-PILOT-08A`、`ADMIN-PILOT-08W`、`ADMIN-PILOT-08T`、`ADMIN-PILOT-08F`、
-`ADMIN-PILOT-08E`、`ADMIN-PILOT-08R`、`ADMIN-PILOT-08C`、`ADMIN-PILOT-08X`、
-`ADMIN-PILOT-08S` 与 `ADMIN-PILOT-08CI` 证明固定工单的候选分配/领取/释放，以及独立预置
-Workflow Task 的表单/资料/APPROVED/双引用 complete、REJECTED→WAIVED、FORCE_APPROVED/reopen，
-以及正常补传/关闭/复审/完结；不证明生产对象存储/专业扫描、外部提审回执，或从外部接单开始的
-完整履约链。
+`ADMIN-PILOT-08*` 与 `ADMIN-PILOT-08CI` 证明固定工单候选分配/领取/释放，独立 Workflow Task 的
+表单/资料/审核/整改/完结，以及预约上门写路径；不证明生产对象存储/专业扫描、外部提审回执，或从
+外部接单开始的完整履约链。
 `ADMIN-PILOT-09` 是明确交付边界，不得用局部读写冒烟替代完整业务写链路验收。
