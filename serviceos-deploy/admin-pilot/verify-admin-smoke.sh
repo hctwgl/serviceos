@@ -127,6 +127,24 @@ resubmit_task_created_event_id="$(new_uuid)"
 resubmit_external_code="ADMIN-PILOT-RESUBMIT-${resubmit_work_order_id%%-*}"
 resubmit_correlation_id="admin-pilot-resubmit-${resubmit_task_id}"
 
+# 预约/上门写链路使用第五个独立 Task，并注入 ACTIVE ServiceAssignment 以对齐 Visit 责任。
+field_ops_work_order_id="$(new_uuid)"
+field_ops_workflow_id="$(new_uuid)"
+field_ops_stage_id="$(new_uuid)"
+field_ops_node_id="$(new_uuid)"
+field_ops_task_id="$(new_uuid)"
+field_ops_start_event_id="$(new_uuid)"
+field_ops_stage_event_id="$(new_uuid)"
+field_ops_node_event_id="$(new_uuid)"
+field_ops_task_created_outbox_id="$(new_uuid)"
+field_ops_task_created_event_id="$(new_uuid)"
+field_ops_network_assignment_id="$(new_uuid)"
+field_ops_technician_assignment_id="$(new_uuid)"
+field_ops_network_saga_id="$(new_uuid)"
+field_ops_technician_saga_id="$(new_uuid)"
+field_ops_external_code="ADMIN-PILOT-FIELD-${field_ops_work_order_id%%-*}"
+field_ops_correlation_id="admin-pilot-field-ops-${field_ops_task_id}"
+
 seed_completion_fixture() {
   local work_order_id="$1"
   local workflow_id="$2"
@@ -185,6 +203,23 @@ seed_completion_fixture \
   "${resubmit_task_created_outbox_id}" "${resubmit_task_created_event_id}" \
   "${resubmit_external_code}" "${resubmit_correlation_id}"
 
+seed_completion_fixture \
+  "${field_ops_work_order_id}" "${field_ops_workflow_id}" "${field_ops_stage_id}" \
+  "${field_ops_node_id}" "${field_ops_task_id}" "${field_ops_start_event_id}" \
+  "${field_ops_stage_event_id}" "${field_ops_node_event_id}" \
+  "${field_ops_task_created_outbox_id}" "${field_ops_task_created_event_id}" \
+  "${field_ops_external_code}" "${field_ops_correlation_id}"
+
+docker compose -f "${compose_file}" exec -T postgres \
+  psql -U serviceos_app -d serviceos \
+  -v field_ops_work_order_id="${field_ops_work_order_id}" \
+  -v field_ops_task_id="${field_ops_task_id}" \
+  -v field_ops_network_assignment_id="${field_ops_network_assignment_id}" \
+  -v field_ops_technician_assignment_id="${field_ops_technician_assignment_id}" \
+  -v field_ops_network_saga_id="${field_ops_network_saga_id}" \
+  -v field_ops_technician_saga_id="${field_ops_technician_saga_id}" \
+  < serviceos-deploy/admin-pilot/seed-admin-field-ops-assignment.sql
+
 if ! curl --fail --silent "http://127.0.0.1:5173" >/dev/null; then
   (
     cd serviceos-admin-web
@@ -203,6 +238,8 @@ export ADMIN_PILOT_REOPEN_WORK_ORDER_CODE="${reopen_external_code}"
 export ADMIN_PILOT_REOPEN_TASK_ID="${reopen_task_id}"
 export ADMIN_PILOT_RESUBMIT_WORK_ORDER_CODE="${resubmit_external_code}"
 export ADMIN_PILOT_RESUBMIT_TASK_ID="${resubmit_task_id}"
+export ADMIN_PILOT_FIELD_OPS_WORK_ORDER_CODE="${field_ops_external_code}"
+export ADMIN_PILOT_FIELD_OPS_TASK_ID="${field_ops_task_id}"
 npm run test:e2e
 
 task_state="$(query_db "
@@ -725,6 +762,60 @@ resubmit_progression_inbox_count="$(query_db "
 ")"
 [[ "${resubmit_progression_inbox_count}" == "1" ]] || {
   echo "Admin 试点补传完结 task.completed 未被 Workflow Inbox 成功消费: ${resubmit_progression_inbox_count}" >&2
+  exit 1
+}
+
+field_ops_state=""
+for _ in $(seq 1 45); do
+  field_ops_state="$(query_db "
+    SELECT appointment.status || ':' ||
+           visit.status || ':' ||
+           count(DISTINCT audit.action_name) || ':' ||
+           count(DISTINCT inbox.event_id)
+      FROM apt_appointment appointment
+      JOIN fld_visit visit
+        ON visit.tenant_id = appointment.tenant_id
+       AND visit.appointment_id = appointment.appointment_id
+      LEFT JOIN aud_audit_record audit
+        ON audit.tenant_id = appointment.tenant_id
+       AND (
+         (
+           audit.target_id = appointment.appointment_id::text
+           AND audit.action_name IN ('APPOINTMENT_PROPOSE', 'APPOINTMENT_CONFIRM')
+         )
+         OR (
+           audit.target_id = visit.visit_id::text
+           AND audit.action_name IN ('VISIT_CHECK_IN', 'VISIT_CHECK_OUT')
+         )
+       )
+      LEFT JOIN rel_outbox_event outbox
+        ON outbox.tenant_id = appointment.tenant_id
+       AND (
+         (
+           outbox.aggregate_type = 'Appointment'
+           AND outbox.aggregate_id = appointment.appointment_id::text
+           AND outbox.event_type IN ('appointment.proposed', 'appointment.confirmed')
+         )
+         OR (
+           outbox.aggregate_type = 'Visit'
+           AND outbox.aggregate_id = visit.visit_id::text
+           AND outbox.event_type IN ('visit.checked-in', 'visit.checked-out')
+         )
+       )
+      LEFT JOIN rel_inbox_record inbox
+        ON inbox.tenant_id = outbox.tenant_id
+       AND inbox.event_id = outbox.event_id
+       AND inbox.status = 'SUCCEEDED'
+     WHERE appointment.task_id = '${field_ops_task_id}'
+     GROUP BY appointment.appointment_id, appointment.status,
+              visit.visit_id, visit.status
+  ")"
+  # 签到后 Appointment 进入 IN_PROGRESS；签退后 Visit=COMPLETED。
+  [[ "${field_ops_state}" == "IN_PROGRESS:COMPLETED:4:4" ]] && break
+  sleep 1
+done
+[[ "${field_ops_state}" == "IN_PROGRESS:COMPLETED:4:4" ]] || {
+  echo "Admin 试点预约/上门写链路不完整: ${field_ops_state}" >&2
   exit 1
 }
 
