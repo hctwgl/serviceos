@@ -38,6 +38,7 @@ VALUES
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'dispatch.read', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'integration.readInbound', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'integration.readOutbound', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'integration.submitClientReview', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'operations.exception.read', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'file.upload', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'file.download', now())

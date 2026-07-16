@@ -122,9 +122,13 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
             CommandMetadata metadata,
             CreateReviewSubmissionCommand command
     ) {
-        if (principal.principalType() != CurrentPrincipal.PrincipalType.SERVICE) {
+        // M137：Admin Portal 以获权 USER 触发提审；SERVICE 适配器仍可调用。
+        // 授权继续以 integration.submitClientReview + Tenant/Project Scope 失败关闭，
+        // 不因主体类型绕过 Capability，也不猜测未授权操作人。
+        if (principal.principalType() != CurrentPrincipal.PrincipalType.SERVICE
+                && principal.principalType() != CurrentPrincipal.PrincipalType.USER) {
             throw new BusinessProblem(ProblemCode.ACCESS_DENIED,
-                    "Review submission delivery requires a SERVICE principal");
+                    "Review submission delivery requires a USER or SERVICE principal");
         }
         if (command.sourceReviewCaseId() == null) {
             throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, "sourceReviewCaseId is required");

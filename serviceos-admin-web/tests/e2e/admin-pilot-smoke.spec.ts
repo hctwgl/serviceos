@@ -1059,3 +1059,63 @@ test('真实 OIDC 登录后可完成预约提议确认与上门签到签退', as
   })
   await expect(page.getByText(`签退 Visit ${checkedIn.visitId}`)).toBeVisible()
 })
+
+test('真实 OIDC 登录后可通过审核并创建 BYD 提审外发直至 ACKNOWLEDGED', async ({ page }) => {
+  test.setTimeout(180_000)
+  const workOrderCode = process.env.ADMIN_PILOT_OUTBOUND_WORK_ORDER_CODE
+  const taskId = process.env.ADMIN_PILOT_OUTBOUND_TASK_ID
+  expect(workOrderCode, '缺少动态外发验证工单编码').toBeTruthy()
+  expect(taskId, '缺少动态外发验证 Task ID').toBeTruthy()
+
+  const { reviewCase, reviewPage } = await prepareOpenReviewCase(
+    page,
+    workOrderCode!,
+    taskId!,
+    'admin-pilot-outbound-e2e',
+    'admin-pilot-outbound.png',
+  )
+
+  const approvePromise = reviewPage.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(`/api/v1/review-cases/${reviewCase.reviewCaseId}:decide`),
+  )
+  await reviewPage.getByLabel('note').fill('Admin pilot outbound approved')
+  await reviewPage.getByRole('button', { name: 'decide', exact: true }).click()
+  expect((await approvePromise).status()).toBe(200)
+  await expect(reviewPage.getByText('已裁决为 APPROVED')).toBeVisible()
+
+  const submitPromise = reviewPage.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith('/api/v1/internal/integration/byd/review-submissions'),
+  )
+  await reviewPage.getByRole('button', { name: 'create BYD review submission', exact: true }).click()
+  const submitResponse = await submitPromise
+  expect(submitResponse.status()).toBe(201)
+  const delivery = (await submitResponse.json()) as {
+    deliveryId: string
+    status: string
+  }
+  expect(delivery.deliveryId).toBeTruthy()
+  await expect(
+    reviewPage.getByText(new RegExp(`已创建外发交付 ${delivery.deliveryId}`)),
+  ).toBeVisible()
+
+  // Task worker 在事务外发送 stub HTTP，再落 ACK/CLIENT Case；轮询权威详情直至 ACKNOWLEDGED。
+  await reviewPage.goto(
+    new URL(`/integration/outbound/${delivery.deliveryId}`, page.url()).toString(),
+  )
+  await expect(reviewPage.getByRole('heading', { name: '外发交付' })).toBeVisible()
+  await expect
+    .poll(
+      async () => {
+        await reviewPage.getByRole('button', { name: '刷新' }).click()
+        return reviewPage.getByText('ACKNOWLEDGED', { exact: true }).count()
+      },
+      { timeout: 60_000 },
+    )
+    .toBeGreaterThan(0)
+
+  await reviewPage.close()
+})

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.70.0
+  version: 0.71.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1832,8 +1832,9 @@ paths:
       operationId: createBydReviewSubmission
       summary: 从已通过 INTERNAL ReviewCase 创建 BYD 提审交付
       description: >-
-        仅允许获权 SERVICE principal 调用。服务端从已冻结的审核决定、Task 与 BYD
-        CanonicalMessage 派生不可变 payload；未知外部结果不得自动重发。
+        允许获权 USER 或 SERVICE principal 调用（需要 integration.submitClientReview）。
+        服务端从已冻结的审核决定、Task 与 BYD CanonicalMessage 派生不可变 payload；
+        未知外部结果不得自动重发。
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/CorrelationId'

@@ -5,12 +5,16 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 compose_file="${repo_root}/serviceos-deploy/compose.yaml"
 backend_log="${TMPDIR:-/tmp}/serviceos-admin-pilot-backend.log"
 admin_log="${TMPDIR:-/tmp}/serviceos-admin-pilot-web.log"
+byd_stub_log="${TMPDIR:-/tmp}/serviceos-admin-pilot-byd-stub.log"
 backend_pid=""
 admin_pid=""
+byd_stub_pid=""
+byd_stub_port=18090
 
 cleanup() {
   [[ -z "${admin_pid}" ]] || kill "${admin_pid}" 2>/dev/null || true
   [[ -z "${backend_pid}" ]] || kill "${backend_pid}" 2>/dev/null || true
+  [[ -z "${byd_stub_pid}" ]] || kill "${byd_stub_pid}" 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -49,18 +53,45 @@ cd "${repo_root}"
 docker compose -f "${compose_file}" up -d postgres keycloak
 wait_http "http://127.0.0.1:8081/realms/serviceos/.well-known/openid-configuration" "Keycloak"
 
-if ! curl --fail --silent "http://127.0.0.1:8080/livez" >/dev/null; then
-  ./mvnw --batch-mode --no-transfer-progress -pl serviceos-backend -am -DskipTests package
-  # complete 只在命令事务内追加 task.completed；必须启用真实 Outbox worker，
-  # 由 Inbox 去重消费者继续推进 Node/Stage/Workflow/WorkOrder，不能用 SQL 模拟异步结果。
-  # 浏览器通过 Vite 同源代理执行私有 PUT，避免把本地 HMAC 上传 URL 暴露为跨域地址；
-  # Backend 仍负责签发短期 token、校验大小/摘要/MIME 并在 Finalize 后调度扫描。
-  SERVICEOS_OUTBOX_SCHEDULING_ENABLED=true \
-  SERVICEOS_TASK_SCHEDULING_ENABLED=true \
-  SERVICEOS_FILE_TRANSFER_BASE_URL=http://127.0.0.1:5173/api/v1/file-transfers \
-    java -jar serviceos-backend/target/serviceos-backend-0.1.0-SNAPSHOT.jar >"${backend_log}" 2>&1 &
-  backend_pid="$!"
+# 本地协议 stub：只证明 errno=0 严格 ACK 路径，不宣称真实 sandbox。
+python3 - <<'PY' >"${byd_stub_log}" 2>&1 &
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+class Handler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        length = int(self.headers.get("Content-Length", "0"))
+        _ = self.rfile.read(length)
+        body = b'{"errno":0,"errmsg":"ok","data":null}'
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, fmt, *args):
+        return
+
+HTTPServer(("127.0.0.1", 18090), Handler).serve_forever()
+PY
+byd_stub_pid="$!"
+
+# 出站夹具要求 Backend 带着 stub URL/凭据版本启动；若已有旧进程则重启，避免漏配环境变量。
+if curl --fail --silent "http://127.0.0.1:8080/livez" >/dev/null; then
+  pkill -f 'serviceos-backend-0.1.0-SNAPSHOT.jar' 2>/dev/null || true
+  sleep 2
 fi
+./mvnw --batch-mode --no-transfer-progress -pl serviceos-backend -am -DskipTests package
+# complete 只在命令事务内追加 task.completed；必须启用真实 Outbox worker，
+# 由 Inbox 去重消费者继续推进 Node/Stage/Workflow/WorkOrder，不能用 SQL 模拟异步结果。
+# 浏览器通过 Vite 同源代理执行私有 PUT，避免把本地 HMAC 上传 URL 暴露为跨域地址；
+# Backend 仍负责签发短期 token、校验大小/摘要/MIME 并在 Finalize 后调度扫描。
+SERVICEOS_OUTBOX_SCHEDULING_ENABLED=true \
+SERVICEOS_TASK_SCHEDULING_ENABLED=true \
+SERVICEOS_FILE_TRANSFER_BASE_URL=http://127.0.0.1:5173/api/v1/file-transfers \
+SERVICEOS_BYD_CPIM_OUTBOUND_BASE_URL="http://127.0.0.1:${byd_stub_port}" \
+SERVICEOS_BYD_CPIM_CREDENTIAL_VERSION_ID=local-admin-pilot-byd-cred-v1 \
+  java -jar serviceos-backend/target/serviceos-backend-0.1.0-SNAPSHOT.jar >"${backend_log}" 2>&1 &
+backend_pid="$!"
 wait_http "http://127.0.0.1:8080/readyz" "ServiceOS Backend"
 
 docker compose -f "${compose_file}" exec -T postgres \
@@ -145,6 +176,36 @@ field_ops_technician_saga_id="$(new_uuid)"
 field_ops_external_code="ADMIN-PILOT-FIELD-${field_ops_work_order_id%%-*}"
 field_ops_correlation_id="admin-pilot-field-ops-${field_ops_task_id}"
 
+# BYD 提审外发使用第六套独立 Task，并登记 CREATE_WORK_ORDER Envelope/Canonical 系谱。
+outbound_work_order_id="$(new_uuid)"
+outbound_workflow_id="$(new_uuid)"
+outbound_stage_id="$(new_uuid)"
+outbound_node_id="$(new_uuid)"
+outbound_task_id="$(new_uuid)"
+outbound_start_event_id="$(new_uuid)"
+outbound_stage_event_id="$(new_uuid)"
+outbound_node_event_id="$(new_uuid)"
+outbound_task_created_outbox_id="$(new_uuid)"
+outbound_task_created_event_id="$(new_uuid)"
+outbound_envelope_id="$(new_uuid)"
+outbound_canonical_id="$(new_uuid)"
+outbound_external_code="ADMIN-PILOT-OUTBOUND-${outbound_work_order_id%%-*}"
+outbound_correlation_id="admin-pilot-outbound-${outbound_task_id}"
+outbound_order_code="PILOT-${outbound_work_order_id%%-*}"
+outbound_business_key="BYD:INSTALL:${outbound_order_code}"
+outbound_transport_dedup="$(python3 - <<PY
+import hashlib
+print(hashlib.sha256(b"admin-pilot-outbound-${outbound_work_order_id}").hexdigest())
+PY
+)"
+outbound_payload_digest="$(python3 - <<PY
+import hashlib
+print(hashlib.sha256(b"admin-pilot-canonical-${outbound_work_order_id}").hexdigest())
+PY
+)"
+outbound_object_ref="admin-pilot/inbound/${outbound_work_order_id}.json"
+outbound_external_message_id="nonce-${outbound_work_order_id}"
+
 seed_completion_fixture() {
   local work_order_id="$1"
   local workflow_id="$2"
@@ -220,6 +281,26 @@ docker compose -f "${compose_file}" exec -T postgres \
   -v field_ops_technician_saga_id="${field_ops_technician_saga_id}" \
   < serviceos-deploy/admin-pilot/seed-admin-field-ops-assignment.sql
 
+seed_completion_fixture \
+  "${outbound_work_order_id}" "${outbound_workflow_id}" "${outbound_stage_id}" \
+  "${outbound_node_id}" "${outbound_task_id}" "${outbound_start_event_id}" \
+  "${outbound_stage_event_id}" "${outbound_node_event_id}" \
+  "${outbound_task_created_outbox_id}" "${outbound_task_created_event_id}" \
+  "${outbound_external_code}" "${outbound_correlation_id}"
+
+docker compose -f "${compose_file}" exec -T postgres \
+  psql -U serviceos_app -d serviceos \
+  -v outbound_work_order_id="${outbound_work_order_id}" \
+  -v outbound_envelope_id="${outbound_envelope_id}" \
+  -v outbound_canonical_id="${outbound_canonical_id}" \
+  -v outbound_business_key="${outbound_business_key}" \
+  -v outbound_transport_dedup="${outbound_transport_dedup}" \
+  -v outbound_payload_digest="${outbound_payload_digest}" \
+  -v outbound_object_ref="${outbound_object_ref}" \
+  -v outbound_external_message_id="${outbound_external_message_id}" \
+  -v outbound_correlation_id="${outbound_correlation_id}" \
+  < serviceos-deploy/admin-pilot/seed-admin-byd-lineage.sql
+
 if ! curl --fail --silent "http://127.0.0.1:5173" >/dev/null; then
   (
     cd serviceos-admin-web
@@ -240,6 +321,8 @@ export ADMIN_PILOT_RESUBMIT_WORK_ORDER_CODE="${resubmit_external_code}"
 export ADMIN_PILOT_RESUBMIT_TASK_ID="${resubmit_task_id}"
 export ADMIN_PILOT_FIELD_OPS_WORK_ORDER_CODE="${field_ops_external_code}"
 export ADMIN_PILOT_FIELD_OPS_TASK_ID="${field_ops_task_id}"
+export ADMIN_PILOT_OUTBOUND_WORK_ORDER_CODE="${outbound_external_code}"
+export ADMIN_PILOT_OUTBOUND_TASK_ID="${outbound_task_id}"
 npm run test:e2e
 
 task_state="$(query_db "
@@ -816,6 +899,34 @@ for _ in $(seq 1 45); do
 done
 [[ "${field_ops_state}" == "COMPLETED:COMPLETED:4:4" ]] || {
   echo "Admin 试点预约/上门写链路不完整: ${field_ops_state}" >&2
+  exit 1
+}
+
+outbound_delivery_state=""
+for _ in $(seq 1 60); do
+  outbound_delivery_state="$(query_db "
+    SELECT delivery.status || ':' ||
+           coalesce(max(attempt.status), 'NONE') || ':' ||
+           count(DISTINCT ack.acknowledgement_id) || ':' ||
+           (delivery.client_review_case_id IS NOT NULL)
+      FROM int_outbound_delivery delivery
+      LEFT JOIN int_delivery_attempt attempt
+        ON attempt.tenant_id = delivery.tenant_id
+       AND attempt.delivery_id = delivery.delivery_id
+      LEFT JOIN int_external_acknowledgement ack
+        ON ack.tenant_id = delivery.tenant_id
+       AND ack.delivery_id = delivery.delivery_id
+     WHERE delivery.source_review_case_id IN (
+             SELECT review_case_id FROM evd_review_case
+              WHERE task_id = '${outbound_task_id}' AND origin = 'INTERNAL'
+           )
+     GROUP BY delivery.delivery_id, delivery.status, delivery.client_review_case_id
+  ")"
+  [[ "${outbound_delivery_state}" == "ACKNOWLEDGED:DELIVERED:1:t" ]] && break
+  sleep 1
+done
+[[ "${outbound_delivery_state}" == "ACKNOWLEDGED:DELIVERED:1:t" ]] || {
+  echo "Admin 试点 BYD 提审外发 ACK 不完整: ${outbound_delivery_state}" >&2
   exit 1
 }
 
