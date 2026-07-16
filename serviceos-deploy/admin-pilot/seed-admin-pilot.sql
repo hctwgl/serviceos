@@ -1,4 +1,4 @@
--- M134 Admin 试点只读冒烟夹具。全部标识固定且写入幂等，禁止复制到生产数据库。
+-- M134 Admin 试点局部读写冒烟夹具。全部标识固定且写入幂等，禁止复制到生产数据库。
 \set ON_ERROR_STOP on
 
 INSERT INTO prj_project (
@@ -104,6 +104,31 @@ INSERT INTO tsk_task (
     '20000000-0000-4000-8000-000000000001', repeat('a', 64),
     '30000000-0000-4000-8000-000000000001', repeat('c', 64), 'PILOT_SURVEY',
     'PILOT_RESPONSE'
+) ON CONFLICT DO NOTHING;
+
+-- 固定开发用户必须先是 ACTIVE 候选人，后端才会投影并允许 claim。
+-- claim 会追加 RESPONSIBLE 责任事实，release 只撤销该责任事实并保留候选资格，
+-- 因此同一夹具可重复执行真实领取/释放写链路，不需要回退业务版本或清理历史审计。
+INSERT INTO tsk_task_assignment_batch (
+    assignment_batch_id, tenant_id, task_id, source_type, source_id,
+    candidate_count, task_version, assigned_by, assigned_at
+) VALUES (
+    '71000000-0000-4000-8000-000000000001', 'tenant-local',
+    '70000000-0000-4000-8000-000000000001', 'MANUAL', 'admin-pilot-seed',
+    1, 1, 'local-fixture', now() - interval '90 minutes'
+) ON CONFLICT DO NOTHING;
+
+INSERT INTO tsk_task_assignment (
+    task_assignment_id, tenant_id, task_id, assignment_batch_id,
+    assignment_kind, principal_type, principal_id, status,
+    source_type, source_id, effective_from, created_by, created_at
+) VALUES (
+    '72000000-0000-4000-8000-000000000001', 'tenant-local',
+    '70000000-0000-4000-8000-000000000001',
+    '71000000-0000-4000-8000-000000000001',
+    'CANDIDATE', 'USER', '06b612f3-a901-4b0e-bd90-86b4259cc087', 'ACTIVE',
+    'MANUAL', 'admin-pilot-seed', now() - interval '90 minutes',
+    'local-fixture', now() - interval '90 minutes'
 ) ON CONFLICT DO NOTHING;
 
 INSERT INTO sla_instance (

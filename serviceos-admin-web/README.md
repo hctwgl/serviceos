@@ -23,7 +23,9 @@ serviceos-deploy/admin-pilot/verify-admin-smoke.sh
 ```
 
 脚本复用本机 Google Chrome，验证真实 Keycloak、Backend、PostgreSQL 与 Admin Web：
-登录 → 工单目录 → 工作区 → 工单详情/Stage/Task/SLA/核心时间线。脚本不会删除本地数据卷。
+登录 → 工单目录 → 工作区 → 工单详情/Stage/Task/SLA/核心时间线 → Task 领取/释放。
+脚本不会删除本地数据卷，并通过真实 RoleGrant、候选责任、版本和幂等保护执行命令；
+浏览器完成后还会校验 READY、候选/责任事实与成功审计记录。
 
 明确未实现：设计系统、SavedView、正式企业 OIDC/BFF、Network/Technician、
 SERVICE-only 车企适配层 UI，以及完整履约写链路 E2E。

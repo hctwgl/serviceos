@@ -109,7 +109,7 @@ docker compose -f serviceos-deploy/compose.yaml up -d postgres
 serviceos-deploy/staging/verify-rehearsal.sh
 ```
 
-Admin 试点只读链路的真实本地冒烟：
+Admin 试点局部读写链路的真实本地冒烟：
 
 ```bash
 serviceos-deploy/admin-pilot/verify-admin-smoke.sh

@@ -17,7 +17,7 @@ lastUpdated: 2026-07-16
 | Admin CI | GitHub Actions 使用 Node 22 执行 `npm ci --no-audit --no-fund` 与 `npm run build`；staging 等待 Java 与 Admin 两个门禁 |
 | 本地身份 | Vite 开发模式显式开启 Keycloak Authorization Code + PKCE；无 client secret、无硬编码 token、无生产手工 JWT 入口 |
 | 后端授权 | JWT 只提供身份声明；ServiceOS 继续从数据库 RoleGrant 实时校验 tenant/project/capability，401 清理本机会话并失败关闭 |
-| 真实 E2E | 固定幂等夹具 + Playwright/Google Chrome 验证登录、工单目录、工作区、详情、Stage、Task、SLA、时间线 |
+| 真实 E2E | 固定幂等夹具 + Playwright/Google Chrome 验证登录、工单目录、工作区、详情、Stage、Task、SLA、时间线，以及 Task claim/release |
 | 数据库 | 使用 `serviceos-deploy/compose.yaml` 的 PostgreSQL 18，后端启动时执行当前 86 个 Flyway 迁移 |
 
 ## 2. P0 根因与修复
@@ -46,7 +46,8 @@ serviceos-deploy/admin-pilot/verify-admin-smoke.sh
 ```
 
 E2E 脚本不执行 `down -v`，不会删除开发者的 PostgreSQL 数据卷。夹具使用固定 UUID 和
-`ON CONFLICT DO NOTHING`，可重复执行；只允许本地开发数据库使用。
+`ON CONFLICT DO NOTHING`，可重复执行；并在浏览器步骤后检查 Task 回到 READY、ACTIVE 候选唯一、
+ACTIVE RESPONSIBLE 清零和成功审计记录存在。夹具只允许本地开发数据库使用。
 
 ## 4. 已证明与未证明边界
 
@@ -56,6 +57,8 @@ E2E 脚本不执行 `down -v`，不会删除开发者的 PostgreSQL 数据卷。
 - Backend 对真实 JWT 的 issuer、JWK、audience 校验；
 - 数据库 RoleGrant 的 tenant/capability/project scope；
 - Admin 对真实工单只读权威投影的聚合展示。
+- Admin 按服务端 allowed-actions 执行 Task claim/release，并由 PostgreSQL 候选/责任事实、
+  `If-Match` 与幂等键保护；release 后回到 READY，可重复验证。
 
 尚未证明：
 
@@ -65,4 +68,4 @@ E2E 脚本不执行 `down -v`，不会删除开发者的 PostgreSQL 数据卷。
 - 正式 sandbox、对象存储、扫描服务、Broker、通知和 SLA BUSINESS 日历；
 - SavedView、设计系统、可访问性与多浏览器矩阵。
 
-因此本次交付只能称为“Admin 试点可运行只读基线”，不能称为“完整现场履约平台已交付”。
+因此本次交付只能称为“Admin 试点可运行局部读写基线”，不能称为“完整现场履约平台已交付”。

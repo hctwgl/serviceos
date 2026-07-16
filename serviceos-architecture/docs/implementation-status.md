@@ -1011,10 +1011,11 @@ FACTS_CALCULATIONS、customer/location、Portal。
 
 - Admin Web 的 Node 22 `npm ci` / production build CI 阻断门禁；
 - 开发态 Keycloak Authorization Code + PKCE，生产失败关闭且删除手工 JWT 粘贴入口；
-- 真实 Backend/PostgreSQL/Chrome 的只读 E2E，覆盖目录、工作区、详情、Stage、Task、SLA、时间线；
+- 真实 Backend/PostgreSQL/Chrome 的 E2E，覆盖目录、工作区、详情、Stage、Task、SLA、时间线，
+  以及受 RoleGrant、候选责任、If-Match 与幂等键保护的 Task claim/release；
 - CI 敏感输出 VIN 误报根因修复与正负样本。
 
-未实现：正式企业 IdP/BFF 和完整履约写链路 E2E；详见
+未实现：正式企业 IdP/BFF 和接单至完结的完整履约写链路 E2E；详见
 `docs/admin-pilot-readiness-baseline.md`。
 
 ## 5. 下一实施方向
