@@ -74,12 +74,14 @@ export async function apiPost<T>(
   options: {
     body?: unknown
     idempotencyKey: string
-    ifMatch: string
+    ifMatch?: string
   },
 ): Promise<ApiResult<T>> {
   const extra: Record<string, string> = {
     'Idempotency-Key': options.idempotencyKey,
-    'If-Match': options.ifMatch,
+  }
+  if (options.ifMatch) {
+    extra['If-Match'] = options.ifMatch
   }
   const hasBody = options.body !== undefined
   if (hasBody) {
@@ -93,6 +95,7 @@ export async function apiPost<T>(
   if (!response.ok) {
     await parseError(response)
   }
+  // 202 Accepted 等也可能带 JSON 体
   const text = await response.text()
   return {
     data: (text ? JSON.parse(text) : null) as T,

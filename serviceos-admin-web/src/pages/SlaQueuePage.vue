@@ -72,13 +72,23 @@ onMounted(() => load())
     />
 
     <p v-if="page?.items?.length" class="links">
-      打开工作区：
+      打开 SLA：
       <RouterLink
         v-for="item in page.items"
         :key="item.slaInstanceId"
-        :to="{ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: item.workOrderId } }"
+        :to="{ name: 'ADMIN.SLA.DETAIL', params: { id: item.slaInstanceId } }"
       >
         {{ item.slaRef }}
+      </RouterLink>
+    </p>
+    <p v-if="page?.items?.length" class="links">
+      打开工作区：
+      <RouterLink
+        v-for="item in page.items"
+        :key="`wo-${item.slaInstanceId}`"
+        :to="{ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: item.workOrderId } }"
+      >
+        {{ item.workOrderId }}
       </RouterLink>
     </p>
   </section>

@@ -46,13 +46,23 @@ onMounted(() => load())
       @next="load(cursor)"
     />
     <p v-if="page?.items?.length" class="links">
-      打开工作区：
+      打开交付：
       <RouterLink
         v-for="item in page.items"
         :key="item.deliveryId"
+        :to="{ name: 'ADMIN.INTEGRATION.DETAIL', params: { id: item.deliveryId } }"
+      >
+        {{ item.externalOrderCode || item.deliveryId }}
+      </RouterLink>
+    </p>
+    <p v-if="page?.items?.length" class="links">
+      打开工作区：
+      <RouterLink
+        v-for="item in page.items"
+        :key="`wo-${item.deliveryId}`"
         :to="{ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: item.sourceWorkOrderId } }"
       >
-        {{ item.externalOrderCode || item.sourceWorkOrderId }}
+        {{ item.sourceWorkOrderId }}
       </RouterLink>
     </p>
   </div>

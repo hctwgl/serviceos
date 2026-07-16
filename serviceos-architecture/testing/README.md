@@ -112,3 +112,7 @@
 - [M109 Admin 任务详情验收矩阵](106-m109-admin-task-detail-acceptance.md)
 - [M110 Admin 项目详情验收矩阵](107-m110-admin-project-detail-acceptance.md)
 - [M111 Admin 运营异常确认验收矩阵](108-m111-admin-exception-acknowledge-acceptance.md)
+- [M112 Admin 审核案例详情验收矩阵](109-m112-admin-review-case-detail-acceptance.md)
+- [M113 Admin 整改案例详情验收矩阵](110-m113-admin-correction-case-detail-acceptance.md)
+- [M114 Admin 外发交付详情验收矩阵](111-m114-admin-outbound-delivery-detail-acceptance.md)
+- [M115 Admin SLA 实例详情验收矩阵](112-m115-admin-sla-instance-detail-acceptance.md)

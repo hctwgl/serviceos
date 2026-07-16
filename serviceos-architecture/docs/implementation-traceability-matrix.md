@@ -206,3 +206,7 @@ Feature gate/authority: if applicable
 | M109 | Admin 任务详情消费 GET /tasks/{id} 与 execution-attempts；复用命令面板 | PRODUCT-01/02 + ARCH-19 + API-02 Task Detail/Attempts + Admin Web build | 表单/资料提交流程编排、OIDC、E2E |
 | M110 | Admin 项目详情与 scope-revisions 历史 | PRODUCT-01/02 + ARCH-19 + API-07 Project Query + Admin Web build | 项目创建/范围修订命令 UI、OIDC、E2E |
 | M111 | Admin 异常队列按 allowedActions 执行 ACKNOWLEDGE | PRODUCT-01/02 + ARCH-19 + API-04 Exception Acknowledge + Admin Web build | 通用 RESOLVED UI、OIDC、E2E |
+| M112 | Admin 审核案例详情与 decide/force/reopen | PRODUCT-01/02 + ARCH-10/19 + Evidence Review APIs + Admin Web build | 表单/资料编排、OIDC、E2E |
+| M113 | Admin 整改案例详情与 resubmit/close/waive | PRODUCT-01/02 + ARCH-10/19 + Correction APIs + Admin Web build | 资料提交流程编排、OIDC、E2E |
+| M114 | Admin 外发交付详情与 UNKNOWN retry | PRODUCT-01/02 + ARCH-13/19 + Outbound APIs + Admin Web build | 人工标记已送达/放弃、OIDC、E2E |
+| M115 | Admin SLA 实例详情 | PRODUCT-01/02 + ARCH-12/19 + SLA Detail API + Admin Web build | BUSINESS 日历、预警 UI、E2E |
