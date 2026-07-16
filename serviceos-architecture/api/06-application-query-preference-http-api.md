@@ -6,12 +6,13 @@ status: Accepted
 
 # 应用工作区、队列与用户偏好 HTTP API
 
-## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91）
+## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92）
 
 **Accepted（可指导实现）**：
 
 - §2 通用查询元数据；
 - §5 中 `GET /api/v1/work-orders/{id}/workspace` 顶层组合快照（M85）；
+- §5 顶层工作区 `serviceAssignmentSummary` 当前 ACTIVE 服务责任摘要（M92）；
 - §5 中 `GET /api/v1/work-orders/{id}/workspace/sections/{section}`：
   `TASKS`、`TIMELINE_AUDIT`（M87）、`APPOINTMENTS_VISITS`（M88）、
   `FORMS_EVIDENCE`（M89）、`REVIEWS_CORRECTIONS`（M90）与 `INTEGRATION`（M91）。

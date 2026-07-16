@@ -37,7 +37,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** M85～M91：工作区组合查询的授权、无 PII、按需区块与缺权降级证据。 */
+/** M85～M92：工作区组合查询的授权、无 PII、按需区块与缺权降级证据。 */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = ServiceOsApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE)
 class WorkOrderWorkspacePostgresIT {
@@ -137,10 +137,12 @@ class WorkOrderWorkspacePostgresIT {
         assertThat(workspace.sectionAvailability().get("FORMS_EVIDENCE")).isEqualTo("UNAVAILABLE");
         assertThat(workspace.sectionAvailability().get("REVIEWS_CORRECTIONS")).isEqualTo("UNAVAILABLE");
         assertThat(workspace.sectionAvailability().get("INTEGRATION")).isEqualTo("UNAVAILABLE");
+        assertThat(workspace.sectionAvailability().get("SERVICE_ASSIGNMENT")).isEqualTo("UNAVAILABLE");
         assertThat(workspace.sectionAvailability().get("SLA")).isEqualTo("UNAVAILABLE");
         assertThat(workspace.sectionAvailability().get("EXCEPTIONS")).isEqualTo("UNAVAILABLE");
         assertThat(workspace.slaSummary()).isNull();
         assertThat(workspace.exceptionSummary()).isNull();
+        assertThat(workspace.serviceAssignmentSummary()).isNull();
         assertThat(workspace.timelineFreshnessStatus()).isEqualTo("UNKNOWN");
         assertThat(workspace.meta().freshnessStatus()).isEqualTo("UNKNOWN");
         assertThat(workspace.meta().projectionCheckpoint()).startsWith("work-order-core-timeline.v1:gen:");
@@ -347,6 +349,42 @@ class WorkOrderWorkspacePostgresIT {
                 "INTEGRATION", "cursor-1", 20))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
+    }
+
+    @Test
+    void serviceAssignmentSummaryLoadsActiveResponsibilitiesWithoutInternalIds() {
+        seedReader("dispatch-reader", projectId, "workOrder.read", "dispatch.read");
+        seedActiveServiceResponsibilities(taskId);
+
+        WorkOrderWorkspace workspace = workspaces.get(
+                principal("dispatch-reader"), "corr-assignment", workOrderId);
+
+        assertThat(workspace.sectionAvailability().get("SERVICE_ASSIGNMENT")).isEqualTo("AVAILABLE");
+        assertThat(workspace.serviceAssignmentSummary()).isNotNull();
+        assertThat(workspace.serviceAssignmentSummary().taskId()).isEqualTo(taskId);
+        assertThat(workspace.serviceAssignmentSummary().networkId()).isEqualTo("network-m92");
+        assertThat(workspace.serviceAssignmentSummary().technicianId()).isEqualTo("technician-m92");
+        assertThat(workspace.serviceAssignmentSummary().networkReassignmentReasonCode())
+                .isEqualTo("INITIAL_ASSIGNMENT");
+        assertThat(workspace.serviceAssignmentSummary().technicianReassignmentReasonCode())
+                .isEqualTo("TECHNICIAN_SELECTED");
+        assertThat(jdbc.sql("""
+                SELECT risk_level FROM auth_capability WHERE capability_code='dispatch.read'
+                """).query(String.class).single()).isEqualTo("NORMAL");
+        assertThat(workspace.toString()).doesNotContain(
+                "activationSagaId", "sourceDecisionId", "authorityAssignmentId",
+                "taskExecutionGuardId", "createdBy");
+    }
+
+    @Test
+    void serviceAssignmentSummaryIsEmptyWhenAuthorizedButNoActiveResponsibility() {
+        seedReader("dispatch-empty-reader", projectId, "workOrder.read", "dispatch.read");
+
+        WorkOrderWorkspace workspace = workspaces.get(
+                principal("dispatch-empty-reader"), "corr-assignment-empty", workOrderId);
+
+        assertThat(workspace.sectionAvailability().get("SERVICE_ASSIGNMENT")).isEqualTo("EMPTY");
+        assertThat(workspace.serviceAssignmentSummary()).isNull();
     }
 
     private UUID project() {
@@ -837,6 +875,53 @@ class WorkOrderWorkspacePostgresIT {
                 .param("receivedAt", java.sql.Timestamp.from(receivedAt))
                 .update();
         return new IntegrationFixture(envelopeId, deliveryId);
+    }
+
+    private void seedActiveServiceResponsibilities(UUID taskId) {
+        Instant networkEffectiveFrom = Instant.parse("2026-07-16T06:30:00Z");
+        Instant technicianEffectiveFrom = networkEffectiveFrom.plusSeconds(300);
+        insertActiveServiceResponsibility(
+                taskId, "NETWORK", "network-m92", "INITIAL_ASSIGNMENT", networkEffectiveFrom);
+        insertActiveServiceResponsibility(
+                taskId, "TECHNICIAN", "technician-m92", "TECHNICIAN_SELECTED",
+                technicianEffectiveFrom);
+    }
+
+    private void insertActiveServiceResponsibility(
+            UUID taskId,
+            String level,
+            String assigneeId,
+            String reasonCode,
+            Instant effectiveFrom
+    ) {
+        jdbc.sql("""
+                INSERT INTO dsp_service_assignment (
+                    service_assignment_id, tenant_id, work_order_id, task_id,
+                    responsibility_level, assignee_id, business_type, source_decision_id,
+                    status, activation_saga_id, reassignment_reason_code,
+                    effective_from, authority_assignment_id, authority_version,
+                    fence_decision_id, fence_policy_version, created_by, created_at
+                ) VALUES (
+                    :id, :tenantId, :workOrderId, :taskId,
+                    :level, :assigneeId, 'SITE_SURVEY', :sourceDecisionId,
+                    'ACTIVE', :activationSagaId, :reasonCode,
+                    :effectiveFrom, :authorityAssignmentId, 1,
+                    :fenceDecisionId, 'M92_FENCE_V1', 'fixture', :effectiveFrom
+                )
+                """)
+                .param("id", UUID.randomUUID())
+                .param("tenantId", TENANT)
+                .param("workOrderId", workOrderId)
+                .param("taskId", taskId)
+                .param("level", level)
+                .param("assigneeId", assigneeId)
+                .param("sourceDecisionId", "decision-" + level.toLowerCase())
+                .param("activationSagaId", UUID.randomUUID())
+                .param("reasonCode", reasonCode)
+                .param("effectiveFrom", java.sql.Timestamp.from(effectiveFrom))
+                .param("authorityAssignmentId", "authority-" + level.toLowerCase())
+                .param("fenceDecisionId", "fence-" + level.toLowerCase())
+                .update();
     }
 
     private UUID seedVisit(UUID appointmentId, UUID taskId) {

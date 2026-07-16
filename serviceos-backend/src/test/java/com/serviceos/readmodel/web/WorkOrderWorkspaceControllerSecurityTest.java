@@ -5,6 +5,7 @@ import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
 import com.serviceos.readmodel.api.WorkOrderWorkspace;
 import com.serviceos.readmodel.api.WorkOrderWorkspace.WorkOrderWorkspaceMeta;
+import com.serviceos.readmodel.api.WorkOrderWorkspace.WorkOrderWorkspaceServiceAssignmentSummary;
 import com.serviceos.readmodel.api.WorkOrderWorkspace.WorkOrderWorkspaceSourceVersions;
 import com.serviceos.readmodel.api.WorkOrderWorkspace.WorkOrderWorkspaceTaskSummary;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceQueryService;
@@ -76,8 +77,12 @@ class WorkOrderWorkspaceControllerSecurityTest {
                 header,
                 new WorkOrderWorkspaceTaskSummary(
                         taskId, "SITE_SURVEY", "HUMAN", "READY", "SURVEY", null, 1),
-                Map.of("TASKS", "AVAILABLE", "SLA", "UNAVAILABLE", "EXCEPTIONS", "UNAVAILABLE"),
+                Map.of("TASKS", "AVAILABLE", "SLA", "UNAVAILABLE", "EXCEPTIONS", "UNAVAILABLE",
+                        "SERVICE_ASSIGNMENT", "AVAILABLE"),
                 "/api/v1/tasks/" + taskId + "/allowed-actions",
+                new WorkOrderWorkspaceServiceAssignmentSummary(
+                        taskId, "network-m92", now.minusSeconds(70), "INITIAL_ASSIGNMENT",
+                        "technician-m92", now.minusSeconds(60), "TECHNICIAN_SELECTED"),
                 null,
                 null,
                 "UNKNOWN",
@@ -95,6 +100,10 @@ class WorkOrderWorkspaceControllerSecurityTest {
                 .andExpect(jsonPath("$.header.externalOrderCode").value("EXT-1"))
                 .andExpect(jsonPath("$.currentTaskSummary.taskType").value("SITE_SURVEY"))
                 .andExpect(jsonPath("$.allowedActionLink").value("/api/v1/tasks/" + taskId + "/allowed-actions"))
+                .andExpect(jsonPath("$.serviceAssignmentSummary.networkId").value("network-m92"))
+                .andExpect(jsonPath("$.serviceAssignmentSummary.technicianId").value("technician-m92"))
+                .andExpect(jsonPath("$.serviceAssignmentSummary.activationSagaId").doesNotExist())
+                .andExpect(jsonPath("$.serviceAssignmentSummary.sourceDecisionId").doesNotExist())
                 .andExpect(jsonPath("$.header.customerName").doesNotExist())
                 .andExpect(jsonPath("$.header.customerMobile").doesNotExist())
                 .andExpect(jsonPath("$.header.serviceAddress").doesNotExist())

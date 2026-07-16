@@ -14,6 +14,7 @@ public record WorkOrderWorkspace(
         WorkOrderWorkspaceTaskSummary currentTaskSummary,
         Map<String, String> sectionAvailability,
         String allowedActionLink,
+        WorkOrderWorkspaceServiceAssignmentSummary serviceAssignmentSummary,
         WorkOrderWorkspaceSlaSummary slaSummary,
         WorkOrderWorkspaceExceptionSummary exceptionSummary,
         String timelineFreshnessStatus,
@@ -39,6 +40,20 @@ public record WorkOrderWorkspace(
     }
 
     public record WorkOrderWorkspaceExceptionSummary(int openCount) {
+    }
+
+    /**
+     * 当前 Task 的 ACTIVE 服务责任；网点与师傅分别保留权威生效时间。
+     */
+    public record WorkOrderWorkspaceServiceAssignmentSummary(
+            UUID taskId,
+            String networkId,
+            Instant networkEffectiveFrom,
+            String networkReassignmentReasonCode,
+            String technicianId,
+            Instant technicianEffectiveFrom,
+            String technicianReassignmentReasonCode
+    ) {
     }
 
     public record WorkOrderWorkspaceSourceVersions(long workOrderVersion) {
