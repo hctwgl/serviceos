@@ -3,7 +3,7 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-16
-baselineCommit: PENDING_M80
+baselineCommit: 565919d
 latestMilestone: M80
 ---
 
@@ -40,7 +40,7 @@ latestMilestone: M80
 | 项目 | 当前值 |
 |---|---|
 | 最新实施里程碑 | M80 工单服务分配生命周期时间线事件合并 |
-| 基线提交 | `PENDING_M80` |
+| 基线提交 | `565919d` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
 | 前端工程 | 尚未建立；已有 Admin、Network、Technician 产品与交互规格 |
