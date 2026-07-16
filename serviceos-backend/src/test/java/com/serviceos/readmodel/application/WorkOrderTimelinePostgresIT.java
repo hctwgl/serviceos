@@ -311,8 +311,8 @@ class WorkOrderTimelinePostgresIT {
                 "corr-cross", workOrderId, null, 10))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.RESOURCE_NOT_FOUND));
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("082");
-        assertThat(flyway.info().applied()).hasSize(84);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("083");
+        assertThat(flyway.info().applied()).hasSize(85);
     }
 
     @Test

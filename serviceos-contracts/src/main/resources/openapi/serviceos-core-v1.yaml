@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.68.0
+  version: 0.69.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1849,6 +1849,34 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /outbound-deliveries:
+    get:
+      operationId: listAuthorizedOutboundDeliveries
+      summary: 查询当前主体有权查看的外发交付队列
+      description: >-
+        API-06 §6 窄切片；默认 UNKNOWN，按 createdAt/deliveryId 正序稳定分页。
+        需要 integration.readOutbound，游标绑定实时项目范围和全部筛选。
+      parameters:
+        - { name: projectId, in: query, schema: { type: string, format: uuid } }
+        - { name: status, in: query, schema: { enum: [PENDING, SENDING, DELIVERED, ACKNOWLEDGED, REJECTED, FAILED_FINAL, UNKNOWN], default: UNKNOWN } }
+        - { name: businessMessageType, in: query, schema: { enum: [SUBMIT_CLIENT_REVIEW] } }
+        - { name: sourceWorkOrderId, in: query, schema: { type: string, format: uuid } }
+        - { name: sourceReviewCaseId, in: query, schema: { type: string, format: uuid } }
+        - { name: cursor, in: query, schema: { type: string, minLength: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 外发交付队列页
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OutboundDeliveryQueuePage' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+
   /outbound-deliveries/{deliveryId}:
     get:
       operationId: getOutboundDelivery
@@ -2925,6 +2953,45 @@ components:
         responseDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
         mappingVersionId: { type: string, minLength: 1, maxLength: 120 }
         receivedAt: { type: string, format: date-time }
+    OutboundDeliveryQueueItem:
+      type: object
+      additionalProperties: false
+      required: [deliveryId, projectId, connectorVersionId, mappingVersionId, businessMessageType,
+        businessKey, sourceReviewCaseId, sourceTaskId, sourceWorkOrderId, sourceSnapshotId,
+        externalOrderCode, executionTaskId, status, clientReviewCaseId, reviewRouteId,
+        aggregateVersion, attemptCount, createdAt, deliveredAt, acknowledgedAt]
+      properties:
+        deliveryId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        connectorVersionId: { type: string, minLength: 1, maxLength: 120 }
+        mappingVersionId: { type: string, minLength: 1, maxLength: 120 }
+        businessMessageType: { enum: [SUBMIT_CLIENT_REVIEW] }
+        businessKey: { type: string, minLength: 1, maxLength: 240 }
+        sourceReviewCaseId: { type: string, format: uuid }
+        sourceTaskId: { type: string, format: uuid }
+        sourceWorkOrderId: { type: string, format: uuid }
+        sourceSnapshotId: { type: string, format: uuid }
+        externalOrderCode: { type: string, minLength: 1, maxLength: 50 }
+        executionTaskId: { type: [string, 'null'], format: uuid }
+        status: { enum: [PENDING, SENDING, DELIVERED, ACKNOWLEDGED, REJECTED, FAILED_FINAL, UNKNOWN] }
+        clientReviewCaseId: { type: [string, 'null'], format: uuid }
+        reviewRouteId: { type: [string, 'null'], format: uuid }
+        aggregateVersion: { type: integer, format: int64, minimum: 1 }
+        attemptCount: { type: integer, minimum: 0, maximum: 1000 }
+        createdAt: { type: string, format: date-time }
+        deliveredAt: { type: [string, 'null'], format: date-time }
+        acknowledgedAt: { type: [string, 'null'], format: date-time }
+    OutboundDeliveryQueuePage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor, asOf]
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/OutboundDeliveryQueueItem' }
+        nextCursor: { type: [string, 'null'] }
+        asOf: { type: string, format: date-time }
     OutboundDelivery:
       type: object
       additionalProperties: false

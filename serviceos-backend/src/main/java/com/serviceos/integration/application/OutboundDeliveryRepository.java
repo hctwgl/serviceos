@@ -1,6 +1,7 @@
 package com.serviceos.integration.application;
 
 import com.serviceos.integration.api.DeliveryTimelineContext;
+import com.serviceos.integration.api.OutboundDeliveryQueueItem;
 import com.serviceos.integration.api.OutboundDeliveryView;
 import com.serviceos.integration.api.DeliveryReplayRequestView;
 
@@ -32,6 +33,18 @@ public interface OutboundDeliveryRepository {
 
     List<DeliveryRecord> listByWorkOrder(
             String tenantId, UUID projectId, UUID workOrderId, int limit);
+
+    List<OutboundDeliveryQueueItem> findQueuePage(
+            String tenantId,
+            boolean tenantWide,
+            List<UUID> projectIds,
+            String status,
+            String businessMessageType,
+            UUID sourceWorkOrderId,
+            UUID sourceReviewCaseId,
+            Instant cursorCreatedAt,
+            UUID cursorId,
+            int fetchSize);
 
     Optional<DeliveryReplayRequestView> findReplay(String tenantId, UUID replayRequestId);
 
