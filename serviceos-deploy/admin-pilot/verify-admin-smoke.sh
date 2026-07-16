@@ -34,7 +34,15 @@ query_db() {
 }
 
 new_uuid() {
-  uuidgen | tr '[:upper:]' '[:lower:]'
+  if command -v uuidgen >/dev/null 2>&1; then
+    uuidgen | tr '[:upper:]' '[:lower:]'
+  else
+    # CI/云环境可能没有 uuidgen；python 标准库足够生成 RFC UUID。
+    python3 - <<'PY'
+import uuid
+print(uuid.uuid4())
+PY
+  fi
 }
 
 cd "${repo_root}"
