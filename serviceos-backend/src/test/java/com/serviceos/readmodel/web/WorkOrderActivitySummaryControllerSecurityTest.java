@@ -81,6 +81,6 @@ class WorkOrderActivitySummaryControllerSecurityTest {
                         .with(jwt())
                         .queryParam("cursor", "cursor-not-accepted"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"));
     }
 }
