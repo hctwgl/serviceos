@@ -37,7 +37,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** M85～M92：工作区组合查询的授权、无 PII、按需区块与缺权降级证据。 */
+/** M85～M94：工作区组合查询的授权、无 PII、按需区块与缺权降级证据。 */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = ServiceOsApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE)
 class WorkOrderWorkspacePostgresIT {
@@ -203,6 +203,7 @@ class WorkOrderWorkspacePostgresIT {
         seedReader("field-reader", projectId, "workOrder.read", "visit.read", "appointment.read");
         UUID appointmentId = seedAppointment(taskId);
         UUID visitId = seedVisit(appointmentId, taskId);
+        UUID contactAttemptId = seedContactAttempt(taskId);
 
         var section = workspaces.getSection(
                 principal("field-reader"), "corr-av", workOrderId, "APPOINTMENTS_VISITS", null, 50);
@@ -215,9 +216,14 @@ class WorkOrderWorkspacePostgresIT {
                 .containsExactly(visitId);
         assertThat(section.appointmentsVisits().appointments()).extracting(item -> item.appointmentId())
                 .containsExactly(appointmentId);
+        assertThat(section.appointmentsVisits().contactAttempts())
+                .extracting(item -> item.contactAttemptId())
+                .containsExactly(contactAttemptId);
         assertThat(section.toString()).doesNotContain(
                 "checkInLocation", "customerName", "address-ref",
-                "note-should-not-leak", "device-should-not-leak");
+                "note-should-not-leak", "device-should-not-leak",
+                "contacted-party-should-not-leak", "recording-should-not-leak",
+                "contact-actor-should-not-leak");
 
         WorkOrderWorkspace workspace = workspaces.get(principal("field-reader"), "corr-av-top", workOrderId);
         assertThat(workspace.sectionAvailability().get("APPOINTMENTS_VISITS")).isEqualTo("AVAILABLE");
@@ -662,6 +668,33 @@ class WorkOrderWorkspacePostgresIT {
                 .param("now", java.sql.Timestamp.from(now))
                 .update();
         return slotId;
+    }
+
+    private UUID seedContactAttempt(UUID taskId) {
+        UUID id = UUID.randomUUID();
+        Instant startedAt = Instant.parse("2026-07-16T02:30:00Z");
+        jdbc.sql("""
+                INSERT INTO apt_contact_attempt (
+                    contact_attempt_id, tenant_id, project_id, work_order_id, task_id,
+                    channel, contacted_party_ref, started_at, ended_at, result_code,
+                    note, next_contact_at, recording_ref, actor_id, created_at
+                ) VALUES (
+                    :id, :tenantId, :projectId, :workOrderId, :taskId,
+                    'PHONE', 'contacted-party-should-not-leak', :startedAt, :endedAt, 'CONNECTED',
+                    'note-should-not-leak', NULL, 'recording-should-not-leak',
+                    'contact-actor-should-not-leak', :createdAt
+                )
+                """)
+                .param("id", id)
+                .param("tenantId", TENANT)
+                .param("projectId", projectId)
+                .param("workOrderId", workOrderId)
+                .param("taskId", taskId)
+                .param("startedAt", java.sql.Timestamp.from(startedAt))
+                .param("endedAt", java.sql.Timestamp.from(startedAt.plusSeconds(30)))
+                .param("createdAt", java.sql.Timestamp.from(startedAt.plusSeconds(31)))
+                .update();
+        return id;
     }
 
     private ReviewCorrectionFixture seedReviewCorrection(UUID taskId) {

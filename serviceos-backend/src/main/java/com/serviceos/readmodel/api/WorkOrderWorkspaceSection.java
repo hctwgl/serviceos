@@ -52,16 +52,18 @@ public record WorkOrderWorkspaceSection(
     }
 
     /**
-     * visits / appointments 为 null 表示对应读权不可用；空列表表示有权但无数据。
+     * visits / appointments / contactAttempts 为 null 表示对应读权不可用；空列表表示有权但无数据。
      */
     public record WorkOrderWorkspaceAppointmentsVisitsSectionData(
             List<WorkOrderWorkspaceVisitSummary> visits,
             List<WorkOrderWorkspaceAppointmentSummary> appointments,
+            List<WorkOrderWorkspaceContactAttemptSummary> contactAttempts,
             String nextCursor
     ) {
         public WorkOrderWorkspaceAppointmentsVisitsSectionData {
             visits = visits == null ? null : List.copyOf(visits);
             appointments = appointments == null ? null : List.copyOf(appointments);
+            contactAttempts = contactAttempts == null ? null : List.copyOf(contactAttempts);
         }
     }
 
@@ -98,6 +100,21 @@ public record WorkOrderWorkspaceSection(
             String timezone,
             Integer estimatedDurationMinutes,
             long aggregateVersion,
+            Instant createdAt
+    ) {
+    }
+
+    /** 不含 contactedPartyRef、note、recordingRef 与 actorId。 */
+    public record WorkOrderWorkspaceContactAttemptSummary(
+            UUID contactAttemptId,
+            UUID taskId,
+            UUID projectId,
+            UUID workOrderId,
+            String channel,
+            Instant startedAt,
+            Instant endedAt,
+            String resultCode,
+            Instant nextContactAt,
             Instant createdAt
     ) {
     }

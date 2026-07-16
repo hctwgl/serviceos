@@ -12,6 +12,7 @@ import com.serviceos.readmodel.api.WorkOrderWorkspaceQueryService;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceAppointmentsVisitsSectionData;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceCorrectionCaseSummary;
+import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceContactAttemptSummary;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceFormSummary;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceFormsEvidenceSectionData;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceInboundEnvelopeSummary;
@@ -154,6 +155,7 @@ class WorkOrderWorkspaceControllerSecurityTest {
         UUID taskId = UUID.randomUUID();
         UUID visitId = UUID.randomUUID();
         UUID appointmentId = UUID.randomUUID();
+        UUID contactAttemptId = UUID.randomUUID();
         CurrentPrincipal principal = new CurrentPrincipal(
                 "reader", "tenant", CurrentPrincipal.PrincipalType.USER, "m88", Set.of());
         Instant now = Instant.parse("2026-07-16T12:00:00Z");
@@ -169,6 +171,9 @@ class WorkOrderWorkspaceControllerSecurityTest {
                                 "IN_PROGRESS", now, now, "WITHIN_GEOFENCE", "ACCEPTED",
                                 null, null, null, null, 1)),
                         List.of(),
+                        List.of(new WorkOrderWorkspaceContactAttemptSummary(
+                                contactAttemptId, taskId, UUID.randomUUID(), workOrderId,
+                                "PHONE", now, now.plusSeconds(30), "CONNECTED", null, now)),
                         null),
                 null,
                 null,
@@ -187,6 +192,12 @@ class WorkOrderWorkspaceControllerSecurityTest {
                 .andExpect(jsonPath("$.appointmentsVisits.visits[0].visitId").value(visitId.toString()))
                 .andExpect(jsonPath("$.appointmentsVisits.visits[0].checkInLatitude").doesNotExist())
                 .andExpect(jsonPath("$.appointmentsVisits.visits[0].deviceId").doesNotExist())
+                .andExpect(jsonPath("$.appointmentsVisits.contactAttempts[0].contactAttemptId")
+                        .value(contactAttemptId.toString()))
+                .andExpect(jsonPath("$.appointmentsVisits.contactAttempts[0].contactedPartyRef").doesNotExist())
+                .andExpect(jsonPath("$.appointmentsVisits.contactAttempts[0].note").doesNotExist())
+                .andExpect(jsonPath("$.appointmentsVisits.contactAttempts[0].recordingRef").doesNotExist())
+                .andExpect(jsonPath("$.appointmentsVisits.contactAttempts[0].actorId").doesNotExist())
                 .andExpect(jsonPath("$.tasks").value(nullValue()))
                 .andExpect(jsonPath("$.timeline").value(nullValue()))
                 .andExpect(jsonPath("$.formsEvidence").value(nullValue()));
