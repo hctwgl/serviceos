@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import {
   getAuthorizedProject,
   listAuthorizedProjectScopeRevisions,
+  reviseProjectScopeRelations,
   type ProjectDetail,
   type ProjectScopeRelationRevisionPage,
 } from '../api/projectDetail'
@@ -13,10 +14,15 @@ const route = useRoute()
 const projectId = computed(() => String(route.params.id ?? ''))
 
 const loading = ref(false)
+const busy = ref(false)
 const error = ref<string | null>(null)
+const message = ref<string | null>(null)
 const detail = ref<ProjectDetail | null>(null)
 const revisions = ref<ProjectScopeRelationRevisionPage | null>(null)
 const revisionCursor = ref<string | undefined>()
+const regionCodes = ref('')
+const networkIds = ref('')
+const reason = ref('ADMIN_SCOPE_ADJUST')
 
 async function loadDetail() {
   loading.value = true
@@ -24,6 +30,14 @@ async function loadDetail() {
   try {
     detail.value = await getAuthorizedProject(projectId.value)
     await loadRevisions()
+    const latest = revisions.value?.items?.[0]
+    if (latest) {
+      regionCodes.value = latest.regionCodes.join(',')
+      networkIds.value = latest.networkIds.join(',')
+    } else if (detail.value.project.regionCodes || detail.value.project.networkIds) {
+      regionCodes.value = (detail.value.project.regionCodes ?? []).join(',')
+      networkIds.value = (detail.value.project.networkIds ?? []).join(',')
+    }
   } catch (err) {
     error.value = err instanceof Error ? err.message : '加载项目详情失败'
     detail.value = null
@@ -40,6 +54,34 @@ async function loadRevisions(next?: string) {
   })
   revisions.value = page
   revisionCursor.value = page.nextCursor ?? undefined
+}
+
+async function reviseScope() {
+  busy.value = true
+  message.value = null
+  error.value = null
+  try {
+    const aggregateVersion =
+      revisions.value?.items?.[0]?.aggregateVersion ?? detail.value?.project.version
+    if (!aggregateVersion) throw new Error('缺少 aggregateVersion')
+    const result = await reviseProjectScopeRelations(projectId.value, aggregateVersion, {
+      regionCodes: regionCodes.value
+        .split(/[,\s]+/)
+        .map((v) => v.trim())
+        .filter(Boolean),
+      networkIds: networkIds.value
+        .split(/[,\s]+/)
+        .map((v) => v.trim())
+        .filter(Boolean),
+      reason: reason.value.trim(),
+    })
+    message.value = `已修订范围 revision=${result.data.revisionId} / v${result.data.aggregateVersion}`
+    await loadDetail()
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '修订范围失败'
+  } finally {
+    busy.value = false
+  }
 }
 
 const revisionRows = computed(() =>
@@ -88,6 +130,16 @@ onMounted(() => {
         </dl>
       </article>
 
+      <article class="card form">
+        <h3>整组修订 REGION/NETWORK</h3>
+        <p class="hint">空数组表示终止该类型全部当前关系；If-Match 使用当前 scope aggregateVersion。</p>
+        <label>regionCodes<input v-model="regionCodes" placeholder="R1,R2" /></label>
+        <label>networkIds<input v-model="networkIds" placeholder="N1,N2" /></label>
+        <label>reason<input v-model="reason" /></label>
+        <button type="button" :disabled="busy" @click="reviseScope">revise-scope-relations</button>
+        <p v-if="message" class="ok">{{ message }}</p>
+      </article>
+
       <QueueTable
         title="范围修订历史"
         :columns="['revisionId', 'aggregateVersion', 'revisedAt', 'reason', 'regionCodes', 'networkIds']"
@@ -124,6 +176,27 @@ onMounted(() => {
   padding: 1rem 1.15rem;
   box-shadow: 0 1px 3px rgb(16 42 67 / 8%);
 }
+.form {
+  display: grid;
+  gap: 0.55rem;
+}
+.hint {
+  margin: 0;
+  color: #627d98;
+  font-size: 0.85rem;
+}
+label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  color: #486581;
+}
+input {
+  border: 1px solid #bcccdc;
+  border-radius: 6px;
+  padding: 0.4rem 0.65rem;
+  font-family: ui-monospace, monospace;
+}
 dl {
   margin: 0;
   display: grid;
@@ -140,9 +213,15 @@ dd {
 .error {
   color: #9b1c1c;
 }
+.ok {
+  color: #054e31;
+  margin: 0;
+}
 button {
   border: 1px solid #bcccdc;
-  background: #f0f4f8;
+  background: #243b53;
+  color: #fff;
+  border-color: #243b53;
   border-radius: 6px;
   padding: 0.4rem 0.75rem;
   cursor: pointer;

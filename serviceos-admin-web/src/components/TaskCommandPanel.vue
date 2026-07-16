@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import {
+  assignTaskCandidates,
   claimHumanTask,
   completeHumanTask,
   releaseHumanTask,
@@ -25,6 +26,8 @@ const reasonCode = ref('OPERATOR_RELEASE')
 const resultRef = ref('')
 const resultDigest = ref('')
 const dualInputJson = ref('')
+const candidatePrincipalIds = ref('')
+const assignSourceId = ref('admin-manual-assign')
 
 const actions = computed(() => props.allowedActions.actions)
 
@@ -92,6 +95,30 @@ async function run(action: TaskAllowedAction) {
     busy.value = false
   }
 }
+
+async function assignCandidates() {
+  busy.value = true
+  message.value = null
+  error.value = null
+  try {
+    const ids = candidatePrincipalIds.value
+      .split(/[,\s]+/)
+      .map((v) => v.trim())
+      .filter(Boolean)
+    if (ids.length === 0) throw new Error('需要至少一个 candidatePrincipalId')
+    const result = await assignTaskCandidates(props.taskId, props.allowedActions.resourceVersion, {
+      candidatePrincipalIds: ids,
+      sourceType: 'MANUAL',
+      sourceId: assignSourceId.value.trim() || 'admin-manual-assign',
+    })
+    message.value = `已冻结候选 batch=${result.data.assignmentBatchId} / count=${result.data.candidateCount} / version=${result.data.taskVersion}`
+    emit('executed')
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '分配候选失败'
+  } finally {
+    busy.value = false
+  }
+}
 </script>
 
 <template>
@@ -135,6 +162,18 @@ async function run(action: TaskAllowedAction) {
           placeholder='[{"kind":"FORM_SUBMISSION","ref":"...","digest":"..."}]'
         />
       </label>
+    </div>
+
+    <div class="fields">
+      <label>
+        assign-candidates principalIds
+        <input v-model="candidatePrincipalIds" placeholder="user-1,user-2" />
+      </label>
+      <label>
+        sourceId
+        <input v-model="assignSourceId" />
+      </label>
+      <button type="button" :disabled="busy" @click="assignCandidates">assign-candidates</button>
     </div>
 
     <p v-if="message" class="ok">{{ message }}</p>

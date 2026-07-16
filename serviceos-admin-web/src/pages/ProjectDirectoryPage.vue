@@ -2,14 +2,25 @@
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import QueueTable from './QueueTable.vue'
-import { listAuthorizedProjects, type ProjectPage } from '../api/projects'
+import { createProject, listAuthorizedProjects, type ProjectPage } from '../api/projects'
 
 const loading = ref(false)
+const busy = ref(false)
 const error = ref<string | null>(null)
+const message = ref<string | null>(null)
 const page = ref<ProjectPage | null>(null)
 const cursor = ref<string | undefined>()
 const status = ref('ACTIVE')
 const clientId = ref('')
+
+const createCode = ref('')
+const createClientId = ref('client-demo')
+const createName = ref('')
+const createStartsOn = ref(new Date().toISOString().slice(0, 10))
+const createEndsOn = ref('')
+const createRegionCodes = ref('')
+const createNetworkIds = ref('')
+const createdProjectId = ref('')
 
 async function load(next?: string) {
   loading.value = true
@@ -29,6 +40,41 @@ async function load(next?: string) {
   }
 }
 
+async function create() {
+  busy.value = true
+  message.value = null
+  error.value = null
+  try {
+    if (!createCode.value.trim() || !createName.value.trim()) {
+      throw new Error('需要 code 与 name')
+    }
+    const regionCodes = createRegionCodes.value
+      .split(/[,\s]+/)
+      .map((v) => v.trim())
+      .filter(Boolean)
+    const networkIds = createNetworkIds.value
+      .split(/[,\s]+/)
+      .map((v) => v.trim())
+      .filter(Boolean)
+    const created = await createProject({
+      code: createCode.value.trim(),
+      clientId: createClientId.value.trim(),
+      name: createName.value.trim(),
+      startsOn: createStartsOn.value,
+      endsOn: createEndsOn.value.trim() || null,
+      regionCodes,
+      networkIds,
+    })
+    createdProjectId.value = created.data.id
+    message.value = `已创建项目 ${created.data.code} / ${created.data.id}`
+    await load()
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '创建项目失败'
+  } finally {
+    busy.value = false
+  }
+}
+
 const rows = computed(() =>
   (page.value?.items ?? []).map((item) => ({
     id: item.id,
@@ -45,7 +91,7 @@ onMounted(() => load())
 </script>
 
 <template>
-  <section>
+  <section class="page">
     <form class="filters" @submit.prevent="load()">
       <label>
         status
@@ -63,6 +109,24 @@ onMounted(() => load())
       </label>
       <button type="submit" :disabled="loading">查询</button>
     </form>
+
+    <article class="card">
+      <h3>创建项目</h3>
+      <label>code<input v-model="createCode" placeholder="PRJ_DEMO_01" /></label>
+      <label>clientId<input v-model="createClientId" /></label>
+      <label>name<input v-model="createName" /></label>
+      <label>startsOn<input v-model="createStartsOn" type="date" /></label>
+      <label>endsOn（可选）<input v-model="createEndsOn" type="date" /></label>
+      <label>regionCodes（逗号分隔，可选）<input v-model="createRegionCodes" /></label>
+      <label>networkIds（逗号分隔，可选）<input v-model="createNetworkIds" /></label>
+      <button type="button" :disabled="busy" @click="create">createProject</button>
+      <p v-if="message" class="ok">{{ message }}</p>
+      <p v-if="createdProjectId" class="links">
+        <RouterLink :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: createdProjectId } }">
+          打开新建项目 {{ createdProjectId }}
+        </RouterLink>
+      </p>
+    </article>
 
     <QueueTable
       title="授权项目目录"
@@ -90,12 +154,20 @@ onMounted(() => load())
 </template>
 
 <style scoped>
+.page { display: grid; gap: 1rem; }
 .filters {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
-  margin-bottom: 1rem;
   align-items: end;
+}
+.card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1rem 1.15rem;
+  box-shadow: 0 1px 3px rgb(16 42 67 / 8%);
+  display: grid;
+  gap: 0.55rem;
 }
 label {
   display: grid;
@@ -117,10 +189,11 @@ button {
   cursor: pointer;
 }
 .links {
-  margin-top: 0.75rem;
+  margin: 0;
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
   font-size: 0.9rem;
 }
+.ok { color: #054e31; margin: 0; }
 </style>

@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-16
-baselineCommit: 0e88e83
-latestMilestone: M127
+baselineCommit: PENDING_M130
+latestMilestone: M130
 ---
 
 # ServiceOS 实施状态总览
@@ -39,8 +39,8 @@ latestMilestone: M127
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M127 Admin 资料下载授权与 Revision 作废 |
-| 基线提交 | `0e88e83` |
+| 最新实施里程碑 | M130 Admin 分配任务候选 |
+| 基线提交 | `PENDING_M130` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
 | 前端工程 | `serviceos-admin-web` 只读队列与工单工作区外壳（Vue+TS+Vite）；Network/Technician 尚未建立 |
@@ -75,7 +75,7 @@ latestMilestone: M127
 | 通知 | 通知与运营异常中心 | `PROPOSED` | 已有总体设计 | 通知通道、模板、可靠发送和 UI | `architecture/14-*` |
 | 履约事实与试算 | 事实提取和双向试算 | `PROPOSED` | 已有设计、API 和数据规划 | 运行时、投影和前端工作区 | M5 设计 |
 | 对账结算 | 对账、结算、争议与调整 | `PROPOSED` | 已有边界设计 | 正式运行时和页面 | `architecture/16-*` |
-| Admin Portal | 总部运营后台 | `PARTIAL` | M101～M127：队列/任务/SLA/异常/外发/工单/项目目录、工作区、allowed-actions 命令面板 | 设计系统、SavedView、OIDC SDK、E2E、完整表单/资料提交流程 | M7 设计、M101～M127 |
+| Admin Portal | 总部运营后台 | `PARTIAL` | M101～M130：队列/任务/SLA/异常/外发/工单/项目目录、工作区、allowed-actions 命令面板 | 设计系统、SavedView、OIDC SDK、E2E、完整表单/资料提交流程 | M7 设计、M101～M130 |
 | Network Portal | 网点协作端 | `PROPOSED` | 页面和跨端协作规格 | 前端代码和 E2E | M7 设计 |
 | Technician App | 师傅移动端 | `PROPOSED` | 弱网、离线工作包、上传队列和页面规格 | 移动端工程、真机和离线运行时 | M7 设计 |
 | External Portal | 用户/车企受控页面 | `PROPOSED` | 最小边界规划 | 二期页面和工程实现 | M7 设计 |
@@ -977,9 +977,21 @@ FACTS_CALCULATIONS、customer/location、Portal。
 
 已实现：authorizeFileDownload 与 invalidateEvidenceRevision。
 
+### M128：Admin 创建项目
+
+已实现：项目目录 createProject。
+
+### M129：Admin 修订项目范围关系
+
+已实现：revise-scope-relations。
+
+### M130：Admin 分配任务候选
+
+已实现：assign-candidates MANUAL。
+
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M127**。M61～M127 在授权只读、时间线投影运行时、工作区组合与
+ServiceOS 可靠纵向切片已推进到 **M130**。M61～M130 在授权只读、时间线投影运行时、工作区组合与
 审核/整改/外发专项队列上继续收敛；没有实现完整 SLA/通知策略、通用队列/SavedView 或整个现场履约平台。
 
 ```text

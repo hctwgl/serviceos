@@ -222,3 +222,6 @@ Feature gate/authority: if applicable
 | M125 | Admin 预约改约与爽约命令 | PRODUCT-01/02 + ARCH-10/19 + Appointment reschedule/no-show APIs + Admin Web build | 日历 UX、OIDC、E2E |
 | M126 | Admin Visit interrupt 命令 | PRODUCT-01/02 + ARCH-10/19 + Visit interrupt API + Admin Web build | 异常联动、OIDC、E2E |
 | M127 | Admin 资料短期下载授权与 Revision 作废 | PRODUCT-01/02 + ARCH-10/11/19 + File/Evidence invalidate APIs + Admin Web build | 在线预览器、OIDC、E2E |
+| M128 | Admin 项目目录 createProject | PRODUCT-01/02 + ARCH-10/19 + Create Project API + Admin Web build | 项目状态机完整 UX、OIDC、E2E |
+| M129 | Admin 项目范围关系整组修订 | PRODUCT-01/02 + ARCH-10/19 + Revise Scope API + Admin Web build | 组织目录联动、OIDC、E2E |
+| M130 | Admin 任务候选 MANUAL 分配 | PRODUCT-01/02 + ARCH-10/19 + Assign Candidates API + Admin Web build | 策略解析 UI、OIDC、E2E |
