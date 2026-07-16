@@ -33,6 +33,9 @@ interface EvidenceItemMapper {
     List<Map<String, Object>> listItems(
             @Param("tenantId") String tenantId, @Param("taskId") String taskId);
 
+    List<Map<String, Object>> listItemSummaries(
+            @Param("tenantId") String tenantId, @Param("taskId") String taskId);
+
     List<Map<String, Object>> listRevisionsForTask(
             @Param("tenantId") String tenantId, @Param("taskId") String taskId);
 

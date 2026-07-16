@@ -225,6 +225,8 @@ class WorkOrderWorkspaceControllerSecurityTest {
                                 taskId, formVersionId, "survey.execution",
                                 "1.0.0", "1.0.0", "c".repeat(64))),
                         List.of(),
+                        List.of(),
+                        List.of(),
                         null),
                 null,
                 null);
@@ -242,6 +244,8 @@ class WorkOrderWorkspaceControllerSecurityTest {
                 .andExpect(jsonPath("$.formsEvidence.forms[0].formKey").value("survey.execution"))
                 .andExpect(jsonPath("$.formsEvidence.forms[0].definitionJson").doesNotExist())
                 .andExpect(jsonPath("$.formsEvidence.forms[0].definition").doesNotExist())
+                .andExpect(jsonPath("$.formsEvidence.formSubmissions").isArray())
+                .andExpect(jsonPath("$.formsEvidence.evidenceItems").isArray())
                 .andExpect(jsonPath("$.tasks").value(nullValue()))
                 .andExpect(jsonPath("$.appointmentsVisits").value(nullValue()));
         verify(workspaces).getSection(principal, "corr-fe", workOrderId, "FORMS_EVIDENCE", null, 50);

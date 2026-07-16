@@ -37,7 +37,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** M85～M94：工作区组合查询的授权、无 PII、按需区块与缺权降级证据。 */
+/** M85～M95：工作区组合查询的授权、无 PII、按需区块与缺权降级证据。 */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = ServiceOsApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE)
 class WorkOrderWorkspacePostgresIT {
@@ -100,7 +100,9 @@ class WorkOrderWorkspacePostgresIT {
                     evd_review_decision, evd_review_case, evd_evidence_set_member,
                     evd_evidence_set_snapshot,
                     evd_evidence_condition_disposition, evd_evidence_resolution_member,
-                    evd_evidence_slot, evd_task_evidence_resolution,
+                    evd_evidence_revision, evd_evidence_item, evd_evidence_slot,
+                    evd_task_evidence_resolution,
+                    frm_form_command_result, frm_submission_validation, frm_form_submission,
                     rel_outbox_publish_attempt, rel_outbox_event,
                     wo_work_order, cfg_configuration_bundle_item, cfg_configuration_bundle,
                     cfg_configuration_asset_version, prj_project,
@@ -242,6 +244,8 @@ class WorkOrderWorkspacePostgresIT {
     void formsEvidenceSectionLoadsWithoutDefinitionJson() {
         seedReader("forms-reader", projectId, "workOrder.read", "form.read", "evidence.read");
         UUID slotId = seedEvidenceSlot(taskId);
+        UUID submissionId = seedFormSubmission(taskId);
+        UUID evidenceItemId = seedEvidenceItem(taskId, slotId);
 
         var section = workspaces.getSection(
                 principal("forms-reader"), "corr-fe", workOrderId, "FORMS_EVIDENCE", null, 50);
@@ -255,9 +259,19 @@ class WorkOrderWorkspacePostgresIT {
                 .containsExactly(formVersionId);
         assertThat(section.formsEvidence().evidenceSlots()).extracting(item -> item.slotId())
                 .containsExactly(slotId);
+        assertThat(section.formsEvidence().formSubmissions())
+                .extracting(item -> item.submissionId())
+                .containsExactly(submissionId);
+        assertThat(section.formsEvidence().formSubmissions().getFirst().errorCount()).isOne();
+        assertThat(section.formsEvidence().evidenceItems())
+                .extracting(item -> item.evidenceItemId())
+                .containsExactly(evidenceItemId);
+        assertThat(section.formsEvidence().evidenceItems().getFirst().revisionCount()).isZero();
         assertThat(section.toString()).doesNotContain(
                 "definitionJson", "requirementDefinition", "resolutionExplanation",
-                "survey.conclusion", "requireGps");
+                "survey.conclusion", "requireGps", "valuesJson", "submittedBy",
+                "validation-message-should-not-leak", "revisions", "fileObjectId",
+                "captureMetadata", "createdBy");
 
         WorkOrderWorkspace workspace = workspaces.get(principal("forms-reader"), "corr-fe-top", workOrderId);
         assertThat(workspace.sectionAvailability().get("FORMS_EVIDENCE")).isEqualTo("AVAILABLE");
@@ -668,6 +682,72 @@ class WorkOrderWorkspacePostgresIT {
                 .param("now", java.sql.Timestamp.from(now))
                 .update();
         return slotId;
+    }
+
+    private UUID seedFormSubmission(UUID taskId) {
+        UUID submissionId = UUID.randomUUID();
+        Instant submittedAt = Instant.parse("2026-07-16T04:30:00Z");
+        jdbc.sql("""
+                INSERT INTO frm_form_submission (
+                    form_submission_id, tenant_id, task_id, project_id, form_version_id,
+                    form_key, submission_version, values_document, content_digest,
+                    validation_status, prefill_version, submitted_by, submitted_at
+                ) VALUES (
+                    :submissionId, :tenantId, :taskId, :projectId, :formVersionId,
+                    :formKey, 1, '{"survey.conclusion":"should-not-leak"}'::jsonb, :digest,
+                    'INVALID', 'prefill-should-not-leak', 'submitter-should-not-leak', :submittedAt
+                )
+                """)
+                .param("submissionId", submissionId)
+                .param("tenantId", TENANT)
+                .param("taskId", taskId)
+                .param("projectId", projectId)
+                .param("formVersionId", formVersionId)
+                .param("formKey", FORM_KEY)
+                .param("digest", Sha256.digest("m95-form-values"))
+                .param("submittedAt", java.sql.Timestamp.from(submittedAt))
+                .update();
+        jdbc.sql("""
+                INSERT INTO frm_submission_validation (
+                    submission_validation_id, tenant_id, form_submission_id,
+                    validator_version, input_digest, validation_status,
+                    errors_document, warnings_document, executed_at
+                ) VALUES (
+                    :validationId, :tenantId, :submissionId,
+                    'M95_VALIDATOR', :digest, 'INVALID',
+                    '[{"message":"validation-message-should-not-leak"}]'::jsonb,
+                    '[]'::jsonb, :submittedAt
+                )
+                """)
+                .param("validationId", UUID.randomUUID())
+                .param("tenantId", TENANT)
+                .param("submissionId", submissionId)
+                .param("digest", Sha256.digest("m95-validation"))
+                .param("submittedAt", java.sql.Timestamp.from(submittedAt))
+                .update();
+        return submissionId;
+    }
+
+    private UUID seedEvidenceItem(UUID taskId, UUID slotId) {
+        UUID itemId = UUID.randomUUID();
+        jdbc.sql("""
+                INSERT INTO evd_evidence_item (
+                    evidence_item_id, tenant_id, project_id, task_id, slot_id,
+                    item_ordinal, status, created_by, created_at
+                ) VALUES (
+                    :itemId, :tenantId, :projectId, :taskId, :slotId,
+                    1, 'OPEN', 'evidence-creator-should-not-leak', :createdAt
+                )
+                """)
+                .param("itemId", itemId)
+                .param("tenantId", TENANT)
+                .param("projectId", projectId)
+                .param("taskId", taskId)
+                .param("slotId", slotId)
+                .param("createdAt", java.sql.Timestamp.from(
+                        Instant.parse("2026-07-16T04:31:00Z")))
+                .update();
+        return itemId;
     }
 
     private UUID seedContactAttempt(UUID taskId) {

@@ -1,7 +1,9 @@
 package com.serviceos.forms.application;
 
 import com.serviceos.forms.api.FormSubmissionView;
+import com.serviceos.forms.api.FormSubmissionSummaryView;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -13,6 +15,8 @@ public interface FormSubmissionRepository {
     void insertValidation(UUID validationId, String tenantId, FormSubmissionView submission,
                           String validatorVersion, String inputDigest);
     Optional<FormSubmissionView> find(String tenantId, UUID submissionId);
+
+    List<FormSubmissionSummaryView> listSummariesByTask(String tenantId, UUID taskId);
     void saveResult(String tenantId, String operationType, String idempotencyKey, UUID submissionId);
     FormSubmissionView findResult(String tenantId, String operationType, String idempotencyKey);
 }

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.64.0
+  version: 0.65.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -154,7 +154,8 @@ paths:
       operationId: getWorkOrderWorkspaceSection
       summary: 按需加载工单工作区区块
       description: >-
-        M94 接受 TASKS、TIMELINE_AUDIT、APPOINTMENTS_VISITS（含联系尝试）、FORMS_EVIDENCE、
+        M95 接受 TASKS、TIMELINE_AUDIT、APPOINTMENTS_VISITS（含联系尝试）、FORMS_EVIDENCE
+        （含提交与资料项安全元数据）、
         REVIEWS_CORRECTIONS 与 INTEGRATION；其余 section 失败关闭为 400。
         复用 workOrder.read；实时组合，不落区块投影表；不含客户 PII。
       parameters:
@@ -2345,6 +2346,23 @@ components:
         semanticVersion: { type: string, minLength: 1, maxLength: 64 }
         schemaVersion: { type: string, minLength: 1, maxLength: 64 }
         contentDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
+    WorkOrderWorkspaceFormSubmissionSummary:
+      type: object
+      additionalProperties: false
+      required: [submissionId, taskId, projectId, formVersionId, formKey, submissionVersion,
+        contentDigest, validationStatus, errorCount, warningCount, submittedAt]
+      properties:
+        submissionId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        formVersionId: { type: string, format: uuid }
+        formKey: { type: string, minLength: 1, maxLength: 120 }
+        submissionVersion: { type: integer, minimum: 1 }
+        contentDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
+        validationStatus: { enum: [VALIDATED, INVALID] }
+        errorCount: { type: integer, minimum: 0 }
+        warningCount: { type: integer, minimum: 0 }
+        submittedAt: { type: string, format: date-time }
     WorkOrderWorkspaceEvidenceSlotSummary:
       type: object
       additionalProperties: false
@@ -2370,10 +2388,27 @@ components:
         active: { type: boolean }
         transition: { type: string, minLength: 1, maxLength: 32 }
         requiredDisposition: { type: string, minLength: 1, maxLength: 32 }
+    WorkOrderWorkspaceEvidenceItemSummary:
+      type: object
+      additionalProperties: false
+      required: [evidenceItemId, taskId, projectId, evidenceSlotId, itemOrdinal, status,
+        revisionCount, latestRevisionNumber, latestRevisionStatus]
+      properties:
+        evidenceItemId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        evidenceSlotId: { type: string, format: uuid }
+        itemOrdinal: { type: integer, minimum: 1 }
+        status: { enum: [OPEN, SUBMITTED, UNDER_REVIEW, ACCEPTED, REJECTED, LOCKED] }
+        revisionCount: { type: integer, minimum: 0 }
+        latestRevisionNumber: { type: [integer, 'null'], minimum: 1 }
+        latestRevisionStatus:
+          type: [string, 'null']
+          enum: [STORED, VALIDATING, VALIDATED, VALIDATION_FAILED, QUARANTINED, INVALIDATED, null]
     WorkOrderWorkspaceFormsEvidenceSectionData:
       type: object
       additionalProperties: false
-      required: [forms, evidenceSlots, nextCursor]
+      required: [forms, formSubmissions, evidenceSlots, evidenceItems, nextCursor]
       properties:
         forms:
           oneOf:
@@ -2381,11 +2416,23 @@ components:
               maxItems: 100
               items: { $ref: '#/components/schemas/WorkOrderWorkspaceFormSummary' }
             - { type: 'null' }
+        formSubmissions:
+          oneOf:
+            - type: array
+              maxItems: 100
+              items: { $ref: '#/components/schemas/WorkOrderWorkspaceFormSubmissionSummary' }
+            - { type: 'null' }
         evidenceSlots:
           oneOf:
             - type: array
               maxItems: 100
               items: { $ref: '#/components/schemas/WorkOrderWorkspaceEvidenceSlotSummary' }
+            - { type: 'null' }
+        evidenceItems:
+          oneOf:
+            - type: array
+              maxItems: 100
+              items: { $ref: '#/components/schemas/WorkOrderWorkspaceEvidenceItemSummary' }
             - { type: 'null' }
         nextCursor: { type: [string, 'null'] }
     WorkOrderWorkspaceReviewDecisionSummary:

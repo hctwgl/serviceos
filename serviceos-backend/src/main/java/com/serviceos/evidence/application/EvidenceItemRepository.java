@@ -1,6 +1,7 @@
 package com.serviceos.evidence.application;
 
 import com.serviceos.evidence.api.EvidenceItemView;
+import com.serviceos.evidence.api.EvidenceItemSummaryView;
 import com.serviceos.evidence.api.EvidenceRevisionView;
 import com.serviceos.evidence.api.EvidenceSlotView;
 import com.serviceos.evidence.api.EvidenceValidationView;
@@ -27,6 +28,8 @@ public interface EvidenceItemRepository {
     Optional<EvidenceItemView> findItem(String tenantId, UUID evidenceItemId);
 
     List<EvidenceItemView> listItems(String tenantId, UUID taskId);
+
+    List<EvidenceItemSummaryView> listItemSummaries(String tenantId, UUID taskId);
 
     Optional<UUID> findCommandResult(String tenantId, String operationType, String idempotencyKey);
 
