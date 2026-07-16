@@ -29,7 +29,10 @@ patterns=(
   '(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}(?![A-Za-z0-9_-])'
   '(?i)(authorization|access[_-]?token|refresh[_-]?token|id[_-]?token|password|client[_-]?secret|signature)\s*[:=]\s*(?!\[REDACTED\])[^,;[:space:]}]+'
   '(?<![0-9])1[3-9][0-9]{9}(?![0-9])'
-  '(?i)(?<![A-HJ-NPR-Z0-9])[A-HJ-NPR-Z0-9]{17}(?![A-HJ-NPR-Z0-9])'
+  # 非结构化 VIN 至少含一个数字，避免把 OpenAPI 生成的 17 字符类型名片段误判为 VIN；
+  # 极端的全字母 VIN 仍由下一条带字段名的规则失败关闭。
+  '(?i)(?<![A-HJ-NPR-Z0-9])(?=[A-HJ-NPR-Z0-9]{17}(?![A-HJ-NPR-Z0-9]))(?=[A-HJ-NPR-Z0-9]*[0-9])[A-HJ-NPR-Z0-9]{17}'
+  '(?i)(vin|vehicleIdentificationNumber)\s*[:=]\s*(?!\[REDACTED\])[A-HJ-NPR-Z0-9]{17}'
   '(?i)(address|customerAddress|installationAddress|用户地址|安装地址)\s*[:=]\s*(?!\[REDACTED\])[^,;}]+'
   '(?i)(price|amount|unitPrice|totalAmount|对上金额|对下金额|结算金额)\s*[:=]\s*(?!\[REDACTED\])-?[0-9]+([.][0-9]+)?'
 )

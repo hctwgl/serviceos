@@ -16,7 +16,7 @@ import { RouterLink, RouterView } from 'vue-router'
       <RouterLink to="/work-orders">工单目录</RouterLink>
       <RouterLink to="/projects">项目目录</RouterLink>
       <RouterLink to="/work-orders/lookup">按 ID 打开</RouterLink>
-      <RouterLink to="/settings/token">访问令牌</RouterLink>
+      <RouterLink to="/settings/token">身份登录</RouterLink>
     </aside>
     <main class="content">
       <RouterView />

@@ -8,6 +8,24 @@ permissions:
   contents: read
 
 jobs:
+  admin-web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: serviceos-admin-web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: serviceos-admin-web/package-lock.json
+      - name: Install immutable Admin Web dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Build production Admin Web
+        run: npm run build
+
   java-contracts:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -79,7 +97,9 @@ jobs:
           retention-days: 14
 
   container-staging:
-    needs: java-contracts
+    needs:
+      - admin-web
+      - java-contracts
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

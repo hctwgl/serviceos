@@ -1,0 +1,169 @@
+-- M134 Admin 试点只读冒烟夹具。全部标识固定且写入幂等，禁止复制到生产数据库。
+\set ON_ERROR_STOP on
+
+INSERT INTO prj_project (
+    project_id, tenant_id, project_code, client_id, project_name, starts_on,
+    project_status, aggregate_version, created_at
+) VALUES (
+    '10000000-0000-4000-8000-000000000001', 'tenant-local', 'ADMIN-PILOT',
+    'BYD', 'Admin 试点项目', current_date, 'ACTIVE', 1, now()
+) ON CONFLICT DO NOTHING;
+
+INSERT INTO cfg_configuration_asset_version (
+    version_id, tenant_id, asset_type, asset_key, semantic_version, schema_version,
+    definition, content_digest, status, published_at
+) VALUES
+(
+    '20000000-0000-4000-8000-000000000001', 'tenant-local', 'WORKFLOW',
+    'ADMIN-PILOT-WORKFLOW', '1.0.0', '1.0.0', '{"workflowCode":"ADMIN_PILOT"}',
+    repeat('a', 64), 'PUBLISHED', now()
+),
+(
+    '20000000-0000-4000-8000-000000000002', 'tenant-local', 'SLA',
+    'PILOT_RESPONSE', '1.0.0', '1.0.0',
+    '{"slaRef":"PILOT_RESPONSE","clockMode":"ELAPSED","targetDurationSeconds":14400}',
+    repeat('b', 64), 'PUBLISHED', now()
+) ON CONFLICT DO NOTHING;
+
+INSERT INTO cfg_configuration_bundle (
+    bundle_id, tenant_id, project_id, bundle_code, bundle_version, brand_code,
+    service_product_code, province_code, effective_from, manifest_digest, status, published_at
+) VALUES (
+    '30000000-0000-4000-8000-000000000001', 'tenant-local',
+    '10000000-0000-4000-8000-000000000001', 'ADMIN-PILOT-BUNDLE', '1.0.0',
+    'BYD_OCEAN', 'HOME_CHARGING_SURVEY_INSTALL', '370000', now() - interval '1 day',
+    repeat('c', 64), 'PUBLISHED', now()
+) ON CONFLICT DO NOTHING;
+
+INSERT INTO cfg_configuration_bundle_item (
+    tenant_id, bundle_id, asset_type, asset_version_id, content_digest
+) VALUES
+(
+    'tenant-local', '30000000-0000-4000-8000-000000000001', 'WORKFLOW',
+    '20000000-0000-4000-8000-000000000001', repeat('a', 64)
+),
+(
+    'tenant-local', '30000000-0000-4000-8000-000000000001', 'SLA',
+    '20000000-0000-4000-8000-000000000002', repeat('b', 64)
+) ON CONFLICT DO NOTHING;
+
+INSERT INTO wo_work_order (
+    id, tenant_id, project_id, client_code, brand_code, service_product_code,
+    external_order_code, payload_digest, status, configuration_bundle_id,
+    configuration_bundle_code, configuration_bundle_version, configuration_bundle_digest,
+    province_code, city_code, district_code, customer_name, customer_mobile,
+    service_address, vehicle_vin, external_dispatched_at, received_at, activated_at, version
+) VALUES (
+    '40000000-0000-4000-8000-000000000001', 'tenant-local',
+    '10000000-0000-4000-8000-000000000001', 'BYD', 'BYD_OCEAN',
+    'HOME_CHARGING_SURVEY_INSTALL', 'ADMIN-PILOT-001', repeat('d', 64), 'ACTIVE',
+    '30000000-0000-4000-8000-000000000001', 'ADMIN-PILOT-BUNDLE', '1.0.0',
+    repeat('c', 64), '370000', '370100', '370102', '本地试点用户', '13800000000',
+    '本地试点地址', 'TESTVIN00000000001', localtimestamp - interval '2 hours',
+    now() - interval '2 hours', now() - interval '110 minutes', 1
+) ON CONFLICT DO NOTHING;
+
+INSERT INTO wfl_workflow_instance (
+    workflow_instance_id, tenant_id, project_id, work_order_id, configuration_bundle_id,
+    workflow_definition_version_id, workflow_key, workflow_version, definition_digest,
+    status, start_event_id, correlation_id, version, started_at, configuration_bundle_digest
+) VALUES (
+    '50000000-0000-4000-8000-000000000001', 'tenant-local',
+    '10000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001',
+    '30000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001',
+    'ADMIN_PILOT', '1.0.0', repeat('a', 64), 'ACTIVE',
+    '51000000-0000-4000-8000-000000000001', 'admin-pilot-seed', 1,
+    now() - interval '110 minutes', repeat('c', 64)
+) ON CONFLICT DO NOTHING;
+
+INSERT INTO wfl_stage_instance (
+    stage_instance_id, tenant_id, workflow_instance_id, work_order_id, stage_code,
+    sequence_no, status, activation_event_id, version, activated_at
+) VALUES (
+    '60000000-0000-4000-8000-000000000001', 'tenant-local',
+    '50000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001',
+    'PILOT_SURVEY', 1, 'ACTIVE', '61000000-0000-4000-8000-000000000001',
+    1, now() - interval '100 minutes'
+) ON CONFLICT DO NOTHING;
+
+INSERT INTO tsk_task (
+    task_id, tenant_id, task_type, task_kind, business_key, payload_digest, priority,
+    status, next_run_at, attempt_count, max_attempts, correlation_id, version,
+    created_at, updated_at, project_id, work_order_id, workflow_instance_id,
+    stage_instance_id, workflow_node_instance_id, workflow_node_id,
+    workflow_definition_version_id, workflow_definition_digest, configuration_bundle_id,
+    configuration_bundle_digest, stage_code, sla_ref
+) VALUES (
+    '70000000-0000-4000-8000-000000000001', 'tenant-local', 'PILOT_SURVEY',
+    'HUMAN', 'admin-pilot:survey', repeat('e', 64), 500, 'READY',
+    now() - interval '90 minutes', 0, 3, 'admin-pilot-seed', 1,
+    now() - interval '90 minutes', now() - interval '90 minutes',
+    '10000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001',
+    '50000000-0000-4000-8000-000000000001', '60000000-0000-4000-8000-000000000001',
+    '65000000-0000-4000-8000-000000000001', 'PILOT_SURVEY_NODE',
+    '20000000-0000-4000-8000-000000000001', repeat('a', 64),
+    '30000000-0000-4000-8000-000000000001', repeat('c', 64), 'PILOT_SURVEY',
+    'PILOT_RESPONSE'
+) ON CONFLICT DO NOTHING;
+
+INSERT INTO sla_instance (
+    sla_instance_id, tenant_id, project_id, work_order_id, task_id, sla_ref,
+    policy_version_id, policy_semantic_version, policy_content_digest, clock_mode,
+    target_duration_seconds, start_event_id, started_at, deadline_at, status,
+    aggregate_version, correlation_id, created_at, updated_at
+) VALUES (
+    '80000000-0000-4000-8000-000000000001', 'tenant-local',
+    '10000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001',
+    '70000000-0000-4000-8000-000000000001', 'PILOT_RESPONSE',
+    '20000000-0000-4000-8000-000000000002', '1.0.0', repeat('b', 64), 'ELAPSED',
+    14400, '81000000-0000-4000-8000-000000000001', now() - interval '90 minutes',
+    now() + interval '150 minutes', 'RUNNING', 1, 'admin-pilot-seed', now(), now()
+) ON CONFLICT DO NOTHING;
+
+INSERT INTO sla_clock_segment (
+    segment_id, tenant_id, sla_instance_id, segment_no, segment_type, started_at, start_event_id
+) VALUES (
+    '82000000-0000-4000-8000-000000000001', 'tenant-local',
+    '80000000-0000-4000-8000-000000000001', 1, 'RUNNING',
+    now() - interval '90 minutes', '81000000-0000-4000-8000-000000000001'
+) ON CONFLICT DO NOTHING;
+
+INSERT INTO sla_milestone (
+    milestone_id, tenant_id, sla_instance_id, milestone_type, scheduled_at, status
+) VALUES (
+    '83000000-0000-4000-8000-000000000001', 'tenant-local',
+    '80000000-0000-4000-8000-000000000001', 'TARGET_DUE',
+    now() + interval '150 minutes', 'PENDING'
+) ON CONFLICT DO NOTHING;
+
+INSERT INTO rdm_work_order_timeline_entry (
+    timeline_entry_id, tenant_id, project_id, work_order_id, source_event_id,
+    source_module, event_type, schema_version, category, resource_type, resource_id,
+    resource_version, resource_code, outcome_code, actor_id, correlation_id,
+    display_template_code, display_template_version, occurred_at, received_at,
+    rebuild_generation
+) VALUES
+(
+    '90000000-0000-4000-8000-000000000001', 'tenant-local',
+    '10000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001',
+    '91000000-0000-4000-8000-000000000001', 'workorder', 'WorkOrderReceived', 1,
+    'WORK_ORDER', 'WORK_ORDER', '40000000-0000-4000-8000-000000000001', 1,
+    'ADMIN-PILOT-001', 'RECEIVED', 'local-fixture', 'admin-pilot-seed',
+    'work-order.received', 1, now() - interval '2 hours', now() - interval '2 hours', 1
+),
+(
+    '90000000-0000-4000-8000-000000000002', 'tenant-local',
+    '10000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001',
+    '91000000-0000-4000-8000-000000000002', 'task', 'HumanTaskCreated', 1,
+    'TASK', 'TASK', '70000000-0000-4000-8000-000000000001', 1,
+    'PILOT_SURVEY', 'READY', 'local-fixture', 'admin-pilot-seed',
+    'task.created', 1, now() - interval '90 minutes', now() - interval '90 minutes', 1
+) ON CONFLICT DO NOTHING;
+
+INSERT INTO rdm_projection_checkpoint (
+    projection_code, tenant_id, partition_key, rebuild_generation,
+    last_source_outbox_id, last_occurred_at, processed_at, status
+) VALUES (
+    'work-order-core-timeline.v1', 'tenant-local', 'tenant-local', 1,
+    NULL, now() - interval '90 minutes', now(), 'RUNNING'
+) ON CONFLICT DO NOTHING;

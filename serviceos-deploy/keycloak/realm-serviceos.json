@@ -73,6 +73,7 @@
     {
       "id": "06b612f3-a901-4b0e-bd90-86b4259cc087",
       "username": "developer",
+      "email": "developer@serviceos.local",
       "enabled": true,
       "emailVerified": true,
       "firstName": "Local",
