@@ -15,6 +15,7 @@ VALUES
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'task.assign', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'task.claim', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'task.start', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'task.complete', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'task.release', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'sla.read', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'appointment.read', now()),
