@@ -21,12 +21,13 @@ lastUpdated: 2026-07-16
 | ADMIN-PILOT-08T | 真实 Task 终态推进 | 每轮新建 Workflow-backed HUMAN Task → assign/claim/start/complete → Inbox 消费 → Node/Stage/Workflow COMPLETED → WorkOrder FULFILLED | PASS |
 | ADMIN-PILOT-08F | 真实表单版本引用 | RUNNING Task 锁定 FormVersion → `form.submit` → VALIDATED FormSubmission → 页面保持精确 ref/digest 为双输入完成的主引用 | PASS |
 | ADMIN-PILOT-08E | 真实资料双输入完成引用 | `task.created` Outbox/Inbox 解析 Slot → Begin → 同源私有 PUT → Finalize → 本地扫描 → 机器校验 VALIDATED → Snapshot → 页面自动提交 FormSubmission + EvidenceSetSnapshot 精确双引用 → complete | PASS |
+| ADMIN-PILOT-08R | 真实资料审核通过 | Snapshot → createReviewCase → 独立审核页读取 OPEN → 普通 APPROVED decide → 权威详情/唯一决定历史 → 创建与裁决审计及两条事件 Inbox 成功 | PASS |
 | ADMIN-PILOT-08CI | 真实写链路 CI 阻断 | GitHub Actions `admin-pilot-e2e` 运行同一 OIDC/Backend/PostgreSQL/Chrome smoke；通过后才启动 staging | PASS |
 | ADMIN-PILOT-09 | 完整履约写链路 | 接单→派单→预约→上门→表单/资料→审核/整改→外发→完结 | NOT PROVEN |
 
 `ADMIN-PILOT-08A`、`ADMIN-PILOT-08W`、`ADMIN-PILOT-08T`、`ADMIN-PILOT-08F`、
-`ADMIN-PILOT-08E` 与
+`ADMIN-PILOT-08E`、`ADMIN-PILOT-08R` 与
 `ADMIN-PILOT-08CI` 只证明固定工单的候选分配/领取/释放，以及独立预置 Workflow Task 的表单提交、
-本地资料上传/校验/Snapshot、双输入完成和 END 推进；不证明生产对象存储/专业扫描、资料审核整改，
-或从外部接单开始的完整履约链。
+本地资料上传/校验/Snapshot、普通 INTERNAL APPROVED 审核、双输入完成和 END 推进；不证明生产
+对象存储/专业扫描、REJECTED 后整改、强制通过/重开、外部提审回执，或从外部接单开始的完整履约链。
 `ADMIN-PILOT-09` 是明确交付边界，不得用固定夹具的局部读写冒烟替代完整业务写链路验收。
