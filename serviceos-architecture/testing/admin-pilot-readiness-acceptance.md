@@ -18,9 +18,11 @@ lastUpdated: 2026-07-16
 | ADMIN-PILOT-08 | 真实只读业务路径 | 目录 → 工作区 → 详情/Stage/Task/SLA/时间线 | PASS |
 | ADMIN-PILOT-08A | 真实候选分配写路径 | 无 ACTIVE 候选 → Admin MANUAL assign-candidates → 最新批次/ACTIVE 候选/审计成立 | PASS |
 | ADMIN-PILOT-08W | 真实 Task 写路径 | allowed-actions → claim → RESPONSIBLE → release → READY；真实 JWT、RoleGrant、候选责任、If-Match 与幂等键 | PASS |
+| ADMIN-PILOT-08T | 真实 Task 终态推进 | 每轮新建 Workflow-backed HUMAN Task → assign/claim/start/complete → Inbox 消费 → Node/Stage/Workflow COMPLETED → WorkOrder FULFILLED | PASS |
 | ADMIN-PILOT-08CI | 真实写链路 CI 阻断 | GitHub Actions `admin-pilot-e2e` 运行同一 OIDC/Backend/PostgreSQL/Chrome smoke；通过后才启动 staging | PASS |
 | ADMIN-PILOT-09 | 完整履约写链路 | 接单→派单→预约→上门→表单/资料→审核/整改→外发→完结 | NOT PROVEN |
 
-`ADMIN-PILOT-08A`、`ADMIN-PILOT-08W` 与 `ADMIN-PILOT-08CI` 只证明既有 Task 的候选分配、
-领取和释放命令链路，不证明接单至完结。
+`ADMIN-PILOT-08A`、`ADMIN-PILOT-08W`、`ADMIN-PILOT-08T` 与 `ADMIN-PILOT-08CI` 只证明
+固定工单的候选分配/领取/释放，以及独立预置 Workflow Task 的启动、完成和 END 推进；不证明从
+外部接单开始的完整履约链。
 `ADMIN-PILOT-09` 是明确交付边界，不得用固定夹具的局部读写冒烟替代完整业务写链路验收。
