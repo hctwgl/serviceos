@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-16
-baselineCommit: f0495cd
-latestMilestone: M100
+baselineCommit: PENDING_M101
+latestMilestone: M101
 ---
 
 # ServiceOS 实施状态总览
@@ -39,11 +39,11 @@ latestMilestone: M100
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M100 运营异常项目范围硬化 |
-| 基线提交 | `f0495cd` |
+| 最新实施里程碑 | M101 Admin Portal 队列外壳 |
+| 基线提交 | `PENDING_M101` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
-| 前端工程 | 尚未建立；已有 Admin、Network、Technician 产品与交互规格 |
+| 前端工程 | `serviceos-admin-web` 只读队列外壳（Vue+TS+Vite）；Network/Technician 尚未建立 |
 | 数据库 | PostgreSQL + Flyway（当前版本 084 / 86） |
 | 契约 | Core OpenAPI 0.70.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、recovered/resolved 与 SLA started/breached/met@v1） |
 
@@ -75,7 +75,7 @@ latestMilestone: M100
 | 通知 | 通知与运营异常中心 | `PROPOSED` | 已有总体设计 | 通知通道、模板、可靠发送和 UI | `architecture/14-*` |
 | 履约事实与试算 | 事实提取和双向试算 | `PROPOSED` | 已有设计、API 和数据规划 | 运行时、投影和前端工作区 | M5 设计 |
 | 对账结算 | 对账、结算、争议与调整 | `PROPOSED` | 已有边界设计 | 正式运行时和页面 | `architecture/16-*` |
-| Admin Portal | 总部运营后台 | `PROPOSED` | 信息架构、Page ID、路由、权限和页面规格 | 前端代码、设计系统实现和 E2E | M7 设计 |
+| Admin Portal | 总部运营后台 | `PARTIAL` | 信息架构、Page ID、路由规格；M101 只读队列外壳与审核/整改/外发/异常队列页 | 设计系统、SavedView、工作区全页、命令 UI、OIDC SDK、E2E | M7 设计、M101 |
 | Network Portal | 网点协作端 | `PROPOSED` | 页面和跨端协作规格 | 前端代码和 E2E | M7 设计 |
 | Technician App | 师傅移动端 | `PROPOSED` | 弱网、离线工作包、上传队列和页面规格 | 移动端工程、真机和离线运行时 | M7 设计 |
 | External Portal | 用户/车企受控页面 | `PROPOSED` | 最小边界规划 | 二期页面和工程实现 | M7 设计 |
@@ -836,9 +836,19 @@ FACTS_CALCULATIONS、customer/location、Portal。
 
 明确未实现：通用 work-queues/SavedView、人工标记已送达/放弃、通用 RESOLVED UI、Portal。
 
+### M101：Admin Portal 队列外壳
+
+已实现：
+
+- `serviceos-admin-web`（Vue + TypeScript + Vite）；
+- 审核/整改/外发/异常只读队列页与本地 JWT 携带；
+- `npm run build` 通过。
+
+明确未实现：设计系统、SavedView、工作区全页、命令 UI、Network/Technician、OIDC SDK、E2E。
+
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M100**。M61～M100 在授权只读、时间线投影运行时、工作区组合与
+ServiceOS 可靠纵向切片已推进到 **M101**。M61～M101 在授权只读、时间线投影运行时、工作区组合与
 审核/整改/外发专项队列上继续收敛；没有实现完整 SLA/通知策略、通用队列/SavedView 或整个现场履约平台。
 
 ```text
