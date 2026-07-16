@@ -191,6 +191,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
+      - name: Install ripgrep
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
       - name: Validate deployment and security descriptors
         run: |
           docker compose -f serviceos-deploy/compose.yaml config --quiet
