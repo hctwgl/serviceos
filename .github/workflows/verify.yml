@@ -5,16 +5,76 @@ on:
     branches:
       - master
   pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 最终候选或手工发布级验证原因
+        required: false
+        default: final-candidate
 
 concurrency:
-  group: verify-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: verify-${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
+  changes:
+    name: classify changes
+    runs-on: ubuntu-latest
+    outputs:
+      full: ${{ steps.classify.outputs.full }}
+      docs_only: ${{ steps.classify.outputs.docs_only }}
+      admin: ${{ steps.classify.outputs.admin }}
+      backend: ${{ steps.classify.outputs.backend }}
+      contracts: ${{ steps.classify.outputs.contracts }}
+      deploy: ${{ steps.classify.outputs.deploy }}
+      pilot: ${{ steps.classify.outputs.pilot }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - id: classify
+        name: Classify changed paths
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          if [[ "${EVENT_NAME}" == "workflow_dispatch" || "${EVENT_NAME}" == "push" ]]; then
+            scripts/detect-ci-changes.sh --full
+            exit 0
+          fi
+
+          base_ref="${PR_BASE_SHA:-${PUSH_BEFORE_SHA:-}}"
+          if [[ -z "${base_ref}" || "${base_ref}" =~ ^0+$ ]] || ! git cat-file -e "${base_ref}^{commit}" 2>/dev/null; then
+            base_ref="$(git merge-base HEAD origin/master)"
+          fi
+          git diff --name-only "${base_ref}" HEAD | scripts/detect-ci-changes.sh
+
+  preflight:
+    name: preflight
+    needs: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install ripgrep
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+      - name: Verify workflow policy and fail-fast repository facts
+        run: |
+          bash scripts/test-ci-change-detection.sh
+          bash scripts/test-verification-preflight.sh
+          bash scripts/verify-milestone-preflight.sh
+
   admin-web:
+    name: admin-web
+    needs: changes
+    if: needs.changes.outputs.full == 'true' || needs.changes.outputs.admin == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -33,6 +93,12 @@ jobs:
         run: npm run build
 
   java-contracts:
+    name: java-contracts
+    needs: changes
+    if: >-
+      needs.changes.outputs.full == 'true' ||
+      needs.changes.outputs.backend == 'true' ||
+      needs.changes.outputs.contracts == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -46,11 +112,8 @@ jobs:
           cache: maven
       - name: Install ripgrep
         run: sudo apt-get update && sudo apt-get install -y ripgrep
-      - name: Fail fast on milestone and migration drift
-        run: |
-          bash scripts/test-verification-preflight.sh
-          bash scripts/verify-milestone-preflight.sh
       - name: Resolve immutable contract comparison base
+        if: needs.changes.outputs.full == 'true' || needs.changes.outputs.contracts == 'true'
         shell: bash
         env:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -62,28 +125,40 @@ jobs:
           fi
           echo "CONTRACT_BASE_REF=${base_ref}" >> "${GITHUB_ENV}"
       - name: Install checksum-pinned OpenAPI compatibility tool
+        if: needs.changes.outputs.full == 'true' || needs.changes.outputs.contracts == 'true'
         shell: bash
         run: |
           echo "OASDIFF_BIN=$(serviceos-contracts/scripts/install-oasdiff.sh "${RUNNER_TEMP}/contract-tools")" >> "${GITHUB_ENV}"
       - name: Reject breaking OpenAPI and mutated event versions
+        if: needs.changes.outputs.full == 'true' || needs.changes.outputs.contracts == 'true'
         run: serviceos-contracts/scripts/check-contract-compatibility.sh
       - name: Prove positive and negative contract gates
+        if: needs.changes.outputs.full == 'true' || needs.changes.outputs.contracts == 'true'
         run: serviceos-contracts/scripts/test-contract-gates.sh
       - name: Require container runtime for PostgreSQL P0 tests
+        if: needs.changes.outputs.full == 'true' || needs.changes.outputs.backend == 'true'
         run: docker info
-      - name: Validate local infrastructure descriptors
-        run: |
-          docker compose -f serviceos-deploy/compose.yaml config --quiet
-          jq empty serviceos-deploy/keycloak/realm-serviceos.json
-          jq empty serviceos-deploy/observability/grafana/dashboards/serviceos-foundation.json
-          bash -n serviceos-deploy/observability/*.sh
-          serviceos-deploy/observability/test-sensitive-output-gate.sh
-      - name: Verify modules, contracts, migrations and transaction slice
+      - name: Run minimum sufficient Maven verification
         shell: bash
+        env:
+          FULL_VERIFY: ${{ needs.changes.outputs.full }}
+          BACKEND_CHANGED: ${{ needs.changes.outputs.backend }}
+          CONTRACTS_CHANGED: ${{ needs.changes.outputs.contracts }}
         run: |
           set -o pipefail
           runtime_log="${RUNNER_TEMP}/serviceos-verify-runtime.log"
-          ./mvnw --batch-mode --no-transfer-progress clean verify 2>&1 | tee "${runtime_log}"
+          if [[ "${FULL_VERIFY}" == "true" ]]; then
+            ./mvnw --batch-mode --no-transfer-progress clean verify 2>&1 | tee "${runtime_log}"
+          elif [[ "${BACKEND_CHANGED}" == "true" && "${CONTRACTS_CHANGED}" == "true" ]]; then
+            ./mvnw --batch-mode --no-transfer-progress \
+              -pl serviceos-backend,serviceos-contracts -am verify 2>&1 | tee "${runtime_log}"
+          elif [[ "${BACKEND_CHANGED}" == "true" ]]; then
+            ./mvnw --batch-mode --no-transfer-progress \
+              -pl serviceos-backend -am verify 2>&1 | tee "${runtime_log}"
+          else
+            ./mvnw --batch-mode --no-transfer-progress \
+              -pl serviceos-contracts -am verify 2>&1 | tee "${runtime_log}"
+          fi
           serviceos-deploy/observability/verify-sensitive-output.sh "${runtime_log}"
       - name: Retain Maven verification diagnostics
         if: always()
@@ -94,8 +169,10 @@ jobs:
           if-no-files-found: error
           retention-days: 7
       - name: Verify repeatable generated TypeScript client
+        if: needs.changes.outputs.full == 'true' || needs.changes.outputs.contracts == 'true'
         run: serviceos-contracts/scripts/verify-client-generation-reproducibility.sh
       - name: Retain generated TypeScript client and provenance manifest
+        if: needs.changes.outputs.full == 'true' || needs.changes.outputs.contracts == 'true'
         uses: actions/upload-artifact@v6
         with:
           name: serviceos-typescript-fetch-client-${{ github.sha }}
@@ -106,10 +183,31 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  deployment-validation:
+    name: deployment-validation
+    needs: changes
+    if: needs.changes.outputs.full == 'true' || needs.changes.outputs.deploy == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: Validate deployment and security descriptors
+        run: |
+          docker compose -f serviceos-deploy/compose.yaml config --quiet
+          serviceos-deploy/staging/generate-local-env.sh "${RUNNER_TEMP}/serviceos-staging.env"
+          docker compose --env-file "${RUNNER_TEMP}/serviceos-staging.env" \
+            -f serviceos-deploy/compose.staging.yaml config --quiet
+          jq empty serviceos-deploy/keycloak/realm-serviceos.json
+          jq empty serviceos-deploy/observability/grafana/dashboards/serviceos-foundation.json
+          bash -n serviceos-deploy/observability/*.sh
+          bash -n serviceos-deploy/admin-pilot/*.sh
+          bash -n serviceos-deploy/staging/*.sh serviceos-deploy/staging/init/*.sh
+          serviceos-deploy/observability/test-sensitive-output-gate.sh
+
   admin-pilot-e2e:
-    needs:
-      - admin-web
-      - java-contracts
+    name: admin-pilot-e2e
+    needs: changes
+    if: needs.changes.outputs.full == 'true' || needs.changes.outputs.pilot == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -148,10 +246,20 @@ jobs:
           retention-days: 7
 
   container-staging:
+    name: container-staging
     needs:
+      - changes
+      - preflight
       - admin-web
       - java-contracts
+      - deployment-validation
       - admin-pilot-e2e
+    if: >-
+      always() &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'push' && github.ref == 'refs/heads/master')) &&
+      !contains(needs.*.result, 'failure') &&
+      !contains(needs.*.result, 'cancelled')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
