@@ -1,6 +1,7 @@
 package com.serviceos.readmodel.api;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -15,14 +16,16 @@ public record WorkOrderWorkspaceSection(
         WorkOrderWorkspaceTimelineSectionData timeline,
         WorkOrderWorkspaceAppointmentsVisitsSectionData appointmentsVisits,
         WorkOrderWorkspaceFormsEvidenceSectionData formsEvidence,
-        WorkOrderWorkspaceReviewsCorrectionsSectionData reviewsCorrections
+        WorkOrderWorkspaceReviewsCorrectionsSectionData reviewsCorrections,
+        WorkOrderWorkspaceIntegrationSectionData integration
 ) {
     public WorkOrderWorkspaceSection {
         int payloads = (tasks != null ? 1 : 0)
                 + (timeline != null ? 1 : 0)
                 + (appointmentsVisits != null ? 1 : 0)
                 + (formsEvidence != null ? 1 : 0)
-                + (reviewsCorrections != null ? 1 : 0);
+                + (reviewsCorrections != null ? 1 : 0)
+                + (integration != null ? 1 : 0);
         if (payloads != 1) {
             throw new IllegalArgumentException("exactly one section payload is required");
         }
@@ -220,6 +223,106 @@ public record WorkOrderWorkspaceSection(
             int resubmissionOrdinal,
             UUID evidenceSetSnapshotId,
             Instant submittedAt
+    ) {
+    }
+
+    /**
+     * inboundEnvelopes / outboundDeliveries 为 null 表示对应读权不可用。
+     */
+    public record WorkOrderWorkspaceIntegrationSectionData(
+            List<WorkOrderWorkspaceInboundEnvelopeSummary> inboundEnvelopes,
+            List<WorkOrderWorkspaceOutboundDeliverySummary> outboundDeliveries,
+            String nextCursor
+    ) {
+        public WorkOrderWorkspaceIntegrationSectionData {
+            inboundEnvelopes = inboundEnvelopes == null ? null : List.copyOf(inboundEnvelopes);
+            outboundDeliveries = outboundDeliveries == null ? null : List.copyOf(outboundDeliveries);
+        }
+    }
+
+    /** 不含原文/Canonical 对象引用、签名值与传输凭据。 */
+    public record WorkOrderWorkspaceInboundEnvelopeSummary(
+            UUID inboundEnvelopeId,
+            UUID projectId,
+            String connectorVersionId,
+            String messageType,
+            String externalMessageId,
+            String signatureStatus,
+            String processingStatus,
+            String mappingVersionId,
+            UUID canonicalMessageId,
+            String resultCode,
+            String resultType,
+            String resultId,
+            Instant receivedAt,
+            Instant completedAt,
+            String correlationId
+    ) {
+    }
+
+    /** 不含操作者、payload、幂等键、重放原因与审批引用。 */
+    public record WorkOrderWorkspaceOutboundDeliverySummary(
+            UUID deliveryId,
+            UUID projectId,
+            String connectorVersionId,
+            String mappingVersionId,
+            String businessMessageType,
+            String businessKey,
+            UUID sourceReviewCaseId,
+            UUID sourceTaskId,
+            UUID sourceWorkOrderId,
+            UUID sourceSnapshotId,
+            String externalOrderCode,
+            UUID executionTaskId,
+            String status,
+            UUID clientReviewCaseId,
+            UUID reviewRouteId,
+            long aggregateVersion,
+            Instant createdAt,
+            Instant deliveredAt,
+            Instant acknowledgedAt,
+            List<WorkOrderWorkspaceDeliveryAttemptSummary> attempts,
+            List<WorkOrderWorkspaceExternalAcknowledgementSummary> acknowledgements,
+            List<WorkOrderWorkspaceDeliveryReplaySummary> replayRequests
+    ) {
+        public WorkOrderWorkspaceOutboundDeliverySummary {
+            attempts = List.copyOf(attempts);
+            acknowledgements = List.copyOf(acknowledgements);
+            replayRequests = List.copyOf(replayRequests);
+        }
+    }
+
+    public record WorkOrderWorkspaceDeliveryAttemptSummary(
+            UUID deliveryAttemptId,
+            int attemptNo,
+            UUID taskExecutionAttemptId,
+            LocalDate requestDate,
+            String status,
+            Integer httpStatus,
+            String resultCode,
+            Instant startedAt,
+            Instant finishedAt
+    ) {
+    }
+
+    public record WorkOrderWorkspaceExternalAcknowledgementSummary(
+            UUID acknowledgementId,
+            String acknowledgementType,
+            String result,
+            String reasonCode,
+            String mappingVersionId,
+            Instant receivedAt
+    ) {
+    }
+
+    public record WorkOrderWorkspaceDeliveryReplaySummary(
+            UUID replayRequestId,
+            UUID executionTaskId,
+            String status,
+            String resultCode,
+            Instant requestedAt,
+            Instant startedAt,
+            Instant finishedAt
     ) {
     }
 }

@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-16
-baselineCommit: 53da11e
-latestMilestone: M90
+baselineCommit: f3f8c29
+latestMilestone: M91
 ---
 
 # ServiceOS 实施状态总览
@@ -39,13 +39,13 @@ latestMilestone: M90
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M90 工单工作区审核与整改区块 |
-| 基线提交 | `53da11e` |
+| 最新实施里程碑 | M91 工单工作区集成区块 |
+| 基线提交 | `f3f8c29` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
 | 前端工程 | 尚未建立；已有 Admin、Network、Technician 产品与交互规格 |
-| 数据库 | PostgreSQL + Flyway（当前版本 078 / 80） |
-| 契约 | Core OpenAPI 0.60.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、recovered/resolved 与 SLA started/breached/met@v1） |
+| 数据库 | PostgreSQL + Flyway（当前版本 079 / 81） |
+| 契约 | Core OpenAPI 0.61.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、recovered/resolved 与 SLA started/breached/met@v1） |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -62,7 +62,7 @@ latestMilestone: M90
 | 工单 | WorkOrder 接收、激活、履约完成与授权工作区投影 | `PARTIAL` | 权威工单、工作流启动、跨阶段和 END 完结；授权目录、非 PII 详情、Stage/Task 执行骨架及核心执行+现场履约时间线 | 完整取消、暂停、恢复、客户敏感详情审计、跨域完整时间线/动作与全部业务分支 | M16～M19、M68～M69、M73～M74 |
 | 工作流 | 线性 Stage/Task 运行时 | `PARTIAL` | 精确版本启动、线性推进、唯一跨阶段推进、完成事件；节点 `slaRef` 传递；授权 Workflow/Stage 当前投影 | 并行/汇聚网关、流程条件表达式、Node/Attempt 历史和复杂流程语义 | M17～M19、M61、M69 |
 | 人工任务与执行历史 | claim/start/complete、责任、执行保护与授权任务读取 | `IMPLEMENTED` | 人工命令、候选领取、唯一责任、release/reclaim、执行保护；表单/资料完成门禁；授权队列/详情、allowed-actions、自动 Attempt 历史及工单内核心 Task 生命周期与指派/Guard/人工接管时间线 | block/retry/cancel 等其他动作、Workflow Node 历史、跨工单/跨域完整历史和 Review 完成条件 | M20～M23、M35、M41、M43、M69～M73、M81 |
-| 应用只读投影 | 工作区、队列、时间线和投影运行时 | `PARTIAL` | 独立 readmodel 模块；核心执行、现场履约、SLA、资料/审核/整改（含外部回执与条件 KEEP/INVALIDATE 处置）、外发交付全链路、异常确认/闭环、ServiceAssignment 与 Task 指派/Guard/人工接管 Inbox 投影；授权时间线与稳定分页；时间线 checkpoint/dead letter/generation 重建与 FRESH/LAGGING/UNKNOWN/REBUILDING freshness；definition 登记、dead letter 幂等重放与旧/孤儿 generation 清理；工单工作区顶层实时组合与 TASKS/TIMELINE_AUDIT/APPOINTMENTS_VISITS/FORMS_EVIDENCE/REVIEWS_CORRECTIONS 按需区块（无 PII/GPS/地址/note/表单 definition/资料 JSON/审核整改自由文本；缺权次级区块降级） | 试算合并、revision/slots 技术噪声、其余 section、队列、SavedView、搜索、多投影平台、Broker offset、Portal、Admin 重建/重放 HTTP | M73～M90 |
+| 应用只读投影 | 工作区、队列、时间线和投影运行时 | `PARTIAL` | 独立 readmodel 模块；核心执行、现场履约、SLA、资料/审核/整改（含外部回执与条件 KEEP/INVALIDATE 处置）、外发交付全链路、异常确认/闭环、ServiceAssignment 与 Task 指派/Guard/人工接管 Inbox 投影；授权时间线与稳定分页；时间线 checkpoint/dead letter/generation 重建与 FRESH/LAGGING/UNKNOWN/REBUILDING freshness；definition 登记、dead letter 幂等重放与旧/孤儿 generation 清理；工单工作区顶层实时组合与 TASKS/TIMELINE_AUDIT/APPOINTMENTS_VISITS/FORMS_EVIDENCE/REVIEWS_CORRECTIONS/INTEGRATION 按需区块（无 PII/GPS/地址/note/表单 definition/资料 JSON/审核整改及集成敏感字段；缺权次级区块降级） | 试算合并、revision/slots 技术噪声、FACTS_CALCULATIONS、队列、SavedView、搜索、多投影平台、Broker offset、Portal、Admin 重建/重放 HTTP | M73～M91 |
 | 服务分配 | 网点分配、容量、改派 Saga、超时恢复 | `IMPLEMENTED` | ServiceAssignment、容量权威、改派、终止、对账和自动恢复 | 完整策略评分、全部异常分支和 UI | M24～M28 |
 | 运营异常 | 异常工作台基础 | `PARTIAL` | 异常记录和恢复入口；M58 将外发 UNKNOWN 与 Task 最终人工事件汇入 OperationalException + HUMAN Task；M59 提供高风险人工重发事实；M60 在严格 ACK 后幂等闭环对应异常并处理事件乱序 | 人工标记已送达/放弃、其他异常类型自动闭环、完整通知、运营中心前端和跨域异常目录 | M29、M58～M60 |
 | 预约 | 预约修订、联系终态动作 | `PARTIAL` | Revision、并发和终态动作基础；公开事件已并入工单时间线 | 用户确认渠道、完整日程和跨端协作 | M30～M31、M74 |
@@ -709,9 +709,21 @@ checkpoint/重建、Portal。
 
 明确未实现：其余 section、审核整改命令聚合、队列/SavedView、Portal、区块持久化投影。
 
+### M91：工单工作区集成区块
+
+已实现：
+
+- API-06 §5 `INTEGRATION` 窄切片 Accepted；
+- 入站只列出明确映射到 WorkOrder 的 Envelope；外发按 source_work_order_id 列出 Delivery；
+- `integration.readInbound` / `integration.readOutbound` 与 Project Scope 分别鉴权和降级；
+- 不扩散对象引用、payload/signature、operator、幂等键与重放 reason/approvalRef/requestedBy；
+- Core OpenAPI 0.61.0；Flyway V079 / 81 migrations。
+
+明确未实现：FACTS_CALCULATIONS、审核回调批次额外归属、专项队列/SavedView、Portal、区块持久化投影。
+
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M90**。M61～M90 在授权只读、时间线投影运行时与工作区组合上继续收敛；
+ServiceOS 可靠纵向切片已推进到 **M91**。M61～M91 在授权只读、时间线投影运行时与工作区组合上继续收敛；
 没有实现完整 SLA/通知策略、队列/SavedView 或整个现场履约平台。
 
 ```text

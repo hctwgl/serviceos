@@ -132,6 +132,25 @@ final class JdbcOutboundDeliveryRepository implements OutboundDeliveryRepository
     }
 
     @Override
+    public List<DeliveryRecord> listByWorkOrder(
+            String tenantId, UUID projectId, UUID workOrderId, int limit
+    ) {
+        return jdbc.sql(DELIVERY_SELECT + """
+                 WHERE tenant_id=:tenant
+                   AND project_id=:projectId
+                   AND source_work_order_id=:workOrderId
+                 ORDER BY created_at, delivery_id
+                 LIMIT :limit
+                """)
+                .param("tenant", tenantId)
+                .param("projectId", projectId)
+                .param("workOrderId", workOrderId)
+                .param("limit", limit)
+                .query(this::delivery)
+                .list();
+    }
+
+    @Override
     public Optional<DeliveryReplayRequestView> findReplay(String tenantId, UUID replayRequestId) {
         return jdbc.sql("""
                 SELECT replay_request_id, delivery_id, execution_task_id, status, reason,

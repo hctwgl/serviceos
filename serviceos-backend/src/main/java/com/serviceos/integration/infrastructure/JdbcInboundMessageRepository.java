@@ -233,6 +233,32 @@ final class JdbcInboundMessageRepository implements InboundMessageRepository {
     }
 
     @Override
+    public List<InboundEnvelopeRecord> listEnvelopesByWorkOrder(
+            String tenantId, UUID projectId, UUID workOrderId, int limit
+    ) {
+        return jdbc.sql(ENVELOPE_SELECT + """
+                 WHERE tenant_id=:tenant
+                   AND project_id=:projectId
+                   AND inbound_envelope_id IN (
+                       SELECT source_envelope_id
+                         FROM int_canonical_message
+                        WHERE tenant_id=:tenant
+                          AND project_id=:projectId
+                          AND result_type='WORK_ORDER'
+                          AND result_id=:workOrderId
+                   )
+                 ORDER BY received_at, inbound_envelope_id
+                 LIMIT :limit
+                """)
+                .param("tenant", tenantId)
+                .param("projectId", projectId)
+                .param("workOrderId", workOrderId.toString())
+                .param("limit", limit)
+                .query(this::envelope)
+                .list();
+    }
+
+    @Override
     public ExternalReviewRouteRegistration registerExternalReviewRoute(NewExternalReviewRoute route) {
         int inserted = jdbc.sql("""
                 INSERT INTO int_external_review_route (

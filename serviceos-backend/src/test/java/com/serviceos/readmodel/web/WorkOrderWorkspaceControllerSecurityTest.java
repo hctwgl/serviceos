@@ -13,6 +13,8 @@ import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceA
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceCorrectionCaseSummary;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceFormSummary;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceFormsEvidenceSectionData;
+import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceInboundEnvelopeSummary;
+import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceIntegrationSectionData;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceReviewCaseSummary;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceReviewsCorrectionsSectionData;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceTasksSectionData;
@@ -118,6 +120,7 @@ class WorkOrderWorkspaceControllerSecurityTest {
                 null,
                 null,
                 null,
+                null,
                 null);
         when(principals.current()).thenReturn(principal);
         when(workspaces.getSection(eq(principal), eq("corr-sec"), eq(workOrderId),
@@ -158,6 +161,7 @@ class WorkOrderWorkspaceControllerSecurityTest {
                                 null, null, null, null, 1)),
                         List.of(),
                         null),
+                null,
                 null,
                 null);
         when(principals.current()).thenReturn(principal);
@@ -202,6 +206,7 @@ class WorkOrderWorkspaceControllerSecurityTest {
                                 "1.0.0", "1.0.0", "c".repeat(64))),
                         List.of(),
                         null),
+                null,
                 null);
         when(principals.current()).thenReturn(principal);
         when(workspaces.getSection(eq(principal), eq("corr-fe"), eq(workOrderId),
@@ -249,7 +254,8 @@ class WorkOrderWorkspaceControllerSecurityTest {
                                 correctionCaseId, taskId, projectId, reviewCaseId, UUID.randomUUID(),
                                 List.of("PHOTO_BLUR"), null, "OPEN", now, null,
                                 null, null, List.of())),
-                        null));
+                        null),
+                null);
         when(principals.current()).thenReturn(principal);
         when(workspaces.getSection(eq(principal), eq("corr-rc"), eq(workOrderId),
                 eq("REVIEWS_CORRECTIONS"), isNull(), eq(50))).thenReturn(section);
@@ -271,5 +277,50 @@ class WorkOrderWorkspaceControllerSecurityTest {
                 .andExpect(jsonPath("$.formsEvidence").value(nullValue()));
         verify(workspaces).getSection(
                 principal, "corr-rc", workOrderId, "REVIEWS_CORRECTIONS", null, 50);
+    }
+
+    @Test
+    void integrationSectionContractIsEnforced() throws Exception {
+        UUID workOrderId = UUID.randomUUID();
+        UUID projectId = UUID.randomUUID();
+        UUID envelopeId = UUID.randomUUID();
+        CurrentPrincipal principal = new CurrentPrincipal(
+                "reader", "tenant", CurrentPrincipal.PrincipalType.USER, "m91", Set.of());
+        Instant now = Instant.parse("2026-07-16T15:00:00Z");
+        WorkOrderWorkspaceSection section = new WorkOrderWorkspaceSection(
+                "INTEGRATION",
+                new WorkOrderWorkspaceSourceVersions(8),
+                new WorkOrderWorkspaceMeta(now, "work-order-core-timeline.v1:gen:1", "FRESH", "q-6"),
+                null,
+                null,
+                null,
+                null,
+                null,
+                new WorkOrderWorkspaceIntegrationSectionData(
+                        List.of(new WorkOrderWorkspaceInboundEnvelopeSummary(
+                                envelopeId, projectId, "byd-cpim-v7.3.1", "CREATE_WORK_ORDER",
+                                "EXT-M91", "VALID", "COMPLETED", "mapping-v1", UUID.randomUUID(),
+                                "ACCEPTED", "WORK_ORDER", workOrderId.toString(), now, now, "corr-in")),
+                        List.of(),
+                        null));
+        when(principals.current()).thenReturn(principal);
+        when(workspaces.getSection(eq(principal), eq("corr-int"), eq(workOrderId),
+                eq("INTEGRATION"), isNull(), eq(50))).thenReturn(section);
+
+        mvc.perform(get("/api/v1/work-orders/{id}/workspace/sections/{section}",
+                        workOrderId, "INTEGRATION")
+                        .with(jwt())
+                        .header("X-Correlation-Id", "corr-int"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("ETag", "\"8\""))
+                .andExpect(jsonPath("$.section").value("INTEGRATION"))
+                .andExpect(jsonPath("$.integration.inboundEnvelopes[0].inboundEnvelopeId")
+                        .value(envelopeId.toString()))
+                .andExpect(jsonPath("$.integration.inboundEnvelopes[0].rawPayloadDigest").doesNotExist())
+                .andExpect(jsonPath("$.integration.outboundDeliveries").isArray())
+                .andExpect(jsonPath("$.tasks").value(nullValue()))
+                .andExpect(jsonPath("$.reviewsCorrections").value(nullValue()));
+        verify(workspaces).getSection(
+                principal, "corr-int", workOrderId, "INTEGRATION", null, 50);
     }
 }

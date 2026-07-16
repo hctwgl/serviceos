@@ -30,6 +30,8 @@ import com.serviceos.task.api.ScheduledTaskView;
 import com.serviceos.task.api.TaskFulfillmentContext;
 import com.serviceos.task.api.TaskFulfillmentContextService;
 import com.serviceos.task.api.TaskSchedulingService;
+import com.serviceos.workorder.api.WorkOrderDetail;
+import com.serviceos.workorder.api.WorkOrderQueryService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.core.JacksonException;
@@ -68,6 +70,7 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
     private final InboundMessageRepository inbound;
     private final OutboundDeliveryRepository deliveries;
     private final TaskSchedulingService tasks;
+    private final WorkOrderQueryService workOrders;
     private final AuthorizationService authorization;
     private final IdempotencyService idempotency;
     private final ObjectStorageGateway storage;
@@ -84,6 +87,7 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
             InboundMessageRepository inbound,
             OutboundDeliveryRepository deliveries,
             TaskSchedulingService tasks,
+            WorkOrderQueryService workOrders,
             AuthorizationService authorization,
             IdempotencyService idempotency,
             ObjectStorageGateway storage,
@@ -100,6 +104,7 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
         this.inbound = inbound;
         this.deliveries = deliveries;
         this.tasks = tasks;
+        this.workOrders = workOrders;
         this.authorization = authorization;
         this.idempotency = idempotency;
         this.storage = storage;
@@ -247,6 +252,24 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
                 READ_CAPABILITY, principal.tenantId(), "OutboundDelivery",
                 deliveryId.toString(), view.projectId().toString()), correlationId);
         return view;
+    }
+
+    @Override
+    public List<OutboundDeliveryView> listForWorkOrder(
+            CurrentPrincipal principal, String correlationId, UUID workOrderId, int limit
+    ) {
+        if (limit < 1 || limit > 100) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, "limit must be between 1 and 100");
+        }
+        WorkOrderDetail workOrder = workOrders.get(principal, correlationId, workOrderId);
+        UUID projectId = workOrder.workOrder().projectId();
+        authorization.require(principal, AuthorizationRequest.projectCapability(
+                READ_CAPABILITY, principal.tenantId(), "WorkOrder",
+                workOrderId.toString(), projectId.toString()), correlationId);
+        return deliveries.listByWorkOrder(principal.tenantId(), projectId, workOrderId, limit)
+                .stream()
+                .map(OutboundDeliveryRepository.DeliveryRecord::view)
+                .toList();
     }
 
     @Override
