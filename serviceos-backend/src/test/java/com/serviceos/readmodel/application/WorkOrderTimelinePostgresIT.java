@@ -39,6 +39,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -312,29 +313,11 @@ class WorkOrderTimelinePostgresIT {
                 t0.plusSeconds(30)));
         handler.handle(message(
                 "fieldwork", "visit.checked-in", 1, "Visit", visitId, 1,
-                Map.of(
-                        "visitId", visitId,
-                        "projectId", projectId,
-                        "workOrderId", workOrderId,
-                        "taskId", taskId,
-                        "technicianId", "tech-9",
-                        "status", "IN_PROGRESS",
-                        "resultCode", null,
-                        "exceptionCode", null,
-                        "occurredAt", t0.plusSeconds(40)),
+                visitPayload(visitId, "IN_PROGRESS", null, null, t0.plusSeconds(40)),
                 t0.plusSeconds(40)));
         handler.handle(message(
                 "fieldwork", "visit.checked-out", 1, "Visit", visitId, 2,
-                Map.of(
-                        "visitId", visitId,
-                        "projectId", projectId,
-                        "workOrderId", workOrderId,
-                        "taskId", taskId,
-                        "technicianId", "tech-9",
-                        "status", "COMPLETED",
-                        "resultCode", "JOB_DONE",
-                        "exceptionCode", null,
-                        "occurredAt", t0.plusSeconds(50)),
+                visitPayload(visitId, "COMPLETED", "JOB_DONE", null, t0.plusSeconds(50)),
                 t0.plusSeconds(50)));
 
         var page = timelines.list(principal("reader", TENANT), "corr-field-ops", workOrderId, null, 20);
@@ -363,16 +346,8 @@ class WorkOrderTimelinePostgresIT {
         UUID wrongVisit = UUID.randomUUID();
         assertThatThrownBy(() -> handler.handle(message(
                 "fieldwork", "visit.interrupted", 1, "Visit", wrongVisit, 2,
-                Map.of(
-                        "visitId", wrongVisit,
-                        "projectId", UUID.randomUUID(),
-                        "workOrderId", workOrderId,
-                        "taskId", taskId,
-                        "technicianId", "tech-9",
-                        "status", "INTERRUPTED",
-                        "resultCode", null,
-                        "exceptionCode", "PARTS_MISSING",
-                        "occurredAt", t0.plusSeconds(60)),
+                visitPayload(wrongVisit, UUID.randomUUID(), "INTERRUPTED", null, "PARTS_MISSING",
+                        t0.plusSeconds(60)),
                 t0.plusSeconds(60))))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Project");
@@ -389,6 +364,38 @@ class WorkOrderTimelinePostgresIT {
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code())
                                 .isEqualTo(ProblemCode.EVENT_PAYLOAD_MISMATCH));
+    }
+
+    private Map<String, Object> visitPayload(
+            UUID visitId,
+            String status,
+            String resultCode,
+            String exceptionCode,
+            Instant occurredAt
+    ) {
+        return visitPayload(visitId, projectId, status, resultCode, exceptionCode, occurredAt);
+    }
+
+    private Map<String, Object> visitPayload(
+            UUID visitId,
+            UUID project,
+            String status,
+            String resultCode,
+            String exceptionCode,
+            Instant occurredAt
+    ) {
+        // Map.of 禁止 null；Visit checkout/interrupt 的互斥编码需要显式 null。
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("visitId", visitId);
+        payload.put("projectId", project);
+        payload.put("workOrderId", workOrderId);
+        payload.put("taskId", taskId);
+        payload.put("technicianId", "tech-9");
+        payload.put("status", status);
+        payload.put("resultCode", resultCode);
+        payload.put("exceptionCode", exceptionCode);
+        payload.put("occurredAt", occurredAt);
+        return payload;
     }
 
     private OutboxMessage message(

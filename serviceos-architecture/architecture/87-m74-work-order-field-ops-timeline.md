@@ -43,6 +43,9 @@ ContactAttempt 公开事件，使 `GET /api/v1/work-orders/{workOrderId}/timelin
 - `(occurredAt DESC, timelineEntryId DESC)` 游标绑定 workOrderId；
 - `freshnessStatus` 仍为显式 `UNKNOWN`，不伪造 Broker checkpoint。
 
+Core OpenAPI 将 timeline 的 `category` / `eventType` / `resourceType` 从封闭 `enum` 调整为
+`x-extensible-enum`，以便后续领域事件可兼容扩展；客户端必须容忍未知值。
+
 ## 5. 数据库
 
 V072 以 expand 方式放宽 `ck_rdm_work_order_timeline_category`，允许
