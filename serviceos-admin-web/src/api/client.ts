@@ -1,4 +1,5 @@
 /** 最小 HTTP 客户端：只携带受信 Bearer，不信任客户端拼装的 tenant/scope。 */
+import { requireAuthentication, usableAccessToken } from '../auth/oidc'
 
 export type ApiError = {
   title?: string
@@ -17,7 +18,7 @@ function apiBase(): string {
 }
 
 function authHeaders(extra: Record<string, string> = {}): HeadersInit {
-  const token = localStorage.getItem('serviceos.accessToken')
+  const token = usableAccessToken()
   const headers: Record<string, string> = {
     Accept: 'application/json',
     'X-Correlation-Id': crypto.randomUUID(),
@@ -30,6 +31,9 @@ function authHeaders(extra: Record<string, string> = {}): HeadersInit {
 }
 
 async function parseError(response: Response): Promise<never> {
+  if (response.status === 401) {
+    requireAuthentication()
+  }
   let problem: ApiError = { title: response.statusText }
   try {
     problem = (await response.json()) as ApiError

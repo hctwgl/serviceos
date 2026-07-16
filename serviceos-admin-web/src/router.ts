@@ -18,10 +18,12 @@ import SlaQueuePage from './pages/SlaQueuePage.vue'
 import SlaInstanceDetailPage from './pages/SlaInstanceDetailPage.vue'
 import ProjectDirectoryPage from './pages/ProjectDirectoryPage.vue'
 import ProjectDetailPage from './pages/ProjectDetailPage.vue'
+import OidcCallbackPage from './pages/OidcCallbackPage.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
+    { path: '/auth/callback', name: 'ADMIN.AUTH.CALLBACK', component: OidcCallbackPage },
     {
       path: '/',
       component: AppShell,
