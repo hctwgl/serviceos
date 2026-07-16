@@ -12,26 +12,38 @@ fail() {
 
 [[ -d "${migration_root}" ]] || fail "迁移目录不存在: ${migration_root}"
 
-mapfile -t versioned_files < <(find "${migration_root}" -type f -name 'V*.sql' -print | sort)
-mapfile -t repeatable_files < <(find "${migration_root}" -type f -name 'R*.sql' -print | sort)
+versioned_files=()
+while IFS= read -r file; do
+  versioned_files[${#versioned_files[@]}]="${file}"
+done < <(find "${migration_root}" -type f -name 'V*.sql' -print | sort)
+
+repeatable_files=()
+while IFS= read -r file; do
+  repeatable_files[${#repeatable_files[@]}]="${file}"
+done < <(find "${migration_root}" -type f -name 'R*.sql' -print | sort)
+
 [[ "${#versioned_files[@]}" -gt 0 ]] || fail "没有发现版本化 Flyway 迁移"
 
-versions=()
-declare -A seen_versions=()
+seen_versions="|"
+latest_version=""
+latest_normalized=-1
 for file in "${versioned_files[@]}"; do
   name="$(basename "${file}")"
   if [[ ! "${name}" =~ ${versioned_pattern} ]]; then
     fail "版本化迁移文件名不合法: ${name}"
   fi
   version="${BASH_REMATCH[1]}"
-  if [[ -n "${seen_versions[${version}]:-}" ]]; then
+  normalized=$((10#${version}))
+  if [[ "${seen_versions}" == *"|${normalized}|"* ]]; then
     fail "Flyway 版本重复: ${version}"
   fi
-  seen_versions["${version}"]=1
-  versions+=("${version}")
+  seen_versions="${seen_versions}${normalized}|"
+  if [[ "${normalized}" -gt "${latest_normalized}" ]]; then
+    latest_normalized="${normalized}"
+    latest_version="${version}"
+  fi
 done
 
-latest_version="$(printf '%s\n' "${versions[@]}" | sort -n | tail -1)"
 migration_count=$(( ${#versioned_files[@]} + ${#repeatable_files[@]} ))
 
 case "${1:-}" in
