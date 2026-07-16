@@ -80,7 +80,7 @@ class VisitPostgresIT {
         seedResponsibility(taskId, "network-a", TECHNICIAN);
         seedGeofence("WARN", 100, 50);
         UUID appointmentId = confirmedAppointment(taskId, "normal");
-        Instant captured = Instant.now().minusSeconds(30);
+        Instant captured = Instant.now().minusSeconds(30).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
         CheckInVisitCommand checkIn = new CheckInVisitCommand(
                 appointmentId, captured, "device-command-normal", "device-032",
                 new VisitLocation(31.230400, 121.473700, 8), false);

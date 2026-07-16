@@ -24,6 +24,7 @@ import com.serviceos.reliability.api.OutboxEvent;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.CommandContext;
 import com.serviceos.shared.CommandMetadata;
+import com.serviceos.shared.PostgresInstants;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.shared.Sha256;
 import com.serviceos.task.api.TaskFulfillmentContext;
@@ -133,7 +134,8 @@ final class DefaultVisitService implements VisitService {
         }
 
         Instant receivedAt = clock.instant();
-        validateCapturedAt(command.capturedAt(), null, receivedAt);
+        Instant capturedAt = PostgresInstants.truncate(command.capturedAt());
+        validateCapturedAt(capturedAt, null, receivedAt);
         GeofenceDecision geofence = geofence(context.tenantId(), appointment.projectId(), command.location());
         UUID visitId = UUID.randomUUID();
         VisitAggregate visit = new VisitAggregate(
@@ -141,7 +143,7 @@ final class DefaultVisitService implements VisitService {
                 appointment.taskId(), appointment.appointmentId(),
                 repository.nextSequence(context.tenantId(), appointment.taskId()),
                 principal.principalId(), responsibility.networkId(), "IN_PROGRESS",
-                command.capturedAt(), receivedAt, command.location(), geofence.result(), geofence.distanceMeters(),
+                capturedAt, receivedAt, command.location(), geofence.result(), geofence.distanceMeters(),
                 geofence.policyVersion(), geofence.policyDecision(), command.deviceId(),
                 command.deviceCommandId(), command.offline(), null, null, null, null, null,
                 List.of(), List.of(), 1, context.actorId(), receivedAt, receivedAt);
@@ -150,7 +152,7 @@ final class DefaultVisitService implements VisitService {
         appointments.advance(context.tenantId(), appointment.appointmentId(), appointment.aggregateVersion(),
                 "CONFIRMED", "IN_PROGRESS", "CHECK_IN_VISIT", context.actorId(), null, receivedAt);
         repository.create(visit);
-        repository.appendFact(context.tenantId(), visitId, 1, "CHECK_IN", command.capturedAt(), receivedAt,
+        repository.appendFact(context.tenantId(), visitId, 1, "CHECK_IN", capturedAt, receivedAt,
                 command.location().latitude(), command.location().longitude(), command.location().accuracyMeters(),
                 geofence.result(), null, null, null, List.of(), context.actorId(), command.deviceId(),
                 command.offline());
@@ -167,7 +169,7 @@ final class DefaultVisitService implements VisitService {
             CurrentPrincipal principal, CommandMetadata metadata, CheckOutVisitCommand command
     ) {
         return terminate(principal, metadata, command.visitId(), command.expectedVersion(),
-                command.capturedAt(), "COMPLETED", command.resultCode(), null, null,
+                PostgresInstants.truncate(command.capturedAt()), "COMPLETED", command.resultCode(), null, null,
                 command.operationRefs(), List.of(), CHECK_OUT, OP_CHECK_OUT,
                 "VISIT_CHECK_OUT", "visit.checked-out");
     }
@@ -178,7 +180,7 @@ final class DefaultVisitService implements VisitService {
             CurrentPrincipal principal, CommandMetadata metadata, InterruptVisitCommand command
     ) {
         return terminate(principal, metadata, command.visitId(), command.expectedVersion(),
-                command.capturedAt(), "INTERRUPTED", null, command.exceptionCode(), command.note(),
+                PostgresInstants.truncate(command.capturedAt()), "INTERRUPTED", null, command.exceptionCode(), command.note(),
                 List.of(), command.evidenceRefs(), INTERRUPT, OP_INTERRUPT,
                 "VISIT_INTERRUPT", "visit.interrupted");
     }
