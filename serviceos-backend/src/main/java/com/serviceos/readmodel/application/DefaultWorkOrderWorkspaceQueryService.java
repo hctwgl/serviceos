@@ -4,8 +4,12 @@ import com.serviceos.appointment.api.AppointmentRevisionView;
 import com.serviceos.appointment.api.AppointmentService;
 import com.serviceos.appointment.api.AppointmentView;
 import com.serviceos.appointment.api.AppointmentWindow;
+import com.serviceos.evidence.api.EvidenceSlotQueryService;
+import com.serviceos.evidence.api.EvidenceSlotView;
 import com.serviceos.fieldwork.api.VisitService;
 import com.serviceos.fieldwork.api.VisitView;
+import com.serviceos.forms.api.TaskFormDefinition;
+import com.serviceos.forms.api.TaskFormQueryService;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.operations.api.OperationalExceptionItem;
 import com.serviceos.operations.api.OperationalExceptionQuery;
@@ -21,6 +25,9 @@ import com.serviceos.readmodel.api.WorkOrderWorkspaceQueryService;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceAppointmentSummary;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceAppointmentsVisitsSectionData;
+import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceEvidenceSlotSummary;
+import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceFormSummary;
+import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceFormsEvidenceSectionData;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceTasksSectionData;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceTimelineSectionData;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceVisitSummary;
@@ -47,7 +54,7 @@ import java.util.UUID;
 
 /**
  * 实时组合工单工作区顶层快照与按需区块。
- * <p>不落工作区投影表；SLA/异常/预约到访缺权时标记 UNAVAILABLE，不把整个工作区打成 403。</p>
+ * <p>不落工作区投影表；SLA/异常/预约到访/表单资料缺权时标记 UNAVAILABLE，不把整个工作区打成 403。</p>
  * <p>故意不加外层事务：次级只读端口缺权会抛 {@code BusinessProblem}，若加入同一事务会
  * 把事务标成 rollback-only，即使外层捕获也会在提交时失败。</p>
  */
@@ -57,7 +64,7 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
             "READY", "PENDING", "CLAIMED", "RUNNING", "RETRY_WAIT", "MANUAL_INTERVENTION");
     private static final Set<String> OPEN_SLA_STATUSES = Set.of("RUNNING", "BREACHED");
     private static final Set<String> ACCEPTED_SECTIONS = Set.of(
-            "TASKS", "TIMELINE_AUDIT", "APPOINTMENTS_VISITS");
+            "TASKS", "TIMELINE_AUDIT", "APPOINTMENTS_VISITS", "FORMS_EVIDENCE");
 
     private final WorkOrderQueryService workOrders;
     private final WorkOrderTaskQueryService workOrderTasks;
@@ -67,6 +74,8 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
     private final OperationalExceptionWorkbenchService exceptions;
     private final VisitService visits;
     private final AppointmentService appointments;
+    private final TaskFormQueryService taskForms;
+    private final EvidenceSlotQueryService evidenceSlots;
     private final Clock clock;
 
     DefaultWorkOrderWorkspaceQueryService(
@@ -78,6 +87,8 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
             OperationalExceptionWorkbenchService exceptions,
             VisitService visits,
             AppointmentService appointments,
+            TaskFormQueryService taskForms,
+            EvidenceSlotQueryService evidenceSlots,
             Clock clock
     ) {
         this.workOrders = workOrders;
@@ -88,6 +99,8 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
         this.exceptions = exceptions;
         this.visits = visits;
         this.appointments = appointments;
+        this.taskForms = taskForms;
+        this.evidenceSlots = evidenceSlots;
         this.clock = clock;
     }
 
@@ -116,7 +129,9 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
         availability.put(
                 "APPOINTMENTS_VISITS",
                 probeAppointmentsVisitsAvailability(principal, correlationId, workOrderId, tasks));
-        availability.put("FORMS_EVIDENCE", "UNAVAILABLE");
+        availability.put(
+                "FORMS_EVIDENCE",
+                probeFormsEvidenceAvailability(principal, correlationId, tasks));
         availability.put("REVIEWS_CORRECTIONS", "UNAVAILABLE");
         availability.put("INTEGRATION", "UNAVAILABLE");
         availability.put("FACTS_CALCULATIONS", "UNAVAILABLE");
@@ -168,6 +183,7 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
                                 page.items().stream().map(this::toTaskSummary).toList(),
                                 page.nextCursor()),
                         null,
+                        null,
                         null);
             }
             case "TIMELINE_AUDIT" -> {
@@ -182,6 +198,7 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
                                 page.nextCursor(),
                                 page.lastProjectedAt(),
                                 page.freshnessStatus()),
+                        null,
                         null);
             }
             case "APPOINTMENTS_VISITS" -> {
@@ -193,7 +210,18 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
                 WorkOrderWorkspaceAppointmentsVisitsSectionData payload =
                         loadAppointmentsVisits(principal, correlationId, workOrderId, limit);
                 yield new WorkOrderWorkspaceSection(
-                        normalized, versions, meta("FRESH"), null, null, payload);
+                        normalized, versions, meta("FRESH"), null, null, payload, null);
+            }
+            case "FORMS_EVIDENCE" -> {
+                if (cursor != null && !cursor.isBlank()) {
+                    throw new BusinessProblem(
+                            ProblemCode.VALIDATION_FAILED,
+                            "FORMS_EVIDENCE cursor paging is not accepted in this slice");
+                }
+                WorkOrderWorkspaceFormsEvidenceSectionData payload =
+                        loadFormsEvidence(principal, correlationId, workOrderId, limit);
+                yield new WorkOrderWorkspaceSection(
+                        normalized, versions, meta("FRESH"), null, null, null, payload);
             }
             default -> throw new BusinessProblem(
                     ProblemCode.VALIDATION_FAILED, "workspace section is not accepted: " + normalized);
@@ -210,18 +238,45 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
                 loadAppointmentsVisits(principal, correlationId, workOrderId, tasks, 1);
         boolean visitDenied = loaded.visits() == null;
         boolean appointmentDenied = loaded.appointments() == null;
-        boolean visitsEmpty = visitDenied || loaded.visits().isEmpty();
-        boolean appointmentsEmpty = appointmentDenied || loaded.appointments().isEmpty();
-        if (visitDenied && appointmentDenied) {
+        return dualHalfAvailability(
+                visitDenied,
+                appointmentDenied,
+                visitDenied || loaded.visits().isEmpty(),
+                appointmentDenied || loaded.appointments().isEmpty());
+    }
+
+    private String probeFormsEvidenceAvailability(
+            CurrentPrincipal principal,
+            String correlationId,
+            List<WorkOrderTaskSummary> tasks
+    ) {
+        WorkOrderWorkspaceFormsEvidenceSectionData loaded =
+                loadFormsEvidence(principal, correlationId, tasks, 1);
+        boolean formsDenied = loaded.forms() == null;
+        boolean slotsDenied = loaded.evidenceSlots() == null;
+        return dualHalfAvailability(
+                formsDenied,
+                slotsDenied,
+                formsDenied || loaded.forms().isEmpty(),
+                slotsDenied || loaded.evidenceSlots().isEmpty());
+    }
+
+    private static String dualHalfAvailability(
+            boolean leftDenied,
+            boolean rightDenied,
+            boolean leftEmpty,
+            boolean rightEmpty
+    ) {
+        if (leftDenied && rightDenied) {
             return "UNAVAILABLE";
         }
-        if (visitDenied && appointmentsEmpty) {
+        if (leftDenied && rightEmpty) {
             return "UNAVAILABLE";
         }
-        if (appointmentDenied && visitsEmpty) {
+        if (rightDenied && leftEmpty) {
             return "UNAVAILABLE";
         }
-        if (visitsEmpty && appointmentsEmpty) {
+        if (leftEmpty && rightEmpty) {
             return "EMPTY";
         }
         return "AVAILABLE";
@@ -288,6 +343,82 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
                 visitSummaries, appointmentSummaries, null);
     }
 
+    private WorkOrderWorkspaceFormsEvidenceSectionData loadFormsEvidence(
+            CurrentPrincipal principal,
+            String correlationId,
+            UUID workOrderId,
+            int limit
+    ) {
+        List<WorkOrderTaskSummary> tasks = workOrderTasks.list(
+                principal, correlationId, workOrderId, null, 100).items();
+        return loadFormsEvidence(principal, correlationId, tasks, limit);
+    }
+
+    private WorkOrderWorkspaceFormsEvidenceSectionData loadFormsEvidence(
+            CurrentPrincipal principal,
+            String correlationId,
+            List<WorkOrderTaskSummary> tasks,
+            int limit
+    ) {
+        List<WorkOrderWorkspaceFormSummary> formSummaries;
+        try {
+            List<WorkOrderWorkspaceFormSummary> collected = new ArrayList<>();
+            for (WorkOrderTaskSummary task : tasks) {
+                for (TaskFormDefinition form : taskForms.listForTask(
+                        principal, correlationId, task.id())) {
+                    collected.add(toFormSummary(form));
+                }
+            }
+            formSummaries = collected.stream()
+                    .sorted(Comparator
+                            .comparing(WorkOrderWorkspaceFormSummary::formKey)
+                            .thenComparing(WorkOrderWorkspaceFormSummary::taskId)
+                            .thenComparing(WorkOrderWorkspaceFormSummary::formVersionId))
+                    .limit(limit)
+                    .toList();
+        } catch (BusinessProblem problem) {
+            if (problem.code() == ProblemCode.ACCESS_DENIED) {
+                formSummaries = null;
+            } else {
+                throw problem;
+            }
+        }
+
+        List<WorkOrderWorkspaceEvidenceSlotSummary> slotSummaries;
+        try {
+            List<WorkOrderWorkspaceEvidenceSlotSummary> collected = new ArrayList<>();
+            for (WorkOrderTaskSummary task : tasks) {
+                try {
+                    for (EvidenceSlotView slot : evidenceSlots.listForTask(
+                            principal, correlationId, task.id())) {
+                        collected.add(toEvidenceSlotSummary(slot));
+                    }
+                } catch (BusinessProblem problem) {
+                    // 未完成可靠解析不能伪装成“无需资料”，但也不能把整个工作区顶层打成冲突。
+                    if (problem.code() == ProblemCode.TASK_STATE_CONFLICT) {
+                        continue;
+                    }
+                    throw problem;
+                }
+            }
+            slotSummaries = collected.stream()
+                    .sorted(Comparator
+                            .comparing(WorkOrderWorkspaceEvidenceSlotSummary::templateKey)
+                            .thenComparing(WorkOrderWorkspaceEvidenceSlotSummary::requirementCode)
+                            .thenComparing(WorkOrderWorkspaceEvidenceSlotSummary::slotId))
+                    .limit(limit)
+                    .toList();
+        } catch (BusinessProblem problem) {
+            if (problem.code() == ProblemCode.ACCESS_DENIED) {
+                slotSummaries = null;
+            } else {
+                throw problem;
+            }
+        }
+
+        return new WorkOrderWorkspaceFormsEvidenceSectionData(formSummaries, slotSummaries, null);
+    }
+
     private WorkOrderWorkspaceVisitSummary toVisitSummary(VisitView visit) {
         // 不投影 GPS、device、note、operation/evidence refs，避免工作区泄露现场敏感细节。
         return new WorkOrderWorkspaceVisitSummary(
@@ -319,6 +450,24 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
                 window == null ? null : window.estimatedDurationMinutes(),
                 appointment.aggregateVersion(),
                 appointment.createdAt());
+    }
+
+    private WorkOrderWorkspaceFormSummary toFormSummary(TaskFormDefinition form) {
+        // 故意不投影 definitionJson：工作区只要绑定摘要，完整 schema 仍走 Task forms API。
+        return new WorkOrderWorkspaceFormSummary(
+                form.taskId(), form.formVersionId(), form.formKey(),
+                form.semanticVersion(), form.schemaVersion(), form.contentDigest());
+    }
+
+    private WorkOrderWorkspaceEvidenceSlotSummary toEvidenceSlotSummary(EvidenceSlotView slot) {
+        // 故意不投影 requirementDefinition / resolutionExplanation JSON。
+        return new WorkOrderWorkspaceEvidenceSlotSummary(
+                slot.slotId(), slot.taskId(), slot.projectId(),
+                slot.templateKey(), slot.templateVersion(),
+                slot.requirementCode(), slot.occurrenceKey(), slot.requirementName(),
+                slot.mediaType(), slot.required(), slot.minCount(), slot.maxCount(),
+                slot.status(), slot.resolvedAt(), slot.slotGeneration(),
+                slot.active(), slot.transition(), slot.requiredDisposition());
     }
 
     private WorkOrderWorkspaceMeta meta(String freshnessStatus) {
