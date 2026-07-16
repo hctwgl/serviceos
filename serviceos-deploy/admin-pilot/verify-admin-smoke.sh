@@ -810,11 +810,11 @@ for _ in $(seq 1 45); do
      GROUP BY appointment.appointment_id, appointment.status,
               visit.visit_id, visit.status
   ")"
-  # 签到后 Appointment 进入 IN_PROGRESS；签退后 Visit=COMPLETED。
-  [[ "${field_ops_state}" == "IN_PROGRESS:COMPLETED:4:4" ]] && break
+  # 签退会把 Appointment 与 Visit 一并推进到 COMPLETED（同事务）。
+  [[ "${field_ops_state}" == "COMPLETED:COMPLETED:4:4" ]] && break
   sleep 1
 done
-[[ "${field_ops_state}" == "IN_PROGRESS:COMPLETED:4:4" ]] || {
+[[ "${field_ops_state}" == "COMPLETED:COMPLETED:4:4" ]] || {
   echo "Admin 试点预约/上门写链路不完整: ${field_ops_state}" >&2
   exit 1
 }
