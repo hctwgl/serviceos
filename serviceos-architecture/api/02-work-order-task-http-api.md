@@ -153,7 +153,7 @@ CorrectWorkOrderData 仅更正由 workorder 拥有的基础字段，按 fieldCod
 
 M73 已实现 `/work-orders/{id}/timeline` 的 WorkOrder/Workflow/Stage/Task 核心事件子集；M74 已合并
 Appointment/Visit/ContactAttempt 现场履约事件；M75 已合并 SLA 事件；M76 已合并 form/snapshot/review/correction 生命周期事件。
-Delivery、异常、试算与结算及 revision 技术噪声尚未合并，客户端不得把当前子集标成完整跨域时间线。
+delivery acknowledged/recovered、试算与结算及 revision 技术噪声尚未合并；M77 已合并 delivery-created 与 exception.resolved@v2，客户端不得把当前子集标成完整跨域时间线。
 
 ## 6. 允许动作响应
 

@@ -251,8 +251,8 @@ class WorkOrderTimelinePostgresIT {
                 "corr-cross", workOrderId, null, 10))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.RESOURCE_NOT_FOUND));
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("074");
-        assertThat(flyway.info().applied()).hasSize(76);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("075");
+        assertThat(flyway.info().applied()).hasSize(77);
     }
 
     @Test
@@ -411,6 +411,41 @@ class WorkOrderTimelinePostgresIT {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Project");
         assertThat(count("rdm_work_order_timeline_entry")).isEqualTo(6);
+    }
+
+    @Test
+    void projectsDeliveryCreatedAndExceptionResolvedV2() {
+        Instant t0 = Instant.parse("2026-07-16T07:00:00Z");
+        UUID deliveryId = UUID.randomUUID();
+        UUID exceptionId = UUID.randomUUID();
+
+        handler.handle(message(
+                "integration", "integration.outbound-delivery-created", 1, "OutboundDelivery",
+                deliveryId, 1,
+                Map.of(
+                        "deliveryId", deliveryId,
+                        "projectId", projectId,
+                        "sourceWorkOrderId", workOrderId,
+                        "createdAt", t0),
+                t0));
+        handler.handle(message(
+                "operations", "operational.exception.resolved", 2, "OperationalException",
+                exceptionId, 2,
+                Map.of(
+                        "exceptionId", exceptionId,
+                        "sourceTaskId", taskId,
+                        "resolutionCode", "DELIVERY_ACK_RECOVERED",
+                        "resolvedAt", t0.plusSeconds(10)),
+                t0.plusSeconds(10)));
+
+        var page = timelines.list(principal("reader", TENANT), "corr-delivery", workOrderId, null, 10);
+        assertThat(page.items()).extracting(WorkOrderTimelineItem::eventType)
+                .containsExactly("operational.exception.resolved", "integration.outbound-delivery-created");
+        assertThat(page.items().get(0).category()).isEqualTo("EXCEPTION");
+        assertThat(page.items().get(0).outcomeCode()).isEqualTo("DELIVERY_ACK_RECOVERED");
+        assertThat(page.items().get(1).category()).isEqualTo("DELIVERY");
+        assertThat(page.items().get(1).outcomeCode()).isEqualTo("CREATED");
+        assertThat(count("rdm_work_order_timeline_entry")).isEqualTo(2);
     }
 
     @Test

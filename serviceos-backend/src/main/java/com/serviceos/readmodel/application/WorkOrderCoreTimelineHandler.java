@@ -57,7 +57,9 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             "evidence.review-case-created", "evidence.client-review-case-created",
             "evidence.review-decided", "evidence.review-case-reopened",
             "evidence.correction-case-created", "evidence.correction-resubmitted",
-            "evidence.correction-closed", "evidence.correction-waived");
+            "evidence.correction-closed", "evidence.correction-waived",
+            "integration.outbound-delivery-created",
+            "operational.exception.resolved");
 
     private final InboxService inbox;
     private final WorkOrderTimelineRepository timelines;
@@ -86,7 +88,8 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
     public boolean supports(String eventType, int schemaVersion) {
         return V1_EVENTS.contains(eventType)
                 && (schemaVersion == 1
-                || ("task.completed".equals(eventType) && schemaVersion == 2));
+                || ("task.completed".equals(eventType) && schemaVersion == 2)
+                || ("operational.exception.resolved".equals(eventType) && schemaVersion == 2));
     }
 
     @Override
@@ -181,6 +184,8 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             case "evidence.correction-resubmitted" -> correctionResubmitted(message);
             case "evidence.correction-closed" -> correctionClosed(message);
             case "evidence.correction-waived" -> correctionWaived(message);
+            case "integration.outbound-delivery-created" -> Optional.of(deliveryCreated(message));
+            case "operational.exception.resolved" -> exceptionResolved(message);
             default -> throw new IllegalArgumentException("unsupported work order timeline event");
         };
     }
@@ -432,6 +437,26 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
                 message, "evidence", "CorrectionCase", payload.correctionCaseId(), payload.taskId(),
                 payload.projectId(), "CORRECTION", "CorrectionCase", null, "WAIVED",
                 payload.waivedBy(), payload.waivedAt());
+    }
+
+    private TimelineFact deliveryCreated(OutboxMessage message) {
+        OutboundDeliveryCreatedPayload payload = read(message, OutboundDeliveryCreatedPayload.class);
+        requireEnvelope(message, "integration", "OutboundDelivery", payload.deliveryId());
+        // 不投影 externalOrderCode / payloadDigest；仅保留交付创建事实。
+        return fact(payload.sourceWorkOrderId(), payload.projectId(), "DELIVERY", "OutboundDelivery",
+                payload.deliveryId(), null, "CREATED", null, payload.createdAt());
+    }
+
+    private Optional<TimelineFact> exceptionResolved(OutboxMessage message) {
+        if (message.schemaVersion() != 2) {
+            throw new IllegalArgumentException("时间线仅接受 operational.exception.resolved@v2");
+        }
+        ExceptionResolvedPayload payload = read(message, ExceptionResolvedPayload.class);
+        return taskScopedFact(
+                message, "operations", "OperationalException", payload.exceptionId(),
+                payload.sourceTaskId(), null, "EXCEPTION", "OperationalException", null,
+                requireCode(payload.resolutionCode(), "exception resolutionCode"), null,
+                payload.resolvedAt());
     }
 
     private Optional<TimelineFact> taskScopedFact(
@@ -748,6 +773,22 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             UUID projectId,
             String waivedBy,
             Instant waivedAt
+    ) {
+    }
+
+    private record OutboundDeliveryCreatedPayload(
+            UUID deliveryId,
+            UUID projectId,
+            UUID sourceWorkOrderId,
+            Instant createdAt
+    ) {
+    }
+
+    private record ExceptionResolvedPayload(
+            UUID exceptionId,
+            UUID sourceTaskId,
+            String resolutionCode,
+            Instant resolvedAt
     ) {
     }
 }

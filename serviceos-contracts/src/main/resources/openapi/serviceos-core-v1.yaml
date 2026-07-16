@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.47.0
+  version: 0.48.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -86,8 +86,8 @@ paths:
       summary: 查询工单执行与现场履约时间线
       description: >-
         每页复用 workOrder.read 实时 Project Scope 鉴权；返回由公开领域事件构建的
-        工单执行、现场履约、SLA 与资料/审核/整改时间线，不读取 Outbox、审计或领域内部表拼接。
-        Delivery、运营异常、试算/结算尚未合并。
+        工单执行、现场履约、SLA、资料/审核/整改、外发交付创建与异常闭环时间线。
+        delivery acknowledged/recovered、试算/结算尚未合并。
       parameters:
         - { name: workOrderId, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: cursor, in: query, schema: { type: string, minLength: 1 } }
@@ -2000,7 +2000,7 @@ components:
       properties:
         id: { type: string, format: uuid }
         # 时间线会持续合并新领域事件；使用可扩展枚举，客户端必须容忍未知值。
-        category: { x-extensible-enum: [WORK_ORDER, WORKFLOW, STAGE, TASK, APPOINTMENT, VISIT, CONTACT_ATTEMPT, SLA, FORM, EVIDENCE, REVIEW, CORRECTION] }
+        category: { x-extensible-enum: [WORK_ORDER, WORKFLOW, STAGE, TASK, APPOINTMENT, VISIT, CONTACT_ATTEMPT, SLA, FORM, EVIDENCE, REVIEW, CORRECTION, DELIVERY, EXCEPTION] }
         eventType:
           x-extensible-enum: [workorder.received, workorder.activated, workorder.fulfilled,
             workflow.started, workflow.completed, stage.activated, stage.completed,
@@ -2013,12 +2013,13 @@ components:
             evidence.review-case-created, evidence.client-review-case-created,
             evidence.review-decided, evidence.review-case-reopened,
             evidence.correction-case-created, evidence.correction-resubmitted,
-            evidence.correction-closed, evidence.correction-waived]
+            evidence.correction-closed, evidence.correction-waived,
+            integration.outbound-delivery-created, operational.exception.resolved]
         schemaVersion: { type: integer, minimum: 1, maximum: 2 }
         occurredAt: { type: string, format: date-time }
         receivedAt: { type: string, format: date-time }
         actorId: { type: [string, 'null'], minLength: 1, maxLength: 128 }
-        resourceType: { x-extensible-enum: [WorkOrder, Workflow, Stage, Task, Appointment, Visit, ContactAttempt, SlaInstance, FormSubmission, EvidenceSetSnapshot, ReviewCase, CorrectionCase] }
+        resourceType: { x-extensible-enum: [WorkOrder, Workflow, Stage, Task, Appointment, Visit, ContactAttempt, SlaInstance, FormSubmission, EvidenceSetSnapshot, ReviewCase, CorrectionCase, OutboundDelivery, OperationalException] }
         resourceId: { type: string, format: uuid }
         resourceVersion: { type: integer, format: int64, minimum: 1 }
         resourceCode: { type: [string, 'null'], minLength: 1, maxLength: 160 }

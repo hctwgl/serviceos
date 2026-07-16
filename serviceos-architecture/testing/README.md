@@ -77,3 +77,4 @@
 - [M74 工单现场履约时间线事件合并验收矩阵](71-m74-work-order-field-ops-timeline-acceptance.md)
 - [M75 工单 SLA 时间线事件合并验收矩阵](72-m75-work-order-sla-timeline-acceptance.md)
 - [M76 工单资料审核时间线事件合并验收矩阵](73-m76-work-order-evidence-review-timeline-acceptance.md)
+- [M77 工单外发交付与异常闭环时间线事件合并验收矩阵](74-m77-work-order-delivery-exception-timeline-acceptance.md)
