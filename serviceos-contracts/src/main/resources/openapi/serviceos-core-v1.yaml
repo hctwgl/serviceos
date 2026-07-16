@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.59.0
+  version: 0.61.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -111,7 +111,8 @@ paths:
       description: >-
         复用 workOrder.read 实时鉴权，组合 Task/时间线 freshness、可选 SLA/异常摘要，
         以及 APPOINTMENTS_VISITS 等 sectionAvailability。不含客户 PII；大区块按需加载见
-        workspace/sections（M87～M89：TASKS/TIMELINE_AUDIT/APPOINTMENTS_VISITS/FORMS_EVIDENCE）。
+        workspace/sections（M87～M91：TASKS/TIMELINE_AUDIT/APPOINTMENTS_VISITS/FORMS_EVIDENCE/
+        REVIEWS_CORRECTIONS/INTEGRATION）。
       parameters:
         - { name: workOrderId, in: path, required: true, schema: { type: string, format: uuid } }
         - $ref: '#/components/parameters/CorrelationId'
@@ -131,14 +132,15 @@ paths:
       operationId: getWorkOrderWorkspaceSection
       summary: 按需加载工单工作区区块
       description: >-
-        M89 接受 TASKS、TIMELINE_AUDIT、APPOINTMENTS_VISITS 与 FORMS_EVIDENCE；其余 section 失败关闭为 400。
+        M91 接受 TASKS、TIMELINE_AUDIT、APPOINTMENTS_VISITS、FORMS_EVIDENCE、
+        REVIEWS_CORRECTIONS 与 INTEGRATION；其余 section 失败关闭为 400。
         复用 workOrder.read；实时组合，不落区块投影表；不含客户 PII。
       parameters:
         - { name: workOrderId, in: path, required: true, schema: { type: string, format: uuid } }
         - name: section
           in: path
           required: true
-          schema: { enum: [TASKS, TIMELINE_AUDIT, APPOINTMENTS_VISITS, FORMS_EVIDENCE] }
+          schema: { enum: [TASKS, TIMELINE_AUDIT, APPOINTMENTS_VISITS, FORMS_EVIDENCE, REVIEWS_CORRECTIONS, INTEGRATION] }
         - { name: cursor, in: query, schema: { type: string, minLength: 1 } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
         - $ref: '#/components/parameters/CorrelationId'
@@ -2311,12 +2313,218 @@ components:
               items: { $ref: '#/components/schemas/WorkOrderWorkspaceEvidenceSlotSummary' }
             - { type: 'null' }
         nextCursor: { type: [string, 'null'] }
+    WorkOrderWorkspaceReviewDecisionSummary:
+      type: object
+      additionalProperties: false
+      required: [reviewDecisionId, decisionOrdinal, decision, decisionSource, reasonCodes, decidedAt]
+      properties:
+        reviewDecisionId: { type: string, format: uuid }
+        decisionOrdinal: { type: integer, minimum: 1 }
+        decision: { enum: [APPROVED, REJECTED, FORCE_APPROVED] }
+        decisionSource: { enum: [INTERNAL, EXTERNAL] }
+        reasonCodes:
+          type: array
+          maxItems: 20
+          items: { type: string, minLength: 1, maxLength: 80 }
+        decidedAt: { type: string, format: date-time }
+    WorkOrderWorkspaceReviewCaseSummary:
+      type: object
+      additionalProperties: false
+      required: [reviewCaseId, taskId, projectId, evidenceSetSnapshotId, scopeType, origin,
+        policyVersion, status, createdAt, decidedAt, decisions]
+      properties:
+        reviewCaseId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        evidenceSetSnapshotId: { type: string, format: uuid }
+        scopeType: { enum: [EVIDENCE_SET_SNAPSHOT] }
+        origin: { enum: [INTERNAL, CLIENT] }
+        policyVersion: { type: string, minLength: 1, maxLength: 80 }
+        status: { enum: [OPEN, APPROVED, REJECTED, FORCE_APPROVED, REOPENED] }
+        createdAt: { type: string, format: date-time }
+        decidedAt: { type: [string, 'null'], format: date-time }
+        decisions:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceReviewDecisionSummary' }
+    WorkOrderWorkspaceCorrectionResubmissionSummary:
+      type: object
+      additionalProperties: false
+      required: [correctionResubmissionId, resubmissionOrdinal, evidenceSetSnapshotId, submittedAt]
+      properties:
+        correctionResubmissionId: { type: string, format: uuid }
+        resubmissionOrdinal: { type: integer, minimum: 1 }
+        evidenceSetSnapshotId: { type: string, format: uuid }
+        submittedAt: { type: string, format: date-time }
+    WorkOrderWorkspaceCorrectionCaseSummary:
+      type: object
+      additionalProperties: false
+      required: [correctionCaseId, taskId, projectId, sourceReviewCaseId, sourceReviewDecisionId,
+        reasonCodes, correctionTaskId, status, createdAt, latestResubmissionSnapshotId,
+        closedAt, waivedAt, resubmissions]
+      properties:
+        correctionCaseId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        sourceReviewCaseId: { type: string, format: uuid }
+        sourceReviewDecisionId: { type: string, format: uuid }
+        reasonCodes:
+          type: array
+          maxItems: 20
+          items: { type: string, minLength: 1, maxLength: 80 }
+        correctionTaskId: { type: [string, 'null'], format: uuid }
+        status: { enum: [OPEN, IN_PROGRESS, RESUBMITTED, CLOSED, WAIVED] }
+        createdAt: { type: string, format: date-time }
+        latestResubmissionSnapshotId: { type: [string, 'null'], format: uuid }
+        closedAt: { type: [string, 'null'], format: date-time }
+        waivedAt: { type: [string, 'null'], format: date-time }
+        resubmissions:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceCorrectionResubmissionSummary' }
+    WorkOrderWorkspaceReviewsCorrectionsSectionData:
+      type: object
+      additionalProperties: false
+      required: [reviews, corrections, nextCursor]
+      properties:
+        reviews:
+          oneOf:
+            - type: array
+              maxItems: 100
+              items: { $ref: '#/components/schemas/WorkOrderWorkspaceReviewCaseSummary' }
+            - { type: 'null' }
+        corrections:
+          oneOf:
+            - type: array
+              maxItems: 100
+              items: { $ref: '#/components/schemas/WorkOrderWorkspaceCorrectionCaseSummary' }
+            - { type: 'null' }
+        nextCursor: { type: [string, 'null'] }
+    WorkOrderWorkspaceInboundEnvelopeSummary:
+      type: object
+      additionalProperties: false
+      required: [inboundEnvelopeId, projectId, connectorVersionId, messageType, externalMessageId,
+        signatureStatus, processingStatus, mappingVersionId, canonicalMessageId, resultCode,
+        resultType, resultId, receivedAt, completedAt, correlationId]
+      properties:
+        inboundEnvelopeId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        connectorVersionId: { type: string, minLength: 1, maxLength: 120 }
+        messageType: { type: string, minLength: 1, maxLength: 80 }
+        externalMessageId: { type: string, minLength: 1, maxLength: 160 }
+        signatureStatus: { const: VALID }
+        processingStatus: { const: COMPLETED }
+        mappingVersionId: { type: string, minLength: 1, maxLength: 120 }
+        canonicalMessageId: { type: string, format: uuid }
+        resultCode: { type: string, minLength: 1, maxLength: 80 }
+        resultType: { const: WORK_ORDER }
+        resultId: { type: string, minLength: 1, maxLength: 160 }
+        receivedAt: { type: string, format: date-time }
+        completedAt: { type: string, format: date-time }
+        correlationId: { type: string, minLength: 1, maxLength: 128 }
+    WorkOrderWorkspaceDeliveryAttemptSummary:
+      type: object
+      additionalProperties: false
+      required: [deliveryAttemptId, attemptNo, taskExecutionAttemptId, requestDate, status,
+        httpStatus, resultCode, startedAt, finishedAt]
+      properties:
+        deliveryAttemptId: { type: string, format: uuid }
+        attemptNo: { type: integer, minimum: 1 }
+        taskExecutionAttemptId: { type: string, format: uuid }
+        requestDate: { type: string, format: date }
+        status: { type: string, minLength: 1, maxLength: 24 }
+        httpStatus: { type: [integer, 'null'], minimum: 100, maximum: 599 }
+        resultCode: { type: [string, 'null'], maxLength: 80 }
+        startedAt: { type: string, format: date-time }
+        finishedAt: { type: [string, 'null'], format: date-time }
+    WorkOrderWorkspaceExternalAcknowledgementSummary:
+      type: object
+      additionalProperties: false
+      required: [acknowledgementId, acknowledgementType, result, reasonCode, mappingVersionId, receivedAt]
+      properties:
+        acknowledgementId: { type: string, format: uuid }
+        acknowledgementType: { type: string, minLength: 1, maxLength: 24 }
+        result: { type: string, minLength: 1, maxLength: 24 }
+        reasonCode: { type: [string, 'null'], maxLength: 80 }
+        mappingVersionId: { type: string, minLength: 1, maxLength: 120 }
+        receivedAt: { type: string, format: date-time }
+    WorkOrderWorkspaceDeliveryReplaySummary:
+      type: object
+      additionalProperties: false
+      required: [replayRequestId, executionTaskId, status, resultCode, requestedAt, startedAt, finishedAt]
+      properties:
+        replayRequestId: { type: string, format: uuid }
+        executionTaskId: { type: [string, 'null'], format: uuid }
+        status: { type: string, minLength: 1, maxLength: 24 }
+        resultCode: { type: [string, 'null'], maxLength: 80 }
+        requestedAt: { type: string, format: date-time }
+        startedAt: { type: [string, 'null'], format: date-time }
+        finishedAt: { type: [string, 'null'], format: date-time }
+    WorkOrderWorkspaceOutboundDeliverySummary:
+      type: object
+      additionalProperties: false
+      required: [deliveryId, projectId, connectorVersionId, mappingVersionId, businessMessageType,
+        businessKey, sourceReviewCaseId, sourceTaskId, sourceWorkOrderId, sourceSnapshotId,
+        externalOrderCode, executionTaskId, status, clientReviewCaseId, reviewRouteId,
+        aggregateVersion, createdAt, deliveredAt, acknowledgedAt, attempts, acknowledgements,
+        replayRequests]
+      properties:
+        deliveryId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        connectorVersionId: { type: string, minLength: 1, maxLength: 120 }
+        mappingVersionId: { type: string, minLength: 1, maxLength: 120 }
+        businessMessageType: { type: string, minLength: 1, maxLength: 80 }
+        businessKey: { type: string, minLength: 1, maxLength: 240 }
+        sourceReviewCaseId: { type: string, format: uuid }
+        sourceTaskId: { type: string, format: uuid }
+        sourceWorkOrderId: { type: string, format: uuid }
+        sourceSnapshotId: { type: string, format: uuid }
+        externalOrderCode: { type: string, minLength: 1, maxLength: 50 }
+        executionTaskId: { type: [string, 'null'], format: uuid }
+        status: { enum: [PENDING, SENDING, DELIVERED, ACKNOWLEDGED, REJECTED, FAILED_FINAL, UNKNOWN] }
+        clientReviewCaseId: { type: [string, 'null'], format: uuid }
+        reviewRouteId: { type: [string, 'null'], format: uuid }
+        aggregateVersion: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        deliveredAt: { type: [string, 'null'], format: date-time }
+        acknowledgedAt: { type: [string, 'null'], format: date-time }
+        attempts:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceDeliveryAttemptSummary' }
+        acknowledgements:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceExternalAcknowledgementSummary' }
+        replayRequests:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceDeliveryReplaySummary' }
+    WorkOrderWorkspaceIntegrationSectionData:
+      type: object
+      additionalProperties: false
+      required: [inboundEnvelopes, outboundDeliveries, nextCursor]
+      properties:
+        inboundEnvelopes:
+          oneOf:
+            - type: array
+              maxItems: 100
+              items: { $ref: '#/components/schemas/WorkOrderWorkspaceInboundEnvelopeSummary' }
+            - { type: 'null' }
+        outboundDeliveries:
+          oneOf:
+            - type: array
+              maxItems: 100
+              items: { $ref: '#/components/schemas/WorkOrderWorkspaceOutboundDeliverySummary' }
+            - { type: 'null' }
+        nextCursor: { type: [string, 'null'] }
     WorkOrderWorkspaceSection:
       type: object
       additionalProperties: false
-      required: [section, sourceVersions, meta, tasks, timeline, appointmentsVisits, formsEvidence]
+      required: [section, sourceVersions, meta, tasks, timeline, appointmentsVisits, formsEvidence,
+        reviewsCorrections, integration]
       properties:
-        section: { enum: [TASKS, TIMELINE_AUDIT, APPOINTMENTS_VISITS, FORMS_EVIDENCE] }
+        section: { enum: [TASKS, TIMELINE_AUDIT, APPOINTMENTS_VISITS, FORMS_EVIDENCE, REVIEWS_CORRECTIONS, INTEGRATION] }
         sourceVersions: { $ref: '#/components/schemas/WorkOrderWorkspaceSourceVersions' }
         meta: { $ref: '#/components/schemas/WorkOrderWorkspaceMeta' }
         tasks:
@@ -2334,6 +2542,14 @@ components:
         formsEvidence:
           oneOf:
             - { $ref: '#/components/schemas/WorkOrderWorkspaceFormsEvidenceSectionData' }
+            - { type: 'null' }
+        reviewsCorrections:
+          oneOf:
+            - { $ref: '#/components/schemas/WorkOrderWorkspaceReviewsCorrectionsSectionData' }
+            - { type: 'null' }
+        integration:
+          oneOf:
+            - { $ref: '#/components/schemas/WorkOrderWorkspaceIntegrationSectionData' }
             - { type: 'null' }
     WorkflowInstance:
       type: object

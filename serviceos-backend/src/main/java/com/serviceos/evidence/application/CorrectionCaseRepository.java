@@ -4,6 +4,7 @@ import com.serviceos.evidence.api.CorrectionCaseView;
 import com.serviceos.evidence.api.CorrectionResubmissionView;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -44,6 +45,8 @@ public interface CorrectionCaseRepository {
     );
 
     Optional<CorrectionCaseView> find(String tenantId, UUID correctionCaseId);
+
+    List<CorrectionCaseView> listByTask(String tenantId, UUID taskId);
 
     Optional<UUID> findBySourceDecision(String tenantId, UUID reviewDecisionId);
 

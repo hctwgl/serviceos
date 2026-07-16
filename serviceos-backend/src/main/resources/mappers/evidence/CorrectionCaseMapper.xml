@@ -95,6 +95,25 @@
            AND correction_case_id = CAST(#{correctionCaseId} AS uuid)
     </select>
 
+    <select id="listCasesByTask" resultType="map">
+        SELECT correction_case_id AS "correctionCaseId", project_id AS "projectId",
+               task_id AS "taskId", source_review_case_id AS "sourceReviewCaseId",
+               source_review_decision_id AS "sourceReviewDecisionId",
+               source_evidence_set_snapshot_id AS "sourceEvidenceSetSnapshotId",
+               source_snapshot_content_digest AS "sourceSnapshotContentDigest",
+               reason_codes::text AS "reasonCodes",
+               correction_task_id AS "correctionTaskId", status AS "status",
+               created_by AS "createdBy", created_at AS "createdAt",
+               latest_resubmission_snapshot_id AS "latestResubmissionSnapshotId",
+               closed_by AS "closedBy", closed_at AS "closedAt",
+               waived_by AS "waivedBy", waived_at AS "waivedAt",
+               waive_approval_ref AS "waiveApprovalRef", waive_note AS "waiveNote"
+          FROM evd_correction_case
+         WHERE tenant_id = #{tenantId}
+           AND task_id = CAST(#{taskId} AS uuid)
+         ORDER BY created_at ASC, correction_case_id ASC
+    </select>
+
     <select id="findCaseIdBySourceDecision" resultType="string">
         SELECT correction_case_id::text
           FROM evd_correction_case

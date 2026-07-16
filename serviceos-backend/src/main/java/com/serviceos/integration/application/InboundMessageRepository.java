@@ -66,6 +66,10 @@ public interface InboundMessageRepository {
             String resultType,
             String resultId);
 
+    /** 只返回成功映射到指定 WorkOrder 的 Envelope；批次审核回调不在本查询中猜测工单归属。 */
+    List<InboundEnvelopeRecord> listEnvelopesByWorkOrder(
+            String tenantId, UUID projectId, UUID workOrderId, int limit);
+
     ExternalReviewRouteRegistration registerExternalReviewRoute(NewExternalReviewRoute route);
 
     Optional<ExternalReviewRouteView> findActiveExternalReviewRoute(

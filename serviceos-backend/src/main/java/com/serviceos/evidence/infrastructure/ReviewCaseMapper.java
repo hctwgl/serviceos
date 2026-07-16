@@ -27,6 +27,9 @@ interface ReviewCaseMapper {
     Map<String, Object> findCase(
             @Param("tenantId") String tenantId, @Param("reviewCaseId") String reviewCaseId);
 
+    List<Map<String, Object>> listCasesByTask(
+            @Param("tenantId") String tenantId, @Param("taskId") String taskId);
+
     Map<String, Object> findTimelineIdentity(
             @Param("tenantId") String tenantId, @Param("reviewCaseId") String reviewCaseId);
 

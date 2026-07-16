@@ -122,6 +122,19 @@ final class MyBatisCorrectionCaseRepository implements CorrectionCaseRepository 
     }
 
     @Override
+    public List<CorrectionCaseView> listByTask(String tenantId, UUID taskId) {
+        return mapper.listCasesByTask(tenantId, taskId.toString()).stream()
+                .map(row -> {
+                    UUID correctionCaseId = uuid(row, "correctionCaseId");
+                    List<CorrectionResubmissionView> rounds = mapper.listResubmissions(
+                                    tenantId, correctionCaseId.toString())
+                            .stream().map(this::resubmissionView).toList();
+                    return caseView(row, rounds);
+                })
+                .toList();
+    }
+
+    @Override
     public Optional<UUID> findBySourceDecision(String tenantId, UUID reviewDecisionId) {
         String id = mapper.findCaseIdBySourceDecision(tenantId, reviewDecisionId.toString());
         return id == null ? Optional.empty() : Optional.of(UUID.fromString(id));

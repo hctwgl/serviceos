@@ -5,6 +5,7 @@ import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.integration.api.InboundEnvelopeView;
+import com.serviceos.workorder.api.WorkOrderQueryService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -21,8 +22,9 @@ import static org.mockito.Mockito.when;
 class DefaultInboundMessageQueryServiceTest {
     private final InboundMessageRepository repository = mock(InboundMessageRepository.class);
     private final AuthorizationService authorization = mock(AuthorizationService.class);
+    private final WorkOrderQueryService workOrders = mock(WorkOrderQueryService.class);
     private final DefaultInboundMessageQueryService service =
-            new DefaultInboundMessageQueryService(repository, authorization);
+            new DefaultInboundMessageQueryService(repository, authorization, workOrders);
 
     @Test
     void completedEnvelopeUsesServerTenantAndProjectScopeWithoutExposingObjectReference() {

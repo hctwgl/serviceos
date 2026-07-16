@@ -8,8 +8,11 @@ import com.serviceos.integration.api.InboundEnvelopeView;
 import com.serviceos.integration.api.InboundMessageQueryService;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
+import com.serviceos.workorder.api.WorkOrderDetail;
+import com.serviceos.workorder.api.WorkOrderQueryService;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.UUID;
 
 /** 入站摘要查询始终按服务端 tenant 和实时 project/tenant scope 授权。 */
@@ -19,13 +22,16 @@ final class DefaultInboundMessageQueryService implements InboundMessageQueryServ
 
     private final InboundMessageRepository messages;
     private final AuthorizationService authorization;
+    private final WorkOrderQueryService workOrders;
 
     DefaultInboundMessageQueryService(
             InboundMessageRepository messages,
-            AuthorizationService authorization
+            AuthorizationService authorization,
+            WorkOrderQueryService workOrders
     ) {
         this.messages = messages;
         this.authorization = authorization;
+        this.workOrders = workOrders;
     }
 
     @Override
@@ -56,6 +62,23 @@ final class DefaultInboundMessageQueryService implements InboundMessageQueryServ
         return view;
     }
 
+    @Override
+    public List<InboundEnvelopeView> listForWorkOrder(
+            CurrentPrincipal principal, String correlationId, UUID workOrderId, int limit
+    ) {
+        validateLimit(limit);
+        WorkOrderDetail workOrder = workOrders.get(principal, correlationId, workOrderId);
+        UUID projectId = workOrder.workOrder().projectId();
+        authorization.require(principal, AuthorizationRequest.projectCapability(
+                READ, principal.tenantId(), "WorkOrder", workOrderId.toString(), projectId.toString()),
+                correlationId);
+        return messages.listEnvelopesByWorkOrder(
+                        principal.tenantId(), projectId, workOrderId, limit)
+                .stream()
+                .map(InboundMessageRepository.InboundEnvelopeRecord::view)
+                .toList();
+    }
+
     private void requireRead(
             CurrentPrincipal principal,
             String correlationId,
@@ -70,5 +93,11 @@ final class DefaultInboundMessageQueryService implements InboundMessageQueryServ
         }
         authorization.require(principal, AuthorizationRequest.projectCapability(
                 READ, principal.tenantId(), resourceType, resourceId, projectId.toString()), correlationId);
+    }
+
+    private static void validateLimit(int limit) {
+        if (limit < 1 || limit > 100) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, "limit must be between 1 and 100");
+        }
     }
 }
