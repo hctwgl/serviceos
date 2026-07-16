@@ -210,3 +210,6 @@ Feature gate/authority: if applicable
 | M113 | Admin 整改案例详情与 resubmit/close/waive | PRODUCT-01/02 + ARCH-10/19 + Correction APIs + Admin Web build | 资料提交流程编排、OIDC、E2E |
 | M114 | Admin 外发交付详情与 UNKNOWN retry | PRODUCT-01/02 + ARCH-13/19 + Outbound APIs + Admin Web build | 人工标记已送达/放弃、OIDC、E2E |
 | M115 | Admin SLA 实例详情 | PRODUCT-01/02 + ARCH-12/19 + SLA Detail API + Admin Web build | BUSINESS 日历、预警 UI、E2E |
+| M116 | Admin 任务详情表单列表与 submitTaskForm；VALIDATED 回填 complete 引用 | PRODUCT-01/02 + ARCH-09/19 + Forms APIs + Admin Web build | 动态表单设计器、OIDC、E2E |
+| M117 | Admin 任务详情资料槽位/项与 createEvidenceSetSnapshot；回填 complete 引用 | PRODUCT-01/02 + ARCH-10/19 + Evidence APIs + Admin Web build | Begin/Finalize 上传编排、OIDC、E2E |
+| M118 | Admin 审核详情创建 BYD review submission OutboundDelivery | PRODUCT-01/02 + ARCH-13/19 + Integration submit API + Admin Web build | 其他 CPIM 提审、OIDC、E2E |

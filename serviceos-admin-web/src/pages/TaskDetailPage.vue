@@ -5,6 +5,7 @@ import { getAuthorizedTask, type TaskDetail } from '../api/taskDetail'
 import { listTaskExecutionAttempts, type TaskExecutionAttemptPage } from '../api/taskAttempts'
 import { getTaskAllowedActions, type TaskAllowedActions } from '../api/tasks'
 import TaskCommandPanel from '../components/TaskCommandPanel.vue'
+import TaskFormsEvidencePanel from '../components/TaskFormsEvidencePanel.vue'
 import QueueTable from './QueueTable.vue'
 
 const route = useRoute()
@@ -16,6 +17,13 @@ const detail = ref<TaskDetail | null>(null)
 const attempts = ref<TaskExecutionAttemptPage | null>(null)
 const allowedActions = ref<TaskAllowedActions | null>(null)
 const allowedError = ref<string | null>(null)
+const preparedResultRef = ref('')
+const preparedResultDigest = ref('')
+
+function onPreparedComplete(payload: { resultRef: string; resultDigest: string }) {
+  preparedResultRef.value = payload.resultRef
+  preparedResultDigest.value = payload.resultDigest
+}
 
 async function load() {
   loading.value = true
@@ -99,11 +107,15 @@ onMounted(() => {
             v-else-if="allowedActions"
             :task-id="taskId"
             :allowed-actions="allowedActions"
+            :prepared-result-ref="preparedResultRef"
+            :prepared-result-digest="preparedResultDigest"
             @executed="load"
           />
           <p v-else>暂无允许动作</p>
         </article>
       </div>
+
+      <TaskFormsEvidencePanel :task-id="taskId" @prepared-complete="onPreparedComplete" />
 
       <QueueTable
         title="执行 Attempt 历史"

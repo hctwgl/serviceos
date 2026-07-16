@@ -8,8 +8,8 @@ import {
   reopenReviewCase,
   type ReviewCase,
 } from '../api/reviews'
+import { createBydReviewSubmission } from '../api/integrationCommands'
 import QueueTable from './QueueTable.vue'
-// QueueTable used for decision history
 
 const route = useRoute()
 const reviewCaseId = computed(() => String(route.params.id ?? ''))
@@ -114,6 +114,20 @@ async function reopen() {
   }
 }
 
+async function submitOutbound() {
+  busy.value = true
+  message.value = null
+  error.value = null
+  try {
+    const result = await createBydReviewSubmission(reviewCaseId.value)
+    message.value = `已创建外发交付 ${result.data.deliveryId} / ${result.data.status}`
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '创建提审外发失败'
+  } finally {
+    busy.value = false
+  }
+}
+
 const decisionRows = computed(() =>
   (detail.value?.decisions ?? []).map((item) => ({
     ordinal: item.decisionOrdinal,
@@ -182,11 +196,14 @@ onMounted(() => {
       </article>
 
       <article v-if="detail.status === 'APPROVED' || detail.status === 'FORCE_APPROVED'" class="card">
-        <h3>重开</h3>
+        <h3>重开 / 提审外发</h3>
         <label>reason<input v-model="reopenReason" /></label>
         <label>triggerRef<input v-model="triggerRef" /></label>
         <label>approvalRef（可选）<input v-model="approvalRef" /></label>
-        <button type="button" :disabled="busy" @click="reopen">reopen</button>
+        <div class="actions">
+          <button type="button" :disabled="busy" @click="reopen">reopen</button>
+          <button type="button" :disabled="busy" @click="submitOutbound">create BYD review submission</button>
+        </div>
       </article>
 
       <QueueTable

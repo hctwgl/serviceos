@@ -12,6 +12,8 @@ import {
 const props = defineProps<{
   taskId: string
   allowedActions: TaskAllowedActions
+  preparedResultRef?: string
+  preparedResultDigest?: string
 }>()
 
 const emit = defineEmits<{ executed: [] }>()
@@ -31,6 +33,14 @@ watch(
   () => {
     message.value = null
     error.value = null
+  },
+)
+
+watch(
+  () => [props.preparedResultRef, props.preparedResultDigest] as const,
+  ([refValue, digestValue]) => {
+    if (refValue) resultRef.value = refValue
+    if (digestValue) resultDigest.value = digestValue
   },
 )
 
