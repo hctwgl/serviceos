@@ -10,6 +10,7 @@ import {
   type WorkOrderWorkspace,
   type WorkOrderWorkspaceSection,
 } from '../api/workspace'
+import { getTaskAllowedActions, type TaskAllowedActions } from '../api/tasks'
 
 const route = useRoute()
 const workOrderId = computed(() => String(route.params.id ?? ''))
@@ -18,6 +19,8 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 const workspace = ref<WorkOrderWorkspace | null>(null)
 const activity = ref<WorkOrderActivitySummary | null>(null)
+const allowedActions = ref<TaskAllowedActions | null>(null)
+const allowedActionsError = ref<string | null>(null)
 const activeSection = ref<SectionCode>('TASKS')
 const sectionLoading = ref(false)
 const sectionError = ref<string | null>(null)
@@ -32,6 +35,19 @@ const sections: SectionCode[] = [
   'INTEGRATION',
 ]
 
+async function loadAllowedActions(taskId: string | undefined) {
+  allowedActions.value = null
+  allowedActionsError.value = null
+  if (!taskId) {
+    return
+  }
+  try {
+    allowedActions.value = await getTaskAllowedActions(taskId)
+  } catch (err) {
+    allowedActionsError.value = err instanceof Error ? err.message : '加载 allowed-actions 失败'
+  }
+}
+
 async function loadWorkspace() {
   loading.value = true
   error.value = null
@@ -42,6 +58,7 @@ async function loadWorkspace() {
     ])
     workspace.value = ws
     activity.value = act
+    await loadAllowedActions(ws.currentTaskSummary?.taskId)
     const firstAvailable = sections.find(
       (code) => ws.sectionAvailability[code] === 'AVAILABLE' || ws.sectionAvailability[code] === 'EMPTY',
     )
@@ -51,6 +68,7 @@ async function loadWorkspace() {
     error.value = err instanceof Error ? err.message : '加载工作区失败'
     workspace.value = null
     activity.value = null
+    allowedActions.value = null
   } finally {
     loading.value = false
   }
@@ -171,6 +189,27 @@ onMounted(() => {
             </li>
           </ul>
           <p v-else>暂无活动摘要</p>
+        </article>
+
+        <article class="card">
+          <h3>当前任务 allowed-actions</h3>
+          <p class="meta">服务端投影；本页不执行命令。</p>
+          <p v-if="allowedActionsError" class="error">{{ allowedActionsError }}</p>
+          <p v-else-if="!workspace.currentTaskSummary">无当前任务</p>
+          <ul v-else-if="allowedActions?.actions?.length">
+            <li v-for="action in allowedActions.actions" :key="action.code">
+              <strong>{{ action.label }}</strong>
+              <span>{{ action.code }}</span>
+              <small>
+                obligations:
+                {{ action.obligations.length ? action.obligations.join(', ') : 'none' }}
+              </small>
+            </li>
+          </ul>
+          <p v-else>暂无允许动作或无权读取</p>
+          <p v-if="allowedActions" class="meta">
+            asOf {{ allowedActions.asOf }} / v{{ allowedActions.resourceVersion }}
+          </p>
         </article>
       </div>
 

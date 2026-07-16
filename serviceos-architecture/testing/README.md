@@ -103,3 +103,4 @@
 - [M100 运营异常项目范围硬化验收矩阵](97-m100-operational-exception-project-scope-acceptance.md)
 - [M101 Admin Portal 队列外壳验收矩阵](98-m101-admin-portal-queue-shell-acceptance.md)
 - [M102 Admin 工单工作区只读外壳验收矩阵](99-m102-admin-work-order-workspace-shell-acceptance.md)
+- [M103 Admin 工作区 allowed-actions 只读投影验收矩阵](100-m103-admin-workspace-allowed-actions-acceptance.md)

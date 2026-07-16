@@ -197,3 +197,4 @@ Feature gate/authority: if applicable
 | M100 | 运营异常工作台 Project Scope 硬化；projectId 筛选/响应、scopeDigest 游标；无 project 孤儿仅 TENANT 可见；OpenAPI 0.70.0；V084 | ARCH-14/42 + API-06 Accepted 窄切片 + OpenAPI Core 0.70.0 + V084 + Operations/Authorization PostgreSQL/ArchitectureTest/L3 | 通用 work-queues/SavedView、人工标记已送达/放弃、Portal |
 | M101 | Admin Portal Vue+TS+Vite 只读队列外壳；审核/整改/外发/异常 Page ID 路由；本地 JWT；npm build | PRODUCT-01/02 + ARCH-19 + API-06 已实现队列消费 + Admin Web build | SavedView、工作区全页、命令 UI、OIDC SDK、Network/Technician、E2E |
 | M102 | Admin 工单工作区只读页；消费 workspace/activity-summary/sections；外发队列深链；npm build | PRODUCT-01/02 + ARCH-19 + API-06 Accepted workspace 窄切片 + Admin Web build | 命令 UI、SavedView、OIDC SDK、Network/Technician、E2E |
+| M103 | Admin 工作区展示当前任务 GET /tasks/{id}/allowed-actions 只读投影；不执行命令；npm build | PRODUCT-01/02 + ARCH-19 + API-02 AllowedActions + Admin Web build | 命令执行 UI、OIDC SDK、SavedView、E2E |
