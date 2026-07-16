@@ -216,6 +216,24 @@ class EvidenceSetSnapshotPostgresIT {
     }
 
     @Test
+    void freezesLatestResolutionWhenFormReresolutionReusesExistingSlot() throws Exception {
+        UUID revisionId = uploadScanAndValidate(
+                pngBytes("reresolved"), "begin-reresolved", "cmd-reresolved");
+        UUID latestResolutionId = appendUnchangedActiveResolution();
+
+        EvidenceSetSnapshotView snapshot = snapshots.create(principal(), metadata("snap-reresolved"),
+                new CreateEvidenceSetSnapshotCommand(
+                        taskId, "TASK_SUBMISSION", List.of(revisionId)));
+
+        assertThat(snapshot.resolutionId()).isEqualTo(latestResolutionId);
+        assertThat(jdbc.sql("""
+                SELECT resolution_id FROM evd_evidence_set_snapshot
+                 WHERE evidence_set_snapshot_id=:snapshot
+                """).param("snapshot", snapshot.evidenceSetSnapshotId())
+                .query(UUID.class).single()).isEqualTo(latestResolutionId);
+    }
+
+    @Test
     void rejectsWrongDigestAndCrossTaskSnapshotWithoutCompletionPollution() throws Exception {
         UUID revisionId = uploadScanAndValidate(pngBytes("gate"), "begin-gate", "cmd-gate");
         EvidenceSetSnapshotView snapshot = snapshots.create(principal(), metadata("snap-gate"),
@@ -270,6 +288,48 @@ class EvidenceSetSnapshotPostgresIT {
                  WHERE evidence_revision_id=:id
                 """).param("id", revisionId).query(String.class).single()).isEqualTo("VALIDATED");
         return revisionId;
+    }
+
+    private UUID appendUnchangedActiveResolution() {
+        UUID resolutionId = UUID.randomUUID();
+        UUID sourceEventId = UUID.randomUUID();
+        jdbc.sql("""
+                INSERT INTO evd_task_evidence_resolution (
+                    resolution_id, tenant_id, project_id, task_id, configuration_bundle_id,
+                    configuration_bundle_digest, stage_code, source_event_id, source_event_digest,
+                    resolver_version, condition_input_digest, resolution_explanation,
+                    generation_no, condition_fact_type, condition_fact_ref, condition_fact_revision,
+                    previous_resolution_id, slot_count, resolved_at)
+                SELECT :resolution, tenant_id, project_id, task_id, configuration_bundle_id,
+                       configuration_bundle_digest, stage_code, :event, :eventDigest,
+                       resolver_version, condition_input_digest,
+                       CAST('{"kind":"TEST_FORM_RERESOLUTION"}' AS jsonb),
+                       2, 'FORM_SUBMISSION', CAST(:event AS varchar), 1,
+                       resolution_id, slot_count, now()
+                  FROM evd_task_evidence_resolution
+                 WHERE tenant_id=:tenant AND task_id=:task AND generation_no=1
+                """).param("resolution", resolutionId).param("event", sourceEventId)
+                .param("eventDigest", "9".repeat(64)).param("tenant", TENANT)
+                .param("task", taskId).update();
+        jdbc.sql("""
+                INSERT INTO evd_evidence_resolution_member (
+                    member_id, tenant_id, project_id, task_id, resolution_id, template_version_id,
+                    requirement_code, occurrence_key, condition_result, active_slot_id,
+                    previous_slot_id, transition, required_disposition, counting_item_count,
+                    condition_input_digest, resolution_explanation, created_at)
+                SELECT :member, tenant_id, project_id, task_id, :resolution, template_version_id,
+                       requirement_code, occurrence_key, true, active_slot_id,
+                       active_slot_id, 'UNCHANGED_ACTIVE', 'NONE', 1,
+                       condition_input_digest, CAST('{"kind":"UNCHANGED_ACTIVE"}' AS jsonb), now()
+                  FROM evd_evidence_resolution_member
+                 WHERE tenant_id=:tenant AND task_id=:task
+                   AND resolution_id=(
+                     SELECT resolution_id FROM evd_task_evidence_resolution
+                      WHERE tenant_id=:tenant AND task_id=:task AND generation_no=1
+                   )
+                """).param("member", UUID.randomUUID()).param("resolution", resolutionId)
+                .param("tenant", TENANT).param("task", taskId).update();
+        return resolutionId;
     }
 
     private void seedResolvedSlot() {
