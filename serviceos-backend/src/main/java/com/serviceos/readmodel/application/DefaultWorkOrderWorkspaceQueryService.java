@@ -4,6 +4,8 @@ import com.serviceos.appointment.api.AppointmentRevisionView;
 import com.serviceos.appointment.api.AppointmentService;
 import com.serviceos.appointment.api.AppointmentView;
 import com.serviceos.appointment.api.AppointmentWindow;
+import com.serviceos.dispatch.api.ServiceAssignmentQueryService;
+import com.serviceos.dispatch.api.ServiceAssignmentSummary;
 import com.serviceos.evidence.api.CorrectionCaseService;
 import com.serviceos.evidence.api.CorrectionCaseView;
 import com.serviceos.evidence.api.CorrectionResubmissionView;
@@ -31,6 +33,7 @@ import com.serviceos.readmodel.api.WorkOrderTimelineQueryService;
 import com.serviceos.readmodel.api.WorkOrderWorkspace;
 import com.serviceos.readmodel.api.WorkOrderWorkspace.WorkOrderWorkspaceExceptionSummary;
 import com.serviceos.readmodel.api.WorkOrderWorkspace.WorkOrderWorkspaceMeta;
+import com.serviceos.readmodel.api.WorkOrderWorkspace.WorkOrderWorkspaceServiceAssignmentSummary;
 import com.serviceos.readmodel.api.WorkOrderWorkspace.WorkOrderWorkspaceSlaSummary;
 import com.serviceos.readmodel.api.WorkOrderWorkspace.WorkOrderWorkspaceSourceVersions;
 import com.serviceos.readmodel.api.WorkOrderWorkspace.WorkOrderWorkspaceTaskSummary;
@@ -105,6 +108,7 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
     private final CorrectionCaseService corrections;
     private final InboundMessageQueryService inboundMessages;
     private final OutboundDeliveryService outboundDeliveries;
+    private final ServiceAssignmentQueryService serviceAssignments;
     private final Clock clock;
 
     DefaultWorkOrderWorkspaceQueryService(
@@ -122,6 +126,7 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
             CorrectionCaseService corrections,
             InboundMessageQueryService inboundMessages,
             OutboundDeliveryService outboundDeliveries,
+            ServiceAssignmentQueryService serviceAssignments,
             Clock clock
     ) {
         this.workOrders = workOrders;
@@ -138,6 +143,7 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
         this.corrections = corrections;
         this.inboundMessages = inboundMessages;
         this.outboundDeliveries = outboundDeliveries;
+        this.serviceAssignments = serviceAssignments;
         this.clock = clock;
     }
 
@@ -176,7 +182,8 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
                 "INTEGRATION",
                 probeIntegrationAvailability(principal, correlationId, workOrderId));
         availability.put("FACTS_CALCULATIONS", "UNAVAILABLE");
-        availability.put("SERVICE_ASSIGNMENT", "UNAVAILABLE");
+        WorkOrderWorkspaceServiceAssignmentSummary serviceAssignmentSummary =
+                loadServiceAssignmentSummary(principal, correlationId, current, availability);
 
         WorkOrderWorkspaceSlaSummary slaSummary = loadSlaSummary(
                 principal, correlationId, workOrderId, availability);
@@ -188,6 +195,7 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
                 current == null ? null : toTaskSummary(current),
                 availability,
                 current == null ? null : "/api/v1/tasks/" + current.id() + "/allowed-actions",
+                serviceAssignmentSummary,
                 slaSummary,
                 exceptionSummary,
                 timelineFreshness,
@@ -803,6 +811,41 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
         } catch (BusinessProblem problem) {
             if (problem.code() == ProblemCode.ACCESS_DENIED) {
                 availability.put("SLA", "UNAVAILABLE");
+                return null;
+            }
+            throw problem;
+        }
+    }
+
+    private WorkOrderWorkspaceServiceAssignmentSummary loadServiceAssignmentSummary(
+            CurrentPrincipal principal,
+            String correlationId,
+            WorkOrderTaskSummary current,
+            Map<String, String> availability
+    ) {
+        if (current == null) {
+            availability.put("SERVICE_ASSIGNMENT", "EMPTY");
+            return null;
+        }
+        try {
+            ServiceAssignmentSummary summary = serviceAssignments.findActiveForTask(
+                            principal, correlationId, current.id())
+                    .orElse(null);
+            availability.put("SERVICE_ASSIGNMENT", summary == null ? "EMPTY" : "AVAILABLE");
+            if (summary == null) {
+                return null;
+            }
+            return new WorkOrderWorkspaceServiceAssignmentSummary(
+                    summary.taskId(),
+                    summary.networkId(),
+                    summary.networkEffectiveFrom(),
+                    summary.networkReassignmentReasonCode(),
+                    summary.technicianId(),
+                    summary.technicianEffectiveFrom(),
+                    summary.technicianReassignmentReasonCode());
+        } catch (BusinessProblem problem) {
+            if (problem.code() == ProblemCode.ACCESS_DENIED) {
+                availability.put("SERVICE_ASSIGNMENT", "UNAVAILABLE");
                 return null;
             }
             throw problem;

@@ -92,3 +92,4 @@
 - [M89 工单工作区表单与资料区块验收矩阵](86-m89-work-order-workspace-forms-evidence-acceptance.md)
 - [M90 工单工作区审核与整改区块验收矩阵](87-m90-work-order-workspace-reviews-corrections-acceptance.md)
 - [M91 工单工作区集成区块验收矩阵](88-m91-work-order-workspace-integration-acceptance.md)
+- [M92 工单工作区服务责任摘要验收矩阵](89-m92-work-order-workspace-service-assignment-acceptance.md)

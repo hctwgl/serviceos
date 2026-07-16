@@ -10,4 +10,6 @@ import java.util.UUID;
 @Mapper
 interface ActiveServiceResponsibilityMapper {
     Map<String, Object> find(@Param("tenantId") String tenantId, @Param("taskId") UUID taskId);
+
+    Map<String, Object> findSummary(@Param("tenantId") String tenantId, @Param("taskId") UUID taskId);
 }

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.61.0
+  version: 0.62.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -2134,6 +2134,19 @@ components:
       required: [openCount]
       properties:
         openCount: { type: integer, minimum: 0 }
+    WorkOrderWorkspaceServiceAssignmentSummary:
+      type: object
+      additionalProperties: false
+      required: [taskId, networkId, networkEffectiveFrom, networkReassignmentReasonCode,
+        technicianId, technicianEffectiveFrom, technicianReassignmentReasonCode]
+      properties:
+        taskId: { type: string, format: uuid }
+        networkId: { type: [string, 'null'], maxLength: 128 }
+        networkEffectiveFrom: { type: [string, 'null'], format: date-time }
+        networkReassignmentReasonCode: { type: [string, 'null'], maxLength: 100 }
+        technicianId: { type: [string, 'null'], maxLength: 128 }
+        technicianEffectiveFrom: { type: [string, 'null'], format: date-time }
+        technicianReassignmentReasonCode: { type: [string, 'null'], maxLength: 100 }
     WorkOrderWorkspaceSourceVersions:
       type: object
       additionalProperties: false
@@ -2153,7 +2166,8 @@ components:
       type: object
       additionalProperties: false
       required: [header, currentTaskSummary, sectionAvailability, allowedActionLink,
-        slaSummary, exceptionSummary, timelineFreshnessStatus, sourceVersions, meta]
+        serviceAssignmentSummary, slaSummary, exceptionSummary, timelineFreshnessStatus,
+        sourceVersions, meta]
       properties:
         header: { $ref: '#/components/schemas/WorkOrder' }
         currentTaskSummary:
@@ -2165,6 +2179,10 @@ components:
           additionalProperties: { enum: [AVAILABLE, EMPTY, UNAVAILABLE] }
           minProperties: 1
         allowedActionLink: { type: [string, 'null'], minLength: 1, maxLength: 200 }
+        serviceAssignmentSummary:
+          oneOf:
+            - { $ref: '#/components/schemas/WorkOrderWorkspaceServiceAssignmentSummary' }
+            - { type: 'null' }
         slaSummary:
           oneOf:
             - { $ref: '#/components/schemas/WorkOrderWorkspaceSlaSummary' }
