@@ -3,7 +3,7 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-16
-baselineCommit: PENDING_M103
+baselineCommit: 9e694ee
 latestMilestone: M103
 ---
 
@@ -40,7 +40,7 @@ latestMilestone: M103
 | 项目 | 当前值 |
 |---|---|
 | 最新实施里程碑 | M103 Admin 工作区 allowed-actions 只读投影 |
-| 基线提交 | `PENDING_M103` |
+| 基线提交 | `9e694ee` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
 | 前端工程 | `serviceos-admin-web` 只读队列与工单工作区外壳（Vue+TS+Vite）；Network/Technician 尚未建立 |
