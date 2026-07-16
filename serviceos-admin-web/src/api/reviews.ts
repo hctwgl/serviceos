@@ -30,6 +30,15 @@ export function getReviewCase(reviewCaseId: string) {
   return apiGet<ReviewCase>(`/review-cases/${reviewCaseId}`)
 }
 
+export function createReviewCase(
+  body: { evidenceSetSnapshotId: string; policyVersion?: string | null },
+) {
+  return apiPost<ReviewCase>('/review-cases', {
+    idempotencyKey: newIdempotencyKey('review-create'),
+    body,
+  })
+}
+
 export function decideReviewCase(
   reviewCaseId: string,
   body: { decision: 'APPROVED' | 'REJECTED'; reasonCodes?: string[]; note?: string | null },

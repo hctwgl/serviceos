@@ -73,12 +73,13 @@ export async function apiPost<T>(
   path: string,
   options: {
     body?: unknown
-    idempotencyKey: string
+    idempotencyKey?: string
     ifMatch?: string
-  },
+  } = {},
 ): Promise<ApiResult<T>> {
-  const extra: Record<string, string> = {
-    'Idempotency-Key': options.idempotencyKey,
+  const extra: Record<string, string> = {}
+  if (options.idempotencyKey) {
+    extra['Idempotency-Key'] = options.idempotencyKey
   }
   if (options.ifMatch) {
     extra['If-Match'] = options.ifMatch

@@ -213,3 +213,6 @@ Feature gate/authority: if applicable
 | M116 | Admin 任务详情表单列表与 submitTaskForm；VALIDATED 回填 complete 引用 | PRODUCT-01/02 + ARCH-09/19 + Forms APIs + Admin Web build | 动态表单设计器、OIDC、E2E |
 | M117 | Admin 任务详情资料槽位/项与 createEvidenceSetSnapshot；回填 complete 引用 | PRODUCT-01/02 + ARCH-10/19 + Evidence APIs + Admin Web build | Begin/Finalize 上传编排、OIDC、E2E |
 | M118 | Admin 审核详情创建 BYD review submission OutboundDelivery | PRODUCT-01/02 + ARCH-13/19 + Integration submit API + Admin Web build | 其他 CPIM 提审、OIDC、E2E |
+| M119 | Admin 资料 Begin→PUT→Finalize 上传编排；SHA-256 | PRODUCT-01/02 + ARCH-10/11/19 + Evidence Upload APIs + Admin Web build | 专业扫描 UI、OIDC、E2E |
+| M120 | Admin REVIEW_REQUIRED 条件 KEEP/INVALIDATE 处置 | PRODUCT-01/02 + ARCH-10/19 + Condition Disposition API + Admin Web build | 自动处置策略、OIDC、E2E |
+| M121 | Admin 快照后 createReviewCase 并深链 | PRODUCT-01/02 + ARCH-10/19 + Create ReviewCase API + Admin Web build | 审核队列自动刷新、OIDC、E2E |
