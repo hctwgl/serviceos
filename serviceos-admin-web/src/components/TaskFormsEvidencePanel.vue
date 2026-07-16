@@ -6,7 +6,11 @@ import {
   beginEvidenceUpload,
   createEvidenceSetSnapshot,
   finalizeEvidenceUpload,
+  getEvidenceItem,
+  getEvidenceSetSnapshot,
+  getFormSubmission,
   invalidateEvidenceRevision,
+  invalidateStoredFile,
   listTaskEvidenceItems,
   listTaskEvidenceSlots,
   listTaskForms,
@@ -19,6 +23,7 @@ import {
   type EvidenceSetSnapshot,
   type EvidenceSlot,
   type FormSubmission,
+  type StoredFile,
   type TaskForm,
 } from '../api/formsEvidence'
 import { createReviewCase } from '../api/reviews'
@@ -53,6 +58,13 @@ const downloadPurpose = ref('ADMIN_REVIEW')
 const lastDownload = ref<DownloadAuthorization | null>(null)
 const invalidateRevisionId = ref('')
 const invalidateReason = ref('QUALITY_ISSUE')
+const lookupSubmissionId = ref('')
+const lookupItemId = ref('')
+const lookupSnapshotId = ref('')
+const lookupJson = ref('')
+const invalidateFileId = ref('')
+const invalidateFileReason = ref('OPERATOR_INVALIDATE')
+const lastInvalidatedFile = ref<StoredFile | null>(null)
 
 async function load() {
   loading.value = true
@@ -196,6 +208,75 @@ async function invalidateRevision() {
     await load()
   } catch (err) {
     error.value = err instanceof Error ? err.message : '作废资料版本失败'
+  } finally {
+    busy.value = false
+  }
+}
+
+async function lookupSubmission() {
+  busy.value = true
+  message.value = null
+  error.value = null
+  try {
+    if (!lookupSubmissionId.value.trim()) throw new Error('需要 submissionId')
+    const data = await getFormSubmission(lookupSubmissionId.value.trim())
+    lookupJson.value = JSON.stringify(data, null, 2)
+    message.value = `已加载表单提交 ${data.submissionId}`
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '加载表单提交失败'
+  } finally {
+    busy.value = false
+  }
+}
+
+async function lookupItem() {
+  busy.value = true
+  message.value = null
+  error.value = null
+  try {
+    if (!lookupItemId.value.trim()) throw new Error('需要 evidenceItemId')
+    const data = await getEvidenceItem(lookupItemId.value.trim())
+    lookupJson.value = JSON.stringify(data, null, 2)
+    message.value = `已加载资料项 ${data.evidenceItemId}`
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '加载资料项失败'
+  } finally {
+    busy.value = false
+  }
+}
+
+async function lookupSnapshot() {
+  busy.value = true
+  message.value = null
+  error.value = null
+  try {
+    if (!lookupSnapshotId.value.trim()) throw new Error('需要 snapshotId')
+    const data = await getEvidenceSetSnapshot(lookupSnapshotId.value.trim())
+    lookupJson.value = JSON.stringify(data, null, 2)
+    message.value = `已加载资料快照 ${data.evidenceSetSnapshotId}`
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '加载资料快照失败'
+  } finally {
+    busy.value = false
+  }
+}
+
+async function invalidateFile() {
+  busy.value = true
+  message.value = null
+  error.value = null
+  try {
+    if (!invalidateFileId.value.trim()) throw new Error('需要 fileId')
+    lastInvalidatedFile.value = (
+      await invalidateStoredFile(invalidateFileId.value.trim(), {
+        reasonCode: invalidateFileReason.value.trim(),
+        sourceType: 'ADMIN_TASK',
+        sourceId: props.taskId,
+      })
+    ).data
+    message.value = `已作废文件 ${lastInvalidatedFile.value.fileId} / ${lastInvalidatedFile.value.lifecycleStatus}`
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '作废文件失败'
   } finally {
     busy.value = false
   }
@@ -429,6 +510,23 @@ onMounted(() => {
       <label>revisionId（作废）<input v-model="invalidateRevisionId" /></label>
       <label>reasonCode<input v-model="invalidateReason" /></label>
       <button type="button" :disabled="busy" @click="invalidateRevision">invalidateEvidenceRevision</button>
+      <label>fileId（作废 StoredFile）<input v-model="invalidateFileId" /></label>
+      <label>file reasonCode<input v-model="invalidateFileReason" /></label>
+      <button type="button" :disabled="busy" @click="invalidateFile">invalidateStoredFile</button>
+      <p v-if="lastInvalidatedFile" class="meta">
+        file={{ lastInvalidatedFile.fileId }} / {{ lastInvalidatedFile.lifecycleStatus }}
+      </p>
+    </article>
+
+    <article class="card">
+      <h4>按 ID 读取提交 / 资料项 / 快照</h4>
+      <label>submissionId<input v-model="lookupSubmissionId" /></label>
+      <button type="button" :disabled="busy" @click="lookupSubmission">getFormSubmission</button>
+      <label>evidenceItemId<input v-model="lookupItemId" /></label>
+      <button type="button" :disabled="busy" @click="lookupItem">getEvidenceItem</button>
+      <label>snapshotId<input v-model="lookupSnapshotId" /></label>
+      <button type="button" :disabled="busy" @click="lookupSnapshot">getEvidenceSetSnapshot</button>
+      <pre v-if="lookupJson" class="preview">{{ lookupJson }}</pre>
     </article>
 
     <article class="card">
@@ -466,4 +564,15 @@ button { background: #243b53; color: #fff; border-color: #243b53; cursor: pointe
 .error { color: #9b1c1c; }
 .ok { color: #054e31; }
 .links { margin: 0; }
+.preview {
+  margin: 0;
+  max-height: 240px;
+  overflow: auto;
+  background: #f0f4f8;
+  border-radius: 8px;
+  padding: .65rem;
+  font-size: .78rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
 </style>

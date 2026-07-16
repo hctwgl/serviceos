@@ -95,11 +95,21 @@ onMounted(() => load())
       </button>
     </div>
 
+    <p v-if="page?.items?.length" class="links">
+      打开详情：
+      <RouterLink
+        v-for="item in page.items"
+        :key="item.exceptionId"
+        :to="{ name: 'ADMIN.EXCEPTION.DETAIL', params: { id: item.exceptionId } }"
+      >
+        {{ item.errorCode || item.exceptionId }}
+      </RouterLink>
+    </p>
     <p v-if="page?.items?.some((i) => i.workOrderId)" class="links">
       打开工作区：
       <RouterLink
         v-for="item in page.items.filter((i) => i.workOrderId)"
-        :key="item.exceptionId"
+        :key="`wo-${item.exceptionId}`"
         :to="{ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: item.workOrderId } }"
       >
         {{ item.errorCode || item.exceptionId }}

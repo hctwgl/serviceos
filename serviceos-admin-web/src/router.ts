@@ -7,6 +7,7 @@ import CorrectionCaseDetailPage from './pages/CorrectionCaseDetailPage.vue'
 import OutboundQueuePage from './pages/OutboundQueuePage.vue'
 import OutboundDeliveryDetailPage from './pages/OutboundDeliveryDetailPage.vue'
 import ExceptionQueuePage from './pages/ExceptionQueuePage.vue'
+import ExceptionDetailPage from './pages/ExceptionDetailPage.vue'
 import TokenPage from './pages/TokenPage.vue'
 import WorkOrderLookupPage from './pages/WorkOrderLookupPage.vue'
 import WorkOrderDirectoryPage from './pages/WorkOrderDirectoryPage.vue'
@@ -37,6 +38,7 @@ export const router = createRouter({
           component: OutboundDeliveryDetailPage,
         },
         { path: 'exceptions', name: 'ADMIN.EXCEPTION.QUEUE', component: ExceptionQueuePage },
+        { path: 'exceptions/:id', name: 'ADMIN.EXCEPTION.DETAIL', component: ExceptionDetailPage },
         { path: 'tasks', name: 'ADMIN.TASK.QUEUE', component: TaskDirectoryPage },
         { path: 'tasks/:id', name: 'ADMIN.TASK.DETAIL', component: TaskDetailPage },
         { path: 'sla', name: 'ADMIN.SLA.QUEUE', component: SlaQueuePage },

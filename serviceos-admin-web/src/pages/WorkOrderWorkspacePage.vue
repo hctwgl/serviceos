@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import {
   getWorkOrderActivitySummary,
   getWorkOrderWorkspace,
@@ -10,8 +10,10 @@ import {
   type WorkOrderWorkspace,
   type WorkOrderWorkspaceSection,
 } from '../api/workspace'
+import { listWorkOrderSlaInstances, type SlaInstancePage } from '../api/sla'
 import { getTaskAllowedActions, type TaskAllowedActions } from '../api/tasks'
 import TaskCommandPanel from '../components/TaskCommandPanel.vue'
+import QueueTable from './QueueTable.vue'
 
 const route = useRoute()
 const workOrderId = computed(() => String(route.params.id ?? ''))
@@ -26,6 +28,8 @@ const activeSection = ref<SectionCode>('TASKS')
 const sectionLoading = ref(false)
 const sectionError = ref<string | null>(null)
 const sectionData = ref<WorkOrderWorkspaceSection | null>(null)
+const slaPage = ref<SlaInstancePage | null>(null)
+const slaError = ref<string | null>(null)
 
 const sections: SectionCode[] = [
   'TASKS',
@@ -50,6 +54,16 @@ async function loadAllowedActions(taskId: string | undefined) {
   }
 }
 
+async function loadSlaInstances() {
+  slaError.value = null
+  try {
+    slaPage.value = await listWorkOrderSlaInstances(workOrderId.value, { limit: '20' })
+  } catch (err) {
+    slaError.value = err instanceof Error ? err.message : '加载工单 SLA 失败'
+    slaPage.value = null
+  }
+}
+
 async function loadWorkspace() {
   loading.value = true
   error.value = null
@@ -60,7 +74,10 @@ async function loadWorkspace() {
     ])
     workspace.value = ws
     activity.value = act
-    await loadAllowedActions(ws.currentTaskSummary?.taskId)
+    await Promise.all([
+      loadAllowedActions(ws.currentTaskSummary?.taskId),
+      loadSlaInstances(),
+    ])
     const firstAvailable = sections.find(
       (code) => ws.sectionAvailability[code] === 'AVAILABLE' || ws.sectionAvailability[code] === 'EMPTY',
     )
@@ -71,6 +88,7 @@ async function loadWorkspace() {
     workspace.value = null
     activity.value = null
     allowedActions.value = null
+    slaPage.value = null
   } finally {
     loading.value = false
   }
@@ -102,6 +120,18 @@ const sectionPreview = computed(() => {
     data.integration
   return JSON.stringify(payload, null, 2)
 })
+
+const slaRows = computed(() =>
+  (slaPage.value?.items ?? []).map((item) => ({
+    slaInstanceId: item.slaInstanceId,
+    slaRef: item.slaRef,
+    status: item.status,
+    deadlineAt: item.deadlineAt,
+    remainingSeconds: item.remainingSeconds,
+    overdueSeconds: item.overdueSeconds,
+    taskId: item.taskId,
+  })),
+)
 
 watch(workOrderId, () => {
   if (workOrderId.value) {
@@ -220,6 +250,28 @@ onMounted(() => {
           </p>
         </article>
       </div>
+
+      <QueueTable
+        title="工单 SLA 实例"
+        :columns="['slaInstanceId', 'slaRef', 'status', 'deadlineAt', 'remainingSeconds', 'overdueSeconds', 'taskId']"
+        :rows="slaRows"
+        :loading="false"
+        :error="slaError"
+        :as-of="slaPage?.asOf"
+        :next-cursor="slaPage?.nextCursor ?? null"
+        @refresh="loadSlaInstances"
+        @next="() => undefined"
+      />
+      <p v-if="slaPage?.items?.length" class="links">
+        打开 SLA 详情：
+        <RouterLink
+          v-for="item in slaPage.items"
+          :key="item.slaInstanceId"
+          :to="{ name: 'ADMIN.SLA.DETAIL', params: { id: item.slaInstanceId } }"
+        >
+          {{ item.slaRef || item.slaInstanceId }}
+        </RouterLink>
+      </p>
 
       <article class="card sections">
         <h3>按需区块</h3>
@@ -359,6 +411,13 @@ pre {
 .action-list small {
   display: block;
   color: #829ab1;
+}
+.links {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-size: 0.9rem;
 }
 button {
   border: 1px solid #bcccdc;

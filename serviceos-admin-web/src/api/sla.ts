@@ -24,3 +24,10 @@ export type SlaInstancePage = {
 export function listSlaInstances(query: Record<string, string | undefined> = {}) {
   return apiGet<SlaInstancePage>('/sla-instances', query)
 }
+
+export function listWorkOrderSlaInstances(
+  workOrderId: string,
+  query: Record<string, string | undefined> = {},
+) {
+  return apiGet<SlaInstancePage>(`/work-orders/${workOrderId}/sla-instances`, query)
+}

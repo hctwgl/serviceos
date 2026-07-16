@@ -104,8 +104,34 @@ export type EvidenceSetSnapshot = {
   createdAt: string
 }
 
+export type StoredFile = {
+  fileId: string
+  tenantId: string
+  originalFileName: string
+  checksumSha256: string
+  size: number
+  declaredMimeType: string
+  detectedMimeType: string
+  lifecycleStatus: 'QUARANTINED' | 'AVAILABLE' | 'INVALIDATED'
+  quarantineReason: string | null
+  createdAt: string
+  version: number
+}
+
 export function listTaskForms(taskId: string) {
   return apiGet<TaskForm[]>(`/tasks/${taskId}/forms`)
+}
+
+export function getFormSubmission(submissionId: string) {
+  return apiGet<FormSubmission>(`/form-submissions/${submissionId}`)
+}
+
+export function getEvidenceItem(itemId: string) {
+  return apiGet<EvidenceItem>(`/evidence-items/${itemId}`)
+}
+
+export function getEvidenceSetSnapshot(snapshotId: string) {
+  return apiGet<EvidenceSetSnapshot>(`/evidence-set-snapshots/${snapshotId}`)
 }
 
 export function submitTaskForm(
@@ -222,6 +248,16 @@ export function invalidateEvidenceRevision(
 ) {
   return apiPost<EvidenceRevision>(`/evidence-revisions/${revisionId}:invalidate`, {
     idempotencyKey: newIdempotencyKey('evidence-invalidate'),
+    body,
+  })
+}
+
+export function invalidateStoredFile(
+  fileId: string,
+  body: { reasonCode: string; sourceType: string; sourceId: string },
+) {
+  return apiPost<StoredFile>(`/files/${fileId}:invalidate`, {
+    idempotencyKey: newIdempotencyKey('file-invalidate'),
     body,
   })
 }
