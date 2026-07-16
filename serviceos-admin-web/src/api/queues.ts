@@ -20,6 +20,8 @@ export type CorrectionCaseQueuePage = {
     correctionCaseId: string
     projectId: string
     taskId: string
+    sourceReviewCaseId: string
+    correctionTaskId: string | null
     status: string
     reasonCodes: string[]
     createdAt: string

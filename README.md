@@ -118,6 +118,10 @@ Admin 试点局部读写链路的真实本地冒烟：
 serviceos-deploy/admin-pilot/verify-admin-smoke.sh
 ```
 
+该冒烟还以独立动态工单证明 INTERNAL 审核 `REJECTED` 后自动创建
+CorrectionCase/整改 Task，并由具备 CRITICAL 能力的 Admin 豁免 Case、同事务取消整改 Task。
+另一独立工单证明 `FORCE_APPROVED` 保持显式决定，重开后导航到同 Snapshot 的后继 OPEN Case。
+
 ## 目录
 
 ```text
