@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.65.0
+  version: 0.66.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -154,7 +154,7 @@ paths:
       operationId: getWorkOrderWorkspaceSection
       summary: 按需加载工单工作区区块
       description: >-
-        M95 接受 TASKS、TIMELINE_AUDIT、APPOINTMENTS_VISITS（含联系尝试）、FORMS_EVIDENCE
+        M96 接受 TASKS、TIMELINE_AUDIT、APPOINTMENTS_VISITS（含联系尝试）、FORMS_EVIDENCE
         （含提交与资料项安全元数据）、
         REVIEWS_CORRECTIONS 与 INTEGRATION；其余 section 失败关闭为 400。
         复用 workOrder.read；实时组合，不落区块投影表；不含客户 PII。
@@ -2453,7 +2453,8 @@ components:
       type: object
       additionalProperties: false
       required: [reviewCaseId, taskId, projectId, evidenceSetSnapshotId, scopeType, origin,
-        policyVersion, status, createdAt, decidedAt, decisions]
+        policyVersion, status, createdAt, decidedAt, sourceReviewCaseId, externalSubmissionRef,
+        callbackBatchRef, mappingVersionId, reopenedFromReviewCaseId, reopenTriggerRef, decisions]
       properties:
         reviewCaseId: { type: string, format: uuid }
         taskId: { type: string, format: uuid }
@@ -2465,6 +2466,12 @@ components:
         status: { enum: [OPEN, APPROVED, REJECTED, FORCE_APPROVED, REOPENED] }
         createdAt: { type: string, format: date-time }
         decidedAt: { type: [string, 'null'], format: date-time }
+        sourceReviewCaseId: { type: [string, 'null'], format: uuid }
+        externalSubmissionRef: { type: [string, 'null'], maxLength: 160 }
+        callbackBatchRef: { type: [string, 'null'], maxLength: 160 }
+        mappingVersionId: { type: [string, 'null'], maxLength: 160 }
+        reopenedFromReviewCaseId: { type: [string, 'null'], format: uuid }
+        reopenTriggerRef: { type: [string, 'null'], maxLength: 160 }
         decisions:
           type: array
           maxItems: 100

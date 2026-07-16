@@ -804,6 +804,9 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
                 review.reviewCaseId(), review.taskId(), review.projectId(),
                 review.evidenceSetSnapshotId(), review.scopeType(), review.origin(),
                 review.policyVersion(), review.status(), review.createdAt(), review.decidedAt(),
+                review.sourceReviewCaseId(), review.externalSubmissionRef(),
+                review.callbackBatchRef(), review.mappingVersionId(),
+                review.reopenedFromReviewCaseId(), review.reopenTriggerRef(),
                 review.decisions().stream().map(this::toReviewDecisionSummary).toList());
     }
 

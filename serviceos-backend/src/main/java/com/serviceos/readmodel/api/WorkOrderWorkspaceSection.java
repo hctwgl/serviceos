@@ -227,6 +227,12 @@ public record WorkOrderWorkspaceSection(
             String status,
             Instant createdAt,
             Instant decidedAt,
+            UUID sourceReviewCaseId,
+            String externalSubmissionRef,
+            String callbackBatchRef,
+            String mappingVersionId,
+            UUID reopenedFromReviewCaseId,
+            String reopenTriggerRef,
             List<WorkOrderWorkspaceReviewDecisionSummary> decisions
     ) {
         public WorkOrderWorkspaceReviewCaseSummary {

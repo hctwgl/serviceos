@@ -37,7 +37,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** M85～M95：工作区组合查询的授权、无 PII、按需区块与缺权降级证据。 */
+/** M85～M96：工作区组合查询的授权、无 PII、按需区块与缺权降级证据。 */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = ServiceOsApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE)
 class WorkOrderWorkspacePostgresIT {
@@ -307,6 +307,9 @@ class WorkOrderWorkspacePostgresIT {
         assertThat(section.reviewsCorrections().reviews().getFirst().decisions())
                 .extracting(item -> item.reviewDecisionId())
                 .containsExactly(fixture.reviewDecisionId());
+        assertThat(section.reviewsCorrections().reviews().getFirst().sourceReviewCaseId()).isNull();
+        assertThat(section.reviewsCorrections().reviews().getFirst().externalSubmissionRef()).isNull();
+        assertThat(section.reviewsCorrections().reviews().getFirst().reopenedFromReviewCaseId()).isNull();
         assertThat(section.reviewsCorrections().corrections())
                 .extracting(item -> item.correctionCaseId())
                 .containsExactly(fixture.correctionCaseId());

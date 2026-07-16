@@ -257,6 +257,8 @@ class WorkOrderWorkspaceControllerSecurityTest {
         UUID taskId = UUID.randomUUID();
         UUID projectId = UUID.randomUUID();
         UUID reviewCaseId = UUID.randomUUID();
+        UUID sourceReviewCaseId = UUID.randomUUID();
+        UUID reopenedReviewCaseId = UUID.randomUUID();
         UUID correctionCaseId = UUID.randomUUID();
         CurrentPrincipal principal = new CurrentPrincipal(
                 "reader", "tenant", CurrentPrincipal.PrincipalType.USER, "m90", Set.of());
@@ -272,8 +274,16 @@ class WorkOrderWorkspaceControllerSecurityTest {
                 new WorkOrderWorkspaceReviewsCorrectionsSectionData(
                         List.of(new WorkOrderWorkspaceReviewCaseSummary(
                                 reviewCaseId, taskId, projectId, UUID.randomUUID(),
-                                "EVIDENCE_SET_SNAPSHOT", "INTERNAL", "POLICY_V1",
-                                "OPEN", now, null, List.of())),
+                                "EVIDENCE_SET_SNAPSHOT", "CLIENT", "POLICY_V1",
+                                "OPEN", now, null, sourceReviewCaseId,
+                                "submission-m96", "batch-m96", "mapping-m96",
+                                null, null, List.of()),
+                                new WorkOrderWorkspaceReviewCaseSummary(
+                                        reopenedReviewCaseId, taskId, projectId, UUID.randomUUID(),
+                                        "EVIDENCE_SET_SNAPSHOT", "INTERNAL", "POLICY_V1",
+                                        "OPEN", now.plusSeconds(1), null,
+                                        null, null, null, null,
+                                        reviewCaseId, "OEM_REJECTION:batch-m96", List.of())),
                         List.of(new WorkOrderWorkspaceCorrectionCaseSummary(
                                 correctionCaseId, taskId, projectId, reviewCaseId, UUID.randomUUID(),
                                 List.of("PHOTO_BLUR"), null, "OPEN", now, null,
@@ -293,6 +303,18 @@ class WorkOrderWorkspaceControllerSecurityTest {
                 .andExpect(jsonPath("$.section").value("REVIEWS_CORRECTIONS"))
                 .andExpect(jsonPath("$.reviewsCorrections.reviews[0].reviewCaseId")
                         .value(reviewCaseId.toString()))
+                .andExpect(jsonPath("$.reviewsCorrections.reviews[0].sourceReviewCaseId")
+                        .value(sourceReviewCaseId.toString()))
+                .andExpect(jsonPath("$.reviewsCorrections.reviews[0].externalSubmissionRef")
+                        .value("submission-m96"))
+                .andExpect(jsonPath("$.reviewsCorrections.reviews[0].callbackBatchRef")
+                        .value("batch-m96"))
+                .andExpect(jsonPath("$.reviewsCorrections.reviews[0].mappingVersionId")
+                        .value("mapping-m96"))
+                .andExpect(jsonPath("$.reviewsCorrections.reviews[1].reopenedFromReviewCaseId")
+                        .value(reviewCaseId.toString()))
+                .andExpect(jsonPath("$.reviewsCorrections.reviews[1].reopenTriggerRef")
+                        .value("OEM_REJECTION:batch-m96"))
                 .andExpect(jsonPath("$.reviewsCorrections.corrections[0].correctionCaseId")
                         .value(correctionCaseId.toString()))
                 .andExpect(jsonPath("$.reviewsCorrections.reviews[0].note").doesNotExist())
