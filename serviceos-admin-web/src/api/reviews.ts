@@ -23,6 +23,8 @@ export type ReviewCase = {
   createdBy: string
   createdAt: string
   decidedAt: string | null
+  reopenedFromReviewCaseId: string | null
+  reopenTriggerRef: string | null
   decisions: ReviewDecision[]
 }
 

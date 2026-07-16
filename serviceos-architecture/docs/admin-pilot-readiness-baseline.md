@@ -17,7 +17,7 @@ lastUpdated: 2026-07-16
 | Admin CI | GitHub Actions 使用 Node 22 执行不可变安装与生产构建；独立 `admin-pilot-e2e` job 安装 Chrome 并运行真实写链路，staging 等待 Java、Admin build 与 Admin E2E 三个门禁 |
 | 本地身份 | Vite 开发模式显式开启 Keycloak Authorization Code + PKCE；无 client secret、无硬编码 token、无生产手工 JWT 入口 |
 | 后端授权 | JWT 只提供身份声明；ServiceOS 继续从数据库 RoleGrant 实时校验 tenant/project/capability，401 清理本机会话并失败关闭 |
-| 真实 E2E | 固定幂等夹具 + Playwright/Google Chrome 验证登录、工单目录、工作区、详情、Stage、Task、SLA、时间线，以及 Task MANUAL assign-candidates/claim/release |
+| 真实 E2E | 固定可释放夹具 + 每轮新建终态/整改/重开夹具 + Playwright/Google Chrome 验证登录与权威只读投影；正常 Task 覆盖表单、资料、APPROVED、双引用 complete 到 FULFILLED；独立 Task 覆盖 REJECTED→自动整改→WAIVED/CANCELLED，以及 FORCE_APPROVED→原 Case REOPENED/后继 Case OPEN |
 | 数据库 | 使用 `serviceos-deploy/compose.yaml` 的 PostgreSQL 18，后端启动时执行当前 86 个 Flyway 迁移 |
 
 ## 2. P0 根因与修复
@@ -45,10 +45,32 @@ serviceos-deploy/observability/verify-sensitive-output.sh /tmp/serviceos-m134-ru
 serviceos-deploy/admin-pilot/verify-admin-smoke.sh
 ```
 
-E2E 脚本不执行 `down -v`，不会删除开发者的 PostgreSQL 数据卷。夹具使用固定 UUID 和
-`ON CONFLICT DO NOTHING`，可重复执行；每轮先关闭上轮 ACTIVE 候选但不回退 Task version，
-再由页面创建新的 MANUAL 候选批次。浏览器步骤后检查 Task 回到 READY、最新候选批次来源正确、
-ACTIVE 候选唯一、ACTIVE RESPONSIBLE 清零和三类成功审计记录存在。夹具只允许本地开发数据库使用。
+E2E 脚本不执行 `down -v`，不会删除开发者的 PostgreSQL 数据卷。可释放夹具使用固定 UUID 和
+`ON CONFLICT DO NOTHING`；每轮先关闭上轮 ACTIVE 候选但不回退 Task version，再由页面创建新的
+MANUAL 候选批次。终态夹具每轮创建全新的 WorkOrder/Workflow/Stage/Node/Task UUID，完成后保留
+不可变历史，不通过 SQL 回退终态。终态 Task 锁定最小 FormVersion 与 Evidence 模板；
+`task.created` 通过真实 Outbox/Inbox 解析 EvidenceSlot。浏览器提交 VALIDATED FormSubmission，
+再执行 Evidence Begin、经 Vite 同源代理访问 Backend 签发的私有 PUT、Finalize、本地扫描、
+机器校验和 Snapshot；页面保持 FormSubmission 为主引用并自动组合两份精确版本引用。
+同一 OIDC 会话在独立审核页创建并读取 INTERNAL ReviewCase，作出普通 APPROVED 决定后重新读取
+权威详情，保持成功消息、案例状态和唯一决定历史同时可见。
+独立整改夹具使用相同真实上传/校验/Snapshot 链路作出普通 REJECTED 决定，经授权
+`status=IN_PROGRESS` 队列定位 CorrectionCase，并在详情页执行需要
+`evidence.waiveCorrection` 的豁免。豁免后重新读取权威详情，保持 WAIVED、来源 Task、
+整改 Task 和成功提示同时可见；同事务取消整改 Task，不用 SQL 模拟终态。
+独立重开夹具在 OPEN Case 上执行 `evidence.forceApprove`，保留显式 FORCE_APPROVED 决定且不创建
+CorrectionCase；随后执行 `review.reopen`，将原 Case 标记 REOPENED，并创建同 Snapshot 的后继
+OPEN Case。Admin 路由切换到后继 Case，展示重开来源与 triggerRef，刷新后身份仍一致。
+重开审计使用稳定结果码 `REOPENED`；自由文本原因与 approvalRef 不再写入 40 字符
+`result_code`，避免合法长文本导致事务回滚。
+M53 表单重解析复用既有 Slot 时，Snapshot 冻结最新 `currentResolutionId`，与 M43 完成门禁保持
+同一配置事实。脚本检查 StoredFile AVAILABLE、EvidenceRevision VALIDATED、Snapshot 成员、
+精确双引用、ReviewCase APPROVED、唯一 ReviewDecision、创建/裁决审计与审核事件 Inbox、
+`task.completed` Inbox 成功消费、候选/责任 EXPIRED、Node/Stage/Workflow COMPLETED 与
+WorkOrder FULFILLED；整改夹具还检查 ReviewCase REJECTED、CorrectionCase WAIVED、整改 Task
+CANCELLED、三类成功审计与四条审核/整改事件 Inbox；重开夹具检查 FORCE_APPROVED 决定、
+原/后继 Case 血缘、三类成功审计、三条审核事件 Inbox 且无 CorrectionCase。夹具只允许本地
+开发数据库使用。
 GitHub Actions 使用同一脚本阻断 PR，并保留 Backend、Admin 与 Playwright 诊断产物；该 job
 通过后才启动容器化 staging 发布、回滚和恢复演练。
 
@@ -63,13 +85,24 @@ GitHub Actions 使用同一脚本阻断 PR，并保留 Backend、Admin 与 Playw
 - Admin 通过真实 MANUAL assign-candidates 创建候选快照，再按服务端 allowed-actions 执行
   Task claim/release；全链路由 PostgreSQL 候选/责任事实、`If-Match` 与幂等键保护，
   release 后回到 READY，可重复验证。
+- Admin 对每轮新建的 Workflow-backed HUMAN Task 执行 assign/claim/start，提交精确锁定的
+  FormVersion，完成真实资料上传、扫描、机器校验与 Snapshot，并使用 VALIDATED FormSubmission
+  和 EvidenceSetSnapshot 创建 INTERNAL ReviewCase、作出普通 APPROVED 裁决，再以精确双引用
+  complete；审核与 `task.completed` 事件均经 Outbox/Inbox 可靠消费，最终推进 Node、Stage、
+  Workflow，并将独立 WorkOrder 置为 FULFILLED。
+- Admin 对独立动态 Task 创建 Snapshot 并作出普通 REJECTED 裁决；系统同事务创建
+  IN_PROGRESS CorrectionCase 与 `evidence.correction` Task。Admin 经授权队列/详情执行
+  CRITICAL WAIVED，Case 与整改 Task 分别进入 WAIVED/CANCELLED，审计和 Outbox/Inbox 完整。
+- Admin 对另一动态 Task 作出 FORCE_APPROVED，再重开为同 Snapshot 的后继 OPEN Case；
+  原 Case、决定、重开来源和 triggerRef 均保留，页面 URL/刷新与后继身份一致。
 
 尚未证明：
 
 - 正式企业 IdP、MFA、生产回调地址、BFF/token renewal/logout 协议；
 - 从外部接单或项目创建开始，经派单、预约、上门、表单、资料、审核、整改、外发到完结的完整写链路；
 - Network/Technician Portal 与跨端协作；
-- 正式 sandbox、对象存储、扫描服务、Broker、通知和 SLA BUSINESS 日历；
+- 正式 sandbox、对象存储、专业扫描服务、Broker、通知和 SLA BUSINESS 日历；
+- 正常补传、关闭、重新审核通过，以及外部提审与回执在同一浏览器写链路中的端到端证明；
 - SavedView、设计系统、可访问性与多浏览器矩阵。
 
 因此本次交付只能称为“Admin 试点可运行局部读写基线”，不能称为“完整现场履约平台已交付”。

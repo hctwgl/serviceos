@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import {
   decideReviewCase,
   forceApproveReviewCase,
@@ -12,6 +12,7 @@ import { createBydReviewSubmission } from '../api/integrationCommands'
 import QueueTable from './QueueTable.vue'
 
 const route = useRoute()
+const router = useRouter()
 const reviewCaseId = computed(() => String(route.params.id ?? ''))
 const loading = ref(false)
 const busy = ref(false)
@@ -58,8 +59,11 @@ async function decide() {
     if (decision.value === 'REJECTED' && body.reasonCodes.length === 0) {
       throw new Error('REJECTED 至少需要一个 reasonCode')
     }
-    detail.value = (await decideReviewCase(reviewCaseId.value, body)).data
-    message.value = `已裁决为 ${detail.value.status}`
+    const decided = (await decideReviewCase(reviewCaseId.value, body)).data
+    // 裁决命令只负责追加不可变决定；随后重新读取权威详情，避免命令响应与队列/详情投影
+    // 在字段演进或异步扩展时让页面残留半更新状态。
+    await load()
+    message.value = `已裁决为 ${decided.status}`
   } catch (err) {
     error.value = err instanceof Error ? err.message : '裁决失败'
   } finally {
@@ -99,14 +103,21 @@ async function reopen() {
     if (!reopenReason.value.trim() || !triggerRef.value.trim()) {
       throw new Error('重开需要 reason 与 triggerRef')
     }
-    detail.value = (
+    const reopened = (
       await reopenReviewCase(reviewCaseId.value, {
         reason: reopenReason.value.trim(),
         triggerRef: triggerRef.value.trim(),
         approvalRef: approvalRef.value.trim() || null,
       })
     ).data
-    message.value = `重开结果：${detail.value.status} / ${detail.value.reviewCaseId}`
+    // reopen 返回同 Snapshot 的新 OPEN Case。路由必须切换到新 Case，否则刷新会回到
+    // 已标记 REOPENED 的旧案例，形成“页面内容与 URL 身份不一致”的操作风险。
+    await router.replace({
+      name: 'ADMIN.REVIEW.DETAIL',
+      params: { id: reopened.reviewCaseId },
+    })
+    await load()
+    message.value = `重开结果：${reopened.status} / ${reopened.reviewCaseId}`
   } catch (err) {
     error.value = err instanceof Error ? err.message : '重开失败'
   } finally {
@@ -157,7 +168,7 @@ onMounted(() => {
     </header>
     <p v-if="error" class="error">{{ error }}</p>
     <p v-if="message" class="ok">{{ message }}</p>
-    <p v-else-if="loading">加载中…</p>
+    <p v-if="loading">加载中…</p>
     <template v-else-if="detail">
       <article class="card">
         <dl>
@@ -166,6 +177,8 @@ onMounted(() => {
           <div><dt>taskId</dt><dd>{{ detail.taskId }}</dd></div>
           <div><dt>projectId</dt><dd>{{ detail.projectId }}</dd></div>
           <div><dt>snapshot</dt><dd>{{ detail.evidenceSetSnapshotId }}</dd></div>
+          <div><dt>reopenedFromReviewCaseId</dt><dd>{{ detail.reopenedFromReviewCaseId ?? '-' }}</dd></div>
+          <div><dt>reopenTriggerRef</dt><dd>{{ detail.reopenTriggerRef ?? '-' }}</dd></div>
         </dl>
         <p class="links">
           <RouterLink :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.taskId } }">任务详情</RouterLink>

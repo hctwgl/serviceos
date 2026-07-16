@@ -29,7 +29,14 @@ onMounted(() => load())
   <section>
     <QueueTable
       title="整改跟踪"
-      :columns="['correctionCaseId', 'projectId', 'status', 'createdAt', 'resubmissionCount']"
+      :columns="[
+        'correctionCaseId',
+        'sourceReviewCaseId',
+        'correctionTaskId',
+        'status',
+        'createdAt',
+        'resubmissionCount',
+      ]"
       :rows="page?.items ?? []"
       :loading="loading"
       :error="error"
@@ -45,7 +52,7 @@ onMounted(() => load())
         :key="item.correctionCaseId"
         :to="{ name: 'ADMIN.CORRECTION.DETAIL', params: { id: item.correctionCaseId } }"
       >
-        {{ item.status }}
+        打开整改案例 {{ item.correctionCaseId }}
       </RouterLink>
     </p>
   </section>
