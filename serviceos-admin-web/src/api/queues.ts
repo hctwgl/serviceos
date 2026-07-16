@@ -33,6 +33,7 @@ export type OutboundDeliveryQueuePage = {
   items: Array<{
     deliveryId: string
     projectId: string
+    sourceWorkOrderId: string
     status: string
     businessMessageType: string
     externalOrderCode: string
@@ -47,6 +48,7 @@ export type OperationalExceptionPage = {
   items: Array<{
     exceptionId: string
     projectId: string | null
+    workOrderId: string | null
     category: string
     severity: string
     status: string

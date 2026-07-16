@@ -6,11 +6,12 @@ import { RouterLink, RouterView } from 'vue-router'
   <div class="shell">
     <aside class="nav">
       <h1>ServiceOS Admin</h1>
-      <p class="hint">只读队列外壳（M101）。动作仍须走服务端 allowed-actions。</p>
+      <p class="hint">只读运营外壳（M101/M102）。动作仍须走服务端 allowed-actions。</p>
       <RouterLink to="/reviews">审核队列</RouterLink>
       <RouterLink to="/corrections">整改跟踪</RouterLink>
       <RouterLink to="/integration/outbound">外发交付</RouterLink>
       <RouterLink to="/exceptions">运营异常</RouterLink>
+      <RouterLink to="/work-orders">工单工作区</RouterLink>
       <RouterLink to="/settings/token">访问令牌</RouterLink>
     </aside>
     <main class="content">

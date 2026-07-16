@@ -1,10 +1,10 @@
-# ServiceOS Admin Web（M101）
+# ServiceOS Admin Web（M101 / M102）
 
 总部运营后台只读外壳。当前切片提供：
 
 - Portal shell 与 Page ID 路由：`ADMIN.REVIEW.QUEUE`、`ADMIN.CORRECTION.QUEUE`、
-  `ADMIN.INTEGRATION.OUTBOUND`、`ADMIN.EXCEPTION.QUEUE`
-- 调用后端 M97～M100 专项队列 API
+  `ADMIN.INTEGRATION.OUTBOUND`、`ADMIN.EXCEPTION.QUEUE`、`ADMIN.WORKORDER.WORKSPACE`
+- 调用后端 M85～M100 工作区与专项队列 API
 - 本地保存 JWT，不在前端做 tenant/capability 判定
 
 ## 开发
@@ -24,4 +24,4 @@ npm run build
 
 ## 明确未实现
 
-设计系统完整 Token、SavedView、工单工作区全页、命令操作 UI、Network/Technician 端、E2E。
+设计系统完整 Token、SavedView、命令操作 UI、正式 OIDC SDK、Network/Technician 端、E2E。
