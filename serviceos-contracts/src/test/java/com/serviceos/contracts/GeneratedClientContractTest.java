@@ -45,6 +45,7 @@ class GeneratedClientContractTest {
                 .contains("markAppointmentNoShow")
                 .contains("listWorkOrderVisits")
                 .contains("listAuthorizedReviewCases")
+                .contains("listAuthorizedCorrectionCases")
                 .contains("checkInVisit")
                 .contains("checkOutVisit")
                 .contains("interruptVisit")

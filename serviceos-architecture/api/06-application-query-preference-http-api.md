@@ -6,7 +6,7 @@ status: Accepted
 
 # 应用工作区、队列与用户偏好 HTTP API
 
-## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97）
+## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98）
 
 **Accepted（可指导实现）**：
 
@@ -21,6 +21,7 @@ status: Accepted
 - `FORMS_EVIDENCE.formSubmissions/evidenceItems` 安全运行时元数据（M95）。
 - `REVIEWS_CORRECTIONS.reviews` CLIENT/重开血缘元数据（M96）。
 - §6 `GET /api/v1/review-cases` 授权审核案例队列（M97）；不接受通用 work-queues。
+- §6 `GET /api/v1/correction-cases` 授权整改案例队列（M98）；不接受通用 work-queues。
 
 **仍为设计草案**：§3 导航、§4 工作台与队列、§5 其余 section、
 §6 其余专项队列与 §7～§11 搜索/偏好/导出等。不得在未再接受前实现。

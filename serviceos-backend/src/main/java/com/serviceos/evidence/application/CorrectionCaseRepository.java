@@ -1,5 +1,6 @@
 package com.serviceos.evidence.application;
 
+import com.serviceos.evidence.api.CorrectionCaseQueueItem;
 import com.serviceos.evidence.api.CorrectionCaseView;
 import com.serviceos.evidence.api.CorrectionResubmissionView;
 
@@ -47,6 +48,17 @@ public interface CorrectionCaseRepository {
     Optional<CorrectionCaseView> find(String tenantId, UUID correctionCaseId);
 
     List<CorrectionCaseView> listByTask(String tenantId, UUID taskId);
+
+    List<CorrectionCaseQueueItem> findQueuePage(
+            String tenantId,
+            boolean tenantWide,
+            List<UUID> projectIds,
+            String status,
+            UUID taskId,
+            UUID sourceReviewCaseId,
+            Instant cursorCreatedAt,
+            UUID cursorId,
+            int fetchSize);
 
     Optional<UUID> findBySourceDecision(String tenantId, UUID reviewDecisionId);
 

@@ -1,5 +1,6 @@
 package com.serviceos.evidence.infrastructure;
 
+import com.serviceos.evidence.api.CorrectionCaseQueueItem;
 import com.serviceos.evidence.api.CorrectionCaseView;
 import com.serviceos.evidence.api.CorrectionResubmissionView;
 import com.serviceos.evidence.application.CorrectionCaseRepository;
@@ -135,6 +136,33 @@ final class MyBatisCorrectionCaseRepository implements CorrectionCaseRepository 
     }
 
     @Override
+    public List<CorrectionCaseQueueItem> findQueuePage(
+            String tenantId,
+            boolean tenantWide,
+            List<UUID> projectIds,
+            String status,
+            UUID taskId,
+            UUID sourceReviewCaseId,
+            Instant cursorCreatedAt,
+            UUID cursorId,
+            int fetchSize
+    ) {
+        return mapper.findQueuePage(
+                        tenantId,
+                        tenantWide,
+                        projectIds.stream().map(UUID::toString).toList(),
+                        status,
+                        taskId == null ? null : taskId.toString(),
+                        sourceReviewCaseId == null ? null : sourceReviewCaseId.toString(),
+                        cursorCreatedAt,
+                        cursorId == null ? null : cursorId.toString(),
+                        fetchSize)
+                .stream()
+                .map(this::queueItem)
+                .toList();
+    }
+
+    @Override
     public Optional<UUID> findBySourceDecision(String tenantId, UUID reviewDecisionId) {
         String id = mapper.findCaseIdBySourceDecision(tenantId, reviewDecisionId.toString());
         return id == null ? Optional.empty() : Optional.of(UUID.fromString(id));
@@ -183,6 +211,23 @@ final class MyBatisCorrectionCaseRepository implements CorrectionCaseRepository 
                 ((Number) row.get("resubmissionOrdinal")).intValue(),
                 uuid(row, "evidenceSetSnapshotId"), text(row, "snapshotContentDigest"),
                 text(row, "submittedBy"), instant(row.get("submittedAt")));
+    }
+
+    private CorrectionCaseQueueItem queueItem(Map<String, Object> row) {
+        return new CorrectionCaseQueueItem(
+                uuid(row, "correctionCaseId"),
+                uuid(row, "projectId"),
+                uuid(row, "taskId"),
+                uuid(row, "sourceReviewCaseId"),
+                uuid(row, "sourceReviewDecisionId"),
+                readCodes(text(row, "reasonCodes")),
+                nullableUuid(row.get("correctionTaskId")),
+                text(row, "status"),
+                instant(row.get("createdAt")),
+                nullableUuid(row.get("latestResubmissionSnapshotId")),
+                nullableInstant(row.get("closedAt")),
+                nullableInstant(row.get("waivedAt")),
+                ((Number) row.get("resubmissionCount")).intValue());
     }
 
     private List<String> readCodes(String json) {
