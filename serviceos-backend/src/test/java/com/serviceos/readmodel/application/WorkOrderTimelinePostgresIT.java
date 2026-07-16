@@ -867,6 +867,79 @@ class WorkOrderTimelinePostgresIT {
     }
 
     @Test
+    void projectsConditionDispositionWithoutReviewRefLeakage() {
+        Instant t0 = Instant.parse("2026-07-16T13:00:00Z");
+        UUID dispositionId = UUID.randomUUID();
+        UUID standaloneTask = task(null, null, "OPERATIONS_REPAIR");
+
+        OutboxMessage disposition = message(
+                "evidence", "evidence.condition-disposition-recorded", 1,
+                "EvidenceConditionDisposition", dispositionId, 1,
+                Map.of(
+                        "dispositionId", dispositionId,
+                        "taskId", taskId,
+                        "projectId", projectId,
+                        "resolutionId", UUID.randomUUID(),
+                        "slotId", UUID.randomUUID(),
+                        "decision", "KEEP",
+                        "reasonCode", "AUDIT_RETENTION",
+                        "reviewRef", "review-case://secret-ref-83",
+                        "affectedRevisionCount", 2,
+                        "decidedAt", t0),
+                t0);
+        handler.handle(disposition);
+        handler.handle(disposition);
+
+        UUID opsDispositionId = UUID.randomUUID();
+        handler.handle(message(
+                "evidence", "evidence.condition-disposition-recorded", 1,
+                "EvidenceConditionDisposition", opsDispositionId, 1,
+                Map.of(
+                        "dispositionId", opsDispositionId,
+                        "taskId", standaloneTask,
+                        "projectId", projectId,
+                        "resolutionId", UUID.randomUUID(),
+                        "slotId", UUID.randomUUID(),
+                        "decision", "INVALIDATE",
+                        "reasonCode", "NO_LONGER_REQUIRED",
+                        "reviewRef", "review-case://ops",
+                        "affectedRevisionCount", 0,
+                        "decidedAt", t0.plusSeconds(10)),
+                t0.plusSeconds(10)));
+
+        var page = timelines.list(principal("reader", TENANT), "corr-disposition", workOrderId, null, 10);
+        assertThat(page.items()).singleElement().satisfies(item -> {
+            assertThat(item.eventType()).isEqualTo("evidence.condition-disposition-recorded");
+            assertThat(item.category()).isEqualTo("EVIDENCE");
+            assertThat(item.resourceType()).isEqualTo("EvidenceConditionDisposition");
+            assertThat(item.resourceId()).isEqualTo(dispositionId);
+            assertThat(item.outcomeCode()).isEqualTo("KEEP");
+            assertThat(objectMapper.writeValueAsString(item))
+                    .doesNotContain("review-case://secret-ref-83", "AUDIT_RETENTION");
+        });
+        assertThat(count("rdm_work_order_timeline_entry")).isEqualTo(1);
+
+        assertThatThrownBy(() -> handler.handle(message(
+                "evidence", "evidence.condition-disposition-recorded", 1,
+                "EvidenceConditionDisposition", dispositionId, 2,
+                Map.of(
+                        "dispositionId", dispositionId,
+                        "taskId", taskId,
+                        "projectId", UUID.randomUUID(),
+                        "resolutionId", UUID.randomUUID(),
+                        "slotId", UUID.randomUUID(),
+                        "decision", "INVALIDATE",
+                        "reasonCode", "X",
+                        "reviewRef", "r",
+                        "affectedRevisionCount", 0,
+                        "decidedAt", t0.plusSeconds(20)),
+                t0.plusSeconds(20))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Project");
+        assertThat(count("rdm_work_order_timeline_entry")).isEqualTo(1);
+    }
+
+    @Test
     void projectsFieldOpsEventsWithoutSensitivePayloadAndRejectsMismatch() {
         Instant t0 = Instant.parse("2026-07-16T04:00:00Z");
         UUID appointmentId = UUID.randomUUID();

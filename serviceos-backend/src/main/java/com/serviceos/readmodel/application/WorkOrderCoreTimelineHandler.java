@@ -42,7 +42,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * 把已发布的核心执行、现场履约、SLA、资料审核、外发交付、ServiceAssignment、Task 指派/Guard
+ * 把已发布的核心执行、现场履约、SLA、资料审核、条件处置、外发交付、ServiceAssignment、Task 指派/Guard
  * 与外部审核回执事件规范化为工单时间线。
  * Inbox 与投影写入同事务，任何身份错配都会整体回滚；不保存 PII、自由文本、GPS、候选人列表或指派细节。
  */
@@ -70,6 +70,7 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             "evidence.review-decided", "evidence.review-case-reopened",
             "evidence.correction-case-created", "evidence.correction-resubmitted",
             "evidence.correction-closed", "evidence.correction-waived",
+            "evidence.condition-disposition-recorded",
             "evidence.external-review-receipt-recorded",
             "integration.outbound-delivery-created",
             "integration.outbound-delivery-acknowledged",
@@ -237,6 +238,7 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             case "evidence.correction-resubmitted" -> correctionResubmitted(message);
             case "evidence.correction-closed" -> correctionClosed(message);
             case "evidence.correction-waived" -> correctionWaived(message);
+            case "evidence.condition-disposition-recorded" -> conditionDispositionRecorded(message);
             case "evidence.external-review-receipt-recorded" -> externalReviewReceiptRecorded(message);
             case "integration.outbound-delivery-created" -> Optional.of(deliveryCreated(message));
             case "integration.outbound-delivery-acknowledged" -> deliveryAcknowledged(message);
@@ -538,6 +540,16 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
                 message, "evidence", "CorrectionCase", payload.correctionCaseId(), payload.taskId(),
                 payload.projectId(), "CORRECTION", "CorrectionCase", null, "WAIVED",
                 payload.waivedBy(), payload.waivedAt());
+    }
+
+    private Optional<TimelineFact> conditionDispositionRecorded(OutboxMessage message) {
+        ConditionDispositionPayload payload = read(message, ConditionDispositionPayload.class);
+        // 不投影 reviewRef / resolutionId / slotId / affectedRevisionCount；outcome 取 KEEP/INVALIDATE。
+        return taskScopedFact(
+                message, "evidence", "EvidenceConditionDisposition", payload.dispositionId(),
+                payload.taskId(), payload.projectId(), "EVIDENCE", "EvidenceConditionDisposition",
+                null, requireCode(payload.decision(), "condition disposition decision"), null,
+                payload.decidedAt());
     }
 
     private Optional<TimelineFact> externalReviewReceiptRecorded(OutboxMessage message) {
@@ -994,6 +1006,15 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             UUID projectId,
             String waivedBy,
             Instant waivedAt
+    ) {
+    }
+
+    private record ConditionDispositionPayload(
+            UUID dispositionId,
+            UUID taskId,
+            UUID projectId,
+            String decision,
+            Instant decidedAt
     ) {
     }
 
