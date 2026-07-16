@@ -137,6 +137,32 @@
          ORDER BY slot_id, item_ordinal
     </select>
 
+    <select id="listItemSummaries" resultType="map">
+        SELECT item.evidence_item_id AS "evidenceItemId",
+               item.task_id AS "taskId",
+               item.project_id AS "projectId",
+               item.slot_id AS "slotId",
+               item.item_ordinal AS "itemOrdinal",
+               item.status AS "status",
+               COALESCE(latest.revision_count, 0) AS "revisionCount",
+               latest.revision_number AS "latestRevisionNumber",
+               latest.status AS "latestRevisionStatus"
+          FROM evd_evidence_item item
+          LEFT JOIN LATERAL (
+              SELECT count(*) OVER ()::integer AS revision_count,
+                     revision_number,
+                     status
+                FROM evd_evidence_revision revision
+               WHERE revision.tenant_id = item.tenant_id
+                 AND revision.evidence_item_id = item.evidence_item_id
+               ORDER BY revision_number DESC
+               LIMIT 1
+          ) latest ON true
+         WHERE item.tenant_id = #{tenantId}
+           AND item.task_id = CAST(#{taskId} AS uuid)
+         ORDER BY item.slot_id, item.item_ordinal
+    </select>
+
     <select id="listRevisionsForTask" resultType="map">
         SELECT <include refid="revisionColumns"/>
           FROM evd_evidence_revision

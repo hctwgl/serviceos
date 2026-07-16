@@ -1,6 +1,7 @@
 package com.serviceos.forms.infrastructure;
 
 import com.serviceos.forms.api.FormSubmissionView;
+import com.serviceos.forms.api.FormSubmissionSummaryView;
 import com.serviceos.forms.api.FormValidationIssue;
 import com.serviceos.forms.application.FormSubmissionRepository;
 import org.springframework.stereotype.Repository;
@@ -72,6 +73,13 @@ final class MyBatisFormSubmissionRepository implements FormSubmissionRepository 
     }
 
     @Override
+    public List<FormSubmissionSummaryView> listSummariesByTask(String tenantId, UUID taskId) {
+        return mapper.listSummariesByTask(tenantId, taskId).stream()
+                .map(this::summary)
+                .toList();
+    }
+
+    @Override
     public void saveResult(String tenantId, String operationType, String idempotencyKey, UUID submissionId) {
         mapper.insertResult(Map.of("tenantId", tenantId, "operationType", operationType,
                 "idempotencyKey", idempotencyKey, "submissionId", submissionId));
@@ -110,6 +118,15 @@ final class MyBatisFormSubmissionRepository implements FormSubmissionRepository 
                 text(row, "validationStatus"),
                 issues(row.get("errors")), issues(row.get("warnings")), text(row, "prefillVersion"),
                 text(row, "submittedBy"), instant(row, "submittedAt"));
+    }
+
+    private FormSubmissionSummaryView summary(Map<String, Object> row) {
+        return new FormSubmissionSummaryView(
+                uuid(row, "submissionId"), uuid(row, "taskId"), uuid(row, "projectId"),
+                uuid(row, "formVersionId"), text(row, "formKey"), integer(row, "submissionVersion"),
+                text(row, "contentDigest"), text(row, "validationStatus"),
+                integer(row, "errorCount"), integer(row, "warningCount"),
+                instant(row, "submittedAt"));
     }
 
     private String json(Object value) {

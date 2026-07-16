@@ -1,6 +1,7 @@
 package com.serviceos.evidence.infrastructure;
 
 import com.serviceos.evidence.api.EvidenceItemView;
+import com.serviceos.evidence.api.EvidenceItemSummaryView;
 import com.serviceos.evidence.api.EvidenceRevisionView;
 import com.serviceos.evidence.api.EvidenceSlotView;
 import com.serviceos.evidence.api.EvidenceValidationView;
@@ -109,6 +110,18 @@ final class MyBatisEvidenceItemRepository implements EvidenceItemRepository {
         }
         return items.stream()
                 .map(row -> itemView(row, byItem.getOrDefault(uuid(row, "evidenceItemId"), List.of())))
+                .toList();
+    }
+
+    @Override
+    public List<EvidenceItemSummaryView> listItemSummaries(String tenantId, UUID taskId) {
+        return mapper.listItemSummaries(tenantId, taskId.toString()).stream()
+                .map(row -> new EvidenceItemSummaryView(
+                        uuid(row, "evidenceItemId"), uuid(row, "taskId"), uuid(row, "projectId"),
+                        uuid(row, "slotId"), number(row, "itemOrdinal").intValue(),
+                        text(row, "status"), number(row, "revisionCount").intValue(),
+                        nullableInteger(row, "latestRevisionNumber"),
+                        text(row, "latestRevisionStatus")))
                 .toList();
     }
 
@@ -403,6 +416,11 @@ final class MyBatisEvidenceItemRepository implements EvidenceItemRepository {
 
     private static Number number(Map<String, Object> row, String key) {
         return (Number) row.get(key);
+    }
+
+    private static Integer nullableInteger(Map<String, Object> row, String key) {
+        Number value = (Number) row.get(key);
+        return value == null ? null : value.intValue();
     }
 
     private static Instant instant(Object value) {

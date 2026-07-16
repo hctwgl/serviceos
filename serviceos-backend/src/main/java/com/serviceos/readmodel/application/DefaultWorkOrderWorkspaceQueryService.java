@@ -12,6 +12,8 @@ import com.serviceos.evidence.api.CorrectionCaseView;
 import com.serviceos.evidence.api.CorrectionResubmissionView;
 import com.serviceos.evidence.api.EvidenceSlotQueryService;
 import com.serviceos.evidence.api.EvidenceSlotView;
+import com.serviceos.evidence.api.EvidenceItemQueryService;
+import com.serviceos.evidence.api.EvidenceItemSummaryView;
 import com.serviceos.evidence.api.ReviewCaseService;
 import com.serviceos.evidence.api.ReviewCaseView;
 import com.serviceos.evidence.api.ReviewDecisionView;
@@ -19,6 +21,8 @@ import com.serviceos.fieldwork.api.VisitService;
 import com.serviceos.fieldwork.api.VisitView;
 import com.serviceos.forms.api.TaskFormDefinition;
 import com.serviceos.forms.api.TaskFormQueryService;
+import com.serviceos.forms.api.FormSubmissionQueryService;
+import com.serviceos.forms.api.FormSubmissionSummaryView;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.integration.api.DeliveryAttemptView;
 import com.serviceos.integration.api.DeliveryReplayRequestView;
@@ -47,7 +51,9 @@ import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceC
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceContactAttemptSummary;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceEvidenceSlotSummary;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceFormSummary;
+import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceFormSubmissionSummary;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceFormsEvidenceSectionData;
+import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceEvidenceItemSummary;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceDeliveryAttemptSummary;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceDeliveryReplaySummary;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceExternalAcknowledgementSummary;
@@ -105,7 +111,9 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
     private final VisitService visits;
     private final AppointmentService appointments;
     private final TaskFormQueryService taskForms;
+    private final FormSubmissionQueryService formSubmissions;
     private final EvidenceSlotQueryService evidenceSlots;
+    private final EvidenceItemQueryService evidenceItems;
     private final ReviewCaseService reviews;
     private final CorrectionCaseService corrections;
     private final InboundMessageQueryService inboundMessages;
@@ -123,7 +131,9 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
             VisitService visits,
             AppointmentService appointments,
             TaskFormQueryService taskForms,
+            FormSubmissionQueryService formSubmissions,
             EvidenceSlotQueryService evidenceSlots,
+            EvidenceItemQueryService evidenceItems,
             ReviewCaseService reviews,
             CorrectionCaseService corrections,
             InboundMessageQueryService inboundMessages,
@@ -140,7 +150,9 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
         this.visits = visits;
         this.appointments = appointments;
         this.taskForms = taskForms;
+        this.formSubmissions = formSubmissions;
         this.evidenceSlots = evidenceSlots;
+        this.evidenceItems = evidenceItems;
         this.reviews = reviews;
         this.corrections = corrections;
         this.inboundMessages = inboundMessages;
@@ -332,13 +344,16 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
     ) {
         WorkOrderWorkspaceFormsEvidenceSectionData loaded =
                 loadFormsEvidence(principal, correlationId, tasks, 1);
-        boolean formsDenied = loaded.forms() == null;
-        boolean slotsDenied = loaded.evidenceSlots() == null;
-        return dualHalfAvailability(
-                formsDenied,
-                slotsDenied,
-                formsDenied || loaded.forms().isEmpty(),
-                slotsDenied || loaded.evidenceSlots().isEmpty());
+        boolean formsDenied = loaded.forms() == null || loaded.formSubmissions() == null;
+        boolean evidenceDenied = loaded.evidenceSlots() == null || loaded.evidenceItems() == null;
+        boolean anyData = (loaded.forms() != null && !loaded.forms().isEmpty())
+                || (loaded.formSubmissions() != null && !loaded.formSubmissions().isEmpty())
+                || (loaded.evidenceSlots() != null && !loaded.evidenceSlots().isEmpty())
+                || (loaded.evidenceItems() != null && !loaded.evidenceItems().isEmpty());
+        if (anyData) {
+            return "AVAILABLE";
+        }
+        return formsDenied || evidenceDenied ? "UNAVAILABLE" : "EMPTY";
     }
 
     private String probeReviewsCorrectionsAvailability(
@@ -519,6 +534,28 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
             }
         }
 
+        List<WorkOrderWorkspaceFormSubmissionSummary> submissionSummaries;
+        try {
+            List<WorkOrderWorkspaceFormSubmissionSummary> collected = new ArrayList<>();
+            for (WorkOrderTaskSummary task : tasks) {
+                formSubmissions.listForTask(principal, correlationId, task.id()).stream()
+                        .map(this::toFormSubmissionSummary)
+                        .forEach(collected::add);
+            }
+            submissionSummaries = collected.stream()
+                    .sorted(Comparator.comparing(
+                                    WorkOrderWorkspaceFormSubmissionSummary::submittedAt)
+                            .thenComparing(WorkOrderWorkspaceFormSubmissionSummary::submissionId))
+                    .limit(limit)
+                    .toList();
+        } catch (BusinessProblem problem) {
+            if (problem.code() == ProblemCode.ACCESS_DENIED) {
+                submissionSummaries = null;
+            } else {
+                throw problem;
+            }
+        }
+
         List<WorkOrderWorkspaceEvidenceSlotSummary> slotSummaries;
         try {
             List<WorkOrderWorkspaceEvidenceSlotSummary> collected = new ArrayList<>();
@@ -551,7 +588,38 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
             }
         }
 
-        return new WorkOrderWorkspaceFormsEvidenceSectionData(formSummaries, slotSummaries, null);
+        List<WorkOrderWorkspaceEvidenceItemSummary> itemSummaries;
+        try {
+            List<WorkOrderWorkspaceEvidenceItemSummary> collected = new ArrayList<>();
+            for (WorkOrderTaskSummary task : tasks) {
+                try {
+                    evidenceItems.listSummariesForTask(principal, correlationId, task.id()).stream()
+                            .map(this::toEvidenceItemSummary)
+                            .forEach(collected::add);
+                } catch (BusinessProblem problem) {
+                    if (problem.code() == ProblemCode.TASK_STATE_CONFLICT) {
+                        continue;
+                    }
+                    throw problem;
+                }
+            }
+            itemSummaries = collected.stream()
+                    .sorted(Comparator
+                            .comparing(WorkOrderWorkspaceEvidenceItemSummary::evidenceSlotId)
+                            .thenComparingInt(WorkOrderWorkspaceEvidenceItemSummary::itemOrdinal)
+                            .thenComparing(WorkOrderWorkspaceEvidenceItemSummary::evidenceItemId))
+                    .limit(limit)
+                    .toList();
+        } catch (BusinessProblem problem) {
+            if (problem.code() == ProblemCode.ACCESS_DENIED) {
+                itemSummaries = null;
+            } else {
+                throw problem;
+            }
+        }
+
+        return new WorkOrderWorkspaceFormsEvidenceSectionData(
+                formSummaries, submissionSummaries, slotSummaries, itemSummaries, null);
     }
 
     private WorkOrderWorkspaceReviewsCorrectionsSectionData loadReviewsCorrections(
@@ -703,6 +771,16 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
                 form.semanticVersion(), form.schemaVersion(), form.contentDigest());
     }
 
+    private WorkOrderWorkspaceFormSubmissionSummary toFormSubmissionSummary(
+            FormSubmissionSummaryView submission
+    ) {
+        return new WorkOrderWorkspaceFormSubmissionSummary(
+                submission.submissionId(), submission.taskId(), submission.projectId(),
+                submission.formVersionId(), submission.formKey(), submission.submissionVersion(),
+                submission.contentDigest(), submission.validationStatus(),
+                submission.errorCount(), submission.warningCount(), submission.submittedAt());
+    }
+
     private WorkOrderWorkspaceEvidenceSlotSummary toEvidenceSlotSummary(EvidenceSlotView slot) {
         // 故意不投影 requirementDefinition / resolutionExplanation JSON。
         return new WorkOrderWorkspaceEvidenceSlotSummary(
@@ -712,6 +790,13 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
                 slot.mediaType(), slot.required(), slot.minCount(), slot.maxCount(),
                 slot.status(), slot.resolvedAt(), slot.slotGeneration(),
                 slot.active(), slot.transition(), slot.requiredDisposition());
+    }
+
+    private WorkOrderWorkspaceEvidenceItemSummary toEvidenceItemSummary(EvidenceItemSummaryView item) {
+        return new WorkOrderWorkspaceEvidenceItemSummary(
+                item.evidenceItemId(), item.taskId(), item.projectId(), item.evidenceSlotId(),
+                item.itemOrdinal(), item.status(), item.revisionCount(),
+                item.latestRevisionNumber(), item.latestRevisionStatus());
     }
 
     private WorkOrderWorkspaceReviewCaseSummary toReviewCaseSummary(ReviewCaseView review) {

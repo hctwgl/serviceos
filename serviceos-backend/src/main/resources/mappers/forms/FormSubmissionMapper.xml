@@ -70,6 +70,27 @@
          WHERE s.tenant_id = #{tenantId} AND s.form_submission_id = #{submissionId}
     </select>
 
+    <select id="listSummariesByTask" resultType="map">
+        SELECT s.form_submission_id AS "submissionId",
+               s.task_id AS "taskId",
+               s.project_id AS "projectId",
+               s.form_version_id AS "formVersionId",
+               s.form_key AS "formKey",
+               s.submission_version AS "submissionVersion",
+               s.content_digest AS "contentDigest",
+               s.validation_status AS "validationStatus",
+               jsonb_array_length(v.errors_document) AS "errorCount",
+               jsonb_array_length(v.warnings_document) AS "warningCount",
+               s.submitted_at AS "submittedAt"
+          FROM frm_form_submission s
+          JOIN frm_submission_validation v
+            ON v.tenant_id = s.tenant_id
+           AND v.form_submission_id = s.form_submission_id
+         WHERE s.tenant_id = #{tenantId}
+           AND s.task_id = #{taskId}
+         ORDER BY s.submitted_at, s.form_submission_id
+    </select>
+
     <insert id="insertResult" parameterType="map">
         INSERT INTO frm_form_command_result (tenant_id, operation_type, idempotency_key, form_submission_id)
         VALUES (#{tenantId}, #{operationType}, #{idempotencyKey}, #{submissionId})

@@ -120,16 +120,20 @@ public record WorkOrderWorkspaceSection(
     }
 
     /**
-     * forms / evidenceSlots 为 null 表示对应读权不可用；空列表表示有权但无数据。
+     * forms / formSubmissions / evidenceSlots / evidenceItems 为 null 表示对应读权不可用。
      */
     public record WorkOrderWorkspaceFormsEvidenceSectionData(
             List<WorkOrderWorkspaceFormSummary> forms,
+            List<WorkOrderWorkspaceFormSubmissionSummary> formSubmissions,
             List<WorkOrderWorkspaceEvidenceSlotSummary> evidenceSlots,
+            List<WorkOrderWorkspaceEvidenceItemSummary> evidenceItems,
             String nextCursor
     ) {
         public WorkOrderWorkspaceFormsEvidenceSectionData {
             forms = forms == null ? null : List.copyOf(forms);
+            formSubmissions = formSubmissions == null ? null : List.copyOf(formSubmissions);
             evidenceSlots = evidenceSlots == null ? null : List.copyOf(evidenceSlots);
+            evidenceItems = evidenceItems == null ? null : List.copyOf(evidenceItems);
         }
     }
 
@@ -141,6 +145,22 @@ public record WorkOrderWorkspaceSection(
             String semanticVersion,
             String schemaVersion,
             String contentDigest
+    ) {
+    }
+
+    /** 不含 values、校验消息、prefillVersion 与 submittedBy。 */
+    public record WorkOrderWorkspaceFormSubmissionSummary(
+            UUID submissionId,
+            UUID taskId,
+            UUID projectId,
+            UUID formVersionId,
+            String formKey,
+            int submissionVersion,
+            String contentDigest,
+            String validationStatus,
+            int errorCount,
+            int warningCount,
+            Instant submittedAt
     ) {
     }
 
@@ -164,6 +184,20 @@ public record WorkOrderWorkspaceSection(
             boolean active,
             String transition,
             String requiredDisposition
+    ) {
+    }
+
+    /** 不含 Revision、文件引用、采集元数据与操作者。 */
+    public record WorkOrderWorkspaceEvidenceItemSummary(
+            UUID evidenceItemId,
+            UUID taskId,
+            UUID projectId,
+            UUID evidenceSlotId,
+            int itemOrdinal,
+            String status,
+            int revisionCount,
+            Integer latestRevisionNumber,
+            String latestRevisionStatus
     ) {
     }
 

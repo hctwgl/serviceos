@@ -3,6 +3,7 @@ package com.serviceos.forms.infrastructure;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -17,6 +18,8 @@ interface FormSubmissionMapper {
     void insertValidation(Map<String, Object> values);
     Map<String, Object> find(@Param("tenantId") String tenantId,
                              @Param("submissionId") UUID submissionId);
+    List<Map<String, Object>> listSummariesByTask(
+            @Param("tenantId") String tenantId, @Param("taskId") UUID taskId);
     void insertResult(Map<String, Object> values);
     Map<String, Object> findResult(@Param("tenantId") String tenantId,
                                    @Param("operationType") String operationType,
