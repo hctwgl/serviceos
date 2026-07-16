@@ -1,5 +1,7 @@
 package com.serviceos.readmodel.application;
 
+import com.serviceos.integration.api.DeliveryTimelineContext;
+import com.serviceos.integration.api.DeliveryTimelineContextQuery;
 import com.serviceos.reliability.api.InboxDecision;
 import com.serviceos.reliability.api.InboxService;
 import com.serviceos.reliability.spi.OutboxMessage;
@@ -35,7 +37,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * 把已发布的核心执行、现场履约、SLA 与资料审核事件规范化为工单时间线。
+ * 把已发布的核心执行、现场履约、SLA、资料审核与外发交付事件规范化为工单时间线。
  * Inbox 与投影写入同事务，任何身份错配都会整体回滚；不保存 PII、自由文本或 GPS。
  */
 @Service
@@ -59,12 +61,16 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             "evidence.correction-case-created", "evidence.correction-resubmitted",
             "evidence.correction-closed", "evidence.correction-waived",
             "integration.outbound-delivery-created",
+            "integration.outbound-delivery-acknowledged",
+            "integration.outbound-delivery-recovered",
+            "integration.outbound-delivery-replay-requested",
             "operational.exception.resolved");
 
     private final InboxService inbox;
     private final WorkOrderTimelineRepository timelines;
     private final WorkOrderScopeQuery workOrderScopes;
     private final TaskTimelineContextQuery taskContexts;
+    private final DeliveryTimelineContextQuery deliveryContexts;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
@@ -73,6 +79,7 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             WorkOrderTimelineRepository timelines,
             WorkOrderScopeQuery workOrderScopes,
             TaskTimelineContextQuery taskContexts,
+            DeliveryTimelineContextQuery deliveryContexts,
             ObjectMapper objectMapper,
             Clock clock
     ) {
@@ -80,6 +87,7 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
         this.timelines = timelines;
         this.workOrderScopes = workOrderScopes;
         this.taskContexts = taskContexts;
+        this.deliveryContexts = deliveryContexts;
         this.objectMapper = objectMapper;
         this.clock = clock;
     }
@@ -185,6 +193,9 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             case "evidence.correction-closed" -> correctionClosed(message);
             case "evidence.correction-waived" -> correctionWaived(message);
             case "integration.outbound-delivery-created" -> Optional.of(deliveryCreated(message));
+            case "integration.outbound-delivery-acknowledged" -> deliveryAcknowledged(message);
+            case "integration.outbound-delivery-recovered" -> deliveryRecovered(message);
+            case "integration.outbound-delivery-replay-requested" -> deliveryReplayRequested(message);
             case "operational.exception.resolved" -> exceptionResolved(message);
             default -> throw new IllegalArgumentException("unsupported work order timeline event");
         };
@@ -445,6 +456,49 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
         // 不投影 externalOrderCode / payloadDigest；仅保留交付创建事实。
         return fact(payload.sourceWorkOrderId(), payload.projectId(), "DELIVERY", "OutboundDelivery",
                 payload.deliveryId(), null, "CREATED", null, payload.createdAt());
+    }
+
+    private Optional<TimelineFact> deliveryAcknowledged(OutboxMessage message) {
+        DeliveryAcknowledgedPayload payload = read(message, DeliveryAcknowledgedPayload.class);
+        return deliveryScopedFact(
+                message, payload.deliveryId(), payload.projectId(), "ACKNOWLEDGED", null,
+                payload.acknowledgedAt());
+    }
+
+    private Optional<TimelineFact> deliveryRecovered(OutboxMessage message) {
+        DeliveryRecoveredPayload payload = read(message, DeliveryRecoveredPayload.class);
+        return deliveryScopedFact(
+                message, payload.deliveryId(), null, "RECOVERED", null, payload.acknowledgedAt());
+    }
+
+    private Optional<TimelineFact> deliveryReplayRequested(OutboxMessage message) {
+        DeliveryReplayRequestedPayload payload = read(message, DeliveryReplayRequestedPayload.class);
+        // reason / approvalRef / digest 不得进入用户时间线。
+        return deliveryScopedFact(
+                message, payload.deliveryId(), payload.projectId(), "REPLAY_REQUESTED",
+                payload.requestedBy(), payload.requestedAt());
+    }
+
+    private Optional<TimelineFact> deliveryScopedFact(
+            OutboxMessage message,
+            UUID deliveryId,
+            UUID projectId,
+            String outcomeCode,
+            String actorId,
+            Instant occurredAt
+    ) {
+        requireEnvelope(message, "integration", "OutboundDelivery", deliveryId);
+        DeliveryTimelineContext context = deliveryContexts.find(message.tenantId(), deliveryId)
+                .orElseThrow(() -> new IllegalStateException("时间线事件引用的 OutboundDelivery 不存在"));
+        if (context.workOrderId() == null) {
+            return Optional.empty();
+        }
+        if (projectId != null && !projectId.equals(context.projectId())) {
+            throw new IllegalArgumentException("时间线事件 Project 与 Delivery 权威范围不一致");
+        }
+        return Optional.of(fact(
+                context.workOrderId(), context.projectId(), "DELIVERY", "OutboundDelivery", deliveryId,
+                null, outcomeCode, actorId, occurredAt));
     }
 
     private Optional<TimelineFact> exceptionResolved(OutboxMessage message) {
@@ -781,6 +835,27 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             UUID projectId,
             UUID sourceWorkOrderId,
             Instant createdAt
+    ) {
+    }
+
+    private record DeliveryAcknowledgedPayload(
+            UUID deliveryId,
+            UUID projectId,
+            Instant acknowledgedAt
+    ) {
+    }
+
+    private record DeliveryRecoveredPayload(
+            UUID deliveryId,
+            Instant acknowledgedAt
+    ) {
+    }
+
+    private record DeliveryReplayRequestedPayload(
+            UUID deliveryId,
+            UUID projectId,
+            String requestedBy,
+            Instant requestedAt
     ) {
     }
 

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.48.0
+  version: 0.49.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -86,8 +86,8 @@ paths:
       summary: 查询工单执行与现场履约时间线
       description: >-
         每页复用 workOrder.read 实时 Project Scope 鉴权；返回由公开领域事件构建的
-        工单执行、现场履约、SLA、资料/审核/整改、外发交付创建与异常闭环时间线。
-        delivery acknowledged/recovered、试算/结算尚未合并。
+        工单执行、现场履约、SLA、资料/审核/整改、外发交付与异常闭环时间线。
+        试算/结算尚未合并。
       parameters:
         - { name: workOrderId, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: cursor, in: query, schema: { type: string, minLength: 1 } }
@@ -2014,7 +2014,11 @@ components:
             evidence.review-decided, evidence.review-case-reopened,
             evidence.correction-case-created, evidence.correction-resubmitted,
             evidence.correction-closed, evidence.correction-waived,
-            integration.outbound-delivery-created, operational.exception.resolved]
+            integration.outbound-delivery-created,
+            integration.outbound-delivery-acknowledged,
+            integration.outbound-delivery-recovered,
+            integration.outbound-delivery-replay-requested,
+            operational.exception.resolved]
         schemaVersion: { type: integer, minimum: 1, maximum: 2 }
         occurredAt: { type: string, format: date-time }
         receivedAt: { type: string, format: date-time }

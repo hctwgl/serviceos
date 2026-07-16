@@ -102,6 +102,8 @@ class WorkOrderTimelinePostgresIT {
                 TRUNCATE TABLE rdm_work_order_timeline_entry, rel_inbox_record,
                     aud_audit_record, tsk_task_execution_attempt, tsk_task,
                     rel_outbox_publish_attempt, rel_outbox_event,
+                    int_delivery_attempt, int_external_acknowledgement, int_delivery_replay_request,
+                    int_outbound_delivery,
                     wo_work_order, cfg_configuration_bundle_item, cfg_configuration_bundle,
                     cfg_configuration_asset_version, prj_project,
                     auth_role_field_policy, auth_role_grant, auth_role_capability, auth_role CASCADE
@@ -449,6 +451,71 @@ class WorkOrderTimelinePostgresIT {
     }
 
     @Test
+    void projectsDeliveryAckRecoveredAndReplayViaPublicContextPort() {
+        Instant t0 = Instant.parse("2026-07-16T08:00:00Z");
+        UUID deliveryId = seedOutboundDelivery();
+
+        handler.handle(message(
+                "integration", "integration.outbound-delivery-replay-requested", 1,
+                "OutboundDelivery", deliveryId, 2,
+                Map.of(
+                        "deliveryId", deliveryId,
+                        "projectId", projectId,
+                        "requestedBy", "ops-1",
+                        "requestedAt", t0),
+                t0));
+        handler.handle(message(
+                "integration", "integration.outbound-delivery-acknowledged", 1,
+                "OutboundDelivery", deliveryId, 3,
+                Map.of(
+                        "deliveryId", deliveryId,
+                        "projectId", projectId,
+                        "acknowledgedAt", t0.plusSeconds(10)),
+                t0.plusSeconds(10)));
+        handler.handle(message(
+                "integration", "integration.outbound-delivery-recovered", 1,
+                "OutboundDelivery", deliveryId, 3,
+                Map.of(
+                        "deliveryId", deliveryId,
+                        "acknowledgedAt", t0.plusSeconds(20)),
+                t0.plusSeconds(20)));
+
+        var page = timelines.list(principal("reader", TENANT), "corr-delivery-ack", workOrderId, null, 10);
+        assertThat(page.items()).extracting(WorkOrderTimelineItem::eventType)
+                .containsExactly(
+                        "integration.outbound-delivery-recovered",
+                        "integration.outbound-delivery-acknowledged",
+                        "integration.outbound-delivery-replay-requested");
+        assertThat(page.items()).extracting(WorkOrderTimelineItem::outcomeCode)
+                .containsExactly("RECOVERED", "ACKNOWLEDGED", "REPLAY_REQUESTED");
+        assertThat(page.items().get(2).actorId()).isEqualTo("ops-1");
+        assertThat(count("rdm_work_order_timeline_entry")).isEqualTo(3);
+
+        assertThatThrownBy(() -> handler.handle(message(
+                "integration", "integration.outbound-delivery-acknowledged", 1,
+                "OutboundDelivery", deliveryId, 4,
+                Map.of(
+                        "deliveryId", deliveryId,
+                        "projectId", UUID.randomUUID(),
+                        "acknowledgedAt", t0.plusSeconds(30)),
+                t0.plusSeconds(30))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Project");
+
+        UUID missing = UUID.randomUUID();
+        assertThatThrownBy(() -> handler.handle(message(
+                "integration", "integration.outbound-delivery-recovered", 1,
+                "OutboundDelivery", missing, 1,
+                Map.of(
+                        "deliveryId", missing,
+                        "acknowledgedAt", t0.plusSeconds(40)),
+                t0.plusSeconds(40))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("OutboundDelivery");
+        assertThat(count("rdm_work_order_timeline_entry")).isEqualTo(3);
+    }
+
+    @Test
     void projectsFieldOpsEventsWithoutSensitivePayloadAndRejectsMismatch() {
         Instant t0 = Instant.parse("2026-07-16T04:00:00Z");
         UUID appointmentId = UUID.randomUUID();
@@ -589,6 +656,40 @@ class WorkOrderTimelinePostgresIT {
         payload.put("exceptionCode", exceptionCode);
         payload.put("occurredAt", occurredAt);
         return payload;
+    }
+
+    private UUID seedOutboundDelivery() {
+        UUID deliveryId = UUID.randomUUID();
+        jdbc.sql("""
+                INSERT INTO int_outbound_delivery (
+                    delivery_id, tenant_id, project_id, connector_version_id, mapping_version_id,
+                    business_message_type, business_key, source_review_case_id, source_task_id,
+                    source_work_order_id, source_snapshot_id, source_snapshot_digest,
+                    external_order_code, operator_principal_id, operator_display_value,
+                    payload_object_ref, payload_digest, external_idempotency_key,
+                    failure_policy_version_id, status, attempt_count, created_by, created_at,
+                    aggregate_version
+                ) VALUES (
+                    :id, :tenantId, :projectId, 'BYD_CPIM_V731', 'MAP-1',
+                    'REVIEW_SUBMISSION', :businessKey, :reviewCaseId, :taskId,
+                    :workOrderId, :snapshotId, :digest,
+                    'EXT-ORDER-1', 'operator', 'OP',
+                    's3://private/payload', :digest, :idem,
+                    'FAIL-1', 'UNKNOWN', 1, 'operator', now(), 1
+                )
+                """)
+                .param("id", deliveryId)
+                .param("tenantId", TENANT)
+                .param("projectId", projectId)
+                .param("businessKey", "m78:" + deliveryId)
+                .param("reviewCaseId", UUID.randomUUID())
+                .param("taskId", taskId)
+                .param("workOrderId", workOrderId)
+                .param("snapshotId", UUID.randomUUID())
+                .param("digest", "a".repeat(64))
+                .param("idem", "b".repeat(64))
+                .update();
+        return deliveryId;
     }
 
     private OutboxMessage message(

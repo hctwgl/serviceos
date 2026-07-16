@@ -1,5 +1,6 @@
 package com.serviceos.integration.application;
 
+import com.serviceos.integration.api.DeliveryTimelineContext;
 import com.serviceos.integration.api.OutboundDeliveryView;
 import com.serviceos.integration.api.DeliveryReplayRequestView;
 
@@ -19,6 +20,11 @@ public interface OutboundDeliveryRepository {
     void attachExecutionTask(String tenantId, UUID deliveryId, UUID taskId, Instant updatedAt);
 
     Optional<DeliveryRecord> find(String tenantId, UUID deliveryId);
+
+    /**
+     * 时间线投影专用：只返回 delivery/project/workOrder 身份，不加载 attempt/ack/replay 图。
+     */
+    Optional<DeliveryTimelineContext> findTimelineContext(String tenantId, UUID deliveryId);
 
     Optional<DeliveryRecord> findBySourceReview(
             String tenantId, UUID sourceReviewCaseId, String businessMessageType);
