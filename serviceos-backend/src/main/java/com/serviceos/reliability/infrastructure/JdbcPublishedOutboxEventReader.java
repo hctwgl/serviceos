@@ -10,6 +10,7 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timestamptz;
@@ -80,6 +81,26 @@ final class JdbcPublishedOutboxEventReader implements PublishedOutboxEventReader
                 .param("afterOutboxId", afterOutboxId)
                 .query(this::mapEvent)
                 .list();
+    }
+
+    @Override
+    public Optional<PublishedOutboxEvent> findPublishedByEventId(UUID eventId) {
+        if (eventId == null) {
+            throw new IllegalArgumentException("eventId must not be null");
+        }
+        return jdbc.sql("""
+                SELECT outbox_id, event_id, module_name, event_type, schema_version,
+                       aggregate_type, aggregate_id, aggregate_version, tenant_id,
+                       correlation_id, causation_id, partition_key, payload::text AS payload,
+                       payload_digest, occurred_at, attempt_count, trace_parent, trace_state,
+                       created_at
+                  FROM rel_outbox_event
+                 WHERE status = 'PUBLISHED'
+                   AND event_id = :eventId
+                """)
+                .param("eventId", eventId)
+                .query(this::mapEvent)
+                .optional();
     }
 
     private PublishedOutboxEvent mapEvent(ResultSet rs, int rowNumber) throws SQLException {

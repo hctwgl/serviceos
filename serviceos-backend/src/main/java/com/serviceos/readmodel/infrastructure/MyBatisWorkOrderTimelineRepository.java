@@ -80,6 +80,11 @@ final class MyBatisWorkOrderTimelineRepository implements WorkOrderTimelineRepos
         return mapper.countGeneration(rebuildGeneration);
     }
 
+    @Override
+    public long deleteGeneration(int rebuildGeneration) {
+        return mapper.deleteGeneration(rebuildGeneration);
+    }
+
     private static WorkOrderTimelineItem item(Map<String, Object> row) {
         return new WorkOrderTimelineItem(
                 uuid(row, "id"),

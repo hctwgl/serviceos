@@ -79,6 +79,9 @@ class WorkOrderTimelinePostgresIT {
     private WorkOrderTimelineRebuildService rebuildService;
 
     @Autowired
+    private WorkOrderTimelineDeadLetterReplayService deadLetterReplayService;
+
+    @Autowired
     private WorkOrderCommandService workOrders;
 
     @Autowired
@@ -269,8 +272,8 @@ class WorkOrderTimelinePostgresIT {
                 "corr-cross", workOrderId, null, 10))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.RESOURCE_NOT_FOUND));
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("077");
-        assertThat(flyway.info().applied()).hasSize(79);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("078");
+        assertThat(flyway.info().applied()).hasSize(80);
     }
 
     @Test
@@ -292,17 +295,127 @@ class WorkOrderTimelinePostgresIT {
         var result = rebuildService.rebuild();
         assertThat(result.switched()).isTrue();
         assertThat(result.activeGeneration()).isEqualTo(2);
+        assertThat(result.cleanedEntries()).isEqualTo(1);
         assertThat(jdbc.sql("""
                 SELECT count(*) FROM rdm_work_order_timeline_entry WHERE rebuild_generation=1
-                """).query(Long.class).single()).isEqualTo(1);
+                """).query(Long.class).single()).isEqualTo(0);
         assertThat(jdbc.sql("""
                 SELECT count(*) FROM rdm_work_order_timeline_entry WHERE rebuild_generation=2
                 """).query(Long.class).single()).isEqualTo(1);
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM rdm_projection_checkpoint WHERE rebuild_generation=1
+                """).query(Long.class).single()).isEqualTo(0);
 
         var page = timelines.list(principal("reader", TENANT), "corr-after-rebuild", workOrderId, null, 10);
         assertThat(page.items()).extracting(WorkOrderTimelineItem::eventType)
                 .containsExactly("task.claimed");
         assertThat(page.freshnessStatus()).isEqualTo("FRESH");
+    }
+
+    @Test
+    void definitionIsSeededForTimelineProjection() {
+        assertThat(jdbc.sql("""
+                SELECT owner_module, partition_strategy, rebuild_policy, freshness_target
+                  FROM rdm_projection_definition
+                 WHERE projection_code='work-order-core-timeline.v1'
+                """).query((rs, row) -> List.of(
+                        rs.getString("owner_module"),
+                        rs.getString("partition_strategy"),
+                        rs.getString("rebuild_policy"),
+                        rs.getString("freshness_target")))
+                .single()).containsExactly(
+                        "readmodel", "TENANT_SINGLE", "FULL_SCAN_PUBLISHED_OUTBOX",
+                        "CHECKPOINT_AND_DEAD_LETTER");
+    }
+
+    @Test
+    void deadLetterReplayMarksReplayedAndClearsLagging() {
+        Instant occurredAt = Instant.parse("2026-07-16T08:30:00Z");
+        OutboxMessage claimed = message(
+                "task", "task.claimed", 1, "Task", taskId, 2,
+                new TaskClaimedPayload(taskId, "technician-1", occurredAt), occurredAt);
+        handler.handle(claimed);
+        insertPublished(claimed);
+
+        assertThat(timelines.list(principal("reader", TENANT), "corr-before-dl", workOrderId, null, 10)
+                .freshnessStatus()).isEqualTo("FRESH");
+
+        jdbc.sql("""
+                INSERT INTO rdm_projection_dead_letter (
+                    dead_letter_id, projection_code, tenant_id, rebuild_generation,
+                    event_id, payload_digest, event_type, schema_version, error_code,
+                    attempt_count, first_failed_at, last_failed_at, resolved_at, resolution
+                ) VALUES (
+                    :id, 'work-order-core-timeline.v1', :tenant, 1,
+                    :eventId, :digest, 'task.claimed', 1, 'SimulatedFailure',
+                    1, now(), now(), NULL, 'PENDING'
+                )
+                """)
+                .param("id", UUID.randomUUID())
+                .param("tenant", TENANT)
+                .param("eventId", claimed.eventId())
+                .param("digest", claimed.payloadDigest())
+                .update();
+
+        assertThat(timelines.list(principal("reader", TENANT), "corr-with-dl", workOrderId, null, 10)
+                .freshnessStatus()).isEqualTo("LAGGING");
+
+        var replay = deadLetterReplayService.replayOpen();
+        assertThat(replay.replayed()).isEqualTo(1);
+        assertThat(replay.discarded()).isEqualTo(0);
+        assertThat(replay.failed()).isEqualTo(0);
+        assertThat(jdbc.sql("""
+                SELECT resolution FROM rdm_projection_dead_letter WHERE event_id=:eventId
+                """).param("eventId", claimed.eventId()).query(String.class).single())
+                .isEqualTo("REPLAYED");
+        assertThat(timelines.list(principal("reader", TENANT), "corr-after-replay", workOrderId, null, 10)
+                .freshnessStatus()).isEqualTo("FRESH");
+    }
+
+    @Test
+    void missingSourceEventIsDiscardedAndFailedProjectionCanRecover() {
+        Instant occurredAt = Instant.parse("2026-07-16T09:00:00Z");
+        OutboxMessage good = message(
+                "task", "task.claimed", 1, "Task", taskId, 2,
+                new TaskClaimedPayload(taskId, "technician-1", occurredAt), occurredAt);
+        handler.handle(good);
+        insertPublished(good);
+
+        UUID workflowId = UUID.randomUUID();
+        OutboxMessage bad = message(
+                "workflow", "workflow.started", 1, "Workflow", workflowId, 1,
+                new WorkflowStartedPayload(
+                        workflowId, UUID.randomUUID(), workOrderId, bundle.bundleId(),
+                        UUID.randomUUID(), "SURVEY_INSTALL", "1.0.0", "c".repeat(64),
+                        occurredAt.plusSeconds(1)),
+                occurredAt.plusSeconds(1));
+        insertPublished(bad);
+
+        var failed = rebuildService.rebuild();
+        assertThat(failed.switched()).isFalse();
+        UUID poisonEventId = bad.eventId();
+        jdbc.sql("DELETE FROM rel_outbox_event WHERE event_id=:id")
+                .param("id", poisonEventId).update();
+
+        var replay = deadLetterReplayService.replayOpen();
+        assertThat(replay.discarded()).isEqualTo(1);
+        assertThat(replay.replayed()).isEqualTo(0);
+
+        var recovered = deadLetterReplayService.recoverFromFailed();
+        assertThat(recovered.activeGeneration()).isEqualTo(1);
+        assertThat(jdbc.sql("""
+                SELECT status FROM rdm_projection_state
+                 WHERE projection_code='work-order-core-timeline.v1'
+                """).query(String.class).single()).isEqualTo("RUNNING");
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM rdm_work_order_timeline_entry WHERE rebuild_generation=2
+                """).query(Long.class).single()).isEqualTo(0);
+
+        var rebuilt = rebuildService.rebuild();
+        assertThat(rebuilt.switched()).isTrue();
+        assertThat(rebuilt.activeGeneration()).isEqualTo(2);
+        assertThat(timelines.list(principal("reader", TENANT), "corr-recovered", workOrderId, null, 10)
+                .freshnessStatus()).isEqualTo("FRESH");
     }
 
     @Test

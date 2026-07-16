@@ -6,12 +6,15 @@ status: Accepted
 
 # 应用投影、队列、保存视图与偏好逻辑数据模型
 
-## 0. 接受范围（M84）
+## 0. 接受范围（M84 / M86）
 
 **Accepted（可指导实现）**：§1 原则、§2 投影运行时、§12 中与 checkpoint/dead letter 保留相关的约束、§13 重建与切换。
-M84 仅将上述语义落实到 `work-order-core-timeline.v1`。
 
-**仍为设计草案、不得在未再接受前实现**：§3 工单工作区/列表其余投影扩展、§4～§11 队列/SavedView/偏好/搜索/移动同步/指标，以及多投影通用平台与 Portal。
+- **M84**：checkpoint / dead letter / generation 重建切换，落实到 `work-order-core-timeline.v1`；
+- **M86**：同一投影补齐 `projection_definition`、dead letter 按 eventId 幂等重放，以及切换后旧 generation /
+  FAILED 孤儿 generation 清理（不引入长观察窗）。
+
+**仍为设计草案、不得在未再接受前实现**：§3 工单工作区/列表其余投影扩展、§4～§11 队列/SavedView/偏好/搜索/移动同步/指标，以及多投影通用平台与 Portal、Admin 重建/重放 HTTP、Broker offset。
 
 ## 1. 原则
 

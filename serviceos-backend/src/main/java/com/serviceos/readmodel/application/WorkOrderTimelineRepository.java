@@ -25,6 +25,9 @@ public interface WorkOrderTimelineRepository {
 
     long countGeneration(int rebuildGeneration);
 
+    /** 删除指定 generation 的全部时间线条目（切换后清理或孤儿清理）。 */
+    long deleteGeneration(int rebuildGeneration);
+
     record TimelineEntry(
             UUID timelineEntryId,
             String tenantId,

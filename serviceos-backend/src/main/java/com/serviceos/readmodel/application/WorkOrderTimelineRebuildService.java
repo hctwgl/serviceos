@@ -14,7 +14,8 @@ import java.util.UUID;
  * 工单时间线 generation 重建作业。
  *
  * <p>不在外层持有长事务：状态切换与逐条投影各自短事务提交。任一条失败则登记 dead letter、
- * 标记 FAILED，且不切换 active generation，旧投影继续可读。</p>
+ * 标记 FAILED，且不切换 active generation，旧投影继续可读。切换成功后立即清理旧 generation
+ * 条目与 checkpoint（M86；不引入长观察窗）。</p>
  */
 @Service
 public class WorkOrderTimelineRebuildService {
@@ -23,23 +24,28 @@ public class WorkOrderTimelineRebuildService {
     private final WorkOrderTimelineProjectionRuntime projectionRuntime;
     private final PublishedOutboxEventReader publishedEvents;
     private final WorkOrderTimelineRebuildProjector timelineProjector;
+    private final WorkOrderTimelineRepository timelines;
     private final Clock clock;
 
     WorkOrderTimelineRebuildService(
             WorkOrderTimelineProjectionRuntime projectionRuntime,
             PublishedOutboxEventReader publishedEvents,
             WorkOrderTimelineRebuildProjector timelineProjector,
+            WorkOrderTimelineRepository timelines,
             Clock clock
     ) {
         this.projectionRuntime = projectionRuntime;
         this.publishedEvents = publishedEvents;
         this.timelineProjector = timelineProjector;
+        this.timelines = timelines;
         this.clock = clock;
     }
 
     public RebuildResult rebuild() {
+        projectionRuntime.requireDefinition();
         WorkOrderTimelineProjectionRuntime.ProjectionState state = projectionRuntime.requireState();
-        int targetGeneration = state.activeGeneration() + 1;
+        int previousGeneration = state.activeGeneration();
+        int targetGeneration = previousGeneration + 1;
         Instant startedAt = clock.instant();
         projectionRuntime.markRebuilding(targetGeneration, startedAt);
 
@@ -74,8 +80,8 @@ public class WorkOrderTimelineRebuildService {
                         projectionRuntime.markFailed(
                                 exception.getClass().getSimpleName(), clock.instant());
                         return new RebuildResult(
-                                false, state.activeGeneration(), targetGeneration, projected,
-                                exception.getMessage());
+                                false, previousGeneration, targetGeneration, projected,
+                                exception.getMessage(), 0, 0);
                     }
                 }
                 PublishedOutboxEvent last = page.getLast();
@@ -88,7 +94,12 @@ public class WorkOrderTimelineRebuildService {
 
             Instant completedAt = clock.instant();
             projectionRuntime.markRunning(targetGeneration, completedAt);
-            return new RebuildResult(true, targetGeneration, targetGeneration, projected, null);
+            long cleanedEntries = timelines.deleteGeneration(previousGeneration);
+            long cleanedCheckpoints =
+                    projectionRuntime.deleteCheckpointsForGeneration(previousGeneration);
+            return new RebuildResult(
+                    true, targetGeneration, targetGeneration, projected, null,
+                    cleanedEntries, cleanedCheckpoints);
         } catch (RuntimeException exception) {
             projectionRuntime.markFailed(exception.getClass().getSimpleName(), clock.instant());
             throw exception;
@@ -100,7 +111,9 @@ public class WorkOrderTimelineRebuildService {
             int activeGeneration,
             int attemptedGeneration,
             long projectedEvents,
-            String errorMessage
+            String errorMessage,
+            long cleanedEntries,
+            long cleanedCheckpoints
     ) {
     }
 }

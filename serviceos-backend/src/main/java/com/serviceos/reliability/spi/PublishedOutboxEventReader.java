@@ -3,6 +3,7 @@ package com.serviceos.reliability.spi;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -20,6 +21,9 @@ public interface PublishedOutboxEventReader {
             Instant afterCreatedAt,
             int limit
     );
+
+    /** 按业务 eventId 读取已发布事件；缺失返回 empty，供 dead letter 重放失败关闭为 DISCARDED。 */
+    Optional<PublishedOutboxEvent> findPublishedByEventId(UUID eventId);
 
     /** 已发布事件及其 Outbox 创建时间（重建游标）。 */
     record PublishedOutboxEvent(OutboxMessage message, Instant createdAt) {

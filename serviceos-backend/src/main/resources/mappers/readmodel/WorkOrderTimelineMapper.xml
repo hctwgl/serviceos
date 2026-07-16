@@ -40,4 +40,8 @@
   SELECT count(*) FROM rdm_work_order_timeline_entry
    WHERE rebuild_generation=#{rebuildGeneration}
  </select>
+ <delete id="deleteGeneration">
+  DELETE FROM rdm_work_order_timeline_entry
+   WHERE rebuild_generation=#{rebuildGeneration}
+ </delete>
 </mapper>

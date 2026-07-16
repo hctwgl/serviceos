@@ -6,6 +6,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -39,6 +40,28 @@ final class JdbcWorkOrderTimelineProjectionRuntime implements WorkOrderTimelineP
                 .optional()
                 .orElseThrow(() -> new IllegalStateException(
                         "缺少投影状态: " + PROJECTION_CODE));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ProjectionDefinition requireDefinition() {
+        return jdbc.sql("""
+                SELECT projection_code, schema_version, partition_strategy,
+                       rebuild_policy, freshness_target, owner_module
+                  FROM rdm_projection_definition
+                 WHERE projection_code = :code
+                """)
+                .param("code", PROJECTION_CODE)
+                .query((rs, row) -> new ProjectionDefinition(
+                        rs.getString("projection_code"),
+                        rs.getInt("schema_version"),
+                        rs.getString("partition_strategy"),
+                        rs.getString("rebuild_policy"),
+                        rs.getString("freshness_target"),
+                        rs.getString("owner_module")))
+                .optional()
+                .orElseThrow(() -> new IllegalStateException(
+                        "缺少投影定义: " + PROJECTION_CODE));
     }
 
     @Override
@@ -95,6 +118,24 @@ final class JdbcWorkOrderTimelineProjectionRuntime implements WorkOrderTimelineP
                 .param("code", PROJECTION_CODE)
                 .param("failedAt", timestamptz(failedAt))
                 .update();
+    }
+
+    @Override
+    @Transactional
+    public void markRecoveredFromFailed(Instant recoveredAt) {
+        int updated = jdbc.sql("""
+                UPDATE rdm_projection_state
+                   SET status = 'RUNNING',
+                       updated_at = :recoveredAt
+                 WHERE projection_code = :code
+                   AND status = 'FAILED'
+                """)
+                .param("code", PROJECTION_CODE)
+                .param("recoveredAt", timestamptz(recoveredAt))
+                .update();
+        if (updated != 1) {
+            throw new IllegalStateException("无法从 FAILED 恢复：投影状态冲突");
+        }
     }
 
     @Override
@@ -178,6 +219,45 @@ final class JdbcWorkOrderTimelineProjectionRuntime implements WorkOrderTimelineP
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public boolean hasAnyOpenDeadLetters() {
+        Long count = jdbc.sql("""
+                SELECT count(*) FROM rdm_projection_dead_letter
+                 WHERE projection_code = :code
+                   AND resolved_at IS NULL
+                """)
+                .param("code", PROJECTION_CODE)
+                .query(Long.class)
+                .single();
+        return count != null && count > 0;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<DeadLetter> listOpenDeadLetters() {
+        return jdbc.sql("""
+                SELECT dead_letter_id, tenant_id, rebuild_generation, event_id, payload_digest,
+                       event_type, schema_version, error_code, attempt_count
+                  FROM rdm_projection_dead_letter
+                 WHERE projection_code = :code
+                   AND resolved_at IS NULL
+                 ORDER BY first_failed_at, dead_letter_id
+                """)
+                .param("code", PROJECTION_CODE)
+                .query((rs, row) -> new DeadLetter(
+                        rs.getObject("dead_letter_id", UUID.class),
+                        rs.getString("tenant_id"),
+                        rs.getInt("rebuild_generation"),
+                        rs.getObject("event_id", UUID.class),
+                        rs.getString("payload_digest"),
+                        rs.getString("event_type"),
+                        rs.getInt("schema_version"),
+                        rs.getString("error_code"),
+                        rs.getInt("attempt_count")))
+                .list();
+    }
+
+    @Override
     @Transactional
     public void recordDeadLetter(
             String tenantId,
@@ -218,6 +298,43 @@ final class JdbcWorkOrderTimelineProjectionRuntime implements WorkOrderTimelineP
                 .param("schemaVersion", schemaVersion)
                 .param("errorCode", truncate(errorCode, 100))
                 .param("failedAt", timestamptz(failedAt))
+                .update();
+    }
+
+    @Override
+    @Transactional
+    public void resolveDeadLetter(UUID deadLetterId, String resolution, Instant resolvedAt) {
+        if (!"REPLAYED".equals(resolution) && !"DISCARDED".equals(resolution)) {
+            throw new IllegalArgumentException("resolution must be REPLAYED or DISCARDED");
+        }
+        int updated = jdbc.sql("""
+                UPDATE rdm_projection_dead_letter
+                   SET resolved_at = :resolvedAt,
+                       resolution = :resolution
+                 WHERE dead_letter_id = :id
+                   AND projection_code = :code
+                   AND resolved_at IS NULL
+                """)
+                .param("id", deadLetterId)
+                .param("code", PROJECTION_CODE)
+                .param("resolvedAt", timestamptz(resolvedAt))
+                .param("resolution", resolution)
+                .update();
+        if (updated != 1) {
+            throw new IllegalStateException("dead letter 不存在或已解决: " + deadLetterId);
+        }
+    }
+
+    @Override
+    @Transactional
+    public long deleteCheckpointsForGeneration(int rebuildGeneration) {
+        return jdbc.sql("""
+                DELETE FROM rdm_projection_checkpoint
+                 WHERE projection_code = :code
+                   AND rebuild_generation = :generation
+                """)
+                .param("code", PROJECTION_CODE)
+                .param("generation", rebuildGeneration)
                 .update();
     }
 

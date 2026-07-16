@@ -26,4 +26,6 @@ interface WorkOrderTimelineMapper {
             @Param("rebuildGeneration") int rebuildGeneration);
 
     long countGeneration(@Param("rebuildGeneration") int rebuildGeneration);
+
+    int deleteGeneration(@Param("rebuildGeneration") int rebuildGeneration);
 }
