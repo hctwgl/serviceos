@@ -1999,9 +1999,10 @@ components:
         displayTemplateCode, displayTemplateVersion]
       properties:
         id: { type: string, format: uuid }
-        category: { enum: [WORK_ORDER, WORKFLOW, STAGE, TASK, APPOINTMENT, VISIT, CONTACT_ATTEMPT] }
+        # 时间线会持续合并新领域事件；使用可扩展枚举，客户端必须容忍未知值。
+        category: { x-extensible-enum: [WORK_ORDER, WORKFLOW, STAGE, TASK, APPOINTMENT, VISIT, CONTACT_ATTEMPT] }
         eventType:
-          enum: [workorder.received, workorder.activated, workorder.fulfilled,
+          x-extensible-enum: [workorder.received, workorder.activated, workorder.fulfilled,
             workflow.started, workflow.completed, stage.activated, stage.completed,
             task.created, task.claimed, task.started, task.released, task.cancelled, task.completed,
             contact.attempt.recorded, appointment.proposed, appointment.confirmed,
@@ -2011,7 +2012,7 @@ components:
         occurredAt: { type: string, format: date-time }
         receivedAt: { type: string, format: date-time }
         actorId: { type: [string, 'null'], minLength: 1, maxLength: 128 }
-        resourceType: { enum: [WorkOrder, Workflow, Stage, Task, Appointment, Visit, ContactAttempt] }
+        resourceType: { x-extensible-enum: [WorkOrder, Workflow, Stage, Task, Appointment, Visit, ContactAttempt] }
         resourceId: { type: string, format: uuid }
         resourceVersion: { type: integer, format: int64, minimum: 1 }
         resourceCode: { type: [string, 'null'], minLength: 1, maxLength: 160 }
