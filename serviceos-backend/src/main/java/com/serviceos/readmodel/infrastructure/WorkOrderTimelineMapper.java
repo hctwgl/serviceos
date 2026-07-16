@@ -15,11 +15,17 @@ interface WorkOrderTimelineMapper {
     List<Map<String, Object>> findPage(
             @Param("tenantId") String tenantId,
             @Param("workOrderId") UUID workOrderId,
+            @Param("rebuildGeneration") int rebuildGeneration,
             @Param("beforeOccurredAt") Instant beforeOccurredAt,
             @Param("beforeEntryId") UUID beforeEntryId,
             @Param("fetchSize") int fetchSize);
 
     Instant findLastProjectedAt(
             @Param("tenantId") String tenantId,
-            @Param("workOrderId") UUID workOrderId);
+            @Param("workOrderId") UUID workOrderId,
+            @Param("rebuildGeneration") int rebuildGeneration);
+
+    long countGeneration(@Param("rebuildGeneration") int rebuildGeneration);
+
+    int deleteGeneration(@Param("rebuildGeneration") int rebuildGeneration);
 }

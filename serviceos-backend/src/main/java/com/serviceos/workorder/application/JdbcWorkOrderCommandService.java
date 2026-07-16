@@ -148,8 +148,11 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
                     row.workOrderId(), row.status(), row.version(), true, row.activatedAt());
         }
 
+        // 载荷 activatedAt 与信封 occurredAt 必须同源 Instant（写入前 clock）。
+        // 禁止把 JDBC 回读的 row.activatedAt() 写入载荷：Timestamp↔Instant 往返可能产生纳秒级偏差，
+        // 导致时间线消费者拒绝「发生时间与载荷不一致」。回执仍返回持久化时间，保证幂等重放一致。
         WorkOrderActivatedPayload payload = new WorkOrderActivatedPayload(
-                row.workOrderId(), row.activatedAt());
+                row.workOrderId(), activatedAt);
         appendEvent(
                 command.tenantId(), row.workOrderId(), row.version(), ACTIVATED_EVENT,
                 command.correlationId(), command.triggerEventId().toString(), payload, activatedAt);
@@ -183,9 +186,10 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
                     row.workOrderId(), row.status(), row.version(), true, row.fulfilledAt());
         }
 
+        // 与 activate 相同：载荷与信封共用写入前 Instant；回执用持久化时间保证幂等一致。
         WorkOrderFulfilledPayload payload = new WorkOrderFulfilledPayload(
                 row.workOrderId(), command.workflowInstanceId(),
-                command.completedStageCodes(), row.fulfilledAt());
+                command.completedStageCodes(), fulfilledAt);
         appendEvent(
                 command.tenantId(), row.workOrderId(), row.version(), FULFILLED_EVENT,
                 command.correlationId(), command.triggerEventId().toString(), payload, fulfilledAt);

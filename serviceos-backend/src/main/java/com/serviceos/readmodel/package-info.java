@@ -5,7 +5,9 @@
         displayName = "Application Read Model",
         allowedDependencies = {
                 "shared", "identity::api", "reliability::api", "reliability::spi",
-                "workorder::api", "workflow::api", "task::api"
+                "workorder::api", "workflow::api", "task::api", "integration::api",
+                "operations::api", "evidence::api", "sla::api",
+                "fieldwork::api", "appointment::api"
         }
 )
 package com.serviceos.readmodel;

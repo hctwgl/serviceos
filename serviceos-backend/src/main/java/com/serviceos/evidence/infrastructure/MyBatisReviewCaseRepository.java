@@ -3,6 +3,7 @@ package com.serviceos.evidence.infrastructure;
 import com.serviceos.evidence.api.ReviewCaseView;
 import com.serviceos.evidence.api.ReviewDecisionView;
 import com.serviceos.evidence.application.ReviewCaseRepository;
+import com.serviceos.evidence.application.ReviewCaseTimelineIdentity;
 import org.springframework.stereotype.Repository;
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
@@ -94,6 +95,16 @@ final class MyBatisReviewCaseRepository implements ReviewCaseRepository {
         List<ReviewDecisionView> decisions = mapper.listDecisions(tenantId, reviewCaseId.toString())
                 .stream().map(this::decisionView).toList();
         return Optional.of(caseView(row, decisions));
+    }
+
+    @Override
+    public Optional<ReviewCaseTimelineIdentity> findTimelineIdentity(String tenantId, UUID reviewCaseId) {
+        Map<String, Object> row = mapper.findTimelineIdentity(tenantId, reviewCaseId.toString());
+        if (row == null) {
+            return Optional.empty();
+        }
+        return Optional.of(new ReviewCaseTimelineIdentity(
+                uuid(row, "reviewCaseId"), uuid(row, "projectId"), uuid(row, "taskId")));
     }
 
     @Override

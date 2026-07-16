@@ -5,6 +5,7 @@ import com.serviceos.fieldwork.api.VisitLocation;
 import com.serviceos.fieldwork.application.GeofencePolicy;
 import com.serviceos.fieldwork.application.VisitAggregate;
 import com.serviceos.fieldwork.application.VisitRepository;
+import com.serviceos.shared.PostgresInstants;
 import org.springframework.stereotype.Repository;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -217,5 +218,8 @@ final class MyBatisVisitRepository implements VisitRepository {
         if (value instanceof java.sql.Timestamp timestamp) return timestamp.toInstant();
         return Instant.parse(value.toString());
     }
-    private static OffsetDateTime time(Instant value) { return value == null ? null : value.atOffset(ZoneOffset.UTC); }
+
+    private static OffsetDateTime time(Instant value) {
+        return value == null ? null : PostgresInstants.truncate(value).atOffset(ZoneOffset.UTC);
+    }
 }

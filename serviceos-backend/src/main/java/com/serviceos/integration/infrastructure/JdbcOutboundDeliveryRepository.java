@@ -2,6 +2,7 @@ package com.serviceos.integration.infrastructure;
 
 import com.serviceos.integration.api.DeliveryAttemptView;
 import com.serviceos.integration.api.DeliveryReplayRequestView;
+import com.serviceos.integration.api.DeliveryTimelineContext;
 import com.serviceos.integration.api.ExternalAcknowledgementView;
 import com.serviceos.integration.api.OutboundDeliveryView;
 import com.serviceos.integration.application.OutboundDeliveryRepository;
@@ -100,6 +101,23 @@ final class JdbcOutboundDeliveryRepository implements OutboundDeliveryRepository
     public Optional<DeliveryRecord> find(String tenantId, UUID deliveryId) {
         return jdbc.sql(DELIVERY_SELECT + " WHERE tenant_id=:tenant AND delivery_id=:id")
                 .param("tenant", tenantId).param("id", deliveryId).query(this::delivery).optional();
+    }
+
+    @Override
+    public Optional<DeliveryTimelineContext> findTimelineContext(String tenantId, UUID deliveryId) {
+        // 时间线只需要稳定身份；禁止在此路径加载 attempt/ack 图以免放大跨模块投影成本。
+        return jdbc.sql("""
+                SELECT delivery_id, project_id, source_work_order_id
+                  FROM int_outbound_delivery
+                 WHERE tenant_id=:tenant AND delivery_id=:id
+                """)
+                .param("tenant", tenantId)
+                .param("id", deliveryId)
+                .query((rs, row) -> new DeliveryTimelineContext(
+                        rs.getObject("delivery_id", UUID.class),
+                        rs.getObject("project_id", UUID.class),
+                        rs.getObject("source_work_order_id", UUID.class)))
+                .optional();
     }
 
     @Override

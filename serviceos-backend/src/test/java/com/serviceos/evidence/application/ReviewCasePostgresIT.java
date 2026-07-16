@@ -133,6 +133,7 @@ class ReviewCasePostgresIT {
     @Autowired JdbcClient jdbc;
 
     UUID projectId;
+    UUID workOrderId;
     UUID slotId;
     UUID taskId;
 
@@ -140,6 +141,7 @@ class ReviewCasePostgresIT {
     void setUp() throws Exception {
         jdbc.sql("""
                 TRUNCATE TABLE
+                    rdm_work_order_timeline_entry,
                     int_delivery_replay_request, int_external_acknowledgement,
                     int_delivery_attempt, int_outbound_delivery,
                     int_inbound_item_result, int_external_review_route,
@@ -153,7 +155,7 @@ class ReviewCasePostgresIT {
                     evd_task_evidence_resolution,
                     fil_download_authorization, fil_scan_result, fil_stored_file, fil_upload_session,
                     ops_task_failure_recovery, ops_exception_ack_result, ops_operational_exception,
-                    tsk_task_execution_guard, tsk_task_assignment, tsk_task,
+                    tsk_task_execution_guard, tsk_task_assignment, tsk_task, wo_work_order,
                     cfg_configuration_bundle_item, cfg_configuration_bundle,
                     cfg_configuration_asset_version, prj_project,
                     aud_audit_record, rel_outbox_publish_attempt, rel_outbox_event,
@@ -1123,6 +1125,30 @@ class ReviewCasePostgresIT {
                         TENANT, projectId, "EVD-REV-BUNDLE", "1.0.0", "BYD", "HOME",
                         null, Instant.now().minusSeconds(60), null, List.of(assetId)));
         taskId = UUID.randomUUID();
+        workOrderId = UUID.randomUUID();
+        // OutboundDelivery.sourceWorkOrderId 指向此工单；时间线投影经 WorkOrderScopeQuery 解析时必须存在。
+        jdbc.sql("""
+                INSERT INTO wo_work_order (
+                    id, tenant_id, project_id, client_code, brand_code, service_product_code,
+                    external_order_code, payload_digest, status, configuration_bundle_id,
+                    configuration_bundle_code, configuration_bundle_version,
+                    configuration_bundle_digest, province_code, city_code, district_code,
+                    customer_name, customer_mobile, service_address, vehicle_vin,
+                    external_dispatched_at, received_at, version)
+                VALUES (
+                    :id, :tenantId, :projectId, 'BYD', 'BYD_OCEAN', 'HOME_CHARGING',
+                    :externalOrderCode, :payloadDigest, 'RECEIVED', :bundleId,
+                    'EVD-REV-BUNDLE', '1.0.0', :bundleDigest, '370000', '370100', '370102',
+                    '测试用户', '13800000000', '测试地址', 'LSREV123456789',
+                    :dispatchedAt, :receivedAt, 1)
+                """)
+                .param("id", workOrderId).param("tenantId", TENANT).param("projectId", projectId)
+                .param("externalOrderCode", "REV-" + workOrderId)
+                .param("payloadDigest", Sha256.digest(workOrderId.toString()))
+                .param("bundleId", bundle.bundleId()).param("bundleDigest", bundle.manifestDigest())
+                .param("dispatchedAt", java.time.LocalDateTime.now().minusHours(1))
+                .param("receivedAt", java.time.OffsetDateTime.now().minusHours(1))
+                .update();
         jdbc.sql("""
                 INSERT INTO tsk_task (
                     task_id, tenant_id, task_type, task_kind, business_key, payload_digest,
@@ -1139,7 +1165,7 @@ class ReviewCasePostgresIT {
                     'SURVEY')
                 """).param("task", taskId).param("tenant", TENANT).param("businessKey", taskId.toString())
                 .param("digest", "d".repeat(64)).param("actor", TECHNICIAN)
-                .param("project", projectId).param("workOrder", UUID.randomUUID())
+                .param("project", projectId).param("workOrder", workOrderId)
                 .param("workflow", UUID.randomUUID()).param("stage", UUID.randomUUID())
                 .param("nodeInstance", UUID.randomUUID()).param("definitionId", assetId)
                 .param("bundle", bundle.bundleId()).param("bundleDigest", bundle.manifestDigest())
