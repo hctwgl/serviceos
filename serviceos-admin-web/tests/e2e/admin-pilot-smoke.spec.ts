@@ -212,6 +212,50 @@ test('真实 OIDC 登录后可完成 Task 并可靠推进 Workflow 与 WorkOrder
     contentDigest: string
   }
 
+  // M44/M112/M121 通过真实 Admin 页面创建 INTERNAL ReviewCase，并在独立页面完成普通 APPROVED
+  // 裁决。使用同一浏览器上下文的新页签，既保留 Task 页的双输入不可变引用，也证明 OIDC 会话、
+  // evidence.review 授权、幂等命令与审核详情读取能够跨页面协作。
+  const reviewCreateResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith('/api/v1/review-cases'),
+  )
+  await page.getByRole('button', { name: 'createReviewCase' }).click()
+  const reviewCreateResponse = await reviewCreateResponsePromise
+  expect(reviewCreateResponse.status()).toBe(201)
+  const reviewCase = (await reviewCreateResponse.json()) as {
+    reviewCaseId: string
+    status: string
+  }
+  expect(reviewCase.status).toBe('OPEN')
+
+  const reviewLink = page.getByRole('link', {
+    name: new RegExp(`打开审核案例 ${reviewCase.reviewCaseId}`),
+  })
+  const reviewHref = await reviewLink.getAttribute('href')
+  expect(reviewHref, '审核案例深链缺失').toBeTruthy()
+  const reviewPage = await page.context().newPage()
+  await reviewPage.goto(new URL(reviewHref!, page.url()).toString())
+  await expect(reviewPage.getByRole('heading', { name: '审核案例' })).toBeVisible()
+  await expect(reviewPage.getByText('OPEN', { exact: true })).toBeVisible()
+
+  const reviewDecisionResponsePromise = reviewPage.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(`/api/v1/review-cases/${reviewCase.reviewCaseId}:decide`),
+  )
+  await reviewPage.getByLabel('note').fill('Admin pilot evidence approved')
+  await reviewPage.getByRole('button', { name: 'decide', exact: true }).click()
+  const reviewDecisionResponse = await reviewDecisionResponsePromise
+  expect(reviewDecisionResponse.status()).toBe(200)
+  expect(await reviewDecisionResponse.json()).toMatchObject({
+    reviewCaseId: reviewCase.reviewCaseId,
+    status: 'APPROVED',
+  })
+  await expect(reviewPage.getByText('已裁决为 APPROVED')).toBeVisible()
+  await expect(reviewPage.getByRole('cell', { name: 'APPROVED', exact: true })).toBeVisible()
+  await reviewPage.close()
+
   // 双输入 Task 的主结果仍是 FormSubmission；页面自动组合两份精确版本引用，
   // 不要求运营人员手工复制 UUID 或摘要，也不能让 Snapshot 覆盖表单主引用。
   await expect(page.getByLabel('resultRef')).toHaveValue(

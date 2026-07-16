@@ -327,6 +327,41 @@ evidence_audit_count="$(query_db "
   exit 1
 }
 
+review_completion_state=""
+for _ in $(seq 1 30); do
+  review_completion_state="$(query_db "
+    SELECT review.status || ':' || count(DISTINCT decision.review_decision_id) || ':' ||
+           count(DISTINCT audit.action_name) || ':' ||
+           count(DISTINCT inbox.event_id)
+      FROM evd_review_case review
+      LEFT JOIN evd_review_decision decision
+        ON decision.tenant_id = review.tenant_id
+       AND decision.review_case_id = review.review_case_id
+      LEFT JOIN aud_audit_record audit
+        ON audit.tenant_id = review.tenant_id
+       AND audit.target_id = review.review_case_id::text
+       AND audit.action_name IN ('REVIEW_CASE_CREATED', 'REVIEW_CASE_DECIDED')
+      LEFT JOIN rel_outbox_event outbox
+        ON outbox.tenant_id = review.tenant_id
+       AND outbox.aggregate_type = 'ReviewCase'
+       AND outbox.aggregate_id = review.review_case_id::text
+       AND outbox.event_type IN ('evidence.review-case-created', 'evidence.review-decided')
+      LEFT JOIN rel_inbox_record inbox
+        ON inbox.tenant_id = outbox.tenant_id
+       AND inbox.event_id = outbox.event_id
+       AND inbox.status = 'SUCCEEDED'
+     WHERE review.task_id = '${completion_task_id}'
+       AND review.origin = 'INTERNAL'
+     GROUP BY review.review_case_id, review.status
+  ")"
+  [[ "${review_completion_state}" == "APPROVED:1:2:2" ]] && break
+  sleep 1
+done
+[[ "${review_completion_state}" == "APPROVED:1:2:2" ]] || {
+  echo "Admin 试点审核案例、唯一裁决、审计或事件消费不完整: ${review_completion_state}" >&2
+  exit 1
+}
+
 progression_inbox_count="$(query_db "
   SELECT count(*)
     FROM rel_inbox_record

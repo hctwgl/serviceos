@@ -58,8 +58,11 @@ async function decide() {
     if (decision.value === 'REJECTED' && body.reasonCodes.length === 0) {
       throw new Error('REJECTED 至少需要一个 reasonCode')
     }
-    detail.value = (await decideReviewCase(reviewCaseId.value, body)).data
-    message.value = `已裁决为 ${detail.value.status}`
+    const decided = (await decideReviewCase(reviewCaseId.value, body)).data
+    // 裁决命令只负责追加不可变决定；随后重新读取权威详情，避免命令响应与队列/详情投影
+    // 在字段演进或异步扩展时让页面残留半更新状态。
+    await load()
+    message.value = `已裁决为 ${decided.status}`
   } catch (err) {
     error.value = err instanceof Error ? err.message : '裁决失败'
   } finally {
@@ -157,7 +160,7 @@ onMounted(() => {
     </header>
     <p v-if="error" class="error">{{ error }}</p>
     <p v-if="message" class="ok">{{ message }}</p>
-    <p v-else-if="loading">加载中…</p>
+    <p v-if="loading">加载中…</p>
     <template v-else-if="detail">
       <article class="card">
         <dl>
