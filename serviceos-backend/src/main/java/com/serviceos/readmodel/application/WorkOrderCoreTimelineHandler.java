@@ -35,7 +35,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * 把已发布的核心执行、现场履约与 SLA 事件规范化为工单时间线。
+ * 把已发布的核心执行、现场履约、SLA 与资料审核事件规范化为工单时间线。
  * Inbox 与投影写入同事务，任何身份错配都会整体回滚；不保存 PII、自由文本或 GPS。
  */
 @Service
@@ -51,7 +51,13 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             "appointment.proposed", "appointment.confirmed", "appointment.rescheduled",
             "appointment.cancelled", "appointment.no-show-marked",
             "visit.checked-in", "visit.checked-out", "visit.interrupted",
-            "sla.started", "sla.breached", "sla.met");
+            "sla.started", "sla.breached", "sla.met",
+            "form.submitted",
+            "evidence.set-snapshotted",
+            "evidence.review-case-created", "evidence.client-review-case-created",
+            "evidence.review-decided", "evidence.review-case-reopened",
+            "evidence.correction-case-created", "evidence.correction-resubmitted",
+            "evidence.correction-closed", "evidence.correction-waived");
 
     private final InboxService inbox;
     private final WorkOrderTimelineRepository timelines;
@@ -165,6 +171,16 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             case "sla.started" -> Optional.of(slaStarted(message));
             case "sla.breached" -> slaBreached(message);
             case "sla.met" -> slaMet(message);
+            case "form.submitted" -> formSubmitted(message);
+            case "evidence.set-snapshotted" -> evidenceSnapshotted(message);
+            case "evidence.review-case-created" -> reviewCaseCreated(message);
+            case "evidence.client-review-case-created" -> clientReviewCaseCreated(message);
+            case "evidence.review-decided" -> reviewDecided(message);
+            case "evidence.review-case-reopened" -> reviewCaseReopened(message);
+            case "evidence.correction-case-created" -> correctionCaseCreated(message);
+            case "evidence.correction-resubmitted" -> correctionResubmitted(message);
+            case "evidence.correction-closed" -> correctionClosed(message);
+            case "evidence.correction-waived" -> correctionWaived(message);
             default -> throw new IllegalArgumentException("unsupported work order timeline event");
         };
     }
@@ -332,6 +348,118 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
         SlaMetPayload payload = read(message, SlaMetPayload.class);
         return slaTaskFact(message, payload.slaInstanceId(), payload.taskId(),
                 requireCode(payload.status(), "sla.met status"), payload.completedAt());
+    }
+
+    private Optional<TimelineFact> formSubmitted(OutboxMessage message) {
+        FormSubmittedPayload payload = read(message, FormSubmittedPayload.class);
+        return taskScopedFact(
+                message, "forms", "FormSubmission", payload.submissionId(), payload.taskId(),
+                payload.projectId(), "FORM", "FormSubmission", payload.formKey(),
+                requireCode(payload.validationStatus(), "form validationStatus"), null,
+                payload.occurredAt());
+    }
+
+    private Optional<TimelineFact> evidenceSnapshotted(OutboxMessage message) {
+        EvidenceSnapshottedPayload payload = read(message, EvidenceSnapshottedPayload.class);
+        return taskScopedFact(
+                message, "evidence", "EvidenceSetSnapshot", payload.evidenceSetSnapshotId(),
+                payload.taskId(), payload.projectId(), "EVIDENCE", "EvidenceSetSnapshot", null,
+                requireCode(payload.purpose(), "evidence snapshot purpose"), null,
+                payload.createdAt());
+    }
+
+    private Optional<TimelineFact> reviewCaseCreated(OutboxMessage message) {
+        ReviewCaseCreatedPayload payload = read(message, ReviewCaseCreatedPayload.class);
+        return taskScopedFact(
+                message, "evidence", "ReviewCase", payload.reviewCaseId(), payload.taskId(),
+                payload.projectId(), "REVIEW", "ReviewCase", null, "CREATED", null,
+                payload.createdAt());
+    }
+
+    private Optional<TimelineFact> clientReviewCaseCreated(OutboxMessage message) {
+        ClientReviewCaseCreatedPayload payload = read(message, ClientReviewCaseCreatedPayload.class);
+        return taskScopedFact(
+                message, "evidence", "ReviewCase", payload.reviewCaseId(), payload.taskId(),
+                payload.projectId(), "REVIEW", "ReviewCase", null, "CLIENT_CREATED", null,
+                payload.createdAt());
+    }
+
+    private Optional<TimelineFact> reviewDecided(OutboxMessage message) {
+        ReviewDecidedPayload payload = read(message, ReviewDecidedPayload.class);
+        return taskScopedFact(
+                message, "evidence", "ReviewCase", payload.reviewCaseId(), payload.taskId(),
+                payload.projectId(), "REVIEW", "ReviewCase", null,
+                requireCode(payload.decision(), "review decision"), payload.decidedBy(),
+                payload.decidedAt());
+    }
+
+    private Optional<TimelineFact> reviewCaseReopened(OutboxMessage message) {
+        ReviewCaseReopenedPayload payload = read(message, ReviewCaseReopenedPayload.class);
+        // reason 正文不得进入时间线；只保留稳定 REOPENED outcome。
+        return taskScopedFact(
+                message, "evidence", "ReviewCase", payload.reviewCaseId(), payload.taskId(),
+                payload.projectId(), "REVIEW", "ReviewCase", null, "REOPENED",
+                payload.reopenedBy(), payload.reopenedAt());
+    }
+
+    private Optional<TimelineFact> correctionCaseCreated(OutboxMessage message) {
+        CorrectionCaseCreatedPayload payload = read(message, CorrectionCaseCreatedPayload.class);
+        return taskScopedFact(
+                message, "evidence", "CorrectionCase", payload.correctionCaseId(), payload.taskId(),
+                payload.projectId(), "CORRECTION", "CorrectionCase", null, "CREATED", null,
+                payload.createdAt());
+    }
+
+    private Optional<TimelineFact> correctionResubmitted(OutboxMessage message) {
+        CorrectionResubmittedPayload payload = read(message, CorrectionResubmittedPayload.class);
+        return taskScopedFact(
+                message, "evidence", "CorrectionCase", payload.correctionCaseId(), payload.taskId(),
+                payload.projectId(), "CORRECTION", "CorrectionCase", null, "RESUBMITTED",
+                payload.submittedBy(), payload.submittedAt());
+    }
+
+    private Optional<TimelineFact> correctionClosed(OutboxMessage message) {
+        CorrectionClosedPayload payload = read(message, CorrectionClosedPayload.class);
+        return taskScopedFact(
+                message, "evidence", "CorrectionCase", payload.correctionCaseId(), payload.taskId(),
+                payload.projectId(), "CORRECTION", "CorrectionCase", null, "CLOSED",
+                payload.closedBy(), payload.closedAt());
+    }
+
+    private Optional<TimelineFact> correctionWaived(OutboxMessage message) {
+        CorrectionWaivedPayload payload = read(message, CorrectionWaivedPayload.class);
+        return taskScopedFact(
+                message, "evidence", "CorrectionCase", payload.correctionCaseId(), payload.taskId(),
+                payload.projectId(), "CORRECTION", "CorrectionCase", null, "WAIVED",
+                payload.waivedBy(), payload.waivedAt());
+    }
+
+    private Optional<TimelineFact> taskScopedFact(
+            OutboxMessage message,
+            String module,
+            String aggregateType,
+            UUID resourceId,
+            UUID taskId,
+            UUID projectId,
+            String category,
+            String resourceType,
+            String resourceCode,
+            String outcomeCode,
+            String actorId,
+            Instant occurredAt
+    ) {
+        requireEnvelope(message, module, aggregateType, resourceId);
+        TaskTimelineContext context = taskContexts.find(message.tenantId(), taskId)
+                .orElseThrow(() -> new IllegalStateException("时间线事件引用的 Task 不存在"));
+        if (context.workOrderId() == null) {
+            return Optional.empty();
+        }
+        if (projectId != null && !projectId.equals(context.projectId())) {
+            throw new IllegalArgumentException("时间线事件 Project 与 Task 权威范围不一致");
+        }
+        return Optional.of(fact(
+                context.workOrderId(), context.projectId(), category, resourceType, resourceId,
+                resourceCode, outcomeCode, actorId, occurredAt));
     }
 
     private Optional<TimelineFact> slaTaskFact(
@@ -531,6 +659,95 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             UUID taskId,
             String status,
             Instant completedAt
+    ) {
+    }
+
+    private record FormSubmittedPayload(
+            UUID submissionId,
+            UUID taskId,
+            UUID projectId,
+            String formKey,
+            String validationStatus,
+            Instant occurredAt
+    ) {
+    }
+
+    private record EvidenceSnapshottedPayload(
+            UUID evidenceSetSnapshotId,
+            UUID taskId,
+            UUID projectId,
+            String purpose,
+            Instant createdAt
+    ) {
+    }
+
+    private record ReviewCaseCreatedPayload(
+            UUID reviewCaseId,
+            UUID taskId,
+            UUID projectId,
+            Instant createdAt
+    ) {
+    }
+
+    private record ClientReviewCaseCreatedPayload(
+            UUID reviewCaseId,
+            UUID taskId,
+            UUID projectId,
+            Instant createdAt
+    ) {
+    }
+
+    private record ReviewDecidedPayload(
+            UUID reviewCaseId,
+            UUID taskId,
+            UUID projectId,
+            String decision,
+            String decidedBy,
+            Instant decidedAt
+    ) {
+    }
+
+    private record ReviewCaseReopenedPayload(
+            UUID reviewCaseId,
+            UUID taskId,
+            UUID projectId,
+            String reopenedBy,
+            Instant reopenedAt
+    ) {
+    }
+
+    private record CorrectionCaseCreatedPayload(
+            UUID correctionCaseId,
+            UUID taskId,
+            UUID projectId,
+            Instant createdAt
+    ) {
+    }
+
+    private record CorrectionResubmittedPayload(
+            UUID correctionCaseId,
+            UUID taskId,
+            UUID projectId,
+            String submittedBy,
+            Instant submittedAt
+    ) {
+    }
+
+    private record CorrectionClosedPayload(
+            UUID correctionCaseId,
+            UUID taskId,
+            UUID projectId,
+            String closedBy,
+            Instant closedAt
+    ) {
+    }
+
+    private record CorrectionWaivedPayload(
+            UUID correctionCaseId,
+            UUID taskId,
+            UUID projectId,
+            String waivedBy,
+            Instant waivedAt
     ) {
     }
 }

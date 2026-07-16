@@ -251,8 +251,8 @@ class WorkOrderTimelinePostgresIT {
                 "corr-cross", workOrderId, null, 10))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.RESOURCE_NOT_FOUND));
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("073");
-        assertThat(flyway.info().applied()).hasSize(75);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("074");
+        assertThat(flyway.info().applied()).hasSize(76);
     }
 
     @Test
@@ -315,6 +315,102 @@ class WorkOrderTimelinePostgresIT {
                 """).param("eventId", standalone.eventId()).query(String.class).single())
                 .isEqualTo("SUCCEEDED");
         assertThat(count("rel_inbox_record")).isEqualTo(4);
+    }
+
+    @Test
+    void projectsEvidenceReviewAndFormEventsViaTaskContext() {
+        Instant t0 = Instant.parse("2026-07-16T06:00:00Z");
+        UUID submissionId = UUID.randomUUID();
+        UUID snapshotId = UUID.randomUUID();
+        UUID reviewCaseId = UUID.randomUUID();
+        UUID correctionCaseId = UUID.randomUUID();
+
+        handler.handle(message(
+                "forms", "form.submitted", 1, "FormSubmission", submissionId, 1,
+                Map.of(
+                        "submissionId", submissionId,
+                        "taskId", taskId,
+                        "projectId", projectId,
+                        "formKey", "SITE_SURVEY",
+                        "validationStatus", "VALIDATED",
+                        "occurredAt", t0),
+                t0));
+        handler.handle(message(
+                "evidence", "evidence.set-snapshotted", 1, "EvidenceSetSnapshot", snapshotId, 1,
+                Map.of(
+                        "evidenceSetSnapshotId", snapshotId,
+                        "taskId", taskId,
+                        "projectId", projectId,
+                        "purpose", "TASK_SUBMISSION",
+                        "createdAt", t0.plusSeconds(5)),
+                t0.plusSeconds(5)));
+        handler.handle(message(
+                "evidence", "evidence.review-case-created", 1, "ReviewCase", reviewCaseId, 1,
+                Map.of(
+                        "reviewCaseId", reviewCaseId,
+                        "taskId", taskId,
+                        "projectId", projectId,
+                        "createdAt", t0.plusSeconds(10)),
+                t0.plusSeconds(10)));
+        handler.handle(message(
+                "evidence", "evidence.review-decided", 1, "ReviewCase", reviewCaseId, 2,
+                Map.of(
+                        "reviewCaseId", reviewCaseId,
+                        "taskId", taskId,
+                        "projectId", projectId,
+                        "decision", "REJECTED",
+                        "decidedBy", "reviewer-1",
+                        "decidedAt", t0.plusSeconds(15)),
+                t0.plusSeconds(15)));
+        handler.handle(message(
+                "evidence", "evidence.correction-case-created", 1, "CorrectionCase", correctionCaseId, 1,
+                Map.of(
+                        "correctionCaseId", correctionCaseId,
+                        "taskId", taskId,
+                        "projectId", projectId,
+                        "createdAt", t0.plusSeconds(20)),
+                t0.plusSeconds(20)));
+        handler.handle(message(
+                "evidence", "evidence.correction-closed", 1, "CorrectionCase", correctionCaseId, 2,
+                Map.of(
+                        "correctionCaseId", correctionCaseId,
+                        "taskId", taskId,
+                        "projectId", projectId,
+                        "closedBy", "reviewer-1",
+                        "closedAt", t0.plusSeconds(25)),
+                t0.plusSeconds(25)));
+
+        var page = timelines.list(principal("reader", TENANT), "corr-evidence", workOrderId, null, 20);
+        assertThat(page.items()).extracting(WorkOrderTimelineItem::eventType)
+                .containsExactly(
+                        "evidence.correction-closed",
+                        "evidence.correction-case-created",
+                        "evidence.review-decided",
+                        "evidence.review-case-created",
+                        "evidence.set-snapshotted",
+                        "form.submitted");
+        assertThat(page.items().get(0).category()).isEqualTo("CORRECTION");
+        assertThat(page.items().get(0).outcomeCode()).isEqualTo("CLOSED");
+        assertThat(page.items().get(2).outcomeCode()).isEqualTo("REJECTED");
+        assertThat(page.items().get(2).actorId()).isEqualTo("reviewer-1");
+        assertThat(page.items().get(4).category()).isEqualTo("EVIDENCE");
+        assertThat(page.items().get(5).category()).isEqualTo("FORM");
+        assertThat(page.items().get(5).resourceCode()).isEqualTo("SITE_SURVEY");
+        assertThat(count("rdm_work_order_timeline_entry")).isEqualTo(6);
+
+        assertThatThrownBy(() -> handler.handle(message(
+                "evidence", "evidence.review-decided", 1, "ReviewCase", reviewCaseId, 3,
+                Map.of(
+                        "reviewCaseId", reviewCaseId,
+                        "taskId", taskId,
+                        "projectId", UUID.randomUUID(),
+                        "decision", "APPROVED",
+                        "decidedBy", "reviewer-2",
+                        "decidedAt", t0.plusSeconds(30)),
+                t0.plusSeconds(30))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Project");
+        assertThat(count("rdm_work_order_timeline_entry")).isEqualTo(6);
     }
 
     @Test

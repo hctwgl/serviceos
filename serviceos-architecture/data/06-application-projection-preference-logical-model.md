@@ -54,8 +54,8 @@ status: Proposed
 保存 normalized timeline item：event/type、occurred/received time、actorRef、resourceRef/version、correlation、display template version 和敏感字段 refs。技术 attempt 可折叠关联。
 
 M73 以 `rdm_work_order_timeline_entry` 实现 WorkOrder/Workflow/Stage/Task 核心事件子集；M74 在同一投影
-合并 Appointment/Visit/ContactAttempt；M75 合并 SLA started/breached/met，显式保留 occurred/received
-双时间且不保存自由文本、payload 或 PII。Evidence/Review、Delivery、异常、试算/结算、checkpoint 和重建作业
+合并 Appointment/Visit/ContactAttempt；M75 合并 SLA；M76 合并 form/snapshot/review/correction，显式保留 occurred/received
+双时间且不保存自由文本、payload 或 PII。Delivery、异常、试算/结算、checkpoint 和重建作业
 仍是未实现边界。
 
 ## 4. 队列投影
