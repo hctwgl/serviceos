@@ -225,13 +225,13 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             case "integration.outbound-delivery-replay-requested" -> deliveryReplayRequested(message);
             case "operational.exception.acknowledged" -> exceptionAcknowledged(message);
             case "operational.exception.resolved" -> exceptionResolved(message);
-            case "service.assignment.pending-activation" -> assignmentLifecycle(message, "PENDING_ACTIVATION");
-            case "service.assignment.task-prepared" -> assignmentLifecycle(message, "TASK_PREPARED");
-            case "service.assignment.activated" -> assignmentLifecycle(message, "ACTIVATED");
-            case "service.assignment.activation-aborted" -> assignmentLifecycle(message, "ABORTED");
-            case "service.assignment.activation-completed" -> assignmentTerminal(message, "ACTIVATION_COMPLETED");
-            case "service.assignment.activation-abort-completed" -> assignmentTerminal(message, "ABORT_COMPLETED");
-            case "service.assignment.activation-timed-out" -> assignmentTimedOut(message);
+            case "service.assignment.pending-activation" -> Optional.of(assignmentLifecycle(message, "PENDING_ACTIVATION"));
+            case "service.assignment.task-prepared" -> Optional.of(assignmentLifecycle(message, "TASK_PREPARED"));
+            case "service.assignment.activated" -> Optional.of(assignmentLifecycle(message, "ACTIVATED"));
+            case "service.assignment.activation-aborted" -> Optional.of(assignmentLifecycle(message, "ABORTED"));
+            case "service.assignment.activation-completed" -> Optional.of(assignmentTerminal(message, "ACTIVATION_COMPLETED"));
+            case "service.assignment.activation-abort-completed" -> Optional.of(assignmentTerminal(message, "ABORT_COMPLETED"));
+            case "service.assignment.activation-timed-out" -> Optional.of(assignmentTimedOut(message));
             default -> throw new IllegalArgumentException("unsupported work order timeline event");
         };
     }
