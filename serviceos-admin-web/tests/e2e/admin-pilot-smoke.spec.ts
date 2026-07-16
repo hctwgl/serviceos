@@ -601,3 +601,349 @@ test('真实 OIDC 登录后可强制通过并导航到重开的后继审核案�
   ).toBeVisible()
   await reviewPage.close()
 })
+
+test('真实 OIDC 登录后审核驳回可经补传关闭并复审通过后完结工单', async ({ page }) => {
+  test.setTimeout(180_000)
+  const workOrderCode = process.env.ADMIN_PILOT_RESUBMIT_WORK_ORDER_CODE
+  const taskId = process.env.ADMIN_PILOT_RESUBMIT_TASK_ID
+  expect(workOrderCode, '缺少动态补传验证工单编码').toBeTruthy()
+  expect(taskId, '缺少动态补传验证 Task ID').toBeTruthy()
+
+  await loginWithLocalKeycloak(page)
+  await page.getByRole('link', { name: workOrderCode! }).click()
+  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+
+  await page
+    .getByLabel('assign-candidates principalIds')
+    .fill('06b612f3-a901-4b0e-bd90-86b4259cc087')
+  await page.getByLabel('sourceId').fill('admin-pilot-resubmit-e2e')
+  const assignmentResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(`/api/v1/tasks/${taskId}:assign-candidates`),
+  )
+  await page.getByRole('button', { name: 'assign-candidates', exact: true }).click()
+  expect((await assignmentResponsePromise).status()).toBe(200)
+
+  const claimResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(`/api/v1/tasks/${taskId}:claim`),
+  )
+  await page.getByRole('button', { name: '领取任务' }).click()
+  expect((await claimResponsePromise).status()).toBe(200)
+
+  const startResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(`/api/v1/tasks/${taskId}:start`),
+  )
+  await page.getByRole('button', { name: '启动任务' }).click()
+  expect((await startResponsePromise).status()).toBe(200)
+
+  await page.getByRole('link', { name: new RegExp(taskId!) }).click()
+  await expect(page.getByRole('heading', { name: '任务详情' })).toBeVisible()
+
+  await page.getByLabel('values JSON').fill('{"completion.note":"ADMIN_PILOT_RESUBMIT_E2E"}')
+  const formResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(`/api/v1/tasks/${taskId}/form-submissions`),
+  )
+  await page.getByRole('button', { name: 'submitTaskForm' }).click()
+  const formResponse = await formResponsePromise
+  expect(formResponse.status()).toBe(201)
+  const submission = (await formResponse.json()) as {
+    submissionId: string
+    contentDigest: string
+    validationStatus: string
+  }
+  expect(submission.validationStatus).toBe('VALIDATED')
+
+  await expect(page.getByRole('cell', { name: 'completion.photo', exact: true })).toBeVisible({
+    timeout: 30_000,
+  })
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+    'base64',
+  )
+  await page.getByLabel('文件').setInputFiles({
+    name: 'admin-pilot-resubmit-v1.png',
+    mimeType: 'image/png',
+    buffer: png,
+  })
+  const firstFinalizePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().includes(`/api/v1/tasks/${taskId}/evidence-slots/`) &&
+      response.url().endsWith(':finalize'),
+  )
+  await page.getByRole('button', { name: 'upload + finalize' }).click()
+  const firstFinalize = await firstFinalizePromise
+  expect(firstFinalize.status()).toBe(201)
+  const firstEvidence = (await firstFinalize.json()) as {
+    evidenceItemId: string
+    revisions: Array<{ evidenceRevisionId: string }>
+  }
+  const firstRevisionId = firstEvidence.revisions.at(-1)?.evidenceRevisionId
+  expect(firstRevisionId, '首轮 Finalize 未返回 EvidenceRevision').toBeTruthy()
+
+  const orchestrationHeader = page
+    .getByRole('heading', { name: '表单 / 资料编排' })
+    .locator('..')
+  await expect
+    .poll(
+      async () => {
+        await orchestrationHeader.getByRole('button', { name: '刷新' }).click()
+        return page
+          .getByRole('row')
+          .filter({ hasText: firstRevisionId! })
+          .filter({ hasText: 'VALIDATED' })
+          .count()
+      },
+      { timeout: 30_000 },
+    )
+    .toBeGreaterThan(0)
+
+  const firstSnapshotPromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(`/api/v1/tasks/${taskId}/evidence-set-snapshots`),
+  )
+  await page.getByRole('button', { name: 'createEvidenceSetSnapshot' }).click()
+  expect((await firstSnapshotPromise).status()).toBe(201)
+
+  const firstReviewCreatePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith('/api/v1/review-cases'),
+  )
+  await page.getByRole('button', { name: 'createReviewCase' }).click()
+  const firstReviewCreate = await firstReviewCreatePromise
+  expect(firstReviewCreate.status()).toBe(201)
+  const rejectedReview = (await firstReviewCreate.json()) as {
+    reviewCaseId: string
+    status: string
+  }
+  expect(rejectedReview.status).toBe('OPEN')
+
+  const reviewHref = await page
+    .getByRole('link', { name: new RegExp(`打开审核案例 ${rejectedReview.reviewCaseId}`) })
+    .getAttribute('href')
+  expect(reviewHref, '首轮审核案例深链缺失').toBeTruthy()
+  const reviewPage = await page.context().newPage()
+  await reviewPage.goto(new URL(reviewHref!, page.url()).toString())
+  await reviewPage.getByLabel('decision').selectOption('REJECTED')
+  await reviewPage.getByLabel('reasonCodes（逗号分隔）').fill('IMAGE.BLUR')
+  await reviewPage.getByLabel('note').fill('Admin pilot resubmit required')
+  const rejectPromise = reviewPage.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(`/api/v1/review-cases/${rejectedReview.reviewCaseId}:decide`),
+  )
+  await reviewPage.getByRole('button', { name: 'decide', exact: true }).click()
+  expect((await rejectPromise).status()).toBe(200)
+  await expect(reviewPage.getByText('已裁决为 REJECTED')).toBeVisible()
+
+  const correctionPage = await page.context().newPage()
+  const correctionQueuePromise = correctionPage.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      response.url().includes('/api/v1/correction-cases') &&
+      response.url().includes('status=IN_PROGRESS'),
+  )
+  await correctionPage.goto(new URL('/corrections', page.url()).toString())
+  const correctionQueueResponse = await correctionQueuePromise
+  expect(correctionQueueResponse.status()).toBe(200)
+  const correctionQueue = (await correctionQueueResponse.json()) as {
+    items: Array<{
+      correctionCaseId: string
+      sourceReviewCaseId: string
+      correctionTaskId: string | null
+      status: string
+    }>
+  }
+  const correction = correctionQueue.items.find(
+    (item) => item.sourceReviewCaseId === rejectedReview.reviewCaseId,
+  )
+  expect(correction, '整改队列未返回本轮驳回生成的 CorrectionCase').toBeTruthy()
+  expect(correction).toMatchObject({ status: 'IN_PROGRESS' })
+  expect(correction?.correctionTaskId, '驳回未自动创建整改 Task').toBeTruthy()
+
+  await correctionPage
+    .getByRole('link', { name: `打开整改案例 ${correction!.correctionCaseId}` })
+    .click()
+  await expect(correctionPage.getByRole('heading', { name: '整改案例' })).toBeVisible()
+
+  // 保持源 Task 页签：在同一 Item 上追加补传 Revision，并冻结新的 Snapshot。
+  await page.getByLabel('文件').setInputFiles({
+    name: 'admin-pilot-resubmit-v2.png',
+    mimeType: 'image/png',
+    buffer: png,
+  })
+  const secondFinalizePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().includes(`/api/v1/tasks/${taskId}/evidence-slots/`) &&
+      response.url().endsWith(':finalize'),
+  )
+  await page.getByRole('button', { name: 'upload + finalize' }).click()
+  const secondFinalize = await secondFinalizePromise
+  expect(secondFinalize.status()).toBe(201)
+  const secondEvidence = (await secondFinalize.json()) as {
+    evidenceItemId: string
+    revisions: Array<{ evidenceRevisionId: string }>
+  }
+  expect(secondEvidence.evidenceItemId).toBe(firstEvidence.evidenceItemId)
+  const secondRevisionId = secondEvidence.revisions.at(-1)?.evidenceRevisionId
+  expect(secondRevisionId, '补传 Finalize 未返回新 EvidenceRevision').toBeTruthy()
+  expect(secondRevisionId).not.toBe(firstRevisionId)
+
+  await expect
+    .poll(
+      async () => {
+        await orchestrationHeader.getByRole('button', { name: '刷新' }).click()
+        return page
+          .getByRole('row')
+          .filter({ hasText: secondRevisionId! })
+          .filter({ hasText: 'VALIDATED' })
+          .count()
+      },
+      { timeout: 30_000 },
+    )
+    .toBeGreaterThan(0)
+
+  const secondSnapshotPromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(`/api/v1/tasks/${taskId}/evidence-set-snapshots`),
+  )
+  await page.getByRole('button', { name: 'createEvidenceSetSnapshot' }).click()
+  const secondSnapshotResponse = await secondSnapshotPromise
+  expect(secondSnapshotResponse.status()).toBe(201)
+  const secondSnapshot = (await secondSnapshotResponse.json()) as {
+    evidenceSetSnapshotId: string
+    contentDigest: string
+  }
+
+  await correctionPage
+    .getByLabel('resubmit snapshotId')
+    .fill(secondSnapshot.evidenceSetSnapshotId)
+  const resubmitPromise = correctionPage.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(
+        `/api/v1/correction-cases/${correction!.correctionCaseId}:resubmit`,
+      ),
+  )
+  await correctionPage.getByRole('button', { name: 'resubmit', exact: true }).click()
+  const resubmitResponse = await resubmitPromise
+  expect(resubmitResponse.status()).toBe(200)
+  expect(await resubmitResponse.json()).toMatchObject({
+    correctionCaseId: correction!.correctionCaseId,
+    status: 'RESUBMITTED',
+    latestResubmissionSnapshotId: secondSnapshot.evidenceSetSnapshotId,
+  })
+  await expect(correctionPage.getByText('已补传，status=RESUBMITTED')).toBeVisible()
+  await expect(correctionPage.getByText('RESUBMITTED', { exact: true })).toBeVisible()
+  await expect(
+    correctionPage.getByRole('cell', { name: secondSnapshot.evidenceSetSnapshotId, exact: true }),
+  ).toBeVisible()
+
+  await correctionPage.getByLabel('close note').fill('verified resubmission close')
+  const closePromise = correctionPage.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(
+        `/api/v1/correction-cases/${correction!.correctionCaseId}:close`,
+      ),
+  )
+  await correctionPage.getByRole('button', { name: 'close', exact: true }).click()
+  const closeResponse = await closePromise
+  expect(closeResponse.status()).toBe(200)
+  expect(await closeResponse.json()).toMatchObject({
+    correctionCaseId: correction!.correctionCaseId,
+    status: 'CLOSED',
+  })
+  await expect(correctionPage.getByText('已关闭，status=CLOSED')).toBeVisible()
+  await expect(correctionPage.getByText('CLOSED', { exact: true })).toBeVisible()
+
+  // close 不等于审核通过：对补传 Snapshot 新建 INTERNAL ReviewCase 并普通 APPROVED。
+  const secondReviewCreatePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith('/api/v1/review-cases'),
+  )
+  await page.getByRole('button', { name: 'createReviewCase' }).click()
+  const secondReviewCreate = await secondReviewCreatePromise
+  expect(secondReviewCreate.status()).toBe(201)
+  const approvedReview = (await secondReviewCreate.json()) as {
+    reviewCaseId: string
+    status: string
+    evidenceSetSnapshotId: string
+  }
+  expect(approvedReview).toMatchObject({
+    status: 'OPEN',
+    evidenceSetSnapshotId: secondSnapshot.evidenceSetSnapshotId,
+  })
+  expect(approvedReview.reviewCaseId).not.toBe(rejectedReview.reviewCaseId)
+
+  const reReviewHref = await page
+    .getByRole('link', { name: new RegExp(`打开审核案例 ${approvedReview.reviewCaseId}`) })
+    .getAttribute('href')
+  expect(reReviewHref, '复审案例深链缺失').toBeTruthy()
+  const reReviewPage = await page.context().newPage()
+  await reReviewPage.goto(new URL(reReviewHref!, page.url()).toString())
+  await reReviewPage.getByLabel('note').fill('Admin pilot resubmission approved')
+  const approvePromise = reReviewPage.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(`/api/v1/review-cases/${approvedReview.reviewCaseId}:decide`),
+  )
+  await reReviewPage.getByRole('button', { name: 'decide', exact: true }).click()
+  const approveResponse = await approvePromise
+  expect(approveResponse.status()).toBe(200)
+  expect(await approveResponse.json()).toMatchObject({
+    reviewCaseId: approvedReview.reviewCaseId,
+    status: 'APPROVED',
+  })
+  await expect(reReviewPage.getByText('已裁决为 APPROVED')).toBeVisible()
+
+  await expect(page.getByLabel('resultRef')).toHaveValue(
+    `form-submission://${submission.submissionId}`,
+  )
+  await expect(page.getByLabel('resultDigest')).toHaveValue(submission.contentDigest)
+  const inputVersionRefs = JSON.parse(
+    await page.getByLabel('inputVersionRefs JSON（双引用可选）').inputValue(),
+  )
+  expect(inputVersionRefs).toEqual([
+    {
+      kind: 'FORM_SUBMISSION',
+      ref: `form-submission://${submission.submissionId}`,
+      digest: submission.contentDigest,
+    },
+    {
+      kind: 'EVIDENCE_SET_SNAPSHOT',
+      ref: `evidence-set-snapshot://${secondSnapshot.evidenceSetSnapshotId}`,
+      digest: secondSnapshot.contentDigest,
+    },
+  ])
+
+  const completePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(`/api/v1/tasks/${taskId}:complete`),
+  )
+  await page.getByRole('button', { name: '完成任务' }).click()
+  const completeResponse = await completePromise
+  const completeBody = await completeResponse.json()
+  expect(completeResponse.status(), JSON.stringify(completeBody)).toBe(200)
+  expect(completeBody).toMatchObject({
+    taskId,
+    status: 'COMPLETED',
+  })
+
+  await reReviewPage.close()
+  await correctionPage.close()
+  await reviewPage.close()
+})

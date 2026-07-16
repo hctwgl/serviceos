@@ -144,12 +144,16 @@ async function uploadEvidence() {
     if (!uploadFile.value) throw new Error('需要选择文件')
     const file = uploadFile.value
     const digest = await sha256Hex(file)
+    // maxCount 按 EvidenceItem 计数。补传必须在同一 Item 上追加 Revision，
+    // 不能在槽位已满时再开新 Item；否则正常整改补传会被 maxCount=1 夹具误杀。
+    const existingItem = items.value.find((item) => item.evidenceSlotId === uploadSlotId.value)
     const session = (
       await beginEvidenceUpload(props.taskId, uploadSlotId.value, {
         originalFileName: file.name,
         declaredMimeType: file.type || 'application/octet-stream',
         expectedSize: file.size,
         expectedSha256: digest,
+        evidenceItemId: existingItem?.evidenceItemId ?? null,
         captureMetadata: {
           capturedAt: new Date().toISOString(),
           captureSource: 'FILE',
@@ -167,10 +171,18 @@ async function uploadEvidence() {
     const latest = item.revisions[item.revisions.length - 1]
     message.value = `已 Finalize 资料项 ${item.evidenceItemId} / revision ${latest?.evidenceRevisionId ?? '—'}`
     if (latest?.evidenceRevisionId) {
-      const current = revisionIds.value.trim()
-      revisionIds.value = current
-        ? `${current},${latest.evidenceRevisionId}`
-        : latest.evidenceRevisionId
+      // 同一 Item 追加 Revision 时剔除该 Item 的旧成员，避免补传 Snapshot 仍引用驳回版本；
+      // 其他槽位已选中的 VALIDATED Revision 继续保留。
+      const superseded = new Set(
+        item.revisions
+          .map((revision) => revision.evidenceRevisionId)
+          .filter((id) => id && id !== latest.evidenceRevisionId),
+      )
+      const kept = revisionIds.value
+        .split(/[,\s]+/)
+        .map((id) => id.trim())
+        .filter((id) => id && !superseded.has(id) && id !== latest.evidenceRevisionId)
+      revisionIds.value = [...kept, latest.evidenceRevisionId].join(',')
       downloadRevisionId.value = latest.evidenceRevisionId
       invalidateRevisionId.value = latest.evidenceRevisionId
     }

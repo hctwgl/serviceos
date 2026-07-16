@@ -105,53 +105,77 @@ reopen_task_created_event_id="$(new_uuid)"
 reopen_external_code="ADMIN-PILOT-REOPEN-${reopen_work_order_id%%-*}"
 reopen_correlation_id="admin-pilot-reopen-${reopen_task_id}"
 
-docker compose -f "${compose_file}" exec -T postgres \
-  psql -U serviceos_app -d serviceos \
-  -v completion_work_order_id="${completion_work_order_id}" \
-  -v completion_workflow_id="${completion_workflow_id}" \
-  -v completion_stage_id="${completion_stage_id}" \
-  -v completion_node_id="${completion_node_id}" \
-  -v completion_task_id="${completion_task_id}" \
-  -v completion_start_event_id="${completion_start_event_id}" \
-  -v completion_stage_event_id="${completion_stage_event_id}" \
-  -v completion_node_event_id="${completion_node_event_id}" \
-  -v completion_task_created_outbox_id="${completion_task_created_outbox_id}" \
-  -v completion_task_created_event_id="${completion_task_created_event_id}" \
-  -v completion_external_code="${completion_external_code}" \
-  -v completion_correlation_id="${completion_correlation_id}" \
-  < serviceos-deploy/admin-pilot/seed-admin-completion.sql
+# 正常补传/关闭/复审/完结使用第四个独立 Task，避免与 WAIVE 或 reopen 路径共享 Case。
+resubmit_work_order_id="$(new_uuid)"
+resubmit_workflow_id="$(new_uuid)"
+resubmit_stage_id="$(new_uuid)"
+resubmit_node_id="$(new_uuid)"
+resubmit_task_id="$(new_uuid)"
+resubmit_start_event_id="$(new_uuid)"
+resubmit_stage_event_id="$(new_uuid)"
+resubmit_node_event_id="$(new_uuid)"
+resubmit_task_created_outbox_id="$(new_uuid)"
+resubmit_task_created_event_id="$(new_uuid)"
+resubmit_external_code="ADMIN-PILOT-RESUBMIT-${resubmit_work_order_id%%-*}"
+resubmit_correlation_id="admin-pilot-resubmit-${resubmit_task_id}"
 
-docker compose -f "${compose_file}" exec -T postgres \
-  psql -U serviceos_app -d serviceos \
-  -v completion_work_order_id="${correction_work_order_id}" \
-  -v completion_workflow_id="${correction_workflow_id}" \
-  -v completion_stage_id="${correction_stage_id}" \
-  -v completion_node_id="${correction_node_id}" \
-  -v completion_task_id="${correction_task_id}" \
-  -v completion_start_event_id="${correction_start_event_id}" \
-  -v completion_stage_event_id="${correction_stage_event_id}" \
-  -v completion_node_event_id="${correction_node_event_id}" \
-  -v completion_task_created_outbox_id="${correction_task_created_outbox_id}" \
-  -v completion_task_created_event_id="${correction_task_created_event_id}" \
-  -v completion_external_code="${correction_external_code}" \
-  -v completion_correlation_id="${correction_correlation_id}" \
-  < serviceos-deploy/admin-pilot/seed-admin-completion.sql
+seed_completion_fixture() {
+  local work_order_id="$1"
+  local workflow_id="$2"
+  local stage_id="$3"
+  local node_id="$4"
+  local task_id="$5"
+  local start_event_id="$6"
+  local stage_event_id="$7"
+  local node_event_id="$8"
+  local task_created_outbox_id="$9"
+  local task_created_event_id="${10}"
+  local external_code="${11}"
+  local correlation_id="${12}"
+  docker compose -f "${compose_file}" exec -T postgres \
+    psql -U serviceos_app -d serviceos \
+    -v completion_work_order_id="${work_order_id}" \
+    -v completion_workflow_id="${workflow_id}" \
+    -v completion_stage_id="${stage_id}" \
+    -v completion_node_id="${node_id}" \
+    -v completion_task_id="${task_id}" \
+    -v completion_start_event_id="${start_event_id}" \
+    -v completion_stage_event_id="${stage_event_id}" \
+    -v completion_node_event_id="${node_event_id}" \
+    -v completion_task_created_outbox_id="${task_created_outbox_id}" \
+    -v completion_task_created_event_id="${task_created_event_id}" \
+    -v completion_external_code="${external_code}" \
+    -v completion_correlation_id="${correlation_id}" \
+    < serviceos-deploy/admin-pilot/seed-admin-completion.sql
+}
 
-docker compose -f "${compose_file}" exec -T postgres \
-  psql -U serviceos_app -d serviceos \
-  -v completion_work_order_id="${reopen_work_order_id}" \
-  -v completion_workflow_id="${reopen_workflow_id}" \
-  -v completion_stage_id="${reopen_stage_id}" \
-  -v completion_node_id="${reopen_node_id}" \
-  -v completion_task_id="${reopen_task_id}" \
-  -v completion_start_event_id="${reopen_start_event_id}" \
-  -v completion_stage_event_id="${reopen_stage_event_id}" \
-  -v completion_node_event_id="${reopen_node_event_id}" \
-  -v completion_task_created_outbox_id="${reopen_task_created_outbox_id}" \
-  -v completion_task_created_event_id="${reopen_task_created_event_id}" \
-  -v completion_external_code="${reopen_external_code}" \
-  -v completion_correlation_id="${reopen_correlation_id}" \
-  < serviceos-deploy/admin-pilot/seed-admin-completion.sql
+seed_completion_fixture \
+  "${completion_work_order_id}" "${completion_workflow_id}" "${completion_stage_id}" \
+  "${completion_node_id}" "${completion_task_id}" "${completion_start_event_id}" \
+  "${completion_stage_event_id}" "${completion_node_event_id}" \
+  "${completion_task_created_outbox_id}" "${completion_task_created_event_id}" \
+  "${completion_external_code}" "${completion_correlation_id}"
+
+seed_completion_fixture \
+  "${correction_work_order_id}" "${correction_workflow_id}" "${correction_stage_id}" \
+  "${correction_node_id}" "${correction_task_id}" "${correction_start_event_id}" \
+  "${correction_stage_event_id}" "${correction_node_event_id}" \
+  "${correction_task_created_outbox_id}" "${correction_task_created_event_id}" \
+  "${correction_external_code}" "${correction_correlation_id}"
+
+seed_completion_fixture \
+  "${reopen_work_order_id}" "${reopen_workflow_id}" "${reopen_stage_id}" \
+  "${reopen_node_id}" "${reopen_task_id}" "${reopen_start_event_id}" \
+  "${reopen_stage_event_id}" "${reopen_node_event_id}" \
+  "${reopen_task_created_outbox_id}" "${reopen_task_created_event_id}" \
+  "${reopen_external_code}" "${reopen_correlation_id}"
+
+seed_completion_fixture \
+  "${resubmit_work_order_id}" "${resubmit_workflow_id}" "${resubmit_stage_id}" \
+  "${resubmit_node_id}" "${resubmit_task_id}" "${resubmit_start_event_id}" \
+  "${resubmit_stage_event_id}" "${resubmit_node_event_id}" \
+  "${resubmit_task_created_outbox_id}" "${resubmit_task_created_event_id}" \
+  "${resubmit_external_code}" "${resubmit_correlation_id}"
 
 if ! curl --fail --silent "http://127.0.0.1:5173" >/dev/null; then
   (
@@ -169,6 +193,8 @@ export ADMIN_PILOT_CORRECTION_WORK_ORDER_CODE="${correction_external_code}"
 export ADMIN_PILOT_CORRECTION_TASK_ID="${correction_task_id}"
 export ADMIN_PILOT_REOPEN_WORK_ORDER_CODE="${reopen_external_code}"
 export ADMIN_PILOT_REOPEN_TASK_ID="${reopen_task_id}"
+export ADMIN_PILOT_RESUBMIT_WORK_ORDER_CODE="${resubmit_external_code}"
+export ADMIN_PILOT_RESUBMIT_TASK_ID="${resubmit_task_id}"
 npm run test:e2e
 
 task_state="$(query_db "
@@ -557,6 +583,109 @@ done
   exit 1
 }
 
+correction_resubmit_state=""
+for _ in $(seq 1 60); do
+  correction_resubmit_state="$(query_db "
+    SELECT rejected.status || ':' ||
+           correction.status || ':' ||
+           count(DISTINCT resubmission.correction_resubmission_id) || ':' ||
+           approved.status || ':' ||
+           task.status || ':' ||
+           work_order.status || ':' ||
+           count(DISTINCT audit.target_id || ':' || audit.action_name) || ':' ||
+           count(DISTINCT inbox.event_id)
+      FROM evd_review_case rejected
+      JOIN evd_review_decision rejected_decision
+        ON rejected_decision.tenant_id = rejected.tenant_id
+       AND rejected_decision.review_case_id = rejected.review_case_id
+       AND rejected_decision.decision = 'REJECTED'
+      JOIN evd_correction_case correction
+        ON correction.tenant_id = rejected_decision.tenant_id
+       AND correction.source_review_decision_id = rejected_decision.review_decision_id
+      JOIN evd_correction_resubmission resubmission
+        ON resubmission.tenant_id = correction.tenant_id
+       AND resubmission.correction_case_id = correction.correction_case_id
+      JOIN evd_review_case approved
+        ON approved.tenant_id = rejected.tenant_id
+       AND approved.task_id = rejected.task_id
+       AND approved.evidence_set_snapshot_id = correction.latest_resubmission_snapshot_id
+       AND approved.origin = 'INTERNAL'
+      JOIN tsk_task task
+        ON task.tenant_id = rejected.tenant_id
+       AND task.task_id = rejected.task_id
+      JOIN wo_work_order work_order
+        ON work_order.tenant_id = task.tenant_id
+       AND work_order.id = task.work_order_id
+      LEFT JOIN aud_audit_record audit
+        ON audit.tenant_id = correction.tenant_id
+       AND (
+         (
+           audit.target_id = rejected.review_case_id::text
+           AND audit.action_name IN ('REVIEW_CASE_CREATED', 'REVIEW_CASE_DECIDED')
+         )
+         OR (
+           audit.target_id = correction.correction_case_id::text
+           AND audit.action_name IN (
+             'CORRECTION_CASE_RESUBMITTED', 'CORRECTION_CASE_CLOSED'
+           )
+         )
+         OR (
+           audit.target_id = approved.review_case_id::text
+           AND audit.action_name IN ('REVIEW_CASE_CREATED', 'REVIEW_CASE_DECIDED')
+         )
+         OR (
+           audit.target_id = task.task_id::text
+           AND audit.action_name = 'TASK_HUMAN_COMPLETE'
+         )
+       )
+      LEFT JOIN rel_outbox_event outbox
+        ON outbox.tenant_id = correction.tenant_id
+       AND (
+         (
+           outbox.aggregate_type = 'ReviewCase'
+           AND outbox.aggregate_id IN (
+             rejected.review_case_id::text, approved.review_case_id::text
+           )
+           AND outbox.event_type IN (
+             'evidence.review-case-created', 'evidence.review-decided'
+           )
+         )
+         OR (
+           outbox.aggregate_type = 'CorrectionCase'
+           AND outbox.aggregate_id = correction.correction_case_id::text
+           AND outbox.event_type IN (
+             'evidence.correction-case-created',
+             'evidence.correction-resubmitted',
+             'evidence.correction-closed'
+           )
+         )
+         OR (
+           outbox.aggregate_type = 'Task'
+           AND outbox.aggregate_id = task.task_id::text
+           AND outbox.event_type = 'task.completed'
+         )
+       )
+      LEFT JOIN rel_inbox_record inbox
+        ON inbox.tenant_id = outbox.tenant_id
+       AND inbox.event_id = outbox.event_id
+       AND inbox.status = 'SUCCEEDED'
+     WHERE rejected.task_id = '${resubmit_task_id}'
+       AND rejected.origin = 'INTERNAL'
+       AND rejected.status = 'REJECTED'
+     GROUP BY rejected.review_case_id, rejected.status, correction.correction_case_id,
+              correction.status, approved.review_case_id, approved.status,
+              task.task_id, task.status, work_order.status
+  ")"
+  # 7 = 驳回/复审各 CREATED+DECIDED + RESUBMITTED + CLOSED + TASK_HUMAN_COMPLETE
+  # 8 = 两轮审核事件 + correction created/resubmitted/closed + task.completed
+  [[ "${correction_resubmit_state}" == "REJECTED:CLOSED:1:APPROVED:COMPLETED:FULFILLED:7:8" ]] && break
+  sleep 1
+done
+[[ "${correction_resubmit_state}" == "REJECTED:CLOSED:1:APPROVED:COMPLETED:FULFILLED:7:8" ]] || {
+  echo "Admin 试点正常补传/关闭/复审/完结不完整: ${correction_resubmit_state}" >&2
+  exit 1
+}
+
 progression_inbox_count="$(query_db "
   SELECT count(*)
     FROM rel_inbox_record
@@ -571,6 +700,23 @@ progression_inbox_count="$(query_db "
 ")"
 [[ "${progression_inbox_count}" == "1" ]] || {
   echo "Admin 试点 task.completed 未被 Workflow Inbox 成功消费: ${progression_inbox_count}" >&2
+  exit 1
+}
+
+resubmit_progression_inbox_count="$(query_db "
+  SELECT count(*)
+    FROM rel_inbox_record
+   WHERE consumer_name = 'workflow.task-completed.v1'
+     AND status = 'SUCCEEDED'
+     AND event_id = (
+       SELECT event_id
+         FROM rel_outbox_event
+        WHERE aggregate_id = '${resubmit_task_id}'
+          AND event_type = 'task.completed'
+     )
+")"
+[[ "${resubmit_progression_inbox_count}" == "1" ]] || {
+  echo "Admin 试点补传完结 task.completed 未被 Workflow Inbox 成功消费: ${resubmit_progression_inbox_count}" >&2
   exit 1
 }
 
