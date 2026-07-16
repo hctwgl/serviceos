@@ -11,6 +11,16 @@ import {
   type WorkOrderWorkspaceSection,
 } from '../api/workspace'
 import { listWorkOrderSlaInstances, type SlaInstancePage } from '../api/sla'
+import {
+  getAuthorizedWorkOrder,
+  getAuthorizedWorkOrderStages,
+  listAuthorizedWorkOrderTasks,
+  listWorkOrderCoreTimeline,
+  type WorkOrderDetail,
+  type WorkOrderTaskPage,
+  type WorkOrderTimelinePage,
+  type WorkflowExecutionProjection,
+} from '../api/workOrderDetail'
 import { getTaskAllowedActions, type TaskAllowedActions } from '../api/tasks'
 import TaskCommandPanel from '../components/TaskCommandPanel.vue'
 import QueueTable from './QueueTable.vue'
@@ -30,6 +40,11 @@ const sectionError = ref<string | null>(null)
 const sectionData = ref<WorkOrderWorkspaceSection | null>(null)
 const slaPage = ref<SlaInstancePage | null>(null)
 const slaError = ref<string | null>(null)
+const workOrderDetail = ref<WorkOrderDetail | null>(null)
+const stages = ref<WorkflowExecutionProjection | null>(null)
+const taskPage = ref<WorkOrderTaskPage | null>(null)
+const timelinePage = ref<WorkOrderTimelinePage | null>(null)
+const authorityError = ref<string | null>(null)
 
 const sections: SectionCode[] = [
   'TASKS',
@@ -64,6 +79,28 @@ async function loadSlaInstances() {
   }
 }
 
+async function loadAuthorityProjections() {
+  authorityError.value = null
+  try {
+    const [detail, stageProjection, tasks, timeline] = await Promise.all([
+      getAuthorizedWorkOrder(workOrderId.value),
+      getAuthorizedWorkOrderStages(workOrderId.value),
+      listAuthorizedWorkOrderTasks(workOrderId.value, { limit: '20' }),
+      listWorkOrderCoreTimeline(workOrderId.value, { limit: '20' }),
+    ])
+    workOrderDetail.value = detail
+    stages.value = stageProjection
+    taskPage.value = tasks
+    timelinePage.value = timeline
+  } catch (err) {
+    authorityError.value = err instanceof Error ? err.message : '加载工单权威投影失败'
+    workOrderDetail.value = null
+    stages.value = null
+    taskPage.value = null
+    timelinePage.value = null
+  }
+}
+
 async function loadWorkspace() {
   loading.value = true
   error.value = null
@@ -77,6 +114,7 @@ async function loadWorkspace() {
     await Promise.all([
       loadAllowedActions(ws.currentTaskSummary?.taskId),
       loadSlaInstances(),
+      loadAuthorityProjections(),
     ])
     const firstAvailable = sections.find(
       (code) => ws.sectionAvailability[code] === 'AVAILABLE' || ws.sectionAvailability[code] === 'EMPTY',
@@ -89,6 +127,10 @@ async function loadWorkspace() {
     activity.value = null
     allowedActions.value = null
     slaPage.value = null
+    workOrderDetail.value = null
+    stages.value = null
+    taskPage.value = null
+    timelinePage.value = null
   } finally {
     loading.value = false
   }
@@ -130,6 +172,38 @@ const slaRows = computed(() =>
     remainingSeconds: item.remainingSeconds,
     overdueSeconds: item.overdueSeconds,
     taskId: item.taskId,
+  })),
+)
+const stageRows = computed(() =>
+  (stages.value?.stages ?? []).map((item) => ({
+    id: item.id,
+    stageCode: item.stageCode,
+    sequenceNo: item.sequenceNo,
+    status: item.status,
+    activatedAt: item.activatedAt,
+    completedAt: item.completedAt,
+  })),
+)
+const taskRows = computed(() =>
+  (taskPage.value?.items ?? []).map((item) => ({
+    id: item.id,
+    taskType: item.taskType,
+    taskKind: item.taskKind,
+    status: item.status,
+    stageCode: item.stageCode,
+    priority: item.priority,
+    version: item.version,
+  })),
+)
+const timelineRows = computed(() =>
+  (timelinePage.value?.items ?? []).map((item) => ({
+    id: item.id,
+    category: item.category,
+    eventType: item.eventType,
+    occurredAt: item.occurredAt,
+    resourceType: item.resourceType,
+    resourceId: item.resourceId,
+    outcomeCode: item.outcomeCode,
   })),
 )
 
@@ -250,6 +324,78 @@ onMounted(() => {
           </p>
         </article>
       </div>
+
+      <article v-if="workOrderDetail" class="card">
+        <h3>工单权威事实</h3>
+        <dl>
+          <div><dt>status</dt><dd>{{ workOrderDetail.workOrder.status }}</dd></div>
+          <div><dt>clientCode</dt><dd>{{ workOrderDetail.workOrder.clientCode }}</dd></div>
+          <div><dt>brandCode</dt><dd>{{ workOrderDetail.workOrder.brandCode }}</dd></div>
+          <div><dt>serviceProductCode</dt><dd>{{ workOrderDetail.workOrder.serviceProductCode }}</dd></div>
+          <div><dt>externalOrderCode</dt><dd>{{ workOrderDetail.workOrder.externalOrderCode }}</dd></div>
+          <div><dt>version</dt><dd>{{ workOrderDetail.workOrder.version }}</dd></div>
+          <div><dt>asOf</dt><dd>{{ workOrderDetail.asOf }}</dd></div>
+        </dl>
+      </article>
+      <p v-if="authorityError" class="error">{{ authorityError }}</p>
+
+      <article v-if="stages" class="card">
+        <h3>Workflow / Stage</h3>
+        <p class="meta">
+          workflow={{ stages.workflow?.workflowKey || '—' }} /
+          {{ stages.workflow?.status || '未初始化' }} /
+          asOf {{ stages.asOf }}
+        </p>
+      </article>
+      <QueueTable
+        title="Stage 投影"
+        :columns="['id', 'stageCode', 'sequenceNo', 'status', 'activatedAt', 'completedAt']"
+        :rows="stageRows"
+        :loading="false"
+        :error="null"
+        :as-of="stages?.asOf"
+        :next-cursor="null"
+        @refresh="loadAuthorityProjections"
+        @next="() => undefined"
+      />
+
+      <QueueTable
+        title="工单 Task 摘要"
+        :columns="['id', 'taskType', 'taskKind', 'status', 'stageCode', 'priority', 'version']"
+        :rows="taskRows"
+        :loading="false"
+        :error="null"
+        :as-of="taskPage?.asOf"
+        :next-cursor="taskPage?.nextCursor ?? null"
+        @refresh="loadAuthorityProjections"
+        @next="() => undefined"
+      />
+      <p v-if="taskPage?.items?.length" class="links">
+        打开任务：
+        <RouterLink
+          v-for="item in taskPage.items"
+          :key="item.id"
+          :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: item.id } }"
+        >
+          {{ item.taskType }} / {{ item.id }}
+        </RouterLink>
+      </p>
+
+      <QueueTable
+        title="核心时间线"
+        :columns="['id', 'category', 'eventType', 'occurredAt', 'resourceType', 'resourceId', 'outcomeCode']"
+        :rows="timelineRows"
+        :loading="false"
+        :error="null"
+        :as-of="timelinePage?.asOf"
+        :next-cursor="timelinePage?.nextCursor ?? null"
+        @refresh="loadAuthorityProjections"
+        @next="() => undefined"
+      />
+      <p v-if="timelinePage" class="meta">
+        freshness={{ timelinePage.freshnessStatus }} / resourceVersion={{ timelinePage.resourceVersion }} /
+        lastProjectedAt={{ timelinePage.lastProjectedAt || '—' }}
+      </p>
 
       <QueueTable
         title="工单 SLA 实例"

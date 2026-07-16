@@ -1,6 +1,6 @@
-# ServiceOS Admin Web（M101～M133）
+# ServiceOS Admin Web（M101～M134）
 
-总部运营后台：队列/目录/详情/工作区/命令，覆盖已实现 OpenAPI 运营表面（含异常详情、工单 SLA、表单/资料详情与文件作废）。
+总部运营后台：已覆盖 OpenAPI 中面向 Admin JWT 的已实现运营表面（队列/详情/命令/工单权威投影）。
 
 ```bash
 npm install && npm run dev
