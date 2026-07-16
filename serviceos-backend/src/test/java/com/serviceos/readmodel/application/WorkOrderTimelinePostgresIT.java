@@ -679,6 +679,115 @@ class WorkOrderTimelinePostgresIT {
     }
 
     @Test
+    void projectsTaskAssignmentGuardAndManualInterventionWithoutCandidateLeakage() {
+        Instant t0 = Instant.parse("2026-07-16T11:00:00Z");
+        UUID standaloneTask = task(null, null, "OPERATIONS_REPAIR");
+
+        Map<String, Object> assignedPayload = new HashMap<>();
+        assignedPayload.put("taskId", taskId);
+        assignedPayload.put("assignmentBatchId", UUID.randomUUID());
+        assignedPayload.put("candidatePrincipalIds", List.of("technician-secret-a", "technician-secret-b"));
+        assignedPayload.put("sourceType", "ASSIGNEE_POLICY");
+        assignedPayload.put("sourceId", "policy://secret/v1");
+        assignedPayload.put("assignedAt", t0);
+
+        OutboxMessage assigned = message(
+                "task", "task.assigned", 1, "Task", taskId, 2, assignedPayload, t0);
+        handler.handle(assigned);
+        handler.handle(assigned);
+
+        handler.handle(message(
+                "task", "task.assignment-prepared", 1, "Task", taskId, 3,
+                Map.of(
+                        "taskId", taskId,
+                        "guardId", UUID.randomUUID(),
+                        "taskAssignmentId", UUID.randomUUID(),
+                        "preparationKey", "prep-secret-key",
+                        "principalId", "tech-principal-1",
+                        "status", "PREPARED",
+                        "serviceAssignmentId", "service-assignment://secret",
+                        "reasonCode", "TECHNICIAN_REASSIGNMENT",
+                        "occurredAt", t0.plusSeconds(10)),
+                t0.plusSeconds(10)));
+
+        handler.handle(message(
+                "task", "task.execution-guard.activated", 1, "Task", taskId, 4,
+                Map.of(
+                        "taskId", taskId,
+                        "guardId", UUID.randomUUID(),
+                        "guardType", "REASSIGNMENT",
+                        "guardKey", "saga://secret/001",
+                        "status", "ACTIVE",
+                        "reasonCode", "TECHNICIAN_REASSIGNMENT",
+                        "occurredAt", t0.plusSeconds(20)),
+                t0.plusSeconds(20)));
+
+        handler.handle(message(
+                "task", "task.execution.manual-intervention-required", 1, "Task", taskId, 5,
+                Map.of(
+                        "taskId", taskId,
+                        "attemptId", UUID.randomUUID(),
+                        "taskType", "integration.push-status",
+                        "businessKey", "secret-business-key",
+                        "attemptNo", 3,
+                        "status", "MANUAL_INTERVENTION",
+                        "errorCode", "REMOTE_RESULT_UNKNOWN"),
+                t0.plusSeconds(30)));
+
+        // 独立运营 Task：Inbox 完成但不投影。
+        handler.handle(message(
+                "task", "task.assigned", 1, "Task", standaloneTask, 2,
+                Map.of(
+                        "taskId", standaloneTask,
+                        "assignmentBatchId", UUID.randomUUID(),
+                        "candidatePrincipalIds", List.of("ops-1"),
+                        "sourceType", "MANUAL",
+                        "sourceId", "manual://ops",
+                        "assignedAt", t0.plusSeconds(40)),
+                t0.plusSeconds(40)));
+
+        var page = timelines.list(principal("reader", TENANT), "corr-task-assign", workOrderId, null, 10);
+        assertThat(page.items()).extracting(WorkOrderTimelineItem::eventType)
+                .containsExactly(
+                        "task.execution.manual-intervention-required",
+                        "task.execution-guard.activated",
+                        "task.assignment-prepared",
+                        "task.assigned");
+        assertThat(page.items()).extracting(WorkOrderTimelineItem::category).containsOnly("TASK");
+        assertThat(page.items()).extracting(WorkOrderTimelineItem::outcomeCode)
+                .containsExactly(
+                        "REMOTE_RESULT_UNKNOWN",
+                        "TECHNICIAN_REASSIGNMENT",
+                        "TECHNICIAN_REASSIGNMENT",
+                        "ASSIGNED");
+        assertThat(page.items().get(2).actorId()).isEqualTo("tech-principal-1");
+        assertThat(page.items()).allSatisfy(item -> {
+            assertThat(item.resourceId()).isEqualTo(taskId);
+            String json = objectMapper.writeValueAsString(item);
+            assertThat(json).doesNotContain("technician-secret-a", "technician-secret-b",
+                    "prep-secret-key", "secret-business-key", "saga://secret");
+        });
+        assertThat(count("rdm_work_order_timeline_entry")).isEqualTo(4);
+
+        assertThatThrownBy(() -> handler.handle(message(
+                "task", "task.assignment-activated", 1, "Task", UUID.randomUUID(), 6,
+                Map.of(
+                        "taskId", taskId,
+                        "guardId", UUID.randomUUID(),
+                        "taskAssignmentId", UUID.randomUUID(),
+                        "preparationKey", "prep",
+                        "principalId", "tech-principal-1",
+                        "status", "ACTIVE",
+                        "serviceAssignmentId", "sa://1",
+                        "reasonCode", "SERVICE_ASSIGNMENT_ACTIVATED",
+                        "occurredAt", t0.plusSeconds(50)),
+                t0.plusSeconds(50))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("信封");
+        assertThat(count("rdm_work_order_timeline_entry")).isEqualTo(4);
+    }
+
+    @Test
     void projectsFieldOpsEventsWithoutSensitivePayloadAndRejectsMismatch() {
         Instant t0 = Instant.parse("2026-07-16T04:00:00Z");
         UUID appointmentId = UUID.randomUUID();

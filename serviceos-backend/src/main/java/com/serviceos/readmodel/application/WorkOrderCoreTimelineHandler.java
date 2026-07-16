@@ -40,8 +40,8 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * 把已发布的核心执行、现场履约、SLA、资料审核、外发交付与 ServiceAssignment 生命周期事件规范化为工单时间线。
- * Inbox 与投影写入同事务，任何身份错配都会整体回滚；不保存 PII、自由文本、GPS 或指派细节。
+ * 把已发布的核心执行、现场履约、SLA、资料审核、外发交付、ServiceAssignment 与 Task 指派/Guard 事件规范化为工单时间线。
+ * Inbox 与投影写入同事务，任何身份错配都会整体回滚；不保存 PII、自由文本、GPS、候选人列表或指派细节。
  */
 @Service
 final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
@@ -52,6 +52,10 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             "stage.activated", "stage.completed",
             "task.created", "task.claimed", "task.started", "task.released",
             "task.cancelled", "task.completed",
+            "task.assigned",
+            "task.assignment-prepared", "task.assignment-activated", "task.assignment-aborted",
+            "task.execution-guard.activated", "task.execution-guard.released",
+            "task.execution.manual-intervention-required",
             "contact.attempt.recorded",
             "appointment.proposed", "appointment.confirmed", "appointment.rescheduled",
             "appointment.cancelled", "appointment.no-show-marked",
@@ -197,6 +201,13 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             case "task.started" -> taskStarted(message);
             case "task.released" -> taskReleased(message);
             case "task.cancelled" -> taskCancelled(message);
+            case "task.assigned" -> taskAssigned(message);
+            case "task.assignment-prepared" -> taskAssignmentHandshake(message, "PREPARED");
+            case "task.assignment-activated" -> taskAssignmentHandshake(message, "ACTIVATED");
+            case "task.assignment-aborted" -> taskAssignmentHandshake(message, "ABORTED");
+            case "task.execution-guard.activated" -> taskExecutionGuard(message, "GUARD_ACTIVATED");
+            case "task.execution-guard.released" -> taskExecutionGuard(message, "GUARD_RELEASED");
+            case "task.execution.manual-intervention-required" -> taskManualIntervention(message);
             case "contact.attempt.recorded" -> Optional.of(contactAttemptRecorded(message));
             case "appointment.proposed" -> Optional.of(appointmentProposed(message));
             case "appointment.confirmed" -> Optional.of(appointmentConfirmed(message));
@@ -321,6 +332,42 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
         TaskCancelledPayload payload = read(message, TaskCancelledPayload.class);
         return taskContextFact(message, payload.taskId(), "CANCELLED", payload.reasonCode(),
                 null, payload.cancelledAt());
+    }
+
+    private Optional<TimelineFact> taskAssigned(OutboxMessage message) {
+        TaskAssignedPayload payload = read(message, TaskAssignedPayload.class);
+        // 不投影 candidatePrincipalIds / sourceId；仅保留分配事实。
+        return taskContextFact(message, payload.taskId(), "ASSIGNED", null, null, payload.assignedAt());
+    }
+
+    private Optional<TimelineFact> taskAssignmentHandshake(OutboxMessage message, String defaultOutcome) {
+        TaskAssignmentHandshakePayload payload = read(message, TaskAssignmentHandshakePayload.class);
+        // 不投影 guardId / taskAssignmentId / preparationKey / serviceAssignmentId。
+        String reason = payload.reasonCode() == null || payload.reasonCode().isBlank()
+                ? null
+                : requireCode(payload.reasonCode(), "task assignment reasonCode");
+        String actor = payload.principalId() == null || payload.principalId().isBlank()
+                ? null
+                : payload.principalId();
+        return taskContextFact(message, payload.taskId(), defaultOutcome, reason, actor, payload.occurredAt());
+    }
+
+    private Optional<TimelineFact> taskExecutionGuard(OutboxMessage message, String defaultOutcome) {
+        TaskExecutionGuardPayload payload = read(message, TaskExecutionGuardPayload.class);
+        // 不投影 guardId / guardKey；outcome 取 reasonCode。
+        String reason = payload.reasonCode() == null || payload.reasonCode().isBlank()
+                ? null
+                : requireCode(payload.reasonCode(), "task execution guard reasonCode");
+        return taskContextFact(message, payload.taskId(), defaultOutcome, reason, null, payload.occurredAt());
+    }
+
+    private Optional<TimelineFact> taskManualIntervention(OutboxMessage message) {
+        TaskManualInterventionPayload payload = read(message, TaskManualInterventionPayload.class);
+        // 不投影 businessKey / resultRef / attempt 细节；outcome 取 errorCode；时间用信封 occurredAt。
+        return taskContextFact(
+                message, payload.taskId(), "MANUAL_INTERVENTION",
+                requireCode(payload.errorCode(), "task manual intervention errorCode"),
+                null, message.occurredAt());
     }
 
     private TimelineFact contactAttemptRecorded(OutboxMessage message) {
@@ -994,6 +1041,34 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             Instant detectedAt
     ) {
     }
+
+    private record TaskAssignedPayload(
+            UUID taskId,
+            Instant assignedAt
+    ) {
+    }
+
+    private record TaskAssignmentHandshakePayload(
+            UUID taskId,
+            String principalId,
+            String reasonCode,
+            Instant occurredAt
+    ) {
+    }
+
+    private record TaskExecutionGuardPayload(
+            UUID taskId,
+            String reasonCode,
+            Instant occurredAt
+    ) {
+    }
+
+    private record TaskManualInterventionPayload(
+            UUID taskId,
+            String errorCode
+    ) {
+    }
+
     /** PostgreSQL timestamptz 仅微秒；信封与载荷比较必须忽略纳秒残留。 */
     private static boolean sameInstant(Instant left, Instant right) {
         if (left == null || right == null) {

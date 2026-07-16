@@ -81,3 +81,4 @@
 - [M78 工单外发交付确认与恢复时间线事件合并验收矩阵](75-m78-work-order-delivery-ack-timeline-acceptance.md)
 - [M79 工单运营异常确认时间线事件合并验收矩阵](76-m79-work-order-exception-ack-timeline-acceptance.md)
 - [M80 工单服务分配生命周期时间线事件合并验收矩阵](77-m80-work-order-assignment-timeline-acceptance.md)
+- [M81 工单 Task 指派与执行保护时间线事件合并验收矩阵](78-m81-work-order-task-assignment-guard-timeline-acceptance.md)

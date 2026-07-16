@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.51.0
+  version: 0.52.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -2005,6 +2005,9 @@ components:
           x-extensible-enum: [workorder.received, workorder.activated, workorder.fulfilled,
             workflow.started, workflow.completed, stage.activated, stage.completed,
             task.created, task.claimed, task.started, task.released, task.cancelled, task.completed,
+            task.assigned, task.assignment-prepared, task.assignment-activated, task.assignment-aborted,
+            task.execution-guard.activated, task.execution-guard.released,
+            task.execution.manual-intervention-required,
             contact.attempt.recorded, appointment.proposed, appointment.confirmed,
             appointment.rescheduled, appointment.cancelled, appointment.no-show-marked,
             visit.checked-in, visit.checked-out, visit.interrupted,
