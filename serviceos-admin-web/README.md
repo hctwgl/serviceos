@@ -4,7 +4,8 @@
 CI 使用 Node 22 执行不可变依赖安装与生产构建，并通过真实 Keycloak、Backend、PostgreSQL 与
 Google Chrome 阻断验证 Task 手工分配候选、领取、释放，以及独立 Task 启动/完成至 WorkOrder
 FULFILLED 的局部写链路；终态 Task 通过锁定 FormVersion 提交 VALIDATED FormSubmission，
-并使用自动回填的不可变引用和摘要完成。
+再通过资料 Begin/PUT/Finalize、本地扫描、机器校验与 Snapshot 形成不可变 EvidenceSetSnapshot，
+页面自动组合表单与资料两份精确版本引用后完成。
 
 ```bash
 npm ci
@@ -28,11 +29,14 @@ serviceos-deploy/admin-pilot/verify-admin-smoke.sh
 脚本复用本机 Google Chrome，验证真实 Keycloak、Backend、PostgreSQL 与 Admin Web：
 登录 → 工单目录 → 工作区 → 工单详情/Stage/Task/SLA/核心时间线
 → Task MANUAL 候选分配 → 领取/释放；另以每轮新建的 Workflow-backed HUMAN Task 验证
-候选分配 → 领取 → 启动 → 锁定表单提交 → 完成 → Node/Stage/Workflow COMPLETED
+候选分配 → 领取 → 启动 → 锁定表单提交 → 资料上传/校验/Snapshot → 双输入完成
+→ Node/Stage/Workflow COMPLETED
 → WorkOrder FULFILLED。
 脚本不会删除本地数据卷，并通过真实 RoleGrant、候选快照、责任事实、版本和幂等保护执行命令；
-浏览器完成后还会校验 READY、候选/责任事实、表单精确引用、成功审计、Outbox/Inbox 消费与
-终态一致性。表单与资料子能力独立降级，资料槽位尚未解析不会阻断锁定表单提交。
+浏览器完成后还会校验 READY、候选/责任事实、表单和资料精确双引用、StoredFile AVAILABLE、
+EvidenceRevision VALIDATED、Snapshot 成员、成功审计、Outbox/Inbox 消费与终态一致性。
+本地文件通过 Vite 同源代理上传，Backend 仍校验短期 token、大小、摘要和 MIME；该证据不代表
+生产对象存储或专业扫描服务已经接入。
 GitHub Actions 的 `admin-pilot-e2e` job 使用同一脚本，成功后才允许进入 staging 发布与回滚演练。
 
 明确未实现：设计系统、SavedView、正式企业 OIDC/BFF、Network/Technician、
