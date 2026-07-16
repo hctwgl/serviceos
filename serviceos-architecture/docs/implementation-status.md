@@ -3,7 +3,7 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-16
-baselineCommit: e7849e3
+baselineCommit: a881cf2
 latestMilestone: M135
 ---
 
@@ -40,7 +40,7 @@ latestMilestone: M135
 | 项目 | 当前值 |
 |---|---|
 | 最新实施里程碑 | M135 Admin 正常整改补传 / 关闭 / 复审写链路 E2E |
-| 基线提交 | `e7849e3` |
+| 基线提交 | `a881cf2` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
 | 前端工程 | `serviceos-admin-web`（Vue+TS+Vite）已纳入 CI 构建，具备开发态 Keycloak PKCE，以及真实只读、Task MANUAL assign-candidates/claim/release、锁定表单提交、资料上传/校验/Snapshot、INTERNAL APPROVED、REJECTED→WAIVED、FORCE_APPROVED→reopen，以及正常补传/关闭/复审 APPROVED 后双引用 complete 至 WorkOrder FULFILLED 的局部写链路 PR 阻断 E2E；Network/Technician 尚未建立 |
