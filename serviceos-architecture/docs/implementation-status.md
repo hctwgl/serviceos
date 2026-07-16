@@ -538,7 +538,7 @@ correlation 展开、重建作业、Broker checkpoint、搜索、导出和 Porta
 - 同一 readmodel Inbox 合并 `sla.started` / `sla.breached` / `sla.met`；
 - started 直接使用载荷 workOrderId；breached/met 经 TaskTimelineContextQuery 解析；
 - 非工单 Task SLA 明确忽略；不投影 digest、elapsedSeconds 或自由文本；
-- V073 expand `SLA` category；Core OpenAPI 0.47.0 扩展 x-extensible-enum；
+- V073 expand `SLA` category；Core OpenAPI 0.46.0 扩展 x-extensible-enum；
 - 查询授权/分页/UNKNOWN freshness 不变。
 
 明确未实现：Evidence/Review、Delivery、OperationalException、试算/结算合并，BUSINESS 日历、
