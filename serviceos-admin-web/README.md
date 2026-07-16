@@ -1,4 +1,4 @@
-# ServiceOS Admin Web（M101 / M102）
+# ServiceOS Admin Web（M101～M105）
 
 总部运营后台只读外壳。当前切片提供：
 
@@ -24,4 +24,4 @@ npm run build
 
 ## 明确未实现
 
-设计系统完整 Token、SavedView、命令操作 UI、正式 OIDC SDK、Network/Technician 端、E2E。
+设计系统完整 Token、SavedView、正式 OIDC SDK、表单/资料提交流程编排、Network/Technician 端、E2E。

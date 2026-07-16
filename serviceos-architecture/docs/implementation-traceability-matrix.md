@@ -199,3 +199,4 @@ Feature gate/authority: if applicable
 | M102 | Admin 工单工作区只读页；消费 workspace/activity-summary/sections；外发队列深链；npm build | PRODUCT-01/02 + ARCH-19 + API-06 Accepted workspace 窄切片 + Admin Web build | 命令 UI、SavedView、OIDC SDK、Network/Technician、E2E |
 | M103 | Admin 工作区展示当前任务 GET /tasks/{id}/allowed-actions 只读投影；不执行命令；npm build | PRODUCT-01/02 + ARCH-19 + API-02 AllowedActions + Admin Web build | 命令执行 UI、OIDC SDK、SavedView、E2E |
 | M104 | Admin 授权工单目录消费 GET /work-orders；status/clientCode 筛选与工作区深链；npm build | PRODUCT-01/02 + ARCH-19 + API-02 Authorized WorkOrder Query + Admin Web build | SavedView、命令 UI、OIDC SDK、E2E |
+| M105 | Admin 工作区按 allowed-actions 执行 claim/start/complete/release；Idempotency-Key+If-Match；npm build | PRODUCT-01/02/05 + ARCH-19 + API-02 Human Task Commands + Admin Web build | 表单/资料提交流程编排、OIDC SDK、SavedView、E2E |

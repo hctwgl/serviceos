@@ -11,6 +11,7 @@ import {
   type WorkOrderWorkspaceSection,
 } from '../api/workspace'
 import { getTaskAllowedActions, type TaskAllowedActions } from '../api/tasks'
+import TaskCommandPanel from '../components/TaskCommandPanel.vue'
 
 const route = useRoute()
 const workOrderId = computed(() => String(route.params.id ?? ''))
@@ -42,7 +43,8 @@ async function loadAllowedActions(taskId: string | undefined) {
     return
   }
   try {
-    allowedActions.value = await getTaskAllowedActions(taskId)
+    const result = await getTaskAllowedActions(taskId)
+    allowedActions.value = result.data
   } catch (err) {
     allowedActionsError.value = err instanceof Error ? err.message : '加载 allowed-actions 失败'
   }
@@ -192,11 +194,18 @@ onMounted(() => {
         </article>
 
         <article class="card">
-          <h3>当前任务 allowed-actions</h3>
-          <p class="meta">服务端投影；本页不执行命令。</p>
+          <h3>当前任务命令</h3>
+          <p class="meta">按钮仅来自服务端 allowed-actions；执行后重新拉取工作区。</p>
           <p v-if="allowedActionsError" class="error">{{ allowedActionsError }}</p>
           <p v-else-if="!workspace.currentTaskSummary">无当前任务</p>
-          <ul v-else-if="allowedActions?.actions?.length">
+          <TaskCommandPanel
+            v-else-if="allowedActions"
+            :task-id="workspace.currentTaskSummary.taskId"
+            :allowed-actions="allowedActions"
+            @executed="loadWorkspace"
+          />
+          <p v-else>暂无允许动作或无权读取</p>
+          <ul v-if="allowedActions?.actions?.length" class="action-list">
             <li v-for="action in allowedActions.actions" :key="action.code">
               <strong>{{ action.label }}</strong>
               <span>{{ action.code }}</span>
@@ -206,7 +215,6 @@ onMounted(() => {
               </small>
             </li>
           </ul>
-          <p v-else>暂无允许动作或无权读取</p>
           <p v-if="allowedActions" class="meta">
             asOf {{ allowedActions.asOf }} / v{{ allowedActions.resourceVersion }}
           </p>
@@ -340,6 +348,17 @@ pre {
 }
 .error {
   color: #9b1c1c;
+}
+.action-list {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+.action-list small {
+  display: block;
+  color: #829ab1;
 }
 button {
   border: 1px solid #bcccdc;

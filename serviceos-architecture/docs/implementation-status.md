@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-16
-baselineCommit: e02c912
-latestMilestone: M104
+baselineCommit: PENDING_M105
+latestMilestone: M105
 ---
 
 # ServiceOS 实施状态总览
@@ -39,8 +39,8 @@ latestMilestone: M104
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M104 Admin 授权工单目录 |
-| 基线提交 | `e02c912` |
+| 最新实施里程碑 | M105 Admin 人工任务命令面板 |
+| 基线提交 | `PENDING_M105` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
 | 前端工程 | `serviceos-admin-web` 只读队列与工单工作区外壳（Vue+TS+Vite）；Network/Technician 尚未建立 |
@@ -75,7 +75,7 @@ latestMilestone: M104
 | 通知 | 通知与运营异常中心 | `PROPOSED` | 已有总体设计 | 通知通道、模板、可靠发送和 UI | `architecture/14-*` |
 | 履约事实与试算 | 事实提取和双向试算 | `PROPOSED` | 已有设计、API 和数据规划 | 运行时、投影和前端工作区 | M5 设计 |
 | 对账结算 | 对账、结算、争议与调整 | `PROPOSED` | 已有边界设计 | 正式运行时和页面 | `architecture/16-*` |
-| Admin Portal | 总部运营后台 | `PARTIAL` | 信息架构、Page ID、路由规格；M101～M104 只读队列/工单目录/工作区/allowed-actions 投影 | 设计系统、SavedView、命令执行 UI、OIDC SDK、E2E | M7 设计、M101～M104 |
+| Admin Portal | 总部运营后台 | `PARTIAL` | 信息架构、Page ID、路由规格；M101～M104 只读运营页；M105 基于 allowed-actions 的 claim/start/complete/release 命令面板 | 设计系统、SavedView、OIDC SDK、E2E、完整表单/资料提交流程 | M7 设计、M101～M105 |
 | Network Portal | 网点协作端 | `PROPOSED` | 页面和跨端协作规格 | 前端代码和 E2E | M7 设计 |
 | Technician App | 师傅移动端 | `PROPOSED` | 弱网、离线工作包、上传队列和页面规格 | 移动端工程、真机和离线运行时 | M7 设计 |
 | External Portal | 用户/车企受控页面 | `PROPOSED` | 最小边界规划 | 二期页面和工程实现 | M7 设计 |
@@ -874,14 +874,23 @@ FACTS_CALCULATIONS、customer/location、Portal。
 
 明确未实现：SavedView、命令执行 UI、OIDC SDK、设计系统、E2E。
 
+### M105：Admin 人工任务命令面板
+
+已实现：
+
+- 工作区按 allowed-actions 执行 claim/start/complete/release；
+- Idempotency-Key + If-Match；成功后刷新；`npm run build` 通过。
+
+明确未实现：表单/资料提交流程编排、OIDC SDK、SavedView、设计系统、E2E。
+
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M104**。M61～M104 在授权只读、时间线投影运行时、工作区组合与
+ServiceOS 可靠纵向切片已推进到 **M105**。M61～M105 在授权只读、时间线投影运行时、工作区组合与
 审核/整改/外发专项队列上继续收敛；没有实现完整 SLA/通知策略、通用队列/SavedView 或整个现场履约平台。
 
 ```text
 候选下一方向（优先从已确认文档中选择最小可靠切片）：
-1. 继续 Admin 命令执行 UI（基于 allowed-actions）与正式 OIDC；SavedView 仍需再接受 API-06 章节；
+1. 继续正式 OIDC 与表单/资料提交流程编排；SavedView 仍需再接受 API-06 章节；
 3. 在接受 ServiceNetwork 状态语义后建立目录与准入/启用/清退生命周期；当前相关文档仍为 Proposed，
    不得猜测状态值或转换规则；
 4. 建立 Organization/Region 目录、层级后代与组织到 Project 的权威关系；
