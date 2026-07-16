@@ -18,8 +18,9 @@ INSERT INTO cfg_configuration_asset_version (
           "nodeId":"PILOT_COMPLETION_NODE",
           "nodeType":"USER_TASK",
           "name":"试点终态验证",
-          "stageCode":"PILOT_COMPLETION",
-          "taskType":"PILOT_COMPLETION"
+          "stageCode":"OTHER",
+          "taskType":"PILOT_COMPLETION",
+          "formRef":"admin.pilot-completion-form"
         },
         {"nodeId":"END","nodeType":"END","name":"结束"}
       ],
@@ -29,6 +30,60 @@ INSERT INTO cfg_configuration_asset_version (
       ]
     }',
     repeat('f', 64), 'PUBLISHED', now()
+) ON CONFLICT DO NOTHING;
+
+INSERT INTO cfg_configuration_asset_version (
+    version_id, tenant_id, asset_type, asset_key, semantic_version, schema_version,
+    definition, content_digest, status, published_at
+) VALUES (
+    '20000000-0000-4000-8000-000000000004', 'tenant-local', 'FORM',
+    'admin.pilot-completion-form', '1.0.0', '1.0.0',
+    '{
+      "formKey":"admin.pilot-completion-form",
+      "version":"1.0.0",
+      "stage":"PILOT_COMPLETION",
+      "sections":[{
+        "sectionKey":"completion",
+        "title":"终态验证",
+        "fields":[{
+          "fieldKey":"completion.note",
+          "label":"完成说明",
+          "dataType":"STRING",
+          "binding":"task.input.completion.note",
+          "required":true
+        }]
+      }]
+    }',
+    repeat('5', 64), 'PUBLISHED', now()
+) ON CONFLICT DO NOTHING;
+
+INSERT INTO cfg_configuration_asset_version (
+    version_id, tenant_id, asset_type, asset_key, semantic_version, schema_version,
+    definition, content_digest, status, published_at
+) VALUES (
+    '20000000-0000-4000-8000-000000000005', 'tenant-local', 'EVIDENCE',
+    'admin.pilot-completion-evidence', '1.0.0', '1.0.0',
+    '{
+      "templateKey":"admin.pilot-completion-evidence",
+      "version":"1.0.0",
+      "title":"试点完结资料",
+      "stage":"OTHER",
+      "items":[{
+        "evidenceKey":"completion.photo",
+        "name":"完结现场照片",
+        "mediaType":"PHOTO",
+        "required":true,
+        "capture":{
+          "allowCamera":true,
+          "allowGallery":true,
+          "minCount":1,
+          "maxCount":1,
+          "maxSizeBytes":1048576
+        },
+        "reviewPolicy":{"reviewRequired":false}
+      }]
+    }',
+    repeat('6', 64), 'PUBLISHED', now()
 ) ON CONFLICT DO NOTHING;
 
 INSERT INTO cfg_configuration_bundle (
@@ -43,9 +98,18 @@ INSERT INTO cfg_configuration_bundle (
 
 INSERT INTO cfg_configuration_bundle_item (
     tenant_id, bundle_id, asset_type, asset_version_id, content_digest
-) VALUES (
+) VALUES
+(
     'tenant-local', '30000000-0000-4000-8000-000000000002', 'WORKFLOW',
     '20000000-0000-4000-8000-000000000003', repeat('f', 64)
+),
+(
+    'tenant-local', '30000000-0000-4000-8000-000000000002', 'FORM',
+    '20000000-0000-4000-8000-000000000004', repeat('5', 64)
+),
+(
+    'tenant-local', '30000000-0000-4000-8000-000000000002', 'EVIDENCE',
+    '20000000-0000-4000-8000-000000000005', repeat('6', 64)
 ) ON CONFLICT DO NOTHING;
 
 INSERT INTO wo_work_order (
@@ -80,7 +144,7 @@ INSERT INTO wfl_stage_instance (
     sequence_no, status, activation_event_id, version, activated_at
 ) VALUES (
     :'completion_stage_id', 'tenant-local', :'completion_workflow_id',
-    :'completion_work_order_id', 'PILOT_COMPLETION', 1, 'ACTIVE',
+    :'completion_work_order_id', 'OTHER', 1, 'ACTIVE',
     :'completion_stage_event_id', 1, now()
 );
 
@@ -90,7 +154,7 @@ INSERT INTO tsk_task (
     created_at, updated_at, project_id, work_order_id, workflow_instance_id,
     stage_instance_id, workflow_node_instance_id, workflow_node_id,
     workflow_definition_version_id, workflow_definition_digest, configuration_bundle_id,
-    configuration_bundle_digest, stage_code
+    configuration_bundle_digest, stage_code, form_ref
 ) VALUES (
     :'completion_task_id', 'tenant-local', 'PILOT_COMPLETION', 'HUMAN',
     :'completion_external_code', repeat('7', 64), 500, 'READY', now(), 0, 3,
@@ -98,7 +162,8 @@ INSERT INTO tsk_task (
     '10000000-0000-4000-8000-000000000001', :'completion_work_order_id',
     :'completion_workflow_id', :'completion_stage_id', :'completion_node_id',
     'PILOT_COMPLETION_NODE', '20000000-0000-4000-8000-000000000003', repeat('f', 64),
-    '30000000-0000-4000-8000-000000000002', repeat('9', 64), 'PILOT_COMPLETION'
+    '30000000-0000-4000-8000-000000000002', repeat('9', 64), 'OTHER',
+    'admin.pilot-completion-form'
 );
 
 INSERT INTO wfl_node_instance (
@@ -109,3 +174,36 @@ INSERT INTO wfl_node_instance (
     :'completion_work_order_id', 'PILOT_COMPLETION_NODE', :'completion_task_id', 'ACTIVE',
     :'completion_node_event_id', 1, now()
 );
+
+-- 通过真实 task.created Outbox 消费生成 EvidenceSlot；夹具不直接写 evd_* 内部表，
+-- 从而证明冻结 Bundle、Stage 匹配、Inbox 去重与资料解析事务共同成立。
+WITH task_created_payload AS (
+    SELECT jsonb_build_object(
+        'taskId', :'completion_task_id',
+        'projectId', '10000000-0000-4000-8000-000000000001',
+        'workOrderId', :'completion_work_order_id',
+        'workflowInstanceId', :'completion_workflow_id',
+        'stageInstanceId', :'completion_stage_id',
+        'workflowNodeInstanceId', :'completion_node_id',
+        'workflowNodeId', 'PILOT_COMPLETION_NODE',
+        'taskType', 'PILOT_COMPLETION',
+        'taskKind', 'HUMAN',
+        'status', 'READY',
+        'workflowDefinitionVersionId', '20000000-0000-4000-8000-000000000003',
+        'workflowDefinitionDigest', repeat('f', 64),
+        'createdAt', to_char(clock_timestamp(), 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+    ) AS payload
+)
+INSERT INTO rel_outbox_event (
+    outbox_id, event_id, module_name, event_type, schema_version,
+    aggregate_type, aggregate_id, aggregate_version, tenant_id,
+    correlation_id, causation_id, partition_key, payload, payload_digest,
+    status, available_at, attempt_count, occurred_at, created_at
+)
+SELECT
+    :'completion_task_created_outbox_id', :'completion_task_created_event_id',
+    'task', 'task.created', 1, 'Task', :'completion_task_id', 1, 'tenant-local',
+    :'completion_correlation_id', :'completion_start_event_id', :'completion_task_id',
+    payload, encode(sha256(convert_to(payload::text, 'UTF8')), 'hex'),
+    'PENDING', now(), 0, now(), now()
+FROM task_created_payload;
