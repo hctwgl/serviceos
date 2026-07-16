@@ -1,10 +1,17 @@
 ---
 title: 应用投影、队列、保存视图与偏好逻辑数据模型
 version: 0.1.0
-status: Proposed
+status: Accepted
 ---
 
 # 应用投影、队列、保存视图与偏好逻辑数据模型
+
+## 0. 接受范围（M84）
+
+**Accepted（可指导实现）**：§1 原则、§2 投影运行时、§12 中与 checkpoint/dead letter 保留相关的约束、§13 重建与切换。
+M84 仅将上述语义落实到 `work-order-core-timeline.v1`。
+
+**仍为设计草案、不得在未再接受前实现**：§3 工单工作区/列表其余投影扩展、§4～§11 队列/SavedView/偏好/搜索/移动同步/指标，以及多投影通用平台与 Portal。
 
 ## 1. 原则
 
@@ -56,8 +63,8 @@ status: Proposed
 M73 以 `rdm_work_order_timeline_entry` 实现 WorkOrder/Workflow/Stage/Task 核心事件子集；M74 在同一投影
 合并 Appointment/Visit/ContactAttempt；M75 合并 SLA；M76 合并 form/snapshot/review/correction，显式保留 occurred/received
 双时间且不保存自由文本、payload 或 PII。M77～M83 另合并外发交付全链路、exception.acknowledged/resolved、
-ServiceAssignment、Task 指派/Guard/人工接管、外部审核回执与条件处置。试算/结算、checkpoint 和重建作业
-仍是未实现边界。
+ServiceAssignment、Task 指派/Guard/人工接管、外部审核回执与条件处置。M84 已为该投影建立
+checkpoint/dead letter 与 generation 重建；试算/结算、工作区/队列/SavedView/搜索仍是未实现边界。
 
 ## 4. 队列投影
 

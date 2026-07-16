@@ -19,19 +19,20 @@ import java.util.UUID;
 
 @Service
 final class DefaultWorkOrderTimelineQueryService implements WorkOrderTimelineQueryService {
-    private static final String FRESHNESS_UNKNOWN = "UNKNOWN";
-
     private final WorkOrderQueryService workOrders;
     private final WorkOrderTimelineRepository timelines;
+    private final WorkOrderTimelineProjectionRuntime projectionRuntime;
     private final Clock clock;
 
     DefaultWorkOrderTimelineQueryService(
             WorkOrderQueryService workOrders,
             WorkOrderTimelineRepository timelines,
+            WorkOrderTimelineProjectionRuntime projectionRuntime,
             Clock clock
     ) {
         this.workOrders = workOrders;
         this.timelines = timelines;
+        this.projectionRuntime = projectionRuntime;
         this.clock = clock;
     }
 
@@ -51,10 +52,13 @@ final class DefaultWorkOrderTimelineQueryService implements WorkOrderTimelineQue
 
         // cursor 只定位读取位置；每页均重新执行 M68 的 tenant 隔离与实时 Project Scope 鉴权。
         WorkOrderDetail workOrder = workOrders.get(principal, correlationId, workOrderId);
+        WorkOrderTimelineProjectionRuntime.ProjectionState state = projectionRuntime.requireState();
+        int generation = state.activeGeneration();
         Cursor decoded = decodeCursor(cursor, workOrderId);
         List<WorkOrderTimelineItem> fetched = timelines.findPage(
                 principal.tenantId(),
                 workOrderId,
+                generation,
                 decoded == null ? null : decoded.occurredAt(),
                 decoded == null ? null : decoded.entryId(),
                 limit + 1);
@@ -66,8 +70,26 @@ final class DefaultWorkOrderTimelineQueryService implements WorkOrderTimelineQue
                 selected,
                 last == null ? null : encodeCursor(workOrderId, last.occurredAt(), last.id()),
                 clock.instant(),
-                timelines.findLastProjectedAt(principal.tenantId(), workOrderId),
-                FRESHNESS_UNKNOWN);
+                timelines.findLastProjectedAt(principal.tenantId(), workOrderId, generation),
+                freshness(principal.tenantId(), state, generation));
+    }
+
+    private String freshness(
+            String tenantId,
+            WorkOrderTimelineProjectionRuntime.ProjectionState state,
+            int generation
+    ) {
+        if ("REBUILDING".equals(state.status())) {
+            return "REBUILDING";
+        }
+        if ("FAILED".equals(state.status())
+                || projectionRuntime.hasOpenDeadLetters(tenantId, generation)) {
+            return "LAGGING";
+        }
+        if (projectionRuntime.findCheckpoint(tenantId, generation).isEmpty()) {
+            return "UNKNOWN";
+        }
+        return "FRESH";
     }
 
     private static String encodeCursor(UUID workOrderId, Instant occurredAt, UUID entryId) {

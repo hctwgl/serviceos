@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.54.0
+  version: 0.55.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -2057,7 +2057,7 @@ components:
         nextCursor: { type: [string, 'null'] }
         asOf: { type: string, format: date-time }
         lastProjectedAt: { type: [string, 'null'], format: date-time }
-        freshnessStatus: { enum: [UNKNOWN] }
+        freshnessStatus: { enum: [FRESH, LAGGING, UNKNOWN, REBUILDING] }
     WorkflowInstance:
       type: object
       additionalProperties: false

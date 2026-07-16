@@ -76,6 +76,9 @@ class WorkOrderTimelinePostgresIT {
     private WorkOrderTimelineQueryService timelines;
 
     @Autowired
+    private WorkOrderTimelineRebuildService rebuildService;
+
+    @Autowired
     private WorkOrderCommandService workOrders;
 
     @Autowired
@@ -99,7 +102,8 @@ class WorkOrderTimelinePostgresIT {
     @BeforeEach
     void seed() {
         jdbc.sql("""
-                TRUNCATE TABLE rdm_work_order_timeline_entry, rel_inbox_record,
+                TRUNCATE TABLE rdm_projection_dead_letter, rdm_projection_checkpoint,
+                    rdm_work_order_timeline_entry, rel_inbox_record,
                     aud_audit_record, tsk_task_execution_attempt, tsk_task,
                     ops_task_failure_recovery, ops_exception_ack_result, ops_operational_exception,
                     rel_outbox_publish_attempt, rel_outbox_event,
@@ -110,6 +114,15 @@ class WorkOrderTimelinePostgresIT {
                     wo_work_order, cfg_configuration_bundle_item, cfg_configuration_bundle,
                     cfg_configuration_asset_version, prj_project,
                     auth_role_field_policy, auth_role_grant, auth_role_capability, auth_role CASCADE
+                """).update();
+        jdbc.sql("""
+                UPDATE rdm_projection_state
+                   SET active_generation = 1,
+                       status = 'RUNNING',
+                       last_rebuild_started_at = NULL,
+                       last_rebuild_completed_at = NULL,
+                       updated_at = now()
+                 WHERE projection_code = 'work-order-core-timeline.v1'
                 """).update();
         projectId = project();
         bundle = bundle();
@@ -170,7 +183,7 @@ class WorkOrderTimelinePostgresIT {
         assertThat(first.items().get(1).actorId()).isEqualTo("technician-1");
         assertThat(first.nextCursor()).isNotBlank();
         assertThat(first.lastProjectedAt()).isNotNull();
-        assertThat(first.freshnessStatus()).isEqualTo("UNKNOWN");
+        assertThat(first.freshnessStatus()).isEqualTo("FRESH");
 
         var second = timelines.list(
                 principal("reader", TENANT), "corr-page-2", workOrderId, first.nextCursor(), 10);
@@ -256,8 +269,83 @@ class WorkOrderTimelinePostgresIT {
                 "corr-cross", workOrderId, null, 10))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.RESOURCE_NOT_FOUND));
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("076");
-        assertThat(flyway.info().applied()).hasSize(78);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("077");
+        assertThat(flyway.info().applied()).hasSize(79);
+    }
+
+    @Test
+    void rebuildSwitchesGenerationAtomicallyAndKeepsOldGenerationReadableUntilSwitch() {
+        Instant occurredAt = Instant.parse("2026-07-16T08:00:00Z");
+        OutboxMessage claimed = message(
+                "task", "task.claimed", 1, "Task", taskId, 2,
+                new TaskClaimedPayload(taskId, "technician-1", occurredAt), occurredAt);
+        handler.handle(claimed);
+        insertPublished(claimed);
+
+        assertThat(timelines.list(principal("reader", TENANT), "corr-before-rebuild", workOrderId, null, 10)
+                .freshnessStatus()).isEqualTo("FRESH");
+        assertThat(jdbc.sql("""
+                SELECT active_generation FROM rdm_projection_state
+                 WHERE projection_code='work-order-core-timeline.v1'
+                """).query(Integer.class).single()).isEqualTo(1);
+
+        var result = rebuildService.rebuild();
+        assertThat(result.switched()).isTrue();
+        assertThat(result.activeGeneration()).isEqualTo(2);
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM rdm_work_order_timeline_entry WHERE rebuild_generation=1
+                """).query(Long.class).single()).isEqualTo(1);
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM rdm_work_order_timeline_entry WHERE rebuild_generation=2
+                """).query(Long.class).single()).isEqualTo(1);
+
+        var page = timelines.list(principal("reader", TENANT), "corr-after-rebuild", workOrderId, null, 10);
+        assertThat(page.items()).extracting(WorkOrderTimelineItem::eventType)
+                .containsExactly("task.claimed");
+        assertThat(page.freshnessStatus()).isEqualTo("FRESH");
+    }
+
+    @Test
+    void rebuildFailureRecordsDeadLetterWithoutSwitchingGeneration() {
+        Instant occurredAt = Instant.parse("2026-07-16T09:00:00Z");
+        OutboxMessage good = message(
+                "task", "task.claimed", 1, "Task", taskId, 2,
+                new TaskClaimedPayload(taskId, "technician-1", occurredAt), occurredAt);
+        handler.handle(good);
+        insertPublished(good);
+
+        // 错误 Project 使重建失败关闭；旧 generation 必须继续可读。
+        UUID workflowId = UUID.randomUUID();
+        OutboxMessage bad = message(
+                "workflow", "workflow.started", 1, "Workflow", workflowId, 1,
+                new WorkflowStartedPayload(
+                        workflowId, UUID.randomUUID(), workOrderId, bundle.bundleId(),
+                        UUID.randomUUID(), "SURVEY_INSTALL", "1.0.0", "c".repeat(64),
+                        occurredAt.plusSeconds(1)),
+                occurredAt.plusSeconds(1));
+        insertPublished(bad);
+
+        var result = rebuildService.rebuild();
+        assertThat(result.switched()).isFalse();
+        assertThat(result.activeGeneration()).isEqualTo(1);
+        assertThat(jdbc.sql("""
+                SELECT status FROM rdm_projection_state
+                 WHERE projection_code='work-order-core-timeline.v1'
+                """).query(String.class).single()).isEqualTo("FAILED");
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM rdm_projection_dead_letter WHERE resolved_at IS NULL
+                """).query(Long.class).single()).isEqualTo(1);
+
+        var page = timelines.list(principal("reader", TENANT), "corr-lagging", workOrderId, null, 10);
+        assertThat(page.items()).extracting(WorkOrderTimelineItem::eventType)
+                .containsExactly("task.claimed");
+        assertThat(page.freshnessStatus()).isEqualTo("LAGGING");
+    }
+
+    @Test
+    void freshnessIsUnknownUntilCheckpointExists() {
+        assertThat(timelines.list(principal("reader", TENANT), "corr-unknown", workOrderId, null, 10)
+                .freshnessStatus()).isEqualTo("UNKNOWN");
     }
 
     @Test
@@ -1240,6 +1328,40 @@ class WorkOrderTimelinePostgresIT {
                 aggregateType, aggregateId.toString(), aggregateVersion, TENANT,
                 "corr-" + eventType, UUID.randomUUID().toString(), aggregateId.toString(),
                 json, Sha256.digest(json), occurredAt, 1);
+    }
+
+    private void insertPublished(OutboxMessage message) {
+        jdbc.sql("""
+                INSERT INTO rel_outbox_event (
+                    outbox_id, event_id, module_name, event_type, schema_version,
+                    aggregate_type, aggregate_id, aggregate_version,
+                    tenant_id, correlation_id, causation_id, partition_key,
+                    payload, payload_digest, status, available_at, occurred_at, created_at,
+                    published_at, attempt_count
+                ) VALUES (
+                    :outboxId, :eventId, :module, :eventType, :schemaVersion,
+                    :aggregateType, :aggregateId, :aggregateVersion,
+                    :tenantId, :correlationId, :causationId, :partitionKey,
+                    CAST(:payload AS jsonb), :payloadDigest, 'PUBLISHED',
+                    :occurredAt, :occurredAt, :occurredAt, :occurredAt, 1
+                )
+                """)
+                .param("outboxId", message.outboxId())
+                .param("eventId", message.eventId())
+                .param("module", message.module())
+                .param("eventType", message.eventType())
+                .param("schemaVersion", message.schemaVersion())
+                .param("aggregateType", message.aggregateType())
+                .param("aggregateId", message.aggregateId())
+                .param("aggregateVersion", message.aggregateVersion())
+                .param("tenantId", message.tenantId())
+                .param("correlationId", message.correlationId())
+                .param("causationId", message.causationId())
+                .param("partitionKey", message.partitionKey())
+                .param("payload", message.payload())
+                .param("payloadDigest", message.payloadDigest())
+                .param("occurredAt", java.sql.Timestamp.from(message.occurredAt()))
+                .update();
     }
 
     private UUID project() {

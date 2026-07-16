@@ -136,8 +136,8 @@ class TaskExecutionAttemptPostgresIT {
                 50))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.RESOURCE_NOT_FOUND));
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("076");
-        assertThat(flyway.info().applied()).hasSize(78);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("077");
+        assertThat(flyway.info().applied()).hasSize(79);
     }
 
     private UUID task(String kind, int attemptCount) {

@@ -84,3 +84,4 @@
 - [M81 工单 Task 指派与执行保护时间线事件合并验收矩阵](78-m81-work-order-task-assignment-guard-timeline-acceptance.md)
 - [M82 工单外部审核回执时间线事件合并验收矩阵](79-m82-work-order-external-receipt-timeline-acceptance.md)
 - [M83 工单条件处置时间线事件合并验收矩阵](80-m83-work-order-condition-disposition-timeline-acceptance.md)
+- [M84 工单时间线投影 Checkpoint 与重建验收矩阵](81-m84-work-order-timeline-projection-checkpoint-rebuild-acceptance.md)

@@ -45,10 +45,11 @@ import java.util.UUID;
  * 把已发布的核心执行、现场履约、SLA、资料审核、条件处置、外发交付、ServiceAssignment、Task 指派/Guard
  * 与外部审核回执事件规范化为工单时间线。
  * Inbox 与投影写入同事务，任何身份错配都会整体回滚；不保存 PII、自由文本、GPS、候选人列表或指派细节。
+ * M84 起写入当前 active generation 并推进 checkpoint。
  */
 @Service
-final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
-    private static final String CONSUMER = "readmodel.work-order-core-timeline.v1";
+final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler, WorkOrderTimelineRebuildProjector {
+    static final String CONSUMER = "readmodel.work-order-core-timeline.v1";
     private static final Set<String> V1_EVENTS = Set.of(
             "workorder.received", "workorder.activated", "workorder.fulfilled",
             "workflow.started", "workflow.completed",
@@ -88,6 +89,7 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
 
     private final InboxService inbox;
     private final WorkOrderTimelineRepository timelines;
+    private final WorkOrderTimelineProjectionRuntime projectionRuntime;
     private final WorkOrderScopeQuery workOrderScopes;
     private final TaskTimelineContextQuery taskContexts;
     private final DeliveryTimelineContextQuery deliveryContexts;
@@ -99,6 +101,7 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
     WorkOrderCoreTimelineHandler(
             InboxService inbox,
             WorkOrderTimelineRepository timelines,
+            WorkOrderTimelineProjectionRuntime projectionRuntime,
             WorkOrderScopeQuery workOrderScopes,
             TaskTimelineContextQuery taskContexts,
             DeliveryTimelineContextQuery deliveryContexts,
@@ -109,6 +112,7 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
     ) {
         this.inbox = inbox;
         this.timelines = timelines;
+        this.projectionRuntime = projectionRuntime;
         this.workOrderScopes = workOrderScopes;
         this.taskContexts = taskContexts;
         this.deliveryContexts = deliveryContexts;
@@ -123,6 +127,11 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             "service.assignment.task-prepared",
             "service.assignment.activated",
             "service.assignment.activation-aborted");
+
+    /** 重建扫描用的事件类型全集（含仅 @v2 的握手事件）。 */
+    static Set<String> supportedEventTypes() {
+        return V1_EVENTS;
+    }
 
     @Override
     public boolean supports(String eventType, int schemaVersion) {
@@ -152,14 +161,54 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             return;
         }
 
+        int generation = projectionRuntime.requireState().activeGeneration();
         Optional<TimelineFact> normalized = normalize(message);
         if (normalized.isEmpty()) {
             // 非工单 Task 明确记为已消费但不产生工单投影，不能阻塞独立运营任务的事件发布。
             inbox.complete(message.tenantId(), CONSUMER, message.eventId(),
                     Sha256.digest("IGNORED_NO_WORK_ORDER|" + message.aggregateId()));
+            projectionRuntime.advanceCheckpoint(
+                    message.tenantId(), generation, message.outboxId(),
+                    message.occurredAt(), clock.instant());
             return;
         }
         TimelineFact fact = normalized.orElseThrow();
+        writeEntry(message, fact, generation, true);
+        inbox.complete(message.tenantId(), CONSUMER, message.eventId(),
+                Sha256.digest(message.eventId() + "|" + fact.workOrderId()));
+        projectionRuntime.advanceCheckpoint(
+                message.tenantId(), generation, message.outboxId(),
+                message.occurredAt(), clock.instant());
+    }
+
+    /**
+     * 重建写入指定 generation：绕过 Inbox，冲突幂等忽略。
+     * @return true 表示写入或忽略无工单事件；失败抛异常由重建作业登记 dead letter。
+     */
+    @Transactional
+    public void projectForRebuild(OutboxMessage message, int rebuildGeneration) {
+        if (!supports(message.eventType(), message.schemaVersion())) {
+            return;
+        }
+        Optional<TimelineFact> normalized = normalize(message);
+        if (normalized.isEmpty()) {
+            projectionRuntime.advanceCheckpoint(
+                    message.tenantId(), rebuildGeneration, message.outboxId(),
+                    message.occurredAt(), clock.instant());
+            return;
+        }
+        writeEntry(message, normalized.orElseThrow(), rebuildGeneration, false);
+        projectionRuntime.advanceCheckpoint(
+                message.tenantId(), rebuildGeneration, message.outboxId(),
+                message.occurredAt(), clock.instant());
+    }
+
+    private void writeEntry(
+            OutboxMessage message,
+            TimelineFact fact,
+            int rebuildGeneration,
+            boolean requireInsert
+    ) {
         WorkOrderScope scope = workOrderScopes.find(message.tenantId(), fact.workOrderId())
                 .orElseThrow(() -> new IllegalStateException("时间线事件引用的工单不存在"));
         if (fact.projectId() != null && !scope.projectId().equals(fact.projectId())) {
@@ -169,8 +218,8 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             throw new IllegalArgumentException("时间线事件发生时间与载荷不一致");
         }
 
-        timelines.append(new WorkOrderTimelineRepository.TimelineEntry(
-                message.eventId(),
+        WorkOrderTimelineRepository.TimelineEntry entry = new WorkOrderTimelineRepository.TimelineEntry(
+                UUID.randomUUID(),
                 message.tenantId(),
                 scope.projectId(),
                 fact.workOrderId(),
@@ -189,9 +238,13 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
                 templateCode(message.eventType()),
                 1,
                 fact.occurredAt(),
-                clock.instant()));
-        inbox.complete(message.tenantId(), CONSUMER, message.eventId(),
-                Sha256.digest(message.eventId() + "|" + fact.workOrderId()));
+                clock.instant(),
+                rebuildGeneration);
+        if (requireInsert) {
+            timelines.append(entry);
+        } else {
+            timelines.appendIfAbsent(entry);
+        }
     }
 
     private Optional<TimelineFact> normalize(OutboxMessage message) {

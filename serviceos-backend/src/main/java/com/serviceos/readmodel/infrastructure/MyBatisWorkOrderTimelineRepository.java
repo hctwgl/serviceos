@@ -21,6 +21,13 @@ final class MyBatisWorkOrderTimelineRepository implements WorkOrderTimelineRepos
 
     @Override
     public void append(TimelineEntry entry) {
+        if (!appendIfAbsent(entry)) {
+            throw new IllegalStateException("时间线来源事件已存在但 Inbox 未识别为重放");
+        }
+    }
+
+    @Override
+    public boolean appendIfAbsent(TimelineEntry entry) {
         Map<String, Object> values = new LinkedHashMap<>();
         values.put("timelineEntryId", entry.timelineEntryId());
         values.put("tenantId", entry.tenantId());
@@ -42,28 +49,35 @@ final class MyBatisWorkOrderTimelineRepository implements WorkOrderTimelineRepos
         values.put("displayTemplateVersion", entry.displayTemplateVersion());
         values.put("occurredAt", entry.occurredAt());
         values.put("receivedAt", entry.receivedAt());
-        if (mapper.append(values) != 1) {
-            throw new IllegalStateException("时间线来源事件已存在但 Inbox 未识别为重放");
-        }
+        values.put("rebuildGeneration", entry.rebuildGeneration());
+        return mapper.append(values) == 1;
     }
 
     @Override
     public List<WorkOrderTimelineItem> findPage(
             String tenantId,
             UUID workOrderId,
+            int rebuildGeneration,
             Instant beforeOccurredAt,
             UUID beforeEntryId,
             int fetchSize
     ) {
-        return mapper.findPage(tenantId, workOrderId, beforeOccurredAt, beforeEntryId, fetchSize)
+        return mapper.findPage(
+                        tenantId, workOrderId, rebuildGeneration,
+                        beforeOccurredAt, beforeEntryId, fetchSize)
                 .stream()
                 .map(MyBatisWorkOrderTimelineRepository::item)
                 .toList();
     }
 
     @Override
-    public Instant findLastProjectedAt(String tenantId, UUID workOrderId) {
-        return mapper.findLastProjectedAt(tenantId, workOrderId);
+    public Instant findLastProjectedAt(String tenantId, UUID workOrderId, int rebuildGeneration) {
+        return mapper.findLastProjectedAt(tenantId, workOrderId, rebuildGeneration);
+    }
+
+    @Override
+    public long countGeneration(int rebuildGeneration) {
+        return mapper.countGeneration(rebuildGeneration);
     }
 
     private static WorkOrderTimelineItem item(Map<String, Object> row) {
