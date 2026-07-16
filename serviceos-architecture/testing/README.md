@@ -85,3 +85,4 @@
 - [M82 工单外部审核回执时间线事件合并验收矩阵](79-m82-work-order-external-receipt-timeline-acceptance.md)
 - [M83 工单条件处置时间线事件合并验收矩阵](80-m83-work-order-condition-disposition-timeline-acceptance.md)
 - [M84 工单时间线投影 Checkpoint 与重建验收矩阵](81-m84-work-order-timeline-projection-checkpoint-rebuild-acceptance.md)
+- [M85 工单工作区只读组合快照验收矩阵](82-m85-work-order-workspace-query-acceptance.md)

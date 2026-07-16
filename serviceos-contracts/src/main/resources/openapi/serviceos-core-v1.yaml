@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.55.0
+  version: 0.56.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -100,6 +100,27 @@ paths:
             ETag: { required: true, schema: { type: string } }
             X-Correlation-Id: { required: true, schema: { type: string } }
           content: { application/json: { schema: { $ref: '#/components/schemas/WorkOrderTimelinePage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /work-orders/{workOrderId}/workspace:
+    get:
+      operationId: getWorkOrderWorkspace
+      summary: 查询工单工作区顶层组合快照
+      description: >-
+        复用 workOrder.read 实时鉴权，组合 Task/时间线 freshness 与可选 SLA/异常摘要。
+        不含客户 PII；大区块按需加载与队列不在本切片。
+      parameters:
+        - { name: workOrderId, in: path, required: true, schema: { type: string, format: uuid } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 工单工作区顶层快照
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/WorkOrderWorkspace' } } }
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
@@ -2058,6 +2079,73 @@ components:
         asOf: { type: string, format: date-time }
         lastProjectedAt: { type: [string, 'null'], format: date-time }
         freshnessStatus: { enum: [FRESH, LAGGING, UNKNOWN, REBUILDING] }
+    WorkOrderWorkspaceTaskSummary:
+      type: object
+      additionalProperties: false
+      required: [taskId, taskType, taskKind, status, stageCode, claimedBy, version]
+      properties:
+        taskId: { type: string, format: uuid }
+        taskType: { type: string, minLength: 1, maxLength: 100 }
+        taskKind: { enum: [HUMAN, AUTOMATED] }
+        status: { type: string, minLength: 1, maxLength: 40 }
+        stageCode: { type: [string, 'null'], minLength: 1, maxLength: 100 }
+        claimedBy: { type: [string, 'null'], minLength: 1, maxLength: 128 }
+        version: { type: integer, format: int64, minimum: 1 }
+    WorkOrderWorkspaceSlaSummary:
+      type: object
+      additionalProperties: false
+      required: [openCount, breachedCount]
+      properties:
+        openCount: { type: integer, minimum: 0 }
+        breachedCount: { type: integer, minimum: 0 }
+    WorkOrderWorkspaceExceptionSummary:
+      type: object
+      additionalProperties: false
+      required: [openCount]
+      properties:
+        openCount: { type: integer, minimum: 0 }
+    WorkOrderWorkspaceSourceVersions:
+      type: object
+      additionalProperties: false
+      required: [workOrderVersion]
+      properties:
+        workOrderVersion: { type: integer, format: int64, minimum: 1 }
+    WorkOrderWorkspaceMeta:
+      type: object
+      additionalProperties: false
+      required: [asOf, projectionCheckpoint, freshnessStatus, queryId]
+      properties:
+        asOf: { type: string, format: date-time }
+        projectionCheckpoint: { type: string, minLength: 1, maxLength: 160 }
+        freshnessStatus: { enum: [FRESH, LAGGING, UNKNOWN, REBUILDING] }
+        queryId: { type: string, minLength: 1, maxLength: 64 }
+    WorkOrderWorkspace:
+      type: object
+      additionalProperties: false
+      required: [header, currentTaskSummary, sectionAvailability, allowedActionLink,
+        slaSummary, exceptionSummary, timelineFreshnessStatus, sourceVersions, meta]
+      properties:
+        header: { $ref: '#/components/schemas/WorkOrder' }
+        currentTaskSummary:
+          oneOf:
+            - { $ref: '#/components/schemas/WorkOrderWorkspaceTaskSummary' }
+            - { type: 'null' }
+        sectionAvailability:
+          type: object
+          additionalProperties: { enum: [AVAILABLE, EMPTY, UNAVAILABLE] }
+          minProperties: 1
+        allowedActionLink: { type: [string, 'null'], minLength: 1, maxLength: 200 }
+        slaSummary:
+          oneOf:
+            - { $ref: '#/components/schemas/WorkOrderWorkspaceSlaSummary' }
+            - { type: 'null' }
+        exceptionSummary:
+          oneOf:
+            - { $ref: '#/components/schemas/WorkOrderWorkspaceExceptionSummary' }
+            - { type: 'null' }
+        timelineFreshnessStatus: { enum: [FRESH, LAGGING, UNKNOWN, REBUILDING] }
+        sourceVersions: { $ref: '#/components/schemas/WorkOrderWorkspaceSourceVersions' }
+        meta: { $ref: '#/components/schemas/WorkOrderWorkspaceMeta' }
     WorkflowInstance:
       type: object
       additionalProperties: false
