@@ -25,6 +25,7 @@ VALUES
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'evidence.read', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'evidence.submit', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'evidence.review', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'evidence.waiveCorrection', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'dispatch.read', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'integration.readInbound', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'integration.readOutbound', now()),

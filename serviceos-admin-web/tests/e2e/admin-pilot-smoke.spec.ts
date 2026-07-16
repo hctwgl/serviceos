@@ -20,7 +20,23 @@ async function loginWithLocalKeycloak(page: import('@playwright/test').Page) {
 
 test('真实 OIDC 登录后可读取核心投影并完成 Task 分配领取释放写链路', async ({ page }) => {
   await loginWithLocalKeycloak(page)
+  await expect(page.getByRole('heading', { name: '授权工单目录' })).toBeVisible()
+  await expect(page.getByText('加载中…')).toHaveCount(0)
   const pilotLink = page.getByRole('link', { name: 'ADMIN-PILOT-001' })
+  // 本地冒烟会按“每轮新建、绝不回退历史事实”累积动态工单；固定基线工单可能不在首屏。
+  // 通过真实游标分页查找，既保持目录查询证明，也避免依赖数据库清理或排序巧合。
+  for (let pageNo = 0; pageNo < 20 && (await pilotLink.count()) === 0; pageNo += 1) {
+    const nextButton = page.getByRole('button', { name: '下一页' })
+    expect(await nextButton.isEnabled(), '20 页内未找到固定 Admin 试点工单').toBe(true)
+    const nextResponsePromise = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'GET' &&
+        response.url().includes('/api/v1/work-orders') &&
+        response.url().includes('cursor='),
+    )
+    await nextButton.click()
+    expect((await nextResponsePromise).status()).toBe(200)
+  }
   await expect(pilotLink).toBeVisible()
   await pilotLink.click()
 
@@ -296,4 +312,197 @@ test('真实 OIDC 登录后可完成 Task 并可靠推进 Workflow 与 WorkOrder
     taskId,
     status: 'COMPLETED',
   })
+})
+
+test('真实 OIDC 登录后审核驳回可进入整改队列并授权豁免整改 Task', async ({ page }) => {
+  test.setTimeout(90_000)
+  const workOrderCode = process.env.ADMIN_PILOT_CORRECTION_WORK_ORDER_CODE
+  const taskId = process.env.ADMIN_PILOT_CORRECTION_TASK_ID
+  expect(workOrderCode, '缺少动态整改验证工单编码').toBeTruthy()
+  expect(taskId, '缺少动态整改验证 Task ID').toBeTruthy()
+
+  await loginWithLocalKeycloak(page)
+  await page.getByRole('link', { name: workOrderCode! }).click()
+  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+
+  await page
+    .getByLabel('assign-candidates principalIds')
+    .fill('06b612f3-a901-4b0e-bd90-86b4259cc087')
+  await page.getByLabel('sourceId').fill('admin-pilot-correction-e2e')
+  const assignmentResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(`/api/v1/tasks/${taskId}:assign-candidates`),
+  )
+  await page.getByRole('button', { name: 'assign-candidates', exact: true }).click()
+  expect((await assignmentResponsePromise).status()).toBe(200)
+
+  const claimResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(`/api/v1/tasks/${taskId}:claim`),
+  )
+  await page.getByRole('button', { name: '领取任务' }).click()
+  expect((await claimResponsePromise).status()).toBe(200)
+
+  const startResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(`/api/v1/tasks/${taskId}:start`),
+  )
+  await page.getByRole('button', { name: '启动任务' }).click()
+  expect((await startResponsePromise).status()).toBe(200)
+
+  await page.getByRole('link', { name: new RegExp(taskId!) }).click()
+  await expect(page.getByRole('heading', { name: '任务详情' })).toBeVisible()
+  await expect(page.getByRole('cell', { name: 'completion.photo', exact: true })).toBeVisible({
+    timeout: 30_000,
+  })
+
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+    'base64',
+  )
+  await page.getByLabel('文件').setInputFiles({
+    name: 'admin-pilot-correction.png',
+    mimeType: 'image/png',
+    buffer: png,
+  })
+  const finalizeResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().includes(`/api/v1/tasks/${taskId}/evidence-slots/`) &&
+      response.url().endsWith(':finalize'),
+  )
+  await page.getByRole('button', { name: 'upload + finalize' }).click()
+  const finalizeResponse = await finalizeResponsePromise
+  expect(finalizeResponse.status()).toBe(201)
+  const evidenceItem = (await finalizeResponse.json()) as {
+    revisions: Array<{ evidenceRevisionId: string }>
+  }
+  const evidenceRevisionId = evidenceItem.revisions.at(-1)?.evidenceRevisionId
+  expect(evidenceRevisionId, 'Finalize 未返回整改验证 EvidenceRevision').toBeTruthy()
+
+  const orchestrationHeader = page
+    .getByRole('heading', { name: '表单 / 资料编排' })
+    .locator('..')
+  await expect
+    .poll(
+      async () => {
+        await orchestrationHeader.getByRole('button', { name: '刷新' }).click()
+        return page
+          .getByRole('row')
+          .filter({ hasText: evidenceRevisionId! })
+          .filter({ hasText: 'VALIDATED' })
+          .count()
+      },
+      { timeout: 30_000 },
+    )
+    .toBeGreaterThan(0)
+
+  const snapshotResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(`/api/v1/tasks/${taskId}/evidence-set-snapshots`),
+  )
+  await page.getByRole('button', { name: 'createEvidenceSetSnapshot' }).click()
+  expect((await snapshotResponsePromise).status()).toBe(201)
+
+  const reviewCreateResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith('/api/v1/review-cases'),
+  )
+  await page.getByRole('button', { name: 'createReviewCase' }).click()
+  const reviewCreateResponse = await reviewCreateResponsePromise
+  expect(reviewCreateResponse.status()).toBe(201)
+  const reviewCase = (await reviewCreateResponse.json()) as {
+    reviewCaseId: string
+    status: string
+  }
+  expect(reviewCase.status).toBe('OPEN')
+
+  const reviewPage = await page.context().newPage()
+  await reviewPage.goto(
+    new URL(
+      await page
+        .getByRole('link', { name: new RegExp(`打开审核案例 ${reviewCase.reviewCaseId}`) })
+        .getAttribute('href') as string,
+      page.url(),
+    ).toString(),
+  )
+  await reviewPage.getByLabel('decision').selectOption('REJECTED')
+  await reviewPage.getByLabel('reasonCodes（逗号分隔）').fill('IMAGE.BLUR')
+  await reviewPage.getByLabel('note').fill('Admin pilot correction required')
+  const rejectResponsePromise = reviewPage.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(`/api/v1/review-cases/${reviewCase.reviewCaseId}:decide`),
+  )
+  await reviewPage.getByRole('button', { name: 'decide', exact: true }).click()
+  const rejectResponse = await rejectResponsePromise
+  expect(rejectResponse.status()).toBe(200)
+  expect(await rejectResponse.json()).toMatchObject({
+    reviewCaseId: reviewCase.reviewCaseId,
+    status: 'REJECTED',
+  })
+  await expect(reviewPage.getByText('已裁决为 REJECTED')).toBeVisible()
+  await expect(reviewPage.getByRole('cell', { name: 'REJECTED', exact: true })).toBeVisible()
+
+  // REJECTED 会同事务创建并激活整改 Case/Task。通过真实授权队列定位来源审核，
+  // 再在详情页执行 CRITICAL 豁免，证明 Case 终态与整改 Task 取消同时成立。
+  const correctionPage = await page.context().newPage()
+  const correctionQueueResponsePromise = correctionPage.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      response.url().includes('/api/v1/correction-cases') &&
+      response.url().includes('status=IN_PROGRESS'),
+  )
+  await correctionPage.goto(new URL('/corrections', page.url()).toString())
+  const correctionQueueResponse = await correctionQueueResponsePromise
+  expect(correctionQueueResponse.status()).toBe(200)
+  const correctionQueue = (await correctionQueueResponse.json()) as {
+    items: Array<{
+      correctionCaseId: string
+      sourceReviewCaseId: string
+      correctionTaskId: string | null
+      status: string
+    }>
+  }
+  const correction = correctionQueue.items.find(
+    (item) => item.sourceReviewCaseId === reviewCase.reviewCaseId,
+  )
+  expect(correction, '整改队列未返回本轮驳回生成的 CorrectionCase').toBeTruthy()
+  expect(correction).toMatchObject({ status: 'IN_PROGRESS' })
+  expect(correction?.correctionTaskId, '驳回未自动创建整改 Task').toBeTruthy()
+
+  await correctionPage
+    .getByRole('link', { name: `打开整改案例 ${correction!.correctionCaseId}` })
+    .click()
+  await expect(correctionPage.getByRole('heading', { name: '整改案例' })).toBeVisible()
+  await expect(correctionPage.getByText('IN_PROGRESS', { exact: true })).toBeVisible()
+  await expect(correctionPage.getByText(correction!.correctionTaskId!, { exact: true })).toBeVisible()
+
+  await correctionPage.getByLabel('waive reason').fill('Pilot authorized correction waiver')
+  await correctionPage.getByLabel('waive approvalRef').fill('ADMIN-PILOT-WAIVE-001')
+  const waiveResponsePromise = correctionPage.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(
+        `/api/v1/correction-cases/${correction!.correctionCaseId}:waive`,
+      ),
+  )
+  await correctionPage.getByRole('button', { name: 'waive', exact: true }).click()
+  const waiveResponse = await waiveResponsePromise
+  expect(waiveResponse.status()).toBe(200)
+  expect(await waiveResponse.json()).toMatchObject({
+    correctionCaseId: correction!.correctionCaseId,
+    status: 'WAIVED',
+  })
+  await expect(correctionPage.getByText('已豁免，status=WAIVED')).toBeVisible()
+  await expect(correctionPage.getByText('WAIVED', { exact: true })).toBeVisible()
+  await expect(correctionPage.getByText(correction!.correctionTaskId!, { exact: true })).toBeVisible()
+
+  await correctionPage.close()
+  await reviewPage.close()
 })
