@@ -6,18 +6,19 @@ status: Accepted
 
 # 应用工作区、队列与用户偏好 HTTP API
 
-## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92）
+## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93）
 
 **Accepted（可指导实现）**：
 
 - §2 通用查询元数据；
 - §5 中 `GET /api/v1/work-orders/{id}/workspace` 顶层组合快照（M85）；
 - §5 顶层工作区 `serviceAssignmentSummary` 当前 ACTIVE 服务责任摘要（M92）；
+- §5 `GET /api/v1/work-orders/{id}/activity-summary` 最近时间线条目摘要（M93）；
 - §5 中 `GET /api/v1/work-orders/{id}/workspace/sections/{section}`：
   `TASKS`、`TIMELINE_AUDIT`（M87）、`APPOINTMENTS_VISITS`（M88）、
   `FORMS_EVIDENCE`（M89）、`REVIEWS_CORRECTIONS`（M90）与 `INTEGRATION`（M91）。
 
-**仍为设计草案**：§3 导航、§4 工作台与队列、§5 其余 section / activity-summary、
+**仍为设计草案**：§3 导航、§4 工作台与队列、§5 其余 section、
 §6～§11 专项队列/搜索/偏好/导出等。不得在未再接受前实现。
 
 ## 1. 目标
@@ -93,6 +94,9 @@ Queue item 最小模型：
 | `GET /api/v1/work-orders/{id}/workspace` | 工单工作区组合快照 |
 | `GET /api/v1/work-orders/{id}/workspace/sections/{section}` | 大区块按需加载 |
 | `GET /api/v1/work-orders/{id}/activity-summary` | 最近关键业务事件 |
+
+M93 接受的 activity-summary 不引入未定义的“关键事件”分类：它返回时间线按业务时间倒序的
+最近 5 条（可调 1～20），不接受 cursor。完整分页继续使用 `/timeline`。
 
 Workspace 顶层：
 

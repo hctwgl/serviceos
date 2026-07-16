@@ -7,6 +7,7 @@ import com.serviceos.configuration.api.ConfigurationService;
 import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
 import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
 import com.serviceos.identity.api.CurrentPrincipal;
+import com.serviceos.readmodel.api.WorkOrderActivitySummaryQueryService;
 import com.serviceos.readmodel.api.WorkOrderTimelineItem;
 import com.serviceos.readmodel.api.WorkOrderTimelineQueryService;
 import com.serviceos.reliability.spi.OutboxMessage;
@@ -74,6 +75,9 @@ class WorkOrderTimelinePostgresIT {
 
     @Autowired
     private WorkOrderTimelineQueryService timelines;
+
+    @Autowired
+    private WorkOrderActivitySummaryQueryService activitySummaries;
 
     @Autowired
     private WorkOrderTimelineRebuildService rebuildService;
@@ -205,6 +209,41 @@ class WorkOrderTimelinePostgresIT {
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code())
                                 .isEqualTo(ProblemCode.EVENT_PAYLOAD_MISMATCH));
+    }
+
+    @Test
+    void activitySummaryDelegatesLatestTimelineOrderingAndRejectsInvalidLimit() {
+        Instant occurredAt = Instant.parse("2026-07-16T01:30:00Z");
+        handler.handle(message(
+                "task", "task.claimed", 1, "Task", taskId, 2,
+                new TaskClaimedPayload(taskId, "technician-activity", occurredAt), occurredAt));
+        handler.handle(message(
+                "task", "task.released", 1, "Task", taskId, 3,
+                new TaskReleasedPayload(
+                        taskId, "technician-activity", "SHIFT_ENDED", occurredAt.plusSeconds(1)),
+                occurredAt.plusSeconds(1)));
+
+        CurrentPrincipal reader = principal("reader", TENANT);
+        var summary = activitySummaries.get(
+                reader, "corr-activity", workOrderId, 1);
+        var timeline = timelines.list(
+                reader, "corr-timeline-parity", workOrderId, null, 1);
+
+        assertThat(summary.items()).containsExactlyElementsOf(timeline.items());
+        assertThat(summary.items()).extracting(WorkOrderTimelineItem::eventType)
+                .containsExactly("task.released");
+        assertThat(summary.resourceVersion()).isEqualTo(timeline.resourceVersion());
+        assertThat(summary.lastProjectedAt()).isEqualTo(timeline.lastProjectedAt());
+        assertThat(summary.meta().freshnessStatus()).isEqualTo(timeline.freshnessStatus());
+        assertThat(summary.meta().projectionCheckpoint())
+                .startsWith("work-order-core-timeline.v1:gen:");
+        assertThat(summary.toString()).doesNotContain(
+                "payload", "customerName", "note", "resultRef", "activationSagaId");
+
+        assertThatThrownBy(() -> activitySummaries.get(
+                reader, "corr-activity-invalid", workOrderId, 21))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
     }
 
     @Test
