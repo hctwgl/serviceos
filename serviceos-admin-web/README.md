@@ -1,11 +1,10 @@
-# ServiceOS Admin Web（M101～M105）
+# ServiceOS Admin Web（M101～M108）
 
-总部运营后台只读外壳。当前切片提供：
+总部运营后台。当前切片提供：
 
-- Portal shell 与 Page ID 路由：`ADMIN.REVIEW.QUEUE`、`ADMIN.CORRECTION.QUEUE`、
-  `ADMIN.INTEGRATION.OUTBOUND`、`ADMIN.EXCEPTION.QUEUE`、`ADMIN.WORKORDER.WORKSPACE`
-- 调用后端 M85～M100 工作区与专项队列 API
-- 本地保存 JWT，不在前端做 tenant/capability 判定
+- 审核/整改/任务/SLA/异常/外发队列与工单/项目目录
+- 工单工作区（sections/activity-summary）与 allowed-actions 命令面板
+- 本地 JWT；写操作仅调用服务端命令并携带幂等键/版本
 
 ## 开发
 
@@ -13,8 +12,6 @@
 npm install
 npm run dev
 ```
-
-默认通过 Vite 代理访问 `http://127.0.0.1:8080/api`。可在「访问令牌」页粘贴 JWT。
 
 ## 构建
 
@@ -24,4 +21,4 @@ npm run build
 
 ## 明确未实现
 
-设计系统完整 Token、SavedView、正式 OIDC SDK、表单/资料提交流程编排、Network/Technician 端、E2E。
+设计系统、SavedView、正式 OIDC SDK、表单/资料提交流程编排、Network/Technician、E2E。

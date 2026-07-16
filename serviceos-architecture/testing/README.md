@@ -106,3 +106,6 @@
 - [M103 Admin 工作区 allowed-actions 只读投影验收矩阵](100-m103-admin-workspace-allowed-actions-acceptance.md)
 - [M104 Admin 授权工单目录验收矩阵](101-m104-admin-work-order-directory-acceptance.md)
 - [M105 Admin 人工任务命令面板验收矩阵](102-m105-admin-task-command-panel-acceptance.md)
+- [M106 Admin 授权任务目录验收矩阵](103-m106-admin-task-directory-acceptance.md)
+- [M107 Admin SLA 工作台验收矩阵](104-m107-admin-sla-queue-acceptance.md)
+- [M108 Admin 授权项目目录验收矩阵](105-m108-admin-project-directory-acceptance.md)
