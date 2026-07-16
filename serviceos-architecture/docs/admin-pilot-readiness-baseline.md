@@ -1,13 +1,14 @@
 ---
-title: M134 Admin 试点可运行基线
+title: Admin 试点可运行基线（含 M135 正常整改补传）
 status: Implemented
 lastUpdated: 2026-07-16
 ---
 
-# M134 Admin 试点可运行基线
+# Admin 试点可运行基线（含 M135 正常整改补传）
 
-本基线不创建 M135/M136，也不扩大 M134 的业务声明范围。目标是让 M101～M134 已有 Admin
-表面具备可重复构建、可登录、可连接真实后端和数据库的试点入口，并明确完整业务链尚未证明的边界。
+本基线覆盖 M101～M135 已有 Admin 表面的可重复构建、登录、真实后端/数据库试点入口，并明确
+完整业务链尚未证明的边界。M135 在既有局部读写基线上追加正常补传/关闭/复审/完结证明，
+不宣称完整 `ADMIN-PILOT-09`。
 
 ## 1. 已建立的基线
 
@@ -17,7 +18,7 @@ lastUpdated: 2026-07-16
 | Admin CI | GitHub Actions 使用 Node 22 执行不可变安装与生产构建；独立 `admin-pilot-e2e` job 安装 Chrome 并运行真实写链路，staging 等待 Java、Admin build 与 Admin E2E 三个门禁 |
 | 本地身份 | Vite 开发模式显式开启 Keycloak Authorization Code + PKCE；无 client secret、无硬编码 token、无生产手工 JWT 入口 |
 | 后端授权 | JWT 只提供身份声明；ServiceOS 继续从数据库 RoleGrant 实时校验 tenant/project/capability，401 清理本机会话并失败关闭 |
-| 真实 E2E | 固定可释放夹具 + 每轮新建终态/整改/重开夹具 + Playwright/Google Chrome 验证登录与权威只读投影；正常 Task 覆盖表单、资料、APPROVED、双引用 complete 到 FULFILLED；独立 Task 覆盖 REJECTED→自动整改→WAIVED/CANCELLED，以及 FORCE_APPROVED→原 Case REOPENED/后继 Case OPEN |
+| 真实 E2E | 固定可释放夹具 + 每轮新建终态/整改豁免/重开/正常补传夹具 + Playwright/Google Chrome；正常 Task 覆盖表单、资料、APPROVED、双引用 complete 到 FULFILLED；独立 Task 覆盖 REJECTED→WAIVED/CANCELLED、FORCE_APPROVED→reopen，以及 REJECTED→resubmit→close→复审 APPROVED→FULFILLED |
 | 数据库 | 使用 `serviceos-deploy/compose.yaml` 的 PostgreSQL 18，后端启动时执行当前 86 个 Flyway 迁移 |
 
 ## 2. P0 根因与修复
@@ -69,8 +70,9 @@ M53 表单重解析复用既有 Slot 时，Snapshot 冻结最新 `currentResolut
 `task.completed` Inbox 成功消费、候选/责任 EXPIRED、Node/Stage/Workflow COMPLETED 与
 WorkOrder FULFILLED；整改夹具还检查 ReviewCase REJECTED、CorrectionCase WAIVED、整改 Task
 CANCELLED、三类成功审计与四条审核/整改事件 Inbox；重开夹具检查 FORCE_APPROVED 决定、
-原/后继 Case 血缘、三类成功审计、三条审核事件 Inbox 且无 CorrectionCase。夹具只允许本地
-开发数据库使用。
+原/后继 Case 血缘、三类成功审计、三条审核事件 Inbox 且无 CorrectionCase；正常补传夹具检查
+CorrectionCase CLOSED、补传轮次、复审 APPROVED、源 Task COMPLETED、WorkOrder FULFILLED
+以及补传/关闭/复审/完结审计与 Inbox。夹具只允许本地开发数据库使用。
 GitHub Actions 使用同一脚本阻断 PR，并保留 Backend、Admin 与 Playwright 诊断产物；该 job
 通过后才启动容器化 staging 发布、回滚和恢复演练。
 
@@ -96,13 +98,21 @@ GitHub Actions 使用同一脚本阻断 PR，并保留 Backend、Admin 与 Playw
 - Admin 对另一动态 Task 作出 FORCE_APPROVED，再重开为同 Snapshot 的后继 OPEN Case；
   原 Case、决定、重开来源和 triggerRef 均保留，页面 URL/刷新与后继身份一致。
 
+已追加证明（M135）：
+
+- Admin 对独立动态 Task 作出普通 REJECTED 后，在源 Task 同 Item 追加补传 Revision 并创建新
+  Snapshot；经授权整改详情 `resubmit`→`close`，再对补传 Snapshot 新建 INTERNAL ReviewCase
+  并普通 APPROVED；随后以 FormSubmission + 补传 Snapshot 双引用 complete，Outbox/Inbox 推进
+  至 WorkOrder FULFILLED。不使用 WAIVE 或同 Snapshot reopen 冒充正常补传复审。
+
 尚未证明：
 
 - 正式企业 IdP、MFA、生产回调地址、BFF/token renewal/logout 协议；
 - 从外部接单或项目创建开始，经派单、预约、上门、表单、资料、审核、整改、外发到完结的完整写链路；
 - Network/Technician Portal 与跨端协作；
 - 正式 sandbox、对象存储、专业扫描服务、Broker、通知和 SLA BUSINESS 日历；
-- 正常补传、关闭、重新审核通过，以及外部提审与回执在同一浏览器写链路中的端到端证明；
+- 外部提审与回执在同一浏览器写链路中的端到端证明；
 - SavedView、设计系统、可访问性与多浏览器矩阵。
 
-因此本次交付只能称为“Admin 试点可运行局部读写基线”，不能称为“完整现场履约平台已交付”。
+因此当前交付只能称为“Admin 试点可运行局部读写基线（含正常整改补传）”，不能称为
+“完整现场履约平台已交付”。

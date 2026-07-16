@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-16
-baselineCommit: 1d17a14
-latestMilestone: M134
+baselineCommit: e7849e3
+latestMilestone: M135
 ---
 
 # ServiceOS 实施状态总览
@@ -39,11 +39,11 @@ latestMilestone: M134
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M134 Admin 工单权威投影与核心时间线 |
-| 基线提交 | `9d42e58` |
+| 最新实施里程碑 | M135 Admin 正常整改补传 / 关闭 / 复审写链路 E2E |
+| 基线提交 | `e7849e3` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
-| 前端工程 | `serviceos-admin-web`（Vue+TS+Vite）已纳入 CI 构建，具备开发态 Keycloak PKCE，以及真实只读、Task MANUAL assign-candidates/claim/release、锁定表单提交、资料上传/校验/Snapshot、INTERNAL ReviewCase APPROVED、双输入和独立 Task complete 至 WorkOrder FULFILLED 的局部写链路 PR 阻断 E2E；Network/Technician 尚未建立 |
+| 前端工程 | `serviceos-admin-web`（Vue+TS+Vite）已纳入 CI 构建，具备开发态 Keycloak PKCE，以及真实只读、Task MANUAL assign-candidates/claim/release、锁定表单提交、资料上传/校验/Snapshot、INTERNAL APPROVED、REJECTED→WAIVED、FORCE_APPROVED→reopen，以及正常补传/关闭/复审 APPROVED 后双引用 complete 至 WorkOrder FULFILLED 的局部写链路 PR 阻断 E2E；Network/Technician 尚未建立 |
 | 数据库 | PostgreSQL + Flyway（当前版本 084 / 86） |
 | 契约 | Core OpenAPI 0.70.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、recovered/resolved 与 SLA started/breached/met@v1） |
 
@@ -75,7 +75,7 @@ latestMilestone: M134
 | 通知 | 通知与运营异常中心 | `PROPOSED` | 已有总体设计 | 通知通道、模板、可靠发送和 UI | `architecture/14-*` |
 | 履约事实与试算 | 事实提取和双向试算 | `PROPOSED` | 已有设计、API 和数据规划 | 运行时、投影和前端工作区 | M5 设计 |
 | 对账结算 | 对账、结算、争议与调整 | `PROPOSED` | 已有边界设计 | 正式运行时和页面 | `architecture/16-*` |
-| Admin Portal | 总部运营后台 | `PARTIAL` | M101～M134：队列/任务/SLA/异常/外发/工单/项目目录、工作区、allowed-actions 命令面板；CI 阻断构建；开发态 Keycloak PKCE；真实只读、Task MANUAL assign-candidates/claim/release、表单/资料/APPROVED/双引用 complete 至 WorkOrder FULFILLED、REJECTED→自动整改→授权 WAIVED/Task CANCELLED，以及 FORCE_APPROVED→重开后继 Case 的局部写链路 PR 阻断 E2E | 设计系统、SavedView、正式企业 OIDC/BFF、生产对象存储/专业扫描、正常整改补传/关闭/复审、外部提审、完整履约写链路 E2E | M7 设计、M101～M134、Admin 试点基线 |
+| Admin Portal | 总部运营后台 | `PARTIAL` | M101～M135：队列/任务/SLA/异常/外发/工单/项目目录、工作区、allowed-actions 命令面板；CI 阻断构建；开发态 Keycloak PKCE；真实只读、Task MANUAL assign-candidates/claim/release、表单/资料/APPROVED/双引用 complete 至 WorkOrder FULFILLED、REJECTED→自动整改→授权 WAIVED/Task CANCELLED、FORCE_APPROVED→重开后继 Case，以及正常补传/关闭/复审 APPROVED→FULFILLED 的局部写链路 PR 阻断 E2E | 设计系统、SavedView、正式企业 OIDC/BFF、生产对象存储/专业扫描、外部提审、完整履约写链路 E2E（含接单/预约/上门/外发） | M7 设计、M101～M135、Admin 试点基线 |
 | Network Portal | 网点协作端 | `PROPOSED` | 页面和跨端协作规格 | 前端代码和 E2E | M7 设计 |
 | Technician App | 师傅移动端 | `PROPOSED` | 弱网、离线工作包、上传队列和页面规格 | 移动端工程、真机和离线运行时 | M7 设计 |
 | External Portal | 用户/车企受控页面 | `PROPOSED` | 最小边界规划 | 二期页面和工程实现 | M7 设计 |
@@ -1003,52 +1003,37 @@ FACTS_CALCULATIONS、customer/location、Portal。
 
 ### M134：Admin 工单权威投影与核心时间线
 
-已实现：工单详情、Stage、Task 摘要与核心时间线。
+已实现：工单详情、Stage、Task 摘要与核心时间线；Admin 试点局部读写基线（含 APPROVED 完结、
+WAIVE、FORCE_APPROVED/reopen）的 PR 阻断 E2E。详见 `docs/admin-pilot-readiness-baseline.md`。
 
-### M134 Admin 试点可运行基线（不新增里程碑）
+### M135：Admin 正常整改补传 / 关闭 / 复审写链路 E2E
 
 已实现：
 
-- Admin Web 的 Node 22 `npm ci` / production build CI 阻断门禁；
-- 开发态 Keycloak Authorization Code + PKCE，生产失败关闭且删除手工 JWT 粘贴入口；
-- 真实 Backend/PostgreSQL/Chrome 的 E2E，覆盖目录、工作区、详情、Stage、Task、SLA、时间线，
-  以及受 RoleGrant、候选/责任事实、If-Match 与幂等键保护的 Task MANUAL
-  assign-candidates/claim/release，并通过每轮新建的 Workflow-backed HUMAN Task 验证
-  assign/claim/start、锁定 FormVersion 提交、Evidence Begin/PUT/Finalize、本地扫描、机器校验、
-  Snapshot、INTERNAL ReviewCase 创建与普通 APPROVED 裁决、精确 FormSubmission +
-  EvidenceSetSnapshot 双引用 complete、Outbox/Inbox 消费与 WorkOrder FULFILLED；
-- 审核页裁决后重新读取权威详情，并修复成功消息隐藏案例状态和决定历史的模板控制流；
-- 独立动态整改夹具证明普通 REJECTED 同事务创建 IN_PROGRESS CorrectionCase 与
-  `evidence.correction` Task；Admin 经授权队列/详情执行 CRITICAL WAIVED，同事务将整改 Task
-  置为 CANCELLED，并校验审计及审核/整改事件 Inbox；
-- 整改队列展示来源审核与整改 Task 引用，详情命令后重新读取权威 Case，成功提示不再隐藏
-  WAIVED 状态、来源 Task、整改 Task 或补传历史；
-- 独立动态重开夹具证明 OPEN→FORCE_APPROVED，随后原 Case REOPENED、同 Snapshot 后继 Case
-  OPEN；Admin 导航到后继 Case，并展示 `reopenedFromReviewCaseId`/`reopenTriggerRef`；
-- 修复合法长 reason/approvalRef 被拼入 40 字符审计 `result_code` 导致重开 500 的缺陷；
-  审计结果改为稳定 `REOPENED`，请求摘要与重开事件继续保留输入证明；
-- Snapshot 冻结 M53 重解析后的最新 current resolution，避免复用既有 Slot 时产生可创建但
-  无法通过 M43 完成门禁的过期 Snapshot；
-- 上述真实写链路已作为独立 PR 阻断 job 执行，通过后才进入 staging 发布、回滚与恢复演练；
-- CI 敏感输出 VIN 误报根因修复与正负样本。
+- Admin 资料上传在槽位已有 Item 时传入 `evidenceItemId`，于同一 Item 追加补传 Revision，
+  避免 `maxCount=1` 阻断正常补传；补传 Snapshot 剔除同 Item 旧成员；
+- 第四套每轮新建动态夹具 + Playwright 证明：REJECTED → 源 Task 新 Snapshot → resubmit →
+  close → 新 INTERNAL ReviewCase APPROVED → 双引用 complete → WorkOrder FULFILLED；
+- `verify-admin-smoke.sh` SQL 断言补传轮次、CLOSED、复审 APPROVED、完结与审计/Inbox；
+- 无 uuidgen 环境使用 python3 生成夹具 UUID。
 
-未实现：正式企业 IdP/BFF、生产对象存储/专业扫描、正常整改补传/关闭/复审、
-外部提审，以及接单至完结的完整履约写链路 E2E；详见
-`docs/admin-pilot-readiness-baseline.md`。
+明确未实现：外部提审与回执同一浏览器链、预约/上门 E2E、ServiceAssignment Admin 写表面、
+从入站接单开始的完整 `ADMIN-PILOT-09`、正式企业 IdP/BFF、生产对象存储/专业扫描；详见
+`docs/admin-pilot-readiness-baseline.md` 与
+`architecture/148-m135-admin-correction-resubmit-rereview-e2e.md`。
 
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M134**。M61～M134 在授权只读、时间线投影运行时、工作区组合与
-审核/整改/外发专项队列上继续收敛；没有实现完整 SLA/通知策略、通用队列/SavedView 或整个现场履约平台。
+ServiceOS 可靠纵向切片已推进到 **M135**。M61～M135 在授权只读、时间线投影、工作区组合、
+审核/整改专项队列与 Admin 局部写链路（含正常补传复审完结）上继续收敛；没有实现完整 SLA/通知
+策略、通用队列/SavedView 或整个现场履约平台。
 
 ```text
 候选下一方向（优先从已确认文档中选择最小可靠切片）：
 1. 正式企业 OIDC/BFF、MFA 与设计系统；SavedView 仍需再接受 API-06 章节；
-2. 用真实脱敏试点业务数据验证接单至完结的完整履约写链路；当前 Admin 基线只证明只读投影与
-   Task MANUAL assign-candidates/claim/release，以及独立预置 Workflow Task 的表单提交、
-   本地资料上传/校验/Snapshot、INTERNAL APPROVED 审核、双输入 complete 至 WorkOrder
-   FULFILLED 局部写链路，并以另一动态 Task 证明 REJECTED 后自动整改与授权 WAIVED/Task
-   CANCELLED，并证明 FORCE_APPROVED/重开血缘；尚未证明正常补传、复审或外部链路；
+2. 用真实脱敏试点业务数据验证接单至完结的完整履约写链路；当前 Admin 基线已证明正常补传/
+   关闭/复审/完结，以及 WAIVE 与 FORCE_APPROVED/reopen；尚未证明外部提审回执，也尚未从
+   外部接单串联预约/上门/外发（试点业务基线仍为 Draft，不得当作 Accepted 数据包）；
 3. 在接受 ServiceNetwork 状态语义后建立目录与准入/启用/清退生命周期；当前相关文档仍为 Proposed，
    不得猜测状态值或转换规则；
 4. 建立 Organization/Region 目录、层级后代与组织到 Project 的权威关系；
