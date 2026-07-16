@@ -100,3 +100,5 @@
 - [M97 授权审核案例队列验收矩阵](94-m97-authorized-review-case-queue-acceptance.md)
 - [M98 授权整改案例队列验收矩阵](95-m98-authorized-correction-case-queue-acceptance.md)
 - [M99 授权外发交付队列验收矩阵](96-m99-authorized-outbound-delivery-queue-acceptance.md)
+244. [M100 运营异常项目范围硬化](architecture/113-m100-operational-exception-project-scope.md)
+245. [M100 运营异常项目范围硬化验收矩阵](testing/97-m100-operational-exception-project-scope-acceptance.md)

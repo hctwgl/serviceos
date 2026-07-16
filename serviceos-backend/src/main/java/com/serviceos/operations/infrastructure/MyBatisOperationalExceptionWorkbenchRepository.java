@@ -24,11 +24,35 @@ final class MyBatisOperationalExceptionWorkbenchRepository
 
     @Override
     public List<OperationalExceptionItem> findPage(
-            String tenantId, String status, String category, String severity,
-            UUID workOrderId, UUID taskId, Instant cursorOpenedAt, UUID cursorId, int fetchSize
+            String tenantId,
+            boolean tenantWide,
+            List<UUID> projectIds,
+            UUID projectId,
+            String status,
+            String category,
+            String severity,
+            UUID workOrderId,
+            UUID taskId,
+            Instant cursorOpenedAt,
+            UUID cursorId,
+            int fetchSize
     ) {
-        return mapper.findPage(tenantId, status, category, severity, workOrderId, taskId,
-                postgresTime(cursorOpenedAt), cursorId, fetchSize).stream().map(this::item).toList();
+        return mapper.findPage(
+                        tenantId,
+                        tenantWide,
+                        projectIds.stream().map(UUID::toString).toList(),
+                        projectId == null ? null : projectId.toString(),
+                        status,
+                        category,
+                        severity,
+                        workOrderId,
+                        taskId,
+                        postgresTime(cursorOpenedAt),
+                        cursorId,
+                        fetchSize)
+                .stream()
+                .map(this::item)
+                .toList();
     }
 
     @Override
@@ -68,7 +92,8 @@ final class MyBatisOperationalExceptionWorkbenchRepository
     private OperationalExceptionItem item(Map<String, Object> row) {
         String status = string(row, "status");
         return new OperationalExceptionItem(
-                uuid(row, "exceptionId"), string(row, "sourceType"), string(row, "sourceId"),
+                uuid(row, "exceptionId"), uuid(row, "projectId"),
+                string(row, "sourceType"), string(row, "sourceId"),
                 uuid(row, "sourceAttemptId"), string(row, "sourceTaskType"),
                 string(row, "category"), string(row, "severity"), string(row, "errorCode"), status,
                 uuid(row, "workOrderId"), uuid(row, "taskId"), uuid(row, "handlingTaskId"),

@@ -5,6 +5,8 @@ import com.serviceos.audit.api.AuditEntry;
 import com.serviceos.authorization.api.AuthorizationDecision;
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
+import com.serviceos.authorization.api.AuthorizedProjectScope;
+import com.serviceos.authorization.api.ProjectScopeAuthorizationService;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.operations.api.AcknowledgeOperationalExceptionCommand;
 import com.serviceos.operations.api.OperationalExceptionAcknowledgement;
@@ -30,10 +32,16 @@ import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
+/**
+ * 运营异常工作台：列表先解析实时项目范围再执行单条范围化 SQL；游标绑定范围与全部筛选。
+ */
 @Service
 final class DefaultOperationalExceptionWorkbenchService implements OperationalExceptionWorkbenchService {
     private static final String READ = "operations.exception.read";
@@ -44,6 +52,7 @@ final class DefaultOperationalExceptionWorkbenchService implements OperationalEx
 
     private final OperationalExceptionWorkbenchRepository repository;
     private final AuthorizationService authorization;
+    private final ProjectScopeAuthorizationService projectScopes;
     private final IdempotencyService idempotency;
     private final AuditAppender audit;
     private final OutboxAppender outbox;
@@ -51,12 +60,18 @@ final class DefaultOperationalExceptionWorkbenchService implements OperationalEx
     private final Clock clock;
 
     DefaultOperationalExceptionWorkbenchService(
-            OperationalExceptionWorkbenchRepository repository, AuthorizationService authorization,
-            IdempotencyService idempotency, AuditAppender audit, OutboxAppender outbox,
-            ObjectMapper objectMapper, Clock clock
+            OperationalExceptionWorkbenchRepository repository,
+            AuthorizationService authorization,
+            ProjectScopeAuthorizationService projectScopes,
+            IdempotencyService idempotency,
+            AuditAppender audit,
+            OutboxAppender outbox,
+            ObjectMapper objectMapper,
+            Clock clock
     ) {
         this.repository = repository;
         this.authorization = authorization;
+        this.projectScopes = projectScopes;
         this.idempotency = idempotency;
         this.audit = audit;
         this.outbox = outbox;
@@ -69,31 +84,50 @@ final class DefaultOperationalExceptionWorkbenchService implements OperationalEx
     public OperationalExceptionPage list(
             CurrentPrincipal principal, String correlationId, OperationalExceptionQuery query
     ) {
-        requireRead(principal, correlationId, "OperationalException", "collection");
+        Objects.requireNonNull(query, "query must not be null");
         String status = normalized(query.status(), STATUSES, "status");
         String severity = normalized(query.severity(), SEVERITIES, "severity");
         String category = optionalCode(query.category(), "category");
-        Cursor cursor = decode(query.cursor());
+        QueryScope scope = query.projectId() == null
+                ? collectionScope(principal, correlationId)
+                : projectScope(principal, correlationId, query.projectId(), READ);
+        Cursor cursor = decode(
+                query.cursor(), scope.digest(), query.projectId(), status, category, severity,
+                query.workOrderId(), query.taskId());
         List<OperationalExceptionItem> fetched = repository.findPage(
-                principal.tenantId(), status, category, severity, query.workOrderId(), query.taskId(),
-                cursor == null ? null : cursor.openedAt(), cursor == null ? null : cursor.exceptionId(),
+                principal.tenantId(),
+                scope.tenantWide(),
+                scope.projectIds(),
+                query.projectId(),
+                status,
+                category,
+                severity,
+                query.workOrderId(),
+                query.taskId(),
+                cursor == null ? null : cursor.openedAt(),
+                cursor == null ? null : cursor.exceptionId(),
                 query.limit() + 1);
-        boolean canAcknowledge = canAcknowledge(principal, correlationId, "collection");
+        boolean canAcknowledge = canAcknowledge(principal, correlationId, "collection", null);
         fetched = fetched.stream().map(item -> withAllowedActions(item, canAcknowledge)).toList();
         boolean more = fetched.size() > query.limit();
         List<OperationalExceptionItem> items = more ? fetched.subList(0, query.limit()) : fetched;
         OperationalExceptionItem last = more ? items.get(items.size() - 1) : null;
-        return new OperationalExceptionPage(items, last == null ? null : encode(last.openedAt(), last.exceptionId()));
+        return new OperationalExceptionPage(
+                items,
+                last == null ? null : encode(
+                        scope.digest(), query.projectId(), status, category, severity,
+                        query.workOrderId(), query.taskId(), last.openedAt(), last.exceptionId()));
     }
 
     @Override
     @Transactional(readOnly = true)
     public OperationalExceptionItem get(CurrentPrincipal principal, String correlationId, UUID exceptionId) {
-        requireRead(principal, correlationId, "OperationalException", exceptionId.toString());
         OperationalExceptionItem item = repository.findById(principal.tenantId(), exceptionId)
                 .orElseThrow(() -> new BusinessProblem(
                         ProblemCode.RESOURCE_NOT_FOUND, "OperationalException does not exist"));
-        return withAllowedActions(item, canAcknowledge(principal, correlationId, exceptionId.toString()));
+        authorizeRead(principal, correlationId, exceptionId, item.projectId());
+        return withAllowedActions(
+                item, canAcknowledge(principal, correlationId, exceptionId.toString(), item.projectId()));
     }
 
     @Override
@@ -105,13 +139,14 @@ final class DefaultOperationalExceptionWorkbenchService implements OperationalEx
         CommandContext context = new CommandContext(
                 principal.tenantId(), principal.principalId(),
                 metadata.correlationId(), metadata.idempotencyKey());
+        OperationalExceptionItem current = repository.findById(context.tenantId(), command.exceptionId())
+                .orElseThrow(() -> new BusinessProblem(
+                        ProblemCode.RESOURCE_NOT_FOUND, "OperationalException does not exist"));
         String digest = Sha256.digest(command.exceptionId() + "|" + command.expectedVersion()
                 + "|" + (command.note() == null ? "" : command.note()));
-        AuthorizationDecision auth = authorization.require(
-                principal,
-                AuthorizationRequest.tenantCapability(
-                        ACK, context.tenantId(), "OperationalException", command.exceptionId().toString()),
-                context.correlationId());
+        AuthorizationDecision auth = authorizeCapability(
+                principal, context.correlationId(), ACK, command.exceptionId().toString(),
+                current.projectId());
         IdempotencyDecision decision = idempotency.begin(context, OPERATION, digest);
         if (decision.kind() == IdempotencyDecision.Kind.REPLAY) {
             return repository.findAcknowledgement(context.tenantId(), context.idempotencyKey());
@@ -121,11 +156,11 @@ final class DefaultOperationalExceptionWorkbenchService implements OperationalEx
         if (!repository.acknowledge(
                 context.tenantId(), command.exceptionId(), command.expectedVersion(),
                 context.actorId(), command.note(), now)) {
-            OperationalExceptionItem current = repository.findById(context.tenantId(), command.exceptionId())
+            OperationalExceptionItem latest = repository.findById(context.tenantId(), command.exceptionId())
                     .orElseThrow(() -> new BusinessProblem(
                             ProblemCode.RESOURCE_NOT_FOUND, "OperationalException does not exist"));
             throw new BusinessProblem(ProblemCode.VERSION_CONFLICT,
-                    current.aggregateVersion() != command.expectedVersion()
+                    latest.aggregateVersion() != command.expectedVersion()
                             ? "OperationalException version changed"
                             : "Only an OPEN OperationalException can be acknowledged");
         }
@@ -150,15 +185,57 @@ final class DefaultOperationalExceptionWorkbenchService implements OperationalEx
         return receipt;
     }
 
-    private void requireRead(CurrentPrincipal principal, String correlationId, String type, String id) {
-        authorization.require(principal,
-                AuthorizationRequest.tenantCapability(READ, principal.tenantId(), type, id), correlationId);
+    private QueryScope projectScope(
+            CurrentPrincipal principal, String correlationId, UUID projectId, String capability
+    ) {
+        authorization.require(principal, AuthorizationRequest.projectCapability(
+                capability, principal.tenantId(), "OperationalException", "collection",
+                projectId.toString()), correlationId);
+        return new QueryScope(false, List.of(projectId), Sha256.digest("PROJECTS:" + projectId));
     }
 
-    private boolean canAcknowledge(CurrentPrincipal principal, String correlationId, String id) {
-        return authorization.authorize(principal,
-                AuthorizationRequest.tenantCapability(
-                        ACK, principal.tenantId(), "OperationalException", id), correlationId)
+    private QueryScope collectionScope(CurrentPrincipal principal, String correlationId) {
+        AuthorizedProjectScope scope =
+                projectScopes.require(principal, READ, "OperationalException", correlationId);
+        return new QueryScope(
+                scope.tenantWide(),
+                scope.projectIds().stream()
+                        .sorted(Comparator.comparing(UUID::toString))
+                        .toList(),
+                scope.scopeDigest());
+    }
+
+    private void authorizeRead(
+            CurrentPrincipal principal, String correlationId, UUID exceptionId, UUID projectId
+    ) {
+        authorizeCapability(principal, correlationId, READ, exceptionId.toString(), projectId);
+    }
+
+    private AuthorizationDecision authorizeCapability(
+            CurrentPrincipal principal,
+            String correlationId,
+            String capability,
+            String resourceId,
+            UUID projectId
+    ) {
+        if (projectId != null) {
+            return authorization.require(principal, AuthorizationRequest.projectCapability(
+                    capability, principal.tenantId(), "OperationalException", resourceId,
+                    projectId.toString()), correlationId);
+        }
+        return authorization.require(principal, AuthorizationRequest.tenantCapability(
+                capability, principal.tenantId(), "OperationalException", resourceId), correlationId);
+    }
+
+    private boolean canAcknowledge(
+            CurrentPrincipal principal, String correlationId, String id, UUID projectId
+    ) {
+        AuthorizationRequest request = projectId == null
+                ? AuthorizationRequest.tenantCapability(
+                        ACK, principal.tenantId(), "OperationalException", id)
+                : AuthorizationRequest.projectCapability(
+                        ACK, principal.tenantId(), "OperationalException", id, projectId.toString());
+        return authorization.authorize(principal, request, correlationId)
                 .effect() == AuthorizationDecision.Effect.ALLOW;
     }
 
@@ -168,43 +245,100 @@ final class DefaultOperationalExceptionWorkbenchService implements OperationalEx
         List<String> actions = canAcknowledge && "OPEN".equals(item.status())
                 ? List.of("ACKNOWLEDGE") : List.of();
         return new OperationalExceptionItem(
-                item.exceptionId(), item.sourceType(), item.sourceId(), item.sourceAttemptId(),
-                item.sourceTaskType(), item.category(), item.severity(), item.errorCode(), item.status(),
-                item.workOrderId(), item.taskId(), item.handlingTaskId(), item.occurrenceCount(),
-                item.aggregateVersion(), item.openedAt(), item.lastDetectedAt(), item.acknowledgedAt(),
+                item.exceptionId(), item.projectId(), item.sourceType(), item.sourceId(),
+                item.sourceAttemptId(), item.sourceTaskType(), item.category(), item.severity(),
+                item.errorCode(), item.status(), item.workOrderId(), item.taskId(),
+                item.handlingTaskId(), item.occurrenceCount(), item.aggregateVersion(),
+                item.openedAt(), item.lastDetectedAt(), item.acknowledgedAt(),
                 item.acknowledgedBy(), item.acknowledgementNote(), item.resolvedAt(),
                 item.resolutionCode(), actions);
     }
 
     private static String normalized(String value, Set<String> allowed, String name) {
-        if (value == null || value.isBlank()) return null;
-        String normalized = value.trim().toUpperCase();
-        if (!allowed.contains(normalized)) throw new IllegalArgumentException(name + " is invalid");
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String normalized = value.trim().toUpperCase(Locale.ROOT);
+        if (!allowed.contains(normalized)) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, name + " is invalid");
+        }
         return normalized;
     }
 
     private static String optionalCode(String value, String name) {
-        if (value == null || value.isBlank()) return null;
-        String normalized = value.trim().toUpperCase();
-        if (!normalized.matches("[A-Z0-9_]{1,80}")) throw new IllegalArgumentException(name + " is invalid");
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String normalized = value.trim().toUpperCase(Locale.ROOT);
+        if (!normalized.matches("[A-Z0-9_]{1,80}")) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, name + " is invalid");
+        }
         return normalized;
     }
 
-    private static String encode(Instant openedAt, UUID exceptionId) {
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(
-                (openedAt + "|" + exceptionId).getBytes(StandardCharsets.UTF_8));
+    private static String encode(
+            String scopeDigest,
+            UUID projectId,
+            String status,
+            String category,
+            String severity,
+            UUID workOrderId,
+            UUID taskId,
+            Instant openedAt,
+            UUID exceptionId
+    ) {
+        String raw = String.join(
+                "|",
+                scopeDigest,
+                nullable(projectId),
+                nullable(status),
+                nullable(category),
+                nullable(severity),
+                nullable(workOrderId),
+                nullable(taskId),
+                openedAt.toString(),
+                exceptionId.toString());
+        return Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(raw.getBytes(StandardCharsets.UTF_8));
     }
 
-    private static Cursor decode(String value) {
-        if (value == null || value.isBlank()) return null;
-        try {
-            String decoded = new String(Base64.getUrlDecoder().decode(value), StandardCharsets.UTF_8);
-            String[] parts = decoded.split("\\|", -1);
-            if (parts.length != 2) throw new IllegalArgumentException();
-            return new Cursor(Instant.parse(parts[0]), UUID.fromString(parts[1]));
-        } catch (RuntimeException exception) {
-            throw new IllegalArgumentException("cursor is invalid", exception);
+    private static Cursor decode(
+            String value,
+            String scopeDigest,
+            UUID projectId,
+            String status,
+            String category,
+            String severity,
+            UUID workOrderId,
+            UUID taskId
+    ) {
+        if (value == null || value.isBlank()) {
+            return null;
         }
+        try {
+            String decoded = new String(
+                    Base64.getUrlDecoder().decode(value), StandardCharsets.UTF_8);
+            String[] parts = decoded.split("\\|", -1);
+            if (parts.length != 9
+                    || !scopeDigest.equals(parts[0])
+                    || !nullable(projectId).equals(parts[1])
+                    || !nullable(status).equals(parts[2])
+                    || !nullable(category).equals(parts[3])
+                    || !nullable(severity).equals(parts[4])
+                    || !nullable(workOrderId).equals(parts[5])
+                    || !nullable(taskId).equals(parts[6])) {
+                throw new IllegalArgumentException();
+            }
+            return new Cursor(Instant.parse(parts[7]), UUID.fromString(parts[8]));
+        } catch (RuntimeException exception) {
+            throw new BusinessProblem(
+                    ProblemCode.VALIDATION_FAILED,
+                    "cursor is invalid for the requested exception scope");
+        }
+    }
+
+    private static String nullable(Object value) {
+        return value == null ? "-" : value.toString();
     }
 
     private String serialize(Object value) {
@@ -215,5 +349,12 @@ final class DefaultOperationalExceptionWorkbenchService implements OperationalEx
         }
     }
 
-    private record Cursor(Instant openedAt, UUID exceptionId) {}
+    private record Cursor(Instant openedAt, UUID exceptionId) {
+    }
+
+    private record QueryScope(boolean tenantWide, List<UUID> projectIds, String digest) {
+        private QueryScope {
+            projectIds = List.copyOf(projectIds);
+        }
+    }
 }

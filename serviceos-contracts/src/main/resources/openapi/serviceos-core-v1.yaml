@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.69.0
+  version: 0.70.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -730,8 +730,12 @@ paths:
   /operational-exceptions:
     get:
       operationId: listOperationalExceptions
-      summary: 查询当前租户的运营异常工作台
+      summary: 查询当前主体授权范围内的运营异常工作台
+      description: >-
+        API-06 §6 窄切片硬化；按 openedAt/exceptionId 倒序稳定分页。
+        需要 operations.exception.read，游标绑定实时项目范围和全部筛选。
       parameters:
+        - { name: projectId, in: query, schema: { type: string, format: uuid } }
         - { name: status, in: query, schema: { type: string, enum: [OPEN, ACKNOWLEDGED, RESOLVED] } }
         - { name: category, in: query, schema: { type: string } }
         - { name: severity, in: query, schema: { type: string, enum: [P0, P1, P2, P3] } }
@@ -3440,11 +3444,12 @@ components:
     OperationalException:
       type: object
       additionalProperties: false
-      required: [exceptionId, sourceType, sourceId, sourceAttemptId, sourceTaskType, category,
+      required: [exceptionId, projectId, sourceType, sourceId, sourceAttemptId, sourceTaskType, category,
                  severity, errorCode, status, occurrenceCount, aggregateVersion, openedAt,
                  lastDetectedAt, allowedActions]
       properties:
         exceptionId: { type: string, format: uuid }
+        projectId: { type: [string, 'null'], format: uuid }
         sourceType: { type: string }
         sourceId: { type: string }
         sourceAttemptId: { type: string, format: uuid }

@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-16
-baselineCommit: 62088e0
-latestMilestone: M99
+baselineCommit: PENDING_M100
+latestMilestone: M100
 ---
 
 # ServiceOS 实施状态总览
@@ -39,13 +39,13 @@ latestMilestone: M99
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M99 授权外发交付队列 |
-| 基线提交 | `62088e0` |
+| 最新实施里程碑 | M100 运营异常项目范围硬化 |
+| 基线提交 | `PENDING_M100` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
 | 前端工程 | 尚未建立；已有 Admin、Network、Technician 产品与交互规格 |
-| 数据库 | PostgreSQL + Flyway（当前版本 083 / 85） |
-| 契约 | Core OpenAPI 0.69.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、recovered/resolved 与 SLA started/breached/met@v1） |
+| 数据库 | PostgreSQL + Flyway（当前版本 084 / 86） |
+| 契约 | Core OpenAPI 0.70.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、recovered/resolved 与 SLA started/breached/met@v1） |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -64,7 +64,7 @@ latestMilestone: M99
 | 人工任务与执行历史 | claim/start/complete、责任、执行保护与授权任务读取 | `IMPLEMENTED` | 人工命令、候选领取、唯一责任、release/reclaim、执行保护；表单/资料完成门禁；授权队列/详情、allowed-actions、自动 Attempt 历史及工单内核心 Task 生命周期与指派/Guard/人工接管时间线 | block/retry/cancel 等其他动作、Workflow Node 历史、跨工单/跨域完整历史和 Review 完成条件 | M20～M23、M35、M41、M43、M69～M73、M81 |
 | 应用只读投影 | 工作区、队列、时间线和投影运行时 | `PARTIAL` | 独立 readmodel 模块；核心执行、现场履约、SLA、资料/审核/整改（含外部回执与条件 KEEP/INVALIDATE 处置）、外发交付全链路、异常确认/闭环、ServiceAssignment 与 Task 指派/Guard/人工接管 Inbox 投影；授权时间线与稳定分页及最近活动摘要；时间线 checkpoint/dead letter/generation 重建与 FRESH/LAGGING/UNKNOWN/REBUILDING freshness；definition 登记、dead letter 幂等重放与旧/孤儿 generation 清理；工单工作区顶层实时组合、当前 ACTIVE 服务责任摘要与 TASKS/TIMELINE_AUDIT/APPOINTMENTS_VISITS（含联系尝试）/FORMS_EVIDENCE（含提交与资料项安全元数据）/REVIEWS_CORRECTIONS（含 CLIENT/重开血缘）/INTEGRATION 按需区块（敏感字段最小化；缺权次级区块降级）；授权跨项目 ReviewCase/CorrectionCase/OutboundDelivery 专项队列 | 试算合并、revision/slots 技术噪声、表单值与资料版本详情、FACTS_CALCULATIONS、关键事件 taxonomy/过滤、通用 work-queues、SavedView、搜索、多投影平台、Broker offset、Portal、Admin 重建/重放 HTTP | M73～M99 |
 | 服务分配 | 网点分配、容量、改派 Saga、超时恢复 | `IMPLEMENTED` | ServiceAssignment、容量权威、改派、终止、对账和自动恢复 | 完整策略评分、全部异常分支和 UI | M24～M28 |
-| 运营异常 | 异常工作台基础 | `PARTIAL` | 异常记录和恢复入口；M58 将外发 UNKNOWN 与 Task 最终人工事件汇入 OperationalException + HUMAN Task；M59 提供高风险人工重发事实；M60 在严格 ACK 后幂等闭环对应异常并处理事件乱序 | 人工标记已送达/放弃、其他异常类型自动闭环、完整通知、运营中心前端和跨域异常目录 | M29、M58～M60 |
+| 运营异常 | 异常工作台基础 | `PARTIAL` | 异常记录和恢复入口；M58 将外发 UNKNOWN 与 Task 最终人工事件汇入 OperationalException + HUMAN Task；M59 提供高风险人工重发事实；M60 在严格 ACK 后幂等闭环对应异常并处理事件乱序；列表/详情/确认已硬化为实时项目范围 | 人工标记已送达/放弃、其他异常类型自动闭环、完整通知、运营中心前端和跨域异常目录 | M29、M58～M60、M100 |
 | 预约 | 预约修订、联系终态动作 | `PARTIAL` | Revision、并发和终态动作基础；公开事件已并入工单时间线 | 用户确认渠道、完整日程和跨端协作 | M30～M31、M74 |
 | 现场作业 | Visit 生命周期 | `PARTIAL` | Visit 运行时基础；签到/签退/中断事件已并入工单时间线 | GPS 策略增强、完整现场提交、离线同步和师傅端 | M32、M74 |
 | 动态表单 | 资产、冻结版本、不可变提交和 Task 完成门禁 | `PARTIAL` | 固定/条件 required、visible 与布尔 validation rule，基础类型校验、精确版本提交和完成引用；form.submitted 已并入工单时间线 | 复杂 validator、计算字段、草稿、冲突、更正和审核 | M33～M35、M53、M76 |
@@ -825,15 +825,25 @@ FACTS_CALCULATIONS、customer/location、Portal。
 明确未实现：通用 work-queues/SavedView、异常队列 Project Scope 硬化、人工标记已送达/放弃、
 FACTS_CALCULATIONS、customer/location、Portal。
 
+### M100：运营异常项目范围硬化
+
+已实现：
+
+- API-06 §6 `GET /operational-exceptions` 项目范围硬化 Accepted；
+- operations.exception.read 实时 TENANT/PROJECT/REGION/NETWORK 范围与 scopeDigest 游标；
+- 新增 projectId 筛选与响应字段；无 project 孤儿仅 TENANT 范围可见；
+- Core OpenAPI 0.70.0；Flyway V084 / 86 migrations。
+
+明确未实现：通用 work-queues/SavedView、人工标记已送达/放弃、通用 RESOLVED UI、Portal。
+
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M99**。M61～M99 在授权只读、时间线投影运行时、工作区组合与
+ServiceOS 可靠纵向切片已推进到 **M100**。M61～M100 在授权只读、时间线投影运行时、工作区组合与
 审核/整改/外发专项队列上继续收敛；没有实现完整 SLA/通知策略、通用队列/SavedView 或整个现场履约平台。
 
 ```text
 候选下一方向（优先从已确认文档中选择最小可靠切片）：
-1. 将运营异常列表升级为 Project Scope + scopeDigest 游标（对齐 M63～M99）；
-2. 在 API-06 其余章节再接受后继续 SavedView、其余 section 与 Portal 只读体验；
+1. 在 API-06 其余章节再接受后继续 SavedView、其余 section 与 Portal 只读体验；
 3. 在接受 ServiceNetwork 状态语义后建立目录与准入/启用/清退生命周期；当前相关文档仍为 Proposed，
    不得猜测状态值或转换规则；
 4. 建立 Organization/Region 目录、层级后代与组织到 Project 的权威关系；

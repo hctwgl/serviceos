@@ -55,7 +55,8 @@ class OperationalExceptionWorkbenchPostgresIT {
         jdbc.sql("""
                 TRUNCATE TABLE ops_exception_ack_result, ops_operational_exception,
                     aud_audit_record, rel_outbox_publish_attempt, rel_outbox_event,
-                    rel_idempotency_record, auth_role_grant, auth_role_capability, auth_role CASCADE
+                    rel_idempotency_record, auth_role_grant, auth_role_capability, auth_role,
+                    prj_project CASCADE
                 """).update();
         seedGrant(TENANT, "ops-user");
     }
@@ -70,11 +71,12 @@ class OperationalExceptionWorkbenchPostgresIT {
         insert(UUID.randomUUID(), OTHER_TENANT, "DISPATCH", "P1", openedAt.plusSeconds(60));
 
         var firstPage = workbench.list(principal(), "corr-list-1",
-                new OperationalExceptionQuery(null, null, null, null, null, null, 1));
+                new OperationalExceptionQuery(null, null, null, null, null, null, null, 1));
         var secondPage = workbench.list(principal(), "corr-list-2",
-                new OperationalExceptionQuery(null, null, null, null, null, firstPage.nextCursor(), 1));
+                new OperationalExceptionQuery(
+                        null, null, null, null, null, null, firstPage.nextCursor(), 1));
         var filtered = workbench.list(principal(), "corr-filter",
-                new OperationalExceptionQuery("open", "dispatch", "p1", null, null, null, 10));
+                new OperationalExceptionQuery(null, "open", "dispatch", "p1", null, null, null, 10));
 
         assertThat(firstPage.items()).extracting(item -> item.exceptionId()).containsExactly(first);
         assertThat(secondPage.items()).extracting(item -> item.exceptionId()).containsExactly(second);
@@ -120,6 +122,43 @@ class OperationalExceptionWorkbenchPostgresIT {
     }
 
     @Test
+    void projectScopedListRequiresMatchingProjectAndBindsCursor() {
+        UUID projectA = UUID.randomUUID();
+        UUID projectB = UUID.randomUUID();
+        seedProject(projectA, "OPS-A");
+        seedProject(projectB, "OPS-B");
+        seedProjectGrant(TENANT, "ops-project-user", projectA);
+        Instant openedAt = Instant.parse("2026-07-16T08:00:00Z");
+        UUID newer = UUID.fromString("ffffffff-ffff-ffff-ffff-ffffffffff01");
+        UUID older = UUID.fromString("ffffffff-ffff-ffff-ffff-ffffffffff02");
+        UUID outOfScope = UUID.randomUUID();
+        insertWithProject(newer, TENANT, projectA, "DISPATCH", "P1", openedAt.plusSeconds(10));
+        insertWithProject(older, TENANT, projectA, "DISPATCH", "P1", openedAt);
+        insertWithProject(outOfScope, TENANT, projectB, "DISPATCH", "P1", openedAt.plusSeconds(5));
+
+        CurrentPrincipal scoped = new CurrentPrincipal(
+                "ops-project-user", TENANT, CurrentPrincipal.PrincipalType.USER, "ops-it", Set.of());
+        var page = workbench.list(scoped, "corr-scope-list",
+                new OperationalExceptionQuery(null, null, null, null, null, null, null, 20));
+        assertThat(page.items()).extracting(item -> item.exceptionId()).containsExactly(newer, older);
+        assertThat(page.items().getFirst().projectId()).isEqualTo(projectA);
+
+        var firstPage = workbench.list(scoped, "corr-scope-page",
+                new OperationalExceptionQuery(projectA, null, null, null, null, null, null, 1));
+        assertThat(firstPage.items()).extracting(item -> item.exceptionId()).containsExactly(newer);
+        assertThat(firstPage.nextCursor()).isNotBlank();
+        assertThatThrownBy(() -> workbench.list(scoped, "corr-scope-other",
+                new OperationalExceptionQuery(projectB, null, null, null, null, null, null, 20)))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.ACCESS_DENIED));
+        assertThatThrownBy(() -> workbench.list(scoped, "corr-scope-cursor",
+                new OperationalExceptionQuery(
+                        projectA, "RESOLVED", null, null, null, null, firstPage.nextCursor(), 20)))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
+    }
+
+    @Test
     void staleVersionCannotAcknowledgeTwice() {
         UUID exceptionId = UUID.randomUUID();
         insert(exceptionId, TENANT, "DISPATCH", "P1", Instant.now());
@@ -134,19 +173,37 @@ class OperationalExceptionWorkbenchPostgresIT {
     }
 
     private void insert(UUID id, String tenant, String category, String severity, Instant openedAt) {
+        insertWithProject(id, tenant, null, category, severity, openedAt);
+    }
+
+    private void insertWithProject(
+            UUID id, String tenant, UUID projectId, String category, String severity, Instant openedAt
+    ) {
         jdbc.sql("""
                 INSERT INTO ops_operational_exception (
-                    exception_id, tenant_id, source_type, source_id, source_attempt_id,
+                    exception_id, tenant_id, project_id, source_type, source_id, source_attempt_id,
                     source_task_type, category_code, severity_code, error_code, status,
                     correlation_id, opened_at, last_detected_at
                 ) VALUES (
-                    :id, :tenant, 'TEST', :sourceId, :attemptId,
+                    :id, :tenant, :projectId, 'TEST', :sourceId, :attemptId,
                     'operations.test', :category, :severity, 'TEST_FAILURE', 'OPEN',
                     'corr-fixture', :openedAt, :openedAt
                 )
-                """).param("id", id).param("tenant", tenant).param("sourceId", id.toString())
+                """).param("id", id).param("tenant", tenant).param("projectId", projectId)
+                .param("sourceId", id.toString())
                 .param("attemptId", UUID.randomUUID()).param("category", category)
                 .param("severity", severity).param("openedAt", timestamptz(openedAt)).update();
+    }
+
+    private void seedProject(UUID projectId, String code) {
+        jdbc.sql("""
+                INSERT INTO prj_project (
+                    project_id, tenant_id, project_code, client_id, project_name,
+                    starts_on, project_status, aggregate_version, created_at)
+                VALUES (:projectId, :tenantId, :code, 'BYD', :name,
+                    CURRENT_DATE - 1, 'ACTIVE', 1, now())
+                """).param("projectId", projectId).param("tenantId", TENANT)
+                .param("code", code).param("name", code).update();
     }
 
     private void seedGrant(String tenant, String actor) {
@@ -172,6 +229,33 @@ class OperationalExceptionWorkbenchPostgresIT {
                 )
                 """).param("grant", UUID.randomUUID()).param("tenant", tenant)
                 .param("actor", actor).param("role", roleId).update();
+    }
+
+    private void seedProjectGrant(String tenant, String actor, UUID projectId) {
+        UUID roleId = UUID.randomUUID();
+        jdbc.sql("""
+                INSERT INTO auth_role (role_id, tenant_id, role_code, role_name, role_status, created_at)
+                VALUES (:role, :tenant, :code, '项目异常处理人', 'ACTIVE', now())
+                """).param("role", roleId).param("tenant", tenant)
+                .param("code", "ops-project-" + roleId).update();
+        for (String capability : Set.of(
+                "operations.exception.read", "operations.exception.acknowledge")) {
+            jdbc.sql("""
+                    INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
+                    VALUES (:role, :capability, now())
+                    """).param("role", roleId).param("capability", capability).update();
+        }
+        jdbc.sql("""
+                INSERT INTO auth_role_grant (
+                    grant_id, tenant_id, principal_id, role_id, scope_type, scope_ref,
+                    valid_from, source_code, approval_ref, created_at
+                ) VALUES (
+                    :grant, :tenant, :actor, :role, 'PROJECT', :project,
+                    now() - interval '1 day', 'TEST_FIXTURE', 'M100-TEST', now()
+                )
+                """).param("grant", UUID.randomUUID()).param("tenant", tenant)
+                .param("actor", actor).param("role", roleId)
+                .param("project", projectId.toString()).update();
     }
 
     private CurrentPrincipal principal() {

@@ -11,8 +11,18 @@ import java.util.UUID;
 /** 应用层持久化端口；MyBatis Mapper 只允许由 infrastructure 适配器调用。 */
 public interface OperationalExceptionWorkbenchRepository {
     List<OperationalExceptionItem> findPage(
-            String tenantId, String status, String category, String severity,
-            UUID workOrderId, UUID taskId, Instant cursorOpenedAt, UUID cursorId, int fetchSize);
+            String tenantId,
+            boolean tenantWide,
+            List<UUID> projectIds,
+            UUID projectId,
+            String status,
+            String category,
+            String severity,
+            UUID workOrderId,
+            UUID taskId,
+            Instant cursorOpenedAt,
+            UUID cursorId,
+            int fetchSize);
 
     Optional<OperationalExceptionItem> findById(String tenantId, UUID exceptionId);
 
