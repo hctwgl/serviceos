@@ -254,8 +254,8 @@ class WorkOrderTimelinePostgresIT {
                 "corr-cross", workOrderId, null, 10))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.RESOURCE_NOT_FOUND));
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("075");
-        assertThat(flyway.info().applied()).hasSize(77);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("076");
+        assertThat(flyway.info().applied()).hasSize(78);
     }
 
     @Test
@@ -572,6 +572,110 @@ class WorkOrderTimelinePostgresIT {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("OperationalException");
         assertThat(count("rdm_work_order_timeline_entry")).isEqualTo(1);
+    }
+
+    @Test
+    void projectsAssignmentLifecycleWithoutAssigneeLeakageAndRejectsMismatch() {
+        Instant t0 = Instant.parse("2026-07-16T10:00:00Z");
+        UUID assignmentId = UUID.randomUUID();
+        UUID sagaId = UUID.randomUUID();
+
+        // 载荷故意携带 assigneeId；投影记录不得保留指派细节。
+        Map<String, Object> pendingPayload = new HashMap<>();
+        pendingPayload.put("serviceAssignmentId", assignmentId);
+        pendingPayload.put("workOrderId", workOrderId);
+        pendingPayload.put("taskId", taskId);
+        pendingPayload.put("assigneeId", "technician-secret-001");
+        pendingPayload.put("capacityReservationId", UUID.randomUUID());
+        pendingPayload.put("guardId", UUID.randomUUID());
+        pendingPayload.put("reasonCode", "MANUAL_REASSIGNMENT");
+        pendingPayload.put("initiatedBy", "dispatch-manager");
+        pendingPayload.put("occurredAt", t0);
+
+        OutboxMessage pending = message(
+                "dispatch", "service.assignment.pending-activation", 2,
+                "ServiceAssignment", assignmentId, 1, pendingPayload, t0);
+        handler.handle(pending);
+        handler.handle(pending);
+
+        Map<String, Object> activatedPayload = new HashMap<>(pendingPayload);
+        activatedPayload.put("reasonCode", "TASK_ASSIGNMENT_PREPARED");
+        activatedPayload.put("occurredAt", t0.plusSeconds(10));
+        handler.handle(message(
+                "dispatch", "service.assignment.activated", 2,
+                "ServiceAssignment", assignmentId, 3,
+                activatedPayload, t0.plusSeconds(10)));
+
+        Map<String, Object> completedPayload = new HashMap<>();
+        completedPayload.put("serviceAssignmentId", assignmentId);
+        completedPayload.put("workOrderId", workOrderId);
+        completedPayload.put("taskId", taskId);
+        completedPayload.put("assigneeId", "technician-secret-001");
+        completedPayload.put("reasonCode", "TASK_ASSIGNMENT_ACTIVATED");
+        completedPayload.put("occurredAt", t0.plusSeconds(20));
+        handler.handle(message(
+                "dispatch", "service.assignment.activation-completed", 1,
+                "ServiceAssignment", assignmentId, 4,
+                completedPayload, t0.plusSeconds(20)));
+
+        Map<String, Object> timedOutPayload = new HashMap<>();
+        timedOutPayload.put("serviceAssignmentId", assignmentId);
+        timedOutPayload.put("workOrderId", workOrderId);
+        timedOutPayload.put("taskId", taskId);
+        timedOutPayload.put("assigneeId", "technician-secret-001");
+        timedOutPayload.put("errorCode", "ACTIVATION_SAGA_TIMEOUT");
+        timedOutPayload.put("detectedAt", t0.plusSeconds(31));
+        handler.handle(message(
+                "dispatch", "service.assignment.activation-timed-out", 1,
+                "ServiceAssignmentActivationSaga", sagaId, 2,
+                timedOutPayload, t0.plusSeconds(31)));
+
+        var page = timelines.list(principal("reader", TENANT), "corr-assignment", workOrderId, null, 10);
+        assertThat(page.items()).extracting(WorkOrderTimelineItem::eventType)
+                .containsExactly(
+                        "service.assignment.activation-timed-out",
+                        "service.assignment.activation-completed",
+                        "service.assignment.activated",
+                        "service.assignment.pending-activation");
+        assertThat(page.items()).extracting(WorkOrderTimelineItem::category)
+                .containsOnly("ASSIGNMENT");
+        assertThat(page.items()).extracting(WorkOrderTimelineItem::resourceType)
+                .containsOnly("ServiceAssignment");
+        assertThat(page.items()).extracting(WorkOrderTimelineItem::outcomeCode)
+                .containsExactly(
+                        "ACTIVATION_SAGA_TIMEOUT",
+                        "TASK_ASSIGNMENT_ACTIVATED",
+                        "TASK_ASSIGNMENT_PREPARED",
+                        "MANUAL_REASSIGNMENT");
+        assertThat(page.items().get(3).actorId()).isEqualTo("dispatch-manager");
+        assertThat(page.items()).allSatisfy(item -> {
+            assertThat(item.resourceId()).isEqualTo(assignmentId);
+            assertThat(item.resourceCode()).isNull();
+            assertThat(objectMapper.writeValueAsString(item)).doesNotContain("technician-secret-001");
+        });
+        assertThat(count("rdm_work_order_timeline_entry")).isEqualTo(4);
+
+        assertThatThrownBy(() -> handler.handle(message(
+                "dispatch", "service.assignment.pending-activation", 1,
+                "ServiceAssignment", assignmentId, 5,
+                Map.of(
+                        "serviceAssignmentId", assignmentId,
+                        "workOrderId", workOrderId,
+                        "taskId", taskId,
+                        "reasonCode", "MANUAL_REASSIGNMENT",
+                        "initiatedBy", "dispatch-manager",
+                        "occurredAt", t0.plusSeconds(40)),
+                t0.plusSeconds(40))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("unsupported");
+
+        assertThatThrownBy(() -> handler.handle(message(
+                "dispatch", "service.assignment.activated", 2,
+                "ServiceAssignment", UUID.randomUUID(), 6,
+                activatedPayload, t0.plusSeconds(50))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("信封");
+        assertThat(count("rdm_work_order_timeline_entry")).isEqualTo(4);
     }
 
     @Test

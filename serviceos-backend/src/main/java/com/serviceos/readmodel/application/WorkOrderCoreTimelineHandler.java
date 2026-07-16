@@ -40,8 +40,8 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * 把已发布的核心执行、现场履约、SLA、资料审核与外发交付事件规范化为工单时间线。
- * Inbox 与投影写入同事务，任何身份错配都会整体回滚；不保存 PII、自由文本或 GPS。
+ * 把已发布的核心执行、现场履约、SLA、资料审核、外发交付与 ServiceAssignment 生命周期事件规范化为工单时间线。
+ * Inbox 与投影写入同事务，任何身份错配都会整体回滚；不保存 PII、自由文本、GPS 或指派细节。
  */
 @Service
 final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
@@ -68,7 +68,14 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             "integration.outbound-delivery-recovered",
             "integration.outbound-delivery-replay-requested",
             "operational.exception.acknowledged",
-            "operational.exception.resolved");
+            "operational.exception.resolved",
+            "service.assignment.pending-activation",
+            "service.assignment.task-prepared",
+            "service.assignment.activated",
+            "service.assignment.activation-aborted",
+            "service.assignment.activation-completed",
+            "service.assignment.activation-abort-completed",
+            "service.assignment.activation-timed-out");
 
     private final InboxService inbox;
     private final WorkOrderTimelineRepository timelines;
@@ -99,12 +106,25 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
         this.clock = clock;
     }
 
+    private static final Set<String> ASSIGNMENT_V2_EVENTS = Set.of(
+            "service.assignment.pending-activation",
+            "service.assignment.task-prepared",
+            "service.assignment.activated",
+            "service.assignment.activation-aborted");
+
     @Override
     public boolean supports(String eventType, int schemaVersion) {
-        return V1_EVENTS.contains(eventType)
-                && (schemaVersion == 1
-                || ("task.completed".equals(eventType) && schemaVersion == 2)
-                || ("operational.exception.resolved".equals(eventType) && schemaVersion == 2));
+        if (!V1_EVENTS.contains(eventType)) {
+            return false;
+        }
+        if (schemaVersion == 1) {
+            // 握手四类事件仅接受 @v2；其余含 activation-completed/timed-out 等 @v1。
+            return !ASSIGNMENT_V2_EVENTS.contains(eventType);
+        }
+        return schemaVersion == 2
+                && ("task.completed".equals(eventType)
+                || "operational.exception.resolved".equals(eventType)
+                || ASSIGNMENT_V2_EVENTS.contains(eventType));
     }
 
     @Override
@@ -205,6 +225,13 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             case "integration.outbound-delivery-replay-requested" -> deliveryReplayRequested(message);
             case "operational.exception.acknowledged" -> exceptionAcknowledged(message);
             case "operational.exception.resolved" -> exceptionResolved(message);
+            case "service.assignment.pending-activation" -> assignmentLifecycle(message, "PENDING_ACTIVATION");
+            case "service.assignment.task-prepared" -> assignmentLifecycle(message, "TASK_PREPARED");
+            case "service.assignment.activated" -> assignmentLifecycle(message, "ACTIVATED");
+            case "service.assignment.activation-aborted" -> assignmentLifecycle(message, "ABORTED");
+            case "service.assignment.activation-completed" -> assignmentTerminal(message, "ACTIVATION_COMPLETED");
+            case "service.assignment.activation-abort-completed" -> assignmentTerminal(message, "ABORT_COMPLETED");
+            case "service.assignment.activation-timed-out" -> assignmentTimedOut(message);
             default -> throw new IllegalArgumentException("unsupported work order timeline event");
         };
     }
@@ -534,6 +561,48 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
                 payload.sourceTaskId(), null, "EXCEPTION", "OperationalException", null,
                 requireCode(payload.resolutionCode(), "exception resolutionCode"), null,
                 payload.resolvedAt());
+    }
+
+    private TimelineFact assignmentLifecycle(OutboxMessage message, String defaultOutcome) {
+        if (message.schemaVersion() != 2) {
+            throw new IllegalArgumentException("时间线仅接受 service.assignment 握手事件 @v2");
+        }
+        AssignmentHandshakePayload payload = read(message, AssignmentHandshakePayload.class);
+        requireEnvelope(message, "dispatch", "ServiceAssignment", payload.serviceAssignmentId());
+        // 不投影 assigneeId / capacityReservationId / guardId；仅保留生命周期与 reason。
+        String outcome = payload.reasonCode() == null || payload.reasonCode().isBlank()
+                ? defaultOutcome
+                : requireCode(payload.reasonCode(), "assignment reasonCode");
+        return fact(
+                payload.workOrderId(), null, "ASSIGNMENT", "ServiceAssignment",
+                payload.serviceAssignmentId(), null, outcome,
+                payload.initiatedBy() == null || payload.initiatedBy().isBlank() ? null : payload.initiatedBy(),
+                payload.occurredAt());
+    }
+
+    private TimelineFact assignmentTerminal(OutboxMessage message, String defaultOutcome) {
+        AssignmentTerminalPayload payload = read(message, AssignmentTerminalPayload.class);
+        requireEnvelope(message, "dispatch", "ServiceAssignment", payload.serviceAssignmentId());
+        String outcome = payload.reasonCode() == null || payload.reasonCode().isBlank()
+                ? defaultOutcome
+                : requireCode(payload.reasonCode(), "assignment reasonCode");
+        return fact(
+                payload.workOrderId(), null, "ASSIGNMENT", "ServiceAssignment",
+                payload.serviceAssignmentId(), null, outcome, null, payload.occurredAt());
+    }
+
+    private TimelineFact assignmentTimedOut(OutboxMessage message) {
+        AssignmentTimedOutPayload payload = read(message, AssignmentTimedOutPayload.class);
+        if (!"dispatch".equals(message.module())
+                || !"ServiceAssignmentActivationSaga".equals(message.aggregateType())) {
+            throw new IllegalArgumentException("时间线事件信封与资源身份不一致");
+        }
+        // resource 仍用 ServiceAssignment，便于同一资源时间线聚合；saga 身份不进入用户可见字段。
+        return fact(
+                payload.workOrderId(), null, "ASSIGNMENT", "ServiceAssignment",
+                payload.serviceAssignmentId(), null,
+                requireCode(payload.errorCode(), "assignment timeout errorCode"),
+                null, payload.detectedAt());
     }
 
     private Optional<TimelineFact> taskScopedFact(
@@ -895,6 +964,34 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             UUID sourceTaskId,
             String resolutionCode,
             Instant resolvedAt
+    ) {
+    }
+
+    private record AssignmentHandshakePayload(
+            UUID serviceAssignmentId,
+            UUID workOrderId,
+            UUID taskId,
+            String reasonCode,
+            String initiatedBy,
+            Instant occurredAt
+    ) {
+    }
+
+    private record AssignmentTerminalPayload(
+            UUID serviceAssignmentId,
+            UUID workOrderId,
+            UUID taskId,
+            String reasonCode,
+            Instant occurredAt
+    ) {
+    }
+
+    private record AssignmentTimedOutPayload(
+            UUID serviceAssignmentId,
+            UUID workOrderId,
+            UUID taskId,
+            String errorCode,
+            Instant detectedAt
     ) {
     }
     /** PostgreSQL timestamptz 仅微秒；信封与载荷比较必须忽略纳秒残留。 */

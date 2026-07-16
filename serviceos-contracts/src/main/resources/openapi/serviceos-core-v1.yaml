@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.50.0
+  version: 0.51.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -2000,7 +2000,7 @@ components:
       properties:
         id: { type: string, format: uuid }
         # 时间线会持续合并新领域事件；使用可扩展枚举，客户端必须容忍未知值。
-        category: { x-extensible-enum: [WORK_ORDER, WORKFLOW, STAGE, TASK, APPOINTMENT, VISIT, CONTACT_ATTEMPT, SLA, FORM, EVIDENCE, REVIEW, CORRECTION, DELIVERY, EXCEPTION] }
+        category: { x-extensible-enum: [WORK_ORDER, WORKFLOW, STAGE, TASK, APPOINTMENT, VISIT, CONTACT_ATTEMPT, SLA, FORM, EVIDENCE, REVIEW, CORRECTION, DELIVERY, EXCEPTION, ASSIGNMENT] }
         eventType:
           x-extensible-enum: [workorder.received, workorder.activated, workorder.fulfilled,
             workflow.started, workflow.completed, stage.activated, stage.completed,
@@ -2019,12 +2019,19 @@ components:
             integration.outbound-delivery-recovered,
             integration.outbound-delivery-replay-requested,
             operational.exception.acknowledged,
-            operational.exception.resolved]
+            operational.exception.resolved,
+            service.assignment.pending-activation,
+            service.assignment.task-prepared,
+            service.assignment.activated,
+            service.assignment.activation-aborted,
+            service.assignment.activation-completed,
+            service.assignment.activation-abort-completed,
+            service.assignment.activation-timed-out]
         schemaVersion: { type: integer, minimum: 1, maximum: 2 }
         occurredAt: { type: string, format: date-time }
         receivedAt: { type: string, format: date-time }
         actorId: { type: [string, 'null'], minLength: 1, maxLength: 128 }
-        resourceType: { x-extensible-enum: [WorkOrder, Workflow, Stage, Task, Appointment, Visit, ContactAttempt, SlaInstance, FormSubmission, EvidenceSetSnapshot, ReviewCase, CorrectionCase, OutboundDelivery, OperationalException] }
+        resourceType: { x-extensible-enum: [WorkOrder, Workflow, Stage, Task, Appointment, Visit, ContactAttempt, SlaInstance, FormSubmission, EvidenceSetSnapshot, ReviewCase, CorrectionCase, OutboundDelivery, OperationalException, ServiceAssignment] }
         resourceId: { type: string, format: uuid }
         resourceVersion: { type: integer, format: int64, minimum: 1 }
         resourceCode: { type: [string, 'null'], minLength: 1, maxLength: 160 }
