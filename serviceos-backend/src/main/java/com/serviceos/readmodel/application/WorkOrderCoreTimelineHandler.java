@@ -1,5 +1,7 @@
 package com.serviceos.readmodel.application;
 
+import com.serviceos.evidence.api.ReviewTimelineContext;
+import com.serviceos.evidence.api.ReviewTimelineContextQuery;
 import com.serviceos.integration.api.DeliveryTimelineContext;
 import com.serviceos.integration.api.DeliveryTimelineContextQuery;
 import com.serviceos.operations.api.ExceptionTimelineContext;
@@ -40,7 +42,8 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * 把已发布的核心执行、现场履约、SLA、资料审核、外发交付、ServiceAssignment 与 Task 指派/Guard 事件规范化为工单时间线。
+ * 把已发布的核心执行、现场履约、SLA、资料审核、外发交付、ServiceAssignment、Task 指派/Guard
+ * 与外部审核回执事件规范化为工单时间线。
  * Inbox 与投影写入同事务，任何身份错配都会整体回滚；不保存 PII、自由文本、GPS、候选人列表或指派细节。
  */
 @Service
@@ -67,6 +70,7 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             "evidence.review-decided", "evidence.review-case-reopened",
             "evidence.correction-case-created", "evidence.correction-resubmitted",
             "evidence.correction-closed", "evidence.correction-waived",
+            "evidence.external-review-receipt-recorded",
             "integration.outbound-delivery-created",
             "integration.outbound-delivery-acknowledged",
             "integration.outbound-delivery-recovered",
@@ -87,6 +91,7 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
     private final TaskTimelineContextQuery taskContexts;
     private final DeliveryTimelineContextQuery deliveryContexts;
     private final ExceptionTimelineContextQuery exceptionContexts;
+    private final ReviewTimelineContextQuery reviewContexts;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
@@ -97,6 +102,7 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             TaskTimelineContextQuery taskContexts,
             DeliveryTimelineContextQuery deliveryContexts,
             ExceptionTimelineContextQuery exceptionContexts,
+            ReviewTimelineContextQuery reviewContexts,
             ObjectMapper objectMapper,
             Clock clock
     ) {
@@ -106,6 +112,7 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
         this.taskContexts = taskContexts;
         this.deliveryContexts = deliveryContexts;
         this.exceptionContexts = exceptionContexts;
+        this.reviewContexts = reviewContexts;
         this.objectMapper = objectMapper;
         this.clock = clock;
     }
@@ -230,6 +237,7 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             case "evidence.correction-resubmitted" -> correctionResubmitted(message);
             case "evidence.correction-closed" -> correctionClosed(message);
             case "evidence.correction-waived" -> correctionWaived(message);
+            case "evidence.external-review-receipt-recorded" -> externalReviewReceiptRecorded(message);
             case "integration.outbound-delivery-created" -> Optional.of(deliveryCreated(message));
             case "integration.outbound-delivery-acknowledged" -> deliveryAcknowledged(message);
             case "integration.outbound-delivery-recovered" -> deliveryRecovered(message);
@@ -530,6 +538,26 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
                 message, "evidence", "CorrectionCase", payload.correctionCaseId(), payload.taskId(),
                 payload.projectId(), "CORRECTION", "CorrectionCase", null, "WAIVED",
                 payload.waivedBy(), payload.waivedAt());
+    }
+
+    private Optional<TimelineFact> externalReviewReceiptRecorded(OutboxMessage message) {
+        ExternalReviewReceiptPayload payload = read(message, ExternalReviewReceiptPayload.class);
+        requireEnvelope(message, "evidence", "ExternalReviewReceipt", payload.receiptId());
+        ReviewTimelineContext context = reviewContexts.find(message.tenantId(), payload.reviewCaseId())
+                .orElseThrow(() -> new IllegalStateException("时间线事件引用的 ReviewCase 不存在"));
+        if (context.workOrderId() == null) {
+            return Optional.empty();
+        }
+        if (payload.projectId() != null && !payload.projectId().equals(context.projectId())) {
+            throw new IllegalArgumentException("时间线事件 Project 与 ReviewCase 权威范围不一致");
+        }
+        // 不投影 externalKey / envelope / canonical / coordinationTaskId。
+        return Optional.of(fact(
+                context.workOrderId(), context.projectId(), "REVIEW", "ExternalReviewReceipt",
+                payload.receiptId(), null,
+                requireCode(payload.result(), "external review receipt result"),
+                payload.receivedBy() == null || payload.receivedBy().isBlank() ? null : payload.receivedBy(),
+                payload.receivedAt()));
     }
 
     private TimelineFact deliveryCreated(OutboxMessage message) {
@@ -966,6 +994,16 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             UUID projectId,
             String waivedBy,
             Instant waivedAt
+    ) {
+    }
+
+    private record ExternalReviewReceiptPayload(
+            UUID receiptId,
+            UUID reviewCaseId,
+            UUID projectId,
+            String result,
+            String receivedBy,
+            Instant receivedAt
     ) {
     }
 

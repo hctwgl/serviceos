@@ -6,7 +6,7 @@
         allowedDependencies = {
                 "shared", "identity::api", "reliability::api", "reliability::spi",
                 "workorder::api", "workflow::api", "task::api", "integration::api",
-                "operations::api"
+                "operations::api", "evidence::api"
         }
 )
 package com.serviceos.readmodel;

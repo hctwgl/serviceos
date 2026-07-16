@@ -105,6 +105,8 @@ class WorkOrderTimelinePostgresIT {
                     rel_outbox_publish_attempt, rel_outbox_event,
                     int_delivery_attempt, int_external_acknowledgement, int_delivery_replay_request,
                     int_outbound_delivery,
+                    evd_review_decision, evd_review_case, evd_evidence_set_member,
+                    evd_evidence_set_snapshot, evd_task_evidence_resolution,
                     wo_work_order, cfg_configuration_bundle_item, cfg_configuration_bundle,
                     cfg_configuration_asset_version, prj_project,
                     auth_role_field_policy, auth_role_grant, auth_role_capability, auth_role CASCADE
@@ -788,6 +790,83 @@ class WorkOrderTimelinePostgresIT {
     }
 
     @Test
+    void projectsExternalReviewReceiptViaReviewTimelineContextPort() {
+        Instant t0 = Instant.parse("2026-07-16T12:00:00Z");
+        UUID reviewCaseId = seedReviewCaseLinkedToTask(taskId);
+        UUID receiptId = UUID.randomUUID();
+
+        OutboxMessage recorded = message(
+                "evidence", "evidence.external-review-receipt-recorded", 1,
+                "ExternalReviewReceipt", receiptId, 1,
+                Map.of(
+                        "receiptId", receiptId,
+                        "reviewCaseId", reviewCaseId,
+                        "reviewDecisionId", UUID.randomUUID(),
+                        "projectId", projectId,
+                        "inboundEnvelopeId", "env-secret-1",
+                        "canonicalMessageId", "can-secret-1",
+                        "externalKey", "EXT-SECRET-KEY",
+                        "result", "APPROVED",
+                        "receivedBy", "adapter-svc",
+                        "receivedAt", t0),
+                t0);
+        handler.handle(recorded);
+        handler.handle(recorded);
+
+        var page = timelines.list(principal("reader", TENANT), "corr-ext-receipt", workOrderId, null, 10);
+        assertThat(page.items()).singleElement().satisfies(item -> {
+            assertThat(item.eventType()).isEqualTo("evidence.external-review-receipt-recorded");
+            assertThat(item.category()).isEqualTo("REVIEW");
+            assertThat(item.resourceType()).isEqualTo("ExternalReviewReceipt");
+            assertThat(item.resourceId()).isEqualTo(receiptId);
+            assertThat(item.outcomeCode()).isEqualTo("APPROVED");
+            assertThat(item.actorId()).isEqualTo("adapter-svc");
+            assertThat(objectMapper.writeValueAsString(item))
+                    .doesNotContain("EXT-SECRET-KEY", "env-secret-1", "can-secret-1");
+        });
+        assertThat(count("rdm_work_order_timeline_entry")).isEqualTo(1);
+
+        UUID mismatchedReceipt = UUID.randomUUID();
+        assertThatThrownBy(() -> handler.handle(message(
+                "evidence", "evidence.external-review-receipt-recorded", 1,
+                "ExternalReviewReceipt", mismatchedReceipt, 1,
+                Map.of(
+                        "receiptId", mismatchedReceipt,
+                        "reviewCaseId", reviewCaseId,
+                        "reviewDecisionId", UUID.randomUUID(),
+                        "projectId", UUID.randomUUID(),
+                        "inboundEnvelopeId", "env-2",
+                        "canonicalMessageId", "can-2",
+                        "externalKey", "EXT-2",
+                        "result", "REJECTED",
+                        "receivedBy", "adapter-svc",
+                        "receivedAt", t0.plusSeconds(10)),
+                t0.plusSeconds(10))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Project");
+
+        UUID missingReceipt = UUID.randomUUID();
+        assertThatThrownBy(() -> handler.handle(message(
+                "evidence", "evidence.external-review-receipt-recorded", 1,
+                "ExternalReviewReceipt", missingReceipt, 1,
+                Map.of(
+                        "receiptId", missingReceipt,
+                        "reviewCaseId", UUID.randomUUID(),
+                        "reviewDecisionId", UUID.randomUUID(),
+                        "projectId", projectId,
+                        "inboundEnvelopeId", "env-3",
+                        "canonicalMessageId", "can-3",
+                        "externalKey", "EXT-3",
+                        "result", "APPROVED",
+                        "receivedBy", "adapter-svc",
+                        "receivedAt", t0.plusSeconds(20)),
+                t0.plusSeconds(20))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("ReviewCase");
+        assertThat(count("rdm_work_order_timeline_entry")).isEqualTo(1);
+    }
+
+    @Test
     void projectsFieldOpsEventsWithoutSensitivePayloadAndRejectsMismatch() {
         Instant t0 = Instant.parse("2026-07-16T04:00:00Z");
         UUID appointmentId = UUID.randomUUID();
@@ -1002,6 +1081,74 @@ class WorkOrderTimelinePostgresIT {
                 .param("attemptId", UUID.randomUUID())
                 .update();
         return exceptionId;
+    }
+
+    private UUID seedReviewCaseLinkedToTask(UUID sourceTaskId) {
+        UUID resolutionId = UUID.randomUUID();
+        UUID snapshotId = UUID.randomUUID();
+        UUID reviewCaseId = UUID.randomUUID();
+        String digest = Sha256.digest(reviewCaseId.toString());
+        jdbc.sql("""
+                INSERT INTO evd_task_evidence_resolution (
+                    resolution_id, tenant_id, project_id, task_id, configuration_bundle_id,
+                    configuration_bundle_digest, stage_code, source_event_id, source_event_digest,
+                    resolver_version, condition_input_digest, resolution_explanation,
+                    generation_no, condition_fact_type, condition_fact_ref, condition_fact_revision,
+                    slot_count, resolved_at)
+                VALUES (
+                    :resolutionId, :tenantId, :projectId, :taskId, :bundleId,
+                    :bundleDigest, 'SURVEY', :eventId, :eventDigest,
+                    'FIXED_EVIDENCE_V1',
+                    '44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a',
+                    CAST('{"kind":"TEST_FIXED_CONTEXT"}' AS jsonb),
+                    1, 'TASK_CREATED', CAST(:eventId AS varchar), 0,
+                    0, now()
+                )
+                """)
+                .param("resolutionId", resolutionId)
+                .param("tenantId", TENANT)
+                .param("projectId", projectId)
+                .param("taskId", sourceTaskId)
+                .param("bundleId", bundle.bundleId())
+                .param("bundleDigest", bundle.manifestDigest())
+                .param("eventId", UUID.randomUUID())
+                .param("eventDigest", digest)
+                .update();
+        jdbc.sql("""
+                INSERT INTO evd_evidence_set_snapshot (
+                    evidence_set_snapshot_id, tenant_id, project_id, task_id, resolution_id,
+                    purpose, member_count, content_digest, eligibility_summary, created_by, created_at
+                ) VALUES (
+                    :snapshotId, :tenantId, :projectId, :taskId, :resolutionId,
+                    'TASK_SUBMISSION', 0, :digest, '{}'::jsonb, 'fixture', now()
+                )
+                """)
+                .param("snapshotId", snapshotId)
+                .param("tenantId", TENANT)
+                .param("projectId", projectId)
+                .param("taskId", sourceTaskId)
+                .param("resolutionId", resolutionId)
+                .param("digest", digest)
+                .update();
+        jdbc.sql("""
+                INSERT INTO evd_review_case (
+                    review_case_id, tenant_id, project_id, task_id, evidence_set_snapshot_id,
+                    snapshot_content_digest, scope_type, origin, policy_version, status,
+                    created_by, created_at
+                ) VALUES (
+                    :id, :tenantId, :projectId, :taskId, :snapshotId,
+                    :digest, 'EVIDENCE_SET_SNAPSHOT', 'INTERNAL', 'POLICY_V1', 'OPEN',
+                    'fixture', now()
+                )
+                """)
+                .param("id", reviewCaseId)
+                .param("tenantId", TENANT)
+                .param("projectId", projectId)
+                .param("taskId", sourceTaskId)
+                .param("snapshotId", snapshotId)
+                .param("digest", digest)
+                .update();
+        return reviewCaseId;
     }
 
     private OutboxMessage message(

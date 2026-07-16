@@ -25,6 +25,9 @@ public interface ReviewCaseRepository {
 
     Optional<ReviewCaseView> find(String tenantId, UUID reviewCaseId);
 
+    /** 时间线专用：只读 reviewCaseId/projectId/taskId，不加载决定。 */
+    Optional<ReviewCaseTimelineIdentity> findTimelineIdentity(String tenantId, UUID reviewCaseId);
+
     Optional<UUID> findActiveBySnapshot(String tenantId, UUID snapshotId, String origin);
 
     Optional<UUID> findClientByExternalSubmissionRef(String tenantId, String externalSubmissionRef);

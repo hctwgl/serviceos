@@ -64,6 +64,15 @@
            AND review_case_id = CAST(#{reviewCaseId} AS uuid)
     </select>
 
+    <select id="findTimelineIdentity" resultType="map">
+        SELECT review_case_id::text AS "reviewCaseId",
+               project_id::text AS "projectId",
+               task_id::text AS "taskId"
+          FROM evd_review_case
+         WHERE tenant_id = #{tenantId}
+           AND review_case_id = CAST(#{reviewCaseId} AS uuid)
+    </select>
+
     <select id="findActiveCaseIdBySnapshot" resultType="string">
         SELECT review_case_id::text
           FROM evd_review_case
