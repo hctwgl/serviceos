@@ -48,6 +48,7 @@ class GeneratedClientContractTest {
                 .contains("checkOutVisit")
                 .contains("interruptVisit")
                 .contains("createBydReviewSubmission")
+                .contains("getWorkOrderActivitySummary")
                 .contains("getOutboundDelivery")
                 .contains("retryUnknownOutboundDelivery");
         assertThat(apiSource)

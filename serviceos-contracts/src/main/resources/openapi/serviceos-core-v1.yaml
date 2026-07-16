@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.62.0
+  version: 0.63.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -100,6 +100,28 @@ paths:
             ETag: { required: true, schema: { type: string } }
             X-Correlation-Id: { required: true, schema: { type: string } }
           content: { application/json: { schema: { $ref: '#/components/schemas/WorkOrderTimelinePage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /work-orders/{workOrderId}/activity-summary:
+    get:
+      operationId: getWorkOrderActivitySummary
+      summary: 查询工单最近活动摘要
+      description: >-
+        返回按业务时间倒序的最近 N 条规范化时间线条目，不额外猜测“关键事件”分类。
+        复用 workOrder.read 实时 Project Scope 鉴权；完整分页请使用 timeline。
+      parameters:
+        - { name: workOrderId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 20, default: 5 } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 最近工单活动摘要
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/WorkOrderActivitySummary' } } }
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
@@ -2109,6 +2131,18 @@ components:
         asOf: { type: string, format: date-time }
         lastProjectedAt: { type: [string, 'null'], format: date-time }
         freshnessStatus: { enum: [FRESH, LAGGING, UNKNOWN, REBUILDING] }
+    WorkOrderActivitySummary:
+      type: object
+      additionalProperties: false
+      required: [resourceVersion, items, lastProjectedAt, meta]
+      properties:
+        resourceVersion: { type: integer, format: int64, minimum: 1 }
+        items:
+          type: array
+          maxItems: 20
+          items: { $ref: '#/components/schemas/WorkOrderTimelineItem' }
+        lastProjectedAt: { type: [string, 'null'], format: date-time }
+        meta: { $ref: '#/components/schemas/WorkOrderWorkspaceMeta' }
     WorkOrderWorkspaceTaskSummary:
       type: object
       additionalProperties: false
