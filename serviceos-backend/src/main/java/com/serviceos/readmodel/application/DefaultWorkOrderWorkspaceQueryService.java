@@ -4,8 +4,14 @@ import com.serviceos.appointment.api.AppointmentRevisionView;
 import com.serviceos.appointment.api.AppointmentService;
 import com.serviceos.appointment.api.AppointmentView;
 import com.serviceos.appointment.api.AppointmentWindow;
+import com.serviceos.evidence.api.CorrectionCaseService;
+import com.serviceos.evidence.api.CorrectionCaseView;
+import com.serviceos.evidence.api.CorrectionResubmissionView;
 import com.serviceos.evidence.api.EvidenceSlotQueryService;
 import com.serviceos.evidence.api.EvidenceSlotView;
+import com.serviceos.evidence.api.ReviewCaseService;
+import com.serviceos.evidence.api.ReviewCaseView;
+import com.serviceos.evidence.api.ReviewDecisionView;
 import com.serviceos.fieldwork.api.VisitService;
 import com.serviceos.fieldwork.api.VisitView;
 import com.serviceos.forms.api.TaskFormDefinition;
@@ -25,9 +31,14 @@ import com.serviceos.readmodel.api.WorkOrderWorkspaceQueryService;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceAppointmentSummary;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceAppointmentsVisitsSectionData;
+import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceCorrectionCaseSummary;
+import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceCorrectionResubmissionSummary;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceEvidenceSlotSummary;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceFormSummary;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceFormsEvidenceSectionData;
+import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceReviewCaseSummary;
+import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceReviewDecisionSummary;
+import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceReviewsCorrectionsSectionData;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceTasksSectionData;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceTimelineSectionData;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceVisitSummary;
@@ -64,7 +75,8 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
             "READY", "PENDING", "CLAIMED", "RUNNING", "RETRY_WAIT", "MANUAL_INTERVENTION");
     private static final Set<String> OPEN_SLA_STATUSES = Set.of("RUNNING", "BREACHED");
     private static final Set<String> ACCEPTED_SECTIONS = Set.of(
-            "TASKS", "TIMELINE_AUDIT", "APPOINTMENTS_VISITS", "FORMS_EVIDENCE");
+            "TASKS", "TIMELINE_AUDIT", "APPOINTMENTS_VISITS", "FORMS_EVIDENCE",
+            "REVIEWS_CORRECTIONS");
 
     private final WorkOrderQueryService workOrders;
     private final WorkOrderTaskQueryService workOrderTasks;
@@ -76,6 +88,8 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
     private final AppointmentService appointments;
     private final TaskFormQueryService taskForms;
     private final EvidenceSlotQueryService evidenceSlots;
+    private final ReviewCaseService reviews;
+    private final CorrectionCaseService corrections;
     private final Clock clock;
 
     DefaultWorkOrderWorkspaceQueryService(
@@ -89,6 +103,8 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
             AppointmentService appointments,
             TaskFormQueryService taskForms,
             EvidenceSlotQueryService evidenceSlots,
+            ReviewCaseService reviews,
+            CorrectionCaseService corrections,
             Clock clock
     ) {
         this.workOrders = workOrders;
@@ -101,6 +117,8 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
         this.appointments = appointments;
         this.taskForms = taskForms;
         this.evidenceSlots = evidenceSlots;
+        this.reviews = reviews;
+        this.corrections = corrections;
         this.clock = clock;
     }
 
@@ -132,7 +150,9 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
         availability.put(
                 "FORMS_EVIDENCE",
                 probeFormsEvidenceAvailability(principal, correlationId, tasks));
-        availability.put("REVIEWS_CORRECTIONS", "UNAVAILABLE");
+        availability.put(
+                "REVIEWS_CORRECTIONS",
+                probeReviewsCorrectionsAvailability(principal, correlationId, tasks));
         availability.put("INTEGRATION", "UNAVAILABLE");
         availability.put("FACTS_CALCULATIONS", "UNAVAILABLE");
         availability.put("SERVICE_ASSIGNMENT", "UNAVAILABLE");
@@ -184,6 +204,7 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
                                 page.nextCursor()),
                         null,
                         null,
+                        null,
                         null);
             }
             case "TIMELINE_AUDIT" -> {
@@ -199,6 +220,7 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
                                 page.lastProjectedAt(),
                                 page.freshnessStatus()),
                         null,
+                        null,
                         null);
             }
             case "APPOINTMENTS_VISITS" -> {
@@ -210,7 +232,7 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
                 WorkOrderWorkspaceAppointmentsVisitsSectionData payload =
                         loadAppointmentsVisits(principal, correlationId, workOrderId, limit);
                 yield new WorkOrderWorkspaceSection(
-                        normalized, versions, meta("FRESH"), null, null, payload, null);
+                        normalized, versions, meta("FRESH"), null, null, payload, null, null);
             }
             case "FORMS_EVIDENCE" -> {
                 if (cursor != null && !cursor.isBlank()) {
@@ -221,7 +243,18 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
                 WorkOrderWorkspaceFormsEvidenceSectionData payload =
                         loadFormsEvidence(principal, correlationId, workOrderId, limit);
                 yield new WorkOrderWorkspaceSection(
-                        normalized, versions, meta("FRESH"), null, null, null, payload);
+                        normalized, versions, meta("FRESH"), null, null, null, payload, null);
+            }
+            case "REVIEWS_CORRECTIONS" -> {
+                if (cursor != null && !cursor.isBlank()) {
+                    throw new BusinessProblem(
+                            ProblemCode.VALIDATION_FAILED,
+                            "REVIEWS_CORRECTIONS cursor paging is not accepted in this slice");
+                }
+                WorkOrderWorkspaceReviewsCorrectionsSectionData payload =
+                        loadReviewsCorrections(principal, correlationId, workOrderId, limit);
+                yield new WorkOrderWorkspaceSection(
+                        normalized, versions, meta("FRESH"), null, null, null, null, payload);
             }
             default -> throw new BusinessProblem(
                     ProblemCode.VALIDATION_FAILED, "workspace section is not accepted: " + normalized);
@@ -259,6 +292,22 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
                 slotsDenied,
                 formsDenied || loaded.forms().isEmpty(),
                 slotsDenied || loaded.evidenceSlots().isEmpty());
+    }
+
+    private String probeReviewsCorrectionsAvailability(
+            CurrentPrincipal principal,
+            String correlationId,
+            List<WorkOrderTaskSummary> tasks
+    ) {
+        WorkOrderWorkspaceReviewsCorrectionsSectionData loaded =
+                loadReviewsCorrections(principal, correlationId, tasks, 1);
+        boolean reviewsDenied = loaded.reviews() == null;
+        boolean correctionsDenied = loaded.corrections() == null;
+        return dualHalfAvailability(
+                reviewsDenied,
+                correctionsDenied,
+                reviewsDenied || loaded.reviews().isEmpty(),
+                correctionsDenied || loaded.corrections().isEmpty());
     }
 
     private static String dualHalfAvailability(
@@ -419,6 +468,68 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
         return new WorkOrderWorkspaceFormsEvidenceSectionData(formSummaries, slotSummaries, null);
     }
 
+    private WorkOrderWorkspaceReviewsCorrectionsSectionData loadReviewsCorrections(
+            CurrentPrincipal principal,
+            String correlationId,
+            UUID workOrderId,
+            int limit
+    ) {
+        List<WorkOrderTaskSummary> tasks = workOrderTasks.list(
+                principal, correlationId, workOrderId, null, 100).items();
+        return loadReviewsCorrections(principal, correlationId, tasks, limit);
+    }
+
+    private WorkOrderWorkspaceReviewsCorrectionsSectionData loadReviewsCorrections(
+            CurrentPrincipal principal,
+            String correlationId,
+            List<WorkOrderTaskSummary> tasks,
+            int limit
+    ) {
+        List<WorkOrderWorkspaceReviewCaseSummary> reviewSummaries;
+        try {
+            List<WorkOrderWorkspaceReviewCaseSummary> collected = new ArrayList<>();
+            for (WorkOrderTaskSummary task : tasks) {
+                reviews.listForTask(principal, correlationId, task.id()).stream()
+                        .map(this::toReviewCaseSummary)
+                        .forEach(collected::add);
+            }
+            reviewSummaries = collected.stream()
+                    .sorted(Comparator.comparing(WorkOrderWorkspaceReviewCaseSummary::createdAt)
+                            .thenComparing(WorkOrderWorkspaceReviewCaseSummary::reviewCaseId))
+                    .limit(limit)
+                    .toList();
+        } catch (BusinessProblem problem) {
+            if (problem.code() == ProblemCode.ACCESS_DENIED) {
+                reviewSummaries = null;
+            } else {
+                throw problem;
+            }
+        }
+
+        List<WorkOrderWorkspaceCorrectionCaseSummary> correctionSummaries;
+        try {
+            List<WorkOrderWorkspaceCorrectionCaseSummary> collected = new ArrayList<>();
+            for (WorkOrderTaskSummary task : tasks) {
+                corrections.listForTask(principal, correlationId, task.id()).stream()
+                        .map(this::toCorrectionCaseSummary)
+                        .forEach(collected::add);
+            }
+            correctionSummaries = collected.stream()
+                    .sorted(Comparator.comparing(WorkOrderWorkspaceCorrectionCaseSummary::createdAt)
+                            .thenComparing(WorkOrderWorkspaceCorrectionCaseSummary::correctionCaseId))
+                    .limit(limit)
+                    .toList();
+        } catch (BusinessProblem problem) {
+            if (problem.code() == ProblemCode.ACCESS_DENIED) {
+                correctionSummaries = null;
+            } else {
+                throw problem;
+            }
+        }
+        return new WorkOrderWorkspaceReviewsCorrectionsSectionData(
+                reviewSummaries, correctionSummaries, null);
+    }
+
     private WorkOrderWorkspaceVisitSummary toVisitSummary(VisitView visit) {
         // 不投影 GPS、device、note、operation/evidence refs，避免工作区泄露现场敏感细节。
         return new WorkOrderWorkspaceVisitSummary(
@@ -468,6 +579,39 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
                 slot.mediaType(), slot.required(), slot.minCount(), slot.maxCount(),
                 slot.status(), slot.resolvedAt(), slot.slotGeneration(),
                 slot.active(), slot.transition(), slot.requiredDisposition());
+    }
+
+    private WorkOrderWorkspaceReviewCaseSummary toReviewCaseSummary(ReviewCaseView review) {
+        return new WorkOrderWorkspaceReviewCaseSummary(
+                review.reviewCaseId(), review.taskId(), review.projectId(),
+                review.evidenceSetSnapshotId(), review.scopeType(), review.origin(),
+                review.policyVersion(), review.status(), review.createdAt(), review.decidedAt(),
+                review.decisions().stream().map(this::toReviewDecisionSummary).toList());
+    }
+
+    private WorkOrderWorkspaceReviewDecisionSummary toReviewDecisionSummary(ReviewDecisionView decision) {
+        // note / approvalRef / decidedBy 不进入工作区摘要，避免自由文本和操作者信息扩散。
+        return new WorkOrderWorkspaceReviewDecisionSummary(
+                decision.reviewDecisionId(), decision.decisionOrdinal(), decision.decision(),
+                decision.decisionSource(), decision.reasonCodes(), decision.decidedAt());
+    }
+
+    private WorkOrderWorkspaceCorrectionCaseSummary toCorrectionCaseSummary(CorrectionCaseView correction) {
+        return new WorkOrderWorkspaceCorrectionCaseSummary(
+                correction.correctionCaseId(), correction.taskId(), correction.projectId(),
+                correction.sourceReviewCaseId(), correction.sourceReviewDecisionId(),
+                correction.reasonCodes(), correction.correctionTaskId(), correction.status(),
+                correction.createdAt(), correction.latestResubmissionSnapshotId(),
+                correction.closedAt(), correction.waivedAt(),
+                correction.resubmissions().stream().map(this::toCorrectionResubmissionSummary).toList());
+    }
+
+    private WorkOrderWorkspaceCorrectionResubmissionSummary toCorrectionResubmissionSummary(
+            CorrectionResubmissionView resubmission
+    ) {
+        return new WorkOrderWorkspaceCorrectionResubmissionSummary(
+                resubmission.correctionResubmissionId(), resubmission.resubmissionOrdinal(),
+                resubmission.evidenceSetSnapshotId(), resubmission.submittedAt());
     }
 
     private WorkOrderWorkspaceMeta meta(String freshnessStatus) {

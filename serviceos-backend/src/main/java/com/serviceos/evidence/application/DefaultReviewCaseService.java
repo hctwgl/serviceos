@@ -25,6 +25,8 @@ import com.serviceos.shared.CommandContext;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.shared.Sha256;
+import com.serviceos.task.api.TaskFulfillmentContext;
+import com.serviceos.task.api.TaskFulfillmentContextService;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,6 +57,7 @@ final class DefaultReviewCaseService implements ReviewCaseService {
     private final ReviewCaseRepository reviews;
     private final EvidenceSetSnapshotRepository snapshots;
     private final CorrectionCaseService corrections;
+    private final TaskFulfillmentContextService tasks;
     private final AuthorizationService authorization;
     private final IdempotencyService idempotency;
     private final AuditAppender audit;
@@ -66,6 +69,7 @@ final class DefaultReviewCaseService implements ReviewCaseService {
             ReviewCaseRepository reviews,
             EvidenceSetSnapshotRepository snapshots,
             CorrectionCaseService corrections,
+            TaskFulfillmentContextService tasks,
             AuthorizationService authorization,
             IdempotencyService idempotency,
             AuditAppender audit,
@@ -76,6 +80,7 @@ final class DefaultReviewCaseService implements ReviewCaseService {
         this.reviews = reviews;
         this.snapshots = snapshots;
         this.corrections = corrections;
+        this.tasks = tasks;
         this.authorization = authorization;
         this.idempotency = idempotency;
         this.audit = audit;
@@ -502,6 +507,20 @@ final class DefaultReviewCaseService implements ReviewCaseService {
                 READ, principal.tenantId(), "ReviewCase", reviewCaseId.toString(),
                 reviewCase.projectId().toString()), correlationId);
         return reviewCase;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ReviewCaseView> listForTask(
+            CurrentPrincipal principal, String correlationId, UUID taskId
+    ) {
+        TaskFulfillmentContext task = tasks.find(principal.tenantId(), taskId)
+                .orElseThrow(() -> new BusinessProblem(
+                        ProblemCode.RESOURCE_NOT_FOUND, "Task does not exist"));
+        authorization.require(principal, AuthorizationRequest.projectCapability(
+                READ, principal.tenantId(), "Task", taskId.toString(), task.projectId().toString()),
+                correlationId);
+        return reviews.listByTask(principal.tenantId(), taskId);
     }
 
     private static String normalizePolicy(String policyVersion) {

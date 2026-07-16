@@ -20,6 +20,8 @@ import com.serviceos.reliability.api.OutboxEvent;
 import com.serviceos.task.api.CancelHandlingTaskCommand;
 import com.serviceos.task.api.CreateHandlingTaskCommand;
 import com.serviceos.task.api.ScheduledTaskView;
+import com.serviceos.task.api.TaskFulfillmentContext;
+import com.serviceos.task.api.TaskFulfillmentContextService;
 import com.serviceos.task.api.TaskResponsibilityQuery;
 import com.serviceos.task.api.TaskSchedulingService;
 import com.serviceos.shared.BusinessProblem;
@@ -53,6 +55,7 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
     private final CorrectionCaseRepository corrections;
     private final EvidenceSetSnapshotRepository snapshots;
     private final TaskSchedulingService tasks;
+    private final TaskFulfillmentContextService taskContexts;
     private final TaskResponsibilityQuery responsibilities;
     private final AuthorizationService authorization;
     private final IdempotencyService idempotency;
@@ -65,6 +68,7 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
             CorrectionCaseRepository corrections,
             EvidenceSetSnapshotRepository snapshots,
             TaskSchedulingService tasks,
+            TaskFulfillmentContextService taskContexts,
             TaskResponsibilityQuery responsibilities,
             AuthorizationService authorization,
             IdempotencyService idempotency,
@@ -76,6 +80,7 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
         this.corrections = corrections;
         this.snapshots = snapshots;
         this.tasks = tasks;
+        this.taskContexts = taskContexts;
         this.responsibilities = responsibilities;
         this.authorization = authorization;
         this.idempotency = idempotency;
@@ -170,6 +175,20 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
                 READ, principal.tenantId(), "CorrectionCase", correctionCaseId.toString(),
                 correction.projectId().toString()), correlationId);
         return correction;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CorrectionCaseView> listForTask(
+            CurrentPrincipal principal, String correlationId, UUID taskId
+    ) {
+        TaskFulfillmentContext task = taskContexts.find(principal.tenantId(), taskId)
+                .orElseThrow(() -> new BusinessProblem(
+                        ProblemCode.RESOURCE_NOT_FOUND, "Task does not exist"));
+        authorization.require(principal, AuthorizationRequest.projectCapability(
+                READ, principal.tenantId(), "Task", taskId.toString(), task.projectId().toString()),
+                correlationId);
+        return corrections.listByTask(principal.tenantId(), taskId);
     }
 
     @Override

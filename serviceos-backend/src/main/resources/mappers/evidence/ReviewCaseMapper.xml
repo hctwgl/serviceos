@@ -64,6 +64,25 @@
            AND review_case_id = CAST(#{reviewCaseId} AS uuid)
     </select>
 
+    <select id="listCasesByTask" resultType="map">
+        SELECT review_case_id AS "reviewCaseId", project_id AS "projectId", task_id AS "taskId",
+               evidence_set_snapshot_id AS "evidenceSetSnapshotId",
+               snapshot_content_digest AS "snapshotContentDigest",
+               scope_type AS "scopeType", origin AS "origin", policy_version AS "policyVersion",
+               status AS "status", created_by AS "createdBy", created_at AS "createdAt",
+               decided_at AS "decidedAt",
+               source_review_case_id AS "sourceReviewCaseId",
+               external_submission_ref AS "externalSubmissionRef",
+               callback_batch_ref AS "callbackBatchRef",
+               mapping_version_id AS "mappingVersionId",
+               reopened_from_review_case_id AS "reopenedFromReviewCaseId",
+               reopen_trigger_ref AS "reopenTriggerRef"
+          FROM evd_review_case
+         WHERE tenant_id = #{tenantId}
+           AND task_id = CAST(#{taskId} AS uuid)
+         ORDER BY created_at ASC, review_case_id ASC
+    </select>
+
     <select id="findTimelineIdentity" resultType="map">
         SELECT review_case_id::text AS "reviewCaseId",
                project_id::text AS "projectId",

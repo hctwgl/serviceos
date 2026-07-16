@@ -37,7 +37,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** M85～M89：工作区组合查询的授权、无 PII、按需区块与缺权降级证据。 */
+/** M85～M90：工作区组合查询的授权、无 PII、按需区块与缺权降级证据。 */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = ServiceOsApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE)
 class WorkOrderWorkspacePostgresIT {
@@ -93,6 +93,9 @@ class WorkOrderWorkspacePostgresIT {
                     apt_contact_attempt_command_result, apt_contact_attempt,
                     apt_appointment_command_result, apt_appointment_status_history,
                     apt_appointment_revision, apt_appointment, dsp_service_assignment,
+                    evd_correction_resubmission, evd_correction_case,
+                    evd_review_decision, evd_review_case, evd_evidence_set_member,
+                    evd_evidence_set_snapshot,
                     evd_evidence_condition_disposition, evd_evidence_resolution_member,
                     evd_evidence_slot, evd_task_evidence_resolution,
                     rel_outbox_publish_attempt, rel_outbox_event,
@@ -129,6 +132,7 @@ class WorkOrderWorkspacePostgresIT {
         assertThat(workspace.sectionAvailability().get("TASKS")).isEqualTo("AVAILABLE");
         assertThat(workspace.sectionAvailability().get("APPOINTMENTS_VISITS")).isEqualTo("UNAVAILABLE");
         assertThat(workspace.sectionAvailability().get("FORMS_EVIDENCE")).isEqualTo("UNAVAILABLE");
+        assertThat(workspace.sectionAvailability().get("REVIEWS_CORRECTIONS")).isEqualTo("UNAVAILABLE");
         assertThat(workspace.sectionAvailability().get("SLA")).isEqualTo("UNAVAILABLE");
         assertThat(workspace.sectionAvailability().get("EXCEPTIONS")).isEqualTo("UNAVAILABLE");
         assertThat(workspace.slaSummary()).isNull();
@@ -165,6 +169,7 @@ class WorkOrderWorkspacePostgresIT {
         assertThat(tasks.timeline()).isNull();
         assertThat(tasks.appointmentsVisits()).isNull();
         assertThat(tasks.formsEvidence()).isNull();
+        assertThat(tasks.reviewsCorrections()).isNull();
         assertThat(tasks.tasks().items()).extracting(item -> item.taskId()).containsExactly(taskId);
         assertThat(tasks.sourceVersions().workOrderVersion()).isEqualTo(1);
         assertThat(tasks.toString()).doesNotContain("customerName", "customerMobile");
@@ -176,10 +181,11 @@ class WorkOrderWorkspacePostgresIT {
         assertThat(timeline.tasks()).isNull();
         assertThat(timeline.appointmentsVisits()).isNull();
         assertThat(timeline.formsEvidence()).isNull();
+        assertThat(timeline.reviewsCorrections()).isNull();
         assertThat(timeline.timeline().freshnessStatus()).isEqualTo("UNKNOWN");
 
         assertThatThrownBy(() -> workspaces.getSection(
-                principal("reader"), "corr-bad", workOrderId, "REVIEWS_CORRECTIONS", null, 20))
+                principal("reader"), "corr-bad", workOrderId, "INTEGRATION", null, 20))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
     }
@@ -248,6 +254,49 @@ class WorkOrderWorkspacePostgresIT {
         assertThatThrownBy(() -> workspaces.getSection(
                 principal("reader"), "corr-fe-cursor", workOrderId,
                 "FORMS_EVIDENCE", "cursor-1", 20))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
+    }
+
+    @Test
+    void reviewsCorrectionsSectionLoadsWithoutFreeText() {
+        seedReader("review-reader", projectId, "workOrder.read", "evidence.read");
+        ReviewCorrectionFixture fixture = seedReviewCorrection(taskId);
+
+        var section = workspaces.getSection(
+                principal("review-reader"), "corr-rc", workOrderId,
+                "REVIEWS_CORRECTIONS", null, 50);
+
+        assertThat(section.section()).isEqualTo("REVIEWS_CORRECTIONS");
+        assertThat(section.reviewsCorrections()).isNotNull();
+        assertThat(section.tasks()).isNull();
+        assertThat(section.timeline()).isNull();
+        assertThat(section.appointmentsVisits()).isNull();
+        assertThat(section.formsEvidence()).isNull();
+        assertThat(section.reviewsCorrections().reviews())
+                .extracting(item -> item.reviewCaseId())
+                .containsExactly(fixture.reviewCaseId());
+        assertThat(section.reviewsCorrections().reviews().getFirst().decisions())
+                .extracting(item -> item.reviewDecisionId())
+                .containsExactly(fixture.reviewDecisionId());
+        assertThat(section.reviewsCorrections().corrections())
+                .extracting(item -> item.correctionCaseId())
+                .containsExactly(fixture.correctionCaseId());
+        assertThat(section.toString()).doesNotContain(
+                "review-note-should-not-leak", "approval-ref-should-not-leak",
+                "waiveNote", "decidedBy");
+
+        WorkOrderWorkspace workspace = workspaces.get(
+                principal("review-reader"), "corr-rc-top", workOrderId);
+        assertThat(workspace.sectionAvailability().get("REVIEWS_CORRECTIONS"))
+                .isEqualTo("AVAILABLE");
+    }
+
+    @Test
+    void reviewsCorrectionsRejectsCursorPaging() {
+        assertThatThrownBy(() -> workspaces.getSection(
+                principal("reader"), "corr-rc-cursor", workOrderId,
+                "REVIEWS_CORRECTIONS", "cursor-1", 20))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
     }
@@ -529,6 +578,122 @@ class WorkOrderWorkspacePostgresIT {
         return slotId;
     }
 
+    private ReviewCorrectionFixture seedReviewCorrection(UUID taskId) {
+        UUID resolutionId = UUID.randomUUID();
+        UUID snapshotId = UUID.randomUUID();
+        UUID reviewCaseId = UUID.randomUUID();
+        UUID reviewDecisionId = UUID.randomUUID();
+        UUID correctionCaseId = UUID.randomUUID();
+        Instant createdAt = Instant.parse("2026-07-16T05:00:00Z");
+        Instant decidedAt = createdAt.plusSeconds(60);
+        String digest = Sha256.digest(snapshotId.toString());
+        jdbc.sql("""
+                INSERT INTO evd_task_evidence_resolution (
+                    resolution_id, tenant_id, project_id, task_id,
+                    configuration_bundle_id, configuration_bundle_digest, stage_code,
+                    source_event_id, source_event_digest, resolver_version,
+                    condition_input_digest, resolution_explanation,
+                    generation_no, condition_fact_type, condition_fact_ref, condition_fact_revision,
+                    slot_count, resolved_at
+                ) VALUES (
+                    :resolutionId, :tenantId, :projectId, :taskId,
+                    :bundleId, :bundleDigest, 'SURVEY',
+                    :eventId, :eventDigest, 'M90_FIXTURE',
+                    :conditionDigest, '{"fixture":true}'::jsonb,
+                    1, 'TASK_CREATED', :factRef, 0, 0, :createdAt
+                )
+                """)
+                .param("resolutionId", resolutionId)
+                .param("tenantId", TENANT)
+                .param("projectId", projectId)
+                .param("taskId", taskId)
+                .param("bundleId", bundle.bundleId())
+                .param("bundleDigest", bundle.manifestDigest())
+                .param("eventId", UUID.randomUUID())
+                .param("eventDigest", "f".repeat(64))
+                .param("conditionDigest", "d".repeat(64))
+                .param("factRef", UUID.randomUUID().toString())
+                .param("createdAt", java.sql.Timestamp.from(createdAt))
+                .update();
+        jdbc.sql("""
+                INSERT INTO evd_evidence_set_snapshot (
+                    evidence_set_snapshot_id, tenant_id, project_id, task_id, resolution_id,
+                    purpose, member_count, content_digest, eligibility_summary, created_by, created_at
+                ) VALUES (
+                    :snapshotId, :tenantId, :projectId, :taskId, :resolutionId,
+                    'TASK_SUBMISSION', 0, :digest, '{}'::jsonb, 'fixture', :createdAt
+                )
+                """)
+                .param("snapshotId", snapshotId)
+                .param("tenantId", TENANT)
+                .param("projectId", projectId)
+                .param("taskId", taskId)
+                .param("resolutionId", resolutionId)
+                .param("digest", digest)
+                .param("createdAt", java.sql.Timestamp.from(createdAt))
+                .update();
+        jdbc.sql("""
+                INSERT INTO evd_review_case (
+                    review_case_id, tenant_id, project_id, task_id, evidence_set_snapshot_id,
+                    snapshot_content_digest, scope_type, origin, policy_version, status,
+                    created_by, created_at, decided_at
+                ) VALUES (
+                    :reviewCaseId, :tenantId, :projectId, :taskId, :snapshotId,
+                    :digest, 'EVIDENCE_SET_SNAPSHOT', 'INTERNAL', 'POLICY_V1', 'REJECTED',
+                    'reviewer-should-not-leak', :createdAt, :decidedAt
+                )
+                """)
+                .param("reviewCaseId", reviewCaseId)
+                .param("tenantId", TENANT)
+                .param("projectId", projectId)
+                .param("taskId", taskId)
+                .param("snapshotId", snapshotId)
+                .param("digest", digest)
+                .param("createdAt", java.sql.Timestamp.from(createdAt))
+                .param("decidedAt", java.sql.Timestamp.from(decidedAt))
+                .update();
+        jdbc.sql("""
+                INSERT INTO evd_review_decision (
+                    review_decision_id, tenant_id, project_id, review_case_id,
+                    decision_ordinal, decision, decision_source, reason_codes,
+                    note, approval_ref, decided_by, decided_at
+                ) VALUES (
+                    :reviewDecisionId, :tenantId, :projectId, :reviewCaseId,
+                    1, 'REJECTED', 'INTERNAL', '["PHOTO_BLUR"]'::jsonb,
+                    'review-note-should-not-leak', NULL, 'reviewer-should-not-leak', :decidedAt
+                )
+                """)
+                .param("reviewDecisionId", reviewDecisionId)
+                .param("tenantId", TENANT)
+                .param("projectId", projectId)
+                .param("reviewCaseId", reviewCaseId)
+                .param("decidedAt", java.sql.Timestamp.from(decidedAt))
+                .update();
+        jdbc.sql("""
+                INSERT INTO evd_correction_case (
+                    correction_case_id, tenant_id, project_id, task_id,
+                    source_review_case_id, source_review_decision_id,
+                    source_evidence_set_snapshot_id, source_snapshot_content_digest,
+                    reason_codes, status, created_by, created_at
+                ) VALUES (
+                    :correctionCaseId, :tenantId, :projectId, :taskId,
+                    :reviewCaseId, :reviewDecisionId, :snapshotId, :digest,
+                    '["PHOTO_BLUR"]'::jsonb, 'OPEN', 'fixture', :decidedAt
+                )
+                """)
+                .param("correctionCaseId", correctionCaseId)
+                .param("tenantId", TENANT)
+                .param("projectId", projectId)
+                .param("taskId", taskId)
+                .param("reviewCaseId", reviewCaseId)
+                .param("reviewDecisionId", reviewDecisionId)
+                .param("snapshotId", snapshotId)
+                .param("digest", digest)
+                .param("decidedAt", java.sql.Timestamp.from(decidedAt))
+                .update();
+        return new ReviewCorrectionFixture(reviewCaseId, reviewDecisionId, correctionCaseId);
+    }
+
     private UUID seedVisit(UUID appointmentId, UUID taskId) {
         UUID visitId = UUID.randomUUID();
         Instant now = Instant.parse("2026-07-16T03:00:00Z");
@@ -567,5 +732,12 @@ class WorkOrderWorkspacePostgresIT {
     private static CurrentPrincipal principal(String principalId) {
         return new CurrentPrincipal(
                 principalId, TENANT, CurrentPrincipal.PrincipalType.USER, "m88", Set.of());
+    }
+
+    private record ReviewCorrectionFixture(
+            UUID reviewCaseId,
+            UUID reviewDecisionId,
+            UUID correctionCaseId
+    ) {
     }
 }

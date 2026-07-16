@@ -98,6 +98,19 @@ final class MyBatisReviewCaseRepository implements ReviewCaseRepository {
     }
 
     @Override
+    public List<ReviewCaseView> listByTask(String tenantId, UUID taskId) {
+        return mapper.listCasesByTask(tenantId, taskId.toString()).stream()
+                .map(row -> {
+                    UUID reviewCaseId = uuid(row, "reviewCaseId");
+                    List<ReviewDecisionView> decisions = mapper.listDecisions(
+                                    tenantId, reviewCaseId.toString())
+                            .stream().map(this::decisionView).toList();
+                    return caseView(row, decisions);
+                })
+                .toList();
+    }
+
+    @Override
     public Optional<ReviewCaseTimelineIdentity> findTimelineIdentity(String tenantId, UUID reviewCaseId) {
         Map<String, Object> row = mapper.findTimelineIdentity(tenantId, reviewCaseId.toString());
         if (row == null) {

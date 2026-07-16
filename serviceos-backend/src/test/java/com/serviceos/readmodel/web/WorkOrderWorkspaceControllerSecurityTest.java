@@ -10,8 +10,11 @@ import com.serviceos.readmodel.api.WorkOrderWorkspace.WorkOrderWorkspaceTaskSumm
 import com.serviceos.readmodel.api.WorkOrderWorkspaceQueryService;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceAppointmentsVisitsSectionData;
+import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceCorrectionCaseSummary;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceFormSummary;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceFormsEvidenceSectionData;
+import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceReviewCaseSummary;
+import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceReviewsCorrectionsSectionData;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceTasksSectionData;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceVisitSummary;
 import com.serviceos.workorder.api.WorkOrderView;
@@ -114,6 +117,7 @@ class WorkOrderWorkspaceControllerSecurityTest {
                         null),
                 null,
                 null,
+                null,
                 null);
         when(principals.current()).thenReturn(principal);
         when(workspaces.getSection(eq(principal), eq("corr-sec"), eq(workOrderId),
@@ -154,6 +158,7 @@ class WorkOrderWorkspaceControllerSecurityTest {
                                 null, null, null, null, 1)),
                         List.of(),
                         null),
+                null,
                 null);
         when(principals.current()).thenReturn(principal);
         when(workspaces.getSection(eq(principal), eq("corr-av"), eq(workOrderId),
@@ -196,7 +201,8 @@ class WorkOrderWorkspaceControllerSecurityTest {
                                 taskId, formVersionId, "survey.execution",
                                 "1.0.0", "1.0.0", "c".repeat(64))),
                         List.of(),
-                        null));
+                        null),
+                null);
         when(principals.current()).thenReturn(principal);
         when(workspaces.getSection(eq(principal), eq("corr-fe"), eq(workOrderId),
                 eq("FORMS_EVIDENCE"), isNull(), eq(50))).thenReturn(section);
@@ -214,5 +220,56 @@ class WorkOrderWorkspaceControllerSecurityTest {
                 .andExpect(jsonPath("$.tasks").value(nullValue()))
                 .andExpect(jsonPath("$.appointmentsVisits").value(nullValue()));
         verify(workspaces).getSection(principal, "corr-fe", workOrderId, "FORMS_EVIDENCE", null, 50);
+    }
+
+    @Test
+    void reviewsCorrectionsSectionContractIsEnforced() throws Exception {
+        UUID workOrderId = UUID.randomUUID();
+        UUID taskId = UUID.randomUUID();
+        UUID projectId = UUID.randomUUID();
+        UUID reviewCaseId = UUID.randomUUID();
+        UUID correctionCaseId = UUID.randomUUID();
+        CurrentPrincipal principal = new CurrentPrincipal(
+                "reader", "tenant", CurrentPrincipal.PrincipalType.USER, "m90", Set.of());
+        Instant now = Instant.parse("2026-07-16T14:00:00Z");
+        WorkOrderWorkspaceSection section = new WorkOrderWorkspaceSection(
+                "REVIEWS_CORRECTIONS",
+                new WorkOrderWorkspaceSourceVersions(7),
+                new WorkOrderWorkspaceMeta(now, "work-order-core-timeline.v1:gen:1", "FRESH", "q-5"),
+                null,
+                null,
+                null,
+                null,
+                new WorkOrderWorkspaceReviewsCorrectionsSectionData(
+                        List.of(new WorkOrderWorkspaceReviewCaseSummary(
+                                reviewCaseId, taskId, projectId, UUID.randomUUID(),
+                                "EVIDENCE_SET_SNAPSHOT", "INTERNAL", "POLICY_V1",
+                                "OPEN", now, null, List.of())),
+                        List.of(new WorkOrderWorkspaceCorrectionCaseSummary(
+                                correctionCaseId, taskId, projectId, reviewCaseId, UUID.randomUUID(),
+                                List.of("PHOTO_BLUR"), null, "OPEN", now, null,
+                                null, null, List.of())),
+                        null));
+        when(principals.current()).thenReturn(principal);
+        when(workspaces.getSection(eq(principal), eq("corr-rc"), eq(workOrderId),
+                eq("REVIEWS_CORRECTIONS"), isNull(), eq(50))).thenReturn(section);
+
+        mvc.perform(get("/api/v1/work-orders/{id}/workspace/sections/{section}",
+                        workOrderId, "REVIEWS_CORRECTIONS")
+                        .with(jwt())
+                        .header("X-Correlation-Id", "corr-rc"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("ETag", "\"7\""))
+                .andExpect(jsonPath("$.section").value("REVIEWS_CORRECTIONS"))
+                .andExpect(jsonPath("$.reviewsCorrections.reviews[0].reviewCaseId")
+                        .value(reviewCaseId.toString()))
+                .andExpect(jsonPath("$.reviewsCorrections.corrections[0].correctionCaseId")
+                        .value(correctionCaseId.toString()))
+                .andExpect(jsonPath("$.reviewsCorrections.reviews[0].note").doesNotExist())
+                .andExpect(jsonPath("$.reviewsCorrections.corrections[0].waiveNote").doesNotExist())
+                .andExpect(jsonPath("$.tasks").value(nullValue()))
+                .andExpect(jsonPath("$.formsEvidence").value(nullValue()));
+        verify(workspaces).getSection(
+                principal, "corr-rc", workOrderId, "REVIEWS_CORRECTIONS", null, 50);
     }
 }
