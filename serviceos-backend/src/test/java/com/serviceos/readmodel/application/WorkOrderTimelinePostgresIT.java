@@ -251,8 +251,70 @@ class WorkOrderTimelinePostgresIT {
                 "corr-cross", workOrderId, null, 10))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.RESOURCE_NOT_FOUND));
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("072");
-        assertThat(flyway.info().applied()).hasSize(74);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("073");
+        assertThat(flyway.info().applied()).hasSize(75);
+    }
+
+    @Test
+    void projectsSlaEventsViaTaskContextAndIgnoresStandaloneTask() {
+        Instant t0 = Instant.parse("2026-07-16T05:00:00Z");
+        UUID slaInstanceId = UUID.randomUUID();
+
+        handler.handle(message(
+                "sla", "sla.started", 1, "SlaInstance", slaInstanceId, 1,
+                Map.of(
+                        "slaInstanceId", slaInstanceId,
+                        "taskId", taskId,
+                        "projectId", projectId,
+                        "workOrderId", workOrderId,
+                        "slaRef", "TASK_ELAPSED_4H",
+                        "startedAt", t0),
+                t0));
+        handler.handle(message(
+                "sla", "sla.breached", 1, "SlaInstance", slaInstanceId, 2,
+                Map.of(
+                        "slaInstanceId", slaInstanceId,
+                        "taskId", taskId,
+                        "detectedAt", t0.plusSeconds(10)),
+                t0.plusSeconds(10)));
+        OutboxMessage met = message(
+                "sla", "sla.met", 1, "SlaInstance", slaInstanceId, 3,
+                Map.of(
+                        "slaInstanceId", slaInstanceId,
+                        "taskId", taskId,
+                        "status", "MET_LATE",
+                        "completedAt", t0.plusSeconds(20)),
+                t0.plusSeconds(20));
+        handler.handle(met);
+        handler.handle(met);
+
+        var page = timelines.list(principal("reader", TENANT), "corr-sla", workOrderId, null, 10);
+        assertThat(page.items()).extracting(WorkOrderTimelineItem::eventType)
+                .containsExactly("sla.met", "sla.breached", "sla.started");
+        assertThat(page.items()).extracting(WorkOrderTimelineItem::category)
+                .containsOnly("SLA");
+        assertThat(page.items().get(0).outcomeCode()).isEqualTo("MET_LATE");
+        assertThat(page.items().get(1).outcomeCode()).isEqualTo("BREACHED");
+        assertThat(page.items().get(2).resourceCode()).isEqualTo("TASK_ELAPSED_4H");
+        assertThat(page.items().get(2).outcomeCode()).isEqualTo("STARTED");
+        assertThat(count("rdm_work_order_timeline_entry")).isEqualTo(3);
+
+        UUID standaloneTask = task(null, null, "OPERATIONS_REPAIR");
+        UUID standaloneSla = UUID.randomUUID();
+        OutboxMessage standalone = message(
+                "sla", "sla.breached", 1, "SlaInstance", standaloneSla, 2,
+                Map.of(
+                        "slaInstanceId", standaloneSla,
+                        "taskId", standaloneTask,
+                        "detectedAt", t0.plusSeconds(30)),
+                t0.plusSeconds(30));
+        handler.handle(standalone);
+        assertThat(count("rdm_work_order_timeline_entry")).isEqualTo(3);
+        assertThat(jdbc.sql("""
+                SELECT status FROM rel_inbox_record WHERE event_id=:eventId
+                """).param("eventId", standalone.eventId()).query(String.class).single())
+                .isEqualTo("SUCCEEDED");
+        assertThat(count("rel_inbox_record")).isEqualTo(4);
     }
 
     @Test

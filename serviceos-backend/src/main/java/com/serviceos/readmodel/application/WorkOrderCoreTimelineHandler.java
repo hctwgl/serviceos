@@ -35,7 +35,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * 把已发布的核心执行与现场履约事件规范化为工单时间线。
+ * 把已发布的核心执行、现场履约与 SLA 事件规范化为工单时间线。
  * Inbox 与投影写入同事务，任何身份错配都会整体回滚；不保存 PII、自由文本或 GPS。
  */
 @Service
@@ -50,7 +50,8 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             "contact.attempt.recorded",
             "appointment.proposed", "appointment.confirmed", "appointment.rescheduled",
             "appointment.cancelled", "appointment.no-show-marked",
-            "visit.checked-in", "visit.checked-out", "visit.interrupted");
+            "visit.checked-in", "visit.checked-out", "visit.interrupted",
+            "sla.started", "sla.breached", "sla.met");
 
     private final InboxService inbox;
     private final WorkOrderTimelineRepository timelines;
@@ -161,6 +162,9 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             case "visit.checked-in" -> Optional.of(visitCheckedIn(message));
             case "visit.checked-out" -> Optional.of(visitCheckedOut(message));
             case "visit.interrupted" -> Optional.of(visitInterrupted(message));
+            case "sla.started" -> Optional.of(slaStarted(message));
+            case "sla.breached" -> slaBreached(message);
+            case "sla.met" -> slaMet(message);
             default -> throw new IllegalArgumentException("unsupported work order timeline event");
         };
     }
@@ -308,6 +312,44 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
         VisitLifecyclePayload payload = read(message, VisitLifecyclePayload.class);
         requireEnvelope(message, "fieldwork", "Visit", payload.visitId());
         return visitFact(payload, requireCode(payload.exceptionCode(), "visit interrupt exceptionCode"));
+    }
+
+    private TimelineFact slaStarted(OutboxMessage message) {
+        SlaStartedPayload payload = read(message, SlaStartedPayload.class);
+        requireEnvelope(message, "sla", "SlaInstance", payload.slaInstanceId());
+        return fact(payload.workOrderId(), payload.projectId(), "SLA", "SlaInstance",
+                payload.slaInstanceId(), payload.slaRef(), "STARTED", null, payload.startedAt());
+    }
+
+    private Optional<TimelineFact> slaBreached(OutboxMessage message) {
+        SlaBreachedPayload payload = read(message, SlaBreachedPayload.class);
+        // 违约检测时间是发布信封的权威 occurredAt；不把 deadline/digest 投影进用户时间线。
+        return slaTaskFact(message, payload.slaInstanceId(), payload.taskId(), "BREACHED",
+                payload.detectedAt());
+    }
+
+    private Optional<TimelineFact> slaMet(OutboxMessage message) {
+        SlaMetPayload payload = read(message, SlaMetPayload.class);
+        return slaTaskFact(message, payload.slaInstanceId(), payload.taskId(),
+                requireCode(payload.status(), "sla.met status"), payload.completedAt());
+    }
+
+    private Optional<TimelineFact> slaTaskFact(
+            OutboxMessage message,
+            UUID slaInstanceId,
+            UUID taskId,
+            String outcomeCode,
+            Instant occurredAt
+    ) {
+        requireEnvelope(message, "sla", "SlaInstance", slaInstanceId);
+        TaskTimelineContext context = taskContexts.find(message.tenantId(), taskId)
+                .orElseThrow(() -> new IllegalStateException("时间线事件引用的 Task 不存在"));
+        if (context.workOrderId() == null) {
+            return Optional.empty();
+        }
+        return Optional.of(fact(
+                context.workOrderId(), context.projectId(), "SLA", "SlaInstance", slaInstanceId,
+                null, outcomeCode, null, occurredAt));
     }
 
     private static TimelineFact appointmentFact(
@@ -464,6 +506,31 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             String resultCode,
             String exceptionCode,
             Instant occurredAt
+    ) {
+    }
+
+    private record SlaStartedPayload(
+            UUID slaInstanceId,
+            UUID taskId,
+            UUID projectId,
+            UUID workOrderId,
+            String slaRef,
+            Instant startedAt
+    ) {
+    }
+
+    private record SlaBreachedPayload(
+            UUID slaInstanceId,
+            UUID taskId,
+            Instant detectedAt
+    ) {
+    }
+
+    private record SlaMetPayload(
+            UUID slaInstanceId,
+            UUID taskId,
+            String status,
+            Instant completedAt
     ) {
     }
 }
