@@ -135,3 +135,5 @@
 - [M132 Admin 工单 SLA 验收矩阵](129-m132-admin-work-order-sla-instances-acceptance.md)
 - [M133 Admin 详情与文件作废验收矩阵](130-m133-admin-evidence-form-detail-and-file-invalidate-acceptance.md)
 - [M134 Admin 工单权威投影验收矩阵](131-m134-admin-work-order-authority-projections-acceptance.md)
+- [M135 Admin 正常整改补传验收矩阵](132-m135-admin-correction-resubmit-rereview-acceptance.md)
+- [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)
