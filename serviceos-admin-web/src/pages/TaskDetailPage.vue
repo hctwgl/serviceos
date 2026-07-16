@@ -5,6 +5,7 @@ import { getAuthorizedTask, type TaskDetail } from '../api/taskDetail'
 import { listTaskExecutionAttempts, type TaskExecutionAttemptPage } from '../api/taskAttempts'
 import { getTaskAllowedActions, type TaskAllowedActions } from '../api/tasks'
 import TaskCommandPanel from '../components/TaskCommandPanel.vue'
+import TaskFieldOpsPanel from '../components/TaskFieldOpsPanel.vue'
 import TaskFormsEvidencePanel from '../components/TaskFormsEvidencePanel.vue'
 import QueueTable from './QueueTable.vue'
 
@@ -116,6 +117,8 @@ onMounted(() => {
       </div>
 
       <TaskFormsEvidencePanel :task-id="taskId" @prepared-complete="onPreparedComplete" />
+
+      <TaskFieldOpsPanel :task-id="taskId" :work-order-id="detail.task.workOrderId ?? null" />
 
       <QueueTable
         title="执行 Attempt 历史"

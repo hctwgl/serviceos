@@ -216,3 +216,6 @@ Feature gate/authority: if applicable
 | M119 | Admin 资料 Begin→PUT→Finalize 上传编排；SHA-256 | PRODUCT-01/02 + ARCH-10/11/19 + Evidence Upload APIs + Admin Web build | 专业扫描 UI、OIDC、E2E |
 | M120 | Admin REVIEW_REQUIRED 条件 KEEP/INVALIDATE 处置 | PRODUCT-01/02 + ARCH-10/19 + Condition Disposition API + Admin Web build | 自动处置策略、OIDC、E2E |
 | M121 | Admin 快照后 createReviewCase 并深链 | PRODUCT-01/02 + ARCH-10/19 + Create ReviewCase API + Admin Web build | 审核队列自动刷新、OIDC、E2E |
+| M122 | Admin 任务联系历史列表与追加联系事实 | PRODUCT-01/02 + ARCH-10/19 + ContactAttempt APIs + Admin Web build | 通话录音回放、OIDC、E2E |
+| M123 | Admin 预约提议/确认/取消命令面板 | PRODUCT-01/02 + ARCH-10/19 + Appointment APIs + Admin Web build | 改约/爽约完整 UX、OIDC、E2E |
+| M124 | Admin 预约签到与 Visit 签退模拟 | PRODUCT-01/02 + ARCH-10/19 + Visit APIs + Admin Web build | 真实设备 GPS、OIDC、E2E |
