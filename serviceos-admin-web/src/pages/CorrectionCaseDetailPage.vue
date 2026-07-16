@@ -43,10 +43,12 @@ async function resubmit() {
     if (!/^[0-9a-fA-F-]{36}$/.test(snapshotId.value.trim())) {
       throw new Error('需要有效的 evidenceSetSnapshotId')
     }
-    detail.value = (
+    const resubmitted = (
       await resubmitCorrectionCase(correctionCaseId.value, snapshotId.value.trim())
     ).data
-    message.value = `已补传，status=${detail.value.status}`
+    // 命令成功后重新读取权威详情，避免补传轮次与 Case 投影停留在命令响应快照。
+    await load()
+    message.value = `已补传，status=${resubmitted.status}`
   } catch (err) {
     error.value = err instanceof Error ? err.message : '补传失败'
   } finally {
@@ -59,8 +61,11 @@ async function closeCase() {
   message.value = null
   error.value = null
   try {
-    detail.value = (await closeCorrectionCase(correctionCaseId.value, closeNote.value || undefined)).data
-    message.value = `已关闭，status=${detail.value.status}`
+    const closed = (
+      await closeCorrectionCase(correctionCaseId.value, closeNote.value || undefined)
+    ).data
+    await load()
+    message.value = `已关闭，status=${closed.status}`
   } catch (err) {
     error.value = err instanceof Error ? err.message : '关闭失败'
   } finally {
@@ -76,13 +81,16 @@ async function waive() {
     if (!waiveReason.value.trim() || !approvalRef.value.trim()) {
       throw new Error('豁免需要 reason 与 approvalRef')
     }
-    detail.value = (
+    const waived = (
       await waiveCorrectionCase(correctionCaseId.value, {
         reason: waiveReason.value.trim(),
         approvalRef: approvalRef.value.trim(),
       })
     ).data
-    message.value = `已豁免，status=${detail.value.status}`
+    // 豁免会在同一事务取消整改 Task；重新读取详情后继续展示权威 Case，
+    // 成功提示不能遮蔽 status、任务引用和补传历史。
+    await load()
+    message.value = `已豁免，status=${waived.status}`
   } catch (err) {
     error.value = err instanceof Error ? err.message : '豁免失败'
   } finally {
@@ -118,12 +126,13 @@ onMounted(() => {
     </header>
     <p v-if="error" class="error">{{ error }}</p>
     <p v-if="message" class="ok">{{ message }}</p>
-    <p v-else-if="loading">加载中…</p>
+    <p v-if="loading">加载中…</p>
     <template v-else-if="detail">
       <article class="card">
         <dl>
           <div><dt>status</dt><dd>{{ detail.status }}</dd></div>
           <div><dt>taskId</dt><dd>{{ detail.taskId }}</dd></div>
+          <div><dt>correctionTaskId</dt><dd>{{ detail.correctionTaskId ?? '-' }}</dd></div>
           <div><dt>sourceReviewCaseId</dt><dd>{{ detail.sourceReviewCaseId }}</dd></div>
           <div><dt>reasonCodes</dt><dd>{{ detail.reasonCodes.join(', ') }}</dd></div>
         </dl>
@@ -132,7 +141,13 @@ onMounted(() => {
             源审核案例
           </RouterLink>
           <RouterLink :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.taskId } }">
-            任务详情
+            来源任务
+          </RouterLink>
+          <RouterLink
+            v-if="detail.correctionTaskId"
+            :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.correctionTaskId } }"
+          >
+            整改任务
           </RouterLink>
         </p>
       </article>

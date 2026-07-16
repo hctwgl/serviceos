@@ -3,7 +3,11 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { getAuthorizedTask, type TaskDetail } from '../api/taskDetail'
 import { listTaskExecutionAttempts, type TaskExecutionAttemptPage } from '../api/taskAttempts'
-import { getTaskAllowedActions, type TaskAllowedActions } from '../api/tasks'
+import {
+  getTaskAllowedActions,
+  type InputVersionRef,
+  type TaskAllowedActions,
+} from '../api/tasks'
 import TaskCommandPanel from '../components/TaskCommandPanel.vue'
 import TaskFieldOpsPanel from '../components/TaskFieldOpsPanel.vue'
 import TaskFormsEvidencePanel from '../components/TaskFormsEvidencePanel.vue'
@@ -18,12 +22,20 @@ const detail = ref<TaskDetail | null>(null)
 const attempts = ref<TaskExecutionAttemptPage | null>(null)
 const allowedActions = ref<TaskAllowedActions | null>(null)
 const allowedError = ref<string | null>(null)
-const preparedResultRef = ref('')
-const preparedResultDigest = ref('')
+const preparedInputs = ref<Partial<Record<InputVersionRef['kind'], InputVersionRef>>>({})
+const preparedInputList = computed(() =>
+  Object.values(preparedInputs.value).filter(
+    (input): input is InputVersionRef => input !== undefined,
+  ),
+)
 
-function onPreparedComplete(payload: { resultRef: string; resultDigest: string }) {
-  preparedResultRef.value = payload.resultRef
-  preparedResultDigest.value = payload.resultDigest
+function onPreparedComplete(payload: InputVersionRef) {
+  // 表单与资料可先后独立产生不可变版本。按 kind 保存两份权威引用，
+  // 避免后产生的 Snapshot 覆盖 FormSubmission，导致双输入 complete 使用错误主引用。
+  preparedInputs.value = {
+    ...preparedInputs.value,
+    [payload.kind]: payload,
+  }
 }
 
 async function load() {
@@ -108,8 +120,7 @@ onMounted(() => {
             v-else-if="allowedActions"
             :task-id="taskId"
             :allowed-actions="allowedActions"
-            :prepared-result-ref="preparedResultRef"
-            :prepared-result-digest="preparedResultDigest"
+            :prepared-inputs="preparedInputList"
             @executed="load"
           />
           <p v-else>暂无允许动作</p>
