@@ -821,10 +821,14 @@ class ReviewCasePostgresIT {
 
         ReviewCaseView reopened = reviews.reopen(forceAdmin(), metadata("reopen-ok"),
                 new ReopenReviewCaseCommand(
-                        approved.reviewCaseId(), "车企驳回", "OEM_REJECTION:batch-1", "APR-RO-1"));
+                        approved.reviewCaseId(),
+                        "OEM requested another complete review round after additional verification",
+                        "OEM_REJECTION:batch-1", "APR-REOPEN-LONG-REFERENCE-1"));
         ReviewCaseView reopenReplay = reviews.reopen(forceAdmin(), metadata("reopen-ok"),
                 new ReopenReviewCaseCommand(
-                        approved.reviewCaseId(), "车企驳回", "OEM_REJECTION:batch-1", "APR-RO-1"));
+                        approved.reviewCaseId(),
+                        "OEM requested another complete review round after additional verification",
+                        "OEM_REJECTION:batch-1", "APR-REOPEN-LONG-REFERENCE-1"));
 
         assertThat(reopenReplay.reviewCaseId()).isEqualTo(reopened.reviewCaseId());
         assertThat(reopened.reviewCaseId()).isNotEqualTo(approved.reviewCaseId());
@@ -832,6 +836,12 @@ class ReviewCasePostgresIT {
         assertThat(reopened.reopenedFromReviewCaseId()).isEqualTo(approved.reviewCaseId());
         assertThat(reopened.reopenTriggerRef()).isEqualTo("OEM_REJECTION:batch-1");
         assertThat(reopened.decisions()).isEmpty();
+        assertThat(jdbc.sql("""
+                SELECT result_code FROM aud_audit_record
+                 WHERE action_name = 'REVIEW_CASE_REOPENED'
+                   AND target_id = :targetId
+                """).param("targetId", reopened.reviewCaseId().toString())
+                .query(String.class).single()).isEqualTo("REOPENED");
 
         ReviewCaseView source = reviews.get(forceAdmin(), "corr-get-source", approved.reviewCaseId());
         assertThat(source.status()).isEqualTo("REOPENED");
