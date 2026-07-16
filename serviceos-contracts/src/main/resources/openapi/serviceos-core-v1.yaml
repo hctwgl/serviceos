@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.57.0
+  version: 0.58.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -109,8 +109,9 @@ paths:
       operationId: getWorkOrderWorkspace
       summary: 查询工单工作区顶层组合快照
       description: >-
-        复用 workOrder.read 实时鉴权，组合 Task/时间线 freshness 与可选 SLA/异常摘要。
-        不含客户 PII；大区块按需加载见 workspace/sections（M87：TASKS/TIMELINE_AUDIT）。
+        复用 workOrder.read 实时鉴权，组合 Task/时间线 freshness、可选 SLA/异常摘要，
+        以及 APPOINTMENTS_VISITS 等 sectionAvailability。不含客户 PII；大区块按需加载见
+        workspace/sections（M87/M88：TASKS/TIMELINE_AUDIT/APPOINTMENTS_VISITS）。
       parameters:
         - { name: workOrderId, in: path, required: true, schema: { type: string, format: uuid } }
         - $ref: '#/components/parameters/CorrelationId'
@@ -130,14 +131,14 @@ paths:
       operationId: getWorkOrderWorkspaceSection
       summary: 按需加载工单工作区区块
       description: >-
-        M87 仅接受 TASKS 与 TIMELINE_AUDIT；其余 section 失败关闭为 400。
+        M88 接受 TASKS、TIMELINE_AUDIT 与 APPOINTMENTS_VISITS；其余 section 失败关闭为 400。
         复用 workOrder.read；实时组合，不落区块投影表；不含客户 PII。
       parameters:
         - { name: workOrderId, in: path, required: true, schema: { type: string, format: uuid } }
         - name: section
           in: path
           required: true
-          schema: { enum: [TASKS, TIMELINE_AUDIT] }
+          schema: { enum: [TASKS, TIMELINE_AUDIT, APPOINTMENTS_VISITS] }
         - { name: cursor, in: query, schema: { type: string, minLength: 1 } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
         - $ref: '#/components/parameters/CorrelationId'
@@ -2195,12 +2196,73 @@ components:
         nextCursor: { type: [string, 'null'] }
         lastProjectedAt: { type: [string, 'null'], format: date-time }
         freshnessStatus: { enum: [FRESH, LAGGING, UNKNOWN, REBUILDING] }
+    WorkOrderWorkspaceVisitSummary:
+      type: object
+      additionalProperties: false
+      required: [visitId, taskId, appointmentId, visitSequence, technicianId, networkId,
+        status, checkInCapturedAt, checkInReceivedAt, geofenceResult, policyDecision,
+        checkOutCapturedAt, checkOutReceivedAt, resultCode, exceptionCode, aggregateVersion]
+      properties:
+        visitId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        appointmentId: { type: string, format: uuid }
+        visitSequence: { type: integer, minimum: 1 }
+        technicianId: { type: string, minLength: 1, maxLength: 128 }
+        networkId: { type: [string, 'null'], minLength: 1, maxLength: 128 }
+        status: { enum: [IN_PROGRESS, COMPLETED, INTERRUPTED] }
+        checkInCapturedAt: { type: string, format: date-time }
+        checkInReceivedAt: { type: string, format: date-time }
+        geofenceResult: { type: string, minLength: 1, maxLength: 32 }
+        policyDecision: { type: string, minLength: 1, maxLength: 24 }
+        checkOutCapturedAt: { type: [string, 'null'], format: date-time }
+        checkOutReceivedAt: { type: [string, 'null'], format: date-time }
+        resultCode: { type: [string, 'null'], minLength: 1, maxLength: 100 }
+        exceptionCode: { type: [string, 'null'], minLength: 1, maxLength: 100 }
+        aggregateVersion: { type: integer, format: int64, minimum: 1 }
+    WorkOrderWorkspaceAppointmentSummary:
+      type: object
+      additionalProperties: false
+      required: [appointmentId, taskId, type, status, assignedNetworkId, technicianId,
+        currentRevisionNo, windowStart, windowEnd, timezone, estimatedDurationMinutes,
+        aggregateVersion, createdAt]
+      properties:
+        appointmentId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        type: { enum: [SURVEY, INSTALLATION, REPAIR, CORRECTION, SECOND_VISIT] }
+        status: { type: string, minLength: 1, maxLength: 24 }
+        assignedNetworkId: { type: [string, 'null'], minLength: 1, maxLength: 128 }
+        technicianId: { type: [string, 'null'], minLength: 1, maxLength: 128 }
+        currentRevisionNo: { type: integer, minimum: 1 }
+        windowStart: { type: [string, 'null'], format: date-time }
+        windowEnd: { type: [string, 'null'], format: date-time }
+        timezone: { type: [string, 'null'], minLength: 1, maxLength: 80 }
+        estimatedDurationMinutes: { type: [integer, 'null'], minimum: 1, maximum: 1440 }
+        aggregateVersion: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+    WorkOrderWorkspaceAppointmentsVisitsSectionData:
+      type: object
+      additionalProperties: false
+      required: [visits, appointments, nextCursor]
+      properties:
+        visits:
+          oneOf:
+            - type: array
+              maxItems: 100
+              items: { $ref: '#/components/schemas/WorkOrderWorkspaceVisitSummary' }
+            - { type: 'null' }
+        appointments:
+          oneOf:
+            - type: array
+              maxItems: 100
+              items: { $ref: '#/components/schemas/WorkOrderWorkspaceAppointmentSummary' }
+            - { type: 'null' }
+        nextCursor: { type: [string, 'null'] }
     WorkOrderWorkspaceSection:
       type: object
       additionalProperties: false
-      required: [section, sourceVersions, meta, tasks, timeline]
+      required: [section, sourceVersions, meta, tasks, timeline, appointmentsVisits]
       properties:
-        section: { enum: [TASKS, TIMELINE_AUDIT] }
+        section: { enum: [TASKS, TIMELINE_AUDIT, APPOINTMENTS_VISITS] }
         sourceVersions: { $ref: '#/components/schemas/WorkOrderWorkspaceSourceVersions' }
         meta: { $ref: '#/components/schemas/WorkOrderWorkspaceMeta' }
         tasks:
@@ -2210,6 +2272,10 @@ components:
         timeline:
           oneOf:
             - { $ref: '#/components/schemas/WorkOrderWorkspaceTimelineSectionData' }
+            - { type: 'null' }
+        appointmentsVisits:
+          oneOf:
+            - { $ref: '#/components/schemas/WorkOrderWorkspaceAppointmentsVisitsSectionData' }
             - { type: 'null' }
     WorkflowInstance:
       type: object

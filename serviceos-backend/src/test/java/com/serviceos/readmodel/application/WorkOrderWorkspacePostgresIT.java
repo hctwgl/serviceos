@@ -21,6 +21,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -35,7 +37,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** M85：工作区组合查询的授权、无 PII 与缺权降级证据。 */
+/** M85/M87/M88：工作区组合查询的授权、无 PII、按需区块与缺权降级证据。 */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = ServiceOsApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE)
 class WorkOrderWorkspacePostgresIT {
@@ -67,6 +69,9 @@ class WorkOrderWorkspacePostgresIT {
     @Autowired
     private JdbcClient jdbc;
 
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
     private UUID projectId;
     private ConfigurationBundleReference bundle;
     private UUID workOrderId;
@@ -79,6 +84,10 @@ class WorkOrderWorkspacePostgresIT {
                     rdm_work_order_timeline_entry, rel_inbox_record,
                     aud_audit_record, tsk_task_execution_attempt, tsk_task,
                     ops_task_failure_recovery, ops_exception_ack_result, ops_operational_exception,
+                    fld_visit_command_result, fld_visit_fact, fld_visit, fld_geofence_policy,
+                    apt_contact_attempt_command_result, apt_contact_attempt,
+                    apt_appointment_command_result, apt_appointment_status_history,
+                    apt_appointment_revision, apt_appointment, dsp_service_assignment,
                     rel_outbox_publish_attempt, rel_outbox_event,
                     wo_work_order, cfg_configuration_bundle_item, cfg_configuration_bundle,
                     cfg_configuration_asset_version, prj_project,
@@ -111,6 +120,7 @@ class WorkOrderWorkspacePostgresIT {
         assertThat(workspace.allowedActionLink())
                 .isEqualTo("/api/v1/tasks/" + taskId + "/allowed-actions");
         assertThat(workspace.sectionAvailability().get("TASKS")).isEqualTo("AVAILABLE");
+        assertThat(workspace.sectionAvailability().get("APPOINTMENTS_VISITS")).isEqualTo("UNAVAILABLE");
         assertThat(workspace.sectionAvailability().get("SLA")).isEqualTo("UNAVAILABLE");
         assertThat(workspace.sectionAvailability().get("EXCEPTIONS")).isEqualTo("UNAVAILABLE");
         assertThat(workspace.slaSummary()).isNull();
@@ -145,6 +155,7 @@ class WorkOrderWorkspacePostgresIT {
         assertThat(tasks.section()).isEqualTo("TASKS");
         assertThat(tasks.tasks()).isNotNull();
         assertThat(tasks.timeline()).isNull();
+        assertThat(tasks.appointmentsVisits()).isNull();
         assertThat(tasks.tasks().items()).extracting(item -> item.taskId()).containsExactly(taskId);
         assertThat(tasks.sourceVersions().workOrderVersion()).isEqualTo(1);
         assertThat(tasks.toString()).doesNotContain("customerName", "customerMobile");
@@ -154,10 +165,44 @@ class WorkOrderWorkspacePostgresIT {
         assertThat(timeline.section()).isEqualTo("TIMELINE_AUDIT");
         assertThat(timeline.timeline()).isNotNull();
         assertThat(timeline.tasks()).isNull();
+        assertThat(timeline.appointmentsVisits()).isNull();
         assertThat(timeline.timeline().freshnessStatus()).isEqualTo("UNKNOWN");
 
         assertThatThrownBy(() -> workspaces.getSection(
                 principal("reader"), "corr-bad", workOrderId, "FORMS_EVIDENCE", null, 20))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
+    }
+
+    @Test
+    void appointmentsVisitsSectionLoadsVisitWithoutSensitiveFields() {
+        seedReader("field-reader", projectId, "workOrder.read", "visit.read", "appointment.read");
+        UUID appointmentId = seedAppointment(taskId);
+        UUID visitId = seedVisit(appointmentId, taskId);
+
+        var section = workspaces.getSection(
+                principal("field-reader"), "corr-av", workOrderId, "APPOINTMENTS_VISITS", null, 50);
+        assertThat(section.section()).isEqualTo("APPOINTMENTS_VISITS");
+        assertThat(section.appointmentsVisits()).isNotNull();
+        assertThat(section.tasks()).isNull();
+        assertThat(section.timeline()).isNull();
+        assertThat(section.appointmentsVisits().visits()).extracting(item -> item.visitId())
+                .containsExactly(visitId);
+        assertThat(section.appointmentsVisits().appointments()).extracting(item -> item.appointmentId())
+                .containsExactly(appointmentId);
+        assertThat(section.toString()).doesNotContain(
+                "checkInLocation", "customerName", "address-ref",
+                "note-should-not-leak", "device-should-not-leak");
+
+        WorkOrderWorkspace workspace = workspaces.get(principal("field-reader"), "corr-av-top", workOrderId);
+        assertThat(workspace.sectionAvailability().get("APPOINTMENTS_VISITS")).isEqualTo("AVAILABLE");
+    }
+
+    @Test
+    void appointmentsVisitsRejectsCursorPaging() {
+        assertThatThrownBy(() -> workspaces.getSection(
+                principal("reader"), "corr-av-cursor", workOrderId,
+                "APPOINTMENTS_VISITS", "cursor-1", 20))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
     }
@@ -234,24 +279,30 @@ class WorkOrderWorkspacePostgresIT {
         return id;
     }
 
-    private void seedReader(String principalId, UUID project, String capability) {
+    private void seedReader(String principalId, UUID project, String... capabilities) {
         UUID roleId = UUID.randomUUID();
         jdbc.sql("""
                 INSERT INTO auth_role (
                     role_id,tenant_id,role_code,role_name,role_status,created_at
-                ) VALUES (:id,:tenantId,'M85_READER','M85 Reader','ACTIVE',now())
-                """).param("id", roleId).param("tenantId", TENANT).update();
-        jdbc.sql("""
-                INSERT INTO auth_role_capability (role_id,capability_code,granted_at)
-                VALUES (:id,:capability,now())
-                """).param("id", roleId).param("capability", capability).update();
+                ) VALUES (:id,:tenantId,:roleCode,'Workspace Reader','ACTIVE',now())
+                """)
+                .param("id", roleId)
+                .param("tenantId", TENANT)
+                .param("roleCode", "WS_READER_" + principalId)
+                .update();
+        for (String capability : capabilities) {
+            jdbc.sql("""
+                    INSERT INTO auth_role_capability (role_id,capability_code,granted_at)
+                    VALUES (:id,:capability,now())
+                    """).param("id", roleId).param("capability", capability).update();
+        }
         jdbc.sql("""
                 INSERT INTO auth_role_grant (
                     grant_id,tenant_id,principal_id,role_id,scope_type,scope_ref,
                     valid_from,source_code,approval_ref,created_at
                 ) VALUES (
                     :grantId,:tenantId,:principalId,:roleId,'PROJECT',:projectId,
-                    now()-interval '1 day','TEST','m85',now()
+                    now()-interval '1 day','TEST','m88',now()
                 )
                 """)
                 .param("grantId", UUID.randomUUID())
@@ -262,8 +313,100 @@ class WorkOrderWorkspacePostgresIT {
                 .update();
     }
 
+    /**
+     * 在同一事务内写入预约与修订：current_revision 外键为 DEFERRABLE，
+     * 需先插预约再插修订，提交时再校验。
+     */
+    private UUID seedAppointment(UUID taskId) {
+        UUID appointmentId = UUID.randomUUID();
+        UUID revisionId = UUID.randomUUID();
+        Instant createdAt = Instant.parse("2026-07-16T01:00:00Z");
+        Instant start = Instant.parse("2026-07-16T02:00:00Z");
+        Instant end = Instant.parse("2026-07-16T05:00:00Z");
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            jdbc.sql("""
+                    INSERT INTO apt_appointment (
+                        appointment_id, tenant_id, project_id, work_order_id, task_id,
+                        appointment_type, status, current_revision_id, current_revision_no,
+                        assigned_network_id, technician_id, aggregate_version, created_by, created_at
+                    ) VALUES (
+                        :id, :tenantId, :projectId, :workOrderId, :taskId,
+                        'SURVEY', 'CONFIRMED', :revisionId, 1,
+                        'network-m88', 'tech-m88', 1, 'fixture', :createdAt
+                    )
+                    """)
+                    .param("id", appointmentId)
+                    .param("tenantId", TENANT)
+                    .param("projectId", projectId)
+                    .param("workOrderId", workOrderId)
+                    .param("taskId", taskId)
+                    .param("revisionId", revisionId)
+                    .param("createdAt", java.sql.Timestamp.from(createdAt))
+                    .update();
+            jdbc.sql("""
+                    INSERT INTO apt_appointment_revision (
+                        revision_id, tenant_id, appointment_id, revision_no, previous_revision_id,
+                        window_start, window_end, timezone, estimated_duration_minutes,
+                        address_ref, address_version,
+                        confirmed_party_type, confirmed_party_ref, confirmation_channel, confirmed_at,
+                        reason_code, note, created_by, created_at
+                    ) VALUES (
+                        :revisionId, :tenantId, :id, 1, NULL,
+                        :start, :end, 'Asia/Shanghai', 120,
+                        'address-ref', 'address-v1',
+                        'CUSTOMER', 'customer-ref', 'PHONE', :confirmedAt,
+                        NULL, 'note-should-not-leak', 'fixture', :createdAt
+                    )
+                    """)
+                    .param("revisionId", revisionId)
+                    .param("tenantId", TENANT)
+                    .param("id", appointmentId)
+                    .param("start", java.sql.Timestamp.from(start))
+                    .param("end", java.sql.Timestamp.from(end))
+                    .param("confirmedAt", java.sql.Timestamp.from(createdAt))
+                    .param("createdAt", java.sql.Timestamp.from(createdAt))
+                    .update();
+        });
+        return appointmentId;
+    }
+
+    private UUID seedVisit(UUID appointmentId, UUID taskId) {
+        UUID visitId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-07-16T03:00:00Z");
+        jdbc.sql("""
+                INSERT INTO fld_visit (
+                    visit_id, tenant_id, project_id, work_order_id, task_id, appointment_id,
+                    visit_sequence, technician_id, network_id, status,
+                    check_in_captured_at, check_in_received_at,
+                    check_in_latitude, check_in_longitude, check_in_accuracy_meters,
+                    geofence_result, geofence_distance_meters, geofence_policy_version,
+                    policy_decision, device_id, device_command_id, offline_flag,
+                    check_out_captured_at, check_out_received_at, result_code, exception_code, note,
+                    operation_refs, evidence_refs, aggregate_version, created_by, created_at, updated_at
+                ) VALUES (
+                    :id, :tenantId, :projectId, :workOrderId, :taskId, :appointmentId,
+                    1, 'tech-m88', 'network-m88', 'IN_PROGRESS',
+                    :now, :now,
+                    31.230400, 121.473700, 8.0,
+                    'WITHIN_GEOFENCE', 5.0, 'geo-v1',
+                    'ACCEPTED', 'device-should-not-leak', 'cmd-m88', false,
+                    NULL, NULL, NULL, NULL, 'note-should-not-leak',
+                    '[]'::jsonb, '[]'::jsonb, 1, 'fixture', :now, :now
+                )
+                """)
+                .param("id", visitId)
+                .param("tenantId", TENANT)
+                .param("projectId", projectId)
+                .param("workOrderId", workOrderId)
+                .param("taskId", taskId)
+                .param("appointmentId", appointmentId)
+                .param("now", java.sql.Timestamp.from(now))
+                .update();
+        return visitId;
+    }
+
     private static CurrentPrincipal principal(String principalId) {
         return new CurrentPrincipal(
-                principalId, TENANT, CurrentPrincipal.PrincipalType.USER, "m85", Set.of());
+                principalId, TENANT, CurrentPrincipal.PrincipalType.USER, "m88", Set.of());
     }
 }

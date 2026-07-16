@@ -9,7 +9,9 @@ import com.serviceos.readmodel.api.WorkOrderWorkspace.WorkOrderWorkspaceSourceVe
 import com.serviceos.readmodel.api.WorkOrderWorkspace.WorkOrderWorkspaceTaskSummary;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceQueryService;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection;
+import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceAppointmentsVisitsSectionData;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceTasksSectionData;
+import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceVisitSummary;
 import com.serviceos.workorder.api.WorkOrderView;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -108,6 +110,7 @@ class WorkOrderWorkspaceControllerSecurityTest {
                         List.of(new WorkOrderWorkspaceTaskSummary(
                                 taskId, "SITE_SURVEY", "HUMAN", "READY", "SURVEY", null, 1)),
                         null),
+                null,
                 null);
         when(principals.current()).thenReturn(principal);
         when(workspaces.getSection(eq(principal), eq("corr-sec"), eq(workOrderId),
@@ -120,7 +123,50 @@ class WorkOrderWorkspaceControllerSecurityTest {
                 .andExpect(header().string("ETag", "\"4\""))
                 .andExpect(jsonPath("$.section").value("TASKS"))
                 .andExpect(jsonPath("$.tasks.items[0].taskType").value("SITE_SURVEY"))
-                .andExpect(jsonPath("$.timeline").value(nullValue()));
+                .andExpect(jsonPath("$.timeline").value(nullValue()))
+                .andExpect(jsonPath("$.appointmentsVisits").value(nullValue()));
         verify(workspaces).getSection(principal, "corr-sec", workOrderId, "TASKS", null, 50);
+    }
+
+    @Test
+    void appointmentsVisitsSectionContractIsEnforced() throws Exception {
+        UUID workOrderId = UUID.randomUUID();
+        UUID taskId = UUID.randomUUID();
+        UUID visitId = UUID.randomUUID();
+        UUID appointmentId = UUID.randomUUID();
+        CurrentPrincipal principal = new CurrentPrincipal(
+                "reader", "tenant", CurrentPrincipal.PrincipalType.USER, "m88", Set.of());
+        Instant now = Instant.parse("2026-07-16T12:00:00Z");
+        WorkOrderWorkspaceSection section = new WorkOrderWorkspaceSection(
+                "APPOINTMENTS_VISITS",
+                new WorkOrderWorkspaceSourceVersions(5),
+                new WorkOrderWorkspaceMeta(now, "work-order-core-timeline.v1:gen:1", "FRESH", "q-3"),
+                null,
+                null,
+                new WorkOrderWorkspaceAppointmentsVisitsSectionData(
+                        List.of(new WorkOrderWorkspaceVisitSummary(
+                                visitId, taskId, appointmentId, 1, "tech-m88", "network-m88",
+                                "IN_PROGRESS", now, now, "WITHIN_GEOFENCE", "ACCEPTED",
+                                null, null, null, null, 1)),
+                        List.of(),
+                        null));
+        when(principals.current()).thenReturn(principal);
+        when(workspaces.getSection(eq(principal), eq("corr-av"), eq(workOrderId),
+                eq("APPOINTMENTS_VISITS"), isNull(), eq(50))).thenReturn(section);
+
+        mvc.perform(get("/api/v1/work-orders/{id}/workspace/sections/{section}",
+                        workOrderId, "APPOINTMENTS_VISITS")
+                        .with(jwt())
+                        .header("X-Correlation-Id", "corr-av"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("ETag", "\"5\""))
+                .andExpect(jsonPath("$.section").value("APPOINTMENTS_VISITS"))
+                .andExpect(jsonPath("$.appointmentsVisits.visits[0].visitId").value(visitId.toString()))
+                .andExpect(jsonPath("$.appointmentsVisits.visits[0].checkInLatitude").doesNotExist())
+                .andExpect(jsonPath("$.appointmentsVisits.visits[0].deviceId").doesNotExist())
+                .andExpect(jsonPath("$.tasks").value(nullValue()))
+                .andExpect(jsonPath("$.timeline").value(nullValue()));
+        verify(workspaces).getSection(
+                principal, "corr-av", workOrderId, "APPOINTMENTS_VISITS", null, 50);
     }
 }
