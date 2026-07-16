@@ -83,6 +83,66 @@
          ORDER BY created_at ASC, review_case_id ASC
     </select>
 
+    <select id="findQueuePage" resultType="map">
+        SELECT review.review_case_id AS "reviewCaseId",
+               review.project_id AS "projectId",
+               review.task_id AS "taskId",
+               review.evidence_set_snapshot_id AS "evidenceSetSnapshotId",
+               review.scope_type AS "scopeType",
+               review.origin AS "origin",
+               review.policy_version AS "policyVersion",
+               review.status AS "status",
+               review.created_at AS "createdAt",
+               review.decided_at AS "decidedAt",
+               review.source_review_case_id AS "sourceReviewCaseId",
+               review.external_submission_ref AS "externalSubmissionRef",
+               review.callback_batch_ref AS "callbackBatchRef",
+               review.mapping_version_id AS "mappingVersionId",
+               review.reopened_from_review_case_id AS "reopenedFromReviewCaseId",
+               review.reopen_trigger_ref AS "reopenTriggerRef",
+               decision.review_decision_id AS "latestDecisionId",
+               decision.decision AS "latestDecision",
+               decision.decision_source AS "latestDecisionSource",
+               decision.reason_codes::text AS "latestReasonCodes",
+               decision.decided_at AS "latestDecisionAt"
+          FROM evd_review_case review
+          LEFT JOIN LATERAL (
+              SELECT review_decision_id, decision, decision_source, reason_codes, decided_at
+                FROM evd_review_decision
+               WHERE tenant_id = review.tenant_id
+                 AND review_case_id = review.review_case_id
+               ORDER BY decision_ordinal DESC
+               LIMIT 1
+          ) decision ON true
+         WHERE review.tenant_id = #{tenantId}
+           AND review.status = #{status}
+        <if test="!tenantWide">
+            <choose>
+                <when test="projectIds != null and !projectIds.isEmpty()">
+                    AND review.project_id IN
+                    <foreach collection="projectIds" item="projectId" open="(" separator="," close=")">
+                        CAST(#{projectId} AS uuid)
+                    </foreach>
+                </when>
+                <otherwise>
+                    AND 1 = 0
+                </otherwise>
+            </choose>
+        </if>
+        <if test="origin != null">
+            AND review.origin = #{origin}
+        </if>
+        <if test="taskId != null">
+            AND review.task_id = CAST(#{taskId} AS uuid)
+        </if>
+        <if test="cursorCreatedAt != null">
+            AND (review.created_at, review.review_case_id)
+                &gt; (#{cursorCreatedAt}, CAST(#{cursorId} AS uuid))
+        </if>
+         ORDER BY review.created_at, review.review_case_id
+         LIMIT #{fetchSize}
+    </select>
+
     <select id="findTimelineIdentity" resultType="map">
         SELECT review_case_id::text AS "reviewCaseId",
                project_id::text AS "projectId",

@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-16
-baselineCommit: f136e82
-latestMilestone: M96
+baselineCommit: PENDING_M97
+latestMilestone: M97
 ---
 
 # ServiceOS 实施状态总览
@@ -39,13 +39,13 @@ latestMilestone: M96
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M96 工单工作区审核血缘元数据 |
-| 基线提交 | `f136e82` |
+| 最新实施里程碑 | M97 授权审核案例队列 |
+| 基线提交 | `PENDING_M97` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
 | 前端工程 | 尚未建立；已有 Admin、Network、Technician 产品与交互规格 |
-| 数据库 | PostgreSQL + Flyway（当前版本 080 / 82） |
-| 契约 | Core OpenAPI 0.66.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、recovered/resolved 与 SLA started/breached/met@v1） |
+| 数据库 | PostgreSQL + Flyway（当前版本 081 / 83） |
+| 契约 | Core OpenAPI 0.67.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、recovered/resolved 与 SLA started/breached/met@v1） |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -70,7 +70,7 @@ latestMilestone: M96
 | 动态表单 | 资产、冻结版本、不可变提交和 Task 完成门禁 | `PARTIAL` | 固定/条件 required、visible 与布尔 validation rule，基础类型校验、精确版本提交和完成引用；form.submitted 已并入工单时间线 | 复杂 validator、计算字段、草稿、冲突、更正和审核 | M33～M35、M53、M76 |
 | 资料 Evidence | 资产、槽位、Item/Revision、机器校验、Snapshot、完成门禁、作废、Review、Correction | `PARTIAL` | 固定/条件槽位、VALIDATED 表单触发只追加重解析、槽位世代/lineage、REVIEW_REQUIRED 与显式 KEEP/INVALIDATE（处置已并入工单时间线）、安全文件联动、Snapshot/完成门禁及审核整改链路 | OCR/CV、GPS 权威距离、长期归档 | M36～M53、M76、M82～M83 |
 | 安全文件 | Begin/Finalize/隔离/扫描/授权下载/作废 | `IMPLEMENTED` | 独立安全文件生命周期；Evidence 编排 Begin/Finalize/Invalidate 联动 | 正式对象存储、专业扫描服务、物理删除 | M11、M38、M46 |
-| 审核整改 | ReviewCase、ReviewDecision、CorrectionCase | `PARTIAL` | Review + Correction + 整改 Task + 强制通过/重开 + 车企回执 + WAIVED；CLIENT Case 来源、批次/mapping 冻结；交付明确成功后自动创建 CLIENT Case/Route，UNKNOWN 可授权人工重发并在严格 ACK 后闭环异常 | 多候选人策略、前端、人工标记已送达/放弃、自动 Evidence target 映射 | M44～M60 |
+| 审核整改 | ReviewCase、ReviewDecision、CorrectionCase | `PARTIAL` | Review + Correction + 整改 Task + 强制通过/重开 + 车企回执 + WAIVED；CLIENT Case 来源、批次/mapping 冻结；交付明确成功后自动创建 CLIENT Case/Route，UNKNOWN 可授权人工重发并在严格 ACK 后闭环异常；授权跨项目 ReviewCase 队列 | Correction 队列、SLA/assignee enrich、多候选人策略、前端、人工标记已送达/放弃、自动 Evidence target 映射 | M44～M60、M97 |
 | SLA | 时钟、预警、升级 | `PARTIAL` | Task `TASK_CREATED→TASK_COMPLETED` ELAPSED 时钟；显式策略版本/摘要锁定；TARGET_DUE 对账；RUNNING/BREACHED/MET/MET_LATE；Inbox/Outbox 与不可变 segment/milestone；`sla.read` + 实时 TENANT/PROJECT/REGION/NETWORK 授权集合的跨项目工作台、工单时间线与详情查询；关系修订使旧游标失败关闭；公开 started/breached/met 已并入工单执行时间线 | BUSINESS 日历、暂停/恢复、免责/重算、预警/升级/通知、其他 subject、组织关系、Portal 前端、考核结算 | M61～M66、M75 |
 | 通知 | 通知与运营异常中心 | `PROPOSED` | 已有总体设计 | 通知通道、模板、可靠发送和 UI | `architecture/14-*` |
 | 履约事实与试算 | 事实提取和双向试算 | `PROPOSED` | 已有设计、API 和数据规划 | 运行时、投影和前端工作区 | M5 设计 |
@@ -786,9 +786,22 @@ customer/location、队列/SavedView、Portal。
 明确未实现：回调批次多工单归属、审核队列/命令聚合、FACTS_CALCULATIONS、
 customer/location、SavedView、Portal。
 
+### M97：授权审核案例队列
+
+已实现：
+
+- API-06 §6 `GET /review-cases` 窄切片 Accepted；
+- evidence.review 实时 TENANT/PROJECT/REGION/NETWORK 项目范围与单条 SQL；
+- OPEN 默认，project/status/origin/task 受控筛选，FIFO 游标绑定 scopeDigest 与全部条件；
+- 队列仅返回安全 Case/血缘/最新决定代码，不含 snapshot digest、正文、审批或操作者；
+- Core OpenAPI 0.67.0；Flyway V081 / 83 migrations。
+
+明确未实现：通用 work-queues/SavedView、SLA/assignee/target enrich、Correction/Outbound 队列、
+FACTS_CALCULATIONS、customer/location、Portal。
+
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M96**。M61～M96 在授权只读、时间线投影运行时与工作区组合上继续收敛；
+ServiceOS 可靠纵向切片已推进到 **M97**。M61～M97 在授权只读、时间线投影运行时、工作区组合与审核队列上继续收敛；
 没有实现完整 SLA/通知策略、队列/SavedView 或整个现场履约平台。
 
 ```text

@@ -30,6 +30,17 @@ interface ReviewCaseMapper {
     List<Map<String, Object>> listCasesByTask(
             @Param("tenantId") String tenantId, @Param("taskId") String taskId);
 
+    List<Map<String, Object>> findQueuePage(
+            @Param("tenantId") String tenantId,
+            @Param("tenantWide") boolean tenantWide,
+            @Param("projectIds") List<String> projectIds,
+            @Param("status") String status,
+            @Param("origin") String origin,
+            @Param("taskId") String taskId,
+            @Param("cursorCreatedAt") Object cursorCreatedAt,
+            @Param("cursorId") String cursorId,
+            @Param("fetchSize") int fetchSize);
+
     Map<String, Object> findTimelineIdentity(
             @Param("tenantId") String tenantId, @Param("reviewCaseId") String reviewCaseId);
 

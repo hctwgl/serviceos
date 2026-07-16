@@ -1,6 +1,7 @@
 package com.serviceos.evidence.infrastructure;
 
 import com.serviceos.evidence.api.ReviewCaseView;
+import com.serviceos.evidence.api.ReviewCaseQueueItem;
 import com.serviceos.evidence.api.ReviewDecisionView;
 import com.serviceos.evidence.application.ReviewCaseRepository;
 import com.serviceos.evidence.application.ReviewCaseTimelineIdentity;
@@ -111,6 +112,33 @@ final class MyBatisReviewCaseRepository implements ReviewCaseRepository {
     }
 
     @Override
+    public List<ReviewCaseQueueItem> findQueuePage(
+            String tenantId,
+            boolean tenantWide,
+            List<UUID> projectIds,
+            String status,
+            String origin,
+            UUID taskId,
+            Instant cursorCreatedAt,
+            UUID cursorId,
+            int fetchSize
+    ) {
+        return mapper.findQueuePage(
+                        tenantId,
+                        tenantWide,
+                        projectIds.stream().map(UUID::toString).toList(),
+                        status,
+                        origin,
+                        taskId == null ? null : taskId.toString(),
+                        cursorCreatedAt,
+                        cursorId == null ? null : cursorId.toString(),
+                        fetchSize)
+                .stream()
+                .map(this::queueItem)
+                .toList();
+    }
+
+    @Override
     public Optional<ReviewCaseTimelineIdentity> findTimelineIdentity(String tenantId, UUID reviewCaseId) {
         Map<String, Object> row = mapper.findTimelineIdentity(tenantId, reviewCaseId.toString());
         if (row == null) {
@@ -179,6 +207,22 @@ final class MyBatisReviewCaseRepository implements ReviewCaseRepository {
                 row.get("note") == null ? null : text(row, "note"),
                 row.get("approvalRef") == null ? null : text(row, "approvalRef"),
                 text(row, "decidedBy"), instant(row.get("decidedAt")));
+    }
+
+    private ReviewCaseQueueItem queueItem(Map<String, Object> row) {
+        return new ReviewCaseQueueItem(
+                uuid(row, "reviewCaseId"), uuid(row, "projectId"), uuid(row, "taskId"),
+                uuid(row, "evidenceSetSnapshotId"), text(row, "scopeType"), text(row, "origin"),
+                text(row, "policyVersion"), text(row, "status"), instant(row.get("createdAt")),
+                row.get("decidedAt") == null ? null : instant(row.get("decidedAt")),
+                nullableUuid(row, "sourceReviewCaseId"), nullableText(row, "externalSubmissionRef"),
+                nullableText(row, "callbackBatchRef"), nullableText(row, "mappingVersionId"),
+                nullableUuid(row, "reopenedFromReviewCaseId"), nullableText(row, "reopenTriggerRef"),
+                nullableUuid(row, "latestDecisionId"), nullableText(row, "latestDecision"),
+                nullableText(row, "latestDecisionSource"),
+                row.get("latestReasonCodes") == null
+                        ? List.of() : readCodes(text(row, "latestReasonCodes")),
+                row.get("latestDecisionAt") == null ? null : instant(row.get("latestDecisionAt")));
     }
 
     private List<String> readCodes(String json) {
