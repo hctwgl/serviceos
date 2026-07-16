@@ -53,3 +53,31 @@ INSERT INTO auth_role_grant (
     'bf64aa35-11cb-40bc-b301-10b5853049b3',
     'TENANT', 'tenant-local', now(), 'LOCAL_FIXTURE', 'local-only', now()
 ) ON CONFLICT (grant_id) DO NOTHING;
+
+-- BYD 适配器 SERVICE 主体：外发 HTTP 成功后同租户落 CLIENT Case / Route。
+INSERT INTO auth_role (
+    role_id, tenant_id, role_code, role_name, role_status, created_at
+) VALUES (
+    'a1c3e5f7-0911-4b2d-8e3f-5a6b7c8d9e0f',
+    'tenant-local', 'local-byd-cpim-adapter', '本地 BYD 适配器', 'ACTIVE', now()
+) ON CONFLICT (tenant_id, role_code) DO NOTHING;
+
+INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
+VALUES
+    ('a1c3e5f7-0911-4b2d-8e3f-5a6b7c8d9e0f', 'evidence.createClientReviewCase', now()),
+    ('a1c3e5f7-0911-4b2d-8e3f-5a6b7c8d9e0f', 'evidence.recordExternalReceipt', now()),
+    ('a1c3e5f7-0911-4b2d-8e3f-5a6b7c8d9e0f', 'evidence.read', now()),
+    ('a1c3e5f7-0911-4b2d-8e3f-5a6b7c8d9e0f', 'integration.registerExternalReviewRoute', now()),
+    ('a1c3e5f7-0911-4b2d-8e3f-5a6b7c8d9e0f', 'integration.submitClientReview', now()),
+    ('a1c3e5f7-0911-4b2d-8e3f-5a6b7c8d9e0f', 'integration.readOutbound', now())
+ON CONFLICT (role_id, capability_code) DO NOTHING;
+
+INSERT INTO auth_role_grant (
+    grant_id, tenant_id, principal_id, role_id, scope_type, scope_ref,
+    valid_from, source_code, approval_ref, created_at
+) VALUES (
+    'd0e1f2a3-b4c5-4678-9012-3456789abcde',
+    'tenant-local', 'service-byd-cpim-adapter',
+    'a1c3e5f7-0911-4b2d-8e3f-5a6b7c8d9e0f',
+    'TENANT', 'tenant-local', now(), 'LOCAL_FIXTURE', 'local-only', now()
+) ON CONFLICT (grant_id) DO NOTHING;
