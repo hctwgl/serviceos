@@ -192,3 +192,40 @@ Feature gate/authority: if applicable
 | M95 | FORMS_EVIDENCE 增加 FormSubmission/EvidenceItem 安全元数据；独立 summary SQL；无 values/校验消息/Revision/file/captureMetadata；OpenAPI 0.65.0；无新 Flyway | ARCH-09/10/19 + API-06 Accepted 扩展 + OpenAPI Core 0.65.0 + Forms/Evidence/Readmodel PostgreSQL/MVC/Contract/Client/ArchitectureTest/L3 | 表单值与资料版本详情、跨 Task cursor、FACTS_CALCULATIONS、队列/SavedView、Portal |
 | M96 | REVIEWS_CORRECTIONS 增加 INTERNAL→CLIENT 与重开血缘；复用现有 evidence API/auth；无决定/豁免文本和操作者；OpenAPI 0.66.0；无新 Flyway | ARCH-10/19 + API-06 Accepted 扩展 + OpenAPI Core 0.66.0 + Evidence/Readmodel PostgreSQL/MVC/Contract/Client/ArchitectureTest/L3 | 回调批次多工单归属、审核队列/命令聚合、FACTS_CALCULATIONS、SavedView、Portal |
 | M97 | API-06 §6 review-cases 授权跨项目队列；OPEN 默认、origin/task/project 筛选、范围绑定 FIFO cursor；安全最新决定摘要；OpenAPI 0.67.0；V081 | ARCH-07/10 + API-06 Accepted 窄切片 + OpenAPI Core 0.67.0 + V081 + Evidence/Authorization PostgreSQL/MVC/Contract/Client/ArchitectureTest/L3 | 通用 work-queues/SavedView、SLA/assignee enrich、Correction/Outbound 队列、Portal |
+| M98 | API-06 §6 correction-cases 授权跨项目队列；OPEN 默认、task/sourceReview/project 筛选、范围绑定 FIFO cursor；安全原因码与补传次数；OpenAPI 0.68.0；V082 | ARCH-10/58 + API-06 Accepted 窄切片 + OpenAPI Core 0.68.0 + V082 + Evidence/Authorization PostgreSQL/MVC/Contract/Client/ArchitectureTest/L3 | 通用 work-queues/SavedView、SLA/assignee enrich、Outbound 队列、异常 Scope 硬化、Portal |
+| M99 | API-06 §6 outbound-deliveries 授权跨项目队列；UNKNOWN 默认、messageType/workOrder/review 筛选、范围绑定 FIFO cursor；安全摘要不含 digest/操作者/对象引用；OpenAPI 0.69.0；V083 | ARCH-13 + API-06 Accepted 窄切片 + OpenAPI Core 0.69.0 + V083 + Integration/Authorization PostgreSQL/MVC/Contract/Client/ArchitectureTest/L3 | 通用 work-queues/SavedView、异常 Scope 硬化、人工标记已送达/放弃、Portal |
+| M100 | 运营异常工作台 Project Scope 硬化；projectId 筛选/响应、scopeDigest 游标；无 project 孤儿仅 TENANT 可见；OpenAPI 0.70.0；V084 | ARCH-14/42 + API-06 Accepted 窄切片 + OpenAPI Core 0.70.0 + V084 + Operations/Authorization PostgreSQL/ArchitectureTest/L3 | 通用 work-queues/SavedView、人工标记已送达/放弃、Portal |
+| M101 | Admin Portal Vue+TS+Vite 只读队列外壳；审核/整改/外发/异常 Page ID 路由；本地 JWT；npm build | PRODUCT-01/02 + ARCH-19 + API-06 已实现队列消费 + Admin Web build | SavedView、工作区全页、命令 UI、OIDC SDK、Network/Technician、E2E |
+| M102 | Admin 工单工作区只读页；消费 workspace/activity-summary/sections；外发队列深链；npm build | PRODUCT-01/02 + ARCH-19 + API-06 Accepted workspace 窄切片 + Admin Web build | 命令 UI、SavedView、OIDC SDK、Network/Technician、E2E |
+| M103 | Admin 工作区展示当前任务 GET /tasks/{id}/allowed-actions 只读投影；不执行命令；npm build | PRODUCT-01/02 + ARCH-19 + API-02 AllowedActions + Admin Web build | 命令执行 UI、OIDC SDK、SavedView、E2E |
+| M104 | Admin 授权工单目录消费 GET /work-orders；status/clientCode 筛选与工作区深链；npm build | PRODUCT-01/02 + ARCH-19 + API-02 Authorized WorkOrder Query + Admin Web build | SavedView、命令 UI、OIDC SDK、E2E |
+| M105 | Admin 工作区按 allowed-actions 执行 claim/start/complete/release；Idempotency-Key+If-Match；npm build | PRODUCT-01/02/05 + ARCH-19 + API-02 Human Task Commands + Admin Web build | 表单/资料提交流程编排、OIDC SDK、SavedView、E2E |
+| M106 | Admin 授权任务目录消费 GET /tasks；筛选与工作区深链；npm build | PRODUCT-01/02 + ARCH-19 + API-02 Task Directory + Admin Web build | 任务详情独立页、SavedView、OIDC、E2E |
+| M107 | Admin SLA 工作台消费 GET /sla-instances；status 筛选与工作区深链；npm build | PRODUCT-01/02 + ARCH-19 + API-04/SLA Query + Admin Web build | SLA 详情操作、BUSINESS 日历、预警通知、E2E |
+| M108 | Admin 授权项目目录消费 GET /projects；status/clientId 筛选；npm build | PRODUCT-01/02 + ARCH-19 + API-07 Project Directory + Admin Web build | 项目创建/范围修订 UI、配置治理、OIDC、E2E |
+| M109 | Admin 任务详情消费 GET /tasks/{id} 与 execution-attempts；复用命令面板 | PRODUCT-01/02 + ARCH-19 + API-02 Task Detail/Attempts + Admin Web build | 表单/资料提交流程编排、OIDC、E2E |
+| M110 | Admin 项目详情与 scope-revisions 历史 | PRODUCT-01/02 + ARCH-19 + API-07 Project Query + Admin Web build | 项目创建/范围修订命令 UI、OIDC、E2E |
+| M111 | Admin 异常队列按 allowedActions 执行 ACKNOWLEDGE | PRODUCT-01/02 + ARCH-19 + API-04 Exception Acknowledge + Admin Web build | 通用 RESOLVED UI、OIDC、E2E |
+| M112 | Admin 审核案例详情与 decide/force/reopen | PRODUCT-01/02 + ARCH-10/19 + Evidence Review APIs + Admin Web build | 表单/资料编排、OIDC、E2E |
+| M113 | Admin 整改案例详情与 resubmit/close/waive | PRODUCT-01/02 + ARCH-10/19 + Correction APIs + Admin Web build | 资料提交流程编排、OIDC、E2E |
+| M114 | Admin 外发交付详情与 UNKNOWN retry | PRODUCT-01/02 + ARCH-13/19 + Outbound APIs + Admin Web build | 人工标记已送达/放弃、OIDC、E2E |
+| M115 | Admin SLA 实例详情 | PRODUCT-01/02 + ARCH-12/19 + SLA Detail API + Admin Web build | BUSINESS 日历、预警 UI、E2E |
+| M116 | Admin 任务详情表单列表与 submitTaskForm；VALIDATED 回填 complete 引用 | PRODUCT-01/02 + ARCH-09/19 + Forms APIs + Admin Web build | 动态表单设计器、OIDC、E2E |
+| M117 | Admin 任务详情资料槽位/项与 createEvidenceSetSnapshot；回填 complete 引用 | PRODUCT-01/02 + ARCH-10/19 + Evidence APIs + Admin Web build | Begin/Finalize 上传编排、OIDC、E2E |
+| M118 | Admin 审核详情创建 BYD review submission OutboundDelivery | PRODUCT-01/02 + ARCH-13/19 + Integration submit API + Admin Web build | 其他 CPIM 提审、OIDC、E2E |
+| M119 | Admin 资料 Begin→PUT→Finalize 上传编排；SHA-256 | PRODUCT-01/02 + ARCH-10/11/19 + Evidence Upload APIs + Admin Web build | 专业扫描 UI、OIDC、E2E |
+| M120 | Admin REVIEW_REQUIRED 条件 KEEP/INVALIDATE 处置 | PRODUCT-01/02 + ARCH-10/19 + Condition Disposition API + Admin Web build | 自动处置策略、OIDC、E2E |
+| M121 | Admin 快照后 createReviewCase 并深链 | PRODUCT-01/02 + ARCH-10/19 + Create ReviewCase API + Admin Web build | 审核队列自动刷新、OIDC、E2E |
+| M122 | Admin 任务联系历史列表与追加联系事实 | PRODUCT-01/02 + ARCH-10/19 + ContactAttempt APIs + Admin Web build | 通话录音回放、OIDC、E2E |
+| M123 | Admin 预约提议/确认/取消命令面板 | PRODUCT-01/02 + ARCH-10/19 + Appointment APIs + Admin Web build | 改约/爽约完整 UX、OIDC、E2E |
+| M124 | Admin 预约签到与 Visit 签退模拟 | PRODUCT-01/02 + ARCH-10/19 + Visit APIs + Admin Web build | 真实设备 GPS、OIDC、E2E |
+| M125 | Admin 预约改约与爽约命令 | PRODUCT-01/02 + ARCH-10/19 + Appointment reschedule/no-show APIs + Admin Web build | 日历 UX、OIDC、E2E |
+| M126 | Admin Visit interrupt 命令 | PRODUCT-01/02 + ARCH-10/19 + Visit interrupt API + Admin Web build | 异常联动、OIDC、E2E |
+| M127 | Admin 资料短期下载授权与 Revision 作废 | PRODUCT-01/02 + ARCH-10/11/19 + File/Evidence invalidate APIs + Admin Web build | 在线预览器、OIDC、E2E |
+| M128 | Admin 项目目录 createProject | PRODUCT-01/02 + ARCH-10/19 + Create Project API + Admin Web build | 项目状态机完整 UX、OIDC、E2E |
+| M129 | Admin 项目范围关系整组修订 | PRODUCT-01/02 + ARCH-10/19 + Revise Scope API + Admin Web build | 组织目录联动、OIDC、E2E |
+| M130 | Admin 任务候选 MANUAL 分配 | PRODUCT-01/02 + ARCH-10/19 + Assign Candidates API + Admin Web build | 策略解析 UI、OIDC、E2E |
+| M131 | Admin 运营异常详情与确认 | PRODUCT-01/02 + ARCH-10/19 + getOperationalException API + Admin Web build | 异常自动解决、OIDC、E2E |
+| M132 | Admin 工单 SLA 实例列表与深链 | PRODUCT-01/02 + ARCH-10/19 + listWorkOrderSlaInstances API + Admin Web build | SLA 策略编辑、OIDC、E2E |
+| M133 | Admin 表单/资料详情读取与 StoredFile 作废 | PRODUCT-01/02 + ARCH-10/11/19 + Detail/Invalidate APIs + Admin Web build | 在线预览器、OIDC、E2E |
+| M134 | Admin 工单权威详情/Stage/Task/核心时间线 | PRODUCT-01/02 + ARCH-10/19 + WorkOrder authority APIs + Admin Web build | 结算时间线、OIDC、E2E |

@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-16
-baselineCommit: d14fbc2
-latestMilestone: M97
+baselineCommit: e406038
+latestMilestone: M134
 ---
 
 # ServiceOS 实施状态总览
@@ -39,13 +39,13 @@ latestMilestone: M97
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M97 授权审核案例队列 |
-| 基线提交 | `d14fbc2` |
+| 最新实施里程碑 | M134 Admin 工单权威投影与核心时间线 |
+| 基线提交 | `e406038` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
-| 前端工程 | 尚未建立；已有 Admin、Network、Technician 产品与交互规格 |
-| 数据库 | PostgreSQL + Flyway（当前版本 081 / 83） |
-| 契约 | Core OpenAPI 0.67.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、recovered/resolved 与 SLA started/breached/met@v1） |
+| 前端工程 | `serviceos-admin-web` 只读队列与工单工作区外壳（Vue+TS+Vite）；Network/Technician 尚未建立 |
+| 数据库 | PostgreSQL + Flyway（当前版本 084 / 86） |
+| 契约 | Core OpenAPI 0.70.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、recovered/resolved 与 SLA started/breached/met@v1） |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -58,24 +58,24 @@ latestMilestone: M97
 | 项目治理 | Project 核心事实、范围关系与授权目录 | `PARTIAL` | 项目创建；REGION/NETWORK 当前关系整组修订和不可变历史；`project.read` 授权目录、详情及历史查询 | owners、品牌/服务产品/配置绑定、生命周期、计划修订审批、目录治理 UI | M8、M64～M67 |
 | 可靠消息 | Inbox、Outbox、Worker claim/lease/retry | `IMPLEMENTED` | 本地可靠发布消费、恢复和人工接管基础 | 正式 Broker 和跨服务运行 | M9～M10 |
 | 配置中心 | 不可变配置资产、Bundle 发布和版本锁定 | `PARTIAL` | FORM、EVIDENCE、SLA v1 资产发布基础；工单/任务冻结引用；SERVICEOS_EXPR_V1 布尔/类型比较子集；FORM/EVIDENCE 字段及 WORKFLOW/SLA 依赖闭包 | 决策表/公式/脚本、完整审批和通用依赖图 | M16、M33、M36、M52～M53、M61 |
-| 外部接入 | BYD CPIM V7.3.1 入站、提审与审核回调 | `PARTIAL` | 协议日期验签、防重放、私有原文、Envelope/Canonical、工单创建；显式审核路由与逐订单回调；不可变 OutboundDelivery/Attempt/Acknowledgement、Task 可靠执行、UNKNOWN 人工接管与授权人工重发；重发严格 ACK 后发布恢复事实；交付创建/确认/恢复/重发请求与异常确认已并入工单时间线 | 其他 CPIM 消息、人工标记已送达/放弃、通用 Connector、生产凭据/对象存储和真实 sandbox | M16、M56～M60、M77～M79 |
+| 外部接入 | BYD CPIM V7.3.1 入站、提审与审核回调 | `PARTIAL` | 协议日期验签、防重放、私有原文、Envelope/Canonical、工单创建；显式审核路由与逐订单回调；不可变 OutboundDelivery/Attempt/Acknowledgement、Task 可靠执行、UNKNOWN 人工接管与授权人工重发；重发严格 ACK 后发布恢复事实；交付创建/确认/恢复/重发请求与异常确认已并入工单时间线；授权跨项目外发交付队列 | 其他 CPIM 消息、人工标记已送达/放弃、通用 Connector、生产凭据/对象存储和真实 sandbox | M16、M56～M60、M77～M79、M99 |
 | 工单 | WorkOrder 接收、激活、履约完成与授权工作区投影 | `PARTIAL` | 权威工单、工作流启动、跨阶段和 END 完结；授权目录、非 PII 详情、Stage/Task 执行骨架及核心执行+现场履约时间线 | 完整取消、暂停、恢复、客户敏感详情审计、跨域完整时间线/动作与全部业务分支 | M16～M19、M68～M69、M73～M74 |
 | 工作流 | 线性 Stage/Task 运行时 | `PARTIAL` | 精确版本启动、线性推进、唯一跨阶段推进、完成事件；节点 `slaRef` 传递；授权 Workflow/Stage 当前投影 | 并行/汇聚网关、流程条件表达式、Node/Attempt 历史和复杂流程语义 | M17～M19、M61、M69 |
 | 人工任务与执行历史 | claim/start/complete、责任、执行保护与授权任务读取 | `IMPLEMENTED` | 人工命令、候选领取、唯一责任、release/reclaim、执行保护；表单/资料完成门禁；授权队列/详情、allowed-actions、自动 Attempt 历史及工单内核心 Task 生命周期与指派/Guard/人工接管时间线 | block/retry/cancel 等其他动作、Workflow Node 历史、跨工单/跨域完整历史和 Review 完成条件 | M20～M23、M35、M41、M43、M69～M73、M81 |
-| 应用只读投影 | 工作区、队列、时间线和投影运行时 | `PARTIAL` | 独立 readmodel 模块；核心执行、现场履约、SLA、资料/审核/整改（含外部回执与条件 KEEP/INVALIDATE 处置）、外发交付全链路、异常确认/闭环、ServiceAssignment 与 Task 指派/Guard/人工接管 Inbox 投影；授权时间线与稳定分页及最近活动摘要；时间线 checkpoint/dead letter/generation 重建与 FRESH/LAGGING/UNKNOWN/REBUILDING freshness；definition 登记、dead letter 幂等重放与旧/孤儿 generation 清理；工单工作区顶层实时组合、当前 ACTIVE 服务责任摘要与 TASKS/TIMELINE_AUDIT/APPOINTMENTS_VISITS（含联系尝试）/FORMS_EVIDENCE（含提交与资料项安全元数据）/REVIEWS_CORRECTIONS（含 CLIENT/重开血缘）/INTEGRATION 按需区块（敏感字段最小化；缺权次级区块降级） | 试算合并、revision/slots 技术噪声、表单值与资料版本详情、FACTS_CALCULATIONS、关键事件 taxonomy/过滤、队列、SavedView、搜索、多投影平台、Broker offset、Portal、Admin 重建/重放 HTTP | M73～M96 |
+| 应用只读投影 | 工作区、队列、时间线和投影运行时 | `PARTIAL` | 独立 readmodel 模块；核心执行、现场履约、SLA、资料/审核/整改（含外部回执与条件 KEEP/INVALIDATE 处置）、外发交付全链路、异常确认/闭环、ServiceAssignment 与 Task 指派/Guard/人工接管 Inbox 投影；授权时间线与稳定分页及最近活动摘要；时间线 checkpoint/dead letter/generation 重建与 FRESH/LAGGING/UNKNOWN/REBUILDING freshness；definition 登记、dead letter 幂等重放与旧/孤儿 generation 清理；工单工作区顶层实时组合、当前 ACTIVE 服务责任摘要与 TASKS/TIMELINE_AUDIT/APPOINTMENTS_VISITS（含联系尝试）/FORMS_EVIDENCE（含提交与资料项安全元数据）/REVIEWS_CORRECTIONS（含 CLIENT/重开血缘）/INTEGRATION 按需区块（敏感字段最小化；缺权次级区块降级）；授权跨项目 ReviewCase/CorrectionCase/OutboundDelivery 专项队列 | 试算合并、revision/slots 技术噪声、表单值与资料版本详情、FACTS_CALCULATIONS、关键事件 taxonomy/过滤、通用 work-queues、SavedView、搜索、多投影平台、Broker offset、Portal、Admin 重建/重放 HTTP | M73～M99 |
 | 服务分配 | 网点分配、容量、改派 Saga、超时恢复 | `IMPLEMENTED` | ServiceAssignment、容量权威、改派、终止、对账和自动恢复 | 完整策略评分、全部异常分支和 UI | M24～M28 |
-| 运营异常 | 异常工作台基础 | `PARTIAL` | 异常记录和恢复入口；M58 将外发 UNKNOWN 与 Task 最终人工事件汇入 OperationalException + HUMAN Task；M59 提供高风险人工重发事实；M60 在严格 ACK 后幂等闭环对应异常并处理事件乱序 | 人工标记已送达/放弃、其他异常类型自动闭环、完整通知、运营中心前端和跨域异常目录 | M29、M58～M60 |
+| 运营异常 | 异常工作台基础 | `PARTIAL` | 异常记录和恢复入口；M58 将外发 UNKNOWN 与 Task 最终人工事件汇入 OperationalException + HUMAN Task；M59 提供高风险人工重发事实；M60 在严格 ACK 后幂等闭环对应异常并处理事件乱序；列表/详情/确认已硬化为实时项目范围 | 人工标记已送达/放弃、其他异常类型自动闭环、完整通知、运营中心前端和跨域异常目录 | M29、M58～M60、M100 |
 | 预约 | 预约修订、联系终态动作 | `PARTIAL` | Revision、并发和终态动作基础；公开事件已并入工单时间线 | 用户确认渠道、完整日程和跨端协作 | M30～M31、M74 |
 | 现场作业 | Visit 生命周期 | `PARTIAL` | Visit 运行时基础；签到/签退/中断事件已并入工单时间线 | GPS 策略增强、完整现场提交、离线同步和师傅端 | M32、M74 |
 | 动态表单 | 资产、冻结版本、不可变提交和 Task 完成门禁 | `PARTIAL` | 固定/条件 required、visible 与布尔 validation rule，基础类型校验、精确版本提交和完成引用；form.submitted 已并入工单时间线 | 复杂 validator、计算字段、草稿、冲突、更正和审核 | M33～M35、M53、M76 |
 | 资料 Evidence | 资产、槽位、Item/Revision、机器校验、Snapshot、完成门禁、作废、Review、Correction | `PARTIAL` | 固定/条件槽位、VALIDATED 表单触发只追加重解析、槽位世代/lineage、REVIEW_REQUIRED 与显式 KEEP/INVALIDATE（处置已并入工单时间线）、安全文件联动、Snapshot/完成门禁及审核整改链路 | OCR/CV、GPS 权威距离、长期归档 | M36～M53、M76、M82～M83 |
 | 安全文件 | Begin/Finalize/隔离/扫描/授权下载/作废 | `IMPLEMENTED` | 独立安全文件生命周期；Evidence 编排 Begin/Finalize/Invalidate 联动 | 正式对象存储、专业扫描服务、物理删除 | M11、M38、M46 |
-| 审核整改 | ReviewCase、ReviewDecision、CorrectionCase | `PARTIAL` | Review + Correction + 整改 Task + 强制通过/重开 + 车企回执 + WAIVED；CLIENT Case 来源、批次/mapping 冻结；交付明确成功后自动创建 CLIENT Case/Route，UNKNOWN 可授权人工重发并在严格 ACK 后闭环异常；授权跨项目 ReviewCase 队列 | Correction 队列、SLA/assignee enrich、多候选人策略、前端、人工标记已送达/放弃、自动 Evidence target 映射 | M44～M60、M97 |
+| 审核整改 | ReviewCase、ReviewDecision、CorrectionCase | `PARTIAL` | Review + Correction + 整改 Task + 强制通过/重开 + 车企回执 + WAIVED；CLIENT Case 来源、批次/mapping 冻结；交付明确成功后自动创建 CLIENT Case/Route，UNKNOWN 可授权人工重发并在严格 ACK 后闭环异常；授权跨项目 ReviewCase 与 CorrectionCase 队列 | SLA/assignee enrich、多候选人策略、前端、人工标记已送达/放弃、自动 Evidence target 映射 | M44～M60、M97～M98 |
 | SLA | 时钟、预警、升级 | `PARTIAL` | Task `TASK_CREATED→TASK_COMPLETED` ELAPSED 时钟；显式策略版本/摘要锁定；TARGET_DUE 对账；RUNNING/BREACHED/MET/MET_LATE；Inbox/Outbox 与不可变 segment/milestone；`sla.read` + 实时 TENANT/PROJECT/REGION/NETWORK 授权集合的跨项目工作台、工单时间线与详情查询；关系修订使旧游标失败关闭；公开 started/breached/met 已并入工单执行时间线 | BUSINESS 日历、暂停/恢复、免责/重算、预警/升级/通知、其他 subject、组织关系、Portal 前端、考核结算 | M61～M66、M75 |
 | 通知 | 通知与运营异常中心 | `PROPOSED` | 已有总体设计 | 通知通道、模板、可靠发送和 UI | `architecture/14-*` |
 | 履约事实与试算 | 事实提取和双向试算 | `PROPOSED` | 已有设计、API 和数据规划 | 运行时、投影和前端工作区 | M5 设计 |
 | 对账结算 | 对账、结算、争议与调整 | `PROPOSED` | 已有边界设计 | 正式运行时和页面 | `architecture/16-*` |
-| Admin Portal | 总部运营后台 | `PROPOSED` | 信息架构、Page ID、路由、权限和页面规格 | 前端代码、设计系统实现和 E2E | M7 设计 |
+| Admin Portal | 总部运营后台 | `PARTIAL` | M101～M134：队列/任务/SLA/异常/外发/工单/项目目录、工作区、allowed-actions 命令面板 | 设计系统、SavedView、OIDC SDK、E2E、完整表单/资料提交流程 | M7 设计、M101～M134 |
 | Network Portal | 网点协作端 | `PROPOSED` | 页面和跨端协作规格 | 前端代码和 E2E | M7 设计 |
 | Technician App | 师傅移动端 | `PROPOSED` | 弱网、离线工作包、上传队列和页面规格 | 移动端工程、真机和离线运行时 | M7 设计 |
 | External Portal | 用户/车企受控页面 | `PROPOSED` | 最小边界规划 | 二期页面和工程实现 | M7 设计 |
@@ -799,23 +799,229 @@ customer/location、SavedView、Portal。
 明确未实现：通用 work-queues/SavedView、SLA/assignee/target enrich、Correction/Outbound 队列、
 FACTS_CALCULATIONS、customer/location、Portal。
 
+### M98：授权整改案例队列
+
+已实现：
+
+- API-06 §6 `GET /correction-cases` 窄切片 Accepted；
+- evidence.read 实时 TENANT/PROJECT/REGION/NETWORK 项目范围与单条 SQL；
+- OPEN 默认，project/status/task/sourceReviewCase 受控筛选，FIFO 游标绑定 scopeDigest 与全部条件；
+- 队列仅返回安全 Case/来源审核引用/原因码/补传次数，不含 digest、操作者或豁免/关闭正文；
+- Core OpenAPI 0.68.0；Flyway V082 / 84 migrations。
+
+明确未实现：通用 work-queues/SavedView、SLA/assignee enrich、异常队列 Project Scope 硬化、
+FACTS_CALCULATIONS、customer/location、Portal。
+
+### M99：授权外发交付队列
+
+已实现：
+
+- API-06 §6 `GET /outbound-deliveries` 窄切片 Accepted；
+- integration.readOutbound 实时 TENANT/PROJECT/REGION/NETWORK 项目范围与单条 SQL；
+- UNKNOWN 默认，project/status/messageType/workOrder/review 受控筛选，FIFO 游标绑定 scopeDigest 与全部条件；
+- 队列仅返回安全 Delivery 身份与 attemptCount，不含 digest、对象引用、操作者或重放审批正文；
+- Core OpenAPI 0.69.0；Flyway V083 / 85 migrations。
+
+明确未实现：通用 work-queues/SavedView、异常队列 Project Scope 硬化、人工标记已送达/放弃、
+FACTS_CALCULATIONS、customer/location、Portal。
+
+### M100：运营异常项目范围硬化
+
+已实现：
+
+- API-06 §6 `GET /operational-exceptions` 项目范围硬化 Accepted；
+- operations.exception.read 实时 TENANT/PROJECT/REGION/NETWORK 范围与 scopeDigest 游标；
+- 新增 projectId 筛选与响应字段；无 project 孤儿仅 TENANT 范围可见；
+- Core OpenAPI 0.70.0；Flyway V084 / 86 migrations。
+
+明确未实现：通用 work-queues/SavedView、人工标记已送达/放弃、通用 RESOLVED UI、Portal。
+
+### M101：Admin Portal 队列外壳
+
+已实现：
+
+- `serviceos-admin-web`（Vue + TypeScript + Vite）；
+- 审核/整改/外发/异常只读队列页与本地 JWT 携带；
+- `npm run build` 通过。
+
+明确未实现：设计系统、SavedView、工作区全页、命令 UI、Network/Technician、OIDC SDK、E2E。
+
+### M102：Admin 工单工作区只读外壳
+
+已实现：
+
+- `/work-orders` 查找与 `/work-orders/:id` 工作区只读页；
+- 消费 workspace / activity-summary / sections；
+- 外发队列深链；`npm run build` 通过。
+
+明确未实现：命令 UI、SavedView、OIDC SDK、设计系统、E2E、Network/Technician。
+
+### M103：Admin 工作区 allowed-actions 只读投影
+
+已实现：
+
+- 工作区展示当前任务服务端 allowed-actions；
+- 不本地推导、不执行命令；`npm run build` 通过。
+
+明确未实现：命令执行 UI、OIDC SDK、SavedView、设计系统、E2E。
+
+### M104：Admin 授权工单目录
+
+已实现：
+
+- Admin `/work-orders` 授权目录与筛选；
+- 深链到工作区；`npm run build` 通过。
+
+明确未实现：SavedView、命令执行 UI、OIDC SDK、设计系统、E2E。
+
+### M105：Admin 人工任务命令面板
+
+已实现：
+
+- 工作区按 allowed-actions 执行 claim/start/complete/release；
+- Idempotency-Key + If-Match；成功后刷新；`npm run build` 通过。
+
+明确未实现：表单/资料提交流程编排、OIDC SDK、SavedView、设计系统、E2E。
+
+### M106：Admin 授权任务目录
+
+已实现：`GET /tasks` 目录页、status/taskKind/assignee=me 筛选、工作区深链；`npm run build`。
+
+明确未实现：任务详情独立页、SavedView、OIDC SDK、E2E。
+
+### M107：Admin SLA 工作台
+
+已实现：`GET /sla-instances` 工作台、status 筛选、工作区深链；`npm run build`。
+
+明确未实现：SLA 详情操作 UI、BUSINESS 日历、预警通知、E2E。
+
+### M108：Admin 授权项目目录
+
+已实现：`GET /projects` 目录页、status/clientId 筛选；`npm run build`。
+
+明确未实现：项目创建/范围修订 UI、配置治理、OIDC SDK、E2E。
+
+### M109：Admin 任务详情
+
+已实现：任务详情、Attempt 历史、命令面板复用、目录深链；`npm run build`。
+
+### M110：Admin 项目详情与范围历史
+
+已实现：项目详情与 scope-revisions 分页、目录深链；`npm run build`。
+
+### M111：Admin 运营异常确认命令
+
+已实现：按 allowedActions 执行 ACKNOWLEDGE（Idempotency-Key/If-Match）；`npm run build`。
+
+### M112：Admin 审核案例详情与裁决
+
+已实现：详情 + decide/force-approve/reopen；队列深链。
+
+### M113：Admin 整改案例详情与命令
+
+已实现：详情 + resubmit/close/waive；队列深链。
+
+### M114：Admin 外发交付详情与人工重发
+
+已实现：详情 + UNKNOWN retry。
+
+### M115：Admin SLA 实例详情
+
+已实现：getSlaInstance 与 segments/milestones 展示。
+
+### M116：Admin 任务表单提交切片
+
+已实现：任务详情表单列表与 JSON 提交，VALIDATED 回填 complete 引用。
+
+### M117：Admin 任务资料快照切片
+
+已实现：槽位/资料项列表与 createEvidenceSetSnapshot，回填 complete 引用。
+
+### M118：Admin BYD 提审外发创建
+
+已实现：审核详情对通过案例创建 BYD review submission OutboundDelivery。
+
+### M119：Admin 资料 Begin/PUT/Finalize 上传
+
+已实现：任务详情资料上传 begin→PUT→finalize，SHA-256 校验。
+
+### M120：Admin 资料条件变化处置
+
+已实现：REVIEW_REQUIRED 槽位 KEEP/INVALIDATE。
+
+### M121：Admin 从资料快照创建审核案例
+
+已实现：快照后 createReviewCase 并深链审核详情。
+
+### M122：Admin 任务联系历史与记录
+
+已实现：任务详情 contact-attempts 列表与追加。
+
+### M123：Admin 任务预约提议确认取消
+
+已实现：propose/confirm/cancel Appointment。
+
+### M124：Admin 上门签到签退
+
+已实现：预约 check-in 与 Visit check-out。
+
+### M125：Admin 预约改约与爽约
+
+已实现：reschedule / mark-no-show。
+
+### M126：Admin 上门中断
+
+已实现：Visit interrupt。
+
+### M127：Admin 资料下载授权与 Revision 作废
+
+已实现：authorizeFileDownload 与 invalidateEvidenceRevision。
+
+### M128：Admin 创建项目
+
+已实现：项目目录 createProject。
+
+### M129：Admin 修订项目范围关系
+
+已实现：revise-scope-relations。
+
+### M130：Admin 分配任务候选
+
+已实现：assign-candidates MANUAL。
+
+### M131：Admin 运营异常详情
+
+已实现：异常详情页与确认命令、队列深链。
+
+### M132：Admin 工单 SLA 实例列表
+
+已实现：工作区 listWorkOrderSlaInstances。
+
+### M133：Admin 表单资料详情与文件作废
+
+已实现：按 ID 读取提交/资料/快照，以及 invalidateStoredFile。
+
+### M134：Admin 工单权威投影与核心时间线
+
+已实现：工单详情、Stage、Task 摘要与核心时间线。
+
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M97**。M61～M97 在授权只读、时间线投影运行时、工作区组合与审核队列上继续收敛；
-没有实现完整 SLA/通知策略、队列/SavedView 或整个现场履约平台。
+ServiceOS 可靠纵向切片已推进到 **M134**。M61～M134 在授权只读、时间线投影运行时、工作区组合与
+审核/整改/外发专项队列上继续收敛；没有实现完整 SLA/通知策略、通用队列/SavedView 或整个现场履约平台。
 
 ```text
 候选下一方向（优先从已确认文档中选择最小可靠切片）：
-1. 在 API-06 其余章节再接受后继续队列、SavedView、其余 section 与 Portal 只读体验；
-2. 在接受 ServiceNetwork 状态语义后建立目录与准入/启用/清退生命周期；当前相关文档仍为 Proposed，
+1. 正式 OIDC 与设计系统；SavedView 仍需再接受 API-06 章节；
+3. 在接受 ServiceNetwork 状态语义后建立目录与准入/启用/清退生命周期；当前相关文档仍为 Proposed，
    不得猜测状态值或转换规则；
-3. 建立 Organization/Region 目录、层级后代与组织到 Project 的权威关系；
-4. 在试点确认日历/暂停/预警规则后扩展 BUSINESS 时钟、暂停和升级；
-5. 多候选人评分、自动 claim、网点容量联动；
-6. OCR/CV、GPS 权威距离、二级审批/MFA、报告 GENERATED 资料包；
-7. 表达式计算字段、决策表/脚本、草稿冲突与离线合并；
-8. 履约事实试算与结算运行时；
-9. Admin 投影重建/重放 HTTP（需另接受运维契约）。
+4. 建立 Organization/Region 目录、层级后代与组织到 Project 的权威关系；
+5. 在试点确认日历/暂停/预警规则后扩展 BUSINESS 时钟、暂停和升级；
+6. 多候选人评分、自动 claim、网点容量联动；
+7. OCR/CV、GPS 权威距离、二级审批/MFA、报告 GENERATED 资料包；
+8. 表达式计算字段、决策表/脚本、草稿冲突与离线合并；
+9. 履约事实试算与结算运行时；
+10. Admin 投影重建/重放 HTTP（需另接受运维契约）。
 ```
 
 接手 Agent 必须先检查仓库是否已有更新的里程碑文档、ADR 或提交；在收到明确批准前不得猜测业务策略并实现上述候选项。

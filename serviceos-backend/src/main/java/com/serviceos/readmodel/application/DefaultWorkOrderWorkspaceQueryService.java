@@ -986,7 +986,8 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
             List<OperationalExceptionItem> items = exceptions.list(
                     principal,
                     correlationId,
-                    new OperationalExceptionQuery("OPEN", null, null, workOrderId, null, null, 100)
+                    new OperationalExceptionQuery(
+                            null, "OPEN", null, null, workOrderId, null, null, 100)
             ).items();
             availability.put("EXCEPTIONS", items.isEmpty() ? "EMPTY" : "AVAILABLE");
             return new WorkOrderWorkspaceExceptionSummary(items.size());

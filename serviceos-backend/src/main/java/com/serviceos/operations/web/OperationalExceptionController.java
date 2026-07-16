@@ -41,6 +41,7 @@ final class OperationalExceptionController {
 
     @GetMapping
     OperationalExceptionPage list(
+            @RequestParam(required = false) UUID projectId,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String severity,
@@ -52,7 +53,7 @@ final class OperationalExceptionController {
     ) {
         return workbench.list(principals.current(), correlationId,
                 new OperationalExceptionQuery(
-                        status, category, severity, workOrderId, taskId, cursor, limit));
+                        projectId, status, category, severity, workOrderId, taskId, cursor, limit));
     }
 
     @GetMapping("/{exceptionId}")

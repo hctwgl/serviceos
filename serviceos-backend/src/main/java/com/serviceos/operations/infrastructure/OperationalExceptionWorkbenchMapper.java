@@ -12,10 +12,17 @@ import java.util.UUID;
 @Mapper
 interface OperationalExceptionWorkbenchMapper {
     List<Map<String, Object>> findPage(
-            @Param("tenantId") String tenantId, @Param("status") String status,
-            @Param("category") String category, @Param("severity") String severity,
-            @Param("workOrderId") UUID workOrderId, @Param("taskId") UUID taskId,
-            @Param("cursorOpenedAt") OffsetDateTime cursorOpenedAt, @Param("cursorId") UUID cursorId,
+            @Param("tenantId") String tenantId,
+            @Param("tenantWide") boolean tenantWide,
+            @Param("projectIds") List<String> projectIds,
+            @Param("projectId") String projectId,
+            @Param("status") String status,
+            @Param("category") String category,
+            @Param("severity") String severity,
+            @Param("workOrderId") UUID workOrderId,
+            @Param("taskId") UUID taskId,
+            @Param("cursorOpenedAt") OffsetDateTime cursorOpenedAt,
+            @Param("cursorId") UUID cursorId,
             @Param("fetchSize") int fetchSize);
 
     Map<String, Object> findById(@Param("tenantId") String tenantId, @Param("exceptionId") UUID exceptionId);

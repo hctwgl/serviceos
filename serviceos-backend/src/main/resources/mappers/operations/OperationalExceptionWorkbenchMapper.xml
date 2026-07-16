@@ -2,7 +2,8 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.serviceos.operations.infrastructure.OperationalExceptionWorkbenchMapper">
     <sql id="workbenchColumns">
-        exception_id AS "exceptionId", source_type AS "sourceType", source_id AS "sourceId",
+        exception_id AS "exceptionId", project_id AS "projectId",
+        source_type AS "sourceType", source_id AS "sourceId",
         source_attempt_id AS "sourceAttemptId", source_task_type AS "sourceTaskType",
         category_code AS "category", severity_code AS "severity", error_code AS "errorCode",
         status, work_order_id AS "workOrderId", task_id AS "taskId",
@@ -17,6 +18,20 @@
         SELECT <include refid="workbenchColumns"/>
           FROM ops_operational_exception
          WHERE tenant_id = #{tenantId}
+        <if test="!tenantWide">
+            <choose>
+                <when test="projectIds != null and !projectIds.isEmpty()">
+                    AND project_id IN
+                    <foreach collection="projectIds" item="scopedProjectId" open="(" separator="," close=")">
+                        CAST(#{scopedProjectId} AS uuid)
+                    </foreach>
+                </when>
+                <otherwise>
+                    AND 1 = 0
+                </otherwise>
+            </choose>
+        </if>
+        <if test="projectId != null">AND project_id = CAST(#{projectId} AS uuid)</if>
         <if test="status != null">AND status = #{status}</if>
         <if test="category != null">AND category_code = #{category}</if>
         <if test="severity != null">AND severity_code = #{severity}</if>

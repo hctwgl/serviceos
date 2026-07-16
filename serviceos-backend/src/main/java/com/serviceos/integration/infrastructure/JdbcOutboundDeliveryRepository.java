@@ -4,6 +4,7 @@ import com.serviceos.integration.api.DeliveryAttemptView;
 import com.serviceos.integration.api.DeliveryReplayRequestView;
 import com.serviceos.integration.api.DeliveryTimelineContext;
 import com.serviceos.integration.api.ExternalAcknowledgementView;
+import com.serviceos.integration.api.OutboundDeliveryQueueItem;
 import com.serviceos.integration.api.OutboundDeliveryView;
 import com.serviceos.integration.application.OutboundDeliveryRepository;
 import com.serviceos.shared.BusinessProblem;
@@ -148,6 +149,86 @@ final class JdbcOutboundDeliveryRepository implements OutboundDeliveryRepository
                 .param("limit", limit)
                 .query(this::delivery)
                 .list();
+    }
+
+    @Override
+    public List<OutboundDeliveryQueueItem> findQueuePage(
+            String tenantId,
+            boolean tenantWide,
+            List<UUID> projectIds,
+            String status,
+            String businessMessageType,
+            UUID sourceWorkOrderId,
+            UUID sourceReviewCaseId,
+            Instant cursorCreatedAt,
+            UUID cursorId,
+            int fetchSize
+    ) {
+        StringBuilder sql = new StringBuilder("""
+                SELECT delivery_id, project_id, connector_version_id, mapping_version_id,
+                       business_message_type, business_key, source_review_case_id, source_task_id,
+                       source_work_order_id, source_snapshot_id, external_order_code,
+                       execution_task_id, status, client_review_case_id, review_route_id,
+                       aggregate_version, attempt_count, created_at, delivered_at, acknowledged_at
+                  FROM int_outbound_delivery
+                 WHERE tenant_id = :tenant
+                   AND status = :status
+                """);
+        if (!tenantWide) {
+            if (projectIds == null || projectIds.isEmpty()) {
+                sql.append(" AND 1 = 0");
+            } else {
+                sql.append(" AND project_id IN (");
+                for (int index = 0; index < projectIds.size(); index++) {
+                    if (index > 0) {
+                        sql.append(", ");
+                    }
+                    sql.append(":projectId").append(index);
+                }
+                sql.append(')');
+            }
+        }
+        if (businessMessageType != null) {
+            sql.append(" AND business_message_type = :messageType");
+        }
+        if (sourceWorkOrderId != null) {
+            sql.append(" AND source_work_order_id = :workOrderId");
+        }
+        if (sourceReviewCaseId != null) {
+            sql.append(" AND source_review_case_id = :reviewCaseId");
+        }
+        if (cursorCreatedAt != null) {
+            sql.append("""
+                     AND (created_at, delivery_id) > (:cursorCreatedAt, :cursorId)
+                    """);
+        }
+        sql.append("""
+                 ORDER BY created_at, delivery_id
+                 LIMIT :fetchSize
+                """);
+        var query = jdbc.sql(sql.toString())
+                .param("tenant", tenantId)
+                .param("status", status)
+                .param("fetchSize", fetchSize);
+        if (!tenantWide && projectIds != null) {
+            for (int index = 0; index < projectIds.size(); index++) {
+                query = query.param("projectId" + index, projectIds.get(index));
+            }
+        }
+        if (businessMessageType != null) {
+            query = query.param("messageType", businessMessageType);
+        }
+        if (sourceWorkOrderId != null) {
+            query = query.param("workOrderId", sourceWorkOrderId);
+        }
+        if (sourceReviewCaseId != null) {
+            query = query.param("reviewCaseId", sourceReviewCaseId);
+        }
+        if (cursorCreatedAt != null) {
+            query = query.param("cursorCreatedAt", timestamptz(cursorCreatedAt))
+                    .param("cursorId", cursorId);
+        }
+        return query.query(this::queueItem).list();
     }
 
     @Override
@@ -440,6 +521,30 @@ final class JdbcOutboundDeliveryRepository implements OutboundDeliveryRepository
                 .param("receivedAt", timestamptz(receivedAt)).param("tenant", tenantId)
                 .param("deliveryId", deliveryId).update();
         requireOne(inserted, "ExternalAcknowledgement business result already exists");
+    }
+
+    private OutboundDeliveryQueueItem queueItem(ResultSet rs, int row) throws SQLException {
+        return new OutboundDeliveryQueueItem(
+                rs.getObject("delivery_id", UUID.class),
+                rs.getObject("project_id", UUID.class),
+                rs.getString("connector_version_id"),
+                rs.getString("mapping_version_id"),
+                rs.getString("business_message_type"),
+                rs.getString("business_key"),
+                rs.getObject("source_review_case_id", UUID.class),
+                rs.getObject("source_task_id", UUID.class),
+                rs.getObject("source_work_order_id", UUID.class),
+                rs.getObject("source_snapshot_id", UUID.class),
+                rs.getString("external_order_code"),
+                rs.getObject("execution_task_id", UUID.class),
+                rs.getString("status"),
+                rs.getObject("client_review_case_id", UUID.class),
+                rs.getObject("review_route_id", UUID.class),
+                rs.getLong("aggregate_version"),
+                rs.getInt("attempt_count"),
+                instant(rs, "created_at"),
+                instant(rs, "delivered_at"),
+                instant(rs, "acknowledged_at"));
     }
 
     private DeliveryRecord delivery(ResultSet rs, int row) throws SQLException {

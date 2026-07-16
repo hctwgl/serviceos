@@ -8,6 +8,8 @@ import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
 import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
 import com.serviceos.evidence.api.BeginEvidenceUploadCommand;
 import com.serviceos.evidence.api.CloseCorrectionCaseCommand;
+import com.serviceos.evidence.api.CorrectionCaseQueryService;
+import com.serviceos.evidence.api.CorrectionCaseQueueQuery;
 import com.serviceos.evidence.api.CorrectionCaseService;
 import com.serviceos.evidence.api.CorrectionCaseView;
 import com.serviceos.evidence.api.CreateEvidenceSetSnapshotCommand;
@@ -91,6 +93,7 @@ class CorrectionCasePostgresIT {
     @Autowired EvidenceSetSnapshotService snapshots;
     @Autowired ReviewCaseService reviews;
     @Autowired CorrectionCaseService corrections;
+    @Autowired CorrectionCaseQueryService correctionQueries;
     @Autowired LocalObjectTransferService transfers;
     @Autowired TaskExecutionWorker worker;
     @Autowired List<OutboxMessageHandler> handlers;
@@ -288,6 +291,77 @@ class CorrectionCasePostgresIT {
         assertThat(jdbc.sql("SELECT count(*) FROM evd_correction_case").query(Long.class).single()).isZero();
         assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type='evidence.correction-case-created'")
                 .query(Long.class).single()).isZero();
+    }
+
+    @Test
+    void authorizedCorrectionQueueDefaultsOpenFiltersAndUsesScopeBoundCursor() throws Exception {
+        UUID firstCorrectionId = openCorrection("queue-1");
+        UUID secondCorrectionId = openCorrection("queue-2");
+        UUID firstReviewId = jdbc.sql("""
+                SELECT source_review_case_id FROM evd_correction_case
+                 WHERE correction_case_id = :id
+                """).param("id", firstCorrectionId).query(UUID.class).single();
+
+        var defaultOpen = correctionQueries.list(
+                reviewer(), "corr-correction-queue-open",
+                new CorrectionCaseQueueQuery(projectId, null, null, null, null, 20));
+        assertThat(defaultOpen.items()).isEmpty();
+
+        var firstPage = correctionQueries.list(
+                reviewer(), "corr-correction-queue-1",
+                new CorrectionCaseQueueQuery(projectId, "IN_PROGRESS", null, null, null, 1));
+        assertThat(firstPage.items()).hasSize(1);
+        assertThat(firstPage.nextCursor()).isNotBlank();
+        var secondPage = correctionQueries.list(
+                reviewer(), "corr-correction-queue-2",
+                new CorrectionCaseQueueQuery(
+                        projectId, "IN_PROGRESS", null, null, firstPage.nextCursor(), 1));
+        assertThat(secondPage.items()).hasSize(1);
+        assertThat(List.of(
+                firstPage.items().getFirst().correctionCaseId(),
+                secondPage.items().getFirst().correctionCaseId()))
+                .containsExactlyInAnyOrder(firstCorrectionId, secondCorrectionId);
+        assertThat(secondPage.items().getFirst().resubmissionCount()).isZero();
+        assertThat(secondPage.toString()).doesNotContain(
+                "sourceSnapshotContentDigest", "createdBy", "closedBy", "waivedBy",
+                "waiveApprovalRef", "waiveNote");
+
+        assertThat(correctionQueries.list(
+                reviewer(), "corr-correction-queue-scope",
+                new CorrectionCaseQueueQuery(null, "IN_PROGRESS", null, null, null, 20)).items())
+                .extracting(item -> item.correctionCaseId())
+                .containsExactlyInAnyOrder(firstCorrectionId, secondCorrectionId);
+        assertThat(correctionQueries.list(
+                reviewer(), "corr-correction-queue-source",
+                new CorrectionCaseQueueQuery(
+                        projectId, "IN_PROGRESS", null, firstReviewId, null, 20)).items())
+                .extracting(item -> item.correctionCaseId())
+                .containsExactly(firstCorrectionId);
+
+        assertThatThrownBy(() -> correctionQueries.list(
+                reviewer(), "corr-correction-queue-cursor",
+                new CorrectionCaseQueueQuery(
+                        projectId, "CLOSED", null, null, firstPage.nextCursor(), 1)))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
+        assertThatThrownBy(() -> correctionQueries.list(
+                reviewer(), "corr-correction-queue-status",
+                new CorrectionCaseQueueQuery(projectId, "UNKNOWN", null, null, null, 20)))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
+    }
+
+    private UUID openCorrection(String marker) throws Exception {
+        EvidenceSetSnapshotView snapshot = createSnapshot(marker);
+        ReviewCaseView review = reviews.create(reviewer(), metadata("queue-review-" + marker),
+                new CreateReviewCaseCommand(snapshot.evidenceSetSnapshotId(), null));
+        reviews.decide(reviewer(), metadata("queue-reject-" + marker),
+                new DecideReviewCaseCommand(review.reviewCaseId(), "REJECTED",
+                        List.of("IMAGE.BLUR"), "blurry"));
+        return jdbc.sql("""
+                SELECT correction_case_id FROM evd_correction_case
+                 WHERE source_review_case_id = :review
+                """).param("review", review.reviewCaseId()).query(UUID.class).single();
     }
 
     private EvidenceSetSnapshotView createSnapshot(String marker) throws Exception {

@@ -50,6 +50,17 @@ interface CorrectionCaseMapper {
     List<Map<String, Object>> listCasesByTask(
             @Param("tenantId") String tenantId, @Param("taskId") String taskId);
 
+    List<Map<String, Object>> findQueuePage(
+            @Param("tenantId") String tenantId,
+            @Param("tenantWide") boolean tenantWide,
+            @Param("projectIds") List<String> projectIds,
+            @Param("status") String status,
+            @Param("taskId") String taskId,
+            @Param("sourceReviewCaseId") String sourceReviewCaseId,
+            @Param("cursorCreatedAt") Object cursorCreatedAt,
+            @Param("cursorId") String cursorId,
+            @Param("fetchSize") int fetchSize);
+
     String findCaseIdBySourceDecision(
             @Param("tenantId") String tenantId, @Param("reviewDecisionId") String reviewDecisionId);
 
