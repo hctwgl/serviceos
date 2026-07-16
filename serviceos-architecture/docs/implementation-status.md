@@ -40,7 +40,7 @@ latestMilestone: M78
 | 项目 | 当前值 |
 |---|---|
 | 最新实施里程碑 | M78 工单外发交付确认与恢复时间线事件合并 |
-| 基线提交 | `PENDING_M78` |
+| 基线提交 | `c42433a` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
 | 前端工程 | 尚未建立；已有 Admin、Network、Technician 产品与交互规格 |

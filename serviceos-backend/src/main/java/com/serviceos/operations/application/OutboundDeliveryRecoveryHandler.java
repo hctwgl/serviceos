@@ -9,6 +9,7 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.UUID;
@@ -52,7 +53,7 @@ final class OutboundDeliveryRecoveryHandler implements OutboxMessageHandler {
                 || taskIds.size() != payload.recoveredTaskIds().size()
                 || !taskIds.contains(payload.successfulExecutionTaskId())
                 || payload.acknowledgedAt() == null
-                || !payload.acknowledgedAt().equals(message.occurredAt())) {
+                || !sameInstant(payload.acknowledgedAt(), message.occurredAt())) {
             throw new IllegalArgumentException("OutboundDelivery recovery identity mismatch");
         }
         exceptions.resolveTaskFailures(new ResolveTaskFailureExceptionsCommand(
@@ -76,4 +77,11 @@ final class OutboundDeliveryRecoveryHandler implements OutboxMessageHandler {
             Instant acknowledgedAt
     ) {
     }
+    private static boolean sameInstant(Instant left, Instant right) {
+        if (left == null || right == null) {
+            return left == right;
+        }
+        return left.truncatedTo(ChronoUnit.MICROS).equals(right.truncatedTo(ChronoUnit.MICROS));
+    }
+
 }

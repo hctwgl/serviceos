@@ -31,6 +31,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
@@ -126,7 +127,7 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
         if (fact.projectId() != null && !scope.projectId().equals(fact.projectId())) {
             throw new IllegalArgumentException("时间线事件 Project 与工单权威范围不一致");
         }
-        if (!message.occurredAt().equals(fact.occurredAt())) {
+        if (!sameInstant(message.occurredAt(), fact.occurredAt())) {
             throw new IllegalArgumentException("时间线事件发生时间与载荷不一致");
         }
 
@@ -866,4 +867,12 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             Instant resolvedAt
     ) {
     }
+    /** PostgreSQL timestamptz 仅微秒；信封与载荷比较必须忽略纳秒残留。 */
+    private static boolean sameInstant(Instant left, Instant right) {
+        if (left == null || right == null) {
+            return left == right;
+        }
+        return left.truncatedTo(ChronoUnit.MICROS).equals(right.truncatedTo(ChronoUnit.MICROS));
+    }
+
 }

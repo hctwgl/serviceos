@@ -87,7 +87,7 @@ class WorkflowLinearProgressionPostgresIT {
     @BeforeEach
     void clean() {
         jdbc.sql("""
-                TRUNCATE TABLE rel_outbox_publish_attempt, rel_outbox_event, rel_inbox_record,
+                TRUNCATE TABLE rdm_work_order_timeline_entry, rel_outbox_publish_attempt, rel_outbox_event, rel_inbox_record,
                     tsk_task_execution_attempt, tsk_task, wfl_node_instance,
                     wfl_stage_instance, wfl_workflow_instance, wo_work_order,
                     cfg_configuration_bundle_item, cfg_configuration_bundle,

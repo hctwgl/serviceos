@@ -409,9 +409,11 @@ class SlaClockPostgresIT {
                     grant_id, tenant_id, principal_id, role_id, scope_type, scope_ref,
                     valid_from, source_code, approval_ref, created_at)
                 VALUES (:grantId, :tenantId, 'sla-reader', :roleId, 'PROJECT', :projectId,
-                    now() - interval '1 day', 'TEST_FIXTURE', 'M63-TEST', now())
+                    :validFrom, 'TEST_FIXTURE', 'M63-TEST', :createdAt)
                 """).param("grantId", UUID.randomUUID()).param("tenantId", TENANT)
-                .param("roleId", readerRole).param("projectId", UUID.randomUUID().toString()).update();
+                .param("roleId", readerRole).param("projectId", UUID.randomUUID().toString())
+                .param("validFrom", fixtureTime().minusDays(1))
+                .param("createdAt", fixtureTime()).update();
 
         assertThatThrownBy(() -> queries.list(principal(), "corr-collection-stale",
                 new SlaInstanceQuery(null, "RUNNING", firstPage.nextCursor(), 1)))
@@ -573,86 +575,107 @@ class SlaClockPostgresIT {
 
     private void seedSlaReadGrant() {
         UUID roleId = UUID.randomUUID();
+        OffsetDateTime createdAt = fixtureTime();
+        OffsetDateTime validFrom = fixtureTime().minusDays(1);
         jdbc.sql("""
                 INSERT INTO auth_role (role_id, tenant_id, role_code, role_name, role_status, created_at)
-                VALUES (:roleId, :tenantId, 'sla-reader', 'SLA 查看人', 'ACTIVE', now())
-                """).param("roleId", roleId).param("tenantId", TENANT).update();
+                VALUES (:roleId, :tenantId, 'sla-reader', 'SLA 查看人', 'ACTIVE', :createdAt)
+                """).param("roleId", roleId).param("tenantId", TENANT)
+                .param("createdAt", createdAt).update();
         jdbc.sql("""
                 INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
-                VALUES (:roleId, 'sla.read', now())
-                """).param("roleId", roleId).update();
+                VALUES (:roleId, 'sla.read', :grantedAt)
+                """).param("roleId", roleId).param("grantedAt", createdAt).update();
         jdbc.sql("""
                 INSERT INTO auth_role_grant (
                     grant_id, tenant_id, principal_id, role_id, scope_type, scope_ref,
                     valid_from, source_code, approval_ref, created_at)
                 VALUES (
                     :grantId, :tenantId, 'sla-reader', :roleId, 'PROJECT', :projectId,
-                    now() - interval '1 day', 'TEST_FIXTURE', 'M62-TEST', now())
+                    :validFrom, 'TEST_FIXTURE', 'M62-TEST', :createdAt)
                 """).param("grantId", UUID.randomUUID()).param("tenantId", TENANT)
-                .param("roleId", roleId).param("projectId", projectId.toString()).update();
+                .param("roleId", roleId).param("projectId", projectId.toString())
+                .param("validFrom", validFrom).param("createdAt", createdAt).update();
     }
 
     private void seedSlaRegionReadGrant() {
         UUID roleId = UUID.randomUUID();
+        OffsetDateTime createdAt = fixtureTime();
+        OffsetDateTime validFrom = fixtureTime().minusDays(1);
         jdbc.sql("""
                 INSERT INTO auth_role (role_id, tenant_id, role_code, role_name, role_status, created_at)
-                VALUES (:roleId, :tenantId, 'sla-region-reader', '区域 SLA 查看人', 'ACTIVE', now())
-                """).param("roleId", roleId).param("tenantId", TENANT).update();
+                VALUES (:roleId, :tenantId, 'sla-region-reader', '区域 SLA 查看人', 'ACTIVE', :createdAt)
+                """).param("roleId", roleId).param("tenantId", TENANT)
+                .param("createdAt", createdAt).update();
         jdbc.sql("""
                 INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
-                VALUES (:roleId, 'sla.read', now())
-                """).param("roleId", roleId).update();
+                VALUES (:roleId, 'sla.read', :grantedAt)
+                """).param("roleId", roleId).param("grantedAt", createdAt).update();
         jdbc.sql("""
                 INSERT INTO auth_role_grant (
                     grant_id, tenant_id, principal_id, role_id, scope_type, scope_ref,
                     valid_from, source_code, approval_ref, created_at)
                 VALUES (
                     :grantId, :tenantId, 'sla-region-reader', :roleId, 'REGION', 'CN-3702',
-                    now() - interval '1 day', 'TEST_FIXTURE', 'M64-TEST', now())
+                    :validFrom, 'TEST_FIXTURE', 'M64-TEST', :createdAt)
                 """).param("grantId", UUID.randomUUID()).param("tenantId", TENANT)
-                .param("roleId", roleId).update();
+                .param("roleId", roleId)
+                .param("validFrom", validFrom).param("createdAt", createdAt).update();
     }
 
     private void seedSlaNetworkReadGrant() {
         UUID roleId = UUID.randomUUID();
+        OffsetDateTime createdAt = fixtureTime();
+        OffsetDateTime validFrom = fixtureTime().minusDays(1);
         jdbc.sql("""
                 INSERT INTO auth_role (role_id, tenant_id, role_code, role_name, role_status, created_at)
-                VALUES (:roleId, :tenantId, 'sla-network-reader', '网点 SLA 查看人', 'ACTIVE', now())
-                """).param("roleId", roleId).param("tenantId", TENANT).update();
+                VALUES (:roleId, :tenantId, 'sla-network-reader', '网点 SLA 查看人', 'ACTIVE', :createdAt)
+                """).param("roleId", roleId).param("tenantId", TENANT)
+                .param("createdAt", createdAt).update();
         jdbc.sql("""
                 INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
-                VALUES (:roleId, 'sla.read', now())
-                """).param("roleId", roleId).update();
+                VALUES (:roleId, 'sla.read', :grantedAt)
+                """).param("roleId", roleId).param("grantedAt", createdAt).update();
         jdbc.sql("""
                 INSERT INTO auth_role_grant (
                     grant_id, tenant_id, principal_id, role_id, scope_type, scope_ref,
                     valid_from, source_code, approval_ref, created_at)
                 VALUES (
                     :grantId, :tenantId, 'sla-network-reader', :roleId, 'NETWORK', 'network-qingdao-a',
-                    now() - interval '1 day', 'TEST_FIXTURE', 'M65-TEST', now())
+                    :validFrom, 'TEST_FIXTURE', 'M65-TEST', :createdAt)
                 """).param("grantId", UUID.randomUUID()).param("tenantId", TENANT)
-                .param("roleId", roleId).update();
+                .param("roleId", roleId)
+                .param("validFrom", validFrom).param("createdAt", createdAt).update();
     }
 
     private void seedProjectScopeRevisionGrant() {
         UUID roleId = UUID.randomUUID();
+        OffsetDateTime createdAt = fixtureTime();
+        OffsetDateTime validFrom = fixtureTime().minusDays(1);
         jdbc.sql("""
                 INSERT INTO auth_role (role_id, tenant_id, role_code, role_name, role_status, created_at)
-                VALUES (:roleId, :tenantId, 'project-scope-admin', '项目范围管理员', 'ACTIVE', now())
-                """).param("roleId", roleId).param("tenantId", TENANT).update();
+                VALUES (:roleId, :tenantId, 'project-scope-admin', '项目范围管理员', 'ACTIVE', :createdAt)
+                """).param("roleId", roleId).param("tenantId", TENANT)
+                .param("createdAt", createdAt).update();
         jdbc.sql("""
                 INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
-                VALUES (:roleId, 'project.reviseScopeRelations', now())
-                """).param("roleId", roleId).update();
+                VALUES (:roleId, 'project.reviseScopeRelations', :grantedAt)
+                """).param("roleId", roleId).param("grantedAt", createdAt).update();
         jdbc.sql("""
                 INSERT INTO auth_role_grant (
                     grant_id, tenant_id, principal_id, role_id, scope_type, scope_ref,
                     valid_from, source_code, approval_ref, created_at)
                 VALUES (
                     :grantId, :tenantId, 'scope-admin', :roleId, 'TENANT', :tenantId,
-                    now() - interval '1 day', 'TEST_FIXTURE', 'M66-TEST', now())
+                    :validFrom, 'TEST_FIXTURE', 'M66-TEST', :createdAt)
                 """).param("grantId", UUID.randomUUID()).param("tenantId", TENANT)
-                .param("roleId", roleId).update();
+                .param("roleId", roleId)
+                .param("validFrom", validFrom).param("createdAt", createdAt).update();
+    }
+
+    /** 授权夹具时间必须对齐 MutableClock，避免墙钟 now() 越过 BASE_TIME 后 grant 尚未生效。 */
+    private static OffsetDateTime fixtureTime() {
+        return OffsetDateTime.ofInstant(BASE_TIME, ZoneOffset.UTC);
     }
 
     private CurrentPrincipal principal() {
