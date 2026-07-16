@@ -91,11 +91,21 @@ onMounted(() => load())
       @next="load(cursor)"
     />
 
+    <p v-if="page?.items?.length" class="links">
+      打开详情：
+      <RouterLink
+        v-for="item in page.items"
+        :key="item.id"
+        :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: item.id } }"
+      >
+        {{ item.taskType }}
+      </RouterLink>
+    </p>
     <p v-if="page?.items?.some((i) => i.workOrderId)" class="links">
       打开工作区：
       <RouterLink
         v-for="item in page.items.filter((i) => i.workOrderId)"
-        :key="item.id"
+        :key="`wo-${item.id}`"
         :to="{ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: item.workOrderId } }"
       >
         {{ item.taskType }}

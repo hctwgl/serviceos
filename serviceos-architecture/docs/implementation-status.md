@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-16
-baselineCommit: 1570a1c
-latestMilestone: M108
+baselineCommit: PENDING_M111
+latestMilestone: M111
 ---
 
 # ServiceOS 实施状态总览
@@ -39,8 +39,8 @@ latestMilestone: M108
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M108 Admin 授权项目目录 |
-| 基线提交 | `1570a1c` |
+| 最新实施里程碑 | M111 Admin 运营异常确认命令 |
+| 基线提交 | `PENDING_M111` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
 | 前端工程 | `serviceos-admin-web` 只读队列与工单工作区外壳（Vue+TS+Vite）；Network/Technician 尚未建立 |
@@ -75,7 +75,7 @@ latestMilestone: M108
 | 通知 | 通知与运营异常中心 | `PROPOSED` | 已有总体设计 | 通知通道、模板、可靠发送和 UI | `architecture/14-*` |
 | 履约事实与试算 | 事实提取和双向试算 | `PROPOSED` | 已有设计、API 和数据规划 | 运行时、投影和前端工作区 | M5 设计 |
 | 对账结算 | 对账、结算、争议与调整 | `PROPOSED` | 已有边界设计 | 正式运行时和页面 | `architecture/16-*` |
-| Admin Portal | 总部运营后台 | `PARTIAL` | M101～M108：队列/任务/SLA/异常/外发/工单/项目目录、工作区、allowed-actions 命令面板 | 设计系统、SavedView、OIDC SDK、E2E、完整表单/资料提交流程 | M7 设计、M101～M108 |
+| Admin Portal | 总部运营后台 | `PARTIAL` | M101～M111：队列/任务/SLA/异常/外发/工单/项目目录、工作区、allowed-actions 命令面板 | 设计系统、SavedView、OIDC SDK、E2E、完整表单/资料提交流程 | M7 设计、M101～M111 |
 | Network Portal | 网点协作端 | `PROPOSED` | 页面和跨端协作规格 | 前端代码和 E2E | M7 设计 |
 | Technician App | 师傅移动端 | `PROPOSED` | 弱网、离线工作包、上传队列和页面规格 | 移动端工程、真机和离线运行时 | M7 设计 |
 | External Portal | 用户/车企受控页面 | `PROPOSED` | 最小边界规划 | 二期页面和工程实现 | M7 设计 |
@@ -901,9 +901,21 @@ FACTS_CALCULATIONS、customer/location、Portal。
 
 明确未实现：项目创建/范围修订 UI、配置治理、OIDC SDK、E2E。
 
+### M109：Admin 任务详情
+
+已实现：任务详情、Attempt 历史、命令面板复用、目录深链；`npm run build`。
+
+### M110：Admin 项目详情与范围历史
+
+已实现：项目详情与 scope-revisions 分页、目录深链；`npm run build`。
+
+### M111：Admin 运营异常确认命令
+
+已实现：按 allowedActions 执行 ACKNOWLEDGE（Idempotency-Key/If-Match）；`npm run build`。
+
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M108**。M61～M108 在授权只读、时间线投影运行时、工作区组合与
+ServiceOS 可靠纵向切片已推进到 **M111**。M61～M111 在授权只读、时间线投影运行时、工作区组合与
 审核/整改/外发专项队列上继续收敛；没有实现完整 SLA/通知策略、通用队列/SavedView 或整个现场履约平台。
 
 ```text

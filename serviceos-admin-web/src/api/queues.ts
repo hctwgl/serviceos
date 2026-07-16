@@ -54,6 +54,8 @@ export type OperationalExceptionPage = {
     status: string
     errorCode: string
     openedAt: string
+    aggregateVersion: number
+    allowedActions: Array<'ACKNOWLEDGE'>
   }>
   nextCursor: string | null
 }

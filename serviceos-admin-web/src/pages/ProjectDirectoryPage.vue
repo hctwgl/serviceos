@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import QueueTable from './QueueTable.vue'
 import { listAuthorizedProjects, type ProjectPage } from '../api/projects'
 
@@ -74,6 +75,17 @@ onMounted(() => load())
       @refresh="load()"
       @next="load(cursor)"
     />
+
+    <p v-if="page?.items?.length" class="links">
+      打开详情：
+      <RouterLink
+        v-for="item in page.items"
+        :key="item.id"
+        :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: item.id } }"
+      >
+        {{ item.code }}
+      </RouterLink>
+    </p>
   </section>
 </template>
 
@@ -103,5 +115,12 @@ button {
   color: #fff;
   border-color: #243b53;
   cursor: pointer;
+}
+.links {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-size: 0.9rem;
 }
 </style>

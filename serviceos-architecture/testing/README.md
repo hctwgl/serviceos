@@ -109,3 +109,6 @@
 - [M106 Admin 授权任务目录验收矩阵](103-m106-admin-task-directory-acceptance.md)
 - [M107 Admin SLA 工作台验收矩阵](104-m107-admin-sla-queue-acceptance.md)
 - [M108 Admin 授权项目目录验收矩阵](105-m108-admin-project-directory-acceptance.md)
+- [M109 Admin 任务详情验收矩阵](106-m109-admin-task-detail-acceptance.md)
+- [M110 Admin 项目详情验收矩阵](107-m110-admin-project-detail-acceptance.md)
+- [M111 Admin 运营异常确认验收矩阵](108-m111-admin-exception-acknowledge-acceptance.md)

@@ -1,10 +1,6 @@
-# ServiceOS Admin Web（M101～M108）
+# ServiceOS Admin Web（M101～M111）
 
-总部运营后台。当前切片提供：
-
-- 审核/整改/任务/SLA/异常/外发队列与工单/项目目录
-- 工单工作区（sections/activity-summary）与 allowed-actions 命令面板
-- 本地 JWT；写操作仅调用服务端命令并携带幂等键/版本
+总部运营后台。覆盖队列、目录、详情、工作区与基于 allowed-actions 的命令。
 
 ## 开发
 

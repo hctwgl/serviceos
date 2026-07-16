@@ -203,3 +203,6 @@ Feature gate/authority: if applicable
 | M106 | Admin 授权任务目录消费 GET /tasks；筛选与工作区深链；npm build | PRODUCT-01/02 + ARCH-19 + API-02 Task Directory + Admin Web build | 任务详情独立页、SavedView、OIDC、E2E |
 | M107 | Admin SLA 工作台消费 GET /sla-instances；status 筛选与工作区深链；npm build | PRODUCT-01/02 + ARCH-19 + API-04/SLA Query + Admin Web build | SLA 详情操作、BUSINESS 日历、预警通知、E2E |
 | M108 | Admin 授权项目目录消费 GET /projects；status/clientId 筛选；npm build | PRODUCT-01/02 + ARCH-19 + API-07 Project Directory + Admin Web build | 项目创建/范围修订 UI、配置治理、OIDC、E2E |
+| M109 | Admin 任务详情消费 GET /tasks/{id} 与 execution-attempts；复用命令面板 | PRODUCT-01/02 + ARCH-19 + API-02 Task Detail/Attempts + Admin Web build | 表单/资料提交流程编排、OIDC、E2E |
+| M110 | Admin 项目详情与 scope-revisions 历史 | PRODUCT-01/02 + ARCH-19 + API-07 Project Query + Admin Web build | 项目创建/范围修订命令 UI、OIDC、E2E |
+| M111 | Admin 异常队列按 allowedActions 执行 ACKNOWLEDGE | PRODUCT-01/02 + ARCH-19 + API-04 Exception Acknowledge + Admin Web build | 通用 RESOLVED UI、OIDC、E2E |

@@ -9,8 +9,10 @@ import WorkOrderLookupPage from './pages/WorkOrderLookupPage.vue'
 import WorkOrderDirectoryPage from './pages/WorkOrderDirectoryPage.vue'
 import WorkOrderWorkspacePage from './pages/WorkOrderWorkspacePage.vue'
 import TaskDirectoryPage from './pages/TaskDirectoryPage.vue'
+import TaskDetailPage from './pages/TaskDetailPage.vue'
 import SlaQueuePage from './pages/SlaQueuePage.vue'
 import ProjectDirectoryPage from './pages/ProjectDirectoryPage.vue'
+import ProjectDetailPage from './pages/ProjectDetailPage.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -25,8 +27,10 @@ export const router = createRouter({
         { path: 'integration/outbound', name: 'ADMIN.INTEGRATION.OUTBOUND', component: OutboundQueuePage },
         { path: 'exceptions', name: 'ADMIN.EXCEPTION.QUEUE', component: ExceptionQueuePage },
         { path: 'tasks', name: 'ADMIN.TASK.QUEUE', component: TaskDirectoryPage },
+        { path: 'tasks/:id', name: 'ADMIN.TASK.DETAIL', component: TaskDetailPage },
         { path: 'sla', name: 'ADMIN.SLA.QUEUE', component: SlaQueuePage },
         { path: 'projects', name: 'ADMIN.PROJECT.LIST', component: ProjectDirectoryPage },
+        { path: 'projects/:id', name: 'ADMIN.PROJECT.DETAIL', component: ProjectDetailPage },
         { path: 'work-orders', name: 'ADMIN.WORKORDER.LIST', component: WorkOrderDirectoryPage },
         { path: 'work-orders/lookup', name: 'ADMIN.WORKORDER.LOOKUP', component: WorkOrderLookupPage },
         {
