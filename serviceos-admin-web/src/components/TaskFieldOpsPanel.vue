@@ -5,11 +5,14 @@ import {
   checkInVisit,
   checkOutVisit,
   confirmAppointment,
+  interruptVisit,
   listTaskAppointments,
   listTaskContactAttempts,
   listWorkOrderVisits,
+  markAppointmentNoShow,
   proposeAppointment,
   recordTaskContactAttempt,
+  rescheduleAppointment,
   type Appointment,
   type ContactAttempt,
   type Visit,
@@ -39,6 +42,14 @@ const confirmPartyType = ref('CUSTOMER')
 const confirmPartyRef = ref('party://customer-1')
 const confirmChannel = ref('PHONE')
 const cancelReason = ref('CUSTOMER_CANCELLED')
+const rescheduleReason = ref('CUSTOMER_REQUEST')
+const noShowPartyType = ref('CUSTOMER')
+const noShowPartyRef = ref('party://customer-1')
+const noShowReason = ref('CUSTOMER_NO_SHOW')
+const noShowEvidenceRefs = ref('evidence://manual-1')
+const interruptCode = ref('SITE_BLOCKED')
+const interruptNote = ref('')
+const interruptEvidenceRefs = ref('evidence://manual-1')
 
 const contactChannel = ref('PHONE')
 const contactedPartyRef = ref('party://customer-1')
@@ -155,6 +166,57 @@ async function cancel() {
   }
 }
 
+async function reschedule() {
+  busy.value = true
+  message.value = null
+  error.value = null
+  try {
+    const appt = selectedAppointment()
+    if (!appt) throw new Error('需要选择预约')
+    const receipt = await rescheduleAppointment(appt.appointmentId, appt.aggregateVersion, {
+      newWindow: {
+        start: windowStart.value,
+        end: windowEnd.value,
+        timezone: timezone.value,
+        estimatedDurationMinutes: Number(durationMinutes.value),
+      },
+      reasonCode: rescheduleReason.value.trim(),
+    })
+    message.value = `已改约 ${receipt.data.appointmentId} / ${receipt.data.status}`
+    await load()
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '改约失败'
+  } finally {
+    busy.value = false
+  }
+}
+
+async function markNoShow() {
+  busy.value = true
+  message.value = null
+  error.value = null
+  try {
+    const appt = selectedAppointment()
+    if (!appt) throw new Error('需要选择预约')
+    const refs = noShowEvidenceRefs.value
+      .split(/[,\s]+/)
+      .map((v) => v.trim())
+      .filter(Boolean)
+    const receipt = await markAppointmentNoShow(appt.appointmentId, appt.aggregateVersion, {
+      noShowPartyType: noShowPartyType.value.trim(),
+      noShowPartyRef: noShowPartyRef.value.trim(),
+      reasonCode: noShowReason.value.trim(),
+      evidenceRefs: refs,
+    })
+    message.value = `已标记爽约 ${receipt.data.appointmentId} / ${receipt.data.status}`
+    await load()
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '标记爽约失败'
+  } finally {
+    busy.value = false
+  }
+}
+
 async function recordContact() {
   busy.value = true
   message.value = null
@@ -228,6 +290,32 @@ async function doCheckOut() {
     await load()
   } catch (err) {
     error.value = err instanceof Error ? err.message : '签退失败'
+  } finally {
+    busy.value = false
+  }
+}
+
+async function doInterrupt() {
+  busy.value = true
+  message.value = null
+  error.value = null
+  try {
+    const visit = visits.value.find((item) => item.visitId === selectedVisitId.value)
+    if (!visit) throw new Error('需要选择 IN_PROGRESS Visit')
+    const refs = interruptEvidenceRefs.value
+      .split(/[,\s]+/)
+      .map((v) => v.trim())
+      .filter(Boolean)
+    const receipt = await interruptVisit(visit.visitId, visit.aggregateVersion, {
+      capturedAt: new Date().toISOString(),
+      exceptionCode: interruptCode.value.trim(),
+      note: interruptNote.value.trim() || null,
+      evidenceRefs: refs,
+    })
+    message.value = `中断 Visit ${receipt.data.visitId} / ${receipt.data.status}`
+    await load()
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '中断上门失败'
   } finally {
     busy.value = false
   }
@@ -349,7 +437,7 @@ onMounted(() => {
     </article>
 
     <article v-if="appointments.length" class="card">
-      <h4>确认 / 取消预约</h4>
+      <h4>确认 / 改约 / 取消 / 爽约</h4>
       <label>
         appointmentId
         <select v-model="selectedAppointmentId">
@@ -361,10 +449,17 @@ onMounted(() => {
       <label>confirmedPartyType<input v-model="confirmPartyType" /></label>
       <label>confirmedPartyRef<input v-model="confirmPartyRef" /></label>
       <label>confirmationChannel<input v-model="confirmChannel" /></label>
+      <label>reschedule reasonCode<input v-model="rescheduleReason" /></label>
       <label>cancel reasonCode<input v-model="cancelReason" /></label>
+      <label>noShowPartyType<input v-model="noShowPartyType" /></label>
+      <label>noShowPartyRef<input v-model="noShowPartyRef" /></label>
+      <label>noShow reasonCode<input v-model="noShowReason" /></label>
+      <label>noShow evidenceRefs<input v-model="noShowEvidenceRefs" /></label>
       <div class="actions">
         <button type="button" :disabled="busy" @click="confirm">confirm</button>
+        <button type="button" :disabled="busy" @click="reschedule">reschedule</button>
         <button type="button" :disabled="busy" @click="cancel">cancel</button>
+        <button type="button" :disabled="busy" @click="markNoShow">mark-no-show</button>
       </div>
     </article>
 
@@ -402,9 +497,13 @@ onMounted(() => {
       </label>
       <label>checkOut resultCode<input v-model="checkOutResult" /></label>
       <label>operationRefs<input v-model="operationRefs" /></label>
+      <label>interrupt exceptionCode<input v-model="interruptCode" /></label>
+      <label>interrupt note<input v-model="interruptNote" /></label>
+      <label>interrupt evidenceRefs<input v-model="interruptEvidenceRefs" /></label>
       <div class="actions">
         <button type="button" :disabled="busy" @click="doCheckIn">check-in</button>
         <button type="button" :disabled="busy" @click="doCheckOut">check-out</button>
+        <button type="button" :disabled="busy" @click="doInterrupt">interrupt</button>
       </div>
       <p v-if="!workOrderId" class="meta">缺少 workOrderId 时无法加载 Visit 列表，仍可对预约执行签到。</p>
     </article>

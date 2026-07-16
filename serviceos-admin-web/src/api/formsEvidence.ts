@@ -72,6 +72,16 @@ export type EvidenceRevision = {
   revisionNumber: number
   status: string
   contentDigest: string
+  fileObjectId?: string
+}
+
+export type DownloadAuthorization = {
+  authorizationId: string
+  fileId: string
+  method: 'GET'
+  downloadUrl: string
+  requiredHeaders: Record<string, string>
+  expiresAt: string
 }
 
 export type EvidenceItem = {
@@ -198,4 +208,20 @@ export function resolveEvidenceConditionChange(
       body,
     },
   )
+}
+
+export function authorizeFileDownload(fileId: string, purpose: string) {
+  return apiPost<DownloadAuthorization>(`/files/${fileId}/download-authorizations`, {
+    body: { purpose },
+  })
+}
+
+export function invalidateEvidenceRevision(
+  revisionId: string,
+  body: { reasonCode: string; approvalRef?: string | null },
+) {
+  return apiPost<EvidenceRevision>(`/evidence-revisions/${revisionId}:invalidate`, {
+    idempotencyKey: newIdempotencyKey('evidence-invalidate'),
+    body,
+  })
 }

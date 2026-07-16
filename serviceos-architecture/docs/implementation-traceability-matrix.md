@@ -219,3 +219,6 @@ Feature gate/authority: if applicable
 | M122 | Admin 任务联系历史列表与追加联系事实 | PRODUCT-01/02 + ARCH-10/19 + ContactAttempt APIs + Admin Web build | 通话录音回放、OIDC、E2E |
 | M123 | Admin 预约提议/确认/取消命令面板 | PRODUCT-01/02 + ARCH-10/19 + Appointment APIs + Admin Web build | 改约/爽约完整 UX、OIDC、E2E |
 | M124 | Admin 预约签到与 Visit 签退模拟 | PRODUCT-01/02 + ARCH-10/19 + Visit APIs + Admin Web build | 真实设备 GPS、OIDC、E2E |
+| M125 | Admin 预约改约与爽约命令 | PRODUCT-01/02 + ARCH-10/19 + Appointment reschedule/no-show APIs + Admin Web build | 日历 UX、OIDC、E2E |
+| M126 | Admin Visit interrupt 命令 | PRODUCT-01/02 + ARCH-10/19 + Visit interrupt API + Admin Web build | 异常联动、OIDC、E2E |
+| M127 | Admin 资料短期下载授权与 Revision 作废 | PRODUCT-01/02 + ARCH-10/11/19 + File/Evidence invalidate APIs + Admin Web build | 在线预览器、OIDC、E2E |

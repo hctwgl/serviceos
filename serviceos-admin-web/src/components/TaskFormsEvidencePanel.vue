@@ -2,9 +2,11 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
+  authorizeFileDownload,
   beginEvidenceUpload,
   createEvidenceSetSnapshot,
   finalizeEvidenceUpload,
+  invalidateEvidenceRevision,
   listTaskEvidenceItems,
   listTaskEvidenceSlots,
   listTaskForms,
@@ -12,6 +14,7 @@ import {
   resolveEvidenceConditionChange,
   sha256Hex,
   submitTaskForm,
+  type DownloadAuthorization,
   type EvidenceItem,
   type EvidenceSetSnapshot,
   type EvidenceSlot,
@@ -45,6 +48,11 @@ const dispositionResolutionId = ref('')
 const dispositionDecision = ref<'KEEP' | 'INVALIDATE'>('KEEP')
 const dispositionReason = ref('CONDITION_REVIEW')
 const dispositionReviewRef = ref('admin-manual-review')
+const downloadRevisionId = ref('')
+const downloadPurpose = ref('ADMIN_REVIEW')
+const lastDownload = ref<DownloadAuthorization | null>(null)
+const invalidateRevisionId = ref('')
+const invalidateReason = ref('QUALITY_ISSUE')
 
 async function load() {
   loading.value = true
@@ -139,10 +147,55 @@ async function uploadEvidence() {
       revisionIds.value = current
         ? `${current},${latest.evidenceRevisionId}`
         : latest.evidenceRevisionId
+      downloadRevisionId.value = latest.evidenceRevisionId
+      invalidateRevisionId.value = latest.evidenceRevisionId
     }
     await load()
   } catch (err) {
     error.value = err instanceof Error ? err.message : '资料上传失败'
+  } finally {
+    busy.value = false
+  }
+}
+
+async function downloadLatest() {
+  busy.value = true
+  message.value = null
+  error.value = null
+  try {
+    const revisionId = downloadRevisionId.value.trim()
+    if (!revisionId) throw new Error('需要 revisionId')
+    let fileId: string | undefined
+    for (const item of items.value) {
+      const rev = item.revisions.find((r) => r.evidenceRevisionId === revisionId)
+      if (rev?.fileObjectId) {
+        fileId = rev.fileObjectId
+        break
+      }
+    }
+    if (!fileId) throw new Error('未找到 revision 的 fileObjectId；请先刷新资料项')
+    lastDownload.value = (await authorizeFileDownload(fileId, downloadPurpose.value.trim())).data
+    message.value = `已签发下载授权 ${lastDownload.value.authorizationId}，expires ${lastDownload.value.expiresAt}`
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '申请下载授权失败'
+  } finally {
+    busy.value = false
+  }
+}
+
+async function invalidateRevision() {
+  busy.value = true
+  message.value = null
+  error.value = null
+  try {
+    if (!invalidateRevisionId.value.trim()) throw new Error('需要 revisionId')
+    const result = await invalidateEvidenceRevision(invalidateRevisionId.value.trim(), {
+      reasonCode: invalidateReason.value.trim(),
+    })
+    message.value = `已作废资料版本 ${result.data.evidenceRevisionId} / ${result.data.status}`
+    await load()
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '作废资料版本失败'
   } finally {
     busy.value = false
   }
@@ -248,6 +301,7 @@ const itemRows = computed(() =>
       latestRevisionId: latest?.evidenceRevisionId,
       latestRevisionStatus: latest?.status,
       latestDigest: latest?.contentDigest,
+      fileObjectId: latest?.fileObjectId,
     }
   }),
 )
@@ -354,7 +408,7 @@ onMounted(() => {
 
     <QueueTable
       title="资料项 / 最新 Revision"
-      :columns="['evidenceItemId', 'evidenceSlotId', 'status', 'latestRevisionId', 'latestRevisionStatus', 'latestDigest']"
+      :columns="['evidenceItemId', 'evidenceSlotId', 'status', 'latestRevisionId', 'latestRevisionStatus', 'latestDigest', 'fileObjectId']"
       :rows="itemRows"
       :loading="false"
       :error="null"
@@ -362,6 +416,20 @@ onMounted(() => {
       @refresh="load"
       @next="() => undefined"
     />
+
+    <article class="card">
+      <h4>资料下载授权 / 作废 Revision</h4>
+      <label>revisionId（下载）<input v-model="downloadRevisionId" /></label>
+      <label>purpose<input v-model="downloadPurpose" /></label>
+      <button type="button" :disabled="busy" @click="downloadLatest">authorizeFileDownload</button>
+      <p v-if="lastDownload" class="meta">
+        auth={{ lastDownload.authorizationId }} / url={{ lastDownload.downloadUrl }} /
+        expires={{ lastDownload.expiresAt }}
+      </p>
+      <label>revisionId（作废）<input v-model="invalidateRevisionId" /></label>
+      <label>reasonCode<input v-model="invalidateReason" /></label>
+      <button type="button" :disabled="busy" @click="invalidateRevision">invalidateEvidenceRevision</button>
+    </article>
 
     <article class="card">
       <h4>创建资料快照 / 审核案例</h4>

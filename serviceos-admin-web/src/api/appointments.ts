@@ -126,6 +126,35 @@ export function cancelAppointment(
   })
 }
 
+export function rescheduleAppointment(
+  appointmentId: string,
+  aggregateVersion: number,
+  body: { newWindow: AppointmentWindow; reasonCode: string; note?: string | null },
+) {
+  return apiPost<AppointmentCommandReceipt>(`/appointments/${appointmentId}:reschedule`, {
+    idempotencyKey: newIdempotencyKey('appt-reschedule'),
+    ifMatch: quotedVersion(aggregateVersion),
+    body,
+  })
+}
+
+export function markAppointmentNoShow(
+  appointmentId: string,
+  aggregateVersion: number,
+  body: {
+    noShowPartyType: string
+    noShowPartyRef: string
+    reasonCode: string
+    evidenceRefs: string[]
+  },
+) {
+  return apiPost<AppointmentCommandReceipt>(`/appointments/${appointmentId}:mark-no-show`, {
+    idempotencyKey: newIdempotencyKey('appt-noshow'),
+    ifMatch: quotedVersion(aggregateVersion),
+    body,
+  })
+}
+
 export function recordTaskContactAttempt(
   taskId: string,
   body: {
@@ -176,6 +205,23 @@ export function checkOutVisit(
 ) {
   return apiPost<VisitCommandReceipt>(`/visits/${visitId}:check-out`, {
     idempotencyKey: newIdempotencyKey('visit-checkout'),
+    ifMatch: quotedVersion(aggregateVersion),
+    body,
+  })
+}
+
+export function interruptVisit(
+  visitId: string,
+  aggregateVersion: number,
+  body: {
+    capturedAt: string
+    exceptionCode: string
+    note?: string | null
+    evidenceRefs: string[]
+  },
+) {
+  return apiPost<VisitCommandReceipt>(`/visits/${visitId}:interrupt`, {
+    idempotencyKey: newIdempotencyKey('visit-interrupt'),
     ifMatch: quotedVersion(aggregateVersion),
     body,
   })
