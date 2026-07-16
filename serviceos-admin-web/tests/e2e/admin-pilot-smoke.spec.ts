@@ -1115,7 +1115,9 @@ test('真实 OIDC 登录后可通过审核并创建 BYD 提审外发直至 ACKNO
     .poll(
       async () => {
         await outboundRefresh.click()
-        return reviewPage.getByText('ACKNOWLEDGED', { exact: true }).count()
+        // 刷新期间模板切到“加载中…”，必须等详情卡恢复后再读取 status。
+        await expect(reviewPage.getByText('加载中…')).toHaveCount(0)
+        return reviewPage.locator('dd', { hasText: /^ACKNOWLEDGED$/ }).count()
       },
       { timeout: 60_000 },
     )
