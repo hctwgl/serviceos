@@ -228,4 +228,4 @@ Feature gate/authority: if applicable
 | M131 | Admin 运营异常详情与确认 | PRODUCT-01/02 + ARCH-10/19 + getOperationalException API + Admin Web build | 异常自动解决、OIDC、E2E |
 | M132 | Admin 工单 SLA 实例列表与深链 | PRODUCT-01/02 + ARCH-10/19 + listWorkOrderSlaInstances API + Admin Web build | SLA 策略编辑、OIDC、E2E |
 | M133 | Admin 表单/资料详情读取与 StoredFile 作废 | PRODUCT-01/02 + ARCH-10/11/19 + Detail/Invalidate APIs + Admin Web build | 在线预览器、OIDC、E2E |
-| M134 | Admin 工单权威详情/Stage/Task/核心时间线；Admin 试点可运行基线增加 CI build、开发态 Keycloak PKCE 与真实 Backend/PostgreSQL/Chrome E2E，并覆盖 Task claim/release 局部写链路 | PRODUCT-01/02 + ARCH-10/19 + WorkOrder authority APIs + Human Task Commands + Admin Web build + `admin-pilot-readiness-acceptance.md` | 结算时间线、正式企业 OIDC/BFF、接单至完结的完整履约写链路 E2E |
+| M134 | Admin 工单权威详情/Stage/Task/核心时间线；Admin 试点可运行基线增加 CI build、开发态 Keycloak PKCE 与真实 Backend/PostgreSQL/Chrome E2E，并以 PR 阻断门禁覆盖 Task claim/release 局部写链路 | PRODUCT-01/02 + ARCH-10/19 + WorkOrder authority APIs + Human Task Commands + Admin Web build/E2E + `admin-pilot-readiness-acceptance.md` | 结算时间线、正式企业 OIDC/BFF、接单至完结的完整履约写链路 E2E |

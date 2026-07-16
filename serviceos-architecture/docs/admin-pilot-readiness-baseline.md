@@ -14,7 +14,7 @@ lastUpdated: 2026-07-16
 | 项目 | 工程证据 |
 |---|---|
 | 主门禁 | `bash scripts/verify-local.sh clean verify` 通过；CI 敏感输出扫描不再把 OpenAPI 类型名误判为 VIN |
-| Admin CI | GitHub Actions 使用 Node 22 执行 `npm ci --no-audit --no-fund` 与 `npm run build`；staging 等待 Java 与 Admin 两个门禁 |
+| Admin CI | GitHub Actions 使用 Node 22 执行不可变安装与生产构建；独立 `admin-pilot-e2e` job 安装 Chrome 并运行真实写链路，staging 等待 Java、Admin build 与 Admin E2E 三个门禁 |
 | 本地身份 | Vite 开发模式显式开启 Keycloak Authorization Code + PKCE；无 client secret、无硬编码 token、无生产手工 JWT 入口 |
 | 后端授权 | JWT 只提供身份声明；ServiceOS 继续从数据库 RoleGrant 实时校验 tenant/project/capability，401 清理本机会话并失败关闭 |
 | 真实 E2E | 固定幂等夹具 + Playwright/Google Chrome 验证登录、工单目录、工作区、详情、Stage、Task、SLA、时间线，以及 Task claim/release |
@@ -48,6 +48,8 @@ serviceos-deploy/admin-pilot/verify-admin-smoke.sh
 E2E 脚本不执行 `down -v`，不会删除开发者的 PostgreSQL 数据卷。夹具使用固定 UUID 和
 `ON CONFLICT DO NOTHING`，可重复执行；并在浏览器步骤后检查 Task 回到 READY、ACTIVE 候选唯一、
 ACTIVE RESPONSIBLE 清零和成功审计记录存在。夹具只允许本地开发数据库使用。
+GitHub Actions 使用同一脚本阻断 PR，并保留 Backend、Admin 与 Playwright 诊断产物；该 job
+通过后才启动容器化 staging 发布、回滚和恢复演练。
 
 ## 4. 已证明与未证明边界
 
