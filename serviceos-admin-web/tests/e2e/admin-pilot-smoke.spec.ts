@@ -1107,10 +1107,14 @@ test('真实 OIDC 登录后可通过审核并创建 BYD 提审外发直至 ACKNO
     new URL(`/integration/outbound/${delivery.deliveryId}`, page.url()).toString(),
   )
   await expect(reviewPage.getByRole('heading', { name: '外发交付' })).toBeVisible()
+  const outboundRefresh = reviewPage
+    .locator('header')
+    .filter({ hasText: '外发交付' })
+    .getByRole('button', { name: '刷新' })
   await expect
     .poll(
       async () => {
-        await reviewPage.getByRole('button', { name: '刷新' }).click()
+        await outboundRefresh.click()
         return reviewPage.getByText('ACKNOWLEDGED', { exact: true }).count()
       },
       { timeout: 60_000 },
