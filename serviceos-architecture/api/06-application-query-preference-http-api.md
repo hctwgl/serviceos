@@ -6,14 +6,17 @@ status: Accepted
 
 # 应用工作区、队列与用户偏好 HTTP API
 
-## 0. 接受范围（M85）
+## 0. 接受范围（M85 / M87）
 
-**Accepted（可指导实现）**：§2 通用查询元数据；§5 中
-`GET /api/v1/work-orders/{id}/workspace` 顶层组合快照（不含 sections 按需加载与
-activity-summary）。
+**Accepted（可指导实现）**：
 
-**仍为设计草案**：§3 导航、§4 工作台与队列、§5 其余端点、§6～§11 专项队列/搜索/偏好/导出等。
-不得在未再接受前实现。
+- §2 通用查询元数据；
+- §5 中 `GET /api/v1/work-orders/{id}/workspace` 顶层组合快照（M85）；
+- §5 中 `GET /api/v1/work-orders/{id}/workspace/sections/{section}` 仅
+  `TASKS` 与 `TIMELINE_AUDIT`（M87）。
+
+**仍为设计草案**：§3 导航、§4 工作台与队列、§5 其余 section / activity-summary、
+§6～§11 专项队列/搜索/偏好/导出等。不得在未再接受前实现。
 
 ## 1. 目标
 

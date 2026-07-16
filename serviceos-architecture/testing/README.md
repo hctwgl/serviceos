@@ -87,3 +87,4 @@
 - [M84 工单时间线投影 Checkpoint 与重建验收矩阵](81-m84-work-order-timeline-projection-checkpoint-rebuild-acceptance.md)
 - [M85 工单工作区只读组合快照验收矩阵](82-m85-work-order-workspace-query-acceptance.md)
 - [M86 工单时间线投影运行时硬化验收矩阵](83-m86-work-order-timeline-projection-runtime-hardening-acceptance.md)
+- [M87 工单工作区按需区块加载验收矩阵](84-m87-work-order-workspace-sections-acceptance.md)

@@ -12,10 +12,14 @@ import com.serviceos.readmodel.api.WorkOrderWorkspace.WorkOrderWorkspaceSlaSumma
 import com.serviceos.readmodel.api.WorkOrderWorkspace.WorkOrderWorkspaceSourceVersions;
 import com.serviceos.readmodel.api.WorkOrderWorkspace.WorkOrderWorkspaceTaskSummary;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceQueryService;
+import com.serviceos.readmodel.api.WorkOrderWorkspaceSection;
+import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceTasksSectionData;
+import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceTimelineSectionData;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.sla.api.SlaInstanceItem;
 import com.serviceos.sla.api.SlaQueryService;
+import com.serviceos.task.api.WorkOrderTaskPage;
 import com.serviceos.task.api.WorkOrderTaskQueryService;
 import com.serviceos.task.api.WorkOrderTaskSummary;
 import com.serviceos.workorder.api.WorkOrderDetail;
@@ -25,12 +29,13 @@ import org.springframework.stereotype.Service;
 import java.time.Clock;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 /**
- * 实时组合工单工作区顶层快照。
+ * 实时组合工单工作区顶层快照与按需区块。
  * <p>不落工作区投影表；SLA/异常缺权时标记 UNAVAILABLE，不把整个工作区打成 403。</p>
  * <p>故意不加外层事务：次级只读端口缺权会抛 {@code BusinessProblem}，若加入同一事务会
  * 把事务标成 rollback-only，即使外层捕获也会在提交时失败。</p>
@@ -40,6 +45,7 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
     private static final Set<String> ACTIVE_TASK_STATUSES = Set.of(
             "READY", "PENDING", "CLAIMED", "RUNNING", "RETRY_WAIT", "MANUAL_INTERVENTION");
     private static final Set<String> OPEN_SLA_STATUSES = Set.of("RUNNING", "BREACHED");
+    private static final Set<String> ACCEPTED_SECTIONS = Set.of("TASKS", "TIMELINE_AUDIT");
 
     private final WorkOrderQueryService workOrders;
     private final WorkOrderTaskQueryService workOrderTasks;
@@ -101,22 +107,89 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
         WorkOrderWorkspaceExceptionSummary exceptionSummary = loadExceptionSummary(
                 principal, correlationId, workOrderId, availability);
 
-        int generation = projectionRuntime.requireState().activeGeneration();
-        String checkpoint = WorkOrderTimelineProjectionRuntime.PROJECTION_CODE + ":gen:" + generation;
-
         return new WorkOrderWorkspace(
                 detail.workOrder(),
-                current == null ? null : new WorkOrderWorkspaceTaskSummary(
-                        current.id(), current.taskType(), current.taskKind(), current.status(),
-                        current.stageCode(), current.claimedBy(), current.version()),
+                current == null ? null : toTaskSummary(current),
                 availability,
                 current == null ? null : "/api/v1/tasks/" + current.id() + "/allowed-actions",
                 slaSummary,
                 exceptionSummary,
                 timelineFreshness,
                 new WorkOrderWorkspaceSourceVersions(detail.workOrder().version()),
-                new WorkOrderWorkspaceMeta(
-                        clock.instant(), checkpoint, timelineFreshness, UUID.randomUUID().toString()));
+                meta(timelineFreshness));
+    }
+
+    @Override
+    public WorkOrderWorkspaceSection getSection(
+            CurrentPrincipal principal,
+            String correlationId,
+            UUID workOrderId,
+            String section,
+            String cursor,
+            int limit
+    ) {
+        String normalized = normalizeSection(section);
+        if (limit < 1 || limit > 100) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, "limit must be between 1 and 100");
+        }
+        // 先鉴权工单，再装载区块，避免未授权主体探测 section 实现边界。
+        WorkOrderDetail detail = workOrders.get(principal, correlationId, workOrderId);
+        WorkOrderWorkspaceSourceVersions versions =
+                new WorkOrderWorkspaceSourceVersions(detail.workOrder().version());
+        return switch (normalized) {
+            case "TASKS" -> {
+                WorkOrderTaskPage page = workOrderTasks.list(
+                        principal, correlationId, workOrderId, cursor, limit);
+                yield new WorkOrderWorkspaceSection(
+                        normalized,
+                        versions,
+                        meta("FRESH"),
+                        new WorkOrderWorkspaceTasksSectionData(
+                                page.items().stream().map(this::toTaskSummary).toList(),
+                                page.nextCursor()),
+                        null);
+            }
+            case "TIMELINE_AUDIT" -> {
+                var page = timelines.list(principal, correlationId, workOrderId, cursor, limit);
+                yield new WorkOrderWorkspaceSection(
+                        normalized,
+                        versions,
+                        meta(page.freshnessStatus()),
+                        null,
+                        new WorkOrderWorkspaceTimelineSectionData(
+                                page.items(),
+                                page.nextCursor(),
+                                page.lastProjectedAt(),
+                                page.freshnessStatus()));
+            }
+            default -> throw new BusinessProblem(
+                    ProblemCode.VALIDATION_FAILED, "workspace section is not accepted: " + normalized);
+        };
+    }
+
+    private WorkOrderWorkspaceMeta meta(String freshnessStatus) {
+        int generation = projectionRuntime.requireState().activeGeneration();
+        String checkpoint = WorkOrderTimelineProjectionRuntime.PROJECTION_CODE + ":gen:" + generation;
+        return new WorkOrderWorkspaceMeta(
+                clock.instant(), checkpoint, freshnessStatus, UUID.randomUUID().toString());
+    }
+
+    private WorkOrderWorkspaceTaskSummary toTaskSummary(WorkOrderTaskSummary task) {
+        return new WorkOrderWorkspaceTaskSummary(
+                task.id(), task.taskType(), task.taskKind(), task.status(),
+                task.stageCode(), task.claimedBy(), task.version());
+    }
+
+    private static String normalizeSection(String section) {
+        if (section == null || section.isBlank()) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, "section is required");
+        }
+        String normalized = section.trim().toUpperCase(Locale.ROOT);
+        if (!ACCEPTED_SECTIONS.contains(normalized)) {
+            throw new BusinessProblem(
+                    ProblemCode.VALIDATION_FAILED, "workspace section is not accepted: " + normalized);
+        }
+        return normalized;
     }
 
     private WorkOrderWorkspaceSlaSummary loadSlaSummary(

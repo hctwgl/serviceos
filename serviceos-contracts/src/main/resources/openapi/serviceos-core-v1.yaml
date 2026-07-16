@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.56.0
+  version: 0.57.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -110,7 +110,7 @@ paths:
       summary: 查询工单工作区顶层组合快照
       description: >-
         复用 workOrder.read 实时鉴权，组合 Task/时间线 freshness 与可选 SLA/异常摘要。
-        不含客户 PII；大区块按需加载与队列不在本切片。
+        不含客户 PII；大区块按需加载见 workspace/sections（M87：TASKS/TIMELINE_AUDIT）。
       parameters:
         - { name: workOrderId, in: path, required: true, schema: { type: string, format: uuid } }
         - $ref: '#/components/parameters/CorrelationId'
@@ -121,6 +121,33 @@ paths:
             ETag: { required: true, schema: { type: string } }
             X-Correlation-Id: { required: true, schema: { type: string } }
           content: { application/json: { schema: { $ref: '#/components/schemas/WorkOrderWorkspace' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /work-orders/{workOrderId}/workspace/sections/{section}:
+    get:
+      operationId: getWorkOrderWorkspaceSection
+      summary: 按需加载工单工作区区块
+      description: >-
+        M87 仅接受 TASKS 与 TIMELINE_AUDIT；其余 section 失败关闭为 400。
+        复用 workOrder.read；实时组合，不落区块投影表；不含客户 PII。
+      parameters:
+        - { name: workOrderId, in: path, required: true, schema: { type: string, format: uuid } }
+        - name: section
+          in: path
+          required: true
+          schema: { enum: [TASKS, TIMELINE_AUDIT] }
+        - { name: cursor, in: query, schema: { type: string, minLength: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 工作区区块快照
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/WorkOrderWorkspaceSection' } } }
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
@@ -2146,6 +2173,44 @@ components:
         timelineFreshnessStatus: { enum: [FRESH, LAGGING, UNKNOWN, REBUILDING] }
         sourceVersions: { $ref: '#/components/schemas/WorkOrderWorkspaceSourceVersions' }
         meta: { $ref: '#/components/schemas/WorkOrderWorkspaceMeta' }
+    WorkOrderWorkspaceTasksSectionData:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceTaskSummary' }
+        nextCursor: { type: [string, 'null'] }
+    WorkOrderWorkspaceTimelineSectionData:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor, lastProjectedAt, freshnessStatus]
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderTimelineItem' }
+        nextCursor: { type: [string, 'null'] }
+        lastProjectedAt: { type: [string, 'null'], format: date-time }
+        freshnessStatus: { enum: [FRESH, LAGGING, UNKNOWN, REBUILDING] }
+    WorkOrderWorkspaceSection:
+      type: object
+      additionalProperties: false
+      required: [section, sourceVersions, meta, tasks, timeline]
+      properties:
+        section: { enum: [TASKS, TIMELINE_AUDIT] }
+        sourceVersions: { $ref: '#/components/schemas/WorkOrderWorkspaceSourceVersions' }
+        meta: { $ref: '#/components/schemas/WorkOrderWorkspaceMeta' }
+        tasks:
+          oneOf:
+            - { $ref: '#/components/schemas/WorkOrderWorkspaceTasksSectionData' }
+            - { type: 'null' }
+        timeline:
+          oneOf:
+            - { $ref: '#/components/schemas/WorkOrderWorkspaceTimelineSectionData' }
+            - { type: 'null' }
     WorkflowInstance:
       type: object
       additionalProperties: false

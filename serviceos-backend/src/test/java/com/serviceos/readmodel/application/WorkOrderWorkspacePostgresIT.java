@@ -138,6 +138,30 @@ class WorkOrderWorkspacePostgresIT {
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.RESOURCE_NOT_FOUND));
     }
 
+    @Test
+    void loadsAcceptedSectionsAndRejectsUnacceptedSection() {
+        var tasks = workspaces.getSection(
+                principal("reader"), "corr-tasks", workOrderId, "TASKS", null, 50);
+        assertThat(tasks.section()).isEqualTo("TASKS");
+        assertThat(tasks.tasks()).isNotNull();
+        assertThat(tasks.timeline()).isNull();
+        assertThat(tasks.tasks().items()).extracting(item -> item.taskId()).containsExactly(taskId);
+        assertThat(tasks.sourceVersions().workOrderVersion()).isEqualTo(1);
+        assertThat(tasks.toString()).doesNotContain("customerName", "customerMobile");
+
+        var timeline = workspaces.getSection(
+                principal("reader"), "corr-timeline", workOrderId, "TIMELINE_AUDIT", null, 20);
+        assertThat(timeline.section()).isEqualTo("TIMELINE_AUDIT");
+        assertThat(timeline.timeline()).isNotNull();
+        assertThat(timeline.tasks()).isNull();
+        assertThat(timeline.timeline().freshnessStatus()).isEqualTo("UNKNOWN");
+
+        assertThatThrownBy(() -> workspaces.getSection(
+                principal("reader"), "corr-bad", workOrderId, "FORMS_EVIDENCE", null, 20))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
+    }
+
     private UUID project() {
         UUID id = UUID.randomUUID();
         jdbc.sql("""
