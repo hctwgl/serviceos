@@ -462,7 +462,6 @@ final class DefaultReviewCaseService implements ReviewCaseService {
         }
 
         UUID newCaseId = UUID.randomUUID();
-        String note = approvalRef == null ? reason : reason + " | approvalRef=" + approvalRef;
         ReviewCaseView created = new ReviewCaseView(
                 newCaseId, current.projectId(), current.taskId(),
                 current.evidenceSetSnapshotId(), current.snapshotContentDigest(),
@@ -490,7 +489,7 @@ final class DefaultReviewCaseService implements ReviewCaseService {
         audit.append(new AuditEntry(
                 UUID.randomUUID(), principal.tenantId(), principal.principalId(),
                 "REVIEW_CASE_REOPENED", REOPEN, "ReviewCase", newCaseId.toString(),
-                "ALLOW", auth.matchedGrantIds(), auth.policyVersion(), note, null,
+                "ALLOW", auth.matchedGrantIds(), auth.policyVersion(), "REOPENED", null,
                 requestDigest, metadata.correlationId(), now));
         idempotency.complete(context, REOPEN_OPERATION, newCaseId.toString(),
                 Sha256.digest(serialize(created)));

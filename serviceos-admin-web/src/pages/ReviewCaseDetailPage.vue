@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import {
   decideReviewCase,
   forceApproveReviewCase,
@@ -12,6 +12,7 @@ import { createBydReviewSubmission } from '../api/integrationCommands'
 import QueueTable from './QueueTable.vue'
 
 const route = useRoute()
+const router = useRouter()
 const reviewCaseId = computed(() => String(route.params.id ?? ''))
 const loading = ref(false)
 const busy = ref(false)
@@ -102,14 +103,21 @@ async function reopen() {
     if (!reopenReason.value.trim() || !triggerRef.value.trim()) {
       throw new Error('重开需要 reason 与 triggerRef')
     }
-    detail.value = (
+    const reopened = (
       await reopenReviewCase(reviewCaseId.value, {
         reason: reopenReason.value.trim(),
         triggerRef: triggerRef.value.trim(),
         approvalRef: approvalRef.value.trim() || null,
       })
     ).data
-    message.value = `重开结果：${detail.value.status} / ${detail.value.reviewCaseId}`
+    // reopen 返回同 Snapshot 的新 OPEN Case。路由必须切换到新 Case，否则刷新会回到
+    // 已标记 REOPENED 的旧案例，形成“页面内容与 URL 身份不一致”的操作风险。
+    await router.replace({
+      name: 'ADMIN.REVIEW.DETAIL',
+      params: { id: reopened.reviewCaseId },
+    })
+    await load()
+    message.value = `重开结果：${reopened.status} / ${reopened.reviewCaseId}`
   } catch (err) {
     error.value = err instanceof Error ? err.message : '重开失败'
   } finally {
@@ -169,6 +177,8 @@ onMounted(() => {
           <div><dt>taskId</dt><dd>{{ detail.taskId }}</dd></div>
           <div><dt>projectId</dt><dd>{{ detail.projectId }}</dd></div>
           <div><dt>snapshot</dt><dd>{{ detail.evidenceSetSnapshotId }}</dd></div>
+          <div><dt>reopenedFromReviewCaseId</dt><dd>{{ detail.reopenedFromReviewCaseId ?? '-' }}</dd></div>
+          <div><dt>reopenTriggerRef</dt><dd>{{ detail.reopenTriggerRef ?? '-' }}</dd></div>
         </dl>
         <p class="links">
           <RouterLink :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.taskId } }">任务详情</RouterLink>
