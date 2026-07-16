@@ -62,7 +62,7 @@ grep -q '^  pull_request:$' "${workflow}"
 grep -A3 '^  pull_request:$' "${workflow}" | grep -q 'master'
 grep -q '^concurrency:$' "${workflow}"
 grep -A3 '^concurrency:$' "${workflow}" | grep -q 'cancel-in-progress: true'
-grep -A3 '^concurrency:$' "${workflow}" | grep -q 'github.head_ref || github.ref_name'
+grep -A3 '^concurrency:$' "${workflow}" | grep -q 'github.event.pull_request.number || github.ref'
 grep -A14 '^  container-staging:$' "${workflow}" | grep -q "github.event_name == 'workflow_dispatch'"
 grep -A14 '^  container-staging:$' "${workflow}" | grep -q "github.event_name == 'push'"
 if grep -A14 '^  container-staging:$' "${workflow}" | grep -q "github.event_name == 'pull_request'"; then
