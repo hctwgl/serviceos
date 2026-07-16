@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.49.0
+  version: 0.50.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -2018,6 +2018,7 @@ components:
             integration.outbound-delivery-acknowledged,
             integration.outbound-delivery-recovered,
             integration.outbound-delivery-replay-requested,
+            operational.exception.acknowledged,
             operational.exception.resolved]
         schemaVersion: { type: integer, minimum: 1, maximum: 2 }
         occurredAt: { type: string, format: date-time }

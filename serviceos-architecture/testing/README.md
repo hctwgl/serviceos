@@ -79,3 +79,4 @@
 - [M76 工单资料审核时间线事件合并验收矩阵](73-m76-work-order-evidence-review-timeline-acceptance.md)
 - [M77 工单外发交付与异常闭环时间线事件合并验收矩阵](74-m77-work-order-delivery-exception-timeline-acceptance.md)
 - [M78 工单外发交付确认与恢复时间线事件合并验收矩阵](75-m78-work-order-delivery-ack-timeline-acceptance.md)
+- [M79 工单运营异常确认时间线事件合并验收矩阵](76-m79-work-order-exception-ack-timeline-acceptance.md)

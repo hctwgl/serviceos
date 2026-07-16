@@ -55,7 +55,7 @@ status: Proposed
 
 M73 以 `rdm_work_order_timeline_entry` 实现 WorkOrder/Workflow/Stage/Task 核心事件子集；M74 在同一投影
 合并 Appointment/Visit/ContactAttempt；M75 合并 SLA；M76 合并 form/snapshot/review/correction，显式保留 occurred/received
-双时间且不保存自由文本、payload 或 PII。M77/M78 另合并外发交付全链路与 exception.resolved@v2。试算/结算、checkpoint 和重建作业
+双时间且不保存自由文本、payload 或 PII。M77～M79 另合并外发交付全链路与 exception.acknowledged/resolved。试算/结算、checkpoint 和重建作业
 仍是未实现边界。
 
 ## 4. 队列投影

@@ -2,6 +2,8 @@ package com.serviceos.readmodel.application;
 
 import com.serviceos.integration.api.DeliveryTimelineContext;
 import com.serviceos.integration.api.DeliveryTimelineContextQuery;
+import com.serviceos.operations.api.ExceptionTimelineContext;
+import com.serviceos.operations.api.ExceptionTimelineContextQuery;
 import com.serviceos.reliability.api.InboxDecision;
 import com.serviceos.reliability.api.InboxService;
 import com.serviceos.reliability.spi.OutboxMessage;
@@ -65,6 +67,7 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             "integration.outbound-delivery-acknowledged",
             "integration.outbound-delivery-recovered",
             "integration.outbound-delivery-replay-requested",
+            "operational.exception.acknowledged",
             "operational.exception.resolved");
 
     private final InboxService inbox;
@@ -72,6 +75,7 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
     private final WorkOrderScopeQuery workOrderScopes;
     private final TaskTimelineContextQuery taskContexts;
     private final DeliveryTimelineContextQuery deliveryContexts;
+    private final ExceptionTimelineContextQuery exceptionContexts;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
@@ -81,6 +85,7 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             WorkOrderScopeQuery workOrderScopes,
             TaskTimelineContextQuery taskContexts,
             DeliveryTimelineContextQuery deliveryContexts,
+            ExceptionTimelineContextQuery exceptionContexts,
             ObjectMapper objectMapper,
             Clock clock
     ) {
@@ -89,6 +94,7 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
         this.workOrderScopes = workOrderScopes;
         this.taskContexts = taskContexts;
         this.deliveryContexts = deliveryContexts;
+        this.exceptionContexts = exceptionContexts;
         this.objectMapper = objectMapper;
         this.clock = clock;
     }
@@ -197,6 +203,7 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             case "integration.outbound-delivery-acknowledged" -> deliveryAcknowledged(message);
             case "integration.outbound-delivery-recovered" -> deliveryRecovered(message);
             case "integration.outbound-delivery-replay-requested" -> deliveryReplayRequested(message);
+            case "operational.exception.acknowledged" -> exceptionAcknowledged(message);
             case "operational.exception.resolved" -> exceptionResolved(message);
             default -> throw new IllegalArgumentException("unsupported work order timeline event");
         };
@@ -500,6 +507,21 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
         return Optional.of(fact(
                 context.workOrderId(), context.projectId(), "DELIVERY", "OutboundDelivery", deliveryId,
                 null, outcomeCode, actorId, occurredAt));
+    }
+
+    private Optional<TimelineFact> exceptionAcknowledged(OutboxMessage message) {
+        ExceptionAcknowledgedPayload payload = read(message, ExceptionAcknowledgedPayload.class);
+        requireEnvelope(message, "operations", "OperationalException", payload.exceptionId());
+        ExceptionTimelineContext context = exceptionContexts.find(message.tenantId(), payload.exceptionId())
+                .orElseThrow(() -> new IllegalStateException("时间线事件引用的 OperationalException 不存在"));
+        if (context.workOrderId() == null) {
+            return Optional.empty();
+        }
+        return Optional.of(fact(
+                context.workOrderId(), context.projectId(), "EXCEPTION", "OperationalException",
+                payload.exceptionId(), null, "ACKNOWLEDGED",
+                requireCode(payload.acknowledgedBy(), "exception acknowledgedBy"),
+                payload.acknowledgedAt()));
     }
 
     private Optional<TimelineFact> exceptionResolved(OutboxMessage message) {
@@ -857,6 +879,14 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler {
             UUID projectId,
             String requestedBy,
             Instant requestedAt
+    ) {
+    }
+
+    private record ExceptionAcknowledgedPayload(
+            UUID exceptionId,
+            String status,
+            Instant acknowledgedAt,
+            String acknowledgedBy
     ) {
     }
 

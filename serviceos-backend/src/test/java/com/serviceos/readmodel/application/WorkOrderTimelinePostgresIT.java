@@ -101,6 +101,7 @@ class WorkOrderTimelinePostgresIT {
         jdbc.sql("""
                 TRUNCATE TABLE rdm_work_order_timeline_entry, rel_inbox_record,
                     aud_audit_record, tsk_task_execution_attempt, tsk_task,
+                    ops_task_failure_recovery, ops_exception_ack_result, ops_operational_exception,
                     rel_outbox_publish_attempt, rel_outbox_event,
                     int_delivery_attempt, int_external_acknowledgement, int_delivery_replay_request,
                     int_outbound_delivery,
@@ -516,6 +517,64 @@ class WorkOrderTimelinePostgresIT {
     }
 
     @Test
+    void projectsExceptionAcknowledgedViaPublicContextPort() {
+        Instant t0 = Instant.parse("2026-07-16T09:00:00Z");
+        UUID exceptionId = seedOperationalExceptionLinkedToTask(taskId);
+        UUID unlinkedException = seedOperationalExceptionUnlinked();
+
+        OutboxMessage ack = message(
+                "operations", "operational.exception.acknowledged", 1,
+                "OperationalException", exceptionId, 2,
+                Map.of(
+                        "exceptionId", exceptionId,
+                        "status", "ACKNOWLEDGED",
+                        "aggregateVersion", 2,
+                        "acknowledgedAt", t0,
+                        "acknowledgedBy", "ops-ack-1"),
+                t0);
+        handler.handle(ack);
+        handler.handle(ack);
+
+        var page = timelines.list(principal("reader", TENANT), "corr-exception-ack", workOrderId, null, 10);
+        assertThat(page.items()).singleElement().satisfies(item -> {
+            assertThat(item.eventType()).isEqualTo("operational.exception.acknowledged");
+            assertThat(item.category()).isEqualTo("EXCEPTION");
+            assertThat(item.outcomeCode()).isEqualTo("ACKNOWLEDGED");
+            assertThat(item.actorId()).isEqualTo("ops-ack-1");
+            assertThat(item.resourceId()).isEqualTo(exceptionId);
+        });
+        assertThat(count("rdm_work_order_timeline_entry")).isEqualTo(1);
+
+        // 无 Task 链接：Inbox 完成但不投影。
+        handler.handle(message(
+                "operations", "operational.exception.acknowledged", 1,
+                "OperationalException", unlinkedException, 2,
+                Map.of(
+                        "exceptionId", unlinkedException,
+                        "status", "ACKNOWLEDGED",
+                        "aggregateVersion", 2,
+                        "acknowledgedAt", t0.plusSeconds(10),
+                        "acknowledgedBy", "ops-ack-2"),
+                t0.plusSeconds(10)));
+        assertThat(count("rdm_work_order_timeline_entry")).isEqualTo(1);
+
+        UUID missing = UUID.randomUUID();
+        assertThatThrownBy(() -> handler.handle(message(
+                "operations", "operational.exception.acknowledged", 1,
+                "OperationalException", missing, 2,
+                Map.of(
+                        "exceptionId", missing,
+                        "status", "ACKNOWLEDGED",
+                        "aggregateVersion", 2,
+                        "acknowledgedAt", t0.plusSeconds(20),
+                        "acknowledgedBy", "ops-ack-3"),
+                t0.plusSeconds(20))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("OperationalException");
+        assertThat(count("rdm_work_order_timeline_entry")).isEqualTo(1);
+    }
+
+    @Test
     void projectsFieldOpsEventsWithoutSensitivePayloadAndRejectsMismatch() {
         Instant t0 = Instant.parse("2026-07-16T04:00:00Z");
         UUID appointmentId = UUID.randomUUID();
@@ -690,6 +749,46 @@ class WorkOrderTimelinePostgresIT {
                 .param("idem", "b".repeat(64))
                 .update();
         return deliveryId;
+    }
+
+    private UUID seedOperationalExceptionLinkedToTask(UUID sourceTaskId) {
+        UUID exceptionId = UUID.randomUUID();
+        jdbc.sql("""
+                INSERT INTO ops_operational_exception (
+                    exception_id, tenant_id, source_type, source_id, source_attempt_id, source_task_type,
+                    category_code, severity_code, error_code, status, correlation_id,
+                    opened_at, last_detected_at, aggregate_version)
+                VALUES (
+                    :id, :tenantId, 'TASK', :sourceId, :attemptId, 'integration.byd.submit-review',
+                    'AUTOMATION_FINAL_FAILURE', 'P1', 'BYD_TRANSPORT_UNKNOWN', 'OPEN', 'corr-m79',
+                    now(), now(), 1)
+                """)
+                .param("id", exceptionId)
+                .param("tenantId", TENANT)
+                .param("sourceId", sourceTaskId.toString())
+                .param("attemptId", UUID.randomUUID())
+                .update();
+        return exceptionId;
+    }
+
+    private UUID seedOperationalExceptionUnlinked() {
+        UUID exceptionId = UUID.randomUUID();
+        jdbc.sql("""
+                INSERT INTO ops_operational_exception (
+                    exception_id, tenant_id, source_type, source_id, source_attempt_id, source_task_type,
+                    category_code, severity_code, error_code, status, correlation_id,
+                    opened_at, last_detected_at, aggregate_version)
+                VALUES (
+                    :id, :tenantId, 'SERVICE_ASSIGNMENT', :sourceId, :attemptId, 'dispatch.timeout',
+                    'AUTOMATION_FINAL_FAILURE', 'P2', 'ASSIGNMENT_TIMEOUT', 'OPEN', 'corr-m79-unlinked',
+                    now(), now(), 1)
+                """)
+                .param("id", exceptionId)
+                .param("tenantId", TENANT)
+                .param("sourceId", UUID.randomUUID().toString())
+                .param("attemptId", UUID.randomUUID())
+                .update();
+        return exceptionId;
     }
 
     private OutboxMessage message(
