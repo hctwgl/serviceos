@@ -106,30 +106,19 @@ INSERT INTO tsk_task (
     'PILOT_RESPONSE'
 ) ON CONFLICT DO NOTHING;
 
--- 固定开发用户必须先是 ACTIVE 候选人，后端才会投影并允许 claim。
--- claim 会追加 RESPONSIBLE 责任事实，release 只撤销该责任事实并保留候选资格，
--- 因此同一夹具可重复执行真实领取/释放写链路，不需要回退业务版本或清理历史审计。
-INSERT INTO tsk_task_assignment_batch (
-    assignment_batch_id, tenant_id, task_id, source_type, source_id,
-    candidate_count, task_version, assigned_by, assigned_at
-) VALUES (
-    '71000000-0000-4000-8000-000000000001', 'tenant-local',
-    '70000000-0000-4000-8000-000000000001', 'MANUAL', 'admin-pilot-seed',
-    1, 1, 'local-fixture', now() - interval '90 minutes'
-) ON CONFLICT DO NOTHING;
-
-INSERT INTO tsk_task_assignment (
-    task_assignment_id, tenant_id, task_id, assignment_batch_id,
-    assignment_kind, principal_type, principal_id, status,
-    source_type, source_id, effective_from, created_by, created_at
-) VALUES (
-    '72000000-0000-4000-8000-000000000001', 'tenant-local',
-    '70000000-0000-4000-8000-000000000001',
-    '71000000-0000-4000-8000-000000000001',
-    'CANDIDATE', 'USER', '06b612f3-a901-4b0e-bd90-86b4259cc087', 'ACTIVE',
-    'MANUAL', 'admin-pilot-seed', now() - interval '90 minutes',
-    'local-fixture', now() - interval '90 minutes'
-) ON CONFLICT DO NOTHING;
+-- 每轮浏览器冒烟必须通过真实 assign-candidates 命令建立候选快照，不能依赖数据库预置 ACTIVE 候选。
+-- 对历史版本夹具留下的 ACTIVE 候选只补齐撤销人、原因和时间，不回退 Task version，
+-- 也不删除既有批次、事件或审计。
+-- 若上次冒烟中断在 CLAIMED/RUNNING，后续命令仍会按状态机失败关闭，脚本不得用 SQL 伪造恢复成功。
+UPDATE tsk_task_assignment
+   SET status = 'REVOKED',
+       effective_to = now(),
+       revoked_by = 'local-fixture',
+       revoke_reason_code = 'E2E_ASSIGNMENT_REPLACED'
+ WHERE tenant_id = 'tenant-local'
+   AND task_id = '70000000-0000-4000-8000-000000000001'
+   AND assignment_kind = 'CANDIDATE'
+   AND status = 'ACTIVE';
 
 INSERT INTO sla_instance (
     sla_instance_id, tenant_id, project_id, work_order_id, task_id, sla_ref,

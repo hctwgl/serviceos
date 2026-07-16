@@ -12,6 +12,7 @@ VALUES
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'project.read', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'workOrder.read', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'task.read', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'task.assign', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'task.claim', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'task.start', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'task.release', now()),

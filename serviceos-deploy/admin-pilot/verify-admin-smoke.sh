@@ -86,6 +86,18 @@ active_candidate_count="$(query_db "
   exit 1
 }
 
+latest_assignment_batch="$(query_db "
+  SELECT source_type || ':' || source_id || ':' || candidate_count
+    FROM tsk_task_assignment_batch
+   WHERE task_id = '70000000-0000-4000-8000-000000000001'
+   ORDER BY assigned_at DESC
+   LIMIT 1
+")"
+[[ "${latest_assignment_batch}" == "MANUAL:admin-pilot-e2e:1" ]] || {
+  echo "Admin 试点最新候选批次不是页面 MANUAL 分配结果: ${latest_assignment_batch}" >&2
+  exit 1
+}
+
 active_responsible_count="$(query_db "
   SELECT count(*)
     FROM tsk_task_assignment
@@ -98,15 +110,17 @@ active_responsible_count="$(query_db "
   exit 1
 }
 
-successful_audit_count="$(query_db "
-  SELECT count(*)
+successful_audit_action_count="$(query_db "
+  SELECT count(DISTINCT action_name)
     FROM aud_audit_record
    WHERE target_id = '70000000-0000-4000-8000-000000000001'
-     AND action_name IN ('TASK_HUMAN_CLAIM', 'TASK_HUMAN_RELEASE')
+     AND action_name IN (
+       'TASK_ASSIGN_CANDIDATES', 'TASK_HUMAN_CLAIM', 'TASK_HUMAN_RELEASE'
+     )
      AND result_code = 'SUCCEEDED'
 ")"
-[[ "${successful_audit_count}" -ge 2 ]] || {
-  echo "Admin 试点 Task 成功审计记录不足: ${successful_audit_count}" >&2
+[[ "${successful_audit_action_count}" == "3" ]] || {
+  echo "Admin 试点候选分配/领取/释放成功审计不完整: ${successful_audit_action_count}" >&2
   exit 1
 }
 
