@@ -214,6 +214,39 @@ completion_audit_count="$(query_db "
   exit 1
 }
 
+form_submission_state="$(query_db "
+  SELECT submission.validation_status || ':' ||
+         (task.result_ref = 'form-submission://' || submission.form_submission_id::text) || ':' ||
+         (task.result_digest = submission.content_digest)
+    FROM frm_form_submission submission
+    JOIN tsk_task task
+      ON task.tenant_id = submission.tenant_id
+     AND task.task_id = submission.task_id
+   WHERE submission.task_id = '${completion_task_id}'
+   ORDER BY submission.submission_version DESC
+   LIMIT 1
+")"
+[[ "${form_submission_state}" == "VALIDATED:true:true" ]] || {
+  echo "Admin 试点表单提交未形成精确 complete 引用: ${form_submission_state}" >&2
+  exit 1
+}
+
+form_submission_audit_count="$(query_db "
+  SELECT count(*)
+    FROM aud_audit_record audit
+    JOIN frm_form_submission submission
+      ON submission.tenant_id = audit.tenant_id
+     AND submission.form_submission_id::text = audit.target_id
+   WHERE submission.task_id = '${completion_task_id}'
+     AND audit.action_name = 'FORM_SUBMITTED'
+     AND audit.capability_code = 'form.submit'
+     AND audit.result_code = 'VALIDATED'
+")"
+[[ "${form_submission_audit_count}" == "1" ]] || {
+  echo "Admin 试点表单提交成功审计不完整: ${form_submission_audit_count}" >&2
+  exit 1
+}
+
 progression_inbox_count="$(query_db "
   SELECT count(*)
     FROM rel_inbox_record

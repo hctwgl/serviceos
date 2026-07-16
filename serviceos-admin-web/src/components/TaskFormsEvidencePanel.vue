@@ -70,14 +70,24 @@ async function load() {
   loading.value = true
   error.value = null
   try {
-    const [formList, slotList, itemList] = await Promise.all([
+    // 表单提交与资料编排是同一面板中的两个独立能力。EvidenceSlot 尚未完成可靠解析时，
+    // 只能降级资料半边，不能丢弃已成功解析的锁定 FormVersion 并阻断合法表单提交。
+    const [formResult, slotResult, itemResult] = await Promise.allSettled([
       listTaskForms(props.taskId),
       listTaskEvidenceSlots(props.taskId),
       listTaskEvidenceItems(props.taskId),
     ])
+    if (formResult.status === 'rejected') throw formResult.reason
+    const formList = formResult.value
+    const slotList = slotResult.status === 'fulfilled' ? slotResult.value : []
+    const itemList = itemResult.status === 'fulfilled' ? itemResult.value : []
     forms.value = formList
     slots.value = slotList
     items.value = itemList
+    const secondaryErrors = [slotResult, itemResult]
+      .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+      .map((result) => (result.reason instanceof Error ? result.reason.message : '资料能力加载失败'))
+    if (secondaryErrors.length) error.value = [...new Set(secondaryErrors)].join('；')
     if (!selectedFormVersionId.value && formList[0]) {
       selectedFormVersionId.value = formList[0].formVersionId
     }

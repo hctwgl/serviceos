@@ -19,7 +19,8 @@ INSERT INTO cfg_configuration_asset_version (
           "nodeType":"USER_TASK",
           "name":"试点终态验证",
           "stageCode":"PILOT_COMPLETION",
-          "taskType":"PILOT_COMPLETION"
+          "taskType":"PILOT_COMPLETION",
+          "formRef":"admin.pilot-completion-form"
         },
         {"nodeId":"END","nodeType":"END","name":"结束"}
       ],
@@ -29,6 +30,31 @@ INSERT INTO cfg_configuration_asset_version (
       ]
     }',
     repeat('f', 64), 'PUBLISHED', now()
+) ON CONFLICT DO NOTHING;
+
+INSERT INTO cfg_configuration_asset_version (
+    version_id, tenant_id, asset_type, asset_key, semantic_version, schema_version,
+    definition, content_digest, status, published_at
+) VALUES (
+    '20000000-0000-4000-8000-000000000004', 'tenant-local', 'FORM',
+    'admin.pilot-completion-form', '1.0.0', '1.0.0',
+    '{
+      "formKey":"admin.pilot-completion-form",
+      "version":"1.0.0",
+      "stage":"PILOT_COMPLETION",
+      "sections":[{
+        "sectionKey":"completion",
+        "title":"终态验证",
+        "fields":[{
+          "fieldKey":"completion.note",
+          "label":"完成说明",
+          "dataType":"STRING",
+          "binding":"task.input.completion.note",
+          "required":true
+        }]
+      }]
+    }',
+    repeat('5', 64), 'PUBLISHED', now()
 ) ON CONFLICT DO NOTHING;
 
 INSERT INTO cfg_configuration_bundle (
@@ -43,9 +69,14 @@ INSERT INTO cfg_configuration_bundle (
 
 INSERT INTO cfg_configuration_bundle_item (
     tenant_id, bundle_id, asset_type, asset_version_id, content_digest
-) VALUES (
+) VALUES
+(
     'tenant-local', '30000000-0000-4000-8000-000000000002', 'WORKFLOW',
     '20000000-0000-4000-8000-000000000003', repeat('f', 64)
+),
+(
+    'tenant-local', '30000000-0000-4000-8000-000000000002', 'FORM',
+    '20000000-0000-4000-8000-000000000004', repeat('5', 64)
 ) ON CONFLICT DO NOTHING;
 
 INSERT INTO wo_work_order (
@@ -90,7 +121,7 @@ INSERT INTO tsk_task (
     created_at, updated_at, project_id, work_order_id, workflow_instance_id,
     stage_instance_id, workflow_node_instance_id, workflow_node_id,
     workflow_definition_version_id, workflow_definition_digest, configuration_bundle_id,
-    configuration_bundle_digest, stage_code
+    configuration_bundle_digest, stage_code, form_ref
 ) VALUES (
     :'completion_task_id', 'tenant-local', 'PILOT_COMPLETION', 'HUMAN',
     :'completion_external_code', repeat('7', 64), 500, 'READY', now(), 0, 3,
@@ -98,7 +129,8 @@ INSERT INTO tsk_task (
     '10000000-0000-4000-8000-000000000001', :'completion_work_order_id',
     :'completion_workflow_id', :'completion_stage_id', :'completion_node_id',
     'PILOT_COMPLETION_NODE', '20000000-0000-4000-8000-000000000003', repeat('f', 64),
-    '30000000-0000-4000-8000-000000000002', repeat('9', 64), 'PILOT_COMPLETION'
+    '30000000-0000-4000-8000-000000000002', repeat('9', 64), 'PILOT_COMPLETION',
+    'admin.pilot-completion-form'
 );
 
 INSERT INTO wfl_node_instance (

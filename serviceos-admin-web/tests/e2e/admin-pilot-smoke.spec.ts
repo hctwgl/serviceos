@@ -126,8 +126,31 @@ test('真实 OIDC 登录后可完成 Task 并可靠推进 Workflow 与 WorkOrder
   await page.getByRole('button', { name: '启动任务' }).click()
   expect((await startResponsePromise).status()).toBe(200)
 
-  await page.getByLabel('resultRef').fill(`admin-pilot://completion/${taskId}`)
-  await page.getByLabel('resultDigest').fill('6'.repeat(64))
+  // M116 页面提交精确锁定的 FormVersion；VALIDATED submission 会把不可变引用和摘要
+  // 回填给 complete 面板，浏览器不自行拼接或猜测完成结果。
+  await page.getByRole('link', { name: new RegExp(taskId!) }).click()
+  await expect(page.getByRole('heading', { name: '任务详情' })).toBeVisible()
+  await expect(page.getByRole('cell', { name: 'admin.pilot-completion-form' })).toBeVisible()
+  await page.getByLabel('values JSON').fill('{"completion.note":"ADMIN_PILOT_E2E"}')
+  const formResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(`/api/v1/tasks/${taskId}/form-submissions`),
+  )
+  await page.getByRole('button', { name: 'submitTaskForm' }).click()
+  const formResponse = await formResponsePromise
+  expect(formResponse.status()).toBe(201)
+  const submission = (await formResponse.json()) as {
+    submissionId: string
+    contentDigest: string
+    validationStatus: string
+  }
+  expect(submission.validationStatus).toBe('VALIDATED')
+  await expect(page.getByLabel('resultRef')).toHaveValue(
+    `form-submission://${submission.submissionId}`,
+  )
+  await expect(page.getByLabel('resultDigest')).toHaveValue(submission.contentDigest)
+
   const completeResponsePromise = page.waitForResponse(
     (response) =>
       response.request().method() === 'POST' &&
