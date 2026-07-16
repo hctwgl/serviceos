@@ -349,13 +349,13 @@ class WorkOrderWorkspacePostgresIT {
                         window_start, window_end, timezone, estimated_duration_minutes,
                         address_ref, address_version,
                         confirmed_party_type, confirmed_party_ref, confirmation_channel, confirmed_at,
-                        reason_code, note, created_by, created_at
+                        reason_code, note, revision_kind, created_by, created_at
                     ) VALUES (
                         :revisionId, :tenantId, :id, 1, NULL,
                         :start, :end, 'Asia/Shanghai', 120,
                         'address-ref', 'address-v1',
                         'CUSTOMER', 'customer-ref', 'PHONE', :confirmedAt,
-                        NULL, 'note-should-not-leak', 'fixture', :createdAt
+                        NULL, 'note-should-not-leak', 'CONFIRM', 'fixture', :createdAt
                     )
                     """)
                     .param("revisionId", revisionId)
