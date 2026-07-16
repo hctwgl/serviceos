@@ -6,6 +6,7 @@ import com.serviceos.integration.api.DeliveryReplayRequestView;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -28,6 +29,9 @@ public interface OutboundDeliveryRepository {
 
     Optional<DeliveryRecord> findBySourceReview(
             String tenantId, UUID sourceReviewCaseId, String businessMessageType);
+
+    List<DeliveryRecord> listByWorkOrder(
+            String tenantId, UUID projectId, UUID workOrderId, int limit);
 
     Optional<DeliveryReplayRequestView> findReplay(String tenantId, UUID replayRequestId);
 

@@ -37,7 +37,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** M85～M90：工作区组合查询的授权、无 PII、按需区块与缺权降级证据。 */
+/** M85～M91：工作区组合查询的授权、无 PII、按需区块与缺权降级证据。 */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = ServiceOsApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE)
 class WorkOrderWorkspacePostgresIT {
@@ -93,6 +93,9 @@ class WorkOrderWorkspacePostgresIT {
                     apt_contact_attempt_command_result, apt_contact_attempt,
                     apt_appointment_command_result, apt_appointment_status_history,
                     apt_appointment_revision, apt_appointment, dsp_service_assignment,
+                    int_delivery_replay_request, int_external_acknowledgement, int_delivery_attempt,
+                    int_outbound_delivery, int_inbound_item_result, int_external_review_route,
+                    int_canonical_message, int_inbound_envelope,
                     evd_correction_resubmission, evd_correction_case,
                     evd_review_decision, evd_review_case, evd_evidence_set_member,
                     evd_evidence_set_snapshot,
@@ -133,6 +136,7 @@ class WorkOrderWorkspacePostgresIT {
         assertThat(workspace.sectionAvailability().get("APPOINTMENTS_VISITS")).isEqualTo("UNAVAILABLE");
         assertThat(workspace.sectionAvailability().get("FORMS_EVIDENCE")).isEqualTo("UNAVAILABLE");
         assertThat(workspace.sectionAvailability().get("REVIEWS_CORRECTIONS")).isEqualTo("UNAVAILABLE");
+        assertThat(workspace.sectionAvailability().get("INTEGRATION")).isEqualTo("UNAVAILABLE");
         assertThat(workspace.sectionAvailability().get("SLA")).isEqualTo("UNAVAILABLE");
         assertThat(workspace.sectionAvailability().get("EXCEPTIONS")).isEqualTo("UNAVAILABLE");
         assertThat(workspace.slaSummary()).isNull();
@@ -170,6 +174,7 @@ class WorkOrderWorkspacePostgresIT {
         assertThat(tasks.appointmentsVisits()).isNull();
         assertThat(tasks.formsEvidence()).isNull();
         assertThat(tasks.reviewsCorrections()).isNull();
+        assertThat(tasks.integration()).isNull();
         assertThat(tasks.tasks().items()).extracting(item -> item.taskId()).containsExactly(taskId);
         assertThat(tasks.sourceVersions().workOrderVersion()).isEqualTo(1);
         assertThat(tasks.toString()).doesNotContain("customerName", "customerMobile");
@@ -182,10 +187,11 @@ class WorkOrderWorkspacePostgresIT {
         assertThat(timeline.appointmentsVisits()).isNull();
         assertThat(timeline.formsEvidence()).isNull();
         assertThat(timeline.reviewsCorrections()).isNull();
+        assertThat(timeline.integration()).isNull();
         assertThat(timeline.timeline().freshnessStatus()).isEqualTo("UNKNOWN");
 
         assertThatThrownBy(() -> workspaces.getSection(
-                principal("reader"), "corr-bad", workOrderId, "INTEGRATION", null, 20))
+                principal("reader"), "corr-bad", workOrderId, "FACTS_CALCULATIONS", null, 20))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
     }
@@ -297,6 +303,48 @@ class WorkOrderWorkspacePostgresIT {
         assertThatThrownBy(() -> workspaces.getSection(
                 principal("reader"), "corr-rc-cursor", workOrderId,
                 "REVIEWS_CORRECTIONS", "cursor-1", 20))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
+    }
+
+    @Test
+    void integrationSectionLoadsInboundAndOutboundWithoutSensitiveFields() {
+        seedReader("integration-reader", projectId, "workOrder.read",
+                "integration.readInbound", "integration.readOutbound");
+        IntegrationFixture fixture = seedIntegration(workOrderId);
+
+        var section = workspaces.getSection(
+                principal("integration-reader"), "corr-int", workOrderId,
+                "INTEGRATION", null, 50);
+
+        assertThat(section.section()).isEqualTo("INTEGRATION");
+        assertThat(section.integration()).isNotNull();
+        assertThat(section.tasks()).isNull();
+        assertThat(section.timeline()).isNull();
+        assertThat(section.appointmentsVisits()).isNull();
+        assertThat(section.formsEvidence()).isNull();
+        assertThat(section.reviewsCorrections()).isNull();
+        assertThat(section.integration().inboundEnvelopes())
+                .extracting(item -> item.inboundEnvelopeId())
+                .containsExactly(fixture.envelopeId());
+        assertThat(section.integration().outboundDeliveries())
+                .extracting(item -> item.deliveryId())
+                .containsExactly(fixture.deliveryId());
+        assertThat(section.toString()).doesNotContain(
+                "private/raw/m91.json", "private/outbound/m91.json",
+                "operator-m91-sensitive", "external-key-m91",
+                "rawPayloadDigest", "payloadDigest", "operatorPrincipalId");
+
+        WorkOrderWorkspace workspace = workspaces.get(
+                principal("integration-reader"), "corr-int-top", workOrderId);
+        assertThat(workspace.sectionAvailability().get("INTEGRATION")).isEqualTo("AVAILABLE");
+    }
+
+    @Test
+    void integrationRejectsCursorPaging() {
+        assertThatThrownBy(() -> workspaces.getSection(
+                principal("reader"), "corr-int-cursor", workOrderId,
+                "INTEGRATION", "cursor-1", 20))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
     }
@@ -694,6 +742,103 @@ class WorkOrderWorkspacePostgresIT {
         return new ReviewCorrectionFixture(reviewCaseId, reviewDecisionId, correctionCaseId);
     }
 
+    private IntegrationFixture seedIntegration(UUID workOrderId) {
+        UUID envelopeId = UUID.randomUUID();
+        UUID canonicalMessageId = UUID.randomUUID();
+        UUID deliveryId = UUID.randomUUID();
+        Instant receivedAt = Instant.parse("2026-07-16T06:00:00Z");
+        Instant completedAt = receivedAt.plusSeconds(1);
+        jdbc.sql("""
+                INSERT INTO int_inbound_envelope (
+                    inbound_envelope_id, tenant_id, project_id, connector_version_id,
+                    message_type, transport_dedup_key, external_message_id, received_at,
+                    raw_payload_object_ref, raw_payload_digest, signature_status,
+                    processing_status, correlation_id
+                ) VALUES (
+                    :envelopeId, :tenantId, :projectId, 'byd-cpim-v7.3.1',
+                    'CREATE_WORK_ORDER', :dedupKey, 'M91-EXTERNAL-MESSAGE', :receivedAt,
+                    'private/raw/m91.json', :rawDigest, 'VALID', 'RECEIVED', 'corr-m91-inbound'
+                )
+                """)
+                .param("envelopeId", envelopeId)
+                .param("tenantId", TENANT)
+                .param("projectId", projectId)
+                .param("dedupKey", Sha256.digest("m91-inbound-dedup"))
+                .param("receivedAt", java.sql.Timestamp.from(receivedAt))
+                .param("rawDigest", Sha256.digest("m91-raw"))
+                .update();
+        jdbc.sql("""
+                INSERT INTO int_canonical_message (
+                    canonical_message_id, tenant_id, project_id, connector_version_id,
+                    message_type, business_key, payload_object_ref, payload_digest,
+                    mapping_version_id, processing_status, result_code, result_type, result_id,
+                    source_envelope_id, created_at, processed_at
+                ) VALUES (
+                    :canonicalId, :tenantId, :projectId, 'byd-cpim-v7.3.1',
+                    'CREATE_WORK_ORDER', 'M91-BUSINESS-KEY', 'private/canonical/m91.json',
+                    :payloadDigest, 'm91-mapping-v1', 'COMPLETED', 'ACCEPTED', 'WORK_ORDER',
+                    :workOrderId, :envelopeId, :receivedAt, :completedAt
+                )
+                """)
+                .param("canonicalId", canonicalMessageId)
+                .param("tenantId", TENANT)
+                .param("projectId", projectId)
+                .param("payloadDigest", Sha256.digest("m91-canonical"))
+                .param("workOrderId", workOrderId.toString())
+                .param("envelopeId", envelopeId)
+                .param("receivedAt", java.sql.Timestamp.from(receivedAt))
+                .param("completedAt", java.sql.Timestamp.from(completedAt))
+                .update();
+        jdbc.sql("""
+                UPDATE int_inbound_envelope
+                   SET canonical_payload_digest=:canonicalDigest,
+                       mapping_version_id='m91-mapping-v1',
+                       canonical_message_id=:canonicalId,
+                       processing_status='COMPLETED',
+                       result_code='ACCEPTED',
+                       result_type='WORK_ORDER',
+                       result_id=:workOrderId,
+                       completed_at=:completedAt
+                 WHERE inbound_envelope_id=:envelopeId
+                """)
+                .param("canonicalDigest", Sha256.digest("m91-canonical"))
+                .param("canonicalId", canonicalMessageId)
+                .param("workOrderId", workOrderId.toString())
+                .param("completedAt", java.sql.Timestamp.from(completedAt))
+                .param("envelopeId", envelopeId)
+                .update();
+        jdbc.sql("""
+                INSERT INTO int_outbound_delivery (
+                    delivery_id, tenant_id, project_id, connector_version_id, mapping_version_id,
+                    business_message_type, business_key, source_review_case_id, source_task_id,
+                    source_work_order_id, source_snapshot_id, source_snapshot_digest,
+                    external_order_code, operator_principal_id, operator_display_value,
+                    payload_object_ref, payload_digest, external_idempotency_key,
+                    failure_policy_version_id, status, created_by, created_at
+                ) VALUES (
+                    :deliveryId, :tenantId, :projectId, 'byd-cpim-v7.3.1', 'm91-outbound-v1',
+                    'SUBMIT_CLIENT_REVIEW', 'M91-DELIVERY', :reviewCaseId, :taskId,
+                    :workOrderId, :snapshotId, :snapshotDigest,
+                    'M91-ORDER', 'operator-m91-sensitive', '敏感操作者',
+                    'private/outbound/m91.json', :payloadDigest, :externalKey,
+                    'm91-fail-closed-v1', 'PENDING', 'fixture', :receivedAt
+                )
+                """)
+                .param("deliveryId", deliveryId)
+                .param("tenantId", TENANT)
+                .param("projectId", projectId)
+                .param("reviewCaseId", UUID.randomUUID())
+                .param("taskId", taskId)
+                .param("workOrderId", workOrderId)
+                .param("snapshotId", UUID.randomUUID())
+                .param("snapshotDigest", Sha256.digest("m91-snapshot"))
+                .param("payloadDigest", Sha256.digest("m91-outbound-payload"))
+                .param("externalKey", Sha256.digest("external-key-m91"))
+                .param("receivedAt", java.sql.Timestamp.from(receivedAt))
+                .update();
+        return new IntegrationFixture(envelopeId, deliveryId);
+    }
+
     private UUID seedVisit(UUID appointmentId, UUID taskId) {
         UUID visitId = UUID.randomUUID();
         Instant now = Instant.parse("2026-07-16T03:00:00Z");
@@ -739,5 +884,8 @@ class WorkOrderWorkspacePostgresIT {
             UUID reviewDecisionId,
             UUID correctionCaseId
     ) {
+    }
+
+    private record IntegrationFixture(UUID envelopeId, UUID deliveryId) {
     }
 }
