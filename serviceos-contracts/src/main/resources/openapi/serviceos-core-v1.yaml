@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.58.0
+  version: 0.59.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -111,7 +111,7 @@ paths:
       description: >-
         复用 workOrder.read 实时鉴权，组合 Task/时间线 freshness、可选 SLA/异常摘要，
         以及 APPOINTMENTS_VISITS 等 sectionAvailability。不含客户 PII；大区块按需加载见
-        workspace/sections（M87/M88：TASKS/TIMELINE_AUDIT/APPOINTMENTS_VISITS）。
+        workspace/sections（M87～M89：TASKS/TIMELINE_AUDIT/APPOINTMENTS_VISITS/FORMS_EVIDENCE）。
       parameters:
         - { name: workOrderId, in: path, required: true, schema: { type: string, format: uuid } }
         - $ref: '#/components/parameters/CorrelationId'
@@ -131,14 +131,14 @@ paths:
       operationId: getWorkOrderWorkspaceSection
       summary: 按需加载工单工作区区块
       description: >-
-        M88 接受 TASKS、TIMELINE_AUDIT 与 APPOINTMENTS_VISITS；其余 section 失败关闭为 400。
+        M89 接受 TASKS、TIMELINE_AUDIT、APPOINTMENTS_VISITS 与 FORMS_EVIDENCE；其余 section 失败关闭为 400。
         复用 workOrder.read；实时组合，不落区块投影表；不含客户 PII。
       parameters:
         - { name: workOrderId, in: path, required: true, schema: { type: string, format: uuid } }
         - name: section
           in: path
           required: true
-          schema: { enum: [TASKS, TIMELINE_AUDIT, APPOINTMENTS_VISITS] }
+          schema: { enum: [TASKS, TIMELINE_AUDIT, APPOINTMENTS_VISITS, FORMS_EVIDENCE] }
         - { name: cursor, in: query, schema: { type: string, minLength: 1 } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
         - $ref: '#/components/parameters/CorrelationId'
@@ -2257,12 +2257,66 @@ components:
               items: { $ref: '#/components/schemas/WorkOrderWorkspaceAppointmentSummary' }
             - { type: 'null' }
         nextCursor: { type: [string, 'null'] }
+    WorkOrderWorkspaceFormSummary:
+      type: object
+      additionalProperties: false
+      required: [taskId, formVersionId, formKey, semanticVersion, schemaVersion, contentDigest]
+      properties:
+        taskId: { type: string, format: uuid }
+        formVersionId: { type: string, format: uuid }
+        formKey: { type: string, minLength: 1, maxLength: 128 }
+        semanticVersion: { type: string, minLength: 1, maxLength: 64 }
+        schemaVersion: { type: string, minLength: 1, maxLength: 64 }
+        contentDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
+    WorkOrderWorkspaceEvidenceSlotSummary:
+      type: object
+      additionalProperties: false
+      required: [slotId, taskId, projectId, templateKey, templateVersion, requirementCode,
+        occurrenceKey, requirementName, mediaType, required, minCount, maxCount, status,
+        resolvedAt, slotGeneration, active, transition, requiredDisposition]
+      properties:
+        slotId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        templateKey: { type: string, minLength: 1, maxLength: 128 }
+        templateVersion: { type: string, minLength: 1, maxLength: 64 }
+        requirementCode: { type: string, minLength: 1, maxLength: 128 }
+        occurrenceKey: { type: string, minLength: 1, maxLength: 64 }
+        requirementName: { type: string, minLength: 1, maxLength: 200 }
+        mediaType: { enum: [PHOTO, VIDEO, DOCUMENT, SIGNATURE, GENERATED_REPORT] }
+        required: { type: boolean }
+        minCount: { type: integer, minimum: 0 }
+        maxCount: { type: [integer, 'null'], minimum: 0 }
+        status: { type: string, minLength: 1, maxLength: 32 }
+        resolvedAt: { type: string, format: date-time }
+        slotGeneration: { type: integer, minimum: 1 }
+        active: { type: boolean }
+        transition: { type: string, minLength: 1, maxLength: 32 }
+        requiredDisposition: { type: string, minLength: 1, maxLength: 32 }
+    WorkOrderWorkspaceFormsEvidenceSectionData:
+      type: object
+      additionalProperties: false
+      required: [forms, evidenceSlots, nextCursor]
+      properties:
+        forms:
+          oneOf:
+            - type: array
+              maxItems: 100
+              items: { $ref: '#/components/schemas/WorkOrderWorkspaceFormSummary' }
+            - { type: 'null' }
+        evidenceSlots:
+          oneOf:
+            - type: array
+              maxItems: 100
+              items: { $ref: '#/components/schemas/WorkOrderWorkspaceEvidenceSlotSummary' }
+            - { type: 'null' }
+        nextCursor: { type: [string, 'null'] }
     WorkOrderWorkspaceSection:
       type: object
       additionalProperties: false
-      required: [section, sourceVersions, meta, tasks, timeline, appointmentsVisits]
+      required: [section, sourceVersions, meta, tasks, timeline, appointmentsVisits, formsEvidence]
       properties:
-        section: { enum: [TASKS, TIMELINE_AUDIT, APPOINTMENTS_VISITS] }
+        section: { enum: [TASKS, TIMELINE_AUDIT, APPOINTMENTS_VISITS, FORMS_EVIDENCE] }
         sourceVersions: { $ref: '#/components/schemas/WorkOrderWorkspaceSourceVersions' }
         meta: { $ref: '#/components/schemas/WorkOrderWorkspaceMeta' }
         tasks:
@@ -2276,6 +2330,10 @@ components:
         appointmentsVisits:
           oneOf:
             - { $ref: '#/components/schemas/WorkOrderWorkspaceAppointmentsVisitsSectionData' }
+            - { type: 'null' }
+        formsEvidence:
+          oneOf:
+            - { $ref: '#/components/schemas/WorkOrderWorkspaceFormsEvidenceSectionData' }
             - { type: 'null' }
     WorkflowInstance:
       type: object

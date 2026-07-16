@@ -37,11 +37,13 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** M85/M87/M88：工作区组合查询的授权、无 PII、按需区块与缺权降级证据。 */
+/** M85～M89：工作区组合查询的授权、无 PII、按需区块与缺权降级证据。 */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = ServiceOsApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE)
 class WorkOrderWorkspacePostgresIT {
     private static final String TENANT = "tenant-workspace-it";
+    private static final String FORM_KEY = "survey.execution";
+    private static final String EVIDENCE_KEY = "survey.site";
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(
@@ -74,6 +76,9 @@ class WorkOrderWorkspacePostgresIT {
 
     private UUID projectId;
     private ConfigurationBundleReference bundle;
+    private UUID formVersionId;
+    private UUID evidenceVersionId;
+    private String evidenceDigest;
     private UUID workOrderId;
     private UUID taskId;
 
@@ -88,6 +93,8 @@ class WorkOrderWorkspacePostgresIT {
                     apt_contact_attempt_command_result, apt_contact_attempt,
                     apt_appointment_command_result, apt_appointment_status_history,
                     apt_appointment_revision, apt_appointment, dsp_service_assignment,
+                    evd_evidence_condition_disposition, evd_evidence_resolution_member,
+                    evd_evidence_slot, evd_task_evidence_resolution,
                     rel_outbox_publish_attempt, rel_outbox_event,
                     wo_work_order, cfg_configuration_bundle_item, cfg_configuration_bundle,
                     cfg_configuration_asset_version, prj_project,
@@ -121,6 +128,7 @@ class WorkOrderWorkspacePostgresIT {
                 .isEqualTo("/api/v1/tasks/" + taskId + "/allowed-actions");
         assertThat(workspace.sectionAvailability().get("TASKS")).isEqualTo("AVAILABLE");
         assertThat(workspace.sectionAvailability().get("APPOINTMENTS_VISITS")).isEqualTo("UNAVAILABLE");
+        assertThat(workspace.sectionAvailability().get("FORMS_EVIDENCE")).isEqualTo("UNAVAILABLE");
         assertThat(workspace.sectionAvailability().get("SLA")).isEqualTo("UNAVAILABLE");
         assertThat(workspace.sectionAvailability().get("EXCEPTIONS")).isEqualTo("UNAVAILABLE");
         assertThat(workspace.slaSummary()).isNull();
@@ -156,6 +164,7 @@ class WorkOrderWorkspacePostgresIT {
         assertThat(tasks.tasks()).isNotNull();
         assertThat(tasks.timeline()).isNull();
         assertThat(tasks.appointmentsVisits()).isNull();
+        assertThat(tasks.formsEvidence()).isNull();
         assertThat(tasks.tasks().items()).extracting(item -> item.taskId()).containsExactly(taskId);
         assertThat(tasks.sourceVersions().workOrderVersion()).isEqualTo(1);
         assertThat(tasks.toString()).doesNotContain("customerName", "customerMobile");
@@ -166,10 +175,11 @@ class WorkOrderWorkspacePostgresIT {
         assertThat(timeline.timeline()).isNotNull();
         assertThat(timeline.tasks()).isNull();
         assertThat(timeline.appointmentsVisits()).isNull();
+        assertThat(timeline.formsEvidence()).isNull();
         assertThat(timeline.timeline().freshnessStatus()).isEqualTo("UNKNOWN");
 
         assertThatThrownBy(() -> workspaces.getSection(
-                principal("reader"), "corr-bad", workOrderId, "FORMS_EVIDENCE", null, 20))
+                principal("reader"), "corr-bad", workOrderId, "REVIEWS_CORRECTIONS", null, 20))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
     }
@@ -186,6 +196,7 @@ class WorkOrderWorkspacePostgresIT {
         assertThat(section.appointmentsVisits()).isNotNull();
         assertThat(section.tasks()).isNull();
         assertThat(section.timeline()).isNull();
+        assertThat(section.formsEvidence()).isNull();
         assertThat(section.appointmentsVisits().visits()).extracting(item -> item.visitId())
                 .containsExactly(visitId);
         assertThat(section.appointmentsVisits().appointments()).extracting(item -> item.appointmentId())
@@ -207,6 +218,40 @@ class WorkOrderWorkspacePostgresIT {
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
     }
 
+    @Test
+    void formsEvidenceSectionLoadsWithoutDefinitionJson() {
+        seedReader("forms-reader", projectId, "workOrder.read", "form.read", "evidence.read");
+        UUID slotId = seedEvidenceSlot(taskId);
+
+        var section = workspaces.getSection(
+                principal("forms-reader"), "corr-fe", workOrderId, "FORMS_EVIDENCE", null, 50);
+        assertThat(section.section()).isEqualTo("FORMS_EVIDENCE");
+        assertThat(section.formsEvidence()).isNotNull();
+        assertThat(section.tasks()).isNull();
+        assertThat(section.appointmentsVisits()).isNull();
+        assertThat(section.formsEvidence().forms()).extracting(item -> item.formKey())
+                .containsExactly(FORM_KEY);
+        assertThat(section.formsEvidence().forms()).extracting(item -> item.formVersionId())
+                .containsExactly(formVersionId);
+        assertThat(section.formsEvidence().evidenceSlots()).extracting(item -> item.slotId())
+                .containsExactly(slotId);
+        assertThat(section.toString()).doesNotContain(
+                "definitionJson", "requirementDefinition", "resolutionExplanation",
+                "survey.conclusion", "requireGps");
+
+        WorkOrderWorkspace workspace = workspaces.get(principal("forms-reader"), "corr-fe-top", workOrderId);
+        assertThat(workspace.sectionAvailability().get("FORMS_EVIDENCE")).isEqualTo("AVAILABLE");
+    }
+
+    @Test
+    void formsEvidenceRejectsCursorPaging() {
+        assertThatThrownBy(() -> workspaces.getSection(
+                principal("reader"), "corr-fe-cursor", workOrderId,
+                "FORMS_EVIDENCE", "cursor-1", 20))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
+    }
+
     private UUID project() {
         UUID id = UUID.randomUUID();
         jdbc.sql("""
@@ -221,14 +266,32 @@ class WorkOrderWorkspacePostgresIT {
     }
 
     private ConfigurationBundleReference bundle() {
-        String definition = "{\"workflowCode\":\"M85\"}";
-        UUID assetId = configurations.publishAsset(new PublishConfigurationAssetCommand(
+        String workflowDefinition = "{\"workflowCode\":\"M85\"}";
+        UUID workflowId = configurations.publishAsset(new PublishConfigurationAssetCommand(
                 TENANT, ConfigurationAssetType.WORKFLOW, "M85-WF", "1.0.0", "1.0.0",
-                definition, Sha256.digest(definition))).versionId();
+                workflowDefinition, Sha256.digest(workflowDefinition))).versionId();
+        String formDefinition = """
+                {"formKey":"survey.execution","version":"1.0.0","stage":"SURVEY","sections":[
+                  {"sectionKey":"site","title":"现场信息","fields":[
+                    {"fieldKey":"survey.conclusion","label":"勘测结论","dataType":"STRING",
+                     "binding":"task.input.survey.conclusion","required":true}]}]}
+                """.trim();
+        formVersionId = configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.FORM, FORM_KEY, "1.0.0", "1.0.0",
+                formDefinition, Sha256.digest(formDefinition))).versionId();
+        String evidenceDefinition = """
+                {"templateKey":"survey.site","version":"1.0.0","stage":"SURVEY",
+                 "items":[{"evidenceKey":"site.photo","name":"现场照片","mediaType":"PHOTO",
+                   "required":true,"capture":{"minCount":1,"maxCount":3,"requireGps":true}}]}
+                """.trim();
+        evidenceDigest = Sha256.digest(evidenceDefinition);
+        evidenceVersionId = configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.EVIDENCE, EVIDENCE_KEY, "1.0.0", "1.0.0",
+                evidenceDefinition, evidenceDigest)).versionId();
         return configurations.publishBundle(new PublishConfigurationBundleCommand(
                 TENANT, projectId, "M85-BUNDLE", "1.0.0", "BYD_OCEAN",
                 "HOME_CHARGING_SURVEY_INSTALL", "370000", Instant.now().minusSeconds(60),
-                null, List.of(assetId)));
+                null, List.of(workflowId, formVersionId, evidenceVersionId)));
     }
 
     private UUID receive(String externalOrderCode) {
@@ -252,12 +315,12 @@ class WorkOrderWorkspacePostgresIT {
                     version,created_at,updated_at,project_id,work_order_id,
                     workflow_instance_id,stage_instance_id,workflow_node_instance_id,
                     workflow_node_id,workflow_definition_version_id,workflow_definition_digest,
-                    configuration_bundle_id,configuration_bundle_digest,stage_code
+                    form_ref,configuration_bundle_id,configuration_bundle_digest,stage_code
                 ) VALUES (
                     :id,:tenantId,:taskType,'HUMAN',:businessKey,:digest,
                     500,'READY',:now,0,3,'corr-task',1,:now,:now,:projectId,:workOrderId,
                     :workflowId,:stageId,:nodeId,'SURVEY_NODE',:definitionId,:definitionDigest,
-                    :bundleId,:bundleDigest,'SURVEY'
+                    :formRef,:bundleId,:bundleDigest,'SURVEY'
                 )
                 """)
                 .param("id", id)
@@ -273,6 +336,7 @@ class WorkOrderWorkspacePostgresIT {
                 .param("nodeId", UUID.randomUUID())
                 .param("definitionId", UUID.randomUUID())
                 .param("definitionDigest", "b".repeat(64))
+                .param("formRef", FORM_KEY)
                 .param("bundleId", bundle.bundleId())
                 .param("bundleDigest", bundle.manifestDigest())
                 .update();
@@ -368,6 +432,101 @@ class WorkOrderWorkspacePostgresIT {
                     .update();
         });
         return appointmentId;
+    }
+
+    private UUID seedEvidenceSlot(UUID taskId) {
+        UUID resolutionId = UUID.randomUUID();
+        UUID slotId = UUID.randomUUID();
+        UUID memberId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-07-16T04:00:00Z");
+        String definitionJson = "{\"evidenceKey\":\"site.photo\",\"name\":\"现场照片\"}";
+        String explanationJson = "{\"fixture\":true}";
+        String conditionDigest = "d".repeat(64);
+        String requirementDigest = Sha256.digest(definitionJson);
+        jdbc.sql("""
+                INSERT INTO evd_task_evidence_resolution (
+                    resolution_id, tenant_id, project_id, task_id,
+                    configuration_bundle_id, configuration_bundle_digest, stage_code,
+                    source_event_id, source_event_digest, resolver_version, slot_count, resolved_at,
+                    condition_input_digest, resolution_explanation,
+                    generation_no, condition_fact_type, condition_fact_ref, condition_fact_revision
+                ) VALUES (
+                    :resolutionId, :tenantId, :projectId, :taskId,
+                    :bundleId, :bundleDigest, 'SURVEY',
+                    :eventId, :eventDigest, 'M89_FIXTURE', 1, :now,
+                    :conditionDigest, CAST(:explanation AS jsonb),
+                    1, 'TASK_CREATED', :factRef, 0
+                )
+                """)
+                .param("resolutionId", resolutionId)
+                .param("tenantId", TENANT)
+                .param("projectId", projectId)
+                .param("taskId", taskId)
+                .param("bundleId", bundle.bundleId())
+                .param("bundleDigest", bundle.manifestDigest())
+                .param("eventId", UUID.randomUUID())
+                .param("eventDigest", "e".repeat(64))
+                .param("now", java.sql.Timestamp.from(now))
+                .param("conditionDigest", conditionDigest)
+                .param("explanation", explanationJson)
+                .param("factRef", UUID.randomUUID().toString())
+                .update();
+        jdbc.sql("""
+                INSERT INTO evd_evidence_slot (
+                    slot_id, tenant_id, project_id, task_id, resolution_id,
+                    template_version_id, template_asset_type, template_key, template_version,
+                    template_digest, requirement_code, occurrence_key, requirement_name,
+                    media_type, required_flag, min_count, max_count, condition_input_digest,
+                    resolution_explanation, requirement_definition, requirement_digest,
+                    status_projection, resolved_at, slot_generation
+                ) VALUES (
+                    :slotId, :tenantId, :projectId, :taskId, :resolutionId,
+                    :templateVersionId, 'EVIDENCE', :templateKey, '1.0.0',
+                    :templateDigest, 'site.photo', '1', '现场照片',
+                    'PHOTO', true, 1, 3, :conditionDigest,
+                    CAST(:explanation AS jsonb), CAST(:definition AS jsonb), :requirementDigest,
+                    'MISSING', :now, 1
+                )
+                """)
+                .param("slotId", slotId)
+                .param("tenantId", TENANT)
+                .param("projectId", projectId)
+                .param("taskId", taskId)
+                .param("resolutionId", resolutionId)
+                .param("templateVersionId", evidenceVersionId)
+                .param("templateKey", EVIDENCE_KEY)
+                .param("templateDigest", evidenceDigest)
+                .param("conditionDigest", conditionDigest)
+                .param("explanation", explanationJson)
+                .param("definition", definitionJson)
+                .param("requirementDigest", requirementDigest)
+                .param("now", java.sql.Timestamp.from(now))
+                .update();
+        jdbc.sql("""
+                INSERT INTO evd_evidence_resolution_member (
+                    member_id, tenant_id, project_id, task_id, resolution_id,
+                    template_version_id, requirement_code, occurrence_key, condition_result,
+                    active_slot_id, previous_slot_id, transition, required_disposition,
+                    counting_item_count, condition_input_digest, resolution_explanation, created_at
+                ) VALUES (
+                    :memberId, :tenantId, :projectId, :taskId, :resolutionId,
+                    :templateVersionId, 'site.photo', '1', true,
+                    :slotId, NULL, 'ACTIVATED', 'NONE',
+                    0, :conditionDigest, CAST(:explanation AS jsonb), :now
+                )
+                """)
+                .param("memberId", memberId)
+                .param("tenantId", TENANT)
+                .param("projectId", projectId)
+                .param("taskId", taskId)
+                .param("resolutionId", resolutionId)
+                .param("templateVersionId", evidenceVersionId)
+                .param("slotId", slotId)
+                .param("conditionDigest", conditionDigest)
+                .param("explanation", explanationJson)
+                .param("now", java.sql.Timestamp.from(now))
+                .update();
+        return slotId;
     }
 
     private UUID seedVisit(UUID appointmentId, UUID taskId) {

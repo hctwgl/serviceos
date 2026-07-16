@@ -10,6 +10,8 @@ import com.serviceos.readmodel.api.WorkOrderWorkspace.WorkOrderWorkspaceTaskSumm
 import com.serviceos.readmodel.api.WorkOrderWorkspaceQueryService;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceAppointmentsVisitsSectionData;
+import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceFormSummary;
+import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceFormsEvidenceSectionData;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceTasksSectionData;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceVisitSummary;
 import com.serviceos.workorder.api.WorkOrderView;
@@ -111,6 +113,7 @@ class WorkOrderWorkspaceControllerSecurityTest {
                                 taskId, "SITE_SURVEY", "HUMAN", "READY", "SURVEY", null, 1)),
                         null),
                 null,
+                null,
                 null);
         when(principals.current()).thenReturn(principal);
         when(workspaces.getSection(eq(principal), eq("corr-sec"), eq(workOrderId),
@@ -124,7 +127,8 @@ class WorkOrderWorkspaceControllerSecurityTest {
                 .andExpect(jsonPath("$.section").value("TASKS"))
                 .andExpect(jsonPath("$.tasks.items[0].taskType").value("SITE_SURVEY"))
                 .andExpect(jsonPath("$.timeline").value(nullValue()))
-                .andExpect(jsonPath("$.appointmentsVisits").value(nullValue()));
+                .andExpect(jsonPath("$.appointmentsVisits").value(nullValue()))
+                .andExpect(jsonPath("$.formsEvidence").value(nullValue()));
         verify(workspaces).getSection(principal, "corr-sec", workOrderId, "TASKS", null, 50);
     }
 
@@ -149,7 +153,8 @@ class WorkOrderWorkspaceControllerSecurityTest {
                                 "IN_PROGRESS", now, now, "WITHIN_GEOFENCE", "ACCEPTED",
                                 null, null, null, null, 1)),
                         List.of(),
-                        null));
+                        null),
+                null);
         when(principals.current()).thenReturn(principal);
         when(workspaces.getSection(eq(principal), eq("corr-av"), eq(workOrderId),
                 eq("APPOINTMENTS_VISITS"), isNull(), eq(50))).thenReturn(section);
@@ -165,8 +170,49 @@ class WorkOrderWorkspaceControllerSecurityTest {
                 .andExpect(jsonPath("$.appointmentsVisits.visits[0].checkInLatitude").doesNotExist())
                 .andExpect(jsonPath("$.appointmentsVisits.visits[0].deviceId").doesNotExist())
                 .andExpect(jsonPath("$.tasks").value(nullValue()))
-                .andExpect(jsonPath("$.timeline").value(nullValue()));
+                .andExpect(jsonPath("$.timeline").value(nullValue()))
+                .andExpect(jsonPath("$.formsEvidence").value(nullValue()));
         verify(workspaces).getSection(
                 principal, "corr-av", workOrderId, "APPOINTMENTS_VISITS", null, 50);
+    }
+
+    @Test
+    void formsEvidenceSectionContractIsEnforced() throws Exception {
+        UUID workOrderId = UUID.randomUUID();
+        UUID taskId = UUID.randomUUID();
+        UUID formVersionId = UUID.randomUUID();
+        CurrentPrincipal principal = new CurrentPrincipal(
+                "reader", "tenant", CurrentPrincipal.PrincipalType.USER, "m89", Set.of());
+        Instant now = Instant.parse("2026-07-16T13:00:00Z");
+        WorkOrderWorkspaceSection section = new WorkOrderWorkspaceSection(
+                "FORMS_EVIDENCE",
+                new WorkOrderWorkspaceSourceVersions(6),
+                new WorkOrderWorkspaceMeta(now, "work-order-core-timeline.v1:gen:1", "FRESH", "q-4"),
+                null,
+                null,
+                null,
+                new WorkOrderWorkspaceFormsEvidenceSectionData(
+                        List.of(new WorkOrderWorkspaceFormSummary(
+                                taskId, formVersionId, "survey.execution",
+                                "1.0.0", "1.0.0", "c".repeat(64))),
+                        List.of(),
+                        null));
+        when(principals.current()).thenReturn(principal);
+        when(workspaces.getSection(eq(principal), eq("corr-fe"), eq(workOrderId),
+                eq("FORMS_EVIDENCE"), isNull(), eq(50))).thenReturn(section);
+
+        mvc.perform(get("/api/v1/work-orders/{id}/workspace/sections/{section}",
+                        workOrderId, "FORMS_EVIDENCE")
+                        .with(jwt())
+                        .header("X-Correlation-Id", "corr-fe"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("ETag", "\"6\""))
+                .andExpect(jsonPath("$.section").value("FORMS_EVIDENCE"))
+                .andExpect(jsonPath("$.formsEvidence.forms[0].formKey").value("survey.execution"))
+                .andExpect(jsonPath("$.formsEvidence.forms[0].definitionJson").doesNotExist())
+                .andExpect(jsonPath("$.formsEvidence.forms[0].definition").doesNotExist())
+                .andExpect(jsonPath("$.tasks").value(nullValue()))
+                .andExpect(jsonPath("$.appointmentsVisits").value(nullValue()));
+        verify(workspaces).getSection(principal, "corr-fe", workOrderId, "FORMS_EVIDENCE", null, 50);
     }
 }
