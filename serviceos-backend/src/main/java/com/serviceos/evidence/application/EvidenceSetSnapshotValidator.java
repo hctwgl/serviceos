@@ -120,11 +120,20 @@ final class EvidenceSetSnapshotValidator {
             }
         }
 
+        UUID currentResolutionId = slots.getFirst().currentResolutionId();
+        if (currentResolutionId == null
+                || slots.stream().anyMatch(slot -> !currentResolutionId.equals(slot.currentResolutionId()))) {
+            throw new BusinessProblem(ProblemCode.TASK_STATE_CONFLICT,
+                    "Current EvidenceSlots do not share one authoritative resolution");
+        }
+
         ordered.sort(Comparator
                 .comparing(EvidenceRevisionView::evidenceSlotId)
                 .thenComparing(EvidenceRevisionView::evidenceItemId)
                 .thenComparingInt(EvidenceRevisionView::revisionNumber));
-        return new ValidatedMembers(ordered, slots.getFirst().resolutionId());
+        // Slot 自身的 resolutionId 是首次创建代次；重解析复用 Slot 时必须冻结查询投影返回的
+        // currentResolutionId，才能让 Snapshot 与完成门禁对“当前配置事实”达成同一判断。
+        return new ValidatedMembers(ordered, currentResolutionId);
     }
 
     String validationDigest(List<EvidenceValidationView> validations) {

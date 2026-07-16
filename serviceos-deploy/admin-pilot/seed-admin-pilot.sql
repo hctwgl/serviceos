@@ -1,4 +1,4 @@
--- M134 Admin 试点只读冒烟夹具。全部标识固定且写入幂等，禁止复制到生产数据库。
+-- M134 Admin 试点局部读写冒烟夹具。全部标识固定且写入幂等，禁止复制到生产数据库。
 \set ON_ERROR_STOP on
 
 INSERT INTO prj_project (
@@ -105,6 +105,20 @@ INSERT INTO tsk_task (
     '30000000-0000-4000-8000-000000000001', repeat('c', 64), 'PILOT_SURVEY',
     'PILOT_RESPONSE'
 ) ON CONFLICT DO NOTHING;
+
+-- 每轮浏览器冒烟必须通过真实 assign-candidates 命令建立候选快照，不能依赖数据库预置 ACTIVE 候选。
+-- 对历史版本夹具留下的 ACTIVE 候选只补齐撤销人、原因和时间，不回退 Task version，
+-- 也不删除既有批次、事件或审计。
+-- 若上次冒烟中断在 CLAIMED/RUNNING，后续命令仍会按状态机失败关闭，脚本不得用 SQL 伪造恢复成功。
+UPDATE tsk_task_assignment
+   SET status = 'REVOKED',
+       effective_to = now(),
+       revoked_by = 'local-fixture',
+       revoke_reason_code = 'E2E_ASSIGNMENT_REPLACED'
+ WHERE tenant_id = 'tenant-local'
+   AND task_id = '70000000-0000-4000-8000-000000000001'
+   AND assignment_kind = 'CANDIDATE'
+   AND status = 'ACTIVE';
 
 INSERT INTO sla_instance (
     sla_instance_id, tenant_id, project_id, work_order_id, task_id, sla_ref,

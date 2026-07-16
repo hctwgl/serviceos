@@ -21,14 +21,16 @@ export type HumanTaskCommandReceipt = {
   occurredAt: string
 }
 
+export type InputVersionRef = {
+  kind: 'FORM_SUBMISSION' | 'EVIDENCE_SET_SNAPSHOT'
+  ref: string
+  digest: string
+}
+
 export type CompleteHumanTaskRequest = {
   resultRef: string
   resultDigest: string
-  inputVersionRefs?: Array<{
-    kind: 'FORM_SUBMISSION' | 'EVIDENCE_SET_SNAPSHOT'
-    ref: string
-    digest: string
-  }>
+  inputVersionRefs?: InputVersionRef[]
 }
 
 export type ReleaseHumanTaskRequest = {

@@ -100,7 +100,10 @@ final class DefaultEvidenceSetSnapshotService implements EvidenceSetSnapshotServ
                     "Task 存在未处置的资料条件变化，不能创建资料快照");
         }
 
-        List<EvidenceSlotView> taskSlots = slots.listSlots(principal.tenantId(), task.taskId());
+        // Snapshot 冻结的是“当前可提交集合”，不能遍历全部历史 Slot。M53 重解析可能合法复用
+        // generation-1 的不可变 Slot，但其 currentResolutionId 已推进；若仍使用创建代次，
+        // M43 完成门禁会把刚创建的 Snapshot 判为过期，形成无法完成的假死 Task。
+        List<EvidenceSlotView> taskSlots = slots.listCurrentSlots(principal.tenantId(), task.taskId());
         List<UUID> revisionIds = command.memberRevisionIds() == null
                 ? List.of() : List.copyOf(command.memberRevisionIds());
         List<EvidenceRevisionView> loaded = items.findRevisionsByIds(

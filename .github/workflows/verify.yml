@@ -2,7 +2,13 @@ name: verify
 
 on:
   push:
+    branches:
+      - master
   pull_request:
+
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -15,8 +21,8 @@ jobs:
       run:
         working-directory: serviceos-admin-web
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: npm
@@ -30,16 +36,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
       - name: Install ripgrep
         run: sudo apt-get update && sudo apt-get install -y ripgrep
+      - name: Fail fast on milestone and migration drift
+        run: |
+          bash scripts/test-verification-preflight.sh
+          bash scripts/verify-milestone-preflight.sh
       - name: Resolve immutable contract comparison base
         shell: bash
         env:
@@ -77,7 +87,7 @@ jobs:
           serviceos-deploy/observability/verify-sensitive-output.sh "${runtime_log}"
       - name: Retain Maven verification diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: serviceos-maven-verify-log-${{ github.sha }}
           path: ${{ runner.temp }}/serviceos-verify-runtime.log
@@ -86,7 +96,7 @@ jobs:
       - name: Verify repeatable generated TypeScript client
         run: serviceos-contracts/scripts/verify-client-generation-reproducibility.sh
       - name: Retain generated TypeScript client and provenance manifest
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: serviceos-typescript-fetch-client-${{ github.sha }}
           path: |
@@ -96,17 +106,59 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  container-staging:
+  admin-pilot-e2e:
     needs:
       - admin-web
       - java-contracts
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: serviceos-admin-web/package-lock.json
+      - name: Install immutable Admin Web dependencies
+        working-directory: serviceos-admin-web
+        run: npm ci --no-audit --no-fund
+      - name: Install Google Chrome for Playwright
+        working-directory: serviceos-admin-web
+        run: npx playwright install --with-deps chrome
+      - name: Require container runtime for real Admin smoke
+        run: docker info
+      - name: Verify authenticated Admin Task write path
+        run: serviceos-deploy/admin-pilot/verify-admin-smoke.sh
+      - name: Retain Admin pilot diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: serviceos-admin-pilot-e2e-${{ github.sha }}
+          path: |
+            /tmp/serviceos-admin-pilot-backend.log
+            /tmp/serviceos-admin-pilot-web.log
+            serviceos-admin-web/test-results/
+            serviceos-admin-web/target/playwright-report/
+          if-no-files-found: warn
+          retention-days: 7
+
+  container-staging:
+    needs:
+      - admin-web
+      - java-contracts
+      - admin-pilot-e2e
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
@@ -125,7 +177,7 @@ jobs:
         run: serviceos-deploy/staging/verify-rehearsal.sh
       - name: Retain staging release evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: serviceos-staging-evidence-${{ github.sha }}
           path: target/staging-rehearsal/

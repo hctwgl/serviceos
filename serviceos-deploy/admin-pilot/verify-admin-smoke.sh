@@ -27,13 +27,30 @@ wait_http() {
   return 1
 }
 
+query_db() {
+  local sql="$1"
+  docker compose -f "${compose_file}" exec -T postgres \
+    psql -U serviceos_app -d serviceos -Atc "${sql}"
+}
+
+new_uuid() {
+  uuidgen | tr '[:upper:]' '[:lower:]'
+}
+
 cd "${repo_root}"
 docker compose -f "${compose_file}" up -d postgres keycloak
 wait_http "http://127.0.0.1:8081/realms/serviceos/.well-known/openid-configuration" "Keycloak"
 
 if ! curl --fail --silent "http://127.0.0.1:8080/livez" >/dev/null; then
   ./mvnw --batch-mode --no-transfer-progress -pl serviceos-backend -am -DskipTests package
-  java -jar serviceos-backend/target/serviceos-backend-0.1.0-SNAPSHOT.jar >"${backend_log}" 2>&1 &
+  # complete 只在命令事务内追加 task.completed；必须启用真实 Outbox worker，
+  # 由 Inbox 去重消费者继续推进 Node/Stage/Workflow/WorkOrder，不能用 SQL 模拟异步结果。
+  # 浏览器通过 Vite 同源代理执行私有 PUT，避免把本地 HMAC 上传 URL 暴露为跨域地址；
+  # Backend 仍负责签发短期 token、校验大小/摘要/MIME 并在 Finalize 后调度扫描。
+  SERVICEOS_OUTBOX_SCHEDULING_ENABLED=true \
+  SERVICEOS_TASK_SCHEDULING_ENABLED=true \
+  SERVICEOS_FILE_TRANSFER_BASE_URL=http://127.0.0.1:5173/api/v1/file-transfers \
+    java -jar serviceos-backend/target/serviceos-backend-0.1.0-SNAPSHOT.jar >"${backend_log}" 2>&1 &
   backend_pid="$!"
 fi
 wait_http "http://127.0.0.1:8080/readyz" "ServiceOS Backend"
@@ -45,6 +62,97 @@ docker compose -f "${compose_file}" exec -T postgres \
   psql -U serviceos_app -d serviceos \
   < serviceos-deploy/admin-pilot/seed-admin-pilot.sql
 
+# 终态验证每轮创建全新的 WorkOrder/Workflow/Stage/Node/Task，绝不通过 SQL 回退终态事实。
+completion_work_order_id="$(new_uuid)"
+completion_workflow_id="$(new_uuid)"
+completion_stage_id="$(new_uuid)"
+completion_node_id="$(new_uuid)"
+completion_task_id="$(new_uuid)"
+completion_start_event_id="$(new_uuid)"
+completion_stage_event_id="$(new_uuid)"
+completion_node_event_id="$(new_uuid)"
+completion_task_created_outbox_id="$(new_uuid)"
+completion_task_created_event_id="$(new_uuid)"
+completion_external_code="ADMIN-PILOT-COMPLETE-${completion_work_order_id%%-*}"
+completion_correlation_id="admin-pilot-complete-${completion_task_id}"
+
+# 整改验证使用独立 WorkOrder/Workflow/Task，避免把驳回、豁免或 Task 取消事实
+# 混入正常 APPROVED 后的终态推进证明。
+correction_work_order_id="$(new_uuid)"
+correction_workflow_id="$(new_uuid)"
+correction_stage_id="$(new_uuid)"
+correction_node_id="$(new_uuid)"
+correction_task_id="$(new_uuid)"
+correction_start_event_id="$(new_uuid)"
+correction_stage_event_id="$(new_uuid)"
+correction_node_event_id="$(new_uuid)"
+correction_task_created_outbox_id="$(new_uuid)"
+correction_task_created_event_id="$(new_uuid)"
+correction_external_code="ADMIN-PILOT-CORRECTION-${correction_work_order_id%%-*}"
+correction_correlation_id="admin-pilot-correction-${correction_task_id}"
+
+# 强制通过/重开血缘使用第三个独立 Task，避免与普通批准或整改豁免共享 ReviewCase。
+reopen_work_order_id="$(new_uuid)"
+reopen_workflow_id="$(new_uuid)"
+reopen_stage_id="$(new_uuid)"
+reopen_node_id="$(new_uuid)"
+reopen_task_id="$(new_uuid)"
+reopen_start_event_id="$(new_uuid)"
+reopen_stage_event_id="$(new_uuid)"
+reopen_node_event_id="$(new_uuid)"
+reopen_task_created_outbox_id="$(new_uuid)"
+reopen_task_created_event_id="$(new_uuid)"
+reopen_external_code="ADMIN-PILOT-REOPEN-${reopen_work_order_id%%-*}"
+reopen_correlation_id="admin-pilot-reopen-${reopen_task_id}"
+
+docker compose -f "${compose_file}" exec -T postgres \
+  psql -U serviceos_app -d serviceos \
+  -v completion_work_order_id="${completion_work_order_id}" \
+  -v completion_workflow_id="${completion_workflow_id}" \
+  -v completion_stage_id="${completion_stage_id}" \
+  -v completion_node_id="${completion_node_id}" \
+  -v completion_task_id="${completion_task_id}" \
+  -v completion_start_event_id="${completion_start_event_id}" \
+  -v completion_stage_event_id="${completion_stage_event_id}" \
+  -v completion_node_event_id="${completion_node_event_id}" \
+  -v completion_task_created_outbox_id="${completion_task_created_outbox_id}" \
+  -v completion_task_created_event_id="${completion_task_created_event_id}" \
+  -v completion_external_code="${completion_external_code}" \
+  -v completion_correlation_id="${completion_correlation_id}" \
+  < serviceos-deploy/admin-pilot/seed-admin-completion.sql
+
+docker compose -f "${compose_file}" exec -T postgres \
+  psql -U serviceos_app -d serviceos \
+  -v completion_work_order_id="${correction_work_order_id}" \
+  -v completion_workflow_id="${correction_workflow_id}" \
+  -v completion_stage_id="${correction_stage_id}" \
+  -v completion_node_id="${correction_node_id}" \
+  -v completion_task_id="${correction_task_id}" \
+  -v completion_start_event_id="${correction_start_event_id}" \
+  -v completion_stage_event_id="${correction_stage_event_id}" \
+  -v completion_node_event_id="${correction_node_event_id}" \
+  -v completion_task_created_outbox_id="${correction_task_created_outbox_id}" \
+  -v completion_task_created_event_id="${correction_task_created_event_id}" \
+  -v completion_external_code="${correction_external_code}" \
+  -v completion_correlation_id="${correction_correlation_id}" \
+  < serviceos-deploy/admin-pilot/seed-admin-completion.sql
+
+docker compose -f "${compose_file}" exec -T postgres \
+  psql -U serviceos_app -d serviceos \
+  -v completion_work_order_id="${reopen_work_order_id}" \
+  -v completion_workflow_id="${reopen_workflow_id}" \
+  -v completion_stage_id="${reopen_stage_id}" \
+  -v completion_node_id="${reopen_node_id}" \
+  -v completion_task_id="${reopen_task_id}" \
+  -v completion_start_event_id="${reopen_start_event_id}" \
+  -v completion_stage_event_id="${reopen_stage_event_id}" \
+  -v completion_node_event_id="${reopen_node_event_id}" \
+  -v completion_task_created_outbox_id="${reopen_task_created_outbox_id}" \
+  -v completion_task_created_event_id="${reopen_task_created_event_id}" \
+  -v completion_external_code="${reopen_external_code}" \
+  -v completion_correlation_id="${reopen_correlation_id}" \
+  < serviceos-deploy/admin-pilot/seed-admin-completion.sql
+
 if ! curl --fail --silent "http://127.0.0.1:5173" >/dev/null; then
   (
     cd serviceos-admin-web
@@ -55,6 +163,415 @@ fi
 wait_http "http://127.0.0.1:5173" "ServiceOS Admin Web"
 
 cd serviceos-admin-web
+export ADMIN_PILOT_COMPLETION_WORK_ORDER_CODE="${completion_external_code}"
+export ADMIN_PILOT_COMPLETION_TASK_ID="${completion_task_id}"
+export ADMIN_PILOT_CORRECTION_WORK_ORDER_CODE="${correction_external_code}"
+export ADMIN_PILOT_CORRECTION_TASK_ID="${correction_task_id}"
+export ADMIN_PILOT_REOPEN_WORK_ORDER_CODE="${reopen_external_code}"
+export ADMIN_PILOT_REOPEN_TASK_ID="${reopen_task_id}"
 npm run test:e2e
+
+task_state="$(query_db "
+  SELECT status || ':' || version || ':' || COALESCE(claimed_by, '')
+    FROM tsk_task
+   WHERE task_id = '70000000-0000-4000-8000-000000000001'
+")"
+[[ "${task_state}" =~ ^READY:[0-9]+:$ ]] || {
+  echo "Admin 试点 Task 最终状态非法: ${task_state}" >&2
+  exit 1
+}
+
+active_candidate_count="$(query_db "
+  SELECT count(*)
+    FROM tsk_task_assignment
+   WHERE task_id = '70000000-0000-4000-8000-000000000001'
+     AND assignment_kind = 'CANDIDATE'
+     AND principal_id = '06b612f3-a901-4b0e-bd90-86b4259cc087'
+     AND status = 'ACTIVE'
+")"
+[[ "${active_candidate_count}" == "1" ]] || {
+  echo "Admin 试点 ACTIVE 候选事实数量非法: ${active_candidate_count}" >&2
+  exit 1
+}
+
+latest_assignment_batch="$(query_db "
+  SELECT source_type || ':' || source_id || ':' || candidate_count
+    FROM tsk_task_assignment_batch
+   WHERE task_id = '70000000-0000-4000-8000-000000000001'
+   ORDER BY assigned_at DESC
+   LIMIT 1
+")"
+[[ "${latest_assignment_batch}" == "MANUAL:admin-pilot-e2e:1" ]] || {
+  echo "Admin 试点最新候选批次不是页面 MANUAL 分配结果: ${latest_assignment_batch}" >&2
+  exit 1
+}
+
+active_responsible_count="$(query_db "
+  SELECT count(*)
+    FROM tsk_task_assignment
+   WHERE task_id = '70000000-0000-4000-8000-000000000001'
+     AND assignment_kind = 'RESPONSIBLE'
+     AND status = 'ACTIVE'
+")"
+[[ "${active_responsible_count}" == "0" ]] || {
+  echo "Admin 试点 release 后仍存在 ACTIVE 责任事实: ${active_responsible_count}" >&2
+  exit 1
+}
+
+successful_audit_action_count="$(query_db "
+  SELECT count(DISTINCT action_name)
+    FROM aud_audit_record
+   WHERE target_id = '70000000-0000-4000-8000-000000000001'
+     AND action_name IN (
+       'TASK_ASSIGN_CANDIDATES', 'TASK_HUMAN_CLAIM', 'TASK_HUMAN_RELEASE'
+     )
+     AND result_code = 'SUCCEEDED'
+")"
+[[ "${successful_audit_action_count}" == "3" ]] || {
+  echo "Admin 试点候选分配/领取/释放成功审计不完整: ${successful_audit_action_count}" >&2
+  exit 1
+}
+
+completion_state=""
+for _ in $(seq 1 60); do
+  completion_state="$(query_db "
+    SELECT task.status || ':' || node.status || ':' || stage.status || ':' ||
+           workflow.status || ':' || work_order.status
+      FROM tsk_task task
+      JOIN wfl_node_instance node
+        ON node.tenant_id = task.tenant_id
+       AND node.workflow_node_instance_id = task.workflow_node_instance_id
+      JOIN wfl_stage_instance stage
+        ON stage.tenant_id = task.tenant_id
+       AND stage.stage_instance_id = task.stage_instance_id
+      JOIN wfl_workflow_instance workflow
+        ON workflow.tenant_id = task.tenant_id
+       AND workflow.workflow_instance_id = task.workflow_instance_id
+      JOIN wo_work_order work_order
+        ON work_order.tenant_id = task.tenant_id
+       AND work_order.id = task.work_order_id
+     WHERE task.task_id = '${completion_task_id}'
+  ")"
+  [[ "${completion_state}" == "COMPLETED:COMPLETED:COMPLETED:COMPLETED:FULFILLED" ]] && break
+  sleep 1
+done
+[[ "${completion_state}" == "COMPLETED:COMPLETED:COMPLETED:COMPLETED:FULFILLED" ]] || {
+  echo "Admin 试点终态推进未闭环: ${completion_state}" >&2
+  exit 1
+}
+
+expired_assignment_count="$(query_db "
+  SELECT count(*)
+    FROM tsk_task_assignment
+   WHERE task_id = '${completion_task_id}'
+     AND assignment_kind IN ('CANDIDATE', 'RESPONSIBLE')
+     AND status = 'EXPIRED'
+")"
+[[ "${expired_assignment_count}" == "2" ]] || {
+  echo "Admin 试点 complete 后候选/责任未全部过期: ${expired_assignment_count}" >&2
+  exit 1
+}
+
+completion_audit_count="$(query_db "
+  SELECT count(DISTINCT action_name)
+    FROM aud_audit_record
+   WHERE target_id = '${completion_task_id}'
+     AND action_name IN (
+       'TASK_ASSIGN_CANDIDATES', 'TASK_HUMAN_CLAIM',
+       'TASK_HUMAN_START', 'TASK_HUMAN_COMPLETE'
+     )
+     AND result_code = 'SUCCEEDED'
+")"
+[[ "${completion_audit_count}" == "4" ]] || {
+  echo "Admin 试点终态命令成功审计不完整: ${completion_audit_count}" >&2
+  exit 1
+}
+
+form_submission_state="$(query_db "
+  SELECT submission.validation_status || ':' ||
+         (task.result_ref = 'form-submission://' || submission.form_submission_id::text) || ':' ||
+         (task.result_digest = submission.content_digest)
+    FROM frm_form_submission submission
+    JOIN tsk_task task
+      ON task.tenant_id = submission.tenant_id
+     AND task.task_id = submission.task_id
+   WHERE submission.task_id = '${completion_task_id}'
+   ORDER BY submission.submission_version DESC
+   LIMIT 1
+")"
+[[ "${form_submission_state}" == "VALIDATED:true:true" ]] || {
+  echo "Admin 试点表单提交未形成精确 complete 引用: ${form_submission_state}" >&2
+  exit 1
+}
+
+form_submission_audit_count="$(query_db "
+  SELECT count(*)
+    FROM aud_audit_record audit
+    JOIN frm_form_submission submission
+      ON submission.tenant_id = audit.tenant_id
+     AND submission.form_submission_id::text = audit.target_id
+   WHERE submission.task_id = '${completion_task_id}'
+     AND audit.action_name = 'FORM_SUBMITTED'
+     AND audit.capability_code = 'form.submit'
+     AND audit.result_code = 'VALIDATED'
+")"
+[[ "${form_submission_audit_count}" == "1" ]] || {
+  echo "Admin 试点表单提交成功审计不完整: ${form_submission_audit_count}" >&2
+  exit 1
+}
+
+evidence_completion_state="$(query_db "
+  SELECT revision.status || ':' || stored_file.lifecycle_status || ':' ||
+         snapshot.purpose || ':' || snapshot.member_count || ':' ||
+         (
+           task.input_version_refs @> jsonb_build_array(jsonb_build_object(
+             'kind', 'FORM_SUBMISSION',
+             'ref', task.result_ref,
+             'digest', task.result_digest
+           ))
+         ) || ':' ||
+         (
+           task.input_version_refs @> jsonb_build_array(jsonb_build_object(
+             'kind', 'EVIDENCE_SET_SNAPSHOT',
+             'ref', 'evidence-set-snapshot://' || snapshot.evidence_set_snapshot_id::text,
+             'digest', snapshot.content_digest
+           ))
+         )
+    FROM tsk_task task
+    JOIN evd_evidence_set_snapshot snapshot
+      ON snapshot.tenant_id = task.tenant_id
+     AND snapshot.task_id = task.task_id
+    JOIN evd_evidence_set_member member
+      ON member.tenant_id = snapshot.tenant_id
+     AND member.evidence_set_snapshot_id = snapshot.evidence_set_snapshot_id
+    JOIN evd_evidence_revision revision
+      ON revision.tenant_id = member.tenant_id
+     AND revision.evidence_revision_id = member.evidence_revision_id
+    JOIN fil_stored_file stored_file
+      ON stored_file.tenant_id = revision.tenant_id
+     AND stored_file.file_id = revision.file_object_id
+   WHERE task.task_id = '${completion_task_id}'
+   ORDER BY snapshot.created_at DESC
+   LIMIT 1
+")"
+[[ "${evidence_completion_state}" == "VALIDATED:AVAILABLE:TASK_SUBMISSION:1:true:true" ]] || {
+  echo "Admin 试点资料未形成可用文件、VALIDATED Revision 与精确双引用: ${evidence_completion_state}" >&2
+  exit 1
+}
+
+evidence_audit_count="$(query_db "
+  SELECT count(DISTINCT action_name)
+    FROM aud_audit_record
+   WHERE action_name IN (
+       'EVIDENCE_UPLOAD_BEGUN',
+       'FILE_UPLOAD_SESSION_CREATED',
+       'FILE_UPLOAD_FINALIZED',
+       'EVIDENCE_REVISION_CREATED',
+       'EVIDENCE_MACHINE_VALIDATION_COMPLETED',
+       'EVIDENCE_SET_SNAPSHOT_CREATED'
+     )
+     AND (
+       target_id = '${completion_task_id}'
+       OR target_id IN (
+         SELECT slot_id::text
+           FROM evd_evidence_slot
+          WHERE task_id = '${completion_task_id}'
+         UNION
+         SELECT evidence_revision_id::text
+           FROM evd_evidence_revision
+          WHERE task_id = '${completion_task_id}'
+         UNION
+         SELECT evidence_set_snapshot_id::text
+           FROM evd_evidence_set_snapshot
+          WHERE task_id = '${completion_task_id}'
+       )
+     )
+")"
+[[ "${evidence_audit_count}" -ge 4 ]] || {
+  echo "Admin 试点资料上传/校验/快照审计不完整: ${evidence_audit_count}" >&2
+  exit 1
+}
+
+review_completion_state=""
+for _ in $(seq 1 30); do
+  review_completion_state="$(query_db "
+    SELECT review.status || ':' || count(DISTINCT decision.review_decision_id) || ':' ||
+           count(DISTINCT audit.action_name) || ':' ||
+           count(DISTINCT inbox.event_id)
+      FROM evd_review_case review
+      LEFT JOIN evd_review_decision decision
+        ON decision.tenant_id = review.tenant_id
+       AND decision.review_case_id = review.review_case_id
+      LEFT JOIN aud_audit_record audit
+        ON audit.tenant_id = review.tenant_id
+       AND audit.target_id = review.review_case_id::text
+       AND audit.action_name IN ('REVIEW_CASE_CREATED', 'REVIEW_CASE_DECIDED')
+      LEFT JOIN rel_outbox_event outbox
+        ON outbox.tenant_id = review.tenant_id
+       AND outbox.aggregate_type = 'ReviewCase'
+       AND outbox.aggregate_id = review.review_case_id::text
+       AND outbox.event_type IN ('evidence.review-case-created', 'evidence.review-decided')
+      LEFT JOIN rel_inbox_record inbox
+        ON inbox.tenant_id = outbox.tenant_id
+       AND inbox.event_id = outbox.event_id
+       AND inbox.status = 'SUCCEEDED'
+     WHERE review.task_id = '${completion_task_id}'
+       AND review.origin = 'INTERNAL'
+     GROUP BY review.review_case_id, review.status
+  ")"
+  [[ "${review_completion_state}" == "APPROVED:1:2:2" ]] && break
+  sleep 1
+done
+[[ "${review_completion_state}" == "APPROVED:1:2:2" ]] || {
+  echo "Admin 试点审核案例、唯一裁决、审计或事件消费不完整: ${review_completion_state}" >&2
+  exit 1
+}
+
+correction_waive_state=""
+for _ in $(seq 1 30); do
+  correction_waive_state="$(query_db "
+    SELECT review.status || ':' ||
+           count(DISTINCT decision.review_decision_id) || ':' ||
+           correction.status || ':' ||
+           correction_task.status || ':' ||
+           count(DISTINCT audit.action_name) || ':' ||
+           count(DISTINCT inbox.event_id)
+      FROM evd_review_case review
+      JOIN evd_review_decision decision
+        ON decision.tenant_id = review.tenant_id
+       AND decision.review_case_id = review.review_case_id
+      JOIN evd_correction_case correction
+        ON correction.tenant_id = decision.tenant_id
+       AND correction.source_review_decision_id = decision.review_decision_id
+      JOIN tsk_task correction_task
+        ON correction_task.tenant_id = correction.tenant_id
+       AND correction_task.task_id = correction.correction_task_id
+      LEFT JOIN aud_audit_record audit
+        ON audit.tenant_id = correction.tenant_id
+       AND (
+         (
+           audit.target_id = review.review_case_id::text
+           AND audit.action_name IN ('REVIEW_CASE_CREATED', 'REVIEW_CASE_DECIDED')
+         )
+         OR (
+           audit.target_id = correction.correction_case_id::text
+           AND audit.action_name = 'CORRECTION_CASE_WAIVED'
+         )
+       )
+      LEFT JOIN rel_outbox_event outbox
+        ON outbox.tenant_id = correction.tenant_id
+       AND (
+         (
+           outbox.aggregate_type = 'ReviewCase'
+           AND outbox.aggregate_id = review.review_case_id::text
+           AND outbox.event_type IN ('evidence.review-case-created', 'evidence.review-decided')
+         )
+         OR (
+           outbox.aggregate_type = 'CorrectionCase'
+           AND outbox.aggregate_id = correction.correction_case_id::text
+           AND outbox.event_type IN (
+             'evidence.correction-case-created',
+             'evidence.correction-waived'
+           )
+         )
+       )
+      LEFT JOIN rel_inbox_record inbox
+        ON inbox.tenant_id = outbox.tenant_id
+       AND inbox.event_id = outbox.event_id
+       AND inbox.status = 'SUCCEEDED'
+     WHERE review.task_id = '${correction_task_id}'
+       AND review.origin = 'INTERNAL'
+     GROUP BY review.review_case_id, review.status, correction.correction_case_id,
+              correction.status, correction_task.status
+  ")"
+  [[ "${correction_waive_state}" == "REJECTED:1:WAIVED:CANCELLED:3:4" ]] && break
+  sleep 1
+done
+[[ "${correction_waive_state}" == "REJECTED:1:WAIVED:CANCELLED:3:4" ]] || {
+  echo "Admin 试点驳回、整改豁免、Task 取消、审计或事件消费不完整: ${correction_waive_state}" >&2
+  exit 1
+}
+
+review_reopen_state=""
+for _ in $(seq 1 30); do
+  review_reopen_state="$(query_db "
+    SELECT source.status || ':' ||
+           decision.decision || ':' ||
+           successor.status || ':' ||
+           (successor.reopened_from_review_case_id = source.review_case_id) || ':' ||
+           successor.reopen_trigger_ref || ':' ||
+           count(DISTINCT audit.action_name) || ':' ||
+           count(DISTINCT inbox.event_id) || ':' ||
+           count(DISTINCT correction.correction_case_id)
+      FROM evd_review_case source
+      JOIN evd_review_decision decision
+        ON decision.tenant_id = source.tenant_id
+       AND decision.review_case_id = source.review_case_id
+      JOIN evd_review_case successor
+        ON successor.tenant_id = source.tenant_id
+       AND successor.reopened_from_review_case_id = source.review_case_id
+      LEFT JOIN evd_correction_case correction
+        ON correction.tenant_id = source.tenant_id
+       AND correction.source_review_decision_id = decision.review_decision_id
+      LEFT JOIN aud_audit_record audit
+        ON audit.tenant_id = source.tenant_id
+       AND (
+         (
+           audit.target_id = source.review_case_id::text
+           AND audit.action_name IN ('REVIEW_CASE_CREATED', 'REVIEW_CASE_FORCE_APPROVED')
+         )
+         OR (
+           audit.target_id = successor.review_case_id::text
+           AND audit.action_name = 'REVIEW_CASE_REOPENED'
+         )
+       )
+      LEFT JOIN rel_outbox_event outbox
+        ON outbox.tenant_id = source.tenant_id
+       AND (
+         (
+           outbox.aggregate_id = source.review_case_id::text
+           AND outbox.event_type IN ('evidence.review-case-created', 'evidence.review-decided')
+         )
+         OR (
+           outbox.aggregate_id = successor.review_case_id::text
+           AND outbox.event_type = 'evidence.review-case-reopened'
+         )
+       )
+      LEFT JOIN rel_inbox_record inbox
+        ON inbox.tenant_id = outbox.tenant_id
+       AND inbox.event_id = outbox.event_id
+       AND inbox.status = 'SUCCEEDED'
+     WHERE source.task_id = '${reopen_task_id}'
+       AND source.reopened_from_review_case_id IS NULL
+     GROUP BY source.review_case_id, source.status, decision.decision,
+              successor.review_case_id, successor.status,
+              successor.reopened_from_review_case_id, successor.reopen_trigger_ref
+  ")"
+  [[ "${review_reopen_state}" == \
+    "REOPENED:FORCE_APPROVED:OPEN:true:OEM_REJECTION:ADMIN-PILOT-001:3:3:0" ]] && break
+  sleep 1
+done
+[[ "${review_reopen_state}" == \
+  "REOPENED:FORCE_APPROVED:OPEN:true:OEM_REJECTION:ADMIN-PILOT-001:3:3:0" ]] || {
+  echo "Admin 试点强制通过、重开血缘、审计或事件消费不完整: ${review_reopen_state}" >&2
+  exit 1
+}
+
+progression_inbox_count="$(query_db "
+  SELECT count(*)
+    FROM rel_inbox_record
+   WHERE consumer_name = 'workflow.task-completed.v1'
+     AND status = 'SUCCEEDED'
+     AND event_id = (
+       SELECT event_id
+         FROM rel_outbox_event
+        WHERE aggregate_id = '${completion_task_id}'
+          AND event_type = 'task.completed'
+     )
+")"
+[[ "${progression_inbox_count}" == "1" ]] || {
+  echo "Admin 试点 task.completed 未被 Workflow Inbox 成功消费: ${progression_inbox_count}" >&2
+  exit 1
+}
 
 echo "Admin 试点冒烟通过：真实 Keycloak、Backend、PostgreSQL 与浏览器链路均已验证"

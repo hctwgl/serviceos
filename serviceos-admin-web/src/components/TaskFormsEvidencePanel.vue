@@ -28,10 +28,11 @@ import {
 } from '../api/formsEvidence'
 import { createReviewCase } from '../api/reviews'
 import { newIdempotencyKey } from '../api/client'
+import type { InputVersionRef } from '../api/tasks'
 import QueueTable from '../pages/QueueTable.vue'
 
 const props = defineProps<{ taskId: string }>()
-const emit = defineEmits<{ preparedComplete: [payload: { resultRef: string; resultDigest: string }] }>()
+const emit = defineEmits<{ preparedComplete: [payload: InputVersionRef] }>()
 
 const loading = ref(false)
 const busy = ref(false)
@@ -70,14 +71,24 @@ async function load() {
   loading.value = true
   error.value = null
   try {
-    const [formList, slotList, itemList] = await Promise.all([
+    // 表单提交与资料编排是同一面板中的两个独立能力。EvidenceSlot 尚未完成可靠解析时，
+    // 只能降级资料半边，不能丢弃已成功解析的锁定 FormVersion 并阻断合法表单提交。
+    const [formResult, slotResult, itemResult] = await Promise.allSettled([
       listTaskForms(props.taskId),
       listTaskEvidenceSlots(props.taskId),
       listTaskEvidenceItems(props.taskId),
     ])
+    if (formResult.status === 'rejected') throw formResult.reason
+    const formList = formResult.value
+    const slotList = slotResult.status === 'fulfilled' ? slotResult.value : []
+    const itemList = itemResult.status === 'fulfilled' ? itemResult.value : []
     forms.value = formList
     slots.value = slotList
     items.value = itemList
+    const secondaryErrors = [slotResult, itemResult]
+      .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+      .map((result) => (result.reason instanceof Error ? result.reason.message : '资料能力加载失败'))
+    if (secondaryErrors.length) error.value = [...new Set(secondaryErrors)].join('；')
     if (!selectedFormVersionId.value && formList[0]) {
       selectedFormVersionId.value = formList[0].formVersionId
     }
@@ -112,8 +123,9 @@ async function submitForm() {
     message.value = `表单提交 ${lastSubmission.value.submissionId} / ${lastSubmission.value.validationStatus}`
     if (lastSubmission.value.validationStatus === 'VALIDATED') {
       emit('preparedComplete', {
-        resultRef: `form-submission://${lastSubmission.value.submissionId}`,
-        resultDigest: lastSubmission.value.contentDigest,
+        kind: 'FORM_SUBMISSION',
+        ref: `form-submission://${lastSubmission.value.submissionId}`,
+        digest: lastSubmission.value.contentDigest,
       })
     }
   } catch (err) {
@@ -318,8 +330,9 @@ async function createSnapshot() {
     lastSnapshot.value = (await createEvidenceSetSnapshot(props.taskId, ids)).data
     message.value = `资料快照 ${lastSnapshot.value.evidenceSetSnapshotId}`
     emit('preparedComplete', {
-      resultRef: `evidence-set-snapshot://${lastSnapshot.value.evidenceSetSnapshotId}`,
-      resultDigest: lastSnapshot.value.contentDigest,
+      kind: 'EVIDENCE_SET_SNAPSHOT',
+      ref: `evidence-set-snapshot://${lastSnapshot.value.evidenceSetSnapshotId}`,
+      digest: lastSnapshot.value.contentDigest,
     })
   } catch (err) {
     error.value = err instanceof Error ? err.message : '创建快照失败'
