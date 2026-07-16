@@ -6,6 +6,7 @@ import {
   completeHumanTask,
   releaseHumanTask,
   startHumanTask,
+  type InputVersionRef,
   type TaskAllowedAction,
   type TaskAllowedActions,
 } from '../api/tasks'
@@ -13,8 +14,7 @@ import {
 const props = defineProps<{
   taskId: string
   allowedActions: TaskAllowedActions
-  preparedResultRef?: string
-  preparedResultDigest?: string
+  preparedInputs?: InputVersionRef[]
 }>()
 
 const emit = defineEmits<{ executed: [] }>()
@@ -40,11 +40,21 @@ watch(
 )
 
 watch(
-  () => [props.preparedResultRef, props.preparedResultDigest] as const,
-  ([refValue, digestValue]) => {
-    if (refValue) resultRef.value = refValue
-    if (digestValue) resultDigest.value = digestValue
+  () => props.preparedInputs,
+  (inputs) => {
+    const form = inputs?.find((input) => input.kind === 'FORM_SUBMISSION')
+    const evidence = inputs?.find((input) => input.kind === 'EVIDENCE_SET_SNAPSHOT')
+    const primary = form ?? evidence
+    if (primary) {
+      resultRef.value = primary.ref
+      resultDigest.value = primary.digest
+    }
+    // 双输入 Task 的主引用必须保持 FormSubmission，并同时提交精确的两份版本引用。
+    // 单输入时清空该字段，避免把旧 Task 的双引用 JSON 带入后续命令。
+    dualInputJson.value =
+      form && evidence ? JSON.stringify([form, evidence], null, 2) : ''
   },
+  { deep: true },
 )
 
 async function run(action: TaskAllowedAction) {
@@ -71,11 +81,7 @@ async function run(action: TaskAllowedAction) {
       if (!resultRef.value.trim() || !/^[0-9a-f]{64}$/.test(resultDigest.value)) {
         throw new Error('complete 需要 resultRef 与 64 位 hex resultDigest')
       }
-      let inputVersionRefs: Array<{
-        kind: 'FORM_SUBMISSION' | 'EVIDENCE_SET_SNAPSHOT'
-        ref: string
-        digest: string
-      }> | undefined
+      let inputVersionRefs: InputVersionRef[] | undefined
       if (dualInputJson.value.trim()) {
         inputVersionRefs = JSON.parse(dualInputJson.value) as typeof inputVersionRefs
       }

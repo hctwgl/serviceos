@@ -45,7 +45,11 @@ if ! curl --fail --silent "http://127.0.0.1:8080/livez" >/dev/null; then
   ./mvnw --batch-mode --no-transfer-progress -pl serviceos-backend -am -DskipTests package
   # complete 只在命令事务内追加 task.completed；必须启用真实 Outbox worker，
   # 由 Inbox 去重消费者继续推进 Node/Stage/Workflow/WorkOrder，不能用 SQL 模拟异步结果。
+  # 浏览器通过 Vite 同源代理执行私有 PUT，避免把本地 HMAC 上传 URL 暴露为跨域地址；
+  # Backend 仍负责签发短期 token、校验大小/摘要/MIME 并在 Finalize 后调度扫描。
   SERVICEOS_OUTBOX_SCHEDULING_ENABLED=true \
+  SERVICEOS_TASK_SCHEDULING_ENABLED=true \
+  SERVICEOS_FILE_TRANSFER_BASE_URL=http://127.0.0.1:5173/api/v1/file-transfers \
     java -jar serviceos-backend/target/serviceos-backend-0.1.0-SNAPSHOT.jar >"${backend_log}" 2>&1 &
   backend_pid="$!"
 fi
@@ -67,6 +71,8 @@ completion_task_id="$(new_uuid)"
 completion_start_event_id="$(new_uuid)"
 completion_stage_event_id="$(new_uuid)"
 completion_node_event_id="$(new_uuid)"
+completion_task_created_outbox_id="$(new_uuid)"
+completion_task_created_event_id="$(new_uuid)"
 completion_external_code="ADMIN-PILOT-COMPLETE-${completion_work_order_id%%-*}"
 completion_correlation_id="admin-pilot-complete-${completion_task_id}"
 
@@ -80,6 +86,8 @@ docker compose -f "${compose_file}" exec -T postgres \
   -v completion_start_event_id="${completion_start_event_id}" \
   -v completion_stage_event_id="${completion_stage_event_id}" \
   -v completion_node_event_id="${completion_node_event_id}" \
+  -v completion_task_created_outbox_id="${completion_task_created_outbox_id}" \
+  -v completion_task_created_event_id="${completion_task_created_event_id}" \
   -v completion_external_code="${completion_external_code}" \
   -v completion_correlation_id="${completion_correlation_id}" \
   < serviceos-deploy/admin-pilot/seed-admin-completion.sql
@@ -244,6 +252,78 @@ form_submission_audit_count="$(query_db "
 ")"
 [[ "${form_submission_audit_count}" == "1" ]] || {
   echo "Admin 试点表单提交成功审计不完整: ${form_submission_audit_count}" >&2
+  exit 1
+}
+
+evidence_completion_state="$(query_db "
+  SELECT revision.status || ':' || stored_file.lifecycle_status || ':' ||
+         snapshot.purpose || ':' || snapshot.member_count || ':' ||
+         (
+           task.input_version_refs @> jsonb_build_array(jsonb_build_object(
+             'kind', 'FORM_SUBMISSION',
+             'ref', task.result_ref,
+             'digest', task.result_digest
+           ))
+         ) || ':' ||
+         (
+           task.input_version_refs @> jsonb_build_array(jsonb_build_object(
+             'kind', 'EVIDENCE_SET_SNAPSHOT',
+             'ref', 'evidence-set-snapshot://' || snapshot.evidence_set_snapshot_id::text,
+             'digest', snapshot.content_digest
+           ))
+         )
+    FROM tsk_task task
+    JOIN evd_evidence_set_snapshot snapshot
+      ON snapshot.tenant_id = task.tenant_id
+     AND snapshot.task_id = task.task_id
+    JOIN evd_evidence_set_member member
+      ON member.tenant_id = snapshot.tenant_id
+     AND member.evidence_set_snapshot_id = snapshot.evidence_set_snapshot_id
+    JOIN evd_evidence_revision revision
+      ON revision.tenant_id = member.tenant_id
+     AND revision.evidence_revision_id = member.evidence_revision_id
+    JOIN fil_stored_file stored_file
+      ON stored_file.tenant_id = revision.tenant_id
+     AND stored_file.file_id = revision.file_object_id
+   WHERE task.task_id = '${completion_task_id}'
+   ORDER BY snapshot.created_at DESC
+   LIMIT 1
+")"
+[[ "${evidence_completion_state}" == "VALIDATED:AVAILABLE:TASK_SUBMISSION:1:true:true" ]] || {
+  echo "Admin 试点资料未形成可用文件、VALIDATED Revision 与精确双引用: ${evidence_completion_state}" >&2
+  exit 1
+}
+
+evidence_audit_count="$(query_db "
+  SELECT count(DISTINCT action_name)
+    FROM aud_audit_record
+   WHERE action_name IN (
+       'EVIDENCE_UPLOAD_BEGUN',
+       'FILE_UPLOAD_SESSION_CREATED',
+       'FILE_UPLOAD_FINALIZED',
+       'EVIDENCE_REVISION_CREATED',
+       'EVIDENCE_MACHINE_VALIDATION_COMPLETED',
+       'EVIDENCE_SET_SNAPSHOT_CREATED'
+     )
+     AND (
+       target_id = '${completion_task_id}'
+       OR target_id IN (
+         SELECT slot_id::text
+           FROM evd_evidence_slot
+          WHERE task_id = '${completion_task_id}'
+         UNION
+         SELECT evidence_revision_id::text
+           FROM evd_evidence_revision
+          WHERE task_id = '${completion_task_id}'
+         UNION
+         SELECT evidence_set_snapshot_id::text
+           FROM evd_evidence_set_snapshot
+          WHERE task_id = '${completion_task_id}'
+       )
+     )
+")"
+[[ "${evidence_audit_count}" -ge 4 ]] || {
+  echo "Admin 试点资料上传/校验/快照审计不完整: ${evidence_audit_count}" >&2
   exit 1
 }
 

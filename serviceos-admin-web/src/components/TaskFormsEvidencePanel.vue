@@ -28,10 +28,11 @@ import {
 } from '../api/formsEvidence'
 import { createReviewCase } from '../api/reviews'
 import { newIdempotencyKey } from '../api/client'
+import type { InputVersionRef } from '../api/tasks'
 import QueueTable from '../pages/QueueTable.vue'
 
 const props = defineProps<{ taskId: string }>()
-const emit = defineEmits<{ preparedComplete: [payload: { resultRef: string; resultDigest: string }] }>()
+const emit = defineEmits<{ preparedComplete: [payload: InputVersionRef] }>()
 
 const loading = ref(false)
 const busy = ref(false)
@@ -122,8 +123,9 @@ async function submitForm() {
     message.value = `表单提交 ${lastSubmission.value.submissionId} / ${lastSubmission.value.validationStatus}`
     if (lastSubmission.value.validationStatus === 'VALIDATED') {
       emit('preparedComplete', {
-        resultRef: `form-submission://${lastSubmission.value.submissionId}`,
-        resultDigest: lastSubmission.value.contentDigest,
+        kind: 'FORM_SUBMISSION',
+        ref: `form-submission://${lastSubmission.value.submissionId}`,
+        digest: lastSubmission.value.contentDigest,
       })
     }
   } catch (err) {
@@ -328,8 +330,9 @@ async function createSnapshot() {
     lastSnapshot.value = (await createEvidenceSetSnapshot(props.taskId, ids)).data
     message.value = `资料快照 ${lastSnapshot.value.evidenceSetSnapshotId}`
     emit('preparedComplete', {
-      resultRef: `evidence-set-snapshot://${lastSnapshot.value.evidenceSetSnapshotId}`,
-      resultDigest: lastSnapshot.value.contentDigest,
+      kind: 'EVIDENCE_SET_SNAPSHOT',
+      ref: `evidence-set-snapshot://${lastSnapshot.value.evidenceSetSnapshotId}`,
+      digest: lastSnapshot.value.contentDigest,
     })
   } catch (err) {
     error.value = err instanceof Error ? err.message : '创建快照失败'
