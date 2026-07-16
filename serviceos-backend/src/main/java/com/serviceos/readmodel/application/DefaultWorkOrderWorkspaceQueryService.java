@@ -4,6 +4,7 @@ import com.serviceos.appointment.api.AppointmentRevisionView;
 import com.serviceos.appointment.api.AppointmentService;
 import com.serviceos.appointment.api.AppointmentView;
 import com.serviceos.appointment.api.AppointmentWindow;
+import com.serviceos.appointment.api.ContactAttemptView;
 import com.serviceos.dispatch.api.ServiceAssignmentQueryService;
 import com.serviceos.dispatch.api.ServiceAssignmentSummary;
 import com.serviceos.evidence.api.CorrectionCaseService;
@@ -43,6 +44,7 @@ import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceA
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceAppointmentsVisitsSectionData;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceCorrectionCaseSummary;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceCorrectionResubmissionSummary;
+import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceContactAttemptSummary;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceEvidenceSlotSummary;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceFormSummary;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection.WorkOrderWorkspaceFormsEvidenceSectionData;
@@ -313,11 +315,14 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
                 loadAppointmentsVisits(principal, correlationId, workOrderId, tasks, 1);
         boolean visitDenied = loaded.visits() == null;
         boolean appointmentDenied = loaded.appointments() == null;
-        return dualHalfAvailability(
-                visitDenied,
-                appointmentDenied,
-                visitDenied || loaded.visits().isEmpty(),
-                appointmentDenied || loaded.appointments().isEmpty());
+        boolean contactDenied = loaded.contactAttempts() == null;
+        boolean anyData = (!visitDenied && !loaded.visits().isEmpty())
+                || (!appointmentDenied && !loaded.appointments().isEmpty())
+                || (!contactDenied && !loaded.contactAttempts().isEmpty());
+        if (anyData) {
+            return "AVAILABLE";
+        }
+        return visitDenied || appointmentDenied || contactDenied ? "UNAVAILABLE" : "EMPTY";
     }
 
     private String probeFormsEvidenceAvailability(
@@ -446,8 +451,31 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
             }
         }
 
+        List<WorkOrderWorkspaceContactAttemptSummary> contactAttemptSummaries;
+        try {
+            List<WorkOrderWorkspaceContactAttemptSummary> collected = new ArrayList<>();
+            for (WorkOrderTaskSummary task : tasks) {
+                appointments.listContactAttempts(principal, correlationId, task.id()).stream()
+                        .map(this::toContactAttemptSummary)
+                        .forEach(collected::add);
+            }
+            contactAttemptSummaries = collected.stream()
+                    .sorted(Comparator.comparing(
+                                    WorkOrderWorkspaceContactAttemptSummary::startedAt,
+                                    Comparator.reverseOrder())
+                            .thenComparing(WorkOrderWorkspaceContactAttemptSummary::contactAttemptId))
+                    .limit(limit)
+                    .toList();
+        } catch (BusinessProblem problem) {
+            if (problem.code() == ProblemCode.ACCESS_DENIED) {
+                contactAttemptSummaries = null;
+            } else {
+                throw problem;
+            }
+        }
+
         return new WorkOrderWorkspaceAppointmentsVisitsSectionData(
-                visitSummaries, appointmentSummaries, null);
+                visitSummaries, appointmentSummaries, contactAttemptSummaries, null);
     }
 
     private WorkOrderWorkspaceFormsEvidenceSectionData loadFormsEvidence(
@@ -658,6 +686,14 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
                 window == null ? null : window.estimatedDurationMinutes(),
                 appointment.aggregateVersion(),
                 appointment.createdAt());
+    }
+
+    private WorkOrderWorkspaceContactAttemptSummary toContactAttemptSummary(ContactAttemptView attempt) {
+        // 联系对象、自由文本、录音引用与操作者只在 Appointment 专用 API 中按需读取。
+        return new WorkOrderWorkspaceContactAttemptSummary(
+                attempt.contactAttemptId(), attempt.taskId(), attempt.projectId(),
+                attempt.workOrderId(), attempt.channel(), attempt.startedAt(), attempt.endedAt(),
+                attempt.resultCode().name(), attempt.nextContactAt(), attempt.createdAt());
     }
 
     private WorkOrderWorkspaceFormSummary toFormSummary(TaskFormDefinition form) {

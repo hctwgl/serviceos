@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.63.0
+  version: 0.64.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -133,7 +133,7 @@ paths:
       description: >-
         复用 workOrder.read 实时鉴权，组合 Task/时间线 freshness、可选 SLA/异常摘要，
         以及 APPOINTMENTS_VISITS 等 sectionAvailability。不含客户 PII；大区块按需加载见
-        workspace/sections（M87～M91：TASKS/TIMELINE_AUDIT/APPOINTMENTS_VISITS/FORMS_EVIDENCE/
+        workspace/sections（M87～M94：TASKS/TIMELINE_AUDIT/APPOINTMENTS_VISITS/FORMS_EVIDENCE/
         REVIEWS_CORRECTIONS/INTEGRATION）。
       parameters:
         - { name: workOrderId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -154,7 +154,7 @@ paths:
       operationId: getWorkOrderWorkspaceSection
       summary: 按需加载工单工作区区块
       description: >-
-        M91 接受 TASKS、TIMELINE_AUDIT、APPOINTMENTS_VISITS、FORMS_EVIDENCE、
+        M94 接受 TASKS、TIMELINE_AUDIT、APPOINTMENTS_VISITS（含联系尝试）、FORMS_EVIDENCE、
         REVIEWS_CORRECTIONS 与 INTEGRATION；其余 section 失败关闭为 400。
         复用 workOrder.read；实时组合，不落区块投影表；不含客户 PII。
       parameters:
@@ -2293,10 +2293,27 @@ components:
         estimatedDurationMinutes: { type: [integer, 'null'], minimum: 1, maximum: 1440 }
         aggregateVersion: { type: integer, format: int64, minimum: 1 }
         createdAt: { type: string, format: date-time }
+    WorkOrderWorkspaceContactAttemptSummary:
+      type: object
+      additionalProperties: false
+      required: [contactAttemptId, taskId, projectId, workOrderId, channel, startedAt,
+        endedAt, resultCode, nextContactAt, createdAt]
+      properties:
+        contactAttemptId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        workOrderId: { type: string, format: uuid }
+        channel: { type: string, minLength: 1, maxLength: 80 }
+        startedAt: { type: string, format: date-time }
+        endedAt: { type: string, format: date-time }
+        resultCode:
+          enum: [CONNECTED, NO_ANSWER, BUSY, WRONG_NUMBER, USER_REQUESTED_LATER, INVALID_CONTACT]
+        nextContactAt: { type: [string, 'null'], format: date-time }
+        createdAt: { type: string, format: date-time }
     WorkOrderWorkspaceAppointmentsVisitsSectionData:
       type: object
       additionalProperties: false
-      required: [visits, appointments, nextCursor]
+      required: [visits, appointments, contactAttempts, nextCursor]
       properties:
         visits:
           oneOf:
@@ -2309,6 +2326,12 @@ components:
             - type: array
               maxItems: 100
               items: { $ref: '#/components/schemas/WorkOrderWorkspaceAppointmentSummary' }
+            - { type: 'null' }
+        contactAttempts:
+          oneOf:
+            - type: array
+              maxItems: 100
+              items: { $ref: '#/components/schemas/WorkOrderWorkspaceContactAttemptSummary' }
             - { type: 'null' }
         nextCursor: { type: [string, 'null'] }
     WorkOrderWorkspaceFormSummary:
