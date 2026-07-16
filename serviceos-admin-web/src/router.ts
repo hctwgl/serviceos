@@ -6,6 +6,7 @@ import OutboundQueuePage from './pages/OutboundQueuePage.vue'
 import ExceptionQueuePage from './pages/ExceptionQueuePage.vue'
 import TokenPage from './pages/TokenPage.vue'
 import WorkOrderLookupPage from './pages/WorkOrderLookupPage.vue'
+import WorkOrderDirectoryPage from './pages/WorkOrderDirectoryPage.vue'
 import WorkOrderWorkspacePage from './pages/WorkOrderWorkspacePage.vue'
 
 export const router = createRouter({
@@ -20,7 +21,8 @@ export const router = createRouter({
         { path: 'corrections', name: 'ADMIN.CORRECTION.QUEUE', component: CorrectionQueuePage },
         { path: 'integration/outbound', name: 'ADMIN.INTEGRATION.OUTBOUND', component: OutboundQueuePage },
         { path: 'exceptions', name: 'ADMIN.EXCEPTION.QUEUE', component: ExceptionQueuePage },
-        { path: 'work-orders', name: 'ADMIN.WORKORDER.LOOKUP', component: WorkOrderLookupPage },
+        { path: 'work-orders', name: 'ADMIN.WORKORDER.LIST', component: WorkOrderDirectoryPage },
+        { path: 'work-orders/lookup', name: 'ADMIN.WORKORDER.LOOKUP', component: WorkOrderLookupPage },
         {
           path: 'work-orders/:id',
           name: 'ADMIN.WORKORDER.WORKSPACE',
