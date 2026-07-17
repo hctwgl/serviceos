@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-17
-baselineCommit: 588c87a787d0f7b545326b1aa8645bb9de18fe33
-latestMilestone: M148
+baselineCommit: PENDING
+latestMilestone: M149
 ---
 
 # ServiceOS 实施状态总览
@@ -39,11 +39,11 @@ latestMilestone: M148
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M148 Admin 审核/整改队列筛选 |
-| 基线提交 | `588c87a787d0f7b545326b1aa8645bb9de18fe33` |
+| 最新实施里程碑 | M149 Admin 工作区审核/整改详情深链 |
+| 基线提交 | `PENDING`（功能提交后回填） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
-| 前端工程 | `serviceos-admin-web`（Vue+TS+Vite）已纳入 CI 构建，具备开发态 Keycloak PKCE，以及真实只读、Task MANUAL assign-candidates/claim/release、表单/资料/审核/整改/完结、正常补传复审，预约上门、BYD 提审外发 ACK、厂端回调，CPIM 入站→激活→Admin HTTP 人工初派→同单预约上门→表单/资料/驳回整改补传复审/外发/完结（ADMIN-PILOT-09），入站 Envelope/Canonical 详情深链、Outbound/Review/Correction 队列 Accepted OpenAPI 筛选，以及工作区 INTEGRATION → 外发交付详情深链的 PR 阻断 E2E；Network/Technician 尚未建立 |
+| 前端工程 | `serviceos-admin-web`（Vue+TS+Vite）已纳入 CI 构建，具备开发态 Keycloak PKCE，以及真实只读、Task MANUAL assign-candidates/claim/release、表单/资料/审核/整改/完结、正常补传复审，预约上门、BYD 提审外发 ACK、厂端回调，CPIM 入站→激活→Admin HTTP 人工初派→同单预约上门→表单/资料/驳回整改补传复审/外发/完结（ADMIN-PILOT-09），入站 Envelope/Canonical 详情深链、Outbound/Review/Correction 队列 Accepted OpenAPI 筛选，以及工作区 INTEGRATION/REVIEWS_CORRECTIONS 详情深链的 PR 阻断 E2E；Network/Technician 尚未建立 |
 | 数据库 | PostgreSQL + Flyway（当前版本 084 / 86） |
 | 契约 | Core OpenAPI 0.72.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、recovered/resolved 与 SLA started/breached/met@v1） |
 
@@ -75,7 +75,7 @@ latestMilestone: M148
 | 通知 | 通知与运营异常中心 | `PROPOSED` | 已有总体设计 | 通知通道、模板、可靠发送和 UI | `architecture/14-*` |
 | 履约事实与试算 | 事实提取和双向试算 | `PROPOSED` | 已有设计、API 和数据规划 | 运行时、投影和前端工作区 | M5 设计 |
 | 对账结算 | 对账、结算、争议与调整 | `PROPOSED` | 已有边界设计 | 正式运行时和页面 | `architecture/16-*` |
-| Admin Portal | 总部运营后台 | `PARTIAL` | M101～M148：队列/任务/SLA/异常/外发/工单/项目目录、工作区、allowed-actions；CI 阻断构建；开发态 Keycloak PKCE；真实只读与写链路 PR 阻断 E2E（含 ADMIN-PILOT-09、入站/外发详情深链、Outbound/Review/Correction 队列 Accepted OpenAPI 筛选） | 设计系统、SavedView、正式企业 OIDC/BFF、生产对象存储/专业扫描、专用入站队列列表、评分/硬过滤派单与 ServiceNetwork 生命周期 | M7 设计、M101～M148、Admin 试点基线 |
+| Admin Portal | 总部运营后台 | `PARTIAL` | M101～M149：队列/任务/SLA/异常/外发/工单/项目目录、工作区、allowed-actions；CI 阻断构建；开发态 Keycloak PKCE；真实只读与写链路 PR 阻断 E2E（含 ADMIN-PILOT-09、入站/外发/审核/整改详情深链、Outbound/Review/Correction 队列 Accepted OpenAPI 筛选） | 设计系统、SavedView、正式企业 OIDC/BFF、生产对象存储/专业扫描、专用入站队列列表、评分/硬过滤派单与 ServiceNetwork 生命周期 | M7 设计、M101～M149、Admin 试点基线 |
 | Network Portal | 网点协作端 | `PROPOSED` | 页面和跨端协作规格 | 前端代码和 E2E | M7 设计 |
 | Technician App | 师傅移动端 | `PROPOSED` | 弱网、离线工作包、上传队列和页面规格 | 移动端工程、真机和离线运行时 | M7 设计 |
 | External Portal | 用户/车企受控页面 | `PROPOSED` | 最小边界规划 | 二期页面和工程实现 | M7 设计 |
@@ -1126,6 +1126,16 @@ M144 起 SPI 种子入口已删除。
 
 明确未实现：评分/硬过滤/DispatchDecision、ServiceNetwork 生命周期、专用入站队列页、真实 sandbox。
 
+### M149：Admin 工作区审核/整改详情深链
+
+已实现：
+
+- 工作区 REVIEWS_CORRECTIONS → `/reviews/{reviewCaseId}` 与 `/corrections/{correctionCaseId}`；
+- 复用已 Implemented 详情 GET 与详情页；
+- Playwright：驳回后从工作区点击审核与整改深链。
+
+明确未实现：专用入站队列列表 API、SavedView、运营异常队列筛选、真实 sandbox。
+
 ### M148：Admin 审核/整改队列筛选
 
 已实现：
@@ -1169,22 +1179,23 @@ M144 起 SPI 种子入口已删除。
 
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M148**。Admin 已证明 `ADMIN-PILOT-09`、入站/外发详情深链与
+ServiceOS 可靠纵向切片已推进到 **M149**。Admin 已证明 `ADMIN-PILOT-09`、入站/外发/审核/整改详情深链与
 Outbound/Review/Correction 队列 Accepted OpenAPI 筛选；没有实现专用入站队列列表、完整评分派单引擎、
 完整 SLA/通知策略、通用队列/SavedView 或整个现场履约平台。
 
 ```text
 候选下一方向（优先从已确认文档中选择最小可靠切片）：
-1. 正式企业 OIDC/BFF、MFA 与设计系统；SavedView 仍需再接受 API-06 章节；
-2. 授权入站 Envelope 队列（需先接受 API-06 §6 `GET /inbound-envelopes` 窄化列表契约）；
-3. 在接受 ServiceNetwork 状态语义后建立目录与准入/启用/清退生命周期；当前相关文档仍为 Proposed，
+1. 运营异常队列 Accepted OpenAPI 筛选（Admin UI 仍硬编码 status=OPEN）；
+2. 正式企业 OIDC/BFF、MFA 与设计系统；SavedView 仍需再接受 API-06 章节；
+3. 授权入站 Envelope 队列（需先接受 API-06 §6 `GET /inbound-envelopes` 窄化列表契约）；
+4. 在接受 ServiceNetwork 状态语义后建立目录与准入/启用/清退生命周期；当前相关文档仍为 Proposed，
    不得猜测状态值或转换规则；
-4. 建立 Organization/Region 目录、层级后代与组织到 Project 的权威关系；
-5. 在试点确认日历/暂停/预警规则后扩展 BUSINESS 时钟、暂停和升级；
-6. 多候选人评分、硬过滤重跑、自动 claim、网点容量联动（需另接受 api/04 / ADR-009 切片）；
-7. OCR/CV、GPS 权威距离、二级审批/MFA、报告 GENERATED 资料包；
-8. 表达式计算字段、决策表/脚本、草稿冲突与离线合并；
-9. 履约事实试算与结算运行时；Admin 投影重建/重放 HTTP（需另接受运维契约）。
+5. 建立 Organization/Region 目录、层级后代与组织到 Project 的权威关系；
+6. 在试点确认日历/暂停/预警规则后扩展 BUSINESS 时钟、暂停和升级；
+7. 多候选人评分、硬过滤重跑、自动 claim、网点容量联动（需另接受 api/04 / ADR-009 切片）；
+8. OCR/CV、GPS 权威距离、二级审批/MFA、报告 GENERATED 资料包；
+9. 表达式计算字段、决策表/脚本、草稿冲突与离线合并；
+10. 履约事实试算与结算运行时；Admin 投影重建/重放 HTTP（需另接受运维契约）。
 ```
 
 接手 Agent 必须先检查仓库是否已有更新的里程碑文档、ADR 或提交；在收到明确批准前不得猜测业务策略并实现上述候选项。

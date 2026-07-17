@@ -210,6 +210,18 @@ type OutboundDeliveryLink = {
   externalOrderCode: string
 }
 
+type ReviewCaseLink = {
+  reviewCaseId: string
+  origin: string
+  status: string
+}
+
+type CorrectionCaseLink = {
+  correctionCaseId: string
+  status: string
+  sourceReviewCaseId: string
+}
+
 const inboundEnvelopeLinks = computed((): InboundEnvelopeLink[] => {
   const integration = sectionData.value?.integration
   if (!integration || activeSection.value !== 'INTEGRATION') return []
@@ -251,6 +263,47 @@ const outboundDeliveryLinks = computed((): OutboundDeliveryLink[] => {
       }
     })
     .filter((item): item is OutboundDeliveryLink => item != null)
+})
+
+/** 复用已 Implemented Review/Correction 详情路由；投影缺权时数组为 null。 */
+const reviewCaseLinks = computed((): ReviewCaseLink[] => {
+  const section = sectionData.value?.reviewsCorrections
+  if (!section || activeSection.value !== 'REVIEWS_CORRECTIONS') return []
+  const raw = (section as Record<string, unknown>).reviews
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null
+      const row = item as Record<string, unknown>
+      const id = row.reviewCaseId
+      if (typeof id !== 'string' || !id) return null
+      return {
+        reviewCaseId: id,
+        origin: String(row.origin ?? '—'),
+        status: String(row.status ?? '—'),
+      }
+    })
+    .filter((item): item is ReviewCaseLink => item != null)
+})
+
+const correctionCaseLinks = computed((): CorrectionCaseLink[] => {
+  const section = sectionData.value?.reviewsCorrections
+  if (!section || activeSection.value !== 'REVIEWS_CORRECTIONS') return []
+  const raw = (section as Record<string, unknown>).corrections
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null
+      const row = item as Record<string, unknown>
+      const id = row.correctionCaseId
+      if (typeof id !== 'string' || !id) return null
+      return {
+        correctionCaseId: id,
+        status: String(row.status ?? '—'),
+        sourceReviewCaseId: String(row.sourceReviewCaseId ?? ''),
+      }
+    })
+    .filter((item): item is CorrectionCaseLink => item != null)
 })
 
 const slaRows = computed(() =>
@@ -587,6 +640,32 @@ onMounted(() => {
               }"
             >
               {{ item.businessMessageType }} / {{ item.status }} / {{ item.externalOrderCode }}
+            </RouterLink>
+          </p>
+          <p v-if="reviewCaseLinks.length" class="links review-links">
+            打开审核案例：
+            <RouterLink
+              v-for="item in reviewCaseLinks"
+              :key="item.reviewCaseId"
+              :to="{
+                name: 'ADMIN.REVIEW.DETAIL',
+                params: { id: item.reviewCaseId },
+              }"
+            >
+              {{ item.origin }} / {{ item.status }} / {{ item.reviewCaseId }}
+            </RouterLink>
+          </p>
+          <p v-if="correctionCaseLinks.length" class="links correction-links">
+            打开整改案例：
+            <RouterLink
+              v-for="item in correctionCaseLinks"
+              :key="item.correctionCaseId"
+              :to="{
+                name: 'ADMIN.CORRECTION.DETAIL',
+                params: { id: item.correctionCaseId },
+              }"
+            >
+              {{ item.status }} / {{ item.correctionCaseId }}
             </RouterLink>
           </p>
           <pre>{{ sectionPreview }}</pre>
