@@ -33,6 +33,13 @@ INSERT INTO cfg_configuration_asset_version (
     repeat('b', 64), 'PUBLISHED', now()
 ) ON CONFLICT DO NOTHING;
 
+-- bundle_item 以 (version_id, content_digest) FK 绑定资产；替换 digest 前必须先断开再重建。
+DELETE FROM cfg_configuration_bundle_item
+ WHERE tenant_id = 'tenant-local'
+   AND bundle_id = '30000000-0000-4000-8000-000000000001'
+   AND asset_type = 'WORKFLOW'
+   AND asset_version_id = '20000000-0000-4000-8000-000000000001';
+
 UPDATE cfg_configuration_asset_version
    SET definition = '{"workflowKey":"ADMIN_PILOT","semanticVersion":"1.0.0","startNodeId":"START","terminalNodeIds":["END"],"nodes":[{"nodeId":"START","nodeType":"START","name":"开始"},{"nodeId":"PILOT_FIELD_OPS","nodeType":"USER_TASK","name":"现场履约","stageCode":"PILOT_SURVEY","taskType":"PILOT_SURVEY","slaRef":"PILOT_RESPONSE"},{"nodeId":"END","nodeType":"END","name":"结束"}],"transitions":[{"transitionId":"t1","from":"START","to":"PILOT_FIELD_OPS"},{"transitionId":"t2","from":"PILOT_FIELD_OPS","to":"END"}]}',
        content_digest = 'f2837436570f57cc32a9651bc36491f0595cd35b5b351cc3056c344d69a2b51a',
@@ -63,12 +70,13 @@ INSERT INTO cfg_configuration_bundle_item (
     '20000000-0000-4000-8000-000000000002', repeat('b', 64)
 ) ON CONFLICT DO NOTHING;
 
-UPDATE cfg_configuration_bundle_item
-   SET content_digest = 'f2837436570f57cc32a9651bc36491f0595cd35b5b351cc3056c344d69a2b51a'
- WHERE tenant_id = 'tenant-local'
-   AND bundle_id = '30000000-0000-4000-8000-000000000001'
-   AND asset_type = 'WORKFLOW'
-   AND asset_version_id = '20000000-0000-4000-8000-000000000001';
+INSERT INTO cfg_configuration_bundle_item (
+    tenant_id, bundle_id, asset_type, asset_version_id, content_digest
+) VALUES (
+    'tenant-local', '30000000-0000-4000-8000-000000000001', 'WORKFLOW',
+    '20000000-0000-4000-8000-000000000001',
+    'f2837436570f57cc32a9651bc36491f0595cd35b5b351cc3056c344d69a2b51a'
+) ON CONFLICT DO NOTHING;
 
 ALTER TABLE cfg_configuration_bundle_item ENABLE TRIGGER trg_cfg_bundle_item_immutable;
 ALTER TABLE cfg_configuration_asset_version ENABLE TRIGGER trg_cfg_asset_version_immutable;
