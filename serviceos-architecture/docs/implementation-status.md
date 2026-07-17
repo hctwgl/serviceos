@@ -3,7 +3,7 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-17
-baselineCommit: PENDING
+baselineCommit: d1c5b3f6a4c91754e472fa8cda26579d96bd1b4f
 latestMilestone: M155
 ---
 
@@ -40,7 +40,7 @@ latestMilestone: M155
 | 项目 | 当前值 |
 |---|---|
 | 最新实施里程碑 | M155 Admin 预约/表单提交详情页 |
-| 基线提交 | `PENDING`（功能提交后回填） |
+| 基线提交 | `d1c5b3f6a4c91754e472fa8cda26579d96bd1b4f` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
 | 前端工程 | `serviceos-admin-web`（Vue+TS+Vite）已纳入 CI 构建，具备开发态 Keycloak PKCE，以及真实只读、Task MANUAL assign-candidates/claim/release、表单/资料/审核/整改/完结、正常补传复审，预约上门、BYD 提审外发 ACK、厂端回调，CPIM 入站→激活→Admin HTTP 人工初派→同单预约上门→表单/资料/驳回整改补传复审/外发/完结（ADMIN-PILOT-09），入站 Envelope/Canonical 详情深链、专项队列与目录/SLA Accepted OpenAPI 筛选，工作区各按需区块详情或 Task 旁路深链，以及预约/表单提交只读详情页的 PR 阻断 E2E；Network/Technician 尚未建立 |
