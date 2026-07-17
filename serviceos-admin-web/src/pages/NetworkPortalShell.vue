@@ -27,6 +27,7 @@ const TEST_IDS: Record<string, string> = {
   'NETWORK.TECHNICIAN.ASSIGN': 'nav-network-assign-technician',
   'NETWORK.APPOINTMENT': 'nav-network-appointments',
   'NETWORK.CORRECTION.QUEUE': 'nav-network-corrections',
+  'NETWORK.EXCEPTION.QUEUE': 'nav-network-exceptions',
   'NETWORK.EVIDENCE.SUPPLEMENT': 'nav-network-evidence-supplement',
 }
 

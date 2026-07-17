@@ -50,6 +50,14 @@
          WHERE tenant_id = #{tenantId} AND exception_id = #{exceptionId}
     </select>
 
+    <select id="listByTask" resultType="map">
+        SELECT <include refid="workbenchColumns"/>
+          FROM ops_operational_exception
+         WHERE tenant_id = #{tenantId}
+           AND task_id = CAST(#{taskId} AS uuid)
+         ORDER BY opened_at ASC, exception_id ASC
+    </select>
+
     <update id="acknowledge">
         UPDATE ops_operational_exception
            SET status = 'ACKNOWLEDGED', acknowledged_at = #{acknowledgedAt},

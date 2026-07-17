@@ -15,8 +15,11 @@ import com.serviceos.network.api.NetworkMembershipView;
 import com.serviceos.network.api.NetworkPortalTechnicianQuery;
 import com.serviceos.network.api.NetworkPortalTechnicianView;
 import com.serviceos.network.api.PrincipalNetworkAffiliationQuery;
+import com.serviceos.operations.api.OperationalExceptionItem;
+import com.serviceos.operations.api.OperationalExceptionWorkbenchService;
 import com.serviceos.readmodel.api.NetworkPortalCapacityItem;
 import com.serviceos.readmodel.api.NetworkPortalCorrectionItem;
+import com.serviceos.readmodel.api.NetworkPortalExceptionItem;
 import com.serviceos.readmodel.api.NetworkPortalPage;
 import com.serviceos.readmodel.api.NetworkPortalQueryService;
 import com.serviceos.readmodel.api.NetworkPortalTaskItem;
@@ -37,6 +40,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -53,9 +57,12 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     private static final String NETWORK_TASK_READ = "networkTask.read";
     private static final String TECHNICIAN_READ_OWN = "technician.readOwnNetwork";
     private static final String EVIDENCE_READ = "evidence.read";
+    private static final String EXCEPTION_READ = "operations.exception.read";
     private static final String CONTEXT_PREFIX = "NETWORK|NETWORK|";
     private static final int DEFAULT_CORRECTION_LIMIT = 50;
     private static final int MAX_CORRECTION_LIMIT = 100;
+    private static final int DEFAULT_EXCEPTION_LIMIT = 50;
+    private static final int MAX_EXCEPTION_LIMIT = 100;
 
     private final PrincipalNetworkAffiliationQuery affiliations;
     private final AuthorizationService authorization;
@@ -64,6 +71,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     private final NetworkPortalTechnicianQuery technicians;
     private final TaskFulfillmentContextService tasks;
     private final CorrectionCaseService corrections;
+    private final OperationalExceptionWorkbenchService exceptions;
     private final ActiveServiceResponsibilityService responsibilities;
     private final Clock clock;
 
@@ -75,6 +83,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
             NetworkPortalTechnicianQuery technicians,
             TaskFulfillmentContextService tasks,
             CorrectionCaseService corrections,
+            OperationalExceptionWorkbenchService exceptions,
             ActiveServiceResponsibilityService responsibilities,
             Clock clock
     ) {
@@ -85,6 +94,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         this.technicians = technicians;
         this.tasks = tasks;
         this.corrections = corrections;
+        this.exceptions = exceptions;
         this.responsibilities = responsibilities;
         this.clock = clock;
     }
@@ -278,6 +288,89 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         return correction;
     }
 
+    /**
+     * 本网点运营异常队列。
+     * <p>
+     * 事务边界：只读。先门禁再按 ACTIVE NETWORK 任务 fan-in {@code listForTask}；
+     * 可选 severity 过滤；taskId 不在 ACTIVE 集合时返回空页（不泄露他网点任务存在性）。
+     * Portal {@code allowedActions} 恒为空（本切片不接受 ACK/resolve）。
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public NetworkPortalPage<NetworkPortalExceptionItem> listExceptions(
+            CurrentPrincipal actor,
+            String correlationId,
+            String networkContextHeader,
+            String status,
+            UUID taskId,
+            String severity,
+            Integer limit
+    ) {
+        UUID networkId = requireAuthorizedNetwork(actor, correlationId, networkContextHeader, EXCEPTION_READ);
+        String effectiveStatus = (status == null || status.isBlank()) ? "OPEN" : status.trim();
+        String effectiveSeverity = normalizeOptionalSeverity(severity);
+        int effectiveLimit = normalizeExceptionLimit(limit);
+        List<NetworkActiveAssignmentView> active = assignments.listActiveForNetwork(
+                actor.tenantId(), networkId.toString());
+        Set<UUID> activeTaskIds = new LinkedHashSet<>();
+        for (NetworkActiveAssignmentView row : active) {
+            activeTaskIds.add(row.taskId());
+        }
+        List<UUID> taskIds;
+        if (taskId != null) {
+            if (!activeTaskIds.contains(taskId)) {
+                return new NetworkPortalPage<>(networkId, List.of(), clock.instant());
+            }
+            taskIds = List.of(taskId);
+        } else {
+            taskIds = List.copyOf(activeTaskIds);
+        }
+        List<NetworkPortalExceptionItem> items = new ArrayList<>();
+        for (UUID candidateTaskId : taskIds) {
+            for (OperationalExceptionItem row : exceptions.listForTask(actor, correlationId, candidateTaskId)) {
+                if (!effectiveStatus.equals(row.status())) {
+                    continue;
+                }
+                if (effectiveSeverity != null && !effectiveSeverity.equals(row.severity())) {
+                    continue;
+                }
+                items.add(toExceptionItem(row));
+            }
+        }
+        items.sort(Comparator
+                .comparing(NetworkPortalExceptionItem::openedAt)
+                .thenComparing(NetworkPortalExceptionItem::exceptionId));
+        if (items.size() > effectiveLimit) {
+            items = items.subList(0, effectiveLimit);
+        }
+        return new NetworkPortalPage<>(networkId, List.copyOf(items), clock.instant());
+    }
+
+    /**
+     * 本网点运营异常详情。
+     * <p>
+     * 失败关闭：Workbench get 鉴权后，ACTIVE NETWORK 责任必须等于上下文网点；
+     * Portal allowedActions 恒为空。
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public NetworkPortalExceptionItem getException(
+            CurrentPrincipal actor,
+            String correlationId,
+            String networkContextHeader,
+            UUID exceptionId
+    ) {
+        Objects.requireNonNull(exceptionId, "exceptionId");
+        UUID networkId = requireAuthorizedNetwork(actor, correlationId, networkContextHeader, EXCEPTION_READ);
+        OperationalExceptionItem item = exceptions.get(actor, correlationId, exceptionId);
+        if (item.taskId() == null) {
+            throw new BusinessProblem(ProblemCode.ACCESS_DENIED,
+                    "任务对本网点没有 ACTIVE NETWORK 责任");
+        }
+        requireNetworkOwnedTask(actor.tenantId(), item.taskId(), networkId);
+        return toExceptionItem(item);
+    }
+
     private void requireNetworkOwnedTask(String tenantId, UUID taskId, UUID networkId) {
         ActiveServiceResponsibility responsibility = responsibilities.find(tenantId, taskId)
                 .orElseThrow(() -> new BusinessProblem(ProblemCode.ACCESS_DENIED,
@@ -307,6 +400,26 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                 resubmissionCount);
     }
 
+    private static NetworkPortalExceptionItem toExceptionItem(OperationalExceptionItem row) {
+        return new NetworkPortalExceptionItem(
+                row.exceptionId(),
+                row.projectId(),
+                row.sourceType(),
+                row.category(),
+                row.severity(),
+                row.errorCode(),
+                row.status(),
+                row.workOrderId(),
+                row.taskId(),
+                row.handlingTaskId(),
+                row.occurrenceCount(),
+                row.openedAt(),
+                row.lastDetectedAt(),
+                row.resolvedAt(),
+                row.resolutionCode(),
+                List.of());
+    }
+
     private static int normalizeCorrectionLimit(Integer limit) {
         if (limit == null) {
             return DEFAULT_CORRECTION_LIMIT;
@@ -316,6 +429,28 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                     "limit 须在 1～100 之间");
         }
         return limit;
+    }
+
+    private static int normalizeExceptionLimit(Integer limit) {
+        if (limit == null) {
+            return DEFAULT_EXCEPTION_LIMIT;
+        }
+        if (limit < 1 || limit > MAX_EXCEPTION_LIMIT) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                    "limit 须在 1～100 之间");
+        }
+        return limit;
+    }
+
+    private static String normalizeOptionalSeverity(String severity) {
+        if (severity == null || severity.isBlank()) {
+            return null;
+        }
+        String normalized = severity.trim().toUpperCase(Locale.ROOT);
+        if (!Set.of("P0", "P1", "P2", "P3").contains(normalized)) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, "severity is invalid");
+        }
+        return normalized;
     }
 
     private List<NetworkPortalCapacityItem> capacityItems(String tenantId, UUID networkId) {

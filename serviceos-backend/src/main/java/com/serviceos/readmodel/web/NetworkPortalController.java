@@ -5,6 +5,7 @@ import com.serviceos.evidence.api.CorrectionResubmissionView;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
 import com.serviceos.readmodel.api.NetworkPortalCapacityItem;
 import com.serviceos.readmodel.api.NetworkPortalCorrectionItem;
+import com.serviceos.readmodel.api.NetworkPortalExceptionItem;
 import com.serviceos.readmodel.api.NetworkPortalPage;
 import com.serviceos.readmodel.api.NetworkPortalQueryService;
 import com.serviceos.readmodel.api.NetworkPortalTaskItem;
@@ -108,6 +109,35 @@ final class NetworkPortalController {
         return ResponseEntity.ok()
                 .header(CorrelationIds.HEADER_NAME, correlationId)
                 .body(toCorrectionResponse(view));
+    }
+
+    @GetMapping("/operational-exceptions")
+    ResponseEntity<NetworkPortalPage<NetworkPortalExceptionItem>> operationalExceptions(
+            @RequestHeader(value = "X-Network-Context", required = false) String networkContext,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "taskId", required = false) UUID taskId,
+            @RequestParam(value = "severity", required = false) String severity,
+            @RequestParam(value = "limit", required = false) Integer limit
+    ) {
+        return response(
+                queries.listExceptions(
+                        principals.current(), correlationId, networkContext,
+                        status, taskId, severity, limit),
+                correlationId);
+    }
+
+    @GetMapping("/operational-exceptions/{exceptionId}")
+    ResponseEntity<NetworkPortalExceptionItem> operationalException(
+            @PathVariable UUID exceptionId,
+            @RequestHeader(value = "X-Network-Context", required = false) String networkContext,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        NetworkPortalExceptionItem body = queries.getException(
+                principals.current(), correlationId, networkContext, exceptionId);
+        return ResponseEntity.ok()
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(body);
     }
 
     private static <T> ResponseEntity<NetworkPortalPage<T>> response(

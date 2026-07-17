@@ -445,6 +445,51 @@ export function getNetworkPortalCorrection(networkContextId: string, correctionC
   )
 }
 
+export type NetworkPortalExceptionItem = {
+  exceptionId: string
+  projectId: string | null
+  sourceType: string
+  category: string
+  severity: string
+  errorCode: string
+  status: string
+  workOrderId: string | null
+  taskId: string | null
+  handlingTaskId: string | null
+  occurrenceCount: number
+  openedAt: string
+  lastDetectedAt: string
+  resolvedAt: string | null
+  resolutionCode: string | null
+  allowedActions: string[]
+}
+
+/** M203：本网点运营异常队列。 */
+export function listNetworkPortalExceptions(
+  networkContextId: string,
+  params?: { status?: string; taskId?: string; severity?: string; limit?: number },
+) {
+  return apiGet<NetworkPortalPage<NetworkPortalExceptionItem>>(
+    '/network-portal/operational-exceptions',
+    {
+      status: params?.status,
+      taskId: params?.taskId,
+      severity: params?.severity,
+      limit: params?.limit == null ? undefined : String(params.limit),
+    },
+    networkHeaders(networkContextId),
+  )
+}
+
+/** M203：本网点运营异常详情。 */
+export function getNetworkPortalException(networkContextId: string, exceptionId: string) {
+  return apiGet<NetworkPortalExceptionItem>(
+    `/network-portal/operational-exceptions/${exceptionId}`,
+    {},
+    networkHeaders(networkContextId),
+  )
+}
+
 /** M201：整改补传 resubmit。 */
 export function resubmitNetworkPortalCorrectionCase(
   networkContextId: string,

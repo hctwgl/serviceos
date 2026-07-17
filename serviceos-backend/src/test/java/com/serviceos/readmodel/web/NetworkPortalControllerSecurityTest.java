@@ -5,6 +5,7 @@ import com.serviceos.evidence.api.CorrectionCaseView;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
 import com.serviceos.readmodel.api.NetworkPortalCorrectionItem;
+import com.serviceos.readmodel.api.NetworkPortalExceptionItem;
 import com.serviceos.readmodel.api.NetworkPortalPage;
 import com.serviceos.readmodel.api.NetworkPortalQueryService;
 import com.serviceos.readmodel.api.NetworkPortalWorkbenchView;
@@ -31,12 +32,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** M194/M202：network-portal 未认证 401；伪造上下文 403 PORTAL_CONTEXT_INVALID。 */
+/** M194/M202/M203：network-portal 未认证 401；伪造上下文 403 PORTAL_CONTEXT_INVALID。 */
 @WebMvcTest(NetworkPortalController.class)
 @Import(SecurityConfiguration.class)
 class NetworkPortalControllerSecurityTest {
     private static final UUID NETWORK_ID = UUID.fromString("019f83a0-2222-7f8c-9505-36fe5c0e8803");
     private static final UUID CORRECTION_ID = UUID.fromString("019f83e0-bbbb-7f8c-9505-36fe5c0e8811");
+    private static final UUID EXCEPTION_ID = UUID.fromString("019f83f0-bbbb-7f8c-9505-36fe5c0e8812");
 
     @Autowired MockMvc mvc;
     @MockitoBean NetworkPortalQueryService queries;
@@ -51,6 +53,12 @@ class NetworkPortalControllerSecurityTest {
                         .header("X-Network-Context", "NETWORK|NETWORK|" + NETWORK_ID))
                 .andExpect(status().isUnauthorized());
         mvc.perform(get("/api/v1/network-portal/correction-cases/" + CORRECTION_ID)
+                        .header("X-Network-Context", "NETWORK|NETWORK|" + NETWORK_ID))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/network-portal/operational-exceptions")
+                        .header("X-Network-Context", "NETWORK|NETWORK|" + NETWORK_ID))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/network-portal/operational-exceptions/" + EXCEPTION_ID)
                         .header("X-Network-Context", "NETWORK|NETWORK|" + NETWORK_ID))
                 .andExpect(status().isUnauthorized());
     }
@@ -165,6 +173,59 @@ class NetworkPortalControllerSecurityTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.correctionCaseId").value(CORRECTION_ID.toString()))
                 .andExpect(jsonPath("$.status").value("OPEN"));
+    }
+
+    @Test
+    void authenticatedMemberGetsExceptionQueue() throws Exception {
+        CurrentPrincipal actor = actor();
+        Instant now = Instant.parse("2026-07-17T12:00:00Z");
+        UUID taskId = UUID.fromString("019f83f0-9999-7f8c-9505-36fe5c0e880a");
+        when(principals.current()).thenReturn(actor);
+        when(queries.listExceptions(
+                eq(actor), eq("exc-list"), eq("NETWORK|NETWORK|" + NETWORK_ID),
+                isNull(), isNull(), isNull(), isNull()))
+                .thenReturn(new NetworkPortalPage<>(
+                        NETWORK_ID,
+                        List.of(new NetworkPortalExceptionItem(
+                                EXCEPTION_ID, UUID.randomUUID(), "TEST", "AUTOMATION_FINAL_FAILURE",
+                                "P1", "TEST_FAILURE", "OPEN", UUID.randomUUID(), taskId, null,
+                                1L, now, now, null, null, List.of())),
+                        now));
+
+        mvc.perform(get("/api/v1/network-portal/operational-exceptions")
+                        .with(jwt().jwt(token -> token.subject("external-subject")
+                                .claim("tenant_id", "tenant-a")))
+                        .header("X-Correlation-Id", "exc-list")
+                        .header("X-Network-Context", "NETWORK|NETWORK|" + NETWORK_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.networkId").value(NETWORK_ID.toString()))
+                .andExpect(jsonPath("$.items[0].exceptionId").value(EXCEPTION_ID.toString()))
+                .andExpect(jsonPath("$.items[0].status").value("OPEN"))
+                .andExpect(jsonPath("$.items[0].allowedActions").isEmpty());
+    }
+
+    @Test
+    void authenticatedMemberGetsExceptionDetail() throws Exception {
+        CurrentPrincipal actor = actor();
+        Instant now = Instant.parse("2026-07-17T12:00:00Z");
+        UUID taskId = UUID.fromString("019f83f0-9999-7f8c-9505-36fe5c0e880a");
+        when(principals.current()).thenReturn(actor);
+        when(queries.getException(
+                eq(actor), eq("exc-get"), eq("NETWORK|NETWORK|" + NETWORK_ID), eq(EXCEPTION_ID)))
+                .thenReturn(new NetworkPortalExceptionItem(
+                        EXCEPTION_ID, UUID.randomUUID(), "TEST", "AUTOMATION_FINAL_FAILURE",
+                        "P1", "TEST_FAILURE", "OPEN", UUID.randomUUID(), taskId, null,
+                        1L, now, now, null, null, List.of()));
+
+        mvc.perform(get("/api/v1/network-portal/operational-exceptions/" + EXCEPTION_ID)
+                        .with(jwt().jwt(token -> token.subject("external-subject")
+                                .claim("tenant_id", "tenant-a")))
+                        .header("X-Correlation-Id", "exc-get")
+                        .header("X-Network-Context", "NETWORK|NETWORK|" + NETWORK_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.exceptionId").value(EXCEPTION_ID.toString()))
+                .andExpect(jsonPath("$.status").value("OPEN"))
+                .andExpect(jsonPath("$.allowedActions").isEmpty());
     }
 
     private static CurrentPrincipal actor() {

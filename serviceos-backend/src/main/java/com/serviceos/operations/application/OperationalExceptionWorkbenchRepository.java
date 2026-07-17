@@ -26,6 +26,9 @@ public interface OperationalExceptionWorkbenchRepository {
 
     Optional<OperationalExceptionItem> findById(String tenantId, UUID exceptionId);
 
+    /** 按任务列出异常；供 Network Portal listForTask 使用。 */
+    List<OperationalExceptionItem> listByTask(String tenantId, UUID taskId);
+
     boolean acknowledge(String tenantId, UUID exceptionId, long expectedVersion,
                         String actorId, String note, Instant acknowledgedAt);
 

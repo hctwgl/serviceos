@@ -211,6 +211,7 @@ title: ServiceOS 里程碑索引
 | M200 | M200 Network Portal 改派师傅 | [213-m200-network-portal-reassign-technician.md](../architecture/213-m200-network-portal-reassign-technician.md) | [197-m200-network-portal-reassign-technician-acceptance.md](../testing/197-m200-network-portal-reassign-technician-acceptance.md) |
 | M201 | M201 Network Portal 资料代补（onBehalf） | [214-m201-network-portal-evidence-on-behalf.md](../architecture/214-m201-network-portal-evidence-on-behalf.md) | [198-m201-network-portal-evidence-on-behalf-acceptance.md](../testing/198-m201-network-portal-evidence-on-behalf-acceptance.md) |
 | M202 | M202 Network Portal 整改队列只读 | [215-m202-network-portal-correction-queue.md](../architecture/215-m202-network-portal-correction-queue.md) | [199-m202-network-portal-correction-queue-acceptance.md](../testing/199-m202-network-portal-correction-queue-acceptance.md) |
+| M203 | M203 Network Portal 运营异常队列只读 | [216-m203-network-portal-exception-queue.md](../architecture/216-m203-network-portal-exception-queue.md) | [200-m203-network-portal-exception-queue-acceptance.md](../testing/200-m203-network-portal-exception-queue-acceptance.md) |
 
 ## 未关联里程碑的文档
 

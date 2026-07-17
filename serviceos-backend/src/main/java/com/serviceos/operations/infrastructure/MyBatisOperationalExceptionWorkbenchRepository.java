@@ -61,6 +61,13 @@ final class MyBatisOperationalExceptionWorkbenchRepository
     }
 
     @Override
+    public List<OperationalExceptionItem> listByTask(String tenantId, UUID taskId) {
+        return mapper.listByTask(tenantId, taskId.toString()).stream()
+                .map(this::item)
+                .toList();
+    }
+
+    @Override
     public boolean acknowledge(
             String tenantId, UUID exceptionId, long expectedVersion,
             String actorId, String note, Instant acknowledgedAt

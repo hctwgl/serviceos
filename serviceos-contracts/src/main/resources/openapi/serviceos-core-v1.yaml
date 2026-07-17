@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.94.0
+  version: 0.95.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1935,6 +1935,64 @@ paths:
           description: CorrectionCase 详情
           headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
           content: { application/json: { schema: { $ref: '#/components/schemas/CorrectionCase' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /network-portal/operational-exceptions:
+    get:
+      operationId: listNetworkPortalOperationalExceptions
+      summary: Network Portal 本网点运营异常队列
+      description: |
+        M203：X-Network-Context + NETWORK scope operations.exception.read。
+        仅返回该网点 ACTIVE NETWORK ServiceAssignment 任务上的 OperationalException 安全摘要；
+        默认 status=OPEN；可选 severity；按 openedAt/exceptionId 正序，内存 limit（1～100，默认 50）。
+        Portal allowedActions 恒为空；不接受 Admin 项目范围 cursor 语义与 Portal ACK/resolve。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/CorrelationId'
+        - name: status
+          in: query
+          schema: { enum: [OPEN, ACKNOWLEDGED, RESOLVED], default: OPEN }
+        - name: taskId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: severity
+          in: query
+          schema: { enum: [P0, P1, P2, P3] }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200':
+          description: 本网点运营异常队列页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkPortalExceptionPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /network-portal/operational-exceptions/{exceptionId}:
+    get:
+      operationId: getNetworkPortalOperationalException
+      summary: Network Portal 本网点运营异常详情
+      description: |
+        M203：X-Network-Context + NETWORK scope operations.exception.read。
+        委托 OperationalExceptionWorkbench.get 后校验 ACTIVE NETWORK 责任等于上下文网点；
+        跨网点 ACCESS_DENIED。Portal allowedActions 恒为空。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - name: exceptionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 运营异常安全摘要
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkPortalExceptionItem' } } }
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
@@ -4734,6 +4792,41 @@ components:
       properties:
         networkId: { type: string, format: uuid }
         items: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/NetworkPortalCorrectionItem' } }
+        asOf: { type: string, format: date-time }
+    NetworkPortalExceptionItem:
+      type: object
+      additionalProperties: false
+      required: [exceptionId, projectId, sourceType, category, severity, errorCode, status,
+        workOrderId, taskId, handlingTaskId, occurrenceCount, openedAt, lastDetectedAt,
+        resolvedAt, resolutionCode, allowedActions]
+      properties:
+        exceptionId: { type: string, format: uuid }
+        projectId: { type: [string, 'null'], format: uuid }
+        sourceType: { type: string, minLength: 1, maxLength: 80 }
+        category: { type: string, minLength: 1, maxLength: 80 }
+        severity: { enum: [P0, P1, P2, P3] }
+        errorCode: { type: string, minLength: 1, maxLength: 100 }
+        status: { enum: [OPEN, ACKNOWLEDGED, RESOLVED] }
+        workOrderId: { type: [string, 'null'], format: uuid }
+        taskId: { type: [string, 'null'], format: uuid }
+        handlingTaskId: { type: [string, 'null'], format: uuid }
+        occurrenceCount: { type: integer, format: int64, minimum: 1 }
+        openedAt: { type: string, format: date-time }
+        lastDetectedAt: { type: string, format: date-time }
+        resolvedAt: { type: [string, 'null'], format: date-time }
+        resolutionCode: { type: [string, 'null'], maxLength: 100 }
+        allowedActions:
+          type: array
+          maxItems: 0
+          items: { type: string }
+          description: Portal 本切片固定为空；不暴露 ACKNOWLEDGE
+    NetworkPortalExceptionPage:
+      type: object
+      additionalProperties: false
+      required: [networkId, items, asOf]
+      properties:
+        networkId: { type: string, format: uuid }
+        items: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/NetworkPortalExceptionItem' } }
         asOf: { type: string, format: date-time }
     TechnicianPortalFeedItem:
       type: object

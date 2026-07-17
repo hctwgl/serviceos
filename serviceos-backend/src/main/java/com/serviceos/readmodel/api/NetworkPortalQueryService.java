@@ -42,4 +42,26 @@ public interface NetworkPortalQueryService {
             String correlationId,
             String networkContextHeader,
             UUID correctionCaseId);
+
+    /**
+     * 本网点运营异常队列。需要 ACTIVE membership + NETWORK scope {@code operations.exception.read}。
+     * 仅聚合 ACTIVE NETWORK 责任任务上的 OperationalException；Portal allowedActions 恒为空。
+     */
+    NetworkPortalPage<NetworkPortalExceptionItem> listExceptions(
+            CurrentPrincipal actor,
+            String correlationId,
+            String networkContextHeader,
+            String status,
+            UUID taskId,
+            String severity,
+            Integer limit);
+
+    /**
+     * 本网点运营异常详情。先经 Workbench get，再校验 ACTIVE NETWORK 责任匹配上下文。
+     */
+    NetworkPortalExceptionItem getException(
+            CurrentPrincipal actor,
+            String correlationId,
+            String networkContextHeader,
+            UUID exceptionId);
 }
