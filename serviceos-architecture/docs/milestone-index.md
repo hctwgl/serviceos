@@ -248,6 +248,7 @@ title: ServiceOS 里程碑索引
 | M237 | M237 Network Portal 工作台统计时间展示 | [250-m237-network-portal-workbench-stats-time.md](../architecture/250-m237-network-portal-workbench-stats-time.md) | [234-m237-network-portal-workbench-stats-time-acceptance.md](../testing/234-m237-network-portal-workbench-stats-time-acceptance.md) |
 | M238 | M238 Network Portal 预约/联系历史 Accepted 字段展示 | [251-m238-network-portal-appointment-contact-history-fields.md](../architecture/251-m238-network-portal-appointment-contact-history-fields.md) | [235-m238-network-portal-appointment-contact-history-fields-acceptance.md](../testing/235-m238-network-portal-appointment-contact-history-fields-acceptance.md) |
 | M239 | M239 Network Portal 工作区 Visit/表单/Evidence Accepted 字段展示 | [252-m239-network-portal-workspace-visit-form-evidence-fields.md](../architecture/252-m239-network-portal-workspace-visit-form-evidence-fields.md) | [236-m239-network-portal-workspace-visit-form-evidence-fields-acceptance.md](../testing/236-m239-network-portal-workspace-visit-form-evidence-fields-acceptance.md) |
+| M240 | M240 Network Portal 工作区协作摘要 Accepted 字段展示 | [253-m240-network-portal-workspace-collaboration-summary-fields.md](../architecture/253-m240-network-portal-workspace-collaboration-summary-fields.md) | [237-m240-network-portal-workspace-collaboration-summary-fields-acceptance.md](../testing/237-m240-network-portal-workspace-collaboration-summary-fields-acceptance.md) |
 
 ## 未关联里程碑的文档
 

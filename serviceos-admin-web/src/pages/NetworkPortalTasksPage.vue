@@ -1129,6 +1129,16 @@ watch(selectedTaskId, () => {
             <span data-testid="contact-history-channel">{{ item.channel }}</span>
             · 操作者
             <span data-testid="contact-history-actor">{{ item.actorId }}</span>
+            <template v-if="item.startedAt || item.endedAt">
+              · 时间
+              <span data-testid="contact-history-window">
+                {{ item.startedAt ?? '—' }} → {{ item.endedAt ?? '—' }}
+              </span>
+            </template>
+            <template v-if="item.nextContactAt">
+              · 下次
+              <span data-testid="contact-history-next">{{ item.nextContactAt }}</span>
+            </template>
           </span>
         </li>
       </ul>

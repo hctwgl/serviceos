@@ -637,6 +637,10 @@ export type NetworkPortalContactAttempt = {
   resultCode: string
   actorId: string
   createdAt: string
+  /** M240：OpenAPI ContactAttempt 既有时间字段；历史行展示，不渲染 party/note/recording。 */
+  startedAt?: string
+  endedAt?: string
+  nextContactAt?: string | null
 }
 
 /** M199：标记本网点预约爽约（CONFIRMED 且窗口已结束）。 */
