@@ -1,5 +1,7 @@
 <script setup lang="ts">
-defineProps<{
+import { RouterLink, type RouteLocationRaw } from 'vue-router'
+
+const props = defineProps<{
   title: string
   columns: string[]
   rows: Array<Record<string, unknown>>
@@ -7,9 +9,25 @@ defineProps<{
   error: string | null
   asOf?: string | null
   nextCursor?: string | null
+  /**
+   * 可选列深链：仅当解析结果非 null 时渲染 RouterLink。
+   * 默认保持明文，避免影响 Attempt/里程碑等非资源队列。
+   */
+  linkColumns?: Record<
+    string,
+    (row: Record<string, unknown>) => RouteLocationRaw | null | undefined
+  >
 }>()
 
 const emit = defineEmits<{ refresh: []; next: [] }>()
+
+function linkFor(column: string, row: Record<string, unknown>): RouteLocationRaw | null {
+  const resolver = props.linkColumns?.[column]
+  if (!resolver) {
+    return null
+  }
+  return resolver(row) ?? null
+}
 </script>
 
 <template>
@@ -37,7 +55,16 @@ const emit = defineEmits<{ refresh: []; next: [] }>()
           <td :colspan="columns.length">暂无数据</td>
         </tr>
         <tr v-for="(row, index) in rows" :key="index">
-          <td v-for="column in columns" :key="column">{{ row[column] ?? '—' }}</td>
+          <td v-for="column in columns" :key="column">
+            <RouterLink
+              v-if="linkFor(column, row)"
+              :to="linkFor(column, row)!"
+              class="queue-cell-link"
+            >
+              {{ row[column] ?? '—' }}
+            </RouterLink>
+            <template v-else>{{ row[column] ?? '—' }}</template>
+          </td>
         </tr>
       </tbody>
     </table>
@@ -99,5 +126,8 @@ td {
 th {
   color: #486581;
   font-weight: 600;
+}
+.queue-cell-link {
+  word-break: break-all;
 }
 </style>

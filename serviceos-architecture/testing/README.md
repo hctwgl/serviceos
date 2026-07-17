@@ -181,4 +181,5 @@
 - [M178 Admin 目录/SLA 项目关联深链验收矩阵](175-m178-admin-pilot-directory-project-deeplink-acceptance.md)
 - [M179 Admin 剩余详情页 projectId 深链验收矩阵](176-m179-admin-pilot-remaining-detail-project-deeplink-acceptance.md)
 - [M180 Admin 专项队列剩余关联资源深链验收矩阵](177-m180-admin-pilot-queue-remaining-resource-deeplink-acceptance.md)
+- [M181 Admin QueueTable 行内单元格深链验收矩阵](178-m181-admin-pilot-queuetable-cell-deeplink-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

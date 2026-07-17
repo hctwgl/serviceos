@@ -1,9 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, type RouteLocationRaw } from 'vue-router'
 import QueueTable from './QueueTable.vue'
 import { createProject, listAuthorizedProjects, type ProjectPage } from '../api/projects'
-import { firstRouteQuery } from '../routeQuery'
+import { firstRouteQuery, uuidRoute } from '../routeQuery'
+
+const linkColumns: Record<
+  string,
+  (row: Record<string, unknown>) => RouteLocationRaw | null
+> = {
+  id: (row) => uuidRoute(row.id, 'ADMIN.PROJECT.DETAIL'),
+}
 
 const route = useRoute()
 
@@ -173,6 +180,7 @@ onMounted(() => {
       title="授权项目目录"
       :columns="['id', 'code', 'name', 'clientId', 'status', 'startsOn', 'endsOn']"
       :rows="rows"
+      :link-columns="linkColumns"
       :loading="loading"
       :error="error"
       :as-of="page?.asOf"

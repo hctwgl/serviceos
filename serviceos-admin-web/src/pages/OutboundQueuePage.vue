@@ -1,13 +1,22 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, type RouteLocationRaw } from 'vue-router'
 import QueueTable from './QueueTable.vue'
 import {
   listOutboundDeliveries,
   type OutboundDeliveryQueuePage,
   type OutboundDeliveryQueueQuery,
 } from '../api/queues'
-import { firstRouteQuery } from '../routeQuery'
+import { firstRouteQuery, uuidRoute } from '../routeQuery'
+
+const linkColumns: Record<
+  string,
+  (row: Record<string, unknown>) => RouteLocationRaw | null
+> = {
+  deliveryId: (row) => uuidRoute(row.deliveryId, 'ADMIN.INTEGRATION.DETAIL'),
+  projectId: (row) => uuidRoute(row.projectId, 'ADMIN.PROJECT.DETAIL'),
+  workspace: (row) => uuidRoute(row.workspace, 'ADMIN.WORKORDER.WORKSPACE'),
+}
 
 const route = useRoute()
 
@@ -142,6 +151,7 @@ onMounted(() => {
       title="外发交付队列"
       :columns="['deliveryId', 'projectId', 'status', 'externalOrderCode', 'attemptCount', 'createdAt', 'workspace']"
       :rows="rows"
+      :link-columns="linkColumns"
       :loading="loading"
       :error="error"
       :as-of="page?.asOf"

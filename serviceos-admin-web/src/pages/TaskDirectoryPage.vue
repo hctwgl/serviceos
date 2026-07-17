@@ -1,9 +1,17 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, type RouteLocationRaw } from 'vue-router'
 import QueueTable from './QueueTable.vue'
 import { listAuthorizedTasks, type TaskDirectoryPage } from '../api/tasksDirectory'
-import { firstRouteQuery } from '../routeQuery'
+import { firstRouteQuery, uuidRoute } from '../routeQuery'
+
+const linkColumns: Record<
+  string,
+  (row: Record<string, unknown>) => RouteLocationRaw | null
+> = {
+  id: (row) => uuidRoute(row.id, 'ADMIN.TASK.DETAIL'),
+  workOrderId: (row) => uuidRoute(row.workOrderId, 'ADMIN.WORKORDER.WORKSPACE'),
+}
 
 const route = useRoute()
 
@@ -126,6 +134,7 @@ onMounted(() => {
       title="授权任务目录"
       :columns="['id', 'taskType', 'taskKind', 'status', 'priority', 'claimedBy', 'workOrderId', 'nextRunAt']"
       :rows="rows"
+      :link-columns="linkColumns"
       :loading="loading"
       :error="error"
       :as-of="page?.asOf"

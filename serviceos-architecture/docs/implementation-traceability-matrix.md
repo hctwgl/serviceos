@@ -275,3 +275,4 @@ Feature gate/authority: if applicable
 | M178 | Admin 目录/SLA 项目关联深链：WorkOrder/Task 目录与 SLA → Project；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Project OpenAPI + Admin Web E2E + `191-m178-*` + `175-m178-*` | QueueTable 行内链接、SavedView、FieldOperation |
 | M179 | Admin 剩余详情页 projectId 深链：Correction/Form/Evidence/Appointment/Visit/SLA/Task/Inbound/Receipt → Project；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Project OpenAPI + Admin Web E2E + `192-m179-*` + `176-m179-*` | QueueTable 行内链接、FieldOperation、SavedView |
 | M180 | Admin 专项队列剩余关联资源深链：Correction/Review 队列 Accepted 字段补齐；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Core OpenAPI + Admin Web E2E + `193-m180-*` + `177-m180-*` | QueueTable 行内链接、SavedView、FieldOperation |
+| M181 | Admin QueueTable 行内单元格深链：可选 linkColumns；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Admin Web E2E + `194-m181-*` + `178-m181-*` | 移除关联资源条、SavedView、FieldOperation |

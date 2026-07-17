@@ -1,9 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, type RouteLocationRaw } from 'vue-router'
 import QueueTable from './QueueTable.vue'
 import { listSlaInstances, type SlaInstancePage } from '../api/sla'
-import { firstRouteQuery } from '../routeQuery'
+import { firstRouteQuery, uuidRoute } from '../routeQuery'
+
+const linkColumns: Record<
+  string,
+  (row: Record<string, unknown>) => RouteLocationRaw | null
+> = {
+  slaInstanceId: (row) => uuidRoute(row.slaInstanceId, 'ADMIN.SLA.DETAIL'),
+  projectId: (row) => uuidRoute(row.projectId, 'ADMIN.PROJECT.DETAIL'),
+  workOrderId: (row) => uuidRoute(row.workOrderId, 'ADMIN.WORKORDER.WORKSPACE'),
+  taskId: (row) => uuidRoute(row.taskId, 'ADMIN.TASK.DETAIL'),
+}
 
 const route = useRoute()
 
@@ -57,6 +67,7 @@ const rows = computed(() =>
     deadlineAt: item.deadlineAt,
     remainingSeconds: item.remainingSeconds,
     overdueSeconds: item.overdueSeconds,
+    projectId: item.projectId,
     workOrderId: item.workOrderId,
     taskId: item.taskId,
   })),
@@ -101,10 +112,12 @@ onMounted(() => {
         'deadlineAt',
         'remainingSeconds',
         'overdueSeconds',
+        'projectId',
         'workOrderId',
         'taskId',
       ]"
       :rows="rows"
+      :link-columns="linkColumns"
       :loading="loading"
       :error="error"
       :as-of="page?.asOf"

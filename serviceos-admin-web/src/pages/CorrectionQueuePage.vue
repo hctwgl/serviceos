@@ -1,13 +1,24 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, type RouteLocationRaw } from 'vue-router'
 import QueueTable from './QueueTable.vue'
 import {
   listCorrectionCases,
   type CorrectionCaseQueuePage,
   type CorrectionCaseQueueQuery,
 } from '../api/queues'
-import { firstRouteQuery } from '../routeQuery'
+import { firstRouteQuery, uuidRoute } from '../routeQuery'
+
+const linkColumns: Record<
+  string,
+  (row: Record<string, unknown>) => RouteLocationRaw | null
+> = {
+  correctionCaseId: (row) =>
+    uuidRoute(row.correctionCaseId, 'ADMIN.CORRECTION.DETAIL'),
+  sourceReviewCaseId: (row) =>
+    uuidRoute(row.sourceReviewCaseId, 'ADMIN.REVIEW.DETAIL'),
+  correctionTaskId: (row) => uuidRoute(row.correctionTaskId, 'ADMIN.TASK.DETAIL'),
+}
 
 const route = useRoute()
 
@@ -130,7 +141,8 @@ onMounted(() => {
         'createdAt',
         'resubmissionCount',
       ]"
-      :rows="page?.items ?? []"
+      :rows="(page?.items ?? []) as Array<Record<string, unknown>>"
+      :link-columns="linkColumns"
       :loading="loading"
       :error="error"
       :as-of="page?.asOf"

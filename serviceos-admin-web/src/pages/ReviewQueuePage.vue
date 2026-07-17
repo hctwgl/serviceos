@@ -1,13 +1,21 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, type RouteLocationRaw } from 'vue-router'
 import QueueTable from './QueueTable.vue'
 import {
   listReviewCases,
   type ReviewCaseQueuePage,
   type ReviewCaseQueueQuery,
 } from '../api/queues'
-import { firstRouteQuery } from '../routeQuery'
+import { firstRouteQuery, uuidRoute } from '../routeQuery'
+
+const linkColumns: Record<
+  string,
+  (row: Record<string, unknown>) => RouteLocationRaw | null
+> = {
+  reviewCaseId: (row) => uuidRoute(row.reviewCaseId, 'ADMIN.REVIEW.DETAIL'),
+  projectId: (row) => uuidRoute(row.projectId, 'ADMIN.PROJECT.DETAIL'),
+}
 
 const route = useRoute()
 
@@ -119,7 +127,8 @@ onMounted(() => {
     <QueueTable
       title="审核队列"
       :columns="['reviewCaseId', 'projectId', 'status', 'origin', 'createdAt', 'latestDecision']"
-      :rows="page?.items ?? []"
+      :rows="(page?.items ?? []) as Array<Record<string, unknown>>"
+      :link-columns="linkColumns"
       :loading="loading"
       :error="error"
       :as-of="page?.asOf"

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, type RouteLocationRaw } from 'vue-router'
 import QueueTable from './QueueTable.vue'
 import {
   listOperationalExceptions,
@@ -8,7 +8,15 @@ import {
   type OperationalExceptionQueueQuery,
 } from '../api/queues'
 import { acknowledgeOperationalException } from '../api/exceptions'
-import { firstRouteQuery } from '../routeQuery'
+import { firstRouteQuery, uuidRoute } from '../routeQuery'
+
+const linkColumns: Record<
+  string,
+  (row: Record<string, unknown>) => RouteLocationRaw | null
+> = {
+  exceptionId: (row) => uuidRoute(row.exceptionId, 'ADMIN.EXCEPTION.DETAIL'),
+  projectId: (row) => uuidRoute(row.projectId, 'ADMIN.PROJECT.DETAIL'),
+}
 
 const route = useRoute()
 
@@ -213,6 +221,7 @@ onMounted(() => {
         'aggregateVersion',
       ]"
       :rows="rows"
+      :link-columns="linkColumns"
       :loading="loading"
       :error="error"
       :next-cursor="cursor ?? null"

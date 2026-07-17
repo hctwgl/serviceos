@@ -1,13 +1,27 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, type RouteLocationRaw } from 'vue-router'
 import QueueTable from './QueueTable.vue'
 import {
   listInboundEnvelopes,
   type InboundEnvelopeQueuePage,
   type InboundEnvelopeQueueQuery,
 } from '../api/queues'
-import { firstRouteQuery } from '../routeQuery'
+import { firstRouteQuery, uuidRoute } from '../routeQuery'
+
+const linkColumns: Record<
+  string,
+  (row: Record<string, unknown>) => RouteLocationRaw | null
+> = {
+  inboundEnvelopeId: (row) =>
+    uuidRoute(row.inboundEnvelopeId, 'ADMIN.INTEGRATION.INBOUND.DETAIL'),
+  projectId: (row) => uuidRoute(row.projectId, 'ADMIN.PROJECT.DETAIL'),
+  // 仅 WORK_ORDER 结果可深链工单工作区；其他 resultType 保持明文。
+  resultId: (row) =>
+    row.resultType === 'WORK_ORDER'
+      ? uuidRoute(row.resultId, 'ADMIN.WORKORDER.WORKSPACE')
+      : null,
+}
 
 const route = useRoute()
 
@@ -156,7 +170,8 @@ onMounted(() => {
         'resultId',
         'receivedAt',
       ]"
-      :rows="rows"
+      :rows="rows as Array<Record<string, unknown>>"
+      :link-columns="linkColumns"
       :loading="loading"
       :error="error"
       :as-of="page?.asOf"
