@@ -3,7 +3,7 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-17
-baselineCommit: TBD
+baselineCommit: c32002fa3209db1e0b77e1a4a290eb1922489839
 latestMilestone: M214
 ---
 
@@ -40,7 +40,7 @@ latestMilestone: M214
 | 项目 | 当前值 |
 |---|---|
 | 最新实施里程碑 | M214 Network Portal 工作区协作队列深链 |
-| 基线提交 | TBD（feat 提交后回填） |
+| 基线提交 | `c32002fa3209db1e0b77e1a4a290eb1922489839` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
 | 前端工程 | `serviceos-admin-web`（Vue+TS+Vite）已纳入 CI 构建，具备开发态 Keycloak PKCE，以及真实只读、Task MANUAL assign-candidates/claim/release、表单/资料/审核/整改/完结、正常补传复审，预约上门、BYD 提审外发 ACK、厂端回调，CPIM 入站→激活→Admin HTTP 人工初派→同单预约上门→表单/资料/驳回整改补传复审/外发/完结（ADMIN-PILOT-09），入站 Envelope 授权队列与详情深链、专项队列与目录/SLA Accepted OpenAPI 筛选，工作区各按需区块详情或 Task 旁路、预约/表单/资料/上门/联系详情页、核心时间线与最近活动资源深链、外部审核回执详情、审核/整改交叉深链、工作区异常摘要→异常队列 query 水合与 handlingTaskId 深链、工作区审核/整改关联资源深链、Task 面板资源详情深链、Canonical Message 独立详情页、专项队列与目录页 query 水合及关联资源深链、外发关联资源与回执入站交叉深链、详情页明文 projectId / 源资源 / 现场与 SLA scope 字段深链、专项队列剩余 Accepted 关联字段深链、QueueTable 可选行内单元格深链、外发 executionTaskId / 快照成员资料项深链，工作区项目与 SLA 任务交叉深链的 PR 阻断 E2E；**M187 Admin 统一用户中心**；**M188 `/me` 导航**；**M189 Admin 个人 SavedView**；**M190 Admin UI Preferences**；**M191 Admin 共享 SavedView**；**M192 Admin 受控全局搜索**；**M193 Admin 最近访问**；**M194 Network Portal 只读 shell**；**M195 Technician Portal Feed shell**；**M196 Network Portal 指派师傅**；**M197 Network Portal 预约协作**；**M198 Network Portal 预约改约/取消**；**M199 Network Portal 爽约与联系尝试**；**M200 Network Portal 改派师傅**；**M201 Network Portal 资料代补 onBehalf**；**M202 Network Portal 整改队列只读**；**M203 Network Portal 运营异常队列只读**；**M204 Network Portal 师傅关系与资质提交**；**M205 Network Portal 本网点资质只读列表**；**M206 Network Portal 师傅关系只读列表**；**M207 Network Portal 工作台能力门控计数增强**；**M208 Network Portal 产能页**；**M209 Network Portal 整改详情只读 UI**；**M210 Network Portal 运营异常详情只读 UI**；**M211 Network Portal 资质详情只读 UI**；**M212 Network Portal 师傅关系详情只读 UI**；**M213 Network Portal 限定工单工作区**；**M214 Network Portal 工作区协作队列深链** |
