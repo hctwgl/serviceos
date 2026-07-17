@@ -272,3 +272,4 @@ Feature gate/authority: if applicable
 | M175 | Admin 运营异常 handlingTaskId 深链：Exception → HUMAN Task；Playwright GET 200 | PRODUCT-01/02 + ARCH-14 + Exception/Task OpenAPI + Admin Web E2E + `188-m175-*` + `172-m175-*` | 多态 sourceId、FieldOperation、SavedView |
 | M176 | Admin 专项队列关联资源深链：Correction/Review 队列 → Review/Task/Project；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Core OpenAPI + Admin Web E2E + `189-m176-*` + `173-m176-*` | QueueTable 行内链接、SavedView、FieldOperation |
 | M177 | Admin 外发/异常/入站队列源资源深链：Outbound/Exception/Inbound 关联资源；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Core OpenAPI + Admin Web E2E + `190-m177-*` + `174-m177-*` | QueueTable 行内链接、多态 sourceId、SavedView |
+| M178 | Admin 目录/SLA 项目关联深链：WorkOrder/Task 目录与 SLA → Project；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Project OpenAPI + Admin Web E2E + `191-m178-*` + `175-m178-*` | QueueTable 行内链接、SavedView、FieldOperation |

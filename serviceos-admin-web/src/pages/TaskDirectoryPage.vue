@@ -154,6 +154,19 @@ onMounted(() => {
         {{ item.taskType }}
       </RouterLink>
     </p>
+    <p
+      v-if="page?.items?.some((i) => i.projectId)"
+      class="links task-directory-cross-links"
+    >
+      打开关联资源：
+      <RouterLink
+        v-for="item in page.items.filter((i) => i.projectId)"
+        :key="`project-${item.id}`"
+        :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: item.projectId! } }"
+      >
+        打开项目 {{ item.projectId }}
+      </RouterLink>
+    </p>
   </section>
 </template>
 

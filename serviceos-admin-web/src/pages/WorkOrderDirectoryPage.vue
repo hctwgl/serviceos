@@ -125,6 +125,16 @@ onMounted(() => {
         {{ item.externalOrderCode }}
       </RouterLink>
     </p>
+    <p v-if="page?.items?.length" class="links work-order-directory-cross-links">
+      打开关联资源：
+      <RouterLink
+        v-for="item in page.items"
+        :key="`project-${item.id}`"
+        :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: item.projectId } }"
+      >
+        打开项目 {{ item.projectId }}
+      </RouterLink>
+    </p>
   </section>
 </template>
 
