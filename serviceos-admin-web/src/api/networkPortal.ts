@@ -45,6 +45,14 @@ export type NetworkPortalWorkspaceContactAttemptSummary = {
   createdAt: string
 }
 
+/** M234：目录页薄 SLA 风险摘要（计数语义同工作台/工作区）。 */
+export type NetworkPortalDirectorySlaRiskSummary = {
+  workOrderId: string
+  taskId: string | null
+  openCount: number
+  breachedCount: number
+}
+
 export type NetworkPortalPage<T> = {
   networkId: string
   items: T[]
@@ -57,6 +65,8 @@ export type NetworkPortalPage<T> = {
   contactAttempts?: NetworkPortalWorkspaceContactAttemptSummary[]
   /** Soft-gated；缺 NETWORK `evidence.read` 时省略（工单/任务目录页）。 */
   corrections?: NetworkPortalWorkspaceCorrectionCaseSummary[]
+  /** Soft-gated；缺 NETWORK `sla.read` 时省略（工单/任务目录页）。 */
+  slaRiskSummaries?: NetworkPortalDirectorySlaRiskSummary[]
 }
 
 export type NetworkPortalWorkOrderItem = {

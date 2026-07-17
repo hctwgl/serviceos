@@ -6,6 +6,7 @@ import {
   listNetworkPortalWorkOrders,
   type NetworkPortalTechnicianItem,
   type NetworkPortalWorkOrderItem,
+  type NetworkPortalDirectorySlaRiskSummary,
   type NetworkPortalWorkspaceAppointmentSummary,
   type NetworkPortalWorkspaceContactAttemptSummary,
   type NetworkPortalWorkspaceCorrectionCaseSummary,
@@ -17,6 +18,7 @@ const techniciansByProfileId = ref<Map<string, NetworkPortalTechnicianItem>>(new
 const appointments = ref<NetworkPortalWorkspaceAppointmentSummary[] | null>(null)
 const contactAttempts = ref<NetworkPortalWorkspaceContactAttemptSummary[] | null>(null)
 const corrections = ref<NetworkPortalWorkspaceCorrectionCaseSummary[] | null>(null)
+const slaRiskSummaries = ref<NetworkPortalDirectorySlaRiskSummary[] | null>(null)
 const error = ref<string | null>(null)
 const usedServerTechnicians = ref(false)
 
@@ -79,6 +81,17 @@ function correctionLabel(taskIds: string[]) {
   return `${first.status} · ${first.reasonCodes.join(',') || first.correctionCaseId}`
 }
 
+function slaRiskLabel(workOrderId: string) {
+  if (slaRiskSummaries.value === null) {
+    return '—'
+  }
+  const matched = slaRiskSummaries.value.find((row) => row.workOrderId === workOrderId)
+  if (!matched) {
+    return '暂无'
+  }
+  return `开放 ${matched.openCount} / 超时 ${matched.breachedCount}`
+}
+
 async function load() {
   if (!props.networkContextId) {
     items.value = []
@@ -86,6 +99,7 @@ async function load() {
     appointments.value = null
     contactAttempts.value = null
     corrections.value = null
+    slaRiskSummaries.value = null
     usedServerTechnicians.value = false
     error.value = '请选择 NETWORK 上下文'
     return
@@ -96,6 +110,7 @@ async function load() {
     appointments.value = page.appointments !== undefined ? page.appointments : null
     contactAttempts.value = page.contactAttempts !== undefined ? page.contactAttempts : null
     corrections.value = page.corrections !== undefined ? page.corrections : null
+    slaRiskSummaries.value = page.slaRiskSummaries !== undefined ? page.slaRiskSummaries : null
     error.value = null
     if (page.technicians !== undefined) {
       applyTechnicians(page.technicians)
@@ -115,6 +130,7 @@ async function load() {
     appointments.value = null
     contactAttempts.value = null
     corrections.value = null
+    slaRiskSummaries.value = null
     usedServerTechnicians.value = false
     error.value = err instanceof Error ? err.message : '工单列表加载失败'
   }
@@ -133,7 +149,7 @@ watch(() => props.networkContextId, () => {
     <h2>本网点工单</h2>
     <p class="hint">
       <template v-if="usedServerTechnicians">
-        M230～M233：师傅、预约窗口、最近联系与整改由列表页服务端旁载交付。
+        M230～M234：师傅、预约窗口、最近联系、整改与 SLA 风险由列表页服务端旁载交付。
       </template>
       <template v-else>
         M217：师傅 displayName fan-in；缺 technician.readOwnNetwork 时保留原始 ID。
@@ -151,6 +167,7 @@ watch(() => props.networkContextId, () => {
           <th v-if="appointments !== null">预约窗口</th>
           <th v-if="contactAttempts !== null">最近联系</th>
           <th v-if="corrections !== null">整改</th>
+          <th v-if="slaRiskSummaries !== null">SLA 风险</th>
           <th>生效自</th>
         </tr>
       </thead>
@@ -191,6 +208,12 @@ watch(() => props.networkContextId, () => {
             data-testid="work-order-correction-summary"
           >
             {{ correctionLabel(item.taskIds) }}
+          </td>
+          <td
+            v-if="slaRiskSummaries !== null"
+            data-testid="work-order-sla-risk"
+          >
+            {{ slaRiskLabel(item.workOrderId) }}
           </td>
           <td data-testid="work-order-effective-from">{{ item.effectiveFrom ?? '—' }}</td>
         </tr>

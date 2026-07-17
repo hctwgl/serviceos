@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.13
+  version: 1.0.14
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1449,6 +1449,9 @@ paths:
         M233：可选 `corrections`（复用 Admin WorkOrderWorkspaceCorrectionCaseSummary）；
         需 NETWORK `evidence.read`，缺能力时省略（不得用空数组伪装）；
         覆盖本页 items[].taskIds；含全部状态。
+        M234：可选 `slaRiskSummaries`（NetworkPortalDirectorySlaRiskSummary）；
+        需 NETWORK `sla.read`，缺能力时省略（不得用空数组伪装）；
+        按本页工单聚合 ACTIVE taskIds 的 open/breached；仅含 openCount>0 行。
       parameters:
         - $ref: '#/components/parameters/NetworkContext'
         - $ref: '#/components/parameters/CorrelationId'
@@ -1527,6 +1530,9 @@ paths:
         M233：可选 `corrections`（复用 Admin WorkOrderWorkspaceCorrectionCaseSummary）；
         需 NETWORK `evidence.read`，缺能力时省略（不得用空数组伪装）；
         覆盖本页 items[].taskId；含全部状态。
+        M234：可选 `slaRiskSummaries`（NetworkPortalDirectorySlaRiskSummary）；
+        需 NETWORK `sla.read`，缺能力时省略（不得用空数组伪装）；
+        按本页 taskId 展开 open/breached；仅含 openCount>0 行。
       parameters:
         - $ref: '#/components/parameters/NetworkContext'
         - $ref: '#/components/parameters/CorrelationId'
@@ -4983,7 +4989,32 @@ components:
           type: array
           maxItems: 100
           items: { $ref: '#/components/schemas/WorkOrderWorkspaceCorrectionCaseSummary' }
+        slaRiskSummaries:
+          description: |
+            M234：需 NETWORK sla.read；缺能力时省略本属性；有能力且无开放风险时返回 []。
+            按本页工单聚合；taskId 恒为 null；仅含 openCount>0 行。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/NetworkPortalDirectorySlaRiskSummary' }
         asOf: { type: string, format: date-time }
+    NetworkPortalDirectorySlaRiskSummary:
+      type: object
+      additionalProperties: false
+      required: [workOrderId, openCount, breachedCount]
+      properties:
+        workOrderId: { type: string, format: uuid }
+        taskId:
+          type: [string, 'null']
+          format: uuid
+          description: 工单目录恒为 null；任务目录为对应 taskId
+        openCount:
+          type: integer
+          minimum: 0
+          description: RUNNING∪BREACHED 实例数
+        breachedCount:
+          type: integer
+          minimum: 0
+          description: BREACHED 实例数（⊆ openCount）
     NetworkPortalWorkOrderWorkspaceSlaSummary:
       type: object
       additionalProperties: false
@@ -5145,6 +5176,13 @@ components:
           type: array
           maxItems: 100
           items: { $ref: '#/components/schemas/WorkOrderWorkspaceCorrectionCaseSummary' }
+        slaRiskSummaries:
+          description: |
+            M234：需 NETWORK sla.read；缺能力时省略本属性；有能力且无开放风险时返回 []。
+            按本页 taskId 展开；仅含 openCount>0 行。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/NetworkPortalDirectorySlaRiskSummary' }
         asOf: { type: string, format: date-time }
     NetworkPortalTechnicianItem:
       type: object

@@ -6,7 +6,7 @@ status: Accepted
 
 # 应用工作区、队列与用户偏好 HTTP API
 
-## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158 / M189 / M190 / M191 / M192 / M193 / M194 / M195 / M202 / M203 / M205 / M206 / M207 / M213 / M214 / M215 / M216 / M217 / M218 / M219 / M220 / M221 / M222 / M223 / M224 / M225 / M226 / M227 / M228 / M229 / M230 / M231 / M232 / M233）
+## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158 / M189 / M190 / M191 / M192 / M193 / M194 / M195 / M202 / M203 / M205 / M206 / M207 / M213 / M214 / M215 / M216 / M217 / M218 / M219 / M220 / M221 / M222 / M223 / M224 / M225 / M226 / M227 / M228 / M229 / M230 / M231 / M232 / M233 / M234）
 
 **Accepted（可指导实现）**：
 
@@ -281,6 +281,11 @@ status: Accepted
   覆盖本页 taskIds；含全部状态。Core OpenAPI → `1.0.13`。catalog 仍
   `page-registry-v16`；Flyway 仍 100/102。
   **不**接受目录 SLA 风险、目录 evidence、独立 NP Correction CRUD、notifications、Portal ACK。
+- §10 Network Portal 目录页 SLA 风险服务端摘要（M234 / ADR-072）：扩展同一 work-orders/tasks
+  可选 `slaRiskSummaries`（`NetworkPortalDirectorySlaRiskSummary`）；NETWORK `sla.read` soft-gate；
+  工单目录按 WO 聚合、任务目录按 task 展开；仅 openCount>0。Core OpenAPI → `1.0.14`。
+  catalog 仍 `page-registry-v16`；Flyway 仍 100/102。
+  **不**接受即将超时窗口、完整 SlaInstance DTO、目录 evidence、notifications、Portal ACK。
 
 **仍为设计草案**：§3 中 `application-context`/`notifications`、§4 工作台与队列、§5 其余 section、
 §6 其余专项队列、§7 中 `VEHICLE`/`CHARGER` 与全文索引搜索、§8 ORGANIZATION 组织树共享与

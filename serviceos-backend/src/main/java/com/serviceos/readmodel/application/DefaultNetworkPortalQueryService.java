@@ -37,6 +37,7 @@ import com.serviceos.operations.api.OperationalExceptionItem;
 import com.serviceos.operations.api.OperationalExceptionWorkbenchService;
 import com.serviceos.readmodel.api.NetworkPortalCapacityItem;
 import com.serviceos.readmodel.api.NetworkPortalCorrectionItem;
+import com.serviceos.readmodel.api.NetworkPortalDirectorySlaRiskSummary;
 import com.serviceos.readmodel.api.NetworkPortalExceptionItem;
 import com.serviceos.readmodel.api.NetworkPortalMembershipItem;
 import com.serviceos.readmodel.api.NetworkPortalPage;
@@ -245,9 +246,15 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         if (hasNetworkCapability(actor, correlationId, EVIDENCE_READ, networkId)) {
             correctionSummaries = loadCorrectionSummaries(actor, correlationId, pageTaskIds);
         }
+        List<NetworkPortalDirectorySlaRiskSummary> slaRiskSummaries = null;
+        if (hasNetworkCapability(actor, correlationId, SLA_READ, networkId)) {
+            slaRiskSummaries = loadDirectorySlaRiskSummariesForWorkOrders(
+                    actor, correlationId, networkId, workOrderItems);
+        }
         return new NetworkPortalPage<>(
                 networkId, workOrderItems, clock.instant(),
-                technicianSummaries, appointmentSummaries, contactAttemptSummaries, correctionSummaries);
+                technicianSummaries, appointmentSummaries, contactAttemptSummaries,
+                correctionSummaries, slaRiskSummaries);
     }
 
     @Override
@@ -885,9 +892,15 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         if (hasNetworkCapability(actor, correlationId, EVIDENCE_READ, networkId)) {
             correctionSummaries = loadCorrectionSummaries(actor, correlationId, pageTaskIds);
         }
+        List<NetworkPortalDirectorySlaRiskSummary> slaRiskSummaries = null;
+        if (hasNetworkCapability(actor, correlationId, SLA_READ, networkId)) {
+            slaRiskSummaries = loadDirectorySlaRiskSummariesForTasks(
+                    actor, correlationId, networkId, taskItems);
+        }
         return new NetworkPortalPage<>(
                 networkId, taskItems, clock.instant(),
-                technicianSummaries, appointmentSummaries, contactAttemptSummaries, correctionSummaries);
+                technicianSummaries, appointmentSummaries, contactAttemptSummaries,
+                correctionSummaries, slaRiskSummaries);
     }
 
     @Override
@@ -1026,6 +1039,106 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
             }
         }
         return new NetworkPortalWorkOrderWorkspaceSlaSummary(open, breached);
+    }
+
+    /**
+     * M234：NETWORK sla.read 已 soft-gate；工单目录按 workOrderId 聚合本页 taskIds 计数。
+     * 仅返回 openCount&gt;0 的行（无风险时 UI 显示「暂无」）。
+     */
+    private List<NetworkPortalDirectorySlaRiskSummary> loadDirectorySlaRiskSummariesForWorkOrders(
+            CurrentPrincipal actor,
+            String correlationId,
+            UUID networkId,
+            List<NetworkPortalWorkOrderItem> workOrderItems
+    ) {
+        List<NetworkPortalDirectorySlaRiskSummary> collected = new ArrayList<>();
+        for (NetworkPortalWorkOrderItem item : workOrderItems) {
+            Set<UUID> taskIds = Set.copyOf(item.taskIds());
+            if (taskIds.isEmpty()) {
+                continue;
+            }
+            UUID projectId = null;
+            for (UUID taskId : taskIds) {
+                TaskFulfillmentContext task = tasks.find(actor.tenantId(), taskId).orElse(null);
+                if (task != null && task.projectId() != null) {
+                    projectId = task.projectId();
+                    break;
+                }
+            }
+            if (projectId == null) {
+                continue;
+            }
+            NetworkPortalWorkOrderWorkspaceSlaSummary counts = loadSlaSummary(
+                    actor, correlationId, item.workOrderId(), projectId, networkId, taskIds);
+            if (counts.openCount() > 0) {
+                collected.add(new NetworkPortalDirectorySlaRiskSummary(
+                        item.workOrderId(), null, counts.openCount(), counts.breachedCount()));
+            }
+        }
+        return List.copyOf(collected);
+    }
+
+    /**
+     * M234：NETWORK sla.read 已 soft-gate；任务目录按 taskId 展开本页计数。
+     * 仅返回 openCount&gt;0 的行。
+     */
+    private List<NetworkPortalDirectorySlaRiskSummary> loadDirectorySlaRiskSummariesForTasks(
+            CurrentPrincipal actor,
+            String correlationId,
+            UUID networkId,
+            List<NetworkPortalTaskItem> taskItems
+    ) {
+        Map<UUID, UUID> workOrderProjects = new LinkedHashMap<>();
+        Map<UUID, Set<UUID>> workOrderTaskIds = new LinkedHashMap<>();
+        for (NetworkPortalTaskItem item : taskItems) {
+            if (item.workOrderId() == null || item.taskId() == null) {
+                continue;
+            }
+            workOrderTaskIds.computeIfAbsent(item.workOrderId(), ignored -> new LinkedHashSet<>())
+                    .add(item.taskId());
+            if (item.projectId() != null) {
+                workOrderProjects.putIfAbsent(item.workOrderId(), item.projectId());
+            } else {
+                TaskFulfillmentContext task = tasks.find(actor.tenantId(), item.taskId()).orElse(null);
+                if (task != null && task.projectId() != null) {
+                    workOrderProjects.putIfAbsent(item.workOrderId(), task.projectId());
+                }
+            }
+        }
+        Map<UUID, int[]> perTask = new LinkedHashMap<>();
+        for (Map.Entry<UUID, Set<UUID>> entry : workOrderTaskIds.entrySet()) {
+            UUID workOrderId = entry.getKey();
+            UUID projectId = workOrderProjects.get(workOrderId);
+            if (projectId == null) {
+                continue;
+            }
+            Set<UUID> taskIds = entry.getValue();
+            List<SlaInstanceItem> items = slaQueries.listForWorkOrderOnNetwork(
+                    actor, correlationId, workOrderId, projectId, networkId, null, SLA_WORKSPACE_LIMIT)
+                    .items();
+            for (SlaInstanceItem item : items) {
+                if (item.taskId() == null || !taskIds.contains(item.taskId())) {
+                    continue;
+                }
+                int[] counts = perTask.computeIfAbsent(item.taskId(), ignored -> new int[2]);
+                if (OPEN_SLA_STATUSES.contains(item.status())) {
+                    counts[0]++;
+                }
+                if ("BREACHED".equals(item.status())) {
+                    counts[1]++;
+                }
+            }
+        }
+        List<NetworkPortalDirectorySlaRiskSummary> collected = new ArrayList<>();
+        for (NetworkPortalTaskItem item : taskItems) {
+            int[] counts = perTask.get(item.taskId());
+            if (counts == null || counts[0] <= 0) {
+                continue;
+            }
+            collected.add(new NetworkPortalDirectorySlaRiskSummary(
+                    item.workOrderId(), item.taskId(), counts[0], counts[1]));
+        }
+        return List.copyOf(collected);
     }
 
     /**

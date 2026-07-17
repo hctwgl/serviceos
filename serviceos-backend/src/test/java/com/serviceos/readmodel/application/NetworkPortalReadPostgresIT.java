@@ -3,6 +3,7 @@ package com.serviceos.readmodel.application;
 import com.serviceos.ServiceOsApplication;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.readmodel.api.NetworkPortalCapacityItem;
+import com.serviceos.readmodel.api.NetworkPortalDirectorySlaRiskSummary;
 import com.serviceos.readmodel.api.NetworkPortalExceptionItem;
 import com.serviceos.readmodel.api.NetworkPortalPage;
 import com.serviceos.readmodel.api.NetworkPortalQueryService;
@@ -415,6 +416,62 @@ class NetworkPortalReadPostgresIT {
         assertThat(withTasks.corrections())
                 .extracting(NetworkPortalWorkspaceCorrectionCaseSummary::correctionCaseId)
                 .containsExactly(correctionA);
+    }
+
+    @Test
+    void directorySlaRiskSummariesAreCapabilityGatedAndTaskScoped() {
+        String context = "NETWORK|NETWORK|" + NETWORK_A;
+        NetworkPortalPage<NetworkPortalWorkOrderItem> withoutCapWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-sla-omit-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> withoutCapTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-sla-omit-task", context);
+        assertThat(withoutCapWo.slaRiskSummaries()).isNull();
+        assertThat(withoutCapTasks.slaRiskSummaries()).isNull();
+
+        seedGrant(PRINCIPAL, "sla.read", "NETWORK", NETWORK_A.toString());
+        NetworkPortalPage<NetworkPortalWorkOrderItem> emptyWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-sla-empty-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> emptyTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-sla-empty-task", context);
+        assertThat(emptyWo.slaRiskSummaries()).isEmpty();
+        assertThat(emptyTasks.slaRiskSummaries()).isEmpty();
+
+        UUID policyA = prepareSlaScopeForTask(TASK_A, "m234-a");
+        alignTaskSlaScope(TASK_A2, TASK_A);
+        UUID policyB = prepareSlaScopeForTask(TASK_B, "m234-b");
+        seedSlaInstance(TASK_A, policyA, "RUNNING");
+        seedSlaInstance(TASK_A2, policyA, "BREACHED");
+        seedSlaInstance(TASK_B, policyB, "BREACHED");
+
+        NetworkPortalPage<NetworkPortalWorkOrderItem> withWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-sla-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> withTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-sla-task", context);
+        assertThat(withWo.slaRiskSummaries())
+                .extracting(NetworkPortalDirectorySlaRiskSummary::workOrderId)
+                .containsExactly(WO_A);
+        assertThat(withWo.slaRiskSummaries().getFirst().taskId()).isNull();
+        assertThat(withWo.slaRiskSummaries().getFirst().openCount()).isEqualTo(2);
+        assertThat(withWo.slaRiskSummaries().getFirst().breachedCount()).isEqualTo(1);
+        assertThat(withTasks.slaRiskSummaries())
+                .extracting(NetworkPortalDirectorySlaRiskSummary::taskId)
+                .containsExactlyInAnyOrder(TASK_A, TASK_A2);
+        assertThat(withTasks.slaRiskSummaries())
+                .noneMatch(row -> TASK_B.equals(row.taskId()));
+        assertThat(withTasks.slaRiskSummaries())
+                .filteredOn(row -> TASK_A.equals(row.taskId()))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.openCount()).isEqualTo(1);
+                    assertThat(row.breachedCount()).isZero();
+                });
+        assertThat(withTasks.slaRiskSummaries())
+                .filteredOn(row -> TASK_A2.equals(row.taskId()))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.openCount()).isEqualTo(1);
+                    assertThat(row.breachedCount()).isEqualTo(1);
+                });
     }
 
     @Test

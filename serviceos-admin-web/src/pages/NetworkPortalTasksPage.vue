@@ -21,6 +21,7 @@ import {
   type NetworkPortalContactAttempt,
   type NetworkPortalTaskItem,
   type NetworkPortalTechnicianItem,
+  type NetworkPortalDirectorySlaRiskSummary,
   type NetworkPortalWorkspaceAppointmentSummary,
   type NetworkPortalWorkspaceContactAttemptSummary,
   type NetworkPortalWorkspaceCorrectionCaseSummary,
@@ -39,6 +40,7 @@ const directoryTechnicians = ref<NetworkPortalTechnicianItem[]>([])
 const directoryAppointments = ref<NetworkPortalWorkspaceAppointmentSummary[] | null>(null)
 const directoryContactAttempts = ref<NetworkPortalWorkspaceContactAttemptSummary[] | null>(null)
 const directoryCorrections = ref<NetworkPortalWorkspaceCorrectionCaseSummary[] | null>(null)
+const directorySlaRiskSummaries = ref<NetworkPortalDirectorySlaRiskSummary[] | null>(null)
 const appointments = ref<NetworkPortalAppointment[]>([])
 const contactAttempts = ref<NetworkPortalContactAttempt[]>([])
 const error = ref<string | null>(null)
@@ -100,6 +102,17 @@ function directoryCorrectionLabel(taskId: string) {
   }
   return `${first.status} · ${first.reasonCodes.join(',') || first.correctionCaseId}`
 }
+
+function directorySlaRiskLabel(taskId: string) {
+  if (directorySlaRiskSummaries.value === null) {
+    return '—'
+  }
+  const matched = directorySlaRiskSummaries.value.find((row) => row.taskId === taskId)
+  if (!matched) {
+    return '暂无'
+  }
+  return `开放 ${matched.openCount} / 超时 ${matched.breachedCount}`
+}
 const selectedTaskId = ref('')
 const selectedTechnicianId = ref('')
 const businessType = ref('INSTALLATION')
@@ -160,6 +173,7 @@ async function load() {
     directoryAppointments.value = null
     directoryContactAttempts.value = null
     directoryCorrections.value = null
+    directorySlaRiskSummaries.value = null
     appointments.value = []
     contactAttempts.value = []
     error.value = '请选择 NETWORK 上下文'
@@ -175,6 +189,8 @@ async function load() {
       taskPage.contactAttempts !== undefined ? taskPage.contactAttempts : null
     directoryCorrections.value =
       taskPage.corrections !== undefined ? taskPage.corrections : null
+    directorySlaRiskSummaries.value =
+      taskPage.slaRiskSummaries !== undefined ? taskPage.slaRiskSummaries : null
     if (taskPage.technicians !== undefined) {
       serverDirectoryTechnicians = taskPage.technicians
       directoryTechnicians.value = taskPage.technicians
@@ -208,6 +224,7 @@ async function load() {
     directoryAppointments.value = null
     directoryContactAttempts.value = null
     directoryCorrections.value = null
+    directorySlaRiskSummaries.value = null
     error.value = err instanceof Error ? err.message : '任务列表加载失败'
   }
   try {
@@ -652,6 +669,7 @@ watch(selectedTaskId, () => {
           <th v-if="directoryAppointments !== null">预约窗口</th>
           <th v-if="directoryContactAttempts !== null">最近联系</th>
           <th v-if="directoryCorrections !== null">整改</th>
+          <th v-if="directorySlaRiskSummaries !== null">SLA 风险</th>
         </tr>
       </thead>
       <tbody>
@@ -690,6 +708,12 @@ watch(selectedTaskId, () => {
             data-testid="task-correction-summary"
           >
             {{ directoryCorrectionLabel(item.taskId) }}
+          </td>
+          <td
+            v-if="directorySlaRiskSummaries !== null"
+            data-testid="task-sla-risk"
+          >
+            {{ directorySlaRiskLabel(item.taskId) }}
           </td>
         </tr>
       </tbody>
