@@ -33,8 +33,8 @@ SLA 工作台 taskId → /tasks/{taskId}
 
 ## 4. 明确未实现
 
-- Visit 详情页（缺 GET by id）；
-- 专用入站队列列表 API、SavedView、企业 OIDC/BFF；
+- ContactAttempt / FieldOperation 独立详情页；
+- SavedView、企业 OIDC/BFF；
 - ServiceNetwork、评分派单；
 - 真实 sandbox。
 

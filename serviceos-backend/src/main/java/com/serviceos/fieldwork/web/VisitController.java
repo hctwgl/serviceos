@@ -51,6 +51,18 @@ final class VisitController {
         return visits.listByWorkOrder(principals.current(), correlationId, workOrderId);
     }
 
+    @GetMapping("/visits/{visitId}")
+    ResponseEntity<VisitView> get(
+            @PathVariable UUID visitId,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        VisitView visit = visits.get(principals.current(), correlationId, visitId);
+        return ResponseEntity.ok()
+                .eTag(Long.toString(visit.aggregateVersion()))
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(visit);
+    }
+
     @PostMapping("/appointments/{appointmentId}/visits:check-in")
     ResponseEntity<VisitCommandReceipt> checkIn(
             @PathVariable UUID appointmentId,

@@ -45,6 +45,7 @@ status: Proposed
 | `POST /visits/{id}/field-operations` | StartFieldOperation | operationType、taskId | 201 |
 | `POST /field-operations/{id}/submissions` | SubmitFieldOperation | formSubmissionRef、evidenceSetRef、resultCode | 201 |
 | `GET /work-orders/{id}/visits` | 上门历史 | — | 200 |
+| `GET /visits/{id}` | 上门 Visit 详情（M159；OpenAPI 权威） | — | 200 |
 | `GET /field-operations/{id}` | 作业与提交版本 | — | 200 |
 
 ### 2.1 Check-in 位置

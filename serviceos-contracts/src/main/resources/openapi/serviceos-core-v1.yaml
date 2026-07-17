@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.73.0
+  version: 0.74.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1717,6 +1717,28 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/Visit' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /visits/{visitId}:
+    get:
+      operationId: getVisit
+      summary: 查询上门 Visit 详情
+      description: >-
+        M159 窄切片；需要 visit.read 与实时 tenant/project/network scope。
+        复用已有 Visit 安全摘要 Schema（含位置/设备/备注）；不新增字段语义。
+      parameters:
+        - $ref: '#/components/parameters/VisitId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Visit 详情
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Visit' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }

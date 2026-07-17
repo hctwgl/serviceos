@@ -39,6 +39,7 @@ class ContractValidationTest {
                         "/tasks/{taskId}/contact-attempts", "/appointments/{appointmentId}:cancel",
                         "/appointments/{appointmentId}:mark-no-show",
                         "/work-orders/{workOrderId}/visits",
+                        "/visits/{visitId}",
                         "/appointments/{appointmentId}/visits:check-in",
                         "/visits/{visitId}:check-out", "/visits/{visitId}:interrupt",
                         "/internal/integration/byd/review-routes",

@@ -250,6 +250,12 @@ type AppointmentDetailLink = {
   status: string
 }
 
+type VisitDetailLink = {
+  visitId: string
+  status: string
+  visitSequence: string
+}
+
 type FormSubmissionDetailLink = {
   submissionId: string
   formKey: string
@@ -262,10 +268,12 @@ type EvidenceItemDetailLink = {
   itemOrdinal: string
 }
 
-/** 仅映射已有 Admin 详情路由；Appointment/Visit/Form 等无对等页时不渲染。 */
+/** 仅映射已有 Admin 详情路由；无对等页的 resourceType 不渲染。 */
 const TIMELINE_RESOURCE_ROUTES: Record<string, string> = {
   WorkOrder: 'ADMIN.WORKORDER.WORKSPACE',
   Task: 'ADMIN.TASK.DETAIL',
+  Appointment: 'ADMIN.APPOINTMENT.DETAIL',
+  Visit: 'ADMIN.VISIT.DETAIL',
   ReviewCase: 'ADMIN.REVIEW.DETAIL',
   CorrectionCase: 'ADMIN.CORRECTION.DETAIL',
   OutboundDelivery: 'ADMIN.INTEGRATION.DETAIL',
@@ -453,9 +461,30 @@ const appointmentDetailLinks = computed((): AppointmentDetailLink[] => {
     .filter((item): item is AppointmentDetailLink => item != null)
 })
 
+/** M159：复用 GET /visits/{id}；与 Task 旁路并列。 */
+const visitDetailLinks = computed((): VisitDetailLink[] => {
+  const section = sectionData.value?.appointmentsVisits
+  if (!section || activeSection.value !== 'APPOINTMENTS_VISITS') return []
+  const raw = section.visits
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null
+      const row = item as Record<string, unknown>
+      const id = row.visitId
+      if (typeof id !== 'string' || !id) return null
+      return {
+        visitId: id,
+        status: String(row.status ?? '—'),
+        visitSequence: String(row.visitSequence ?? '—'),
+      }
+    })
+    .filter((item): item is VisitDetailLink => item != null)
+})
+
 /**
- * Visit/ContactAttempt 仍无独立详情页；旁路到 Task。
- * appointments 已有详情页，仍保留 Task 旁路供现场操作入口。
+ * ContactAttempt 仍无独立详情页；旁路到 Task。
+ * appointments/visits 已有详情页，仍保留 Task 旁路供现场操作入口。
  */
 const appointmentVisitTaskLinks = computed((): RelatedTaskLink[] => {
   const section = sectionData.value?.appointmentsVisits
@@ -970,6 +999,19 @@ onMounted(() => {
               }"
             >
               {{ item.type }} / {{ item.status }} / {{ item.appointmentId }}
+            </RouterLink>
+          </p>
+          <p v-if="visitDetailLinks.length" class="links visit-detail-links">
+            打开上门详情：
+            <RouterLink
+              v-for="item in visitDetailLinks"
+              :key="item.visitId"
+              :to="{
+                name: 'ADMIN.VISIT.DETAIL',
+                params: { id: item.visitId },
+              }"
+            >
+              {{ item.status }} / seq={{ item.visitSequence }} / {{ item.visitId }}
             </RouterLink>
           </p>
           <p v-if="appointmentVisitTaskLinks.length" class="links appointment-visit-task-links">

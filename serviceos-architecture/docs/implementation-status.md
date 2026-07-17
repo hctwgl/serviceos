@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-17
-baselineCommit: faed9d2719dc8c1306f316bb92dea12390eea325
-latestMilestone: M158
+baselineCommit: PENDING
+latestMilestone: M159
 ---
 
 # ServiceOS 实施状态总览
@@ -39,13 +39,13 @@ latestMilestone: M158
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M158 授权入站 Envelope 队列 |
+| 最新实施里程碑 | M159 Admin 上门 Visit 详情页 |
 | 基线提交 | `PENDING`（功能提交后回填） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
-| 前端工程 | `serviceos-admin-web`（Vue+TS+Vite）已纳入 CI 构建，具备开发态 Keycloak PKCE，以及真实只读、Task MANUAL assign-candidates/claim/release、表单/资料/审核/整改/完结、正常补传复审，预约上门、BYD 提审外发 ACK、厂端回调，CPIM 入站→激活→Admin HTTP 人工初派→同单预约上门→表单/资料/驳回整改补传复审/外发/完结（ADMIN-PILOT-09），入站 Envelope 授权队列与详情深链、专项队列与目录/SLA Accepted OpenAPI 筛选，工作区各按需区块详情或 Task 旁路、预约/表单/资料详情页，以及工作区项目与 SLA 任务交叉深链的 PR 阻断 E2E；Network/Technician 尚未建立 |
+| 前端工程 | `serviceos-admin-web`（Vue+TS+Vite）已纳入 CI 构建，具备开发态 Keycloak PKCE，以及真实只读、Task MANUAL assign-candidates/claim/release、表单/资料/审核/整改/完结、正常补传复审，预约上门、BYD 提审外发 ACK、厂端回调，CPIM 入站→激活→Admin HTTP 人工初派→同单预约上门→表单/资料/驳回整改补传复审/外发/完结（ADMIN-PILOT-09），入站 Envelope 授权队列与详情深链、专项队列与目录/SLA Accepted OpenAPI 筛选，工作区各按需区块详情或 Task 旁路、预约/表单/资料/上门详情页，以及工作区项目与 SLA 任务交叉深链的 PR 阻断 E2E；Network/Technician 尚未建立 |
 | 数据库 | PostgreSQL + Flyway（当前版本 085 / 87） |
-| 契约 | Core OpenAPI 0.73.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、recovered/resolved 与 SLA started/breached/met@v1） |
+| 契约 | Core OpenAPI 0.74.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、recovered/resolved 与 SLA started/breached/met@v1） |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -66,7 +66,7 @@ latestMilestone: M158
 | 服务分配 | 网点分配、容量、改派 Saga、超时恢复 | `IMPLEMENTED` | ServiceAssignment、容量权威、改派、终止、对账和自动恢复 | 完整策略评分、全部异常分支和 UI | M24～M28 |
 | 运营异常 | 异常工作台基础 | `PARTIAL` | 异常记录和恢复入口；M58 将外发 UNKNOWN 与 Task 最终人工事件汇入 OperationalException + HUMAN Task；M59 提供高风险人工重发事实；M60 在严格 ACK 后幂等闭环对应异常并处理事件乱序；列表/详情/确认已硬化为实时项目范围 | 人工标记已送达/放弃、其他异常类型自动闭环、完整通知、运营中心前端和跨域异常目录 | M29、M58～M60、M100 |
 | 预约 | 预约修订、联系终态动作 | `PARTIAL` | Revision、并发和终态动作基础；公开事件已并入工单时间线；Admin propose/confirm E2E | 用户确认渠道、完整日程和跨端协作 | M30～M31、M74、M136 |
-| 现场作业 | Visit 生命周期 | `PARTIAL` | Visit 运行时基础；签到/签退/中断事件已并入工单时间线；Admin check-in/check-out E2E | GPS 策略增强、完整现场提交、离线同步和师傅端 | M32、M74、M136 |
+| 现场作业 | Visit 生命周期 | `PARTIAL` | Visit 运行时基础；签到/签退/中断事件已并入工单时间线；Admin check-in/check-out E2E；`GET /visits/{id}` 与详情页 | GPS 策略增强、完整现场提交、离线同步和师傅端 | M32、M74、M136、M159 |
 | 动态表单 | 资产、冻结版本、不可变提交和 Task 完成门禁 | `PARTIAL` | 固定/条件 required、visible 与布尔 validation rule，基础类型校验、精确版本提交和完成引用；form.submitted 已并入工单时间线 | 复杂 validator、计算字段、草稿、冲突、更正和审核 | M33～M35、M53、M76 |
 | 资料 Evidence | 资产、槽位、Item/Revision、机器校验、Snapshot、完成门禁、作废、Review、Correction | `PARTIAL` | 固定/条件槽位、VALIDATED 表单触发只追加重解析、槽位世代/lineage、REVIEW_REQUIRED 与显式 KEEP/INVALIDATE（处置已并入工单时间线）、安全文件联动、Snapshot/完成门禁及审核整改链路 | OCR/CV、GPS 权威距离、长期归档 | M36～M53、M76、M82～M83 |
 | 安全文件 | Begin/Finalize/隔离/扫描/授权下载/作废 | `IMPLEMENTED` | 独立安全文件生命周期；Evidence 编排 Begin/Finalize/Invalidate 联动 | 正式对象存储、专业扫描服务、物理删除 | M11、M38、M46 |
@@ -75,7 +75,7 @@ latestMilestone: M158
 | 通知 | 通知与运营异常中心 | `PROPOSED` | 已有总体设计 | 通知通道、模板、可靠发送和 UI | `architecture/14-*` |
 | 履约事实与试算 | 事实提取和双向试算 | `PROPOSED` | 已有设计、API 和数据规划 | 运行时、投影和前端工作区 | M5 设计 |
 | 对账结算 | 对账、结算、争议与调整 | `PROPOSED` | 已有边界设计 | 正式运行时和页面 | `architecture/16-*` |
-| Admin Portal | 总部运营后台 | `PARTIAL` | M101～M158：队列/任务/SLA/异常/入站/外发/工单/项目目录、工作区、allowed-actions；CI 阻断构建；开发态 Keycloak PKCE；真实只读与写链路 PR 阻断 E2E（含 ADMIN-PILOT-09、工作区各区块详情或 Task 旁路、预约/表单/资料详情页、项目与 SLA 任务交叉深链、专项队列与目录/SLA Accepted OpenAPI 筛选、入站 Envelope 授权队列） | 设计系统、SavedView、正式企业 OIDC/BFF、生产对象存储/专业扫描、评分/硬过滤派单与 ServiceNetwork 生命周期 | M7 设计、M101～M158、Admin 试点基线 |
+| Admin Portal | 总部运营后台 | `PARTIAL` | M101～M159：队列/任务/SLA/异常/入站/外发/工单/项目目录、工作区、allowed-actions；CI 阻断构建；开发态 Keycloak PKCE；真实只读与写链路 PR 阻断 E2E（含 ADMIN-PILOT-09、工作区各区块详情或 Task 旁路、预约/表单/资料/上门详情页、项目与 SLA 任务交叉深链、专项队列与目录/SLA Accepted OpenAPI 筛选、入站 Envelope 授权队列） | 设计系统、SavedView、正式企业 OIDC/BFF、生产对象存储/专业扫描、评分/硬过滤派单与 ServiceNetwork 生命周期 | M7 设计、M101～M159、Admin 试点基线 |
 | Network Portal | 网点协作端 | `PROPOSED` | 页面和跨端协作规格 | 前端代码和 E2E | M7 设计 |
 | Technician App | 师傅移动端 | `PROPOSED` | 弱网、离线工作包、上传队列和页面规格 | 移动端工程、真机和离线运行时 | M7 设计 |
 | External Portal | 用户/车企受控页面 | `PROPOSED` | 最小边界规划 | 二期页面和工程实现 | M7 设计 |
@@ -1126,6 +1126,16 @@ M144 起 SPI 种子入口已删除。
 
 明确未实现：评分/硬过滤/DispatchDecision、ServiceNetwork 生命周期、专用入站队列页、真实 sandbox。
 
+### M159：Admin 上门 Visit 详情页
+
+已实现：
+
+- Core OpenAPI 0.74.0 `GET /visits/{visitId}`（`visit.read` + ETag）；
+- Admin `/visits/{id}` 只读详情；工作区 AV → 上门详情深链；
+- PostgreSQL IT、MVC 安全测试、Playwright `ADMIN-PILOT-08VD`。
+
+明确未实现：ContactAttempt 详情、FieldOperation 详情、SavedView、企业 OIDC/BFF、真实 sandbox。
+
 ### M158：授权入站 Envelope 队列
 
 已实现：
@@ -1272,22 +1282,22 @@ M144 起 SPI 种子入口已删除。
 
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M158**。Admin Pilot 已覆盖工作区区块详情/旁路、预约/表单/资料详情、
+ServiceOS 可靠纵向切片已推进到 **M159**。Admin Pilot 已覆盖工作区区块详情/旁路、预约/表单/资料/上门详情、
 项目与 SLA 任务交叉深链、专项队列（含入站 Envelope）与目录筛选、`ADMIN-PILOT-09`；没有实现完整
 评分派单引擎、完整 SLA/通知策略、通用队列/SavedView 或整个现场履约平台。
 
 ```text
 候选下一方向（优先从已确认文档中选择最小可靠切片；勿发明契约）：
 1. 正式企业 OIDC/BFF、MFA 与设计系统；SavedView 仍需再接受 API-06 章节；
-2. Visit GET by id 接受后补齐 Visit 详情页；当前 OpenAPI 无该读路径；
-3. 在接受 ServiceNetwork 状态语义后建立目录与准入/启用/清退生命周期；当前相关文档仍为 Proposed，
+2. 在接受 ServiceNetwork 状态语义后建立目录与准入/启用/清退生命周期；当前相关文档仍为 Proposed，
    不得猜测状态值或转换规则；
-4. 建立 Organization/Region 目录、层级后代与组织到 Project 的权威关系；
-5. 在试点确认日历/暂停/预警规则后扩展 BUSINESS 时钟、暂停和升级；
-6. 多候选人评分、硬过滤重跑、自动 claim、网点容量联动（需另接受 api/04 / ADR-009 切片）；
-7. OCR/CV、GPS 权威距离、二级审批/MFA、报告 GENERATED 资料包；
-8. 表达式计算字段、决策表/脚本、草稿冲突与离线合并；
-9. 履约事实试算与结算运行时；Admin 投影重建/重放 HTTP（需另接受运维契约）。
+3. 建立 Organization/Region 目录、层级后代与组织到 Project 的权威关系；
+4. 在试点确认日历/暂停/预警规则后扩展 BUSINESS 时钟、暂停和升级；
+5. 多候选人评分、硬过滤重跑、自动 claim、网点容量联动（需另接受 api/04 / ADR-009 切片）；
+6. OCR/CV、GPS 权威距离、二级审批/MFA、报告 GENERATED 资料包；
+7. 表达式计算字段、决策表/脚本、草稿冲突与离线合并；
+8. 履约事实试算与结算运行时；Admin 投影重建/重放 HTTP（需另接受运维契约）；
+9. ContactAttempt / FieldOperation 详情（需对应读契约确认）。
 ```
 
 接手 Agent 必须先检查仓库是否已有更新的里程碑文档、ADR 或提交；在收到明确批准前不得猜测业务策略并实现上述候选项。

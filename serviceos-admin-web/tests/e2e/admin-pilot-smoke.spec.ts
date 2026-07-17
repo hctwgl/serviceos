@@ -1560,6 +1560,27 @@ test('真实 OIDC 登录后可完成预约提议确认与上门签到签退', as
     status: 'COMPLETED',
   })
   await expect(page.getByText(`签退 Visit ${checkedIn.visitId}`)).toBeVisible()
+
+  // M159：工作区 APPOINTMENTS_VISITS → 上门详情（GET /visits/{id}）。
+  await page.getByRole('link', { name: '工单目录' }).click()
+  await page.getByRole('link', { name: workOrderCode! }).click()
+  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await page.getByRole('button', { name: /APPOINTMENTS_VISITS/ }).click()
+  await expect(page.getByText('区块加载中…')).toHaveCount(0)
+  await expect(page.getByText('打开上门详情：')).toBeVisible()
+  const workspaceVisitDetailPromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname === `/api/v1/visits/${checkedIn.visitId}`,
+  )
+  await page
+    .getByRole('link', {
+      name: new RegExp(`COMPLETED\\s*/\\s*seq=\\d+\\s*/\\s*${checkedIn.visitId}`),
+    })
+    .click()
+  expect((await workspaceVisitDetailPromise).status()).toBe(200)
+  await expect(page.getByRole('heading', { name: '上门详情' })).toBeVisible()
+  await expect(page).toHaveURL(new RegExp(`/visits/${checkedIn.visitId}$`))
 })
 
 test('真实 OIDC 登录后可通过审核外发并经厂端回调关闭 CLIENT Case', async ({ page, request }) => {
