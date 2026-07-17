@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.10
+  version: 1.0.11
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1440,6 +1440,9 @@ paths:
         M230：可选 `technicians`（复用 NetworkPortalTechnicianItem）；
         需 NETWORK `technician.readOwnNetwork`，缺能力时省略（不得用空数组伪装）；
         仅含本页 items[].technicianId 命中的本网点 ACTIVE 师傅。
+        M231：可选 `appointments`（复用 Admin/NP 预约摘要字段集）；
+        需 NETWORK `networkPortal.manageAppointment`，缺能力时省略（不得用空数组伪装）；
+        覆盖本页 items[].taskIds；另按可信 networkId 过滤 assignedNetworkId。
       parameters:
         - $ref: '#/components/parameters/NetworkContext'
         - $ref: '#/components/parameters/CorrelationId'
@@ -1509,6 +1512,9 @@ paths:
         M230：可选 `technicians`（复用 NetworkPortalTechnicianItem）；
         需 NETWORK `technician.readOwnNetwork`，缺能力时省略（不得用空数组伪装）；
         仅含本页 items[].technicianId 命中的本网点 ACTIVE 师傅。
+        M231：可选 `appointments`（复用 Admin/NP 预约摘要字段集）；
+        需 NETWORK `networkPortal.manageAppointment`，缺能力时省略（不得用空数组伪装）；
+        覆盖本页 items[].taskId；另按可信 networkId 过滤 assignedNetworkId。
       parameters:
         - $ref: '#/components/parameters/NetworkContext'
         - $ref: '#/components/parameters/CorrelationId'
@@ -4941,6 +4947,14 @@ components:
           type: array
           maxItems: 100
           items: { $ref: '#/components/schemas/NetworkPortalTechnicianItem' }
+        appointments:
+          description: |
+            M231：需 NETWORK networkPortal.manageAppointment；缺能力时省略本属性；有能力且无实例时返回 []。
+            元素字段复用 WorkOrderWorkspaceAppointmentSummary（无 revisions/allowedActions/address）；
+            覆盖本页 items[].taskIds，并按可信 networkId 过滤 assignedNetworkId。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceAppointmentSummary' }
         asOf: { type: string, format: date-time }
     NetworkPortalWorkOrderWorkspaceSlaSummary:
       type: object
@@ -5079,6 +5093,14 @@ components:
           type: array
           maxItems: 100
           items: { $ref: '#/components/schemas/NetworkPortalTechnicianItem' }
+        appointments:
+          description: |
+            M231：需 NETWORK networkPortal.manageAppointment；缺能力时省略本属性；有能力且无实例时返回 []。
+            元素字段复用 WorkOrderWorkspaceAppointmentSummary（无 revisions/allowedActions/address）；
+            覆盖本页 items[].taskId，并按可信 networkId 过滤 assignedNetworkId。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceAppointmentSummary' }
         asOf: { type: string, format: date-time }
     NetworkPortalTechnicianItem:
       type: object

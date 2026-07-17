@@ -229,8 +229,18 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
             technicianSummaries = loadTechnicianSummaries(
                     actor.tenantId(), networkId, wantedTechnicianIds);
         }
+        List<NetworkPortalWorkspaceAppointmentSummary> appointmentSummaries = null;
+        if (hasNetworkCapability(actor, correlationId, MANAGE_APPOINTMENT, networkId)) {
+            Set<UUID> pageTaskIds = new LinkedHashSet<>();
+            for (NetworkPortalWorkOrderItem item : workOrderItems) {
+                pageTaskIds.addAll(item.taskIds());
+            }
+            appointmentSummaries = loadAppointmentSummaries(
+                    actor, correlationId, networkId, pageTaskIds);
+        }
         return new NetworkPortalPage<>(
-                networkId, workOrderItems, clock.instant(), technicianSummaries);
+                networkId, workOrderItems, clock.instant(),
+                technicianSummaries, appointmentSummaries);
     }
 
     @Override
@@ -851,8 +861,18 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
             technicianSummaries = loadTechnicianSummaries(
                     actor.tenantId(), networkId, wantedTechnicianIds);
         }
+        List<NetworkPortalWorkspaceAppointmentSummary> appointmentSummaries = null;
+        if (hasNetworkCapability(actor, correlationId, MANAGE_APPOINTMENT, networkId)) {
+            Set<UUID> pageTaskIds = new LinkedHashSet<>();
+            for (NetworkPortalTaskItem item : taskItems) {
+                pageTaskIds.add(item.taskId());
+            }
+            appointmentSummaries = loadAppointmentSummaries(
+                    actor, correlationId, networkId, pageTaskIds);
+        }
         return new NetworkPortalPage<>(
-                networkId, taskItems, clock.instant(), technicianSummaries);
+                networkId, taskItems, clock.instant(),
+                technicianSummaries, appointmentSummaries);
     }
 
     @Override

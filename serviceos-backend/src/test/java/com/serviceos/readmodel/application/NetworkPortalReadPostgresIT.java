@@ -310,6 +310,43 @@ class NetworkPortalReadPostgresIT {
     }
 
     @Test
+    void directoryAppointmentSummariesAreCapabilityGatedAndTaskScoped() {
+        String context = "NETWORK|NETWORK|" + NETWORK_A;
+        NetworkPortalPage<NetworkPortalWorkOrderItem> withoutCapWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-apt-omit-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> withoutCapTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-apt-omit-task", context);
+        assertThat(withoutCapWo.appointments()).isNull();
+        assertThat(withoutCapTasks.appointments()).isNull();
+
+        seedGrant(PRINCIPAL, "networkPortal.manageAppointment", "NETWORK", NETWORK_A.toString());
+        seedGrant(PRINCIPAL, "appointment.read", "NETWORK", NETWORK_A.toString());
+        NetworkPortalPage<NetworkPortalWorkOrderItem> emptyWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-apt-empty-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> emptyTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-apt-empty-task", context);
+        assertThat(emptyWo.appointments()).isEmpty();
+        assertThat(emptyTasks.appointments()).isEmpty();
+
+        UUID appointmentA = seedAppointment(TASK_A, WO_A, NETWORK_A.toString(), "m231-a");
+        seedAppointment(TASK_B, WO_B, NETWORK_B.toString(), "m231-b");
+        seedAppointment(TASK_A, WO_A, NETWORK_B.toString(), "m231-foreign-net");
+
+        NetworkPortalPage<NetworkPortalWorkOrderItem> withWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-apt-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> withTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-apt-task", context);
+        assertThat(withWo.appointments())
+                .extracting(NetworkPortalWorkspaceAppointmentSummary::appointmentId)
+                .containsExactly(appointmentA);
+        assertThat(withWo.appointments().getFirst().status()).isEqualTo("CONFIRMED");
+        assertThat(withWo.appointments().getFirst().timezone()).isEqualTo("Asia/Shanghai");
+        assertThat(withTasks.appointments())
+                .extracting(NetworkPortalWorkspaceAppointmentSummary::appointmentId)
+                .containsExactly(appointmentA);
+    }
+
+    @Test
     void workOrderWorkspaceTechnicianSummariesAreCapabilityGatedAndMatched() {
         String context = "NETWORK|NETWORK|" + NETWORK_A;
         // 临时撤掉夹具默认的 technician.readOwnNetwork，验证省略语义

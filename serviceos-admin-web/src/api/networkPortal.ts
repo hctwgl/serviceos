@@ -14,12 +14,31 @@ export type NetworkPortalTechnicianItem = {
   membershipVersion?: number
 }
 
+/** M227/M231：预约摘要（对齐 Admin WorkOrderWorkspaceAppointmentSummary）。 */
+export type NetworkPortalWorkspaceAppointmentSummary = {
+  appointmentId: string
+  taskId: string
+  type: string
+  status: string
+  assignedNetworkId: string | null
+  technicianId: string | null
+  currentRevisionNo: number
+  windowStart: string | null
+  windowEnd: string | null
+  timezone: string | null
+  estimatedDurationMinutes: number | null
+  aggregateVersion: number
+  createdAt: string
+}
+
 export type NetworkPortalPage<T> = {
   networkId: string
   items: T[]
   asOf: string
   /** Soft-gated；缺 NETWORK `technician.readOwnNetwork` 时省略（工单/任务目录页）。 */
   technicians?: NetworkPortalTechnicianItem[]
+  /** Soft-gated；缺 NETWORK `networkPortal.manageAppointment` 时省略（工单/任务目录页）。 */
+  appointments?: NetworkPortalWorkspaceAppointmentSummary[]
 }
 
 export type NetworkPortalWorkOrderItem = {
@@ -263,23 +282,6 @@ export type NetworkPortalWorkOrderWorkspace = {
   /** Soft-gated；缺 NETWORK `technician.readOwnNetwork` 时省略，不得用空数组伪装无权限。 */
   technicians?: NetworkPortalTechnicianItem[]
   asOf: string
-}
-
-/** M227：工作区预约摘要（对齐 Admin WorkOrderWorkspaceAppointmentSummary）。 */
-export type NetworkPortalWorkspaceAppointmentSummary = {
-  appointmentId: string
-  taskId: string
-  type: string
-  status: string
-  assignedNetworkId: string | null
-  technicianId: string | null
-  currentRevisionNo: number
-  windowStart: string | null
-  windowEnd: string | null
-  timezone: string | null
-  estimatedDurationMinutes: number | null
-  aggregateVersion: number
-  createdAt: string
 }
 
 /** M227：工作区联系尝试摘要（对齐 Admin；无 party/note/recording/actor）。 */
