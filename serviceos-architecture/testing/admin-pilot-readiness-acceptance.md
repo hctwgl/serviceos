@@ -1,10 +1,10 @@
 ---
-title: Admin 试点可运行基线验收（含 M160）
+title: Admin 试点可运行基线验收（含 M161）
 status: Implemented
 lastUpdated: 2026-07-17
 ---
 
-# Admin 试点可运行基线验收（含 M160）
+# Admin 试点可运行基线验收（含 M161）
 
 | ID | 场景 | 证据 | 结果 |
 |---|---|---|---|
@@ -50,6 +50,7 @@ lastUpdated: 2026-07-17
 | ADMIN-PILOT-08IQ | 真实入站 Envelope 授权队列 | 默认 RECEIVED；COMPLETED+projectId 筛选；详情 GET 200 | PASS |
 | ADMIN-PILOT-08VD | 真实上门 Visit 详情页 | `/visits/{id}`；工作区 AV 深链 GET 200 | PASS |
 | ADMIN-PILOT-08CA | 真实联系尝试 ContactAttempt 详情页 | `/contact-attempts/{id}`；工作区 AV 深链 GET 200 | PASS |
+| ADMIN-PILOT-08CT | 真实核心时间线资源详情深链 | 核心时间线 → FormSubmission / EvidenceSetSnapshot GET 200 | PASS |
 | ADMIN-PILOT-08CI | 真实写链路 CI 阻断 | GitHub Actions `admin-pilot-e2e` 运行同一 OIDC/Backend/PostgreSQL/Chrome smoke；通过后才启动 staging | PASS |
 | ADMIN-PILOT-09 | 完整履约写链路 | 接单→Admin 派单(HTTP Manual Assign)→预约→上门→表单/资料→审核/整改→外发→完结 | PASS |
 

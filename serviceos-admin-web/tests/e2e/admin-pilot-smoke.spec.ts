@@ -773,6 +773,53 @@ test('真实 OIDC 登录后可完成 Task 并可靠推进 Workflow 与 WorkOrder
   await page.getByRole('link', { name: '工单目录' }).click()
   await page.getByRole('link', { name: workOrderCode! }).click()
   await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+
+  // M161：权威核心时间线 → FormSubmission / EvidenceSetSnapshot 详情深链。
+  await expect(page.getByText('打开核心时间线资源：')).toBeVisible({ timeout: 30_000 })
+  const coreTimelineFormPromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname ===
+        `/api/v1/form-submissions/${submission.submissionId}`,
+  )
+  await page
+    .getByRole('link', {
+      name: new RegExp(
+        `core\\s*/\\s*form\\.submitted\\s*/\\s*FormSubmission\\s*/\\s*(admin\\.pilot-completion-form|${submission.submissionId})`,
+      ),
+    })
+    .click()
+  expect((await coreTimelineFormPromise).status()).toBe(200)
+  await expect(page.getByRole('heading', { name: '表单提交详情' })).toBeVisible()
+  await expect(page).toHaveURL(
+    new RegExp(`/form-submissions/${submission.submissionId}$`),
+  )
+  await page.getByRole('link', { name: '工单目录' }).click()
+  await page.getByRole('link', { name: workOrderCode! }).click()
+  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await expect(page.getByText('打开核心时间线资源：')).toBeVisible()
+  const coreTimelineSnapshotPromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname ===
+        `/api/v1/evidence-set-snapshots/${snapshot.evidenceSetSnapshotId}`,
+  )
+  await page
+    .getByRole('link', {
+      name: new RegExp(
+        `core\\s*/\\s*evidence\\.set-snapshotted\\s*/\\s*EvidenceSetSnapshot\\s*/\\s*${snapshot.evidenceSetSnapshotId}`,
+      ),
+    })
+    .click()
+  expect((await coreTimelineSnapshotPromise).status()).toBe(200)
+  await expect(page.getByRole('heading', { name: '资料快照详情' })).toBeVisible()
+  await expect(page).toHaveURL(
+    new RegExp(`/evidence-set-snapshots/${snapshot.evidenceSetSnapshotId}$`),
+  )
+
+  await page.getByRole('link', { name: '工单目录' }).click()
+  await page.getByRole('link', { name: workOrderCode! }).click()
+  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
   await page.getByRole('button', { name: /FORMS_EVIDENCE/ }).click()
   await expect(page.getByText('区块加载中…')).toHaveCount(0)
   await expect(page.getByText('打开表单提交详情：')).toBeVisible()

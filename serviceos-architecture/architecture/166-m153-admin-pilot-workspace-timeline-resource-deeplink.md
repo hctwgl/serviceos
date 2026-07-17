@@ -46,8 +46,8 @@ lastUpdated: 2026-07-17
 
 ## 5. 明确未实现
 
-- Appointment / Visit / FormSubmission / EvidenceItem 独立详情页；
-- 权威「核心时间线」表格内嵌链接（可与本节同构，留待后续）；
+- Appointment / Visit / FormSubmission / EvidenceItem 独立详情页（后续 M155～M160 已分别补齐对应详情页）；
+- 权威「核心时间线」表格内嵌链接（M161 已以表格旁链同构实现）；
 - 专用入站队列列表 API、SavedView、企业 OIDC/BFF；
 - 真实 sandbox。
 

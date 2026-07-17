@@ -281,6 +281,9 @@ const TIMELINE_RESOURCE_ROUTES: Record<string, string> = {
   Appointment: 'ADMIN.APPOINTMENT.DETAIL',
   Visit: 'ADMIN.VISIT.DETAIL',
   ContactAttempt: 'ADMIN.CONTACT_ATTEMPT.DETAIL',
+  FormSubmission: 'ADMIN.FORM_SUBMISSION.DETAIL',
+  EvidenceItem: 'ADMIN.EVIDENCE_ITEM.DETAIL',
+  EvidenceSetSnapshot: 'ADMIN.EVIDENCE_SET_SNAPSHOT.DETAIL',
   ReviewCase: 'ADMIN.REVIEW.DETAIL',
   CorrectionCase: 'ADMIN.CORRECTION.DETAIL',
   OutboundDelivery: 'ADMIN.INTEGRATION.DETAIL',
@@ -414,14 +417,13 @@ const taskSectionLinks = computed((): TaskSectionLink[] => {
     .filter((item): item is TaskSectionLink => item != null)
 })
 
-/** 按需 TIMELINE_AUDIT：仅对已有详情页的 resourceType 生成深链。 */
-const timelineResourceLinks = computed((): TimelineResourceLink[] => {
-  const section = sectionData.value?.timeline
-  if (!section || activeSection.value !== 'TIMELINE_AUDIT') return []
-  const raw = section.items
-  if (!Array.isArray(raw)) return []
+function collectTimelineResourceLinks(
+  rows: unknown,
+  labelPrefix: string | null,
+): TimelineResourceLink[] {
+  if (!Array.isArray(rows)) return []
   const seen = new Set<string>()
-  return raw
+  return rows
     .map((item) => {
       if (!item || typeof item !== 'object') return null
       const row = item as Record<string, unknown>
@@ -429,22 +431,36 @@ const timelineResourceLinks = computed((): TimelineResourceLink[] => {
       const resourceId = typeof row.resourceId === 'string' ? row.resourceId : ''
       const routeName = TIMELINE_RESOURCE_ROUTES[resourceType]
       if (!routeName || !resourceId) return null
-      const dedupeKey = `${resourceType}:${resourceId}`
+      const dedupeKey = `${labelPrefix ?? 'audit'}:${resourceType}:${resourceId}`
       if (seen.has(dedupeKey)) return null
       seen.add(dedupeKey)
       const eventType = String(row.eventType ?? '—')
       const resourceCode =
         typeof row.resourceCode === 'string' && row.resourceCode ? row.resourceCode : resourceId
+      const body = `${eventType} / ${resourceType} / ${resourceCode}`
       return {
         key: dedupeKey,
         routeName,
         resourceId,
         eventType,
         resourceType,
-        label: `${eventType} / ${resourceType} / ${resourceCode}`,
+        // 前缀避免与权威区 / TIMELINE_AUDIT / 核心时间线链接 Playwright strict 冲突
+        label: labelPrefix ? `${labelPrefix} / ${body}` : body,
       }
     })
     .filter((item): item is TimelineResourceLink => item != null)
+}
+
+/** 按需 TIMELINE_AUDIT：仅对已有详情页的 resourceType 生成深链。 */
+const timelineResourceLinks = computed((): TimelineResourceLink[] => {
+  const section = sectionData.value?.timeline
+  if (!section || activeSection.value !== 'TIMELINE_AUDIT') return []
+  return collectTimelineResourceLinks(section.items, null)
+})
+
+/** M161：权威核心时间线表格旁链；与 TIMELINE_AUDIT 同构白名单。 */
+const coreTimelineResourceLinks = computed((): TimelineResourceLink[] => {
+  return collectTimelineResourceLinks(timelinePage.value?.items ?? [], 'core')
 })
 
 /** M155：复用已有 GET /appointments/{id}；与 Task 旁路并列。 */
@@ -880,6 +896,19 @@ onMounted(() => {
         @refresh="loadAuthorityProjections"
         @next="() => undefined"
       />
+      <p v-if="coreTimelineResourceLinks.length" class="links core-timeline-resource-links">
+        打开核心时间线资源：
+        <RouterLink
+          v-for="item in coreTimelineResourceLinks"
+          :key="item.key"
+          :to="{
+            name: item.routeName,
+            params: { id: item.resourceId },
+          }"
+        >
+          {{ item.label }}
+        </RouterLink>
+      </p>
       <p v-if="timelinePage" class="meta">
         freshness={{ timelinePage.freshnessStatus }} / resourceVersion={{ timelinePage.resourceVersion }} /
         lastProjectedAt={{ timelinePage.lastProjectedAt || '—' }}

@@ -161,4 +161,5 @@
 - [M158 授权入站 Envelope 队列验收矩阵](155-m158-authorized-inbound-envelope-queue-acceptance.md)
 - [M159 Admin 上门 Visit 详情页验收矩阵](156-m159-admin-pilot-visit-detail-acceptance.md)
 - [M160 Admin 联系尝试 ContactAttempt 详情页验收矩阵](157-m160-admin-pilot-contact-attempt-detail-acceptance.md)
+- [M161 Admin 核心时间线资源详情深链验收矩阵](158-m161-admin-pilot-core-timeline-resource-deeplink-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

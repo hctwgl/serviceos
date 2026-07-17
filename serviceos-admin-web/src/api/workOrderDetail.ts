@@ -65,6 +65,7 @@ export type WorkOrderTimelineItem = {
   actorId: string
   resourceType: string
   resourceId: string
+  resourceCode?: string | null
   outcomeCode: string | null
   correlationId: string
 }
