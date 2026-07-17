@@ -511,10 +511,15 @@ export type NetworkPortalAppointmentRevision = {
   revisionId?: string
   revisionNo: number
   window: AppointmentWindow
-  /** 契约含 addressRef；UI 禁止渲染（ADR-054）。 */
+  /** 契约含 addressRef；UI 禁止渲染（ADR-054 / ADR-076）。 */
   addressRef?: string
   addressVersion?: string
   note?: string | null
+  /** M238：确认渠道 / 确认方类型（非 PII）；缺省表示尚未确认。 */
+  confirmationChannel?: string | null
+  confirmedPartyType?: string | null
+  /** 修订操作者；与 Appointment.createdBy 可不同。 */
+  createdBy?: string
 }
 
 export type NetworkPortalAppointment = {
@@ -525,7 +530,9 @@ export type NetworkPortalAppointment = {
   assignedNetworkId: string | null
   aggregateVersion: number
   currentRevisionNo: number
-  /** OpenAPI Appointment.revisions；M216 仅消费 current window。 */
+  /** OpenAPI Appointment.createdBy；product/03 §8「操作者」。 */
+  createdBy?: string
+  /** OpenAPI Appointment.revisions；M216/M238 消费 current window/渠道。 */
   revisions?: NetworkPortalAppointmentRevision[]
 }
 

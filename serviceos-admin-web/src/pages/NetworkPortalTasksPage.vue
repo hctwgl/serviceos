@@ -317,6 +317,34 @@ async function loadContactAttempts() {
   }
 }
 
+/** M238：当前 revision；用于窗口 / 确认渠道（不渲染 addressRef/note）。 */
+function currentAppointmentRevision(item: NetworkPortalAppointment) {
+  const revisions = item.revisions ?? []
+  return (
+    revisions.find((revision) => revision.revisionNo === item.currentRevisionNo) ??
+    revisions[revisions.length - 1] ??
+    null
+  )
+}
+
+function appointmentHistoryWindowLabel(item: NetworkPortalAppointment) {
+  const revision = currentAppointmentRevision(item)
+  if (!revision?.window) {
+    return '—'
+  }
+  return `${revision.window.start} → ${revision.window.end}（${revision.window.timezone}）`
+}
+
+function appointmentHistoryChannelLabel(item: NetworkPortalAppointment) {
+  const revision = currentAppointmentRevision(item)
+  return revision?.confirmationChannel ?? '—'
+}
+
+function appointmentHistoryPartyTypeLabel(item: NetworkPortalAppointment) {
+  const revision = currentAppointmentRevision(item)
+  return revision?.confirmedPartyType ?? '—'
+}
+
 async function submitAssign() {
   if (!props.networkContextId) {
     assignError.value = '请选择 NETWORK 上下文'
@@ -852,6 +880,7 @@ watch(selectedTaskId, () => {
       <p class="hint">
         调用 Network Portal 预约 propose/confirm/reschedule/cancel/mark-no-show 与联系尝试；
         确认方固定为 NETWORK_MEMBER + 当前主体；改约/取消/爽约使用列表 If-Match 版本。
+        历史必须展示操作者与渠道（product/03 §8）；不渲染 addressRef/note。
       </p>
       <label>
         任务
@@ -960,9 +989,29 @@ watch(selectedTaskId, () => {
         提议预约
       </button>
       <ul data-testid="network-appointments-list" class="appointments">
-        <li v-for="item in appointments" :key="item.appointmentId">
-          <span>
-            {{ item.appointmentId }} · {{ item.status }} · v{{ item.aggregateVersion }}
+        <li
+          v-for="item in appointments"
+          :key="item.appointmentId"
+          :data-testid="`appointment-history-${item.appointmentId}`"
+        >
+          <span data-testid="appointment-history-summary">
+            {{ item.appointmentId }} · {{ item.type }} · {{ item.status }} · v{{
+              item.aggregateVersion
+            }}
+            · 操作者
+            <span data-testid="appointment-history-created-by">{{ item.createdBy ?? '—' }}</span>
+            · 渠道
+            <span data-testid="appointment-history-channel">{{
+              appointmentHistoryChannelLabel(item)
+            }}</span>
+            · 确认方类型
+            <span data-testid="appointment-history-party-type">{{
+              appointmentHistoryPartyTypeLabel(item)
+            }}</span>
+            · 窗口
+            <span data-testid="appointment-history-window">{{
+              appointmentHistoryWindowLabel(item)
+            }}</span>
           </span>
           <span class="actions">
             <button
@@ -1019,7 +1068,10 @@ watch(selectedTaskId, () => {
       @submit.prevent="submitContactAttempt"
     >
       <h3>本网点联系尝试</h3>
-      <p class="hint">调用 Network Portal ContactAttempt；操作者来自 JWT。</p>
+      <p class="hint">
+        调用 Network Portal ContactAttempt；操作者来自 JWT，历史展示 actorId 与渠道
+        （product/03 §8）；不渲染 party/note/recording。
+      </p>
       <label>
         渠道
         <input v-model="contactChannel" data-testid="contact-channel" aria-label="contact channel" />
@@ -1067,8 +1119,17 @@ watch(selectedTaskId, () => {
         记录联系
       </button>
       <ul data-testid="network-contact-list" class="appointments">
-        <li v-for="item in contactAttempts" :key="item.contactAttemptId">
-          {{ item.contactAttemptId }} · {{ item.resultCode }} · {{ item.channel }}
+        <li
+          v-for="item in contactAttempts"
+          :key="item.contactAttemptId"
+          :data-testid="`contact-history-${item.contactAttemptId}`"
+        >
+          <span data-testid="contact-history-summary">
+            {{ item.contactAttemptId }} · {{ item.resultCode }} · 渠道
+            <span data-testid="contact-history-channel">{{ item.channel }}</span>
+            · 操作者
+            <span data-testid="contact-history-actor">{{ item.actorId }}</span>
+          </span>
         </li>
       </ul>
       <p v-if="contactError" class="error" data-testid="contact-error">{{ contactError }}</p>
