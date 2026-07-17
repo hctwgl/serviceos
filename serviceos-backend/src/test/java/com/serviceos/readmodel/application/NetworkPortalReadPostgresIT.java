@@ -11,9 +11,11 @@ import com.serviceos.readmodel.api.NetworkPortalWorkbenchView;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderItem;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderWorkspace;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderWorkspaceSlaSummary;
+import com.serviceos.readmodel.api.NetworkPortalWorkspaceCorrectionCaseSummary;
 import com.serviceos.readmodel.api.NetworkPortalWorkspaceEvidenceItemSummary;
 import com.serviceos.readmodel.api.NetworkPortalWorkspaceEvidenceSlotSummary;
 import com.serviceos.readmodel.api.NetworkPortalWorkspaceFormSubmissionSummary;
+import com.serviceos.shared.Sha256;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
 import org.flywaydb.core.Flyway;
@@ -89,6 +91,9 @@ class NetworkPortalReadPostgresIT {
                     sla_milestone, sla_clock_segment, sla_instance,
                     frm_form_command_result, frm_submission_validation, frm_form_submission,
                     fld_visit_command_result, fld_visit_fact, fld_visit,
+                    evd_correction_resubmission, evd_correction_case, evd_correction_command_result,
+                    evd_review_decision, evd_review_case, evd_review_command_result,
+                    evd_evidence_set_member, evd_evidence_set_snapshot,
                     evd_evidence_revision, evd_evidence_item, evd_evidence_upload_session,
                     evd_evidence_resolution_member, evd_evidence_slot, evd_task_evidence_resolution,
                     tsk_task,
@@ -196,6 +201,7 @@ class NetworkPortalReadPostgresIT {
         assertThat(workspace.formSubmissions()).isNull();
         assertThat(workspace.evidenceSlots()).isNull();
         assertThat(workspace.evidenceItems()).isNull();
+        assertThat(workspace.corrections()).isNull();
     }
 
     @Test
@@ -232,16 +238,20 @@ class NetworkPortalReadPostgresIT {
                 actor(PRINCIPAL), "corr-ws-evd-omit", context, WO_A);
         assertThat(withoutCap.evidenceSlots()).isNull();
         assertThat(withoutCap.evidenceItems()).isNull();
+        assertThat(withoutCap.corrections()).isNull();
 
         seedGrant(PRINCIPAL, "evidence.read", "NETWORK", NETWORK_A.toString());
         NetworkPortalWorkOrderWorkspace empty = portal.getWorkOrderWorkspace(
                 actor(PRINCIPAL), "corr-ws-evd-empty", context, WO_A);
         assertThat(empty.evidenceSlots()).isEmpty();
         assertThat(empty.evidenceItems()).isEmpty();
+        assertThat(empty.corrections()).isEmpty();
 
         UUID slotA = seedEvidenceSlot(TASK_A, "site.photo", "现场照片");
         UUID itemA = seedEvidenceItem(TASK_A, slotA);
         seedEvidenceSlot(TASK_B, "foreign.photo", "他网点照片");
+        UUID correctionA = seedOpenCorrection(TASK_A, "m225-a");
+        seedOpenCorrection(TASK_B, "m225-b");
 
         NetworkPortalWorkOrderWorkspace withData = portal.getWorkOrderWorkspace(
                 actor(PRINCIPAL), "corr-ws-evd", context, WO_A);
@@ -255,6 +265,12 @@ class NetworkPortalReadPostgresIT {
                 .containsExactly(itemA);
         assertThat(withData.evidenceItems().getFirst().status()).isEqualTo("OPEN");
         assertThat(withData.evidenceItems().getFirst().revisionCount()).isZero();
+        assertThat(withData.corrections())
+                .extracting(NetworkPortalWorkspaceCorrectionCaseSummary::correctionCaseId)
+                .containsExactly(correctionA);
+        assertThat(withData.corrections().getFirst().status()).isEqualTo("OPEN");
+        assertThat(withData.corrections().getFirst().reasonCodes()).containsExactly("MISSING_PHOTO");
+        assertThat(withData.corrections().getFirst().resubmissions()).isEmpty();
     }
 
     @Test
@@ -784,6 +800,134 @@ class NetworkPortalReadPostgresIT {
                 .param("slotId", slotId)
                 .update();
         return itemId;
+    }
+
+    /** M225：最小 OPEN CorrectionCase（复用既有 resolution，避免 generation 冲突）。 */
+    private UUID seedOpenCorrection(UUID taskId, String marker) {
+        var task = jdbc.sql("""
+                SELECT project_id, configuration_bundle_id, configuration_bundle_digest
+                  FROM tsk_task WHERE task_id=:id
+                """)
+                .param("id", taskId)
+                .query((rs, rowNum) -> new Object[] {
+                        rs.getObject("project_id", UUID.class),
+                        rs.getObject("configuration_bundle_id", UUID.class),
+                        rs.getString("configuration_bundle_digest")
+                })
+                .single();
+        UUID projectId = (UUID) task[0];
+        UUID bundleId = (UUID) task[1];
+        String bundleDigest = (String) task[2];
+        UUID resolutionId = jdbc.sql("""
+                SELECT resolution_id FROM evd_task_evidence_resolution
+                 WHERE tenant_id=:tenant AND task_id=:task
+                 ORDER BY generation_no DESC LIMIT 1
+                """)
+                .param("tenant", TENANT)
+                .param("task", taskId)
+                .query(UUID.class)
+                .optional()
+                .orElse(null);
+        if (resolutionId == null) {
+            resolutionId = UUID.randomUUID();
+            String digest = Sha256.digest(taskId.toString() + marker);
+            jdbc.sql("""
+                    INSERT INTO evd_task_evidence_resolution (
+                        resolution_id, tenant_id, project_id, task_id, configuration_bundle_id,
+                        configuration_bundle_digest, stage_code, source_event_id, source_event_digest,
+                        resolver_version, condition_input_digest, resolution_explanation,
+                        generation_no, condition_fact_type, condition_fact_ref, condition_fact_revision,
+                        slot_count, resolved_at)
+                    VALUES (
+                        :id, :tenant, :project, :task, :bundle, :digest, 'INSTALLATION', :event,
+                        :eventDigest, 'FIXED_EVIDENCE_V1',
+                        '44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a',
+                        CAST('{"kind":"TEST_FIXED_CONTEXT"}' AS jsonb),
+                        1, 'TASK_CREATED', CAST(:event AS varchar), 0, 0, now())
+                    """)
+                    .param("id", resolutionId)
+                    .param("tenant", TENANT)
+                    .param("project", projectId)
+                    .param("task", taskId)
+                    .param("bundle", bundleId)
+                    .param("digest", bundleDigest)
+                    .param("event", UUID.randomUUID())
+                    .param("eventDigest", digest)
+                    .update();
+        }
+        UUID snapshotId = UUID.randomUUID();
+        String snapshotDigest = Sha256.digest(marker + ":" + snapshotId);
+        jdbc.sql("""
+                INSERT INTO evd_evidence_set_snapshot (
+                    evidence_set_snapshot_id, tenant_id, project_id, task_id, resolution_id,
+                    purpose, member_count, content_digest, eligibility_summary, created_by, created_at
+                ) VALUES (
+                    :id, :tenant, :project, :task, :resolution,
+                    'TASK_SUBMISSION', 0, :digest, '{}'::jsonb, 'fixture', now())
+                """)
+                .param("id", snapshotId)
+                .param("tenant", TENANT)
+                .param("project", projectId)
+                .param("task", taskId)
+                .param("resolution", resolutionId)
+                .param("digest", snapshotDigest)
+                .update();
+        UUID reviewCaseId = UUID.randomUUID();
+        UUID reviewDecisionId = UUID.randomUUID();
+        UUID correctionCaseId = UUID.randomUUID();
+        jdbc.sql("""
+                INSERT INTO evd_review_case (
+                    review_case_id, tenant_id, project_id, task_id, evidence_set_snapshot_id,
+                    snapshot_content_digest, scope_type, origin, policy_version, status,
+                    created_by, created_at, decided_at
+                ) VALUES (
+                    :id, :tenant, :project, :task, :snapshot, :digest,
+                    'EVIDENCE_SET_SNAPSHOT', 'INTERNAL', 'POLICY_V1', 'REJECTED',
+                    'fixture', now(), now())
+                """)
+                .param("id", reviewCaseId)
+                .param("tenant", TENANT)
+                .param("project", projectId)
+                .param("task", taskId)
+                .param("snapshot", snapshotId)
+                .param("digest", snapshotDigest)
+                .update();
+        jdbc.sql("""
+                INSERT INTO evd_review_decision (
+                    review_decision_id, tenant_id, project_id, review_case_id,
+                    decision_ordinal, decision, decision_source, reason_codes,
+                    note, approval_ref, decided_by, decided_at
+                ) VALUES (
+                    :id, :tenant, :project, :review,
+                    1, 'REJECTED', 'INTERNAL', '["MISSING_PHOTO"]'::jsonb,
+                    NULL, NULL, 'fixture', now())
+                """)
+                .param("id", reviewDecisionId)
+                .param("tenant", TENANT)
+                .param("project", projectId)
+                .param("review", reviewCaseId)
+                .update();
+        jdbc.sql("""
+                INSERT INTO evd_correction_case (
+                    correction_case_id, tenant_id, project_id, task_id,
+                    source_review_case_id, source_review_decision_id,
+                    source_evidence_set_snapshot_id, source_snapshot_content_digest,
+                    reason_codes, status, created_by, created_at
+                ) VALUES (
+                    :id, :tenant, :project, :task,
+                    :review, :decision, :snapshot, :digest,
+                    '["MISSING_PHOTO"]'::jsonb, 'OPEN', 'fixture', now())
+                """)
+                .param("id", correctionCaseId)
+                .param("tenant", TENANT)
+                .param("project", projectId)
+                .param("task", taskId)
+                .param("review", reviewCaseId)
+                .param("decision", reviewDecisionId)
+                .param("snapshot", snapshotId)
+                .param("digest", snapshotDigest)
+                .update();
+        return correctionCaseId;
     }
 
     /**

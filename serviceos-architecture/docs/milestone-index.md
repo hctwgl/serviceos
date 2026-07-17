@@ -233,6 +233,7 @@ title: ServiceOS 里程碑索引
 | M222 | M222 Network Portal 工作区 Visit/表单提交摘要 | [235-m222-network-portal-workspace-visit-form-summary.md](../architecture/235-m222-network-portal-workspace-visit-form-summary.md) | [219-m222-network-portal-workspace-visit-form-summary-acceptance.md](../testing/219-m222-network-portal-workspace-visit-form-summary-acceptance.md) |
 | M223 | M223 Network Portal 工作区 Evidence 槽位/资料项摘要 | [236-m223-network-portal-workspace-evidence-summary.md](../architecture/236-m223-network-portal-workspace-evidence-summary.md) | [220-m223-network-portal-workspace-evidence-summary-acceptance.md](../testing/220-m223-network-portal-workspace-evidence-summary-acceptance.md) |
 | M224 | M224 Network Portal 工作台薄 SLA 风险计数 | [237-m224-network-portal-workbench-sla-risk-counts.md](../architecture/237-m224-network-portal-workbench-sla-risk-counts.md) | [221-m224-network-portal-workbench-sla-risk-counts-acceptance.md](../testing/221-m224-network-portal-workbench-sla-risk-counts-acceptance.md) |
+| M225 | M225 Network Portal 工作区整改摘要 | [238-m225-network-portal-workspace-correction-summary.md](../architecture/238-m225-network-portal-workspace-correction-summary.md) | [222-m225-network-portal-workspace-correction-summary-acceptance.md](../testing/222-m225-network-portal-workspace-correction-summary-acceptance.md) |
 
 ## 未关联里程碑的文档
 

@@ -11,6 +11,7 @@ import com.serviceos.dispatch.api.NetworkCapacityCounterView;
 import com.serviceos.dispatch.api.NetworkCapacitySummaryQuery;
 import com.serviceos.evidence.api.CorrectionCaseService;
 import com.serviceos.evidence.api.CorrectionCaseView;
+import com.serviceos.evidence.api.CorrectionResubmissionView;
 import com.serviceos.evidence.api.EvidenceItemQueryService;
 import com.serviceos.evidence.api.EvidenceItemSummaryView;
 import com.serviceos.evidence.api.EvidenceSlotQueryService;
@@ -39,6 +40,8 @@ import com.serviceos.readmodel.api.NetworkPortalWorkbenchView;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderItem;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderWorkspace;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderWorkspaceSlaSummary;
+import com.serviceos.readmodel.api.NetworkPortalWorkspaceCorrectionCaseSummary;
+import com.serviceos.readmodel.api.NetworkPortalWorkspaceCorrectionResubmissionSummary;
 import com.serviceos.readmodel.api.NetworkPortalWorkspaceEvidenceItemSummary;
 import com.serviceos.readmodel.api.NetworkPortalWorkspaceEvidenceSlotSummary;
 import com.serviceos.readmodel.api.NetworkPortalWorkspaceFormSubmissionSummary;
@@ -97,6 +100,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     private static final int WORKSPACE_VISIT_LIMIT = 100;
     private static final int WORKSPACE_FORM_LIMIT = 100;
     private static final int WORKSPACE_EVIDENCE_LIMIT = 100;
+    private static final int WORKSPACE_CORRECTION_LIMIT = 100;
     private static final Set<String> OPEN_SLA_STATUSES = Set.of("RUNNING", "BREACHED");
 
     private final PrincipalNetworkAffiliationQuery affiliations;
@@ -264,11 +268,13 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         }
         List<NetworkPortalWorkspaceEvidenceSlotSummary> evidenceSlotSummaries = null;
         List<NetworkPortalWorkspaceEvidenceItemSummary> evidenceItemSummaries = null;
+        List<NetworkPortalWorkspaceCorrectionCaseSummary> correctionSummaries = null;
         if (hasNetworkCapability(actor, correlationId, EVIDENCE_READ, networkId)) {
             evidenceSlotSummaries = loadEvidenceSlotSummaries(
                     actor, correlationId, networkId, activeTaskIds);
             evidenceItemSummaries = loadEvidenceItemSummaries(
                     actor, correlationId, networkId, activeTaskIds);
+            correctionSummaries = loadCorrectionSummaries(actor, correlationId, activeTaskIds);
         }
         return new NetworkPortalWorkOrderWorkspace(
                 networkId,
@@ -284,6 +290,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                 formSubmissionSummaries,
                 evidenceSlotSummaries,
                 evidenceItemSummaries,
+                correctionSummaries,
                 clock.instant());
     }
 
@@ -484,6 +491,59 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                 item.revisionCount(),
                 item.latestRevisionNumber(),
                 item.latestRevisionStatus());
+    }
+
+    /**
+     * M225：NETWORK evidence.read 已 soft-gate；仅 fan-in ACTIVE taskIds；含全部状态。
+     */
+    private List<NetworkPortalWorkspaceCorrectionCaseSummary> loadCorrectionSummaries(
+            CurrentPrincipal actor,
+            String correlationId,
+            Set<UUID> activeTaskIds
+    ) {
+        List<NetworkPortalWorkspaceCorrectionCaseSummary> collected = new ArrayList<>();
+        for (UUID taskId : activeTaskIds) {
+            for (CorrectionCaseView row : corrections.listForTask(actor, correlationId, taskId)) {
+                collected.add(toCorrectionCaseSummary(row));
+            }
+        }
+        return collected.stream()
+                .sorted(Comparator
+                        .comparing(NetworkPortalWorkspaceCorrectionCaseSummary::createdAt)
+                        .thenComparing(NetworkPortalWorkspaceCorrectionCaseSummary::correctionCaseId))
+                .limit(WORKSPACE_CORRECTION_LIMIT)
+                .toList();
+    }
+
+    private NetworkPortalWorkspaceCorrectionCaseSummary toCorrectionCaseSummary(
+            CorrectionCaseView correction
+    ) {
+        return new NetworkPortalWorkspaceCorrectionCaseSummary(
+                correction.correctionCaseId(),
+                correction.taskId(),
+                correction.projectId(),
+                correction.sourceReviewCaseId(),
+                correction.sourceReviewDecisionId(),
+                correction.reasonCodes(),
+                correction.correctionTaskId(),
+                correction.status(),
+                correction.createdAt(),
+                correction.latestResubmissionSnapshotId(),
+                correction.closedAt(),
+                correction.waivedAt(),
+                correction.resubmissions().stream()
+                        .map(this::toCorrectionResubmissionSummary)
+                        .toList());
+    }
+
+    private NetworkPortalWorkspaceCorrectionResubmissionSummary toCorrectionResubmissionSummary(
+            CorrectionResubmissionView resubmission
+    ) {
+        return new NetworkPortalWorkspaceCorrectionResubmissionSummary(
+                resubmission.correctionResubmissionId(),
+                resubmission.resubmissionOrdinal(),
+                resubmission.evidenceSetSnapshotId(),
+                resubmission.submittedAt());
     }
 
     @Override

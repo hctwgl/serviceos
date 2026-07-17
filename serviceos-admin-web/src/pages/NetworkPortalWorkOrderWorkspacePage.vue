@@ -3,7 +3,6 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import {
   getNetworkPortalWorkOrderWorkspace,
-  listNetworkPortalCorrections,
   listNetworkPortalExceptions,
   listNetworkPortalTaskAppointments,
   listNetworkPortalTaskContactAttempts,
@@ -11,7 +10,6 @@ import {
   type AppointmentWindow,
   type NetworkPortalAppointment,
   type NetworkPortalContactAttempt,
-  type NetworkPortalCorrectionItem,
   type NetworkPortalExceptionItem,
   type NetworkPortalTechnicianItem,
   type NetworkPortalWorkOrderWorkspace,
@@ -21,7 +19,6 @@ const props = defineProps<{ networkContextId: string | null }>()
 const route = useRoute()
 const workOrderId = computed(() => String(route.params.id ?? ''))
 const detail = ref<NetworkPortalWorkOrderWorkspace | null>(null)
-const relatedCorrections = ref<NetworkPortalCorrectionItem[] | null>(null)
 const relatedExceptions = ref<NetworkPortalExceptionItem[] | null>(null)
 const relatedAppointments = ref<NetworkPortalAppointment[] | null>(null)
 const relatedContactAttempts = ref<NetworkPortalContactAttempt[] | null>(null)
@@ -113,7 +110,6 @@ async function loadTechnicians() {
 }
 
 async function loadRelated(taskIds: string[]) {
-  relatedCorrections.value = null
   relatedExceptions.value = null
   relatedAppointments.value = null
   relatedContactAttempts.value = null
@@ -121,14 +117,7 @@ async function loadRelated(taskIds: string[]) {
     return
   }
   const taskSet = new Set(taskIds)
-  try {
-    const page = await listNetworkPortalCorrections(props.networkContextId, { status: 'OPEN' })
-    relatedCorrections.value = page.items.filter(
-      (item) => item.taskId != null && taskSet.has(item.taskId),
-    )
-  } catch {
-    relatedCorrections.value = null
-  }
+  // M225：整改摘要改由 workspace.corrections 服务端交付；不再客户端 fan-in。
   try {
     const page = await listNetworkPortalExceptions(props.networkContextId, { status: 'OPEN' })
     relatedExceptions.value = page.items.filter(
@@ -153,7 +142,6 @@ async function loadRelated(taskIds: string[]) {
 async function load() {
   if (!props.networkContextId) {
     detail.value = null
-    relatedCorrections.value = null
     relatedExceptions.value = null
     relatedAppointments.value = null
     relatedContactAttempts.value = null
@@ -176,7 +164,6 @@ async function load() {
     await Promise.all([loadRelated(detail.value.taskIds), loadTechnicians()])
   } catch (err) {
     detail.value = null
-    relatedCorrections.value = null
     relatedExceptions.value = null
     relatedAppointments.value = null
     relatedContactAttempts.value = null
@@ -539,24 +526,32 @@ watch(
       </section>
 
       <section
-        v-if="relatedCorrections"
+        v-if="detail.corrections"
         data-testid="workspace-related-corrections"
         class="related"
+        aria-label="Correction case summaries"
       >
-        <h3>相关 OPEN 整改</h3>
-        <ul v-if="relatedCorrections.length">
+        <h3>整改摘要</h3>
+        <ul v-if="detail.corrections.length">
           <li
-            v-for="item in relatedCorrections"
+            v-for="item in detail.corrections"
             :key="item.correctionCaseId"
             :data-testid="`workspace-related-correction-${item.correctionCaseId}`"
           >
             <RouterLink :to="`/network-portal/corrections/${item.correctionCaseId}`">
               {{ item.correctionCaseId }}
             </RouterLink>
-            （task {{ item.taskId }} · {{ item.status }}）
+            <span class="muted">
+              （task {{ item.taskId }} · {{ item.status }} ·
+              reasons {{ item.reasonCodes.join(', ') || '—' }} ·
+              resubmits {{ item.resubmissions.length }}）
+            </span>
           </li>
         </ul>
-        <p v-else data-testid="workspace-related-corrections-empty">暂无相关 OPEN 整改</p>
+        <p v-else data-testid="workspace-related-corrections-empty">暂无整改摘要</p>
+        <p class="hint">
+          需 NETWORK <code>evidence.read</code>。字段对齐 Admin 工作区整改摘要；无 createdBy/waiveNote。
+        </p>
       </section>
 
       <section

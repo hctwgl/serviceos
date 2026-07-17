@@ -121,6 +121,24 @@ async function stubPortal(page: Page) {
               effectiveFrom: '2026-07-17T10:00:00Z',
             },
           ],
+          // M225：整改摘要由 workspace.corrections 交付（不再依赖列表 fan-in）
+          corrections: [
+            {
+              correctionCaseId: CORRECTION_ID,
+              taskId: TASK_ID,
+              projectId: '019f84a0-eeee-7f8c-9505-36fe5c0ed005',
+              sourceReviewCaseId: '019f84a0-ffff-7f8c-9505-36fe5c0ed006',
+              sourceReviewDecisionId: '019f84a0-1111-7f8c-9505-36fe5c0ed007',
+              reasonCodes: ['MISSING_PHOTO'],
+              correctionTaskId: null,
+              status: 'OPEN',
+              createdAt: '2026-07-17T11:00:00Z',
+              latestResubmissionSnapshotId: null,
+              closedAt: null,
+              waivedAt: null,
+              resubmissions: [],
+            },
+          ],
         }),
       })
     },

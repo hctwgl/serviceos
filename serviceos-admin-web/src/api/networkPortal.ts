@@ -172,6 +172,31 @@ export type NetworkPortalWorkspaceEvidenceItemSummary = {
   latestRevisionStatus: string | null
 }
 
+/** M225：字段对齐 Admin WorkOrderWorkspaceCorrectionResubmissionSummary。 */
+export type NetworkPortalWorkspaceCorrectionResubmissionSummary = {
+  correctionResubmissionId: string
+  resubmissionOrdinal: number
+  evidenceSetSnapshotId: string
+  submittedAt: string
+}
+
+/** M225：字段对齐 Admin WorkOrderWorkspaceCorrectionCaseSummary（无 createdBy/waiveNote）。 */
+export type NetworkPortalWorkspaceCorrectionCaseSummary = {
+  correctionCaseId: string
+  taskId: string
+  projectId: string
+  sourceReviewCaseId: string
+  sourceReviewDecisionId: string
+  reasonCodes: string[]
+  correctionTaskId: string | null
+  status: string
+  createdAt: string
+  latestResubmissionSnapshotId: string | null
+  closedAt: string | null
+  waivedAt: string | null
+  resubmissions: NetworkPortalWorkspaceCorrectionResubmissionSummary[]
+}
+
 /** M213：限定工单工作区薄快照（ACTIVE NETWORK 责任门禁）。 */
 export type NetworkPortalWorkOrderWorkspace = {
   networkId: string
@@ -192,6 +217,8 @@ export type NetworkPortalWorkOrderWorkspace = {
   evidenceSlots?: NetworkPortalWorkspaceEvidenceSlotSummary[]
   /** Soft-gated；缺 NETWORK `evidence.read` 时与 evidenceSlots 同时省略。 */
   evidenceItems?: NetworkPortalWorkspaceEvidenceItemSummary[]
+  /** Soft-gated；缺 NETWORK `evidence.read` 时省略，不得用空数组伪装无权限。 */
+  corrections?: NetworkPortalWorkspaceCorrectionCaseSummary[]
   asOf: string
 }
 

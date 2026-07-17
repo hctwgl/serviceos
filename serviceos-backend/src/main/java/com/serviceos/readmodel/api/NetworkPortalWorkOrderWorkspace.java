@@ -18,6 +18,9 @@ import java.util.UUID;
  *
  * <p>M223：可选 {@code evidenceSlots}/{@code evidenceItems} 在无 NETWORK
  * {@code evidence.read} 时为 null（同时省略）；有能力时可为空列表。</p>
+ *
+ * <p>M225：可选 {@code corrections} 在无 NETWORK {@code evidence.read} 时为 null（省略）；
+ * 有能力时可为空列表。</p>
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record NetworkPortalWorkOrderWorkspace(
@@ -34,6 +37,7 @@ public record NetworkPortalWorkOrderWorkspace(
         List<NetworkPortalWorkspaceFormSubmissionSummary> formSubmissions,
         List<NetworkPortalWorkspaceEvidenceSlotSummary> evidenceSlots,
         List<NetworkPortalWorkspaceEvidenceItemSummary> evidenceItems,
+        List<NetworkPortalWorkspaceCorrectionCaseSummary> corrections,
         Instant asOf
 ) {
     public NetworkPortalWorkOrderWorkspace {
@@ -43,5 +47,6 @@ public record NetworkPortalWorkOrderWorkspace(
         formSubmissions = formSubmissions == null ? null : List.copyOf(formSubmissions);
         evidenceSlots = evidenceSlots == null ? null : List.copyOf(evidenceSlots);
         evidenceItems = evidenceItems == null ? null : List.copyOf(evidenceItems);
+        corrections = corrections == null ? null : List.copyOf(corrections);
     }
 }
