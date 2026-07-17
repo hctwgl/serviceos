@@ -90,6 +90,8 @@ SERVICEOS_TASK_SCHEDULING_ENABLED=true \
 SERVICEOS_FILE_TRANSFER_BASE_URL=http://127.0.0.1:5173/api/v1/file-transfers \
 SERVICEOS_BYD_CPIM_OUTBOUND_BASE_URL="http://127.0.0.1:${byd_stub_port}" \
 SERVICEOS_BYD_CPIM_CREDENTIAL_VERSION_ID=local-admin-pilot-byd-cred-v1 \
+SERVICEOS_BYD_CPIM_TENANT_ID=tenant-local \
+SERVICEOS_BYD_CPIM_ADAPTER_PRINCIPAL_ID=service-byd-cpim-adapter \
   java -jar serviceos-backend/target/serviceos-backend-0.1.0-SNAPSHOT.jar >"${backend_log}" 2>&1 &
 backend_pid="$!"
 wait_http "http://127.0.0.1:8080/readyz" "ServiceOS Backend"

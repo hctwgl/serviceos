@@ -90,6 +90,8 @@ onMounted(() => {
           <div><dt>aggregateVersion</dt><dd>{{ detail.aggregateVersion }}</dd></div>
           <div><dt>sourceWorkOrderId</dt><dd>{{ detail.sourceWorkOrderId }}</dd></div>
           <div><dt>sourceReviewCaseId</dt><dd>{{ detail.sourceReviewCaseId }}</dd></div>
+          <div><dt>clientReviewCaseId</dt><dd>{{ detail.clientReviewCaseId ?? '-' }}</dd></div>
+          <div><dt>reviewRouteId</dt><dd>{{ detail.reviewRouteId ?? '-' }}</dd></div>
         </dl>
         <p class="links">
           <RouterLink :to="{ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: detail.sourceWorkOrderId } }">
@@ -97,6 +99,12 @@ onMounted(() => {
           </RouterLink>
           <RouterLink :to="{ name: 'ADMIN.REVIEW.DETAIL', params: { id: detail.sourceReviewCaseId } }">
             源审核案例
+          </RouterLink>
+          <RouterLink
+            v-if="detail.clientReviewCaseId"
+            :to="{ name: 'ADMIN.REVIEW.DETAIL', params: { id: detail.clientReviewCaseId } }"
+          >
+            CLIENT 审核案例
           </RouterLink>
         </p>
       </article>

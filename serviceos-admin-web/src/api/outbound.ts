@@ -14,6 +14,8 @@ export type OutboundDelivery = {
   createdAt: string
   deliveredAt: string | null
   acknowledgedAt: string | null
+  clientReviewCaseId: string | null
+  reviewRouteId: string | null
   attempts: Array<Record<string, unknown>>
   acknowledgements: Array<Record<string, unknown>>
   replayRequests: Array<Record<string, unknown>>
