@@ -199,6 +199,7 @@ title: ServiceOS 里程碑索引
 | M188 | M188 Portal 上下文与导航 | [201-m188-portal-context-navigation.md](../architecture/201-m188-portal-context-navigation.md) | [185-m188-portal-context-navigation-acceptance.md](../testing/185-m188-portal-context-navigation-acceptance.md) |
 | M189 | M189 Admin 个人 SavedView | [202-m189-admin-personal-saved-view.md](../architecture/202-m189-admin-personal-saved-view.md) | [186-m189-admin-personal-saved-view-acceptance.md](../testing/186-m189-admin-personal-saved-view-acceptance.md) |
 | M190 | M190 Admin UI Preferences | [203-m190-admin-ui-preferences.md](../architecture/203-m190-admin-ui-preferences.md) | [187-m190-admin-ui-preferences-acceptance.md](../testing/187-m190-admin-ui-preferences-acceptance.md) |
+| M191 | M191 Admin 共享 SavedView | [204-m191-admin-shared-saved-view.md](../architecture/204-m191-admin-shared-saved-view.md) | [188-m191-admin-shared-saved-view-acceptance.md](../testing/188-m191-admin-shared-saved-view-acceptance.md) |
 
 ## 未关联里程碑的文档
 

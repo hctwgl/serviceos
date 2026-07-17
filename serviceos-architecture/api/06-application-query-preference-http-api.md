@@ -6,7 +6,7 @@ status: Accepted
 
 # 应用工作区、队列与用户偏好 HTTP API
 
-## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158 / M189 / M190）
+## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158 / M189 / M190 / M191）
 
 **Accepted（可指导实现）**：
 
@@ -26,10 +26,18 @@ status: Accepted
 - §6 `GET /api/v1/operational-exceptions` 运营异常项目范围硬化（M100）；不接受通用 work-queues。
 - §6 `GET /api/v1/inbound-envelopes` 授权入站 Envelope 队列（M158）；仅含已绑定
   `projectId` 的安全摘要；不接受 null-project 可见性、原文下载或通用 work-queues。
-- §8 个人 SavedView CRUD（M189）：仅 `GET/POST /me/saved-views`、
+- §8 个人 SavedView CRUD（M189）：`GET/POST /me/saved-views`、
   `PUT/DELETE /me/saved-views/{id}`；Portal=`ADMIN`；pageId 限于已有 Accepted 筛选目录的
   Admin 页面（至少 `ADMIN.TASK.QUEUE`、`ADMIN.WORKORDER.LIST`、`ADMIN.CORRECTION.QUEUE`）。
-  **不**接受 `POST /saved-views/{id}:share`、角色/组织共享视图、Network/Technician SavedView。
+- §8 共享 SavedView（M191）：`POST /api/v1/saved-views/{id}:share` 仅针对 Portal=`ADMIN`、
+  由调用方拥有的个人视图。可见性接受 `ROLE`（`sharedScopeRef=roleId`）与租户级 `TENANT`
+  （`sharedScopeRef` 为空）；本切片不接受组织树 `ORGANIZATION` 共享。共享只共享**查询定义**，
+  **不**授予 capability 或数据访问权；应用共享视图时业务列表/队列仍重新鉴权。
+  `GET /me/saved-views?pageId=` 须返回本人 `PRIVATE` 视图，以及当前主体可见的共享视图
+  （同租户 `TENANT`，或 `ROLE` 且主体持有对应有效 RoleGrant）。取消共享：同一 share 端点
+  body `visibility=PRIVATE`（owner 始终可收回；分享出 PRIVATE 需要
+  `preference.shareSavedView` HIGH capability）。不接受独立 `:unshare` 路径本切片外的语义扩展。
+  **不**接受 Network/Technician SavedView。
 - §9 Admin UI Preference（M190）：仅
   `GET /me/ui-preferences?portal=ADMIN`、
   `PUT /me/ui-preferences`（body：`portal` + `preferences` 映射）、
@@ -38,8 +46,8 @@ status: Accepted
   **不**接受共享偏好、Network/Technician Portal 偏好。
 
 **仍为设计草案**：§3 导航、§4 工作台与队列、§5 其余 section、
-§6 其余专项队列、§7 搜索、§8 共享 SavedView、§9 非 Admin Portal UI Preference、
-§10～§11 与导出分析等。不得在未再接受前实现。
+§6 其余专项队列、§7 搜索、§8 ORGANIZATION 组织树共享与 Network/Technician SavedView、
+§9 非 Admin Portal UI Preference、§10～§11 与导出分析等。不得在未再接受前实现。
 
 ## 1. 目标
 
@@ -178,11 +186,22 @@ sourceVersions
 
 | 方法与路径 | 用途 |
 |---|---|
-| `GET /api/v1/me/saved-views?pageId=` | 个人/共享视图 |
-| `POST /api/v1/me/saved-views` | 创建个人视图 |
-| `PUT /api/v1/me/saved-views/{id}` | 更新名称/列/排序/受控筛选 |
-| `DELETE /api/v1/me/saved-views/{id}` | 删除个人视图 |
-| `POST /api/v1/saved-views/{id}:share` | 共享给角色/组织（受控能力） |
+| `GET /api/v1/me/saved-views?pageId=` | 个人 + 当前主体可见的共享视图 |
+| `POST /api/v1/me/saved-views` | 创建个人视图（初始 `visibility=PRIVATE`） |
+| `PUT /api/v1/me/saved-views/{id}` | 更新名称/列/排序/受控筛选（仅 owner） |
+| `DELETE /api/v1/me/saved-views/{id}` | 删除个人视图（仅 owner） |
+| `POST /api/v1/saved-views/{id}:share` | 设置可见性：`ROLE` / `TENANT` / `PRIVATE`（受控能力） |
+
+### 8.1 共享 SavedView（M191 Accepted）
+
+- 仅 owner 可 share；跨主体按 `RESOURCE_NOT_FOUND`。
+- body：`visibility`（`PRIVATE` \| `ROLE` \| `TENANT`）与可选 `sharedScopeRef`；
+  `ROLE` 时 `sharedScopeRef` 必须为同租户有效 `roleId`；`TENANT`/`PRIVATE` 时必须为空。
+- 分享到 `ROLE`/`TENANT` 需要 `preference.shareSavedView`（HIGH）；owner 将可见性收回
+  `PRIVATE` **不**要求该 capability。
+- 共享只复制查询定义可见性；不授予页面、字段或数据能力；列表含共享项不意味可执行业务查询。
+- 并发：`If-Match` 绑定 `aggregateVersion`；冲突 `VERSION_CONFLICT`。
+- 本切片不接受 `ORGANIZATION`、独立 `:unshare` 路径、Network/Technician Portal。
 
 View 保存 filter AST、列、排序和密度，不保存任意 SQL、访问 token 或完整敏感搜索值。每次执行重新鉴权并与当前字段目录/Schema 迁移。
 

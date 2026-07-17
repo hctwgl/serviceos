@@ -5,6 +5,8 @@ export type SavedViewPageId =
   | 'ADMIN.WORKORDER.LIST'
   | 'ADMIN.CORRECTION.QUEUE'
 
+export type SavedViewVisibility = 'PRIVATE' | 'ROLE' | 'TENANT'
+
 export type SavedViewFilterClause = {
   field: string
   operator: 'EQ'
@@ -17,9 +19,12 @@ export type SavedViewFilterAst = {
 
 export type SavedView = {
   id: string
+  ownerPrincipalId: string
   portal: 'ADMIN'
   pageId: SavedViewPageId
   name: string
+  visibility: SavedViewVisibility
+  sharedScopeRef: string | null
   schemaVersion: number
   filter: SavedViewFilterAst
   sort: { fields: { field: string; direction: 'ASC' | 'DESC' }[] } | null
@@ -71,6 +76,17 @@ export function deleteSavedView(id: string) {
   return apiDelete(`/me/saved-views/${id}`)
 }
 
+export function shareSavedView(
+  id: string,
+  aggregateVersion: number,
+  body: { visibility: SavedViewVisibility; sharedScopeRef?: string | null },
+) {
+  return apiPost<SavedView>(`/saved-views/${id}:share`, {
+    ifMatch: quotedVersion(aggregateVersion),
+    body,
+  })
+}
+
 /** 将当前页面筛选值编码为受控 filter AST（仅非空字段）。 */
 export function filtersToAst(filters: Record<string, string | undefined>): SavedViewFilterAst {
   const clauses: SavedViewFilterClause[] = []
@@ -91,4 +107,15 @@ export function astToFilters(filter: SavedViewFilterAst): Record<string, string>
     }
   }
   return next
+}
+
+export function visibilityLabel(visibility: SavedViewVisibility): string {
+  switch (visibility) {
+    case 'PRIVATE':
+      return '私有'
+    case 'ROLE':
+      return '角色共享'
+    case 'TENANT':
+      return '租户共享'
+  }
 }

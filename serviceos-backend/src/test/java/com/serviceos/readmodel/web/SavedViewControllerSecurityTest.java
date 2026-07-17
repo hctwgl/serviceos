@@ -9,6 +9,7 @@ import com.serviceos.readmodel.api.SavedViewFilterAst;
 import com.serviceos.readmodel.api.SavedViewFilterClause;
 import com.serviceos.readmodel.api.SavedViewPage;
 import com.serviceos.readmodel.api.SavedViewQueryService;
+import com.serviceos.readmodel.api.SavedViewVisibility;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
 import org.junit.jupiter.api.Test;
@@ -41,7 +42,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** M189：SavedView HTTP 只信任 JWT 派生主体；未认证 401；跨主体 404。 */
+/** M189/M191：SavedView HTTP 只信任 JWT 派生主体；share 能力门禁；未认证 401。 */
 @WebMvcTest(SavedViewController.class)
 @Import(SecurityConfiguration.class)
 class SavedViewControllerSecurityTest {
@@ -70,7 +71,8 @@ class SavedViewControllerSecurityTest {
                         .header("X-Correlation-Id", "corr-list"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].pageId").value("ADMIN.TASK.QUEUE"))
-                .andExpect(jsonPath("$.items[0].name").value("READY 视图"));
+                .andExpect(jsonPath("$.items[0].name").value("READY 视图"))
+                .andExpect(jsonPath("$.items[0].visibility").value("PRIVATE"));
     }
 
     @Test
@@ -141,6 +143,39 @@ class SavedViewControllerSecurityTest {
                 .andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"));
     }
 
+    @Test
+    void shareWithoutCapabilityIsDenied() throws Exception {
+        CurrentPrincipal actor = actor();
+        UUID id = UUID.fromString("019f81a0-4444-7f8c-9505-36fe5c0e8804");
+        when(principals.current()).thenReturn(actor);
+        when(commands.share(eq(actor), eq("corr-share"), eq(id), eq(1L),
+                eq(SavedViewVisibility.TENANT), isNull()))
+                .thenThrow(new BusinessProblem(ProblemCode.ACCESS_DENIED, "The action is not allowed"));
+
+        mvc.perform(post("/api/v1/saved-views/" + id + ":share")
+                        .with(jwt().jwt(token -> token.subject("external-subject").claim("tenant_id", "tenant-a")))
+                        .header("X-Correlation-Id", "corr-share")
+                        .header("If-Match", "1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "visibility": "TENANT" }
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("ACCESS_DENIED"));
+    }
+
+    @Test
+    void unauthenticatedShareIsRejected() throws Exception {
+        UUID id = UUID.fromString("019f81a0-4444-7f8c-9505-36fe5c0e8804");
+        mvc.perform(post("/api/v1/saved-views/" + id + ":share")
+                        .header("If-Match", "1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "visibility": "TENANT" }
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
     private static CurrentPrincipal actor() {
         return new CurrentPrincipal(
                 "019f81a0-1111-7f8c-9505-36fe5c0e8801",
@@ -153,9 +188,12 @@ class SavedViewControllerSecurityTest {
     private static SavedView sampleView(Instant now) {
         return new SavedView(
                 UUID.fromString("019f81a0-4444-7f8c-9505-36fe5c0e8804"),
+                "019f81a0-1111-7f8c-9505-36fe5c0e8801",
                 "ADMIN",
                 "ADMIN.TASK.QUEUE",
                 "READY 视图",
+                SavedViewVisibility.PRIVATE,
+                null,
                 1,
                 new SavedViewFilterAst(List.of(new SavedViewFilterClause("status", "EQ", "READY"))),
                 null,

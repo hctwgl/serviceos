@@ -7,6 +7,7 @@ import com.serviceos.readmodel.api.SavedViewFilterAst;
 import com.serviceos.readmodel.api.SavedViewPage;
 import com.serviceos.readmodel.api.SavedViewQueryService;
 import com.serviceos.readmodel.api.SavedViewSortSpec;
+import com.serviceos.readmodel.api.SavedViewVisibility;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.CorrelationIds;
 import com.serviceos.shared.ProblemCode;
@@ -31,8 +32,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Admin 个人 SavedView HTTP 适配器。tenant/principal 只来自受信 CurrentPrincipal；
- * 不提供 share 端点；页面数据访问仍由各业务查询重新鉴权。
+ * Admin SavedView HTTP 适配器。tenant/principal 只来自受信 CurrentPrincipal；
+ * share 仅改变查询定义可见性，不授予页面数据能力。
  */
 @RestController
 @RequestMapping("/api/v1")
@@ -118,6 +119,26 @@ final class SavedViewController {
                 .build();
     }
 
+    @PostMapping("/saved-views/{savedViewId}:share")
+    ResponseEntity<SavedView> share(
+            @PathVariable UUID savedViewId,
+            @RequestHeader("If-Match") String ifMatch,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @Valid @RequestBody ShareSavedViewRequest request
+    ) {
+        SavedView view = commands.share(
+                principals.current(),
+                correlationId,
+                savedViewId,
+                parseVersion(ifMatch),
+                request.visibility(),
+                request.sharedScopeRef());
+        return ResponseEntity.ok()
+                .eTag(Long.toString(view.aggregateVersion()))
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(view);
+    }
+
     private static long parseVersion(String ifMatch) {
         if (ifMatch == null || ifMatch.isBlank()) {
             throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, "If-Match 不能为空");
@@ -151,6 +172,12 @@ final class SavedViewController {
             SavedViewSortSpec sort,
             List<String> columns,
             Boolean isDefault
+    ) {
+    }
+
+    record ShareSavedViewRequest(
+            @NotNull SavedViewVisibility visibility,
+            @Size(max = 128) String sharedScopeRef
     ) {
     }
 }

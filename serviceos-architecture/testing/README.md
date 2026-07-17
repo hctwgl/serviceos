@@ -191,4 +191,5 @@
 - [M188 Portal 上下文与导航验收矩阵](185-m188-portal-context-navigation-acceptance.md)
 - [M189 Admin 个人 SavedView 验收矩阵](186-m189-admin-personal-saved-view-acceptance.md)
 - [M190 Admin UI Preferences 验收矩阵](187-m190-admin-ui-preferences-acceptance.md)
+- [M191 Admin 共享 SavedView 验收矩阵](188-m191-admin-shared-saved-view-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

@@ -118,7 +118,9 @@ VALUES
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'authorization.approveGrant', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'authorization.revokeGrant', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'authorization.delegate', now()),
-    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'authorization.explain', now())
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'authorization.explain', now()),
+    -- M191 Admin 共享 SavedView
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'preference.shareSavedView', now())
 ON CONFLICT (role_id, capability_code) DO NOTHING;
 
 INSERT INTO auth_role_grant (

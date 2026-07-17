@@ -3,6 +3,7 @@ package com.serviceos.readmodel.application;
 import com.serviceos.readmodel.api.SavedView;
 import com.serviceos.readmodel.api.SavedViewFilterAst;
 import com.serviceos.readmodel.api.SavedViewSortSpec;
+import com.serviceos.readmodel.api.SavedViewVisibility;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
@@ -26,9 +27,12 @@ public final class SavedViewJson {
     public static SavedView toView(SavedViewRepository.SavedViewRecord record) {
         return new SavedView(
                 record.id(),
+                record.principalId(),
                 record.portal(),
                 record.pageId(),
                 record.name(),
+                record.visibility() == null ? SavedViewVisibility.PRIVATE : record.visibility(),
+                record.sharedScopeRef(),
                 record.schemaVersion(),
                 readFilter(record.filterJson()),
                 readSort(record.sortJson()),

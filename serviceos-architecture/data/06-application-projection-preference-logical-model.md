@@ -6,7 +6,7 @@ status: Accepted
 
 # 应用投影、队列、保存视图与偏好逻辑数据模型
 
-## 0. 接受范围（M84 / M86 / M189 / M190）
+## 0. 接受范围（M84 / M86 / M189 / M190 / M191）
 
 **Accepted（可指导实现）**：§1 原则、§2 投影运行时、§12 中与 checkpoint/dead letter 保留相关的约束、§13 重建与切换。
 
@@ -14,14 +14,18 @@ status: Accepted
 - **M86**：同一投影补齐 `projection_definition`、dead letter 按 eventId 幂等重放，以及切换后旧 generation /
   FAILED 孤儿 generation 清理（不引入长观察窗）。
 - **M189**：§6 `saved_view` **个人所有权切片**（`visibility=PRIVATE` / portal=`ADMIN` /
-  owner_principal_id 作用域）；对应物理表 `rdm_saved_view`。不接受 ROLE/ORGANIZATION 共享、
-  `shared_scope_ref` 或分享表。
+  owner_principal_id 作用域）；对应物理表 `rdm_saved_view`。
 - **M190**：§7 `UserUiPreference` **个人 Admin 键白名单切片**（portal=`ADMIN`；
   键仅 `theme`/`density`/`locale`/`reduceMotion`/`defaultSavedViews`/`columnWidths`）；
   对应物理表 `rdm_ui_preference`。不接受共享偏好、Network/Technician Portal 偏好或安全绕过键。
+- **M191**：§6 `saved_view` **共享切片**：`visibility` 接受 `PRIVATE` / `ROLE` / `TENANT`
+  （工程用 `TENANT` 表达租户级共享；逻辑稿中的 `ORGANIZATION` 组织树共享本切片不接受）；
+  `shared_scope_ref` 在 `ROLE` 时为 `roleId`，在 `PRIVATE`/`TENANT` 时为空。仍无独立分享表；
+  不接受 Network/Technician SavedView。
 
 **仍为设计草案、不得在未再接受前实现**：§3 工单工作区/列表其余投影扩展、§4～§5 队列/专项投影、
-§6 共享 SavedView、§7 非 Admin/白名单外偏好、§8～§11 搜索/移动同步/指标，以及多投影通用平台与 Portal、Admin 重建/重放 HTTP、Broker offset。
+§6 ORGANIZATION 组织树共享与 Network/Technician SavedView、§7 非 Admin/白名单外偏好、
+§8～§11 搜索/移动同步/指标，以及多投影通用平台与 Portal、Admin 重建/重放 HTTP、Broker offset。
 
 ## 1. 原则
 
@@ -121,15 +125,25 @@ saved_view_id
 owner_principal_id
 portal / page_id
 name
-visibility（PRIVATE/ROLE/ORGANIZATION）
+visibility（PRIVATE/ROLE/TENANT；ORGANIZATION 仍为草案）
 filter_schema_version / filter_ast
 columns / sort / density
-shared_scope_ref
+shared_scope_ref（ROLE=roleId；PRIVATE/TENANT=null）
 version
 created_at / updated_at
 ```
 
 个人 view 只能由 owner 修改。共享 view 需要 capability；它只共享查询定义，不授予字段/数据访问权。
+
+#### 6.1 共享字段（M191 Accepted）
+
+物理表 `rdm_saved_view` 增加：
+
+- `visibility`：`PRIVATE` \| `ROLE` \| `TENANT`，默认 `PRIVATE`；
+- `shared_scope_ref`：`ROLE` 时为同租户 `roleId` 字符串；`PRIVATE`/`TENANT` 时必须为 null。
+
+唯一性仍按 owner + page + name；共享视图名称可在不同 owner 间碰撞，列表按可见性合并展示。
+列表索引覆盖 tenant/page/visibility（及 ROLE 的 `shared_scope_ref`）。
 
 Schema 升级保存 migration result：MIGRATED/PARTIAL/INVALID。无效字段不静默忽略，提示用户修复或重置。
 

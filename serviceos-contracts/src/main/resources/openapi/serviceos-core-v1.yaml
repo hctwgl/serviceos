@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.82.0
+  version: 0.83.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1218,9 +1218,10 @@ paths:
   /me/saved-views:
     get:
       operationId: listMySavedViews
-      summary: 列出当前主体在指定 pageId 下的个人 SavedView
+      summary: 列出当前主体在指定 pageId 下可见的 SavedView
       description: |
-        M189：仅个人视图。列出/应用视图不授予页面 capability；业务查询仍重新鉴权。
+        M189/M191：返回本人 PRIVATE 视图，以及同租户 TENANT 共享与持有 RoleGrant 的 ROLE 共享视图。
+        列出/应用视图不授予页面 capability；业务查询仍重新鉴权。
         支持 pageId：ADMIN.TASK.QUEUE、ADMIN.WORKORDER.LIST、ADMIN.CORRECTION.QUEUE。
       parameters:
         - name: pageId
@@ -1232,7 +1233,7 @@ paths:
         - $ref: '#/components/parameters/CorrelationId'
       responses:
         '200':
-          description: 个人 SavedView 列表
+          description: 个人与可见共享 SavedView 列表
           headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
           content: { application/json: { schema: { $ref: '#/components/schemas/SavedViewPage' } } }
         '400': { $ref: '#/components/responses/Problem' }
@@ -1313,6 +1314,42 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+
+  /saved-views/{savedViewId}:share:
+    post:
+      operationId: shareSavedView
+      summary: 设置 Admin SavedView 可见性（共享或收回）
+      description: |
+        M191：仅 owner 可操作。visibility=ROLE/TENANT 需要 preference.shareSavedView（HIGH）；
+        visibility=PRIVATE 收回共享，owner 始终允许。共享只共享查询定义，不授予数据访问权。
+        ROLE 时 sharedScopeRef 为同租户 roleId；TENANT/PRIVATE 时 sharedScopeRef 必须为空。
+      parameters:
+        - name: savedViewId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: If-Match
+          in: header
+          required: true
+          schema: { type: string, minLength: 1 }
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ShareSavedViewRequest' }
+      responses:
+        '200':
+          description: 已更新可见性
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+            ETag: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/SavedView' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
 
   /me/ui-preferences:
     get:
@@ -3730,12 +3767,20 @@ components:
     SavedView:
       type: object
       additionalProperties: false
-      required: [id, portal, pageId, name, schemaVersion, filter, isDefault, aggregateVersion, createdAt, updatedAt]
+      required: [id, ownerPrincipalId, portal, pageId, name, visibility, schemaVersion, filter, isDefault, aggregateVersion, createdAt, updatedAt]
       properties:
         id: { type: string, format: uuid }
+        ownerPrincipalId: { type: string, minLength: 1, maxLength: 128 }
         portal: { enum: [ADMIN] }
         pageId: { enum: [ADMIN.TASK.QUEUE, ADMIN.WORKORDER.LIST, ADMIN.CORRECTION.QUEUE] }
         name: { type: string, minLength: 1, maxLength: 120 }
+        visibility: { enum: [PRIVATE, ROLE, TENANT] }
+        sharedScopeRef:
+          oneOf:
+            - type: string
+              minLength: 1
+              maxLength: 128
+            - type: 'null'
         schemaVersion: { type: integer, minimum: 1 }
         filter: { $ref: '#/components/schemas/SavedViewFilterAst' }
         sort: { oneOf: [{ $ref: '#/components/schemas/SavedViewSortSpec' }, { type: 'null' }] }
@@ -3778,6 +3823,19 @@ components:
         sort: { $ref: '#/components/schemas/SavedViewSortSpec' }
         columns: { type: array, items: { type: string, minLength: 1, maxLength: 64 } }
         isDefault: { type: boolean, default: false }
+    ShareSavedViewRequest:
+      type: object
+      additionalProperties: false
+      required: [visibility]
+      properties:
+        visibility: { enum: [PRIVATE, ROLE, TENANT] }
+        sharedScopeRef:
+          oneOf:
+            - type: string
+              minLength: 1
+              maxLength: 128
+            - type: 'null'
+          description: ROLE 时为同租户 roleId；PRIVATE/TENANT 必须为空
 
     UiPreferenceEntry:
       type: object
