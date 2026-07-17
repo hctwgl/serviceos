@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.77.0
+  version: 0.78.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -426,6 +426,473 @@ paths:
           content: { application/json: { schema: { $ref: '#/components/schemas/ReassignmentWorkItemPage' } } }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+
+  /partner-organizations:
+    get:
+      operationId: listPartnerOrganizations
+      summary: 查询合作组织目录
+      description: 需要 network.read；合作组织不进入内部 OrgUnit closure。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 合作组织页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/PartnerOrganizationPage' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createPartnerOrganization
+      summary: 创建合作组织
+      description: 需要 network.managePartner。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreatePartnerOrganizationRequest' } } }
+      responses:
+        '200':
+          description: 新建合作组织
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/PartnerOrganization' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /partner-organizations/{partnerOrganizationId}:
+    get:
+      operationId: getPartnerOrganization
+      summary: 读取合作组织
+      parameters:
+        - $ref: '#/components/parameters/PartnerOrganizationId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 合作组织详情
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/PartnerOrganization' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /service-networks:
+    get:
+      operationId: listServiceNetworks
+      summary: 查询 ServiceNetwork 目录
+      description: 需要 network.read。
+      parameters:
+        - { name: partnerOrganizationId, in: query, schema: { type: string, format: uuid } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 网点页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/ServiceNetworkPage' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createServiceNetwork
+      summary: 创建 ServiceNetwork
+      description: 需要 network.manageNetwork；网点不得进入内部组织 closure。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreateServiceNetworkRequest' } } }
+      responses:
+        '200':
+          description: 新建网点
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/ServiceNetwork' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /service-networks/{networkId}:
+    get:
+      operationId: getServiceNetwork
+      summary: 读取 ServiceNetwork
+      parameters:
+        - $ref: '#/components/parameters/ServiceNetworkId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 网点详情
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/ServiceNetwork' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /service-networks/{networkId}:deactivate:
+    post:
+      operationId: deactivateServiceNetwork
+      summary: 清退 ServiceNetwork
+      description: 需要 network.manageNetwork；汇总未完成工作影响并创建 clearance 待办。
+      parameters:
+        - $ref: '#/components/parameters/ServiceNetworkId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/NetworkReasonRequest' } } }
+      responses:
+        '200':
+          description: 已清退网点
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/ServiceNetwork' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /service-networks/{networkId}/memberships:
+    get:
+      operationId: listNetworkMemberships
+      summary: 查询网点成员
+      description: 需要 network.read。
+      parameters:
+        - $ref: '#/components/parameters/ServiceNetworkId'
+        - { name: principalId, in: query, schema: { type: string, format: uuid } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 网点成员页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkMembershipPage' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: inviteNetworkMember
+      summary: 邀请网点成员
+      description: 需要 network.manageMembership；复用既有 Principal，不创建 IdentityLink。
+      parameters:
+        - $ref: '#/components/parameters/ServiceNetworkId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/InviteNetworkMemberRequest' } } }
+      responses:
+        '200':
+          description: 新建网点成员关系
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkMembership' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /network-memberships/{membershipId}:terminate:
+    post:
+      operationId: terminateNetworkMembership
+      summary: 终止网点成员关系
+      parameters:
+        - $ref: '#/components/parameters/NetworkMembershipId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/NetworkReasonRequest' } } }
+      responses:
+        '200':
+          description: 已终止成员关系
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkMembership' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /technician-profiles:
+    get:
+      operationId: listTechnicianProfiles
+      summary: 查询师傅档案目录
+      description: 需要 network.read。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 师傅档案页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianProfilePage' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createTechnicianProfile
+      summary: 创建师傅档案
+      description: 需要 network.manageTechnician；与 Principal 一对一，生命周期独立。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreateTechnicianProfileRequest' } } }
+      responses:
+        '200':
+          description: 新建师傅档案
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianProfile' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /technician-profiles/{profileId}:
+    get:
+      operationId: getTechnicianProfile
+      summary: 读取师傅档案
+      parameters:
+        - $ref: '#/components/parameters/TechnicianProfileId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 师傅档案
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianProfile' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /technician-profiles/{profileId}:disable:
+    post:
+      operationId: disableTechnicianProfile
+      summary: 停用师傅档案
+      description: 需要 network.manageTechnician；同事务创建 clearance 待办；可接单立即失败关闭。
+      parameters:
+        - $ref: '#/components/parameters/TechnicianProfileId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/NetworkReasonRequest' } } }
+      responses:
+        '200':
+          description: 已停用档案
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianProfile' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /technician-profiles/{profileId}:enable:
+    post:
+      operationId: enableTechnicianProfile
+      summary: 重新启用师傅档案
+      parameters:
+        - $ref: '#/components/parameters/TechnicianProfileId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 已启用档案
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianProfile' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /technician-profiles/{profileId}/eligibility:
+    get:
+      operationId: checkTechnicianEligibility
+      summary: 判定师傅在指定网点是否可接单
+      description: 需要 network.read；Principal ACTIVE 不单独构成可接单。
+      parameters:
+        - $ref: '#/components/parameters/TechnicianProfileId'
+        - { name: networkId, in: query, required: true, schema: { type: string, format: uuid } }
+        - { name: at, in: query, schema: { type: string, format: date-time } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 可接单判定
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianEligibility' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /technician-profiles/{profileId}/qualifications:
+    get:
+      operationId: listTechnicianQualifications
+      summary: 列出师傅资质
+      parameters:
+        - $ref: '#/components/parameters/TechnicianProfileId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 资质页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianQualificationPage' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /network-technician-memberships:
+    get:
+      operationId: listNetworkTechnicianMemberships
+      summary: 查询师傅多网点服务关系
+      parameters:
+        - { name: networkId, in: query, schema: { type: string, format: uuid } }
+        - { name: technicianProfileId, in: query, schema: { type: string, format: uuid } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 师傅网点关系页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkTechnicianMembershipPage' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createNetworkTechnicianMembership
+      summary: 建立师傅与网点服务关系
+      description: 需要 network.manageTechnician；同一师傅可有多条独立有效期关系。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreateNetworkTechnicianMembershipRequest' } } }
+      responses:
+        '200':
+          description: 新建关系
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkTechnicianMembership' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /network-technician-memberships/{membershipId}:terminate:
+    post:
+      operationId: terminateNetworkTechnicianMembership
+      summary: 终止师傅网点服务关系
+      parameters:
+        - $ref: '#/components/parameters/NetworkTechnicianMembershipId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/NetworkReasonRequest' } } }
+      responses:
+        '200':
+          description: 已终止关系
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkTechnicianMembership' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /technician-qualifications:
+    post:
+      operationId: submitTechnicianQualification
+      summary: 提交师傅资质
+      description: 需要 network.manageTechnician；状态 PENDING，网点不能自批 APPROVED。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/SubmitTechnicianQualificationRequest' } } }
+      responses:
+        '200':
+          description: 已提交资质
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianQualification' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /technician-qualifications/{qualificationId}:decide:
+    post:
+      operationId: decideTechnicianQualification
+      summary: 总部裁决师傅资质
+      description: 需要 network.reviewQualification。
+      parameters:
+        - $ref: '#/components/parameters/TechnicianQualificationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/DecideTechnicianQualificationRequest' } } }
+      responses:
+        '200':
+          description: 裁决后的资质
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianQualification' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /clearance-work-items:
+    get:
+      operationId: listOpenNetworkClearanceWorkItems
+      summary: 列出网点/师傅清退待办
+      description: 需要 network.read。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: OPEN clearance 页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkClearanceWorkItemPage' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /service-networks/{networkId}/deactivation-impact:
+    get:
+      operationId: getServiceNetworkDeactivationImpact
+      summary: 预览网点清退影响
+      description: 需要 network.read。
+      parameters:
+        - $ref: '#/components/parameters/ServiceNetworkId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 影响摘要
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkDeactivationImpact' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
   /work-orders:
     get:
       operationId: listAuthorizedWorkOrders
@@ -2488,6 +2955,36 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    PartnerOrganizationId:
+      name: partnerOrganizationId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ServiceNetworkId:
+      name: networkId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    NetworkMembershipId:
+      name: membershipId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    NetworkTechnicianMembershipId:
+      name: membershipId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    TechnicianProfileId:
+      name: profileId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    TechnicianQualificationId:
+      name: qualificationId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     TaskId:
       name: taskId
       in: path
@@ -2833,6 +3330,245 @@ components:
         principalId: { type: [string, 'null'], format: uuid }
         membershipType: { type: [string, 'null'], enum: [PRIMARY, SECONDARY, MANAGER] }
         validFrom: { type: [string, 'null'], format: date-time }
+
+    PartnerOrganization:
+      type: object
+      additionalProperties: false
+      required: [id, code, name, status, version, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string, minLength: 1, maxLength: 64 }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        status: { enum: [ACTIVE, DISABLED] }
+        version: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    PartnerOrganizationPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/PartnerOrganization' } }
+        asOf: { type: string, format: date-time }
+    ServiceNetwork:
+      type: object
+      additionalProperties: false
+      required: [id, partnerOrganizationId, networkCode, networkName, status, version, createdAt, updatedAt,
+        deactivatedAt, deactivatedBy, deactivateReason]
+      properties:
+        id: { type: string, format: uuid }
+        partnerOrganizationId: { type: string, format: uuid }
+        networkCode: { type: string, minLength: 1, maxLength: 64 }
+        networkName: { type: string, minLength: 1, maxLength: 200 }
+        status: { enum: [ACTIVE, DEACTIVATED] }
+        version: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        deactivatedAt: { type: [string, 'null'], format: date-time }
+        deactivatedBy: { type: [string, 'null'], minLength: 1, maxLength: 128 }
+        deactivateReason: { type: [string, 'null'], minLength: 1, maxLength: 500 }
+    ServiceNetworkPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/ServiceNetwork' } }
+        asOf: { type: string, format: date-time }
+    NetworkMembership:
+      type: object
+      additionalProperties: false
+      required: [id, serviceNetworkId, principalId, role, status, validFrom, validTo, version, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        serviceNetworkId: { type: string, format: uuid }
+        principalId: { type: string, format: uuid }
+        role: { enum: [MANAGER, STAFF] }
+        status: { enum: [ACTIVE, TERMINATED] }
+        validFrom: { type: string, format: date-time }
+        validTo: { type: [string, 'null'], format: date-time }
+        version: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+    NetworkMembershipPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/NetworkMembership' } }
+        asOf: { type: string, format: date-time }
+    TechnicianProfile:
+      type: object
+      additionalProperties: false
+      required: [id, principalId, displayName, status, version, createdAt, updatedAt,
+        disabledAt, disabledBy, disabledReason]
+      properties:
+        id: { type: string, format: uuid }
+        principalId: { type: string, format: uuid }
+        displayName: { type: string, minLength: 1, maxLength: 200 }
+        status: { enum: [ACTIVE, DISABLED] }
+        version: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        disabledAt: { type: [string, 'null'], format: date-time }
+        disabledBy: { type: [string, 'null'], minLength: 1, maxLength: 128 }
+        disabledReason: { type: [string, 'null'], minLength: 1, maxLength: 500 }
+    TechnicianProfilePage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/TechnicianProfile' } }
+        asOf: { type: string, format: date-time }
+    NetworkTechnicianMembership:
+      type: object
+      additionalProperties: false
+      required: [id, serviceNetworkId, technicianProfileId, status, validFrom, validTo, version, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        serviceNetworkId: { type: string, format: uuid }
+        technicianProfileId: { type: string, format: uuid }
+        status: { enum: [ACTIVE, TERMINATED] }
+        validFrom: { type: string, format: date-time }
+        validTo: { type: [string, 'null'], format: date-time }
+        version: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+    NetworkTechnicianMembershipPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/NetworkTechnicianMembership' } }
+        asOf: { type: string, format: date-time }
+    TechnicianQualification:
+      type: object
+      additionalProperties: false
+      required: [id, technicianProfileId, qualificationCode, status, validFrom, validTo, version, submittedAt]
+      properties:
+        id: { type: string, format: uuid }
+        technicianProfileId: { type: string, format: uuid }
+        qualificationCode: { type: string, minLength: 1, maxLength: 64 }
+        status: { enum: [PENDING, APPROVED, REJECTED, EXPIRED] }
+        validFrom: { type: string, format: date-time }
+        validTo: { type: [string, 'null'], format: date-time }
+        version: { type: integer, format: int64, minimum: 1 }
+        submittedAt: { type: string, format: date-time }
+    TechnicianQualificationPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/TechnicianQualification' } }
+        asOf: { type: string, format: date-time }
+    TechnicianEligibility:
+      type: object
+      additionalProperties: false
+      required: [technicianProfileId, serviceNetworkId, evaluatedAt, eligible, reason]
+      properties:
+        technicianProfileId: { type: string, format: uuid }
+        serviceNetworkId: { type: string, format: uuid }
+        evaluatedAt: { type: string, format: date-time }
+        eligible: { type: boolean }
+        reason: { type: [string, 'null'], maxLength: 500 }
+    NetworkClearanceWorkItem:
+      type: object
+      additionalProperties: false
+      required: [id, subjectType, serviceNetworkId, technicianProfileId, status, reason,
+        openTaskCount, openAppointmentCount, openVisitCount, activeAssignmentCount,
+        offlinePackageCount, createdBy, createdAt, correlationId]
+      properties:
+        id: { type: string, format: uuid }
+        subjectType: { enum: [SERVICE_NETWORK, TECHNICIAN_PROFILE] }
+        serviceNetworkId: { type: [string, 'null'], format: uuid }
+        technicianProfileId: { type: [string, 'null'], format: uuid }
+        status: { enum: [OPEN, CLOSED] }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+        openTaskCount: { type: integer, minimum: 0 }
+        openAppointmentCount: { type: integer, minimum: 0 }
+        openVisitCount: { type: integer, minimum: 0 }
+        activeAssignmentCount: { type: integer, minimum: 0 }
+        offlinePackageCount: { type: integer, minimum: 0 }
+        createdBy: { type: string, minLength: 1, maxLength: 128 }
+        createdAt: { type: string, format: date-time }
+        correlationId: { type: string, minLength: 1, maxLength: 128 }
+    NetworkClearanceWorkItemPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/NetworkClearanceWorkItem' } }
+        asOf: { type: string, format: date-time }
+    NetworkDeactivationImpact:
+      type: object
+      additionalProperties: false
+      required: [serviceNetworkId, openTaskCount, openAppointmentCount, openVisitCount,
+        activeAssignmentCount, offlinePackageCount]
+      properties:
+        serviceNetworkId: { type: string, format: uuid }
+        openTaskCount: { type: integer, minimum: 0 }
+        openAppointmentCount: { type: integer, minimum: 0 }
+        openVisitCount: { type: integer, minimum: 0 }
+        activeAssignmentCount: { type: integer, minimum: 0 }
+        offlinePackageCount: { type: integer, minimum: 0 }
+    CreatePartnerOrganizationRequest:
+      type: object
+      additionalProperties: false
+      required: [code, name]
+      properties:
+        code: { type: string, minLength: 1, maxLength: 64 }
+        name: { type: string, minLength: 1, maxLength: 200 }
+    CreateServiceNetworkRequest:
+      type: object
+      additionalProperties: false
+      required: [partnerOrganizationId, networkCode, networkName]
+      properties:
+        partnerOrganizationId: { type: string, format: uuid }
+        networkCode: { type: string, minLength: 1, maxLength: 64 }
+        networkName: { type: string, minLength: 1, maxLength: 200 }
+    InviteNetworkMemberRequest:
+      type: object
+      additionalProperties: false
+      required: [principalId, role, validFrom]
+      properties:
+        principalId: { type: string, format: uuid }
+        role: { enum: [MANAGER, STAFF] }
+        validFrom: { type: string, format: date-time }
+    NetworkReasonRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    CreateTechnicianProfileRequest:
+      type: object
+      additionalProperties: false
+      required: [principalId, displayName]
+      properties:
+        principalId: { type: string, format: uuid }
+        displayName: { type: string, minLength: 1, maxLength: 200 }
+    CreateNetworkTechnicianMembershipRequest:
+      type: object
+      additionalProperties: false
+      required: [networkId, technicianProfileId, validFrom]
+      properties:
+        networkId: { type: string, format: uuid }
+        technicianProfileId: { type: string, format: uuid }
+        validFrom: { type: string, format: date-time }
+    SubmitTechnicianQualificationRequest:
+      type: object
+      additionalProperties: false
+      required: [technicianProfileId, qualificationCode, validFrom]
+      properties:
+        technicianProfileId: { type: string, format: uuid }
+        qualificationCode: { type: string, minLength: 1, maxLength: 64 }
+        validFrom: { type: string, format: date-time }
+        validTo: { type: [string, 'null'], format: date-time }
+    DecideTechnicianQualificationRequest:
+      type: object
+      additionalProperties: false
+      required: [decision, reason]
+      properties:
+        decision: { enum: [APPROVED, REJECTED] }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+
     TaskDirectoryItem:
       type: object
       additionalProperties: false

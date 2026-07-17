@@ -1,8 +1,9 @@
 ---
 title: M185 网点人员与师傅身份目录
-status: Draft
+status: Implemented
 milestone: M185
 lastUpdated: 2026-07-17
+relatedMilestones: [M184, M186, M187, M188]
 ---
 
 # M185 网点人员与师傅身份目录
@@ -45,6 +46,15 @@ clearance 待办并汇总影响端口结果；新可接单立即失败关闭。
 
 ## 已实现
 
+- [x] ADR-024
+- [x] OpenAPI Core `0.78.0`
+- [x] Flyway `V088`
+- [x] Modulith `network` module
+- [x] PartnerOrganization / ServiceNetwork / membership invite lifecycle
+- [x] TechnicianProfile / network technician membership / qualification review
+- [x] Eligibility query + clearance work items + assigned-work impact port
+- [x] Postgres IT + security tests
+- [x] Acceptance evidence + docs sync
 - `network` Modulith 模块与 `net_` Flyway V088；
 - PartnerOrganization、ServiceNetwork、NetworkMembership、TechnicianProfile、
   NetworkTechnicianMembership、TechnicianQualification 命令/查询与 HTTP `/api/v1` 适配器；
@@ -57,7 +67,8 @@ clearance 待办并汇总影响端口结果；新可接单立即失败关闭。
 - Coverage/Capability 地理与品牌硬过滤引擎；
 - 离线工作包强制回收运行时；
 - Admin/Network Portal 用户中心页面；
-- 自动改派未完成 Task。
+- 自动改派未完成 Task；
+- RoleGrant 申请审批（M186）、Admin 用户中心（M187）、Portal `/me`（M188）。
 
 ## 工程证据
 
@@ -65,6 +76,7 @@ clearance 待办并汇总影响端口结果；新可接单立即失败关闭。
 - `serviceos-backend/src/test/java/com/serviceos/network/web/NetworkControllerSecurityTest.java`
 - `serviceos-backend/src/test/java/com/serviceos/ArchitectureTest.java`
 - Flyway：`db/migration/network/V088__create_network_technician_directory.sql`
+- OpenAPI：`serviceos-core-v1.yaml` 0.78.0
 
 ## 验证命令
 
@@ -72,4 +84,5 @@ clearance 待办并汇总影响端口结果；新可接单立即失败关闭。
 bash scripts/agent-verify.sh it NetworkDirectoryPostgresIT
 bash scripts/agent-verify.sh test NetworkControllerSecurityTest
 bash scripts/agent-verify.sh arch
+bash scripts/verify-local.sh
 ```

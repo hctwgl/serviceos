@@ -37,6 +37,7 @@ com.serviceos.<module>/
 | forms | 动态表单资产、不可变 FormSubmission | `frm_` | api |
 | identity | OIDC/JWT 主体上下文、统一主体目录与任职终止停用端口 | `idn_` | api |
 | organization | 企业组织、OrgUnit closure、任职与目录同步收据 | `org_` | api |
+| network | 合作组织、ServiceNetwork、网点成员、师傅档案与资质 | `net_` | api |
 | integration | BYD CPIM 入站 Envelope/Canonical、OutboundDelivery/Attempt/Ack | `int_` | api、byd（适配器） |
 | operations | OperationalException 运营异常工作台 | `ops_` | api |
 | project | Project 核心事实、REGION/NETWORK 范围关系与修订收据 | `prj_` | api |

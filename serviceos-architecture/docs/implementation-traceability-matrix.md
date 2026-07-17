@@ -34,7 +34,7 @@ status: Proposed
 | forms | ARCH-09、ADR-018/022 | API-03、form.submitted@v1 | DATA-03、V053 | M3 FORM、M53 FRM | E3 |
 | evidence | ARCH-10、ADR-008/018/022 | API-03、evidence.slots-reresolved@v1 | DATA-03、V053 | M3 EVD/FILE、M53 | E3 |
 | review | ARCH-10 | API-03、OpenAPI 0.30.0、client-review-case-created@v1 | DATA-03、V049/V054/V056 | M3 REV/COR、M55/M57 | E3 |
-| network | ARCH-11 | API-04 | DATA-04 | M4 NET | E4 |
+| network | ARCH-11、ADR-024、M185 | API-04、Core OpenAPI 0.78.0 | DATA-04、V088 | M4 NET、M185 | E4 |
 | dispatch | ARCH-11、ADR-009 | API-04 | DATA-04 | M4 DSP/ASN | E4 |
 | sla | ARCH-12、M61～M66 | sla.started/breached/met@v1；API-04、OpenAPI Core 0.38.0 | DATA-04、V061～V066 | M4 SLA、M61～M66 | E4 |
 | integration | ARCH-13、ADR-010/014、M57～M60 | API-04、OpenAPI Core 0.32.0、BYD CPIM 0.3.0、outbound-delivery-created/acknowledged/replay-requested/recovered@v1、route/callback 事件 | DATA-04、V055～V060 | M4 INT/DLV、M56～M60 | E2/E4 |
@@ -279,3 +279,4 @@ Feature gate/authority: if applicable
 | M182 | Admin 外发执行任务与快照成员深链：executionTaskId + Snapshot members；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Outbound/Evidence OpenAPI + Admin Web E2E + `195-m182-*` + `179-m182-*` | FieldOperation、SavedView |
 | M183 | 统一 Principal/IdentityLink/PersonProfile/Persona；JIT 并发去重；启停实时失权；安全目录 API | 身份治理计划 + Core OpenAPI 0.76.0 + Flyway V086 + PostgreSQL/MVC/ArchitectureTest + `196-m183-*` + `180-m183-*` | M184～M188、解绑、密码、跨服务身份缓存/事件 |
 | M184 | Organization/OrgUnit/closure/OrgMembership；LOCAL/EXTERNAL_AUTHORITATIVE；同步收据；离职停用/撤权/待重分配 | ADR-023 + Core OpenAPI 0.77.0 + Flyway V087 + PostgreSQL/MVC/ArchitectureTest + `197-m184-*` + `181-m184-*` | M185～M188、正式 HR Connector、ORGANIZATION DataScope、Admin 用户中心 |
+| M185 | PartnerOrganization/ServiceNetwork/NetworkMembership；TechnicianProfile/多网点关系；资质审核；可接单与清退影响 | ADR-024 + Core OpenAPI 0.78.0 + Flyway V088 + PostgreSQL/MVC/ArchitectureTest + `198-m185-*` + `182-m185-*` | M186～M188、Coverage/Capability 硬过滤、离线工作包回收、自动改派、Portal UI |
