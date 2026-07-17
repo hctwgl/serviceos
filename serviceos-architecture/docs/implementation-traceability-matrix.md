@@ -17,13 +17,13 @@ status: Proposed
 | identity | ARCH-07、ARCH-21 | API-01/02 通用身份上下文 | DATA-02 | M2 AUTH、M6 SEC | E1 |
 | organization | ARCH-01、ARCH-07、ARCH-11 | API-02/04 | DATA-02/04 | M2 AUTH、M4 DSP | E1/E4 |
 | project/workorder query | ARCH-01/03/05、M64～M68 | API-02/07、OpenAPI Core 0.39.0、project.created@v3、project.scope-relations-revised@v1 | DATA-01、V064～V068 | M2 CFG/WO、M7 ADM、M64～M68 | E0/E2 |
-| authorization | ARCH-07、ARCH-21、M63～M67、ADR-025/026、M186、M188、M196～M215 | API-01/02/07、Core OpenAPI 1.0.0、ProjectScopeAuthorizationService、治理 HTTP、`/me*` | DATA-02、V064～V067、V089～V090、V096～V100 | M2 AUTH、M6 SEC、M63～M67、M186、M188、M196～M215 | E1/E4 |
+| authorization | ARCH-07、ARCH-21、M63～M67、ADR-025/026、M186、M188、M196～M216 | API-01/02/07、Core OpenAPI 1.0.0、ProjectScopeAuthorizationService、治理 HTTP、`/me*` | DATA-02、V064～V067、V089～V090、V096～V100 | M2 AUTH、M6 SEC、M63～M67、M186、M188、M196～M216 | E1/E4 |
 | audit | ARCH-07、ARCH-21 | 所有高风险命令 | DATA-02 | M2 AUD、M6 SEC/OPS | E1 |
 | authority | ARCH-17、ARCH-20 | API-01/05 authority/fence | DATA-05 | M5 CUT、M6 TX | E1/E5 |
 | configuration | ARCH-05 | API-01/02 | DATA-01 | M2 CFG | E2 |
 | files | ARCH-10、ARCH-21、ARCH-25 | API-03 资料引用、API-08 文件控制面 | DATA-03、V010 物理迁移 | M3 FILE、M6 SEC、M11 | E1/E3 |
 | reliability | ARCH-20、ADR-014 | API-01 通用命令/事件 | DATA-01 | M6 TX | E1 |
-| readmodel | PRODUCT-01～07、ARCH-19、ADR-027/028/029/030/031/032/033/040/041/043/044/045/046/047/048/049/050/051/052/053、M189～M195、M202～M203、M205～M215 | API-06（§3 最近访问 + §7 受控搜索 + §8 SavedView 个人+共享 + §9 Admin UI Preference + §10 Network Portal 只读/整改/异常/资质/师傅关系/工作台 enrichment/产能页/整改详情/异常详情/资质详情/关系详情/限定工作区/协作深链/预约联系 fan-in + §11 Technician Feed）、Core OpenAPI 1.0.0 | DATA-06、V071～V078、V091～V095 | M7 WO/QRY、M73～M99、M158、M189～M195、M202～M203、M205～M215 | U0/U1 |
+| readmodel | PRODUCT-01～07、ARCH-19、ADR-027/028/029/030/031/032/033/040/041/043/044/045/046/047/048/049/050/051/052/053/054、M189～M195、M202～M203、M205～M216 | API-06（§3 最近访问 + §7 受控搜索 + §8 SavedView 个人+共享 + §9 Admin UI Preference + §10 Network Portal 只读/整改/异常/资质/师傅关系/工作台 enrichment/产能页/整改详情/异常详情/资质详情/关系详情/限定工作区/协作深链/预约联系 fan-in/师傅 fan-in + §11 Technician Feed）、Core OpenAPI 1.0.0 | DATA-06、V071～V078、V091～V095 | M7 WO/QRY、M73～M99、M158、M189～M195、M202～M203、M205～M216 | U0/U1 |
 | automation | ARCH-06、ARCH-20 | API-01 事件 | DATA-01 | M2 TASK、M6 TX | E1 |
 | operations | ARCH-14、ARCH-20、M60、ADR-041、M203 | API-04 exception、API-06 §10 Network Portal operational-exceptions、outbound-delivery-recovered@v1、operational-exception-resolved@v2、Core OpenAPI 0.95.0 | DATA-04、V060、V084 | M4 OPS、M6 TX、M60、M203 | E1/E4 |
 | workorder | ARCH-03/06 | API-01/02 | DATA-01 | M2 WO | E2 |
@@ -310,3 +310,4 @@ Feature gate/authority: if applicable
 | M213 | Network Portal 限定工单工作区：`GET /network-portal/work-orders/{id}/workspace`；ACTIVE NETWORK 门禁；薄 DTO；Page Registry `NETWORK.WORKORDER.WORKSPACE` + `page-registry-v16`；Admin Web `/network-portal/work-orders/:id` | ADR-051 + Core OpenAPI 1.0.0 + Flyway 100/102（无新迁移）+ PostgreSQL/MVC/ArchitectureTest + Admin E2E + `226-m213-*` + `210-m213-*` | Admin workspace 复用、完整 §6.1、PII/INTEGRATION、Portal ACK、notifications |
 | M214 | Network Portal 工作区协作队列深链：UI-only taskId 深链/水合 + related OPEN 整改/异常 fan-in；catalog 仍 v16 | ADR-052 + Core OpenAPI 1.0.0（无契约变更）+ Flyway 100/102（无新迁移）+ Admin E2E + `227-m214-*` + `211-m214-*` | SLA/Visit/表单 DTO、PII、Portal ACK、notifications |
 | M215 | Network Portal 工作区预约/联系 fan-in：按 taskIds 客户端拉取 M197/M199 appointments/contact-attempts；缺能力省略；catalog 仍 v16 | ADR-053 + Core OpenAPI 1.0.0（无契约变更）+ Flyway 100/102（无新迁移）+ Admin E2E + `228-m215-*` + `212-m215-*` | SLA/Visit/表单 DTO、PII、写控件、notifications |
+| M216 | Network Portal 工作区当前师傅 fan-in：客户端 fan-in M194 technicians 解析 displayName/membershipId + 预约 window 只读 enrichment；catalog 仍 v16 | ADR-054 + Core OpenAPI 1.0.0（无契约变更）+ Flyway 100/102（无新迁移）+ Admin E2E + `229-m216-*` + `213-m216-*` | SLA/Visit/表单 DTO、Admin workspace 复用、addressRef/PII、notifications |

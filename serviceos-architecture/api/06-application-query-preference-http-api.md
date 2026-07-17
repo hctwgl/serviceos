@@ -6,7 +6,7 @@ status: Accepted
 
 # 应用工作区、队列与用户偏好 HTTP API
 
-## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158 / M189 / M190 / M191 / M192 / M193 / M194 / M195 / M202 / M203 / M205 / M206 / M207）
+## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158 / M189 / M190 / M191 / M192 / M193 / M194 / M195 / M202 / M203 / M205 / M206 / M207 / M213 / M214 / M215 / M216）
 
 **Accepted（可指导实现）**：
 
@@ -167,6 +167,13 @@ status: Accepted
   `GET /network-portal/tasks/{taskId}/contact-attempts`（M199）；缺
   `networkPortal.manageAppointment` 时省略区块。catalog 仍 `page-registry-v16`；
   OpenAPI 仍 `1.0.0`。**不**接受 SLA/Visit/表单 DTO、PII、写控件嵌入工作区。
+- §10 Network Portal 工作区当前师傅 fan-in（M216 UI-only）：**不**新增 HTTP；客户端
+  fan-in `GET /network-portal/technicians`（M194）解析头/`tasks[].technicianId` →
+  `displayName`/`membershipId`，深链师傅列表与 membership 详情；未指派深链
+  `/tasks?taskId=`；可选展示既有 `Appointment.revisions[current].window`（禁止
+  addressRef/note/PII）。缺 `technician.readOwnNetwork` 时省略师傅区块。catalog 仍
+  `page-registry-v16`；OpenAPI 仍 `1.0.0`。**不**接受 SLA/Visit/表单 DTO、Admin
+  workspace 复用、客户 PII。
 - §11 Technician Portal Feed 子集（M195）：仅
   `GET /api/v1/technician/me/task-feed`（可选 `sinceCursor` 不透明游标；ACTIVE TECHNICIAN
   ServiceAssignment / TaskAssignment；撤权/结束时 tombstone 仅含 `taskId` +

@@ -283,6 +283,16 @@ export type AppointmentCommandReceipt = {
   occurredAt: string
 }
 
+export type NetworkPortalAppointmentRevision = {
+  revisionId?: string
+  revisionNo: number
+  window: AppointmentWindow
+  /** 契约含 addressRef；UI 禁止渲染（ADR-054）。 */
+  addressRef?: string
+  addressVersion?: string
+  note?: string | null
+}
+
 export type NetworkPortalAppointment = {
   appointmentId: string
   taskId: string
@@ -291,6 +301,8 @@ export type NetworkPortalAppointment = {
   assignedNetworkId: string | null
   aggregateVersion: number
   currentRevisionNo: number
+  /** OpenAPI Appointment.revisions；M216 仅消费 current window。 */
+  revisions?: NetworkPortalAppointmentRevision[]
 }
 
 /** M197：列出本网点任务预约。 */

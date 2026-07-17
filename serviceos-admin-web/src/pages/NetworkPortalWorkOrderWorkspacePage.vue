@@ -7,10 +7,13 @@ import {
   listNetworkPortalExceptions,
   listNetworkPortalTaskAppointments,
   listNetworkPortalTaskContactAttempts,
+  listNetworkPortalTechnicians,
+  type AppointmentWindow,
   type NetworkPortalAppointment,
   type NetworkPortalContactAttempt,
   type NetworkPortalCorrectionItem,
   type NetworkPortalExceptionItem,
+  type NetworkPortalTechnicianItem,
   type NetworkPortalWorkOrderWorkspace,
 } from '../api/networkPortal'
 
@@ -22,8 +25,59 @@ const relatedCorrections = ref<NetworkPortalCorrectionItem[] | null>(null)
 const relatedExceptions = ref<NetworkPortalExceptionItem[] | null>(null)
 const relatedAppointments = ref<NetworkPortalAppointment[] | null>(null)
 const relatedContactAttempts = ref<NetworkPortalContactAttempt[] | null>(null)
+const techniciansByProfileId = ref<Map<string, NetworkPortalTechnicianItem> | null>(null)
 const error = ref<string | null>(null)
 const loading = ref(false)
+
+function appointmentWindow(item: NetworkPortalAppointment): AppointmentWindow | null {
+  const revisions = item.revisions
+  if (!revisions?.length) {
+    return null
+  }
+  const current =
+    revisions.find((revision) => revision.revisionNo === item.currentRevisionNo) ??
+    revisions[revisions.length - 1]
+  return current?.window ?? null
+}
+
+function resolveTechnician(technicianId: string | null | undefined) {
+  if (!technicianId || !techniciansByProfileId.value) {
+    return null
+  }
+  return techniciansByProfileId.value.get(technicianId) ?? null
+}
+
+const currentTechnicians = computed(() => {
+  if (!detail.value || !techniciansByProfileId.value) {
+    return null
+  }
+  const ids = new Set<string>()
+  if (detail.value.technicianId) {
+    ids.add(detail.value.technicianId)
+  }
+  for (const task of detail.value.tasks) {
+    if (task.technicianId) {
+      ids.add(task.technicianId)
+    }
+  }
+  const items: NetworkPortalTechnicianItem[] = []
+  for (const id of ids) {
+    const tech = techniciansByProfileId.value.get(id)
+    if (tech) {
+      items.push(tech)
+    }
+  }
+  return items
+})
+
+const unassignedTaskIds = computed(() => {
+  if (!detail.value) {
+    return [] as string[]
+  }
+  return detail.value.tasks
+    .filter((task) => !task.technicianId)
+    .map((task) => task.taskId)
+})
 
 async function fanInByTaskId<T>(
   taskIds: string[],
@@ -39,6 +93,23 @@ async function fanInByTaskId<T>(
     return null
   }
   return results.flatMap((result) => (result.status === 'fulfilled' ? result.value : []))
+}
+
+async function loadTechnicians() {
+  techniciansByProfileId.value = null
+  if (!props.networkContextId) {
+    return
+  }
+  try {
+    const page = await listNetworkPortalTechnicians(props.networkContextId)
+    const map = new Map<string, NetworkPortalTechnicianItem>()
+    for (const item of page.items) {
+      map.set(item.technicianProfileId, item)
+    }
+    techniciansByProfileId.value = map
+  } catch {
+    techniciansByProfileId.value = null
+  }
 }
 
 async function loadRelated(taskIds: string[]) {
@@ -86,6 +157,7 @@ async function load() {
     relatedExceptions.value = null
     relatedAppointments.value = null
     relatedContactAttempts.value = null
+    techniciansByProfileId.value = null
     error.value = '请选择 NETWORK 上下文'
     return
   }
@@ -101,13 +173,14 @@ async function load() {
       workOrderId.value,
     )
     error.value = null
-    await loadRelated(detail.value.taskIds)
+    await Promise.all([loadRelated(detail.value.taskIds), loadTechnicians()])
   } catch (err) {
     detail.value = null
     relatedCorrections.value = null
     relatedExceptions.value = null
     relatedAppointments.value = null
     relatedContactAttempts.value = null
+    techniciansByProfileId.value = null
     error.value = err instanceof Error ? err.message : '工单工作区加载失败'
   } finally {
     loading.value = false
@@ -145,7 +218,7 @@ watch(
       </div>
     </header>
     <p class="hint">
-      只读薄快照（M213）+ 协作深链（M214）+ 预约/联系 fan-in（M215）：缺能力时省略相关区块。
+      只读薄快照（M213）+ 协作深链（M214）+ 预约/联系 fan-in（M215）+ 师傅 fan-in（M216）：缺能力时省略相关区块。
     </p>
     <p v-if="error" data-testid="network-portal-error">{{ error }}</p>
     <p v-else-if="loading" data-testid="workspace-loading">加载中…</p>
@@ -157,10 +230,61 @@ watch(
           <dt>businessType</dt>
           <dd data-testid="workspace-business-type">{{ detail.businessType ?? '—' }}</dd>
         </div>
-        <div><dt>technicianId</dt><dd>{{ detail.technicianId ?? '—' }}</dd></div>
+        <div>
+          <dt>technicianId</dt>
+          <dd data-testid="workspace-header-technician-id">
+            <template v-if="resolveTechnician(detail.technicianId)">
+              {{ resolveTechnician(detail.technicianId)!.displayName }}
+              <span class="muted">（{{ detail.technicianId }}）</span>
+            </template>
+            <template v-else>{{ detail.technicianId ?? '—' }}</template>
+          </dd>
+        </div>
         <div><dt>effectiveFrom</dt><dd>{{ detail.effectiveFrom ?? '—' }}</dd></div>
         <div><dt>asOf</dt><dd data-testid="workspace-as-of">{{ detail.asOf }}</dd></div>
       </dl>
+
+      <section
+        v-if="currentTechnicians"
+        data-testid="workspace-current-technicians"
+        class="related"
+      >
+        <h3>当前师傅</h3>
+        <ul v-if="currentTechnicians.length">
+          <li
+            v-for="tech in currentTechnicians"
+            :key="tech.technicianProfileId"
+            :data-testid="`workspace-technician-${tech.technicianProfileId}`"
+          >
+            <strong data-testid="workspace-technician-display-name">{{ tech.displayName }}</strong>
+            <span class="muted">（{{ tech.technicianProfileId }} · {{ tech.membershipStatus }}）</span>
+            <RouterLink
+              :to="`/network-portal/technicians/memberships/${tech.membershipId}`"
+              data-testid="workspace-technician-membership-deeplink"
+            >
+              关系详情
+            </RouterLink>
+            <RouterLink
+              to="/network-portal/technicians"
+              data-testid="workspace-technician-list-deeplink"
+            >
+              师傅列表
+            </RouterLink>
+          </li>
+        </ul>
+        <p v-else data-testid="workspace-current-technicians-empty">暂无已解析师傅</p>
+        <ul v-if="unassignedTaskIds.length" data-testid="workspace-unassigned-tasks">
+          <li v-for="taskId in unassignedTaskIds" :key="taskId">
+            未指派任务
+            <RouterLink
+              :to="{ path: '/network-portal/tasks', query: { taskId } }"
+              data-testid="workspace-unassigned-task-deeplink"
+            >
+              {{ taskId }}
+            </RouterLink>
+          </li>
+        </ul>
+      </section>
 
       <h3>本网点 ACTIVE 任务</h3>
       <table data-testid="workspace-tasks-table">
@@ -184,7 +308,20 @@ watch(
             <td>{{ task.status ?? '—' }}</td>
             <td>{{ task.stageCode ?? '—' }}</td>
             <td>{{ task.taskType ?? '—' }}</td>
-            <td>{{ task.technicianId ?? '—' }}</td>
+            <td :data-testid="`workspace-task-technician-${task.taskId}`">
+              <template v-if="resolveTechnician(task.technicianId)">
+                {{ resolveTechnician(task.technicianId)!.displayName }}
+              </template>
+              <template v-else-if="task.technicianId">{{ task.technicianId }}</template>
+              <template v-else>
+                <RouterLink
+                  :to="{ path: '/network-portal/tasks', query: { taskId: task.taskId } }"
+                  data-testid="workspace-task-assign-deeplink"
+                >
+                  未指派
+                </RouterLink>
+              </template>
+            </td>
             <td class="links">
               <RouterLink
                 :to="{ path: '/network-portal/tasks', query: { taskId: task.taskId } }"
@@ -230,6 +367,15 @@ watch(
             </RouterLink>
             （task {{ item.taskId }} · {{ item.type }} · {{ item.status }} · rev
             {{ item.currentRevisionNo }}）
+            <span
+              v-if="appointmentWindow(item)"
+              data-testid="workspace-appointment-window"
+              class="window"
+            >
+              window {{ appointmentWindow(item)!.start }} ~ {{ appointmentWindow(item)!.end }}
+              （{{ appointmentWindow(item)!.timezone }} ·
+              {{ appointmentWindow(item)!.estimatedDurationMinutes }}min）
+            </span>
           </li>
         </ul>
         <p v-else data-testid="workspace-related-appointments-empty">暂无相关预约</p>
@@ -313,7 +459,8 @@ watch(
   align-items: flex-start;
 }
 .meta,
-.hint {
+.hint,
+.muted {
   color: #5b6573;
   font-size: 0.9rem;
 }
@@ -358,5 +505,11 @@ td {
 }
 .related ul {
   padding-left: 1.1rem;
+}
+.window {
+  display: block;
+  margin-top: 0.2rem;
+  color: #374151;
+  font-size: 0.8rem;
 }
 </style>
