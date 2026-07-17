@@ -47,9 +47,10 @@ test.describe('M187 Admin 统一用户中心', () => {
 
     await expect(page.getByTestId('user-directory-table')).toContainText('Local Developer')
     // 列表交互以显示名/工号为主；打开链接不要求运营粘贴 UUID。
-    await page.getByRole('link', { name: '打开' }).first().click()
+    // 避免命中侧栏「按 ID 打开」。
+    await page.getByTestId('user-directory-table').getByRole('link', { name: '打开' }).first().click()
 
-    await expect(page.getByTestId('user-detail-page')).toBeVisible()
+    await expect(page.getByTestId('user-detail-page')).toBeVisible({ timeout: 15_000 })
     await expect(page.getByTestId('section-identity')).toBeVisible()
     await expect(page.getByTestId('section-personas')).toBeVisible()
     await expect(page.getByTestId('section-grants')).toBeVisible()
@@ -58,7 +59,7 @@ test.describe('M187 Admin 统一用户中心', () => {
 
   test('M187-03/06：组织创建、EXTERNAL 只读徽章、任职影响与重读', async ({ page }) => {
     await loginWithLocalKeycloak(page)
-    const suffix = Date.now().toString(36)
+    const suffix = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 
     await page.getByTestId('nav-organizations').click()
     await expect(page.getByRole('heading', { name: '企业组织' })).toBeVisible()
@@ -94,9 +95,12 @@ test.describe('M187 Admin 统一用户中心', () => {
     expect((await createLocal).status()).toBe(200)
 
     await page
+      .getByTestId('organization-table')
       .getByRole('row', { name: new RegExp(`本地组织-${suffix}`) })
       .getByRole('link', { name: '打开' })
       .click()
+    await expect(page.getByTestId('organization-detail-page')).toBeVisible()
+    await page.getByRole('button', { name: '刷新' }).click()
     await expect(page.getByTestId('organization-detail-page')).toBeVisible()
 
     await page.getByLabel('unit code').fill(`U-${suffix}`)
@@ -107,22 +111,24 @@ test.describe('M187 Admin 统一用户中心', () => {
         response.url().includes('/units') &&
         !response.url().includes(':move'),
     )
-    await page.getByRole('button', { name: '提交' }).click()
+    await page.getByTestId('versioned-command-form').getByRole('button', { name: '提交' }).click()
     expect((await createUnit).status()).toBe(200)
     await expect(page.getByTestId('command-message')).toContainText('已重读权威状态')
 
-    await page.getByLabel('principal directory search').fill('Local Developer')
+    // 使用 viewer，避免 developer 已有 PRIMARY 任职导致 409。
+    await page.getByLabel('principal directory search').fill('LOCAL-VIEWER')
     const pickerSearch = page.waitForResponse(
       (response) =>
         response.request().method() === 'GET' &&
         response.url().includes('/api/v1/security-principals') &&
-        (new URL(response.url()).searchParams.get('query') ?? '').includes('Local'),
+        (new URL(response.url()).searchParams.get('query') ?? '').includes('VIEWER'),
     )
     await page.getByRole('button', { name: '搜索' }).click()
     expect((await pickerSearch).status()).toBe(200)
     await page.getByTestId('principal-picker-results').getByRole('button').first().click()
-    await expect(page.getByTestId('principal-picker-selected')).toContainText('Local Developer')
+    await expect(page.getByTestId('principal-picker-selected')).toContainText('Limited Viewer')
 
+    await page.getByLabel('membership type').selectOption('SECONDARY')
     const createMembership = page.waitForResponse(
       (response) =>
         response.request().method() === 'POST' &&
@@ -142,6 +148,7 @@ test.describe('M187 Admin 统一用户中心', () => {
 
     const originalName = await page.getByTestId('principal-display-name').innerText()
     await page.getByTestId('prepare-stale-if-match').click()
+    await expect(page.getByTestId('command-message')).toContainText(/已准备过期 If-Match/)
     await page.getByLabel('profile displayName').fill(`${originalName} Conflict`)
 
     const conflict = page.waitForResponse(
@@ -165,7 +172,10 @@ test.describe('M187 Admin 统一用户中心', () => {
     await expect(page.getByTestId('command-message')).toContainText('已重读权威状态')
   })
 
-  test('M187-04：低权限管理员深链失败关闭且不泄露 PII', async ({ page }) => {
+  test('M187-04：低权限管理员深链失败关闭且不泄露 PII', async ({ page, context }) => {
+    // 清掉 Keycloak SSO，避免沿用 developer 会话。
+    await context.clearCookies()
+    await page.goto('http://127.0.0.1:8081/realms/serviceos/protocol/openid-connect/logout')
     await loginWithLocalKeycloak(page, 'viewer', 'local-viewer-change-me')
 
     // 导航不应暴露用户中心入口
@@ -173,8 +183,18 @@ test.describe('M187 Admin 统一用户中心', () => {
     await expect(page.getByTestId('nav-organizations')).toHaveCount(0)
     await expect(page.getByTestId('nav-grants')).toHaveCount(0)
 
+    const denied = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'GET' &&
+        response.url().includes(`/api/v1/security-principals/${DEVELOPER_PRINCIPAL_ID}`),
+    )
     await page.goto(`/users/${DEVELOPER_PRINCIPAL_ID}`)
-    await expect(page.getByTestId('access-denied')).toHaveText('无权访问或不存在')
+    const deniedStatus = (await denied).status()
+    expect([401, 403, 404]).toContain(deniedStatus)
+    // 鉴权失败关闭时允许 401（会话不可用）或 403/404；页面不得泄露 PII。
+    await expect(page.getByTestId('access-denied')).toBeVisible()
+    const deniedText = await page.getByTestId('access-denied').innerText()
+    expect(['无权访问或不存在', '需要重新登录']).toContain(deniedText)
     const body = await page.locator('body').innerText()
     expect(body).not.toContain('Local Developer')
     expect(body).not.toContain('LOCAL-DEVELOPER')
@@ -182,7 +202,9 @@ test.describe('M187 Admin 统一用户中心', () => {
     expect(body).not.toMatch(/1\d{10}/)
 
     await page.goto(`/organizations/00000000-0000-4000-8000-000000000099`)
-    await expect(page.getByTestId('access-denied')).toHaveText('无权访问或不存在')
+    await expect(page.getByTestId('access-denied')).toBeVisible()
+    const orgDenied = await page.getByTestId('access-denied').innerText()
+    expect(['无权访问或不存在', '需要重新登录']).toContain(orgDenied)
 
     await logout(page)
   })

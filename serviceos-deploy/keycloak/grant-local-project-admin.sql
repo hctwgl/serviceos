@@ -106,63 +106,6 @@ VALUES
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'authorization.explain', now())
 ON CONFLICT (role_id, capability_code) DO NOTHING;
 
--- M187：低权限 viewer，用于无治理能力深链 / SoD 失败关闭 E2E（仅 workOrder.read）。
-INSERT INTO idn_security_principal (
-    principal_id, tenant_id, principal_type, principal_status,
-    aggregate_version, created_at, updated_at
-) VALUES (
-    '88aa1111-2222-4333-8444-555566667777', 'tenant-local', 'USER', 'ACTIVE', 1, now(), now()
-) ON CONFLICT (principal_id) DO NOTHING;
-
-INSERT INTO idn_person_profile (
-    principal_id, tenant_id, display_name, employee_number,
-    profile_version, created_at, updated_at, updated_by
-) VALUES (
-    '88aa1111-2222-4333-8444-555566667777', 'tenant-local', 'Limited Viewer',
-    'LOCAL-VIEWER', 1, now(), now(), 'local-fixture'
-) ON CONFLICT (principal_id) DO NOTHING;
-
-INSERT INTO idn_identity_link (
-    identity_link_id, tenant_id, principal_id, issuer, subject_value,
-    client_id, linked_by, linked_at
-) VALUES (
-    '99bb2222-3333-4444-8555-666677778888', 'tenant-local',
-    '88aa1111-2222-4333-8444-555566667777',
-    'http://localhost:8081/realms/serviceos', '88aa1111-2222-4333-8444-555566667777',
-    'serviceos-local-cli', 'local-fixture', now()
-) ON CONFLICT (tenant_id, issuer, subject_value) DO NOTHING;
-
-INSERT INTO idn_principal_lifecycle_event (
-    lifecycle_event_id, tenant_id, principal_id, event_type, principal_version,
-    reason, actor_id, request_digest, correlation_id, occurred_at
-) VALUES (
-    'aabb3333-4444-4555-8666-777788889999', 'tenant-local',
-    '88aa1111-2222-4333-8444-555566667777', 'REGISTERED', 1,
-    'LOCAL_FIXTURE', 'local-fixture', repeat('0', 64), 'local-fixture', now()
-) ON CONFLICT (lifecycle_event_id) DO NOTHING;
-
-INSERT INTO auth_role (
-    role_id, tenant_id, role_code, role_name, role_status, created_at
-) VALUES (
-    'bbcc4444-5555-4666-8777-888899990000',
-    'tenant-local', 'local-limited-viewer', '本地只读观察者', 'ACTIVE', now()
-) ON CONFLICT (tenant_id, role_code) DO NOTHING;
-
-INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
-VALUES
-    ('bbcc4444-5555-4666-8777-888899990000', 'workOrder.read', now())
-ON CONFLICT (role_id, capability_code) DO NOTHING;
-
-INSERT INTO auth_role_grant (
-    grant_id, tenant_id, principal_id, role_id, scope_type, scope_ref,
-    valid_from, source_code, approval_ref, created_at
-) VALUES (
-    'ccdd5555-6666-4777-8888-999900001111',
-    'tenant-local', '88aa1111-2222-4333-8444-555566667777',
-    'bbcc4444-5555-4666-8777-888899990000',
-    'TENANT', 'tenant-local', now(), 'LOCAL_FIXTURE', 'local-only', now()
-) ON CONFLICT (grant_id) DO NOTHING;
-
 INSERT INTO auth_role_grant (
     grant_id, tenant_id, principal_id, role_id, scope_type, scope_ref,
     valid_from, source_code, approval_ref, created_at
@@ -172,6 +115,9 @@ INSERT INTO auth_role_grant (
     'bf64aa35-11cb-40bc-b301-10b5853049b3',
     'TENANT', 'tenant-local', now(), 'LOCAL_FIXTURE', 'local-only', now()
 ) ON CONFLICT (grant_id) DO NOTHING;
+
+-- M187 低权限 viewer：Keycloak create 不保证自定义 UUID，由
+-- verify-admin-smoke.sh#ensure_m187_viewer 按实际 subject 幂等回填。
 
 -- BYD 适配器 SERVICE 主体：外发 HTTP 成功后同租户落 CLIENT Case / Route。
 INSERT INTO auth_role (

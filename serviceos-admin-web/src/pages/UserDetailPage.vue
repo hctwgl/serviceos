@@ -98,8 +98,9 @@ async function saveProfile() {
   } catch (err) {
     if (isConflictError(err)) {
       staleVersion.value = null
-      error.value = '版本冲突（409），请刷新后重试'
       await load()
+      // load() 会清空 error；冲突提示必须在重读后写回，供运营恢复。
+      error.value = '版本冲突（409），请刷新后重试'
     } else {
       error.value = safeAccessDeniedMessage(err)
     }
@@ -137,17 +138,25 @@ async function toggleLifecycle() {
 
 async function useStaleVersionForTest() {
   if (!detail.value) return
-  // 确保至少有一次版本推进，才能构造严格小于当前的过期 If-Match。
-  if (detail.value.principal.version <= 1) {
-    await updateSecurityPrincipalProfile(principalId.value, detail.value.principal.version, {
-      displayName: detail.value.principal.displayName,
-      employeeNumber: detail.value.principal.employeeNumber,
-    })
-    await load()
+  busy.value = true
+  error.value = null
+  try {
+    // 确保至少有一次版本推进，才能构造严格小于当前的过期 If-Match。
+    if (detail.value.principal.version <= 1) {
+      await updateSecurityPrincipalProfile(principalId.value, detail.value.principal.version, {
+        displayName: detail.value.principal.displayName,
+        employeeNumber: detail.value.principal.employeeNumber,
+      })
+      await load()
+    }
+    if (!detail.value) return
+    staleVersion.value = detail.value.principal.version - 1
+    message.value = `已准备过期 If-Match=v${staleVersion.value}`
+  } catch (err) {
+    error.value = safeAccessDeniedMessage(err)
+  } finally {
+    busy.value = false
   }
-  if (!detail.value) return
-  staleVersion.value = detail.value.principal.version - 1
-  message.value = `已准备过期 If-Match=v${staleVersion.value}`
 }
 
 watch(principalId, () => {
@@ -169,10 +178,11 @@ onMounted(() => {
     </header>
 
     <p v-if="denied" class="error" data-testid="access-denied">{{ error }}</p>
-    <p v-else-if="error" class="error">{{ error }}</p>
-    <p v-else-if="loading">加载中…</p>
+    <p v-else-if="loading && !detail">加载中…</p>
+    <p v-else-if="!detail && error" class="error">{{ error }}</p>
 
     <template v-else-if="detail">
+      <p v-if="error" class="error">{{ error }}</p>
       <p v-if="message" class="ok" data-testid="command-message">{{ message }}</p>
 
       <article class="card" data-testid="section-identity">
@@ -239,7 +249,12 @@ onMounted(() => {
       >
         <label>displayName<input v-model="displayName" aria-label="profile displayName" /></label>
         <label>employeeNumber<input v-model="employeeNumber" aria-label="profile employeeNumber" /></label>
-        <button type="button" data-testid="prepare-stale-if-match" @click="useStaleVersionForTest">
+        <button
+          type="button"
+          data-testid="prepare-stale-if-match"
+          :disabled="busy"
+          @click="() => void useStaleVersionForTest()"
+        >
           准备过期 If-Match（E2E）
         </button>
       </VersionedCommandForm>
