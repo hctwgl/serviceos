@@ -131,13 +131,63 @@ onMounted(() => {
       <article class="card">
         <dl>
           <div><dt>status</dt><dd>{{ detail.status }}</dd></div>
-          <div><dt>taskId</dt><dd>{{ detail.taskId }}</dd></div>
-          <div><dt>correctionTaskId</dt><dd>{{ detail.correctionTaskId ?? '-' }}</dd></div>
-          <div><dt>sourceReviewCaseId</dt><dd>{{ detail.sourceReviewCaseId }}</dd></div>
-          <div><dt>sourceEvidenceSetSnapshotId</dt><dd>{{ detail.sourceEvidenceSetSnapshotId }}</dd></div>
+          <div>
+            <dt>taskId</dt>
+            <dd>
+              <RouterLink :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.taskId } }">
+                {{ detail.taskId }}
+              </RouterLink>
+            </dd>
+          </div>
+          <div>
+            <dt>correctionTaskId</dt>
+            <dd>
+              <RouterLink
+                v-if="detail.correctionTaskId"
+                :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.correctionTaskId } }"
+              >
+                {{ detail.correctionTaskId }}
+              </RouterLink>
+              <template v-else>-</template>
+            </dd>
+          </div>
+          <div>
+            <dt>sourceReviewCaseId</dt>
+            <dd>
+              <RouterLink
+                :to="{ name: 'ADMIN.REVIEW.DETAIL', params: { id: detail.sourceReviewCaseId } }"
+              >
+                {{ detail.sourceReviewCaseId }}
+              </RouterLink>
+            </dd>
+          </div>
+          <div>
+            <dt>sourceEvidenceSetSnapshotId</dt>
+            <dd>
+              <RouterLink
+                :to="{
+                  name: 'ADMIN.EVIDENCE_SET_SNAPSHOT.DETAIL',
+                  params: { id: detail.sourceEvidenceSetSnapshotId },
+                }"
+              >
+                {{ detail.sourceEvidenceSetSnapshotId }}
+              </RouterLink>
+            </dd>
+          </div>
           <div>
             <dt>latestResubmissionSnapshotId</dt>
-            <dd>{{ detail.latestResubmissionSnapshotId ?? '-' }}</dd>
+            <dd>
+              <RouterLink
+                v-if="detail.latestResubmissionSnapshotId"
+                :to="{
+                  name: 'ADMIN.EVIDENCE_SET_SNAPSHOT.DETAIL',
+                  params: { id: detail.latestResubmissionSnapshotId },
+                }"
+              >
+                {{ detail.latestResubmissionSnapshotId }}
+              </RouterLink>
+              <template v-else>-</template>
+            </dd>
           </div>
           <div><dt>reasonCodes</dt><dd>{{ detail.reasonCodes.join(', ') }}</dd></div>
         </dl>

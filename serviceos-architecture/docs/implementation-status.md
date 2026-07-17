@@ -1130,7 +1130,7 @@ M144 起 SPI 种子入口已删除。
 
 已实现：
 
-- 外发 / 回执 / 异常 / 审核事实格源 UUID → 已有详情路由；
+- 外发 / 回执 / 异常 / 审核 / 整改事实格源 UUID → 已有详情路由；
 - `reviewRouteId` 与多态 sourceId 保持明文；不新增 OpenAPI；
 - Playwright `ADMIN-PILOT-08OI`。
 

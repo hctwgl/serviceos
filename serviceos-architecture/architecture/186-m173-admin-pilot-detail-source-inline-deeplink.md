@@ -17,6 +17,7 @@ lastUpdated: 2026-07-17
 外部审核回执 → inboundEnvelope / canonical / coordinationTask
 异常详情 → workOrder / task
 审核详情 → task / snapshot
+整改详情 → task / correctionTask / sourceReview / sourceSnapshot / latestResubmitSnapshot
 ```
 
 `reviewRouteId`、多态 `sourceId`/`sourceAttemptId` 保持明文（无安全详情契约）。
@@ -38,6 +39,6 @@ lastUpdated: 2026-07-17
 ## 5. 证据入口
 
 - `OutboundDeliveryDetailPage.vue` / `ExternalReviewReceiptDetailPage.vue` /
-  `ExceptionDetailPage.vue` / `ReviewCaseDetailPage.vue`
+  `ExceptionDetailPage.vue` / `ReviewCaseDetailPage.vue` / `CorrectionCaseDetailPage.vue`
 - `admin-pilot-smoke.spec.ts`
 - `testing/170-m173-admin-pilot-detail-source-inline-deeplink-acceptance.md`
