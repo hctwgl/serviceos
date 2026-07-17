@@ -14,10 +14,33 @@ public interface EvidenceCommandService {
             BeginEvidenceUploadCommand command
     );
 
+    /**
+     * M201：受控代补 Begin。绕过「主体 = Task.responsiblePrincipalId」，
+     * 要求 {@code evidence.submitOnBehalf}；CaptureMetadata 由服务端写入 onBehalf 字段。
+     */
+    EvidenceUploadSessionView beginUploadOnBehalf(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            BeginEvidenceUploadOnBehalfCommand command
+    );
+
     EvidenceItemView finalizeUpload(
             CurrentPrincipal principal,
             CommandMetadata metadata,
             FinalizeEvidenceUploadCommand command
+    );
+
+    /**
+     * M201：受控代补 Finalize。任务校验与鉴权同 beginUploadOnBehalf；
+     * 仍要求上传会话 {@code createdBy} 等于当前主体。
+     *
+     * @param networkId 非空时按 NETWORK scope 校验 {@code evidence.submitOnBehalf}
+     */
+    EvidenceItemView finalizeUploadOnBehalf(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            FinalizeEvidenceUploadCommand command,
+            java.util.UUID networkId
     );
 
     EvidenceRevisionView invalidate(

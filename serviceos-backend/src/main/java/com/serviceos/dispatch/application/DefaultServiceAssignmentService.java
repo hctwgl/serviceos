@@ -515,6 +515,15 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
     }
 
     private AuthorizationDecision authorize(CurrentPrincipal principal, CommandContext context, UUID taskId) {
+        // M196：Network Portal 委托期间按 NETWORK scope 鉴权；Admin TENANT 路径不变。
+        String networkScope = NetworkScopedDispatchAuthorization.currentNetworkId();
+        if (networkScope != null) {
+            return authorization.require(principal,
+                    AuthorizationRequest.networkCapability(
+                            CAPABILITY, context.tenantId(), "ServiceAssignment",
+                            taskId.toString(), networkScope),
+                    context.correlationId());
+        }
         return authorization.require(principal,
                 AuthorizationRequest.tenantCapability(
                         CAPABILITY, context.tenantId(), "ServiceAssignment", taskId.toString()),

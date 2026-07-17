@@ -33,7 +33,7 @@ class CaptureMetadataValidatorTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
-    void normalizesMinimalCaptureMetadataAndRejectsOnBehalf() {
+    void normalizesMinimalCaptureMetadataAndRejectsClientOnBehalf() {
         Instant receivedAt = Instant.parse("2026-07-14T10:00:00Z");
         ObjectNode input = objectMapper.createObjectNode();
         input.put("captureSource", "CAMERA");
@@ -52,5 +52,27 @@ class CaptureMetadataValidatorTest {
         assertThatThrownBy(() -> CaptureMetadataValidator.normalize(
                 objectMapper, onBehalf, receivedAt, "technician-1"))
                 .hasMessageContaining("on-behalf");
+
+        ObjectNode withReason = input.deepCopy();
+        withReason.put("onBehalfReason", "forged");
+        assertThatThrownBy(() -> CaptureMetadataValidator.normalize(
+                objectMapper, withReason, receivedAt, "technician-1", "tech-a", "ok"))
+                .hasMessageContaining("on-behalf");
+    }
+
+    @Test
+    void serviceSideOnBehalfWritesOperatorAndDelegationFields() {
+        Instant receivedAt = Instant.parse("2026-07-14T10:00:00Z");
+        ObjectNode input = objectMapper.createObjectNode();
+        input.put("captureSource", "CAMERA");
+        input.put("capturedAt", "2026-07-14T09:59:00Z");
+
+        String normalized = CaptureMetadataValidator.normalize(
+                objectMapper, input, receivedAt, "network-operator-1",
+                "technician-profile-1", "整改代补");
+        assertThat(normalized).contains("\"uploadedBy\":\"network-operator-1\"");
+        assertThat(normalized).contains("\"onBehalfOf\":\"technician-profile-1\"");
+        assertThat(normalized).contains("\"onBehalfReason\":\"整改代补\"");
+        assertThat(normalized).contains("\"uploadedRole\":\"NETWORK_OPERATOR\"");
     }
 }

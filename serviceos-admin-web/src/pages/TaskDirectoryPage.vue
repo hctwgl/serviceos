@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, type RouteLocationRaw } from 'vue-router'
+import SavedViewBar from '../components/SavedViewBar.vue'
 import QueueTable from './QueueTable.vue'
 import { listAuthorizedTasks, type TaskDirectoryPage } from '../api/tasksDirectory'
 import { firstRouteQuery, uuidRoute } from '../routeQuery'
@@ -70,6 +71,23 @@ function search() {
   return load()
 }
 
+function currentFilters() {
+  return {
+    status: status.value || undefined,
+    taskKind: taskKind.value || undefined,
+    assignee: assigneeMe.value ? 'me' : undefined,
+    projectId: projectId.value.trim() || undefined,
+  }
+}
+
+function applySavedView(filters: Record<string, string>) {
+  status.value = filters.status ?? ''
+  taskKind.value = filters.taskKind ?? ''
+  projectId.value = filters.projectId ?? ''
+  assigneeMe.value = filters.assignee === 'me'
+  return search()
+}
+
 const rows = computed(() =>
   (page.value?.items ?? []).map((item) => ({
     id: item.id,
@@ -91,6 +109,12 @@ onMounted(() => {
 
 <template>
   <section>
+    <SavedViewBar
+      page-id="ADMIN.TASK.QUEUE"
+      :schema-version="1"
+      :current-filters="currentFilters()"
+      @apply="applySavedView"
+    />
     <form class="filters" @submit.prevent="search">
       <label>
         status

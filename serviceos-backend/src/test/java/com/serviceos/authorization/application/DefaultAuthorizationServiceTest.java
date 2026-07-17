@@ -26,7 +26,26 @@ class DefaultAuthorizationServiceTest {
     private final AuthorizationDenialAuditWriter writer = new AuthorizationDenialAuditWriter(audit, clock);
     private CapabilityGrantMatch grantMatch = new CapabilityGrantMatch(
             true, List.of("grant-1"), List.of("TENANT:tenant-a"), "test-policy-v1");
-    private final AuthorizationPolicyStore policyStore = (tenant, principal, request, evaluatedAt) -> grantMatch;
+    private final AuthorizationPolicyStore policyStore = new AuthorizationPolicyStore() {
+        @Override
+        public CapabilityGrantMatch findCapabilityGrants(
+                String tenantId, String principalId, AuthorizationRequest request, Instant evaluatedAt
+        ) {
+            return grantMatch;
+        }
+
+        @Override
+        public List<String> listEffectiveCapabilityCodes(
+                String tenantId, String principalId, String scopeType, String scopeRef, Instant evaluatedAt
+        ) {
+            return List.of();
+        }
+
+        @Override
+        public String policyVersion(String tenantId) {
+            return "test-policy-v1";
+        }
+    };
     private final DefaultAuthorizationService service = new DefaultAuthorizationService(writer, policyStore, clock);
 
     @Test

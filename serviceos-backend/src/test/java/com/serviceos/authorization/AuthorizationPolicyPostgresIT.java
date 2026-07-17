@@ -72,8 +72,52 @@ class AuthorizationPolicyPostgresIT {
         jdbc.sql("""
                 TRUNCATE TABLE prj_project_network, prj_project_region, prj_project, aud_audit_record,
                     auth_role_field_policy, auth_field_policy_rule, auth_field_policy,
-                    auth_role_grant, auth_role_capability, auth_role CASCADE
+                    auth_delegation_capability, auth_delegation, auth_role_grant_event,
+                    auth_tenant_grant_generation, auth_role_grant, auth_role_capability, auth_role CASCADE
                 """).update();
+    }
+
+    @Test
+    void denyPreferBeatsMatchingAllowForSameCapabilityAndScope() {
+        UUID allowRole = seedRoleGrant("allow-reader", PRINCIPAL, "PROJECT", "project-a");
+        UUID denyRole = UUID.randomUUID();
+        jdbc.sql("""
+                        INSERT INTO auth_role (
+                            role_id, tenant_id, role_code, role_name, role_status, created_at
+                        ) VALUES (:roleId, :tenantId, 'deny-reader', 'deny-reader', 'ACTIVE', now())
+                        """)
+                .param("roleId", denyRole)
+                .param("tenantId", TENANT)
+                .update();
+        jdbc.sql("""
+                        INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
+                        VALUES (:roleId, 'project.create', now())
+                        """)
+                .param("roleId", denyRole)
+                .update();
+        jdbc.sql("""
+                        INSERT INTO auth_role_grant (
+                            grant_id, tenant_id, principal_id, role_id, scope_type, scope_ref,
+                            valid_from, source_code, approval_ref, grant_effect, created_at
+                        ) VALUES (
+                            :grantId, :tenantId, :principalId, :roleId, 'PROJECT', 'project-a',
+                            now() - interval '1 day', 'TEST_FIXTURE', 'test-approval', 'DENY', now()
+                        )
+                        """)
+                .param("grantId", UUID.randomUUID())
+                .param("tenantId", TENANT)
+                .param("principalId", PRINCIPAL)
+                .param("roleId", denyRole)
+                .update();
+        assertThat(allowRole).isNotNull();
+
+        AuthorizationDecision decision = authorization.authorize(
+                principal(PRINCIPAL),
+                AuthorizationRequest.projectCapability(
+                        "project.create", TENANT, "Project", "project-a", "project-a"),
+                "corr-deny-prefer");
+        assertThat(decision.effect()).isEqualTo(AuthorizationDecision.Effect.DENY);
+        assertThat(decision.policyVersion()).startsWith("role-grant-v3:g");
     }
 
     @Test
@@ -170,7 +214,7 @@ class AuthorizationPolicyPostgresIT {
         assertThat(decision.fields().get("settlementAmount").permission())
                 .isEqualTo(FieldPermission.HIDDEN);
         assertThat(decision.matchedGrantIds()).hasSize(2);
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("086");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("099");
     }
 
     @Test

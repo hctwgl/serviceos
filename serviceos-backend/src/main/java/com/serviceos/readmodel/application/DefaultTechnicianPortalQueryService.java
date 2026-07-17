@@ -1,0 +1,373 @@
+package com.serviceos.readmodel.application;
+
+import com.serviceos.appointment.api.TechnicianScheduleAppointmentQuery;
+import com.serviceos.appointment.api.TechnicianScheduleAppointmentView;
+import com.serviceos.authorization.api.AuthorizationRequest;
+import com.serviceos.authorization.api.AuthorizationService;
+import com.serviceos.dispatch.api.TechnicianActiveAssignmentQuery;
+import com.serviceos.dispatch.api.TechnicianActiveAssignmentView;
+import com.serviceos.identity.api.CurrentPrincipal;
+import com.serviceos.network.api.NetworkTechnicianMembershipView;
+import com.serviceos.network.api.PrincipalNetworkAffiliationQuery;
+import com.serviceos.network.api.TechnicianProfileView;
+import com.serviceos.readmodel.api.TechnicianPortalFeedItem;
+import com.serviceos.readmodel.api.TechnicianPortalFeedPage;
+import com.serviceos.readmodel.api.TechnicianPortalQueryService;
+import com.serviceos.readmodel.api.TechnicianPortalScheduleItem;
+import com.serviceos.readmodel.api.TechnicianPortalSchedulePage;
+import com.serviceos.readmodel.api.TechnicianPortalSyncSummary;
+import com.serviceos.shared.BusinessProblem;
+import com.serviceos.shared.ProblemCode;
+import com.serviceos.task.api.TaskFulfillmentContext;
+import com.serviceos.task.api.TaskFulfillmentContextService;
+import com.serviceos.task.api.TechnicianTaskAssignmentFeedQuery;
+import com.serviceos.task.api.TechnicianTaskAssignmentFeedView;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.nio.charset.StandardCharsets;
+import java.time.Clock;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+
+/**
+ * Technician Portal Feed 只读编排。
+ *
+ * <p>事务边界：只读；不写 Outbox/领域事实。鉴权顺序：解析可信
+ * {@code X-Technician-Context} → ACTIVE TechnicianProfile + NetworkTechnicianMembership →
+ * NETWORK scope {@code task.readAssigned} → 仅当前师傅 assignee 的责任。跨网点失败关闭。</p>
+ */
+@Service
+final class DefaultTechnicianPortalQueryService implements TechnicianPortalQueryService {
+    private static final String TASK_READ_ASSIGNED = "task.readAssigned";
+    private static final String CONTEXT_PREFIX = "TECHNICIAN|NETWORK|";
+    private static final String ITEM_ASSIGNMENT = "ASSIGNMENT";
+    private static final String ITEM_TOMBSTONE = "TOMBSTONE";
+
+    private final PrincipalNetworkAffiliationQuery affiliations;
+    private final AuthorizationService authorization;
+    private final TechnicianActiveAssignmentQuery assignments;
+    private final TechnicianTaskAssignmentFeedQuery taskAssignments;
+    private final TechnicianScheduleAppointmentQuery appointments;
+    private final TaskFulfillmentContextService tasks;
+    private final Clock clock;
+
+    DefaultTechnicianPortalQueryService(
+            PrincipalNetworkAffiliationQuery affiliations,
+            AuthorizationService authorization,
+            TechnicianActiveAssignmentQuery assignments,
+            TechnicianTaskAssignmentFeedQuery taskAssignments,
+            TechnicianScheduleAppointmentQuery appointments,
+            TaskFulfillmentContextService tasks,
+            Clock clock
+    ) {
+        this.affiliations = affiliations;
+        this.authorization = authorization;
+        this.assignments = assignments;
+        this.taskAssignments = taskAssignments;
+        this.appointments = appointments;
+        this.tasks = tasks;
+        this.clock = clock;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public TechnicianPortalFeedPage taskFeed(
+            CurrentPrincipal actor,
+            String correlationId,
+            String technicianContextHeader,
+            String sinceCursor
+    ) {
+        AuthorizedTechnicianContext ctx = requireAuthorizedTechnician(
+                actor, correlationId, technicianContextHeader);
+        List<TechnicianPortalFeedItem> items;
+        if (sinceCursor == null || sinceCursor.isBlank()) {
+            items = snapshotFeed(actor.tenantId(), ctx);
+        } else {
+            items = deltaFeed(actor.tenantId(), ctx, sinceCursor);
+        }
+        String nextCursor = items.isEmpty() ? null : items.getLast().cursor();
+        return new TechnicianPortalFeedPage(ctx.networkId(), items, nextCursor, clock.instant());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public TechnicianPortalSchedulePage schedule(
+            CurrentPrincipal actor, String correlationId, String technicianContextHeader
+    ) {
+        AuthorizedTechnicianContext ctx = requireAuthorizedTechnician(
+                actor, correlationId, technicianContextHeader);
+        Set<UUID> taskIds = activeTaskIds(actor.tenantId(), ctx);
+        List<TechnicianScheduleAppointmentView> rows =
+                appointments.listForTasks(actor.tenantId(), taskIds);
+        List<TechnicianPortalScheduleItem> items = rows.stream()
+                .map(row -> new TechnicianPortalScheduleItem(
+                        row.appointmentId(),
+                        row.taskId(),
+                        row.workOrderId(),
+                        row.projectId(),
+                        row.type(),
+                        row.status(),
+                        row.windowStart(),
+                        row.windowEnd(),
+                        row.timezone()))
+                .toList();
+        return new TechnicianPortalSchedulePage(ctx.networkId(), items, clock.instant());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public TechnicianPortalSyncSummary syncSummary(
+            CurrentPrincipal actor, String correlationId, String technicianContextHeader
+    ) {
+        AuthorizedTechnicianContext ctx = requireAuthorizedTechnician(
+                actor, correlationId, technicianContextHeader);
+        Set<UUID> taskIds = activeTaskIds(actor.tenantId(), ctx);
+        int pending = taskIds.size();
+        int appointmentWindows = appointments.listForTasks(actor.tenantId(), taskIds).size();
+        int tombstones = assignments.countEndedForTechnician(
+                actor.tenantId(), ctx.networkId().toString(), ctx.assigneeIds());
+        tombstones += networkScopedRevokedTaskAssignments(actor.tenantId(), ctx).size();
+        return new TechnicianPortalSyncSummary(
+                ctx.networkId(), pending, appointmentWindows, tombstones, clock.instant());
+    }
+
+    private List<TechnicianPortalFeedItem> snapshotFeed(String tenantId, AuthorizedTechnicianContext ctx) {
+        Map<UUID, TechnicianPortalFeedItem> byTask = new LinkedHashMap<>();
+        for (TechnicianActiveAssignmentView row : assignments.listActiveForTechnician(
+                tenantId, ctx.networkId().toString(), ctx.assigneeIds())) {
+            byTask.put(row.taskId(), toAssignmentItem(tenantId, row));
+        }
+        for (TechnicianTaskAssignmentFeedView row : networkScopedActiveTaskAssignments(tenantId, ctx)) {
+            byTask.putIfAbsent(row.taskId(), toTaskAssignmentItem(tenantId, row));
+        }
+        return List.copyOf(byTask.values());
+    }
+
+    private List<TechnicianPortalFeedItem> deltaFeed(
+            String tenantId, AuthorizedTechnicianContext ctx, String sinceCursor
+    ) {
+        FeedCursor cursor = decodeCursor(sinceCursor);
+        List<TechnicianPortalFeedItem> items = new ArrayList<>();
+        for (TechnicianActiveAssignmentView row : assignments.listChangesSince(
+                tenantId, ctx.networkId().toString(), ctx.assigneeIds(),
+                cursor.instant(), cursor.assignmentId())) {
+            if ("ENDED".equals(row.status())) {
+                items.add(toTombstone(
+                        row.taskId(),
+                        row.endReasonCode() == null ? "SERVICE_ASSIGNMENT_ENDED" : row.endReasonCode(),
+                        encodeCursor(row.effectiveTo(), row.serviceAssignmentId())));
+            } else {
+                items.add(toAssignmentItem(tenantId, row));
+            }
+        }
+        for (TechnicianTaskAssignmentFeedView row : networkScopedRevokedTaskAssignments(tenantId, ctx)) {
+            if (row.effectiveTo() == null) {
+                continue;
+            }
+            if (row.effectiveTo().isBefore(cursor.instant())
+                    || (row.effectiveTo().equals(cursor.instant())
+                    && row.taskAssignmentId().compareTo(cursor.assignmentId()) <= 0)) {
+                continue;
+            }
+            items.add(toTombstone(
+                    row.taskId(),
+                    row.revokeReasonCode() == null ? "TASK_ASSIGNMENT_REVOKED" : row.revokeReasonCode(),
+                    encodeCursor(row.effectiveTo(), row.taskAssignmentId())));
+        }
+        return List.copyOf(items);
+    }
+
+    private Set<UUID> activeTaskIds(String tenantId, AuthorizedTechnicianContext ctx) {
+        Set<UUID> taskIds = new LinkedHashSet<>();
+        for (TechnicianActiveAssignmentView row : assignments.listActiveForTechnician(
+                tenantId, ctx.networkId().toString(), ctx.assigneeIds())) {
+            taskIds.add(row.taskId());
+        }
+        for (TechnicianTaskAssignmentFeedView row : networkScopedActiveTaskAssignments(tenantId, ctx)) {
+            taskIds.add(row.taskId());
+        }
+        return taskIds;
+    }
+
+    private List<TechnicianTaskAssignmentFeedView> networkScopedActiveTaskAssignments(
+            String tenantId, AuthorizedTechnicianContext ctx
+    ) {
+        List<TechnicianTaskAssignmentFeedView> candidates =
+                taskAssignments.listActiveForPrincipal(tenantId, ctx.principalId().toString());
+        Set<UUID> allowed = networkScopedTaskIdSet(tenantId, ctx.networkId(), candidates.stream()
+                .map(TechnicianTaskAssignmentFeedView::taskId)
+                .toList());
+        return candidates.stream().filter(row -> allowed.contains(row.taskId())).toList();
+    }
+
+    private List<TechnicianTaskAssignmentFeedView> networkScopedRevokedTaskAssignments(
+            String tenantId, AuthorizedTechnicianContext ctx
+    ) {
+        List<TechnicianTaskAssignmentFeedView> candidates =
+                taskAssignments.listRevokedForPrincipal(tenantId, ctx.principalId().toString());
+        Set<UUID> allowed = networkScopedTaskIdSet(tenantId, ctx.networkId(), candidates.stream()
+                .map(TechnicianTaskAssignmentFeedView::taskId)
+                .toList());
+        return candidates.stream().filter(row -> allowed.contains(row.taskId())).toList();
+    }
+
+    private Set<UUID> networkScopedTaskIdSet(String tenantId, UUID networkId, List<UUID> candidates) {
+        return new HashSet<>(assignments.filterTaskIdsForNetwork(
+                tenantId, networkId.toString(), candidates));
+    }
+
+    private TechnicianPortalFeedItem toAssignmentItem(String tenantId, TechnicianActiveAssignmentView row) {
+        TaskFulfillmentContext task = tasks.find(tenantId, row.taskId()).orElse(null);
+        String cursor = encodeCursor(row.effectiveFrom(), row.serviceAssignmentId());
+        return new TechnicianPortalFeedItem(
+                ITEM_ASSIGNMENT,
+                row.taskId(),
+                row.workOrderId(),
+                task == null ? null : task.projectId(),
+                row.serviceAssignmentId(),
+                null,
+                task == null ? null : task.taskType(),
+                task == null ? null : task.taskKind(),
+                task == null ? null : task.stageCode(),
+                task == null ? null : task.status(),
+                row.businessType(),
+                row.effectiveFrom(),
+                cursor,
+                null);
+    }
+
+    private TechnicianPortalFeedItem toTaskAssignmentItem(
+            String tenantId, TechnicianTaskAssignmentFeedView row
+    ) {
+        TaskFulfillmentContext task = tasks.find(tenantId, row.taskId()).orElse(null);
+        String cursor = encodeCursor(row.effectiveFrom(), row.taskAssignmentId());
+        return new TechnicianPortalFeedItem(
+                ITEM_ASSIGNMENT,
+                row.taskId(),
+                row.workOrderId(),
+                task == null ? null : task.projectId(),
+                null,
+                row.taskAssignmentId(),
+                task == null ? null : task.taskType(),
+                task == null ? null : task.taskKind(),
+                task == null ? null : task.stageCode(),
+                task == null ? null : task.status(),
+                null,
+                row.effectiveFrom(),
+                cursor,
+                null);
+    }
+
+    private static TechnicianPortalFeedItem toTombstone(UUID taskId, String reason, String cursor) {
+        return new TechnicianPortalFeedItem(
+                ITEM_TOMBSTONE,
+                taskId,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                cursor,
+                reason);
+    }
+
+    private AuthorizedTechnicianContext requireAuthorizedTechnician(
+            CurrentPrincipal actor, String correlationId, String technicianContextHeader
+    ) {
+        UUID networkId = parseTechnicianContext(technicianContextHeader);
+        UUID principalId = requirePrincipalUuid(actor);
+        Instant at = clock.instant();
+        TechnicianProfileView profile = affiliations.findActiveTechnicianProfile(
+                actor.tenantId(), principalId)
+                .orElseThrow(() -> new BusinessProblem(ProblemCode.PORTAL_CONTEXT_INVALID,
+                        "当前主体没有有效的 TechnicianProfile"));
+        boolean member = affiliations.listActiveTechnicianMemberships(
+                        actor.tenantId(), profile.id(), at).stream()
+                .map(NetworkTechnicianMembershipView::serviceNetworkId)
+                .anyMatch(networkId::equals);
+        if (!member) {
+            throw new BusinessProblem(ProblemCode.PORTAL_CONTEXT_INVALID,
+                    "当前主体不能使用请求的 Technician Portal 上下文");
+        }
+        authorization.require(actor, AuthorizationRequest.networkCapability(
+                        TASK_READ_ASSIGNED, actor.tenantId(), "ServiceNetwork",
+                        networkId.toString(), networkId.toString()),
+                correlationId);
+        List<String> assigneeIds = List.of(principalId.toString(), profile.id().toString());
+        return new AuthorizedTechnicianContext(networkId, principalId, profile.id(), assigneeIds);
+    }
+
+    private static UUID parseTechnicianContext(String header) {
+        if (header == null || header.isBlank()) {
+            throw new BusinessProblem(ProblemCode.PORTAL_CONTEXT_INVALID, "缺少 X-Technician-Context");
+        }
+        String raw = header.trim();
+        String uuidPart = raw;
+        if (raw.startsWith(CONTEXT_PREFIX)) {
+            uuidPart = raw.substring(CONTEXT_PREFIX.length());
+        } else if (raw.contains("|")) {
+            throw new BusinessProblem(ProblemCode.PORTAL_CONTEXT_INVALID, "Technician Portal 上下文形态无效");
+        }
+        try {
+            return UUID.fromString(uuidPart);
+        } catch (IllegalArgumentException ex) {
+            throw new BusinessProblem(ProblemCode.PORTAL_CONTEXT_INVALID, "Technician Portal 上下文形态无效");
+        }
+    }
+
+    private static UUID requirePrincipalUuid(CurrentPrincipal actor) {
+        try {
+            return UUID.fromString(actor.principalId());
+        } catch (IllegalArgumentException ex) {
+            throw new BusinessProblem(ProblemCode.PORTAL_CONTEXT_INVALID,
+                    "当前主体无法形成 Technician Portal 上下文");
+        }
+    }
+
+    private static String encodeCursor(Instant instant, UUID id) {
+        Instant ts = instant == null ? Instant.EPOCH : instant;
+        String raw = ts.toEpochMilli() + ":" + id;
+        return Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(raw.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static FeedCursor decodeCursor(String opaque) {
+        try {
+            String raw = new String(Base64.getUrlDecoder().decode(opaque), StandardCharsets.UTF_8);
+            int sep = raw.indexOf(':');
+            if (sep <= 0) {
+                throw new IllegalArgumentException("bad cursor");
+            }
+            Instant instant = Instant.ofEpochMilli(Long.parseLong(raw.substring(0, sep)));
+            UUID id = UUID.fromString(raw.substring(sep + 1));
+            return new FeedCursor(instant, id);
+        } catch (RuntimeException ex) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, "sinceCursor 无效");
+        }
+    }
+
+    private record AuthorizedTechnicianContext(
+            UUID networkId,
+            UUID principalId,
+            UUID technicianProfileId,
+            List<String> assigneeIds
+    ) {
+    }
+
+    private record FeedCursor(Instant instant, UUID assignmentId) {
+    }
+}

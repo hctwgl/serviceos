@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.76.0
+  version: 0.94.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -162,6 +162,1949 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /organizations:
+    get:
+      operationId: listOrganizations
+      summary: 查询当前租户企业组织目录
+      description: 需要 organization.read。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 组织列表
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/OrganizationPage' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createOrganization
+      summary: 创建企业组织
+      description: 需要 organization.manageStructure；EXTERNAL_AUTHORITATIVE 必须提供 sourceSystem/sourceKey。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreateOrganizationRequest' } } }
+      responses:
+        '200':
+          description: 新建组织
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/Organization' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /organizations/{organizationId}:
+    get:
+      operationId: getOrganization
+      summary: 读取企业组织及单元列表
+      description: 需要 organization.read。
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 组织详情
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/OrganizationDetail' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /organizations/{organizationId}/units:
+    get:
+      operationId: listOrganizationUnits
+      summary: 列出组织单元
+      description: 需要 organization.read；asTree 预留树形响应，当前返回扁平列表。
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - { name: asTree, in: query, schema: { type: boolean, default: false } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 组织单元列表
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/OrgUnit' } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createOrganizationUnit
+      summary: 创建组织单元并维护 closure
+      description: 需要 organization.manageStructure；EXTERNAL_AUTHORITATIVE 另需 organization.overrideExternal。If-Match 绑定组织聚合版本。
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreateOrgUnitRequest' } } }
+      responses:
+        '200':
+          description: 新建单元
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/OrgUnit' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /organizations/{organizationId}/units/{orgUnitId}:move:
+    post:
+      operationId: moveOrganizationUnit
+      summary: 移动组织单元并原子重建 closure
+      description: 需要 organization.manageStructure；循环与跨组织父节点失败关闭。If-Match 绑定单元聚合版本。
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - $ref: '#/components/parameters/OrgUnitId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/MoveOrgUnitRequest' } } }
+      responses:
+        '200':
+          description: 移动后的单元
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/OrgUnit' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /organizations/{organizationId}/memberships:
+    get:
+      operationId: listOrganizationMemberships
+      summary: 查询组织任职
+      description: 需要 organization.read；可按 principalId 过滤。
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - { name: principalId, in: query, schema: { type: string, format: uuid } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 任职页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/OrgMembershipPage' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createOrganizationMembership
+      summary: 创建组织任职
+      description: 需要 organization.manageMembership；同一主体同时只能有一条有效 PRIMARY。
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreateOrgMembershipRequest' } } }
+      responses:
+        '200':
+          description: 新建任职
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/OrgMembership' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /org-memberships/{membershipId}:transfer:
+    post:
+      operationId: transferOrganizationMembership
+      summary: 调动任职到新单元
+      description: 旧任职终止并创建新任职历史；If-Match 绑定任职聚合版本。
+      parameters:
+        - $ref: '#/components/parameters/MembershipId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/TransferOrgMembershipRequest' } } }
+      responses:
+        '200':
+          description: 调动后的任职
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/OrgMembership' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /org-memberships/{membershipId}:terminate:
+    post:
+      operationId: terminateOrganizationMembership
+      summary: 终止任职并可联动主体失权
+      description: disablePrincipal=true 时同事务停用 Principal、撤销有效 RoleGrant 并创建待重分配清单。
+      parameters:
+        - $ref: '#/components/parameters/MembershipId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/TerminateOrgMembershipRequest' } } }
+      responses:
+        '200':
+          description: 已终止任职
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/OrgMembership' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /organizations/{organizationId}/directory-sync-batches:
+    post:
+      operationId: submitOrganizationDirectorySyncBatch
+      summary: 提交外部组织目录同步批次
+      description: 需要 organization.sync；按 sourceSystem+externalBatchKey 幂等；乱序版本 SKIPPED。
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/SubmitDirectorySyncBatchRequest' } } }
+      responses:
+        '200':
+          description: 同步批次收据
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/DirectorySyncBatch' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /directory-sync-batches/{batchId}:
+    get:
+      operationId: getDirectorySyncBatch
+      summary: 读取同步批次与逐项结果
+      description: 需要 organization.read。
+      parameters:
+        - $ref: '#/components/parameters/DirectorySyncBatchId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 同步批次详情
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/DirectorySyncBatch' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /reassignment-work-items:
+    get:
+      operationId: listOpenReassignmentWorkItems
+      summary: 列出因任职终止产生的待重分配清单
+      description: 需要 organization.read。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: OPEN 待办页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/ReassignmentWorkItemPage' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+
+  /partner-organizations:
+    get:
+      operationId: listPartnerOrganizations
+      summary: 查询合作组织目录
+      description: 需要 network.read；合作组织不进入内部 OrgUnit closure。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 合作组织页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/PartnerOrganizationPage' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createPartnerOrganization
+      summary: 创建合作组织
+      description: 需要 network.managePartner。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreatePartnerOrganizationRequest' } } }
+      responses:
+        '200':
+          description: 新建合作组织
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/PartnerOrganization' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /partner-organizations/{partnerOrganizationId}:
+    get:
+      operationId: getPartnerOrganization
+      summary: 读取合作组织
+      parameters:
+        - $ref: '#/components/parameters/PartnerOrganizationId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 合作组织详情
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/PartnerOrganization' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /service-networks:
+    get:
+      operationId: listServiceNetworks
+      summary: 查询 ServiceNetwork 目录
+      description: 需要 network.read。
+      parameters:
+        - { name: partnerOrganizationId, in: query, schema: { type: string, format: uuid } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 网点页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/ServiceNetworkPage' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createServiceNetwork
+      summary: 创建 ServiceNetwork
+      description: 需要 network.manageNetwork；网点不得进入内部组织 closure。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreateServiceNetworkRequest' } } }
+      responses:
+        '200':
+          description: 新建网点
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/ServiceNetwork' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /service-networks/{networkId}:
+    get:
+      operationId: getServiceNetwork
+      summary: 读取 ServiceNetwork
+      parameters:
+        - $ref: '#/components/parameters/ServiceNetworkId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 网点详情
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/ServiceNetwork' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /service-networks/{networkId}:deactivate:
+    post:
+      operationId: deactivateServiceNetwork
+      summary: 清退 ServiceNetwork
+      description: 需要 network.manageNetwork；汇总未完成工作影响并创建 clearance 待办。
+      parameters:
+        - $ref: '#/components/parameters/ServiceNetworkId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/NetworkReasonRequest' } } }
+      responses:
+        '200':
+          description: 已清退网点
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/ServiceNetwork' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /service-networks/{networkId}/memberships:
+    get:
+      operationId: listNetworkMemberships
+      summary: 查询网点成员
+      description: 需要 network.read。
+      parameters:
+        - $ref: '#/components/parameters/ServiceNetworkId'
+        - { name: principalId, in: query, schema: { type: string, format: uuid } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 网点成员页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkMembershipPage' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: inviteNetworkMember
+      summary: 邀请网点成员
+      description: 需要 network.manageMembership；复用既有 Principal，不创建 IdentityLink。
+      parameters:
+        - $ref: '#/components/parameters/ServiceNetworkId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/InviteNetworkMemberRequest' } } }
+      responses:
+        '200':
+          description: 新建网点成员关系
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkMembership' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /network-memberships/{membershipId}:terminate:
+    post:
+      operationId: terminateNetworkMembership
+      summary: 终止网点成员关系
+      parameters:
+        - $ref: '#/components/parameters/NetworkMembershipId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/NetworkReasonRequest' } } }
+      responses:
+        '200':
+          description: 已终止成员关系
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkMembership' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /technician-profiles:
+    get:
+      operationId: listTechnicianProfiles
+      summary: 查询师傅档案目录
+      description: 需要 network.read。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 师傅档案页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianProfilePage' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createTechnicianProfile
+      summary: 创建师傅档案
+      description: 需要 network.manageTechnician；与 Principal 一对一，生命周期独立。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreateTechnicianProfileRequest' } } }
+      responses:
+        '200':
+          description: 新建师傅档案
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianProfile' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /technician-profiles/{profileId}:
+    get:
+      operationId: getTechnicianProfile
+      summary: 读取师傅档案
+      parameters:
+        - $ref: '#/components/parameters/TechnicianProfileId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 师傅档案
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianProfile' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /technician-profiles/{profileId}:disable:
+    post:
+      operationId: disableTechnicianProfile
+      summary: 停用师傅档案
+      description: 需要 network.manageTechnician；同事务创建 clearance 待办；可接单立即失败关闭。
+      parameters:
+        - $ref: '#/components/parameters/TechnicianProfileId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/NetworkReasonRequest' } } }
+      responses:
+        '200':
+          description: 已停用档案
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianProfile' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /technician-profiles/{profileId}:enable:
+    post:
+      operationId: enableTechnicianProfile
+      summary: 重新启用师傅档案
+      parameters:
+        - $ref: '#/components/parameters/TechnicianProfileId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 已启用档案
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianProfile' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /technician-profiles/{profileId}/eligibility:
+    get:
+      operationId: checkTechnicianEligibility
+      summary: 判定师傅在指定网点是否可接单
+      description: 需要 network.read；Principal ACTIVE 不单独构成可接单。
+      parameters:
+        - $ref: '#/components/parameters/TechnicianProfileId'
+        - { name: networkId, in: query, required: true, schema: { type: string, format: uuid } }
+        - { name: at, in: query, schema: { type: string, format: date-time } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 可接单判定
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianEligibility' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /technician-profiles/{profileId}/qualifications:
+    get:
+      operationId: listTechnicianQualifications
+      summary: 列出师傅资质
+      parameters:
+        - $ref: '#/components/parameters/TechnicianProfileId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 资质页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianQualificationPage' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /network-technician-memberships:
+    get:
+      operationId: listNetworkTechnicianMemberships
+      summary: 查询师傅多网点服务关系
+      parameters:
+        - { name: networkId, in: query, schema: { type: string, format: uuid } }
+        - { name: technicianProfileId, in: query, schema: { type: string, format: uuid } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 师傅网点关系页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkTechnicianMembershipPage' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createNetworkTechnicianMembership
+      summary: 建立师傅与网点服务关系
+      description: 需要 network.manageTechnician；同一师傅可有多条独立有效期关系。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreateNetworkTechnicianMembershipRequest' } } }
+      responses:
+        '200':
+          description: 新建关系
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkTechnicianMembership' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /network-technician-memberships/{membershipId}:terminate:
+    post:
+      operationId: terminateNetworkTechnicianMembership
+      summary: 终止师傅网点服务关系
+      parameters:
+        - $ref: '#/components/parameters/NetworkTechnicianMembershipId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/NetworkReasonRequest' } } }
+      responses:
+        '200':
+          description: 已终止关系
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkTechnicianMembership' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /technician-qualifications:
+    post:
+      operationId: submitTechnicianQualification
+      summary: 提交师傅资质
+      description: 需要 network.manageTechnician；状态 PENDING，网点不能自批 APPROVED。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/SubmitTechnicianQualificationRequest' } } }
+      responses:
+        '200':
+          description: 已提交资质
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianQualification' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /technician-qualifications/{qualificationId}:decide:
+    post:
+      operationId: decideTechnicianQualification
+      summary: 总部裁决师傅资质
+      description: 需要 network.reviewQualification。
+      parameters:
+        - $ref: '#/components/parameters/TechnicianQualificationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/DecideTechnicianQualificationRequest' } } }
+      responses:
+        '200':
+          description: 裁决后的资质
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianQualification' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /clearance-work-items:
+    get:
+      operationId: listOpenNetworkClearanceWorkItems
+      summary: 列出网点/师傅清退待办
+      description: 需要 network.read。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: OPEN clearance 页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkClearanceWorkItemPage' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /service-networks/{networkId}/deactivation-impact:
+    get:
+      operationId: getServiceNetworkDeactivationImpact
+      summary: 预览网点清退影响
+      description: 需要 network.read。
+      parameters:
+        - $ref: '#/components/parameters/ServiceNetworkId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 影响摘要
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkDeactivationImpact' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /capabilities:
+    get:
+      operationId: listCapabilities
+      summary: 查询稳定 Capability 目录
+      description: 需要 authorization.read；租户不得改写能力语义或风险级别。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Capability 目录
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Capability' } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /roles:
+    get:
+      operationId: listRoles
+      summary: 查询当前租户角色目录
+      description: 需要 authorization.read。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 角色页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/RolePage' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createRole
+      summary: 创建租户角色并组合稳定 Capability
+      description: 需要 authorization.manageRoles；只能引用目录能力，不能改写风险级别。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreateRoleRequest' } } }
+      responses:
+        '200':
+          description: 新建角色
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/Role' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /roles/{roleId}:
+    get:
+      operationId: getRole
+      summary: 读取角色与能力组合
+      description: 需要 authorization.read。
+      parameters:
+        - $ref: '#/components/parameters/RoleId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 角色详情
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/Role' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /role-grants:
+    get:
+      operationId: listRoleGrants
+      summary: 查询 RoleGrant
+      description: 需要 authorization.read。
+      parameters:
+        - { name: principalId, in: query, schema: { type: string, minLength: 1, maxLength: 128 } }
+        - { name: grantStatus, in: query, schema: { enum: [PENDING_APPROVAL, ACTIVE, REJECTED, REVOKED] } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: RoleGrant 页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/RoleGrantPage' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: requestRoleGrant
+      summary: 申请 RoleGrant
+      description: 需要 authorization.requestGrant；创建 PENDING_APPROVAL 授权申请。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/RequestRoleGrantRequest' } } }
+      responses:
+        '200':
+          description: 授权申请
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/RoleGrant' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /role-grants/{grantId}:approve:
+    post:
+      operationId: decideRoleGrant
+      summary: 批准或拒绝 RoleGrant
+      description: 需要 authorization.approveGrant；高风险不得自批；不得超过可授予范围。
+      parameters:
+        - $ref: '#/components/parameters/GrantId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/DecideRoleGrantRequest' } } }
+      responses:
+        '200':
+          description: 审批后的授权
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/RoleGrant' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /role-grants/{grantId}:revoke:
+    post:
+      operationId: revokeRoleGrant
+      summary: 撤销 RoleGrant
+      description: 需要 authorization.revokeGrant；撤销后立即失权并推进 grant generation。
+      parameters:
+        - $ref: '#/components/parameters/GrantId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/RevokeRoleGrantRequest' } } }
+      responses:
+        '200':
+          description: 已撤销授权
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/RoleGrant' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /delegations:
+    get:
+      operationId: listDelegations
+      summary: 查询 Delegation
+      description: 需要 authorization.read。
+      parameters:
+        - { name: delegatePrincipalId, in: query, schema: { type: string, minLength: 1, maxLength: 128 } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Delegation 页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/DelegationPage' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createDelegation
+      summary: 创建 Delegation
+      description: 需要 authorization.delegate；能力/范围/期限不得超过委托人。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreateDelegationRequest' } } }
+      responses:
+        '200':
+          description: 新建委托
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/Delegation' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /delegations/{delegationId}:revoke:
+    post:
+      operationId: revokeDelegation
+      summary: 撤销 Delegation
+      description: 需要 authorization.delegate。
+      parameters:
+        - $ref: '#/components/parameters/DelegationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/RevokeDelegationRequest' } } }
+      responses:
+        '200':
+          description: 已撤销委托
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/Delegation' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /authorization:explain:
+    post:
+      operationId: explainAuthorization
+      summary: 解释一次假设授权判定
+      description: 需要 authorization.explain；返回脱敏匹配摘要并写审计，不执行业务动作。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/ExplainAuthorizationRequest' } } }
+      responses:
+        '200':
+          description: 授权解释
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/AuthorizationExplainResult' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /me:
+    get:
+      operationId: getMe
+      summary: 当前主体摘要与 Persona
+      description: |
+        返回当前 JWT 映射的 Principal、有效 Persona 与 contextVersion。
+        Schema 预留 CONSUMER Persona，但不宣称 C 端身份已交付，也不返回 Consumer Portal 入口。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 当前主体
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/MeProfile' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /me/contexts:
+    get:
+      operationId: listMeContexts
+      summary: 当前主体可用 Portal 上下文
+      description: |
+        仅由有效 Persona、Membership、RoleGrant 计算 ADMIN/NETWORK/TECHNICIAN 上下文。
+        请求中的 projectId/networkId/contextId 只能选择本接口已返回项，不能创建授权。
+        CONSUMER Persona 不产生上下文。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 可用上下文
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/MeContexts' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /me/capabilities:
+    get:
+      operationId: listMeCapabilities
+      summary: 当前上下文有效 Capability 集合
+      description: |
+        导航/体验辅助查询。业务 API 仍须按资源重新鉴权；旧 contextVersion 失败关闭。
+      parameters:
+        - name: contextId
+          in: query
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 200 }
+        - name: expectedContextVersion
+          in: query
+          required: false
+          schema: { type: string, minLength: 1, maxLength: 120 }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 上下文能力集合
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/MeCapabilities' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /me/navigation:
+    get:
+      operationId: listMeNavigation
+      summary: 当前上下文可见导航
+      description: |
+        由代码注册 Page Registry、Capability、feature gate 与 context 计算稳定 pageId。
+        导航隐藏不是授权事实；直接访问隐藏 URL 或伪造 allowed action 仍由后端重新鉴权。
+      parameters:
+        - name: contextId
+          in: query
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 200 }
+        - name: expectedContextVersion
+          in: query
+          required: false
+          schema: { type: string, minLength: 1, maxLength: 120 }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 导航项
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/MeNavigation' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /search:
+    get:
+      operationId: searchResources
+      summary: Admin 受控全局搜索
+      description: |
+        M192：Portal=ADMIN。需要 search.read（HIGH）。types 仅接受 WORK_ORDER、EXTERNAL_ORDER、
+        NETWORK、TECHNICIAN；未支持 type（含 VEHICLE/CHARGER）返回 SEARCH_TERM_NOT_ALLOWED（422）。
+        缺 type 对应读能力时省略该 type（降级），不整请求 403。经既有授权查询 fan-in，不授予额外能力。
+        响应不回显完整敏感 q，仅提供 qDigest；手机号形态仅允许末四位。
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 200 }
+        - name: types
+          in: query
+          required: false
+          description: 逗号分隔；缺省为全部本切片接受类型
+          schema: { type: string, maxLength: 200 }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 受控搜索结果
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/ControlledSearchResult' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /me/saved-views:
+    get:
+      operationId: listMySavedViews
+      summary: 列出当前主体在指定 pageId 下可见的 SavedView
+      description: |
+        M189/M191：返回本人 PRIVATE 视图，以及同租户 TENANT 共享与持有 RoleGrant 的 ROLE 共享视图。
+        列出/应用视图不授予页面 capability；业务查询仍重新鉴权。
+        支持 pageId：ADMIN.TASK.QUEUE、ADMIN.WORKORDER.LIST、ADMIN.CORRECTION.QUEUE。
+      parameters:
+        - name: pageId
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [ADMIN.TASK.QUEUE, ADMIN.WORKORDER.LIST, ADMIN.CORRECTION.QUEUE]
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 个人与可见共享 SavedView 列表
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/SavedViewPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createMySavedView
+      summary: 创建个人 SavedView
+      description: |
+        任意已认证主体可创建自己的视图。filter AST 仅允许页面 Accepted OpenAPI query 字段/EQ。
+        未知字段返回 QUERY_FILTER_NOT_ALLOWED；schema 不兼容返回 SAVED_VIEW_SCHEMA_OUTDATED。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateSavedViewRequest' }
+      responses:
+        '200':
+          description: 已创建视图
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+            ETag: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/SavedView' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /me/saved-views/{savedViewId}:
+    put:
+      operationId: updateMySavedView
+      summary: 更新本人 SavedView
+      description: |
+        仅 owner 可更新；跨主体返回 404。目录不兼容返回 SAVED_VIEW_SCHEMA_OUTDATED。
+      parameters:
+        - name: savedViewId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: If-Match
+          in: header
+          required: true
+          schema: { type: string, minLength: 1 }
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateSavedViewRequest' }
+      responses:
+        '200':
+          description: 已更新视图
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+            ETag: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/SavedView' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+    delete:
+      operationId: deleteMySavedView
+      summary: 删除本人 SavedView
+      parameters:
+        - name: savedViewId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '204':
+          description: 已删除
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /saved-views/{savedViewId}:share:
+    post:
+      operationId: shareSavedView
+      summary: 设置 Admin SavedView 可见性（共享或收回）
+      description: |
+        M191：仅 owner 可操作。visibility=ROLE/TENANT 需要 preference.shareSavedView（HIGH）；
+        visibility=PRIVATE 收回共享，owner 始终允许。共享只共享查询定义，不授予数据访问权。
+        ROLE 时 sharedScopeRef 为同租户 roleId；TENANT/PRIVATE 时 sharedScopeRef 必须为空。
+      parameters:
+        - name: savedViewId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: If-Match
+          in: header
+          required: true
+          schema: { type: string, minLength: 1 }
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ShareSavedViewRequest' }
+      responses:
+        '200':
+          description: 已更新可见性
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+            ETag: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/SavedView' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+
+  /me/recent-resources:
+    get:
+      operationId: listMyRecentResources
+      summary: 列出当前主体的 Admin 最近访问资源
+      description: |
+        M193：仅 Portal=ADMIN。任意已认证主体可读自己的最近访问；不要求新 capability。
+        服务端对每项经既有授权查询重新鉴权，失权项省略（不整列表 403）。
+        支持类型：WORK_ORDER、TASK、PROJECT、NETWORK、TECHNICIAN。上限默认/最大 20。
+      parameters:
+        - name: portal
+          in: query
+          required: false
+          schema: { type: string, enum: [ADMIN], default: ADMIN }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 20, default: 20 }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 已按当前授权过滤的最近访问列表
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/RecentResourcePage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+    put:
+      operationId: touchMyRecentResource
+      summary: 记录一次 Admin 资源访问（upsert）
+      description: |
+        M193：upsert 本人最近访问行并更新 lastVisitedAt。同 (resourceType, resourceId) 覆盖。
+        portal 必须为 ADMIN。displayRef 仅为非敏感短标签；不得含完整电话/地址/价格。
+        不要求新 capability；超出上限时裁剪最旧行。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TouchRecentResourceRequest' }
+      responses:
+        '200':
+          description: 已记录的最近访问项
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/RecentResourceItem' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /network-portal/work-orders:
+    get:
+      operationId: listNetworkPortalWorkOrders
+      summary: Network Portal 本网点 ACTIVE 责任工单
+      description: |
+        M194：需要有效 NETWORK 门户上下文（X-Network-Context）与 NETWORK scope networkTask.read。
+        仅返回该网点 ACTIVE NETWORK ServiceAssignment 对应工单；禁止 query-param networkId。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 本网点 ACTIVE 责任工单列表
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkPortalWorkOrderPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /network-portal/tasks:
+    get:
+      operationId: listNetworkPortalTasks
+      summary: Network Portal 本网点 ACTIVE 责任任务
+      description: |
+        M194：X-Network-Context + networkTask.read。数据范围同 work-orders，按任务展开。
+      parameters:
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 本网点 ACTIVE 责任任务列表
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkPortalTaskPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /network-portal/technicians:
+    get:
+      operationId: listNetworkPortalTechnicians
+      summary: Network Portal 本网点师傅列表
+      description: |
+        M194：X-Network-Context + technician.readOwnNetwork。仅 ACTIVE NetworkTechnicianMembership。
+      parameters:
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 本网点 ACTIVE 师傅列表
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkPortalTechnicianPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /network-portal/capacity:
+    get:
+      operationId: listNetworkPortalCapacity
+      summary: Network Portal 本网点容量计数
+      description: |
+        M194：X-Network-Context + networkTask.read。读取 dsp_capacity_counter（NETWORK assignee）。
+      parameters:
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 本网点容量计数列表
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkPortalCapacityPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /network-portal/workbench:
+    get:
+      operationId: getNetworkPortalWorkbench
+      summary: Network Portal 工作台计数摘要
+      description: |
+        M194：X-Network-Context + networkTask.read。返回 ACTIVE 工单/任务/师傅计数与容量摘要。
+      parameters:
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 工作台摘要
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkPortalWorkbenchView' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /network-portal/tasks/{taskId}:assign-technician:
+    post:
+      operationId: assignNetworkPortalTechnician
+      summary: Network Portal 为本网点任务指派师傅
+      description: |
+        M196：X-Network-Context + NETWORK scope networkPortal.assignTechnician。
+        请求体不含 networkAssigneeId；服务端强制等于可信上下文网点 UUID 字符串。
+        委托已 Implemented 的 ManualAssign 激活 saga；不支持改派/评分/硬过滤。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）；
+        已有不同师傅 ACTIVE TECHNICIAN 返回 SERVICE_ASSIGNMENT_CONFLICT（409）。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NetworkPortalAssignTechnicianRequest' }
+      responses:
+        '200':
+          description: 双责任已激活或幂等回放
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ManualServiceAssignmentReceipt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /network-portal/tasks/{taskId}:reassign-technician:
+    post:
+      operationId: reassignNetworkPortalTechnician
+      summary: Network Portal 为本网点任务改派师傅
+      description: |
+        M200：X-Network-Context + NETWORK scope networkPortal.reassignTechnician。
+        请求体含 technicianAssigneeId、businessType、reasonCode；不含 networkAssigneeId。
+        要求已有 ACTIVE NETWORK=上下文网点与不同 ACTIVE TECHNICIAN；委托 ManualReassign
+        （ServiceAssignment prepare supersedes → confirm → activate → complete）。
+        无 ACTIVE TECHNICIAN 时返回 VALIDATION_FAILED（应使用 assign-technician）。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NetworkPortalReassignTechnicianRequest' }
+      responses:
+        '200':
+          description: 师傅责任已切换或幂等回放
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ManualServiceAssignmentReceipt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /network-portal/tasks/{taskId}/appointments:
+    get:
+      operationId: listNetworkPortalTaskAppointments
+      summary: Network Portal 查询本网点任务预约
+      description: |
+        M197：X-Network-Context + NETWORK scope networkPortal.manageAppointment。
+        任务必须对本上下文网点持有 ACTIVE NETWORK ServiceAssignment；委托 appointment.read。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 当前租户下该任务的预约列表
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Appointment' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: proposeNetworkPortalAppointment
+      summary: Network Portal 为本网点任务提议预约
+      description: |
+        M197：X-Network-Context + NETWORK scope networkPortal.manageAppointment。
+        Body 与 Admin propose 同形；服务端强制任务 ACTIVE NETWORK 责任等于可信上下文网点。
+        委托已 Implemented 的 appointments.propose；不发明并行预约状态机。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProposeAppointmentRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/AppointmentCommandReceipt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /network-portal/appointments/{appointmentId}:confirm:
+    post:
+      operationId: confirmNetworkPortalAppointment
+      summary: Network Portal 确认本网点预约
+      description: |
+        M197：X-Network-Context + NETWORK scope networkPortal.manageAppointment + If-Match。
+        Body 与 Admin confirm 同形，但 confirmedPartyType 仅允许 NETWORK_MEMBER 或 NETWORK，
+        confirmedPartyRef 必须等于当前 JWT principalId；拒绝 TECHNICIAN 伪装。
+        预约所属任务必须对本上下文网点持有 ACTIVE NETWORK 责任。
+        委托已 Implemented 的 appointments.confirm。
+      parameters:
+        - $ref: '#/components/parameters/AppointmentId'
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConfirmAppointmentRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/AppointmentCommandReceipt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /network-portal/appointments/{appointmentId}:reschedule:
+    post:
+      operationId: rescheduleNetworkPortalAppointment
+      summary: Network Portal 改约本网点已确认预约
+      description: |
+        M198：X-Network-Context + NETWORK scope networkPortal.manageAppointment + If-Match。
+        Body 与 Admin reschedule 同形；改约追加 PROPOSED 修订并要求重新确认。
+        预约所属任务必须对本上下文网点持有 ACTIVE NETWORK 责任。
+        委托已 Implemented 的 appointments.reschedule（底层另需 appointment.manage）；
+        复用 M197 能力种子，无新 Flyway。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - $ref: '#/components/parameters/AppointmentId'
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RescheduleAppointmentRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/AppointmentCommandReceipt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /network-portal/appointments/{appointmentId}:cancel:
+    post:
+      operationId: cancelNetworkPortalAppointment
+      summary: Network Portal 取消本网点预约
+      description: |
+        M198：X-Network-Context + NETWORK scope networkPortal.manageAppointment + If-Match。
+        Body 与 Admin cancel 同形（reasonCode、可选 note）。
+        预约所属任务必须对本上下文网点持有 ACTIVE NETWORK 责任。
+        委托已 Implemented 的 appointments.cancel（底层另需 appointment.cancel）；
+        复用 M197 能力种子，无新 Flyway。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - $ref: '#/components/parameters/AppointmentId'
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CancelAppointmentRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/AppointmentCommandReceipt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /network-portal/appointments/{appointmentId}:mark-no-show:
+    post:
+      operationId: markNetworkPortalAppointmentNoShow
+      summary: Network Portal 标记本网点预约爽约
+      description: |
+        M199：X-Network-Context + NETWORK scope networkPortal.manageAppointment + If-Match。
+        Body 与 Admin mark-no-show 同形；仅 CONFIRMED 且窗口已结束的预约可标记 NO_SHOW。
+        预约所属任务必须对本上下文网点持有 ACTIVE NETWORK 责任。
+        委托已 Implemented 的 appointments.markNoShow（底层另需 appointment.manage）；
+        复用 M197 能力种子，无新 Flyway。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - $ref: '#/components/parameters/AppointmentId'
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MarkAppointmentNoShowRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/AppointmentCommandReceipt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /network-portal/tasks/{taskId}/contact-attempts:
+    get:
+      operationId: listNetworkPortalTaskContactAttempts
+      summary: Network Portal 查询本网点任务联系尝试
+      description: |
+        M199：X-Network-Context + NETWORK scope networkPortal.manageAppointment。
+        任务必须对本上下文网点持有 ACTIVE NETWORK ServiceAssignment；委托 appointment.read。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 当前租户下该任务的联系尝试列表
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ContactAttempt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: recordNetworkPortalTaskContactAttempt
+      summary: Network Portal 为本网点任务记录联系尝试
+      description: |
+        M199：X-Network-Context + NETWORK scope networkPortal.manageAppointment。
+        Body 与 Admin RecordContactAttempt 同形；操作者来自 JWT，不接受客户端伪造 actor。
+        任务必须对本上下文网点持有 ACTIVE NETWORK 责任。
+        委托已 Implemented 的 contact-attempts 写入（底层另需 appointment.recordContact）；
+        复用 M197 能力种子，无新 Flyway。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecordContactAttemptRequest' }
+      responses:
+        '201':
+          description: 已记录的不可变联系事实
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+            Location:
+              required: true
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContactAttempt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /network-portal/tasks/{taskId}/evidence-slots/{slotId}/upload-sessions:
+    post:
+      operationId: beginNetworkPortalEvidenceUploadOnBehalf
+      summary: Network Portal 代师傅 Begin 资料上传
+      description: |
+        M201：X-Network-Context + NETWORK scope evidence.submitOnBehalf。
+        Body 含 BeginEvidence 字段与权威 onBehalfOf/onBehalfReason；captureMetadata 内伪造
+        onBehalfOf/delegationRef/onBehalfReason 仍失败关闭。
+        要求任务存在未关闭 CorrectionCase，且 onBehalfOf = ACTIVE TECHNICIAN 且为本网点 ACTIVE 师傅。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - name: slotId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NetworkPortalBeginEvidenceUploadRequest' }
+      responses:
+        '201':
+          description: 上传会话创建或幂等重放成功
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EvidenceUploadSession' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /network-portal/tasks/{taskId}/evidence-slots/{slotId}/upload-sessions/{uploadSessionId}:finalize:
+    post:
+      operationId: finalizeNetworkPortalEvidenceUploadOnBehalf
+      summary: Network Portal 代师傅 Finalize 资料上传
+      description: |
+        M201：X-Network-Context + NETWORK scope evidence.submitOnBehalf。
+        Body 与 FinalizeEvidenceUploadRequest 同形；会话 createdBy 必须为当前主体。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - name: slotId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: uploadSessionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FinalizeEvidenceUploadRequest' }
+      responses:
+        '201':
+          description: EvidenceItem 与 Revision 已创建或幂等重放
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EvidenceItem' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '410': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /network-portal/correction-cases:
+    get:
+      operationId: listNetworkPortalCorrectionCases
+      summary: Network Portal 本网点整改队列
+      description: |
+        M202：X-Network-Context + NETWORK scope evidence.read。
+        仅返回该网点 ACTIVE NETWORK ServiceAssignment 任务上的 CorrectionCase 安全摘要；
+        默认 status=OPEN；按 createdAt/correctionCaseId 正序，内存 limit（1～100，默认 50）。
+        不接受 Admin 项目范围 cursor 语义。上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/CorrelationId'
+        - name: status
+          in: query
+          schema: { enum: [OPEN, IN_PROGRESS, RESUBMITTED, CLOSED, WAIVED], default: OPEN }
+        - name: taskId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200':
+          description: 本网点整改队列页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkPortalCorrectionPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /network-portal/correction-cases/{correctionCaseId}:
+    get:
+      operationId: getNetworkPortalCorrectionCase
+      summary: Network Portal 本网点整改详情
+      description: |
+        M202：X-Network-Context + NETWORK scope evidence.read。
+        委托 CorrectionCase.get 后校验 ACTIVE NETWORK 责任等于上下文网点；跨网点 ACCESS_DENIED。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - name: correctionCaseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: CorrectionCase 详情
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/CorrectionCase' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /network-portal/correction-cases/{correctionCaseId}:resubmit:
+    post:
+      operationId: resubmitNetworkPortalCorrectionCase
+      summary: Network Portal 整改补传 resubmit
+      description: |
+        M201：X-Network-Context + NETWORK scope evidence.submitOnBehalf 门禁后，
+        委托 CorrectionCase.resubmit（底层另需 evidence.submit）；整改任务须为本网点 ACTIVE NETWORK。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - name: correctionCaseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResubmitCorrectionCaseRequest' }
+      responses:
+        '200':
+          description: 整改已补传或幂等回放
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CorrectionCase' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /technician/me/task-feed:
+    get:
+      operationId: listTechnicianTaskFeed
+      summary: Technician Portal 当前师傅任务 Feed
+      description: |
+        M195：需要有效 TECHNICIAN 门户上下文（X-Technician-Context）与 NETWORK scope task.readAssigned。
+        返回当前师傅 ACTIVE TECHNICIAN ServiceAssignment / TaskAssignment；可选 sinceCursor 增量，
+        含撤权/结束 tombstone（仅 taskId + invalidationReason）。禁止离线工作包 runtime。
+        上下文缺失/伪造/非师傅成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - $ref: '#/components/parameters/TechnicianContext'
+        - name: sinceCursor
+          in: query
+          required: false
+          description: 不透明增量游标；缺省返回 ACTIVE 快照
+          schema: { type: string, minLength: 1, maxLength: 256 }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 任务 Feed
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianPortalFeedPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /technician/me/schedule:
+    get:
+      operationId: listTechnicianSchedule
+      summary: Technician Portal 当前师傅预约日程
+      description: |
+        M195：X-Technician-Context + task.readAssigned。对当前 ACTIVE 责任任务 fan-in 预约，
+        仅非敏感字段（无地址等）。
+      parameters:
+        - $ref: '#/components/parameters/TechnicianContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 预约日程
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianPortalSchedulePage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /technician/me/sync-summary:
+    get:
+      operationId: getTechnicianSyncSummary
+      summary: Technician Portal 轻量同步摘要
+      description: |
+        M195：X-Technician-Context + task.readAssigned。返回 pending feed / 预约窗口 / tombstone 计数；
+        不含离线命令运行时。
+      parameters:
+        - $ref: '#/components/parameters/TechnicianContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 同步摘要
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianPortalSyncSummary' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /me/ui-preferences:
+    get:
+      operationId: getMyUiPreferences
+      summary: 获取当前主体在指定 Portal 下的个人 UI 偏好
+      description: |
+        M190：仅 Portal=ADMIN。任意已认证主体可读自己的偏好；不授予页面 capability。
+        允许键：theme、density、locale、reduceMotion、defaultSavedViews、columnWidths。
+      parameters:
+        - name: portal
+          in: query
+          required: true
+          schema: { type: string, enum: [ADMIN] }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 个人 UI 偏好文档
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/UiPreferencesDocument' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+    put:
+      operationId: putMyUiPreferences
+      summary: 更新当前主体的个人 UI 偏好（按键 upsert）
+      description: |
+        portal 必须为 ADMIN。未知/禁止键返回 UI_PREFERENCE_KEY_NOT_ALLOWED。
+        可按键提供 expectedVersion 做乐观并发；冲突 VERSION_CONFLICT。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PutUiPreferencesRequest' }
+      responses:
+        '200':
+          description: 更新后的偏好文档
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/UiPreferencesDocument' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /me/ui-preferences/{key}:
+    delete:
+      operationId: deleteMyUiPreference
+      summary: 删除指定偏好键以恢复默认
+      description: |
+        仅删除本人偏好；删除不存在的键幂等成功（204）。portal 默认 ADMIN，非 ADMIN 失败关闭。
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [theme, density, locale, reduceMotion, defaultSavedViews, columnWidths]
+        - name: portal
+          in: query
+          required: false
+          schema: { type: string, enum: [ADMIN], default: ADMIN }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '204':
+          description: 已删除或本就不存在
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /work-orders:
     get:
       operationId: listAuthorizedWorkOrders
@@ -1095,7 +3038,8 @@ paths:
       summary: 为资料槽位创建受限上传会话
       description: >-
         evidence 编排 files BeginUpload；要求 evidence.submit、file.upload、当前责任人与未 Guard 的
-        RUNNING HUMAN Task。CaptureMetadata 由服务端规范化；onBehalfOf 在 M38 失败关闭。
+        RUNNING HUMAN Task。CaptureMetadata 由服务端规范化；客户端 onBehalfOf/delegationRef/onBehalfReason
+        在 Admin 路径仍失败关闭（M38）；代补仅经 Network Portal M201 命令级字段启用。
       parameters:
         - $ref: '#/components/parameters/TaskId'
         - name: slotId
@@ -2204,6 +4148,71 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    OrganizationId:
+      name: organizationId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    OrgUnitId:
+      name: orgUnitId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    MembershipId:
+      name: membershipId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    DirectorySyncBatchId:
+      name: batchId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    PartnerOrganizationId:
+      name: partnerOrganizationId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ServiceNetworkId:
+      name: networkId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    NetworkMembershipId:
+      name: membershipId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    NetworkTechnicianMembershipId:
+      name: membershipId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    TechnicianProfileId:
+      name: profileId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    TechnicianQualificationId:
+      name: qualificationId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    RoleId:
+      name: roleId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    GrantId:
+      name: grantId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    DelegationId:
+      name: delegationId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     TaskId:
       name: taskId
       in: path
@@ -2254,6 +4263,28 @@ components:
       schema:
         type: string
         maxLength: 128
+    NetworkContext:
+      name: X-Network-Context
+      in: header
+      required: true
+      description: |
+        M194：M188 contextId 形态 `NETWORK|NETWORK|{uuid}`，或经 ACTIVE NetworkMembership
+        校验后的纯 network UUID。不得用查询参数代替。
+      schema:
+        type: string
+        minLength: 36
+        maxLength: 80
+    TechnicianContext:
+      name: X-Technician-Context
+      in: header
+      required: true
+      description: |
+        M195：M188 contextId 形态 `TECHNICIAN|NETWORK|{uuid}`，或经 ACTIVE
+        NetworkTechnicianMembership 校验后的纯 network UUID。不得用查询参数代替。
+      schema:
+        type: string
+        minLength: 36
+        maxLength: 96
     IfMatch:
       name: If-Match
       in: header
@@ -2342,6 +4373,1132 @@ components:
         personaType: { enum: [INTERNAL_EMPLOYEE, NETWORK_MEMBER, TECHNICIAN, CONSUMER, SERVICE_ACCOUNT] }
         validFrom: { type: string, format: date-time }
         validTo: { type: [string, 'null'], format: date-time }
+    MeProfile:
+      type: object
+      additionalProperties: false
+      required: [principalId, tenantId, displayName, personas, contextVersion, asOf]
+      properties:
+        principalId: { type: string, minLength: 1, maxLength: 128 }
+        tenantId: { type: string, minLength: 1, maxLength: 64 }
+        displayName: { type: string, minLength: 1, maxLength: 200 }
+        personas: { type: array, items: { $ref: '#/components/schemas/PrincipalPersona' } }
+        contextVersion: { type: string, minLength: 1, maxLength: 120 }
+        asOf: { type: string, format: date-time }
+    MeContextScopeSummary:
+      type: object
+      additionalProperties: false
+      required: [organizationIds, networkIds, projectIds]
+      properties:
+        organizationIds: { type: array, items: { type: string, minLength: 1, maxLength: 128 } }
+        networkIds: { type: array, items: { type: string, minLength: 1, maxLength: 128 } }
+        projectIds: { type: array, items: { type: string, minLength: 1, maxLength: 128 } }
+    MeContext:
+      type: object
+      additionalProperties: false
+      required: [contextId, portal, personaType, scopeType, scopeRef, scopeSummary, version]
+      properties:
+        contextId: { type: string, minLength: 1, maxLength: 200 }
+        portal: { enum: [ADMIN, NETWORK, TECHNICIAN] }
+        personaType: { enum: [INTERNAL_EMPLOYEE, NETWORK_MEMBER, TECHNICIAN, SERVICE_ACCOUNT] }
+        scopeType: { enum: [TENANT, PROJECT, REGION, NETWORK] }
+        scopeRef: { type: string, minLength: 1, maxLength: 128 }
+        scopeSummary: { $ref: '#/components/schemas/MeContextScopeSummary' }
+        version: { type: string, minLength: 1, maxLength: 120 }
+    MeContexts:
+      type: object
+      additionalProperties: false
+      required: [contexts, contextVersion, asOf]
+      properties:
+        contexts: { type: array, items: { $ref: '#/components/schemas/MeContext' } }
+        contextVersion: { type: string, minLength: 1, maxLength: 120 }
+        asOf: { type: string, format: date-time }
+    MeCapabilities:
+      type: object
+      additionalProperties: false
+      required: [contextId, portal, capabilityCodes, contextVersion, asOf]
+      properties:
+        contextId: { type: string, minLength: 1, maxLength: 200 }
+        portal: { enum: [ADMIN, NETWORK, TECHNICIAN] }
+        capabilityCodes: { type: array, items: { type: string, minLength: 1, maxLength: 120 } }
+        contextVersion: { type: string, minLength: 1, maxLength: 120 }
+        asOf: { type: string, format: date-time }
+    MeNavigationItem:
+      type: object
+      additionalProperties: false
+      required: [pageId, routeKey, title, order, section, requiredCapabilities]
+      properties:
+        pageId: { type: string, minLength: 1, maxLength: 120 }
+        routeKey: { type: string, minLength: 1, maxLength: 200 }
+        title: { type: string, minLength: 1, maxLength: 200 }
+        order: { type: integer, minimum: 0 }
+        section: { type: string, minLength: 1, maxLength: 120 }
+        requiredCapabilities: { type: array, items: { type: string, minLength: 1, maxLength: 120 } }
+    MeNavigation:
+      type: object
+      additionalProperties: false
+      required: [contextId, portal, contextVersion, navigationCatalogVersion, items, asOf]
+      properties:
+        contextId: { type: string, minLength: 1, maxLength: 200 }
+        portal: { enum: [ADMIN, NETWORK, TECHNICIAN] }
+        contextVersion: { type: string, minLength: 1, maxLength: 120 }
+        navigationCatalogVersion: { type: string, minLength: 1, maxLength: 64 }
+        items: { type: array, items: { $ref: '#/components/schemas/MeNavigationItem' } }
+        asOf: { type: string, format: date-time }
+    SavedViewFilterClause:
+      type: object
+      additionalProperties: false
+      required: [field, operator, value]
+      properties:
+        field: { type: string, minLength: 1, maxLength: 64 }
+        operator: { enum: [EQ] }
+        value: { type: string, minLength: 1, maxLength: 200 }
+    SavedViewFilterAst:
+      type: object
+      additionalProperties: false
+      required: [clauses]
+      properties:
+        clauses: { type: array, items: { $ref: '#/components/schemas/SavedViewFilterClause' } }
+    SavedViewSortField:
+      type: object
+      additionalProperties: false
+      required: [field, direction]
+      properties:
+        field: { type: string, minLength: 1, maxLength: 64 }
+        direction: { enum: [ASC, DESC] }
+    SavedViewSortSpec:
+      type: object
+      additionalProperties: false
+      required: [fields]
+      properties:
+        fields: { type: array, items: { $ref: '#/components/schemas/SavedViewSortField' } }
+    SavedView:
+      type: object
+      additionalProperties: false
+      required: [id, ownerPrincipalId, portal, pageId, name, visibility, schemaVersion, filter, isDefault, aggregateVersion, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        ownerPrincipalId: { type: string, minLength: 1, maxLength: 128 }
+        portal: { enum: [ADMIN] }
+        pageId: { enum: [ADMIN.TASK.QUEUE, ADMIN.WORKORDER.LIST, ADMIN.CORRECTION.QUEUE] }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        visibility: { enum: [PRIVATE, ROLE, TENANT] }
+        sharedScopeRef:
+          oneOf:
+            - type: string
+              minLength: 1
+              maxLength: 128
+            - type: 'null'
+        schemaVersion: { type: integer, minimum: 1 }
+        filter: { $ref: '#/components/schemas/SavedViewFilterAst' }
+        sort: { oneOf: [{ $ref: '#/components/schemas/SavedViewSortSpec' }, { type: 'null' }] }
+        columns:
+          oneOf:
+            - type: array
+              items: { type: string, minLength: 1, maxLength: 64 }
+            - type: 'null'
+        isDefault: { type: boolean }
+        aggregateVersion: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    SavedViewPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/SavedView' } }
+        asOf: { type: string, format: date-time }
+    ControlledSearchHit:
+      type: object
+      additionalProperties: false
+      required: [resourceRef, type, primaryLabel, matchReason, deepLink]
+      properties:
+        resourceRef: { type: string, minLength: 1, maxLength: 128 }
+        type: { enum: [WORK_ORDER, EXTERNAL_ORDER, NETWORK, TECHNICIAN] }
+        primaryLabel: { type: string, minLength: 1, maxLength: 200 }
+        maskedSecondaryLabel:
+          oneOf:
+            - type: string
+              maxLength: 200
+            - type: 'null'
+        matchReason: { type: string, minLength: 1, maxLength: 64 }
+        deepLink: { type: string, minLength: 1, maxLength: 256 }
+    ControlledSearchMeta:
+      type: object
+      additionalProperties: false
+      required: [qDigest, requestedTypes, searchedTypes, omittedTypes]
+      properties:
+        qDigest: { type: string, minLength: 1, maxLength: 128 }
+        requestedTypes:
+          type: array
+          items: { enum: [WORK_ORDER, EXTERNAL_ORDER, NETWORK, TECHNICIAN] }
+        searchedTypes:
+          type: array
+          items: { enum: [WORK_ORDER, EXTERNAL_ORDER, NETWORK, TECHNICIAN] }
+        omittedTypes:
+          type: array
+          items: { enum: [WORK_ORDER, EXTERNAL_ORDER, NETWORK, TECHNICIAN] }
+          description: 因缺 underlying 读能力而省略的类型
+    ControlledSearchResult:
+      type: object
+      additionalProperties: false
+      required: [items, meta, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/ControlledSearchHit' } }
+        meta: { $ref: '#/components/schemas/ControlledSearchMeta' }
+        asOf: { type: string, format: date-time }
+    CreateSavedViewRequest:
+      type: object
+      additionalProperties: false
+      required: [pageId, name, schemaVersion, filter]
+      properties:
+        pageId: { enum: [ADMIN.TASK.QUEUE, ADMIN.WORKORDER.LIST, ADMIN.CORRECTION.QUEUE] }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        schemaVersion: { type: integer, minimum: 1 }
+        filter: { $ref: '#/components/schemas/SavedViewFilterAst' }
+        sort: { $ref: '#/components/schemas/SavedViewSortSpec' }
+        columns: { type: array, items: { type: string, minLength: 1, maxLength: 64 } }
+        isDefault: { type: boolean, default: false }
+    UpdateSavedViewRequest:
+      type: object
+      additionalProperties: false
+      required: [name, schemaVersion, filter]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        schemaVersion: { type: integer, minimum: 1 }
+        filter: { $ref: '#/components/schemas/SavedViewFilterAst' }
+        sort: { $ref: '#/components/schemas/SavedViewSortSpec' }
+        columns: { type: array, items: { type: string, minLength: 1, maxLength: 64 } }
+        isDefault: { type: boolean, default: false }
+    ShareSavedViewRequest:
+      type: object
+      additionalProperties: false
+      required: [visibility]
+      properties:
+        visibility: { enum: [PRIVATE, ROLE, TENANT] }
+        sharedScopeRef:
+          oneOf:
+            - type: string
+              minLength: 1
+              maxLength: 128
+            - type: 'null'
+          description: ROLE 时为同租户 roleId；PRIVATE/TENANT 必须为空
+
+    RecentResourceItem:
+      type: object
+      additionalProperties: false
+      required: [resourceType, resourceId, displayRef, lastVisitedAt, deepLink]
+      properties:
+        resourceType: { enum: [WORK_ORDER, TASK, PROJECT, NETWORK, TECHNICIAN] }
+        resourceId: { type: string, minLength: 1, maxLength: 128 }
+        pageId:
+          oneOf:
+            - type: string
+              minLength: 1
+              maxLength: 64
+            - type: 'null'
+        displayRef:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: 非敏感短标签；不得含完整电话/地址/价格
+        lastVisitedAt: { type: string, format: date-time }
+        deepLink: { type: string, minLength: 1, maxLength: 256 }
+    RecentResourcePage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/RecentResourceItem' } }
+        asOf: { type: string, format: date-time }
+    NetworkPortalWorkOrderItem:
+      type: object
+      additionalProperties: false
+      required: [workOrderId, taskIds]
+      properties:
+        workOrderId: { type: string, format: uuid }
+        projectId: { type: [string, 'null'], format: uuid }
+        taskIds: { type: array, items: { type: string, format: uuid } }
+        businessType: { type: [string, 'null'], maxLength: 100 }
+        technicianId: { type: [string, 'null'], maxLength: 128 }
+        effectiveFrom: { type: [string, 'null'], format: date-time }
+    NetworkPortalWorkOrderPage:
+      type: object
+      additionalProperties: false
+      required: [networkId, items, asOf]
+      properties:
+        networkId: { type: string, format: uuid }
+        items: { type: array, items: { $ref: '#/components/schemas/NetworkPortalWorkOrderItem' } }
+        asOf: { type: string, format: date-time }
+    NetworkPortalTaskItem:
+      type: object
+      additionalProperties: false
+      required: [taskId, workOrderId]
+      properties:
+        taskId: { type: string, format: uuid }
+        workOrderId: { type: string, format: uuid }
+        projectId: { type: [string, 'null'], format: uuid }
+        taskType: { type: [string, 'null'], maxLength: 64 }
+        taskKind: { type: [string, 'null'], maxLength: 32 }
+        stageCode: { type: [string, 'null'], maxLength: 64 }
+        status: { type: [string, 'null'], maxLength: 32 }
+        businessType: { type: [string, 'null'], maxLength: 100 }
+        technicianId: { type: [string, 'null'], maxLength: 128 }
+        effectiveFrom: { type: [string, 'null'], format: date-time }
+    NetworkPortalTaskPage:
+      type: object
+      additionalProperties: false
+      required: [networkId, items, asOf]
+      properties:
+        networkId: { type: string, format: uuid }
+        items: { type: array, items: { $ref: '#/components/schemas/NetworkPortalTaskItem' } }
+        asOf: { type: string, format: date-time }
+    NetworkPortalTechnicianItem:
+      type: object
+      additionalProperties: false
+      required: [membershipId, technicianProfileId, principalId, displayName, profileStatus, membershipStatus, validFrom]
+      properties:
+        membershipId: { type: string, format: uuid }
+        technicianProfileId: { type: string, format: uuid }
+        principalId: { type: string, format: uuid }
+        displayName: { type: string, minLength: 1, maxLength: 200 }
+        profileStatus: { type: string, maxLength: 32 }
+        membershipStatus: { type: string, maxLength: 32 }
+        validFrom: { type: string, format: date-time }
+        validTo: { type: [string, 'null'], format: date-time }
+    NetworkPortalTechnicianPage:
+      type: object
+      additionalProperties: false
+      required: [networkId, items, asOf]
+      properties:
+        networkId: { type: string, format: uuid }
+        items: { type: array, items: { $ref: '#/components/schemas/NetworkPortalTechnicianItem' } }
+        asOf: { type: string, format: date-time }
+    NetworkPortalCapacityItem:
+      type: object
+      additionalProperties: false
+      required: [capacityCounterId, businessType, maxUnits, occupiedUnits, availableUnits, version, updatedAt]
+      properties:
+        capacityCounterId: { type: string, format: uuid }
+        businessType: { type: string, maxLength: 100 }
+        maxUnits: { type: integer, minimum: 1 }
+        occupiedUnits: { type: integer, minimum: 0 }
+        availableUnits: { type: integer, minimum: 0 }
+        version: { type: integer, minimum: 1 }
+        updatedAt: { type: string, format: date-time }
+    NetworkPortalCapacityPage:
+      type: object
+      additionalProperties: false
+      required: [networkId, items, asOf]
+      properties:
+        networkId: { type: string, format: uuid }
+        items: { type: array, items: { $ref: '#/components/schemas/NetworkPortalCapacityItem' } }
+        asOf: { type: string, format: date-time }
+    NetworkPortalWorkbenchView:
+      type: object
+      additionalProperties: false
+      required: [networkId, activeWorkOrderCount, activeTaskCount, activeTechnicianCount, capacity, asOf]
+      properties:
+        networkId: { type: string, format: uuid }
+        activeWorkOrderCount: { type: integer, minimum: 0 }
+        activeTaskCount: { type: integer, minimum: 0 }
+        activeTechnicianCount: { type: integer, minimum: 0 }
+        capacity: { type: array, items: { $ref: '#/components/schemas/NetworkPortalCapacityItem' } }
+        asOf: { type: string, format: date-time }
+    NetworkPortalCorrectionItem:
+      type: object
+      additionalProperties: false
+      required: [correctionCaseId, projectId, taskId, sourceReviewCaseId, sourceReviewDecisionId,
+        reasonCodes, correctionTaskId, status, createdAt, latestResubmissionSnapshotId,
+        closedAt, waivedAt, resubmissionCount]
+      properties:
+        correctionCaseId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        sourceReviewCaseId: { type: string, format: uuid }
+        sourceReviewDecisionId: { type: string, format: uuid }
+        reasonCodes:
+          type: array
+          maxItems: 20
+          items: { type: string, minLength: 1, maxLength: 80 }
+        correctionTaskId: { type: [string, 'null'], format: uuid }
+        status: { enum: [OPEN, IN_PROGRESS, RESUBMITTED, CLOSED, WAIVED] }
+        createdAt: { type: string, format: date-time }
+        latestResubmissionSnapshotId: { type: [string, 'null'], format: uuid }
+        closedAt: { type: [string, 'null'], format: date-time }
+        waivedAt: { type: [string, 'null'], format: date-time }
+        resubmissionCount: { type: integer, minimum: 0, maximum: 1000 }
+    NetworkPortalCorrectionPage:
+      type: object
+      additionalProperties: false
+      required: [networkId, items, asOf]
+      properties:
+        networkId: { type: string, format: uuid }
+        items: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/NetworkPortalCorrectionItem' } }
+        asOf: { type: string, format: date-time }
+    TechnicianPortalFeedItem:
+      type: object
+      additionalProperties: false
+      required: [itemType, taskId, cursor]
+      properties:
+        itemType: { type: string, enum: [ASSIGNMENT, TOMBSTONE] }
+        taskId: { type: string, format: uuid }
+        workOrderId: { type: [string, 'null'], format: uuid }
+        projectId: { type: [string, 'null'], format: uuid }
+        serviceAssignmentId: { type: [string, 'null'], format: uuid }
+        taskAssignmentId: { type: [string, 'null'], format: uuid }
+        taskType: { type: [string, 'null'], maxLength: 64 }
+        taskKind: { type: [string, 'null'], maxLength: 32 }
+        stageCode: { type: [string, 'null'], maxLength: 64 }
+        taskStatus: { type: [string, 'null'], maxLength: 32 }
+        businessType: { type: [string, 'null'], maxLength: 100 }
+        effectiveFrom: { type: [string, 'null'], format: date-time }
+        cursor: { type: string, minLength: 1, maxLength: 256 }
+        invalidationReason: { type: [string, 'null'], maxLength: 100 }
+    TechnicianPortalFeedPage:
+      type: object
+      additionalProperties: false
+      required: [networkId, items, asOf]
+      properties:
+        networkId: { type: string, format: uuid }
+        items: { type: array, items: { $ref: '#/components/schemas/TechnicianPortalFeedItem' } }
+        nextCursor: { type: [string, 'null'], maxLength: 256 }
+        asOf: { type: string, format: date-time }
+    TechnicianPortalScheduleItem:
+      type: object
+      additionalProperties: false
+      required: [appointmentId, taskId, workOrderId, type, status]
+      properties:
+        appointmentId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        workOrderId: { type: string, format: uuid }
+        projectId: { type: [string, 'null'], format: uuid }
+        type: { type: string, maxLength: 32 }
+        status: { type: string, maxLength: 24 }
+        windowStart: { type: [string, 'null'], format: date-time }
+        windowEnd: { type: [string, 'null'], format: date-time }
+        timezone: { type: [string, 'null'], maxLength: 80 }
+    TechnicianPortalSchedulePage:
+      type: object
+      additionalProperties: false
+      required: [networkId, items, asOf]
+      properties:
+        networkId: { type: string, format: uuid }
+        items: { type: array, items: { $ref: '#/components/schemas/TechnicianPortalScheduleItem' } }
+        asOf: { type: string, format: date-time }
+    TechnicianPortalSyncSummary:
+      type: object
+      additionalProperties: false
+      required: [networkId, pendingFeedItemCount, appointmentWindowCount, tombstoneCount, asOf]
+      properties:
+        networkId: { type: string, format: uuid }
+        pendingFeedItemCount: { type: integer, minimum: 0 }
+        appointmentWindowCount: { type: integer, minimum: 0 }
+        tombstoneCount: { type: integer, minimum: 0 }
+        asOf: { type: string, format: date-time }
+    TouchRecentResourceRequest:
+      type: object
+      additionalProperties: false
+      required: [resourceType, resourceId]
+      properties:
+        portal: { type: string, enum: [ADMIN], default: ADMIN }
+        resourceType: { enum: [WORK_ORDER, TASK, PROJECT, NETWORK, TECHNICIAN] }
+        resourceId: { type: string, minLength: 1, maxLength: 128 }
+        pageId:
+          oneOf:
+            - type: string
+              minLength: 1
+              maxLength: 64
+            - type: 'null'
+        displayRef:
+          oneOf:
+            - type: string
+              minLength: 1
+              maxLength: 120
+            - type: 'null'
+    UiPreferenceEntry:
+      type: object
+      additionalProperties: false
+      required: [key, value, schemaVersion, aggregateVersion, updatedAt]
+      properties:
+        key:
+          type: string
+          enum: [theme, density, locale, reduceMotion, defaultSavedViews, columnWidths]
+        value:
+          description: 受控 JSON 值；形态按 key 由服务端白名单校验
+          oneOf:
+            - type: string
+            - type: boolean
+            - type: object
+              additionalProperties: true
+            - type: array
+              items: {}
+            - type: number
+        schemaVersion: { type: integer, minimum: 1 }
+        aggregateVersion: { type: integer, format: int64, minimum: 1 }
+        updatedAt: { type: string, format: date-time }
+    UiPreferencesDocument:
+      type: object
+      additionalProperties: false
+      required: [portal, preferences, asOf]
+      properties:
+        portal: { enum: [ADMIN] }
+        preferences:
+          type: object
+          additionalProperties: { $ref: '#/components/schemas/UiPreferenceEntry' }
+        asOf: { type: string, format: date-time }
+    UiPreferenceWrite:
+      type: object
+      additionalProperties: false
+      required: [value, schemaVersion]
+      properties:
+        value:
+          description: 受控 JSON 值；形态按 key 由服务端白名单校验
+          oneOf:
+            - type: string
+            - type: boolean
+            - type: object
+              additionalProperties: true
+            - type: array
+              items: {}
+            - type: number
+        schemaVersion: { type: integer, minimum: 1 }
+        expectedVersion: { type: integer, format: int64, minimum: 1 }
+    PutUiPreferencesRequest:
+      type: object
+      additionalProperties: false
+      required: [portal, preferences]
+      properties:
+        portal: { enum: [ADMIN] }
+        preferences:
+          type: object
+          minProperties: 1
+          additionalProperties: { $ref: '#/components/schemas/UiPreferenceWrite' }
+    Organization:
+      type: object
+      additionalProperties: false
+      required: [id, code, name, authorityMode, status, sourceSystem, sourceKey, version, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string, minLength: 1, maxLength: 64 }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        authorityMode: { enum: [LOCAL, EXTERNAL_AUTHORITATIVE] }
+        status: { enum: [ACTIVE, DISABLED] }
+        sourceSystem: { type: [string, 'null'], minLength: 1, maxLength: 64 }
+        sourceKey: { type: [string, 'null'], minLength: 1, maxLength: 128 }
+        version: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    OrganizationPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Organization' } }
+        asOf: { type: string, format: date-time }
+    OrganizationDetail:
+      type: object
+      additionalProperties: false
+      required: [organization, units, asOf]
+      properties:
+        organization: { $ref: '#/components/schemas/Organization' }
+        units: { type: array, items: { $ref: '#/components/schemas/OrgUnit' } }
+        asOf: { type: string, format: date-time }
+    OrgUnit:
+      type: object
+      additionalProperties: false
+      required: [id, organizationId, parentUnitId, unitCode, unitName, status, sourceSystem,
+        sourceKey, sourceVersion, version, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        organizationId: { type: string, format: uuid }
+        parentUnitId: { type: [string, 'null'], format: uuid }
+        unitCode: { type: string, minLength: 1, maxLength: 64 }
+        unitName: { type: string, minLength: 1, maxLength: 200 }
+        status: { enum: [ACTIVE, DISABLED] }
+        sourceSystem: { type: [string, 'null'], minLength: 1, maxLength: 64 }
+        sourceKey: { type: [string, 'null'], minLength: 1, maxLength: 128 }
+        sourceVersion: { type: [integer, 'null'], format: int64, minimum: 1 }
+        version: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    OrgMembership:
+      type: object
+      additionalProperties: false
+      required: [id, organizationId, orgUnitId, principalId, membershipType, status, validFrom,
+        validTo, sourceSystem, sourceKey, sourceVersion, version, createdBy, createdAt,
+        terminatedBy, terminatedAt, terminateReason]
+      properties:
+        id: { type: string, format: uuid }
+        organizationId: { type: string, format: uuid }
+        orgUnitId: { type: string, format: uuid }
+        principalId: { type: string, format: uuid }
+        membershipType: { enum: [PRIMARY, SECONDARY, MANAGER] }
+        status: { enum: [ACTIVE, TERMINATED] }
+        validFrom: { type: string, format: date-time }
+        validTo: { type: [string, 'null'], format: date-time }
+        sourceSystem: { type: [string, 'null'], minLength: 1, maxLength: 64 }
+        sourceKey: { type: [string, 'null'], minLength: 1, maxLength: 128 }
+        sourceVersion: { type: [integer, 'null'], format: int64, minimum: 1 }
+        version: { type: integer, format: int64, minimum: 1 }
+        createdBy: { type: string, minLength: 1, maxLength: 128 }
+        createdAt: { type: string, format: date-time }
+        terminatedBy: { type: [string, 'null'], minLength: 1, maxLength: 128 }
+        terminatedAt: { type: [string, 'null'], format: date-time }
+        terminateReason: { type: [string, 'null'], minLength: 1, maxLength: 500 }
+    OrgMembershipPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/OrgMembership' } }
+        asOf: { type: string, format: date-time }
+    DirectorySyncItem:
+      type: object
+      additionalProperties: false
+      required: [id, itemIndex, operationType, sourceKey, externalVersion, itemStatus,
+        resultCode, resultMessage, resourceType, resourceId, processedAt]
+      properties:
+        id: { type: string, format: uuid }
+        itemIndex: { type: integer, minimum: 0 }
+        operationType: { enum: [UPSERT_UNIT, UPSERT_MEMBERSHIP, TERMINATE_MEMBERSHIP] }
+        sourceKey: { type: string, minLength: 1, maxLength: 128 }
+        externalVersion: { type: integer, format: int64, minimum: 1 }
+        itemStatus: { enum: [SUCCESS, FAILED, SKIPPED] }
+        resultCode: { type: [string, 'null'], maxLength: 64 }
+        resultMessage: { type: [string, 'null'], maxLength: 500 }
+        resourceType: { type: [string, 'null'], maxLength: 40 }
+        resourceId: { type: [string, 'null'], format: uuid }
+        processedAt: { type: string, format: date-time }
+    DirectorySyncBatch:
+      type: object
+      additionalProperties: false
+      required: [id, organizationId, sourceSystem, externalBatchKey, batchStatus, receivedAt,
+        completedAt, successCount, failedCount, skippedCount, items]
+      properties:
+        id: { type: string, format: uuid }
+        organizationId: { type: string, format: uuid }
+        sourceSystem: { type: string, minLength: 1, maxLength: 64 }
+        externalBatchKey: { type: string, minLength: 1, maxLength: 128 }
+        batchStatus: { enum: [RECEIVED, COMPLETED, COMPLETED_WITH_ERRORS] }
+        receivedAt: { type: string, format: date-time }
+        completedAt: { type: [string, 'null'], format: date-time }
+        successCount: { type: integer, minimum: 0 }
+        failedCount: { type: integer, minimum: 0 }
+        skippedCount: { type: integer, minimum: 0 }
+        items: { type: array, items: { $ref: '#/components/schemas/DirectorySyncItem' } }
+    ReassignmentWorkItem:
+      type: object
+      additionalProperties: false
+      required: [id, organizationId, membershipId, principalId, workItemStatus, reason,
+        createdBy, createdAt, correlationId]
+      properties:
+        id: { type: string, format: uuid }
+        organizationId: { type: string, format: uuid }
+        membershipId: { type: string, format: uuid }
+        principalId: { type: string, format: uuid }
+        workItemStatus: { enum: [OPEN, CLOSED] }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+        createdBy: { type: string, minLength: 1, maxLength: 128 }
+        createdAt: { type: string, format: date-time }
+        correlationId: { type: string, minLength: 1, maxLength: 128 }
+    ReassignmentWorkItemPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/ReassignmentWorkItem' } }
+        asOf: { type: string, format: date-time }
+    CreateOrganizationRequest:
+      type: object
+      additionalProperties: false
+      required: [code, name, authorityMode]
+      properties:
+        code: { type: string, minLength: 1, maxLength: 64 }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        authorityMode: { enum: [LOCAL, EXTERNAL_AUTHORITATIVE] }
+        sourceSystem: { type: [string, 'null'], minLength: 1, maxLength: 64 }
+        sourceKey: { type: [string, 'null'], minLength: 1, maxLength: 128 }
+    CreateOrgUnitRequest:
+      type: object
+      additionalProperties: false
+      required: [unitCode, unitName]
+      properties:
+        parentUnitId: { type: [string, 'null'], format: uuid }
+        unitCode: { type: string, minLength: 1, maxLength: 64 }
+        unitName: { type: string, minLength: 1, maxLength: 200 }
+    MoveOrgUnitRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        newParentUnitId: { type: [string, 'null'], format: uuid }
+    CreateOrgMembershipRequest:
+      type: object
+      additionalProperties: false
+      required: [unitId, principalId, membershipType, validFrom]
+      properties:
+        unitId: { type: string, format: uuid }
+        principalId: { type: string, format: uuid }
+        membershipType: { enum: [PRIMARY, SECONDARY, MANAGER] }
+        validFrom: { type: string, format: date-time }
+    TransferOrgMembershipRequest:
+      type: object
+      additionalProperties: false
+      required: [targetUnitId]
+      properties:
+        targetUnitId: { type: string, format: uuid }
+        membershipType: { type: [string, 'null'], enum: [PRIMARY, SECONDARY, MANAGER] }
+        validFrom: { type: [string, 'null'], format: date-time }
+    TerminateOrgMembershipRequest:
+      type: object
+      additionalProperties: false
+      required: [reason, disablePrincipal]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 500 }
+        disablePrincipal: { type: boolean }
+    SubmitDirectorySyncBatchRequest:
+      type: object
+      additionalProperties: false
+      required: [sourceSystem, externalBatchKey, items]
+      properties:
+        sourceSystem: { type: string, minLength: 1, maxLength: 64 }
+        externalBatchKey: { type: string, minLength: 1, maxLength: 128 }
+        items:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/DirectorySyncItemRequest' }
+    DirectorySyncItemRequest:
+      type: object
+      additionalProperties: false
+      required: [operationType, sourceKey, externalVersion]
+      properties:
+        operationType: { enum: [UPSERT_UNIT, UPSERT_MEMBERSHIP, TERMINATE_MEMBERSHIP] }
+        sourceKey: { type: string, minLength: 1, maxLength: 128 }
+        externalVersion: { type: integer, format: int64, minimum: 1 }
+        unitCode: { type: [string, 'null'], minLength: 1, maxLength: 64 }
+        unitName: { type: [string, 'null'], minLength: 1, maxLength: 200 }
+        parentSourceKey: { type: [string, 'null'], minLength: 1, maxLength: 128 }
+        principalId: { type: [string, 'null'], format: uuid }
+        membershipType: { type: [string, 'null'], enum: [PRIMARY, SECONDARY, MANAGER] }
+        validFrom: { type: [string, 'null'], format: date-time }
+
+    PartnerOrganization:
+      type: object
+      additionalProperties: false
+      required: [id, code, name, status, version, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string, minLength: 1, maxLength: 64 }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        status: { enum: [ACTIVE, DISABLED] }
+        version: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    PartnerOrganizationPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/PartnerOrganization' } }
+        asOf: { type: string, format: date-time }
+    ServiceNetwork:
+      type: object
+      additionalProperties: false
+      required: [id, partnerOrganizationId, networkCode, networkName, status, version, createdAt, updatedAt,
+        deactivatedAt, deactivatedBy, deactivateReason]
+      properties:
+        id: { type: string, format: uuid }
+        partnerOrganizationId: { type: string, format: uuid }
+        networkCode: { type: string, minLength: 1, maxLength: 64 }
+        networkName: { type: string, minLength: 1, maxLength: 200 }
+        status: { enum: [ACTIVE, DEACTIVATED] }
+        version: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        deactivatedAt: { type: [string, 'null'], format: date-time }
+        deactivatedBy: { type: [string, 'null'], minLength: 1, maxLength: 128 }
+        deactivateReason: { type: [string, 'null'], minLength: 1, maxLength: 500 }
+    ServiceNetworkPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/ServiceNetwork' } }
+        asOf: { type: string, format: date-time }
+    NetworkMembership:
+      type: object
+      additionalProperties: false
+      required: [id, serviceNetworkId, principalId, role, status, validFrom, validTo, version, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        serviceNetworkId: { type: string, format: uuid }
+        principalId: { type: string, format: uuid }
+        role: { enum: [MANAGER, STAFF] }
+        status: { enum: [ACTIVE, TERMINATED] }
+        validFrom: { type: string, format: date-time }
+        validTo: { type: [string, 'null'], format: date-time }
+        version: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+    NetworkMembershipPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/NetworkMembership' } }
+        asOf: { type: string, format: date-time }
+    TechnicianProfile:
+      type: object
+      additionalProperties: false
+      required: [id, principalId, displayName, status, version, createdAt, updatedAt,
+        disabledAt, disabledBy, disabledReason]
+      properties:
+        id: { type: string, format: uuid }
+        principalId: { type: string, format: uuid }
+        displayName: { type: string, minLength: 1, maxLength: 200 }
+        status: { enum: [ACTIVE, DISABLED] }
+        version: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        disabledAt: { type: [string, 'null'], format: date-time }
+        disabledBy: { type: [string, 'null'], minLength: 1, maxLength: 128 }
+        disabledReason: { type: [string, 'null'], minLength: 1, maxLength: 500 }
+    TechnicianProfilePage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/TechnicianProfile' } }
+        asOf: { type: string, format: date-time }
+    NetworkTechnicianMembership:
+      type: object
+      additionalProperties: false
+      required: [id, serviceNetworkId, technicianProfileId, status, validFrom, validTo, version, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        serviceNetworkId: { type: string, format: uuid }
+        technicianProfileId: { type: string, format: uuid }
+        status: { enum: [ACTIVE, TERMINATED] }
+        validFrom: { type: string, format: date-time }
+        validTo: { type: [string, 'null'], format: date-time }
+        version: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+    NetworkTechnicianMembershipPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/NetworkTechnicianMembership' } }
+        asOf: { type: string, format: date-time }
+    TechnicianQualification:
+      type: object
+      additionalProperties: false
+      required: [id, technicianProfileId, qualificationCode, status, validFrom, validTo, version, submittedAt]
+      properties:
+        id: { type: string, format: uuid }
+        technicianProfileId: { type: string, format: uuid }
+        qualificationCode: { type: string, minLength: 1, maxLength: 64 }
+        status: { enum: [PENDING, APPROVED, REJECTED, EXPIRED] }
+        validFrom: { type: string, format: date-time }
+        validTo: { type: [string, 'null'], format: date-time }
+        version: { type: integer, format: int64, minimum: 1 }
+        submittedAt: { type: string, format: date-time }
+    TechnicianQualificationPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/TechnicianQualification' } }
+        asOf: { type: string, format: date-time }
+    TechnicianEligibility:
+      type: object
+      additionalProperties: false
+      required: [technicianProfileId, serviceNetworkId, evaluatedAt, eligible, reason]
+      properties:
+        technicianProfileId: { type: string, format: uuid }
+        serviceNetworkId: { type: string, format: uuid }
+        evaluatedAt: { type: string, format: date-time }
+        eligible: { type: boolean }
+        reason: { type: [string, 'null'], maxLength: 500 }
+    NetworkClearanceWorkItem:
+      type: object
+      additionalProperties: false
+      required: [id, subjectType, serviceNetworkId, technicianProfileId, status, reason,
+        openTaskCount, openAppointmentCount, openVisitCount, activeAssignmentCount,
+        offlinePackageCount, createdBy, createdAt, correlationId]
+      properties:
+        id: { type: string, format: uuid }
+        subjectType: { enum: [SERVICE_NETWORK, TECHNICIAN_PROFILE] }
+        serviceNetworkId: { type: [string, 'null'], format: uuid }
+        technicianProfileId: { type: [string, 'null'], format: uuid }
+        status: { enum: [OPEN, CLOSED] }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+        openTaskCount: { type: integer, minimum: 0 }
+        openAppointmentCount: { type: integer, minimum: 0 }
+        openVisitCount: { type: integer, minimum: 0 }
+        activeAssignmentCount: { type: integer, minimum: 0 }
+        offlinePackageCount: { type: integer, minimum: 0 }
+        createdBy: { type: string, minLength: 1, maxLength: 128 }
+        createdAt: { type: string, format: date-time }
+        correlationId: { type: string, minLength: 1, maxLength: 128 }
+    NetworkClearanceWorkItemPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/NetworkClearanceWorkItem' } }
+        asOf: { type: string, format: date-time }
+    NetworkDeactivationImpact:
+      type: object
+      additionalProperties: false
+      required: [serviceNetworkId, openTaskCount, openAppointmentCount, openVisitCount,
+        activeAssignmentCount, offlinePackageCount]
+      properties:
+        serviceNetworkId: { type: string, format: uuid }
+        openTaskCount: { type: integer, minimum: 0 }
+        openAppointmentCount: { type: integer, minimum: 0 }
+        openVisitCount: { type: integer, minimum: 0 }
+        activeAssignmentCount: { type: integer, minimum: 0 }
+        offlinePackageCount: { type: integer, minimum: 0 }
+    Capability:
+      type: object
+      additionalProperties: false
+      required: [capabilityCode, capabilityName, riskLevel]
+      properties:
+        capabilityCode: { type: string, minLength: 1, maxLength: 120 }
+        capabilityName: { type: string, minLength: 1, maxLength: 200 }
+        riskLevel: { enum: [NORMAL, HIGH, CRITICAL] }
+    Role:
+      type: object
+      additionalProperties: false
+      required: [roleId, roleCode, roleName, roleKind, roleStatus, capabilityCodes, version,
+        createdAt, updatedAt]
+      properties:
+        roleId: { type: string, format: uuid }
+        roleCode: { type: string, minLength: 1, maxLength: 120 }
+        roleName: { type: string, minLength: 1, maxLength: 200 }
+        roleKind: { enum: [PLATFORM_TEMPLATE, TENANT] }
+        roleStatus: { enum: [ACTIVE, DISABLED] }
+        description: { type: [string, 'null'], maxLength: 500 }
+        capabilityCodes: { type: array, items: { type: string, minLength: 1, maxLength: 120 } }
+        version: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    RolePage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Role' } }
+        asOf: { type: string, format: date-time }
+    RoleGrant:
+      type: object
+      additionalProperties: false
+      required: [grantId, principalId, roleId, roleCode, scopeType, scopeRef, grantStatus,
+        grantEffect, validFrom, sourceCode, version, createdAt, updatedAt]
+      properties:
+        grantId: { type: string, format: uuid }
+        principalId: { type: string, minLength: 1, maxLength: 128 }
+        roleId: { type: string, format: uuid }
+        roleCode: { type: string, minLength: 1, maxLength: 120 }
+        scopeType: { enum: [TENANT, PROJECT, REGION, NETWORK] }
+        scopeRef: { type: string, minLength: 1, maxLength: 128 }
+        grantStatus: { enum: [PENDING_APPROVAL, ACTIVE, REJECTED, REVOKED] }
+        grantEffect: { enum: [ALLOW, DENY] }
+        validFrom: { type: string, format: date-time }
+        validTo: { type: [string, 'null'], format: date-time }
+        sourceCode: { type: string, minLength: 1, maxLength: 40 }
+        requestedBy: { type: [string, 'null'], maxLength: 128 }
+        requestReason: { type: [string, 'null'], maxLength: 500 }
+        approvedBy: { type: [string, 'null'], maxLength: 128 }
+        approvedAt: { type: [string, 'null'], format: date-time }
+        rejectedBy: { type: [string, 'null'], maxLength: 128 }
+        rejectedAt: { type: [string, 'null'], format: date-time }
+        rejectReason: { type: [string, 'null'], maxLength: 500 }
+        revokedAt: { type: [string, 'null'], format: date-time }
+        revokedBy: { type: [string, 'null'], maxLength: 128 }
+        revokeReason: { type: [string, 'null'], maxLength: 500 }
+        version: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    RoleGrantPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/RoleGrant' } }
+        asOf: { type: string, format: date-time }
+    Delegation:
+      type: object
+      additionalProperties: false
+      required: [delegationId, delegatorPrincipalId, delegatePrincipalId, capabilityCodes,
+        scopeType, scopeRef, validFrom, reason, delegationStatus, version, createdAt, updatedAt]
+      properties:
+        delegationId: { type: string, format: uuid }
+        delegatorPrincipalId: { type: string, minLength: 1, maxLength: 128 }
+        delegatePrincipalId: { type: string, minLength: 1, maxLength: 128 }
+        capabilityCodes: { type: array, minItems: 1, items: { type: string, minLength: 1, maxLength: 120 } }
+        scopeType: { enum: [TENANT, PROJECT, REGION, NETWORK] }
+        scopeRef: { type: string, minLength: 1, maxLength: 128 }
+        validFrom: { type: string, format: date-time }
+        validTo: { type: [string, 'null'], format: date-time }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+        delegationStatus: { enum: [ACTIVE, REVOKED] }
+        version: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        revokedAt: { type: [string, 'null'], format: date-time }
+        revokedBy: { type: [string, 'null'], maxLength: 128 }
+        revokeReason: { type: [string, 'null'], maxLength: 500 }
+    DelegationPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Delegation' } }
+        asOf: { type: string, format: date-time }
+    AuthorizationExplainResult:
+      type: object
+      additionalProperties: false
+      required: [effect, reasonCodes, matchedGrantIds, dataScopeExplanations, obligations, policyVersion]
+      properties:
+        effect: { enum: [ALLOW, DENY] }
+        reasonCodes: { type: array, items: { type: string } }
+        matchedGrantIds: { type: array, items: { type: string } }
+        dataScopeExplanations: { type: array, items: { type: string } }
+        obligations: { type: array, items: { type: string } }
+        policyVersion: { type: string, minLength: 1 }
+    CreateRoleRequest:
+      type: object
+      additionalProperties: false
+      required: [roleCode, roleName, capabilityCodes]
+      properties:
+        roleCode: { type: string, minLength: 1, maxLength: 120 }
+        roleName: { type: string, minLength: 1, maxLength: 200 }
+        description: { type: [string, 'null'], maxLength: 500 }
+        capabilityCodes:
+          type: array
+          minItems: 1
+          items: { type: string, minLength: 1, maxLength: 120 }
+    RequestRoleGrantRequest:
+      type: object
+      additionalProperties: false
+      required: [principalId, roleId, scopeType, scopeRef, validFrom, requestReason]
+      properties:
+        principalId: { type: string, minLength: 1, maxLength: 128 }
+        roleId: { type: string, format: uuid }
+        scopeType: { enum: [TENANT, PROJECT, REGION, NETWORK] }
+        scopeRef: { type: string, minLength: 1, maxLength: 128 }
+        grantEffect: { type: [string, 'null'], enum: [ALLOW, DENY] }
+        validFrom: { type: string, format: date-time }
+        validTo: { type: [string, 'null'], format: date-time }
+        requestReason: { type: string, minLength: 1, maxLength: 500 }
+    DecideRoleGrantRequest:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties:
+        decision: { enum: [APPROVE, REJECT] }
+        note: { type: [string, 'null'], maxLength: 500 }
+    RevokeRoleGrantRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    CreateDelegationRequest:
+      type: object
+      additionalProperties: false
+      required: [delegatePrincipalId, capabilityCodes, scopeType, scopeRef, validFrom, reason]
+      properties:
+        delegatePrincipalId: { type: string, minLength: 1, maxLength: 128 }
+        capabilityCodes:
+          type: array
+          minItems: 1
+          items: { type: string, minLength: 1, maxLength: 120 }
+        scopeType: { enum: [TENANT, PROJECT, REGION, NETWORK] }
+        scopeRef: { type: string, minLength: 1, maxLength: 128 }
+        validFrom: { type: string, format: date-time }
+        validTo: { type: [string, 'null'], format: date-time }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    RevokeDelegationRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    ExplainAuthorizationRequest:
+      type: object
+      additionalProperties: false
+      required: [subjectPrincipalId, capability, resourceType, resourceId]
+      properties:
+        subjectPrincipalId: { type: string, minLength: 1, maxLength: 128 }
+        capability: { type: string, minLength: 1, maxLength: 120 }
+        resourceType: { type: string, minLength: 1, maxLength: 64 }
+        resourceId: { type: string, minLength: 1, maxLength: 128 }
+        projectId: { type: [string, 'null'], maxLength: 128 }
+        organizationId: { type: [string, 'null'], maxLength: 128 }
+        regionCode: { type: [string, 'null'], maxLength: 128 }
+        networkId: { type: [string, 'null'], maxLength: 128 }
+    CreatePartnerOrganizationRequest:
+      type: object
+      additionalProperties: false
+      required: [code, name]
+      properties:
+        code: { type: string, minLength: 1, maxLength: 64 }
+        name: { type: string, minLength: 1, maxLength: 200 }
+    CreateServiceNetworkRequest:
+      type: object
+      additionalProperties: false
+      required: [partnerOrganizationId, networkCode, networkName]
+      properties:
+        partnerOrganizationId: { type: string, format: uuid }
+        networkCode: { type: string, minLength: 1, maxLength: 64 }
+        networkName: { type: string, minLength: 1, maxLength: 200 }
+    InviteNetworkMemberRequest:
+      type: object
+      additionalProperties: false
+      required: [principalId, role, validFrom]
+      properties:
+        principalId: { type: string, format: uuid }
+        role: { enum: [MANAGER, STAFF] }
+        validFrom: { type: string, format: date-time }
+    NetworkReasonRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    CreateTechnicianProfileRequest:
+      type: object
+      additionalProperties: false
+      required: [principalId, displayName]
+      properties:
+        principalId: { type: string, format: uuid }
+        displayName: { type: string, minLength: 1, maxLength: 200 }
+    CreateNetworkTechnicianMembershipRequest:
+      type: object
+      additionalProperties: false
+      required: [networkId, technicianProfileId, validFrom]
+      properties:
+        networkId: { type: string, format: uuid }
+        technicianProfileId: { type: string, format: uuid }
+        validFrom: { type: string, format: date-time }
+    SubmitTechnicianQualificationRequest:
+      type: object
+      additionalProperties: false
+      required: [technicianProfileId, qualificationCode, validFrom]
+      properties:
+        technicianProfileId: { type: string, format: uuid }
+        qualificationCode: { type: string, minLength: 1, maxLength: 64 }
+        validFrom: { type: string, format: date-time }
+        validTo: { type: [string, 'null'], format: date-time }
+    DecideTechnicianQualificationRequest:
+      type: object
+      additionalProperties: false
+      required: [decision, reason]
+      properties:
+        decision: { enum: [APPROVED, REJECTED] }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+
     TaskDirectoryItem:
       type: object
       additionalProperties: false
@@ -3698,6 +6855,29 @@ components:
         networkAssigneeId: { type: string, minLength: 1, maxLength: 128 }
         technicianAssigneeId: { type: string, minLength: 1, maxLength: 128 }
         businessType: { type: string, minLength: 1, maxLength: 100 }
+    NetworkPortalAssignTechnicianRequest:
+      type: object
+      additionalProperties: false
+      required: [technicianAssigneeId, businessType]
+      properties:
+        technicianAssigneeId:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: 师傅 assignee（通常为 technicianProfileId）；不得携带 networkAssigneeId
+        businessType: { type: string, minLength: 1, maxLength: 100 }
+    NetworkPortalReassignTechnicianRequest:
+      type: object
+      additionalProperties: false
+      required: [technicianAssigneeId, businessType, reasonCode]
+      properties:
+        technicianAssigneeId:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: 目标师傅 assignee（通常为 technicianProfileId）；不得携带 networkAssigneeId
+        businessType: { type: string, minLength: 1, maxLength: 100 }
+        reasonCode: { type: string, pattern: '^[A-Z][A-Z0-9_]{1,99}$' }
     ManualServiceAssignmentReceipt:
       type: object
       additionalProperties: false
@@ -4127,6 +7307,28 @@ components:
         expectedSize: { type: integer, format: int64, minimum: 1 }
         expectedSha256: { type: string, pattern: '^[0-9A-Fa-f]{64}$' }
         captureMetadata: { $ref: '#/components/schemas/CaptureMetadata' }
+    NetworkPortalBeginEvidenceUploadRequest:
+      type: object
+      additionalProperties: false
+      required: [originalFileName, declaredMimeType, expectedSize, expectedSha256, captureMetadata,
+                 onBehalfOf, onBehalfReason]
+      properties:
+        evidenceItemId: { type: [string, 'null'], format: uuid }
+        originalFileName: { type: string, minLength: 1, maxLength: 255 }
+        declaredMimeType: { type: string, minLength: 3, maxLength: 255 }
+        expectedSize: { type: integer, format: int64, minimum: 1 }
+        expectedSha256: { type: string, pattern: '^[0-9A-Fa-f]{64}$' }
+        captureMetadata: { $ref: '#/components/schemas/CaptureMetadata' }
+        onBehalfOf:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: 代补对象（任务 ACTIVE TECHNICIAN assignee，通常为 technicianProfileId）
+        onBehalfReason:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: 代补原因；仅服务端写入 CaptureMetadata
     FinalizeEvidenceUploadRequest:
       type: object
       additionalProperties: false

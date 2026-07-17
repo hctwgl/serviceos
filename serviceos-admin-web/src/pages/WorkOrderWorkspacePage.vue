@@ -24,6 +24,7 @@ import {
 import { getTaskAllowedActions, type TaskAllowedActions } from '../api/tasks'
 import { manualAssignServiceAssignments } from '../api/dispatch'
 import TaskCommandPanel from '../components/TaskCommandPanel.vue'
+import { recordRecentVisit } from '../recent/recordRecentVisit'
 import QueueTable from './QueueTable.vue'
 
 const route = useRoute()
@@ -154,6 +155,13 @@ async function loadWorkspace() {
     )
     activeSection.value = firstAvailable ?? 'TASKS'
     await loadSection(activeSection.value)
+    recordRecentVisit({
+      resourceType: 'WORK_ORDER',
+      resourceId: workOrderId.value,
+      pageId: 'ADMIN.WORKORDER.WORKSPACE',
+      displayRef:
+        workOrderDetail.value?.workOrder?.externalOrderCode ?? workOrderId.value.slice(0, 8),
+    })
   } catch (err) {
     error.value = err instanceof Error ? err.message : '加载工作区失败'
     workspace.value = null

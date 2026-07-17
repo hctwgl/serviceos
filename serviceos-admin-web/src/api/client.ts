@@ -5,6 +5,7 @@ export type ApiError = {
   title?: string
   detail?: string
   code?: string
+  errorCode?: string
 }
 
 export type ApiResult<T> = {
@@ -46,14 +47,19 @@ async function parseError(response: Response): Promise<never> {
   })
 }
 
-export async function apiGet<T>(path: string, query: Record<string, string | undefined> = {}): Promise<T> {
-  const result = await apiGetWithMeta<T>(path, query)
+export async function apiGet<T>(
+  path: string,
+  query: Record<string, string | undefined> = {},
+  extraHeaders: Record<string, string> = {},
+): Promise<T> {
+  const result = await apiGetWithMeta<T>(path, query, extraHeaders)
   return result.data
 }
 
 export async function apiGetWithMeta<T>(
   path: string,
   query: Record<string, string | undefined> = {},
+  extraHeaders: Record<string, string> = {},
 ): Promise<ApiResult<T>> {
   const url = new URL(`${apiBase()}${path}`, window.location.origin)
   for (const [key, value] of Object.entries(query)) {
@@ -61,7 +67,7 @@ export async function apiGetWithMeta<T>(
       url.searchParams.set(key, value)
     }
   }
-  const headers = authHeaders()
+  const headers = authHeaders(extraHeaders)
   const response = await fetch(url, { headers })
   if (!response.ok) {
     await parseError(response)
@@ -79,9 +85,39 @@ export async function apiPost<T>(
     body?: unknown
     idempotencyKey?: string
     ifMatch?: string
+    headers?: Record<string, string>
   } = {},
 ): Promise<ApiResult<T>> {
-  const extra: Record<string, string> = {}
+  return apiWrite<T>('POST', path, options)
+}
+
+export async function apiPut<T>(
+  path: string,
+  options: {
+    body?: unknown
+    ifMatch?: string
+  } = {},
+): Promise<ApiResult<T>> {
+  return apiWrite<T>('PUT', path, options)
+}
+
+export async function apiDelete(
+  path: string,
+): Promise<ApiResult<null>> {
+  return apiWrite<null>('DELETE', path, {})
+}
+
+async function apiWrite<T>(
+  method: 'POST' | 'PUT' | 'DELETE',
+  path: string,
+  options: {
+    body?: unknown
+    idempotencyKey?: string
+    ifMatch?: string
+    headers?: Record<string, string>
+  },
+): Promise<ApiResult<T>> {
+  const extra: Record<string, string> = { ...(options.headers ?? {}) }
   if (options.idempotencyKey) {
     extra['Idempotency-Key'] = options.idempotencyKey
   }
@@ -93,14 +129,20 @@ export async function apiPost<T>(
     extra['Content-Type'] = 'application/json'
   }
   const response = await fetch(`${apiBase()}${path}`, {
-    method: 'POST',
+    method,
     headers: authHeaders(extra),
     body: hasBody ? JSON.stringify(options.body) : undefined,
   })
   if (!response.ok) {
     await parseError(response)
   }
-  // 202 Accepted 等也可能带 JSON 体
+  if (response.status === 204) {
+    return {
+      data: null as T,
+      etag: response.headers.get('ETag'),
+      correlationId: response.headers.get('X-Correlation-Id') ?? '',
+    }
+  }
   const text = await response.text()
   return {
     data: (text ? JSON.parse(text) : null) as T,
@@ -115,4 +157,44 @@ export function quotedVersion(version: number): string {
 
 export function newIdempotencyKey(prefix: string): string {
   return `${prefix}-${crypto.randomUUID()}`
+}
+
+export type HttpStatusError = Error & {
+  status?: number
+  problem?: ApiError
+}
+
+/** 探测目录可见性：403/404 表示无能力或不可见，不触发登录跳转以外的副作用。 */
+export async function apiProbe(path: string): Promise<'allow' | 'deny' | 'unauthenticated'> {
+  const url = new URL(`${apiBase()}${path}`, window.location.origin)
+  const response = await fetch(url, { headers: authHeaders() })
+  if (response.status === 401) {
+    return 'unauthenticated'
+  }
+  if (response.ok) {
+    return 'allow'
+  }
+  if (response.status === 403 || response.status === 404) {
+    return 'deny'
+  }
+  return 'deny'
+}
+
+/** 治理深链失败关闭文案：不回显后端 detail，避免泄露姓名/部门/角色。 */
+export function safeAccessDeniedMessage(err: unknown): string {
+  const status = (err as HttpStatusError | undefined)?.status
+  if (status === 403 || status === 404) {
+    return '无权访问或不存在'
+  }
+  if (status === 409) {
+    return '版本冲突，请刷新后重试'
+  }
+  if (status === 401) {
+    return '需要重新登录'
+  }
+  return '请求失败，请稍后重试'
+}
+
+export function isConflictError(err: unknown): boolean {
+  return (err as HttpStatusError | undefined)?.status === 409
 }

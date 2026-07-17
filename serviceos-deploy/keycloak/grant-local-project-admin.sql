@@ -35,6 +35,21 @@ INSERT INTO idn_principal_lifecycle_event (
     'LOCAL_FIXTURE', 'local-fixture', repeat('0', 64), 'local-fixture', now()
 ) ON CONFLICT (lifecycle_event_id) DO NOTHING;
 
+-- M188：ADMIN 上下文要求有效 INTERNAL_EMPLOYEE Persona + RoleGrant。
+INSERT INTO idn_principal_persona (
+    persona_id, tenant_id, principal_id, persona_type, persona_status,
+    valid_from, valid_to, persona_version, created_by, created_at
+) VALUES (
+    '8c0d1e2f-3a4b-4c5d-8e6f-7a8b9c0d1e2f',
+    'tenant-local', '06b612f3-a901-4b0e-bd90-86b4259cc087',
+    'INTERNAL_EMPLOYEE', 'ACTIVE', now() - interval '1 day', NULL, 1,
+    'local-fixture', now()
+) ON CONFLICT (tenant_id, principal_id, persona_type) DO NOTHING;
+
+INSERT INTO auth_tenant_grant_generation (tenant_id, generation, updated_at)
+VALUES ('tenant-local', 1, now())
+ON CONFLICT (tenant_id) DO NOTHING;
+
 INSERT INTO auth_role (
     role_id, tenant_id, role_code, role_name, role_status, created_at
 ) VALUES (
@@ -84,7 +99,30 @@ VALUES
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'identity.readSensitive', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'identity.manageLinks', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'identity.manageLifecycle', now()),
-    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'identity.manageProfile', now())
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'identity.manageProfile', now()),
+    -- M187 Admin 统一用户中心：组织 / 网点 / 授权治理能力
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'organization.read', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'organization.manageStructure', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'organization.manageMembership', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'organization.sync', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'organization.overrideExternal', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'network.read', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'network.managePartner', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'network.manageNetwork', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'network.manageMembership', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'network.manageTechnician', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'network.reviewQualification', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'authorization.read', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'authorization.manageRoles', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'authorization.requestGrant', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'authorization.approveGrant', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'authorization.revokeGrant', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'authorization.delegate', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'authorization.explain', now()),
+    -- M191 Admin 共享 SavedView
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'preference.shareSavedView', now()),
+    -- M192 Admin 受控全局搜索
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'search.read', now())
 ON CONFLICT (role_id, capability_code) DO NOTHING;
 
 INSERT INTO auth_role_grant (
@@ -96,6 +134,9 @@ INSERT INTO auth_role_grant (
     'bf64aa35-11cb-40bc-b301-10b5853049b3',
     'TENANT', 'tenant-local', now(), 'LOCAL_FIXTURE', 'local-only', now()
 ) ON CONFLICT (grant_id) DO NOTHING;
+
+-- M187 低权限 viewer：Keycloak create 不保证自定义 UUID，由
+-- verify-admin-smoke.sh#ensure_m187_viewer 按实际 subject 幂等回填。
 
 -- BYD 适配器 SERVICE 主体：外发 HTTP 成功后同租户落 CLIENT Case / Route。
 INSERT INTO auth_role (

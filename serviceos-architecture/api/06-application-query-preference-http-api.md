@@ -6,7 +6,7 @@ status: Accepted
 
 # 应用工作区、队列与用户偏好 HTTP API
 
-## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158）
+## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158 / M189 / M190 / M191 / M192 / M193 / M194 / M195 / M202）
 
 **Accepted（可指导实现）**：
 
@@ -26,9 +26,85 @@ status: Accepted
 - §6 `GET /api/v1/operational-exceptions` 运营异常项目范围硬化（M100）；不接受通用 work-queues。
 - §6 `GET /api/v1/inbound-envelopes` 授权入站 Envelope 队列（M158）；仅含已绑定
   `projectId` 的安全摘要；不接受 null-project 可见性、原文下载或通用 work-queues。
+- §8 个人 SavedView CRUD（M189）：`GET/POST /me/saved-views`、
+  `PUT/DELETE /me/saved-views/{id}`；Portal=`ADMIN`；pageId 限于已有 Accepted 筛选目录的
+  Admin 页面（至少 `ADMIN.TASK.QUEUE`、`ADMIN.WORKORDER.LIST`、`ADMIN.CORRECTION.QUEUE`）。
+- §8 共享 SavedView（M191）：`POST /api/v1/saved-views/{id}:share` 仅针对 Portal=`ADMIN`、
+  由调用方拥有的个人视图。可见性接受 `ROLE`（`sharedScopeRef=roleId`）与租户级 `TENANT`
+  （`sharedScopeRef` 为空）；本切片不接受组织树 `ORGANIZATION` 共享。共享只共享**查询定义**，
+  **不**授予 capability 或数据访问权；应用共享视图时业务列表/队列仍重新鉴权。
+  `GET /me/saved-views?pageId=` 须返回本人 `PRIVATE` 视图，以及当前主体可见的共享视图
+  （同租户 `TENANT`，或 `ROLE` 且主体持有对应有效 RoleGrant）。取消共享：同一 share 端点
+  body `visibility=PRIVATE`（owner 始终可收回；分享出 PRIVATE 需要
+  `preference.shareSavedView` HIGH capability）。不接受独立 `:unshare` 路径本切片外的语义扩展。
+  **不**接受 Network/Technician SavedView。
+- §9 Admin UI Preference（M190）：仅
+  `GET /me/ui-preferences?portal=ADMIN`、
+  `PUT /me/ui-preferences`（body：`portal` + `preferences` 映射）、
+  `DELETE /me/ui-preferences/{key}` 恢复默认；Portal 必须为 `ADMIN`，其他 Portal 失败关闭。
+  允许键白名单见 §9；禁止关闭安全确认、隐藏必填、绕过脱敏或禁用事务通知。
+  **不**接受共享偏好、Network/Technician Portal 偏好。
+- §7 Admin 受控全局搜索（M192）：`GET /api/v1/search?q=&types=`；Portal 上下文仅
+  `ADMIN`。本切片接受 type 子集：`WORK_ORDER`、`EXTERNAL_ORDER`、`NETWORK`、
+  `TECHNICIAN`。**不**接受 `VEHICLE` / `CHARGER`（客户端请求未支持 type 时返回
+  `SEARCH_TERM_NOT_ALLOWED` / HTTP 422）。手机号形态查询仅允许末四位精确；响应与日志
+  **不**回显完整敏感 `q`（仅 `qDigest` / 掩码）。结果项：`resourceRef`、`type`、
+  `primaryLabel`、`maskedSecondaryLabel`、`matchReason`、`deepLink`。服务端经既有授权
+  查询端口应用当前 ScopePredicate；搜索**不**授予 capability。需要 `search.read`（HIGH）
+  加 underlying type 读能力：缺 type 能力时省略该 type（降级），缺 `search.read` 则整请求
+  403。实现为授权查询 fan-in / 受控精确·前缀回退，**不**要求 `search_document` 索引平台。
+- §3 Admin 最近访问（M193）：仅
+  `GET /api/v1/me/recent-resources` 与
+  `PUT /api/v1/me/recent-resources`（upsert / touch，body：`resourceType`、`resourceId`、
+  可选 `pageId`/`displayRef`；portal 固定 `ADMIN`）。
+  本切片 resourceType：`WORK_ORDER`、`TASK`、`PROJECT`、`NETWORK`、`TECHNICIAN`。
+  任意已认证主体仅可读写自己的最近访问列表，**不**要求新 capability；读取时对每项经既有
+  授权查询端口重新鉴权，失权项**省略**（不整列表 403），并可在读路径删除陈旧行。
+  列表上限（如 20）；同 `(principal, portal, resourceType, resourceId)` upsert
+  `lastVisitedAt`。`displayRef` 仅为非敏感短标签，不得保存完整地址/电话/价格。
+  **不**接受 `GET /me/notifications`、`GET /me/application-context`（后者与 M188 `/me`
+  重叠；通知属独立 Epic）。**不**接受 Network/Technician Portal 最近访问。
+- §10 Network Portal 只读查询子集（M194）：仅
+  `GET /api/v1/network-portal/work-orders`、
+  `GET /api/v1/network-portal/tasks`、
+  `GET /api/v1/network-portal/technicians`、
+  `GET /api/v1/network-portal/workbench`（计数/摘要）、
+  `GET /api/v1/network-portal/capacity`（`dsp_capacity_counter` 按 networkId 聚合只读）。
+  networkId **必须**从可信头 `X-Network-Context` 解析：接受 M188 `contextId` 形态
+  `NETWORK|NETWORK|{uuid}`，或在校验当前主体对该网点持有 ACTIVE NetworkMembership 后接受
+  纯 network UUID。**禁止**查询参数任意指定 networkId。上下文缺失、伪造或非成员返回
+  `PORTAL_CONTEXT_INVALID`（403）。数据范围：该网点 ACTIVE NETWORK ServiceAssignment 对应的
+  工单/任务；师傅列表为该网点 ACTIVE NetworkTechnicianMembership。能力：有效 NETWORK
+  门户成员资格 + 既有 `networkTask.read` / `technician.readOwnNetwork`（NETWORK scope），
+  跨网点失败关闭。**不**接受 Technician Feed §11、Admin work-queues §4、完整 product/03 页面集、
+  Network Portal 写命令。
+- §10 Network Portal 整改队列只读（M202 窄扩展）：仅
+  `GET /api/v1/network-portal/correction-cases`（`status` 默认 `OPEN`、可选 `taskId`、
+  `limit` 1～100 默认 50；`NetworkPortalPage` 形态安全摘要）与
+  `GET /api/v1/network-portal/correction-cases/{correctionCaseId}`（CorrectionCase 详情形）。
+  门禁：ACTIVE NetworkMembership + NETWORK scope `evidence.read`；数据仅限上下文网点
+  ACTIVE NETWORK 责任任务上的整改。**不**接受 Admin 项目范围 cursor 队列语义、资质/产能写、
+  异常队列。
+- §11 Technician Portal Feed 子集（M195）：仅
+  `GET /api/v1/technician/me/task-feed`（可选 `sinceCursor` 不透明游标；ACTIVE TECHNICIAN
+  ServiceAssignment / TaskAssignment；撤权/结束时 tombstone 仅含 `taskId` +
+  `invalidationReason`，不暴露敏感正文）、
+  `GET /api/v1/technician/me/schedule`（对上述 ACTIVE 任务 fan-in 预约，非敏感字段）、
+  `GET /api/v1/technician/me/sync-summary`（pending feed / 预约窗口 / tombstone 轻量计数；
+  **不**含离线命令 runtime）。networkId **必须**从可信头 `X-Technician-Context` 解析：接受
+  M188 `contextId` 形态 `TECHNICIAN|NETWORK|{uuid}`，或在校验当前主体对该网点持有 ACTIVE
+  NetworkTechnicianMembership（及有效 TechnicianProfile）后接受纯 network UUID。**禁止**查询
+  参数任意指定 networkId。上下文缺失、伪造或非师傅成员返回 `PORTAL_CONTEXT_INVALID`（403）。
+  Feed 仅含 TECHNICIAN assignee = 当前 principal（或 TechnicianProfile 关联 principal）的责任。
+  能力：有效师傅成员资格 + 既有 `task.readAssigned`（NETWORK scope）。**不**接受
+  `GET /mobile-work-packages/{id}/status`（离线工作包 runtime 未 Accepted）、完整 Technician App、
+  Network Portal 写命令。
 
-**仍为设计草案**：§3 导航、§4 工作台与队列、§5 其余 section、
-§6 其余专项队列与 §7～§11 搜索/偏好/导出等。不得在未再接受前实现。
+**仍为设计草案**：§3 中 `application-context`/`notifications`、§4 工作台与队列、§5 其余 section、
+§6 其余专项队列、§7 中 `VEHICLE`/`CHARGER` 与全文索引搜索、§8 ORGANIZATION 组织树共享与
+Network/Technician SavedView、§9 非 Admin Portal UI Preference、§10 未列入本切片的其余
+Network 查询、§11 离线工作包 status 与导出分析等。
+不得在未再接受前实现。
 
 ## 1. 目标
 
@@ -159,19 +235,42 @@ sourceVersions
 |---|---|
 | `GET /api/v1/search?q=&types=` | 当前 tenant/scope 内受控搜索 |
 
-支持 type：WORK_ORDER、EXTERNAL_ORDER、VEHICLE、CHARGER、NETWORK、TECHNICIAN。手机号仅允许末四位/授权精确搜索；响应不回显完整敏感 query。
+### 7.1 Admin 受控搜索（M192 Accepted）
 
-搜索结果：resourceRef、type、primaryLabel、maskedSecondaryLabel、matchReason、deepLink。服务端先应用 ScopePredicate，再返回结果。
+- Portal：`ADMIN`；其他 Portal 不得调用本切片。
+- 接受 type：`WORK_ORDER`、`EXTERNAL_ORDER`、`NETWORK`、`TECHNICIAN`。
+  未支持 type（含 `VEHICLE`/`CHARGER`）→ `SEARCH_TERM_NOT_ALLOWED`（422）。
+- `q`：最短 2（UUID / 精确外部单号除外）；每 type 结果上限小（如 10），总上限；超时失败关闭。
+- 手机号：若 `q` 呈完整手机号形态，仅允许末四位精确；禁止在响应/日志中回显完整敏感 `q`。
+- 匹配语义（无全文索引）：工单 UUID 或授权范围内 `externalOrderCode` 精确；
+  `EXTERNAL_ORDER` 同码匹配但结果 type 区分；网点 code/name 前缀；师傅 displayName 前缀或
+  关联主体 `employeeNumber` 精确（经 identity/network 授权端口）。
+- 结果：`resourceRef`、`type`、`primaryLabel`、`maskedSecondaryLabel`、`matchReason`、`deepLink`。
+- 能力：`search.read`（HIGH）+ 各 type 对应读能力；缺 type 能力省略该 type，不整请求 403。
+- **不**接受独立搜索索引平台、`VEHICLE`/`CHARGER`、Network/Technician Portal 搜索 UI。
+
+完整设计草案仍可包含 VEHICLE/CHARGER；本切片外类型在未再接受前不得实现。
 
 ## 8. Saved View
 
 | 方法与路径 | 用途 |
 |---|---|
-| `GET /api/v1/me/saved-views?pageId=` | 个人/共享视图 |
-| `POST /api/v1/me/saved-views` | 创建个人视图 |
-| `PUT /api/v1/me/saved-views/{id}` | 更新名称/列/排序/受控筛选 |
-| `DELETE /api/v1/me/saved-views/{id}` | 删除个人视图 |
-| `POST /api/v1/saved-views/{id}:share` | 共享给角色/组织（受控能力） |
+| `GET /api/v1/me/saved-views?pageId=` | 个人 + 当前主体可见的共享视图 |
+| `POST /api/v1/me/saved-views` | 创建个人视图（初始 `visibility=PRIVATE`） |
+| `PUT /api/v1/me/saved-views/{id}` | 更新名称/列/排序/受控筛选（仅 owner） |
+| `DELETE /api/v1/me/saved-views/{id}` | 删除个人视图（仅 owner） |
+| `POST /api/v1/saved-views/{id}:share` | 设置可见性：`ROLE` / `TENANT` / `PRIVATE`（受控能力） |
+
+### 8.1 共享 SavedView（M191 Accepted）
+
+- 仅 owner 可 share；跨主体按 `RESOURCE_NOT_FOUND`。
+- body：`visibility`（`PRIVATE` \| `ROLE` \| `TENANT`）与可选 `sharedScopeRef`；
+  `ROLE` 时 `sharedScopeRef` 必须为同租户有效 `roleId`；`TENANT`/`PRIVATE` 时必须为空。
+- 分享到 `ROLE`/`TENANT` 需要 `preference.shareSavedView`（HIGH）；owner 将可见性收回
+  `PRIVATE` **不**要求该 capability。
+- 共享只复制查询定义可见性；不授予页面、字段或数据能力；列表含共享项不意味可执行业务查询。
+- 并发：`If-Match` 绑定 `aggregateVersion`；冲突 `VERSION_CONFLICT`。
+- 本切片不接受 `ORGANIZATION`、独立 `:unshare` 路径、Network/Technician Portal。
 
 View 保存 filter AST、列、排序和密度，不保存任意 SQL、访问 token 或完整敏感搜索值。每次执行重新鉴权并与当前字段目录/Schema 迁移。
 
@@ -185,28 +284,52 @@ View 保存 filter AST、列、排序和密度，不保存任意 SQL、访问 to
 
 偏好不能关闭事务通知、安全告警、必填字段、数据脱敏或高风险确认。
 
+### 9.1 Admin UI Preference（M190 Accepted）
+
+本切片仅接受 Portal=`ADMIN`。`portal` 查询/请求体必须为 `ADMIN`；`NETWORK`/`TECHNICIAN` 或其他值
+返回 `VALIDATION_FAILED`（失败关闭）。任意已认证主体仅可读写**自己的**偏好（tenant + principal
+作用域）；跨主体按不存在/不可达处理，不新增 Capability。
+
+**允许键（白名单；未知键 `UI_PREFERENCE_KEY_NOT_ALLOWED` 或 `VALIDATION_FAILED`）**：
+
+| key | value 形态 | 说明 |
+|---|---|---|
+| `theme` | `LIGHT` \| `DARK` \| `SYSTEM` | 外观主题 |
+| `density` | `COMFORTABLE` \| `COMPACT` | 列表/表单密度 |
+| `locale` | BCP-47 字符串（如 `zh-CN`） | 界面语言；本切片采用 `locale`，不另设 `language` |
+| `reduceMotion` | boolean | 减少动画 |
+| `defaultSavedViews` | `{ "<pageId>": "<uuid>" \| null, ... }` | 每页默认 SavedView；pageId 限于已 Accepted 个人 SavedView 页面 |
+| `columnWidths` | `{ "schemaVersion": n, "pages": { "<pageId>": { "<columnId>": widthPx } } }` | 可选列宽；schemaVersioned；pageId 同上 |
+
+**明确禁止（失败关闭）**：任何试图关闭安全确认、隐藏必填字段、绕过脱敏、禁用事务/安全通知的键或值。
+白名单外键一律拒绝。
+
+并发：按 preference_key 乐观版本（`aggregateVersion` / 可选 `expectedVersion`）；冲突 `VERSION_CONFLICT`。
+
 ## 10. Network 查询
 
-| 方法与路径 | 用途 |
-|---|---|
-| `GET /api/v1/network-portal/workbench` | 当前 NetworkMembership 工作台 |
-| `GET /api/v1/network-portal/work-orders` | 当前 ACTIVE assignment 工单 |
-| `GET /api/v1/network-portal/tasks` | 本网点 Task |
-| `GET /api/v1/network-portal/technicians` | 本网点师傅/能力/资质摘要 |
-| `GET /api/v1/network-portal/capacity` | 本网点容量和派单状态 |
+| 方法与路径 | 用途 | 接受状态 |
+|---|---|---|
+| `GET /api/v1/network-portal/workbench` | 当前 NetworkMembership 工作台（计数/摘要） | M194 Accepted |
+| `GET /api/v1/network-portal/work-orders` | 当前 ACTIVE assignment 工单 | M194 Accepted |
+| `GET /api/v1/network-portal/tasks` | 本网点 Task | M194 Accepted |
+| `GET /api/v1/network-portal/technicians` | 本网点师傅/能力/资质摘要 | M194 Accepted |
+| `GET /api/v1/network-portal/capacity` | 本网点容量和派单状态 | M194 Accepted |
+| `GET /api/v1/network-portal/correction-cases` | 本网点整改队列安全摘要 | M202 Accepted |
+| `GET /api/v1/network-portal/correction-cases/{correctionCaseId}` | 本网点整改详情 | M202 Accepted |
 
-networkId 从可信应用上下文解析；拥有多个 membership 时使用经授权的 `X-Network-Context`，不能在查询参数任意指定。
+networkId 从可信应用上下文解析；拥有多个 membership 时使用经授权的 `X-Network-Context`，不能在查询参数任意指定。详见 §0 M194 / M202。
 
 ## 11. Technician Feed 与工作包状态
 
-| 方法与路径 | 用途 |
-|---|---|
-| `GET /api/v1/technician/me/task-feed` | 当前 TaskAssignment Feed 与增量 cursor |
-| `GET /api/v1/technician/me/schedule` | Appointment 日程 |
-| `GET /api/v1/technician/me/sync-summary` | 待同步/冲突/失败摘要 |
-| `GET /api/v1/mobile-work-packages/{id}/status` | 工作包有效性和服务器版本 |
+| 方法与路径 | 用途 | 接受状态 |
+|---|---|---|
+| `GET /api/v1/technician/me/task-feed` | 当前 TaskAssignment / ServiceAssignment Feed 与增量 cursor | M195 Accepted |
+| `GET /api/v1/technician/me/schedule` | Appointment 日程 | M195 Accepted |
+| `GET /api/v1/technician/me/sync-summary` | 待处理 feed / 预约窗口 / tombstone 轻量计数 | M195 Accepted |
+| `GET /api/v1/mobile-work-packages/{id}/status` | 工作包有效性和服务器版本 | 仍为设计草案（离线 runtime 未 Accepted） |
 
-Feed 支持 `sinceCursor` 增量；删除/撤权使用 tombstone，仅含 taskId 和 invalidationReason，不继续暴露敏感正文。
+Feed 支持 `sinceCursor` 增量；删除/撤权使用 tombstone，仅含 taskId 和 invalidationReason，不继续暴露敏感正文。上下文与能力见 §0 M195。
 
 ## 12. 批量 Operation 查询
 
@@ -254,6 +377,7 @@ MVP 不从 SHADOW CalculationRun 推断正式收入/成本/毛利；试算汇总
 | `PORTAL_CONTEXT_INVALID` | 403 | 当前主体不能使用请求 Portal/网点上下文 |
 | `SAVED_VIEW_SCHEMA_OUTDATED` | 409 | 视图字段已变化，需迁移/重置 |
 | `QUERY_FILTER_NOT_ALLOWED` | 422 | 字段或操作符不允许 |
+| `UI_PREFERENCE_KEY_NOT_ALLOWED` | 422 | UI 偏好键不在白名单或被禁止 |
 | `PROJECTION_REBUILDING` | 200/503 | 可返回降级数据或暂不可用 |
 | `SEARCH_TERM_NOT_ALLOWED` | 422 | 敏感/过宽搜索不允许 |
 | `WORK_PACKAGE_INVALIDATED` | 409 | assignment/authority/config 已变化 |

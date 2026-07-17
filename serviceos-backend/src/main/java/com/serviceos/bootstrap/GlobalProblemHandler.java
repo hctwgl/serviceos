@@ -23,7 +23,9 @@ final class GlobalProblemHandler {
     ProblemDetail handleBusinessProblem(BusinessProblem exception, HttpServletRequest request) {
         HttpStatus status = switch (exception.code()) {
             case UNAUTHENTICATED -> HttpStatus.UNAUTHORIZED;
-            case ACCESS_DENIED -> HttpStatus.FORBIDDEN;
+            case ACCESS_DENIED, ROLE_GRANT_ESCALATION_FORBIDDEN, PORTAL_CONTEXT_INVALID
+                    -> HttpStatus.FORBIDDEN;
+            case ROLE_GRANT_DUTY_CONFLICT, DELEGATION_SCOPE_TOO_BROAD -> HttpStatus.UNPROCESSABLE_CONTENT;
             case IDEMPOTENCY_KEY_REUSED, IDEMPOTENCY_IN_PROGRESS,
                  FILE_UPLOAD_CONFLICT, FILE_FINALIZE_IN_PROGRESS,
                  TASK_STATE_CONFLICT, TASK_ASSIGNMENT_CONFLICT,
@@ -37,11 +39,18 @@ final class GlobalProblemHandler {
                  TASK_INPUT_REFS_INVALID, REVIEW_CASE_CONFLICT, REVIEW_CASE_ALREADY_DECIDED,
                  CORRECTION_CASE_CONFLICT, CORRECTION_CASE_STATE_CONFLICT,
                  EVIDENCE_SNAPSHOT_PURPOSE_UNSUPPORTED,
-                 VERSION_CONFLICT, IDENTITY_LINK_CONFLICT, IDENTITY_PROFILE_CONFLICT -> HttpStatus.CONFLICT;
+                 VERSION_CONFLICT, IDENTITY_LINK_CONFLICT, IDENTITY_PROFILE_CONFLICT,
+                 ORGANIZATION_AUTHORITY_CONFLICT, ORGANIZATION_UNIT_CYCLE,
+                 ORGANIZATION_MEMBERSHIP_CONFLICT, ORGANIZATION_SYNC_CONFLICT,
+                 NETWORK_AUTHORITY_CONFLICT, NETWORK_MEMBERSHIP_CONFLICT,
+                 NETWORK_TECHNICIAN_CONFLICT, NETWORK_QUALIFICATION_CONFLICT,
+                 SAVED_VIEW_SCHEMA_OUTDATED -> HttpStatus.CONFLICT;
             case FILE_UPLOAD_EXPIRED -> HttpStatus.GONE;
             case FILE_NOT_AVAILABLE -> HttpStatus.LOCKED;
             case RESOURCE_NOT_FOUND -> HttpStatus.NOT_FOUND;
             case VALIDATION_FAILED -> HttpStatus.BAD_REQUEST;
+            case QUERY_FILTER_NOT_ALLOWED, UI_PREFERENCE_KEY_NOT_ALLOWED, SEARCH_TERM_NOT_ALLOWED
+                    -> HttpStatus.UNPROCESSABLE_CONTENT;
             default -> HttpStatus.UNPROCESSABLE_CONTENT;
         };
         return problem(status, exception.code(), exception.getMessage(), request);

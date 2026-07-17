@@ -4,8 +4,11 @@ import com.serviceos.identity.application.IdentityDirectoryQueryRepository;
 import com.serviceos.identity.domain.SecurityPrincipal;
 import org.springframework.stereotype.Repository;
 
+import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -43,7 +46,20 @@ final class MyBatisIdentityDirectoryQueryRepository implements IdentityDirectory
     }
 
     private static Instant instant(Object value) {
-        return value instanceof OffsetDateTime dateTime ? dateTime.toInstant() : (Instant) value;
+        // MyBatis Map 结果在不同驱动/类型处理器下可能返回 Instant、OffsetDateTime 或 Timestamp。
+        if (value instanceof Instant instantValue) {
+            return instantValue;
+        }
+        if (value instanceof OffsetDateTime dateTime) {
+            return dateTime.toInstant();
+        }
+        if (value instanceof Timestamp timestamp) {
+            return timestamp.toInstant();
+        }
+        if (value instanceof LocalDateTime localDateTime) {
+            return localDateTime.toInstant(ZoneOffset.UTC);
+        }
+        throw new IllegalArgumentException("unsupported instant column type: " + value.getClass().getName());
     }
 
     private static Instant instantOrNull(Object value) {

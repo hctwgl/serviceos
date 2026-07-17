@@ -3,6 +3,13 @@
  */
 @org.springframework.modulith.ApplicationModule(
         displayName = "Authorization",
-        allowedDependencies = {"shared", "identity::api", "audit::api"}
+        allowedDependencies = {
+                "shared",
+                "identity::api",
+                "audit::api",
+                "organization :: api",
+                "network :: api",
+                "reliability :: api"
+        }
 )
 package com.serviceos.authorization;

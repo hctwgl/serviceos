@@ -86,6 +86,95 @@ cd "${repo_root}"
 docker compose -f "${compose_file}" up -d postgres keycloak
 wait_http "http://127.0.0.1:8081/realms/serviceos/.well-known/openid-configuration" "Keycloak"
 
+# M187：确保低权限 viewer 存在；Keycloak create 不保证自定义 UUID，故以实际 subject 回填 IdentityLink。
+ensure_m187_viewer() {
+  docker compose -f "${compose_file}" exec -T keycloak \
+    /opt/keycloak/bin/kcadm.sh config credentials \
+    --server http://localhost:8080 --realm master \
+    --user admin --password local-admin-change-me >/dev/null
+  local viewer_json
+  viewer_json="$(docker compose -f "${compose_file}" exec -T keycloak \
+    /opt/keycloak/bin/kcadm.sh get users -r serviceos -q username=viewer 2>/dev/null || true)"
+  if ! grep -q '"username" *: *"viewer"' <<<"${viewer_json}"; then
+    docker compose -f "${compose_file}" exec -T keycloak \
+      /opt/keycloak/bin/kcadm.sh create users -r serviceos \
+      -s username=viewer \
+      -s email=viewer@serviceos.local \
+      -s enabled=true \
+      -s emailVerified=true \
+      -s firstName=Limited \
+      -s lastName=Viewer \
+      -s 'attributes.tenant_id=["tenant-local"]' \
+      -s 'credentials=[{"type":"password","value":"local-viewer-change-me","temporary":false}]' >/dev/null
+    docker compose -f "${compose_file}" exec -T keycloak \
+      /opt/keycloak/bin/kcadm.sh add-roles -r serviceos --uusername viewer --rolename workOrder.read >/dev/null || true
+    viewer_json="$(docker compose -f "${compose_file}" exec -T keycloak \
+      /opt/keycloak/bin/kcadm.sh get users -r serviceos -q username=viewer)"
+  fi
+  local viewer_id
+  viewer_id="$(VIEWER_JSON="${viewer_json}" python3 - <<'PY'
+import json, os
+users = json.loads(os.environ["VIEWER_JSON"])
+print(users[0]["id"])
+PY
+)"
+  [[ -n "${viewer_id}" ]] || {
+    echo "无法解析 Keycloak viewer id" >&2
+    exit 1
+  }
+  echo "M187 viewer subject=${viewer_id}"
+  docker compose -f "${compose_file}" exec -T postgres \
+    psql -U serviceos_app -d serviceos -v ON_ERROR_STOP=1 <<SQL
+INSERT INTO idn_security_principal (
+    principal_id, tenant_id, principal_type, principal_status,
+    aggregate_version, created_at, updated_at
+) VALUES (
+    '${viewer_id}', 'tenant-local', 'USER', 'ACTIVE', 1, now(), now()
+) ON CONFLICT (principal_id) DO NOTHING;
+
+INSERT INTO idn_person_profile (
+    principal_id, tenant_id, display_name, employee_number,
+    profile_version, created_at, updated_at, updated_by
+) VALUES (
+    '${viewer_id}', 'tenant-local', 'Limited Viewer',
+    'LOCAL-VIEWER', 1, now(), now(), 'local-fixture'
+) ON CONFLICT (principal_id) DO NOTHING;
+
+INSERT INTO idn_identity_link (
+    identity_link_id, tenant_id, principal_id, issuer, subject_value,
+    client_id, linked_by, linked_at
+) VALUES (
+    '${viewer_id}', 'tenant-local',
+    '${viewer_id}',
+    'http://localhost:8081/realms/serviceos', '${viewer_id}',
+    'serviceos-local-cli', 'local-fixture', now()
+) ON CONFLICT (tenant_id, issuer, subject_value) DO NOTHING;
+
+INSERT INTO auth_role (
+    role_id, tenant_id, role_code, role_name, role_status, created_at
+) VALUES (
+    'bbcc4444-5555-4666-8777-888899990000',
+    'tenant-local', 'local-limited-viewer', '本地只读观察者', 'ACTIVE', now()
+) ON CONFLICT (tenant_id, role_code) DO NOTHING;
+
+INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
+VALUES
+    ('bbcc4444-5555-4666-8777-888899990000', 'workOrder.read', now())
+ON CONFLICT (role_id, capability_code) DO NOTHING;
+
+INSERT INTO auth_role_grant (
+    grant_id, tenant_id, principal_id, role_id, scope_type, scope_ref,
+    valid_from, source_code, approval_ref, created_at
+) VALUES (
+    'ccdd5555-6666-4777-8888-999900001111',
+    'tenant-local', '${viewer_id}',
+    'bbcc4444-5555-4666-8777-888899990000',
+    'TENANT', 'tenant-local', now(), 'LOCAL_FIXTURE', 'local-only', now()
+) ON CONFLICT (grant_id) DO UPDATE
+SET principal_id = EXCLUDED.principal_id;
+SQL
+}
+
 # 本地协议 stub：只证明 errno=0 严格 ACK 路径，不宣称真实 sandbox。
 python3 - <<'PY' >"${byd_stub_log}" 2>&1 &
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -134,6 +223,8 @@ wait_http "http://127.0.0.1:8080/readyz" "ServiceOS Backend"
 docker compose -f "${compose_file}" exec -T postgres \
   psql -U serviceos_app -d serviceos \
   < serviceos-deploy/keycloak/grant-local-project-admin.sql
+# M187 viewer 必须在 Flyway/seed 之后按 Keycloak 实际 subject 回填 IdentityLink。
+ensure_m187_viewer
 docker compose -f "${compose_file}" exec -T postgres \
   psql -U serviceos_app -d serviceos \
   < serviceos-deploy/admin-pilot/seed-admin-pilot.sql

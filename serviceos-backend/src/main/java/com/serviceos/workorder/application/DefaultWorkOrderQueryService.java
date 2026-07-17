@@ -48,6 +48,7 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
         validateLimit(query.limit());
         String clientCode = normalizeCode(query.clientCode(), "clientCode");
         String status = normalizeStatus(query.status());
+        String externalOrderCode = normalizeCode(query.externalOrderCode(), "externalOrderCode");
         AuthorizedProjectScope scope = projectScopes.require(principal, READ, "WorkOrder", correlationId);
         if (query.projectId() != null && !scope.tenantWide() && !scope.projectIds().contains(query.projectId())) {
             authorization.require(principal, AuthorizationRequest.projectCapability(READ, principal.tenantId(),
@@ -55,12 +56,14 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
             throw new IllegalStateException("工单项目范围拒绝未能失败关闭");
         }
         String filterDigest = Sha256.digest("clientCode=" + nullable(clientCode) + "|projectId="
-                + nullable(query.projectId()) + "|status=" + nullable(status));
+                + nullable(query.projectId()) + "|status=" + nullable(status)
+                + "|externalOrderCode=" + nullable(externalOrderCode));
         Cursor cursor = decodeCursor(query.cursor(), scope.scopeDigest(), filterDigest);
         List<UUID> projectIds = scope.projectIds().stream()
                 .sorted(Comparator.comparing(UUID::toString)).toList();
         List<WorkOrderView> fetched = queries.findPage(principal.tenantId(), scope.tenantWide(), projectIds,
-                clientCode, query.projectId(), status, cursor == null ? null : cursor.receivedAt(),
+                clientCode, query.projectId(), status, externalOrderCode,
+                cursor == null ? null : cursor.receivedAt(),
                 cursor == null ? null : cursor.id(), query.limit() + 1);
         boolean more = fetched.size() > query.limit();
         List<WorkOrderView> selected = more ? fetched.subList(0, query.limit()) : fetched;

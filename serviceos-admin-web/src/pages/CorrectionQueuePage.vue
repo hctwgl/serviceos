@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { RouterLink, useRoute, type RouteLocationRaw } from 'vue-router'
+import SavedViewBar from '../components/SavedViewBar.vue'
 import QueueTable from './QueueTable.vue'
 import {
   listCorrectionCases,
@@ -85,6 +86,23 @@ function search() {
   return load()
 }
 
+function currentFilters() {
+  return {
+    status: status.value || undefined,
+    projectId: projectId.value.trim() || undefined,
+    taskId: taskId.value.trim() || undefined,
+    sourceReviewCaseId: sourceReviewCaseId.value.trim() || undefined,
+  }
+}
+
+function applySavedView(filters: Record<string, string>) {
+  status.value = filters.status ?? 'IN_PROGRESS'
+  projectId.value = filters.projectId ?? ''
+  taskId.value = filters.taskId ?? ''
+  sourceReviewCaseId.value = filters.sourceReviewCaseId ?? ''
+  return search()
+}
+
 onMounted(() => {
   hydrateFiltersFromRoute()
   return load()
@@ -93,6 +111,12 @@ onMounted(() => {
 
 <template>
   <section>
+    <SavedViewBar
+      page-id="ADMIN.CORRECTION.QUEUE"
+      :schema-version="1"
+      :current-filters="currentFilters()"
+      @apply="applySavedView"
+    />
     <form class="filters" @submit.prevent="search">
       <label>
         status

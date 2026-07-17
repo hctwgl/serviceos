@@ -18,9 +18,9 @@ final class MyBatisWorkOrderQueryRepository implements WorkOrderQueryRepository 
     MyBatisWorkOrderQueryRepository(WorkOrderQueryMapper mapper) { this.mapper = mapper; }
     @Override public List<WorkOrderView> findPage(String tenantId, boolean tenantWide,
             List<UUID> projectIds, String clientCode, UUID projectId, String status,
-            Instant cursorReceivedAt, UUID cursorId, int fetchSize) {
+            String externalOrderCode, Instant cursorReceivedAt, UUID cursorId, int fetchSize) {
         return mapper.findPage(tenantId, tenantWide, projectIds.stream().map(UUID::toString).toList(),
-                clientCode, projectId, status, cursorReceivedAt, cursorId, fetchSize)
+                clientCode, projectId, status, externalOrderCode, cursorReceivedAt, cursorId, fetchSize)
                 .stream().map(MyBatisWorkOrderQueryRepository::view).toList();
     }
     @Override public Optional<WorkOrderView> findById(String tenantId, UUID workOrderId) {
