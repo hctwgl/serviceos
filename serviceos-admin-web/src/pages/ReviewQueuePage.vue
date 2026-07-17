@@ -153,6 +153,30 @@ onMounted(() => {
       >
         打开任务 {{ item.taskId }}
       </RouterLink>
+      <RouterLink
+        v-for="item in page.items"
+        :key="`snapshot-${item.reviewCaseId}`"
+        :to="{
+          name: 'ADMIN.EVIDENCE_SET_SNAPSHOT.DETAIL',
+          params: { id: item.evidenceSetSnapshotId },
+        }"
+      >
+        打开资料快照 {{ item.evidenceSetSnapshotId }}
+      </RouterLink>
+      <RouterLink
+        v-for="item in page.items.filter((i) => i.sourceReviewCaseId)"
+        :key="`src-review-${item.reviewCaseId}`"
+        :to="{ name: 'ADMIN.REVIEW.DETAIL', params: { id: item.sourceReviewCaseId! } }"
+      >
+        打开源审核 {{ item.sourceReviewCaseId }}
+      </RouterLink>
+      <RouterLink
+        v-for="item in page.items.filter((i) => i.reopenedFromReviewCaseId)"
+        :key="`reopened-from-${item.reviewCaseId}`"
+        :to="{ name: 'ADMIN.REVIEW.DETAIL', params: { id: item.reopenedFromReviewCaseId! } }"
+      >
+        打开重开来源 {{ item.reopenedFromReviewCaseId }}
+      </RouterLink>
     </p>
   </section>
 </template>

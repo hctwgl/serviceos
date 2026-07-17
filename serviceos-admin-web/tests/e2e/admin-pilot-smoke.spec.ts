@@ -77,6 +77,8 @@ async function openInProgressCorrectionFromFilteredQueue(
   const correctionQueue = (await correctionQueueResponse.json()) as {
     items: Array<{
       correctionCaseId: string
+      projectId: string
+      taskId: string
       sourceReviewCaseId: string
       correctionTaskId: string | null
       status: string
@@ -120,6 +122,39 @@ async function openInProgressCorrectionFromFilteredQueue(
     })
     .click()
   expect((await queueCorrectionTaskPromise).status()).toBe(200)
+  await expect(correctionPage.getByRole('heading', { name: '任务详情' })).toBeVisible()
+  await correctionPage.goBack()
+  await expect(correctionPage.getByRole('heading', { name: '整改跟踪' })).toBeVisible()
+
+  // M180：整改队列剩余 Accepted 关联字段（项目 / 来源任务）。
+  const queueProjectPromise = correctionPage.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname === `/api/v1/projects/${correction!.projectId}`,
+  )
+  await correctionPage
+    .locator('.correction-queue-cross-links')
+    .getByRole('link', {
+      name: new RegExp(`打开项目\\s+${correction!.projectId}`),
+    })
+    .click()
+  expect((await queueProjectPromise).status()).toBe(200)
+  await expect(correctionPage.getByRole('heading', { name: '项目详情' })).toBeVisible()
+  await correctionPage.goBack()
+  await expect(correctionPage.getByRole('heading', { name: '整改跟踪' })).toBeVisible()
+
+  const queueSourceTaskPromise = correctionPage.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname === `/api/v1/tasks/${correction!.taskId}`,
+  )
+  await correctionPage
+    .locator('.correction-queue-cross-links')
+    .getByRole('link', {
+      name: new RegExp(`打开来源任务\\s+${correction!.taskId}`),
+    })
+    .click()
+  expect((await queueSourceTaskPromise).status()).toBe(200)
   await expect(correctionPage.getByRole('heading', { name: '任务详情' })).toBeVisible()
   await correctionPage.goBack()
   await expect(correctionPage.getByRole('heading', { name: '整改跟踪' })).toBeVisible()
@@ -1246,7 +1281,7 @@ test('真实 OIDC 登录后可完成 Task 并可靠推进 Workflow 与 WorkOrder
 })
 
 test('真实 OIDC 登录后审核驳回可进入整改队列并授权豁免整改 Task', async ({ page }) => {
-  test.setTimeout(90_000)
+  test.setTimeout(120_000)
   const workOrderCode = process.env.ADMIN_PILOT_CORRECTION_WORK_ORDER_CODE
   const taskId = process.env.ADMIN_PILOT_CORRECTION_TASK_ID
   expect(workOrderCode, '缺少动态整改验证工单编码').toBeTruthy()
@@ -1259,6 +1294,33 @@ test('真实 OIDC 登录后审核驳回可进入整改队列并授权豁免整�
     'admin-pilot-correction-e2e',
     'admin-pilot-correction.png',
   )
+
+  // M180：审核队列 → 资料快照（Accepted ReviewCaseQueueItem.evidenceSetSnapshotId）。
+  const reviewQueuePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname === '/api/v1/review-cases' &&
+      new URL(response.url()).searchParams.get('status') === 'OPEN' &&
+      new URL(response.url()).searchParams.get('taskId') === taskId,
+  )
+  await page.goto(`/reviews?status=OPEN&taskId=${taskId}`)
+  expect((await reviewQueuePromise).status()).toBe(200)
+  await expect(page.getByRole('heading', { name: '审核队列' })).toBeVisible()
+  const reviewQueueSnapshotPromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname ===
+        `/api/v1/evidence-set-snapshots/${reviewCase.evidenceSetSnapshotId}`,
+  )
+  await page
+    .locator('.review-queue-cross-links')
+    .getByRole('link', {
+      name: new RegExp(`打开资料快照\\s+${reviewCase.evidenceSetSnapshotId}`),
+    })
+    .click()
+  expect((await reviewQueueSnapshotPromise).status()).toBe(200)
+  await expect(page.getByRole('heading', { name: '资料快照详情' })).toBeVisible()
+
   await reviewPage.getByLabel('decision').selectOption('REJECTED')
   await reviewPage.getByLabel('reasonCodes（逗号分隔）').fill('IMAGE.BLUR')
   await reviewPage.getByLabel('note').fill('Admin pilot correction required')

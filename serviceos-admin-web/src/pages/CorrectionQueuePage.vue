@@ -155,6 +155,20 @@ onMounted(() => {
       打开关联资源：
       <RouterLink
         v-for="item in page.items"
+        :key="`project-${item.correctionCaseId}`"
+        :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: item.projectId } }"
+      >
+        打开项目 {{ item.projectId }}
+      </RouterLink>
+      <RouterLink
+        v-for="item in page.items"
+        :key="`task-${item.correctionCaseId}`"
+        :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: item.taskId } }"
+      >
+        打开来源任务 {{ item.taskId }}
+      </RouterLink>
+      <RouterLink
+        v-for="item in page.items"
         :key="`src-review-${item.correctionCaseId}`"
         :to="{ name: 'ADMIN.REVIEW.DETAIL', params: { id: item.sourceReviewCaseId } }"
       >
@@ -166,6 +180,16 @@ onMounted(() => {
         :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: item.correctionTaskId! } }"
       >
         打开整改任务 {{ item.correctionTaskId }}
+      </RouterLink>
+      <RouterLink
+        v-for="item in page.items.filter((i) => i.latestResubmissionSnapshotId)"
+        :key="`resub-snap-${item.correctionCaseId}`"
+        :to="{
+          name: 'ADMIN.EVIDENCE_SET_SNAPSHOT.DETAIL',
+          params: { id: item.latestResubmissionSnapshotId! },
+        }"
+      >
+        打开最近补传快照 {{ item.latestResubmissionSnapshotId }}
       </RouterLink>
     </p>
   </section>

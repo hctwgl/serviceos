@@ -5,9 +5,12 @@ export type ReviewCaseQueuePage = {
     reviewCaseId: string
     projectId: string
     taskId: string
+    evidenceSetSnapshotId: string
     status: string
     origin: string
     createdAt: string
+    sourceReviewCaseId: string | null
+    reopenedFromReviewCaseId: string | null
     latestDecision: string | null
     latestReasonCodes: string[]
   }>
@@ -22,6 +25,7 @@ export type CorrectionCaseQueuePage = {
     taskId: string
     sourceReviewCaseId: string
     correctionTaskId: string | null
+    latestResubmissionSnapshotId: string | null
     status: string
     reasonCodes: string[]
     createdAt: string

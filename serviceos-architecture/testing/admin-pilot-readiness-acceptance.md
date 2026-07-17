@@ -69,6 +69,7 @@ lastUpdated: 2026-07-17
 | ADMIN-PILOT-08QO | 真实外发/异常/入站队列源资源深链 | 外发源任务 / 异常接管 Task / 入站项目 GET 200 | PASS |
 | ADMIN-PILOT-08DP | 真实目录/SLA 项目关联深链 | 工单/任务目录 → Project GET 200 | PASS |
 | ADMIN-PILOT-08PP | 真实剩余详情页 projectId 深链 | 整改详情 → `/projects/{id}` GET 200 | PASS |
+| ADMIN-PILOT-08QR | 真实专项队列剩余关联资源深链 | 审核队列 Snapshot / 整改队列 Project·来源 Task GET 200 | PASS |
 | ADMIN-PILOT-08CI | 真实写链路 CI 阻断 | GitHub Actions `admin-pilot-e2e` 运行同一 OIDC/Backend/PostgreSQL/Chrome smoke；通过后才启动 staging | PASS |
 | ADMIN-PILOT-09 | 完整履约写链路 | 接单→Admin 派单(HTTP Manual Assign)→预约→上门→表单/资料→审核/整改→外发→完结 | PASS |
 
@@ -76,6 +77,6 @@ lastUpdated: 2026-07-17
 表单/资料/审核/整改/完结与外发 ACK/厂端回调，入站工单经 Admin HTTP 初派后同单预约上门→表单/
 资料/驳回整改补传复审/外发/完结，入站/外发/审核/整改/TASKS/TIMELINE 资源详情深链、预约上门/表单资料
 Task 旁路与预约/表单提交/资料项/资料快照/上门/联系详情页、工作区项目与 SLA 任务交叉深链、详情页
-明文 projectId / 源资源 / 现场与 SLA scope 字段深链（含剩余详情页 projectId）、运营异常 handlingTaskId 深链、专项队列关联资源深链（含外发/异常/入站源资源与目录/SLA 项目深链），以及专项队列与目录/SLA Accepted OpenAPI 筛选。`ADMIN-PILOT-09` 已由入站路径证明；派单为
+明文 projectId / 源资源 / 现场与 SLA scope 字段深链（含剩余详情页 projectId）、运营异常 handlingTaskId 深链、专项队列关联资源深链（含外发/异常/入站源资源、目录/SLA 项目与 Correction/Review 剩余 Accepted 字段），以及专项队列与目录/SLA Accepted OpenAPI 筛选。`ADMIN-PILOT-09` 已由入站路径证明；派单为
 窄化 Manual Assign。不证明 FieldOperation 详情、SavedView、评分/硬过滤引擎、ServiceNetwork
 生命周期或生产对象存储/专业扫描。
