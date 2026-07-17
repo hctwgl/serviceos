@@ -1126,6 +1126,16 @@ M144 起 SPI 种子入口已删除。
 
 明确未实现：评分/硬过滤/DispatchDecision、ServiceNetwork 生命周期、专用入站队列页、真实 sandbox。
 
+### M174：Admin 现场/表单/SLA 事实格 scope 深链
+
+已实现：
+
+- 预约/上门/联系/表单/资料/SLA/任务事实格 → workOrder/task/appointment/project；
+- 入站 resultId（WORK_ORDER）与审核 reopenedFrom；不新增 OpenAPI；
+- Playwright `ADMIN-PILOT-08FI`。
+
+明确未实现：ServiceNetwork/Technician 目录、FieldOperation、SavedView、企业 OIDC/BFF。
+
 ### M173：Admin 详情页源资源明文字段深链
 
 已实现：
@@ -1420,8 +1430,8 @@ M144 起 SPI 种子入口已删除。
 
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M173**。Admin Pilot 已覆盖工作区区块详情/旁路、预约/表单/资料/上门/联系详情、
-核心时间线与最近活动资源深链、外部审核回执详情、审核/整改交叉深链、异常摘要→异常队列 query 水合、工作区审核/整改关联资源深链、Task 面板资源详情深链、Canonical Message 独立详情页、专项队列与目录页 query 水合、外发关联资源与回执入站交叉深链、详情页明文 projectId / 源资源字段深链、项目与 SLA 任务交叉深链、专项队列（含入站 Envelope）与目录筛选、`ADMIN-PILOT-09`；
+ServiceOS 可靠纵向切片已推进到 **M174**。Admin Pilot 已覆盖工作区区块详情/旁路、预约/表单/资料/上门/联系详情、
+核心时间线与最近活动资源深链、外部审核回执详情、审核/整改交叉深链、异常摘要→异常队列 query 水合、工作区审核/整改关联资源深链、Task 面板资源详情深链、Canonical Message 独立详情页、专项队列与目录页 query 水合、外发关联资源与回执入站交叉深链、详情页明文 projectId / 源资源 / 现场与 SLA scope 字段深链、项目与 SLA 任务交叉深链、专项队列（含入站 Envelope）与目录筛选、`ADMIN-PILOT-09`；
 没有实现完整评分派单引擎、完整 SLA/通知策略、通用队列/SavedView 或整个现场履约平台。
 
 ```text
