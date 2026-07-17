@@ -21,6 +21,9 @@ import com.serviceos.evidence.api.EvidenceItemQueryService;
 import com.serviceos.evidence.api.EvidenceItemSummaryView;
 import com.serviceos.evidence.api.EvidenceSlotQueryService;
 import com.serviceos.evidence.api.EvidenceSlotView;
+import com.serviceos.evidence.api.ReviewCaseService;
+import com.serviceos.evidence.api.ReviewCaseView;
+import com.serviceos.evidence.api.ReviewDecisionView;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.network.api.NetworkMembershipView;
 import com.serviceos.network.api.NetworkPortalMembershipQuery;
@@ -52,6 +55,8 @@ import com.serviceos.readmodel.api.NetworkPortalWorkspaceCorrectionResubmissionS
 import com.serviceos.readmodel.api.NetworkPortalWorkspaceEvidenceItemSummary;
 import com.serviceos.readmodel.api.NetworkPortalWorkspaceEvidenceSlotSummary;
 import com.serviceos.readmodel.api.NetworkPortalWorkspaceFormSubmissionSummary;
+import com.serviceos.readmodel.api.NetworkPortalWorkspaceReviewCaseSummary;
+import com.serviceos.readmodel.api.NetworkPortalWorkspaceReviewDecisionSummary;
 import com.serviceos.readmodel.api.NetworkPortalWorkspaceVisitSummary;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
@@ -109,6 +114,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     private static final int WORKSPACE_FORM_LIMIT = 100;
     private static final int WORKSPACE_EVIDENCE_LIMIT = 100;
     private static final int WORKSPACE_CORRECTION_LIMIT = 100;
+    private static final int WORKSPACE_REVIEW_LIMIT = 100;
     private static final int WORKSPACE_EXCEPTION_LIMIT = 100;
     private static final int WORKSPACE_APPOINTMENT_LIMIT = 100;
     private static final int WORKSPACE_CONTACT_LIMIT = 100;
@@ -123,6 +129,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     private final NetworkPortalMembershipQuery memberships;
     private final TaskFulfillmentContextService tasks;
     private final CorrectionCaseService corrections;
+    private final ReviewCaseService reviews;
     private final OperationalExceptionWorkbenchService exceptions;
     private final ActiveServiceResponsibilityService responsibilities;
     private final SlaQueryService slaQueries;
@@ -143,6 +150,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
             NetworkPortalMembershipQuery memberships,
             TaskFulfillmentContextService tasks,
             CorrectionCaseService corrections,
+            ReviewCaseService reviews,
             OperationalExceptionWorkbenchService exceptions,
             ActiveServiceResponsibilityService responsibilities,
             SlaQueryService slaQueries,
@@ -162,6 +170,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         this.memberships = memberships;
         this.tasks = tasks;
         this.corrections = corrections;
+        this.reviews = reviews;
         this.exceptions = exceptions;
         this.responsibilities = responsibilities;
         this.slaQueries = slaQueries;
@@ -283,12 +292,14 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         List<NetworkPortalWorkspaceEvidenceSlotSummary> evidenceSlotSummaries = null;
         List<NetworkPortalWorkspaceEvidenceItemSummary> evidenceItemSummaries = null;
         List<NetworkPortalWorkspaceCorrectionCaseSummary> correctionSummaries = null;
+        List<NetworkPortalWorkspaceReviewCaseSummary> reviewSummaries = null;
         if (hasNetworkCapability(actor, correlationId, EVIDENCE_READ, networkId)) {
             evidenceSlotSummaries = loadEvidenceSlotSummaries(
                     actor, correlationId, networkId, activeTaskIds);
             evidenceItemSummaries = loadEvidenceItemSummaries(
                     actor, correlationId, networkId, activeTaskIds);
             correctionSummaries = loadCorrectionSummaries(actor, correlationId, activeTaskIds);
+            reviewSummaries = loadReviewSummaries(actor, correlationId, activeTaskIds);
         }
         List<NetworkPortalExceptionItem> exceptionSummaries = null;
         if (hasNetworkCapability(actor, correlationId, EXCEPTION_READ, networkId)) {
@@ -331,6 +342,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                 evidenceSlotSummaries,
                 evidenceItemSummaries,
                 correctionSummaries,
+                reviewSummaries,
                 exceptionSummaries,
                 appointmentSummaries,
                 contactAttemptSummaries,
@@ -560,6 +572,28 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     }
 
     /**
+     * M229：NETWORK evidence.read 已 soft-gate；仅 fan-in ACTIVE taskIds；含全部状态。
+     */
+    private List<NetworkPortalWorkspaceReviewCaseSummary> loadReviewSummaries(
+            CurrentPrincipal actor,
+            String correlationId,
+            Set<UUID> activeTaskIds
+    ) {
+        List<NetworkPortalWorkspaceReviewCaseSummary> collected = new ArrayList<>();
+        for (UUID taskId : activeTaskIds) {
+            for (ReviewCaseView row : reviews.listForTask(actor, correlationId, taskId)) {
+                collected.add(toReviewCaseSummary(row));
+            }
+        }
+        return collected.stream()
+                .sorted(Comparator
+                        .comparing(NetworkPortalWorkspaceReviewCaseSummary::createdAt)
+                        .thenComparing(NetworkPortalWorkspaceReviewCaseSummary::reviewCaseId))
+                .limit(WORKSPACE_REVIEW_LIMIT)
+                .toList();
+    }
+
+    /**
      * M226：NETWORK operations.exception.read 已 soft-gate；仅 fan-in ACTIVE taskIds；含全部状态。
      */
     private List<NetworkPortalExceptionItem> loadExceptionSummaries(
@@ -721,6 +755,42 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                 correction.resubmissions().stream()
                         .map(this::toCorrectionResubmissionSummary)
                         .toList());
+    }
+
+    private NetworkPortalWorkspaceReviewCaseSummary toReviewCaseSummary(ReviewCaseView review) {
+        return new NetworkPortalWorkspaceReviewCaseSummary(
+                review.reviewCaseId(),
+                review.taskId(),
+                review.projectId(),
+                review.evidenceSetSnapshotId(),
+                review.scopeType(),
+                review.origin(),
+                review.policyVersion(),
+                review.status(),
+                review.createdAt(),
+                review.decidedAt(),
+                review.sourceReviewCaseId(),
+                review.externalSubmissionRef(),
+                review.callbackBatchRef(),
+                review.mappingVersionId(),
+                review.reopenedFromReviewCaseId(),
+                review.reopenTriggerRef(),
+                review.decisions() == null
+                        ? List.of()
+                        : review.decisions().stream().map(this::toReviewDecisionSummary).toList());
+    }
+
+    private NetworkPortalWorkspaceReviewDecisionSummary toReviewDecisionSummary(
+            ReviewDecisionView decision
+    ) {
+        // note / approvalRef / decidedBy 不进入工作区摘要，避免自由文本和操作者信息扩散。
+        return new NetworkPortalWorkspaceReviewDecisionSummary(
+                decision.reviewDecisionId(),
+                decision.decisionOrdinal(),
+                decision.decision(),
+                decision.decisionSource(),
+                decision.reasonCodes(),
+                decision.decidedAt());
     }
 
     private NetworkPortalWorkspaceCorrectionResubmissionSummary toCorrectionResubmissionSummary(

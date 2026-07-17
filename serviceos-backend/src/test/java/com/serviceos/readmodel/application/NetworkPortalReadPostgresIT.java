@@ -18,6 +18,7 @@ import com.serviceos.readmodel.api.NetworkPortalWorkspaceCorrectionCaseSummary;
 import com.serviceos.readmodel.api.NetworkPortalWorkspaceEvidenceItemSummary;
 import com.serviceos.readmodel.api.NetworkPortalWorkspaceEvidenceSlotSummary;
 import com.serviceos.readmodel.api.NetworkPortalWorkspaceFormSubmissionSummary;
+import com.serviceos.readmodel.api.NetworkPortalWorkspaceReviewCaseSummary;
 import com.serviceos.shared.Sha256;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
@@ -212,6 +213,7 @@ class NetworkPortalReadPostgresIT {
         assertThat(workspace.evidenceSlots()).isNull();
         assertThat(workspace.evidenceItems()).isNull();
         assertThat(workspace.corrections()).isNull();
+        assertThat(workspace.reviews()).isNull();
         assertThat(workspace.exceptions()).isNull();
         assertThat(workspace.appointments()).isNull();
         assertThat(workspace.contactAttempts()).isNull();
@@ -408,6 +410,7 @@ class NetworkPortalReadPostgresIT {
         assertThat(withoutCap.evidenceSlots()).isNull();
         assertThat(withoutCap.evidenceItems()).isNull();
         assertThat(withoutCap.corrections()).isNull();
+        assertThat(withoutCap.reviews()).isNull();
 
         seedGrant(PRINCIPAL, "evidence.read", "NETWORK", NETWORK_A.toString());
         NetworkPortalWorkOrderWorkspace empty = portal.getWorkOrderWorkspace(
@@ -415,6 +418,7 @@ class NetworkPortalReadPostgresIT {
         assertThat(empty.evidenceSlots()).isEmpty();
         assertThat(empty.evidenceItems()).isEmpty();
         assertThat(empty.corrections()).isEmpty();
+        assertThat(empty.reviews()).isEmpty();
 
         UUID slotA = seedEvidenceSlot(TASK_A, "site.photo", "现场照片");
         UUID itemA = seedEvidenceItem(TASK_A, slotA);
@@ -440,6 +444,17 @@ class NetworkPortalReadPostgresIT {
         assertThat(withData.corrections().getFirst().status()).isEqualTo("OPEN");
         assertThat(withData.corrections().getFirst().reasonCodes()).containsExactly("MISSING_PHOTO");
         assertThat(withData.corrections().getFirst().resubmissions()).isEmpty();
+        // M229：seedOpenCorrection 同时写入 review+decision；他网点 TASK_B 不计入
+        assertThat(withData.reviews())
+                .extracting(NetworkPortalWorkspaceReviewCaseSummary::reviewCaseId)
+                .containsExactly(withData.corrections().getFirst().sourceReviewCaseId());
+        assertThat(withData.reviews().getFirst().status()).isEqualTo("REJECTED");
+        assertThat(withData.reviews().getFirst().origin()).isEqualTo("INTERNAL");
+        assertThat(withData.reviews().getFirst().decisions()).hasSize(1);
+        assertThat(withData.reviews().getFirst().decisions().getFirst().decision())
+                .isEqualTo("REJECTED");
+        assertThat(withData.reviews().getFirst().decisions().getFirst().reasonCodes())
+                .containsExactly("MISSING_PHOTO");
     }
 
     @Test

@@ -449,6 +449,7 @@ watch(
             <span class="muted">
               （task {{ item.taskId }} · {{ item.status }} ·
               reasons {{ item.reasonCodes.join(', ') || '—' }} ·
+              sourceReview {{ item.sourceReviewCaseId || '—' }} ·
               resubmits {{ item.resubmissions.length }}）
             </span>
           </li>
@@ -456,6 +457,38 @@ watch(
         <p v-else data-testid="workspace-related-corrections-empty">暂无整改摘要</p>
         <p class="hint">
           需 NETWORK <code>evidence.read</code>。字段对齐 Admin 工作区整改摘要；无 createdBy/waiveNote。
+        </p>
+      </section>
+
+      <section
+        v-if="detail.reviews"
+        data-testid="workspace-related-reviews"
+        class="related"
+        aria-label="Review case summaries"
+      >
+        <h3>审核摘要</h3>
+        <ul v-if="detail.reviews.length">
+          <li
+            v-for="item in detail.reviews"
+            :key="item.reviewCaseId"
+            :data-testid="`workspace-related-review-${item.reviewCaseId}`"
+          >
+            <RouterLink
+              :to="{ path: '/network-portal/tasks', query: { taskId: item.taskId } }"
+              data-testid="workspace-review-task-deeplink"
+            >
+              {{ item.reviewCaseId }}
+            </RouterLink>
+            <span class="muted">
+              （task {{ item.taskId }} · {{ item.origin }} · {{ item.status }} ·
+              decisions {{ item.decisions.length }}）
+            </span>
+          </li>
+        </ul>
+        <p v-else data-testid="workspace-related-reviews-empty">暂无审核摘要</p>
+        <p class="hint">
+          需 NETWORK <code>evidence.read</code>。字段对齐 Admin 工作区审核摘要；无
+          note/approvalRef/decidedBy；无独立 NP Review 详情页。
         </p>
       </section>
 

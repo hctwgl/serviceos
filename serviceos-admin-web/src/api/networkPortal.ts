@@ -197,6 +197,37 @@ export type NetworkPortalWorkspaceCorrectionCaseSummary = {
   resubmissions: NetworkPortalWorkspaceCorrectionResubmissionSummary[]
 }
 
+/** M229：字段对齐 Admin WorkOrderWorkspaceReviewDecisionSummary（无 note/approvalRef/decidedBy）。 */
+export type NetworkPortalWorkspaceReviewDecisionSummary = {
+  reviewDecisionId: string
+  decisionOrdinal: number
+  decision: string
+  decisionSource: string
+  reasonCodes: string[]
+  decidedAt: string
+}
+
+/** M229：字段对齐 Admin WorkOrderWorkspaceReviewCaseSummary（无 createdBy/digest）。 */
+export type NetworkPortalWorkspaceReviewCaseSummary = {
+  reviewCaseId: string
+  taskId: string
+  projectId: string
+  evidenceSetSnapshotId: string
+  scopeType: string
+  origin: string
+  policyVersion: string
+  status: string
+  createdAt: string
+  decidedAt: string | null
+  sourceReviewCaseId: string | null
+  externalSubmissionRef: string | null
+  callbackBatchRef: string | null
+  mappingVersionId: string | null
+  reopenedFromReviewCaseId: string | null
+  reopenTriggerRef: string | null
+  decisions: NetworkPortalWorkspaceReviewDecisionSummary[]
+}
+
 /** M213：限定工单工作区薄快照（ACTIVE NETWORK 责任门禁）。 */
 export type NetworkPortalWorkOrderWorkspace = {
   networkId: string
@@ -219,6 +250,8 @@ export type NetworkPortalWorkOrderWorkspace = {
   evidenceItems?: NetworkPortalWorkspaceEvidenceItemSummary[]
   /** Soft-gated；缺 NETWORK `evidence.read` 时省略，不得用空数组伪装无权限。 */
   corrections?: NetworkPortalWorkspaceCorrectionCaseSummary[]
+  /** Soft-gated；缺 NETWORK `evidence.read` 时省略，不得用空数组伪装无权限。 */
+  reviews?: NetworkPortalWorkspaceReviewCaseSummary[]
   /** Soft-gated；缺 NETWORK `operations.exception.read` 时省略，不得用空数组伪装无权限。 */
   exceptions?: NetworkPortalExceptionItem[]
   /** Soft-gated；缺 NETWORK `networkPortal.manageAppointment` 时与 contactAttempts 同时省略。 */
