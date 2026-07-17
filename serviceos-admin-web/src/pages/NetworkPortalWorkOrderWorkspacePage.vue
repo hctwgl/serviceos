@@ -219,7 +219,7 @@ watch(
     </header>
     <p class="hint">
       只读薄快照（M213）+ 协作深链（M214）+ 预约/联系 fan-in（M215）+ 师傅 fan-in（M216）+
-      SLA 摘要（M221）：缺能力时省略相关区块。
+      SLA 摘要（M221）+ Visit/表单提交摘要（M222）：缺能力时省略相关区块。
     </p>
     <p v-if="error" data-testid="network-portal-error">{{ error }}</p>
     <p v-else-if="loading" data-testid="workspace-loading">加载中…</p>
@@ -265,6 +265,58 @@ watch(
         <p class="hint">
           需 NETWORK <code>sla.read</code>。仅统计本网点 ACTIVE 任务上 RUNNING/BREACHED
           （breached ⊆ open）。无 SLA 详情表或深链。
+        </p>
+      </section>
+
+      <section
+        v-if="detail.visits"
+        data-testid="workspace-visits"
+        class="related"
+        aria-label="Visit summaries"
+      >
+        <h3>Visit 摘要</h3>
+        <ul v-if="detail.visits.length">
+          <li
+            v-for="visit in detail.visits"
+            :key="visit.visitId"
+            :data-testid="`workspace-visit-${visit.visitId}`"
+          >
+            <strong>{{ visit.visitId }}</strong>
+            <span class="muted">
+              （task {{ visit.taskId }} · seq {{ visit.visitSequence }} · {{ visit.status }} ·
+              {{ visit.geofenceResult }} / {{ visit.policyDecision }}）
+            </span>
+          </li>
+        </ul>
+        <p v-else data-testid="workspace-visits-empty">暂无本网点 Visit</p>
+        <p class="hint">
+          需 NETWORK <code>visit.read</code>。不含 GPS/note/device。无独立 Visit 详情页。
+        </p>
+      </section>
+
+      <section
+        v-if="detail.formSubmissions"
+        data-testid="workspace-form-submissions"
+        class="related"
+        aria-label="Form submission summaries"
+      >
+        <h3>表单提交摘要</h3>
+        <ul v-if="detail.formSubmissions.length">
+          <li
+            v-for="row in detail.formSubmissions"
+            :key="row.submissionId"
+            :data-testid="`workspace-form-submission-${row.submissionId}`"
+          >
+            <strong>{{ row.formKey }}</strong>
+            <span class="muted">
+              （{{ row.submissionId }} · task {{ row.taskId }} · v{{ row.submissionVersion }} ·
+              {{ row.validationStatus }} · err {{ row.errorCount }} / warn {{ row.warningCount }}）
+            </span>
+          </li>
+        </ul>
+        <p v-else data-testid="workspace-form-submissions-empty">暂无表单提交</p>
+        <p class="hint">
+          需 NETWORK <code>form.read</code>。不含 values/submittedBy。无表单 definition。
         </p>
       </section>
 

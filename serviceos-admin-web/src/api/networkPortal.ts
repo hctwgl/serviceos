@@ -100,6 +100,41 @@ export type NetworkPortalWorkOrderWorkspaceSlaSummary = {
   breachedCount: number
 }
 
+/** M222：字段对齐 Admin WorkOrderWorkspaceVisitSummary（无 GPS/note/device）。 */
+export type NetworkPortalWorkspaceVisitSummary = {
+  visitId: string
+  taskId: string
+  appointmentId: string
+  visitSequence: number
+  technicianId: string
+  networkId: string | null
+  status: string
+  checkInCapturedAt: string
+  checkInReceivedAt: string
+  geofenceResult: string
+  policyDecision: string
+  checkOutCapturedAt: string | null
+  checkOutReceivedAt: string | null
+  resultCode: string | null
+  exceptionCode: string | null
+  aggregateVersion: number
+}
+
+/** M222：字段对齐 Admin WorkOrderWorkspaceFormSubmissionSummary（无 values）。 */
+export type NetworkPortalWorkspaceFormSubmissionSummary = {
+  submissionId: string
+  taskId: string
+  projectId: string
+  formVersionId: string
+  formKey: string
+  submissionVersion: number
+  contentDigest: string
+  validationStatus: string
+  errorCount: number
+  warningCount: number
+  submittedAt: string
+}
+
 /** M213：限定工单工作区薄快照（ACTIVE NETWORK 责任门禁）。 */
 export type NetworkPortalWorkOrderWorkspace = {
   networkId: string
@@ -112,6 +147,10 @@ export type NetworkPortalWorkOrderWorkspace = {
   tasks: NetworkPortalTaskItem[]
   /** Soft-gated；缺 NETWORK `sla.read` 时省略，不得用 0 伪装无权限。 */
   slaSummary?: NetworkPortalWorkOrderWorkspaceSlaSummary
+  /** Soft-gated；缺 NETWORK `visit.read` 时省略，不得用空数组伪装无权限。 */
+  visits?: NetworkPortalWorkspaceVisitSummary[]
+  /** Soft-gated；缺 NETWORK `form.read` 时省略，不得用空数组伪装无权限。 */
+  formSubmissions?: NetworkPortalWorkspaceFormSubmissionSummary[]
   asOf: string
 }
 

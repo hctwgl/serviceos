@@ -12,6 +12,9 @@ import java.util.UUID;
  *
  * <p>M221：可选 {@code slaSummary} 在无 NETWORK {@code sla.read} 时为 null，
  * 经 {@link JsonInclude.Include#NON_NULL} 从 JSON 省略。</p>
+ *
+ * <p>M222：可选 {@code visits}/{@code formSubmissions} 在无 NETWORK
+ * {@code visit.read}/{@code form.read} 时为 null（省略）；有能力时可为空列表。</p>
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record NetworkPortalWorkOrderWorkspace(
@@ -24,10 +27,14 @@ public record NetworkPortalWorkOrderWorkspace(
         Instant effectiveFrom,
         List<NetworkPortalTaskItem> tasks,
         NetworkPortalWorkOrderWorkspaceSlaSummary slaSummary,
+        List<NetworkPortalWorkspaceVisitSummary> visits,
+        List<NetworkPortalWorkspaceFormSubmissionSummary> formSubmissions,
         Instant asOf
 ) {
     public NetworkPortalWorkOrderWorkspace {
         taskIds = taskIds == null ? List.of() : List.copyOf(taskIds);
         tasks = tasks == null ? List.of() : List.copyOf(tasks);
+        visits = visits == null ? null : List.copyOf(visits);
+        formSubmissions = formSubmissions == null ? null : List.copyOf(formSubmissions);
     }
 }

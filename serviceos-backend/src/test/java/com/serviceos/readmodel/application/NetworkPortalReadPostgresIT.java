@@ -11,6 +11,7 @@ import com.serviceos.readmodel.api.NetworkPortalWorkbenchView;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderItem;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderWorkspace;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderWorkspaceSlaSummary;
+import com.serviceos.readmodel.api.NetworkPortalWorkspaceFormSubmissionSummary;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
 import org.flywaydb.core.Flyway;
@@ -84,6 +85,8 @@ class NetworkPortalReadPostgresIT {
                     dsp_service_assignment_activation_saga, dsp_capacity_reservation,
                     dsp_service_assignment, dsp_capacity_counter,
                     sla_milestone, sla_clock_segment, sla_instance,
+                    frm_form_command_result, frm_submission_validation, frm_form_submission,
+                    fld_visit_command_result, fld_visit_fact, fld_visit,
                     tsk_task,
                     cfg_configuration_bundle_item, cfg_configuration_bundle,
                     cfg_configuration_asset_version, prj_project,
@@ -183,8 +186,37 @@ class NetworkPortalReadPostgresIT {
                 actor(PRINCIPAL), "corr-ws-unknown", context, UUID.randomUUID()))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         p -> assertThat(p.code()).isEqualTo(ProblemCode.ACCESS_DENIED));
-        // M221：无 sla.read 时省略 slaSummary
+        // M221/M222：无 soft-gate 能力时省略 enrichment 字段
         assertThat(workspace.slaSummary()).isNull();
+        assertThat(workspace.visits()).isNull();
+        assertThat(workspace.formSubmissions()).isNull();
+    }
+
+    @Test
+    void workOrderWorkspaceVisitAndFormSummariesAreCapabilityGatedAndTaskScoped() {
+        String context = "NETWORK|NETWORK|" + NETWORK_A;
+        NetworkPortalWorkOrderWorkspace withoutCap = portal.getWorkOrderWorkspace(
+                actor(PRINCIPAL), "corr-ws-vf-omit", context, WO_A);
+        assertThat(withoutCap.visits()).isNull();
+        assertThat(withoutCap.formSubmissions()).isNull();
+
+        seedGrant(PRINCIPAL, "visit.read", "NETWORK", NETWORK_A.toString());
+        NetworkPortalWorkOrderWorkspace withVisitOnly = portal.getWorkOrderWorkspace(
+                actor(PRINCIPAL), "corr-ws-visit-empty", context, WO_A);
+        assertThat(withVisitOnly.visits()).isEmpty();
+        assertThat(withVisitOnly.formSubmissions()).isNull();
+
+        seedGrant(PRINCIPAL, "form.read", "NETWORK", NETWORK_A.toString());
+        seedFormSubmission(TASK_A, "install.form");
+        seedFormSubmission(TASK_B, "foreign.form");
+        NetworkPortalWorkOrderWorkspace withBoth = portal.getWorkOrderWorkspace(
+                actor(PRINCIPAL), "corr-ws-form", context, WO_A);
+        assertThat(withBoth.visits()).isEmpty();
+        assertThat(withBoth.formSubmissions())
+                .extracting(NetworkPortalWorkspaceFormSubmissionSummary::taskId)
+                .containsExactly(TASK_A);
+        assertThat(withBoth.formSubmissions().getFirst().formKey()).isEqualTo("install.form");
+        assertThat(withBoth.formSubmissions().getFirst().validationStatus()).isEqualTo("VALIDATED");
     }
 
     @Test
@@ -487,6 +519,62 @@ class NetworkPortalReadPostgresIT {
                 .param("assignee", networkId.toString())
                 .param("max", max)
                 .param("occupied", occupied)
+                .update();
+    }
+
+    private void seedFormSubmission(UUID taskId, String formKey) {
+        UUID projectId = jdbc.sql("SELECT project_id FROM tsk_task WHERE task_id=:id")
+                .param("id", taskId).query(UUID.class).single();
+        UUID formVersionId = UUID.randomUUID();
+        UUID submissionId = UUID.randomUUID();
+        OffsetDateTime now = OffsetDateTime.ofInstant(Instant.parse("2026-07-17T04:00:00Z"), ZoneOffset.UTC);
+        String digest = "e".repeat(64);
+        jdbc.sql("""
+                INSERT INTO cfg_configuration_asset_version (
+                    version_id, tenant_id, asset_type, asset_key, semantic_version, schema_version,
+                    definition, content_digest, status, published_at)
+                VALUES (
+                    :versionId, :tenantId, 'FORM', :assetKey, '1.0.0', '1.0.0',
+                    CAST(:definition AS jsonb), :digest, 'PUBLISHED', :publishedAt)
+                """)
+                .param("versionId", formVersionId)
+                .param("tenantId", TENANT)
+                .param("assetKey", formKey)
+                .param("definition", "{\"formKey\":\"" + formKey + "\",\"fields\":[]}")
+                .param("digest", digest)
+                .param("publishedAt", now)
+                .update();
+        jdbc.sql("""
+                INSERT INTO frm_form_submission (
+                    form_submission_id, tenant_id, task_id, project_id, form_version_id, form_key,
+                    submission_version, values_document, content_digest, validation_status,
+                    submitted_by, submitted_at)
+                VALUES (
+                    :submissionId, :tenantId, :taskId, :projectId, :formVersionId, :formKey,
+                    1, '{}'::jsonb, :digest, 'VALIDATED', 'tester', :submittedAt)
+                """)
+                .param("submissionId", submissionId)
+                .param("tenantId", TENANT)
+                .param("taskId", taskId)
+                .param("projectId", projectId)
+                .param("formVersionId", formVersionId)
+                .param("formKey", formKey)
+                .param("digest", digest)
+                .param("submittedAt", now)
+                .update();
+        jdbc.sql("""
+                INSERT INTO frm_submission_validation (
+                    submission_validation_id, tenant_id, form_submission_id, validator_version,
+                    input_digest, validation_status, errors_document, warnings_document, executed_at)
+                VALUES (
+                    :validationId, :tenantId, :submissionId, 'v1',
+                    :digest, 'VALIDATED', '[]'::jsonb, '[]'::jsonb, :executedAt)
+                """)
+                .param("validationId", UUID.randomUUID())
+                .param("tenantId", TENANT)
+                .param("submissionId", submissionId)
+                .param("digest", digest)
+                .param("executedAt", now)
                 .update();
     }
 

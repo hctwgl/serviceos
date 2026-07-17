@@ -35,10 +35,16 @@ import com.serviceos.readmodel.api.NetworkPortalWorkbenchView;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderItem;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderWorkspace;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderWorkspaceSlaSummary;
+import com.serviceos.readmodel.api.NetworkPortalWorkspaceFormSubmissionSummary;
+import com.serviceos.readmodel.api.NetworkPortalWorkspaceVisitSummary;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.sla.api.SlaInstanceItem;
 import com.serviceos.sla.api.SlaQueryService;
+import com.serviceos.fieldwork.api.VisitService;
+import com.serviceos.fieldwork.api.VisitView;
+import com.serviceos.forms.api.FormSubmissionQueryService;
+import com.serviceos.forms.api.FormSubmissionSummaryView;
 import com.serviceos.task.api.TaskFulfillmentContext;
 import com.serviceos.task.api.TaskFulfillmentContextService;
 import org.springframework.stereotype.Service;
@@ -70,6 +76,8 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     private static final String EVIDENCE_READ = "evidence.read";
     private static final String EXCEPTION_READ = "operations.exception.read";
     private static final String SLA_READ = "sla.read";
+    private static final String VISIT_READ = "visit.read";
+    private static final String FORM_READ = "form.read";
     private static final String CONTEXT_PREFIX = "NETWORK|NETWORK|";
     private static final int DEFAULT_CORRECTION_LIMIT = 50;
     private static final int MAX_CORRECTION_LIMIT = 100;
@@ -80,6 +88,8 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     private static final int DEFAULT_MEMBERSHIP_LIMIT = 50;
     private static final int MAX_MEMBERSHIP_LIMIT = 100;
     private static final int SLA_WORKSPACE_LIMIT = 100;
+    private static final int WORKSPACE_VISIT_LIMIT = 100;
+    private static final int WORKSPACE_FORM_LIMIT = 100;
     private static final Set<String> OPEN_SLA_STATUSES = Set.of("RUNNING", "BREACHED");
 
     private final PrincipalNetworkAffiliationQuery affiliations;
@@ -94,6 +104,8 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     private final OperationalExceptionWorkbenchService exceptions;
     private final ActiveServiceResponsibilityService responsibilities;
     private final SlaQueryService slaQueries;
+    private final VisitService visits;
+    private final FormSubmissionQueryService formSubmissions;
     private final Clock clock;
 
     DefaultNetworkPortalQueryService(
@@ -109,6 +121,8 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
             OperationalExceptionWorkbenchService exceptions,
             ActiveServiceResponsibilityService responsibilities,
             SlaQueryService slaQueries,
+            VisitService visits,
+            FormSubmissionQueryService formSubmissions,
             Clock clock
     ) {
         this.affiliations = affiliations;
@@ -123,6 +137,8 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         this.exceptions = exceptions;
         this.responsibilities = responsibilities;
         this.slaQueries = slaQueries;
+        this.visits = visits;
+        this.formSubmissions = formSubmissions;
         this.clock = clock;
     }
 
@@ -217,10 +233,21 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                     row.technicianId(),
                     row.effectiveFrom()));
         }
+        Set<UUID> activeTaskIds = Set.copyOf(taskIds);
         NetworkPortalWorkOrderWorkspaceSlaSummary slaSummary = null;
         if (projectId != null && hasNetworkCapability(actor, correlationId, SLA_READ, networkId)) {
             slaSummary = loadSlaSummary(
-                    actor, correlationId, workOrderId, projectId, networkId, Set.copyOf(taskIds));
+                    actor, correlationId, workOrderId, projectId, networkId, activeTaskIds);
+        }
+        List<NetworkPortalWorkspaceVisitSummary> visitSummaries = null;
+        if (hasNetworkCapability(actor, correlationId, VISIT_READ, networkId)) {
+            visitSummaries = loadVisitSummaries(
+                    actor, correlationId, workOrderId, networkId, activeTaskIds);
+        }
+        List<NetworkPortalWorkspaceFormSubmissionSummary> formSubmissionSummaries = null;
+        if (hasNetworkCapability(actor, correlationId, FORM_READ, networkId)) {
+            formSubmissionSummaries = loadFormSubmissionSummaries(
+                    actor, correlationId, networkId, activeTaskIds);
         }
         return new NetworkPortalWorkOrderWorkspace(
                 networkId,
@@ -232,6 +259,8 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                 effectiveFrom,
                 taskItems,
                 slaSummary,
+                visitSummaries,
+                formSubmissionSummaries,
                 clock.instant());
     }
 
@@ -263,6 +292,86 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
             }
         }
         return new NetworkPortalWorkOrderWorkspaceSlaSummary(open, breached);
+    }
+
+    /**
+     * M222：NETWORK visit.read 已 soft-gate；按本网点 + ACTIVE taskIds 过滤后投影摘要。
+     */
+    private List<NetworkPortalWorkspaceVisitSummary> loadVisitSummaries(
+            CurrentPrincipal actor,
+            String correlationId,
+            UUID workOrderId,
+            UUID networkId,
+            Set<UUID> activeTaskIds
+    ) {
+        return visits.listByWorkOrderOnNetwork(actor, correlationId, workOrderId, networkId).stream()
+                .filter(visit -> visit.taskId() != null && activeTaskIds.contains(visit.taskId()))
+                .sorted(Comparator.comparingInt(VisitView::visitSequence)
+                        .thenComparing(VisitView::visitId))
+                .limit(WORKSPACE_VISIT_LIMIT)
+                .map(this::toVisitSummary)
+                .toList();
+    }
+
+    /**
+     * M222：NETWORK form.read 已 soft-gate；仅 fan-in 本网点 ACTIVE taskIds。
+     */
+    private List<NetworkPortalWorkspaceFormSubmissionSummary> loadFormSubmissionSummaries(
+            CurrentPrincipal actor,
+            String correlationId,
+            UUID networkId,
+            Set<UUID> activeTaskIds
+    ) {
+        List<NetworkPortalWorkspaceFormSubmissionSummary> collected = new ArrayList<>();
+        for (UUID taskId : activeTaskIds) {
+            for (FormSubmissionSummaryView row : formSubmissions.listForTaskOnNetwork(
+                    actor, correlationId, taskId, networkId)) {
+                collected.add(toFormSubmissionSummary(row));
+            }
+        }
+        return collected.stream()
+                .sorted(Comparator
+                        .comparing(NetworkPortalWorkspaceFormSubmissionSummary::submittedAt)
+                        .thenComparing(NetworkPortalWorkspaceFormSubmissionSummary::submissionId))
+                .limit(WORKSPACE_FORM_LIMIT)
+                .toList();
+    }
+
+    private NetworkPortalWorkspaceVisitSummary toVisitSummary(VisitView visit) {
+        return new NetworkPortalWorkspaceVisitSummary(
+                visit.visitId(),
+                visit.taskId(),
+                visit.appointmentId(),
+                visit.visitSequence(),
+                visit.technicianId(),
+                visit.networkId(),
+                visit.status(),
+                visit.checkInCapturedAt(),
+                visit.checkInReceivedAt(),
+                visit.geofenceResult(),
+                visit.policyDecision(),
+                visit.checkOutCapturedAt(),
+                visit.checkOutReceivedAt(),
+                visit.resultCode(),
+                visit.exceptionCode(),
+                visit.aggregateVersion());
+    }
+
+    private NetworkPortalWorkspaceFormSubmissionSummary toFormSubmissionSummary(
+            FormSubmissionSummaryView submission
+    ) {
+        return new NetworkPortalWorkspaceFormSubmissionSummary(
+                submission.submissionId(),
+                submission.taskId(),
+                submission.projectId(),
+                submission.formVersionId(),
+                submission.formKey(),
+                submission.submissionVersion(),
+                submission.contentDigest(),
+                submission.validationStatus(),
+                submission.errorCount(),
+                submission.warningCount(),
+                submission.submittedAt());
     }
 
     @Override

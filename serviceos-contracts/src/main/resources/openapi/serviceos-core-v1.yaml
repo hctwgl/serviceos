@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.1
+  version: 1.0.2
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1459,6 +1459,9 @@ paths:
         响应为安全薄 DTO（工单头 + 本网点 ACTIVE 任务摘要），不含 INTEGRATION/定价/PII。
         M221：可选 `slaSummary`（openCount/breachedCount）；需 NETWORK `sla.read`，
         缺能力时省略该属性（不得用 0 伪装无权限）；按本网点 ACTIVE taskIds 过滤。
+        M222：可选 `visits` / `formSubmissions`（复用 Admin 工作区摘要字段集）；
+        分别需 NETWORK `visit.read` / `form.read`，缺能力时省略属性（不得用空数组伪装）；
+        Visit 另按可信 networkId 过滤；表单提交仅覆盖 ACTIVE taskIds。
         上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
       parameters:
         - name: workOrderId
@@ -4939,6 +4942,20 @@ components:
           description: |
             M221：需 NETWORK sla.read；缺能力时省略本属性；有能力且无实例时返回 0/0。
           $ref: '#/components/schemas/NetworkPortalWorkOrderWorkspaceSlaSummary'
+        visits:
+          description: |
+            M222：需 NETWORK visit.read；缺能力时省略本属性；有能力且无实例时返回 []。
+            元素字段复用 WorkOrderWorkspaceVisitSummary（无 GPS/note/device）。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceVisitSummary' }
+        formSubmissions:
+          description: |
+            M222：需 NETWORK form.read；缺能力时省略本属性；有能力且无实例时返回 []。
+            元素字段复用 WorkOrderWorkspaceFormSubmissionSummary（无 values/submittedBy）。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceFormSubmissionSummary' }
         asOf: { type: string, format: date-time }
     NetworkPortalTaskItem:
       type: object

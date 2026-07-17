@@ -6,7 +6,7 @@ status: Accepted
 
 # 应用工作区、队列与用户偏好 HTTP API
 
-## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158 / M189 / M190 / M191 / M192 / M193 / M194 / M195 / M202 / M203 / M205 / M206 / M207 / M213 / M214 / M215 / M216 / M217 / M218 / M219 / M220 / M221）
+## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158 / M189 / M190 / M191 / M192 / M193 / M194 / M195 / M202 / M203 / M205 / M206 / M207 / M213 / M214 / M215 / M216 / M217 / M218 / M219 / M220 / M221 / M222）
 
 **Accepted（可指导实现）**：
 
@@ -212,6 +212,13 @@ status: Accepted
   不得用 0 伪装无权限）；仅计本网点 ACTIVE `taskIds` 上 RUNNING/BREACHED。
   Core OpenAPI → `1.0.1`。catalog 仍 `page-registry-v16`；Flyway 仍 100/102。
   **不**接受 Visit/表单摘要、工作台 SLA 风险计数、Admin workspace 复用、PII、SLA 详情/deeplink。
+- §10 Network Portal 工作区 Visit/表单提交摘要（M222 / ADR-060）：扩展同一 workspace 可选
+  `visits`（`$ref` `WorkOrderWorkspaceVisitSummary`；NETWORK `visit.read`）与
+  `formSubmissions`（`$ref` `WorkOrderWorkspaceFormSubmissionSummary`；NETWORK `form.read`）；
+  缺能力省略属性（不得用空数组伪装）；Visit 另按可信 networkId 过滤；表单仅 ACTIVE taskIds。
+  Core OpenAPI → `1.0.2`。catalog 仍 `page-registry-v16`；Flyway 仍 100/102。
+  **不**接受 definition/values、Evidence 摘要、Admin workspace 复用、独立 NP Visit/表单列表 API、
+  工作台 SLA 风险、notifications。
 
 **仍为设计草案**：§3 中 `application-context`/`notifications`、§4 工作台与队列、§5 其余 section、
 §6 其余专项队列、§7 中 `VEHICLE`/`CHARGER` 与全文索引搜索、§8 ORGANIZATION 组织树共享与
