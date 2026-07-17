@@ -169,8 +169,8 @@ class WorkOrderCommandPostgresIT {
 
     @Test
     void migrationSetIsCurrentAndRepeatable() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("091");
-        assertThat(flyway.info().applied()).hasSize(93);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("092");
+        assertThat(flyway.info().applied()).hasSize(94);
         assertThat(flyway.migrate().migrationsExecuted).isZero();
     }
 

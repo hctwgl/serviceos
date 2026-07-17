@@ -23,7 +23,7 @@ status: Proposed
 | configuration | ARCH-05 | API-01/02 | DATA-01 | M2 CFG | E2 |
 | files | ARCH-10、ARCH-21、ARCH-25 | API-03 资料引用、API-08 文件控制面 | DATA-03、V010 物理迁移 | M3 FILE、M6 SEC、M11 | E1/E3 |
 | reliability | ARCH-20、ADR-014 | API-01 通用命令/事件 | DATA-01 | M6 TX | E1 |
-| readmodel | PRODUCT-01～07、ARCH-19、ADR-027、M189 | API-06（含 §8 个人 SavedView）、Core OpenAPI 0.81.0 | DATA-06、V071～V078、V091 | M7 WO/QRY、M73～M99、M158、M189 | U0/U1 |
+| readmodel | PRODUCT-01～07、ARCH-19、ADR-027/028、M189～M190 | API-06（§8 SavedView + §9 Admin UI Preference）、Core OpenAPI 0.82.0 | DATA-06、V071～V078、V091～V092 | M7 WO/QRY、M73～M99、M158、M189～M190 | U0/U1 |
 | automation | ARCH-06、ARCH-20 | API-01 事件 | DATA-01 | M2 TASK、M6 TX | E1 |
 | operations | ARCH-14、ARCH-20、M60 | API-04 exception、outbound-delivery-recovered@v1、operational-exception-resolved@v2 | DATA-04、V060 | M4 OPS、M6 TX、M60 | E1/E4 |
 | workorder | ARCH-03/06 | API-01/02 | DATA-01 | M2 WO | E2 |
@@ -284,3 +284,4 @@ Feature gate/authority: if applicable
 | M187 | Admin 统一用户中心：用户/组织/网点/师傅/角色/授权页；目录选择器；影响面板；If-Match 写流；Capability 探测导航；真实 Keycloak PKCE E2E | PRODUCT-01 + Core OpenAPI 0.79.0（无 bump）+ Admin Web + deploy seed + `200-m187-*` + `184-m187-*` + `admin-user-center.spec.ts` | M188 `/me` 导航、Network/Technician Portal、正式 IdP/HR Connector |
 | M188 | Portal `/me` contexts/capabilities/navigation；代码 Page Registry + V090 覆盖；contextVersion 失权；Admin 消费与 Network/Technician stub；CONSUMER 不暴露入口 | ADR-026 + Core OpenAPI 0.80.0 + Flyway V090 + PostgreSQL/MVC/ArchitectureTest + Admin E2E + `201-m188-*` + `185-m188-*` | Consumer Identity Epic、完整 Network/Technician UI、MFA obligation 执行器 |
 | M189 | Admin 个人 SavedView CRUD；受控 filter AST；`rdm_saved_view`；Admin Task/WorkOrder/Correction UI；不授予页面 capability | ADR-027 + Core OpenAPI 0.81.0 + Flyway V091 + PostgreSQL/MVC/ArchitectureTest + Admin E2E + `202-m189-*` + `186-m189-*` | 共享 SavedView、UI Preference、Network/Technician 偏好 |
+| M190 | Admin UI Preference CRUD；键白名单；`rdm_ui_preference`；Admin 偏好面板与 CSS 应用；可选默认 SavedView 绑定 | ADR-028 + Core OpenAPI 0.82.0 + Flyway V092 + PostgreSQL/MVC/ArchitectureTest + Admin E2E + `203-m190-*` + `187-m190-*` | 共享偏好、Network/Technician Portal、设计系统大改 |

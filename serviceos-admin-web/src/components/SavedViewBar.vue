@@ -9,6 +9,8 @@ import {
   type SavedView,
   type SavedViewPageId,
 } from '../api/savedViews'
+import { defaultSavedViewIdForPage } from '../api/uiPreferences'
+import { currentUiPreferences, loadAndApplyUiPreferences } from '../preferences/uiPreferenceState'
 
 const props = defineProps<{
   pageId: SavedViewPageId
@@ -26,6 +28,7 @@ const selectedId = ref('')
 const saveName = ref('')
 const busy = ref(false)
 const message = ref<string | null>(null)
+const autoAppliedDefault = ref(false)
 
 async function refresh() {
   busy.value = true
@@ -36,11 +39,34 @@ async function refresh() {
     if (selectedId.value && !views.value.some((v) => v.id === selectedId.value)) {
       selectedId.value = ''
     }
+    await maybeApplyDefaultFromPreference()
   } catch (err) {
     message.value = err instanceof Error ? err.message : '加载保存视图失败'
   } finally {
     busy.value = false
   }
+}
+
+/** 可选：打开页面时按 UI Preference defaultSavedViews 自动应用默认视图一次。 */
+async function maybeApplyDefaultFromPreference() {
+  if (autoAppliedDefault.value) {
+    return
+  }
+  let prefs = currentUiPreferences()
+  if (!prefs) {
+    prefs = await loadAndApplyUiPreferences()
+  }
+  const preferredId = defaultSavedViewIdForPage(prefs, props.pageId)
+  const preferred =
+    (preferredId ? views.value.find((v) => v.id === preferredId) : undefined) ??
+    views.value.find((v) => v.isDefault)
+  if (!preferred || preferred.schemaVersion !== props.schemaVersion) {
+    return
+  }
+  selectedId.value = preferred.id
+  emit('apply', astToFilters(preferred.filter))
+  message.value = `已应用默认视图：${preferred.name}`
+  autoAppliedDefault.value = true
 }
 
 async function applySelected() {
@@ -105,6 +131,7 @@ watch(
   () => props.pageId,
   () => {
     selectedId.value = ''
+    autoAppliedDefault.value = false
     return refresh()
   },
 )

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.81.0
+  version: 0.82.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1313,6 +1313,77 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+
+  /me/ui-preferences:
+    get:
+      operationId: getMyUiPreferences
+      summary: 获取当前主体在指定 Portal 下的个人 UI 偏好
+      description: |
+        M190：仅 Portal=ADMIN。任意已认证主体可读自己的偏好；不授予页面 capability。
+        允许键：theme、density、locale、reduceMotion、defaultSavedViews、columnWidths。
+      parameters:
+        - name: portal
+          in: query
+          required: true
+          schema: { type: string, enum: [ADMIN] }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 个人 UI 偏好文档
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/UiPreferencesDocument' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+    put:
+      operationId: putMyUiPreferences
+      summary: 更新当前主体的个人 UI 偏好（按键 upsert）
+      description: |
+        portal 必须为 ADMIN。未知/禁止键返回 UI_PREFERENCE_KEY_NOT_ALLOWED。
+        可按键提供 expectedVersion 做乐观并发；冲突 VERSION_CONFLICT。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PutUiPreferencesRequest' }
+      responses:
+        '200':
+          description: 更新后的偏好文档
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/UiPreferencesDocument' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /me/ui-preferences/{key}:
+    delete:
+      operationId: deleteMyUiPreference
+      summary: 删除指定偏好键以恢复默认
+      description: |
+        仅删除本人偏好；删除不存在的键幂等成功（204）。portal 默认 ADMIN，非 ADMIN 失败关闭。
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [theme, density, locale, reduceMotion, defaultSavedViews, columnWidths]
+        - name: portal
+          in: query
+          required: false
+          schema: { type: string, enum: [ADMIN], default: ADMIN }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '204':
+          description: 已删除或本就不存在
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /work-orders:
     get:
       operationId: listAuthorizedWorkOrders
@@ -3707,6 +3778,65 @@ components:
         sort: { $ref: '#/components/schemas/SavedViewSortSpec' }
         columns: { type: array, items: { type: string, minLength: 1, maxLength: 64 } }
         isDefault: { type: boolean, default: false }
+
+    UiPreferenceEntry:
+      type: object
+      additionalProperties: false
+      required: [key, value, schemaVersion, aggregateVersion, updatedAt]
+      properties:
+        key:
+          type: string
+          enum: [theme, density, locale, reduceMotion, defaultSavedViews, columnWidths]
+        value:
+          description: 受控 JSON 值；形态按 key 由服务端白名单校验
+          oneOf:
+            - type: string
+            - type: boolean
+            - type: object
+              additionalProperties: true
+            - type: array
+              items: {}
+            - type: number
+        schemaVersion: { type: integer, minimum: 1 }
+        aggregateVersion: { type: integer, format: int64, minimum: 1 }
+        updatedAt: { type: string, format: date-time }
+    UiPreferencesDocument:
+      type: object
+      additionalProperties: false
+      required: [portal, preferences, asOf]
+      properties:
+        portal: { enum: [ADMIN] }
+        preferences:
+          type: object
+          additionalProperties: { $ref: '#/components/schemas/UiPreferenceEntry' }
+        asOf: { type: string, format: date-time }
+    UiPreferenceWrite:
+      type: object
+      additionalProperties: false
+      required: [value, schemaVersion]
+      properties:
+        value:
+          description: 受控 JSON 值；形态按 key 由服务端白名单校验
+          oneOf:
+            - type: string
+            - type: boolean
+            - type: object
+              additionalProperties: true
+            - type: array
+              items: {}
+            - type: number
+        schemaVersion: { type: integer, minimum: 1 }
+        expectedVersion: { type: integer, format: int64, minimum: 1 }
+    PutUiPreferencesRequest:
+      type: object
+      additionalProperties: false
+      required: [portal, preferences]
+      properties:
+        portal: { enum: [ADMIN] }
+        preferences:
+          type: object
+          minProperties: 1
+          additionalProperties: { $ref: '#/components/schemas/UiPreferenceWrite' }
     Organization:
       type: object
       additionalProperties: false

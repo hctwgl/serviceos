@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-17
-baselineCommit: e34e4b6485c99c7fb5130a6c16321c30de234274
-latestMilestone: M189
+baselineCommit: TBD
+latestMilestone: M190
 ---
 
 # ServiceOS 实施状态总览
@@ -39,13 +39,13 @@ latestMilestone: M189
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M189 Admin 个人 SavedView |
-| 基线提交 | `e34e4b6485c99c7fb5130a6c16321c30de234274`（功能提交后回填） |
+| 最新实施里程碑 | M190 Admin UI Preferences |
+| 基线提交 | `TBD`（功能提交后回填） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
-| 前端工程 | `serviceos-admin-web`（Vue+TS+Vite）已纳入 CI 构建，具备开发态 Keycloak PKCE，以及真实只读、Task MANUAL assign-candidates/claim/release、表单/资料/审核/整改/完结、正常补传复审，预约上门、BYD 提审外发 ACK、厂端回调，CPIM 入站→激活→Admin HTTP 人工初派→同单预约上门→表单/资料/驳回整改补传复审/外发/完结（ADMIN-PILOT-09），入站 Envelope 授权队列与详情深链、专项队列与目录/SLA Accepted OpenAPI 筛选，工作区各按需区块详情或 Task 旁路、预约/表单/资料/上门/联系详情页、核心时间线与最近活动资源深链、外部审核回执详情、审核/整改交叉深链、工作区异常摘要→异常队列 query 水合与 handlingTaskId 深链、工作区审核/整改关联资源深链、Task 面板资源详情深链、Canonical Message 独立详情页、专项队列与目录页 query 水合及关联资源深链、外发关联资源与回执入站交叉深链、详情页明文 projectId / 源资源 / 现场与 SLA scope 字段深链、专项队列剩余 Accepted 关联字段深链、QueueTable 可选行内单元格深链、外发 executionTaskId / 快照成员资料项深链，工作区项目与 SLA 任务交叉深链的 PR 阻断 E2E；**M187 Admin 统一用户中心**；**M188 `/me` 导航**；**M189 Admin 个人 SavedView**（任务/工单/整改页 SavedViewBar + E2E） |
-| 数据库 | PostgreSQL + Flyway（当前版本 091 / 93） |
-| 契约 | Core OpenAPI 0.81.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、recovered/resolved 与 SLA started/breached/met@v1） |
+| 前端工程 | `serviceos-admin-web`（Vue+TS+Vite）已纳入 CI 构建，具备开发态 Keycloak PKCE，以及真实只读、Task MANUAL assign-candidates/claim/release、表单/资料/审核/整改/完结、正常补传复审，预约上门、BYD 提审外发 ACK、厂端回调，CPIM 入站→激活→Admin HTTP 人工初派→同单预约上门→表单/资料/驳回整改补传复审/外发/完结（ADMIN-PILOT-09），入站 Envelope 授权队列与详情深链、专项队列与目录/SLA Accepted OpenAPI 筛选，工作区各按需区块详情或 Task 旁路、预约/表单/资料/上门/联系详情页、核心时间线与最近活动资源深链、外部审核回执详情、审核/整改交叉深链、工作区异常摘要→异常队列 query 水合与 handlingTaskId 深链、工作区审核/整改关联资源深链、Task 面板资源详情深链、Canonical Message 独立详情页、专项队列与目录页 query 水合及关联资源深链、外发关联资源与回执入站交叉深链、详情页明文 projectId / 源资源 / 现场与 SLA scope 字段深链、专项队列剩余 Accepted 关联字段深链、QueueTable 可选行内单元格深链、外发 executionTaskId / 快照成员资料项深链，工作区项目与 SLA 任务交叉深链的 PR 阻断 E2E；**M187 Admin 统一用户中心**；**M188 `/me` 导航**；**M189 Admin 个人 SavedView**；**M190 Admin UI Preferences**（偏好面板 + theme/density/reduceMotion CSS + E2E） |
+| 数据库 | PostgreSQL + Flyway（当前版本 092 / 94） |
+| 契约 | Core OpenAPI 0.82.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、recovered/resolved 与 SLA started/breached/met@v1） |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -84,7 +84,8 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | 角色与授权治理 | Role/Capability/RoleGrant 管理、审批、撤销与 Delegation | `IMPLEMENTED` | 扩展 `authorization`：角色/能力目录、申请/审批/拒绝/撤销、Delegation、SoD 与可授予范围、DENY 优先、grant generation、授权解释与治理 HTTP；Admin 角色/授权页（M187）；`/me*` 上下文与导航（M188） | MFA obligation 执行器 | M186～M188 |
 | 统一用户中心 | Admin 用户、组织、网点人员、师傅、角色和授权治理 | `IMPLEMENTED` | 目录选择器、分区详情、影响面板、If-Match 写流、EXTERNAL 只读徽章、Capability 探测导航、真实 Keycloak PKCE E2E（含低权限深链）；M188 起导航改消费 `/me/navigation` | 正式企业 IdP / HR Connector | M187、M188 |
 | Portal 上下文与导航 | `/me`、contexts、capabilities、navigation 与多 Persona | `IMPLEMENTED` | 服务端上下文；代码 Page Registry + V090 覆盖；contextVersion 失权；Admin 消费与 Network/Technician stub；CONSUMER 不暴露入口 | 完整 Network/Technician 产品 UI；Consumer Identity | M188 |
-| Admin 个人 SavedView | 个人筛选视图 CRUD 与 Admin 目录/队列应用 | `IMPLEMENTED` | API-06 §8 个人切片；`rdm_saved_view`；受控 filter AST；Admin Task/WorkOrder/Correction SavedViewBar；不授予页面能力 | 共享 SavedView、UI Preference、Network/Technician 偏好、设计系统级组件 | M189 |
+| Admin 个人 SavedView | 个人筛选视图 CRUD 与 Admin 目录/队列应用 | `IMPLEMENTED` | API-06 §8 个人切片；`rdm_saved_view`；受控 filter AST；Admin Task/WorkOrder/Correction SavedViewBar；不授予页面能力 | 共享 SavedView、Network/Technician 偏好、设计系统级组件 | M189 |
+| Admin UI Preference | 个人展示偏好 CRUD 与 Admin Web 应用 | `IMPLEMENTED` | API-06 §9 Admin 切片；`rdm_ui_preference`；键白名单；主题/密度/减少动画；可选默认 SavedView 绑定 | 共享偏好、Network/Technician Portal、设计系统级主题引擎 | M190 |
 | Consumer Identity | CustomerProfile、用户资源关系和 C 端身份 | `ACCEPTED` | Principal/IdentityLink/API Schema 已预留 Consumer Persona | 身份治理序列之后的独立 Epic；待登录、隐私、客户主数据与注销策略确认；不得宣称已实现 | 后续正式 Epic |
 | 项目治理 | Project 核心事实、范围关系与授权目录 | `PARTIAL` | 项目创建；REGION/NETWORK 当前关系整组修订和不可变历史；`project.read` 授权目录、详情及历史查询 | owners、品牌/服务产品/配置绑定、生命周期、计划修订审批、目录治理 UI | M8、M64～M67 |
 | 可靠消息 | Inbox、Outbox、Worker claim/lease/retry | `IMPLEMENTED` | 本地可靠发布消费、恢复和人工接管基础 | 正式 Broker 和跨服务运行 | M9～M10 |
@@ -93,7 +94,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | 工单 | WorkOrder 接收、激活、履约完成与授权工作区投影 | `PARTIAL` | 权威工单、工作流启动、跨阶段和 END 完结；授权目录、非 PII 详情、Stage/Task 执行骨架及核心执行+现场履约时间线 | 完整取消、暂停、恢复、客户敏感详情审计、跨域完整时间线/动作与全部业务分支 | M16～M19、M68～M69、M73～M74 |
 | 工作流 | 线性 Stage/Task 运行时 | `PARTIAL` | 精确版本启动、线性推进、唯一跨阶段推进、完成事件；节点 `slaRef` 传递；授权 Workflow/Stage 当前投影 | 并行/汇聚网关、流程条件表达式、Node/Attempt 历史和复杂流程语义 | M17～M19、M61、M69 |
 | 人工任务与执行历史 | claim/start/complete、责任、执行保护与授权任务读取 | `IMPLEMENTED` | 人工命令、候选领取、唯一责任、release/reclaim、执行保护；表单/资料完成门禁；授权队列/详情、allowed-actions、自动 Attempt 历史及工单内核心 Task 生命周期与指派/Guard/人工接管时间线 | block/retry/cancel 等其他动作、Workflow Node 历史、跨工单/跨域完整历史和 Review 完成条件 | M20～M23、M35、M41、M43、M69～M73、M81 |
-| 应用只读投影 | 工作区、队列、时间线和投影运行时 | `PARTIAL` | 独立 readmodel 模块；核心执行、现场履约、SLA、资料/审核/整改（含外部回执与条件 KEEP/INVALIDATE 处置）、外发交付全链路、异常确认/闭环、ServiceAssignment 与 Task 指派/Guard/人工接管 Inbox 投影；授权时间线与稳定分页及最近活动摘要；时间线 checkpoint/dead letter/generation 重建与 FRESH/LAGGING/UNKNOWN/REBUILDING freshness；definition 登记、dead letter 幂等重放与旧/孤儿 generation 清理；工单工作区顶层实时组合、当前 ACTIVE 服务责任摘要与 TASKS/TIMELINE_AUDIT/APPOINTMENTS_VISITS（含联系尝试）/FORMS_EVIDENCE（含提交与资料项安全元数据）/REVIEWS_CORRECTIONS（含 CLIENT/重开血缘）/INTEGRATION 按需区块（敏感字段最小化；缺权次级区块降级）；授权跨项目 ReviewCase/CorrectionCase/OutboundDelivery/InboundEnvelope 专项队列；Admin 个人 SavedView（M189） | 试算合并、revision/slots 技术噪声、表单值与资料版本详情、FACTS_CALCULATIONS、关键事件 taxonomy/过滤、通用 work-queues、共享 SavedView、搜索、多投影平台、Broker offset、Portal、Admin 重建/重放 HTTP | M73～M99、M158、M189 |
+| 应用只读投影 | 工作区、队列、时间线和投影运行时 | `PARTIAL` | 独立 readmodel 模块；核心执行、现场履约、SLA、资料/审核/整改（含外部回执与条件 KEEP/INVALIDATE 处置）、外发交付全链路、异常确认/闭环、ServiceAssignment 与 Task 指派/Guard/人工接管 Inbox 投影；授权时间线与稳定分页及最近活动摘要；时间线 checkpoint/dead letter/generation 重建与 FRESH/LAGGING/UNKNOWN/REBUILDING freshness；definition 登记、dead letter 幂等重放与旧/孤儿 generation 清理；工单工作区顶层实时组合、当前 ACTIVE 服务责任摘要与 TASKS/TIMELINE_AUDIT/APPOINTMENTS_VISITS（含联系尝试）/FORMS_EVIDENCE（含提交与资料项安全元数据）/REVIEWS_CORRECTIONS（含 CLIENT/重开血缘）/INTEGRATION 按需区块（敏感字段最小化；缺权次级区块降级）；授权跨项目 ReviewCase/CorrectionCase/OutboundDelivery/InboundEnvelope 专项队列；Admin 个人 SavedView（M189）与 UI Preference（M190） | 试算合并、revision/slots 技术噪声、表单值与资料版本详情、FACTS_CALCULATIONS、关键事件 taxonomy/过滤、通用 work-queues、共享 SavedView/偏好、搜索、多投影平台、Broker offset、Portal、Admin 重建/重放 HTTP | M73～M99、M158、M189～M190 |
 | 服务分配 | 网点分配、容量、改派 Saga、超时恢复 | `IMPLEMENTED` | ServiceAssignment、容量权威、改派、终止、对账和自动恢复 | 完整策略评分、全部异常分支和 UI | M24～M28 |
 | 运营异常 | 异常工作台基础 | `PARTIAL` | 异常记录和恢复入口；M58 将外发 UNKNOWN 与 Task 最终人工事件汇入 OperationalException + HUMAN Task；M59 提供高风险人工重发事实；M60 在严格 ACK 后幂等闭环对应异常并处理事件乱序；列表/详情/确认已硬化为实时项目范围 | 人工标记已送达/放弃、其他异常类型自动闭环、完整通知、运营中心前端和跨域异常目录 | M29、M58～M60、M100 |
 | 预约 | 预约修订、联系终态动作 | `PARTIAL` | Revision、并发和终态动作基础；公开事件已并入工单时间线；Admin propose/confirm E2E；`GET /contact-attempts/{id}` 与详情页 | 用户确认渠道、完整日程和跨端协作 | M30～M31、M74、M136、M160 |
@@ -106,7 +107,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | 通知 | 通知与运营异常中心 | `PROPOSED` | 已有总体设计 | 通知通道、模板、可靠发送和 UI | `architecture/14-*` |
 | 履约事实与试算 | 事实提取和双向试算 | `PROPOSED` | 已有设计、API 和数据规划 | 运行时、投影和前端工作区 | M5 设计 |
 | 对账结算 | 对账、结算、争议与调整 | `PROPOSED` | 已有边界设计 | 正式运行时和页面 | `architecture/16-*` |
-| Admin Portal | 总部运营后台 | `PARTIAL` | M101～M182：队列/任务/SLA/异常/入站/外发/工单/项目目录、工作区、allowed-actions；CI 阻断构建；开发态 Keycloak PKCE；真实只读与写链路 PR 阻断 E2E；M187～M188 用户中心与 `/me` 导航；**M189 个人 SavedView**（任务/工单/整改） | 设计系统、共享 SavedView/UI Preference、正式企业 OIDC/BFF、生产对象存储/专业扫描、评分/硬过滤派单与 ServiceNetwork 生命周期 | M7 设计、M101～M182、M187～M189、Admin 试点基线 |
+| Admin Portal | 总部运营后台 | `PARTIAL` | M101～M182：队列/任务/SLA/异常/入站/外发/工单/项目目录、工作区、allowed-actions；CI 阻断构建；开发态 Keycloak PKCE；真实只读与写链路 PR 阻断 E2E；M187～M188 用户中心与 `/me` 导航；**M189 个人 SavedView**；**M190 UI Preferences**（主题/密度/减少动画） | 设计系统、共享 SavedView/偏好、正式企业 OIDC/BFF、生产对象存储/专业扫描、评分/硬过滤派单与 ServiceNetwork 生命周期 | M7 设计、M101～M182、M187～M190、Admin 试点基线 |
 | Network Portal | 网点协作端 | `PROPOSED` | 页面和跨端协作规格 | 前端代码和 E2E | M7 设计 |
 | Technician App | 师傅移动端 | `PROPOSED` | 弱网、离线工作包、上传队列和页面规格 | 移动端工程、真机和离线运行时 | M7 设计 |
 | External Portal | 用户/车企受控页面 | `PROPOSED` | 最小边界规划 | 二期页面和工程实现 | M7 设计 |
@@ -119,8 +120,8 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M189**。身份治理 M183～M188 与 Admin 个人 SavedView 已交付。
-没有实现共享 SavedView、UI Preference、Consumer Identity、正式 HR Connector、ORGANIZATION
+ServiceOS 可靠纵向切片已推进到 **M190**。身份治理 M183～M188、Admin 个人 SavedView 与 Admin UI
+Preference 已交付。没有实现共享 SavedView/偏好、Consumer Identity、正式 HR Connector、ORGANIZATION
 DataScope，也没有完整 Network/Technician 产品 UI。
 
 ```text
@@ -131,7 +132,7 @@ DataScope，也没有完整 Network/Technician 产品 UI。
 4. OCR/CV、GPS 权威距离、二级审批/MFA、报告 GENERATED 资料包；
 5. 表达式计算字段、决策表/脚本、草稿冲突与离线合并；
 6. FieldOperation 详情（API-03 仍为 Proposed，不得猜测读契约）；
-7. 正式企业门户设计系统、共享 SavedView / UI Preference（需再接受 API-06 其余章节）；完整 Network/Technician Portal UI。
+7. 正式企业门户设计系统、共享 SavedView / 跨 Portal UI Preference（需再接受 API-06 其余章节）；完整 Network/Technician Portal UI。
 ```
 
 接手 Agent 必须先检查仓库是否已有更新的里程碑文档、ADR 或提交；在收到明确批准前不得猜测业务策略并实现上述候选项。

@@ -6,7 +6,7 @@ status: Accepted
 
 # 应用工作区、队列与用户偏好 HTTP API
 
-## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158 / M189）
+## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158 / M189 / M190）
 
 **Accepted（可指导实现）**：
 
@@ -30,10 +30,16 @@ status: Accepted
   `PUT/DELETE /me/saved-views/{id}`；Portal=`ADMIN`；pageId 限于已有 Accepted 筛选目录的
   Admin 页面（至少 `ADMIN.TASK.QUEUE`、`ADMIN.WORKORDER.LIST`、`ADMIN.CORRECTION.QUEUE`）。
   **不**接受 `POST /saved-views/{id}:share`、角色/组织共享视图、Network/Technician SavedView。
+- §9 Admin UI Preference（M190）：仅
+  `GET /me/ui-preferences?portal=ADMIN`、
+  `PUT /me/ui-preferences`（body：`portal` + `preferences` 映射）、
+  `DELETE /me/ui-preferences/{key}` 恢复默认；Portal 必须为 `ADMIN`，其他 Portal 失败关闭。
+  允许键白名单见 §9；禁止关闭安全确认、隐藏必填、绕过脱敏或禁用事务通知。
+  **不**接受共享偏好、Network/Technician Portal 偏好。
 
 **仍为设计草案**：§3 导航、§4 工作台与队列、§5 其余 section、
-§6 其余专项队列、§7 搜索、§8 共享 SavedView、§9 UI Preference、§10～§11 与导出分析等。
-不得在未再接受前实现。
+§6 其余专项队列、§7 搜索、§8 共享 SavedView、§9 非 Admin Portal UI Preference、
+§10～§11 与导出分析等。不得在未再接受前实现。
 
 ## 1. 目标
 
@@ -190,6 +196,28 @@ View 保存 filter AST、列、排序和密度，不保存任意 SQL、访问 to
 
 偏好不能关闭事务通知、安全告警、必填字段、数据脱敏或高风险确认。
 
+### 9.1 Admin UI Preference（M190 Accepted）
+
+本切片仅接受 Portal=`ADMIN`。`portal` 查询/请求体必须为 `ADMIN`；`NETWORK`/`TECHNICIAN` 或其他值
+返回 `VALIDATION_FAILED`（失败关闭）。任意已认证主体仅可读写**自己的**偏好（tenant + principal
+作用域）；跨主体按不存在/不可达处理，不新增 Capability。
+
+**允许键（白名单；未知键 `UI_PREFERENCE_KEY_NOT_ALLOWED` 或 `VALIDATION_FAILED`）**：
+
+| key | value 形态 | 说明 |
+|---|---|---|
+| `theme` | `LIGHT` \| `DARK` \| `SYSTEM` | 外观主题 |
+| `density` | `COMFORTABLE` \| `COMPACT` | 列表/表单密度 |
+| `locale` | BCP-47 字符串（如 `zh-CN`） | 界面语言；本切片采用 `locale`，不另设 `language` |
+| `reduceMotion` | boolean | 减少动画 |
+| `defaultSavedViews` | `{ "<pageId>": "<uuid>" \| null, ... }` | 每页默认 SavedView；pageId 限于已 Accepted 个人 SavedView 页面 |
+| `columnWidths` | `{ "schemaVersion": n, "pages": { "<pageId>": { "<columnId>": widthPx } } }` | 可选列宽；schemaVersioned；pageId 同上 |
+
+**明确禁止（失败关闭）**：任何试图关闭安全确认、隐藏必填字段、绕过脱敏、禁用事务/安全通知的键或值。
+白名单外键一律拒绝。
+
+并发：按 preference_key 乐观版本（`aggregateVersion` / 可选 `expectedVersion`）；冲突 `VERSION_CONFLICT`。
+
 ## 10. Network 查询
 
 | 方法与路径 | 用途 |
@@ -259,6 +287,7 @@ MVP 不从 SHADOW CalculationRun 推断正式收入/成本/毛利；试算汇总
 | `PORTAL_CONTEXT_INVALID` | 403 | 当前主体不能使用请求 Portal/网点上下文 |
 | `SAVED_VIEW_SCHEMA_OUTDATED` | 409 | 视图字段已变化，需迁移/重置 |
 | `QUERY_FILTER_NOT_ALLOWED` | 422 | 字段或操作符不允许 |
+| `UI_PREFERENCE_KEY_NOT_ALLOWED` | 422 | UI 偏好键不在白名单或被禁止 |
 | `PROJECTION_REBUILDING` | 200/503 | 可返回降级数据或暂不可用 |
 | `SEARCH_TERM_NOT_ALLOWED` | 422 | 敏感/过宽搜索不允许 |
 | `WORK_PACKAGE_INVALIDATED` | 409 | assignment/authority/config 已变化 |

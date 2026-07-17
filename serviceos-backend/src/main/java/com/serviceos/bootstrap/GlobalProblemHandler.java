@@ -48,7 +48,7 @@ final class GlobalProblemHandler {
             case FILE_NOT_AVAILABLE -> HttpStatus.LOCKED;
             case RESOURCE_NOT_FOUND -> HttpStatus.NOT_FOUND;
             case VALIDATION_FAILED -> HttpStatus.BAD_REQUEST;
-            case QUERY_FILTER_NOT_ALLOWED -> HttpStatus.UNPROCESSABLE_CONTENT;
+            case QUERY_FILTER_NOT_ALLOWED, UI_PREFERENCE_KEY_NOT_ALLOWED -> HttpStatus.UNPROCESSABLE_CONTENT;
             default -> HttpStatus.UNPROCESSABLE_CONTENT;
         };
         return problem(status, exception.code(), exception.getMessage(), request);

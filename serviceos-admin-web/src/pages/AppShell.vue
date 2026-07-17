@@ -7,6 +7,7 @@ import {
   type PortalNavState,
 } from '../nav/portalNavigation'
 import { AUTH_REQUIRED_EVENT, currentLocalOidcSession } from '../auth/oidc'
+import { loadAndApplyUiPreferences } from '../preferences/uiPreferenceState'
 
 const nav = ref<PortalNavState>({
   contexts: [],
@@ -37,6 +38,9 @@ async function onContextChange(event: Event) {
 
 onMounted(() => {
   void refreshNav()
+  if (currentLocalOidcSession().authenticated) {
+    void loadAndApplyUiPreferences()
+  }
   window.addEventListener(AUTH_REQUIRED_EVENT, () => {
     nav.value = {
       contexts: [],
@@ -50,6 +54,7 @@ onMounted(() => {
   window.addEventListener('focus', () => {
     if (currentLocalOidcSession().authenticated) {
       void refreshNav(nav.value.activeContextId)
+      void loadAndApplyUiPreferences()
     }
   })
 })
@@ -92,6 +97,7 @@ onMounted(() => {
         </RouterLink>
       </template>
       <RouterLink to="/work-orders/lookup">按 ID 打开</RouterLink>
+      <RouterLink to="/settings/preferences" data-testid="nav-ui-preferences">界面偏好</RouterLink>
       <RouterLink to="/settings/token">身份登录</RouterLink>
       <RouterLink to="/portal-stubs" data-testid="nav-portal-stubs">Portal stubs</RouterLink>
     </aside>
@@ -109,6 +115,17 @@ onMounted(() => {
   font-family: Inter, system-ui, sans-serif;
   color: #102a43;
   background: #f5f7fa;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+:global(html.theme-dark) .shell {
+  color: #f0f4f8;
+  background: #102a43;
+}
+:global(html.density-compact) .content {
+  padding: 0.85rem;
+}
+:global(html.reduce-motion) .shell {
+  transition: none;
 }
 .nav {
   display: flex;
