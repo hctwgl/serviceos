@@ -72,8 +72,8 @@ class PortalContextPostgresIT {
                     idn_person_profile, idn_security_principal,
                     rel_idempotency_record, aud_audit_record CASCADE
                 """).update();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("095");
-        assertThat(flyway.info().applied()).hasSize(97);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("096");
+        assertThat(flyway.info().applied()).hasSize(98);
 
         seedPrincipal();
         seedPersona("INTERNAL_EMPLOYEE");
@@ -136,7 +136,7 @@ class PortalContextPostgresIT {
     void m188_03_navigationUsesPageRegistryAndCapabilityGate() {
         String adminContext = "ADMIN|TENANT|" + TENANT;
         MeNavigationView nav = portal.navigation(actor(), "corr-nav", adminContext, null);
-        assertThat(nav.navigationCatalogVersion()).isEqualTo("page-registry-v4");
+        assertThat(nav.navigationCatalogVersion()).isEqualTo("page-registry-v5");
         assertThat(nav.items()).extracting(i -> i.pageId())
                 .contains("ADMIN.USER.DIRECTORY", "ADMIN.GRANT.DIRECTORY");
         assertThat(nav.items()).noneMatch(i -> i.pageId().startsWith("NETWORK."));

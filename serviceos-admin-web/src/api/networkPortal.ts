@@ -1,5 +1,5 @@
-/** Network Portal 只读 API：networkId 只经 X-Network-Context，禁止 query-param。 */
-import { apiGet, type HttpStatusError } from './client'
+/** Network Portal API：networkId 只经 X-Network-Context，禁止 query-param。 */
+import { apiGet, apiPost, type HttpStatusError } from './client'
 
 export type NetworkPortalPage<T> = {
   networkId: string
@@ -92,6 +92,33 @@ export function getNetworkPortalWorkbench(networkContextId: string) {
     '/network-portal/workbench',
     {},
     networkHeaders(networkContextId),
+  )
+}
+
+export type ManualServiceAssignmentReceipt = {
+  taskId: string
+  workOrderId: string
+  networkServiceAssignmentId: string
+  technicianServiceAssignmentId: string
+  networkAssigneeId: string
+  technicianAssigneeId: string
+  occurredAt: string
+}
+
+/** M196：指派师傅；不提交 networkAssigneeId，服务端强制等于可信上下文网点。 */
+export function assignNetworkPortalTechnician(
+  networkContextId: string,
+  taskId: string,
+  body: { technicianAssigneeId: string; businessType: string },
+  idempotencyKey = crypto.randomUUID(),
+) {
+  return apiPost<ManualServiceAssignmentReceipt>(
+    `/network-portal/tasks/${taskId}:assign-technician`,
+    {
+      body,
+      idempotencyKey,
+      headers: networkHeaders(networkContextId),
+    },
   )
 }
 

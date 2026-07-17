@@ -1,13 +1,11 @@
-package com.serviceos.readmodel.application;
+package com.serviceos.dispatch;
 
 import com.serviceos.ServiceOsApplication;
+import com.serviceos.dispatch.api.ManualServiceAssignmentReceipt;
+import com.serviceos.dispatch.api.NetworkPortalAssignTechnicianService;
 import com.serviceos.identity.api.CurrentPrincipal;
-import com.serviceos.readmodel.api.TechnicianPortalFeedItem;
-import com.serviceos.readmodel.api.TechnicianPortalFeedPage;
-import com.serviceos.readmodel.api.TechnicianPortalQueryService;
-import com.serviceos.readmodel.api.TechnicianPortalSchedulePage;
-import com.serviceos.readmodel.api.TechnicianPortalSyncSummary;
 import com.serviceos.shared.BusinessProblem;
+import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.ProblemCode;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,8 +15,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -32,28 +28,25 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * M195 Technician Portal Feed：本人 ACTIVE 责任、tombstone、日程、sync-summary、跨网点与非师傅拒绝。
+ * M196 Network Portal 指派师傅：成功指派、membership/capability 失败关闭、师傅不在网点、
+ * 不同网点/不同师傅 ACTIVE 冲突、伪造上下文。
  */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = ServiceOsApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE)
-class TechnicianPortalFeedPostgresIT {
-    private static final String TENANT = "tenant-technician-portal-m195";
-    private static final UUID TECH_PRINCIPAL = UUID.fromString("019f83b0-1111-7f8c-9505-36fe5c0e8801");
-    private static final UUID OTHER_TECH_PRINCIPAL = UUID.fromString("019f83b0-1112-7f8c-9505-36fe5c0e8802");
-    private static final UUID NON_TECH_PRINCIPAL = UUID.fromString("019f83b0-1113-7f8c-9505-36fe5c0e8803");
-    private static final UUID NETWORK_A = UUID.fromString("019f83b0-2222-7f8c-9505-36fe5c0e8804");
-    private static final UUID NETWORK_B = UUID.fromString("019f83b0-3333-7f8c-9505-36fe5c0e8805");
-    private static final UUID PARTNER = UUID.fromString("019f83b0-4444-7f8c-9505-36fe5c0e8806");
-    private static final UUID TECH_PROFILE_A = UUID.fromString("019f83b0-5555-7f8c-9505-36fe5c0e8807");
+class NetworkPortalAssignTechnicianPostgresIT {
+    private static final String TENANT = "tenant-network-portal-m196";
+    private static final String BUSINESS_TYPE = "INSTALLATION";
+    private static final UUID PRINCIPAL = UUID.fromString("019f83b0-1111-7f8c-9505-36fe5c0e8801");
+    private static final UUID OTHER_PRINCIPAL = UUID.fromString("019f83b0-1112-7f8c-9505-36fe5c0e8802");
+    private static final UUID NETWORK_A = UUID.fromString("019f83b0-2222-7f8c-9505-36fe5c0e8803");
+    private static final UUID NETWORK_B = UUID.fromString("019f83b0-3333-7f8c-9505-36fe5c0e8804");
+    private static final UUID PARTNER = UUID.fromString("019f83b0-4444-7f8c-9505-36fe5c0e8805");
+    private static final UUID TECH_PROFILE = UUID.fromString("019f83b0-5555-7f8c-9505-36fe5c0e8806");
+    private static final UUID TECH_PRINCIPAL = UUID.fromString("019f83b0-6666-7f8c-9505-36fe5c0e8807");
     private static final UUID TECH_PROFILE_B = UUID.fromString("019f83b0-5556-7f8c-9505-36fe5c0e8808");
-    private static final UUID WO_A = UUID.fromString("019f83b0-7777-7f8c-9505-36fe5c0e8809");
-    private static final UUID WO_B = UUID.fromString("019f83b0-8888-7f8c-9505-36fe5c0e880a");
-    private static final UUID TASK_A = UUID.fromString("019f83b0-9999-7f8c-9505-36fe5c0e880b");
-    private static final UUID TASK_B = UUID.fromString("019f83b0-aaaa-7f8c-9505-36fe5c0e880c");
-    private static final UUID TASK_OTHER = UUID.fromString("019f83b0-bbbb-7f8c-9505-36fe5c0e880d");
-    private static final UUID PROJECT_A = UUID.fromString("019f83b0-cccc-7f8c-9505-36fe5c0e880e");
-    private static final UUID APPOINTMENT_A = UUID.fromString("019f83b0-dddd-7f8c-9505-36fe5c0e880f");
-    private static final UUID TECH_ASSIGNMENT_A = UUID.fromString("019f83b0-eeee-7f8c-9505-36fe5c0e8810");
+    private static final UUID TECH_PRINCIPAL_B = UUID.fromString("019f83b0-6667-7f8c-9505-36fe5c0e8809");
+    private static final UUID WO = UUID.fromString("019f83b0-7777-7f8c-9505-36fe5c0e880a");
+    private static final UUID TASK = UUID.fromString("019f83b0-9999-7f8c-9505-36fe5c0e880b");
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(
@@ -71,21 +64,17 @@ class TechnicianPortalFeedPostgresIT {
         registry.add("serviceos.task.scheduling-enabled", () -> "false");
     }
 
-    @Autowired TechnicianPortalQueryService portal;
+    @Autowired NetworkPortalAssignTechnicianService portalAssign;
     @Autowired JdbcClient jdbc;
     @Autowired Flyway flyway;
-    @Autowired PlatformTransactionManager transactionManager;
 
     @BeforeEach
     void cleanAndSeed() {
         jdbc.sql("""
-                TRUNCATE TABLE apt_appointment_command_result, apt_contact_attempt_command_result,
-                    apt_contact_attempt, apt_appointment_status_history, apt_appointment,
-                    apt_appointment_revision,
-                    dsp_assignment_command_result, dsp_capacity_command_result,
+                TRUNCATE TABLE dsp_assignment_command_result, dsp_capacity_command_result,
                     dsp_service_assignment_activation_saga, dsp_capacity_reservation,
                     dsp_service_assignment, dsp_capacity_counter,
-                    tsk_task_assignment, tsk_task_assignment_batch, tsk_task,
+                    tsk_task,
                     auth_delegation_capability, auth_delegation, auth_role_grant_event,
                     auth_tenant_grant_generation, auth_role_grant, auth_role_capability, auth_role,
                     net_technician_qualification, net_network_technician_membership,
@@ -97,28 +86,25 @@ class TechnicianPortalFeedPostgresIT {
                 """).update();
         assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("096");
         assertThat(flyway.info().applied()).hasSize(98);
+        assertThat(jdbc.sql("""
+                        SELECT risk_level FROM auth_capability
+                         WHERE capability_code='networkPortal.assignTechnician'
+                        """).query(String.class).single()).isEqualTo("HIGH");
 
+        seedPrincipal(PRINCIPAL, "Portal Member");
+        seedPrincipal(OTHER_PRINCIPAL, "Other Member");
         seedPrincipal(TECH_PRINCIPAL, "Technician A");
-        seedPrincipal(OTHER_TECH_PRINCIPAL, "Technician B");
-        seedPrincipal(NON_TECH_PRINCIPAL, "Staff Only");
-        seedPersona(TECH_PRINCIPAL, "TECHNICIAN");
-        seedPersona(OTHER_TECH_PRINCIPAL, "TECHNICIAN");
-        seedPersona(NON_TECH_PRINCIPAL, "NETWORK_MEMBER");
+        seedPrincipal(TECH_PRINCIPAL_B, "Technician B");
+        seedPersona(PRINCIPAL, "NETWORK_MEMBER");
         seedPartnerAndNetworks();
-        seedTechnician(TECH_PROFILE_A, TECH_PRINCIPAL, NETWORK_A, "师傅甲");
-        seedTechnician(TECH_PROFILE_B, OTHER_TECH_PRINCIPAL, NETWORK_B, "师傅乙");
-        seedGrant(TECH_PRINCIPAL, "task.readAssigned", "NETWORK", NETWORK_A.toString());
-        seedGrant(OTHER_TECH_PRINCIPAL, "task.readAssigned", "NETWORK", NETWORK_B.toString());
-        seedHumanTask(TASK_A, WO_A, PROJECT_A);
-        seedHumanTask(TASK_B, WO_B, UUID.randomUUID());
-        seedHumanTask(TASK_OTHER, UUID.randomUUID(), UUID.randomUUID());
-        // 本人 ACTIVE：assignee = principalId
-        seedActivePair(NETWORK_A, WO_A, TASK_A, TECH_PRINCIPAL.toString(), TECH_ASSIGNMENT_A);
-        // 同网点另一师傅责任（不应出现在本人 feed）
-        seedActivePair(NETWORK_A, UUID.randomUUID(), TASK_OTHER, "other-assignee", UUID.randomUUID());
-        // 跨网点师傅责任
-        seedActivePair(NETWORK_B, WO_B, TASK_B, OTHER_TECH_PRINCIPAL.toString(), UUID.randomUUID());
-        seedAppointment(APPOINTMENT_A, TASK_A, WO_A, PROJECT_A);
+        seedNetworkMembership(PRINCIPAL, NETWORK_A);
+        seedNetworkMembership(OTHER_PRINCIPAL, NETWORK_B);
+        seedTechnician(TECH_PROFILE, TECH_PRINCIPAL, NETWORK_A, true);
+        seedTechnician(TECH_PROFILE_B, TECH_PRINCIPAL_B, NETWORK_B, true);
+        seedGrant(PRINCIPAL, "networkPortal.assignTechnician", "NETWORK", NETWORK_A.toString());
+        seedGrant(PRINCIPAL, "dispatch.assignment.manage", "NETWORK", NETWORK_A.toString());
+        seedGrant(PRINCIPAL, "dispatch.capacity.configure", "NETWORK", NETWORK_A.toString());
+        seedHumanTask(TASK, WO);
         jdbc.sql("""
                 INSERT INTO auth_tenant_grant_generation (tenant_id, generation, updated_at)
                 VALUES (:tenant, 1, now())
@@ -127,89 +113,108 @@ class TechnicianPortalFeedPostgresIT {
     }
 
     @Test
-    void feedContainsOnlyCurrentTechnicianAssignments() {
-        String context = "TECHNICIAN|NETWORK|" + NETWORK_A;
-        TechnicianPortalFeedPage feed = portal.taskFeed(actor(TECH_PRINCIPAL), "corr-feed", context, null);
-        assertThat(feed.networkId()).isEqualTo(NETWORK_A);
-        assertThat(feed.items()).extracting(TechnicianPortalFeedItem::taskId).containsExactly(TASK_A);
-        assertThat(feed.items()).noneMatch(item -> TASK_B.equals(item.taskId()) || TASK_OTHER.equals(item.taskId()));
-        assertThat(feed.items().getFirst().itemType()).isEqualTo("ASSIGNMENT");
-        assertThat(feed.items().getFirst().taskStatus()).isEqualTo("READY");
-        assertThat(feed.items().getFirst().invalidationReason()).isNull();
+    void successAssignsNetworkAndTechnicianFromTrustedContext() {
+        // 本网点已有 ACTIVE NETWORK，尚无 TECHNICIAN —— 典型 Portal 初派
+        seedActiveAssignment(NETWORK_A.toString(), "NETWORK", TASK, WO);
+        String context = "NETWORK|NETWORK|" + NETWORK_A;
 
-        // 纯 UUID 形态在 ACTIVE 师傅成员下也可接受
-        TechnicianPortalFeedPage byUuid =
-                portal.taskFeed(actor(TECH_PRINCIPAL), "corr-uuid", NETWORK_A.toString(), null);
-        assertThat(byUuid.items()).hasSize(1);
+        ManualServiceAssignmentReceipt receipt = portalAssign.assignTechnician(
+                actor(PRINCIPAL), metadata("m196-ok"), context, TASK,
+                TECH_PROFILE.toString(), BUSINESS_TYPE);
+
+        assertThat(receipt.networkAssigneeId()).isEqualTo(NETWORK_A.toString());
+        assertThat(receipt.technicianAssigneeId()).isEqualTo(TECH_PROFILE.toString());
+        assertThat(jdbc.sql("""
+                        SELECT responsibility_level || ':' || assignee_id || ':' || status
+                          FROM dsp_service_assignment
+                         WHERE tenant_id = :tenant AND task_id = :task
+                         ORDER BY responsibility_level
+                        """)
+                .param("tenant", TENANT).param("task", TASK)
+                .query(String.class).list())
+                .contains(
+                        "NETWORK:" + NETWORK_A + ":ACTIVE",
+                        "TECHNICIAN:" + TECH_PROFILE + ":ACTIVE");
+
+        ManualServiceAssignmentReceipt replay = portalAssign.assignTechnician(
+                actor(PRINCIPAL), metadata("m196-ok"), context, TASK,
+                TECH_PROFILE.toString(), BUSINESS_TYPE);
+        assertThat(replay.networkServiceAssignmentId()).isEqualTo(receipt.networkServiceAssignmentId());
+        assertThat(replay.technicianServiceAssignmentId()).isEqualTo(receipt.technicianServiceAssignmentId());
     }
 
     @Test
-    void tombstoneAppearsAfterAssignmentEndedWithCursor() {
-        String context = "TECHNICIAN|NETWORK|" + NETWORK_A;
-        TechnicianPortalFeedPage before = portal.taskFeed(actor(TECH_PRINCIPAL), "corr-before", context, null);
-        String cursor = before.items().getFirst().cursor();
+    void wrongNetworkMembershipIsPortalContextInvalid() {
+        assertThatThrownBy(() -> portalAssign.assignTechnician(
+                actor(PRINCIPAL), metadata("m196-cross"), "NETWORK|NETWORK|" + NETWORK_B, TASK,
+                TECH_PROFILE.toString(), BUSINESS_TYPE))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        p -> assertThat(p.code()).isEqualTo(ProblemCode.PORTAL_CONTEXT_INVALID));
+    }
 
-        Instant endedAt = Instant.parse("2026-07-17T03:00:00Z");
+    @Test
+    void technicianNotOnNetworkIsRejected() {
+        seedActiveAssignment(NETWORK_A.toString(), "NETWORK", TASK, WO);
+        assertThatThrownBy(() -> portalAssign.assignTechnician(
+                actor(PRINCIPAL), metadata("m196-tech"), "NETWORK|NETWORK|" + NETWORK_A, TASK,
+                TECH_PROFILE_B.toString(), BUSINESS_TYPE))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        p -> assertThat(p.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
+    }
+
+    @Test
+    void differentNetworkActiveConflicts() {
+        seedActiveAssignment(NETWORK_B.toString(), "NETWORK", TASK, WO);
+        assertThatThrownBy(() -> portalAssign.assignTechnician(
+                actor(PRINCIPAL), metadata("m196-net-conflict"), "NETWORK|NETWORK|" + NETWORK_A, TASK,
+                TECH_PROFILE.toString(), BUSINESS_TYPE))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        p -> assertThat(p.code()).isEqualTo(ProblemCode.SERVICE_ASSIGNMENT_CONFLICT));
+    }
+
+    @Test
+    void differentTechnicianActiveConflicts() {
+        seedActiveAssignment(NETWORK_A.toString(), "NETWORK", TASK, WO);
+        seedActiveAssignment("other-tech-assignee", "TECHNICIAN", TASK, WO);
+        assertThatThrownBy(() -> portalAssign.assignTechnician(
+                actor(PRINCIPAL), metadata("m196-tech-conflict"), "NETWORK|NETWORK|" + NETWORK_A, TASK,
+                TECH_PROFILE.toString(), BUSINESS_TYPE))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        p -> assertThat(p.code()).isEqualTo(ProblemCode.SERVICE_ASSIGNMENT_CONFLICT));
+    }
+
+    @Test
+    void forgedContextIsPortalContextInvalid() {
+        assertThatThrownBy(() -> portalAssign.assignTechnician(
+                actor(PRINCIPAL), metadata("m196-forged"), "NETWORK|NETWORK|" + UUID.randomUUID(), TASK,
+                TECH_PROFILE.toString(), BUSINESS_TYPE))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        p -> assertThat(p.code()).isEqualTo(ProblemCode.PORTAL_CONTEXT_INVALID));
+    }
+
+    @Test
+    void missingCapabilityIsAccessDeniedAfterMembership() {
         jdbc.sql("""
-                UPDATE dsp_service_assignment
-                   SET status='ENDED',
-                       effective_to=:endedAt,
-                       ended_by='test',
-                       end_reason_code='REASSIGNED'
-                 WHERE service_assignment_id=:id
+                UPDATE auth_role_grant SET grant_status='REVOKED', revoked_at=now(),
+                       revoked_by='test', revoke_reason='m196',
+                       aggregate_version = aggregate_version + 1, updated_at=now()
+                 WHERE tenant_id=:tenant AND principal_id=:principal
+                   AND scope_type='NETWORK' AND scope_ref=:network
+                   AND role_id IN (
+                     SELECT role_id FROM auth_role_capability
+                      WHERE capability_code='networkPortal.assignTechnician'
+                   )
                 """)
-                .param("endedAt", java.sql.Timestamp.from(endedAt))
-                .param("id", TECH_ASSIGNMENT_A)
+                .param("tenant", TENANT)
+                .param("principal", PRINCIPAL.toString())
+                .param("network", NETWORK_A.toString())
                 .update();
 
-        TechnicianPortalFeedPage delta =
-                portal.taskFeed(actor(TECH_PRINCIPAL), "corr-tomb", context, cursor);
-        assertThat(delta.items()).hasSize(1);
-        assertThat(delta.items().getFirst().itemType()).isEqualTo("TOMBSTONE");
-        assertThat(delta.items().getFirst().taskId()).isEqualTo(TASK_A);
-        assertThat(delta.items().getFirst().invalidationReason()).isEqualTo("REASSIGNED");
-        assertThat(delta.items().getFirst().workOrderId()).isNull();
-        assertThat(delta.items().getFirst().taskStatus()).isNull();
-    }
-
-    @Test
-    void scheduleAndSyncSummaryFanInActiveTasks() {
-        String context = "TECHNICIAN|NETWORK|" + NETWORK_A;
-        TechnicianPortalSchedulePage schedule =
-                portal.schedule(actor(TECH_PRINCIPAL), "corr-sched", context);
-        assertThat(schedule.items()).hasSize(1);
-        assertThat(schedule.items().getFirst().appointmentId()).isEqualTo(APPOINTMENT_A);
-        assertThat(schedule.items().getFirst().taskId()).isEqualTo(TASK_A);
-        assertThat(schedule.items().getFirst().type()).isEqualTo("INSTALLATION");
-
-        TechnicianPortalSyncSummary summary =
-                portal.syncSummary(actor(TECH_PRINCIPAL), "corr-sync", context);
-        assertThat(summary.pendingFeedItemCount()).isEqualTo(1);
-        assertThat(summary.appointmentWindowCount()).isEqualTo(1);
-        assertThat(summary.tombstoneCount()).isEqualTo(0);
-    }
-
-    @Test
-    void crossNetworkAndNonTechnicianArePortalContextInvalid() {
-        assertThatThrownBy(() -> portal.taskFeed(
-                actor(TECH_PRINCIPAL), "corr-cross", "TECHNICIAN|NETWORK|" + NETWORK_B, null))
+        assertThatThrownBy(() -> portalAssign.assignTechnician(
+                actor(PRINCIPAL), metadata("m196-cap"), "NETWORK|NETWORK|" + NETWORK_A, TASK,
+                TECH_PROFILE.toString(), BUSINESS_TYPE))
                 .isInstanceOfSatisfying(BusinessProblem.class,
-                        p -> assertThat(p.code()).isEqualTo(ProblemCode.PORTAL_CONTEXT_INVALID));
-
-        assertThatThrownBy(() -> portal.taskFeed(
-                actor(NON_TECH_PRINCIPAL), "corr-non", "TECHNICIAN|NETWORK|" + NETWORK_A, null))
-                .isInstanceOfSatisfying(BusinessProblem.class,
-                        p -> assertThat(p.code()).isEqualTo(ProblemCode.PORTAL_CONTEXT_INVALID));
-
-        assertThatThrownBy(() -> portal.taskFeed(
-                actor(TECH_PRINCIPAL), "corr-forged", "TECHNICIAN|NETWORK|" + UUID.randomUUID(), null))
-                .isInstanceOfSatisfying(BusinessProblem.class,
-                        p -> assertThat(p.code()).isEqualTo(ProblemCode.PORTAL_CONTEXT_INVALID));
-
-        assertThatThrownBy(() -> portal.taskFeed(
-                actor(TECH_PRINCIPAL), "corr-net-ctx", "NETWORK|NETWORK|" + NETWORK_A, null))
-                .isInstanceOfSatisfying(BusinessProblem.class,
-                        p -> assertThat(p.code()).isEqualTo(ProblemCode.PORTAL_CONTEXT_INVALID));
+                        p -> assertThat(p.code()).isEqualTo(ProblemCode.ACCESS_DENIED));
     }
 
     private void seedPrincipal(UUID principalId, String displayName) {
@@ -254,7 +259,7 @@ class TechnicianPortalFeedPostgresIT {
                 INSERT INTO net_partner_organization (
                     partner_organization_id, tenant_id, partner_code, partner_name,
                     partner_status, aggregate_version, created_at, updated_at
-                ) VALUES (:id, :tenant, 'P-195', 'Partner 195', 'ACTIVE', 1, now(), now())
+                ) VALUES (:id, :tenant, 'P-196', 'Partner 196', 'ACTIVE', 1, now(), now())
                 """).param("id", PARTNER).param("tenant", TENANT).update();
         for (UUID networkId : new UUID[]{NETWORK_A, NETWORK_B}) {
             jdbc.sql("""
@@ -274,7 +279,24 @@ class TechnicianPortalFeedPostgresIT {
         }
     }
 
-    private void seedTechnician(UUID profileId, UUID principalId, UUID networkId, String name) {
+    private void seedNetworkMembership(UUID principalId, UUID networkId) {
+        jdbc.sql("""
+                INSERT INTO net_network_membership (
+                    membership_id, tenant_id, service_network_id, principal_id, membership_role,
+                    membership_status, valid_from, invited_by, created_at, aggregate_version
+                ) VALUES (
+                    :id, :tenant, :network, :principal, 'STAFF',
+                    'ACTIVE', now() - interval '1 day', 'test', now(), 1
+                )
+                """)
+                .param("id", UUID.randomUUID())
+                .param("tenant", TENANT)
+                .param("network", networkId)
+                .param("principal", principalId)
+                .update();
+    }
+
+    private void seedTechnician(UUID profileId, UUID principalId, UUID networkId, boolean approvedQual) {
         jdbc.sql("""
                 INSERT INTO net_technician_profile (
                     technician_profile_id, tenant_id, principal_id, display_name, profile_status,
@@ -286,7 +308,7 @@ class TechnicianPortalFeedPostgresIT {
                 .param("id", profileId)
                 .param("tenant", TENANT)
                 .param("principal", principalId)
-                .param("name", name)
+                .param("name", "师傅 " + profileId.toString().substring(24))
                 .update();
         jdbc.sql("""
                 INSERT INTO net_network_technician_membership (
@@ -302,9 +324,26 @@ class TechnicianPortalFeedPostgresIT {
                 .param("network", networkId)
                 .param("profile", profileId)
                 .update();
+        if (approvedQual) {
+            jdbc.sql("""
+                    INSERT INTO net_technician_qualification (
+                        qualification_id, tenant_id, technician_profile_id, qualification_code,
+                        qualification_status, valid_from, valid_to, submitted_by, submitted_at,
+                        decided_by, decided_at, decision_reason, aggregate_version
+                    ) VALUES (
+                        :id, :tenant, :profile, 'EV-INSTALL', 'APPROVED',
+                        now() - interval '1 day', now() + interval '365 day',
+                        'test', now(), 'test', now(), 'M196 fixture', 1
+                    )
+                    """)
+                    .param("id", UUID.randomUUID())
+                    .param("tenant", TENANT)
+                    .param("profile", profileId)
+                    .update();
+        }
     }
 
-    private void seedHumanTask(UUID taskId, UUID workOrderId, UUID projectId) {
+    private void seedHumanTask(UUID taskId, UUID workOrderId) {
         Instant now = Instant.parse("2026-07-17T00:00:00Z");
         jdbc.sql("""
                 INSERT INTO tsk_task (
@@ -324,10 +363,10 @@ class TechnicianPortalFeedPostgresIT {
                 """)
                 .param("taskId", taskId)
                 .param("tenantId", TENANT)
-                .param("businessKey", "m195:" + taskId)
+                .param("businessKey", "m196:" + taskId)
                 .param("digest", "a".repeat(64))
                 .param("now", java.sql.Timestamp.from(now))
-                .param("projectId", projectId)
+                .param("projectId", UUID.randomUUID())
                 .param("workOrderId", workOrderId)
                 .param("workflowInstanceId", UUID.randomUUID())
                 .param("stageInstanceId", UUID.randomUUID())
@@ -339,21 +378,37 @@ class TechnicianPortalFeedPostgresIT {
                 .update();
     }
 
-    private void seedActivePair(
-            UUID networkId, UUID workOrderId, UUID taskId, String technicianAssigneeId,
-            UUID techAssignmentId
-    ) {
+    private void seedActiveAssignment(String assigneeId, String level, UUID taskId, UUID workOrderId) {
+        UUID assignmentId = UUID.randomUUID();
+        UUID sagaId = UUID.randomUUID();
+        UUID counterId = UUID.randomUUID();
         Instant now = Instant.parse("2026-07-17T01:00:00Z");
-        insertAssignment(UUID.randomUUID(), workOrderId, taskId, "NETWORK", networkId.toString(),
-                UUID.randomUUID(), now);
-        insertAssignment(techAssignmentId, workOrderId, taskId, "TECHNICIAN", technicianAssigneeId,
-                UUID.randomUUID(), now);
-    }
-
-    private void insertAssignment(
-            UUID assignmentId, UUID workOrderId, UUID taskId, String level, String assigneeId,
-            UUID sagaId, Instant now
-    ) {
+        // ManualAssign 识别既有 ACTIVE 时 JOIN CONFIRMED reservation；冲突预检只看 assignment 行。
+        jdbc.sql("""
+                INSERT INTO dsp_capacity_counter (
+                    capacity_counter_id, tenant_id, responsibility_level, assignee_id,
+                    business_type, max_units, occupied_units, version, updated_by, updated_at
+                ) VALUES (
+                    :id, :tenant, :level, :assignee, 'INSTALLATION', 10, 1, 1, 'test', :now
+                )
+                ON CONFLICT (tenant_id, responsibility_level, assignee_id, business_type) DO NOTHING
+                """)
+                .param("id", counterId)
+                .param("tenant", TENANT)
+                .param("level", level)
+                .param("assignee", assigneeId)
+                .param("now", java.sql.Timestamp.from(now))
+                .update();
+        UUID resolvedCounterId = jdbc.sql("""
+                        SELECT capacity_counter_id FROM dsp_capacity_counter
+                         WHERE tenant_id = :tenant AND responsibility_level = :level
+                           AND assignee_id = :assignee AND business_type = 'INSTALLATION'
+                        """)
+                .param("tenant", TENANT)
+                .param("level", level)
+                .param("assignee", assigneeId)
+                .query(UUID.class)
+                .single();
         jdbc.sql("""
                 INSERT INTO dsp_service_assignment (
                     service_assignment_id, tenant_id, work_order_id, task_id,
@@ -382,60 +437,20 @@ class TechnicianPortalFeedPostgresIT {
                 .param("fenceDecision", "fence://" + assignmentId)
                 .param("fencePolicy", "fence-policy-v1")
                 .update();
-    }
-
-    private void seedAppointment(UUID appointmentId, UUID taskId, UUID workOrderId, UUID projectId) {
-        UUID revisionId = UUID.randomUUID();
-        Instant start = Instant.parse("2026-07-18T08:00:00Z");
-        Instant end = Instant.parse("2026-07-18T10:00:00Z");
-        Instant createdAt = Instant.parse("2026-07-17T01:30:00Z");
-        // current_revision FK 为 DEFERRABLE：同事务内先插预约再插修订
-        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
-            jdbc.sql("""
-                    INSERT INTO apt_appointment (
-                        appointment_id, tenant_id, project_id, work_order_id, task_id,
-                        appointment_type, status, current_revision_id, current_revision_no,
-                        assigned_network_id, technician_id, aggregate_version, created_by, created_at
-                    ) VALUES (
-                        :id, :tenant, :projectId, :workOrderId, :taskId,
-                        'INSTALLATION', 'CONFIRMED', :revisionId, 1,
-                        :network, :tech, 1, 'test', :createdAt
-                    )
-                    """)
-                    .param("id", appointmentId)
-                    .param("tenant", TENANT)
-                    .param("projectId", projectId)
-                    .param("workOrderId", workOrderId)
-                    .param("taskId", taskId)
-                    .param("revisionId", revisionId)
-                    .param("network", NETWORK_A.toString())
-                    .param("tech", TECH_PRINCIPAL.toString())
-                    .param("createdAt", java.sql.Timestamp.from(createdAt))
-                    .update();
-            jdbc.sql("""
-                    INSERT INTO apt_appointment_revision (
-                        revision_id, tenant_id, appointment_id, revision_no, previous_revision_id,
-                        window_start, window_end, timezone, estimated_duration_minutes,
-                        address_ref, address_version,
-                        confirmed_party_type, confirmed_party_ref, confirmation_channel, confirmed_at,
-                        reason_code, note, revision_kind, created_by, created_at
-                    ) VALUES (
-                        :revisionId, :tenant, :appointmentId, 1, NULL,
-                        :start, :end, 'Asia/Shanghai', 120,
-                        'addr-ref', 'v1',
-                        'CUSTOMER', 'customer-ref', 'PHONE', :confirmedAt,
-                        NULL, 'note-should-not-leak', 'CONFIRM', 'test', :createdAt
-                    )
-                    """)
-                    .param("revisionId", revisionId)
-                    .param("tenant", TENANT)
-                    .param("appointmentId", appointmentId)
-                    .param("start", java.sql.Timestamp.from(start))
-                    .param("end", java.sql.Timestamp.from(end))
-                    .param("confirmedAt", java.sql.Timestamp.from(createdAt))
-                    .param("createdAt", java.sql.Timestamp.from(createdAt))
-                    .update();
-        });
+        jdbc.sql("""
+                INSERT INTO dsp_capacity_reservation (
+                    capacity_reservation_id, tenant_id, service_assignment_id,
+                    capacity_counter_id, units, status, held_at, confirmed_at
+                ) VALUES (
+                    :id, :tenant, :assignmentId, :counterId, 1, 'CONFIRMED', :now, :now
+                )
+                """)
+                .param("id", UUID.randomUUID())
+                .param("tenant", TENANT)
+                .param("assignmentId", assignmentId)
+                .param("counterId", resolvedCounterId)
+                .param("now", java.sql.Timestamp.from(now))
+                .update();
     }
 
     private void seedGrant(UUID principalId, String capability, String scopeType, String scopeRef) {
@@ -450,7 +465,7 @@ class TechnicianPortalFeedPostgresIT {
                 """)
                 .param("roleId", roleId)
                 .param("tenant", TENANT)
-                .param("code", "m195-" + capability + "-" + UUID.randomUUID())
+                .param("code", "m196-" + capability + "-" + UUID.randomUUID())
                 .update();
         jdbc.sql("""
                 INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
@@ -481,6 +496,10 @@ class TechnicianPortalFeedPostgresIT {
 
     private static CurrentPrincipal actor(UUID principalId) {
         return new CurrentPrincipal(principalId.toString(), TENANT, CurrentPrincipal.PrincipalType.USER,
-                "technician-portal", Set.of());
+                "network-portal", Set.of());
+    }
+
+    private static CommandMetadata metadata(String key) {
+        return new CommandMetadata("corr-" + key, key);
     }
 }

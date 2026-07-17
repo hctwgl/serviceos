@@ -77,12 +77,18 @@ final class DefaultCapacityAuthorityService implements CapacityAuthorityService 
         String digest = Sha256.digest(command.responsibilityLevel() + "|" + command.assigneeId()
                 + "|" + command.businessType() + "|" + command.maxUnits()
                 + "|" + command.expectedVersion());
-        AuthorizationDecision authorizationDecision = authorization.require(
-                principal,
+        // M196：Network Portal 委托期间按 NETWORK scope 鉴权；Admin TENANT 路径不变。
+        String resourceId = command.responsibilityLevel() + ":" + command.assigneeId()
+                + ":" + command.businessType();
+        String networkScope = NetworkScopedDispatchAuthorization.currentNetworkId();
+        AuthorizationDecision authorizationDecision = networkScope != null
+                ? authorization.require(principal,
+                AuthorizationRequest.networkCapability(
+                        CAPABILITY, context.tenantId(), "CapacityCounter", resourceId, networkScope),
+                context.correlationId())
+                : authorization.require(principal,
                 AuthorizationRequest.tenantCapability(
-                        CAPABILITY, context.tenantId(), "CapacityCounter",
-                        command.responsibilityLevel() + ":" + command.assigneeId()
-                                + ":" + command.businessType()),
+                        CAPABILITY, context.tenantId(), "CapacityCounter", resourceId),
                 context.correlationId());
         IdempotencyDecision decision = idempotency.begin(context, OPERATION, digest);
         if (decision.kind() == IdempotencyDecision.Kind.REPLAY) {

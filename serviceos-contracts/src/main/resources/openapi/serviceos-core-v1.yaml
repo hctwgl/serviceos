@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.87.0
+  version: 0.88.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1516,6 +1516,39 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+  /network-portal/tasks/{taskId}:assign-technician:
+    post:
+      operationId: assignNetworkPortalTechnician
+      summary: Network Portal 为本网点任务指派师傅
+      description: |
+        M196：X-Network-Context + NETWORK scope networkPortal.assignTechnician。
+        请求体不含 networkAssigneeId；服务端强制等于可信上下文网点 UUID 字符串。
+        委托已 Implemented 的 ManualAssign 激活 saga；不支持改派/评分/硬过滤。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）；
+        已有不同师傅 ACTIVE TECHNICIAN 返回 SERVICE_ASSIGNMENT_CONFLICT（409）。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NetworkPortalAssignTechnicianRequest' }
+      responses:
+        '200':
+          description: 双责任已激活或幂等回放
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ManualServiceAssignmentReceipt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
   /technician/me/task-feed:
     get:
       operationId: listTechnicianTaskFeed
@@ -6365,6 +6398,17 @@ components:
       properties:
         networkAssigneeId: { type: string, minLength: 1, maxLength: 128 }
         technicianAssigneeId: { type: string, minLength: 1, maxLength: 128 }
+        businessType: { type: string, minLength: 1, maxLength: 100 }
+    NetworkPortalAssignTechnicianRequest:
+      type: object
+      additionalProperties: false
+      required: [technicianAssigneeId, businessType]
+      properties:
+        technicianAssigneeId:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: 师傅 assignee（通常为 technicianProfileId）；不得携带 networkAssigneeId
         businessType: { type: string, minLength: 1, maxLength: 100 }
     ManualServiceAssignmentReceipt:
       type: object

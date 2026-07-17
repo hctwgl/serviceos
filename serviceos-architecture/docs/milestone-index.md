@@ -204,6 +204,7 @@ title: ServiceOS 里程碑索引
 | M193 | M193 Admin 最近访问 | [206-m193-admin-recent-resources.md](../architecture/206-m193-admin-recent-resources.md) | [190-m193-admin-recent-resources-acceptance.md](../testing/190-m193-admin-recent-resources-acceptance.md) |
 | M194 | M194 Network Portal 只读查询 | [207-m194-network-portal-read-apis.md](../architecture/207-m194-network-portal-read-apis.md) | [191-m194-network-portal-read-apis-acceptance.md](../testing/191-m194-network-portal-read-apis-acceptance.md) |
 | M195 | M195 Technician Portal Feed | [208-m195-technician-portal-feed.md](../architecture/208-m195-technician-portal-feed.md) | [192-m195-technician-portal-feed-acceptance.md](../testing/192-m195-technician-portal-feed-acceptance.md) |
+| M196 | M196 Network Portal 指派师傅 | [209-m196-network-portal-assign-technician.md](../architecture/209-m196-network-portal-assign-technician.md) | [193-m196-network-portal-assign-technician-acceptance.md](../testing/193-m196-network-portal-assign-technician-acceptance.md) |
 
 ## 未关联里程碑的文档
 

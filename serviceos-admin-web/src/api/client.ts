@@ -85,6 +85,7 @@ export async function apiPost<T>(
     body?: unknown
     idempotencyKey?: string
     ifMatch?: string
+    headers?: Record<string, string>
   } = {},
 ): Promise<ApiResult<T>> {
   return apiWrite<T>('POST', path, options)
@@ -113,9 +114,10 @@ async function apiWrite<T>(
     body?: unknown
     idempotencyKey?: string
     ifMatch?: string
+    headers?: Record<string, string>
   },
 ): Promise<ApiResult<T>> {
-  const extra: Record<string, string> = {}
+  const extra: Record<string, string> = { ...(options.headers ?? {}) }
   if (options.idempotencyKey) {
     extra['Idempotency-Key'] = options.idempotencyKey
   }
