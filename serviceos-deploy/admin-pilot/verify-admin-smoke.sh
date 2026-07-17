@@ -85,12 +85,14 @@ fi
 # 由 Inbox 去重消费者继续推进 Node/Stage/Workflow/WorkOrder，不能用 SQL 模拟异步结果。
 # 浏览器通过 Vite 同源代理执行私有 PUT，避免把本地 HMAC 上传 URL 暴露为跨域地址；
 # Backend 仍负责签发短期 token、校验大小/摘要/MIME 并在 Finalize 后调度扫描。
+# 入站 CREATE_WORK_ORDER 必须解析到试点项目 ADMIN-PILOT，不能沿用默认 BYD-OCEAN-SD-PILOT。
 SERVICEOS_OUTBOX_SCHEDULING_ENABLED=true \
 SERVICEOS_TASK_SCHEDULING_ENABLED=true \
 SERVICEOS_FILE_TRANSFER_BASE_URL=http://127.0.0.1:5173/api/v1/file-transfers \
 SERVICEOS_BYD_CPIM_OUTBOUND_BASE_URL="http://127.0.0.1:${byd_stub_port}" \
 SERVICEOS_BYD_CPIM_CREDENTIAL_VERSION_ID=local-admin-pilot-byd-cred-v1 \
 SERVICEOS_BYD_CPIM_TENANT_ID=tenant-local \
+SERVICEOS_BYD_CPIM_PROJECT_CODE=ADMIN-PILOT \
 SERVICEOS_BYD_CPIM_ADAPTER_PRINCIPAL_ID=service-byd-cpim-adapter \
   java -jar serviceos-backend/target/serviceos-backend-0.1.0-SNAPSHOT.jar >"${backend_log}" 2>&1 &
 backend_pid="$!"
@@ -312,6 +314,10 @@ if ! curl --fail --silent "http://127.0.0.1:5173" >/dev/null; then
 fi
 wait_http "http://127.0.0.1:5173" "ServiceOS Admin Web"
 
+# 入站接单不依赖预置工单夹具：每轮生成唯一 orderCode，由 Playwright 签名 POST 创建 RECEIVED 工单。
+inbound_order_uuid="$(new_uuid)"
+inbound_order_code="ADMIN-PILOT-IN-${inbound_order_uuid%%-*}"
+
 cd serviceos-admin-web
 export ADMIN_PILOT_COMPLETION_WORK_ORDER_CODE="${completion_external_code}"
 export ADMIN_PILOT_COMPLETION_TASK_ID="${completion_task_id}"
@@ -325,6 +331,7 @@ export ADMIN_PILOT_FIELD_OPS_WORK_ORDER_CODE="${field_ops_external_code}"
 export ADMIN_PILOT_FIELD_OPS_TASK_ID="${field_ops_task_id}"
 export ADMIN_PILOT_OUTBOUND_WORK_ORDER_CODE="${outbound_external_code}"
 export ADMIN_PILOT_OUTBOUND_TASK_ID="${outbound_task_id}"
+export ADMIN_PILOT_INBOUND_ORDER_CODE="${inbound_order_code}"
 npm run test:e2e
 
 task_state="$(query_db "
@@ -967,6 +974,50 @@ for _ in $(seq 1 45); do
 done
 [[ "${callback_state}" == "APPROVED:1:1:1" ]] || {
   echo "Admin 试点 BYD 厂端回调联调不完整: ${callback_state}" >&2
+  exit 1
+}
+
+inbound_state=""
+for _ in $(seq 1 45); do
+  inbound_state="$(query_db "
+    SELECT work_order.status || ':' ||
+           count(DISTINCT envelope.inbound_envelope_id) || ':' ||
+           count(DISTINCT canonical.canonical_message_id) || ':' ||
+           count(DISTINCT audit.audit_id) || ':' ||
+           count(DISTINCT outbox.event_id)
+      FROM wo_work_order work_order
+      LEFT JOIN int_inbound_envelope envelope
+        ON envelope.tenant_id = work_order.tenant_id
+       AND envelope.project_id = work_order.project_id
+       AND envelope.message_type = 'CREATE_WORK_ORDER'
+       AND envelope.processing_status = 'COMPLETED'
+       AND envelope.result_type = 'WORK_ORDER'
+       AND envelope.result_id = work_order.id::text
+      LEFT JOIN int_canonical_message canonical
+        ON canonical.tenant_id = envelope.tenant_id
+       AND canonical.canonical_message_id = envelope.canonical_message_id
+       AND canonical.message_type = 'CREATE_WORK_ORDER'
+       AND canonical.result_code = 'ACCEPTED'
+       AND canonical.result_type = 'WORK_ORDER'
+       AND canonical.result_id = work_order.id::text
+      LEFT JOIN aud_audit_record audit
+        ON audit.tenant_id = work_order.tenant_id
+       AND audit.target_id = envelope.inbound_envelope_id::text
+       AND audit.action_name = 'INBOUND_MESSAGE_PROCESSED'
+      LEFT JOIN rel_outbox_event outbox
+        ON outbox.tenant_id = work_order.tenant_id
+       AND outbox.aggregate_type = 'CanonicalMessage'
+       AND outbox.aggregate_id = canonical.canonical_message_id::text
+       AND outbox.event_type = 'integration.canonical-message-processed'
+     WHERE work_order.tenant_id = 'tenant-local'
+       AND work_order.external_order_code = '${inbound_order_code}'
+     GROUP BY work_order.id, work_order.status
+  ")"
+  [[ "${inbound_state}" == "RECEIVED:1:1:1:1" ]] && break
+  sleep 1
+done
+[[ "${inbound_state}" == "RECEIVED:1:1:1:1" ]] || {
+  echo "Admin 试点 BYD 入站 CREATE_WORK_ORDER 接单不完整: ${inbound_state}" >&2
   exit 1
 }
 

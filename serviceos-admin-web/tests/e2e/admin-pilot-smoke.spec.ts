@@ -1235,3 +1235,94 @@ test('真实 OIDC 登录后可通过审核外发并经厂端回调关闭 CLIENT 
 
   await reviewPage.close()
 })
+
+test('真实 OIDC 登录后可通过 CPIM 入站 CREATE_WORK_ORDER 看见工单', async ({
+  page,
+  request,
+}) => {
+  const orderCode = process.env.ADMIN_PILOT_INBOUND_ORDER_CODE
+  expect(orderCode, '缺少动态入站接单 orderCode').toBeTruthy()
+
+  const appKey = process.env.SERVICEOS_BYD_CPIM_APP_KEY ?? 'local-byd-app-key'
+  const appSecret =
+    process.env.SERVICEOS_BYD_CPIM_APP_SECRET ?? 'local-byd-app-secret-change-me'
+  // 与 BydCpimInboundOrderHttpPostgresIT.validPayload 对齐；orderAmount 以数字入 JSON，
+  // 签名侧统一 String.valueOf，避免数字/字符串不一致导致验签失败。
+  const payload: Record<string, string | number> = {
+    orderCode: orderCode!,
+    contactName: 'Admin 试点入站用户',
+    contactMobile: '13900000001',
+    contactAddress: '山东省济南市历下区入站试点路1号',
+    provinceCode: '370000',
+    provinceName: '山东省',
+    cityCode: '370100',
+    cityName: '济南市',
+    areaCode: '370102',
+    areaName: '历下区',
+    wallboxName: '比亚迪7kW交流充电桩',
+    wallboxPower: '7kW',
+    bringWallbox: '1',
+    dispatchTime: '2026-07-16T10:00:00',
+    carOwnerType: '1',
+    type: '1',
+    carBrand: '40',
+    carSeries: '海豹',
+    carModel: '海豹06 DM-i',
+    vin: 'LGXCE6CD0RA999001',
+    dealerName: '济南海洋网经销商',
+    rightCode: `RIGHT-IN-${orderCode!.slice(-8)}`,
+    orderAmount: 0,
+    source: '1',
+    channel: 'CPIM',
+  }
+  const signParams = Object.fromEntries(
+    Object.entries(payload).map(([key, value]) => [key, String(value)]),
+  ) as Record<string, string>
+  const nonce = randomUUID()
+  const currentDate = asiaShanghaiDateToday()
+  const signature = signBydCpimPayload(appSecret, nonce, currentDate, signParams)
+  const inboundResponse = await request.post(
+    'http://127.0.0.1:8080/api/v1/integrations/byd/cpim/v7.3.1/install-orders',
+    {
+      headers: {
+        'Content-Type': 'application/json',
+        APP_KEY: appKey,
+        Nonce: nonce,
+        Cur_Time: currentDate,
+        Sign: signature,
+        'X-Correlation-Id': `admin-pilot-inbound-${orderCode}`,
+      },
+      data: payload,
+    },
+  )
+  expect(inboundResponse.status(), await inboundResponse.text()).toBe(200)
+  expect(await inboundResponse.json()).toMatchObject({
+    success: true,
+    code: 'ACCEPTED',
+    orderCode,
+    replay: false,
+  })
+
+  await loginWithLocalKeycloak(page)
+  await page.locator('select').first().selectOption('RECEIVED')
+  await page.getByRole('button', { name: '查询' }).click()
+  await expect(page.getByRole('link', { name: orderCode! })).toBeVisible({
+    timeout: 30_000,
+  })
+  await page.getByRole('link', { name: orderCode! }).click()
+  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await expect(page.locator('dt', { hasText: /^状态$/ }).locator('xpath=../dd')).toHaveText(
+    'RECEIVED',
+  )
+  await expect(
+    page.locator('dt', { hasText: /^外部单号$/ }).locator('xpath=../dd'),
+  ).toHaveText(orderCode!)
+
+  await page.getByRole('button', { name: /INTEGRATION/ }).click()
+  await expect(page.getByText('区块加载中…')).toHaveCount(0)
+  const integrationPreview = page.locator('article.sections pre')
+  await expect(integrationPreview).toContainText('CREATE_WORK_ORDER')
+  await expect(integrationPreview).toContainText('COMPLETED')
+  await expect(integrationPreview).toContainText('WORK_ORDER')
+  await expect(integrationPreview).toContainText('ACCEPTED')
+})
