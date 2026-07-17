@@ -1,0 +1,554 @@
+name: materialize-identity-governance-roadmap
+
+on:
+  push:
+    branches:
+      - docs/m135-m140-identity-governance-roadmap
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Write accepted M135-M140 governance program
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+
+          roadmap = r'''---
+          title: M135～M140 统一身份、组织与授权治理交付计划
+          version: 1.0.0
+          status: Accepted
+          decisionDate: 2026-07-17
+          ---
+
+          # M135～M140 统一身份、组织与授权治理交付计划
+
+          ## 1. 决策
+
+          ServiceOS 正式接受 M135～M140 作为 M134 之后的连续实施序列，用于把现有 OIDC/JWT、Capability、RoleGrant 和范围授权底座扩展为可运营的统一主体目录、企业组织、网点人员、师傅身份、角色授权治理和多 Portal 上下文。
+
+          本计划是实施承诺，不是完成声明。只有对应代码、Flyway、OpenAPI/事件契约、PostgreSQL 与安全测试、Portal E2E 和实施状态证据全部成立后，单个里程碑才能从 `ACCEPTED` 改为 `IMPLEMENTED`。
+
+          ## 2. 不变量
+
+          1. ServiceOS 不保存登录密码、密码摘要、MFA 秘钥或 IdP 会话；认证仍由 Keycloak/企业 IdP 负责。
+          2. `Principal` 是稳定操作主体；自然人、服务账号、登录身份、人员档案、组织关系、业务身份和授权不得混成一张万能用户表。
+          3. 一名自然人可以绑定多个外部身份、拥有多个 Persona，并在不同有效期和范围拥有不同 RoleGrant。
+          4. 内部组织、合作商、ServiceNetwork 和 TechnicianProfile 是不同业务对象；网点不能伪装成内部部门，师傅档案不能等同登录账号。
+          5. 菜单、路由和按钮不是授权事实。服务端命令继续按 Capability、DataScope、当前责任、状态、版本和 obligations 实时判定。
+          6. 用户停用、离职、转岗、网点清退和师傅关系失效必须失败关闭，并生成待重新分配工作，不得只隐藏菜单。
+          7. 所有身份绑定、组织变更、授权申请/审批/撤销、代办和敏感查看均保留增强审计。
+          8. 内部员工组织可由 HR/OA/AD/企业微信等外部主数据源同步，也可使用 LOCAL 权威模式；两种模式必须显式，不做静默双向覆盖。
+
+          ## 3. 领域所有权
+
+          | 事实 | 权威边界 |
+          |---|---|
+          | OIDC issuer/subject、Principal、IdentityLink、PersonProfile、Persona、账号状态 | `identity` |
+          | 企业/合作组织、内部 OrgUnit、closure、人员任职与来源同步 | 独立组织目录边界；实施前通过 Modulith 依赖评审确定模块名 |
+          | Role、稳定 Capability、RoleGrant、DataScope、Delegation、授权决定 | `authorization` |
+          | ServiceNetwork、NetworkMembership、TechnicianProfile、网点师傅关系、技能与资质 | 服务网络边界；不得由 identity 或 authorization 直接拥有 |
+          | 页面注册、Portal 上下文和导航投影 | 应用/Portal 边界；只消费公开查询，不成为授权权威 |
+
+          跨模块只保存稳定 ID，通过公开 API、查询端口和事件协作；禁止直接连接其他模块内部表或建立跨模块物理外键。
+
+          ## 4. 正式里程碑
+
+          | 里程碑 | 目标 | 主要交付 | 退出条件 |
+          |---|---|---|---|
+          | M135 | 统一主体目录 | Principal、IdentityLink、PersonProfile、Persona、登录后绑定、主体生命周期和安全查询 | 一个主体可绑定多个身份并拥有多个 Persona；停用实时失权；不保存密码；PostgreSQL/安全/契约证据通过 |
+          | M136 | 企业组织与任职 | Organization、OrgUnit、closure、OrgMembership、LOCAL/EXTERNAL_AUTHORITATIVE 来源和同步收据 | 组织树、历史任职、调动/离职和外部同步乱序可验证；离职触发撤权与待办重分配 |
+          | M137 | 网点人员与师傅身份 | Partner Organization、ServiceNetwork 目录、NetworkMembership、TechnicianProfile、NetworkTechnicianMembership、Qualification、邀请绑定 | 网点与部门边界明确；师傅多网点关系、资质和停用影响可验证；跨网点读取失败关闭 |
+          | M138 | 角色与授权治理 | Role/Capability 目录、RoleGrant 申请/审批/撤销、Delegation、职责分离、授权解释和审计 | 不能越权授予；高风险授权不可自批；授权变化使旧上下文/游标失效；历史只追加 |
+          | M139 | Admin 统一用户中心 | 用户目录、组织树、合作组织/网点人员、师傅、角色和授权治理页面 | Admin 通过真实 OIDC 完成搜索、绑定、组织变更、授权和停用；页面不接受原始 principalId 作为主要操作方式 |
+          | M140 | Portal 上下文与导航 | `/me`、可用 contexts、capabilities、navigation；多 Persona/组织/项目/网点上下文和代码注册 Page Registry | 服务端计算 Portal 上下文；前端不能自报 network/project 扩权；导航变化不削弱业务 API 鉴权；三 Portal 可独立接入 |
+
+          ## 5. M135：统一主体目录
+
+          ### 5.1 最小模型
+
+          ```text
+          security_principal
+          identity_link
+          person_profile
+          principal_persona
+          principal_lifecycle_event
+          ```
+
+          `identity_link` 至少以 `(tenantId, issuer, subject)` 唯一；账号名、手机号和邮箱不能替代稳定 subject。首次登录的自动登记必须受租户/客户端策略控制，未知 issuer、冲突绑定和跨租户 subject 失败关闭。
+
+          ### 5.2 最小 API
+
+          ```text
+          GET  /api/v1/security-principals
+          GET  /api/v1/security-principals/{id}
+          GET  /api/v1/security-principals/{id}/identities
+          POST /api/v1/security-principals/{id}/identity-links
+          POST /api/v1/security-principals/{id}:disable
+          POST /api/v1/security-principals/{id}:enable
+          ```
+
+          普通调用方只获得最小展示信息；完整身份绑定、联系方式和生命周期历史使用独立 Capability 与字段策略。
+
+          ## 6. M136：企业组织与人员任职
+
+          ### 6.1 模型
+
+          ```text
+          organization
+          org_unit
+          org_unit_closure
+          org_membership
+          directory_sync_batch
+          directory_sync_item
+          ```
+
+          `OrgMembership` 使用有效期和只追加历史，支持主职、兼职和负责人关系。组织移动必须重建 closure 并保留旧结构审计，不得通过字符串路径猜测下级权限。
+
+          ### 6.2 主数据模式
+
+          - `LOCAL`：ServiceOS 是组织和任职权威，可通过 Admin 治理。
+          - `EXTERNAL_AUTHORITATIVE`：HR/OA/AD/企业微信等是权威；ServiceOS 保存可用投影、来源键、同步批次和冲突结果，外部管理字段在 UI 只读。
+          - 不实施未定义的双向同步；需要回写时另行接受 Connector/ADR。
+
+          ## 7. M137：网点人员与师傅身份
+
+          ### 7.1 模型
+
+          ```text
+          partner_organization
+          service_network
+          network_membership
+          technician_profile
+          network_technician_membership
+          technician_qualification
+          ```
+
+          `TechnicianProfile` 与 `Principal` 一对一或显式受控关联，但生命周期独立；账号有效不代表可接单。可接单至少要求主体、师傅档案、当前网点关系、技能/资质和服务状态全部有效。
+
+          网点负责人只能邀请和维护授权网点范围内成员；总部负责网点准入、负责人、高风险停用和资质最终审核。清退前必须展示未完成 Task、Appointment、Visit 和离线工作包影响。
+
+          ## 8. M138：角色与授权治理
+
+          `Capability` 是全局稳定安全契约，不能由租户重定义语义。租户可以创建角色并组合能力，但所有 RoleGrant 必须包含主体、角色、组织/项目/区域/网点范围、有效期、来源、原因和审批信息。
+
+          正式命令包括申请、批准、拒绝、撤销和委托；高风险能力应用职责分离、MFA/approval obligations 和可授予范围校验。授权历史只追加，不能覆盖原授权区间。
+
+          ## 9. M139：Admin 统一用户中心
+
+          Admin 最小页面：
+
+          ```text
+          用户目录
+          企业组织架构与任职
+          合作组织与网点人员
+          师傅档案、关系与资质
+          角色与 Capability
+          用户授权、临时授权与撤销
+          身份绑定、停用影响与审计
+          ```
+
+          页面搜索和选择使用安全目录 API，不要求运营人员复制 UUID。所有写动作展示影响范围、未完成工作、版本、原因和审批 obligations，并在成功后重新读取权威结果。
+
+          ## 10. M140：Portal 上下文与导航
+
+          最小查询：
+
+          ```text
+          GET /api/v1/me
+          GET /api/v1/me/contexts
+          GET /api/v1/me/capabilities
+          GET /api/v1/me/navigation
+          ```
+
+          上下文由有效 Persona、Membership 和 RoleGrant 计算，至少支持 ADMIN、NETWORK、TECHNICIAN。请求中的 projectId/networkId 只能选择服务端已返回上下文，不能创建授权。
+
+          页面使用代码注册的稳定 `pageId`、route 和 required capabilities；数据库可管理启用、标题覆盖、排序和 feature gate，但不保存任意前端组件路径，也不替代后端权限。
+
+          ## 11. C 端边界
+
+          Consumer Identity/CustomerProfile 属于 M140 之后的独立正式 Epic，目标已接受，但在手机号/微信登录、隐私同意、客户主数据权威、车辆/地址关系和注销保留策略确认前不分配实施里程碑。
+
+          M135～M140 必须保证模型不阻碍 C 端：Principal 支持 Consumer Persona，IdentityLink 不假设企业账号，资源授权不依赖企业组织树。不得在本序列中用 `ROLE_CUSTOMER` 直接开放全部客户工单。
+
+          ## 12. 顺序和依赖
+
+          ```text
+          M135 Principal
+            → M136 Organization
+            → M137 Network/Technician identity
+            → M138 Authorization governance
+            → M139 Admin user center
+            → M140 Portal context/navigation
+          ```
+
+          后续里程碑可以在前一里程碑 Draft PR 上评审设计，但默认不得在前一里程碑合并前形成依赖未稳定内部表的实现。任何跨模块接口变化先合并公共契约和架构测试。
+
+          ## 13. 全局完成定义
+
+          - 代码、Flyway、OpenAPI/事件 Schema、生成客户端和自动化测试形成证据；
+          - PostgreSQL Testcontainers 覆盖唯一性、有效期、乱序、并发和撤权；
+          - MVC Security 覆盖跨租户、跨组织、跨网点和越权授予；
+          - Spring Modulith ArchitectureTest 证明模块边界；
+          - Admin/Network/Technician 适用 E2E 使用真实 OIDC，不用跳过后端鉴权的测试口令；
+          - 敏感日志、导出、审计和缓存失权门禁通过；
+          - `implementation-status.md` 只在证据成立后逐里程碑改为 IMPLEMENTED；
+          - 未实施的 Consumer、正式 HR/企业微信 Connector 和生产企业 IdP 不得被文档或 UI 宣称完成。
+          '''
+
+          acceptance = r'''---
+          title: M135～M140 统一身份、组织与授权治理验收矩阵
+          version: 1.0.0
+          status: Accepted
+          decisionDate: 2026-07-17
+          ---
+
+          # M135～M140 统一身份、组织与授权治理验收矩阵
+
+          ## 1. 使用方式
+
+          本矩阵是 M135～M140 的程序级 P0/P1 验收基线。每个实现里程碑仍需创建对应实现文档和更细测试证据；本矩阵中的 P0 未通过时，不得声明该里程碑完成。
+
+          证据等级：
+
+          - `DB`：真实 PostgreSQL + Flyway/Testcontainers；
+          - `SEC`：认证、授权、字段策略和失败关闭；
+          - `CONTRACT`：OpenAPI/事件 Schema、兼容门禁和生成客户端；
+          - `ARCH`：Spring Modulith 模块边界；
+          - `E2E`：真实 OIDC、Backend、PostgreSQL 和适用 Portal；
+          - `OPS`：审计、日志、缓存失权、同步和恢复。
+
+          ## 2. 程序级 P0 不变量
+
+          | ID | 场景 | 预期 | 证据 |
+          |---|---|---|---|
+          | IOG-P0-01 | 检查 ServiceOS 数据库和 API | 不保存密码、密码摘要、MFA secret 或 IdP session；敏感身份信息按字段策略最小化 | DB/SEC |
+          | IOG-P0-02 | 同一 `(tenant, issuer, subject)` 并发绑定 | 只产生一个 IdentityLink；冲突绑定失败关闭且有安全审计 | DB/SEC |
+          | IOG-P0-03 | 一人具有内部员工和师傅 Persona | 保持一个 Principal、多 Persona 和独立有效期；不能用单一 userType 覆盖 | DB/CONTRACT |
+          | IOG-P0-04 | 已停用主体使用旧 JWT、旧游标或旧离线上下文 | 新命令失败关闭；适用查询失权；旧缓存和导航不能恢复权限 | SEC/E2E/OPS |
+          | IOG-P0-05 | 内部部门、合作商、网点和师傅档案建模 | 对象边界独立，无“网点即部门”或“师傅即登录用户”的兼容字段 | DB/ARCH |
+          | IOG-P0-06 | 前端伪造角色、Persona、projectId 或 networkId | 服务端忽略自报授权，只接受实时 RoleGrant/Membership/责任关系 | SEC/E2E |
+          | IOG-P0-07 | 授权或组织关系变更 | 新请求立即按权威事实判定；旧 scope cursor/context version 失败关闭 | DB/SEC/OPS |
+          | IOG-P0-08 | 删除或覆盖历史授权/任职 | 普通命令不可改写历史；通过终止/撤销追加新事实 | DB/SEC |
+          | IOG-P0-09 | 敏感用户目录搜索、导出或查看身份绑定 | 按管理范围和字段策略过滤，行为自身增强审计 | SEC/OPS |
+          | IOG-P0-10 | 任一新模块读取其他模块内部表 | ArchitectureTest 阻断；只能通过公开 API、端口或事件 | ARCH |
+
+          ## 3. M135 统一主体目录
+
+          | ID | 优先级 | 场景 | 预期 | 证据 |
+          |---|---|---|---|---|
+          | M135-01 | P0 | 已允许 issuer 的首次 OIDC 登录 | 幂等登记 Principal/IdentityLink，返回稳定 principalId | DB/SEC/E2E |
+          | M135-02 | P0 | 未知 issuer、错误 tenant claim、subject 冲突 | 失败关闭，不生成半绑定主体 | SEC/DB |
+          | M135-03 | P0 | 绑定第二个外部身份 | 两个 IdentityLink 指向同一 Principal，审批/能力满足且完整审计 | DB/SEC |
+          | M135-04 | P0 | 禁用主体 | 后续命令拒绝，记录原因和操作者；不删除历史业务事实 | DB/SEC/OPS |
+          | M135-05 | P0 | 普通目录查询 | 不返回完整手机号、邮箱、issuer 内部属性或服务凭据 | SEC/CONTRACT |
+          | M135-06 | P1 | Profile/Pers​ona 并发更新 | 使用版本/ETag；冲突返回稳定 409，不最后写胜出 | DB/CONTRACT |
+
+          ## 4. M136 企业组织与任职
+
+          | ID | 优先级 | 场景 | 预期 | 证据 |
+          |---|---|---|---|---|
+          | M136-01 | P0 | 建立多层 OrgUnit | closure 祖先/后代与 depth 正确，循环和跨租户父节点被拒绝 | DB |
+          | M136-02 | P0 | 员工调部门、兼职和负责人变化 | 旧 Membership 保留，新有效期准确，同一时刻约束符合策略 | DB |
+          | M136-03 | P0 | 离职/停用同步 | Principal 新操作失权，RoleGrant 终止/撤销，产生待重分配清单 | DB/SEC/OPS |
+          | M136-04 | P0 | EXTERNAL_AUTHORITATIVE 字段被 Admin 修改 | 失败关闭或走明确 override 流程，不静默覆盖来源 | SEC/E2E |
+          | M136-05 | P0 | 同一外部同步批次重放、乱序或部分失败 | 幂等、可恢复、逐项结果可追踪，不产生组织回退 | DB/OPS |
+          | M136-06 | P1 | 组织移动 | closure 原子切换，授权投影刷新，历史审计可解释 | DB/SEC/OPS |
+
+          ## 5. M137 网点人员与师傅身份
+
+          | ID | 优先级 | 场景 | 预期 | 证据 |
+          |---|---|---|---|---|
+          | M137-01 | P0 | 合作商拥有多个 ServiceNetwork | 网点是独立业务资源，可关联经营/结算主体，不进入内部部门 closure | DB/ARCH |
+          | M137-02 | P0 | 网点负责人邀请成员 | 只能作用于授权网点，身份绑定与 NetworkMembership 分开登记 | SEC/E2E |
+          | M137-03 | P0 | 一名师傅关联多个网点 | 每条关系有效期独立；分配时明确使用 membership；跨网点数据隔离 | DB/SEC |
+          | M137-04 | P0 | 账号有效但资质过期或师傅档案停用 | 不能获得新分配候选，不把账号状态误当可服务状态 | DB/SEC |
+          | M137-05 | P0 | 清退网点或停用师傅 | 展示并处理未完成 Task/Appointment/Visit/离线包，旧命令拒绝 | E2E/OPS |
+          | M137-06 | P1 | 资质提交与总部审核 | 文件、Review、有效期和决定只追加；网点不能自标“已认证” | DB/SEC/E2E |
+
+          ## 6. M138 角色与授权治理
+
+          | ID | 优先级 | 场景 | 预期 | 证据 |
+          |---|---|---|---|---|
+          | M138-01 | P0 | 创建租户角色 | 只能组合稳定 Capability，不能更改能力语义或风险级别 | DB/SEC |
+          | M138-02 | P0 | 申请高风险 RoleGrant | 申请人不能自批；审批者不能超过自己的可授予范围 | SEC/E2E |
+          | M138-03 | P0 | 撤销/到期 RoleGrant | 新请求立即失权，旧游标/context version 失败关闭，历史保留 | DB/SEC/OPS |
+          | M138-04 | P0 | 同一主体多范围授权 | 同条授权维度按 AND，多条有效授权按 OR；显式拒绝优先 | DB/SEC |
+          | M138-05 | P0 | 创建 Delegation | 能力、范围和期限不得超过委托人；实际操作者和原责任人均审计 | SEC/OPS |
+          | M138-06 | P1 | authorization:explain | 只向专用管理能力返回脱敏解释，不泄露他人敏感 grant/policy | SEC/CONTRACT |
+
+          ## 7. M139 Admin 统一用户中心
+
+          | ID | 优先级 | 场景 | 预期 | 证据 |
+          |---|---|---|---|---|
+          | M139-01 | P0 | 按姓名/工号/网点搜索并选择人员 | 使用授权目录，不要求复制 principal UUID；结果按范围和脱敏策略过滤 | E2E/SEC |
+          | M139-02 | P0 | 查看主体详情 | 分区显示身份、Persona、任职、网点/师傅关系和授权来源，不混成单一角色字段 | E2E |
+          | M139-03 | P0 | 调动、停用或撤权 | 页面展示影响和 obligations，提交后重读权威状态及待重分配结果 | E2E/OPS |
+          | M139-04 | P0 | 低权限管理员打开治理深链 | 安全的无权/不存在响应，不泄露姓名、部门、手机号或角色 | SEC/E2E |
+          | M139-05 | P0 | 并发修改 | ETag/version 冲突可恢复，不覆盖新事实 | E2E/DB |
+          | M139-06 | P1 | EXTERNAL_AUTHORITATIVE 组织 | 来源字段只读并显示 lastSyncedAt/同步状态，人工扩展字段边界清晰 | E2E |
+
+          ## 8. M140 Portal 上下文与导航
+
+          | ID | 优先级 | 场景 | 预期 | 证据 |
+          |---|---|---|---|---|
+          | M140-01 | P0 | 多 Persona 用户调用 `/me/contexts` | 返回其当前有效 ADMIN/NETWORK/TECHNICIAN contexts、范围摘要和版本 | CONTRACT/SEC |
+          | M140-02 | P0 | 请求未返回的 network/project context | 失败关闭，不能通过请求体或本地存储扩权 | SEC/E2E |
+          | M140-03 | P0 | `/me/navigation` | 由 Page Registry、Capability、feature gate 和 context 计算；pageId 稳定 | CONTRACT/E2E |
+          | M140-04 | P0 | 直接访问隐藏 URL 或伪造 allowed action | 后端数据和命令仍重新鉴权；导航不成为授权事实 | SEC/E2E |
+          | M140-05 | P0 | 授权/成员关系变化后刷新 | context/navigation 版本变化，旧缓存不可恢复已撤权限 | E2E/OPS |
+          | M140-06 | P1 | Consumer Persona 兼容性 | Principal/IdentityLink/API Schema 不假设企业组织；未实现 C 端页面不暴露入口 | CONTRACT/ARCH |
+
+          ## 9. 非功能与恢复
+
+          | ID | 优先级 | 场景 | 预期 |
+          |---|---|---|---|
+          | IOG-NFR-01 | P0 | 10 万主体、深组织树和多范围授权基准 | 查询使用索引/投影，不对列表逐行远程鉴权；目标和证据写入里程碑文档 |
+          | IOG-NFR-02 | P0 | IdP/HR 同步不可用 | 已登录且未撤权主体按明确策略运行；新绑定/同步不伪造成功，恢复后可重试 |
+          | IOG-NFR-03 | P0 | 日志与诊断包扫描 | 不出现密码、token、完整手机号/邮箱、证件、subject 映射或审批敏感正文 |
+          | IOG-NFR-04 | P0 | 迁移失败/回滚 | Flyway 失败关闭；不建立虚假默认 Principal、Organization、Membership 或 Grant |
+          | IOG-NFR-05 | P1 | 组织/授权投影重建 | 有 checkpoint/freshness/失败可见性，高风险命令始终读权威事实 |
+
+          ## 10. 完成判定
+
+          单个里程碑至少提交：实现文档、迁移、机器契约、目标测试、ArchitectureTest、适用 Portal E2E、敏感输出门禁、`implementation-status.md` 更新和可追踪 PR 证据。仅有页面、fixture、Keycloak realm JSON 或初始化 SQL 不算完成。
+          '''
+
+          worklist = r'''---
+          title: M135～M140 身份与组织治理 Agent 工作清单
+          version: 1.0.0
+          status: Accepted
+          decisionDate: 2026-07-17
+          ---
+
+          # M135～M140 身份与组织治理 Agent 工作清单
+
+          ## 1. 执行规则
+
+          1. 每次开始先读取最新 `master`、`AGENTS.md`、实施状态、本交付计划和程序级验收矩阵；不得根据旧 PR 猜基线。
+          2. 默认一个里程碑一个独立分支和 Draft PR；前一里程碑未合并时，不依赖其内部表继续开发。确需 stacked PR 必须得到项目负责人明确批准。
+          3. 开发阶段执行 L0～L2 精准本地验证并继续工作，不在每次中间 push 后等待 GitHub Actions；最终候选 HEAD 冻结后才等待一次完整门禁。
+          4. 不创建传统 `sys_user(password, role, dept_id)` 万能表，不用单一 `user_type` 覆盖多 Persona，不用 Keycloak Group 代替业务组织权威。
+          5. 不用菜单、路由、JWT role 或前端自报 scope 代替后端 RoleGrant/Membership/责任实时鉴权。
+          6. 不读其他模块内部表、不建立跨模块外键、不在事件或日志中泄露密码、token、完整联系方式和身份映射。
+          7. 所有写命令具备 Idempotency-Key、版本/ETag、审计、失败关闭和明确恢复路径。
+          8. Flyway 使用下一个连续版本；不得修改已发布迁移。Apple Silicon/PostgreSQL 镜像规则继续遵守根 `AGENTS.md`。
+
+          ## 2. 共用交付模板
+
+          每个里程碑 PR 必须包含：
+
+          ```text
+          架构/实现文档
+          数据模型与 Flyway
+          公共 API/端口
+          OpenAPI 与必要事件 Schema
+          PostgreSQL Testcontainers
+          MVC Security
+          Spring Modulith ArchitectureTest
+          审计/幂等/并发/缓存失权测试
+          适用 Portal 或真实 OIDC E2E
+          implementation-status 与 README 索引同步
+          明确未实现边界
+          ```
+
+          预留实现文档编号：M135 从 `architecture/148-*` 开始；每个新里程碑使用连续编号。程序级验收矩阵不替代里程碑实现证据。
+
+          ## 3. M135 Agent 清单：统一主体目录
+
+          分支建议：`feat/m135-unified-principal-directory`
+
+          - 盘点现有 `identity`、JWT principal、authorization 的稳定 principalId 使用；禁止破坏已有主体引用。
+          - 定义 Principal、IdentityLink、PersonProfile、Persona 和生命周期不变量。
+          - 决定首次登录登记策略、受信 issuer/client 和冲突绑定处置。
+          - 增加迁移、Repository、应用服务、公开查询/命令 API 和审计。
+          - 提供主体搜索/详情的最小字段与 FieldPolicy；不暴露密码、token 或不必要 IdP 属性。
+          - 覆盖并发绑定、跨租户 subject、禁用旧 JWT、多个 Persona 和版本冲突。
+          - 更新 Core OpenAPI、生成客户端、实施状态和索引。
+
+          完成后才允许 M136 依赖稳定 Principal API。
+
+          ## 4. M136 Agent 清单：企业组织与任职
+
+          分支建议：`feat/m136-organization-directory`
+
+          - 通过 ADR/架构文档确定独立组织目录模块名和允许依赖。
+          - 实现 Organization、OrgUnit、closure、OrgMembership 和有效期历史。
+          - 明确 LOCAL 与 EXTERNAL_AUTHORITATIVE 字段所有权、来源键和同步收据。
+          - 实现组织树/搜索、成员查询、调动、离职和同步批次；禁止任意 SQL scope。
+          - 离职/停用联动主体失权、RoleGrant 终止/撤销和待重新分配清单。
+          - 覆盖循环、组织移动、乱序同步、重复批次、部分失败和跨租户父子关系。
+
+          ## 5. M137 Agent 清单：网点人员与师傅身份
+
+          分支建议：`feat/m137-network-technician-directory`
+
+          - 明确 Partner Organization、ServiceNetwork 与内部 OrgUnit 的边界。
+          - 实现 NetworkMembership、TechnicianProfile、NetworkTechnicianMembership 和 Qualification。
+          - 邀请/绑定账号必须复用 M135 Principal，不创建第二套用户表。
+          - 候选与派单查询同时验证师傅档案、网点关系、技能/资质和状态。
+          - 清退/停用展示并处理 Task、Appointment、Visit、ServiceAssignment 和离线工作包影响。
+          - 覆盖多网点师傅、跨网点隔离、资质过期、并发邀请和旧成员缓存失权。
+
+          ## 6. M138 Agent 清单：角色与授权治理
+
+          分支建议：`feat/m138-role-grant-governance`
+
+          - 复用现有 Capability 与 RoleGrant 运行时，不另建平行 RBAC。
+          - 实现角色模板/租户角色、授权申请/审批/撤销、Delegation 和授权解释。
+          - 高风险授权执行职责分离、可授予范围、MFA/approval obligations 和增强审计。
+          - 授权历史只追加；到期/撤销使查询 context、scope cursor 和缓存失败关闭。
+          - 覆盖同授权维度 AND、多授权 OR、显式拒绝、越权授予、自批和乱序撤销。
+
+          ## 7. M139 Agent 清单：Admin 统一用户中心
+
+          分支建议：`feat/m139-admin-user-center`
+
+          - 建立用户、组织、合作方/网点人员、师傅、角色与授权页面。
+          - 所有选择器使用目录搜索，不把 principal UUID 暴露为主要交互。
+          - 显示来源、有效期、同步状态、影响范围、未完成工作、版本和 obligations。
+          - EXTERNAL_AUTHORITATIVE 字段只读；写动作提交后重读权威 API。
+          - 使用真实 Keycloak PKCE、Backend、PostgreSQL 和 Chrome 覆盖搜索、绑定、调动、授权、撤权和停用。
+          - 无权限深链和搜索不得泄露姓名、联系方式、组织或角色。
+
+          ## 8. M140 Agent 清单：Portal 上下文与导航
+
+          分支建议：`feat/m140-portal-context-navigation`
+
+          - 实现 `/me`、`/me/contexts`、`/me/capabilities`、`/me/navigation`。
+          - 上下文只由有效 Persona、Membership、RoleGrant 和 feature gate 计算。
+          - 建立代码注册 Page Registry；数据库仅管理启用、标题覆盖、顺序和 feature gate。
+          - Admin、Network、Technician Portal 独立消费 contexts；前端切换不能扩权。
+          - 覆盖旧上下文版本、授权变化、网点切换、多 Persona、隐藏 URL 和伪造 allowed action。
+          - Schema 预留 Consumer Persona，但不得宣称 C 端注册/用户中心已交付。
+
+          ## 9. PR 描述必填
+
+          ```text
+          Milestone / baseline SHA
+          解决的权威事实和不变量
+          数据与模块所有权
+          API/事件/迁移变更
+          授权与敏感数据影响
+          幂等、并发、撤权和恢复证明
+          精准测试与最终完整门禁
+          明确未实现
+          下一里程碑允许依赖的公共表面
+          ```
+
+          ## 10. 禁止完成声明
+
+          下列情况只能标记 PARTIAL 或保持 ACCEPTED：只有设计/页面；只有 Keycloak realm 或初始化 SQL；测试使用跳过鉴权的 token；没有 PostgreSQL 证据；没有撤权/跨租户测试；仍要求手工输入 principalId；网点/师傅与账号混为一表；导航隐藏但 API 可越权；文档未同步。
+          '''
+
+          Path('serviceos-architecture/roadmap/03-identity-organization-governance-delivery-plan.md').write_text(roadmap.strip() + '\n', encoding='utf-8')
+          Path('serviceos-architecture/testing/identity-organization-governance-program-acceptance.md').write_text(acceptance.strip() + '\n', encoding='utf-8')
+          Path('serviceos-architecture/roadmap/04-identity-organization-governance-agent-worklist.md').write_text(worklist.strip() + '\n', encoding='utf-8')
+
+          status_path = Path('serviceos-architecture/docs/implementation-status.md')
+          status = status_path.read_text(encoding='utf-8')
+          status = re.sub(r'^lastUpdated: .*$', 'lastUpdated: 2026-07-17', status, count=1, flags=re.MULTILINE)
+
+          plan_section = '''## 2.1 已接受的下一实施序列：M135～M140
+
+          M135～M140 已由项目负责人正式接受为 M134 之后的身份与组织治理实施序列，但当前均尚未实现，不改变 `latestMilestone: M134`：
+
+          | 里程碑 | 状态 | 目标 |
+          |---|---|---|
+          | M135 | `ACCEPTED` | 统一 Principal、IdentityLink、PersonProfile、Persona 与主体生命周期 |
+          | M136 | `ACCEPTED` | 企业 Organization/OrgUnit/closure、人员任职和 LOCAL/外部权威同步 |
+          | M137 | `ACCEPTED` | 合作组织、ServiceNetwork 人员、TechnicianProfile、网点关系与资质 |
+          | M138 | `ACCEPTED` | Role/Capability/RoleGrant 申请审批撤销、Delegation、职责分离和授权解释 |
+          | M139 | `ACCEPTED` | Admin 统一用户中心与真实 OIDC 治理 E2E |
+          | M140 | `ACCEPTED` | `/me` contexts/capabilities/navigation、多 Persona 与三 Portal 上下文 |
+
+          正式事实源：
+
+          - [M135～M140 交付计划](../roadmap/03-identity-organization-governance-delivery-plan.md)
+          - [程序级验收矩阵](../testing/identity-organization-governance-program-acceptance.md)
+          - [Agent 工作清单](../roadmap/04-identity-organization-governance-agent-worklist.md)
+
+          Consumer Identity/CustomerProfile 是 M140 之后的已接受后续 Epic；在登录渠道、隐私同意、客户主数据和注销保留策略确认前不分配里程碑，也不得宣称已实现。
+          '''.strip()
+
+          if '## 2.1 已接受的下一实施序列：M135～M140' not in status:
+              marker = '每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。'
+              status = status.replace(marker, marker + '\n\n' + plan_section, 1)
+
+          capability_rows = [
+              '| 统一主体目录 | Principal、IdentityLink、PersonProfile、Persona 与生命周期 | `ACCEPTED` | 现有 JWT principalId 和后端身份上下文可复用 | M135 代码、迁移、契约、目录 API、停用失权和安全测试 | M135 正式路线 |',
+              '| 企业组织目录 | Organization、OrgUnit、closure、任职与主数据同步 | `ACCEPTED` | 已有概念模型和授权范围需求 | M136 组织权威、有效期历史、同步收据、离职联动和治理 API/UI | M136 正式路线 |',
+              '| 网点人员与师傅身份 | NetworkMembership、TechnicianProfile、网点关系与资质 | `ACCEPTED` | 已有 ServiceAssignment/TaskAssignment 和产品规格 | M137 目录运行时、身份绑定、多网点关系、资质和停用影响 | M137 正式路线 |',
+              '| 角色与授权治理 | Role/Capability/RoleGrant 管理、审批、撤销与 Delegation | `ACCEPTED` | 实时 RoleGrant 授权运行时已实现 | M138 治理命令、职责分离、授权解释、历史和 Admin 操作面 | M138 正式路线 |',
+              '| 统一用户中心 | Admin 用户、组织、网点人员、师傅、角色和授权治理 | `ACCEPTED` | Admin Web 与真实 Keycloak PKCE 基线可复用 | M139 页面、目录选择器、影响展示、真实 OIDC 治理 E2E | M139 正式路线 |',
+              '| Portal 上下文与导航 | `/me`、contexts、capabilities、navigation 与多 Persona | `ACCEPTED` | pageId/capability/独立 Portal 规格已存在 | M140 服务端上下文、Page Registry、缓存失权和三 Portal 接入 | M140 正式路线 |',
+              '| Consumer Identity | CustomerProfile、用户资源关系和 C 端身份 | `ACCEPTED` | Principal/IdentityLink 模型必须预留 Consumer Persona | M140 后独立 Epic；待登录、隐私、客户主数据与注销策略确认 | 后续正式 Epic |',
+          ]
+          if '| 统一主体目录 | Principal、IdentityLink、PersonProfile、Persona 与生命周期 |' not in status:
+              lines = status.splitlines()
+              for index, line in enumerate(lines):
+                  if line.startswith('| 身份授权 |'):
+                      lines[index + 1:index + 1] = capability_rows
+                      break
+              else:
+                  raise RuntimeError('identity capability row not found')
+              status = '\n'.join(lines) + ('\n' if status.endswith('\n') else '')
+          status_path.write_text(status, encoding='utf-8')
+
+          arch_readme_path = Path('serviceos-architecture/README.md')
+          arch_readme = arch_readme_path.read_text(encoding='utf-8')
+          index_entries = '''316. [M135～M140 统一身份、组织与授权治理交付计划](roadmap/03-identity-organization-governance-delivery-plan.md)
+          317. [M135～M140 统一身份、组织与授权治理验收矩阵](testing/identity-organization-governance-program-acceptance.md)
+          318. [M135～M140 身份与组织治理 Agent 工作清单](roadmap/04-identity-organization-governance-agent-worklist.md)
+          '''.strip()
+          if '03-identity-organization-governance-delivery-plan.md' not in arch_readme:
+              arch_readme = arch_readme.replace('\n## 仓库结构', '\n' + index_entries + '\n\n## 仓库结构', 1)
+          arch_readme_path.write_text(arch_readme, encoding='utf-8')
+
+          agents_path = Path('AGENTS.md')
+          agents = agents_path.read_text(encoding='utf-8')
+          agents_section = '''## M135～M140 身份与组织治理正式执行入口
+
+          M135～M140 已接受为 M134 之后的正式实施序列，但尚未实现。涉及用户、组织、网点人员、师傅、角色授权或 Portal 上下文的 Agent 必须先阅读：
+
+          - `serviceos-architecture/roadmap/03-identity-organization-governance-delivery-plan.md`
+          - `serviceos-architecture/testing/identity-organization-governance-program-acceptance.md`
+          - `serviceos-architecture/roadmap/04-identity-organization-governance-agent-worklist.md`
+
+          不得创建保存密码的本地万能用户表，不得用单一 `user_type`、Keycloak Group、菜单或前端 scope 代替 Principal/Persona/Membership/RoleGrant 的权威边界。默认一个里程碑一个 Draft PR；只有对应工程证据成立后才更新 `latestMilestone` 或声明 IMPLEMENTED。
+          '''.strip()
+          if '## M135～M140 身份与组织治理正式执行入口' not in agents:
+              agents = agents.rstrip() + '\n\n' + agents_section + '\n'
+          agents_path.write_text(agents, encoding='utf-8')
+          PY
+
+          rm .github/workflows/materialize-identity-governance-roadmap.yml
+
+      - name: Validate documentation baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          bash scripts/verify-milestone-preflight.sh
+
+      - name: Commit generated documentation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "docs: accept M135-M140 identity governance program"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
