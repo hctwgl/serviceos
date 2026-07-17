@@ -22,6 +22,7 @@ export type FormSubmission = {
   validationStatus: 'VALIDATED' | 'INVALID'
   errors: Array<{ fieldKey: string; code: string; message: string }>
   warnings: Array<{ fieldKey: string; code: string; message: string }>
+  prefillVersion?: string | null
   submittedBy: string
   submittedAt: string
 }

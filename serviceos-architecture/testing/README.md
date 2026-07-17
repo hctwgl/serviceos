@@ -155,4 +155,5 @@
 - [M152 Admin 工作区 TASKS → 任务详情深链验收矩阵](149-m152-admin-pilot-workspace-tasks-task-detail-deeplink-acceptance.md)
 - [M153 Admin 工作区 TIMELINE_AUDIT → 资源详情深链验收矩阵](150-m153-admin-pilot-workspace-timeline-resource-deeplink-acceptance.md)
 - [M154 Admin 工作区预约上门/表单资料 → Task 旁路深链验收矩阵](151-m154-admin-pilot-workspace-av-fe-task-deeplink-acceptance.md)
+- [M155 Admin 预约/表单提交详情页验收矩阵](152-m155-admin-pilot-appointment-form-submission-detail-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

@@ -7,6 +7,22 @@ export type AppointmentWindow = {
   estimatedDurationMinutes: number
 }
 
+export type AppointmentRevision = {
+  revisionId: string
+  revisionNo: number
+  windowStart?: string | null
+  windowEnd?: string | null
+  timezone?: string | null
+  estimatedDurationMinutes?: number | null
+  addressRef?: string | null
+  addressVersion?: string | null
+  status?: string | null
+  confirmedPartyType?: string | null
+  confirmedPartyRef?: string | null
+  confirmationChannel?: string | null
+  createdAt?: string | null
+}
+
 export type Appointment = {
   appointmentId: string
   projectId: string
@@ -20,6 +36,7 @@ export type Appointment = {
   currentRevisionNo: number
   createdAt: string
   createdBy: string
+  revisions?: AppointmentRevision[]
   allowedActions: Array<'CONFIRM' | 'RESCHEDULE' | 'CANCEL' | 'MARK_NO_SHOW'>
 }
 

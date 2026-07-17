@@ -244,6 +244,18 @@ type RelatedTaskLink = {
   label: string
 }
 
+type AppointmentDetailLink = {
+  appointmentId: string
+  type: string
+  status: string
+}
+
+type FormSubmissionDetailLink = {
+  submissionId: string
+  formKey: string
+  validationStatus: string
+}
+
 /** 仅映射已有 Admin 详情路由；Appointment/Visit/Form 等无对等页时不渲染。 */
 const TIMELINE_RESOURCE_ROUTES: Record<string, string> = {
   WorkOrder: 'ADMIN.WORKORDER.WORKSPACE',
@@ -414,9 +426,30 @@ const timelineResourceLinks = computed((): TimelineResourceLink[] => {
     .filter((item): item is TimelineResourceLink => item != null)
 })
 
+/** M155：复用已有 GET /appointments/{id}；与 Task 旁路并列。 */
+const appointmentDetailLinks = computed((): AppointmentDetailLink[] => {
+  const section = sectionData.value?.appointmentsVisits
+  if (!section || activeSection.value !== 'APPOINTMENTS_VISITS') return []
+  const raw = section.appointments
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null
+      const row = item as Record<string, unknown>
+      const id = row.appointmentId
+      if (typeof id !== 'string' || !id) return null
+      return {
+        appointmentId: id,
+        type: String(row.type ?? '—'),
+        status: String(row.status ?? '—'),
+      }
+    })
+    .filter((item): item is AppointmentDetailLink => item != null)
+})
+
 /**
- * 预约/上门/联系尝试尚无独立 Admin 详情页；旁路到已 Implemented Task 详情
- *（TaskFieldOpsPanel 承载现场操作）。
+ * Visit/ContactAttempt 仍无独立详情页；旁路到 Task。
+ * appointments 已有详情页，仍保留 Task 旁路供现场操作入口。
  */
 const appointmentVisitTaskLinks = computed((): RelatedTaskLink[] => {
   const section = sectionData.value?.appointmentsVisits
@@ -434,9 +467,30 @@ const appointmentVisitTaskLinks = computed((): RelatedTaskLink[] => {
   })
 })
 
+/** M155：复用已有 GET /form-submissions/{id}；与 Task 旁路并列。 */
+const formSubmissionDetailLinks = computed((): FormSubmissionDetailLink[] => {
+  const section = sectionData.value?.formsEvidence
+  if (!section || activeSection.value !== 'FORMS_EVIDENCE') return []
+  const raw = section.formSubmissions
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null
+      const row = item as Record<string, unknown>
+      const id = row.submissionId
+      if (typeof id !== 'string' || !id) return null
+      return {
+        submissionId: id,
+        formKey: String(row.formKey ?? '—'),
+        validationStatus: String(row.validationStatus ?? '—'),
+      }
+    })
+    .filter((item): item is FormSubmissionDetailLink => item != null)
+})
+
 /**
- * 表单/资料尚无独立 Admin 详情页；旁路到已 Implemented Task 详情
- *（TaskFormsEvidencePanel 承载编排）。
+ * 表单定义/资料槽位仍无独立详情页；旁路到 Task。
+ * formSubmissions 已有详情页，仍保留 Task 旁路供编排入口。
  */
 const formsEvidenceTaskLinks = computed((): RelatedTaskLink[] => {
   const section = sectionData.value?.formsEvidence
@@ -846,6 +900,19 @@ onMounted(() => {
               {{ item.label }}
             </RouterLink>
           </p>
+          <p v-if="appointmentDetailLinks.length" class="links appointment-detail-links">
+            打开预约详情：
+            <RouterLink
+              v-for="item in appointmentDetailLinks"
+              :key="item.appointmentId"
+              :to="{
+                name: 'ADMIN.APPOINTMENT.DETAIL',
+                params: { id: item.appointmentId },
+              }"
+            >
+              {{ item.type }} / {{ item.status }} / {{ item.appointmentId }}
+            </RouterLink>
+          </p>
           <p v-if="appointmentVisitTaskLinks.length" class="links appointment-visit-task-links">
             打开预约上门关联任务：
             <RouterLink
@@ -857,6 +924,19 @@ onMounted(() => {
               }"
             >
               {{ item.label }}
+            </RouterLink>
+          </p>
+          <p v-if="formSubmissionDetailLinks.length" class="links form-submission-detail-links">
+            打开表单提交详情：
+            <RouterLink
+              v-for="item in formSubmissionDetailLinks"
+              :key="item.submissionId"
+              :to="{
+                name: 'ADMIN.FORM_SUBMISSION.DETAIL',
+                params: { id: item.submissionId },
+              }"
+            >
+              {{ item.formKey }} / {{ item.validationStatus }} / {{ item.submissionId }}
             </RouterLink>
           </p>
           <p v-if="formsEvidenceTaskLinks.length" class="links forms-evidence-task-links">

@@ -1,13 +1,13 @@
 ---
-title: Admin 试点可运行基线（含 M154 工作区 AV/FE Task 旁路）
+title: Admin 试点可运行基线（含 M155 预约/表单提交详情）
 status: Implemented
 lastUpdated: 2026-07-17
 ---
 
-# Admin 试点可运行基线（含 M154 工作区 AV/FE Task 旁路）
+# Admin 试点可运行基线（含 M155 预约/表单提交详情）
 
-本基线覆盖 M101～M154 已有 Admin 表面的可重复构建、登录、真实后端/数据库试点入口，并明确
-平台级未实现边界。M135～M154 追加补传复审、预约上门、提审外发 ACK、厂端回调、入站接单激活、
+本基线覆盖 M101～M155 已有 Admin 表面的可重复构建、登录、真实后端/数据库试点入口，并明确
+平台级未实现边界。M135～M155 追加补传复审、预约上门、提审外发 ACK、厂端回调、入站接单激活、
 Admin HTTP 人工初派、同单预约上门→表单/资料/驳回整改补传复审/外发/完结（`ADMIN-PILOT-09`）、
 入站 Envelope/Canonical 详情深链、专项队列与目录/SLA Accepted OpenAPI 筛选，以及工作区外发/审核/整改详情深链。
 
@@ -208,6 +208,11 @@ GitHub Actions 使用同一脚本阻断 PR，并保留 Backend、Admin 与 Playw
 
 - 工作区 APPOINTMENTS_VISITS / FORMS_EVIDENCE Task 旁路深链；
 - Appointment/Visit/Form/Evidence 独立详情页、专用入站队列列表仍未证明。
+
+已追加证明（M155 / ADMIN-PILOT-08AD）：
+
+- 预约/表单提交只读详情页与工作区深链；
+- Visit/EvidenceItem 独立详情页、专用入站队列列表仍未证明。
 
 尚未证明：
 

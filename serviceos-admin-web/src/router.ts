@@ -17,6 +17,8 @@ import TaskDirectoryPage from './pages/TaskDirectoryPage.vue'
 import TaskDetailPage from './pages/TaskDetailPage.vue'
 import SlaQueuePage from './pages/SlaQueuePage.vue'
 import SlaInstanceDetailPage from './pages/SlaInstanceDetailPage.vue'
+import AppointmentDetailPage from './pages/AppointmentDetailPage.vue'
+import FormSubmissionDetailPage from './pages/FormSubmissionDetailPage.vue'
 import ProjectDirectoryPage from './pages/ProjectDirectoryPage.vue'
 import ProjectDetailPage from './pages/ProjectDetailPage.vue'
 import OidcCallbackPage from './pages/OidcCallbackPage.vue'
@@ -49,6 +51,16 @@ export const router = createRouter({
         { path: 'exceptions/:id', name: 'ADMIN.EXCEPTION.DETAIL', component: ExceptionDetailPage },
         { path: 'tasks', name: 'ADMIN.TASK.QUEUE', component: TaskDirectoryPage },
         { path: 'tasks/:id', name: 'ADMIN.TASK.DETAIL', component: TaskDetailPage },
+        {
+          path: 'appointments/:id',
+          name: 'ADMIN.APPOINTMENT.DETAIL',
+          component: AppointmentDetailPage,
+        },
+        {
+          path: 'form-submissions/:id',
+          name: 'ADMIN.FORM_SUBMISSION.DETAIL',
+          component: FormSubmissionDetailPage,
+        },
         { path: 'sla', name: 'ADMIN.SLA.QUEUE', component: SlaQueuePage },
         { path: 'sla/:id', name: 'ADMIN.SLA.DETAIL', component: SlaInstanceDetailPage },
         { path: 'projects', name: 'ADMIN.PROJECT.LIST', component: ProjectDirectoryPage },

@@ -638,7 +638,32 @@ test('真实 OIDC 登录后可完成 Task 并可靠推进 Workflow 与 WorkOrder
     status: 'COMPLETED',
   })
 
-  // M154：完结后从工作区 FORMS_EVIDENCE 旁路回 Task（不得打断上方双输入 complete 面板状态）。
+  // M155 / M154：完结后证明表单提交详情与 Task 旁路（不得打断上方双输入 complete 面板状态）。
+  await page.getByRole('link', { name: '工单目录' }).click()
+  await page.getByRole('link', { name: workOrderCode! }).click()
+  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await page.getByRole('button', { name: /FORMS_EVIDENCE/ }).click()
+  await expect(page.getByText('区块加载中…')).toHaveCount(0)
+  await expect(page.getByText('打开表单提交详情：')).toBeVisible()
+  const workspaceFormSubmissionPromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname ===
+        `/api/v1/form-submissions/${submission.submissionId}`,
+  )
+  await page
+    .getByRole('link', {
+      name: new RegExp(
+        `admin\\.pilot-completion-form\\s*/\\s*VALIDATED\\s*/\\s*${submission.submissionId}`,
+      ),
+    })
+    .click()
+  expect((await workspaceFormSubmissionPromise).status()).toBe(200)
+  await expect(page.getByRole('heading', { name: '表单提交详情' })).toBeVisible()
+  await expect(page).toHaveURL(
+    new RegExp(`/form-submissions/${submission.submissionId}$`),
+  )
+
   await page.getByRole('link', { name: '工单目录' }).click()
   await page.getByRole('link', { name: workOrderCode! }).click()
   await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
@@ -1301,9 +1326,32 @@ test('真实 OIDC 登录后可完成预约提议确认与上门签到签退', as
   })
   await expect(page.getByText(`已确认预约 ${proposed.appointmentId}`)).toBeVisible()
 
-  // M154：工作区 APPOINTMENTS_VISITS → Task 详情旁路（无独立预约详情页）。
+  // M155：工作区 APPOINTMENTS_VISITS → 预约详情（包装 GET /appointments/{id}）。
   await page.getByRole('link', { name: '工单目录' }).click()
   await page.getByRole('link', { name: workOrderCode! }).click()
+  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await page.getByRole('button', { name: /APPOINTMENTS_VISITS/ }).click()
+  await expect(page.getByText('区块加载中…')).toHaveCount(0)
+  await expect(page.getByText('打开预约详情：')).toBeVisible()
+  const workspaceAppointmentDetailPromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname ===
+        `/api/v1/appointments/${proposed.appointmentId}`,
+  )
+  await page
+    .getByRole('link', {
+      name: new RegExp(
+        `INSTALLATION\\s*/\\s*CONFIRMED\\s*/\\s*${proposed.appointmentId}`,
+      ),
+    })
+    .click()
+  expect((await workspaceAppointmentDetailPromise).status()).toBe(200)
+  await expect(page.getByRole('heading', { name: '预约详情' })).toBeVisible()
+  await expect(page).toHaveURL(new RegExp(`/appointments/${proposed.appointmentId}$`))
+
+  // M154：同区块 Task 旁路仍可用（现场操作入口）。
+  await page.getByRole('link', { name: '工单工作区' }).click()
   await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
   await page.getByRole('button', { name: /APPOINTMENTS_VISITS/ }).click()
   await expect(page.getByText('区块加载中…')).toHaveCount(0)
