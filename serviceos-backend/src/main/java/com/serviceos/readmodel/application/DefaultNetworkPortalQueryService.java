@@ -11,6 +11,10 @@ import com.serviceos.dispatch.api.NetworkCapacityCounterView;
 import com.serviceos.dispatch.api.NetworkCapacitySummaryQuery;
 import com.serviceos.evidence.api.CorrectionCaseService;
 import com.serviceos.evidence.api.CorrectionCaseView;
+import com.serviceos.evidence.api.EvidenceItemQueryService;
+import com.serviceos.evidence.api.EvidenceItemSummaryView;
+import com.serviceos.evidence.api.EvidenceSlotQueryService;
+import com.serviceos.evidence.api.EvidenceSlotView;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.network.api.NetworkMembershipView;
 import com.serviceos.network.api.NetworkPortalMembershipQuery;
@@ -35,6 +39,8 @@ import com.serviceos.readmodel.api.NetworkPortalWorkbenchView;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderItem;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderWorkspace;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderWorkspaceSlaSummary;
+import com.serviceos.readmodel.api.NetworkPortalWorkspaceEvidenceItemSummary;
+import com.serviceos.readmodel.api.NetworkPortalWorkspaceEvidenceSlotSummary;
 import com.serviceos.readmodel.api.NetworkPortalWorkspaceFormSubmissionSummary;
 import com.serviceos.readmodel.api.NetworkPortalWorkspaceVisitSummary;
 import com.serviceos.shared.BusinessProblem;
@@ -90,6 +96,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     private static final int SLA_WORKSPACE_LIMIT = 100;
     private static final int WORKSPACE_VISIT_LIMIT = 100;
     private static final int WORKSPACE_FORM_LIMIT = 100;
+    private static final int WORKSPACE_EVIDENCE_LIMIT = 100;
     private static final Set<String> OPEN_SLA_STATUSES = Set.of("RUNNING", "BREACHED");
 
     private final PrincipalNetworkAffiliationQuery affiliations;
@@ -106,6 +113,8 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     private final SlaQueryService slaQueries;
     private final VisitService visits;
     private final FormSubmissionQueryService formSubmissions;
+    private final EvidenceSlotQueryService evidenceSlots;
+    private final EvidenceItemQueryService evidenceItems;
     private final Clock clock;
 
     DefaultNetworkPortalQueryService(
@@ -123,6 +132,8 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
             SlaQueryService slaQueries,
             VisitService visits,
             FormSubmissionQueryService formSubmissions,
+            EvidenceSlotQueryService evidenceSlots,
+            EvidenceItemQueryService evidenceItems,
             Clock clock
     ) {
         this.affiliations = affiliations;
@@ -139,6 +150,8 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         this.slaQueries = slaQueries;
         this.visits = visits;
         this.formSubmissions = formSubmissions;
+        this.evidenceSlots = evidenceSlots;
+        this.evidenceItems = evidenceItems;
         this.clock = clock;
     }
 
@@ -249,6 +262,14 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
             formSubmissionSummaries = loadFormSubmissionSummaries(
                     actor, correlationId, networkId, activeTaskIds);
         }
+        List<NetworkPortalWorkspaceEvidenceSlotSummary> evidenceSlotSummaries = null;
+        List<NetworkPortalWorkspaceEvidenceItemSummary> evidenceItemSummaries = null;
+        if (hasNetworkCapability(actor, correlationId, EVIDENCE_READ, networkId)) {
+            evidenceSlotSummaries = loadEvidenceSlotSummaries(
+                    actor, correlationId, networkId, activeTaskIds);
+            evidenceItemSummaries = loadEvidenceItemSummaries(
+                    actor, correlationId, networkId, activeTaskIds);
+        }
         return new NetworkPortalWorkOrderWorkspace(
                 networkId,
                 workOrderId,
@@ -261,6 +282,8 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                 slaSummary,
                 visitSummaries,
                 formSubmissionSummaries,
+                evidenceSlotSummaries,
+                evidenceItemSummaries,
                 clock.instant());
     }
 
@@ -372,6 +395,95 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                 submission.errorCount(),
                 submission.warningCount(),
                 submission.submittedAt());
+    }
+
+    /**
+     * M223：NETWORK evidence.read 已 soft-gate；仅 fan-in ACTIVE taskIds。
+     * OnNetwork 端口对未解析任务返回空列表，避免污染工作区只读事务。
+     */
+    private List<NetworkPortalWorkspaceEvidenceSlotSummary> loadEvidenceSlotSummaries(
+            CurrentPrincipal actor,
+            String correlationId,
+            UUID networkId,
+            Set<UUID> activeTaskIds
+    ) {
+        List<NetworkPortalWorkspaceEvidenceSlotSummary> collected = new ArrayList<>();
+        for (UUID taskId : activeTaskIds) {
+            for (EvidenceSlotView slot : evidenceSlots.listForTaskOnNetwork(
+                    actor, correlationId, taskId, networkId)) {
+                collected.add(toEvidenceSlotSummary(slot));
+            }
+        }
+        return collected.stream()
+                .sorted(Comparator
+                        .comparing(NetworkPortalWorkspaceEvidenceSlotSummary::templateKey)
+                        .thenComparing(NetworkPortalWorkspaceEvidenceSlotSummary::requirementCode)
+                        .thenComparing(NetworkPortalWorkspaceEvidenceSlotSummary::slotId))
+                .limit(WORKSPACE_EVIDENCE_LIMIT)
+                .toList();
+    }
+
+    /**
+     * M223：NETWORK evidence.read 已 soft-gate；仅 fan-in ACTIVE taskIds。
+     */
+    private List<NetworkPortalWorkspaceEvidenceItemSummary> loadEvidenceItemSummaries(
+            CurrentPrincipal actor,
+            String correlationId,
+            UUID networkId,
+            Set<UUID> activeTaskIds
+    ) {
+        List<NetworkPortalWorkspaceEvidenceItemSummary> collected = new ArrayList<>();
+        for (UUID taskId : activeTaskIds) {
+            evidenceItems.listSummariesForTaskOnNetwork(
+                            actor, correlationId, taskId, networkId)
+                    .stream()
+                    .map(this::toEvidenceItemSummary)
+                    .forEach(collected::add);
+        }
+        return collected.stream()
+                .sorted(Comparator
+                        .comparing(NetworkPortalWorkspaceEvidenceItemSummary::evidenceSlotId)
+                        .thenComparingInt(NetworkPortalWorkspaceEvidenceItemSummary::itemOrdinal)
+                        .thenComparing(NetworkPortalWorkspaceEvidenceItemSummary::evidenceItemId))
+                .limit(WORKSPACE_EVIDENCE_LIMIT)
+                .toList();
+    }
+
+    private NetworkPortalWorkspaceEvidenceSlotSummary toEvidenceSlotSummary(EvidenceSlotView slot) {
+        return new NetworkPortalWorkspaceEvidenceSlotSummary(
+                slot.slotId(),
+                slot.taskId(),
+                slot.projectId(),
+                slot.templateKey(),
+                slot.templateVersion(),
+                slot.requirementCode(),
+                slot.occurrenceKey(),
+                slot.requirementName(),
+                slot.mediaType(),
+                slot.required(),
+                slot.minCount(),
+                slot.maxCount(),
+                slot.status(),
+                slot.resolvedAt(),
+                slot.slotGeneration(),
+                slot.active(),
+                slot.transition(),
+                slot.requiredDisposition());
+    }
+
+    private NetworkPortalWorkspaceEvidenceItemSummary toEvidenceItemSummary(
+            EvidenceItemSummaryView item
+    ) {
+        return new NetworkPortalWorkspaceEvidenceItemSummary(
+                item.evidenceItemId(),
+                item.taskId(),
+                item.projectId(),
+                item.evidenceSlotId(),
+                item.itemOrdinal(),
+                item.status(),
+                item.revisionCount(),
+                item.latestRevisionNumber(),
+                item.latestRevisionStatus());
     }
 
     @Override

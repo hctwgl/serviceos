@@ -11,6 +11,8 @@ import com.serviceos.readmodel.api.NetworkPortalWorkbenchView;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderItem;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderWorkspace;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderWorkspaceSlaSummary;
+import com.serviceos.readmodel.api.NetworkPortalWorkspaceEvidenceItemSummary;
+import com.serviceos.readmodel.api.NetworkPortalWorkspaceEvidenceSlotSummary;
 import com.serviceos.readmodel.api.NetworkPortalWorkspaceFormSubmissionSummary;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
@@ -87,6 +89,8 @@ class NetworkPortalReadPostgresIT {
                     sla_milestone, sla_clock_segment, sla_instance,
                     frm_form_command_result, frm_submission_validation, frm_form_submission,
                     fld_visit_command_result, fld_visit_fact, fld_visit,
+                    evd_evidence_revision, evd_evidence_item, evd_evidence_upload_session,
+                    evd_evidence_resolution_member, evd_evidence_slot, evd_task_evidence_resolution,
                     tsk_task,
                     cfg_configuration_bundle_item, cfg_configuration_bundle,
                     cfg_configuration_asset_version, prj_project,
@@ -186,10 +190,12 @@ class NetworkPortalReadPostgresIT {
                 actor(PRINCIPAL), "corr-ws-unknown", context, UUID.randomUUID()))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         p -> assertThat(p.code()).isEqualTo(ProblemCode.ACCESS_DENIED));
-        // M221/M222：无 soft-gate 能力时省略 enrichment 字段
+        // M221/M222/M223：无 soft-gate 能力时省略 enrichment 字段
         assertThat(workspace.slaSummary()).isNull();
         assertThat(workspace.visits()).isNull();
         assertThat(workspace.formSubmissions()).isNull();
+        assertThat(workspace.evidenceSlots()).isNull();
+        assertThat(workspace.evidenceItems()).isNull();
     }
 
     @Test
@@ -217,6 +223,38 @@ class NetworkPortalReadPostgresIT {
                 .containsExactly(TASK_A);
         assertThat(withBoth.formSubmissions().getFirst().formKey()).isEqualTo("install.form");
         assertThat(withBoth.formSubmissions().getFirst().validationStatus()).isEqualTo("VALIDATED");
+    }
+
+    @Test
+    void workOrderWorkspaceEvidenceSummariesAreCapabilityGatedAndTaskScoped() {
+        String context = "NETWORK|NETWORK|" + NETWORK_A;
+        NetworkPortalWorkOrderWorkspace withoutCap = portal.getWorkOrderWorkspace(
+                actor(PRINCIPAL), "corr-ws-evd-omit", context, WO_A);
+        assertThat(withoutCap.evidenceSlots()).isNull();
+        assertThat(withoutCap.evidenceItems()).isNull();
+
+        seedGrant(PRINCIPAL, "evidence.read", "NETWORK", NETWORK_A.toString());
+        NetworkPortalWorkOrderWorkspace empty = portal.getWorkOrderWorkspace(
+                actor(PRINCIPAL), "corr-ws-evd-empty", context, WO_A);
+        assertThat(empty.evidenceSlots()).isEmpty();
+        assertThat(empty.evidenceItems()).isEmpty();
+
+        UUID slotA = seedEvidenceSlot(TASK_A, "site.photo", "现场照片");
+        UUID itemA = seedEvidenceItem(TASK_A, slotA);
+        seedEvidenceSlot(TASK_B, "foreign.photo", "他网点照片");
+
+        NetworkPortalWorkOrderWorkspace withData = portal.getWorkOrderWorkspace(
+                actor(PRINCIPAL), "corr-ws-evd", context, WO_A);
+        assertThat(withData.evidenceSlots())
+                .extracting(NetworkPortalWorkspaceEvidenceSlotSummary::taskId)
+                .containsExactly(TASK_A);
+        assertThat(withData.evidenceSlots().getFirst().requirementCode()).isEqualTo("site.photo");
+        assertThat(withData.evidenceSlots().getFirst().mediaType()).isEqualTo("PHOTO");
+        assertThat(withData.evidenceItems())
+                .extracting(NetworkPortalWorkspaceEvidenceItemSummary::evidenceItemId)
+                .containsExactly(itemA);
+        assertThat(withData.evidenceItems().getFirst().status()).isEqualTo("OPEN");
+        assertThat(withData.evidenceItems().getFirst().revisionCount()).isZero();
     }
 
     @Test
@@ -576,6 +614,176 @@ class NetworkPortalReadPostgresIT {
                 .param("digest", digest)
                 .param("executedAt", now)
                 .update();
+    }
+
+    /** M223：最小已解析 EvidenceSlot 夹具（含 resolution member）。 */
+    private UUID seedEvidenceSlot(UUID taskId, String requirementCode, String requirementName) {
+        var task = jdbc.sql("""
+                SELECT project_id, configuration_bundle_id, configuration_bundle_digest
+                  FROM tsk_task WHERE task_id=:id
+                """)
+                .param("id", taskId)
+                .query((rs, rowNum) -> new Object[] {
+                        rs.getObject("project_id", UUID.class),
+                        rs.getObject("configuration_bundle_id", UUID.class),
+                        rs.getString("configuration_bundle_digest")
+                })
+                .single();
+        UUID projectId = (UUID) task[0];
+        UUID bundleId = (UUID) task[1];
+        String bundleDigest = (String) task[2];
+        // resolution FK → cfg_configuration_bundle；任务夹具可能只有孤儿 UUID，按需补齐
+        OffsetDateTime scopeNow = OffsetDateTime.ofInstant(
+                Instant.parse("2026-07-17T00:00:00Z"), ZoneOffset.UTC);
+        jdbc.sql("""
+                INSERT INTO prj_project (
+                    project_id, tenant_id, project_code, client_id, project_name,
+                    starts_on, ends_on, project_status, aggregate_version, created_at)
+                VALUES (
+                    :projectId, :tenantId, :code, 'BYD', 'M223 Evidence fixture',
+                    DATE '2026-07-01', NULL, 'ACTIVE', 1, :createdAt)
+                ON CONFLICT (project_id) DO NOTHING
+                """)
+                .param("projectId", projectId)
+                .param("tenantId", TENANT)
+                .param("code", "M223-" + taskId.toString().substring(24))
+                .param("createdAt", scopeNow)
+                .update();
+        jdbc.sql("""
+                INSERT INTO cfg_configuration_bundle (
+                    bundle_id, tenant_id, project_id, bundle_code, bundle_version,
+                    brand_code, service_product_code, province_code, effective_from, effective_until,
+                    manifest_digest, status, published_at)
+                VALUES (
+                    :bundleId, :tenantId, :projectId, :bundleCode, '1.0.0',
+                    'BYD_OCEAN', 'HOME_CHARGING', NULL, :effectiveFrom, NULL,
+                    :manifestDigest, 'PUBLISHED', :publishedAt)
+                ON CONFLICT (bundle_id) DO NOTHING
+                """)
+                .param("bundleId", bundleId)
+                .param("tenantId", TENANT)
+                .param("projectId", projectId)
+                .param("bundleCode", "M223-BUNDLE-" + taskId.toString().substring(24))
+                .param("effectiveFrom", scopeNow)
+                .param("manifestDigest", bundleDigest)
+                .param("publishedAt", scopeNow)
+                .update();
+        UUID templateId = UUID.randomUUID();
+        UUID resolutionId = UUID.randomUUID();
+        UUID slotId = UUID.randomUUID();
+        OffsetDateTime now = OffsetDateTime.ofInstant(Instant.parse("2026-07-17T04:00:00Z"), ZoneOffset.UTC);
+        String definition = "{\"evidenceKey\":\"" + requirementCode
+                + "\",\"mediaType\":\"PHOTO\",\"required\":true,\"capture\":{\"minCount\":1,\"maxCount\":2}}";
+        String digest = "a".repeat(64);
+        jdbc.sql("""
+                INSERT INTO cfg_configuration_asset_version (
+                    version_id, tenant_id, asset_type, asset_key, semantic_version, schema_version,
+                    definition, content_digest, status, published_at)
+                VALUES (
+                    :versionId, :tenantId, 'EVIDENCE', :assetKey, '1.0.0', '1.0.0',
+                    CAST(:definition AS jsonb), :digest, 'PUBLISHED', :publishedAt)
+                """)
+                .param("versionId", templateId)
+                .param("tenantId", TENANT)
+                .param("assetKey", "tpl." + requirementCode + "." + taskId.toString().substring(24))
+                .param("definition", definition)
+                .param("digest", digest)
+                .param("publishedAt", now)
+                .update();
+        jdbc.sql("""
+                INSERT INTO evd_task_evidence_resolution (
+                    resolution_id, tenant_id, project_id, task_id, configuration_bundle_id,
+                    configuration_bundle_digest, stage_code, source_event_id, source_event_digest,
+                    resolver_version, condition_input_digest, resolution_explanation,
+                    generation_no, condition_fact_type, condition_fact_ref, condition_fact_revision,
+                    slot_count, resolved_at)
+                VALUES (
+                    :id, :tenant, :project, :task, :bundle, :digest, 'INSTALLATION', :event,
+                    :eventDigest, 'FIXED_EVIDENCE_V1',
+                    '44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a',
+                    CAST('{"kind":"TEST_FIXED_CONTEXT"}' AS jsonb),
+                    1, 'TASK_CREATED', CAST(:event AS varchar), 0, 1, now())
+                """)
+                .param("id", resolutionId)
+                .param("tenant", TENANT)
+                .param("project", projectId)
+                .param("task", taskId)
+                .param("bundle", bundleId)
+                .param("digest", bundleDigest)
+                .param("event", UUID.randomUUID())
+                .param("eventDigest", digest)
+                .update();
+        jdbc.sql("""
+                INSERT INTO evd_evidence_slot (
+                    slot_id, tenant_id, project_id, task_id, resolution_id, template_version_id,
+                    template_key, template_version, template_digest, requirement_code, occurrence_key,
+                    requirement_name, media_type, required_flag, min_count, max_count,
+                    condition_input_digest, resolution_explanation, requirement_definition,
+                    requirement_digest, status_projection, resolved_at, slot_generation)
+                VALUES (
+                    :slot, :tenant, :project, :task, :resolution, :template,
+                    :templateKey, '1.0.0', :templateDigest, :reqCode, 'default',
+                    :reqName, 'PHOTO', true, 1, 2, :conditionDigest,
+                    CAST('{"kind":"FIXED"}' AS jsonb), CAST(:definition AS jsonb),
+                    :reqDigest, 'MISSING', now(), 1)
+                """)
+                .param("slot", slotId)
+                .param("tenant", TENANT)
+                .param("project", projectId)
+                .param("task", taskId)
+                .param("resolution", resolutionId)
+                .param("template", templateId)
+                .param("templateKey", "survey.site")
+                .param("templateDigest", digest)
+                .param("reqCode", requirementCode)
+                .param("reqName", requirementName)
+                .param("conditionDigest", "e".repeat(64))
+                .param("definition", definition)
+                .param("reqDigest", "f".repeat(64))
+                .update();
+        jdbc.sql("""
+                INSERT INTO evd_evidence_resolution_member (
+                    member_id, tenant_id, project_id, task_id, resolution_id, template_version_id,
+                    requirement_code, occurrence_key, condition_result, active_slot_id,
+                    previous_slot_id, transition, required_disposition, counting_item_count,
+                    condition_input_digest, resolution_explanation, created_at)
+                VALUES (
+                    :slot, :tenant, :project, :task, :resolution, :template,
+                    :reqCode, 'default', true, :slot, NULL, 'ACTIVATED', 'NONE', 0,
+                    :conditionDigest, CAST('{"kind":"FIXED"}' AS jsonb), now())
+                """)
+                .param("slot", slotId)
+                .param("tenant", TENANT)
+                .param("project", projectId)
+                .param("task", taskId)
+                .param("resolution", resolutionId)
+                .param("template", templateId)
+                .param("reqCode", requirementCode)
+                .param("conditionDigest", "e".repeat(64))
+                .update();
+        return slotId;
+    }
+
+    /** M223：无 Revision 的 OPEN EvidenceItem（revisionCount=0）。 */
+    private UUID seedEvidenceItem(UUID taskId, UUID slotId) {
+        UUID projectId = jdbc.sql("SELECT project_id FROM tsk_task WHERE task_id=:id")
+                .param("id", taskId).query(UUID.class).single();
+        UUID itemId = UUID.randomUUID();
+        jdbc.sql("""
+                INSERT INTO evd_evidence_item (
+                    evidence_item_id, tenant_id, project_id, task_id, slot_id,
+                    item_ordinal, status, created_by, created_at)
+                VALUES (
+                    :itemId, :tenantId, :projectId, :taskId, :slotId,
+                    1, 'OPEN', 'tester', now())
+                """)
+                .param("itemId", itemId)
+                .param("tenantId", TENANT)
+                .param("projectId", projectId)
+                .param("taskId", taskId)
+                .param("slotId", slotId)
+                .update();
+        return itemId;
     }
 
     /**

@@ -53,4 +53,25 @@ final class DefaultEvidenceSlotQueryService implements EvidenceSlotQueryService 
         // Portal 必须显式看到需要人工处置的历史槽位，不能因新代条件为 false 就把风险资料隐藏。
         return repository.listCurrentSlots(principal.tenantId(), taskId);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<EvidenceSlotView> listForTaskOnNetwork(
+            CurrentPrincipal principal, String correlationId, UUID taskId, UUID networkId
+    ) {
+        if (tasks.find(principal.tenantId(), taskId).isEmpty()) {
+            throw new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "Task does not exist");
+        }
+        authorization.require(principal, AuthorizationRequest.networkCapability(
+                READ,
+                principal.tenantId(),
+                "Task",
+                taskId.toString(),
+                networkId.toString()), correlationId);
+        if (!repository.resolutionExists(principal.tenantId(), taskId)) {
+            // Network Portal 工作区 soft enrichment：未解析视为该任务无槽位，不抛冲突。
+            return List.of();
+        }
+        return repository.listCurrentSlots(principal.tenantId(), taskId);
+    }
 }

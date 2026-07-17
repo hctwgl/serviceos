@@ -135,6 +135,41 @@ export type NetworkPortalWorkspaceFormSubmissionSummary = {
   submittedAt: string
 }
 
+/** M223：字段对齐 Admin WorkOrderWorkspaceEvidenceSlotSummary（无 definition JSON）。 */
+export type NetworkPortalWorkspaceEvidenceSlotSummary = {
+  slotId: string
+  taskId: string
+  projectId: string
+  templateKey: string
+  templateVersion: string
+  requirementCode: string
+  occurrenceKey: string
+  requirementName: string
+  mediaType: string
+  required: boolean
+  minCount: number
+  maxCount: number | null
+  status: string
+  resolvedAt: string
+  slotGeneration: number
+  active: boolean
+  transition: string
+  requiredDisposition: string
+}
+
+/** M223：字段对齐 Admin WorkOrderWorkspaceEvidenceItemSummary（无 file/metadata）。 */
+export type NetworkPortalWorkspaceEvidenceItemSummary = {
+  evidenceItemId: string
+  taskId: string
+  projectId: string
+  evidenceSlotId: string
+  itemOrdinal: number
+  status: string
+  revisionCount: number
+  latestRevisionNumber: number | null
+  latestRevisionStatus: string | null
+}
+
 /** M213：限定工单工作区薄快照（ACTIVE NETWORK 责任门禁）。 */
 export type NetworkPortalWorkOrderWorkspace = {
   networkId: string
@@ -151,6 +186,10 @@ export type NetworkPortalWorkOrderWorkspace = {
   visits?: NetworkPortalWorkspaceVisitSummary[]
   /** Soft-gated；缺 NETWORK `form.read` 时省略，不得用空数组伪装无权限。 */
   formSubmissions?: NetworkPortalWorkspaceFormSubmissionSummary[]
+  /** Soft-gated；缺 NETWORK `evidence.read` 时与 evidenceItems 同时省略。 */
+  evidenceSlots?: NetworkPortalWorkspaceEvidenceSlotSummary[]
+  /** Soft-gated；缺 NETWORK `evidence.read` 时与 evidenceSlots 同时省略。 */
+  evidenceItems?: NetworkPortalWorkspaceEvidenceItemSummary[]
   asOf: string
 }
 

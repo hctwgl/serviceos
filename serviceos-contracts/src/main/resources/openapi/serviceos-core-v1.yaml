@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.2
+  version: 1.0.3
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1462,6 +1462,9 @@ paths:
         M222：可选 `visits` / `formSubmissions`（复用 Admin 工作区摘要字段集）；
         分别需 NETWORK `visit.read` / `form.read`，缺能力时省略属性（不得用空数组伪装）；
         Visit 另按可信 networkId 过滤；表单提交仅覆盖 ACTIVE taskIds。
+        M223：可选 `evidenceSlots` / `evidenceItems`（复用 Admin 工作区摘要字段集）；
+        需 NETWORK `evidence.read`，缺能力时同时省略两属性（不得用空数组伪装）；
+        仅覆盖 ACTIVE taskIds；单任务未完成可靠解析时该任务贡献空结果（不抛冲突）。
         上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
       parameters:
         - name: workOrderId
@@ -4956,6 +4959,22 @@ components:
           type: array
           maxItems: 100
           items: { $ref: '#/components/schemas/WorkOrderWorkspaceFormSubmissionSummary' }
+        evidenceSlots:
+          description: |
+            M223：需 NETWORK evidence.read；缺能力时与 evidenceItems 同时省略；
+            有能力且无实例时返回 []。元素字段复用 WorkOrderWorkspaceEvidenceSlotSummary
+            （无 definition/explanation JSON）。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceEvidenceSlotSummary' }
+        evidenceItems:
+          description: |
+            M223：需 NETWORK evidence.read；缺能力时与 evidenceSlots 同时省略；
+            有能力且无实例时返回 []。元素字段复用 WorkOrderWorkspaceEvidenceItemSummary
+            （无 Revision 图/file/captureMetadata）。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceEvidenceItemSummary' }
         asOf: { type: string, format: date-time }
     NetworkPortalTaskItem:
       type: object

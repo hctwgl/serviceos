@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-17
-baselineCommit: f28a4aeeedc43f7f1746eb2031af0fedf0d2c298
-latestMilestone: M222
+baselineCommit: TBD
+latestMilestone: M223
 ---
 
 # ServiceOS 实施状态总览
@@ -39,13 +39,13 @@ latestMilestone: M222
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M222 Network Portal 工作区 Visit/表单提交摘要 |
+| 最新实施里程碑 | M223 Network Portal 工作区 Evidence 槽位/资料项摘要 |
 | 基线提交 | `TBD`（feat 提交后由 docs(status) 回填） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
-| 前端工程 | `serviceos-admin-web`（Vue+TS+Vite）已纳入 CI 构建，具备开发态 Keycloak PKCE，以及真实只读、Task MANUAL assign-candidates/claim/release、表单/资料/审核/整改/完结、正常补传复审，预约上门、BYD 提审外发 ACK、厂端回调，CPIM 入站→激活→Admin HTTP 人工初派→同单预约上门→表单/资料/驳回整改补传复审/外发/完结（ADMIN-PILOT-09），入站 Envelope 授权队列与详情深链、专项队列与目录/SLA Accepted OpenAPI 筛选，工作区各按需区块详情或 Task 旁路、预约/表单/资料/上门/联系详情页、核心时间线与最近活动资源深链、外部审核回执详情、审核/整改交叉深链、工作区异常摘要→异常队列 query 水合与 handlingTaskId 深链、工作区审核/整改关联资源深链、Task 面板资源详情深链、Canonical Message 独立详情页、专项队列与目录页 query 水合及关联资源深链、外发关联资源与回执入站交叉深链、详情页明文 projectId / 源资源 / 现场与 SLA scope 字段深链、专项队列剩余 Accepted 关联字段深链、QueueTable 可选行内单元格深链、外发 executionTaskId / 快照成员资料项深链，工作区项目与 SLA 任务交叉深链的 PR 阻断 E2E；**M187 Admin 统一用户中心**；**M188 `/me` 导航**；**M189 Admin 个人 SavedView**；**M190 Admin UI Preferences**；**M191 Admin 共享 SavedView**；**M192 Admin 受控全局搜索**；**M193 Admin 最近访问**；**M194 Network Portal 只读 shell**；**M195 Technician Portal Feed shell**；**M196 Network Portal 指派师傅**；**M197 Network Portal 预约协作**；**M198 Network Portal 预约改约/取消**；**M199 Network Portal 爽约与联系尝试**；**M200 Network Portal 改派师傅**；**M201 Network Portal 资料代补 onBehalf**；**M202 Network Portal 整改队列只读**；**M203 Network Portal 运营异常队列只读**；**M204 Network Portal 师傅关系与资质提交**；**M205 Network Portal 本网点资质只读列表**；**M206 Network Portal 师傅关系只读列表**；**M207 Network Portal 工作台能力门控计数增强**；**M208 Network Portal 产能页**；**M209 Network Portal 整改详情只读 UI**；**M210 Network Portal 运营异常详情只读 UI**；**M211 Network Portal 资质详情只读 UI**；**M212 Network Portal 师傅关系详情只读 UI**；**M213 Network Portal 限定工单工作区**；**M214 Network Portal 工作区协作队列深链**；**M215 Network Portal 工作区预约/联系 fan-in**；**M216 Network Portal 工作区当前师傅 fan-in**；**M217 Network Portal 目录页师傅 fan-in**；**M218 Technician Portal Feed Accepted 字段展示**；**M219 Technician Portal TECHNICIAN.ME 页壳**；**M220 Network Portal 队列/列表 Accepted 字段展示**；**M221 Network Portal 工作区薄 SLA 摘要**；**M222 Network Portal 工作区 Visit/表单提交摘要** |
+| 前端工程 | `serviceos-admin-web`（Vue+TS+Vite）已纳入 CI 构建，具备开发态 Keycloak PKCE，以及真实只读、Task MANUAL assign-candidates/claim/release、表单/资料/审核/整改/完结、正常补传复审，预约上门、BYD 提审外发 ACK、厂端回调，CPIM 入站→激活→Admin HTTP 人工初派→同单预约上门→表单/资料/驳回整改补传复审/外发/完结（ADMIN-PILOT-09），入站 Envelope 授权队列与详情深链、专项队列与目录/SLA Accepted OpenAPI 筛选，工作区各按需区块详情或 Task 旁路、预约/表单/资料/上门/联系详情页、核心时间线与最近活动资源深链、外部审核回执详情、审核/整改交叉深链、工作区异常摘要→异常队列 query 水合与 handlingTaskId 深链、工作区审核/整改关联资源深链、Task 面板资源详情深链、Canonical Message 独立详情页、专项队列与目录页 query 水合及关联资源深链、外发关联资源与回执入站交叉深链、详情页明文 projectId / 源资源 / 现场与 SLA scope 字段深链、专项队列剩余 Accepted 关联字段深链、QueueTable 可选行内单元格深链、外发 executionTaskId / 快照成员资料项深链，工作区项目与 SLA 任务交叉深链的 PR 阻断 E2E；**M187 Admin 统一用户中心**；**M188 `/me` 导航**；**M189 Admin 个人 SavedView**；**M190 Admin UI Preferences**；**M191 Admin 共享 SavedView**；**M192 Admin 受控全局搜索**；**M193 Admin 最近访问**；**M194 Network Portal 只读 shell**；**M195 Technician Portal Feed shell**；**M196 Network Portal 指派师傅**；**M197 Network Portal 预约协作**；**M198 Network Portal 预约改约/取消**；**M199 Network Portal 爽约与联系尝试**；**M200 Network Portal 改派师傅**；**M201 Network Portal 资料代补 onBehalf**；**M202 Network Portal 整改队列只读**；**M203 Network Portal 运营异常队列只读**；**M204 Network Portal 师傅关系与资质提交**；**M205 Network Portal 本网点资质只读列表**；**M206 Network Portal 师傅关系只读列表**；**M207 Network Portal 工作台能力门控计数增强**；**M208 Network Portal 产能页**；**M209 Network Portal 整改详情只读 UI**；**M210 Network Portal 运营异常详情只读 UI**；**M211 Network Portal 资质详情只读 UI**；**M212 Network Portal 师傅关系详情只读 UI**；**M213 Network Portal 限定工单工作区**；**M214 Network Portal 工作区协作队列深链**；**M215 Network Portal 工作区预约/联系 fan-in**；**M216 Network Portal 工作区当前师傅 fan-in**；**M217 Network Portal 目录页师傅 fan-in**；**M218 Technician Portal Feed Accepted 字段展示**；**M219 Technician Portal TECHNICIAN.ME 页壳**；**M220 Network Portal 队列/列表 Accepted 字段展示**；**M221 Network Portal 工作区薄 SLA 摘要**；**M222 Network Portal 工作区 Visit/表单提交摘要**；**M223 Network Portal 工作区 Evidence 槽位/资料项摘要** |
 | 数据库 | PostgreSQL + Flyway（当前版本 100 / 102） |
-| 契约 | Core OpenAPI 1.0.2 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、recovered/resolved 与 SLA started/breached/met@v1） |
+| 契约 | Core OpenAPI 1.0.3 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、recovered/resolved 与 SLA started/breached/met@v1） |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -108,6 +108,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | Network Portal 队列字段展示 | 整改/异常/资质/师傅列表 Accepted 字段 | `IMPLEMENTED` | UI-only：四列表 + 任务目录既有列 + handlingTaskId 深链；OpenAPI 仍 1.0.0；catalog 仍 v16；Flyway 仍 100/102 | ACK/decide、Admin Review 深链、SLA/Visit/表单、notifications | M220 |
 | Network Portal 工作区 SLA 摘要 | 限定工单工作区薄 SLA 计数 | `IMPLEMENTED` | 扩展 workspace 可选 `slaSummary`；NETWORK `sla.read` soft-gate；按 ACTIVE taskIds 计 open/breached；OpenAPI 1.0.1；catalog 仍 v16；Flyway 仍 100/102；Admin Web + IT/E2E | Visit/表单摘要、工作台 SLA 风险计数、Admin workspace 复用、PII、SLA 详情 | M221 |
 | Network Portal 工作区 Visit/表单 | 限定工单工作区 Visit/表单提交摘要 | `IMPLEMENTED` | 扩展 workspace 可选 `visits`/`formSubmissions`；NETWORK `visit.read`/`form.read` soft-gate；复用 Admin 摘要字段集；OpenAPI 1.0.2；catalog 仍 v16；Flyway 仍 100/102；Admin Web + IT/E2E | definition/values、Evidence 摘要、Admin workspace 复用、独立 NP 列表 API | M222 |
+| Network Portal 工作区 Evidence | 限定工单工作区 Evidence 槽位/资料项摘要 | `IMPLEMENTED` | 扩展 workspace 可选 `evidenceSlots`/`evidenceItems`；NETWORK `evidence.read` soft-gate；复用 Admin 摘要字段集；OpenAPI 1.0.3；catalog 仍 v16；Flyway 仍 100/102；Admin Web + IT/E2E | Admin workspace 复用、独立 NP Evidence 列表、缩略图/下载、Revision 图、definition JSON | M223 |
 | Network Portal 运营异常队列 | 网点协作只读异常发现面 | `IMPLEMENTED` | list/get operational-exceptions；复用 `operations.exception.read` NETWORK；Page Registry `NETWORK.EXCEPTION.QUEUE`；Admin Web `/network-portal/exceptions`；allowedActions 恒为空 | Portal ACK/resolve、Admin cursor 队列、产能写 | M203 |
 | Network Portal 师傅关系与资质 | 网点协作写命令（membership/qualification） | `IMPLEMENTED` | create/terminate membership + submit qualification；`networkPortal.manageTechnician`；NETWORK 收窄 `network.manageTechnician`；Page Registry `NETWORK.QUALIFICATION` + 扩展 `NETWORK.TECHNICIAN.LIST`；Admin Web 控件 | Portal decide、FileObject、createTechnicianProfile、产能申请 | M204 |
 | Network Portal 资质只读列表 | 网点协作只读资质发现面 | `IMPLEMENTED` | list/get technician-qualifications；复用 `technician.readOwnNetwork` NETWORK；ACTIVE 师傅 fan-in；Page Registry `page-registry-v12` 扩展 `NETWORK.QUALIFICATION`；Admin Web `/network-portal/qualifications` | Portal decide、FileObject、产能申请 | M205 |
@@ -140,7 +141,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | 履约事实与试算 | 事实提取和双向试算 | `PROPOSED` | 已有设计、API 和数据规划 | 运行时、投影和前端工作区 | M5 设计 |
 | 对账结算 | 对账、结算、争议与调整 | `PROPOSED` | 已有边界设计 | 正式运行时和页面 | `architecture/16-*` |
 | Admin Portal | 总部运营后台 | `PARTIAL` | M101～M182：队列/任务/SLA/异常/入站/外发/工单/项目目录、工作区、allowed-actions；CI 阻断构建；开发态 Keycloak PKCE；真实只读与写链路 PR 阻断 E2E；M187～M188 用户中心与 `/me` 导航；**M189 个人 SavedView**；**M190 UI Preferences**；**M191 共享 SavedView**；**M192 受控全局搜索**；**M193 最近访问** | 设计系统、共享偏好、正式企业 OIDC/BFF、生产对象存储/专业扫描、评分/硬过滤派单与 ServiceNetwork 生命周期 | M7 设计、M101～M182、M187～M193、Admin 试点基线 |
-| Network Portal | 网点协作端 | `PARTIAL` | M194：只读 work-orders/tasks/technicians/workbench/capacity；`X-Network-Context`；Admin Web `/network-portal/*` shell；跨网点失败关闭；**M196：指派师傅**；**M197：预约 propose/confirm**；**M198：预约改约/取消**；**M199：爽约/联系尝试**；**M200：改派师傅**；**M201：资料代补 onBehalf**；**M202：整改队列只读**；**M203：运营异常队列只读**；**M204：师傅关系绑定/终止与资质提交**；**M205：本网点资质只读列表**；**M206：师傅关系只读列表（含 version）**；**M207：工作台能力门控 enrichment 计数**；**M208：产能页 NETWORK.CAPACITY**；**M209：整改详情只读 UI**；**M210：运营异常详情只读 UI**；**M211：资质详情只读 UI**；**M212：师傅关系详情只读 UI**；**M213：限定工单工作区**；**M214：工作区协作队列深链**；**M215：工作区预约/联系 fan-in**；**M216：工作区当前师傅 fan-in**；**M217：目录页师傅 fan-in**；**M220：队列/列表 Accepted 字段展示**；**M221：工作区薄 SLA 摘要**；**M222：工作区 Visit/表单提交摘要** | 槽位策略表、完整 product/03 设计系统、评分/容量策略引擎、Portal ACK/decide、产能申请、工作台 SLA 风险计数、消息页、Evidence 工作区摘要 | M7 设计、M194、M196～M217、M220～M222 |
+| Network Portal | 网点协作端 | `PARTIAL` | M194：只读 work-orders/tasks/technicians/workbench/capacity；`X-Network-Context`；Admin Web `/network-portal/*` shell；跨网点失败关闭；**M196：指派师傅**；**M197：预约 propose/confirm**；**M198：预约改约/取消**；**M199：爽约/联系尝试**；**M200：改派师傅**；**M201：资料代补 onBehalf**；**M202：整改队列只读**；**M203：运营异常队列只读**；**M204：师傅关系绑定/终止与资质提交**；**M205：本网点资质只读列表**；**M206：师傅关系只读列表（含 version）**；**M207：工作台能力门控 enrichment 计数**；**M208：产能页 NETWORK.CAPACITY**；**M209：整改详情只读 UI**；**M210：运营异常详情只读 UI**；**M211：资质详情只读 UI**；**M212：师傅关系详情只读 UI**；**M213：限定工单工作区**；**M214：工作区协作队列深链**；**M215：工作区预约/联系 fan-in**；**M216：工作区当前师傅 fan-in**；**M217：目录页师傅 fan-in**；**M220：队列/列表 Accepted 字段展示**；**M221：工作区薄 SLA 摘要**；**M222：工作区 Visit/表单提交摘要**；**M223：工作区 Evidence 槽位/资料项摘要** | 槽位策略表、完整 product/03 设计系统、评分/容量策略引擎、Portal ACK/decide、产能申请、工作台 SLA 风险计数、消息页 | M7 设计、M194、M196～M217、M220～M223 |
 | Technician App / Portal | 师傅移动端与 Feed | `PARTIAL` | M195：Feed/schedule/sync-summary；`X-Technician-Context`；Admin Web `/technician-portal/*` shell；tombstone 与跨网点失败关闭 | 离线工作包、GPS/相机/大上传、真机与离线运行时 | M7 设计、M195 |
 | External Portal | 用户/车企受控页面 | `PROPOSED` | 最小边界规划 | 二期页面和工程实现 | M7 设计 |
 
@@ -152,20 +153,20 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M222**。身份治理 M183～M188、Admin 个人/共享 SavedView、Admin UI
+ServiceOS 可靠纵向切片已推进到 **M223**。身份治理 M183～M188、Admin 个人/共享 SavedView、Admin UI
 Preference、受控全局搜索、最近访问、Network Portal 只读查询、Technician Portal Feed、Network Portal
 指派/改派师傅、预约协作/改约取消/爽约与联系尝试、资料代补 onBehalf、整改队列只读、运营异常队列只读、
 师傅关系与资质提交、本网点资质只读列表、师傅关系只读列表（含 terminate version）、工作台能力门控
-enrichment 计数、Network Portal 产能页（`NETWORK.CAPACITY`）、整改详情只读 UI、运营异常详情只读 UI、资质详情只读 UI、师傅关系详情只读 UI、限定工单工作区（`NETWORK.WORKORDER.WORKSPACE`）、工作区协作队列深链/水合、预约/联系 fan-in、当前师傅 fan-in、目录页师傅 fan-in/工作台基数深链、Technician Portal Feed Accepted 字段展示、TECHNICIAN.ME 页壳、Network Portal 队列/列表 Accepted 字段展示、工作区薄 SLA 摘要（`slaSummary`）与工作区 Visit/表单提交摘要（`visits`/`formSubmissions`）已交付。product/03
+enrichment 计数、Network Portal 产能页（`NETWORK.CAPACITY`）、整改详情只读 UI、运营异常详情只读 UI、资质详情只读 UI、师傅关系详情只读 UI、限定工单工作区（`NETWORK.WORKORDER.WORKSPACE`）、工作区协作队列深链/水合、预约/联系 fan-in、当前师傅 fan-in、目录页师傅 fan-in/工作台基数深链、Technician Portal Feed Accepted 字段展示、TECHNICIAN.ME 页壳、Network Portal 队列/列表 Accepted 字段展示、工作区薄 SLA 摘要（`slaSummary`）、工作区 Visit/表单提交摘要（`visits`/`formSubmissions`）与工作区 Evidence 槽位/资料项摘要（`evidenceSlots`/`evidenceItems`）已交付。product/03
 独立页壳剩余主要是 `NETWORK.NOTIFICATION`（notifications 仍 deferred）。
 没有实现 `search_document` 索引平台、VEHICLE/CHARGER 搜索、共享 UI Preference、notifications、
 Consumer Identity、正式 HR Connector、ORGANIZATION DataScope、槽位 allowOnBehalf 配置表、Portal
-ACK/resolve/decide、产能申请、工作台 SLA 风险计数、Evidence 工作区摘要或离线工作包；其余仍属需另接受契约后的 deferred invent 项。
+ACK/resolve/decide、产能申请、工作台 SLA 风险计数或离线工作包；其余仍属需另接受契约后的 deferred invent 项。
 
 ```text
 候选下一方向（优先从已确认文档中选择最小可靠切片；勿发明契约）：
-1. 工作区 enrichment：Evidence 槽位/资料项摘要（需另接受字段切片与 NP 读 API，勿发明 PII；禁 Admin workspace 复用；SLA/Visit/表单摘要已由 M221～M222 交付）；
-2. Technician Portal 其余页壳（TASK.DETAIL / MESSAGE / PROFILE 扩展 / 离线 Sync Center）需另接受契约；
+1. Technician Portal 其余页壳（TASK.DETAIL / MESSAGE / PROFILE 扩展 / 离线 Sync Center）需另接受契约；
+2. 工作台 SLA 风险计数 / notifications / Portal ACK（需另接受契约；勿发明）；
 3. Consumer Identity/CustomerProfile Epic（仍为 ACCEPTED/deferred；登录/隐私/主数据确认前不分配里程碑）；
 4. 在试点确认日历/暂停/预警规则后扩展 BUSINESS 时钟、暂停和升级；
 5. 多候选人评分、硬过滤重跑、自动 claim、网点容量联动（需另接受 api/04 / ADR-009 切片）；

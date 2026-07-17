@@ -55,4 +55,25 @@ final class DefaultEvidenceItemQueryService implements EvidenceItemQueryService 
         }
         return items.listItemSummaries(principal.tenantId(), taskId);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<EvidenceItemSummaryView> listSummariesForTaskOnNetwork(
+            CurrentPrincipal principal, String correlationId, UUID taskId, UUID networkId
+    ) {
+        if (tasks.find(principal.tenantId(), taskId).isEmpty()) {
+            throw new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "Task does not exist");
+        }
+        authorization.require(principal, AuthorizationRequest.networkCapability(
+                READ,
+                principal.tenantId(),
+                "Task",
+                taskId.toString(),
+                networkId.toString()), correlationId);
+        if (!slots.resolutionExists(principal.tenantId(), taskId)) {
+            // Network Portal 工作区 soft enrichment：未解析视为该任务无资料项，不抛冲突。
+            return List.of();
+        }
+        return items.listItemSummaries(principal.tenantId(), taskId);
+    }
 }

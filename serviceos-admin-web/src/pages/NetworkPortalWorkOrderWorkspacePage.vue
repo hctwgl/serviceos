@@ -321,6 +321,62 @@ watch(
       </section>
 
       <section
+        v-if="detail.evidenceSlots"
+        data-testid="workspace-evidence-slots"
+        class="related"
+        aria-label="Evidence slot summaries"
+      >
+        <h3>资料槽位摘要</h3>
+        <ul v-if="detail.evidenceSlots.length">
+          <li
+            v-for="slot in detail.evidenceSlots"
+            :key="slot.slotId"
+            :data-testid="`workspace-evidence-slot-${slot.slotId}`"
+          >
+            <strong>{{ slot.requirementName }}</strong>
+            <span class="muted">
+              （{{ slot.requirementCode }} · {{ slot.mediaType }} · {{ slot.status }} ·
+              task {{ slot.taskId }} · gen {{ slot.slotGeneration }}）
+            </span>
+          </li>
+        </ul>
+        <p v-else data-testid="workspace-evidence-slots-empty">暂无资料槽位</p>
+        <p class="hint">
+          需 NETWORK <code>evidence.read</code>。不含 definition/explanation JSON。无缩略图/下载。
+        </p>
+      </section>
+
+      <section
+        v-if="detail.evidenceItems"
+        data-testid="workspace-evidence-items"
+        class="related"
+        aria-label="Evidence item summaries"
+      >
+        <h3>资料项摘要</h3>
+        <ul v-if="detail.evidenceItems.length">
+          <li
+            v-for="item in detail.evidenceItems"
+            :key="item.evidenceItemId"
+            :data-testid="`workspace-evidence-item-${item.evidenceItemId}`"
+          >
+            <strong>{{ item.evidenceItemId }}</strong>
+            <span class="muted">
+              （slot {{ item.evidenceSlotId }} · #{{ item.itemOrdinal }} · {{ item.status }} ·
+              rev {{ item.revisionCount }}
+              <template v-if="item.latestRevisionStatus">
+                / {{ item.latestRevisionStatus }}
+              </template>
+              ）
+            </span>
+          </li>
+        </ul>
+        <p v-else data-testid="workspace-evidence-items-empty">暂无资料项</p>
+        <p class="hint">
+          需 NETWORK <code>evidence.read</code>。不含 Revision 图/file/captureMetadata。
+        </p>
+      </section>
+
+      <section
         v-if="currentTechnicians"
         data-testid="workspace-current-technicians"
         class="related"
