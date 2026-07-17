@@ -200,6 +200,7 @@ title: ServiceOS 里程碑索引
 | M189 | M189 Admin 个人 SavedView | [202-m189-admin-personal-saved-view.md](../architecture/202-m189-admin-personal-saved-view.md) | [186-m189-admin-personal-saved-view-acceptance.md](../testing/186-m189-admin-personal-saved-view-acceptance.md) |
 | M190 | M190 Admin UI Preferences | [203-m190-admin-ui-preferences.md](../architecture/203-m190-admin-ui-preferences.md) | [187-m190-admin-ui-preferences-acceptance.md](../testing/187-m190-admin-ui-preferences-acceptance.md) |
 | M191 | M191 Admin 共享 SavedView | [204-m191-admin-shared-saved-view.md](../architecture/204-m191-admin-shared-saved-view.md) | [188-m191-admin-shared-saved-view-acceptance.md](../testing/188-m191-admin-shared-saved-view-acceptance.md) |
+| M192 | M192 Admin 受控全局搜索 | [205-m192-admin-controlled-search.md](../architecture/205-m192-admin-controlled-search.md) | [189-m192-admin-controlled-search-acceptance.md](../testing/189-m192-admin-controlled-search-acceptance.md) |
 
 ## 未关联里程碑的文档
 

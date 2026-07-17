@@ -19,6 +19,7 @@ const nav = ref<PortalNavState>({
 })
 
 const TEST_IDS: Record<string, string> = {
+  'ADMIN.SEARCH': 'nav-search',
   'ADMIN.USER.DIRECTORY': 'nav-users',
   'ADMIN.ORGANIZATION.DIRECTORY': 'nav-organizations',
   'ADMIN.NETWORK.DIRECTORY': 'nav-networks',

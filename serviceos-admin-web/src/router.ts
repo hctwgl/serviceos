@@ -42,6 +42,7 @@ import RoleDetailPage from './pages/RoleDetailPage.vue'
 import GrantDirectoryPage from './pages/GrantDirectoryPage.vue'
 import PortalStubsPage from './pages/PortalStubsPage.vue'
 import UiPreferencesPage from './pages/UiPreferencesPage.vue'
+import SearchPage from './pages/SearchPage.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -51,6 +52,12 @@ export const router = createRouter({
       path: '/',
       component: AppShell,
       children: [
+        {
+          path: 'search',
+          name: 'ADMIN.SEARCH',
+          component: SearchPage,
+          meta: { pageId: 'ADMIN.SEARCH' },
+        },
         { path: '', redirect: '/reviews' },
         { path: 'reviews', name: 'ADMIN.REVIEW.QUEUE', component: ReviewQueuePage },
         { path: 'reviews/:id', name: 'ADMIN.REVIEW.DETAIL', component: ReviewCaseDetailPage },

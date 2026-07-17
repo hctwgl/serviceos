@@ -6,7 +6,7 @@ status: Accepted
 
 # 应用工作区、队列与用户偏好 HTTP API
 
-## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158 / M189 / M190 / M191）
+## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158 / M189 / M190 / M191 / M192）
 
 **Accepted（可指导实现）**：
 
@@ -44,10 +44,20 @@ status: Accepted
   `DELETE /me/ui-preferences/{key}` 恢复默认；Portal 必须为 `ADMIN`，其他 Portal 失败关闭。
   允许键白名单见 §9；禁止关闭安全确认、隐藏必填、绕过脱敏或禁用事务通知。
   **不**接受共享偏好、Network/Technician Portal 偏好。
+- §7 Admin 受控全局搜索（M192）：`GET /api/v1/search?q=&types=`；Portal 上下文仅
+  `ADMIN`。本切片接受 type 子集：`WORK_ORDER`、`EXTERNAL_ORDER`、`NETWORK`、
+  `TECHNICIAN`。**不**接受 `VEHICLE` / `CHARGER`（客户端请求未支持 type 时返回
+  `SEARCH_TERM_NOT_ALLOWED` / HTTP 422）。手机号形态查询仅允许末四位精确；响应与日志
+  **不**回显完整敏感 `q`（仅 `qDigest` / 掩码）。结果项：`resourceRef`、`type`、
+  `primaryLabel`、`maskedSecondaryLabel`、`matchReason`、`deepLink`。服务端经既有授权
+  查询端口应用当前 ScopePredicate；搜索**不**授予 capability。需要 `search.read`（HIGH）
+  加 underlying type 读能力：缺 type 能力时省略该 type（降级），缺 `search.read` 则整请求
+  403。实现为授权查询 fan-in / 受控精确·前缀回退，**不**要求 `search_document` 索引平台。
 
 **仍为设计草案**：§3 导航、§4 工作台与队列、§5 其余 section、
-§6 其余专项队列、§7 搜索、§8 ORGANIZATION 组织树共享与 Network/Technician SavedView、
-§9 非 Admin Portal UI Preference、§10～§11 与导出分析等。不得在未再接受前实现。
+§6 其余专项队列、§7 中 `VEHICLE`/`CHARGER` 与全文索引搜索、§8 ORGANIZATION 组织树共享与
+Network/Technician SavedView、§9 非 Admin Portal UI Preference、§10～§11 与导出分析等。
+不得在未再接受前实现。
 
 ## 1. 目标
 
@@ -178,9 +188,21 @@ sourceVersions
 |---|---|
 | `GET /api/v1/search?q=&types=` | 当前 tenant/scope 内受控搜索 |
 
-支持 type：WORK_ORDER、EXTERNAL_ORDER、VEHICLE、CHARGER、NETWORK、TECHNICIAN。手机号仅允许末四位/授权精确搜索；响应不回显完整敏感 query。
+### 7.1 Admin 受控搜索（M192 Accepted）
 
-搜索结果：resourceRef、type、primaryLabel、maskedSecondaryLabel、matchReason、deepLink。服务端先应用 ScopePredicate，再返回结果。
+- Portal：`ADMIN`；其他 Portal 不得调用本切片。
+- 接受 type：`WORK_ORDER`、`EXTERNAL_ORDER`、`NETWORK`、`TECHNICIAN`。
+  未支持 type（含 `VEHICLE`/`CHARGER`）→ `SEARCH_TERM_NOT_ALLOWED`（422）。
+- `q`：最短 2（UUID / 精确外部单号除外）；每 type 结果上限小（如 10），总上限；超时失败关闭。
+- 手机号：若 `q` 呈完整手机号形态，仅允许末四位精确；禁止在响应/日志中回显完整敏感 `q`。
+- 匹配语义（无全文索引）：工单 UUID 或授权范围内 `externalOrderCode` 精确；
+  `EXTERNAL_ORDER` 同码匹配但结果 type 区分；网点 code/name 前缀；师傅 displayName 前缀或
+  关联主体 `employeeNumber` 精确（经 identity/network 授权端口）。
+- 结果：`resourceRef`、`type`、`primaryLabel`、`maskedSecondaryLabel`、`matchReason`、`deepLink`。
+- 能力：`search.read`（HIGH）+ 各 type 对应读能力；缺 type 能力省略该 type，不整请求 403。
+- **不**接受独立搜索索引平台、`VEHICLE`/`CHARGER`、Network/Technician Portal 搜索 UI。
+
+完整设计草案仍可包含 VEHICLE/CHARGER；本切片外类型在未再接受前不得实现。
 
 ## 8. Saved View
 

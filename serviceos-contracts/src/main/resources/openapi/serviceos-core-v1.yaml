@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.83.0
+  version: 0.84.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1215,6 +1215,35 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /search:
+    get:
+      operationId: searchResources
+      summary: Admin 受控全局搜索
+      description: |
+        M192：Portal=ADMIN。需要 search.read（HIGH）。types 仅接受 WORK_ORDER、EXTERNAL_ORDER、
+        NETWORK、TECHNICIAN；未支持 type（含 VEHICLE/CHARGER）返回 SEARCH_TERM_NOT_ALLOWED（422）。
+        缺 type 对应读能力时省略该 type（降级），不整请求 403。经既有授权查询 fan-in，不授予额外能力。
+        响应不回显完整敏感 q，仅提供 qDigest；手机号形态仅允许末四位。
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 200 }
+        - name: types
+          in: query
+          required: false
+          description: 逗号分隔；缺省为全部本切片接受类型
+          schema: { type: string, maxLength: 200 }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 受控搜索结果
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/ControlledSearchResult' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /me/saved-views:
     get:
       operationId: listMySavedViews
@@ -3799,6 +3828,45 @@ components:
       required: [items, asOf]
       properties:
         items: { type: array, items: { $ref: '#/components/schemas/SavedView' } }
+        asOf: { type: string, format: date-time }
+    ControlledSearchHit:
+      type: object
+      additionalProperties: false
+      required: [resourceRef, type, primaryLabel, matchReason, deepLink]
+      properties:
+        resourceRef: { type: string, minLength: 1, maxLength: 128 }
+        type: { enum: [WORK_ORDER, EXTERNAL_ORDER, NETWORK, TECHNICIAN] }
+        primaryLabel: { type: string, minLength: 1, maxLength: 200 }
+        maskedSecondaryLabel:
+          oneOf:
+            - type: string
+              maxLength: 200
+            - type: 'null'
+        matchReason: { type: string, minLength: 1, maxLength: 64 }
+        deepLink: { type: string, minLength: 1, maxLength: 256 }
+    ControlledSearchMeta:
+      type: object
+      additionalProperties: false
+      required: [qDigest, requestedTypes, searchedTypes, omittedTypes]
+      properties:
+        qDigest: { type: string, minLength: 1, maxLength: 128 }
+        requestedTypes:
+          type: array
+          items: { enum: [WORK_ORDER, EXTERNAL_ORDER, NETWORK, TECHNICIAN] }
+        searchedTypes:
+          type: array
+          items: { enum: [WORK_ORDER, EXTERNAL_ORDER, NETWORK, TECHNICIAN] }
+        omittedTypes:
+          type: array
+          items: { enum: [WORK_ORDER, EXTERNAL_ORDER, NETWORK, TECHNICIAN] }
+          description: 因缺 underlying 读能力而省略的类型
+    ControlledSearchResult:
+      type: object
+      additionalProperties: false
+      required: [items, meta, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/ControlledSearchHit' } }
+        meta: { $ref: '#/components/schemas/ControlledSearchMeta' }
         asOf: { type: string, format: date-time }
     CreateSavedViewRequest:
       type: object

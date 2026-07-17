@@ -18,6 +18,7 @@
     <if test="clientCode != null">AND client_code=#{clientCode}</if>
     <if test="projectId != null">AND project_id=#{projectId}</if>
     <if test="status != null">AND status=#{status}</if>
+    <if test="externalOrderCode != null">AND external_order_code=#{externalOrderCode}</if>
     <if test="cursorReceivedAt != null">AND (received_at,id) &lt; (#{cursorReceivedAt},#{cursorId})</if>
     ORDER BY received_at DESC,id DESC LIMIT #{fetchSize}
   </select>

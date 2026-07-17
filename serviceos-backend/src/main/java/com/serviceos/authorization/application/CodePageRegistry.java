@@ -10,12 +10,14 @@ import java.util.List;
  */
 @Component
 final class CodePageRegistry {
-    static final String CATALOG_VERSION = "page-registry-v1";
+    static final String CATALOG_VERSION = "page-registry-v2";
 
     private final List<RegisteredPage> pages = List.of(
             // ADMIN
             page("ADMIN.WORKBENCH", "ADMIN", "workbench", "工作台", 10, "核心",
                     List.of("workOrder.read"), null),
+            page("ADMIN.SEARCH", "ADMIN", "search", "全局搜索", 15, "核心",
+                    List.of("search.read"), null),
             page("ADMIN.WORK_ORDER.LIST", "ADMIN", "work-orders", "工单目录", 20, "工单履约",
                     List.of("workOrder.read"), null),
             page("ADMIN.TASK.DIRECTORY", "ADMIN", "tasks", "任务目录", 30, "工单履约",

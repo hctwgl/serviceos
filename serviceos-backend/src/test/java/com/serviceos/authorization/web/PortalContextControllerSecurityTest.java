@@ -108,7 +108,7 @@ class PortalContextControllerSecurityTest {
                 "role-grant-v3:g2", now));
         when(queries.navigation(eq(actor), eq("corr-nav"), eq("ADMIN|TENANT|tenant-a"), isNull()))
                 .thenReturn(new MeNavigationView(
-                        "ADMIN|TENANT|tenant-a", "ADMIN", "role-grant-v3:g2", "page-registry-v1",
+                        "ADMIN|TENANT|tenant-a", "ADMIN", "role-grant-v3:g2", "page-registry-v2",
                         List.of(new MeNavigationItemView(
                                 "ADMIN.USER.DIRECTORY", "users", "用户目录", 200, "平台治理",
                                 List.of("identity.read"))),
