@@ -166,4 +166,5 @@
 - [M163 Admin 外部审核回执详情页验收矩阵](160-m163-admin-pilot-external-review-receipt-detail-acceptance.md)
 - [M164 Admin 审核/整改详情交叉深链验收矩阵](161-m164-admin-pilot-review-correction-cross-deeplink-acceptance.md)
 - [M165 Admin 工作区异常摘要 → 异常队列 query 水合验收矩阵](162-m165-admin-pilot-exception-summary-queue-hydrate-acceptance.md)
+- [M166 Admin 工作区审核/整改关联资源深链验收矩阵](163-m166-admin-pilot-workspace-reviews-corrections-cross-deeplink-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

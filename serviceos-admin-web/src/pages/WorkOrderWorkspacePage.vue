@@ -214,12 +214,22 @@ type ReviewCaseLink = {
   reviewCaseId: string
   origin: string
   status: string
+  evidenceSetSnapshotId: string
+  reopenedFromReviewCaseId: string
 }
 
 type CorrectionCaseLink = {
   correctionCaseId: string
   status: string
   sourceReviewCaseId: string
+  latestResubmissionSnapshotId: string
+}
+
+type ReviewCorrectionCrossLink = {
+  key: string
+  routeName: string
+  resourceId: string
+  label: string
 }
 
 type TaskSectionLink = {
@@ -366,11 +376,17 @@ const reviewCaseLinks = computed((): ReviewCaseLink[] => {
       if (!item || typeof item !== 'object') return null
       const row = item as Record<string, unknown>
       const id = row.reviewCaseId
+      const snapshotId = row.evidenceSetSnapshotId
       if (typeof id !== 'string' || !id) return null
+      if (typeof snapshotId !== 'string' || !snapshotId) return null
+      const reopenedFrom =
+        typeof row.reopenedFromReviewCaseId === 'string' ? row.reopenedFromReviewCaseId : ''
       return {
         reviewCaseId: id,
         origin: String(row.origin ?? '—'),
         status: String(row.status ?? '—'),
+        evidenceSetSnapshotId: snapshotId,
+        reopenedFromReviewCaseId: reopenedFrom,
       }
     })
     .filter((item): item is ReviewCaseLink => item != null)
@@ -386,14 +402,80 @@ const correctionCaseLinks = computed((): CorrectionCaseLink[] => {
       if (!item || typeof item !== 'object') return null
       const row = item as Record<string, unknown>
       const id = row.correctionCaseId
+      const sourceReviewCaseId = row.sourceReviewCaseId
       if (typeof id !== 'string' || !id) return null
+      if (typeof sourceReviewCaseId !== 'string' || !sourceReviewCaseId) return null
+      const latestSnapshot =
+        typeof row.latestResubmissionSnapshotId === 'string'
+          ? row.latestResubmissionSnapshotId
+          : ''
       return {
         correctionCaseId: id,
         status: String(row.status ?? '—'),
-        sourceReviewCaseId: String(row.sourceReviewCaseId ?? ''),
+        sourceReviewCaseId,
+        latestResubmissionSnapshotId: latestSnapshot,
       }
     })
     .filter((item): item is CorrectionCaseLink => item != null)
+})
+
+/**
+ * 工作区区块级交叉深链：仅使用 Accepted 投影字段，目标复用已有详情页。
+ * 前缀 rc / 避免与详情页「打开资料快照」及时间线资源链接严格模式冲突。
+ */
+const reviewCorrectionCrossLinks = computed((): ReviewCorrectionCrossLink[] => {
+  if (activeSection.value !== 'REVIEWS_CORRECTIONS') return []
+  const links: ReviewCorrectionCrossLink[] = []
+  const seen = new Set<string>()
+  for (const review of reviewCaseLinks.value) {
+    const snapshotKey = `snapshot:${review.evidenceSetSnapshotId}`
+    if (!seen.has(snapshotKey)) {
+      seen.add(snapshotKey)
+      links.push({
+        key: snapshotKey,
+        routeName: 'ADMIN.EVIDENCE_SET_SNAPSHOT.DETAIL',
+        resourceId: review.evidenceSetSnapshotId,
+        label: `rc / Snapshot / ${review.evidenceSetSnapshotId}`,
+      })
+    }
+    if (review.reopenedFromReviewCaseId) {
+      const sourceKey = `source-review:${review.reopenedFromReviewCaseId}`
+      if (!seen.has(sourceKey)) {
+        seen.add(sourceKey)
+        links.push({
+          key: sourceKey,
+          routeName: 'ADMIN.REVIEW.DETAIL',
+          resourceId: review.reopenedFromReviewCaseId,
+          label: `rc / 源审核 / ${review.reopenedFromReviewCaseId}`,
+        })
+      }
+    }
+  }
+  for (const correction of correctionCaseLinks.value) {
+    const sourceKey = `correction-source-review:${correction.sourceReviewCaseId}`
+    if (!seen.has(sourceKey)) {
+      seen.add(sourceKey)
+      links.push({
+        key: sourceKey,
+        routeName: 'ADMIN.REVIEW.DETAIL',
+        resourceId: correction.sourceReviewCaseId,
+        label: `rc / 整改源审核 / ${correction.sourceReviewCaseId}`,
+      })
+    }
+    if (correction.latestResubmissionSnapshotId) {
+      const resubmitKey = `resubmit-snapshot:${correction.latestResubmissionSnapshotId}`
+      if (!seen.has(resubmitKey)) {
+        seen.add(resubmitKey)
+        links.push({
+          key: resubmitKey,
+          routeName: 'ADMIN.EVIDENCE_SET_SNAPSHOT.DETAIL',
+          resourceId: correction.latestResubmissionSnapshotId,
+          label: `rc / 最近补传快照 / ${correction.latestResubmissionSnapshotId}`,
+        })
+      }
+    }
+  }
+  return links
 })
 
 /** 复用已 Implemented Task 详情路由；与权威 Task 表深链并列，覆盖按需 TASKS 区块。 */
@@ -1046,6 +1128,22 @@ onMounted(() => {
               }"
             >
               {{ item.status }} / {{ item.correctionCaseId }}
+            </RouterLink>
+          </p>
+          <p
+            v-if="reviewCorrectionCrossLinks.length"
+            class="links review-correction-cross-links"
+          >
+            打开审核/整改关联资源：
+            <RouterLink
+              v-for="item in reviewCorrectionCrossLinks"
+              :key="item.key"
+              :to="{
+                name: item.routeName,
+                params: { id: item.resourceId },
+              }"
+            >
+              {{ item.label }}
             </RouterLink>
           </p>
           <p v-if="taskSectionLinks.length" class="links task-section-links">

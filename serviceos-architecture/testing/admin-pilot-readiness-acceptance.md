@@ -55,6 +55,7 @@ lastUpdated: 2026-07-17
 | ADMIN-PILOT-08ER | 真实外部审核回执详情页 | `/external-review-receipts/{id}`；回调后核心时间线 GET 200 | PASS |
 | ADMIN-PILOT-08RC | 真实审核/整改详情交叉深链 | Review→Snapshot、Correction→Snapshot、后继→源 Review GET 200 | PASS |
 | ADMIN-PILOT-08EH | 真实工作区异常摘要 → 异常队列水合 | exceptionSummary → `/exceptions?workOrderId&status=OPEN`；表单水合；GET 200 | PASS |
+| ADMIN-PILOT-08RW | 真实工作区审核/整改关联资源深链 | REVIEWS_CORRECTIONS → Snapshot / 源审核 GET 200 | PASS |
 | ADMIN-PILOT-08CI | 真实写链路 CI 阻断 | GitHub Actions `admin-pilot-e2e` 运行同一 OIDC/Backend/PostgreSQL/Chrome smoke；通过后才启动 staging | PASS |
 | ADMIN-PILOT-09 | 完整履约写链路 | 接单→Admin 派单(HTTP Manual Assign)→预约→上门→表单/资料→审核/整改→外发→完结 | PASS |
 
