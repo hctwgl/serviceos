@@ -146,4 +146,5 @@
 - [M143 Admin 试点 SPI ServiceAssignment 种子验收矩阵](140-m143-admin-spi-service-assignment-seed-acceptance.md)
 - [M144 Admin 人工初派 ServiceAssignment 验收矩阵](141-m144-admin-manual-service-assignment-acceptance.md)
 - [M145 Admin 入站 Envelope/Canonical 详情深链验收矩阵](142-m145-admin-inbound-envelope-detail-acceptance.md)
+- [M146 Admin 外发交付队列筛选验收矩阵](143-m146-admin-outbound-queue-filters-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

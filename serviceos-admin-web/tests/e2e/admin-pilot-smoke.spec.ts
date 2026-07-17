@@ -1189,6 +1189,22 @@ test('真实 OIDC 登录后可通过审核外发并经厂端回调关闭 CLIENT 
   )
   expect(externalOrderCode).toBeTruthy()
 
+  // M146：外发队列按 ACKNOWLEDGED 筛选可见该交付（默认 UNKNOWN 切片看不到）。
+  await reviewPage.goto(new URL('/integration/outbound', page.url()).toString())
+  await expect(reviewPage.getByRole('heading', { name: '外发交付队列' })).toBeVisible()
+  await reviewPage.getByLabel('outbound status filter').selectOption('ACKNOWLEDGED')
+  const queueFilterPromise = reviewPage.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      response.url().includes('/api/v1/outbound-deliveries') &&
+      new URL(response.url()).searchParams.get('status') === 'ACKNOWLEDGED',
+  )
+  await reviewPage.getByRole('button', { name: '查询' }).click()
+  expect((await queueFilterPromise).status()).toBe(200)
+  await expect(
+    reviewPage.getByRole('link', { name: externalOrderCode, exact: true }).first(),
+  ).toBeVisible()
+
   // 厂端回调是 CPIM 签名入站，不走 Admin JWT；在同一浏览器链路后以协议方身份联调。
   const appKey = process.env.SERVICEOS_BYD_CPIM_APP_KEY ?? 'local-byd-app-key'
   const appSecret =

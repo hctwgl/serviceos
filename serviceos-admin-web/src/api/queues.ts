@@ -73,7 +73,18 @@ export function listCorrectionCases(params: Record<string, string | undefined> =
   })
 }
 
-export function listOutboundDeliveries(params: Record<string, string | undefined> = {}) {
+/** API-06 §6 外发队列筛选；status 省略时服务端默认 UNKNOWN。 */
+export type OutboundDeliveryQueueQuery = {
+  projectId?: string
+  status?: string
+  businessMessageType?: string
+  sourceWorkOrderId?: string
+  sourceReviewCaseId?: string
+  cursor?: string
+  limit?: string
+}
+
+export function listOutboundDeliveries(params: OutboundDeliveryQueueQuery = {}) {
   return apiGet<OutboundDeliveryQueuePage>('/outbound-deliveries', params)
 }
 
