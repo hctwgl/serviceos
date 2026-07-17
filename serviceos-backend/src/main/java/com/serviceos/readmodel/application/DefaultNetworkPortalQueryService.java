@@ -101,6 +101,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     private static final int WORKSPACE_FORM_LIMIT = 100;
     private static final int WORKSPACE_EVIDENCE_LIMIT = 100;
     private static final int WORKSPACE_CORRECTION_LIMIT = 100;
+    private static final int WORKSPACE_EXCEPTION_LIMIT = 100;
     private static final Set<String> OPEN_SLA_STATUSES = Set.of("RUNNING", "BREACHED");
 
     private final PrincipalNetworkAffiliationQuery affiliations;
@@ -276,6 +277,10 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                     actor, correlationId, networkId, activeTaskIds);
             correctionSummaries = loadCorrectionSummaries(actor, correlationId, activeTaskIds);
         }
+        List<NetworkPortalExceptionItem> exceptionSummaries = null;
+        if (hasNetworkCapability(actor, correlationId, EXCEPTION_READ, networkId)) {
+            exceptionSummaries = loadExceptionSummaries(actor, correlationId, activeTaskIds);
+        }
         return new NetworkPortalWorkOrderWorkspace(
                 networkId,
                 workOrderId,
@@ -291,6 +296,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                 evidenceSlotSummaries,
                 evidenceItemSummaries,
                 correctionSummaries,
+                exceptionSummaries,
                 clock.instant());
     }
 
@@ -512,6 +518,28 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                         .comparing(NetworkPortalWorkspaceCorrectionCaseSummary::createdAt)
                         .thenComparing(NetworkPortalWorkspaceCorrectionCaseSummary::correctionCaseId))
                 .limit(WORKSPACE_CORRECTION_LIMIT)
+                .toList();
+    }
+
+    /**
+     * M226：NETWORK operations.exception.read 已 soft-gate；仅 fan-in ACTIVE taskIds；含全部状态。
+     */
+    private List<NetworkPortalExceptionItem> loadExceptionSummaries(
+            CurrentPrincipal actor,
+            String correlationId,
+            Set<UUID> activeTaskIds
+    ) {
+        List<NetworkPortalExceptionItem> collected = new ArrayList<>();
+        for (UUID taskId : activeTaskIds) {
+            for (OperationalExceptionItem row : exceptions.listForTask(actor, correlationId, taskId)) {
+                collected.add(toExceptionItem(row));
+            }
+        }
+        return collected.stream()
+                .sorted(Comparator
+                        .comparing(NetworkPortalExceptionItem::openedAt)
+                        .thenComparing(NetworkPortalExceptionItem::exceptionId))
+                .limit(WORKSPACE_EXCEPTION_LIMIT)
                 .toList();
     }
 

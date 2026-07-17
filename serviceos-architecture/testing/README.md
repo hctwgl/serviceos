@@ -226,4 +226,5 @@
 - [M223 Network Portal 工作区 Evidence 槽位/资料项摘要验收矩阵](220-m223-network-portal-workspace-evidence-summary-acceptance.md)
 - [M224 Network Portal 工作台薄 SLA 风险计数验收矩阵](221-m224-network-portal-workbench-sla-risk-counts-acceptance.md)
 - [M225 Network Portal 工作区整改摘要验收矩阵](222-m225-network-portal-workspace-correction-summary-acceptance.md)
+- [M226 Network Portal 工作区运营异常摘要验收矩阵](223-m226-network-portal-workspace-exception-summary-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

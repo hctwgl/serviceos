@@ -219,6 +219,8 @@ export type NetworkPortalWorkOrderWorkspace = {
   evidenceItems?: NetworkPortalWorkspaceEvidenceItemSummary[]
   /** Soft-gated；缺 NETWORK `evidence.read` 时省略，不得用空数组伪装无权限。 */
   corrections?: NetworkPortalWorkspaceCorrectionCaseSummary[]
+  /** Soft-gated；缺 NETWORK `operations.exception.read` 时省略，不得用空数组伪装无权限。 */
+  exceptions?: NetworkPortalExceptionItem[]
   asOf: string
 }
 

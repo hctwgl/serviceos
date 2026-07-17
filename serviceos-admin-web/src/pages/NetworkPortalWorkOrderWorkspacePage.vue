@@ -3,14 +3,12 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import {
   getNetworkPortalWorkOrderWorkspace,
-  listNetworkPortalExceptions,
   listNetworkPortalTaskAppointments,
   listNetworkPortalTaskContactAttempts,
   listNetworkPortalTechnicians,
   type AppointmentWindow,
   type NetworkPortalAppointment,
   type NetworkPortalContactAttempt,
-  type NetworkPortalExceptionItem,
   type NetworkPortalTechnicianItem,
   type NetworkPortalWorkOrderWorkspace,
 } from '../api/networkPortal'
@@ -19,7 +17,6 @@ const props = defineProps<{ networkContextId: string | null }>()
 const route = useRoute()
 const workOrderId = computed(() => String(route.params.id ?? ''))
 const detail = ref<NetworkPortalWorkOrderWorkspace | null>(null)
-const relatedExceptions = ref<NetworkPortalExceptionItem[] | null>(null)
 const relatedAppointments = ref<NetworkPortalAppointment[] | null>(null)
 const relatedContactAttempts = ref<NetworkPortalContactAttempt[] | null>(null)
 const techniciansByProfileId = ref<Map<string, NetworkPortalTechnicianItem> | null>(null)
@@ -110,22 +107,13 @@ async function loadTechnicians() {
 }
 
 async function loadRelated(taskIds: string[]) {
-  relatedExceptions.value = null
   relatedAppointments.value = null
   relatedContactAttempts.value = null
   if (!props.networkContextId || taskIds.length === 0) {
     return
   }
-  const taskSet = new Set(taskIds)
   // M225：整改摘要改由 workspace.corrections 服务端交付；不再客户端 fan-in。
-  try {
-    const page = await listNetworkPortalExceptions(props.networkContextId, { status: 'OPEN' })
-    relatedExceptions.value = page.items.filter(
-      (item) => item.taskId != null && taskSet.has(item.taskId),
-    )
-  } catch {
-    relatedExceptions.value = null
-  }
+  // M226：异常摘要改由 workspace.exceptions 服务端交付；不再客户端 OPEN fan-in。
   // ADR-053：缺 manageAppointment 或任一次 403 时同时省略预约/联系区块，
   // 不得用空列表伪装无权限。
   const appointments = await fanInByTaskId(taskIds, listNetworkPortalTaskAppointments)
@@ -142,7 +130,6 @@ async function loadRelated(taskIds: string[]) {
 async function load() {
   if (!props.networkContextId) {
     detail.value = null
-    relatedExceptions.value = null
     relatedAppointments.value = null
     relatedContactAttempts.value = null
     techniciansByProfileId.value = null
@@ -164,7 +151,6 @@ async function load() {
     await Promise.all([loadRelated(detail.value.taskIds), loadTechnicians()])
   } catch (err) {
     detail.value = null
-    relatedExceptions.value = null
     relatedAppointments.value = null
     relatedContactAttempts.value = null
     techniciansByProfileId.value = null
@@ -555,24 +541,32 @@ watch(
       </section>
 
       <section
-        v-if="relatedExceptions"
+        v-if="detail.exceptions"
         data-testid="workspace-related-exceptions"
         class="related"
+        aria-label="Operational exception summaries"
       >
-        <h3>相关 OPEN 异常</h3>
-        <ul v-if="relatedExceptions.length">
+        <h3>异常摘要</h3>
+        <ul v-if="detail.exceptions.length">
           <li
-            v-for="item in relatedExceptions"
+            v-for="item in detail.exceptions"
             :key="item.exceptionId"
             :data-testid="`workspace-related-exception-${item.exceptionId}`"
           >
             <RouterLink :to="`/network-portal/exceptions/${item.exceptionId}`">
               {{ item.exceptionId }}
             </RouterLink>
-            （task {{ item.taskId || '—' }} · {{ item.severity }} · {{ item.status }}）
+            <span class="muted">
+              （task {{ item.taskId || '—' }} · {{ item.severity }} · {{ item.status }} ·
+              {{ item.errorCode }}）
+            </span>
           </li>
         </ul>
-        <p v-else data-testid="workspace-related-exceptions-empty">暂无相关 OPEN 异常</p>
+        <p v-else data-testid="workspace-related-exceptions-empty">暂无异常摘要</p>
+        <p class="hint">
+          需 NETWORK <code>operations.exception.read</code>。字段对齐队列
+          <code>NetworkPortalExceptionItem</code>；allowedActions 恒为空；含全部状态。
+        </p>
       </section>
     </template>
   </section>

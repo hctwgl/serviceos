@@ -3,6 +3,7 @@ package com.serviceos.readmodel.application;
 import com.serviceos.ServiceOsApplication;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.readmodel.api.NetworkPortalCapacityItem;
+import com.serviceos.readmodel.api.NetworkPortalExceptionItem;
 import com.serviceos.readmodel.api.NetworkPortalPage;
 import com.serviceos.readmodel.api.NetworkPortalQueryService;
 import com.serviceos.readmodel.api.NetworkPortalTaskItem;
@@ -96,6 +97,7 @@ class NetworkPortalReadPostgresIT {
                     evd_evidence_set_member, evd_evidence_set_snapshot,
                     evd_evidence_revision, evd_evidence_item, evd_evidence_upload_session,
                     evd_evidence_resolution_member, evd_evidence_slot, evd_task_evidence_resolution,
+                    ops_exception_ack_result, ops_operational_exception,
                     tsk_task,
                     cfg_configuration_bundle_item, cfg_configuration_bundle,
                     cfg_configuration_asset_version, prj_project,
@@ -195,13 +197,39 @@ class NetworkPortalReadPostgresIT {
                 actor(PRINCIPAL), "corr-ws-unknown", context, UUID.randomUUID()))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         p -> assertThat(p.code()).isEqualTo(ProblemCode.ACCESS_DENIED));
-        // M221/M222/M223：无 soft-gate 能力时省略 enrichment 字段
+        // M221/M222/M223/M225/M226：无 soft-gate 能力时省略 enrichment 字段
         assertThat(workspace.slaSummary()).isNull();
         assertThat(workspace.visits()).isNull();
         assertThat(workspace.formSubmissions()).isNull();
         assertThat(workspace.evidenceSlots()).isNull();
         assertThat(workspace.evidenceItems()).isNull();
         assertThat(workspace.corrections()).isNull();
+        assertThat(workspace.exceptions()).isNull();
+    }
+
+    @Test
+    void workOrderWorkspaceExceptionSummariesAreCapabilityGatedAndTaskScoped() {
+        String context = "NETWORK|NETWORK|" + NETWORK_A;
+        NetworkPortalWorkOrderWorkspace withoutCap = portal.getWorkOrderWorkspace(
+                actor(PRINCIPAL), "corr-ws-exc-omit", context, WO_A);
+        assertThat(withoutCap.exceptions()).isNull();
+
+        seedGrant(PRINCIPAL, "operations.exception.read", "NETWORK", NETWORK_A.toString());
+        NetworkPortalWorkOrderWorkspace empty = portal.getWorkOrderWorkspace(
+                actor(PRINCIPAL), "corr-ws-exc-empty", context, WO_A);
+        assertThat(empty.exceptions()).isEmpty();
+
+        UUID exceptionA = seedOpenException(TASK_A, WO_A, "P1", "m226-a");
+        seedOpenException(TASK_B, WO_B, "P2", "m226-b");
+
+        NetworkPortalWorkOrderWorkspace withData = portal.getWorkOrderWorkspace(
+                actor(PRINCIPAL), "corr-ws-exc", context, WO_A);
+        assertThat(withData.exceptions())
+                .extracting(NetworkPortalExceptionItem::exceptionId)
+                .containsExactly(exceptionA);
+        assertThat(withData.exceptions().getFirst().status()).isEqualTo("OPEN");
+        assertThat(withData.exceptions().getFirst().severity()).isEqualTo("P1");
+        assertThat(withData.exceptions().getFirst().allowedActions()).isEmpty();
     }
 
     @Test
@@ -928,6 +956,58 @@ class NetworkPortalReadPostgresIT {
                 .param("digest", snapshotDigest)
                 .update();
         return correctionCaseId;
+    }
+
+    /** M226：最小 OPEN OperationalException（按 task 关联；他网点任务用于 scope 负例）。 */
+    private UUID seedOpenException(UUID taskId, UUID workOrderId, String severity, String marker) {
+        UUID exceptionId = UUID.randomUUID();
+        UUID projectId = jdbc.sql("SELECT project_id FROM tsk_task WHERE task_id=:id")
+                .param("id", taskId)
+                .query(UUID.class)
+                .single();
+        // ops_operational_exception.project_id → prj_project；任务夹具可能只有孤儿 UUID
+        OffsetDateTime scopeNow = OffsetDateTime.ofInstant(
+                Instant.parse("2026-07-17T00:00:00Z"), ZoneOffset.UTC);
+        jdbc.sql("""
+                INSERT INTO prj_project (
+                    project_id, tenant_id, project_code, client_id, project_name,
+                    starts_on, ends_on, project_status, aggregate_version, created_at)
+                VALUES (
+                    :projectId, :tenantId, :code, 'BYD', 'M226 Exception fixture',
+                    DATE '2026-07-01', NULL, 'ACTIVE', 1, :createdAt)
+                ON CONFLICT (project_id) DO NOTHING
+                """)
+                .param("projectId", projectId)
+                .param("tenantId", TENANT)
+                .param("code", "M226-" + taskId.toString().substring(24))
+                .param("createdAt", scopeNow)
+                .update();
+        Instant openedAt = Instant.parse("2026-07-17T02:00:00Z");
+        jdbc.sql("""
+                INSERT INTO ops_operational_exception (
+                    exception_id, tenant_id, project_id, source_type, source_id, source_attempt_id,
+                    source_task_type, category_code, severity_code, error_code, status,
+                    work_order_id, task_id, occurrence_count, correlation_id,
+                    opened_at, last_detected_at, aggregate_version
+                ) VALUES (
+                    :id, :tenant, :projectId, 'TEST', :sourceId, :attemptId,
+                    'operations.test', 'AUTOMATION_FINAL_FAILURE', :severity, 'TEST_FAILURE', 'OPEN',
+                    :workOrderId, :taskId, 1, :corr,
+                    :openedAt, :openedAt, 1
+                )
+                """)
+                .param("id", exceptionId)
+                .param("tenant", TENANT)
+                .param("projectId", projectId)
+                .param("sourceId", "m226-" + marker)
+                .param("attemptId", UUID.randomUUID())
+                .param("severity", severity)
+                .param("workOrderId", workOrderId)
+                .param("taskId", taskId)
+                .param("corr", "corr-m226-" + marker)
+                .param("openedAt", java.sql.Timestamp.from(openedAt))
+                .update();
+        return exceptionId;
     }
 
     /**

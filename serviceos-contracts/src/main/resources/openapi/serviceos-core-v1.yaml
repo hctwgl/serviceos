@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.5
+  version: 1.0.6
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1467,6 +1467,9 @@ paths:
         仅覆盖 ACTIVE taskIds；单任务未完成可靠解析时该任务贡献空结果（不抛冲突）。
         M225：可选 `corrections`（复用 Admin WorkOrderWorkspaceCorrectionCaseSummary）；
         需 NETWORK `evidence.read`，缺能力时省略（不得用空数组伪装）；仅覆盖 ACTIVE taskIds。
+        M226：可选 `exceptions`（复用 NetworkPortalExceptionItem）；
+        需 NETWORK `operations.exception.read`，缺能力时省略（不得用空数组伪装）；
+        仅覆盖 ACTIVE taskIds；含全部状态。
         上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
       parameters:
         - name: workOrderId
@@ -4986,6 +4989,13 @@ components:
           type: array
           maxItems: 100
           items: { $ref: '#/components/schemas/WorkOrderWorkspaceCorrectionCaseSummary' }
+        exceptions:
+          description: |
+            M226：需 NETWORK operations.exception.read；缺能力时省略本属性；有能力且无实例时返回 []。
+            元素字段复用 NetworkPortalExceptionItem（allowedActions 恒为空）。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/NetworkPortalExceptionItem' }
         asOf: { type: string, format: date-time }
     NetworkPortalTaskItem:
       type: object
