@@ -9,14 +9,18 @@ INSERT INTO prj_project (
     'BYD', 'Admin 试点项目', current_date, 'ACTIVE', 1, now()
 ) ON CONFLICT DO NOTHING;
 
+-- M140：WORKFLOW 必须可被 WorkflowDefinitionParser 解析，使入站 workorder.received
+-- 经 Outbox 自动启动 Stage/Task 并激活工单；占位 {"workflowCode":...} 会导致入站停在 RECEIVED。
 INSERT INTO cfg_configuration_asset_version (
     version_id, tenant_id, asset_type, asset_key, semantic_version, schema_version,
     definition, content_digest, status, published_at
 ) VALUES
 (
     '20000000-0000-4000-8000-000000000001', 'tenant-local', 'WORKFLOW',
-    'ADMIN-PILOT-WORKFLOW', '1.0.0', '1.0.0', '{"workflowCode":"ADMIN_PILOT"}',
-    repeat('a', 64), 'PUBLISHED', now()
+    'ADMIN-PILOT-WORKFLOW', '1.0.0', '1.0.0',
+    '{"workflowKey":"ADMIN_PILOT","semanticVersion":"1.0.0","startNodeId":"START","terminalNodeIds":["END"],"nodes":[{"nodeId":"START","nodeType":"START","name":"开始"},{"nodeId":"PILOT_FIELD_OPS","nodeType":"USER_TASK","name":"现场履约","stageCode":"PILOT_SURVEY","taskType":"PILOT_SURVEY","slaRef":"PILOT_RESPONSE"},{"nodeId":"END","nodeType":"END","name":"结束"}],"transitions":[{"transitionId":"t1","from":"START","to":"PILOT_FIELD_OPS"},{"transitionId":"t2","from":"PILOT_FIELD_OPS","to":"END"}]}',
+    'f2837436570f57cc32a9651bc36491f0595cd35b5b351cc3056c344d69a2b51a',
+    'PUBLISHED', now()
 ),
 (
     '20000000-0000-4000-8000-000000000002', 'tenant-local', 'SLA',
@@ -24,6 +28,13 @@ INSERT INTO cfg_configuration_asset_version (
     '{"slaRef":"PILOT_RESPONSE","clockMode":"ELAPSED","targetDurationSeconds":14400}',
     repeat('b', 64), 'PUBLISHED', now()
 ) ON CONFLICT DO NOTHING;
+
+UPDATE cfg_configuration_asset_version
+   SET definition = '{"workflowKey":"ADMIN_PILOT","semanticVersion":"1.0.0","startNodeId":"START","terminalNodeIds":["END"],"nodes":[{"nodeId":"START","nodeType":"START","name":"开始"},{"nodeId":"PILOT_FIELD_OPS","nodeType":"USER_TASK","name":"现场履约","stageCode":"PILOT_SURVEY","taskType":"PILOT_SURVEY","slaRef":"PILOT_RESPONSE"},{"nodeId":"END","nodeType":"END","name":"结束"}],"transitions":[{"transitionId":"t1","from":"START","to":"PILOT_FIELD_OPS"},{"transitionId":"t2","from":"PILOT_FIELD_OPS","to":"END"}]}',
+       content_digest = 'f2837436570f57cc32a9651bc36491f0595cd35b5b351cc3056c344d69a2b51a',
+       published_at = now()
+ WHERE version_id = '20000000-0000-4000-8000-000000000001'
+   AND tenant_id = 'tenant-local';
 
 INSERT INTO cfg_configuration_bundle (
     bundle_id, tenant_id, project_id, bundle_code, bundle_version, brand_code,
@@ -40,12 +51,20 @@ INSERT INTO cfg_configuration_bundle_item (
 ) VALUES
 (
     'tenant-local', '30000000-0000-4000-8000-000000000001', 'WORKFLOW',
-    '20000000-0000-4000-8000-000000000001', repeat('a', 64)
+    '20000000-0000-4000-8000-000000000001',
+    'f2837436570f57cc32a9651bc36491f0595cd35b5b351cc3056c344d69a2b51a'
 ),
 (
     'tenant-local', '30000000-0000-4000-8000-000000000001', 'SLA',
     '20000000-0000-4000-8000-000000000002', repeat('b', 64)
 ) ON CONFLICT DO NOTHING;
+
+UPDATE cfg_configuration_bundle_item
+   SET content_digest = 'f2837436570f57cc32a9651bc36491f0595cd35b5b351cc3056c344d69a2b51a'
+ WHERE tenant_id = 'tenant-local'
+   AND bundle_id = '30000000-0000-4000-8000-000000000001'
+   AND asset_type = 'WORKFLOW'
+   AND asset_version_id = '20000000-0000-4000-8000-000000000001';
 
 INSERT INTO wo_work_order (
     id, tenant_id, project_id, client_code, brand_code, service_product_code,

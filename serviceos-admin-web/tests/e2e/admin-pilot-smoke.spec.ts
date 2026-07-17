@@ -1236,75 +1236,16 @@ test('真实 OIDC 登录后可通过审核外发并经厂端回调关闭 CLIENT 
   await reviewPage.close()
 })
 
-test('真实 OIDC 登录后可通过 CPIM 入站 CREATE_WORK_ORDER 看见工单', async ({
-  page,
-  request,
-}) => {
+test('真实 OIDC 登录后可在入站激活工单上完成领取与预约上门', async ({ page }) => {
+  test.setTimeout(120_000)
+  // 冒烟脚本已完成 CPIM 入站、Outbox 激活与 Visit 所需 SA 夹具；此处证明同单 Admin 写路径。
   const orderCode = process.env.ADMIN_PILOT_INBOUND_ORDER_CODE
+  const taskId = process.env.ADMIN_PILOT_INBOUND_TASK_ID
   expect(orderCode, '缺少动态入站接单 orderCode').toBeTruthy()
-
-  const appKey = process.env.SERVICEOS_BYD_CPIM_APP_KEY ?? 'local-byd-app-key'
-  const appSecret =
-    process.env.SERVICEOS_BYD_CPIM_APP_SECRET ?? 'local-byd-app-secret-change-me'
-  // 与 BydCpimInboundOrderHttpPostgresIT.validPayload 对齐；orderAmount 以数字入 JSON，
-  // 签名侧统一 String.valueOf，避免数字/字符串不一致导致验签失败。
-  const payload: Record<string, string | number> = {
-    orderCode: orderCode!,
-    contactName: 'Admin 试点入站用户',
-    contactMobile: '13900000001',
-    contactAddress: '山东省济南市历下区入站试点路1号',
-    provinceCode: '370000',
-    provinceName: '山东省',
-    cityCode: '370100',
-    cityName: '济南市',
-    areaCode: '370102',
-    areaName: '历下区',
-    wallboxName: '比亚迪7kW交流充电桩',
-    wallboxPower: '7kW',
-    bringWallbox: '1',
-    dispatchTime: '2026-07-16T10:00:00',
-    carOwnerType: '1',
-    type: '1',
-    carBrand: '40',
-    carSeries: '海豹',
-    carModel: '海豹06 DM-i',
-    vin: 'LGXCE6CD0RA999001',
-    dealerName: '济南海洋网经销商',
-    rightCode: `RIGHT-IN-${orderCode!.slice(-8)}`,
-    orderAmount: 0,
-    source: '1',
-    channel: 'CPIM',
-  }
-  const signParams = Object.fromEntries(
-    Object.entries(payload).map(([key, value]) => [key, String(value)]),
-  ) as Record<string, string>
-  const nonce = randomUUID()
-  const currentDate = asiaShanghaiDateToday()
-  const signature = signBydCpimPayload(appSecret, nonce, currentDate, signParams)
-  const inboundResponse = await request.post(
-    'http://127.0.0.1:8080/api/v1/integrations/byd/cpim/v7.3.1/install-orders',
-    {
-      headers: {
-        'Content-Type': 'application/json',
-        APP_KEY: appKey,
-        Nonce: nonce,
-        Cur_Time: currentDate,
-        Sign: signature,
-        'X-Correlation-Id': `admin-pilot-inbound-${orderCode}`,
-      },
-      data: payload,
-    },
-  )
-  expect(inboundResponse.status(), await inboundResponse.text()).toBe(200)
-  expect(await inboundResponse.json()).toMatchObject({
-    success: true,
-    code: 'ACCEPTED',
-    orderCode,
-    replay: false,
-  })
+  expect(taskId, '缺少入站激活后的 Task ID').toBeTruthy()
 
   await loginWithLocalKeycloak(page)
-  await page.locator('select').first().selectOption('RECEIVED')
+  await page.locator('select').first().selectOption('ACTIVE')
   await page.getByRole('button', { name: '查询' }).click()
   await expect(page.getByRole('link', { name: orderCode! })).toBeVisible({
     timeout: 30_000,
@@ -1312,7 +1253,7 @@ test('真实 OIDC 登录后可通过 CPIM 入站 CREATE_WORK_ORDER 看见工单'
   await page.getByRole('link', { name: orderCode! }).click()
   await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
   await expect(page.locator('dt', { hasText: /^状态$/ }).locator('xpath=../dd')).toHaveText(
-    'RECEIVED',
+    'ACTIVE',
   )
   await expect(
     page.locator('dt', { hasText: /^外部单号$/ }).locator('xpath=../dd'),
@@ -1325,4 +1266,99 @@ test('真实 OIDC 登录后可通过 CPIM 入站 CREATE_WORK_ORDER 看见工单'
   await expect(integrationPreview).toContainText('COMPLETED')
   await expect(integrationPreview).toContainText('WORK_ORDER')
   await expect(integrationPreview).toContainText('ACCEPTED')
+
+  await page
+    .getByLabel('assign-candidates principalIds')
+    .fill('06b612f3-a901-4b0e-bd90-86b4259cc087')
+  await page.getByLabel('sourceId').fill('admin-pilot-inbound-e2e')
+  const assignmentResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(`/api/v1/tasks/${taskId}:assign-candidates`),
+  )
+  await page.getByRole('button', { name: 'assign-candidates', exact: true }).click()
+  expect((await assignmentResponsePromise).status()).toBe(200)
+
+  const claimResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(`/api/v1/tasks/${taskId}:claim`),
+  )
+  await page.getByRole('button', { name: '领取任务' }).click()
+  expect((await claimResponsePromise).status()).toBe(200)
+
+  const startResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(`/api/v1/tasks/${taskId}:start`),
+  )
+  await page.getByRole('button', { name: '启动任务' }).click()
+  expect((await startResponsePromise).status()).toBe(200)
+
+  await page.getByRole('link', { name: new RegExp(taskId!) }).click()
+  await expect(page.getByRole('heading', { name: '任务详情' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '联系 / 预约 / 上门' })).toBeVisible()
+
+  const windowStart = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
+  const windowEnd = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString()
+  await page.getByLabel('window.start').fill(windowStart)
+  await page.getByLabel('window.end').fill(windowEnd)
+  await page.getByLabel('type').selectOption('INSTALLATION')
+
+  const proposePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(`/api/v1/tasks/${taskId}/appointments`),
+  )
+  await page.getByRole('button', { name: 'proposeAppointment', exact: true }).click()
+  const proposeResponse = await proposePromise
+  expect(proposeResponse.status()).toBe(201)
+  const proposed = (await proposeResponse.json()) as {
+    appointmentId: string
+    status: string
+  }
+  expect(proposed.status).toBe('PROPOSED')
+  await expect(page.getByText(`已提议预约 ${proposed.appointmentId}`)).toBeVisible()
+
+  const confirmPromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(`/api/v1/appointments/${proposed.appointmentId}:confirm`),
+  )
+  await page.getByRole('button', { name: 'confirm', exact: true }).click()
+  const confirmResponse = await confirmPromise
+  expect(confirmResponse.status()).toBe(200)
+  expect(await confirmResponse.json()).toMatchObject({
+    appointmentId: proposed.appointmentId,
+    status: 'CONFIRMED',
+  })
+
+  const checkInPromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(
+        `/api/v1/appointments/${proposed.appointmentId}/visits:check-in`,
+      ),
+  )
+  await page.getByRole('button', { name: 'check-in', exact: true }).click()
+  const checkInResponse = await checkInPromise
+  expect(checkInResponse.status()).toBe(201)
+  const checkedIn = (await checkInResponse.json()) as {
+    visitId: string
+    status: string
+  }
+  expect(checkedIn.status).toBe('IN_PROGRESS')
+
+  const checkOutPromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(`/api/v1/visits/${checkedIn.visitId}:check-out`),
+  )
+  await page.getByRole('button', { name: 'check-out', exact: true }).click()
+  const checkOutResponse = await checkOutPromise
+  expect(checkOutResponse.status()).toBe(200)
+  expect(await checkOutResponse.json()).toMatchObject({
+    visitId: checkedIn.visitId,
+    status: 'COMPLETED',
+  })
 })

@@ -314,9 +314,121 @@ if ! curl --fail --silent "http://127.0.0.1:5173" >/dev/null; then
 fi
 wait_http "http://127.0.0.1:5173" "ServiceOS Admin Web"
 
-# 入站接单不依赖预置工单夹具：每轮生成唯一 orderCode，由 Playwright 签名 POST 创建 RECEIVED 工单。
+# M140：真实 CPIM 入站创建工单 → Outbox 激活 Workflow/Task → 注入 Visit 所需 SA 夹具，
+# 再由 Playwright 在同一工单上证明 assign/claim/start 与预约上门。不宣称 Admin 派单 HTTP。
 inbound_order_uuid="$(new_uuid)"
 inbound_order_code="ADMIN-PILOT-IN-${inbound_order_uuid%%-*}"
+inbound_network_assignment_id="$(new_uuid)"
+inbound_technician_assignment_id="$(new_uuid)"
+inbound_network_saga_id="$(new_uuid)"
+inbound_technician_saga_id="$(new_uuid)"
+
+python3 - <<PY
+import hashlib
+import json
+import urllib.request
+import uuid
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+app_key = "local-byd-app-key"
+app_secret = "local-byd-app-secret-change-me"
+order_code = "${inbound_order_code}"
+vin_suffix = uuid.uuid4().hex[:6].upper()
+payload = {
+    "orderCode": order_code,
+    "contactName": "Admin 试点入站用户",
+    "contactMobile": "13900000001",
+    "contactAddress": "山东省济南市历下区入站试点路1号",
+    "provinceCode": "370000",
+    "provinceName": "山东省",
+    "cityCode": "370100",
+    "cityName": "济南市",
+    "areaCode": "370102",
+    "areaName": "历下区",
+    "wallboxName": "比亚迪7kW交流充电桩",
+    "wallboxPower": "7kW",
+    "bringWallbox": "1",
+    "dispatchTime": "2026-07-16T10:00:00",
+    "carOwnerType": "1",
+    "type": "1",
+    "carBrand": "40",
+    "carSeries": "海豹",
+    "carModel": "海豹06 DM-i",
+    "vin": f"LGXCE6CD0RA{vin_suffix}",
+    "dealerName": "济南海洋网经销商",
+    "rightCode": f"RIGHT-IN-{order_code[-8:]}",
+    "orderAmount": 0,
+    "source": "1",
+    "channel": "CPIM",
+}
+nonce = str(uuid.uuid4())
+current_date = datetime.now(ZoneInfo("Asia/Shanghai")).date().isoformat()
+params = "&".join(f"{key}={value}" for key, value in sorted(
+    (key, str(value)) for key, value in payload.items()
+))
+signature = hashlib.sha256(
+    f"{app_secret}&{nonce}&{current_date}&{params}".encode("utf-8")
+).hexdigest()
+body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+request = urllib.request.Request(
+    "http://127.0.0.1:8080/api/v1/integrations/byd/cpim/v7.3.1/install-orders",
+    data=body,
+    method="POST",
+    headers={
+        "Content-Type": "application/json",
+        "APP_KEY": app_key,
+        "Nonce": nonce,
+        "Cur_Time": current_date,
+        "Sign": signature,
+        "X-Correlation-Id": f"admin-pilot-inbound-{order_code}",
+    },
+)
+with urllib.request.urlopen(request, timeout=30) as response:
+    result = json.loads(response.read().decode("utf-8"))
+if not result.get("success") or result.get("code") != "ACCEPTED":
+    raise SystemExit(f"入站 CREATE_WORK_ORDER 失败: {result}")
+print(f"inbound ACCEPTED orderCode={order_code}")
+PY
+
+inbound_work_order_id=""
+inbound_task_id=""
+for _ in $(seq 1 60); do
+  inbound_ids="$(query_db "
+    SELECT work_order.id::text || '|' || task.task_id::text
+      FROM wo_work_order work_order
+      JOIN tsk_task task
+        ON task.tenant_id = work_order.tenant_id
+       AND task.work_order_id = work_order.id
+       AND task.task_kind = 'HUMAN'
+       AND task.status = 'READY'
+     WHERE work_order.tenant_id = 'tenant-local'
+       AND work_order.external_order_code = '${inbound_order_code}'
+       AND work_order.status = 'ACTIVE'
+     ORDER BY task.created_at
+     LIMIT 1
+  ")"
+  if [[ "${inbound_ids}" == *"|"* ]]; then
+    inbound_work_order_id="${inbound_ids%%|*}"
+    inbound_task_id="${inbound_ids#*|}"
+    break
+  fi
+  sleep 1
+done
+[[ -n "${inbound_work_order_id}" && -n "${inbound_task_id}" ]] || {
+  echo "入站工单未在超时内激活并创建 HUMAN Task: ${inbound_order_code}" >&2
+  exit 1
+}
+
+docker compose -f "${compose_file}" exec -T postgres \
+  psql -U serviceos_app -d serviceos \
+  -v field_ops_work_order_id="${inbound_work_order_id}" \
+  -v field_ops_task_id="${inbound_task_id}" \
+  -v field_ops_network_assignment_id="${inbound_network_assignment_id}" \
+  -v field_ops_technician_assignment_id="${inbound_technician_assignment_id}" \
+  -v field_ops_network_saga_id="${inbound_network_saga_id}" \
+  -v field_ops_technician_saga_id="${inbound_technician_saga_id}" \
+  < serviceos-deploy/admin-pilot/seed-admin-field-ops-assignment.sql
 
 cd serviceos-admin-web
 export ADMIN_PILOT_COMPLETION_WORK_ORDER_CODE="${completion_external_code}"
@@ -332,6 +444,7 @@ export ADMIN_PILOT_FIELD_OPS_TASK_ID="${field_ops_task_id}"
 export ADMIN_PILOT_OUTBOUND_WORK_ORDER_CODE="${outbound_external_code}"
 export ADMIN_PILOT_OUTBOUND_TASK_ID="${outbound_task_id}"
 export ADMIN_PILOT_INBOUND_ORDER_CODE="${inbound_order_code}"
+export ADMIN_PILOT_INBOUND_TASK_ID="${inbound_task_id}"
 npm run test:e2e
 
 task_state="$(query_db "
@@ -978,13 +1091,16 @@ done
 }
 
 inbound_state=""
-for _ in $(seq 1 45); do
+for _ in $(seq 1 60); do
   inbound_state="$(query_db "
     SELECT work_order.status || ':' ||
            count(DISTINCT envelope.inbound_envelope_id) || ':' ||
            count(DISTINCT canonical.canonical_message_id) || ':' ||
-           count(DISTINCT audit.audit_id) || ':' ||
-           count(DISTINCT outbox.event_id)
+           count(DISTINCT workflow.workflow_instance_id) || ':' ||
+           count(DISTINCT task.task_id) || ':' ||
+           count(DISTINCT appointment.appointment_id) || ':' ||
+           count(DISTINCT visit.visit_id) || ':' ||
+           count(DISTINCT audit.audit_id)
       FROM wo_work_order work_order
       LEFT JOIN int_inbound_envelope envelope
         ON envelope.tenant_id = work_order.tenant_id
@@ -1000,24 +1116,48 @@ for _ in $(seq 1 45); do
        AND canonical.result_code = 'ACCEPTED'
        AND canonical.result_type = 'WORK_ORDER'
        AND canonical.result_id = work_order.id::text
+      LEFT JOIN wfl_workflow_instance workflow
+        ON workflow.tenant_id = work_order.tenant_id
+       AND workflow.work_order_id = work_order.id
+       AND workflow.status = 'ACTIVE'
+      LEFT JOIN tsk_task task
+        ON task.tenant_id = work_order.tenant_id
+       AND task.work_order_id = work_order.id
+       AND task.task_id = '${inbound_task_id}'
+      LEFT JOIN apt_appointment appointment
+        ON appointment.tenant_id = task.tenant_id
+       AND appointment.task_id = task.task_id
+       AND appointment.status = 'COMPLETED'
+      LEFT JOIN fld_visit visit
+        ON visit.tenant_id = appointment.tenant_id
+       AND visit.appointment_id = appointment.appointment_id
+       AND visit.status = 'COMPLETED'
       LEFT JOIN aud_audit_record audit
         ON audit.tenant_id = work_order.tenant_id
-       AND audit.target_id = envelope.inbound_envelope_id::text
-       AND audit.action_name = 'INBOUND_MESSAGE_PROCESSED'
-      LEFT JOIN rel_outbox_event outbox
-        ON outbox.tenant_id = work_order.tenant_id
-       AND outbox.aggregate_type = 'CanonicalMessage'
-       AND outbox.aggregate_id = canonical.canonical_message_id::text
-       AND outbox.event_type = 'integration.canonical-message-processed'
+       AND (
+         (
+           audit.target_id = envelope.inbound_envelope_id::text
+           AND audit.action_name = 'INBOUND_MESSAGE_PROCESSED'
+         )
+         OR (
+           audit.target_id = appointment.appointment_id::text
+           AND audit.action_name IN ('APPOINTMENT_PROPOSE', 'APPOINTMENT_CONFIRM')
+         )
+         OR (
+           audit.target_id = visit.visit_id::text
+           AND audit.action_name IN ('VISIT_CHECK_IN', 'VISIT_CHECK_OUT')
+         )
+       )
      WHERE work_order.tenant_id = 'tenant-local'
        AND work_order.external_order_code = '${inbound_order_code}'
      GROUP BY work_order.id, work_order.status
   ")"
-  [[ "${inbound_state}" == "RECEIVED:1:1:1:1" ]] && break
+  # ACTIVE + Envelope + Canonical + Workflow + Task + Appointment + Visit + 5 audits
+  [[ "${inbound_state}" == "ACTIVE:1:1:1:1:1:1:5" ]] && break
   sleep 1
 done
-[[ "${inbound_state}" == "RECEIVED:1:1:1:1" ]] || {
-  echo "Admin 试点 BYD 入站 CREATE_WORK_ORDER 接单不完整: ${inbound_state}" >&2
+[[ "${inbound_state}" == "ACTIVE:1:1:1:1:1:1:5" ]] || {
+  echo "Admin 试点入站同单激活/预约上门贯通不完整: ${inbound_state}" >&2
   exit 1
 }
 
