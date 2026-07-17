@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.71.0
+  version: 0.72.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -459,6 +459,36 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/TaskAssignmentBatchReceipt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /tasks/{taskId}/service-assignments:manual-assign:
+    post:
+      operationId: manualAssignServiceAssignments
+      summary: Admin 人工初派网点与师傅服务责任
+      description: >-
+        窄化试点命令：确保容量后经 ServiceAssignment 激活 saga 同事务落到 ACTIVE NETWORK +
+        TECHNICIAN。不执行评分/硬过滤/DispatchRequest，不支持改派；能力为
+        dispatch.assignment.manage 与 dispatch.capacity.configure。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ManualAssignServiceAssignmentRequest' }
+      responses:
+        '200':
+          description: 双责任已激活或幂等回放
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ManualServiceAssignmentReceipt' }
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
@@ -3311,6 +3341,27 @@ components:
           items: { type: string, minLength: 1, maxLength: 128 }
         sourceType: { enum: [ASSIGNEE_POLICY, MANUAL] }
         sourceId: { type: string, minLength: 1, maxLength: 160 }
+    ManualAssignServiceAssignmentRequest:
+      type: object
+      additionalProperties: false
+      required: [networkAssigneeId, technicianAssigneeId, businessType]
+      properties:
+        networkAssigneeId: { type: string, minLength: 1, maxLength: 128 }
+        technicianAssigneeId: { type: string, minLength: 1, maxLength: 128 }
+        businessType: { type: string, minLength: 1, maxLength: 100 }
+    ManualServiceAssignmentReceipt:
+      type: object
+      additionalProperties: false
+      required: [taskId, workOrderId, networkServiceAssignmentId, technicianServiceAssignmentId,
+        networkAssigneeId, technicianAssigneeId, occurredAt]
+      properties:
+        taskId: { type: string, format: uuid }
+        workOrderId: { type: string, format: uuid }
+        networkServiceAssignmentId: { type: string, format: uuid }
+        technicianServiceAssignmentId: { type: string, format: uuid }
+        networkAssigneeId: { type: string, minLength: 1, maxLength: 128 }
+        technicianAssigneeId: { type: string, minLength: 1, maxLength: 128 }
+        occurredAt: { type: string, format: date-time }
     ReleaseHumanTaskRequest:
       type: object
       additionalProperties: false

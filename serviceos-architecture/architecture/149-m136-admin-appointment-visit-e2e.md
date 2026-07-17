@@ -43,7 +43,7 @@ assign/claim/start
 ## 4. 工程证据
 
 - `serviceos-deploy/keycloak/grant-local-project-admin.sql`
-- `serviceos-deploy/admin-pilot/seed-admin-pilot-assignment.sh`（M143 起经 Dispatch SPI；原 SQL 直插已删除）
+- Admin HTTP `service-assignments:manual-assign`（M144；M143 SPI 种子与更早 SQL 直插已删除）
 - `serviceos-deploy/admin-pilot/verify-admin-smoke.sh`
 - `serviceos-admin-web/tests/e2e/admin-pilot-smoke.spec.ts`
 - `testing/133-m136-admin-appointment-visit-acceptance.md`

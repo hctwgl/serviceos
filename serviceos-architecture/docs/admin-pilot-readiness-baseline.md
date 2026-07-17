@@ -1,15 +1,15 @@
 ---
-title: Admin 试点可运行基线（含 M143 SPI SA 种子）
+title: Admin 试点可运行基线（含 M144 Admin 人工初派）
 status: Implemented
 lastUpdated: 2026-07-17
 ---
 
-# Admin 试点可运行基线（含 M143 SPI SA 种子）
+# Admin 试点可运行基线（含 M144 Admin 人工初派）
 
-本基线覆盖 M101～M143 已有 Admin 表面的可重复构建、登录、真实后端/数据库试点入口，并明确
-完整业务链尚未证明的边界。M135～M143 追加补传复审、预约上门、提审外发 ACK、厂端回调、入站
-接单激活与同单预约上门→表单/资料/驳回整改补传复审/外发/完结，以及 Visit 所需 SA 经 Dispatch
-SPI 编排注入；不宣称完整 `ADMIN-PILOT-09`。
+本基线覆盖 M101～M144 已有 Admin 表面的可重复构建、登录、真实后端/数据库试点入口，并明确
+平台级未实现边界。M135～M144 追加补传复审、预约上门、提审外发 ACK、厂端回调、入站接单激活、
+Admin HTTP 人工初派，以及同单预约上门→表单/资料/驳回整改补传复审/外发/完结；入站路径证明
+`ADMIN-PILOT-09`（派单为窄化 Manual Assign）。
 
 ## 1. 已建立的基线
 
@@ -150,19 +150,23 @@ GitHub Actions 使用同一脚本阻断 PR，并保留 Backend、Admin 与 Playw
 
 已追加证明（M143）：
 
-- field-ops 与入站工单的 Visit 所需 ServiceAssignment 经 Capacity/Assignment SPI 编排注入
-  （ACTIVE + CONFIRMED reservation + COMPLETED saga）；SQL 直插已删除；
-- Admin 派单 HTTP 仍未证明。
+- field-ops 与入站工单的 Visit 所需 ServiceAssignment 曾经 Capacity/Assignment SPI 编排注入；
+  M144 起改为 Admin HTTP，SPI 种子已删除。
+
+已追加证明（M144 / ADMIN-PILOT-09）：
+
+- Admin HTTP `service-assignments:manual-assign` 人工初派 NETWORK+TECHNICIAN；
+- 入站同单：接单→Admin 派单→预约上门→表单/资料→驳回整改补传复审→外发→完结；
+- 派单为窄化 Manual Assign（无评分/硬过滤/ServiceNetwork 生命周期）。
 
 尚未证明：
 
 - 正式企业 IdP、MFA、生产回调地址、BFF/token renewal/logout 协议；
-- 从外部接单开始经 Admin 派单到完结的完整 `ADMIN-PILOT-09`（入站同单整改外发完结已证明，
-  派单仍为 SPI 种子而非 Admin HTTP）；
+- 评分/硬过滤/DispatchDecision/ServiceNetwork 目录生命周期；
 - Network/Technician Portal 与跨端协作；
 - 正式 sandbox、对象存储、专业扫描服务、Broker、通知和 SLA BUSINESS 日历；
 - 真实 sandbox 提审与生产厂端联调；
 - SavedView、设计系统、可访问性与多浏览器矩阵。
 
-因此当前交付只能称为“Admin 试点可运行局部读写基线（含入站同单整改外发完结、补传与独立外发 ACK）”，
+因此当前交付可称为“Admin 试点可运行基线（含 ADMIN-PILOT-09 窄化派单）”，
 不能称为“完整现场履约平台已交付”。

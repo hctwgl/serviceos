@@ -22,6 +22,7 @@ import {
   type WorkflowExecutionProjection,
 } from '../api/workOrderDetail'
 import { getTaskAllowedActions, type TaskAllowedActions } from '../api/tasks'
+import { manualAssignServiceAssignments } from '../api/dispatch'
 import TaskCommandPanel from '../components/TaskCommandPanel.vue'
 import QueueTable from './QueueTable.vue'
 
@@ -45,6 +46,38 @@ const stages = ref<WorkflowExecutionProjection | null>(null)
 const taskPage = ref<WorkOrderTaskPage | null>(null)
 const timelinePage = ref<WorkOrderTimelinePage | null>(null)
 const authorityError = ref<string | null>(null)
+const networkAssigneeId = ref('admin-pilot-network-1')
+const technicianAssigneeId = ref('06b612f3-a901-4b0e-bd90-86b4259cc087')
+const assignBusinessType = ref('INSTALLATION')
+const manualAssignBusy = ref(false)
+const manualAssignError = ref<string | null>(null)
+const manualAssignMessage = ref<string | null>(null)
+
+async function runManualAssign() {
+  const taskId = workspace.value?.currentTaskSummary?.taskId
+  if (!taskId) {
+    manualAssignError.value = '无当前任务，无法人工初派'
+    return
+  }
+  manualAssignBusy.value = true
+  manualAssignError.value = null
+  manualAssignMessage.value = null
+  try {
+    const result = await manualAssignServiceAssignments(taskId, {
+      networkAssigneeId: networkAssigneeId.value.trim(),
+      technicianAssigneeId: technicianAssigneeId.value.trim(),
+      businessType: assignBusinessType.value.trim(),
+    })
+    const receipt = result.data
+    manualAssignMessage.value =
+      `已初派 network=${receipt.networkAssigneeId} tech=${receipt.technicianAssigneeId}`
+    await loadWorkspace()
+  } catch (err) {
+    manualAssignError.value = err instanceof Error ? err.message : '人工初派失败'
+  } finally {
+    manualAssignBusy.value = false
+  }
+}
 
 const sections: SectionCode[] = [
   'TASKS',
@@ -266,6 +299,41 @@ onMounted(() => {
                 tech {{ String(workspace.serviceAssignmentSummary.technicianId ?? '—') }}
               </dd>
               <dd v-else>不可用或缺失权</dd>
+            </div>
+            <div class="manual-assign">
+              <dt>人工初派</dt>
+              <dd>
+                <label>
+                  networkAssigneeId
+                  <input
+                    v-model="networkAssigneeId"
+                    aria-label="manual-assign networkAssigneeId"
+                  />
+                </label>
+                <label>
+                  technicianAssigneeId
+                  <input
+                    v-model="technicianAssigneeId"
+                    aria-label="manual-assign technicianAssigneeId"
+                  />
+                </label>
+                <label>
+                  businessType
+                  <input
+                    v-model="assignBusinessType"
+                    aria-label="manual-assign businessType"
+                  />
+                </label>
+                <button
+                  type="button"
+                  :disabled="manualAssignBusy || !workspace.currentTaskSummary"
+                  @click="runManualAssign"
+                >
+                  manual-assign
+                </button>
+                <p v-if="manualAssignError" class="error">{{ manualAssignError }}</p>
+                <p v-if="manualAssignMessage" class="meta">{{ manualAssignMessage }}</p>
+              </dd>
             </div>
             <div>
               <dt>SLA</dt>
@@ -571,5 +639,21 @@ button {
   border-radius: 6px;
   padding: 0.4rem 0.75rem;
   cursor: pointer;
+}
+.manual-assign dd {
+  display: grid;
+  gap: 0.4rem;
+}
+.manual-assign label {
+  display: grid;
+  gap: 0.15rem;
+  font-size: 0.8rem;
+  color: #627d98;
+}
+.manual-assign input {
+  border: 1px solid #bcccdc;
+  border-radius: 6px;
+  padding: 0.35rem 0.5rem;
+  font-family: ui-monospace, monospace;
 }
 </style>

@@ -36,6 +36,8 @@ VALUES
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'evidence.waiveCorrection', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'review.reopen', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'dispatch.read', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'dispatch.assignment.manage', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'dispatch.capacity.configure', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'integration.readInbound', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'integration.readOutbound', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'integration.submitClientReview', now()),

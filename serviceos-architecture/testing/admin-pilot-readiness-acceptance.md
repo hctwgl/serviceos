@@ -1,10 +1,10 @@
 ---
-title: Admin 试点可运行基线验收（含 M143）
+title: Admin 试点可运行基线验收（含 M144）
 status: Implemented
 lastUpdated: 2026-07-17
 ---
 
-# Admin 试点可运行基线验收（含 M143）
+# Admin 试点可运行基线验收（含 M144）
 
 | ID | 场景 | 证据 | 结果 |
 |---|---|---|---|
@@ -32,11 +32,11 @@ lastUpdated: 2026-07-17
 | ADMIN-PILOT-08ACT | 真实入站激活与同单预约上门 | 可解析 WORKFLOW → ACTIVE + HUMAN Task；assign/claim/start + propose→confirm→check-in→check-out | PASS |
 | ADMIN-PILOT-08FUL | 真实入站同单表单/资料/审核/外发完结 | BYD:INSTALL 系谱；form→snapshot→INTERNAL APPROVED→BYD ACK→厂端回调→dual complete→FULFILLED | PASS |
 | ADMIN-PILOT-08COR | 真实入站同单整改补传复审外发完结 | REJECTED→CorrectionCase→同 Item 补传→resubmit/close→复审 APPROVED→BYD ACK→厂端回调→FULFILLED | PASS |
-| ADMIN-PILOT-08SA | 真实 SPI ServiceAssignment 种子 | Capacity+Assignment SPI → ACTIVE NETWORK/TECHNICIAN + CONFIRMED reservation + COMPLETED saga；非 SQL 直插 | PASS |
+| ADMIN-PILOT-08SA | 真实 Admin HTTP 人工初派 | `manual-assign` → ACTIVE NETWORK/TECHNICIAN + CONFIRMED + COMPLETED；`created_by` 为 Admin 主体 | PASS |
 | ADMIN-PILOT-08CI | 真实写链路 CI 阻断 | GitHub Actions `admin-pilot-e2e` 运行同一 OIDC/Backend/PostgreSQL/Chrome smoke；通过后才启动 staging | PASS |
-| ADMIN-PILOT-09 | 完整履约写链路 | 接单→派单→预约→上门→表单/资料→审核/整改→外发→完结 | NOT PROVEN |
+| ADMIN-PILOT-09 | 完整履约写链路 | 接单→Admin 派单(HTTP Manual Assign)→预约→上门→表单/资料→审核/整改→外发→完结 | PASS |
 
 `ADMIN-PILOT-08*` 与 `ADMIN-PILOT-08CI` 证明固定工单候选分配/领取/释放，独立 Workflow Task 的
-表单/资料/审核/整改/完结与外发 ACK/厂端回调，以及入站工单激活后同单预约上门→表单/资料/
-驳回整改补传复审/外发/完结；SA 经 Dispatch SPI 种子证明，不证明 Admin 派单 HTTP 或生产对象存储/
-专业扫描。`ADMIN-PILOT-09` 是明确交付边界，不得用局部读写冒烟替代含 Admin 派单的完整业务写链路验收。
+表单/资料/审核/整改/完结与外发 ACK/厂端回调，以及入站工单经 Admin HTTP 初派后同单预约上门→表单/
+资料/驳回整改补传复审/外发/完结。`ADMIN-PILOT-09` 已由入站路径证明；派单为窄化 Manual Assign，
+不证明评分/硬过滤引擎、ServiceNetwork 生命周期或生产对象存储/专业扫描。

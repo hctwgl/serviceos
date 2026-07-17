@@ -41,5 +41,5 @@ CapacityAuthorityService.configure（NETWORK / TECHNICIAN）
 
 ## 4. 删除条件
 
-当 Accepted 的 Manual Assign HTTP 落地且 Admin 冒烟改为经该表面创建 ServiceAssignment 后，删除
-本种子入口与 `AdminPilotLiveServiceAssignmentSeeder`。
+已在 **M144** 满足：Manual Assign HTTP 落地后删除
+`AdminPilotLiveServiceAssignmentSeeder` 与 `seed-admin-pilot-assignment.sh`。

@@ -49,13 +49,10 @@ PY
   fi
 }
 
-# M143：经 Dispatch SPI 注入 ACTIVE NETWORK/TECHNICIAN；不走 SQL 直插，不宣称 Admin 派单 HTTP。
-seed_service_assignment_via_spi() {
-  local work_order_id="$1"
-  local task_id="$2"
-  local run_key="$3"
-  bash "${repo_root}/serviceos-deploy/admin-pilot/seed-admin-pilot-assignment.sh" \
-    "${work_order_id}" "${task_id}" "${run_key}"
+# M144：断言 Admin HTTP 人工初派留下的 ACTIVE 责任 / CONFIRMED reservation / COMPLETED saga。
+assert_manual_service_assignment() {
+  local task_id="$1"
+  local run_key="$2"
   local sa_state
   sa_state="$(query_db "
     SELECT count(DISTINCT CASE WHEN a.responsibility_level = 'NETWORK'
@@ -65,7 +62,9 @@ seed_service_assignment_via_spi() {
                                 AND a.assignee_id = '06b612f3-a901-4b0e-bd90-86b4259cc087'
                                 AND a.status = 'ACTIVE' THEN a.service_assignment_id END) || ':' ||
            count(DISTINCT CASE WHEN r.status = 'CONFIRMED' THEN r.capacity_reservation_id END) || ':' ||
-           count(DISTINCT CASE WHEN s.stage = 'COMPLETED' THEN s.activation_saga_id END)
+           count(DISTINCT CASE WHEN s.stage = 'COMPLETED' THEN s.activation_saga_id END) || ':' ||
+           count(DISTINCT CASE WHEN a.created_by = '06b612f3-a901-4b0e-bd90-86b4259cc087'
+                                THEN a.service_assignment_id END)
       FROM dsp_service_assignment a
       LEFT JOIN dsp_capacity_reservation r
         ON r.tenant_id = a.tenant_id
@@ -77,8 +76,8 @@ seed_service_assignment_via_spi() {
      WHERE a.tenant_id = 'tenant-local'
        AND a.task_id = '${task_id}'
   ")"
-  [[ "${sa_state}" == "1:1:2:2" ]] || {
-    echo "SPI ServiceAssignment 种子不完整 (${run_key}): ${sa_state}" >&2
+  [[ "${sa_state}" == "1:1:2:2:2" ]] || {
+    echo "Admin HTTP ServiceAssignment 不完整 (${run_key}): ${sa_state}" >&2
     exit 1
   }
 }
@@ -305,9 +304,6 @@ seed_completion_fixture \
   "${field_ops_task_created_outbox_id}" "${field_ops_task_created_event_id}" \
   "${field_ops_external_code}" "${field_ops_correlation_id}"
 
-seed_service_assignment_via_spi \
-  "${field_ops_work_order_id}" "${field_ops_task_id}" "field-ops-${field_ops_task_id}"
-
 seed_completion_fixture \
   "${outbound_work_order_id}" "${outbound_workflow_id}" "${outbound_stage_id}" \
   "${outbound_node_id}" "${outbound_task_id}" "${outbound_start_event_id}" \
@@ -337,8 +333,8 @@ if ! curl --fail --silent "http://127.0.0.1:5173" >/dev/null; then
 fi
 wait_http "http://127.0.0.1:5173" "ServiceOS Admin Web"
 
-# M140/M143：真实 CPIM 入站创建工单 → Outbox 激活 Workflow/Task → SPI 注入 Visit 所需 SA，
-# 再由 Playwright 在同一工单上证明 assign/claim/start 与预约上门。不宣称 Admin 派单 HTTP。
+# M140/M144：真实 CPIM 入站创建工单 → Outbox 激活 Workflow/Task；Playwright 经 Admin HTTP
+# 人工初派后证明领取/预约上门/整改外发完结（ADMIN-PILOT-09）。
 inbound_order_uuid="$(new_uuid)"
 inbound_order_code="ADMIN-PILOT-IN-${inbound_order_uuid%%-*}"
 
@@ -438,9 +434,6 @@ done
   echo "入站工单未在超时内激活并创建 HUMAN Task: ${inbound_order_code}" >&2
   exit 1
 }
-
-seed_service_assignment_via_spi \
-  "${inbound_work_order_id}" "${inbound_task_id}" "inbound-${inbound_task_id}"
 
 cd serviceos-admin-web
 export ADMIN_PILOT_COMPLETION_WORK_ORDER_CODE="${completion_external_code}"
@@ -1202,5 +1195,8 @@ done
   echo "Admin 试点入站同单整改补传复审外发贯通不完整: ${inbound_state}" >&2
   exit 1
 }
+
+assert_manual_service_assignment "${field_ops_task_id}" "field-ops"
+assert_manual_service_assignment "${inbound_task_id}" "inbound"
 
 echo "Admin 试点冒烟通过：真实 Keycloak、Backend、PostgreSQL 与浏览器链路均已验证"

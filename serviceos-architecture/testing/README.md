@@ -144,4 +144,5 @@
 - [M141 Admin 入站同单表单/资料/审核/外发验收矩阵](138-m141-admin-inbound-form-review-outbound-acceptance.md)
 - [M142 Admin 入站同单整改补传复审外发验收矩阵](139-m142-admin-inbound-correction-resubmit-acceptance.md)
 - [M143 Admin 试点 SPI ServiceAssignment 种子验收矩阵](140-m143-admin-spi-service-assignment-seed-acceptance.md)
+- [M144 Admin 人工初派 ServiceAssignment 验收矩阵](141-m144-admin-manual-service-assignment-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

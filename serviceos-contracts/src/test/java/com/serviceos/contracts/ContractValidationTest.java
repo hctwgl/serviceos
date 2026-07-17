@@ -32,7 +32,9 @@ class ContractValidationTest {
         assertThat(result.getOpenAPI().getPaths())
                 .containsKeys("/projects", "/projects/{projectId}",
                         "/projects/{projectId}/scope-revisions", "/files/upload-sessions",
-                        "/tasks/{taskId}:assign-candidates", "/tasks/{taskId}:claim",
+                        "/tasks/{taskId}:assign-candidates",
+                        "/tasks/{taskId}/service-assignments:manual-assign",
+                        "/tasks/{taskId}:claim",
                         "/tasks/{taskId}:start", "/tasks/{taskId}:complete", "/tasks/{taskId}:release",
                         "/tasks/{taskId}/contact-attempts", "/appointments/{appointmentId}:cancel",
                         "/appointments/{appointmentId}:mark-no-show",
