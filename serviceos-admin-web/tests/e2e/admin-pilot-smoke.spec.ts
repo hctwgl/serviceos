@@ -652,6 +652,26 @@ test('真实 OIDC 登录后可完成 Task 并可靠推进 Workflow 与 WorkOrder
   )
   await expect(page.getByLabel('resultDigest')).toHaveValue(submission.contentDigest)
 
+  // M167：Task 面板 → 表单提交详情（新页签，保留双输入面板状态）。
+  const submissionLink = page.locator('.task-forms-submission-links').getByRole('link', {
+    name: new RegExp(
+      `task\\s*/\\s*FormSubmission\\s*/\\s*VALIDATED\\s*/\\s*${submission.submissionId}`,
+    ),
+  })
+  const submissionHref = await submissionLink.getAttribute('href')
+  expect(submissionHref, '表单提交深链缺失').toBeTruthy()
+  const submissionPage = await page.context().newPage()
+  const taskSubmissionDetailPromise = submissionPage.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname ===
+        `/api/v1/form-submissions/${submission.submissionId}`,
+  )
+  await submissionPage.goto(new URL(submissionHref!, page.url()).toString())
+  expect((await taskSubmissionDetailPromise).status()).toBe(200)
+  await expect(submissionPage.getByRole('heading', { name: '表单提交详情' })).toBeVisible()
+  await submissionPage.close()
+
   // M38/M39/M40 继续通过真实页面执行 Begin→本地私有 PUT→Finalize，
   // 等待扫描与机器校验 worker 将不可变 Revision 推进至 VALIDATED 后再冻结 Snapshot。
   await expect(page.getByRole('cell', { name: 'completion.photo', exact: true })).toBeVisible({
@@ -698,6 +718,26 @@ test('真实 OIDC 登录后可完成 Task 并可靠推进 Workflow 与 WorkOrder
       { timeout: 30_000 },
     )
     .toBeGreaterThan(0)
+
+  // M167：Task 面板 → 资料项详情（新页签，保留双输入面板状态）。
+  const evidenceItemLink = page.locator('.task-forms-item-links').getByRole('link', {
+    name: new RegExp(
+      `task\\s*/\\s*EvidenceItem\\s*/\\s*\\S+\\s*/\\s*${evidenceItem.evidenceItemId}`,
+    ),
+  })
+  const evidenceItemHref = await evidenceItemLink.getAttribute('href')
+  expect(evidenceItemHref, '资料项深链缺失').toBeTruthy()
+  const evidenceItemPage = await page.context().newPage()
+  const taskEvidenceItemDetailPromise = evidenceItemPage.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname ===
+        `/api/v1/evidence-items/${evidenceItem.evidenceItemId}`,
+  )
+  await evidenceItemPage.goto(new URL(evidenceItemHref!, page.url()).toString())
+  expect((await taskEvidenceItemDetailPromise).status()).toBe(200)
+  await expect(evidenceItemPage.getByRole('heading', { name: '资料项详情' })).toBeVisible()
+  await evidenceItemPage.close()
 
   const snapshotResponsePromise = page.waitForResponse(
     (response) =>
@@ -1726,6 +1766,45 @@ test('真实 OIDC 登录后可完成预约提议确认与上门签到签退', as
   })
   await expect(page.getByText(`已确认预约 ${proposed.appointmentId}`)).toBeVisible()
 
+  // M167：Task 面板 → 联系 / 预约详情（复用已有详情页）。
+  const taskContactDetailPromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname ===
+        `/api/v1/contact-attempts/${recordedContact.contactAttemptId}`,
+  )
+  await page
+    .locator('.task-fieldops-contact-links')
+    .getByRole('link', {
+      name: new RegExp(
+        `task\\s*/\\s*ContactAttempt\\s*/\\s*${recordedContact.channel}\\s*/\\s*${recordedContact.resultCode}\\s*/\\s*${recordedContact.contactAttemptId}`,
+      ),
+    })
+    .click()
+  expect((await taskContactDetailPromise).status()).toBe(200)
+  await expect(page.getByRole('heading', { name: '联系详情' })).toBeVisible()
+  await page.goto(`/tasks/${taskId}`)
+  await expect(page.getByRole('heading', { name: '联系 / 预约 / 上门' })).toBeVisible()
+
+  const taskAppointmentDetailPromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname ===
+        `/api/v1/appointments/${proposed.appointmentId}`,
+  )
+  await page
+    .locator('.task-fieldops-appointment-links')
+    .getByRole('link', {
+      name: new RegExp(
+        `task\\s*/\\s*Appointment\\s*/\\s*INSTALLATION\\s*/\\s*CONFIRMED\\s*/\\s*${proposed.appointmentId}`,
+      ),
+    })
+    .click()
+  expect((await taskAppointmentDetailPromise).status()).toBe(200)
+  await expect(page.getByRole('heading', { name: '预约详情' })).toBeVisible()
+  await page.goto(`/tasks/${taskId}`)
+  await expect(page.getByRole('heading', { name: '联系 / 预约 / 上门' })).toBeVisible()
+
   // M155：工作区 APPOINTMENTS_VISITS → 预约详情（包装 GET /appointments/{id}）。
   await page.getByRole('link', { name: '工单目录' }).click()
   await page.getByRole('link', { name: workOrderCode! }).click()
@@ -1803,6 +1882,25 @@ test('真实 OIDC 登录后可完成预约提议确认与上门签到签退', as
     status: 'COMPLETED',
   })
   await expect(page.getByText(`签退 Visit ${checkedIn.visitId}`)).toBeVisible()
+
+  // M167：Task 面板 → 上门详情。
+  const taskVisitDetailPromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname === `/api/v1/visits/${checkedIn.visitId}`,
+  )
+  await page
+    .locator('.task-fieldops-visit-links')
+    .getByRole('link', {
+      name: new RegExp(
+        `task\\s*/\\s*Visit\\s*/\\s*COMPLETED\\s*/\\s*seq=\\d+\\s*/\\s*${checkedIn.visitId}`,
+      ),
+    })
+    .click()
+  expect((await taskVisitDetailPromise).status()).toBe(200)
+  await expect(page.getByRole('heading', { name: '上门详情' })).toBeVisible()
+  await page.goto(`/tasks/${taskId}`)
+  await expect(page.getByRole('heading', { name: '联系 / 预约 / 上门' })).toBeVisible()
 
   // M159：工作区 APPOINTMENTS_VISITS → 上门详情（GET /visits/{id}）。
   await page.getByRole('link', { name: '工单目录' }).click()

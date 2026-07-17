@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-17
-baselineCommit: 26ddbb470bc2c51282ba4dfcaae94759f16d3654
-latestMilestone: M166
+baselineCommit: PENDING
+latestMilestone: M167
 ---
 
 # ServiceOS 实施状态总览
@@ -39,11 +39,11 @@ latestMilestone: M166
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M166 Admin 工作区审核/整改关联资源深链 |
-| 基线提交 | `26ddbb470bc2c51282ba4dfcaae94759f16d3654` |
+| 最新实施里程碑 | M167 Admin Task 面板资源详情深链 |
+| 基线提交 | `PENDING` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
-| 前端工程 | `serviceos-admin-web`（Vue+TS+Vite）已纳入 CI 构建，具备开发态 Keycloak PKCE，以及真实只读、Task MANUAL assign-candidates/claim/release、表单/资料/审核/整改/完结、正常补传复审，预约上门、BYD 提审外发 ACK、厂端回调，CPIM 入站→激活→Admin HTTP 人工初派→同单预约上门→表单/资料/驳回整改补传复审/外发/完结（ADMIN-PILOT-09），入站 Envelope 授权队列与详情深链、专项队列与目录/SLA Accepted OpenAPI 筛选，工作区各按需区块详情或 Task 旁路、预约/表单/资料/上门/联系详情页、核心时间线与最近活动资源深链、外部审核回执详情、审核/整改交叉深链、工作区异常摘要→异常队列 query 水合、工作区审核/整改关联资源深链，以及工作区项目与 SLA 任务交叉深链的 PR 阻断 E2E；Network/Technician 尚未建立 |
+| 前端工程 | `serviceos-admin-web`（Vue+TS+Vite）已纳入 CI 构建，具备开发态 Keycloak PKCE，以及真实只读、Task MANUAL assign-candidates/claim/release、表单/资料/审核/整改/完结、正常补传复审，预约上门、BYD 提审外发 ACK、厂端回调，CPIM 入站→激活→Admin HTTP 人工初派→同单预约上门→表单/资料/驳回整改补传复审/外发/完结（ADMIN-PILOT-09），入站 Envelope 授权队列与详情深链、专项队列与目录/SLA Accepted OpenAPI 筛选，工作区各按需区块详情或 Task 旁路、预约/表单/资料/上门/联系详情页、核心时间线与最近活动资源深链、外部审核回执详情、审核/整改交叉深链、工作区异常摘要→异常队列 query 水合、工作区审核/整改关联资源深链、Task 面板资源详情深链，以及工作区项目与 SLA 任务交叉深链的 PR 阻断 E2E；Network/Technician 尚未建立 |
 | 数据库 | PostgreSQL + Flyway（当前版本 085 / 87） |
 | 契约 | Core OpenAPI 0.75.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、recovered/resolved 与 SLA started/breached/met@v1） |
 
@@ -75,7 +75,7 @@ latestMilestone: M166
 | 通知 | 通知与运营异常中心 | `PROPOSED` | 已有总体设计 | 通知通道、模板、可靠发送和 UI | `architecture/14-*` |
 | 履约事实与试算 | 事实提取和双向试算 | `PROPOSED` | 已有设计、API 和数据规划 | 运行时、投影和前端工作区 | M5 设计 |
 | 对账结算 | 对账、结算、争议与调整 | `PROPOSED` | 已有边界设计 | 正式运行时和页面 | `architecture/16-*` |
-| Admin Portal | 总部运营后台 | `PARTIAL` | M101～M166：队列/任务/SLA/异常/入站/外发/工单/项目目录、工作区、allowed-actions；CI 阻断构建；开发态 Keycloak PKCE；真实只读与写链路 PR 阻断 E2E（含 ADMIN-PILOT-09、工作区各区块详情或 Task 旁路、预约/表单/资料/上门/联系详情页、核心时间线与最近活动资源深链、外部审核回执详情、审核/整改交叉深链、异常摘要→异常队列 query 水合、工作区审核/整改关联资源深链、项目与 SLA 任务交叉深链、专项队列与目录/SLA Accepted OpenAPI 筛选、入站 Envelope 授权队列） | 设计系统、SavedView、正式企业 OIDC/BFF、生产对象存储/专业扫描、评分/硬过滤派单与 ServiceNetwork 生命周期 | M7 设计、M101～M166、Admin 试点基线 |
+| Admin Portal | 总部运营后台 | `PARTIAL` | M101～M167：队列/任务/SLA/异常/入站/外发/工单/项目目录、工作区、allowed-actions；CI 阻断构建；开发态 Keycloak PKCE；真实只读与写链路 PR 阻断 E2E（含 ADMIN-PILOT-09、工作区各区块详情或 Task 旁路、预约/表单/资料/上门/联系详情页、核心时间线与最近活动资源深链、外部审核回执详情、审核/整改交叉深链、异常摘要→异常队列 query 水合、工作区审核/整改关联资源深链、Task 面板资源详情深链、项目与 SLA 任务交叉深链、专项队列与目录/SLA Accepted OpenAPI 筛选、入站 Envelope 授权队列） | 设计系统、SavedView、正式企业 OIDC/BFF、生产对象存储/专业扫描、评分/硬过滤派单与 ServiceNetwork 生命周期 | M7 设计、M101～M167、Admin 试点基线 |
 | Network Portal | 网点协作端 | `PROPOSED` | 页面和跨端协作规格 | 前端代码和 E2E | M7 设计 |
 | Technician App | 师傅移动端 | `PROPOSED` | 弱网、离线工作包、上传队列和页面规格 | 移动端工程、真机和离线运行时 | M7 设计 |
 | External Portal | 用户/车企受控页面 | `PROPOSED` | 最小边界规划 | 二期页面和工程实现 | M7 设计 |
@@ -1126,6 +1126,16 @@ M144 起 SPI 种子入口已删除。
 
 明确未实现：评分/硬过滤/DispatchDecision、ServiceNetwork 生命周期、专用入站队列页、真实 sandbox。
 
+### M167：Admin Task 面板资源详情深链
+
+已实现：
+
+- TaskFieldOpsPanel → ContactAttempt / Appointment / Visit；
+- TaskFormsEvidencePanel → FormSubmission / EvidenceItem；
+- Playwright `ADMIN-PILOT-08TP`。
+
+明确未实现：FieldOperation 详情、SavedView、企业 OIDC/BFF、真实 sandbox。
+
 ### M166：Admin 工作区审核/整改关联资源深链
 
 已实现：
@@ -1350,8 +1360,8 @@ M144 起 SPI 种子入口已删除。
 
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M166**。Admin Pilot 已覆盖工作区区块详情/旁路、预约/表单/资料/上门/联系详情、
-核心时间线与最近活动资源深链、外部审核回执详情、审核/整改交叉深链、异常摘要→异常队列 query 水合、工作区审核/整改关联资源深链、项目与 SLA 任务交叉深链、专项队列（含入站 Envelope）与目录筛选、`ADMIN-PILOT-09`；
+ServiceOS 可靠纵向切片已推进到 **M167**。Admin Pilot 已覆盖工作区区块详情/旁路、预约/表单/资料/上门/联系详情、
+核心时间线与最近活动资源深链、外部审核回执详情、审核/整改交叉深链、异常摘要→异常队列 query 水合、工作区审核/整改关联资源深链、Task 面板资源详情深链、项目与 SLA 任务交叉深链、专项队列（含入站 Envelope）与目录筛选、`ADMIN-PILOT-09`；
 没有实现完整评分派单引擎、完整 SLA/通知策略、通用队列/SavedView 或整个现场履约平台。
 
 ```text

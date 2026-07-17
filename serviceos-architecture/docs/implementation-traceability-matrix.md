@@ -261,3 +261,4 @@ Feature gate/authority: if applicable
 | M164 | Admin 审核/整改详情交叉深链：Review↔Snapshot、后继→源 Review、Correction→源 Snapshot；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Admin Web E2E + `177-m164-*` + `161-m164-*` | FieldOperation 详情、SavedView、异常队列 query 水合、真实 sandbox |
 | M165 | Admin 工作区异常摘要 → 异常队列 query 水合：exceptionSummary 深链 + ExceptionQueuePage route.query 水合；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + API-06 §6 + Admin Web E2E + `178-m165-*` + `162-m165-*` | FieldOperation 详情、SavedView、多 status OR、真实 sandbox |
 | M166 | Admin 工作区审核/整改关联资源深链：REVIEWS_CORRECTIONS → Snapshot / 源审核 / 最近补传快照；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + OpenAPI workspace section + Admin Web E2E + `179-m166-*` + `163-m166-*` | FieldOperation 详情、SavedView、真实 sandbox |
+| M167 | Admin Task 面板资源详情深链：FieldOps/FormsEvidence → 已有详情页；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Admin Web E2E + `180-m167-*` + `164-m167-*` | FieldOperation 详情、SavedView、真实 sandbox |

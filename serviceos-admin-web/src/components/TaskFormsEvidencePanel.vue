@@ -466,6 +466,17 @@ onMounted(() => {
         last={{ lastSubmission.submissionId }} / {{ lastSubmission.validationStatus }} /
         digest={{ lastSubmission.contentDigest }}
       </p>
+      <p v-if="lastSubmission" class="links task-forms-submission-links">
+        <RouterLink
+          :to="{
+            name: 'ADMIN.FORM_SUBMISSION.DETAIL',
+            params: { id: lastSubmission.submissionId },
+          }"
+        >
+          task / FormSubmission / {{ lastSubmission.validationStatus }} /
+          {{ lastSubmission.submissionId }}
+        </RouterLink>
+      </p>
     </article>
 
     <QueueTable
@@ -522,6 +533,19 @@ onMounted(() => {
       @refresh="load"
       @next="() => undefined"
     />
+    <p v-if="items.length" class="links task-forms-item-links">
+      打开任务资料项详情：
+      <RouterLink
+        v-for="item in items"
+        :key="item.evidenceItemId"
+        :to="{
+          name: 'ADMIN.EVIDENCE_ITEM.DETAIL',
+          params: { id: item.evidenceItemId },
+        }"
+      >
+        task / EvidenceItem / {{ item.status }} / {{ item.evidenceItemId }}
+      </RouterLink>
+    </p>
 
     <article class="card">
       <h4>资料下载授权 / 作废 Revision</h4>

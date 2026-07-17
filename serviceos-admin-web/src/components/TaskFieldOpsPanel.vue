@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import {
   cancelAppointment,
   checkInVisit,
@@ -384,6 +385,20 @@ onMounted(() => {
       @refresh="load"
       @next="() => undefined"
     />
+    <p v-if="contacts.length" class="links task-fieldops-contact-links">
+      打开任务联系详情：
+      <RouterLink
+        v-for="item in contacts"
+        :key="item.contactAttemptId"
+        :to="{
+          name: 'ADMIN.CONTACT_ATTEMPT.DETAIL',
+          params: { id: item.contactAttemptId },
+        }"
+      >
+        task / ContactAttempt / {{ item.channel }} / {{ item.resultCode }} /
+        {{ item.contactAttemptId }}
+      </RouterLink>
+    </p>
 
     <article class="card">
       <h4>记录联系</h4>
@@ -414,6 +429,19 @@ onMounted(() => {
       @refresh="load"
       @next="() => undefined"
     />
+    <p v-if="appointments.length" class="links task-fieldops-appointment-links">
+      打开任务预约详情：
+      <RouterLink
+        v-for="item in appointments"
+        :key="item.appointmentId"
+        :to="{
+          name: 'ADMIN.APPOINTMENT.DETAIL',
+          params: { id: item.appointmentId },
+        }"
+      >
+        task / Appointment / {{ item.type }} / {{ item.status }} / {{ item.appointmentId }}
+      </RouterLink>
+    </p>
 
     <article class="card">
       <h4>提议预约</h4>
@@ -473,6 +501,19 @@ onMounted(() => {
       @refresh="load"
       @next="() => undefined"
     />
+    <p v-if="visits.length" class="links task-fieldops-visit-links">
+      打开任务上门详情：
+      <RouterLink
+        v-for="item in visits"
+        :key="item.visitId"
+        :to="{
+          name: 'ADMIN.VISIT.DETAIL',
+          params: { id: item.visitId },
+        }"
+      >
+        task / Visit / {{ item.status }} / seq={{ item.visitSequence }} / {{ item.visitId }}
+      </RouterLink>
+    </p>
 
     <article class="card">
       <h4>签到 / 签退</h4>
@@ -522,4 +563,11 @@ button { background: #243b53; color: #fff; border-color: #243b53; cursor: pointe
 .actions { display: flex; gap: .5rem; flex-wrap: wrap; }
 .error { color: #9b1c1c; }
 .ok { color: #054e31; }
+.links {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+}
 </style>
