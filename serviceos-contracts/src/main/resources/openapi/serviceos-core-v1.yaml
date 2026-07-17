@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.90.0
+  version: 0.91.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1680,6 +1680,96 @@ paths:
             schema: { $ref: '#/components/schemas/CancelAppointmentRequest' }
       responses:
         '200': { $ref: '#/components/responses/AppointmentCommandReceipt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /network-portal/appointments/{appointmentId}:mark-no-show:
+    post:
+      operationId: markNetworkPortalAppointmentNoShow
+      summary: Network Portal 标记本网点预约爽约
+      description: |
+        M199：X-Network-Context + NETWORK scope networkPortal.manageAppointment + If-Match。
+        Body 与 Admin mark-no-show 同形；仅 CONFIRMED 且窗口已结束的预约可标记 NO_SHOW。
+        预约所属任务必须对本上下文网点持有 ACTIVE NETWORK 责任。
+        委托已 Implemented 的 appointments.markNoShow（底层另需 appointment.manage）；
+        复用 M197 能力种子，无新 Flyway。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - $ref: '#/components/parameters/AppointmentId'
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MarkAppointmentNoShowRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/AppointmentCommandReceipt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /network-portal/tasks/{taskId}/contact-attempts:
+    get:
+      operationId: listNetworkPortalTaskContactAttempts
+      summary: Network Portal 查询本网点任务联系尝试
+      description: |
+        M199：X-Network-Context + NETWORK scope networkPortal.manageAppointment。
+        任务必须对本上下文网点持有 ACTIVE NETWORK ServiceAssignment；委托 appointment.read。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 当前租户下该任务的联系尝试列表
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ContactAttempt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: recordNetworkPortalTaskContactAttempt
+      summary: Network Portal 为本网点任务记录联系尝试
+      description: |
+        M199：X-Network-Context + NETWORK scope networkPortal.manageAppointment。
+        Body 与 Admin RecordContactAttempt 同形；操作者来自 JWT，不接受客户端伪造 actor。
+        任务必须对本上下文网点持有 ACTIVE NETWORK 责任。
+        委托已 Implemented 的 contact-attempts 写入（底层另需 appointment.recordContact）；
+        复用 M197 能力种子，无新 Flyway。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecordContactAttemptRequest' }
+      responses:
+        '201':
+          description: 已记录的不可变联系事实
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+            Location:
+              required: true
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContactAttempt' }
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }

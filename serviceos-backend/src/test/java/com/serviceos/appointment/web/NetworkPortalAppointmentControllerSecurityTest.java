@@ -1,6 +1,8 @@
 package com.serviceos.appointment.web;
 
 import com.serviceos.appointment.api.AppointmentCommandReceipt;
+import com.serviceos.appointment.api.ContactAttemptView;
+import com.serviceos.appointment.api.ContactResultCode;
 import com.serviceos.appointment.api.NetworkPortalAppointmentService;
 import com.serviceos.appointment.api.ProposeAppointmentCommand;
 import com.serviceos.bootstrap.SecurityConfiguration;
@@ -29,7 +31,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** M197/M198：network-portal appointments 未认证 401；缺能力 403；改约/取消回执。 */
+/** M197/M198/M199：network-portal appointments 未认证 401；缺能力 403；改约/取消/爽约/联系回执。 */
 @WebMvcTest(NetworkPortalAppointmentController.class)
 @Import(SecurityConfiguration.class)
 class NetworkPortalAppointmentControllerSecurityTest {
@@ -242,6 +244,91 @@ class NetworkPortalAppointmentControllerSecurityTest {
                 .andExpect(jsonPath("$.status").value("CANCELLED"));
     }
 
+    @Test
+    void unauthenticatedMarkNoShowIsRejected() throws Exception {
+        mvc.perform(post("/api/v1/network-portal/appointments/{appointmentId}:mark-no-show", APPOINTMENT_ID)
+                        .header("X-Network-Context", "NETWORK|NETWORK|" + NETWORK_ID)
+                        .header("Idempotency-Key", "m199-1")
+                        .header("If-Match", "\"2\"")
+                        .contentType("application/json")
+                        .content(noShowBody()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void authenticatedMarkNoShowReturnsReceipt() throws Exception {
+        CurrentPrincipal actor = actor();
+        AppointmentCommandReceipt receipt = new AppointmentCommandReceipt(
+                APPOINTMENT_ID, UUID.randomUUID(), "NO_SHOW", 3, 3,
+                Instant.parse("2026-07-17T06:00:00Z"));
+        when(principals.current()).thenReturn(actor);
+        when(portalAppointments.markNoShow(
+                eq(actor), any(), eq("NETWORK|NETWORK|" + NETWORK_ID), eq(APPOINTMENT_ID),
+                eq(2L), eq("CUSTOMER"), eq("customer-ref"), eq("CUSTOMER_ABSENT"),
+                eq(List.of("file-ref-1"))))
+                .thenReturn(receipt);
+
+        mvc.perform(post("/api/v1/network-portal/appointments/{appointmentId}:mark-no-show", APPOINTMENT_ID)
+                        .with(jwt().jwt(token -> token.subject("external-subject")
+                                .claim("tenant_id", "tenant-a")))
+                        .header("X-Correlation-Id", "corr-no-show")
+                        .header("X-Network-Context", "NETWORK|NETWORK|" + NETWORK_ID)
+                        .header("Idempotency-Key", "m199-no-show")
+                        .header("If-Match", "\"2\"")
+                        .contentType("application/json")
+                        .content(noShowBody()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("NO_SHOW"));
+    }
+
+    @Test
+    void authenticatedRecordContactAttemptReturnsCreated() throws Exception {
+        CurrentPrincipal actor = actor();
+        UUID contactId = UUID.fromString("019f83c0-bbbb-7f8c-9505-36fe5c0e880e");
+        ContactAttemptView attempt = new ContactAttemptView(
+                contactId, UUID.randomUUID(), UUID.randomUUID(), TASK_ID,
+                "PHONE", "party-ref", Instant.parse("2026-07-17T08:00:00Z"),
+                Instant.parse("2026-07-17T08:05:00Z"), ContactResultCode.NO_ANSWER,
+                "无人接听", null, null, PRINCIPAL_ID.toString(),
+                Instant.parse("2026-07-17T08:06:00Z"));
+        when(principals.current()).thenReturn(actor);
+        when(portalAppointments.recordContactAttempt(
+                eq(actor), any(), eq("NETWORK|NETWORK|" + NETWORK_ID), eq(TASK_ID), any()))
+                .thenReturn(attempt);
+
+        mvc.perform(post("/api/v1/network-portal/tasks/{taskId}/contact-attempts", TASK_ID)
+                        .with(jwt().jwt(token -> token.subject("external-subject")
+                                .claim("tenant_id", "tenant-a")))
+                        .header("X-Correlation-Id", "corr-contact")
+                        .header("X-Network-Context", "NETWORK|NETWORK|" + NETWORK_ID)
+                        .header("Idempotency-Key", "m199-contact")
+                        .contentType("application/json")
+                        .content(contactBody()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.resultCode").value("NO_ANSWER"))
+                .andExpect(jsonPath("$.contactAttemptId").value(contactId.toString()));
+    }
+
+    @Test
+    void missingCapabilityOnContactReturnsAccessDenied() throws Exception {
+        CurrentPrincipal actor = actor();
+        when(principals.current()).thenReturn(actor);
+        when(portalAppointments.recordContactAttempt(
+                eq(actor), any(), eq("NETWORK|NETWORK|" + NETWORK_ID), eq(TASK_ID), any()))
+                .thenThrow(new BusinessProblem(ProblemCode.ACCESS_DENIED, "The action is not allowed"));
+
+        mvc.perform(post("/api/v1/network-portal/tasks/{taskId}/contact-attempts", TASK_ID)
+                        .with(jwt().jwt(token -> token.subject("external-subject")
+                                .claim("tenant_id", "tenant-a")))
+                        .header("X-Correlation-Id", "corr-deny-contact")
+                        .header("X-Network-Context", "NETWORK|NETWORK|" + NETWORK_ID)
+                        .header("Idempotency-Key", "m199-deny-contact")
+                        .contentType("application/json")
+                        .content(contactBody()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("ACCESS_DENIED"));
+    }
+
     private static String proposeBody() {
         return """
                 {
@@ -269,6 +356,30 @@ class NetworkPortalAppointmentControllerSecurityTest {
                   },
                   "reasonCode": "CUSTOMER_REQUESTED_LATER",
                   "note": "改约"
+                }
+                """;
+    }
+
+    private static String noShowBody() {
+        return """
+                {
+                  "noShowPartyType": "CUSTOMER",
+                  "noShowPartyRef": "customer-ref",
+                  "reasonCode": "CUSTOMER_ABSENT",
+                  "evidenceRefs": ["file-ref-1"]
+                }
+                """;
+    }
+
+    private static String contactBody() {
+        return """
+                {
+                  "channel": "PHONE",
+                  "contactedPartyRef": "party-ref",
+                  "startedAt": "2026-07-17T08:00:00Z",
+                  "endedAt": "2026-07-17T08:05:00Z",
+                  "resultCode": "NO_ANSWER",
+                  "note": "无人接听"
                 }
                 """;
     }

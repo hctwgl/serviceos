@@ -6,8 +6,11 @@ import com.serviceos.appointment.api.AppointmentView;
 import com.serviceos.appointment.api.AppointmentWindow;
 import com.serviceos.appointment.api.CancelAppointmentCommand;
 import com.serviceos.appointment.api.ConfirmAppointmentCommand;
+import com.serviceos.appointment.api.ContactAttemptView;
+import com.serviceos.appointment.api.MarkAppointmentNoShowCommand;
 import com.serviceos.appointment.api.NetworkPortalAppointmentService;
 import com.serviceos.appointment.api.ProposeAppointmentCommand;
+import com.serviceos.appointment.api.RecordContactAttemptCommand;
 import com.serviceos.appointment.api.RescheduleAppointmentCommand;
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
@@ -31,13 +34,14 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Network Portal 预约协作适配器（M197 propose/confirm + M198 reschedule/cancel）。
+ * Network Portal 预约协作适配器
+ * （M197 propose/confirm + M198 reschedule/cancel + M199 mark-no-show/contact）。
  * <p>
  * 事务边界：门禁预检与 AppointmentService 命令同事务；聚合修订、幂等、审计与 Outbox
  * 由 AppointmentService 保证。
  * 幂等键：HTTP Idempotency-Key 原样下传。
  * 失败关闭：伪造上下文、非成员、任务/预约非本网点 ACTIVE NETWORK、伪装 TECHNICIAN 确认方、
- * 乐观锁版本冲突。
+ * 乐观锁版本冲突、未结束窗口爽约。
  */
 @Service
 final class DefaultNetworkPortalAppointmentService implements NetworkPortalAppointmentService {
@@ -164,8 +168,61 @@ final class DefaultNetworkPortalAppointmentService implements NetworkPortalAppoi
                 appointmentId, expectedVersion, reasonCode, note));
     }
 
+    @Override
+    @Transactional
+    public AppointmentCommandReceipt markNoShow(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            String networkContextHeader,
+            UUID appointmentId,
+            long expectedVersion,
+            String noShowPartyType,
+            String noShowPartyRef,
+            String reasonCode,
+            List<String> evidenceRefs
+    ) {
+        Objects.requireNonNull(appointmentId, "appointmentId");
+        UUID networkId = requireAuthorizedNetwork(principal, metadata.correlationId(), networkContextHeader);
+        requireNetworkOwnedAppointment(principal, metadata.correlationId(), appointmentId, networkId);
+        return appointments.markNoShow(principal, metadata, new MarkAppointmentNoShowCommand(
+                appointmentId, expectedVersion, noShowPartyType, noShowPartyRef, reasonCode, evidenceRefs));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ContactAttemptView> listContactAttempts(
+            CurrentPrincipal principal,
+            String correlationId,
+            String networkContextHeader,
+            UUID taskId
+    ) {
+        Objects.requireNonNull(taskId, "taskId");
+        UUID networkId = requireAuthorizedNetwork(principal, correlationId, networkContextHeader);
+        requireNetworkOwnedTask(principal.tenantId(), taskId, networkId);
+        return appointments.listContactAttempts(principal, correlationId, taskId);
+    }
+
+    @Override
+    @Transactional
+    public ContactAttemptView recordContactAttempt(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            String networkContextHeader,
+            UUID taskId,
+            RecordContactAttemptCommand command
+    ) {
+        Objects.requireNonNull(taskId, "taskId");
+        Objects.requireNonNull(command, "command");
+        if (!taskId.equals(command.taskId())) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, "path taskId 与请求体 taskId 不一致");
+        }
+        UUID networkId = requireAuthorizedNetwork(principal, metadata.correlationId(), networkContextHeader);
+        requireNetworkOwnedTask(principal.tenantId(), taskId, networkId);
+        return appointments.recordContactAttempt(principal, metadata, command);
+    }
+
     /**
-     * 改约/取消前校验预约任务对本上下文网点持有 ACTIVE NETWORK 责任，并核对 snapshot 网点。
+     * 改约/取消/爽约前校验预约任务对本上下文网点持有 ACTIVE NETWORK 责任，并核对 snapshot 网点。
      */
     private void requireNetworkOwnedAppointment(
             CurrentPrincipal principal, String correlationId, UUID appointmentId, UUID networkId

@@ -4,8 +4,11 @@ import com.serviceos.appointment.api.AppointmentCommandReceipt;
 import com.serviceos.appointment.api.AppointmentType;
 import com.serviceos.appointment.api.AppointmentView;
 import com.serviceos.appointment.api.AppointmentWindow;
+import com.serviceos.appointment.api.ContactAttemptView;
+import com.serviceos.appointment.api.ContactResultCode;
 import com.serviceos.appointment.api.NetworkPortalAppointmentService;
 import com.serviceos.appointment.api.ProposeAppointmentCommand;
+import com.serviceos.appointment.api.RecordContactAttemptCommand;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.CorrelationIds;
@@ -143,6 +146,66 @@ final class NetworkPortalAppointmentController {
         return receipt(receipt, correlationId);
     }
 
+    @PostMapping("/appointments/{appointmentId}:mark-no-show")
+    ResponseEntity<AppointmentCommandReceipt> markNoShow(
+            @PathVariable UUID appointmentId,
+            @RequestHeader(value = "X-Network-Context", required = false) String networkContext,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestHeader("If-Match") String ifMatch,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @Valid @RequestBody MarkNoShowRequest request
+    ) {
+        AppointmentCommandReceipt receipt = portalAppointments.markNoShow(
+                principals.current(),
+                new CommandMetadata(correlationId, idempotencyKey),
+                networkContext,
+                appointmentId,
+                version(ifMatch),
+                request.noShowPartyType(),
+                request.noShowPartyRef(),
+                request.reasonCode(),
+                request.evidenceRefs());
+        return receipt(receipt, correlationId);
+    }
+
+    @GetMapping("/tasks/{taskId}/contact-attempts")
+    List<ContactAttemptView> listContactAttempts(
+            @PathVariable UUID taskId,
+            @RequestHeader(value = "X-Network-Context", required = false) String networkContext,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        return portalAppointments.listContactAttempts(
+                principals.current(), correlationId, networkContext, taskId);
+    }
+
+    @PostMapping("/tasks/{taskId}/contact-attempts")
+    ResponseEntity<ContactAttemptView> recordContactAttempt(
+            @PathVariable UUID taskId,
+            @RequestHeader(value = "X-Network-Context", required = false) String networkContext,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @Valid @RequestBody ContactAttemptRequest request
+    ) {
+        ContactAttemptView attempt = portalAppointments.recordContactAttempt(
+                principals.current(),
+                new CommandMetadata(correlationId, idempotencyKey),
+                networkContext,
+                taskId,
+                new RecordContactAttemptCommand(
+                        taskId,
+                        request.channel(),
+                        request.contactedPartyRef(),
+                        request.startedAt(),
+                        request.endedAt(),
+                        request.resultCode(),
+                        request.note(),
+                        request.nextContactAt(),
+                        request.recordingRef()));
+        return ResponseEntity.created(URI.create("/api/v1/contact-attempts/" + attempt.contactAttemptId()))
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(attempt);
+    }
+
     private static ResponseEntity<AppointmentCommandReceipt> receipt(
             AppointmentCommandReceipt body, String correlationId
     ) {
@@ -199,6 +262,26 @@ final class NetworkPortalAppointmentController {
     record CancelRequest(
             @NotBlank @Size(max = 100) String reasonCode,
             @Size(max = 500) String note
+    ) {
+    }
+
+    record MarkNoShowRequest(
+            @NotBlank @Size(max = 80) String noShowPartyType,
+            @NotBlank @Size(max = 200) String noShowPartyRef,
+            @NotBlank @Size(max = 100) String reasonCode,
+            @NotNull List<@NotBlank @Size(max = 500) String> evidenceRefs
+    ) {
+    }
+
+    record ContactAttemptRequest(
+            @NotBlank @Size(max = 80) String channel,
+            @NotBlank @Size(max = 200) String contactedPartyRef,
+            @NotNull Instant startedAt,
+            @NotNull Instant endedAt,
+            @NotNull ContactResultCode resultCode,
+            @Size(max = 500) String note,
+            Instant nextContactAt,
+            @Size(max = 500) String recordingRef
     ) {
     }
 }

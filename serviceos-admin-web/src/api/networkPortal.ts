@@ -241,6 +241,75 @@ export function cancelNetworkPortalAppointment(
   )
 }
 
+export type NetworkPortalContactAttempt = {
+  contactAttemptId: string
+  taskId: string
+  channel: string
+  contactedPartyRef: string
+  resultCode: string
+  actorId: string
+  createdAt: string
+}
+
+/** M199：标记本网点预约爽约（CONFIRMED 且窗口已结束）。 */
+export function markNetworkPortalAppointmentNoShow(
+  networkContextId: string,
+  appointmentId: string,
+  body: {
+    noShowPartyType: string
+    noShowPartyRef: string
+    reasonCode: string
+    evidenceRefs: string[]
+  },
+  aggregateVersion: number,
+  idempotencyKey = crypto.randomUUID(),
+) {
+  return apiPost<AppointmentCommandReceipt>(
+    `/network-portal/appointments/${appointmentId}:mark-no-show`,
+    {
+      body,
+      idempotencyKey,
+      ifMatch: `"${aggregateVersion}"`,
+      headers: networkHeaders(networkContextId),
+    },
+  )
+}
+
+/** M199：列出本网点任务联系尝试。 */
+export function listNetworkPortalTaskContactAttempts(networkContextId: string, taskId: string) {
+  return apiGet<NetworkPortalContactAttempt[]>(
+    `/network-portal/tasks/${taskId}/contact-attempts`,
+    {},
+    networkHeaders(networkContextId),
+  )
+}
+
+/** M199：记录本网点任务联系尝试。 */
+export function recordNetworkPortalTaskContactAttempt(
+  networkContextId: string,
+  taskId: string,
+  body: {
+    channel: string
+    contactedPartyRef: string
+    startedAt: string
+    endedAt: string
+    resultCode: string
+    note?: string | null
+    nextContactAt?: string | null
+    recordingRef?: string | null
+  },
+  idempotencyKey = crypto.randomUUID(),
+) {
+  return apiPost<NetworkPortalContactAttempt>(
+    `/network-portal/tasks/${taskId}/contact-attempts`,
+    {
+      body,
+      idempotencyKey,
+      headers: networkHeaders(networkContextId),
+    },
+  )
+}
+
 export function isPortalContextInvalid(err: unknown): boolean {
   const problem = (err as HttpStatusError | undefined)?.problem
   return (

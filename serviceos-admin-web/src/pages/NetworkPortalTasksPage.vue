@@ -5,11 +5,15 @@ import {
   cancelNetworkPortalAppointment,
   confirmNetworkPortalAppointment,
   listNetworkPortalTaskAppointments,
+  listNetworkPortalTaskContactAttempts,
   listNetworkPortalTasks,
   listNetworkPortalTechnicians,
+  markNetworkPortalAppointmentNoShow,
   proposeNetworkPortalAppointment,
+  recordNetworkPortalTaskContactAttempt,
   rescheduleNetworkPortalAppointment,
   type NetworkPortalAppointment,
+  type NetworkPortalContactAttempt,
   type NetworkPortalTaskItem,
   type NetworkPortalTechnicianItem,
 } from '../api/networkPortal'
@@ -19,6 +23,7 @@ const props = defineProps<{ networkContextId: string | null }>()
 const items = ref<NetworkPortalTaskItem[]>([])
 const technicians = ref<NetworkPortalTechnicianItem[]>([])
 const appointments = ref<NetworkPortalAppointment[]>([])
+const contactAttempts = ref<NetworkPortalContactAttempt[]>([])
 const error = ref<string | null>(null)
 const selectedTaskId = ref('')
 const selectedTechnicianId = ref('')
@@ -39,12 +44,25 @@ const rescheduleReason = ref('CUSTOMER_REQUESTED_LATER')
 const cancelReason = ref('CUSTOMER_CANCELLED')
 const rescheduleStart = ref('2026-09-11T02:00:00.000Z')
 const rescheduleEnd = ref('2026-09-11T05:00:00.000Z')
+const noShowReason = ref('CUSTOMER_ABSENT')
+const noShowPartyRef = ref('customer-ref')
+const noShowEvidenceRef = ref('file-ref-1')
+const contactChannel = ref('PHONE')
+const contactPartyRef = ref('party-ref')
+const contactResultCode = ref('NO_ANSWER')
+const contactNote = ref('网点联系')
+const contactStart = ref('2026-07-17T08:00:00.000Z')
+const contactEnd = ref('2026-07-17T08:05:00.000Z')
+const contactBusy = ref(false)
+const contactError = ref<string | null>(null)
+const contactMessage = ref<string | null>(null)
 
 async function load() {
   if (!props.networkContextId) {
     items.value = []
     technicians.value = []
     appointments.value = []
+    contactAttempts.value = []
     error.value = '请选择 NETWORK 上下文'
     return
   }
@@ -72,6 +90,7 @@ async function load() {
     technicians.value = []
   }
   await loadAppointments()
+  await loadContactAttempts()
 }
 
 async function loadAppointments() {
@@ -87,6 +106,21 @@ async function loadAppointments() {
     appointments.value = page
   } catch {
     appointments.value = []
+  }
+}
+
+async function loadContactAttempts() {
+  contactAttempts.value = []
+  if (!props.networkContextId || !selectedTaskId.value) {
+    return
+  }
+  try {
+    contactAttempts.value = await listNetworkPortalTaskContactAttempts(
+      props.networkContextId,
+      selectedTaskId.value,
+    )
+  } catch {
+    contactAttempts.value = []
   }
 }
 
@@ -247,6 +281,71 @@ async function submitCancel(item: NetworkPortalAppointment) {
   }
 }
 
+async function submitNoShow(item: NetworkPortalAppointment) {
+  if (!props.networkContextId) {
+    appointmentError.value = '请选择 NETWORK 上下文'
+    return
+  }
+  appointmentBusy.value = true
+  appointmentError.value = null
+  appointmentMessage.value = null
+  try {
+    const result = await markNetworkPortalAppointmentNoShow(
+      props.networkContextId,
+      item.appointmentId,
+      {
+        noShowPartyType: 'CUSTOMER',
+        noShowPartyRef: noShowPartyRef.value.trim() || 'customer-ref',
+        reasonCode: noShowReason.value.trim() || 'CUSTOMER_ABSENT',
+        evidenceRefs: [noShowEvidenceRef.value.trim() || 'file-ref-1'],
+      },
+      item.aggregateVersion,
+    )
+    appointmentMessage.value =
+      `已标记爽约 appointment=${result.data.appointmentId} status=${result.data.status}`
+    await loadAppointments()
+  } catch (err) {
+    appointmentError.value = err instanceof Error ? err.message : '标记爽约失败'
+  } finally {
+    appointmentBusy.value = false
+  }
+}
+
+async function submitContactAttempt() {
+  if (!props.networkContextId) {
+    contactError.value = '请选择 NETWORK 上下文'
+    return
+  }
+  if (!selectedTaskId.value) {
+    contactError.value = '请选择任务'
+    return
+  }
+  contactBusy.value = true
+  contactError.value = null
+  contactMessage.value = null
+  try {
+    const result = await recordNetworkPortalTaskContactAttempt(
+      props.networkContextId,
+      selectedTaskId.value,
+      {
+        channel: contactChannel.value.trim() || 'PHONE',
+        contactedPartyRef: contactPartyRef.value.trim() || 'party-ref',
+        startedAt: contactStart.value,
+        endedAt: contactEnd.value,
+        resultCode: contactResultCode.value,
+        note: contactNote.value.trim() || null,
+      },
+    )
+    contactMessage.value =
+      `已记录联系 contactAttempt=${result.data.contactAttemptId} result=${result.data.resultCode}`
+    await loadContactAttempts()
+  } catch (err) {
+    contactError.value = err instanceof Error ? err.message : '记录联系失败'
+  } finally {
+    contactBusy.value = false
+  }
+}
+
 onMounted(() => {
   void load()
 })
@@ -257,6 +356,7 @@ watch(() => props.networkContextId, () => {
 })
 watch(selectedTaskId, () => {
   void loadAppointments()
+  void loadContactAttempts()
 })
 </script>
 
@@ -343,8 +443,8 @@ watch(selectedTaskId, () => {
     >
       <h3>本网点预约</h3>
       <p class="hint">
-        调用 Network Portal 预约 propose/confirm/reschedule/cancel；确认方固定为 NETWORK_MEMBER + 当前主体；
-        改约/取消使用列表 If-Match 版本。
+        调用 Network Portal 预约 propose/confirm/reschedule/cancel/mark-no-show 与联系尝试；
+        确认方固定为 NETWORK_MEMBER + 当前主体；改约/取消/爽约使用列表 If-Match 版本。
       </p>
       <label>
         任务
@@ -421,6 +521,30 @@ watch(selectedTaskId, () => {
           aria-label="cancel reason"
         />
       </label>
+      <label>
+        爽约原因
+        <input
+          v-model="noShowReason"
+          data-testid="appointment-noshow-reason"
+          aria-label="no-show reason"
+        />
+      </label>
+      <label>
+        爽约对象引用
+        <input
+          v-model="noShowPartyRef"
+          data-testid="appointment-noshow-party-ref"
+          aria-label="no-show party ref"
+        />
+      </label>
+      <label>
+        爽约证据引用
+        <input
+          v-model="noShowEvidenceRef"
+          data-testid="appointment-noshow-evidence-ref"
+          aria-label="no-show evidence ref"
+        />
+      </label>
       <button
         type="submit"
         data-testid="appointment-propose-submit"
@@ -461,6 +585,15 @@ watch(selectedTaskId, () => {
             >
               取消
             </button>
+            <button
+              v-if="item.status === 'CONFIRMED'"
+              type="button"
+              data-testid="appointment-noshow-submit"
+              :disabled="appointmentBusy"
+              @click="submitNoShow(item)"
+            >
+              标记爽约
+            </button>
           </span>
         </li>
       </ul>
@@ -470,6 +603,69 @@ watch(selectedTaskId, () => {
       <p v-if="appointmentMessage" class="ok" data-testid="appointment-message">
         {{ appointmentMessage }}
       </p>
+    </form>
+
+    <form
+      class="assign"
+      data-testid="network-contact-form"
+      data-page-id="NETWORK.CONTACT"
+      @submit.prevent="submitContactAttempt"
+    >
+      <h3>本网点联系尝试</h3>
+      <p class="hint">调用 Network Portal ContactAttempt；操作者来自 JWT。</p>
+      <label>
+        渠道
+        <input v-model="contactChannel" data-testid="contact-channel" aria-label="contact channel" />
+      </label>
+      <label>
+        联系对象引用
+        <input
+          v-model="contactPartyRef"
+          data-testid="contact-party-ref"
+          aria-label="contact party ref"
+        />
+      </label>
+      <label>
+        结果码
+        <select
+          v-model="contactResultCode"
+          data-testid="contact-result-code"
+          aria-label="contact result code"
+        >
+          <option value="CONNECTED">CONNECTED</option>
+          <option value="NO_ANSWER">NO_ANSWER</option>
+          <option value="BUSY">BUSY</option>
+          <option value="WRONG_NUMBER">WRONG_NUMBER</option>
+          <option value="USER_REQUESTED_LATER">USER_REQUESTED_LATER</option>
+          <option value="INVALID_CONTACT">INVALID_CONTACT</option>
+        </select>
+      </label>
+      <label>
+        开始时间
+        <input v-model="contactStart" data-testid="contact-started-at" aria-label="contact started at" />
+      </label>
+      <label>
+        结束时间
+        <input v-model="contactEnd" data-testid="contact-ended-at" aria-label="contact ended at" />
+      </label>
+      <label>
+        备注
+        <input v-model="contactNote" data-testid="contact-note" aria-label="contact note" />
+      </label>
+      <button
+        type="submit"
+        data-testid="contact-submit"
+        :disabled="contactBusy || !props.networkContextId"
+      >
+        记录联系
+      </button>
+      <ul data-testid="network-contact-list" class="appointments">
+        <li v-for="item in contactAttempts" :key="item.contactAttemptId">
+          {{ item.contactAttemptId }} · {{ item.resultCode }} · {{ item.channel }}
+        </li>
+      </ul>
+      <p v-if="contactError" class="error" data-testid="contact-error">{{ contactError }}</p>
+      <p v-if="contactMessage" class="ok" data-testid="contact-message">{{ contactMessage }}</p>
     </form>
   </section>
 </template>
