@@ -111,6 +111,21 @@ export function listOutboundDeliveries(params: OutboundDeliveryQueueQuery = {}) 
   return apiGet<OutboundDeliveryQueuePage>('/outbound-deliveries', params)
 }
 
-export function listOperationalExceptions(params: Record<string, string | undefined> = {}) {
+/**
+ * API-06 §6 运营异常队列筛选；status/severity/category 省略表示不限。
+ * Admin 运营默认仍显式传 status=OPEN。
+ */
+export type OperationalExceptionQueueQuery = {
+  projectId?: string
+  status?: string
+  category?: string
+  severity?: string
+  workOrderId?: string
+  taskId?: string
+  cursor?: string
+  limit?: string
+}
+
+export function listOperationalExceptions(params: OperationalExceptionQueueQuery = {}) {
   return apiGet<OperationalExceptionPage>('/operational-exceptions', params)
 }
