@@ -70,14 +70,6 @@ INSERT INTO cfg_configuration_bundle_item (
     '20000000-0000-4000-8000-000000000002', repeat('b', 64)
 ) ON CONFLICT DO NOTHING;
 
-INSERT INTO cfg_configuration_bundle_item (
-    tenant_id, bundle_id, asset_type, asset_version_id, content_digest
-) VALUES (
-    'tenant-local', '30000000-0000-4000-8000-000000000001', 'WORKFLOW',
-    '20000000-0000-4000-8000-000000000001',
-    'f2837436570f57cc32a9651bc36491f0595cd35b5b351cc3056c344d69a2b51a'
-) ON CONFLICT DO NOTHING;
-
 ALTER TABLE cfg_configuration_bundle_item ENABLE TRIGGER trg_cfg_bundle_item_immutable;
 ALTER TABLE cfg_configuration_asset_version ENABLE TRIGGER trg_cfg_asset_version_immutable;
 
