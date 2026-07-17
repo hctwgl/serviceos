@@ -787,8 +787,19 @@ onMounted(() => {
             </div>
             <div>
               <dt>异常</dt>
-              <dd v-if="workspace.exceptionSummary">
+              <dd v-if="workspace.exceptionSummary" class="exception-summary-links">
                 open {{ Number(workspace.exceptionSummary.openCount ?? 0) }}
+                <RouterLink
+                  :to="{
+                    name: 'ADMIN.EXCEPTION.QUEUE',
+                    query: {
+                      workOrderId,
+                      status: 'OPEN',
+                    },
+                  }"
+                >
+                  打开运营异常队列
+                </RouterLink>
               </dd>
               <dd v-else>不可用或缺失权</dd>
             </div>
@@ -1283,6 +1294,10 @@ pre {
   flex-wrap: wrap;
   gap: 0.75rem;
   font-size: 0.9rem;
+}
+.exception-summary-links {
+  display: grid;
+  gap: 0.35rem;
 }
 button {
   border: 1px solid #bcccdc;

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import QueueTable from './QueueTable.vue'
 import {
   listOperationalExceptions,
@@ -8,6 +8,8 @@ import {
   type OperationalExceptionQueueQuery,
 } from '../api/queues'
 import { acknowledgeOperationalException } from '../api/exceptions'
+
+const route = useRoute()
 
 const loading = ref(false)
 const error = ref<string | null>(null)
@@ -20,6 +22,7 @@ const busyId = ref<string | null>(null)
 /**
  * 运营默认 OPEN（与既有硬编码一致）。
  * OpenAPI/服务端省略 status 表示不限；UI 提供空选项显式对应。
+ * 深链 query 水合：仅在路由显式给出时覆盖默认值，避免侧栏直达行为漂移。
  */
 const status = ref('OPEN')
 const severity = ref('')
@@ -27,6 +30,48 @@ const category = ref('')
 const projectId = ref('')
 const workOrderId = ref('')
 const taskId = ref('')
+
+function firstQuery(name: string): string | undefined {
+  const raw = route.query[name]
+  if (typeof raw === 'string') {
+    return raw
+  }
+  if (Array.isArray(raw) && typeof raw[0] === 'string') {
+    return raw[0]
+  }
+  return undefined
+}
+
+/**
+ * 从 URL query 水合筛选表单。
+ * status 允许空串表示「不限」；其余字段空串表示未筛选。
+ */
+function hydrateFiltersFromRoute() {
+  const nextStatus = firstQuery('status')
+  if (nextStatus !== undefined) {
+    status.value = nextStatus
+  }
+  const nextSeverity = firstQuery('severity')
+  if (nextSeverity !== undefined) {
+    severity.value = nextSeverity
+  }
+  const nextCategory = firstQuery('category')
+  if (nextCategory !== undefined) {
+    category.value = nextCategory
+  }
+  const nextProjectId = firstQuery('projectId')
+  if (nextProjectId !== undefined) {
+    projectId.value = nextProjectId
+  }
+  const nextWorkOrderId = firstQuery('workOrderId')
+  if (nextWorkOrderId !== undefined) {
+    workOrderId.value = nextWorkOrderId
+  }
+  const nextTaskId = firstQuery('taskId')
+  if (nextTaskId !== undefined) {
+    taskId.value = nextTaskId
+  }
+}
 
 function queryParams(next?: string): OperationalExceptionQueueQuery {
   return {
@@ -97,7 +142,10 @@ const acknowledgeable = computed(() =>
   ),
 )
 
-onMounted(() => load())
+onMounted(() => {
+  hydrateFiltersFromRoute()
+  return load()
+})
 </script>
 
 <template>
