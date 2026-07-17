@@ -16,6 +16,7 @@ import { isConflictError, safeAccessDeniedMessage } from '../api/client'
 import ImpactPanel from '../components/ImpactPanel.vue'
 import PrincipalPicker from '../components/PrincipalPicker.vue'
 import VersionedCommandForm from '../components/VersionedCommandForm.vue'
+import { recordRecentVisit } from '../recent/recordRecentVisit'
 
 const route = useRoute()
 const networkId = computed(() => String(route.params.id ?? ''))
@@ -53,6 +54,12 @@ async function load() {
     network.value = result.data
     memberships.value = (await listNetworkMemberships(networkId.value)).items
     impact.value = await getServiceNetworkDeactivationImpact(networkId.value)
+    recordRecentVisit({
+      resourceType: 'NETWORK',
+      resourceId: networkId.value,
+      pageId: 'ADMIN.NETWORK.DETAIL',
+      displayRef: result.data.networkName || result.data.networkCode,
+    })
   } catch (err) {
     network.value = null
     denied.value = true

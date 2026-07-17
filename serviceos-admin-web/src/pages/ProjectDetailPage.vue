@@ -8,6 +8,7 @@ import {
   type ProjectDetail,
   type ProjectScopeRelationRevisionPage,
 } from '../api/projectDetail'
+import { recordRecentVisit } from '../recent/recordRecentVisit'
 import QueueTable from './QueueTable.vue'
 
 const route = useRoute()
@@ -38,6 +39,12 @@ async function loadDetail() {
       regionCodes.value = (detail.value.project.regionCodes ?? []).join(',')
       networkIds.value = (detail.value.project.networkIds ?? []).join(',')
     }
+    recordRecentVisit({
+      resourceType: 'PROJECT',
+      resourceId: projectId.value,
+      pageId: 'ADMIN.PROJECT.DETAIL',
+      displayRef: detail.value.project.name || detail.value.project.code,
+    })
   } catch (err) {
     error.value = err instanceof Error ? err.message : '加载项目详情失败'
     detail.value = null

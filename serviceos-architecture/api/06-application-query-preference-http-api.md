@@ -6,7 +6,7 @@ status: Accepted
 
 # 应用工作区、队列与用户偏好 HTTP API
 
-## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158 / M189 / M190 / M191 / M192）
+## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158 / M189 / M190 / M191 / M192 / M193）
 
 **Accepted（可指导实现）**：
 
@@ -53,8 +53,19 @@ status: Accepted
   查询端口应用当前 ScopePredicate；搜索**不**授予 capability。需要 `search.read`（HIGH）
   加 underlying type 读能力：缺 type 能力时省略该 type（降级），缺 `search.read` 则整请求
   403。实现为授权查询 fan-in / 受控精确·前缀回退，**不**要求 `search_document` 索引平台。
+- §3 Admin 最近访问（M193）：仅
+  `GET /api/v1/me/recent-resources` 与
+  `PUT /api/v1/me/recent-resources`（upsert / touch，body：`resourceType`、`resourceId`、
+  可选 `pageId`/`displayRef`；portal 固定 `ADMIN`）。
+  本切片 resourceType：`WORK_ORDER`、`TASK`、`PROJECT`、`NETWORK`、`TECHNICIAN`。
+  任意已认证主体仅可读写自己的最近访问列表，**不**要求新 capability；读取时对每项经既有
+  授权查询端口重新鉴权，失权项**省略**（不整列表 403），并可在读路径删除陈旧行。
+  列表上限（如 20）；同 `(principal, portal, resourceType, resourceId)` upsert
+  `lastVisitedAt`。`displayRef` 仅为非敏感短标签，不得保存完整地址/电话/价格。
+  **不**接受 `GET /me/notifications`、`GET /me/application-context`（后者与 M188 `/me`
+  重叠；通知属独立 Epic）。**不**接受 Network/Technician Portal 最近访问。
 
-**仍为设计草案**：§3 导航、§4 工作台与队列、§5 其余 section、
+**仍为设计草案**：§3 中 `application-context`/`notifications`、§4 工作台与队列、§5 其余 section、
 §6 其余专项队列、§7 中 `VEHICLE`/`CHARGER` 与全文索引搜索、§8 ORGANIZATION 组织树共享与
 Network/Technician SavedView、§9 非 Admin Portal UI Preference、§10～§11 与导出分析等。
 不得在未再接受前实现。

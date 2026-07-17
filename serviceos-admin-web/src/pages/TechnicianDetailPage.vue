@@ -16,6 +16,7 @@ import { listServiceNetworks, type ServiceNetwork } from '../api/networks'
 import { isConflictError, safeAccessDeniedMessage } from '../api/client'
 import ImpactPanel from '../components/ImpactPanel.vue'
 import VersionedCommandForm from '../components/VersionedCommandForm.vue'
+import { recordRecentVisit } from '../recent/recordRecentVisit'
 
 const route = useRoute()
 const profileId = computed(() => String(route.params.id ?? ''))
@@ -49,6 +50,12 @@ async function load() {
     memberships.value = (
       await listNetworkTechnicianMemberships({ technicianProfileId: profileId.value })
     ).items
+    recordRecentVisit({
+      resourceType: 'TECHNICIAN',
+      resourceId: profileId.value,
+      pageId: 'ADMIN.TECHNICIAN.DETAIL',
+      displayRef: result.data.displayName || profileId.value.slice(0, 8),
+    })
     networks.value = (await listServiceNetworks()).items
     if (!networkId.value && networks.value[0]) {
       networkId.value = networks.value[0].id

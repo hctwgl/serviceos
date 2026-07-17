@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.84.0
+  version: 0.85.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1380,6 +1380,55 @@ paths:
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
 
+  /me/recent-resources:
+    get:
+      operationId: listMyRecentResources
+      summary: 列出当前主体的 Admin 最近访问资源
+      description: |
+        M193：仅 Portal=ADMIN。任意已认证主体可读自己的最近访问；不要求新 capability。
+        服务端对每项经既有授权查询重新鉴权，失权项省略（不整列表 403）。
+        支持类型：WORK_ORDER、TASK、PROJECT、NETWORK、TECHNICIAN。上限默认/最大 20。
+      parameters:
+        - name: portal
+          in: query
+          required: false
+          schema: { type: string, enum: [ADMIN], default: ADMIN }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 20, default: 20 }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 已按当前授权过滤的最近访问列表
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/RecentResourcePage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+    put:
+      operationId: touchMyRecentResource
+      summary: 记录一次 Admin 资源访问（upsert）
+      description: |
+        M193：upsert 本人最近访问行并更新 lastVisitedAt。同 (resourceType, resourceId) 覆盖。
+        portal 必须为 ADMIN。displayRef 仅为非敏感短标签；不得含完整电话/地址/价格。
+        不要求新 capability；超出上限时裁剪最旧行。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TouchRecentResourceRequest' }
+      responses:
+        '200':
+          description: 已记录的最近访问项
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/RecentResourceItem' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /me/ui-preferences:
     get:
       operationId: getMyUiPreferences
@@ -3905,6 +3954,53 @@ components:
             - type: 'null'
           description: ROLE 时为同租户 roleId；PRIVATE/TENANT 必须为空
 
+    RecentResourceItem:
+      type: object
+      additionalProperties: false
+      required: [resourceType, resourceId, displayRef, lastVisitedAt, deepLink]
+      properties:
+        resourceType: { enum: [WORK_ORDER, TASK, PROJECT, NETWORK, TECHNICIAN] }
+        resourceId: { type: string, minLength: 1, maxLength: 128 }
+        pageId:
+          oneOf:
+            - type: string
+              minLength: 1
+              maxLength: 64
+            - type: 'null'
+        displayRef:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: 非敏感短标签；不得含完整电话/地址/价格
+        lastVisitedAt: { type: string, format: date-time }
+        deepLink: { type: string, minLength: 1, maxLength: 256 }
+    RecentResourcePage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/RecentResourceItem' } }
+        asOf: { type: string, format: date-time }
+    TouchRecentResourceRequest:
+      type: object
+      additionalProperties: false
+      required: [resourceType, resourceId]
+      properties:
+        portal: { type: string, enum: [ADMIN], default: ADMIN }
+        resourceType: { enum: [WORK_ORDER, TASK, PROJECT, NETWORK, TECHNICIAN] }
+        resourceId: { type: string, minLength: 1, maxLength: 128 }
+        pageId:
+          oneOf:
+            - type: string
+              minLength: 1
+              maxLength: 64
+            - type: 'null'
+        displayRef:
+          oneOf:
+            - type: string
+              minLength: 1
+              maxLength: 120
+            - type: 'null'
     UiPreferenceEntry:
       type: object
       additionalProperties: false

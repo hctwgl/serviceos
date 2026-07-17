@@ -8,6 +8,10 @@ import {
 } from '../nav/portalNavigation'
 import { AUTH_REQUIRED_EVENT, currentLocalOidcSession } from '../auth/oidc'
 import { loadAndApplyUiPreferences } from '../preferences/uiPreferenceState'
+import {
+  listRecentResources,
+  type RecentResourceItem,
+} from '../api/recentResources'
 
 const nav = ref<PortalNavState>({
   contexts: [],
@@ -17,6 +21,9 @@ const nav = ref<PortalNavState>({
   stale: false,
   error: null,
 })
+
+const recentItems = ref<RecentResourceItem[]>([])
+const recentError = ref<string | null>(null)
 
 const TEST_IDS: Record<string, string> = {
   'ADMIN.SEARCH': 'nav-search',
@@ -32,6 +39,22 @@ async function refreshNav(preferredContextId?: string | null) {
   nav.value = await loadAdminPortalNavigation(preferredContextId)
 }
 
+async function refreshRecent() {
+  if (!currentLocalOidcSession().authenticated) {
+    recentItems.value = []
+    recentError.value = null
+    return
+  }
+  try {
+    const page = await listRecentResources(10)
+    recentItems.value = page.items
+    recentError.value = null
+  } catch (err) {
+    recentError.value = err instanceof Error ? err.message : '最近访问加载失败'
+    recentItems.value = []
+  }
+}
+
 async function onContextChange(event: Event) {
   const value = (event.target as HTMLSelectElement).value
   await refreshNav(value)
@@ -41,6 +64,7 @@ onMounted(() => {
   void refreshNav()
   if (currentLocalOidcSession().authenticated) {
     void loadAndApplyUiPreferences()
+    void refreshRecent()
   }
   window.addEventListener(AUTH_REQUIRED_EVENT, () => {
     nav.value = {
@@ -51,11 +75,14 @@ onMounted(() => {
       stale: false,
       error: null,
     }
+    recentItems.value = []
+    recentError.value = null
   })
   window.addEventListener('focus', () => {
     if (currentLocalOidcSession().authenticated) {
       void refreshNav(nav.value.activeContextId)
       void loadAndApplyUiPreferences()
+      void refreshRecent()
     }
   })
 })
@@ -101,6 +128,31 @@ onMounted(() => {
       <RouterLink to="/settings/preferences" data-testid="nav-ui-preferences">界面偏好</RouterLink>
       <RouterLink to="/settings/token">身份登录</RouterLink>
       <RouterLink to="/portal-stubs" data-testid="nav-portal-stubs">Portal stubs</RouterLink>
+      <section class="recent" data-testid="recent-resources">
+        <h2>最近访问</h2>
+        <p v-if="recentError" class="error" data-testid="recent-error">{{ recentError }}</p>
+        <p v-else-if="recentItems.length === 0" class="recent-empty" data-testid="recent-empty">暂无记录</p>
+        <RouterLink
+          v-for="item in recentItems"
+          :key="`${item.resourceType}:${item.resourceId}`"
+          :to="item.deepLink"
+          class="recent-item"
+          :data-testid="`recent-${item.resourceType}-${item.resourceId}`"
+          :data-resource-type="item.resourceType"
+          :data-resource-id="item.resourceId"
+        >
+          <span class="recent-type">{{ item.resourceType }}</span>
+          <span class="recent-label">{{ item.displayRef }}</span>
+        </RouterLink>
+        <button
+          type="button"
+          class="recent-refresh"
+          data-testid="recent-refresh"
+          @click="refreshRecent"
+        >
+          刷新最近
+        </button>
+      </section>
     </aside>
     <main class="content">
       <RouterView />
@@ -174,6 +226,52 @@ onMounted(() => {
 .nav a.router-link-active {
   background: #334e68;
   color: #fff;
+}
+.recent {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #486581;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.recent h2 {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #bcccdc;
+}
+.recent-empty {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #9fb3c8;
+}
+.recent-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  font-size: 0.78rem;
+}
+.recent-type {
+  color: #9fb3c8;
+  font-size: 0.68rem;
+}
+.recent-label {
+  color: #f0f4f8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recent-refresh {
+  margin-top: 0.25rem;
+  align-self: flex-start;
+  background: transparent;
+  border: 1px solid #627d98;
+  color: #d9e2ec;
+  border-radius: 4px;
+  padding: 0.2rem 0.45rem;
+  font-size: 0.72rem;
+  cursor: pointer;
 }
 .content {
   padding: 1.5rem;

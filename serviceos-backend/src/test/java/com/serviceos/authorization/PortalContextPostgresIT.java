@@ -72,8 +72,8 @@ class PortalContextPostgresIT {
                     idn_person_profile, idn_security_principal,
                     rel_idempotency_record, aud_audit_record CASCADE
                 """).update();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("094");
-        assertThat(flyway.info().applied()).hasSize(96);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("095");
+        assertThat(flyway.info().applied()).hasSize(97);
 
         seedPrincipal();
         seedPersona("INTERNAL_EMPLOYEE");

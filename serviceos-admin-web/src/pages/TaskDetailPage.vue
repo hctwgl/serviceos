@@ -11,6 +11,7 @@ import {
 import TaskCommandPanel from '../components/TaskCommandPanel.vue'
 import TaskFieldOpsPanel from '../components/TaskFieldOpsPanel.vue'
 import TaskFormsEvidencePanel from '../components/TaskFormsEvidencePanel.vue'
+import { recordRecentVisit } from '../recent/recordRecentVisit'
 import QueueTable from './QueueTable.vue'
 
 const route = useRoute()
@@ -51,6 +52,12 @@ async function load() {
     detail.value = task
     attempts.value = attemptPage
     allowedActions.value = actions.data
+    recordRecentVisit({
+      resourceType: 'TASK',
+      resourceId: taskId.value,
+      pageId: 'ADMIN.TASK.DETAIL',
+      displayRef: task.task?.taskType ?? taskId.value.slice(0, 8),
+    })
   } catch (err) {
     error.value = err instanceof Error ? err.message : '加载任务详情失败'
     detail.value = null
