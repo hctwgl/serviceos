@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.72.0
+  version: 0.73.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1791,6 +1791,35 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /inbound-envelopes:
+    get:
+      operationId: listAuthorizedInboundEnvelopes
+      summary: 查询当前主体有权查看的入站 Envelope 队列
+      description: >-
+        API-06 §6.1 窄切片（M158）；默认 processingStatus=RECEIVED，按 receivedAt/id 倒序稳定分页。
+        需要 integration.readInbound；仅返回已绑定 projectId 的安全摘要；游标绑定实时项目范围和全部筛选。
+        不返回 digest、对象引用、签名原文或传输凭据。
+      parameters:
+        - { name: projectId, in: query, schema: { type: string, format: uuid } }
+        - { name: processingStatus, in: query, schema: { enum: [RECEIVED, COMPLETED, REJECTED], default: RECEIVED } }
+        - { name: messageType, in: query, schema: { enum: [CREATE_WORK_ORDER, RECORD_CLIENT_REVIEW_RESULT] } }
+        - { name: resultType, in: query, schema: { type: string, minLength: 1, maxLength: 80 } }
+        - { name: resultId, in: query, schema: { type: string, minLength: 1, maxLength: 160 } }
+        - { name: canonicalMessageId, in: query, schema: { type: string, format: uuid } }
+        - { name: cursor, in: query, schema: { type: string, minLength: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 入站 Envelope 队列页
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InboundEnvelopeQueuePage' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
   /inbound-envelopes/{envelopeId}:
     get:
       operationId: getInboundEnvelope
@@ -3094,6 +3123,40 @@ components:
         requestedAt: { type: string, format: date-time }
         startedAt: { type: [string, 'null'], format: date-time }
         finishedAt: { type: [string, 'null'], format: date-time }
+    InboundEnvelopeQueueItem:
+      type: object
+      additionalProperties: false
+      required: [inboundEnvelopeId, projectId, connectorVersionId, messageType,
+        externalMessageId, signatureStatus, processingStatus, mappingVersionId,
+        canonicalMessageId, resultCode, resultType, resultId, receivedAt, completedAt,
+        correlationId]
+      properties:
+        inboundEnvelopeId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        connectorVersionId: { type: string, minLength: 1, maxLength: 120 }
+        messageType: { enum: [CREATE_WORK_ORDER, RECORD_CLIENT_REVIEW_RESULT] }
+        externalMessageId: { type: string, minLength: 1, maxLength: 160 }
+        signatureStatus: { enum: [VALID] }
+        processingStatus: { enum: [RECEIVED, COMPLETED, REJECTED] }
+        mappingVersionId: { type: [string, 'null'], maxLength: 120 }
+        canonicalMessageId: { type: [string, 'null'], format: uuid }
+        resultCode: { type: [string, 'null'], maxLength: 80 }
+        resultType: { type: [string, 'null'], maxLength: 80 }
+        resultId: { type: [string, 'null'], maxLength: 160 }
+        receivedAt: { type: string, format: date-time }
+        completedAt: { type: [string, 'null'], format: date-time }
+        correlationId: { type: string, minLength: 1, maxLength: 128 }
+    InboundEnvelopeQueuePage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor, asOf]
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/InboundEnvelopeQueueItem' }
+        nextCursor: { type: [string, 'null'] }
+        asOf: { type: string, format: date-time }
     InboundEnvelope:
       type: object
       additionalProperties: false

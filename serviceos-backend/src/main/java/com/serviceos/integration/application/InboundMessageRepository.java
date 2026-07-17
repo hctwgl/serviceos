@@ -2,6 +2,7 @@ package com.serviceos.integration.application;
 
 import com.serviceos.integration.api.CanonicalMessageView;
 import com.serviceos.integration.api.ExternalReviewRouteView;
+import com.serviceos.integration.api.InboundEnvelopeQueueItem;
 import com.serviceos.integration.api.InboundEnvelopeView;
 
 import java.time.Instant;
@@ -69,6 +70,23 @@ public interface InboundMessageRepository {
     /** 只返回成功映射到指定 WorkOrder 的 Envelope；批次审核回调不在本查询中猜测工单归属。 */
     List<InboundEnvelopeRecord> listEnvelopesByWorkOrder(
             String tenantId, UUID projectId, UUID workOrderId, int limit);
+
+    /**
+     * 授权入站队列分页。调用方必须已解析实时项目范围；本方法只执行范围化 SQL，
+     * 且始终排除 project_id 为空的 Envelope。
+     */
+    List<InboundEnvelopeQueueItem> findQueuePage(
+            String tenantId,
+            boolean tenantWide,
+            List<UUID> projectIds,
+            String processingStatus,
+            String messageType,
+            String resultType,
+            String resultId,
+            UUID canonicalMessageId,
+            Instant cursorReceivedAt,
+            UUID cursorId,
+            int fetchSize);
 
     ExternalReviewRouteRegistration registerExternalReviewRoute(NewExternalReviewRoute route);
 

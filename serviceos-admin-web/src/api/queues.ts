@@ -111,6 +111,44 @@ export function listOutboundDeliveries(params: OutboundDeliveryQueueQuery = {}) 
   return apiGet<OutboundDeliveryQueuePage>('/outbound-deliveries', params)
 }
 
+/** API-06 §6.1 入站队列筛选；processingStatus 省略时服务端默认 RECEIVED。 */
+export type InboundEnvelopeQueueQuery = {
+  projectId?: string
+  processingStatus?: string
+  messageType?: string
+  resultType?: string
+  resultId?: string
+  canonicalMessageId?: string
+  cursor?: string
+  limit?: string
+}
+
+export type InboundEnvelopeQueuePage = {
+  items: Array<{
+    inboundEnvelopeId: string
+    projectId: string
+    connectorVersionId: string
+    messageType: string
+    externalMessageId: string
+    signatureStatus: string
+    processingStatus: string
+    mappingVersionId: string | null
+    canonicalMessageId: string | null
+    resultCode: string | null
+    resultType: string | null
+    resultId: string | null
+    receivedAt: string
+    completedAt: string | null
+    correlationId: string
+  }>
+  nextCursor: string | null
+  asOf: string
+}
+
+export function listInboundEnvelopes(params: InboundEnvelopeQueueQuery = {}) {
+  return apiGet<InboundEnvelopeQueuePage>('/inbound-envelopes', params)
+}
+
 /**
  * API-06 §6 运营异常队列筛选；status/severity/category 省略表示不限。
  * Admin 运营默认仍显式传 status=OPEN。

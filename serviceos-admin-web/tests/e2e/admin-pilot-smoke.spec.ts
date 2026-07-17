@@ -255,8 +255,44 @@ test('真实 OIDC 登录后可读取核心投影并完成 Task 分配领取释�
   await page.getByRole('button', { name: '查询' }).click()
   expect((await exceptionFilterPromise).status()).toBe(200)
 
-  // M151：目录/SLA Accepted OpenAPI 筛选补齐（projectId / activeOn / SUCCEEDED）。
+  // M158：入站 Envelope 授权队列（默认 RECEIVED；COMPLETED + projectId 深链详情）。
   const pilotProjectId = '10000000-0000-4000-8000-000000000001'
+  await page.getByRole('link', { name: '入站队列' }).click()
+  await expect(page.getByRole('heading', { name: '入站 Envelope 队列' })).toBeVisible()
+  await expect(page.getByLabel('inbound processingStatus filter')).toHaveValue('RECEIVED')
+  const inboundDefaultPromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname === '/api/v1/inbound-envelopes' &&
+      new URL(response.url()).searchParams.get('processingStatus') === 'RECEIVED',
+  )
+  await page.getByRole('button', { name: '查询' }).click()
+  expect((await inboundDefaultPromise).status()).toBe(200)
+
+  await page.getByLabel('inbound processingStatus filter').selectOption('COMPLETED')
+  await page.getByLabel('inbound projectId filter').fill(pilotProjectId)
+  await page.getByLabel('inbound messageType filter').selectOption('CREATE_WORK_ORDER')
+  const inboundCompletedPromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname === '/api/v1/inbound-envelopes' &&
+      new URL(response.url()).searchParams.get('processingStatus') === 'COMPLETED' &&
+      new URL(response.url()).searchParams.get('projectId') === pilotProjectId &&
+      new URL(response.url()).searchParams.get('messageType') === 'CREATE_WORK_ORDER',
+  )
+  await page.getByRole('button', { name: '查询' }).click()
+  expect((await inboundCompletedPromise).status()).toBe(200)
+  await expect(page.getByText('打开入站：')).toBeVisible()
+  const inboundDetailPromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      /\/api\/v1\/inbound-envelopes\/[0-9a-f-]+$/.test(new URL(response.url()).pathname),
+  )
+  await page.getByRole('link', { name: /^CREATE_WORK_ORDER\s*\// }).first().click()
+  expect((await inboundDetailPromise).status()).toBe(200)
+  await expect(page.getByRole('heading', { name: '入站 Envelope' })).toBeVisible()
+
+  // M151：目录/SLA Accepted OpenAPI 筛选补齐（projectId / activeOn / SUCCEEDED）。
   await page.getByRole('link', { name: '工单目录' }).click()
   await expect(page.getByRole('heading', { name: '授权工单目录' })).toBeVisible()
   await page.getByLabel('workOrder projectId filter').fill(pilotProjectId)

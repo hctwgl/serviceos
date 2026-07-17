@@ -158,4 +158,5 @@
 - [M155 Admin 预约/表单提交详情页验收矩阵](152-m155-admin-pilot-appointment-form-submission-detail-acceptance.md)
 - [M156 Admin 资料项/资料快照详情页验收矩阵](153-m156-admin-pilot-evidence-item-snapshot-detail-acceptance.md)
 - [M157 Admin 工作区项目与 SLA 任务深链验收矩阵](154-m157-admin-pilot-workspace-project-sla-task-deeplink-acceptance.md)
+- [M158 授权入站 Envelope 队列验收矩阵](155-m158-authorized-inbound-envelope-queue-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

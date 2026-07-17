@@ -46,7 +46,8 @@ class ContractValidationTest {
                         "/outbound-deliveries/{deliveryId}",
                         "/sla-instances", "/sla-instances/{slaInstanceId}",
                         "/work-orders/{workOrderId}/sla-instances",
-                        "/inbound-envelopes/{envelopeId}", "/canonical-messages/{messageId}");
+                        "/inbound-envelopes", "/inbound-envelopes/{envelopeId}",
+                        "/canonical-messages/{messageId}");
     }
 
     @Test

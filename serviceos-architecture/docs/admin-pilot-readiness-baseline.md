@@ -1,13 +1,13 @@
 ---
-title: Admin 试点可运行基线（含 M157 项目/SLA 任务深链）
+title: Admin 试点可运行基线（含 M158 入站 Envelope 队列）
 status: Implemented
 lastUpdated: 2026-07-17
 ---
 
-# Admin 试点可运行基线（含 M157 项目/SLA 任务深链）
+# Admin 试点可运行基线（含 M158 入站 Envelope 队列）
 
-本基线覆盖 M101～M157 已有 Admin 表面的可重复构建、登录、真实后端/数据库试点入口，并明确
-平台级未实现边界。M135～M157 追加补传复审、预约上门、提审外发 ACK、厂端回调、入站接单激活、
+本基线覆盖 M101～M158 已有 Admin 表面的可重复构建、登录、真实后端/数据库试点入口，并明确
+平台级未实现边界。M135～M158 追加补传复审、预约上门、提审外发 ACK、厂端回调、入站接单激活、
 Admin HTTP 人工初派、同单预约上门→表单/资料/驳回整改补传复审/外发/完结（`ADMIN-PILOT-09`）、
 入站 Envelope/Canonical 详情深链、专项队列与目录/SLA Accepted OpenAPI 筛选，以及工作区外发/审核/整改详情深链。
 
@@ -222,12 +222,16 @@ GitHub Actions 使用同一脚本阻断 PR，并保留 Backend、Admin 与 Playw
 已追加证明（M157 / ADMIN-PILOT-08XN）：
 
 - 工作区项目与 SLA 任务交叉深链；
-- Admin R1 只读胶水在已 Accepted 契约上已基本收口；Visit/inbound 列表/SavedView 仍依赖契约接受。
+- Admin R1 只读胶水在已 Accepted 契约上已基本收口；Visit/SavedView 仍依赖契约接受。
+
+已追加证明（M158 / ADMIN-PILOT-08IQ）：
+
+- 授权入站 Envelope 队列（API-06 §6.1）与 Admin 筛选/详情深链；
+- null-project 可见性、原文下载、SavedView 仍未证明。
 
 尚未证明：
 
 - 正式企业 IdP、MFA、生产回调地址、BFF/token renewal/logout 协议；
-- 授权入站 Envelope 队列列表（需另接受 API-06 §6）；
 - 评分/硬过滤/DispatchDecision/ServiceNetwork 目录生命周期；
 - Network/Technician Portal 与跨端协作；
 - 正式 sandbox、对象存储、专业扫描服务、Broker、通知和 SLA BUSINESS 日历；
