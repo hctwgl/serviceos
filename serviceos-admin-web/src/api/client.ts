@@ -81,6 +81,34 @@ export async function apiPost<T>(
     ifMatch?: string
   } = {},
 ): Promise<ApiResult<T>> {
+  return apiWrite<T>('POST', path, options)
+}
+
+export async function apiPut<T>(
+  path: string,
+  options: {
+    body?: unknown
+    ifMatch?: string
+  } = {},
+): Promise<ApiResult<T>> {
+  return apiWrite<T>('PUT', path, options)
+}
+
+export async function apiDelete(
+  path: string,
+): Promise<ApiResult<null>> {
+  return apiWrite<null>('DELETE', path, {})
+}
+
+async function apiWrite<T>(
+  method: 'POST' | 'PUT' | 'DELETE',
+  path: string,
+  options: {
+    body?: unknown
+    idempotencyKey?: string
+    ifMatch?: string
+  },
+): Promise<ApiResult<T>> {
   const extra: Record<string, string> = {}
   if (options.idempotencyKey) {
     extra['Idempotency-Key'] = options.idempotencyKey
@@ -93,14 +121,20 @@ export async function apiPost<T>(
     extra['Content-Type'] = 'application/json'
   }
   const response = await fetch(`${apiBase()}${path}`, {
-    method: 'POST',
+    method,
     headers: authHeaders(extra),
     body: hasBody ? JSON.stringify(options.body) : undefined,
   })
   if (!response.ok) {
     await parseError(response)
   }
-  // 202 Accepted 等也可能带 JSON 体
+  if (response.status === 204) {
+    return {
+      data: null as T,
+      etag: response.headers.get('ETag'),
+      correlationId: response.headers.get('X-Correlation-Id') ?? '',
+    }
+  }
   const text = await response.text()
   return {
     data: (text ? JSON.parse(text) : null) as T,

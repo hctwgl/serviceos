@@ -42,11 +42,13 @@ final class GlobalProblemHandler {
                  ORGANIZATION_AUTHORITY_CONFLICT, ORGANIZATION_UNIT_CYCLE,
                  ORGANIZATION_MEMBERSHIP_CONFLICT, ORGANIZATION_SYNC_CONFLICT,
                  NETWORK_AUTHORITY_CONFLICT, NETWORK_MEMBERSHIP_CONFLICT,
-                 NETWORK_TECHNICIAN_CONFLICT, NETWORK_QUALIFICATION_CONFLICT -> HttpStatus.CONFLICT;
+                 NETWORK_TECHNICIAN_CONFLICT, NETWORK_QUALIFICATION_CONFLICT,
+                 SAVED_VIEW_SCHEMA_OUTDATED -> HttpStatus.CONFLICT;
             case FILE_UPLOAD_EXPIRED -> HttpStatus.GONE;
             case FILE_NOT_AVAILABLE -> HttpStatus.LOCKED;
             case RESOURCE_NOT_FOUND -> HttpStatus.NOT_FOUND;
             case VALIDATION_FAILED -> HttpStatus.BAD_REQUEST;
+            case QUERY_FILTER_NOT_ALLOWED -> HttpStatus.UNPROCESSABLE_CONTENT;
             default -> HttpStatus.UNPROCESSABLE_CONTENT;
         };
         return problem(status, exception.code(), exception.getMessage(), request);

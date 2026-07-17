@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.80.0
+  version: 0.81.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1215,6 +1215,104 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /me/saved-views:
+    get:
+      operationId: listMySavedViews
+      summary: 列出当前主体在指定 pageId 下的个人 SavedView
+      description: |
+        M189：仅个人视图。列出/应用视图不授予页面 capability；业务查询仍重新鉴权。
+        支持 pageId：ADMIN.TASK.QUEUE、ADMIN.WORKORDER.LIST、ADMIN.CORRECTION.QUEUE。
+      parameters:
+        - name: pageId
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [ADMIN.TASK.QUEUE, ADMIN.WORKORDER.LIST, ADMIN.CORRECTION.QUEUE]
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 个人 SavedView 列表
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/SavedViewPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createMySavedView
+      summary: 创建个人 SavedView
+      description: |
+        任意已认证主体可创建自己的视图。filter AST 仅允许页面 Accepted OpenAPI query 字段/EQ。
+        未知字段返回 QUERY_FILTER_NOT_ALLOWED；schema 不兼容返回 SAVED_VIEW_SCHEMA_OUTDATED。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateSavedViewRequest' }
+      responses:
+        '200':
+          description: 已创建视图
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+            ETag: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/SavedView' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /me/saved-views/{savedViewId}:
+    put:
+      operationId: updateMySavedView
+      summary: 更新本人 SavedView
+      description: |
+        仅 owner 可更新；跨主体返回 404。目录不兼容返回 SAVED_VIEW_SCHEMA_OUTDATED。
+      parameters:
+        - name: savedViewId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: If-Match
+          in: header
+          required: true
+          schema: { type: string, minLength: 1 }
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateSavedViewRequest' }
+      responses:
+        '200':
+          description: 已更新视图
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+            ETag: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/SavedView' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+    delete:
+      operationId: deleteMySavedView
+      summary: 删除本人 SavedView
+      parameters:
+        - name: savedViewId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '204':
+          description: 已删除
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
   /work-orders:
     get:
       operationId: listAuthorizedWorkOrders
@@ -3531,6 +3629,84 @@ components:
         navigationCatalogVersion: { type: string, minLength: 1, maxLength: 64 }
         items: { type: array, items: { $ref: '#/components/schemas/MeNavigationItem' } }
         asOf: { type: string, format: date-time }
+    SavedViewFilterClause:
+      type: object
+      additionalProperties: false
+      required: [field, operator, value]
+      properties:
+        field: { type: string, minLength: 1, maxLength: 64 }
+        operator: { enum: [EQ] }
+        value: { type: string, minLength: 1, maxLength: 200 }
+    SavedViewFilterAst:
+      type: object
+      additionalProperties: false
+      required: [clauses]
+      properties:
+        clauses: { type: array, items: { $ref: '#/components/schemas/SavedViewFilterClause' } }
+    SavedViewSortField:
+      type: object
+      additionalProperties: false
+      required: [field, direction]
+      properties:
+        field: { type: string, minLength: 1, maxLength: 64 }
+        direction: { enum: [ASC, DESC] }
+    SavedViewSortSpec:
+      type: object
+      additionalProperties: false
+      required: [fields]
+      properties:
+        fields: { type: array, items: { $ref: '#/components/schemas/SavedViewSortField' } }
+    SavedView:
+      type: object
+      additionalProperties: false
+      required: [id, portal, pageId, name, schemaVersion, filter, isDefault, aggregateVersion, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        portal: { enum: [ADMIN] }
+        pageId: { enum: [ADMIN.TASK.QUEUE, ADMIN.WORKORDER.LIST, ADMIN.CORRECTION.QUEUE] }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        schemaVersion: { type: integer, minimum: 1 }
+        filter: { $ref: '#/components/schemas/SavedViewFilterAst' }
+        sort: { oneOf: [{ $ref: '#/components/schemas/SavedViewSortSpec' }, { type: 'null' }] }
+        columns:
+          oneOf:
+            - type: array
+              items: { type: string, minLength: 1, maxLength: 64 }
+            - type: 'null'
+        isDefault: { type: boolean }
+        aggregateVersion: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    SavedViewPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/SavedView' } }
+        asOf: { type: string, format: date-time }
+    CreateSavedViewRequest:
+      type: object
+      additionalProperties: false
+      required: [pageId, name, schemaVersion, filter]
+      properties:
+        pageId: { enum: [ADMIN.TASK.QUEUE, ADMIN.WORKORDER.LIST, ADMIN.CORRECTION.QUEUE] }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        schemaVersion: { type: integer, minimum: 1 }
+        filter: { $ref: '#/components/schemas/SavedViewFilterAst' }
+        sort: { $ref: '#/components/schemas/SavedViewSortSpec' }
+        columns: { type: array, items: { type: string, minLength: 1, maxLength: 64 } }
+        isDefault: { type: boolean, default: false }
+    UpdateSavedViewRequest:
+      type: object
+      additionalProperties: false
+      required: [name, schemaVersion, filter]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        schemaVersion: { type: integer, minimum: 1 }
+        filter: { $ref: '#/components/schemas/SavedViewFilterAst' }
+        sort: { $ref: '#/components/schemas/SavedViewSortSpec' }
+        columns: { type: array, items: { type: string, minLength: 1, maxLength: 64 } }
+        isDefault: { type: boolean, default: false }
     Organization:
       type: object
       additionalProperties: false

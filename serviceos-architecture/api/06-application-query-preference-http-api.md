@@ -6,7 +6,7 @@ status: Accepted
 
 # 应用工作区、队列与用户偏好 HTTP API
 
-## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158）
+## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158 / M189）
 
 **Accepted（可指导实现）**：
 
@@ -26,9 +26,14 @@ status: Accepted
 - §6 `GET /api/v1/operational-exceptions` 运营异常项目范围硬化（M100）；不接受通用 work-queues。
 - §6 `GET /api/v1/inbound-envelopes` 授权入站 Envelope 队列（M158）；仅含已绑定
   `projectId` 的安全摘要；不接受 null-project 可见性、原文下载或通用 work-queues。
+- §8 个人 SavedView CRUD（M189）：仅 `GET/POST /me/saved-views`、
+  `PUT/DELETE /me/saved-views/{id}`；Portal=`ADMIN`；pageId 限于已有 Accepted 筛选目录的
+  Admin 页面（至少 `ADMIN.TASK.QUEUE`、`ADMIN.WORKORDER.LIST`、`ADMIN.CORRECTION.QUEUE`）。
+  **不**接受 `POST /saved-views/{id}:share`、角色/组织共享视图、Network/Technician SavedView。
 
 **仍为设计草案**：§3 导航、§4 工作台与队列、§5 其余 section、
-§6 其余专项队列与 §7～§11 搜索/偏好/导出等。不得在未再接受前实现。
+§6 其余专项队列、§7 搜索、§8 共享 SavedView、§9 UI Preference、§10～§11 与导出分析等。
+不得在未再接受前实现。
 
 ## 1. 目标
 
