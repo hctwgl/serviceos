@@ -1184,20 +1184,31 @@ test('真实 OIDC 登录后可通过审核外发并经厂端回调关闭 CLIENT 
       .locator('xpath=../dd')
       .innerText()
   ).trim()
+  const sourceWorkOrderId = (
+    await reviewPage
+      .locator('dt', { hasText: /^sourceWorkOrderId$/ })
+      .locator('xpath=../dd')
+      .innerText()
+  ).trim()
   expect(clientReviewCaseId).toMatch(
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
   )
   expect(externalOrderCode).toBeTruthy()
+  expect(sourceWorkOrderId).toMatch(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+  )
 
-  // M146：外发队列按 ACKNOWLEDGED 筛选可见该交付（默认 UNKNOWN 切片看不到）。
+  // M146：外发队列按 ACKNOWLEDGED + sourceWorkOrderId 收窄，避免历史 ACK 页把本交付挤出首页。
   await reviewPage.goto(new URL('/integration/outbound', page.url()).toString())
   await expect(reviewPage.getByRole('heading', { name: '外发交付队列' })).toBeVisible()
   await reviewPage.getByLabel('outbound status filter').selectOption('ACKNOWLEDGED')
+  await reviewPage.getByLabel('outbound sourceWorkOrderId filter').fill(sourceWorkOrderId)
   const queueFilterPromise = reviewPage.waitForResponse(
     (response) =>
       response.request().method() === 'GET' &&
       response.url().includes('/api/v1/outbound-deliveries') &&
-      new URL(response.url()).searchParams.get('status') === 'ACKNOWLEDGED',
+      new URL(response.url()).searchParams.get('status') === 'ACKNOWLEDGED' &&
+      new URL(response.url()).searchParams.get('sourceWorkOrderId') === sourceWorkOrderId,
   )
   await reviewPage.getByRole('button', { name: '查询' }).click()
   expect((await queueFilterPromise).status()).toBe(200)
