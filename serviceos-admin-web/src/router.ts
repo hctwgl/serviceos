@@ -19,6 +19,8 @@ import SlaQueuePage from './pages/SlaQueuePage.vue'
 import SlaInstanceDetailPage from './pages/SlaInstanceDetailPage.vue'
 import AppointmentDetailPage from './pages/AppointmentDetailPage.vue'
 import FormSubmissionDetailPage from './pages/FormSubmissionDetailPage.vue'
+import EvidenceItemDetailPage from './pages/EvidenceItemDetailPage.vue'
+import EvidenceSetSnapshotDetailPage from './pages/EvidenceSetSnapshotDetailPage.vue'
 import ProjectDirectoryPage from './pages/ProjectDirectoryPage.vue'
 import ProjectDetailPage from './pages/ProjectDetailPage.vue'
 import OidcCallbackPage from './pages/OidcCallbackPage.vue'
@@ -60,6 +62,16 @@ export const router = createRouter({
           path: 'form-submissions/:id',
           name: 'ADMIN.FORM_SUBMISSION.DETAIL',
           component: FormSubmissionDetailPage,
+        },
+        {
+          path: 'evidence-items/:id',
+          name: 'ADMIN.EVIDENCE_ITEM.DETAIL',
+          component: EvidenceItemDetailPage,
+        },
+        {
+          path: 'evidence-set-snapshots/:id',
+          name: 'ADMIN.EVIDENCE_SET_SNAPSHOT.DETAIL',
+          component: EvidenceSetSnapshotDetailPage,
         },
         { path: 'sla', name: 'ADMIN.SLA.QUEUE', component: SlaQueuePage },
         { path: 'sla/:id', name: 'ADMIN.SLA.DETAIL', component: SlaInstanceDetailPage },

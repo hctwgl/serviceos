@@ -256,6 +256,12 @@ type FormSubmissionDetailLink = {
   validationStatus: string
 }
 
+type EvidenceItemDetailLink = {
+  evidenceItemId: string
+  status: string
+  itemOrdinal: string
+}
+
 /** 仅映射已有 Admin 详情路由；Appointment/Visit/Form 等无对等页时不渲染。 */
 const TIMELINE_RESOURCE_ROUTES: Record<string, string> = {
   WorkOrder: 'ADMIN.WORKORDER.WORKSPACE',
@@ -486,6 +492,27 @@ const formSubmissionDetailLinks = computed((): FormSubmissionDetailLink[] => {
       }
     })
     .filter((item): item is FormSubmissionDetailLink => item != null)
+})
+
+/** M156：复用已有 GET /evidence-items/{id}；与 Task 旁路并列。 */
+const evidenceItemDetailLinks = computed((): EvidenceItemDetailLink[] => {
+  const section = sectionData.value?.formsEvidence
+  if (!section || activeSection.value !== 'FORMS_EVIDENCE') return []
+  const raw = section.evidenceItems
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null
+      const row = item as Record<string, unknown>
+      const id = row.evidenceItemId
+      if (typeof id !== 'string' || !id) return null
+      return {
+        evidenceItemId: id,
+        status: String(row.status ?? '—'),
+        itemOrdinal: String(row.itemOrdinal ?? '—'),
+      }
+    })
+    .filter((item): item is EvidenceItemDetailLink => item != null)
 })
 
 /**
@@ -937,6 +964,19 @@ onMounted(() => {
               }"
             >
               {{ item.formKey }} / {{ item.validationStatus }} / {{ item.submissionId }}
+            </RouterLink>
+          </p>
+          <p v-if="evidenceItemDetailLinks.length" class="links evidence-item-detail-links">
+            打开资料项详情：
+            <RouterLink
+              v-for="item in evidenceItemDetailLinks"
+              :key="item.evidenceItemId"
+              :to="{
+                name: 'ADMIN.EVIDENCE_ITEM.DETAIL',
+                params: { id: item.evidenceItemId },
+              }"
+            >
+              #{{ item.itemOrdinal }} / {{ item.status }} / {{ item.evidenceItemId }}
             </RouterLink>
           </p>
           <p v-if="formsEvidenceTaskLinks.length" class="links forms-evidence-task-links">

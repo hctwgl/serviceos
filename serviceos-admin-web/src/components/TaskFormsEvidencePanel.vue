@@ -567,6 +567,16 @@ onMounted(() => {
       <p v-if="lastSnapshot" class="meta">
         snapshot={{ lastSnapshot.evidenceSetSnapshotId }} / digest={{ lastSnapshot.contentDigest }}
       </p>
+      <p v-if="lastSnapshot" class="links">
+        <RouterLink
+          :to="{
+            name: 'ADMIN.EVIDENCE_SET_SNAPSHOT.DETAIL',
+            params: { id: lastSnapshot.evidenceSetSnapshotId },
+          }"
+        >
+          打开资料快照 {{ lastSnapshot.evidenceSetSnapshotId }}
+        </RouterLink>
+      </p>
       <p v-if="lastReviewCaseId" class="links">
         <RouterLink :to="{ name: 'ADMIN.REVIEW.DETAIL', params: { id: lastReviewCaseId } }">
           打开审核案例 {{ lastReviewCaseId }}

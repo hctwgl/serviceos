@@ -92,17 +92,35 @@ export type EvidenceItem = {
   evidenceSlotId: string
   itemOrdinal: number
   status: string
+  createdBy?: string
+  createdAt?: string
   revisions: EvidenceRevision[]
+}
+
+export type EvidenceSetSnapshotMember = {
+  memberId: string
+  evidenceSlotId: string
+  evidenceItemId: string
+  evidenceRevisionId: string
+  revisionNumber: number
+  revisionStatus: string
+  contentDigest: string
+  validationDigest?: string
+  memberOrdinal: number
 }
 
 export type EvidenceSetSnapshot = {
   evidenceSetSnapshotId: string
   taskId: string
   projectId: string
+  resolutionId?: string
   purpose: 'TASK_SUBMISSION'
   contentDigest: string
   memberCount: number
+  eligibilitySummary?: Record<string, unknown>
+  createdBy?: string
   createdAt: string
+  members?: EvidenceSetSnapshotMember[]
 }
 
 export type StoredFile = {

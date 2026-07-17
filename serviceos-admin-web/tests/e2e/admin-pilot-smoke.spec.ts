@@ -553,6 +553,27 @@ test('真实 OIDC 登录后可完成 Task 并可靠推进 Workflow 与 WorkOrder
     contentDigest: string
   }
 
+  // M156：Task 面板深链打开资料快照详情（新页签，保留双输入面板状态）。
+  const snapshotLink = page.getByRole('link', {
+    name: new RegExp(`打开资料快照 ${snapshot.evidenceSetSnapshotId}`),
+  })
+  const snapshotHref = await snapshotLink.getAttribute('href')
+  expect(snapshotHref, '资料快照深链缺失').toBeTruthy()
+  const snapshotPage = await page.context().newPage()
+  const snapshotDetailPromise = snapshotPage.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname ===
+        `/api/v1/evidence-set-snapshots/${snapshot.evidenceSetSnapshotId}`,
+  )
+  await snapshotPage.goto(new URL(snapshotHref!, page.url()).toString())
+  expect((await snapshotDetailPromise).status()).toBe(200)
+  await expect(snapshotPage.getByRole('heading', { name: '资料快照详情' })).toBeVisible()
+  await expect(snapshotPage).toHaveURL(
+    new RegExp(`/evidence-set-snapshots/${snapshot.evidenceSetSnapshotId}$`),
+  )
+  await snapshotPage.close()
+
   // M44/M112/M121 通过真实 Admin 页面创建 INTERNAL ReviewCase，并在独立页面完成普通 APPROVED
   // 裁决。使用同一浏览器上下文的新页签，既保留 Task 页的双输入不可变引用，也证明 OIDC 会话、
   // evidence.review 授权、幂等命令与审核详情读取能够跨页面协作。
@@ -685,6 +706,32 @@ test('真实 OIDC 登录后可完成 Task 并可靠推进 Workflow 与 WorkOrder
   expect((await workspaceFeTaskPromise).status()).toBe(200)
   await expect(page.getByRole('heading', { name: '任务详情' })).toBeVisible()
   await expect(page).toHaveURL(new RegExp(`/tasks/${taskId}$`))
+
+  // M156：工作区 FORMS_EVIDENCE → 资料项详情。
+  await page.getByRole('link', { name: '工单目录' }).click()
+  await page.getByRole('link', { name: workOrderCode! }).click()
+  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await page.getByRole('button', { name: /FORMS_EVIDENCE/ }).click()
+  await expect(page.getByText('区块加载中…')).toHaveCount(0)
+  await expect(page.getByText('打开资料项详情：')).toBeVisible()
+  const workspaceEvidenceItemPromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname ===
+        `/api/v1/evidence-items/${evidenceItem.evidenceItemId}`,
+  )
+  await page
+    .getByRole('link', {
+      name: new RegExp(
+        `#\\d+\\s*/\\s*\\S+\\s*/\\s*${evidenceItem.evidenceItemId}`,
+      ),
+    })
+    .click()
+  expect((await workspaceEvidenceItemPromise).status()).toBe(200)
+  await expect(page.getByRole('heading', { name: '资料项详情' })).toBeVisible()
+  await expect(page).toHaveURL(
+    new RegExp(`/evidence-items/${evidenceItem.evidenceItemId}$`),
+  )
 })
 
 test('真实 OIDC 登录后审核驳回可进入整改队列并授权豁免整改 Task', async ({ page }) => {
