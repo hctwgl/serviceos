@@ -3,7 +3,7 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-16
-baselineCommit: 6f713fb0c7f98df78b563c00173e8888b1166744
+baselineCommit: 5237b27fc4401dc5dc75793d40022bfe2a731a37
 latestMilestone: M137
 ---
 
@@ -40,7 +40,7 @@ latestMilestone: M137
 | 项目 | 当前值 |
 |---|---|
 | 最新实施里程碑 | M137 Admin BYD 提审外发 ACK E2E |
-| 基线提交 | `6f713fb0c7f98df78b563c00173e8888b1166744` |
+| 基线提交 | `5237b27fc4401dc5dc75793d40022bfe2a731a37` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
 | 前端工程 | `serviceos-admin-web`（Vue+TS+Vite）已纳入 CI 构建，具备开发态 Keycloak PKCE，以及真实只读、Task MANUAL assign-candidates/claim/release、表单/资料/审核/整改/完结、正常补传复审，以及预约 propose→confirm→上门 check-in/check-out 的局部写链路 PR 阻断 E2E；Network/Technician 尚未建立 |
