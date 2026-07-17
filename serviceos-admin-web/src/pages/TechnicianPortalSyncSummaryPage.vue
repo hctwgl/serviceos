@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
-import { getTechnicianSyncSummary, type TechnicianPortalSyncSummary } from '../api/technicianPortal'
+import { RouterLink } from 'vue-router'
+import {
+  getTechnicianSyncSummary,
+  type TechnicianPortalSyncSummary,
+} from '../api/technicianPortal'
 
 const props = defineProps<{ technicianContextId: string | null }>()
 const summary = ref<TechnicianPortalSyncSummary | null>(null)
@@ -32,31 +36,79 @@ watch(() => props.technicianContextId, () => {
 <template>
   <section data-testid="technician-portal-sync-summary">
     <h2>同步摘要</h2>
+    <p class="hint">M218：展示 asOf/networkId；计数深链 Feed/日程（不含离线命令 runtime）。</p>
     <p v-if="error" data-testid="technician-portal-error">{{ error }}</p>
-    <dl v-else-if="summary" data-testid="technician-sync-summary-counts">
-      <div>
-        <dt>待处理 Feed</dt>
-        <dd>{{ summary.pendingFeedItemCount }}</dd>
-      </div>
-      <div>
-        <dt>预约窗口</dt>
-        <dd>{{ summary.appointmentWindowCount }}</dd>
-      </div>
-      <div>
-        <dt>Tombstone</dt>
-        <dd>{{ summary.tombstoneCount }}</dd>
-      </div>
-    </dl>
+    <template v-else-if="summary">
+      <dl data-testid="technician-sync-summary-meta" class="meta">
+        <div>
+          <dt>networkId</dt>
+          <dd data-testid="technician-sync-network-id">{{ summary.networkId }}</dd>
+        </div>
+        <div>
+          <dt>asOf</dt>
+          <dd data-testid="technician-sync-as-of">{{ summary.asOf }}</dd>
+        </div>
+      </dl>
+      <dl data-testid="technician-sync-summary-counts">
+        <div>
+          <dt>待处理 Feed</dt>
+          <dd>
+            <RouterLink
+              to="/technician-portal/task-feed"
+              data-testid="technician-sync-feed-deeplink"
+            >
+              {{ summary.pendingFeedItemCount }}
+            </RouterLink>
+          </dd>
+        </div>
+        <div>
+          <dt>预约窗口</dt>
+          <dd>
+            <RouterLink
+              to="/technician-portal/schedule"
+              data-testid="technician-sync-schedule-deeplink"
+            >
+              {{ summary.appointmentWindowCount }}
+            </RouterLink>
+          </dd>
+        </div>
+        <div>
+          <dt>Tombstone</dt>
+          <dd>
+            <RouterLink
+              to="/technician-portal/task-feed"
+              data-testid="technician-sync-tombstone-deeplink"
+            >
+              {{ summary.tombstoneCount }}
+            </RouterLink>
+          </dd>
+        </div>
+      </dl>
+    </template>
   </section>
 </template>
 
 <style scoped>
-dl {
+.hint,
+.meta {
+  color: #5b6573;
+  font-size: 0.9rem;
+}
+.meta {
+  margin-bottom: 1rem;
+}
+.meta dd {
+  margin: 0 0 0.35rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+  word-break: break-all;
+}
+dl[data-testid='technician-sync-summary-counts'] {
   display: grid;
   gap: 0.75rem;
-  max-width: 20rem;
+  max-width: 22rem;
 }
-div {
+dl[data-testid='technician-sync-summary-counts'] > div {
   display: flex;
   justify-content: space-between;
   gap: 1rem;

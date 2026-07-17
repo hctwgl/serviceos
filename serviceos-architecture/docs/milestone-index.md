@@ -226,6 +226,7 @@ title: ServiceOS 里程碑索引
 | M215 | M215 Network Portal 工作区预约/联系尝试 fan-in | [228-m215-network-portal-workspace-appointment-fanin.md](../architecture/228-m215-network-portal-workspace-appointment-fanin.md) | [212-m215-network-portal-workspace-appointment-fanin-acceptance.md](../testing/212-m215-network-portal-workspace-appointment-fanin-acceptance.md) |
 | M216 | M216 Network Portal 工作区当前师傅 fan-in | [229-m216-network-portal-workspace-technician-fanin.md](../architecture/229-m216-network-portal-workspace-technician-fanin.md) | [213-m216-network-portal-workspace-technician-fanin-acceptance.md](../testing/213-m216-network-portal-workspace-technician-fanin-acceptance.md) |
 | M217 | M217 Network Portal 目录页师傅 fan-in 与工作台基数深链 | [230-m217-network-portal-directory-technician-fanin.md](../architecture/230-m217-network-portal-directory-technician-fanin.md) | [214-m217-network-portal-directory-technician-fanin-acceptance.md](../testing/214-m217-network-portal-directory-technician-fanin-acceptance.md) |
+| M218 | M218 Technician Portal Feed/日程 Accepted 字段展示 | [231-m218-technician-portal-feed-field-enrichment.md](../architecture/231-m218-technician-portal-feed-field-enrichment.md) | [215-m218-technician-portal-feed-field-enrichment-acceptance.md](../testing/215-m218-technician-portal-feed-field-enrichment-acceptance.md) |
 
 ## 未关联里程碑的文档
 

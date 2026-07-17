@@ -6,7 +6,7 @@ status: Accepted
 
 # 应用工作区、队列与用户偏好 HTTP API
 
-## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158 / M189 / M190 / M191 / M192 / M193 / M194 / M195 / M202 / M203 / M205 / M206 / M207 / M213 / M214 / M215 / M216 / M217）
+## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158 / M189 / M190 / M191 / M192 / M193 / M194 / M195 / M202 / M203 / M205 / M206 / M207 / M213 / M214 / M215 / M216 / M217 / M218）
 
 **Accepted（可指导实现）**：
 
@@ -193,6 +193,11 @@ status: Accepted
   能力：有效师傅成员资格 + 既有 `task.readAssigned`（NETWORK scope）。**不**接受
   `GET /mobile-work-packages/{id}/status`（离线工作包 runtime 未 Accepted）、完整 Technician App、
   Network Portal 写命令。
+- §11 Technician Portal Feed Accepted 字段展示（M218 UI-only）：**不**新增 HTTP；在 M195
+  shell 上展示 task-feed/schedule/sync-summary 既有非 PII 字段与 asOf/networkId；Feed
+  `taskId` 深链 schedule?taskId=；SyncSummary 计数深链 Feed/日程；可选 sinceCursor 增量。
+  catalog 仍 `page-registry-v16`；OpenAPI 仍 `1.0.0`。**不**接受离线工作包、TASK.DETAIL、
+  MESSAGE、PII、GPS/上传。
 
 **仍为设计草案**：§3 中 `application-context`/`notifications`、§4 工作台与队列、§5 其余 section、
 §6 其余专项队列、§7 中 `VEHICLE`/`CHARGER` 与全文索引搜索、§8 ORGANIZATION 组织树共享与
