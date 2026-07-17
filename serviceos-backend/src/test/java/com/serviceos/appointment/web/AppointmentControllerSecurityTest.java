@@ -19,11 +19,13 @@ import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
 
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -96,6 +98,8 @@ class AppointmentControllerSecurityTest {
                         .header("Idempotency-Key", "contact-1")
                         .contentType("application/json").content(contactBody()))
                 .andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/contact-attempts/{id}", APPOINTMENT_ID))
+                .andExpect(status().isUnauthorized());
         mvc.perform(post("/api/v1/appointments/{id}:cancel", APPOINTMENT_ID)
                         .header("Idempotency-Key", "cancel-1").header("If-Match", "\"1\"")
                         .contentType("application/json").content("{\"reasonCode\":\"CUSTOMER_CANCELLED\"}"))
@@ -107,6 +111,31 @@ class AppointmentControllerSecurityTest {
                                  "reasonCode":"CUSTOMER_ABSENT","evidenceRefs":[]}
                                 """))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void authenticatedGetContactAttemptUsesTrustedPrincipal() throws Exception {
+        CurrentPrincipal principal = new CurrentPrincipal(
+                "scheduler", "tenant-trusted", CurrentPrincipal.PrincipalType.USER,
+                "network-web", Set.of());
+        when(principals.current()).thenReturn(principal);
+        UUID attemptId = UUID.fromString("30000000-0000-4000-8000-000000000031");
+        when(appointments.getContactAttempt(eq(principal), anyString(), eq(attemptId)))
+                .thenReturn(new ContactAttemptView(
+                        attemptId, UUID.randomUUID(), UUID.randomUUID(), APPOINTMENT_ID, "PHONE",
+                        "customer-ref", Instant.parse("2026-07-14T11:00:00Z"),
+                        Instant.parse("2026-07-14T11:01:00Z"), ContactResultCode.CONNECTED,
+                        "note", null, null, "scheduler", Instant.parse("2026-07-14T11:01:00Z")));
+
+        mvc.perform(get("/api/v1/contact-attempts/{id}", attemptId)
+                        .with(jwt().jwt(token -> token.subject("scheduler")
+                                .claim("tenant_id", "tenant-trusted"))))
+                .andExpect(status().isOk())
+                .andExpect(header().exists("X-Correlation-Id"))
+                .andExpect(jsonPath("$.resultCode").value("CONNECTED"))
+                .andExpect(jsonPath("$.contactAttemptId").value(attemptId.toString()));
+
+        verify(appointments).getContactAttempt(eq(principal), anyString(), eq(attemptId));
     }
 
     @Test

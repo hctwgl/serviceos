@@ -160,4 +160,5 @@
 - [M157 Admin 工作区项目与 SLA 任务深链验收矩阵](154-m157-admin-pilot-workspace-project-sla-task-deeplink-acceptance.md)
 - [M158 授权入站 Envelope 队列验收矩阵](155-m158-authorized-inbound-envelope-queue-acceptance.md)
 - [M159 Admin 上门 Visit 详情页验收矩阵](156-m159-admin-pilot-visit-detail-acceptance.md)
+- [M160 Admin 联系尝试 ContactAttempt 详情页验收矩阵](157-m160-admin-pilot-contact-attempt-detail-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

@@ -246,6 +246,20 @@ class AppointmentPostgresIT {
                 .containsExactly(ContactResultCode.NO_ANSWER, ContactResultCode.NO_ANSWER,
                         ContactResultCode.NO_ANSWER, ContactResultCode.CONNECTED);
         assertThat(history.getFirst().startedAt()).isEqualTo(first);
+        // M160：按 ID 读取与列表投影一致，并拒绝跨主体与缺失资源。
+        var byId = appointments.getContactAttempt(principal(), "corr-get-contact",
+                history.getLast().contactAttemptId());
+        assertThat(byId.contactAttemptId()).isEqualTo(history.getLast().contactAttemptId());
+        assertThat(byId.resultCode()).isEqualTo(ContactResultCode.CONNECTED);
+        assertThat(byId.recordingRef()).isEqualTo("recording://call-4");
+        assertThatThrownBy(() -> appointments.getContactAttempt(
+                principal("intruder"), "corr-get-contact-deny", history.getLast().contactAttemptId()))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.ACCESS_DENIED));
+        assertThatThrownBy(() -> appointments.getContactAttempt(
+                principal(), "corr-missing-contact", UUID.randomUUID()))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.RESOURCE_NOT_FOUND));
         assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type = 'contact.attempt.recorded'")
                 .query(Long.class).single()).isEqualTo(4);
         assertThatThrownBy(() -> jdbc.sql("UPDATE apt_contact_attempt SET note = 'tampered'").update())

@@ -128,6 +128,11 @@ export function getVisit(visitId: string) {
   return apiGetWithMeta<Visit>(`/visits/${visitId}`)
 }
 
+/** 不可变联系事实；无 ETag。 */
+export function getContactAttempt(contactAttemptId: string) {
+  return apiGet<ContactAttempt>(`/contact-attempts/${contactAttemptId}`)
+}
+
 export function proposeAppointment(
   taskId: string,
   body: {

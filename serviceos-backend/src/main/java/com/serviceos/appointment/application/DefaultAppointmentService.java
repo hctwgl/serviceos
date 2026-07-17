@@ -136,6 +136,21 @@ final class DefaultAppointmentService implements AppointmentService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public ContactAttemptView getContactAttempt(
+            CurrentPrincipal principal, String correlationId, UUID contactAttemptId
+    ) {
+        // 不可变事实：按 ID 读取后仍走与列表一致的 appointment.read + project/network scope。
+        ContactAttemptView attempt = repository.findContactAttemptById(principal.tenantId(), contactAttemptId)
+                .orElseThrow(() -> new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND,
+                        "ContactAttempt does not exist"));
+        ActiveServiceResponsibility responsibility = responsibility(principal.tenantId(), attempt.taskId());
+        require(principal, READ, attempt.projectId(), responsibility.networkId(),
+                "ContactAttempt", contactAttemptId.toString(), correlationId);
+        return attempt;
+    }
+
+    @Override
     @Transactional
     public ContactAttemptView recordContactAttempt(
             CurrentPrincipal principal, CommandMetadata metadata, RecordContactAttemptCommand command

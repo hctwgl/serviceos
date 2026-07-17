@@ -19,6 +19,8 @@ public interface AppointmentRepository {
 
     List<ContactAttemptView> findContactAttempts(String tenantId, UUID taskId);
 
+    Optional<ContactAttemptView> findContactAttemptById(String tenantId, UUID contactAttemptId);
+
     void appendContactAttempt(String tenantId, ContactAttemptView attempt);
 
     void saveContactResult(String tenantId, String operationType, String idempotencyKey, UUID attemptId);

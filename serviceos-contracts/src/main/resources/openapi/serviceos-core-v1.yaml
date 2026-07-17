@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.74.0
+  version: 0.75.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1597,6 +1597,27 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /contact-attempts/{contactAttemptId}:
+    get:
+      operationId: getContactAttempt
+      summary: 查询不可变联系尝试详情
+      description: >-
+        M160 窄切片；需要 appointment.read 与实时 tenant/project/network scope。
+        复用已有 ContactAttempt Schema；联系事实不可变，不返回 ETag。
+      parameters:
+        - $ref: '#/components/parameters/ContactAttemptId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 联系尝试详情
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContactAttempt' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
   /appointments/{appointmentId}:
     get:
       operationId: getAppointment
@@ -2051,6 +2072,11 @@ components:
       schema: { type: string, format: uuid }
     VisitId:
       name: visitId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ContactAttemptId:
+      name: contactAttemptId
       in: path
       required: true
       schema: { type: string, format: uuid }

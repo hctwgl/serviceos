@@ -256,6 +256,12 @@ type VisitDetailLink = {
   visitSequence: string
 }
 
+type ContactAttemptDetailLink = {
+  contactAttemptId: string
+  channel: string
+  resultCode: string
+}
+
 type FormSubmissionDetailLink = {
   submissionId: string
   formKey: string
@@ -274,6 +280,7 @@ const TIMELINE_RESOURCE_ROUTES: Record<string, string> = {
   Task: 'ADMIN.TASK.DETAIL',
   Appointment: 'ADMIN.APPOINTMENT.DETAIL',
   Visit: 'ADMIN.VISIT.DETAIL',
+  ContactAttempt: 'ADMIN.CONTACT_ATTEMPT.DETAIL',
   ReviewCase: 'ADMIN.REVIEW.DETAIL',
   CorrectionCase: 'ADMIN.CORRECTION.DETAIL',
   OutboundDelivery: 'ADMIN.INTEGRATION.DETAIL',
@@ -482,9 +489,29 @@ const visitDetailLinks = computed((): VisitDetailLink[] => {
     .filter((item): item is VisitDetailLink => item != null)
 })
 
+/** M160：复用 GET /contact-attempts/{id}；与 Task 旁路并列。 */
+const contactAttemptDetailLinks = computed((): ContactAttemptDetailLink[] => {
+  const section = sectionData.value?.appointmentsVisits
+  if (!section || activeSection.value !== 'APPOINTMENTS_VISITS') return []
+  const raw = section.contactAttempts
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null
+      const row = item as Record<string, unknown>
+      const id = row.contactAttemptId
+      if (typeof id !== 'string' || !id) return null
+      return {
+        contactAttemptId: id,
+        channel: String(row.channel ?? '—'),
+        resultCode: String(row.resultCode ?? '—'),
+      }
+    })
+    .filter((item): item is ContactAttemptDetailLink => item != null)
+})
+
 /**
- * ContactAttempt 仍无独立详情页；旁路到 Task。
- * appointments/visits 已有详情页，仍保留 Task 旁路供现场操作入口。
+ * appointments/visits/contactAttempts 已有详情页时，仍保留 Task 旁路供现场操作入口。
  */
 const appointmentVisitTaskLinks = computed((): RelatedTaskLink[] => {
   const section = sectionData.value?.appointmentsVisits
@@ -1012,6 +1039,19 @@ onMounted(() => {
               }"
             >
               {{ item.status }} / seq={{ item.visitSequence }} / {{ item.visitId }}
+            </RouterLink>
+          </p>
+          <p v-if="contactAttemptDetailLinks.length" class="links contact-attempt-detail-links">
+            打开联系详情：
+            <RouterLink
+              v-for="item in contactAttemptDetailLinks"
+              :key="item.contactAttemptId"
+              :to="{
+                name: 'ADMIN.CONTACT_ATTEMPT.DETAIL',
+                params: { id: item.contactAttemptId },
+              }"
+            >
+              {{ item.channel }} / {{ item.resultCode }} / {{ item.contactAttemptId }}
             </RouterLink>
           </p>
           <p v-if="appointmentVisitTaskLinks.length" class="links appointment-visit-task-links">

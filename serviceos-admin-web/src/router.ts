@@ -20,6 +20,7 @@ import SlaQueuePage from './pages/SlaQueuePage.vue'
 import SlaInstanceDetailPage from './pages/SlaInstanceDetailPage.vue'
 import AppointmentDetailPage from './pages/AppointmentDetailPage.vue'
 import VisitDetailPage from './pages/VisitDetailPage.vue'
+import ContactAttemptDetailPage from './pages/ContactAttemptDetailPage.vue'
 import FormSubmissionDetailPage from './pages/FormSubmissionDetailPage.vue'
 import EvidenceItemDetailPage from './pages/EvidenceItemDetailPage.vue'
 import EvidenceSetSnapshotDetailPage from './pages/EvidenceSetSnapshotDetailPage.vue'
@@ -69,6 +70,11 @@ export const router = createRouter({
           path: 'visits/:id',
           name: 'ADMIN.VISIT.DETAIL',
           component: VisitDetailPage,
+        },
+        {
+          path: 'contact-attempts/:id',
+          name: 'ADMIN.CONTACT_ATTEMPT.DETAIL',
+          component: ContactAttemptDetailPage,
         },
         {
           path: 'form-submissions/:id',

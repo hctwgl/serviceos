@@ -72,6 +72,12 @@
          ORDER BY c.started_at, c.contact_attempt_id
     </select>
 
+    <select id="findContactAttemptById" resultType="map">
+        SELECT <include refid="contactColumns"/>
+          FROM apt_contact_attempt c
+         WHERE c.tenant_id = #{tenantId} AND c.contact_attempt_id = #{contactAttemptId}
+    </select>
+
     <insert id="insertContactAttempt" parameterType="map">
         INSERT INTO apt_contact_attempt (
             contact_attempt_id, tenant_id, project_id, work_order_id, task_id, channel,

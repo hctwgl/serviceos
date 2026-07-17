@@ -1446,6 +1446,25 @@ test('真实 OIDC 登录后可完成预约提议确认与上门签到签退', as
   await expect(page.getByRole('heading', { name: '任务详情' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '联系 / 预约 / 上门' })).toBeVisible()
 
+  // M160：先记录联系，供工作区 AV → 联系详情深链证明。
+  const recordContactPromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(`/api/v1/tasks/${taskId}/contact-attempts`),
+  )
+  await page.getByRole('button', { name: 'recordContactAttempt', exact: true }).click()
+  const recordContactResponse = await recordContactPromise
+  expect(recordContactResponse.status()).toBe(201)
+  const recordedContact = (await recordContactResponse.json()) as {
+    contactAttemptId: string
+    channel: string
+    resultCode: string
+  }
+  expect(recordedContact.contactAttemptId).toBeTruthy()
+  await expect(
+    page.getByText(`已记录联系 ${recordedContact.contactAttemptId}`),
+  ).toBeVisible()
+
   // UI 在加载时预填未来窗口；此处显式覆盖，避免时钟漂移导致窗口非法。
   const windowStart = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
   const windowEnd = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString()
@@ -1581,6 +1600,32 @@ test('真实 OIDC 登录后可完成预约提议确认与上门签到签退', as
   expect((await workspaceVisitDetailPromise).status()).toBe(200)
   await expect(page.getByRole('heading', { name: '上门详情' })).toBeVisible()
   await expect(page).toHaveURL(new RegExp(`/visits/${checkedIn.visitId}$`))
+
+  // M160：工作区 APPOINTMENTS_VISITS → 联系详情（GET /contact-attempts/{id}）。
+  await page.getByRole('link', { name: '工单目录' }).click()
+  await page.getByRole('link', { name: workOrderCode! }).click()
+  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await page.getByRole('button', { name: /APPOINTMENTS_VISITS/ }).click()
+  await expect(page.getByText('区块加载中…')).toHaveCount(0)
+  await expect(page.getByText('打开联系详情：')).toBeVisible()
+  const workspaceContactDetailPromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname ===
+        `/api/v1/contact-attempts/${recordedContact.contactAttemptId}`,
+  )
+  await page
+    .getByRole('link', {
+      name: new RegExp(
+        `${recordedContact.channel}\\s*/\\s*${recordedContact.resultCode}\\s*/\\s*${recordedContact.contactAttemptId}`,
+      ),
+    })
+    .click()
+  expect((await workspaceContactDetailPromise).status()).toBe(200)
+  await expect(page.getByRole('heading', { name: '联系详情' })).toBeVisible()
+  await expect(page).toHaveURL(
+    new RegExp(`/contact-attempts/${recordedContact.contactAttemptId}$`),
+  )
 })
 
 test('真实 OIDC 登录后可通过审核外发并经厂端回调关闭 CLIENT Case', async ({ page, request }) => {
