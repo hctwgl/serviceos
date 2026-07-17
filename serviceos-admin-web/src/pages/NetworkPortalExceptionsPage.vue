@@ -53,7 +53,14 @@ watch(() => props.networkContextId, () => {
       </thead>
       <tbody>
         <tr v-for="item in items" :key="item.exceptionId">
-          <td>{{ item.exceptionId }}</td>
+          <td>
+            <RouterLink
+              :to="`/network-portal/exceptions/${item.exceptionId}`"
+              data-testid="exception-case-deeplink"
+            >
+              {{ item.exceptionId }}
+            </RouterLink>
+          </td>
           <td>{{ item.taskId || '—' }}</td>
           <td>{{ item.severity }}</td>
           <td>{{ item.status }}</td>
