@@ -34,7 +34,8 @@ public final class DatabaseMigrationMain {
             "classpath:db/migration/sla",
             "classpath:db/migration/readmodel",
             "classpath:db/migration/identity",
-            "classpath:db/migration/organization"
+            "classpath:db/migration/organization",
+            "classpath:db/migration/network"
     };
 
     private DatabaseMigrationMain() {

@@ -33,6 +33,7 @@ spring:
       - classpath:db/migration/readmodel
       - classpath:db/migration/identity
       - classpath:db/migration/organization
+      - classpath:db/migration/network
     validate-migration-naming: true
   security:
     oauth2:

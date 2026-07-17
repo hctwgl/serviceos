@@ -20,7 +20,7 @@ class ArchitectureTest {
     void firstEngineeringSliceMustExposeExpectedModules() {
         assertThat(modules.stream().map(module -> module.getIdentifier().toString()).toList())
                 .contains(
-                        "shared", "bootstrap", "identity", "authorization", "organization",
+                        "shared", "bootstrap", "identity", "authorization", "organization", "network",
                         "reliability", "audit", "project", "configuration", "task",
                         "operations", "files", "integration", "workorder", "workflow",
                         "evidence");
