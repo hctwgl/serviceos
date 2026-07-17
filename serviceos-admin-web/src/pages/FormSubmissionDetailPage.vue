@@ -47,6 +47,16 @@ onMounted(() => {
           <div><dt>formKey</dt><dd>{{ detail.formKey }}</dd></div>
           <div><dt>validationStatus</dt><dd>{{ detail.validationStatus }}</dd></div>
           <div>
+            <dt>projectId</dt>
+            <dd>
+              <RouterLink
+                :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: detail.projectId } }"
+              >
+                {{ detail.projectId }}
+              </RouterLink>
+            </dd>
+          </div>
+          <div>
             <dt>taskId</dt>
             <dd>
               <RouterLink :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.taskId } }">
@@ -64,7 +74,12 @@ onMounted(() => {
           <div><dt>errorCount</dt><dd>{{ detail.errors?.length ?? 0 }}</dd></div>
           <div><dt>warningCount</dt><dd>{{ detail.warnings?.length ?? 0 }}</dd></div>
         </dl>
-        <p class="links">
+        <p class="links form-submission-cross-links">
+          <RouterLink
+            :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: detail.projectId } }"
+          >
+            打开项目 {{ detail.projectId }}
+          </RouterLink>
           <RouterLink :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.taskId } }">
             任务详情
           </RouterLink>

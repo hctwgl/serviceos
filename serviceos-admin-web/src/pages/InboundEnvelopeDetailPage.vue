@@ -71,6 +71,18 @@ onMounted(() => {
           <div><dt>processingStatus</dt><dd>{{ envelope.processingStatus }}</dd></div>
           <div><dt>signatureStatus</dt><dd>{{ envelope.signatureStatus }}</dd></div>
           <div><dt>externalMessageId</dt><dd>{{ envelope.externalMessageId }}</dd></div>
+          <div>
+            <dt>projectId</dt>
+            <dd>
+              <RouterLink
+                v-if="envelope.projectId"
+                :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: envelope.projectId } }"
+              >
+                {{ envelope.projectId }}
+              </RouterLink>
+              <template v-else>—</template>
+            </dd>
+          </div>
           <div><dt>resultCode</dt><dd>{{ envelope.resultCode ?? '—' }}</dd></div>
           <div><dt>resultType</dt><dd>{{ envelope.resultType ?? '—' }}</dd></div>
           <div>
@@ -85,6 +97,21 @@ onMounted(() => {
               <template v-else>{{ envelope.resultId ?? '—' }}</template>
             </dd>
           </div>
+          <div>
+            <dt>canonicalMessageId</dt>
+            <dd>
+              <RouterLink
+                v-if="envelope.canonicalMessageId"
+                :to="{
+                  name: 'ADMIN.INTEGRATION.CANONICAL.DETAIL',
+                  params: { id: envelope.canonicalMessageId },
+                }"
+              >
+                {{ envelope.canonicalMessageId }}
+              </RouterLink>
+              <template v-else>—</template>
+            </dd>
+          </div>
           <div><dt>receivedAt</dt><dd>{{ envelope.receivedAt }}</dd></div>
           <div><dt>completedAt</dt><dd>{{ envelope.completedAt ?? '—' }}</dd></div>
           <div><dt>correlationId</dt><dd>{{ envelope.correlationId }}</dd></div>
@@ -94,7 +121,13 @@ onMounted(() => {
             <dd>{{ envelope.canonicalPayloadDigest ?? '—' }}</dd>
           </div>
         </dl>
-        <p class="links">
+        <p class="links inbound-envelope-cross-links">
+          <RouterLink
+            v-if="envelope.projectId"
+            :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: envelope.projectId } }"
+          >
+            打开项目 {{ envelope.projectId }}
+          </RouterLink>
           <RouterLink
             v-if="workOrderId"
             :to="{ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: workOrderId } }"
@@ -110,7 +143,10 @@ onMounted(() => {
           >
             打开 Canonical {{ envelope.canonicalMessageId }}
           </RouterLink>
-          <span v-if="!workOrderId && !envelope.canonicalMessageId" class="meta">
+          <span
+            v-if="!envelope.projectId && !workOrderId && !envelope.canonicalMessageId"
+            class="meta"
+          >
             无关联详情链接
           </span>
         </p>

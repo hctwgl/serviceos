@@ -51,6 +51,16 @@ onMounted(() => {
           <div><dt>status</dt><dd>{{ detail.status }}</dd></div>
           <div><dt>visitSequence</dt><dd>{{ detail.visitSequence }}</dd></div>
           <div>
+            <dt>projectId</dt>
+            <dd>
+              <RouterLink
+                :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: detail.projectId } }"
+              >
+                {{ detail.projectId }}
+              </RouterLink>
+            </dd>
+          </div>
+          <div>
             <dt>workOrderId</dt>
             <dd>
               <RouterLink
@@ -91,7 +101,12 @@ onMounted(() => {
           <div><dt>checkOutCapturedAt</dt><dd>{{ detail.checkOutCapturedAt || '—' }}</dd></div>
           <div><dt>ETag</dt><dd>{{ etag || '—' }}</dd></div>
         </dl>
-        <p class="links">
+        <p class="links visit-cross-links">
+          <RouterLink
+            :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: detail.projectId } }"
+          >
+            打开项目 {{ detail.projectId }}
+          </RouterLink>
           <RouterLink
             :to="{ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: detail.workOrderId } }"
           >

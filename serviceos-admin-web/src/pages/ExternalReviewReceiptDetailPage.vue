@@ -54,6 +54,26 @@ onMounted(() => {
           <div><dt>receivedBy</dt><dd>{{ detail.receivedBy }}</dd></div>
           <div><dt>receivedAt</dt><dd>{{ detail.receivedAt }}</dd></div>
           <div>
+            <dt>projectId</dt>
+            <dd>
+              <RouterLink
+                :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: detail.projectId } }"
+              >
+                {{ detail.projectId }}
+              </RouterLink>
+            </dd>
+          </div>
+          <div>
+            <dt>reviewCaseId</dt>
+            <dd>
+              <RouterLink
+                :to="{ name: 'ADMIN.REVIEW.DETAIL', params: { id: detail.reviewCaseId } }"
+              >
+                {{ detail.reviewCaseId }}
+              </RouterLink>
+            </dd>
+          </div>
+          <div>
             <dt>inboundEnvelopeId</dt>
             <dd>
               <RouterLink
@@ -93,7 +113,12 @@ onMounted(() => {
           </div>
           <div><dt>payloadRef</dt><dd>{{ detail.payloadRef || '—' }}</dd></div>
         </dl>
-        <p class="links">
+        <p class="links receipt-cross-links">
+          <RouterLink
+            :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: detail.projectId } }"
+          >
+            打开项目 {{ detail.projectId }}
+          </RouterLink>
           <RouterLink
             :to="{ name: 'ADMIN.REVIEW.DETAIL', params: { id: detail.reviewCaseId } }"
           >

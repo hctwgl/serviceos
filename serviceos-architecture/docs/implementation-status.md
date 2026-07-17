@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-17
-baselineCommit: 0361d71dd7fbb4a0e8786d0755ebef81cf8c6ad4
-latestMilestone: M178
+baselineCommit: PENDING_M179_FEATURE_SHA
+latestMilestone: M179
 ---
 
 # ServiceOS 实施状态总览
@@ -39,11 +39,11 @@ latestMilestone: M178
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M178 Admin 目录/SLA 项目关联深链 |
-| 基线提交 | `0361d71dd7fbb4a0e8786d0755ebef81cf8c6ad4` |
+| 最新实施里程碑 | M179 Admin 剩余详情页 projectId 深链 |
+| 基线提交 | `PENDING_M179_FEATURE_SHA` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
-| 前端工程 | `serviceos-admin-web`（Vue+TS+Vite）已纳入 CI 构建，具备开发态 Keycloak PKCE，以及真实只读、Task MANUAL assign-candidates/claim/release、表单/资料/审核/整改/完结、正常补传复审，预约上门、BYD 提审外发 ACK、厂端回调，CPIM 入站→激活→Admin HTTP 人工初派→同单预约上门→表单/资料/驳回整改补传复审/外发/完结（ADMIN-PILOT-09），入站 Envelope 授权队列与详情深链、专项队列与目录/SLA Accepted OpenAPI 筛选，工作区各按需区块详情或 Task 旁路、预约/表单/资料/上门/联系详情页、核心时间线与最近活动资源深链、外部审核回执详情、审核/整改交叉深链、工作区异常摘要→异常队列 query 水合与 handlingTaskId 深链、工作区审核/整改关联资源深链、Task 面板资源详情深链、Canonical Message 独立详情页、专项队列与目录页 query 水合及关联资源深链（含外发/异常/入站源资源与目录/SLA 项目深链）、外发关联资源与回执入站交叉深链、详情页明文 projectId / 源资源 / 现场与 SLA scope 字段深链，以及工作区项目与 SLA 任务交叉深链的 PR 阻断 E2E；Network/Technician 尚未建立 |
+| 前端工程 | `serviceos-admin-web`（Vue+TS+Vite）已纳入 CI 构建，具备开发态 Keycloak PKCE，以及真实只读、Task MANUAL assign-candidates/claim/release、表单/资料/审核/整改/完结、正常补传复审，预约上门、BYD 提审外发 ACK、厂端回调，CPIM 入站→激活→Admin HTTP 人工初派→同单预约上门→表单/资料/驳回整改补传复审/外发/完结（ADMIN-PILOT-09），入站 Envelope 授权队列与详情深链、专项队列与目录/SLA Accepted OpenAPI 筛选，工作区各按需区块详情或 Task 旁路、预约/表单/资料/上门/联系详情页、核心时间线与最近活动资源深链、外部审核回执详情、审核/整改交叉深链、工作区异常摘要→异常队列 query 水合与 handlingTaskId 深链、工作区审核/整改关联资源深链、Task 面板资源详情深链、Canonical Message 独立详情页、专项队列与目录页 query 水合及关联资源深链（含外发/异常/入站源资源与目录/SLA 项目深链）、外发关联资源与回执入站交叉深链、详情页明文 projectId（含剩余详情页） / 源资源 / 现场与 SLA scope 字段深链，以及工作区项目与 SLA 任务交叉深链的 PR 阻断 E2E；Network/Technician 尚未建立 |
 | 数据库 | PostgreSQL + Flyway（当前版本 085 / 87） |
 | 契约 | Core OpenAPI 0.75.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、recovered/resolved 与 SLA started/breached/met@v1） |
 
@@ -75,7 +75,7 @@ latestMilestone: M178
 | 通知 | 通知与运营异常中心 | `PROPOSED` | 已有总体设计 | 通知通道、模板、可靠发送和 UI | `architecture/14-*` |
 | 履约事实与试算 | 事实提取和双向试算 | `PROPOSED` | 已有设计、API 和数据规划 | 运行时、投影和前端工作区 | M5 设计 |
 | 对账结算 | 对账、结算、争议与调整 | `PROPOSED` | 已有边界设计 | 正式运行时和页面 | `architecture/16-*` |
-| Admin Portal | 总部运营后台 | `PARTIAL` | M101～M178：队列/任务/SLA/异常/入站/外发/工单/项目目录、工作区、allowed-actions；CI 阻断构建；开发态 Keycloak PKCE；真实只读与写链路 PR 阻断 E2E（含 ADMIN-PILOT-09、工作区各区块详情或 Task 旁路、预约/表单/资料/上门/联系详情页、核心时间线与最近活动资源深链、外部审核回执详情、审核/整改交叉深链、异常摘要→异常队列 query 水合与 handlingTaskId 深链、工作区审核/整改关联资源深链、Task 面板资源详情深链、Canonical Message 独立详情页、专项队列与目录页 query 水合及关联资源深链（含外发/异常/入站源资源与目录/SLA 项目深链）、外发关联资源与回执入站交叉深链、详情页明文 projectId / 源资源 / 现场与 SLA scope 字段深链、项目与 SLA 任务交叉深链、专项队列与目录/SLA Accepted OpenAPI 筛选、入站 Envelope 授权队列） | 设计系统、SavedView、正式企业 OIDC/BFF、生产对象存储/专业扫描、评分/硬过滤派单与 ServiceNetwork 生命周期 | M7 设计、M101～M178、Admin 试点基线 |
+| Admin Portal | 总部运营后台 | `PARTIAL` | M101～M179：队列/任务/SLA/异常/入站/外发/工单/项目目录、工作区、allowed-actions；CI 阻断构建；开发态 Keycloak PKCE；真实只读与写链路 PR 阻断 E2E（含 ADMIN-PILOT-09、工作区各区块详情或 Task 旁路、预约/表单/资料/上门/联系详情页、核心时间线与最近活动资源深链、外部审核回执详情、审核/整改交叉深链、异常摘要→异常队列 query 水合与 handlingTaskId 深链、工作区审核/整改关联资源深链、Task 面板资源详情深链、Canonical Message 独立详情页、专项队列与目录页 query 水合及关联资源深链（含外发/异常/入站源资源与目录/SLA 项目深链）、外发关联资源与回执入站交叉深链、详情页明文 projectId（含剩余详情页） / 源资源 / 现场与 SLA scope 字段深链、项目与 SLA 任务交叉深链、专项队列与目录/SLA Accepted OpenAPI 筛选、入站 Envelope 授权队列） | 设计系统、SavedView、正式企业 OIDC/BFF、生产对象存储/专业扫描、评分/硬过滤派单与 ServiceNetwork 生命周期 | M7 设计、M101～M179、Admin 试点基线 |
 | Network Portal | 网点协作端 | `PROPOSED` | 页面和跨端协作规格 | 前端代码和 E2E | M7 设计 |
 | Technician App | 师傅移动端 | `PROPOSED` | 弱网、离线工作包、上传队列和页面规格 | 移动端工程、真机和离线运行时 | M7 设计 |
 | External Portal | 用户/车企受控页面 | `PROPOSED` | 最小边界规划 | 二期页面和工程实现 | M7 设计 |
@@ -1126,6 +1126,16 @@ M144 起 SPI 种子入口已删除。
 
 明确未实现：评分/硬过滤/DispatchDecision、ServiceNetwork 生命周期、专用入站队列页、真实 sandbox。
 
+### M179：Admin 剩余详情页 projectId 深链
+
+已实现：
+
+- 整改/表单/资料/预约/上门/SLA/任务/入站/回执详情 → `ADMIN.PROJECT.DETAIL`；
+- 入站事实格 `canonicalMessageId`、回执事实格 `reviewCaseId`；不新增 OpenAPI；
+- Playwright `ADMIN-PILOT-08PP`。
+
+明确未实现：QueueTable 行内链接、FieldOperation、SavedView、企业 OIDC/BFF。
+
 ### M178：Admin 目录/SLA 项目关联深链
 
 已实现：
@@ -1470,21 +1480,21 @@ M144 起 SPI 种子入口已删除。
 
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M178**。Admin Pilot 已覆盖工作区区块详情/旁路、预约/表单/资料/上门/联系详情、
-核心时间线与最近活动资源深链、外部审核回执详情、审核/整改交叉深链、异常摘要→异常队列 query 水合与 handlingTaskId 深链、工作区审核/整改关联资源深链、Task 面板资源详情深链、Canonical Message 独立详情页、专项队列与目录页 query 水合及关联资源深链（含外发/异常/入站源资源与目录/SLA 项目深链）、外发关联资源与回执入站交叉深链、详情页明文 projectId / 源资源 / 现场与 SLA scope 字段深链、项目与 SLA 任务交叉深链、专项队列（含入站 Envelope）与目录筛选、`ADMIN-PILOT-09`；
+ServiceOS 可靠纵向切片已推进到 **M179**。Admin Pilot 已覆盖工作区区块详情/旁路、预约/表单/资料/上门/联系详情、
+核心时间线与最近活动资源深链、外部审核回执详情、审核/整改交叉深链、异常摘要→异常队列 query 水合与 handlingTaskId 深链、工作区审核/整改关联资源深链、Task 面板资源详情深链、Canonical Message 独立详情页、专项队列与目录页 query 水合及关联资源深链（含外发/异常/入站源资源与目录/SLA 项目深链）、外发关联资源与回执入站交叉深链、详情页明文 projectId（含剩余详情页） / 源资源 / 现场与 SLA scope 字段深链、项目与 SLA 任务交叉深链、专项队列（含入站 Envelope）与目录筛选、`ADMIN-PILOT-09`；
 没有实现完整评分派单引擎、完整 SLA/通知策略、通用队列/SavedView 或整个现场履约平台。
 
 ```text
 候选下一方向（优先从已确认文档中选择最小可靠切片；勿发明契约）：
-1. 正式企业 OIDC/BFF、MFA 与设计系统；SavedView 仍需再接受 API-06 章节；
-2. 在接受 ServiceNetwork 状态语义后建立目录与准入/启用/清退生命周期；当前相关文档仍为 Proposed，
+1. Correction/Review 队列剩余 Accepted 关联字段深链；QueueTable 可选行内链接；
+2. 正式企业 OIDC/BFF、MFA 与设计系统；SavedView 仍需再接受 API-06 章节；
+3. 在接受 ServiceNetwork 状态语义后建立目录与准入/启用/清退生命周期；当前相关文档仍为 Proposed，
    不得猜测状态值或转换规则；
-3. 建立 Organization/Region 目录、层级后代与组织到 Project 的权威关系；
-4. 在试点确认日历/暂停/预警规则后扩展 BUSINESS 时钟、暂停和升级；
-5. 多候选人评分、硬过滤重跑、自动 claim、网点容量联动（需另接受 api/04 / ADR-009 切片）；
-6. OCR/CV、GPS 权威距离、二级审批/MFA、报告 GENERATED 资料包；
-7. 表达式计算字段、决策表/脚本、草稿冲突与离线合并；
-8. 履约事实试算与结算运行时；Admin 投影重建/重放 HTTP（需另接受运维契约）；
+4. 建立 Organization/Region 目录、层级后代与组织到 Project 的权威关系；
+5. 在试点确认日历/暂停/预警规则后扩展 BUSINESS 时钟、暂停和升级；
+6. 多候选人评分、硬过滤重跑、自动 claim、网点容量联动（需另接受 api/04 / ADR-009 切片）；
+7. OCR/CV、GPS 权威距离、二级审批/MFA、报告 GENERATED 资料包；
+8. 表达式计算字段、决策表/脚本、草稿冲突与离线合并；
 9. FieldOperation 详情（API-03 仍为 Proposed，不得猜测读契约）。
 ```
 

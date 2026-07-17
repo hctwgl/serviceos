@@ -46,6 +46,16 @@ onMounted(() => {
         <dl>
           <div><dt>purpose</dt><dd>{{ detail.purpose }}</dd></div>
           <div>
+            <dt>projectId</dt>
+            <dd>
+              <RouterLink
+                :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: detail.projectId } }"
+              >
+                {{ detail.projectId }}
+              </RouterLink>
+            </dd>
+          </div>
+          <div>
             <dt>taskId</dt>
             <dd>
               <RouterLink :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.taskId } }">
@@ -59,7 +69,12 @@ onMounted(() => {
           <div><dt>createdBy</dt><dd>{{ detail.createdBy || '—' }}</dd></div>
           <div><dt>createdAt</dt><dd>{{ detail.createdAt }}</dd></div>
         </dl>
-        <p class="links">
+        <p class="links evidence-snapshot-cross-links">
+          <RouterLink
+            :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: detail.projectId } }"
+          >
+            打开项目 {{ detail.projectId }}
+          </RouterLink>
           <RouterLink :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.taskId } }">
             任务详情
           </RouterLink>

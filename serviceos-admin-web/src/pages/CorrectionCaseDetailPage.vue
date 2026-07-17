@@ -132,6 +132,16 @@ onMounted(() => {
         <dl>
           <div><dt>status</dt><dd>{{ detail.status }}</dd></div>
           <div>
+            <dt>projectId</dt>
+            <dd>
+              <RouterLink
+                :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: detail.projectId } }"
+              >
+                {{ detail.projectId }}
+              </RouterLink>
+            </dd>
+          </div>
+          <div>
             <dt>taskId</dt>
             <dd>
               <RouterLink :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.taskId } }">
@@ -192,6 +202,11 @@ onMounted(() => {
           <div><dt>reasonCodes</dt><dd>{{ detail.reasonCodes.join(', ') }}</dd></div>
         </dl>
         <p class="links correction-cross-links">
+          <RouterLink
+            :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: detail.projectId } }"
+          >
+            打开项目 {{ detail.projectId }}
+          </RouterLink>
           <RouterLink :to="{ name: 'ADMIN.REVIEW.DETAIL', params: { id: detail.sourceReviewCaseId } }">
             源审核案例
           </RouterLink>
