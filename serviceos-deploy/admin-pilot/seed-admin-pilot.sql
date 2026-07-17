@@ -10,8 +10,8 @@ INSERT INTO prj_project (
 ) ON CONFLICT DO NOTHING;
 
 -- M140/M141：WORKFLOW 必须可被 WorkflowDefinitionParser 解析，使入站 workorder.received
--- 经 Outbox 自动启动 Stage/Task 并激活工单；USER_TASK 带 formRef，Bundle 含 FORM/EVIDENCE
--- （stage=PILOT_SURVEY）以支持同单表单/资料/审核/外发。
+-- 经 Outbox 自动启动 Stage/Task 并激活工单；USER_TASK 带 formRef/slaRef，Bundle 含可启动
+-- TaskSlaPolicy 的 SLA、以及 stage=PILOT_SURVEY 的 FORM/EVIDENCE，以支持同单表单/资料/审核/外发/完结。
 -- 本地试点库若已写入旧定义，需短暂关闭不可变触发器才能替换（仅限本地夹具，禁止生产用法）。
 ALTER TABLE cfg_configuration_asset_version DISABLE TRIGGER trg_cfg_asset_version_immutable;
 ALTER TABLE cfg_configuration_bundle_item DISABLE TRIGGER trg_cfg_bundle_item_immutable;
@@ -30,21 +30,29 @@ INSERT INTO cfg_configuration_asset_version (
 (
     '20000000-0000-4000-8000-000000000002', 'tenant-local', 'SLA',
     'PILOT_RESPONSE', '1.0.0', '1.0.0',
-    '{"slaRef":"PILOT_RESPONSE","clockMode":"ELAPSED","targetDurationSeconds":14400}',
-    repeat('b', 64), 'PUBLISHED', now()
+    '{"policyKey":"PILOT_RESPONSE","version":"1.0.0","subjectType":"TASK","taskTypes":["PILOT_SURVEY"],"startEvent":"TASK_CREATED","stopEvent":"TASK_COMPLETED","clockMode":"ELAPSED","targetDurationSeconds":14400}',
+    '3ca27e3a4ce99cf98cacf1d2c8203f5aa353cc86cfa96749bd8595803cc1ceb5', 'PUBLISHED', now()
 ) ON CONFLICT DO NOTHING;
 
 -- bundle_item 以 (version_id, content_digest) FK 绑定资产；替换 digest 前必须先断开再重建。
 DELETE FROM cfg_configuration_bundle_item
  WHERE tenant_id = 'tenant-local'
    AND bundle_id = '30000000-0000-4000-8000-000000000001'
-   AND asset_type IN ('WORKFLOW', 'FORM', 'EVIDENCE');
+   AND asset_type IN ('WORKFLOW', 'FORM', 'EVIDENCE', 'SLA');
 
 UPDATE cfg_configuration_asset_version
    SET definition = '{"workflowKey":"ADMIN_PILOT","semanticVersion":"1.0.0","startNodeId":"START","terminalNodeIds":["END"],"nodes":[{"nodeId":"START","nodeType":"START","name":"开始"},{"nodeId":"PILOT_FIELD_OPS","nodeType":"USER_TASK","name":"现场履约","stageCode":"PILOT_SURVEY","taskType":"PILOT_SURVEY","slaRef":"PILOT_RESPONSE","formRef":"admin.pilot-inbound-form"},{"nodeId":"END","nodeType":"END","name":"结束"}],"transitions":[{"transitionId":"t1","from":"START","to":"PILOT_FIELD_OPS"},{"transitionId":"t2","from":"PILOT_FIELD_OPS","to":"END"}]}',
        content_digest = '73bf5f7e929cfd98fc25e0f8e332ae14cc6da8a1e4fcc3b2782dae51fe777c37',
        published_at = now()
  WHERE version_id = '20000000-0000-4000-8000-000000000001'
+   AND tenant_id = 'tenant-local';
+
+
+UPDATE cfg_configuration_asset_version
+   SET definition = '{"policyKey":"PILOT_RESPONSE","version":"1.0.0","subjectType":"TASK","taskTypes":["PILOT_SURVEY"],"startEvent":"TASK_CREATED","stopEvent":"TASK_COMPLETED","clockMode":"ELAPSED","targetDurationSeconds":14400}',
+       content_digest = '3ca27e3a4ce99cf98cacf1d2c8203f5aa353cc86cfa96749bd8595803cc1ceb5',
+       published_at = now()
+ WHERE version_id = '20000000-0000-4000-8000-000000000002'
    AND tenant_id = 'tenant-local';
 
 INSERT INTO cfg_configuration_asset_version (
@@ -90,7 +98,8 @@ INSERT INTO cfg_configuration_bundle_item (
 ),
 (
     'tenant-local', '30000000-0000-4000-8000-000000000001', 'SLA',
-    '20000000-0000-4000-8000-000000000002', repeat('b', 64)
+    '20000000-0000-4000-8000-000000000002',
+    '3ca27e3a4ce99cf98cacf1d2c8203f5aa353cc86cfa96749bd8595803cc1ceb5'
 ),
 (
     'tenant-local', '30000000-0000-4000-8000-000000000001', 'FORM',
@@ -188,7 +197,8 @@ INSERT INTO sla_instance (
     '80000000-0000-4000-8000-000000000001', 'tenant-local',
     '10000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001',
     '70000000-0000-4000-8000-000000000001', 'PILOT_RESPONSE',
-    '20000000-0000-4000-8000-000000000002', '1.0.0', repeat('b', 64), 'ELAPSED',
+    '20000000-0000-4000-8000-000000000002', '1.0.0',
+    '3ca27e3a4ce99cf98cacf1d2c8203f5aa353cc86cfa96749bd8595803cc1ceb5', 'ELAPSED',
     14400, '81000000-0000-4000-8000-000000000001', now() - interval '90 minutes',
     now() + interval '150 minutes', 'RUNNING', 1, 'admin-pilot-seed', now(), now()
 ) ON CONFLICT DO NOTHING;
