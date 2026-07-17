@@ -934,4 +934,40 @@ done
   exit 1
 }
 
+callback_state=""
+for _ in $(seq 1 45); do
+  callback_state="$(query_db "
+    SELECT client_case.status || ':' ||
+           count(DISTINCT receipt.receipt_id) || ':' ||
+           count(DISTINCT decision.review_decision_id) || ':' ||
+           count(DISTINCT envelope.inbound_envelope_id)
+      FROM int_outbound_delivery delivery
+      JOIN evd_review_case client_case
+        ON client_case.review_case_id = delivery.client_review_case_id
+      LEFT JOIN evd_external_review_receipt receipt
+        ON receipt.tenant_id = client_case.tenant_id
+       AND receipt.review_case_id = client_case.review_case_id
+      LEFT JOIN evd_review_decision decision
+        ON decision.tenant_id = client_case.tenant_id
+       AND decision.review_case_id = client_case.review_case_id
+       AND decision.decision_source = 'EXTERNAL'
+       AND decision.decision = 'APPROVED'
+      LEFT JOIN int_inbound_envelope envelope
+        ON envelope.tenant_id = delivery.tenant_id
+       AND envelope.message_type = 'RECORD_CLIENT_REVIEW_RESULT'
+       AND envelope.processing_status = 'COMPLETED'
+     WHERE delivery.source_review_case_id IN (
+             SELECT review_case_id FROM evd_review_case
+              WHERE task_id = '${outbound_task_id}' AND origin = 'INTERNAL'
+           )
+     GROUP BY client_case.review_case_id, client_case.status
+  ")"
+  [[ "${callback_state}" == "APPROVED:1:1:1" ]] && break
+  sleep 1
+done
+[[ "${callback_state}" == "APPROVED:1:1:1" ]] || {
+  echo "Admin 试点 BYD 厂端回调联调不完整: ${callback_state}" >&2
+  exit 1
+}
+
 echo "Admin 试点冒烟通过：真实 Keycloak、Backend、PostgreSQL 与浏览器链路均已验证"

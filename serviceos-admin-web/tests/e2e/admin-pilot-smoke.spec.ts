@@ -1,4 +1,39 @@
+import { createHash, randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
+
+/** 与 Backend BydCpimSignatureVerifier 一致：AppSecret&Nonce&Cur_Time&sortedParams */
+function signBydCpimPayload(
+  appSecret: string,
+  nonce: string,
+  currentDate: string,
+  businessParameters: Record<string, string>,
+) {
+  const params = Object.keys(businessParameters)
+    .sort()
+    .map((key) => `${key}=${businessParameters[key]}`)
+    .join('&')
+  const source = `${appSecret}&${nonce}&${currentDate}&${params}`
+  return createHash('sha256').update(source, 'utf8').digest('hex')
+}
+
+function asiaShanghaiDateTimeNow() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date())
+  const value = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
+  return `${value('year')}-${value('month')}-${value('day')} ${value('hour')}:${value('minute')}:${value('second')}`
+}
+
+function asiaShanghaiDateToday() {
+  return asiaShanghaiDateTimeNow().slice(0, 10)
+}
 
 async function loginWithLocalKeycloak(page: import('@playwright/test').Page) {
   await page.goto('/settings/token')
@@ -1060,7 +1095,7 @@ test('真实 OIDC 登录后可完成预约提议确认与上门签到签退', as
   await expect(page.getByText(`签退 Visit ${checkedIn.visitId}`)).toBeVisible()
 })
 
-test('真实 OIDC 登录后可通过审核并创建 BYD 提审外发直至 ACKNOWLEDGED', async ({ page }) => {
+test('真实 OIDC 登录后可通过审核外发并经厂端回调关闭 CLIENT Case', async ({ page, request }) => {
   test.setTimeout(180_000)
   const workOrderCode = process.env.ADMIN_PILOT_OUTBOUND_WORK_ORDER_CODE
   const taskId = process.env.ADMIN_PILOT_OUTBOUND_TASK_ID
@@ -1096,6 +1131,7 @@ test('真实 OIDC 登录后可通过审核并创建 BYD 提审外发直至 ACKNO
   const delivery = (await submitResponse.json()) as {
     deliveryId: string
     status: string
+    externalOrderCode?: string
   }
   expect(delivery.deliveryId).toBeTruthy()
   await expect(
@@ -1122,6 +1158,80 @@ test('真实 OIDC 登录后可通过审核并创建 BYD 提审外发直至 ACKNO
       { timeout: 60_000 },
     )
     .toBeGreaterThan(0)
+
+  const clientReviewCaseId = (
+    await reviewPage
+      .locator('dt', { hasText: /^clientReviewCaseId$/ })
+      .locator('xpath=../dd')
+      .innerText()
+  ).trim()
+  const externalOrderCode = (
+    await reviewPage
+      .locator('dt', { hasText: /^externalOrderCode$/ })
+      .locator('xpath=../dd')
+      .innerText()
+  ).trim()
+  expect(clientReviewCaseId).toMatch(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+  )
+  expect(externalOrderCode).toBeTruthy()
+
+  // 厂端回调是 CPIM 签名入站，不走 Admin JWT；在同一浏览器链路后以协议方身份联调。
+  const appKey = process.env.SERVICEOS_BYD_CPIM_APP_KEY ?? 'local-byd-app-key'
+  const appSecret =
+    process.env.SERVICEOS_BYD_CPIM_APP_SECRET ?? 'local-byd-app-secret-change-me'
+  const payload = {
+    orderCode: externalOrderCode,
+    result: '1',
+    remark: 'Admin pilot OEM approved',
+    examinePerson: 'BYD-PILOT-REVIEWER',
+    examineDate: asiaShanghaiDateTimeNow(),
+  }
+  const nonce = randomUUID()
+  const currentDate = asiaShanghaiDateToday()
+  const signature = signBydCpimPayload(appSecret, nonce, currentDate, payload)
+  const callbackResponse = await request.post(
+    'http://127.0.0.1:8080/api/v1/integrations/byd/cpim/v7.3.1/review-results',
+    {
+      headers: {
+        'Content-Type': 'application/json',
+        APP_KEY: appKey,
+        Nonce: nonce,
+        Cur_Time: currentDate,
+        Sign: signature,
+        'X-Correlation-Id': `admin-pilot-callback-${delivery.deliveryId}`,
+      },
+      data: payload,
+    },
+  )
+  expect(callbackResponse.status(), await callbackResponse.text()).toBe(200)
+  expect(await callbackResponse.json()).toMatchObject({ message: 'success', data: [] })
+
+  await reviewPage.getByRole('link', { name: 'CLIENT 审核案例' }).click()
+  await expect(reviewPage.getByRole('heading', { name: '审核案例' })).toBeVisible()
+  await expect(reviewPage).toHaveURL(new RegExp(`/reviews/${clientReviewCaseId}$`))
+  const clientRefresh = reviewPage
+    .locator('header')
+    .filter({ hasText: '审核案例' })
+    .getByRole('button', { name: '刷新' })
+  await expect
+    .poll(
+      async () => {
+        await clientRefresh.click()
+        await expect(reviewPage.getByText('加载中…')).toHaveCount(0)
+        const status = await reviewPage
+          .locator('dt', { hasText: /^status$/ })
+          .locator('xpath=../dd')
+          .innerText()
+        const origin = await reviewPage
+          .locator('dt', { hasText: /^origin$/ })
+          .locator('xpath=../dd')
+          .innerText()
+        return `${origin.trim()}:${status.trim()}`
+      },
+      { timeout: 30_000 },
+    )
+    .toBe('CLIENT:APPROVED')
 
   await reviewPage.close()
 })
