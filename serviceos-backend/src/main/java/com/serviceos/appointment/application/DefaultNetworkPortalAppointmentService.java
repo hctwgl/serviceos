@@ -3,9 +3,12 @@ package com.serviceos.appointment.application;
 import com.serviceos.appointment.api.AppointmentCommandReceipt;
 import com.serviceos.appointment.api.AppointmentService;
 import com.serviceos.appointment.api.AppointmentView;
+import com.serviceos.appointment.api.AppointmentWindow;
+import com.serviceos.appointment.api.CancelAppointmentCommand;
 import com.serviceos.appointment.api.ConfirmAppointmentCommand;
 import com.serviceos.appointment.api.NetworkPortalAppointmentService;
 import com.serviceos.appointment.api.ProposeAppointmentCommand;
+import com.serviceos.appointment.api.RescheduleAppointmentCommand;
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.dispatch.api.ActiveServiceResponsibility;
@@ -28,12 +31,13 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * M197 Network Portal 预约协作适配器。
+ * Network Portal 预约协作适配器（M197 propose/confirm + M198 reschedule/cancel）。
  * <p>
  * 事务边界：门禁预检与 AppointmentService 命令同事务；聚合修订、幂等、审计与 Outbox
  * 由 AppointmentService 保证。
  * 幂等键：HTTP Idempotency-Key 原样下传。
- * 失败关闭：伪造上下文、非成员、任务/预约非本网点 ACTIVE NETWORK、伪装 TECHNICIAN 确认方。
+ * 失败关闭：伪造上下文、非成员、任务/预约非本网点 ACTIVE NETWORK、伪装 TECHNICIAN 确认方、
+ * 乐观锁版本冲突。
  */
 @Service
 final class DefaultNetworkPortalAppointmentService implements NetworkPortalAppointmentService {
@@ -120,6 +124,59 @@ final class DefaultNetworkPortalAppointmentService implements NetworkPortalAppoi
         String partyRef = requireConfirmPartyRef(principal, confirmedPartyRef);
         return appointments.confirm(principal, metadata, new ConfirmAppointmentCommand(
                 appointmentId, expectedVersion, partyType, partyRef, confirmationChannel));
+    }
+
+    @Override
+    @Transactional
+    public AppointmentCommandReceipt reschedule(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            String networkContextHeader,
+            UUID appointmentId,
+            long expectedVersion,
+            AppointmentWindow newWindow,
+            String reasonCode,
+            String note
+    ) {
+        Objects.requireNonNull(appointmentId, "appointmentId");
+        Objects.requireNonNull(newWindow, "newWindow");
+        UUID networkId = requireAuthorizedNetwork(principal, metadata.correlationId(), networkContextHeader);
+        requireNetworkOwnedAppointment(principal, metadata.correlationId(), appointmentId, networkId);
+        return appointments.reschedule(principal, metadata, new RescheduleAppointmentCommand(
+                appointmentId, expectedVersion, newWindow, reasonCode, note));
+    }
+
+    @Override
+    @Transactional
+    public AppointmentCommandReceipt cancel(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            String networkContextHeader,
+            UUID appointmentId,
+            long expectedVersion,
+            String reasonCode,
+            String note
+    ) {
+        Objects.requireNonNull(appointmentId, "appointmentId");
+        UUID networkId = requireAuthorizedNetwork(principal, metadata.correlationId(), networkContextHeader);
+        requireNetworkOwnedAppointment(principal, metadata.correlationId(), appointmentId, networkId);
+        return appointments.cancel(principal, metadata, new CancelAppointmentCommand(
+                appointmentId, expectedVersion, reasonCode, note));
+    }
+
+    /**
+     * 改约/取消前校验预约任务对本上下文网点持有 ACTIVE NETWORK 责任，并核对 snapshot 网点。
+     */
+    private void requireNetworkOwnedAppointment(
+            CurrentPrincipal principal, String correlationId, UUID appointmentId, UUID networkId
+    ) {
+        AppointmentView current = appointments.get(principal, correlationId, appointmentId);
+        requireNetworkOwnedTask(principal.tenantId(), current.taskId(), networkId);
+        if (current.assignedNetworkId() == null
+                || !current.assignedNetworkId().equals(networkId.toString())) {
+            throw new BusinessProblem(ProblemCode.ACCESS_DENIED,
+                    "预约不属于当前 Network Portal 上下文网点");
+        }
     }
 
     /**

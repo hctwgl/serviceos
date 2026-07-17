@@ -206,6 +206,7 @@ title: ServiceOS 里程碑索引
 | M195 | M195 Technician Portal Feed | [208-m195-technician-portal-feed.md](../architecture/208-m195-technician-portal-feed.md) | [192-m195-technician-portal-feed-acceptance.md](../testing/192-m195-technician-portal-feed-acceptance.md) |
 | M196 | M196 Network Portal 指派师傅 | [209-m196-network-portal-assign-technician.md](../architecture/209-m196-network-portal-assign-technician.md) | [193-m196-network-portal-assign-technician-acceptance.md](../testing/193-m196-network-portal-assign-technician-acceptance.md) |
 | M197 | M197 Network Portal 预约协作 | [210-m197-network-portal-appointments.md](../architecture/210-m197-network-portal-appointments.md) | [194-m197-network-portal-appointments-acceptance.md](../testing/194-m197-network-portal-appointments-acceptance.md) |
+| M198 | M198 Network Portal 预约生命周期（改约/取消） | [211-m198-network-portal-appointment-lifecycle.md](../architecture/211-m198-network-portal-appointment-lifecycle.md) | [195-m198-network-portal-appointment-lifecycle-acceptance.md](../testing/195-m198-network-portal-appointment-lifecycle-acceptance.md) |
 
 ## 未关联里程碑的文档
 

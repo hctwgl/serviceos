@@ -199,6 +199,48 @@ export function confirmNetworkPortalAppointment(
   )
 }
 
+/** M198：改约已确认预约；If-Match 来自列表/回执 aggregateVersion。 */
+export function rescheduleNetworkPortalAppointment(
+  networkContextId: string,
+  appointmentId: string,
+  body: {
+    newWindow: AppointmentWindow
+    reasonCode: string
+    note?: string | null
+  },
+  aggregateVersion: number,
+  idempotencyKey = crypto.randomUUID(),
+) {
+  return apiPost<AppointmentCommandReceipt>(
+    `/network-portal/appointments/${appointmentId}:reschedule`,
+    {
+      body,
+      idempotencyKey,
+      ifMatch: `"${aggregateVersion}"`,
+      headers: networkHeaders(networkContextId),
+    },
+  )
+}
+
+/** M198：取消提议中或已确认预约。 */
+export function cancelNetworkPortalAppointment(
+  networkContextId: string,
+  appointmentId: string,
+  body: { reasonCode: string; note?: string | null },
+  aggregateVersion: number,
+  idempotencyKey = crypto.randomUUID(),
+) {
+  return apiPost<AppointmentCommandReceipt>(
+    `/network-portal/appointments/${appointmentId}:cancel`,
+    {
+      body,
+      idempotencyKey,
+      ifMatch: `"${aggregateVersion}"`,
+      headers: networkHeaders(networkContextId),
+    },
+  )
+}
+
 export function isPortalContextInvalid(err: unknown): boolean {
   const problem = (err as HttpStatusError | undefined)?.problem
   return (

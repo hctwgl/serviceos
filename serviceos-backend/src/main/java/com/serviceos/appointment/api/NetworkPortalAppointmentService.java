@@ -7,11 +7,12 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * M197 Network Portal 预约协作公开边界。
+ * Network Portal 预约协作公开边界（M197 propose/confirm + M198 reschedule/cancel）。
  * <p>
  * 能力：NETWORK scope {@code networkPortal.manageAppointment}；委托
- * {@link AppointmentService#propose}/{@link AppointmentService#confirm}/{@link AppointmentService#listByTask}。
- * 确认方类型仅允许 {@code NETWORK_MEMBER}/{@code NETWORK}，禁止伪装 {@code TECHNICIAN}。
+ * {@link AppointmentService}（底层另需 {@code appointment.read}/{@code appointment.propose}/
+ * {@code appointment.manage}/{@code appointment.cancel}）。确认方类型仅允许
+ * {@code NETWORK_MEMBER}/{@code NETWORK}，禁止伪装 {@code TECHNICIAN}。
  */
 public interface NetworkPortalAppointmentService {
     List<AppointmentView> listByTask(
@@ -38,5 +39,26 @@ public interface NetworkPortalAppointmentService {
             String confirmedPartyType,
             String confirmedPartyRef,
             String confirmationChannel
+    );
+
+    AppointmentCommandReceipt reschedule(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            String networkContextHeader,
+            UUID appointmentId,
+            long expectedVersion,
+            AppointmentWindow newWindow,
+            String reasonCode,
+            String note
+    );
+
+    AppointmentCommandReceipt cancel(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            String networkContextHeader,
+            UUID appointmentId,
+            long expectedVersion,
+            String reasonCode,
+            String note
     );
 }

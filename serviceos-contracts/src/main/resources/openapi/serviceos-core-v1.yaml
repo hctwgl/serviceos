@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.89.0
+  version: 0.90.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1620,6 +1620,64 @@ paths:
         content:
           application/json:
             schema: { $ref: '#/components/schemas/ConfirmAppointmentRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/AppointmentCommandReceipt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /network-portal/appointments/{appointmentId}:reschedule:
+    post:
+      operationId: rescheduleNetworkPortalAppointment
+      summary: Network Portal 改约本网点已确认预约
+      description: |
+        M198：X-Network-Context + NETWORK scope networkPortal.manageAppointment + If-Match。
+        Body 与 Admin reschedule 同形；改约追加 PROPOSED 修订并要求重新确认。
+        预约所属任务必须对本上下文网点持有 ACTIVE NETWORK 责任。
+        委托已 Implemented 的 appointments.reschedule（底层另需 appointment.manage）；
+        复用 M197 能力种子，无新 Flyway。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - $ref: '#/components/parameters/AppointmentId'
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RescheduleAppointmentRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/AppointmentCommandReceipt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /network-portal/appointments/{appointmentId}:cancel:
+    post:
+      operationId: cancelNetworkPortalAppointment
+      summary: Network Portal 取消本网点预约
+      description: |
+        M198：X-Network-Context + NETWORK scope networkPortal.manageAppointment + If-Match。
+        Body 与 Admin cancel 同形（reasonCode、可选 note）。
+        预约所属任务必须对本上下文网点持有 ACTIVE NETWORK 责任。
+        委托已 Implemented 的 appointments.cancel（底层另需 appointment.cancel）；
+        复用 M197 能力种子，无新 Flyway。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - $ref: '#/components/parameters/AppointmentId'
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CancelAppointmentRequest' }
       responses:
         '200': { $ref: '#/components/responses/AppointmentCommandReceipt' }
         '400': { $ref: '#/components/responses/Problem' }

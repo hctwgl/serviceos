@@ -198,4 +198,5 @@
 - [M195 Technician Portal Feed 验收矩阵](192-m195-technician-portal-feed-acceptance.md)
 - [M196 Network Portal 指派师傅验收矩阵](193-m196-network-portal-assign-technician-acceptance.md)
 - [M197 Network Portal 预约协作验收矩阵](194-m197-network-portal-appointments-acceptance.md)
+- [M198 Network Portal 预约生命周期（改约/取消）验收矩阵](195-m198-network-portal-appointment-lifecycle-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

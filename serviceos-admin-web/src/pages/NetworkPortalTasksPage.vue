@@ -2,11 +2,13 @@
 import { onMounted, ref, watch } from 'vue'
 import {
   assignNetworkPortalTechnician,
+  cancelNetworkPortalAppointment,
   confirmNetworkPortalAppointment,
   listNetworkPortalTaskAppointments,
   listNetworkPortalTasks,
   listNetworkPortalTechnicians,
   proposeNetworkPortalAppointment,
+  rescheduleNetworkPortalAppointment,
   type NetworkPortalAppointment,
   type NetworkPortalTaskItem,
   type NetworkPortalTechnicianItem,
@@ -33,6 +35,10 @@ const windowEnd = ref('2026-08-20T04:00:00.000Z')
 const appointmentBusy = ref(false)
 const appointmentError = ref<string | null>(null)
 const appointmentMessage = ref<string | null>(null)
+const rescheduleReason = ref('CUSTOMER_REQUESTED_LATER')
+const cancelReason = ref('CUSTOMER_CANCELLED')
+const rescheduleStart = ref('2026-09-11T02:00:00.000Z')
+const rescheduleEnd = ref('2026-09-11T05:00:00.000Z')
 
 async function load() {
   if (!props.networkContextId) {
@@ -179,6 +185,68 @@ async function submitConfirm(item: NetworkPortalAppointment) {
   }
 }
 
+async function submitReschedule(item: NetworkPortalAppointment) {
+  if (!props.networkContextId) {
+    appointmentError.value = '请选择 NETWORK 上下文'
+    return
+  }
+  appointmentBusy.value = true
+  appointmentError.value = null
+  appointmentMessage.value = null
+  try {
+    const result = await rescheduleNetworkPortalAppointment(
+      props.networkContextId,
+      item.appointmentId,
+      {
+        newWindow: {
+          start: rescheduleStart.value,
+          end: rescheduleEnd.value,
+          timezone: 'Asia/Shanghai',
+          estimatedDurationMinutes: 120,
+        },
+        reasonCode: rescheduleReason.value.trim() || 'CUSTOMER_REQUESTED_LATER',
+        note: 'Network Portal 改约',
+      },
+      item.aggregateVersion,
+    )
+    appointmentMessage.value =
+      `已改约 appointment=${result.data.appointmentId} status=${result.data.status}`
+    await loadAppointments()
+  } catch (err) {
+    appointmentError.value = err instanceof Error ? err.message : '改约失败'
+  } finally {
+    appointmentBusy.value = false
+  }
+}
+
+async function submitCancel(item: NetworkPortalAppointment) {
+  if (!props.networkContextId) {
+    appointmentError.value = '请选择 NETWORK 上下文'
+    return
+  }
+  appointmentBusy.value = true
+  appointmentError.value = null
+  appointmentMessage.value = null
+  try {
+    const result = await cancelNetworkPortalAppointment(
+      props.networkContextId,
+      item.appointmentId,
+      {
+        reasonCode: cancelReason.value.trim() || 'CUSTOMER_CANCELLED',
+        note: 'Network Portal 取消',
+      },
+      item.aggregateVersion,
+    )
+    appointmentMessage.value =
+      `已取消 appointment=${result.data.appointmentId} status=${result.data.status}`
+    await loadAppointments()
+  } catch (err) {
+    appointmentError.value = err instanceof Error ? err.message : '取消预约失败'
+  } finally {
+    appointmentBusy.value = false
+  }
+}
+
 onMounted(() => {
   void load()
 })
@@ -275,7 +343,8 @@ watch(selectedTaskId, () => {
     >
       <h3>本网点预约</h3>
       <p class="hint">
-        调用 Network Portal 预约 propose/confirm；确认方固定为 NETWORK_MEMBER + 当前主体。
+        调用 Network Portal 预约 propose/confirm/reschedule/cancel；确认方固定为 NETWORK_MEMBER + 当前主体；
+        改约/取消使用列表 If-Match 版本。
       </p>
       <label>
         任务
@@ -320,6 +389,38 @@ watch(selectedTaskId, () => {
           aria-label="address version"
         />
       </label>
+      <label>
+        改约窗口开始
+        <input
+          v-model="rescheduleStart"
+          data-testid="appointment-reschedule-start"
+          aria-label="reschedule window start"
+        />
+      </label>
+      <label>
+        改约窗口结束
+        <input
+          v-model="rescheduleEnd"
+          data-testid="appointment-reschedule-end"
+          aria-label="reschedule window end"
+        />
+      </label>
+      <label>
+        改约原因
+        <input
+          v-model="rescheduleReason"
+          data-testid="appointment-reschedule-reason"
+          aria-label="reschedule reason"
+        />
+      </label>
+      <label>
+        取消原因
+        <input
+          v-model="cancelReason"
+          data-testid="appointment-cancel-reason"
+          aria-label="cancel reason"
+        />
+      </label>
       <button
         type="submit"
         data-testid="appointment-propose-submit"
@@ -332,15 +433,35 @@ watch(selectedTaskId, () => {
           <span>
             {{ item.appointmentId }} · {{ item.status }} · v{{ item.aggregateVersion }}
           </span>
-          <button
-            v-if="item.status === 'PROPOSED'"
-            type="button"
-            data-testid="appointment-confirm-submit"
-            :disabled="appointmentBusy"
-            @click="submitConfirm(item)"
-          >
-            确认
-          </button>
+          <span class="actions">
+            <button
+              v-if="item.status === 'PROPOSED'"
+              type="button"
+              data-testid="appointment-confirm-submit"
+              :disabled="appointmentBusy"
+              @click="submitConfirm(item)"
+            >
+              确认
+            </button>
+            <button
+              v-if="item.status === 'CONFIRMED'"
+              type="button"
+              data-testid="appointment-reschedule-submit"
+              :disabled="appointmentBusy"
+              @click="submitReschedule(item)"
+            >
+              改约
+            </button>
+            <button
+              v-if="item.status === 'PROPOSED' || item.status === 'CONFIRMED'"
+              type="button"
+              data-testid="appointment-cancel-submit"
+              :disabled="appointmentBusy"
+              @click="submitCancel(item)"
+            >
+              取消
+            </button>
+          </span>
         </li>
       </ul>
       <p v-if="appointmentError" class="error" data-testid="appointment-error">
@@ -386,5 +507,9 @@ watch(selectedTaskId, () => {
   gap: 0.75rem;
   align-items: center;
   justify-content: space-between;
+}
+.actions {
+  display: flex;
+  gap: 0.5rem;
 }
 </style>

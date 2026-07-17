@@ -99,10 +99,57 @@ final class NetworkPortalAppointmentController {
                 request.confirmedPartyType(),
                 request.confirmedPartyRef(),
                 request.confirmationChannel());
+        return receipt(receipt, correlationId);
+    }
+
+    @PostMapping("/appointments/{appointmentId}:reschedule")
+    ResponseEntity<AppointmentCommandReceipt> reschedule(
+            @PathVariable UUID appointmentId,
+            @RequestHeader(value = "X-Network-Context", required = false) String networkContext,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestHeader("If-Match") String ifMatch,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @Valid @RequestBody RescheduleRequest request
+    ) {
+        AppointmentCommandReceipt receipt = portalAppointments.reschedule(
+                principals.current(),
+                new CommandMetadata(correlationId, idempotencyKey),
+                networkContext,
+                appointmentId,
+                version(ifMatch),
+                request.newWindow().toWindow(),
+                request.reasonCode(),
+                request.note());
+        return receipt(receipt, correlationId);
+    }
+
+    @PostMapping("/appointments/{appointmentId}:cancel")
+    ResponseEntity<AppointmentCommandReceipt> cancel(
+            @PathVariable UUID appointmentId,
+            @RequestHeader(value = "X-Network-Context", required = false) String networkContext,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestHeader("If-Match") String ifMatch,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @Valid @RequestBody CancelRequest request
+    ) {
+        AppointmentCommandReceipt receipt = portalAppointments.cancel(
+                principals.current(),
+                new CommandMetadata(correlationId, idempotencyKey),
+                networkContext,
+                appointmentId,
+                version(ifMatch),
+                request.reasonCode(),
+                request.note());
+        return receipt(receipt, correlationId);
+    }
+
+    private static ResponseEntity<AppointmentCommandReceipt> receipt(
+            AppointmentCommandReceipt body, String correlationId
+    ) {
         return ResponseEntity.ok()
-                .eTag(Long.toString(receipt.aggregateVersion()))
+                .eTag(Long.toString(body.aggregateVersion()))
                 .header(CorrelationIds.HEADER_NAME, correlationId)
-                .body(receipt);
+                .body(body);
     }
 
     private static long version(String ifMatch) {
@@ -139,6 +186,19 @@ final class NetworkPortalAppointmentController {
             @NotBlank @Size(max = 80) String confirmedPartyType,
             @NotBlank @Size(max = 200) String confirmedPartyRef,
             @NotBlank @Size(max = 80) String confirmationChannel
+    ) {
+    }
+
+    record RescheduleRequest(
+            @NotNull @Valid WindowRequest newWindow,
+            @NotBlank @Size(max = 100) String reasonCode,
+            @Size(max = 500) String note
+    ) {
+    }
+
+    record CancelRequest(
+            @NotBlank @Size(max = 100) String reasonCode,
+            @Size(max = 500) String note
     ) {
     }
 }
