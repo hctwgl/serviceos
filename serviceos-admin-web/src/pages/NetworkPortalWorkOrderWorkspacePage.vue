@@ -218,7 +218,8 @@ watch(
       </div>
     </header>
     <p class="hint">
-      只读薄快照（M213）+ 协作深链（M214）+ 预约/联系 fan-in（M215）+ 师傅 fan-in（M216）：缺能力时省略相关区块。
+      只读薄快照（M213）+ 协作深链（M214）+ 预约/联系 fan-in（M215）+ 师傅 fan-in（M216）+
+      SLA 摘要（M221）：缺能力时省略相关区块。
     </p>
     <p v-if="error" data-testid="network-portal-error">{{ error }}</p>
     <p v-else-if="loading" data-testid="workspace-loading">加载中…</p>
@@ -243,6 +244,29 @@ watch(
         <div><dt>effectiveFrom</dt><dd>{{ detail.effectiveFrom ?? '—' }}</dd></div>
         <div><dt>asOf</dt><dd data-testid="workspace-as-of">{{ detail.asOf }}</dd></div>
       </dl>
+
+      <section
+        v-if="detail.slaSummary"
+        data-testid="workspace-sla-summary"
+        class="related sla-summary"
+        aria-label="SLA summary"
+      >
+        <h3>SLA 摘要</h3>
+        <dl data-testid="workspace-sla-summary-fields">
+          <div>
+            <dt>openCount</dt>
+            <dd data-testid="workspace-sla-open-count">{{ detail.slaSummary.openCount }}</dd>
+          </div>
+          <div>
+            <dt>breachedCount</dt>
+            <dd data-testid="workspace-sla-breached-count">{{ detail.slaSummary.breachedCount }}</dd>
+          </div>
+        </dl>
+        <p class="hint">
+          需 NETWORK <code>sla.read</code>。仅统计本网点 ACTIVE 任务上 RUNNING/BREACHED
+          （breached ⊆ open）。无 SLA 详情表或深链。
+        </p>
+      </section>
 
       <section
         v-if="currentTechnicians"
@@ -505,6 +529,12 @@ td {
 }
 .related ul {
   padding-left: 1.1rem;
+}
+.sla-summary {
+  padding: 0.75rem 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
 }
 .window {
   display: block;

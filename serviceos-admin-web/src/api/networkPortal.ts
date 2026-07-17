@@ -94,6 +94,12 @@ export function listNetworkPortalWorkOrders(networkContextId: string) {
   )
 }
 
+/** M221：工作区薄 SLA 摘要；缺 NETWORK sla.read 时省略。 */
+export type NetworkPortalWorkOrderWorkspaceSlaSummary = {
+  openCount: number
+  breachedCount: number
+}
+
 /** M213：限定工单工作区薄快照（ACTIVE NETWORK 责任门禁）。 */
 export type NetworkPortalWorkOrderWorkspace = {
   networkId: string
@@ -104,6 +110,8 @@ export type NetworkPortalWorkOrderWorkspace = {
   technicianId: string | null
   effectiveFrom: string | null
   tasks: NetworkPortalTaskItem[]
+  /** Soft-gated；缺 NETWORK `sla.read` 时省略，不得用 0 伪装无权限。 */
+  slaSummary?: NetworkPortalWorkOrderWorkspaceSlaSummary
   asOf: string
 }
 

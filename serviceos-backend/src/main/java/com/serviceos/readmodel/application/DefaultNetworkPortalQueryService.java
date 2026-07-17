@@ -34,8 +34,11 @@ import com.serviceos.readmodel.api.NetworkPortalTechnicianItem;
 import com.serviceos.readmodel.api.NetworkPortalWorkbenchView;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderItem;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderWorkspace;
+import com.serviceos.readmodel.api.NetworkPortalWorkOrderWorkspaceSlaSummary;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
+import com.serviceos.sla.api.SlaInstanceItem;
+import com.serviceos.sla.api.SlaQueryService;
 import com.serviceos.task.api.TaskFulfillmentContext;
 import com.serviceos.task.api.TaskFulfillmentContextService;
 import org.springframework.stereotype.Service;
@@ -66,6 +69,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     private static final String TECHNICIAN_READ_OWN = "technician.readOwnNetwork";
     private static final String EVIDENCE_READ = "evidence.read";
     private static final String EXCEPTION_READ = "operations.exception.read";
+    private static final String SLA_READ = "sla.read";
     private static final String CONTEXT_PREFIX = "NETWORK|NETWORK|";
     private static final int DEFAULT_CORRECTION_LIMIT = 50;
     private static final int MAX_CORRECTION_LIMIT = 100;
@@ -75,6 +79,8 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     private static final int MAX_QUALIFICATION_LIMIT = 100;
     private static final int DEFAULT_MEMBERSHIP_LIMIT = 50;
     private static final int MAX_MEMBERSHIP_LIMIT = 100;
+    private static final int SLA_WORKSPACE_LIMIT = 100;
+    private static final Set<String> OPEN_SLA_STATUSES = Set.of("RUNNING", "BREACHED");
 
     private final PrincipalNetworkAffiliationQuery affiliations;
     private final AuthorizationService authorization;
@@ -87,6 +93,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     private final CorrectionCaseService corrections;
     private final OperationalExceptionWorkbenchService exceptions;
     private final ActiveServiceResponsibilityService responsibilities;
+    private final SlaQueryService slaQueries;
     private final Clock clock;
 
     DefaultNetworkPortalQueryService(
@@ -101,6 +108,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
             CorrectionCaseService corrections,
             OperationalExceptionWorkbenchService exceptions,
             ActiveServiceResponsibilityService responsibilities,
+            SlaQueryService slaQueries,
             Clock clock
     ) {
         this.affiliations = affiliations;
@@ -114,6 +122,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         this.corrections = corrections;
         this.exceptions = exceptions;
         this.responsibilities = responsibilities;
+        this.slaQueries = slaQueries;
         this.clock = clock;
     }
 
@@ -208,6 +217,11 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                     row.technicianId(),
                     row.effectiveFrom()));
         }
+        NetworkPortalWorkOrderWorkspaceSlaSummary slaSummary = null;
+        if (projectId != null && hasNetworkCapability(actor, correlationId, SLA_READ, networkId)) {
+            slaSummary = loadSlaSummary(
+                    actor, correlationId, workOrderId, projectId, networkId, Set.copyOf(taskIds));
+        }
         return new NetworkPortalWorkOrderWorkspace(
                 networkId,
                 workOrderId,
@@ -217,7 +231,38 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                 technicianId,
                 effectiveFrom,
                 taskItems,
+                slaSummary,
                 clock.instant());
+    }
+
+    /**
+     * M221：NETWORK sla.read 已 soft-gate；按本网点 ACTIVE taskIds 过滤后计数。
+     */
+    private NetworkPortalWorkOrderWorkspaceSlaSummary loadSlaSummary(
+            CurrentPrincipal actor,
+            String correlationId,
+            UUID workOrderId,
+            UUID projectId,
+            UUID networkId,
+            Set<UUID> activeTaskIds
+    ) {
+        List<SlaInstanceItem> items = slaQueries.listForWorkOrderOnNetwork(
+                actor, correlationId, workOrderId, projectId, networkId, null, SLA_WORKSPACE_LIMIT)
+                .items();
+        int open = 0;
+        int breached = 0;
+        for (SlaInstanceItem item : items) {
+            if (item.taskId() == null || !activeTaskIds.contains(item.taskId())) {
+                continue;
+            }
+            if (OPEN_SLA_STATUSES.contains(item.status())) {
+                open++;
+            }
+            if ("BREACHED".equals(item.status())) {
+                breached++;
+            }
+        }
+        return new NetworkPortalWorkOrderWorkspaceSlaSummary(open, breached);
     }
 
     @Override
