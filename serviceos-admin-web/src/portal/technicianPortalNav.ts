@@ -103,7 +103,7 @@ export function technicianPortalRoutePath(pageId: string): string {
     case 'TECHNICIAN.SYNC.SUMMARY':
       return '/technician-portal/sync-summary'
     case 'TECHNICIAN.ME':
-      return '/technician-portal/sync-summary'
+      return '/technician-portal/me'
     default:
       return '/technician-portal/task-feed'
   }

@@ -61,6 +61,7 @@ import TechnicianPortalShell from './pages/TechnicianPortalShell.vue'
 import TechnicianPortalTaskFeedPage from './pages/TechnicianPortalTaskFeedPage.vue'
 import TechnicianPortalSchedulePage from './pages/TechnicianPortalSchedulePage.vue'
 import TechnicianPortalSyncSummaryPage from './pages/TechnicianPortalSyncSummaryPage.vue'
+import TechnicianPortalMePage from './pages/TechnicianPortalMePage.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -326,6 +327,12 @@ export const router = createRouter({
           name: 'TECHNICIAN.SYNC.SUMMARY',
           component: TechnicianPortalSyncSummaryPage,
           meta: { pageId: 'TECHNICIAN.SYNC.SUMMARY' },
+        },
+        {
+          path: 'me',
+          name: 'TECHNICIAN.ME',
+          component: TechnicianPortalMePage,
+          meta: { pageId: 'TECHNICIAN.ME' },
         },
       ],
     },

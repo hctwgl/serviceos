@@ -219,4 +219,5 @@
 - [M216 Network Portal 工作区当前师傅 fan-in 验收矩阵](213-m216-network-portal-workspace-technician-fanin-acceptance.md)
 - [M217 Network Portal 目录页师傅 fan-in 验收矩阵](214-m217-network-portal-directory-technician-fanin-acceptance.md)
 - [M218 Technician Portal Feed Accepted 字段展示验收矩阵](215-m218-technician-portal-feed-field-enrichment-acceptance.md)
+- [M219 Technician Portal TECHNICIAN.ME 页壳验收矩阵](216-m219-technician-portal-me-shell-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

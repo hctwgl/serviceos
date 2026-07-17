@@ -227,6 +227,7 @@ title: ServiceOS 里程碑索引
 | M216 | M216 Network Portal 工作区当前师傅 fan-in | [229-m216-network-portal-workspace-technician-fanin.md](../architecture/229-m216-network-portal-workspace-technician-fanin.md) | [213-m216-network-portal-workspace-technician-fanin-acceptance.md](../testing/213-m216-network-portal-workspace-technician-fanin-acceptance.md) |
 | M217 | M217 Network Portal 目录页师傅 fan-in 与工作台基数深链 | [230-m217-network-portal-directory-technician-fanin.md](../architecture/230-m217-network-portal-directory-technician-fanin.md) | [214-m217-network-portal-directory-technician-fanin-acceptance.md](../testing/214-m217-network-portal-directory-technician-fanin-acceptance.md) |
 | M218 | M218 Technician Portal Feed/日程 Accepted 字段展示 | [231-m218-technician-portal-feed-field-enrichment.md](../architecture/231-m218-technician-portal-feed-field-enrichment.md) | [215-m218-technician-portal-feed-field-enrichment-acceptance.md](../testing/215-m218-technician-portal-feed-field-enrichment-acceptance.md) |
+| M219 | M219 Technician Portal TECHNICIAN.ME /me 页壳 | [232-m219-technician-portal-me-shell.md](../architecture/232-m219-technician-portal-me-shell.md) | [216-m219-technician-portal-me-shell-acceptance.md](../testing/216-m219-technician-portal-me-shell-acceptance.md) |
 
 ## 未关联里程碑的文档
 
