@@ -108,6 +108,10 @@ export function networkPortalRoutePath(pageId: string): string {
       return '/network-portal/tasks'
     case 'NETWORK.APPOINTMENT':
       return '/network-portal/tasks'
+    case 'NETWORK.EVIDENCE.SUPPLEMENT':
+      return '/network-portal/tasks'
+    case 'NETWORK.CORRECTION.QUEUE':
+      return '/network-portal/corrections'
     default:
       return '/network-portal/workbench'
   }

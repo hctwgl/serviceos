@@ -350,6 +350,32 @@ export type NetworkPortalCorrectionCase = {
   latestResubmissionSnapshotId: string | null
 }
 
+export type NetworkPortalCorrectionItem = {
+  correctionCaseId: string
+  projectId: string
+  taskId: string
+  sourceReviewCaseId: string
+  sourceReviewDecisionId: string
+  reasonCodes: string[]
+  correctionTaskId: string | null
+  status: string
+  createdAt: string
+  latestResubmissionSnapshotId: string | null
+  closedAt: string | null
+  waivedAt: string | null
+  resubmissionCount: number
+}
+
+export type NetworkPortalCorrectionDetail = {
+  correctionCaseId: string
+  projectId: string
+  taskId: string
+  status: string
+  reasonCodes: string[]
+  createdAt: string
+  latestResubmissionSnapshotId: string | null
+}
+
 /** M201：代师傅 Begin 资料上传。 */
 export function beginNetworkPortalEvidenceUploadOnBehalf(
   networkContextId: string,
@@ -391,6 +417,31 @@ export function finalizeNetworkPortalEvidenceUploadOnBehalf(
       body,
       headers: networkHeaders(networkContextId),
     },
+  )
+}
+
+/** M202：本网点整改队列。 */
+export function listNetworkPortalCorrections(
+  networkContextId: string,
+  params?: { status?: string; taskId?: string; limit?: number },
+) {
+  return apiGet<NetworkPortalPage<NetworkPortalCorrectionItem>>(
+    '/network-portal/correction-cases',
+    {
+      status: params?.status,
+      taskId: params?.taskId,
+      limit: params?.limit == null ? undefined : String(params.limit),
+    },
+    networkHeaders(networkContextId),
+  )
+}
+
+/** M202：本网点整改详情。 */
+export function getNetworkPortalCorrection(networkContextId: string, correctionCaseId: string) {
+  return apiGet<NetworkPortalCorrectionDetail>(
+    `/network-portal/correction-cases/${correctionCaseId}`,
+    {},
+    networkHeaders(networkContextId),
   )
 }
 

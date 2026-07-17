@@ -2,16 +2,21 @@ package com.serviceos.readmodel.application;
 
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
+import com.serviceos.dispatch.api.ActiveServiceResponsibility;
+import com.serviceos.dispatch.api.ActiveServiceResponsibilityService;
 import com.serviceos.dispatch.api.NetworkActiveAssignmentQuery;
 import com.serviceos.dispatch.api.NetworkActiveAssignmentView;
 import com.serviceos.dispatch.api.NetworkCapacityCounterView;
 import com.serviceos.dispatch.api.NetworkCapacitySummaryQuery;
+import com.serviceos.evidence.api.CorrectionCaseService;
+import com.serviceos.evidence.api.CorrectionCaseView;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.network.api.NetworkMembershipView;
 import com.serviceos.network.api.NetworkPortalTechnicianQuery;
 import com.serviceos.network.api.NetworkPortalTechnicianView;
 import com.serviceos.network.api.PrincipalNetworkAffiliationQuery;
 import com.serviceos.readmodel.api.NetworkPortalCapacityItem;
+import com.serviceos.readmodel.api.NetworkPortalCorrectionItem;
 import com.serviceos.readmodel.api.NetworkPortalPage;
 import com.serviceos.readmodel.api.NetworkPortalQueryService;
 import com.serviceos.readmodel.api.NetworkPortalTaskItem;
@@ -28,10 +33,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -45,7 +52,10 @@ import java.util.UUID;
 final class DefaultNetworkPortalQueryService implements NetworkPortalQueryService {
     private static final String NETWORK_TASK_READ = "networkTask.read";
     private static final String TECHNICIAN_READ_OWN = "technician.readOwnNetwork";
+    private static final String EVIDENCE_READ = "evidence.read";
     private static final String CONTEXT_PREFIX = "NETWORK|NETWORK|";
+    private static final int DEFAULT_CORRECTION_LIMIT = 50;
+    private static final int MAX_CORRECTION_LIMIT = 100;
 
     private final PrincipalNetworkAffiliationQuery affiliations;
     private final AuthorizationService authorization;
@@ -53,6 +63,8 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     private final NetworkCapacitySummaryQuery capacity;
     private final NetworkPortalTechnicianQuery technicians;
     private final TaskFulfillmentContextService tasks;
+    private final CorrectionCaseService corrections;
+    private final ActiveServiceResponsibilityService responsibilities;
     private final Clock clock;
 
     DefaultNetworkPortalQueryService(
@@ -62,6 +74,8 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
             NetworkCapacitySummaryQuery capacity,
             NetworkPortalTechnicianQuery technicians,
             TaskFulfillmentContextService tasks,
+            CorrectionCaseService corrections,
+            ActiveServiceResponsibilityService responsibilities,
             Clock clock
     ) {
         this.affiliations = affiliations;
@@ -70,6 +84,8 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         this.capacity = capacity;
         this.technicians = technicians;
         this.tasks = tasks;
+        this.corrections = corrections;
+        this.responsibilities = responsibilities;
         this.clock = clock;
     }
 
@@ -188,6 +204,118 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                 technicianCount,
                 capacityItems(actor.tenantId(), networkId),
                 asOf);
+    }
+
+    /**
+     * 本网点整改队列。
+     * <p>
+     * 事务边界：只读。先门禁再按 ACTIVE NETWORK 任务 fan-in {@code listForTask}；
+     * taskId 过滤不在 ACTIVE 集合时返回空页（不泄露他网点任务存在性）。
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public NetworkPortalPage<NetworkPortalCorrectionItem> listCorrections(
+            CurrentPrincipal actor,
+            String correlationId,
+            String networkContextHeader,
+            String status,
+            UUID taskId,
+            Integer limit
+    ) {
+        UUID networkId = requireAuthorizedNetwork(actor, correlationId, networkContextHeader, EVIDENCE_READ);
+        String effectiveStatus = (status == null || status.isBlank()) ? "OPEN" : status.trim();
+        int effectiveLimit = normalizeCorrectionLimit(limit);
+        List<NetworkActiveAssignmentView> active = assignments.listActiveForNetwork(
+                actor.tenantId(), networkId.toString());
+        Set<UUID> activeTaskIds = new LinkedHashSet<>();
+        for (NetworkActiveAssignmentView row : active) {
+            activeTaskIds.add(row.taskId());
+        }
+        List<UUID> taskIds;
+        if (taskId != null) {
+            if (!activeTaskIds.contains(taskId)) {
+                return new NetworkPortalPage<>(networkId, List.of(), clock.instant());
+            }
+            taskIds = List.of(taskId);
+        } else {
+            taskIds = List.copyOf(activeTaskIds);
+        }
+        List<NetworkPortalCorrectionItem> items = new ArrayList<>();
+        for (UUID candidateTaskId : taskIds) {
+            for (CorrectionCaseView row : corrections.listForTask(actor, correlationId, candidateTaskId)) {
+                if (!effectiveStatus.equals(row.status())) {
+                    continue;
+                }
+                items.add(toCorrectionItem(row));
+            }
+        }
+        items.sort(Comparator
+                .comparing(NetworkPortalCorrectionItem::createdAt)
+                .thenComparing(NetworkPortalCorrectionItem::correctionCaseId));
+        if (items.size() > effectiveLimit) {
+            items = items.subList(0, effectiveLimit);
+        }
+        return new NetworkPortalPage<>(networkId, List.copyOf(items), clock.instant());
+    }
+
+    /**
+     * 本网点整改详情。
+     * <p>
+     * 失败关闭：CorrectionCaseService.get 鉴权后，ACTIVE NETWORK 责任必须等于上下文网点。
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public CorrectionCaseView getCorrection(
+            CurrentPrincipal actor,
+            String correlationId,
+            String networkContextHeader,
+            UUID correctionCaseId
+    ) {
+        Objects.requireNonNull(correctionCaseId, "correctionCaseId");
+        UUID networkId = requireAuthorizedNetwork(actor, correlationId, networkContextHeader, EVIDENCE_READ);
+        CorrectionCaseView correction = corrections.get(actor, correlationId, correctionCaseId);
+        requireNetworkOwnedTask(actor.tenantId(), correction.taskId(), networkId);
+        return correction;
+    }
+
+    private void requireNetworkOwnedTask(String tenantId, UUID taskId, UUID networkId) {
+        ActiveServiceResponsibility responsibility = responsibilities.find(tenantId, taskId)
+                .orElseThrow(() -> new BusinessProblem(ProblemCode.ACCESS_DENIED,
+                        "任务对本网点没有 ACTIVE NETWORK 责任"));
+        if (responsibility.networkId() == null
+                || !responsibility.networkId().equals(networkId.toString())) {
+            throw new BusinessProblem(ProblemCode.ACCESS_DENIED,
+                    "任务对本网点没有 ACTIVE NETWORK 责任");
+        }
+    }
+
+    private static NetworkPortalCorrectionItem toCorrectionItem(CorrectionCaseView row) {
+        int resubmissionCount = row.resubmissions() == null ? 0 : row.resubmissions().size();
+        return new NetworkPortalCorrectionItem(
+                row.correctionCaseId(),
+                row.projectId(),
+                row.taskId(),
+                row.sourceReviewCaseId(),
+                row.sourceReviewDecisionId(),
+                row.reasonCodes(),
+                row.correctionTaskId(),
+                row.status(),
+                row.createdAt(),
+                row.latestResubmissionSnapshotId(),
+                row.closedAt(),
+                row.waivedAt(),
+                resubmissionCount);
+    }
+
+    private static int normalizeCorrectionLimit(Integer limit) {
+        if (limit == null) {
+            return DEFAULT_CORRECTION_LIMIT;
+        }
+        if (limit < 1 || limit > MAX_CORRECTION_LIMIT) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                    "limit 须在 1～100 之间");
+        }
+        return limit;
     }
 
     private List<NetworkPortalCapacityItem> capacityItems(String tenantId, UUID networkId) {

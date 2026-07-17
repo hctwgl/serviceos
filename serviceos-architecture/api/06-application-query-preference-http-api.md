@@ -6,7 +6,7 @@ status: Accepted
 
 # 应用工作区、队列与用户偏好 HTTP API
 
-## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158 / M189 / M190 / M191 / M192 / M193 / M194 / M195）
+## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158 / M189 / M190 / M191 / M192 / M193 / M194 / M195 / M202）
 
 **Accepted（可指导实现）**：
 
@@ -78,6 +78,13 @@ status: Accepted
   门户成员资格 + 既有 `networkTask.read` / `technician.readOwnNetwork`（NETWORK scope），
   跨网点失败关闭。**不**接受 Technician Feed §11、Admin work-queues §4、完整 product/03 页面集、
   Network Portal 写命令。
+- §10 Network Portal 整改队列只读（M202 窄扩展）：仅
+  `GET /api/v1/network-portal/correction-cases`（`status` 默认 `OPEN`、可选 `taskId`、
+  `limit` 1～100 默认 50；`NetworkPortalPage` 形态安全摘要）与
+  `GET /api/v1/network-portal/correction-cases/{correctionCaseId}`（CorrectionCase 详情形）。
+  门禁：ACTIVE NetworkMembership + NETWORK scope `evidence.read`；数据仅限上下文网点
+  ACTIVE NETWORK 责任任务上的整改。**不**接受 Admin 项目范围 cursor 队列语义、资质/产能写、
+  异常队列。
 - §11 Technician Portal Feed 子集（M195）：仅
   `GET /api/v1/technician/me/task-feed`（可选 `sinceCursor` 不透明游标；ACTIVE TECHNICIAN
   ServiceAssignment / TaskAssignment；撤权/结束时 tombstone 仅含 `taskId` +
@@ -308,8 +315,10 @@ View 保存 filter AST、列、排序和密度，不保存任意 SQL、访问 to
 | `GET /api/v1/network-portal/tasks` | 本网点 Task | M194 Accepted |
 | `GET /api/v1/network-portal/technicians` | 本网点师傅/能力/资质摘要 | M194 Accepted |
 | `GET /api/v1/network-portal/capacity` | 本网点容量和派单状态 | M194 Accepted |
+| `GET /api/v1/network-portal/correction-cases` | 本网点整改队列安全摘要 | M202 Accepted |
+| `GET /api/v1/network-portal/correction-cases/{correctionCaseId}` | 本网点整改详情 | M202 Accepted |
 
-networkId 从可信应用上下文解析；拥有多个 membership 时使用经授权的 `X-Network-Context`，不能在查询参数任意指定。详见 §0 M194。
+networkId 从可信应用上下文解析；拥有多个 membership 时使用经授权的 `X-Network-Context`，不能在查询参数任意指定。详见 §0 M194 / M202。
 
 ## 11. Technician Feed 与工作包状态
 

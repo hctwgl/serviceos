@@ -1,7 +1,10 @@
 package com.serviceos.readmodel.web;
 
+import com.serviceos.evidence.api.CorrectionCaseView;
+import com.serviceos.evidence.api.CorrectionResubmissionView;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
 import com.serviceos.readmodel.api.NetworkPortalCapacityItem;
+import com.serviceos.readmodel.api.NetworkPortalCorrectionItem;
 import com.serviceos.readmodel.api.NetworkPortalPage;
 import com.serviceos.readmodel.api.NetworkPortalQueryService;
 import com.serviceos.readmodel.api.NetworkPortalTaskItem;
@@ -11,10 +14,16 @@ import com.serviceos.readmodel.api.NetworkPortalWorkOrderItem;
 import com.serviceos.shared.CorrelationIds;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 
 /**
  * Network Portal 只读 HTTP 适配器。networkId 仅来自可信头 X-Network-Context，
@@ -74,11 +83,97 @@ final class NetworkPortalController {
                 .body(body);
     }
 
+    @GetMapping("/correction-cases")
+    ResponseEntity<NetworkPortalPage<NetworkPortalCorrectionItem>> correctionCases(
+            @RequestHeader(value = "X-Network-Context", required = false) String networkContext,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "taskId", required = false) UUID taskId,
+            @RequestParam(value = "limit", required = false) Integer limit
+    ) {
+        return response(
+                queries.listCorrections(
+                        principals.current(), correlationId, networkContext, status, taskId, limit),
+                correlationId);
+    }
+
+    @GetMapping("/correction-cases/{correctionCaseId}")
+    ResponseEntity<CorrectionCaseResponse> correctionCase(
+            @PathVariable UUID correctionCaseId,
+            @RequestHeader(value = "X-Network-Context", required = false) String networkContext,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        CorrectionCaseView view = queries.getCorrection(
+                principals.current(), correlationId, networkContext, correctionCaseId);
+        return ResponseEntity.ok()
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(toCorrectionResponse(view));
+    }
+
     private static <T> ResponseEntity<NetworkPortalPage<T>> response(
             NetworkPortalPage<T> body, String correlationId
     ) {
         return ResponseEntity.ok()
                 .header(CorrelationIds.HEADER_NAME, correlationId)
                 .body(body);
+    }
+
+    /** 与 CorrectionCaseController 响应形对齐，复用 OpenAPI CorrectionCase。 */
+    private static CorrectionCaseResponse toCorrectionResponse(CorrectionCaseView correction) {
+        return new CorrectionCaseResponse(
+                correction.correctionCaseId(), correction.projectId(), correction.taskId(),
+                correction.sourceReviewCaseId(), correction.sourceReviewDecisionId(),
+                correction.sourceEvidenceSetSnapshotId(), correction.sourceSnapshotContentDigest(),
+                correction.reasonCodes(), correction.correctionTaskId(), correction.status(),
+                correction.createdBy(),
+                correction.createdAt(), correction.latestResubmissionSnapshotId(),
+                correction.closedBy(), correction.closedAt(),
+                correction.waivedBy(), correction.waivedAt(),
+                correction.waiveApprovalRef(), correction.waiveNote(),
+                correction.resubmissions() == null
+                        ? List.of()
+                        : correction.resubmissions().stream().map(NetworkPortalController::toRound).toList());
+    }
+
+    private static CorrectionResubmissionResponse toRound(CorrectionResubmissionView round) {
+        return new CorrectionResubmissionResponse(
+                round.correctionResubmissionId(), round.correctionCaseId(), round.resubmissionOrdinal(),
+                round.evidenceSetSnapshotId(), round.snapshotContentDigest(),
+                round.submittedBy(), round.submittedAt());
+    }
+
+    record CorrectionCaseResponse(
+            UUID correctionCaseId,
+            UUID projectId,
+            UUID taskId,
+            UUID sourceReviewCaseId,
+            UUID sourceReviewDecisionId,
+            UUID sourceEvidenceSetSnapshotId,
+            String sourceSnapshotContentDigest,
+            List<String> reasonCodes,
+            UUID correctionTaskId,
+            String status,
+            String createdBy,
+            Instant createdAt,
+            UUID latestResubmissionSnapshotId,
+            String closedBy,
+            Instant closedAt,
+            String waivedBy,
+            Instant waivedAt,
+            String waiveApprovalRef,
+            String waiveNote,
+            List<CorrectionResubmissionResponse> resubmissions
+    ) {
+    }
+
+    record CorrectionResubmissionResponse(
+            UUID correctionResubmissionId,
+            UUID correctionCaseId,
+            int resubmissionOrdinal,
+            UUID evidenceSetSnapshotId,
+            String snapshotContentDigest,
+            String submittedBy,
+            Instant submittedAt
+    ) {
     }
 }

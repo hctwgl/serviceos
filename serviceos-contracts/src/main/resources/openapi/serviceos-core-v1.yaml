@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.93.0
+  version: 0.94.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1886,6 +1886,59 @@ paths:
         '409': { $ref: '#/components/responses/Problem' }
         '410': { $ref: '#/components/responses/Problem' }
         '422': { $ref: '#/components/responses/Problem' }
+  /network-portal/correction-cases:
+    get:
+      operationId: listNetworkPortalCorrectionCases
+      summary: Network Portal 本网点整改队列
+      description: |
+        M202：X-Network-Context + NETWORK scope evidence.read。
+        仅返回该网点 ACTIVE NETWORK ServiceAssignment 任务上的 CorrectionCase 安全摘要；
+        默认 status=OPEN；按 createdAt/correctionCaseId 正序，内存 limit（1～100，默认 50）。
+        不接受 Admin 项目范围 cursor 语义。上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/CorrelationId'
+        - name: status
+          in: query
+          schema: { enum: [OPEN, IN_PROGRESS, RESUBMITTED, CLOSED, WAIVED], default: OPEN }
+        - name: taskId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200':
+          description: 本网点整改队列页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkPortalCorrectionPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /network-portal/correction-cases/{correctionCaseId}:
+    get:
+      operationId: getNetworkPortalCorrectionCase
+      summary: Network Portal 本网点整改详情
+      description: |
+        M202：X-Network-Context + NETWORK scope evidence.read。
+        委托 CorrectionCase.get 后校验 ACTIVE NETWORK 责任等于上下文网点；跨网点 ACCESS_DENIED。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - name: correctionCaseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: CorrectionCase 详情
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/CorrectionCase' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
   /network-portal/correction-cases/{correctionCaseId}:resubmit:
     post:
       operationId: resubmitNetworkPortalCorrectionCase
@@ -4650,6 +4703,37 @@ components:
         activeTaskCount: { type: integer, minimum: 0 }
         activeTechnicianCount: { type: integer, minimum: 0 }
         capacity: { type: array, items: { $ref: '#/components/schemas/NetworkPortalCapacityItem' } }
+        asOf: { type: string, format: date-time }
+    NetworkPortalCorrectionItem:
+      type: object
+      additionalProperties: false
+      required: [correctionCaseId, projectId, taskId, sourceReviewCaseId, sourceReviewDecisionId,
+        reasonCodes, correctionTaskId, status, createdAt, latestResubmissionSnapshotId,
+        closedAt, waivedAt, resubmissionCount]
+      properties:
+        correctionCaseId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        sourceReviewCaseId: { type: string, format: uuid }
+        sourceReviewDecisionId: { type: string, format: uuid }
+        reasonCodes:
+          type: array
+          maxItems: 20
+          items: { type: string, minLength: 1, maxLength: 80 }
+        correctionTaskId: { type: [string, 'null'], format: uuid }
+        status: { enum: [OPEN, IN_PROGRESS, RESUBMITTED, CLOSED, WAIVED] }
+        createdAt: { type: string, format: date-time }
+        latestResubmissionSnapshotId: { type: [string, 'null'], format: uuid }
+        closedAt: { type: [string, 'null'], format: date-time }
+        waivedAt: { type: [string, 'null'], format: date-time }
+        resubmissionCount: { type: integer, minimum: 0, maximum: 1000 }
+    NetworkPortalCorrectionPage:
+      type: object
+      additionalProperties: false
+      required: [networkId, items, asOf]
+      properties:
+        networkId: { type: string, format: uuid }
+        items: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/NetworkPortalCorrectionItem' } }
         asOf: { type: string, format: date-time }
     TechnicianPortalFeedItem:
       type: object

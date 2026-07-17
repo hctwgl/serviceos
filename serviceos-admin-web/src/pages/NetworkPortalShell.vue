@@ -26,6 +26,8 @@ const TEST_IDS: Record<string, string> = {
   'NETWORK.TECHNICIAN.LIST': 'nav-network-technicians',
   'NETWORK.TECHNICIAN.ASSIGN': 'nav-network-assign-technician',
   'NETWORK.APPOINTMENT': 'nav-network-appointments',
+  'NETWORK.CORRECTION.QUEUE': 'nav-network-corrections',
+  'NETWORK.EVIDENCE.SUPPLEMENT': 'nav-network-evidence-supplement',
 }
 
 async function refreshNav(preferredContextId?: string | null) {

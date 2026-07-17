@@ -48,6 +48,7 @@ import NetworkPortalWorkbenchPage from './pages/NetworkPortalWorkbenchPage.vue'
 import NetworkPortalWorkOrdersPage from './pages/NetworkPortalWorkOrdersPage.vue'
 import NetworkPortalTasksPage from './pages/NetworkPortalTasksPage.vue'
 import NetworkPortalTechniciansPage from './pages/NetworkPortalTechniciansPage.vue'
+import NetworkPortalCorrectionsPage from './pages/NetworkPortalCorrectionsPage.vue'
 import TechnicianPortalShell from './pages/TechnicianPortalShell.vue'
 import TechnicianPortalTaskFeedPage from './pages/TechnicianPortalTaskFeedPage.vue'
 import TechnicianPortalSchedulePage from './pages/TechnicianPortalSchedulePage.vue'
@@ -238,6 +239,12 @@ export const router = createRouter({
           name: 'NETWORK.TECHNICIAN.LIST',
           component: NetworkPortalTechniciansPage,
           meta: { pageId: 'NETWORK.TECHNICIAN.LIST' },
+        },
+        {
+          path: 'corrections',
+          name: 'NETWORK.CORRECTION.QUEUE',
+          component: NetworkPortalCorrectionsPage,
+          meta: { pageId: 'NETWORK.CORRECTION.QUEUE' },
         },
       ],
     },
