@@ -62,14 +62,37 @@ export type OperationalExceptionPage = {
   nextCursor: string | null
 }
 
-export function listReviewCases(params: Record<string, string | undefined> = {}) {
+/** API-06 §6 审核队列筛选；status 省略时服务端默认 OPEN。 */
+export type ReviewCaseQueueQuery = {
+  projectId?: string
+  status?: string
+  origin?: string
+  taskId?: string
+  cursor?: string
+  limit?: string
+}
+
+export function listReviewCases(params: ReviewCaseQueueQuery = {}) {
   return apiGet<ReviewCaseQueuePage>('/review-cases', params)
 }
 
-export function listCorrectionCases(params: Record<string, string | undefined> = {}) {
+/**
+ * API-06 §6 整改队列筛选；status 省略时服务端默认 OPEN。
+ * Admin 运营默认仍显式传 IN_PROGRESS（与既有冒烟/客户端一致）。
+ */
+export type CorrectionCaseQueueQuery = {
+  projectId?: string
+  status?: string
+  taskId?: string
+  sourceReviewCaseId?: string
+  cursor?: string
+  limit?: string
+}
+
+export function listCorrectionCases(params: CorrectionCaseQueueQuery = {}) {
   return apiGet<CorrectionCaseQueuePage>('/correction-cases', {
-    status: params.status ?? 'IN_PROGRESS',
     ...params,
+    status: params.status ?? 'IN_PROGRESS',
   })
 }
 
