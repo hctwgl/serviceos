@@ -1,13 +1,13 @@
 ---
-title: Admin 试点可运行基线（含 M161 核心时间线深链）
+title: Admin 试点可运行基线（含 M162 最近活动深链）
 status: Implemented
 lastUpdated: 2026-07-17
 ---
 
-# Admin 试点可运行基线（含 M161 核心时间线深链）
+# Admin 试点可运行基线（含 M162 最近活动深链）
 
-本基线覆盖 M101～M161 已有 Admin 表面的可重复构建、登录、真实后端/数据库试点入口，并明确
-平台级未实现边界。M135～M161 追加补传复审、预约上门、提审外发 ACK、厂端回调、入站接单激活、
+本基线覆盖 M101～M162 已有 Admin 表面的可重复构建、登录、真实后端/数据库试点入口，并明确
+平台级未实现边界。M135～M162 追加补传复审、预约上门、提审外发 ACK、厂端回调、入站接单激活、
 Admin HTTP 人工初派、同单预约上门→表单/资料/驳回整改补传复审/外发/完结（`ADMIN-PILOT-09`）、
 入站 Envelope/Canonical 详情深链、专项队列与目录/SLA Accepted OpenAPI 筛选，以及工作区外发/审核/整改详情深链。
 
@@ -242,6 +242,11 @@ GitHub Actions 使用同一脚本阻断 PR，并保留 Backend、Admin 与 Playw
 已追加证明（M161 / ADMIN-PILOT-08CT）：
 
 - 权威核心时间线 → FormSubmission / EvidenceSetSnapshot 等已有详情页深链；
+- FieldOperation 详情、SavedView 仍未证明。
+
+已追加证明（M162 / ADMIN-PILOT-08AS）：
+
+- 最近活动摘要 → 已有详情页深链（与时间线白名单同构）；
 - FieldOperation 详情、SavedView 仍未证明。
 
 尚未证明：

@@ -463,6 +463,11 @@ const coreTimelineResourceLinks = computed((): TimelineResourceLink[] => {
   return collectTimelineResourceLinks(timelinePage.value?.items ?? [], 'core')
 })
 
+/** M162：最近活动摘要复用同一白名单；标签前缀 activity / 避免与核心时间线冲突。 */
+const activityResourceLinks = computed((): TimelineResourceLink[] => {
+  return collectTimelineResourceLinks(activity.value?.items ?? [], 'activity')
+})
+
 /** M155：复用已有 GET /appointments/{id}；与 Task 旁路并列。 */
 const appointmentDetailLinks = computed((): AppointmentDetailLink[] => {
   const section = sectionData.value?.appointmentsVisits
@@ -799,6 +804,19 @@ onMounted(() => {
             </li>
           </ul>
           <p v-else>暂无活动摘要</p>
+          <p v-if="activityResourceLinks.length" class="links activity-resource-links">
+            打开最近活动资源：
+            <RouterLink
+              v-for="item in activityResourceLinks"
+              :key="item.key"
+              :to="{
+                name: item.routeName,
+                params: { id: item.resourceId },
+              }"
+            >
+              {{ item.label }}
+            </RouterLink>
+          </p>
         </article>
 
         <article class="card">
