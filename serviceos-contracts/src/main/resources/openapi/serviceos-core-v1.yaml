@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.12
+  version: 1.0.13
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1446,6 +1446,9 @@ paths:
         M232：可选 `contactAttempts`（复用 Admin/NP 联系摘要字段集）；
         需 NETWORK `networkPortal.manageAppointment`，缺能力时省略（不得用空数组伪装）；
         覆盖本页 items[].taskIds。
+        M233：可选 `corrections`（复用 Admin WorkOrderWorkspaceCorrectionCaseSummary）；
+        需 NETWORK `evidence.read`，缺能力时省略（不得用空数组伪装）；
+        覆盖本页 items[].taskIds；含全部状态。
       parameters:
         - $ref: '#/components/parameters/NetworkContext'
         - $ref: '#/components/parameters/CorrelationId'
@@ -1521,6 +1524,9 @@ paths:
         M232：可选 `contactAttempts`（复用 Admin/NP 联系摘要字段集）；
         需 NETWORK `networkPortal.manageAppointment`，缺能力时省略（不得用空数组伪装）；
         覆盖本页 items[].taskId。
+        M233：可选 `corrections`（复用 Admin WorkOrderWorkspaceCorrectionCaseSummary）；
+        需 NETWORK `evidence.read`，缺能力时省略（不得用空数组伪装）；
+        覆盖本页 items[].taskId；含全部状态。
       parameters:
         - $ref: '#/components/parameters/NetworkContext'
         - $ref: '#/components/parameters/CorrelationId'
@@ -4969,6 +4975,14 @@ components:
           type: array
           maxItems: 100
           items: { $ref: '#/components/schemas/WorkOrderWorkspaceContactAttemptSummary' }
+        corrections:
+          description: |
+            M233：需 NETWORK evidence.read；缺能力时省略本属性；有能力且无实例时返回 []。
+            元素字段复用 WorkOrderWorkspaceCorrectionCaseSummary（无 createdBy/waiveNote）；
+            覆盖本页 items[].taskIds；含全部状态。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceCorrectionCaseSummary' }
         asOf: { type: string, format: date-time }
     NetworkPortalWorkOrderWorkspaceSlaSummary:
       type: object
@@ -5123,6 +5137,14 @@ components:
           type: array
           maxItems: 100
           items: { $ref: '#/components/schemas/WorkOrderWorkspaceContactAttemptSummary' }
+        corrections:
+          description: |
+            M233：需 NETWORK evidence.read；缺能力时省略本属性；有能力且无实例时返回 []。
+            元素字段复用 WorkOrderWorkspaceCorrectionCaseSummary（无 createdBy/waiveNote）；
+            覆盖本页 items[].taskId；含全部状态。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceCorrectionCaseSummary' }
         asOf: { type: string, format: date-time }
     NetworkPortalTechnicianItem:
       type: object

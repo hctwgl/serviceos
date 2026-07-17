@@ -17,6 +17,9 @@ import java.util.UUID;
  *
  * <p>M232：可选 {@code contactAttempts} 仅在工单/任务目录页填充；缺 NETWORK
  * {@code networkPortal.manageAppointment} 时为 null（省略）。</p>
+ *
+ * <p>M233：可选 {@code corrections} 仅在工单/任务目录页填充；缺 NETWORK
+ * {@code evidence.read} 时为 null（省略）。</p>
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record NetworkPortalPage<T>(
@@ -25,18 +28,20 @@ public record NetworkPortalPage<T>(
         Instant asOf,
         List<NetworkPortalTechnicianItem> technicians,
         List<NetworkPortalWorkspaceAppointmentSummary> appointments,
-        List<NetworkPortalWorkspaceContactAttemptSummary> contactAttempts
+        List<NetworkPortalWorkspaceContactAttemptSummary> contactAttempts,
+        List<NetworkPortalWorkspaceCorrectionCaseSummary> corrections
 ) {
     public NetworkPortalPage {
         items = items == null ? List.of() : List.copyOf(items);
         technicians = technicians == null ? null : List.copyOf(technicians);
         appointments = appointments == null ? null : List.copyOf(appointments);
         contactAttempts = contactAttempts == null ? null : List.copyOf(contactAttempts);
+        corrections = corrections == null ? null : List.copyOf(corrections);
     }
 
     /** 无旁载 enrichment 的列表页（纠正/异常/资质等）。 */
     public NetworkPortalPage(UUID networkId, List<T> items, Instant asOf) {
-        this(networkId, items, asOf, null, null, null);
+        this(networkId, items, asOf, null, null, null, null);
     }
 
     /** M230 兼容：仅师傅旁载。 */
@@ -46,7 +51,7 @@ public record NetworkPortalPage<T>(
             Instant asOf,
             List<NetworkPortalTechnicianItem> technicians
     ) {
-        this(networkId, items, asOf, technicians, null, null);
+        this(networkId, items, asOf, technicians, null, null, null);
     }
 
     /** M231 兼容：师傅 + 预约旁载。 */
@@ -57,6 +62,18 @@ public record NetworkPortalPage<T>(
             List<NetworkPortalTechnicianItem> technicians,
             List<NetworkPortalWorkspaceAppointmentSummary> appointments
     ) {
-        this(networkId, items, asOf, technicians, appointments, null);
+        this(networkId, items, asOf, technicians, appointments, null, null);
+    }
+
+    /** M232 兼容：师傅 + 预约 + 联系旁载。 */
+    public NetworkPortalPage(
+            UUID networkId,
+            List<T> items,
+            Instant asOf,
+            List<NetworkPortalTechnicianItem> technicians,
+            List<NetworkPortalWorkspaceAppointmentSummary> appointments,
+            List<NetworkPortalWorkspaceContactAttemptSummary> contactAttempts
+    ) {
+        this(networkId, items, asOf, technicians, appointments, contactAttempts, null);
     }
 }

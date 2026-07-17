@@ -383,6 +383,41 @@ class NetworkPortalReadPostgresIT {
     }
 
     @Test
+    void directoryCorrectionSummariesAreCapabilityGatedAndTaskScoped() {
+        String context = "NETWORK|NETWORK|" + NETWORK_A;
+        NetworkPortalPage<NetworkPortalWorkOrderItem> withoutCapWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-corr-omit-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> withoutCapTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-corr-omit-task", context);
+        assertThat(withoutCapWo.corrections()).isNull();
+        assertThat(withoutCapTasks.corrections()).isNull();
+
+        seedGrant(PRINCIPAL, "evidence.read", "NETWORK", NETWORK_A.toString());
+        NetworkPortalPage<NetworkPortalWorkOrderItem> emptyWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-corr-empty-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> emptyTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-corr-empty-task", context);
+        assertThat(emptyWo.corrections()).isEmpty();
+        assertThat(emptyTasks.corrections()).isEmpty();
+
+        UUID correctionA = seedOpenCorrection(TASK_A, "m233-a");
+        seedOpenCorrection(TASK_B, "m233-b");
+
+        NetworkPortalPage<NetworkPortalWorkOrderItem> withWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-corr-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> withTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-corr-task", context);
+        assertThat(withWo.corrections())
+                .extracting(NetworkPortalWorkspaceCorrectionCaseSummary::correctionCaseId)
+                .containsExactly(correctionA);
+        assertThat(withWo.corrections().getFirst().status()).isEqualTo("OPEN");
+        assertThat(withWo.corrections().getFirst().reasonCodes()).containsExactly("MISSING_PHOTO");
+        assertThat(withTasks.corrections())
+                .extracting(NetworkPortalWorkspaceCorrectionCaseSummary::correctionCaseId)
+                .containsExactly(correctionA);
+    }
+
+    @Test
     void workOrderWorkspaceTechnicianSummariesAreCapabilityGatedAndMatched() {
         String context = "NETWORK|NETWORK|" + NETWORK_A;
         // 临时撤掉夹具默认的 technician.readOwnNetwork，验证省略语义
@@ -1145,7 +1180,7 @@ class NetworkPortalReadPostgresIT {
         return itemId;
     }
 
-    /** M225：最小 OPEN CorrectionCase（复用既有 resolution，避免 generation 冲突）。 */
+    /** M225 / M233：最小 OPEN CorrectionCase（复用既有 resolution，避免 generation 冲突）。 */
     private UUID seedOpenCorrection(UUID taskId, String marker) {
         var task = jdbc.sql("""
                 SELECT project_id, configuration_bundle_id, configuration_bundle_digest
@@ -1161,6 +1196,42 @@ class NetworkPortalReadPostgresIT {
         UUID projectId = (UUID) task[0];
         UUID bundleId = (UUID) task[1];
         String bundleDigest = (String) task[2];
+        // resolution FK → prj_project / cfg_configuration_bundle；任务夹具可能只有孤儿 UUID
+        OffsetDateTime scopeNow = OffsetDateTime.ofInstant(
+                Instant.parse("2026-07-17T00:00:00Z"), ZoneOffset.UTC);
+        jdbc.sql("""
+                INSERT INTO prj_project (
+                    project_id, tenant_id, project_code, client_id, project_name,
+                    starts_on, ends_on, project_status, aggregate_version, created_at)
+                VALUES (
+                    :projectId, :tenantId, :code, 'BYD', 'M233 Correction fixture',
+                    DATE '2026-07-01', NULL, 'ACTIVE', 1, :createdAt)
+                ON CONFLICT (project_id) DO NOTHING
+                """)
+                .param("projectId", projectId)
+                .param("tenantId", TENANT)
+                .param("code", "M233-" + taskId.toString().substring(24))
+                .param("createdAt", scopeNow)
+                .update();
+        jdbc.sql("""
+                INSERT INTO cfg_configuration_bundle (
+                    bundle_id, tenant_id, project_id, bundle_code, bundle_version,
+                    brand_code, service_product_code, province_code, effective_from, effective_until,
+                    manifest_digest, status, published_at)
+                VALUES (
+                    :bundleId, :tenantId, :projectId, :bundleCode, '1.0.0',
+                    'BYD_OCEAN', 'HOME_CHARGING', NULL, :effectiveFrom, NULL,
+                    :manifestDigest, 'PUBLISHED', :publishedAt)
+                ON CONFLICT (bundle_id) DO NOTHING
+                """)
+                .param("bundleId", bundleId)
+                .param("tenantId", TENANT)
+                .param("projectId", projectId)
+                .param("bundleCode", "M233-BUNDLE-" + taskId.toString().substring(24))
+                .param("effectiveFrom", scopeNow)
+                .param("manifestDigest", bundleDigest)
+                .param("publishedAt", scopeNow)
+                .update();
         UUID resolutionId = jdbc.sql("""
                 SELECT resolution_id FROM evd_task_evidence_resolution
                  WHERE tenant_id=:tenant AND task_id=:task

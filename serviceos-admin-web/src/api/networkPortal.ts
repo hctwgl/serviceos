@@ -55,6 +55,8 @@ export type NetworkPortalPage<T> = {
   appointments?: NetworkPortalWorkspaceAppointmentSummary[]
   /** Soft-gated；缺 NETWORK `networkPortal.manageAppointment` 时省略（工单/任务目录页）。 */
   contactAttempts?: NetworkPortalWorkspaceContactAttemptSummary[]
+  /** Soft-gated；缺 NETWORK `evidence.read` 时省略（工单/任务目录页）。 */
+  corrections?: NetworkPortalWorkspaceCorrectionCaseSummary[]
 }
 
 export type NetworkPortalWorkOrderItem = {

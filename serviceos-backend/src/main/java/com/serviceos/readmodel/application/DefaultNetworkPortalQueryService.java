@@ -231,19 +231,23 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         }
         List<NetworkPortalWorkspaceAppointmentSummary> appointmentSummaries = null;
         List<NetworkPortalWorkspaceContactAttemptSummary> contactAttemptSummaries = null;
+        Set<UUID> pageTaskIds = new LinkedHashSet<>();
+        for (NetworkPortalWorkOrderItem item : workOrderItems) {
+            pageTaskIds.addAll(item.taskIds());
+        }
         if (hasNetworkCapability(actor, correlationId, MANAGE_APPOINTMENT, networkId)) {
-            Set<UUID> pageTaskIds = new LinkedHashSet<>();
-            for (NetworkPortalWorkOrderItem item : workOrderItems) {
-                pageTaskIds.addAll(item.taskIds());
-            }
             appointmentSummaries = loadAppointmentSummaries(
                     actor, correlationId, networkId, pageTaskIds);
             contactAttemptSummaries = loadContactAttemptSummaries(
                     actor, correlationId, pageTaskIds);
         }
+        List<NetworkPortalWorkspaceCorrectionCaseSummary> correctionSummaries = null;
+        if (hasNetworkCapability(actor, correlationId, EVIDENCE_READ, networkId)) {
+            correctionSummaries = loadCorrectionSummaries(actor, correlationId, pageTaskIds);
+        }
         return new NetworkPortalPage<>(
                 networkId, workOrderItems, clock.instant(),
-                technicianSummaries, appointmentSummaries, contactAttemptSummaries);
+                technicianSummaries, appointmentSummaries, contactAttemptSummaries, correctionSummaries);
     }
 
     @Override
@@ -576,7 +580,8 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     }
 
     /**
-     * M225：NETWORK evidence.read 已 soft-gate；仅 fan-in ACTIVE taskIds；含全部状态。
+     * M225 / M233：NETWORK evidence.read 已 soft-gate；仅 fan-in 给定 taskIds；含全部状态。
+     * 工作台传入 ACTIVE taskIds；目录页传入当前页 taskIds。
      */
     private List<NetworkPortalWorkspaceCorrectionCaseSummary> loadCorrectionSummaries(
             CurrentPrincipal actor,
@@ -866,19 +871,23 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         }
         List<NetworkPortalWorkspaceAppointmentSummary> appointmentSummaries = null;
         List<NetworkPortalWorkspaceContactAttemptSummary> contactAttemptSummaries = null;
+        Set<UUID> pageTaskIds = new LinkedHashSet<>();
+        for (NetworkPortalTaskItem item : taskItems) {
+            pageTaskIds.add(item.taskId());
+        }
         if (hasNetworkCapability(actor, correlationId, MANAGE_APPOINTMENT, networkId)) {
-            Set<UUID> pageTaskIds = new LinkedHashSet<>();
-            for (NetworkPortalTaskItem item : taskItems) {
-                pageTaskIds.add(item.taskId());
-            }
             appointmentSummaries = loadAppointmentSummaries(
                     actor, correlationId, networkId, pageTaskIds);
             contactAttemptSummaries = loadContactAttemptSummaries(
                     actor, correlationId, pageTaskIds);
         }
+        List<NetworkPortalWorkspaceCorrectionCaseSummary> correctionSummaries = null;
+        if (hasNetworkCapability(actor, correlationId, EVIDENCE_READ, networkId)) {
+            correctionSummaries = loadCorrectionSummaries(actor, correlationId, pageTaskIds);
+        }
         return new NetworkPortalPage<>(
                 networkId, taskItems, clock.instant(),
-                technicianSummaries, appointmentSummaries, contactAttemptSummaries);
+                technicianSummaries, appointmentSummaries, contactAttemptSummaries, correctionSummaries);
     }
 
     @Override
