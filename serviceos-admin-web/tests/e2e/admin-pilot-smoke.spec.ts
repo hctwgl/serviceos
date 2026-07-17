@@ -1697,7 +1697,7 @@ test('真实 OIDC 登录后可完成预约提议确认与上门签到签退', as
 })
 
 test('真实 OIDC 登录后可通过审核外发并经厂端回调关闭 CLIENT Case', async ({ page, request }) => {
-  test.setTimeout(180_000)
+  test.setTimeout(240_000)
   const workOrderCode = process.env.ADMIN_PILOT_OUTBOUND_WORK_ORDER_CODE
   const taskId = process.env.ADMIN_PILOT_OUTBOUND_TASK_ID
   expect(workOrderCode, '缺少动态外发验证工单编码').toBeTruthy()
@@ -1896,10 +1896,28 @@ test('真实 OIDC 登录后可通过审核外发并经厂端回调关闭 CLIENT 
     .toBe('CLIENT:APPROVED')
 
   // M163：厂端回调后核心时间线 → ExternalReviewReceipt 详情（GET /internal/...）。
+  // Inbox 投影可能晚于 CLIENT:APPROVED；轮询刷新工作区直至回执链接出现。
   await reviewPage.getByRole('link', { name: '工单目录' }).click()
-  await reviewPage.getByRole('link', { name: workOrderCode! }).click()
+  await expect(reviewPage.getByRole('heading', { name: '授权工单目录' })).toBeVisible()
+  await reviewPage.getByRole('link', { name: workOrderCode!, exact: true }).click()
   await expect(reviewPage.getByRole('heading', { name: '工单工作区' })).toBeVisible()
-  await expect(reviewPage.getByText('打开核心时间线资源：')).toBeVisible({ timeout: 30_000 })
+  const workspaceRefresh = reviewPage
+    .locator('header')
+    .filter({ hasText: '工单工作区' })
+    .getByRole('button', { name: '刷新' })
+  const receiptLink = reviewPage.locator('.core-timeline-resource-links').getByRole('link', {
+    name: /core\s*\/\s*evidence\.external-review-receipt-recorded\s*\/\s*ExternalReviewReceipt/,
+  })
+  await expect
+    .poll(
+      async () => {
+        await workspaceRefresh.click()
+        await expect(reviewPage.getByText('加载中…')).toHaveCount(0)
+        return receiptLink.count()
+      },
+      { timeout: 60_000 },
+    )
+    .toBeGreaterThan(0)
   const receiptDetailPromise = reviewPage.waitForResponse(
     (response) =>
       response.request().method() === 'GET' &&
@@ -1907,12 +1925,7 @@ test('真实 OIDC 登录后可通过审核外发并经厂端回调关闭 CLIENT 
         '/api/v1/internal/external-review-receipts/',
       ),
   )
-  await reviewPage
-    .locator('.core-timeline-resource-links')
-    .getByRole('link', {
-      name: /core\s*\/\s*evidence\.external-review-receipt-recorded\s*\/\s*ExternalReviewReceipt/,
-    })
-    .click()
+  await receiptLink.click()
   const receiptDetailResponse = await receiptDetailPromise
   expect(receiptDetailResponse.status()).toBe(200)
   const receiptBody = (await receiptDetailResponse.json()) as {
