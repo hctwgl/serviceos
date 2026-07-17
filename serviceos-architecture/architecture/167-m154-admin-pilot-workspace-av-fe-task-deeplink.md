@@ -22,7 +22,7 @@ lastUpdated: 2026-07-17
 
 1. `APPOINTMENTS_VISITS`：优先 appointments，其次 visits / contactAttempts，按 `taskId` 去重；
 2. `FORMS_EVIDENCE`：优先 formSubmissions，其次 forms / evidenceItems / evidenceSlots；
-3. Playwright：预约确认后证明 AV 深链；表单 VALIDATED 后证明 FE 深链。
+3. Playwright：预约确认后证明 AV 深链；Task 完结后证明 FE 深链（置于 complete 之后，避免打断双输入面板）。
 
 ## 3. 事务 / 授权 / 幂等
 

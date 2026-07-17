@@ -493,29 +493,6 @@ test('真实 OIDC 登录后可完成 Task 并可靠推进 Workflow 与 WorkOrder
   )
   await expect(page.getByLabel('resultDigest')).toHaveValue(submission.contentDigest)
 
-  // M154：工作区 FORMS_EVIDENCE → Task 详情旁路（无独立表单/资料详情页）。
-  await page.getByRole('link', { name: '工单目录' }).click()
-  await page.getByRole('link', { name: workOrderCode! }).click()
-  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
-  await page.getByRole('button', { name: /FORMS_EVIDENCE/ }).click()
-  await expect(page.getByText('区块加载中…')).toHaveCount(0)
-  await expect(page.getByText('打开表单资料关联任务：')).toBeVisible()
-  const workspaceFeTaskPromise = page.waitForResponse(
-    (response) =>
-      response.request().method() === 'GET' &&
-      new URL(response.url()).pathname === `/api/v1/tasks/${taskId}`,
-  )
-  await page
-    .getByRole('link', {
-      name: new RegExp(
-        `submission\\s*/\\s*admin\\.pilot-completion-form\\s*/\\s*VALIDATED\\s*/\\s*${taskId}`,
-      ),
-    })
-    .click()
-  expect((await workspaceFeTaskPromise).status()).toBe(200)
-  await expect(page.getByRole('heading', { name: '任务详情' })).toBeVisible()
-  await expect(page).toHaveURL(new RegExp(`/tasks/${taskId}$`))
-
   // M38/M39/M40 继续通过真实页面执行 Begin→本地私有 PUT→Finalize，
   // 等待扫描与机器校验 worker 将不可变 Revision 推进至 VALIDATED 后再冻结 Snapshot。
   await expect(page.getByRole('cell', { name: 'completion.photo', exact: true })).toBeVisible({
@@ -660,6 +637,29 @@ test('真实 OIDC 登录后可完成 Task 并可靠推进 Workflow 与 WorkOrder
     taskId,
     status: 'COMPLETED',
   })
+
+  // M154：完结后从工作区 FORMS_EVIDENCE 旁路回 Task（不得打断上方双输入 complete 面板状态）。
+  await page.getByRole('link', { name: '工单目录' }).click()
+  await page.getByRole('link', { name: workOrderCode! }).click()
+  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await page.getByRole('button', { name: /FORMS_EVIDENCE/ }).click()
+  await expect(page.getByText('区块加载中…')).toHaveCount(0)
+  await expect(page.getByText('打开表单资料关联任务：')).toBeVisible()
+  const workspaceFeTaskPromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname === `/api/v1/tasks/${taskId}`,
+  )
+  await page
+    .getByRole('link', {
+      name: new RegExp(
+        `submission\\s*/\\s*admin\\.pilot-completion-form\\s*/\\s*VALIDATED\\s*/\\s*${taskId}`,
+      ),
+    })
+    .click()
+  expect((await workspaceFeTaskPromise).status()).toBe(200)
+  await expect(page.getByRole('heading', { name: '任务详情' })).toBeVisible()
+  await expect(page).toHaveURL(new RegExp(`/tasks/${taskId}$`))
 })
 
 test('真实 OIDC 登录后审核驳回可进入整改队列并授权豁免整改 Task', async ({ page }) => {

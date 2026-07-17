@@ -10,7 +10,7 @@ lastUpdated: 2026-07-17
 | ID | 场景 | 期望 | 自动化入口 |
 |---|---|---|---|
 | M154-01 | APPOINTMENTS_VISITS → Task | 预约 CONFIRMED 后加载区块可见「打开预约上门关联任务」；点击后 `GET /api/v1/tasks/{taskId}` 200 | `admin-pilot-smoke.spec.ts`（现场履约） |
-| M154-02 | FORMS_EVIDENCE → Task | 表单 VALIDATED 后加载区块可见「打开表单资料关联任务」；点击后 Task GET 200 | `admin-pilot-smoke.spec.ts`（完结） |
+| M154-02 | FORMS_EVIDENCE → Task | Task 完结后加载区块可见「打开表单资料关联任务」；点击后 Task GET 200（断言放在 complete 之后，避免打断双输入面板状态） | `admin-pilot-smoke.spec.ts`（完结） |
 | M154-03 | 试点验收登记 | `ADMIN-PILOT-08AF` | `verify-admin-smoke.sh` |
 
 ## 明确不做
