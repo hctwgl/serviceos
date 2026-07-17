@@ -583,6 +583,11 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         if (hasNetworkCapability(actor, correlationId, TECHNICIAN_READ_OWN, networkId)) {
             pendingQualificationCount = countPendingQualifications(actor.tenantId(), networkId);
         }
+        NetworkPortalWorkOrderWorkspaceSlaSummary slaSummary = null;
+        if (hasNetworkCapability(actor, correlationId, SLA_READ, networkId)) {
+            slaSummary = loadWorkbenchSlaSummary(
+                    actor, correlationId, networkId, workOrders, activeTaskIds);
+        }
 
         return new NetworkPortalWorkbenchView(
                 networkId,
@@ -594,7 +599,55 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                 unassigned,
                 openCorrectionCaseCount,
                 openOperationalExceptionCount,
-                pendingQualificationCount);
+                pendingQualificationCount,
+                slaSummary);
+    }
+
+    /**
+     * M224：NETWORK sla.read 已 soft-gate；跨本网点 ACTIVE 工单 fan-in 后按 ACTIVE taskIds 计数。
+     */
+    private NetworkPortalWorkOrderWorkspaceSlaSummary loadWorkbenchSlaSummary(
+            CurrentPrincipal actor,
+            String correlationId,
+            UUID networkId,
+            Set<UUID> workOrderIds,
+            Set<UUID> activeTaskIds
+    ) {
+        Map<UUID, UUID> workOrderProjects = new LinkedHashMap<>();
+        for (UUID taskId : activeTaskIds) {
+            TaskFulfillmentContext task = tasks.find(actor.tenantId(), taskId).orElse(null);
+            if (task == null || task.projectId() == null || task.workOrderId() == null) {
+                continue;
+            }
+            if (!workOrderIds.contains(task.workOrderId())) {
+                continue;
+            }
+            workOrderProjects.putIfAbsent(task.workOrderId(), task.projectId());
+        }
+        int open = 0;
+        int breached = 0;
+        for (Map.Entry<UUID, UUID> entry : workOrderProjects.entrySet()) {
+            List<SlaInstanceItem> items = slaQueries.listForWorkOrderOnNetwork(
+                    actor,
+                    correlationId,
+                    entry.getKey(),
+                    entry.getValue(),
+                    networkId,
+                    null,
+                    SLA_WORKSPACE_LIMIT).items();
+            for (SlaInstanceItem item : items) {
+                if (item.taskId() == null || !activeTaskIds.contains(item.taskId())) {
+                    continue;
+                }
+                if (OPEN_SLA_STATUSES.contains(item.status())) {
+                    open++;
+                }
+                if ("BREACHED".equals(item.status())) {
+                    breached++;
+                }
+            }
+        }
+        return new NetworkPortalWorkOrderWorkspaceSlaSummary(open, breached);
     }
 
     /**

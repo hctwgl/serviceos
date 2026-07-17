@@ -80,6 +80,8 @@ export type NetworkPortalWorkbench = {
   openOperationalExceptionCount?: number
   /** 需 technician.readOwnNetwork；缺能力时省略 */
   pendingQualificationCount?: number
+  /** Soft-gated；缺 NETWORK `sla.read` 时省略，不得用 0 伪装无权限。 */
+  slaSummary?: NetworkPortalWorkOrderWorkspaceSlaSummary
 }
 
 function networkHeaders(networkContextId: string): Record<string, string> {

@@ -224,4 +224,5 @@
 - [M221 Network Portal 工作区薄 SLA 摘要验收矩阵](218-m221-network-portal-workspace-sla-summary-acceptance.md)
 - [M222 Network Portal 工作区 Visit/表单提交摘要验收矩阵](219-m222-network-portal-workspace-visit-form-summary-acceptance.md)
 - [M223 Network Portal 工作区 Evidence 槽位/资料项摘要验收矩阵](220-m223-network-portal-workspace-evidence-summary-acceptance.md)
+- [M224 Network Portal 工作台薄 SLA 风险计数验收矩阵](221-m224-network-portal-workbench-sla-risk-counts-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

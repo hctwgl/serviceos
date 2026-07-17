@@ -74,6 +74,19 @@ watch(() => props.networkContextId, () => {
             待审资质：{{ data.pendingQualificationCount }}
           </RouterLink>
         </li>
+        <li v-if="data.slaSummary" data-testid="workbench-sla-summary">
+          <span data-testid="workbench-sla-open-count">
+            SLA 风险（开放）：{{ data.slaSummary.openCount }}
+          </span>
+          <span class="muted"> / </span>
+          <span data-testid="workbench-sla-breached-count">
+            已超时：{{ data.slaSummary.breachedCount }}
+          </span>
+          <p class="hint">
+            需 NETWORK <code>sla.read</code>。仅统计本网点 ACTIVE 任务上 RUNNING/BREACHED
+            （breached ⊆ open）。无 SLA 详情表或深链。
+          </p>
+        </li>
       </ul>
       <div data-testid="network-workbench-capacity">
         <h3>

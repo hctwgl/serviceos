@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.3
+  version: 1.0.4
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1730,6 +1730,8 @@ paths:
         M194：X-Network-Context + networkTask.read。返回 ACTIVE 工单/任务/师傅计数与容量摘要。
         M207：附加能力门控发现计数；缺 enrichment 能力时省略对应可选属性（不得用 null/0 伪装无权限）；
         unassignedTechnicianTaskCount 在基座成功时始终返回。
+        M224：可选 `slaSummary`（openCount/breachedCount，语义同 M221）；需 NETWORK `sla.read`，
+        缺能力时省略该属性（不得用 0 伪装无权限）；按本网点全部 ACTIVE taskIds 聚合。
       parameters:
         - $ref: '#/components/parameters/NetworkContext'
         - $ref: '#/components/parameters/CorrelationId'
@@ -5080,6 +5082,11 @@ components:
           description: |
             本网点 ACTIVE 师傅的 PENDING 资质数；需 NETWORK technician.readOwnNetwork；
             缺能力时省略本属性。
+        slaSummary:
+          description: |
+            M224：需 NETWORK sla.read；缺能力时省略本属性；有能力且无实例时返回 0/0。
+            字段语义同 NetworkPortalWorkOrderWorkspaceSlaSummary（跨本网点全部 ACTIVE taskIds）。
+          $ref: '#/components/schemas/NetworkPortalWorkOrderWorkspaceSlaSummary'
     NetworkPortalCorrectionItem:
       type: object
       additionalProperties: false
