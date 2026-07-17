@@ -24,7 +24,8 @@ SLA 工作台 taskId → /tasks/{taskId}
 
 1. `WorkOrderWorkspacePage`：项目与当前任务 `RouterLink`；「打开 SLA 关联任务」；
 2. `SlaQueuePage`：列展示 `taskId`；「打开关联任务」；
-3. Playwright：工作区项目 GET；工作区/队列 SLA→Task GET。
+3. SLA→Task 链接文案为三段 `SLA / slaRef / taskId`，与权威区 `taskType / taskId` 消歧；
+4. Playwright：工作区项目 GET；工作区/队列 SLA→Task GET。
 
 ## 3. 事务 / 授权 / 幂等
 

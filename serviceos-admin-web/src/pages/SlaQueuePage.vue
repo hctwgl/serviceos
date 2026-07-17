@@ -123,7 +123,8 @@ onMounted(() => load())
         :key="`task-${item.slaInstanceId}`"
         :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: item.taskId } }"
       >
-        {{ item.slaRef || item.slaInstanceId }} / {{ item.taskId }}
+        <!-- 三段标签：避免与权威区「taskType / taskId」strict 冲突 -->
+        SLA / {{ item.slaRef || item.slaInstanceId }} / {{ item.taskId }}
       </RouterLink>
     </p>
   </section>
