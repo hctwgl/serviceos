@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import {
   listNetworkPortalQualifications,
   type NetworkPortalQualificationItem,
@@ -51,7 +52,14 @@ watch(() => props.networkContextId, () => {
       </thead>
       <tbody>
         <tr v-for="item in items" :key="item.id">
-          <td>{{ item.id }}</td>
+          <td>
+            <RouterLink
+              :to="`/network-portal/qualifications/${item.id}`"
+              data-testid="qualification-case-deeplink"
+            >
+              {{ item.id }}
+            </RouterLink>
+          </td>
           <td>{{ item.technicianProfileId }}</td>
           <td>{{ item.qualificationCode }}</td>
           <td>{{ item.status }}</td>

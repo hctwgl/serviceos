@@ -219,6 +219,7 @@ title: ServiceOS 里程碑索引
 | M208 | M208 Network Portal 产能页 | [221-m208-network-portal-capacity-page.md](../architecture/221-m208-network-portal-capacity-page.md) | [205-m208-network-portal-capacity-page-acceptance.md](../testing/205-m208-network-portal-capacity-page-acceptance.md) |
 | M209 | M209 Network Portal 整改详情只读 UI | [222-m209-network-portal-correction-detail.md](../architecture/222-m209-network-portal-correction-detail.md) | [206-m209-network-portal-correction-detail-acceptance.md](../testing/206-m209-network-portal-correction-detail-acceptance.md) |
 | M210 | M210 Network Portal 运营异常详情只读 UI | [223-m210-network-portal-exception-detail.md](../architecture/223-m210-network-portal-exception-detail.md) | [207-m210-network-portal-exception-detail-acceptance.md](../testing/207-m210-network-portal-exception-detail-acceptance.md) |
+| M211 | M211 Network Portal 资质详情只读 UI | [224-m211-network-portal-qualification-detail.md](../architecture/224-m211-network-portal-qualification-detail.md) | [208-m211-network-portal-qualification-detail-acceptance.md](../testing/208-m211-network-portal-qualification-detail-acceptance.md) |
 
 ## 未关联里程碑的文档
 
