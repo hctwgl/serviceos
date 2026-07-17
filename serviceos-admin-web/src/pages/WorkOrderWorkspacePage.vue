@@ -238,6 +238,12 @@ type TimelineResourceLink = {
   label: string
 }
 
+type RelatedTaskLink = {
+  key: string
+  taskId: string
+  label: string
+}
+
 /** 仅映射已有 Admin 详情路由；Appointment/Visit/Form 等无对等页时不渲染。 */
 const TIMELINE_RESOURCE_ROUTES: Record<string, string> = {
   WorkOrder: 'ADMIN.WORKORDER.WORKSPACE',
@@ -247,6 +253,26 @@ const TIMELINE_RESOURCE_ROUTES: Record<string, string> = {
   OutboundDelivery: 'ADMIN.INTEGRATION.DETAIL',
   OperationalException: 'ADMIN.EXCEPTION.DETAIL',
   SlaInstance: 'ADMIN.SLA.DETAIL',
+}
+
+function collectRelatedTaskLinks(
+  rows: unknown,
+  toLabel: (row: Record<string, unknown>, taskId: string) => string | null,
+): RelatedTaskLink[] {
+  if (!Array.isArray(rows)) return []
+  const seen = new Set<string>()
+  const links: RelatedTaskLink[] = []
+  for (const item of rows) {
+    if (!item || typeof item !== 'object') continue
+    const row = item as Record<string, unknown>
+    const taskId = typeof row.taskId === 'string' ? row.taskId : ''
+    if (!taskId || seen.has(taskId)) continue
+    const label = toLabel(row, taskId)
+    if (!label) continue
+    seen.add(taskId)
+    links.push({ key: taskId, taskId, label })
+  }
+  return links
 }
 
 const inboundEnvelopeLinks = computed((): InboundEnvelopeLink[] => {
@@ -386,6 +412,50 @@ const timelineResourceLinks = computed((): TimelineResourceLink[] => {
       }
     })
     .filter((item): item is TimelineResourceLink => item != null)
+})
+
+/**
+ * 预约/上门/联系尝试尚无独立 Admin 详情页；旁路到已 Implemented Task 详情
+ *（TaskFieldOpsPanel 承载现场操作）。
+ */
+const appointmentVisitTaskLinks = computed((): RelatedTaskLink[] => {
+  const section = sectionData.value?.appointmentsVisits
+  if (!section || activeSection.value !== 'APPOINTMENTS_VISITS') return []
+  const fromAppointments = collectRelatedTaskLinks(section.appointments, (row, taskId) => {
+    return `appointment / ${String(row.type ?? '—')} / ${String(row.status ?? '—')} / ${taskId}`
+  })
+  if (fromAppointments.length) return fromAppointments
+  const fromVisits = collectRelatedTaskLinks(section.visits, (row, taskId) => {
+    return `visit / ${String(row.status ?? '—')} / ${taskId}`
+  })
+  if (fromVisits.length) return fromVisits
+  return collectRelatedTaskLinks(section.contactAttempts, (row, taskId) => {
+    return `contact / ${String(row.channel ?? '—')} / ${String(row.resultCode ?? '—')} / ${taskId}`
+  })
+})
+
+/**
+ * 表单/资料尚无独立 Admin 详情页；旁路到已 Implemented Task 详情
+ *（TaskFormsEvidencePanel 承载编排）。
+ */
+const formsEvidenceTaskLinks = computed((): RelatedTaskLink[] => {
+  const section = sectionData.value?.formsEvidence
+  if (!section || activeSection.value !== 'FORMS_EVIDENCE') return []
+  const fromSubmissions = collectRelatedTaskLinks(section.formSubmissions, (row, taskId) => {
+    return `submission / ${String(row.formKey ?? '—')} / ${String(row.validationStatus ?? '—')} / ${taskId}`
+  })
+  if (fromSubmissions.length) return fromSubmissions
+  const fromForms = collectRelatedTaskLinks(section.forms, (row, taskId) => {
+    return `form / ${String(row.formKey ?? '—')} / ${taskId}`
+  })
+  if (fromForms.length) return fromForms
+  const fromItems = collectRelatedTaskLinks(section.evidenceItems, (row, taskId) => {
+    return `evidence-item / ${String(row.status ?? '—')} / ${taskId}`
+  })
+  if (fromItems.length) return fromItems
+  return collectRelatedTaskLinks(section.evidenceSlots, (row, taskId) => {
+    return `evidence-slot / ${String(row.requirementCode ?? '—')} / ${taskId}`
+  })
 })
 
 const slaRows = computed(() =>
@@ -771,6 +841,32 @@ onMounted(() => {
               :to="{
                 name: item.routeName,
                 params: { id: item.resourceId },
+              }"
+            >
+              {{ item.label }}
+            </RouterLink>
+          </p>
+          <p v-if="appointmentVisitTaskLinks.length" class="links appointment-visit-task-links">
+            打开预约上门关联任务：
+            <RouterLink
+              v-for="item in appointmentVisitTaskLinks"
+              :key="item.key"
+              :to="{
+                name: 'ADMIN.TASK.DETAIL',
+                params: { id: item.taskId },
+              }"
+            >
+              {{ item.label }}
+            </RouterLink>
+          </p>
+          <p v-if="formsEvidenceTaskLinks.length" class="links forms-evidence-task-links">
+            打开表单资料关联任务：
+            <RouterLink
+              v-for="item in formsEvidenceTaskLinks"
+              :key="item.key"
+              :to="{
+                name: 'ADMIN.TASK.DETAIL',
+                params: { id: item.taskId },
               }"
             >
               {{ item.label }}
