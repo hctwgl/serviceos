@@ -1201,9 +1201,16 @@ test('真实 OIDC 登录后可通过审核外发并经厂端回调关闭 CLIENT 
   )
   await reviewPage.getByRole('button', { name: '查询' }).click()
   expect((await queueFilterPromise).status()).toBe(200)
-  await expect(
-    reviewPage.getByRole('link', { name: externalOrderCode, exact: true }).first(),
-  ).toBeVisible()
+  const deliveryQueueLink = reviewPage
+    .getByRole('link', { name: externalOrderCode, exact: true })
+    .first()
+  await expect(deliveryQueueLink).toBeVisible()
+  // 从筛选结果深链回交付详情，再继续厂端回调与 CLIENT Case 断言。
+  await deliveryQueueLink.click()
+  await expect(reviewPage.getByRole('heading', { name: '外发交付' })).toBeVisible()
+  await expect(reviewPage).toHaveURL(
+    new RegExp(`/integration/outbound/${delivery.deliveryId}$`),
+  )
 
   // 厂端回调是 CPIM 签名入站，不走 Admin JWT；在同一浏览器链路后以协议方身份联调。
   const appKey = process.env.SERVICEOS_BYD_CPIM_APP_KEY ?? 'local-byd-app-key'
