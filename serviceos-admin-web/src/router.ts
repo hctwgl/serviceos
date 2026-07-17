@@ -53,6 +53,7 @@ import NetworkPortalCorrectionDetailPage from './pages/NetworkPortalCorrectionDe
 import NetworkPortalExceptionDetailPage from './pages/NetworkPortalExceptionDetailPage.vue'
 import NetworkPortalQualificationDetailPage from './pages/NetworkPortalQualificationDetailPage.vue'
 import NetworkPortalMembershipDetailPage from './pages/NetworkPortalMembershipDetailPage.vue'
+import NetworkPortalWorkOrderWorkspacePage from './pages/NetworkPortalWorkOrderWorkspacePage.vue'
 import NetworkPortalExceptionsPage from './pages/NetworkPortalExceptionsPage.vue'
 import NetworkPortalQualificationsPage from './pages/NetworkPortalQualificationsPage.vue'
 import NetworkPortalCapacityPage from './pages/NetworkPortalCapacityPage.vue'
@@ -234,6 +235,12 @@ export const router = createRouter({
           name: 'NETWORK.WORKORDER.LIST',
           component: NetworkPortalWorkOrdersPage,
           meta: { pageId: 'NETWORK.WORKORDER.LIST' },
+        },
+        {
+          path: 'work-orders/:id',
+          name: 'NETWORK.WORKORDER.WORKSPACE',
+          component: NetworkPortalWorkOrderWorkspacePage,
+          meta: { pageId: 'NETWORK.WORKORDER.WORKSPACE' },
         },
         {
           path: 'tasks',

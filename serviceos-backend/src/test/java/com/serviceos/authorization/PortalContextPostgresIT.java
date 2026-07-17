@@ -119,9 +119,9 @@ class PortalContextPostgresIT {
         assertThat(contexts.contexts()).extracting(c -> c.contextId()).contains(networkA, networkB);
 
         MeNavigationView navA = portal.navigation(actor(), "corr-nav-a", networkA, null);
-        assertThat(navA.navigationCatalogVersion()).isEqualTo("page-registry-v15");
+        assertThat(navA.navigationCatalogVersion()).isEqualTo("page-registry-v16");
         assertThat(navA.items()).extracting(i -> i.pageId())
-                .contains("NETWORK.TASK.QUEUE", "NETWORK.CAPACITY");
+                .contains("NETWORK.TASK.QUEUE", "NETWORK.CAPACITY", "NETWORK.WORKORDER.WORKSPACE");
 
         assertThatThrownBy(() -> portal.navigation(actor(), "corr-forged",
                 "NETWORK|NETWORK|" + UUID.randomUUID(), null))
@@ -138,7 +138,7 @@ class PortalContextPostgresIT {
     void m188_03_navigationUsesPageRegistryAndCapabilityGate() {
         String adminContext = "ADMIN|TENANT|" + TENANT;
         MeNavigationView nav = portal.navigation(actor(), "corr-nav", adminContext, null);
-        assertThat(nav.navigationCatalogVersion()).isEqualTo("page-registry-v15");
+        assertThat(nav.navigationCatalogVersion()).isEqualTo("page-registry-v16");
         assertThat(nav.items()).extracting(i -> i.pageId())
                 .contains("ADMIN.USER.DIRECTORY", "ADMIN.GRANT.DIRECTORY");
         assertThat(nav.items()).noneMatch(i -> i.pageId().startsWith("NETWORK."));

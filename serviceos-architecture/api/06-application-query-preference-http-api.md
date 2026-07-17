@@ -147,6 +147,15 @@ status: Accepted
   `/network-portal/technicians/memberships/:id` 只读详情；师傅列表关系 ID 深链。
   Page Registry 仍归属 `NETWORK.TECHNICIAN.LIST`（catalog **保持** `page-registry-v15`）。
   **不**接受操作员 NetworkMembership、Portal decide、新 pageId/capability。
+- §10 Network Portal 限定工单工作区（M213 窄接受）：新增
+  `GET /api/v1/network-portal/work-orders/{workOrderId}/workspace`
+  （`X-Network-Context` + NETWORK `networkTask.read` + ACTIVE NETWORK assignment 门禁；
+  无责任 → `ACCESS_DENIED`）。响应薄 DTO `NetworkPortalWorkOrderWorkspace`
+  （工单头 + ACTIVE 任务摘要；**不**复用 Admin workspace）。Page Registry
+  `NETWORK.WORKORDER.WORKSPACE`（catalog → `page-registry-v16`）。Admin Web
+  `/network-portal/work-orders/:id`。Core OpenAPI → `1.0.0`。
+  **不**接受 Admin workspace 直调、客户 PII、INTEGRATION、Portal ACK、notifications、
+  FieldOperation、完整 §6.1 SLA/Visit/表单区块发明。
 - §11 Technician Portal Feed 子集（M195）：仅
   `GET /api/v1/technician/me/task-feed`（可选 `sinceCursor` 不透明游标；ACTIVE TECHNICIAN
   ServiceAssignment / TaskAssignment；撤权/结束时 tombstone 仅含 `taskId` +
@@ -374,6 +383,7 @@ View 保存 filter AST、列、排序和密度，不保存任意 SQL、访问 to
 |---|---|---|
 | `GET /api/v1/network-portal/workbench` | 当前 NetworkMembership 工作台（计数/摘要；M207 能力门控 enrichment） | M194 / M207 Accepted |
 | `GET /api/v1/network-portal/work-orders` | 当前 ACTIVE assignment 工单 | M194 Accepted |
+| `GET /api/v1/network-portal/work-orders/{workOrderId}/workspace` | 限定工单工作区薄快照 | M213 Accepted |
 | `GET /api/v1/network-portal/tasks` | 本网点 Task | M194 Accepted |
 | `GET /api/v1/network-portal/technicians` | 本网点师傅/能力/资质摘要 | M194 Accepted |
 | `GET /api/v1/network-portal/capacity` | 本网点容量和派单状态（M208 注册 `NETWORK.CAPACITY` 页壳；无新路径） | M194 Accepted；M208 页壳 |

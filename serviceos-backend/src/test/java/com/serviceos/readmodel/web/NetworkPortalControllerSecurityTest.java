@@ -12,6 +12,8 @@ import com.serviceos.readmodel.api.NetworkPortalQualificationItem;
 import com.serviceos.readmodel.api.NetworkPortalQueryService;
 import com.serviceos.readmodel.api.NetworkPortalWorkbenchView;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderItem;
+import com.serviceos.readmodel.api.NetworkPortalWorkOrderWorkspace;
+import com.serviceos.readmodel.api.NetworkPortalTaskItem;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
 import org.junit.jupiter.api.Test;
@@ -43,6 +45,7 @@ class NetworkPortalControllerSecurityTest {
     private static final UUID EXCEPTION_ID = UUID.fromString("019f83f0-bbbb-7f8c-9505-36fe5c0e8812");
     private static final UUID QUALIFICATION_ID = UUID.fromString("019f85d0-bbbb-7f8c-9505-36fe5c0e8813");
     private static final UUID MEMBERSHIP_ID = UUID.fromString("019f85d0-cccc-7f8c-9505-36fe5c0e8814");
+    private static final UUID WORK_ORDER_ID = UUID.fromString("019f83a0-7777-7f8c-9505-36fe5c0e8808");
 
     @Autowired MockMvc mvc;
     @MockitoBean NetworkPortalQueryService queries;
@@ -77,6 +80,9 @@ class NetworkPortalControllerSecurityTest {
         mvc.perform(get("/api/v1/network-portal/technician-memberships/" + MEMBERSHIP_ID)
                         .header("X-Network-Context", "NETWORK|NETWORK|" + NETWORK_ID))
                 .andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/network-portal/work-orders/" + WORK_ORDER_ID + "/workspace")
+                        .header("X-Network-Context", "NETWORK|NETWORK|" + NETWORK_ID))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -100,7 +106,7 @@ class NetworkPortalControllerSecurityTest {
     void authenticatedMemberGetsWorkOrders() throws Exception {
         CurrentPrincipal actor = actor();
         Instant now = Instant.parse("2026-07-17T12:00:00Z");
-        UUID workOrderId = UUID.fromString("019f83a0-7777-7f8c-9505-36fe5c0e8808");
+        UUID workOrderId = WORK_ORDER_ID;
         when(principals.current()).thenReturn(actor);
         when(queries.listWorkOrders(eq(actor), eq("corr-ok"), eq("NETWORK|NETWORK|" + NETWORK_ID)))
                 .thenReturn(new NetworkPortalPage<>(
@@ -118,6 +124,37 @@ class NetworkPortalControllerSecurityTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.networkId").value(NETWORK_ID.toString()))
                 .andExpect(jsonPath("$.items[0].workOrderId").value(workOrderId.toString()));
+    }
+
+    @Test
+    void authenticatedMemberGetsWorkOrderWorkspace() throws Exception {
+        CurrentPrincipal actor = actor();
+        Instant now = Instant.parse("2026-07-17T12:00:00Z");
+        UUID taskId = UUID.fromString("019f83a0-9999-7f8c-9505-36fe5c0e880a");
+        when(principals.current()).thenReturn(actor);
+        when(queries.getWorkOrderWorkspace(
+                eq(actor), eq("corr-ws"), eq("NETWORK|NETWORK|" + NETWORK_ID), eq(WORK_ORDER_ID)))
+                .thenReturn(new NetworkPortalWorkOrderWorkspace(
+                        NETWORK_ID,
+                        WORK_ORDER_ID,
+                        null,
+                        List.of(taskId),
+                        "INSTALLATION",
+                        "tech-1",
+                        now,
+                        List.of(new NetworkPortalTaskItem(
+                                taskId, WORK_ORDER_ID, null, "INSTALL", "HUMAN", "S1",
+                                "READY", "INSTALLATION", "tech-1", now)),
+                        now));
+
+        mvc.perform(get("/api/v1/network-portal/work-orders/" + WORK_ORDER_ID + "/workspace")
+                        .with(jwt().jwt(token -> token.subject("external-subject")
+                                .claim("tenant_id", "tenant-a")))
+                        .header("X-Correlation-Id", "corr-ws")
+                        .header("X-Network-Context", "NETWORK|NETWORK|" + NETWORK_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.workOrderId").value(WORK_ORDER_ID.toString()))
+                .andExpect(jsonPath("$.tasks[0].taskId").value(taskId.toString()));
     }
 
     @Test

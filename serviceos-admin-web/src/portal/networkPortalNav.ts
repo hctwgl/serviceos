@@ -100,6 +100,8 @@ export function networkPortalRoutePath(pageId: string): string {
       return '/network-portal/workbench'
     case 'NETWORK.WORKORDER.LIST':
       return '/network-portal/work-orders'
+    case 'NETWORK.WORKORDER.WORKSPACE':
+      return '/network-portal/work-orders'
     case 'NETWORK.TASK.QUEUE':
       return '/network-portal/tasks'
     case 'NETWORK.TECHNICIAN.LIST':

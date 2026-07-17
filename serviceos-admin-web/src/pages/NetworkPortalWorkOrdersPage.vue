@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import {
   listNetworkPortalWorkOrders,
   type NetworkPortalWorkOrderItem,
@@ -34,7 +35,7 @@ watch(() => props.networkContextId, () => {
 </script>
 
 <template>
-  <section data-testid="network-portal-work-orders">
+  <section data-testid="network-portal-work-orders" data-page-id="NETWORK.WORKORDER.LIST">
     <h2>本网点工单</h2>
     <p v-if="error" data-testid="network-portal-error">{{ error }}</p>
     <table v-else data-testid="network-work-orders-table">
@@ -48,7 +49,14 @@ watch(() => props.networkContextId, () => {
       </thead>
       <tbody>
         <tr v-for="item in items" :key="item.workOrderId">
-          <td>{{ item.workOrderId }}</td>
+          <td>
+            <RouterLink
+              :to="`/network-portal/work-orders/${item.workOrderId}`"
+              data-testid="work-order-workspace-deeplink"
+            >
+              {{ item.workOrderId }}
+            </RouterLink>
+          </td>
           <td>{{ item.taskIds.length }}</td>
           <td>{{ item.businessType ?? '—' }}</td>
           <td>{{ item.technicianId ?? '—' }}</td>

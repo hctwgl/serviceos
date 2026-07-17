@@ -94,6 +94,30 @@ export function listNetworkPortalWorkOrders(networkContextId: string) {
   )
 }
 
+/** M213：限定工单工作区薄快照（ACTIVE NETWORK 责任门禁）。 */
+export type NetworkPortalWorkOrderWorkspace = {
+  networkId: string
+  workOrderId: string
+  projectId: string | null
+  taskIds: string[]
+  businessType: string | null
+  technicianId: string | null
+  effectiveFrom: string | null
+  tasks: NetworkPortalTaskItem[]
+  asOf: string
+}
+
+export function getNetworkPortalWorkOrderWorkspace(
+  networkContextId: string,
+  workOrderId: string,
+) {
+  return apiGet<NetworkPortalWorkOrderWorkspace>(
+    `/network-portal/work-orders/${workOrderId}/workspace`,
+    {},
+    networkHeaders(networkContextId),
+  )
+}
+
 export function listNetworkPortalTasks(networkContextId: string) {
   return apiGet<NetworkPortalPage<NetworkPortalTaskItem>>(
     '/network-portal/tasks',

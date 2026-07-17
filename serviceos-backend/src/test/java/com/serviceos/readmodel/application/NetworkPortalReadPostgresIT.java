@@ -9,6 +9,7 @@ import com.serviceos.readmodel.api.NetworkPortalTaskItem;
 import com.serviceos.readmodel.api.NetworkPortalTechnicianItem;
 import com.serviceos.readmodel.api.NetworkPortalWorkbenchView;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderItem;
+import com.serviceos.readmodel.api.NetworkPortalWorkOrderWorkspace;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
 import org.flywaydb.core.Flyway;
@@ -146,6 +147,29 @@ class NetworkPortalReadPostgresIT {
         NetworkPortalPage<NetworkPortalWorkOrderItem> byUuid =
                 portal.listWorkOrders(actor(PRINCIPAL), "corr-uuid", NETWORK_A.toString());
         assertThat(byUuid.items()).hasSize(1);
+    }
+
+    @Test
+    void workOrderWorkspaceReturnsActiveTasksAndDeniesForeignWorkOrders() {
+        String context = "NETWORK|NETWORK|" + NETWORK_A;
+        NetworkPortalWorkOrderWorkspace workspace = portal.getWorkOrderWorkspace(
+                actor(PRINCIPAL), "corr-ws", context, WO_A);
+        assertThat(workspace.networkId()).isEqualTo(NETWORK_A);
+        assertThat(workspace.workOrderId()).isEqualTo(WO_A);
+        assertThat(workspace.taskIds()).containsExactly(TASK_A);
+        assertThat(workspace.tasks()).extracting(NetworkPortalTaskItem::taskId).containsExactly(TASK_A);
+        assertThat(workspace.tasks().getFirst().status()).isEqualTo("READY");
+        assertThat(workspace.technicianId()).isEqualTo("tech-a");
+
+        assertThatThrownBy(() -> portal.getWorkOrderWorkspace(
+                actor(PRINCIPAL), "corr-ws-foreign", context, WO_B))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        p -> assertThat(p.code()).isEqualTo(ProblemCode.ACCESS_DENIED));
+
+        assertThatThrownBy(() -> portal.getWorkOrderWorkspace(
+                actor(PRINCIPAL), "corr-ws-unknown", context, UUID.randomUUID()))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        p -> assertThat(p.code()).isEqualTo(ProblemCode.ACCESS_DENIED));
     }
 
     @Test

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.99.0
+  version: 1.0.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1448,6 +1448,32 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+  /network-portal/work-orders/{workOrderId}/workspace:
+    get:
+      operationId: getNetworkPortalWorkOrderWorkspace
+      summary: Network Portal 限定工单工作区（薄快照）
+      description: |
+        M213：X-Network-Context + NETWORK scope networkTask.read。
+        仅当 workOrderId 对本网点存在 ACTIVE NETWORK ServiceAssignment 时返回；
+        否则 ACCESS_DENIED（改派后旧 URL 失败关闭）。**不**复用 Admin WorkOrderWorkspace；
+        响应为安全薄 DTO（工单头 + 本网点 ACTIVE 任务摘要），不含 INTEGRATION/定价/PII。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - name: workOrderId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 限定工单工作区薄快照
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkPortalWorkOrderWorkspace' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
   /network-portal/tasks:
     get:
       operationId: listNetworkPortalTasks
@@ -4877,6 +4903,23 @@ components:
       properties:
         networkId: { type: string, format: uuid }
         items: { type: array, items: { $ref: '#/components/schemas/NetworkPortalWorkOrderItem' } }
+        asOf: { type: string, format: date-time }
+    NetworkPortalWorkOrderWorkspace:
+      type: object
+      additionalProperties: false
+      required: [networkId, workOrderId, taskIds, tasks, asOf]
+      properties:
+        networkId: { type: string, format: uuid }
+        workOrderId: { type: string, format: uuid }
+        projectId: { type: [string, 'null'], format: uuid }
+        taskIds: { type: array, maxItems: 100, items: { type: string, format: uuid } }
+        businessType: { type: [string, 'null'], maxLength: 100 }
+        technicianId: { type: [string, 'null'], maxLength: 128 }
+        effectiveFrom: { type: [string, 'null'], format: date-time }
+        tasks:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/NetworkPortalTaskItem' }
         asOf: { type: string, format: date-time }
     NetworkPortalTaskItem:
       type: object

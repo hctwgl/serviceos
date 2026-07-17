@@ -14,6 +14,7 @@ import com.serviceos.readmodel.api.NetworkPortalTaskItem;
 import com.serviceos.readmodel.api.NetworkPortalTechnicianItem;
 import com.serviceos.readmodel.api.NetworkPortalWorkbenchView;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderItem;
+import com.serviceos.readmodel.api.NetworkPortalWorkOrderWorkspace;
 import com.serviceos.shared.CorrelationIds;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -49,6 +50,19 @@ final class NetworkPortalController {
             @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
     ) {
         return response(queries.listWorkOrders(principals.current(), correlationId, networkContext), correlationId);
+    }
+
+    @GetMapping("/work-orders/{workOrderId}/workspace")
+    ResponseEntity<NetworkPortalWorkOrderWorkspace> workOrderWorkspace(
+            @PathVariable("workOrderId") UUID workOrderId,
+            @RequestHeader(value = "X-Network-Context", required = false) String networkContext,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        NetworkPortalWorkOrderWorkspace body = queries.getWorkOrderWorkspace(
+                principals.current(), correlationId, networkContext, workOrderId);
+        return ResponseEntity.ok()
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(body);
     }
 
     @GetMapping("/tasks")

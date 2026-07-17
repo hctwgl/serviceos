@@ -33,6 +33,7 @@ import com.serviceos.readmodel.api.NetworkPortalTaskItem;
 import com.serviceos.readmodel.api.NetworkPortalTechnicianItem;
 import com.serviceos.readmodel.api.NetworkPortalWorkbenchView;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderItem;
+import com.serviceos.readmodel.api.NetworkPortalWorkOrderWorkspace;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.task.api.TaskFulfillmentContext;
@@ -152,6 +153,71 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
             }
         }
         return new NetworkPortalPage<>(networkId, List.copyOf(byWorkOrder.values()), clock.instant());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public NetworkPortalWorkOrderWorkspace getWorkOrderWorkspace(
+            CurrentPrincipal actor,
+            String correlationId,
+            String networkContextHeader,
+            UUID workOrderId
+    ) {
+        UUID networkId = requireAuthorizedNetwork(actor, correlationId, networkContextHeader, NETWORK_TASK_READ);
+        Objects.requireNonNull(workOrderId, "workOrderId");
+        List<NetworkActiveAssignmentView> active = assignments.listActiveForNetwork(
+                actor.tenantId(), networkId.toString());
+        List<NetworkActiveAssignmentView> forWorkOrder = active.stream()
+                .filter(row -> workOrderId.equals(row.workOrderId()))
+                .toList();
+        if (forWorkOrder.isEmpty()) {
+            throw new BusinessProblem(ProblemCode.ACCESS_DENIED, "工单不在本网点 ACTIVE 责任范围");
+        }
+        List<UUID> taskIds = new ArrayList<>();
+        List<NetworkPortalTaskItem> taskItems = new ArrayList<>();
+        UUID projectId = null;
+        String businessType = null;
+        String technicianId = null;
+        Instant effectiveFrom = null;
+        for (NetworkActiveAssignmentView row : forWorkOrder) {
+            if (!taskIds.contains(row.taskId())) {
+                taskIds.add(row.taskId());
+            }
+            if (businessType == null) {
+                businessType = row.businessType();
+            }
+            if (technicianId == null) {
+                technicianId = row.technicianId();
+            }
+            if (effectiveFrom == null) {
+                effectiveFrom = row.effectiveFrom();
+            }
+            TaskFulfillmentContext task = tasks.find(actor.tenantId(), row.taskId()).orElse(null);
+            if (projectId == null && task != null) {
+                projectId = task.projectId();
+            }
+            taskItems.add(new NetworkPortalTaskItem(
+                    row.taskId(),
+                    row.workOrderId(),
+                    task == null ? null : task.projectId(),
+                    task == null ? null : task.taskType(),
+                    task == null ? null : task.taskKind(),
+                    task == null ? null : task.stageCode(),
+                    task == null ? null : task.status(),
+                    row.businessType(),
+                    row.technicianId(),
+                    row.effectiveFrom()));
+        }
+        return new NetworkPortalWorkOrderWorkspace(
+                networkId,
+                workOrderId,
+                projectId,
+                taskIds,
+                businessType,
+                technicianId,
+                effectiveFrom,
+                taskItems,
+                clock.instant());
     }
 
     @Override

@@ -50,7 +50,7 @@ async function stubNetworkQualificationDetail(page: Page) {
         contextId: CONTEXT_ID,
         portal: 'NETWORK',
         contextVersion: 'ctx-v1',
-        navigationCatalogVersion: 'page-registry-v15',
+        navigationCatalogVersion: 'page-registry-v16',
         asOf: '2026-07-17T12:00:00Z',
         items: [
           {

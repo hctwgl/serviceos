@@ -10,6 +10,16 @@ public interface NetworkPortalQueryService {
     NetworkPortalPage<NetworkPortalWorkOrderItem> listWorkOrders(
             CurrentPrincipal actor, String correlationId, String networkContextHeader);
 
+    /**
+     * 本网点限定工单工作区。需要 ACTIVE membership + NETWORK {@code networkTask.read}，
+     * 且 workOrderId 对本网点存在 ACTIVE NETWORK ServiceAssignment。
+     */
+    NetworkPortalWorkOrderWorkspace getWorkOrderWorkspace(
+            CurrentPrincipal actor,
+            String correlationId,
+            String networkContextHeader,
+            UUID workOrderId);
+
     NetworkPortalPage<NetworkPortalTaskItem> listTasks(
             CurrentPrincipal actor, String correlationId, String networkContextHeader);
 
