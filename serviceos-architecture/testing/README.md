@@ -200,4 +200,5 @@
 - [M197 Network Portal 预约协作验收矩阵](194-m197-network-portal-appointments-acceptance.md)
 - [M198 Network Portal 预约生命周期（改约/取消）验收矩阵](195-m198-network-portal-appointment-lifecycle-acceptance.md)
 - [M199 Network Portal 爽约与联系尝试验收矩阵](196-m199-network-portal-no-show-contact-acceptance.md)
+- [M200 Network Portal 改派师傅验收矩阵](197-m200-network-portal-reassign-technician-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.91.0
+  version: 0.92.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1539,6 +1539,40 @@ paths:
       responses:
         '200':
           description: 双责任已激活或幂等回放
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ManualServiceAssignmentReceipt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /network-portal/tasks/{taskId}:reassign-technician:
+    post:
+      operationId: reassignNetworkPortalTechnician
+      summary: Network Portal 为本网点任务改派师傅
+      description: |
+        M200：X-Network-Context + NETWORK scope networkPortal.reassignTechnician。
+        请求体含 technicianAssigneeId、businessType、reasonCode；不含 networkAssigneeId。
+        要求已有 ACTIVE NETWORK=上下文网点与不同 ACTIVE TECHNICIAN；委托 ManualReassign
+        （ServiceAssignment prepare supersedes → confirm → activate → complete）。
+        无 ACTIVE TECHNICIAN 时返回 VALIDATION_FAILED（应使用 assign-technician）。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NetworkPortalReassignTechnicianRequest' }
+      responses:
+        '200':
+          description: 师傅责任已切换或幂等回放
           headers:
             X-Correlation-Id: { required: true, schema: { type: string } }
           content:
@@ -6636,6 +6670,18 @@ components:
           maxLength: 128
           description: 师傅 assignee（通常为 technicianProfileId）；不得携带 networkAssigneeId
         businessType: { type: string, minLength: 1, maxLength: 100 }
+    NetworkPortalReassignTechnicianRequest:
+      type: object
+      additionalProperties: false
+      required: [technicianAssigneeId, businessType, reasonCode]
+      properties:
+        technicianAssigneeId:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: 目标师傅 assignee（通常为 technicianProfileId）；不得携带 networkAssigneeId
+        businessType: { type: string, minLength: 1, maxLength: 100 }
+        reasonCode: { type: string, pattern: '^[A-Z][A-Z0-9_]{1,99}$' }
     ManualServiceAssignmentReceipt:
       type: object
       additionalProperties: false

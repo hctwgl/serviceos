@@ -11,6 +11,7 @@ import {
   markNetworkPortalAppointmentNoShow,
   proposeNetworkPortalAppointment,
   recordNetworkPortalTaskContactAttempt,
+  reassignNetworkPortalTechnician,
   rescheduleNetworkPortalAppointment,
   type NetworkPortalAppointment,
   type NetworkPortalContactAttempt,
@@ -31,6 +32,10 @@ const businessType = ref('INSTALLATION')
 const assignBusy = ref(false)
 const assignError = ref<string | null>(null)
 const assignMessage = ref<string | null>(null)
+const reassignReason = ref('MANUAL_REASSIGNMENT')
+const reassignBusy = ref(false)
+const reassignError = ref<string | null>(null)
+const reassignMessage = ref<string | null>(null)
 
 const appointmentType = ref('SURVEY')
 const addressRef = ref('network-portal-address')
@@ -148,6 +153,38 @@ async function submitAssign() {
     assignError.value = err instanceof Error ? err.message : '指派师傅失败'
   } finally {
     assignBusy.value = false
+  }
+}
+
+async function submitReassign() {
+  if (!props.networkContextId) {
+    reassignError.value = '请选择 NETWORK 上下文'
+    return
+  }
+  if (!selectedTaskId.value || !selectedTechnicianId.value) {
+    reassignError.value = '请选择任务与目标师傅'
+    return
+  }
+  reassignBusy.value = true
+  reassignError.value = null
+  reassignMessage.value = null
+  try {
+    const result = await reassignNetworkPortalTechnician(
+      props.networkContextId,
+      selectedTaskId.value,
+      {
+        technicianAssigneeId: selectedTechnicianId.value,
+        businessType: businessType.value.trim() || 'INSTALLATION',
+        reasonCode: reassignReason.value.trim() || 'MANUAL_REASSIGNMENT',
+      },
+    )
+    reassignMessage.value =
+      `已改派 network=${result.data.networkAssigneeId} tech=${result.data.technicianAssigneeId}`
+    await load()
+  } catch (err) {
+    reassignError.value = err instanceof Error ? err.message : '改派师傅失败'
+  } finally {
+    reassignBusy.value = false
   }
 }
 
@@ -424,6 +461,14 @@ watch(selectedTaskId, () => {
         业务类型
         <input v-model="businessType" data-testid="assign-business-type" aria-label="business type" />
       </label>
+      <label>
+        改派原因
+        <input
+          v-model="reassignReason"
+          data-testid="reassign-reason"
+          aria-label="reassign reason"
+        />
+      </label>
       <button
         type="submit"
         data-testid="assign-technician-submit"
@@ -431,8 +476,18 @@ watch(selectedTaskId, () => {
       >
         指派师傅
       </button>
+      <button
+        type="button"
+        data-testid="reassign-technician-submit"
+        :disabled="reassignBusy || !props.networkContextId"
+        @click="submitReassign"
+      >
+        改派师傅
+      </button>
       <p v-if="assignError" class="error" data-testid="assign-technician-error">{{ assignError }}</p>
       <p v-if="assignMessage" class="ok" data-testid="assign-technician-message">{{ assignMessage }}</p>
+      <p v-if="reassignError" class="error" data-testid="reassign-technician-error">{{ reassignError }}</p>
+      <p v-if="reassignMessage" class="ok" data-testid="reassign-technician-message">{{ reassignMessage }}</p>
     </form>
 
     <form

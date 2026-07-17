@@ -105,6 +105,23 @@ export type ManualServiceAssignmentReceipt = {
   occurredAt: string
 }
 
+/** M200：同网点改派师傅；需已有不同 ACTIVE TECHNICIAN。 */
+export function reassignNetworkPortalTechnician(
+  networkContextId: string,
+  taskId: string,
+  body: { technicianAssigneeId: string; businessType: string; reasonCode: string },
+  idempotencyKey = crypto.randomUUID(),
+) {
+  return apiPost<ManualServiceAssignmentReceipt>(
+    `/network-portal/tasks/${taskId}:reassign-technician`,
+    {
+      body,
+      idempotencyKey,
+      headers: networkHeaders(networkContextId),
+    },
+  )
+}
+
 /** M196：指派师傅；不提交 networkAssigneeId，服务端强制等于可信上下文网点。 */
 export function assignNetworkPortalTechnician(
   networkContextId: string,

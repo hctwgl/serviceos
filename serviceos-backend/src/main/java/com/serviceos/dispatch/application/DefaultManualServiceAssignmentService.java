@@ -6,6 +6,7 @@ import com.serviceos.dispatch.api.CompleteServiceAssignmentActivationCommand;
 import com.serviceos.dispatch.api.ConfigureCapacityCommand;
 import com.serviceos.dispatch.api.ConfirmTaskAssignmentPreparedCommand;
 import com.serviceos.dispatch.api.ManualAssignServiceAssignmentCommand;
+import com.serviceos.dispatch.api.ManualReassignTechnicianCommand;
 import com.serviceos.dispatch.api.ManualServiceAssignmentReceipt;
 import com.serviceos.dispatch.api.ManualServiceAssignmentService;
 import com.serviceos.dispatch.api.PrepareServiceAssignmentCommand;
@@ -26,11 +27,11 @@ import java.time.Clock;
 import java.util.UUID;
 
 /**
- * M144：将已 Implemented 的容量与激活 saga SPI 编排为 Admin 人工初派用例。
+ * M144/M200：将已 Implemented 的容量与激活 saga SPI 编排为 Admin/Portal 人工初派与改派用例。
  * <p>
- * 事务边界：双责任激活同事务提交，避免 NETWORK 已 ACTIVE 而 TECHNICIAN 失败的半成品。
+ * 事务边界：双责任激活/改派同事务提交，避免 NETWORK 已 ACTIVE 而 TECHNICIAN 失败的半成品。
  * 幂等：子步骤键由 HTTP Idempotency-Key 派生，重复请求走 SPI 冻结回放。
- * 明确不做：硬过滤重跑、评分、DispatchDecision、ServiceNetwork 生命周期、改派。
+ * 明确不做：硬过滤重跑、评分、DispatchDecision、ServiceNetwork 生命周期、跨网点改派。
  */
 @Service
 final class DefaultManualServiceAssignmentService implements ManualServiceAssignmentService {
@@ -91,6 +92,94 @@ final class DefaultManualServiceAssignmentService implements ManualServiceAssign
                 network.serviceAssignmentId(), technician.serviceAssignmentId(),
                 command.networkAssigneeId(), command.technicianAssigneeId(),
                 clock.instant());
+    }
+
+    @Override
+    @Transactional
+    public ManualServiceAssignmentReceipt reassignTechnician(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            ManualReassignTechnicianCommand command
+    ) {
+        TaskFulfillmentContext task = tasks.find(principal.tenantId(), command.taskId())
+                .orElseThrow(() -> new BusinessProblem(
+                        ProblemCode.RESOURCE_NOT_FOUND, "Task does not exist"));
+        if (!"HUMAN".equals(task.taskKind())) {
+            throw new BusinessProblem(ProblemCode.TASK_STATE_CONFLICT,
+                    "Only a HUMAN Task supports technician reassignment");
+        }
+
+        var activeNetwork = activeAssignee(principal.tenantId(), command.taskId(), ResponsibilityLevel.NETWORK)
+                .orElseThrow(() -> new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                        "Task has no ACTIVE NETWORK responsibility"));
+        if (!activeNetwork.assigneeId().equals(command.networkAssigneeId())) {
+            throw new BusinessProblem(ProblemCode.SERVICE_ASSIGNMENT_CONFLICT,
+                    "ACTIVE NETWORK responsibility belongs to another network");
+        }
+
+        var activeTech = activeAssignee(principal.tenantId(), command.taskId(), ResponsibilityLevel.TECHNICIAN)
+                .orElseThrow(() -> new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                        "Task has no ACTIVE TECHNICIAN responsibility; use assign-technician"));
+        if (activeTech.assigneeId().equals(command.technicianAssigneeId())) {
+            return new ManualServiceAssignmentReceipt(
+                    command.taskId(), task.workOrderId(),
+                    activeNetwork.serviceAssignmentId(), activeTech.serviceAssignmentId(),
+                    command.networkAssigneeId(), command.technicianAssigneeId(),
+                    clock.instant());
+        }
+
+        String key = metadata.idempotencyKey();
+        ensureCapacity(principal, metadata, ResponsibilityLevel.TECHNICIAN,
+                command.technicianAssigneeId(), command.businessType(), key + "-cap-technician");
+
+        ServiceAssignmentReceipt technician = reassignTechnicianLevel(
+                principal, metadata, task.workOrderId(), command.taskId(),
+                command.technicianAssigneeId(), command.businessType(),
+                activeTech.serviceAssignmentId(), command.reasonCode(), key + "-technician");
+
+        return new ManualServiceAssignmentReceipt(
+                command.taskId(), task.workOrderId(),
+                activeNetwork.serviceAssignmentId(), technician.serviceAssignmentId(),
+                command.networkAssigneeId(), command.technicianAssigneeId(),
+                clock.instant());
+    }
+
+    private ServiceAssignmentReceipt reassignTechnicianLevel(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            UUID workOrderId,
+            UUID taskId,
+            String technicianAssigneeId,
+            String businessType,
+            UUID supersedesServiceAssignmentId,
+            String reasonCode,
+            String key
+    ) {
+        long capacityVersion = capacityVersion(
+                principal.tenantId(), ResponsibilityLevel.TECHNICIAN, technicianAssigneeId, businessType);
+        ServiceAssignmentReceipt pending = assignments.prepare(
+                principal, child(metadata, key + "-prepare"),
+                new PrepareServiceAssignmentCommand(
+                        UUID.randomUUID(), workOrderId, taskId, ResponsibilityLevel.TECHNICIAN,
+                        technicianAssigneeId, businessType,
+                        "decision://manual-reassign/" + key,
+                        supersedesServiceAssignmentId, reasonCode, capacityVersion));
+        UUID preparedId = UUID.randomUUID();
+        assignments.confirmTaskPrepared(
+                principal, child(metadata, key + "-task-prepared"),
+                new ConfirmTaskAssignmentPreparedCommand(
+                        pending.sagaId(), pending.serviceAssignmentId(), taskId,
+                        UUID.randomUUID(), preparedId, 1));
+        ServiceAssignmentReceipt activated = assignments.activate(
+                principal, child(metadata, key + "-activate"),
+                new ActivateServiceAssignmentCommand(
+                        pending.sagaId(), pending.serviceAssignmentId(), 2,
+                        "authority://manual-reassign/" + technicianAssigneeId, 1,
+                        "fence://manual-reassign/" + technicianAssigneeId, "manual-reassign-geo-v1"));
+        return assignments.complete(
+                principal, child(metadata, key + "-complete"),
+                new CompleteServiceAssignmentActivationCommand(
+                        activated.sagaId(), activated.serviceAssignmentId(), preparedId, 3));
     }
 
     private ServiceAssignmentReceipt activateLevel(
