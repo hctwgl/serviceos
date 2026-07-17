@@ -1,14 +1,15 @@
 ---
-title: Admin 试点可运行基线（含 M142 入站同单整改外发）
+title: Admin 试点可运行基线（含 M143 SPI SA 种子）
 status: Implemented
 lastUpdated: 2026-07-17
 ---
 
-# Admin 试点可运行基线（含 M142 入站同单整改外发）
+# Admin 试点可运行基线（含 M143 SPI SA 种子）
 
-本基线覆盖 M101～M142 已有 Admin 表面的可重复构建、登录、真实后端/数据库试点入口，并明确
-完整业务链尚未证明的边界。M135～M142 追加补传复审、预约上门、提审外发 ACK、厂端回调、入站
-接单激活与同单预约上门→表单/资料/驳回整改补传复审/外发/完结证明，不宣称完整 `ADMIN-PILOT-09`。
+本基线覆盖 M101～M143 已有 Admin 表面的可重复构建、登录、真实后端/数据库试点入口，并明确
+完整业务链尚未证明的边界。M135～M143 追加补传复审、预约上门、提审外发 ACK、厂端回调、入站
+接单激活与同单预约上门→表单/资料/驳回整改补传复审/外发/完结，以及 Visit 所需 SA 经 Dispatch
+SPI 编排注入；不宣称完整 `ADMIN-PILOT-09`。
 
 ## 1. 已建立的基线
 
@@ -145,14 +146,19 @@ GitHub Actions 使用同一脚本阻断 PR，并保留 Backend、Admin 与 Playw
 已追加证明（M142）：
 
 - 同一入站工单 REJECTED → CorrectionCase → 同 Item 补传 → resubmit/close → 复审 APPROVED
-  → BYD ACK → 厂端回调 → FULFILLED；
-- Visit 所需 ServiceAssignment 仍为本地夹具；Admin 派单 HTTP 仍未证明。
+  → BYD ACK → 厂端回调 → FULFILLED。
+
+已追加证明（M143）：
+
+- field-ops 与入站工单的 Visit 所需 ServiceAssignment 经 Capacity/Assignment SPI 编排注入
+  （ACTIVE + CONFIRMED reservation + COMPLETED saga）；SQL 直插已删除；
+- Admin 派单 HTTP 仍未证明。
 
 尚未证明：
 
 - 正式企业 IdP、MFA、生产回调地址、BFF/token renewal/logout 协议；
 - 从外部接单开始经 Admin 派单到完结的完整 `ADMIN-PILOT-09`（入站同单整改外发完结已证明，
-  派单仍为夹具）；
+  派单仍为 SPI 种子而非 Admin HTTP）；
 - Network/Technician Portal 与跨端协作；
 - 正式 sandbox、对象存储、专业扫描服务、Broker、通知和 SLA BUSINESS 日历；
 - 真实 sandbox 提审与生产厂端联调；

@@ -49,6 +49,40 @@ PY
   fi
 }
 
+# M143：经 Dispatch SPI 注入 ACTIVE NETWORK/TECHNICIAN；不走 SQL 直插，不宣称 Admin 派单 HTTP。
+seed_service_assignment_via_spi() {
+  local work_order_id="$1"
+  local task_id="$2"
+  local run_key="$3"
+  bash "${repo_root}/serviceos-deploy/admin-pilot/seed-admin-pilot-assignment.sh" \
+    "${work_order_id}" "${task_id}" "${run_key}"
+  local sa_state
+  sa_state="$(query_db "
+    SELECT count(DISTINCT CASE WHEN a.responsibility_level = 'NETWORK'
+                                AND a.assignee_id = 'admin-pilot-network-1'
+                                AND a.status = 'ACTIVE' THEN a.service_assignment_id END) || ':' ||
+           count(DISTINCT CASE WHEN a.responsibility_level = 'TECHNICIAN'
+                                AND a.assignee_id = '06b612f3-a901-4b0e-bd90-86b4259cc087'
+                                AND a.status = 'ACTIVE' THEN a.service_assignment_id END) || ':' ||
+           count(DISTINCT CASE WHEN r.status = 'CONFIRMED' THEN r.capacity_reservation_id END) || ':' ||
+           count(DISTINCT CASE WHEN s.stage = 'COMPLETED' THEN s.activation_saga_id END)
+      FROM dsp_service_assignment a
+      LEFT JOIN dsp_capacity_reservation r
+        ON r.tenant_id = a.tenant_id
+       AND r.service_assignment_id = a.service_assignment_id
+      LEFT JOIN dsp_service_assignment_activation_saga s
+        ON s.tenant_id = a.tenant_id
+       AND s.task_id = a.task_id
+       AND s.new_service_assignment_id = a.service_assignment_id
+     WHERE a.tenant_id = 'tenant-local'
+       AND a.task_id = '${task_id}'
+  ")"
+  [[ "${sa_state}" == "1:1:2:2" ]] || {
+    echo "SPI ServiceAssignment 种子不完整 (${run_key}): ${sa_state}" >&2
+    exit 1
+  }
+}
+
 cd "${repo_root}"
 docker compose -f "${compose_file}" up -d postgres keycloak
 wait_http "http://127.0.0.1:8081/realms/serviceos/.well-known/openid-configuration" "Keycloak"
@@ -173,10 +207,6 @@ field_ops_stage_event_id="$(new_uuid)"
 field_ops_node_event_id="$(new_uuid)"
 field_ops_task_created_outbox_id="$(new_uuid)"
 field_ops_task_created_event_id="$(new_uuid)"
-field_ops_network_assignment_id="$(new_uuid)"
-field_ops_technician_assignment_id="$(new_uuid)"
-field_ops_network_saga_id="$(new_uuid)"
-field_ops_technician_saga_id="$(new_uuid)"
 field_ops_external_code="ADMIN-PILOT-FIELD-${field_ops_work_order_id%%-*}"
 field_ops_correlation_id="admin-pilot-field-ops-${field_ops_task_id}"
 
@@ -275,15 +305,8 @@ seed_completion_fixture \
   "${field_ops_task_created_outbox_id}" "${field_ops_task_created_event_id}" \
   "${field_ops_external_code}" "${field_ops_correlation_id}"
 
-docker compose -f "${compose_file}" exec -T postgres \
-  psql -U serviceos_app -d serviceos \
-  -v field_ops_work_order_id="${field_ops_work_order_id}" \
-  -v field_ops_task_id="${field_ops_task_id}" \
-  -v field_ops_network_assignment_id="${field_ops_network_assignment_id}" \
-  -v field_ops_technician_assignment_id="${field_ops_technician_assignment_id}" \
-  -v field_ops_network_saga_id="${field_ops_network_saga_id}" \
-  -v field_ops_technician_saga_id="${field_ops_technician_saga_id}" \
-  < serviceos-deploy/admin-pilot/seed-admin-field-ops-assignment.sql
+seed_service_assignment_via_spi \
+  "${field_ops_work_order_id}" "${field_ops_task_id}" "field-ops-${field_ops_task_id}"
 
 seed_completion_fixture \
   "${outbound_work_order_id}" "${outbound_workflow_id}" "${outbound_stage_id}" \
@@ -314,14 +337,10 @@ if ! curl --fail --silent "http://127.0.0.1:5173" >/dev/null; then
 fi
 wait_http "http://127.0.0.1:5173" "ServiceOS Admin Web"
 
-# M140：真实 CPIM 入站创建工单 → Outbox 激活 Workflow/Task → 注入 Visit 所需 SA 夹具，
+# M140/M143：真实 CPIM 入站创建工单 → Outbox 激活 Workflow/Task → SPI 注入 Visit 所需 SA，
 # 再由 Playwright 在同一工单上证明 assign/claim/start 与预约上门。不宣称 Admin 派单 HTTP。
 inbound_order_uuid="$(new_uuid)"
 inbound_order_code="ADMIN-PILOT-IN-${inbound_order_uuid%%-*}"
-inbound_network_assignment_id="$(new_uuid)"
-inbound_technician_assignment_id="$(new_uuid)"
-inbound_network_saga_id="$(new_uuid)"
-inbound_technician_saga_id="$(new_uuid)"
 
 python3 - <<PY
 import hashlib
@@ -420,15 +439,8 @@ done
   exit 1
 }
 
-docker compose -f "${compose_file}" exec -T postgres \
-  psql -U serviceos_app -d serviceos \
-  -v field_ops_work_order_id="${inbound_work_order_id}" \
-  -v field_ops_task_id="${inbound_task_id}" \
-  -v field_ops_network_assignment_id="${inbound_network_assignment_id}" \
-  -v field_ops_technician_assignment_id="${inbound_technician_assignment_id}" \
-  -v field_ops_network_saga_id="${inbound_network_saga_id}" \
-  -v field_ops_technician_saga_id="${inbound_technician_saga_id}" \
-  < serviceos-deploy/admin-pilot/seed-admin-field-ops-assignment.sql
+seed_service_assignment_via_spi \
+  "${inbound_work_order_id}" "${inbound_task_id}" "inbound-${inbound_task_id}"
 
 cd serviceos-admin-web
 export ADMIN_PILOT_COMPLETION_WORK_ORDER_CODE="${completion_external_code}"
