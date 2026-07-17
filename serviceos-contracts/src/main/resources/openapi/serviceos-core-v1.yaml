@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.76.0
+  version: 0.77.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -162,6 +162,270 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /organizations:
+    get:
+      operationId: listOrganizations
+      summary: 查询当前租户企业组织目录
+      description: 需要 organization.read。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 组织列表
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/OrganizationPage' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createOrganization
+      summary: 创建企业组织
+      description: 需要 organization.manageStructure；EXTERNAL_AUTHORITATIVE 必须提供 sourceSystem/sourceKey。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreateOrganizationRequest' } } }
+      responses:
+        '200':
+          description: 新建组织
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/Organization' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /organizations/{organizationId}:
+    get:
+      operationId: getOrganization
+      summary: 读取企业组织及单元列表
+      description: 需要 organization.read。
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 组织详情
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/OrganizationDetail' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /organizations/{organizationId}/units:
+    get:
+      operationId: listOrganizationUnits
+      summary: 列出组织单元
+      description: 需要 organization.read；asTree 预留树形响应，当前返回扁平列表。
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - { name: asTree, in: query, schema: { type: boolean, default: false } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 组织单元列表
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/OrgUnit' } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createOrganizationUnit
+      summary: 创建组织单元并维护 closure
+      description: 需要 organization.manageStructure；EXTERNAL_AUTHORITATIVE 另需 organization.overrideExternal。If-Match 绑定组织聚合版本。
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreateOrgUnitRequest' } } }
+      responses:
+        '200':
+          description: 新建单元
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/OrgUnit' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /organizations/{organizationId}/units/{orgUnitId}:move:
+    post:
+      operationId: moveOrganizationUnit
+      summary: 移动组织单元并原子重建 closure
+      description: 需要 organization.manageStructure；循环与跨组织父节点失败关闭。If-Match 绑定单元聚合版本。
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - $ref: '#/components/parameters/OrgUnitId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/MoveOrgUnitRequest' } } }
+      responses:
+        '200':
+          description: 移动后的单元
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/OrgUnit' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /organizations/{organizationId}/memberships:
+    get:
+      operationId: listOrganizationMemberships
+      summary: 查询组织任职
+      description: 需要 organization.read；可按 principalId 过滤。
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - { name: principalId, in: query, schema: { type: string, format: uuid } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 任职页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/OrgMembershipPage' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createOrganizationMembership
+      summary: 创建组织任职
+      description: 需要 organization.manageMembership；同一主体同时只能有一条有效 PRIMARY。
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreateOrgMembershipRequest' } } }
+      responses:
+        '200':
+          description: 新建任职
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/OrgMembership' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /org-memberships/{membershipId}:transfer:
+    post:
+      operationId: transferOrganizationMembership
+      summary: 调动任职到新单元
+      description: 旧任职终止并创建新任职历史；If-Match 绑定任职聚合版本。
+      parameters:
+        - $ref: '#/components/parameters/MembershipId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/TransferOrgMembershipRequest' } } }
+      responses:
+        '200':
+          description: 调动后的任职
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/OrgMembership' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /org-memberships/{membershipId}:terminate:
+    post:
+      operationId: terminateOrganizationMembership
+      summary: 终止任职并可联动主体失权
+      description: disablePrincipal=true 时同事务停用 Principal、撤销有效 RoleGrant 并创建待重分配清单。
+      parameters:
+        - $ref: '#/components/parameters/MembershipId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/TerminateOrgMembershipRequest' } } }
+      responses:
+        '200':
+          description: 已终止任职
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/OrgMembership' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /organizations/{organizationId}/directory-sync-batches:
+    post:
+      operationId: submitOrganizationDirectorySyncBatch
+      summary: 提交外部组织目录同步批次
+      description: 需要 organization.sync；按 sourceSystem+externalBatchKey 幂等；乱序版本 SKIPPED。
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/SubmitDirectorySyncBatchRequest' } } }
+      responses:
+        '200':
+          description: 同步批次收据
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/DirectorySyncBatch' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /directory-sync-batches/{batchId}:
+    get:
+      operationId: getDirectorySyncBatch
+      summary: 读取同步批次与逐项结果
+      description: 需要 organization.read。
+      parameters:
+        - $ref: '#/components/parameters/DirectorySyncBatchId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 同步批次详情
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/DirectorySyncBatch' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /reassignment-work-items:
+    get:
+      operationId: listOpenReassignmentWorkItems
+      summary: 列出因任职终止产生的待重分配清单
+      description: 需要 organization.read。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: OPEN 待办页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/ReassignmentWorkItemPage' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
   /work-orders:
     get:
       operationId: listAuthorizedWorkOrders
@@ -2204,6 +2468,26 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    OrganizationId:
+      name: organizationId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    OrgUnitId:
+      name: orgUnitId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    MembershipId:
+      name: membershipId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    DirectorySyncBatchId:
+      name: batchId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     TaskId:
       name: taskId
       in: path
@@ -2342,6 +2626,213 @@ components:
         personaType: { enum: [INTERNAL_EMPLOYEE, NETWORK_MEMBER, TECHNICIAN, CONSUMER, SERVICE_ACCOUNT] }
         validFrom: { type: string, format: date-time }
         validTo: { type: [string, 'null'], format: date-time }
+    Organization:
+      type: object
+      additionalProperties: false
+      required: [id, code, name, authorityMode, status, sourceSystem, sourceKey, version, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string, minLength: 1, maxLength: 64 }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        authorityMode: { enum: [LOCAL, EXTERNAL_AUTHORITATIVE] }
+        status: { enum: [ACTIVE, DISABLED] }
+        sourceSystem: { type: [string, 'null'], minLength: 1, maxLength: 64 }
+        sourceKey: { type: [string, 'null'], minLength: 1, maxLength: 128 }
+        version: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    OrganizationPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Organization' } }
+        asOf: { type: string, format: date-time }
+    OrganizationDetail:
+      type: object
+      additionalProperties: false
+      required: [organization, units, asOf]
+      properties:
+        organization: { $ref: '#/components/schemas/Organization' }
+        units: { type: array, items: { $ref: '#/components/schemas/OrgUnit' } }
+        asOf: { type: string, format: date-time }
+    OrgUnit:
+      type: object
+      additionalProperties: false
+      required: [id, organizationId, parentUnitId, unitCode, unitName, status, sourceSystem,
+        sourceKey, sourceVersion, version, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        organizationId: { type: string, format: uuid }
+        parentUnitId: { type: [string, 'null'], format: uuid }
+        unitCode: { type: string, minLength: 1, maxLength: 64 }
+        unitName: { type: string, minLength: 1, maxLength: 200 }
+        status: { enum: [ACTIVE, DISABLED] }
+        sourceSystem: { type: [string, 'null'], minLength: 1, maxLength: 64 }
+        sourceKey: { type: [string, 'null'], minLength: 1, maxLength: 128 }
+        sourceVersion: { type: [integer, 'null'], format: int64, minimum: 1 }
+        version: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    OrgMembership:
+      type: object
+      additionalProperties: false
+      required: [id, organizationId, orgUnitId, principalId, membershipType, status, validFrom,
+        validTo, sourceSystem, sourceKey, sourceVersion, version, createdBy, createdAt,
+        terminatedBy, terminatedAt, terminateReason]
+      properties:
+        id: { type: string, format: uuid }
+        organizationId: { type: string, format: uuid }
+        orgUnitId: { type: string, format: uuid }
+        principalId: { type: string, format: uuid }
+        membershipType: { enum: [PRIMARY, SECONDARY, MANAGER] }
+        status: { enum: [ACTIVE, TERMINATED] }
+        validFrom: { type: string, format: date-time }
+        validTo: { type: [string, 'null'], format: date-time }
+        sourceSystem: { type: [string, 'null'], minLength: 1, maxLength: 64 }
+        sourceKey: { type: [string, 'null'], minLength: 1, maxLength: 128 }
+        sourceVersion: { type: [integer, 'null'], format: int64, minimum: 1 }
+        version: { type: integer, format: int64, minimum: 1 }
+        createdBy: { type: string, minLength: 1, maxLength: 128 }
+        createdAt: { type: string, format: date-time }
+        terminatedBy: { type: [string, 'null'], minLength: 1, maxLength: 128 }
+        terminatedAt: { type: [string, 'null'], format: date-time }
+        terminateReason: { type: [string, 'null'], minLength: 1, maxLength: 500 }
+    OrgMembershipPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/OrgMembership' } }
+        asOf: { type: string, format: date-time }
+    DirectorySyncItem:
+      type: object
+      additionalProperties: false
+      required: [id, itemIndex, operationType, sourceKey, externalVersion, itemStatus,
+        resultCode, resultMessage, resourceType, resourceId, processedAt]
+      properties:
+        id: { type: string, format: uuid }
+        itemIndex: { type: integer, minimum: 0 }
+        operationType: { enum: [UPSERT_UNIT, UPSERT_MEMBERSHIP, TERMINATE_MEMBERSHIP] }
+        sourceKey: { type: string, minLength: 1, maxLength: 128 }
+        externalVersion: { type: integer, format: int64, minimum: 1 }
+        itemStatus: { enum: [SUCCESS, FAILED, SKIPPED] }
+        resultCode: { type: [string, 'null'], maxLength: 64 }
+        resultMessage: { type: [string, 'null'], maxLength: 500 }
+        resourceType: { type: [string, 'null'], maxLength: 40 }
+        resourceId: { type: [string, 'null'], format: uuid }
+        processedAt: { type: string, format: date-time }
+    DirectorySyncBatch:
+      type: object
+      additionalProperties: false
+      required: [id, organizationId, sourceSystem, externalBatchKey, batchStatus, receivedAt,
+        completedAt, successCount, failedCount, skippedCount, items]
+      properties:
+        id: { type: string, format: uuid }
+        organizationId: { type: string, format: uuid }
+        sourceSystem: { type: string, minLength: 1, maxLength: 64 }
+        externalBatchKey: { type: string, minLength: 1, maxLength: 128 }
+        batchStatus: { enum: [RECEIVED, COMPLETED, COMPLETED_WITH_ERRORS] }
+        receivedAt: { type: string, format: date-time }
+        completedAt: { type: [string, 'null'], format: date-time }
+        successCount: { type: integer, minimum: 0 }
+        failedCount: { type: integer, minimum: 0 }
+        skippedCount: { type: integer, minimum: 0 }
+        items: { type: array, items: { $ref: '#/components/schemas/DirectorySyncItem' } }
+    ReassignmentWorkItem:
+      type: object
+      additionalProperties: false
+      required: [id, organizationId, membershipId, principalId, workItemStatus, reason,
+        createdBy, createdAt, correlationId]
+      properties:
+        id: { type: string, format: uuid }
+        organizationId: { type: string, format: uuid }
+        membershipId: { type: string, format: uuid }
+        principalId: { type: string, format: uuid }
+        workItemStatus: { enum: [OPEN, CLOSED] }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+        createdBy: { type: string, minLength: 1, maxLength: 128 }
+        createdAt: { type: string, format: date-time }
+        correlationId: { type: string, minLength: 1, maxLength: 128 }
+    ReassignmentWorkItemPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/ReassignmentWorkItem' } }
+        asOf: { type: string, format: date-time }
+    CreateOrganizationRequest:
+      type: object
+      additionalProperties: false
+      required: [code, name, authorityMode]
+      properties:
+        code: { type: string, minLength: 1, maxLength: 64 }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        authorityMode: { enum: [LOCAL, EXTERNAL_AUTHORITATIVE] }
+        sourceSystem: { type: [string, 'null'], minLength: 1, maxLength: 64 }
+        sourceKey: { type: [string, 'null'], minLength: 1, maxLength: 128 }
+    CreateOrgUnitRequest:
+      type: object
+      additionalProperties: false
+      required: [unitCode, unitName]
+      properties:
+        parentUnitId: { type: [string, 'null'], format: uuid }
+        unitCode: { type: string, minLength: 1, maxLength: 64 }
+        unitName: { type: string, minLength: 1, maxLength: 200 }
+    MoveOrgUnitRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        newParentUnitId: { type: [string, 'null'], format: uuid }
+    CreateOrgMembershipRequest:
+      type: object
+      additionalProperties: false
+      required: [unitId, principalId, membershipType, validFrom]
+      properties:
+        unitId: { type: string, format: uuid }
+        principalId: { type: string, format: uuid }
+        membershipType: { enum: [PRIMARY, SECONDARY, MANAGER] }
+        validFrom: { type: string, format: date-time }
+    TransferOrgMembershipRequest:
+      type: object
+      additionalProperties: false
+      required: [targetUnitId]
+      properties:
+        targetUnitId: { type: string, format: uuid }
+        membershipType: { type: [string, 'null'], enum: [PRIMARY, SECONDARY, MANAGER] }
+        validFrom: { type: [string, 'null'], format: date-time }
+    TerminateOrgMembershipRequest:
+      type: object
+      additionalProperties: false
+      required: [reason, disablePrincipal]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 500 }
+        disablePrincipal: { type: boolean }
+    SubmitDirectorySyncBatchRequest:
+      type: object
+      additionalProperties: false
+      required: [sourceSystem, externalBatchKey, items]
+      properties:
+        sourceSystem: { type: string, minLength: 1, maxLength: 64 }
+        externalBatchKey: { type: string, minLength: 1, maxLength: 128 }
+        items:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/DirectorySyncItemRequest' }
+    DirectorySyncItemRequest:
+      type: object
+      additionalProperties: false
+      required: [operationType, sourceKey, externalVersion]
+      properties:
+        operationType: { enum: [UPSERT_UNIT, UPSERT_MEMBERSHIP, TERMINATE_MEMBERSHIP] }
+        sourceKey: { type: string, minLength: 1, maxLength: 128 }
+        externalVersion: { type: integer, format: int64, minimum: 1 }
+        unitCode: { type: [string, 'null'], minLength: 1, maxLength: 64 }
+        unitName: { type: [string, 'null'], minLength: 1, maxLength: 200 }
+        parentSourceKey: { type: [string, 'null'], minLength: 1, maxLength: 128 }
+        principalId: { type: [string, 'null'], format: uuid }
+        membershipType: { type: [string, 'null'], enum: [PRIMARY, SECONDARY, MANAGER] }
+        validFrom: { type: [string, 'null'], format: date-time }
     TaskDirectoryItem:
       type: object
       additionalProperties: false

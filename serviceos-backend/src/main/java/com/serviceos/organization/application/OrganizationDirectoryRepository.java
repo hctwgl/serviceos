@@ -58,10 +58,6 @@ public interface OrganizationDirectoryRepository {
             String tenantId, UUID membershipId, long expectedVersion,
             String reason, String actorId, Instant terminatedAt);
 
-    boolean transferMembership(
-            String tenantId, UUID membershipId, long expectedVersion,
-            UUID targetUnitId, String membershipType, Instant validFrom, String actorId, Instant now);
-
     void lockSyncBatchKey(String tenantId, String sourceSystem, String externalBatchKey);
 
     Optional<UUID> findSyncBatchId(String tenantId, String sourceSystem, String externalBatchKey);

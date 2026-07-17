@@ -228,7 +228,8 @@ final class DefaultOrganizationCommandService implements OrganizationCommandServ
         CommandExecution execution = begin(actor, metadata, "organization.transferMembership",
                 "organization.manageMembership", membershipId.toString(), input);
         if (execution.replay()) {
-            return requireMembership(actor.tenantId(), membershipId).toView();
+            UUID newId = UUID.fromString(execution.decision().resourceId().orElseThrow());
+            return requireMembership(actor.tenantId(), newId).toView();
         }
         OrgMembership current = lockedMembership(actor.tenantId(), membershipId, expectedVersion);
         if (current.status() != OrgMembership.Status.ACTIVE) {
@@ -241,13 +242,26 @@ final class DefaultOrganizationCommandService implements OrganizationCommandServ
             throw new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "目标单元不存在");
         }
         Instant now = clock.instant();
-        if (!directory.transferMembership(actor.tenantId(), membershipId, expectedVersion,
-                targetUnitId, type, validFrom, actor.principalId(), now)) {
+        Instant nextValidFrom = validFrom == null ? now : validFrom;
+        if (!nextValidFrom.isAfter(current.validFrom())) {
+            throw new IllegalArgumentException("validFrom must be after current membership start");
+        }
+        // 调动只追加：先终止旧任职，再插入新任职，禁止原地改写历史区间。
+        if (!directory.terminateMembership(actor.tenantId(), membershipId, expectedVersion,
+                "调动", actor.principalId(), nextValidFrom)) {
             throw versionConflict();
         }
-        completeStructure(actor, metadata, execution, current.organizationId(), membershipId, expectedVersion + 1,
-                "MEMBERSHIP_TRANSFERRED", "OrgMembership", "organization.manageMembership", null, now);
-        return requireMembership(actor.tenantId(), membershipId).toView();
+        String newType = type == null ? current.membershipType().name() : type;
+        UUID newMembershipId = UUID.randomUUID();
+        OrgMembership created = new OrgMembership(newMembershipId, actor.tenantId(), current.organizationId(),
+                targetUnitId, current.principalId(), OrgMembership.MembershipType.valueOf(newType),
+                OrgMembership.Status.ACTIVE, nextValidFrom, null, null, null, null, 1,
+                actor.principalId(), now, null, null, null);
+        directory.insertMembership(created);
+        completeStructure(actor, metadata, execution, current.organizationId(), newMembershipId, 1,
+                "MEMBERSHIP_TRANSFERRED", "OrgMembership", "organization.manageMembership", "调动", now,
+                newMembershipId.toString());
+        return created.toView();
     }
 
     @Override
@@ -322,7 +336,8 @@ final class DefaultOrganizationCommandService implements OrganizationCommandServ
         int success = 0, failed = 0, skipped = 0;
         for (int index = 0; index < items.size(); index++) {
             SyncItemInput item = items.get(index);
-            ProcessResult result = processSyncItem(actor, organizationId, sourceSystem, item, now);
+            ProcessResult result = processSyncItem(
+                    actor, organizationId, sourceSystem, item, now, metadata.correlationId());
             directory.insertSyncItem(UUID.randomUUID(), batchId, actor.tenantId(), index,
                     item.operationType(), item.sourceKey(), item.externalVersion(),
                     result.status(), result.resultCode(), result.resultMessage(),
@@ -342,13 +357,15 @@ final class DefaultOrganizationCommandService implements OrganizationCommandServ
     }
 
     private ProcessResult processSyncItem(
-            CurrentPrincipal actor, UUID organizationId, String sourceSystem, SyncItemInput item, Instant now
+            CurrentPrincipal actor, UUID organizationId, String sourceSystem, SyncItemInput item,
+            Instant now, String correlationId
     ) {
         try {
             return switch (item.operationType()) {
                 case "UPSERT_UNIT" -> upsertUnitSync(actor, organizationId, sourceSystem, item, now);
                 case "UPSERT_MEMBERSHIP" -> upsertMembershipSync(actor, organizationId, sourceSystem, item, now);
-                case "TERMINATE_MEMBERSHIP" -> terminateMembershipSync(actor, sourceSystem, item, now);
+                case "TERMINATE_MEMBERSHIP" -> terminateMembershipSync(
+                        actor, sourceSystem, item, now, correlationId);
                 default -> new ProcessResult("FAILED", "INVALID_OPERATION", "未知操作类型", null, null);
             };
         } catch (BusinessProblem problem) {
@@ -402,7 +419,7 @@ final class DefaultOrganizationCommandService implements OrganizationCommandServ
     }
 
     private ProcessResult terminateMembershipSync(
-            CurrentPrincipal actor, String sourceSystem, SyncItemInput item, Instant now
+            CurrentPrincipal actor, String sourceSystem, SyncItemInput item, Instant now, String correlationId
     ) {
         Long existingVersion = directory.findMembershipSourceVersion(actor.tenantId(), sourceSystem, item.sourceKey());
         if (existingVersion != null && existingVersion >= item.externalVersion()) {
@@ -411,8 +428,19 @@ final class DefaultOrganizationCommandService implements OrganizationCommandServ
         OrgMembership membership = directory.findMembershipBySource(actor.tenantId(), sourceSystem, item.sourceKey())
                 .orElseThrow(() -> new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "任职来源键不存在"));
         if (membership.status() == OrgMembership.Status.ACTIVE) {
-            directory.terminateMembership(actor.tenantId(), membership.id(), membership.version(),
-                    "外部同步终止", actor.principalId(), now);
+            // 外部离职同步默认联动主体失权、RoleGrant 撤销与待重分配，避免只改任职投影。
+            if (!directory.terminateMembership(actor.tenantId(), membership.id(), membership.version(),
+                    "外部同步终止", actor.principalId(), now)) {
+                throw versionConflict();
+            }
+            principalLifecycle.disableForEmploymentTermination(
+                    actor.tenantId(), membership.principalId(), actor.principalId(),
+                    "外部同步终止", correlationId);
+            roleGrants.terminateActiveGrants(actor.tenantId(), membership.principalId().toString(),
+                    now, actor.principalId(), "外部同步终止", correlationId);
+            directory.insertReassignmentWorkItem(UUID.randomUUID(), actor.tenantId(),
+                    membership.organizationId(), membership.id(), membership.principalId(),
+                    "外部同步终止", actor.principalId(), correlationId, now);
         }
         return new ProcessResult("SUCCESS", null, null, "OrgMembership", membership.id());
     }

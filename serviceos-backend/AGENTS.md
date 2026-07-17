@@ -35,7 +35,8 @@ com.serviceos.<module>/
 | fieldwork | Visit 签到/签退/中断现场生命周期 | `fld_` | api |
 | files | 安全文件 Begin/Finalize/隔离/扫描/授权下载 | `fil_` | api |
 | forms | 动态表单资产、不可变 FormSubmission | `frm_` | api |
-| identity | OIDC/JWT 主体上下文与认证 | 无自有表 | api |
+| identity | OIDC/JWT 主体上下文、统一主体目录与任职终止停用端口 | `idn_` | api |
+| organization | 企业组织、OrgUnit closure、任职与目录同步收据 | `org_` | api |
 | integration | BYD CPIM 入站 Envelope/Canonical、OutboundDelivery/Attempt/Ack | `int_` | api、byd（适配器） |
 | operations | OperationalException 运营异常工作台 | `ops_` | api |
 | project | Project 核心事实、REGION/NETWORK 范围关系与修订收据 | `prj_` | api |

@@ -58,7 +58,11 @@ fi
 
 index_file="$root/serviceos-architecture/docs/milestone-index.md"
 [[ -f "$index_file" ]] || fail "milestone-index.md 缺失，请运行 bash scripts/generate-milestone-index.sh 生成"
-if ! diff <(bash "$root/scripts/generate-milestone-index.sh" --stdout) "$index_file" >/dev/null; then
+# 使用临时文件而非进程替换：部分环境下 `<(cmd --stdout)` 会得到空流，造成假阴性过期。
+generated_index="$(mktemp)"
+trap 'rm -f "${generated_index}"' EXIT
+bash "$root/scripts/generate-milestone-index.sh" --stdout > "${generated_index}"
+if ! diff "${generated_index}" "$index_file" >/dev/null; then
   fail "milestone-index.md 已过期，请运行 bash scripts/generate-milestone-index.sh 重新生成"
 fi
 

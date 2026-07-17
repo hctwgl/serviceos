@@ -342,30 +342,6 @@ final class JdbcOrganizationDirectoryRepository implements OrganizationDirectory
     }
 
     @Override
-    public boolean transferMembership(
-            String tenantId, UUID membershipId, long expectedVersion,
-            UUID targetUnitId, String membershipType, Instant validFrom, String actorId, Instant now
-    ) {
-        try {
-            var spec = jdbc.sql("""
-                    UPDATE org_membership
-                       SET org_unit_id=:targetUnitId,
-                           membership_type=COALESCE(:membershipType, membership_type),
-                           valid_from=COALESCE(:validFrom, valid_from),
-                           aggregate_version=aggregate_version+1
-                     WHERE tenant_id=:tenant AND membership_id=:id
-                       AND aggregate_version=:expected AND membership_status='ACTIVE'
-                    """)
-                    .param("targetUnitId", targetUnitId).param("membershipType", membershipType)
-                    .param("validFrom", validFrom == null ? null : dbTime(validFrom))
-                    .param("tenant", tenantId).param("id", membershipId).param("expected", expectedVersion);
-            return spec.update() == 1;
-        } catch (DuplicateKeyException exception) {
-            throw new BusinessProblem(ProblemCode.ORGANIZATION_MEMBERSHIP_CONFLICT, "同一主体已存在有效主职");
-        }
-    }
-
-    @Override
     public void lockSyncBatchKey(String tenantId, String sourceSystem, String externalBatchKey) {
         jdbc.sql("""
                 SELECT 1
@@ -526,6 +502,13 @@ final class JdbcOrganizationDirectoryRepository implements OrganizationDirectory
     ) {
         Optional<OrgUnit> existing = findUnitBySource(tenantId, sourceSystem, sourceKey);
         if (existing.isPresent()) {
+            OrgUnit current = existing.get();
+            UUID currentParent = current.parentUnitId();
+            boolean parentChanged = (currentParent == null) != (parentUnitId == null)
+                    || (currentParent != null && !currentParent.equals(parentUnitId));
+            if (parentChanged && parentUnitId != null && isDescendant(tenantId, current.id(), parentUnitId)) {
+                throw new BusinessProblem(ProblemCode.ORGANIZATION_UNIT_CYCLE, "同步不能把单元移动到其子孙节点下");
+            }
             jdbc.sql("""
                     UPDATE org_unit
                        SET unit_code=:code, unit_name=:name, parent_unit_id=:parentId,
@@ -535,7 +518,11 @@ final class JdbcOrganizationDirectoryRepository implements OrganizationDirectory
                     """)
                     .param("code", unitCode).param("name", unitName).param("parentId", parentUnitId)
                     .param("sourceVersion", sourceVersion).param("now", dbTime(now))
-                    .param("tenant", tenantId).param("id", existing.get().id()).update();
+                    .param("tenant", tenantId).param("id", current.id()).update();
+            // 同步路径也可能改父节点；必须同步重建 closure，避免下级授权依据陈旧。
+            if (parentChanged) {
+                rebuildClosureForMove(tenantId, organizationId, current.id(), parentUnitId);
+            }
         } else {
             OrgUnit unit = new OrgUnit(unitId, tenantId, organizationId, parentUnitId, unitCode, unitName,
                     OrgUnit.Status.ACTIVE, sourceSystem, sourceKey, sourceVersion, 1, now, now);

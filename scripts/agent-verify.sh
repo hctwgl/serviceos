@@ -75,10 +75,14 @@ case "${command_name}" in
     bash scripts/test-find-milestone.sh
     index_file="serviceos-architecture/docs/milestone-index.md"
     if [[ -f "${index_file}" ]]; then
-      if ! diff <(bash scripts/generate-milestone-index.sh --stdout) "${index_file}" >/dev/null; then
+      generated_index="$(mktemp)"
+      bash scripts/generate-milestone-index.sh --stdout > "${generated_index}"
+      if ! diff "${generated_index}" "${index_file}" >/dev/null; then
+        rm -f "${generated_index}"
         echo "里程碑索引已过期，请运行 bash scripts/generate-milestone-index.sh 重新生成。" >&2
         exit 1
       fi
+      rm -f "${generated_index}"
       echo "里程碑索引为最新。"
     else
       echo "里程碑索引缺失，请运行 bash scripts/generate-milestone-index.sh 生成。" >&2

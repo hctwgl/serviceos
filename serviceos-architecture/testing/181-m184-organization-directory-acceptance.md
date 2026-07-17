@@ -1,6 +1,6 @@
 ---
 title: M184 企业组织与任职目录验收矩阵
-status: Draft
+status: Implemented
 milestone: M184
 lastUpdated: 2026-07-17
 ---

@@ -1,6 +1,6 @@
 ---
 title: M184 企业组织与任职目录
-status: Draft
+status: Implemented
 milestone: M184
 lastUpdated: 2026-07-17
 ---
@@ -49,8 +49,8 @@ RoleGrant 终止与待重分配清单。
 ### 不变量
 
 - closure 是授权/树查询唯一下级依据，禁止字符串路径猜测；
-- OrgUnit 移动在同一事务删除旧闭包边并重建子树闭包，写结构事件与审计；
-- Membership 终止只写 `valid_to`/`terminated_*`，不 UPDATE 历史区间起点或删除行；
+- OrgUnit 移动与同步改父在同一事务重建闭包边；
+- Membership 调动/终止只追加：先终止旧行再插入新行，不 UPDATE 历史区间起点；
 - 同一主体在同一时刻最多一条有效 `PRIMARY` 任职；
 - 跨租户父子、自环、把后代设为父节点一律失败关闭；
 - EXTERNAL_AUTHORITATIVE 组织的结构/任职普通命令返回明确错误，不静默覆盖来源。
@@ -80,7 +80,14 @@ RoleGrant 终止与待重分配清单。
 
 ## 已实现
 
-（实施完成后回填代码/迁移/契约路径）
+- Flyway `V087`：`org_organization` / `org_unit` / `org_unit_closure` / `org_membership` /
+  `org_directory_sync_batch` / `org_directory_sync_item` / `org_reassignment_work_item` /
+  `org_structure_event` 与五项能力；
+- `organization` Modulith 模块与 HTTP API（见 Core OpenAPI 0.77.0）；
+- LOCAL/EXTERNAL_AUTHORITATIVE 写门禁、closure 创建/移动/同步重建；
+- 任职创建/调动（只追加）/终止；离职联动停用、撤权与待办；
+- 同步批次幂等、乱序 SKIPPED、部分失败 `COMPLETED_WITH_ERRORS`；
+- `OrganizationDirectoryPostgresIT`、`OrganizationControllerSecurityTest`、`ArchitectureTest`。
 
 ## 明确未实现
 
@@ -88,11 +95,22 @@ RoleGrant 终止与待重分配清单。
 - RoleGrant 申请审批、Delegation、authorization:explain；
 - Admin 用户中心与组织治理 UI；
 - Portal 上下文；正式外部 Connector 与回写；
-- ORGANIZATION DataScope 匹配器、组织投影异步重建平台。
+- ORGANIZATION DataScope 匹配器、组织投影异步重建平台；
+- `asTree=true` 的树形 JSON 投影（当前返回扁平列表）。
 
 ## 工程证据
 
-（实施完成后回填）
+- `db/migration/organization/V087__create_organization_directory.sql`
+- `organization/application/DefaultOrganizationCommandService.java`
+- `organization/infrastructure/JdbcOrganizationDirectoryRepository.java`
+- `organization/web/OrganizationController.java`
+- `identity/api/PrincipalEmploymentLifecyclePort.java`
+- `authorization/application/OrganizationRoleGrantAdapter.java`
+- `serviceos-core-v1.yaml` 0.77.0
+- `OrganizationDirectoryPostgresIT`
+- `OrganizationControllerSecurityTest`
+- `ArchitectureTest`
+- `decisions/ADR-023-organization-directory-module.md`
 
 ## 验证命令
 

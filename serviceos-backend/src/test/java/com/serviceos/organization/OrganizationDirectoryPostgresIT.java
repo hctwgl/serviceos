@@ -126,8 +126,11 @@ class OrganizationDirectoryPostgresIT {
         var transferred = commands.transferMembership(actor(), metadata("transfer"), secondary.id(),
                 secondary.version(), unitB.id(), "SECONDARY", NOW.plusSeconds(3600));
         assertThat(transferred.orgUnitId()).isEqualTo(unitB.id());
+        assertThat(transferred.id()).isNotEqualTo(secondary.id());
         assertThat(queries.listMemberships(actor(), "read", org.id(), null, principal).items())
-                .hasSize(2);
+                .hasSize(3);
+        assertThat(jdbc.sql("SELECT membership_status FROM org_membership WHERE membership_id=:id")
+                .param("id", secondary.id()).query(String.class).single()).isEqualTo("TERMINATED");
     }
 
     @Test
@@ -159,31 +162,16 @@ class OrganizationDirectoryPostgresIT {
         var org = commands.createOrganization(actor(), metadata("ext-org"), "EXT", "External Org",
                 "EXTERNAL_AUTHORITATIVE", "HRIS", "ext-org-1");
 
-        assertThatThrownBy(() -> commands.createUnit(actor(), metadata("denied"), org.id(), org.version(),
+        // 仅有结构管理能力、没有 override 的操作者不得改外部权威组织。
+        seedRole("structure-only", List.of("organization.read", "organization.manageStructure"));
+        CurrentPrincipal structureOnly = new CurrentPrincipal(
+                "structure-only", TENANT, CurrentPrincipal.PrincipalType.USER, CLIENT, Set.of());
+        assertThatThrownBy(() -> commands.createUnit(structureOnly, metadata("denied"), org.id(), org.version(),
                 null, "DENIED", "Denied"))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.ACCESS_DENIED));
 
-        UUID overrideRole = UUID.randomUUID();
-        jdbc.sql("""
-                INSERT INTO auth_role (role_id, tenant_id, role_code, role_name, role_status, created_at)
-                VALUES (:roleId, :tenant, 'override-only', 'Override', 'ACTIVE', now())
-                """).param("roleId", overrideRole).param("tenant", TENANT).update();
-        jdbc.sql("""
-                INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
-                VALUES (:roleId, 'organization.overrideExternal', now())
-                """).param("roleId", overrideRole).update();
-        jdbc.sql("""
-                INSERT INTO auth_role_grant (
-                    grant_id, tenant_id, principal_id, role_id, scope_type, scope_ref,
-                    valid_from, source_code, approval_ref, created_at
-                ) VALUES (
-                    :grantId, :tenant, :actor, :roleId, 'TENANT', :tenant,
-                    now() - interval '1 day', 'TEST', 'override', now()
-                )
-                """).param("grantId", UUID.randomUUID()).param("tenant", TENANT)
-                .param("actor", ACTOR).param("roleId", overrideRole).update();
-
+        // ACTOR 在 BeforeEach 已具备 organization.overrideExternal，可显式覆盖。
         var unit = commands.createUnit(actor(), metadata("override"), org.id(), org.version(),
                 null, "OK", "Override OK");
         assertThat(unit.unitCode()).isEqualTo("OK");

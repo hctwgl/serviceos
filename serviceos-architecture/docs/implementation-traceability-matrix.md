@@ -278,3 +278,4 @@ Feature gate/authority: if applicable
 | M181 | Admin QueueTable 行内单元格深链：可选 linkColumns；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Admin Web E2E + `194-m181-*` + `178-m181-*` | 移除关联资源条、SavedView、FieldOperation |
 | M182 | Admin 外发执行任务与快照成员深链：executionTaskId + Snapshot members；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Outbound/Evidence OpenAPI + Admin Web E2E + `195-m182-*` + `179-m182-*` | FieldOperation、SavedView |
 | M183 | 统一 Principal/IdentityLink/PersonProfile/Persona；JIT 并发去重；启停实时失权；安全目录 API | 身份治理计划 + Core OpenAPI 0.76.0 + Flyway V086 + PostgreSQL/MVC/ArchitectureTest + `196-m183-*` + `180-m183-*` | M184～M188、解绑、密码、跨服务身份缓存/事件 |
+| M184 | Organization/OrgUnit/closure/OrgMembership；LOCAL/EXTERNAL_AUTHORITATIVE；同步收据；离职停用/撤权/待重分配 | ADR-023 + Core OpenAPI 0.77.0 + Flyway V087 + PostgreSQL/MVC/ArchitectureTest + `197-m184-*` + `181-m184-*` | M185～M188、正式 HR Connector、ORGANIZATION DataScope、Admin 用户中心 |
