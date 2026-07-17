@@ -222,6 +222,7 @@ title: ServiceOS 里程碑索引
 | M211 | M211 Network Portal 资质详情只读 UI | [224-m211-network-portal-qualification-detail.md](../architecture/224-m211-network-portal-qualification-detail.md) | [208-m211-network-portal-qualification-detail-acceptance.md](../testing/208-m211-network-portal-qualification-detail-acceptance.md) |
 | M212 | M212 Network Portal 师傅关系详情只读 UI | [225-m212-network-portal-membership-detail.md](../architecture/225-m212-network-portal-membership-detail.md) | [209-m212-network-portal-membership-detail-acceptance.md](../testing/209-m212-network-portal-membership-detail-acceptance.md) |
 | M213 | M213 Network Portal 限定工单工作区 | [226-m213-network-portal-work-order-workspace.md](../architecture/226-m213-network-portal-work-order-workspace.md) | [210-m213-network-portal-work-order-workspace-acceptance.md](../testing/210-m213-network-portal-work-order-workspace-acceptance.md) |
+| M214 | M214 Network Portal 工作区协作队列深链与 query 水合 | [227-m214-network-portal-workspace-queue-deeplinks.md](../architecture/227-m214-network-portal-workspace-queue-deeplinks.md) | [211-m214-network-portal-workspace-queue-deeplinks-acceptance.md](../testing/211-m214-network-portal-workspace-queue-deeplinks-acceptance.md) |
 
 ## 未关联里程碑的文档
 

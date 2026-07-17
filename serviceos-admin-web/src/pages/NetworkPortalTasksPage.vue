@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import {
   assignNetworkPortalTechnician,
   beginNetworkPortalEvidenceUploadOnBehalf,
@@ -24,6 +25,11 @@ import {
 import { getMe } from '../api/me'
 
 const props = defineProps<{ networkContextId: string | null }>()
+const route = useRoute()
+const queryTaskId = computed(() => {
+  const raw = route.query.taskId
+  return typeof raw === 'string' && raw.trim() ? raw.trim() : null
+})
 const items = ref<NetworkPortalTaskItem[]>([])
 const technicians = ref<NetworkPortalTechnicianItem[]>([])
 const appointments = ref<NetworkPortalAppointment[]>([])
@@ -94,11 +100,25 @@ async function load() {
     const taskPage = await listNetworkPortalTasks(props.networkContextId)
     items.value = taskPage.items
     error.value = null
-    if (!selectedTaskId.value && items.value.length > 0) {
+    const fromQuery = queryTaskId.value
+      ? items.value.find((item) => item.taskId === queryTaskId.value)
+      : null
+    if (fromQuery) {
+      selectedTaskId.value = fromQuery.taskId
+      if (fromQuery.businessType) {
+        businessType.value = fromQuery.businessType
+      }
+    } else if (!selectedTaskId.value && items.value.length > 0) {
       selectedTaskId.value = items.value[0].taskId
       if (items.value[0].businessType) {
         businessType.value = items.value[0].businessType
       }
+    } else if (
+      selectedTaskId.value
+      && !items.value.some((item) => item.taskId === selectedTaskId.value)
+      && items.value.length > 0
+    ) {
+      selectedTaskId.value = items.value[0].taskId
     }
   } catch (err) {
     items.value = []
@@ -506,6 +526,9 @@ watch(() => props.networkContextId, () => {
   selectedTechnicianId.value = ''
   void load()
 })
+watch(queryTaskId, () => {
+  void load()
+})
 watch(selectedTaskId, () => {
   void loadAppointments()
   void loadContactAttempts()
@@ -513,8 +536,15 @@ watch(selectedTaskId, () => {
 </script>
 
 <template>
-  <section data-testid="network-portal-tasks">
+  <section data-testid="network-portal-tasks" data-page-id="NETWORK.TASK.QUEUE">
     <h2>本网点任务</h2>
+    <p
+      v-if="queryTaskId"
+      class="filter"
+      data-testid="tasks-task-filter"
+    >
+      已按 query 选中 taskId：{{ selectedTaskId || queryTaskId }}
+    </p>
     <p v-if="error" data-testid="network-portal-error">{{ error }}</p>
     <table v-else data-testid="network-tasks-table">
       <thead>
@@ -957,7 +987,8 @@ watch(selectedTaskId, () => {
   display: grid;
   gap: 0.25rem;
 }
-.hint {
+.hint,
+.filter {
   color: #555;
   font-size: 0.9rem;
 }

@@ -214,4 +214,5 @@
 - [M211 Network Portal 资质详情只读 UI 验收矩阵](208-m211-network-portal-qualification-detail-acceptance.md)
 - [M212 Network Portal 师傅关系详情只读 UI 验收矩阵](209-m212-network-portal-membership-detail-acceptance.md)
 - [M213 Network Portal 限定工单工作区验收矩阵](210-m213-network-portal-work-order-workspace-acceptance.md)
+- [M214 Network Portal 工作区协作队列深链验收矩阵](211-m214-network-portal-workspace-queue-deeplinks-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

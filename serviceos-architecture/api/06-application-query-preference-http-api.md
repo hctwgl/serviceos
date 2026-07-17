@@ -156,6 +156,11 @@ status: Accepted
   `/network-portal/work-orders/:id`。Core OpenAPI → `1.0.0`。
   **不**接受 Admin workspace 直调、客户 PII、INTEGRATION、Portal ACK、notifications、
   FieldOperation、完整 §6.1 SLA/Visit/表单区块发明。
+- §10 Network Portal 工作区协作队列深链（M214 UI-only）：**不**新增 HTTP；在 M213 工作区
+  上深链 `/tasks?taskId=`、`/corrections?taskId=`、`/exceptions?taskId=`，目标页水合
+  `route.query.taskId` 并传入既有 list 过滤；工作区可 fan-in OPEN 整改/异常摘要（缺能力
+  省略）。catalog 仍 `page-registry-v16`；OpenAPI 仍 `1.0.0`。
+  **不**接受 SLA/Visit/表单 DTO 发明、PII、Portal ACK、notifications。
 - §11 Technician Portal Feed 子集（M195）：仅
   `GET /api/v1/technician/me/task-feed`（可选 `sinceCursor` 不透明游标；ACTIVE TECHNICIAN
   ServiceAssignment / TaskAssignment；撤权/结束时 tombstone 仅含 `taskId` +

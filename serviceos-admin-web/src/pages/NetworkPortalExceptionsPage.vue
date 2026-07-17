@@ -1,12 +1,17 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import { RouterLink, useRoute } from 'vue-router'
 import {
   listNetworkPortalExceptions,
   type NetworkPortalExceptionItem,
 } from '../api/networkPortal'
 
 const props = defineProps<{ networkContextId: string | null }>()
+const route = useRoute()
+const filterTaskId = computed(() => {
+  const raw = route.query.taskId
+  return typeof raw === 'string' && raw.trim() ? raw.trim() : null
+})
 const items = ref<NetworkPortalExceptionItem[]>([])
 const error = ref<string | null>(null)
 
@@ -17,7 +22,10 @@ async function load() {
     return
   }
   try {
-    const page = await listNetworkPortalExceptions(props.networkContextId, { status: 'OPEN' })
+    const page = await listNetworkPortalExceptions(props.networkContextId, {
+      status: 'OPEN',
+      taskId: filterTaskId.value ?? undefined,
+    })
     items.value = page.items
     error.value = null
   } catch (err) {
@@ -29,15 +37,28 @@ async function load() {
 onMounted(() => {
   void load()
 })
-watch(() => props.networkContextId, () => {
-  void load()
-})
+watch(
+  () => [props.networkContextId, filterTaskId.value] as const,
+  () => {
+    void load()
+  },
+)
 </script>
 
 <template>
   <section data-testid="network-portal-exceptions" data-page-id="NETWORK.EXCEPTION.QUEUE">
     <h2>本网点异常</h2>
     <p class="hint">未关闭运营异常；可深链到任务页处理，Portal 不提供一键 ACK。</p>
+    <p
+      v-if="filterTaskId"
+      class="filter"
+      data-testid="exceptions-task-filter"
+    >
+      已按 taskId 过滤：{{ filterTaskId }}
+      <RouterLink to="/network-portal/exceptions" data-testid="exceptions-clear-task-filter">
+        清除
+      </RouterLink>
+    </p>
     <p v-if="error" data-testid="network-portal-error">{{ error }}</p>
     <table v-else data-testid="network-exceptions-table">
       <thead>
@@ -84,9 +105,13 @@ watch(() => props.networkContextId, () => {
 </template>
 
 <style scoped>
-.hint {
+.hint,
+.filter {
   color: #5b6573;
   font-size: 0.9rem;
+}
+.filter a {
+  margin-left: 0.5rem;
 }
 table {
   width: 100%;
