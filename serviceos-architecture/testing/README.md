@@ -172,4 +172,5 @@
 - [M169 Admin 专项队列 route.query 水合验收矩阵](166-m169-admin-pilot-queue-query-hydrate-acceptance.md)
 - [M170 Admin 目录页 route.query 水合验收矩阵](167-m170-admin-pilot-directory-query-hydrate-acceptance.md)
 - [M171 Admin 外发关联资源与回执入站交叉深链验收矩阵](168-m171-admin-pilot-outbound-related-resource-deeplink-acceptance.md)
+- [M172 Admin 详情页明文 projectId 深链验收矩阵](169-m172-admin-pilot-detail-projectid-deeplink-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

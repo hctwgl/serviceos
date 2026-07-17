@@ -77,7 +77,18 @@ onMounted(() => {
         <dl>
           <div><dt>severity</dt><dd>{{ detail.severity }}</dd></div>
           <div><dt>category</dt><dd>{{ detail.category }}</dd></div>
-          <div><dt>projectId</dt><dd>{{ detail.projectId || '—' }}</dd></div>
+          <div>
+            <dt>projectId</dt>
+            <dd>
+              <RouterLink
+                v-if="detail.projectId"
+                :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: detail.projectId } }"
+              >
+                {{ detail.projectId }}
+              </RouterLink>
+              <template v-else>—</template>
+            </dd>
+          </div>
           <div><dt>workOrderId</dt><dd>{{ detail.workOrderId || '—' }}</dd></div>
           <div><dt>taskId</dt><dd>{{ detail.taskId || '—' }}</dd></div>
           <div><dt>sourceType</dt><dd>{{ detail.sourceType }}</dd></div>
@@ -96,6 +107,12 @@ onMounted(() => {
           <div><dt>allowedActions</dt><dd>{{ detail.allowedActions.join(', ') || '—' }}</dd></div>
         </dl>
         <p class="links">
+          <RouterLink
+            v-if="detail.projectId"
+            :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: detail.projectId } }"
+          >
+            打开项目 {{ detail.projectId }}
+          </RouterLink>
           <RouterLink v-if="detail.workOrderId" :to="{ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: detail.workOrderId } }">
             打开工单工作区
           </RouterLink>

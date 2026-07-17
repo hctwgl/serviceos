@@ -175,12 +175,24 @@ onMounted(() => {
           <div><dt>status</dt><dd>{{ detail.status }}</dd></div>
           <div><dt>origin</dt><dd>{{ detail.origin }}</dd></div>
           <div><dt>taskId</dt><dd>{{ detail.taskId }}</dd></div>
-          <div><dt>projectId</dt><dd>{{ detail.projectId }}</dd></div>
+          <div>
+            <dt>projectId</dt>
+            <dd>
+              <RouterLink
+                :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: detail.projectId } }"
+              >
+                {{ detail.projectId }}
+              </RouterLink>
+            </dd>
+          </div>
           <div><dt>snapshot</dt><dd>{{ detail.evidenceSetSnapshotId }}</dd></div>
           <div><dt>reopenedFromReviewCaseId</dt><dd>{{ detail.reopenedFromReviewCaseId ?? '-' }}</dd></div>
           <div><dt>reopenTriggerRef</dt><dd>{{ detail.reopenTriggerRef ?? '-' }}</dd></div>
         </dl>
         <p class="links review-cross-links">
+          <RouterLink :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: detail.projectId } }">
+            打开项目 {{ detail.projectId }}
+          </RouterLink>
           <RouterLink :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.taskId } }">
             任务详情
           </RouterLink>

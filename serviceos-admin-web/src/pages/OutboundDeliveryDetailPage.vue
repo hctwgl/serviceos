@@ -88,6 +88,16 @@ onMounted(() => {
           <div><dt>status</dt><dd>{{ detail.status }}</dd></div>
           <div><dt>externalOrderCode</dt><dd>{{ detail.externalOrderCode }}</dd></div>
           <div><dt>aggregateVersion</dt><dd>{{ detail.aggregateVersion }}</dd></div>
+          <div>
+            <dt>projectId</dt>
+            <dd>
+              <RouterLink
+                :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: detail.projectId } }"
+              >
+                {{ detail.projectId }}
+              </RouterLink>
+            </dd>
+          </div>
           <div><dt>sourceWorkOrderId</dt><dd>{{ detail.sourceWorkOrderId }}</dd></div>
           <div><dt>sourceReviewCaseId</dt><dd>{{ detail.sourceReviewCaseId }}</dd></div>
           <div><dt>sourceTaskId</dt><dd>{{ detail.sourceTaskId }}</dd></div>
@@ -96,6 +106,9 @@ onMounted(() => {
           <div><dt>reviewRouteId</dt><dd>{{ detail.reviewRouteId ?? '-' }}</dd></div>
         </dl>
         <p class="links outbound-cross-links">
+          <RouterLink :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: detail.projectId } }">
+            打开项目 {{ detail.projectId }}
+          </RouterLink>
           <RouterLink :to="{ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: detail.sourceWorkOrderId } }">
             工单工作区
           </RouterLink>

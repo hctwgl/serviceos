@@ -54,7 +54,18 @@ onMounted(() => {
           <div><dt>messageType</dt><dd>{{ detail.messageType }}</dd></div>
           <div><dt>businessKey</dt><dd>{{ detail.businessKey }}</dd></div>
           <div><dt>processingStatus</dt><dd>{{ detail.processingStatus }}</dd></div>
-          <div><dt>projectId</dt><dd>{{ detail.projectId ?? '—' }}</dd></div>
+          <div>
+            <dt>projectId</dt>
+            <dd>
+              <RouterLink
+                v-if="detail.projectId"
+                :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: detail.projectId } }"
+              >
+                {{ detail.projectId }}
+              </RouterLink>
+              <template v-else>—</template>
+            </dd>
+          </div>
           <div><dt>connectorVersionId</dt><dd>{{ detail.connectorVersionId }}</dd></div>
           <div><dt>mappingVersionId</dt><dd>{{ detail.mappingVersionId }}</dd></div>
           <div><dt>resultCode</dt><dd>{{ detail.resultCode ?? '—' }}</dd></div>
@@ -66,12 +77,18 @@ onMounted(() => {
         </dl>
         <p class="links">
           <RouterLink
+            v-if="detail.projectId"
+            :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: detail.projectId } }"
+          >
+            打开项目 {{ detail.projectId }}
+          </RouterLink>
+          <RouterLink
             v-if="workOrderId"
             :to="{ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: workOrderId } }"
           >
             工单工作区
           </RouterLink>
-          <span v-else class="meta">无 WORK_ORDER 结果链接</span>
+          <span v-if="!detail.projectId && !workOrderId" class="meta">无关联详情链接</span>
         </p>
       </article>
     </template>
