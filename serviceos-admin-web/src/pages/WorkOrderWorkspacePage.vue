@@ -203,6 +203,13 @@ type InboundEnvelopeLink = {
   resultCode: string | null
 }
 
+type OutboundDeliveryLink = {
+  deliveryId: string
+  businessMessageType: string
+  status: string
+  externalOrderCode: string
+}
+
 const inboundEnvelopeLinks = computed((): InboundEnvelopeLink[] => {
   const integration = sectionData.value?.integration
   if (!integration || activeSection.value !== 'INTEGRATION') return []
@@ -222,6 +229,28 @@ const inboundEnvelopeLinks = computed((): InboundEnvelopeLink[] => {
       }
     })
     .filter((item): item is InboundEnvelopeLink => item != null)
+})
+
+/** 复用已 Implemented Outbound 详情路由；投影缺权时 outboundDeliveries 为 null。 */
+const outboundDeliveryLinks = computed((): OutboundDeliveryLink[] => {
+  const integration = sectionData.value?.integration
+  if (!integration || activeSection.value !== 'INTEGRATION') return []
+  const raw = integration.outboundDeliveries
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null
+      const row = item as Record<string, unknown>
+      const id = row.deliveryId
+      if (typeof id !== 'string' || !id) return null
+      return {
+        deliveryId: id,
+        businessMessageType: String(row.businessMessageType ?? '—'),
+        status: String(row.status ?? '—'),
+        externalOrderCode: String(row.externalOrderCode ?? id),
+      }
+    })
+    .filter((item): item is OutboundDeliveryLink => item != null)
 })
 
 const slaRows = computed(() =>
@@ -545,6 +574,19 @@ onMounted(() => {
             >
               {{ item.messageType }} / {{ item.processingStatus }}
               <template v-if="item.resultCode"> / {{ item.resultCode }}</template>
+            </RouterLink>
+          </p>
+          <p v-if="outboundDeliveryLinks.length" class="links outbound-links">
+            打开外发交付：
+            <RouterLink
+              v-for="item in outboundDeliveryLinks"
+              :key="item.deliveryId"
+              :to="{
+                name: 'ADMIN.INTEGRATION.DETAIL',
+                params: { id: item.deliveryId },
+              }"
+            >
+              {{ item.businessMessageType }} / {{ item.status }} / {{ item.externalOrderCode }}
             </RouterLink>
           </p>
           <pre>{{ sectionPreview }}</pre>

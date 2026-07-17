@@ -1198,6 +1198,33 @@ test('真实 OIDC 登录后可通过审核外发并经厂端回调关闭 CLIENT 
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
   )
 
+  // M147：工作区 INTEGRATION → 外发交付详情深链（复用已有 OutboundDeliveryDetailPage）。
+  await reviewPage.goto(
+    new URL(`/work-orders/${sourceWorkOrderId}`, page.url()).toString(),
+  )
+  await expect(reviewPage.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await reviewPage.getByRole('button', { name: /INTEGRATION/ }).click()
+  await expect(reviewPage.getByText('区块加载中…')).toHaveCount(0)
+  const workspaceOutboundDetailPromise = reviewPage.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname ===
+        `/api/v1/outbound-deliveries/${delivery.deliveryId}`,
+  )
+  await reviewPage
+    .getByRole('link', {
+      name: new RegExp(
+        `SUBMIT_CLIENT_REVIEW\\s*/\\s*ACKNOWLEDGED\\s*/\\s*${externalOrderCode}`,
+      ),
+    })
+    .click()
+  expect((await workspaceOutboundDetailPromise).status()).toBe(200)
+  await expect(reviewPage.getByRole('heading', { name: '外发交付' })).toBeVisible()
+  await expect(reviewPage).toHaveURL(
+    new RegExp(`/integration/outbound/${delivery.deliveryId}$`),
+  )
+  await expect(reviewPage.getByText(externalOrderCode, { exact: true }).first()).toBeVisible()
+
   // M146：外发队列按 ACKNOWLEDGED + sourceWorkOrderId 收窄，避免历史 ACK 页把本交付挤出首页。
   await reviewPage.goto(new URL('/integration/outbound', page.url()).toString())
   await expect(reviewPage.getByRole('heading', { name: '外发交付队列' })).toBeVisible()

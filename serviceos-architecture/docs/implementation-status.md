@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-17
-baselineCommit: 969c0d06b0e93b396f5855d5a7b6af0e292042d7
-latestMilestone: M146
+baselineCommit: PENDING
+latestMilestone: M147
 ---
 
 # ServiceOS 实施状态总览
@@ -39,11 +39,11 @@ latestMilestone: M146
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M146 Admin 外发交付队列筛选 |
-| 基线提交 | `969c0d06b0e93b396f5855d5a7b6af0e292042d7` |
+| 最新实施里程碑 | M147 Admin 工作区外发交付详情深链 |
+| 基线提交 | `PENDING`（功能提交后回填） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
-| 前端工程 | `serviceos-admin-web`（Vue+TS+Vite）已纳入 CI 构建，具备开发态 Keycloak PKCE，以及真实只读、Task MANUAL assign-candidates/claim/release、表单/资料/审核/整改/完结、正常补传复审，预约上门、BYD 提审外发 ACK、厂端回调，CPIM 入站→激活→Admin HTTP 人工初派→同单预约上门→表单/资料/驳回整改补传复审/外发/完结（ADMIN-PILOT-09），入站 Envelope/Canonical 详情深链，以及 Outbound Delivery 队列 Accepted OpenAPI 筛选（默认 UNKNOWN）的 PR 阻断 E2E；Network/Technician 尚未建立 |
+| 前端工程 | `serviceos-admin-web`（Vue+TS+Vite）已纳入 CI 构建，具备开发态 Keycloak PKCE，以及真实只读、Task MANUAL assign-candidates/claim/release、表单/资料/审核/整改/完结、正常补传复审，预约上门、BYD 提审外发 ACK、厂端回调，CPIM 入站→激活→Admin HTTP 人工初派→同单预约上门→表单/资料/驳回整改补传复审/外发/完结（ADMIN-PILOT-09），入站 Envelope/Canonical 详情深链、Outbound Delivery 队列 Accepted OpenAPI 筛选（默认 UNKNOWN），以及工作区 INTEGRATION → 外发交付详情深链的 PR 阻断 E2E；Network/Technician 尚未建立 |
 | 数据库 | PostgreSQL + Flyway（当前版本 084 / 86） |
 | 契约 | Core OpenAPI 0.72.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、recovered/resolved 与 SLA started/breached/met@v1） |
 
@@ -75,7 +75,7 @@ latestMilestone: M146
 | 通知 | 通知与运营异常中心 | `PROPOSED` | 已有总体设计 | 通知通道、模板、可靠发送和 UI | `architecture/14-*` |
 | 履约事实与试算 | 事实提取和双向试算 | `PROPOSED` | 已有设计、API 和数据规划 | 运行时、投影和前端工作区 | M5 设计 |
 | 对账结算 | 对账、结算、争议与调整 | `PROPOSED` | 已有边界设计 | 正式运行时和页面 | `architecture/16-*` |
-| Admin Portal | 总部运营后台 | `PARTIAL` | M101～M146：队列/任务/SLA/异常/外发/工单/项目目录、工作区、allowed-actions；CI 阻断构建；开发态 Keycloak PKCE；真实只读与写链路 PR 阻断 E2E（含 ADMIN-PILOT-09、入站 Envelope/Canonical 详情深链、Outbound 队列 Accepted OpenAPI 筛选） | 设计系统、SavedView、正式企业 OIDC/BFF、生产对象存储/专业扫描、专用入站队列列表、评分/硬过滤派单与 ServiceNetwork 生命周期 | M7 设计、M101～M146、Admin 试点基线 |
+| Admin Portal | 总部运营后台 | `PARTIAL` | M101～M147：队列/任务/SLA/异常/外发/工单/项目目录、工作区、allowed-actions；CI 阻断构建；开发态 Keycloak PKCE；真实只读与写链路 PR 阻断 E2E（含 ADMIN-PILOT-09、入站/外发详情深链、Outbound 队列 Accepted OpenAPI 筛选） | 设计系统、SavedView、正式企业 OIDC/BFF、生产对象存储/专业扫描、专用入站队列列表、评分/硬过滤派单与 ServiceNetwork 生命周期 | M7 设计、M101～M147、Admin 试点基线 |
 | Network Portal | 网点协作端 | `PROPOSED` | 页面和跨端协作规格 | 前端代码和 E2E | M7 设计 |
 | Technician App | 师傅移动端 | `PROPOSED` | 弱网、离线工作包、上传队列和页面规格 | 移动端工程、真机和离线运行时 | M7 设计 |
 | External Portal | 用户/车企受控页面 | `PROPOSED` | 最小边界规划 | 二期页面和工程实现 | M7 设计 |
@@ -1126,6 +1126,16 @@ M144 起 SPI 种子入口已删除。
 
 明确未实现：评分/硬过滤/DispatchDecision、ServiceNetwork 生命周期、专用入站队列页、真实 sandbox。
 
+### M147：Admin 工作区外发交付详情深链
+
+已实现：
+
+- 工作区 INTEGRATION → `/integration/outbound/{deliveryId}`；
+- 复用已 Implemented `GET /outbound-deliveries/{id}` 与详情页；
+- Playwright：ACK 后从工作区点击外发深链并断言详情与 `externalOrderCode`。
+
+明确未实现：专用入站队列列表 API、Review/Correction 队列筛选增强、SavedView、真实 sandbox。
+
 ### M146：Admin 外发交付队列筛选
 
 已实现：
@@ -1149,13 +1159,13 @@ M144 起 SPI 种子入口已删除。
 
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M146**。Admin 已证明 `ADMIN-PILOT-09`、入站 Envelope/Canonical
-详情深链与 Outbound 队列 Accepted OpenAPI 筛选；没有实现专用入站队列列表、完整评分派单引擎、
-完整 SLA/通知策略、通用队列/SavedView 或整个现场履约平台。
+ServiceOS 可靠纵向切片已推进到 **M147**。Admin 已证明 `ADMIN-PILOT-09`、入站/外发详情深链与
+Outbound 队列 Accepted OpenAPI 筛选；没有实现专用入站队列列表、完整评分派单引擎、完整 SLA/通知策略、
+通用队列/SavedView 或整个现场履约平台。
 
 ```text
 候选下一方向（优先从已确认文档中选择最小可靠切片）：
-1. Workspace INTEGRATION → Outbound Delivery 深链，或 Review/Correction 队列筛选增强；
+1. Review/Correction 队列筛选增强（Accepted OpenAPI 单值筛选接到 Admin UI）；
 2. 正式企业 OIDC/BFF、MFA 与设计系统；SavedView 仍需再接受 API-06 章节；
 3. 授权入站 Envelope 队列（需先接受 API-06 §6 `GET /inbound-envelopes` 窄化列表契约）；
 4. 在接受 ServiceNetwork 状态语义后建立目录与准入/启用/清退生命周期；当前相关文档仍为 Proposed，

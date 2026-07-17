@@ -1,15 +1,15 @@
 ---
-title: Admin 试点可运行基线（含 M146 外发队列筛选）
+title: Admin 试点可运行基线（含 M147 外发详情深链）
 status: Implemented
 lastUpdated: 2026-07-17
 ---
 
-# Admin 试点可运行基线（含 M146 外发队列筛选）
+# Admin 试点可运行基线（含 M147 外发详情深链）
 
-本基线覆盖 M101～M146 已有 Admin 表面的可重复构建、登录、真实后端/数据库试点入口，并明确
-平台级未实现边界。M135～M146 追加补传复审、预约上门、提审外发 ACK、厂端回调、入站接单激活、
+本基线覆盖 M101～M147 已有 Admin 表面的可重复构建、登录、真实后端/数据库试点入口，并明确
+平台级未实现边界。M135～M147 追加补传复审、预约上门、提审外发 ACK、厂端回调、入站接单激活、
 Admin HTTP 人工初派、同单预约上门→表单/资料/驳回整改补传复审/外发/完结（`ADMIN-PILOT-09`）、
-入站 Envelope/Canonical 详情深链，以及 Outbound Delivery 队列 Accepted OpenAPI 筛选。
+入站 Envelope/Canonical 详情深链、Outbound Delivery 队列 Accepted OpenAPI 筛选，以及工作区外发交付详情深链。
 
 ## 1. 已建立的基线
 
@@ -169,6 +169,11 @@ GitHub Actions 使用同一脚本阻断 PR，并保留 Backend、Admin 与 Playw
 - Outbound Delivery 队列 UI 绑定 Accepted OpenAPI 单值筛选（默认 `UNKNOWN`）；
 - ACK 后按 `ACKNOWLEDGED` 筛选可见目标交付；多 status OR / SavedView 仍未证明。
 
+已追加证明（M147 / ADMIN-PILOT-08OD）：
+
+- 工作区 INTEGRATION 深链打开外发交付详情（复用已有详情页与 GET）；
+- 专用入站队列列表仍未证明。
+
 尚未证明：
 
 - 正式企业 IdP、MFA、生产回调地址、BFF/token renewal/logout 协议；
@@ -179,5 +184,5 @@ GitHub Actions 使用同一脚本阻断 PR，并保留 Backend、Admin 与 Playw
 - 真实 sandbox 提审与生产厂端联调；
 - SavedView、设计系统、可访问性与多浏览器矩阵。
 
-因此当前交付可称为“Admin 试点可运行基线（含 ADMIN-PILOT-09、入站详情深链与外发队列筛选）”，
+因此当前交付可称为“Admin 试点可运行基线（含 ADMIN-PILOT-09、入站/外发详情深链与外发队列筛选）”，
 不能称为“完整现场履约平台已交付”。

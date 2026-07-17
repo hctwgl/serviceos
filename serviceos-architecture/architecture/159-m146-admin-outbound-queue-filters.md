@@ -37,7 +37,7 @@ lastUpdated: 2026-07-17
 
 - status 省略表示“全部”（服务端仍默认 UNKNOWN）；
 - 多 status OR、SavedView / 通用 work-queues；
-- Workspace INTEGRATION → Outbound Delivery 深链；
+- Workspace INTEGRATION → Outbound Delivery 深链（M147 已实现）；
 - 专用入站队列列表、原文下载、真实 sandbox。
 
 ## 5. 证据入口
