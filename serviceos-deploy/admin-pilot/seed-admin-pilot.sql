@@ -262,3 +262,36 @@ INSERT INTO rdm_projection_checkpoint (
     'work-order-core-timeline.v1', 'tenant-local', 'tenant-local', 1,
     NULL, now() - interval '90 minutes', now(), 'RUNNING'
 ) ON CONFLICT DO NOTHING;
+
+-- M175：OPEN 运营异常 + HUMAN 人工接管 Task，证明 handlingTaskId → 任务详情深链。
+-- 接管 Task 与生产 createHandlingTask 一致：无 project/workOrder 绑定，走 TENANT task.read。
+INSERT INTO tsk_task (
+    task_id, tenant_id, task_type, task_kind, business_key, payload_digest, priority,
+    status, next_run_at, attempt_count, max_attempts, correlation_id, version,
+    created_at, updated_at
+) VALUES (
+    '71000000-0000-4000-8000-000000000001', 'tenant-local',
+    'operations.resolve-exception', 'HUMAN',
+    'a1000000-0000-4000-8000-000000000001', repeat('f', 64), 100, 'READY',
+    now() - interval '30 minutes', 0, 1, 'admin-pilot-exception-handling', 1,
+    now() - interval '30 minutes', now() - interval '30 minutes'
+) ON CONFLICT DO NOTHING;
+
+INSERT INTO ops_operational_exception (
+    exception_id, tenant_id, project_id, source_type, source_id, source_attempt_id,
+    source_task_type, category_code, severity_code, error_code, status,
+    work_order_id, task_id, handling_task_id, occurrence_count, aggregate_version,
+    correlation_id, opened_at, last_detected_at
+) VALUES (
+    'a1000000-0000-4000-8000-000000000001', 'tenant-local',
+    '10000000-0000-4000-8000-000000000001', 'TASK',
+    '70000000-0000-4000-8000-000000000001',
+    'a2000000-0000-4000-8000-000000000001',
+    'integration.byd.submit-review', 'AUTOMATION_FINAL_FAILURE', 'P1',
+    'ADMIN_PILOT_TRANSPORT_UNKNOWN', 'OPEN',
+    '40000000-0000-4000-8000-000000000001',
+    '70000000-0000-4000-8000-000000000001',
+    '71000000-0000-4000-8000-000000000001',
+    1, 1, 'admin-pilot-exception-handling',
+    now() - interval '30 minutes', now() - interval '30 minutes'
+) ON CONFLICT DO NOTHING;
