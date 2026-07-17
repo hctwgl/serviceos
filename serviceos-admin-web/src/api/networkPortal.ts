@@ -1,10 +1,25 @@
 /** Network Portal API：networkId 只经 X-Network-Context，禁止 query-param。 */
 import { apiGet, apiPost, type HttpStatusError } from './client'
 
+export type NetworkPortalTechnicianItem = {
+  membershipId: string
+  technicianProfileId: string
+  principalId: string
+  displayName: string
+  profileStatus: string
+  membershipStatus: string
+  validFrom: string
+  validTo: string | null
+  /** M206：ACTIVE 关系乐观版本（附加字段，terminate 亦可从 memberships 列表取） */
+  membershipVersion?: number
+}
+
 export type NetworkPortalPage<T> = {
   networkId: string
   items: T[]
   asOf: string
+  /** Soft-gated；缺 NETWORK `technician.readOwnNetwork` 时省略（工单/任务目录页）。 */
+  technicians?: NetworkPortalTechnicianItem[]
 }
 
 export type NetworkPortalWorkOrderItem = {
@@ -27,19 +42,6 @@ export type NetworkPortalTaskItem = {
   businessType: string | null
   technicianId: string | null
   effectiveFrom: string | null
-}
-
-export type NetworkPortalTechnicianItem = {
-  membershipId: string
-  technicianProfileId: string
-  principalId: string
-  displayName: string
-  profileStatus: string
-  membershipStatus: string
-  validFrom: string
-  validTo: string | null
-  /** M206：ACTIVE 关系乐观版本（附加字段，terminate 亦可从 memberships 列表取） */
-  membershipVersion?: number
 }
 
 export type NetworkPortalMembershipItem = {

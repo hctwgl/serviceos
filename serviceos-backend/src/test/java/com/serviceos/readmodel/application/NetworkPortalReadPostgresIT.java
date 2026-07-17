@@ -159,12 +159,19 @@ class NetworkPortalReadPostgresIT {
         assertThat(workOrders.items()).extracting(NetworkPortalWorkOrderItem::workOrderId)
                 .containsExactly(WO_A);
         assertThat(workOrders.items()).noneMatch(item -> WO_B.equals(item.workOrderId()));
+        // M230：夹具默认已授 technician.readOwnNetwork，目录页旁载命中师傅
+        assertThat(workOrders.technicians())
+                .extracting(NetworkPortalTechnicianItem::technicianProfileId)
+                .containsExactly(TECH_PROFILE);
 
         NetworkPortalPage<NetworkPortalTaskItem> tasks =
                 portal.listTasks(actor(PRINCIPAL), "corr-task", context);
         assertThat(tasks.items()).extracting(NetworkPortalTaskItem::taskId)
                 .containsExactlyInAnyOrder(TASK_A, TASK_A2);
         assertThat(tasks.items()).allMatch(item -> "READY".equals(item.status()));
+        assertThat(tasks.technicians())
+                .extracting(NetworkPortalTechnicianItem::technicianProfileId)
+                .containsExactly(TECH_PROFILE);
 
         NetworkPortalWorkbenchView workbench = portal.workbench(actor(PRINCIPAL), "corr-wb", context);
         assertThat(workbench.activeWorkOrderCount()).isEqualTo(1);
@@ -219,6 +226,85 @@ class NetworkPortalReadPostgresIT {
         assertThat(workspace.contactAttempts()).isNull();
         // M228：夹具默认已授 technician.readOwnNetwork，故 technicians 有命中项
         assertThat(workspace.technicians())
+                .extracting(NetworkPortalTechnicianItem::technicianProfileId)
+                .containsExactly(TECH_PROFILE);
+    }
+
+    @Test
+    void directoryTechnicianSummariesAreCapabilityGatedAndMatched() {
+        String context = "NETWORK|NETWORK|" + NETWORK_A;
+        jdbc.sql("""
+                UPDATE auth_role_grant SET grant_status='REVOKED', revoked_at=now(),
+                       revoked_by='test', revoke_reason='m230',
+                       aggregate_version = aggregate_version + 1, updated_at=now()
+                 WHERE tenant_id=:tenant AND principal_id=:principal
+                   AND scope_type='NETWORK' AND scope_ref=:network
+                   AND role_id IN (
+                     SELECT role_id FROM auth_role_capability
+                      WHERE capability_code='technician.readOwnNetwork'
+                   )
+                """)
+                .param("tenant", TENANT)
+                .param("principal", PRINCIPAL.toString())
+                .param("network", NETWORK_A.toString())
+                .update();
+        jdbc.sql("""
+                UPDATE auth_tenant_grant_generation
+                   SET generation = generation + 1, updated_at = now()
+                 WHERE tenant_id = :tenant
+                """).param("tenant", TENANT).update();
+        NetworkPortalPage<NetworkPortalWorkOrderItem> withoutCapWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-tech-omit-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> withoutCapTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-tech-omit-task", context);
+        assertThat(withoutCapWo.technicians()).isNull();
+        assertThat(withoutCapTasks.technicians()).isNull();
+
+        seedGrant(PRINCIPAL, "technician.readOwnNetwork", "NETWORK", NETWORK_A.toString());
+        jdbc.sql("""
+                UPDATE auth_tenant_grant_generation
+                   SET generation = generation + 1, updated_at = now()
+                 WHERE tenant_id = :tenant
+                """).param("tenant", TENANT).update();
+        jdbc.sql("""
+                UPDATE dsp_service_assignment
+                   SET assignee_id = 'unknown-tech'
+                 WHERE tenant_id = :tenant
+                   AND responsibility_level = 'TECHNICIAN'
+                   AND task_id IN (:taskA, :taskA2)
+                """)
+                .param("tenant", TENANT)
+                .param("taskA", TASK_A)
+                .param("taskA2", TASK_A2)
+                .update();
+        NetworkPortalPage<NetworkPortalWorkOrderItem> emptyWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-tech-empty-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> emptyTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-tech-empty-task", context);
+        assertThat(emptyWo.technicians()).isEmpty();
+        assertThat(emptyTasks.technicians()).isEmpty();
+
+        jdbc.sql("""
+                UPDATE dsp_service_assignment
+                   SET assignee_id = :tech
+                 WHERE tenant_id = :tenant
+                   AND responsibility_level = 'TECHNICIAN'
+                   AND task_id IN (:taskA, :taskA2)
+                """)
+                .param("tenant", TENANT)
+                .param("tech", TECH_PROFILE.toString())
+                .param("taskA", TASK_A)
+                .param("taskA2", TASK_A2)
+                .update();
+        NetworkPortalPage<NetworkPortalWorkOrderItem> withWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-tech-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> withTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-tech-task", context);
+        assertThat(withWo.technicians())
+                .extracting(NetworkPortalTechnicianItem::technicianProfileId)
+                .containsExactly(TECH_PROFILE);
+        assertThat(withWo.technicians().getFirst().displayName()).isEqualTo("网点师傅甲");
+        assertThat(withTasks.technicians())
                 .extracting(NetworkPortalTechnicianItem::technicianProfileId)
                 .containsExactly(TECH_PROFILE);
     }

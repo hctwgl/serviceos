@@ -217,7 +217,20 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                         existing.effectiveFrom() != null ? existing.effectiveFrom() : row.effectiveFrom()));
             }
         }
-        return new NetworkPortalPage<>(networkId, List.copyOf(byWorkOrder.values()), clock.instant());
+        List<NetworkPortalWorkOrderItem> workOrderItems = List.copyOf(byWorkOrder.values());
+        List<NetworkPortalTechnicianItem> technicianSummaries = null;
+        if (hasNetworkCapability(actor, correlationId, TECHNICIAN_READ_OWN, networkId)) {
+            Set<String> wantedTechnicianIds = new LinkedHashSet<>();
+            for (NetworkPortalWorkOrderItem item : workOrderItems) {
+                if (item.technicianId() != null && !item.technicianId().isBlank()) {
+                    wantedTechnicianIds.add(item.technicianId());
+                }
+            }
+            technicianSummaries = loadTechnicianSummaries(
+                    actor.tenantId(), networkId, wantedTechnicianIds);
+        }
+        return new NetworkPortalPage<>(
+                networkId, workOrderItems, clock.instant(), technicianSummaries);
     }
 
     @Override
@@ -826,7 +839,20 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                     row.technicianId(),
                     row.effectiveFrom()));
         }
-        return new NetworkPortalPage<>(networkId, List.copyOf(items), clock.instant());
+        List<NetworkPortalTaskItem> taskItems = List.copyOf(items);
+        List<NetworkPortalTechnicianItem> technicianSummaries = null;
+        if (hasNetworkCapability(actor, correlationId, TECHNICIAN_READ_OWN, networkId)) {
+            Set<String> wantedTechnicianIds = new LinkedHashSet<>();
+            for (NetworkPortalTaskItem item : taskItems) {
+                if (item.technicianId() != null && !item.technicianId().isBlank()) {
+                    wantedTechnicianIds.add(item.technicianId());
+                }
+            }
+            technicianSummaries = loadTechnicianSummaries(
+                    actor.tenantId(), networkId, wantedTechnicianIds);
+        }
+        return new NetworkPortalPage<>(
+                networkId, taskItems, clock.instant(), technicianSummaries);
     }
 
     @Override

@@ -238,6 +238,7 @@ title: ServiceOS 里程碑索引
 | M227 | M227 Network Portal 工作区预约/联系服务端摘要 | [240-m227-network-portal-workspace-appointment-contact-summary.md](../architecture/240-m227-network-portal-workspace-appointment-contact-summary.md) | [224-m227-network-portal-workspace-appointment-contact-summary-acceptance.md](../testing/224-m227-network-portal-workspace-appointment-contact-summary-acceptance.md) |
 | M228 | M228 Network Portal 工作区当前师傅服务端摘要 | [241-m228-network-portal-workspace-technician-summary.md](../architecture/241-m228-network-portal-workspace-technician-summary.md) | [225-m228-network-portal-workspace-technician-summary-acceptance.md](../testing/225-m228-network-portal-workspace-technician-summary-acceptance.md) |
 | M229 | M229 Network Portal 工作区审核案例服务端摘要 | [242-m229-network-portal-workspace-review-summary.md](../architecture/242-m229-network-portal-workspace-review-summary.md) | [226-m229-network-portal-workspace-review-summary-acceptance.md](../testing/226-m229-network-portal-workspace-review-summary-acceptance.md) |
+| M230 | M230 Network Portal 目录页师傅服务端摘要 | [243-m230-network-portal-directory-technician-summary.md](../architecture/243-m230-network-portal-directory-technician-summary.md) | [227-m230-network-portal-directory-technician-summary-acceptance.md](../testing/227-m230-network-portal-directory-technician-summary-acceptance.md) |
 
 ## 未关联里程碑的文档
 

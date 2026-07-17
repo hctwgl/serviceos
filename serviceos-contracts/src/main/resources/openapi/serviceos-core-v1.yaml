@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.9
+  version: 1.0.10
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1437,6 +1437,9 @@ paths:
         M194：需要有效 NETWORK 门户上下文（X-Network-Context）与 NETWORK scope networkTask.read。
         仅返回该网点 ACTIVE NETWORK ServiceAssignment 对应工单；禁止 query-param networkId。
         上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+        M230：可选 `technicians`（复用 NetworkPortalTechnicianItem）；
+        需 NETWORK `technician.readOwnNetwork`，缺能力时省略（不得用空数组伪装）；
+        仅含本页 items[].technicianId 命中的本网点 ACTIVE 师傅。
       parameters:
         - $ref: '#/components/parameters/NetworkContext'
         - $ref: '#/components/parameters/CorrelationId'
@@ -1503,6 +1506,9 @@ paths:
       summary: Network Portal 本网点 ACTIVE 责任任务
       description: |
         M194：X-Network-Context + networkTask.read。数据范围同 work-orders，按任务展开。
+        M230：可选 `technicians`（复用 NetworkPortalTechnicianItem）；
+        需 NETWORK `technician.readOwnNetwork`，缺能力时省略（不得用空数组伪装）；
+        仅含本页 items[].technicianId 命中的本网点 ACTIVE 师傅。
       parameters:
         - $ref: '#/components/parameters/NetworkContext'
         - $ref: '#/components/parameters/CorrelationId'
@@ -4928,6 +4934,13 @@ components:
       properties:
         networkId: { type: string, format: uuid }
         items: { type: array, items: { $ref: '#/components/schemas/NetworkPortalWorkOrderItem' } }
+        technicians:
+          description: |
+            M230：需 NETWORK technician.readOwnNetwork；缺能力时省略本属性；有能力且无命中时返回 []。
+            元素字段复用 NetworkPortalTechnicianItem；仅含本页 items[].technicianId 命中项。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/NetworkPortalTechnicianItem' }
         asOf: { type: string, format: date-time }
     NetworkPortalWorkOrderWorkspaceSlaSummary:
       type: object
@@ -5059,6 +5072,13 @@ components:
       properties:
         networkId: { type: string, format: uuid }
         items: { type: array, items: { $ref: '#/components/schemas/NetworkPortalTaskItem' } }
+        technicians:
+          description: |
+            M230：需 NETWORK technician.readOwnNetwork；缺能力时省略本属性；有能力且无命中时返回 []。
+            元素字段复用 NetworkPortalTechnicianItem；仅含本页 items[].technicianId 命中项。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/NetworkPortalTechnicianItem' }
         asOf: { type: string, format: date-time }
     NetworkPortalTechnicianItem:
       type: object

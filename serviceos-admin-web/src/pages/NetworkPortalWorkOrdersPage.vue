@@ -12,6 +12,7 @@ const props = defineProps<{ networkContextId: string | null }>()
 const items = ref<NetworkPortalWorkOrderItem[]>([])
 const techniciansByProfileId = ref<Map<string, NetworkPortalTechnicianItem>>(new Map())
 const error = ref<string | null>(null)
+const usedServerTechnicians = ref(false)
 
 function technicianLabel(technicianId: string | null | undefined) {
   if (!technicianId) {
@@ -21,10 +22,19 @@ function technicianLabel(technicianId: string | null | undefined) {
   return tech ? tech.displayName : technicianId
 }
 
+function applyTechnicians(rows: NetworkPortalTechnicianItem[]) {
+  const map = new Map<string, NetworkPortalTechnicianItem>()
+  for (const item of rows) {
+    map.set(item.technicianProfileId, item)
+  }
+  techniciansByProfileId.value = map
+}
+
 async function load() {
   if (!props.networkContextId) {
     items.value = []
     techniciansByProfileId.value = new Map()
+    usedServerTechnicians.value = false
     error.value = '请选择 NETWORK 上下文'
     return
   }
@@ -32,19 +42,24 @@ async function load() {
     const page = await listNetworkPortalWorkOrders(props.networkContextId)
     items.value = page.items
     error.value = null
+    if (page.technicians !== undefined) {
+      // M230：服务端旁载替换 M217 client fan-in
+      applyTechnicians(page.technicians)
+      usedServerTechnicians.value = true
+      return
+    }
+    usedServerTechnicians.value = false
+    try {
+      const techPage = await listNetworkPortalTechnicians(props.networkContextId)
+      applyTechnicians(techPage.items)
+    } catch {
+      techniciansByProfileId.value = new Map()
+    }
   } catch (err) {
     items.value = []
-    error.value = err instanceof Error ? err.message : '工单列表加载失败'
-  }
-  try {
-    const techPage = await listNetworkPortalTechnicians(props.networkContextId)
-    const map = new Map<string, NetworkPortalTechnicianItem>()
-    for (const item of techPage.items) {
-      map.set(item.technicianProfileId, item)
-    }
-    techniciansByProfileId.value = map
-  } catch {
     techniciansByProfileId.value = new Map()
+    usedServerTechnicians.value = false
+    error.value = err instanceof Error ? err.message : '工单列表加载失败'
   }
 }
 
@@ -59,7 +74,14 @@ watch(() => props.networkContextId, () => {
 <template>
   <section data-testid="network-portal-work-orders" data-page-id="NETWORK.WORKORDER.LIST">
     <h2>本网点工单</h2>
-    <p class="hint">M217：师傅 displayName fan-in；缺 technician.readOwnNetwork 时保留原始 ID。</p>
+    <p class="hint">
+      <template v-if="usedServerTechnicians">
+        M230：师傅 displayName 由列表页服务端 <code>technicians</code> 交付。
+      </template>
+      <template v-else>
+        M217：师傅 displayName fan-in；缺 technician.readOwnNetwork 时保留原始 ID。
+      </template>
+    </p>
     <p v-if="error" data-testid="network-portal-error">{{ error }}</p>
     <table v-else data-testid="network-work-orders-table">
       <thead>

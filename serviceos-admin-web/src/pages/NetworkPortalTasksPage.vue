@@ -32,6 +32,7 @@ const queryTaskId = computed(() => {
 })
 const items = ref<NetworkPortalTaskItem[]>([])
 const technicians = ref<NetworkPortalTechnicianItem[]>([])
+const directoryTechnicians = ref<NetworkPortalTechnicianItem[]>([])
 const appointments = ref<NetworkPortalAppointment[]>([])
 const contactAttempts = ref<NetworkPortalContactAttempt[]>([])
 const error = ref<string | null>(null)
@@ -39,6 +40,13 @@ const error = ref<string | null>(null)
 function technicianLabel(technicianId: string | null | undefined) {
   if (!technicianId) {
     return '未指派'
+  }
+  // M230：优先目录页服务端旁载；回退指派候选列表（M217 fan-in / 写控件全集）
+  const fromDirectory = directoryTechnicians.value.find(
+    (item) => item.technicianProfileId === technicianId,
+  )
+  if (fromDirectory) {
+    return fromDirectory.displayName
   }
   const tech = technicians.value.find((item) => item.technicianProfileId === technicianId)
   return tech ? tech.displayName : technicianId
@@ -99,14 +107,22 @@ async function load() {
   if (!props.networkContextId) {
     items.value = []
     technicians.value = []
+    directoryTechnicians.value = []
     appointments.value = []
     contactAttempts.value = []
     error.value = '请选择 NETWORK 上下文'
     return
   }
+  let serverDirectoryTechnicians: NetworkPortalTechnicianItem[] | null = null
   try {
     const taskPage = await listNetworkPortalTasks(props.networkContextId)
     items.value = taskPage.items
+    if (taskPage.technicians !== undefined) {
+      serverDirectoryTechnicians = taskPage.technicians
+      directoryTechnicians.value = taskPage.technicians
+    } else {
+      directoryTechnicians.value = []
+    }
     error.value = null
     const fromQuery = queryTaskId.value
       ? items.value.find((item) => item.taskId === queryTaskId.value)
@@ -130,11 +146,16 @@ async function load() {
     }
   } catch (err) {
     items.value = []
+    directoryTechnicians.value = []
     error.value = err instanceof Error ? err.message : '任务列表加载失败'
   }
   try {
+    // 指派/改派下拉仍需 ACTIVE 候选全集；目录展示优先用 page.technicians
     const techPage = await listNetworkPortalTechnicians(props.networkContextId)
     technicians.value = techPage.items
+    if (serverDirectoryTechnicians === null) {
+      directoryTechnicians.value = techPage.items
+    }
     if (!selectedTechnicianId.value && technicians.value.length > 0) {
       selectedTechnicianId.value = technicians.value[0].technicianProfileId
     }
