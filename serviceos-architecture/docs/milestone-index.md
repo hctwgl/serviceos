@@ -243,6 +243,7 @@ title: ServiceOS 里程碑索引
 | M232 | M232 Network Portal 目录页联系尝试服务端摘要 | [245-m232-network-portal-directory-contact-summary.md](../architecture/245-m232-network-portal-directory-contact-summary.md) | [229-m232-network-portal-directory-contact-summary-acceptance.md](../testing/229-m232-network-portal-directory-contact-summary-acceptance.md) |
 | M233 | M233 Network Portal 目录页资料整改案例服务端摘要 | [246-m233-network-portal-directory-correction-summary.md](../architecture/246-m233-network-portal-directory-correction-summary.md) | [230-m233-network-portal-directory-correction-summary-acceptance.md](../testing/230-m233-network-portal-directory-correction-summary-acceptance.md) |
 | M234 | M234 Network Portal 目录页 SLA 风险服务端摘要 | [247-m234-network-portal-directory-sla-risk-summary.md](../architecture/247-m234-network-portal-directory-sla-risk-summary.md) | [231-m234-network-portal-directory-sla-risk-summary-acceptance.md](../testing/231-m234-network-portal-directory-sla-risk-summary-acceptance.md) |
+| M235 | M235 Network Portal 目录页资料 Evidence 服务端摘要 | [248-m235-network-portal-directory-evidence-summary.md](../architecture/248-m235-network-portal-directory-evidence-summary.md) | [232-m235-network-portal-directory-evidence-summary-acceptance.md](../testing/232-m235-network-portal-directory-evidence-summary-acceptance.md) |
 
 ## 未关联里程碑的文档
 

@@ -243,8 +243,14 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                     actor, correlationId, pageTaskIds);
         }
         List<NetworkPortalWorkspaceCorrectionCaseSummary> correctionSummaries = null;
+        List<NetworkPortalWorkspaceEvidenceSlotSummary> evidenceSlotSummaries = null;
+        List<NetworkPortalWorkspaceEvidenceItemSummary> evidenceItemSummaries = null;
         if (hasNetworkCapability(actor, correlationId, EVIDENCE_READ, networkId)) {
             correctionSummaries = loadCorrectionSummaries(actor, correlationId, pageTaskIds);
+            evidenceSlotSummaries = loadEvidenceSlotSummaries(
+                    actor, correlationId, networkId, pageTaskIds);
+            evidenceItemSummaries = loadEvidenceItemSummaries(
+                    actor, correlationId, networkId, pageTaskIds);
         }
         List<NetworkPortalDirectorySlaRiskSummary> slaRiskSummaries = null;
         if (hasNetworkCapability(actor, correlationId, SLA_READ, networkId)) {
@@ -254,7 +260,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         return new NetworkPortalPage<>(
                 networkId, workOrderItems, clock.instant(),
                 technicianSummaries, appointmentSummaries, contactAttemptSummaries,
-                correctionSummaries, slaRiskSummaries);
+                correctionSummaries, evidenceSlotSummaries, evidenceItemSummaries, slaRiskSummaries);
     }
 
     @Override
@@ -498,8 +504,9 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     }
 
     /**
-     * M223：NETWORK evidence.read 已 soft-gate；仅 fan-in ACTIVE taskIds。
-     * OnNetwork 端口对未解析任务返回空列表，避免污染工作区只读事务。
+     * M223 / M235：NETWORK evidence.read 已 soft-gate；仅 fan-in 给定 taskIds。
+     * 工作台传入 ACTIVE taskIds；目录页传入当前页 taskIds。
+     * OnNetwork 端口对未解析任务返回空列表，避免污染只读事务。
      */
     private List<NetworkPortalWorkspaceEvidenceSlotSummary> loadEvidenceSlotSummaries(
             CurrentPrincipal actor,
@@ -524,7 +531,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     }
 
     /**
-     * M223：NETWORK evidence.read 已 soft-gate；仅 fan-in ACTIVE taskIds。
+     * M223 / M235：NETWORK evidence.read 已 soft-gate；仅 fan-in 给定 taskIds。
      */
     private List<NetworkPortalWorkspaceEvidenceItemSummary> loadEvidenceItemSummaries(
             CurrentPrincipal actor,
@@ -889,8 +896,14 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                     actor, correlationId, pageTaskIds);
         }
         List<NetworkPortalWorkspaceCorrectionCaseSummary> correctionSummaries = null;
+        List<NetworkPortalWorkspaceEvidenceSlotSummary> evidenceSlotSummaries = null;
+        List<NetworkPortalWorkspaceEvidenceItemSummary> evidenceItemSummaries = null;
         if (hasNetworkCapability(actor, correlationId, EVIDENCE_READ, networkId)) {
             correctionSummaries = loadCorrectionSummaries(actor, correlationId, pageTaskIds);
+            evidenceSlotSummaries = loadEvidenceSlotSummaries(
+                    actor, correlationId, networkId, pageTaskIds);
+            evidenceItemSummaries = loadEvidenceItemSummaries(
+                    actor, correlationId, networkId, pageTaskIds);
         }
         List<NetworkPortalDirectorySlaRiskSummary> slaRiskSummaries = null;
         if (hasNetworkCapability(actor, correlationId, SLA_READ, networkId)) {
@@ -900,7 +913,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         return new NetworkPortalPage<>(
                 networkId, taskItems, clock.instant(),
                 technicianSummaries, appointmentSummaries, contactAttemptSummaries,
-                correctionSummaries, slaRiskSummaries);
+                correctionSummaries, evidenceSlotSummaries, evidenceItemSummaries, slaRiskSummaries);
     }
 
     @Override

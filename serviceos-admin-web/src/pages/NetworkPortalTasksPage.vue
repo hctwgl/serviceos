@@ -25,6 +25,8 @@ import {
   type NetworkPortalWorkspaceAppointmentSummary,
   type NetworkPortalWorkspaceContactAttemptSummary,
   type NetworkPortalWorkspaceCorrectionCaseSummary,
+  type NetworkPortalWorkspaceEvidenceItemSummary,
+  type NetworkPortalWorkspaceEvidenceSlotSummary,
 } from '../api/networkPortal'
 import { getMe } from '../api/me'
 
@@ -40,6 +42,8 @@ const directoryTechnicians = ref<NetworkPortalTechnicianItem[]>([])
 const directoryAppointments = ref<NetworkPortalWorkspaceAppointmentSummary[] | null>(null)
 const directoryContactAttempts = ref<NetworkPortalWorkspaceContactAttemptSummary[] | null>(null)
 const directoryCorrections = ref<NetworkPortalWorkspaceCorrectionCaseSummary[] | null>(null)
+const directoryEvidenceSlots = ref<NetworkPortalWorkspaceEvidenceSlotSummary[] | null>(null)
+const directoryEvidenceItems = ref<NetworkPortalWorkspaceEvidenceItemSummary[] | null>(null)
 const directorySlaRiskSummaries = ref<NetworkPortalDirectorySlaRiskSummary[] | null>(null)
 const appointments = ref<NetworkPortalAppointment[]>([])
 const contactAttempts = ref<NetworkPortalContactAttempt[]>([])
@@ -101,6 +105,31 @@ function directoryCorrectionLabel(taskId: string) {
     return `OPEN ×${openCount} · ${first.reasonCodes.join(',') || first.status}`
   }
   return `${first.status} · ${first.reasonCodes.join(',') || first.correctionCaseId}`
+}
+
+function directoryEvidenceLabel(taskId: string) {
+  if (directoryEvidenceSlots.value === null) {
+    return '—'
+  }
+  const slots = directoryEvidenceSlots.value.filter((row) => row.taskId === taskId)
+  const items = (directoryEvidenceItems.value ?? []).filter((row) => row.taskId === taskId)
+  if (slots.length === 0 && items.length === 0) {
+    return '暂无'
+  }
+  const missing = slots.filter((row) => row.status === 'MISSING').length
+  const openItems = items.filter((row) => row.status === 'OPEN').length
+  const parts: string[] = []
+  if (missing > 0) {
+    parts.push(`MISSING ×${missing}`)
+  }
+  if (openItems > 0) {
+    parts.push(`OPEN项 ×${openItems}`)
+  }
+  if (parts.length === 0) {
+    const first = slots[0]
+    return first ? `${first.status} · ${first.requirementCode}` : `项 ×${items.length}`
+  }
+  return parts.join(' · ')
 }
 
 function directorySlaRiskLabel(taskId: string) {
@@ -173,6 +202,8 @@ async function load() {
     directoryAppointments.value = null
     directoryContactAttempts.value = null
     directoryCorrections.value = null
+    directoryEvidenceSlots.value = null
+    directoryEvidenceItems.value = null
     directorySlaRiskSummaries.value = null
     appointments.value = []
     contactAttempts.value = []
@@ -189,6 +220,10 @@ async function load() {
       taskPage.contactAttempts !== undefined ? taskPage.contactAttempts : null
     directoryCorrections.value =
       taskPage.corrections !== undefined ? taskPage.corrections : null
+    directoryEvidenceSlots.value =
+      taskPage.evidenceSlots !== undefined ? taskPage.evidenceSlots : null
+    directoryEvidenceItems.value =
+      taskPage.evidenceItems !== undefined ? taskPage.evidenceItems : null
     directorySlaRiskSummaries.value =
       taskPage.slaRiskSummaries !== undefined ? taskPage.slaRiskSummaries : null
     if (taskPage.technicians !== undefined) {
@@ -224,6 +259,8 @@ async function load() {
     directoryAppointments.value = null
     directoryContactAttempts.value = null
     directoryCorrections.value = null
+    directoryEvidenceSlots.value = null
+    directoryEvidenceItems.value = null
     directorySlaRiskSummaries.value = null
     error.value = err instanceof Error ? err.message : '任务列表加载失败'
   }
@@ -668,6 +705,7 @@ watch(selectedTaskId, () => {
           <th>师傅</th>
           <th v-if="directoryAppointments !== null">预约窗口</th>
           <th v-if="directoryContactAttempts !== null">最近联系</th>
+          <th v-if="directoryEvidenceSlots !== null">资料</th>
           <th v-if="directoryCorrections !== null">整改</th>
           <th v-if="directorySlaRiskSummaries !== null">SLA 风险</th>
         </tr>
@@ -702,6 +740,12 @@ watch(selectedTaskId, () => {
             data-testid="task-contact-attempt"
           >
             {{ directoryContactLabel(item.taskId) }}
+          </td>
+          <td
+            v-if="directoryEvidenceSlots !== null"
+            data-testid="task-evidence-summary"
+          >
+            {{ directoryEvidenceLabel(item.taskId) }}
           </td>
           <td
             v-if="directoryCorrections !== null"

@@ -416,6 +416,58 @@ class NetworkPortalReadPostgresIT {
         assertThat(withTasks.corrections())
                 .extracting(NetworkPortalWorkspaceCorrectionCaseSummary::correctionCaseId)
                 .containsExactly(correctionA);
+        // M235：同权下 evidence 旁载一并出现（本用例未 seed slot → []）
+        assertThat(withWo.evidenceSlots()).isEmpty();
+        assertThat(withWo.evidenceItems()).isEmpty();
+        assertThat(withTasks.evidenceSlots()).isEmpty();
+        assertThat(withTasks.evidenceItems()).isEmpty();
+    }
+
+    @Test
+    void directoryEvidenceSummariesAreCapabilityGatedAndTaskScoped() {
+        String context = "NETWORK|NETWORK|" + NETWORK_A;
+        NetworkPortalPage<NetworkPortalWorkOrderItem> withoutCapWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-evd-omit-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> withoutCapTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-evd-omit-task", context);
+        assertThat(withoutCapWo.evidenceSlots()).isNull();
+        assertThat(withoutCapWo.evidenceItems()).isNull();
+        assertThat(withoutCapTasks.evidenceSlots()).isNull();
+        assertThat(withoutCapTasks.evidenceItems()).isNull();
+
+        seedGrant(PRINCIPAL, "evidence.read", "NETWORK", NETWORK_A.toString());
+        NetworkPortalPage<NetworkPortalWorkOrderItem> emptyWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-evd-empty-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> emptyTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-evd-empty-task", context);
+        assertThat(emptyWo.evidenceSlots()).isEmpty();
+        assertThat(emptyWo.evidenceItems()).isEmpty();
+        assertThat(emptyTasks.evidenceSlots()).isEmpty();
+        assertThat(emptyTasks.evidenceItems()).isEmpty();
+
+        UUID slotA = seedEvidenceSlot(TASK_A, "site.photo", "现场照片");
+        UUID itemA = seedEvidenceItem(TASK_A, slotA);
+        seedEvidenceSlot(TASK_B, "foreign.photo", "他网点照片");
+
+        NetworkPortalPage<NetworkPortalWorkOrderItem> withWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-evd-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> withTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-evd-task", context);
+        assertThat(withWo.evidenceSlots())
+                .extracting(NetworkPortalWorkspaceEvidenceSlotSummary::taskId)
+                .containsExactly(TASK_A);
+        assertThat(withWo.evidenceSlots().getFirst().requirementCode()).isEqualTo("site.photo");
+        assertThat(withWo.evidenceSlots().getFirst().mediaType()).isEqualTo("PHOTO");
+        assertThat(withWo.evidenceItems())
+                .extracting(NetworkPortalWorkspaceEvidenceItemSummary::evidenceItemId)
+                .containsExactly(itemA);
+        assertThat(withWo.evidenceItems().getFirst().status()).isEqualTo("OPEN");
+        assertThat(withTasks.evidenceSlots())
+                .extracting(NetworkPortalWorkspaceEvidenceSlotSummary::taskId)
+                .containsExactly(TASK_A);
+        assertThat(withTasks.evidenceItems())
+                .extracting(NetworkPortalWorkspaceEvidenceItemSummary::evidenceItemId)
+                .containsExactly(itemA);
     }
 
     @Test

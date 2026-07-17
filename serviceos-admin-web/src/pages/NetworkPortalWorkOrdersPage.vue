@@ -10,6 +10,8 @@ import {
   type NetworkPortalWorkspaceAppointmentSummary,
   type NetworkPortalWorkspaceContactAttemptSummary,
   type NetworkPortalWorkspaceCorrectionCaseSummary,
+  type NetworkPortalWorkspaceEvidenceItemSummary,
+  type NetworkPortalWorkspaceEvidenceSlotSummary,
 } from '../api/networkPortal'
 
 const props = defineProps<{ networkContextId: string | null }>()
@@ -18,6 +20,8 @@ const techniciansByProfileId = ref<Map<string, NetworkPortalTechnicianItem>>(new
 const appointments = ref<NetworkPortalWorkspaceAppointmentSummary[] | null>(null)
 const contactAttempts = ref<NetworkPortalWorkspaceContactAttemptSummary[] | null>(null)
 const corrections = ref<NetworkPortalWorkspaceCorrectionCaseSummary[] | null>(null)
+const evidenceSlots = ref<NetworkPortalWorkspaceEvidenceSlotSummary[] | null>(null)
+const evidenceItems = ref<NetworkPortalWorkspaceEvidenceItemSummary[] | null>(null)
 const slaRiskSummaries = ref<NetworkPortalDirectorySlaRiskSummary[] | null>(null)
 const error = ref<string | null>(null)
 const usedServerTechnicians = ref(false)
@@ -81,6 +85,31 @@ function correctionLabel(taskIds: string[]) {
   return `${first.status} · ${first.reasonCodes.join(',') || first.correctionCaseId}`
 }
 
+function evidenceLabel(taskIds: string[]) {
+  if (evidenceSlots.value === null) {
+    return '—'
+  }
+  const slots = evidenceSlots.value.filter((row) => taskIds.includes(row.taskId))
+  const items = (evidenceItems.value ?? []).filter((row) => taskIds.includes(row.taskId))
+  if (slots.length === 0 && items.length === 0) {
+    return '暂无'
+  }
+  const missing = slots.filter((row) => row.status === 'MISSING').length
+  const openItems = items.filter((row) => row.status === 'OPEN').length
+  const parts: string[] = []
+  if (missing > 0) {
+    parts.push(`MISSING ×${missing}`)
+  }
+  if (openItems > 0) {
+    parts.push(`OPEN项 ×${openItems}`)
+  }
+  if (parts.length === 0) {
+    const first = slots[0]
+    return first ? `${first.status} · ${first.requirementCode}` : `项 ×${items.length}`
+  }
+  return parts.join(' · ')
+}
+
 function slaRiskLabel(workOrderId: string) {
   if (slaRiskSummaries.value === null) {
     return '—'
@@ -99,6 +128,8 @@ async function load() {
     appointments.value = null
     contactAttempts.value = null
     corrections.value = null
+    evidenceSlots.value = null
+    evidenceItems.value = null
     slaRiskSummaries.value = null
     usedServerTechnicians.value = false
     error.value = '请选择 NETWORK 上下文'
@@ -110,6 +141,8 @@ async function load() {
     appointments.value = page.appointments !== undefined ? page.appointments : null
     contactAttempts.value = page.contactAttempts !== undefined ? page.contactAttempts : null
     corrections.value = page.corrections !== undefined ? page.corrections : null
+    evidenceSlots.value = page.evidenceSlots !== undefined ? page.evidenceSlots : null
+    evidenceItems.value = page.evidenceItems !== undefined ? page.evidenceItems : null
     slaRiskSummaries.value = page.slaRiskSummaries !== undefined ? page.slaRiskSummaries : null
     error.value = null
     if (page.technicians !== undefined) {
@@ -130,6 +163,8 @@ async function load() {
     appointments.value = null
     contactAttempts.value = null
     corrections.value = null
+    evidenceSlots.value = null
+    evidenceItems.value = null
     slaRiskSummaries.value = null
     usedServerTechnicians.value = false
     error.value = err instanceof Error ? err.message : '工单列表加载失败'
@@ -149,7 +184,7 @@ watch(() => props.networkContextId, () => {
     <h2>本网点工单</h2>
     <p class="hint">
       <template v-if="usedServerTechnicians">
-        M230～M234：师傅、预约窗口、最近联系、整改与 SLA 风险由列表页服务端旁载交付。
+        M230～M235：师傅、预约窗口、最近联系、整改、资料与 SLA 风险由列表页服务端旁载交付。
       </template>
       <template v-else>
         M217：师傅 displayName fan-in；缺 technician.readOwnNetwork 时保留原始 ID。
@@ -166,6 +201,7 @@ watch(() => props.networkContextId, () => {
           <th>师傅</th>
           <th v-if="appointments !== null">预约窗口</th>
           <th v-if="contactAttempts !== null">最近联系</th>
+          <th v-if="evidenceSlots !== null">资料</th>
           <th v-if="corrections !== null">整改</th>
           <th v-if="slaRiskSummaries !== null">SLA 风险</th>
           <th>生效自</th>
@@ -202,6 +238,12 @@ watch(() => props.networkContextId, () => {
             data-testid="work-order-contact-attempt"
           >
             {{ contactLabel(item.taskIds) }}
+          </td>
+          <td
+            v-if="evidenceSlots !== null"
+            data-testid="work-order-evidence-summary"
+          >
+            {{ evidenceLabel(item.taskIds) }}
           </td>
           <td
             v-if="corrections !== null"

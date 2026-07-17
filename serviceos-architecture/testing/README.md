@@ -235,4 +235,5 @@
 - [M232 Network Portal 目录页联系尝试服务端摘要验收矩阵](229-m232-network-portal-directory-contact-summary-acceptance.md)
 - [M233 Network Portal 目录页资料整改服务端摘要验收矩阵](230-m233-network-portal-directory-correction-summary-acceptance.md)
 - [M234 Network Portal 目录页 SLA 风险服务端摘要验收矩阵](231-m234-network-portal-directory-sla-risk-summary-acceptance.md)
+- [M235 Network Portal 目录页资料 Evidence 服务端摘要验收矩阵](232-m235-network-portal-directory-evidence-summary-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

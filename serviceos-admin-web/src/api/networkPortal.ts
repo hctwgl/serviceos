@@ -65,6 +65,10 @@ export type NetworkPortalPage<T> = {
   contactAttempts?: NetworkPortalWorkspaceContactAttemptSummary[]
   /** Soft-gated；缺 NETWORK `evidence.read` 时省略（工单/任务目录页）。 */
   corrections?: NetworkPortalWorkspaceCorrectionCaseSummary[]
+  /** Soft-gated；缺 NETWORK `evidence.read` 时与 evidenceItems 同时省略（工单/任务目录页）。 */
+  evidenceSlots?: NetworkPortalWorkspaceEvidenceSlotSummary[]
+  /** Soft-gated；缺 NETWORK `evidence.read` 时与 evidenceSlots 同时省略（工单/任务目录页）。 */
+  evidenceItems?: NetworkPortalWorkspaceEvidenceItemSummary[]
   /** Soft-gated；缺 NETWORK `sla.read` 时省略（工单/任务目录页）。 */
   slaRiskSummaries?: NetworkPortalDirectorySlaRiskSummary[]
 }

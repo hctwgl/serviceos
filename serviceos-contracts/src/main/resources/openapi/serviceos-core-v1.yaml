@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.14
+  version: 1.0.15
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1452,6 +1452,9 @@ paths:
         M234：可选 `slaRiskSummaries`（NetworkPortalDirectorySlaRiskSummary）；
         需 NETWORK `sla.read`，缺能力时省略（不得用空数组伪装）；
         按本页工单聚合 ACTIVE taskIds 的 open/breached；仅含 openCount>0 行。
+        M235：可选 `evidenceSlots` / `evidenceItems`（复用 Admin 工作区摘要字段集）；
+        需 NETWORK `evidence.read`，缺能力时同时省略（不得用空数组伪装）；
+        覆盖本页 items[].taskIds。
       parameters:
         - $ref: '#/components/parameters/NetworkContext'
         - $ref: '#/components/parameters/CorrelationId'
@@ -1533,6 +1536,9 @@ paths:
         M234：可选 `slaRiskSummaries`（NetworkPortalDirectorySlaRiskSummary）；
         需 NETWORK `sla.read`，缺能力时省略（不得用空数组伪装）；
         按本页 taskId 展开 open/breached；仅含 openCount>0 行。
+        M235：可选 `evidenceSlots` / `evidenceItems`（复用 Admin 工作区摘要字段集）；
+        需 NETWORK `evidence.read`，缺能力时同时省略（不得用空数组伪装）；
+        覆盖本页 items[].taskId。
       parameters:
         - $ref: '#/components/parameters/NetworkContext'
         - $ref: '#/components/parameters/CorrelationId'
@@ -4989,6 +4995,22 @@ components:
           type: array
           maxItems: 100
           items: { $ref: '#/components/schemas/WorkOrderWorkspaceCorrectionCaseSummary' }
+        evidenceSlots:
+          description: |
+            M235：需 NETWORK evidence.read；缺能力时与 evidenceItems 同时省略；
+            有能力且无实例时返回 []。元素字段复用 WorkOrderWorkspaceEvidenceSlotSummary；
+            覆盖本页 items[].taskIds。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceEvidenceSlotSummary' }
+        evidenceItems:
+          description: |
+            M235：需 NETWORK evidence.read；缺能力时与 evidenceSlots 同时省略；
+            有能力且无实例时返回 []。元素字段复用 WorkOrderWorkspaceEvidenceItemSummary；
+            覆盖本页 items[].taskIds。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceEvidenceItemSummary' }
         slaRiskSummaries:
           description: |
             M234：需 NETWORK sla.read；缺能力时省略本属性；有能力且无开放风险时返回 []。
@@ -5176,6 +5198,22 @@ components:
           type: array
           maxItems: 100
           items: { $ref: '#/components/schemas/WorkOrderWorkspaceCorrectionCaseSummary' }
+        evidenceSlots:
+          description: |
+            M235：需 NETWORK evidence.read；缺能力时与 evidenceItems 同时省略；
+            有能力且无实例时返回 []。元素字段复用 WorkOrderWorkspaceEvidenceSlotSummary；
+            覆盖本页 items[].taskId。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceEvidenceSlotSummary' }
+        evidenceItems:
+          description: |
+            M235：需 NETWORK evidence.read；缺能力时与 evidenceSlots 同时省略；
+            有能力且无实例时返回 []。元素字段复用 WorkOrderWorkspaceEvidenceItemSummary；
+            覆盖本页 items[].taskId。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceEvidenceItemSummary' }
         slaRiskSummaries:
           description: |
             M234：需 NETWORK sla.read；缺能力时省略本属性；有能力且无开放风险时返回 []。
