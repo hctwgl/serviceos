@@ -241,4 +241,5 @@
 - [M238 Network Portal 预约/联系历史 Accepted 字段展示验收矩阵](235-m238-network-portal-appointment-contact-history-fields-acceptance.md)
 - [M239 Network Portal 工作区 Visit/表单/Evidence Accepted 字段展示验收矩阵](236-m239-network-portal-workspace-visit-form-evidence-fields-acceptance.md)
 - [M240 Network Portal 工作区协作摘要 Accepted 字段展示验收矩阵](237-m240-network-portal-workspace-collaboration-summary-fields-acceptance.md)
+- [M241 Network Portal 预约/联系历史残余 Accepted 字段展示验收矩阵](238-m241-network-portal-appointment-contact-history-residual-fields-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)
