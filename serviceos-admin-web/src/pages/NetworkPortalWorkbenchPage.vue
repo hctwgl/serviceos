@@ -36,9 +36,21 @@ watch(() => props.networkContextId, () => {
     <p v-if="error" data-testid="network-portal-error">{{ error }}</p>
     <template v-else-if="data">
       <ul data-testid="network-workbench-counts">
-        <li>ACTIVE 工单：{{ data.activeWorkOrderCount }}</li>
-        <li>ACTIVE 任务：{{ data.activeTaskCount }}</li>
-        <li>ACTIVE 师傅：{{ data.activeTechnicianCount }}</li>
+        <li>
+          <RouterLink to="/network-portal/work-orders" data-testid="workbench-active-work-orders">
+            ACTIVE 工单：{{ data.activeWorkOrderCount }}
+          </RouterLink>
+        </li>
+        <li>
+          <RouterLink to="/network-portal/tasks" data-testid="workbench-active-tasks">
+            ACTIVE 任务：{{ data.activeTaskCount }}
+          </RouterLink>
+        </li>
+        <li>
+          <RouterLink to="/network-portal/technicians" data-testid="workbench-active-technicians">
+            ACTIVE 师傅：{{ data.activeTechnicianCount }}
+          </RouterLink>
+        </li>
         <li v-if="typeof data.unassignedTechnicianTaskCount === 'number'">
           <RouterLink to="/network-portal/tasks" data-testid="workbench-unassigned-count">
             待指派任务：{{ data.unassignedTechnicianTaskCount }}

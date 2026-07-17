@@ -78,7 +78,19 @@ watch(
       <div><dt>category</dt><dd>{{ detail.category }}</dd></div>
       <div><dt>sourceType</dt><dd>{{ detail.sourceType }}</dd></div>
       <div><dt>projectId</dt><dd>{{ detail.projectId ?? '—' }}</dd></div>
-      <div><dt>workOrderId</dt><dd>{{ detail.workOrderId ?? '—' }}</dd></div>
+      <div>
+        <dt>workOrderId</dt>
+        <dd>
+          <RouterLink
+            v-if="detail.workOrderId"
+            :to="`/network-portal/work-orders/${detail.workOrderId}`"
+            data-testid="exception-detail-work-order-deeplink"
+          >
+            {{ detail.workOrderId }}
+          </RouterLink>
+          <span v-else>—</span>
+        </dd>
+      </div>
       <div>
         <dt>taskId</dt>
         <dd>

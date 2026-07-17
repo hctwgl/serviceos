@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import {
   assignNetworkPortalTechnician,
   beginNetworkPortalEvidenceUploadOnBehalf,
@@ -35,6 +35,14 @@ const technicians = ref<NetworkPortalTechnicianItem[]>([])
 const appointments = ref<NetworkPortalAppointment[]>([])
 const contactAttempts = ref<NetworkPortalContactAttempt[]>([])
 const error = ref<string | null>(null)
+
+function technicianLabel(technicianId: string | null | undefined) {
+  if (!technicianId) {
+    return '未指派'
+  }
+  const tech = technicians.value.find((item) => item.technicianProfileId === technicianId)
+  return tech ? tech.displayName : technicianId
+}
 const selectedTaskId = ref('')
 const selectedTechnicianId = ref('')
 const businessType = ref('INSTALLATION')
@@ -551,18 +559,31 @@ watch(selectedTaskId, () => {
         <tr>
           <th>任务</th>
           <th>工单</th>
+          <th>项目</th>
           <th>状态</th>
+          <th>阶段</th>
           <th>类型</th>
+          <th>种类</th>
           <th>师傅</th>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="item in items" :key="item.taskId">
+        <tr v-for="item in items" :key="item.taskId" :data-testid="`task-row-${item.taskId}`">
           <td>{{ item.taskId }}</td>
-          <td>{{ item.workOrderId }}</td>
+          <td>
+            <RouterLink
+              :to="`/network-portal/work-orders/${item.workOrderId}`"
+              data-testid="task-work-order-workspace-deeplink"
+            >
+              {{ item.workOrderId }}
+            </RouterLink>
+          </td>
+          <td data-testid="task-project-id">{{ item.projectId ?? '—' }}</td>
           <td>{{ item.status ?? '—' }}</td>
+          <td data-testid="task-stage-code">{{ item.stageCode ?? '—' }}</td>
           <td>{{ item.taskType ?? '—' }}</td>
-          <td>{{ item.technicianId ?? '未指派' }}</td>
+          <td data-testid="task-kind">{{ item.taskKind ?? '—' }}</td>
+          <td data-testid="task-technician-label">{{ technicianLabel(item.technicianId) }}</td>
         </tr>
       </tbody>
     </table>

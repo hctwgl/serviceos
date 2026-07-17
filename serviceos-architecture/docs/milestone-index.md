@@ -225,6 +225,7 @@ title: ServiceOS 里程碑索引
 | M214 | M214 Network Portal 工作区协作队列深链与 query 水合 | [227-m214-network-portal-workspace-queue-deeplinks.md](../architecture/227-m214-network-portal-workspace-queue-deeplinks.md) | [211-m214-network-portal-workspace-queue-deeplinks-acceptance.md](../testing/211-m214-network-portal-workspace-queue-deeplinks-acceptance.md) |
 | M215 | M215 Network Portal 工作区预约/联系尝试 fan-in | [228-m215-network-portal-workspace-appointment-fanin.md](../architecture/228-m215-network-portal-workspace-appointment-fanin.md) | [212-m215-network-portal-workspace-appointment-fanin-acceptance.md](../testing/212-m215-network-portal-workspace-appointment-fanin-acceptance.md) |
 | M216 | M216 Network Portal 工作区当前师傅 fan-in | [229-m216-network-portal-workspace-technician-fanin.md](../architecture/229-m216-network-portal-workspace-technician-fanin.md) | [213-m216-network-portal-workspace-technician-fanin-acceptance.md](../testing/213-m216-network-portal-workspace-technician-fanin-acceptance.md) |
+| M217 | M217 Network Portal 目录页师傅 fan-in 与工作台基数深链 | [230-m217-network-portal-directory-technician-fanin.md](../architecture/230-m217-network-portal-directory-technician-fanin.md) | [214-m217-network-portal-directory-technician-fanin-acceptance.md](../testing/214-m217-network-portal-directory-technician-fanin-acceptance.md) |
 
 ## 未关联里程碑的文档
 

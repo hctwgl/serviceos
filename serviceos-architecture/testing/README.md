@@ -217,4 +217,5 @@
 - [M214 Network Portal 工作区协作队列深链验收矩阵](211-m214-network-portal-workspace-queue-deeplinks-acceptance.md)
 - [M215 Network Portal 工作区预约/联系 fan-in 验收矩阵](212-m215-network-portal-workspace-appointment-fanin-acceptance.md)
 - [M216 Network Portal 工作区当前师傅 fan-in 验收矩阵](213-m216-network-portal-workspace-technician-fanin-acceptance.md)
+- [M217 Network Portal 目录页师傅 fan-in 验收矩阵](214-m217-network-portal-directory-technician-fanin-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

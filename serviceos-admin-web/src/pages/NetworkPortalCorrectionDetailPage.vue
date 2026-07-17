@@ -103,7 +103,19 @@ watch(
           <dt>reasonCodes</dt>
           <dd>{{ detail.reasonCodes.join(', ') || '—' }}</dd>
         </div>
-        <div><dt>correctionTaskId</dt><dd>{{ detail.correctionTaskId ?? '—' }}</dd></div>
+        <div>
+          <dt>correctionTaskId</dt>
+          <dd>
+            <RouterLink
+              v-if="detail.correctionTaskId"
+              :to="{ path: '/network-portal/tasks', query: { taskId: detail.correctionTaskId } }"
+              data-testid="correction-detail-correction-task-deeplink"
+            >
+              {{ detail.correctionTaskId }}
+            </RouterLink>
+            <span v-else>—</span>
+          </dd>
+        </div>
         <div><dt>createdBy</dt><dd>{{ detail.createdBy }}</dd></div>
         <div><dt>createdAt</dt><dd>{{ detail.createdAt }}</dd></div>
         <div>
