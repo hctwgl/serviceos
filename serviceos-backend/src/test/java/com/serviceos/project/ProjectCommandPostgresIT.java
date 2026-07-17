@@ -141,7 +141,7 @@ class ProjectCommandPostgresIT {
         assertThat(jdbc.sql("SELECT jsonb_array_length(matched_grant_ids) FROM aud_audit_record")
                 .query(Integer.class).single()).isEqualTo(1);
         assertThat(jdbc.sql("SELECT authorization_policy_version FROM aud_audit_record")
-                .query(String.class).single()).isEqualTo("role-grant-v2");
+                .query(String.class).single()).isEqualTo("role-grant-v3:g0");
     }
 
     @Test

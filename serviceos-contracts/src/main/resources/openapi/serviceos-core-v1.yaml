@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.78.0
+  version: 0.79.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -893,6 +893,244 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+  /capabilities:
+    get:
+      operationId: listCapabilities
+      summary: 查询稳定 Capability 目录
+      description: 需要 authorization.read；租户不得改写能力语义或风险级别。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Capability 目录
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Capability' } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /roles:
+    get:
+      operationId: listRoles
+      summary: 查询当前租户角色目录
+      description: 需要 authorization.read。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 角色页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/RolePage' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createRole
+      summary: 创建租户角色并组合稳定 Capability
+      description: 需要 authorization.manageRoles；只能引用目录能力，不能改写风险级别。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreateRoleRequest' } } }
+      responses:
+        '200':
+          description: 新建角色
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/Role' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /roles/{roleId}:
+    get:
+      operationId: getRole
+      summary: 读取角色与能力组合
+      description: 需要 authorization.read。
+      parameters:
+        - $ref: '#/components/parameters/RoleId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 角色详情
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/Role' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /role-grants:
+    get:
+      operationId: listRoleGrants
+      summary: 查询 RoleGrant
+      description: 需要 authorization.read。
+      parameters:
+        - { name: principalId, in: query, schema: { type: string, minLength: 1, maxLength: 128 } }
+        - { name: grantStatus, in: query, schema: { enum: [PENDING_APPROVAL, ACTIVE, REJECTED, REVOKED] } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: RoleGrant 页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/RoleGrantPage' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: requestRoleGrant
+      summary: 申请 RoleGrant
+      description: 需要 authorization.requestGrant；创建 PENDING_APPROVAL 授权申请。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/RequestRoleGrantRequest' } } }
+      responses:
+        '200':
+          description: 授权申请
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/RoleGrant' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /role-grants/{grantId}:approve:
+    post:
+      operationId: decideRoleGrant
+      summary: 批准或拒绝 RoleGrant
+      description: 需要 authorization.approveGrant；高风险不得自批；不得超过可授予范围。
+      parameters:
+        - $ref: '#/components/parameters/GrantId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/DecideRoleGrantRequest' } } }
+      responses:
+        '200':
+          description: 审批后的授权
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/RoleGrant' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /role-grants/{grantId}:revoke:
+    post:
+      operationId: revokeRoleGrant
+      summary: 撤销 RoleGrant
+      description: 需要 authorization.revokeGrant；撤销后立即失权并推进 grant generation。
+      parameters:
+        - $ref: '#/components/parameters/GrantId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/RevokeRoleGrantRequest' } } }
+      responses:
+        '200':
+          description: 已撤销授权
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/RoleGrant' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /delegations:
+    get:
+      operationId: listDelegations
+      summary: 查询 Delegation
+      description: 需要 authorization.read。
+      parameters:
+        - { name: delegatePrincipalId, in: query, schema: { type: string, minLength: 1, maxLength: 128 } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Delegation 页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/DelegationPage' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createDelegation
+      summary: 创建 Delegation
+      description: 需要 authorization.delegate；能力/范围/期限不得超过委托人。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreateDelegationRequest' } } }
+      responses:
+        '200':
+          description: 新建委托
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/Delegation' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /delegations/{delegationId}:revoke:
+    post:
+      operationId: revokeDelegation
+      summary: 撤销 Delegation
+      description: 需要 authorization.delegate。
+      parameters:
+        - $ref: '#/components/parameters/DelegationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/RevokeDelegationRequest' } } }
+      responses:
+        '200':
+          description: 已撤销委托
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/Delegation' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /authorization:explain:
+    post:
+      operationId: explainAuthorization
+      summary: 解释一次假设授权判定
+      description: 需要 authorization.explain；返回脱敏匹配摘要并写审计，不执行业务动作。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/ExplainAuthorizationRequest' } } }
+      responses:
+        '200':
+          description: 授权解释
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/AuthorizationExplainResult' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
   /work-orders:
     get:
       operationId: listAuthorizedWorkOrders
@@ -2985,6 +3223,21 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    RoleId:
+      name: roleId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    GrantId:
+      name: grantId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    DelegationId:
+      name: delegationId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     TaskId:
       name: taskId
       in: path
@@ -3508,6 +3761,186 @@ components:
         openVisitCount: { type: integer, minimum: 0 }
         activeAssignmentCount: { type: integer, minimum: 0 }
         offlinePackageCount: { type: integer, minimum: 0 }
+    Capability:
+      type: object
+      additionalProperties: false
+      required: [capabilityCode, capabilityName, riskLevel]
+      properties:
+        capabilityCode: { type: string, minLength: 1, maxLength: 120 }
+        capabilityName: { type: string, minLength: 1, maxLength: 200 }
+        riskLevel: { enum: [NORMAL, HIGH, CRITICAL] }
+    Role:
+      type: object
+      additionalProperties: false
+      required: [roleId, roleCode, roleName, roleKind, roleStatus, capabilityCodes, version,
+        createdAt, updatedAt]
+      properties:
+        roleId: { type: string, format: uuid }
+        roleCode: { type: string, minLength: 1, maxLength: 120 }
+        roleName: { type: string, minLength: 1, maxLength: 200 }
+        roleKind: { enum: [PLATFORM_TEMPLATE, TENANT] }
+        roleStatus: { enum: [ACTIVE, DISABLED] }
+        description: { type: [string, 'null'], maxLength: 500 }
+        capabilityCodes: { type: array, items: { type: string, minLength: 1, maxLength: 120 } }
+        version: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    RolePage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Role' } }
+        asOf: { type: string, format: date-time }
+    RoleGrant:
+      type: object
+      additionalProperties: false
+      required: [grantId, principalId, roleId, roleCode, scopeType, scopeRef, grantStatus,
+        grantEffect, validFrom, sourceCode, version, createdAt, updatedAt]
+      properties:
+        grantId: { type: string, format: uuid }
+        principalId: { type: string, minLength: 1, maxLength: 128 }
+        roleId: { type: string, format: uuid }
+        roleCode: { type: string, minLength: 1, maxLength: 120 }
+        scopeType: { enum: [TENANT, PROJECT, REGION, NETWORK] }
+        scopeRef: { type: string, minLength: 1, maxLength: 128 }
+        grantStatus: { enum: [PENDING_APPROVAL, ACTIVE, REJECTED, REVOKED] }
+        grantEffect: { enum: [ALLOW, DENY] }
+        validFrom: { type: string, format: date-time }
+        validTo: { type: [string, 'null'], format: date-time }
+        sourceCode: { type: string, minLength: 1, maxLength: 40 }
+        requestedBy: { type: [string, 'null'], maxLength: 128 }
+        requestReason: { type: [string, 'null'], maxLength: 500 }
+        approvedBy: { type: [string, 'null'], maxLength: 128 }
+        approvedAt: { type: [string, 'null'], format: date-time }
+        rejectedBy: { type: [string, 'null'], maxLength: 128 }
+        rejectedAt: { type: [string, 'null'], format: date-time }
+        rejectReason: { type: [string, 'null'], maxLength: 500 }
+        revokedAt: { type: [string, 'null'], format: date-time }
+        revokedBy: { type: [string, 'null'], maxLength: 128 }
+        revokeReason: { type: [string, 'null'], maxLength: 500 }
+        version: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    RoleGrantPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/RoleGrant' } }
+        asOf: { type: string, format: date-time }
+    Delegation:
+      type: object
+      additionalProperties: false
+      required: [delegationId, delegatorPrincipalId, delegatePrincipalId, capabilityCodes,
+        scopeType, scopeRef, validFrom, reason, delegationStatus, version, createdAt, updatedAt]
+      properties:
+        delegationId: { type: string, format: uuid }
+        delegatorPrincipalId: { type: string, minLength: 1, maxLength: 128 }
+        delegatePrincipalId: { type: string, minLength: 1, maxLength: 128 }
+        capabilityCodes: { type: array, minItems: 1, items: { type: string, minLength: 1, maxLength: 120 } }
+        scopeType: { enum: [TENANT, PROJECT, REGION, NETWORK] }
+        scopeRef: { type: string, minLength: 1, maxLength: 128 }
+        validFrom: { type: string, format: date-time }
+        validTo: { type: [string, 'null'], format: date-time }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+        delegationStatus: { enum: [ACTIVE, REVOKED] }
+        version: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        revokedAt: { type: [string, 'null'], format: date-time }
+        revokedBy: { type: [string, 'null'], maxLength: 128 }
+        revokeReason: { type: [string, 'null'], maxLength: 500 }
+    DelegationPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Delegation' } }
+        asOf: { type: string, format: date-time }
+    AuthorizationExplainResult:
+      type: object
+      additionalProperties: false
+      required: [effect, reasonCodes, matchedGrantIds, dataScopeExplanations, obligations, policyVersion]
+      properties:
+        effect: { enum: [ALLOW, DENY] }
+        reasonCodes: { type: array, items: { type: string } }
+        matchedGrantIds: { type: array, items: { type: string } }
+        dataScopeExplanations: { type: array, items: { type: string } }
+        obligations: { type: array, items: { type: string } }
+        policyVersion: { type: string, minLength: 1 }
+    CreateRoleRequest:
+      type: object
+      additionalProperties: false
+      required: [roleCode, roleName, capabilityCodes]
+      properties:
+        roleCode: { type: string, minLength: 1, maxLength: 120 }
+        roleName: { type: string, minLength: 1, maxLength: 200 }
+        description: { type: [string, 'null'], maxLength: 500 }
+        capabilityCodes:
+          type: array
+          minItems: 1
+          items: { type: string, minLength: 1, maxLength: 120 }
+    RequestRoleGrantRequest:
+      type: object
+      additionalProperties: false
+      required: [principalId, roleId, scopeType, scopeRef, validFrom, requestReason]
+      properties:
+        principalId: { type: string, minLength: 1, maxLength: 128 }
+        roleId: { type: string, format: uuid }
+        scopeType: { enum: [TENANT, PROJECT, REGION, NETWORK] }
+        scopeRef: { type: string, minLength: 1, maxLength: 128 }
+        grantEffect: { type: [string, 'null'], enum: [ALLOW, DENY] }
+        validFrom: { type: string, format: date-time }
+        validTo: { type: [string, 'null'], format: date-time }
+        requestReason: { type: string, minLength: 1, maxLength: 500 }
+    DecideRoleGrantRequest:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties:
+        decision: { enum: [APPROVE, REJECT] }
+        note: { type: [string, 'null'], maxLength: 500 }
+    RevokeRoleGrantRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    CreateDelegationRequest:
+      type: object
+      additionalProperties: false
+      required: [delegatePrincipalId, capabilityCodes, scopeType, scopeRef, validFrom, reason]
+      properties:
+        delegatePrincipalId: { type: string, minLength: 1, maxLength: 128 }
+        capabilityCodes:
+          type: array
+          minItems: 1
+          items: { type: string, minLength: 1, maxLength: 120 }
+        scopeType: { enum: [TENANT, PROJECT, REGION, NETWORK] }
+        scopeRef: { type: string, minLength: 1, maxLength: 128 }
+        validFrom: { type: string, format: date-time }
+        validTo: { type: [string, 'null'], format: date-time }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    RevokeDelegationRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    ExplainAuthorizationRequest:
+      type: object
+      additionalProperties: false
+      required: [subjectPrincipalId, capability, resourceType, resourceId]
+      properties:
+        subjectPrincipalId: { type: string, minLength: 1, maxLength: 128 }
+        capability: { type: string, minLength: 1, maxLength: 120 }
+        resourceType: { type: string, minLength: 1, maxLength: 64 }
+        resourceId: { type: string, minLength: 1, maxLength: 128 }
+        projectId: { type: [string, 'null'], maxLength: 128 }
+        organizationId: { type: [string, 'null'], maxLength: 128 }
+        regionCode: { type: [string, 'null'], maxLength: 128 }
+        networkId: { type: [string, 'null'], maxLength: 128 }
     CreatePartnerOrganizationRequest:
       type: object
       additionalProperties: false

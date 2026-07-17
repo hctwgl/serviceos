@@ -9,17 +9,19 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timestamptz;
 
 /**
- * RoleGrant 权威查询。有效期、撤销与 tenant scope 在同一 SQL 中实时判定，不能只信缓存/JWT。
+ * RoleGrant/Delegation 权威查询。仅 ACTIVE 未过期未撤销授权参与判定；匹配范围内 DENY 优先于 ALLOW；
+ * policyVersion 绑定租户 grant generation，撤销后使依赖旧版本的上下文失败关闭。
  */
 @Repository
 final class JdbcAuthorizationPolicyStore implements AuthorizationPolicyStore, ProjectScopePolicyStore {
-    private static final String POLICY_VERSION = "role-grant-v2";
-
     private final JdbcClient jdbc;
 
     JdbcAuthorizationPolicyStore(JdbcClient jdbc) {
@@ -33,8 +35,12 @@ final class JdbcAuthorizationPolicyStore implements AuthorizationPolicyStore, Pr
             AuthorizationRequest request,
             Instant evaluatedAt
     ) {
-        List<MatchedGrantRow> grants = jdbc.sql("""
-                        SELECT g.grant_id::text, g.scope_type, g.scope_ref
+        String policyVersion = policyVersion(tenantId);
+        List<MatchedGrantRow> grantRows = jdbc.sql("""
+                        SELECT g.grant_id::text AS match_id,
+                               g.scope_type,
+                               g.scope_ref,
+                               g.grant_effect AS effect
                           FROM auth_role_grant g
                           JOIN auth_role r
                             ON r.role_id = g.role_id
@@ -47,6 +53,8 @@ final class JdbcAuthorizationPolicyStore implements AuthorizationPolicyStore, Pr
                            AND c.capability_code = :capability
                            AND r.tenant_id = :tenantId
                            AND r.role_status = 'ACTIVE'
+                           AND g.grant_status = 'ACTIVE'
+                           AND g.revoked_at IS NULL
                            AND (
                                 (g.scope_type = 'TENANT' AND g.scope_ref = :tenantId)
                              OR (g.scope_type = 'PROJECT' AND g.scope_ref = :projectId)
@@ -55,34 +63,91 @@ final class JdbcAuthorizationPolicyStore implements AuthorizationPolicyStore, Pr
                            )
                            AND g.valid_from <= :evaluatedAt
                            AND (g.valid_to IS NULL OR g.valid_to > :evaluatedAt)
-                           AND g.revoked_at IS NULL
                          ORDER BY g.grant_id
                         """)
                 .param("tenantId", tenantId)
                 .param("principalId", principalId)
                 .param("capability", request.capability())
-                // 空串不是合法 scope_ref，用作 null-safe sentinel，避免 JDBC 参数类型推断歧义。
                 .param("projectId", nullSafeScope(request.projectId()))
                 .param("regionCode", nullSafeScope(request.regionCode()))
                 .param("networkId", nullSafeScope(request.networkId()))
                 .param("evaluatedAt", timestamptz(evaluatedAt))
                 .query((rs, rowNum) -> new MatchedGrantRow(
-                        rs.getString("grant_id"), rs.getString("scope_type"), rs.getString("scope_ref")))
+                        rs.getString("match_id"),
+                        rs.getString("scope_type"),
+                        rs.getString("scope_ref"),
+                        rs.getString("effect")))
                 .list();
-        return grants.isEmpty()
-                ? CapabilityGrantMatch.denied(POLICY_VERSION)
-                : new CapabilityGrantMatch(
-                        true,
-                        grants.stream().map(MatchedGrantRow::grantId).toList(),
-                        grants.stream().map(row -> row.scopeType() + ":" + row.scopeRef()).toList(),
-                        POLICY_VERSION);
+
+        List<MatchedGrantRow> denyRows = grantRows.stream()
+                .filter(row -> "DENY".equals(row.effect()))
+                .toList();
+        if (!denyRows.isEmpty()) {
+            return new CapabilityGrantMatch(
+                    false,
+                    denyRows.stream().map(MatchedGrantRow::matchId).toList(),
+                    denyRows.stream().map(row -> row.scopeType() + ":" + row.scopeRef()).toList(),
+                    policyVersion);
+        }
+
+        List<MatchedGrantRow> allowRows = new ArrayList<>(grantRows.stream()
+                .filter(row -> "ALLOW".equals(row.effect()))
+                .toList());
+
+        List<MatchedGrantRow> delegationRows = jdbc.sql("""
+                        SELECT ('delegation:' || d.delegation_id::text) AS match_id,
+                               d.scope_type,
+                               d.scope_ref,
+                               'ALLOW' AS effect
+                          FROM auth_delegation d
+                          JOIN auth_delegation_capability dc
+                            ON dc.delegation_id = d.delegation_id
+                         WHERE d.tenant_id = :tenantId
+                           AND d.delegate_principal_id = :principalId
+                           AND dc.capability_code = :capability
+                           AND d.delegation_status = 'ACTIVE'
+                           AND d.revoked_at IS NULL
+                           AND (
+                                (d.scope_type = 'TENANT' AND d.scope_ref = :tenantId)
+                             OR (d.scope_type = 'PROJECT' AND d.scope_ref = :projectId)
+                             OR (d.scope_type = 'REGION' AND d.scope_ref = :regionCode)
+                             OR (d.scope_type = 'NETWORK' AND d.scope_ref = :networkId)
+                           )
+                           AND d.valid_from <= :evaluatedAt
+                           AND (d.valid_to IS NULL OR d.valid_to > :evaluatedAt)
+                         ORDER BY d.delegation_id
+                        """)
+                .param("tenantId", tenantId)
+                .param("principalId", principalId)
+                .param("capability", request.capability())
+                .param("projectId", nullSafeScope(request.projectId()))
+                .param("regionCode", nullSafeScope(request.regionCode()))
+                .param("networkId", nullSafeScope(request.networkId()))
+                .param("evaluatedAt", timestamptz(evaluatedAt))
+                .query((rs, rowNum) -> new MatchedGrantRow(
+                        rs.getString("match_id"),
+                        rs.getString("scope_type"),
+                        rs.getString("scope_ref"),
+                        rs.getString("effect")))
+                .list();
+        allowRows.addAll(delegationRows);
+
+        if (allowRows.isEmpty()) {
+            return CapabilityGrantMatch.denied(policyVersion);
+        }
+        return new CapabilityGrantMatch(
+                true,
+                allowRows.stream().map(MatchedGrantRow::matchId).toList(),
+                allowRows.stream().map(row -> row.scopeType() + ":" + row.scopeRef()).toList(),
+                policyVersion);
     }
 
     @Override
     public ProjectScopeGrantMatch findProjectScopeGrants(
             String tenantId, String principalId, String capability, Instant evaluatedAt
     ) {
-        List<String> scopes = jdbc.sql("""
+        String policyVersion = policyVersion(tenantId);
+        List<String> grantScopes = jdbc.sql("""
                         SELECT g.scope_type || ':' || g.scope_ref
                           FROM auth_role_grant g
                           JOIN auth_role r ON r.role_id = g.role_id
@@ -92,9 +157,11 @@ final class JdbcAuthorizationPolicyStore implements AuthorizationPolicyStore, Pr
                            AND rc.capability_code = :capability
                            AND r.tenant_id = :tenantId
                            AND r.role_status = 'ACTIVE'
+                           AND g.grant_status = 'ACTIVE'
+                           AND g.grant_effect = 'ALLOW'
+                           AND g.revoked_at IS NULL
                            AND g.valid_from <= :evaluatedAt
                            AND (g.valid_to IS NULL OR g.valid_to > :evaluatedAt)
-                           AND g.revoked_at IS NULL
                          ORDER BY g.scope_type, g.scope_ref, g.grant_id
                         """)
                 .param("tenantId", tenantId)
@@ -103,13 +170,47 @@ final class JdbcAuthorizationPolicyStore implements AuthorizationPolicyStore, Pr
                 .param("evaluatedAt", timestamptz(evaluatedAt))
                 .query(String.class)
                 .list();
-        return new ProjectScopeGrantMatch(scopes, POLICY_VERSION);
+        List<String> delegationScopes = jdbc.sql("""
+                        SELECT d.scope_type || ':' || d.scope_ref
+                          FROM auth_delegation d
+                          JOIN auth_delegation_capability dc ON dc.delegation_id = d.delegation_id
+                         WHERE d.tenant_id = :tenantId
+                           AND d.delegate_principal_id = :principalId
+                           AND dc.capability_code = :capability
+                           AND d.delegation_status = 'ACTIVE'
+                           AND d.revoked_at IS NULL
+                           AND d.valid_from <= :evaluatedAt
+                           AND (d.valid_to IS NULL OR d.valid_to > :evaluatedAt)
+                         ORDER BY d.scope_type, d.scope_ref, d.delegation_id
+                        """)
+                .param("tenantId", tenantId)
+                .param("principalId", principalId)
+                .param("capability", capability)
+                .param("evaluatedAt", timestamptz(evaluatedAt))
+                .query(String.class)
+                .list();
+        Set<String> scopes = new LinkedHashSet<>(grantScopes);
+        scopes.addAll(delegationScopes);
+        return new ProjectScopeGrantMatch(List.copyOf(scopes), policyVersion);
+    }
+
+    private String policyVersion(String tenantId) {
+        long generation = jdbc.sql("""
+                        SELECT generation
+                          FROM auth_tenant_grant_generation
+                         WHERE tenant_id = :tenantId
+                        """)
+                .param("tenantId", tenantId)
+                .query(Long.class)
+                .optional()
+                .orElse(0L);
+        return "role-grant-v3:g" + generation;
     }
 
     private static String nullSafeScope(String value) {
         return value == null ? "" : value;
     }
 
-    private record MatchedGrantRow(String grantId, String scopeType, String scopeRef) {
+    private record MatchedGrantRow(String matchId, String scopeType, String scopeRef, String effect) {
     }
 }

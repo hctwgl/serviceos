@@ -23,7 +23,8 @@ final class GlobalProblemHandler {
     ProblemDetail handleBusinessProblem(BusinessProblem exception, HttpServletRequest request) {
         HttpStatus status = switch (exception.code()) {
             case UNAUTHENTICATED -> HttpStatus.UNAUTHORIZED;
-            case ACCESS_DENIED -> HttpStatus.FORBIDDEN;
+            case ACCESS_DENIED, ROLE_GRANT_ESCALATION_FORBIDDEN -> HttpStatus.FORBIDDEN;
+            case ROLE_GRANT_DUTY_CONFLICT, DELEGATION_SCOPE_TOO_BROAD -> HttpStatus.UNPROCESSABLE_CONTENT;
             case IDEMPOTENCY_KEY_REUSED, IDEMPOTENCY_IN_PROGRESS,
                  FILE_UPLOAD_CONFLICT, FILE_FINALIZE_IN_PROGRESS,
                  TASK_STATE_CONFLICT, TASK_ASSIGNMENT_CONFLICT,
