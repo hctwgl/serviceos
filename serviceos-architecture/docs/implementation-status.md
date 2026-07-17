@@ -3,7 +3,7 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-17
-baselineCommit: PENDING_M142_COMMIT
+baselineCommit: f50c1f6656d81ba43dfc425d642f5808e1b1fe5d
 latestMilestone: M142
 ---
 
@@ -40,7 +40,7 @@ latestMilestone: M142
 | 项目 | 当前值 |
 |---|---|
 | 最新实施里程碑 | M142 Admin 入站同单整改补传复审外发 E2E |
-| 基线提交 | `PENDING_M142_COMMIT` |
+| 基线提交 | `f50c1f6656d81ba43dfc425d642f5808e1b1fe5d` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
 | 前端工程 | `serviceos-admin-web`（Vue+TS+Vite）已纳入 CI 构建，具备开发态 Keycloak PKCE，以及真实只读、Task MANUAL assign-candidates/claim/release、表单/资料/审核/整改/完结、正常补传复审，预约上门、BYD 提审外发 ACK、厂端回调，以及 CPIM 入站→激活→同单预约上门→表单/资料/驳回整改补传复审/外发/完结的局部写链路 PR 阻断 E2E；Network/Technician 尚未建立 |
