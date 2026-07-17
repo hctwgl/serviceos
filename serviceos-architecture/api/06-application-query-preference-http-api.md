@@ -141,6 +141,12 @@ status: Accepted
   `/network-portal/qualifications/:id` 只读详情（含 decided*/version）；列表资质 ID 深链。
   Page Registry 仍归属 `NETWORK.QUALIFICATION`（catalog **保持** `page-registry-v15`）。
   **不**接受 Portal decide、FileObject、新 pageId/capability。
+- §10 Network Portal 师傅关系详情只读 UI（M212 窄扩展）：**不**新增 HTTP 路径；消费既有
+  `GET /api/v1/network-portal/technician-memberships/{membershipId}`（M206 / ADR-044；
+  响应 `NetworkPortalMembershipItem`，含真实 version）。Admin Web
+  `/network-portal/technicians/memberships/:id` 只读详情；师傅列表关系 ID 深链。
+  Page Registry 仍归属 `NETWORK.TECHNICIAN.LIST`（catalog **保持** `page-registry-v15`）。
+  **不**接受操作员 NetworkMembership、Portal decide、新 pageId/capability。
 - §11 Technician Portal Feed 子集（M195）：仅
   `GET /api/v1/technician/me/task-feed`（可选 `sinceCursor` 不透明游标；ACTIVE TECHNICIAN
   ServiceAssignment / TaskAssignment；撤权/结束时 tombstone 仅含 `taskId` +
@@ -378,7 +384,7 @@ View 保存 filter AST、列、排序和密度，不保存任意 SQL、访问 to
 | `GET /api/v1/network-portal/technician-qualifications` | 本网点师傅资质列表安全摘要 | M205 Accepted |
 | `GET /api/v1/network-portal/technician-qualifications/{qualificationId}` | 本网点师傅资质详情（M211 Admin Web 只读详情页） | M205 Accepted；M211 详情 UI |
 | `GET /api/v1/network-portal/technician-memberships` | 本网点师傅关系列表安全摘要（含 version） | M206 Accepted |
-| `GET /api/v1/network-portal/technician-memberships/{membershipId}` | 本网点师傅关系详情 | M206 Accepted |
+| `GET /api/v1/network-portal/technician-memberships/{membershipId}` | 本网点师傅关系详情（M212 Admin Web 只读详情页） | M206 Accepted；M212 详情 UI |
 
 networkId 从可信应用上下文解析；拥有多个 membership 时使用经授权的 `X-Network-Context`，不能在查询参数任意指定。详见 §0 M194 / M202 / M203 / M205 / M206 / M207 / M208。
 

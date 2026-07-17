@@ -52,6 +52,7 @@ import NetworkPortalCorrectionsPage from './pages/NetworkPortalCorrectionsPage.v
 import NetworkPortalCorrectionDetailPage from './pages/NetworkPortalCorrectionDetailPage.vue'
 import NetworkPortalExceptionDetailPage from './pages/NetworkPortalExceptionDetailPage.vue'
 import NetworkPortalQualificationDetailPage from './pages/NetworkPortalQualificationDetailPage.vue'
+import NetworkPortalMembershipDetailPage from './pages/NetworkPortalMembershipDetailPage.vue'
 import NetworkPortalExceptionsPage from './pages/NetworkPortalExceptionsPage.vue'
 import NetworkPortalQualificationsPage from './pages/NetworkPortalQualificationsPage.vue'
 import NetworkPortalCapacityPage from './pages/NetworkPortalCapacityPage.vue'
@@ -244,6 +245,12 @@ export const router = createRouter({
           path: 'technicians',
           name: 'NETWORK.TECHNICIAN.LIST',
           component: NetworkPortalTechniciansPage,
+          meta: { pageId: 'NETWORK.TECHNICIAN.LIST' },
+        },
+        {
+          path: 'technicians/memberships/:id',
+          name: 'NETWORK.TECHNICIAN.MEMBERSHIP.DETAIL',
+          component: NetworkPortalMembershipDetailPage,
           meta: { pageId: 'NETWORK.TECHNICIAN.LIST' },
         },
         {

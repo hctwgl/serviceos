@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import {
   createNetworkPortalTechnicianMembership,
   listNetworkPortalTechnicianMemberships,
@@ -131,6 +132,7 @@ watch(() => props.networkContextId, () => {
     <table v-else data-testid="network-technicians-table">
       <thead>
         <tr>
+          <th>关系 ID</th>
           <th>姓名</th>
           <th>档案状态</th>
           <th>关系状态</th>
@@ -141,6 +143,14 @@ watch(() => props.networkContextId, () => {
       </thead>
       <tbody>
         <tr v-for="item in items" :key="item.membershipId">
+          <td>
+            <RouterLink
+              :to="`/network-portal/technicians/memberships/${item.membershipId}`"
+              data-testid="membership-case-deeplink"
+            >
+              {{ item.membershipId }}
+            </RouterLink>
+          </td>
           <td>{{ item.displayName }}</td>
           <td>{{ item.profileStatus }}</td>
           <td>{{ item.membershipStatus }}</td>
