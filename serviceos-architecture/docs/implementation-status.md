@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-17
-baselineCommit: 80ffb351ed4c1de4ea8a3ac5ac43e0d461172be0
-latestMilestone: M187
+baselineCommit: PENDING_M188_FEATURE_SHA
+latestMilestone: M188
 ---
 
 # ServiceOS 实施状态总览
@@ -39,21 +39,21 @@ latestMilestone: M187
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M187 Admin 统一用户中心 |
-| 基线提交 | `80ffb351ed4c1de4ea8a3ac5ac43e0d461172be0` |
+| 最新实施里程碑 | M188 Portal 上下文与导航 |
+| 基线提交 | `PENDING_M188_FEATURE_SHA`（功能提交后回填） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
-| 前端工程 | `serviceos-admin-web`（Vue+TS+Vite）已纳入 CI 构建，具备开发态 Keycloak PKCE，以及真实只读、Task MANUAL assign-candidates/claim/release、表单/资料/审核/整改/完结、正常补传复审，预约上门、BYD 提审外发 ACK、厂端回调，CPIM 入站→激活→Admin HTTP 人工初派→同单预约上门→表单/资料/驳回整改补传复审/外发/完结（ADMIN-PILOT-09），入站 Envelope 授权队列与详情深链、专项队列与目录/SLA Accepted OpenAPI 筛选，工作区各按需区块详情或 Task 旁路、预约/表单/资料/上门/联系详情页、核心时间线与最近活动资源深链、外部审核回执详情、审核/整改交叉深链、工作区异常摘要→异常队列 query 水合与 handlingTaskId 深链、工作区审核/整改关联资源深链、Task 面板资源详情深链、Canonical Message 独立详情页、专项队列与目录页 query 水合及关联资源深链、外发关联资源与回执入站交叉深链、详情页明文 projectId / 源资源 / 现场与 SLA scope 字段深链、专项队列剩余 Accepted 关联字段深链、QueueTable 可选行内单元格深链、外发 executionTaskId / 快照成员资料项深链，工作区项目与 SLA 任务交叉深链的 PR 阻断 E2E；**M187 Admin 统一用户中心**（用户/组织/网点/师傅/角色/授权页面、目录选择器、影响面板、If-Match 写流、Capability 探测导航、真实 Keycloak PKCE 治理 E2E）；Network/Technician Portal UI 与 `/me` 导航仍属 M188 |
-| 数据库 | PostgreSQL + Flyway（当前版本 089 / 91） |
-| 契约 | Core OpenAPI 0.79.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、recovered/resolved 与 SLA started/breached/met@v1） |
+| 前端工程 | `serviceos-admin-web`（Vue+TS+Vite）已纳入 CI 构建，具备开发态 Keycloak PKCE，以及真实只读、Task MANUAL assign-candidates/claim/release、表单/资料/审核/整改/完结、正常补传复审，预约上门、BYD 提审外发 ACK、厂端回调，CPIM 入站→激活→Admin HTTP 人工初派→同单预约上门→表单/资料/驳回整改补传复审/外发/完结（ADMIN-PILOT-09），入站 Envelope 授权队列与详情深链、专项队列与目录/SLA Accepted OpenAPI 筛选，工作区各按需区块详情或 Task 旁路、预约/表单/资料/上门/联系详情页、核心时间线与最近活动资源深链、外部审核回执详情、审核/整改交叉深链、工作区异常摘要→异常队列 query 水合与 handlingTaskId 深链、工作区审核/整改关联资源深链、Task 面板资源详情深链、Canonical Message 独立详情页、专项队列与目录页 query 水合及关联资源深链、外发关联资源与回执入站交叉深链、详情页明文 projectId / 源资源 / 现场与 SLA scope 字段深链、专项队列剩余 Accepted 关联字段深链、QueueTable 可选行内单元格深链、外发 executionTaskId / 快照成员资料项深链，工作区项目与 SLA 任务交叉深链的 PR 阻断 E2E；**M187 Admin 统一用户中心**；**M188 `/me` 导航**（contexts/capabilities/navigation、Page Registry、Admin 消费与 Network/Technician stub） |
+| 数据库 | PostgreSQL + Flyway（当前版本 090 / 92） |
+| 契约 | Core OpenAPI 0.80.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、recovered/resolved 与 SLA started/breached/met@v1） |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
 ## 2.1 已接受的实施序列：身份与组织治理
 
 项目负责人已确认将原计划重编号为 M183～M188，连续承接已实现的 Admin Pilot M135～M182。
-M183～M187 已完成统一主体目录、企业组织任职、网点/师傅目录、RoleGrant 治理与 Admin 统一用户中心；
-M188 保持 `ACCEPTED`，只有对应工程证据成立后才能推进状态。
+M183～M188 已完成统一主体目录、企业组织任职、网点/师傅目录、RoleGrant 治理、Admin 统一用户中心
+与 Portal `/me` 上下文/导航。Consumer Identity 仍为后续独立 Epic。
 
 | 里程碑 | 状态 | 目标 |
 |---|---|---|
@@ -62,7 +62,7 @@ M188 保持 `ACCEPTED`，只有对应工程证据成立后才能推进状态。
 | M185 | `IMPLEMENTED` | 合作组织、ServiceNetwork 人员、TechnicianProfile、网点关系与资质 |
 | M186 | `IMPLEMENTED` | Role/Capability/RoleGrant 申请审批撤销、Delegation、职责分离和授权解释 |
 | M187 | `IMPLEMENTED` | Admin 统一用户中心与真实 OIDC 治理 E2E |
-| M188 | `ACCEPTED` | `/me` contexts/capabilities/navigation、多 Persona 与三 Portal 上下文 |
+| M188 | `IMPLEMENTED` | `/me` contexts/capabilities/navigation、多 Persona 与三 Portal 上下文 |
 
 正式事实源：
 
@@ -81,10 +81,10 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | 统一主体目录 | Principal、IdentityLink、PersonProfile、Persona 与生命周期 | `IMPLEMENTED` | 稳定内部 Principal；受控并发 JIT；多 IdentityLink/Persona；Profile；启停实时失权；安全目录与敏感身份分权查询；幂等、If-Match、审计和 PostgreSQL 不可变事实 | 身份解绑、密码管理、身份缓存与跨服务身份事件；网点、授权治理和 Portal 上下文由 M185～M188 承接 | M183 |
 | 企业组织目录 | Organization、OrgUnit、closure、任职与主数据同步 | `IMPLEMENTED` | 独立 `organization` 模块；closure；主职/兼职/负责人；LOCAL/EXTERNAL_AUTHORITATIVE；同步批次幂等与乱序；离职停用/撤权/待重分配；治理 API；Admin 组织页（M187） | 正式 HR Connector、双向回写、ORGANIZATION DataScope | M184、M187 |
 | 网点人员与师傅身份 | NetworkMembership、TechnicianProfile、网点关系与资质 | `IMPLEMENTED` | 独立 `network` 模块；PartnerOrganization/ServiceNetwork；成员邀请；TechnicianProfile/多网点关系；资质只追加审核；可接单查询；清退/停用 clearance 与 ACTIVE 派单影响摘要；Admin 网点/师傅页（M187） | Coverage/Capability 地理硬过滤、离线工作包回收、自动改派、Network Portal UI | M185、M187 |
-| 角色与授权治理 | Role/Capability/RoleGrant 管理、审批、撤销与 Delegation | `IMPLEMENTED` | 扩展 `authorization`：角色/能力目录、申请/审批/拒绝/撤销、Delegation、SoD 与可授予范围、DENY 优先、grant generation、授权解释与治理 HTTP；Admin 角色/授权页（M187） | Portal `/me` 上下文消费（M188）；MFA obligation 执行器 | M186、M187 |
-| 统一用户中心 | Admin 用户、组织、网点人员、师傅、角色和授权治理 | `IMPLEMENTED` | 目录选择器、分区详情、影响面板、If-Match 写流、EXTERNAL 只读徽章、Capability 探测导航、真实 Keycloak PKCE E2E（含低权限深链） | `/me` Page Registry 与三 Portal 上下文（M188） | M187 |
-| Portal 上下文与导航 | `/me`、contexts、capabilities、navigation 与多 Persona | `ACCEPTED` | pageId/capability/独立 Portal 规格已存在 | M188：服务端上下文、Page Registry、缓存失权和三 Portal 接入 | 身份治理正式路线 |
-| Consumer Identity | CustomerProfile、用户资源关系和 C 端身份 | `ACCEPTED` | Principal/IdentityLink 模型必须预留 Consumer Persona | 身份治理序列之后的独立 Epic；待登录、隐私、客户主数据与注销策略确认 | 后续正式 Epic |
+| 角色与授权治理 | Role/Capability/RoleGrant 管理、审批、撤销与 Delegation | `IMPLEMENTED` | 扩展 `authorization`：角色/能力目录、申请/审批/拒绝/撤销、Delegation、SoD 与可授予范围、DENY 优先、grant generation、授权解释与治理 HTTP；Admin 角色/授权页（M187）；`/me*` 上下文与导航（M188） | MFA obligation 执行器 | M186～M188 |
+| 统一用户中心 | Admin 用户、组织、网点人员、师傅、角色和授权治理 | `IMPLEMENTED` | 目录选择器、分区详情、影响面板、If-Match 写流、EXTERNAL 只读徽章、Capability 探测导航、真实 Keycloak PKCE E2E（含低权限深链）；M188 起导航改消费 `/me/navigation` | 正式企业 IdP / HR Connector | M187、M188 |
+| Portal 上下文与导航 | `/me`、contexts、capabilities、navigation 与多 Persona | `IMPLEMENTED` | 服务端上下文；代码 Page Registry + V090 覆盖；contextVersion 失权；Admin 消费与 Network/Technician stub；CONSUMER 不暴露入口 | 完整 Network/Technician 产品 UI；Consumer Identity | M188 |
+| Consumer Identity | CustomerProfile、用户资源关系和 C 端身份 | `ACCEPTED` | Principal/IdentityLink/API Schema 已预留 Consumer Persona | 身份治理序列之后的独立 Epic；待登录、隐私、客户主数据与注销策略确认；不得宣称已实现 | 后续正式 Epic |
 | 项目治理 | Project 核心事实、范围关系与授权目录 | `PARTIAL` | 项目创建；REGION/NETWORK 当前关系整组修订和不可变历史；`project.read` 授权目录、详情及历史查询 | owners、品牌/服务产品/配置绑定、生命周期、计划修订审批、目录治理 UI | M8、M64～M67 |
 | 可靠消息 | Inbox、Outbox、Worker claim/lease/retry | `IMPLEMENTED` | 本地可靠发布消费、恢复和人工接管基础 | 正式 Broker 和跨服务运行 | M9～M10 |
 | 配置中心 | 不可变配置资产、Bundle 发布和版本锁定 | `PARTIAL` | FORM、EVIDENCE、SLA v1 资产发布基础；工单/任务冻结引用；SERVICEOS_EXPR_V1 布尔/类型比较子集；FORM/EVIDENCE 字段及 WORKFLOW/SLA 依赖闭包 | 决策表/公式/脚本、完整审批和通用依赖图 | M16、M33、M36、M52～M53、M61 |
@@ -118,19 +118,19 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M187**。统一主体目录、企业组织任职、网点/师傅目录、RoleGrant
-治理与 Admin 统一用户中心已经建立；没有实现 M188 Portal `/me` 上下文/导航，也没有实现正式 HR
-Connector、ORGANIZATION DataScope、身份缓存或跨服务身份事件。
+ServiceOS 可靠纵向切片已推进到 **M188**。统一主体目录、企业组织任职、网点/师傅目录、RoleGrant
+治理、Admin 统一用户中心与 Portal `/me` 上下文/导航已经建立。没有实现 Consumer Identity、正式 HR
+Connector、ORGANIZATION DataScope、身份缓存或跨服务身份事件；也没有完整 Network/Technician 产品 UI。
 
 ```text
 候选下一方向（优先从已确认文档中选择最小可靠切片；勿发明契约）：
-1. 按已接受 M188 推进 Portal `/me` contexts/capabilities/navigation；
+1. Consumer Identity/CustomerProfile Epic（仍为 ACCEPTED/deferred；登录/隐私/主数据确认前不分配里程碑）；
 2. 在试点确认日历/暂停/预警规则后扩展 BUSINESS 时钟、暂停和升级；
 3. 多候选人评分、硬过滤重跑、自动 claim、网点容量联动（需另接受 api/04 / ADR-009 切片）；
 4. OCR/CV、GPS 权威距离、二级审批/MFA、报告 GENERATED 资料包；
 5. 表达式计算字段、决策表/脚本、草稿冲突与离线合并；
 6. FieldOperation 详情（API-03 仍为 Proposed，不得猜测读契约）；
-7. 正式企业门户设计系统与 SavedView（需再接受 API-06）；其余候选项仍依赖 Proposed 文档接受。
+7. 正式企业门户设计系统与 SavedView（需再接受 API-06）；完整 Network/Technician Portal UI。
 ```
 
 接手 Agent 必须先检查仓库是否已有更新的里程碑文档、ADR 或提交；在收到明确批准前不得猜测业务策略并实现上述候选项。

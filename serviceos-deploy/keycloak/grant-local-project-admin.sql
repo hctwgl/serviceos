@@ -35,6 +35,21 @@ INSERT INTO idn_principal_lifecycle_event (
     'LOCAL_FIXTURE', 'local-fixture', repeat('0', 64), 'local-fixture', now()
 ) ON CONFLICT (lifecycle_event_id) DO NOTHING;
 
+-- M188：ADMIN 上下文要求有效 INTERNAL_EMPLOYEE Persona + RoleGrant。
+INSERT INTO idn_principal_persona (
+    persona_id, tenant_id, principal_id, persona_type, persona_status,
+    valid_from, valid_to, persona_version, created_by, created_at
+) VALUES (
+    '8c0d1e2f-3a4b-4c5d-8e6f-7a8b9c0d1e2f',
+    'tenant-local', '06b612f3-a901-4b0e-bd90-86b4259cc087',
+    'INTERNAL_EMPLOYEE', 'ACTIVE', now() - interval '1 day', NULL, 1,
+    'local-fixture', now()
+) ON CONFLICT (tenant_id, principal_id, persona_type) DO NOTHING;
+
+INSERT INTO auth_tenant_grant_generation (tenant_id, generation, updated_at)
+VALUES ('tenant-local', 1, now())
+ON CONFLICT (tenant_id) DO NOTHING;
+
 INSERT INTO auth_role (
     role_id, tenant_id, role_code, role_name, role_status, created_at
 ) VALUES (

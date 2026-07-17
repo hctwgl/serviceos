@@ -196,6 +196,7 @@ title: ServiceOS 里程碑索引
 | M185 | M185 网点人员与师傅身份目录 | [198-m185-network-technician-directory.md](../architecture/198-m185-network-technician-directory.md) | [182-m185-network-technician-directory-acceptance.md](../testing/182-m185-network-technician-directory-acceptance.md) |
 | M186 | M186 角色与授权治理 | [199-m186-role-grant-governance.md](../architecture/199-m186-role-grant-governance.md) | [183-m186-role-grant-governance-acceptance.md](../testing/183-m186-role-grant-governance-acceptance.md) |
 | M187 | M187 Admin 统一用户中心 | [200-m187-admin-user-center.md](../architecture/200-m187-admin-user-center.md) | [184-m187-admin-user-center-acceptance.md](../testing/184-m187-admin-user-center-acceptance.md) |
+| M188 | M188 Portal 上下文与导航 | [201-m188-portal-context-navigation.md](../architecture/201-m188-portal-context-navigation.md) | [185-m188-portal-context-navigation-acceptance.md](../testing/185-m188-portal-context-navigation-acceptance.md) |
 
 ## 未关联里程碑的文档
 

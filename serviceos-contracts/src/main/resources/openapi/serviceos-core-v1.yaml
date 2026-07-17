@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.79.0
+  version: 0.80.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1131,6 +1131,90 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+  /me:
+    get:
+      operationId: getMe
+      summary: 当前主体摘要与 Persona
+      description: |
+        返回当前 JWT 映射的 Principal、有效 Persona 与 contextVersion。
+        Schema 预留 CONSUMER Persona，但不宣称 C 端身份已交付，也不返回 Consumer Portal 入口。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 当前主体
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/MeProfile' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /me/contexts:
+    get:
+      operationId: listMeContexts
+      summary: 当前主体可用 Portal 上下文
+      description: |
+        仅由有效 Persona、Membership、RoleGrant 计算 ADMIN/NETWORK/TECHNICIAN 上下文。
+        请求中的 projectId/networkId/contextId 只能选择本接口已返回项，不能创建授权。
+        CONSUMER Persona 不产生上下文。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 可用上下文
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/MeContexts' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /me/capabilities:
+    get:
+      operationId: listMeCapabilities
+      summary: 当前上下文有效 Capability 集合
+      description: |
+        导航/体验辅助查询。业务 API 仍须按资源重新鉴权；旧 contextVersion 失败关闭。
+      parameters:
+        - name: contextId
+          in: query
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 200 }
+        - name: expectedContextVersion
+          in: query
+          required: false
+          schema: { type: string, minLength: 1, maxLength: 120 }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 上下文能力集合
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/MeCapabilities' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /me/navigation:
+    get:
+      operationId: listMeNavigation
+      summary: 当前上下文可见导航
+      description: |
+        由代码注册 Page Registry、Capability、feature gate 与 context 计算稳定 pageId。
+        导航隐藏不是授权事实；直接访问隐藏 URL 或伪造 allowed action 仍由后端重新鉴权。
+      parameters:
+        - name: contextId
+          in: query
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 200 }
+        - name: expectedContextVersion
+          in: query
+          required: false
+          schema: { type: string, minLength: 1, maxLength: 120 }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 导航项
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/MeNavigation' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
   /work-orders:
     get:
       operationId: listAuthorizedWorkOrders
@@ -3376,6 +3460,77 @@ components:
         personaType: { enum: [INTERNAL_EMPLOYEE, NETWORK_MEMBER, TECHNICIAN, CONSUMER, SERVICE_ACCOUNT] }
         validFrom: { type: string, format: date-time }
         validTo: { type: [string, 'null'], format: date-time }
+    MeProfile:
+      type: object
+      additionalProperties: false
+      required: [principalId, tenantId, displayName, personas, contextVersion, asOf]
+      properties:
+        principalId: { type: string, minLength: 1, maxLength: 128 }
+        tenantId: { type: string, minLength: 1, maxLength: 64 }
+        displayName: { type: string, minLength: 1, maxLength: 200 }
+        personas: { type: array, items: { $ref: '#/components/schemas/PrincipalPersona' } }
+        contextVersion: { type: string, minLength: 1, maxLength: 120 }
+        asOf: { type: string, format: date-time }
+    MeContextScopeSummary:
+      type: object
+      additionalProperties: false
+      required: [organizationIds, networkIds, projectIds]
+      properties:
+        organizationIds: { type: array, items: { type: string, minLength: 1, maxLength: 128 } }
+        networkIds: { type: array, items: { type: string, minLength: 1, maxLength: 128 } }
+        projectIds: { type: array, items: { type: string, minLength: 1, maxLength: 128 } }
+    MeContext:
+      type: object
+      additionalProperties: false
+      required: [contextId, portal, personaType, scopeType, scopeRef, scopeSummary, version]
+      properties:
+        contextId: { type: string, minLength: 1, maxLength: 200 }
+        portal: { enum: [ADMIN, NETWORK, TECHNICIAN] }
+        personaType: { enum: [INTERNAL_EMPLOYEE, NETWORK_MEMBER, TECHNICIAN, SERVICE_ACCOUNT] }
+        scopeType: { enum: [TENANT, PROJECT, REGION, NETWORK] }
+        scopeRef: { type: string, minLength: 1, maxLength: 128 }
+        scopeSummary: { $ref: '#/components/schemas/MeContextScopeSummary' }
+        version: { type: string, minLength: 1, maxLength: 120 }
+    MeContexts:
+      type: object
+      additionalProperties: false
+      required: [contexts, contextVersion, asOf]
+      properties:
+        contexts: { type: array, items: { $ref: '#/components/schemas/MeContext' } }
+        contextVersion: { type: string, minLength: 1, maxLength: 120 }
+        asOf: { type: string, format: date-time }
+    MeCapabilities:
+      type: object
+      additionalProperties: false
+      required: [contextId, portal, capabilityCodes, contextVersion, asOf]
+      properties:
+        contextId: { type: string, minLength: 1, maxLength: 200 }
+        portal: { enum: [ADMIN, NETWORK, TECHNICIAN] }
+        capabilityCodes: { type: array, items: { type: string, minLength: 1, maxLength: 120 } }
+        contextVersion: { type: string, minLength: 1, maxLength: 120 }
+        asOf: { type: string, format: date-time }
+    MeNavigationItem:
+      type: object
+      additionalProperties: false
+      required: [pageId, routeKey, title, order, section, requiredCapabilities]
+      properties:
+        pageId: { type: string, minLength: 1, maxLength: 120 }
+        routeKey: { type: string, minLength: 1, maxLength: 200 }
+        title: { type: string, minLength: 1, maxLength: 200 }
+        order: { type: integer, minimum: 0 }
+        section: { type: string, minLength: 1, maxLength: 120 }
+        requiredCapabilities: { type: array, items: { type: string, minLength: 1, maxLength: 120 } }
+    MeNavigation:
+      type: object
+      additionalProperties: false
+      required: [contextId, portal, contextVersion, navigationCatalogVersion, items, asOf]
+      properties:
+        contextId: { type: string, minLength: 1, maxLength: 200 }
+        portal: { enum: [ADMIN, NETWORK, TECHNICIAN] }
+        contextVersion: { type: string, minLength: 1, maxLength: 120 }
+        navigationCatalogVersion: { type: string, minLength: 1, maxLength: 64 }
+        items: { type: array, items: { $ref: '#/components/schemas/MeNavigationItem' } }
+        asOf: { type: string, format: date-time }
     Organization:
       type: object
       additionalProperties: false

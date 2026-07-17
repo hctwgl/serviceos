@@ -194,7 +194,129 @@ final class JdbcAuthorizationPolicyStore implements AuthorizationPolicyStore, Pr
         return new ProjectScopeGrantMatch(List.copyOf(scopes), policyVersion);
     }
 
-    private String policyVersion(String tenantId) {
+    @Override
+    public List<String> listEffectiveCapabilityCodes(
+            String tenantId,
+            String principalId,
+            String scopeType,
+            String scopeRef,
+            Instant evaluatedAt
+    ) {
+        List<CapabilityEffectRow> rows = jdbc.sql("""
+                        SELECT c.capability_code, g.grant_effect AS effect
+                          FROM auth_role_grant g
+                          JOIN auth_role r ON r.role_id = g.role_id
+                          JOIN auth_role_capability rc ON rc.role_id = g.role_id
+                          JOIN auth_capability c ON c.capability_code = rc.capability_code
+                         WHERE g.tenant_id = :tenantId
+                           AND g.principal_id = :principalId
+                           AND r.tenant_id = :tenantId
+                           AND r.role_status = 'ACTIVE'
+                           AND g.grant_status = 'ACTIVE'
+                           AND g.revoked_at IS NULL
+                           AND g.scope_type = :scopeType
+                           AND g.scope_ref = :scopeRef
+                           AND g.valid_from <= :evaluatedAt
+                           AND (g.valid_to IS NULL OR g.valid_to > :evaluatedAt)
+                        UNION ALL
+                        SELECT dc.capability_code, 'ALLOW' AS effect
+                          FROM auth_delegation d
+                          JOIN auth_delegation_capability dc ON dc.delegation_id = d.delegation_id
+                         WHERE d.tenant_id = :tenantId
+                           AND d.delegate_principal_id = :principalId
+                           AND d.delegation_status = 'ACTIVE'
+                           AND d.revoked_at IS NULL
+                           AND d.scope_type = :scopeType
+                           AND d.scope_ref = :scopeRef
+                           AND d.valid_from <= :evaluatedAt
+                           AND (d.valid_to IS NULL OR d.valid_to > :evaluatedAt)
+                        """)
+                .param("tenantId", tenantId)
+                .param("principalId", principalId)
+                .param("scopeType", scopeType)
+                .param("scopeRef", scopeRef)
+                .param("evaluatedAt", timestamptz(evaluatedAt))
+                .query((rs, rowNum) -> new CapabilityEffectRow(
+                        rs.getString("capability_code"), rs.getString("effect")))
+                .list();
+
+        Set<String> denied = new LinkedHashSet<>();
+        Set<String> allowed = new LinkedHashSet<>();
+        for (CapabilityEffectRow row : rows) {
+            if ("DENY".equals(row.effect())) {
+                denied.add(row.capabilityCode());
+            } else if ("ALLOW".equals(row.effect())) {
+                allowed.add(row.capabilityCode());
+            }
+        }
+
+        // 运行时 TENANT 范围授权可覆盖 PROJECT/REGION/NETWORK 请求；导航能力集合同步并入。
+        // 业务命令仍按具体资源重新鉴权，本集合不是授权凭证。
+        if (!"TENANT".equals(scopeType)) {
+            mergeEffects(allowed, denied, jdbc.sql("""
+                            SELECT c.capability_code, g.grant_effect AS effect
+                              FROM auth_role_grant g
+                              JOIN auth_role r ON r.role_id = g.role_id
+                              JOIN auth_role_capability rc ON rc.role_id = g.role_id
+                              JOIN auth_capability c ON c.capability_code = rc.capability_code
+                             WHERE g.tenant_id = :tenantId
+                               AND g.principal_id = :principalId
+                               AND r.role_status = 'ACTIVE'
+                               AND g.grant_status = 'ACTIVE'
+                               AND g.revoked_at IS NULL
+                               AND g.scope_type = 'TENANT'
+                               AND g.scope_ref = :tenantId
+                               AND g.valid_from <= :evaluatedAt
+                               AND (g.valid_to IS NULL OR g.valid_to > :evaluatedAt)
+                            """)
+                    .param("tenantId", tenantId)
+                    .param("principalId", principalId)
+                    .param("evaluatedAt", timestamptz(evaluatedAt))
+                    .query((rs, rowNum) -> new CapabilityEffectRow(
+                            rs.getString("capability_code"), rs.getString("effect")))
+                    .list());
+        } else {
+            List<String> projectRegion = jdbc.sql("""
+                            SELECT DISTINCT c.capability_code
+                              FROM auth_role_grant g
+                              JOIN auth_role r ON r.role_id = g.role_id
+                              JOIN auth_role_capability rc ON rc.role_id = g.role_id
+                              JOIN auth_capability c ON c.capability_code = rc.capability_code
+                             WHERE g.tenant_id = :tenantId
+                               AND g.principal_id = :principalId
+                               AND r.role_status = 'ACTIVE'
+                               AND g.grant_status = 'ACTIVE'
+                               AND g.grant_effect = 'ALLOW'
+                               AND g.revoked_at IS NULL
+                               AND g.scope_type IN ('PROJECT', 'REGION')
+                               AND g.valid_from <= :evaluatedAt
+                               AND (g.valid_to IS NULL OR g.valid_to > :evaluatedAt)
+                            """)
+                    .param("tenantId", tenantId)
+                    .param("principalId", principalId)
+                    .param("evaluatedAt", timestamptz(evaluatedAt))
+                    .query(String.class)
+                    .list();
+            allowed.addAll(projectRegion);
+        }
+        allowed.removeAll(denied);
+        return List.copyOf(allowed);
+    }
+
+    private static void mergeEffects(
+            Set<String> allowed, Set<String> denied, List<CapabilityEffectRow> rows
+    ) {
+        for (CapabilityEffectRow row : rows) {
+            if ("DENY".equals(row.effect())) {
+                denied.add(row.capabilityCode());
+            } else if ("ALLOW".equals(row.effect())) {
+                allowed.add(row.capabilityCode());
+            }
+        }
+    }
+
+    @Override
+    public String policyVersion(String tenantId) {
         long generation = jdbc.sql("""
                         SELECT generation
                           FROM auth_tenant_grant_generation
@@ -205,6 +327,9 @@ final class JdbcAuthorizationPolicyStore implements AuthorizationPolicyStore, Pr
                 .optional()
                 .orElse(0L);
         return "role-grant-v3:g" + generation;
+    }
+
+    private record CapabilityEffectRow(String capabilityCode, String effect) {
     }
 
     private static String nullSafeScope(String value) {

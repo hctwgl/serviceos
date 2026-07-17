@@ -40,6 +40,7 @@ import TechnicianDetailPage from './pages/TechnicianDetailPage.vue'
 import RoleDirectoryPage from './pages/RoleDirectoryPage.vue'
 import RoleDetailPage from './pages/RoleDetailPage.vue'
 import GrantDirectoryPage from './pages/GrantDirectoryPage.vue'
+import PortalStubsPage from './pages/PortalStubsPage.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -181,6 +182,12 @@ export const router = createRouter({
           name: 'ADMIN.GRANT.DIRECTORY',
           component: GrantDirectoryPage,
           meta: { pageId: 'ADMIN.GRANT.DIRECTORY' },
+        },
+        {
+          path: 'portal-stubs',
+          name: 'ADMIN.PORTAL.STUBS',
+          component: PortalStubsPage,
+          meta: { pageId: 'ADMIN.PORTAL.STUBS' },
         },
         { path: 'settings/token', name: 'ADMIN.TOKEN', component: TokenPage },
       ],

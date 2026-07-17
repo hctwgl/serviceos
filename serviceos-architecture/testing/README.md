@@ -188,4 +188,5 @@
 - [M185 网点人员与师傅身份目录验收矩阵](182-m185-network-technician-directory-acceptance.md)
 - [M186 角色与授权治理验收矩阵](183-m186-role-grant-governance-acceptance.md)
 - [M187 Admin 统一用户中心验收矩阵](184-m187-admin-user-center-acceptance.md)
+- [M188 Portal 上下文与导航验收矩阵](185-m188-portal-context-navigation-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

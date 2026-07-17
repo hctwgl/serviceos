@@ -2,40 +2,54 @@
 import { onMounted, ref } from 'vue'
 import { RouterLink, RouterView } from 'vue-router'
 import {
-  probeGovernanceAccess,
-  type GovernanceAccess,
-} from '../nav/governanceAccess'
+  loadAdminPortalNavigation,
+  routePathFor,
+  type PortalNavState,
+} from '../nav/portalNavigation'
 import { AUTH_REQUIRED_EVENT, currentLocalOidcSession } from '../auth/oidc'
 
-const access = ref<GovernanceAccess>({
-  users: false,
-  organizations: false,
-  networks: false,
-  technicians: false,
-  roles: false,
-  grants: false,
+const nav = ref<PortalNavState>({
+  contexts: [],
+  activeContextId: null,
+  contextVersion: null,
+  items: [],
+  stale: false,
+  error: null,
 })
 
-async function refreshAccess() {
-  access.value = await probeGovernanceAccess()
+const TEST_IDS: Record<string, string> = {
+  'ADMIN.USER.DIRECTORY': 'nav-users',
+  'ADMIN.ORGANIZATION.DIRECTORY': 'nav-organizations',
+  'ADMIN.NETWORK.DIRECTORY': 'nav-networks',
+  'ADMIN.TECHNICIAN.DIRECTORY': 'nav-technicians',
+  'ADMIN.ROLE.DIRECTORY': 'nav-roles',
+  'ADMIN.GRANT.DIRECTORY': 'nav-grants',
+}
+
+async function refreshNav(preferredContextId?: string | null) {
+  nav.value = await loadAdminPortalNavigation(preferredContextId)
+}
+
+async function onContextChange(event: Event) {
+  const value = (event.target as HTMLSelectElement).value
+  await refreshNav(value)
 }
 
 onMounted(() => {
-  void refreshAccess()
+  void refreshNav()
   window.addEventListener(AUTH_REQUIRED_EVENT, () => {
-    access.value = {
-      users: false,
-      organizations: false,
-      networks: false,
-      technicians: false,
-      roles: false,
-      grants: false,
+    nav.value = {
+      contexts: [],
+      activeContextId: null,
+      contextVersion: null,
+      items: [],
+      stale: false,
+      error: null,
     }
   })
-  // 登录页返回后重新探测
   window.addEventListener('focus', () => {
     if (currentLocalOidcSession().authenticated) {
-      void refreshAccess()
+      void refreshNav(nav.value.activeContextId)
     }
   })
 })
@@ -45,33 +59,41 @@ onMounted(() => {
   <div class="shell">
     <aside class="nav">
       <h1>ServiceOS Admin</h1>
-      <p class="hint">运营外壳（M101～M187）。写操作仅走服务端命令与 Capability。</p>
-      <RouterLink to="/reviews">审核队列</RouterLink>
-      <RouterLink to="/corrections">整改跟踪</RouterLink>
-      <RouterLink to="/tasks">任务目录</RouterLink>
-      <RouterLink to="/sla">SLA 工作台</RouterLink>
-      <RouterLink to="/exceptions">运营异常</RouterLink>
-      <RouterLink to="/integration/inbound">入站队列</RouterLink>
-      <RouterLink to="/integration/outbound">外发交付</RouterLink>
-      <RouterLink to="/work-orders">工单目录</RouterLink>
-      <RouterLink to="/projects">项目目录</RouterLink>
-      <template v-if="access.users || access.organizations || access.networks || access.technicians || access.roles || access.grants">
-        <p class="section">用户中心</p>
-        <RouterLink v-if="access.users" to="/users" data-testid="nav-users">用户目录</RouterLink>
-        <RouterLink v-if="access.organizations" to="/organizations" data-testid="nav-organizations">
-          企业组织
+      <p class="hint">运营外壳（M101～M188）。导航来自 `/me/navigation`，写操作仍走服务端命令与 Capability。</p>
+      <div
+        v-if="nav.contexts.filter((c) => c.portal === 'ADMIN').length > 1"
+        class="context"
+      >
+        <label for="portal-context">上下文</label>
+        <select
+          id="portal-context"
+          data-testid="portal-context-select"
+          :value="nav.activeContextId ?? ''"
+          @change="onContextChange"
+        >
+          <option
+            v-for="context in nav.contexts.filter((c) => c.portal === 'ADMIN')"
+            :key="context.contextId"
+            :value="context.contextId"
+          >
+            {{ context.portal }} / {{ context.scopeRef }}
+          </option>
+        </select>
+      </div>
+      <p v-if="nav.stale" class="stale" data-testid="context-stale-banner">上下文已刷新（旧版本失效）</p>
+      <p v-if="nav.error" class="error" data-testid="nav-error">{{ nav.error }}</p>
+      <template v-for="item in nav.items" :key="item.pageId">
+        <RouterLink
+          :to="routePathFor(item)"
+          :data-testid="TEST_IDS[item.pageId] ?? `nav-${item.routeKey.replaceAll('/', '-')}`"
+          :data-page-id="item.pageId"
+        >
+          {{ item.title }}
         </RouterLink>
-        <RouterLink v-if="access.networks" to="/networks" data-testid="nav-networks">
-          合作组织与网点
-        </RouterLink>
-        <RouterLink v-if="access.technicians" to="/technicians" data-testid="nav-technicians">
-          师傅档案
-        </RouterLink>
-        <RouterLink v-if="access.roles" to="/roles" data-testid="nav-roles">角色与 Capability</RouterLink>
-        <RouterLink v-if="access.grants" to="/grants" data-testid="nav-grants">授权与委托</RouterLink>
       </template>
       <RouterLink to="/work-orders/lookup">按 ID 打开</RouterLink>
       <RouterLink to="/settings/token">身份登录</RouterLink>
+      <RouterLink to="/portal-stubs" data-testid="nav-portal-stubs">Portal stubs</RouterLink>
     </aside>
     <main class="content">
       <RouterView />
@@ -105,12 +127,25 @@ onMounted(() => {
   font-size: 0.8rem;
   color: #9fb3c8;
 }
-.section {
-  margin: 0.5rem 0 0;
+.context {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+}
+.context select {
+  padding: 0.35rem;
+}
+.stale,
+.error {
+  margin: 0;
   font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #9fb3c8;
+}
+.stale {
+  color: #f0b429;
+}
+.error {
+  color: #f86a6a;
 }
 .nav a {
   color: #d9e2ec;

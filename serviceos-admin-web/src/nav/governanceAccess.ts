@@ -1,5 +1,4 @@
-import { apiProbe } from '../api/client'
-import { currentLocalOidcSession } from '../auth/oidc'
+import { loadAdminPortalNavigation, navItemVisible } from './portalNavigation'
 
 export type GovernanceNavKey =
   | 'users'
@@ -20,28 +19,29 @@ const EMPTY: GovernanceAccess = {
   grants: false,
 }
 
+const PAGE_IDS: Record<GovernanceNavKey, string> = {
+  users: 'ADMIN.USER.DIRECTORY',
+  organizations: 'ADMIN.ORGANIZATION.DIRECTORY',
+  networks: 'ADMIN.NETWORK.DIRECTORY',
+  technicians: 'ADMIN.TECHNICIAN.DIRECTORY',
+  roles: 'ADMIN.ROLE.DIRECTORY',
+  grants: 'ADMIN.GRANT.DIRECTORY',
+}
+
 /**
- * M187 导航门禁：在 /me/capabilities（M188）落地前，以真实目录读接口探测后端 Capability。
- * 探测失败一律隐藏入口；深链仍由页面与后端失败关闭。
+ * M188：治理入口可见性改为消费 `/me/navigation` pageId，不再探测目录读接口。
  */
 export async function probeGovernanceAccess(): Promise<GovernanceAccess> {
-  if (!currentLocalOidcSession().authenticated) {
+  const nav = await loadAdminPortalNavigation()
+  if (nav.error && nav.items.length === 0) {
     return { ...EMPTY }
   }
-  const [users, organizations, networks, technicians, roles, grants] = await Promise.all([
-    apiProbe('/security-principals?limit=1'),
-    apiProbe('/organizations'),
-    apiProbe('/service-networks'),
-    apiProbe('/technician-profiles'),
-    apiProbe('/roles'),
-    apiProbe('/role-grants'),
-  ])
   return {
-    users: users === 'allow',
-    organizations: organizations === 'allow',
-    networks: networks === 'allow',
-    technicians: technicians === 'allow',
-    roles: roles === 'allow',
-    grants: grants === 'allow',
+    users: navItemVisible(nav.items, PAGE_IDS.users),
+    organizations: navItemVisible(nav.items, PAGE_IDS.organizations),
+    networks: navItemVisible(nav.items, PAGE_IDS.networks),
+    technicians: navItemVisible(nav.items, PAGE_IDS.technicians),
+    roles: navItemVisible(nav.items, PAGE_IDS.roles),
+    grants: navItemVisible(nav.items, PAGE_IDS.grants),
   }
 }
