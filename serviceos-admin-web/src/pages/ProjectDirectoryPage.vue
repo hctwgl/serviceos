@@ -1,8 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute, type RouteLocationRaw } from 'vue-router'
 import QueueTable from './QueueTable.vue'
 import { createProject, listAuthorizedProjects, type ProjectPage } from '../api/projects'
+import { firstRouteQuery, uuidRoute } from '../routeQuery'
+
+const linkColumns: Record<
+  string,
+  (row: Record<string, unknown>) => RouteLocationRaw | null
+> = {
+  id: (row) => uuidRoute(row.id, 'ADMIN.PROJECT.DETAIL'),
+}
+
+const route = useRoute()
 
 const loading = ref(false)
 const busy = ref(false)
@@ -10,8 +20,10 @@ const error = ref<string | null>(null)
 const message = ref<string | null>(null)
 const page = ref<ProjectPage | null>(null)
 const cursor = ref<string | undefined>()
+/** 运营默认 ACTIVE；显式 route.query 可覆盖。 */
 const status = ref('ACTIVE')
 const clientId = ref('')
+const activeOn = ref('')
 
 const createCode = ref('')
 const createClientId = ref('client-demo')
@@ -22,6 +34,21 @@ const createRegionCodes = ref('')
 const createNetworkIds = ref('')
 const createdProjectId = ref('')
 
+function hydrateFiltersFromRoute() {
+  const nextStatus = firstRouteQuery(route, 'status')
+  if (nextStatus !== undefined) {
+    status.value = nextStatus
+  }
+  const nextClientId = firstRouteQuery(route, 'clientId')
+  if (nextClientId !== undefined) {
+    clientId.value = nextClientId
+  }
+  const nextActiveOn = firstRouteQuery(route, 'activeOn')
+  if (nextActiveOn !== undefined) {
+    activeOn.value = nextActiveOn
+  }
+}
+
 async function load(next?: string) {
   loading.value = true
   error.value = null
@@ -30,7 +57,8 @@ async function load(next?: string) {
       cursor: next,
       limit: '20',
       status: status.value || undefined,
-      clientId: clientId.value || undefined,
+      clientId: clientId.value.trim() || undefined,
+      activeOn: activeOn.value.trim() || undefined,
     })
     cursor.value = page.value.nextCursor ?? undefined
   } catch (err) {
@@ -38,6 +66,11 @@ async function load(next?: string) {
   } finally {
     loading.value = false
   }
+}
+
+function search() {
+  cursor.value = undefined
+  return load()
 }
 
 async function create() {
@@ -87,16 +120,19 @@ const rows = computed(() =>
   })),
 )
 
-onMounted(() => load())
+onMounted(() => {
+  hydrateFiltersFromRoute()
+  return load()
+})
 </script>
 
 <template>
   <section class="page">
-    <form class="filters" @submit.prevent="load()">
+    <form class="filters" @submit.prevent="search">
       <label>
         status
-        <select v-model="status">
-          <option value="">全部</option>
+        <select v-model="status" aria-label="project status filter">
+          <option value="">（不限）</option>
           <option value="DRAFT">DRAFT</option>
           <option value="ACTIVE">ACTIVE</option>
           <option value="SUSPENDED">SUSPENDED</option>
@@ -105,7 +141,19 @@ onMounted(() => load())
       </label>
       <label>
         clientId
-        <input v-model="clientId" placeholder="可选" />
+        <input
+          v-model="clientId"
+          aria-label="project clientId filter"
+          placeholder="可选"
+        />
+      </label>
+      <label>
+        activeOn
+        <input
+          v-model="activeOn"
+          aria-label="project activeOn filter"
+          type="date"
+        />
       </label>
       <button type="submit" :disabled="loading">查询</button>
     </form>
@@ -132,6 +180,7 @@ onMounted(() => load())
       title="授权项目目录"
       :columns="['id', 'code', 'name', 'clientId', 'status', 'startsOn', 'endsOn']"
       :rows="rows"
+      :link-columns="linkColumns"
       :loading="loading"
       :error="error"
       :as-of="page?.asOf"

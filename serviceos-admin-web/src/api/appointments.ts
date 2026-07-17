@@ -7,6 +7,22 @@ export type AppointmentWindow = {
   estimatedDurationMinutes: number
 }
 
+export type AppointmentRevision = {
+  revisionId: string
+  revisionNo: number
+  windowStart?: string | null
+  windowEnd?: string | null
+  timezone?: string | null
+  estimatedDurationMinutes?: number | null
+  addressRef?: string | null
+  addressVersion?: string | null
+  status?: string | null
+  confirmedPartyType?: string | null
+  confirmedPartyRef?: string | null
+  confirmationChannel?: string | null
+  createdAt?: string | null
+}
+
 export type Appointment = {
   appointmentId: string
   projectId: string
@@ -20,6 +36,7 @@ export type Appointment = {
   currentRevisionNo: number
   createdAt: string
   createdBy: string
+  revisions?: AppointmentRevision[]
   allowedActions: Array<'CONFIRM' | 'RESCHEDULE' | 'CANCEL' | 'MARK_NO_SHOW'>
 }
 
@@ -49,6 +66,12 @@ export type ContactAttempt = {
   createdAt: string
 }
 
+export type VisitLocation = {
+  latitude: number
+  longitude: number
+  accuracyMeters: number
+}
+
 export type Visit = {
   visitId: string
   projectId: string
@@ -57,9 +80,27 @@ export type Visit = {
   appointmentId: string
   visitSequence: number
   technicianId: string
+  networkId?: string | null
   status: string
+  checkInCapturedAt?: string
+  checkInReceivedAt?: string
+  checkInLocation?: VisitLocation | null
+  geofenceResult?: string | null
+  geofenceDistanceMeters?: number | null
+  geofencePolicyVersion?: string | null
+  policyDecision?: string | null
+  deviceId?: string | null
+  deviceCommandId?: string | null
+  offline?: boolean
+  checkOutCapturedAt?: string | null
+  checkOutReceivedAt?: string | null
+  resultCode?: string | null
+  exceptionCode?: string | null
+  note?: string | null
+  operationRefs?: string[]
+  evidenceRefs?: string[]
   aggregateVersion: number
-  allowedActions?: Array<'CHECK_OUT' | 'INTERRUPT'>
+  allowedActions?: Array<'visit.checkOut' | 'visit.interrupt' | 'CHECK_OUT' | 'INTERRUPT'>
 }
 
 export type VisitCommandReceipt = {
@@ -81,6 +122,15 @@ export function listTaskContactAttempts(taskId: string) {
 
 export function getAppointment(appointmentId: string) {
   return apiGetWithMeta<Appointment>(`/appointments/${appointmentId}`)
+}
+
+export function getVisit(visitId: string) {
+  return apiGetWithMeta<Visit>(`/visits/${visitId}`)
+}
+
+/** 不可变联系事实；无 ETag。 */
+export function getContactAttempt(contactAttemptId: string) {
+  return apiGet<ContactAttempt>(`/contact-attempts/${contactAttemptId}`)
 }
 
 export function proposeAppointment(

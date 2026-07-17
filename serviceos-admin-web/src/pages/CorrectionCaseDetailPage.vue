@@ -131,12 +131,82 @@ onMounted(() => {
       <article class="card">
         <dl>
           <div><dt>status</dt><dd>{{ detail.status }}</dd></div>
-          <div><dt>taskId</dt><dd>{{ detail.taskId }}</dd></div>
-          <div><dt>correctionTaskId</dt><dd>{{ detail.correctionTaskId ?? '-' }}</dd></div>
-          <div><dt>sourceReviewCaseId</dt><dd>{{ detail.sourceReviewCaseId }}</dd></div>
+          <div>
+            <dt>projectId</dt>
+            <dd>
+              <RouterLink
+                :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: detail.projectId } }"
+              >
+                {{ detail.projectId }}
+              </RouterLink>
+            </dd>
+          </div>
+          <div>
+            <dt>taskId</dt>
+            <dd>
+              <RouterLink :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.taskId } }">
+                {{ detail.taskId }}
+              </RouterLink>
+            </dd>
+          </div>
+          <div>
+            <dt>correctionTaskId</dt>
+            <dd>
+              <RouterLink
+                v-if="detail.correctionTaskId"
+                :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.correctionTaskId } }"
+              >
+                {{ detail.correctionTaskId }}
+              </RouterLink>
+              <template v-else>-</template>
+            </dd>
+          </div>
+          <div>
+            <dt>sourceReviewCaseId</dt>
+            <dd>
+              <RouterLink
+                :to="{ name: 'ADMIN.REVIEW.DETAIL', params: { id: detail.sourceReviewCaseId } }"
+              >
+                {{ detail.sourceReviewCaseId }}
+              </RouterLink>
+            </dd>
+          </div>
+          <div>
+            <dt>sourceEvidenceSetSnapshotId</dt>
+            <dd>
+              <RouterLink
+                :to="{
+                  name: 'ADMIN.EVIDENCE_SET_SNAPSHOT.DETAIL',
+                  params: { id: detail.sourceEvidenceSetSnapshotId },
+                }"
+              >
+                {{ detail.sourceEvidenceSetSnapshotId }}
+              </RouterLink>
+            </dd>
+          </div>
+          <div>
+            <dt>latestResubmissionSnapshotId</dt>
+            <dd>
+              <RouterLink
+                v-if="detail.latestResubmissionSnapshotId"
+                :to="{
+                  name: 'ADMIN.EVIDENCE_SET_SNAPSHOT.DETAIL',
+                  params: { id: detail.latestResubmissionSnapshotId },
+                }"
+              >
+                {{ detail.latestResubmissionSnapshotId }}
+              </RouterLink>
+              <template v-else>-</template>
+            </dd>
+          </div>
           <div><dt>reasonCodes</dt><dd>{{ detail.reasonCodes.join(', ') }}</dd></div>
         </dl>
-        <p class="links">
+        <p class="links correction-cross-links">
+          <RouterLink
+            :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: detail.projectId } }"
+          >
+            打开项目 {{ detail.projectId }}
+          </RouterLink>
           <RouterLink :to="{ name: 'ADMIN.REVIEW.DETAIL', params: { id: detail.sourceReviewCaseId } }">
             源审核案例
           </RouterLink>
@@ -148,6 +218,23 @@ onMounted(() => {
             :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.correctionTaskId } }"
           >
             整改任务
+          </RouterLink>
+          <RouterLink
+            :to="{
+              name: 'ADMIN.EVIDENCE_SET_SNAPSHOT.DETAIL',
+              params: { id: detail.sourceEvidenceSetSnapshotId },
+            }"
+          >
+            打开源资料快照 {{ detail.sourceEvidenceSetSnapshotId }}
+          </RouterLink>
+          <RouterLink
+            v-if="detail.latestResubmissionSnapshotId"
+            :to="{
+              name: 'ADMIN.EVIDENCE_SET_SNAPSHOT.DETAIL',
+              params: { id: detail.latestResubmissionSnapshotId },
+            }"
+          >
+            打开最近补传快照 {{ detail.latestResubmissionSnapshotId }}
           </RouterLink>
         </p>
       </article>

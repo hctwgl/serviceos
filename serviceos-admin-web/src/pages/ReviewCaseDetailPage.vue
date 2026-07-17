@@ -174,14 +174,78 @@ onMounted(() => {
         <dl>
           <div><dt>status</dt><dd>{{ detail.status }}</dd></div>
           <div><dt>origin</dt><dd>{{ detail.origin }}</dd></div>
-          <div><dt>taskId</dt><dd>{{ detail.taskId }}</dd></div>
-          <div><dt>projectId</dt><dd>{{ detail.projectId }}</dd></div>
-          <div><dt>snapshot</dt><dd>{{ detail.evidenceSetSnapshotId }}</dd></div>
-          <div><dt>reopenedFromReviewCaseId</dt><dd>{{ detail.reopenedFromReviewCaseId ?? '-' }}</dd></div>
+          <div>
+            <dt>taskId</dt>
+            <dd>
+              <RouterLink :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.taskId } }">
+                {{ detail.taskId }}
+              </RouterLink>
+            </dd>
+          </div>
+          <div>
+            <dt>projectId</dt>
+            <dd>
+              <RouterLink
+                :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: detail.projectId } }"
+              >
+                {{ detail.projectId }}
+              </RouterLink>
+            </dd>
+          </div>
+          <div>
+            <dt>snapshot</dt>
+            <dd>
+              <RouterLink
+                :to="{
+                  name: 'ADMIN.EVIDENCE_SET_SNAPSHOT.DETAIL',
+                  params: { id: detail.evidenceSetSnapshotId },
+                }"
+              >
+                {{ detail.evidenceSetSnapshotId }}
+              </RouterLink>
+            </dd>
+          </div>
+          <div>
+            <dt>reopenedFromReviewCaseId</dt>
+            <dd>
+              <RouterLink
+                v-if="detail.reopenedFromReviewCaseId"
+                :to="{
+                  name: 'ADMIN.REVIEW.DETAIL',
+                  params: { id: detail.reopenedFromReviewCaseId },
+                }"
+              >
+                {{ detail.reopenedFromReviewCaseId }}
+              </RouterLink>
+              <template v-else>-</template>
+            </dd>
+          </div>
           <div><dt>reopenTriggerRef</dt><dd>{{ detail.reopenTriggerRef ?? '-' }}</dd></div>
         </dl>
-        <p class="links">
-          <RouterLink :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.taskId } }">任务详情</RouterLink>
+        <p class="links review-cross-links">
+          <RouterLink :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: detail.projectId } }">
+            打开项目 {{ detail.projectId }}
+          </RouterLink>
+          <RouterLink :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.taskId } }">
+            任务详情
+          </RouterLink>
+          <RouterLink
+            :to="{
+              name: 'ADMIN.EVIDENCE_SET_SNAPSHOT.DETAIL',
+              params: { id: detail.evidenceSetSnapshotId },
+            }"
+          >
+            打开资料快照 {{ detail.evidenceSetSnapshotId }}
+          </RouterLink>
+          <RouterLink
+            v-if="detail.reopenedFromReviewCaseId"
+            :to="{
+              name: 'ADMIN.REVIEW.DETAIL',
+              params: { id: detail.reopenedFromReviewCaseId },
+            }"
+          >
+            打开源审核案例 {{ detail.reopenedFromReviewCaseId }}
+          </RouterLink>
         </p>
       </article>
 

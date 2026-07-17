@@ -53,6 +53,12 @@ final class MyBatisAppointmentRepository implements AppointmentRepository {
     }
 
     @Override
+    public Optional<ContactAttemptView> findContactAttemptById(String tenantId, UUID contactAttemptId) {
+        return Optional.ofNullable(mapper.findContactAttemptById(tenantId, contactAttemptId))
+                .map(this::contactAttempt);
+    }
+
+    @Override
     public void appendContactAttempt(String tenantId, ContactAttemptView attempt) {
         Map<String, Object> values = new HashMap<>();
         values.put("tenantId", tenantId);

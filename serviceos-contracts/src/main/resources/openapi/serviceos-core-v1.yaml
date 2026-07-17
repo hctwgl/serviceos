@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.70.0
+  version: 0.75.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -459,6 +459,36 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/TaskAssignmentBatchReceipt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /tasks/{taskId}/service-assignments:manual-assign:
+    post:
+      operationId: manualAssignServiceAssignments
+      summary: Admin 人工初派网点与师傅服务责任
+      description: >-
+        窄化试点命令：确保容量后经 ServiceAssignment 激活 saga 同事务落到 ACTIVE NETWORK +
+        TECHNICIAN。不执行评分/硬过滤/DispatchRequest，不支持改派；能力为
+        dispatch.assignment.manage 与 dispatch.capacity.configure。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ManualAssignServiceAssignmentRequest' }
+      responses:
+        '200':
+          description: 双责任已激活或幂等回放
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ManualServiceAssignmentReceipt' }
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
@@ -1567,6 +1597,27 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /contact-attempts/{contactAttemptId}:
+    get:
+      operationId: getContactAttempt
+      summary: 查询不可变联系尝试详情
+      description: >-
+        M160 窄切片；需要 appointment.read 与实时 tenant/project/network scope。
+        复用已有 ContactAttempt Schema；联系事实不可变，不返回 ETag。
+      parameters:
+        - $ref: '#/components/parameters/ContactAttemptId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 联系尝试详情
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContactAttempt' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
   /appointments/{appointmentId}:
     get:
       operationId: getAppointment
@@ -1690,6 +1741,28 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+  /visits/{visitId}:
+    get:
+      operationId: getVisit
+      summary: 查询上门 Visit 详情
+      description: >-
+        M159 窄切片；需要 visit.read 与实时 tenant/project/network scope。
+        复用已有 Visit 安全摘要 Schema（含位置/设备/备注）；不新增字段语义。
+      parameters:
+        - $ref: '#/components/parameters/VisitId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Visit 详情
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Visit' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
   /appointments/{appointmentId}/visits:check-in:
     post:
       operationId: checkInVisit
@@ -1761,6 +1834,35 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /inbound-envelopes:
+    get:
+      operationId: listAuthorizedInboundEnvelopes
+      summary: 查询当前主体有权查看的入站 Envelope 队列
+      description: >-
+        API-06 §6.1 窄切片（M158）；默认 processingStatus=RECEIVED，按 receivedAt/id 倒序稳定分页。
+        需要 integration.readInbound；仅返回已绑定 projectId 的安全摘要；游标绑定实时项目范围和全部筛选。
+        不返回 digest、对象引用、签名原文或传输凭据。
+      parameters:
+        - { name: projectId, in: query, schema: { type: string, format: uuid } }
+        - { name: processingStatus, in: query, schema: { enum: [RECEIVED, COMPLETED, REJECTED], default: RECEIVED } }
+        - { name: messageType, in: query, schema: { enum: [CREATE_WORK_ORDER, RECORD_CLIENT_REVIEW_RESULT] } }
+        - { name: resultType, in: query, schema: { type: string, minLength: 1, maxLength: 80 } }
+        - { name: resultId, in: query, schema: { type: string, minLength: 1, maxLength: 160 } }
+        - { name: canonicalMessageId, in: query, schema: { type: string, format: uuid } }
+        - { name: cursor, in: query, schema: { type: string, minLength: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 入站 Envelope 队列页
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InboundEnvelopeQueuePage' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
   /inbound-envelopes/{envelopeId}:
     get:
       operationId: getInboundEnvelope
@@ -1832,8 +1934,9 @@ paths:
       operationId: createBydReviewSubmission
       summary: 从已通过 INTERNAL ReviewCase 创建 BYD 提审交付
       description: >-
-        仅允许获权 SERVICE principal 调用。服务端从已冻结的审核决定、Task 与 BYD
-        CanonicalMessage 派生不可变 payload；未知外部结果不得自动重发。
+        允许获权 USER 或 SERVICE principal 调用（需要 integration.submitClientReview）。
+        服务端从已冻结的审核决定、Task 与 BYD CanonicalMessage 派生不可变 payload；
+        未知外部结果不得自动重发。
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/CorrelationId'
@@ -1969,6 +2072,11 @@ components:
       schema: { type: string, format: uuid }
     VisitId:
       name: visitId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ContactAttemptId:
+      name: contactAttemptId
       in: path
       required: true
       schema: { type: string, format: uuid }
@@ -3063,6 +3171,40 @@ components:
         requestedAt: { type: string, format: date-time }
         startedAt: { type: [string, 'null'], format: date-time }
         finishedAt: { type: [string, 'null'], format: date-time }
+    InboundEnvelopeQueueItem:
+      type: object
+      additionalProperties: false
+      required: [inboundEnvelopeId, projectId, connectorVersionId, messageType,
+        externalMessageId, signatureStatus, processingStatus, mappingVersionId,
+        canonicalMessageId, resultCode, resultType, resultId, receivedAt, completedAt,
+        correlationId]
+      properties:
+        inboundEnvelopeId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        connectorVersionId: { type: string, minLength: 1, maxLength: 120 }
+        messageType: { enum: [CREATE_WORK_ORDER, RECORD_CLIENT_REVIEW_RESULT] }
+        externalMessageId: { type: string, minLength: 1, maxLength: 160 }
+        signatureStatus: { enum: [VALID] }
+        processingStatus: { enum: [RECEIVED, COMPLETED, REJECTED] }
+        mappingVersionId: { type: [string, 'null'], maxLength: 120 }
+        canonicalMessageId: { type: [string, 'null'], format: uuid }
+        resultCode: { type: [string, 'null'], maxLength: 80 }
+        resultType: { type: [string, 'null'], maxLength: 80 }
+        resultId: { type: [string, 'null'], maxLength: 160 }
+        receivedAt: { type: string, format: date-time }
+        completedAt: { type: [string, 'null'], format: date-time }
+        correlationId: { type: string, minLength: 1, maxLength: 128 }
+    InboundEnvelopeQueuePage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor, asOf]
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/InboundEnvelopeQueueItem' }
+        nextCursor: { type: [string, 'null'] }
+        asOf: { type: string, format: date-time }
     InboundEnvelope:
       type: object
       additionalProperties: false
@@ -3310,6 +3452,27 @@ components:
           items: { type: string, minLength: 1, maxLength: 128 }
         sourceType: { enum: [ASSIGNEE_POLICY, MANUAL] }
         sourceId: { type: string, minLength: 1, maxLength: 160 }
+    ManualAssignServiceAssignmentRequest:
+      type: object
+      additionalProperties: false
+      required: [networkAssigneeId, technicianAssigneeId, businessType]
+      properties:
+        networkAssigneeId: { type: string, minLength: 1, maxLength: 128 }
+        technicianAssigneeId: { type: string, minLength: 1, maxLength: 128 }
+        businessType: { type: string, minLength: 1, maxLength: 100 }
+    ManualServiceAssignmentReceipt:
+      type: object
+      additionalProperties: false
+      required: [taskId, workOrderId, networkServiceAssignmentId, technicianServiceAssignmentId,
+        networkAssigneeId, technicianAssigneeId, occurredAt]
+      properties:
+        taskId: { type: string, format: uuid }
+        workOrderId: { type: string, format: uuid }
+        networkServiceAssignmentId: { type: string, format: uuid }
+        technicianServiceAssignmentId: { type: string, format: uuid }
+        networkAssigneeId: { type: string, minLength: 1, maxLength: 128 }
+        technicianAssigneeId: { type: string, minLength: 1, maxLength: 128 }
+        occurredAt: { type: string, format: date-time }
     ReleaseHumanTaskRequest:
       type: object
       additionalProperties: false

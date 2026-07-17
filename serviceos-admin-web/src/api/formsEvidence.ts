@@ -22,6 +22,7 @@ export type FormSubmission = {
   validationStatus: 'VALIDATED' | 'INVALID'
   errors: Array<{ fieldKey: string; code: string; message: string }>
   warnings: Array<{ fieldKey: string; code: string; message: string }>
+  prefillVersion?: string | null
   submittedBy: string
   submittedAt: string
 }
@@ -91,17 +92,35 @@ export type EvidenceItem = {
   evidenceSlotId: string
   itemOrdinal: number
   status: string
+  createdBy?: string
+  createdAt?: string
   revisions: EvidenceRevision[]
+}
+
+export type EvidenceSetSnapshotMember = {
+  memberId: string
+  evidenceSlotId: string
+  evidenceItemId: string
+  evidenceRevisionId: string
+  revisionNumber: number
+  revisionStatus: string
+  contentDigest: string
+  validationDigest?: string
+  memberOrdinal: number
 }
 
 export type EvidenceSetSnapshot = {
   evidenceSetSnapshotId: string
   taskId: string
   projectId: string
+  resolutionId?: string
   purpose: 'TASK_SUBMISSION'
   contentDigest: string
   memberCount: number
+  eligibilitySummary?: Record<string, unknown>
+  createdBy?: string
   createdAt: string
+  members?: EvidenceSetSnapshotMember[]
 }
 
 export type StoredFile = {
@@ -118,12 +137,43 @@ export type StoredFile = {
   version: number
 }
 
+export type ExternalReviewAffectedTarget = {
+  targetType: 'EVIDENCE_REVISION'
+  evidenceSlotId: string
+  evidenceItemId: string
+  evidenceRevisionId: string
+}
+
+export type ExternalReviewReceipt = {
+  receiptId: string
+  projectId: string
+  reviewCaseId: string
+  reviewDecisionId: string
+  inboundEnvelopeId: string
+  canonicalMessageId: string
+  externalKey: string
+  callbackBatchRef: string
+  mappingVersionId: string
+  result: 'APPROVED' | 'REJECTED'
+  reasonCodes: string[]
+  affectedTargets: ExternalReviewAffectedTarget[]
+  payloadRef?: string | null
+  coordinationTaskId?: string | null
+  receivedBy: string
+  receivedAt: string
+}
+
 export function listTaskForms(taskId: string) {
   return apiGet<TaskForm[]>(`/tasks/${taskId}/forms`)
 }
 
 export function getFormSubmission(submissionId: string) {
   return apiGet<FormSubmission>(`/form-submissions/${submissionId}`)
+}
+
+/** 复用已 Implemented GET /internal/external-review-receipts/{id}（evidence.read）。 */
+export function getExternalReviewReceipt(receiptId: string) {
+  return apiGet<ExternalReviewReceipt>(`/internal/external-review-receipts/${receiptId}`)
 }
 
 export function getEvidenceItem(itemId: string) {

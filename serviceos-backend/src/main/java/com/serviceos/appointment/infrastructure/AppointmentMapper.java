@@ -21,6 +21,9 @@ interface AppointmentMapper {
     List<Map<String, Object>> findContactAttempts(
             @Param("tenantId") String tenantId, @Param("taskId") UUID taskId);
 
+    Map<String, Object> findContactAttemptById(
+            @Param("tenantId") String tenantId, @Param("contactAttemptId") UUID contactAttemptId);
+
     void insertContactAttempt(Map<String, Object> parameters);
 
     void insertContactResult(Map<String, Object> parameters);

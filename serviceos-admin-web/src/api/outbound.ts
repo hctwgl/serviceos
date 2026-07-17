@@ -8,12 +8,18 @@ export type OutboundDelivery = {
   sourceReviewCaseId: string
   sourceTaskId: string
   sourceWorkOrderId: string
+  sourceSnapshotId: string
+  sourceSnapshotDigest: string
   externalOrderCode: string
+  /** OpenAPI nullable；队列侧已深链，详情类型对齐。 */
+  executionTaskId: string | null
   status: string
   aggregateVersion: number
   createdAt: string
   deliveredAt: string | null
   acknowledgedAt: string | null
+  clientReviewCaseId: string | null
+  reviewRouteId: string | null
   attempts: Array<Record<string, unknown>>
   acknowledgements: Array<Record<string, unknown>>
   replayRequests: Array<Record<string, unknown>>

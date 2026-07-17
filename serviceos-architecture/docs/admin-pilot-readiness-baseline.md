@@ -1,13 +1,15 @@
 ---
-title: M134 Admin 试点可运行基线
+title: Admin 试点可运行基线（含 M164 审核/整改交叉深链）
 status: Implemented
-lastUpdated: 2026-07-16
+lastUpdated: 2026-07-17
 ---
 
-# M134 Admin 试点可运行基线
+# Admin 试点可运行基线（含 M164 审核/整改交叉深链）
 
-本基线不创建 M135/M136，也不扩大 M134 的业务声明范围。目标是让 M101～M134 已有 Admin
-表面具备可重复构建、可登录、可连接真实后端和数据库的试点入口，并明确完整业务链尚未证明的边界。
+本基线覆盖 M101～M164 已有 Admin 表面的可重复构建、登录、真实后端/数据库试点入口，并明确
+平台级未实现边界。M135～M164 追加补传复审、预约上门、提审外发 ACK、厂端回调、入站接单激活、
+Admin HTTP 人工初派、同单预约上门→表单/资料/驳回整改补传复审/外发/完结（`ADMIN-PILOT-09`）、
+入站 Envelope/Canonical 详情深链、专项队列与目录/SLA Accepted OpenAPI 筛选，以及工作区外发/审核/整改详情深链。
 
 ## 1. 已建立的基线
 
@@ -17,7 +19,7 @@ lastUpdated: 2026-07-16
 | Admin CI | GitHub Actions 使用 Node 22 执行不可变安装与生产构建；独立 `admin-pilot-e2e` job 安装 Chrome 并运行真实写链路，staging 等待 Java、Admin build 与 Admin E2E 三个门禁 |
 | 本地身份 | Vite 开发模式显式开启 Keycloak Authorization Code + PKCE；无 client secret、无硬编码 token、无生产手工 JWT 入口 |
 | 后端授权 | JWT 只提供身份声明；ServiceOS 继续从数据库 RoleGrant 实时校验 tenant/project/capability，401 清理本机会话并失败关闭 |
-| 真实 E2E | 固定可释放夹具 + 每轮新建终态/整改/重开夹具 + Playwright/Google Chrome 验证登录与权威只读投影；正常 Task 覆盖表单、资料、APPROVED、双引用 complete 到 FULFILLED；独立 Task 覆盖 REJECTED→自动整改→WAIVED/CANCELLED，以及 FORCE_APPROVED→原 Case REOPENED/后继 Case OPEN |
+| 真实 E2E | 固定可释放夹具 + 每轮新建终态/整改豁免/重开/正常补传/现场履约夹具 + Playwright/Google Chrome；覆盖表单资料审核完结、WAIVE、reopen、补传复审，以及 propose→confirm→check-in→check-out |
 | 数据库 | 使用 `serviceos-deploy/compose.yaml` 的 PostgreSQL 18，后端启动时执行当前 86 个 Flyway 迁移 |
 
 ## 2. P0 根因与修复
@@ -69,8 +71,9 @@ M53 表单重解析复用既有 Slot 时，Snapshot 冻结最新 `currentResolut
 `task.completed` Inbox 成功消费、候选/责任 EXPIRED、Node/Stage/Workflow COMPLETED 与
 WorkOrder FULFILLED；整改夹具还检查 ReviewCase REJECTED、CorrectionCase WAIVED、整改 Task
 CANCELLED、三类成功审计与四条审核/整改事件 Inbox；重开夹具检查 FORCE_APPROVED 决定、
-原/后继 Case 血缘、三类成功审计、三条审核事件 Inbox 且无 CorrectionCase。夹具只允许本地
-开发数据库使用。
+原/后继 Case 血缘、三类成功审计、三条审核事件 Inbox 且无 CorrectionCase；正常补传夹具检查
+CorrectionCase CLOSED、补传轮次、复审 APPROVED、源 Task COMPLETED、WorkOrder FULFILLED
+以及补传/关闭/复审/完结审计与 Inbox。夹具只允许本地开发数据库使用。
 GitHub Actions 使用同一脚本阻断 PR，并保留 Backend、Admin 与 Playwright 诊断产物；该 job
 通过后才启动容器化 staging 发布、回滚和恢复演练。
 
@@ -96,13 +99,174 @@ GitHub Actions 使用同一脚本阻断 PR，并保留 Backend、Admin 与 Playw
 - Admin 对另一动态 Task 作出 FORCE_APPROVED，再重开为同 Snapshot 的后继 OPEN Case；
   原 Case、决定、重开来源和 triggerRef 均保留，页面 URL/刷新与后继身份一致。
 
+已追加证明（M135）：
+
+- Admin 对独立动态 Task 作出普通 REJECTED 后，在源 Task 同 Item 追加补传 Revision 并创建新
+  Snapshot；经授权整改详情 `resubmit`→`close`，再对补传 Snapshot 新建 INTERNAL ReviewCase
+  并普通 APPROVED；随后以 FormSubmission + 补传 Snapshot 双引用 complete，Outbox/Inbox 推进
+  至 WorkOrder FULFILLED。不使用 WAIVE 或同 Snapshot reopen 冒充正常补传复审。
+
+已追加证明（M136）：
+
+- 本地 RoleGrant 具备预约/上门写能力；第五套夹具注入 ACTIVE ServiceAssignment；
+- Admin 对独立动态 Task 执行 proposeAppointment→confirm→check-in→check-out，Appointment 与
+  Visit 终态均为 COMPLETED，审计与 Outbox/Inbox 完整。
+
+已追加证明（M137）：
+
+- 获权 USER 可创建 BYD 提审交付；夹具登记 CREATE_WORK_ORDER Canonical 系谱；
+- 本地协议 stub 严格 `errno=0` 后 Delivery ACKNOWLEDGED 并自动创建 CLIENT ReviewCase；
+- Admin 外发详情可见 ACKNOWLEDGED。不宣称真实 sandbox。
+
+已追加证明（M138）：
+
+- 外发详情展示 CLIENT 案例链接；同租户 CPIM 签名回调（result=1）将 CLIENT Case 推进到 APPROVED；
+- Admin 浏览器可见 `CLIENT:APPROVED`，并有 EXTERNAL receipt/decision 持久化证据。
+
+已追加证明（M139）：
+
+- 冒烟 Backend 绑定 `SERVICEOS_BYD_CPIM_PROJECT_CODE=ADMIN-PILOT`；
+- CPIM 签名 POST `/install-orders` 创建 RECEIVED 工单；
+- Admin 目录/工作区/INTEGRATION 可见 CREATE_WORK_ORDER COMPLETED；
+- SQL 断言 Envelope/Canonical/审计/Outbox。
+
+已追加证明（M140）：
+
+- ADMIN-PILOT WORKFLOW 可解析；入站后 Outbox 自动 ACTIVE + HUMAN Task；
+- 同单 Admin assign/claim/start 与 propose→confirm→check-in→check-out；
+- Visit 所需 ServiceAssignment 仍为本地夹具，不宣称 Admin 派单 HTTP。
+
+已追加证明（M141）：
+
+- 入站 Canonical `BYD:INSTALL:{orderCode}` 与出站提审系谱对齐；
+- ADMIN-PILOT Bundle 含 formRef + PILOT_SURVEY FORM/EVIDENCE；
+- 同单表单/资料/INTERNAL APPROVED/BYD ACK/厂端回调/双输入 complete→FULFILLED；
+- Visit 所需 ServiceAssignment 仍为本地夹具。
+
+已追加证明（M142）：
+
+- 同一入站工单 REJECTED → CorrectionCase → 同 Item 补传 → resubmit/close → 复审 APPROVED
+  → BYD ACK → 厂端回调 → FULFILLED。
+
+已追加证明（M143）：
+
+- field-ops 与入站工单的 Visit 所需 ServiceAssignment 曾经 Capacity/Assignment SPI 编排注入；
+  M144 起改为 Admin HTTP，SPI 种子已删除。
+
+已追加证明（M144 / ADMIN-PILOT-09）：
+
+- Admin HTTP `service-assignments:manual-assign` 人工初派 NETWORK+TECHNICIAN；
+- 入站同单：接单→Admin 派单→预约上门→表单/资料→驳回整改补传复审→外发→完结；
+- 派单为窄化 Manual Assign（无评分/硬过滤/ServiceNetwork 生命周期）。
+
+已追加证明（M145）：
+
+- 工作区 INTEGRATION 深链打开入站 Envelope/Canonical 安全摘要详情；
+- 专用入站队列列表仍未证明。
+
+已追加证明（M146 / ADMIN-PILOT-08OQ）：
+
+- Outbound Delivery 队列 UI 绑定 Accepted OpenAPI 单值筛选（默认 `UNKNOWN`）；
+- ACK 后按 `ACKNOWLEDGED` 筛选可见目标交付；多 status OR / SavedView 仍未证明。
+
+已追加证明（M147 / ADMIN-PILOT-08OD）：
+
+- 工作区 INTEGRATION 深链打开外发交付详情（复用已有详情页与 GET）；
+- 专用入站队列列表仍未证明。
+
+已追加证明（M148 / ADMIN-PILOT-08RQ / 08CQ）：
+
+- Review/Correction 队列 UI 绑定 Accepted OpenAPI 单值筛选；
+- Playwright 证明 `OPEN+taskId` 与 `IN_PROGRESS+sourceReviewCaseId`；多 status OR / SavedView 仍未证明。
+
+已追加证明（M149 / ADMIN-PILOT-08RD）：
+
+- 工作区 REVIEWS_CORRECTIONS 深链打开审核与整改详情；
+- 专用入站队列列表仍未证明。
+
+已追加证明（M150 / ADMIN-PILOT-08EQ）：
+
+- Operational Exception 队列 UI 绑定 Accepted OpenAPI 单值筛选（默认 OPEN）；
+- Playwright 证明 `ACKNOWLEDGED+P1` 查询 200；多 status OR / SavedView 仍未证明。
+
+已追加证明（M151 / ADMIN-PILOT-08DF）：
+
+- 工单/任务/SLA `projectId`、任务 `SUCCEEDED`、项目 `activeOn` 筛选接到 Admin；
+- 专用入站队列列表仍未证明。
+
+已追加证明（M152 / ADMIN-PILOT-08TD）：
+
+- 工作区 TASKS 深链打开任务详情；
+- TIMELINE/预约/表单证据独立详情深链、专用入站队列列表仍未证明。
+
+已追加证明（M153 / ADMIN-PILOT-08TL）：
+
+- 工作区 TIMELINE_AUDIT 白名单资源深链打开任务详情；
+- Appointment/Visit/Form/Evidence 独立详情页、专用入站队列列表仍未证明。
+
+已追加证明（M154 / ADMIN-PILOT-08AF）：
+
+- 工作区 APPOINTMENTS_VISITS / FORMS_EVIDENCE Task 旁路深链；
+- Appointment/Visit/Form/Evidence 独立详情页、专用入站队列列表仍未证明。
+
+已追加证明（M155 / ADMIN-PILOT-08AD）：
+
+- 预约/表单提交只读详情页与工作区深链；
+- Visit/EvidenceItem 独立详情页、专用入站队列列表仍未证明。
+
+已追加证明（M156 / ADMIN-PILOT-08ED）：
+
+- 资料项/资料快照只读详情页与工作区/Task 面板深链；
+- Visit 独立详情页、专用入站队列列表仍未证明。
+
+已追加证明（M157 / ADMIN-PILOT-08XN）：
+
+- 工作区项目与 SLA 任务交叉深链；
+- Admin R1 只读胶水在已 Accepted 契约上已基本收口；Visit/SavedView 仍依赖契约接受。
+
+已追加证明（M158 / ADMIN-PILOT-08IQ）：
+
+- 授权入站 Envelope 队列（API-06 §6.1）与 Admin 筛选/详情深链；
+- null-project 可见性、原文下载、SavedView 仍未证明。
+
+已追加证明（M159 / ADMIN-PILOT-08VD）：
+
+- `GET /visits/{id}` 与 Admin 上门详情页；工作区 AV 深链；
+- ContactAttempt/FieldOperation 详情、SavedView 仍未证明。
+
+已追加证明（M160 / ADMIN-PILOT-08CA）：
+
+- `GET /contact-attempts/{id}` 与 Admin 联系详情页；工作区 AV 深链；
+- FieldOperation 详情、SavedView 仍未证明。
+
+已追加证明（M161 / ADMIN-PILOT-08CT）：
+
+- 权威核心时间线 → FormSubmission / EvidenceSetSnapshot 等已有详情页深链；
+- FieldOperation 详情、SavedView 仍未证明。
+
+已追加证明（M162 / ADMIN-PILOT-08AS）：
+
+- 最近活动摘要 → 已有详情页深链（与时间线白名单同构）；
+- FieldOperation 详情、SavedView 仍未证明。
+
+已追加证明（M163 / ADMIN-PILOT-08ER）：
+
+- ExternalReviewReceipt Admin 详情与时间线白名单；厂端回调后核心时间线深链；
+- FieldOperation 详情、SavedView 仍未证明。
+
+已追加证明（M164 / ADMIN-PILOT-08RC）：
+
+- 审核/整改详情交叉深链（Snapshot / 源 Review）；
+- FieldOperation 详情、SavedView 仍未证明。
+
 尚未证明：
 
 - 正式企业 IdP、MFA、生产回调地址、BFF/token renewal/logout 协议；
-- 从外部接单或项目创建开始，经派单、预约、上门、表单、资料、审核、整改、外发到完结的完整写链路；
+- 评分/硬过滤/DispatchDecision/ServiceNetwork 目录生命周期；
 - Network/Technician Portal 与跨端协作；
 - 正式 sandbox、对象存储、专业扫描服务、Broker、通知和 SLA BUSINESS 日历；
-- 正常补传、关闭、重新审核通过，以及外部提审与回执在同一浏览器写链路中的端到端证明；
+- 真实 sandbox 提审与生产厂端联调；
 - SavedView、设计系统、可访问性与多浏览器矩阵。
 
-因此本次交付只能称为“Admin 试点可运行局部读写基线”，不能称为“完整现场履约平台已交付”。
+因此当前交付可称为“Admin 试点可运行基线（含 ADMIN-PILOT-09、详情深链与专项队列/目录筛选）”，
+不能称为“完整现场履约平台已交付”。

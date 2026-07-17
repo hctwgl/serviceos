@@ -14,6 +14,8 @@ public interface AppointmentService {
 
     List<ContactAttemptView> listContactAttempts(CurrentPrincipal principal, String correlationId, UUID taskId);
 
+    ContactAttemptView getContactAttempt(CurrentPrincipal principal, String correlationId, UUID contactAttemptId);
+
     ContactAttemptView recordContactAttempt(
             CurrentPrincipal principal, CommandMetadata metadata, RecordContactAttemptCommand command);
 

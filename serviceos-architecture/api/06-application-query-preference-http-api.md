@@ -6,7 +6,7 @@ status: Accepted
 
 # 应用工作区、队列与用户偏好 HTTP API
 
-## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100）
+## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158）
 
 **Accepted（可指导实现）**：
 
@@ -24,6 +24,8 @@ status: Accepted
 - §6 `GET /api/v1/correction-cases` 授权整改案例队列（M98）；不接受通用 work-queues。
 - §6 `GET /api/v1/outbound-deliveries` 授权外发交付队列（M99）；不接受通用 work-queues。
 - §6 `GET /api/v1/operational-exceptions` 运营异常项目范围硬化（M100）；不接受通用 work-queues。
+- §6 `GET /api/v1/inbound-envelopes` 授权入站 Envelope 队列（M158）；仅含已绑定
+  `projectId` 的安全摘要；不接受 null-project 可见性、原文下载或通用 work-queues。
 
 **仍为设计草案**：§3 导航、§4 工作台与队列、§5 其余 section、
 §6 其余专项队列与 §7～§11 搜索/偏好/导出等。不得在未再接受前实现。
@@ -132,11 +134,24 @@ sourceVersions
 | `GET /api/v1/correction-cases` | 整改跟踪队列 |
 | `GET /api/v1/operational-exceptions` | 异常队列 |
 | `GET /api/v1/outbound-deliveries` | 回传/通知交付队列 |
+| `GET /api/v1/inbound-envelopes` | 入站 Envelope 授权队列（M158） |
 | `GET /api/v1/fact-extraction-runs` | 事实冲突/失败队列 |
 | `GET /api/v1/calculation-runs` | SHADOW 试算队列 |
 | `GET /api/v1/sla-instances` | SLA 风险/超时队列 |
 
 这些端点复用各领域的查询模型和数据范围；本 API 只规定 Portal 需要的筛选、分页和 freshness，不转移实体所有权。
+
+### 6.1 `GET /api/v1/inbound-envelopes`（M158 Accepted）
+
+- 能力：`integration.readInbound`；实时 TENANT/PROJECT/REGION/NETWORK 项目范围；
+- 仅返回 `projectId IS NOT NULL` 的 Envelope；null-project 可见性仍为草案；
+- 筛选：`projectId`、`processingStatus`（默认 `RECEIVED`）、`messageType`、
+  `resultType`、`resultId`、`canonicalMessageId`、`cursor`、`limit`（1～100）；
+- 排序：`receivedAt DESC, inboundEnvelopeId DESC`；游标绑定 scopeDigest 与全部筛选；
+- 响应页：`{ items, nextCursor, asOf }`；
+- 条目安全字段：身份、messageType、externalMessageId、signature/processing 状态、
+  mapping/canonical/result 引用、receivedAt/completedAt、correlationId；
+- 禁止：raw/canonical payload digest、对象存储引用、签名原文、nonce、凭据。
 
 ## 7. 全局搜索
 

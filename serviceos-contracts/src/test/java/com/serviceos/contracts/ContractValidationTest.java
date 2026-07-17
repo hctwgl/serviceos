@@ -32,11 +32,16 @@ class ContractValidationTest {
         assertThat(result.getOpenAPI().getPaths())
                 .containsKeys("/projects", "/projects/{projectId}",
                         "/projects/{projectId}/scope-revisions", "/files/upload-sessions",
-                        "/tasks/{taskId}:assign-candidates", "/tasks/{taskId}:claim",
+                        "/tasks/{taskId}:assign-candidates",
+                        "/tasks/{taskId}/service-assignments:manual-assign",
+                        "/tasks/{taskId}:claim",
                         "/tasks/{taskId}:start", "/tasks/{taskId}:complete", "/tasks/{taskId}:release",
-                        "/tasks/{taskId}/contact-attempts", "/appointments/{appointmentId}:cancel",
+                        "/tasks/{taskId}/contact-attempts",
+                        "/contact-attempts/{contactAttemptId}",
+                        "/appointments/{appointmentId}:cancel",
                         "/appointments/{appointmentId}:mark-no-show",
                         "/work-orders/{workOrderId}/visits",
+                        "/visits/{visitId}",
                         "/appointments/{appointmentId}/visits:check-in",
                         "/visits/{visitId}:check-out", "/visits/{visitId}:interrupt",
                         "/internal/integration/byd/review-routes",
@@ -44,7 +49,8 @@ class ContractValidationTest {
                         "/outbound-deliveries/{deliveryId}",
                         "/sla-instances", "/sla-instances/{slaInstanceId}",
                         "/work-orders/{workOrderId}/sla-instances",
-                        "/inbound-envelopes/{envelopeId}", "/canonical-messages/{messageId}");
+                        "/inbound-envelopes", "/inbound-envelopes/{envelopeId}",
+                        "/canonical-messages/{messageId}");
     }
 
     @Test

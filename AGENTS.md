@@ -403,9 +403,16 @@ bash scripts/verify-local.sh \
 
 确需偏离本指南时，必须说明冲突规则、原因、影响、迁移与回退方案；涉及长期架构、数据、安全或契约的偏离需更新 ADR、事实源和验收矩阵，并获得明确批准。局部、可逆且不改变业务语义的实现调整不需要为形式而新增 ADR。
 
-## M135～M140 身份与组织治理正式执行入口
+## 身份与组织治理正式执行入口（编号冲突待裁决）
 
-M135～M140 已接受为 M134 之后的正式实施序列，但尚未实现。涉及用户、组织、网点人员、师傅、角色授权或 Portal 上下文的 Agent 必须先阅读：
+`master` 已接受身份与组织治理交付计划，原文使用 M135～M140 编号。
+但当前工程基线已推进至 **M182**，且 **M135～M182 已被 Admin Pilot 切片占用并 Implemented**。
+
+在项目负责人完成程序级重编号前：
+
+1. 不得按原 M135～M140 编号实施身份治理，也不得覆盖已实现的 Admin Pilot 里程碑文档；
+2. 涉及用户、组织、网点人员、师傅、角色授权或 Portal 上下文时，仍须先阅读下列内容事实源；
+3. 工程基线以 `implementation-status.md` 的 `latestMilestone: M182` 为准。
 
 - `serviceos-architecture/roadmap/03-identity-organization-governance-delivery-plan.md`
 - `serviceos-architecture/testing/identity-organization-governance-program-acceptance.md`

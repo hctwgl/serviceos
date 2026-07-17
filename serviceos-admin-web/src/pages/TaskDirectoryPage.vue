@@ -1,16 +1,49 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute, type RouteLocationRaw } from 'vue-router'
 import QueueTable from './QueueTable.vue'
 import { listAuthorizedTasks, type TaskDirectoryPage } from '../api/tasksDirectory'
+import { firstRouteQuery, uuidRoute } from '../routeQuery'
+
+const linkColumns: Record<
+  string,
+  (row: Record<string, unknown>) => RouteLocationRaw | null
+> = {
+  id: (row) => uuidRoute(row.id, 'ADMIN.TASK.DETAIL'),
+  workOrderId: (row) => uuidRoute(row.workOrderId, 'ADMIN.WORKORDER.WORKSPACE'),
+}
+
+const route = useRoute()
 
 const loading = ref(false)
 const error = ref<string | null>(null)
 const page = ref<TaskDirectoryPage | null>(null)
 const cursor = ref<string | undefined>()
+/** 默认不限；显式 route.query 可覆盖。 */
 const status = ref('')
 const taskKind = ref('')
 const assigneeMe = ref(false)
+const projectId = ref('')
+
+function hydrateFiltersFromRoute() {
+  const nextStatus = firstRouteQuery(route, 'status')
+  if (nextStatus !== undefined) {
+    status.value = nextStatus
+  }
+  const nextTaskKind = firstRouteQuery(route, 'taskKind')
+  if (nextTaskKind !== undefined) {
+    taskKind.value = nextTaskKind
+  }
+  const nextProjectId = firstRouteQuery(route, 'projectId')
+  if (nextProjectId !== undefined) {
+    projectId.value = nextProjectId
+  }
+  // assignee=me 仅在显式 query 时开启；缺省保持侧栏直达的未勾选态。
+  const nextAssignee = firstRouteQuery(route, 'assignee')
+  if (nextAssignee !== undefined) {
+    assigneeMe.value = nextAssignee === 'me'
+  }
+}
 
 async function load(next?: string) {
   loading.value = true
@@ -22,6 +55,7 @@ async function load(next?: string) {
       status: status.value || undefined,
       taskKind: taskKind.value || undefined,
       assignee: assigneeMe.value ? 'me' : undefined,
+      projectId: projectId.value.trim() || undefined,
     })
     cursor.value = page.value.nextCursor ?? undefined
   } catch (err) {
@@ -29,6 +63,11 @@ async function load(next?: string) {
   } finally {
     loading.value = false
   }
+}
+
+function search() {
+  cursor.value = undefined
+  return load()
 }
 
 const rows = computed(() =>
@@ -44,21 +83,25 @@ const rows = computed(() =>
   })),
 )
 
-onMounted(() => load())
+onMounted(() => {
+  hydrateFiltersFromRoute()
+  return load()
+})
 </script>
 
 <template>
   <section>
-    <form class="filters" @submit.prevent="load()">
+    <form class="filters" @submit.prevent="search">
       <label>
         status
-        <select v-model="status">
-          <option value="">全部</option>
+        <select v-model="status" aria-label="task status filter">
+          <option value="">（不限）</option>
           <option value="READY">READY</option>
           <option value="CLAIMED">CLAIMED</option>
           <option value="RUNNING">RUNNING</option>
           <option value="PENDING">PENDING</option>
           <option value="RETRY_WAIT">RETRY_WAIT</option>
+          <option value="SUCCEEDED">SUCCEEDED</option>
           <option value="MANUAL_INTERVENTION">MANUAL_INTERVENTION</option>
           <option value="COMPLETED">COMPLETED</option>
           <option value="CANCELLED">CANCELLED</option>
@@ -66,14 +109,22 @@ onMounted(() => load())
       </label>
       <label>
         taskKind
-        <select v-model="taskKind">
-          <option value="">全部</option>
+        <select v-model="taskKind" aria-label="task taskKind filter">
+          <option value="">（不限）</option>
           <option value="HUMAN">HUMAN</option>
           <option value="AUTOMATED">AUTOMATED</option>
         </select>
       </label>
+      <label>
+        projectId
+        <input
+          v-model="projectId"
+          aria-label="task projectId filter"
+          placeholder="uuid"
+        />
+      </label>
       <label class="check">
-        <input v-model="assigneeMe" type="checkbox" />
+        <input v-model="assigneeMe" type="checkbox" aria-label="task assignee me filter" />
         assignee=me
       </label>
       <button type="submit" :disabled="loading">查询</button>
@@ -83,6 +134,7 @@ onMounted(() => load())
       title="授权任务目录"
       :columns="['id', 'taskType', 'taskKind', 'status', 'priority', 'claimedBy', 'workOrderId', 'nextRunAt']"
       :rows="rows"
+      :link-columns="linkColumns"
       :loading="loading"
       :error="error"
       :as-of="page?.asOf"
@@ -109,6 +161,19 @@ onMounted(() => load())
         :to="{ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: item.workOrderId } }"
       >
         {{ item.taskType }}
+      </RouterLink>
+    </p>
+    <p
+      v-if="page?.items?.some((i) => i.projectId)"
+      class="links task-directory-cross-links"
+    >
+      打开关联资源：
+      <RouterLink
+        v-for="item in page.items.filter((i) => i.projectId)"
+        :key="`project-${item.id}`"
+        :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: item.projectId! } }"
+      >
+        打开项目 {{ item.projectId }}
       </RouterLink>
     </p>
   </section>

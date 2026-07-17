@@ -104,6 +104,17 @@ class VisitPostgresIT {
         assertThat(history.getFirst().operationRefs()).containsExactly("operation://survey/1");
         assertThat(history.getFirst().checkInCapturedAt()).isEqualTo(captured);
         assertThat(history.getFirst().checkInReceivedAt()).isAfter(captured);
+        // M159：按 ID 读取与列表投影一致，并拒绝跨主体。
+        var byId = visits.get(principal(), "corr-get", first.visitId());
+        assertThat(byId.visitId()).isEqualTo(first.visitId());
+        assertThat(byId.status()).isEqualTo("COMPLETED");
+        assertThat(byId.operationRefs()).containsExactly("operation://survey/1");
+        assertThatThrownBy(() -> visits.get(principal("intruder"), "corr-get-deny", first.visitId()))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.ACCESS_DENIED));
+        assertThatThrownBy(() -> visits.get(principal(), "corr-missing", UUID.randomUUID()))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.RESOURCE_NOT_FOUND));
         assertThat(jdbc.sql("SELECT count(*) FROM fld_visit_fact WHERE visit_id = :id")
                 .param("id", first.visitId()).query(Long.class).single()).isEqualTo(2);
         assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE module_name = 'fieldwork'")

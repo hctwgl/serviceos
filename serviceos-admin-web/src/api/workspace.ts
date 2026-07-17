@@ -55,6 +55,7 @@ export type WorkOrderActivitySummary = {
     occurredAt?: string
     resourceType?: string
     resourceId?: string
+    resourceCode?: string | null
   }>
   lastProjectedAt?: string | null
   meta: { asOf: string; freshnessStatus?: string; queryId?: string }

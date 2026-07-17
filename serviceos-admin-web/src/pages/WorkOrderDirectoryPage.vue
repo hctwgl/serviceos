@@ -1,15 +1,43 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute, type RouteLocationRaw } from 'vue-router'
 import QueueTable from './QueueTable.vue'
 import { listAuthorizedWorkOrders, type WorkOrderPage } from '../api/workOrders'
+import { firstRouteQuery, uuidRoute } from '../routeQuery'
+
+const linkColumns: Record<
+  string,
+  (row: Record<string, unknown>) => RouteLocationRaw | null
+> = {
+  id: (row) => uuidRoute(row.id, 'ADMIN.WORKORDER.WORKSPACE'),
+  projectId: (row) => uuidRoute(row.projectId, 'ADMIN.PROJECT.DETAIL'),
+}
+
+const route = useRoute()
 
 const loading = ref(false)
 const error = ref<string | null>(null)
 const page = ref<WorkOrderPage | null>(null)
 const cursor = ref<string | undefined>()
+/** 默认不限；显式 route.query 可覆盖。 */
 const status = ref('')
 const clientCode = ref('')
+const projectId = ref('')
+
+function hydrateFiltersFromRoute() {
+  const nextStatus = firstRouteQuery(route, 'status')
+  if (nextStatus !== undefined) {
+    status.value = nextStatus
+  }
+  const nextClientCode = firstRouteQuery(route, 'clientCode')
+  if (nextClientCode !== undefined) {
+    clientCode.value = nextClientCode
+  }
+  const nextProjectId = firstRouteQuery(route, 'projectId')
+  if (nextProjectId !== undefined) {
+    projectId.value = nextProjectId
+  }
+}
 
 async function load(next?: string) {
   loading.value = true
@@ -19,7 +47,8 @@ async function load(next?: string) {
       cursor: next,
       limit: '20',
       status: status.value || undefined,
-      clientCode: clientCode.value || undefined,
+      clientCode: clientCode.value.trim() || undefined,
+      projectId: projectId.value.trim() || undefined,
     })
     cursor.value = page.value.nextCursor ?? undefined
   } catch (err) {
@@ -27,6 +56,11 @@ async function load(next?: string) {
   } finally {
     loading.value = false
   }
+}
+
+function search() {
+  cursor.value = undefined
+  return load()
 }
 
 const rows = computed(() =>
@@ -40,16 +74,19 @@ const rows = computed(() =>
   })),
 )
 
-onMounted(() => load())
+onMounted(() => {
+  hydrateFiltersFromRoute()
+  return load()
+})
 </script>
 
 <template>
   <section>
-    <form class="filters" @submit.prevent="load()">
+    <form class="filters" @submit.prevent="search">
       <label>
         status
-        <select v-model="status">
-          <option value="">全部</option>
+        <select v-model="status" aria-label="workOrder status filter">
+          <option value="">（不限）</option>
           <option value="RECEIVED">RECEIVED</option>
           <option value="ACTIVE">ACTIVE</option>
           <option value="FULFILLED">FULFILLED</option>
@@ -57,7 +94,19 @@ onMounted(() => load())
       </label>
       <label>
         clientCode
-        <input v-model="clientCode" placeholder="可选" />
+        <input
+          v-model="clientCode"
+          aria-label="workOrder clientCode filter"
+          placeholder="可选"
+        />
+      </label>
+      <label>
+        projectId
+        <input
+          v-model="projectId"
+          aria-label="workOrder projectId filter"
+          placeholder="uuid"
+        />
       </label>
       <button type="submit" :disabled="loading">查询</button>
     </form>
@@ -66,6 +115,7 @@ onMounted(() => load())
       title="授权工单目录"
       :columns="['id', 'externalOrderCode', 'status', 'clientCode', 'projectId', 'receivedAt']"
       :rows="rows"
+      :link-columns="linkColumns"
       :loading="loading"
       :error="error"
       :as-of="page?.asOf"
@@ -82,6 +132,16 @@ onMounted(() => load())
         :to="{ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: item.id } }"
       >
         {{ item.externalOrderCode }}
+      </RouterLink>
+    </p>
+    <p v-if="page?.items?.length" class="links work-order-directory-cross-links">
+      打开关联资源：
+      <RouterLink
+        v-for="item in page.items"
+        :key="`project-${item.id}`"
+        :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: item.projectId } }"
+      >
+        打开项目 {{ item.projectId }}
       </RouterLink>
     </p>
   </section>

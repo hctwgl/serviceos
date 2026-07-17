@@ -77,9 +77,55 @@ onMounted(() => {
         <dl>
           <div><dt>severity</dt><dd>{{ detail.severity }}</dd></div>
           <div><dt>category</dt><dd>{{ detail.category }}</dd></div>
-          <div><dt>projectId</dt><dd>{{ detail.projectId || '—' }}</dd></div>
-          <div><dt>workOrderId</dt><dd>{{ detail.workOrderId || '—' }}</dd></div>
-          <div><dt>taskId</dt><dd>{{ detail.taskId || '—' }}</dd></div>
+          <div>
+            <dt>projectId</dt>
+            <dd>
+              <RouterLink
+                v-if="detail.projectId"
+                :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: detail.projectId } }"
+              >
+                {{ detail.projectId }}
+              </RouterLink>
+              <template v-else>—</template>
+            </dd>
+          </div>
+          <div>
+            <dt>workOrderId</dt>
+            <dd>
+              <RouterLink
+                v-if="detail.workOrderId"
+                :to="{ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: detail.workOrderId } }"
+              >
+                {{ detail.workOrderId }}
+              </RouterLink>
+              <template v-else>—</template>
+            </dd>
+          </div>
+          <div>
+            <dt>taskId</dt>
+            <dd>
+              <RouterLink
+                v-if="detail.taskId"
+                :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.taskId } }"
+              >
+                {{ detail.taskId }}
+              </RouterLink>
+              <template v-else>—</template>
+            </dd>
+          </div>
+          <div>
+            <dt>handlingTaskId</dt>
+            <dd>
+              <RouterLink
+                v-if="detail.handlingTaskId"
+                :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.handlingTaskId } }"
+              >
+                {{ detail.handlingTaskId }}
+              </RouterLink>
+              <template v-else>—</template>
+            </dd>
+          </div>
+          <!-- sourceType/sourceId 为自由字符串，无封闭枚举到详情路由的映射，保持明文 -->
           <div><dt>sourceType</dt><dd>{{ detail.sourceType }}</dd></div>
           <div><dt>sourceId</dt><dd>{{ detail.sourceId }}</dd></div>
           <div><dt>sourceAttemptId</dt><dd>{{ detail.sourceAttemptId }}</dd></div>
@@ -95,12 +141,24 @@ onMounted(() => {
           <div><dt>resolutionCode</dt><dd>{{ detail.resolutionCode || '—' }}</dd></div>
           <div><dt>allowedActions</dt><dd>{{ detail.allowedActions.join(', ') || '—' }}</dd></div>
         </dl>
-        <p class="links">
+        <p class="links exception-cross-links">
+          <RouterLink
+            v-if="detail.projectId"
+            :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: detail.projectId } }"
+          >
+            打开项目 {{ detail.projectId }}
+          </RouterLink>
           <RouterLink v-if="detail.workOrderId" :to="{ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: detail.workOrderId } }">
             打开工单工作区
           </RouterLink>
           <RouterLink v-if="detail.taskId" :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.taskId } }">
             打开任务详情
+          </RouterLink>
+          <RouterLink
+            v-if="detail.handlingTaskId"
+            :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.handlingTaskId } }"
+          >
+            打开人工接管任务 {{ detail.handlingTaskId }}
           </RouterLink>
           <RouterLink :to="{ name: 'ADMIN.EXCEPTION.QUEUE' }">返回异常队列</RouterLink>
         </p>

@@ -101,13 +101,55 @@ onMounted(() => {
             <div><dt>类型</dt><dd>{{ detail.task.taskType }} / {{ detail.task.taskKind }}</dd></div>
             <div><dt>状态</dt><dd>{{ detail.task.status }}</dd></div>
             <div><dt>优先级</dt><dd>{{ detail.task.priority }}</dd></div>
+            <div>
+              <dt>projectId</dt>
+              <dd>
+                <RouterLink
+                  v-if="detail.task.projectId"
+                  :to="{
+                    name: 'ADMIN.PROJECT.DETAIL',
+                    params: { id: detail.task.projectId },
+                  }"
+                >
+                  {{ detail.task.projectId }}
+                </RouterLink>
+                <template v-else>—</template>
+              </dd>
+            </div>
+            <div>
+              <dt>workOrderId</dt>
+              <dd>
+                <RouterLink
+                  v-if="detail.task.workOrderId"
+                  :to="{
+                    name: 'ADMIN.WORKORDER.WORKSPACE',
+                    params: { id: detail.task.workOrderId },
+                  }"
+                >
+                  {{ detail.task.workOrderId }}
+                </RouterLink>
+                <template v-else>—</template>
+              </dd>
+            </div>
             <div><dt>责任人</dt><dd>{{ detail.responsibleUserId || detail.task.claimedBy || '—' }}</dd></div>
             <div><dt>formRef</dt><dd>{{ detail.formRef || '—' }}</dd></div>
             <div><dt>version</dt><dd>{{ detail.task.version }}</dd></div>
             <div><dt>asOf</dt><dd>{{ detail.asOf }}</dd></div>
           </dl>
-          <p v-if="detail.task.workOrderId" class="links">
-            <RouterLink :to="{ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: detail.task.workOrderId } }">
+          <p
+            v-if="detail.task.projectId || detail.task.workOrderId"
+            class="links task-detail-cross-links"
+          >
+            <RouterLink
+              v-if="detail.task.projectId"
+              :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: detail.task.projectId } }"
+            >
+              打开项目 {{ detail.task.projectId }}
+            </RouterLink>
+            <RouterLink
+              v-if="detail.task.workOrderId"
+              :to="{ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: detail.task.workOrderId } }"
+            >
               打开工单工作区
             </RouterLink>
           </p>

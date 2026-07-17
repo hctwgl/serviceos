@@ -2,6 +2,7 @@ package com.serviceos.integration.infrastructure;
 
 import com.serviceos.integration.api.CanonicalMessageView;
 import com.serviceos.integration.api.ExternalReviewRouteView;
+import com.serviceos.integration.api.InboundEnvelopeQueueItem;
 import com.serviceos.integration.api.InboundEnvelopeView;
 import com.serviceos.integration.application.InboundMessageRepository;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -259,6 +260,94 @@ final class JdbcInboundMessageRepository implements InboundMessageRepository {
     }
 
     @Override
+    public List<InboundEnvelopeQueueItem> findQueuePage(
+            String tenantId,
+            boolean tenantWide,
+            List<UUID> projectIds,
+            String processingStatus,
+            String messageType,
+            String resultType,
+            String resultId,
+            UUID canonicalMessageId,
+            Instant cursorReceivedAt,
+            UUID cursorId,
+            int fetchSize
+    ) {
+        // M158：始终排除 null project；null-project 可见性仍属草案。
+        StringBuilder sql = new StringBuilder("""
+                SELECT inbound_envelope_id, project_id, connector_version_id, message_type,
+                       external_message_id, signature_status, processing_status,
+                       mapping_version_id, canonical_message_id, result_code, result_type,
+                       result_id, received_at, completed_at, correlation_id
+                  FROM int_inbound_envelope
+                 WHERE tenant_id = :tenant
+                   AND project_id IS NOT NULL
+                   AND processing_status = :processingStatus
+                """);
+        if (!tenantWide) {
+            if (projectIds == null || projectIds.isEmpty()) {
+                sql.append(" AND 1 = 0");
+            } else {
+                sql.append(" AND project_id IN (");
+                for (int index = 0; index < projectIds.size(); index++) {
+                    if (index > 0) {
+                        sql.append(", ");
+                    }
+                    sql.append(":projectId").append(index);
+                }
+                sql.append(')');
+            }
+        }
+        if (messageType != null) {
+            sql.append(" AND message_type = :messageType");
+        }
+        if (resultType != null) {
+            sql.append(" AND result_type = :resultType");
+        }
+        if (resultId != null) {
+            sql.append(" AND result_id = :resultId");
+        }
+        if (canonicalMessageId != null) {
+            sql.append(" AND canonical_message_id = :canonicalMessageId");
+        }
+        if (cursorReceivedAt != null) {
+            sql.append("""
+                     AND (received_at, inbound_envelope_id) < (:cursorReceivedAt, :cursorId)
+                    """);
+        }
+        sql.append("""
+                 ORDER BY received_at DESC, inbound_envelope_id DESC
+                 LIMIT :fetchSize
+                """);
+        var query = jdbc.sql(sql.toString())
+                .param("tenant", tenantId)
+                .param("processingStatus", processingStatus)
+                .param("fetchSize", fetchSize);
+        if (!tenantWide && projectIds != null) {
+            for (int index = 0; index < projectIds.size(); index++) {
+                query = query.param("projectId" + index, projectIds.get(index));
+            }
+        }
+        if (messageType != null) {
+            query = query.param("messageType", messageType);
+        }
+        if (resultType != null) {
+            query = query.param("resultType", resultType);
+        }
+        if (resultId != null) {
+            query = query.param("resultId", resultId);
+        }
+        if (canonicalMessageId != null) {
+            query = query.param("canonicalMessageId", canonicalMessageId);
+        }
+        if (cursorReceivedAt != null) {
+            query = query.param("cursorReceivedAt", timestamptz(cursorReceivedAt))
+                    .param("cursorId", cursorId);
+        }
+        return query.query(this::queueItem).list();
+    }
+
+    @Override
     public ExternalReviewRouteRegistration registerExternalReviewRoute(NewExternalReviewRoute route) {
         int inserted = jdbc.sql("""
                 INSERT INTO int_external_review_route (
@@ -424,6 +513,25 @@ final class JdbcInboundMessageRepository implements InboundMessageRepository {
                 rs.getObject("received_at", java.time.OffsetDateTime.class).toInstant(),
                 instant(rs, "completed_at"), rs.getString("correlation_id")),
                 rs.getString("raw_payload_object_ref"), rs.getString("transport_dedup_key"));
+    }
+
+    private InboundEnvelopeQueueItem queueItem(ResultSet rs, int row) throws SQLException {
+        return new InboundEnvelopeQueueItem(
+                rs.getObject("inbound_envelope_id", UUID.class),
+                rs.getObject("project_id", UUID.class),
+                rs.getString("connector_version_id"),
+                rs.getString("message_type"),
+                rs.getString("external_message_id"),
+                rs.getString("signature_status"),
+                rs.getString("processing_status"),
+                rs.getString("mapping_version_id"),
+                rs.getObject("canonical_message_id", UUID.class),
+                rs.getString("result_code"),
+                rs.getString("result_type"),
+                rs.getString("result_id"),
+                rs.getObject("received_at", java.time.OffsetDateTime.class).toInstant(),
+                instant(rs, "completed_at"),
+                rs.getString("correlation_id"));
     }
 
     private CanonicalMessageRecord canonical(ResultSet rs, int row) throws SQLException {

@@ -75,6 +75,19 @@ final class AppointmentController {
         return appointments.listContactAttempts(principals.current(), correlationId, taskId);
     }
 
+    @GetMapping("/contact-attempts/{contactAttemptId}")
+    ResponseEntity<ContactAttemptView> getContactAttempt(
+            @PathVariable UUID contactAttemptId,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        // 不可变联系事实无 aggregateVersion，故不返回 ETag。
+        ContactAttemptView attempt = appointments.getContactAttempt(
+                principals.current(), correlationId, contactAttemptId);
+        return ResponseEntity.ok()
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(attempt);
+    }
+
     @PostMapping("/tasks/{taskId}/contact-attempts")
     ResponseEntity<ContactAttemptView> recordContactAttempt(
             @PathVariable UUID taskId,
@@ -88,8 +101,7 @@ final class AppointmentController {
                         taskId, request.channel(), request.contactedPartyRef(), request.startedAt(),
                         request.endedAt(), request.resultCode(), request.note(), request.nextContactAt(),
                         request.recordingRef()));
-        return ResponseEntity.created(URI.create("/api/v1/tasks/" + taskId + "/contact-attempts/"
-                        + attempt.contactAttemptId()))
+        return ResponseEntity.created(URI.create("/api/v1/contact-attempts/" + attempt.contactAttemptId()))
                 .header(CorrelationIds.HEADER_NAME, correlationId).body(attempt);
     }
 

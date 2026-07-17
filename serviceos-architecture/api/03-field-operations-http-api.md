@@ -14,6 +14,7 @@ status: Proposed
 |---|---|---|---|
 | `POST /tasks/{taskId}/contact-attempts` | RecordContactAttempt | channel、partyRef、resultCode、timestamps | 201 |
 | `GET /tasks/{taskId}/contact-attempts` | 查询不可变联系历史 | — | 200 |
+| `GET /contact-attempts/{id}` | 联系尝试详情（M160；OpenAPI 权威） | — | 200 |
 | `POST /tasks/{taskId}/appointments` | ProposeAppointment | type、window、addressRef、participants | 201 |
 | `POST /appointments/{id}:confirm` | ConfirmAppointment | revision、confirmedByParty、channel | 200 |
 | `POST /appointments/{id}:reschedule` | RescheduleAppointment | newWindow、reasonCode、note? | 200 |
@@ -45,6 +46,7 @@ status: Proposed
 | `POST /visits/{id}/field-operations` | StartFieldOperation | operationType、taskId | 201 |
 | `POST /field-operations/{id}/submissions` | SubmitFieldOperation | formSubmissionRef、evidenceSetRef、resultCode | 201 |
 | `GET /work-orders/{id}/visits` | 上门历史 | — | 200 |
+| `GET /visits/{id}` | 上门 Visit 详情（M159；OpenAPI 权威） | — | 200 |
 | `GET /field-operations/{id}` | 作业与提交版本 | — | 200 |
 
 ### 2.1 Check-in 位置

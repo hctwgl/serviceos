@@ -107,6 +107,15 @@ final class DefaultVisitService implements VisitService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public VisitView get(CurrentPrincipal principal, String correlationId, UUID visitId) {
+        VisitAggregate visit = visit(principal.tenantId(), visitId);
+        require(principal, READ, visit.projectId(), visit.networkId(), "Visit",
+                visitId.toString(), correlationId);
+        return view(principal, correlationId, visit);
+    }
+
+    @Override
     @Transactional
     public VisitCommandReceipt checkIn(
             CurrentPrincipal principal, CommandMetadata metadata, CheckInVisitCommand command

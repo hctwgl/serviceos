@@ -1,9 +1,24 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute, type RouteLocationRaw } from 'vue-router'
 import QueueTable from './QueueTable.vue'
-import { listOperationalExceptions, type OperationalExceptionPage } from '../api/queues'
+import {
+  listOperationalExceptions,
+  type OperationalExceptionPage,
+  type OperationalExceptionQueueQuery,
+} from '../api/queues'
 import { acknowledgeOperationalException } from '../api/exceptions'
+import { firstRouteQuery, uuidRoute } from '../routeQuery'
+
+const linkColumns: Record<
+  string,
+  (row: Record<string, unknown>) => RouteLocationRaw | null
+> = {
+  exceptionId: (row) => uuidRoute(row.exceptionId, 'ADMIN.EXCEPTION.DETAIL'),
+  projectId: (row) => uuidRoute(row.projectId, 'ADMIN.PROJECT.DETAIL'),
+}
+
+const route = useRoute()
 
 const loading = ref(false)
 const error = ref<string | null>(null)
@@ -13,11 +28,67 @@ const cursor = ref<string | undefined>()
 const note = ref('')
 const busyId = ref<string | null>(null)
 
+/**
+ * 运营默认 OPEN（与既有硬编码一致）。
+ * OpenAPI/服务端省略 status 表示不限；UI 提供空选项显式对应。
+ * 深链 query 水合：仅在路由显式给出时覆盖默认值，避免侧栏直达行为漂移。
+ */
+const status = ref('OPEN')
+const severity = ref('')
+const category = ref('')
+const projectId = ref('')
+const workOrderId = ref('')
+const taskId = ref('')
+
+/**
+ * 从 URL query 水合筛选表单。
+ * status 允许空串表示「不限」；其余字段空串表示未筛选。
+ */
+function hydrateFiltersFromRoute() {
+  const nextStatus = firstRouteQuery(route, 'status')
+  if (nextStatus !== undefined) {
+    status.value = nextStatus
+  }
+  const nextSeverity = firstRouteQuery(route, 'severity')
+  if (nextSeverity !== undefined) {
+    severity.value = nextSeverity
+  }
+  const nextCategory = firstRouteQuery(route, 'category')
+  if (nextCategory !== undefined) {
+    category.value = nextCategory
+  }
+  const nextProjectId = firstRouteQuery(route, 'projectId')
+  if (nextProjectId !== undefined) {
+    projectId.value = nextProjectId
+  }
+  const nextWorkOrderId = firstRouteQuery(route, 'workOrderId')
+  if (nextWorkOrderId !== undefined) {
+    workOrderId.value = nextWorkOrderId
+  }
+  const nextTaskId = firstRouteQuery(route, 'taskId')
+  if (nextTaskId !== undefined) {
+    taskId.value = nextTaskId
+  }
+}
+
+function queryParams(next?: string): OperationalExceptionQueueQuery {
+  return {
+    cursor: next,
+    limit: '20',
+    status: status.value || undefined,
+    severity: severity.value || undefined,
+    category: category.value.trim() || undefined,
+    projectId: projectId.value.trim() || undefined,
+    workOrderId: workOrderId.value.trim() || undefined,
+    taskId: taskId.value.trim() || undefined,
+  }
+}
+
 async function load(next?: string) {
   loading.value = true
   error.value = null
   try {
-    page.value = await listOperationalExceptions({ cursor: next, limit: '20', status: 'OPEN' })
+    page.value = await listOperationalExceptions(queryParams(next))
     cursor.value = page.value.nextCursor ?? undefined
   } catch (err) {
     error.value = err instanceof Error ? err.message : '加载异常队列失败'
@@ -26,12 +97,21 @@ async function load(next?: string) {
   }
 }
 
+function search() {
+  cursor.value = undefined
+  return load()
+}
+
 async function acknowledge(exceptionId: string, aggregateVersion: number) {
   busyId.value = exceptionId
   message.value = null
   error.value = null
   try {
-    const result = await acknowledgeOperationalException(exceptionId, aggregateVersion, note.value || null)
+    const result = await acknowledgeOperationalException(
+      exceptionId,
+      aggregateVersion,
+      note.value || null,
+    )
     message.value = `已确认 ${result.data.exceptionId}，version=${result.data.aggregateVersion}`
     await load()
   } catch (err) {
@@ -60,11 +140,69 @@ const acknowledgeable = computed(() =>
   ),
 )
 
-onMounted(() => load())
+onMounted(() => {
+  hydrateFiltersFromRoute()
+  return load()
+})
 </script>
 
 <template>
   <section>
+    <form class="filters" @submit.prevent="search">
+      <label>
+        status
+        <select v-model="status" aria-label="exception status filter">
+          <option value="">（不限）</option>
+          <option value="OPEN">OPEN</option>
+          <option value="ACKNOWLEDGED">ACKNOWLEDGED</option>
+          <option value="RESOLVED">RESOLVED</option>
+        </select>
+      </label>
+      <label>
+        severity
+        <select v-model="severity" aria-label="exception severity filter">
+          <option value="">（不限）</option>
+          <option value="P0">P0</option>
+          <option value="P1">P1</option>
+          <option value="P2">P2</option>
+          <option value="P3">P3</option>
+        </select>
+      </label>
+      <label>
+        category
+        <input
+          v-model="category"
+          aria-label="exception category filter"
+          placeholder="e.g. AUTOMATION_FINAL_FAILURE"
+        />
+      </label>
+      <label>
+        projectId
+        <input
+          v-model="projectId"
+          aria-label="exception projectId filter"
+          placeholder="uuid"
+        />
+      </label>
+      <label>
+        workOrderId
+        <input
+          v-model="workOrderId"
+          aria-label="exception workOrderId filter"
+          placeholder="uuid"
+        />
+      </label>
+      <label>
+        taskId
+        <input
+          v-model="taskId"
+          aria-label="exception taskId filter"
+          placeholder="uuid"
+        />
+      </label>
+      <button type="submit" :disabled="loading">查询</button>
+    </form>
+
     <label class="note">
       确认备注（可选）
       <input v-model="note" maxlength="500" placeholder="人工接管说明" />
@@ -72,8 +210,18 @@ onMounted(() => load())
 
     <QueueTable
       title="运营异常队列"
-      :columns="['exceptionId', 'projectId', 'severity', 'category', 'status', 'errorCode', 'openedAt', 'aggregateVersion']"
+      :columns="[
+        'exceptionId',
+        'projectId',
+        'severity',
+        'category',
+        'status',
+        'errorCode',
+        'openedAt',
+        'aggregateVersion',
+      ]"
       :rows="rows"
+      :link-columns="linkColumns"
       :loading="loading"
       :error="error"
       :next-cursor="cursor ?? null"
@@ -102,7 +250,7 @@ onMounted(() => load())
         :key="item.exceptionId"
         :to="{ name: 'ADMIN.EXCEPTION.DETAIL', params: { id: item.exceptionId } }"
       >
-        {{ item.errorCode || item.exceptionId }}
+        打开异常 {{ item.exceptionId }}
       </RouterLink>
     </p>
     <p v-if="page?.items?.some((i) => i.workOrderId)" class="links">
@@ -112,13 +260,57 @@ onMounted(() => load())
         :key="`wo-${item.exceptionId}`"
         :to="{ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: item.workOrderId } }"
       >
-        {{ item.errorCode || item.exceptionId }}
+        {{ item.workOrderId }}
+      </RouterLink>
+    </p>
+    <p
+      v-if="
+        page?.items?.some(
+          (i) => i.projectId || i.taskId || i.handlingTaskId,
+        )
+      "
+      class="links exception-queue-cross-links"
+    >
+      打开关联资源：
+      <RouterLink
+        v-for="item in page.items.filter((i) => i.projectId)"
+        :key="`project-${item.exceptionId}`"
+        :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: item.projectId! } }"
+      >
+        打开项目 {{ item.projectId }}
+      </RouterLink>
+      <RouterLink
+        v-for="item in page.items.filter((i) => i.taskId)"
+        :key="`task-${item.exceptionId}`"
+        :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: item.taskId! } }"
+      >
+        打开任务 {{ item.taskId }}
+      </RouterLink>
+      <RouterLink
+        v-for="item in page.items.filter((i) => i.handlingTaskId)"
+        :key="`handling-${item.exceptionId}`"
+        :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: item.handlingTaskId! } }"
+      >
+        打开人工接管任务 {{ item.handlingTaskId }}
       </RouterLink>
     </p>
   </section>
 </template>
 
 <style scoped>
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  align-items: end;
+}
+label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  color: #486581;
+}
 .note {
   display: grid;
   gap: 0.25rem;
@@ -127,10 +319,16 @@ onMounted(() => load())
   font-size: 0.85rem;
   color: #486581;
 }
-input {
+select,
+input,
+button {
   border: 1px solid #bcccdc;
   border-radius: 6px;
   padding: 0.4rem 0.65rem;
+}
+input {
+  min-width: 12rem;
+  font-family: ui-monospace, monospace;
 }
 .acks {
   margin-top: 0.75rem;
@@ -139,11 +337,9 @@ input {
   gap: 0.5rem;
 }
 button {
-  border: 0;
   background: #243b53;
   color: #fff;
-  border-radius: 6px;
-  padding: 0.4rem 0.75rem;
+  border-color: #243b53;
   cursor: pointer;
 }
 button:disabled {

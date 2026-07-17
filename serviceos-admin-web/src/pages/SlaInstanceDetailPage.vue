@@ -54,12 +54,53 @@ onMounted(() => {
         <dl>
           <div><dt>status</dt><dd>{{ detail.instance.status }}</dd></div>
           <div><dt>slaRef</dt><dd>{{ detail.instance.slaRef }}</dd></div>
+          <div>
+            <dt>projectId</dt>
+            <dd>
+              <RouterLink
+                :to="{
+                  name: 'ADMIN.PROJECT.DETAIL',
+                  params: { id: detail.instance.projectId },
+                }"
+              >
+                {{ detail.instance.projectId }}
+              </RouterLink>
+            </dd>
+          </div>
+          <div>
+            <dt>workOrderId</dt>
+            <dd>
+              <RouterLink
+                :to="{
+                  name: 'ADMIN.WORKORDER.WORKSPACE',
+                  params: { id: detail.instance.workOrderId },
+                }"
+              >
+                {{ detail.instance.workOrderId }}
+              </RouterLink>
+            </dd>
+          </div>
+          <div>
+            <dt>taskId</dt>
+            <dd>
+              <RouterLink
+                :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.instance.taskId } }"
+              >
+                {{ detail.instance.taskId }}
+              </RouterLink>
+            </dd>
+          </div>
           <div><dt>deadlineAt</dt><dd>{{ detail.instance.deadlineAt }}</dd></div>
           <div><dt>remainingSeconds</dt><dd>{{ detail.instance.remainingSeconds }}</dd></div>
           <div><dt>overdueSeconds</dt><dd>{{ detail.instance.overdueSeconds }}</dd></div>
           <div><dt>asOf</dt><dd>{{ detail.asOf }}</dd></div>
         </dl>
-        <p class="links">
+        <p class="links sla-instance-cross-links">
+          <RouterLink
+            :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: detail.instance.projectId } }"
+          >
+            打开项目 {{ detail.instance.projectId }}
+          </RouterLink>
           <RouterLink :to="{ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: detail.instance.workOrderId } }">
             工单工作区
           </RouterLink>

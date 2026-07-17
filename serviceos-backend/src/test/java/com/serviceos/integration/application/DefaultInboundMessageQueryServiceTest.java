@@ -3,13 +3,16 @@ package com.serviceos.integration.application;
 import com.serviceos.authorization.api.AuthorizationDecision;
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
+import com.serviceos.authorization.api.ProjectScopeAuthorizationService;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.integration.api.InboundEnvelopeView;
 import com.serviceos.workorder.api.WorkOrderQueryService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -22,9 +25,13 @@ import static org.mockito.Mockito.when;
 class DefaultInboundMessageQueryServiceTest {
     private final InboundMessageRepository repository = mock(InboundMessageRepository.class);
     private final AuthorizationService authorization = mock(AuthorizationService.class);
+    private final ProjectScopeAuthorizationService projectScopes =
+            mock(ProjectScopeAuthorizationService.class);
     private final WorkOrderQueryService workOrders = mock(WorkOrderQueryService.class);
+    private final Clock clock = Clock.fixed(Instant.parse("2026-07-17T04:00:00Z"), ZoneOffset.UTC);
     private final DefaultInboundMessageQueryService service =
-            new DefaultInboundMessageQueryService(repository, authorization, workOrders);
+            new DefaultInboundMessageQueryService(
+                    repository, authorization, projectScopes, workOrders, clock);
 
     @Test
     void completedEnvelopeUsesServerTenantAndProjectScopeWithoutExposingObjectReference() {

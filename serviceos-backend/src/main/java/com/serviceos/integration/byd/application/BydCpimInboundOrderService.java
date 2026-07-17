@@ -52,6 +52,8 @@ import java.util.UUID;
 public class BydCpimInboundOrderService {
     private static final String CONNECTOR_VERSION = BydCpimOrderMapper.ADAPTER_VERSION;
     private static final String MESSAGE_TYPE = "CREATE_WORK_ORDER";
+    /** 与出站提审、适配契约一致：Canonical business_key = BYD:INSTALL:{orderCode}。 */
+    private static final String INSTALL_BUSINESS_PREFIX = "BYD:INSTALL:";
     private static final String RECEIVE_CAPABILITY = "integration.receiveInbound";
     private static final String AUTH_POLICY = "BYD_CPIM_SIGNATURE_V7_3_1";
 
@@ -227,9 +229,10 @@ public class BydCpimInboundOrderService {
             BydCpimSignatureHeaders headers
     ) {
         Instant now = clock.instant();
+        String installBusinessKey = installBusinessKey(mapped.externalOrderCode());
         var registered = messages.registerCanonical(new InboundMessageRepository.NewCanonicalMessage(
                 UUID.randomUUID(), tenantId, bundle.projectId(), CONNECTOR_VERSION, MESSAGE_TYPE,
-                mapped.externalOrderCode(), canonicalObjectRef, canonicalPayloadDigest,
+                installBusinessKey, canonicalObjectRef, canonicalPayloadDigest,
                 mapped.mappingVersion(), envelope.inboundEnvelopeId(), now));
         CanonicalMessageView canonical = registered.message().view();
         if (!canonical.payloadDigest().equals(canonicalPayloadDigest)) {
@@ -252,12 +255,14 @@ public class BydCpimInboundOrderService {
                     tenantId, envelope.inboundEnvelopeId(), canonical.projectId(), canonical.payloadDigest(),
                     canonical.mappingVersionId(), canonical.canonicalMessageId(), canonical.resultCode(),
                     canonical.resultType(), canonical.resultId(), now);
+            // HTTP 响应 orderCode 始终是 CPIM 外部单号，不能把 Canonical business_key 前缀泄漏给车企。
+            BydCpimInboundOrderResponse replayed = BydCpimInboundOrderResponse.accepted(
+                    orderCodeFromBusinessKey(canonical.businessKey()), CONNECTOR_VERSION,
+                    canonical.mappingVersionId(), true);
             replayGuard.complete(
                     headers.appKey(), headers.nonce(), headers.currentDate().toEpochDay(),
-                    responseDigest(BydCpimInboundOrderResponse.accepted(
-                            canonical.businessKey(), CONNECTOR_VERSION, canonical.mappingVersionId(), true)));
-            return BydCpimInboundOrderResponse.accepted(
-                    canonical.businessKey(), CONNECTOR_VERSION, canonical.mappingVersionId(), true);
+                    responseDigest(replayed));
+            return replayed;
         }
 
         WorkOrderReceipt receipt = workOrderCommandService.receive(new ReceiveExternalWorkOrderCommand(
@@ -338,11 +343,25 @@ public class BydCpimInboundOrderService {
                     .map(InboundMessageRepository.CanonicalMessageRecord::view)
                     .orElseThrow(() -> new IllegalStateException("Completed Envelope lost CanonicalMessage"));
             return BydCpimInboundOrderResponse.accepted(
-                    canonical.businessKey(), canonical.connectorVersionId(),
-                    canonical.mappingVersionId(), true);
+                    orderCodeFromBusinessKey(canonical.businessKey()),
+                    canonical.connectorVersionId(), canonical.mappingVersionId(), true);
         }
         return BydCpimInboundOrderResponse.rejected(
                 envelope.resultCode(), "request was already rejected by the inbound pipeline");
+    }
+
+    private static String installBusinessKey(String externalOrderCode) {
+        return INSTALL_BUSINESS_PREFIX + requiredText(externalOrderCode, "externalOrderCode");
+    }
+
+    private static String orderCodeFromBusinessKey(String businessKey) {
+        String normalized = requiredText(businessKey, "businessKey");
+        if (normalized.startsWith(INSTALL_BUSINESS_PREFIX)) {
+            return requiredText(
+                    normalized.substring(INSTALL_BUSINESS_PREFIX.length()), "externalOrderCode");
+        }
+        // 新系统默认使用前缀键；若历史测试夹具仍写入裸 orderCode，响应保持可解析。
+        return normalized;
     }
 
     private void appendProcessedEvent(
