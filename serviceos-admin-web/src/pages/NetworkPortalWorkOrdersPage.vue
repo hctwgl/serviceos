@@ -26,6 +26,11 @@ const slaRiskSummaries = ref<NetworkPortalDirectorySlaRiskSummary[] | null>(null
 const error = ref<string | null>(null)
 const usedServerTechnicians = ref(false)
 
+function regionLabel(item: NetworkPortalWorkOrderItem) {
+  const parts = [item.provinceCode, item.cityCode, item.districtCode].filter(Boolean)
+  return parts.length ? parts.join('/') : '—'
+}
+
 function technicianLabel(technicianId: string | null | undefined) {
   if (!technicianId) {
     return '—'
@@ -184,7 +189,7 @@ watch(() => props.networkContextId, () => {
     <h2>本网点工单</h2>
     <p class="hint">
       <template v-if="usedServerTechnicians">
-        M230～M235：师傅、预约窗口、最近联系、整改、资料与 SLA 风险由列表页服务端旁载交付。
+        M230～M236：师傅、预约窗口、最近联系、整改、资料、SLA 风险与服务产品/区域/接收时间由列表交付。
       </template>
       <template v-else>
         M217：师傅 displayName fan-in；缺 technician.readOwnNetwork 时保留原始 ID。
@@ -196,6 +201,8 @@ watch(() => props.networkContextId, () => {
         <tr>
           <th>工单</th>
           <th>项目</th>
+          <th>服务产品</th>
+          <th>区域</th>
           <th>任务数</th>
           <th>业务类型</th>
           <th>师傅</th>
@@ -204,6 +211,7 @@ watch(() => props.networkContextId, () => {
           <th v-if="evidenceSlots !== null">资料</th>
           <th v-if="corrections !== null">整改</th>
           <th v-if="slaRiskSummaries !== null">SLA 风险</th>
+          <th>接收时间</th>
           <th>生效自</th>
         </tr>
       </thead>
@@ -222,6 +230,8 @@ watch(() => props.networkContextId, () => {
             </RouterLink>
           </td>
           <td data-testid="work-order-project-id">{{ item.projectId ?? '—' }}</td>
+          <td data-testid="work-order-service-product">{{ item.serviceProductCode ?? '—' }}</td>
+          <td data-testid="work-order-region">{{ regionLabel(item) }}</td>
           <td>{{ item.taskIds.length }}</td>
           <td>{{ item.businessType ?? '—' }}</td>
           <td data-testid="work-order-technician-label">
@@ -257,6 +267,7 @@ watch(() => props.networkContextId, () => {
           >
             {{ slaRiskLabel(item.workOrderId) }}
           </td>
+          <td data-testid="work-order-received-at">{{ item.receivedAt ?? '—' }}</td>
           <td data-testid="work-order-effective-from">{{ item.effectiveFrom ?? '—' }}</td>
         </tr>
       </tbody>

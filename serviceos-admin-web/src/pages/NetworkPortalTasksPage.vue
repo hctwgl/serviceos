@@ -142,6 +142,11 @@ function directorySlaRiskLabel(taskId: string) {
   }
   return `开放 ${matched.openCount} / 超时 ${matched.breachedCount}`
 }
+
+function taskRegionLabel(item: NetworkPortalTaskItem) {
+  const parts = [item.provinceCode, item.cityCode, item.districtCode].filter(Boolean)
+  return parts.length ? parts.join('/') : '—'
+}
 const selectedTaskId = ref('')
 const selectedTechnicianId = ref('')
 const businessType = ref('INSTALLATION')
@@ -696,11 +701,14 @@ watch(selectedTaskId, () => {
           <th>任务</th>
           <th>工单</th>
           <th>项目</th>
+          <th>服务产品</th>
+          <th>区域</th>
           <th>状态</th>
           <th>阶段</th>
           <th>类型</th>
           <th>种类</th>
           <th>业务</th>
+          <th>接收时间</th>
           <th>生效自</th>
           <th>师傅</th>
           <th v-if="directoryAppointments !== null">预约窗口</th>
@@ -722,11 +730,14 @@ watch(selectedTaskId, () => {
             </RouterLink>
           </td>
           <td data-testid="task-project-id">{{ item.projectId ?? '—' }}</td>
+          <td data-testid="task-service-product">{{ item.serviceProductCode ?? '—' }}</td>
+          <td data-testid="task-region">{{ taskRegionLabel(item) }}</td>
           <td>{{ item.status ?? '—' }}</td>
           <td data-testid="task-stage-code">{{ item.stageCode ?? '—' }}</td>
           <td>{{ item.taskType ?? '—' }}</td>
           <td data-testid="task-kind">{{ item.taskKind ?? '—' }}</td>
           <td data-testid="task-business-type">{{ item.businessType ?? '—' }}</td>
+          <td data-testid="task-received-at">{{ item.receivedAt ?? '—' }}</td>
           <td data-testid="task-effective-from">{{ item.effectiveFrom ?? '—' }}</td>
           <td data-testid="task-technician-label">{{ technicianLabel(item.technicianId) }}</td>
           <td

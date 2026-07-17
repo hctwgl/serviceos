@@ -80,6 +80,14 @@ export type NetworkPortalWorkOrderItem = {
   businessType: string | null
   technicianId: string | null
   effectiveFrom: string | null
+  /** M236：非 PII 工单头；缺失时为 null。 */
+  brandCode?: string | null
+  serviceProductCode?: string | null
+  provinceCode?: string | null
+  cityCode?: string | null
+  districtCode?: string | null
+  /** M236：工单接收时间（产品「更新时间」MVP 映射）。 */
+  receivedAt?: string | null
 }
 
 export type NetworkPortalTaskItem = {
@@ -93,6 +101,13 @@ export type NetworkPortalTaskItem = {
   businessType: string | null
   technicianId: string | null
   effectiveFrom: string | null
+  /** M236：所属工单非 PII 头。 */
+  brandCode?: string | null
+  serviceProductCode?: string | null
+  provinceCode?: string | null
+  cityCode?: string | null
+  districtCode?: string | null
+  receivedAt?: string | null
 }
 
 export type NetworkPortalMembershipItem = {
