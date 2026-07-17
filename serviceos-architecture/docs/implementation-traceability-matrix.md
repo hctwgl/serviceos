@@ -17,7 +17,7 @@ status: Proposed
 | identity | ARCH-07、ARCH-21 | API-01/02 通用身份上下文 | DATA-02 | M2 AUTH、M6 SEC | E1 |
 | organization | ARCH-01、ARCH-07、ARCH-11 | API-02/04 | DATA-02/04 | M2 AUTH、M4 DSP | E1/E4 |
 | project/workorder query | ARCH-01/03/05、M64～M68 | API-02/07、OpenAPI Core 0.39.0、project.created@v3、project.scope-relations-revised@v1 | DATA-01、V064～V068 | M2 CFG/WO、M7 ADM、M64～M68 | E0/E2 |
-| authorization | ARCH-07、ARCH-21、M63～M67 | API-01/02、ProjectScopeAuthorizationService、ProjectRegionScopeResolver、ProjectNetworkScopeResolver | DATA-02、V064～V067 | M2 AUTH、M6 SEC、M63～M67 | E1/E4 |
+| authorization | ARCH-07、ARCH-21、M63～M67、ADR-025、M186 | API-01/02/07、Core OpenAPI 0.79.0、ProjectScopeAuthorizationService、治理 HTTP | DATA-02、V064～V067、V089 | M2 AUTH、M6 SEC、M63～M67、M186 | E1/E4 |
 | audit | ARCH-07、ARCH-21 | 所有高风险命令 | DATA-02 | M2 AUD、M6 SEC/OPS | E1 |
 | authority | ARCH-17、ARCH-20 | API-01/05 authority/fence | DATA-05 | M5 CUT、M6 TX | E1/E5 |
 | configuration | ARCH-05 | API-01/02 | DATA-01 | M2 CFG | E2 |
@@ -280,3 +280,4 @@ Feature gate/authority: if applicable
 | M183 | 统一 Principal/IdentityLink/PersonProfile/Persona；JIT 并发去重；启停实时失权；安全目录 API | 身份治理计划 + Core OpenAPI 0.76.0 + Flyway V086 + PostgreSQL/MVC/ArchitectureTest + `196-m183-*` + `180-m183-*` | M184～M188、解绑、密码、跨服务身份缓存/事件 |
 | M184 | Organization/OrgUnit/closure/OrgMembership；LOCAL/EXTERNAL_AUTHORITATIVE；同步收据；离职停用/撤权/待重分配 | ADR-023 + Core OpenAPI 0.77.0 + Flyway V087 + PostgreSQL/MVC/ArchitectureTest + `197-m184-*` + `181-m184-*` | M185～M188、正式 HR Connector、ORGANIZATION DataScope、Admin 用户中心 |
 | M185 | PartnerOrganization/ServiceNetwork/NetworkMembership；TechnicianProfile/多网点关系；资质审核；可接单与清退影响 | ADR-024 + Core OpenAPI 0.78.0 + Flyway V088 + PostgreSQL/MVC/ArchitectureTest + `198-m185-*` + `182-m185-*` | M186～M188、Coverage/Capability 硬过滤、离线工作包回收、自动改派、Portal UI |
+| M186 | Role/Capability 目录；RoleGrant 申请/审批/撤销；Delegation；SoD/可授予范围；DENY 优先；grant generation；授权解释 | ADR-025 + Core OpenAPI 0.79.0 + Flyway V089 + PostgreSQL/MVC/ArchitectureTest + `199-m186-*` + `183-m186-*` | M187～M188、Admin 授权 UI、MFA obligation 执行器、Portal `/me` 消费 |
