@@ -46,7 +46,16 @@ onMounted(() => {
         <dl>
           <div><dt>formKey</dt><dd>{{ detail.formKey }}</dd></div>
           <div><dt>validationStatus</dt><dd>{{ detail.validationStatus }}</dd></div>
+          <div>
+            <dt>taskId</dt>
+            <dd>
+              <RouterLink :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.taskId } }">
+                {{ detail.taskId }}
+              </RouterLink>
+            </dd>
+          </div>
           <div><dt>submissionVersion</dt><dd>{{ detail.submissionVersion }}</dd></div>
+          <!-- formVersionId 无 Implemented 配置详情页 -->
           <div><dt>formVersionId</dt><dd>{{ detail.formVersionId }}</dd></div>
           <div><dt>contentDigest</dt><dd>{{ detail.contentDigest }}</dd></div>
           <div><dt>prefillVersion</dt><dd>{{ detail.prefillVersion || '—' }}</dd></div>

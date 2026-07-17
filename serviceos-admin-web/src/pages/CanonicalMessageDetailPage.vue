@@ -70,7 +70,18 @@ onMounted(() => {
           <div><dt>mappingVersionId</dt><dd>{{ detail.mappingVersionId }}</dd></div>
           <div><dt>resultCode</dt><dd>{{ detail.resultCode ?? '—' }}</dd></div>
           <div><dt>resultType</dt><dd>{{ detail.resultType ?? '—' }}</dd></div>
-          <div><dt>resultId</dt><dd>{{ detail.resultId ?? '—' }}</dd></div>
+          <div>
+            <dt>resultId</dt>
+            <dd>
+              <RouterLink
+                v-if="workOrderId"
+                :to="{ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: workOrderId } }"
+              >
+                {{ workOrderId }}
+              </RouterLink>
+              <template v-else>{{ detail.resultId ?? '—' }}</template>
+            </dd>
+          </div>
           <div><dt>payloadDigest</dt><dd>{{ detail.payloadDigest }}</dd></div>
           <div><dt>createdAt</dt><dd>{{ detail.createdAt }}</dd></div>
           <div><dt>processedAt</dt><dd>{{ detail.processedAt ?? '—' }}</dd></div>

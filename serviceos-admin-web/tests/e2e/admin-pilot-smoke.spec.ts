@@ -1960,6 +1960,22 @@ test('真实 OIDC 登录后可完成预约提议确认与上门签到签退', as
   await expect(page.getByRole('heading', { name: '预约详情' })).toBeVisible()
   await expect(page).toHaveURL(new RegExp(`/appointments/${proposed.appointmentId}$`))
 
+  // M174：预约事实格明文 taskId → 任务详情。
+  const appointmentInlineTaskPromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname === `/api/v1/tasks/${taskId}`,
+  )
+  await page
+    .locator('dt', { hasText: /^taskId$/ })
+    .locator('xpath=../dd')
+    .getByRole('link', { name: taskId!, exact: true })
+    .click()
+  expect((await appointmentInlineTaskPromise).status()).toBe(200)
+  await expect(page.getByRole('heading', { name: '任务详情' })).toBeVisible()
+  await page.goto(new URL(`/appointments/${proposed.appointmentId}`, page.url()).toString())
+  await expect(page.getByRole('heading', { name: '预约详情' })).toBeVisible()
+
   // M154：同区块 Task 旁路仍可用（现场操作入口）。
   await page.getByRole('link', { name: '工单工作区' }).click()
   await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()

@@ -174,4 +174,5 @@
 - [M171 Admin 外发关联资源与回执入站交叉深链验收矩阵](168-m171-admin-pilot-outbound-related-resource-deeplink-acceptance.md)
 - [M172 Admin 详情页明文 projectId 深链验收矩阵](169-m172-admin-pilot-detail-projectid-deeplink-acceptance.md)
 - [M173 Admin 详情页源资源明文字段深链验收矩阵](170-m173-admin-pilot-detail-source-inline-deeplink-acceptance.md)
+- [M174 Admin 现场/表单/SLA 事实格 scope 深链验收矩阵](171-m174-admin-pilot-fieldops-inline-scope-deeplink-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

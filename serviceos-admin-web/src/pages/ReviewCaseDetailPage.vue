@@ -205,7 +205,21 @@ onMounted(() => {
               </RouterLink>
             </dd>
           </div>
-          <div><dt>reopenedFromReviewCaseId</dt><dd>{{ detail.reopenedFromReviewCaseId ?? '-' }}</dd></div>
+          <div>
+            <dt>reopenedFromReviewCaseId</dt>
+            <dd>
+              <RouterLink
+                v-if="detail.reopenedFromReviewCaseId"
+                :to="{
+                  name: 'ADMIN.REVIEW.DETAIL',
+                  params: { id: detail.reopenedFromReviewCaseId },
+                }"
+              >
+                {{ detail.reopenedFromReviewCaseId }}
+              </RouterLink>
+              <template v-else>-</template>
+            </dd>
+          </div>
           <div><dt>reopenTriggerRef</dt><dd>{{ detail.reopenTriggerRef ?? '-' }}</dd></div>
         </dl>
         <p class="links review-cross-links">

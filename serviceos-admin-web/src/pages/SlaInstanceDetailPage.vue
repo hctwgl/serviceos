@@ -54,6 +54,29 @@ onMounted(() => {
         <dl>
           <div><dt>status</dt><dd>{{ detail.instance.status }}</dd></div>
           <div><dt>slaRef</dt><dd>{{ detail.instance.slaRef }}</dd></div>
+          <div>
+            <dt>workOrderId</dt>
+            <dd>
+              <RouterLink
+                :to="{
+                  name: 'ADMIN.WORKORDER.WORKSPACE',
+                  params: { id: detail.instance.workOrderId },
+                }"
+              >
+                {{ detail.instance.workOrderId }}
+              </RouterLink>
+            </dd>
+          </div>
+          <div>
+            <dt>taskId</dt>
+            <dd>
+              <RouterLink
+                :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.instance.taskId } }"
+              >
+                {{ detail.instance.taskId }}
+              </RouterLink>
+            </dd>
+          </div>
           <div><dt>deadlineAt</dt><dd>{{ detail.instance.deadlineAt }}</dd></div>
           <div><dt>remainingSeconds</dt><dd>{{ detail.instance.remainingSeconds }}</dd></div>
           <div><dt>overdueSeconds</dt><dd>{{ detail.instance.overdueSeconds }}</dd></div>

@@ -45,6 +45,14 @@ onMounted(() => {
       <article class="card">
         <dl>
           <div><dt>purpose</dt><dd>{{ detail.purpose }}</dd></div>
+          <div>
+            <dt>taskId</dt>
+            <dd>
+              <RouterLink :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.taskId } }">
+                {{ detail.taskId }}
+              </RouterLink>
+            </dd>
+          </div>
           <div><dt>memberCount</dt><dd>{{ detail.memberCount }}</dd></div>
           <div><dt>contentDigest</dt><dd>{{ detail.contentDigest }}</dd></div>
           <div><dt>resolutionId</dt><dd>{{ detail.resolutionId || '—' }}</dd></div>

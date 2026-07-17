@@ -46,6 +46,34 @@ onMounted(() => {
         <dl>
           <div><dt>channel</dt><dd>{{ detail.channel }}</dd></div>
           <div><dt>resultCode</dt><dd>{{ detail.resultCode }}</dd></div>
+          <div>
+            <dt>projectId</dt>
+            <dd>
+              <RouterLink
+                :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: detail.projectId } }"
+              >
+                {{ detail.projectId }}
+              </RouterLink>
+            </dd>
+          </div>
+          <div>
+            <dt>workOrderId</dt>
+            <dd>
+              <RouterLink
+                :to="{ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: detail.workOrderId } }"
+              >
+                {{ detail.workOrderId }}
+              </RouterLink>
+            </dd>
+          </div>
+          <div>
+            <dt>taskId</dt>
+            <dd>
+              <RouterLink :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.taskId } }">
+                {{ detail.taskId }}
+              </RouterLink>
+            </dd>
+          </div>
           <div><dt>contactedPartyRef</dt><dd>{{ detail.contactedPartyRef }}</dd></div>
           <div><dt>startedAt</dt><dd>{{ detail.startedAt }}</dd></div>
           <div><dt>endedAt</dt><dd>{{ detail.endedAt }}</dd></div>
@@ -55,6 +83,11 @@ onMounted(() => {
           <div><dt>createdAt</dt><dd>{{ detail.createdAt }}</dd></div>
         </dl>
         <p class="links">
+          <RouterLink
+            :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: detail.projectId } }"
+          >
+            打开项目 {{ detail.projectId }}
+          </RouterLink>
           <RouterLink
             :to="{ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: detail.workOrderId } }"
           >

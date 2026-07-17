@@ -50,8 +50,27 @@ onMounted(() => {
         <dl>
           <div><dt>status</dt><dd>{{ detail.status }}</dd></div>
           <div><dt>type</dt><dd>{{ detail.type }}</dd></div>
+          <div>
+            <dt>workOrderId</dt>
+            <dd>
+              <RouterLink
+                :to="{ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: detail.workOrderId } }"
+              >
+                {{ detail.workOrderId }}
+              </RouterLink>
+            </dd>
+          </div>
+          <div>
+            <dt>taskId</dt>
+            <dd>
+              <RouterLink :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.taskId } }">
+                {{ detail.taskId }}
+              </RouterLink>
+            </dd>
+          </div>
           <div><dt>currentRevisionNo</dt><dd>{{ detail.currentRevisionNo }}</dd></div>
           <div><dt>aggregateVersion</dt><dd>{{ detail.aggregateVersion }}</dd></div>
+          <!-- assignedNetworkId / technicianId 无 Implemented 目录详情页 -->
           <div><dt>assignedNetworkId</dt><dd>{{ detail.assignedNetworkId || '—' }}</dd></div>
           <div><dt>technicianId</dt><dd>{{ detail.technicianId || '—' }}</dd></div>
           <div><dt>createdAt</dt><dd>{{ detail.createdAt }}</dd></div>

@@ -46,6 +46,15 @@ onMounted(() => {
         <dl>
           <div><dt>status</dt><dd>{{ detail.status }}</dd></div>
           <div><dt>itemOrdinal</dt><dd>{{ detail.itemOrdinal }}</dd></div>
+          <div>
+            <dt>taskId</dt>
+            <dd>
+              <RouterLink :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.taskId } }">
+                {{ detail.taskId }}
+              </RouterLink>
+            </dd>
+          </div>
+          <!-- evidenceSlotId 无独立详情路由 -->
           <div><dt>evidenceSlotId</dt><dd>{{ detail.evidenceSlotId }}</dd></div>
           <div><dt>revisionCount</dt><dd>{{ detail.revisions?.length ?? 0 }}</dd></div>
           <div><dt>createdBy</dt><dd>{{ detail.createdBy || '—' }}</dd></div>

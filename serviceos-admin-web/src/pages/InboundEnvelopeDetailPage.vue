@@ -73,7 +73,18 @@ onMounted(() => {
           <div><dt>externalMessageId</dt><dd>{{ envelope.externalMessageId }}</dd></div>
           <div><dt>resultCode</dt><dd>{{ envelope.resultCode ?? '—' }}</dd></div>
           <div><dt>resultType</dt><dd>{{ envelope.resultType ?? '—' }}</dd></div>
-          <div><dt>resultId</dt><dd>{{ envelope.resultId ?? '—' }}</dd></div>
+          <div>
+            <dt>resultId</dt>
+            <dd>
+              <RouterLink
+                v-if="workOrderId"
+                :to="{ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: workOrderId } }"
+              >
+                {{ workOrderId }}
+              </RouterLink>
+              <template v-else>{{ envelope.resultId ?? '—' }}</template>
+            </dd>
+          </div>
           <div><dt>receivedAt</dt><dd>{{ envelope.receivedAt }}</dd></div>
           <div><dt>completedAt</dt><dd>{{ envelope.completedAt ?? '—' }}</dd></div>
           <div><dt>correlationId</dt><dd>{{ envelope.correlationId }}</dd></div>
@@ -129,7 +140,21 @@ onMounted(() => {
             <div><dt>processingStatus</dt><dd>{{ canonical.processingStatus }}</dd></div>
             <div><dt>resultCode</dt><dd>{{ canonical.resultCode ?? '—' }}</dd></div>
             <div><dt>resultType</dt><dd>{{ canonical.resultType ?? '—' }}</dd></div>
-            <div><dt>resultId</dt><dd>{{ canonical.resultId ?? '—' }}</dd></div>
+            <div>
+              <dt>resultId</dt>
+              <dd>
+                <RouterLink
+                  v-if="canonical.resultType === 'WORK_ORDER' && canonical.resultId"
+                  :to="{
+                    name: 'ADMIN.WORKORDER.WORKSPACE',
+                    params: { id: canonical.resultId },
+                  }"
+                >
+                  {{ canonical.resultId }}
+                </RouterLink>
+                <template v-else>{{ canonical.resultId ?? '—' }}</template>
+              </dd>
+            </div>
             <div><dt>payloadDigest</dt><dd>{{ canonical.payloadDigest }}</dd></div>
             <div><dt>createdAt</dt><dd>{{ canonical.createdAt }}</dd></div>
             <div><dt>processedAt</dt><dd>{{ canonical.processedAt ?? '—' }}</dd></div>
