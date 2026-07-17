@@ -6,7 +6,7 @@ import { RouterLink, RouterView } from 'vue-router'
   <div class="shell">
     <aside class="nav">
       <h1>ServiceOS Admin</h1>
-      <p class="hint">运营外壳（M101～M168）。写操作仅走服务端 allowed-actions/命令。</p>
+      <p class="hint">运营外壳（M101～M169）。写操作仅走服务端 allowed-actions/命令。</p>
       <RouterLink to="/reviews">审核队列</RouterLink>
       <RouterLink to="/corrections">整改跟踪</RouterLink>
       <RouterLink to="/tasks">任务目录</RouterLink>

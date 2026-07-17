@@ -1,25 +1,55 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import QueueTable from './QueueTable.vue'
 import {
   listInboundEnvelopes,
   type InboundEnvelopeQueuePage,
   type InboundEnvelopeQueueQuery,
 } from '../api/queues'
+import { firstRouteQuery } from '../routeQuery'
+
+const route = useRoute()
 
 const loading = ref(false)
 const error = ref<string | null>(null)
 const page = ref<InboundEnvelopeQueuePage | null>(null)
 const cursor = ref<string | undefined>()
 
-/** 与 OpenAPI 默认一致：省略或空时服务端仍按 RECEIVED。 */
+/** 与 OpenAPI 默认一致：省略或空时服务端仍按 RECEIVED。显式 query 可覆盖。 */
 const processingStatus = ref('RECEIVED')
 const messageType = ref('')
 const projectId = ref('')
 const resultType = ref('')
 const resultId = ref('')
 const canonicalMessageId = ref('')
+
+function hydrateFiltersFromRoute() {
+  const nextProcessingStatus = firstRouteQuery(route, 'processingStatus')
+  if (nextProcessingStatus !== undefined) {
+    processingStatus.value = nextProcessingStatus
+  }
+  const nextMessageType = firstRouteQuery(route, 'messageType')
+  if (nextMessageType !== undefined) {
+    messageType.value = nextMessageType
+  }
+  const nextProjectId = firstRouteQuery(route, 'projectId')
+  if (nextProjectId !== undefined) {
+    projectId.value = nextProjectId
+  }
+  const nextResultType = firstRouteQuery(route, 'resultType')
+  if (nextResultType !== undefined) {
+    resultType.value = nextResultType
+  }
+  const nextResultId = firstRouteQuery(route, 'resultId')
+  if (nextResultId !== undefined) {
+    resultId.value = nextResultId
+  }
+  const nextCanonicalMessageId = firstRouteQuery(route, 'canonicalMessageId')
+  if (nextCanonicalMessageId !== undefined) {
+    canonicalMessageId.value = nextCanonicalMessageId
+  }
+}
 
 function queryParams(next?: string): InboundEnvelopeQueueQuery {
   return {
@@ -54,7 +84,10 @@ function search() {
 
 const rows = computed(() => page.value?.items ?? [])
 
-onMounted(() => load())
+onMounted(() => {
+  hydrateFiltersFromRoute()
+  return load()
+})
 </script>
 
 <template>

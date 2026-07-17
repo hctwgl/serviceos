@@ -1,23 +1,45 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import QueueTable from './QueueTable.vue'
 import {
   listReviewCases,
   type ReviewCaseQueuePage,
   type ReviewCaseQueueQuery,
 } from '../api/queues'
+import { firstRouteQuery } from '../routeQuery'
+
+const route = useRoute()
 
 const loading = ref(false)
 const error = ref<string | null>(null)
 const page = ref<ReviewCaseQueuePage | null>(null)
 const cursor = ref<string | undefined>()
 
-/** 与 OpenAPI 省略默认一致：status=OPEN。 */
+/** 与 OpenAPI 省略默认一致：status=OPEN。显式 query 可覆盖。 */
 const status = ref('OPEN')
 const origin = ref('')
 const projectId = ref('')
 const taskId = ref('')
+
+function hydrateFiltersFromRoute() {
+  const nextStatus = firstRouteQuery(route, 'status')
+  if (nextStatus !== undefined) {
+    status.value = nextStatus
+  }
+  const nextOrigin = firstRouteQuery(route, 'origin')
+  if (nextOrigin !== undefined) {
+    origin.value = nextOrigin
+  }
+  const nextProjectId = firstRouteQuery(route, 'projectId')
+  if (nextProjectId !== undefined) {
+    projectId.value = nextProjectId
+  }
+  const nextTaskId = firstRouteQuery(route, 'taskId')
+  if (nextTaskId !== undefined) {
+    taskId.value = nextTaskId
+  }
+}
 
 function queryParams(next?: string): ReviewCaseQueueQuery {
   return {
@@ -48,7 +70,10 @@ function search() {
   return load()
 }
 
-onMounted(() => load())
+onMounted(() => {
+  hydrateFiltersFromRoute()
+  return load()
+})
 </script>
 
 <template>

@@ -8,6 +8,7 @@ import {
   type OperationalExceptionQueueQuery,
 } from '../api/queues'
 import { acknowledgeOperationalException } from '../api/exceptions'
+import { firstRouteQuery } from '../routeQuery'
 
 const route = useRoute()
 
@@ -31,43 +32,32 @@ const projectId = ref('')
 const workOrderId = ref('')
 const taskId = ref('')
 
-function firstQuery(name: string): string | undefined {
-  const raw = route.query[name]
-  if (typeof raw === 'string') {
-    return raw
-  }
-  if (Array.isArray(raw) && typeof raw[0] === 'string') {
-    return raw[0]
-  }
-  return undefined
-}
-
 /**
  * 从 URL query 水合筛选表单。
  * status 允许空串表示「不限」；其余字段空串表示未筛选。
  */
 function hydrateFiltersFromRoute() {
-  const nextStatus = firstQuery('status')
+  const nextStatus = firstRouteQuery(route, 'status')
   if (nextStatus !== undefined) {
     status.value = nextStatus
   }
-  const nextSeverity = firstQuery('severity')
+  const nextSeverity = firstRouteQuery(route, 'severity')
   if (nextSeverity !== undefined) {
     severity.value = nextSeverity
   }
-  const nextCategory = firstQuery('category')
+  const nextCategory = firstRouteQuery(route, 'category')
   if (nextCategory !== undefined) {
     category.value = nextCategory
   }
-  const nextProjectId = firstQuery('projectId')
+  const nextProjectId = firstRouteQuery(route, 'projectId')
   if (nextProjectId !== undefined) {
     projectId.value = nextProjectId
   }
-  const nextWorkOrderId = firstQuery('workOrderId')
+  const nextWorkOrderId = firstRouteQuery(route, 'workOrderId')
   if (nextWorkOrderId !== undefined) {
     workOrderId.value = nextWorkOrderId
   }
-  const nextTaskId = firstQuery('taskId')
+  const nextTaskId = firstRouteQuery(route, 'taskId')
   if (nextTaskId !== undefined) {
     taskId.value = nextTaskId
   }

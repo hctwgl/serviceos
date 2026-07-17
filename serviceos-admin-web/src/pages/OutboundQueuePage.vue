@@ -1,24 +1,50 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import QueueTable from './QueueTable.vue'
 import {
   listOutboundDeliveries,
   type OutboundDeliveryQueuePage,
   type OutboundDeliveryQueueQuery,
 } from '../api/queues'
+import { firstRouteQuery } from '../routeQuery'
+
+const route = useRoute()
 
 const loading = ref(false)
 const error = ref<string | null>(null)
 const page = ref<OutboundDeliveryQueuePage | null>(null)
 const cursor = ref<string | undefined>()
 
-/** 与 OpenAPI 默认一致：省略或空时服务端仍按 UNKNOWN。 */
+/** 与 OpenAPI 默认一致：省略或空时服务端仍按 UNKNOWN。显式 query 可覆盖。 */
 const status = ref('UNKNOWN')
 const businessMessageType = ref('')
 const projectId = ref('')
 const sourceWorkOrderId = ref('')
 const sourceReviewCaseId = ref('')
+
+function hydrateFiltersFromRoute() {
+  const nextStatus = firstRouteQuery(route, 'status')
+  if (nextStatus !== undefined) {
+    status.value = nextStatus
+  }
+  const nextBusinessMessageType = firstRouteQuery(route, 'businessMessageType')
+  if (nextBusinessMessageType !== undefined) {
+    businessMessageType.value = nextBusinessMessageType
+  }
+  const nextProjectId = firstRouteQuery(route, 'projectId')
+  if (nextProjectId !== undefined) {
+    projectId.value = nextProjectId
+  }
+  const nextSourceWorkOrderId = firstRouteQuery(route, 'sourceWorkOrderId')
+  if (nextSourceWorkOrderId !== undefined) {
+    sourceWorkOrderId.value = nextSourceWorkOrderId
+  }
+  const nextSourceReviewCaseId = firstRouteQuery(route, 'sourceReviewCaseId')
+  if (nextSourceReviewCaseId !== undefined) {
+    sourceReviewCaseId.value = nextSourceReviewCaseId
+  }
+}
 
 function queryParams(next?: string): OutboundDeliveryQueueQuery {
   return {
@@ -57,7 +83,10 @@ const rows = computed(() =>
   })),
 )
 
-onMounted(() => load())
+onMounted(() => {
+  hydrateFiltersFromRoute()
+  return load()
+})
 </script>
 
 <template>

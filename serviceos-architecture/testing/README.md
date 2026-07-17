@@ -169,4 +169,5 @@
 - [M166 Admin 工作区审核/整改关联资源深链验收矩阵](163-m166-admin-pilot-workspace-reviews-corrections-cross-deeplink-acceptance.md)
 - [M167 Admin Task 面板资源详情深链验收矩阵](164-m167-admin-pilot-task-panel-resource-deeplink-acceptance.md)
 - [M168 Admin Canonical Message 独立详情页验收矩阵](165-m168-admin-pilot-canonical-message-detail-acceptance.md)
+- [M169 Admin 专项队列 route.query 水合验收矩阵](166-m169-admin-pilot-queue-query-hydrate-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

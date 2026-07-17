@@ -439,6 +439,65 @@ test('真实 OIDC 登录后可读取核心投影并完成 Task 分配领取释�
   await expect(page).toHaveURL(
     new RegExp(`/exceptions\\?.*workOrderId=${pilotWorkOrderId}`),
   )
+
+  // M169：专项队列 route.query 水合（对齐 ExceptionQueue；侧栏直达默认值不变）。
+  const pilotTaskIdForQueue = '70000000-0000-4000-8000-000000000001'
+  const reviewHydratePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname === '/api/v1/review-cases' &&
+      new URL(response.url()).searchParams.get('status') === 'OPEN' &&
+      new URL(response.url()).searchParams.get('taskId') === pilotTaskIdForQueue,
+  )
+  await page.goto(`/reviews?status=OPEN&taskId=${pilotTaskIdForQueue}`)
+  expect((await reviewHydratePromise).status()).toBe(200)
+  await expect(page.getByRole('heading', { name: '审核队列' })).toBeVisible()
+  await expect(page.getByLabel('review status filter')).toHaveValue('OPEN')
+  await expect(page.getByLabel('review taskId filter')).toHaveValue(pilotTaskIdForQueue)
+
+  const correctionHydratePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname === '/api/v1/correction-cases' &&
+      new URL(response.url()).searchParams.get('status') === 'IN_PROGRESS' &&
+      new URL(response.url()).searchParams.get('taskId') === pilotTaskIdForQueue,
+  )
+  await page.goto(`/corrections?status=IN_PROGRESS&taskId=${pilotTaskIdForQueue}`)
+  expect((await correctionHydratePromise).status()).toBe(200)
+  await expect(page.getByRole('heading', { name: '整改跟踪' })).toBeVisible()
+  await expect(page.getByLabel('correction status filter')).toHaveValue('IN_PROGRESS')
+  await expect(page.getByLabel('correction taskId filter')).toHaveValue(pilotTaskIdForQueue)
+
+  const inboundHydratePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname === '/api/v1/inbound-envelopes' &&
+      new URL(response.url()).searchParams.get('processingStatus') === 'COMPLETED' &&
+      new URL(response.url()).searchParams.get('projectId') === pilotProjectId &&
+      new URL(response.url()).searchParams.get('messageType') === 'CREATE_WORK_ORDER',
+  )
+  await page.goto(
+    `/integration/inbound?processingStatus=COMPLETED&projectId=${pilotProjectId}&messageType=CREATE_WORK_ORDER`,
+  )
+  expect((await inboundHydratePromise).status()).toBe(200)
+  await expect(page.getByRole('heading', { name: '入站 Envelope 队列' })).toBeVisible()
+  await expect(page.getByLabel('inbound processingStatus filter')).toHaveValue('COMPLETED')
+  await expect(page.getByLabel('inbound projectId filter')).toHaveValue(pilotProjectId)
+  await expect(page.getByLabel('inbound messageType filter')).toHaveValue('CREATE_WORK_ORDER')
+
+  const outboundHydratePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname === '/api/v1/outbound-deliveries' &&
+      new URL(response.url()).searchParams.get('status') === 'UNKNOWN' &&
+      new URL(response.url()).searchParams.get('projectId') === pilotProjectId,
+  )
+  await page.goto(`/integration/outbound?status=UNKNOWN&projectId=${pilotProjectId}`)
+  expect((await outboundHydratePromise).status()).toBe(200)
+  await expect(page.getByRole('heading', { name: '外发交付队列' })).toBeVisible()
+  await expect(page.getByLabel('outbound status filter')).toHaveValue('UNKNOWN')
+  await expect(page.getByLabel('outbound projectId filter')).toHaveValue(pilotProjectId)
+
   await page.goto(`/work-orders/${pilotWorkOrderId}`)
   await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
 

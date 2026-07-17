@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import QueueTable from './QueueTable.vue'
 import {
   listCorrectionCases,
   type CorrectionCaseQueuePage,
   type CorrectionCaseQueueQuery,
 } from '../api/queues'
+import { firstRouteQuery } from '../routeQuery'
+
+const route = useRoute()
 
 const loading = ref(false)
 const error = ref<string | null>(null)
@@ -16,11 +19,31 @@ const cursor = ref<string | undefined>()
 /**
  * 运营默认 IN_PROGRESS（与既有 Admin 客户端一致）；
  * OpenAPI 省略 status 时服务端默认 OPEN，故 UI 必须显式传 IN_PROGRESS。
+ * 显式 route.query 可覆盖默认值。
  */
 const status = ref('IN_PROGRESS')
 const projectId = ref('')
 const taskId = ref('')
 const sourceReviewCaseId = ref('')
+
+function hydrateFiltersFromRoute() {
+  const nextStatus = firstRouteQuery(route, 'status')
+  if (nextStatus !== undefined) {
+    status.value = nextStatus
+  }
+  const nextProjectId = firstRouteQuery(route, 'projectId')
+  if (nextProjectId !== undefined) {
+    projectId.value = nextProjectId
+  }
+  const nextTaskId = firstRouteQuery(route, 'taskId')
+  if (nextTaskId !== undefined) {
+    taskId.value = nextTaskId
+  }
+  const nextSourceReviewCaseId = firstRouteQuery(route, 'sourceReviewCaseId')
+  if (nextSourceReviewCaseId !== undefined) {
+    sourceReviewCaseId.value = nextSourceReviewCaseId
+  }
+}
 
 function queryParams(next?: string): CorrectionCaseQueueQuery {
   return {
@@ -51,7 +74,10 @@ function search() {
   return load()
 }
 
-onMounted(() => load())
+onMounted(() => {
+  hydrateFiltersFromRoute()
+  return load()
+})
 </script>
 
 <template>
