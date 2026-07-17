@@ -31,6 +31,20 @@ export type NetworkPortalWorkspaceAppointmentSummary = {
   createdAt: string
 }
 
+/** M227/M232：联系尝试摘要（对齐 Admin；无 party/note/recording/actor）。 */
+export type NetworkPortalWorkspaceContactAttemptSummary = {
+  contactAttemptId: string
+  taskId: string
+  projectId: string
+  workOrderId: string
+  channel: string
+  startedAt: string
+  endedAt: string
+  resultCode: string
+  nextContactAt: string | null
+  createdAt: string
+}
+
 export type NetworkPortalPage<T> = {
   networkId: string
   items: T[]
@@ -39,6 +53,8 @@ export type NetworkPortalPage<T> = {
   technicians?: NetworkPortalTechnicianItem[]
   /** Soft-gated；缺 NETWORK `networkPortal.manageAppointment` 时省略（工单/任务目录页）。 */
   appointments?: NetworkPortalWorkspaceAppointmentSummary[]
+  /** Soft-gated；缺 NETWORK `networkPortal.manageAppointment` 时省略（工单/任务目录页）。 */
+  contactAttempts?: NetworkPortalWorkspaceContactAttemptSummary[]
 }
 
 export type NetworkPortalWorkOrderItem = {
@@ -282,20 +298,6 @@ export type NetworkPortalWorkOrderWorkspace = {
   /** Soft-gated；缺 NETWORK `technician.readOwnNetwork` 时省略，不得用空数组伪装无权限。 */
   technicians?: NetworkPortalTechnicianItem[]
   asOf: string
-}
-
-/** M227：工作区联系尝试摘要（对齐 Admin；无 party/note/recording/actor）。 */
-export type NetworkPortalWorkspaceContactAttemptSummary = {
-  contactAttemptId: string
-  taskId: string
-  projectId: string
-  workOrderId: string
-  channel: string
-  startedAt: string
-  endedAt: string
-  resultCode: string
-  nextContactAt: string | null
-  createdAt: string
 }
 
 export function getNetworkPortalWorkOrderWorkspace(

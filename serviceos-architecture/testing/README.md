@@ -232,4 +232,5 @@
 - [M229 Network Portal 工作区审核案例服务端摘要验收矩阵](226-m229-network-portal-workspace-review-summary-acceptance.md)
 - [M230 Network Portal 目录页师傅服务端摘要验收矩阵](227-m230-network-portal-directory-technician-summary-acceptance.md)
 - [M231 Network Portal 目录页预约服务端摘要验收矩阵](228-m231-network-portal-directory-appointment-summary-acceptance.md)
+- [M232 Network Portal 目录页联系尝试服务端摘要验收矩阵](229-m232-network-portal-directory-contact-summary-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

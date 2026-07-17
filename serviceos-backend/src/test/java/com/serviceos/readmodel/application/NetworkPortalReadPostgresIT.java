@@ -347,6 +347,42 @@ class NetworkPortalReadPostgresIT {
     }
 
     @Test
+    void directoryContactAttemptSummariesAreCapabilityGatedAndTaskScoped() {
+        String context = "NETWORK|NETWORK|" + NETWORK_A;
+        NetworkPortalPage<NetworkPortalWorkOrderItem> withoutCapWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-contact-omit-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> withoutCapTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-contact-omit-task", context);
+        assertThat(withoutCapWo.contactAttempts()).isNull();
+        assertThat(withoutCapTasks.contactAttempts()).isNull();
+
+        seedGrant(PRINCIPAL, "networkPortal.manageAppointment", "NETWORK", NETWORK_A.toString());
+        seedGrant(PRINCIPAL, "appointment.read", "NETWORK", NETWORK_A.toString());
+        NetworkPortalPage<NetworkPortalWorkOrderItem> emptyWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-contact-empty-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> emptyTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-contact-empty-task", context);
+        assertThat(emptyWo.contactAttempts()).isEmpty();
+        assertThat(emptyTasks.contactAttempts()).isEmpty();
+
+        UUID contactA = seedContactAttempt(TASK_A, WO_A, "m232-a");
+        seedContactAttempt(TASK_B, WO_B, "m232-b");
+
+        NetworkPortalPage<NetworkPortalWorkOrderItem> withWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-contact-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> withTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-contact-task", context);
+        assertThat(withWo.contactAttempts())
+                .extracting(NetworkPortalWorkspaceContactAttemptSummary::contactAttemptId)
+                .containsExactly(contactA);
+        assertThat(withWo.contactAttempts().getFirst().channel()).isEqualTo("PHONE");
+        assertThat(withWo.contactAttempts().getFirst().resultCode()).isEqualTo("CONNECTED");
+        assertThat(withTasks.contactAttempts())
+                .extracting(NetworkPortalWorkspaceContactAttemptSummary::contactAttemptId)
+                .containsExactly(contactA);
+    }
+
+    @Test
     void workOrderWorkspaceTechnicianSummariesAreCapabilityGatedAndMatched() {
         String context = "NETWORK|NETWORK|" + NETWORK_A;
         // 临时撤掉夹具默认的 technician.readOwnNetwork，验证省略语义

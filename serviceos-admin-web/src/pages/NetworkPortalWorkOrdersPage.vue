@@ -7,12 +7,14 @@ import {
   type NetworkPortalTechnicianItem,
   type NetworkPortalWorkOrderItem,
   type NetworkPortalWorkspaceAppointmentSummary,
+  type NetworkPortalWorkspaceContactAttemptSummary,
 } from '../api/networkPortal'
 
 const props = defineProps<{ networkContextId: string | null }>()
 const items = ref<NetworkPortalWorkOrderItem[]>([])
 const techniciansByProfileId = ref<Map<string, NetworkPortalTechnicianItem>>(new Map())
 const appointments = ref<NetworkPortalWorkspaceAppointmentSummary[] | null>(null)
+const contactAttempts = ref<NetworkPortalWorkspaceContactAttemptSummary[] | null>(null)
 const error = ref<string | null>(null)
 const usedServerTechnicians = ref(false)
 
@@ -47,11 +49,24 @@ function appointmentWindowLabel(taskIds: string[]) {
   return `${first.windowStart ?? '?'} → ${first.windowEnd ?? '?'}（${first.status}）`
 }
 
+function contactLabel(taskIds: string[]) {
+  if (contactAttempts.value === null) {
+    return '—'
+  }
+  const matched = contactAttempts.value.filter((row) => taskIds.includes(row.taskId))
+  if (matched.length === 0) {
+    return '暂无'
+  }
+  const first = matched[0]
+  return `${first.channel} · ${first.resultCode} · ${first.startedAt}`
+}
+
 async function load() {
   if (!props.networkContextId) {
     items.value = []
     techniciansByProfileId.value = new Map()
     appointments.value = null
+    contactAttempts.value = null
     usedServerTechnicians.value = false
     error.value = '请选择 NETWORK 上下文'
     return
@@ -60,9 +75,9 @@ async function load() {
     const page = await listNetworkPortalWorkOrders(props.networkContextId)
     items.value = page.items
     appointments.value = page.appointments !== undefined ? page.appointments : null
+    contactAttempts.value = page.contactAttempts !== undefined ? page.contactAttempts : null
     error.value = null
     if (page.technicians !== undefined) {
-      // M230：服务端旁载替换 M217 client fan-in
       applyTechnicians(page.technicians)
       usedServerTechnicians.value = true
     } else {
@@ -78,6 +93,7 @@ async function load() {
     items.value = []
     techniciansByProfileId.value = new Map()
     appointments.value = null
+    contactAttempts.value = null
     usedServerTechnicians.value = false
     error.value = err instanceof Error ? err.message : '工单列表加载失败'
   }
@@ -96,7 +112,7 @@ watch(() => props.networkContextId, () => {
     <h2>本网点工单</h2>
     <p class="hint">
       <template v-if="usedServerTechnicians">
-        M230/M231：师傅与预约窗口由列表页服务端旁载交付。
+        M230～M232：师傅、预约窗口与最近联系由列表页服务端旁载交付。
       </template>
       <template v-else>
         M217：师傅 displayName fan-in；缺 technician.readOwnNetwork 时保留原始 ID。
@@ -112,6 +128,7 @@ watch(() => props.networkContextId, () => {
           <th>业务类型</th>
           <th>师傅</th>
           <th v-if="appointments !== null">预约窗口</th>
+          <th v-if="contactAttempts !== null">最近联系</th>
           <th>生效自</th>
         </tr>
       </thead>
@@ -140,6 +157,12 @@ watch(() => props.networkContextId, () => {
             data-testid="work-order-appointment-window"
           >
             {{ appointmentWindowLabel(item.taskIds) }}
+          </td>
+          <td
+            v-if="contactAttempts !== null"
+            data-testid="work-order-contact-attempt"
+          >
+            {{ contactLabel(item.taskIds) }}
           </td>
           <td data-testid="work-order-effective-from">{{ item.effectiveFrom ?? '—' }}</td>
         </tr>

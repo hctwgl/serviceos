@@ -230,6 +230,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                     actor.tenantId(), networkId, wantedTechnicianIds);
         }
         List<NetworkPortalWorkspaceAppointmentSummary> appointmentSummaries = null;
+        List<NetworkPortalWorkspaceContactAttemptSummary> contactAttemptSummaries = null;
         if (hasNetworkCapability(actor, correlationId, MANAGE_APPOINTMENT, networkId)) {
             Set<UUID> pageTaskIds = new LinkedHashSet<>();
             for (NetworkPortalWorkOrderItem item : workOrderItems) {
@@ -237,10 +238,12 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
             }
             appointmentSummaries = loadAppointmentSummaries(
                     actor, correlationId, networkId, pageTaskIds);
+            contactAttemptSummaries = loadContactAttemptSummaries(
+                    actor, correlationId, pageTaskIds);
         }
         return new NetworkPortalPage<>(
                 networkId, workOrderItems, clock.instant(),
-                technicianSummaries, appointmentSummaries);
+                technicianSummaries, appointmentSummaries, contactAttemptSummaries);
     }
 
     @Override
@@ -862,6 +865,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                     actor.tenantId(), networkId, wantedTechnicianIds);
         }
         List<NetworkPortalWorkspaceAppointmentSummary> appointmentSummaries = null;
+        List<NetworkPortalWorkspaceContactAttemptSummary> contactAttemptSummaries = null;
         if (hasNetworkCapability(actor, correlationId, MANAGE_APPOINTMENT, networkId)) {
             Set<UUID> pageTaskIds = new LinkedHashSet<>();
             for (NetworkPortalTaskItem item : taskItems) {
@@ -869,10 +873,12 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
             }
             appointmentSummaries = loadAppointmentSummaries(
                     actor, correlationId, networkId, pageTaskIds);
+            contactAttemptSummaries = loadContactAttemptSummaries(
+                    actor, correlationId, pageTaskIds);
         }
         return new NetworkPortalPage<>(
                 networkId, taskItems, clock.instant(),
-                technicianSummaries, appointmentSummaries);
+                technicianSummaries, appointmentSummaries, contactAttemptSummaries);
     }
 
     @Override

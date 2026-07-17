@@ -22,6 +22,7 @@ import {
   type NetworkPortalTaskItem,
   type NetworkPortalTechnicianItem,
   type NetworkPortalWorkspaceAppointmentSummary,
+  type NetworkPortalWorkspaceContactAttemptSummary,
 } from '../api/networkPortal'
 import { getMe } from '../api/me'
 
@@ -35,6 +36,7 @@ const items = ref<NetworkPortalTaskItem[]>([])
 const technicians = ref<NetworkPortalTechnicianItem[]>([])
 const directoryTechnicians = ref<NetworkPortalTechnicianItem[]>([])
 const directoryAppointments = ref<NetworkPortalWorkspaceAppointmentSummary[] | null>(null)
+const directoryContactAttempts = ref<NetworkPortalWorkspaceContactAttemptSummary[] | null>(null)
 const appointments = ref<NetworkPortalAppointment[]>([])
 const contactAttempts = ref<NetworkPortalContactAttempt[]>([])
 const error = ref<string | null>(null)
@@ -67,6 +69,18 @@ function directoryAppointmentWindowLabel(taskId: string) {
     return first.status
   }
   return `${first.windowStart ?? '?'} → ${first.windowEnd ?? '?'}（${first.status}）`
+}
+
+function directoryContactLabel(taskId: string) {
+  if (directoryContactAttempts.value === null) {
+    return '—'
+  }
+  const matched = directoryContactAttempts.value.filter((row) => row.taskId === taskId)
+  if (matched.length === 0) {
+    return '暂无'
+  }
+  const first = matched[0]
+  return `${first.channel} · ${first.resultCode} · ${first.startedAt}`
 }
 const selectedTaskId = ref('')
 const selectedTechnicianId = ref('')
@@ -126,6 +140,7 @@ async function load() {
     technicians.value = []
     directoryTechnicians.value = []
     directoryAppointments.value = null
+    directoryContactAttempts.value = null
     appointments.value = []
     contactAttempts.value = []
     error.value = '请选择 NETWORK 上下文'
@@ -137,6 +152,8 @@ async function load() {
     items.value = taskPage.items
     directoryAppointments.value =
       taskPage.appointments !== undefined ? taskPage.appointments : null
+    directoryContactAttempts.value =
+      taskPage.contactAttempts !== undefined ? taskPage.contactAttempts : null
     if (taskPage.technicians !== undefined) {
       serverDirectoryTechnicians = taskPage.technicians
       directoryTechnicians.value = taskPage.technicians
@@ -168,6 +185,7 @@ async function load() {
     items.value = []
     directoryTechnicians.value = []
     directoryAppointments.value = null
+    directoryContactAttempts.value = null
     error.value = err instanceof Error ? err.message : '任务列表加载失败'
   }
   try {
@@ -610,6 +628,7 @@ watch(selectedTaskId, () => {
           <th>生效自</th>
           <th>师傅</th>
           <th v-if="directoryAppointments !== null">预约窗口</th>
+          <th v-if="directoryContactAttempts !== null">最近联系</th>
         </tr>
       </thead>
       <tbody>
@@ -636,6 +655,12 @@ watch(selectedTaskId, () => {
             data-testid="task-appointment-window"
           >
             {{ directoryAppointmentWindowLabel(item.taskId) }}
+          </td>
+          <td
+            v-if="directoryContactAttempts !== null"
+            data-testid="task-contact-attempt"
+          >
+            {{ directoryContactLabel(item.taskId) }}
           </td>
         </tr>
       </tbody>
