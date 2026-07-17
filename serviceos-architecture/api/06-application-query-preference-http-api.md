@@ -6,7 +6,7 @@ status: Accepted
 
 # 应用工作区、队列与用户偏好 HTTP API
 
-## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158 / M189 / M190 / M191 / M192 / M193）
+## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158 / M189 / M190 / M191 / M192 / M193 / M194）
 
 **Accepted（可指导实现）**：
 
@@ -64,10 +64,25 @@ status: Accepted
   `lastVisitedAt`。`displayRef` 仅为非敏感短标签，不得保存完整地址/电话/价格。
   **不**接受 `GET /me/notifications`、`GET /me/application-context`（后者与 M188 `/me`
   重叠；通知属独立 Epic）。**不**接受 Network/Technician Portal 最近访问。
+- §10 Network Portal 只读查询子集（M194）：仅
+  `GET /api/v1/network-portal/work-orders`、
+  `GET /api/v1/network-portal/tasks`、
+  `GET /api/v1/network-portal/technicians`、
+  `GET /api/v1/network-portal/workbench`（计数/摘要）、
+  `GET /api/v1/network-portal/capacity`（`dsp_capacity_counter` 按 networkId 聚合只读）。
+  networkId **必须**从可信头 `X-Network-Context` 解析：接受 M188 `contextId` 形态
+  `NETWORK|NETWORK|{uuid}`，或在校验当前主体对该网点持有 ACTIVE NetworkMembership 后接受
+  纯 network UUID。**禁止**查询参数任意指定 networkId。上下文缺失、伪造或非成员返回
+  `PORTAL_CONTEXT_INVALID`（403）。数据范围：该网点 ACTIVE NETWORK ServiceAssignment 对应的
+  工单/任务；师傅列表为该网点 ACTIVE NetworkTechnicianMembership。能力：有效 NETWORK
+  门户成员资格 + 既有 `networkTask.read` / `technician.readOwnNetwork`（NETWORK scope），
+  跨网点失败关闭。**不**接受 Technician Feed §11、Admin work-queues §4、完整 product/03 页面集、
+  Network Portal 写命令。
 
 **仍为设计草案**：§3 中 `application-context`/`notifications`、§4 工作台与队列、§5 其余 section、
 §6 其余专项队列、§7 中 `VEHICLE`/`CHARGER` 与全文索引搜索、§8 ORGANIZATION 组织树共享与
-Network/Technician SavedView、§9 非 Admin Portal UI Preference、§10～§11 与导出分析等。
+Network/Technician SavedView、§9 非 Admin Portal UI Preference、§10 未列入本切片的其余
+Network 查询、§11 Technician Feed 与导出分析等。
 不得在未再接受前实现。
 
 ## 1. 目标
@@ -272,15 +287,15 @@ View 保存 filter AST、列、排序和密度，不保存任意 SQL、访问 to
 
 ## 10. Network 查询
 
-| 方法与路径 | 用途 |
-|---|---|
-| `GET /api/v1/network-portal/workbench` | 当前 NetworkMembership 工作台 |
-| `GET /api/v1/network-portal/work-orders` | 当前 ACTIVE assignment 工单 |
-| `GET /api/v1/network-portal/tasks` | 本网点 Task |
-| `GET /api/v1/network-portal/technicians` | 本网点师傅/能力/资质摘要 |
-| `GET /api/v1/network-portal/capacity` | 本网点容量和派单状态 |
+| 方法与路径 | 用途 | 接受状态 |
+|---|---|---|
+| `GET /api/v1/network-portal/workbench` | 当前 NetworkMembership 工作台（计数/摘要） | M194 Accepted |
+| `GET /api/v1/network-portal/work-orders` | 当前 ACTIVE assignment 工单 | M194 Accepted |
+| `GET /api/v1/network-portal/tasks` | 本网点 Task | M194 Accepted |
+| `GET /api/v1/network-portal/technicians` | 本网点师傅/能力/资质摘要 | M194 Accepted |
+| `GET /api/v1/network-portal/capacity` | 本网点容量和派单状态 | M194 Accepted |
 
-networkId 从可信应用上下文解析；拥有多个 membership 时使用经授权的 `X-Network-Context`，不能在查询参数任意指定。
+networkId 从可信应用上下文解析；拥有多个 membership 时使用经授权的 `X-Network-Context`，不能在查询参数任意指定。详见 §0 M194。
 
 ## 11. Technician Feed 与工作包状态
 

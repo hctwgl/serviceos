@@ -128,6 +128,7 @@ onMounted(() => {
       <RouterLink to="/settings/preferences" data-testid="nav-ui-preferences">界面偏好</RouterLink>
       <RouterLink to="/settings/token">身份登录</RouterLink>
       <RouterLink to="/portal-stubs" data-testid="nav-portal-stubs">Portal stubs</RouterLink>
+      <RouterLink to="/network-portal" data-testid="nav-network-portal">Network Portal</RouterLink>
       <section class="recent" data-testid="recent-resources">
         <h2>最近访问</h2>
         <p v-if="recentError" class="error" data-testid="recent-error">{{ recentError }}</p>

@@ -43,6 +43,11 @@ import GrantDirectoryPage from './pages/GrantDirectoryPage.vue'
 import PortalStubsPage from './pages/PortalStubsPage.vue'
 import UiPreferencesPage from './pages/UiPreferencesPage.vue'
 import SearchPage from './pages/SearchPage.vue'
+import NetworkPortalShell from './pages/NetworkPortalShell.vue'
+import NetworkPortalWorkbenchPage from './pages/NetworkPortalWorkbenchPage.vue'
+import NetworkPortalWorkOrdersPage from './pages/NetworkPortalWorkOrdersPage.vue'
+import NetworkPortalTasksPage from './pages/NetworkPortalTasksPage.vue'
+import NetworkPortalTechniciansPage from './pages/NetworkPortalTechniciansPage.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -199,6 +204,37 @@ export const router = createRouter({
         },
         { path: 'settings/preferences', name: 'ADMIN.UI.PREFERENCES', component: UiPreferencesPage },
         { path: 'settings/token', name: 'ADMIN.TOKEN', component: TokenPage },
+      ],
+    },
+    {
+      path: '/network-portal',
+      component: NetworkPortalShell,
+      children: [
+        { path: '', redirect: { name: 'NETWORK.WORKBENCH' } },
+        {
+          path: 'workbench',
+          name: 'NETWORK.WORKBENCH',
+          component: NetworkPortalWorkbenchPage,
+          meta: { pageId: 'NETWORK.WORKBENCH' },
+        },
+        {
+          path: 'work-orders',
+          name: 'NETWORK.WORKORDER.LIST',
+          component: NetworkPortalWorkOrdersPage,
+          meta: { pageId: 'NETWORK.WORKORDER.LIST' },
+        },
+        {
+          path: 'tasks',
+          name: 'NETWORK.TASK.QUEUE',
+          component: NetworkPortalTasksPage,
+          meta: { pageId: 'NETWORK.TASK.QUEUE' },
+        },
+        {
+          path: 'technicians',
+          name: 'NETWORK.TECHNICIAN.LIST',
+          component: NetworkPortalTechniciansPage,
+          meta: { pageId: 'NETWORK.TECHNICIAN.LIST' },
+        },
       ],
     },
   ],

@@ -5,6 +5,7 @@ export type ApiError = {
   title?: string
   detail?: string
   code?: string
+  errorCode?: string
 }
 
 export type ApiResult<T> = {
@@ -46,14 +47,19 @@ async function parseError(response: Response): Promise<never> {
   })
 }
 
-export async function apiGet<T>(path: string, query: Record<string, string | undefined> = {}): Promise<T> {
-  const result = await apiGetWithMeta<T>(path, query)
+export async function apiGet<T>(
+  path: string,
+  query: Record<string, string | undefined> = {},
+  extraHeaders: Record<string, string> = {},
+): Promise<T> {
+  const result = await apiGetWithMeta<T>(path, query, extraHeaders)
   return result.data
 }
 
 export async function apiGetWithMeta<T>(
   path: string,
   query: Record<string, string | undefined> = {},
+  extraHeaders: Record<string, string> = {},
 ): Promise<ApiResult<T>> {
   const url = new URL(`${apiBase()}${path}`, window.location.origin)
   for (const [key, value] of Object.entries(query)) {
@@ -61,7 +67,7 @@ export async function apiGetWithMeta<T>(
       url.searchParams.set(key, value)
     }
   }
-  const headers = authHeaders()
+  const headers = authHeaders(extraHeaders)
   const response = await fetch(url, { headers })
   if (!response.ok) {
     await parseError(response)

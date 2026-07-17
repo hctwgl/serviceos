@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.85.0
+  version: 0.86.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1429,6 +1429,93 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '422': { $ref: '#/components/responses/Problem' }
+  /network-portal/work-orders:
+    get:
+      operationId: listNetworkPortalWorkOrders
+      summary: Network Portal 本网点 ACTIVE 责任工单
+      description: |
+        M194：需要有效 NETWORK 门户上下文（X-Network-Context）与 NETWORK scope networkTask.read。
+        仅返回该网点 ACTIVE NETWORK ServiceAssignment 对应工单；禁止 query-param networkId。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 本网点 ACTIVE 责任工单列表
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkPortalWorkOrderPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /network-portal/tasks:
+    get:
+      operationId: listNetworkPortalTasks
+      summary: Network Portal 本网点 ACTIVE 责任任务
+      description: |
+        M194：X-Network-Context + networkTask.read。数据范围同 work-orders，按任务展开。
+      parameters:
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 本网点 ACTIVE 责任任务列表
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkPortalTaskPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /network-portal/technicians:
+    get:
+      operationId: listNetworkPortalTechnicians
+      summary: Network Portal 本网点师傅列表
+      description: |
+        M194：X-Network-Context + technician.readOwnNetwork。仅 ACTIVE NetworkTechnicianMembership。
+      parameters:
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 本网点 ACTIVE 师傅列表
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkPortalTechnicianPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /network-portal/capacity:
+    get:
+      operationId: listNetworkPortalCapacity
+      summary: Network Portal 本网点容量计数
+      description: |
+        M194：X-Network-Context + networkTask.read。读取 dsp_capacity_counter（NETWORK assignee）。
+      parameters:
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 本网点容量计数列表
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkPortalCapacityPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /network-portal/workbench:
+    get:
+      operationId: getNetworkPortalWorkbench
+      summary: Network Portal 工作台计数摘要
+      description: |
+        M194：X-Network-Context + networkTask.read。返回 ACTIVE 工单/任务/师傅计数与容量摘要。
+      parameters:
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 工作台摘要
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkPortalWorkbenchView' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
   /me/ui-preferences:
     get:
       operationId: getMyUiPreferences
@@ -3656,6 +3743,17 @@ components:
       schema:
         type: string
         maxLength: 128
+    NetworkContext:
+      name: X-Network-Context
+      in: header
+      required: true
+      description: |
+        M194：M188 contextId 形态 `NETWORK|NETWORK|{uuid}`，或经 ACTIVE NetworkMembership
+        校验后的纯 network UUID。不得用查询参数代替。
+      schema:
+        type: string
+        minLength: 36
+        maxLength: 80
     IfMatch:
       name: If-Match
       in: header
@@ -3980,6 +4078,100 @@ components:
       required: [items, asOf]
       properties:
         items: { type: array, items: { $ref: '#/components/schemas/RecentResourceItem' } }
+        asOf: { type: string, format: date-time }
+    NetworkPortalWorkOrderItem:
+      type: object
+      additionalProperties: false
+      required: [workOrderId, taskIds]
+      properties:
+        workOrderId: { type: string, format: uuid }
+        projectId: { type: [string, 'null'], format: uuid }
+        taskIds: { type: array, items: { type: string, format: uuid } }
+        businessType: { type: [string, 'null'], maxLength: 100 }
+        technicianId: { type: [string, 'null'], maxLength: 128 }
+        effectiveFrom: { type: [string, 'null'], format: date-time }
+    NetworkPortalWorkOrderPage:
+      type: object
+      additionalProperties: false
+      required: [networkId, items, asOf]
+      properties:
+        networkId: { type: string, format: uuid }
+        items: { type: array, items: { $ref: '#/components/schemas/NetworkPortalWorkOrderItem' } }
+        asOf: { type: string, format: date-time }
+    NetworkPortalTaskItem:
+      type: object
+      additionalProperties: false
+      required: [taskId, workOrderId]
+      properties:
+        taskId: { type: string, format: uuid }
+        workOrderId: { type: string, format: uuid }
+        projectId: { type: [string, 'null'], format: uuid }
+        taskType: { type: [string, 'null'], maxLength: 64 }
+        taskKind: { type: [string, 'null'], maxLength: 32 }
+        stageCode: { type: [string, 'null'], maxLength: 64 }
+        status: { type: [string, 'null'], maxLength: 32 }
+        businessType: { type: [string, 'null'], maxLength: 100 }
+        technicianId: { type: [string, 'null'], maxLength: 128 }
+        effectiveFrom: { type: [string, 'null'], format: date-time }
+    NetworkPortalTaskPage:
+      type: object
+      additionalProperties: false
+      required: [networkId, items, asOf]
+      properties:
+        networkId: { type: string, format: uuid }
+        items: { type: array, items: { $ref: '#/components/schemas/NetworkPortalTaskItem' } }
+        asOf: { type: string, format: date-time }
+    NetworkPortalTechnicianItem:
+      type: object
+      additionalProperties: false
+      required: [membershipId, technicianProfileId, principalId, displayName, profileStatus, membershipStatus, validFrom]
+      properties:
+        membershipId: { type: string, format: uuid }
+        technicianProfileId: { type: string, format: uuid }
+        principalId: { type: string, format: uuid }
+        displayName: { type: string, minLength: 1, maxLength: 200 }
+        profileStatus: { type: string, maxLength: 32 }
+        membershipStatus: { type: string, maxLength: 32 }
+        validFrom: { type: string, format: date-time }
+        validTo: { type: [string, 'null'], format: date-time }
+    NetworkPortalTechnicianPage:
+      type: object
+      additionalProperties: false
+      required: [networkId, items, asOf]
+      properties:
+        networkId: { type: string, format: uuid }
+        items: { type: array, items: { $ref: '#/components/schemas/NetworkPortalTechnicianItem' } }
+        asOf: { type: string, format: date-time }
+    NetworkPortalCapacityItem:
+      type: object
+      additionalProperties: false
+      required: [capacityCounterId, businessType, maxUnits, occupiedUnits, availableUnits, version, updatedAt]
+      properties:
+        capacityCounterId: { type: string, format: uuid }
+        businessType: { type: string, maxLength: 100 }
+        maxUnits: { type: integer, minimum: 1 }
+        occupiedUnits: { type: integer, minimum: 0 }
+        availableUnits: { type: integer, minimum: 0 }
+        version: { type: integer, minimum: 1 }
+        updatedAt: { type: string, format: date-time }
+    NetworkPortalCapacityPage:
+      type: object
+      additionalProperties: false
+      required: [networkId, items, asOf]
+      properties:
+        networkId: { type: string, format: uuid }
+        items: { type: array, items: { $ref: '#/components/schemas/NetworkPortalCapacityItem' } }
+        asOf: { type: string, format: date-time }
+    NetworkPortalWorkbenchView:
+      type: object
+      additionalProperties: false
+      required: [networkId, activeWorkOrderCount, activeTaskCount, activeTechnicianCount, capacity, asOf]
+      properties:
+        networkId: { type: string, format: uuid }
+        activeWorkOrderCount: { type: integer, minimum: 0 }
+        activeTaskCount: { type: integer, minimum: 0 }
+        activeTechnicianCount: { type: integer, minimum: 0 }
+        capacity: { type: array, items: { $ref: '#/components/schemas/NetworkPortalCapacityItem' } }
         asOf: { type: string, format: date-time }
     TouchRecentResourceRequest:
       type: object

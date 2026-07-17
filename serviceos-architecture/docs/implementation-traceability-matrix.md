@@ -23,7 +23,7 @@ status: Proposed
 | configuration | ARCH-05 | API-01/02 | DATA-01 | M2 CFG | E2 |
 | files | ARCH-10、ARCH-21、ARCH-25 | API-03 资料引用、API-08 文件控制面 | DATA-03、V010 物理迁移 | M3 FILE、M6 SEC、M11 | E1/E3 |
 | reliability | ARCH-20、ADR-014 | API-01 通用命令/事件 | DATA-01 | M6 TX | E1 |
-| readmodel | PRODUCT-01～07、ARCH-19、ADR-027/028/029/030/031、M189～M193 | API-06（§3 最近访问 + §7 受控搜索 + §8 SavedView 个人+共享 + §9 Admin UI Preference）、Core OpenAPI 0.85.0 | DATA-06、V071～V078、V091～V095 | M7 WO/QRY、M73～M99、M158、M189～M193 | U0/U1 |
+| readmodel | PRODUCT-01～07、ARCH-19、ADR-027/028/029/030/031/032、M189～M194 | API-06（§3 最近访问 + §7 受控搜索 + §8 SavedView 个人+共享 + §9 Admin UI Preference + §10 Network Portal 只读）、Core OpenAPI 0.86.0 | DATA-06、V071～V078、V091～V095 | M7 WO/QRY、M73～M99、M158、M189～M194 | U0/U1 |
 | automation | ARCH-06、ARCH-20 | API-01 事件 | DATA-01 | M2 TASK、M6 TX | E1 |
 | operations | ARCH-14、ARCH-20、M60 | API-04 exception、outbound-delivery-recovered@v1、operational-exception-resolved@v2 | DATA-04、V060 | M4 OPS、M6 TX、M60 | E1/E4 |
 | workorder | ARCH-03/06 | API-01/02 | DATA-01 | M2 WO | E2 |
@@ -288,3 +288,4 @@ Feature gate/authority: if applicable
 | M191 | Admin 共享 SavedView：ROLE/TENANT 可见性；`preference.shareSavedView`；列表合并；Share≠数据授权；Admin Share/Unshare UI | ADR-029 + Core OpenAPI 0.83.0 + Flyway V093 + PostgreSQL/MVC/ArchitectureTest + Admin E2E + `204-m191-*` + `188-m191-*` | ORGANIZATION 组织树共享、Network/Technician SavedView、共享 UI Preference |
 | M192 | Admin 受控全局搜索：`search.read` + type 读能力降级；WO/EXTERNAL/NETWORK/TECHNICIAN fan-in；无索引平台；Admin Search 页 | ADR-030 + Core OpenAPI 0.84.0 + Flyway V094 + PostgreSQL/MVC/ArchitectureTest + Admin E2E + `205-m192-*` + `189-m192-*` | `search_document` 索引、VEHICLE/CHARGER、Network/Technician Portal 搜索 |
 | M193 | Admin 最近访问：`GET/PUT /me/recent-resources`；读时重鉴权省略失权项；`rdm_recent_resource`；AppShell Recent | ADR-031 + Core OpenAPI 0.85.0 + Flyway V095 + PostgreSQL/MVC/ArchitectureTest + Admin E2E + `206-m193-*` + `190-m193-*` | notifications、application-context、Network/Technician Portal 最近访问 |
+| M194 | Network Portal 只读：`/network-portal/work-orders|tasks|technicians|workbench|capacity`；`X-Network-Context`；ACTIVE assignment fan-in；Admin Web shell | ADR-032 + Core OpenAPI 0.86.0 + Flyway 095/97 + PostgreSQL/MVC/ArchitectureTest + Admin E2E + `207-m194-*` + `191-m194-*` | Technician Feed、Network 写命令、完整 product/03、评分/容量策略引擎 |

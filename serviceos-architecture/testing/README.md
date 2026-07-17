@@ -194,4 +194,5 @@
 - [M191 Admin 共享 SavedView 验收矩阵](188-m191-admin-shared-saved-view-acceptance.md)
 - [M192 Admin 受控全局搜索验收矩阵](189-m192-admin-controlled-search-acceptance.md)
 - [M193 Admin 最近访问验收矩阵](190-m193-admin-recent-resources-acceptance.md)
+- [M194 Network Portal 只读查询验收矩阵](191-m194-network-portal-read-apis-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)
