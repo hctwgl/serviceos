@@ -564,6 +564,8 @@ watch(selectedTaskId, () => {
           <th>阶段</th>
           <th>类型</th>
           <th>种类</th>
+          <th>业务</th>
+          <th>生效自</th>
           <th>师傅</th>
         </tr>
       </thead>
@@ -583,6 +585,8 @@ watch(selectedTaskId, () => {
           <td data-testid="task-stage-code">{{ item.stageCode ?? '—' }}</td>
           <td>{{ item.taskType ?? '—' }}</td>
           <td data-testid="task-kind">{{ item.taskKind ?? '—' }}</td>
+          <td data-testid="task-business-type">{{ item.businessType ?? '—' }}</td>
+          <td data-testid="task-effective-from">{{ item.effectiveFrom ?? '—' }}</td>
           <td data-testid="task-technician-label">{{ technicianLabel(item.technicianId) }}</td>
         </tr>
       </tbody>

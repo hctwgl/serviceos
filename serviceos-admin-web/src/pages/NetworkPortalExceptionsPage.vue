@@ -48,7 +48,7 @@ watch(
 <template>
   <section data-testid="network-portal-exceptions" data-page-id="NETWORK.EXCEPTION.QUEUE">
     <h2>本网点异常</h2>
-    <p class="hint">未关闭运营异常；可深链到任务页处理，Portal 不提供一键 ACK。</p>
+    <p class="hint">未关闭运营异常；M220 展示 Accepted 字段；Portal 不提供一键 ACK。</p>
     <p
       v-if="filterTaskId"
       class="filter"
@@ -64,16 +64,25 @@ watch(
       <thead>
         <tr>
           <th>异常</th>
+          <th>项目</th>
+          <th>工单</th>
           <th>任务</th>
+          <th>处理任务</th>
+          <th>来源/类别</th>
           <th>严重度</th>
           <th>状态</th>
           <th>错误码</th>
-          <th>打开时间</th>
+          <th>次数</th>
+          <th>打开/最近</th>
           <th>任务</th>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="item in items" :key="item.exceptionId">
+        <tr
+          v-for="item in items"
+          :key="item.exceptionId"
+          :data-testid="`exception-row-${item.exceptionId}`"
+        >
           <td>
             <RouterLink
               :to="`/network-portal/exceptions/${item.exceptionId}`"
@@ -82,11 +91,38 @@ watch(
               {{ item.exceptionId }}
             </RouterLink>
           </td>
+          <td data-testid="exception-project-id">{{ item.projectId ?? '—' }}</td>
+          <td>
+            <RouterLink
+              v-if="item.workOrderId"
+              :to="`/network-portal/work-orders/${item.workOrderId}`"
+              data-testid="exception-work-order-deeplink"
+            >
+              {{ item.workOrderId }}
+            </RouterLink>
+            <span v-else>—</span>
+          </td>
           <td>{{ item.taskId || '—' }}</td>
+          <td>
+            <RouterLink
+              v-if="item.handlingTaskId"
+              :to="{ path: '/network-portal/tasks', query: { taskId: item.handlingTaskId } }"
+              data-testid="exception-handling-task-deeplink"
+            >
+              {{ item.handlingTaskId }}
+            </RouterLink>
+            <span v-else>—</span>
+          </td>
+          <td data-testid="exception-source-category">
+            {{ item.sourceType }} / {{ item.category }}
+          </td>
           <td>{{ item.severity }}</td>
           <td>{{ item.status }}</td>
           <td>{{ item.errorCode }}</td>
-          <td>{{ item.openedAt }}</td>
+          <td data-testid="exception-occurrence-count">{{ item.occurrenceCount }}</td>
+          <td data-testid="exception-opened-last">
+            {{ item.openedAt }} / {{ item.lastDetectedAt }}
+          </td>
           <td>
             <RouterLink
               v-if="item.taskId"

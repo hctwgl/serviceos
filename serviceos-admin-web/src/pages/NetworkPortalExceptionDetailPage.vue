@@ -104,7 +104,19 @@ watch(
           <span v-else>—</span>
         </dd>
       </div>
-      <div><dt>handlingTaskId</dt><dd>{{ detail.handlingTaskId ?? '—' }}</dd></div>
+      <div>
+        <dt>handlingTaskId</dt>
+        <dd>
+          <RouterLink
+            v-if="detail.handlingTaskId"
+            :to="{ path: '/network-portal/tasks', query: { taskId: detail.handlingTaskId } }"
+            data-testid="exception-detail-handling-task-deeplink"
+          >
+            {{ detail.handlingTaskId }}
+          </RouterLink>
+          <span v-else>—</span>
+        </dd>
+      </div>
       <div><dt>occurrenceCount</dt><dd>{{ detail.occurrenceCount }}</dd></div>
       <div><dt>openedAt</dt><dd>{{ detail.openedAt }}</dd></div>
       <div><dt>lastDetectedAt</dt><dd>{{ detail.lastDetectedAt }}</dd></div>

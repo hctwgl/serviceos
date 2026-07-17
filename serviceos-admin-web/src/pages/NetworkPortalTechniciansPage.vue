@@ -134,15 +134,21 @@ watch(() => props.networkContextId, () => {
         <tr>
           <th>关系 ID</th>
           <th>姓名</th>
+          <th>主体</th>
           <th>档案状态</th>
           <th>关系状态</th>
+          <th>有效期</th>
           <th>版本</th>
           <th>档案 ID</th>
           <th>操作</th>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="item in items" :key="item.membershipId">
+        <tr
+          v-for="item in items"
+          :key="item.membershipId"
+          :data-testid="`technician-row-${item.membershipId}`"
+        >
           <td>
             <RouterLink
               :to="`/network-portal/technicians/memberships/${item.membershipId}`"
@@ -152,8 +158,12 @@ watch(() => props.networkContextId, () => {
             </RouterLink>
           </td>
           <td>{{ item.displayName }}</td>
+          <td data-testid="technician-principal-id">{{ item.principalId }}</td>
           <td>{{ item.profileStatus }}</td>
           <td>{{ item.membershipStatus }}</td>
+          <td data-testid="technician-valid-range">
+            {{ item.validFrom }} → {{ item.validTo ?? '—' }}
+          </td>
           <td data-testid="technician-membership-version">
             {{ versionForMembership(item.membershipId) }}
           </td>

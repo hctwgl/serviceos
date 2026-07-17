@@ -37,7 +37,7 @@ watch(() => props.networkContextId, () => {
 <template>
   <section data-testid="network-portal-qualifications" data-page-id="NETWORK.QUALIFICATION">
     <h2>本网点资质</h2>
-    <p class="hint">ACTIVE 师傅的资质记录；只读发现，不含裁决。</p>
+    <p class="hint">ACTIVE 师傅的资质记录；M220 展示 Accepted 字段；只读，不含裁决控件。</p>
     <p v-if="error" data-testid="network-portal-error">{{ error }}</p>
     <table v-else data-testid="network-qualifications-table">
       <thead>
@@ -47,11 +47,14 @@ watch(() => props.networkContextId, () => {
           <th>代码</th>
           <th>状态</th>
           <th>有效期</th>
-          <th>提交时间</th>
+          <th>提交人/时间</th>
+          <th>裁决人/时间</th>
+          <th>裁决原因</th>
+          <th>版本</th>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="item in items" :key="item.id">
+        <tr v-for="item in items" :key="item.id" :data-testid="`qualification-row-${item.id}`">
           <td>
             <RouterLink
               :to="`/network-portal/qualifications/${item.id}`"
@@ -64,7 +67,14 @@ watch(() => props.networkContextId, () => {
           <td>{{ item.qualificationCode }}</td>
           <td>{{ item.status }}</td>
           <td>{{ item.validFrom }} → {{ item.validTo ?? '—' }}</td>
-          <td>{{ item.submittedAt }}</td>
+          <td data-testid="qualification-submitted">
+            {{ item.submittedBy }} / {{ item.submittedAt }}
+          </td>
+          <td data-testid="qualification-decided">
+            {{ item.decidedBy ?? '—' }} / {{ item.decidedAt ?? '—' }}
+          </td>
+          <td data-testid="qualification-decision-reason">{{ item.decisionReason ?? '—' }}</td>
+          <td data-testid="qualification-version">{{ item.version }}</td>
         </tr>
       </tbody>
     </table>
