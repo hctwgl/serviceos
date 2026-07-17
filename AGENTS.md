@@ -402,3 +402,13 @@ bash scripts/verify-local.sh \
 ## 14. 例外
 
 确需偏离本指南时，必须说明冲突规则、原因、影响、迁移与回退方案；涉及长期架构、数据、安全或契约的偏离需更新 ADR、事实源和验收矩阵，并获得明确批准。局部、可逆且不改变业务语义的实现调整不需要为形式而新增 ADR。
+
+## M135～M140 身份与组织治理正式执行入口
+
+M135～M140 已接受为 M134 之后的正式实施序列，但尚未实现。涉及用户、组织、网点人员、师傅、角色授权或 Portal 上下文的 Agent 必须先阅读：
+
+- `serviceos-architecture/roadmap/03-identity-organization-governance-delivery-plan.md`
+- `serviceos-architecture/testing/identity-organization-governance-program-acceptance.md`
+- `serviceos-architecture/roadmap/04-identity-organization-governance-agent-worklist.md`
+
+不得创建保存密码的本地万能用户表，不得用单一 `user_type`、Keycloak Group、菜单或前端 scope 代替 Principal/Persona/Membership/RoleGrant 的权威边界。默认一个里程碑一个 Draft PR；只有对应工程证据成立后才更新 `latestMilestone` 或声明 IMPLEMENTED。
