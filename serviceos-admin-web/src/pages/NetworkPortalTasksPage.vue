@@ -2,15 +2,21 @@
 import { onMounted, ref, watch } from 'vue'
 import {
   assignNetworkPortalTechnician,
+  confirmNetworkPortalAppointment,
+  listNetworkPortalTaskAppointments,
   listNetworkPortalTasks,
   listNetworkPortalTechnicians,
+  proposeNetworkPortalAppointment,
+  type NetworkPortalAppointment,
   type NetworkPortalTaskItem,
   type NetworkPortalTechnicianItem,
 } from '../api/networkPortal'
+import { getMe } from '../api/me'
 
 const props = defineProps<{ networkContextId: string | null }>()
 const items = ref<NetworkPortalTaskItem[]>([])
 const technicians = ref<NetworkPortalTechnicianItem[]>([])
+const appointments = ref<NetworkPortalAppointment[]>([])
 const error = ref<string | null>(null)
 const selectedTaskId = ref('')
 const selectedTechnicianId = ref('')
@@ -19,10 +25,20 @@ const assignBusy = ref(false)
 const assignError = ref<string | null>(null)
 const assignMessage = ref<string | null>(null)
 
+const appointmentType = ref('SURVEY')
+const addressRef = ref('network-portal-address')
+const addressVersion = ref('v1')
+const windowStart = ref('2026-08-20T01:00:00.000Z')
+const windowEnd = ref('2026-08-20T04:00:00.000Z')
+const appointmentBusy = ref(false)
+const appointmentError = ref<string | null>(null)
+const appointmentMessage = ref<string | null>(null)
+
 async function load() {
   if (!props.networkContextId) {
     items.value = []
     technicians.value = []
+    appointments.value = []
     error.value = '请选择 NETWORK 上下文'
     return
   }
@@ -48,6 +64,23 @@ async function load() {
     }
   } catch {
     technicians.value = []
+  }
+  await loadAppointments()
+}
+
+async function loadAppointments() {
+  appointments.value = []
+  if (!props.networkContextId || !selectedTaskId.value) {
+    return
+  }
+  try {
+    const page = await listNetworkPortalTaskAppointments(
+      props.networkContextId,
+      selectedTaskId.value,
+    )
+    appointments.value = page
+  } catch {
+    appointments.value = []
   }
 }
 
@@ -78,6 +111,74 @@ async function submitAssign() {
   }
 }
 
+async function submitPropose() {
+  if (!props.networkContextId) {
+    appointmentError.value = '请选择 NETWORK 上下文'
+    return
+  }
+  if (!selectedTaskId.value) {
+    appointmentError.value = '请选择任务'
+    return
+  }
+  appointmentBusy.value = true
+  appointmentError.value = null
+  appointmentMessage.value = null
+  try {
+    const result = await proposeNetworkPortalAppointment(
+      props.networkContextId,
+      selectedTaskId.value,
+      {
+        type: appointmentType.value,
+        window: {
+          start: windowStart.value,
+          end: windowEnd.value,
+          timezone: 'Asia/Shanghai',
+          estimatedDurationMinutes: 120,
+        },
+        addressRef: addressRef.value.trim() || 'network-portal-address',
+        addressVersion: addressVersion.value.trim() || 'v1',
+      },
+    )
+    appointmentMessage.value =
+      `已提议 appointment=${result.data.appointmentId} status=${result.data.status}`
+    await loadAppointments()
+  } catch (err) {
+    appointmentError.value = err instanceof Error ? err.message : '提议预约失败'
+  } finally {
+    appointmentBusy.value = false
+  }
+}
+
+async function submitConfirm(item: NetworkPortalAppointment) {
+  if (!props.networkContextId) {
+    appointmentError.value = '请选择 NETWORK 上下文'
+    return
+  }
+  appointmentBusy.value = true
+  appointmentError.value = null
+  appointmentMessage.value = null
+  try {
+    const me = await getMe()
+    const result = await confirmNetworkPortalAppointment(
+      props.networkContextId,
+      item.appointmentId,
+      {
+        confirmedPartyType: 'NETWORK_MEMBER',
+        confirmedPartyRef: me.principalId,
+        confirmationChannel: 'PHONE',
+      },
+      item.aggregateVersion,
+    )
+    appointmentMessage.value =
+      `已确认 appointment=${result.data.appointmentId} status=${result.data.status}`
+    await loadAppointments()
+  } catch (err) {
+    appointmentError.value = err instanceof Error ? err.message : '确认预约失败'
+  } finally {
+    appointmentBusy.value = false
+  }
+}
+
 onMounted(() => {
   void load()
 })
@@ -85,6 +186,9 @@ watch(() => props.networkContextId, () => {
   selectedTaskId.value = ''
   selectedTechnicianId.value = ''
   void load()
+})
+watch(selectedTaskId, () => {
+  void loadAppointments()
 })
 </script>
 
@@ -162,6 +266,90 @@ watch(() => props.networkContextId, () => {
       <p v-if="assignError" class="error" data-testid="assign-technician-error">{{ assignError }}</p>
       <p v-if="assignMessage" class="ok" data-testid="assign-technician-message">{{ assignMessage }}</p>
     </form>
+
+    <form
+      class="assign"
+      data-testid="network-appointment-form"
+      data-page-id="NETWORK.APPOINTMENT"
+      @submit.prevent="submitPropose"
+    >
+      <h3>本网点预约</h3>
+      <p class="hint">
+        调用 Network Portal 预约 propose/confirm；确认方固定为 NETWORK_MEMBER + 当前主体。
+      </p>
+      <label>
+        任务
+        <select
+          v-model="selectedTaskId"
+          data-testid="appointment-task-select"
+          aria-label="appointment task"
+        >
+          <option disabled value="">选择任务</option>
+          <option v-for="item in items" :key="item.taskId" :value="item.taskId">
+            {{ item.taskId }}
+          </option>
+        </select>
+      </label>
+      <label>
+        类型
+        <select v-model="appointmentType" data-testid="appointment-type" aria-label="appointment type">
+          <option value="SURVEY">SURVEY</option>
+          <option value="INSTALLATION">INSTALLATION</option>
+          <option value="REPAIR">REPAIR</option>
+          <option value="CORRECTION">CORRECTION</option>
+          <option value="SECOND_VISIT">SECOND_VISIT</option>
+        </select>
+      </label>
+      <label>
+        窗口开始
+        <input v-model="windowStart" data-testid="appointment-window-start" aria-label="window start" />
+      </label>
+      <label>
+        窗口结束
+        <input v-model="windowEnd" data-testid="appointment-window-end" aria-label="window end" />
+      </label>
+      <label>
+        地址引用
+        <input v-model="addressRef" data-testid="appointment-address-ref" aria-label="address ref" />
+      </label>
+      <label>
+        地址版本
+        <input
+          v-model="addressVersion"
+          data-testid="appointment-address-version"
+          aria-label="address version"
+        />
+      </label>
+      <button
+        type="submit"
+        data-testid="appointment-propose-submit"
+        :disabled="appointmentBusy || !props.networkContextId"
+      >
+        提议预约
+      </button>
+      <ul data-testid="network-appointments-list" class="appointments">
+        <li v-for="item in appointments" :key="item.appointmentId">
+          <span>
+            {{ item.appointmentId }} · {{ item.status }} · v{{ item.aggregateVersion }}
+          </span>
+          <button
+            v-if="item.status === 'PROPOSED'"
+            type="button"
+            data-testid="appointment-confirm-submit"
+            :disabled="appointmentBusy"
+            @click="submitConfirm(item)"
+          >
+            确认
+          </button>
+        </li>
+      </ul>
+      <p v-if="appointmentError" class="error" data-testid="appointment-error">
+        {{ appointmentError }}
+      </p>
+      <p v-if="appointmentMessage" class="ok" data-testid="appointment-message">
+        {{ appointmentMessage }}
+      </p>
+    </form>
   </section>
 </template>
 
@@ -185,5 +373,18 @@ watch(() => props.networkContextId, () => {
 }
 .ok {
   color: #165;
+}
+.appointments {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+.appointments li {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
 }
 </style>

@@ -5,7 +5,7 @@
         displayName = "Appointment",
         allowedDependencies = {
                 "shared", "identity::api", "authorization::api", "audit::api",
-                "reliability::api", "task::api", "dispatch::api"
+                "reliability::api", "task::api", "dispatch::api", "network::api"
         }
 )
 package com.serviceos.appointment;

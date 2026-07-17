@@ -106,6 +106,8 @@ export function networkPortalRoutePath(pageId: string): string {
       return '/network-portal/technicians'
     case 'NETWORK.TECHNICIAN.ASSIGN':
       return '/network-portal/tasks'
+    case 'NETWORK.APPOINTMENT':
+      return '/network-portal/tasks'
     default:
       return '/network-portal/workbench'
   }

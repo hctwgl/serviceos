@@ -63,8 +63,8 @@ class SavedViewPostgresIT {
     @BeforeEach
     void clean() {
         jdbc.sql("TRUNCATE TABLE rdm_saved_view CASCADE").update();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("096");
-        assertThat(flyway.info().applied()).hasSize(98);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("097");
+        assertThat(flyway.info().applied()).hasSize(99);
     }
 
     @Test

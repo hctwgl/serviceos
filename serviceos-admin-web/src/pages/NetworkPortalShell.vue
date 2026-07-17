@@ -25,6 +25,7 @@ const TEST_IDS: Record<string, string> = {
   'NETWORK.TASK.QUEUE': 'nav-network-tasks',
   'NETWORK.TECHNICIAN.LIST': 'nav-network-technicians',
   'NETWORK.TECHNICIAN.ASSIGN': 'nav-network-assign-technician',
+  'NETWORK.APPOINTMENT': 'nav-network-appointments',
 }
 
 async function refreshNav(preferredContextId?: string | null) {
@@ -67,7 +68,7 @@ onMounted(() => {
   <div class="shell" data-testid="network-portal-shell">
     <aside class="nav">
       <h1>ServiceOS Network</h1>
-      <p class="hint">网点协作门户（M194 只读 + M196 指派师傅）。上下文来自 `/me/contexts`；API 携带 `X-Network-Context`。</p>
+      <p class="hint">网点协作门户（M194 只读 + M196 指派 + M197 预约）。上下文来自 `/me/contexts`；API 携带 `X-Network-Context`。</p>
       <div
         v-if="nav.contexts.filter((c) => c.portal === 'NETWORK').length > 0"
         class="context"

@@ -17,19 +17,19 @@ status: Proposed
 | identity | ARCH-07、ARCH-21 | API-01/02 通用身份上下文 | DATA-02 | M2 AUTH、M6 SEC | E1 |
 | organization | ARCH-01、ARCH-07、ARCH-11 | API-02/04 | DATA-02/04 | M2 AUTH、M4 DSP | E1/E4 |
 | project/workorder query | ARCH-01/03/05、M64～M68 | API-02/07、OpenAPI Core 0.39.0、project.created@v3、project.scope-relations-revised@v1 | DATA-01、V064～V068 | M2 CFG/WO、M7 ADM、M64～M68 | E0/E2 |
-| authorization | ARCH-07、ARCH-21、M63～M67、ADR-025/026、M186、M188、M196 | API-01/02/07、Core OpenAPI 0.88.0、ProjectScopeAuthorizationService、治理 HTTP、`/me*` | DATA-02、V064～V067、V089～V090、V096 | M2 AUTH、M6 SEC、M63～M67、M186、M188、M196 | E1/E4 |
+| authorization | ARCH-07、ARCH-21、M63～M67、ADR-025/026、M186、M188、M196、M197 | API-01/02/07、Core OpenAPI 0.89.0、ProjectScopeAuthorizationService、治理 HTTP、`/me*` | DATA-02、V064～V067、V089～V090、V096～V097 | M2 AUTH、M6 SEC、M63～M67、M186、M188、M196、M197 | E1/E4 |
 | audit | ARCH-07、ARCH-21 | 所有高风险命令 | DATA-02 | M2 AUD、M6 SEC/OPS | E1 |
 | authority | ARCH-17、ARCH-20 | API-01/05 authority/fence | DATA-05 | M5 CUT、M6 TX | E1/E5 |
 | configuration | ARCH-05 | API-01/02 | DATA-01 | M2 CFG | E2 |
 | files | ARCH-10、ARCH-21、ARCH-25 | API-03 资料引用、API-08 文件控制面 | DATA-03、V010 物理迁移 | M3 FILE、M6 SEC、M11 | E1/E3 |
 | reliability | ARCH-20、ADR-014 | API-01 通用命令/事件 | DATA-01 | M6 TX | E1 |
-| readmodel | PRODUCT-01～07、ARCH-19、ADR-027/028/029/030/031/032/033、M189～M195 | API-06（§3 最近访问 + §7 受控搜索 + §8 SavedView 个人+共享 + §9 Admin UI Preference + §10 Network Portal 只读 + §11 Technician Feed）、Core OpenAPI 0.88.0 | DATA-06、V071～V078、V091～V095 | M7 WO/QRY、M73～M99、M158、M189～M195 | U0/U1 |
+| readmodel | PRODUCT-01～07、ARCH-19、ADR-027/028/029/030/031/032/033、M189～M195 | API-06（§3 最近访问 + §7 受控搜索 + §8 SavedView 个人+共享 + §9 Admin UI Preference + §10 Network Portal 只读 + §11 Technician Feed）、Core OpenAPI 0.89.0 | DATA-06、V071～V078、V091～V095 | M7 WO/QRY、M73～M99、M158、M189～M195 | U0/U1 |
 | automation | ARCH-06、ARCH-20 | API-01 事件 | DATA-01 | M2 TASK、M6 TX | E1 |
 | operations | ARCH-14、ARCH-20、M60 | API-04 exception、outbound-delivery-recovered@v1、operational-exception-resolved@v2 | DATA-04、V060 | M4 OPS、M6 TX、M60 | E1/E4 |
 | workorder | ARCH-03/06 | API-01/02 | DATA-01 | M2 WO | E2 |
 | task | ARCH-06、M61 | API-01/02、task.created/completed@v1/v2 | DATA-01、V061 | M2 TASK、M61 | E1/E2 |
 | workflow | ARCH-06/20、ADR-006 | API-01 领域事件 | DATA-01 process link | M2 WF、M6 TX-011 | E2 |
-| appointment | ARCH-08 | API-03 | DATA-03 | M3 APT | E3 |
+| appointment | ARCH-08、ADR-035、M197 | API-03、Core OpenAPI 0.89.0 Network Portal appointments | DATA-03、V030、V097 | M3 APT、M197 | E3 |
 | fieldwork | ARCH-08 | API-03 | DATA-03 | M3 VISIT/FIELD | E3 |
 | forms | ARCH-09、ADR-018/022 | API-03、form.submitted@v1 | DATA-03、V053 | M3 FORM、M53 FRM | E3 |
 | evidence | ARCH-10、ADR-008/018/022 | API-03、evidence.slots-reresolved@v1 | DATA-03、V053 | M3 EVD/FILE、M53 | E3 |
@@ -291,3 +291,4 @@ Feature gate/authority: if applicable
 | M194 | Network Portal 只读：`/network-portal/work-orders|tasks|technicians|workbench|capacity`；`X-Network-Context`；ACTIVE assignment fan-in；Admin Web shell | ADR-032 + Core OpenAPI 0.86.0 + Flyway 095/97 + PostgreSQL/MVC/ArchitectureTest + Admin E2E + `207-m194-*` + `191-m194-*` | Technician Feed、Network 写命令、完整 product/03、评分/容量策略引擎 |
 | M195 | Technician Portal Feed：`/technician/me/task-feed|schedule|sync-summary`；`X-Technician-Context`；本人 ACTIVE assignment + tombstone；Admin Web shell | ADR-033 + Core OpenAPI 0.87.0 + Flyway 095/97 + PostgreSQL/MVC/ArchitectureTest + Admin E2E + `208-m195-*` + `192-m195-*` | 离线工作包、mobile sync commands、完整 Technician App、Network 写命令 |
 | M196 | Network Portal 指派师傅：`POST /network-portal/tasks/{taskId}:assign-technician`；强制 networkAssigneeId；委托 ManualAssign；Admin Web 表单 | ADR-034 + Core OpenAPI 0.88.0 + Flyway V096/98 + PostgreSQL/MVC/ArchitectureTest + Admin E2E + `209-m196-*` + `193-m196-*` | 改派、评分/硬过滤、预约/资料 Network 写、离线工作包 |
+| M197 | Network Portal 预约协作：propose/confirm/list；`networkPortal.manageAppointment`；拒绝 TECHNICIAN 确认伪装；Admin Web 表单 | ADR-035 + Core OpenAPI 0.89.0 + Flyway V097/99 + PostgreSQL/MVC/ArchitectureTest + Admin E2E + `210-m197-*` + `194-m197-*` | 改约/取消/爽约/联系尝试 Network 写、资料补传、离线工作包 |

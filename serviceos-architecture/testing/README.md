@@ -197,4 +197,5 @@
 - [M194 Network Portal 只读查询验收矩阵](191-m194-network-portal-read-apis-acceptance.md)
 - [M195 Technician Portal Feed 验收矩阵](192-m195-technician-portal-feed-acceptance.md)
 - [M196 Network Portal 指派师傅验收矩阵](193-m196-network-portal-assign-technician-acceptance.md)
+- [M197 Network Portal 预约协作验收矩阵](194-m197-network-portal-appointments-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

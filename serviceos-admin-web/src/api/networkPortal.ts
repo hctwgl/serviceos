@@ -122,6 +122,83 @@ export function assignNetworkPortalTechnician(
   )
 }
 
+export type AppointmentWindow = {
+  start: string
+  end: string
+  timezone: string
+  estimatedDurationMinutes: number
+}
+
+export type AppointmentCommandReceipt = {
+  appointmentId: string
+  revisionId: string
+  status: string
+  revisionNo: number
+  aggregateVersion: number
+  occurredAt: string
+}
+
+export type NetworkPortalAppointment = {
+  appointmentId: string
+  taskId: string
+  type: string
+  status: string
+  assignedNetworkId: string | null
+  aggregateVersion: number
+  currentRevisionNo: number
+}
+
+/** M197：列出本网点任务预约。 */
+export function listNetworkPortalTaskAppointments(networkContextId: string, taskId: string) {
+  return apiGet<NetworkPortalAppointment[]>(
+    `/network-portal/tasks/${taskId}/appointments`,
+    {},
+    networkHeaders(networkContextId),
+  )
+}
+
+/** M197：提议预约；委托 Admin propose 同形 body。 */
+export function proposeNetworkPortalAppointment(
+  networkContextId: string,
+  taskId: string,
+  body: {
+    type: string
+    window: AppointmentWindow
+    addressRef: string
+    addressVersion: string
+  },
+  idempotencyKey = crypto.randomUUID(),
+) {
+  return apiPost<AppointmentCommandReceipt>(`/network-portal/tasks/${taskId}/appointments`, {
+    body,
+    idempotencyKey,
+    headers: networkHeaders(networkContextId),
+  })
+}
+
+/** M197：确认预约；confirmedPartyType 仅 NETWORK_MEMBER/NETWORK。 */
+export function confirmNetworkPortalAppointment(
+  networkContextId: string,
+  appointmentId: string,
+  body: {
+    confirmedPartyType: string
+    confirmedPartyRef: string
+    confirmationChannel: string
+  },
+  aggregateVersion: number,
+  idempotencyKey = crypto.randomUUID(),
+) {
+  return apiPost<AppointmentCommandReceipt>(
+    `/network-portal/appointments/${appointmentId}:confirm`,
+    {
+      body,
+      idempotencyKey,
+      ifMatch: `"${aggregateVersion}"`,
+      headers: networkHeaders(networkContextId),
+    },
+  )
+}
+
 export function isPortalContextInvalid(err: unknown): boolean {
   const problem = (err as HttpStatusError | undefined)?.problem
   return (
