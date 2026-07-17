@@ -1,10 +1,10 @@
 ---
-title: Admin 试点可运行基线验收（含 M136）
+title: Admin 试点可运行基线验收（含 M137）
 status: Implemented
 lastUpdated: 2026-07-16
 ---
 
-# Admin 试点可运行基线验收（含 M136）
+# Admin 试点可运行基线验收（含 M137）
 
 | ID | 场景 | 证据 | 结果 |
 |---|---|---|---|
@@ -26,6 +26,7 @@ lastUpdated: 2026-07-16
 | ADMIN-PILOT-08X | 真实强制通过与重开 | 独立 OPEN Case → CRITICAL FORCE_APPROVED → 原 Case REOPENED + 同 Snapshot 后继 OPEN；页面导航/刷新保持后继身份，三类审计与三条事件 Inbox 成功，无 CorrectionCase | PASS |
 | ADMIN-PILOT-08S | 真实正常补传关闭复审完结 | 独立 Task：REJECTED → 源 Task 补传 Snapshot → resubmit → close → 新 ReviewCase APPROVED → 双引用 complete → FULFILLED；审计与 Inbox 成功 | PASS |
 | ADMIN-PILOT-08V | 真实预约上门写路径 | 独立 Task：propose→confirm→check-in→check-out；Appointment/Visit COMPLETED；审计与 Inbox 成功 | PASS |
+| ADMIN-PILOT-08O | 真实 BYD 提审外发 ACK | APPROVED → createBydReviewSubmission → 本地 stub errno=0 → ACKNOWLEDGED + CLIENT Case | PASS |
 | ADMIN-PILOT-08CI | 真实写链路 CI 阻断 | GitHub Actions `admin-pilot-e2e` 运行同一 OIDC/Backend/PostgreSQL/Chrome smoke；通过后才启动 staging | PASS |
 | ADMIN-PILOT-09 | 完整履约写链路 | 接单→派单→预约→上门→表单/资料→审核/整改→外发→完结 | NOT PROVEN |
 

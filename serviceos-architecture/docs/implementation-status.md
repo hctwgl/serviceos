@@ -4,7 +4,7 @@ version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-16
 baselineCommit: 6f713fb0c7f98df78b563c00173e8888b1166744
-latestMilestone: M136
+latestMilestone: M137
 ---
 
 # ServiceOS 实施状态总览
@@ -39,13 +39,13 @@ latestMilestone: M136
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M136 Admin 预约 / 上门写链路 E2E |
+| 最新实施里程碑 | M137 Admin BYD 提审外发 ACK E2E |
 | 基线提交 | `6f713fb0c7f98df78b563c00173e8888b1166744` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
 | 前端工程 | `serviceos-admin-web`（Vue+TS+Vite）已纳入 CI 构建，具备开发态 Keycloak PKCE，以及真实只读、Task MANUAL assign-candidates/claim/release、表单/资料/审核/整改/完结、正常补传复审，以及预约 propose→confirm→上门 check-in/check-out 的局部写链路 PR 阻断 E2E；Network/Technician 尚未建立 |
 | 数据库 | PostgreSQL + Flyway（当前版本 084 / 86） |
-| 契约 | Core OpenAPI 0.70.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、recovered/resolved 与 SLA started/breached/met@v1） |
+| 契约 | Core OpenAPI 0.71.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、recovered/resolved 与 SLA started/breached/met@v1） |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -75,7 +75,7 @@ latestMilestone: M136
 | 通知 | 通知与运营异常中心 | `PROPOSED` | 已有总体设计 | 通知通道、模板、可靠发送和 UI | `architecture/14-*` |
 | 履约事实与试算 | 事实提取和双向试算 | `PROPOSED` | 已有设计、API 和数据规划 | 运行时、投影和前端工作区 | M5 设计 |
 | 对账结算 | 对账、结算、争议与调整 | `PROPOSED` | 已有边界设计 | 正式运行时和页面 | `architecture/16-*` |
-| Admin Portal | 总部运营后台 | `PARTIAL` | M101～M136：队列/任务/SLA/异常/外发/工单/项目目录、工作区、allowed-actions；CI 阻断构建；开发态 Keycloak PKCE；真实只读与局部写链路 PR 阻断 E2E（含补传复审完结与预约上门） | 设计系统、SavedView、正式企业 OIDC/BFF、生产对象存储/专业扫描、外部提审、完整履约写链路 E2E（含接单/派单/外发） | M7 设计、M101～M136、Admin 试点基线 |
+| Admin Portal | 总部运营后台 | `PARTIAL` | M101～M137：队列/任务/SLA/异常/外发/工单/项目目录、工作区、allowed-actions；CI 阻断构建；开发态 Keycloak PKCE；真实只读与局部写链路 PR 阻断 E2E（含补传复审完结、预约上门与 BYD 提审外发 ACK） | 设计系统、SavedView、正式企业 OIDC/BFF、生产对象存储/专业扫描、外部提审、完整履约写链路 E2E（含接单/派单/外发） | M7 设计、M101～M137、Admin 试点基线 |
 | Network Portal | 网点协作端 | `PROPOSED` | 页面和跨端协作规格 | 前端代码和 E2E | M7 设计 |
 | Technician App | 师傅移动端 | `PROPOSED` | 弱网、离线工作包、上传队列和页面规格 | 移动端工程、真机和离线运行时 | M7 设计 |
 | External Portal | 用户/车企受控页面 | `PROPOSED` | 最小边界规划 | 二期页面和工程实现 | M7 设计 |
@@ -1034,17 +1034,26 @@ WAIVE、FORCE_APPROVED/reopen）的 PR 阻断 E2E。详见 `docs/admin-pilot-rea
 明确未实现：用户确认渠道、GPS BLOCK 策略演练、派单 Admin HTTP、外部提审 stub/回调、完整
 `ADMIN-PILOT-09`；详见 `architecture/149-m136-admin-appointment-visit-e2e.md`。
 
+### M137：Admin BYD 提审外发 ACK E2E
+
+已实现：
+
+- 获权 USER/SERVICE 可创建 BYD 提审交付；OpenAPI 0.71.0；
+- 第六套夹具登记 CREATE_WORK_ORDER Canonical 系谱；本地 stub 严格 errno=0；
+- Admin 审核页创建外发后详情可见 ACKNOWLEDGED，并自动创建 CLIENT ReviewCase；
+- 本地 BYD adapter SERVICE 主体获 CLIENT Case/Route 能力。
+
+明确未实现：真实 sandbox、厂端回调浏览器联调、其他 CPIM、入站接单完整链。
+
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M136**。Admin 局部写链路已覆盖补传复审完结与预约上门；
+ServiceOS 可靠纵向切片已推进到 **M137**。Admin 局部写链路已覆盖补传复审、预约上门与提审外发 ACK；
 没有实现完整 SLA/通知策略、通用队列/SavedView 或整个现场履约平台。
 
 ```text
 候选下一方向（优先从已确认文档中选择最小可靠切片）：
 1. 正式企业 OIDC/BFF、MFA 与设计系统；SavedView 仍需再接受 API-06 章节；
-2. 本地 BYD stub 外发 ACK + 回调 Admin E2E，再视试点数据接受情况串联入站接单；
-   当前已证明预约上门与补传复审完结，尚未证明外部提审回执与从入站接单开始的完整链
-   （试点业务基线仍为 Draft）；
+2. 厂端审核回调浏览器联调与入站接单串联（试点业务基线仍为 Draft）；
 3. 在接受 ServiceNetwork 状态语义后建立目录与准入/启用/清退生命周期；当前相关文档仍为 Proposed，
    不得猜测状态值或转换规则；
 4. 建立 Organization/Region 目录、层级后代与组织到 Project 的权威关系；
