@@ -225,6 +225,8 @@ export type NetworkPortalWorkOrderWorkspace = {
   appointments?: NetworkPortalWorkspaceAppointmentSummary[]
   /** Soft-gated；缺 NETWORK `networkPortal.manageAppointment` 时与 appointments 同时省略。 */
   contactAttempts?: NetworkPortalWorkspaceContactAttemptSummary[]
+  /** Soft-gated；缺 NETWORK `technician.readOwnNetwork` 时省略，不得用空数组伪装无权限。 */
+  technicians?: NetworkPortalTechnicianItem[]
   asOf: string
 }
 

@@ -3,8 +3,6 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import {
   getNetworkPortalWorkOrderWorkspace,
-  listNetworkPortalTechnicians,
-  type NetworkPortalTechnicianItem,
   type NetworkPortalWorkOrderWorkspace,
   type NetworkPortalWorkspaceAppointmentSummary,
 } from '../api/networkPortal'
@@ -13,7 +11,6 @@ const props = defineProps<{ networkContextId: string | null }>()
 const route = useRoute()
 const workOrderId = computed(() => String(route.params.id ?? ''))
 const detail = ref<NetworkPortalWorkOrderWorkspace | null>(null)
-const techniciansByProfileId = ref<Map<string, NetworkPortalTechnicianItem> | null>(null)
 const error = ref<string | null>(null)
 const loading = ref(false)
 
@@ -22,34 +19,13 @@ function hasAppointmentWindow(item: NetworkPortalWorkspaceAppointmentSummary) {
 }
 
 function resolveTechnician(technicianId: string | null | undefined) {
-  if (!technicianId || !techniciansByProfileId.value) {
+  if (!technicianId || !detail.value?.technicians) {
     return null
   }
-  return techniciansByProfileId.value.get(technicianId) ?? null
+  return (
+    detail.value.technicians.find((tech) => tech.technicianProfileId === technicianId) ?? null
+  )
 }
-
-const currentTechnicians = computed(() => {
-  if (!detail.value || !techniciansByProfileId.value) {
-    return null
-  }
-  const ids = new Set<string>()
-  if (detail.value.technicianId) {
-    ids.add(detail.value.technicianId)
-  }
-  for (const task of detail.value.tasks) {
-    if (task.technicianId) {
-      ids.add(task.technicianId)
-    }
-  }
-  const items: NetworkPortalTechnicianItem[] = []
-  for (const id of ids) {
-    const tech = techniciansByProfileId.value.get(id)
-    if (tech) {
-      items.push(tech)
-    }
-  }
-  return items
-})
 
 const unassignedTaskIds = computed(() => {
   if (!detail.value) {
@@ -60,27 +36,9 @@ const unassignedTaskIds = computed(() => {
     .map((task) => task.taskId)
 })
 
-async function loadTechnicians() {
-  techniciansByProfileId.value = null
-  if (!props.networkContextId) {
-    return
-  }
-  try {
-    const page = await listNetworkPortalTechnicians(props.networkContextId)
-    const map = new Map<string, NetworkPortalTechnicianItem>()
-    for (const item of page.items) {
-      map.set(item.technicianProfileId, item)
-    }
-    techniciansByProfileId.value = map
-  } catch {
-    techniciansByProfileId.value = null
-  }
-}
-
 async function load() {
   if (!props.networkContextId) {
     detail.value = null
-    techniciansByProfileId.value = null
     error.value = '请选择 NETWORK 上下文'
     return
   }
@@ -96,11 +54,8 @@ async function load() {
       workOrderId.value,
     )
     error.value = null
-    // M225/M226/M227：整改/异常/预约/联系由 workspace 服务端交付；仅师傅名仍客户端 fan-in。
-    await loadTechnicians()
   } catch (err) {
     detail.value = null
-    techniciansByProfileId.value = null
     error.value = err instanceof Error ? err.message : '工单工作区加载失败'
   } finally {
     loading.value = false
@@ -138,8 +93,7 @@ watch(
       </div>
     </header>
     <p class="hint">
-      只读薄快照（M213）+ 协作深链（M214）+ 预约/联系 fan-in（M215）+ 师傅 fan-in（M216）+
-      SLA 摘要（M221）+ Visit/表单提交摘要（M222）：缺能力时省略相关区块。
+      只读薄快照（M213）+ 协作深链（M214）+ 服务端摘要 enrichment（M221～M228）：缺能力时省略相关区块。
     </p>
     <p v-if="error" data-testid="network-portal-error">{{ error }}</p>
     <p v-else-if="loading" data-testid="workspace-loading">加载中…</p>
@@ -297,14 +251,15 @@ watch(
       </section>
 
       <section
-        v-if="currentTechnicians"
+        v-if="detail.technicians"
         data-testid="workspace-current-technicians"
         class="related"
+        aria-label="Current technician summaries"
       >
         <h3>当前师傅</h3>
-        <ul v-if="currentTechnicians.length">
+        <ul v-if="detail.technicians.length">
           <li
-            v-for="tech in currentTechnicians"
+            v-for="tech in detail.technicians"
             :key="tech.technicianProfileId"
             :data-testid="`workspace-technician-${tech.technicianProfileId}`"
           >
@@ -336,6 +291,10 @@ watch(
             </RouterLink>
           </li>
         </ul>
+        <p class="hint">
+          需 NETWORK <code>technician.readOwnNetwork</code>。字段对齐
+          <code>NetworkPortalTechnicianItem</code>；仅含工作区 technicianId 命中项。
+        </p>
       </section>
 
       <h3>本网点 ACTIVE 任务</h3>

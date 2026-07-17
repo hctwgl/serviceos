@@ -137,8 +137,8 @@ class NetworkPortalReadPostgresIT {
         seedHumanTask(TASK_A, WO_A);
         seedHumanTask(TASK_A2, WO_A);
         seedHumanTask(TASK_B, WO_B);
-        seedActiveNetworkAssignment(NETWORK_A, WO_A, TASK_A, "tech-a");
-        seedActiveNetworkAssignment(NETWORK_A, WO_A, TASK_A2, "tech-a");
+        seedActiveNetworkAssignment(NETWORK_A, WO_A, TASK_A, TECH_PROFILE.toString());
+        seedActiveNetworkAssignment(NETWORK_A, WO_A, TASK_A2, TECH_PROFILE.toString());
         seedActiveNetworkAssignment(NETWORK_B, WO_B, TASK_B, "tech-b");
         seedCapacity(NETWORK_A, 10, 3);
         seedCapacity(NETWORK_B, 5, 1);
@@ -194,7 +194,7 @@ class NetworkPortalReadPostgresIT {
         assertThat(workspace.tasks()).extracting(NetworkPortalTaskItem::taskId)
                 .containsExactlyInAnyOrder(TASK_A, TASK_A2);
         assertThat(workspace.tasks().getFirst().status()).isEqualTo("READY");
-        assertThat(workspace.technicianId()).isEqualTo("tech-a");
+        assertThat(workspace.technicianId()).isEqualTo(TECH_PROFILE.toString());
 
         assertThatThrownBy(() -> portal.getWorkOrderWorkspace(
                 actor(PRINCIPAL), "corr-ws-foreign", context, WO_B))
@@ -215,6 +215,100 @@ class NetworkPortalReadPostgresIT {
         assertThat(workspace.exceptions()).isNull();
         assertThat(workspace.appointments()).isNull();
         assertThat(workspace.contactAttempts()).isNull();
+        // M228：夹具默认已授 technician.readOwnNetwork，故 technicians 有命中项
+        assertThat(workspace.technicians())
+                .extracting(NetworkPortalTechnicianItem::technicianProfileId)
+                .containsExactly(TECH_PROFILE);
+    }
+
+    @Test
+    void workOrderWorkspaceTechnicianSummariesAreCapabilityGatedAndMatched() {
+        String context = "NETWORK|NETWORK|" + NETWORK_A;
+        // 临时撤掉夹具默认的 technician.readOwnNetwork，验证省略语义
+        jdbc.sql("""
+                UPDATE auth_role_grant SET grant_status='REVOKED', revoked_at=now(),
+                       revoked_by='test', revoke_reason='m228',
+                       aggregate_version = aggregate_version + 1, updated_at=now()
+                 WHERE tenant_id=:tenant AND principal_id=:principal
+                   AND scope_type='NETWORK' AND scope_ref=:network
+                   AND role_id IN (
+                     SELECT role_id FROM auth_role_capability
+                      WHERE capability_code='technician.readOwnNetwork'
+                   )
+                """)
+                .param("tenant", TENANT)
+                .param("principal", PRINCIPAL.toString())
+                .param("network", NETWORK_A.toString())
+                .update();
+        jdbc.sql("""
+                UPDATE auth_tenant_grant_generation
+                   SET generation = generation + 1, updated_at = now()
+                 WHERE tenant_id = :tenant
+                """).param("tenant", TENANT).update();
+        NetworkPortalWorkOrderWorkspace withoutCap = portal.getWorkOrderWorkspace(
+                actor(PRINCIPAL), "corr-ws-tech-omit", context, WO_A);
+        assertThat(withoutCap.technicians()).isNull();
+
+        seedGrant(PRINCIPAL, "technician.readOwnNetwork", "NETWORK", NETWORK_A.toString());
+        jdbc.sql("""
+                UPDATE auth_tenant_grant_generation
+                   SET generation = generation + 1, updated_at = now()
+                 WHERE tenant_id = :tenant
+                """).param("tenant", TENANT).update();
+        // 故意用不存在的 profile 指派，验证「有能力但无命中 → []」
+        jdbc.sql("""
+                UPDATE dsp_service_assignment
+                   SET assignee_id = 'unknown-tech'
+                 WHERE tenant_id = :tenant
+                   AND task_id = :taskA
+                   AND responsibility_level = 'TECHNICIAN'
+                """)
+                .param("tenant", TENANT)
+                .param("taskA", TASK_A)
+                .update();
+        jdbc.sql("""
+                UPDATE dsp_service_assignment
+                   SET assignee_id = 'unknown-tech'
+                 WHERE tenant_id = :tenant
+                   AND task_id = :taskA2
+                   AND responsibility_level = 'TECHNICIAN'
+                """)
+                .param("tenant", TENANT)
+                .param("taskA2", TASK_A2)
+                .update();
+        NetworkPortalWorkOrderWorkspace empty = portal.getWorkOrderWorkspace(
+                actor(PRINCIPAL), "corr-ws-tech-empty", context, WO_A);
+        assertThat(empty.technicians()).isEmpty();
+
+        jdbc.sql("""
+                UPDATE dsp_service_assignment
+                   SET assignee_id = :profile
+                 WHERE tenant_id = :tenant
+                   AND task_id = :taskA
+                   AND responsibility_level = 'TECHNICIAN'
+                """)
+                .param("profile", TECH_PROFILE.toString())
+                .param("tenant", TENANT)
+                .param("taskA", TASK_A)
+                .update();
+        jdbc.sql("""
+                UPDATE dsp_service_assignment
+                   SET assignee_id = :profile
+                 WHERE tenant_id = :tenant
+                   AND task_id = :taskA2
+                   AND responsibility_level = 'TECHNICIAN'
+                """)
+                .param("profile", TECH_PROFILE.toString())
+                .param("tenant", TENANT)
+                .param("taskA2", TASK_A2)
+                .update();
+        NetworkPortalWorkOrderWorkspace withData = portal.getWorkOrderWorkspace(
+                actor(PRINCIPAL), "corr-ws-tech", context, WO_A);
+        assertThat(withData.technicians())
+                .extracting(NetworkPortalTechnicianItem::technicianProfileId)
+                .containsExactly(TECH_PROFILE);
+        assertThat(withData.technicians().getFirst().displayName()).isEqualTo("网点师傅甲");
+        assertThat(withData.technicians().getFirst().membershipStatus()).isEqualTo("ACTIVE");
     }
 
     @Test

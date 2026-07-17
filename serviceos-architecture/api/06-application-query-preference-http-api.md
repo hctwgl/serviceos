@@ -6,7 +6,7 @@ status: Accepted
 
 # 应用工作区、队列与用户偏好 HTTP API
 
-## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158 / M189 / M190 / M191 / M192 / M193 / M194 / M195 / M202 / M203 / M205 / M206 / M207 / M213 / M214 / M215 / M216 / M217 / M218 / M219 / M220 / M221 / M222 / M223 / M224 / M225 / M226 / M227）
+## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158 / M189 / M190 / M191 / M192 / M193 / M194 / M195 / M202 / M203 / M205 / M206 / M207 / M213 / M214 / M215 / M216 / M217 / M218 / M219 / M220 / M221 / M222 / M223 / M224 / M225 / M226 / M227 / M228）
 
 **Accepted（可指导实现）**：
 
@@ -247,7 +247,12 @@ status: Accepted
   `appointments`/`contactAttempts`（`$ref` Admin 摘要）；NETWORK
   `networkPortal.manageAppointment` soft-gate；ACTIVE taskIds；预约按 networkId 过滤。
   Core OpenAPI → `1.0.7`。catalog 仍 `page-registry-v16`；Flyway 仍 100/102。
-  **不**接受完整 Appointment DTO、写控件、PII、师傅服务端摘要、notifications。
+  **不**接受完整 Appointment DTO、写控件、PII、notifications。
+- §10 Network Portal 工作区当前师傅服务端摘要（M228 / ADR-066）：扩展同一 workspace 可选
+  `technicians`（`$ref` `NetworkPortalTechnicianItem`）；NETWORK
+  `technician.readOwnNetwork` soft-gate；仅工作区 technicianId 命中项。
+  Core OpenAPI → `1.0.8`。catalog 仍 `page-registry-v16`；Flyway 仍 100/102。
+  **不**接受 PII、写控件、Admin workspace 复用、notifications。
 
 **仍为设计草案**：§3 中 `application-context`/`notifications`、§4 工作台与队列、§5 其余 section、
 §6 其余专项队列、§7 中 `VEHICLE`/`CHARGER` 与全文索引搜索、§8 ORGANIZATION 组织树共享与

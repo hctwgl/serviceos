@@ -302,6 +302,20 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
             contactAttemptSummaries = loadContactAttemptSummaries(
                     actor, correlationId, activeTaskIds);
         }
+        List<NetworkPortalTechnicianItem> technicianSummaries = null;
+        if (hasNetworkCapability(actor, correlationId, TECHNICIAN_READ_OWN, networkId)) {
+            Set<String> wantedTechnicianIds = new LinkedHashSet<>();
+            if (technicianId != null && !technicianId.isBlank()) {
+                wantedTechnicianIds.add(technicianId);
+            }
+            for (NetworkPortalTaskItem task : taskItems) {
+                if (task.technicianId() != null && !task.technicianId().isBlank()) {
+                    wantedTechnicianIds.add(task.technicianId());
+                }
+            }
+            technicianSummaries = loadTechnicianSummaries(
+                    actor.tenantId(), networkId, wantedTechnicianIds);
+        }
         return new NetworkPortalWorkOrderWorkspace(
                 networkId,
                 workOrderId,
@@ -320,6 +334,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                 exceptionSummaries,
                 appointmentSummaries,
                 contactAttemptSummaries,
+                technicianSummaries,
                 clock.instant());
     }
 
@@ -655,6 +670,36 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                 attempt.resultCode().name(),
                 attempt.nextContactAt(),
                 attempt.createdAt());
+    }
+
+    /**
+     * M228：NETWORK technician.readOwnNetwork 已 soft-gate；仅返回工作区 technicianId 命中项。
+     */
+    private List<NetworkPortalTechnicianItem> loadTechnicianSummaries(
+            String tenantId,
+            UUID networkId,
+            Set<String> wantedTechnicianIds
+    ) {
+        if (wantedTechnicianIds.isEmpty()) {
+            return List.of();
+        }
+        return technicians.listActiveTechnicians(tenantId, networkId).stream()
+                .filter(row -> wantedTechnicianIds.contains(row.technicianProfileId().toString()))
+                .map(row -> new NetworkPortalTechnicianItem(
+                        row.membershipId(),
+                        row.technicianProfileId(),
+                        row.principalId(),
+                        row.displayName(),
+                        row.profileStatus(),
+                        row.membershipStatus(),
+                        row.validFrom(),
+                        row.validTo(),
+                        row.membershipVersion()))
+                .sorted(Comparator
+                        .comparing(NetworkPortalTechnicianItem::displayName,
+                                Comparator.nullsLast(String::compareTo))
+                        .thenComparing(NetworkPortalTechnicianItem::technicianProfileId))
+                .toList();
     }
 
     private NetworkPortalWorkspaceCorrectionCaseSummary toCorrectionCaseSummary(
