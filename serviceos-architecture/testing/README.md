@@ -237,4 +237,5 @@
 - [M234 Network Portal 目录页 SLA 风险服务端摘要验收矩阵](231-m234-network-portal-directory-sla-risk-summary-acceptance.md)
 - [M235 Network Portal 目录页资料 Evidence 服务端摘要验收矩阵](232-m235-network-portal-directory-evidence-summary-acceptance.md)
 - [M236 Network Portal 目录页工单头字段验收矩阵](233-m236-network-portal-directory-work-order-header-acceptance.md)
+- [M237 Network Portal 工作台统计时间展示验收矩阵](234-m237-network-portal-workbench-stats-time-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)
