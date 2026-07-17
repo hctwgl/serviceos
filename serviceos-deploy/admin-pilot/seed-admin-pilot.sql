@@ -230,7 +230,7 @@ INSERT INTO rdm_work_order_timeline_entry (
     '90000000-0000-4000-8000-000000000001', 'tenant-local',
     '10000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001',
     '91000000-0000-4000-8000-000000000001', 'workorder', 'WorkOrderReceived', 1,
-    'WORK_ORDER', 'WORK_ORDER', '40000000-0000-4000-8000-000000000001', 1,
+    'WORK_ORDER', 'WorkOrder', '40000000-0000-4000-8000-000000000001', 1,
     'ADMIN-PILOT-001', 'RECEIVED', 'local-fixture', 'admin-pilot-seed',
     'work-order.received', 1, now() - interval '2 hours', now() - interval '2 hours', 1
 ),
@@ -238,10 +238,22 @@ INSERT INTO rdm_work_order_timeline_entry (
     '90000000-0000-4000-8000-000000000002', 'tenant-local',
     '10000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001',
     '91000000-0000-4000-8000-000000000002', 'task', 'HumanTaskCreated', 1,
-    'TASK', 'TASK', '70000000-0000-4000-8000-000000000001', 1,
+    'TASK', 'Task', '70000000-0000-4000-8000-000000000001', 1,
     'PILOT_SURVEY', 'READY', 'local-fixture', 'admin-pilot-seed',
     'task.created', 1, now() - interval '90 minutes', now() - interval '90 minutes', 1
 ) ON CONFLICT DO NOTHING;
+
+-- 本地夹具纠偏：历史种子曾把 resource_type 写成 category 风格大写，与 OpenAPI PascalCase 不一致。
+UPDATE rdm_work_order_timeline_entry
+   SET resource_type = 'WorkOrder'
+ WHERE tenant_id = 'tenant-local'
+   AND timeline_entry_id = '90000000-0000-4000-8000-000000000001'
+   AND resource_type <> 'WorkOrder';
+UPDATE rdm_work_order_timeline_entry
+   SET resource_type = 'Task'
+ WHERE tenant_id = 'tenant-local'
+   AND timeline_entry_id = '90000000-0000-4000-8000-000000000002'
+   AND resource_type <> 'Task';
 
 INSERT INTO rdm_projection_checkpoint (
     projection_code, tenant_id, partition_key, rebuild_generation,

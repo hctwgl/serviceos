@@ -229,6 +229,26 @@ type TaskSectionLink = {
   status: string
 }
 
+type TimelineResourceLink = {
+  key: string
+  routeName: string
+  resourceId: string
+  eventType: string
+  resourceType: string
+  label: string
+}
+
+/** 仅映射已有 Admin 详情路由；Appointment/Visit/Form 等无对等页时不渲染。 */
+const TIMELINE_RESOURCE_ROUTES: Record<string, string> = {
+  WorkOrder: 'ADMIN.WORKORDER.WORKSPACE',
+  Task: 'ADMIN.TASK.DETAIL',
+  ReviewCase: 'ADMIN.REVIEW.DETAIL',
+  CorrectionCase: 'ADMIN.CORRECTION.DETAIL',
+  OutboundDelivery: 'ADMIN.INTEGRATION.DETAIL',
+  OperationalException: 'ADMIN.EXCEPTION.DETAIL',
+  SlaInstance: 'ADMIN.SLA.DETAIL',
+}
+
 const inboundEnvelopeLinks = computed((): InboundEnvelopeLink[] => {
   const integration = sectionData.value?.integration
   if (!integration || activeSection.value !== 'INTEGRATION') return []
@@ -333,6 +353,39 @@ const taskSectionLinks = computed((): TaskSectionLink[] => {
       }
     })
     .filter((item): item is TaskSectionLink => item != null)
+})
+
+/** 按需 TIMELINE_AUDIT：仅对已有详情页的 resourceType 生成深链。 */
+const timelineResourceLinks = computed((): TimelineResourceLink[] => {
+  const section = sectionData.value?.timeline
+  if (!section || activeSection.value !== 'TIMELINE_AUDIT') return []
+  const raw = section.items
+  if (!Array.isArray(raw)) return []
+  const seen = new Set<string>()
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null
+      const row = item as Record<string, unknown>
+      const resourceType = typeof row.resourceType === 'string' ? row.resourceType : ''
+      const resourceId = typeof row.resourceId === 'string' ? row.resourceId : ''
+      const routeName = TIMELINE_RESOURCE_ROUTES[resourceType]
+      if (!routeName || !resourceId) return null
+      const dedupeKey = `${resourceType}:${resourceId}`
+      if (seen.has(dedupeKey)) return null
+      seen.add(dedupeKey)
+      const eventType = String(row.eventType ?? '—')
+      const resourceCode =
+        typeof row.resourceCode === 'string' && row.resourceCode ? row.resourceCode : resourceId
+      return {
+        key: dedupeKey,
+        routeName,
+        resourceId,
+        eventType,
+        resourceType,
+        label: `${eventType} / ${resourceType} / ${resourceCode}`,
+      }
+    })
+    .filter((item): item is TimelineResourceLink => item != null)
 })
 
 const slaRows = computed(() =>
@@ -708,6 +761,19 @@ onMounted(() => {
               }"
             >
               {{ item.taskType }} / {{ item.taskKind }} / {{ item.status }} / {{ item.taskId }}
+            </RouterLink>
+          </p>
+          <p v-if="timelineResourceLinks.length" class="links timeline-resource-links">
+            打开时间线资源：
+            <RouterLink
+              v-for="item in timelineResourceLinks"
+              :key="item.key"
+              :to="{
+                name: item.routeName,
+                params: { id: item.resourceId },
+              }"
+            >
+              {{ item.label }}
             </RouterLink>
           </p>
           <pre>{{ sectionPreview }}</pre>
