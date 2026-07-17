@@ -174,7 +174,14 @@ onMounted(() => {
         <dl>
           <div><dt>status</dt><dd>{{ detail.status }}</dd></div>
           <div><dt>origin</dt><dd>{{ detail.origin }}</dd></div>
-          <div><dt>taskId</dt><dd>{{ detail.taskId }}</dd></div>
+          <div>
+            <dt>taskId</dt>
+            <dd>
+              <RouterLink :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.taskId } }">
+                {{ detail.taskId }}
+              </RouterLink>
+            </dd>
+          </div>
           <div>
             <dt>projectId</dt>
             <dd>
@@ -185,7 +192,19 @@ onMounted(() => {
               </RouterLink>
             </dd>
           </div>
-          <div><dt>snapshot</dt><dd>{{ detail.evidenceSetSnapshotId }}</dd></div>
+          <div>
+            <dt>snapshot</dt>
+            <dd>
+              <RouterLink
+                :to="{
+                  name: 'ADMIN.EVIDENCE_SET_SNAPSHOT.DETAIL',
+                  params: { id: detail.evidenceSetSnapshotId },
+                }"
+              >
+                {{ detail.evidenceSetSnapshotId }}
+              </RouterLink>
+            </dd>
+          </div>
           <div><dt>reopenedFromReviewCaseId</dt><dd>{{ detail.reopenedFromReviewCaseId ?? '-' }}</dd></div>
           <div><dt>reopenTriggerRef</dt><dd>{{ detail.reopenTriggerRef ?? '-' }}</dd></div>
         </dl>

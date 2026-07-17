@@ -2189,6 +2189,24 @@ test('真实 OIDC 登录后可通过审核外发并经厂端回调关闭 CLIENT 
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
   )
 
+  // M173：外发详情事实格明文 sourceTaskId → 任务详情（与下方「打开源任务」链接并列）。
+  const outboundInlineTaskPromise = reviewPage.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname === `/api/v1/tasks/${sourceTaskId}`,
+  )
+  await reviewPage
+    .locator('dt', { hasText: /^sourceTaskId$/ })
+    .locator('xpath=../dd')
+    .getByRole('link', { name: sourceTaskId, exact: true })
+    .click()
+  expect((await outboundInlineTaskPromise).status()).toBe(200)
+  await expect(reviewPage.getByRole('heading', { name: '任务详情' })).toBeVisible()
+  await reviewPage.goto(
+    new URL(`/integration/outbound/${delivery.deliveryId}`, page.url()).toString(),
+  )
+  await expect(reviewPage.getByRole('heading', { name: '外发交付' })).toBeVisible()
+
   // M171：外发详情 → 源任务 / 源资料快照交叉深链。
   const outboundSourceTaskPromise = reviewPage.waitForResponse(
     (response) =>

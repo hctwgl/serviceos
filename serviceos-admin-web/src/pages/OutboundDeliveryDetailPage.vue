@@ -98,11 +98,63 @@ onMounted(() => {
               </RouterLink>
             </dd>
           </div>
-          <div><dt>sourceWorkOrderId</dt><dd>{{ detail.sourceWorkOrderId }}</dd></div>
-          <div><dt>sourceReviewCaseId</dt><dd>{{ detail.sourceReviewCaseId }}</dd></div>
-          <div><dt>sourceTaskId</dt><dd>{{ detail.sourceTaskId }}</dd></div>
-          <div><dt>sourceSnapshotId</dt><dd>{{ detail.sourceSnapshotId }}</dd></div>
-          <div><dt>clientReviewCaseId</dt><dd>{{ detail.clientReviewCaseId ?? '-' }}</dd></div>
+          <div>
+            <dt>sourceWorkOrderId</dt>
+            <dd>
+              <RouterLink
+                :to="{
+                  name: 'ADMIN.WORKORDER.WORKSPACE',
+                  params: { id: detail.sourceWorkOrderId },
+                }"
+              >
+                {{ detail.sourceWorkOrderId }}
+              </RouterLink>
+            </dd>
+          </div>
+          <div>
+            <dt>sourceReviewCaseId</dt>
+            <dd>
+              <RouterLink
+                :to="{ name: 'ADMIN.REVIEW.DETAIL', params: { id: detail.sourceReviewCaseId } }"
+              >
+                {{ detail.sourceReviewCaseId }}
+              </RouterLink>
+            </dd>
+          </div>
+          <div>
+            <dt>sourceTaskId</dt>
+            <dd>
+              <RouterLink :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.sourceTaskId } }">
+                {{ detail.sourceTaskId }}
+              </RouterLink>
+            </dd>
+          </div>
+          <div>
+            <dt>sourceSnapshotId</dt>
+            <dd>
+              <RouterLink
+                :to="{
+                  name: 'ADMIN.EVIDENCE_SET_SNAPSHOT.DETAIL',
+                  params: { id: detail.sourceSnapshotId },
+                }"
+              >
+                {{ detail.sourceSnapshotId }}
+              </RouterLink>
+            </dd>
+          </div>
+          <div>
+            <dt>clientReviewCaseId</dt>
+            <dd>
+              <RouterLink
+                v-if="detail.clientReviewCaseId"
+                :to="{ name: 'ADMIN.REVIEW.DETAIL', params: { id: detail.clientReviewCaseId } }"
+              >
+                {{ detail.clientReviewCaseId }}
+              </RouterLink>
+              <template v-else>-</template>
+            </dd>
+          </div>
+          <!-- reviewRouteId 无 Implemented 详情契约，保持明文 -->
           <div><dt>reviewRouteId</dt><dd>{{ detail.reviewRouteId ?? '-' }}</dd></div>
         </dl>
         <p class="links outbound-cross-links">

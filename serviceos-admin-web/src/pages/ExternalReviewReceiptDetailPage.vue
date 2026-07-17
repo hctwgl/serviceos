@@ -53,9 +53,44 @@ onMounted(() => {
           <div><dt>mappingVersionId</dt><dd>{{ detail.mappingVersionId }}</dd></div>
           <div><dt>receivedBy</dt><dd>{{ detail.receivedBy }}</dd></div>
           <div><dt>receivedAt</dt><dd>{{ detail.receivedAt }}</dd></div>
-          <div><dt>inboundEnvelopeId</dt><dd>{{ detail.inboundEnvelopeId }}</dd></div>
-          <div><dt>canonicalMessageId</dt><dd>{{ detail.canonicalMessageId }}</dd></div>
-          <div><dt>coordinationTaskId</dt><dd>{{ detail.coordinationTaskId || '—' }}</dd></div>
+          <div>
+            <dt>inboundEnvelopeId</dt>
+            <dd>
+              <RouterLink
+                :to="{
+                  name: 'ADMIN.INTEGRATION.INBOUND.DETAIL',
+                  params: { id: detail.inboundEnvelopeId },
+                }"
+              >
+                {{ detail.inboundEnvelopeId }}
+              </RouterLink>
+            </dd>
+          </div>
+          <div>
+            <dt>canonicalMessageId</dt>
+            <dd>
+              <RouterLink
+                :to="{
+                  name: 'ADMIN.INTEGRATION.CANONICAL.DETAIL',
+                  params: { id: detail.canonicalMessageId },
+                }"
+              >
+                {{ detail.canonicalMessageId }}
+              </RouterLink>
+            </dd>
+          </div>
+          <div>
+            <dt>coordinationTaskId</dt>
+            <dd>
+              <RouterLink
+                v-if="detail.coordinationTaskId"
+                :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.coordinationTaskId } }"
+              >
+                {{ detail.coordinationTaskId }}
+              </RouterLink>
+              <template v-else>—</template>
+            </dd>
+          </div>
           <div><dt>payloadRef</dt><dd>{{ detail.payloadRef || '—' }}</dd></div>
         </dl>
         <p class="links">

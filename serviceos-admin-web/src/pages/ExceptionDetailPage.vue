@@ -89,8 +89,30 @@ onMounted(() => {
               <template v-else>—</template>
             </dd>
           </div>
-          <div><dt>workOrderId</dt><dd>{{ detail.workOrderId || '—' }}</dd></div>
-          <div><dt>taskId</dt><dd>{{ detail.taskId || '—' }}</dd></div>
+          <div>
+            <dt>workOrderId</dt>
+            <dd>
+              <RouterLink
+                v-if="detail.workOrderId"
+                :to="{ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: detail.workOrderId } }"
+              >
+                {{ detail.workOrderId }}
+              </RouterLink>
+              <template v-else>—</template>
+            </dd>
+          </div>
+          <div>
+            <dt>taskId</dt>
+            <dd>
+              <RouterLink
+                v-if="detail.taskId"
+                :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.taskId } }"
+              >
+                {{ detail.taskId }}
+              </RouterLink>
+              <template v-else>—</template>
+            </dd>
+          </div>
           <div><dt>sourceType</dt><dd>{{ detail.sourceType }}</dd></div>
           <div><dt>sourceId</dt><dd>{{ detail.sourceId }}</dd></div>
           <div><dt>sourceAttemptId</dt><dd>{{ detail.sourceAttemptId }}</dd></div>

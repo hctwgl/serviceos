@@ -267,3 +267,4 @@ Feature gate/authority: if applicable
 | M170 | Admin 目录页 route.query 水合：WorkOrder/Task/SLA/Project；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + OpenAPI directories + Admin Web E2E + `183-m170-*` + `167-m170-*` | FieldOperation 详情、SavedView、真实 sandbox |
 | M171 | Admin 外发关联资源与回执入站交叉深链：sourceTask/Snapshot + Envelope；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Outbound/Receipt OpenAPI + Admin Web E2E + `184-m171-*` + `168-m171-*` | ReviewRoute 详情、FieldOperation、SavedView、真实 sandbox |
 | M172 | Admin 详情页明文 projectId 深链：Review/Exception/Canonical/Outbound → Project；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Project OpenAPI + Admin Web E2E + `185-m172-*` + `169-m172-*` | FieldOperation、ReviewRoute、SavedView、真实 sandbox |
+| M173 | Admin 详情页源资源明文字段深链：Outbound/Receipt/Exception/Review 事实格 UUID；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Core OpenAPI + Admin Web E2E + `186-m173-*` + `170-m173-*` | ReviewRoute、FieldOperation、SavedView、真实 sandbox |
