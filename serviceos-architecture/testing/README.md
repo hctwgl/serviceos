@@ -176,4 +176,5 @@
 - [M173 Admin 详情页源资源明文字段深链验收矩阵](170-m173-admin-pilot-detail-source-inline-deeplink-acceptance.md)
 - [M174 Admin 现场/表单/SLA 事实格 scope 深链验收矩阵](171-m174-admin-pilot-fieldops-inline-scope-deeplink-acceptance.md)
 - [M175 Admin 运营异常 handlingTaskId 深链验收矩阵](172-m175-admin-pilot-exception-handling-task-deeplink-acceptance.md)
+- [M176 Admin 专项队列关联资源深链验收矩阵](173-m176-admin-pilot-queue-related-resource-deeplink-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

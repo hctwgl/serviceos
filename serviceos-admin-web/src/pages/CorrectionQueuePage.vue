@@ -148,6 +148,26 @@ onMounted(() => {
         打开整改案例 {{ item.correctionCaseId }}
       </RouterLink>
     </p>
+    <p
+      v-if="page?.items?.length"
+      class="links correction-queue-cross-links"
+    >
+      打开关联资源：
+      <RouterLink
+        v-for="item in page.items"
+        :key="`src-review-${item.correctionCaseId}`"
+        :to="{ name: 'ADMIN.REVIEW.DETAIL', params: { id: item.sourceReviewCaseId } }"
+      >
+        打开源审核 {{ item.sourceReviewCaseId }}
+      </RouterLink>
+      <RouterLink
+        v-for="item in page.items.filter((i) => i.correctionTaskId)"
+        :key="`corr-task-${item.correctionCaseId}`"
+        :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: item.correctionTaskId! } }"
+      >
+        打开整改任务 {{ item.correctionTaskId }}
+      </RouterLink>
+    </p>
   </section>
 </template>
 

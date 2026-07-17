@@ -270,3 +270,4 @@ Feature gate/authority: if applicable
 | M173 | Admin 详情页源资源明文字段深链：Outbound/Receipt/Exception/Review/Correction 事实格 UUID；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Core OpenAPI + Admin Web E2E + `186-m173-*` + `170-m173-*` | ReviewRoute、FieldOperation、SavedView、真实 sandbox |
 | M174 | Admin 现场/表单/SLA 事实格 scope 深链：Appointment/Visit/Contact/Form/Evidence/SLA/Task/Inbound；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Core OpenAPI + Admin Web E2E + `187-m174-*` + `171-m174-*` | ServiceNetwork/Technician 目录、FieldOperation、SavedView |
 | M175 | Admin 运营异常 handlingTaskId 深链：Exception → HUMAN Task；Playwright GET 200 | PRODUCT-01/02 + ARCH-14 + Exception/Task OpenAPI + Admin Web E2E + `188-m175-*` + `172-m175-*` | 多态 sourceId、FieldOperation、SavedView |
+| M176 | Admin 专项队列关联资源深链：Correction/Review 队列 → Review/Task/Project；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Core OpenAPI + Admin Web E2E + `189-m176-*` + `173-m176-*` | QueueTable 行内链接、SavedView、FieldOperation |

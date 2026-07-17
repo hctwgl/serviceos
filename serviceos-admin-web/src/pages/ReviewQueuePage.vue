@@ -137,6 +137,23 @@ onMounted(() => {
         打开审核案例 {{ item.reviewCaseId }}
       </RouterLink>
     </p>
+    <p v-if="page?.items?.length" class="links review-queue-cross-links">
+      打开关联资源：
+      <RouterLink
+        v-for="item in page.items"
+        :key="`project-${item.reviewCaseId}`"
+        :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: item.projectId } }"
+      >
+        打开项目 {{ item.projectId }}
+      </RouterLink>
+      <RouterLink
+        v-for="item in page.items"
+        :key="`task-${item.reviewCaseId}`"
+        :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: item.taskId } }"
+      >
+        打开任务 {{ item.taskId }}
+      </RouterLink>
+    </p>
   </section>
 </template>
 

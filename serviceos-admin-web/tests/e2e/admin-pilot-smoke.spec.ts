@@ -88,6 +88,42 @@ async function openInProgressCorrectionFromFilteredQueue(
   expect(correction, missingMessage).toBeTruthy()
   expect(correction).toMatchObject({ status: 'IN_PROGRESS' })
   expect(correction?.correctionTaskId, '驳回未自动创建整改 Task').toBeTruthy()
+
+  // M176：整改队列关联资源深链（源审核 / 整改 Task），再进入整改详情。
+  const queueSourceReviewPromise = correctionPage.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname ===
+        `/api/v1/review-cases/${sourceReviewCaseId}`,
+  )
+  await correctionPage
+    .locator('.correction-queue-cross-links')
+    .getByRole('link', {
+      name: new RegExp(`打开源审核\\s+${sourceReviewCaseId}`),
+    })
+    .click()
+  expect((await queueSourceReviewPromise).status()).toBe(200)
+  await expect(correctionPage.getByRole('heading', { name: '审核案例' })).toBeVisible()
+  await correctionPage.goBack()
+  await expect(correctionPage.getByRole('heading', { name: '整改跟踪' })).toBeVisible()
+
+  const queueCorrectionTaskPromise = correctionPage.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname ===
+        `/api/v1/tasks/${correction!.correctionTaskId}`,
+  )
+  await correctionPage
+    .locator('.correction-queue-cross-links')
+    .getByRole('link', {
+      name: new RegExp(`打开整改任务\\s+${correction!.correctionTaskId}`),
+    })
+    .click()
+  expect((await queueCorrectionTaskPromise).status()).toBe(200)
+  await expect(correctionPage.getByRole('heading', { name: '任务详情' })).toBeVisible()
+  await correctionPage.goBack()
+  await expect(correctionPage.getByRole('heading', { name: '整改跟踪' })).toBeVisible()
+
   await correctionPage
     .getByRole('link', { name: `打开整改案例 ${correction!.correctionCaseId}` })
     .click()
