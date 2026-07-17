@@ -11,13 +11,13 @@ title: ServiceOS Agent 任务导航
 ```text
 1. serviceos-architecture/docs/implementation-status.md（约 225 行：基线、能力总览、下一方向）
 2. 本文件中匹配任务类型的行（确定最小必读集）
-3. 用 serviceos-architecture/docs/milestone-index.md Grep 定位具体 Mxx 文档（一行一里程碑）
+3. 用 `bash scripts/find-milestone.sh <Mxx|关键词>` 定位具体 Mxx 文档（一行一里程碑）
 4. 只读最小必读集；Mxx 文档先读 frontmatter 与「已实现/明确未实现」两节再决定是否深读
 ```
 
 检索纪律：
 
-- 从 `milestone-index.md` Grep 里程碑号、模块名或关键词入手，不批量通读 `architecture/`、`testing/` 目录；
+- 通过 `scripts/find-milestone.sh` 查询里程碑号、模块名或关键词，不整份读取 `milestone-index.md`，也不批量通读 `architecture/`、`testing/` 目录；
 - 只读与任务直接相关的 Mxx 文档（通常是最近一次同模块切片）；历史摘要细节查 `implementation-status-archive.md`，不回读状态总览找；
 - 冲突优先级按根 `AGENTS.md` §2.2；代码与文档冲突时不默认代码正确；
 - 探索阶段的 token 预算是「3～6 个文件」，超过就说明路由选错了，回到本表重新定位。

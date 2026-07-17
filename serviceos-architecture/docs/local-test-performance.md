@@ -44,6 +44,17 @@ bash scripts/verify-local.sh
 6. 架构不一致时失败关闭，不允许静默使用模拟模式；
 7. 原样执行传入的 Maven 参数，不跳过测试。
 
+输出模式默认为 `auto`：交互终端显示完整实时日志；Agent/CI 等非交互调用只显示最终摘要，
+完整 Maven 日志写入 `target/verification-logs/`。失败时精简模式仍返回原始非零退出码、关键错误、
+日志尾部和完整日志路径。需要诊断实时输出时执行：
+
+```bash
+SERVICEOS_VERIFY_OUTPUT=full bash scripts/verify-local.sh
+```
+
+`SERVICEOS_VERIFY_OUTPUT` 只控制 `auto|full|compact` 三种日志呈现，不改变 Maven 参数、测试范围、
+Testcontainers、Flyway、契约或模块边界门禁。
+
 ## 3. 分级验证示例
 
 ### 3.1 指定测试类

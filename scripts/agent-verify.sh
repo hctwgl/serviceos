@@ -72,6 +72,7 @@ case "${command_name}" in
     git diff --check
     bash -n scripts/*.sh
     bash scripts/test-generate-milestone-index.sh
+    bash scripts/test-find-milestone.sh
     index_file="serviceos-architecture/docs/milestone-index.md"
     if [[ -f "${index_file}" ]]; then
       if ! diff <(bash scripts/generate-milestone-index.sh --stdout) "${index_file}" >/dev/null; then

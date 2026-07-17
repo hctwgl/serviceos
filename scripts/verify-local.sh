@@ -16,6 +16,25 @@ if [[ "$#" -eq 0 ]]; then
   set -- verify
 fi
 
+# 人类在交互终端中默认保留完整进度；Agent/CI 的非交互调用默认把完整日志落盘，
+# 只回传结果摘要。这样不会隐藏任何证据或改变 Maven 参数，同时避免 Flyway、
+# Testcontainers 和客户端生成器的逐行日志占满会话上下文。
+output_mode="${SERVICEOS_VERIFY_OUTPUT:-auto}"
+case "${output_mode}" in
+  auto)
+    if [[ -t 1 ]]; then
+      output_mode="full"
+    else
+      output_mode="compact"
+    fi
+    ;;
+  full|compact) ;;
+  *)
+    echo "SERVICEOS_VERIFY_OUTPUT 只支持 auto、full 或 compact。" >&2
+    exit 2
+    ;;
+esac
+
 # 只有里程碑/全量 verify 才先执行机械预检；精准 test 保持快速反馈，不重复扩大验证范围。
 if [[ " $* " == *" verify "* ]]; then
   bash scripts/test-verification-preflight.sh
@@ -110,6 +129,40 @@ echo "执行 Maven 验证：./mvnw --no-transfer-progress $*"
 
 # 只影响当前命令，不修改用户的永久环境变量。
 # Testcontainers 将继承已经清理的平台环境，并使用上方校验过的本地原生镜像。
+if [[ "${output_mode}" == "full" ]]; then
+  env -u DOCKER_DEFAULT_PLATFORM \
+    SERVICEOS_TEST_POSTGRES_IMAGE="${postgres_image}" \
+    ./mvnw --no-transfer-progress "$@"
+  exit $?
+fi
+
+log_dir="${repository_root}/target/verification-logs"
+mkdir -p "${log_dir}"
+log_file="${log_dir}/verify-$(date '+%Y%m%dT%H%M%S')-$$.log"
+started_at="$(date +%s)"
+echo "非交互精简输出已启用；完整日志：${log_file}"
+
+set +e
 env -u DOCKER_DEFAULT_PLATFORM \
   SERVICEOS_TEST_POSTGRES_IMAGE="${postgres_image}" \
-  ./mvnw --no-transfer-progress "$@"
+  ./mvnw --no-transfer-progress "$@" >"${log_file}" 2>&1
+status=$?
+set -e
+
+elapsed_seconds=$(( $(date +%s) - started_at ))
+if [[ "${status}" -eq 0 ]]; then
+  echo "Maven 验证通过，耗时 ${elapsed_seconds}s。"
+  # 只显示最终 Reactor/构建摘要；完整测试、迁移和生成物日志仍保存在上方路径。
+  grep -E 'Reactor Summary|^[[]INFO[]] ServiceOS|BUILD SUCCESS|Total time:|Finished at:' \
+    "${log_file}" | tail -n 16 || true
+  exit 0
+fi
+
+echo "Maven 验证失败（exit=${status}，耗时 ${elapsed_seconds}s）。" >&2
+echo "关键失败摘要：" >&2
+grep -E 'Failures: [1-9]|Errors: [1-9]|BUILD FAILURE|^[[]ERROR[]]' "${log_file}" \
+  | tail -n 80 >&2 || true
+echo "日志尾部：" >&2
+tail -n 80 "${log_file}" >&2
+echo "完整日志：${log_file}" >&2
+exit "${status}"

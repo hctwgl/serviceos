@@ -361,7 +361,9 @@ class ProjectCommandPostgresIT {
 
     @Test
     void repeatedMigrationIsNoOp() {
-        assertThat(flyway.info().applied().length).isEqualTo(88);
+        // 全仓迁移数量由 scripts/migration-baseline.sh 与里程碑预检统一校验；
+        // 本测试只证明当前应用配置下重复 migrate 不会执行任何迁移，避免每新增一个 Flyway
+        // 都在业务测试中同步维护与用例语义无关的魔法数字。
         assertThat(flyway.migrate().migrationsExecuted).isZero();
     }
 
