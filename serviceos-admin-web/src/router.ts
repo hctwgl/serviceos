@@ -6,6 +6,7 @@ import CorrectionQueuePage from './pages/CorrectionQueuePage.vue'
 import CorrectionCaseDetailPage from './pages/CorrectionCaseDetailPage.vue'
 import OutboundQueuePage from './pages/OutboundQueuePage.vue'
 import OutboundDeliveryDetailPage from './pages/OutboundDeliveryDetailPage.vue'
+import InboundEnvelopeDetailPage from './pages/InboundEnvelopeDetailPage.vue'
 import ExceptionQueuePage from './pages/ExceptionQueuePage.vue'
 import ExceptionDetailPage from './pages/ExceptionDetailPage.vue'
 import TokenPage from './pages/TokenPage.vue'
@@ -38,6 +39,11 @@ export const router = createRouter({
           path: 'integration/outbound/:id',
           name: 'ADMIN.INTEGRATION.DETAIL',
           component: OutboundDeliveryDetailPage,
+        },
+        {
+          path: 'integration/inbound/:id',
+          name: 'ADMIN.INTEGRATION.INBOUND.DETAIL',
+          component: InboundEnvelopeDetailPage,
         },
         { path: 'exceptions', name: 'ADMIN.EXCEPTION.QUEUE', component: ExceptionQueuePage },
         { path: 'exceptions/:id', name: 'ADMIN.EXCEPTION.DETAIL', component: ExceptionDetailPage },

@@ -196,6 +196,34 @@ const sectionPreview = computed(() => {
   return JSON.stringify(payload, null, 2)
 })
 
+type InboundEnvelopeLink = {
+  inboundEnvelopeId: string
+  messageType: string
+  processingStatus: string
+  resultCode: string | null
+}
+
+const inboundEnvelopeLinks = computed((): InboundEnvelopeLink[] => {
+  const integration = sectionData.value?.integration
+  if (!integration || activeSection.value !== 'INTEGRATION') return []
+  const raw = integration.inboundEnvelopes
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null
+      const row = item as Record<string, unknown>
+      const id = row.inboundEnvelopeId
+      if (typeof id !== 'string' || !id) return null
+      return {
+        inboundEnvelopeId: id,
+        messageType: String(row.messageType ?? '—'),
+        processingStatus: String(row.processingStatus ?? '—'),
+        resultCode: row.resultCode == null ? null : String(row.resultCode),
+      }
+    })
+    .filter((item): item is InboundEnvelopeLink => item != null)
+})
+
 const slaRows = computed(() =>
   (slaPage.value?.items ?? []).map((item) => ({
     slaInstanceId: item.slaInstanceId,
@@ -504,7 +532,23 @@ onMounted(() => {
         </div>
         <p v-if="sectionError" class="error">{{ sectionError }}</p>
         <p v-else-if="sectionLoading">区块加载中…</p>
-        <pre v-else>{{ sectionPreview }}</pre>
+        <template v-else>
+          <p v-if="inboundEnvelopeLinks.length" class="links inbound-links">
+            打开入站 Envelope：
+            <RouterLink
+              v-for="item in inboundEnvelopeLinks"
+              :key="item.inboundEnvelopeId"
+              :to="{
+                name: 'ADMIN.INTEGRATION.INBOUND.DETAIL',
+                params: { id: item.inboundEnvelopeId },
+              }"
+            >
+              {{ item.messageType }} / {{ item.processingStatus }}
+              <template v-if="item.resultCode"> / {{ item.resultCode }}</template>
+            </RouterLink>
+          </p>
+          <pre>{{ sectionPreview }}</pre>
+        </template>
       </article>
     </template>
   </section>
