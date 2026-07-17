@@ -87,6 +87,78 @@ export function listNetworkPortalTechnicians(networkContextId: string) {
   )
 }
 
+export type NetworkTechnicianMembership = {
+  id: string
+  serviceNetworkId: string
+  technicianProfileId: string
+  status: string
+  validFrom: string
+  validTo: string | null
+  version: number
+  createdAt: string
+}
+
+export type TechnicianQualification = {
+  id: string
+  technicianProfileId: string
+  qualificationCode: string
+  status: string
+  validFrom: string
+  validTo: string | null
+  version: number
+  submittedAt: string
+}
+
+/** M204：绑定本网点师傅服务关系；禁止提交 networkId。 */
+export function createNetworkPortalTechnicianMembership(
+  networkContextId: string,
+  body: { technicianProfileId: string; validFrom: string },
+  idempotencyKey = crypto.randomUUID(),
+) {
+  return apiPost<NetworkTechnicianMembership>('/network-portal/technician-memberships', {
+    body,
+    idempotencyKey,
+    headers: networkHeaders(networkContextId),
+  })
+}
+
+/** M204：终止本网点师傅服务关系。 */
+export function terminateNetworkPortalTechnicianMembership(
+  networkContextId: string,
+  membershipId: string,
+  body: { reason: string },
+  aggregateVersion: number,
+  idempotencyKey = crypto.randomUUID(),
+) {
+  return apiPost<NetworkTechnicianMembership>(
+    `/network-portal/technician-memberships/${membershipId}:terminate`,
+    {
+      body,
+      idempotencyKey,
+      ifMatch: `"${aggregateVersion}"`,
+      headers: networkHeaders(networkContextId),
+    },
+  )
+}
+
+/** M204：提交本网点师傅资质（PENDING）。 */
+export function submitNetworkPortalTechnicianQualification(
+  networkContextId: string,
+  body: {
+    technicianProfileId: string
+    qualificationCode: string
+    validFrom: string
+    validTo?: string | null
+  },
+  idempotencyKey = crypto.randomUUID(),
+) {
+  return apiPost<TechnicianQualification>('/network-portal/technician-qualifications', {
+    body,
+    idempotencyKey,
+    headers: networkHeaders(networkContextId),
+  })
+}
+
 export function getNetworkPortalWorkbench(networkContextId: string) {
   return apiGet<NetworkPortalWorkbench>(
     '/network-portal/workbench',

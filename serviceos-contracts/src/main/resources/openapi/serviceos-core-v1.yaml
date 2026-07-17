@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.95.0
+  version: 0.96.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1482,6 +1482,94 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+  /network-portal/technician-memberships:
+    post:
+      operationId: createNetworkPortalTechnicianMembership
+      summary: Network Portal 绑定本网点师傅服务关系
+      description: |
+        M204：X-Network-Context + NETWORK scope networkPortal.manageTechnician。
+        请求体不含 networkId；服务端强制等于可信上下文网点。
+        委托 M185 createNetworkTechnicianMembership；底层 network.manageTechnician 按 NETWORK 收窄。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NetworkPortalCreateTechnicianMembershipRequest' }
+      responses:
+        '200':
+          description: 已创建 ACTIVE 关系或幂等回放
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkTechnicianMembership' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /network-portal/technician-memberships/{membershipId}:terminate:
+    post:
+      operationId: terminateNetworkPortalTechnicianMembership
+      summary: Network Portal 终止本网点师傅服务关系
+      description: |
+        M204：X-Network-Context + NETWORK scope networkPortal.manageTechnician + If-Match。
+        membership 必须属于上下文网点，否则 ACCESS_DENIED。
+        委托 M185 terminateNetworkTechnicianMembership。
+      parameters:
+        - $ref: '#/components/parameters/NetworkTechnicianMembershipId'
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/NetworkReasonRequest' } } }
+      responses:
+        '200':
+          description: 已终止关系或幂等回放
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkTechnicianMembership' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /network-portal/technician-qualifications:
+    post:
+      operationId: submitNetworkPortalTechnicianQualification
+      summary: Network Portal 提交本网点师傅资质（PENDING）
+      description: |
+        M204：X-Network-Context + NETWORK scope networkPortal.manageTechnician。
+        师傅必须对本网点持有 ACTIVE NetworkTechnicianMembership，否则 VALIDATION_FAILED。
+        委托 M185 submitQualification；状态恒为 PENDING，网点不能自批。
+      parameters:
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SubmitTechnicianQualificationRequest' }
+      responses:
+        '200':
+          description: 已提交 PENDING 资质或幂等回放
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianQualification' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
   /network-portal/capacity:
     get:
       operationId: listNetworkPortalCapacity
@@ -5573,6 +5661,13 @@ components:
       required: [networkId, technicianProfileId, validFrom]
       properties:
         networkId: { type: string, format: uuid }
+        technicianProfileId: { type: string, format: uuid }
+        validFrom: { type: string, format: date-time }
+    NetworkPortalCreateTechnicianMembershipRequest:
+      type: object
+      additionalProperties: false
+      required: [technicianProfileId, validFrom]
+      properties:
         technicianProfileId: { type: string, format: uuid }
         validFrom: { type: string, format: date-time }
     SubmitTechnicianQualificationRequest:

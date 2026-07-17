@@ -24,4 +24,14 @@ final class NetworkAuthorizationAdapter implements NetworkAuthorizationPort {
                 capability, principal.tenantId(), "Network", resourceId), correlationId);
         return new NetworkAuthorizationEvidence(decision.matchedGrantIds(), decision.policyVersion());
     }
+
+    @Override
+    public NetworkAuthorizationEvidence requireNetworkCapability(
+            CurrentPrincipal principal, String capability, String networkId,
+            String resourceId, String correlationId
+    ) {
+        var decision = authorization.require(principal, AuthorizationRequest.networkCapability(
+                capability, principal.tenantId(), "ServiceNetwork", resourceId, networkId), correlationId);
+        return new NetworkAuthorizationEvidence(decision.matchedGrantIds(), decision.policyVersion());
+    }
 }

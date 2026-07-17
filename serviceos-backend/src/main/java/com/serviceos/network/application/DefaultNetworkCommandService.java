@@ -440,8 +440,13 @@ final class DefaultNetworkCommandService implements NetworkCommandService {
             CurrentPrincipal actor, CommandMetadata metadata, String operation,
             String capability, String resourceId, Object input
     ) {
-        NetworkAuthorizationEvidence decision = authorization.requireTenantCapability(
-                actor, capability, resourceId, metadata.correlationId());
+        // M204：Network Portal 委托期间按 NETWORK scope 鉴权；Admin TENANT 路径不变。
+        String networkScope = NetworkScopedNetworkAuthorization.currentNetworkId();
+        NetworkAuthorizationEvidence decision = networkScope != null
+                ? authorization.requireNetworkCapability(
+                        actor, capability, networkScope, resourceId, metadata.correlationId())
+                : authorization.requireTenantCapability(
+                        actor, capability, resourceId, metadata.correlationId());
         return beginAfterAuthorization(actor, metadata, operation, resourceId, input, decision);
     }
 

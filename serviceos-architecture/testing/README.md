@@ -204,4 +204,5 @@
 - [M201 Network Portal 资料代补（onBehalf）验收矩阵](198-m201-network-portal-evidence-on-behalf-acceptance.md)
 - [M202 Network Portal 整改队列只读验收矩阵](199-m202-network-portal-correction-queue-acceptance.md)
 - [M203 Network Portal 运营异常队列只读验收矩阵](200-m203-network-portal-exception-queue-acceptance.md)
+- [M204 Network Portal 师傅关系与资质提交验收矩阵](201-m204-network-portal-manage-technician-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)
