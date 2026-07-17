@@ -201,6 +201,13 @@ type InboundEnvelopeLink = {
   messageType: string
   processingStatus: string
   resultCode: string | null
+  canonicalMessageId: string
+}
+
+type CanonicalMessageLink = {
+  canonicalMessageId: string
+  messageType: string
+  processingStatus: string
 }
 
 type OutboundDeliveryLink = {
@@ -333,14 +340,34 @@ const inboundEnvelopeLinks = computed((): InboundEnvelopeLink[] => {
       const row = item as Record<string, unknown>
       const id = row.inboundEnvelopeId
       if (typeof id !== 'string' || !id) return null
+      const canonicalMessageId =
+        typeof row.canonicalMessageId === 'string' ? row.canonicalMessageId : ''
       return {
         inboundEnvelopeId: id,
         messageType: String(row.messageType ?? '—'),
         processingStatus: String(row.processingStatus ?? '—'),
         resultCode: row.resultCode == null ? null : String(row.resultCode),
+        canonicalMessageId,
       }
     })
     .filter((item): item is InboundEnvelopeLink => item != null)
+})
+
+/** 复用已 Implemented Canonical GET；仅渲染投影已给出的 canonicalMessageId。 */
+const canonicalMessageLinks = computed((): CanonicalMessageLink[] => {
+  if (activeSection.value !== 'INTEGRATION') return []
+  const seen = new Set<string>()
+  const links: CanonicalMessageLink[] = []
+  for (const item of inboundEnvelopeLinks.value) {
+    if (!item.canonicalMessageId || seen.has(item.canonicalMessageId)) continue
+    seen.add(item.canonicalMessageId)
+    links.push({
+      canonicalMessageId: item.canonicalMessageId,
+      messageType: item.messageType,
+      processingStatus: item.processingStatus,
+    })
+  }
+  return links
 })
 
 /** 复用已 Implemented Outbound 详情路由；投影缺权时 outboundDeliveries 为 null。 */
@@ -1089,6 +1116,20 @@ onMounted(() => {
             >
               {{ item.messageType }} / {{ item.processingStatus }}
               <template v-if="item.resultCode"> / {{ item.resultCode }}</template>
+            </RouterLink>
+          </p>
+          <p v-if="canonicalMessageLinks.length" class="links canonical-links">
+            打开 Canonical Message：
+            <RouterLink
+              v-for="item in canonicalMessageLinks"
+              :key="item.canonicalMessageId"
+              :to="{
+                name: 'ADMIN.INTEGRATION.CANONICAL.DETAIL',
+                params: { id: item.canonicalMessageId },
+              }"
+            >
+              {{ item.messageType }} / {{ item.processingStatus }} /
+              {{ item.canonicalMessageId }}
             </RouterLink>
           </p>
           <p v-if="outboundDeliveryLinks.length" class="links outbound-links">

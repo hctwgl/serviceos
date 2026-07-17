@@ -70,6 +70,14 @@ onMounted(() => {
           >
             协调任务
           </RouterLink>
+          <RouterLink
+            :to="{
+              name: 'ADMIN.INTEGRATION.CANONICAL.DETAIL',
+              params: { id: detail.canonicalMessageId },
+            }"
+          >
+            打开 Canonical {{ detail.canonicalMessageId }}
+          </RouterLink>
         </p>
       </article>
       <pre class="dump">{{

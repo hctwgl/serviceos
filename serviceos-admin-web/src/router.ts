@@ -8,6 +8,7 @@ import OutboundQueuePage from './pages/OutboundQueuePage.vue'
 import OutboundDeliveryDetailPage from './pages/OutboundDeliveryDetailPage.vue'
 import InboundEnvelopeQueuePage from './pages/InboundEnvelopeQueuePage.vue'
 import InboundEnvelopeDetailPage from './pages/InboundEnvelopeDetailPage.vue'
+import CanonicalMessageDetailPage from './pages/CanonicalMessageDetailPage.vue'
 import ExceptionQueuePage from './pages/ExceptionQueuePage.vue'
 import ExceptionDetailPage from './pages/ExceptionDetailPage.vue'
 import TokenPage from './pages/TokenPage.vue'
@@ -57,6 +58,11 @@ export const router = createRouter({
           path: 'integration/inbound/:id',
           name: 'ADMIN.INTEGRATION.INBOUND.DETAIL',
           component: InboundEnvelopeDetailPage,
+        },
+        {
+          path: 'integration/canonical/:id',
+          name: 'ADMIN.INTEGRATION.CANONICAL.DETAIL',
+          component: CanonicalMessageDetailPage,
         },
         { path: 'exceptions', name: 'ADMIN.EXCEPTION.QUEUE', component: ExceptionQueuePage },
         { path: 'exceptions/:id', name: 'ADMIN.EXCEPTION.DETAIL', component: ExceptionDetailPage },

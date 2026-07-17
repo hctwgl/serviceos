@@ -90,7 +90,18 @@ onMounted(() => {
           >
             工单工作区
           </RouterLink>
-          <span v-else class="meta">无 WORK_ORDER 结果链接</span>
+          <RouterLink
+            v-if="envelope.canonicalMessageId"
+            :to="{
+              name: 'ADMIN.INTEGRATION.CANONICAL.DETAIL',
+              params: { id: envelope.canonicalMessageId },
+            }"
+          >
+            打开 Canonical {{ envelope.canonicalMessageId }}
+          </RouterLink>
+          <span v-if="!workOrderId && !envelope.canonicalMessageId" class="meta">
+            无关联详情链接
+          </span>
         </p>
       </article>
 
@@ -100,7 +111,19 @@ onMounted(() => {
         <p v-else-if="canonicalError" class="error">{{ canonicalError }}</p>
         <template v-else-if="canonical">
           <dl>
-            <div><dt>canonicalMessageId</dt><dd>{{ canonical.canonicalMessageId }}</dd></div>
+            <div>
+              <dt>canonicalMessageId</dt>
+              <dd>
+                <RouterLink
+                  :to="{
+                    name: 'ADMIN.INTEGRATION.CANONICAL.DETAIL',
+                    params: { id: canonical.canonicalMessageId },
+                  }"
+                >
+                  {{ canonical.canonicalMessageId }}
+                </RouterLink>
+              </dd>
+            </div>
             <div><dt>businessKey</dt><dd>{{ canonical.businessKey }}</dd></div>
             <div><dt>messageType</dt><dd>{{ canonical.messageType }}</dd></div>
             <div><dt>processingStatus</dt><dd>{{ canonical.processingStatus }}</dd></div>
