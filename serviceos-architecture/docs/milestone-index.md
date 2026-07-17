@@ -217,6 +217,7 @@ title: ServiceOS 里程碑索引
 | M206 | M206 Network Portal 师傅关系只读列表 | [219-m206-network-portal-technician-memberships.md](../architecture/219-m206-network-portal-technician-memberships.md) | [203-m206-network-portal-technician-memberships-acceptance.md](../testing/203-m206-network-portal-technician-memberships-acceptance.md) |
 | M207 | M207 Network Portal 工作台能力门控计数增强 | [220-m207-network-portal-workbench-enrichment.md](../architecture/220-m207-network-portal-workbench-enrichment.md) | [204-m207-network-portal-workbench-enrichment-acceptance.md](../testing/204-m207-network-portal-workbench-enrichment-acceptance.md) |
 | M208 | M208 Network Portal 产能页 | [221-m208-network-portal-capacity-page.md](../architecture/221-m208-network-portal-capacity-page.md) | [205-m208-network-portal-capacity-page-acceptance.md](../testing/205-m208-network-portal-capacity-page-acceptance.md) |
+| M209 | M209 Network Portal 整改详情只读 UI | [222-m209-network-portal-correction-detail.md](../architecture/222-m209-network-portal-correction-detail.md) | [206-m209-network-portal-correction-detail-acceptance.md](../testing/206-m209-network-portal-correction-detail-acceptance.md) |
 
 ## 未关联里程碑的文档
 

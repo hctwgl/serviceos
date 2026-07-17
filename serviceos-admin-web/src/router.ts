@@ -49,6 +49,7 @@ import NetworkPortalWorkOrdersPage from './pages/NetworkPortalWorkOrdersPage.vue
 import NetworkPortalTasksPage from './pages/NetworkPortalTasksPage.vue'
 import NetworkPortalTechniciansPage from './pages/NetworkPortalTechniciansPage.vue'
 import NetworkPortalCorrectionsPage from './pages/NetworkPortalCorrectionsPage.vue'
+import NetworkPortalCorrectionDetailPage from './pages/NetworkPortalCorrectionDetailPage.vue'
 import NetworkPortalExceptionsPage from './pages/NetworkPortalExceptionsPage.vue'
 import NetworkPortalQualificationsPage from './pages/NetworkPortalQualificationsPage.vue'
 import NetworkPortalCapacityPage from './pages/NetworkPortalCapacityPage.vue'
@@ -247,6 +248,12 @@ export const router = createRouter({
           path: 'corrections',
           name: 'NETWORK.CORRECTION.QUEUE',
           component: NetworkPortalCorrectionsPage,
+          meta: { pageId: 'NETWORK.CORRECTION.QUEUE' },
+        },
+        {
+          path: 'corrections/:id',
+          name: 'NETWORK.CORRECTION.DETAIL',
+          component: NetworkPortalCorrectionDetailPage,
           meta: { pageId: 'NETWORK.CORRECTION.QUEUE' },
         },
         {

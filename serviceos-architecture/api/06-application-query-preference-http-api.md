@@ -123,6 +123,12 @@ status: Accepted
   （能力仍为 NETWORK `networkTask.read`；catalog `page-registry-v15`）并交付 Admin Web
   `/network-portal/capacity` 只读列表（含 `version`）。工作台 capacity 深链至该页。
   **不**接受 `CapacityAdjustmentRequest`、产能写、未 Accepted 字段发明。
+- §10 Network Portal 整改详情只读 UI（M209 窄扩展）：**不**新增 HTTP 路径；消费既有
+  `GET /api/v1/network-portal/correction-cases/{correctionCaseId}`（M202 / ADR-040；
+  响应 `CorrectionCase`）。Admin Web `/network-portal/corrections/:id` 只读详情（含
+  source snapshot 与 `resubmissions[]`）；列表案例 ID 深链；任务代补深链。Page Registry
+  仍归属 `NETWORK.CORRECTION.QUEUE`（catalog **保持** `page-registry-v15`）。
+  **不**接受 Portal close/waive/ACK、新 pageId/capability。
 - §11 Technician Portal Feed 子集（M195）：仅
   `GET /api/v1/technician/me/task-feed`（可选 `sinceCursor` 不透明游标；ACTIVE TECHNICIAN
   ServiceAssignment / TaskAssignment；撤权/结束时 tombstone 仅含 `taskId` +
@@ -354,7 +360,7 @@ View 保存 filter AST、列、排序和密度，不保存任意 SQL、访问 to
 | `GET /api/v1/network-portal/technicians` | 本网点师傅/能力/资质摘要 | M194 Accepted |
 | `GET /api/v1/network-portal/capacity` | 本网点容量和派单状态（M208 注册 `NETWORK.CAPACITY` 页壳；无新路径） | M194 Accepted；M208 页壳 |
 | `GET /api/v1/network-portal/correction-cases` | 本网点整改队列安全摘要 | M202 Accepted |
-| `GET /api/v1/network-portal/correction-cases/{correctionCaseId}` | 本网点整改详情 | M202 Accepted |
+| `GET /api/v1/network-portal/correction-cases/{correctionCaseId}` | 本网点整改详情（M209 Admin Web 只读详情页） | M202 Accepted；M209 详情 UI |
 | `GET /api/v1/network-portal/operational-exceptions` | 本网点运营异常队列安全摘要 | M203 Accepted |
 | `GET /api/v1/network-portal/operational-exceptions/{exceptionId}` | 本网点运营异常详情 | M203 Accepted |
 | `GET /api/v1/network-portal/technician-qualifications` | 本网点师傅资质列表安全摘要 | M205 Accepted |

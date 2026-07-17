@@ -470,14 +470,38 @@ export type NetworkPortalCorrectionItem = {
   resubmissionCount: number
 }
 
+/** M209：对齐 OpenAPI CorrectionCase（getNetworkPortalCorrectionCase）。 */
+export type NetworkPortalCorrectionResubmission = {
+  correctionResubmissionId: string
+  correctionCaseId: string
+  resubmissionOrdinal: number
+  evidenceSetSnapshotId: string
+  snapshotContentDigest: string
+  submittedBy?: string
+  submittedAt?: string | null
+}
+
 export type NetworkPortalCorrectionDetail = {
   correctionCaseId: string
   projectId: string
   taskId: string
-  status: string
+  sourceReviewCaseId: string
+  sourceReviewDecisionId: string
+  sourceEvidenceSetSnapshotId: string
+  sourceSnapshotContentDigest: string
   reasonCodes: string[]
+  correctionTaskId?: string | null
+  status: string
+  createdBy: string
   createdAt: string
-  latestResubmissionSnapshotId: string | null
+  latestResubmissionSnapshotId?: string | null
+  closedBy?: string | null
+  closedAt?: string | null
+  waivedBy?: string | null
+  waivedAt?: string | null
+  waiveApprovalRef?: string | null
+  waiveNote?: string | null
+  resubmissions: NetworkPortalCorrectionResubmission[]
 }
 
 /** M201：代师傅 Begin 资料上传。 */
@@ -540,7 +564,7 @@ export function listNetworkPortalCorrections(
   )
 }
 
-/** M202：本网点整改详情。 */
+/** M202/M209：本网点整改详情（CorrectionCase 完整形）。 */
 export function getNetworkPortalCorrection(networkContextId: string, correctionCaseId: string) {
   return apiGet<NetworkPortalCorrectionDetail>(
     `/network-portal/correction-cases/${correctionCaseId}`,

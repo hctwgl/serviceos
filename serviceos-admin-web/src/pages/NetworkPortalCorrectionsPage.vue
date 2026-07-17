@@ -52,7 +52,14 @@ watch(() => props.networkContextId, () => {
       </thead>
       <tbody>
         <tr v-for="item in items" :key="item.correctionCaseId">
-          <td>{{ item.correctionCaseId }}</td>
+          <td>
+            <RouterLink
+              :to="`/network-portal/corrections/${item.correctionCaseId}`"
+              data-testid="correction-case-deeplink"
+            >
+              {{ item.correctionCaseId }}
+            </RouterLink>
+          </td>
           <td>{{ item.taskId }}</td>
           <td>{{ item.status }}</td>
           <td>{{ item.reasonCodes.join(', ') || '—' }}</td>
