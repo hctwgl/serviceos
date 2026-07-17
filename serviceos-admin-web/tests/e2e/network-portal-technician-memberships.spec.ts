@@ -57,7 +57,7 @@ async function mockNetworkPortalMembershipApis(page: Page) {
         contextId: CONTEXT_ID,
         portal: 'NETWORK',
         contextVersion: 'ctx-v1',
-        navigationCatalogVersion: 'page-registry-v14',
+        navigationCatalogVersion: 'page-registry-v15',
         asOf: '2026-07-17T12:00:00Z',
         items: [
           {

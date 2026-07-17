@@ -190,6 +190,15 @@ export function getNetworkPortalWorkbench(networkContextId: string) {
   )
 }
 
+/** M208：独立产能页；复用 M194 GET /network-portal/capacity。 */
+export function listNetworkPortalCapacity(networkContextId: string) {
+  return apiGet<NetworkPortalPage<NetworkPortalCapacityItem>>(
+    '/network-portal/capacity',
+    {},
+    networkHeaders(networkContextId),
+  )
+}
+
 export type ManualServiceAssignmentReceipt = {
   taskId: string
   workOrderId: string

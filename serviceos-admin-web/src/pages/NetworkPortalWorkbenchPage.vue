@@ -64,7 +64,11 @@ watch(() => props.networkContextId, () => {
         </li>
       </ul>
       <div data-testid="network-workbench-capacity">
-        <h3>容量</h3>
+        <h3>
+          <RouterLink to="/network-portal/capacity" data-testid="workbench-capacity-deeplink">
+            容量
+          </RouterLink>
+        </h3>
         <ul v-if="data.capacity.length">
           <li
             v-for="row in data.capacity"
@@ -72,7 +76,7 @@ watch(() => props.networkContextId, () => {
             :data-testid="`workbench-capacity-${row.businessType}`"
           >
             {{ row.businessType }}：占用 {{ row.occupiedUnits }} / 上限 {{ row.maxUnits }}
-            （可用 {{ row.availableUnits }}）
+            （可用 {{ row.availableUnits }}，v{{ row.version }}）
           </li>
         </ul>
         <p v-else data-testid="workbench-capacity-empty">暂无容量计数</p>

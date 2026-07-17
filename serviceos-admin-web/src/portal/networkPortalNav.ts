@@ -116,6 +116,8 @@ export function networkPortalRoutePath(pageId: string): string {
       return '/network-portal/corrections'
     case 'NETWORK.EXCEPTION.QUEUE':
       return '/network-portal/exceptions'
+    case 'NETWORK.CAPACITY':
+      return '/network-portal/capacity'
     default:
       return '/network-portal/workbench'
   }

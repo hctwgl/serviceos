@@ -30,6 +30,7 @@ const TEST_IDS: Record<string, string> = {
   'NETWORK.CORRECTION.QUEUE': 'nav-network-corrections',
   'NETWORK.EXCEPTION.QUEUE': 'nav-network-exceptions',
   'NETWORK.EVIDENCE.SUPPLEMENT': 'nav-network-evidence-supplement',
+  'NETWORK.CAPACITY': 'nav-network-capacity',
 }
 
 async function refreshNav(preferredContextId?: string | null) {

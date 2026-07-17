@@ -208,4 +208,5 @@
 - [M205 Network Portal 本网点资质只读列表验收矩阵](202-m205-network-portal-qualification-list-acceptance.md)
 - [M206 Network Portal 师傅关系只读列表验收矩阵](203-m206-network-portal-technician-memberships-acceptance.md)
 - [M207 Network Portal 工作台能力门控计数增强验收矩阵](204-m207-network-portal-workbench-enrichment-acceptance.md)
+- [M208 Network Portal 产能页验收矩阵](205-m208-network-portal-capacity-page-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

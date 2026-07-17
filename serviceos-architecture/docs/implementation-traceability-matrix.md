@@ -17,13 +17,13 @@ status: Proposed
 | identity | ARCH-07、ARCH-21 | API-01/02 通用身份上下文 | DATA-02 | M2 AUTH、M6 SEC | E1 |
 | organization | ARCH-01、ARCH-07、ARCH-11 | API-02/04 | DATA-02/04 | M2 AUTH、M4 DSP | E1/E4 |
 | project/workorder query | ARCH-01/03/05、M64～M68 | API-02/07、OpenAPI Core 0.39.0、project.created@v3、project.scope-relations-revised@v1 | DATA-01、V064～V068 | M2 CFG/WO、M7 ADM、M64～M68 | E0/E2 |
-| authorization | ARCH-07、ARCH-21、M63～M67、ADR-025/026、M186、M188、M196～M207 | API-01/02/07、Core OpenAPI 0.99.0、ProjectScopeAuthorizationService、治理 HTTP、`/me*` | DATA-02、V064～V067、V089～V090、V096～V100 | M2 AUTH、M6 SEC、M63～M67、M186、M188、M196～M207 | E1/E4 |
+| authorization | ARCH-07、ARCH-21、M63～M67、ADR-025/026、M186、M188、M196～M208 | API-01/02/07、Core OpenAPI 0.99.0、ProjectScopeAuthorizationService、治理 HTTP、`/me*` | DATA-02、V064～V067、V089～V090、V096～V100 | M2 AUTH、M6 SEC、M63～M67、M186、M188、M196～M208 | E1/E4 |
 | audit | ARCH-07、ARCH-21 | 所有高风险命令 | DATA-02 | M2 AUD、M6 SEC/OPS | E1 |
 | authority | ARCH-17、ARCH-20 | API-01/05 authority/fence | DATA-05 | M5 CUT、M6 TX | E1/E5 |
 | configuration | ARCH-05 | API-01/02 | DATA-01 | M2 CFG | E2 |
 | files | ARCH-10、ARCH-21、ARCH-25 | API-03 资料引用、API-08 文件控制面 | DATA-03、V010 物理迁移 | M3 FILE、M6 SEC、M11 | E1/E3 |
 | reliability | ARCH-20、ADR-014 | API-01 通用命令/事件 | DATA-01 | M6 TX | E1 |
-| readmodel | PRODUCT-01～07、ARCH-19、ADR-027/028/029/030/031/032/033/040/041/043/044/045、M189～M195、M202～M203、M205～M207 | API-06（§3 最近访问 + §7 受控搜索 + §8 SavedView 个人+共享 + §9 Admin UI Preference + §10 Network Portal 只读/整改/异常/资质/师傅关系/工作台 enrichment + §11 Technician Feed）、Core OpenAPI 0.99.0 | DATA-06、V071～V078、V091～V095 | M7 WO/QRY、M73～M99、M158、M189～M195、M202～M203、M205～M207 | U0/U1 |
+| readmodel | PRODUCT-01～07、ARCH-19、ADR-027/028/029/030/031/032/033/040/041/043/044/045/046、M189～M195、M202～M203、M205～M208 | API-06（§3 最近访问 + §7 受控搜索 + §8 SavedView 个人+共享 + §9 Admin UI Preference + §10 Network Portal 只读/整改/异常/资质/师傅关系/工作台 enrichment/产能页 + §11 Technician Feed）、Core OpenAPI 0.99.0 | DATA-06、V071～V078、V091～V095 | M7 WO/QRY、M73～M99、M158、M189～M195、M202～M203、M205～M208 | U0/U1 |
 | automation | ARCH-06、ARCH-20 | API-01 事件 | DATA-01 | M2 TASK、M6 TX | E1 |
 | operations | ARCH-14、ARCH-20、M60、ADR-041、M203 | API-04 exception、API-06 §10 Network Portal operational-exceptions、outbound-delivery-recovered@v1、operational-exception-resolved@v2、Core OpenAPI 0.95.0 | DATA-04、V060、V084 | M4 OPS、M6 TX、M60、M203 | E1/E4 |
 | workorder | ARCH-03/06 | API-01/02 | DATA-01 | M2 WO | E2 |
@@ -302,3 +302,4 @@ Feature gate/authority: if applicable
 | M205 | Network Portal 本网点资质只读：`GET /network-portal/technician-qualifications` list/get；复用 `technician.readOwnNetwork` NETWORK；ACTIVE 师傅 fan-in；Page Registry `page-registry-v12`；Admin Web `/network-portal/qualifications` | ADR-043 + Core OpenAPI 0.97.0 + Flyway 100/102（无新迁移）+ PostgreSQL/MVC/ArchitectureTest + Admin E2E + `218-m205-*` + `202-m205-*` | Portal decide、FileObject、产能申请、离线工作包 |
 | M206 | Network Portal 师傅关系只读：`GET /network-portal/technician-memberships` list/get；复用 `technician.readOwnNetwork` NETWORK；默认 ACTIVE；含真实 version；Page Registry `page-registry-v13`；Admin Web 终止表单填充真实 version | ADR-044 + Core OpenAPI 0.98.0 + Flyway 100/102（无新迁移）+ PostgreSQL/MVC/ArchitectureTest + Admin E2E + `219-m206-*` + `203-m206-*` | 操作员 NetworkMembership、Portal decide、产能申请、离线工作包 |
 | M207 | Network Portal 工作台能力门控 enrichment：扩展 `GET /network-portal/workbench`；`unassignedTechnicianTaskCount` + correction/exception/qualification 可选计数；缺能力省略；Page Registry `page-registry-v14`；Admin Web capacity/深链 | ADR-045 + Core OpenAPI 0.99.0 + Flyway 100/102（无新迁移）+ PostgreSQL/MVC/ArchitectureTest + Admin E2E + `220-m207-*` + `204-m207-*` | SLA 风险计数、产能申请、Portal ACK/decide、离线工作包 |
+| M208 | Network Portal 产能页：复用 `GET /network-portal/capacity`；Page Registry `NETWORK.CAPACITY` + `page-registry-v15`；Admin Web `/network-portal/capacity`（含 `version`）；工作台深链 | ADR-046 + Core OpenAPI 0.99.0（无契约变更）+ Flyway 100/102（无新迁移）+ PostgreSQL/MVC/ArchitectureTest + Admin E2E + `221-m208-*` + `205-m208-*` | 产能申请/写、`CapacityAdjustmentRequest`、未 Accepted 字段、离线工作包 |
