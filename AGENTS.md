@@ -253,7 +253,7 @@ bash scripts/verify-local.sh
 
 ### L4：干净构建/发布
 
-仅发布候选、主分支/PR CI、构建机制变化、从零可复现验证、怀疑缓存污染或用户明确要求时执行。
+仅发布候选、主分支 CI、手工最终候选验证、构建机制变化、从零可复现验证、怀疑缓存污染或用户明确要求时执行。
 
 Apple Silicon + OrbStack/Docker 本地环境必须执行：
 
@@ -288,6 +288,20 @@ bash scripts/verify-local.sh \
 ```
 
 测试禁令：不得删除或跳过失败测试、放宽核心断言、默认跳过 CI 门禁、用 Mock 替代必须证明的 PostgreSQL/安全行为，或捕获异常后忽略失败。
+
+### 10.2 GitHub Actions 反馈节奏
+
+- Agent 不得在每次中间提交或 push 后停下等待 GitHub Actions；开发过程中应继续使用 L0～L2
+  精准本地测试推进同一切片；
+- PR 流水线按文件变化运行最低充分门禁：纯文档只做 Preflight，Admin Web、Backend、Contracts
+  和 Deployment 分别触发对应验证；未知或 CI 基础设施变化保守升级为完整 PR 验证；
+- 同一 PR 的新提交由 workflow `concurrency` 自动取消旧运行。旧运行被取消是预期反馈收敛，
+  不得当作产品或测试失败重复修复；
+- 只有最终候选 HEAD 已冻结、精准本地测试通过且不再计划追加提交时，Agent 才通过
+  `workflow_dispatch` 等待一次完整远端验证；
+- `container-staging` 只属于 `master` push、明确手工验证或发布候选，不属于普通 PR；
+- 最终候选完整验证和 `master` 门禁仍必须保留 PostgreSQL、Flyway、契约兼容、安全扫描、
+  Spring Modulith、Admin E2E、镜像构建、迁移、Smoke、回滚与恢复演练，不得因分层触发而删除。
 
 ---
 
@@ -326,10 +340,10 @@ bash scripts/verify-local.sh \
 2. 定位能力/模块，选择 R0～R3
 3. 渐进读取直接事实源，列出范围与非目标
 4. 小步修改代码、契约、迁移、测试和必要文档
-5. 每个逻辑小步运行 L0/L1；风险点运行 L2
+5. 每个逻辑小步运行 L0/L1；风险点运行 L2；中间 push 后继续开发，不等待远端流水线
 6. 清理被替代代码和无依据兜底
 7. 切片完成后做相邻模块回归
-8. 里程碑完成前执行 L3；需要时执行 L4/staging
+8. 冻结最终候选 HEAD 后执行 L3，并只等待一次完整远端验证；L4/staging 仅用于发布候选、手工或 master
 9. 同步实施状态和追踪矩阵
 10. 检查 diff、工作区和事实源一致性后提交
 ```
@@ -388,3 +402,20 @@ bash scripts/verify-local.sh \
 ## 14. 例外
 
 确需偏离本指南时，必须说明冲突规则、原因、影响、迁移与回退方案；涉及长期架构、数据、安全或契约的偏离需更新 ADR、事实源和验收矩阵，并获得明确批准。局部、可逆且不改变业务语义的实现调整不需要为形式而新增 ADR。
+
+## 身份与组织治理正式执行入口（编号冲突待裁决）
+
+`master` 已接受身份与组织治理交付计划，原文使用 M135～M140 编号。
+但当前工程基线已推进至 **M182**，且 **M135～M182 已被 Admin Pilot 切片占用并 Implemented**。
+
+在项目负责人完成程序级重编号前：
+
+1. 不得按原 M135～M140 编号实施身份治理，也不得覆盖已实现的 Admin Pilot 里程碑文档；
+2. 涉及用户、组织、网点人员、师傅、角色授权或 Portal 上下文时，仍须先阅读下列内容事实源；
+3. 工程基线以 `implementation-status.md` 的 `latestMilestone: M182` 为准。
+
+- `serviceos-architecture/roadmap/03-identity-organization-governance-delivery-plan.md`
+- `serviceos-architecture/testing/identity-organization-governance-program-acceptance.md`
+- `serviceos-architecture/roadmap/04-identity-organization-governance-agent-worklist.md`
+
+不得创建保存密码的本地万能用户表，不得用单一 `user_type`、Keycloak Group、菜单或前端 scope 代替 Principal/Persona/Membership/RoleGrant 的权威边界。默认一个里程碑一个 Draft PR；只有对应工程证据成立后才更新 `latestMilestone` 或声明 IMPLEMENTED。
