@@ -12,6 +12,7 @@ const page = ref<ProjectPage | null>(null)
 const cursor = ref<string | undefined>()
 const status = ref('ACTIVE')
 const clientId = ref('')
+const activeOn = ref('')
 
 const createCode = ref('')
 const createClientId = ref('client-demo')
@@ -30,7 +31,8 @@ async function load(next?: string) {
       cursor: next,
       limit: '20',
       status: status.value || undefined,
-      clientId: clientId.value || undefined,
+      clientId: clientId.value.trim() || undefined,
+      activeOn: activeOn.value.trim() || undefined,
     })
     cursor.value = page.value.nextCursor ?? undefined
   } catch (err) {
@@ -38,6 +40,11 @@ async function load(next?: string) {
   } finally {
     loading.value = false
   }
+}
+
+function search() {
+  cursor.value = undefined
+  return load()
 }
 
 async function create() {
@@ -92,11 +99,11 @@ onMounted(() => load())
 
 <template>
   <section class="page">
-    <form class="filters" @submit.prevent="load()">
+    <form class="filters" @submit.prevent="search">
       <label>
         status
-        <select v-model="status">
-          <option value="">全部</option>
+        <select v-model="status" aria-label="project status filter">
+          <option value="">（不限）</option>
           <option value="DRAFT">DRAFT</option>
           <option value="ACTIVE">ACTIVE</option>
           <option value="SUSPENDED">SUSPENDED</option>
@@ -105,7 +112,19 @@ onMounted(() => load())
       </label>
       <label>
         clientId
-        <input v-model="clientId" placeholder="可选" />
+        <input
+          v-model="clientId"
+          aria-label="project clientId filter"
+          placeholder="可选"
+        />
+      </label>
+      <label>
+        activeOn
+        <input
+          v-model="activeOn"
+          aria-label="project activeOn filter"
+          type="date"
+        />
       </label>
       <button type="submit" :disabled="loading">查询</button>
     </form>

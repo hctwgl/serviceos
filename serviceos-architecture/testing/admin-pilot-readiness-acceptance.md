@@ -1,10 +1,10 @@
 ---
-title: Admin 试点可运行基线验收（含 M150）
+title: Admin 试点可运行基线验收（含 M151）
 status: Implemented
 lastUpdated: 2026-07-17
 ---
 
-# Admin 试点可运行基线验收（含 M150）
+# Admin 试点可运行基线验收（含 M151）
 
 | ID | 场景 | 证据 | 结果 |
 |---|---|---|---|
@@ -40,12 +40,12 @@ lastUpdated: 2026-07-17
 | ADMIN-PILOT-08CQ | 真实整改队列 Accepted OpenAPI 筛选 | 默认 IN_PROGRESS；`IN_PROGRESS+sourceReviewCaseId` 可见目标整改案例 | PASS |
 | ADMIN-PILOT-08RD | 真实工作区审核/整改详情深链 | REVIEWS_CORRECTIONS → `/reviews/{id}` 与 `/corrections/{id}` | PASS |
 | ADMIN-PILOT-08EQ | 真实运营异常队列 Accepted OpenAPI 筛选 | 默认 OPEN；`ACKNOWLEDGED+P1` 查询 200 | PASS |
+| ADMIN-PILOT-08DF | 真实目录/SLA Accepted OpenAPI 筛选补齐 | WO/Task/SLA `projectId`；Task `SUCCEEDED`；Project `activeOn` | PASS |
 | ADMIN-PILOT-08CI | 真实写链路 CI 阻断 | GitHub Actions `admin-pilot-e2e` 运行同一 OIDC/Backend/PostgreSQL/Chrome smoke；通过后才启动 staging | PASS |
 | ADMIN-PILOT-09 | 完整履约写链路 | 接单→Admin 派单(HTTP Manual Assign)→预约→上门→表单/资料→审核/整改→外发→完结 | PASS |
 
 `ADMIN-PILOT-08*` 与 `ADMIN-PILOT-08CI` 证明固定工单候选分配/领取/释放，独立 Workflow Task 的
 表单/资料/审核/整改/完结与外发 ACK/厂端回调，入站工单经 Admin HTTP 初派后同单预约上门→表单/
-资料/驳回整改补传复审/外发/完结，入站/外发/审核/整改详情深链，以及 Outbound/Review/Correction/
-OperationalException 队列 Accepted OpenAPI 筛选。`ADMIN-PILOT-09` 已由入站路径证明；派单为窄化
-Manual Assign。不证明专用入站队列列表、多 status OR、SavedView、评分/硬过滤引擎、ServiceNetwork
-生命周期或生产对象存储/专业扫描。
+资料/驳回整改补传复审/外发/完结，入站/外发/审核/整改详情深链，以及专项队列与目录/SLA Accepted
+OpenAPI 筛选。`ADMIN-PILOT-09` 已由入站路径证明；派单为窄化 Manual Assign。不证明专用入站队列
+列表、多 status OR、SavedView、评分/硬过滤引擎、ServiceNetwork 生命周期或生产对象存储/专业扫描。

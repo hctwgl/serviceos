@@ -1,15 +1,15 @@
 ---
-title: Admin 试点可运行基线（含 M150 运营异常队列筛选）
+title: Admin 试点可运行基线（含 M151 目录/SLA 筛选补齐）
 status: Implemented
 lastUpdated: 2026-07-17
 ---
 
-# Admin 试点可运行基线（含 M150 运营异常队列筛选）
+# Admin 试点可运行基线（含 M151 目录/SLA 筛选补齐）
 
-本基线覆盖 M101～M150 已有 Admin 表面的可重复构建、登录、真实后端/数据库试点入口，并明确
-平台级未实现边界。M135～M150 追加补传复审、预约上门、提审外发 ACK、厂端回调、入站接单激活、
+本基线覆盖 M101～M151 已有 Admin 表面的可重复构建、登录、真实后端/数据库试点入口，并明确
+平台级未实现边界。M135～M151 追加补传复审、预约上门、提审外发 ACK、厂端回调、入站接单激活、
 Admin HTTP 人工初派、同单预约上门→表单/资料/驳回整改补传复审/外发/完结（`ADMIN-PILOT-09`）、
-入站 Envelope/Canonical 详情深链、Outbound/Review/Correction/OperationalException 队列 Accepted OpenAPI 筛选，以及工作区外发/审核/整改详情深链。
+入站 Envelope/Canonical 详情深链、专项队列与目录/SLA Accepted OpenAPI 筛选，以及工作区外发/审核/整改详情深链。
 
 ## 1. 已建立的基线
 
@@ -189,6 +189,11 @@ GitHub Actions 使用同一脚本阻断 PR，并保留 Backend、Admin 与 Playw
 - Operational Exception 队列 UI 绑定 Accepted OpenAPI 单值筛选（默认 OPEN）；
 - Playwright 证明 `ACKNOWLEDGED+P1` 查询 200；多 status OR / SavedView 仍未证明。
 
+已追加证明（M151 / ADMIN-PILOT-08DF）：
+
+- 工单/任务/SLA `projectId`、任务 `SUCCEEDED`、项目 `activeOn` 筛选接到 Admin；
+- 专用入站队列列表仍未证明。
+
 尚未证明：
 
 - 正式企业 IdP、MFA、生产回调地址、BFF/token renewal/logout 协议；
@@ -199,5 +204,5 @@ GitHub Actions 使用同一脚本阻断 PR，并保留 Backend、Admin 与 Playw
 - 真实 sandbox 提审与生产厂端联调；
 - SavedView、设计系统、可访问性与多浏览器矩阵。
 
-因此当前交付可称为“Admin 试点可运行基线（含 ADMIN-PILOT-09、入站/外发/审核/整改详情深链与专项队列筛选）”，
+因此当前交付可称为“Admin 试点可运行基线（含 ADMIN-PILOT-09、详情深链与专项队列/目录筛选）”，
 不能称为“完整现场履约平台已交付”。

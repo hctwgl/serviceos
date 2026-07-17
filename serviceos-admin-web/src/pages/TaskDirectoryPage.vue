@@ -11,6 +11,7 @@ const cursor = ref<string | undefined>()
 const status = ref('')
 const taskKind = ref('')
 const assigneeMe = ref(false)
+const projectId = ref('')
 
 async function load(next?: string) {
   loading.value = true
@@ -22,6 +23,7 @@ async function load(next?: string) {
       status: status.value || undefined,
       taskKind: taskKind.value || undefined,
       assignee: assigneeMe.value ? 'me' : undefined,
+      projectId: projectId.value.trim() || undefined,
     })
     cursor.value = page.value.nextCursor ?? undefined
   } catch (err) {
@@ -29,6 +31,11 @@ async function load(next?: string) {
   } finally {
     loading.value = false
   }
+}
+
+function search() {
+  cursor.value = undefined
+  return load()
 }
 
 const rows = computed(() =>
@@ -49,16 +56,17 @@ onMounted(() => load())
 
 <template>
   <section>
-    <form class="filters" @submit.prevent="load()">
+    <form class="filters" @submit.prevent="search">
       <label>
         status
-        <select v-model="status">
-          <option value="">全部</option>
+        <select v-model="status" aria-label="task status filter">
+          <option value="">（不限）</option>
           <option value="READY">READY</option>
           <option value="CLAIMED">CLAIMED</option>
           <option value="RUNNING">RUNNING</option>
           <option value="PENDING">PENDING</option>
           <option value="RETRY_WAIT">RETRY_WAIT</option>
+          <option value="SUCCEEDED">SUCCEEDED</option>
           <option value="MANUAL_INTERVENTION">MANUAL_INTERVENTION</option>
           <option value="COMPLETED">COMPLETED</option>
           <option value="CANCELLED">CANCELLED</option>
@@ -66,14 +74,22 @@ onMounted(() => load())
       </label>
       <label>
         taskKind
-        <select v-model="taskKind">
-          <option value="">全部</option>
+        <select v-model="taskKind" aria-label="task taskKind filter">
+          <option value="">（不限）</option>
           <option value="HUMAN">HUMAN</option>
           <option value="AUTOMATED">AUTOMATED</option>
         </select>
       </label>
+      <label>
+        projectId
+        <input
+          v-model="projectId"
+          aria-label="task projectId filter"
+          placeholder="uuid"
+        />
+      </label>
       <label class="check">
-        <input v-model="assigneeMe" type="checkbox" />
+        <input v-model="assigneeMe" type="checkbox" aria-label="task assignee me filter" />
         assignee=me
       </label>
       <button type="submit" :disabled="loading">查询</button>

@@ -8,7 +8,9 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 const page = ref<SlaInstancePage | null>(null)
 const cursor = ref<string | undefined>()
+/** 运营默认 BREACHED；省略 status 表示不限。 */
 const status = ref('BREACHED')
+const projectId = ref('')
 
 async function load(next?: string) {
   loading.value = true
@@ -18,6 +20,7 @@ async function load(next?: string) {
       cursor: next,
       limit: '20',
       status: status.value || undefined,
+      projectId: projectId.value.trim() || undefined,
     })
     cursor.value = page.value.nextCursor ?? undefined
   } catch (err) {
@@ -25,6 +28,11 @@ async function load(next?: string) {
   } finally {
     loading.value = false
   }
+}
+
+function search() {
+  cursor.value = undefined
+  return load()
 }
 
 const rows = computed(() =>
@@ -45,23 +53,39 @@ onMounted(() => load())
 
 <template>
   <section>
-    <form class="filters" @submit.prevent="load()">
+    <form class="filters" @submit.prevent="search">
       <label>
         status
-        <select v-model="status">
-          <option value="">全部</option>
+        <select v-model="status" aria-label="sla status filter">
+          <option value="">（不限）</option>
           <option value="RUNNING">RUNNING</option>
           <option value="BREACHED">BREACHED</option>
           <option value="MET">MET</option>
           <option value="MET_LATE">MET_LATE</option>
         </select>
       </label>
+      <label>
+        projectId
+        <input
+          v-model="projectId"
+          aria-label="sla projectId filter"
+          placeholder="uuid"
+        />
+      </label>
       <button type="submit" :disabled="loading">查询</button>
     </form>
 
     <QueueTable
       title="SLA 工作台"
-      :columns="['slaInstanceId', 'status', 'slaRef', 'deadlineAt', 'remainingSeconds', 'overdueSeconds', 'workOrderId']"
+      :columns="[
+        'slaInstanceId',
+        'status',
+        'slaRef',
+        'deadlineAt',
+        'remainingSeconds',
+        'overdueSeconds',
+        'workOrderId',
+      ]"
       :rows="rows"
       :loading="loading"
       :error="error"
@@ -97,6 +121,7 @@ onMounted(() => load())
 <style scoped>
 .filters {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.75rem;
   margin-bottom: 1rem;
   align-items: end;
@@ -108,10 +133,15 @@ label {
   color: #486581;
 }
 select,
+input,
 button {
   border: 1px solid #bcccdc;
   border-radius: 6px;
   padding: 0.4rem 0.65rem;
+}
+input {
+  min-width: 12rem;
+  font-family: ui-monospace, monospace;
 }
 button {
   background: #243b53;

@@ -219,6 +219,7 @@ async function prepareOpenReviewCase(
 }
 
 test('真实 OIDC 登录后可读取核心投影并完成 Task 分配领取释放写链路', async ({ page }) => {
+  test.setTimeout(90_000)
   await loginWithLocalKeycloak(page)
   await expect(page.getByRole('heading', { name: '授权工单目录' })).toBeVisible()
   await expect(page.getByText('加载中…')).toHaveCount(0)
@@ -238,6 +239,62 @@ test('真实 OIDC 登录后可读取核心投影并完成 Task 分配领取释�
   )
   await page.getByRole('button', { name: '查询' }).click()
   expect((await exceptionFilterPromise).status()).toBe(200)
+
+  // M151：目录/SLA Accepted OpenAPI 筛选补齐（projectId / activeOn / SUCCEEDED）。
+  const pilotProjectId = '10000000-0000-4000-8000-000000000001'
+  await page.getByRole('link', { name: '工单目录' }).click()
+  await expect(page.getByRole('heading', { name: '授权工单目录' })).toBeVisible()
+  await page.getByLabel('workOrder projectId filter').fill(pilotProjectId)
+  const workOrderFilterPromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname === '/api/v1/work-orders' &&
+      new URL(response.url()).searchParams.get('projectId') === pilotProjectId,
+  )
+  await page.getByRole('button', { name: '查询' }).click()
+  expect((await workOrderFilterPromise).status()).toBe(200)
+
+  await page.getByRole('link', { name: '任务目录' }).click()
+  await expect(page.getByRole('heading', { name: '授权任务目录' })).toBeVisible()
+  await page.getByLabel('task projectId filter').fill(pilotProjectId)
+  await page.getByLabel('task status filter').selectOption('SUCCEEDED')
+  const taskFilterPromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname === '/api/v1/tasks' &&
+      new URL(response.url()).searchParams.get('projectId') === pilotProjectId &&
+      new URL(response.url()).searchParams.get('status') === 'SUCCEEDED',
+  )
+  await page.getByRole('button', { name: '查询' }).click()
+  expect((await taskFilterPromise).status()).toBe(200)
+
+  await page.getByRole('link', { name: 'SLA 工作台' }).click()
+  await expect(page.getByRole('heading', { name: 'SLA 工作台' })).toBeVisible()
+  await page.getByLabel('sla projectId filter').fill(pilotProjectId)
+  const slaFilterPromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname === '/api/v1/sla-instances' &&
+      new URL(response.url()).searchParams.get('projectId') === pilotProjectId &&
+      new URL(response.url()).searchParams.get('status') === 'BREACHED',
+  )
+  await page.getByRole('button', { name: '查询' }).click()
+  expect((await slaFilterPromise).status()).toBe(200)
+
+  await page.getByRole('link', { name: '项目目录' }).click()
+  await expect(page.getByRole('heading', { name: '授权项目目录' })).toBeVisible()
+  const activeOn = new Date().toISOString().slice(0, 10)
+  await page.getByLabel('project activeOn filter').fill(activeOn)
+  const projectFilterPromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname === '/api/v1/projects' &&
+      new URL(response.url()).searchParams.get('activeOn') === activeOn &&
+      new URL(response.url()).searchParams.get('status') === 'ACTIVE',
+  )
+  await page.getByRole('button', { name: '查询' }).click()
+  expect((await projectFilterPromise).status()).toBe(200)
+
   await page.getByRole('link', { name: '工单目录' }).click()
   await expect(page.getByRole('heading', { name: '授权工单目录' })).toBeVisible()
 

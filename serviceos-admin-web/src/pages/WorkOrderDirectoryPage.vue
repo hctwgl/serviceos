@@ -10,6 +10,7 @@ const page = ref<WorkOrderPage | null>(null)
 const cursor = ref<string | undefined>()
 const status = ref('')
 const clientCode = ref('')
+const projectId = ref('')
 
 async function load(next?: string) {
   loading.value = true
@@ -19,7 +20,8 @@ async function load(next?: string) {
       cursor: next,
       limit: '20',
       status: status.value || undefined,
-      clientCode: clientCode.value || undefined,
+      clientCode: clientCode.value.trim() || undefined,
+      projectId: projectId.value.trim() || undefined,
     })
     cursor.value = page.value.nextCursor ?? undefined
   } catch (err) {
@@ -27,6 +29,11 @@ async function load(next?: string) {
   } finally {
     loading.value = false
   }
+}
+
+function search() {
+  cursor.value = undefined
+  return load()
 }
 
 const rows = computed(() =>
@@ -45,11 +52,11 @@ onMounted(() => load())
 
 <template>
   <section>
-    <form class="filters" @submit.prevent="load()">
+    <form class="filters" @submit.prevent="search">
       <label>
         status
-        <select v-model="status">
-          <option value="">全部</option>
+        <select v-model="status" aria-label="workOrder status filter">
+          <option value="">（不限）</option>
           <option value="RECEIVED">RECEIVED</option>
           <option value="ACTIVE">ACTIVE</option>
           <option value="FULFILLED">FULFILLED</option>
@@ -57,7 +64,19 @@ onMounted(() => load())
       </label>
       <label>
         clientCode
-        <input v-model="clientCode" placeholder="可选" />
+        <input
+          v-model="clientCode"
+          aria-label="workOrder clientCode filter"
+          placeholder="可选"
+        />
+      </label>
+      <label>
+        projectId
+        <input
+          v-model="projectId"
+          aria-label="workOrder projectId filter"
+          placeholder="uuid"
+        />
       </label>
       <button type="submit" :disabled="loading">查询</button>
     </form>
