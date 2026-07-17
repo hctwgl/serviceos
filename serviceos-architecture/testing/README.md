@@ -138,4 +138,5 @@
 - [M135 Admin 正常整改补传验收矩阵](132-m135-admin-correction-resubmit-rereview-acceptance.md)
 - [M136 Admin 预约上门写链路验收矩阵](133-m136-admin-appointment-visit-acceptance.md)
 - [M137 Admin BYD 提审外发 ACK 验收矩阵](134-m137-admin-byd-outbound-ack-acceptance.md)
+- [M138 Admin BYD 厂端审核回调验收矩阵](135-m138-admin-byd-callback-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

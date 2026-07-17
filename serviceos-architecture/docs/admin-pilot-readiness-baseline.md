@@ -1,13 +1,13 @@
 ---
-title: Admin 试点可运行基线（含 M137 外发 ACK）
+title: Admin 试点可运行基线（含 M138 厂端回调）
 status: Implemented
 lastUpdated: 2026-07-16
 ---
 
-# Admin 试点可运行基线（含 M137 外发 ACK）
+# Admin 试点可运行基线（含 M138 厂端回调）
 
-本基线覆盖 M101～M137 已有 Admin 表面的可重复构建、登录、真实后端/数据库试点入口，并明确
-完整业务链尚未证明的边界。M135～M137 追加补传复审、预约上门与 BYD 提审外发 ACK 证明，
+本基线覆盖 M101～M138 已有 Admin 表面的可重复构建、登录、真实后端/数据库试点入口，并明确
+完整业务链尚未证明的边界。M135～M138 追加补传复审、预约上门、提审外发 ACK 与厂端回调证明，
 不宣称完整 `ADMIN-PILOT-09`。
 
 ## 1. 已建立的基线
@@ -117,14 +117,19 @@ GitHub Actions 使用同一脚本阻断 PR，并保留 Backend、Admin 与 Playw
 - 本地协议 stub 严格 `errno=0` 后 Delivery ACKNOWLEDGED 并自动创建 CLIENT ReviewCase；
 - Admin 外发详情可见 ACKNOWLEDGED。不宣称真实 sandbox。
 
+已追加证明（M138）：
+
+- 外发详情展示 CLIENT 案例链接；同租户 CPIM 签名回调（result=1）将 CLIENT Case 推进到 APPROVED；
+- Admin 浏览器可见 `CLIENT:APPROVED`，并有 EXTERNAL receipt/decision 持久化证据。
+
 尚未证明：
 
 - 正式企业 IdP、MFA、生产回调地址、BFF/token renewal/logout 协议；
 - 从外部接单开始，经派单、表单、资料、审核、整改、外发到完结的完整写链路（预约上门局部已证）；
 - Network/Technician Portal 与跨端协作；
 - 正式 sandbox、对象存储、专业扫描服务、Broker、通知和 SLA BUSINESS 日历；
-- 真实 sandbox 提审与厂端回调浏览器联调；
+- 真实 sandbox 提审与生产厂端联调；
 - SavedView、设计系统、可访问性与多浏览器矩阵。
 
-因此当前交付只能称为“Admin 试点可运行局部读写基线（含补传、预约上门与外发 ACK）”，不能称为
+因此当前交付只能称为“Admin 试点可运行局部读写基线（含补传、预约上门、外发 ACK 与厂端回调）”，不能称为
 “完整现场履约平台已交付”。
