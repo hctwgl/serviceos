@@ -47,8 +47,9 @@ frontmatter_field() {
 }
 
 # 首个 Markdown 标题文本。
+# 使用 awk 单进程退出，避免 set -o pipefail 下 `sed | head` 触发 SIGPIPE(141)。
 first_heading() {
-  sed -n 's/^#*[[:space:]]*//p' "$1" | head -1
+  awk '/^#/{sub(/^#+[[:space:]]*/, ""); print; exit}' "$1"
 }
 
 # 仅接受标题开头的 Mxx，避免“验收基线（含 M164）”等聚合文档被误归为单一里程碑。
