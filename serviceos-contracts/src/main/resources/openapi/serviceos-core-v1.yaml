@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.97.0
+  version: 0.98.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1483,6 +1483,34 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
   /network-portal/technician-memberships:
+    get:
+      operationId: listNetworkPortalTechnicianMemberships
+      summary: Network Portal 本网点师傅关系列表
+      description: |
+        M206：X-Network-Context + NETWORK scope technician.readOwnNetwork。
+        仅返回 serviceNetworkId = 上下文网点的 NetworkTechnicianMembership 安全摘要（含 version，供 terminate If-Match）。
+        可选 status（默认 ACTIVE）、technicianProfileId、limit（1～100，默认 50）；按 createdAt/id 正序。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/CorrelationId'
+        - name: status
+          in: query
+          schema: { enum: [ACTIVE, TERMINATED], default: ACTIVE }
+        - name: technicianProfileId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200':
+          description: 本网点师傅关系列表页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkPortalMembershipPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
     post:
       operationId: createNetworkPortalTechnicianMembership
       summary: Network Portal 绑定本网点师傅服务关系
@@ -1512,6 +1540,27 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /network-portal/technician-memberships/{membershipId}:
+    get:
+      operationId: getNetworkPortalTechnicianMembership
+      summary: Network Portal 本网点师傅关系详情
+      description: |
+        M206：X-Network-Context + NETWORK scope technician.readOwnNetwork。
+        serviceNetworkId 必须等于上下文网点，否则 ACCESS_DENIED；含真实 version。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - $ref: '#/components/parameters/NetworkTechnicianMembershipId'
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 师傅关系安全摘要
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkPortalMembershipItem' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
   /network-portal/technician-memberships/{membershipId}:terminate:
     post:
       operationId: terminateNetworkPortalTechnicianMembership
@@ -4853,7 +4902,7 @@ components:
     NetworkPortalTechnicianItem:
       type: object
       additionalProperties: false
-      required: [membershipId, technicianProfileId, principalId, displayName, profileStatus, membershipStatus, validFrom]
+      required: [membershipId, technicianProfileId, principalId, displayName, profileStatus, membershipStatus, validFrom, membershipVersion]
       properties:
         membershipId: { type: string, format: uuid }
         technicianProfileId: { type: string, format: uuid }
@@ -4863,6 +4912,11 @@ components:
         membershipStatus: { type: string, maxLength: 32 }
         validFrom: { type: string, format: date-time }
         validTo: { type: [string, 'null'], format: date-time }
+        membershipVersion:
+          type: integer
+          format: int64
+          minimum: 1
+          description: M206 附加：ACTIVE 关系乐观版本，可供 terminate If-Match
     NetworkPortalTechnicianPage:
       type: object
       additionalProperties: false
@@ -4993,6 +5047,30 @@ components:
       properties:
         networkId: { type: string, format: uuid }
         items: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/NetworkPortalQualificationItem' } }
+        asOf: { type: string, format: date-time }
+    NetworkPortalMembershipItem:
+      type: object
+      additionalProperties: false
+      required: [id, serviceNetworkId, technicianProfileId, status, validFrom, validTo,
+        version, createdAt, terminatedAt, terminateReason]
+      properties:
+        id: { type: string, format: uuid }
+        serviceNetworkId: { type: string, format: uuid }
+        technicianProfileId: { type: string, format: uuid }
+        status: { enum: [ACTIVE, TERMINATED] }
+        validFrom: { type: string, format: date-time }
+        validTo: { type: [string, 'null'], format: date-time }
+        version: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        terminatedAt: { type: [string, 'null'], format: date-time }
+        terminateReason: { type: [string, 'null'], maxLength: 500 }
+    NetworkPortalMembershipPage:
+      type: object
+      additionalProperties: false
+      required: [networkId, items, asOf]
+      properties:
+        networkId: { type: string, format: uuid }
+        items: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/NetworkPortalMembershipItem' } }
         asOf: { type: string, format: date-time }
     TechnicianPortalFeedItem:
       type: object

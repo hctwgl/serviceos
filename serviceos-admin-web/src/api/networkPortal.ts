@@ -38,6 +38,21 @@ export type NetworkPortalTechnicianItem = {
   membershipStatus: string
   validFrom: string
   validTo: string | null
+  /** M206：ACTIVE 关系乐观版本（附加字段，terminate 亦可从 memberships 列表取） */
+  membershipVersion?: number
+}
+
+export type NetworkPortalMembershipItem = {
+  id: string
+  serviceNetworkId: string
+  technicianProfileId: string
+  status: string
+  validFrom: string
+  validTo: string | null
+  version: number
+  createdAt: string
+  terminatedAt: string | null
+  terminateReason: string | null
 }
 
 export type NetworkPortalCapacityItem = {
@@ -597,6 +612,34 @@ export function listNetworkPortalQualifications(
 export function getNetworkPortalQualification(networkContextId: string, qualificationId: string) {
   return apiGet<NetworkPortalQualificationItem>(
     `/network-portal/technician-qualifications/${qualificationId}`,
+    {},
+    networkHeaders(networkContextId),
+  )
+}
+
+/** M206：本网点师傅关系列表（含真实 version，供 terminate If-Match）。 */
+export function listNetworkPortalTechnicianMemberships(
+  networkContextId: string,
+  params?: { status?: string; technicianProfileId?: string; limit?: number },
+) {
+  return apiGet<NetworkPortalPage<NetworkPortalMembershipItem>>(
+    '/network-portal/technician-memberships',
+    {
+      status: params?.status,
+      technicianProfileId: params?.technicianProfileId,
+      limit: params?.limit == null ? undefined : String(params.limit),
+    },
+    networkHeaders(networkContextId),
+  )
+}
+
+/** M206：本网点师傅关系详情。 */
+export function getNetworkPortalTechnicianMembership(
+  networkContextId: string,
+  membershipId: string,
+) {
+  return apiGet<NetworkPortalMembershipItem>(
+    `/network-portal/technician-memberships/${membershipId}`,
     {},
     networkHeaders(networkContextId),
   )

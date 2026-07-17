@@ -6,7 +6,7 @@ status: Accepted
 
 # 应用工作区、队列与用户偏好 HTTP API
 
-## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158 / M189 / M190 / M191 / M192 / M193 / M194 / M195 / M202 / M203 / M205）
+## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158 / M189 / M190 / M191 / M192 / M193 / M194 / M195 / M202 / M203 / M205 / M206）
 
 **Accepted（可指导实现）**：
 
@@ -98,6 +98,15 @@ status: Accepted
   `GET /api/v1/network-portal/technician-qualifications/{qualificationId}`（同形安全摘要）。
   门禁：ACTIVE NetworkMembership + NETWORK scope `technician.readOwnNetwork`；数据仅限对本网点
   持有 ACTIVE NetworkTechnicianMembership 的师傅资质。**不**接受 Portal decide、FileObject、
+  产能申请。
+- §10 Network Portal 本网点师傅关系只读（M206 窄扩展）：仅
+  `GET /api/v1/network-portal/technician-memberships`（可选 `status` 默认 `ACTIVE`、
+  `technicianProfileId`、`limit` 1～100 默认 50；`NetworkPortalPage` 形态安全摘要，含真实
+  `version`）与
+  `GET /api/v1/network-portal/technician-memberships/{membershipId}`（同形安全摘要；
+  `serviceNetworkId` 必须等于上下文）。
+  门禁：ACTIVE NetworkMembership + NETWORK scope `technician.readOwnNetwork`；数据仅限
+  `serviceNetworkId = contextNetworkId`。**不**接受操作员 NetworkMembership CRUD、Portal decide、
   产能申请。
 - §11 Technician Portal Feed 子集（M195）：仅
   `GET /api/v1/technician/me/task-feed`（可选 `sinceCursor` 不透明游标；ACTIVE TECHNICIAN
@@ -335,8 +344,10 @@ View 保存 filter AST、列、排序和密度，不保存任意 SQL、访问 to
 | `GET /api/v1/network-portal/operational-exceptions/{exceptionId}` | 本网点运营异常详情 | M203 Accepted |
 | `GET /api/v1/network-portal/technician-qualifications` | 本网点师傅资质列表安全摘要 | M205 Accepted |
 | `GET /api/v1/network-portal/technician-qualifications/{qualificationId}` | 本网点师傅资质详情 | M205 Accepted |
+| `GET /api/v1/network-portal/technician-memberships` | 本网点师傅关系列表安全摘要（含 version） | M206 Accepted |
+| `GET /api/v1/network-portal/technician-memberships/{membershipId}` | 本网点师傅关系详情 | M206 Accepted |
 
-networkId 从可信应用上下文解析；拥有多个 membership 时使用经授权的 `X-Network-Context`，不能在查询参数任意指定。详见 §0 M194 / M202 / M203 / M205。
+networkId 从可信应用上下文解析；拥有多个 membership 时使用经授权的 `X-Network-Context`，不能在查询参数任意指定。详见 §0 M194 / M202 / M203 / M205 / M206。
 
 ## 11. Technician Feed 与工作包状态
 

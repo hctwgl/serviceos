@@ -12,9 +12,11 @@ import com.serviceos.evidence.api.CorrectionCaseService;
 import com.serviceos.evidence.api.CorrectionCaseView;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.network.api.NetworkMembershipView;
+import com.serviceos.network.api.NetworkPortalMembershipQuery;
 import com.serviceos.network.api.NetworkPortalQualificationQuery;
 import com.serviceos.network.api.NetworkPortalTechnicianQuery;
 import com.serviceos.network.api.NetworkPortalTechnicianView;
+import com.serviceos.network.api.NetworkTechnicianMembershipView;
 import com.serviceos.network.api.PrincipalNetworkAffiliationQuery;
 import com.serviceos.network.api.TechnicianQualificationView;
 import com.serviceos.operations.api.OperationalExceptionItem;
@@ -22,6 +24,7 @@ import com.serviceos.operations.api.OperationalExceptionWorkbenchService;
 import com.serviceos.readmodel.api.NetworkPortalCapacityItem;
 import com.serviceos.readmodel.api.NetworkPortalCorrectionItem;
 import com.serviceos.readmodel.api.NetworkPortalExceptionItem;
+import com.serviceos.readmodel.api.NetworkPortalMembershipItem;
 import com.serviceos.readmodel.api.NetworkPortalPage;
 import com.serviceos.readmodel.api.NetworkPortalQualificationItem;
 import com.serviceos.readmodel.api.NetworkPortalQueryService;
@@ -68,6 +71,8 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     private static final int MAX_EXCEPTION_LIMIT = 100;
     private static final int DEFAULT_QUALIFICATION_LIMIT = 50;
     private static final int MAX_QUALIFICATION_LIMIT = 100;
+    private static final int DEFAULT_MEMBERSHIP_LIMIT = 50;
+    private static final int MAX_MEMBERSHIP_LIMIT = 100;
 
     private final PrincipalNetworkAffiliationQuery affiliations;
     private final AuthorizationService authorization;
@@ -75,6 +80,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     private final NetworkCapacitySummaryQuery capacity;
     private final NetworkPortalTechnicianQuery technicians;
     private final NetworkPortalQualificationQuery qualifications;
+    private final NetworkPortalMembershipQuery memberships;
     private final TaskFulfillmentContextService tasks;
     private final CorrectionCaseService corrections;
     private final OperationalExceptionWorkbenchService exceptions;
@@ -88,6 +94,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
             NetworkCapacitySummaryQuery capacity,
             NetworkPortalTechnicianQuery technicians,
             NetworkPortalQualificationQuery qualifications,
+            NetworkPortalMembershipQuery memberships,
             TaskFulfillmentContextService tasks,
             CorrectionCaseService corrections,
             OperationalExceptionWorkbenchService exceptions,
@@ -100,6 +107,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         this.capacity = capacity;
         this.technicians = technicians;
         this.qualifications = qualifications;
+        this.memberships = memberships;
         this.tasks = tasks;
         this.corrections = corrections;
         this.exceptions = exceptions;
@@ -187,7 +195,8 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                         row.profileStatus(),
                         row.membershipStatus(),
                         row.validFrom(),
-                        row.validTo()))
+                        row.validTo(),
+                        row.membershipVersion()))
                 .toList();
         return new NetworkPortalPage<>(networkId, items, clock.instant());
     }
@@ -454,6 +463,67 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         }
     }
 
+    /**
+     * 本网点师傅关系列表。
+     * <p>
+     * 事务边界：只读。先门禁再 fan-in 本网点关系；status 默认 ACTIVE；
+     * 可选 technicianProfileId；按 createdAt/id 正序，内存 limit（1～100，默认 50）。
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public NetworkPortalPage<NetworkPortalMembershipItem> listMemberships(
+            CurrentPrincipal actor,
+            String correlationId,
+            String networkContextHeader,
+            String status,
+            UUID technicianProfileId,
+            Integer limit
+    ) {
+        UUID networkId = requireAuthorizedNetwork(actor, correlationId, networkContextHeader, TECHNICIAN_READ_OWN);
+        String effectiveStatus = normalizeMembershipStatus(status);
+        int effectiveLimit = normalizeMembershipLimit(limit);
+        List<NetworkPortalMembershipItem> items = new ArrayList<>();
+        for (NetworkTechnicianMembershipView row : memberships.listForNetwork(actor.tenantId(), networkId)) {
+            if (!effectiveStatus.equals(row.status())) {
+                continue;
+            }
+            if (technicianProfileId != null && !technicianProfileId.equals(row.technicianProfileId())) {
+                continue;
+            }
+            items.add(toMembershipItem(row));
+        }
+        items.sort(Comparator
+                .comparing(NetworkPortalMembershipItem::createdAt)
+                .thenComparing(NetworkPortalMembershipItem::id));
+        if (items.size() > effectiveLimit) {
+            items = items.subList(0, effectiveLimit);
+        }
+        return new NetworkPortalPage<>(networkId, List.copyOf(items), clock.instant());
+    }
+
+    /**
+     * 本网点师傅关系详情。
+     * <p>
+     * 失败关闭：不存在 RESOURCE_NOT_FOUND；serviceNetworkId ≠ 上下文则 ACCESS_DENIED。
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public NetworkPortalMembershipItem getMembership(
+            CurrentPrincipal actor,
+            String correlationId,
+            String networkContextHeader,
+            UUID membershipId
+    ) {
+        Objects.requireNonNull(membershipId, "membershipId");
+        UUID networkId = requireAuthorizedNetwork(actor, correlationId, networkContextHeader, TECHNICIAN_READ_OWN);
+        NetworkTechnicianMembershipView view = memberships.findById(actor.tenantId(), membershipId)
+                .orElseThrow(() -> new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "师傅服务关系不存在"));
+        if (!networkId.equals(view.serviceNetworkId())) {
+            throw new BusinessProblem(ProblemCode.ACCESS_DENIED, "师傅服务关系不属于本网点");
+        }
+        return toMembershipItem(view);
+    }
+
     private static NetworkPortalQualificationItem toQualificationItem(TechnicianQualificationView row) {
         return new NetworkPortalQualificationItem(
                 row.id(),
@@ -470,11 +540,36 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                 row.version());
     }
 
+    private static NetworkPortalMembershipItem toMembershipItem(NetworkTechnicianMembershipView row) {
+        return new NetworkPortalMembershipItem(
+                row.id(),
+                row.serviceNetworkId(),
+                row.technicianProfileId(),
+                row.status(),
+                row.validFrom(),
+                row.validTo(),
+                row.version(),
+                row.createdAt(),
+                row.terminatedAt(),
+                row.terminateReason());
+    }
+
     private static int normalizeQualificationLimit(Integer limit) {
         if (limit == null) {
             return DEFAULT_QUALIFICATION_LIMIT;
         }
         if (limit < 1 || limit > MAX_QUALIFICATION_LIMIT) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                    "limit 须在 1～100 之间");
+        }
+        return limit;
+    }
+
+    private static int normalizeMembershipLimit(Integer limit) {
+        if (limit == null) {
+            return DEFAULT_MEMBERSHIP_LIMIT;
+        }
+        if (limit < 1 || limit > MAX_MEMBERSHIP_LIMIT) {
             throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
                     "limit 须在 1～100 之间");
         }
@@ -487,6 +582,18 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         }
         String normalized = status.trim().toUpperCase(Locale.ROOT);
         if (!Set.of("PENDING", "APPROVED", "REJECTED", "EXPIRED").contains(normalized)) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, "status is invalid");
+        }
+        return normalized;
+    }
+
+    /** status 缺省 ACTIVE；非法值失败关闭。 */
+    private static String normalizeMembershipStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return "ACTIVE";
+        }
+        String normalized = status.trim().toUpperCase(Locale.ROOT);
+        if (!Set.of("ACTIVE", "TERMINATED").contains(normalized)) {
             throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, "status is invalid");
         }
         return normalized;

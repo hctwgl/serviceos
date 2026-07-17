@@ -85,4 +85,25 @@ public interface NetworkPortalQueryService {
             String correlationId,
             String networkContextHeader,
             UUID qualificationId);
+
+    /**
+     * 本网点师傅关系列表。需要 ACTIVE membership + NETWORK scope {@code technician.readOwnNetwork}。
+     * 仅返回 serviceNetworkId = 上下文网点的关系；status 默认 ACTIVE。
+     */
+    NetworkPortalPage<NetworkPortalMembershipItem> listMemberships(
+            CurrentPrincipal actor,
+            String correlationId,
+            String networkContextHeader,
+            String status,
+            UUID technicianProfileId,
+            Integer limit);
+
+    /**
+     * 本网点师傅关系详情。serviceNetworkId 必须等于上下文网点，否则 ACCESS_DENIED。
+     */
+    NetworkPortalMembershipItem getMembership(
+            CurrentPrincipal actor,
+            String correlationId,
+            String networkContextHeader,
+            UUID membershipId);
 }

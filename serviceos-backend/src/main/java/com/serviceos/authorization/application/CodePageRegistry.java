@@ -10,7 +10,7 @@ import java.util.List;
  */
 @Component
 final class CodePageRegistry {
-    static final String CATALOG_VERSION = "page-registry-v12";
+    static final String CATALOG_VERSION = "page-registry-v13";
 
     private final List<RegisteredPage> pages = List.of(
             // ADMIN

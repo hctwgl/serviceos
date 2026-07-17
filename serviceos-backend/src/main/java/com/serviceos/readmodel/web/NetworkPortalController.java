@@ -6,6 +6,7 @@ import com.serviceos.identity.api.CurrentPrincipalProvider;
 import com.serviceos.readmodel.api.NetworkPortalCapacityItem;
 import com.serviceos.readmodel.api.NetworkPortalCorrectionItem;
 import com.serviceos.readmodel.api.NetworkPortalExceptionItem;
+import com.serviceos.readmodel.api.NetworkPortalMembershipItem;
 import com.serviceos.readmodel.api.NetworkPortalPage;
 import com.serviceos.readmodel.api.NetworkPortalQualificationItem;
 import com.serviceos.readmodel.api.NetworkPortalQueryService;
@@ -164,6 +165,34 @@ final class NetworkPortalController {
     ) {
         NetworkPortalQualificationItem body = queries.getQualification(
                 principals.current(), correlationId, networkContext, qualificationId);
+        return ResponseEntity.ok()
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(body);
+    }
+
+    @GetMapping("/technician-memberships")
+    ResponseEntity<NetworkPortalPage<NetworkPortalMembershipItem>> technicianMemberships(
+            @RequestHeader(value = "X-Network-Context", required = false) String networkContext,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "technicianProfileId", required = false) UUID technicianProfileId,
+            @RequestParam(value = "limit", required = false) Integer limit
+    ) {
+        return response(
+                queries.listMemberships(
+                        principals.current(), correlationId, networkContext,
+                        status, technicianProfileId, limit),
+                correlationId);
+    }
+
+    @GetMapping("/technician-memberships/{membershipId}")
+    ResponseEntity<NetworkPortalMembershipItem> technicianMembership(
+            @PathVariable UUID membershipId,
+            @RequestHeader(value = "X-Network-Context", required = false) String networkContext,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        NetworkPortalMembershipItem body = queries.getMembership(
+                principals.current(), correlationId, networkContext, membershipId);
         return ResponseEntity.ok()
                 .header(CorrelationIds.HEADER_NAME, correlationId)
                 .body(body);

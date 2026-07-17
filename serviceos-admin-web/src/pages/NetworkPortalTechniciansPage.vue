@@ -2,39 +2,60 @@
 import { onMounted, ref, watch } from 'vue'
 import {
   createNetworkPortalTechnicianMembership,
+  listNetworkPortalTechnicianMemberships,
   listNetworkPortalTechnicians,
   submitNetworkPortalTechnicianQualification,
   terminateNetworkPortalTechnicianMembership,
+  type NetworkPortalMembershipItem,
   type NetworkPortalTechnicianItem,
 } from '../api/networkPortal'
 
 const props = defineProps<{ networkContextId: string | null }>()
 const items = ref<NetworkPortalTechnicianItem[]>([])
+const memberships = ref<NetworkPortalMembershipItem[]>([])
 const error = ref<string | null>(null)
 const actionMessage = ref<string | null>(null)
 
 const createProfileId = ref('')
 const createValidFrom = ref(new Date().toISOString())
 const terminateMembershipId = ref('')
-const terminateVersion = ref('1')
+const terminateVersion = ref('')
 const terminateReason = ref('')
 const qualProfileId = ref('')
 const qualCode = ref('EV-INSTALL')
 const qualValidFrom = ref(new Date().toISOString())
 const qualValidTo = ref('')
 
+function versionForMembership(membershipId: string): string {
+  const fromList = memberships.value.find((row) => row.id === membershipId)
+  if (fromList != null) {
+    return String(fromList.version)
+  }
+  const fromTech = items.value.find((row) => row.membershipId === membershipId)
+  if (fromTech?.membershipVersion != null) {
+    return String(fromTech.membershipVersion)
+  }
+  return ''
+}
+
 async function load() {
   if (!props.networkContextId) {
     items.value = []
+    memberships.value = []
     error.value = '请选择 NETWORK 上下文'
     return
   }
   try {
-    const page = await listNetworkPortalTechnicians(props.networkContextId)
-    items.value = page.items
+    const [techPage, memPage] = await Promise.all([
+      listNetworkPortalTechnicians(props.networkContextId),
+      listNetworkPortalTechnicianMemberships(props.networkContextId, { status: 'ACTIVE' }),
+    ])
+    items.value = techPage.items
+    memberships.value = memPage.items
     error.value = null
   } catch (err) {
     items.value = []
+    memberships.value = []
     error.value = err instanceof Error ? err.message : '师傅列表加载失败'
   }
 }
@@ -89,7 +110,8 @@ async function onSubmitQualification() {
 
 function fillTerminate(item: NetworkPortalTechnicianItem) {
   terminateMembershipId.value = item.membershipId
-  terminateVersion.value = '1'
+  // M206：必须从 memberships 列表（或 technicians.membershipVersion）取真实 version，禁止硬编码 1
+  terminateVersion.value = versionForMembership(item.membershipId)
   terminateReason.value = '网点调整'
   qualProfileId.value = item.technicianProfileId
 }
@@ -112,6 +134,7 @@ watch(() => props.networkContextId, () => {
           <th>姓名</th>
           <th>档案状态</th>
           <th>关系状态</th>
+          <th>版本</th>
           <th>档案 ID</th>
           <th>操作</th>
         </tr>
@@ -121,6 +144,9 @@ watch(() => props.networkContextId, () => {
           <td>{{ item.displayName }}</td>
           <td>{{ item.profileStatus }}</td>
           <td>{{ item.membershipStatus }}</td>
+          <td data-testid="technician-membership-version">
+            {{ versionForMembership(item.membershipId) }}
+          </td>
           <td>{{ item.technicianProfileId }}</td>
           <td>
             <button
@@ -137,7 +163,7 @@ watch(() => props.networkContextId, () => {
     <p v-if="!error && items.length === 0">暂无 ACTIVE 师傅关系</p>
 
     <section data-testid="network-manage-technician-forms" data-page-id="NETWORK.QUALIFICATION">
-      <h3>师傅关系与资质（M204）</h3>
+      <h3>师傅关系与资质（M204/M206）</h3>
       <p v-if="actionMessage" data-testid="manage-technician-message">{{ actionMessage }}</p>
 
       <form

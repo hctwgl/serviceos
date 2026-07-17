@@ -12,6 +12,7 @@ public record NetworkPortalTechnicianItem(
         String profileStatus,
         String membershipStatus,
         Instant validFrom,
-        Instant validTo
+        Instant validTo,
+        long membershipVersion
 ) {
 }

@@ -6,6 +6,7 @@ import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
 import com.serviceos.readmodel.api.NetworkPortalCorrectionItem;
 import com.serviceos.readmodel.api.NetworkPortalExceptionItem;
+import com.serviceos.readmodel.api.NetworkPortalMembershipItem;
 import com.serviceos.readmodel.api.NetworkPortalPage;
 import com.serviceos.readmodel.api.NetworkPortalQualificationItem;
 import com.serviceos.readmodel.api.NetworkPortalQueryService;
@@ -33,7 +34,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** M194/M202/M203/M205：network-portal 未认证 401；伪造上下文 403 PORTAL_CONTEXT_INVALID。 */
+/** M194/M202/M203/M205/M206：network-portal 未认证 401；伪造上下文 403 PORTAL_CONTEXT_INVALID。 */
 @WebMvcTest(NetworkPortalController.class)
 @Import(SecurityConfiguration.class)
 class NetworkPortalControllerSecurityTest {
@@ -41,6 +42,7 @@ class NetworkPortalControllerSecurityTest {
     private static final UUID CORRECTION_ID = UUID.fromString("019f83e0-bbbb-7f8c-9505-36fe5c0e8811");
     private static final UUID EXCEPTION_ID = UUID.fromString("019f83f0-bbbb-7f8c-9505-36fe5c0e8812");
     private static final UUID QUALIFICATION_ID = UUID.fromString("019f85d0-bbbb-7f8c-9505-36fe5c0e8813");
+    private static final UUID MEMBERSHIP_ID = UUID.fromString("019f85d0-cccc-7f8c-9505-36fe5c0e8814");
 
     @Autowired MockMvc mvc;
     @MockitoBean NetworkPortalQueryService queries;
@@ -67,6 +69,12 @@ class NetworkPortalControllerSecurityTest {
                         .header("X-Network-Context", "NETWORK|NETWORK|" + NETWORK_ID))
                 .andExpect(status().isUnauthorized());
         mvc.perform(get("/api/v1/network-portal/technician-qualifications/" + QUALIFICATION_ID)
+                        .header("X-Network-Context", "NETWORK|NETWORK|" + NETWORK_ID))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/network-portal/technician-memberships")
+                        .header("X-Network-Context", "NETWORK|NETWORK|" + NETWORK_ID))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/network-portal/technician-memberships/" + MEMBERSHIP_ID)
                         .header("X-Network-Context", "NETWORK|NETWORK|" + NETWORK_ID))
                 .andExpect(status().isUnauthorized());
     }
@@ -262,6 +270,34 @@ class NetworkPortalControllerSecurityTest {
                 .andExpect(jsonPath("$.networkId").value(NETWORK_ID.toString()))
                 .andExpect(jsonPath("$.items[0].id").value(QUALIFICATION_ID.toString()))
                 .andExpect(jsonPath("$.items[0].status").value("PENDING"));
+    }
+
+    @Test
+    void authenticatedMemberGetsMembershipList() throws Exception {
+        CurrentPrincipal actor = actor();
+        Instant now = Instant.parse("2026-07-17T12:00:00Z");
+        UUID profileId = UUID.fromString("019f85d0-5555-7f8c-9505-36fe5c0e8806");
+        when(principals.current()).thenReturn(actor);
+        when(queries.listMemberships(
+                eq(actor), eq("mem-list"), eq("NETWORK|NETWORK|" + NETWORK_ID),
+                isNull(), isNull(), isNull()))
+                .thenReturn(new NetworkPortalPage<>(
+                        NETWORK_ID,
+                        List.of(new NetworkPortalMembershipItem(
+                                MEMBERSHIP_ID, NETWORK_ID, profileId, "ACTIVE",
+                                now, null, 3L, now, null, null)),
+                        now));
+
+        mvc.perform(get("/api/v1/network-portal/technician-memberships")
+                        .with(jwt().jwt(token -> token.subject("external-subject")
+                                .claim("tenant_id", "tenant-a")))
+                        .header("X-Correlation-Id", "mem-list")
+                        .header("X-Network-Context", "NETWORK|NETWORK|" + NETWORK_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.networkId").value(NETWORK_ID.toString()))
+                .andExpect(jsonPath("$.items[0].id").value(MEMBERSHIP_ID.toString()))
+                .andExpect(jsonPath("$.items[0].version").value(3))
+                .andExpect(jsonPath("$.items[0].status").value("ACTIVE"));
     }
 
     private static CurrentPrincipal actor() {
