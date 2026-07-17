@@ -284,6 +284,7 @@ const TIMELINE_RESOURCE_ROUTES: Record<string, string> = {
   FormSubmission: 'ADMIN.FORM_SUBMISSION.DETAIL',
   EvidenceItem: 'ADMIN.EVIDENCE_ITEM.DETAIL',
   EvidenceSetSnapshot: 'ADMIN.EVIDENCE_SET_SNAPSHOT.DETAIL',
+  ExternalReviewReceipt: 'ADMIN.EXTERNAL_REVIEW_RECEIPT.DETAIL',
   ReviewCase: 'ADMIN.REVIEW.DETAIL',
   CorrectionCase: 'ADMIN.CORRECTION.DETAIL',
   OutboundDelivery: 'ADMIN.INTEGRATION.DETAIL',

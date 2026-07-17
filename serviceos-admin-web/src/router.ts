@@ -24,6 +24,7 @@ import ContactAttemptDetailPage from './pages/ContactAttemptDetailPage.vue'
 import FormSubmissionDetailPage from './pages/FormSubmissionDetailPage.vue'
 import EvidenceItemDetailPage from './pages/EvidenceItemDetailPage.vue'
 import EvidenceSetSnapshotDetailPage from './pages/EvidenceSetSnapshotDetailPage.vue'
+import ExternalReviewReceiptDetailPage from './pages/ExternalReviewReceiptDetailPage.vue'
 import ProjectDirectoryPage from './pages/ProjectDirectoryPage.vue'
 import ProjectDetailPage from './pages/ProjectDetailPage.vue'
 import OidcCallbackPage from './pages/OidcCallbackPage.vue'
@@ -90,6 +91,11 @@ export const router = createRouter({
           path: 'evidence-set-snapshots/:id',
           name: 'ADMIN.EVIDENCE_SET_SNAPSHOT.DETAIL',
           component: EvidenceSetSnapshotDetailPage,
+        },
+        {
+          path: 'external-review-receipts/:id',
+          name: 'ADMIN.EXTERNAL_REVIEW_RECEIPT.DETAIL',
+          component: ExternalReviewReceiptDetailPage,
         },
         { path: 'sla', name: 'ADMIN.SLA.QUEUE', component: SlaQueuePage },
         { path: 'sla/:id', name: 'ADMIN.SLA.DETAIL', component: SlaInstanceDetailPage },

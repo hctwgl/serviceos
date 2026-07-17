@@ -163,4 +163,5 @@
 - [M160 Admin 联系尝试 ContactAttempt 详情页验收矩阵](157-m160-admin-pilot-contact-attempt-detail-acceptance.md)
 - [M161 Admin 核心时间线资源详情深链验收矩阵](158-m161-admin-pilot-core-timeline-resource-deeplink-acceptance.md)
 - [M162 Admin 最近活动资源详情深链验收矩阵](159-m162-admin-pilot-activity-summary-resource-deeplink-acceptance.md)
+- [M163 Admin 外部审核回执详情页验收矩阵](160-m163-admin-pilot-external-review-receipt-detail-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

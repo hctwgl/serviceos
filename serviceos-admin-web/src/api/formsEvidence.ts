@@ -137,12 +137,43 @@ export type StoredFile = {
   version: number
 }
 
+export type ExternalReviewAffectedTarget = {
+  targetType: 'EVIDENCE_REVISION'
+  evidenceSlotId: string
+  evidenceItemId: string
+  evidenceRevisionId: string
+}
+
+export type ExternalReviewReceipt = {
+  receiptId: string
+  projectId: string
+  reviewCaseId: string
+  reviewDecisionId: string
+  inboundEnvelopeId: string
+  canonicalMessageId: string
+  externalKey: string
+  callbackBatchRef: string
+  mappingVersionId: string
+  result: 'APPROVED' | 'REJECTED'
+  reasonCodes: string[]
+  affectedTargets: ExternalReviewAffectedTarget[]
+  payloadRef?: string | null
+  coordinationTaskId?: string | null
+  receivedBy: string
+  receivedAt: string
+}
+
 export function listTaskForms(taskId: string) {
   return apiGet<TaskForm[]>(`/tasks/${taskId}/forms`)
 }
 
 export function getFormSubmission(submissionId: string) {
   return apiGet<FormSubmission>(`/form-submissions/${submissionId}`)
+}
+
+/** 复用已 Implemented GET /internal/external-review-receipts/{id}（evidence.read）。 */
+export function getExternalReviewReceipt(receiptId: string) {
+  return apiGet<ExternalReviewReceipt>(`/internal/external-review-receipts/${receiptId}`)
 }
 
 export function getEvidenceItem(itemId: string) {
