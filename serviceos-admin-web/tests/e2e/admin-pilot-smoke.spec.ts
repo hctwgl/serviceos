@@ -1002,8 +1002,10 @@ test('真实 OIDC 登录后可完成预约提议确认与上门签到签退', as
   )
   await page.getByRole('button', { name: 'manual-assign', exact: true }).click()
   expect((await manualAssignPromise).status()).toBe(200)
-  await expect(page.getByText(/已初派 network=/)).toBeVisible()
-  await expect(page.getByText(/admin-pilot-network-1/)).toBeVisible()
+  await expect(page.getByText(/已初派 network=admin-pilot-network-1/)).toBeVisible()
+  await expect(
+    page.locator('dt', { hasText: /^服务责任$/ }).locator('xpath=../dd'),
+  ).toContainText('admin-pilot-network-1')
 
   await page
     .getByLabel('assign-candidates principalIds')
