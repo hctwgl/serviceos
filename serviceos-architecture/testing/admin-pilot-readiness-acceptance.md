@@ -1,10 +1,10 @@
 ---
-title: Admin 试点可运行基线验收（含 M138）
+title: Admin 试点可运行基线验收（含 M139）
 status: Implemented
-lastUpdated: 2026-07-16
+lastUpdated: 2026-07-17
 ---
 
-# Admin 试点可运行基线验收（含 M138）
+# Admin 试点可运行基线验收（含 M139）
 
 | ID | 场景 | 证据 | 结果 |
 |---|---|---|---|
@@ -28,10 +28,11 @@ lastUpdated: 2026-07-16
 | ADMIN-PILOT-08V | 真实预约上门写路径 | 独立 Task：propose→confirm→check-in→check-out；Appointment/Visit COMPLETED；审计与 Inbox 成功 | PASS |
 | ADMIN-PILOT-08O | 真实 BYD 提审外发 ACK | APPROVED → createBydReviewSubmission → 本地 stub errno=0 → ACKNOWLEDGED + CLIENT Case | PASS |
 | ADMIN-PILOT-08CB | 真实厂端回调关闭 CLIENT | CPIM 签名回调 result=1 → EXTERNAL APPROVED；Admin 可见 CLIENT:APPROVED | PASS |
+| ADMIN-PILOT-08IN | 真实入站 CREATE_WORK_ORDER 接单 | CPIM 签名 install-orders → RECEIVED；Admin 目录/工作区/INTEGRATION 可见；Envelope/Canonical/审计/Outbox | PASS |
 | ADMIN-PILOT-08CI | 真实写链路 CI 阻断 | GitHub Actions `admin-pilot-e2e` 运行同一 OIDC/Backend/PostgreSQL/Chrome smoke；通过后才启动 staging | PASS |
 | ADMIN-PILOT-09 | 完整履约写链路 | 接单→派单→预约→上门→表单/资料→审核/整改→外发→完结 | NOT PROVEN |
 
 `ADMIN-PILOT-08*` 与 `ADMIN-PILOT-08CI` 证明固定工单候选分配/领取/释放，独立 Workflow Task 的
-表单/资料/审核/整改/完结，以及预约上门写路径；不证明生产对象存储/专业扫描、外部提审回执，或从
-外部接单开始的完整履约链。
+表单/资料/审核/整改/完结，预约上门、外发 ACK/厂端回调，以及独立入站 CREATE_WORK_ORDER 接单可见；
+不证明生产对象存储/专业扫描，或从外部接单开始经派单到完结的同单完整履约链。
 `ADMIN-PILOT-09` 是明确交付边界，不得用局部读写冒烟替代完整业务写链路验收。
