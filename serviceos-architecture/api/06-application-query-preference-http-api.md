@@ -161,6 +161,12 @@ status: Accepted
   `route.query.taskId` 并传入既有 list 过滤；工作区可 fan-in OPEN 整改/异常摘要（缺能力
   省略）。catalog 仍 `page-registry-v16`；OpenAPI 仍 `1.0.0`。
   **不**接受 SLA/Visit/表单 DTO 发明、PII、Portal ACK、notifications。
+- §10 Network Portal 工作区预约/联系 fan-in（M215 UI-only）：**不**新增 HTTP；按工作区
+  `taskIds` 客户端 fan-in
+  `GET /network-portal/tasks/{taskId}/appointments`（M197）与
+  `GET /network-portal/tasks/{taskId}/contact-attempts`（M199）；缺
+  `networkPortal.manageAppointment` 时省略区块。catalog 仍 `page-registry-v16`；
+  OpenAPI 仍 `1.0.0`。**不**接受 SLA/Visit/表单 DTO、PII、写控件嵌入工作区。
 - §11 Technician Portal Feed 子集（M195）：仅
   `GET /api/v1/technician/me/task-feed`（可选 `sinceCursor` 不透明游标；ACTIVE TECHNICIAN
   ServiceAssignment / TaskAssignment；撤权/结束时 tombstone 仅含 `taskId` +

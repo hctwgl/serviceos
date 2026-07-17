@@ -5,6 +5,10 @@ import {
   getNetworkPortalWorkOrderWorkspace,
   listNetworkPortalCorrections,
   listNetworkPortalExceptions,
+  listNetworkPortalTaskAppointments,
+  listNetworkPortalTaskContactAttempts,
+  type NetworkPortalAppointment,
+  type NetworkPortalContactAttempt,
   type NetworkPortalCorrectionItem,
   type NetworkPortalExceptionItem,
   type NetworkPortalWorkOrderWorkspace,
@@ -16,12 +20,32 @@ const workOrderId = computed(() => String(route.params.id ?? ''))
 const detail = ref<NetworkPortalWorkOrderWorkspace | null>(null)
 const relatedCorrections = ref<NetworkPortalCorrectionItem[] | null>(null)
 const relatedExceptions = ref<NetworkPortalExceptionItem[] | null>(null)
+const relatedAppointments = ref<NetworkPortalAppointment[] | null>(null)
+const relatedContactAttempts = ref<NetworkPortalContactAttempt[] | null>(null)
 const error = ref<string | null>(null)
 const loading = ref(false)
+
+async function fanInByTaskId<T>(
+  taskIds: string[],
+  loader: (networkContextId: string, taskId: string) => Promise<T[]>,
+): Promise<T[] | null> {
+  if (!props.networkContextId || taskIds.length === 0) {
+    return null
+  }
+  const results = await Promise.allSettled(
+    taskIds.map((taskId) => loader(props.networkContextId!, taskId)),
+  )
+  if (results.some((result) => result.status === 'rejected')) {
+    return null
+  }
+  return results.flatMap((result) => (result.status === 'fulfilled' ? result.value : []))
+}
 
 async function loadRelated(taskIds: string[]) {
   relatedCorrections.value = null
   relatedExceptions.value = null
+  relatedAppointments.value = null
+  relatedContactAttempts.value = null
   if (!props.networkContextId || taskIds.length === 0) {
     return
   }
@@ -32,7 +56,6 @@ async function loadRelated(taskIds: string[]) {
       (item) => item.taskId != null && taskSet.has(item.taskId),
     )
   } catch {
-    // 缺 evidence.read 等能力时省略，不伪造空列表语义为“无数据权限”
     relatedCorrections.value = null
   }
   try {
@@ -43,6 +66,17 @@ async function loadRelated(taskIds: string[]) {
   } catch {
     relatedExceptions.value = null
   }
+  // ADR-053：缺 manageAppointment 或任一次 403 时同时省略预约/联系区块，
+  // 不得用空列表伪装无权限。
+  const appointments = await fanInByTaskId(taskIds, listNetworkPortalTaskAppointments)
+  const contacts = await fanInByTaskId(taskIds, listNetworkPortalTaskContactAttempts)
+  if (appointments === null || contacts === null) {
+    relatedAppointments.value = null
+    relatedContactAttempts.value = null
+  } else {
+    relatedAppointments.value = appointments
+    relatedContactAttempts.value = contacts
+  }
 }
 
 async function load() {
@@ -50,6 +84,8 @@ async function load() {
     detail.value = null
     relatedCorrections.value = null
     relatedExceptions.value = null
+    relatedAppointments.value = null
+    relatedContactAttempts.value = null
     error.value = '请选择 NETWORK 上下文'
     return
   }
@@ -70,6 +106,8 @@ async function load() {
     detail.value = null
     relatedCorrections.value = null
     relatedExceptions.value = null
+    relatedAppointments.value = null
+    relatedContactAttempts.value = null
     error.value = err instanceof Error ? err.message : '工单工作区加载失败'
   } finally {
     loading.value = false
@@ -107,7 +145,7 @@ watch(
       </div>
     </header>
     <p class="hint">
-      只读薄快照（M213）+ 协作队列深链（M214）：任务/整改/异常走既有 Portal API；缺能力时省略相关区块。
+      只读薄快照（M213）+ 协作深链（M214）+ 预约/联系 fan-in（M215）：缺能力时省略相关区块。
     </p>
     <p v-if="error" data-testid="network-portal-error">{{ error }}</p>
     <p v-else-if="loading" data-testid="workspace-loading">加载中…</p>
@@ -171,6 +209,56 @@ watch(
         </tbody>
       </table>
       <p v-if="detail.tasks.length === 0" data-testid="workspace-tasks-empty">暂无 ACTIVE 任务</p>
+
+      <section
+        v-if="relatedAppointments"
+        data-testid="workspace-related-appointments"
+        class="related"
+      >
+        <h3>相关预约</h3>
+        <ul v-if="relatedAppointments.length">
+          <li
+            v-for="item in relatedAppointments"
+            :key="item.appointmentId"
+            :data-testid="`workspace-related-appointment-${item.appointmentId}`"
+          >
+            <RouterLink
+              :to="{ path: '/network-portal/tasks', query: { taskId: item.taskId } }"
+              data-testid="workspace-appointment-task-deeplink"
+            >
+              {{ item.appointmentId }}
+            </RouterLink>
+            （task {{ item.taskId }} · {{ item.type }} · {{ item.status }} · rev
+            {{ item.currentRevisionNo }}）
+          </li>
+        </ul>
+        <p v-else data-testid="workspace-related-appointments-empty">暂无相关预约</p>
+      </section>
+
+      <section
+        v-if="relatedContactAttempts"
+        data-testid="workspace-related-contacts"
+        class="related"
+      >
+        <h3>相关联系尝试</h3>
+        <ul v-if="relatedContactAttempts.length">
+          <li
+            v-for="item in relatedContactAttempts"
+            :key="item.contactAttemptId"
+            :data-testid="`workspace-related-contact-${item.contactAttemptId}`"
+          >
+            <RouterLink
+              :to="{ path: '/network-portal/tasks', query: { taskId: item.taskId } }"
+              data-testid="workspace-contact-task-deeplink"
+            >
+              {{ item.contactAttemptId }}
+            </RouterLink>
+            （task {{ item.taskId }} · {{ item.channel }} · {{ item.resultCode }} ·
+            {{ item.createdAt }}）
+          </li>
+        </ul>
+        <p v-else data-testid="workspace-related-contacts-empty">暂无相关联系尝试</p>
+      </section>
 
       <section
         v-if="relatedCorrections"
