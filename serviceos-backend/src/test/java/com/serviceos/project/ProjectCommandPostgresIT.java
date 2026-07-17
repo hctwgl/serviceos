@@ -361,7 +361,7 @@ class ProjectCommandPostgresIT {
 
     @Test
     void repeatedMigrationIsNoOp() {
-        assertThat(flyway.info().applied().length).isEqualTo(86);
+        assertThat(flyway.info().applied().length).isEqualTo(88);
         assertThat(flyway.migrate().migrationsExecuted).isZero();
     }
 

@@ -1,6 +1,7 @@
 package com.serviceos.identity.infrastructure;
 
 import com.serviceos.identity.api.CurrentPrincipal;
+import com.serviceos.identity.api.PrincipalAuthenticationService;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
 import org.junit.jupiter.api.AfterEach;
@@ -15,9 +16,15 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class SecurityContextCurrentPrincipalProviderTest {
-    private final SecurityContextCurrentPrincipalProvider provider = new SecurityContextCurrentPrincipalProvider();
+    private final PrincipalAuthenticationService authenticationService = mock(PrincipalAuthenticationService.class);
+    private final SecurityContextCurrentPrincipalProvider provider =
+            new SecurityContextCurrentPrincipalProvider(authenticationService);
 
     @AfterEach
     void clearSecurityContext() {
@@ -26,6 +33,8 @@ class SecurityContextCurrentPrincipalProviderTest {
 
     @Test
     void mapsTrustedJwtClaimsIntoStablePrincipal() {
+        when(authenticationService.resolveOrRegister(any(), anyString()))
+                .thenReturn("019f7022-17ea-7f8c-9505-36fe5c0e8844");
         Jwt jwt = jwtBuilder()
                 .subject("user-1001")
                 .claim("tenant_id", "tenant-a")
@@ -38,7 +47,7 @@ class SecurityContextCurrentPrincipalProviderTest {
 
         CurrentPrincipal principal = provider.current();
 
-        assertThat(principal.principalId()).isEqualTo("user-1001");
+        assertThat(principal.principalId()).isEqualTo("019f7022-17ea-7f8c-9505-36fe5c0e8844");
         assertThat(principal.tenantId()).isEqualTo("tenant-a");
         assertThat(principal.assertedCapabilities())
                 .contains("project.create", "workOrder.read", "profile", "evidence.submit");
@@ -59,6 +68,7 @@ class SecurityContextCurrentPrincipalProviderTest {
         Instant now = Instant.parse("2026-07-13T03:30:00Z");
         return Jwt.withTokenValue("test-token")
                 .header("alg", "none")
+                .issuer("https://idp.example.com/realms/serviceos")
                 .issuedAt(now)
                 .expiresAt(now.plusSeconds(300));
     }

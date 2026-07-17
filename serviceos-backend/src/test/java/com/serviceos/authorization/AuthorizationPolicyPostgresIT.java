@@ -170,7 +170,7 @@ class AuthorizationPolicyPostgresIT {
         assertThat(decision.fields().get("settlementAmount").permission())
                 .isEqualTo(FieldPermission.HIDDEN);
         assertThat(decision.matchedGrantIds()).hasSize(2);
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("085");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("086");
     }
 
     @Test

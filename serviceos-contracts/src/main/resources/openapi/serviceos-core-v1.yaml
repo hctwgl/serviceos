@@ -1,13 +1,167 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.75.0
+  version: 0.76.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
 security:
   - bearerAuth: []
 paths:
+  /security-principals:
+    get:
+      operationId: listSecurityPrincipals
+      summary: 分页查询当前租户的统一主体目录
+      description: 需要 identity.read；普通目录不返回 issuer、subject 等敏感身份绑定。
+      parameters:
+        - { name: query, in: query, schema: { type: string, minLength: 1, maxLength: 200 } }
+        - { name: status, in: query, schema: { enum: [ACTIVE, DISABLED] } }
+        - { name: cursor, in: query, schema: { type: string, minLength: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: displayName/principalId 正序的主体页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/SecurityPrincipalPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /security-principals/{principalId}:
+    get:
+      operationId: getSecurityPrincipal
+      summary: 读取统一主体及 Persona
+      parameters:
+        - $ref: '#/components/parameters/PrincipalId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 主体当前事实，不含敏感身份绑定
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/SecurityPrincipalDetail' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /security-principals/{principalId}/identities:
+    get:
+      operationId: listPrincipalIdentityLinks
+      summary: 读取主体的敏感外部身份绑定
+      description: 需要独立的 identity.readSensitive 高风险能力。
+      parameters:
+        - $ref: '#/components/parameters/PrincipalId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 不可变身份绑定列表
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/IdentityLink' } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /security-principals/{principalId}/identity-links:
+    post:
+      operationId: linkPrincipalIdentity
+      summary: 为现有主体追加外部身份
+      description: 身份绑定不可修改或删除；同一 tenant/issuer/subject 只能绑定一个主体。
+      parameters:
+        - $ref: '#/components/parameters/PrincipalId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/LinkIdentityRequest' } } }
+      responses:
+        '200': { $ref: '#/components/responses/SecurityPrincipalCommandResult' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /security-principals/{principalId}:disable:
+    post:
+      operationId: disableSecurityPrincipal
+      summary: 停用统一主体
+      description: 停用提交后，所有已绑定身份的旧 JWT 在下一次请求解析时立即失败关闭。
+      parameters:
+        - $ref: '#/components/parameters/PrincipalId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/PrincipalLifecycleReasonRequest' } } }
+      responses:
+        '200': { $ref: '#/components/responses/SecurityPrincipalCommandResult' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /security-principals/{principalId}:enable:
+    post:
+      operationId: enableSecurityPrincipal
+      summary: 重新启用统一主体
+      parameters:
+        - $ref: '#/components/parameters/PrincipalId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/PrincipalLifecycleReasonRequest' } } }
+      responses:
+        '200': { $ref: '#/components/responses/SecurityPrincipalCommandResult' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /security-principals/{principalId}:update-profile:
+    post:
+      operationId: updateSecurityPrincipalProfile
+      summary: 更新主体 PersonProfile
+      parameters:
+        - $ref: '#/components/parameters/PrincipalId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/UpdatePrincipalProfileRequest' } } }
+      responses:
+        '200': { $ref: '#/components/responses/SecurityPrincipalCommandResult' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /security-principals/{principalId}/personas:
+    post:
+      operationId: addSecurityPrincipalPersona
+      summary: 为主体追加 Persona
+      parameters:
+        - $ref: '#/components/parameters/PrincipalId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/AddPrincipalPersonaRequest' } } }
+      responses:
+        '200':
+          description: 新增 Persona
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/PrincipalPersona' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
   /work-orders:
     get:
       operationId: listAuthorizedWorkOrders
@@ -2045,6 +2199,11 @@ components:
       bearerFormat: JWT
       description: 由受信 OIDC 提供方签发，必须包含 subject、tenant_id；token 中的能力声明不能替代 ServiceOS RoleGrant。
   parameters:
+    PrincipalId:
+      name: principalId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     TaskId:
       name: taskId
       in: path
@@ -2104,6 +2263,85 @@ components:
         type: string
         pattern: '^"[1-9][0-9]*"$'
   schemas:
+    SecurityPrincipal:
+      type: object
+      additionalProperties: false
+      required: [id, type, status, displayName, employeeNumber, version, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        type: { enum: [USER, SERVICE] }
+        status: { enum: [ACTIVE, DISABLED] }
+        displayName: { type: string, minLength: 1, maxLength: 200 }
+        employeeNumber: { type: [string, 'null'], minLength: 1, maxLength: 128 }
+        version: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    SecurityPrincipalPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/SecurityPrincipal' } }
+        nextCursor: { type: [string, 'null'] }
+        asOf: { type: string, format: date-time }
+    PrincipalPersona:
+      type: object
+      additionalProperties: false
+      required: [id, personaType, status, validFrom, validTo, version]
+      properties:
+        id: { type: string, format: uuid }
+        personaType: { enum: [INTERNAL_EMPLOYEE, NETWORK_MEMBER, TECHNICIAN, CONSUMER, SERVICE_ACCOUNT] }
+        status: { enum: [ACTIVE, DISABLED] }
+        validFrom: { type: string, format: date-time }
+        validTo: { type: [string, 'null'], format: date-time }
+        version: { type: integer, format: int64, minimum: 1 }
+    SecurityPrincipalDetail:
+      type: object
+      additionalProperties: false
+      required: [principal, personas, asOf]
+      properties:
+        principal: { $ref: '#/components/schemas/SecurityPrincipal' }
+        personas: { type: array, items: { $ref: '#/components/schemas/PrincipalPersona' } }
+        asOf: { type: string, format: date-time }
+    IdentityLink:
+      type: object
+      additionalProperties: false
+      required: [id, issuer, subject, clientId, linkedAt]
+      properties:
+        id: { type: string, format: uuid }
+        issuer: { type: string, minLength: 1, maxLength: 512 }
+        subject: { type: string, minLength: 1, maxLength: 255 }
+        clientId: { type: [string, 'null'], minLength: 1, maxLength: 128 }
+        linkedAt: { type: string, format: date-time }
+    LinkIdentityRequest:
+      type: object
+      additionalProperties: false
+      required: [issuer, subject]
+      properties:
+        issuer: { type: string, minLength: 1, maxLength: 512 }
+        subject: { type: string, minLength: 1, maxLength: 255 }
+        clientId: { type: [string, 'null'], minLength: 1, maxLength: 128 }
+    PrincipalLifecycleReasonRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    UpdatePrincipalProfileRequest:
+      type: object
+      additionalProperties: false
+      required: [displayName]
+      properties:
+        displayName: { type: string, minLength: 1, maxLength: 200 }
+        employeeNumber: { type: [string, 'null'], minLength: 1, maxLength: 128 }
+    AddPrincipalPersonaRequest:
+      type: object
+      additionalProperties: false
+      required: [personaType, validFrom]
+      properties:
+        personaType: { enum: [INTERNAL_EMPLOYEE, NETWORK_MEMBER, TECHNICIAN, CONSUMER, SERVICE_ACCOUNT] }
+        validFrom: { type: string, format: date-time }
+        validTo: { type: [string, 'null'], format: date-time }
     TaskDirectoryItem:
       type: object
       additionalProperties: false
@@ -4508,6 +4746,14 @@ components:
         errorCode: { type: string }
         correlationId: { type: [string, 'null'] }
   responses:
+    SecurityPrincipalCommandResult:
+      description: 主体命令成功或首次幂等结果重放成功
+      headers:
+        ETag: { required: true, schema: { type: string } }
+        X-Correlation-Id: { required: true, schema: { type: string } }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/SecurityPrincipal' }
     VisitCommandReceipt:
       description: Visit 命令成功或返回首次幂等冻结响应
       headers:

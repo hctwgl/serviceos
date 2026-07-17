@@ -191,6 +191,7 @@ title: ServiceOS 里程碑索引
 | M180 | M180 Admin 专项队列剩余关联资源深链 | [193-m180-admin-pilot-queue-remaining-resource-deeplink.md](../architecture/193-m180-admin-pilot-queue-remaining-resource-deeplink.md) | [177-m180-admin-pilot-queue-remaining-resource-deeplink-acceptance.md](../testing/177-m180-admin-pilot-queue-remaining-resource-deeplink-acceptance.md) |
 | M181 | M181 Admin QueueTable 行内单元格深链 | [194-m181-admin-pilot-queuetable-cell-deeplink.md](../architecture/194-m181-admin-pilot-queuetable-cell-deeplink.md) | [178-m181-admin-pilot-queuetable-cell-deeplink-acceptance.md](../testing/178-m181-admin-pilot-queuetable-cell-deeplink-acceptance.md) |
 | M182 | M182 Admin 外发执行任务与快照成员深链 | [195-m182-admin-pilot-outbound-execution-snapshot-member-deeplink.md](../architecture/195-m182-admin-pilot-outbound-execution-snapshot-member-deeplink.md) | [179-m182-admin-pilot-outbound-execution-snapshot-member-deeplink-acceptance.md](../testing/179-m182-admin-pilot-outbound-execution-snapshot-member-deeplink-acceptance.md) |
+| M183 | M183 统一主体目录 | [196-m183-unified-principal-directory.md](../architecture/196-m183-unified-principal-directory.md) | [180-m183-unified-principal-directory-acceptance.md](../testing/180-m183-unified-principal-directory-acceptance.md) |
 
 ## 未关联里程碑的文档
 

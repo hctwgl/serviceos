@@ -1,4 +1,40 @@
 -- 仅用于本地开发。先启动后端让 Flyway 建表，再执行本脚本。
+-- 统一主体目录使用 Keycloak 用户稳定 id 作为预配 Principal id；issuer/subject 绑定后，
+-- Resource Server 每次请求都必须先解析该绑定并检查主体状态，不能继续把 JWT subject 直接当授权主体。
+INSERT INTO idn_security_principal (
+    principal_id, tenant_id, principal_type, principal_status,
+    aggregate_version, created_at, updated_at
+) VALUES (
+    '06b612f3-a901-4b0e-bd90-86b4259cc087', 'tenant-local', 'USER', 'ACTIVE', 1, now(), now()
+) ON CONFLICT (principal_id) DO NOTHING;
+
+INSERT INTO idn_person_profile (
+    principal_id, tenant_id, display_name, employee_number,
+    profile_version, created_at, updated_at, updated_by
+) VALUES (
+    '06b612f3-a901-4b0e-bd90-86b4259cc087', 'tenant-local', 'Local Developer',
+    'LOCAL-DEVELOPER', 1, now(), now(), 'local-fixture'
+) ON CONFLICT (principal_id) DO NOTHING;
+
+INSERT INTO idn_identity_link (
+    identity_link_id, tenant_id, principal_id, issuer, subject_value,
+    client_id, linked_by, linked_at
+) VALUES (
+    '4b6d6352-a4da-4ead-9424-0dc32f7c9279', 'tenant-local',
+    '06b612f3-a901-4b0e-bd90-86b4259cc087',
+    'http://localhost:8081/realms/serviceos', '06b612f3-a901-4b0e-bd90-86b4259cc087',
+    'serviceos-local-cli', 'local-fixture', now()
+) ON CONFLICT (tenant_id, issuer, subject_value) DO NOTHING;
+
+INSERT INTO idn_principal_lifecycle_event (
+    lifecycle_event_id, tenant_id, principal_id, event_type, principal_version,
+    reason, actor_id, request_digest, correlation_id, occurred_at
+) VALUES (
+    'b7df24e5-e9c9-4199-bcce-f651f6ff4a01', 'tenant-local',
+    '06b612f3-a901-4b0e-bd90-86b4259cc087', 'REGISTERED', 1,
+    'LOCAL_FIXTURE', 'local-fixture', repeat('0', 64), 'local-fixture', now()
+) ON CONFLICT (lifecycle_event_id) DO NOTHING;
+
 INSERT INTO auth_role (
     role_id, tenant_id, role_code, role_name, role_status, created_at
 ) VALUES (
@@ -43,7 +79,12 @@ VALUES
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'integration.submitClientReview', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'operations.exception.read', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'file.upload', now()),
-    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'file.download', now())
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'file.download', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'identity.read', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'identity.readSensitive', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'identity.manageLinks', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'identity.manageLifecycle', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'identity.manageProfile', now())
 ON CONFLICT (role_id, capability_code) DO NOTHING;
 
 INSERT INTO auth_role_grant (

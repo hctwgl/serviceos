@@ -2,8 +2,12 @@ package com.serviceos.identity.infrastructure;
 
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
+import com.serviceos.identity.api.AuthenticatedIdentity;
+import com.serviceos.identity.api.PrincipalAuthenticationService;
 import com.serviceos.shared.BusinessProblem;
+import com.serviceos.shared.CorrelationIds;
 import com.serviceos.shared.ProblemCode;
+import org.slf4j.MDC;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -18,6 +22,12 @@ import java.util.Set;
  */
 @Component
 final class SecurityContextCurrentPrincipalProvider implements CurrentPrincipalProvider {
+    private final PrincipalAuthenticationService authenticationService;
+
+    SecurityContextCurrentPrincipalProvider(PrincipalAuthenticationService authenticationService) {
+        this.authenticationService = authenticationService;
+    }
+
     @Override
     public CurrentPrincipal current() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -48,6 +58,18 @@ final class SecurityContextCurrentPrincipalProvider implements CurrentPrincipalP
                 ? jwt.getClaimAsString("client_id")
                 : jwt.getClaimAsString("azp");
 
-        return new CurrentPrincipal(jwt.getSubject(), tenantId, principalType, clientId, capabilities);
+        if (jwt.getIssuer() == null || clientId == null || clientId.isBlank()) {
+            throw new BusinessProblem(ProblemCode.UNAUTHENTICATED,
+                    "The authenticated subject has no trusted issuer/client context");
+        }
+        String displayName = jwt.getClaimAsString("name");
+        if (displayName == null || displayName.isBlank()) {
+            displayName = jwt.getClaimAsString("preferred_username");
+        }
+        String correlationId = CorrelationIds.normalizeOrCreate(MDC.get("correlationId"));
+        String principalId = authenticationService.resolveOrRegister(new AuthenticatedIdentity(
+                tenantId, jwt.getIssuer().toString(), jwt.getSubject(), clientId,
+                principalType, displayName), correlationId);
+        return new CurrentPrincipal(principalId, tenantId, principalType, clientId, capabilities);
     }
 }

@@ -1,0 +1,197 @@
+package com.serviceos.identity;
+
+import com.serviceos.ServiceOsApplication;
+import com.serviceos.identity.api.AuthenticatedIdentity;
+import com.serviceos.identity.api.CurrentPrincipal;
+import com.serviceos.identity.api.PrincipalAuthenticationService;
+import com.serviceos.identity.api.SecurityPrincipalCommandService;
+import com.serviceos.identity.api.SecurityPrincipalQueryService;
+import com.serviceos.shared.BusinessProblem;
+import com.serviceos.shared.CommandMetadata;
+import com.serviceos.shared.ProblemCode;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executors;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+/**
+ * M183 统一主体目录的真实 PostgreSQL 验收证据。
+ *
+ * <p>这里刻意验证 advisory lock、唯一约束、聚合版本和停用后的实时认证路径；这些行为不能用
+ * Mock 或 H2 代替，否则无法证明并发首次登录不会创建两个主体，也无法证明旧 JWT 会立即失效。</p>
+ */
+@Testcontainers(disabledWithoutDocker = true)
+@SpringBootTest(classes = ServiceOsApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE)
+class IdentityDirectoryPostgresIT {
+    private static final String TENANT = "tenant-identity-test";
+    private static final String CLIENT = "admin-web";
+    private static final String ISSUER = "https://idp.example.com/realms/serviceos";
+    private static final String ACTOR = "identity-admin";
+
+    @Container
+    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(
+            DockerImageName.parse("postgres:18-alpine"))
+            .withDatabaseName("serviceos")
+            .withUsername("serviceos_test")
+            .withPassword("serviceos_test");
+
+    @DynamicPropertySource
+    static void properties(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
+        registry.add("spring.datasource.username", POSTGRES::getUsername);
+        registry.add("spring.datasource.password", POSTGRES::getPassword);
+        registry.add("serviceos.identity.jit-registration.allowed-contexts", () -> TENANT + "|" + CLIENT);
+    }
+
+    @Autowired
+    PrincipalAuthenticationService authentication;
+
+    @Autowired
+    SecurityPrincipalCommandService commands;
+
+    @Autowired
+    SecurityPrincipalQueryService queries;
+
+    @Autowired
+    JdbcClient jdbc;
+
+    @BeforeEach
+    void cleanAndAuthorizeActor() {
+        jdbc.sql("""
+                TRUNCATE TABLE idn_principal_lifecycle_event, idn_principal_persona,
+                    idn_identity_link, idn_person_profile, idn_security_principal,
+                    rel_idempotency_record, aud_audit_record,
+                    auth_role_grant, auth_role_capability, auth_role CASCADE
+                """).update();
+        UUID roleId = UUID.randomUUID();
+        jdbc.sql("""
+                INSERT INTO auth_role (role_id, tenant_id, role_code, role_name, role_status, created_at)
+                VALUES (:roleId, :tenant, 'identity-admin', 'Identity Admin', 'ACTIVE', now())
+                """).param("roleId", roleId).param("tenant", TENANT).update();
+        for (String capability : List.of(
+                "identity.read", "identity.readSensitive", "identity.manageLinks",
+                "identity.manageLifecycle", "identity.manageProfile")) {
+            jdbc.sql("""
+                    INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
+                    VALUES (:roleId, :capability, now())
+                    """).param("roleId", roleId).param("capability", capability).update();
+        }
+        jdbc.sql("""
+                INSERT INTO auth_role_grant (
+                    grant_id, tenant_id, principal_id, role_id, scope_type, scope_ref,
+                    valid_from, source_code, approval_ref, created_at
+                ) VALUES (
+                    :grantId, :tenant, :actor, :roleId, 'TENANT', :tenant,
+                    now() - interval '1 day', 'TEST_FIXTURE', 'm183-acceptance', now()
+                )
+                """).param("grantId", UUID.randomUUID()).param("tenant", TENANT)
+                .param("actor", ACTOR).param("roleId", roleId).update();
+    }
+
+    @Test
+    void concurrentFirstLoginCreatesOneStablePrincipal() throws Exception {
+        AuthenticatedIdentity identity = identity("subject-concurrent", "并发用户");
+        Callable<String> login = () -> authentication.resolveOrRegister(identity, "corr-jit-concurrent");
+
+        try (var executor = Executors.newFixedThreadPool(6)) {
+            var futures = executor.invokeAll(List.of(login, login, login, login, login, login));
+            Set<String> principalIds = futures.stream().map(future -> {
+                try {
+                    return future.get();
+                } catch (Exception exception) {
+                    throw new AssertionError(exception);
+                }
+            }).collect(java.util.stream.Collectors.toSet());
+
+            assertThat(principalIds).hasSize(1);
+            assertThat(jdbc.sql("SELECT count(*) FROM idn_security_principal").query(Long.class).single())
+                    .isEqualTo(1L);
+            assertThat(jdbc.sql("SELECT count(*) FROM idn_identity_link").query(Long.class).single())
+                    .isEqualTo(1L);
+        }
+    }
+
+    @Test
+    void secondIdentityResolvesSamePrincipalAndDisableRejectsOldJwtImmediately() {
+        UUID principalId = UUID.fromString(authentication.resolveOrRegister(
+                identity("subject-primary", "多身份用户"), "corr-primary"));
+        CurrentPrincipal actor = actor();
+
+        var linked = commands.linkIdentity(actor, metadata("link-second"), principalId, 1,
+                "https://second-idp.example.com", "subject-secondary", "mobile-portal");
+        assertThat(linked.version()).isEqualTo(2);
+        String resolved = authentication.resolveOrRegister(new AuthenticatedIdentity(
+                TENANT, "https://second-idp.example.com", "subject-secondary", "mobile-portal",
+                CurrentPrincipal.PrincipalType.USER, "多身份用户"), "corr-secondary");
+        assertThat(resolved).isEqualTo(principalId.toString());
+        assertThat(queries.identities(actor, "corr-sensitive-read", principalId)).hasSize(2);
+
+        var disabled = commands.disable(actor, metadata("disable"), principalId, 2, "离职停用");
+        assertThat(disabled.status()).isEqualTo("DISABLED");
+        assertThatThrownBy(() -> authentication.resolveOrRegister(
+                identity("subject-primary", "多身份用户"), "corr-old-token"))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.ACCESS_DENIED));
+    }
+
+    @Test
+    void profileEmployeeNumberConflictReturnsExplicitConflictAndRollsBackVersion() {
+        UUID first = UUID.fromString(authentication.resolveOrRegister(
+                identity("subject-profile-a", "甲用户"), "corr-profile-a"));
+        UUID second = UUID.fromString(authentication.resolveOrRegister(
+                identity("subject-profile-b", "乙用户"), "corr-profile-b"));
+
+        commands.updateProfile(actor(), metadata("profile-a"), first, 1, "甲用户", "EMP-001");
+        assertThatThrownBy(() -> commands.updateProfile(
+                actor(), metadata("profile-b"), second, 1, "乙用户", "EMP-001"))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.IDENTITY_PROFILE_CONFLICT));
+
+        assertThat(queries.get(actor(), "corr-read-second", second).principal().version()).isEqualTo(1);
+    }
+
+    @Test
+    void unknownContextAndServicePrincipalFailClosed() {
+        var unknownClient = new AuthenticatedIdentity(TENANT, ISSUER, "subject-other-client", "unknown-client",
+                CurrentPrincipal.PrincipalType.USER, "未知客户端");
+        var service = new AuthenticatedIdentity(TENANT, ISSUER, "service-subject", CLIENT,
+                CurrentPrincipal.PrincipalType.SERVICE, "服务账号");
+
+        assertThatThrownBy(() -> authentication.resolveOrRegister(unknownClient, "corr-unknown-client"))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.ACCESS_DENIED));
+        assertThatThrownBy(() -> authentication.resolveOrRegister(service, "corr-service"))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.ACCESS_DENIED));
+    }
+
+    private static AuthenticatedIdentity identity(String subject, String displayName) {
+        return new AuthenticatedIdentity(TENANT, ISSUER, subject, CLIENT,
+                CurrentPrincipal.PrincipalType.USER, displayName);
+    }
+
+    private static CurrentPrincipal actor() {
+        return new CurrentPrincipal(ACTOR, TENANT, CurrentPrincipal.PrincipalType.USER, CLIENT, Set.of());
+    }
+
+    private static CommandMetadata metadata(String suffix) {
+        return new CommandMetadata("corr-" + suffix, "idem-" + suffix);
+    }
+}

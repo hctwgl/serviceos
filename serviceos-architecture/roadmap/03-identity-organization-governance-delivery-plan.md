@@ -1,15 +1,15 @@
 ---
-title: M135～M140 统一身份、组织与授权治理交付计划
+title: M183～M188 统一身份、组织与授权治理交付计划
 version: 1.0.0
 status: Accepted
 decisionDate: 2026-07-17
 ---
 
-# M135～M140 统一身份、组织与授权治理交付计划
+# M183～M188 统一身份、组织与授权治理交付计划
 
 ## 1. 决策
 
-ServiceOS 正式接受 M135～M140 作为 M134 之后的连续实施序列，用于把现有 OIDC/JWT、Capability、RoleGrant 和范围授权底座扩展为可运营的统一主体目录、企业组织、网点人员、师傅身份、角色授权治理和多 Portal 上下文。
+ServiceOS 正式接受 M183～M188 作为 M182 之后的连续实施序列，用于把现有 OIDC/JWT、Capability、RoleGrant 和范围授权底座扩展为可运营的统一主体目录、企业组织、网点人员、师傅身份、角色授权治理和多 Portal 上下文。
 
 本计划是实施承诺，不是完成声明。只有对应代码、Flyway、OpenAPI/事件契约、PostgreSQL 与安全测试、Portal E2E 和实施状态证据全部成立后，单个里程碑才能从 `ACCEPTED` 改为 `IMPLEMENTED`。
 
@@ -40,14 +40,14 @@ ServiceOS 正式接受 M135～M140 作为 M134 之后的连续实施序列，用
 
 | 里程碑 | 目标 | 主要交付 | 退出条件 |
 |---|---|---|---|
-| M135 | 统一主体目录 | Principal、IdentityLink、PersonProfile、Persona、登录后绑定、主体生命周期和安全查询 | 一个主体可绑定多个身份并拥有多个 Persona；停用实时失权；不保存密码；PostgreSQL/安全/契约证据通过 |
-| M136 | 企业组织与任职 | Organization、OrgUnit、closure、OrgMembership、LOCAL/EXTERNAL_AUTHORITATIVE 来源和同步收据 | 组织树、历史任职、调动/离职和外部同步乱序可验证；离职触发撤权与待办重分配 |
-| M137 | 网点人员与师傅身份 | Partner Organization、ServiceNetwork 目录、NetworkMembership、TechnicianProfile、NetworkTechnicianMembership、Qualification、邀请绑定 | 网点与部门边界明确；师傅多网点关系、资质和停用影响可验证；跨网点读取失败关闭 |
-| M138 | 角色与授权治理 | Role/Capability 目录、RoleGrant 申请/审批/撤销、Delegation、职责分离、授权解释和审计 | 不能越权授予；高风险授权不可自批；授权变化使旧上下文/游标失效；历史只追加 |
-| M139 | Admin 统一用户中心 | 用户目录、组织树、合作组织/网点人员、师傅、角色和授权治理页面 | Admin 通过真实 OIDC 完成搜索、绑定、组织变更、授权和停用；页面不接受原始 principalId 作为主要操作方式 |
-| M140 | Portal 上下文与导航 | `/me`、可用 contexts、capabilities、navigation；多 Persona/组织/项目/网点上下文和代码注册 Page Registry | 服务端计算 Portal 上下文；前端不能自报 network/project 扩权；导航变化不削弱业务 API 鉴权；三 Portal 可独立接入 |
+| M183 | 统一主体目录 | Principal、IdentityLink、PersonProfile、Persona、登录后绑定、主体生命周期和安全查询 | 一个主体可绑定多个身份并拥有多个 Persona；停用实时失权；不保存密码；PostgreSQL/安全/契约证据通过 |
+| M184 | 企业组织与任职 | Organization、OrgUnit、closure、OrgMembership、LOCAL/EXTERNAL_AUTHORITATIVE 来源和同步收据 | 组织树、历史任职、调动/离职和外部同步乱序可验证；离职触发撤权与待办重分配 |
+| M185 | 网点人员与师傅身份 | Partner Organization、ServiceNetwork 目录、NetworkMembership、TechnicianProfile、NetworkTechnicianMembership、Qualification、邀请绑定 | 网点与部门边界明确；师傅多网点关系、资质和停用影响可验证；跨网点读取失败关闭 |
+| M186 | 角色与授权治理 | Role/Capability 目录、RoleGrant 申请/审批/撤销、Delegation、职责分离、授权解释和审计 | 不能越权授予；高风险授权不可自批；授权变化使旧上下文/游标失效；历史只追加 |
+| M187 | Admin 统一用户中心 | 用户目录、组织树、合作组织/网点人员、师傅、角色和授权治理页面 | Admin 通过真实 OIDC 完成搜索、绑定、组织变更、授权和停用；页面不接受原始 principalId 作为主要操作方式 |
+| M188 | Portal 上下文与导航 | `/me`、可用 contexts、capabilities、navigation；多 Persona/组织/项目/网点上下文和代码注册 Page Registry | 服务端计算 Portal 上下文；前端不能自报 network/project 扩权；导航变化不削弱业务 API 鉴权；三 Portal 可独立接入 |
 
-## 5. M135：统一主体目录
+## 5. M183：统一主体目录
 
 ### 5.1 最小模型
 
@@ -74,7 +74,7 @@ POST /api/v1/security-principals/{id}:enable
 
 普通调用方只获得最小展示信息；完整身份绑定、联系方式和生命周期历史使用独立 Capability 与字段策略。
 
-## 6. M136：企业组织与人员任职
+## 6. M184：企业组织与人员任职
 
 ### 6.1 模型
 
@@ -95,7 +95,7 @@ directory_sync_item
 - `EXTERNAL_AUTHORITATIVE`：HR/OA/AD/企业微信等是权威；ServiceOS 保存可用投影、来源键、同步批次和冲突结果，外部管理字段在 UI 只读。
 - 不实施未定义的双向同步；需要回写时另行接受 Connector/ADR。
 
-## 7. M137：网点人员与师傅身份
+## 7. M185：网点人员与师傅身份
 
 ### 7.1 模型
 
@@ -112,13 +112,13 @@ technician_qualification
 
 网点负责人只能邀请和维护授权网点范围内成员；总部负责网点准入、负责人、高风险停用和资质最终审核。清退前必须展示未完成 Task、Appointment、Visit 和离线工作包影响。
 
-## 8. M138：角色与授权治理
+## 8. M186：角色与授权治理
 
 `Capability` 是全局稳定安全契约，不能由租户重定义语义。租户可以创建角色并组合能力，但所有 RoleGrant 必须包含主体、角色、组织/项目/区域/网点范围、有效期、来源、原因和审批信息。
 
 正式命令包括申请、批准、拒绝、撤销和委托；高风险能力应用职责分离、MFA/approval obligations 和可授予范围校验。授权历史只追加，不能覆盖原授权区间。
 
-## 9. M139：Admin 统一用户中心
+## 9. M187：Admin 统一用户中心
 
 Admin 最小页面：
 
@@ -134,7 +134,7 @@ Admin 最小页面：
 
 页面搜索和选择使用安全目录 API，不要求运营人员复制 UUID。所有写动作展示影响范围、未完成工作、版本、原因和审批 obligations，并在成功后重新读取权威结果。
 
-## 10. M140：Portal 上下文与导航
+## 10. M188：Portal 上下文与导航
 
 最小查询：
 
@@ -151,19 +151,19 @@ GET /api/v1/me/navigation
 
 ## 11. C 端边界
 
-Consumer Identity/CustomerProfile 属于 M140 之后的独立正式 Epic，目标已接受，但在手机号/微信登录、隐私同意、客户主数据权威、车辆/地址关系和注销保留策略确认前不分配实施里程碑。
+Consumer Identity/CustomerProfile 属于 M188 之后的独立正式 Epic，目标已接受，但在手机号/微信登录、隐私同意、客户主数据权威、车辆/地址关系和注销保留策略确认前不分配实施里程碑。
 
-M135～M140 必须保证模型不阻碍 C 端：Principal 支持 Consumer Persona，IdentityLink 不假设企业账号，资源授权不依赖企业组织树。不得在本序列中用 `ROLE_CUSTOMER` 直接开放全部客户工单。
+M183～M188 必须保证模型不阻碍 C 端：Principal 支持 Consumer Persona，IdentityLink 不假设企业账号，资源授权不依赖企业组织树。不得在本序列中用 `ROLE_CUSTOMER` 直接开放全部客户工单。
 
 ## 12. 顺序和依赖
 
 ```text
-M135 Principal
-  → M136 Organization
-  → M137 Network/Technician identity
-  → M138 Authorization governance
-  → M139 Admin user center
-  → M140 Portal context/navigation
+M183 Principal
+  → M184 Organization
+  → M185 Network/Technician identity
+  → M186 Authorization governance
+  → M187 Admin user center
+  → M188 Portal context/navigation
 ```
 
 后续里程碑可以在前一里程碑 Draft PR 上评审设计，但默认不得在前一里程碑合并前形成依赖未稳定内部表的实现。任何跨模块接口变化先合并公共契约和架构测试。

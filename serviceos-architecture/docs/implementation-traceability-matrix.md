@@ -277,3 +277,4 @@ Feature gate/authority: if applicable
 | M180 | Admin 专项队列剩余关联资源深链：Correction/Review 队列 Accepted 字段补齐；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Core OpenAPI + Admin Web E2E + `193-m180-*` + `177-m180-*` | QueueTable 行内链接、SavedView、FieldOperation |
 | M181 | Admin QueueTable 行内单元格深链：可选 linkColumns；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Admin Web E2E + `194-m181-*` + `178-m181-*` | 移除关联资源条、SavedView、FieldOperation |
 | M182 | Admin 外发执行任务与快照成员深链：executionTaskId + Snapshot members；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Outbound/Evidence OpenAPI + Admin Web E2E + `195-m182-*` + `179-m182-*` | FieldOperation、SavedView |
+| M183 | 统一 Principal/IdentityLink/PersonProfile/Persona；JIT 并发去重；启停实时失权；安全目录 API | 身份治理计划 + Core OpenAPI 0.76.0 + Flyway V086 + PostgreSQL/MVC/ArchitectureTest + `196-m183-*` + `180-m183-*` | M184～M188、解绑、密码、跨服务身份缓存/事件 |

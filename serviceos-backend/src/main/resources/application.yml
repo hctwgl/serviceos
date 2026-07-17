@@ -31,6 +31,7 @@ spring:
       - classpath:db/migration/evidence
       - classpath:db/migration/sla
       - classpath:db/migration/readmodel
+      - classpath:db/migration/identity
     validate-migration-naming: true
   security:
     oauth2:
@@ -114,6 +115,10 @@ server:
   shutdown: graceful
 
 serviceos:
+  identity:
+    jit-registration:
+      # 默认失败关闭；格式为 tenantId|clientId，多个组合逗号分隔。issuer/audience 仍由 Resource Server 校验。
+      allowed-contexts: ${SERVICEOS_IDENTITY_JIT_ALLOWED_CONTEXTS:}
   outbox:
     # 模块化单体默认由本地可靠消费者处理；生产切换 Broker 时必须提供真实 Publisher/Consumer。
     publisher: ${SERVICEOS_OUTBOX_PUBLISHER:local}

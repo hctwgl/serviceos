@@ -26,7 +26,7 @@ title: ServiceOS Agent 任务导航
 
 | 任务类型 | 最小必读（按序） | 按需阅读 |
 |---|---|---|
-| 开工定位：下一个任务是什么 | `serviceos-architecture/docs/implementation-status.md` §2/§2.1/§3/§5 | 身份治理序列（原 M135～M140，编号冲突待重排，见 §2.1）：`serviceos-architecture/roadmap/03-identity-organization-governance-delivery-plan.md`、`serviceos-architecture/roadmap/04-identity-organization-governance-agent-worklist.md`、`serviceos-architecture/testing/identity-organization-governance-program-acceptance.md` |
+| 开工定位：下一个任务是什么 | `serviceos-architecture/docs/implementation-status.md` §2/§2.1/§3/§5 | 身份治理序列 M183～M188：`serviceos-architecture/roadmap/03-identity-organization-governance-delivery-plan.md`、`serviceos-architecture/roadmap/04-identity-organization-governance-agent-worklist.md`、`serviceos-architecture/testing/identity-organization-governance-program-acceptance.md` |
 | 后端新里程碑（通用） | ① 若已有 Accepted 设计：对应 Mxx 实现文档 + 验收矩阵；② `serviceos-architecture/docs/implementation-traceability-matrix.md` §2 该模块行；③ `grep -i <模块或关键词> serviceos-architecture/docs/milestone-index.md` 找最近一次同模块里程碑的实现文档 + 验收矩阵；④ `serviceos-backend/AGENTS.md` 该模块行 | 领域总体设计（`serviceos-architecture/architecture/00`～`21` 编号文档）相关章节、相关 ADR（`serviceos-architecture/decisions/`） |
 | readmodel 时间线/工作区切片 | `serviceos-architecture/architecture/86-m73-work-order-core-execution-timeline.md`（投影基线）、`serviceos-architecture/architecture/97-m84-work-order-timeline-projection-checkpoint-rebuild.md`（checkpoint/重建）、index Grep `时间线\|工作区` 取最近一次同类切片、`serviceos-architecture/api/06-application-query-preference-http-api.md` 对应 Accepted 章节 | `serviceos-architecture/data/06-application-projection-preference-logical-model.md` |
 | 授权查询/队列切片 | `serviceos-architecture/architecture/80-m67-authorized-project-directory-query.md`、`serviceos-architecture/architecture/81-m68-authorized-work-order-query.md`、index Grep `队列` 取最近一次（如 M99/M158）、`serviceos-architecture/architecture/07-identity-authorization-audit.md` 授权章节 | `serviceos-architecture/data/02-authorization-audit-logical-model.md` |
@@ -41,5 +41,5 @@ title: ServiceOS Agent 任务导航
 ## 明确不做
 
 - 任何任务都不得因为「找上下文」而 `cat` 或全量 Read 整个 `architecture/`、`testing/`、`docs/` 目录；
-- 身份治理序列在原 M135～M140 编号重排完成前，不得按旧编号实施（见 `implementation-status.md` §2.1）；
+- 身份治理序列已重编号为 M183～M188；不得再使用与 Admin Pilot 历史冲突的旧 M135～M140 编号（见 `implementation-status.md` §2.1）；
 - 「候选下一方向」清单（status §5）中的条目在明确批准前不得当作任务直接实现。

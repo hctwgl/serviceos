@@ -183,4 +183,5 @@
 - [M180 Admin 专项队列剩余关联资源深链验收矩阵](177-m180-admin-pilot-queue-remaining-resource-deeplink-acceptance.md)
 - [M181 Admin QueueTable 行内单元格深链验收矩阵](178-m181-admin-pilot-queuetable-cell-deeplink-acceptance.md)
 - [M182 Admin 外发执行任务与快照成员深链验收矩阵](179-m182-admin-pilot-outbound-execution-snapshot-member-deeplink-acceptance.md)
+- [M183 统一主体目录验收矩阵](180-m183-unified-principal-directory-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

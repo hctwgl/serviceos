@@ -1,11 +1,11 @@
 ---
-title: M135～M140 身份与组织治理 Agent 工作清单
+title: M183～M188 身份与组织治理 Agent 工作清单
 version: 1.0.0
 status: Accepted
 decisionDate: 2026-07-17
 ---
 
-# M135～M140 身份与组织治理 Agent 工作清单
+# M183～M188 身份与组织治理 Agent 工作清单
 
 ## 1. 执行规则
 
@@ -36,11 +36,11 @@ implementation-status 与 README 索引同步
 明确未实现边界
 ```
 
-预留实现文档编号：M135 从 `architecture/148-*` 开始；每个新里程碑使用连续编号。程序级验收矩阵不替代里程碑实现证据。
+实现文档编号：M183 从 `architecture/196-*` 开始；每个新里程碑使用连续编号。程序级验收矩阵不替代里程碑实现证据。
 
-## 3. M135 Agent 清单：统一主体目录
+## 3. M183 Agent 清单：统一主体目录
 
-分支建议：`feat/m135-unified-principal-directory`
+分支建议：`feat/m183-unified-principal-directory`
 
 - 盘点现有 `identity`、JWT principal、authorization 的稳定 principalId 使用；禁止破坏已有主体引用。
 - 定义 Principal、IdentityLink、PersonProfile、Persona 和生命周期不变量。
@@ -50,11 +50,11 @@ implementation-status 与 README 索引同步
 - 覆盖并发绑定、跨租户 subject、禁用旧 JWT、多个 Persona 和版本冲突。
 - 更新 Core OpenAPI、生成客户端、实施状态和索引。
 
-完成后才允许 M136 依赖稳定 Principal API。
+完成后才允许 M184 依赖稳定 Principal API。
 
-## 4. M136 Agent 清单：企业组织与任职
+## 4. M184 Agent 清单：企业组织与任职
 
-分支建议：`feat/m136-organization-directory`
+分支建议：`feat/m184-organization-directory`
 
 - 通过 ADR/架构文档确定独立组织目录模块名和允许依赖。
 - 实现 Organization、OrgUnit、closure、OrgMembership 和有效期历史。
@@ -63,20 +63,20 @@ implementation-status 与 README 索引同步
 - 离职/停用联动主体失权、RoleGrant 终止/撤销和待重新分配清单。
 - 覆盖循环、组织移动、乱序同步、重复批次、部分失败和跨租户父子关系。
 
-## 5. M137 Agent 清单：网点人员与师傅身份
+## 5. M185 Agent 清单：网点人员与师傅身份
 
-分支建议：`feat/m137-network-technician-directory`
+分支建议：`feat/m185-network-technician-directory`
 
 - 明确 Partner Organization、ServiceNetwork 与内部 OrgUnit 的边界。
 - 实现 NetworkMembership、TechnicianProfile、NetworkTechnicianMembership 和 Qualification。
-- 邀请/绑定账号必须复用 M135 Principal，不创建第二套用户表。
+- 邀请/绑定账号必须复用 M183 Principal，不创建第二套用户表。
 - 候选与派单查询同时验证师傅档案、网点关系、技能/资质和状态。
 - 清退/停用展示并处理 Task、Appointment、Visit、ServiceAssignment 和离线工作包影响。
 - 覆盖多网点师傅、跨网点隔离、资质过期、并发邀请和旧成员缓存失权。
 
-## 6. M138 Agent 清单：角色与授权治理
+## 6. M186 Agent 清单：角色与授权治理
 
-分支建议：`feat/m138-role-grant-governance`
+分支建议：`feat/m186-role-grant-governance`
 
 - 复用现有 Capability 与 RoleGrant 运行时，不另建平行 RBAC。
 - 实现角色模板/租户角色、授权申请/审批/撤销、Delegation 和授权解释。
@@ -84,9 +84,9 @@ implementation-status 与 README 索引同步
 - 授权历史只追加；到期/撤销使查询 context、scope cursor 和缓存失败关闭。
 - 覆盖同授权维度 AND、多授权 OR、显式拒绝、越权授予、自批和乱序撤销。
 
-## 7. M139 Agent 清单：Admin 统一用户中心
+## 7. M187 Agent 清单：Admin 统一用户中心
 
-分支建议：`feat/m139-admin-user-center`
+分支建议：`feat/m187-admin-user-center`
 
 - 建立用户、组织、合作方/网点人员、师傅、角色与授权页面。
 - 所有选择器使用目录搜索，不把 principal UUID 暴露为主要交互。
@@ -95,9 +95,9 @@ implementation-status 与 README 索引同步
 - 使用真实 Keycloak PKCE、Backend、PostgreSQL 和 Chrome 覆盖搜索、绑定、调动、授权、撤权和停用。
 - 无权限深链和搜索不得泄露姓名、联系方式、组织或角色。
 
-## 8. M140 Agent 清单：Portal 上下文与导航
+## 8. M188 Agent 清单：Portal 上下文与导航
 
-分支建议：`feat/m140-portal-context-navigation`
+分支建议：`feat/m188-portal-context-navigation`
 
 - 实现 `/me`、`/me/contexts`、`/me/capabilities`、`/me/navigation`。
 - 上下文只由有效 Persona、Membership、RoleGrant 和 feature gate 计算。
