@@ -2490,6 +2490,32 @@ test('真实 OIDC 登录后可通过审核外发并经厂端回调关闭 CLIENT 
     new URL(`/integration/outbound/${delivery.deliveryId}`, page.url()).toString(),
   )
   await expect(reviewPage.getByRole('heading', { name: '外发交付' })).toBeVisible()
+  // M182：外发详情 → 执行任务（OpenAPI executionTaskId）。
+  const executionTaskId = (
+    await reviewPage
+      .locator('dt', { hasText: /^executionTaskId$/ })
+      .locator('xpath=../dd')
+      .innerText()
+  ).trim()
+  expect(executionTaskId).toMatch(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+  )
+  const outboundExecutionTaskPromise = reviewPage.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname === `/api/v1/tasks/${executionTaskId}`,
+  )
+  await reviewPage
+    .locator('.outbound-cross-links')
+    .getByRole('link', { name: new RegExp(`打开执行任务\\s+${executionTaskId}`) })
+    .click()
+  expect((await outboundExecutionTaskPromise).status()).toBe(200)
+  await expect(reviewPage.getByRole('heading', { name: '任务详情' })).toBeVisible()
+  await reviewPage.goto(
+    new URL(`/integration/outbound/${delivery.deliveryId}`, page.url()).toString(),
+  )
+  await expect(reviewPage.getByRole('heading', { name: '外发交付' })).toBeVisible()
+
   const outboundSourceSnapshotPromise = reviewPage.waitForResponse(
     (response) =>
       response.request().method() === 'GET' &&
@@ -2500,8 +2526,30 @@ test('真实 OIDC 登录后可通过审核外发并经厂端回调关闭 CLIENT 
     .locator('.outbound-cross-links')
     .getByRole('link', { name: new RegExp(`打开源资料快照\\s+${sourceSnapshotId}`) })
     .click()
-  expect((await outboundSourceSnapshotPromise).status()).toBe(200)
+  const outboundSourceSnapshotResponse = await outboundSourceSnapshotPromise
+  expect(outboundSourceSnapshotResponse.status()).toBe(200)
   await expect(reviewPage.getByRole('heading', { name: '资料快照详情' })).toBeVisible()
+  const snapshotDetail = (await outboundSourceSnapshotResponse.json()) as {
+    members?: Array<{ evidenceItemId: string }>
+  }
+  const memberEvidenceItemId = snapshotDetail.members?.[0]?.evidenceItemId
+  expect(memberEvidenceItemId, '源资料快照缺少成员 evidenceItemId').toBeTruthy()
+
+  // M182：资料快照成员 → 资料项详情。
+  const snapshotMemberItemPromise = reviewPage.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname ===
+        `/api/v1/evidence-items/${memberEvidenceItemId}`,
+  )
+  await reviewPage
+    .locator('.evidence-snapshot-member-links')
+    .getByRole('link', {
+      name: new RegExp(`打开资料项\\s+${memberEvidenceItemId}`),
+    })
+    .click()
+  expect((await snapshotMemberItemPromise).status()).toBe(200)
+  await expect(reviewPage.getByRole('heading', { name: '资料项详情' })).toBeVisible()
 
   // M147：工作区 INTEGRATION → 外发交付详情深链（复用已有 OutboundDeliveryDetailPage）。
   await reviewPage.goto(

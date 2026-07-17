@@ -80,6 +80,21 @@ onMounted(() => {
           </RouterLink>
         </p>
       </article>
+      <article v-if="detail.members?.length" class="card">
+        <h3>成员资料项</h3>
+        <p class="links evidence-snapshot-member-links">
+          <RouterLink
+            v-for="member in detail.members"
+            :key="member.memberId"
+            :to="{
+              name: 'ADMIN.EVIDENCE_ITEM.DETAIL',
+              params: { id: member.evidenceItemId },
+            }"
+          >
+            打开资料项 {{ member.evidenceItemId }}
+          </RouterLink>
+        </p>
+      </article>
       <pre class="dump">{{
         JSON.stringify(
           {

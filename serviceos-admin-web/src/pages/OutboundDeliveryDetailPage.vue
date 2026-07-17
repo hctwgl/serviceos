@@ -130,6 +130,18 @@ onMounted(() => {
             </dd>
           </div>
           <div>
+            <dt>executionTaskId</dt>
+            <dd>
+              <RouterLink
+                v-if="detail.executionTaskId"
+                :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.executionTaskId } }"
+              >
+                {{ detail.executionTaskId }}
+              </RouterLink>
+              <template v-else>-</template>
+            </dd>
+          </div>
+          <div>
             <dt>sourceSnapshotId</dt>
             <dd>
               <RouterLink
@@ -169,6 +181,12 @@ onMounted(() => {
           </RouterLink>
           <RouterLink :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.sourceTaskId } }">
             打开源任务 {{ detail.sourceTaskId }}
+          </RouterLink>
+          <RouterLink
+            v-if="detail.executionTaskId"
+            :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.executionTaskId } }"
+          >
+            打开执行任务 {{ detail.executionTaskId }}
           </RouterLink>
           <RouterLink
             :to="{

@@ -11,6 +11,8 @@ export type OutboundDelivery = {
   sourceSnapshotId: string
   sourceSnapshotDigest: string
   externalOrderCode: string
+  /** OpenAPI nullable；队列侧已深链，详情类型对齐。 */
+  executionTaskId: string | null
   status: string
   aggregateVersion: number
   createdAt: string
