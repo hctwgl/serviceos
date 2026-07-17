@@ -2,8 +2,10 @@
 import { onMounted, ref, watch } from 'vue'
 import {
   assignNetworkPortalTechnician,
+  beginNetworkPortalEvidenceUploadOnBehalf,
   cancelNetworkPortalAppointment,
   confirmNetworkPortalAppointment,
+  finalizeNetworkPortalEvidenceUploadOnBehalf,
   listNetworkPortalTaskAppointments,
   listNetworkPortalTaskContactAttempts,
   listNetworkPortalTasks,
@@ -13,6 +15,7 @@ import {
   recordNetworkPortalTaskContactAttempt,
   reassignNetworkPortalTechnician,
   rescheduleNetworkPortalAppointment,
+  resubmitNetworkPortalCorrectionCase,
   type NetworkPortalAppointment,
   type NetworkPortalContactAttempt,
   type NetworkPortalTaskItem,
@@ -61,6 +64,22 @@ const contactEnd = ref('2026-07-17T08:05:00.000Z')
 const contactBusy = ref(false)
 const contactError = ref<string | null>(null)
 const contactMessage = ref<string | null>(null)
+
+const evidenceSlotId = ref('')
+const onBehalfOf = ref('')
+const onBehalfReason = ref('整改代补')
+const evidenceSha256 = ref('a'.repeat(64))
+const evidenceFileName = ref('site.png')
+const evidenceExpectedSize = ref(128)
+const uploadSessionId = ref('')
+const evidenceBusy = ref(false)
+const evidenceError = ref<string | null>(null)
+const evidenceMessage = ref<string | null>(null)
+const correctionCaseId = ref('')
+const evidenceSetSnapshotId = ref('')
+const resubmitBusy = ref(false)
+const resubmitError = ref<string | null>(null)
+const resubmitMessage = ref<string | null>(null)
 
 async function load() {
   if (!props.networkContextId) {
@@ -153,6 +172,102 @@ async function submitAssign() {
     assignError.value = err instanceof Error ? err.message : '指派师傅失败'
   } finally {
     assignBusy.value = false
+  }
+}
+
+async function submitEvidenceBegin() {
+  if (!props.networkContextId) {
+    evidenceError.value = '请选择 NETWORK 上下文'
+    return
+  }
+  if (!selectedTaskId.value || !evidenceSlotId.value || !onBehalfOf.value) {
+    evidenceError.value = '请填写任务、槽位与 onBehalfOf'
+    return
+  }
+  evidenceBusy.value = true
+  evidenceError.value = null
+  evidenceMessage.value = null
+  try {
+    const result = await beginNetworkPortalEvidenceUploadOnBehalf(
+      props.networkContextId,
+      selectedTaskId.value,
+      evidenceSlotId.value,
+      {
+        originalFileName: evidenceFileName.value.trim() || 'site.png',
+        declaredMimeType: 'image/png',
+        expectedSize: Number(evidenceExpectedSize.value) || 128,
+        expectedSha256: evidenceSha256.value.trim(),
+        captureMetadata: {
+          captureSource: 'CAMERA',
+          capturedAt: new Date().toISOString(),
+        },
+        onBehalfOf: onBehalfOf.value.trim(),
+        onBehalfReason: onBehalfReason.value.trim() || '整改代补',
+      },
+    )
+    uploadSessionId.value = result.data.uploadSessionId
+    evidenceMessage.value = `已创建上传会话 ${result.data.uploadSessionId}`
+  } catch (err) {
+    evidenceError.value = err instanceof Error ? err.message : '代补 Begin 失败'
+  } finally {
+    evidenceBusy.value = false
+  }
+}
+
+async function submitEvidenceFinalize() {
+  if (!props.networkContextId) {
+    evidenceError.value = '请选择 NETWORK 上下文'
+    return
+  }
+  if (!selectedTaskId.value || !evidenceSlotId.value || !uploadSessionId.value) {
+    evidenceError.value = '请先 Begin 并填写槽位/会话'
+    return
+  }
+  evidenceBusy.value = true
+  evidenceError.value = null
+  evidenceMessage.value = null
+  try {
+    const result = await finalizeNetworkPortalEvidenceUploadOnBehalf(
+      props.networkContextId,
+      selectedTaskId.value,
+      evidenceSlotId.value,
+      uploadSessionId.value,
+      {
+        actualSha256: evidenceSha256.value.trim(),
+        finalizeCommandId: crypto.randomUUID(),
+      },
+    )
+    evidenceMessage.value = `已 Finalize evidenceItem=${result.data.evidenceItemId}`
+  } catch (err) {
+    evidenceError.value = err instanceof Error ? err.message : '代补 Finalize 失败'
+  } finally {
+    evidenceBusy.value = false
+  }
+}
+
+async function submitCorrectionResubmit() {
+  if (!props.networkContextId) {
+    resubmitError.value = '请选择 NETWORK 上下文'
+    return
+  }
+  if (!correctionCaseId.value || !evidenceSetSnapshotId.value) {
+    resubmitError.value = '请填写 correctionCaseId 与 snapshotId'
+    return
+  }
+  resubmitBusy.value = true
+  resubmitError.value = null
+  resubmitMessage.value = null
+  try {
+    const result = await resubmitNetworkPortalCorrectionCase(
+      props.networkContextId,
+      correctionCaseId.value.trim(),
+      { evidenceSetSnapshotId: evidenceSetSnapshotId.value.trim() },
+    )
+    resubmitMessage.value = `整改已补传 status=${result.data.status}`
+  } catch (err) {
+    resubmitError.value = err instanceof Error ? err.message : '整改 resubmit 失败'
+  } finally {
+    resubmitBusy.value = false
   }
 }
 
@@ -721,6 +836,112 @@ watch(selectedTaskId, () => {
       </ul>
       <p v-if="contactError" class="error" data-testid="contact-error">{{ contactError }}</p>
       <p v-if="contactMessage" class="ok" data-testid="contact-message">{{ contactMessage }}</p>
+    </form>
+
+    <form
+      class="assign"
+      data-testid="network-evidence-on-behalf-form"
+      data-page-id="NETWORK.EVIDENCE.SUPPLEMENT"
+      @submit.prevent="submitEvidenceBegin"
+    >
+      <h3>资料代补</h3>
+      <p class="hint">
+        调用 Network Portal begin/finalize on-behalf 与 correction resubmit；
+        onBehalfOf 须为 ACTIVE TECHNICIAN。
+      </p>
+      <label>
+        任务
+        <select v-model="selectedTaskId" data-testid="evidence-task-select" aria-label="evidence task">
+          <option disabled value="">选择任务</option>
+          <option v-for="item in items" :key="item.taskId" :value="item.taskId">
+            {{ item.taskId }}
+          </option>
+        </select>
+      </label>
+      <label>
+        槽位 ID
+        <input v-model="evidenceSlotId" data-testid="evidence-slot-id" aria-label="evidence slot id" />
+      </label>
+      <label>
+        onBehalfOf
+        <input v-model="onBehalfOf" data-testid="evidence-on-behalf-of" aria-label="on behalf of" />
+      </label>
+      <label>
+        onBehalfReason
+        <input
+          v-model="onBehalfReason"
+          data-testid="evidence-on-behalf-reason"
+          aria-label="on behalf reason"
+        />
+      </label>
+      <label>
+        SHA-256
+        <input v-model="evidenceSha256" data-testid="evidence-sha256" aria-label="evidence sha256" />
+      </label>
+      <label>
+        文件名
+        <input v-model="evidenceFileName" data-testid="evidence-file-name" aria-label="file name" />
+      </label>
+      <label>
+        预期大小
+        <input
+          v-model.number="evidenceExpectedSize"
+          type="number"
+          data-testid="evidence-expected-size"
+          aria-label="expected size"
+        />
+      </label>
+      <label>
+        上传会话 ID
+        <input
+          v-model="uploadSessionId"
+          data-testid="evidence-upload-session-id"
+          aria-label="upload session id"
+        />
+      </label>
+      <button
+        type="submit"
+        data-testid="evidence-begin-submit"
+        :disabled="evidenceBusy || !props.networkContextId"
+      >
+        Begin 代补上传
+      </button>
+      <button
+        type="button"
+        data-testid="evidence-finalize-submit"
+        :disabled="evidenceBusy || !props.networkContextId"
+        @click="submitEvidenceFinalize"
+      >
+        Finalize 代补上传
+      </button>
+      <p v-if="evidenceError" class="error" data-testid="evidence-on-behalf-error">{{ evidenceError }}</p>
+      <p v-if="evidenceMessage" class="ok" data-testid="evidence-on-behalf-message">{{ evidenceMessage }}</p>
+      <label>
+        整改案例 ID
+        <input
+          v-model="correctionCaseId"
+          data-testid="correction-case-id"
+          aria-label="correction case id"
+        />
+      </label>
+      <label>
+        Snapshot ID
+        <input
+          v-model="evidenceSetSnapshotId"
+          data-testid="evidence-set-snapshot-id"
+          aria-label="evidence set snapshot id"
+        />
+      </label>
+      <button
+        type="button"
+        data-testid="correction-resubmit-submit"
+        :disabled="resubmitBusy || !props.networkContextId"
+        @click="submitCorrectionResubmit"
+      >
+        整改 Resubmit
+      </button>
+      <p v-if="resubmitError" class="error" data-testid="correction-resubmit-error">{{ resubmitError }}</p>
+      <p v-if="resubmitMessage" class="ok" data-testid="correction-resubmit-message">{{ resubmitMessage }}</p>
     </form>
   </section>
 </template>

@@ -12,7 +12,7 @@ import java.util.Set;
 
 /**
  * M38 最小可演进 CaptureMetadata。客户端声明不是 GPS/水印/EXIF 权威事实；
- * onBehalfOf 在本切片失败关闭。
+ * 客户端 onBehalfOf/delegationRef/onBehalfReason 失败关闭；M201 仅允许服务端命令级代补字段写入。
  */
 final class CaptureMetadataValidator {
     private static final Set<String> SOURCES = Set.of(
@@ -22,6 +22,21 @@ final class CaptureMetadataValidator {
     }
 
     static String normalize(ObjectMapper objectMapper, JsonNode input, Instant receivedAt, String uploadedBy) {
+        return normalize(objectMapper, input, receivedAt, uploadedBy, null, null);
+    }
+
+    /**
+     * @param onBehalfOf     服务端命令级代补对象；非空时与 {@code onBehalfReason} 一并写入规范化 JSON
+     * @param onBehalfReason 服务端命令级代补原因
+     */
+    static String normalize(
+            ObjectMapper objectMapper,
+            JsonNode input,
+            Instant receivedAt,
+            String uploadedBy,
+            String onBehalfOf,
+            String onBehalfReason
+    ) {
         if (input == null || !input.isObject()) {
             throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, "captureMetadata must be an object");
         }
@@ -43,7 +58,8 @@ final class CaptureMetadataValidator {
             throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, "capturedAt is too far in the future");
         }
 
-        if (hasText(input, "onBehalfOf") || hasText(input, "delegationRef")) {
+        // 客户端不得伪造代补关系；Admin 普通 submit 与 Portal 路径均失败关闭 JSON 内字段。
+        if (hasText(input, "onBehalfOf") || hasText(input, "delegationRef") || hasText(input, "onBehalfReason")) {
             throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
                     "on-behalf evidence upload is not enabled in M38");
         }
@@ -73,6 +89,24 @@ final class CaptureMetadataValidator {
             }
             normalized.put("clientChecksum", checksum);
         }
+
+        boolean hasOnBehalfOf = onBehalfOf != null && !onBehalfOf.isBlank();
+        boolean hasOnBehalfReason = onBehalfReason != null && !onBehalfReason.isBlank();
+        if (hasOnBehalfOf || hasOnBehalfReason) {
+            if (!hasOnBehalfOf || !hasOnBehalfReason) {
+                throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                        "onBehalfOf and onBehalfReason must both be provided by the service");
+            }
+            String behalfOf = onBehalfOf.trim();
+            String reason = onBehalfReason.trim();
+            if (behalfOf.length() > 128 || reason.length() > 500) {
+                throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, "on-behalf fields are invalid");
+            }
+            normalized.put("onBehalfOf", behalfOf);
+            normalized.put("onBehalfReason", reason);
+            normalized.put("uploadedRole", "NETWORK_OPERATOR");
+        }
+
         try {
             return objectMapper.writeValueAsString(normalized);
         } catch (Exception exception) {

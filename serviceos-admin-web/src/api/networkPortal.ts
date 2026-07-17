@@ -327,6 +327,90 @@ export function recordNetworkPortalTaskContactAttempt(
   )
 }
 
+export type NetworkPortalEvidenceUploadSession = {
+  uploadSessionId: string
+  fileId: string
+  taskId: string
+  evidenceSlotId: string
+  evidenceItemId: string | null
+  status: string
+}
+
+export type NetworkPortalEvidenceItem = {
+  evidenceItemId: string
+  taskId: string
+  evidenceSlotId: string
+  status: string
+}
+
+export type NetworkPortalCorrectionCase = {
+  correctionCaseId: string
+  taskId: string
+  status: string
+  latestResubmissionSnapshotId: string | null
+}
+
+/** M201：代师傅 Begin 资料上传。 */
+export function beginNetworkPortalEvidenceUploadOnBehalf(
+  networkContextId: string,
+  taskId: string,
+  slotId: string,
+  body: {
+    originalFileName: string
+    declaredMimeType: string
+    expectedSize: number
+    expectedSha256: string
+    captureMetadata: Record<string, unknown>
+    onBehalfOf: string
+    onBehalfReason: string
+    evidenceItemId?: string | null
+  },
+  idempotencyKey = crypto.randomUUID(),
+) {
+  return apiPost<NetworkPortalEvidenceUploadSession>(
+    `/network-portal/tasks/${taskId}/evidence-slots/${slotId}/upload-sessions`,
+    {
+      body,
+      idempotencyKey,
+      headers: networkHeaders(networkContextId),
+    },
+  )
+}
+
+/** M201：代师傅 Finalize 资料上传。 */
+export function finalizeNetworkPortalEvidenceUploadOnBehalf(
+  networkContextId: string,
+  taskId: string,
+  slotId: string,
+  uploadSessionId: string,
+  body: { actualSha256: string; finalizeCommandId: string },
+) {
+  return apiPost<NetworkPortalEvidenceItem>(
+    `/network-portal/tasks/${taskId}/evidence-slots/${slotId}/upload-sessions/${uploadSessionId}:finalize`,
+    {
+      body,
+      headers: networkHeaders(networkContextId),
+    },
+  )
+}
+
+/** M201：整改补传 resubmit。 */
+export function resubmitNetworkPortalCorrectionCase(
+  networkContextId: string,
+  correctionCaseId: string,
+  body: { evidenceSetSnapshotId: string },
+  idempotencyKey = crypto.randomUUID(),
+) {
+  return apiPost<NetworkPortalCorrectionCase>(
+    `/network-portal/correction-cases/${correctionCaseId}:resubmit`,
+    {
+      body,
+      idempotencyKey,
+      headers: networkHeaders(networkContextId),
+    },
+  )
+}
+
 export function isPortalContextInvalid(err: unknown): boolean {
   const problem = (err as HttpStatusError | undefined)?.problem
   return (

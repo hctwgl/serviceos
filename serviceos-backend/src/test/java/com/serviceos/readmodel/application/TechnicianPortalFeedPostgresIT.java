@@ -95,8 +95,8 @@ class TechnicianPortalFeedPostgresIT {
                     idn_person_profile, idn_security_principal,
                     rel_idempotency_record, aud_audit_record CASCADE
                 """).update();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("098");
-        assertThat(flyway.info().applied()).hasSize(100);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("099");
+        assertThat(flyway.info().applied()).hasSize(101);
 
         seedPrincipal(TECH_PRINCIPAL, "Technician A");
         seedPrincipal(OTHER_TECH_PRINCIPAL, "Technician B");

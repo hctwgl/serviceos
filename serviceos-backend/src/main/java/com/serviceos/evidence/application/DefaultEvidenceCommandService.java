@@ -6,6 +6,7 @@ import com.serviceos.authorization.api.AuthorizationDecision;
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.evidence.api.BeginEvidenceUploadCommand;
+import com.serviceos.evidence.api.BeginEvidenceUploadOnBehalfCommand;
 import com.serviceos.evidence.api.EvidenceCommandService;
 import com.serviceos.evidence.api.EvidenceItemView;
 import com.serviceos.evidence.api.EvidenceRevisionView;
@@ -52,6 +53,7 @@ import java.util.UUID;
 @Service
 final class DefaultEvidenceCommandService implements EvidenceCommandService {
     private static final String SUBMIT = "evidence.submit";
+    private static final String SUBMIT_ON_BEHALF = "evidence.submitOnBehalf";
     private static final String INVALIDATE = "evidence.invalidate";
     private static final String READ = "evidence.read";
     private static final String FINALIZE_OPERATION = "evidence.upload.finalize";
@@ -102,16 +104,81 @@ final class DefaultEvidenceCommandService implements EvidenceCommandService {
     ) {
         TaskFulfillmentContext task = requireTask(principal.tenantId(), command.taskId());
         validateExecutableTask(principal, task);
-        AuthorizationDecision auth = authorization.require(principal,
-                AuthorizationRequest.projectCapability(SUBMIT, principal.tenantId(), "EvidenceSlot",
-                        command.slotId().toString(), task.projectId().toString()),
-                metadata.correlationId());
-        EvidenceSlotView slot = requireSlot(principal.tenantId(), command.taskId(), command.slotId());
-        Instant now = clock.instant();
+        AuthorizationDecision auth = requireSubmitAuth(
+                principal, metadata.correlationId(), SUBMIT, command.slotId(), task.projectId(), null);
         String captureMetadata = CaptureMetadataValidator.normalize(
-                objectMapper, readTree(command.captureMetadataJson()), now, principal.principalId());
-        if (command.evidenceItemId() != null) {
-            EvidenceItemView item = repository.findItem(principal.tenantId(), command.evidenceItemId())
+                objectMapper, readTree(command.captureMetadataJson()), clock.instant(),
+                principal.principalId());
+        return beginUploadInternal(
+                principal, metadata, task, command.slotId(), command.evidenceItemId(),
+                command.originalFileName(), command.declaredMimeType(), command.expectedSize(),
+                command.expectedSha256(), captureMetadata, auth, SUBMIT);
+    }
+
+    @Override
+    public EvidenceUploadSessionView beginUploadOnBehalf(
+            CurrentPrincipal principal, CommandMetadata metadata, BeginEvidenceUploadOnBehalfCommand command
+    ) {
+        TaskFulfillmentContext task = requireTask(principal.tenantId(), command.taskId());
+        validateExecutableTaskOnBehalf(task);
+        String onBehalfOf = requireText(command.onBehalfOf(), "onBehalfOf", 128);
+        String onBehalfReason = requireText(command.onBehalfReason(), "onBehalfReason", 500);
+        AuthorizationDecision auth = requireSubmitAuth(
+                principal, metadata.correlationId(), SUBMIT_ON_BEHALF, command.slotId(),
+                task.projectId(), command.networkId());
+        String captureMetadata = CaptureMetadataValidator.normalize(
+                objectMapper, readTree(command.captureMetadataJson()), clock.instant(),
+                principal.principalId(), onBehalfOf, onBehalfReason);
+        return beginUploadInternal(
+                principal, metadata, task, command.slotId(), command.evidenceItemId(),
+                command.originalFileName(), command.declaredMimeType(), command.expectedSize(),
+                command.expectedSha256(), captureMetadata, auth, SUBMIT_ON_BEHALF);
+    }
+
+    @Override
+    public EvidenceItemView finalizeUpload(
+            CurrentPrincipal principal, CommandMetadata metadata, FinalizeEvidenceUploadCommand command
+    ) {
+        TaskFulfillmentContext task = requireTask(principal.tenantId(), command.taskId());
+        validateExecutableTask(principal, task);
+        AuthorizationDecision auth = requireSubmitAuth(
+                principal, metadata.correlationId(), SUBMIT, command.slotId(), task.projectId(), null);
+        return finalizeUploadInternal(principal, metadata, command, task, auth, SUBMIT);
+    }
+
+    @Override
+    public EvidenceItemView finalizeUploadOnBehalf(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            FinalizeEvidenceUploadCommand command,
+            UUID networkId
+    ) {
+        TaskFulfillmentContext task = requireTask(principal.tenantId(), command.taskId());
+        validateExecutableTaskOnBehalf(task);
+        AuthorizationDecision auth = requireSubmitAuth(
+                principal, metadata.correlationId(), SUBMIT_ON_BEHALF, command.slotId(),
+                task.projectId(), networkId);
+        return finalizeUploadInternal(principal, metadata, command, task, auth, SUBMIT_ON_BEHALF);
+    }
+
+    private EvidenceUploadSessionView beginUploadInternal(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            TaskFulfillmentContext task,
+            UUID slotId,
+            UUID evidenceItemId,
+            String originalFileName,
+            String declaredMimeType,
+            long expectedSize,
+            String expectedSha256,
+            String captureMetadata,
+            AuthorizationDecision auth,
+            String auditCapability
+    ) {
+        EvidenceSlotView slot = requireSlot(principal.tenantId(), task.taskId(), slotId);
+        Instant now = clock.instant();
+        if (evidenceItemId != null) {
+            EvidenceItemView item = repository.findItem(principal.tenantId(), evidenceItemId)
                     .orElseThrow(() -> new BusinessProblem(
                             ProblemCode.RESOURCE_NOT_FOUND, "EvidenceItem does not exist"));
             if (!item.evidenceSlotId().equals(slot.slotId()) || !item.taskId().equals(task.taskId())) {
@@ -123,9 +190,8 @@ final class DefaultEvidenceCommandService implements EvidenceCommandService {
         }
 
         UploadSessionView session = files.beginUpload(principal, metadata, new BeginUploadCommand(
-                BUSINESS_CONTEXT, command.slotId().toString(), command.originalFileName(),
-                command.declaredMimeType(), command.expectedSize(),
-                normalizeSha(command.expectedSha256())));
+                BUSINESS_CONTEXT, slotId.toString(), originalFileName,
+                declaredMimeType, expectedSize, normalizeSha(expectedSha256)));
 
         EvidenceUploadBinding binding = transactions.execute(status -> {
             var existing = repository.findUploadBinding(principal.tenantId(), session.uploadSessionId());
@@ -134,14 +200,14 @@ final class DefaultEvidenceCommandService implements EvidenceCommandService {
             }
             EvidenceUploadBinding created = new EvidenceUploadBinding(
                     session.uploadSessionId(), principal.tenantId(), task.projectId(), task.taskId(),
-                    slot.slotId(), session.fileId(), command.evidenceItemId(),
-                    normalizeSha(command.expectedSha256()), command.declaredMimeType(),
-                    command.expectedSize(), command.originalFileName(), captureMetadata,
+                    slot.slotId(), session.fileId(), evidenceItemId,
+                    normalizeSha(expectedSha256), declaredMimeType,
+                    expectedSize, originalFileName, captureMetadata,
                     "PENDING", principal.principalId(), now);
             repository.insertUploadBinding(created);
             audit.append(new AuditEntry(
                     UUID.randomUUID(), principal.tenantId(), principal.principalId(),
-                    "EVIDENCE_UPLOAD_BEGUN", SUBMIT, "EvidenceSlot", slot.slotId().toString(),
+                    "EVIDENCE_UPLOAD_BEGUN", auditCapability, "EvidenceSlot", slot.slotId().toString(),
                     "ALLOW", auth.matchedGrantIds(), auth.policyVersion(), session.status(), null,
                     Sha256.digest(session.uploadSessionId() + "|" + captureMetadata),
                     metadata.correlationId(), now));
@@ -150,16 +216,14 @@ final class DefaultEvidenceCommandService implements EvidenceCommandService {
         return toSessionView(session, binding);
     }
 
-    @Override
-    public EvidenceItemView finalizeUpload(
-            CurrentPrincipal principal, CommandMetadata metadata, FinalizeEvidenceUploadCommand command
+    private EvidenceItemView finalizeUploadInternal(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            FinalizeEvidenceUploadCommand command,
+            TaskFulfillmentContext task,
+            AuthorizationDecision auth,
+            String auditCapability
     ) {
-        TaskFulfillmentContext task = requireTask(principal.tenantId(), command.taskId());
-        validateExecutableTask(principal, task);
-        AuthorizationDecision auth = authorization.require(principal,
-                AuthorizationRequest.projectCapability(SUBMIT, principal.tenantId(), "EvidenceSlot",
-                        command.slotId().toString(), task.projectId().toString()),
-                metadata.correlationId());
         EvidenceSlotView slot = requireSlot(principal.tenantId(), command.taskId(), command.slotId());
         EvidenceUploadBinding binding = repository.findUploadBinding(
                         principal.tenantId(), command.uploadSessionId())
@@ -214,8 +278,34 @@ final class DefaultEvidenceCommandService implements EvidenceCommandService {
                                 ProblemCode.INTERNAL_ERROR, "Finalize replay result missing"));
             }
             return persistFinalizedRevision(
-                    principal, metadata, command, task, slot, binding, stored, auth, digest, context);
+                    principal, metadata, command, task, slot, binding, stored, auth, digest, context,
+                    auditCapability);
         });
+    }
+
+    private static String requireText(String value, String name, int max) {
+        if (value == null || value.isBlank() || value.trim().length() > max) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, name + " is invalid");
+        }
+        return value.trim();
+    }
+
+    private AuthorizationDecision requireSubmitAuth(
+            CurrentPrincipal principal,
+            String correlationId,
+            String capability,
+            UUID slotId,
+            UUID projectId,
+            UUID networkId
+    ) {
+        AuthorizationRequest request = networkId != null
+                ? AuthorizationRequest.networkCapability(
+                        capability, principal.tenantId(), "EvidenceSlot", slotId.toString(),
+                        networkId.toString())
+                : AuthorizationRequest.projectCapability(
+                        capability, principal.tenantId(), "EvidenceSlot", slotId.toString(),
+                        projectId.toString());
+        return authorization.require(principal, request, correlationId);
     }
 
     @Override
@@ -256,7 +346,8 @@ final class DefaultEvidenceCommandService implements EvidenceCommandService {
             StoredFileView stored,
             AuthorizationDecision auth,
             String digest,
-            CommandContext context
+            CommandContext context,
+            String auditCapability
     ) {
         var existing = repository.findRevisionByUploadSession(
                 principal.tenantId(), command.uploadSessionId());
@@ -322,7 +413,7 @@ final class DefaultEvidenceCommandService implements EvidenceCommandService {
                 task.taskId().toString(), payload, Sha256.digest(payload), now));
         audit.append(new AuditEntry(
                 UUID.randomUUID(), principal.tenantId(), principal.principalId(),
-                "EVIDENCE_REVISION_CREATED", SUBMIT, "EvidenceRevision",
+                "EVIDENCE_REVISION_CREATED", auditCapability, "EvidenceRevision",
                 revision.evidenceRevisionId().toString(), "ALLOW", auth.matchedGrantIds(),
                 auth.policyVersion(), revision.status(), null, digest,
                 metadata.correlationId(), now));
@@ -433,6 +524,21 @@ final class DefaultEvidenceCommandService implements EvidenceCommandService {
     }
 
     private static void validateExecutableTask(CurrentPrincipal principal, TaskFulfillmentContext task) {
+        validateExecutableTaskBase(task);
+        if (!principal.principalId().equals(task.responsiblePrincipalId())) {
+            throw new BusinessProblem(ProblemCode.TECHNICIAN_ASSIGNMENT_CHANGED,
+                    "Task no longer belongs to this technician");
+        }
+    }
+
+    /**
+     * M201 代补：保留 RUNNING HUMAN / 未 Guard，但不要求主体等于 responsiblePrincipalId。
+     */
+    private static void validateExecutableTaskOnBehalf(TaskFulfillmentContext task) {
+        validateExecutableTaskBase(task);
+    }
+
+    private static void validateExecutableTaskBase(TaskFulfillmentContext task) {
         if (!"HUMAN".equals(task.taskKind()) || !"RUNNING".equals(task.status())) {
             throw new BusinessProblem(ProblemCode.TASK_STATE_CONFLICT,
                     "Evidence upload requires a RUNNING HUMAN Task");
@@ -440,10 +546,6 @@ final class DefaultEvidenceCommandService implements EvidenceCommandService {
         if (task.executionGuarded()) {
             throw new BusinessProblem(ProblemCode.TASK_EXECUTION_GUARDED,
                     "Evidence upload is disabled while a Task execution guard is ACTIVE");
-        }
-        if (!principal.principalId().equals(task.responsiblePrincipalId())) {
-            throw new BusinessProblem(ProblemCode.TECHNICIAN_ASSIGNMENT_CHANGED,
-                    "Task no longer belongs to this technician");
         }
     }
 

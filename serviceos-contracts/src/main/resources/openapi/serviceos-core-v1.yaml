@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.92.0
+  version: 0.93.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1809,6 +1809,117 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /network-portal/tasks/{taskId}/evidence-slots/{slotId}/upload-sessions:
+    post:
+      operationId: beginNetworkPortalEvidenceUploadOnBehalf
+      summary: Network Portal 代师傅 Begin 资料上传
+      description: |
+        M201：X-Network-Context + NETWORK scope evidence.submitOnBehalf。
+        Body 含 BeginEvidence 字段与权威 onBehalfOf/onBehalfReason；captureMetadata 内伪造
+        onBehalfOf/delegationRef/onBehalfReason 仍失败关闭。
+        要求任务存在未关闭 CorrectionCase，且 onBehalfOf = ACTIVE TECHNICIAN 且为本网点 ACTIVE 师傅。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - name: slotId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NetworkPortalBeginEvidenceUploadRequest' }
+      responses:
+        '201':
+          description: 上传会话创建或幂等重放成功
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EvidenceUploadSession' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /network-portal/tasks/{taskId}/evidence-slots/{slotId}/upload-sessions/{uploadSessionId}:finalize:
+    post:
+      operationId: finalizeNetworkPortalEvidenceUploadOnBehalf
+      summary: Network Portal 代师傅 Finalize 资料上传
+      description: |
+        M201：X-Network-Context + NETWORK scope evidence.submitOnBehalf。
+        Body 与 FinalizeEvidenceUploadRequest 同形；会话 createdBy 必须为当前主体。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - name: slotId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: uploadSessionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FinalizeEvidenceUploadRequest' }
+      responses:
+        '201':
+          description: EvidenceItem 与 Revision 已创建或幂等重放
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EvidenceItem' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '410': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /network-portal/correction-cases/{correctionCaseId}:resubmit:
+    post:
+      operationId: resubmitNetworkPortalCorrectionCase
+      summary: Network Portal 整改补传 resubmit
+      description: |
+        M201：X-Network-Context + NETWORK scope evidence.submitOnBehalf 门禁后，
+        委托 CorrectionCase.resubmit（底层另需 evidence.submit）；整改任务须为本网点 ACTIVE NETWORK。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - name: correctionCaseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResubmitCorrectionCaseRequest' }
+      responses:
+        '200':
+          description: 整改已补传或幂等回放
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CorrectionCase' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
   /technician/me/task-feed:
     get:
       operationId: listTechnicianTaskFeed
@@ -2874,7 +2985,8 @@ paths:
       summary: 为资料槽位创建受限上传会话
       description: >-
         evidence 编排 files BeginUpload；要求 evidence.submit、file.upload、当前责任人与未 Guard 的
-        RUNNING HUMAN Task。CaptureMetadata 由服务端规范化；onBehalfOf 在 M38 失败关闭。
+        RUNNING HUMAN Task。CaptureMetadata 由服务端规范化；客户端 onBehalfOf/delegationRef/onBehalfReason
+        在 Admin 路径仍失败关闭（M38）；代补仅经 Network Portal M201 命令级字段启用。
       parameters:
         - $ref: '#/components/parameters/TaskId'
         - name: slotId
@@ -7111,6 +7223,28 @@ components:
         expectedSize: { type: integer, format: int64, minimum: 1 }
         expectedSha256: { type: string, pattern: '^[0-9A-Fa-f]{64}$' }
         captureMetadata: { $ref: '#/components/schemas/CaptureMetadata' }
+    NetworkPortalBeginEvidenceUploadRequest:
+      type: object
+      additionalProperties: false
+      required: [originalFileName, declaredMimeType, expectedSize, expectedSha256, captureMetadata,
+                 onBehalfOf, onBehalfReason]
+      properties:
+        evidenceItemId: { type: [string, 'null'], format: uuid }
+        originalFileName: { type: string, minLength: 1, maxLength: 255 }
+        declaredMimeType: { type: string, minLength: 3, maxLength: 255 }
+        expectedSize: { type: integer, format: int64, minimum: 1 }
+        expectedSha256: { type: string, pattern: '^[0-9A-Fa-f]{64}$' }
+        captureMetadata: { $ref: '#/components/schemas/CaptureMetadata' }
+        onBehalfOf:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: 代补对象（任务 ACTIVE TECHNICIAN assignee，通常为 technicianProfileId）
+        onBehalfReason:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: 代补原因；仅服务端写入 CaptureMetadata
     FinalizeEvidenceUploadRequest:
       type: object
       additionalProperties: false

@@ -5,6 +5,8 @@ import com.serviceos.audit.api.AuditEntry;
 import com.serviceos.authorization.api.AuthorizationDecision;
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
+import com.serviceos.dispatch.api.ActiveServiceResponsibility;
+import com.serviceos.dispatch.api.ActiveServiceResponsibilityService;
 import com.serviceos.evidence.api.CloseCorrectionCaseCommand;
 import com.serviceos.evidence.api.CorrectionCaseService;
 import com.serviceos.evidence.api.CorrectionCaseView;
@@ -57,6 +59,7 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
     private final TaskSchedulingService tasks;
     private final TaskFulfillmentContextService taskContexts;
     private final TaskResponsibilityQuery responsibilities;
+    private final ActiveServiceResponsibilityService serviceResponsibilities;
     private final AuthorizationService authorization;
     private final IdempotencyService idempotency;
     private final AuditAppender audit;
@@ -70,6 +73,7 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
             TaskSchedulingService tasks,
             TaskFulfillmentContextService taskContexts,
             TaskResponsibilityQuery responsibilities,
+            ActiveServiceResponsibilityService serviceResponsibilities,
             AuthorizationService authorization,
             IdempotencyService idempotency,
             AuditAppender audit,
@@ -82,6 +86,7 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
         this.tasks = tasks;
         this.taskContexts = taskContexts;
         this.responsibilities = responsibilities;
+        this.serviceResponsibilities = serviceResponsibilities;
         this.authorization = authorization;
         this.idempotency = idempotency;
         this.audit = audit;
@@ -171,9 +176,9 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
         CorrectionCaseView correction = corrections.find(principal.tenantId(), correctionCaseId)
                 .orElseThrow(() -> new BusinessProblem(
                         ProblemCode.RESOURCE_NOT_FOUND, "CorrectionCase does not exist"));
-        authorization.require(principal, AuthorizationRequest.projectCapability(
+        authorization.require(principal, capabilityRequest(
                 READ, principal.tenantId(), "CorrectionCase", correctionCaseId.toString(),
-                correction.projectId().toString()), correlationId);
+                correction.projectId(), correction.taskId()), correlationId);
         return correction;
     }
 
@@ -185,8 +190,10 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
         TaskFulfillmentContext task = taskContexts.find(principal.tenantId(), taskId)
                 .orElseThrow(() -> new BusinessProblem(
                         ProblemCode.RESOURCE_NOT_FOUND, "Task does not exist"));
-        authorization.require(principal, AuthorizationRequest.projectCapability(
-                READ, principal.tenantId(), "Task", taskId.toString(), task.projectId().toString()),
+        // PROJECT + NETWORK 并入请求，使 Network Portal NETWORK scope evidence.read 可匹配（M201）。
+        authorization.require(principal, capabilityRequest(
+                        READ, principal.tenantId(), "Task", taskId.toString(),
+                        task.projectId(), taskId),
                 correlationId);
         return corrections.listByTask(principal.tenantId(), taskId);
     }
@@ -199,9 +206,10 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
         CorrectionCaseView current = corrections.find(principal.tenantId(), command.correctionCaseId())
                 .orElseThrow(() -> new BusinessProblem(
                         ProblemCode.RESOURCE_NOT_FOUND, "CorrectionCase does not exist"));
+        // 同 Appointment：NETWORK scope evidence.submit 可满足 Portal 代补 resubmit（M201）。
         AuthorizationDecision auth = authorization.require(principal,
-                AuthorizationRequest.projectCapability(SUBMIT, principal.tenantId(), "CorrectionCase",
-                        current.correctionCaseId().toString(), current.projectId().toString()),
+                capabilityRequest(SUBMIT, principal.tenantId(), "CorrectionCase",
+                        current.correctionCaseId().toString(), current.projectId(), current.taskId()),
                 metadata.correlationId());
         if ("CLOSED".equals(current.status()) || "WAIVED".equals(current.status())) {
             throw new BusinessProblem(ProblemCode.CORRECTION_CASE_STATE_CONFLICT,
@@ -438,6 +446,25 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
 
     private static String nullToEmpty(String value) {
         return value == null ? "" : value;
+    }
+
+    /**
+     * 同时携带 projectId 与 ACTIVE NETWORK 责任网点，使 PROJECT/NETWORK RoleGrant 均可匹配。
+     */
+    private AuthorizationRequest capabilityRequest(
+            String capability,
+            String tenantId,
+            String resourceType,
+            String resourceId,
+            UUID projectId,
+            UUID taskId
+    ) {
+        String networkId = serviceResponsibilities.find(tenantId, taskId)
+                .map(ActiveServiceResponsibility::networkId)
+                .orElse(null);
+        return new AuthorizationRequest(
+                capability, tenantId, resourceType, resourceId,
+                projectId == null ? null : projectId.toString(), null, null, networkId);
     }
 
     private String serialize(Object value) {
