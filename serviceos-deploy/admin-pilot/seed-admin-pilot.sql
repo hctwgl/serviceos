@@ -11,6 +11,10 @@ INSERT INTO prj_project (
 
 -- M140：WORKFLOW 必须可被 WorkflowDefinitionParser 解析，使入站 workorder.received
 -- 经 Outbox 自动启动 Stage/Task 并激活工单；占位 {"workflowCode":...} 会导致入站停在 RECEIVED。
+-- 本地试点库若已写入旧占位定义，需短暂关闭不可变触发器才能替换（仅限本地夹具，禁止生产用法）。
+ALTER TABLE cfg_configuration_asset_version DISABLE TRIGGER trg_cfg_asset_version_immutable;
+ALTER TABLE cfg_configuration_bundle_item DISABLE TRIGGER trg_cfg_bundle_item_immutable;
+
 INSERT INTO cfg_configuration_asset_version (
     version_id, tenant_id, asset_type, asset_key, semantic_version, schema_version,
     definition, content_digest, status, published_at
@@ -65,6 +69,9 @@ UPDATE cfg_configuration_bundle_item
    AND bundle_id = '30000000-0000-4000-8000-000000000001'
    AND asset_type = 'WORKFLOW'
    AND asset_version_id = '20000000-0000-4000-8000-000000000001';
+
+ALTER TABLE cfg_configuration_bundle_item ENABLE TRIGGER trg_cfg_bundle_item_immutable;
+ALTER TABLE cfg_configuration_asset_version ENABLE TRIGGER trg_cfg_asset_version_immutable;
 
 INSERT INTO wo_work_order (
     id, tenant_id, project_id, client_code, brand_code, service_product_code,
