@@ -136,7 +136,7 @@ class PortalContextPostgresIT {
     void m188_03_navigationUsesPageRegistryAndCapabilityGate() {
         String adminContext = "ADMIN|TENANT|" + TENANT;
         MeNavigationView nav = portal.navigation(actor(), "corr-nav", adminContext, null);
-        assertThat(nav.navigationCatalogVersion()).isEqualTo("page-registry-v11");
+        assertThat(nav.navigationCatalogVersion()).isEqualTo("page-registry-v12");
         assertThat(nav.items()).extracting(i -> i.pageId())
                 .contains("ADMIN.USER.DIRECTORY", "ADMIN.GRANT.DIRECTORY");
         assertThat(nav.items()).noneMatch(i -> i.pageId().startsWith("NETWORK."));

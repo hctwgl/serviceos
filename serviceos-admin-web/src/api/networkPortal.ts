@@ -562,6 +562,46 @@ export function getNetworkPortalException(networkContextId: string, exceptionId:
   )
 }
 
+export type NetworkPortalQualificationItem = {
+  id: string
+  technicianProfileId: string
+  qualificationCode: string
+  status: string
+  validFrom: string
+  validTo: string | null
+  submittedBy: string
+  submittedAt: string
+  decidedBy: string | null
+  decidedAt: string | null
+  decisionReason: string | null
+  version: number
+}
+
+/** M205：本网点师傅资质列表。 */
+export function listNetworkPortalQualifications(
+  networkContextId: string,
+  params?: { status?: string; technicianProfileId?: string; limit?: number },
+) {
+  return apiGet<NetworkPortalPage<NetworkPortalQualificationItem>>(
+    '/network-portal/technician-qualifications',
+    {
+      status: params?.status,
+      technicianProfileId: params?.technicianProfileId,
+      limit: params?.limit == null ? undefined : String(params.limit),
+    },
+    networkHeaders(networkContextId),
+  )
+}
+
+/** M205：本网点师傅资质详情。 */
+export function getNetworkPortalQualification(networkContextId: string, qualificationId: string) {
+  return apiGet<NetworkPortalQualificationItem>(
+    `/network-portal/technician-qualifications/${qualificationId}`,
+    {},
+    networkHeaders(networkContextId),
+  )
+}
+
 /** M201：整改补传 resubmit。 */
 export function resubmitNetworkPortalCorrectionCase(
   networkContextId: string,

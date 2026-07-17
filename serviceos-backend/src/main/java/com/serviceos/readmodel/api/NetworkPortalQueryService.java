@@ -64,4 +64,25 @@ public interface NetworkPortalQueryService {
             String correlationId,
             String networkContextHeader,
             UUID exceptionId);
+
+    /**
+     * 本网点师傅资质列表。需要 ACTIVE membership + NETWORK scope {@code technician.readOwnNetwork}。
+     * 仅聚合 ACTIVE NetworkTechnicianMembership 师傅上的资质。
+     */
+    NetworkPortalPage<NetworkPortalQualificationItem> listQualifications(
+            CurrentPrincipal actor,
+            String correlationId,
+            String networkContextHeader,
+            String status,
+            UUID technicianProfileId,
+            Integer limit);
+
+    /**
+     * 本网点师傅资质详情。资质所属师傅须对本网点持有 ACTIVE 关系，否则 ACCESS_DENIED。
+     */
+    NetworkPortalQualificationItem getQualification(
+            CurrentPrincipal actor,
+            String correlationId,
+            String networkContextHeader,
+            UUID qualificationId);
 }

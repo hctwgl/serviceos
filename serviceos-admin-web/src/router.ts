@@ -50,6 +50,7 @@ import NetworkPortalTasksPage from './pages/NetworkPortalTasksPage.vue'
 import NetworkPortalTechniciansPage from './pages/NetworkPortalTechniciansPage.vue'
 import NetworkPortalCorrectionsPage from './pages/NetworkPortalCorrectionsPage.vue'
 import NetworkPortalExceptionsPage from './pages/NetworkPortalExceptionsPage.vue'
+import NetworkPortalQualificationsPage from './pages/NetworkPortalQualificationsPage.vue'
 import TechnicianPortalShell from './pages/TechnicianPortalShell.vue'
 import TechnicianPortalTaskFeedPage from './pages/TechnicianPortalTaskFeedPage.vue'
 import TechnicianPortalSchedulePage from './pages/TechnicianPortalSchedulePage.vue'
@@ -252,6 +253,12 @@ export const router = createRouter({
           name: 'NETWORK.EXCEPTION.QUEUE',
           component: NetworkPortalExceptionsPage,
           meta: { pageId: 'NETWORK.EXCEPTION.QUEUE' },
+        },
+        {
+          path: 'qualifications',
+          name: 'NETWORK.QUALIFICATION',
+          component: NetworkPortalQualificationsPage,
+          meta: { pageId: 'NETWORK.QUALIFICATION' },
         },
       ],
     },

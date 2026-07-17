@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.96.0
+  version: 0.97.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1542,6 +1542,34 @@ paths:
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
   /network-portal/technician-qualifications:
+    get:
+      operationId: listNetworkPortalTechnicianQualifications
+      summary: Network Portal 本网点师傅资质列表
+      description: |
+        M205：X-Network-Context + NETWORK scope technician.readOwnNetwork。
+        仅返回对本网点持有 ACTIVE NetworkTechnicianMembership 的师傅资质安全摘要；
+        可选 status / technicianProfileId 过滤；按 submittedAt/id 正序，内存 limit（1～100，默认 50）。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/CorrelationId'
+        - name: status
+          in: query
+          schema: { enum: [PENDING, APPROVED, REJECTED, EXPIRED] }
+        - name: technicianProfileId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200':
+          description: 本网点资质列表页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkPortalQualificationPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
     post:
       operationId: submitNetworkPortalTechnicianQualification
       summary: Network Portal 提交本网点师傅资质（PENDING）
@@ -1570,6 +1598,30 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /network-portal/technician-qualifications/{qualificationId}:
+    get:
+      operationId: getNetworkPortalTechnicianQualification
+      summary: Network Portal 本网点师傅资质详情
+      description: |
+        M205：X-Network-Context + NETWORK scope technician.readOwnNetwork。
+        资质所属师傅须对本网点持有 ACTIVE NetworkTechnicianMembership；跨网点 ACCESS_DENIED。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - name: qualificationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 资质安全摘要
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkPortalQualificationItem' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
   /network-portal/capacity:
     get:
       operationId: listNetworkPortalCapacity
@@ -4915,6 +4967,32 @@ components:
       properties:
         networkId: { type: string, format: uuid }
         items: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/NetworkPortalExceptionItem' } }
+        asOf: { type: string, format: date-time }
+    NetworkPortalQualificationItem:
+      type: object
+      additionalProperties: false
+      required: [id, technicianProfileId, qualificationCode, status, validFrom, validTo,
+        submittedBy, submittedAt, decidedBy, decidedAt, decisionReason, version]
+      properties:
+        id: { type: string, format: uuid }
+        technicianProfileId: { type: string, format: uuid }
+        qualificationCode: { type: string, minLength: 1, maxLength: 64 }
+        status: { enum: [PENDING, APPROVED, REJECTED, EXPIRED] }
+        validFrom: { type: string, format: date-time }
+        validTo: { type: [string, 'null'], format: date-time }
+        submittedBy: { type: string, minLength: 1, maxLength: 128 }
+        submittedAt: { type: string, format: date-time }
+        decidedBy: { type: [string, 'null'], maxLength: 128 }
+        decidedAt: { type: [string, 'null'], format: date-time }
+        decisionReason: { type: [string, 'null'], maxLength: 500 }
+        version: { type: integer, format: int64, minimum: 1 }
+    NetworkPortalQualificationPage:
+      type: object
+      additionalProperties: false
+      required: [networkId, items, asOf]
+      properties:
+        networkId: { type: string, format: uuid }
+        items: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/NetworkPortalQualificationItem' } }
         asOf: { type: string, format: date-time }
     TechnicianPortalFeedItem:
       type: object

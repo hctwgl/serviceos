@@ -105,7 +105,7 @@ export function networkPortalRoutePath(pageId: string): string {
     case 'NETWORK.TECHNICIAN.LIST':
       return '/network-portal/technicians'
     case 'NETWORK.QUALIFICATION':
-      return '/network-portal/technicians'
+      return '/network-portal/qualifications'
     case 'NETWORK.TECHNICIAN.ASSIGN':
       return '/network-portal/tasks'
     case 'NETWORK.APPOINTMENT':

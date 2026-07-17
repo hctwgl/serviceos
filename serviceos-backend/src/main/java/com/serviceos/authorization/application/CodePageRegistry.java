@@ -10,7 +10,7 @@ import java.util.List;
  */
 @Component
 final class CodePageRegistry {
-    static final String CATALOG_VERSION = "page-registry-v11";
+    static final String CATALOG_VERSION = "page-registry-v12";
 
     private final List<RegisteredPage> pages = List.of(
             // ADMIN
@@ -59,7 +59,7 @@ final class CodePageRegistry {
             page("NETWORK.TECHNICIAN.LIST", "NETWORK", "technicians", "本网点师傅", 30, "人员与能力",
                     List.of("technician.readOwnNetwork", "networkPortal.manageTechnician"), null),
             page("NETWORK.QUALIFICATION", "NETWORK", "technicians/qualifications", "资质与到期", 32, "人员与能力",
-                    List.of("networkPortal.manageTechnician"), null),
+                    List.of("networkPortal.manageTechnician", "technician.readOwnNetwork"), null),
             page("NETWORK.TECHNICIAN.ASSIGN", "NETWORK", "tasks/assign-technician", "分配师傅", 25, "工单任务",
                     List.of("networkPortal.assignTechnician", "networkPortal.reassignTechnician"), null),
             page("NETWORK.APPOINTMENT", "NETWORK", "tasks/appointments", "本网点预约", 28, "工单任务",

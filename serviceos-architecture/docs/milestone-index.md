@@ -213,6 +213,7 @@ title: ServiceOS 里程碑索引
 | M202 | M202 Network Portal 整改队列只读 | [215-m202-network-portal-correction-queue.md](../architecture/215-m202-network-portal-correction-queue.md) | [199-m202-network-portal-correction-queue-acceptance.md](../testing/199-m202-network-portal-correction-queue-acceptance.md) |
 | M203 | M203 Network Portal 运营异常队列只读 | [216-m203-network-portal-exception-queue.md](../architecture/216-m203-network-portal-exception-queue.md) | [200-m203-network-portal-exception-queue-acceptance.md](../testing/200-m203-network-portal-exception-queue-acceptance.md) |
 | M204 | M204 Network Portal 师傅关系与资质提交 | [217-m204-network-portal-manage-technician.md](../architecture/217-m204-network-portal-manage-technician.md) | [201-m204-network-portal-manage-technician-acceptance.md](../testing/201-m204-network-portal-manage-technician-acceptance.md) |
+| M205 | M205 Network Portal 本网点资质只读列表 | [218-m205-network-portal-qualification-list.md](../architecture/218-m205-network-portal-qualification-list.md) | [202-m205-network-portal-qualification-list-acceptance.md](../testing/202-m205-network-portal-qualification-list-acceptance.md) |
 
 ## 未关联里程碑的文档
 

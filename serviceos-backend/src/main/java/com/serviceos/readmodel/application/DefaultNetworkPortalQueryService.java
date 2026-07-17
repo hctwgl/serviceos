@@ -12,15 +12,18 @@ import com.serviceos.evidence.api.CorrectionCaseService;
 import com.serviceos.evidence.api.CorrectionCaseView;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.network.api.NetworkMembershipView;
+import com.serviceos.network.api.NetworkPortalQualificationQuery;
 import com.serviceos.network.api.NetworkPortalTechnicianQuery;
 import com.serviceos.network.api.NetworkPortalTechnicianView;
 import com.serviceos.network.api.PrincipalNetworkAffiliationQuery;
+import com.serviceos.network.api.TechnicianQualificationView;
 import com.serviceos.operations.api.OperationalExceptionItem;
 import com.serviceos.operations.api.OperationalExceptionWorkbenchService;
 import com.serviceos.readmodel.api.NetworkPortalCapacityItem;
 import com.serviceos.readmodel.api.NetworkPortalCorrectionItem;
 import com.serviceos.readmodel.api.NetworkPortalExceptionItem;
 import com.serviceos.readmodel.api.NetworkPortalPage;
+import com.serviceos.readmodel.api.NetworkPortalQualificationItem;
 import com.serviceos.readmodel.api.NetworkPortalQueryService;
 import com.serviceos.readmodel.api.NetworkPortalTaskItem;
 import com.serviceos.readmodel.api.NetworkPortalTechnicianItem;
@@ -63,12 +66,15 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     private static final int MAX_CORRECTION_LIMIT = 100;
     private static final int DEFAULT_EXCEPTION_LIMIT = 50;
     private static final int MAX_EXCEPTION_LIMIT = 100;
+    private static final int DEFAULT_QUALIFICATION_LIMIT = 50;
+    private static final int MAX_QUALIFICATION_LIMIT = 100;
 
     private final PrincipalNetworkAffiliationQuery affiliations;
     private final AuthorizationService authorization;
     private final NetworkActiveAssignmentQuery assignments;
     private final NetworkCapacitySummaryQuery capacity;
     private final NetworkPortalTechnicianQuery technicians;
+    private final NetworkPortalQualificationQuery qualifications;
     private final TaskFulfillmentContextService tasks;
     private final CorrectionCaseService corrections;
     private final OperationalExceptionWorkbenchService exceptions;
@@ -81,6 +87,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
             NetworkActiveAssignmentQuery assignments,
             NetworkCapacitySummaryQuery capacity,
             NetworkPortalTechnicianQuery technicians,
+            NetworkPortalQualificationQuery qualifications,
             TaskFulfillmentContextService tasks,
             CorrectionCaseService corrections,
             OperationalExceptionWorkbenchService exceptions,
@@ -92,6 +99,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         this.assignments = assignments;
         this.capacity = capacity;
         this.technicians = technicians;
+        this.qualifications = qualifications;
         this.tasks = tasks;
         this.corrections = corrections;
         this.exceptions = exceptions;
@@ -371,6 +379,70 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         return toExceptionItem(item);
     }
 
+    /**
+     * 本网点师傅资质列表。
+     * <p>
+     * 事务边界：只读。先门禁再 fan-in ACTIVE 师傅资质；可选 status / technicianProfileId 过滤；
+     * 按 submittedAt/id 正序，内存 limit（1～100，默认 50）。
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public NetworkPortalPage<NetworkPortalQualificationItem> listQualifications(
+            CurrentPrincipal actor,
+            String correlationId,
+            String networkContextHeader,
+            String status,
+            UUID technicianProfileId,
+            Integer limit
+    ) {
+        UUID networkId = requireAuthorizedNetwork(actor, correlationId, networkContextHeader, TECHNICIAN_READ_OWN);
+        String effectiveStatus = normalizeOptionalQualificationStatus(status);
+        int effectiveLimit = normalizeQualificationLimit(limit);
+        List<NetworkPortalQualificationItem> items = new ArrayList<>();
+        for (TechnicianQualificationView row :
+                qualifications.listForActiveTechnicians(actor.tenantId(), networkId)) {
+            if (effectiveStatus != null && !effectiveStatus.equals(row.status())) {
+                continue;
+            }
+            if (technicianProfileId != null && !technicianProfileId.equals(row.technicianProfileId())) {
+                continue;
+            }
+            items.add(toQualificationItem(row));
+        }
+        items.sort(Comparator
+                .comparing(NetworkPortalQualificationItem::submittedAt)
+                .thenComparing(NetworkPortalQualificationItem::id));
+        if (items.size() > effectiveLimit) {
+            items = items.subList(0, effectiveLimit);
+        }
+        return new NetworkPortalPage<>(networkId, List.copyOf(items), clock.instant());
+    }
+
+    /**
+     * 本网点师傅资质详情。
+     * <p>
+     * 失败关闭：资质不存在 RESOURCE_NOT_FOUND；所属师傅非本网点 ACTIVE 则 ACCESS_DENIED。
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public NetworkPortalQualificationItem getQualification(
+            CurrentPrincipal actor,
+            String correlationId,
+            String networkContextHeader,
+            UUID qualificationId
+    ) {
+        Objects.requireNonNull(qualificationId, "qualificationId");
+        UUID networkId = requireAuthorizedNetwork(actor, correlationId, networkContextHeader, TECHNICIAN_READ_OWN);
+        TechnicianQualificationView view = qualifications.findById(actor.tenantId(), qualificationId)
+                .orElseThrow(() -> new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "资质记录不存在"));
+        boolean activeOnNetwork = technicians.listActiveTechnicians(actor.tenantId(), networkId).stream()
+                .anyMatch(tech -> tech.technicianProfileId().equals(view.technicianProfileId()));
+        if (!activeOnNetwork) {
+            throw new BusinessProblem(ProblemCode.ACCESS_DENIED, "资质不属于本网点 ACTIVE 师傅");
+        }
+        return toQualificationItem(view);
+    }
+
     private void requireNetworkOwnedTask(String tenantId, UUID taskId, UUID networkId) {
         ActiveServiceResponsibility responsibility = responsibilities.find(tenantId, taskId)
                 .orElseThrow(() -> new BusinessProblem(ProblemCode.ACCESS_DENIED,
@@ -380,6 +452,44 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
             throw new BusinessProblem(ProblemCode.ACCESS_DENIED,
                     "任务对本网点没有 ACTIVE NETWORK 责任");
         }
+    }
+
+    private static NetworkPortalQualificationItem toQualificationItem(TechnicianQualificationView row) {
+        return new NetworkPortalQualificationItem(
+                row.id(),
+                row.technicianProfileId(),
+                row.qualificationCode(),
+                row.status(),
+                row.validFrom(),
+                row.validTo(),
+                row.submittedBy(),
+                row.submittedAt(),
+                row.decidedBy(),
+                row.decidedAt(),
+                row.decisionReason(),
+                row.version());
+    }
+
+    private static int normalizeQualificationLimit(Integer limit) {
+        if (limit == null) {
+            return DEFAULT_QUALIFICATION_LIMIT;
+        }
+        if (limit < 1 || limit > MAX_QUALIFICATION_LIMIT) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                    "limit 须在 1～100 之间");
+        }
+        return limit;
+    }
+
+    private static String normalizeOptionalQualificationStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return null;
+        }
+        String normalized = status.trim().toUpperCase(Locale.ROOT);
+        if (!Set.of("PENDING", "APPROVED", "REJECTED", "EXPIRED").contains(normalized)) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, "status is invalid");
+        }
+        return normalized;
     }
 
     private static NetworkPortalCorrectionItem toCorrectionItem(CorrectionCaseView row) {

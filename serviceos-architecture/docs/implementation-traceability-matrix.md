@@ -17,13 +17,13 @@ status: Proposed
 | identity | ARCH-07、ARCH-21 | API-01/02 通用身份上下文 | DATA-02 | M2 AUTH、M6 SEC | E1 |
 | organization | ARCH-01、ARCH-07、ARCH-11 | API-02/04 | DATA-02/04 | M2 AUTH、M4 DSP | E1/E4 |
 | project/workorder query | ARCH-01/03/05、M64～M68 | API-02/07、OpenAPI Core 0.39.0、project.created@v3、project.scope-relations-revised@v1 | DATA-01、V064～V068 | M2 CFG/WO、M7 ADM、M64～M68 | E0/E2 |
-| authorization | ARCH-07、ARCH-21、M63～M67、ADR-025/026、M186、M188、M196～M204 | API-01/02/07、Core OpenAPI 0.96.0、ProjectScopeAuthorizationService、治理 HTTP、`/me*` | DATA-02、V064～V067、V089～V090、V096～V100 | M2 AUTH、M6 SEC、M63～M67、M186、M188、M196～M204 | E1/E4 |
+| authorization | ARCH-07、ARCH-21、M63～M67、ADR-025/026、M186、M188、M196～M205 | API-01/02/07、Core OpenAPI 0.97.0、ProjectScopeAuthorizationService、治理 HTTP、`/me*` | DATA-02、V064～V067、V089～V090、V096～V100 | M2 AUTH、M6 SEC、M63～M67、M186、M188、M196～M205 | E1/E4 |
 | audit | ARCH-07、ARCH-21 | 所有高风险命令 | DATA-02 | M2 AUD、M6 SEC/OPS | E1 |
 | authority | ARCH-17、ARCH-20 | API-01/05 authority/fence | DATA-05 | M5 CUT、M6 TX | E1/E5 |
 | configuration | ARCH-05 | API-01/02 | DATA-01 | M2 CFG | E2 |
 | files | ARCH-10、ARCH-21、ARCH-25 | API-03 资料引用、API-08 文件控制面 | DATA-03、V010 物理迁移 | M3 FILE、M6 SEC、M11 | E1/E3 |
 | reliability | ARCH-20、ADR-014 | API-01 通用命令/事件 | DATA-01 | M6 TX | E1 |
-| readmodel | PRODUCT-01～07、ARCH-19、ADR-027/028/029/030/031/032/033/040/041、M189～M195、M202～M203 | API-06（§3 最近访问 + §7 受控搜索 + §8 SavedView 个人+共享 + §9 Admin UI Preference + §10 Network Portal 只读/整改/异常 + §11 Technician Feed）、Core OpenAPI 0.95.0 | DATA-06、V071～V078、V091～V095 | M7 WO/QRY、M73～M99、M158、M189～M195、M202～M203 | U0/U1 |
+| readmodel | PRODUCT-01～07、ARCH-19、ADR-027/028/029/030/031/032/033/040/041/043、M189～M195、M202～M203、M205 | API-06（§3 最近访问 + §7 受控搜索 + §8 SavedView 个人+共享 + §9 Admin UI Preference + §10 Network Portal 只读/整改/异常/资质 + §11 Technician Feed）、Core OpenAPI 0.97.0 | DATA-06、V071～V078、V091～V095 | M7 WO/QRY、M73～M99、M158、M189～M195、M202～M203、M205 | U0/U1 |
 | automation | ARCH-06、ARCH-20 | API-01 事件 | DATA-01 | M2 TASK、M6 TX | E1 |
 | operations | ARCH-14、ARCH-20、M60、ADR-041、M203 | API-04 exception、API-06 §10 Network Portal operational-exceptions、outbound-delivery-recovered@v1、operational-exception-resolved@v2、Core OpenAPI 0.95.0 | DATA-04、V060、V084 | M4 OPS、M6 TX、M60、M203 | E1/E4 |
 | workorder | ARCH-03/06 | API-01/02 | DATA-01 | M2 WO | E2 |
@@ -34,7 +34,7 @@ status: Proposed
 | forms | ARCH-09、ADR-018/022 | API-03、form.submitted@v1 | DATA-03、V053 | M3 FORM、M53 FRM | E3 |
 | evidence | ARCH-10、ADR-008/018/022/039/040、M201～M202 | API-03、Core OpenAPI 0.94.0 Network Portal evidence on-behalf / correction queue、evidence.slots-reresolved@v1 | DATA-03、V053、V099 | M3 EVD/FILE、M53、M201、M202 | E3 |
 | review | ARCH-10 | API-03、OpenAPI 0.30.0、client-review-case-created@v1 | DATA-03、V049/V054/V056 | M3 REV/COR、M55/M57 | E3 |
-| network | ARCH-11、ADR-024/042、M185、M204 | API-04、Core OpenAPI 0.96.0 Network Portal manage-technician | DATA-04、V088、V100 | M4 NET、M185、M204 | E4 |
+| network | ARCH-11、ADR-024/042/043、M185、M204、M205 | API-04、Core OpenAPI 0.97.0 Network Portal manage-technician + qualification list | DATA-04、V088、V100 | M4 NET、M185、M204、M205 | E4 |
 | dispatch | ARCH-11、ADR-009、ADR-034/038、M144、M196、M200 | API-04、Core OpenAPI 0.92.0 Network Portal assign/reassign-technician | DATA-04、V024、V096、V098 | M4 DSP/ASN、M144、M196、M200 | E4 |
 | sla | ARCH-12、M61～M66 | sla.started/breached/met@v1；API-04、OpenAPI Core 0.38.0 | DATA-04、V061～V066 | M4 SLA、M61～M66 | E4 |
 | integration | ARCH-13、ADR-010/014、M57～M60 | API-04、OpenAPI Core 0.32.0、BYD CPIM 0.3.0、outbound-delivery-created/acknowledged/replay-requested/recovered@v1、route/callback 事件 | DATA-04、V055～V060 | M4 INT/DLV、M56～M60 | E2/E4 |
@@ -299,3 +299,4 @@ Feature gate/authority: if applicable
 | M202 | Network Portal 整改队列只读：`GET /network-portal/correction-cases` list/get；复用 `evidence.read` NETWORK；Page Registry `NETWORK.CORRECTION.QUEUE`；Admin Web `/network-portal/corrections` | ADR-040 + Core OpenAPI 0.94.0 + Flyway 099/101（无新迁移）+ PostgreSQL/MVC/ArchitectureTest + Admin E2E + `215-m202-*` + `199-m202-*` | Admin cursor 队列语义、资质/产能写、异常队列、离线工作包 |
 | M203 | Network Portal 运营异常队列只读：`GET /network-portal/operational-exceptions` list/get；复用 `operations.exception.read` NETWORK；`listForTask` + NETWORK get auth；Page Registry `NETWORK.EXCEPTION.QUEUE`；Admin Web `/network-portal/exceptions`；allowedActions 恒为空 | ADR-041 + Core OpenAPI 0.95.0 + Flyway 099/101（无新迁移）+ PostgreSQL/MVC/ArchitectureTest + Admin E2E + `216-m203-*` + `200-m203-*` | Portal ACK/resolve、Admin cursor 队列语义、资质/产能写、离线工作包 |
 | M204 | Network Portal 师傅关系与资质提交：create/terminate membership + submit qualification；`networkPortal.manageTechnician`；NETWORK 收窄 `network.manageTechnician`；Page Registry `NETWORK.QUALIFICATION`；Admin Web 控件 | ADR-042 + Core OpenAPI 0.96.0 + Flyway V100/102 + PostgreSQL/MVC/ArchitectureTest + Admin E2E + `217-m204-*` + `201-m204-*` | Portal decide、FileObject、createTechnicianProfile、产能申请、离线工作包 |
+| M205 | Network Portal 本网点资质只读：`GET /network-portal/technician-qualifications` list/get；复用 `technician.readOwnNetwork` NETWORK；ACTIVE 师傅 fan-in；Page Registry `page-registry-v12`；Admin Web `/network-portal/qualifications` | ADR-043 + Core OpenAPI 0.97.0 + Flyway 100/102（无新迁移）+ PostgreSQL/MVC/ArchitectureTest + Admin E2E + `218-m205-*` + `202-m205-*` | Portal decide、FileObject、产能申请、离线工作包 |
