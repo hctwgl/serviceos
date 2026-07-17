@@ -1,5 +1,6 @@
 package com.serviceos.readmodel.application;
 
+import com.serviceos.authorization.api.AuthorizationDecision;
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.dispatch.api.ActiveServiceResponsibility;
@@ -210,6 +211,13 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         return new NetworkPortalPage<>(networkId, capacityItems(actor.tenantId(), networkId), clock.instant());
     }
 
+    /**
+     * 本网点工作台。
+     * <p>
+     * 基座门禁：ACTIVE NetworkMembership + NETWORK {@code networkTask.read}。
+     * enrichment 能力用 {@link AuthorizationService#authorize}（非 require）：缺能力仅省略字段，
+     * 不导致整页失败。有能力时 fan-in 全量计数，不受 list limit 截断。
+     */
     @Override
     @Transactional(readOnly = true)
     public NetworkPortalWorkbenchView workbench(
@@ -219,18 +227,98 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         List<NetworkActiveAssignmentView> active = assignments.listActiveForNetwork(
                 actor.tenantId(), networkId.toString());
         Set<UUID> workOrders = new LinkedHashSet<>();
+        Set<UUID> activeTaskIds = new LinkedHashSet<>();
+        int unassigned = 0;
         for (NetworkActiveAssignmentView row : active) {
             workOrders.add(row.workOrderId());
+            activeTaskIds.add(row.taskId());
+            if (row.technicianId() == null || row.technicianId().isBlank()) {
+                unassigned++;
+            }
         }
         int technicianCount = technicians.listActiveTechnicians(actor.tenantId(), networkId).size();
         Instant asOf = clock.instant();
+
+        Integer openCorrectionCaseCount = null;
+        if (hasNetworkCapability(actor, correlationId, EVIDENCE_READ, networkId)) {
+            openCorrectionCaseCount = countOpenCorrections(actor, correlationId, activeTaskIds);
+        }
+        Integer openOperationalExceptionCount = null;
+        if (hasNetworkCapability(actor, correlationId, EXCEPTION_READ, networkId)) {
+            openOperationalExceptionCount = countOpenExceptions(actor, correlationId, activeTaskIds);
+        }
+        Integer pendingQualificationCount = null;
+        if (hasNetworkCapability(actor, correlationId, TECHNICIAN_READ_OWN, networkId)) {
+            pendingQualificationCount = countPendingQualifications(actor.tenantId(), networkId);
+        }
+
         return new NetworkPortalWorkbenchView(
                 networkId,
                 workOrders.size(),
                 active.size(),
                 technicianCount,
                 capacityItems(actor.tenantId(), networkId),
-                asOf);
+                asOf,
+                unassigned,
+                openCorrectionCaseCount,
+                openOperationalExceptionCount,
+                pendingQualificationCount);
+    }
+
+    /**
+     * enrichment 门禁：authorize + ALLOW，缺能力返回 false，不抛 ACCESS_DENIED。
+     */
+    private boolean hasNetworkCapability(
+            CurrentPrincipal actor, String correlationId, String capability, UUID networkId
+    ) {
+        AuthorizationDecision decision = authorization.authorize(
+                actor,
+                AuthorizationRequest.networkCapability(
+                        capability,
+                        actor.tenantId(),
+                        "ServiceNetwork",
+                        networkId.toString(),
+                        networkId.toString()),
+                correlationId);
+        return decision.effect() == AuthorizationDecision.Effect.ALLOW;
+    }
+
+    private int countOpenCorrections(
+            CurrentPrincipal actor, String correlationId, Set<UUID> activeTaskIds
+    ) {
+        int count = 0;
+        for (UUID taskId : activeTaskIds) {
+            for (CorrectionCaseView row : corrections.listForTask(actor, correlationId, taskId)) {
+                if ("OPEN".equals(row.status())) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    private int countOpenExceptions(
+            CurrentPrincipal actor, String correlationId, Set<UUID> activeTaskIds
+    ) {
+        int count = 0;
+        for (UUID taskId : activeTaskIds) {
+            for (OperationalExceptionItem row : exceptions.listForTask(actor, correlationId, taskId)) {
+                if ("OPEN".equals(row.status())) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    private int countPendingQualifications(String tenantId, UUID networkId) {
+        int count = 0;
+        for (TechnicianQualificationView row : qualifications.listForActiveTechnicians(tenantId, networkId)) {
+            if ("PENDING".equals(row.status())) {
+                count++;
+            }
+        }
+        return count;
     }
 
     /**

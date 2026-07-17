@@ -6,7 +6,7 @@ status: Accepted
 
 # 应用工作区、队列与用户偏好 HTTP API
 
-## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158 / M189 / M190 / M191 / M192 / M193 / M194 / M195 / M202 / M203 / M205 / M206）
+## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158 / M189 / M190 / M191 / M192 / M193 / M194 / M195 / M202 / M203 / M205 / M206 / M207）
 
 **Accepted（可指导实现）**：
 
@@ -108,6 +108,16 @@ status: Accepted
   门禁：ACTIVE NetworkMembership + NETWORK scope `technician.readOwnNetwork`；数据仅限
   `serviceNetworkId = contextNetworkId`。**不**接受操作员 NetworkMembership CRUD、Portal decide、
   产能申请。
+- §10 Network Portal 工作台能力门控计数增强（M207 窄扩展）：复用
+  `GET /api/v1/network-portal/workbench`（**不**新增路径）。基座门禁不变（ACTIVE
+  NetworkMembership + NETWORK `networkTask.read`）。附加可选计数字段：
+  `unassignedTechnicianTaskCount`（基座成功时始终返回）、
+  `openCorrectionCaseCount`（NETWORK `evidence.read`）、
+  `openOperationalExceptionCount`（NETWORK `operations.exception.read`）、
+  `pendingQualificationCount`（NETWORK `technician.readOwnNetwork`）。
+  enrichment 缺能力时 JSON **省略**对应属性（不得用 `null`/`0` 伪装无权限）；有能力且计数为 0
+  时仍返回 0。enrichment 能力使用 `authorize`（非 `require`），缺能力不导致整页失败。
+  **不**接受 SLA 风险计数、产能申请、Portal ACK/decide、新 capability。
 - §11 Technician Portal Feed 子集（M195）：仅
   `GET /api/v1/technician/me/task-feed`（可选 `sinceCursor` 不透明游标；ACTIVE TECHNICIAN
   ServiceAssignment / TaskAssignment；撤权/结束时 tombstone 仅含 `taskId` +
@@ -333,7 +343,7 @@ View 保存 filter AST、列、排序和密度，不保存任意 SQL、访问 to
 
 | 方法与路径 | 用途 | 接受状态 |
 |---|---|---|
-| `GET /api/v1/network-portal/workbench` | 当前 NetworkMembership 工作台（计数/摘要） | M194 Accepted |
+| `GET /api/v1/network-portal/workbench` | 当前 NetworkMembership 工作台（计数/摘要；M207 能力门控 enrichment） | M194 / M207 Accepted |
 | `GET /api/v1/network-portal/work-orders` | 当前 ACTIVE assignment 工单 | M194 Accepted |
 | `GET /api/v1/network-portal/tasks` | 本网点 Task | M194 Accepted |
 | `GET /api/v1/network-portal/technicians` | 本网点师傅/能力/资质摘要 | M194 Accepted |
@@ -347,7 +357,7 @@ View 保存 filter AST、列、排序和密度，不保存任意 SQL、访问 to
 | `GET /api/v1/network-portal/technician-memberships` | 本网点师傅关系列表安全摘要（含 version） | M206 Accepted |
 | `GET /api/v1/network-portal/technician-memberships/{membershipId}` | 本网点师傅关系详情 | M206 Accepted |
 
-networkId 从可信应用上下文解析；拥有多个 membership 时使用经授权的 `X-Network-Context`，不能在查询参数任意指定。详见 §0 M194 / M202 / M203 / M205 / M206。
+networkId 从可信应用上下文解析；拥有多个 membership 时使用经授权的 `X-Network-Context`，不能在查询参数任意指定。详见 §0 M194 / M202 / M203 / M205 / M206 / M207。
 
 ## 11. Technician Feed 与工作包状态
 

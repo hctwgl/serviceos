@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import { getNetworkPortalWorkbench, type NetworkPortalWorkbench } from '../api/networkPortal'
 
 const props = defineProps<{ networkContextId: string | null }>()
@@ -33,10 +34,49 @@ watch(() => props.networkContextId, () => {
   <section data-testid="network-portal-workbench">
     <h2>本网点工作台</h2>
     <p v-if="error" data-testid="network-portal-error">{{ error }}</p>
-    <ul v-else-if="data" data-testid="network-workbench-counts">
-      <li>ACTIVE 工单：{{ data.activeWorkOrderCount }}</li>
-      <li>ACTIVE 任务：{{ data.activeTaskCount }}</li>
-      <li>ACTIVE 师傅：{{ data.activeTechnicianCount }}</li>
-    </ul>
+    <template v-else-if="data">
+      <ul data-testid="network-workbench-counts">
+        <li>ACTIVE 工单：{{ data.activeWorkOrderCount }}</li>
+        <li>ACTIVE 任务：{{ data.activeTaskCount }}</li>
+        <li>ACTIVE 师傅：{{ data.activeTechnicianCount }}</li>
+        <li v-if="typeof data.unassignedTechnicianTaskCount === 'number'">
+          <RouterLink to="/network-portal/tasks" data-testid="workbench-unassigned-count">
+            待指派任务：{{ data.unassignedTechnicianTaskCount }}
+          </RouterLink>
+        </li>
+        <li v-if="typeof data.openCorrectionCaseCount === 'number'">
+          <RouterLink to="/network-portal/corrections" data-testid="workbench-correction-count">
+            待处理整改：{{ data.openCorrectionCaseCount }}
+          </RouterLink>
+        </li>
+        <li v-if="typeof data.openOperationalExceptionCount === 'number'">
+          <RouterLink to="/network-portal/exceptions" data-testid="workbench-exception-count">
+            待处理异常：{{ data.openOperationalExceptionCount }}
+          </RouterLink>
+        </li>
+        <li v-if="typeof data.pendingQualificationCount === 'number'">
+          <RouterLink
+            to="/network-portal/qualifications"
+            data-testid="workbench-qualification-count"
+          >
+            待审资质：{{ data.pendingQualificationCount }}
+          </RouterLink>
+        </li>
+      </ul>
+      <div data-testid="network-workbench-capacity">
+        <h3>容量</h3>
+        <ul v-if="data.capacity.length">
+          <li
+            v-for="row in data.capacity"
+            :key="row.capacityCounterId"
+            :data-testid="`workbench-capacity-${row.businessType}`"
+          >
+            {{ row.businessType }}：占用 {{ row.occupiedUnits }} / 上限 {{ row.maxUnits }}
+            （可用 {{ row.availableUnits }}）
+          </li>
+        </ul>
+        <p v-else data-testid="workbench-capacity-empty">暂无容量计数</p>
+      </div>
+    </template>
   </section>
 </template>

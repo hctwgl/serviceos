@@ -72,6 +72,14 @@ export type NetworkPortalWorkbench = {
   activeTechnicianCount: number
   capacity: NetworkPortalCapacityItem[]
   asOf: string
+  /** 基座成功时始终返回；无 TECHNICIAN assignee 的 ACTIVE 任务数 */
+  unassignedTechnicianTaskCount?: number
+  /** 需 evidence.read；缺能力时省略 */
+  openCorrectionCaseCount?: number
+  /** 需 operations.exception.read；缺能力时省略 */
+  openOperationalExceptionCount?: number
+  /** 需 technician.readOwnNetwork；缺能力时省略 */
+  pendingQualificationCount?: number
 }
 
 function networkHeaders(networkContextId: string): Record<string, string> {

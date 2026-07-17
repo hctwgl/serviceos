@@ -134,6 +134,11 @@ class NetworkPortalReadPostgresIT {
         assertThat(workbench.activeWorkOrderCount()).isEqualTo(1);
         assertThat(workbench.activeTaskCount()).isEqualTo(1);
         assertThat(workbench.activeTechnicianCount()).isEqualTo(1);
+        assertThat(workbench.unassignedTechnicianTaskCount()).isEqualTo(0);
+        assertThat(workbench.openCorrectionCaseCount()).isNull();
+        assertThat(workbench.openOperationalExceptionCount()).isNull();
+        // PRINCIPAL 另有 technician.readOwnNetwork，故 pendingQualificationCount 存在（本夹具无 PENDING）
+        assertThat(workbench.pendingQualificationCount()).isEqualTo(0);
         assertThat(workbench.capacity()).extracting(NetworkPortalCapacityItem::occupiedUnits)
                 .containsExactly(3);
 

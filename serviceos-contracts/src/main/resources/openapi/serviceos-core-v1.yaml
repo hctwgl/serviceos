@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.98.0
+  version: 0.99.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1694,6 +1694,8 @@ paths:
       summary: Network Portal 工作台计数摘要
       description: |
         M194：X-Network-Context + networkTask.read。返回 ACTIVE 工单/任务/师傅计数与容量摘要。
+        M207：附加能力门控发现计数；缺 enrichment 能力时省略对应可选属性（不得用 null/0 伪装无权限）；
+        unassignedTechnicianTaskCount 在基座成功时始终返回。
       parameters:
         - $ref: '#/components/parameters/NetworkContext'
         - $ref: '#/components/parameters/CorrelationId'
@@ -4956,6 +4958,30 @@ components:
         activeTechnicianCount: { type: integer, minimum: 0 }
         capacity: { type: array, items: { $ref: '#/components/schemas/NetworkPortalCapacityItem' } }
         asOf: { type: string, format: date-time }
+        unassignedTechnicianTaskCount:
+          type: integer
+          minimum: 0
+          description: |
+            ACTIVE NETWORK 责任且无 TECHNICIAN assignee 的任务数；与 networkTask.read 同门禁，
+            工作台成功时始终返回。
+        openCorrectionCaseCount:
+          type: integer
+          minimum: 0
+          description: |
+            本网点 ACTIVE 任务上 OPEN CorrectionCase 数；需 NETWORK evidence.read；
+            缺能力时省略本属性。
+        openOperationalExceptionCount:
+          type: integer
+          minimum: 0
+          description: |
+            本网点 ACTIVE 任务上 OPEN OperationalException 数；需 NETWORK operations.exception.read；
+            缺能力时省略本属性。
+        pendingQualificationCount:
+          type: integer
+          minimum: 0
+          description: |
+            本网点 ACTIVE 师傅的 PENDING 资质数；需 NETWORK technician.readOwnNetwork；
+            缺能力时省略本属性。
     NetworkPortalCorrectionItem:
       type: object
       additionalProperties: false
