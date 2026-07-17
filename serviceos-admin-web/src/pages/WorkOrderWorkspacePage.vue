@@ -222,6 +222,13 @@ type CorrectionCaseLink = {
   sourceReviewCaseId: string
 }
 
+type TaskSectionLink = {
+  taskId: string
+  taskType: string
+  taskKind: string
+  status: string
+}
+
 const inboundEnvelopeLinks = computed((): InboundEnvelopeLink[] => {
   const integration = sectionData.value?.integration
   if (!integration || activeSection.value !== 'INTEGRATION') return []
@@ -304,6 +311,28 @@ const correctionCaseLinks = computed((): CorrectionCaseLink[] => {
       }
     })
     .filter((item): item is CorrectionCaseLink => item != null)
+})
+
+/** 复用已 Implemented Task 详情路由；与权威 Task 表深链并列，覆盖按需 TASKS 区块。 */
+const taskSectionLinks = computed((): TaskSectionLink[] => {
+  const section = sectionData.value?.tasks
+  if (!section || activeSection.value !== 'TASKS') return []
+  const raw = section.items
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null
+      const row = item as Record<string, unknown>
+      const id = row.taskId
+      if (typeof id !== 'string' || !id) return null
+      return {
+        taskId: id,
+        taskType: String(row.taskType ?? '—'),
+        taskKind: String(row.taskKind ?? '—'),
+        status: String(row.status ?? '—'),
+      }
+    })
+    .filter((item): item is TaskSectionLink => item != null)
 })
 
 const slaRows = computed(() =>
@@ -666,6 +695,19 @@ onMounted(() => {
               }"
             >
               {{ item.status }} / {{ item.correctionCaseId }}
+            </RouterLink>
+          </p>
+          <p v-if="taskSectionLinks.length" class="links task-section-links">
+            打开区块任务：
+            <RouterLink
+              v-for="item in taskSectionLinks"
+              :key="item.taskId"
+              :to="{
+                name: 'ADMIN.TASK.DETAIL',
+                params: { id: item.taskId },
+              }"
+            >
+              {{ item.taskType }} / {{ item.taskKind }} / {{ item.status }} / {{ item.taskId }}
             </RouterLink>
           </p>
           <pre>{{ sectionPreview }}</pre>

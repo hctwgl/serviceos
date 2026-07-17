@@ -152,4 +152,5 @@
 - [M149 Admin 工作区审核/整改详情深链验收矩阵](146-m149-admin-workspace-review-correction-deeplink-acceptance.md)
 - [M150 Admin 运营异常队列筛选验收矩阵](147-m150-admin-operational-exception-queue-filters-acceptance.md)
 - [M151 Admin 目录与 SLA 筛选补齐验收矩阵](148-m151-admin-directory-sla-filter-parity-acceptance.md)
+- [M152 Admin 工作区 TASKS → 任务详情深链验收矩阵](149-m152-admin-pilot-workspace-tasks-task-detail-deeplink-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)
