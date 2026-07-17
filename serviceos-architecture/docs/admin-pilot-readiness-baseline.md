@@ -1,14 +1,14 @@
 ---
-title: Admin 试点可运行基线（含 M140 入站激活同单预约）
+title: Admin 试点可运行基线（含 M141 入站同单表单审核外发）
 status: Implemented
 lastUpdated: 2026-07-17
 ---
 
-# Admin 试点可运行基线（含 M140 入站激活同单预约）
+# Admin 试点可运行基线（含 M141 入站同单表单审核外发）
 
-本基线覆盖 M101～M140 已有 Admin 表面的可重复构建、登录、真实后端/数据库试点入口，并明确
-完整业务链尚未证明的边界。M135～M140 追加补传复审、预约上门、提审外发 ACK、厂端回调、入站
-接单激活与同单预约上门证明，不宣称完整 `ADMIN-PILOT-09`。
+本基线覆盖 M101～M141 已有 Admin 表面的可重复构建、登录、真实后端/数据库试点入口，并明确
+完整业务链尚未证明的边界。M135～M141 追加补传复审、预约上门、提审外发 ACK、厂端回调、入站
+接单激活与同单预约上门→表单/资料/审核/外发/完结证明，不宣称完整 `ADMIN-PILOT-09`。
 
 ## 1. 已建立的基线
 
@@ -133,18 +133,24 @@ GitHub Actions 使用同一脚本阻断 PR，并保留 Backend、Admin 与 Playw
 
 - ADMIN-PILOT WORKFLOW 可解析；入站后 Outbox 自动 ACTIVE + HUMAN Task；
 - 同单 Admin assign/claim/start 与 propose→confirm→check-in→check-out；
-- Visit 所需 ServiceAssignment 仍为本地夹具，不宣称 Admin 派单 HTTP；
-- 同单表单/资料/审核/外发仍未贯通。
+- Visit 所需 ServiceAssignment 仍为本地夹具，不宣称 Admin 派单 HTTP。
+
+已追加证明（M141）：
+
+- 入站 Canonical `BYD:INSTALL:{orderCode}` 与出站提审系谱对齐；
+- ADMIN-PILOT Bundle 含 formRef + PILOT_SURVEY FORM/EVIDENCE；
+- 同单表单/资料/INTERNAL APPROVED/BYD ACK/厂端回调/双输入 complete→FULFILLED；
+- Visit 所需 ServiceAssignment 仍为本地夹具；同单整改分支与 Admin 派单 HTTP 仍未证明。
 
 尚未证明：
 
 - 正式企业 IdP、MFA、生产回调地址、BFF/token renewal/logout 协议；
-- 从外部接单开始，经 Admin 派单、表单、资料、审核、整改、外发到完结的完整写链路（入站激活与
-  预约上门已在同单证明，审核外发仍在独立夹具）；
+- 从外部接单开始经 Admin 派单与同单整改到完结的完整 `ADMIN-PILOT-09`（入站同单审核外发完结已证明，
+  派单仍为夹具）；
 - Network/Technician Portal 与跨端协作；
 - 正式 sandbox、对象存储、专业扫描服务、Broker、通知和 SLA BUSINESS 日历；
 - 真实 sandbox 提审与生产厂端联调；
 - SavedView、设计系统、可访问性与多浏览器矩阵。
 
-因此当前交付只能称为“Admin 试点可运行局部读写基线（含入站激活同单预约、补传、外发 ACK 与厂端回调）”，
+因此当前交付只能称为“Admin 试点可运行局部读写基线（含入站同单表单审核外发完结、补传与独立外发 ACK）”，
 不能称为“完整现场履约平台已交付”。

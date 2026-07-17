@@ -1236,9 +1236,13 @@ test('真实 OIDC 登录后可通过审核外发并经厂端回调关闭 CLIENT 
   await reviewPage.close()
 })
 
-test('真实 OIDC 登录后可在入站激活工单上完成领取与预约上门', async ({ page }) => {
-  test.setTimeout(120_000)
-  // 冒烟脚本已完成 CPIM 入站、Outbox 激活与 Visit 所需 SA 夹具；此处证明同单 Admin 写路径。
+test('真实 OIDC 登录后可在入站激活工单上完成领取、预约上门、表单资料审核与外发', async ({
+  page,
+  request,
+}) => {
+  test.setTimeout(240_000)
+  // 冒烟脚本已完成 CPIM 入站、Outbox 激活与 Visit 所需 SA 夹具；此处证明同单 Admin 写路径
+  // 直至表单/资料/INTERNAL 审核/BYD 外发 ACK/厂端回调与双输入完结（不宣称 ADMIN-PILOT-09）。
   const orderCode = process.env.ADMIN_PILOT_INBOUND_ORDER_CODE
   const taskId = process.env.ADMIN_PILOT_INBOUND_TASK_ID
   expect(orderCode, '缺少动态入站接单 orderCode').toBeTruthy()
@@ -1359,6 +1363,250 @@ test('真实 OIDC 登录后可在入站激活工单上完成领取与预约上�
   expect(checkOutResponse.status()).toBe(200)
   expect(await checkOutResponse.json()).toMatchObject({
     visitId: checkedIn.visitId,
+    status: 'COMPLETED',
+  })
+
+  // M141：同一入站 Task 继续表单 → 资料 Snapshot → INTERNAL APPROVED → BYD 外发 → 厂端回调 → complete。
+  await expect(page.getByRole('cell', { name: 'admin.pilot-inbound-form' })).toBeVisible()
+  await page.getByLabel('values JSON').fill('{"survey.note":"ADMIN_PILOT_INBOUND_E2E"}')
+  const formResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(`/api/v1/tasks/${taskId}/form-submissions`),
+  )
+  await page.getByRole('button', { name: 'submitTaskForm' }).click()
+  const formResponse = await formResponsePromise
+  expect(formResponse.status()).toBe(201)
+  const submission = (await formResponse.json()) as {
+    submissionId: string
+    contentDigest: string
+    validationStatus: string
+  }
+  expect(submission.validationStatus).toBe('VALIDATED')
+
+  await expect(page.getByRole('cell', { name: 'survey.photo', exact: true })).toBeVisible({
+    timeout: 30_000,
+  })
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+    'base64',
+  )
+  await page.getByLabel('文件').setInputFiles({
+    name: 'admin-pilot-inbound.png',
+    mimeType: 'image/png',
+    buffer: png,
+  })
+  const finalizeResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().includes(`/api/v1/tasks/${taskId}/evidence-slots/`) &&
+      response.url().endsWith(':finalize'),
+  )
+  await page.getByRole('button', { name: 'upload + finalize' }).click()
+  const finalizeResponse = await finalizeResponsePromise
+  expect(finalizeResponse.status()).toBe(201)
+  const evidenceItem = (await finalizeResponse.json()) as {
+    revisions: Array<{ evidenceRevisionId: string }>
+  }
+  const evidenceRevisionId = evidenceItem.revisions.at(-1)?.evidenceRevisionId
+  expect(evidenceRevisionId, 'Finalize 未返回 EvidenceRevision').toBeTruthy()
+
+  const orchestrationHeader = page
+    .getByRole('heading', { name: '表单 / 资料编排' })
+    .locator('..')
+  await expect
+    .poll(
+      async () => {
+        await orchestrationHeader.getByRole('button', { name: '刷新' }).click()
+        return page
+          .getByRole('row')
+          .filter({ hasText: evidenceRevisionId! })
+          .filter({ hasText: 'VALIDATED' })
+          .count()
+      },
+      { timeout: 30_000 },
+    )
+    .toBeGreaterThan(0)
+
+  const snapshotResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(`/api/v1/tasks/${taskId}/evidence-set-snapshots`),
+  )
+  await page.getByRole('button', { name: 'createEvidenceSetSnapshot' }).click()
+  const snapshotResponse = await snapshotResponsePromise
+  expect(snapshotResponse.status()).toBe(201)
+  const snapshot = (await snapshotResponse.json()) as {
+    evidenceSetSnapshotId: string
+    contentDigest: string
+  }
+
+  const reviewCreateResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith('/api/v1/review-cases'),
+  )
+  await page.getByRole('button', { name: 'createReviewCase' }).click()
+  const reviewCreateResponse = await reviewCreateResponsePromise
+  expect(reviewCreateResponse.status()).toBe(201)
+  const reviewCase = (await reviewCreateResponse.json()) as {
+    reviewCaseId: string
+    status: string
+  }
+  expect(reviewCase.status).toBe('OPEN')
+
+  const reviewHref = await page
+    .getByRole('link', { name: new RegExp(`打开审核案例 ${reviewCase.reviewCaseId}`) })
+    .getAttribute('href')
+  expect(reviewHref, '审核案例深链缺失').toBeTruthy()
+  const reviewPage = await page.context().newPage()
+  await reviewPage.goto(new URL(reviewHref!, page.url()).toString())
+  await expect(reviewPage.getByRole('heading', { name: '审核案例' })).toBeVisible()
+
+  const approvePromise = reviewPage.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(`/api/v1/review-cases/${reviewCase.reviewCaseId}:decide`),
+  )
+  await reviewPage.getByLabel('note').fill('Admin pilot inbound approved')
+  await reviewPage.getByRole('button', { name: 'decide', exact: true }).click()
+  expect((await approvePromise).status()).toBe(200)
+  await expect(reviewPage.getByText('已裁决为 APPROVED')).toBeVisible()
+
+  const submitPromise = reviewPage.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith('/api/v1/internal/integration/byd/review-submissions'),
+  )
+  await reviewPage.getByRole('button', { name: 'create BYD review submission', exact: true }).click()
+  const submitResponse = await submitPromise
+  expect(submitResponse.status()).toBe(201)
+  const delivery = (await submitResponse.json()) as {
+    deliveryId: string
+  }
+  expect(delivery.deliveryId).toBeTruthy()
+
+  await reviewPage.goto(
+    new URL(`/integration/outbound/${delivery.deliveryId}`, page.url()).toString(),
+  )
+  await expect(reviewPage.getByRole('heading', { name: '外发交付' })).toBeVisible()
+  const outboundRefresh = reviewPage
+    .locator('header')
+    .filter({ hasText: '外发交付' })
+    .getByRole('button', { name: '刷新' })
+  await expect
+    .poll(
+      async () => {
+        await outboundRefresh.click()
+        await expect(reviewPage.getByText('加载中…')).toHaveCount(0)
+        return reviewPage.locator('dd', { hasText: /^ACKNOWLEDGED$/ }).count()
+      },
+      { timeout: 60_000 },
+    )
+    .toBeGreaterThan(0)
+
+  const clientReviewCaseId = (
+    await reviewPage
+      .locator('dt', { hasText: /^clientReviewCaseId$/ })
+      .locator('xpath=../dd')
+      .innerText()
+  ).trim()
+  const externalOrderCode = (
+    await reviewPage
+      .locator('dt', { hasText: /^externalOrderCode$/ })
+      .locator('xpath=../dd')
+      .innerText()
+  ).trim()
+  expect(clientReviewCaseId).toMatch(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+  )
+  expect(externalOrderCode).toBe(orderCode)
+
+  const appKey = process.env.SERVICEOS_BYD_CPIM_APP_KEY ?? 'local-byd-app-key'
+  const appSecret =
+    process.env.SERVICEOS_BYD_CPIM_APP_SECRET ?? 'local-byd-app-secret-change-me'
+  const payload = {
+    orderCode: externalOrderCode,
+    result: '1',
+    remark: 'Admin pilot inbound OEM approved',
+    examinePerson: 'BYD-PILOT-REVIEWER',
+    examineDate: asiaShanghaiDateTimeNow(),
+  }
+  const nonce = randomUUID()
+  const currentDate = asiaShanghaiDateToday()
+  const signature = signBydCpimPayload(appSecret, nonce, currentDate, payload)
+  const callbackResponse = await request.post(
+    'http://127.0.0.1:8080/api/v1/integrations/byd/cpim/v7.3.1/review-results',
+    {
+      headers: {
+        'Content-Type': 'application/json',
+        APP_KEY: appKey,
+        Nonce: nonce,
+        Cur_Time: currentDate,
+        Sign: signature,
+        'X-Correlation-Id': `admin-pilot-inbound-callback-${delivery.deliveryId}`,
+      },
+      data: payload,
+    },
+  )
+  expect(callbackResponse.status(), await callbackResponse.text()).toBe(200)
+
+  await reviewPage.getByRole('link', { name: 'CLIENT 审核案例' }).click()
+  await expect(reviewPage.getByRole('heading', { name: '审核案例' })).toBeVisible()
+  const clientRefresh = reviewPage
+    .locator('header')
+    .filter({ hasText: '审核案例' })
+    .getByRole('button', { name: '刷新' })
+  await expect
+    .poll(
+      async () => {
+        await clientRefresh.click()
+        await expect(reviewPage.getByText('加载中…')).toHaveCount(0)
+        const status = await reviewPage
+          .locator('dt', { hasText: /^status$/ })
+          .locator('xpath=../dd')
+          .innerText()
+        const origin = await reviewPage
+          .locator('dt', { hasText: /^origin$/ })
+          .locator('xpath=../dd')
+          .innerText()
+        return `${origin.trim()}:${status.trim()}`
+      },
+      { timeout: 30_000 },
+    )
+    .toBe('CLIENT:APPROVED')
+  await reviewPage.close()
+
+  await expect(page.getByLabel('resultRef')).toHaveValue(
+    `form-submission://${submission.submissionId}`,
+  )
+  const inputVersionRefs = JSON.parse(
+    await page.getByLabel('inputVersionRefs JSON（双引用可选）').inputValue(),
+  )
+  expect(inputVersionRefs).toEqual([
+    {
+      kind: 'FORM_SUBMISSION',
+      ref: `form-submission://${submission.submissionId}`,
+      digest: submission.contentDigest,
+    },
+    {
+      kind: 'EVIDENCE_SET_SNAPSHOT',
+      ref: `evidence-set-snapshot://${snapshot.evidenceSetSnapshotId}`,
+      digest: snapshot.contentDigest,
+    },
+  ])
+
+  const completeResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(`/api/v1/tasks/${taskId}:complete`),
+  )
+  await page.getByRole('button', { name: '完成任务' }).click()
+  const completeResponse = await completeResponsePromise
+  const completeBody = await completeResponse.json()
+  expect(completeResponse.status(), JSON.stringify(completeBody)).toBe(200)
+  expect(completeBody).toMatchObject({
+    taskId,
     status: 'COMPLETED',
   })
 })

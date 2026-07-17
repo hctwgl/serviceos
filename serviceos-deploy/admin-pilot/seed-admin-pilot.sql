@@ -9,9 +9,10 @@ INSERT INTO prj_project (
     'BYD', 'Admin 试点项目', current_date, 'ACTIVE', 1, now()
 ) ON CONFLICT DO NOTHING;
 
--- M140：WORKFLOW 必须可被 WorkflowDefinitionParser 解析，使入站 workorder.received
--- 经 Outbox 自动启动 Stage/Task 并激活工单；占位 {"workflowCode":...} 会导致入站停在 RECEIVED。
--- 本地试点库若已写入旧占位定义，需短暂关闭不可变触发器才能替换（仅限本地夹具，禁止生产用法）。
+-- M140/M141：WORKFLOW 必须可被 WorkflowDefinitionParser 解析，使入站 workorder.received
+-- 经 Outbox 自动启动 Stage/Task 并激活工单；USER_TASK 带 formRef，Bundle 含 FORM/EVIDENCE
+-- （stage=PILOT_SURVEY）以支持同单表单/资料/审核/外发。
+-- 本地试点库若已写入旧定义，需短暂关闭不可变触发器才能替换（仅限本地夹具，禁止生产用法）。
 ALTER TABLE cfg_configuration_asset_version DISABLE TRIGGER trg_cfg_asset_version_immutable;
 ALTER TABLE cfg_configuration_bundle_item DISABLE TRIGGER trg_cfg_bundle_item_immutable;
 
@@ -22,8 +23,8 @@ INSERT INTO cfg_configuration_asset_version (
 (
     '20000000-0000-4000-8000-000000000001', 'tenant-local', 'WORKFLOW',
     'ADMIN-PILOT-WORKFLOW', '1.0.0', '1.0.0',
-    '{"workflowKey":"ADMIN_PILOT","semanticVersion":"1.0.0","startNodeId":"START","terminalNodeIds":["END"],"nodes":[{"nodeId":"START","nodeType":"START","name":"开始"},{"nodeId":"PILOT_FIELD_OPS","nodeType":"USER_TASK","name":"现场履约","stageCode":"PILOT_SURVEY","taskType":"PILOT_SURVEY","slaRef":"PILOT_RESPONSE"},{"nodeId":"END","nodeType":"END","name":"结束"}],"transitions":[{"transitionId":"t1","from":"START","to":"PILOT_FIELD_OPS"},{"transitionId":"t2","from":"PILOT_FIELD_OPS","to":"END"}]}',
-    'f2837436570f57cc32a9651bc36491f0595cd35b5b351cc3056c344d69a2b51a',
+    '{"workflowKey":"ADMIN_PILOT","semanticVersion":"1.0.0","startNodeId":"START","terminalNodeIds":["END"],"nodes":[{"nodeId":"START","nodeType":"START","name":"开始"},{"nodeId":"PILOT_FIELD_OPS","nodeType":"USER_TASK","name":"现场履约","stageCode":"PILOT_SURVEY","taskType":"PILOT_SURVEY","slaRef":"PILOT_RESPONSE","formRef":"admin.pilot-inbound-form"},{"nodeId":"END","nodeType":"END","name":"结束"}],"transitions":[{"transitionId":"t1","from":"START","to":"PILOT_FIELD_OPS"},{"transitionId":"t2","from":"PILOT_FIELD_OPS","to":"END"}]}',
+    '73bf5f7e929cfd98fc25e0f8e332ae14cc6da8a1e4fcc3b2782dae51fe777c37',
     'PUBLISHED', now()
 ),
 (
@@ -37,15 +38,37 @@ INSERT INTO cfg_configuration_asset_version (
 DELETE FROM cfg_configuration_bundle_item
  WHERE tenant_id = 'tenant-local'
    AND bundle_id = '30000000-0000-4000-8000-000000000001'
-   AND asset_type = 'WORKFLOW'
-   AND asset_version_id = '20000000-0000-4000-8000-000000000001';
+   AND asset_type IN ('WORKFLOW', 'FORM', 'EVIDENCE');
 
 UPDATE cfg_configuration_asset_version
-   SET definition = '{"workflowKey":"ADMIN_PILOT","semanticVersion":"1.0.0","startNodeId":"START","terminalNodeIds":["END"],"nodes":[{"nodeId":"START","nodeType":"START","name":"开始"},{"nodeId":"PILOT_FIELD_OPS","nodeType":"USER_TASK","name":"现场履约","stageCode":"PILOT_SURVEY","taskType":"PILOT_SURVEY","slaRef":"PILOT_RESPONSE"},{"nodeId":"END","nodeType":"END","name":"结束"}],"transitions":[{"transitionId":"t1","from":"START","to":"PILOT_FIELD_OPS"},{"transitionId":"t2","from":"PILOT_FIELD_OPS","to":"END"}]}',
-       content_digest = 'f2837436570f57cc32a9651bc36491f0595cd35b5b351cc3056c344d69a2b51a',
+   SET definition = '{"workflowKey":"ADMIN_PILOT","semanticVersion":"1.0.0","startNodeId":"START","terminalNodeIds":["END"],"nodes":[{"nodeId":"START","nodeType":"START","name":"开始"},{"nodeId":"PILOT_FIELD_OPS","nodeType":"USER_TASK","name":"现场履约","stageCode":"PILOT_SURVEY","taskType":"PILOT_SURVEY","slaRef":"PILOT_RESPONSE","formRef":"admin.pilot-inbound-form"},{"nodeId":"END","nodeType":"END","name":"结束"}],"transitions":[{"transitionId":"t1","from":"START","to":"PILOT_FIELD_OPS"},{"transitionId":"t2","from":"PILOT_FIELD_OPS","to":"END"}]}',
+       content_digest = '73bf5f7e929cfd98fc25e0f8e332ae14cc6da8a1e4fcc3b2782dae51fe777c37',
        published_at = now()
  WHERE version_id = '20000000-0000-4000-8000-000000000001'
    AND tenant_id = 'tenant-local';
+
+INSERT INTO cfg_configuration_asset_version (
+    version_id, tenant_id, asset_type, asset_key, semantic_version, schema_version,
+    definition, content_digest, status, published_at
+) VALUES
+(
+    '20000000-0000-4000-8000-000000000006', 'tenant-local', 'FORM',
+    'admin.pilot-inbound-form', '1.0.0', '1.0.0',
+    '{"formKey":"admin.pilot-inbound-form","version":"1.0.0","stage":"PILOT_SURVEY","sections":[{"sectionKey":"survey","title":"入站现场勘察","fields":[{"fieldKey":"survey.note","label":"勘察说明","dataType":"STRING","binding":"task.input.survey.note","required":true}]}]}',
+    'b868b1fe5b492009ae45f15eebb11a4cd5db42517b1cc32205b676f00a724b26',
+    'PUBLISHED', now()
+),
+(
+    '20000000-0000-4000-8000-000000000007', 'tenant-local', 'EVIDENCE',
+    'admin.pilot-inbound-evidence', '1.0.0', '1.0.0',
+    '{"templateKey":"admin.pilot-inbound-evidence","version":"1.0.0","title":"入站勘察资料","stage":"PILOT_SURVEY","items":[{"evidenceKey":"survey.photo","name":"勘察现场照片","mediaType":"PHOTO","required":true,"capture":{"allowCamera":true,"allowGallery":true,"minCount":1,"maxCount":1,"maxSizeBytes":1048576},"reviewPolicy":{"reviewRequired":false}}]}',
+    'ece3e8cdb6a96a9c0ed709173345ed9c75dc2b37da6e4ca37fbbe70a3440322c',
+    'PUBLISHED', now()
+) ON CONFLICT (version_id) DO UPDATE
+SET definition = EXCLUDED.definition,
+    content_digest = EXCLUDED.content_digest,
+    asset_key = EXCLUDED.asset_key,
+    published_at = now();
 
 INSERT INTO cfg_configuration_bundle (
     bundle_id, tenant_id, project_id, bundle_code, bundle_version, brand_code,
@@ -63,11 +86,21 @@ INSERT INTO cfg_configuration_bundle_item (
 (
     'tenant-local', '30000000-0000-4000-8000-000000000001', 'WORKFLOW',
     '20000000-0000-4000-8000-000000000001',
-    'f2837436570f57cc32a9651bc36491f0595cd35b5b351cc3056c344d69a2b51a'
+    '73bf5f7e929cfd98fc25e0f8e332ae14cc6da8a1e4fcc3b2782dae51fe777c37'
 ),
 (
     'tenant-local', '30000000-0000-4000-8000-000000000001', 'SLA',
     '20000000-0000-4000-8000-000000000002', repeat('b', 64)
+),
+(
+    'tenant-local', '30000000-0000-4000-8000-000000000001', 'FORM',
+    '20000000-0000-4000-8000-000000000006',
+    'b868b1fe5b492009ae45f15eebb11a4cd5db42517b1cc32205b676f00a724b26'
+),
+(
+    'tenant-local', '30000000-0000-4000-8000-000000000001', 'EVIDENCE',
+    '20000000-0000-4000-8000-000000000007',
+    'ece3e8cdb6a96a9c0ed709173345ed9c75dc2b37da6e4ca37fbbe70a3440322c'
 ) ON CONFLICT DO NOTHING;
 
 ALTER TABLE cfg_configuration_bundle_item ENABLE TRIGGER trg_cfg_bundle_item_immutable;

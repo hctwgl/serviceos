@@ -1096,17 +1096,25 @@ done
   exit 1
 }
 
+# M141：同单入站贯通终态——FULFILLED + BYD:INSTALL 系谱 + 表单/资料/审核/外发/回调。
 inbound_state=""
-for _ in $(seq 1 60); do
+for _ in $(seq 1 90); do
   inbound_state="$(query_db "
     SELECT work_order.status || ':' ||
            count(DISTINCT envelope.inbound_envelope_id) || ':' ||
-           count(DISTINCT canonical.canonical_message_id) || ':' ||
-           count(DISTINCT workflow.workflow_instance_id) || ':' ||
-           count(DISTINCT task.task_id) || ':' ||
+           bool_or(
+             canonical.business_key = 'BYD:INSTALL:' || work_order.external_order_code
+           ) || ':' ||
+           max(workflow.status) || ':' ||
+           max(task.status) || ':' ||
+           max(task.form_ref) || ':' ||
            count(DISTINCT appointment.appointment_id) || ':' ||
            count(DISTINCT visit.visit_id) || ':' ||
-           count(DISTINCT audit.audit_id)
+           count(DISTINCT submission.form_submission_id) || ':' ||
+           count(DISTINCT snapshot.evidence_set_snapshot_id) || ':' ||
+           count(DISTINCT internal_case.review_case_id) || ':' ||
+           coalesce(max(delivery.status), 'NONE') || ':' ||
+           coalesce(max(client_case.status), 'NONE')
       FROM wo_work_order work_order
       LEFT JOIN int_inbound_envelope envelope
         ON envelope.tenant_id = work_order.tenant_id
@@ -1125,7 +1133,6 @@ for _ in $(seq 1 60); do
       LEFT JOIN wfl_workflow_instance workflow
         ON workflow.tenant_id = work_order.tenant_id
        AND workflow.work_order_id = work_order.id
-       AND workflow.status = 'ACTIVE'
       LEFT JOIN tsk_task task
         ON task.tenant_id = work_order.tenant_id
        AND task.work_order_id = work_order.id
@@ -1138,32 +1145,38 @@ for _ in $(seq 1 60); do
         ON visit.tenant_id = appointment.tenant_id
        AND visit.appointment_id = appointment.appointment_id
        AND visit.status = 'COMPLETED'
-      LEFT JOIN aud_audit_record audit
-        ON audit.tenant_id = work_order.tenant_id
-       AND (
-         (
-           audit.target_id = envelope.inbound_envelope_id::text
-           AND audit.action_name = 'INBOUND_MESSAGE_PROCESSED'
-         )
-         OR (
-           audit.target_id = appointment.appointment_id::text
-           AND audit.action_name IN ('APPOINTMENT_PROPOSE', 'APPOINTMENT_CONFIRM')
-         )
-         OR (
-           audit.target_id = visit.visit_id::text
-           AND audit.action_name IN ('VISIT_CHECK_IN', 'VISIT_CHECK_OUT')
-         )
-       )
+      LEFT JOIN frm_form_submission submission
+        ON submission.tenant_id = task.tenant_id
+       AND submission.task_id = task.task_id
+       AND submission.validation_status = 'VALIDATED'
+      LEFT JOIN evd_evidence_set_snapshot snapshot
+        ON snapshot.tenant_id = task.tenant_id
+       AND snapshot.task_id = task.task_id
+      LEFT JOIN evd_review_case internal_case
+        ON internal_case.tenant_id = task.tenant_id
+       AND internal_case.task_id = task.task_id
+       AND internal_case.origin = 'INTERNAL'
+       AND internal_case.status = 'APPROVED'
+      LEFT JOIN int_outbound_delivery delivery
+        ON delivery.tenant_id = internal_case.tenant_id
+       AND delivery.source_review_case_id = internal_case.review_case_id
+       AND delivery.status = 'ACKNOWLEDGED'
+      LEFT JOIN evd_review_case client_case
+        ON client_case.review_case_id = delivery.client_review_case_id
+       AND client_case.origin = 'CLIENT'
+       AND client_case.status = 'APPROVED'
      WHERE work_order.tenant_id = 'tenant-local'
        AND work_order.external_order_code = '${inbound_order_code}'
      GROUP BY work_order.id, work_order.status
   ")"
-  # ACTIVE + Envelope + Canonical + Workflow + Task + Appointment + Visit + 5 audits
-  [[ "${inbound_state}" == "ACTIVE:1:1:1:1:1:1:5" ]] && break
+  # FULFILLED : Envelope : BYD:INSTALL key : Workflow : Task : formRef : Apt : Visit : Form : Snapshot : INTERNAL : Outbound : CLIENT
+  [[ "${inbound_state}" == "FULFILLED:1:t:COMPLETED:COMPLETED:admin.pilot-inbound-form:1:1:1:1:1:ACKNOWLEDGED:APPROVED" \
+    || "${inbound_state}" == "FULFILLED:1:true:COMPLETED:COMPLETED:admin.pilot-inbound-form:1:1:1:1:1:ACKNOWLEDGED:APPROVED" ]] && break
   sleep 1
 done
-[[ "${inbound_state}" == "ACTIVE:1:1:1:1:1:1:5" ]] || {
-  echo "Admin 试点入站同单激活/预约上门贯通不完整: ${inbound_state}" >&2
+[[ "${inbound_state}" == "FULFILLED:1:t:COMPLETED:COMPLETED:admin.pilot-inbound-form:1:1:1:1:1:ACKNOWLEDGED:APPROVED" \
+  || "${inbound_state}" == "FULFILLED:1:true:COMPLETED:COMPLETED:admin.pilot-inbound-form:1:1:1:1:1:ACKNOWLEDGED:APPROVED" ]] || {
+  echo "Admin 试点入站同单表单/资料/审核/外发贯通不完整: ${inbound_state}" >&2
   exit 1
 }
 
