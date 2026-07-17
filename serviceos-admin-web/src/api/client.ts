@@ -116,3 +116,43 @@ export function quotedVersion(version: number): string {
 export function newIdempotencyKey(prefix: string): string {
   return `${prefix}-${crypto.randomUUID()}`
 }
+
+export type HttpStatusError = Error & {
+  status?: number
+  problem?: ApiError
+}
+
+/** 探测目录可见性：403/404 表示无能力或不可见，不触发登录跳转以外的副作用。 */
+export async function apiProbe(path: string): Promise<'allow' | 'deny' | 'unauthenticated'> {
+  const url = new URL(`${apiBase()}${path}`, window.location.origin)
+  const response = await fetch(url, { headers: authHeaders() })
+  if (response.status === 401) {
+    return 'unauthenticated'
+  }
+  if (response.ok) {
+    return 'allow'
+  }
+  if (response.status === 403 || response.status === 404) {
+    return 'deny'
+  }
+  return 'deny'
+}
+
+/** 治理深链失败关闭文案：不回显后端 detail，避免泄露姓名/部门/角色。 */
+export function safeAccessDeniedMessage(err: unknown): string {
+  const status = (err as HttpStatusError | undefined)?.status
+  if (status === 403 || status === 404) {
+    return '无权访问或不存在'
+  }
+  if (status === 409) {
+    return '版本冲突，请刷新后重试'
+  }
+  if (status === 401) {
+    return '需要重新登录'
+  }
+  return '请求失败，请稍后重试'
+}
+
+export function isConflictError(err: unknown): boolean {
+  return (err as HttpStatusError | undefined)?.status === 409
+}

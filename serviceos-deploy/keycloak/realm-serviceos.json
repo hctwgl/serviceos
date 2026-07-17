@@ -85,6 +85,22 @@
         { "type": "password", "value": "local-dev-change-me", "temporary": false }
       ],
       "realmRoles": ["project.create", "workOrder.read", "file.upload", "file.download"]
+    },
+    {
+      "id": "88aa1111-2222-4333-8444-555566667777",
+      "username": "viewer",
+      "email": "viewer@serviceos.local",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Limited",
+      "lastName": "Viewer",
+      "attributes": {
+        "tenant_id": ["tenant-local"]
+      },
+      "credentials": [
+        { "type": "password", "value": "local-viewer-change-me", "temporary": false }
+      ],
+      "realmRoles": ["workOrder.read"]
     }
   ]
 }

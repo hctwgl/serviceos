@@ -86,6 +86,86 @@ cd "${repo_root}"
 docker compose -f "${compose_file}" up -d postgres keycloak
 wait_http "http://127.0.0.1:8081/realms/serviceos/.well-known/openid-configuration" "Keycloak"
 
+# M187：既有 Keycloak 数据卷不会重导入 realm；幂等确保低权限 viewer 存在，供无治理能力深链 E2E。
+python3 - <<'PY'
+import json
+import urllib.error
+import urllib.parse
+import urllib.request
+
+base = "http://127.0.0.1:8081"
+token_body = urllib.parse.urlencode(
+    {
+        "grant_type": "password",
+        "client_id": "admin-cli",
+        "username": "admin",
+        "password": "local-admin-change-me",
+    }
+).encode()
+with urllib.request.urlopen(
+    urllib.request.Request(
+        f"{base}/realms/master/protocol/openid-connect/token",
+        data=token_body,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        method="POST",
+    )
+) as resp:
+    access_token = json.load(resp)["access_token"]
+
+headers = {
+    "Authorization": f"Bearer {access_token}",
+    "Content-Type": "application/json",
+}
+viewer_id = "88aa1111-2222-4333-8444-555566667777"
+get_url = f"{base}/admin/realms/serviceos/users/{viewer_id}"
+try:
+    with urllib.request.urlopen(urllib.request.Request(get_url, headers=headers, method="GET")):
+        print("Keycloak viewer user already present")
+except urllib.error.HTTPError as err:
+    if err.code != 404:
+        raise
+    payload = {
+        "id": viewer_id,
+        "username": "viewer",
+        "email": "viewer@serviceos.local",
+        "enabled": True,
+        "emailVerified": True,
+        "firstName": "Limited",
+        "lastName": "Viewer",
+        "attributes": {"tenant_id": ["tenant-local"]},
+        "credentials": [
+            {"type": "password", "value": "local-viewer-change-me", "temporary": False}
+        ],
+    }
+    req = urllib.request.Request(
+        f"{base}/admin/realms/serviceos/users",
+        data=json.dumps(payload).encode(),
+        headers=headers,
+        method="POST",
+    )
+    with urllib.request.urlopen(req) as resp:
+        if resp.status not in (201, 204):
+            raise RuntimeError(f"create viewer failed: HTTP {resp.status}")
+    # 绑定 workOrder.read realm role（JWT claim 仅作本地辅助；授权仍以 RoleGrant 为准）
+    with urllib.request.urlopen(
+        urllib.request.Request(
+            f"{base}/admin/realms/serviceos/roles/workOrder.read",
+            headers=headers,
+            method="GET",
+        )
+    ) as resp:
+        role = json.load(resp)
+    role_req = urllib.request.Request(
+        f"{base}/admin/realms/serviceos/users/{viewer_id}/role-mappings/realm",
+        data=json.dumps([role]).encode(),
+        headers=headers,
+        method="POST",
+    )
+    with urllib.request.urlopen(role_req):
+        pass
+    print("Keycloak viewer user created for M187 unauthorized deep-link E2E")
+PY
+
 # 本地协议 stub：只证明 errno=0 严格 ACK 路径，不宣称真实 sandbox。
 python3 - <<'PY' >"${byd_stub_log}" 2>&1 &
 from http.server import BaseHTTPRequestHandler, HTTPServer
