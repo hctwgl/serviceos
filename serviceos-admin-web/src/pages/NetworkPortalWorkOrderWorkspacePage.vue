@@ -158,13 +158,33 @@ watch(
             <strong>{{ visit.visitId }}</strong>
             <span class="muted">
               （task {{ visit.taskId }} · seq {{ visit.visitSequence }} · {{ visit.status }} ·
-              {{ visit.geofenceResult }} / {{ visit.policyDecision }}）
+              {{ visit.geofenceResult }} / {{ visit.policyDecision }} · v{{ visit.aggregateVersion }}）
+            </span>
+            <span class="muted" data-testid="workspace-visit-appointment">
+              · appointment {{ visit.appointmentId }}
+            </span>
+            <span class="muted" data-testid="workspace-visit-technician">
+              · technician {{ visit.technicianId }}
+            </span>
+            <span class="muted" data-testid="workspace-visit-network">
+              · network {{ visit.networkId ?? '—' }}
+            </span>
+            <span class="muted" data-testid="workspace-visit-checkin">
+              · check-in {{ visit.checkInCapturedAt }} / recv {{ visit.checkInReceivedAt }}
+            </span>
+            <span class="muted" data-testid="workspace-visit-checkout">
+              · check-out {{ visit.checkOutCapturedAt ?? '—' }} / recv
+              {{ visit.checkOutReceivedAt ?? '—' }}
+            </span>
+            <span class="muted" data-testid="workspace-visit-result">
+              · result {{ visit.resultCode ?? '—' }} / exception {{ visit.exceptionCode ?? '—' }}
             </span>
           </li>
         </ul>
         <p v-else data-testid="workspace-visits-empty">暂无本网点 Visit</p>
         <p class="hint">
-          需 NETWORK <code>visit.read</code>。不含 GPS/note/device。无独立 Visit 详情页。
+          需 NETWORK <code>visit.read</code>。展示 Accepted 非 PII 摘要字段；不含
+          GPS/note/device。无独立 Visit 详情页。
         </p>
       </section>
 
@@ -186,11 +206,24 @@ watch(
               （{{ row.submissionId }} · task {{ row.taskId }} · v{{ row.submissionVersion }} ·
               {{ row.validationStatus }} · err {{ row.errorCount }} / warn {{ row.warningCount }}）
             </span>
+            <span class="muted" data-testid="workspace-form-project">
+              · project {{ row.projectId }}
+            </span>
+            <span class="muted" data-testid="workspace-form-version">
+              · formVersion {{ row.formVersionId }}
+            </span>
+            <span class="muted" data-testid="workspace-form-submitted-at">
+              · submittedAt {{ row.submittedAt }}
+            </span>
+            <span class="muted" data-testid="workspace-form-digest">
+              · digest {{ row.contentDigest }}
+            </span>
           </li>
         </ul>
         <p v-else data-testid="workspace-form-submissions-empty">暂无表单提交</p>
         <p class="hint">
-          需 NETWORK <code>form.read</code>。不含 values/submittedBy。无表单 definition。
+          需 NETWORK <code>form.read</code>。展示 Accepted 非 PII 摘要字段；不含
+          values/submittedBy。无表单 definition。
         </p>
       </section>
 
@@ -212,11 +245,27 @@ watch(
               （{{ slot.requirementCode }} · {{ slot.mediaType }} · {{ slot.status }} ·
               task {{ slot.taskId }} · gen {{ slot.slotGeneration }}）
             </span>
+            <span class="muted" data-testid="workspace-evidence-slot-template">
+              · template {{ slot.templateKey }}@{{ slot.templateVersion }}
+            </span>
+            <span class="muted" data-testid="workspace-evidence-slot-counts">
+              · required {{ slot.required }} · min {{ slot.minCount }} / max
+              {{ slot.maxCount ?? '—' }}
+            </span>
+            <span class="muted" data-testid="workspace-evidence-slot-state">
+              · active {{ slot.active }} · {{ slot.transition }} · disposition
+              {{ slot.requiredDisposition }}
+            </span>
+            <span class="muted" data-testid="workspace-evidence-slot-resolved">
+              · resolvedAt {{ slot.resolvedAt }} · occurrence {{ slot.occurrenceKey }} · project
+              {{ slot.projectId }}
+            </span>
           </li>
         </ul>
         <p v-else data-testid="workspace-evidence-slots-empty">暂无资料槽位</p>
         <p class="hint">
-          需 NETWORK <code>evidence.read</code>。不含 definition/explanation JSON。无缩略图/下载。
+          需 NETWORK <code>evidence.read</code>。展示 Accepted 非 PII 槽位摘要；不含
+          definition/explanation JSON。无缩略图/下载。
         </p>
       </section>
 
@@ -237,16 +286,23 @@ watch(
             <span class="muted">
               （slot {{ item.evidenceSlotId }} · #{{ item.itemOrdinal }} · {{ item.status }} ·
               rev {{ item.revisionCount }}
+              <template v-if="item.latestRevisionNumber != null">
+                / #{{ item.latestRevisionNumber }}
+              </template>
               <template v-if="item.latestRevisionStatus">
                 / {{ item.latestRevisionStatus }}
               </template>
               ）
             </span>
+            <span class="muted" data-testid="workspace-evidence-item-project">
+              · project {{ item.projectId }}
+            </span>
           </li>
         </ul>
         <p v-else data-testid="workspace-evidence-items-empty">暂无资料项</p>
         <p class="hint">
-          需 NETWORK <code>evidence.read</code>。不含 Revision 图/file/captureMetadata。
+          需 NETWORK <code>evidence.read</code>。展示 Accepted 非 PII 资料项摘要；不含
+          Revision 图/file/captureMetadata。
         </p>
       </section>
 
