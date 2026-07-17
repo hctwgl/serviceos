@@ -138,6 +138,8 @@ serviceos-deploy/        本地/环境部署入口
 
 完整实施状态与每个里程碑的代码、迁移、契约和测试证据见
 [实施状态总览](serviceos-architecture/docs/implementation-status.md) 与
-[Architecture Book](serviceos-architecture/README.md)。验证阶段划分、CI 去重和最终候选规则见
-[验证执行策略](serviceos-architecture/docs/verification-execution-policy.md)。最新切片见
-[M159 Admin 上门 Visit 详情页](serviceos-architecture/architecture/172-m159-admin-pilot-visit-detail.md)。
+[Architecture Book](serviceos-architecture/README.md)。Agent 探索入口见
+[任务导航](serviceos-architecture/docs/agent-navigation.md) 与
+[里程碑索引](serviceos-architecture/docs/milestone-index.md)。验证阶段划分、CI 去重和最终候选规则见
+[验证执行策略](serviceos-architecture/docs/verification-execution-policy.md)。最新切片从实施状态总览的
+`latestMilestone` 进入生成式里程碑索引定位，不在根 README 维护易过期的单里程碑指针。

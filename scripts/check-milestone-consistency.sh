@@ -56,4 +56,10 @@ if [[ -n "$allow_pending" && "$allow_pending" != "--allow-pending-baseline" ]]; 
   fail "未知参数: $allow_pending"
 fi
 
+index_file="$root/serviceos-architecture/docs/milestone-index.md"
+[[ -f "$index_file" ]] || fail "milestone-index.md 缺失，请运行 bash scripts/generate-milestone-index.sh 生成"
+if ! diff <(bash "$root/scripts/generate-milestone-index.sh" --stdout) "$index_file" >/dev/null; then
+  fail "milestone-index.md 已过期，请运行 bash scripts/generate-milestone-index.sh 重新生成"
+fi
+
 echo "里程碑一致性检查通过: $milestone / Flyway $flyway_version / $expected_migration_count migrations"
