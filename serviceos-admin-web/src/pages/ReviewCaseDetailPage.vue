@@ -180,8 +180,27 @@ onMounted(() => {
           <div><dt>reopenedFromReviewCaseId</dt><dd>{{ detail.reopenedFromReviewCaseId ?? '-' }}</dd></div>
           <div><dt>reopenTriggerRef</dt><dd>{{ detail.reopenTriggerRef ?? '-' }}</dd></div>
         </dl>
-        <p class="links">
-          <RouterLink :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.taskId } }">任务详情</RouterLink>
+        <p class="links review-cross-links">
+          <RouterLink :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.taskId } }">
+            任务详情
+          </RouterLink>
+          <RouterLink
+            :to="{
+              name: 'ADMIN.EVIDENCE_SET_SNAPSHOT.DETAIL',
+              params: { id: detail.evidenceSetSnapshotId },
+            }"
+          >
+            打开资料快照 {{ detail.evidenceSetSnapshotId }}
+          </RouterLink>
+          <RouterLink
+            v-if="detail.reopenedFromReviewCaseId"
+            :to="{
+              name: 'ADMIN.REVIEW.DETAIL',
+              params: { id: detail.reopenedFromReviewCaseId },
+            }"
+          >
+            打开源审核案例 {{ detail.reopenedFromReviewCaseId }}
+          </RouterLink>
         </p>
       </article>
 
