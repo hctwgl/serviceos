@@ -922,10 +922,12 @@ for _ in $(seq 1 60); do
            )
      GROUP BY delivery.delivery_id, delivery.status, delivery.client_review_case_id
   ")"
-  [[ "${outbound_delivery_state}" == "ACKNOWLEDGED:DELIVERED:1:t" ]] && break
+  [[ "${outbound_delivery_state}" == "ACKNOWLEDGED:DELIVERED:1:true" \
+    || "${outbound_delivery_state}" == "ACKNOWLEDGED:DELIVERED:1:t" ]] && break
   sleep 1
 done
-[[ "${outbound_delivery_state}" == "ACKNOWLEDGED:DELIVERED:1:t" ]] || {
+[[ "${outbound_delivery_state}" == "ACKNOWLEDGED:DELIVERED:1:true" \
+  || "${outbound_delivery_state}" == "ACKNOWLEDGED:DELIVERED:1:t" ]] || {
   echo "Admin 试点 BYD 提审外发 ACK 不完整: ${outbound_delivery_state}" >&2
   exit 1
 }
