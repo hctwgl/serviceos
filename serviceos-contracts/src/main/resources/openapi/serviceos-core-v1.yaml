@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 0.86.0
+  version: 0.87.0
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1513,6 +1513,68 @@ paths:
           description: 工作台摘要
           headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
           content: { application/json: { schema: { $ref: '#/components/schemas/NetworkPortalWorkbenchView' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /technician/me/task-feed:
+    get:
+      operationId: listTechnicianTaskFeed
+      summary: Technician Portal 当前师傅任务 Feed
+      description: |
+        M195：需要有效 TECHNICIAN 门户上下文（X-Technician-Context）与 NETWORK scope task.readAssigned。
+        返回当前师傅 ACTIVE TECHNICIAN ServiceAssignment / TaskAssignment；可选 sinceCursor 增量，
+        含撤权/结束 tombstone（仅 taskId + invalidationReason）。禁止离线工作包 runtime。
+        上下文缺失/伪造/非师傅成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - $ref: '#/components/parameters/TechnicianContext'
+        - name: sinceCursor
+          in: query
+          required: false
+          description: 不透明增量游标；缺省返回 ACTIVE 快照
+          schema: { type: string, minLength: 1, maxLength: 256 }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 任务 Feed
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianPortalFeedPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /technician/me/schedule:
+    get:
+      operationId: listTechnicianSchedule
+      summary: Technician Portal 当前师傅预约日程
+      description: |
+        M195：X-Technician-Context + task.readAssigned。对当前 ACTIVE 责任任务 fan-in 预约，
+        仅非敏感字段（无地址等）。
+      parameters:
+        - $ref: '#/components/parameters/TechnicianContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 预约日程
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianPortalSchedulePage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /technician/me/sync-summary:
+    get:
+      operationId: getTechnicianSyncSummary
+      summary: Technician Portal 轻量同步摘要
+      description: |
+        M195：X-Technician-Context + task.readAssigned。返回 pending feed / 预约窗口 / tombstone 计数；
+        不含离线命令运行时。
+      parameters:
+        - $ref: '#/components/parameters/TechnicianContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 同步摘要
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianPortalSyncSummary' } } }
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
@@ -3754,6 +3816,17 @@ components:
         type: string
         minLength: 36
         maxLength: 80
+    TechnicianContext:
+      name: X-Technician-Context
+      in: header
+      required: true
+      description: |
+        M195：M188 contextId 形态 `TECHNICIAN|NETWORK|{uuid}`，或经 ACTIVE
+        NetworkTechnicianMembership 校验后的纯 network UUID。不得用查询参数代替。
+      schema:
+        type: string
+        minLength: 36
+        maxLength: 96
     IfMatch:
       name: If-Match
       in: header
@@ -4172,6 +4245,66 @@ components:
         activeTaskCount: { type: integer, minimum: 0 }
         activeTechnicianCount: { type: integer, minimum: 0 }
         capacity: { type: array, items: { $ref: '#/components/schemas/NetworkPortalCapacityItem' } }
+        asOf: { type: string, format: date-time }
+    TechnicianPortalFeedItem:
+      type: object
+      additionalProperties: false
+      required: [itemType, taskId, cursor]
+      properties:
+        itemType: { type: string, enum: [ASSIGNMENT, TOMBSTONE] }
+        taskId: { type: string, format: uuid }
+        workOrderId: { type: [string, 'null'], format: uuid }
+        projectId: { type: [string, 'null'], format: uuid }
+        serviceAssignmentId: { type: [string, 'null'], format: uuid }
+        taskAssignmentId: { type: [string, 'null'], format: uuid }
+        taskType: { type: [string, 'null'], maxLength: 64 }
+        taskKind: { type: [string, 'null'], maxLength: 32 }
+        stageCode: { type: [string, 'null'], maxLength: 64 }
+        taskStatus: { type: [string, 'null'], maxLength: 32 }
+        businessType: { type: [string, 'null'], maxLength: 100 }
+        effectiveFrom: { type: [string, 'null'], format: date-time }
+        cursor: { type: string, minLength: 1, maxLength: 256 }
+        invalidationReason: { type: [string, 'null'], maxLength: 100 }
+    TechnicianPortalFeedPage:
+      type: object
+      additionalProperties: false
+      required: [networkId, items, asOf]
+      properties:
+        networkId: { type: string, format: uuid }
+        items: { type: array, items: { $ref: '#/components/schemas/TechnicianPortalFeedItem' } }
+        nextCursor: { type: [string, 'null'], maxLength: 256 }
+        asOf: { type: string, format: date-time }
+    TechnicianPortalScheduleItem:
+      type: object
+      additionalProperties: false
+      required: [appointmentId, taskId, workOrderId, type, status]
+      properties:
+        appointmentId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        workOrderId: { type: string, format: uuid }
+        projectId: { type: [string, 'null'], format: uuid }
+        type: { type: string, maxLength: 32 }
+        status: { type: string, maxLength: 24 }
+        windowStart: { type: [string, 'null'], format: date-time }
+        windowEnd: { type: [string, 'null'], format: date-time }
+        timezone: { type: [string, 'null'], maxLength: 80 }
+    TechnicianPortalSchedulePage:
+      type: object
+      additionalProperties: false
+      required: [networkId, items, asOf]
+      properties:
+        networkId: { type: string, format: uuid }
+        items: { type: array, items: { $ref: '#/components/schemas/TechnicianPortalScheduleItem' } }
+        asOf: { type: string, format: date-time }
+    TechnicianPortalSyncSummary:
+      type: object
+      additionalProperties: false
+      required: [networkId, pendingFeedItemCount, appointmentWindowCount, tombstoneCount, asOf]
+      properties:
+        networkId: { type: string, format: uuid }
+        pendingFeedItemCount: { type: integer, minimum: 0 }
+        appointmentWindowCount: { type: integer, minimum: 0 }
+        tombstoneCount: { type: integer, minimum: 0 }
         asOf: { type: string, format: date-time }
     TouchRecentResourceRequest:
       type: object

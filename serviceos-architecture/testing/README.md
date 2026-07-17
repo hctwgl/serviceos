@@ -195,4 +195,5 @@
 - [M192 Admin 受控全局搜索验收矩阵](189-m192-admin-controlled-search-acceptance.md)
 - [M193 Admin 最近访问验收矩阵](190-m193-admin-recent-resources-acceptance.md)
 - [M194 Network Portal 只读查询验收矩阵](191-m194-network-portal-read-apis-acceptance.md)
+- [M195 Technician Portal Feed 验收矩阵](192-m195-technician-portal-feed-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

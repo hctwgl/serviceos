@@ -48,6 +48,10 @@ import NetworkPortalWorkbenchPage from './pages/NetworkPortalWorkbenchPage.vue'
 import NetworkPortalWorkOrdersPage from './pages/NetworkPortalWorkOrdersPage.vue'
 import NetworkPortalTasksPage from './pages/NetworkPortalTasksPage.vue'
 import NetworkPortalTechniciansPage from './pages/NetworkPortalTechniciansPage.vue'
+import TechnicianPortalShell from './pages/TechnicianPortalShell.vue'
+import TechnicianPortalTaskFeedPage from './pages/TechnicianPortalTaskFeedPage.vue'
+import TechnicianPortalSchedulePage from './pages/TechnicianPortalSchedulePage.vue'
+import TechnicianPortalSyncSummaryPage from './pages/TechnicianPortalSyncSummaryPage.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -234,6 +238,31 @@ export const router = createRouter({
           name: 'NETWORK.TECHNICIAN.LIST',
           component: NetworkPortalTechniciansPage,
           meta: { pageId: 'NETWORK.TECHNICIAN.LIST' },
+        },
+      ],
+    },
+    {
+      path: '/technician-portal',
+      component: TechnicianPortalShell,
+      children: [
+        { path: '', redirect: { name: 'TECHNICIAN.TASK.LIST' } },
+        {
+          path: 'task-feed',
+          name: 'TECHNICIAN.TASK.LIST',
+          component: TechnicianPortalTaskFeedPage,
+          meta: { pageId: 'TECHNICIAN.TASK.LIST' },
+        },
+        {
+          path: 'schedule',
+          name: 'TECHNICIAN.SCHEDULE',
+          component: TechnicianPortalSchedulePage,
+          meta: { pageId: 'TECHNICIAN.SCHEDULE' },
+        },
+        {
+          path: 'sync-summary',
+          name: 'TECHNICIAN.SYNC.SUMMARY',
+          component: TechnicianPortalSyncSummaryPage,
+          meta: { pageId: 'TECHNICIAN.SYNC.SUMMARY' },
         },
       ],
     },
