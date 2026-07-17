@@ -264,3 +264,4 @@ Feature gate/authority: if applicable
 | M167 | Admin Task 面板资源详情深链：FieldOps/FormsEvidence → 已有详情页；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Admin Web E2E + `180-m167-*` + `164-m167-*` | FieldOperation 详情、SavedView、真实 sandbox |
 | M168 | Admin Canonical Message 独立详情页：复用 GET /canonical-messages/{id}；Envelope/INTEGRATION/回执深链；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + Integration OpenAPI + Admin Web E2E + `181-m168-*` + `165-m168-*` | FieldOperation 详情、SavedView、原文下载、真实 sandbox |
 | M169 | Admin 专项队列 route.query 水合：Review/Correction/Inbound/Outbound 对齐 Exception；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + API-06 queues + Admin Web E2E + `182-m169-*` + `166-m169-*` | FieldOperation 详情、SavedView、多 status OR、真实 sandbox |
+| M170 | Admin 目录页 route.query 水合：WorkOrder/Task/SLA/Project；Playwright GET 200 | PRODUCT-01/02 + ARCH-19 + OpenAPI directories + Admin Web E2E + `183-m170-*` + `167-m170-*` | FieldOperation 详情、SavedView、真实 sandbox |

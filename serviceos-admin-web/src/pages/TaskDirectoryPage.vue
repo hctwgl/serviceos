@@ -1,17 +1,41 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import QueueTable from './QueueTable.vue'
 import { listAuthorizedTasks, type TaskDirectoryPage } from '../api/tasksDirectory'
+import { firstRouteQuery } from '../routeQuery'
+
+const route = useRoute()
 
 const loading = ref(false)
 const error = ref<string | null>(null)
 const page = ref<TaskDirectoryPage | null>(null)
 const cursor = ref<string | undefined>()
+/** 默认不限；显式 route.query 可覆盖。 */
 const status = ref('')
 const taskKind = ref('')
 const assigneeMe = ref(false)
 const projectId = ref('')
+
+function hydrateFiltersFromRoute() {
+  const nextStatus = firstRouteQuery(route, 'status')
+  if (nextStatus !== undefined) {
+    status.value = nextStatus
+  }
+  const nextTaskKind = firstRouteQuery(route, 'taskKind')
+  if (nextTaskKind !== undefined) {
+    taskKind.value = nextTaskKind
+  }
+  const nextProjectId = firstRouteQuery(route, 'projectId')
+  if (nextProjectId !== undefined) {
+    projectId.value = nextProjectId
+  }
+  // assignee=me 仅在显式 query 时开启；缺省保持侧栏直达的未勾选态。
+  const nextAssignee = firstRouteQuery(route, 'assignee')
+  if (nextAssignee !== undefined) {
+    assigneeMe.value = nextAssignee === 'me'
+  }
+}
 
 async function load(next?: string) {
   loading.value = true
@@ -51,7 +75,10 @@ const rows = computed(() =>
   })),
 )
 
-onMounted(() => load())
+onMounted(() => {
+  hydrateFiltersFromRoute()
+  return load()
+})
 </script>
 
 <template>

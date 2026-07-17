@@ -59,6 +59,7 @@ lastUpdated: 2026-07-17
 | ADMIN-PILOT-08TP | 真实 Task 面板资源详情深链 | Contact/Appointment/Visit/FormSubmission/EvidenceItem GET 200 | PASS |
 | ADMIN-PILOT-08CM | 真实 Canonical Message 独立详情页 | Envelope/INTEGRATION → `/integration/canonical/{id}` GET 200 | PASS |
 | ADMIN-PILOT-08QH | 真实专项队列 route.query 水合 | Review/Correction/Inbound/Outbound 深链筛选表单水合；GET 200 | PASS |
+| ADMIN-PILOT-08DH | 真实目录页 route.query 水合 | WorkOrder/Task/SLA/Project 深链筛选表单水合；GET 200 | PASS |
 | ADMIN-PILOT-08CI | 真实写链路 CI 阻断 | GitHub Actions `admin-pilot-e2e` 运行同一 OIDC/Backend/PostgreSQL/Chrome smoke；通过后才启动 staging | PASS |
 | ADMIN-PILOT-09 | 完整履约写链路 | 接单→Admin 派单(HTTP Manual Assign)→预约→上门→表单/资料→审核/整改→外发→完结 | PASS |
 

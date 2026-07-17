@@ -1,16 +1,30 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import QueueTable from './QueueTable.vue'
 import { listSlaInstances, type SlaInstancePage } from '../api/sla'
+import { firstRouteQuery } from '../routeQuery'
+
+const route = useRoute()
 
 const loading = ref(false)
 const error = ref<string | null>(null)
 const page = ref<SlaInstancePage | null>(null)
 const cursor = ref<string | undefined>()
-/** 运营默认 BREACHED；省略 status 表示不限。 */
+/** 运营默认 BREACHED；省略 status 表示不限。显式 query 可覆盖。 */
 const status = ref('BREACHED')
 const projectId = ref('')
+
+function hydrateFiltersFromRoute() {
+  const nextStatus = firstRouteQuery(route, 'status')
+  if (nextStatus !== undefined) {
+    status.value = nextStatus
+  }
+  const nextProjectId = firstRouteQuery(route, 'projectId')
+  if (nextProjectId !== undefined) {
+    projectId.value = nextProjectId
+  }
+}
 
 async function load(next?: string) {
   loading.value = true
@@ -48,7 +62,10 @@ const rows = computed(() =>
   })),
 )
 
-onMounted(() => load())
+onMounted(() => {
+  hydrateFiltersFromRoute()
+  return load()
+})
 </script>
 
 <template>

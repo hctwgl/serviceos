@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import QueueTable from './QueueTable.vue'
 import { createProject, listAuthorizedProjects, type ProjectPage } from '../api/projects'
+import { firstRouteQuery } from '../routeQuery'
+
+const route = useRoute()
 
 const loading = ref(false)
 const busy = ref(false)
@@ -10,6 +13,7 @@ const error = ref<string | null>(null)
 const message = ref<string | null>(null)
 const page = ref<ProjectPage | null>(null)
 const cursor = ref<string | undefined>()
+/** 运营默认 ACTIVE；显式 route.query 可覆盖。 */
 const status = ref('ACTIVE')
 const clientId = ref('')
 const activeOn = ref('')
@@ -22,6 +26,21 @@ const createEndsOn = ref('')
 const createRegionCodes = ref('')
 const createNetworkIds = ref('')
 const createdProjectId = ref('')
+
+function hydrateFiltersFromRoute() {
+  const nextStatus = firstRouteQuery(route, 'status')
+  if (nextStatus !== undefined) {
+    status.value = nextStatus
+  }
+  const nextClientId = firstRouteQuery(route, 'clientId')
+  if (nextClientId !== undefined) {
+    clientId.value = nextClientId
+  }
+  const nextActiveOn = firstRouteQuery(route, 'activeOn')
+  if (nextActiveOn !== undefined) {
+    activeOn.value = nextActiveOn
+  }
+}
 
 async function load(next?: string) {
   loading.value = true
@@ -94,7 +113,10 @@ const rows = computed(() =>
   })),
 )
 
-onMounted(() => load())
+onMounted(() => {
+  hydrateFiltersFromRoute()
+  return load()
+})
 </script>
 
 <template>
