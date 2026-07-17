@@ -3,35 +3,22 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import {
   getNetworkPortalWorkOrderWorkspace,
-  listNetworkPortalTaskAppointments,
-  listNetworkPortalTaskContactAttempts,
   listNetworkPortalTechnicians,
-  type AppointmentWindow,
-  type NetworkPortalAppointment,
-  type NetworkPortalContactAttempt,
   type NetworkPortalTechnicianItem,
   type NetworkPortalWorkOrderWorkspace,
+  type NetworkPortalWorkspaceAppointmentSummary,
 } from '../api/networkPortal'
 
 const props = defineProps<{ networkContextId: string | null }>()
 const route = useRoute()
 const workOrderId = computed(() => String(route.params.id ?? ''))
 const detail = ref<NetworkPortalWorkOrderWorkspace | null>(null)
-const relatedAppointments = ref<NetworkPortalAppointment[] | null>(null)
-const relatedContactAttempts = ref<NetworkPortalContactAttempt[] | null>(null)
 const techniciansByProfileId = ref<Map<string, NetworkPortalTechnicianItem> | null>(null)
 const error = ref<string | null>(null)
 const loading = ref(false)
 
-function appointmentWindow(item: NetworkPortalAppointment): AppointmentWindow | null {
-  const revisions = item.revisions
-  if (!revisions?.length) {
-    return null
-  }
-  const current =
-    revisions.find((revision) => revision.revisionNo === item.currentRevisionNo) ??
-    revisions[revisions.length - 1]
-  return current?.window ?? null
+function hasAppointmentWindow(item: NetworkPortalWorkspaceAppointmentSummary) {
+  return item.windowStart != null && item.windowEnd != null
 }
 
 function resolveTechnician(technicianId: string | null | undefined) {
@@ -73,22 +60,6 @@ const unassignedTaskIds = computed(() => {
     .map((task) => task.taskId)
 })
 
-async function fanInByTaskId<T>(
-  taskIds: string[],
-  loader: (networkContextId: string, taskId: string) => Promise<T[]>,
-): Promise<T[] | null> {
-  if (!props.networkContextId || taskIds.length === 0) {
-    return null
-  }
-  const results = await Promise.allSettled(
-    taskIds.map((taskId) => loader(props.networkContextId!, taskId)),
-  )
-  if (results.some((result) => result.status === 'rejected')) {
-    return null
-  }
-  return results.flatMap((result) => (result.status === 'fulfilled' ? result.value : []))
-}
-
 async function loadTechnicians() {
   techniciansByProfileId.value = null
   if (!props.networkContextId) {
@@ -106,32 +77,9 @@ async function loadTechnicians() {
   }
 }
 
-async function loadRelated(taskIds: string[]) {
-  relatedAppointments.value = null
-  relatedContactAttempts.value = null
-  if (!props.networkContextId || taskIds.length === 0) {
-    return
-  }
-  // M225：整改摘要改由 workspace.corrections 服务端交付；不再客户端 fan-in。
-  // M226：异常摘要改由 workspace.exceptions 服务端交付；不再客户端 OPEN fan-in。
-  // ADR-053：缺 manageAppointment 或任一次 403 时同时省略预约/联系区块，
-  // 不得用空列表伪装无权限。
-  const appointments = await fanInByTaskId(taskIds, listNetworkPortalTaskAppointments)
-  const contacts = await fanInByTaskId(taskIds, listNetworkPortalTaskContactAttempts)
-  if (appointments === null || contacts === null) {
-    relatedAppointments.value = null
-    relatedContactAttempts.value = null
-  } else {
-    relatedAppointments.value = appointments
-    relatedContactAttempts.value = contacts
-  }
-}
-
 async function load() {
   if (!props.networkContextId) {
     detail.value = null
-    relatedAppointments.value = null
-    relatedContactAttempts.value = null
     techniciansByProfileId.value = null
     error.value = '请选择 NETWORK 上下文'
     return
@@ -148,11 +96,10 @@ async function load() {
       workOrderId.value,
     )
     error.value = null
-    await Promise.all([loadRelated(detail.value.taskIds), loadTechnicians()])
+    // M225/M226/M227：整改/异常/预约/联系由 workspace 服务端交付；仅师傅名仍客户端 fan-in。
+    await loadTechnicians()
   } catch (err) {
     detail.value = null
-    relatedAppointments.value = null
-    relatedContactAttempts.value = null
     techniciansByProfileId.value = null
     error.value = err instanceof Error ? err.message : '工单工作区加载失败'
   } finally {
@@ -453,14 +400,15 @@ watch(
       <p v-if="detail.tasks.length === 0" data-testid="workspace-tasks-empty">暂无 ACTIVE 任务</p>
 
       <section
-        v-if="relatedAppointments"
+        v-if="detail.appointments"
         data-testid="workspace-related-appointments"
         class="related"
+        aria-label="Appointment summaries"
       >
-        <h3>相关预约</h3>
-        <ul v-if="relatedAppointments.length">
+        <h3>预约摘要</h3>
+        <ul v-if="detail.appointments.length">
           <li
-            v-for="item in relatedAppointments"
+            v-for="item in detail.appointments"
             :key="item.appointmentId"
             :data-testid="`workspace-related-appointment-${item.appointmentId}`"
           >
@@ -470,31 +418,37 @@ watch(
             >
               {{ item.appointmentId }}
             </RouterLink>
-            （task {{ item.taskId }} · {{ item.type }} · {{ item.status }} · rev
-            {{ item.currentRevisionNo }}）
+            <span class="muted">
+              （task {{ item.taskId }} · {{ item.type }} · {{ item.status }} · rev
+              {{ item.currentRevisionNo }}）
+            </span>
             <span
-              v-if="appointmentWindow(item)"
+              v-if="hasAppointmentWindow(item)"
               data-testid="workspace-appointment-window"
               class="window"
             >
-              window {{ appointmentWindow(item)!.start }} ~ {{ appointmentWindow(item)!.end }}
-              （{{ appointmentWindow(item)!.timezone }} ·
-              {{ appointmentWindow(item)!.estimatedDurationMinutes }}min）
+              window {{ item.windowStart }} ~ {{ item.windowEnd }}
+              （{{ item.timezone }} · {{ item.estimatedDurationMinutes }}min）
             </span>
           </li>
         </ul>
-        <p v-else data-testid="workspace-related-appointments-empty">暂无相关预约</p>
+        <p v-else data-testid="workspace-related-appointments-empty">暂无预约摘要</p>
+        <p class="hint">
+          需 NETWORK <code>networkPortal.manageAppointment</code>。字段对齐 Admin
+          工作区预约摘要；无 revisions/address。
+        </p>
       </section>
 
       <section
-        v-if="relatedContactAttempts"
+        v-if="detail.contactAttempts"
         data-testid="workspace-related-contacts"
         class="related"
+        aria-label="Contact attempt summaries"
       >
-        <h3>相关联系尝试</h3>
-        <ul v-if="relatedContactAttempts.length">
+        <h3>联系尝试摘要</h3>
+        <ul v-if="detail.contactAttempts.length">
           <li
-            v-for="item in relatedContactAttempts"
+            v-for="item in detail.contactAttempts"
             :key="item.contactAttemptId"
             :data-testid="`workspace-related-contact-${item.contactAttemptId}`"
           >
@@ -504,11 +458,17 @@ watch(
             >
               {{ item.contactAttemptId }}
             </RouterLink>
-            （task {{ item.taskId }} · {{ item.channel }} · {{ item.resultCode }} ·
-            {{ item.createdAt }}）
+            <span class="muted">
+              （task {{ item.taskId }} · {{ item.channel }} · {{ item.resultCode }} ·
+              {{ item.createdAt }}）
+            </span>
           </li>
         </ul>
-        <p v-else data-testid="workspace-related-contacts-empty">暂无相关联系尝试</p>
+        <p v-else data-testid="workspace-related-contacts-empty">暂无联系尝试摘要</p>
+        <p class="hint">
+          需 NETWORK <code>networkPortal.manageAppointment</code>。字段对齐 Admin
+          联系摘要；无 party/note/recording/actor。
+        </p>
       </section>
 
       <section

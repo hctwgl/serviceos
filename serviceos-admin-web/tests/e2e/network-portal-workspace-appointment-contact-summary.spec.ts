@@ -1,10 +1,6 @@
 import { expect, test, type Page, type Route } from '@playwright/test'
 
-/**
- * M215 历史用例：原客户端 fan-in 已由 M227 服务端摘要替换。
- * 本文件保留兼容断言路径，数据改由 workspace.appointments/contactAttempts 交付。
- */
-const NETWORK_ID = '019f84a0-2222-7f8c-9505-36fe5c0e8803'
+const NETWORK_ID = '019f84a0-2255-7f8c-9505-36fe5c0e8803'
 const CONTEXT_ID = `NETWORK|NETWORK|${NETWORK_ID}`
 const WORK_ORDER_ID = '019f84a0-aaaa-7f8c-9505-36fe5c0ee001'
 const TASK_ID = '019f84a0-bbbb-7f8c-9505-36fe5c0ee002'
@@ -28,7 +24,11 @@ async function loginWithLocalKeycloak(
   await expect(page).toHaveURL(/\/work-orders$/)
 }
 
-async function stubPortal(page: Page, options?: { denyAppointment?: boolean }) {
+async function stubWorkspaceAppointments(
+  page: Page,
+  options?: { includeAppointments?: boolean },
+) {
+  const includeAppointments = options?.includeAppointments !== false
   await page.route('**/api/v1/me/contexts**', async (route: Route) => {
     await route.fulfill({
       status: 200,
@@ -98,25 +98,23 @@ async function stubPortal(page: Page, options?: { denyAppointment?: boolean }) {
             effectiveFrom: '2026-07-17T10:00:00Z',
           },
         ],
-        // M225 兼容：旧断言期望 corrections 区块可见
-        corrections: [],
       }
-      if (!options?.denyAppointment) {
+      if (includeAppointments) {
         body.appointments = [
           {
             appointmentId: APPOINTMENT_ID,
             taskId: TASK_ID,
-            type: 'SURVEY',
-            status: 'PROPOSED',
+            type: 'INSTALLATION',
+            status: 'CONFIRMED',
             assignedNetworkId: NETWORK_ID,
-            technicianId: null,
+            technicianId: 'tech-a',
             currentRevisionNo: 1,
-            windowStart: null,
-            windowEnd: null,
-            timezone: null,
-            estimatedDurationMinutes: null,
+            windowStart: '2026-07-18T02:00:00Z',
+            windowEnd: '2026-07-18T05:00:00Z',
+            timezone: 'Asia/Shanghai',
+            estimatedDurationMinutes: 120,
             aggregateVersion: 1,
-            createdAt: '2026-07-17T10:00:00Z',
+            createdAt: '2026-07-17T01:30:00Z',
           },
         ]
         body.contactAttempts = [
@@ -126,11 +124,11 @@ async function stubPortal(page: Page, options?: { denyAppointment?: boolean }) {
             projectId: '019f84a0-eeee-7f8c-9505-36fe5c0ee005',
             workOrderId: WORK_ORDER_ID,
             channel: 'PHONE',
-            startedAt: '2026-07-17T11:00:00Z',
-            endedAt: '2026-07-17T11:00:30Z',
-            resultCode: 'NO_ANSWER',
+            startedAt: '2026-07-17T02:30:00Z',
+            endedAt: '2026-07-17T02:30:30Z',
+            resultCode: 'CONNECTED',
             nextContactAt: null,
-            createdAt: '2026-07-17T11:00:00Z',
+            createdAt: '2026-07-17T02:30:31Z',
           },
         ]
       }
@@ -158,16 +156,19 @@ async function stubPortal(page: Page, options?: { denyAppointment?: boolean }) {
   }
 }
 
-test.describe('M215 Network Portal 工作区预约/联系 fan-in（由 M227 服务端摘要承接）', () => {
-  test('M215-01/02/03：展示预约与联系摘要并深链任务', async ({ page }) => {
+test.describe('M227 Network Portal 工作区预约/联系服务端摘要', () => {
+  test('M227-05a：展示 appointments/contactAttempts 摘要与深链', async ({ page }) => {
     await loginWithLocalKeycloak(page)
-    await stubPortal(page)
+    await stubWorkspaceAppointments(page)
     await page.goto(`/network-portal/work-orders/${WORK_ORDER_ID}`)
     await expect(page.getByTestId('network-portal-work-order-workspace')).toBeVisible({
       timeout: 15_000,
     })
     await expect(page.getByTestId(`workspace-related-appointment-${APPOINTMENT_ID}`)).toBeVisible()
-    await expect(page.getByTestId(`workspace-related-contact-${CONTACT_ID}`)).toBeVisible()
+    await expect(page.getByTestId('workspace-appointment-window')).toContainText('Asia/Shanghai')
+    await expect(page.getByTestId(`workspace-related-contact-${CONTACT_ID}`)).toContainText(
+      'CONNECTED',
+    )
     await expect(page.getByTestId('workspace-appointment-task-deeplink')).toHaveAttribute(
       'href',
       `/network-portal/tasks?taskId=${TASK_ID}`,
@@ -178,15 +179,15 @@ test.describe('M215 Network Portal 工作区预约/联系 fan-in（由 M227 服�
     )
   })
 
-  test('M215-04：缺预约能力时省略预约/联系区块', async ({ page }) => {
+  test('M227-05b：缺字段时同时省略预约/联系区块', async ({ page }) => {
     await loginWithLocalKeycloak(page)
-    await stubPortal(page, { denyAppointment: true })
+    await stubWorkspaceAppointments(page, { includeAppointments: false })
     await page.goto(`/network-portal/work-orders/${WORK_ORDER_ID}`)
     await expect(page.getByTestId('network-portal-work-order-workspace')).toBeVisible({
       timeout: 15_000,
     })
+    await expect(page.getByTestId('workspace-header-fields')).toBeVisible()
     await expect(page.getByTestId('workspace-related-appointments')).toHaveCount(0)
     await expect(page.getByTestId('workspace-related-contacts')).toHaveCount(0)
-    await expect(page.getByTestId('workspace-related-corrections')).toBeVisible()
   })
 })

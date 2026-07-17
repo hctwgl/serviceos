@@ -1,5 +1,10 @@
 package com.serviceos.readmodel.application;
 
+import com.serviceos.appointment.api.AppointmentRevisionView;
+import com.serviceos.appointment.api.AppointmentService;
+import com.serviceos.appointment.api.AppointmentView;
+import com.serviceos.appointment.api.AppointmentWindow;
+import com.serviceos.appointment.api.ContactAttemptView;
 import com.serviceos.authorization.api.AuthorizationDecision;
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
@@ -40,6 +45,8 @@ import com.serviceos.readmodel.api.NetworkPortalWorkbenchView;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderItem;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderWorkspace;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderWorkspaceSlaSummary;
+import com.serviceos.readmodel.api.NetworkPortalWorkspaceAppointmentSummary;
+import com.serviceos.readmodel.api.NetworkPortalWorkspaceContactAttemptSummary;
 import com.serviceos.readmodel.api.NetworkPortalWorkspaceCorrectionCaseSummary;
 import com.serviceos.readmodel.api.NetworkPortalWorkspaceCorrectionResubmissionSummary;
 import com.serviceos.readmodel.api.NetworkPortalWorkspaceEvidenceItemSummary;
@@ -87,6 +94,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     private static final String SLA_READ = "sla.read";
     private static final String VISIT_READ = "visit.read";
     private static final String FORM_READ = "form.read";
+    private static final String MANAGE_APPOINTMENT = "networkPortal.manageAppointment";
     private static final String CONTEXT_PREFIX = "NETWORK|NETWORK|";
     private static final int DEFAULT_CORRECTION_LIMIT = 50;
     private static final int MAX_CORRECTION_LIMIT = 100;
@@ -102,6 +110,8 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     private static final int WORKSPACE_EVIDENCE_LIMIT = 100;
     private static final int WORKSPACE_CORRECTION_LIMIT = 100;
     private static final int WORKSPACE_EXCEPTION_LIMIT = 100;
+    private static final int WORKSPACE_APPOINTMENT_LIMIT = 100;
+    private static final int WORKSPACE_CONTACT_LIMIT = 100;
     private static final Set<String> OPEN_SLA_STATUSES = Set.of("RUNNING", "BREACHED");
 
     private final PrincipalNetworkAffiliationQuery affiliations;
@@ -120,6 +130,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     private final FormSubmissionQueryService formSubmissions;
     private final EvidenceSlotQueryService evidenceSlots;
     private final EvidenceItemQueryService evidenceItems;
+    private final AppointmentService appointments;
     private final Clock clock;
 
     DefaultNetworkPortalQueryService(
@@ -139,6 +150,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
             FormSubmissionQueryService formSubmissions,
             EvidenceSlotQueryService evidenceSlots,
             EvidenceItemQueryService evidenceItems,
+            AppointmentService appointments,
             Clock clock
     ) {
         this.affiliations = affiliations;
@@ -157,6 +169,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         this.formSubmissions = formSubmissions;
         this.evidenceSlots = evidenceSlots;
         this.evidenceItems = evidenceItems;
+        this.appointments = appointments;
         this.clock = clock;
     }
 
@@ -281,6 +294,14 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         if (hasNetworkCapability(actor, correlationId, EXCEPTION_READ, networkId)) {
             exceptionSummaries = loadExceptionSummaries(actor, correlationId, activeTaskIds);
         }
+        List<NetworkPortalWorkspaceAppointmentSummary> appointmentSummaries = null;
+        List<NetworkPortalWorkspaceContactAttemptSummary> contactAttemptSummaries = null;
+        if (hasNetworkCapability(actor, correlationId, MANAGE_APPOINTMENT, networkId)) {
+            appointmentSummaries = loadAppointmentSummaries(
+                    actor, correlationId, networkId, activeTaskIds);
+            contactAttemptSummaries = loadContactAttemptSummaries(
+                    actor, correlationId, activeTaskIds);
+        }
         return new NetworkPortalWorkOrderWorkspace(
                 networkId,
                 workOrderId,
@@ -297,6 +318,8 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                 evidenceItemSummaries,
                 correctionSummaries,
                 exceptionSummaries,
+                appointmentSummaries,
+                contactAttemptSummaries,
                 clock.instant());
     }
 
@@ -541,6 +564,97 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                         .thenComparing(NetworkPortalExceptionItem::exceptionId))
                 .limit(WORKSPACE_EXCEPTION_LIMIT)
                 .toList();
+    }
+
+    /**
+     * M227：NETWORK networkPortal.manageAppointment 已 soft-gate；仅 fan-in ACTIVE taskIds；
+     * 另按可信 networkId 过滤 assignedNetworkId。
+     */
+    private List<NetworkPortalWorkspaceAppointmentSummary> loadAppointmentSummaries(
+            CurrentPrincipal actor,
+            String correlationId,
+            UUID networkId,
+            Set<UUID> activeTaskIds
+    ) {
+        String trustedNetwork = networkId.toString();
+        List<NetworkPortalWorkspaceAppointmentSummary> collected = new ArrayList<>();
+        for (UUID taskId : activeTaskIds) {
+            for (AppointmentView row : appointments.listByTask(actor, correlationId, taskId)) {
+                if (!trustedNetwork.equals(row.assignedNetworkId())) {
+                    continue;
+                }
+                collected.add(toAppointmentSummary(row));
+            }
+        }
+        return collected.stream()
+                .sorted(Comparator
+                        .comparing(NetworkPortalWorkspaceAppointmentSummary::createdAt)
+                        .thenComparing(NetworkPortalWorkspaceAppointmentSummary::appointmentId))
+                .limit(WORKSPACE_APPOINTMENT_LIMIT)
+                .toList();
+    }
+
+    /**
+     * M227：NETWORK networkPortal.manageAppointment 已 soft-gate；仅 fan-in ACTIVE taskIds。
+     */
+    private List<NetworkPortalWorkspaceContactAttemptSummary> loadContactAttemptSummaries(
+            CurrentPrincipal actor,
+            String correlationId,
+            Set<UUID> activeTaskIds
+    ) {
+        List<NetworkPortalWorkspaceContactAttemptSummary> collected = new ArrayList<>();
+        for (UUID taskId : activeTaskIds) {
+            for (ContactAttemptView row : appointments.listContactAttempts(actor, correlationId, taskId)) {
+                collected.add(toContactAttemptSummary(row));
+            }
+        }
+        return collected.stream()
+                .sorted(Comparator
+                        .comparing(NetworkPortalWorkspaceContactAttemptSummary::startedAt,
+                                Comparator.reverseOrder())
+                        .thenComparing(NetworkPortalWorkspaceContactAttemptSummary::contactAttemptId))
+                .limit(WORKSPACE_CONTACT_LIMIT)
+                .toList();
+    }
+
+    private static NetworkPortalWorkspaceAppointmentSummary toAppointmentSummary(
+            AppointmentView appointment
+    ) {
+        AppointmentRevisionView current = appointment.revisions().stream()
+                .filter(revision -> revision.revisionNo() == appointment.currentRevisionNo())
+                .findFirst()
+                .orElse(appointment.revisions().isEmpty() ? null : appointment.revisions().getLast());
+        AppointmentWindow window = current == null ? null : current.window();
+        return new NetworkPortalWorkspaceAppointmentSummary(
+                appointment.appointmentId(),
+                appointment.taskId(),
+                appointment.type().name(),
+                appointment.status(),
+                appointment.assignedNetworkId(),
+                appointment.technicianId(),
+                appointment.currentRevisionNo(),
+                window == null ? null : window.start(),
+                window == null ? null : window.end(),
+                window == null ? null : window.timezone(),
+                window == null ? null : window.estimatedDurationMinutes(),
+                appointment.aggregateVersion(),
+                appointment.createdAt());
+    }
+
+    private static NetworkPortalWorkspaceContactAttemptSummary toContactAttemptSummary(
+            ContactAttemptView attempt
+    ) {
+        return new NetworkPortalWorkspaceContactAttemptSummary(
+                attempt.contactAttemptId(),
+                attempt.taskId(),
+                attempt.projectId(),
+                attempt.workOrderId(),
+                attempt.channel(),
+                attempt.startedAt(),
+                attempt.endedAt(),
+                attempt.resultCode().name(),
+                attempt.nextContactAt(),
+                attempt.createdAt());
     }
 
     private NetworkPortalWorkspaceCorrectionCaseSummary toCorrectionCaseSummary(

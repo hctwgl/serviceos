@@ -12,6 +12,8 @@ import com.serviceos.readmodel.api.NetworkPortalWorkbenchView;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderItem;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderWorkspace;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderWorkspaceSlaSummary;
+import com.serviceos.readmodel.api.NetworkPortalWorkspaceAppointmentSummary;
+import com.serviceos.readmodel.api.NetworkPortalWorkspaceContactAttemptSummary;
 import com.serviceos.readmodel.api.NetworkPortalWorkspaceCorrectionCaseSummary;
 import com.serviceos.readmodel.api.NetworkPortalWorkspaceEvidenceItemSummary;
 import com.serviceos.readmodel.api.NetworkPortalWorkspaceEvidenceSlotSummary;
@@ -27,6 +29,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -82,6 +86,7 @@ class NetworkPortalReadPostgresIT {
     @Autowired NetworkPortalQueryService portal;
     @Autowired JdbcClient jdbc;
     @Autowired Flyway flyway;
+    @Autowired PlatformTransactionManager transactionManager;
 
     @BeforeEach
     void cleanAndSeed() {
@@ -98,6 +103,9 @@ class NetworkPortalReadPostgresIT {
                     evd_evidence_revision, evd_evidence_item, evd_evidence_upload_session,
                     evd_evidence_resolution_member, evd_evidence_slot, evd_task_evidence_resolution,
                     ops_exception_ack_result, ops_operational_exception,
+                    apt_contact_attempt_command_result, apt_contact_attempt,
+                    apt_appointment_command_result, apt_appointment_status_history,
+                    apt_appointment_revision, apt_appointment,
                     tsk_task,
                     cfg_configuration_bundle_item, cfg_configuration_bundle,
                     cfg_configuration_asset_version, prj_project,
@@ -205,6 +213,45 @@ class NetworkPortalReadPostgresIT {
         assertThat(workspace.evidenceItems()).isNull();
         assertThat(workspace.corrections()).isNull();
         assertThat(workspace.exceptions()).isNull();
+        assertThat(workspace.appointments()).isNull();
+        assertThat(workspace.contactAttempts()).isNull();
+    }
+
+    @Test
+    void workOrderWorkspaceAppointmentAndContactSummariesAreCapabilityGatedAndTaskScoped() {
+        String context = "NETWORK|NETWORK|" + NETWORK_A;
+        NetworkPortalWorkOrderWorkspace withoutCap = portal.getWorkOrderWorkspace(
+                actor(PRINCIPAL), "corr-ws-apt-omit", context, WO_A);
+        assertThat(withoutCap.appointments()).isNull();
+        assertThat(withoutCap.contactAttempts()).isNull();
+
+        seedGrant(PRINCIPAL, "networkPortal.manageAppointment", "NETWORK", NETWORK_A.toString());
+        seedGrant(PRINCIPAL, "appointment.read", "NETWORK", NETWORK_A.toString());
+        NetworkPortalWorkOrderWorkspace empty = portal.getWorkOrderWorkspace(
+                actor(PRINCIPAL), "corr-ws-apt-empty", context, WO_A);
+        assertThat(empty.appointments()).isEmpty();
+        assertThat(empty.contactAttempts()).isEmpty();
+
+        UUID appointmentA = seedAppointment(TASK_A, WO_A, NETWORK_A.toString(), "m227-a");
+        seedAppointment(TASK_B, WO_B, NETWORK_B.toString(), "m227-b");
+        // 同任务但 assignedNetworkId 他网点 → 不得计入
+        seedAppointment(TASK_A, WO_A, NETWORK_B.toString(), "m227-foreign-net");
+        UUID contactA = seedContactAttempt(TASK_A, WO_A, "m227-a");
+        seedContactAttempt(TASK_B, WO_B, "m227-b");
+
+        NetworkPortalWorkOrderWorkspace withData = portal.getWorkOrderWorkspace(
+                actor(PRINCIPAL), "corr-ws-apt", context, WO_A);
+        assertThat(withData.appointments())
+                .extracting(NetworkPortalWorkspaceAppointmentSummary::appointmentId)
+                .containsExactly(appointmentA);
+        assertThat(withData.appointments().getFirst().type()).isEqualTo("INSTALLATION");
+        assertThat(withData.appointments().getFirst().status()).isEqualTo("CONFIRMED");
+        assertThat(withData.appointments().getFirst().timezone()).isEqualTo("Asia/Shanghai");
+        assertThat(withData.contactAttempts())
+                .extracting(NetworkPortalWorkspaceContactAttemptSummary::contactAttemptId)
+                .containsExactly(contactA);
+        assertThat(withData.contactAttempts().getFirst().channel()).isEqualTo("PHONE");
+        assertThat(withData.contactAttempts().getFirst().resultCode()).isEqualTo("CONNECTED");
     }
 
     @Test
@@ -1008,6 +1055,131 @@ class NetworkPortalReadPostgresIT {
                 .param("openedAt", java.sql.Timestamp.from(openedAt))
                 .update();
         return exceptionId;
+    }
+
+    /** M227：最小 CONFIRMED Appointment（current_revision FK 为 DEFERRABLE）。 */
+    private UUID seedAppointment(
+            UUID taskId, UUID workOrderId, String assignedNetworkId, String marker
+    ) {
+        UUID appointmentId = UUID.randomUUID();
+        UUID revisionId = UUID.randomUUID();
+        UUID projectId = jdbc.sql("SELECT project_id FROM tsk_task WHERE task_id=:id")
+                .param("id", taskId)
+                .query(UUID.class)
+                .single();
+        OffsetDateTime scopeNow = OffsetDateTime.ofInstant(
+                Instant.parse("2026-07-17T00:00:00Z"), ZoneOffset.UTC);
+        jdbc.sql("""
+                INSERT INTO prj_project (
+                    project_id, tenant_id, project_code, client_id, project_name,
+                    starts_on, ends_on, project_status, aggregate_version, created_at)
+                VALUES (
+                    :projectId, :tenantId, :code, 'BYD', 'M227 Appointment fixture',
+                    DATE '2026-07-01', NULL, 'ACTIVE', 1, :createdAt)
+                ON CONFLICT (project_id) DO NOTHING
+                """)
+                .param("projectId", projectId)
+                .param("tenantId", TENANT)
+                .param("code", "M227A-" + marker + "-" + taskId.toString().substring(24))
+                .param("createdAt", scopeNow)
+                .update();
+        Instant createdAt = Instant.parse("2026-07-17T01:30:00Z");
+        Instant start = Instant.parse("2026-07-18T02:00:00Z");
+        Instant end = Instant.parse("2026-07-18T05:00:00Z");
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            jdbc.sql("""
+                    INSERT INTO apt_appointment (
+                        appointment_id, tenant_id, project_id, work_order_id, task_id,
+                        appointment_type, status, current_revision_id, current_revision_no,
+                        assigned_network_id, technician_id, aggregate_version, created_by, created_at
+                    ) VALUES (
+                        :id, :tenant, :projectId, :workOrderId, :taskId,
+                        'INSTALLATION', 'CONFIRMED', :revisionId, 1,
+                        :network, 'tech-a', 1, 'fixture', :createdAt
+                    )
+                    """)
+                    .param("id", appointmentId)
+                    .param("tenant", TENANT)
+                    .param("projectId", projectId)
+                    .param("workOrderId", workOrderId)
+                    .param("taskId", taskId)
+                    .param("revisionId", revisionId)
+                    .param("network", assignedNetworkId)
+                    .param("createdAt", java.sql.Timestamp.from(createdAt))
+                    .update();
+            jdbc.sql("""
+                    INSERT INTO apt_appointment_revision (
+                        revision_id, tenant_id, appointment_id, revision_no, previous_revision_id,
+                        window_start, window_end, timezone, estimated_duration_minutes,
+                        address_ref, address_version,
+                        confirmed_party_type, confirmed_party_ref, confirmation_channel, confirmed_at,
+                        reason_code, note, revision_kind, created_by, created_at
+                    ) VALUES (
+                        :revisionId, :tenant, :appointmentId, 1, NULL,
+                        :start, :end, 'Asia/Shanghai', 120,
+                        'addr-ref', 'v1',
+                        'CUSTOMER', 'customer-ref', 'PHONE', :confirmedAt,
+                        NULL, 'note-should-not-leak', 'CONFIRM', 'fixture', :createdAt
+                    )
+                    """)
+                    .param("revisionId", revisionId)
+                    .param("tenant", TENANT)
+                    .param("appointmentId", appointmentId)
+                    .param("start", java.sql.Timestamp.from(start))
+                    .param("end", java.sql.Timestamp.from(end))
+                    .param("confirmedAt", java.sql.Timestamp.from(createdAt))
+                    .param("createdAt", java.sql.Timestamp.from(createdAt))
+                    .update();
+        });
+        return appointmentId;
+    }
+
+    /** M227：最小 ContactAttempt（无 PII 泄漏字段进入摘要）。 */
+    private UUID seedContactAttempt(UUID taskId, UUID workOrderId, String marker) {
+        UUID contactAttemptId = UUID.randomUUID();
+        UUID projectId = jdbc.sql("SELECT project_id FROM tsk_task WHERE task_id=:id")
+                .param("id", taskId)
+                .query(UUID.class)
+                .single();
+        OffsetDateTime scopeNow = OffsetDateTime.ofInstant(
+                Instant.parse("2026-07-17T00:00:00Z"), ZoneOffset.UTC);
+        jdbc.sql("""
+                INSERT INTO prj_project (
+                    project_id, tenant_id, project_code, client_id, project_name,
+                    starts_on, ends_on, project_status, aggregate_version, created_at)
+                VALUES (
+                    :projectId, :tenantId, :code, 'BYD', 'M227 Contact fixture',
+                    DATE '2026-07-01', NULL, 'ACTIVE', 1, :createdAt)
+                ON CONFLICT (project_id) DO NOTHING
+                """)
+                .param("projectId", projectId)
+                .param("tenantId", TENANT)
+                .param("code", "M227C-" + marker + "-" + taskId.toString().substring(24))
+                .param("createdAt", scopeNow)
+                .update();
+        Instant startedAt = Instant.parse("2026-07-17T02:30:00Z");
+        jdbc.sql("""
+                INSERT INTO apt_contact_attempt (
+                    contact_attempt_id, tenant_id, project_id, work_order_id, task_id,
+                    channel, contacted_party_ref, started_at, ended_at, result_code,
+                    note, next_contact_at, recording_ref, actor_id, created_at
+                ) VALUES (
+                    :id, :tenantId, :projectId, :workOrderId, :taskId,
+                    'PHONE', 'contacted-party-should-not-leak', :startedAt, :endedAt, 'CONNECTED',
+                    'note-should-not-leak', NULL, 'recording-should-not-leak',
+                    'contact-actor-should-not-leak', :createdAt
+                )
+                """)
+                .param("id", contactAttemptId)
+                .param("tenantId", TENANT)
+                .param("projectId", projectId)
+                .param("workOrderId", workOrderId)
+                .param("taskId", taskId)
+                .param("startedAt", java.sql.Timestamp.from(startedAt))
+                .param("endedAt", java.sql.Timestamp.from(startedAt.plusSeconds(30)))
+                .param("createdAt", java.sql.Timestamp.from(startedAt.plusSeconds(31)))
+                .update();
+        return contactAttemptId;
     }
 
     /**

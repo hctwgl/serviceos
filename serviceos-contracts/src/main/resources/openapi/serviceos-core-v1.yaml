@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.6
+  version: 1.0.7
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1470,6 +1470,10 @@ paths:
         M226：可选 `exceptions`（复用 NetworkPortalExceptionItem）；
         需 NETWORK `operations.exception.read`，缺能力时省略（不得用空数组伪装）；
         仅覆盖 ACTIVE taskIds；含全部状态。
+        M227：可选 `appointments` / `contactAttempts`（复用 Admin 工作区摘要字段集）；
+        需 NETWORK `networkPortal.manageAppointment`，缺能力时同时省略两属性
+        （不得用空数组伪装）；仅覆盖 ACTIVE taskIds；预约另按可信 networkId 过滤
+        assignedNetworkId。
         上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
       parameters:
         - name: workOrderId
@@ -4996,6 +5000,22 @@ components:
           type: array
           maxItems: 100
           items: { $ref: '#/components/schemas/NetworkPortalExceptionItem' }
+        appointments:
+          description: |
+            M227：需 NETWORK networkPortal.manageAppointment；缺能力时与 contactAttempts 同时省略；
+            有能力且无实例时返回 []。元素字段复用 WorkOrderWorkspaceAppointmentSummary
+            （无 revisions/allowedActions/address）。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceAppointmentSummary' }
+        contactAttempts:
+          description: |
+            M227：需 NETWORK networkPortal.manageAppointment；缺能力时与 appointments 同时省略；
+            有能力且无实例时返回 []。元素字段复用 WorkOrderWorkspaceContactAttemptSummary
+            （无 contactedPartyRef/note/recordingRef/actorId）。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceContactAttemptSummary' }
         asOf: { type: string, format: date-time }
     NetworkPortalTaskItem:
       type: object

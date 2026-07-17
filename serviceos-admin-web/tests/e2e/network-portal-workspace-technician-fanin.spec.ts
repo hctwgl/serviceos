@@ -114,6 +114,38 @@ async function stubPortal(page: Page, options?: { denyTechnicians?: boolean }) {
               effectiveFrom: '2026-07-17T10:00:00Z',
             },
           ],
+          // M227：预约 window 由 workspace.appointments 交付（不再依赖列表 fan-in）
+          appointments: [
+            {
+              appointmentId: APPOINTMENT_ID,
+              taskId: TASK_ASSIGNED,
+              type: 'SURVEY',
+              status: 'PROPOSED',
+              assignedNetworkId: NETWORK_ID,
+              technicianId: TECH_PROFILE_ID,
+              currentRevisionNo: 1,
+              windowStart: WINDOW_START,
+              windowEnd: WINDOW_END,
+              timezone: 'Asia/Shanghai',
+              estimatedDurationMinutes: 180,
+              aggregateVersion: 1,
+              createdAt: '2026-07-17T10:00:00Z',
+            },
+          ],
+          contactAttempts: [
+            {
+              contactAttemptId: CONTACT_ID,
+              taskId: TASK_ASSIGNED,
+              projectId: '019f84a0-eeee-7f8c-9505-36fe5c0ee005',
+              workOrderId: WORK_ORDER_ID,
+              channel: 'PHONE',
+              startedAt: '2026-07-17T11:00:00Z',
+              endedAt: '2026-07-17T11:00:30Z',
+              resultCode: 'NO_ANSWER',
+              nextContactAt: null,
+              createdAt: '2026-07-17T11:00:00Z',
+            },
+          ],
         }),
       })
     },

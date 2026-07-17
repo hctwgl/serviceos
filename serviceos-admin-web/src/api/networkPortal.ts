@@ -221,7 +221,42 @@ export type NetworkPortalWorkOrderWorkspace = {
   corrections?: NetworkPortalWorkspaceCorrectionCaseSummary[]
   /** Soft-gated；缺 NETWORK `operations.exception.read` 时省略，不得用空数组伪装无权限。 */
   exceptions?: NetworkPortalExceptionItem[]
+  /** Soft-gated；缺 NETWORK `networkPortal.manageAppointment` 时与 contactAttempts 同时省略。 */
+  appointments?: NetworkPortalWorkspaceAppointmentSummary[]
+  /** Soft-gated；缺 NETWORK `networkPortal.manageAppointment` 时与 appointments 同时省略。 */
+  contactAttempts?: NetworkPortalWorkspaceContactAttemptSummary[]
   asOf: string
+}
+
+/** M227：工作区预约摘要（对齐 Admin WorkOrderWorkspaceAppointmentSummary）。 */
+export type NetworkPortalWorkspaceAppointmentSummary = {
+  appointmentId: string
+  taskId: string
+  type: string
+  status: string
+  assignedNetworkId: string | null
+  technicianId: string | null
+  currentRevisionNo: number
+  windowStart: string | null
+  windowEnd: string | null
+  timezone: string | null
+  estimatedDurationMinutes: number | null
+  aggregateVersion: number
+  createdAt: string
+}
+
+/** M227：工作区联系尝试摘要（对齐 Admin；无 party/note/recording/actor）。 */
+export type NetworkPortalWorkspaceContactAttemptSummary = {
+  contactAttemptId: string
+  taskId: string
+  projectId: string
+  workOrderId: string
+  channel: string
+  startedAt: string
+  endedAt: string
+  resultCode: string
+  nextContactAt: string | null
+  createdAt: string
 }
 
 export function getNetworkPortalWorkOrderWorkspace(
