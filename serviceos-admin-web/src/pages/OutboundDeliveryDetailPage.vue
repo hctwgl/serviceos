@@ -90,15 +90,28 @@ onMounted(() => {
           <div><dt>aggregateVersion</dt><dd>{{ detail.aggregateVersion }}</dd></div>
           <div><dt>sourceWorkOrderId</dt><dd>{{ detail.sourceWorkOrderId }}</dd></div>
           <div><dt>sourceReviewCaseId</dt><dd>{{ detail.sourceReviewCaseId }}</dd></div>
+          <div><dt>sourceTaskId</dt><dd>{{ detail.sourceTaskId }}</dd></div>
+          <div><dt>sourceSnapshotId</dt><dd>{{ detail.sourceSnapshotId }}</dd></div>
           <div><dt>clientReviewCaseId</dt><dd>{{ detail.clientReviewCaseId ?? '-' }}</dd></div>
           <div><dt>reviewRouteId</dt><dd>{{ detail.reviewRouteId ?? '-' }}</dd></div>
         </dl>
-        <p class="links">
+        <p class="links outbound-cross-links">
           <RouterLink :to="{ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: detail.sourceWorkOrderId } }">
             工单工作区
           </RouterLink>
           <RouterLink :to="{ name: 'ADMIN.REVIEW.DETAIL', params: { id: detail.sourceReviewCaseId } }">
             源审核案例
+          </RouterLink>
+          <RouterLink :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.sourceTaskId } }">
+            打开源任务 {{ detail.sourceTaskId }}
+          </RouterLink>
+          <RouterLink
+            :to="{
+              name: 'ADMIN.EVIDENCE_SET_SNAPSHOT.DETAIL',
+              params: { id: detail.sourceSnapshotId },
+            }"
+          >
+            打开源资料快照 {{ detail.sourceSnapshotId }}
           </RouterLink>
           <RouterLink
             v-if="detail.clientReviewCaseId"
@@ -144,6 +157,10 @@ input, textarea, button { border: 1px solid #bcccdc; border-radius: 6px; padding
 button { background: #243b53; color: #fff; border-color: #243b53; cursor: pointer; }
 .error { color: #9b1c1c; }
 .ok { color: #054e31; }
-.links { display: flex; gap: .75rem; }
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
 .dump { background: #f0f4f8; border-radius: 8px; padding: .75rem; overflow: auto; max-height: 320px; font-size: .8rem; }
 </style>

@@ -8,6 +8,8 @@ export type OutboundDelivery = {
   sourceReviewCaseId: string
   sourceTaskId: string
   sourceWorkOrderId: string
+  sourceSnapshotId: string
+  sourceSnapshotDigest: string
   externalOrderCode: string
   status: string
   aggregateVersion: number

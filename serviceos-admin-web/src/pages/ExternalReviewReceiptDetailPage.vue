@@ -72,6 +72,14 @@ onMounted(() => {
           </RouterLink>
           <RouterLink
             :to="{
+              name: 'ADMIN.INTEGRATION.INBOUND.DETAIL',
+              params: { id: detail.inboundEnvelopeId },
+            }"
+          >
+            打开入站 Envelope {{ detail.inboundEnvelopeId }}
+          </RouterLink>
+          <RouterLink
+            :to="{
               name: 'ADMIN.INTEGRATION.CANONICAL.DETAIL',
               params: { id: detail.canonicalMessageId },
             }"

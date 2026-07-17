@@ -215,6 +215,17 @@ type OutboundDeliveryLink = {
   businessMessageType: string
   status: string
   externalOrderCode: string
+  sourceReviewCaseId: string
+  sourceTaskId: string
+  sourceSnapshotId: string
+  clientReviewCaseId: string
+}
+
+type OutboundCrossLink = {
+  key: string
+  routeName: string
+  resourceId: string
+  label: string
 }
 
 type ReviewCaseLink = {
@@ -381,15 +392,81 @@ const outboundDeliveryLinks = computed((): OutboundDeliveryLink[] => {
       if (!item || typeof item !== 'object') return null
       const row = item as Record<string, unknown>
       const id = row.deliveryId
+      const sourceReviewCaseId = row.sourceReviewCaseId
+      const sourceTaskId = row.sourceTaskId
+      const sourceSnapshotId = row.sourceSnapshotId
       if (typeof id !== 'string' || !id) return null
+      if (typeof sourceReviewCaseId !== 'string' || !sourceReviewCaseId) return null
+      if (typeof sourceTaskId !== 'string' || !sourceTaskId) return null
+      if (typeof sourceSnapshotId !== 'string' || !sourceSnapshotId) return null
       return {
         deliveryId: id,
         businessMessageType: String(row.businessMessageType ?? '—'),
         status: String(row.status ?? '—'),
         externalOrderCode: String(row.externalOrderCode ?? id),
+        sourceReviewCaseId,
+        sourceTaskId,
+        sourceSnapshotId,
+        clientReviewCaseId:
+          typeof row.clientReviewCaseId === 'string' ? row.clientReviewCaseId : '',
       }
     })
     .filter((item): item is OutboundDeliveryLink => item != null)
+})
+
+/**
+ * 工作区外发关联资源深链：仅使用 Accepted INTEGRATION 投影字段。
+ * 前缀 ob / 避免与交付详情链接及详情页交叉链严格模式冲突。
+ */
+const outboundCrossLinks = computed((): OutboundCrossLink[] => {
+  if (activeSection.value !== 'INTEGRATION') return []
+  const links: OutboundCrossLink[] = []
+  const seen = new Set<string>()
+  for (const item of outboundDeliveryLinks.value) {
+    const reviewKey = `source-review:${item.sourceReviewCaseId}`
+    if (!seen.has(reviewKey)) {
+      seen.add(reviewKey)
+      links.push({
+        key: reviewKey,
+        routeName: 'ADMIN.REVIEW.DETAIL',
+        resourceId: item.sourceReviewCaseId,
+        label: `ob / 源审核 / ${item.sourceReviewCaseId}`,
+      })
+    }
+    const taskKey = `source-task:${item.sourceTaskId}`
+    if (!seen.has(taskKey)) {
+      seen.add(taskKey)
+      links.push({
+        key: taskKey,
+        routeName: 'ADMIN.TASK.DETAIL',
+        resourceId: item.sourceTaskId,
+        label: `ob / 源任务 / ${item.sourceTaskId}`,
+      })
+    }
+    const snapshotKey = `source-snapshot:${item.sourceSnapshotId}`
+    if (!seen.has(snapshotKey)) {
+      seen.add(snapshotKey)
+      links.push({
+        key: snapshotKey,
+        routeName: 'ADMIN.EVIDENCE_SET_SNAPSHOT.DETAIL',
+        resourceId: item.sourceSnapshotId,
+        label: `ob / 源快照 / ${item.sourceSnapshotId}`,
+      })
+    }
+    if (item.clientReviewCaseId) {
+      const clientKey = `client-review:${item.clientReviewCaseId}`
+      if (!seen.has(clientKey)) {
+        seen.add(clientKey)
+        links.push({
+          key: clientKey,
+          routeName: 'ADMIN.REVIEW.DETAIL',
+          resourceId: item.clientReviewCaseId,
+          label: `ob / CLIENT 审核 / ${item.clientReviewCaseId}`,
+        })
+      }
+    }
+  }
+  return links
 })
 
 /** 复用已 Implemented Review/Correction 详情路由；投影缺权时数组为 null。 */
@@ -1143,6 +1220,19 @@ onMounted(() => {
               }"
             >
               {{ item.businessMessageType }} / {{ item.status }} / {{ item.externalOrderCode }}
+            </RouterLink>
+          </p>
+          <p v-if="outboundCrossLinks.length" class="links outbound-cross-links">
+            打开外发关联资源：
+            <RouterLink
+              v-for="item in outboundCrossLinks"
+              :key="item.key"
+              :to="{
+                name: item.routeName,
+                params: { id: item.resourceId },
+              }"
+            >
+              {{ item.label }}
             </RouterLink>
           </p>
           <p v-if="reviewCaseLinks.length" class="links review-links">

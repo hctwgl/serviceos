@@ -2145,6 +2145,18 @@ test('真实 OIDC 登录后可通过审核外发并经厂端回调关闭 CLIENT 
       .locator('xpath=../dd')
       .innerText()
   ).trim()
+  const sourceTaskId = (
+    await reviewPage
+      .locator('dt', { hasText: /^sourceTaskId$/ })
+      .locator('xpath=../dd')
+      .innerText()
+  ).trim()
+  const sourceSnapshotId = (
+    await reviewPage
+      .locator('dt', { hasText: /^sourceSnapshotId$/ })
+      .locator('xpath=../dd')
+      .innerText()
+  ).trim()
   expect(clientReviewCaseId).toMatch(
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
   )
@@ -2152,6 +2164,41 @@ test('真实 OIDC 登录后可通过审核外发并经厂端回调关闭 CLIENT 
   expect(sourceWorkOrderId).toMatch(
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
   )
+  expect(sourceTaskId).toMatch(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+  )
+  expect(sourceSnapshotId).toMatch(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+  )
+
+  // M171：外发详情 → 源任务 / 源资料快照交叉深链。
+  const outboundSourceTaskPromise = reviewPage.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname === `/api/v1/tasks/${sourceTaskId}`,
+  )
+  await reviewPage
+    .locator('.outbound-cross-links')
+    .getByRole('link', { name: new RegExp(`打开源任务\\s+${sourceTaskId}`) })
+    .click()
+  expect((await outboundSourceTaskPromise).status()).toBe(200)
+  await expect(reviewPage.getByRole('heading', { name: '任务详情' })).toBeVisible()
+  await reviewPage.goto(
+    new URL(`/integration/outbound/${delivery.deliveryId}`, page.url()).toString(),
+  )
+  await expect(reviewPage.getByRole('heading', { name: '外发交付' })).toBeVisible()
+  const outboundSourceSnapshotPromise = reviewPage.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname ===
+        `/api/v1/evidence-set-snapshots/${sourceSnapshotId}`,
+  )
+  await reviewPage
+    .locator('.outbound-cross-links')
+    .getByRole('link', { name: new RegExp(`打开源资料快照\\s+${sourceSnapshotId}`) })
+    .click()
+  expect((await outboundSourceSnapshotPromise).status()).toBe(200)
+  await expect(reviewPage.getByRole('heading', { name: '资料快照详情' })).toBeVisible()
 
   // M147：工作区 INTEGRATION → 外发交付详情深链（复用已有 OutboundDeliveryDetailPage）。
   await reviewPage.goto(
@@ -2160,6 +2207,27 @@ test('真实 OIDC 登录后可通过审核外发并经厂端回调关闭 CLIENT 
   await expect(reviewPage.getByRole('heading', { name: '工单工作区' })).toBeVisible()
   await reviewPage.getByRole('button', { name: /INTEGRATION/ }).click()
   await expect(reviewPage.getByText('区块加载中…')).toHaveCount(0)
+
+  // M171：工作区外发关联资源 → 源任务。
+  await expect(reviewPage.getByText('打开外发关联资源：')).toBeVisible()
+  const workspaceOutboundTaskPromise = reviewPage.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname === `/api/v1/tasks/${sourceTaskId}`,
+  )
+  await reviewPage
+    .locator('.outbound-cross-links')
+    .getByRole('link', { name: new RegExp(`ob\\s*/\\s*源任务\\s*/\\s*${sourceTaskId}`) })
+    .click()
+  expect((await workspaceOutboundTaskPromise).status()).toBe(200)
+  await expect(reviewPage.getByRole('heading', { name: '任务详情' })).toBeVisible()
+  await reviewPage.goto(
+    new URL(`/work-orders/${sourceWorkOrderId}`, page.url()).toString(),
+  )
+  await expect(reviewPage.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await reviewPage.getByRole('button', { name: /INTEGRATION/ }).click()
+  await expect(reviewPage.getByText('区块加载中…')).toHaveCount(0)
+
   const workspaceOutboundDetailPromise = reviewPage.waitForResponse(
     (response) =>
       response.request().method() === 'GET' &&
@@ -2167,6 +2235,7 @@ test('真实 OIDC 登录后可通过审核外发并经厂端回调关闭 CLIENT 
         `/api/v1/outbound-deliveries/${delivery.deliveryId}`,
   )
   await reviewPage
+    .locator('.outbound-links')
     .getByRole('link', {
       name: new RegExp(
         `SUBMIT_CLIENT_REVIEW\\s*/\\s*ACKNOWLEDGED\\s*/\\s*${externalOrderCode}`,
@@ -2298,11 +2367,31 @@ test('真实 OIDC 登录后可通过审核外发并经厂端回调关闭 CLIENT 
   const receiptBody = (await receiptDetailResponse.json()) as {
     receiptId: string
     result: string
+    inboundEnvelopeId: string
   }
   expect(receiptBody.result).toBe('APPROVED')
+  expect(receiptBody.inboundEnvelopeId).toBeTruthy()
   await expect(reviewPage.getByRole('heading', { name: '外部审核回执' })).toBeVisible()
   await expect(reviewPage).toHaveURL(
     new RegExp(`/external-review-receipts/${receiptBody.receiptId}$`),
+  )
+
+  // M171：外部审核回执 → 入站 Envelope 交叉深链。
+  const receiptEnvelopePromise = reviewPage.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname ===
+        `/api/v1/inbound-envelopes/${receiptBody.inboundEnvelopeId}`,
+  )
+  await reviewPage
+    .getByRole('link', {
+      name: new RegExp(`打开入站 Envelope\\s+${receiptBody.inboundEnvelopeId}`),
+    })
+    .click()
+  expect((await receiptEnvelopePromise).status()).toBe(200)
+  await expect(reviewPage.getByRole('heading', { name: '入站 Envelope' })).toBeVisible()
+  await expect(reviewPage).toHaveURL(
+    new RegExp(`/integration/inbound/${receiptBody.inboundEnvelopeId}$`),
   )
 
   await reviewPage.close()
