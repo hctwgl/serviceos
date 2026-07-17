@@ -615,7 +615,19 @@ onMounted(() => {
           <h3>概览</h3>
           <dl>
             <div><dt>状态</dt><dd>{{ workspace.header.status }}</dd></div>
-            <div><dt>项目</dt><dd>{{ workspace.header.projectId }}</dd></div>
+            <div>
+              <dt>项目</dt>
+              <dd>
+                <RouterLink
+                  :to="{
+                    name: 'ADMIN.PROJECT.DETAIL',
+                    params: { id: workspace.header.projectId },
+                  }"
+                >
+                  {{ workspace.header.projectId }}
+                </RouterLink>
+              </dd>
+            </div>
             <div><dt>外部单号</dt><dd>{{ workspace.header.externalOrderCode || '—' }}</dd></div>
             <div><dt>时间线 freshness</dt><dd>{{ workspace.timelineFreshnessStatus }}</dd></div>
             <div><dt>asOf</dt><dd>{{ workspace.meta.asOf }}</dd></div>
@@ -631,7 +643,16 @@ onMounted(() => {
               <dd v-if="workspace.currentTaskSummary">
                 {{ workspace.currentTaskSummary.taskType }} /
                 {{ workspace.currentTaskSummary.status }}
-                <small>{{ workspace.currentTaskSummary.taskId }}</small>
+                <small>
+                  <RouterLink
+                    :to="{
+                      name: 'ADMIN.TASK.DETAIL',
+                      params: { id: workspace.currentTaskSummary.taskId },
+                    }"
+                  >
+                    {{ workspace.currentTaskSummary.taskId }}
+                  </RouterLink>
+                </small>
               </dd>
               <dd v-else>—</dd>
             </div>
@@ -827,6 +848,16 @@ onMounted(() => {
           :to="{ name: 'ADMIN.SLA.DETAIL', params: { id: item.slaInstanceId } }"
         >
           {{ item.slaRef || item.slaInstanceId }}
+        </RouterLink>
+      </p>
+      <p v-if="slaPage?.items?.length" class="links sla-task-links">
+        打开 SLA 关联任务：
+        <RouterLink
+          v-for="item in slaPage.items"
+          :key="`sla-task-${item.slaInstanceId}`"
+          :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: item.taskId } }"
+        >
+          {{ item.slaRef || item.slaInstanceId }} / {{ item.taskId }}
         </RouterLink>
       </p>
 

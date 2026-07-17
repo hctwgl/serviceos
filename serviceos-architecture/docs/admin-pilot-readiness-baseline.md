@@ -1,13 +1,13 @@
 ---
-title: Admin 试点可运行基线（含 M156 资料项/快照详情）
+title: Admin 试点可运行基线（含 M157 项目/SLA 任务深链）
 status: Implemented
 lastUpdated: 2026-07-17
 ---
 
-# Admin 试点可运行基线（含 M156 资料项/快照详情）
+# Admin 试点可运行基线（含 M157 项目/SLA 任务深链）
 
-本基线覆盖 M101～M156 已有 Admin 表面的可重复构建、登录、真实后端/数据库试点入口，并明确
-平台级未实现边界。M135～M156 追加补传复审、预约上门、提审外发 ACK、厂端回调、入站接单激活、
+本基线覆盖 M101～M157 已有 Admin 表面的可重复构建、登录、真实后端/数据库试点入口，并明确
+平台级未实现边界。M135～M157 追加补传复审、预约上门、提审外发 ACK、厂端回调、入站接单激活、
 Admin HTTP 人工初派、同单预约上门→表单/资料/驳回整改补传复审/外发/完结（`ADMIN-PILOT-09`）、
 入站 Envelope/Canonical 详情深链、专项队列与目录/SLA Accepted OpenAPI 筛选，以及工作区外发/审核/整改详情深链。
 
@@ -218,6 +218,11 @@ GitHub Actions 使用同一脚本阻断 PR，并保留 Backend、Admin 与 Playw
 
 - 资料项/资料快照只读详情页与工作区/Task 面板深链；
 - Visit 独立详情页、专用入站队列列表仍未证明。
+
+已追加证明（M157 / ADMIN-PILOT-08XN）：
+
+- 工作区项目与 SLA 任务交叉深链；
+- Admin R1 只读胶水在已 Accepted 契约上已基本收口；Visit/inbound 列表/SavedView 仍依赖契约接受。
 
 尚未证明：
 

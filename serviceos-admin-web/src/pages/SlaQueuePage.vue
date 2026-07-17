@@ -85,6 +85,7 @@ onMounted(() => load())
         'remainingSeconds',
         'overdueSeconds',
         'workOrderId',
+        'taskId',
       ]"
       :rows="rows"
       :loading="loading"
@@ -113,6 +114,16 @@ onMounted(() => load())
         :to="{ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: item.workOrderId } }"
       >
         {{ item.workOrderId }}
+      </RouterLink>
+    </p>
+    <p v-if="page?.items?.length" class="links">
+      打开关联任务：
+      <RouterLink
+        v-for="item in page.items"
+        :key="`task-${item.slaInstanceId}`"
+        :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: item.taskId } }"
+      >
+        {{ item.slaRef || item.slaInstanceId }} / {{ item.taskId }}
       </RouterLink>
     </p>
   </section>

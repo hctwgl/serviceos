@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-17
-baselineCommit: ebcc5bd4156ed49a4ae7bb40ebcad77515815dbc
-latestMilestone: M156
+baselineCommit: PENDING
+latestMilestone: M157
 ---
 
 # ServiceOS 实施状态总览
@@ -39,11 +39,11 @@ latestMilestone: M156
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M156 Admin 资料项/资料快照详情页 |
-| 基线提交 | `ebcc5bd4156ed49a4ae7bb40ebcad77515815dbc` |
+| 最新实施里程碑 | M157 Admin 工作区项目与 SLA 任务深链 |
+| 基线提交 | `PENDING`（功能提交后回填） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
-| 前端工程 | `serviceos-admin-web`（Vue+TS+Vite）已纳入 CI 构建，具备开发态 Keycloak PKCE，以及真实只读、Task MANUAL assign-candidates/claim/release、表单/资料/审核/整改/完结、正常补传复审，预约上门、BYD 提审外发 ACK、厂端回调，CPIM 入站→激活→Admin HTTP 人工初派→同单预约上门→表单/资料/驳回整改补传复审/外发/完结（ADMIN-PILOT-09），入站 Envelope/Canonical 详情深链、专项队列与目录/SLA Accepted OpenAPI 筛选，工作区各按需区块详情或 Task 旁路深链，以及预约/表单提交/资料项/资料快照只读详情页的 PR 阻断 E2E；Network/Technician 尚未建立 |
+| 前端工程 | `serviceos-admin-web`（Vue+TS+Vite）已纳入 CI 构建，具备开发态 Keycloak PKCE，以及真实只读、Task MANUAL assign-candidates/claim/release、表单/资料/审核/整改/完结、正常补传复审，预约上门、BYD 提审外发 ACK、厂端回调，CPIM 入站→激活→Admin HTTP 人工初派→同单预约上门→表单/资料/驳回整改补传复审/外发/完结（ADMIN-PILOT-09），入站 Envelope/Canonical 详情深链、专项队列与目录/SLA Accepted OpenAPI 筛选，工作区各按需区块详情或 Task 旁路、预约/表单/资料详情页，以及工作区项目与 SLA 任务交叉深链的 PR 阻断 E2E；Network/Technician 尚未建立 |
 | 数据库 | PostgreSQL + Flyway（当前版本 084 / 86） |
 | 契约 | Core OpenAPI 0.72.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、recovered/resolved 与 SLA started/breached/met@v1） |
 
@@ -75,7 +75,7 @@ latestMilestone: M156
 | 通知 | 通知与运营异常中心 | `PROPOSED` | 已有总体设计 | 通知通道、模板、可靠发送和 UI | `architecture/14-*` |
 | 履约事实与试算 | 事实提取和双向试算 | `PROPOSED` | 已有设计、API 和数据规划 | 运行时、投影和前端工作区 | M5 设计 |
 | 对账结算 | 对账、结算、争议与调整 | `PROPOSED` | 已有边界设计 | 正式运行时和页面 | `architecture/16-*` |
-| Admin Portal | 总部运营后台 | `PARTIAL` | M101～M156：队列/任务/SLA/异常/外发/工单/项目目录、工作区、allowed-actions；CI 阻断构建；开发态 Keycloak PKCE；真实只读与写链路 PR 阻断 E2E（含 ADMIN-PILOT-09、工作区各区块详情或 Task 旁路、预约/表单提交/资料项/资料快照详情页、专项队列与目录/SLA Accepted OpenAPI 筛选） | 设计系统、SavedView、正式企业 OIDC/BFF、生产对象存储/专业扫描、专用入站队列列表、评分/硬过滤派单与 ServiceNetwork 生命周期 | M7 设计、M101～M156、Admin 试点基线 |
+| Admin Portal | 总部运营后台 | `PARTIAL` | M101～M157：队列/任务/SLA/异常/外发/工单/项目目录、工作区、allowed-actions；CI 阻断构建；开发态 Keycloak PKCE；真实只读与写链路 PR 阻断 E2E（含 ADMIN-PILOT-09、工作区各区块详情或 Task 旁路、预约/表单/资料详情页、项目与 SLA 任务交叉深链、专项队列与目录/SLA Accepted OpenAPI 筛选） | 设计系统、SavedView、正式企业 OIDC/BFF、生产对象存储/专业扫描、专用入站队列列表、评分/硬过滤派单与 ServiceNetwork 生命周期 | M7 设计、M101～M157、Admin 试点基线 |
 | Network Portal | 网点协作端 | `PROPOSED` | 页面和跨端协作规格 | 前端代码和 E2E | M7 设计 |
 | Technician App | 师傅移动端 | `PROPOSED` | 弱网、离线工作包、上传队列和页面规格 | 移动端工程、真机和离线运行时 | M7 设计 |
 | External Portal | 用户/车企受控页面 | `PROPOSED` | 最小边界规划 | 二期页面和工程实现 | M7 设计 |
@@ -1126,6 +1126,16 @@ M144 起 SPI 种子入口已删除。
 
 明确未实现：评分/硬过滤/DispatchDecision、ServiceNetwork 生命周期、专用入站队列页、真实 sandbox。
 
+### M157：Admin 工作区项目与 SLA 任务深链
+
+已实现：
+
+- 工作区概览 `projectId` → 项目详情；`currentTaskSummary.taskId` → 任务详情；
+- 工作区/SLA 工作台「打开 SLA 关联任务」→ Task 详情；
+- Playwright：项目 GET；工作区与队列 SLA→Task GET。
+
+明确未实现：Visit 独立详情页、专用入站队列列表 API、SavedView、企业 OIDC/BFF、真实 sandbox。
+
 ### M156：Admin 资料项/资料快照详情页
 
 已实现：
@@ -1251,12 +1261,13 @@ M144 起 SPI 种子入口已删除。
 
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M156**。Admin 已证明 `ADMIN-PILOT-09`、工作区各按需区块详情或
-Task 旁路、预约/表单提交/资料项/资料快照只读详情页与专项队列及目录/SLA Accepted OpenAPI 筛选；没有
-实现专用入站队列列表、完整评分派单引擎、完整 SLA/通知策略、通用队列/SavedView 或整个现场履约平台。
+ServiceOS 可靠纵向切片已推进到 **M157**。Admin Pilot 在已 Accepted 契约上的只读胶水已基本收口
+（工作区区块详情/旁路、预约/表单/资料详情、项目与 SLA 任务交叉深链、专项队列与目录筛选、
+`ADMIN-PILOT-09`）；没有实现专用入站队列列表、完整评分派单引擎、完整 SLA/通知策略、通用队列/
+SavedView 或整个现场履约平台。
 
 ```text
-候选下一方向（优先从已确认文档中选择最小可靠切片）：
+候选下一方向（优先从已确认文档中选择最小可靠切片；Admin R1 胶水无更多未阻塞项时勿发明契约）：
 1. 正式企业 OIDC/BFF、MFA 与设计系统；SavedView 仍需再接受 API-06 章节；
 2. 授权入站 Envelope 队列（需先接受 API-06 §6 `GET /inbound-envelopes` 窄化列表契约）；
 3. Visit GET by id 接受后补齐 Visit 详情页；当前 OpenAPI 无该读路径；
