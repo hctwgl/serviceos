@@ -1079,7 +1079,7 @@ for _ in $(seq 1 45); do
              'BYD:REVIEW:' || delivery.external_order_code || ':%'
       LEFT JOIN int_inbound_envelope envelope
         ON envelope.tenant_id = callback_canonical.tenant_id
-       AND envelope.canonical_message_id = callback_canonical.canonical_message_id
+       AND envelope.inbound_envelope_id = callback_canonical.source_envelope_id
        AND envelope.message_type = 'RECORD_CLIENT_REVIEW_RESULT'
        AND envelope.processing_status = 'COMPLETED'
      WHERE delivery.source_review_case_id IN (
