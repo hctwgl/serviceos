@@ -169,6 +169,54 @@ onMounted(() => {
         {{ item.sourceWorkOrderId }}
       </RouterLink>
     </p>
+    <p v-if="page?.items?.length" class="links outbound-queue-cross-links">
+      打开关联资源：
+      <RouterLink
+        v-for="item in page.items"
+        :key="`project-${item.deliveryId}`"
+        :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: item.projectId } }"
+      >
+        打开项目 {{ item.projectId }}
+      </RouterLink>
+      <RouterLink
+        v-for="item in page.items"
+        :key="`src-review-${item.deliveryId}`"
+        :to="{ name: 'ADMIN.REVIEW.DETAIL', params: { id: item.sourceReviewCaseId } }"
+      >
+        打开源审核 {{ item.sourceReviewCaseId }}
+      </RouterLink>
+      <RouterLink
+        v-for="item in page.items"
+        :key="`src-task-${item.deliveryId}`"
+        :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: item.sourceTaskId } }"
+      >
+        打开源任务 {{ item.sourceTaskId }}
+      </RouterLink>
+      <RouterLink
+        v-for="item in page.items"
+        :key="`src-snap-${item.deliveryId}`"
+        :to="{
+          name: 'ADMIN.EVIDENCE_SET_SNAPSHOT.DETAIL',
+          params: { id: item.sourceSnapshotId },
+        }"
+      >
+        打开源资料快照 {{ item.sourceSnapshotId }}
+      </RouterLink>
+      <RouterLink
+        v-for="item in page.items.filter((i) => i.executionTaskId)"
+        :key="`exec-${item.deliveryId}`"
+        :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: item.executionTaskId! } }"
+      >
+        打开执行任务 {{ item.executionTaskId }}
+      </RouterLink>
+      <RouterLink
+        v-for="item in page.items.filter((i) => i.clientReviewCaseId)"
+        :key="`client-${item.deliveryId}`"
+        :to="{ name: 'ADMIN.REVIEW.DETAIL', params: { id: item.clientReviewCaseId! } }"
+      >
+        打开 CLIENT 审核 {{ item.clientReviewCaseId }}
+      </RouterLink>
+    </p>
   </section>
 </template>
 

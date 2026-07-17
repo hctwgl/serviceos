@@ -177,6 +177,35 @@ onMounted(() => {
         {{ item.messageType }} / {{ item.externalMessageId || item.inboundEnvelopeId }}
       </RouterLink>
     </p>
+    <p v-if="page?.items?.length" class="links inbound-queue-cross-links">
+      打开关联资源：
+      <RouterLink
+        v-for="item in page.items"
+        :key="`project-${item.inboundEnvelopeId}`"
+        :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: item.projectId } }"
+      >
+        打开项目 {{ item.projectId }}
+      </RouterLink>
+      <RouterLink
+        v-for="item in page.items.filter((i) => i.canonicalMessageId)"
+        :key="`canonical-${item.inboundEnvelopeId}`"
+        :to="{
+          name: 'ADMIN.INTEGRATION.CANONICAL.DETAIL',
+          params: { id: item.canonicalMessageId! },
+        }"
+      >
+        打开 Canonical {{ item.canonicalMessageId }}
+      </RouterLink>
+      <RouterLink
+        v-for="item in page.items.filter(
+          (i) => i.resultType === 'WORK_ORDER' && i.resultId,
+        )"
+        :key="`result-${item.inboundEnvelopeId}`"
+        :to="{ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: item.resultId! } }"
+      >
+        打开工单工作区 {{ item.resultId }}
+      </RouterLink>
+    </p>
   </section>
 </template>
 

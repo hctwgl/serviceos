@@ -36,6 +36,11 @@ export type OutboundDeliveryQueuePage = {
     deliveryId: string
     projectId: string
     sourceWorkOrderId: string
+    sourceReviewCaseId: string
+    sourceTaskId: string
+    sourceSnapshotId: string
+    executionTaskId: string | null
+    clientReviewCaseId: string | null
     status: string
     businessMessageType: string
     externalOrderCode: string
@@ -51,6 +56,8 @@ export type OperationalExceptionPage = {
     exceptionId: string
     projectId: string | null
     workOrderId: string | null
+    taskId: string | null
+    handlingTaskId: string | null
     category: string
     severity: string
     status: string
