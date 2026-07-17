@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-17
-baselineCommit: 9beaf0b8d40a930ae6e81e75e705558bdf42a080
-latestMilestone: M141
+baselineCommit: PENDING_M142_COMMIT
+latestMilestone: M142
 ---
 
 # ServiceOS 实施状态总览
@@ -39,11 +39,11 @@ latestMilestone: M141
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M141 Admin 入站同单表单/资料/审核/外发 E2E |
-| 基线提交 | `9beaf0b8d40a930ae6e81e75e705558bdf42a080` |
+| 最新实施里程碑 | M142 Admin 入站同单整改补传复审外发 E2E |
+| 基线提交 | `PENDING_M142_COMMIT` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts` |
-| 前端工程 | `serviceos-admin-web`（Vue+TS+Vite）已纳入 CI 构建，具备开发态 Keycloak PKCE，以及真实只读、Task MANUAL assign-candidates/claim/release、表单/资料/审核/整改/完结、正常补传复审，预约上门、BYD 提审外发 ACK、厂端回调，以及 CPIM 入站→激活→同单预约上门→表单/资料/审核/外发/完结的局部写链路 PR 阻断 E2E；Network/Technician 尚未建立 |
+| 前端工程 | `serviceos-admin-web`（Vue+TS+Vite）已纳入 CI 构建，具备开发态 Keycloak PKCE，以及真实只读、Task MANUAL assign-candidates/claim/release、表单/资料/审核/整改/完结、正常补传复审，预约上门、BYD 提审外发 ACK、厂端回调，以及 CPIM 入站→激活→同单预约上门→表单/资料/驳回整改补传复审/外发/完结的局部写链路 PR 阻断 E2E；Network/Technician 尚未建立 |
 | 数据库 | PostgreSQL + Flyway（当前版本 084 / 86） |
 | 契约 | Core OpenAPI 0.71.0 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、recovered/resolved 与 SLA started/breached/met@v1） |
 
@@ -75,7 +75,7 @@ latestMilestone: M141
 | 通知 | 通知与运营异常中心 | `PROPOSED` | 已有总体设计 | 通知通道、模板、可靠发送和 UI | `architecture/14-*` |
 | 履约事实与试算 | 事实提取和双向试算 | `PROPOSED` | 已有设计、API 和数据规划 | 运行时、投影和前端工作区 | M5 设计 |
 | 对账结算 | 对账、结算、争议与调整 | `PROPOSED` | 已有边界设计 | 正式运行时和页面 | `architecture/16-*` |
-| Admin Portal | 总部运营后台 | `PARTIAL` | M101～M141：队列/任务/SLA/异常/外发/工单/项目目录、工作区、allowed-actions；CI 阻断构建；开发态 Keycloak PKCE；真实只读与局部写链路 PR 阻断 E2E（含补传复审完结、预约上门、BYD 提审外发 ACK、厂端回调、入站接单激活与同单预约上门→表单/资料/审核/外发/完结） | 设计系统、SavedView、正式企业 OIDC/BFF、生产对象存储/专业扫描、完整履约写链路 E2E（含 Admin 派单 HTTP） | M7 设计、M101～M141、Admin 试点基线 |
+| Admin Portal | 总部运营后台 | `PARTIAL` | M101～M142：队列/任务/SLA/异常/外发/工单/项目目录、工作区、allowed-actions；CI 阻断构建；开发态 Keycloak PKCE；真实只读与局部写链路 PR 阻断 E2E（含补传复审完结、预约上门、BYD 提审外发 ACK、厂端回调、入站接单激活与同单预约上门→表单/资料/驳回整改补传复审/外发/完结） | 设计系统、SavedView、正式企业 OIDC/BFF、生产对象存储/专业扫描、完整履约写链路 E2E（含 Admin 派单 HTTP） | M7 设计、M101～M142、Admin 试点基线 |
 | Network Portal | 网点协作端 | `PROPOSED` | 页面和跨端协作规格 | 前端代码和 E2E | M7 设计 |
 | Technician App | 师傅移动端 | `PROPOSED` | 弱网、离线工作包、上传队列和页面规格 | 移动端工程、真机和离线运行时 | M7 设计 |
 | External Portal | 用户/车企受控页面 | `PROPOSED` | 最小边界规划 | 二期页面和工程实现 | M7 设计 |
@@ -1092,25 +1092,36 @@ WAIVE、FORCE_APPROVED/reopen）的 PR 阻断 E2E。详见 `docs/admin-pilot-rea
 
 明确未实现：Admin 派单 HTTP、同单整改分支、专用入站队列页、真实 sandbox、完整 `ADMIN-PILOT-09`。
 
+### M142：Admin 入站同单整改补传复审外发 E2E
+
+已实现：
+
+- 同一入站工单 Playwright：预约上门 → 表单/首轮资料 → INTERNAL REJECTED → CorrectionCase
+  → 同 Item 补传 → resubmit/close → 复审 APPROVED → BYD ACK → 厂端回调 → dual complete → FULFILLED；
+- SQL 断言双 Snapshot、REJECTED/CLOSED/APPROVED、Outbound/CLIENT 与完结状态；
+- ServiceAssignment 仍为本地夹具。
+
+明确未实现：Admin 派单 HTTP、专用入站队列页、真实 sandbox、完整 `ADMIN-PILOT-09`。
+
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M141**。Admin 已证明入站→激活→同单预约上门→表单/资料/审核/
-外发/完结，以及独立夹具上的补传复审；没有实现 Admin 派单 HTTP、完整 SLA/通知策略、通用队列/
-SavedView 或整个现场履约平台。
+ServiceOS 可靠纵向切片已推进到 **M142**。Admin 已证明入站→激活→同单预约上门→表单/资料/
+驳回整改补传复审→外发/完结；没有实现 Admin 派单 HTTP、完整 SLA/通知策略、通用队列/SavedView
+或整个现场履约平台。
 
 ```text
 候选下一方向（优先从已确认文档中选择最小可靠切片）：
 1. 正式企业 OIDC/BFF、MFA 与设计系统；SavedView 仍需再接受 API-06 章节；
-2. Admin ServiceAssignment / 派单 HTTP（当前仍为 SPI + 本地夹具；继续向 ADMIN-PILOT-09 收敛）；
-3. 同单整改驳回/补传分支接到入站工单（独立夹具已证明，同单尚未贯通）；
-4. 在接受 ServiceNetwork 状态语义后建立目录与准入/启用/清退生命周期；当前相关文档仍为 Proposed，
+2. Admin ServiceAssignment / 派单 HTTP（当前仍为 SPI + 本地夹具；完整 ADMIN-PILOT-09 的剩余硬门禁，
+   需先接受窄化 API/派单契约，不得猜测 Proposed ServiceNetwork 语义）；
+3. 在接受 ServiceNetwork 状态语义后建立目录与准入/启用/清退生命周期；当前相关文档仍为 Proposed，
    不得猜测状态值或转换规则；
-5. 建立 Organization/Region 目录、层级后代与组织到 Project 的权威关系；
-6. 在试点确认日历/暂停/预警规则后扩展 BUSINESS 时钟、暂停和升级；
-7. 多候选人评分、自动 claim、网点容量联动；
-8. OCR/CV、GPS 权威距离、二级审批/MFA、报告 GENERATED 资料包；
-9. 表达式计算字段、决策表/脚本、草稿冲突与离线合并；
-10. 履约事实试算与结算运行时；Admin 投影重建/重放 HTTP（需另接受运维契约）。
+4. 建立 Organization/Region 目录、层级后代与组织到 Project 的权威关系；
+5. 在试点确认日历/暂停/预警规则后扩展 BUSINESS 时钟、暂停和升级；
+6. 多候选人评分、自动 claim、网点容量联动；
+7. OCR/CV、GPS 权威距离、二级审批/MFA、报告 GENERATED 资料包；
+8. 表达式计算字段、决策表/脚本、草稿冲突与离线合并；
+9. 履约事实试算与结算运行时；Admin 投影重建/重放 HTTP（需另接受运维契约）。
 ```
 
 接手 Agent 必须先检查仓库是否已有更新的里程碑文档、ADR 或提交；在收到明确批准前不得猜测业务策略并实现上述候选项。

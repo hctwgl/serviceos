@@ -1096,7 +1096,7 @@ done
   exit 1
 }
 
-# M141：同单入站贯通终态——FULFILLED + BYD:INSTALL 系谱 + 表单/资料/审核/外发/回调。
+# M142：同单入站贯通终态——FULFILLED + 系谱 + 双 Snapshot + REJECTED/CLOSED 整改 + 复审外发/回调。
 inbound_state=""
 for _ in $(seq 1 90); do
   inbound_state="$(query_db "
@@ -1112,7 +1112,9 @@ for _ in $(seq 1 90); do
            count(DISTINCT visit.visit_id) || ':' ||
            count(DISTINCT submission.form_submission_id) || ':' ||
            count(DISTINCT snapshot.evidence_set_snapshot_id) || ':' ||
-           count(DISTINCT internal_case.review_case_id) || ':' ||
+           count(DISTINCT rejected_case.review_case_id) || ':' ||
+           count(DISTINCT correction.correction_case_id) || ':' ||
+           count(DISTINCT approved_case.review_case_id) || ':' ||
            coalesce(max(delivery.status), 'NONE') || ':' ||
            coalesce(max(client_case.status), 'NONE')
       FROM wo_work_order work_order
@@ -1152,14 +1154,23 @@ for _ in $(seq 1 90); do
       LEFT JOIN evd_evidence_set_snapshot snapshot
         ON snapshot.tenant_id = task.tenant_id
        AND snapshot.task_id = task.task_id
-      LEFT JOIN evd_review_case internal_case
-        ON internal_case.tenant_id = task.tenant_id
-       AND internal_case.task_id = task.task_id
-       AND internal_case.origin = 'INTERNAL'
-       AND internal_case.status = 'APPROVED'
+      LEFT JOIN evd_review_case rejected_case
+        ON rejected_case.tenant_id = task.tenant_id
+       AND rejected_case.task_id = task.task_id
+       AND rejected_case.origin = 'INTERNAL'
+       AND rejected_case.status = 'REJECTED'
+      LEFT JOIN evd_correction_case correction
+        ON correction.tenant_id = rejected_case.tenant_id
+       AND correction.source_review_case_id = rejected_case.review_case_id
+       AND correction.status = 'CLOSED'
+      LEFT JOIN evd_review_case approved_case
+        ON approved_case.tenant_id = task.tenant_id
+       AND approved_case.task_id = task.task_id
+       AND approved_case.origin = 'INTERNAL'
+       AND approved_case.status = 'APPROVED'
       LEFT JOIN int_outbound_delivery delivery
-        ON delivery.tenant_id = internal_case.tenant_id
-       AND delivery.source_review_case_id = internal_case.review_case_id
+        ON delivery.tenant_id = approved_case.tenant_id
+       AND delivery.source_review_case_id = approved_case.review_case_id
        AND delivery.status = 'ACKNOWLEDGED'
       LEFT JOIN evd_review_case client_case
         ON client_case.review_case_id = delivery.client_review_case_id
@@ -1169,14 +1180,14 @@ for _ in $(seq 1 90); do
        AND work_order.external_order_code = '${inbound_order_code}'
      GROUP BY work_order.id, work_order.status
   ")"
-  # FULFILLED : Envelope : BYD:INSTALL key : Workflow : Task : formRef : Apt : Visit : Form : Snapshot : INTERNAL : Outbound : CLIENT
-  [[ "${inbound_state}" == "FULFILLED:1:t:COMPLETED:COMPLETED:admin.pilot-inbound-form:1:1:1:1:1:ACKNOWLEDGED:APPROVED" \
-    || "${inbound_state}" == "FULFILLED:1:true:COMPLETED:COMPLETED:admin.pilot-inbound-form:1:1:1:1:1:ACKNOWLEDGED:APPROVED" ]] && break
+  # FULFILLED : Envelope : BYD:INSTALL : WF : Task : formRef : Apt : Visit : Form : Snapshots : REJECTED : CLOSED : APPROVED : Outbound : CLIENT
+  [[ "${inbound_state}" == "FULFILLED:1:t:COMPLETED:COMPLETED:admin.pilot-inbound-form:1:1:1:2:1:1:1:ACKNOWLEDGED:APPROVED" \
+    || "${inbound_state}" == "FULFILLED:1:true:COMPLETED:COMPLETED:admin.pilot-inbound-form:1:1:1:2:1:1:1:ACKNOWLEDGED:APPROVED" ]] && break
   sleep 1
 done
-[[ "${inbound_state}" == "FULFILLED:1:t:COMPLETED:COMPLETED:admin.pilot-inbound-form:1:1:1:1:1:ACKNOWLEDGED:APPROVED" \
-  || "${inbound_state}" == "FULFILLED:1:true:COMPLETED:COMPLETED:admin.pilot-inbound-form:1:1:1:1:1:ACKNOWLEDGED:APPROVED" ]] || {
-  echo "Admin 试点入站同单表单/资料/审核/外发贯通不完整: ${inbound_state}" >&2
+[[ "${inbound_state}" == "FULFILLED:1:t:COMPLETED:COMPLETED:admin.pilot-inbound-form:1:1:1:2:1:1:1:ACKNOWLEDGED:APPROVED" \
+  || "${inbound_state}" == "FULFILLED:1:true:COMPLETED:COMPLETED:admin.pilot-inbound-form:1:1:1:2:1:1:1:ACKNOWLEDGED:APPROVED" ]] || {
+  echo "Admin 试点入站同单整改补传复审外发贯通不完整: ${inbound_state}" >&2
   exit 1
 }
 
