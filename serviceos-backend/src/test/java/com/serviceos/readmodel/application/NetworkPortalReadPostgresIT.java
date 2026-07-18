@@ -3,6 +3,8 @@ package com.serviceos.readmodel.application;
 import com.serviceos.ServiceOsApplication;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.readmodel.api.NetworkPortalCapacityItem;
+import com.serviceos.readmodel.api.NetworkPortalDirectorySlaRiskSummary;
+import com.serviceos.readmodel.api.NetworkPortalExceptionItem;
 import com.serviceos.readmodel.api.NetworkPortalPage;
 import com.serviceos.readmodel.api.NetworkPortalQueryService;
 import com.serviceos.readmodel.api.NetworkPortalTaskItem;
@@ -11,10 +13,13 @@ import com.serviceos.readmodel.api.NetworkPortalWorkbenchView;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderItem;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderWorkspace;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderWorkspaceSlaSummary;
+import com.serviceos.readmodel.api.NetworkPortalWorkspaceAppointmentSummary;
+import com.serviceos.readmodel.api.NetworkPortalWorkspaceContactAttemptSummary;
 import com.serviceos.readmodel.api.NetworkPortalWorkspaceCorrectionCaseSummary;
 import com.serviceos.readmodel.api.NetworkPortalWorkspaceEvidenceItemSummary;
 import com.serviceos.readmodel.api.NetworkPortalWorkspaceEvidenceSlotSummary;
 import com.serviceos.readmodel.api.NetworkPortalWorkspaceFormSubmissionSummary;
+import com.serviceos.readmodel.api.NetworkPortalWorkspaceReviewCaseSummary;
 import com.serviceos.shared.Sha256;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
@@ -26,6 +31,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -81,6 +88,7 @@ class NetworkPortalReadPostgresIT {
     @Autowired NetworkPortalQueryService portal;
     @Autowired JdbcClient jdbc;
     @Autowired Flyway flyway;
+    @Autowired PlatformTransactionManager transactionManager;
 
     @BeforeEach
     void cleanAndSeed() {
@@ -96,7 +104,11 @@ class NetworkPortalReadPostgresIT {
                     evd_evidence_set_member, evd_evidence_set_snapshot,
                     evd_evidence_revision, evd_evidence_item, evd_evidence_upload_session,
                     evd_evidence_resolution_member, evd_evidence_slot, evd_task_evidence_resolution,
-                    tsk_task,
+                    ops_exception_ack_result, ops_operational_exception,
+                    apt_contact_attempt_command_result, apt_contact_attempt,
+                    apt_appointment_command_result, apt_appointment_status_history,
+                    apt_appointment_revision, apt_appointment,
+                    tsk_task, wo_work_order,
                     cfg_configuration_bundle_item, cfg_configuration_bundle,
                     cfg_configuration_asset_version, prj_project,
                     auth_delegation_capability, auth_delegation, auth_role_grant_event,
@@ -127,8 +139,12 @@ class NetworkPortalReadPostgresIT {
         seedHumanTask(TASK_A, WO_A);
         seedHumanTask(TASK_A2, WO_A);
         seedHumanTask(TASK_B, WO_B);
-        seedActiveNetworkAssignment(NETWORK_A, WO_A, TASK_A, "tech-a");
-        seedActiveNetworkAssignment(NETWORK_A, WO_A, TASK_A2, "tech-a");
+        seedWorkOrderHeader(WO_A, TASK_A, "BYD_OCEAN", "HOME_CHARGING",
+                "370000", "370100", "370102");
+        seedWorkOrderHeader(WO_B, TASK_B, "BYD_OCEAN", "HOME_CHARGING",
+                "310000", "310100", "310101");
+        seedActiveNetworkAssignment(NETWORK_A, WO_A, TASK_A, TECH_PROFILE.toString());
+        seedActiveNetworkAssignment(NETWORK_A, WO_A, TASK_A2, TECH_PROFILE.toString());
         seedActiveNetworkAssignment(NETWORK_B, WO_B, TASK_B, "tech-b");
         seedCapacity(NETWORK_A, 10, 3);
         seedCapacity(NETWORK_B, 5, 1);
@@ -148,12 +164,19 @@ class NetworkPortalReadPostgresIT {
         assertThat(workOrders.items()).extracting(NetworkPortalWorkOrderItem::workOrderId)
                 .containsExactly(WO_A);
         assertThat(workOrders.items()).noneMatch(item -> WO_B.equals(item.workOrderId()));
+        // M230：夹具默认已授 technician.readOwnNetwork，目录页旁载命中师傅
+        assertThat(workOrders.technicians())
+                .extracting(NetworkPortalTechnicianItem::technicianProfileId)
+                .containsExactly(TECH_PROFILE);
 
         NetworkPortalPage<NetworkPortalTaskItem> tasks =
                 portal.listTasks(actor(PRINCIPAL), "corr-task", context);
         assertThat(tasks.items()).extracting(NetworkPortalTaskItem::taskId)
                 .containsExactlyInAnyOrder(TASK_A, TASK_A2);
         assertThat(tasks.items()).allMatch(item -> "READY".equals(item.status()));
+        assertThat(tasks.technicians())
+                .extracting(NetworkPortalTechnicianItem::technicianProfileId)
+                .containsExactly(TECH_PROFILE);
 
         NetworkPortalWorkbenchView workbench = portal.workbench(actor(PRINCIPAL), "corr-wb", context);
         assertThat(workbench.activeWorkOrderCount()).isEqualTo(1);
@@ -184,7 +207,7 @@ class NetworkPortalReadPostgresIT {
         assertThat(workspace.tasks()).extracting(NetworkPortalTaskItem::taskId)
                 .containsExactlyInAnyOrder(TASK_A, TASK_A2);
         assertThat(workspace.tasks().getFirst().status()).isEqualTo("READY");
-        assertThat(workspace.technicianId()).isEqualTo("tech-a");
+        assertThat(workspace.technicianId()).isEqualTo(TECH_PROFILE.toString());
 
         assertThatThrownBy(() -> portal.getWorkOrderWorkspace(
                 actor(PRINCIPAL), "corr-ws-foreign", context, WO_B))
@@ -195,13 +218,496 @@ class NetworkPortalReadPostgresIT {
                 actor(PRINCIPAL), "corr-ws-unknown", context, UUID.randomUUID()))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         p -> assertThat(p.code()).isEqualTo(ProblemCode.ACCESS_DENIED));
-        // M221/M222/M223：无 soft-gate 能力时省略 enrichment 字段
+        // M221/M222/M223/M225/M226：无 soft-gate 能力时省略 enrichment 字段
         assertThat(workspace.slaSummary()).isNull();
         assertThat(workspace.visits()).isNull();
         assertThat(workspace.formSubmissions()).isNull();
         assertThat(workspace.evidenceSlots()).isNull();
         assertThat(workspace.evidenceItems()).isNull();
         assertThat(workspace.corrections()).isNull();
+        assertThat(workspace.reviews()).isNull();
+        assertThat(workspace.exceptions()).isNull();
+        assertThat(workspace.appointments()).isNull();
+        assertThat(workspace.contactAttempts()).isNull();
+        // M228：夹具默认已授 technician.readOwnNetwork，故 technicians 有命中项
+        assertThat(workspace.technicians())
+                .extracting(NetworkPortalTechnicianItem::technicianProfileId)
+                .containsExactly(TECH_PROFILE);
+    }
+
+    @Test
+    void directoryTechnicianSummariesAreCapabilityGatedAndMatched() {
+        String context = "NETWORK|NETWORK|" + NETWORK_A;
+        jdbc.sql("""
+                UPDATE auth_role_grant SET grant_status='REVOKED', revoked_at=now(),
+                       revoked_by='test', revoke_reason='m230',
+                       aggregate_version = aggregate_version + 1, updated_at=now()
+                 WHERE tenant_id=:tenant AND principal_id=:principal
+                   AND scope_type='NETWORK' AND scope_ref=:network
+                   AND role_id IN (
+                     SELECT role_id FROM auth_role_capability
+                      WHERE capability_code='technician.readOwnNetwork'
+                   )
+                """)
+                .param("tenant", TENANT)
+                .param("principal", PRINCIPAL.toString())
+                .param("network", NETWORK_A.toString())
+                .update();
+        jdbc.sql("""
+                UPDATE auth_tenant_grant_generation
+                   SET generation = generation + 1, updated_at = now()
+                 WHERE tenant_id = :tenant
+                """).param("tenant", TENANT).update();
+        NetworkPortalPage<NetworkPortalWorkOrderItem> withoutCapWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-tech-omit-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> withoutCapTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-tech-omit-task", context);
+        assertThat(withoutCapWo.technicians()).isNull();
+        assertThat(withoutCapTasks.technicians()).isNull();
+
+        seedGrant(PRINCIPAL, "technician.readOwnNetwork", "NETWORK", NETWORK_A.toString());
+        jdbc.sql("""
+                UPDATE auth_tenant_grant_generation
+                   SET generation = generation + 1, updated_at = now()
+                 WHERE tenant_id = :tenant
+                """).param("tenant", TENANT).update();
+        jdbc.sql("""
+                UPDATE dsp_service_assignment
+                   SET assignee_id = 'unknown-tech'
+                 WHERE tenant_id = :tenant
+                   AND responsibility_level = 'TECHNICIAN'
+                   AND task_id IN (:taskA, :taskA2)
+                """)
+                .param("tenant", TENANT)
+                .param("taskA", TASK_A)
+                .param("taskA2", TASK_A2)
+                .update();
+        NetworkPortalPage<NetworkPortalWorkOrderItem> emptyWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-tech-empty-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> emptyTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-tech-empty-task", context);
+        assertThat(emptyWo.technicians()).isEmpty();
+        assertThat(emptyTasks.technicians()).isEmpty();
+
+        jdbc.sql("""
+                UPDATE dsp_service_assignment
+                   SET assignee_id = :tech
+                 WHERE tenant_id = :tenant
+                   AND responsibility_level = 'TECHNICIAN'
+                   AND task_id IN (:taskA, :taskA2)
+                """)
+                .param("tenant", TENANT)
+                .param("tech", TECH_PROFILE.toString())
+                .param("taskA", TASK_A)
+                .param("taskA2", TASK_A2)
+                .update();
+        NetworkPortalPage<NetworkPortalWorkOrderItem> withWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-tech-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> withTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-tech-task", context);
+        assertThat(withWo.technicians())
+                .extracting(NetworkPortalTechnicianItem::technicianProfileId)
+                .containsExactly(TECH_PROFILE);
+        assertThat(withWo.technicians().getFirst().displayName()).isEqualTo("网点师傅甲");
+        assertThat(withTasks.technicians())
+                .extracting(NetworkPortalTechnicianItem::technicianProfileId)
+                .containsExactly(TECH_PROFILE);
+    }
+
+    @Test
+    void directoryAppointmentSummariesAreCapabilityGatedAndTaskScoped() {
+        String context = "NETWORK|NETWORK|" + NETWORK_A;
+        NetworkPortalPage<NetworkPortalWorkOrderItem> withoutCapWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-apt-omit-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> withoutCapTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-apt-omit-task", context);
+        assertThat(withoutCapWo.appointments()).isNull();
+        assertThat(withoutCapTasks.appointments()).isNull();
+
+        seedGrant(PRINCIPAL, "networkPortal.manageAppointment", "NETWORK", NETWORK_A.toString());
+        seedGrant(PRINCIPAL, "appointment.read", "NETWORK", NETWORK_A.toString());
+        NetworkPortalPage<NetworkPortalWorkOrderItem> emptyWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-apt-empty-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> emptyTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-apt-empty-task", context);
+        assertThat(emptyWo.appointments()).isEmpty();
+        assertThat(emptyTasks.appointments()).isEmpty();
+
+        UUID appointmentA = seedAppointment(TASK_A, WO_A, NETWORK_A.toString(), "m231-a");
+        seedAppointment(TASK_B, WO_B, NETWORK_B.toString(), "m231-b");
+        seedAppointment(TASK_A, WO_A, NETWORK_B.toString(), "m231-foreign-net");
+
+        NetworkPortalPage<NetworkPortalWorkOrderItem> withWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-apt-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> withTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-apt-task", context);
+        assertThat(withWo.appointments())
+                .extracting(NetworkPortalWorkspaceAppointmentSummary::appointmentId)
+                .containsExactly(appointmentA);
+        assertThat(withWo.appointments().getFirst().status()).isEqualTo("CONFIRMED");
+        assertThat(withWo.appointments().getFirst().timezone()).isEqualTo("Asia/Shanghai");
+        assertThat(withTasks.appointments())
+                .extracting(NetworkPortalWorkspaceAppointmentSummary::appointmentId)
+                .containsExactly(appointmentA);
+    }
+
+    @Test
+    void directoryContactAttemptSummariesAreCapabilityGatedAndTaskScoped() {
+        String context = "NETWORK|NETWORK|" + NETWORK_A;
+        NetworkPortalPage<NetworkPortalWorkOrderItem> withoutCapWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-contact-omit-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> withoutCapTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-contact-omit-task", context);
+        assertThat(withoutCapWo.contactAttempts()).isNull();
+        assertThat(withoutCapTasks.contactAttempts()).isNull();
+
+        seedGrant(PRINCIPAL, "networkPortal.manageAppointment", "NETWORK", NETWORK_A.toString());
+        seedGrant(PRINCIPAL, "appointment.read", "NETWORK", NETWORK_A.toString());
+        NetworkPortalPage<NetworkPortalWorkOrderItem> emptyWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-contact-empty-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> emptyTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-contact-empty-task", context);
+        assertThat(emptyWo.contactAttempts()).isEmpty();
+        assertThat(emptyTasks.contactAttempts()).isEmpty();
+
+        UUID contactA = seedContactAttempt(TASK_A, WO_A, "m232-a");
+        seedContactAttempt(TASK_B, WO_B, "m232-b");
+
+        NetworkPortalPage<NetworkPortalWorkOrderItem> withWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-contact-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> withTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-contact-task", context);
+        assertThat(withWo.contactAttempts())
+                .extracting(NetworkPortalWorkspaceContactAttemptSummary::contactAttemptId)
+                .containsExactly(contactA);
+        assertThat(withWo.contactAttempts().getFirst().channel()).isEqualTo("PHONE");
+        assertThat(withWo.contactAttempts().getFirst().resultCode()).isEqualTo("CONNECTED");
+        assertThat(withTasks.contactAttempts())
+                .extracting(NetworkPortalWorkspaceContactAttemptSummary::contactAttemptId)
+                .containsExactly(contactA);
+    }
+
+    @Test
+    void directoryCorrectionSummariesAreCapabilityGatedAndTaskScoped() {
+        String context = "NETWORK|NETWORK|" + NETWORK_A;
+        NetworkPortalPage<NetworkPortalWorkOrderItem> withoutCapWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-corr-omit-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> withoutCapTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-corr-omit-task", context);
+        assertThat(withoutCapWo.corrections()).isNull();
+        assertThat(withoutCapTasks.corrections()).isNull();
+
+        seedGrant(PRINCIPAL, "evidence.read", "NETWORK", NETWORK_A.toString());
+        NetworkPortalPage<NetworkPortalWorkOrderItem> emptyWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-corr-empty-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> emptyTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-corr-empty-task", context);
+        assertThat(emptyWo.corrections()).isEmpty();
+        assertThat(emptyTasks.corrections()).isEmpty();
+
+        UUID correctionA = seedOpenCorrection(TASK_A, "m233-a");
+        seedOpenCorrection(TASK_B, "m233-b");
+
+        NetworkPortalPage<NetworkPortalWorkOrderItem> withWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-corr-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> withTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-corr-task", context);
+        assertThat(withWo.corrections())
+                .extracting(NetworkPortalWorkspaceCorrectionCaseSummary::correctionCaseId)
+                .containsExactly(correctionA);
+        assertThat(withWo.corrections().getFirst().status()).isEqualTo("OPEN");
+        assertThat(withWo.corrections().getFirst().reasonCodes()).containsExactly("MISSING_PHOTO");
+        assertThat(withTasks.corrections())
+                .extracting(NetworkPortalWorkspaceCorrectionCaseSummary::correctionCaseId)
+                .containsExactly(correctionA);
+        // M235：同权下 evidence 旁载一并出现（本用例未 seed slot → []）
+        assertThat(withWo.evidenceSlots()).isEmpty();
+        assertThat(withWo.evidenceItems()).isEmpty();
+        assertThat(withTasks.evidenceSlots()).isEmpty();
+        assertThat(withTasks.evidenceItems()).isEmpty();
+    }
+
+    @Test
+    void directoryWorkOrderHeadersExposeProductRegionAndReceivedAt() {
+        String context = "NETWORK|NETWORK|" + NETWORK_A;
+        NetworkPortalPage<NetworkPortalWorkOrderItem> workOrders = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-header-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> tasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-header-task", context);
+
+        assertThat(workOrders.items()).hasSize(1);
+        NetworkPortalWorkOrderItem wo = workOrders.items().getFirst();
+        assertThat(wo.brandCode()).isEqualTo("BYD_OCEAN");
+        assertThat(wo.serviceProductCode()).isEqualTo("HOME_CHARGING");
+        assertThat(wo.provinceCode()).isEqualTo("370000");
+        assertThat(wo.cityCode()).isEqualTo("370100");
+        assertThat(wo.districtCode()).isEqualTo("370102");
+        assertThat(wo.receivedAt()).isNotNull();
+
+        assertThat(tasks.items())
+                .allSatisfy(item -> {
+                    assertThat(item.serviceProductCode()).isEqualTo("HOME_CHARGING");
+                    assertThat(item.provinceCode()).isEqualTo("370000");
+                    assertThat(item.receivedAt()).isNotNull();
+                });
+        // 他网点工单头不得出现在本网点目录
+        assertThat(workOrders.items())
+                .noneMatch(item -> "310000".equals(item.provinceCode()));
+    }
+
+    @Test
+    void directoryEvidenceSummariesAreCapabilityGatedAndTaskScoped() {
+        String context = "NETWORK|NETWORK|" + NETWORK_A;
+        NetworkPortalPage<NetworkPortalWorkOrderItem> withoutCapWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-evd-omit-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> withoutCapTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-evd-omit-task", context);
+        assertThat(withoutCapWo.evidenceSlots()).isNull();
+        assertThat(withoutCapWo.evidenceItems()).isNull();
+        assertThat(withoutCapTasks.evidenceSlots()).isNull();
+        assertThat(withoutCapTasks.evidenceItems()).isNull();
+
+        seedGrant(PRINCIPAL, "evidence.read", "NETWORK", NETWORK_A.toString());
+        NetworkPortalPage<NetworkPortalWorkOrderItem> emptyWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-evd-empty-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> emptyTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-evd-empty-task", context);
+        assertThat(emptyWo.evidenceSlots()).isEmpty();
+        assertThat(emptyWo.evidenceItems()).isEmpty();
+        assertThat(emptyTasks.evidenceSlots()).isEmpty();
+        assertThat(emptyTasks.evidenceItems()).isEmpty();
+
+        UUID slotA = seedEvidenceSlot(TASK_A, "site.photo", "现场照片");
+        UUID itemA = seedEvidenceItem(TASK_A, slotA);
+        seedEvidenceSlot(TASK_B, "foreign.photo", "他网点照片");
+
+        NetworkPortalPage<NetworkPortalWorkOrderItem> withWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-evd-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> withTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-evd-task", context);
+        assertThat(withWo.evidenceSlots())
+                .extracting(NetworkPortalWorkspaceEvidenceSlotSummary::taskId)
+                .containsExactly(TASK_A);
+        assertThat(withWo.evidenceSlots().getFirst().requirementCode()).isEqualTo("site.photo");
+        assertThat(withWo.evidenceSlots().getFirst().mediaType()).isEqualTo("PHOTO");
+        assertThat(withWo.evidenceItems())
+                .extracting(NetworkPortalWorkspaceEvidenceItemSummary::evidenceItemId)
+                .containsExactly(itemA);
+        assertThat(withWo.evidenceItems().getFirst().status()).isEqualTo("OPEN");
+        assertThat(withTasks.evidenceSlots())
+                .extracting(NetworkPortalWorkspaceEvidenceSlotSummary::taskId)
+                .containsExactly(TASK_A);
+        assertThat(withTasks.evidenceItems())
+                .extracting(NetworkPortalWorkspaceEvidenceItemSummary::evidenceItemId)
+                .containsExactly(itemA);
+    }
+
+    @Test
+    void directorySlaRiskSummariesAreCapabilityGatedAndTaskScoped() {
+        String context = "NETWORK|NETWORK|" + NETWORK_A;
+        NetworkPortalPage<NetworkPortalWorkOrderItem> withoutCapWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-sla-omit-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> withoutCapTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-sla-omit-task", context);
+        assertThat(withoutCapWo.slaRiskSummaries()).isNull();
+        assertThat(withoutCapTasks.slaRiskSummaries()).isNull();
+
+        seedGrant(PRINCIPAL, "sla.read", "NETWORK", NETWORK_A.toString());
+        NetworkPortalPage<NetworkPortalWorkOrderItem> emptyWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-sla-empty-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> emptyTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-sla-empty-task", context);
+        assertThat(emptyWo.slaRiskSummaries()).isEmpty();
+        assertThat(emptyTasks.slaRiskSummaries()).isEmpty();
+
+        UUID policyA = prepareSlaScopeForTask(TASK_A, "m234-a");
+        alignTaskSlaScope(TASK_A2, TASK_A);
+        UUID policyB = prepareSlaScopeForTask(TASK_B, "m234-b");
+        seedSlaInstance(TASK_A, policyA, "RUNNING");
+        seedSlaInstance(TASK_A2, policyA, "BREACHED");
+        seedSlaInstance(TASK_B, policyB, "BREACHED");
+
+        NetworkPortalPage<NetworkPortalWorkOrderItem> withWo = portal.listWorkOrders(
+                actor(PRINCIPAL), "corr-dir-sla-wo", context);
+        NetworkPortalPage<NetworkPortalTaskItem> withTasks = portal.listTasks(
+                actor(PRINCIPAL), "corr-dir-sla-task", context);
+        assertThat(withWo.slaRiskSummaries())
+                .extracting(NetworkPortalDirectorySlaRiskSummary::workOrderId)
+                .containsExactly(WO_A);
+        assertThat(withWo.slaRiskSummaries().getFirst().taskId()).isNull();
+        assertThat(withWo.slaRiskSummaries().getFirst().openCount()).isEqualTo(2);
+        assertThat(withWo.slaRiskSummaries().getFirst().breachedCount()).isEqualTo(1);
+        assertThat(withTasks.slaRiskSummaries())
+                .extracting(NetworkPortalDirectorySlaRiskSummary::taskId)
+                .containsExactlyInAnyOrder(TASK_A, TASK_A2);
+        assertThat(withTasks.slaRiskSummaries())
+                .noneMatch(row -> TASK_B.equals(row.taskId()));
+        assertThat(withTasks.slaRiskSummaries())
+                .filteredOn(row -> TASK_A.equals(row.taskId()))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.openCount()).isEqualTo(1);
+                    assertThat(row.breachedCount()).isZero();
+                });
+        assertThat(withTasks.slaRiskSummaries())
+                .filteredOn(row -> TASK_A2.equals(row.taskId()))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.openCount()).isEqualTo(1);
+                    assertThat(row.breachedCount()).isEqualTo(1);
+                });
+    }
+
+    @Test
+    void workOrderWorkspaceTechnicianSummariesAreCapabilityGatedAndMatched() {
+        String context = "NETWORK|NETWORK|" + NETWORK_A;
+        // 临时撤掉夹具默认的 technician.readOwnNetwork，验证省略语义
+        jdbc.sql("""
+                UPDATE auth_role_grant SET grant_status='REVOKED', revoked_at=now(),
+                       revoked_by='test', revoke_reason='m228',
+                       aggregate_version = aggregate_version + 1, updated_at=now()
+                 WHERE tenant_id=:tenant AND principal_id=:principal
+                   AND scope_type='NETWORK' AND scope_ref=:network
+                   AND role_id IN (
+                     SELECT role_id FROM auth_role_capability
+                      WHERE capability_code='technician.readOwnNetwork'
+                   )
+                """)
+                .param("tenant", TENANT)
+                .param("principal", PRINCIPAL.toString())
+                .param("network", NETWORK_A.toString())
+                .update();
+        jdbc.sql("""
+                UPDATE auth_tenant_grant_generation
+                   SET generation = generation + 1, updated_at = now()
+                 WHERE tenant_id = :tenant
+                """).param("tenant", TENANT).update();
+        NetworkPortalWorkOrderWorkspace withoutCap = portal.getWorkOrderWorkspace(
+                actor(PRINCIPAL), "corr-ws-tech-omit", context, WO_A);
+        assertThat(withoutCap.technicians()).isNull();
+
+        seedGrant(PRINCIPAL, "technician.readOwnNetwork", "NETWORK", NETWORK_A.toString());
+        jdbc.sql("""
+                UPDATE auth_tenant_grant_generation
+                   SET generation = generation + 1, updated_at = now()
+                 WHERE tenant_id = :tenant
+                """).param("tenant", TENANT).update();
+        // 故意用不存在的 profile 指派，验证「有能力但无命中 → []」
+        jdbc.sql("""
+                UPDATE dsp_service_assignment
+                   SET assignee_id = 'unknown-tech'
+                 WHERE tenant_id = :tenant
+                   AND task_id = :taskA
+                   AND responsibility_level = 'TECHNICIAN'
+                """)
+                .param("tenant", TENANT)
+                .param("taskA", TASK_A)
+                .update();
+        jdbc.sql("""
+                UPDATE dsp_service_assignment
+                   SET assignee_id = 'unknown-tech'
+                 WHERE tenant_id = :tenant
+                   AND task_id = :taskA2
+                   AND responsibility_level = 'TECHNICIAN'
+                """)
+                .param("tenant", TENANT)
+                .param("taskA2", TASK_A2)
+                .update();
+        NetworkPortalWorkOrderWorkspace empty = portal.getWorkOrderWorkspace(
+                actor(PRINCIPAL), "corr-ws-tech-empty", context, WO_A);
+        assertThat(empty.technicians()).isEmpty();
+
+        jdbc.sql("""
+                UPDATE dsp_service_assignment
+                   SET assignee_id = :profile
+                 WHERE tenant_id = :tenant
+                   AND task_id = :taskA
+                   AND responsibility_level = 'TECHNICIAN'
+                """)
+                .param("profile", TECH_PROFILE.toString())
+                .param("tenant", TENANT)
+                .param("taskA", TASK_A)
+                .update();
+        jdbc.sql("""
+                UPDATE dsp_service_assignment
+                   SET assignee_id = :profile
+                 WHERE tenant_id = :tenant
+                   AND task_id = :taskA2
+                   AND responsibility_level = 'TECHNICIAN'
+                """)
+                .param("profile", TECH_PROFILE.toString())
+                .param("tenant", TENANT)
+                .param("taskA2", TASK_A2)
+                .update();
+        NetworkPortalWorkOrderWorkspace withData = portal.getWorkOrderWorkspace(
+                actor(PRINCIPAL), "corr-ws-tech", context, WO_A);
+        assertThat(withData.technicians())
+                .extracting(NetworkPortalTechnicianItem::technicianProfileId)
+                .containsExactly(TECH_PROFILE);
+        assertThat(withData.technicians().getFirst().displayName()).isEqualTo("网点师傅甲");
+        assertThat(withData.technicians().getFirst().membershipStatus()).isEqualTo("ACTIVE");
+    }
+
+    @Test
+    void workOrderWorkspaceAppointmentAndContactSummariesAreCapabilityGatedAndTaskScoped() {
+        String context = "NETWORK|NETWORK|" + NETWORK_A;
+        NetworkPortalWorkOrderWorkspace withoutCap = portal.getWorkOrderWorkspace(
+                actor(PRINCIPAL), "corr-ws-apt-omit", context, WO_A);
+        assertThat(withoutCap.appointments()).isNull();
+        assertThat(withoutCap.contactAttempts()).isNull();
+
+        seedGrant(PRINCIPAL, "networkPortal.manageAppointment", "NETWORK", NETWORK_A.toString());
+        seedGrant(PRINCIPAL, "appointment.read", "NETWORK", NETWORK_A.toString());
+        NetworkPortalWorkOrderWorkspace empty = portal.getWorkOrderWorkspace(
+                actor(PRINCIPAL), "corr-ws-apt-empty", context, WO_A);
+        assertThat(empty.appointments()).isEmpty();
+        assertThat(empty.contactAttempts()).isEmpty();
+
+        UUID appointmentA = seedAppointment(TASK_A, WO_A, NETWORK_A.toString(), "m227-a");
+        seedAppointment(TASK_B, WO_B, NETWORK_B.toString(), "m227-b");
+        // 同任务但 assignedNetworkId 他网点 → 不得计入
+        seedAppointment(TASK_A, WO_A, NETWORK_B.toString(), "m227-foreign-net");
+        UUID contactA = seedContactAttempt(TASK_A, WO_A, "m227-a");
+        seedContactAttempt(TASK_B, WO_B, "m227-b");
+
+        NetworkPortalWorkOrderWorkspace withData = portal.getWorkOrderWorkspace(
+                actor(PRINCIPAL), "corr-ws-apt", context, WO_A);
+        assertThat(withData.appointments())
+                .extracting(NetworkPortalWorkspaceAppointmentSummary::appointmentId)
+                .containsExactly(appointmentA);
+        assertThat(withData.appointments().getFirst().type()).isEqualTo("INSTALLATION");
+        assertThat(withData.appointments().getFirst().status()).isEqualTo("CONFIRMED");
+        assertThat(withData.appointments().getFirst().timezone()).isEqualTo("Asia/Shanghai");
+        assertThat(withData.contactAttempts())
+                .extracting(NetworkPortalWorkspaceContactAttemptSummary::contactAttemptId)
+                .containsExactly(contactA);
+        assertThat(withData.contactAttempts().getFirst().channel()).isEqualTo("PHONE");
+        assertThat(withData.contactAttempts().getFirst().resultCode()).isEqualTo("CONNECTED");
+    }
+
+    @Test
+    void workOrderWorkspaceExceptionSummariesAreCapabilityGatedAndTaskScoped() {
+        String context = "NETWORK|NETWORK|" + NETWORK_A;
+        NetworkPortalWorkOrderWorkspace withoutCap = portal.getWorkOrderWorkspace(
+                actor(PRINCIPAL), "corr-ws-exc-omit", context, WO_A);
+        assertThat(withoutCap.exceptions()).isNull();
+
+        seedGrant(PRINCIPAL, "operations.exception.read", "NETWORK", NETWORK_A.toString());
+        NetworkPortalWorkOrderWorkspace empty = portal.getWorkOrderWorkspace(
+                actor(PRINCIPAL), "corr-ws-exc-empty", context, WO_A);
+        assertThat(empty.exceptions()).isEmpty();
+
+        UUID exceptionA = seedOpenException(TASK_A, WO_A, "P1", "m226-a");
+        seedOpenException(TASK_B, WO_B, "P2", "m226-b");
+
+        NetworkPortalWorkOrderWorkspace withData = portal.getWorkOrderWorkspace(
+                actor(PRINCIPAL), "corr-ws-exc", context, WO_A);
+        assertThat(withData.exceptions())
+                .extracting(NetworkPortalExceptionItem::exceptionId)
+                .containsExactly(exceptionA);
+        assertThat(withData.exceptions().getFirst().status()).isEqualTo("OPEN");
+        assertThat(withData.exceptions().getFirst().severity()).isEqualTo("P1");
+        assertThat(withData.exceptions().getFirst().allowedActions()).isEmpty();
     }
 
     @Test
@@ -239,6 +745,7 @@ class NetworkPortalReadPostgresIT {
         assertThat(withoutCap.evidenceSlots()).isNull();
         assertThat(withoutCap.evidenceItems()).isNull();
         assertThat(withoutCap.corrections()).isNull();
+        assertThat(withoutCap.reviews()).isNull();
 
         seedGrant(PRINCIPAL, "evidence.read", "NETWORK", NETWORK_A.toString());
         NetworkPortalWorkOrderWorkspace empty = portal.getWorkOrderWorkspace(
@@ -246,6 +753,7 @@ class NetworkPortalReadPostgresIT {
         assertThat(empty.evidenceSlots()).isEmpty();
         assertThat(empty.evidenceItems()).isEmpty();
         assertThat(empty.corrections()).isEmpty();
+        assertThat(empty.reviews()).isEmpty();
 
         UUID slotA = seedEvidenceSlot(TASK_A, "site.photo", "现场照片");
         UUID itemA = seedEvidenceItem(TASK_A, slotA);
@@ -271,6 +779,17 @@ class NetworkPortalReadPostgresIT {
         assertThat(withData.corrections().getFirst().status()).isEqualTo("OPEN");
         assertThat(withData.corrections().getFirst().reasonCodes()).containsExactly("MISSING_PHOTO");
         assertThat(withData.corrections().getFirst().resubmissions()).isEmpty();
+        // M229：seedOpenCorrection 同时写入 review+decision；他网点 TASK_B 不计入
+        assertThat(withData.reviews())
+                .extracting(NetworkPortalWorkspaceReviewCaseSummary::reviewCaseId)
+                .containsExactly(withData.corrections().getFirst().sourceReviewCaseId());
+        assertThat(withData.reviews().getFirst().status()).isEqualTo("REJECTED");
+        assertThat(withData.reviews().getFirst().origin()).isEqualTo("INTERNAL");
+        assertThat(withData.reviews().getFirst().decisions()).hasSize(1);
+        assertThat(withData.reviews().getFirst().decisions().getFirst().decision())
+                .isEqualTo("REJECTED");
+        assertThat(withData.reviews().getFirst().decisions().getFirst().reasonCodes())
+                .containsExactly("MISSING_PHOTO");
     }
 
     @Test
@@ -472,6 +991,101 @@ class NetworkPortalReadPostgresIT {
                 .param("tenant", TENANT)
                 .param("network", networkId)
                 .param("profile", TECH_PROFILE)
+                .update();
+    }
+
+    /** M236：非 PII 工单头（服务产品 / 区域 / receivedAt）；项目/bundle 按任务夹具补齐。 */
+    private void seedWorkOrderHeader(
+            UUID workOrderId,
+            UUID taskId,
+            String brandCode,
+            String serviceProductCode,
+            String provinceCode,
+            String cityCode,
+            String districtCode
+    ) {
+        var task = jdbc.sql("""
+                SELECT project_id, configuration_bundle_id, configuration_bundle_digest
+                  FROM tsk_task WHERE task_id=:id
+                """)
+                .param("id", taskId)
+                .query((rs, rowNum) -> new Object[] {
+                        rs.getObject("project_id", UUID.class),
+                        rs.getObject("configuration_bundle_id", UUID.class),
+                        rs.getString("configuration_bundle_digest")
+                })
+                .single();
+        UUID projectId = (UUID) task[0];
+        UUID bundleId = (UUID) task[1];
+        String bundleDigest = (String) task[2];
+        OffsetDateTime scopeNow = OffsetDateTime.ofInstant(
+                Instant.parse("2026-07-17T00:00:00Z"), ZoneOffset.UTC);
+        jdbc.sql("""
+                INSERT INTO prj_project (
+                    project_id, tenant_id, project_code, client_id, project_name,
+                    starts_on, ends_on, project_status, aggregate_version, created_at)
+                VALUES (
+                    :projectId, :tenantId, :code, 'BYD', 'M236 WO header fixture',
+                    DATE '2026-07-01', NULL, 'ACTIVE', 1, :createdAt)
+                ON CONFLICT (project_id) DO NOTHING
+                """)
+                .param("projectId", projectId)
+                .param("tenantId", TENANT)
+                .param("code", "M236-" + workOrderId.toString().substring(24))
+                .param("createdAt", scopeNow)
+                .update();
+        jdbc.sql("""
+                INSERT INTO cfg_configuration_bundle (
+                    bundle_id, tenant_id, project_id, bundle_code, bundle_version,
+                    brand_code, service_product_code, province_code, effective_from, effective_until,
+                    manifest_digest, status, published_at)
+                VALUES (
+                    :bundleId, :tenantId, :projectId, :bundleCode, '1.0.0',
+                    :brandCode, :product, :province, :effectiveFrom, NULL,
+                    :manifestDigest, 'PUBLISHED', :publishedAt)
+                ON CONFLICT (bundle_id) DO NOTHING
+                """)
+                .param("bundleId", bundleId)
+                .param("tenantId", TENANT)
+                .param("projectId", projectId)
+                .param("bundleCode", "M236-BUNDLE-" + workOrderId.toString().substring(24))
+                .param("brandCode", brandCode)
+                .param("product", serviceProductCode)
+                .param("province", provinceCode)
+                .param("effectiveFrom", scopeNow)
+                .param("manifestDigest", bundleDigest)
+                .param("publishedAt", scopeNow)
+                .update();
+        jdbc.sql("""
+                INSERT INTO wo_work_order (
+                    id, tenant_id, project_id, client_code, brand_code, service_product_code,
+                    external_order_code, payload_digest, status,
+                    configuration_bundle_id, configuration_bundle_code, configuration_bundle_version,
+                    configuration_bundle_digest, province_code, city_code, district_code,
+                    customer_name, customer_mobile, service_address, vehicle_vin,
+                    external_dispatched_at, received_at, activated_at, version
+                ) VALUES (
+                    :id, :tenantId, :projectId, 'BYD', :brandCode, :product,
+                    :externalOrderCode, :payloadDigest, 'ACTIVE',
+                    :bundleId, 'M236-BUNDLE', '1.0.0', :bundleDigest,
+                    :province, :city, :district,
+                    '测试客户', '13800000000', '测试地址', 'VIN123456789012345',
+                    :receivedAt, :receivedAt, :receivedAt, 1)
+                ON CONFLICT (id) DO NOTHING
+                """)
+                .param("id", workOrderId)
+                .param("tenantId", TENANT)
+                .param("projectId", projectId)
+                .param("brandCode", brandCode)
+                .param("product", serviceProductCode)
+                .param("externalOrderCode", "M236-" + workOrderId)
+                .param("payloadDigest", "c".repeat(64))
+                .param("bundleId", bundleId)
+                .param("bundleDigest", bundleDigest)
+                .param("province", provinceCode)
+                .param("city", cityCode)
+                .param("district", districtCode)
+                .param("receivedAt", java.sql.Timestamp.from(Instant.parse("2026-07-17T02:00:00Z")))
                 .update();
     }
 
@@ -802,7 +1416,7 @@ class NetworkPortalReadPostgresIT {
         return itemId;
     }
 
-    /** M225：最小 OPEN CorrectionCase（复用既有 resolution，避免 generation 冲突）。 */
+    /** M225 / M233：最小 OPEN CorrectionCase（复用既有 resolution，避免 generation 冲突）。 */
     private UUID seedOpenCorrection(UUID taskId, String marker) {
         var task = jdbc.sql("""
                 SELECT project_id, configuration_bundle_id, configuration_bundle_digest
@@ -818,6 +1432,42 @@ class NetworkPortalReadPostgresIT {
         UUID projectId = (UUID) task[0];
         UUID bundleId = (UUID) task[1];
         String bundleDigest = (String) task[2];
+        // resolution FK → prj_project / cfg_configuration_bundle；任务夹具可能只有孤儿 UUID
+        OffsetDateTime scopeNow = OffsetDateTime.ofInstant(
+                Instant.parse("2026-07-17T00:00:00Z"), ZoneOffset.UTC);
+        jdbc.sql("""
+                INSERT INTO prj_project (
+                    project_id, tenant_id, project_code, client_id, project_name,
+                    starts_on, ends_on, project_status, aggregate_version, created_at)
+                VALUES (
+                    :projectId, :tenantId, :code, 'BYD', 'M233 Correction fixture',
+                    DATE '2026-07-01', NULL, 'ACTIVE', 1, :createdAt)
+                ON CONFLICT (project_id) DO NOTHING
+                """)
+                .param("projectId", projectId)
+                .param("tenantId", TENANT)
+                .param("code", "M233-" + taskId.toString().substring(24))
+                .param("createdAt", scopeNow)
+                .update();
+        jdbc.sql("""
+                INSERT INTO cfg_configuration_bundle (
+                    bundle_id, tenant_id, project_id, bundle_code, bundle_version,
+                    brand_code, service_product_code, province_code, effective_from, effective_until,
+                    manifest_digest, status, published_at)
+                VALUES (
+                    :bundleId, :tenantId, :projectId, :bundleCode, '1.0.0',
+                    'BYD_OCEAN', 'HOME_CHARGING', NULL, :effectiveFrom, NULL,
+                    :manifestDigest, 'PUBLISHED', :publishedAt)
+                ON CONFLICT (bundle_id) DO NOTHING
+                """)
+                .param("bundleId", bundleId)
+                .param("tenantId", TENANT)
+                .param("projectId", projectId)
+                .param("bundleCode", "M233-BUNDLE-" + taskId.toString().substring(24))
+                .param("effectiveFrom", scopeNow)
+                .param("manifestDigest", bundleDigest)
+                .param("publishedAt", scopeNow)
+                .update();
         UUID resolutionId = jdbc.sql("""
                 SELECT resolution_id FROM evd_task_evidence_resolution
                  WHERE tenant_id=:tenant AND task_id=:task
@@ -928,6 +1578,183 @@ class NetworkPortalReadPostgresIT {
                 .param("digest", snapshotDigest)
                 .update();
         return correctionCaseId;
+    }
+
+    /** M226：最小 OPEN OperationalException（按 task 关联；他网点任务用于 scope 负例）。 */
+    private UUID seedOpenException(UUID taskId, UUID workOrderId, String severity, String marker) {
+        UUID exceptionId = UUID.randomUUID();
+        UUID projectId = jdbc.sql("SELECT project_id FROM tsk_task WHERE task_id=:id")
+                .param("id", taskId)
+                .query(UUID.class)
+                .single();
+        // ops_operational_exception.project_id → prj_project；任务夹具可能只有孤儿 UUID
+        OffsetDateTime scopeNow = OffsetDateTime.ofInstant(
+                Instant.parse("2026-07-17T00:00:00Z"), ZoneOffset.UTC);
+        jdbc.sql("""
+                INSERT INTO prj_project (
+                    project_id, tenant_id, project_code, client_id, project_name,
+                    starts_on, ends_on, project_status, aggregate_version, created_at)
+                VALUES (
+                    :projectId, :tenantId, :code, 'BYD', 'M226 Exception fixture',
+                    DATE '2026-07-01', NULL, 'ACTIVE', 1, :createdAt)
+                ON CONFLICT (project_id) DO NOTHING
+                """)
+                .param("projectId", projectId)
+                .param("tenantId", TENANT)
+                .param("code", "M226-" + taskId.toString().substring(24))
+                .param("createdAt", scopeNow)
+                .update();
+        Instant openedAt = Instant.parse("2026-07-17T02:00:00Z");
+        jdbc.sql("""
+                INSERT INTO ops_operational_exception (
+                    exception_id, tenant_id, project_id, source_type, source_id, source_attempt_id,
+                    source_task_type, category_code, severity_code, error_code, status,
+                    work_order_id, task_id, occurrence_count, correlation_id,
+                    opened_at, last_detected_at, aggregate_version
+                ) VALUES (
+                    :id, :tenant, :projectId, 'TEST', :sourceId, :attemptId,
+                    'operations.test', 'AUTOMATION_FINAL_FAILURE', :severity, 'TEST_FAILURE', 'OPEN',
+                    :workOrderId, :taskId, 1, :corr,
+                    :openedAt, :openedAt, 1
+                )
+                """)
+                .param("id", exceptionId)
+                .param("tenant", TENANT)
+                .param("projectId", projectId)
+                .param("sourceId", "m226-" + marker)
+                .param("attemptId", UUID.randomUUID())
+                .param("severity", severity)
+                .param("workOrderId", workOrderId)
+                .param("taskId", taskId)
+                .param("corr", "corr-m226-" + marker)
+                .param("openedAt", java.sql.Timestamp.from(openedAt))
+                .update();
+        return exceptionId;
+    }
+
+    /** M227：最小 CONFIRMED Appointment（current_revision FK 为 DEFERRABLE）。 */
+    private UUID seedAppointment(
+            UUID taskId, UUID workOrderId, String assignedNetworkId, String marker
+    ) {
+        UUID appointmentId = UUID.randomUUID();
+        UUID revisionId = UUID.randomUUID();
+        UUID projectId = jdbc.sql("SELECT project_id FROM tsk_task WHERE task_id=:id")
+                .param("id", taskId)
+                .query(UUID.class)
+                .single();
+        OffsetDateTime scopeNow = OffsetDateTime.ofInstant(
+                Instant.parse("2026-07-17T00:00:00Z"), ZoneOffset.UTC);
+        jdbc.sql("""
+                INSERT INTO prj_project (
+                    project_id, tenant_id, project_code, client_id, project_name,
+                    starts_on, ends_on, project_status, aggregate_version, created_at)
+                VALUES (
+                    :projectId, :tenantId, :code, 'BYD', 'M227 Appointment fixture',
+                    DATE '2026-07-01', NULL, 'ACTIVE', 1, :createdAt)
+                ON CONFLICT (project_id) DO NOTHING
+                """)
+                .param("projectId", projectId)
+                .param("tenantId", TENANT)
+                .param("code", "M227A-" + marker + "-" + taskId.toString().substring(24))
+                .param("createdAt", scopeNow)
+                .update();
+        Instant createdAt = Instant.parse("2026-07-17T01:30:00Z");
+        Instant start = Instant.parse("2026-07-18T02:00:00Z");
+        Instant end = Instant.parse("2026-07-18T05:00:00Z");
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            jdbc.sql("""
+                    INSERT INTO apt_appointment (
+                        appointment_id, tenant_id, project_id, work_order_id, task_id,
+                        appointment_type, status, current_revision_id, current_revision_no,
+                        assigned_network_id, technician_id, aggregate_version, created_by, created_at
+                    ) VALUES (
+                        :id, :tenant, :projectId, :workOrderId, :taskId,
+                        'INSTALLATION', 'CONFIRMED', :revisionId, 1,
+                        :network, 'tech-a', 1, 'fixture', :createdAt
+                    )
+                    """)
+                    .param("id", appointmentId)
+                    .param("tenant", TENANT)
+                    .param("projectId", projectId)
+                    .param("workOrderId", workOrderId)
+                    .param("taskId", taskId)
+                    .param("revisionId", revisionId)
+                    .param("network", assignedNetworkId)
+                    .param("createdAt", java.sql.Timestamp.from(createdAt))
+                    .update();
+            jdbc.sql("""
+                    INSERT INTO apt_appointment_revision (
+                        revision_id, tenant_id, appointment_id, revision_no, previous_revision_id,
+                        window_start, window_end, timezone, estimated_duration_minutes,
+                        address_ref, address_version,
+                        confirmed_party_type, confirmed_party_ref, confirmation_channel, confirmed_at,
+                        reason_code, note, revision_kind, created_by, created_at
+                    ) VALUES (
+                        :revisionId, :tenant, :appointmentId, 1, NULL,
+                        :start, :end, 'Asia/Shanghai', 120,
+                        'addr-ref', 'v1',
+                        'CUSTOMER', 'customer-ref', 'PHONE', :confirmedAt,
+                        NULL, 'note-should-not-leak', 'CONFIRM', 'fixture', :createdAt
+                    )
+                    """)
+                    .param("revisionId", revisionId)
+                    .param("tenant", TENANT)
+                    .param("appointmentId", appointmentId)
+                    .param("start", java.sql.Timestamp.from(start))
+                    .param("end", java.sql.Timestamp.from(end))
+                    .param("confirmedAt", java.sql.Timestamp.from(createdAt))
+                    .param("createdAt", java.sql.Timestamp.from(createdAt))
+                    .update();
+        });
+        return appointmentId;
+    }
+
+    /** M227：最小 ContactAttempt（无 PII 泄漏字段进入摘要）。 */
+    private UUID seedContactAttempt(UUID taskId, UUID workOrderId, String marker) {
+        UUID contactAttemptId = UUID.randomUUID();
+        UUID projectId = jdbc.sql("SELECT project_id FROM tsk_task WHERE task_id=:id")
+                .param("id", taskId)
+                .query(UUID.class)
+                .single();
+        OffsetDateTime scopeNow = OffsetDateTime.ofInstant(
+                Instant.parse("2026-07-17T00:00:00Z"), ZoneOffset.UTC);
+        jdbc.sql("""
+                INSERT INTO prj_project (
+                    project_id, tenant_id, project_code, client_id, project_name,
+                    starts_on, ends_on, project_status, aggregate_version, created_at)
+                VALUES (
+                    :projectId, :tenantId, :code, 'BYD', 'M227 Contact fixture',
+                    DATE '2026-07-01', NULL, 'ACTIVE', 1, :createdAt)
+                ON CONFLICT (project_id) DO NOTHING
+                """)
+                .param("projectId", projectId)
+                .param("tenantId", TENANT)
+                .param("code", "M227C-" + marker + "-" + taskId.toString().substring(24))
+                .param("createdAt", scopeNow)
+                .update();
+        Instant startedAt = Instant.parse("2026-07-17T02:30:00Z");
+        jdbc.sql("""
+                INSERT INTO apt_contact_attempt (
+                    contact_attempt_id, tenant_id, project_id, work_order_id, task_id,
+                    channel, contacted_party_ref, started_at, ended_at, result_code,
+                    note, next_contact_at, recording_ref, actor_id, created_at
+                ) VALUES (
+                    :id, :tenantId, :projectId, :workOrderId, :taskId,
+                    'PHONE', 'contacted-party-should-not-leak', :startedAt, :endedAt, 'CONNECTED',
+                    'note-should-not-leak', NULL, 'recording-should-not-leak',
+                    'contact-actor-should-not-leak', :createdAt
+                )
+                """)
+                .param("id", contactAttemptId)
+                .param("tenantId", TENANT)
+                .param("projectId", projectId)
+                .param("workOrderId", workOrderId)
+                .param("taskId", taskId)
+                .param("startedAt", java.sql.Timestamp.from(startedAt))
+                .param("endedAt", java.sql.Timestamp.from(startedAt.plusSeconds(30)))
+                .param("createdAt", java.sql.Timestamp.from(startedAt.plusSeconds(31)))
+                .update();
+        return contactAttemptId;
     }
 
     /**

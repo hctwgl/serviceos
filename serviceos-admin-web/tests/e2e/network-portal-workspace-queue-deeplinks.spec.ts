@@ -139,6 +139,27 @@ async function stubPortal(page: Page) {
               resubmissions: [],
             },
           ],
+          // M226：异常摘要由 workspace.exceptions 交付（不再依赖 OPEN 列表 fan-in）
+          exceptions: [
+            {
+              exceptionId: EXCEPTION_ID,
+              projectId: null,
+              sourceType: 'OUTBOUND_DELIVERY',
+              category: 'INTEGRATION',
+              severity: 'P2',
+              errorCode: 'OUTBOUND_UNKNOWN',
+              status: 'OPEN',
+              workOrderId: WORK_ORDER_ID,
+              taskId: TASK_ID,
+              handlingTaskId: null,
+              occurrenceCount: 1,
+              openedAt: '2026-07-17T11:00:00Z',
+              lastDetectedAt: '2026-07-17T11:00:00Z',
+              resolvedAt: null,
+              resolutionCode: null,
+              allowedActions: [],
+            },
+          ],
         }),
       })
     },

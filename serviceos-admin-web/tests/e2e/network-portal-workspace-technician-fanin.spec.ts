@@ -76,45 +76,94 @@ async function stubPortal(page: Page, options?: { denyTechnicians?: boolean }) {
   await page.route(
     `**/api/v1/network-portal/work-orders/${WORK_ORDER_ID}/workspace`,
     async (route: Route) => {
+      const body: Record<string, unknown> = {
+        networkId: NETWORK_ID,
+        workOrderId: WORK_ORDER_ID,
+        projectId: null,
+        taskIds: [TASK_ASSIGNED, TASK_UNASSIGNED],
+        businessType: 'INSTALLATION',
+        technicianId: TECH_PROFILE_ID,
+        effectiveFrom: '2026-07-17T10:00:00Z',
+        asOf: '2026-07-17T12:00:00Z',
+        tasks: [
+          {
+            taskId: TASK_ASSIGNED,
+            workOrderId: WORK_ORDER_ID,
+            projectId: null,
+            taskType: 'INSTALL',
+            taskKind: 'HUMAN',
+            stageCode: 'S1',
+            status: 'READY',
+            businessType: 'INSTALLATION',
+            technicianId: TECH_PROFILE_ID,
+            effectiveFrom: '2026-07-17T10:00:00Z',
+          },
+          {
+            taskId: TASK_UNASSIGNED,
+            workOrderId: WORK_ORDER_ID,
+            projectId: null,
+            taskType: 'SURVEY',
+            taskKind: 'HUMAN',
+            stageCode: 'S0',
+            status: 'READY',
+            businessType: 'INSTALLATION',
+            technicianId: null,
+            effectiveFrom: '2026-07-17T10:00:00Z',
+          },
+        ],
+        // M227：预约 window 由 workspace.appointments 交付
+        appointments: [
+          {
+            appointmentId: APPOINTMENT_ID,
+            taskId: TASK_ASSIGNED,
+            type: 'SURVEY',
+            status: 'PROPOSED',
+            assignedNetworkId: NETWORK_ID,
+            technicianId: TECH_PROFILE_ID,
+            currentRevisionNo: 1,
+            windowStart: WINDOW_START,
+            windowEnd: WINDOW_END,
+            timezone: 'Asia/Shanghai',
+            estimatedDurationMinutes: 180,
+            aggregateVersion: 1,
+            createdAt: '2026-07-17T10:00:00Z',
+          },
+        ],
+        contactAttempts: [
+          {
+            contactAttemptId: CONTACT_ID,
+            taskId: TASK_ASSIGNED,
+            projectId: '019f84a0-eeee-7f8c-9505-36fe5c0ee005',
+            workOrderId: WORK_ORDER_ID,
+            channel: 'PHONE',
+            startedAt: '2026-07-17T11:00:00Z',
+            endedAt: '2026-07-17T11:00:30Z',
+            resultCode: 'NO_ANSWER',
+            nextContactAt: null,
+            createdAt: '2026-07-17T11:00:00Z',
+          },
+        ],
+      }
+      // M228：师傅摘要由 workspace.technicians 交付（不再依赖列表 fan-in）
+      if (!options?.denyTechnicians) {
+        body.technicians = [
+          {
+            membershipId: MEMBERSHIP_ID,
+            technicianProfileId: TECH_PROFILE_ID,
+            principalId: 'principal-a',
+            displayName: '张师傅',
+            profileStatus: 'ACTIVE',
+            membershipStatus: 'ACTIVE',
+            validFrom: '2026-01-01T00:00:00Z',
+            validTo: null,
+            membershipVersion: 1,
+          },
+        ]
+      }
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({
-          networkId: NETWORK_ID,
-          workOrderId: WORK_ORDER_ID,
-          projectId: null,
-          taskIds: [TASK_ASSIGNED, TASK_UNASSIGNED],
-          businessType: 'INSTALLATION',
-          technicianId: TECH_PROFILE_ID,
-          effectiveFrom: '2026-07-17T10:00:00Z',
-          asOf: '2026-07-17T12:00:00Z',
-          tasks: [
-            {
-              taskId: TASK_ASSIGNED,
-              workOrderId: WORK_ORDER_ID,
-              projectId: null,
-              taskType: 'INSTALL',
-              taskKind: 'HUMAN',
-              stageCode: 'S1',
-              status: 'READY',
-              businessType: 'INSTALLATION',
-              technicianId: TECH_PROFILE_ID,
-              effectiveFrom: '2026-07-17T10:00:00Z',
-            },
-            {
-              taskId: TASK_UNASSIGNED,
-              workOrderId: WORK_ORDER_ID,
-              projectId: null,
-              taskType: 'SURVEY',
-              taskKind: 'HUMAN',
-              stageCode: 'S0',
-              status: 'READY',
-              businessType: 'INSTALLATION',
-              technicianId: null,
-              effectiveFrom: '2026-07-17T10:00:00Z',
-            },
-          ],
-        }),
+        body: JSON.stringify(body),
       })
     },
   )
