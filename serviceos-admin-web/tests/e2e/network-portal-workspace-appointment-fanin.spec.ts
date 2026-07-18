@@ -1,5 +1,9 @@
 import { expect, test, type Page, type Route } from '@playwright/test'
 
+/**
+ * M215 历史用例：原客户端 fan-in 已由 M227 服务端摘要替换。
+ * 本文件保留兼容断言路径，数据改由 workspace.appointments/contactAttempts 交付。
+ */
 const NETWORK_ID = '019f84a0-2222-7f8c-9505-36fe5c0e8803'
 const CONTEXT_ID = `NETWORK|NETWORK|${NETWORK_ID}`
 const WORK_ORDER_ID = '019f84a0-aaaa-7f8c-9505-36fe5c0ee001'
@@ -71,106 +75,90 @@ async function stubPortal(page: Page, options?: { denyAppointment?: boolean }) {
   await page.route(
     `**/api/v1/network-portal/work-orders/${WORK_ORDER_ID}/workspace`,
     async (route: Route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          networkId: NETWORK_ID,
-          workOrderId: WORK_ORDER_ID,
-          projectId: null,
-          taskIds: [TASK_ID],
-          businessType: 'INSTALLATION',
-          technicianId: 'tech-a',
-          effectiveFrom: '2026-07-17T10:00:00Z',
-          asOf: '2026-07-17T12:00:00Z',
-          tasks: [
-            {
-              taskId: TASK_ID,
-              workOrderId: WORK_ORDER_ID,
-              projectId: null,
-              taskType: 'INSTALL',
-              taskKind: 'HUMAN',
-              stageCode: 'S1',
-              status: 'READY',
-              businessType: 'INSTALLATION',
-              technicianId: 'tech-a',
-              effectiveFrom: '2026-07-17T10:00:00Z',
-            },
-          ],
-        }),
-      })
-    },
-  )
-  await page.route('**/api/v1/network-portal/correction-cases**', async (route: Route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ networkId: NETWORK_ID, asOf: '2026-07-17T12:00:00Z', items: [] }),
-    })
-  })
-  await page.route('**/api/v1/network-portal/operational-exceptions**', async (route: Route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ networkId: NETWORK_ID, asOf: '2026-07-17T12:00:00Z', items: [] }),
-    })
-  })
-  await page.route(`**/api/v1/network-portal/tasks/${TASK_ID}/appointments**`, async (route: Route) => {
-    if (options?.denyAppointment) {
-      await route.fulfill({
-        status: 403,
-        contentType: 'application/json',
-        body: JSON.stringify({ errorCode: 'ACCESS_DENIED', message: 'denied' }),
-      })
-      return
-    }
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify([
-        {
-          appointmentId: APPOINTMENT_ID,
-          taskId: TASK_ID,
-          type: 'SURVEY',
-          status: 'PROPOSED',
-          assignedNetworkId: NETWORK_ID,
-          aggregateVersion: 1,
-          currentRevisionNo: 1,
-        },
-      ]),
-    })
-  })
-  await page.route(
-    `**/api/v1/network-portal/tasks/${TASK_ID}/contact-attempts**`,
-    async (route: Route) => {
-      if (options?.denyAppointment) {
-        await route.fulfill({
-          status: 403,
-          contentType: 'application/json',
-          body: JSON.stringify({ errorCode: 'ACCESS_DENIED', message: 'denied' }),
-        })
-        return
+      const body: Record<string, unknown> = {
+        networkId: NETWORK_ID,
+        workOrderId: WORK_ORDER_ID,
+        projectId: null,
+        taskIds: [TASK_ID],
+        businessType: 'INSTALLATION',
+        technicianId: 'tech-a',
+        effectiveFrom: '2026-07-17T10:00:00Z',
+        asOf: '2026-07-17T12:00:00Z',
+        tasks: [
+          {
+            taskId: TASK_ID,
+            workOrderId: WORK_ORDER_ID,
+            projectId: null,
+            taskType: 'INSTALL',
+            taskKind: 'HUMAN',
+            stageCode: 'S1',
+            status: 'READY',
+            businessType: 'INSTALLATION',
+            technicianId: 'tech-a',
+            effectiveFrom: '2026-07-17T10:00:00Z',
+          },
+        ],
+        // M225 兼容：旧断言期望 corrections 区块可见
+        corrections: [],
+      }
+      if (!options?.denyAppointment) {
+        body.appointments = [
+          {
+            appointmentId: APPOINTMENT_ID,
+            taskId: TASK_ID,
+            type: 'SURVEY',
+            status: 'PROPOSED',
+            assignedNetworkId: NETWORK_ID,
+            technicianId: null,
+            currentRevisionNo: 1,
+            windowStart: null,
+            windowEnd: null,
+            timezone: null,
+            estimatedDurationMinutes: null,
+            aggregateVersion: 1,
+            createdAt: '2026-07-17T10:00:00Z',
+          },
+        ]
+        body.contactAttempts = [
+          {
+            contactAttemptId: CONTACT_ID,
+            taskId: TASK_ID,
+            projectId: '019f84a0-eeee-7f8c-9505-36fe5c0ee005',
+            workOrderId: WORK_ORDER_ID,
+            channel: 'PHONE',
+            startedAt: '2026-07-17T11:00:00Z',
+            endedAt: '2026-07-17T11:00:30Z',
+            resultCode: 'NO_ANSWER',
+            nextContactAt: null,
+            createdAt: '2026-07-17T11:00:00Z',
+          },
+        ]
       }
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify([
-          {
-            contactAttemptId: CONTACT_ID,
-            taskId: TASK_ID,
-            channel: 'PHONE',
-            contactedPartyRef: 'party-1',
-            resultCode: 'NO_ANSWER',
-            actorId: 'actor-1',
-            createdAt: '2026-07-17T11:00:00Z',
-          },
-        ]),
+        body: JSON.stringify(body),
       })
     },
   )
+  for (const pattern of [
+    '**/api/v1/network-portal/correction-cases**',
+    '**/api/v1/network-portal/operational-exceptions**',
+    '**/api/v1/network-portal/tasks/*/appointments**',
+    '**/api/v1/network-portal/tasks/*/contact-attempts**',
+    '**/api/v1/network-portal/technicians**',
+  ]) {
+    await page.route(pattern, async (route: Route) => {
+      await route.fulfill({
+        status: 403,
+        contentType: 'application/problem+json',
+        body: JSON.stringify({ title: 'ACCESS_DENIED', status: 403 }),
+      })
+    })
+  }
 }
 
-test.describe('M215 Network Portal 工作区预约/联系 fan-in', () => {
+test.describe('M215 Network Portal 工作区预约/联系 fan-in（由 M227 服务端摘要承接）', () => {
   test('M215-01/02/03：展示预约与联系摘要并深链任务', async ({ page }) => {
     await loginWithLocalKeycloak(page)
     await stubPortal(page)
