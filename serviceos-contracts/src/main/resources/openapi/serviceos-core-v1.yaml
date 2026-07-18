@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.33
+  version: 1.0.34
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -5086,6 +5086,50 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+  /configuration/drafts/{draftId}:dependencies:
+    get:
+      operationId: analyzeConfigurationDraftDependencies
+      summary: 分析配置草稿依赖
+      description: 扫描 WORKFLOW 草稿中的资产引用，对照租户已发布版本；需要 configuration.draft.write。
+      parameters:
+        - name: draftId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 依赖报告
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConfigurationDependencyReport' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /configuration/dependency-reports:analyze:
+    post:
+      operationId: analyzeConfigurationDependencies
+      summary: 分析原始配置定义依赖
+      description: 对 WORKFLOW 定义做确定性依赖扫描；可选 bundleId 限定在 Bundle 内命中。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AnalyzeConfigurationDependenciesRequest' }
+      responses:
+        '200':
+          description: 依赖报告
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConfigurationDependencyReport' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
   /configuration/drafts/{draftId}:approve:
     post:
       operationId: approveConfigurationDraft
@@ -5535,6 +5579,42 @@ components:
         activatedAt: { type: string, format: date-time }
         supersededAt: { type: [string, 'null'], format: date-time }
         aggregateVersion: { type: integer, format: int64, minimum: 1 }
+    AnalyzeConfigurationDependenciesRequest:
+      type: object
+      additionalProperties: false
+      required: [assetType, definitionJson]
+      properties:
+        assetType: { type: string, enum: [WORKFLOW] }
+        assetKey: { type: [string, 'null'] }
+        definitionJson: { type: string }
+        bundleId: { type: [string, 'null'], format: uuid }
+    ConfigurationDependencyReport:
+      type: object
+      additionalProperties: false
+      required: [assetType, assetKey, complete, dependencies]
+      properties:
+        assetType: { type: string, enum: [WORKFLOW] }
+        assetKey: { type: string }
+        draftId: { type: [string, 'null'], format: uuid }
+        bundleId: { type: [string, 'null'], format: uuid }
+        complete: { type: boolean }
+        dependencies:
+          type: array
+          items: { $ref: '#/components/schemas/ConfigurationDependencyItem' }
+    ConfigurationDependencyItem:
+      type: object
+      additionalProperties: false
+      required: [refField, refValue, expectedAssetType, status, detail]
+      properties:
+        refField: { type: string }
+        refValue: { type: string }
+        sourceNodeId: { type: [string, 'null'] }
+        expectedAssetType:
+          type: string
+          enum: [WORKFLOW, FORM, EVIDENCE, RULE, SLA, DISPATCH, PRICING, INTEGRATION, ASSIGNEE_POLICY, NOTIFICATION]
+        status: { type: string, enum: [SATISFIED, MISSING, UNKNOWN_TYPE] }
+        satisfiedVersionId: { type: [string, 'null'], format: uuid }
+        detail: { type: string }
     ConfigurationDraftDiff:
       type: object
       additionalProperties: false

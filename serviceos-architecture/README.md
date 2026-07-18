@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M290 多槽位 CANARY 与满量自动晋级**，功能证据提交 `c593deb501f9265b4b7dd01364cb43bf9eaeaae3`（合并入 `master` 后改为合并提交）。
+当前工程基线为 **M291 配置依赖分析**，功能证据提交待回填（合并入 `master` 后改为合并提交）。
 
 当前已具备多 OEM 内核、复杂流程运行时（含取消/重开/跳转/补偿）与标准服务模板族。下一主线是阶段三领域配置设计器。
 
@@ -685,6 +685,8 @@ serviceos-architecture/
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
 - [M290 实现文档](architecture/303-m290-multi-slot-canary-auto-promote.md)
 - [M290 验收矩阵](testing/287-m290-multi-slot-canary-auto-promote-acceptance.md)
+- [M291 实现文档](architecture/304-m291-configuration-dependency-analysis.md)
+- [M291 验收矩阵](testing/288-m291-configuration-dependency-analysis-acceptance.md)
 - [M289 实现文档](architecture/302-m289-workflow-canvas-edges-conditions.md)
 - [M289 验收矩阵](testing/286-m289-workflow-canvas-edges-conditions-acceptance.md)
 - [M288 实现文档](architecture/301-m288-percentage-canary-traffic.md)

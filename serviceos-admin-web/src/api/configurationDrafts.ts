@@ -33,6 +33,25 @@ export type ConfigurationDraftDiff = {
   identical: boolean
 }
 
+export type ConfigurationDependencyItem = {
+  refField: string
+  refValue: string
+  sourceNodeId: string | null
+  expectedAssetType: string
+  status: 'SATISFIED' | 'MISSING' | 'UNKNOWN_TYPE'
+  satisfiedVersionId: string | null
+  detail: string
+}
+
+export type ConfigurationDependencyReport = {
+  assetType: string
+  assetKey: string
+  draftId: string | null
+  bundleId: string | null
+  complete: boolean
+  dependencies: ConfigurationDependencyItem[]
+}
+
 export type CreateConfigurationDraftRequest = {
   assetType: DesignerAssetType
   assetKey: string
@@ -72,6 +91,10 @@ export function validateConfigurationDraft(draftId: string) {
 
 export function diffConfigurationDraft(draftId: string) {
   return apiGet<ConfigurationDraftDiff>(`/configuration/drafts/${draftId}:diff`)
+}
+
+export function analyzeConfigurationDraftDependencies(draftId: string) {
+  return apiGet<ConfigurationDependencyReport>(`/configuration/drafts/${draftId}:dependencies`)
 }
 
 export function approveConfigurationDraft(draftId: string, approvalRef: string, aggregateVersion: number) {

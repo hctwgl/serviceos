@@ -2,6 +2,8 @@ package com.serviceos.configuration.web;
 
 import com.serviceos.configuration.api.ApproveConfigurationDraftCommand;
 import com.serviceos.configuration.api.ConfigurationAssetType;
+import com.serviceos.configuration.api.ConfigurationDependencyAnalysisService;
+import com.serviceos.configuration.api.ConfigurationDependencyReport;
 import com.serviceos.configuration.api.ConfigurationDraftDiffView;
 import com.serviceos.configuration.api.ConfigurationDraftService;
 import com.serviceos.configuration.api.ConfigurationDraftView;
@@ -31,13 +33,16 @@ import java.util.UUID;
 @RequestMapping("/api/v1/configuration/drafts")
 final class ConfigurationDraftController {
     private final ConfigurationDraftService drafts;
+    private final ConfigurationDependencyAnalysisService dependencies;
     private final CurrentPrincipalProvider principals;
 
     ConfigurationDraftController(
             ConfigurationDraftService drafts,
+            ConfigurationDependencyAnalysisService dependencies,
             CurrentPrincipalProvider principals
     ) {
         this.drafts = drafts;
+        this.dependencies = dependencies;
         this.principals = principals;
     }
 
@@ -135,6 +140,18 @@ final class ConfigurationDraftController {
         return ok(view, correlationId);
     }
 
+    @GetMapping("/{draftId}:dependencies")
+    ResponseEntity<DependencyReportHttpModels.DependencyReportResponse> dependencies(
+            @PathVariable UUID draftId,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        ConfigurationDependencyReport report = dependencies.analyzeDraft(
+                principals.current(), correlationId, draftId);
+        return ResponseEntity.ok()
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(toDependencyResponse(report));
+    }
+
     @PostMapping("/{draftId}:publish")
     ResponseEntity<DraftResponse> publish(
             @PathVariable UUID draftId,
@@ -171,6 +188,23 @@ final class ConfigurationDraftController {
         } catch (NumberFormatException exception) {
             throw new IllegalArgumentException("If-Match aggregate version is invalid");
         }
+    }
+
+    private static DependencyReportHttpModels.DependencyReportResponse toDependencyResponse(
+            ConfigurationDependencyReport report
+    ) {
+        return new DependencyReportHttpModels.DependencyReportResponse(
+                report.assetType().name(),
+                report.assetKey(),
+                report.draftId(),
+                report.bundleId(),
+                report.complete(),
+                report.dependencies().stream()
+                        .map(item -> new DependencyReportHttpModels.DependencyItemResponse(
+                                item.refField(), item.refValue(), item.sourceNodeId(),
+                                item.expectedAssetType().name(), item.status().name(),
+                                item.satisfiedVersionId(), item.detail()))
+                        .toList());
     }
 
     record CreateDraftRequest(

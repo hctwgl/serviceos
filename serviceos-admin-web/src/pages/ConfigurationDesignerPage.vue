@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import {
+  analyzeConfigurationDraftDependencies,
   approveConfigurationDraft,
   createConfigurationDraft,
   diffConfigurationDraft,
@@ -8,6 +9,7 @@ import {
   publishConfigurationDraft,
   updateConfigurationDraft,
   validateConfigurationDraft,
+  type ConfigurationDependencyReport,
   type ConfigurationDraft,
   type ConfigurationDraftDiff,
   type DesignerAssetType,
@@ -19,6 +21,7 @@ const drafts = ref<ConfigurationDraft[]>([])
 const selected = ref<ConfigurationDraft | null>(null)
 const definitionText = ref('')
 const diffView = ref<ConfigurationDraftDiff | null>(null)
+const dependencyReport = ref<ConfigurationDependencyReport | null>(null)
 const approvalRef = ref('APR-LOCAL-1')
 const loading = ref(false)
 const busy = ref(false)
@@ -46,6 +49,7 @@ function selectDraft(draft: ConfigurationDraft) {
   selected.value = draft
   definitionText.value = prettyJson(draft.definitionJson)
   diffView.value = null
+  dependencyReport.value = null
   message.value = null
   error.value = null
 }
@@ -283,6 +287,20 @@ async function loadDiff() {
   }
 }
 
+async function loadDependencies() {
+  if (!selected.value || selected.value.assetType !== 'WORKFLOW') return
+  busy.value = true
+  error.value = null
+  try {
+    dependencyReport.value = await analyzeConfigurationDraftDependencies(selected.value.draftId)
+    message.value = dependencyReport.value.complete ? '依赖完整' : '存在未满足依赖'
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '依赖分析失败'
+  } finally {
+    busy.value = false
+  }
+}
+
 async function approveDraft() {
   if (!selected.value) return
   busy.value = true
@@ -362,6 +380,14 @@ onMounted(async () => {
       <button type="button" :disabled="busy || !selected" data-testid="save-draft" @click="saveDraft">保存</button>
       <button type="button" :disabled="busy || !selected" data-testid="validate-draft" @click="validateDraft">校验</button>
       <button type="button" :disabled="busy || !selected" data-testid="diff-draft" @click="loadDiff">Diff</button>
+      <button
+        type="button"
+        :disabled="busy || !selected || selected.assetType !== 'WORKFLOW'"
+        data-testid="analyze-dependencies"
+        @click="loadDependencies"
+      >
+        依赖分析
+      </button>
       <label>
         approvalRef
         <input v-model="approvalRef" data-testid="approval-ref" />
@@ -414,6 +440,21 @@ onMounted(async () => {
           <li v-for="(item, index) in selected.validationErrors" :key="index">{{ item }}</li>
         </ul>
         <pre v-if="diffView" class="diff" data-testid="draft-diff">{{ diffView.unifiedDiff }}</pre>
+        <div v-if="dependencyReport" class="deps" data-testid="dependency-report">
+          <h3>依赖报告 · {{ dependencyReport.complete ? '完整' : '不完整' }}</h3>
+          <ul>
+            <li
+              v-for="(item, index) in dependencyReport.dependencies"
+              :key="index"
+              :data-status="item.status"
+            >
+              <strong>{{ item.refField }}={{ item.refValue }}</strong>
+              · {{ item.status }}
+              <span v-if="item.sourceNodeId"> @{{ item.sourceNodeId }}</span>
+              — {{ item.detail }}
+            </li>
+          </ul>
+        </div>
       </main>
     </div>
   </section>
@@ -466,6 +507,22 @@ aside li {
 aside li.active {
   border-color: #0969da;
   background: #ddf4ff;
+}
+.deps {
+  border: 1px solid #d0d7de;
+  border-radius: 0.4rem;
+  padding: 0.75rem;
+  background: #f6f8fa;
+}
+.deps ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.2rem;
+}
+.deps li[data-status='MISSING'] {
+  color: #cf222e;
+}
+.deps li[data-status='SATISFIED'] {
+  color: #1a7f37;
 }
 textarea {
   width: 100%;
