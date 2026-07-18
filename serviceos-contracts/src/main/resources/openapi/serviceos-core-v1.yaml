@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.26
+  version: 1.0.27
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -6971,6 +6971,7 @@ components:
         category: { x-extensible-enum: [WORK_ORDER, WORKFLOW, STAGE, TASK, APPOINTMENT, VISIT, CONTACT_ATTEMPT, SLA, FORM, EVIDENCE, REVIEW, CORRECTION, DELIVERY, EXCEPTION, ASSIGNMENT] }
         eventType:
           x-extensible-enum: [workorder.received, workorder.activated, workorder.fulfilled,
+            workorder.cancelled, workorder.reopened,
             workflow.started, workflow.completed, stage.activated, stage.completed,
             task.created, task.claimed, task.started, task.released, task.cancelled, task.completed,
             task.assigned, task.assignment-prepared, task.assignment-activated, task.assignment-aborted,

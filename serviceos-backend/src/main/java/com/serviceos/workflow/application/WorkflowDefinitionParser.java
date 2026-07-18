@@ -52,6 +52,25 @@ final class WorkflowDefinitionParser {
     }
 
     /**
+     * 人工跳转目标：必须是单实例任务节点；禁止跳到网关/等待/定时器/子流程。
+     */
+    ProgressionDefinition resolveJumpTarget(ConfigurationAssetDefinition asset, String targetNodeId) {
+        Graph graph = parseGraph(asset);
+        String requiredNodeId = requiredValue(targetNodeId, "targetNodeId");
+        JsonNode target = graph.nodes().get(requiredNodeId);
+        if (target == null) {
+            throw new IllegalArgumentException("jump target node does not exist: " + requiredNodeId);
+        }
+        TaskNode task = requireTaskNode(target, "jump target");
+        if (task.multiInstanceCardinality() >= 2) {
+            throw new IllegalArgumentException("jump target must not be a multi-instance task");
+        }
+        return ProgressionDefinition.task(
+                task.nodeId(), task.stageCode(), task.taskType(), task.taskKind(),
+                task.formRef(), task.slaRef(), 1);
+    }
+
+    /**
      * 从已完成任务推进到下一可执行任务或 END。
      *
      * <p>已完成任务必须恰好一条无条件出边；目标可为任务、END、EXCLUSIVE_GATEWAY 或 WAIT_EVENT。

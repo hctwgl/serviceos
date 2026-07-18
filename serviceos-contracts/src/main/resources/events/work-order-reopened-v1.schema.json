@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/work-order-reopened-v1.schema.json",
+  "title": "WorkOrderReopenedV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId", "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"},
+    "eventType": {"const": "workorder.reopened"},
+    "schemaVersion": {"const": 1},
+    "tenantId": {"type": "string"},
+    "correlationId": {"type": "string"},
+    "causationId": {"type": "string"},
+    "aggregateType": {"const": "WorkOrder"},
+    "aggregateId": {"type": "string", "format": "uuid"},
+    "aggregateVersion": {"type": "integer", "minimum": 1},
+    "occurredAt": {"type": "string", "format": "date-time"},
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workOrderId", "projectId", "bundleRef", "approvalRef", "reopenedAt"],
+      "properties": {
+        "workOrderId": {"type": "string", "format": "uuid"},
+        "projectId": {"type": "string", "format": "uuid"},
+        "bundleRef": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["bundleId", "bundleCode", "bundleVersion", "manifestDigest"],
+          "properties": {
+            "bundleId": {"type": "string", "format": "uuid"},
+            "bundleCode": {"type": "string", "minLength": 1},
+            "bundleVersion": {"type": "string", "minLength": 1},
+            "manifestDigest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+          }
+        },
+        "approvalRef": {"type": "string", "minLength": 1, "maxLength": 128},
+        "reopenedAt": {"type": "string", "format": "date-time"}
+      }
+    }
+  }
+}

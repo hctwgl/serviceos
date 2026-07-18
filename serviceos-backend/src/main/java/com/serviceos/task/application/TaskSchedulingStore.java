@@ -2,6 +2,7 @@ package com.serviceos.task.application;
 
 import com.serviceos.task.api.ScheduleAutomatedTaskCommand;
 import com.serviceos.task.api.CancelHandlingTaskCommand;
+import com.serviceos.task.api.CancelOpenWorkflowTasksCommand;
 import com.serviceos.task.api.CreateHandlingTaskCommand;
 import com.serviceos.task.api.HandlingTaskCancellationReceipt;
 import com.serviceos.task.api.CompleteHandlingTaskCommand;
@@ -19,4 +20,6 @@ public interface TaskSchedulingStore {
     HandlingTaskCompletionReceipt completeHandlingTask(CompleteHandlingTaskCommand command);
 
     ScheduledTaskView createWorkflowTask(CreateWorkflowTaskCommand command);
+
+    int cancelOpenTasksForWorkflows(CancelOpenWorkflowTasksCommand command);
 }

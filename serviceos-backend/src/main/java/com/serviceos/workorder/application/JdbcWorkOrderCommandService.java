@@ -4,16 +4,22 @@ import com.serviceos.reliability.api.OutboxAppender;
 import com.serviceos.reliability.api.OutboxEvent;
 import com.serviceos.shared.Sha256;
 import com.serviceos.workorder.api.ActivateWorkOrderCommand;
+import com.serviceos.workorder.api.CancelWorkOrderCommand;
 import com.serviceos.workorder.api.ExternalWorkOrderConflictException;
 import com.serviceos.workorder.api.FulfillWorkOrderCommand;
 import com.serviceos.workorder.api.ReceiveExternalWorkOrderCommand;
+import com.serviceos.workorder.api.ReopenWorkOrderCommand;
 import com.serviceos.workorder.api.WorkOrderActivatedPayload;
 import com.serviceos.workorder.api.WorkOrderActivationReceipt;
+import com.serviceos.workorder.api.WorkOrderCancellationReceipt;
+import com.serviceos.workorder.api.WorkOrderCancelledPayload;
 import com.serviceos.workorder.api.WorkOrderCommandService;
 import com.serviceos.workorder.api.WorkOrderFulfilledPayload;
 import com.serviceos.workorder.api.WorkOrderFulfillmentReceipt;
 import com.serviceos.workorder.api.WorkOrderReceipt;
 import com.serviceos.workorder.api.WorkOrderReceivedPayload;
+import com.serviceos.workorder.api.WorkOrderReopenReceipt;
+import com.serviceos.workorder.api.WorkOrderReopenedPayload;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
@@ -31,6 +37,8 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
     private static final String RECEIVED_EVENT = "workorder.received";
     private static final String ACTIVATED_EVENT = "workorder.activated";
     private static final String FULFILLED_EVENT = "workorder.fulfilled";
+    private static final String CANCELLED_EVENT = "workorder.cancelled";
+    private static final String REOPENED_EVENT = "workorder.reopened";
 
     private final JdbcClient jdbc;
     private final OutboxAppender outbox;
@@ -197,6 +205,99 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
                 row.workOrderId(), row.status(), row.version(), false, row.fulfilledAt());
     }
 
+    @Override
+    @Transactional
+    public WorkOrderCancellationReceipt cancel(CancelWorkOrderCommand command) {
+        Instant cancelledAt = clock.instant();
+        int updated = jdbc.sql("""
+                UPDATE wo_work_order
+                   SET status = 'CANCELLED',
+                       cancelled_at = :cancelledAt,
+                       cancel_reason_code = :reasonCode,
+                       cancel_approval_ref = :approvalRef,
+                       version = version + 1
+                 WHERE tenant_id = :tenantId AND id = :workOrderId
+                   AND status IN ('RECEIVED', 'ACTIVE')
+                   AND version = :expectedVersion
+                """)
+                .param("cancelledAt", java.sql.Timestamp.from(cancelledAt))
+                .param("reasonCode", command.reasonCode())
+                .param("approvalRef", command.approvalRef())
+                .param("tenantId", command.tenantId())
+                .param("workOrderId", command.workOrderId())
+                .param("expectedVersion", command.expectedVersion())
+                .update();
+
+        CancellationRow row = findCancellation(command.tenantId(), command.workOrderId());
+        if (updated == 0) {
+            if ("CANCELLED".equals(row.status())
+                    && command.reasonCode().equals(row.cancelReasonCode())
+                    && java.util.Objects.equals(command.approvalRef(), row.cancelApprovalRef())) {
+                return new WorkOrderCancellationReceipt(
+                        row.workOrderId(), row.status(), row.version(), true, row.cancelledAt());
+            }
+            throw new ExternalWorkOrderConflictException(
+                    "work order cannot be cancelled from status " + row.status()
+                            + " at version " + row.version());
+        }
+
+        WorkOrderCancelledPayload payload = new WorkOrderCancelledPayload(
+                row.workOrderId(), command.reasonCode(), command.approvalRef(), cancelledAt);
+        appendEvent(
+                command.tenantId(), row.workOrderId(), row.version(), CANCELLED_EVENT,
+                command.correlationId(), command.causationId(), payload, cancelledAt);
+        return new WorkOrderCancellationReceipt(
+                row.workOrderId(), row.status(), row.version(), false, row.cancelledAt());
+    }
+
+    @Override
+    @Transactional
+    public WorkOrderReopenReceipt reopen(ReopenWorkOrderCommand command) {
+        Instant reopenedAt = clock.instant();
+        int updated = jdbc.sql("""
+                UPDATE wo_work_order
+                   SET status = 'ACTIVE',
+                       reopened_at = :reopenedAt,
+                       reopen_approval_ref = :approvalRef,
+                       activated_at = COALESCE(activated_at, :reopenedAt),
+                       version = version + 1
+                 WHERE tenant_id = :tenantId AND id = :workOrderId
+                   AND status = 'CANCELLED'
+                   AND version = :expectedVersion
+                """)
+                .param("reopenedAt", java.sql.Timestamp.from(reopenedAt))
+                .param("approvalRef", command.approvalRef())
+                .param("tenantId", command.tenantId())
+                .param("workOrderId", command.workOrderId())
+                .param("expectedVersion", command.expectedVersion())
+                .update();
+
+        ReopenRow row = findReopen(command.tenantId(), command.workOrderId());
+        if (updated == 0) {
+            if ("ACTIVE".equals(row.status())
+                    && command.approvalRef().equals(row.reopenApprovalRef())) {
+                return new WorkOrderReopenReceipt(
+                        row.workOrderId(), row.status(), row.version(), true, row.reopenedAt());
+            }
+            throw new ExternalWorkOrderConflictException(
+                    "work order cannot be reopened from status " + row.status()
+                            + " at version " + row.version());
+        }
+
+        WorkOrderReopenedPayload payload = new WorkOrderReopenedPayload(
+                row.workOrderId(),
+                row.projectId(),
+                new WorkOrderReceivedPayload.ConfigurationBundleRef(
+                        row.bundleId(), row.bundleCode(), row.bundleVersion(), row.bundleDigest()),
+                command.approvalRef(),
+                reopenedAt);
+        appendEvent(
+                command.tenantId(), row.workOrderId(), row.version(), REOPENED_EVENT,
+                command.correlationId(), command.causationId(), payload, reopenedAt);
+        return new WorkOrderReopenReceipt(
+                row.workOrderId(), row.status(), row.version(), false, row.reopenedAt());
+    }
+
     private void appendReceivedEvent(
             UUID workOrderId,
             ReceiveExternalWorkOrderCommand command,
@@ -306,6 +407,50 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
                 .single();
     }
 
+    private CancellationRow findCancellation(String tenantId, UUID workOrderId) {
+        return jdbc.sql("""
+                SELECT id, status, version, cancelled_at, cancel_reason_code, cancel_approval_ref
+                  FROM wo_work_order
+                 WHERE tenant_id = :tenantId AND id = :workOrderId
+                """)
+                .param("tenantId", tenantId)
+                .param("workOrderId", workOrderId)
+                .query((rs, rowNum) -> new CancellationRow(
+                        rs.getObject("id", UUID.class),
+                        rs.getString("status"),
+                        rs.getLong("version"),
+                        rs.getTimestamp("cancelled_at") == null
+                                ? null : rs.getTimestamp("cancelled_at").toInstant(),
+                        rs.getString("cancel_reason_code"),
+                        rs.getString("cancel_approval_ref")))
+                .single();
+    }
+
+    private ReopenRow findReopen(String tenantId, UUID workOrderId) {
+        return jdbc.sql("""
+                SELECT id, project_id, status, version, reopened_at, reopen_approval_ref,
+                       configuration_bundle_id, configuration_bundle_code,
+                       configuration_bundle_version, configuration_bundle_digest
+                  FROM wo_work_order
+                 WHERE tenant_id = :tenantId AND id = :workOrderId
+                """)
+                .param("tenantId", tenantId)
+                .param("workOrderId", workOrderId)
+                .query((rs, rowNum) -> new ReopenRow(
+                        rs.getObject("id", UUID.class),
+                        rs.getObject("project_id", UUID.class),
+                        rs.getString("status"),
+                        rs.getLong("version"),
+                        rs.getTimestamp("reopened_at") == null
+                                ? null : rs.getTimestamp("reopened_at").toInstant(),
+                        rs.getString("reopen_approval_ref"),
+                        rs.getObject("configuration_bundle_id", UUID.class),
+                        rs.getString("configuration_bundle_code"),
+                        rs.getString("configuration_bundle_version"),
+                        rs.getString("configuration_bundle_digest")))
+                .single();
+    }
+
     private static WorkOrderReceipt receipt(
             UUID id,
             ReceiveExternalWorkOrderCommand command,
@@ -345,6 +490,30 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
             String status,
             long version,
             Instant fulfilledAt
+    ) {
+    }
+
+    private record CancellationRow(
+            UUID workOrderId,
+            String status,
+            long version,
+            Instant cancelledAt,
+            String cancelReasonCode,
+            String cancelApprovalRef
+    ) {
+    }
+
+    private record ReopenRow(
+            UUID workOrderId,
+            UUID projectId,
+            String status,
+            long version,
+            Instant reopenedAt,
+            String reopenApprovalRef,
+            UUID bundleId,
+            String bundleCode,
+            String bundleVersion,
+            String bundleDigest
     ) {
     }
 }
