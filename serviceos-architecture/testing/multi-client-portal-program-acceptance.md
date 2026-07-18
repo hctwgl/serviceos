@@ -43,7 +43,7 @@ lastUpdated: 2026-07-18
 | MCP-AUTH-02 | Portal Context | ADMIN/NETWORK/TECHNICIAN Context 不可跨用 | negative security tests |
 | MCP-AUTH-03 | Capability | 菜单和动作消费服务端 capability/allowedActions | UI + API tests |
 | MCP-AUTH-04 | 深链重鉴权 | 打开深链时重新验证身份、范围和当前责任 | security E2E |
-| MCP-AUTH-05 | Token 存储 | Web 不持久化长效敏感 Token；iOS 使用 Keychain | M250 Web memory-token gate + future iOS security review |
+| MCP-AUTH-05 | Token 存储 | Web 不持久化长效敏感 Token；iOS 使用 Keychain | M250 Web memory-token gate + M251 vault boundary + future Keychain security review |
 | MCP-AUTH-06 | Context 切换 | 切换后清理相关查询缓存和敏感状态 | M250 generic context-boundary test + app E2E |
 | MCP-AUTH-07 | 旧师傅失权 | 改派后旧 Context 无法读取或写入新事实 | end-to-end negative tests |
 
@@ -53,7 +53,7 @@ lastUpdated: 2026-07-18
 |---|---|---|---|
 | MCP-CONTRACT-01 | TypeScript Client | 可从 Core OpenAPI 重复生成且无手工漂移 | M247 reproducibility + independent consumer gate |
 | MCP-CONTRACT-02 | Swift Client | 可从同一 OpenAPI 重复生成 | M248 reproducibility + Swift 6 independent consumer gate |
-| MCP-CONTRACT-03 | Error Model | H5/iOS 对 Problem Details 和 errorCode 语义一致 | M250 Web baseline + future iOS contract/client tests |
+| MCP-CONTRACT-03 | Error Model | H5/iOS 对 Problem Details 和 errorCode 语义一致 | M250 Web + M251 iOS shared baselines; app contract tests pending |
 | MCP-CONTRACT-04 | Page/Action Identity | 同一业务目标复用 pageId/actionCode | registry tests |
 | MCP-CONTRACT-05 | Unknown Action | 客户端未知 action 安全降级，不自行猜测 | negative tests |
 | MCP-CONTRACT-06 | Schema 版本 | 表单、Evidence 和 WorkPackage 版本可声明与校验 | schema tests |
@@ -82,7 +82,7 @@ lastUpdated: 2026-07-18
 | MCP-IOS-02 | 登录和刷新 | 登录、刷新、过期、注销和撤销可靠 | XCTest/XCUITest |
 | MCP-IOS-03 | Keychain | Token/密钥不进入普通偏好或日志 | security tests |
 | MCP-IOS-04 | Swift Client | 生成客户端与服务端契约一致 | CI |
-| MCP-IOS-05 | Trace/日志 | 错误可定位且无 PII/Token/文件路径 | log review/tests |
+| MCP-IOS-05 | Trace/日志 | 错误可定位且无 PII/Token/文件路径 | M251 diagnostic baseline + future app log review/tests |
 | MCP-IOS-06 | 可访问性 | Dynamic Type、VoiceOver、触控区域通过 | accessibility tests |
 | MCP-IOS-07 | TestFlight | 内部测试包可安装、升级和回滚 | distribution evidence |
 
