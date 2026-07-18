@@ -2,6 +2,7 @@ package com.serviceos.workflow.application;
 
 import com.serviceos.configuration.api.ConfigurationAssetType;
 import com.serviceos.configuration.api.ConfigurationService;
+import com.serviceos.configuration.api.ExpressionContext;
 import com.serviceos.reliability.api.InboxDecision;
 import com.serviceos.reliability.api.InboxService;
 import com.serviceos.reliability.api.OutboxAppender;
@@ -18,6 +19,8 @@ import com.serviceos.workflow.api.StageCompletedPayload;
 import com.serviceos.workflow.api.WorkflowCompletedPayload;
 import com.serviceos.workorder.api.FulfillWorkOrderCommand;
 import com.serviceos.workorder.api.WorkOrderCommandService;
+import com.serviceos.workorder.api.WorkOrderExpressionContext;
+import com.serviceos.workorder.api.WorkOrderExpressionContextQuery;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,7 +36,8 @@ import java.util.UUID;
 /**
  * TaskCompleted v1 的可靠本地消费者，将当前流程节点原子地推进到唯一下一任务或 END。
  *
- * <p>M19 支持单一无条件的同阶段、跨阶段与 END；网关、并行和条件分支仍失败关闭。</p>
+ * <p>M19 支持单一无条件的同阶段、跨阶段与 END；M269 支持途经 {@code EXCLUSIVE_GATEWAY}
+ * 的唯一命中推进，零/多命中失败关闭。并行与 WAIT_EVENT 仍未实现。</p>
  */
 @Service
 final class WorkflowTaskCompletedHandler implements OutboxMessageHandler {
@@ -46,6 +50,7 @@ final class WorkflowTaskCompletedHandler implements OutboxMessageHandler {
     private final TaskSchedulingService tasks;
     private final OutboxAppender outbox;
     private final WorkOrderCommandService workOrders;
+    private final WorkOrderExpressionContextQuery workOrderExpressions;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
@@ -57,6 +62,7 @@ final class WorkflowTaskCompletedHandler implements OutboxMessageHandler {
             TaskSchedulingService tasks,
             OutboxAppender outbox,
             WorkOrderCommandService workOrders,
+            WorkOrderExpressionContextQuery workOrderExpressions,
             ObjectMapper objectMapper,
             Clock clock
     ) {
@@ -67,6 +73,7 @@ final class WorkflowTaskCompletedHandler implements OutboxMessageHandler {
         this.tasks = tasks;
         this.outbox = outbox;
         this.workOrders = workOrders;
+        this.workOrderExpressions = workOrderExpressions;
         this.objectMapper = objectMapper;
         this.clock = clock;
     }
@@ -95,7 +102,8 @@ final class WorkflowTaskCompletedHandler implements OutboxMessageHandler {
         var asset = configurations.requireAssetVersion(
                 message.tenantId(), current.workflowDefinitionVersionId(),
                 ConfigurationAssetType.WORKFLOW, current.workflowDefinitionDigest());
-        var progression = parser.progression(asset, current.nodeId());
+        ExpressionContext expressionContext = expressionContext(message.tenantId(), current);
+        var progression = parser.progression(asset, current.nodeId(), expressionContext);
 
         int completedRows = jdbc.sql("""
                         UPDATE wfl_node_instance
@@ -383,6 +391,22 @@ final class WorkflowTaskCompletedHandler implements OutboxMessageHandler {
         if (!completed.taskId().toString().equals(message.aggregateId())) {
             throw new IllegalArgumentException("TaskCompleted aggregateId does not match payload");
         }
+    }
+
+    /**
+     * 网关条件只读取工单冻结事实与当前完成任务的 stage/taskType；不引入可变“最新配置”。
+     */
+    private ExpressionContext expressionContext(String tenantId, NodeRuntime current) {
+        WorkOrderExpressionContext workOrder = workOrderExpressions.find(tenantId, current.workOrderId())
+                .orElseThrow(() -> new IllegalStateException(
+                        "workflow progression missing WorkOrder expression context: "
+                                + current.workOrderId()));
+        return new ExpressionContext(
+                new ExpressionContext.WorkOrderContext(
+                        workOrder.clientCode(), workOrder.brandCode(), workOrder.serviceProductCode()),
+                new ExpressionContext.RegionContext(
+                        workOrder.provinceCode(), workOrder.cityCode(), workOrder.districtCode()),
+                new ExpressionContext.TaskContext(current.stageCode(), current.taskType()));
     }
 
     private record NodeRuntime(

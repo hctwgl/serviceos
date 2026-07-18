@@ -674,8 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M268 配置治理 MVP**（Workflow 条件静态校验），功能证据提交
-`2015ae56310eba9905877a93e356fe317ffeb705`（合并入 `master` 后改为合并提交）。
+当前工程基线为 **M269 EXCLUSIVE_GATEWAY 运行时**（功能提交后回填 SHA；合并入 `master` 后改为合并提交）。
 此前 M267 Connector SPI 证据为 `994cb46f1e31ddc8a4364a776cc4849e766c3b6d`；M266 仍为上一
 master 合并基线 `088018a6eac180f7fe36536fae9d073fa797757c`。
 
@@ -687,8 +686,9 @@ master 合并基线 `088018a6eac180f7fe36536fae9d073fa797757c`。
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M269 实现文档](architecture/282-m269-exclusive-gateway-runtime.md)
+- [M269 验收矩阵](testing/266-m269-exclusive-gateway-runtime-acceptance.md)
 - [M268 实现文档](architecture/281-m268-configuration-governance-mvp.md)
-- [M268 验收矩阵](testing/265-m268-configuration-governance-mvp-acceptance.md)
 - [M267 实现文档](architecture/280-m267-generic-connector-spi.md)
 - [多车企平台内核交付计划](roadmap/06-multi-oem-platform-kernel-delivery-plan.md)
 - [多车企平台内核程序级验收矩阵](testing/multi-oem-platform-kernel-program-acceptance.md)
