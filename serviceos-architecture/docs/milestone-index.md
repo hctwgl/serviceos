@@ -290,6 +290,7 @@ title: ServiceOS 里程碑索引
 | M279 | M279 工单取消/重开与流程人工跳转 | [292-m279-work-order-cancel-reopen-jump.md](../architecture/292-m279-work-order-cancel-reopen-jump.md) | [276-m279-work-order-cancel-reopen-jump-acceptance.md](../testing/276-m279-work-order-cancel-reopen-jump-acceptance.md) |
 | M280 | M280 取消时配置化补偿任务 | [293-m280-workflow-compensation-on-cancel.md](../architecture/293-m280-workflow-compensation-on-cancel.md) | [277-m280-workflow-compensation-on-cancel-acceptance.md](../testing/277-m280-workflow-compensation-on-cancel-acceptance.md) |
 | M281 | M281 标准维修/移机/巡检配置模板 | [294-m281-standard-charger-service-templates.md](../architecture/294-m281-standard-charger-service-templates.md) | [278-m281-standard-charger-service-templates-acceptance.md](../testing/278-m281-standard-charger-service-templates-acceptance.md) |
+| M282 | M282 Workflow 配置设计器 API（草稿→校验→发布） | [295-m282-workflow-configuration-designer-api.md](../architecture/295-m282-workflow-configuration-designer-api.md) | [279-m282-workflow-configuration-designer-api-acceptance.md](../testing/279-m282-workflow-configuration-designer-api-acceptance.md) |
 
 ## 未关联里程碑的文档
 

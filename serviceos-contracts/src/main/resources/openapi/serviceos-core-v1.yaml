@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.27
+  version: 1.0.28
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -4942,6 +4942,155 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /configuration/drafts:
+    get:
+      operationId: listConfigurationDrafts
+      summary: 列出配置资产草稿
+      description: M282 仅支持 WORKFLOW；需要 configuration.draft.write。
+      parameters:
+        - name: assetType
+          in: query
+          schema: { type: string, enum: [WORKFLOW], default: WORKFLOW }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 草稿列表（按更新时间倒序，最多 100）
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/ConfigurationDraft' } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createConfigurationDraft
+      summary: 创建配置资产草稿
+      description: M282 仅支持 WORKFLOW；需要 configuration.draft.write。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateConfigurationDraftRequest' }
+      responses:
+        '200':
+          description: 新建草稿
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConfigurationDraft' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /configuration/drafts/{draftId}:
+    get:
+      operationId: getConfigurationDraft
+      summary: 读取配置资产草稿
+      parameters:
+        - name: draftId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 草稿当前事实
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConfigurationDraft' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    put:
+      operationId: updateConfigurationDraft
+      summary: 更新配置资产草稿定义
+      parameters:
+        - name: draftId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateConfigurationDraftRequest' }
+      responses:
+        '200':
+          description: 更新后的草稿
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConfigurationDraft' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /configuration/drafts/{draftId}:validate:
+    post:
+      operationId: validateConfigurationDraft
+      summary: 静态校验配置草稿
+      description: 校验通过后状态变为 VALIDATED；失败保持 DRAFT 并写入 validationErrors。
+      parameters:
+        - name: draftId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 校验通过的草稿
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConfigurationDraft' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /configuration/drafts/{draftId}:publish:
+    post:
+      operationId: publishConfigurationDraft
+      summary: 发布已校验的配置草稿
+      description: 需要 configuration.publish（HIGH）；仅 VALIDATED 可发布，生成不可变资产版本。
+      parameters:
+        - name: draftId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 已发布草稿（含 publishedVersionId）
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConfigurationDraft' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
 components:
   securitySchemes:
     bearerAuth:
@@ -5121,6 +5270,47 @@ components:
         type: string
         pattern: '^"[1-9][0-9]*"$'
   schemas:
+    CreateConfigurationDraftRequest:
+      type: object
+      additionalProperties: false
+      required: [assetType, assetKey, intendedSemanticVersion, schemaVersion, definitionJson]
+      properties:
+        assetType: { type: string, enum: [WORKFLOW] }
+        assetKey: { type: string, minLength: 1, maxLength: 128 }
+        intendedSemanticVersion: { type: string, minLength: 1, maxLength: 64 }
+        schemaVersion: { type: string, minLength: 1, maxLength: 64 }
+        definitionJson: { type: string, minLength: 2, maxLength: 1000000 }
+        baseVersionId: { type: [string, 'null'], format: uuid }
+    UpdateConfigurationDraftRequest:
+      type: object
+      additionalProperties: false
+      required: [definitionJson]
+      properties:
+        definitionJson: { type: string, minLength: 2, maxLength: 1000000 }
+    ConfigurationDraft:
+      type: object
+      additionalProperties: false
+      required: [draftId, assetType, assetKey, intendedSemanticVersion, schemaVersion,
+                 definitionJson, contentDigest, status, validationErrors, aggregateVersion,
+                 createdBy, updatedBy, createdAt, updatedAt]
+      properties:
+        draftId: { type: string, format: uuid }
+        assetType: { type: string, enum: [WORKFLOW] }
+        assetKey: { type: string }
+        intendedSemanticVersion: { type: string }
+        schemaVersion: { type: string }
+        definitionJson: { type: string }
+        contentDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
+        status: { enum: [DRAFT, VALIDATED, PUBLISHED, DISCARDED] }
+        baseVersionId: { type: [string, 'null'], format: uuid }
+        publishedVersionId: { type: [string, 'null'], format: uuid }
+        validationErrors: { type: array, items: { type: string } }
+        aggregateVersion: { type: integer, format: int64, minimum: 1 }
+        createdBy: { type: string }
+        updatedBy: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
     SecurityPrincipal:
       type: object
       additionalProperties: false

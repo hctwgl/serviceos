@@ -33,7 +33,7 @@ import java.util.Set;
  * 完整 Workflow JSON Schema 结构门禁仍待夹具与历史定义对齐后启用。</p>
  */
 @Component
-final class ConfigurationAssetSchemaValidator {
+public final class ConfigurationAssetSchemaValidator {
     private static final String FORM_SCHEMA_VERSION = "1.0.0";
     private static final String EVIDENCE_SCHEMA_VERSION = "1.0.0";
     private static final String SLA_SCHEMA_VERSION = "1.0.0";
@@ -65,7 +65,7 @@ final class ConfigurationAssetSchemaValidator {
                 loadSchema("configuration-schemas/sla-v1.schema.json"));
     }
 
-    void validate(PublishConfigurationAssetCommand command) {
+    public void validate(PublishConfigurationAssetCommand command) {
         if (command.assetType() == ConfigurationAssetType.WORKFLOW) {
             validateWorkflowSemantics(parse(command.definitionJson()), command.assetKey());
             return;

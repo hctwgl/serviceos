@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M281 标准维修/移机/巡检配置模板**，功能证据提交 `6b0e3d338ad445db73529c84aa01d04a2980d318`（合并入 `master` 后改为合并提交）。
+当前工程基线为 **M282 Workflow 配置设计器 API**，功能证据提交待回填（合并入 `master` 后改为合并提交）。
 
 当前已具备多 OEM 内核、复杂流程运行时（含取消/重开/跳转/补偿）与标准服务模板族。下一主线是阶段三领域配置设计器。
 
@@ -683,6 +683,8 @@ serviceos-architecture/
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M282 实现文档](architecture/295-m282-workflow-configuration-designer-api.md)
+- [M282 验收矩阵](testing/279-m282-workflow-configuration-designer-api-acceptance.md)
 - [M281 实现文档](architecture/294-m281-standard-charger-service-templates.md)
 - [M281 验收矩阵](testing/278-m281-standard-charger-service-templates-acceptance.md)
 - [M280 实现文档](architecture/293-m280-workflow-compensation-on-cancel.md)

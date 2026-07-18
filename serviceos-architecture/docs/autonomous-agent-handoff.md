@@ -8,14 +8,14 @@ lastUpdated: 2026-07-18
 ## 当前
 
 - PR：https://github.com/hctwgl/serviceos/pull/146
-- latestMilestone：**M281**
-- Flyway：**109 / 111**
-- OpenAPI：**1.0.27**
+- latestMilestone：**M282**（提交后回填 baselineCommit）
+- Flyway：**111 / 113**
+- OpenAPI：**1.0.28**
 
 ## 已完成
 
-阶段一 M267～M274；阶段二 M275～M280；**M281** 标准维修/移机/巡检模板（家充勘安已在 M271）
+阶段一/二 M267～M281；阶段三首切片 **M282** Workflow 配置设计器草稿→校验→发布 API
 
 ## 下一步
 
-阶段三：领域配置设计器（流程/表单/资料/SLA/映射等）最小纵向切片
+FORM/EVIDENCE/SLA 设计器 API；Admin 可视化流程画布；Diff/审批/灰度
