@@ -249,4 +249,5 @@
 - [M246 Technician Portal 表单提交安全摘要验收矩阵](243-m246-technician-portal-form-submission-history-acceptance.md)
 - [M247 TypeScript OpenAPI Client 消费基础验收矩阵](244-m247-typescript-openapi-client-consumer-foundation-acceptance.md)
 - [M248 Swift OpenAPI Client 消费基础验收矩阵](245-m248-swift-openapi-client-consumer-foundation-acceptance.md)
+- [M249 多端共享 Design Token 基础验收矩阵](246-m249-shared-design-token-foundation-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)
