@@ -1,5 +1,6 @@
 package com.serviceos.readmodel.application;
 
+import com.serviceos.appointment.api.TechnicianContactAttemptQuery;
 import com.serviceos.appointment.api.TechnicianScheduleAppointmentQuery;
 import com.serviceos.appointment.api.TechnicianScheduleAppointmentView;
 import com.serviceos.authorization.api.AuthorizationRequest;
@@ -10,6 +11,7 @@ import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.network.api.NetworkTechnicianMembershipView;
 import com.serviceos.network.api.PrincipalNetworkAffiliationQuery;
 import com.serviceos.network.api.TechnicianProfileView;
+import com.serviceos.readmodel.api.TechnicianPortalContactAttemptItem;
 import com.serviceos.readmodel.api.TechnicianPortalFeedItem;
 import com.serviceos.readmodel.api.TechnicianPortalFeedPage;
 import com.serviceos.readmodel.api.TechnicianPortalQueryService;
@@ -58,6 +60,7 @@ final class DefaultTechnicianPortalQueryService implements TechnicianPortalQuery
     private final TechnicianActiveAssignmentQuery assignments;
     private final TechnicianTaskAssignmentFeedQuery taskAssignments;
     private final TechnicianScheduleAppointmentQuery appointments;
+    private final TechnicianContactAttemptQuery contactAttempts;
     private final TaskFulfillmentContextService tasks;
     private final Clock clock;
 
@@ -67,6 +70,7 @@ final class DefaultTechnicianPortalQueryService implements TechnicianPortalQuery
             TechnicianActiveAssignmentQuery assignments,
             TechnicianTaskAssignmentFeedQuery taskAssignments,
             TechnicianScheduleAppointmentQuery appointments,
+            TechnicianContactAttemptQuery contactAttempts,
             TaskFulfillmentContextService tasks,
             Clock clock
     ) {
@@ -75,6 +79,7 @@ final class DefaultTechnicianPortalQueryService implements TechnicianPortalQuery
         this.assignments = assignments;
         this.taskAssignments = taskAssignments;
         this.appointments = appointments;
+        this.contactAttempts = contactAttempts;
         this.tasks = tasks;
         this.clock = clock;
     }
@@ -182,6 +187,18 @@ final class DefaultTechnicianPortalQueryService implements TechnicianPortalQuery
                         row.windowEnd(),
                         row.timezone()))
                 .toList();
+        List<TechnicianPortalContactAttemptItem> contactAttemptItems = contactAttempts
+                .listForTasks(actor.tenantId(), Set.of(taskId)).stream()
+                .map(row -> new TechnicianPortalContactAttemptItem(
+                        row.contactAttemptId(),
+                        row.taskId(),
+                        row.channel(),
+                        row.startedAt(),
+                        row.endedAt(),
+                        row.resultCode(),
+                        row.nextContactAt(),
+                        row.createdAt()))
+                .toList();
 
         return new TechnicianPortalTaskDetail(
                 ctx.networkId(),
@@ -201,6 +218,7 @@ final class DefaultTechnicianPortalQueryService implements TechnicianPortalQuery
                 task.executionGuarded(),
                 task.version(),
                 appointmentItems,
+                contactAttemptItems,
                 clock.instant());
     }
 

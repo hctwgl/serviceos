@@ -210,6 +210,10 @@ status: Accepted
   resourceVersion 与 M195 非敏感预约摘要。Core OpenAPI → `1.0.17`；catalog 仍
   `page-registry-v16`；Flyway 仍 100/102。**不**接受地址/联系人/表单值/资料文件/配置源码、
   Technician 写命令、客户端推导 allowed-actions、离线工作包、GPS/上传、MESSAGE/PROFILE。
+- §11 Technician Portal 联系历史安全摘要（M244 / ADR-082）：M243 详情增加
+  `contactAttempts[]`；仅含联系事实 ID、taskId、channel、startedAt/endedAt、resultCode、
+  nextContactAt、createdAt。禁止 `contactedPartyRef`、note、recordingRef、actorId；Core OpenAPI →
+  `1.0.18`；catalog/Flyway 不变；不接受联系写入。
 - §10 Network Portal 队列/列表 Accepted 字段展示（M220 UI-only）：**不**新增 HTTP；整改/
   异常/资质/师傅列表与任务目录展示既有非 PII 字段；`correctionTaskId`/`handlingTaskId`/
   `workOrderId` 门户内深链；异常详情 `handlingTaskId` 深链。catalog 仍 `page-registry-v16`；

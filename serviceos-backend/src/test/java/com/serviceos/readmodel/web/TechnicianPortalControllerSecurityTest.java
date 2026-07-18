@@ -111,7 +111,7 @@ class TechnicianPortalControllerSecurityTest {
                 .thenReturn(new TechnicianPortalTaskDetail(
                         NETWORK_ID, taskId, workOrderId, projectId,
                         null, null, "INSTALLATION", "HUMAN", "INSTALL", "READY",
-                        "INSTALLATION", now, false, 1, List.of(), now));
+                        "INSTALLATION", now, false, 1, List.of(), List.of(), now));
 
         mvc.perform(get("/api/v1/technician/me/tasks/{taskId}", taskId)
                         .with(jwt().jwt(token -> token.subject("external-subject")
@@ -122,7 +122,8 @@ class TechnicianPortalControllerSecurityTest {
                 .andExpect(jsonPath("$.networkId").value(NETWORK_ID.toString()))
                 .andExpect(jsonPath("$.taskId").value(taskId.toString()))
                 .andExpect(jsonPath("$.taskStatus").value("READY"))
-                .andExpect(jsonPath("$.appointments").isArray());
+                .andExpect(jsonPath("$.appointments").isArray())
+                .andExpect(jsonPath("$.contactAttempts").isArray());
     }
 
     private static CurrentPrincipal actor() {

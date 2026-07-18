@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.17
+  version: 1.0.18
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -2344,9 +2344,10 @@ paths:
       operationId: getTechnicianTaskDetail
       summary: Technician Portal 当前责任任务在线详情
       description: |
-        M243：需要有效 X-Technician-Context 与 NETWORK scope task.readAssigned。
+        M243～M244：需要有效 X-Technician-Context 与 NETWORK scope task.readAssigned。
         仅返回当前师傅 ACTIVE ServiceAssignment/TaskAssignment 对应的非 PII 任务头、执行保护状态和
-        非敏感预约摘要；不返回地址、联系人、表单值、资料文件、配置源码或离线工作包。
+        非敏感预约/联系历史摘要；联系摘要不含 contactedPartyRef、note、recordingRef、actorId；
+        不返回地址、联系人、表单值、资料文件、配置源码或离线工作包。
         其他师傅、其他网点、已撤权或不存在的 taskId 均返回 404，避免资源枚举。
       parameters:
         - name: taskId
@@ -5524,7 +5525,7 @@ components:
       type: object
       additionalProperties: false
       required: [networkId, taskId, workOrderId, taskType, taskKind, stageCode, taskStatus,
-                 executionGuarded, resourceVersion, appointments, asOf]
+                 executionGuarded, resourceVersion, appointments, contactAttempts, asOf]
       properties:
         networkId: { type: string, format: uuid }
         taskId: { type: string, format: uuid }
@@ -5543,7 +5544,23 @@ components:
         appointments:
           type: array
           items: { $ref: '#/components/schemas/TechnicianPortalScheduleItem' }
+        contactAttempts:
+          type: array
+          items: { $ref: '#/components/schemas/TechnicianPortalContactAttemptItem' }
         asOf: { type: string, format: date-time }
+    TechnicianPortalContactAttemptItem:
+      type: object
+      additionalProperties: false
+      required: [contactAttemptId, taskId, channel, startedAt, endedAt, resultCode, createdAt]
+      properties:
+        contactAttemptId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        channel: { type: string, minLength: 1, maxLength: 80 }
+        startedAt: { type: string, format: date-time }
+        endedAt: { type: string, format: date-time }
+        resultCode: { enum: [CONNECTED, NO_ANSWER, BUSY, WRONG_NUMBER, USER_REQUESTED_LATER, INVALID_CONTACT] }
+        nextContactAt: { type: [string, 'null'], format: date-time }
+        createdAt: { type: string, format: date-time }
     TechnicianPortalScheduleItem:
       type: object
       additionalProperties: false

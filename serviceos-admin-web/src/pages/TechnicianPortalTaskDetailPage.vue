@@ -46,7 +46,7 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
       <div>
         <RouterLink to="/technician-portal/task-feed">← 返回任务 Feed</RouterLink>
         <h2>任务详情</h2>
-        <p class="hint">M243：当前 ACTIVE 责任任务的在线非 PII 详情；执行授权仍以服务端命令为准。</p>
+        <p class="hint">M244：当前 ACTIVE 责任任务的在线非 PII 详情与联系历史；执行授权仍以服务端命令为准。</p>
       </div>
       <button type="button" data-testid="technician-task-detail-refresh" @click="load">刷新</button>
     </header>
@@ -93,8 +93,30 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
         <p v-else>暂无预约</p>
       </section>
 
+      <section class="contacts">
+        <div class="section-title">
+          <h3>联系历史</h3>
+          <span>仅安全事实摘要</span>
+        </div>
+        <table v-if="detail.contactAttempts.length > 0" data-testid="technician-task-detail-contact-attempts">
+          <thead>
+            <tr><th>渠道</th><th>结果</th><th>开始</th><th>结束</th><th>下次联系</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="attempt in detail.contactAttempts" :key="attempt.contactAttemptId">
+              <td>{{ attempt.channel }}</td>
+              <td>{{ attempt.resultCode }}</td>
+              <td>{{ attempt.startedAt }}</td>
+              <td>{{ attempt.endedAt }}</td>
+              <td>{{ attempt.nextContactAt ?? '—' }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-else data-testid="technician-task-detail-no-contact-attempts">暂无联系记录</p>
+      </section>
+
       <p class="boundary" data-testid="technician-task-detail-boundary">
-        本切片不返回地址、联系人、表单值、资料文件、配置源码或离线工作包。
+        本切片不返回地址、联系人、联系对象引用、自由文本、录音引用、操作者标识、表单值、资料文件、配置源码或离线工作包。
       </p>
     </template>
   </section>

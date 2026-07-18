@@ -54,6 +54,7 @@ class TechnicianPortalFeedPostgresIT {
     private static final UUID TASK_OTHER = UUID.fromString("019f83b0-bbbb-7f8c-9505-36fe5c0e880d");
     private static final UUID PROJECT_A = UUID.fromString("019f83b0-cccc-7f8c-9505-36fe5c0e880e");
     private static final UUID APPOINTMENT_A = UUID.fromString("019f83b0-dddd-7f8c-9505-36fe5c0e880f");
+    private static final UUID CONTACT_ATTEMPT_A = UUID.fromString("019f83b0-ddde-7f8c-9505-36fe5c0e8811");
     private static final UUID TECH_ASSIGNMENT_A = UUID.fromString("019f83b0-eeee-7f8c-9505-36fe5c0e8810");
 
     @Container
@@ -120,6 +121,7 @@ class TechnicianPortalFeedPostgresIT {
         // 跨网点师傅责任
         seedActivePair(NETWORK_B, WO_B, TASK_B, OTHER_TECH_PRINCIPAL.toString(), UUID.randomUUID());
         seedAppointment(APPOINTMENT_A, TASK_A, WO_A, PROJECT_A);
+        seedContactAttempt(CONTACT_ATTEMPT_A, TASK_A, WO_A, PROJECT_A);
         jdbc.sql("""
                 INSERT INTO auth_tenant_grant_generation (tenant_id, generation, updated_at)
                 VALUES (:tenant, 1, now())
@@ -213,6 +215,13 @@ class TechnicianPortalFeedPostgresIT {
             assertThat(appointment.taskId()).isEqualTo(TASK_A);
             assertThat(appointment.timezone()).isEqualTo("Asia/Shanghai");
         });
+        assertThat(detail.contactAttempts()).singleElement().satisfies(attempt -> {
+            assertThat(attempt.contactAttemptId()).isEqualTo(CONTACT_ATTEMPT_A);
+            assertThat(attempt.taskId()).isEqualTo(TASK_A);
+            assertThat(attempt.channel()).isEqualTo("PHONE");
+            assertThat(attempt.resultCode()).isEqualTo("NO_ANSWER");
+            assertThat(attempt.nextContactAt()).isEqualTo(Instant.parse("2026-07-17T04:00:00Z"));
+        });
 
         // 同一合法 Portal 上下文下，其他师傅或其他网点任务统一按不存在处理，避免资源枚举。
         assertThatThrownBy(() -> portal.taskDetail(
@@ -223,6 +232,29 @@ class TechnicianPortalFeedPostgresIT {
                 actor(TECH_PRINCIPAL), "corr-other", context, TASK_OTHER))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.RESOURCE_NOT_FOUND));
+    }
+
+    private void seedContactAttempt(UUID attemptId, UUID taskId, UUID workOrderId, UUID projectId) {
+        // 故意写入敏感引用/自由文本/录音引用，证明 Technician 投影只取固定安全字段。
+        jdbc.sql("""
+                INSERT INTO apt_contact_attempt (
+                    contact_attempt_id, tenant_id, project_id, work_order_id, task_id,
+                    channel, contacted_party_ref, started_at, ended_at, result_code,
+                    note, next_contact_at, recording_ref, actor_id, created_at
+                ) VALUES (
+                    :id, :tenant, :project, :workOrder, :task,
+                    'PHONE', 'customer-sensitive-ref',
+                    '2026-07-17 03:00:00+00', '2026-07-17 03:02:00+00', 'NO_ANSWER',
+                    'sensitive free text', '2026-07-17 04:00:00+00',
+                    'recording-sensitive-ref', 'other-actor-sensitive-id', '2026-07-17 03:03:00+00'
+                )
+                """)
+                .param("id", attemptId)
+                .param("tenant", TENANT)
+                .param("project", projectId)
+                .param("workOrder", workOrderId)
+                .param("task", taskId)
+                .update();
     }
 
     @Test
