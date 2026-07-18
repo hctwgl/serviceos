@@ -80,6 +80,8 @@ final class TechnicianAppStore {
     private(set) var evidenceItems: [TechnicianOnlineEvidenceItem] = []
     private(set) var evidenceMessage: String?
     private(set) var evidenceUploading = false
+    private(set) var taskSubmissionMessage: String?
+    private(set) var taskSubmitting = false
     private(set) var onlineMessage: String?
     private(set) var onlineLoading = false
     var selectedTab: TechnicianAppTab = .taskFeed
@@ -261,6 +263,52 @@ final class TechnicianAppStore {
         }
     }
 
+    func completeTask(session: TechnicianSession, taskID: UUID) async {
+        guard let dependencies, let detail = taskDetail, detail.taskId == taskID else { return }
+        let revisionIDs = evidenceItems
+            .filter { $0.status == "ACTIVE" }
+            .compactMap { item in
+                item.revisions.filter { $0.status == "VALIDATED" }
+                    .max { $0.revisionNumber < $1.revisionNumber }?.evidenceRevisionId
+            }
+        guard !revisionIDs.isEmpty else {
+            taskSubmissionMessage = "没有可冻结的已校验资料版本，请等待服务器扫描与校验"
+            return
+        }
+        let formSubmissionID = detail.formSubmissions?
+            .filter { $0.validationStatus == .validated }
+            .max { $0.submissionVersion < $1.submissionVersion }?.submissionId
+        guard taskForms.isEmpty || formSubmissionID != nil else {
+            taskSubmissionMessage = "当前冻结表单尚无已校验提交，不能完成任务"
+            return
+        }
+        taskSubmitting = true
+        taskSubmissionMessage = "正在冻结不可变资料集合…"
+        defer { taskSubmitting = false }
+        do {
+            let snapshot = try await dependencies.onlineService.createTaskSubmissionSnapshot(
+                contextID: session.activeContext.contextId,
+                taskID: taskID,
+                revisionIDs: revisionIDs
+            )
+            taskSubmissionMessage = "服务器正在复核冻结输入并完成任务…"
+            _ = try await dependencies.onlineService.completeTask(
+                contextID: session.activeContext.contextId,
+                taskID: taskID,
+                resourceVersion: detail.resourceVersion,
+                snapshotID: snapshot.evidenceSetSnapshotId,
+                formSubmissionID: formSubmissionID
+            )
+            taskSubmissionMessage = "任务已完成；资料摘要与输入版本引用均由服务器冻结"
+            taskDetail = try await dependencies.onlineService.taskDetail(
+                contextID: session.activeContext.contextId,
+                taskID: taskID
+            )
+        } catch {
+            taskSubmissionMessage = Self.safeMessage(for: error)
+        }
+    }
+
     func checkIn(session: TechnicianSession, appointmentID: UUID, taskID: UUID) async {
         guard let dependencies else { return }
         onlineLoading = true
@@ -401,6 +449,8 @@ final class TechnicianAppStore {
         evidenceItems = []
         evidenceMessage = nil
         evidenceUploading = false
+        taskSubmissionMessage = nil
+        taskSubmitting = false
         onlineMessage = nil
         onlineLoading = false
     }

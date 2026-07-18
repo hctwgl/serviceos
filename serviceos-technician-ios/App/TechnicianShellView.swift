@@ -168,6 +168,25 @@ private struct TechnicianTaskDetailView: View {
                     executionGuarded: detail.executionGuarded
                 )
 
+                Section("冻结资料并完成任务") {
+                    Text("只选择 ACTIVE Item 的最新 VALIDATED Revision；引用、摘要与输入版本由服务器重新读取并冻结。")
+                        .font(.footnote).foregroundStyle(.secondary)
+                    Button {
+                        Task { await store.completeTask(session: session, taskID: taskID) }
+                    } label: {
+                        Label(store.taskSubmitting ? "服务器复核中…" : "冻结资料并完成任务",
+                              systemImage: "checkmark.seal")
+                    }
+                    .disabled(store.taskSubmitting || store.evidenceUploading
+                        || detail.executionGuarded || detail.taskStatus != "RUNNING")
+                    .accessibilityIdentifier("technician.task.complete")
+                    if let message = store.taskSubmissionMessage {
+                        Text(message).font(.callout).foregroundStyle(.secondary)
+                            .accessibilityIdentifier("technician.task.complete.message")
+                    }
+                }
+                .accessibilityIdentifier("technician.task.submission")
+
                 Section("预约与到场") {
                     if let appointment = confirmedAppointment {
                         LabeledContent("预约", value: appointment.type)

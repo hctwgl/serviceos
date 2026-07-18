@@ -77,6 +77,10 @@ actor FakeOnlineTransport: ServiceHTTPTransporting {
             body = #"{}"#
         } else if request.url!.path.hasSuffix(":finalize") {
             body = #"{"evidenceItemId":"92000000-0000-4000-8000-000000000264","taskId":"50000000-0000-4000-8000-000000000263","evidenceSlotId":"90000000-0000-4000-8000-000000000264","itemOrdinal":1,"status":"STORED","createdAt":"2026-07-18T10:00:02Z","revisions":[{"evidenceRevisionId":"93000000-0000-4000-8000-000000000264","revisionNumber":1,"contentDigest":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","mimeType":"image/jpeg","sizeBytes":10,"status":"STORED","createdAt":"2026-07-18T10:00:02Z"}]}"#
+        } else if request.url!.path.hasSuffix("/evidence-set-snapshots") {
+            body = #"{"evidenceSetSnapshotId":"94000000-0000-4000-8000-000000000265","taskId":"50000000-0000-4000-8000-000000000263","purpose":"TASK_SUBMISSION","memberCount":1,"contentDigest":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","createdAt":"2026-07-18T10:00:03Z","members":[{"evidenceSlotId":"90000000-0000-4000-8000-000000000264","evidenceItemId":"92000000-0000-4000-8000-000000000264","evidenceRevisionId":"93000000-0000-4000-8000-000000000264","revisionNumber":1,"revisionStatus":"VALIDATED","contentDigest":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","memberOrdinal":1}]}"#
+        } else if request.url!.path.hasSuffix(":complete") {
+            body = #"{"taskId":"50000000-0000-4000-8000-000000000263","status":"COMPLETED","resourceVersion":4,"occurredAt":"2026-07-18T10:00:04Z"}"#
         } else {
             body = #"{"visitId":"40000000-0000-4000-8000-000000000262","status":"IN_PROGRESS","aggregateVersion":1,"geofenceResult":"WITHIN_GEOFENCE","policyDecision":"ACCEPTED","occurredAt":"2026-07-18T10:00:01Z"}"#
         }
@@ -268,5 +272,30 @@ struct FoundationSmoke {
         precondition(evidenceRequests[8].idempotencyKey == nil)
         precondition(evidenceRequests[9].body.contains("actualSha256"))
         precondition(evidenceRequests[9].body.contains("finalizeCommandId"))
+        let snapshot = try await online.createTaskSubmissionSnapshot(
+            contextID: contextID,
+            taskID: formTaskID,
+            revisionIDs: [uploaded.revisions[0].evidenceRevisionId]
+        )
+        precondition(snapshot.memberCount == 1)
+        let completion = try await online.completeTask(
+            contextID: contextID,
+            taskID: formTaskID,
+            resourceVersion: 3,
+            snapshotID: snapshot.evidenceSetSnapshotId,
+            formSubmissionID: submission.submissionId
+        )
+        precondition(completion.status == "COMPLETED")
+        let taskSubmissionRequests = await onlineTransport.captured()
+        precondition(taskSubmissionRequests.count == 12)
+        precondition(taskSubmissionRequests[10].idempotencyKey != nil)
+        precondition(taskSubmissionRequests[10].body.contains(#""memberRevisionIds":["93000000-0000-4000-8000-000000000264"]"#))
+        precondition(!taskSubmissionRequests[10].body.contains("contentDigest"))
+        precondition(taskSubmissionRequests[11].ifMatch == "\"3\"")
+        precondition(taskSubmissionRequests[11].idempotencyKey != nil)
+        precondition(taskSubmissionRequests[11].body.contains(#""evidenceSetSnapshotId":"94000000-0000-4000-8000-000000000265""#))
+        precondition(taskSubmissionRequests[11].body.contains(#""formSubmissionId":"70000000-0000-4000-8000-000000000263""#))
+        precondition(!taskSubmissionRequests[11].body.contains("resultRef"))
+        precondition(!taskSubmissionRequests[11].body.contains("inputVersionRefs"))
     }
 }
