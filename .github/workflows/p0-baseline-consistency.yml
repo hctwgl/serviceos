@@ -1,0 +1,48 @@
+name: p0-baseline-consistency
+
+on:
+  pull_request:
+    branches:
+      - master
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.head_ref == 'docs/p0-baseline-consistency'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Apply P0 documentation fixes
+        run: python3 scripts/p0-fix-baseline-docs.py
+
+      - name: Validate documentation baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          bash scripts/verify-milestone-preflight.sh
+
+      - name: Commit P0 documentation fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo 'P0 documentation is already current.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add serviceos-architecture/README.md serviceos-architecture/docs/implementation-status.md
+          git diff --cached --check
+          git commit -m 'docs: align M266 baseline facts'
+          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
