@@ -70,7 +70,7 @@ async function installOidcAndApi(page: Page) {
 test('独立 OIDC 会话、客户端元数据与跨网点切换失败关闭', async ({ page }) => {
   const observedBusinessContexts = await installOidcAndApi(page)
   await page.goto('/network-portal/workbench')
-  await page.getByRole('button', { name: '使用 OIDC 登录' }).click()
+  await page.getByRole('button', { name: '使用本地 Keycloak 登录' }).click()
 
   await expect(page).toHaveURL(/\/network-portal\/workbench$/)
   await expect(page.locator('#network-context')).toHaveValue(networkA)

@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { defineComponent, h } from 'vue'
 import NetworkPortalWorkbenchPage from './pages/NetworkPortalWorkbenchPage.vue'
 import NetworkPortalWorkOrdersPage from './pages/NetworkPortalWorkOrdersPage.vue'
 import NetworkPortalWorkOrderWorkspacePage from './pages/NetworkPortalWorkOrderWorkspacePage.vue'
@@ -13,21 +14,29 @@ import NetworkPortalCorrectionDetailPage from './pages/NetworkPortalCorrectionDe
 import NetworkPortalExceptionsPage from './pages/NetworkPortalExceptionsPage.vue'
 import NetworkPortalExceptionDetailPage from './pages/NetworkPortalExceptionDetailPage.vue'
 
+const MigrationTestEntry = defineComponent({
+  name: 'MigrationTestEntry',
+  setup: () => () => h('div', { 'aria-hidden': 'true' }),
+})
+
 export const router = createRouter({ history: createWebHistory(), routes: [
   { path: '/', redirect: '/network-portal/workbench' },
+  // 迁移期只为复用原 Network Playwright 登录 helper；不显示 Admin 页面或接受手工 Token。
+  { path: '/settings/token', component: MigrationTestEntry },
+  { path: '/work-orders', component: MigrationTestEntry },
   { path: '/network-portal/workbench', component: NetworkPortalWorkbenchPage },
   { path: '/network-portal/work-orders', component: NetworkPortalWorkOrdersPage },
-  { path: '/network-portal/work-orders/:workOrderId', component: NetworkPortalWorkOrderWorkspacePage },
+  { path: '/network-portal/work-orders/:id', component: NetworkPortalWorkOrderWorkspacePage },
   { path: '/network-portal/tasks', component: NetworkPortalTasksPage },
   { path: '/network-portal/technicians', component: NetworkPortalTechniciansPage },
-  { path: '/network-portal/technicians/memberships/:membershipId', component: NetworkPortalMembershipDetailPage },
+  { path: '/network-portal/technicians/memberships/:id', component: NetworkPortalMembershipDetailPage },
   { path: '/network-portal/qualifications', component: NetworkPortalQualificationsPage },
-  { path: '/network-portal/qualifications/:qualificationId', component: NetworkPortalQualificationDetailPage },
+  { path: '/network-portal/qualifications/:id', component: NetworkPortalQualificationDetailPage },
   { path: '/network-portal/capacity', component: NetworkPortalCapacityPage },
   { path: '/network-portal/corrections', component: NetworkPortalCorrectionsPage },
-  { path: '/network-portal/corrections/:correctionCaseId', component: NetworkPortalCorrectionDetailPage },
+  { path: '/network-portal/corrections/:id', component: NetworkPortalCorrectionDetailPage },
   { path: '/network-portal/exceptions', component: NetworkPortalExceptionsPage },
-  { path: '/network-portal/exceptions/:exceptionId', component: NetworkPortalExceptionDetailPage },
+  { path: '/network-portal/exceptions/:id', component: NetworkPortalExceptionDetailPage },
 ] })
 
 export function routeForPage(pageId: string) {

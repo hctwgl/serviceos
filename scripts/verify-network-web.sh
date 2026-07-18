@@ -15,6 +15,17 @@ if rg -n -i '\b(price|pricing|settlement|quote|quotedAmount|serviceFee)\b' \
   exit 1
 fi
 
+if rg -n "path: '/network-portal|from './pages/NetworkPortal" \
+  "${repository_root}/serviceos-admin-web/src/router.ts"; then
+  echo "Admin Web 禁止恢复正式 Network Portal 路由。" >&2
+  exit 1
+fi
+if find "${repository_root}/serviceos-admin-web/src/pages" -maxdepth 1 -name 'NetworkPortal*.vue' -print -quit | grep -q . \
+  || [[ -f "${repository_root}/serviceos-admin-web/src/api/networkPortal.ts" ]]; then
+  echo "Admin Web 中仍残留正式 Network Portal 页面或业务 API。" >&2
+  exit 1
+fi
+
 (
   cd "${app_directory}"
   npm ci --ignore-scripts --no-audit --no-fund --silent

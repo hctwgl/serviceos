@@ -13,14 +13,28 @@ const environment = resolveNetworkEnvironment({
   clientVersion: import.meta.env.VITE_SERVICEOS_CLIENT_VERSION,
 })
 const api = createNetworkApi(environment)
+const loginLabel = import.meta.env.DEV ? '使用本地 Keycloak 登录' : '使用 OIDC 登录'
+const devDiagnostics = import.meta.env.DEV
 const session = ref<NetworkSession | null>(null)
 const error = ref<string | null>(null)
+const forgeResult = ref('')
 const groupedNavigation = computed(() => (session.value?.navigation ?? []).reduce<Record<string, NavigationItem[]>>((groups, item) => {
   ;(groups[item.section] ??= []).push(item)
   return groups
 }, {}))
 async function refresh(contextId?: string) { try { error.value = null; session.value = await loadNetworkSession(api, contextId) } catch (cause) { session.value = null; error.value = cause instanceof Error ? cause.message : '上下文加载失败' } }
-async function login() { await beginLogin() }
+async function tryForgedContext() {
+  try {
+    await loadNetworkSession(api, `NETWORK|NETWORK|${crypto.randomUUID()}`)
+    forgeResult.value = 'unexpected-allow'
+  } catch {
+    forgeResult.value = '伪造 NETWORK 上下文被拒绝'
+  }
+}
+async function login() {
+  // `/settings/token` 仅用于迁移期自动化兼容；登录后落到独立应用自己的稳定测试入口。
+  await beginLogin(window.location.pathname === '/settings/token' ? '/work-orders' : undefined)
+}
 function signOut() { logout(); session.value = null }
 onMounted(() => { if (accessToken()) void refresh() })
 </script>
@@ -36,17 +50,23 @@ onMounted(() => { if (accessToken()) void refresh() })
       <section v-if="!session" class="boundary-card" aria-labelledby="foundation-title">
         <h2 id="foundation-title">连接网点上下文</h2>
         <p v-if="error" class="error">{{ error }}</p>
-        <button v-if="isLoginAvailable()" type="button" @click="login">使用 OIDC 登录</button>
+        <button v-if="isLoginAvailable()" type="button" @click="login">
+          {{ loginLabel }}
+        </button>
         <button type="button" @click="refresh()">加载当前会话</button>
         <p v-if="!isLoginAvailable()">身份接入尚未配置，应用失败关闭，不接受手工 Token。</p>
       </section>
       <template v-else>
-        <aside class="context-card">
+        <aside class="context-card" data-testid="network-portal-shell">
           <label for="network-context">网点上下文</label>
           <select id="network-context" :value="session.activeContextId" @change="refresh(($event.target as HTMLSelectElement).value)">
             <option v-for="context in session.contexts" :key="context.contextId" :value="context.contextId">{{ context.scopeRef }}</option>
           </select>
           <p>{{ session.capabilities.length }} 项服务端 Capability</p>
+          <template v-if="devDiagnostics">
+            <button type="button" data-testid="forge-network-context" @click="tryForgedContext">伪造 NETWORK 上下文</button>
+            <p data-testid="forge-network-result">{{ forgeResult }}</p>
+          </template>
           <button type="button" @click="signOut">退出</button>
         </aside>
         <section class="boundary-card">

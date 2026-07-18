@@ -24,6 +24,8 @@ const nav = ref<PortalNavState>({
 
 const recentItems = ref<RecentResourceItem[]>([])
 const recentError = ref<string | null>(null)
+const networkPortalUrl = import.meta.env.VITE_NETWORK_PORTAL_URL?.trim()
+  || (import.meta.env.DEV ? 'http://localhost:5174' : '')
 
 const TEST_IDS: Record<string, string> = {
   'ADMIN.SEARCH': 'nav-search',
@@ -128,7 +130,7 @@ onMounted(() => {
       <RouterLink to="/settings/preferences" data-testid="nav-ui-preferences">界面偏好</RouterLink>
       <RouterLink to="/settings/token">身份登录</RouterLink>
       <RouterLink to="/portal-stubs" data-testid="nav-portal-stubs">Portal stubs</RouterLink>
-      <RouterLink to="/network-portal" data-testid="nav-network-portal">Network Portal</RouterLink>
+      <a v-if="networkPortalUrl" :href="networkPortalUrl" data-testid="nav-network-portal">独立 Network Portal</a>
       <section class="recent" data-testid="recent-resources">
         <h2>最近访问</h2>
         <p v-if="recentError" class="error" data-testid="recent-error">{{ recentError }}</p>

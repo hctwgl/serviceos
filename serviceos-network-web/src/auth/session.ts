@@ -40,13 +40,16 @@ export function logout() {
  * Web 公共客户端使用 Authorization Code + PKCE；授权回调完成后 Token 只进入 M250
  * 内存 Store，不写 local/session storage。sessionStorage 仅保存一次性 state、verifier 与返回路径。
  */
-export async function beginLogin() {
+export async function beginLogin(returnPathOverride?: string) {
   if (!enabled()) throw new Error('OIDC 未配置')
   const verifier = randomUrlSafe()
   const state = randomUrlSafe(32)
   sessionStorage.setItem(verifierKey, verifier)
   sessionStorage.setItem(stateKey, state)
-  sessionStorage.setItem(returnPathKey, `${window.location.pathname}${window.location.search}${window.location.hash}`)
+  const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`
+  const returnPath = returnPathOverride ?? currentPath
+  if (!returnPath.startsWith('/') || returnPath.startsWith('//')) throw new Error('OIDC 返回路径非法')
+  sessionStorage.setItem(returnPathKey, returnPath)
   const url = new URL(`${issuer()}/protocol/openid-connect/auth`)
   Object.entries({ client_id: clientId(), redirect_uri: redirectUri(), response_type: 'code', scope: 'openid profile', state,
     code_challenge_method: 'S256', code_challenge: await challenge(verifier) }).forEach(([key, value]) => url.searchParams.set(key, value))
