@@ -256,4 +256,5 @@
 - [M253 多端客户端元数据与可观测性验收矩阵](250-m253-client-metadata-observability-acceptance.md)
 - [M254 Track A 多端共享基础总门禁验收矩阵](251-m254-track-a-client-foundation-gate-acceptance.md)
 - [M255 独立 Network Web AppShell 与环境基础验收矩阵](252-m255-independent-network-web-shell-acceptance.md)
+- [M256 独立 Network Web 完整交付批次验收矩阵](253-m256-network-web-delivery-batch-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

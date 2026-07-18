@@ -27,24 +27,24 @@ lastUpdated: 2026-07-18
 
 | ID | 验收项 | 预期 | 证据 |
 |---|---|---|---|
-| MCP-APP-01 | Admin 独立构建 | 不依赖 Network/Technician 路由才能构建和运行 | CI build + route test |
-| MCP-APP-02 | Network 独立构建 | 独立 AppShell、会话、环境和部署 | M255 local AppShell/build/environment; session/deploy/E2E pending |
+| MCP-APP-01 | Admin 独立构建 | 不依赖 Network/Technician 路由才能构建和运行 | M256 Admin build without Network routes |
+| MCP-APP-02 | Network 独立构建 | 独立 AppShell、会话、环境和部署 | M255 shell + M256 OIDC/session/76 E2E/container smoke |
 | MCP-APP-03 | Technician H5 独立构建 | 独立 AppShell、Technician Context 和路由 | CI build + Playwright |
 | MCP-APP-04 | Technician iOS 独立构建 | SwiftUI 工程可在模拟器和开发真机构建 | Xcode CI + device evidence |
 | MCP-APP-05 | 单仓库共享边界 | 共享包不包含角色菜单或数据范围假设 | M247-M254 independent consumers + source gates + aggregate gate |
-| MCP-APP-06 | 旧路由迁移 | 双运行验证后才删除 Admin 中正式 Portal 路由 | migration E2E |
+| MCP-APP-06 | 旧路由迁移 | 双运行验证后才删除 Admin 中正式 Portal 路由 | M256 75 migrated regressions + Admin build + route source gate |
 | MCP-APP-07 | 无 WebView 替代 | iOS 核心现场能力为原生实现 | source/review/device test |
 
 ## 4. 身份、上下文与授权
 
 | ID | 验收项 | 预期 | 证据 |
 |---|---|---|---|
-| MCP-AUTH-01 | OIDC PKCE | Web/iOS 使用受控授权码流程 | auth E2E |
-| MCP-AUTH-02 | Portal Context | ADMIN/NETWORK/TECHNICIAN Context 不可跨用 | negative security tests |
+| MCP-AUTH-01 | OIDC PKCE | Web/iOS 使用受控授权码流程 | M256 Network auth E2E; iOS pending |
+| MCP-AUTH-02 | Portal Context | ADMIN/NETWORK/TECHNICIAN Context 不可跨用 | M256 Network negative E2E/PostgreSQL; other apps ongoing |
 | MCP-AUTH-03 | Capability | 菜单和动作消费服务端 capability/allowedActions | UI + API tests |
 | MCP-AUTH-04 | 深链重鉴权 | 打开深链时重新验证身份、范围和当前责任 | security E2E |
 | MCP-AUTH-05 | Token 存储 | Web 不持久化长效敏感 Token；iOS 使用 Keychain | M250 Web memory-token gate + M251 vault boundary + future Keychain security review |
-| MCP-AUTH-06 | Context 切换 | 切换后清理相关查询缓存和敏感状态 | M250 generic context-boundary test + app E2E |
+| MCP-AUTH-06 | Context 切换 | 切换后清理相关查询缓存和敏感状态 | M250 generic boundary + M256 A/B Network E2E |
 | MCP-AUTH-07 | 旧师傅失权 | 改派后旧 Context 无法读取或写入新事实 | end-to-end negative tests |
 
 ## 5. 契约与客户端生成
