@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M283 FORM/EVIDENCE/SLA 配置设计器 API**，功能证据提交待回填（合并入 `master` 后改为合并提交）。
+当前工程基线为 **M283 FORM/EVIDENCE/SLA 配置设计器 API**，功能证据提交 `79d2b7f453113edacf1d6135ae49110ccb977eac`（合并入 `master` 后改为合并提交）。
 
 当前已具备多 OEM 内核、复杂流程运行时（含取消/重开/跳转/补偿）与标准服务模板族。下一主线是阶段三领域配置设计器。
 

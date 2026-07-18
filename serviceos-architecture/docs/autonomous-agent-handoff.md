@@ -8,7 +8,7 @@ lastUpdated: 2026-07-18
 ## 当前
 
 - PR：https://github.com/hctwgl/serviceos/pull/146
-- latestMilestone：**M283**（提交后回填 baselineCommit）
+- latestMilestone：**M283**
 - Flyway：**111 / 113**
 - OpenAPI：**1.0.29**
 
