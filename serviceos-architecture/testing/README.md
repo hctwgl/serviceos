@@ -254,4 +254,5 @@
 - [M251 iOS auth/context/error/trace 共享基础验收矩阵](248-m251-ios-core-auth-context-error-trace-foundation-acceptance.md)
 - [M252 多端 Page/Feature/Action 机器注册表验收矩阵](249-m252-cross-client-identity-registry-acceptance.md)
 - [M253 多端客户端元数据与可观测性验收矩阵](250-m253-client-metadata-observability-acceptance.md)
+- [M254 Track A 多端共享基础总门禁验收矩阵](251-m254-track-a-client-foundation-gate-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)
