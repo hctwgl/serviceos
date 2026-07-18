@@ -6,7 +6,6 @@ import com.serviceos.configuration.api.ConfigurationDraftService;
 import com.serviceos.configuration.api.ConfigurationDraftView;
 import com.serviceos.configuration.api.ConfigurationPublicationException;
 import com.serviceos.configuration.api.CreateConfigurationDraftCommand;
-import com.serviceos.configuration.api.UpdateConfigurationDraftCommand;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.CommandMetadata;
@@ -28,12 +27,12 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** M282：Workflow 草稿设计器 create → validate → publish。 */
+/** M283：FORM/EVIDENCE/SLA 设计器草稿校验发布。 */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = ServiceOsApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE)
-class WorkflowConfigurationDesignerPostgresIT {
-    private static final String TENANT = "tenant-cfg-m282-it";
-    private static final String ACTOR = "designer-m282";
+class FormEvidenceSlaDesignerPostgresIT {
+    private static final String TENANT = "tenant-cfg-m283-it";
+    private static final String ACTOR = "designer-m283";
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(
@@ -47,7 +46,7 @@ class WorkflowConfigurationDesignerPostgresIT {
         registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
-        registry.add("serviceos.outbox.worker-id", () -> "cfg-m282-it");
+        registry.add("serviceos.outbox.worker-id", () -> "cfg-m283-it");
     }
 
     @Autowired ConfigurationDraftService drafts;
@@ -64,65 +63,54 @@ class WorkflowConfigurationDesignerPostgresIT {
     }
 
     @Test
-    void draftValidateAndPublishWorkflow() {
-        ConfigurationDraftView created = drafts.create(principal(), meta("c1"), new CreateConfigurationDraftCommand(
-                ConfigurationAssetType.WORKFLOW, "platform.designer.m282", "1.0.0", "1.0.0",
-                validWorkflow(), null));
-        assertThat(created.status()).isEqualTo("DRAFT");
-        assertThat(created.aggregateVersion()).isEqualTo(1L);
-
-        ConfigurationDraftView updated = drafts.update(principal(), meta("u1"),
-                new UpdateConfigurationDraftCommand(created.draftId(), 1L, validWorkflow()));
-        assertThat(updated.status()).isEqualTo("DRAFT");
-        assertThat(updated.aggregateVersion()).isEqualTo(2L);
-
-        ConfigurationDraftView validated = drafts.validate(principal(), meta("v1"), created.draftId());
-        assertThat(validated.status()).isEqualTo("VALIDATED");
-        assertThat(validated.validationErrors()).isEmpty();
-
-        ConfigurationDraftView published = drafts.publish(principal(), meta("p1"), created.draftId());
-        assertThat(published.status()).isEqualTo("PUBLISHED");
-        assertThat(published.publishedVersionId()).isNotNull();
-        assertThat(jdbc.sql("""
-                SELECT status FROM cfg_configuration_asset_version WHERE version_id = :id
-                """).param("id", published.publishedVersionId()).query(String.class).single())
-                .isEqualTo("PUBLISHED");
+    void formEvidenceAndSlaDraftsPublish() {
+        assertPublished(ConfigurationAssetType.FORM, "designer.form.m283", validForm());
+        assertPublished(ConfigurationAssetType.EVIDENCE, "designer.evidence.m283", validEvidence());
+        assertPublished(ConfigurationAssetType.SLA, "designer.sla.m283", validSla());
     }
 
     @Test
-    void invalidWorkflowFailsValidationClosed() {
-        ConfigurationDraftView created = drafts.create(principal(), meta("bad"), new CreateConfigurationDraftCommand(
-                ConfigurationAssetType.WORKFLOW, "platform.designer.m282.bad", "1.0.0", "1.0.0",
-                """
-                {"workflowKey":"bad.m282","semanticVersion":"1.0.0","startNodeId":"START",
-                 "nodes":[
-                   {"nodeId":"START","nodeType":"START","name":"开始"},
-                   {"nodeId":"GW","nodeType":"EXCLUSIVE_GATEWAY","name":"坏网关"},
-                   {"nodeId":"END","nodeType":"END","name":"结束"}],
-                 "transitions":[
-                   {"transitionId":"t1","from":"START","to":"GW"},
-                   {"transitionId":"t2","from":"GW","to":"END"}]}
-                """, null));
-        assertThatThrownBy(() -> drafts.validate(principal(), meta("v-bad"), created.draftId()))
+    void invalidFormFailsValidationClosed() {
+        ConfigurationDraftView created = drafts.create(principal(), meta("bad-form"),
+                new CreateConfigurationDraftCommand(
+                        ConfigurationAssetType.FORM, "designer.form.bad", "1.0.0", "1.0.0",
+                        """
+                        {"formKey":"bad.form","version":"1.0.0","stage":"SURVEY","sections":[]}
+                        """, null));
+        assertThatThrownBy(() -> drafts.validate(principal(), meta("v-bad-form"), created.draftId()))
                 .isInstanceOf(ConfigurationPublicationException.class);
         assertThat(drafts.get(principal(), "corr-get", created.draftId()).status()).isEqualTo("DRAFT");
         assertThat(drafts.get(principal(), "corr-get", created.draftId()).validationErrors()).isNotEmpty();
     }
 
     @Test
-    void unsupportedAssetTypeRejected() {
+    void ruleTypeStillRejected() {
         assertThatThrownBy(() -> drafts.create(principal(), meta("rule"), new CreateConfigurationDraftCommand(
-                ConfigurationAssetType.RULE, "rule.m282", "1.0.0", "1.0.0", "{}", null)))
+                ConfigurationAssetType.RULE, "rule.m283", "1.0.0", "1.0.0", "{}", null)))
                 .isInstanceOf(BusinessProblem.class)
                 .extracting(ex -> ((BusinessProblem) ex).code())
                 .isEqualTo(ProblemCode.VALIDATION_FAILED);
+    }
+
+    private void assertPublished(ConfigurationAssetType type, String key, String definition) {
+        ConfigurationDraftView created = drafts.create(principal(), meta("c-" + key),
+                new CreateConfigurationDraftCommand(type, key, "1.0.0", "1.0.0", definition, null));
+        ConfigurationDraftView validated = drafts.validate(principal(), meta("v-" + key), created.draftId());
+        assertThat(validated.status()).isEqualTo("VALIDATED");
+        ConfigurationDraftView published = drafts.publish(principal(), meta("p-" + key), created.draftId());
+        assertThat(published.status()).isEqualTo("PUBLISHED");
+        assertThat(published.publishedVersionId()).isNotNull();
+        assertThat(jdbc.sql("""
+                SELECT asset_type FROM cfg_configuration_asset_version WHERE version_id = :id
+                """).param("id", published.publishedVersionId()).query(String.class).single())
+                .isEqualTo(type.name());
     }
 
     private void seedGrants() {
         UUID roleId = UUID.randomUUID();
         jdbc.sql("""
                 INSERT INTO auth_role (role_id, tenant_id, role_code, role_name, role_status, created_at)
-                VALUES (:id, :tenant, 'cfg-designer', '配置设计器', 'ACTIVE', now())
+                VALUES (:id, :tenant, 'cfg-designer-m283', '配置设计器M283', 'ACTIVE', now())
                 """).param("id", roleId).param("tenant", TENANT).update();
         for (String capability : List.of("configuration.draft.write", "configuration.publish")) {
             jdbc.sql("""
@@ -136,7 +124,7 @@ class WorkflowConfigurationDesignerPostgresIT {
                     valid_from, source_code, approval_ref, created_at
                 ) VALUES (
                     :grant, :tenant, :principal, :role, 'TENANT', :tenant,
-                    now() - interval '1 day', 'TEST', 'm282', now()
+                    now() - interval '1 day', 'TEST', 'm283', now()
                 )
                 """)
                 .param("grant", UUID.randomUUID())
@@ -155,17 +143,32 @@ class WorkflowConfigurationDesignerPostgresIT {
         return new CommandMetadata("corr-" + key, "idem-" + key);
     }
 
-    private static String validWorkflow() {
+    private static String validForm() {
         return """
-                {"workflowKey":"designer.m282","semanticVersion":"1.0.0","startNodeId":"START",
-                 "nodes":[
-                   {"nodeId":"START","nodeType":"START","name":"开始"},
-                   {"nodeId":"TASK_A","nodeType":"SERVICE_TASK","name":"任务A",
-                    "stageCode":"STAGE_A","taskType":"DESIGNER_TASK"},
-                   {"nodeId":"END","nodeType":"END","name":"结束"}],
-                 "transitions":[
-                   {"transitionId":"t1","from":"START","to":"TASK_A"},
-                   {"transitionId":"t2","from":"TASK_A","to":"END"}]}
+                {"formKey":"designer.form.m283","version":"1.0.0","stage":"SURVEY",
+                 "sections":[{"sectionKey":"base","title":"基础","fields":[{
+                   "fieldKey":"result.value","label":"结果","dataType":"STRING",
+                   "binding":"task.input.result.value"}]}]}
+                """;
+    }
+
+    private static String validEvidence() {
+        return """
+                {"templateKey":"designer.evidence.m283","version":"1.0.0","title":"现场资料","stage":"SURVEY",
+                 "items":[{"evidenceKey":"site.panorama","name":"全景图","mediaType":"PHOTO","required":true,
+                   "capture":{"allowCamera":true,"allowGallery":false,"requireRealtimeCapture":true,
+                     "requireGps":true,"watermarkFields":["TIME","GPS","WORK_ORDER_NO"],
+                     "minCount":1,"maxCount":3,"maxSizeBytes":10485760},
+                   "qualityChecks":[{"checkType":"BLUR","severity":"BLOCK"}],
+                   "reviewPolicy":{"reviewRequired":true,"allowItemLevelReject":true}}]}
+                """;
+    }
+
+    private static String validSla() {
+        return """
+                {"policyKey":"designer.sla.m283","version":"1.0.0","subjectType":"TASK",
+                 "taskTypes":["DESIGNER_TASK"],"startEvent":"TASK_CREATED","stopEvent":"TASK_COMPLETED",
+                 "clockMode":"ELAPSED","targetDurationSeconds":3600}
                 """;
     }
 }

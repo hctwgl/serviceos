@@ -28,19 +28,25 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 /**
  * Workflow 配置设计器草稿服务。
  *
  * <p>事务边界：草稿写与发布同事务；发布成功后草稿标记 PUBLISHED 并绑定不可变 versionId。
- * M282 仅开放 WORKFLOW；其他资产类型失败关闭。</p>
+ * M282 开放 WORKFLOW；M283 扩展 FORM/EVIDENCE/SLA。其余类型失败关闭。</p>
  */
 @Service
 final class DefaultConfigurationDraftService implements ConfigurationDraftService {
     private static final String WRITE = "configuration.draft.write";
     private static final String PUBLISH = "configuration.publish";
     private static final String RESOURCE = "ConfigurationDraft";
+    private static final Set<ConfigurationAssetType> DESIGNER_TYPES = Set.of(
+            ConfigurationAssetType.WORKFLOW,
+            ConfigurationAssetType.FORM,
+            ConfigurationAssetType.EVIDENCE,
+            ConfigurationAssetType.SLA);
 
     private final JdbcClient jdbc;
     private final AuthorizationService authorization;
@@ -75,7 +81,7 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
         Objects.requireNonNull(principal, "principal");
         Objects.requireNonNull(metadata, "metadata");
         Objects.requireNonNull(command, "command");
-        requireWorkflowOnly(command.assetType());
+        requireDesignerSupported(command.assetType());
         String definition = requireDefinition(command.definitionJson());
         String assetKey = requireText(command.assetKey(), "assetKey", 128);
         String semanticVersion = requireText(command.intendedSemanticVersion(), "intendedSemanticVersion", 64);
@@ -124,7 +130,7 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
         Objects.requireNonNull(metadata, "metadata");
         Objects.requireNonNull(command, "command");
         ConfigurationDraftView current = requireDraft(principal.tenantId(), command.draftId());
-        requireWorkflowOnly(current.assetType());
+        requireDesignerSupported(current.assetType());
         if (!"DRAFT".equals(current.status()) && !"VALIDATED".equals(current.status())) {
             throw new BusinessProblem(ProblemCode.VERSION_CONFLICT,
                     "仅 DRAFT/VALIDATED 草稿可更新，当前状态=" + current.status());
@@ -180,7 +186,7 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
             ConfigurationAssetType assetType
     ) {
         Objects.requireNonNull(assetType, "assetType");
-        requireWorkflowOnly(assetType);
+        requireDesignerSupported(assetType);
         authorization.require(principal, AuthorizationRequest.tenantCapability(
                 WRITE, principal.tenantId(), RESOURCE, assetType.name()), correlationId);
         return jdbc.sql("""
@@ -205,7 +211,7 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
             UUID draftId
     ) {
         ConfigurationDraftView current = requireDraft(principal.tenantId(), draftId);
-        requireWorkflowOnly(current.assetType());
+        requireDesignerSupported(current.assetType());
         if (!"DRAFT".equals(current.status()) && !"VALIDATED".equals(current.status())) {
             throw new BusinessProblem(ProblemCode.VERSION_CONFLICT,
                     "仅 DRAFT/VALIDATED 草稿可校验，当前状态=" + current.status());
@@ -261,7 +267,7 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
             UUID draftId
     ) {
         ConfigurationDraftView current = requireDraft(principal.tenantId(), draftId);
-        requireWorkflowOnly(current.assetType());
+        requireDesignerSupported(current.assetType());
         if (!"VALIDATED".equals(current.status())) {
             throw new BusinessProblem(ProblemCode.VERSION_CONFLICT,
                     "仅 VALIDATED 草稿可发布，当前状态=" + current.status());
@@ -355,10 +361,11 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
         }
     }
 
-    private static void requireWorkflowOnly(ConfigurationAssetType assetType) {
-        if (assetType != ConfigurationAssetType.WORKFLOW) {
+    private static void requireDesignerSupported(ConfigurationAssetType assetType) {
+        if (!DESIGNER_TYPES.contains(assetType)) {
             throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
-                    "M282 设计器仅支持 WORKFLOW 资产类型");
+                    "配置设计器暂不支持资产类型 " + assetType
+                            + "；允许 WORKFLOW/FORM/EVIDENCE/SLA");
         }
     }
 

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.28
+  version: 1.0.29
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -4946,11 +4946,11 @@ paths:
     get:
       operationId: listConfigurationDrafts
       summary: 列出配置资产草稿
-      description: M282 仅支持 WORKFLOW；需要 configuration.draft.write。
+      description: M282/M283 支持 WORKFLOW/FORM/EVIDENCE/SLA；需要 configuration.draft.write。
       parameters:
         - name: assetType
           in: query
-          schema: { type: string, enum: [WORKFLOW], default: WORKFLOW }
+          schema: { type: string, enum: [WORKFLOW, FORM, EVIDENCE, SLA], default: WORKFLOW }
         - $ref: '#/components/parameters/CorrelationId'
       responses:
         '200':
@@ -4965,7 +4965,7 @@ paths:
     post:
       operationId: createConfigurationDraft
       summary: 创建配置资产草稿
-      description: M282 仅支持 WORKFLOW；需要 configuration.draft.write。
+      description: M282/M283 支持 WORKFLOW/FORM/EVIDENCE/SLA；需要 configuration.draft.write。
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/CorrelationId'
@@ -5275,7 +5275,7 @@ components:
       additionalProperties: false
       required: [assetType, assetKey, intendedSemanticVersion, schemaVersion, definitionJson]
       properties:
-        assetType: { type: string, enum: [WORKFLOW] }
+        assetType: { type: string, enum: [WORKFLOW, FORM, EVIDENCE, SLA] }
         assetKey: { type: string, minLength: 1, maxLength: 128 }
         intendedSemanticVersion: { type: string, minLength: 1, maxLength: 64 }
         schemaVersion: { type: string, minLength: 1, maxLength: 64 }
@@ -5295,7 +5295,7 @@ components:
                  createdBy, updatedBy, createdAt, updatedAt]
       properties:
         draftId: { type: string, format: uuid }
-        assetType: { type: string, enum: [WORKFLOW] }
+        assetType: { type: string, enum: [WORKFLOW, FORM, EVIDENCE, SLA] }
         assetKey: { type: string }
         intendedSemanticVersion: { type: string }
         schemaVersion: { type: string }

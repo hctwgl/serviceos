@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-18
-baselineCommit: 7ad15629b851250cd0b2159f99bbbb3a0c0f3907
-latestMilestone: M282
+baselineCommit: TBD_AFTER_FEATURE_COMMIT
+latestMilestone: M283
 ---
 
 # ServiceOS 实施状态总览
@@ -39,13 +39,13 @@ latestMilestone: M282
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M282 Workflow 配置设计器 API |
-| 基线提交 | `7ad15629b851250cd0b2159f99bbbb3a0c0f3907`（功能证据；合并入 `master` 后改为合并提交） |
+| 最新实施里程碑 | M283 FORM/EVIDENCE/SLA 配置设计器 API |
+| 基线提交 | `TBD_AFTER_FEATURE_COMMIT`（功能证据；合并入 `master` 后改为合并提交） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts`、`@serviceos/web-core`、`ServiceOSIOSCore`、独立且可部署的 `serviceos-network-web` 与 `serviceos-technician-web`、Swift 6 `TechnicianIOSFoundation`，以及已在 iPhone 17 Pro Simulator 安装启动、实跑 XCTest/XCUITest、形成 Production arm64 archive/dSYM，并接入当前任务、在线 Visit、冻结基础表单、前台 Evidence 采集上传、Snapshot/Task 完成与多轮资料整改的原生 `TechnicianIOS` SwiftUI App；由同一 Core OpenAPI 生成并经独立消费者门禁验证的 `@serviceos/core-client` 与 `ServiceOSCoreClient` |
 | 前端工程 | `serviceos-admin-web` 独立承载总部运营、统一用户中心、`/me` 导航、SavedView、UI Preference、受控搜索与最近访问；M256 后 Network 正式产品由独立 `serviceos-network-web` 承载，M257 后 Technician 正式产品由独立移动优先 `serviceos-technician-web` 承载，M262～M266 依次增加在线 Visit、冻结表单、Evidence 三段式上传、Snapshot/Task 完成与独立整改 Task 多轮补传/重新提交；Admin 仅保留可配置外链和 M188 诊断；两套独立 Web 均实际接入共享 Core、OIDC PKCE、服务端 Context/Capability/导航、Playwright 回归和独立容器镜像 |
 | 数据库 | PostgreSQL + Flyway（当前版本 111 / 113） |
-| 契约 | Core OpenAPI 1.0.28 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 `workorder.cancelled@v1`、`workorder.reopened@v1`、project.created@v3、project.scope-relations-revised@v1、`task.handling-completed@v1`、recovered/resolved 与 SLA started/breached/met@v1） |
+| 契约 | Core OpenAPI 1.0.29 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 `workorder.cancelled@v1`、`workorder.reopened@v1`、project.created@v3、project.scope-relations-revised@v1、`task.handling-completed@v1`、recovered/resolved 与 SLA started/breached/met@v1） |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -144,7 +144,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | Consumer Identity | CustomerProfile、用户资源关系和 C 端身份 | `ACCEPTED` | Principal/IdentityLink/API Schema 已预留 Consumer Persona | 身份治理序列之后的独立 Epic；待登录、隐私、客户主数据与注销策略确认；不得宣称已实现 | 后续正式 Epic |
 | 项目治理 | Project 核心事实、范围关系与授权目录 | `PARTIAL` | 项目创建；REGION/NETWORK 当前关系整组修订和不可变历史；`project.read` 授权目录、详情及历史查询 | owners、品牌/服务产品/配置绑定、生命周期、计划修订审批、目录治理 UI | M8、M64～M67 |
 | 可靠消息 | Inbox、Outbox、Worker claim/lease/retry | `IMPLEMENTED` | 本地可靠发布消费、恢复和人工接管基础 | 正式 Broker 和跨服务运行 | M9～M10 |
-| 配置中心 | 不可变配置资产、Bundle 发布、设计器草稿 | `PARTIAL` | 上项 + **M282** Workflow 草稿→校验→发布 API（OpenAPI 1.0.28） | 可视化画布、FORM/EVIDENCE/SLA 设计器、Diff/审批/灰度、Bundle UI | M16、M33、M36、M52～M53、M61、M268、M271、M281、M282 |
+| 配置中心 | 不可变配置资产、Bundle 发布、设计器草稿 | `PARTIAL` | **M282/M283** WORKFLOW/FORM/EVIDENCE/SLA 草稿→校验→发布（OpenAPI 1.0.29） | 可视化画布、Diff/审批/灰度、Bundle UI、其余资产类型 | M16、M33、M36、M52～M53、M61、M268、M271、M281～M283 |
 | 外部接入 | BYD CPIM + REFERENCE_OEM SAMPLE | `PARTIAL` | BYD 入站/提审/回调切片；**M267** 通用 SPI 管道；**M272** REFERENCE_OEM SAMPLE 独立 Connector（明确 REFERENCE/SAMPLE/TBD_EXTERNAL_CONTRACT） | 真实第二家协议/Sandbox（BLOCKED_EXTERNAL）、回调/出站全面 SPI、人工标记已送达/放弃、生产凭据/对象存储 | M16、M56～M60、M77～M79、M99、M158、M267、M272、M273 |
 | 工单 | WorkOrder 接收、激活、履约完成与授权工作区投影 | `PARTIAL` | 权威工单、工作流启动、跨阶段和 END 完结；授权目录、非 PII 详情、Stage/Task 执行骨架及核心执行+现场履约时间线 | 完整取消、暂停、恢复、客户敏感详情审计、跨域完整时间线/动作与全部业务分支 | M16～M19、M68～M69、M73～M74 |
 | 工作流 | 线性 + 网关 + WAIT/TIMER + SUB_PROCESS + 多实例 + 取消/重开/跳转/补偿 + 标准模板 | `PARTIAL` | 上项 + **M281** 维修/移机/巡检标准模板（含家充勘安） | HTTP 命令面、表单/资料完整模板包、设计器 | M17～M19、M61、M69、M268～M271、M275～M281 |
@@ -175,15 +175,15 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M282**。阶段一已闭合；复杂流程运行时已覆盖 EXCLUSIVE、PARALLEL、
-WAIT_EVENT、TIMER、SUB_PROCESS、多实例、取消/重开/跳转，取消时配置化补偿任务（Flyway V109），标准模板族，以及 **Workflow 配置设计器草稿 API**（Flyway V110～V111）。
+ServiceOS 可靠纵向切片已推进到 **M283**。阶段一已闭合；复杂流程运行时已覆盖 EXCLUSIVE、PARALLEL、
+WAIT_EVENT、TIMER、SUB_PROCESS、多实例、取消/重开/跳转，取消时配置化补偿任务（Flyway V109），标准模板族，以及 **WORKFLOW/FORM/EVIDENCE/SLA 配置设计器 API**（OpenAPI 1.0.29）。
 
-下一主线：FORM/EVIDENCE/SLA 设计器与 Admin 可视化画布。
+下一主线：Admin 可视化画布与 Diff/审批/灰度。
 真实 OEM2/3 与签名真机仍为 `BLOCKED_EXTERNAL`。
 
 ```text
 已接受推进顺序：
-1. FORM/EVIDENCE/SLA 设计器切片与 Admin 画布；
+1. Admin 可视化流程/表单画布；
 2. Diff/审批/灰度；
 3. Track F/G 与真实 OEM 外部证据。
 ```

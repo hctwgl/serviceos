@@ -291,6 +291,7 @@ title: ServiceOS 里程碑索引
 | M280 | M280 取消时配置化补偿任务 | [293-m280-workflow-compensation-on-cancel.md](../architecture/293-m280-workflow-compensation-on-cancel.md) | [277-m280-workflow-compensation-on-cancel-acceptance.md](../testing/277-m280-workflow-compensation-on-cancel-acceptance.md) |
 | M281 | M281 标准维修/移机/巡检配置模板 | [294-m281-standard-charger-service-templates.md](../architecture/294-m281-standard-charger-service-templates.md) | [278-m281-standard-charger-service-templates-acceptance.md](../testing/278-m281-standard-charger-service-templates-acceptance.md) |
 | M282 | M282 Workflow 配置设计器 API（草稿→校验→发布） | [295-m282-workflow-configuration-designer-api.md](../architecture/295-m282-workflow-configuration-designer-api.md) | [279-m282-workflow-configuration-designer-api-acceptance.md](../testing/279-m282-workflow-configuration-designer-api-acceptance.md) |
+| M283 | M283 FORM/EVIDENCE/SLA 配置设计器 API | [296-m283-form-evidence-sla-designer-api.md](../architecture/296-m283-form-evidence-sla-designer-api.md) | [280-m283-form-evidence-sla-designer-api-acceptance.md](../testing/280-m283-form-evidence-sla-designer-api-acceptance.md) |
 
 ## 未关联里程碑的文档
 
