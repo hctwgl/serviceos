@@ -67,6 +67,35 @@ class ConfigurationSchemaDriftTest {
     }
 
     @Test
+    void embeddedNotificationSchemaMatchesArchitectureSource() throws IOException {
+        assertSchemaSynced("notification.schema.json", "notification-v1.schema.json");
+    }
+
+    @Test
+    void embeddedAssigneePolicySchemaMatchesArchitectureSource() throws IOException {
+        assertSchemaSynced("assignee-policy.schema.json", "assignee-policy-v1.schema.json");
+    }
+
+    @Test
+    void embeddedIntegrationSchemaMatchesArchitectureSource() throws IOException {
+        assertSchemaSynced("integration.schema.json", "integration-v1.schema.json");
+    }
+
+    @Test
+    void embeddedPricingSchemaMatchesArchitectureSource() throws IOException {
+        assertSchemaSynced("pricing.schema.json", "pricing-v1.schema.json");
+    }
+
+    private void assertSchemaSynced(String architectureFile, String runtimeFile) throws IOException {
+        Path repository = repositoryRoot();
+        Path architectureSchema = repository.resolve(
+                "serviceos-architecture/configuration/schemas/" + architectureFile);
+        Path runtimeSchema = repository.resolve(
+                "serviceos-backend/src/main/resources/configuration-schemas/" + runtimeFile);
+        assertThat(Files.mismatch(architectureSchema, runtimeSchema)).isEqualTo(-1L);
+    }
+
+    @Test
     void embeddedHomeChargingTemplateMatchesArchitectureSource() throws IOException {
         assertTemplateSynced("home-charging-survey-install");
     }

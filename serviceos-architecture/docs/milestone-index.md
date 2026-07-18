@@ -303,6 +303,7 @@ title: ServiceOS 里程碑索引
 | M292 | M292 WORKFLOW 配置干跑模拟 | [305-m292-configuration-workflow-simulation.md](../architecture/305-m292-configuration-workflow-simulation.md) | [289-m292-configuration-workflow-simulation-acceptance.md](../testing/289-m292-configuration-workflow-simulation-acceptance.md) |
 | M293 | M293 Bundle 通道停用 | [306-m293-bundle-channel-deactivate.md](../architecture/306-m293-bundle-channel-deactivate.md) | [290-m293-bundle-channel-deactivate-acceptance.md](../testing/290-m293-bundle-channel-deactivate-acceptance.md) |
 | M294 | M294 RULE/DISPATCH 配置设计器 | [307-m294-rule-dispatch-designer.md](../architecture/307-m294-rule-dispatch-designer.md) | [291-m294-rule-dispatch-designer-acceptance.md](../testing/291-m294-rule-dispatch-designer-acceptance.md) |
+| M295 | M295 NOTIFICATION/ASSIGNEE/INTEGRATION/PRICING 设计器 | [308-m295-remaining-asset-designers.md](../architecture/308-m295-remaining-asset-designers.md) | [292-m295-remaining-asset-designers-acceptance.md](../testing/292-m295-remaining-asset-designers-acceptance.md) |
 
 ## 未关联里程碑的文档
 

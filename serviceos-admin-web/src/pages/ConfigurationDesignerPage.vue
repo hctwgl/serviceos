@@ -241,6 +241,98 @@ function defaultDefinition(type: DesignerAssetType): string {
       2,
     )
   }
+  if (type === 'NOTIFICATION') {
+    return JSON.stringify(
+      {
+        policyKey: 'platform.designer.demo.notification',
+        version: '1.0.0',
+        defaultChannel: 'IN_APP',
+        triggers: [
+          {
+            triggerKey: 'task-completed',
+            eventType: 'task.completed',
+            templateKey: 'task.completed.inapp',
+            channel: 'IN_APP',
+            when: {
+              language: 'SERVICEOS_EXPR_V1',
+              source: 'task.taskType == "DESIGNER_DEMO"',
+            },
+            recipientRole: 'PROJECT_MANAGER',
+          },
+        ],
+      },
+      null,
+      2,
+    )
+  }
+  if (type === 'ASSIGNEE_POLICY') {
+    return JSON.stringify(
+      {
+        policyKey: 'platform.designer.demo.assignee',
+        version: '1.0.0',
+        strategies: [
+          {
+            strategyKey: 'role-pool',
+            candidateType: 'ROLE',
+            priority: 10,
+            when: {
+              language: 'SERVICEOS_EXPR_V1',
+              source: 'workOrder.brandCode == "PLATFORM"',
+            },
+            roleCode: 'TECHNICIAN',
+            maxCandidates: 20,
+          },
+        ],
+        fallback: { mode: 'MANUAL_INTERVENTION', roleCode: 'DISPATCHER' },
+      },
+      null,
+      2,
+    )
+  }
+  if (type === 'INTEGRATION') {
+    return JSON.stringify(
+      {
+        mappingKey: 'platform.designer.demo.integration',
+        version: '1.0.0',
+        connectorCode: 'REFERENCE_OEM',
+        direction: 'INBOUND',
+        fieldMappings: [
+          {
+            mappingId: 'order-code',
+            externalPath: 'orderNo',
+            internalPath: 'externalOrderCode',
+            required: true,
+            transform: 'TRIM',
+          },
+        ],
+      },
+      null,
+      2,
+    )
+  }
+  if (type === 'PRICING') {
+    return JSON.stringify(
+      {
+        pricingKey: 'platform.designer.demo.pricing',
+        version: '1.0.0',
+        currency: 'CNY',
+        lines: [
+          {
+            lineKey: 'base-install',
+            chargeCode: 'INSTALL_BASE',
+            amountMinor: 19900,
+            when: {
+              language: 'SERVICEOS_EXPR_V1',
+              source: 'workOrder.serviceProductCode == "INSTALL"',
+            },
+            billableTo: 'OEM',
+          },
+        ],
+      },
+      null,
+      2,
+    )
+  }
   return JSON.stringify(
     {
       templateKey: 'platform.designer.demo.evidence',
@@ -464,6 +556,10 @@ onMounted(async () => {
           <option value="SLA">SLA</option>
           <option value="RULE">RULE</option>
           <option value="DISPATCH">DISPATCH</option>
+          <option value="NOTIFICATION">NOTIFICATION</option>
+          <option value="ASSIGNEE_POLICY">ASSIGNEE_POLICY</option>
+          <option value="INTEGRATION">INTEGRATION</option>
+          <option value="PRICING">PRICING</option>
         </select>
       </label>
       <label>

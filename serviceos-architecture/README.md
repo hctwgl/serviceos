@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M294 RULE/DISPATCH 配置设计器**，功能证据提交 `2952eb6cb583aa899e34f976ec18bda40f5db7b2`（合并入 `master` 后改为合并提交）。
+当前工程基线为 **M295 剩余资产设计器**，功能证据提交待回填（合并入 `master` 后改为合并提交）。
 
 当前已具备多 OEM 内核、复杂流程运行时（含取消/重开/跳转/补偿）与标准服务模板族。下一主线是阶段三领域配置设计器。
 
@@ -693,6 +693,8 @@ serviceos-architecture/
 - [M293 验收矩阵](testing/290-m293-bundle-channel-deactivate-acceptance.md)
 - [M294 实现文档](architecture/307-m294-rule-dispatch-designer.md)
 - [M294 验收矩阵](testing/291-m294-rule-dispatch-designer-acceptance.md)
+- [M295 实现文档](architecture/308-m295-remaining-asset-designers.md)
+- [M295 验收矩阵](testing/292-m295-remaining-asset-designers-acceptance.md)
 - [M289 实现文档](architecture/302-m289-workflow-canvas-edges-conditions.md)
 - [M289 验收矩阵](testing/286-m289-workflow-canvas-edges-conditions-acceptance.md)
 - [M288 实现文档](architecture/301-m288-percentage-canary-traffic.md)

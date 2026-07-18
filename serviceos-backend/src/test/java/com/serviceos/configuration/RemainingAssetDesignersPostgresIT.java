@@ -7,7 +7,6 @@ import com.serviceos.configuration.api.ConfigurationDraftService;
 import com.serviceos.configuration.api.ConfigurationDraftView;
 import com.serviceos.configuration.api.ConfigurationPublicationException;
 import com.serviceos.configuration.api.CreateConfigurationDraftCommand;
-import com.serviceos.configuration.api.UpdateConfigurationDraftCommand;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.shared.CommandMetadata;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,12 +26,12 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** M282：Workflow 草稿设计器 create → validate → publish。 */
+/** M295：NOTIFICATION/ASSIGNEE_POLICY/INTEGRATION/PRICING 设计器。 */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = ServiceOsApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE)
-class WorkflowConfigurationDesignerPostgresIT {
-    private static final String TENANT = "tenant-cfg-m282-it";
-    private static final String ACTOR = "designer-m282";
+class RemainingAssetDesignersPostgresIT {
+    private static final String TENANT = "tenant-cfg-m295-it";
+    private static final String ACTOR = "designer-m295";
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(
@@ -46,7 +45,7 @@ class WorkflowConfigurationDesignerPostgresIT {
         registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
-        registry.add("serviceos.outbox.worker-id", () -> "cfg-m282-it");
+        registry.add("serviceos.outbox.worker-id", () -> "cfg-m295-it");
     }
 
     @Autowired ConfigurationDraftService drafts;
@@ -63,60 +62,46 @@ class WorkflowConfigurationDesignerPostgresIT {
     }
 
     @Test
-    void draftValidateAndPublishWorkflow() {
-        ConfigurationDraftView created = drafts.create(principal(), meta("c1"), new CreateConfigurationDraftCommand(
-                ConfigurationAssetType.WORKFLOW, "platform.designer.m282", "1.0.0", "1.0.0",
-                validWorkflow(), null));
-        assertThat(created.status()).isEqualTo("DRAFT");
-        assertThat(created.aggregateVersion()).isEqualTo(1L);
-
-        ConfigurationDraftView updated = drafts.update(principal(), meta("u1"),
-                new UpdateConfigurationDraftCommand(created.draftId(), 1L, validWorkflow()));
-        assertThat(updated.status()).isEqualTo("DRAFT");
-        assertThat(updated.aggregateVersion()).isEqualTo(2L);
-
-        ConfigurationDraftView validated = drafts.validate(principal(), meta("v1"), created.draftId());
-        assertThat(validated.status()).isEqualTo("VALIDATED");
-        assertThat(validated.validationErrors()).isEmpty();
-
-        ConfigurationDraftView approved = drafts.approve(principal(), meta("a1"),
-                new ApproveConfigurationDraftCommand(created.draftId(), validated.aggregateVersion(), "APR-M282-1"));
-        assertThat(approved.status()).isEqualTo("APPROVED");
-
-        ConfigurationDraftView published = drafts.publish(principal(), meta("p1"), created.draftId());
-        assertThat(published.status()).isEqualTo("PUBLISHED");
-        assertThat(published.publishedVersionId()).isNotNull();
-        assertThat(jdbc.sql("""
-                SELECT status FROM cfg_configuration_asset_version WHERE version_id = :id
-                """).param("id", published.publishedVersionId()).query(String.class).single())
-                .isEqualTo("PUBLISHED");
+    void remainingAssetTypesPublish() {
+        assertPublished(ConfigurationAssetType.NOTIFICATION, "designer.notification.m295", validNotification());
+        assertPublished(ConfigurationAssetType.ASSIGNEE_POLICY, "designer.assignee.m295", validAssignee());
+        assertPublished(ConfigurationAssetType.INTEGRATION, "designer.integration.m295", validIntegration());
+        assertPublished(ConfigurationAssetType.PRICING, "designer.pricing.m295", validPricing());
     }
 
     @Test
-    void invalidWorkflowFailsValidationClosed() {
-        ConfigurationDraftView created = drafts.create(principal(), meta("bad"), new CreateConfigurationDraftCommand(
-                ConfigurationAssetType.WORKFLOW, "platform.designer.m282.bad", "1.0.0", "1.0.0",
-                """
-                {"workflowKey":"bad.m282","semanticVersion":"1.0.0","startNodeId":"START",
-                 "nodes":[
-                   {"nodeId":"START","nodeType":"START","name":"开始"},
-                   {"nodeId":"GW","nodeType":"EXCLUSIVE_GATEWAY","name":"坏网关"},
-                   {"nodeId":"END","nodeType":"END","name":"结束"}],
-                 "transitions":[
-                   {"transitionId":"t1","from":"START","to":"GW"},
-                   {"transitionId":"t2","from":"GW","to":"END"}]}
-                """, null));
-        assertThatThrownBy(() -> drafts.validate(principal(), meta("v-bad"), created.draftId()))
+    void invalidNotificationFailsClosed() {
+        ConfigurationDraftView created = drafts.create(principal(), meta("bad-n"),
+                new CreateConfigurationDraftCommand(
+                        ConfigurationAssetType.NOTIFICATION, "designer.notification.bad", "1.0.0", "1.0.0",
+                        """
+                        {"policyKey":"designer.notification.bad","version":"1.0.0",
+                         "defaultChannel":"IN_APP","triggers":[]}
+                        """, null));
+        assertThatThrownBy(() -> drafts.validate(principal(), meta("v-bad-n"), created.draftId()))
                 .isInstanceOf(ConfigurationPublicationException.class);
-        assertThat(drafts.get(principal(), "corr-get", created.draftId()).status()).isEqualTo("DRAFT");
         assertThat(drafts.get(principal(), "corr-get", created.draftId()).validationErrors()).isNotEmpty();
+    }
+
+    private void assertPublished(ConfigurationAssetType type, String key, String definition) {
+        ConfigurationDraftView created = drafts.create(principal(), meta("c-" + key),
+                new CreateConfigurationDraftCommand(type, key, "1.0.0", "1.0.0", definition, null));
+        ConfigurationDraftView validated = drafts.validate(principal(), meta("v-" + key), created.draftId());
+        assertThat(validated.status()).isEqualTo("VALIDATED");
+        ConfigurationDraftView approved = drafts.approve(principal(), meta("a-" + key),
+                new ApproveConfigurationDraftCommand(
+                        created.draftId(), validated.aggregateVersion(), "APR-" + key));
+        assertThat(approved.status()).isEqualTo("APPROVED");
+        ConfigurationDraftView published = drafts.publish(principal(), meta("p-" + key), created.draftId());
+        assertThat(published.status()).isEqualTo("PUBLISHED");
+        assertThat(published.publishedVersionId()).isNotNull();
     }
 
     private void seedGrants() {
         UUID roleId = UUID.randomUUID();
         jdbc.sql("""
                 INSERT INTO auth_role (role_id, tenant_id, role_code, role_name, role_status, created_at)
-                VALUES (:id, :tenant, 'cfg-designer', '配置设计器', 'ACTIVE', now())
+                VALUES (:id, :tenant, 'cfg-designer-m295', '配置设计器M295', 'ACTIVE', now())
                 """).param("id", roleId).param("tenant", TENANT).update();
         for (String capability : List.of(
                 "configuration.draft.write", "configuration.approve", "configuration.publish")) {
@@ -131,7 +116,7 @@ class WorkflowConfigurationDesignerPostgresIT {
                     valid_from, source_code, approval_ref, created_at
                 ) VALUES (
                     :grant, :tenant, :principal, :role, 'TENANT', :tenant,
-                    now() - interval '1 day', 'TEST', 'm282', now()
+                    now() - interval '1 day', 'TEST', 'm295', now()
                 )
                 """)
                 .param("grant", UUID.randomUUID())
@@ -151,17 +136,41 @@ class WorkflowConfigurationDesignerPostgresIT {
         return new CommandMetadata("corr-" + key, "idem-" + key);
     }
 
-    private static String validWorkflow() {
+    private static String validNotification() {
         return """
-                {"workflowKey":"designer.m282","semanticVersion":"1.0.0","startNodeId":"START",
-                 "nodes":[
-                   {"nodeId":"START","nodeType":"START","name":"开始"},
-                   {"nodeId":"TASK_A","nodeType":"SERVICE_TASK","name":"任务A",
-                    "stageCode":"STAGE_A","taskType":"DESIGNER_TASK"},
-                   {"nodeId":"END","nodeType":"END","name":"结束"}],
-                 "transitions":[
-                   {"transitionId":"t1","from":"START","to":"TASK_A"},
-                   {"transitionId":"t2","from":"TASK_A","to":"END"}]}
+                {"policyKey":"designer.notification.m295","version":"1.0.0","defaultChannel":"IN_APP",
+                 "triggers":[{"triggerKey":"task-completed","eventType":"task.completed",
+                   "templateKey":"task.completed.inapp","channel":"IN_APP",
+                   "when":{"language":"SERVICEOS_EXPR_V1","source":"task.taskType == \\"DESIGNER_TASK\\""},
+                   "recipientRole":"PROJECT_MANAGER"}]}
+                """;
+    }
+
+    private static String validAssignee() {
+        return """
+                {"policyKey":"designer.assignee.m295","version":"1.0.0",
+                 "strategies":[{"strategyKey":"role-pool","candidateType":"ROLE","priority":10,
+                   "when":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.brandCode == \\"PLATFORM\\""},
+                   "roleCode":"TECHNICIAN","maxCandidates":20}],
+                 "fallback":{"mode":"MANUAL_INTERVENTION","roleCode":"DISPATCHER"}}
+                """;
+    }
+
+    private static String validIntegration() {
+        return """
+                {"mappingKey":"designer.integration.m295","version":"1.0.0","connectorCode":"REFERENCE_OEM",
+                 "direction":"INBOUND",
+                 "fieldMappings":[{"mappingId":"order-code","externalPath":"orderNo",
+                   "internalPath":"externalOrderCode","required":true,"transform":"TRIM"}]}
+                """;
+    }
+
+    private static String validPricing() {
+        return """
+                {"pricingKey":"designer.pricing.m295","version":"1.0.0","currency":"CNY",
+                 "lines":[{"lineKey":"base-install","chargeCode":"INSTALL_BASE","amountMinor":19900,
+                   "when":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.serviceProductCode == \\"INSTALL\\""},
+                   "billableTo":"OEM"}]}
                 """;
     }
 }

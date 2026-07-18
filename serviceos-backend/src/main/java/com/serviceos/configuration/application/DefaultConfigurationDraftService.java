@@ -51,7 +51,11 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
             ConfigurationAssetType.EVIDENCE,
             ConfigurationAssetType.SLA,
             ConfigurationAssetType.RULE,
-            ConfigurationAssetType.DISPATCH);
+            ConfigurationAssetType.DISPATCH,
+            ConfigurationAssetType.NOTIFICATION,
+            ConfigurationAssetType.ASSIGNEE_POLICY,
+            ConfigurationAssetType.INTEGRATION,
+            ConfigurationAssetType.PRICING);
 
     private final JdbcClient jdbc;
     private final AuthorizationService authorization;

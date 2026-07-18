@@ -8,9 +8,7 @@ import com.serviceos.configuration.api.ConfigurationDraftView;
 import com.serviceos.configuration.api.ConfigurationPublicationException;
 import com.serviceos.configuration.api.CreateConfigurationDraftCommand;
 import com.serviceos.identity.api.CurrentPrincipal;
-import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.CommandMetadata;
-import com.serviceos.shared.ProblemCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -82,15 +80,6 @@ class FormEvidenceSlaDesignerPostgresIT {
                 .isInstanceOf(ConfigurationPublicationException.class);
         assertThat(drafts.get(principal(), "corr-get", created.draftId()).status()).isEqualTo("DRAFT");
         assertThat(drafts.get(principal(), "corr-get", created.draftId()).validationErrors()).isNotEmpty();
-    }
-
-    @Test
-    void pricingTypeStillRejected() {
-        assertThatThrownBy(() -> drafts.create(principal(), meta("pricing"), new CreateConfigurationDraftCommand(
-                ConfigurationAssetType.PRICING, "pricing.m283", "1.0.0", "1.0.0", "{}", null)))
-                .isInstanceOf(BusinessProblem.class)
-                .extracting(ex -> ((BusinessProblem) ex).code())
-                .isEqualTo(ProblemCode.VALIDATION_FAILED);
     }
 
     private void assertPublished(ConfigurationAssetType type, String key, String definition) {

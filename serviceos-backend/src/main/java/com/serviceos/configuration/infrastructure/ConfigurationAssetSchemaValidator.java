@@ -39,12 +39,20 @@ public final class ConfigurationAssetSchemaValidator {
     private static final String SLA_SCHEMA_VERSION = "1.0.0";
     private static final String RULE_SCHEMA_VERSION = "1.0.0";
     private static final String DISPATCH_SCHEMA_VERSION = "1.0.0";
+    private static final String NOTIFICATION_SCHEMA_VERSION = "1.0.0";
+    private static final String ASSIGNEE_POLICY_SCHEMA_VERSION = "1.0.0";
+    private static final String INTEGRATION_SCHEMA_VERSION = "1.0.0";
+    private static final String PRICING_SCHEMA_VERSION = "1.0.0";
     private static final Set<ConfigurationAssetType> SCHEMA_GOVERNED_TYPES = Set.of(
             ConfigurationAssetType.FORM,
             ConfigurationAssetType.EVIDENCE,
             ConfigurationAssetType.SLA,
             ConfigurationAssetType.RULE,
-            ConfigurationAssetType.DISPATCH);
+            ConfigurationAssetType.DISPATCH,
+            ConfigurationAssetType.NOTIFICATION,
+            ConfigurationAssetType.ASSIGNEE_POLICY,
+            ConfigurationAssetType.INTEGRATION,
+            ConfigurationAssetType.PRICING);
 
     private final ObjectMapper objectMapper;
     private final Map<SchemaKey, JsonSchema> schemas;
@@ -62,17 +70,26 @@ public final class ConfigurationAssetSchemaValidator {
     ConfigurationAssetSchemaValidator(ObjectMapper objectMapper, ExpressionEvaluator expressions) {
         this.objectMapper = objectMapper;
         this.expressions = expressions;
-        this.schemas = Map.of(
-                new SchemaKey(ConfigurationAssetType.FORM, FORM_SCHEMA_VERSION),
-                loadSchema("configuration-schemas/form-v1.schema.json"),
-                new SchemaKey(ConfigurationAssetType.EVIDENCE, EVIDENCE_SCHEMA_VERSION),
-                loadSchema("configuration-schemas/evidence-v1.schema.json"),
-                new SchemaKey(ConfigurationAssetType.SLA, SLA_SCHEMA_VERSION),
-                loadSchema("configuration-schemas/sla-v1.schema.json"),
-                new SchemaKey(ConfigurationAssetType.RULE, RULE_SCHEMA_VERSION),
-                loadSchema("configuration-schemas/rule-v1.schema.json"),
-                new SchemaKey(ConfigurationAssetType.DISPATCH, DISPATCH_SCHEMA_VERSION),
+        Map<SchemaKey, JsonSchema> loaded = new LinkedHashMap<>();
+        loaded.put(new SchemaKey(ConfigurationAssetType.FORM, FORM_SCHEMA_VERSION),
+                loadSchema("configuration-schemas/form-v1.schema.json"));
+        loaded.put(new SchemaKey(ConfigurationAssetType.EVIDENCE, EVIDENCE_SCHEMA_VERSION),
+                loadSchema("configuration-schemas/evidence-v1.schema.json"));
+        loaded.put(new SchemaKey(ConfigurationAssetType.SLA, SLA_SCHEMA_VERSION),
+                loadSchema("configuration-schemas/sla-v1.schema.json"));
+        loaded.put(new SchemaKey(ConfigurationAssetType.RULE, RULE_SCHEMA_VERSION),
+                loadSchema("configuration-schemas/rule-v1.schema.json"));
+        loaded.put(new SchemaKey(ConfigurationAssetType.DISPATCH, DISPATCH_SCHEMA_VERSION),
                 loadSchema("configuration-schemas/dispatch-v1.schema.json"));
+        loaded.put(new SchemaKey(ConfigurationAssetType.NOTIFICATION, NOTIFICATION_SCHEMA_VERSION),
+                loadSchema("configuration-schemas/notification-v1.schema.json"));
+        loaded.put(new SchemaKey(ConfigurationAssetType.ASSIGNEE_POLICY, ASSIGNEE_POLICY_SCHEMA_VERSION),
+                loadSchema("configuration-schemas/assignee-policy-v1.schema.json"));
+        loaded.put(new SchemaKey(ConfigurationAssetType.INTEGRATION, INTEGRATION_SCHEMA_VERSION),
+                loadSchema("configuration-schemas/integration-v1.schema.json"));
+        loaded.put(new SchemaKey(ConfigurationAssetType.PRICING, PRICING_SCHEMA_VERSION),
+                loadSchema("configuration-schemas/pricing-v1.schema.json"));
+        this.schemas = Map.copyOf(loaded);
     }
 
     public void validate(PublishConfigurationAssetCommand command) {
@@ -106,8 +123,10 @@ public final class ConfigurationAssetSchemaValidator {
         String identityField = switch (command.assetType()) {
             case FORM -> "formKey";
             case EVIDENCE -> "templateKey";
-            case SLA, DISPATCH -> "policyKey";
+            case SLA, DISPATCH, NOTIFICATION, ASSIGNEE_POLICY -> "policyKey";
             case RULE -> "ruleKey";
+            case INTEGRATION -> "mappingKey";
+            case PRICING -> "pricingKey";
             default -> throw new IllegalStateException("schema-governed asset type has no identity field");
         };
         if (!command.assetKey().equals(definition.path(identityField).asText())) {
@@ -126,6 +145,14 @@ public final class ConfigurationAssetSchemaValidator {
             validateRuleSemantics(definition);
         } else if (command.assetType() == ConfigurationAssetType.DISPATCH) {
             validateDispatchSemantics(definition);
+        } else if (command.assetType() == ConfigurationAssetType.NOTIFICATION) {
+            validateNotificationSemantics(definition);
+        } else if (command.assetType() == ConfigurationAssetType.ASSIGNEE_POLICY) {
+            validateAssigneePolicySemantics(definition);
+        } else if (command.assetType() == ConfigurationAssetType.INTEGRATION) {
+            validateIntegrationSemantics(definition);
+        } else if (command.assetType() == ConfigurationAssetType.PRICING) {
+            validatePricingSemantics(definition);
         }
     }
 
@@ -588,6 +615,68 @@ public final class ConfigurationAssetSchemaValidator {
             } catch (ExpressionEvaluationException exception) {
                 throw new ConfigurationPublicationException(
                         "DISPATCH scoring 表达式无效: " + factorKey + "; " + exception.getMessage());
+            }
+        }
+    }
+
+    private void validateNotificationSemantics(JsonNode definition) {
+        Set<String> keys = new HashSet<>();
+        for (JsonNode trigger : definition.path("triggers")) {
+            String triggerKey = trigger.path("triggerKey").asText();
+            if (!keys.add(triggerKey)) {
+                throw new ConfigurationPublicationException(
+                        "NOTIFICATION triggerKey must be unique: " + triggerKey);
+            }
+            try {
+                expressions.validate(expression(trigger.path("when")));
+            } catch (ExpressionEvaluationException exception) {
+                throw new ConfigurationPublicationException(
+                        "NOTIFICATION when 表达式无效: " + triggerKey + "; " + exception.getMessage());
+            }
+        }
+    }
+
+    private void validateAssigneePolicySemantics(JsonNode definition) {
+        Set<String> keys = new HashSet<>();
+        for (JsonNode strategy : definition.path("strategies")) {
+            String strategyKey = strategy.path("strategyKey").asText();
+            if (!keys.add(strategyKey)) {
+                throw new ConfigurationPublicationException(
+                        "ASSIGNEE_POLICY strategyKey must be unique: " + strategyKey);
+            }
+            try {
+                expressions.validate(expression(strategy.path("when")));
+            } catch (ExpressionEvaluationException exception) {
+                throw new ConfigurationPublicationException(
+                        "ASSIGNEE_POLICY when 表达式无效: " + strategyKey + "; " + exception.getMessage());
+            }
+        }
+    }
+
+    private void validateIntegrationSemantics(JsonNode definition) {
+        Set<String> ids = new HashSet<>();
+        for (JsonNode mapping : definition.path("fieldMappings")) {
+            String mappingId = mapping.path("mappingId").asText();
+            if (!ids.add(mappingId)) {
+                throw new ConfigurationPublicationException(
+                        "INTEGRATION mappingId must be unique: " + mappingId);
+            }
+        }
+    }
+
+    private void validatePricingSemantics(JsonNode definition) {
+        Set<String> keys = new HashSet<>();
+        for (JsonNode line : definition.path("lines")) {
+            String lineKey = line.path("lineKey").asText();
+            if (!keys.add(lineKey)) {
+                throw new ConfigurationPublicationException(
+                        "PRICING lineKey must be unique: " + lineKey);
+            }
+            try {
+                expressions.validate(expression(line.path("when")));
+            } catch (ExpressionEvaluationException exception) {
+                throw new ConfigurationPublicationException(
+                        "PRICING when 表达式无效: " + lineKey + "; " + exception.getMessage());
             }
         }
     }
