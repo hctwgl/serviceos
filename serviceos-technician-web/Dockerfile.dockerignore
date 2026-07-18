@@ -10,3 +10,7 @@
 !serviceos-web-core/
 !serviceos-web-core/package.json
 !serviceos-web-core/src/**
+serviceos-technician-web/node_modules/**
+serviceos-technician-web/dist/**
+serviceos-technician-web/target/**
+serviceos-technician-web/test-results/**

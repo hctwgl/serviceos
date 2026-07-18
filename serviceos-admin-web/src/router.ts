@@ -43,12 +43,6 @@ import GrantDirectoryPage from './pages/GrantDirectoryPage.vue'
 import PortalStubsPage from './pages/PortalStubsPage.vue'
 import UiPreferencesPage from './pages/UiPreferencesPage.vue'
 import SearchPage from './pages/SearchPage.vue'
-import TechnicianPortalShell from './pages/TechnicianPortalShell.vue'
-import TechnicianPortalTaskFeedPage from './pages/TechnicianPortalTaskFeedPage.vue'
-import TechnicianPortalSchedulePage from './pages/TechnicianPortalSchedulePage.vue'
-import TechnicianPortalSyncSummaryPage from './pages/TechnicianPortalSyncSummaryPage.vue'
-import TechnicianPortalMePage from './pages/TechnicianPortalMePage.vue'
-import TechnicianPortalTaskDetailPage from './pages/TechnicianPortalTaskDetailPage.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -205,43 +199,6 @@ export const router = createRouter({
         },
         { path: 'settings/preferences', name: 'ADMIN.UI.PREFERENCES', component: UiPreferencesPage },
         { path: 'settings/token', name: 'ADMIN.TOKEN', component: TokenPage },
-      ],
-    },
-    {
-      path: '/technician-portal',
-      component: TechnicianPortalShell,
-      children: [
-        { path: '', redirect: { name: 'TECHNICIAN.TASK.LIST' } },
-        {
-          path: 'task-feed',
-          name: 'TECHNICIAN.TASK.LIST',
-          component: TechnicianPortalTaskFeedPage,
-          meta: { pageId: 'TECHNICIAN.TASK.LIST' },
-        },
-        {
-          path: 'tasks/:id',
-          name: 'TECHNICIAN.TASK.DETAIL',
-          component: TechnicianPortalTaskDetailPage,
-          meta: { pageId: 'TECHNICIAN.TASK.DETAIL' },
-        },
-        {
-          path: 'schedule',
-          name: 'TECHNICIAN.SCHEDULE',
-          component: TechnicianPortalSchedulePage,
-          meta: { pageId: 'TECHNICIAN.SCHEDULE' },
-        },
-        {
-          path: 'sync-summary',
-          name: 'TECHNICIAN.SYNC.SUMMARY',
-          component: TechnicianPortalSyncSummaryPage,
-          meta: { pageId: 'TECHNICIAN.SYNC.SUMMARY' },
-        },
-        {
-          path: 'me',
-          name: 'TECHNICIAN.ME',
-          component: TechnicianPortalMePage,
-          meta: { pageId: 'TECHNICIAN.ME' },
-        },
       ],
     },
   ],

@@ -16,6 +16,7 @@ set -euo pipefail
 #   bash scripts/agent-verify.sh client-metadata    Web/iOS Header、后端低基数观测与 OpenAPI 元数据门禁
 #   bash scripts/agent-verify.sh client-foundation  Track A 全部生成物、独立消费者与契约兼容总门禁
 #   bash scripts/agent-verify.sh network-web         独立 Network Web 构建、76 E2E、隔离与旧路由回流门禁
+#   bash scripts/agent-verify.sh technician-web      独立 Technician H5 构建、8 E2E、隔离与旧路由回流门禁
 #   bash scripts/agent-verify.sh web-core           Web auth/context/error/trace 基础构建与消费门禁
 #   bash scripts/agent-verify.sh ios-core           iOS auth/context/error/trace 基础构建与消费门禁
 #   bash scripts/agent-verify.sh docs               git diff --check + 脚本语法 + 里程碑索引新鲜度
@@ -104,6 +105,9 @@ case "${command_name}" in
     ;;
   network-web)
     scripts/verify-network-web.sh
+    ;;
+  technician-web)
+    scripts/verify-technician-web.sh
     ;;
   web-core)
     scripts/verify-web-core.sh
