@@ -5,6 +5,9 @@ const CONTEXT_ID = `TECHNICIAN|NETWORK|${NETWORK_ID}`
 const TASK_ID = '019f84b0-bbbb-7f8c-9505-36fe5c0ee002'
 const WORK_ORDER_ID = '019f84b0-aaaa-7f8c-9505-36fe5c0ee001'
 const APPOINTMENT_ID = '019f84b0-cccc-7f8c-9505-36fe5c0ee003'
+const EVIDENCE_SLOT_ID = '019f84b0-dddc-7f8c-9505-36fe5c0ee011'
+const EVIDENCE_ITEM_ID = '019f84b0-dddb-7f8c-9505-36fe5c0ee012'
+const EVIDENCE_REVISION_ID = '019f84b0-ddda-7f8c-9505-36fe5c0ee013'
 
 async function loginWithLocalKeycloak(
   page: Page,
@@ -53,6 +56,8 @@ async function stubTechnicianContext(
     warningCount: 1,
     submittedAt: '2026-07-19T02:00:00Z',
   }]
+  let evidenceItems: Array<Record<string, unknown>> = []
+  let expectedEvidenceDigest = ''
   await page.route('**/api/v1/me/contexts**', async (route: Route) => {
     await route.fulfill({
       status: 200,
@@ -175,6 +180,53 @@ async function stubTechnicianContext(
       }) })
       return
     }
+    if (pathname.endsWith('/evidence-slots') && route.request().method() === 'GET') {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{
+        slotId: EVIDENCE_SLOT_ID, requirementCode: 'SITE_PHOTO', occurrenceKey: '1',
+        requirementName: '现场照片', mediaType: 'PHOTO', required: true, minCount: 1, maxCount: 1,
+        status: evidenceItems.length ? 'SATISFIED' : 'MISSING', active: true,
+        transition: 'ACTIVATED', requiredDisposition: 'NONE',
+      }]) })
+      return
+    }
+    if (pathname.endsWith('/evidence-items') && route.request().method() === 'GET') {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(evidenceItems) })
+      return
+    }
+    if (pathname.endsWith(':finalize') && pathname.includes('/evidence-slots/')) {
+      const body = route.request().postDataJSON()
+      expect(body.actualSha256).toBe(expectedEvidenceDigest)
+      expect(body.finalizeCommandId).toBeTruthy()
+      evidenceItems = [{
+        evidenceItemId: EVIDENCE_ITEM_ID, taskId: TASK_ID, evidenceSlotId: EVIDENCE_SLOT_ID,
+        itemOrdinal: 1, status: 'ACTIVE', createdAt: '2026-07-19T03:00:00Z', revisions: [{
+          evidenceRevisionId: EVIDENCE_REVISION_ID, revisionNumber: 1,
+          contentDigest: expectedEvidenceDigest, mimeType: 'image/jpeg', sizeBytes: 10,
+          status: 'STORED', createdAt: '2026-07-19T03:00:00Z',
+        }],
+      }]
+      await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(evidenceItems[0]) })
+      return
+    }
+    if (pathname.endsWith('/upload-sessions') && pathname.includes('/evidence-slots/')) {
+      const request = route.request()
+      const body = request.postDataJSON()
+      expect(request.headers()['idempotency-key']).toBeTruthy()
+      expect(body.captureSource).toBe('FILE')
+      expect(body.expectedSize).toBe(10)
+      expect(body).not.toHaveProperty('offline')
+      expect(body).not.toHaveProperty('uploadedBy')
+      expect(body).not.toHaveProperty('locationVerified')
+      expect(body).not.toHaveProperty('onBehalfOf')
+      expectedEvidenceDigest = body.expectedSha256
+      await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({
+        uploadSessionId: '019f84b0-ddd9-7f8c-9505-36fe5c0ee014',
+        evidenceSlotId: EVIDENCE_SLOT_ID, evidenceItemId: null, status: 'CREATED', uploadMethod: 'PUT',
+        uploadUrl: '/api/v1/file-transfers/test-token', requiredHeaders: { 'Content-Type': 'image/jpeg' },
+        uploadAuthorizationExpiresAt: '2026-07-19T03:05:00Z', sessionExpiresAt: '2026-07-19T03:10:00Z',
+      }) })
+      return
+    }
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -219,6 +271,14 @@ async function stubTechnicianContext(
         asOf: '2026-07-18T03:00:00Z',
       }),
     })
+  })
+  await page.route('**/api/v1/file-transfers/test-token', async (route: Route) => {
+    const request = route.request()
+    expect(request.method()).toBe('PUT')
+    expect(request.headers()['authorization']).toBeUndefined()
+    expect(request.headers()['x-technician-context']).toBeUndefined()
+    expect(request.postDataBuffer()?.byteLength).toBe(10)
+    await route.fulfill({ status: 204, body: '' })
   })
   await page.route('**/api/v1/technician/me/appointments/*/visits:check-in', async (route: Route) => {
     const request = route.request()
@@ -333,5 +393,21 @@ test.describe('M246 Technician Portal 表单提交安全摘要', () => {
     await expect(page.getByTestId('technician-online-form-message')).toContainText('版本 3')
     await expect(page.getByTestId('technician-task-detail-form-submissions')).toContainText('VALIDATED')
     await expect(page.getByTestId('technician-online-form')).toContainText('不会伪装成已保存草稿')
+  })
+
+  test('M264-01：浏览器资料走受限 PUT/Finalize 且不伪造可信元数据', async ({ page }) => {
+    await stubTechnicianContext(page, { taskStatus: 'RUNNING' })
+    await loginWithLocalKeycloak(page)
+    await navigateTechnician(page, `/technician-portal/tasks/${TASK_ID}`)
+
+    await expect(page.getByTestId(`technician-evidence-slot-${EVIDENCE_SLOT_ID}`)).toContainText('MISSING')
+    await page.getByTestId(`technician-evidence-file-${EVIDENCE_SLOT_ID}`).setInputFiles({
+      name: 'site.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('0123456789'),
+    })
+    await page.getByTestId(`technician-evidence-upload-${EVIDENCE_SLOT_ID}`).click()
+
+    await expect(page.getByTestId('technician-evidence-message')).toContainText('等待扫描与机器校验')
+    await expect(page.getByTestId(`technician-evidence-slot-${EVIDENCE_SLOT_ID}`)).toContainText('Revision 1 · STORED')
+    await expect(page.getByTestId('technician-online-evidence')).toContainText('不后台重试')
   })
 })

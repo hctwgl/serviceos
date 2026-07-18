@@ -7,6 +7,14 @@ import {
   interruptTechnicianVisit,
   listTechnicianTaskForms,
   submitTechnicianTaskForm,
+  listTechnicianTaskEvidenceSlots,
+  listTechnicianTaskEvidenceItems,
+  beginTechnicianEvidenceUpload,
+  putTechnicianEvidenceUpload,
+  finalizeTechnicianEvidenceUpload,
+  sha256Hex,
+  type TechnicianEvidenceItem,
+  type TechnicianEvidenceSlot,
   type TechnicianPortalTaskDetail,
   type TechnicianTaskForm,
   type TechnicianTaskFormField,
@@ -27,6 +35,12 @@ const formLoading = ref(false)
 const formSubmitting = ref(false)
 const formMessage = ref<string | null>(null)
 const formIssues = ref<Array<{ fieldKey: string; code: string; message: string }>>([])
+const evidenceSlots = ref<TechnicianEvidenceSlot[]>([])
+const evidenceItems = ref<TechnicianEvidenceItem[]>([])
+const selectedEvidenceFiles = ref<Record<string, File | undefined>>({})
+const evidenceLoading = ref(false)
+const evidenceUploadingSlotId = ref<string | null>(null)
+const evidenceMessage = ref<string | null>(null)
 
 const supportedFormTypes = new Set(['STRING', 'TEXT', 'INTEGER', 'DECIMAL', 'BOOLEAN', 'DATE', 'DATETIME'])
 const activeForm = computed(() => taskForms.value[0] ?? null)
@@ -237,6 +251,85 @@ async function loadForms(taskId: string) {
   }
 }
 
+function evidenceAccept(slot: TechnicianEvidenceSlot) {
+  if (slot.mediaType === 'PHOTO') return 'image/*'
+  if (slot.mediaType === 'VIDEO') return 'video/*'
+  if (slot.mediaType === 'DOCUMENT') return 'image/*,application/pdf'
+  return '*/*'
+}
+
+function selectEvidenceFile(slotId: string, event: Event) {
+  selectedEvidenceFiles.value[slotId] = (event.target as HTMLInputElement).files?.[0]
+}
+
+function itemsForSlot(slotId: string) {
+  return evidenceItems.value.filter((item) => item.evidenceSlotId === slotId && item.status === 'ACTIVE')
+}
+
+async function uploadEvidence(slot: TechnicianEvidenceSlot) {
+  const context = props.technicianContextId
+  const task = detail.value
+  const file = selectedEvidenceFiles.value[slot.slotId]
+  if (!context || !task || !file || evidenceUploadingSlotId.value) return
+  if (!slot.active || slot.requiredDisposition !== 'NONE') {
+    evidenceMessage.value = '该资料槽位当前不可上传，请先完成条件变化处置'
+    return
+  }
+  evidenceUploadingSlotId.value = slot.slotId
+  evidenceMessage.value = '正在计算 SHA-256…'
+  try {
+    const digest = await sha256Hex(file)
+    const existing = itemsForSlot(slot.slotId)
+    // 未达到 maxCount 时创建新 Item；达到上限后在最后一个 Item 上追加 Revision，不能突破槽位上限。
+    const evidenceItemId = slot.maxCount !== null && existing.length >= slot.maxCount
+      ? existing.at(-1)?.evidenceItemId ?? null
+      : null
+    evidenceMessage.value = '正在创建受限上传会话…'
+    const session = (await beginTechnicianEvidenceUpload(context, task.taskId, slot.slotId, {
+      evidenceItemId,
+      originalFileName: file.name || `evidence-${crypto.randomUUID()}`,
+      declaredMimeType: file.type || 'application/octet-stream',
+      expectedSize: file.size,
+      expectedSha256: digest,
+      captureSource: 'FILE',
+      capturedAt: new Date(file.lastModified || Date.now()).toISOString(),
+    })).data
+    evidenceMessage.value = '正在上传到受限私有地址…'
+    await putTechnicianEvidenceUpload(session, file)
+    evidenceMessage.value = '正在由服务器校验并 Finalize…'
+    const item = (await finalizeTechnicianEvidenceUpload(
+      context, task.taskId, slot.slotId, session.uploadSessionId, digest,
+    )).data
+    const revision = item.revisions.at(-1)
+    evidenceMessage.value = `资料已 Finalize：Item ${item.itemOrdinal} / Revision ${revision?.revisionNumber ?? '—'}，等待扫描与机器校验`
+    selectedEvidenceFiles.value[slot.slotId] = undefined
+    await loadEvidence(task.taskId)
+  } catch (err) {
+    evidenceMessage.value = userFacingError(err, '资料上传失败，请重新选择文件后重试')
+  } finally {
+    evidenceUploadingSlotId.value = null
+  }
+}
+
+async function loadEvidence(taskId: string) {
+  evidenceSlots.value = []
+  evidenceItems.value = []
+  evidenceLoading.value = true
+  try {
+    if (!props.technicianContextId) return
+    const [slots, items] = await Promise.all([
+      listTechnicianTaskEvidenceSlots(props.technicianContextId, taskId),
+      listTechnicianTaskEvidenceItems(props.technicianContextId, taskId),
+    ])
+    evidenceSlots.value = slots
+    evidenceItems.value = items
+  } catch (err) {
+    evidenceMessage.value = userFacingError(err, '任务资料加载失败')
+  } finally {
+    evidenceLoading.value = false
+  }
+}
+
 async function load() {
   const taskId = String(route.params.id ?? '')
   if (!props.technicianContextId) {
@@ -252,7 +345,7 @@ async function load() {
   try {
     detail.value = await getTechnicianTaskDetail(props.technicianContextId, taskId)
     error.value = null
-    await loadForms(taskId)
+    await Promise.all([loadForms(taskId), loadEvidence(taskId)])
   } catch (err) {
     detail.value = null
     error.value = userFacingError(err, '任务详情加载失败')
@@ -399,6 +492,63 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
         </div>
       </section>
 
+      <section class="evidence" data-testid="technician-online-evidence">
+        <div class="section-title">
+          <h3>在线现场资料</h3>
+          <span>受限 PUT → Finalize → 隔离扫描</span>
+        </div>
+        <p class="hint">
+          文件只在你明确选择后上传；浏览器端不缓存草稿、不后台重试，也不会把选中文件当作已提交资料。
+        </p>
+        <p v-if="evidenceLoading">正在加载资料槽位…</p>
+        <p v-else-if="evidenceSlots.length === 0" data-testid="technician-evidence-empty">当前任务没有资料槽位</p>
+        <div v-else class="evidence-slots">
+          <article
+            v-for="slot in evidenceSlots"
+            :key="slot.slotId"
+            class="evidence-slot"
+            :data-testid="`technician-evidence-slot-${slot.slotId}`"
+          >
+            <div>
+              <strong>{{ slot.requirementName }}</strong>
+              <span>{{ slot.required ? '必需' : '可选' }} · {{ slot.mediaType }} · {{ slot.status }}</span>
+            </div>
+            <p>数量 {{ itemsForSlot(slot.slotId).length }} / {{ slot.maxCount ?? '不限' }}，最低 {{ slot.minCount }}</p>
+            <ul v-if="itemsForSlot(slot.slotId).length > 0" class="revision-list">
+              <li v-for="item in itemsForSlot(slot.slotId)" :key="item.evidenceItemId">
+                Item {{ item.itemOrdinal }}：
+                <span v-if="item.revisions.length > 0">
+                  Revision {{ item.revisions.at(-1)?.revisionNumber }} · {{ item.revisions.at(-1)?.status }}
+                </span>
+                <span v-else>尚无 Revision</span>
+              </li>
+            </ul>
+            <p v-if="!slot.active || slot.requiredDisposition !== 'NONE'" class="error">
+              条件变化待处置，当前客户端已阻止上传。
+            </p>
+            <template v-else>
+              <input
+                type="file"
+                :accept="evidenceAccept(slot)"
+                :capture="slot.mediaType === 'PHOTO' ? 'environment' : undefined"
+                :disabled="evidenceUploadingSlotId !== null || detail.executionGuarded || detail.taskStatus !== 'RUNNING'"
+                :data-testid="`technician-evidence-file-${slot.slotId}`"
+                @change="selectEvidenceFile(slot.slotId, $event)"
+              >
+              <button
+                type="button"
+                :disabled="!selectedEvidenceFiles[slot.slotId] || evidenceUploadingSlotId !== null || detail.executionGuarded || detail.taskStatus !== 'RUNNING'"
+                :data-testid="`technician-evidence-upload-${slot.slotId}`"
+                @click="uploadEvidence(slot)"
+              >
+                {{ evidenceUploadingSlotId === slot.slotId ? '上传并校验中…' : '上传并 Finalize' }}
+              </button>
+            </template>
+          </article>
+        </div>
+        <p v-if="evidenceMessage" role="status" data-testid="technician-evidence-message">{{ evidenceMessage }}</p>
+      </section>
+
       <section class="visits">
         <div class="section-title">
           <h3>上门历史</h3>
@@ -448,7 +598,7 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
             </button>
           </form>
           <p v-if="activeVisit" class="hint" data-testid="technician-visit-checkout-boundary">
-            签退必须引用已完成现场操作；基础表单已接入，但 Evidence/作业引用尚未形成前不会生成占位 operationRefs。
+            签退必须引用已完成现场操作；表单和资料上传已接入，但结构化作业引用尚未形成前不会生成占位 operationRefs。
           </p>
           <p v-if="visitActionMessage" class="action-message" role="status" data-testid="technician-visit-action-message">
             {{ visitActionMessage }}
@@ -479,7 +629,7 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
       </section>
 
       <p class="boundary" data-testid="technician-task-detail-boundary">
-        任务详情摘要不返回地址、联系人、联系对象引用、录音、GPS、设备、离线命令、现场资料引用或提交人；在线表单只读取任务冻结定义并回显本次提交结果，不提供草稿、prefill 或离线工作包。
+        任务详情摘要不返回地址、联系人、联系对象引用、录音、GPS、设备、离线命令、文件对象或提交人；在线表单只读取任务冻结定义，资料只返回安全状态摘要；均不提供草稿、后台恢复或离线工作包。
       </p>
     </template>
   </section>
@@ -513,6 +663,26 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
   border: 1px solid #cbd5e1;
   border-radius: 8px;
   background: #f8fafc;
+}
+.evidence-slots {
+  display: grid;
+  gap: 0.75rem;
+}
+.evidence-slot {
+  display: grid;
+  gap: 0.6rem;
+  padding: 1rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+.evidence-slot > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.revision-list {
+  margin: 0;
 }
 .dynamic-form,
 .dynamic-form fieldset,
