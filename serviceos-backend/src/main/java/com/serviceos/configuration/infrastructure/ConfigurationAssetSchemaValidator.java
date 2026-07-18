@@ -181,6 +181,7 @@ final class ConfigurationAssetSchemaValidator {
             }
         }
         Map<String, List<JsonNode>> outgoing = new LinkedHashMap<>();
+        Map<String, List<JsonNode>> incoming = new LinkedHashMap<>();
         for (JsonNode transition : workflow.path("transitions")) {
             String from = transition.path("from").asText();
             String to = transition.path("to").asText();
@@ -190,6 +191,7 @@ final class ConfigurationAssetSchemaValidator {
             }
             validateTransitionCondition(transition, from);
             outgoing.computeIfAbsent(from, ignored -> new java.util.ArrayList<>()).add(transition);
+            incoming.computeIfAbsent(to, ignored -> new java.util.ArrayList<>()).add(transition);
         }
         for (Map.Entry<String, JsonNode> entry : nodes.entrySet()) {
             String nodeType = entry.getValue().path("nodeType").asText();
@@ -207,6 +209,63 @@ final class ConfigurationAssetSchemaValidator {
                 }
             } else if ("WAIT_EVENT".equals(nodeType)) {
                 validateWaitEventNode(entry.getValue(), entry.getKey(), outgoing);
+            } else if ("PARALLEL_GATEWAY".equals(nodeType)) {
+                validateParallelGatewayNode(entry.getKey(), outgoing, incoming, nodes);
+            }
+        }
+    }
+
+    private void validateParallelGatewayNode(
+            String nodeId,
+            Map<String, List<JsonNode>> outgoing,
+            Map<String, List<JsonNode>> incoming,
+            Map<String, JsonNode> nodes
+    ) {
+        List<JsonNode> outs = outgoing.getOrDefault(nodeId, List.of());
+        List<JsonNode> ins = incoming.getOrDefault(nodeId, List.of());
+        boolean fork = outs.size() >= 2;
+        boolean join = ins.size() >= 2;
+        if (fork && join) {
+            throw new ConfigurationPublicationException(
+                    "PARALLEL_GATEWAY 不能同时作为 fork 与 join: " + nodeId);
+        }
+        if (!fork && !join) {
+            throw new ConfigurationPublicationException(
+                    "PARALLEL_GATEWAY 必须是 fork(≥2 出边) 或 join(≥2 入边): " + nodeId);
+        }
+        if (fork) {
+            for (JsonNode edge : outs) {
+                if (present(edge, "condition")) {
+                    throw new ConfigurationPublicationException(
+                            "PARALLEL fork 出边必须无条件: " + nodeId);
+                }
+            }
+            String sharedStage = null;
+            for (JsonNode edge : outs) {
+                JsonNode target = nodes.get(edge.path("to").asText());
+                String targetType = target.path("nodeType").asText();
+                if (!Set.of("USER_TASK", "SERVICE_TASK", "REVIEW_TASK", "MANUAL_INTERVENTION", "WAIT_EVENT")
+                        .contains(targetType)) {
+                    throw new ConfigurationPublicationException(
+                            "PARALLEL fork 目标必须是任务或 WAIT_EVENT: " + edge.path("to").asText());
+                }
+                String stage = target.path("stageCode").asText();
+                if (stage == null || stage.isBlank()) {
+                    throw new ConfigurationPublicationException(
+                            "PARALLEL fork 目标必须声明 stageCode: " + edge.path("to").asText());
+                }
+                if (sharedStage == null) {
+                    sharedStage = stage;
+                } else if (!sharedStage.equals(stage)) {
+                    throw new ConfigurationPublicationException(
+                            "PARALLEL fork 分支必须共享 stageCode: " + nodeId);
+                }
+            }
+        }
+        if (join) {
+            if (outs.size() != 1 || present(outs.getFirst(), "condition")) {
+                throw new ConfigurationPublicationException(
+                        "PARALLEL join 必须恰好一条无条件出边: " + nodeId);
             }
         }
     }

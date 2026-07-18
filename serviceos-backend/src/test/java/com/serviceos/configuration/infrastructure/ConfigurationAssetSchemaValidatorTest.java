@@ -70,6 +70,38 @@ class ConfigurationAssetSchemaValidatorTest {
     }
 
     @Test
+    void parallelGatewayForkAndJoinShapesValidated() {
+        String valid = """
+                {"workflowKey":"parallel.demo","semanticVersion":"1.0.0","startNodeId":"START",
+                 "nodes":[
+                   {"nodeId":"START","nodeType":"START","name":"开始"},
+                   {"nodeId":"A","nodeType":"SERVICE_TASK","name":"A","stageCode":"S1","taskType":"TA"},
+                   {"nodeId":"FORK","nodeType":"PARALLEL_GATEWAY","name":"fork"},
+                   {"nodeId":"B","nodeType":"SERVICE_TASK","name":"B","stageCode":"S2","taskType":"TB"},
+                   {"nodeId":"C","nodeType":"SERVICE_TASK","name":"C","stageCode":"S2","taskType":"TC"},
+                   {"nodeId":"JOIN","nodeType":"PARALLEL_GATEWAY","name":"join"},
+                   {"nodeId":"D","nodeType":"SERVICE_TASK","name":"D","stageCode":"S3","taskType":"TD"}],
+                 "transitions":[
+                   {"transitionId":"t1","from":"START","to":"A"},
+                   {"transitionId":"t2","from":"A","to":"FORK"},
+                   {"transitionId":"t3","from":"FORK","to":"B"},
+                   {"transitionId":"t4","from":"FORK","to":"C"},
+                   {"transitionId":"t5","from":"B","to":"JOIN"},
+                   {"transitionId":"t6","from":"C","to":"JOIN"},
+                   {"transitionId":"t7","from":"JOIN","to":"D"}]}
+                """.trim();
+        assertThatCode(() -> validator.validate(command(valid))).doesNotThrowAnyException();
+
+        String badFork = valid.replace(
+                "{\"transitionId\":\"t4\",\"from\":\"FORK\",\"to\":\"C\"}",
+                "{\"transitionId\":\"t4\",\"from\":\"FORK\",\"to\":\"C\","
+                        + "\"condition\":{\"language\":\"SERVICEOS_EXPR_V1\",\"source\":\"true\"}}");
+        assertThatThrownBy(() -> validator.validate(command(badFork)))
+                .isInstanceOf(ConfigurationPublicationException.class)
+                .hasMessageContaining("PARALLEL fork");
+    }
+
+    @Test
     void waitEventRequiresTypeTemplateAndUnconditionalExit() {
         String valid = """
                 {"workflowKey":"wait.demo","semanticVersion":"1.0.0","startNodeId":"START",

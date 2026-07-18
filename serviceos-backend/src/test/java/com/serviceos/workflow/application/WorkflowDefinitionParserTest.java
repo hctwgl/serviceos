@@ -70,6 +70,23 @@ class WorkflowDefinitionParserTest {
     }
 
     @Test
+    void parallelGatewayForksAndJoinPending() {
+        var fork = parser.progression(asset(parallelDefinition()), "INTAKE_TASK", oceanContext());
+        assertThat(fork.fork()).isTrue();
+        assertThat(fork.forkBranches()).extracting(b -> b.nodeId())
+                .containsExactly("BRANCH_A", "BRANCH_B");
+
+        var joinA = parser.progression(asset(parallelDefinition()), "BRANCH_A", oceanContext());
+        assertThat(joinA.joinPending()).isTrue();
+        assertThat(joinA.nodeId()).isEqualTo("JOIN");
+        assertThat(joinA.joinFromNodeId()).isEqualTo("BRANCH_A");
+        assertThat(joinA.expectedJoinTokens()).isEqualTo(2);
+
+        var after = parser.progressionAfterJoin(asset(parallelDefinition()), "JOIN", oceanContext());
+        assertThat(after.nodeId()).isEqualTo("MERGE_TASK");
+    }
+
+    @Test
     void waitEventProgressionReturnsWaitingDefinition() {
         var result = parser.progression(asset(waitDefinition()), "SURVEY_TASK", oceanContext());
         assertThat(result.waiting()).isTrue();
@@ -163,6 +180,32 @@ class WorkflowDefinitionParserTest {
                  "transitions":[
                    {"transitionId":"t1","from":"START","to":"ASSIGN_COORDINATORS"},
                    {"transitionId":"t2","from":"ASSIGN_COORDINATORS","to":"INITIAL_REVIEW"}]}
+                """;
+    }
+
+    private static String parallelDefinition() {
+        return """
+                {"workflowKey":"parallel.demo","semanticVersion":"1.0.0","startNodeId":"START",
+                 "nodes":[
+                   {"nodeId":"START","nodeType":"START","name":"开始"},
+                   {"nodeId":"INTAKE_TASK","nodeType":"SERVICE_TASK","name":"受理",
+                    "stageCode":"INTAKE","taskType":"ASSIGN_COORDINATORS"},
+                   {"nodeId":"FORK","nodeType":"PARALLEL_GATEWAY","name":"分叉"},
+                   {"nodeId":"BRANCH_A","nodeType":"SERVICE_TASK","name":"分支A",
+                    "stageCode":"PARALLEL","taskType":"BRANCH_A"},
+                   {"nodeId":"BRANCH_B","nodeType":"SERVICE_TASK","name":"分支B",
+                    "stageCode":"PARALLEL","taskType":"BRANCH_B"},
+                   {"nodeId":"JOIN","nodeType":"PARALLEL_GATEWAY","name":"汇聚"},
+                   {"nodeId":"MERGE_TASK","nodeType":"SERVICE_TASK","name":"汇合后",
+                    "stageCode":"CLOSE","taskType":"MERGE"}],
+                 "transitions":[
+                   {"transitionId":"t1","from":"START","to":"INTAKE_TASK"},
+                   {"transitionId":"t2","from":"INTAKE_TASK","to":"FORK"},
+                   {"transitionId":"t3","from":"FORK","to":"BRANCH_A"},
+                   {"transitionId":"t4","from":"FORK","to":"BRANCH_B"},
+                   {"transitionId":"t5","from":"BRANCH_A","to":"JOIN"},
+                   {"transitionId":"t6","from":"BRANCH_B","to":"JOIN"},
+                   {"transitionId":"t7","from":"JOIN","to":"MERGE_TASK"}]}
                 """;
     }
 

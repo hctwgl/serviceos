@@ -275,5 +275,6 @@
 - [M272 REFERENCE_OEM SAMPLE Connector 验收矩阵](269-m272-reference-oem-sample-connector-acceptance.md)
 - [M273 双车企入站端到端回归验收矩阵](270-m273-dual-oem-inbound-regression-acceptance.md)
 - [M274 第三家车企接入手册验收矩阵](271-m274-third-oem-onboarding-handbook-acceptance.md)
+- [M275 PARALLEL_GATEWAY 运行时验收矩阵](272-m275-parallel-gateway-runtime-acceptance.md)
 - [多车企平台内核程序级验收矩阵](multi-oem-platform-kernel-program-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M274 第三家车企接入手册（阶段一收口）**，功能证据提交 `0b285a5c254fea36ba03d6a33c96639f190f77f4`（合并入 `master` 后改为合并提交）。
+当前工程基线为 **M275 PARALLEL_GATEWAY 分叉与汇聚运行时**，功能证据提交 `0b285a5c254fea36ba03d6a33c96639f190f77f4`（合并入 `master` 后改为合并提交）。
 此前 M267 Connector SPI 证据为 `994cb46f1e31ddc8a4364a776cc4849e766c3b6d`；M266 仍为上一
 master 合并基线 `088018a6eac180f7fe36536fae9d073fa797757c`。
 
@@ -686,6 +686,8 @@ master 合并基线 `088018a6eac180f7fe36536fae9d073fa797757c`。
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M275 实现文档](architecture/288-m275-parallel-gateway-runtime.md)
+- [M275 验收矩阵](testing/272-m275-parallel-gateway-runtime-acceptance.md)
 - [M274 实现文档](architecture/287-m274-third-oem-onboarding-handbook.md)
 - [M273 实现文档](architecture/286-m273-dual-oem-inbound-regression.md)
 - [M272 实现文档](architecture/285-m272-reference-oem-sample-connector.md)

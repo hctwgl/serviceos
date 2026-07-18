@@ -283,6 +283,7 @@ title: ServiceOS 里程碑索引
 | M272 | M272 REFERENCE_OEM SAMPLE Connector | [285-m272-reference-oem-sample-connector.md](../architecture/285-m272-reference-oem-sample-connector.md) | [269-m272-reference-oem-sample-connector-acceptance.md](../testing/269-m272-reference-oem-sample-connector-acceptance.md) |
 | M273 | M273 双车企入站端到端回归 | [286-m273-dual-oem-inbound-regression.md](../architecture/286-m273-dual-oem-inbound-regression.md) | [270-m273-dual-oem-inbound-regression-acceptance.md](../testing/270-m273-dual-oem-inbound-regression-acceptance.md) |
 | M274 | M274 第三家车企接入手册 | [287-m274-third-oem-onboarding-handbook.md](../architecture/287-m274-third-oem-onboarding-handbook.md) | [271-m274-third-oem-onboarding-handbook-acceptance.md](../testing/271-m274-third-oem-onboarding-handbook-acceptance.md) |
+| M275 | M275 PARALLEL_GATEWAY 分叉与汇聚运行时 | [288-m275-parallel-gateway-runtime.md](../architecture/288-m275-parallel-gateway-runtime.md) | [272-m275-parallel-gateway-runtime-acceptance.md](../testing/272-m275-parallel-gateway-runtime-acceptance.md) |
 
 ## 未关联里程碑的文档
 

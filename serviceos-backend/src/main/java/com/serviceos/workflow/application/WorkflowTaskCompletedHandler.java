@@ -220,6 +220,43 @@ final class WorkflowTaskCompletedHandler implements OutboxMessageHandler, Workfl
             WorkflowDefinitionParser.ProgressionDefinition progression,
             Instant activatedAt
     ) {
+        if (progression.joinPending()) {
+            boolean complete = recordParallelJoinArrival(
+                    tenantId, current, progression, activationEventId, activatedAt);
+            if (!complete) {
+                return Sha256.digest(current.workflowNodeInstanceId() + "|JOIN_WAIT|"
+                        + progression.nodeId() + "|" + progression.joinFromNodeId());
+            }
+            var asset = configurations.requireAssetVersion(
+                    tenantId, current.workflowDefinitionVersionId(),
+                    ConfigurationAssetType.WORKFLOW, current.workflowDefinitionDigest());
+            ExpressionContext expressionContext = expressionContext(tenantId, current);
+            var afterJoin = parser.progressionAfterJoin(asset, progression.nodeId(), expressionContext);
+            return activateProgression(
+                    tenantId, activationEventId, correlationId, payloadDigest,
+                    current, afterJoin, activatedAt);
+        }
+        if (progression.fork()) {
+            NodeRuntime branchCurrent = current;
+            String branchStage = progression.stageCode();
+            if (branchStage != null && !branchStage.equals(current.stageCode())) {
+                completeStage(tenantId, activationEventId, correlationId, current, activatedAt);
+                UUID stageId = UUID.randomUUID();
+                int sequenceNo = current.stageSequenceNo() + 1;
+                activateStage(
+                        tenantId, activationEventId, correlationId, current,
+                        stageId, branchStage, sequenceNo, activatedAt);
+                branchCurrent = current.withActiveStage(stageId, branchStage, sequenceNo);
+            }
+            StringBuilder digest = new StringBuilder();
+            for (var branch : progression.forkBranches()) {
+                digest.append('|').append(activateProgression(
+                        tenantId, activationEventId, correlationId, payloadDigest,
+                        branchCurrent, branch, activatedAt));
+            }
+            return Sha256.digest(current.workflowNodeInstanceId() + "|FORK|" + progression.nodeId()
+                    + digest);
+        }
         boolean stageCompleted = progression.end()
                 || (progression.stageCode() != null
                 && !current.stageCode().equals(progression.stageCode()));
@@ -327,6 +364,103 @@ final class WorkflowTaskCompletedHandler implements OutboxMessageHandler, Workfl
                 .update();
         return Sha256.digest(current.workflowNodeInstanceId() + "|" + nextNodeInstanceId
                 + "|" + nextTask.taskId());
+    }
+
+    /**
+     * 记录并行汇聚 token；返回是否已到齐。
+     */
+    private boolean recordParallelJoinArrival(
+            String tenantId,
+            NodeRuntime current,
+            WorkflowDefinitionParser.ProgressionDefinition progression,
+            UUID activationEventId,
+            Instant arrivedAt
+    ) {
+        UUID proposedJoinId = UUID.randomUUID();
+        jdbc.sql("""
+                        INSERT INTO wfl_parallel_join (
+                            parallel_join_id, tenant_id, workflow_instance_id, join_node_id,
+                            expected_tokens, arrived_tokens, status, version, opened_at
+                        )
+                        SELECT :joinId, :tenantId, :workflowId, :joinNodeId,
+                               :expected, 0, 'OPEN', 1, :openedAt
+                         WHERE NOT EXISTS (
+                            SELECT 1 FROM wfl_parallel_join
+                             WHERE tenant_id = :tenantId
+                               AND workflow_instance_id = :workflowId
+                               AND join_node_id = :joinNodeId
+                               AND status = 'OPEN'
+                         )
+                        """)
+                .param("joinId", proposedJoinId)
+                .param("tenantId", tenantId)
+                .param("workflowId", current.workflowInstanceId())
+                .param("joinNodeId", progression.nodeId())
+                .param("expected", progression.expectedJoinTokens())
+                .param("openedAt", java.sql.Timestamp.from(arrivedAt))
+                .update();
+
+        var join = jdbc.sql("""
+                        SELECT parallel_join_id, expected_tokens, arrived_tokens, status
+                          FROM wfl_parallel_join
+                         WHERE tenant_id = :tenantId
+                           AND workflow_instance_id = :workflowId
+                           AND join_node_id = :joinNodeId
+                           AND status = 'OPEN'
+                         FOR UPDATE
+                        """)
+                .param("tenantId", tenantId)
+                .param("workflowId", current.workflowInstanceId())
+                .param("joinNodeId", progression.nodeId())
+                .query((rs, row) -> new ParallelJoinRow(
+                        rs.getObject("parallel_join_id", UUID.class),
+                        rs.getInt("expected_tokens"),
+                        rs.getInt("arrived_tokens"),
+                        rs.getString("status")))
+                .single();
+        if (!"OPEN".equals(join.status())) {
+            throw new IllegalStateException("PARALLEL join is not OPEN: " + progression.nodeId());
+        }
+        int inserted = jdbc.sql("""
+                        INSERT INTO wfl_parallel_join_token (
+                            parallel_join_id, from_node_id, source_node_instance_id,
+                            activation_event_id, arrived_at
+                        ) VALUES (
+                            :joinId, :fromNodeId, :sourceNodeInstanceId,
+                            :activationEventId, :arrivedAt
+                        )
+                        ON CONFLICT DO NOTHING
+                        """)
+                .param("joinId", join.joinId())
+                .param("fromNodeId", progression.joinFromNodeId())
+                .param("sourceNodeInstanceId", current.workflowNodeInstanceId())
+                .param("activationEventId", activationEventId)
+                .param("arrivedAt", java.sql.Timestamp.from(arrivedAt))
+                .update();
+        if (inserted != 1) {
+            throw new IllegalArgumentException(
+                    "PARALLEL join duplicate token from " + progression.joinFromNodeId());
+        }
+        int arrived = join.arrivedTokens() + 1;
+        int updated = jdbc.sql("""
+                        UPDATE wfl_parallel_join
+                           SET arrived_tokens = :arrived,
+                               status = CASE WHEN :arrived = expected_tokens THEN 'COMPLETED' ELSE status END,
+                               completed_at = CASE WHEN :arrived = expected_tokens THEN :completedAt ELSE completed_at END,
+                               version = version + 1
+                         WHERE parallel_join_id = :joinId
+                           AND status = 'OPEN'
+                           AND arrived_tokens = :previous
+                        """)
+                .param("arrived", arrived)
+                .param("completedAt", java.sql.Timestamp.from(arrivedAt))
+                .param("joinId", join.joinId())
+                .param("previous", join.arrivedTokens())
+                .update();
+        if (updated != 1) {
+            throw new IllegalStateException("PARALLEL join counter update lost race");
+        }
+        return arrived == join.expectedTokens();
     }
 
     private void completeStage(
@@ -665,6 +799,14 @@ final class WorkflowTaskCompletedHandler implements OutboxMessageHandler, Workfl
                 new ExpressionContext.TaskContext(current.stageCode(), taskType));
     }
 
+    private record ParallelJoinRow(
+            UUID joinId,
+            int expectedTokens,
+            int arrivedTokens,
+            String status
+    ) {
+    }
+
     private record WaitSubscription(
             UUID waitSubscriptionId,
             String tenantId,
@@ -707,5 +849,14 @@ final class WorkflowTaskCompletedHandler implements OutboxMessageHandler, Workfl
             UUID taskDefinitionVersionId,
             String taskDefinitionDigest
     ) {
+        NodeRuntime withActiveStage(UUID stageInstanceId, String stageCode, int stageSequenceNo) {
+            return new NodeRuntime(
+                    workflowNodeInstanceId, workflowInstanceId, stageInstanceId, workOrderId, nodeId,
+                    taskId, nodeStatus, stageCode, stageSequenceNo, "ACTIVE", 1, projectId,
+                    workflowStatus, workflowVersion, workflowDefinitionVersionId,
+                    workflowDefinitionDigest, configurationBundleId, configurationBundleDigest,
+                    taskType, taskKind, taskStatus, taskResultRef, taskResultDigest,
+                    taskDefinitionVersionId, taskDefinitionDigest);
+        }
     }
 }

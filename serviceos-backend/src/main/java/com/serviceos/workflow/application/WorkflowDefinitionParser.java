@@ -22,8 +22,8 @@ import java.util.Set;
 /**
  * 受控 JSON 工作流的最小可执行解释器。
  *
- * <p>M17～M19 提供线性无条件推进；M269 增加 {@code EXCLUSIVE_GATEWAY}；M270 增加
- * {@code WAIT_EVENT} 挂起定义解析。并行网关与子流程仍未实现。</p>
+ * <p>M17～M19 线性推进；M269 EXCLUSIVE_GATEWAY；M270 WAIT_EVENT；M275 PARALLEL_GATEWAY
+ * 分叉/汇聚。子流程与定时器仍未实现。</p>
  */
 @Component
 final class WorkflowDefinitionParser {
@@ -71,17 +71,19 @@ final class WorkflowDefinitionParser {
         }
         requireTaskNode(completed, "completed workflow node");
         JsonNode firstTarget = requireSingleUnconditionalTarget(graph, requiredNodeId, "completed task node");
-        return resolveTarget(graph, requiredText(firstTarget, "nodeId"), context, new HashSet<>());
+        return resolveTarget(
+                graph, requiredText(firstTarget, "nodeId"), context, new HashSet<>(), requiredNodeId);
     }
 
     private ProgressionDefinition resolveTarget(
             Graph graph,
             String targetNodeId,
             ExpressionContext context,
-            Set<String> visiting
+            Set<String> visiting,
+            String arrivalFromNodeId
     ) {
         if (!visiting.add(targetNodeId)) {
-            throw new IllegalArgumentException("workflow exclusive gateway cycle detected at " + targetNodeId);
+            throw new IllegalArgumentException("workflow gateway cycle detected at " + targetNodeId);
         }
         JsonNode target = graph.nodes().get(targetNodeId);
         if (target == null) {
@@ -99,7 +101,7 @@ final class WorkflowDefinitionParser {
         }
         if ("EXCLUSIVE_GATEWAY".equals(targetType)) {
             String chosen = chooseExclusiveGatewayTarget(graph, targetNodeId, context);
-            return resolveTarget(graph, chosen, context, visiting);
+            return resolveTarget(graph, chosen, context, visiting, targetNodeId);
         }
         if ("WAIT_EVENT".equals(targetType)) {
             return ProgressionDefinition.waiting(
@@ -108,8 +110,65 @@ final class WorkflowDefinitionParser {
                     requiredText(target, "waitEventType"),
                     requiredText(target, "correlationKeyTemplate"));
         }
+        if ("PARALLEL_GATEWAY".equals(targetType)) {
+            return resolveParallelGateway(graph, targetNodeId, context, visiting, arrivalFromNodeId);
+        }
         throw new IllegalArgumentException(
                 "workflow progression does not support nodeType: " + targetType);
+    }
+
+    private ProgressionDefinition resolveParallelGateway(
+            Graph graph,
+            String gatewayNodeId,
+            ExpressionContext context,
+            Set<String> visiting,
+            String arrivalFromNodeId
+    ) {
+        List<Transition> outgoing = graph.transitions().stream()
+                .filter(transition -> transition.from().equals(gatewayNodeId))
+                .toList();
+        List<Transition> incoming = graph.transitions().stream()
+                .filter(transition -> transition.to().equals(gatewayNodeId))
+                .toList();
+        boolean fork = outgoing.size() >= 2 && outgoing.stream().allMatch(Transition::unconditional);
+        boolean join = incoming.size() >= 2;
+        if (fork && join) {
+            throw new IllegalArgumentException(
+                    "PARALLEL_GATEWAY cannot be both fork and join: " + gatewayNodeId);
+        }
+        if (fork) {
+            List<ProgressionDefinition> branches = new ArrayList<>();
+            String sharedStage = null;
+            for (Transition transition : outgoing) {
+                ProgressionDefinition branch = resolveTarget(
+                        graph, transition.to(), context, new HashSet<>(visiting), gatewayNodeId);
+                if (branch.end() || branch.joinPending() || branch.fork()) {
+                    throw new IllegalArgumentException(
+                            "PARALLEL fork branch must be task or WAIT_EVENT: " + transition.to());
+                }
+                if (sharedStage == null) {
+                    sharedStage = branch.stageCode();
+                } else if (!sharedStage.equals(branch.stageCode())) {
+                    throw new IllegalArgumentException(
+                            "PARALLEL fork branches must share stageCode: " + gatewayNodeId);
+                }
+                branches.add(branch);
+            }
+            return ProgressionDefinition.fork(gatewayNodeId, sharedStage, branches);
+        }
+        if (join) {
+            if (outgoing.size() != 1 || !outgoing.getFirst().unconditional()) {
+                throw new IllegalArgumentException(
+                        "PARALLEL join must have exactly one unconditional outgoing: " + gatewayNodeId);
+            }
+            if (arrivalFromNodeId == null || arrivalFromNodeId.isBlank()) {
+                throw new IllegalArgumentException(
+                        "PARALLEL join requires arrival fromNodeId: " + gatewayNodeId);
+            }
+            return ProgressionDefinition.joinPending(gatewayNodeId, arrivalFromNodeId, incoming.size());
+        }
+        throw new IllegalArgumentException(
+                "PARALLEL_GATEWAY must be fork (>=2 outs) or join (>=2 ins): " + gatewayNodeId);
     }
 
     /**
@@ -128,7 +187,26 @@ final class WorkflowDefinitionParser {
             throw new IllegalArgumentException("wait node must be WAIT_EVENT: " + requiredNodeId);
         }
         JsonNode target = requireSingleUnconditionalTarget(graph, requiredNodeId, "WAIT_EVENT node");
-        return resolveTarget(graph, requiredText(target, "nodeId"), context, new HashSet<>());
+        return resolveTarget(
+                graph, requiredText(target, "nodeId"), context, new HashSet<>(), requiredNodeId);
+    }
+
+    /** Join 汇聚完成后，沿唯一出边继续。 */
+    ProgressionDefinition progressionAfterJoin(
+            ConfigurationAssetDefinition asset,
+            String joinNodeId,
+            ExpressionContext context
+    ) {
+        Objects.requireNonNull(context, "expression context must not be null");
+        Graph graph = parseGraph(asset);
+        String requiredNodeId = requiredValue(joinNodeId, "joinNodeId");
+        JsonNode joinNode = graph.nodes().get(requiredNodeId);
+        if (joinNode == null || !"PARALLEL_GATEWAY".equals(requiredText(joinNode, "nodeType"))) {
+            throw new IllegalArgumentException("join node must be PARALLEL_GATEWAY: " + requiredNodeId);
+        }
+        JsonNode target = requireSingleUnconditionalTarget(graph, requiredNodeId, "PARALLEL join");
+        return resolveTarget(
+                graph, requiredText(target, "nodeId"), context, new HashSet<>(), requiredNodeId);
     }
 
     private String chooseExclusiveGatewayTarget(
@@ -295,17 +373,25 @@ final class WorkflowDefinitionParser {
             boolean end,
             boolean waiting,
             String waitEventType,
-            String correlationKeyTemplate
+            String correlationKeyTemplate,
+            boolean fork,
+            List<ProgressionDefinition> forkBranches,
+            boolean joinPending,
+            String joinFromNodeId,
+            int expectedJoinTokens
     ) {
         static ProgressionDefinition task(
                 String nodeId, String stageCode, String taskType, WorkflowTaskKind taskKind,
                 String formRef, String slaRef) {
             return new ProgressionDefinition(
-                    nodeId, stageCode, taskType, taskKind, formRef, slaRef, false, false, null, null);
+                    nodeId, stageCode, taskType, taskKind, formRef, slaRef,
+                    false, false, null, null, false, List.of(), false, null, 0);
         }
 
         static ProgressionDefinition end(String nodeId) {
-            return new ProgressionDefinition(nodeId, null, null, null, null, null, true, false, null, null);
+            return new ProgressionDefinition(
+                    nodeId, null, null, null, null, null,
+                    true, false, null, null, false, List.of(), false, null, 0);
         }
 
         static ProgressionDefinition waiting(
@@ -315,8 +401,29 @@ final class WorkflowDefinitionParser {
                 String correlationKeyTemplate
         ) {
             return new ProgressionDefinition(
-                    nodeId, stageCode, null, null, null, null, false, true,
-                    waitEventType, correlationKeyTemplate);
+                    nodeId, stageCode, null, null, null, null,
+                    false, true, waitEventType, correlationKeyTemplate,
+                    false, List.of(), false, null, 0);
+        }
+
+        static ProgressionDefinition fork(
+                String forkNodeId,
+                String stageCode,
+                List<ProgressionDefinition> branches
+        ) {
+            return new ProgressionDefinition(
+                    forkNodeId, stageCode, null, null, null, null,
+                    false, false, null, null, true, List.copyOf(branches), false, null, 0);
+        }
+
+        static ProgressionDefinition joinPending(
+                String joinNodeId,
+                String fromNodeId,
+                int expectedTokens
+        ) {
+            return new ProgressionDefinition(
+                    joinNodeId, null, null, null, null, null,
+                    false, false, null, null, false, List.of(), true, fromNodeId, expectedTokens);
         }
     }
 

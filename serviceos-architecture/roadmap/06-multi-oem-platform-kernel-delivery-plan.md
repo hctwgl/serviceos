@@ -59,6 +59,8 @@ BYD 和 OEM2（REFERENCE 或真实）使用独立 Connector
 
 阶段一声明范围已闭合（真实 OEM2/OEM3 协议仍 BLOCKED_EXTERNAL）。
 
+阶段二已开始：M275 PARALLEL_GATEWAY Implemented。
+
 
 | 切片 | 状态 | 证据 |
 |---|---|---|
