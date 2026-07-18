@@ -73,6 +73,9 @@ final class TechnicianAppStore {
     private(set) var configuration: TechnicianIOSConfiguration?
     private(set) var taskFeed: TechnicianPortalFeedPage?
     private(set) var taskDetail: TechnicianPortalTaskDetail?
+    private(set) var taskForms: [TechnicianTaskForm] = []
+    private(set) var formMessage: String?
+    private(set) var formIssues: [TechnicianIOSFoundation.TechnicianFormValidationIssue] = []
     private(set) var onlineMessage: String?
     private(set) var onlineLoading = false
     var selectedTab: TechnicianAppTab = .taskFeed
@@ -175,9 +178,22 @@ final class TechnicianAppStore {
                 contextID: session.activeContext.contextId,
                 taskID: taskID
             )
+            do {
+                taskForms = try await dependencies.onlineService.taskForms(
+                    contextID: session.activeContext.contextId,
+                    taskID: taskID
+                )
+                formMessage = nil
+                formIssues = []
+            } catch {
+                // 表单次级资源失败不能抹掉已获权的任务详情；仍以安全文案明确不可填写。
+                taskForms = []
+                formMessage = Self.safeMessage(for: error)
+            }
             onlineMessage = nil
         } catch {
             taskDetail = nil
+            taskForms = []
             onlineMessage = Self.safeMessage(for: error)
         }
     }
@@ -242,6 +258,37 @@ final class TechnicianAppStore {
         }
     }
 
+    func submitForm(
+        session: TechnicianSession,
+        taskID: UUID,
+        formVersionID: UUID,
+        values: [String: TechnicianFormValue]
+    ) async {
+        guard let dependencies else { return }
+        onlineLoading = true
+        formMessage = "正在提交不可变表单事实…"
+        formIssues = []
+        defer { onlineLoading = false }
+        do {
+            let result = try await dependencies.onlineService.submitForm(
+                contextID: session.activeContext.contextId,
+                taskID: taskID,
+                formVersionID: formVersionID,
+                values: values
+            )
+            formIssues = result.errors
+            formMessage = result.validationStatus == "VALIDATED"
+                ? "表单提交成功（版本 \(result.submissionVersion)）"
+                : "服务器已保留 INVALID 提交，请按错误修正后产生新版本"
+            taskDetail = try await dependencies.onlineService.taskDetail(
+                contextID: session.activeContext.contextId,
+                taskID: taskID
+            )
+        } catch {
+            formMessage = Self.safeMessage(for: error)
+        }
+    }
+
     private func restoreSession(using dependencies: TechnicianAppDependencies) async {
         phase = .launching
         if await dependencies.tokenVault.currentAccessToken() != nil {
@@ -284,6 +331,9 @@ final class TechnicianAppStore {
     private func clearOnlineState() {
         taskFeed = nil
         taskDetail = nil
+        taskForms = []
+        formMessage = nil
+        formIssues = []
         onlineMessage = nil
         onlineLoading = false
     }
