@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import ServiceOSCoreClient
 import ServiceOSIOSCore
+import UIKit
 // Hosted XCTest 复用 App 已链接的 Foundation，避免静态 Swift Package 在宿主与测试 bundle 中重复装载。
 @_exported import TechnicianIOSFoundation
 
@@ -24,6 +25,8 @@ struct TechnicianAppDependencies {
     let tokenLifecycle: OIDCTokenLifecycle
     let tokenVault: any OIDCTokenPersisting
     let sessionLoader: TechnicianSessionLoader
+    let onlineService: TechnicianOnlineService
+    let locationProvider: OneShotLocationProvider
 
     @MainActor
     static func live(bundle: Bundle = .main) throws -> TechnicianAppDependencies {
@@ -53,7 +56,12 @@ struct TechnicianAppDependencies {
             sessionLoader: TechnicianSessionLoader(
                 requestBuilder: requestBuilder,
                 transport: URLSessionServiceTransport()
-            )
+            ),
+            onlineService: TechnicianOnlineService(
+                requestBuilder: requestBuilder,
+                transport: URLSessionServiceTransport()
+            ),
+            locationProvider: OneShotLocationProvider()
         )
     }
 }
@@ -63,6 +71,10 @@ struct TechnicianAppDependencies {
 final class TechnicianAppStore {
     private(set) var phase: TechnicianAppPhase = .launching
     private(set) var configuration: TechnicianIOSConfiguration?
+    private(set) var taskFeed: TechnicianPortalFeedPage?
+    private(set) var taskDetail: TechnicianPortalTaskDetail?
+    private(set) var onlineMessage: String?
+    private(set) var onlineLoading = false
     var selectedTab: TechnicianAppTab = .taskFeed
     private var dependencies: TechnicianAppDependencies?
     private var hasBootstrapped = false
@@ -135,7 +147,99 @@ final class TechnicianAppStore {
         }
         await dependencies.tokenLifecycle.logout()
         selectedTab = .taskFeed
+        clearOnlineState()
         phase = .signedOut
+    }
+
+    func loadTaskFeed(session: TechnicianSession) async {
+        guard let dependencies else { return }
+        onlineLoading = true
+        defer { onlineLoading = false }
+        do {
+            taskFeed = try await dependencies.onlineService.taskFeed(
+                contextID: session.activeContext.contextId
+            )
+            onlineMessage = nil
+        } catch {
+            taskFeed = nil
+            onlineMessage = Self.safeMessage(for: error)
+        }
+    }
+
+    func loadTaskDetail(session: TechnicianSession, taskID: UUID) async {
+        guard let dependencies else { return }
+        onlineLoading = true
+        defer { onlineLoading = false }
+        do {
+            taskDetail = try await dependencies.onlineService.taskDetail(
+                contextID: session.activeContext.contextId,
+                taskID: taskID
+            )
+            onlineMessage = nil
+        } catch {
+            taskDetail = nil
+            onlineMessage = Self.safeMessage(for: error)
+        }
+    }
+
+    func checkIn(session: TechnicianSession, appointmentID: UUID, taskID: UUID) async {
+        guard let dependencies else { return }
+        onlineLoading = true
+        onlineMessage = "正在获取一次定位…"
+        defer { onlineLoading = false }
+        do {
+            let location = try await dependencies.locationProvider.capture()
+            let commandID = UUID().uuidString.lowercased()
+            let deviceID = UIDevice.current.identifierForVendor?.uuidString.lowercased()
+                ?? "ios-installation-\(Bundle.main.bundleIdentifier ?? "technician")"
+            let receipt = try await dependencies.onlineService.checkIn(
+                contextID: session.activeContext.contextId,
+                appointmentID: appointmentID,
+                deviceID: deviceID,
+                deviceCommandID: commandID,
+                location: location
+            )
+            onlineMessage = receipt.policyDecision == .warning
+                ? "已到场，但位置策略提示 \(receipt.geofenceResult.rawValue)"
+                : "到场已由服务器确认"
+            taskDetail = try await dependencies.onlineService.taskDetail(
+                contextID: session.activeContext.contextId,
+                taskID: taskID
+            )
+        } catch is TechnicianLocationError {
+            onlineMessage = "无法获取位置，请在系统设置中允许使用 App 时定位后重试"
+        } catch {
+            onlineMessage = Self.safeMessage(for: error)
+        }
+    }
+
+    func interrupt(
+        session: TechnicianSession,
+        visitID: UUID,
+        aggregateVersion: Int64,
+        taskID: UUID,
+        exceptionCode: String,
+        note: String
+    ) async {
+        guard let dependencies else { return }
+        onlineLoading = true
+        defer { onlineLoading = false }
+        do {
+            _ = try await dependencies.onlineService.interrupt(
+                contextID: session.activeContext.contextId,
+                visitID: visitID,
+                aggregateVersion: aggregateVersion,
+                exceptionCode: exceptionCode,
+                note: note
+            )
+            onlineMessage = "无法施工已由服务器确认；未伪造任何资料上传"
+            taskDetail = try await dependencies.onlineService.taskDetail(
+                contextID: session.activeContext.contextId,
+                taskID: taskID
+            )
+        } catch {
+            onlineMessage = Self.safeMessage(for: error)
+        }
     }
 
     private func restoreSession(using dependencies: TechnicianAppDependencies) async {
@@ -173,7 +277,15 @@ final class TechnicianAppStore {
             throw TechnicianAppNavigationError.noSupportedPage
         }
         selectedTab = visibleTabs.contains(selectedTab) ? selectedTab : firstVisibleTab
+        clearOnlineState()
         phase = .ready(session)
+    }
+
+    private func clearOnlineState() {
+        taskFeed = nil
+        taskDetail = nil
+        onlineMessage = nil
+        onlineLoading = false
     }
 
     private static func safeMessage(for error: Error) -> String {

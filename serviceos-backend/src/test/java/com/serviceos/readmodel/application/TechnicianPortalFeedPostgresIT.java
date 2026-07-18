@@ -2,6 +2,9 @@ package com.serviceos.readmodel.application;
 
 import com.serviceos.ServiceOsApplication;
 import com.serviceos.identity.api.CurrentPrincipal;
+import com.serviceos.fieldwork.api.CheckInVisitCommand;
+import com.serviceos.fieldwork.api.TechnicianVisitCommandService;
+import com.serviceos.fieldwork.api.VisitLocation;
 import com.serviceos.readmodel.api.TechnicianPortalFeedItem;
 import com.serviceos.readmodel.api.TechnicianPortalFeedPage;
 import com.serviceos.readmodel.api.TechnicianPortalQueryService;
@@ -9,6 +12,7 @@ import com.serviceos.readmodel.api.TechnicianPortalSchedulePage;
 import com.serviceos.readmodel.api.TechnicianPortalSyncSummary;
 import com.serviceos.readmodel.api.TechnicianPortalTaskDetail;
 import com.serviceos.shared.BusinessProblem;
+import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.ProblemCode;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
@@ -75,6 +79,7 @@ class TechnicianPortalFeedPostgresIT {
     }
 
     @Autowired TechnicianPortalQueryService portal;
+    @Autowired TechnicianVisitCommandService technicianVisits;
     @Autowired JdbcClient jdbc;
     @Autowired Flyway flyway;
     @Autowired PlatformTransactionManager transactionManager;
@@ -83,6 +88,7 @@ class TechnicianPortalFeedPostgresIT {
     void cleanAndSeed() {
         jdbc.sql("""
                 TRUNCATE TABLE apt_appointment_command_result, apt_contact_attempt_command_result,
+                    fld_visit_command_result, fld_visit_fact, fld_visit, fld_geofence_policy,
                     apt_contact_attempt, apt_appointment_status_history, apt_appointment,
                     apt_appointment_revision,
                     dsp_assignment_command_result, dsp_capacity_command_result,
@@ -147,6 +153,55 @@ class TechnicianPortalFeedPostgresIT {
         TechnicianPortalFeedPage byUuid =
                 portal.taskFeed(actor(TECH_PRINCIPAL), "corr-uuid", NETWORK_A.toString(), null);
         assertThat(byUuid.items()).hasSize(1);
+    }
+
+    @Test
+    void technicianContextCheckInPersistsOnlineVisitAndRejectsForgedNetwork() {
+        UUID taskId = UUID.randomUUID();
+        UUID workOrderId = UUID.randomUUID();
+        UUID projectId = UUID.randomUUID();
+        UUID appointmentId = UUID.randomUUID();
+        seedHumanTask(taskId, workOrderId, projectId);
+        seedActivePair(NETWORK_A, workOrderId, taskId, TECH_PRINCIPAL.toString(), UUID.randomUUID());
+        jdbc.sql("""
+                INSERT INTO tsk_task_assignment (
+                    task_assignment_id, tenant_id, task_id, assignment_kind,
+                    principal_type, principal_id, status, source_type, source_id,
+                    effective_from, created_by, created_at)
+                VALUES (:id, :tenant, :task, 'RESPONSIBLE', 'USER', :principal,
+                    'ACTIVE', 'MANUAL', 'M262-FIXTURE', now(), 'test', now())
+                """).param("id", UUID.randomUUID()).param("tenant", TENANT).param("task", taskId)
+                .param("principal", TECH_PRINCIPAL.toString()).update();
+        seedAppointment(appointmentId, taskId, workOrderId, projectId);
+        seedGrant(TECH_PRINCIPAL, "visit.checkIn", "PROJECT", projectId.toString());
+        String commandId = "m262-device-command";
+        CheckInVisitCommand command = new CheckInVisitCommand(
+                appointmentId,
+                Instant.parse("2026-07-18T08:10:00Z"),
+                commandId,
+                "m262-ios-device",
+                new VisitLocation(36.067, 120.382, 12),
+                false);
+
+        assertThatThrownBy(() -> technicianVisits.checkIn(
+                actor(TECH_PRINCIPAL), new CommandMetadata("corr-m262-forged", commandId),
+                "TECHNICIAN|NETWORK|" + NETWORK_B, command))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.PORTAL_CONTEXT_INVALID));
+
+        var receipt = technicianVisits.checkIn(
+                actor(TECH_PRINCIPAL), new CommandMetadata("corr-m262", commandId),
+                "TECHNICIAN|NETWORK|" + NETWORK_A, command);
+        assertThat(receipt.status()).isEqualTo("IN_PROGRESS");
+        assertThat(jdbc.sql("""
+                SELECT network_id, technician_id, offline_flag
+                  FROM fld_visit WHERE visit_id = :id
+                """).param("id", receipt.visitId()).query((rs, row) -> Set.of(
+                        rs.getString("network_id"), rs.getString("technician_id"),
+                        Boolean.toString(rs.getBoolean("offline_flag")))).single())
+                .containsExactlyInAnyOrder(NETWORK_A.toString(), TECH_PRINCIPAL.toString(), "false");
+        assertThat(jdbc.sql("SELECT status FROM apt_appointment WHERE appointment_id = :id")
+                .param("id", appointmentId).query(String.class).single()).isEqualTo("IN_PROGRESS");
     }
 
     @Test

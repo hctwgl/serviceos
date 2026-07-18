@@ -43,6 +43,9 @@ status: Proposed
 | `POST /appointments/{id}/visits:check-in` | CheckInVisit | capturedAt、location、deviceId、deviceCommandId | 201 |
 | `POST /visits/{id}:check-out` | CheckOutVisit | capturedAt、resultCode、operationRefs | 200 |
 | `POST /visits/{id}:interrupt` | InterruptVisit | exceptionCode、note、evidenceRefs | 200 |
+| `POST /technician/me/appointments/{id}/visits:check-in` | 当前 Technician 在线签到（M262） | capturedAt、location、deviceId、deviceCommandId | 201 |
+| `POST /technician/me/visits/{id}:check-out` | 当前 Technician 签退（M262 契约） | capturedAt、resultCode、operationRefs | 200 |
+| `POST /technician/me/visits/{id}:interrupt` | 当前 Technician 无法施工中断（M262） | capturedAt、exceptionCode、note?、evidenceRefs | 200 |
 | `POST /visits/{id}/field-operations` | StartFieldOperation | operationType、taskId | 201 |
 | `POST /field-operations/{id}/submissions` | SubmitFieldOperation | formSubmissionRef、evidenceSetRef、resultCode | 201 |
 | `GET /work-orders/{id}/visits` | 上门历史 | — | 200 |
@@ -66,6 +69,11 @@ status: Proposed
 ```
 
 服务器返回权威 `receivedAt`、geofenceResult、Visit ID 和版本。
+
+M262 的 Technician 专用路径必须携带可信 `X-Technician-Context`，服务端同时复核 ACTIVE
+TechnicianProfile、网点关系、资源网点、当前责任与 Capability。专用 check-in 不接受 `offline` 或
+`receivedAt`，固定 `offline=false`；`Idempotency-Key` 必须等于 `deviceCommandId`。终态命令要求带引号的
+正整数 `If-Match`。客户端没有真实已完成现场操作引用时不得调用 check-out 或生成占位 `operationRefs`。
 
 ## 3. 表单
 

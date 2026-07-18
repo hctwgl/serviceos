@@ -66,7 +66,7 @@ lastUpdated: 2026-07-18
 |---|---|---|---|
 | MCP-H5-01 | Feed/日程/任务详情 | 当前责任、tombstone、深链和 asOf 正确 | M257 迁移/隔离 Playwright + PostgreSQL |
 | MCP-H5-02 | 联系/预约 | 仅使用已接受权威引用和服务端动作 | contract + E2E |
-| MCP-H5-03 | Visit | 明确浏览器定位限制，不伪造原生可信度 | M257 全局 H5 能力边界；Visit 写仍属 Track E |
+| MCP-H5-03 | Visit | 明确浏览器定位限制，不伪造原生可信度 | M262 一次性浏览器定位签到/中断 Playwright；无真实 operationRefs 时不开放签退 |
 | MCP-H5-04 | 动态表单 | 按冻结 Schema 渲染和校验 | component/E2E |
 | MCP-H5-05 | Evidence | 在线会话、checksum、finalize 状态可见 | E2E |
 | MCP-H5-06 | 提交/整改 | exact versions、单项补传和多轮历史 | E2E |
@@ -90,10 +90,10 @@ lastUpdated: 2026-07-18
 
 | ID | 验收项 | 预期 | 证据 |
 |---|---|---|---|
-| MCP-ONLINE-01 | 当前任务 | 只显示当前 ACTIVE 责任任务 | API + device E2E |
+| MCP-ONLINE-01 | 当前任务 | 只显示当前 ACTIVE 责任任务 | M262 原生 Feed/详情 + 服务端当前责任门禁；真实 device E2E 待补 |
 | MCP-ONLINE-02 | 联系预约 | 拨号返回、联系结果、预约修订和并发正确 | device E2E |
-| MCP-ONLINE-03 | Check-in | 主动采集时间/GPS/精度，策略可解释 | device/location tests |
-| MCP-ONLINE-04 | Visit | 无法施工、中断、Check-out 和版本校验正确 | device E2E |
+| MCP-ONLINE-03 | Check-in | 主动采集时间/GPS/精度，策略可解释 | M262 one-shot CoreLocation + Foundation/service tests；真机精度待补 |
+| MCP-ONLINE-04 | Visit | 无法施工、中断、Check-out 和版本校验正确 | M262 中断与 quoted If-Match 已证明；真实 operationRefs check-out/device E2E 待补 |
 | MCP-ONLINE-05 | 表单 | 本地草稿、条件、单位和服务端校验一致 | XCTest/device E2E |
 | MCP-ONLINE-06 | 相机与资料 | 原生采集、metadata、checksum 和 Slot 规则正确 | real-device tests |
 | MCP-ONLINE-07 | 在线上传 | 进度、失败、重试、finalize 和服务端校验正确 | upload tests |

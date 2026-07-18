@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import {
   getTechnicianTaskDetail,
+  checkInTechnicianVisit,
+  interruptTechnicianVisit,
   type TechnicianPortalTaskDetail,
 } from '../api/technicianPortal'
 import { userFacingError } from '../api/client'
@@ -11,6 +13,98 @@ const props = defineProps<{ technicianContextId: string | null }>()
 const route = useRoute()
 const detail = ref<TechnicianPortalTaskDetail | null>(null)
 const error = ref<string | null>(null)
+const visitActionMessage = ref<string | null>(null)
+const visitActionBusy = ref(false)
+const interruptCode = ref('SITE_UNSAFE')
+const interruptNote = ref('')
+
+const confirmedAppointment = computed(() =>
+  detail.value?.appointments.find((appointment) => appointment.status === 'CONFIRMED') ?? null,
+)
+const activeVisit = computed(() =>
+  detail.value?.visits.find((visit) => visit.status === 'IN_PROGRESS') ?? null,
+)
+
+function browserDeviceId() {
+  const key = 'serviceos-technician-web-device-id'
+  const existing = sessionStorage.getItem(key)
+  if (existing) return existing
+  const next = `web-session-${crypto.randomUUID()}`
+  sessionStorage.setItem(key, next)
+  return next
+}
+
+function currentPosition(): Promise<GeolocationPosition> {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('当前浏览器不支持定位，请使用 iOS App 或允许定位的浏览器'))
+      return
+    }
+    // H5 只做用户主动触发的一次定位，不持续跟踪，也不宣称具备原生可信度或后台能力。
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 15_000,
+    })
+  })
+}
+
+async function checkIn() {
+  if (!props.technicianContextId || !confirmedAppointment.value || visitActionBusy.value) return
+  visitActionBusy.value = true
+  visitActionMessage.value = '正在获取一次定位…'
+  try {
+    const position = await currentPosition()
+    const commandId = crypto.randomUUID()
+    const receipt = await checkInTechnicianVisit(
+      props.technicianContextId,
+      confirmedAppointment.value.appointmentId,
+      {
+        capturedAt: new Date(position.timestamp).toISOString(),
+        deviceCommandId: commandId,
+        deviceId: browserDeviceId(),
+        location: {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracyMeters: Math.max(position.coords.accuracy, 0.1),
+        },
+      },
+    )
+    visitActionMessage.value = receipt.data.policyDecision === 'WARNING'
+      ? `已到场，但位置策略提示 ${receipt.data.geofenceResult}`
+      : '到场已由服务器确认'
+    await load()
+  } catch (err) {
+    visitActionMessage.value = userFacingError(err, '到场记录失败，请检查定位权限或网络后重试')
+  } finally {
+    visitActionBusy.value = false
+  }
+}
+
+async function interrupt() {
+  if (!props.technicianContextId || !activeVisit.value || visitActionBusy.value) return
+  visitActionBusy.value = true
+  try {
+    await interruptTechnicianVisit(
+      props.technicianContextId,
+      activeVisit.value.visitId,
+      activeVisit.value.aggregateVersion,
+      {
+        capturedAt: new Date().toISOString(),
+        exceptionCode: interruptCode.value,
+        note: interruptNote.value.trim() || null,
+        evidenceRefs: [],
+      },
+    )
+    visitActionMessage.value = '无法施工已由服务器确认；未伪造任何资料上传'
+    interruptNote.value = ''
+    await load()
+  } catch (err) {
+    visitActionMessage.value = userFacingError(err, '无法施工记录失败，请刷新任务后重试')
+  } finally {
+    visitActionBusy.value = false
+  }
+}
 
 async function load() {
   const taskId = String(route.params.id ?? '')
@@ -142,6 +236,39 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
           </tbody>
         </table>
         <p v-else data-testid="technician-task-detail-no-visits">暂无上门记录</p>
+
+        <div class="visit-actions" data-testid="technician-visit-online-actions">
+          <h4>在线现场操作</h4>
+          <p class="hint">浏览器只在你点击时采集一次位置；不会后台定位，也不代表原生设备可信度。</p>
+          <button
+            v-if="confirmedAppointment && !activeVisit"
+            type="button"
+            :disabled="visitActionBusy || detail.executionGuarded"
+            data-testid="technician-visit-check-in"
+            @click="checkIn"
+          >{{ visitActionBusy ? '处理中…' : '主动定位并签到' }}</button>
+
+          <form v-if="activeVisit" class="interrupt-form" data-testid="technician-visit-interrupt-form" @submit.prevent="interrupt">
+            <label>无法施工原因
+              <select v-model="interruptCode" data-testid="technician-visit-interrupt-code">
+                <option value="SITE_UNSAFE">现场不安全</option>
+                <option value="MATERIAL_MISSING">物料缺失</option>
+              </select>
+            </label>
+            <label>说明（可选）
+              <textarea v-model="interruptNote" maxlength="500" data-testid="technician-visit-interrupt-note" />
+            </label>
+            <button type="submit" :disabled="visitActionBusy" data-testid="technician-visit-interrupt">
+              {{ visitActionBusy ? '处理中…' : '确认无法施工' }}
+            </button>
+          </form>
+          <p v-if="activeVisit" class="hint" data-testid="technician-visit-checkout-boundary">
+            签退必须引用已完成现场操作；动态表单/资料尚未接入前，不会生成占位 operationRefs 或伪造完成。
+          </p>
+          <p v-if="visitActionMessage" class="action-message" role="status" data-testid="technician-visit-action-message">
+            {{ visitActionMessage }}
+          </p>
+        </div>
       </section>
 
       <section class="contacts">
@@ -187,6 +314,30 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
 }
 .error {
   color: #a11;
+}
+.visit-actions {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+.interrupt-form {
+  display: grid;
+  gap: 0.75rem;
+}
+.interrupt-form label {
+  display: grid;
+  gap: 0.25rem;
+}
+.interrupt-form select,
+.interrupt-form textarea {
+  min-height: 44px;
+  font: inherit;
+}
+.action-message {
+  color: #155e3b;
+  font-weight: 600;
 }
 .summary {
   display: grid;

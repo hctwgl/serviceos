@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-18
-baselineCommit: 6a411aa4e0b9857a306421c157bf2c1e164815a6
-latestMilestone: M261
+baselineCommit: b067af8dfe7697ce1100b25480ae80a9bfc44ba1
+latestMilestone: M262
 ---
 
 # ServiceOS 实施状态总览
@@ -39,13 +39,13 @@ latestMilestone: M261
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M261 Technician iOS 签名与分发就绪基础 |
-| 基线提交 | `6a411aa4e0b9857a306421c157bf2c1e164815a6` |
+| 最新实施里程碑 | M262 Technician 在线 Visit 交付批次 |
+| 基线提交 | `b067af8dfe7697ce1100b25480ae80a9bfc44ba1` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
-| 当前可构建工程 | `serviceos-backend`、`serviceos-contracts`、`@serviceos/web-core`、`ServiceOSIOSCore`、独立且可部署的 `serviceos-network-web` 与 `serviceos-technician-web`、Swift 6 `TechnicianIOSFoundation`，以及已在 iPhone 17 Pro Simulator 安装启动、实跑 XCTest/XCUITest，并形成 Production arm64 archive/dSYM 的原生 `TechnicianIOS` SwiftUI App；由同一 Core OpenAPI 生成并经独立消费者门禁验证的 `@serviceos/core-client` 与 `ServiceOSCoreClient` |
-| 前端工程 | `serviceos-admin-web` 独立承载总部运营、统一用户中心、`/me` 导航、SavedView、UI Preference、受控搜索与最近访问；M256 后 Network 正式产品由独立 `serviceos-network-web` 承载，M257 后 Technician Feed/Schedule/Sync/Me/Task Detail 由独立移动优先 `serviceos-technician-web` 承载，Admin 仅保留可配置外链和 M188 诊断；两套独立 Web 均实际接入 `@serviceos/web-core`、OIDC PKCE、服务端 Context/Capability/导航、Playwright 回归和独立容器镜像 |
+| 当前可构建工程 | `serviceos-backend`、`serviceos-contracts`、`@serviceos/web-core`、`ServiceOSIOSCore`、独立且可部署的 `serviceos-network-web` 与 `serviceos-technician-web`、Swift 6 `TechnicianIOSFoundation`，以及已在 iPhone 17 Pro Simulator 安装启动、实跑 XCTest/XCUITest、形成 Production arm64 archive/dSYM，并接入当前任务与在线 Visit 的原生 `TechnicianIOS` SwiftUI App；由同一 Core OpenAPI 生成并经独立消费者门禁验证的 `@serviceos/core-client` 与 `ServiceOSCoreClient` |
+| 前端工程 | `serviceos-admin-web` 独立承载总部运营、统一用户中心、`/me` 导航、SavedView、UI Preference、受控搜索与最近访问；M256 后 Network 正式产品由独立 `serviceos-network-web` 承载，M257 后 Technician Feed/Schedule/Sync/Me/Task Detail 由独立移动优先 `serviceos-technician-web` 承载，M262 增加一次性浏览器定位签到与中断；Admin 仅保留可配置外链和 M188 诊断；两套独立 Web 均实际接入 `@serviceos/web-core`、OIDC PKCE、服务端 Context/Capability/导航、Playwright 回归和独立容器镜像 |
 | 数据库 | PostgreSQL + Flyway（当前版本 100 / 102） |
-| 契约 | Core OpenAPI 1.0.21 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、recovered/resolved 与 SLA started/breached/met@v1） |
+| 契约 | Core OpenAPI 1.0.22 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、recovered/resolved 与 SLA started/breached/met@v1） |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -105,7 +105,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | Network Portal 目录页师傅 fan-in | 工单/任务目录 displayName + 工作台基数深链 | `IMPLEMENTED` | UI-only：目录师傅名/既有列、工作台 ACTIVE 基数深链、详情残余深链；OpenAPI 仍 1.0.0；catalog 仍 v16；Flyway 仍 100/102 | 列表预约 N+1、SLA/Visit/表单、PII、notifications | M217 |
 | Technician Portal Feed 字段展示 | Feed/日程/同步摘要 Accepted 字段 UI | `IMPLEMENTED` | UI-only：展示 M195 既有非 PII 字段 + 门户内深链/taskId 水合/sinceCursor；OpenAPI 仍 1.0.0；catalog 仍 v16；Flyway 仍 100/102 | 离线工作包、TASK.DETAIL、MESSAGE、PII | M218 |
 | Technician Portal ME 页壳 | TECHNICIAN.ME 消费 /me* | `IMPLEMENTED` | UI-only：`/technician-portal/me` + listMeCapabilities；修正 ME 别名；OpenAPI 仍 1.0.0；catalog 仍 v16；Flyway 仍 100/102 | PROFILE/TASK.DETAIL/MESSAGE、离线、PII | M219 |
-| Technician Portal 当前责任任务详情 | ACTIVE 当前师傅任务在线非 PII 详情与协作历史 | `IMPLEMENTED` | 当前责任门禁；Task/预约/联系/Visit 安全摘要；project `form.read` 软门禁的表单提交校验摘要；Feed 深链；OpenAPI 1.0.20；Flyway 100/102 | 联系/Visit/表单写；Evidence、整改；离线工作包、GPS/设备明细、MESSAGE/PROFILE、PII | M243～M246 |
+| Technician Portal 当前责任任务详情 | ACTIVE 当前师傅任务在线非 PII 详情与协作历史 | `IMPLEMENTED` | 当前责任门禁；Task/预约/联系/Visit 安全摘要；project `form.read` 软门禁的表单提交校验摘要；Feed 深链；M262 H5/iOS 在线签到与中断；OpenAPI 1.0.22；Flyway 100/102 | 联系/预约写；动态表单/Evidence/真实 operationRefs 签退/整改；离线工作包、MESSAGE/PROFILE、PII | M243～M246、M262 |
 | Network Portal 队列字段展示 | 整改/异常/资质/师傅列表 Accepted 字段 | `IMPLEMENTED` | UI-only：四列表 + 任务目录既有列 + handlingTaskId 深链；OpenAPI 仍 1.0.0；catalog 仍 v16；Flyway 仍 100/102 | ACK/decide、Admin Review 深链、SLA/Visit/表单、notifications | M220 |
 | Network Portal 工作区 SLA 摘要 | 限定工单工作区薄 SLA 计数 | `IMPLEMENTED` | 扩展 workspace 可选 `slaSummary`；NETWORK `sla.read` soft-gate；按 ACTIVE taskIds 计 open/breached；OpenAPI 1.0.1；catalog 仍 v16；Flyway 仍 100/102；Admin Web + IT/E2E | Visit/表单摘要（已由 M222 交付）、Admin workspace 复用、PII、SLA 详情 | M221 |
 | Network Portal 工作区 Visit/表单 | 限定工单工作区 Visit/表单提交摘要 | `IMPLEMENTED` | 扩展 workspace 可选 `visits`/`formSubmissions`；NETWORK `visit.read`/`form.read` soft-gate；复用 Admin 摘要字段集；OpenAPI 1.0.2；catalog 仍 v16；Flyway 仍 100/102；Admin Web + IT/E2E | definition/values、Evidence 摘要、Admin workspace 复用、独立 NP 列表 API | M222 |
@@ -138,7 +138,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | Network Portal 预约协作 | 网点协作写命令（预约） | `IMPLEMENTED` | propose/confirm/list；`networkPortal.manageAppointment`；拒绝 TECHNICIAN 确认伪装；委托 AppointmentService；Admin Web 表单 | 资料补传（爽约/联系见 M199） | M197 |
 | Network Portal 预约生命周期 | 网点协作写命令（改约/取消） | `IMPLEMENTED` | reschedule/cancel；复用 `networkPortal.manageAppointment`；If-Match；委托 AppointmentService；Admin Web 动作 | 资料补传（爽约/联系见 M199） | M198 |
 | Network Portal 爽约与联系 | 网点协作写命令（爽约/联系） | `IMPLEMENTED` | mark-no-show + contact-attempts list/record；复用 `networkPortal.manageAppointment`；委托 AppointmentService；Admin Web 动作 | 资料补传、Visit（改派见 M200） | M199 |
-| Technician Portal Feed | 师傅任务 Feed / 日程 / 同步摘要 / 我的 / 当前任务详情 | `IMPLEMENTED` | API-06 §11 子集；`X-Technician-Context`；本人 ACTIVE TECHNICIAN assignment Feed；tombstone；schedule；sync-summary；Admin Web `/technician-portal/*`；**M218 Accepted 字段展示**；**M219 TECHNICIAN.ME /me 页壳**；**M243 当前责任任务在线详情**；**M244～M246 联系/Visit/表单提交安全摘要** | 离线工作包、mobile sync commands、完整 Technician App、MESSAGE、PROFILE、在线履约写命令 | M195、M218、M219、M243～M246 |
+| Technician Portal Feed | 师傅任务 Feed / 日程 / 同步摘要 / 我的 / 当前任务详情 | `IMPLEMENTED` | API-06 §11 子集；`X-Technician-Context`；本人 ACTIVE TECHNICIAN assignment Feed；tombstone；schedule；sync-summary；独立 H5/iOS；M218/M219/M243～M246 只读详情；M262 在线 Visit 签到/中断 | 离线工作包、mobile sync commands、MESSAGE、PROFILE、联系/预约/表单/Evidence/整改写闭环 | M195、M218、M219、M243～M246、M257～M262 |
 | Consumer Identity | CustomerProfile、用户资源关系和 C 端身份 | `ACCEPTED` | Principal/IdentityLink/API Schema 已预留 Consumer Persona | 身份治理序列之后的独立 Epic；待登录、隐私、客户主数据与注销策略确认；不得宣称已实现 | 后续正式 Epic |
 | 项目治理 | Project 核心事实、范围关系与授权目录 | `PARTIAL` | 项目创建；REGION/NETWORK 当前关系整组修订和不可变历史；`project.read` 授权目录、详情及历史查询 | owners、品牌/服务产品/配置绑定、生命周期、计划修订审批、目录治理 UI | M8、M64～M67 |
 | 可靠消息 | Inbox、Outbox、Worker claim/lease/retry | `IMPLEMENTED` | 本地可靠发布消费、恢复和人工接管基础 | 正式 Broker 和跨服务运行 | M9～M10 |
@@ -151,7 +151,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | 服务分配 | 网点分配、容量、改派 Saga、超时恢复 | `IMPLEMENTED` | ServiceAssignment、容量权威、改派、终止、对账和自动恢复 | 完整策略评分、全部异常分支和 UI | M24～M28 |
 | 运营异常 | 异常工作台基础 | `PARTIAL` | 异常记录和恢复入口；M58 将外发 UNKNOWN 与 Task 最终人工事件汇入 OperationalException + HUMAN Task；M59 提供高风险人工重发事实；M60 在严格 ACK 后幂等闭环对应异常并处理事件乱序；列表/详情/确认已硬化为实时项目范围 | 人工标记已送达/放弃、其他异常类型自动闭环、完整通知、运营中心前端和跨域异常目录 | M29、M58～M60、M100 |
 | 预约 | 预约修订、联系终态动作 | `PARTIAL` | Revision、并发和终态动作基础；公开事件已并入工单时间线；Admin propose/confirm E2E；`GET /contact-attempts/{id}` 与详情页；Network Portal propose/confirm（M197）；reschedule/cancel（M198）；mark-no-show/contact（M199） | 用户确认渠道、完整日程、资料 Network 写 | M30～M31、M74、M136、M160、M197～M199 |
-| 现场作业 | Visit 生命周期 | `PARTIAL` | Visit 运行时基础；签到/签退/中断事件已并入工单时间线；Admin check-in/check-out E2E；`GET /visits/{id}` 与详情页 | GPS 策略增强、完整现场提交、离线同步和师傅端 | M32、M74、M136、M159 |
+| 现场作业 | Visit 生命周期 | `PARTIAL` | Visit 运行时基础；签到/签退/中断事件已并入工单时间线；Admin check-in/check-out E2E；`GET /visits/{id}` 与详情页；M262 Technician Context/当前责任双校验、H5/iOS 一次性定位签到与中断 | GPS 策略增强、真实 operationRefs 签退、完整现场提交、离线同步、真机定位 | M32、M74、M136、M159、M262 |
 | 动态表单 | 资产、冻结版本、不可变提交和 Task 完成门禁 | `PARTIAL` | 固定/条件 required、visible 与布尔 validation rule，基础类型校验、精确版本提交和完成引用；form.submitted 已并入工单时间线 | 复杂 validator、计算字段、草稿、冲突、更正和审核 | M33～M35、M53、M76 |
 | 资料 Evidence | 资产、槽位、Item/Revision、机器校验、Snapshot、完成门禁、作废、Review、Correction | `PARTIAL` | 固定/条件槽位、VALIDATED 表单触发只追加重解析、槽位世代/lineage、REVIEW_REQUIRED 与显式 KEEP/INVALIDATE（处置已并入工单时间线）、安全文件联动、Snapshot/完成门禁及审核整改链路 | OCR/CV、GPS 权威距离、长期归档 | M36～M53、M76、M82～M83 |
 | 安全文件 | Begin/Finalize/隔离/扫描/授权下载/作废 | `IMPLEMENTED` | 独立安全文件生命周期；Evidence 编排 Begin/Finalize/Invalidate 联动 | 正式对象存储、专业扫描服务、物理删除 | M11、M38、M46 |
@@ -162,7 +162,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | 对账结算 | 对账、结算、争议与调整 | `PROPOSED` | 已有边界设计 | 正式运行时和页面 | `architecture/16-*` |
 | Admin Portal | 总部运营后台 | `PARTIAL` | M101～M182：队列/任务/SLA/异常/入站/外发/工单/项目目录、工作区、allowed-actions；CI 阻断构建；开发态 Keycloak PKCE；真实只读与写链路 PR 阻断 E2E；M187～M188 用户中心与 `/me` 导航；**M189 个人 SavedView**；**M190 UI Preferences**；**M191 共享 SavedView**；**M192 受控全局搜索**；**M193 最近访问** | 设计系统、共享偏好、正式企业 OIDC/BFF、生产对象存储/专业扫描、评分/硬过滤派单与 ServiceNetwork 生命周期 | M7 设计、M101～M182、M187～M193、Admin 试点基线 |
 | Network Portal | 网点协作端 | `PARTIAL` | M194～M242 已交付 workbench、工单/任务、限定工作区、师傅关系/资质、产能、整改和运营异常等受控读写切片；M256 将全部正式产品页迁入独立 `serviceos-network-web`，接入 OIDC PKCE、`/me` NETWORK 上下文、Capability/服务端导航、跨网点失败关闭、76 项 Playwright 回归与独立容器镜像；Admin 不再承载正式 `/network-portal/*` 路由 | 槽位策略表、完整 product/03 设计系统、评分/容量策略引擎、Portal ACK/resolve/decide、产能申请、notifications/消息页、生产 IdP 与集群发布 | M7 设计、M194～M242、M255～M256 |
-| Technician App / Portal | 师傅移动端与 Feed | `PARTIAL` | M195/M218/M219/M243～M246 只读安全切片；M257 独立移动优先 H5；M258 iOS Foundation；M259 SwiftUI App/Xcode；M260 Simulator XCTest/XCUITest；M261 Production archive/dSYM、AppIcon、隐私清单与真实发布入口 | 本机 0 签名身份/无物理设备；签名真机/真实 IdP/VoiceOver 人工听读/崩溃采集/TestFlight；Track E 在线写闭环；Track F 离线工作包 | M7 设计、M195、M218～M219、M243～M246、M257～M261 |
+| Technician App / Portal | 师傅移动端与 Feed | `PARTIAL` | M195/M218/M219/M243～M246 只读安全切片；M257 独立移动优先 H5；M258～M261 iOS Foundation/App/Simulator/分发基础；M262 H5/iOS 当前任务、一次性定位签到与中断 | 联系/预约、动态表单、Evidence、真实签退与整改在线闭环；Track F 离线；签名真机/真实 IdP/VoiceOver/崩溃采集/TestFlight | M7 设计、M195、M218～M219、M243～M246、M257～M262 |
 | External Portal | 用户/车企受控页面 | `PROPOSED` | 最小边界规划 | 二期页面和工程实现 | M7 设计 |
 
 ## 4. 里程碑历史摘要
@@ -173,7 +173,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M261**。身份治理 M183～M188、Admin 个人/共享 SavedView、Admin UI
+ServiceOS 可靠纵向切片已推进到 **M262**。身份治理 M183～M188、Admin 个人/共享 SavedView、Admin UI
 Preference、受控全局搜索、最近访问、Network Portal 只读查询、Technician Portal Feed、Network Portal
 指派/改派师傅、预约协作/改约取消/爽约与联系尝试、资料代补 onBehalf、整改队列只读、运营异常队列只读、
 师傅关系与资质提交、本网点资质只读列表、师傅关系只读列表（含 terminate version）、工作台能力门控
@@ -191,7 +191,9 @@ Technician H5 迁移边界，迁入 Feed/Schedule/Sync/Me/Task Detail、8 条移
 Admin 正式 Technician 路由；M258 已交付 iOS 仓库内安全 Foundation；M259 已使用完整 Xcode 交付原生
 SwiftUI App、五环境工程、generic Simulator/iPhoneOS 构建和测试 bundle；M260 已在 iPhone 17 Pro
 Simulator 完成安装启动、3 项 App XCTest 和 1 项 Accessibility XXXL XCUITest；M261 已交付 AppIcon、
-PrivacyInfo、Production arm64 archive/dSYM 和真实发布失败关闭入口。当前机器没有有效 Apple 签名身份或物理
+PrivacyInfo、Production arm64 archive/dSYM 和真实发布失败关闭入口；M262 已开始 Track E，交付 H5/iOS 当前
+任务上的在线定位签到与无法施工中断，并以 Technician Context、当前责任和 Capability 双重失败关闭。由于
+ADR-082 尚无权威联系人引用，联系/预约写未实施；由于尚无真实现场操作引用，客户端签退未开放。当前机器没有有效 Apple 签名身份或物理
 iPhone，因此下一批 Track D/G 外部证据仍必须补齐开发团队签名真机、真实 IdP、VoiceOver 人工听读、崩溃
 采集与 TestFlight；不能用 Simulator 本地签名或无签名 archive 替代。Network 独立页壳剩余主要是
 `NETWORK.NOTIFICATION`（notifications 仍 deferred）。

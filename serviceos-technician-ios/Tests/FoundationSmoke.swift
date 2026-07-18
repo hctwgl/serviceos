@@ -35,6 +35,39 @@ actor FakeOIDCTransport: OIDCTokenEndpointTransporting {
     func capturedBodies() -> [String] { bodies }
 }
 
+actor FakeOnlineTransport: ServiceHTTPTransporting {
+    struct Captured: Sendable {
+        let method: String
+        let path: String
+        let context: String?
+        let idempotencyKey: String?
+        let ifMatch: String?
+        let body: String
+    }
+
+    private(set) var requests: [Captured] = []
+
+    func execute(_ request: URLRequest) async throws -> ServiceHTTPResponse {
+        requests.append(.init(
+            method: request.httpMethod ?? "GET",
+            path: request.url!.path,
+            context: request.value(forHTTPHeaderField: "X-Technician-Context"),
+            idempotencyKey: request.value(forHTTPHeaderField: "Idempotency-Key"),
+            ifMatch: request.value(forHTTPHeaderField: "If-Match"),
+            body: String(data: request.httpBody ?? Data(), encoding: .utf8) ?? ""
+        ))
+        let body: String
+        if request.url!.path.hasSuffix("/task-feed") {
+            body = #"{"networkId":"20000000-0000-4000-8000-000000000262","items":[],"nextCursor":null,"asOf":"2026-07-18T10:00:00Z"}"#
+        } else {
+            body = #"{"visitId":"40000000-0000-4000-8000-000000000262","status":"IN_PROGRESS","aggregateVersion":1,"geofenceResult":"WITHIN_GEOFENCE","policyDecision":"ACCEPTED","occurredAt":"2026-07-18T10:00:01Z"}"#
+        }
+        return ServiceHTTPResponse(data: Data(body.utf8), status: 200, diagnostics: .init(headers: [:]))
+    }
+
+    func captured() -> [Captured] { requests }
+}
+
 actor TestOIDCTokenVault: OIDCTokenPersisting {
     private var tokenSet: OIDCTokenSet?
     private let now: Date
@@ -133,5 +166,34 @@ struct FoundationSmoke {
         precondition(redacted["photoPath"] == "<redacted>")
         precondition(GeneratedContractBoundary.apiConfigurationType == ServiceOSCoreClientAPIConfiguration.self)
         precondition(GeneratedContractBoundary.primaryActionColor == "#243B53")
+
+        let onlineTransport = FakeOnlineTransport()
+        let online = TechnicianOnlineService(requestBuilder: builder, transport: onlineTransport)
+        let contextID = "TECHNICIAN|NETWORK|20000000-0000-4000-8000-000000000262"
+        let feed = try await online.taskFeed(contextID: contextID)
+        precondition(feed.items.isEmpty)
+        _ = try await online.checkIn(
+            contextID: contextID,
+            appointmentID: UUID(uuidString: "30000000-0000-4000-8000-000000000262")!,
+            deviceID: "ios-device-262",
+            deviceCommandID: "ios-command-262",
+            location: .init(latitude: 31.2304, longitude: 121.4737, accuracyMeters: 8,
+                            capturedAt: Date(timeIntervalSince1970: 1_800_000_000))
+        )
+        _ = try await online.interrupt(
+            contextID: contextID,
+            visitID: UUID(uuidString: "40000000-0000-4000-8000-000000000262")!,
+            aggregateVersion: 1,
+            exceptionCode: "SITE_UNSAFE",
+            note: "现场存在安全风险"
+        )
+        let onlineRequests = await onlineTransport.captured()
+        precondition(onlineRequests.count == 3)
+        precondition(onlineRequests.allSatisfy { $0.context == contextID })
+        precondition(onlineRequests[1].idempotencyKey == "ios-command-262")
+        precondition(!onlineRequests[1].body.contains("offline"))
+        precondition(!onlineRequests[1].body.contains("receivedAt"))
+        precondition(onlineRequests[2].ifMatch == "\"1\"")
+        precondition(onlineRequests[2].body.contains(#""evidenceRefs":[]"#))
     }
 }

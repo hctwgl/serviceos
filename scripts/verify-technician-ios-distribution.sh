@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# M261 发布就绪性门禁：在没有 Apple 账号材料的机器上也能证明 Production archive 结构、
+# M261/M262 发布就绪性门禁：在没有 Apple 账号材料的机器上也能证明 Production archive 结构、
 # App Store 图标、隐私清单和 dSYM；真实签名仍必须走 archive-technician-ios-release.sh。
 
 repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -29,6 +29,21 @@ jq -e '.images == [{"filename":"AppIcon-1024.png","idiom":"universal","platform"
   "${icon_set}/Contents.json" >/dev/null || { echo "AppIcon Contents.json 不符合单一 1024 图标约束。" >&2; exit 1; }
 [[ "$(plutil -extract NSPrivacyTracking raw -o - "${privacy_manifest}")" == "false" ]] || {
   echo "隐私清单不得声明 tracking。" >&2
+  exit 1
+}
+plutil -convert json -o - "${privacy_manifest}" | jq -e '
+  [.NSPrivacyCollectedDataTypes[] | {
+    type: .NSPrivacyCollectedDataType,
+    linked: .NSPrivacyCollectedDataTypeLinked,
+    tracking: .NSPrivacyCollectedDataTypeTracking,
+    purposes: .NSPrivacyCollectedDataTypePurposes
+  }] == [
+    {type:"NSPrivacyCollectedDataTypePreciseLocation",linked:true,tracking:false,
+     purposes:["NSPrivacyCollectedDataTypePurposeAppFunctionality"]},
+    {type:"NSPrivacyCollectedDataTypeDeviceID",linked:true,tracking:false,
+     purposes:["NSPrivacyCollectedDataTypePurposeAppFunctionality"]}
+  ]' >/dev/null || {
+  echo "隐私清单必须精确声明主动签到使用的位置与设备标识，且仅用于 App 功能、不追踪。" >&2
   exit 1
 }
 rg -q 'ASSETCATALOG_COMPILER_APPICON_NAME[[:space:]]*=[[:space:]]*AppIcon' \
