@@ -21,9 +21,12 @@ import {
   type NetworkPortalContactAttempt,
   type NetworkPortalTaskItem,
   type NetworkPortalTechnicianItem,
+  type NetworkPortalDirectorySlaRiskSummary,
   type NetworkPortalWorkspaceAppointmentSummary,
   type NetworkPortalWorkspaceContactAttemptSummary,
   type NetworkPortalWorkspaceCorrectionCaseSummary,
+  type NetworkPortalWorkspaceEvidenceItemSummary,
+  type NetworkPortalWorkspaceEvidenceSlotSummary,
 } from '../api/networkPortal'
 import { getMe } from '../api/me'
 
@@ -39,6 +42,9 @@ const directoryTechnicians = ref<NetworkPortalTechnicianItem[]>([])
 const directoryAppointments = ref<NetworkPortalWorkspaceAppointmentSummary[] | null>(null)
 const directoryContactAttempts = ref<NetworkPortalWorkspaceContactAttemptSummary[] | null>(null)
 const directoryCorrections = ref<NetworkPortalWorkspaceCorrectionCaseSummary[] | null>(null)
+const directoryEvidenceSlots = ref<NetworkPortalWorkspaceEvidenceSlotSummary[] | null>(null)
+const directoryEvidenceItems = ref<NetworkPortalWorkspaceEvidenceItemSummary[] | null>(null)
+const directorySlaRiskSummaries = ref<NetworkPortalDirectorySlaRiskSummary[] | null>(null)
 const appointments = ref<NetworkPortalAppointment[]>([])
 const contactAttempts = ref<NetworkPortalContactAttempt[]>([])
 const error = ref<string | null>(null)
@@ -100,6 +106,47 @@ function directoryCorrectionLabel(taskId: string) {
   }
   return `${first.status} · ${first.reasonCodes.join(',') || first.correctionCaseId}`
 }
+
+function directoryEvidenceLabel(taskId: string) {
+  if (directoryEvidenceSlots.value === null) {
+    return '—'
+  }
+  const slots = directoryEvidenceSlots.value.filter((row) => row.taskId === taskId)
+  const items = (directoryEvidenceItems.value ?? []).filter((row) => row.taskId === taskId)
+  if (slots.length === 0 && items.length === 0) {
+    return '暂无'
+  }
+  const missing = slots.filter((row) => row.status === 'MISSING').length
+  const openItems = items.filter((row) => row.status === 'OPEN').length
+  const parts: string[] = []
+  if (missing > 0) {
+    parts.push(`MISSING ×${missing}`)
+  }
+  if (openItems > 0) {
+    parts.push(`OPEN项 ×${openItems}`)
+  }
+  if (parts.length === 0) {
+    const first = slots[0]
+    return first ? `${first.status} · ${first.requirementCode}` : `项 ×${items.length}`
+  }
+  return parts.join(' · ')
+}
+
+function directorySlaRiskLabel(taskId: string) {
+  if (directorySlaRiskSummaries.value === null) {
+    return '—'
+  }
+  const matched = directorySlaRiskSummaries.value.find((row) => row.taskId === taskId)
+  if (!matched) {
+    return '暂无'
+  }
+  return `开放 ${matched.openCount} / 超时 ${matched.breachedCount}`
+}
+
+function taskRegionLabel(item: NetworkPortalTaskItem) {
+  const parts = [item.provinceCode, item.cityCode, item.districtCode].filter(Boolean)
+  return parts.length ? parts.join('/') : '—'
+}
 const selectedTaskId = ref('')
 const selectedTechnicianId = ref('')
 const businessType = ref('INSTALLATION')
@@ -160,6 +207,9 @@ async function load() {
     directoryAppointments.value = null
     directoryContactAttempts.value = null
     directoryCorrections.value = null
+    directoryEvidenceSlots.value = null
+    directoryEvidenceItems.value = null
+    directorySlaRiskSummaries.value = null
     appointments.value = []
     contactAttempts.value = []
     error.value = '请选择 NETWORK 上下文'
@@ -175,6 +225,12 @@ async function load() {
       taskPage.contactAttempts !== undefined ? taskPage.contactAttempts : null
     directoryCorrections.value =
       taskPage.corrections !== undefined ? taskPage.corrections : null
+    directoryEvidenceSlots.value =
+      taskPage.evidenceSlots !== undefined ? taskPage.evidenceSlots : null
+    directoryEvidenceItems.value =
+      taskPage.evidenceItems !== undefined ? taskPage.evidenceItems : null
+    directorySlaRiskSummaries.value =
+      taskPage.slaRiskSummaries !== undefined ? taskPage.slaRiskSummaries : null
     if (taskPage.technicians !== undefined) {
       serverDirectoryTechnicians = taskPage.technicians
       directoryTechnicians.value = taskPage.technicians
@@ -208,6 +264,9 @@ async function load() {
     directoryAppointments.value = null
     directoryContactAttempts.value = null
     directoryCorrections.value = null
+    directoryEvidenceSlots.value = null
+    directoryEvidenceItems.value = null
+    directorySlaRiskSummaries.value = null
     error.value = err instanceof Error ? err.message : '任务列表加载失败'
   }
   try {
@@ -256,6 +315,45 @@ async function loadContactAttempts() {
   } catch {
     contactAttempts.value = []
   }
+}
+
+/** M238：当前 revision；用于窗口 / 确认渠道（不渲染 addressRef/note）。 */
+function currentAppointmentRevision(item: NetworkPortalAppointment) {
+  const revisions = item.revisions ?? []
+  return (
+    revisions.find((revision) => revision.revisionNo === item.currentRevisionNo) ??
+    revisions[revisions.length - 1] ??
+    null
+  )
+}
+
+function appointmentHistoryWindowLabel(item: NetworkPortalAppointment) {
+  const revision = currentAppointmentRevision(item)
+  if (!revision?.window) {
+    return '—'
+  }
+  const duration =
+    typeof revision.window.estimatedDurationMinutes === 'number'
+      ? ` · ${revision.window.estimatedDurationMinutes}min`
+      : ''
+  return `${revision.window.start} → ${revision.window.end}（${revision.window.timezone}${duration}）`
+}
+
+function appointmentHistoryChannelLabel(item: NetworkPortalAppointment) {
+  const revision = currentAppointmentRevision(item)
+  return revision?.confirmationChannel ?? '—'
+}
+
+function appointmentHistoryPartyTypeLabel(item: NetworkPortalAppointment) {
+  const revision = currentAppointmentRevision(item)
+  return revision?.confirmedPartyType ?? '—'
+}
+
+function appointmentHistoryAllowedActionsLabel(item: NetworkPortalAppointment) {
+  if (!item.allowedActions?.length) {
+    return '—'
+  }
+  return item.allowedActions.join(', ')
 }
 
 async function submitAssign() {
@@ -642,16 +740,21 @@ watch(selectedTaskId, () => {
           <th>任务</th>
           <th>工单</th>
           <th>项目</th>
+          <th>服务产品</th>
+          <th>区域</th>
           <th>状态</th>
           <th>阶段</th>
           <th>类型</th>
           <th>种类</th>
           <th>业务</th>
+          <th>接收时间</th>
           <th>生效自</th>
           <th>师傅</th>
           <th v-if="directoryAppointments !== null">预约窗口</th>
           <th v-if="directoryContactAttempts !== null">最近联系</th>
+          <th v-if="directoryEvidenceSlots !== null">资料</th>
           <th v-if="directoryCorrections !== null">整改</th>
+          <th v-if="directorySlaRiskSummaries !== null">SLA 风险</th>
         </tr>
       </thead>
       <tbody>
@@ -666,11 +769,14 @@ watch(selectedTaskId, () => {
             </RouterLink>
           </td>
           <td data-testid="task-project-id">{{ item.projectId ?? '—' }}</td>
+          <td data-testid="task-service-product">{{ item.serviceProductCode ?? '—' }}</td>
+          <td data-testid="task-region">{{ taskRegionLabel(item) }}</td>
           <td>{{ item.status ?? '—' }}</td>
           <td data-testid="task-stage-code">{{ item.stageCode ?? '—' }}</td>
           <td>{{ item.taskType ?? '—' }}</td>
           <td data-testid="task-kind">{{ item.taskKind ?? '—' }}</td>
           <td data-testid="task-business-type">{{ item.businessType ?? '—' }}</td>
+          <td data-testid="task-received-at">{{ item.receivedAt ?? '—' }}</td>
           <td data-testid="task-effective-from">{{ item.effectiveFrom ?? '—' }}</td>
           <td data-testid="task-technician-label">{{ technicianLabel(item.technicianId) }}</td>
           <td
@@ -686,10 +792,22 @@ watch(selectedTaskId, () => {
             {{ directoryContactLabel(item.taskId) }}
           </td>
           <td
+            v-if="directoryEvidenceSlots !== null"
+            data-testid="task-evidence-summary"
+          >
+            {{ directoryEvidenceLabel(item.taskId) }}
+          </td>
+          <td
             v-if="directoryCorrections !== null"
             data-testid="task-correction-summary"
           >
             {{ directoryCorrectionLabel(item.taskId) }}
+          </td>
+          <td
+            v-if="directorySlaRiskSummaries !== null"
+            data-testid="task-sla-risk"
+          >
+            {{ directorySlaRiskLabel(item.taskId) }}
           </td>
         </tr>
       </tbody>
@@ -773,6 +891,7 @@ watch(selectedTaskId, () => {
       <p class="hint">
         调用 Network Portal 预约 propose/confirm/reschedule/cancel/mark-no-show 与联系尝试；
         确认方固定为 NETWORK_MEMBER + 当前主体；改约/取消/爽约使用列表 If-Match 版本。
+        历史展示操作者/渠道/范围/时间/allowedActions（product/03 §8）；不渲染 addressRef/note。
       </p>
       <label>
         任务
@@ -881,9 +1000,46 @@ watch(selectedTaskId, () => {
         提议预约
       </button>
       <ul data-testid="network-appointments-list" class="appointments">
-        <li v-for="item in appointments" :key="item.appointmentId">
-          <span>
-            {{ item.appointmentId }} · {{ item.status }} · v{{ item.aggregateVersion }}
+        <li
+          v-for="item in appointments"
+          :key="item.appointmentId"
+          :data-testid="`appointment-history-${item.appointmentId}`"
+        >
+          <span data-testid="appointment-history-summary">
+            {{ item.appointmentId }} · {{ item.type }} · {{ item.status }} · rev
+            {{ item.currentRevisionNo }} · v{{ item.aggregateVersion }}
+            · 操作者
+            <span data-testid="appointment-history-created-by">{{ item.createdBy ?? '—' }}</span>
+            · 渠道
+            <span data-testid="appointment-history-channel">{{
+              appointmentHistoryChannelLabel(item)
+            }}</span>
+            · 确认方类型
+            <span data-testid="appointment-history-party-type">{{
+              appointmentHistoryPartyTypeLabel(item)
+            }}</span>
+            · 窗口
+            <span data-testid="appointment-history-window">{{
+              appointmentHistoryWindowLabel(item)
+            }}</span>
+            · project
+            <span data-testid="appointment-history-project">{{ item.projectId ?? '—' }}</span>
+            · workOrder
+            <span data-testid="appointment-history-work-order">{{ item.workOrderId ?? '—' }}</span>
+            · network
+            <span data-testid="appointment-history-network">{{
+              item.assignedNetworkId ?? '—'
+            }}</span>
+            · technician
+            <span data-testid="appointment-history-technician">{{
+              item.technicianId ?? '—'
+            }}</span>
+            · createdAt
+            <span data-testid="appointment-history-created-at">{{ item.createdAt ?? '—' }}</span>
+            · allowed
+            <span data-testid="appointment-history-allowed-actions">{{
+              appointmentHistoryAllowedActionsLabel(item)
+            }}</span>
           </span>
           <span class="actions">
             <button
@@ -940,7 +1096,10 @@ watch(selectedTaskId, () => {
       @submit.prevent="submitContactAttempt"
     >
       <h3>本网点联系尝试</h3>
-      <p class="hint">调用 Network Portal ContactAttempt；操作者来自 JWT。</p>
+      <p class="hint">
+        调用 Network Portal ContactAttempt；操作者来自 JWT，历史展示 actorId/渠道/范围/时间
+        （product/03 §8）；不渲染 party/note/recording。
+      </p>
       <label>
         渠道
         <input v-model="contactChannel" data-testid="contact-channel" aria-label="contact channel" />
@@ -988,8 +1147,33 @@ watch(selectedTaskId, () => {
         记录联系
       </button>
       <ul data-testid="network-contact-list" class="appointments">
-        <li v-for="item in contactAttempts" :key="item.contactAttemptId">
-          {{ item.contactAttemptId }} · {{ item.resultCode }} · {{ item.channel }}
+        <li
+          v-for="item in contactAttempts"
+          :key="item.contactAttemptId"
+          :data-testid="`contact-history-${item.contactAttemptId}`"
+        >
+          <span data-testid="contact-history-summary">
+            {{ item.contactAttemptId }} · {{ item.resultCode }} · 渠道
+            <span data-testid="contact-history-channel">{{ item.channel }}</span>
+            · 操作者
+            <span data-testid="contact-history-actor">{{ item.actorId }}</span>
+            · project
+            <span data-testid="contact-history-project">{{ item.projectId ?? '—' }}</span>
+            · workOrder
+            <span data-testid="contact-history-work-order">{{ item.workOrderId ?? '—' }}</span>
+            · createdAt
+            <span data-testid="contact-history-created-at">{{ item.createdAt }}</span>
+            <template v-if="item.startedAt || item.endedAt">
+              · 时间
+              <span data-testid="contact-history-window">
+                {{ item.startedAt ?? '—' }} → {{ item.endedAt ?? '—' }}
+              </span>
+            </template>
+            <template v-if="item.nextContactAt">
+              · 下次
+              <span data-testid="contact-history-next">{{ item.nextContactAt }}</span>
+            </template>
+          </span>
         </li>
       </ul>
       <p v-if="contactError" class="error" data-testid="contact-error">{{ contactError }}</p>
