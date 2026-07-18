@@ -378,3 +378,4 @@ Feature gate/authority: if applicable
 | M281 | 标准维修/移机/巡检配置模板（平台中立）+ 架构/运行时同步 + 发布冒烟 | templates + Drift + StandardChargerServiceTemplates IT + `294-m281-*` + `278-m281-*` | 表单/资料完整包、设计器、真实 OEM Bundle 绑定 |
 | M282 | Workflow 配置设计器草稿→校验→发布 API；Flyway V110～V111；OpenAPI 1.0.28 | DraftService + Controller + Designer IT + ArchitectureTest + `295-m282-*` + `279-m282-*` | 可视化画布、FORM/EVIDENCE/SLA 设计器、Diff/审批/灰度 |
 | M283 | FORM/EVIDENCE/SLA 纳入同一设计器 API；OpenAPI 1.0.29 | DraftService 类型扩展 + FormEvidenceSlaDesigner IT + `296-m283-*` + `280-m283-*` | Admin 画布、Diff/审批/灰度、其余资产类型 |
+| M284 | Admin 配置设计器壳：Page Registry v17、JSON 编辑、WORKFLOW 结构预览 | Admin Vue + PortalContext IT + build + Playwright + `297-m284-*` + `281-m284-*` | 拖拽画布、Diff/审批/灰度 |

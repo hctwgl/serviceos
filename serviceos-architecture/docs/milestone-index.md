@@ -292,6 +292,7 @@ title: ServiceOS 里程碑索引
 | M281 | M281 标准维修/移机/巡检配置模板 | [294-m281-standard-charger-service-templates.md](../architecture/294-m281-standard-charger-service-templates.md) | [278-m281-standard-charger-service-templates-acceptance.md](../testing/278-m281-standard-charger-service-templates-acceptance.md) |
 | M282 | M282 Workflow 配置设计器 API（草稿→校验→发布） | [295-m282-workflow-configuration-designer-api.md](../architecture/295-m282-workflow-configuration-designer-api.md) | [279-m282-workflow-configuration-designer-api-acceptance.md](../testing/279-m282-workflow-configuration-designer-api-acceptance.md) |
 | M283 | M283 FORM/EVIDENCE/SLA 配置设计器 API | [296-m283-form-evidence-sla-designer-api.md](../architecture/296-m283-form-evidence-sla-designer-api.md) | [280-m283-form-evidence-sla-designer-api-acceptance.md](../testing/280-m283-form-evidence-sla-designer-api-acceptance.md) |
+| M284 | M284 Admin 配置设计器壳（结构预览 + JSON 编辑） | [297-m284-admin-configuration-designer-shell.md](../architecture/297-m284-admin-configuration-designer-shell.md) | [281-m284-admin-configuration-designer-shell-acceptance.md](../testing/281-m284-admin-configuration-designer-shell-acceptance.md) |
 
 ## 未关联里程碑的文档
 

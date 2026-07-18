@@ -1,0 +1,416 @@
+<script setup lang="ts">
+import { computed, onMounted, ref, watch } from 'vue'
+import {
+  createConfigurationDraft,
+  listConfigurationDrafts,
+  publishConfigurationDraft,
+  updateConfigurationDraft,
+  validateConfigurationDraft,
+  type ConfigurationDraft,
+  type DesignerAssetType,
+} from '../api/configurationDrafts'
+
+const assetType = ref<DesignerAssetType>('WORKFLOW')
+const drafts = ref<ConfigurationDraft[]>([])
+const selected = ref<ConfigurationDraft | null>(null)
+const definitionText = ref('')
+const loading = ref(false)
+const busy = ref(false)
+const error = ref<string | null>(null)
+const message = ref<string | null>(null)
+
+const createKey = ref('platform.designer.demo')
+const createVersion = ref('1.0.0')
+
+const workflowNodes = computed(() => {
+  if (assetType.value !== 'WORKFLOW') {
+    return [] as Array<{ nodeId: string; nodeType: string; name?: string; stageCode?: string }>
+  }
+  try {
+    const parsed = JSON.parse(definitionText.value) as {
+      nodes?: Array<{ nodeId: string; nodeType: string; name?: string; stageCode?: string }>
+    }
+    return parsed.nodes ?? []
+  } catch {
+    return []
+  }
+})
+
+async function refreshList() {
+  loading.value = true
+  error.value = null
+  try {
+    drafts.value = await listConfigurationDrafts(assetType.value)
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '加载草稿失败'
+  } finally {
+    loading.value = false
+  }
+}
+
+function selectDraft(draft: ConfigurationDraft) {
+  selected.value = draft
+  definitionText.value = prettyJson(draft.definitionJson)
+  message.value = null
+  error.value = null
+}
+
+function prettyJson(raw: string): string {
+  try {
+    return JSON.stringify(JSON.parse(raw), null, 2)
+  } catch {
+    return raw
+  }
+}
+
+function defaultDefinition(type: DesignerAssetType): string {
+  if (type === 'WORKFLOW') {
+    return JSON.stringify(
+      {
+        workflowKey: 'platform.designer.demo',
+        semanticVersion: '1.0.0',
+        startNodeId: 'START',
+        nodes: [
+          { nodeId: 'START', nodeType: 'START', name: '开始' },
+          {
+            nodeId: 'TASK_A',
+            nodeType: 'SERVICE_TASK',
+            name: '示例任务',
+            stageCode: 'STAGE_A',
+            taskType: 'DESIGNER_DEMO',
+          },
+          { nodeId: 'END', nodeType: 'END', name: '结束' },
+        ],
+        transitions: [
+          { transitionId: 't1', from: 'START', to: 'TASK_A' },
+          { transitionId: 't2', from: 'TASK_A', to: 'END' },
+        ],
+      },
+      null,
+      2,
+    )
+  }
+  if (type === 'SLA') {
+    return JSON.stringify(
+      {
+        policyKey: 'platform.designer.demo.sla',
+        version: '1.0.0',
+        subjectType: 'TASK',
+        taskTypes: ['DESIGNER_DEMO'],
+        startEvent: 'TASK_CREATED',
+        stopEvent: 'TASK_COMPLETED',
+        clockMode: 'ELAPSED',
+        targetDurationSeconds: 3600,
+      },
+      null,
+      2,
+    )
+  }
+  if (type === 'FORM') {
+    return JSON.stringify(
+      {
+        formKey: 'platform.designer.demo.form',
+        version: '1.0.0',
+        stage: 'SURVEY',
+        sections: [
+          {
+            sectionKey: 'base',
+            title: '基础',
+            fields: [
+              {
+                fieldKey: 'result.value',
+                label: '结果',
+                dataType: 'STRING',
+                binding: 'task.input.result.value',
+              },
+            ],
+          },
+        ],
+      },
+      null,
+      2,
+    )
+  }
+  return JSON.stringify(
+    {
+      templateKey: 'platform.designer.demo.evidence',
+      version: '1.0.0',
+      title: '示例资料',
+      stage: 'SURVEY',
+      items: [
+        {
+          evidenceKey: 'site.panorama',
+          name: '全景图',
+          mediaType: 'PHOTO',
+          required: true,
+          capture: {
+            allowCamera: true,
+            allowGallery: false,
+            requireRealtimeCapture: true,
+            requireGps: true,
+            watermarkFields: ['TIME', 'GPS', 'WORK_ORDER_NO'],
+            minCount: 1,
+            maxCount: 3,
+            maxSizeBytes: 10485760,
+          },
+          qualityChecks: [{ checkType: 'BLUR', severity: 'BLOCK' }],
+          reviewPolicy: { reviewRequired: true, allowItemLevelReject: true },
+        },
+      ],
+    },
+    null,
+    2,
+  )
+}
+
+async function createDraft() {
+  busy.value = true
+  error.value = null
+  message.value = null
+  try {
+    const definitionJson = definitionText.value.trim() || defaultDefinition(assetType.value)
+    const created = await createConfigurationDraft({
+      assetType: assetType.value,
+      assetKey: createKey.value.trim(),
+      intendedSemanticVersion: createVersion.value.trim(),
+      schemaVersion: '1.0.0',
+      definitionJson,
+    })
+    selectDraft(created.data)
+    message.value = '草稿已创建'
+    await refreshList()
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '创建草稿失败'
+  } finally {
+    busy.value = false
+  }
+}
+
+async function saveDraft() {
+  if (!selected.value) return
+  busy.value = true
+  error.value = null
+  message.value = null
+  try {
+    const updated = await updateConfigurationDraft(
+      selected.value.draftId,
+      definitionText.value,
+      selected.value.aggregateVersion,
+    )
+    selectDraft(updated.data)
+    message.value = '草稿已保存'
+    await refreshList()
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '保存失败'
+  } finally {
+    busy.value = false
+  }
+}
+
+async function validateDraft() {
+  if (!selected.value) return
+  busy.value = true
+  error.value = null
+  message.value = null
+  try {
+    if (selected.value.status === 'DRAFT' || selected.value.status === 'VALIDATED') {
+      const updated = await updateConfigurationDraft(
+        selected.value.draftId,
+        definitionText.value,
+        selected.value.aggregateVersion,
+      )
+      selectDraft(updated.data)
+    }
+    const validated = await validateConfigurationDraft(selected.value.draftId)
+    selectDraft(validated.data)
+    message.value = '校验通过'
+    await refreshList()
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '校验失败'
+    await refreshList()
+    if (selected.value) {
+      const latest = drafts.value.find((d) => d.draftId === selected.value?.draftId)
+      if (latest) selectDraft(latest)
+    }
+  } finally {
+    busy.value = false
+  }
+}
+
+async function publishDraft() {
+  if (!selected.value) return
+  busy.value = true
+  error.value = null
+  message.value = null
+  try {
+    const published = await publishConfigurationDraft(selected.value.draftId)
+    selectDraft(published.data)
+    message.value = `已发布版本 ${published.data.publishedVersionId}`
+    await refreshList()
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '发布失败'
+  } finally {
+    busy.value = false
+  }
+}
+
+watch(assetType, async () => {
+  selected.value = null
+  definitionText.value = defaultDefinition(assetType.value)
+  await refreshList()
+})
+
+onMounted(async () => {
+  definitionText.value = defaultDefinition(assetType.value)
+  await refreshList()
+})
+</script>
+
+<template>
+  <section class="designer" data-testid="configuration-designer">
+    <header>
+      <h1>配置设计器</h1>
+      <p>草稿 → 校验 → 发布。设计模型与运行模型同为配置 JSON；WORKFLOW 提供节点结构预览。</p>
+    </header>
+
+    <div class="toolbar">
+      <label>
+        资产类型
+        <select v-model="assetType" data-testid="asset-type">
+          <option value="WORKFLOW">WORKFLOW</option>
+          <option value="FORM">FORM</option>
+          <option value="EVIDENCE">EVIDENCE</option>
+          <option value="SLA">SLA</option>
+        </select>
+      </label>
+      <label>
+        assetKey
+        <input v-model="createKey" data-testid="asset-key" />
+      </label>
+      <label>
+        version
+        <input v-model="createVersion" data-testid="asset-version" />
+      </label>
+      <button type="button" :disabled="busy" data-testid="create-draft" @click="createDraft">新建草稿</button>
+      <button type="button" :disabled="busy || !selected" data-testid="save-draft" @click="saveDraft">保存</button>
+      <button type="button" :disabled="busy || !selected" data-testid="validate-draft" @click="validateDraft">校验</button>
+      <button type="button" :disabled="busy || !selected || selected.status !== 'VALIDATED'" data-testid="publish-draft" @click="publishDraft">发布</button>
+    </div>
+
+    <p v-if="loading">加载中…</p>
+    <p v-if="message" class="ok" data-testid="designer-message">{{ message }}</p>
+    <p v-if="error" class="err" data-testid="designer-error">{{ error }}</p>
+
+    <div class="layout">
+      <aside>
+        <h2>草稿列表</h2>
+        <ul data-testid="draft-list">
+          <li
+            v-for="draft in drafts"
+            :key="draft.draftId"
+            :class="{ active: selected?.draftId === draft.draftId }"
+            @click="selectDraft(draft)"
+          >
+            <strong>{{ draft.assetKey }}</strong>
+            <span>{{ draft.status }} · v{{ draft.intendedSemanticVersion }}</span>
+          </li>
+        </ul>
+      </aside>
+
+      <main>
+        <h2>定义 JSON</h2>
+        <textarea
+          v-model="definitionText"
+          rows="22"
+          data-testid="definition-json"
+          spellcheck="false"
+        />
+        <div v-if="selected" class="meta">
+          <span>状态：{{ selected.status }}</span>
+          <span>版本：{{ selected.aggregateVersion }}</span>
+          <span v-if="selected.publishedVersionId">已发布：{{ selected.publishedVersionId }}</span>
+        </div>
+        <ul v-if="selected?.validationErrors?.length" class="errors" data-testid="validation-errors">
+          <li v-for="(item, index) in selected.validationErrors" :key="index">{{ item }}</li>
+        </ul>
+      </main>
+
+      <aside v-if="assetType === 'WORKFLOW'" class="preview" data-testid="workflow-preview">
+        <h2>节点结构预览</h2>
+        <article v-for="node in workflowNodes" :key="node.nodeId" class="node-card">
+          <strong>{{ node.nodeId }}</strong>
+          <span>{{ node.nodeType }}</span>
+          <span v-if="node.name">{{ node.name }}</span>
+          <span v-if="node.stageCode">stage={{ node.stageCode }}</span>
+        </article>
+        <p v-if="workflowNodes.length === 0" class="muted">无法解析 nodes；请修正 JSON。</p>
+      </aside>
+    </div>
+  </section>
+</template>
+
+<style scoped>
+.designer {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+}
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: end;
+}
+.toolbar label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+}
+.layout {
+  display: grid;
+  grid-template-columns: 16rem 1fr 16rem;
+  gap: 1rem;
+}
+aside ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+aside li {
+  border: 1px solid #d0d7de;
+  border-radius: 0.4rem;
+  padding: 0.5rem;
+  margin-bottom: 0.5rem;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+aside li.active {
+  border-color: #0969da;
+  background: #ddf4ff;
+}
+textarea {
+  width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+}
+.node-card {
+  border: 1px solid #d0d7de;
+  border-radius: 0.4rem;
+  padding: 0.5rem;
+  margin-bottom: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.ok { color: #1a7f37; }
+.err, .errors { color: #cf222e; }
+.muted { color: #656d76; }
+.meta { display: flex; gap: 1rem; font-size: 0.85rem; margin-top: 0.5rem; }
+@media (max-width: 1100px) {
+  .layout { grid-template-columns: 1fr; }
+}
+</style>

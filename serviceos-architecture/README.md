@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M283 FORM/EVIDENCE/SLA 配置设计器 API**，功能证据提交 `79d2b7f453113edacf1d6135ae49110ccb977eac`（合并入 `master` 后改为合并提交）。
+当前工程基线为 **M284 Admin 配置设计器壳**，功能证据提交待回填（合并入 `master` 后改为合并提交）。
 
 当前已具备多 OEM 内核、复杂流程运行时（含取消/重开/跳转/补偿）与标准服务模板族。下一主线是阶段三领域配置设计器。
 
@@ -683,6 +683,8 @@ serviceos-architecture/
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M284 实现文档](architecture/297-m284-admin-configuration-designer-shell.md)
+- [M284 验收矩阵](testing/281-m284-admin-configuration-designer-shell-acceptance.md)
 - [M283 实现文档](architecture/296-m283-form-evidence-sla-designer-api.md)
 - [M283 验收矩阵](testing/280-m283-form-evidence-sla-designer-api-acceptance.md)
 - [M282 实现文档](architecture/295-m282-workflow-configuration-designer-api.md)
