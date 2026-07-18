@@ -20,7 +20,7 @@ lastUpdated: 2026-07-18
 | MOK-07 | EXCLUSIVE_GATEWAY | 唯一 true 出边推进；零/多命中失败关闭 | PASS（M269） |
 | MOK-08 | WAIT_EVENT | 关联键幂等唤醒；重复事件不双推进 | PASS（M270） |
 | MOK-09 | 标准家充安装模板 | 平台 Bundle 模板可发布；不嵌入 OEM DTO | PASS（M271） |
-| MOK-10 | REFERENCE_OEM / 第二家 | 独立 Connector + Bundle；不确定协议 `TBD_EXTERNAL_CONTRACT` | 后续 |
+| MOK-10 | REFERENCE_OEM / 第二家 | 独立 Connector + Bundle；不确定协议 `TBD_EXTERNAL_CONTRACT` | PASS（M272 SAMPLE；真实协议 BLOCKED_EXTERNAL） |
 | MOK-11 | 双车企 E2E | BYD + OEM2 安装链路；重复/冲突/驳回/UNKNOWN/乱序有证据 | 后续 |
 | MOK-12 | 第三家接入手册 | 手册步骤可执行且引用 SPI/配置资产 | 后续 |
 | MOK-13 | 历史工单配置锁定 | 新发布不影响在途工单冻结版本 | 既有 M16+；回归保持 |

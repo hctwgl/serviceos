@@ -272,5 +272,6 @@
 - [M269 EXCLUSIVE_GATEWAY 运行时验收矩阵](266-m269-exclusive-gateway-runtime-acceptance.md)
 - [M270 WAIT_EVENT 运行时验收矩阵](267-m270-wait-event-runtime-acceptance.md)
 - [M271 标准家充勘测安装配置模板验收矩阵](268-m271-home-charging-survey-install-template-acceptance.md)
+- [M272 REFERENCE_OEM SAMPLE Connector 验收矩阵](269-m272-reference-oem-sample-connector-acceptance.md)
 - [多车企平台内核程序级验收矩阵](multi-oem-platform-kernel-program-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

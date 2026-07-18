@@ -280,6 +280,7 @@ title: ServiceOS 里程碑索引
 | M269 | M269 EXCLUSIVE_GATEWAY 运行时 | [282-m269-exclusive-gateway-runtime.md](../architecture/282-m269-exclusive-gateway-runtime.md) | [266-m269-exclusive-gateway-runtime-acceptance.md](../testing/266-m269-exclusive-gateway-runtime-acceptance.md) |
 | M270 | M270 WAIT_EVENT 运行时 | [283-m270-wait-event-runtime.md](../architecture/283-m270-wait-event-runtime.md) | [267-m270-wait-event-runtime-acceptance.md](../testing/267-m270-wait-event-runtime-acceptance.md) |
 | M271 | M271 标准家充勘测安装配置模板 | [284-m271-home-charging-survey-install-template.md](../architecture/284-m271-home-charging-survey-install-template.md) | [268-m271-home-charging-survey-install-template-acceptance.md](../testing/268-m271-home-charging-survey-install-template-acceptance.md) |
+| M272 | M272 REFERENCE_OEM SAMPLE Connector | [285-m272-reference-oem-sample-connector.md](../architecture/285-m272-reference-oem-sample-connector.md) | [269-m272-reference-oem-sample-connector-acceptance.md](../testing/269-m272-reference-oem-sample-connector-acceptance.md) |
 
 ## 未关联里程碑的文档
 

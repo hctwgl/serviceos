@@ -5,22 +5,17 @@ lastUpdated: 2026-07-18
 
 # ServiceOS 自主 Agent 交接
 
-## 当前分支和 HEAD
+## 当前分支 / PR
 
-- 分支：`cursor/bc-71d073b6-2d93-418e-a750-0b73ee12db1c-0a6a`
-- PR：https://github.com/hctwgl/serviceos/pull/146
-- latestMilestone：**M271**（提交后回填 SHA）
+- `cursor/bc-71d073b6-2d93-418e-a750-0b73ee12db1c-0a6a`
+- https://github.com/hctwgl/serviceos/pull/146
+- latestMilestone：**M272**（提交后回填）
 
-## 当前目标
+## 已完成（本轮）
 
-M271 已完成（待提交）。下一目标：**M272 REFERENCE_OEM**。
-
-## 已完成
-
-M267 SPI → M268 配置治理 → M269 EXCLUSIVE_GATEWAY → M270 WAIT_EVENT → M271 标准家充模板
+M267→M272：SPI、配置治理、EXCLUSIVE_GATEWAY、WAIT_EVENT、标准家充模板、REFERENCE_OEM SAMPLE
 
 ## 下一步
 
-1. `integration.referenceoem` SAMPLE/REFERENCE 适配器实现 SPI
-2. 独立 Bundle + 标记 `TBD_EXTERNAL_CONTRACT`
-3. `285-m272-*` / `269-m272-*`
+1. M273 双车企端到端回归（BYD + REFERENCE_OEM + 独立 Bundle）
+2. M274 第三家接入手册

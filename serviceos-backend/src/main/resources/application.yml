@@ -154,6 +154,12 @@ serviceos:
         credential-version-id: ${SERVICEOS_BYD_CPIM_CREDENTIAL_VERSION_ID:}
         connect-timeout: ${SERVICEOS_BYD_CPIM_CONNECT_TIMEOUT:PT5S}
         request-timeout: ${SERVICEOS_BYD_CPIM_REQUEST_TIMEOUT:PT15S}
+    # REFERENCE / SAMPLE 第二家车企演示配置；非生产协议（TBD_EXTERNAL_CONTRACT）。
+    reference-oem:
+      app-key: ${SERVICEOS_REFERENCE_OEM_APP_KEY:local-reference-oem-key}
+      app-secret: ${SERVICEOS_REFERENCE_OEM_APP_SECRET:local-reference-oem-secret-change-me}
+      tenant-id: ${SERVICEOS_REFERENCE_OEM_TENANT_ID:tenant-reference-oem-pilot}
+      project-code: ${SERVICEOS_REFERENCE_OEM_PROJECT_CODE:REFERENCE-OEM-PILOT}
   files:
     # 参考工程默认使用私有本地沙箱；生产部署必须切换为受管对象存储适配器和专业扫描服务。
     storage: ${SERVICEOS_FILE_STORAGE:local-private}
