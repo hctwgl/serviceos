@@ -191,14 +191,20 @@ final class JdbcConfigurationService implements ConfigurationService {
                     "project is missing, inactive, or outside its validity window");
         }
 
-        // M286/M288：通道激活优先；preferCanary 强制 CANARY；否则按 trafficPercent 哈希分流。
-        ChannelBundle canary = resolveActiveChannel(query, project.projectId(), "CANARY");
-        ChannelBundle stable = resolveActiveChannel(query, project.projectId(), "STABLE");
-        if (query.preferCanary() && canary != null) {
-            return canary.reference();
+        // M286/M288/M290：多槽位 CANARY 累计分流；preferCanary 取 primary 或首个槽位。
+        List<ChannelBundle> canaries = resolveActiveChannels(query, project.projectId(), "CANARY");
+        ChannelBundle stable = resolveActiveChannels(query, project.projectId(), "STABLE").stream()
+                .findFirst().orElse(null);
+        if (query.preferCanary() && !canaries.isEmpty()) {
+            ChannelBundle forced = canaries.stream()
+                    .filter(item -> "primary".equals(item.slotCode()))
+                    .findFirst()
+                    .orElse(canaries.getFirst());
+            return forced.reference();
         }
-        if (canary != null && canary.trafficPercent() > 0 && selectCanaryBucket(query, canary.trafficPercent())) {
-            return canary.reference();
+        ChannelBundle selectedCanary = selectCanaryByTraffic(query, canaries);
+        if (selectedCanary != null) {
+            return selectedCanary.reference();
         }
         if (stable != null) {
             return stable.reference();
@@ -250,7 +256,7 @@ final class JdbcConfigurationService implements ConfigurationService {
         return preferred.getFirst().reference();
     }
 
-    private ChannelBundle resolveActiveChannel(
+    private List<ChannelBundle> resolveActiveChannels(
             ResolveConfigurationBundleQuery query,
             UUID projectId,
             String channel
@@ -258,7 +264,7 @@ final class JdbcConfigurationService implements ConfigurationService {
         // 通道激活是项目级发布指针：命中后不再做 province/时间窗扫描，避免与兼容扫描的互斥生效窗冲突。
         return jdbc.sql("""
                         SELECT b.bundle_id, b.project_id, b.bundle_code, b.bundle_version, b.manifest_digest,
-                               a.traffic_percent
+                               a.traffic_percent, a.slot_code
                           FROM cfg_bundle_channel_activation a
                           JOIN cfg_configuration_bundle b
                             ON b.tenant_id = a.tenant_id AND b.bundle_id = a.bundle_id
@@ -269,6 +275,7 @@ final class JdbcConfigurationService implements ConfigurationService {
                            AND b.status = 'PUBLISHED'
                            AND b.brand_code = :brandCode
                            AND b.service_product_code = :serviceProductCode
+                         ORDER BY a.slot_code
                         """)
                 .param("tenantId", query.tenantId())
                 .param("projectId", projectId)
@@ -282,27 +289,42 @@ final class JdbcConfigurationService implements ConfigurationService {
                                 rs.getString("bundle_code"),
                                 rs.getString("bundle_version"),
                                 rs.getString("manifest_digest")),
-                        rs.getInt("traffic_percent")))
-                .optional()
-                .orElse(null);
+                        rs.getInt("traffic_percent"),
+                        rs.getString("slot_code")))
+                .list();
     }
 
-    private static boolean selectCanaryBucket(ResolveConfigurationBundleQuery query, int trafficPercent) {
-        if (trafficPercent >= 100) {
-            return true;
+    private static ChannelBundle selectCanaryByTraffic(
+            ResolveConfigurationBundleQuery query,
+            List<ChannelBundle> canaries
+    ) {
+        if (canaries.isEmpty()) {
+            return null;
         }
-        if (trafficPercent <= 0) {
-            return false;
+        int total = canaries.stream().mapToInt(ChannelBundle::trafficPercent).sum();
+        if (total <= 0) {
+            return null;
         }
         String key = query.canaryRoutingKey() != null
                 ? query.canaryRoutingKey()
                 : String.join("|", query.tenantId(), query.projectCode(), query.brandCode(),
                 query.serviceProductCode(), query.provinceCode());
         int bucket = Math.floorMod(Sha256.digest(key).hashCode(), 100);
-        return bucket < trafficPercent;
+        int cursor = 0;
+        for (ChannelBundle canary : canaries) {
+            cursor += canary.trafficPercent();
+            if (bucket < cursor) {
+                return canary;
+            }
+        }
+        return null;
     }
 
-    private record ChannelBundle(ConfigurationBundleReference reference, int trafficPercent) {
+    private record ChannelBundle(
+            ConfigurationBundleReference reference,
+            int trafficPercent,
+            String slotCode
+    ) {
     }
 
     @Override

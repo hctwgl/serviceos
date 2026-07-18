@@ -290,5 +290,6 @@
 - [M287 Workflow 可视化拖拽画布验收矩阵](284-m287-workflow-visual-canvas-acceptance.md)
 - [M288 CANARY 百分比流量灰度验收矩阵](285-m288-percentage-canary-traffic-acceptance.md)
 - [M289 Workflow 画布建边与条件编辑验收矩阵](286-m289-workflow-canvas-edges-conditions-acceptance.md)
+- [M290 多槽位 CANARY 与满量自动晋级验收矩阵](287-m290-multi-slot-canary-auto-promote-acceptance.md)
 - [多车企平台内核程序级验收矩阵](multi-oem-platform-kernel-program-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

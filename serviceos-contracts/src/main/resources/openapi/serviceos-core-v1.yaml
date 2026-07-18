@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.32
+  version: 1.0.33
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -5189,6 +5189,37 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /configuration/bundle-activations/{activationId}:adjust-traffic:
+    post:
+      operationId: adjustCanaryTraffic
+      summary: 调整 ACTIVE CANARY 槽位流量
+      description: 可设 autoPromoteWhenFull；调至 100% 时自动晋级并停用其它 CANARY 槽位。
+      parameters:
+        - name: activationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdjustCanaryTrafficRequest' }
+      responses:
+        '200':
+          description: 调整后的激活（或晋级后的 STABLE）
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BundleChannelActivation' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
   /configuration/bundle-activations/{activationId}:promote:
     post:
       operationId: promoteCanaryBundleActivation
@@ -5463,6 +5494,20 @@ components:
           minimum: 0
           maximum: 100
           description: CANARY 分流百分比；省略时 CANARY 默认 0，STABLE 固定 100。
+        slotCode:
+          type: [string, 'null']
+          pattern: '^[a-z][a-z0-9_-]{0,63}$'
+          description: CANARY 槽位名；STABLE 固定 primary。
+        autoPromoteWhenFull:
+          type: [boolean, 'null']
+          description: CANARY 以 100% 激活时是否立即晋级 STABLE。
+    AdjustCanaryTrafficRequest:
+      type: object
+      additionalProperties: false
+      required: [trafficPercent]
+      properties:
+        trafficPercent: { type: integer, minimum: 0, maximum: 100 }
+        autoPromoteWhenFull: { type: [boolean, 'null'] }
     BundleActivationApprovalRequest:
       type: object
       additionalProperties: false
@@ -5472,12 +5517,13 @@ components:
     BundleChannelActivation:
       type: object
       additionalProperties: false
-      required: [activationId, projectId, channel, bundleId, bundleCode, bundleVersion,
+      required: [activationId, projectId, channel, slotCode, bundleId, bundleCode, bundleVersion,
                  status, approvalRef, trafficPercent, activatedBy, activatedAt, aggregateVersion]
       properties:
         activationId: { type: string, format: uuid }
         projectId: { type: string, format: uuid }
         channel: { type: string, enum: [STABLE, CANARY] }
+        slotCode: { type: string }
         bundleId: { type: string, format: uuid }
         bundleCode: { type: string }
         bundleVersion: { type: string }

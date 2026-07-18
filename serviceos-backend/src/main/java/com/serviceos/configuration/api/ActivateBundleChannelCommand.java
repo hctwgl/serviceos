@@ -7,7 +7,9 @@ public record ActivateBundleChannelCommand(
         BundleChannel channel,
         UUID bundleId,
         String approvalRef,
-        Integer trafficPercent
+        Integer trafficPercent,
+        String slotCode,
+        boolean autoPromoteWhenFull
 ) {
     public ActivateBundleChannelCommand(
             UUID projectId,
@@ -15,6 +17,16 @@ public record ActivateBundleChannelCommand(
             UUID bundleId,
             String approvalRef
     ) {
-        this(projectId, channel, bundleId, approvalRef, null);
+        this(projectId, channel, bundleId, approvalRef, null, null, false);
+    }
+
+    public ActivateBundleChannelCommand(
+            UUID projectId,
+            BundleChannel channel,
+            UUID bundleId,
+            String approvalRef,
+            Integer trafficPercent
+    ) {
+        this(projectId, channel, bundleId, approvalRef, trafficPercent, null, false);
     }
 }

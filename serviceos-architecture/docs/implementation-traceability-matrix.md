@@ -384,3 +384,4 @@ Feature gate/authority: if applicable
 | M287 | Admin Workflow 可视化拖拽画布；布局 metadata.layout | WorkflowCanvas + Designer + Playwright + build + `300-m287-*` + `284-m287-*` | 画布建边、条件编辑、百分比灰度 |
 | M288 | CANARY trafficPercent 哈希分流；preferCanary 强制；OpenAPI 1.0.32；Flyway V116 | resolve + Activation + PercentageCanary IT + `301-m288-*` + `285-m288-*` | 多 CANARY、动态调比例 UI、自动晋级 |
 | M289 | Workflow 画布建边/删边与 EXCLUSIVE_GATEWAY 条件编辑 | WorkflowCanvas + Playwright + build + `302-m289-*` + `286-m289-*` | 条件积木、并行网关向导、自动晋级 |
+| M290 | 多槽位 CANARY、流量预算、adjust-traffic 满量自动晋级；OpenAPI 1.0.33；Flyway V117 | ActivationService + MultiSlot IT + `303-m290-*` + `287-m290-*` | 指标驱动晋级、区域槽位 UI |

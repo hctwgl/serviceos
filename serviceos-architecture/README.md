@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M289 Workflow 画布建边与条件编辑**，功能证据提交 `e5b050e7bd665b656c1bfa81a06466cb5ee0a4f7`（合并入 `master` 后改为合并提交）。
+当前工程基线为 **M290 多槽位 CANARY 与满量自动晋级**，功能证据提交待回填（合并入 `master` 后改为合并提交）。
 
 当前已具备多 OEM 内核、复杂流程运行时（含取消/重开/跳转/补偿）与标准服务模板族。下一主线是阶段三领域配置设计器。
 
@@ -683,6 +683,8 @@ serviceos-architecture/
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M290 实现文档](architecture/303-m290-multi-slot-canary-auto-promote.md)
+- [M290 验收矩阵](testing/287-m290-multi-slot-canary-auto-promote-acceptance.md)
 - [M289 实现文档](architecture/302-m289-workflow-canvas-edges-conditions.md)
 - [M289 验收矩阵](testing/286-m289-workflow-canvas-edges-conditions-acceptance.md)
 - [M288 实现文档](architecture/301-m288-percentage-canary-traffic.md)

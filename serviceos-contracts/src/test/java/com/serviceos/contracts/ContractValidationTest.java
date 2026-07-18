@@ -67,6 +67,7 @@ class ContractValidationTest {
                         "/configuration/drafts/{draftId}:approve",
                         "/configuration/drafts/{draftId}:publish",
                         "/configuration/bundle-activations",
+                        "/configuration/bundle-activations/{activationId}:adjust-traffic",
                         "/configuration/bundle-activations/{activationId}:promote",
                         "/configuration/bundle-activations/{activationId}:rollback");
     }

@@ -7,6 +7,7 @@ public record BundleChannelActivationView(
         UUID activationId,
         UUID projectId,
         BundleChannel channel,
+        String slotCode,
         UUID bundleId,
         String bundleCode,
         String bundleVersion,

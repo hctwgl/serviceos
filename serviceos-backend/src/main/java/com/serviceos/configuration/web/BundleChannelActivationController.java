@@ -1,6 +1,7 @@
 package com.serviceos.configuration.web;
 
 import com.serviceos.configuration.api.ActivateBundleChannelCommand;
+import com.serviceos.configuration.api.AdjustCanaryTrafficCommand;
 import com.serviceos.configuration.api.BundleChannel;
 import com.serviceos.configuration.api.BundleChannelActivationService;
 import com.serviceos.configuration.api.BundleChannelActivationView;
@@ -22,7 +23,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-/** Bundle 灰度通道激活 / 晋级 / 回滚协议适配。 */
+/** Bundle 灰度通道激活 / 流量调整 / 晋级 / 回滚协议适配。 */
 @RestController
 @RequestMapping("/api/v1/configuration/bundle-activations")
 final class BundleChannelActivationController {
@@ -61,7 +62,28 @@ final class BundleChannelActivationController {
                         BundleChannel.valueOf(request.channel()),
                         request.bundleId(),
                         request.approvalRef(),
-                        request.trafficPercent()));
+                        request.trafficPercent(),
+                        request.slotCode(),
+                        Boolean.TRUE.equals(request.autoPromoteWhenFull())));
+        return ok(view, correlationId);
+    }
+
+    @PostMapping("/{activationId}:adjust-traffic")
+    ResponseEntity<ActivationResponse> adjustTraffic(
+            @PathVariable UUID activationId,
+            @RequestHeader("If-Match") String ifMatch,
+            @RequestBody AdjustTrafficRequest request,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        BundleChannelActivationView view = activations.adjustCanaryTraffic(
+                principals.current(),
+                new CommandMetadata(correlationId, idempotencyKey == null ? correlationId : idempotencyKey),
+                new AdjustCanaryTrafficCommand(
+                        activationId,
+                        version(ifMatch),
+                        request.trafficPercent(),
+                        Boolean.TRUE.equals(request.autoPromoteWhenFull())));
         return ok(view, correlationId);
     }
 
@@ -107,10 +129,18 @@ final class BundleChannelActivationController {
 
     private static ActivationResponse toResponse(BundleChannelActivationView view) {
         return new ActivationResponse(
-                view.activationId(), view.projectId(), view.channel().name(), view.bundleId(),
-                view.bundleCode(), view.bundleVersion(), view.previousActivationId(), view.status(),
-                view.approvalRef(), view.trafficPercent(), view.activatedBy(), view.activatedAt(),
-                view.supersededAt(), view.aggregateVersion());
+                view.activationId(), view.projectId(), view.channel().name(), view.slotCode(),
+                view.bundleId(), view.bundleCode(), view.bundleVersion(), view.previousActivationId(),
+                view.status(), view.approvalRef(), view.trafficPercent(), view.activatedBy(),
+                view.activatedAt(), view.supersededAt(), view.aggregateVersion());
+    }
+
+    private static long version(String ifMatch) {
+        try {
+            return Long.parseLong(ifMatch.replace("\"", "").trim());
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException("If-Match aggregate version is invalid");
+        }
     }
 
     record ActivateRequest(
@@ -118,8 +148,13 @@ final class BundleChannelActivationController {
             String channel,
             UUID bundleId,
             String approvalRef,
-            Integer trafficPercent
+            Integer trafficPercent,
+            String slotCode,
+            Boolean autoPromoteWhenFull
     ) {
+    }
+
+    record AdjustTrafficRequest(int trafficPercent, Boolean autoPromoteWhenFull) {
     }
 
     record ApprovalRequest(String approvalRef) {
@@ -129,6 +164,7 @@ final class BundleChannelActivationController {
             UUID activationId,
             UUID projectId,
             String channel,
+            String slotCode,
             UUID bundleId,
             String bundleCode,
             String bundleVersion,
