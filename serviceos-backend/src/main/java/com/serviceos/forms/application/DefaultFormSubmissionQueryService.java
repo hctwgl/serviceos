@@ -47,4 +47,21 @@ final class DefaultFormSubmissionQueryService implements FormSubmissionQueryServ
                 correlationId);
         return submissions.listSummariesByTask(principal.tenantId(), taskId);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<FormSubmissionSummaryView> listForTaskOnNetwork(
+            CurrentPrincipal principal, String correlationId, UUID taskId, UUID networkId
+    ) {
+        if (tasks.find(principal.tenantId(), taskId).isEmpty()) {
+            throw new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "Task does not exist");
+        }
+        authorization.require(principal, AuthorizationRequest.networkCapability(
+                READ,
+                principal.tenantId(),
+                "Task",
+                taskId.toString(),
+                networkId.toString()), correlationId);
+        return submissions.listSummariesByTask(principal.tenantId(), taskId);
+    }
 }
