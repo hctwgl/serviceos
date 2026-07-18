@@ -59,6 +59,8 @@ class GeneratedClientContractTest {
                 .contains("listTechnicianTaskEvidenceItems")
                 .contains("beginTechnicianEvidenceUpload")
                 .contains("finalizeTechnicianEvidenceUpload")
+                .contains("createTechnicianTaskEvidenceSetSnapshot")
+                .contains("completeTechnicianTask")
                 .contains("createBydReviewSubmission")
                 .contains("getWorkOrderActivitySummary")
                 .contains("getOutboundDelivery")
@@ -98,6 +100,8 @@ class GeneratedClientContractTest {
                 .contains("listTechnicianTaskEvidenceItems")
                 .contains("beginTechnicianEvidenceUpload")
                 .contains("finalizeTechnicianEvidenceUpload")
+                .contains("createTechnicianTaskEvidenceSetSnapshot")
+                .contains("completeTechnicianTask")
                 .contains("finalizeEvidenceUpload");
 
         // 上游 swift6 oneOf 模板会把 Dictionary 类型拼进 case 名；受控模板必须保持合法 Swift 标识符。

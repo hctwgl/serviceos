@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.24
+  version: 1.0.25
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -2598,6 +2598,53 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/TechnicianEvidenceItem' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /technician/me/tasks/{taskId}/evidence-set-snapshots:
+    post:
+      operationId: createTechnicianTaskEvidenceSetSnapshot
+      summary: 冻结当前任务的在线资料提交集合
+      description: M265：客户端只选择 VALIDATED revision ID；服务端固定 purpose=TASK_SUBMISSION，并复核当前责任、Slot 数量、最新解析代次和摘要。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/TechnicianContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianCreateEvidenceSetSnapshotRequest' } } }
+      responses:
+        '201':
+          description: 不可变 TASK_SUBMISSION Snapshot
+          content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianEvidenceSetSnapshot' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /technician/me/tasks/{taskId}:complete:
+    post:
+      operationId: completeTechnicianTask
+      summary: 以权威表单与资料对象完成当前任务
+      description: M265：客户端只提交 Snapshot/FormSubmission UUID；服务端重读摘要并构造规范引用，再由 Task 内核复核双输入、版本、状态和责任。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/TechnicianContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianCompleteTaskRequest' } } }
+      responses:
+        '200':
+          description: Task 已完成或幂等回放
+          content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianTaskCompletionReceipt' } } }
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
@@ -9063,6 +9110,61 @@ components:
         revisions:
           type: array
           items: { $ref: '#/components/schemas/TechnicianEvidenceRevision' }
+    TechnicianCreateEvidenceSetSnapshotRequest:
+      type: object
+      additionalProperties: false
+      required: [memberRevisionIds]
+      properties:
+        memberRevisionIds:
+          type: array
+          minItems: 1
+          maxItems: 100
+          uniqueItems: true
+          items: { type: string, format: uuid }
+    TechnicianEvidenceSetMember:
+      type: object
+      additionalProperties: false
+      required: [evidenceSlotId, evidenceItemId, evidenceRevisionId, revisionNumber,
+                 revisionStatus, contentDigest, memberOrdinal]
+      properties:
+        evidenceSlotId: { type: string, format: uuid }
+        evidenceItemId: { type: string, format: uuid }
+        evidenceRevisionId: { type: string, format: uuid }
+        revisionNumber: { type: integer, minimum: 1 }
+        revisionStatus: { enum: [VALIDATED] }
+        contentDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
+        memberOrdinal: { type: integer, minimum: 1 }
+    TechnicianEvidenceSetSnapshot:
+      type: object
+      additionalProperties: false
+      required: [evidenceSetSnapshotId, taskId, purpose, memberCount, contentDigest, createdAt, members]
+      properties:
+        evidenceSetSnapshotId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        purpose: { enum: [TASK_SUBMISSION] }
+        memberCount: { type: integer, minimum: 1 }
+        contentDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
+        createdAt: { type: string, format: date-time }
+        members:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/TechnicianEvidenceSetMember' }
+    TechnicianCompleteTaskRequest:
+      type: object
+      additionalProperties: false
+      required: [evidenceSetSnapshotId]
+      properties:
+        evidenceSetSnapshotId: { type: string, format: uuid }
+        formSubmissionId: { type: [string, 'null'], format: uuid }
+    TechnicianTaskCompletionReceipt:
+      type: object
+      additionalProperties: false
+      required: [taskId, status, resourceVersion, occurredAt]
+      properties:
+        taskId: { type: string, format: uuid }
+        status: { enum: [COMPLETED] }
+        resourceVersion: { type: integer, format: int64, minimum: 1 }
+        occurredAt: { type: string, format: date-time }
     VisitLocation:
       type: object
       additionalProperties: false

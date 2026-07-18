@@ -4,10 +4,13 @@ import com.serviceos.bootstrap.SecurityConfiguration;
 import com.serviceos.evidence.api.EvidenceItemView;
 import com.serviceos.evidence.api.EvidenceRevisionView;
 import com.serviceos.evidence.api.EvidenceSlotView;
+import com.serviceos.evidence.api.EvidenceSetSnapshotMemberView;
+import com.serviceos.evidence.api.EvidenceSetSnapshotView;
 import com.serviceos.evidence.api.EvidenceUploadSessionView;
 import com.serviceos.evidence.api.TechnicianEvidenceService;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
+import com.serviceos.task.api.HumanTaskCommandReceipt;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -41,6 +44,7 @@ class TechnicianEvidenceControllerSecurityTest {
     private static final UUID SESSION = UUID.fromString("50000000-0000-4000-8000-000000000264");
     private static final UUID ITEM = UUID.fromString("60000000-0000-4000-8000-000000000264");
     private static final UUID REVISION = UUID.fromString("70000000-0000-4000-8000-000000000264");
+    private static final UUID SNAPSHOT = UUID.fromString("80000000-0000-4000-8000-000000000265");
     private static final Instant NOW = Instant.parse("2026-07-18T12:00:00Z");
     private static final String CONTEXT = "TECHNICIAN|NETWORK|" + NETWORK;
 
@@ -110,6 +114,29 @@ class TechnicianEvidenceControllerSecurityTest {
         verify(evidence).finalizeUpload(eq(principal()), any(), eq(CONTEXT), any());
     }
 
+    @Test
+    void snapshotAndCompleteAcceptOnlyAuthorityObjectIdsAndQuotedVersion() throws Exception {
+        when(principals.current()).thenReturn(principal());
+        when(evidence.createTaskSubmissionSnapshot(eq(principal()), any(), eq(CONTEXT), eq(TASK), any()))
+                .thenReturn(snapshot());
+        when(evidence.completeTask(eq(principal()), any(), eq(CONTEXT), any())).thenReturn(
+                new HumanTaskCommandReceipt(TASK, "COMPLETED", PRINCIPAL.toString(), 8, NOW));
+
+        mvc.perform(post("/api/v1/technician/me/tasks/{taskId}/evidence-set-snapshots", TASK)
+                        .with(jwt().jwt(token -> token.subject(PRINCIPAL.toString())
+                                .claim("tenant_id", "tenant-264")))
+                        .header("X-Technician-Context", CONTEXT)
+                        .header("Idempotency-Key", "snapshot-265")
+                        .contentType("application/json")
+                        .content("{\"memberRevisionIds\":[\"" + REVISION + "\"]}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.evidenceSetSnapshotId").value(SNAPSHOT.toString()))
+                .andExpect(jsonPath("$.members[0].evidenceRevisionId").value(REVISION.toString()))
+                .andExpect(jsonPath("$.createdBy").doesNotExist())
+                .andExpect(jsonPath("$.eligibilitySummary").doesNotExist());
+
+    }
+
     private static EvidenceSlotView slot() {
         return new EvidenceSlotView(
                 SLOT, UUID.randomUUID(), TASK, UUID.randomUUID(), UUID.randomUUID(), "site-photo",
@@ -126,6 +153,15 @@ class TechnicianEvidenceControllerSecurityTest {
                         "a".repeat(64), "image/jpeg", 4, "{\"uploadedBy\":\"secret\"}",
                         "STORED", SESSION, "finalize-264", PRINCIPAL.toString(), NOW,
                         List.of(), null, null, null, null)));
+    }
+
+    private static EvidenceSetSnapshotView snapshot() {
+        return new EvidenceSetSnapshotView(
+                SNAPSHOT, TASK, UUID.randomUUID(), UUID.randomUUID(), "TASK_SUBMISSION", 1,
+                "b".repeat(64), "{\"eligible\":true}", PRINCIPAL.toString(), NOW,
+                List.of(new EvidenceSetSnapshotMemberView(
+                        UUID.randomUUID(), SLOT, ITEM, REVISION, 1, "VALIDATED",
+                        "a".repeat(64), "c".repeat(64), 1)));
     }
 
     private static CurrentPrincipal principal() {
