@@ -294,5 +294,6 @@
 - [M291 配置依赖分析验收矩阵](288-m291-configuration-dependency-analysis-acceptance.md)
 - [M292 WORKFLOW 干跑模拟验收矩阵](289-m292-configuration-workflow-simulation-acceptance.md)
 - [M293 Bundle 通道停用验收矩阵](290-m293-bundle-channel-deactivate-acceptance.md)
+- [M294 RULE/DISPATCH 配置设计器验收矩阵](291-m294-rule-dispatch-designer-acceptance.md)
 - [多车企平台内核程序级验收矩阵](multi-oem-platform-kernel-program-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

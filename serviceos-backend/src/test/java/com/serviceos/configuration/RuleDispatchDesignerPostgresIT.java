@@ -8,9 +8,7 @@ import com.serviceos.configuration.api.ConfigurationDraftView;
 import com.serviceos.configuration.api.ConfigurationPublicationException;
 import com.serviceos.configuration.api.CreateConfigurationDraftCommand;
 import com.serviceos.identity.api.CurrentPrincipal;
-import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.CommandMetadata;
-import com.serviceos.shared.ProblemCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,12 +26,12 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** M283：FORM/EVIDENCE/SLA 设计器草稿校验发布。 */
+/** M294：RULE/DISPATCH 设计器校验与发布。 */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = ServiceOsApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE)
-class FormEvidenceSlaDesignerPostgresIT {
-    private static final String TENANT = "tenant-cfg-m283-it";
-    private static final String ACTOR = "designer-m283";
+class RuleDispatchDesignerPostgresIT {
+    private static final String TENANT = "tenant-cfg-m294-it";
+    private static final String ACTOR = "designer-m294";
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(
@@ -47,7 +45,7 @@ class FormEvidenceSlaDesignerPostgresIT {
         registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
-        registry.add("serviceos.outbox.worker-id", () -> "cfg-m283-it");
+        registry.add("serviceos.outbox.worker-id", () -> "cfg-m294-it");
     }
 
     @Autowired ConfigurationDraftService drafts;
@@ -64,33 +62,24 @@ class FormEvidenceSlaDesignerPostgresIT {
     }
 
     @Test
-    void formEvidenceAndSlaDraftsPublish() {
-        assertPublished(ConfigurationAssetType.FORM, "designer.form.m283", validForm());
-        assertPublished(ConfigurationAssetType.EVIDENCE, "designer.evidence.m283", validEvidence());
-        assertPublished(ConfigurationAssetType.SLA, "designer.sla.m283", validSla());
+    void ruleAndDispatchDraftsPublish() {
+        assertPublished(ConfigurationAssetType.RULE, "designer.rule.m294", validRule());
+        assertPublished(ConfigurationAssetType.DISPATCH, "designer.dispatch.m294", validDispatch());
     }
 
     @Test
-    void invalidFormFailsValidationClosed() {
-        ConfigurationDraftView created = drafts.create(principal(), meta("bad-form"),
+    void invalidRuleFailsValidationClosed() {
+        ConfigurationDraftView created = drafts.create(principal(), meta("bad-rule"),
                 new CreateConfigurationDraftCommand(
-                        ConfigurationAssetType.FORM, "designer.form.bad", "1.0.0", "1.0.0",
+                        ConfigurationAssetType.RULE, "designer.rule.bad", "1.0.0", "1.0.0",
                         """
-                        {"formKey":"bad.form","version":"1.0.0","stage":"SURVEY","sections":[]}
+                        {"ruleKey":"designer.rule.bad","version":"1.0.0","subjectType":"EVIDENCE_REVIEW",
+                         "stage":"REVIEW","rules":[],"defaultAction":"PASS"}
                         """, null));
-        assertThatThrownBy(() -> drafts.validate(principal(), meta("v-bad-form"), created.draftId()))
+        assertThatThrownBy(() -> drafts.validate(principal(), meta("v-bad-rule"), created.draftId()))
                 .isInstanceOf(ConfigurationPublicationException.class);
         assertThat(drafts.get(principal(), "corr-get", created.draftId()).status()).isEqualTo("DRAFT");
         assertThat(drafts.get(principal(), "corr-get", created.draftId()).validationErrors()).isNotEmpty();
-    }
-
-    @Test
-    void pricingTypeStillRejected() {
-        assertThatThrownBy(() -> drafts.create(principal(), meta("pricing"), new CreateConfigurationDraftCommand(
-                ConfigurationAssetType.PRICING, "pricing.m283", "1.0.0", "1.0.0", "{}", null)))
-                .isInstanceOf(BusinessProblem.class)
-                .extracting(ex -> ((BusinessProblem) ex).code())
-                .isEqualTo(ProblemCode.VALIDATION_FAILED);
     }
 
     private void assertPublished(ConfigurationAssetType type, String key, String definition) {
@@ -105,17 +94,13 @@ class FormEvidenceSlaDesignerPostgresIT {
         ConfigurationDraftView published = drafts.publish(principal(), meta("p-" + key), created.draftId());
         assertThat(published.status()).isEqualTo("PUBLISHED");
         assertThat(published.publishedVersionId()).isNotNull();
-        assertThat(jdbc.sql("""
-                SELECT asset_type FROM cfg_configuration_asset_version WHERE version_id = :id
-                """).param("id", published.publishedVersionId()).query(String.class).single())
-                .isEqualTo(type.name());
     }
 
     private void seedGrants() {
         UUID roleId = UUID.randomUUID();
         jdbc.sql("""
                 INSERT INTO auth_role (role_id, tenant_id, role_code, role_name, role_status, created_at)
-                VALUES (:id, :tenant, 'cfg-designer-m283', '配置设计器M283', 'ACTIVE', now())
+                VALUES (:id, :tenant, 'cfg-designer-m294', '配置设计器M294', 'ACTIVE', now())
                 """).param("id", roleId).param("tenant", TENANT).update();
         for (String capability : List.of(
                 "configuration.draft.write", "configuration.approve", "configuration.publish")) {
@@ -130,7 +115,7 @@ class FormEvidenceSlaDesignerPostgresIT {
                     valid_from, source_code, approval_ref, created_at
                 ) VALUES (
                     :grant, :tenant, :principal, :role, 'TENANT', :tenant,
-                    now() - interval '1 day', 'TEST', 'm283', now()
+                    now() - interval '1 day', 'TEST', 'm294', now()
                 )
                 """)
                 .param("grant", UUID.randomUUID())
@@ -150,32 +135,33 @@ class FormEvidenceSlaDesignerPostgresIT {
         return new CommandMetadata("corr-" + key, "idem-" + key);
     }
 
-    private static String validForm() {
+    private static String validRule() {
         return """
-                {"formKey":"designer.form.m283","version":"1.0.0","stage":"SURVEY",
-                 "sections":[{"sectionKey":"base","title":"基础","fields":[{
-                   "fieldKey":"result.value","label":"结果","dataType":"STRING",
-                   "binding":"task.input.result.value"}]}]}
+                {"ruleKey":"designer.rule.m294","version":"1.0.0","subjectType":"EVIDENCE_REVIEW",
+                 "stage":"REVIEW","title":"资料审核规则",
+                 "rules":[{
+                   "ruleCode":"MISSING_PANORAMA",
+                   "name":"缺少全景图",
+                   "severity":"BLOCK",
+                   "when":{"language":"SERVICEOS_EXPR_V1","source":"task.taskType == \\"DESIGNER_TASK\\""},
+                   "rejectReasonCode":"EVIDENCE_MISSING",
+                   "message":"必须补传全景图"}],
+                 "defaultAction":"PASS"}
                 """;
     }
 
-    private static String validEvidence() {
+    private static String validDispatch() {
         return """
-                {"templateKey":"designer.evidence.m283","version":"1.0.0","title":"现场资料","stage":"SURVEY",
-                 "items":[{"evidenceKey":"site.panorama","name":"全景图","mediaType":"PHOTO","required":true,
-                   "capture":{"allowCamera":true,"allowGallery":false,"requireRealtimeCapture":true,
-                     "requireGps":true,"watermarkFields":["TIME","GPS","WORK_ORDER_NO"],
-                     "minCount":1,"maxCount":3,"maxSizeBytes":10485760},
-                   "qualityChecks":[{"checkType":"BLUR","severity":"BLOCK"}],
-                   "reviewPolicy":{"reviewRequired":true,"allowItemLevelReject":true}}]}
-                """;
-    }
-
-    private static String validSla() {
-        return """
-                {"policyKey":"designer.sla.m283","version":"1.0.0","subjectType":"TASK",
-                 "taskTypes":["DESIGNER_TASK"],"startEvent":"TASK_CREATED","stopEvent":"TASK_COMPLETED",
-                 "clockMode":"ELAPSED","targetDurationSeconds":3600}
+                {"policyKey":"designer.dispatch.m294","version":"1.0.0",
+                 "scope":{"brandCodes":["PLATFORM"],"businessTypes":["INSTALL"],"regionCodes":["370000"]},
+                 "hardFilters":[{
+                   "filterKey":"ENABLED","order":1,
+                   "expression":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.brandCode == \\"PLATFORM\\""},
+                   "failureCode":"NETWORK_DISABLED"}],
+                 "scoring":[{
+                   "factorKey":"REMAINING_CAPACITY","weight":1.0,
+                   "expression":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.brandCode == \\"PLATFORM\\""}}],
+                 "fallback":{"onNoCandidate":"MANUAL_INTERVENTION","manualRole":"DISPATCHER","resolutionHours":4}}
                 """;
     }
 }

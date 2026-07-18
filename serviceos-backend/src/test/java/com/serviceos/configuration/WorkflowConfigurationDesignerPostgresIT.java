@@ -116,8 +116,8 @@ class WorkflowConfigurationDesignerPostgresIT {
 
     @Test
     void unsupportedAssetTypeRejected() {
-        assertThatThrownBy(() -> drafts.create(principal(), meta("rule"), new CreateConfigurationDraftCommand(
-                ConfigurationAssetType.RULE, "rule.m282", "1.0.0", "1.0.0", "{}", null)))
+        assertThatThrownBy(() -> drafts.create(principal(), meta("pricing"), new CreateConfigurationDraftCommand(
+                ConfigurationAssetType.PRICING, "pricing.m282", "1.0.0", "1.0.0", "{}", null)))
                 .isInstanceOf(BusinessProblem.class)
                 .extracting(ex -> ((BusinessProblem) ex).code())
                 .isEqualTo(ProblemCode.VALIDATION_FAILED);

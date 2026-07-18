@@ -173,6 +173,74 @@ function defaultDefinition(type: DesignerAssetType): string {
       2,
     )
   }
+  if (type === 'RULE') {
+    return JSON.stringify(
+      {
+        ruleKey: 'platform.designer.demo.rule',
+        version: '1.0.0',
+        subjectType: 'EVIDENCE_REVIEW',
+        stage: 'REVIEW',
+        title: '示例审核规则',
+        rules: [
+          {
+            ruleCode: 'MISSING_PANORAMA',
+            name: '缺少全景图',
+            severity: 'BLOCK',
+            when: {
+              language: 'SERVICEOS_EXPR_V1',
+              source: 'task.taskType == "DESIGNER_DEMO"',
+            },
+            rejectReasonCode: 'EVIDENCE_MISSING',
+            message: '必须补传全景图',
+          },
+        ],
+        defaultAction: 'PASS',
+      },
+      null,
+      2,
+    )
+  }
+  if (type === 'DISPATCH') {
+    return JSON.stringify(
+      {
+        policyKey: 'platform.designer.demo.dispatch',
+        version: '1.0.0',
+        scope: {
+          brandCodes: ['PLATFORM'],
+          businessTypes: ['INSTALL'],
+          regionCodes: ['370000'],
+        },
+        hardFilters: [
+          {
+            filterKey: 'ENABLED',
+            order: 1,
+            expression: {
+              language: 'SERVICEOS_EXPR_V1',
+              source: 'workOrder.brandCode == "PLATFORM"',
+            },
+            failureCode: 'NETWORK_DISABLED',
+          },
+        ],
+        scoring: [
+          {
+            factorKey: 'REMAINING_CAPACITY',
+            weight: 1.0,
+            expression: {
+              language: 'SERVICEOS_EXPR_V1',
+              source: 'workOrder.brandCode == "PLATFORM"',
+            },
+          },
+        ],
+        fallback: {
+          onNoCandidate: 'MANUAL_INTERVENTION',
+          manualRole: 'DISPATCHER',
+          resolutionHours: 4,
+        },
+      },
+      null,
+      2,
+    )
+  }
   return JSON.stringify(
     {
       templateKey: 'platform.designer.demo.evidence',
@@ -394,6 +462,8 @@ onMounted(async () => {
           <option value="FORM">FORM</option>
           <option value="EVIDENCE">EVIDENCE</option>
           <option value="SLA">SLA</option>
+          <option value="RULE">RULE</option>
+          <option value="DISPATCH">DISPATCH</option>
         </select>
       </label>
       <label>

@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.dev/schema/rule/v1",
+  "title": "ServiceOS Review Rule Set",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ruleKey", "version", "subjectType", "stage", "rules", "defaultAction"],
+  "properties": {
+    "ruleKey": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]+$", "maxLength": 120},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "subjectType": {
+      "type": "string",
+      "enum": ["EVIDENCE_REVIEW", "FORM_REVIEW", "WORK_ORDER_REVIEW"]
+    },
+    "stage": {"type": "string", "minLength": 1, "maxLength": 64},
+    "title": {"type": "string", "maxLength": 200},
+    "rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/ruleItem"}
+    },
+    "defaultAction": {
+      "type": "string",
+      "enum": ["PASS", "REQUIRE_MANUAL"]
+    }
+  },
+  "$defs": {
+    "expression": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["language", "source"],
+      "properties": {
+        "language": {"type": "string", "enum": ["SERVICEOS_EXPR_V1"]},
+        "source": {"type": "string", "minLength": 1, "maxLength": 2000}
+      }
+    },
+    "ruleItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ruleCode", "name", "severity", "when", "rejectReasonCode"],
+      "properties": {
+        "ruleCode": {"type": "string", "pattern": "^[A-Z0-9][A-Z0-9._-]{1,63}$"},
+        "name": {"type": "string", "minLength": 1, "maxLength": 120},
+        "severity": {"type": "string", "enum": ["BLOCK", "WARN", "REQUIRE_APPROVAL"]},
+        "when": {"$ref": "#/$defs/expression"},
+        "rejectReasonCode": {"type": "string", "minLength": 1, "maxLength": 64},
+        "message": {"type": "string", "maxLength": 500}
+      }
+    }
+  }
+}

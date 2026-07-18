@@ -45,6 +45,28 @@ class ConfigurationSchemaDriftTest {
     }
 
     @Test
+    void embeddedRuleSchemaMatchesArchitectureSource() throws IOException {
+        Path repository = repositoryRoot();
+        Path architectureSchema = repository.resolve(
+                "serviceos-architecture/configuration/schemas/rule.schema.json");
+        Path runtimeSchema = repository.resolve(
+                "serviceos-backend/src/main/resources/configuration-schemas/rule-v1.schema.json");
+
+        assertThat(Files.mismatch(architectureSchema, runtimeSchema)).isEqualTo(-1L);
+    }
+
+    @Test
+    void embeddedDispatchSchemaMatchesArchitectureSource() throws IOException {
+        Path repository = repositoryRoot();
+        Path architectureSchema = repository.resolve(
+                "serviceos-architecture/configuration/schemas/dispatch.schema.json");
+        Path runtimeSchema = repository.resolve(
+                "serviceos-backend/src/main/resources/configuration-schemas/dispatch-v1.schema.json");
+
+        assertThat(Files.mismatch(architectureSchema, runtimeSchema)).isEqualTo(-1L);
+    }
+
+    @Test
     void embeddedHomeChargingTemplateMatchesArchitectureSource() throws IOException {
         assertTemplateSynced("home-charging-survey-install");
     }

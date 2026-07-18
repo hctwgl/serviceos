@@ -37,8 +37,14 @@ public final class ConfigurationAssetSchemaValidator {
     private static final String FORM_SCHEMA_VERSION = "1.0.0";
     private static final String EVIDENCE_SCHEMA_VERSION = "1.0.0";
     private static final String SLA_SCHEMA_VERSION = "1.0.0";
+    private static final String RULE_SCHEMA_VERSION = "1.0.0";
+    private static final String DISPATCH_SCHEMA_VERSION = "1.0.0";
     private static final Set<ConfigurationAssetType> SCHEMA_GOVERNED_TYPES = Set.of(
-            ConfigurationAssetType.FORM, ConfigurationAssetType.EVIDENCE, ConfigurationAssetType.SLA);
+            ConfigurationAssetType.FORM,
+            ConfigurationAssetType.EVIDENCE,
+            ConfigurationAssetType.SLA,
+            ConfigurationAssetType.RULE,
+            ConfigurationAssetType.DISPATCH);
 
     private final ObjectMapper objectMapper;
     private final Map<SchemaKey, JsonSchema> schemas;
@@ -62,7 +68,11 @@ public final class ConfigurationAssetSchemaValidator {
                 new SchemaKey(ConfigurationAssetType.EVIDENCE, EVIDENCE_SCHEMA_VERSION),
                 loadSchema("configuration-schemas/evidence-v1.schema.json"),
                 new SchemaKey(ConfigurationAssetType.SLA, SLA_SCHEMA_VERSION),
-                loadSchema("configuration-schemas/sla-v1.schema.json"));
+                loadSchema("configuration-schemas/sla-v1.schema.json"),
+                new SchemaKey(ConfigurationAssetType.RULE, RULE_SCHEMA_VERSION),
+                loadSchema("configuration-schemas/rule-v1.schema.json"),
+                new SchemaKey(ConfigurationAssetType.DISPATCH, DISPATCH_SCHEMA_VERSION),
+                loadSchema("configuration-schemas/dispatch-v1.schema.json"));
     }
 
     public void validate(PublishConfigurationAssetCommand command) {
@@ -96,7 +106,8 @@ public final class ConfigurationAssetSchemaValidator {
         String identityField = switch (command.assetType()) {
             case FORM -> "formKey";
             case EVIDENCE -> "templateKey";
-            case SLA -> "policyKey";
+            case SLA, DISPATCH -> "policyKey";
+            case RULE -> "ruleKey";
             default -> throw new IllegalStateException("schema-governed asset type has no identity field");
         };
         if (!command.assetKey().equals(definition.path(identityField).asText())) {
@@ -111,6 +122,10 @@ public final class ConfigurationAssetSchemaValidator {
             validateEvidenceSemantics(definition);
         } else if (command.assetType() == ConfigurationAssetType.FORM) {
             validateFormSemantics(definition);
+        } else if (command.assetType() == ConfigurationAssetType.RULE) {
+            validateRuleSemantics(definition);
+        } else if (command.assetType() == ConfigurationAssetType.DISPATCH) {
+            validateDispatchSemantics(definition);
         }
     }
 
@@ -525,6 +540,55 @@ public final class ConfigurationAssetSchemaValidator {
             String ruleKey = rule.path("ruleKey").asText();
             validateExpression(expression(rule.path("assert")), types,
                     "FORM validationRule", ruleKey);
+        }
+    }
+
+    /** RULE：ruleCode 唯一，when 表达式必须通过 SERVICEOS_EXPR_V1 静态校验。 */
+    private void validateRuleSemantics(JsonNode definition) {
+        Set<String> codes = new HashSet<>();
+        for (JsonNode item : definition.path("rules")) {
+            String ruleCode = item.path("ruleCode").asText();
+            if (!codes.add(ruleCode)) {
+                throw new ConfigurationPublicationException("RULE ruleCode must be unique: " + ruleCode);
+            }
+            try {
+                expressions.validate(expression(item.path("when")));
+            } catch (ExpressionEvaluationException exception) {
+                throw new ConfigurationPublicationException(
+                        "RULE when 表达式无效: " + ruleCode + "; " + exception.getMessage());
+            }
+        }
+    }
+
+    /** DISPATCH：filterKey/factorKey 唯一，表达式静态校验。 */
+    private void validateDispatchSemantics(JsonNode definition) {
+        Set<String> filters = new HashSet<>();
+        for (JsonNode filter : definition.path("hardFilters")) {
+            String filterKey = filter.path("filterKey").asText() + "#" + filter.path("order").asInt();
+            if (!filters.add(filterKey)) {
+                throw new ConfigurationPublicationException(
+                        "DISPATCH hardFilters order/filterKey 必须唯一: " + filterKey);
+            }
+            try {
+                expressions.validate(expression(filter.path("expression")));
+            } catch (ExpressionEvaluationException exception) {
+                throw new ConfigurationPublicationException(
+                        "DISPATCH hardFilter 表达式无效: " + filterKey + "; " + exception.getMessage());
+            }
+        }
+        Set<String> factors = new HashSet<>();
+        for (JsonNode factor : definition.path("scoring")) {
+            String factorKey = factor.path("factorKey").asText();
+            if (!factors.add(factorKey)) {
+                throw new ConfigurationPublicationException(
+                        "DISPATCH scoring factorKey must be unique: " + factorKey);
+            }
+            try {
+                expressions.validate(expression(factor.path("expression")));
+            } catch (ExpressionEvaluationException exception) {
+                throw new ConfigurationPublicationException(
+                        "DISPATCH scoring 表达式无效: " + factorKey + "; " + exception.getMessage());
+            }
         }
     }
 

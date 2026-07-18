@@ -1,6 +1,6 @@
 import { apiGet, apiGetWithMeta, apiPost, apiPut, newIdempotencyKey, quotedVersion } from './client'
 
-export type DesignerAssetType = 'WORKFLOW' | 'FORM' | 'EVIDENCE' | 'SLA'
+export type DesignerAssetType = 'WORKFLOW' | 'FORM' | 'EVIDENCE' | 'SLA' | 'RULE' | 'DISPATCH'
 
 export type ConfigurationDraft = {
   draftId: string
