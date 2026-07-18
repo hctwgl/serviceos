@@ -278,6 +278,7 @@ title: ServiceOS 里程碑索引
 | M267 | M267 通用 Connector SPI 与 BYD 入站边界归位 | [280-m267-generic-connector-spi.md](../architecture/280-m267-generic-connector-spi.md) | [264-m267-generic-connector-spi-acceptance.md](../testing/264-m267-generic-connector-spi-acceptance.md) |
 | M268 | M268 配置治理 MVP（Workflow 条件与依赖静态校验） | [281-m268-configuration-governance-mvp.md](../architecture/281-m268-configuration-governance-mvp.md) | [265-m268-configuration-governance-mvp-acceptance.md](../testing/265-m268-configuration-governance-mvp-acceptance.md) |
 | M269 | M269 EXCLUSIVE_GATEWAY 运行时 | [282-m269-exclusive-gateway-runtime.md](../architecture/282-m269-exclusive-gateway-runtime.md) | [266-m269-exclusive-gateway-runtime-acceptance.md](../testing/266-m269-exclusive-gateway-runtime-acceptance.md) |
+| M270 | M270 WAIT_EVENT 运行时 | [283-m270-wait-event-runtime.md](../architecture/283-m270-wait-event-runtime.md) | [267-m270-wait-event-runtime-acceptance.md](../testing/267-m270-wait-event-runtime-acceptance.md) |
 
 ## 未关联里程碑的文档
 

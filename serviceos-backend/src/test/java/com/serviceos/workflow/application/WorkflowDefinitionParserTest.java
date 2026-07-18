@@ -70,6 +70,19 @@ class WorkflowDefinitionParserTest {
     }
 
     @Test
+    void waitEventProgressionReturnsWaitingDefinition() {
+        var result = parser.progression(asset(waitDefinition()), "SURVEY_TASK", oceanContext());
+        assertThat(result.waiting()).isTrue();
+        assertThat(result.nodeId()).isEqualTo("WAIT_ACK");
+        assertThat(result.waitEventType()).isEqualTo("demo.client-ack");
+        assertThat(result.correlationKeyTemplate()).isEqualTo("workOrder:{workOrderId}");
+
+        var after = parser.progressionAfterWait(asset(waitDefinition()), "WAIT_ACK", oceanContext());
+        assertThat(after.nodeId()).isEqualTo("INSTALL_TASK");
+        assertThat(after.waiting()).isFalse();
+    }
+
+    @Test
     void exclusiveGatewayZeroAndMultiHitFailClosed() {
         assertThatThrownBy(() -> parser.progression(
                 asset(gatewayDefinition("false", "false")), "SURVEY_TASK", oceanContext()))
@@ -150,6 +163,25 @@ class WorkflowDefinitionParserTest {
                  "transitions":[
                    {"transitionId":"t1","from":"START","to":"ASSIGN_COORDINATORS"},
                    {"transitionId":"t2","from":"ASSIGN_COORDINATORS","to":"INITIAL_REVIEW"}]}
+                """;
+    }
+
+    private static String waitDefinition() {
+        return """
+                {"workflowKey":"wait.demo","semanticVersion":"1.0.0","startNodeId":"START",
+                 "nodes":[
+                   {"nodeId":"START","nodeType":"START","name":"开始"},
+                   {"nodeId":"SURVEY_TASK","nodeType":"SERVICE_TASK","name":"勘测",
+                    "stageCode":"SURVEY","taskType":"SURVEY"},
+                   {"nodeId":"WAIT_ACK","nodeType":"WAIT_EVENT","name":"等待确认",
+                    "stageCode":"SURVEY","waitEventType":"demo.client-ack",
+                    "correlationKeyTemplate":"workOrder:{workOrderId}"},
+                   {"nodeId":"INSTALL_TASK","nodeType":"SERVICE_TASK","name":"安装",
+                    "stageCode":"INSTALL","taskType":"INSTALL"}],
+                 "transitions":[
+                   {"transitionId":"t1","from":"START","to":"SURVEY_TASK"},
+                   {"transitionId":"t2","from":"SURVEY_TASK","to":"WAIT_ACK"},
+                   {"transitionId":"t3","from":"WAIT_ACK","to":"INSTALL_TASK"}]}
                 """;
     }
 

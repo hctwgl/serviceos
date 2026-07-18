@@ -62,4 +62,5 @@ BYD 和 OEM2（REFERENCE 或真实）使用独立 Connector
 | 1～3（M267） | Implemented | ADR-085、`280-m267-*`、`264-m267-*`、BYD 入站 IT、ArchitectureTest |
 | 4（M268） | Implemented | workflow condition 对齐表达式、EXCLUSIVE_GATEWAY 静态校验、`281-m268-*` |
 | 5～6（M269） | Implemented | EXCLUSIVE_GATEWAY 运行时零/多命中失败关闭、`282-m269-*` |
-| 7～11 | 未开始 | 下一切片：WAIT_EVENT（M270） |
+| 7（M270） | Implemented | WAIT_EVENT 挂起/幂等唤醒、`283-m270-*` |
+| 8～11 | 未开始 | 下一切片：标准家充安装模板（M271） |

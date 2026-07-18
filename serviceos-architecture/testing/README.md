@@ -270,5 +270,6 @@
 - [M267 通用 Connector SPI 验收矩阵](264-m267-generic-connector-spi-acceptance.md)
 - [M268 配置治理 MVP 验收矩阵](265-m268-configuration-governance-mvp-acceptance.md)
 - [M269 EXCLUSIVE_GATEWAY 运行时验收矩阵](266-m269-exclusive-gateway-runtime-acceptance.md)
+- [M270 WAIT_EVENT 运行时验收矩阵](267-m270-wait-event-runtime-acceptance.md)
 - [多车企平台内核程序级验收矩阵](multi-oem-platform-kernel-program-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

@@ -22,8 +22,8 @@ import java.util.Set;
 /**
  * 受控 JSON 工作流的最小可执行解释器。
  *
- * <p>M17～M19 提供线性无条件推进；M269 增加 {@code EXCLUSIVE_GATEWAY}：按出边条件求值，
- * 要求恰好一条为 true，零命中/多命中失败关闭。并行网关、等待事件与子流程仍未实现。</p>
+ * <p>M17～M19 提供线性无条件推进；M269 增加 {@code EXCLUSIVE_GATEWAY}；M270 增加
+ * {@code WAIT_EVENT} 挂起定义解析。并行网关与子流程仍未实现。</p>
  */
 @Component
 final class WorkflowDefinitionParser {
@@ -54,7 +54,7 @@ final class WorkflowDefinitionParser {
     /**
      * 从已完成任务推进到下一可执行任务或 END。
      *
-     * <p>已完成任务必须恰好一条无条件出边；目标可为任务、END 或 EXCLUSIVE_GATEWAY。
+     * <p>已完成任务必须恰好一条无条件出边；目标可为任务、END、EXCLUSIVE_GATEWAY 或 WAIT_EVENT。
      * 网关求值需要工单冻结表达式上下文，不得读取“最新配置”。</p>
      */
     ProgressionDefinition progression(
@@ -101,8 +101,34 @@ final class WorkflowDefinitionParser {
             String chosen = chooseExclusiveGatewayTarget(graph, targetNodeId, context);
             return resolveTarget(graph, chosen, context, visiting);
         }
+        if ("WAIT_EVENT".equals(targetType)) {
+            return ProgressionDefinition.waiting(
+                    targetNodeId,
+                    requiredText(target, "stageCode"),
+                    requiredText(target, "waitEventType"),
+                    requiredText(target, "correlationKeyTemplate"));
+        }
         throw new IllegalArgumentException(
                 "workflow progression does not support nodeType: " + targetType);
+    }
+
+    /**
+     * 从已唤醒的 WAIT_EVENT 节点推进到其唯一无条件后继。
+     */
+    ProgressionDefinition progressionAfterWait(
+            ConfigurationAssetDefinition asset,
+            String waitNodeId,
+            ExpressionContext context
+    ) {
+        Objects.requireNonNull(context, "expression context must not be null");
+        Graph graph = parseGraph(asset);
+        String requiredNodeId = requiredValue(waitNodeId, "waitNodeId");
+        JsonNode waitNode = graph.nodes().get(requiredNodeId);
+        if (waitNode == null || !"WAIT_EVENT".equals(requiredText(waitNode, "nodeType"))) {
+            throw new IllegalArgumentException("wait node must be WAIT_EVENT: " + requiredNodeId);
+        }
+        JsonNode target = requireSingleUnconditionalTarget(graph, requiredNodeId, "WAIT_EVENT node");
+        return resolveTarget(graph, requiredText(target, "nodeId"), context, new HashSet<>());
     }
 
     private String chooseExclusiveGatewayTarget(
@@ -266,16 +292,31 @@ final class WorkflowDefinitionParser {
             WorkflowTaskKind taskKind,
             String formRef,
             String slaRef,
-            boolean end
+            boolean end,
+            boolean waiting,
+            String waitEventType,
+            String correlationKeyTemplate
     ) {
         static ProgressionDefinition task(
                 String nodeId, String stageCode, String taskType, WorkflowTaskKind taskKind,
                 String formRef, String slaRef) {
-            return new ProgressionDefinition(nodeId, stageCode, taskType, taskKind, formRef, slaRef, false);
+            return new ProgressionDefinition(
+                    nodeId, stageCode, taskType, taskKind, formRef, slaRef, false, false, null, null);
         }
 
         static ProgressionDefinition end(String nodeId) {
-            return new ProgressionDefinition(nodeId, null, null, null, null, null, true);
+            return new ProgressionDefinition(nodeId, null, null, null, null, null, true, false, null, null);
+        }
+
+        static ProgressionDefinition waiting(
+                String nodeId,
+                String stageCode,
+                String waitEventType,
+                String correlationKeyTemplate
+        ) {
+            return new ProgressionDefinition(
+                    nodeId, stageCode, null, null, null, null, false, true,
+                    waitEventType, correlationKeyTemplate);
         }
     }
 

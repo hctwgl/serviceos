@@ -70,6 +70,30 @@ class ConfigurationAssetSchemaValidatorTest {
     }
 
     @Test
+    void waitEventRequiresTypeTemplateAndUnconditionalExit() {
+        String valid = """
+                {"workflowKey":"wait.demo","semanticVersion":"1.0.0","startNodeId":"START",
+                 "nodes":[
+                   {"nodeId":"START","nodeType":"START","name":"开始"},
+                   {"nodeId":"TASK","nodeType":"USER_TASK","name":"任务","stageCode":"S1","taskType":"T1"},
+                   {"nodeId":"WAIT","nodeType":"WAIT_EVENT","name":"等待",
+                    "stageCode":"S1","waitEventType":"demo.ack",
+                    "correlationKeyTemplate":"workOrder:{workOrderId}"},
+                   {"nodeId":"END","nodeType":"END","name":"结束"}],
+                 "transitions":[
+                   {"transitionId":"t1","from":"START","to":"TASK"},
+                   {"transitionId":"t2","from":"TASK","to":"WAIT"},
+                   {"transitionId":"t3","from":"WAIT","to":"END"}]}
+                """.trim();
+        assertThatCode(() -> validator.validate(command(valid))).doesNotThrowAnyException();
+
+        String missingType = valid.replace("\"waitEventType\":\"demo.ack\",", "");
+        assertThatThrownBy(() -> validator.validate(command(missingType)))
+                .isInstanceOf(ConfigurationPublicationException.class)
+                .hasMessageContaining("waitEventType");
+    }
+
+    @Test
     void stringConditionFailsClosed() {
         String definition = """
                 {"workflowKey":"string.condition","semanticVersion":"1.0.0","startNodeId":"START",

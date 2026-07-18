@@ -193,20 +193,53 @@ final class ConfigurationAssetSchemaValidator {
         }
         for (Map.Entry<String, JsonNode> entry : nodes.entrySet()) {
             String nodeType = entry.getValue().path("nodeType").asText();
-            if (!"EXCLUSIVE_GATEWAY".equals(nodeType)) {
-                continue;
-            }
-            List<JsonNode> edges = outgoing.getOrDefault(entry.getKey(), List.of());
-            if (edges.size() < 2) {
-                throw new ConfigurationPublicationException(
-                        "EXCLUSIVE_GATEWAY 至少需要两条出边: " + entry.getKey());
-            }
-            for (JsonNode edge : edges) {
-                if (!present(edge, "condition")) {
+            if ("EXCLUSIVE_GATEWAY".equals(nodeType)) {
+                List<JsonNode> edges = outgoing.getOrDefault(entry.getKey(), List.of());
+                if (edges.size() < 2) {
                     throw new ConfigurationPublicationException(
-                            "EXCLUSIVE_GATEWAY 出边必须带 condition: " + entry.getKey());
+                            "EXCLUSIVE_GATEWAY 至少需要两条出边: " + entry.getKey());
                 }
+                for (JsonNode edge : edges) {
+                    if (!present(edge, "condition")) {
+                        throw new ConfigurationPublicationException(
+                                "EXCLUSIVE_GATEWAY 出边必须带 condition: " + entry.getKey());
+                    }
+                }
+            } else if ("WAIT_EVENT".equals(nodeType)) {
+                validateWaitEventNode(entry.getValue(), entry.getKey(), outgoing);
             }
+        }
+    }
+
+    private void validateWaitEventNode(
+            JsonNode node,
+            String nodeId,
+            Map<String, List<JsonNode>> outgoing
+    ) {
+        if (!present(node, "waitEventType")) {
+            throw new ConfigurationPublicationException(
+                    "WAIT_EVENT 必须声明 waitEventType: " + nodeId);
+        }
+        if (!present(node, "correlationKeyTemplate")) {
+            throw new ConfigurationPublicationException(
+                    "WAIT_EVENT 必须声明 correlationKeyTemplate: " + nodeId);
+        }
+        if (!present(node, "stageCode")) {
+            throw new ConfigurationPublicationException(
+                    "WAIT_EVENT 必须声明 stageCode: " + nodeId);
+        }
+        String template = node.path("correlationKeyTemplate").asText();
+        if (!template.contains("{workOrderId}")
+                && !template.contains("{projectId}")
+                && !template.contains("{workflowInstanceId}")
+                && !template.contains("{tenantId}")) {
+            throw new ConfigurationPublicationException(
+                    "WAIT_EVENT correlationKeyTemplate 必须包含受支持占位符: " + nodeId);
+        }
+        List<JsonNode> edges = outgoing.getOrDefault(nodeId, List.of());
+        if (edges.size() != 1 || present(edges.getFirst(), "condition")) {
+            throw new ConfigurationPublicationException(
+                    "WAIT_EVENT 必须恰好一条无条件出边: " + nodeId);
         }
     }
 

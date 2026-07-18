@@ -54,6 +54,16 @@
         "evidenceRef": {"type": ["string", "null"], "maxLength": 120},
         "slaRef": {"type": ["string", "null"], "maxLength": 120},
         "integrationRef": {"type": ["string", "null"], "maxLength": 120},
+        "waitEventType": {
+          "type": ["string", "null"],
+          "pattern": "^[a-z][a-z0-9._-]*$",
+          "maxLength": 160
+        },
+        "correlationKeyTemplate": {
+          "type": ["string", "null"],
+          "minLength": 1,
+          "maxLength": 300
+        },
         "entryActions": {"type": "array", "items": {"type": "string"}, "default": []},
         "exitActions": {"type": "array", "items": {"type": "string"}, "default": []},
         "retryPolicy": {"$ref": "#/$defs/retryPolicy"},
