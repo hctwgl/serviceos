@@ -389,4 +389,5 @@ Feature gate/authority: if applicable
 | M292 | WORKFLOW 干跑模拟（线性/EXCLUSIVE/WAIT 暂停）；OpenAPI 1.0.35 | WorkflowSimulationService + PostgresIT + `305-m292-*` + `289-m292-*` | 历史回放、并行展开 |
 | M293 | Bundle 通道停用 + 通道托管项目 resolve 失败关闭；OpenAPI 1.0.36 | ActivationService.deactivate + Deactivate IT + `306-m293-*` + `290-m293-*` | Admin 发布控制台 |
 | M294 | RULE/DISPATCH Schema 设计器；OpenAPI 1.0.37 | rule/dispatch schemas + RuleDispatchDesignerPostgresIT + `307-m294-*` + `291-m294-*` | — |
-| M295 | NOTIFICATION/ASSIGNEE/INTEGRATION/PRICING 设计器；OpenAPI 1.0.38 | RemainingAssetDesignersPostgresIT + 4 schemas + `308-m295-*` + `292-m295-*` | 历史回放、运行时引擎 |
+| M295 | NOTIFICATION/ASSIGNEE/INTEGRATION/PRICING 设计器；OpenAPI 1.0.38 | RemainingAssetDesignersPostgresIT + 4 schemas + `308-m295-*` + `292-m295-*` | 运行时引擎 |
+| M296 | 冻结 Bundle WORKFLOW 历史回放；OpenAPI 1.0.39 | HistoricalReplayService + PostgresIT + `309-m296-*` + `293-m296-*` | 事件时间轴回放 |

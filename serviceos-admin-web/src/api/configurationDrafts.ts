@@ -140,6 +140,28 @@ export function simulateConfigurationDraft(
   })
 }
 
+export type ConfigurationHistoricalReplayReport = {
+  bundleId: string
+  bundleCode: string
+  bundleVersion: string
+  manifestDigest: string
+  workflowVersionId: string
+  workflowAssetKey: string
+  workflowSemanticVersion: string
+  outcome: 'COMPLETED' | 'WAITING' | 'FAIL_CLOSED' | 'STEP_LIMIT'
+  message: string
+  steps: ConfigurationSimulationStep[]
+}
+
+export function runConfigurationHistoricalReplay(body: {
+  bundleId: string
+  workflowAssetKey?: string | null
+  context?: ConfigurationSimulationContext
+  maxSteps?: number
+}) {
+  return apiPost<ConfigurationHistoricalReplayReport>('/configuration/replays:run', { body })
+}
+
 export function approveConfigurationDraft(draftId: string, approvalRef: string, aggregateVersion: number) {
   return apiPost<ConfigurationDraft>(`/configuration/drafts/${draftId}:approve`, {
     idempotencyKey: newIdempotencyKey('cfg-draft-approve'),

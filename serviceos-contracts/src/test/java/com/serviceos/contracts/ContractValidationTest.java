@@ -70,6 +70,7 @@ class ContractValidationTest {
                         "/configuration/drafts/{draftId}:publish",
                         "/configuration/dependency-reports:analyze",
                         "/configuration/simulations:run",
+                        "/configuration/replays:run",
                         "/configuration/bundle-activations",
                         "/configuration/bundle-activations/{activationId}:adjust-traffic",
                         "/configuration/bundle-activations/{activationId}:promote",

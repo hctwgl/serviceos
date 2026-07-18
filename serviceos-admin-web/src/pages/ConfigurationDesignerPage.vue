@@ -7,12 +7,14 @@ import {
   diffConfigurationDraft,
   listConfigurationDrafts,
   publishConfigurationDraft,
+  runConfigurationHistoricalReplay,
   simulateConfigurationDraft,
   updateConfigurationDraft,
   validateConfigurationDraft,
   type ConfigurationDependencyReport,
   type ConfigurationDraft,
   type ConfigurationDraftDiff,
+  type ConfigurationHistoricalReplayReport,
   type ConfigurationSimulationReport,
   type DesignerAssetType,
 } from '../api/configurationDrafts'
@@ -25,7 +27,9 @@ const definitionText = ref('')
 const diffView = ref<ConfigurationDraftDiff | null>(null)
 const dependencyReport = ref<ConfigurationDependencyReport | null>(null)
 const simulationReport = ref<ConfigurationSimulationReport | null>(null)
+const replayReport = ref<ConfigurationHistoricalReplayReport | null>(null)
 const simClientCode = ref('OEM_A')
+const replayBundleId = ref('')
 const approvalRef = ref('APR-LOCAL-1')
 const loading = ref(false)
 const busy = ref(false)
@@ -489,6 +493,33 @@ async function runSimulation() {
   }
 }
 
+async function runHistoricalReplay() {
+  if (!replayBundleId.value.trim()) {
+    error.value = '请填写冻结 Bundle ID'
+    return
+  }
+  busy.value = true
+  error.value = null
+  try {
+    const result = await runConfigurationHistoricalReplay({
+      bundleId: replayBundleId.value.trim(),
+      context: {
+        workOrder: { clientCode: simClientCode.value || null, brandCode: null, serviceProductCode: null },
+        region: { provinceCode: null, cityCode: null, districtCode: null },
+        task: { stageCode: null, taskType: null },
+        formValues: {},
+      },
+      maxSteps: 64,
+    })
+    replayReport.value = result.data
+    message.value = `历史回放：${result.data.outcome} · ${result.data.bundleCode}@${result.data.bundleVersion}`
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '历史回放失败'
+  } finally {
+    busy.value = false
+  }
+}
+
 async function approveDraft() {
   if (!selected.value) return
   busy.value = true
@@ -595,6 +626,13 @@ onMounted(async () => {
         干跑模拟
       </button>
       <label>
+        冻结 Bundle ID
+        <input v-model="replayBundleId" data-testid="replay-bundle-id" placeholder="uuid" />
+      </label>
+      <button type="button" :disabled="busy" data-testid="historical-replay" @click="runHistoricalReplay">
+        历史回放
+      </button>
+      <label>
         approvalRef
         <input v-model="approvalRef" data-testid="approval-ref" />
       </label>
@@ -666,6 +704,20 @@ onMounted(async () => {
           <p>{{ simulationReport.message }}</p>
           <ol>
             <li v-for="step in simulationReport.steps" :key="step.index">
+              [{{ step.nodeType }} {{ step.nodeId }}] {{ step.action }} — {{ step.detail }}
+            </li>
+          </ol>
+        </div>
+        <div v-if="replayReport" class="sim replay" data-testid="historical-replay-report">
+          <h3>
+            历史回放 · {{ replayReport.outcome }} · {{ replayReport.bundleCode }}@{{ replayReport.bundleVersion }}
+          </h3>
+          <p>
+            WORKFLOW {{ replayReport.workflowAssetKey }}@{{ replayReport.workflowSemanticVersion }} —
+            {{ replayReport.message }}
+          </p>
+          <ol>
+            <li v-for="step in replayReport.steps" :key="step.index">
               [{{ step.nodeType }} {{ step.nodeId }}] {{ step.action }} — {{ step.detail }}
             </li>
           </ol>

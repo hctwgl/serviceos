@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.38
+  version: 1.0.39
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -5179,6 +5179,31 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+  /configuration/replays:run:
+    post:
+      operationId: runConfigurationHistoricalReplay
+      summary: 历史回放冻结 Bundle 中的 WORKFLOW
+      description: |
+        仅读取已发布 Bundle 冻结清单中的 WORKFLOW 定义并干跑；
+        不读取草稿、不读取当前通道激活、不写运行时表。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RunConfigurationHistoricalReplayRequest' }
+      responses:
+        '200':
+          description: 历史回放报告
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConfigurationHistoricalReplayReport' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
   /configuration/drafts/{draftId}:approve:
     post:
       operationId: approveConfigurationDraft
@@ -5763,6 +5788,33 @@ components:
         nodeType: { type: string }
         action: { type: string }
         detail: { type: string }
+    RunConfigurationHistoricalReplayRequest:
+      type: object
+      additionalProperties: false
+      required: [bundleId]
+      properties:
+        bundleId: { type: string, format: uuid }
+        workflowAssetKey: { type: [string, 'null'] }
+        context: { $ref: '#/components/schemas/ConfigurationSimulationContext' }
+        maxSteps: { type: integer, minimum: 1, maximum: 256 }
+    ConfigurationHistoricalReplayReport:
+      type: object
+      additionalProperties: false
+      required: [bundleId, bundleCode, bundleVersion, manifestDigest, workflowVersionId,
+                 workflowAssetKey, workflowSemanticVersion, outcome, message, steps]
+      properties:
+        bundleId: { type: string, format: uuid }
+        bundleCode: { type: string }
+        bundleVersion: { type: string }
+        manifestDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
+        workflowVersionId: { type: string, format: uuid }
+        workflowAssetKey: { type: string }
+        workflowSemanticVersion: { type: string }
+        outcome: { type: string, enum: [COMPLETED, WAITING, FAIL_CLOSED, STEP_LIMIT] }
+        message: { type: string }
+        steps:
+          type: array
+          items: { $ref: '#/components/schemas/ConfigurationSimulationStep' }
     ConfigurationDraftDiff:
       type: object
       additionalProperties: false
