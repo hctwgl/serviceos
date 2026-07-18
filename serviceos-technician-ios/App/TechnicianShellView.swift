@@ -1,6 +1,9 @@
+import PhotosUI
 import ServiceOSCoreClient
 import SwiftUI
 import TechnicianIOSFoundation
+import UIKit
+import UniformTypeIdentifiers
 
 struct TechnicianShellView: View {
     let store: TechnicianAppStore
@@ -157,6 +160,14 @@ private struct TechnicianTaskDetailView: View {
                     executionGuarded: detail.executionGuarded
                 )
 
+                TechnicianOnlineEvidenceSection(
+                    store: store,
+                    session: session,
+                    taskID: taskID,
+                    taskStatus: detail.taskStatus,
+                    executionGuarded: detail.executionGuarded
+                )
+
                 Section("预约与到场") {
                     if let appointment = confirmedAppointment {
                         LabeledContent("预约", value: appointment.type)
@@ -198,7 +209,7 @@ private struct TechnicianTaskDetailView: View {
                         Button("确认无法施工", role: .destructive) { confirmingInterrupt = true }
                             .disabled(store.onlineLoading)
                             .accessibilityIdentifier("technician.visit.interrupt")
-                        Text("签退必须引用已完成现场操作；基础表单已接入，但 Evidence/作业引用尚未形成前不生成占位 operationRefs。")
+                        Text("签退必须引用已完成现场操作；表单与 Evidence 上传已接入，但作业引用尚未形成前不生成占位 operationRefs。")
                             .font(.footnote).foregroundStyle(.secondary)
                             .accessibilityIdentifier("technician.visit.checkout-boundary")
                     }
@@ -241,6 +252,163 @@ private struct TechnicianTaskDetailView: View {
         .accessibilityIdentifier("technician.task.detail")
     }
 }
+
+private struct TechnicianOnlineEvidenceSection: View {
+    let store: TechnicianAppStore
+    let session: TechnicianSession
+    let taskID: UUID
+    let taskStatus: String
+    let executionGuarded: Bool
+
+    var body: some View {
+        Section("在线现场资料") {
+            Text("文件只在本次前台操作中读取；不进入离线草稿或后台上传。完成 PUT 后仍须由服务器扫描与校验。")
+                .font(.footnote).foregroundStyle(.secondary)
+            if store.evidenceSlots.isEmpty {
+                Text(store.evidenceMessage ?? "当前任务没有可上传的资料槽位")
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(store.evidenceSlots) { slot in
+                    TechnicianEvidenceSlotRow(
+                        store: store,
+                        session: session,
+                        taskID: taskID,
+                        slot: slot,
+                        items: store.evidenceItems.filter { $0.evidenceSlotId == slot.slotId },
+                        uploadDisabled: store.evidenceUploading || executionGuarded
+                            || taskStatus != "RUNNING" || !slot.active
+                    )
+                }
+            }
+            if let message = store.evidenceMessage {
+                Text(message).font(.callout).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("technician.evidence.message")
+            }
+        }
+        .accessibilityIdentifier("technician.evidence.section")
+    }
+}
+
+private struct TechnicianEvidenceSlotRow: View {
+    let store: TechnicianAppStore
+    let session: TechnicianSession
+    let taskID: UUID
+    let slot: TechnicianOnlineEvidenceSlot
+    let items: [TechnicianOnlineEvidenceItem]
+    let uploadDisabled: Bool
+    @State private var galleryItem: PhotosPickerItem?
+    @State private var importingFile = false
+    @State private var showingCamera = false
+    @State private var localMessage: String?
+
+    private var acceptsPhoto: Bool { slot.mediaType == "PHOTO" }
+    private var acceptsVideo: Bool { slot.mediaType == "VIDEO" }
+    private var pickerFilter: PHPickerFilter { acceptsVideo ? .videos : .images }
+    private var contentTypes: [UTType] {
+        if acceptsPhoto { return [.image] }
+        if acceptsVideo { return [.movie] }
+        return [.pdf, .plainText, .data]
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(slot.requirementName).font(.headline)
+                if slot.required { Text("必填").font(.caption).foregroundStyle(.red) }
+                Spacer()
+                Text("\(items.count)/\(slot.maxCount.map(String.init) ?? "∞")")
+                    .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+            }
+            Text("\(slot.mediaType) · \(slot.status)")
+                .font(.caption).foregroundStyle(.secondary)
+            ForEach(items.sorted { $0.itemOrdinal < $1.itemOrdinal }) { item in
+                let latest = item.revisions.max { $0.revisionNumber < $1.revisionNumber }
+                Text("第 \(item.itemOrdinal) 项 · \(latest?.status ?? item.status)")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            HStack {
+                if acceptsPhoto {
+                    Button { showingCamera = true } label: {
+                        Label("拍照", systemImage: "camera")
+                    }
+                    .disabled(uploadDisabled || !UIImagePickerController.isSourceTypeAvailable(.camera))
+                }
+                if acceptsPhoto || acceptsVideo {
+                    PhotosPicker(selection: $galleryItem, matching: pickerFilter) {
+                        Label("相册", systemImage: "photo.on.rectangle")
+                    }
+                    .disabled(uploadDisabled)
+                } else {
+                    Button { importingFile = true } label: {
+                        Label("选择文件", systemImage: "doc")
+                    }
+                    .disabled(uploadDisabled)
+                }
+            }
+            if let localMessage { Text(localMessage).font(.caption).foregroundStyle(.red) }
+        }
+        .task(id: galleryItem) {
+            guard let galleryItem else { return }
+            defer { self.galleryItem = nil }
+            do {
+                guard let data = try await galleryItem.loadTransferable(type: Data.self), !data.isEmpty else {
+                    throw TechnicianEvidenceSelectionError.emptySelection
+                }
+                let mimeType = galleryItem.supportedContentTypes.first?.preferredMIMEType
+                    ?? (acceptsVideo ? "video/quicktime" : "image/jpeg")
+                await upload(data: data, fileName: acceptsVideo ? "现场视频.mov" : "现场照片.jpg",
+                             mimeType: mimeType, source: .gallery)
+            } catch {
+                localMessage = "无法读取所选资料，请重新选择"
+            }
+        }
+        .sheet(isPresented: $showingCamera) {
+            TechnicianCameraPicker { image in
+                showingCamera = false
+                guard let data = image.jpegData(compressionQuality: 0.9) else {
+                    localMessage = "无法读取拍摄照片"
+                    return
+                }
+                Task { await upload(data: data, fileName: "现场照片.jpg", mimeType: "image/jpeg", source: .camera) }
+            } onCancel: {
+                showingCamera = false
+            }
+            .ignoresSafeArea()
+        }
+        .fileImporter(isPresented: $importingFile, allowedContentTypes: contentTypes) { result in
+            do {
+                let url = try result.get()
+                let scoped = url.startAccessingSecurityScopedResource()
+                defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+                let data = try Data(contentsOf: url)
+                let mimeType = UTType(filenameExtension: url.pathExtension)?.preferredMIMEType
+                    ?? "application/octet-stream"
+                Task { await upload(data: data, fileName: url.lastPathComponent, mimeType: mimeType, source: .file) }
+            } catch {
+                localMessage = "无法读取所选文件，请重新选择"
+            }
+        }
+        .accessibilityIdentifier("technician.evidence.slot.\(slot.slotId.uuidString.lowercased())")
+    }
+
+    @MainActor
+    private func upload(
+        data: Data,
+        fileName: String,
+        mimeType: String,
+        source: TechnicianEvidenceUploadAsset.Source
+    ) async {
+        localMessage = nil
+        await store.uploadEvidence(
+            session: session,
+            taskID: taskID,
+            slot: slot,
+            asset: .init(data: data, fileName: fileName, mimeType: mimeType, source: source, capturedAt: Date())
+        )
+    }
+}
+
+private enum TechnicianEvidenceSelectionError: Error { case emptySelection }
 
 private struct TechnicianOnlineFormSection: View {
     let store: TechnicianAppStore

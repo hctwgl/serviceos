@@ -37,6 +37,8 @@
     <dict><key>NSAllowsLocalNetworking</key><true/></dict>
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>仅在你主动签到时采集一次位置，用于判断到场范围和记录现场履约事实。</string>
+    <key>NSCameraUsageDescription</key>
+    <string>仅在你主动拍摄现场资料时使用相机，照片用于当前任务的履约证据上传。</string>
     <key>SERVICEOS_API_BASE_URL</key>
     <string>$(SERVICEOS_API_BASE_URL)</string>
     <key>SERVICEOS_CLIENT_VERSION</key>

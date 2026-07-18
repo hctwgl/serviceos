@@ -1,0 +1,28 @@
+package com.serviceos.evidence.api;
+
+import com.serviceos.identity.api.CurrentPrincipal;
+import com.serviceos.shared.CommandMetadata;
+
+import java.util.List;
+import java.util.UUID;
+
+/** Technician Portal 当前责任任务的在线资料适配端口。 */
+public interface TechnicianEvidenceService {
+    List<EvidenceSlotView> listSlots(
+            CurrentPrincipal principal, String correlationId, String technicianContextHeader, UUID taskId);
+
+    List<EvidenceItemView> listItems(
+            CurrentPrincipal principal, String correlationId, String technicianContextHeader, UUID taskId);
+
+    EvidenceUploadSessionView beginUpload(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            String technicianContextHeader,
+            TechnicianBeginEvidenceUploadCommand command);
+
+    EvidenceItemView finalizeUpload(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            String technicianContextHeader,
+            FinalizeEvidenceUploadCommand command);
+}

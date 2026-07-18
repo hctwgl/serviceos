@@ -175,6 +175,53 @@ export type TechnicianFormSubmission = {
   submittedAt: string
 }
 
+export type TechnicianEvidenceSlot = {
+  slotId: string
+  requirementCode: string
+  occurrenceKey: string
+  requirementName: string
+  mediaType: 'PHOTO' | 'VIDEO' | 'DOCUMENT' | 'SIGNATURE' | 'GENERATED_REPORT'
+  required: boolean
+  minCount: number
+  maxCount: number | null
+  status: 'MISSING' | 'PARTIAL' | 'SATISFIED' | 'INVALIDATED'
+  active: boolean
+  transition: string
+  requiredDisposition: 'NONE' | 'REVIEW_REQUIRED'
+}
+
+export type TechnicianEvidenceRevision = {
+  evidenceRevisionId: string
+  revisionNumber: number
+  contentDigest: string
+  mimeType: string
+  sizeBytes: number
+  status: 'STORED' | 'VALIDATING' | 'VALIDATED' | 'VALIDATION_FAILED' | 'QUARANTINED' | 'INVALIDATED'
+  createdAt: string
+}
+
+export type TechnicianEvidenceItem = {
+  evidenceItemId: string
+  taskId: string
+  evidenceSlotId: string
+  itemOrdinal: number
+  status: 'ACTIVE' | 'INVALIDATED'
+  createdAt: string
+  revisions: TechnicianEvidenceRevision[]
+}
+
+export type TechnicianEvidenceUploadSession = {
+  uploadSessionId: string
+  evidenceSlotId: string
+  evidenceItemId: string | null
+  status: string
+  uploadMethod: 'PUT' | null
+  uploadUrl: string | null
+  requiredHeaders: Record<string, string>
+  uploadAuthorizationExpiresAt: string
+  sessionExpiresAt: string
+}
+
 function technicianHeaders(technicianContextId: string): Record<string, string> {
   return { 'X-Technician-Context': technicianContextId }
 }
@@ -231,6 +278,77 @@ export function submitTechnicianTaskForm(
     {
       body: { formVersionId, values },
       idempotencyKey: crypto.randomUUID(),
+      headers: technicianHeaders(technicianContextId),
+    },
+  )
+}
+
+export function listTechnicianTaskEvidenceSlots(technicianContextId: string, taskId: string) {
+  return apiGet<TechnicianEvidenceSlot[]>(
+    `/technician/me/tasks/${encodeURIComponent(taskId)}/evidence-slots`,
+    {}, technicianHeaders(technicianContextId),
+  )
+}
+
+export function listTechnicianTaskEvidenceItems(technicianContextId: string, taskId: string) {
+  return apiGet<TechnicianEvidenceItem[]>(
+    `/technician/me/tasks/${encodeURIComponent(taskId)}/evidence-items`,
+    {}, technicianHeaders(technicianContextId),
+  )
+}
+
+export async function sha256Hex(file: Blob): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer())
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
+export function beginTechnicianEvidenceUpload(
+  technicianContextId: string,
+  taskId: string,
+  slotId: string,
+  body: {
+    evidenceItemId?: string | null
+    originalFileName: string
+    declaredMimeType: string
+    expectedSize: number
+    expectedSha256: string
+    captureSource: 'CAMERA' | 'GALLERY' | 'FILE'
+    capturedAt: string
+  },
+) {
+  return apiPost<TechnicianEvidenceUploadSession>(
+    `/technician/me/tasks/${encodeURIComponent(taskId)}/evidence-slots/${encodeURIComponent(slotId)}/upload-sessions`,
+    { body, idempotencyKey: crypto.randomUUID(), headers: technicianHeaders(technicianContextId) },
+  )
+}
+
+/** 数据面只使用服务端返回的短期受限 URL/headers，不携带 JWT 或 Portal Context。 */
+export async function putTechnicianEvidenceUpload(
+  session: TechnicianEvidenceUploadSession,
+  file: Blob,
+): Promise<void> {
+  if (!session.uploadUrl || session.uploadMethod !== 'PUT') {
+    throw new Error('上传会话未返回受限 PUT 地址')
+  }
+  const response = await fetch(session.uploadUrl, {
+    method: 'PUT', headers: session.requiredHeaders, body: file,
+  })
+  if (!response.ok) throw new Error(`资料上传失败（HTTP ${response.status}）`)
+}
+
+export function finalizeTechnicianEvidenceUpload(
+  technicianContextId: string,
+  taskId: string,
+  slotId: string,
+  uploadSessionId: string,
+  actualSha256: string,
+) {
+  return apiPost<TechnicianEvidenceItem>(
+    `/technician/me/tasks/${encodeURIComponent(taskId)}/evidence-slots/${encodeURIComponent(slotId)}`
+      + `/upload-sessions/${encodeURIComponent(uploadSessionId)}:finalize`,
+    {
+      body: { actualSha256, finalizeCommandId: crypto.randomUUID() },
       headers: technicianHeaders(technicianContextId),
     },
   )

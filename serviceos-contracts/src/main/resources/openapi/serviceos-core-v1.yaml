@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.23
+  version: 1.0.24
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -2488,6 +2488,116 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/TechnicianFormSubmission' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /technician/me/tasks/{taskId}/evidence-slots:
+    get:
+      operationId: listTechnicianTaskEvidenceSlots
+      summary: 查询当前责任任务的活动资料槽位
+      description: |
+        M264：先实时验证 Technician Context、ACTIVE 网点关系、task.readAssigned、资源网点与当前责任，
+        再按 evidence.read 查询可靠解析结果。仅返回移动端展示所需槽位元数据，不返回冻结规则 JSON。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/TechnicianContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 当前任务资料槽位；无要求时返回空数组
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/TechnicianEvidenceSlot' } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /technician/me/tasks/{taskId}/evidence-items:
+    get:
+      operationId: listTechnicianTaskEvidenceItems
+      summary: 查询当前责任任务的安全资料版本摘要
+      description: M264：不返回 fileObjectId、上传者、原始 CaptureMetadata、扫描详情或永久 URL。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/TechnicianContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 当前任务资料项与不可变版本安全摘要
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/TechnicianEvidenceItem' } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /technician/me/tasks/{taskId}/evidence-slots/{slotId}/upload-sessions:
+    post:
+      operationId: beginTechnicianEvidenceUpload
+      summary: 当前师傅为资料槽位创建在线受限上传会话
+      description: |
+        M264：请求不接受 tenant、uploader、offline、locationVerified、onBehalfOf 或对象 key。
+        服务端固定 online，Evidence/Files 内核继续校验 RUNNING/guard、evidence.submit、file.upload、
+        slot maxCount、checksum、幂等与受限短期 PUT。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - name: slotId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/TechnicianContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TechnicianBeginEvidenceUploadRequest' }
+      responses:
+        '201':
+          description: 受限上传会话创建或幂等重放成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TechnicianEvidenceUploadSession' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /technician/me/tasks/{taskId}/evidence-slots/{slotId}/upload-sessions/{uploadSessionId}:finalize:
+    post:
+      operationId: finalizeTechnicianEvidenceUpload
+      summary: Finalize 当前师傅在线资料并创建不可变 Revision
+      description: |
+        M264：先由 Files 重新读取对象并验证大小、checksum 与魔数 MIME，再由 Evidence 短事务写入
+        Item/Revision、槽位投影、审计、幂等结果和 Outbox。对象 I/O 不占用资料事务。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - name: slotId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: uploadSessionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/TechnicianContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TechnicianFinalizeEvidenceUploadRequest' }
+      responses:
+        '201':
+          description: 不可变资料项/版本创建或幂等重放成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TechnicianEvidenceItem' }
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
@@ -8873,6 +8983,86 @@ components:
           type: array
           items: { $ref: '#/components/schemas/TechnicianFormValidationIssue' }
         submittedAt: { type: string, format: date-time }
+    TechnicianEvidenceSlot:
+      type: object
+      additionalProperties: false
+      required: [slotId, requirementCode, occurrenceKey, requirementName, mediaType, required,
+                 minCount, maxCount, status, active, transition, requiredDisposition]
+      properties:
+        slotId: { type: string, format: uuid }
+        requirementCode: { type: string, minLength: 1, maxLength: 128 }
+        occurrenceKey: { type: string, minLength: 1, maxLength: 64 }
+        requirementName: { type: string, minLength: 1, maxLength: 200 }
+        mediaType: { enum: [PHOTO, VIDEO, DOCUMENT, SIGNATURE, GENERATED_REPORT] }
+        required: { type: boolean }
+        minCount: { type: integer, minimum: 0 }
+        maxCount: { type: [integer, 'null'], minimum: 1 }
+        status: { enum: [MISSING, PARTIAL, SATISFIED, INVALIDATED] }
+        active: { type: boolean }
+        transition: { enum: [ACTIVATED, UNCHANGED_ACTIVE, DEACTIVATED, UNCHANGED_INACTIVE] }
+        requiredDisposition: { enum: [NONE, REVIEW_REQUIRED] }
+    TechnicianBeginEvidenceUploadRequest:
+      type: object
+      additionalProperties: false
+      required: [originalFileName, declaredMimeType, expectedSize, expectedSha256, captureSource, capturedAt]
+      properties:
+        evidenceItemId: { type: [string, 'null'], format: uuid }
+        originalFileName: { type: string, minLength: 1, maxLength: 255 }
+        declaredMimeType: { type: string, minLength: 3, maxLength: 128 }
+        expectedSize: { type: integer, format: int64, minimum: 1 }
+        expectedSha256: { type: string, pattern: '^[0-9A-Fa-f]{64}$' }
+        captureSource: { enum: [CAMERA, GALLERY, FILE] }
+        capturedAt: { type: string, format: date-time }
+    TechnicianFinalizeEvidenceUploadRequest:
+      type: object
+      additionalProperties: false
+      required: [actualSha256, finalizeCommandId]
+      properties:
+        actualSha256: { type: string, pattern: '^[0-9A-Fa-f]{64}$' }
+        finalizeCommandId: { type: string, minLength: 1, maxLength: 160 }
+    TechnicianEvidenceUploadSession:
+      type: object
+      additionalProperties: false
+      required: [uploadSessionId, evidenceSlotId, status, uploadMethod, uploadUrl,
+                 requiredHeaders, uploadAuthorizationExpiresAt, sessionExpiresAt]
+      properties:
+        uploadSessionId: { type: string, format: uuid }
+        evidenceSlotId: { type: string, format: uuid }
+        evidenceItemId: { type: [string, 'null'], format: uuid }
+        status: { enum: [CREATED, UPLOADING, FINALIZING, COMPLETED, EXPIRED, FAILED] }
+        uploadMethod: { type: [string, 'null'], enum: [PUT, null] }
+        uploadUrl: { type: [string, 'null'], format: uri }
+        requiredHeaders:
+          type: object
+          additionalProperties: { type: string }
+        uploadAuthorizationExpiresAt: { type: string, format: date-time }
+        sessionExpiresAt: { type: string, format: date-time }
+    TechnicianEvidenceRevision:
+      type: object
+      additionalProperties: false
+      required: [evidenceRevisionId, revisionNumber, contentDigest, mimeType, sizeBytes, status, createdAt]
+      properties:
+        evidenceRevisionId: { type: string, format: uuid }
+        revisionNumber: { type: integer, minimum: 1 }
+        contentDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
+        mimeType: { type: string, minLength: 3, maxLength: 128 }
+        sizeBytes: { type: integer, format: int64, minimum: 1 }
+        status: { enum: [STORED, VALIDATING, VALIDATED, VALIDATION_FAILED, QUARANTINED, INVALIDATED] }
+        createdAt: { type: string, format: date-time }
+    TechnicianEvidenceItem:
+      type: object
+      additionalProperties: false
+      required: [evidenceItemId, taskId, evidenceSlotId, itemOrdinal, status, createdAt, revisions]
+      properties:
+        evidenceItemId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        evidenceSlotId: { type: string, format: uuid }
+        itemOrdinal: { type: integer, minimum: 1 }
+        status: { enum: [ACTIVE, INVALIDATED] }
+        createdAt: { type: string, format: date-time }
+        revisions:
+          type: array
+          items: { $ref: '#/components/schemas/TechnicianEvidenceRevision' }
     VisitLocation:
       type: object
       additionalProperties: false
