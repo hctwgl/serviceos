@@ -12,6 +12,8 @@ import {
   beginTechnicianEvidenceUpload,
   putTechnicianEvidenceUpload,
   finalizeTechnicianEvidenceUpload,
+  createTechnicianTaskEvidenceSetSnapshot,
+  completeTechnicianTask,
   sha256Hex,
   type TechnicianEvidenceItem,
   type TechnicianEvidenceSlot,
@@ -41,6 +43,8 @@ const selectedEvidenceFiles = ref<Record<string, File | undefined>>({})
 const evidenceLoading = ref(false)
 const evidenceUploadingSlotId = ref<string | null>(null)
 const evidenceMessage = ref<string | null>(null)
+const taskSubmitting = ref(false)
+const taskSubmissionMessage = ref<string | null>(null)
 
 const supportedFormTypes = new Set(['STRING', 'TEXT', 'INTEGER', 'DECIMAL', 'BOOLEAN', 'DATE', 'DATETIME'])
 const activeForm = computed(() => taskForms.value[0] ?? null)
@@ -330,6 +334,44 @@ async function loadEvidence(taskId: string) {
   }
 }
 
+async function completeTask() {
+  const context = props.technicianContextId
+  const task = detail.value
+  if (!context || !task || taskSubmitting.value) return
+  const revisionIds = evidenceItems.value
+    .filter((item) => item.status === 'ACTIVE')
+    .map((item) => item.revisions.filter((revision) => revision.status === 'VALIDATED')
+      .sort((left, right) => right.revisionNumber - left.revisionNumber)[0]?.evidenceRevisionId)
+    .filter((id): id is string => Boolean(id))
+  const formSubmissionId = activeForm.value
+    ? task.formSubmissions?.filter((submission) => submission.validationStatus === 'VALIDATED')
+      .sort((left, right) => right.submissionVersion - left.submissionVersion)[0]?.submissionId ?? null
+    : null
+  if (revisionIds.length === 0) {
+    taskSubmissionMessage.value = '没有可冻结的 VALIDATED 资料版本；请等待服务器扫描与机器校验'
+    return
+  }
+  if (activeForm.value && !formSubmissionId) {
+    taskSubmissionMessage.value = '当前表单尚无 VALIDATED 提交，不能完成任务'
+    return
+  }
+  taskSubmitting.value = true
+  taskSubmissionMessage.value = '正在冻结不可变资料集合…'
+  try {
+    const snapshot = await createTechnicianTaskEvidenceSetSnapshot(context, task.taskId, revisionIds)
+    taskSubmissionMessage.value = '资料集合已冻结，正在由服务器复核双输入并完成任务…'
+    await completeTechnicianTask(
+      context, task.taskId, task.resourceVersion, snapshot.data.evidenceSetSnapshotId, formSubmissionId,
+    )
+    taskSubmissionMessage.value = '任务已由服务器完成；Snapshot 与输入版本引用均已冻结'
+    await load()
+  } catch (err) {
+    taskSubmissionMessage.value = userFacingError(err, '任务提交失败，请刷新任务状态后重试')
+  } finally {
+    taskSubmitting.value = false
+  }
+}
+
 async function load() {
   const taskId = String(route.params.id ?? '')
   if (!props.technicianContextId) {
@@ -547,6 +589,25 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
           </article>
         </div>
         <p v-if="evidenceMessage" role="status" data-testid="technician-evidence-message">{{ evidenceMessage }}</p>
+      </section>
+
+      <section class="task-submission" data-testid="technician-task-submission">
+        <div class="section-title">
+          <h3>冻结资料并完成任务</h3>
+          <span>Snapshot → 服务端复核 → Complete</span>
+        </div>
+        <p class="hint">
+          客户端只选择每个 ACTIVE Item 的最新 VALIDATED Revision；不可变引用、摘要和输入版本均由服务器重新读取并冻结。
+        </p>
+        <button
+          type="button"
+          :disabled="taskSubmitting || evidenceLoading || evidenceUploadingSlotId !== null || detail.executionGuarded || detail.taskStatus !== 'RUNNING'"
+          data-testid="technician-task-complete"
+          @click="completeTask"
+        >{{ taskSubmitting ? '服务器复核并完成中…' : '冻结资料并完成任务' }}</button>
+        <p v-if="taskSubmissionMessage" role="status" data-testid="technician-task-submission-message">
+          {{ taskSubmissionMessage }}
+        </p>
       </section>
 
       <section class="visits">

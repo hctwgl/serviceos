@@ -8,6 +8,7 @@ const APPOINTMENT_ID = '019f84b0-cccc-7f8c-9505-36fe5c0ee003'
 const EVIDENCE_SLOT_ID = '019f84b0-dddc-7f8c-9505-36fe5c0ee011'
 const EVIDENCE_ITEM_ID = '019f84b0-dddb-7f8c-9505-36fe5c0ee012'
 const EVIDENCE_REVISION_ID = '019f84b0-ddda-7f8c-9505-36fe5c0ee013'
+const EVIDENCE_SNAPSHOT_ID = '019f84b0-ddd8-7f8c-9505-36fe5c0ee015'
 
 async function loginWithLocalKeycloak(
   page: Page,
@@ -28,8 +29,9 @@ async function loginWithLocalKeycloak(
 
 async function stubTechnicianContext(
   page: Page,
-  options: { visits?: Array<Record<string, unknown>>; taskStatus?: string } = {},
+  options: { visits?: Array<Record<string, unknown>>; taskStatus?: string; validatedEvidence?: boolean } = {},
 ) {
+  let taskStatus = options.taskStatus ?? 'READY'
   let visits = options.visits ?? [{
     visitId: '019f84b0-fffe-7f8c-9505-36fe5c0ee007',
     taskId: TASK_ID,
@@ -56,7 +58,14 @@ async function stubTechnicianContext(
     warningCount: 1,
     submittedAt: '2026-07-19T02:00:00Z',
   }]
-  let evidenceItems: Array<Record<string, unknown>> = []
+  let evidenceItems: Array<Record<string, unknown>> = options.validatedEvidence ? [{
+    evidenceItemId: EVIDENCE_ITEM_ID, taskId: TASK_ID, evidenceSlotId: EVIDENCE_SLOT_ID,
+    itemOrdinal: 1, status: 'ACTIVE', createdAt: '2026-07-19T03:00:00Z', revisions: [{
+      evidenceRevisionId: EVIDENCE_REVISION_ID, revisionNumber: 1,
+      contentDigest: 'c'.repeat(64), mimeType: 'image/jpeg', sizeBytes: 10,
+      status: 'VALIDATED', createdAt: '2026-07-19T03:00:00Z',
+    }],
+  }] : []
   let expectedEvidenceDigest = ''
   await page.route('**/api/v1/me/contexts**', async (route: Route) => {
     await route.fulfill({
@@ -193,6 +202,38 @@ async function stubTechnicianContext(
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(evidenceItems) })
       return
     }
+    if (pathname.endsWith('/evidence-set-snapshots') && route.request().method() === 'POST') {
+      const request = route.request()
+      const body = request.postDataJSON()
+      expect(request.headers()['idempotency-key']).toBeTruthy()
+      expect(body).toEqual({ memberRevisionIds: [EVIDENCE_REVISION_ID] })
+      await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({
+        evidenceSetSnapshotId: EVIDENCE_SNAPSHOT_ID, taskId: TASK_ID, purpose: 'TASK_SUBMISSION',
+        memberCount: 1, contentDigest: 'd'.repeat(64), createdAt: '2026-07-19T03:10:00Z',
+        members: [{ evidenceRevisionId: EVIDENCE_REVISION_ID, evidenceItemId: EVIDENCE_ITEM_ID,
+          evidenceSlotId: EVIDENCE_SLOT_ID, revisionNumber: 1, revisionStatus: 'VALIDATED',
+          contentDigest: 'c'.repeat(64), memberOrdinal: 1 }],
+      }) })
+      return
+    }
+    if (pathname.endsWith(`${TASK_ID}:complete`) && route.request().method() === 'POST') {
+      const request = route.request()
+      const body = request.postDataJSON()
+      expect(request.headers()['idempotency-key']).toBeTruthy()
+      expect(request.headers()['if-match']).toBe('"3"')
+      expect(body).toEqual({
+        evidenceSetSnapshotId: EVIDENCE_SNAPSHOT_ID,
+        formSubmissionId: formSubmissions.at(-1)?.submissionId,
+      })
+      expect(body).not.toHaveProperty('resultRef')
+      expect(body).not.toHaveProperty('inputVersionRefs')
+      taskStatus = 'COMPLETED'
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+        taskId: TASK_ID, status: 'COMPLETED', resourceVersion: 4,
+        occurredAt: '2026-07-19T03:11:00Z',
+      }) })
+      return
+    }
     if (pathname.endsWith(':finalize') && pathname.includes('/evidence-slots/')) {
       const body = route.request().postDataJSON()
       expect(body.actualSha256).toBe(expectedEvidenceDigest)
@@ -240,7 +281,7 @@ async function stubTechnicianContext(
         taskType: 'INSTALLATION',
         taskKind: 'HUMAN',
         stageCode: 'INSTALL',
-        taskStatus: options.taskStatus ?? 'READY',
+        taskStatus,
         businessType: 'INSTALLATION',
         effectiveFrom: '2026-07-18T02:00:00Z',
         executionGuarded: false,
@@ -409,5 +450,17 @@ test.describe('M246 Technician Portal 表单提交安全摘要', () => {
     await expect(page.getByTestId('technician-evidence-message')).toContainText('等待扫描与机器校验')
     await expect(page.getByTestId(`technician-evidence-slot-${EVIDENCE_SLOT_ID}`)).toContainText('Revision 1 · STORED')
     await expect(page.getByTestId('technician-online-evidence')).toContainText('不后台重试')
+  })
+
+  test('M265-01：只提交已校验版本 ID，由服务器冻结引用与摘要后完成任务', async ({ page }) => {
+    await stubTechnicianContext(page, { taskStatus: 'RUNNING', validatedEvidence: true })
+    await loginWithLocalKeycloak(page)
+    await navigateTechnician(page, `/technician-portal/tasks/${TASK_ID}`)
+
+    await page.getByTestId('technician-task-complete').click()
+
+    await expect(page.getByTestId('technician-task-submission-message')).toContainText('输入版本引用均已冻结')
+    await expect(page.getByTestId('technician-task-detail-status')).toHaveText('COMPLETED')
+    await expect(page.getByTestId('technician-task-submission')).toContainText('服务器重新读取并冻结')
   })
 })
