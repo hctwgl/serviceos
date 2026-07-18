@@ -1,6 +1,6 @@
 /**
- * 兼容 M188 stub 入口：委托给 Network Portal 导航加载器。
- * 完整 UI 见 `/network-portal/*`（M194）。
+ * Admin 仅保留 M188 诊断入口：验证 NETWORK Context 与服务端导航失败关闭。
+ * 正式产品 UI 已迁移到独立 `serviceos-network-web`，不得在 Admin 恢复业务路由。
  */
 import {
   loadNetworkPortalNavigation as loadNetworkPortalNavState,

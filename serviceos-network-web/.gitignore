@@ -1,5 +1,7 @@
 node_modules
 dist
+target
+test-results
 *.local
 *.log
 .DS_Store

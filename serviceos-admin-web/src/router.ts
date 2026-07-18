@@ -43,20 +43,6 @@ import GrantDirectoryPage from './pages/GrantDirectoryPage.vue'
 import PortalStubsPage from './pages/PortalStubsPage.vue'
 import UiPreferencesPage from './pages/UiPreferencesPage.vue'
 import SearchPage from './pages/SearchPage.vue'
-import NetworkPortalShell from './pages/NetworkPortalShell.vue'
-import NetworkPortalWorkbenchPage from './pages/NetworkPortalWorkbenchPage.vue'
-import NetworkPortalWorkOrdersPage from './pages/NetworkPortalWorkOrdersPage.vue'
-import NetworkPortalTasksPage from './pages/NetworkPortalTasksPage.vue'
-import NetworkPortalTechniciansPage from './pages/NetworkPortalTechniciansPage.vue'
-import NetworkPortalCorrectionsPage from './pages/NetworkPortalCorrectionsPage.vue'
-import NetworkPortalCorrectionDetailPage from './pages/NetworkPortalCorrectionDetailPage.vue'
-import NetworkPortalExceptionDetailPage from './pages/NetworkPortalExceptionDetailPage.vue'
-import NetworkPortalQualificationDetailPage from './pages/NetworkPortalQualificationDetailPage.vue'
-import NetworkPortalMembershipDetailPage from './pages/NetworkPortalMembershipDetailPage.vue'
-import NetworkPortalWorkOrderWorkspacePage from './pages/NetworkPortalWorkOrderWorkspacePage.vue'
-import NetworkPortalExceptionsPage from './pages/NetworkPortalExceptionsPage.vue'
-import NetworkPortalQualificationsPage from './pages/NetworkPortalQualificationsPage.vue'
-import NetworkPortalCapacityPage from './pages/NetworkPortalCapacityPage.vue'
 import TechnicianPortalShell from './pages/TechnicianPortalShell.vue'
 import TechnicianPortalTaskFeedPage from './pages/TechnicianPortalTaskFeedPage.vue'
 import TechnicianPortalSchedulePage from './pages/TechnicianPortalSchedulePage.vue'
@@ -219,91 +205,6 @@ export const router = createRouter({
         },
         { path: 'settings/preferences', name: 'ADMIN.UI.PREFERENCES', component: UiPreferencesPage },
         { path: 'settings/token', name: 'ADMIN.TOKEN', component: TokenPage },
-      ],
-    },
-    {
-      path: '/network-portal',
-      component: NetworkPortalShell,
-      children: [
-        { path: '', redirect: { name: 'NETWORK.WORKBENCH' } },
-        {
-          path: 'workbench',
-          name: 'NETWORK.WORKBENCH',
-          component: NetworkPortalWorkbenchPage,
-          meta: { pageId: 'NETWORK.WORKBENCH' },
-        },
-        {
-          path: 'work-orders',
-          name: 'NETWORK.WORKORDER.LIST',
-          component: NetworkPortalWorkOrdersPage,
-          meta: { pageId: 'NETWORK.WORKORDER.LIST' },
-        },
-        {
-          path: 'work-orders/:id',
-          name: 'NETWORK.WORKORDER.WORKSPACE',
-          component: NetworkPortalWorkOrderWorkspacePage,
-          meta: { pageId: 'NETWORK.WORKORDER.WORKSPACE' },
-        },
-        {
-          path: 'tasks',
-          name: 'NETWORK.TASK.QUEUE',
-          component: NetworkPortalTasksPage,
-          meta: { pageId: 'NETWORK.TASK.QUEUE' },
-        },
-        {
-          path: 'technicians',
-          name: 'NETWORK.TECHNICIAN.LIST',
-          component: NetworkPortalTechniciansPage,
-          meta: { pageId: 'NETWORK.TECHNICIAN.LIST' },
-        },
-        {
-          path: 'technicians/memberships/:id',
-          name: 'NETWORK.TECHNICIAN.MEMBERSHIP.DETAIL',
-          component: NetworkPortalMembershipDetailPage,
-          meta: { pageId: 'NETWORK.TECHNICIAN.LIST' },
-        },
-        {
-          path: 'corrections',
-          name: 'NETWORK.CORRECTION.QUEUE',
-          component: NetworkPortalCorrectionsPage,
-          meta: { pageId: 'NETWORK.CORRECTION.QUEUE' },
-        },
-        {
-          path: 'corrections/:id',
-          name: 'NETWORK.CORRECTION.DETAIL',
-          component: NetworkPortalCorrectionDetailPage,
-          meta: { pageId: 'NETWORK.CORRECTION.QUEUE' },
-        },
-        {
-          path: 'exceptions',
-          name: 'NETWORK.EXCEPTION.QUEUE',
-          component: NetworkPortalExceptionsPage,
-          meta: { pageId: 'NETWORK.EXCEPTION.QUEUE' },
-        },
-        {
-          path: 'exceptions/:id',
-          name: 'NETWORK.EXCEPTION.DETAIL',
-          component: NetworkPortalExceptionDetailPage,
-          meta: { pageId: 'NETWORK.EXCEPTION.QUEUE' },
-        },
-        {
-          path: 'qualifications',
-          name: 'NETWORK.QUALIFICATION',
-          component: NetworkPortalQualificationsPage,
-          meta: { pageId: 'NETWORK.QUALIFICATION' },
-        },
-        {
-          path: 'qualifications/:id',
-          name: 'NETWORK.QUALIFICATION.DETAIL',
-          component: NetworkPortalQualificationDetailPage,
-          meta: { pageId: 'NETWORK.QUALIFICATION' },
-        },
-        {
-          path: 'capacity',
-          name: 'NETWORK.CAPACITY',
-          component: NetworkPortalCapacityPage,
-          meta: { pageId: 'NETWORK.CAPACITY' },
-        },
       ],
     },
     {

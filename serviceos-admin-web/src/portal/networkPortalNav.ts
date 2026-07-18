@@ -93,34 +93,3 @@ export async function loadNetworkPortalNavigation(
     }
   }
 }
-
-export function networkPortalRoutePath(pageId: string): string {
-  switch (pageId) {
-    case 'NETWORK.WORKBENCH':
-      return '/network-portal/workbench'
-    case 'NETWORK.WORKORDER.LIST':
-      return '/network-portal/work-orders'
-    case 'NETWORK.WORKORDER.WORKSPACE':
-      return '/network-portal/work-orders'
-    case 'NETWORK.TASK.QUEUE':
-      return '/network-portal/tasks'
-    case 'NETWORK.TECHNICIAN.LIST':
-      return '/network-portal/technicians'
-    case 'NETWORK.QUALIFICATION':
-      return '/network-portal/qualifications'
-    case 'NETWORK.TECHNICIAN.ASSIGN':
-      return '/network-portal/tasks'
-    case 'NETWORK.APPOINTMENT':
-      return '/network-portal/tasks'
-    case 'NETWORK.EVIDENCE.SUPPLEMENT':
-      return '/network-portal/tasks'
-    case 'NETWORK.CORRECTION.QUEUE':
-      return '/network-portal/corrections'
-    case 'NETWORK.EXCEPTION.QUEUE':
-      return '/network-portal/exceptions'
-    case 'NETWORK.CAPACITY':
-      return '/network-portal/capacity'
-    default:
-      return '/network-portal/workbench'
-  }
-}
