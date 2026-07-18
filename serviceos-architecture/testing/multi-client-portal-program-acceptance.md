@@ -95,8 +95,8 @@ lastUpdated: 2026-07-18
 | MCP-ONLINE-03 | Check-in | 主动采集时间/GPS/精度，策略可解释 | M262 one-shot CoreLocation + Foundation/service tests；真机精度待补 |
 | MCP-ONLINE-04 | Visit | 无法施工、中断、Check-out 和版本校验正确 | M262 中断与 quoted If-Match 已证明；真实 operationRefs check-out/device E2E 待补 |
 | MCP-ONLINE-05 | 表单 | 本地草稿、条件、单位和服务端校验一致 | M263 已证明冻结基础字段与服务端校验；草稿/条件/单位/device E2E 待补 |
-| MCP-ONLINE-06 | 相机与资料 | 原生采集、metadata、checksum 和 Slot 规则正确 | real-device tests |
-| MCP-ONLINE-07 | 在线上传 | 进度、失败、重试、finalize 和服务端校验正确 | upload tests |
+| MCP-ONLINE-06 | 相机与资料 | 原生采集、metadata、checksum 和 Slot 规则正确 | M264 已证明 H5 文件选择、iOS 相机/相册/文件接线、checksum/Slot 与隐私门禁；物理设备采集待补 |
+| MCP-ONLINE-07 | 在线上传 | 进度、失败、重试、finalize 和服务端校验正确 | M264 已证明在线 Begin/无凭证 PUT/Finalize 与诚实状态；弱网重试、断点/后台、生产扫描待补 |
 | MCP-ONLINE-08 | 提交门禁 | 必需表单/资料/Visit 未满足时不能误完成 | E2E |
 | MCP-ONLINE-09 | 整改 | 仅处理驳回项，产生新 revision 并保留历史 | E2E |
 

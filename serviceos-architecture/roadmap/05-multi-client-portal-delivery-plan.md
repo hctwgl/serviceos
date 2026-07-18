@@ -140,7 +140,7 @@ lastUpdated: 2026-07-18
 1. 联系对象权威引用、联系记录和预约；
 2. Check-in、Visit、无法施工、Check-out；
 3. 动态表单和在线草稿（M263 已交付冻结基础字段在线提交；条件/选项/高级控件与草稿冲突仍待后续）；
-4. EvidenceSlot、相机/浏览器上传、checksum 和 finalize；
+4. EvidenceSlot、相机/浏览器上传、checksum 和 finalize（M264 已交付在线前台单文件链路；真机、弱网、断点/后台和生产扫描待补）；
 5. 提交前检查和任务完成门禁；
 6. 审核驳回、Correction Task 和单项补传。
 
