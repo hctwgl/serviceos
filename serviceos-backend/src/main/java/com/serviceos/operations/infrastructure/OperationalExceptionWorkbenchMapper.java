@@ -27,6 +27,8 @@ interface OperationalExceptionWorkbenchMapper {
 
     Map<String, Object> findById(@Param("tenantId") String tenantId, @Param("exceptionId") UUID exceptionId);
 
+    List<Map<String, Object>> listByTask(@Param("tenantId") String tenantId, @Param("taskId") String taskId);
+
     int acknowledge(
             @Param("tenantId") String tenantId, @Param("exceptionId") UUID exceptionId,
             @Param("expectedVersion") long expectedVersion, @Param("actorId") String actorId,

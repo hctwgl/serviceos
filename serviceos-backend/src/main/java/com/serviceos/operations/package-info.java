@@ -5,7 +5,7 @@
         displayName = "Operational Exception",
         allowedDependencies = {
                 "shared", "identity::api", "authorization::api", "audit::api",
-                "reliability::api", "reliability::spi", "task::api"
+                "reliability::api", "reliability::spi", "task::api", "dispatch::api"
         }
 )
 package com.serviceos.operations;

@@ -8,4 +8,11 @@ import com.serviceos.identity.api.CurrentPrincipal;
 public interface NetworkAuthorizationPort {
     NetworkAuthorizationEvidence requireTenantCapability(
             CurrentPrincipal principal, String capability, String resourceId, String correlationId);
+
+    /**
+     * NETWORK scope 能力门禁。TENANT 级授予仍覆盖；供 Network Portal 收窄委托路径使用。
+     */
+    NetworkAuthorizationEvidence requireNetworkCapability(
+            CurrentPrincipal principal, String capability, String networkId,
+            String resourceId, String correlationId);
 }

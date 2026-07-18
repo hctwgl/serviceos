@@ -5,12 +5,16 @@ import com.serviceos.evidence.api.CorrectionResubmissionView;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
 import com.serviceos.readmodel.api.NetworkPortalCapacityItem;
 import com.serviceos.readmodel.api.NetworkPortalCorrectionItem;
+import com.serviceos.readmodel.api.NetworkPortalExceptionItem;
+import com.serviceos.readmodel.api.NetworkPortalMembershipItem;
 import com.serviceos.readmodel.api.NetworkPortalPage;
+import com.serviceos.readmodel.api.NetworkPortalQualificationItem;
 import com.serviceos.readmodel.api.NetworkPortalQueryService;
 import com.serviceos.readmodel.api.NetworkPortalTaskItem;
 import com.serviceos.readmodel.api.NetworkPortalTechnicianItem;
 import com.serviceos.readmodel.api.NetworkPortalWorkbenchView;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderItem;
+import com.serviceos.readmodel.api.NetworkPortalWorkOrderWorkspace;
 import com.serviceos.shared.CorrelationIds;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -46,6 +50,19 @@ final class NetworkPortalController {
             @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
     ) {
         return response(queries.listWorkOrders(principals.current(), correlationId, networkContext), correlationId);
+    }
+
+    @GetMapping("/work-orders/{workOrderId}/workspace")
+    ResponseEntity<NetworkPortalWorkOrderWorkspace> workOrderWorkspace(
+            @PathVariable("workOrderId") UUID workOrderId,
+            @RequestHeader(value = "X-Network-Context", required = false) String networkContext,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        NetworkPortalWorkOrderWorkspace body = queries.getWorkOrderWorkspace(
+                principals.current(), correlationId, networkContext, workOrderId);
+        return ResponseEntity.ok()
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(body);
     }
 
     @GetMapping("/tasks")
@@ -108,6 +125,91 @@ final class NetworkPortalController {
         return ResponseEntity.ok()
                 .header(CorrelationIds.HEADER_NAME, correlationId)
                 .body(toCorrectionResponse(view));
+    }
+
+    @GetMapping("/operational-exceptions")
+    ResponseEntity<NetworkPortalPage<NetworkPortalExceptionItem>> operationalExceptions(
+            @RequestHeader(value = "X-Network-Context", required = false) String networkContext,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "taskId", required = false) UUID taskId,
+            @RequestParam(value = "severity", required = false) String severity,
+            @RequestParam(value = "limit", required = false) Integer limit
+    ) {
+        return response(
+                queries.listExceptions(
+                        principals.current(), correlationId, networkContext,
+                        status, taskId, severity, limit),
+                correlationId);
+    }
+
+    @GetMapping("/operational-exceptions/{exceptionId}")
+    ResponseEntity<NetworkPortalExceptionItem> operationalException(
+            @PathVariable UUID exceptionId,
+            @RequestHeader(value = "X-Network-Context", required = false) String networkContext,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        NetworkPortalExceptionItem body = queries.getException(
+                principals.current(), correlationId, networkContext, exceptionId);
+        return ResponseEntity.ok()
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(body);
+    }
+
+    @GetMapping("/technician-qualifications")
+    ResponseEntity<NetworkPortalPage<NetworkPortalQualificationItem>> technicianQualifications(
+            @RequestHeader(value = "X-Network-Context", required = false) String networkContext,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "technicianProfileId", required = false) UUID technicianProfileId,
+            @RequestParam(value = "limit", required = false) Integer limit
+    ) {
+        return response(
+                queries.listQualifications(
+                        principals.current(), correlationId, networkContext,
+                        status, technicianProfileId, limit),
+                correlationId);
+    }
+
+    @GetMapping("/technician-qualifications/{qualificationId}")
+    ResponseEntity<NetworkPortalQualificationItem> technicianQualification(
+            @PathVariable UUID qualificationId,
+            @RequestHeader(value = "X-Network-Context", required = false) String networkContext,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        NetworkPortalQualificationItem body = queries.getQualification(
+                principals.current(), correlationId, networkContext, qualificationId);
+        return ResponseEntity.ok()
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(body);
+    }
+
+    @GetMapping("/technician-memberships")
+    ResponseEntity<NetworkPortalPage<NetworkPortalMembershipItem>> technicianMemberships(
+            @RequestHeader(value = "X-Network-Context", required = false) String networkContext,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "technicianProfileId", required = false) UUID technicianProfileId,
+            @RequestParam(value = "limit", required = false) Integer limit
+    ) {
+        return response(
+                queries.listMemberships(
+                        principals.current(), correlationId, networkContext,
+                        status, technicianProfileId, limit),
+                correlationId);
+    }
+
+    @GetMapping("/technician-memberships/{membershipId}")
+    ResponseEntity<NetworkPortalMembershipItem> technicianMembership(
+            @PathVariable UUID membershipId,
+            @RequestHeader(value = "X-Network-Context", required = false) String networkContext,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        NetworkPortalMembershipItem body = queries.getMembership(
+                principals.current(), correlationId, networkContext, membershipId);
+        return ResponseEntity.ok()
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(body);
     }
 
     private static <T> ResponseEntity<NetworkPortalPage<T>> response(

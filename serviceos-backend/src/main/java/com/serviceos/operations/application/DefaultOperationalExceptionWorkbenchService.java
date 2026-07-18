@@ -7,6 +7,8 @@ import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.authorization.api.AuthorizedProjectScope;
 import com.serviceos.authorization.api.ProjectScopeAuthorizationService;
+import com.serviceos.dispatch.api.ActiveServiceResponsibility;
+import com.serviceos.dispatch.api.ActiveServiceResponsibilityService;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.operations.api.AcknowledgeOperationalExceptionCommand;
 import com.serviceos.operations.api.OperationalExceptionAcknowledgement;
@@ -23,6 +25,8 @@ import com.serviceos.shared.CommandContext;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.shared.Sha256;
+import com.serviceos.task.api.TaskFulfillmentContext;
+import com.serviceos.task.api.TaskFulfillmentContextService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
@@ -53,6 +57,8 @@ final class DefaultOperationalExceptionWorkbenchService implements OperationalEx
     private final OperationalExceptionWorkbenchRepository repository;
     private final AuthorizationService authorization;
     private final ProjectScopeAuthorizationService projectScopes;
+    private final TaskFulfillmentContextService taskContexts;
+    private final ActiveServiceResponsibilityService serviceResponsibilities;
     private final IdempotencyService idempotency;
     private final AuditAppender audit;
     private final OutboxAppender outbox;
@@ -63,6 +69,8 @@ final class DefaultOperationalExceptionWorkbenchService implements OperationalEx
             OperationalExceptionWorkbenchRepository repository,
             AuthorizationService authorization,
             ProjectScopeAuthorizationService projectScopes,
+            TaskFulfillmentContextService taskContexts,
+            ActiveServiceResponsibilityService serviceResponsibilities,
             IdempotencyService idempotency,
             AuditAppender audit,
             OutboxAppender outbox,
@@ -72,6 +80,8 @@ final class DefaultOperationalExceptionWorkbenchService implements OperationalEx
         this.repository = repository;
         this.authorization = authorization;
         this.projectScopes = projectScopes;
+        this.taskContexts = taskContexts;
+        this.serviceResponsibilities = serviceResponsibilities;
         this.idempotency = idempotency;
         this.audit = audit;
         this.outbox = outbox;
@@ -125,9 +135,31 @@ final class DefaultOperationalExceptionWorkbenchService implements OperationalEx
         OperationalExceptionItem item = repository.findById(principal.tenantId(), exceptionId)
                 .orElseThrow(() -> new BusinessProblem(
                         ProblemCode.RESOURCE_NOT_FOUND, "OperationalException does not exist"));
-        authorizeRead(principal, correlationId, exceptionId, item.projectId());
+        // PROJECT + NETWORK 并入请求，使 Network Portal NETWORK scope operations.exception.read 可匹配（M203）。
+        authorizeRead(principal, correlationId, exceptionId, item.projectId(), item.taskId());
         return withAllowedActions(
                 item, canAcknowledge(principal, correlationId, exceptionId.toString(), item.projectId()));
+    }
+
+    /**
+     * 按任务列出运营异常。
+     * <p>
+     * 事务边界：只读。鉴权先于查询；NETWORK scope 依赖 ACTIVE NETWORK 责任网点。
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<OperationalExceptionItem> listForTask(
+            CurrentPrincipal principal, String correlationId, UUID taskId
+    ) {
+        Objects.requireNonNull(taskId, "taskId must not be null");
+        TaskFulfillmentContext task = taskContexts.find(principal.tenantId(), taskId)
+                .orElseThrow(() -> new BusinessProblem(
+                        ProblemCode.RESOURCE_NOT_FOUND, "Task does not exist"));
+        authorization.require(principal, capabilityRequest(
+                        READ, principal.tenantId(), "Task", taskId.toString(),
+                        task.projectId(), taskId),
+                correlationId);
+        return repository.listByTask(principal.tenantId(), taskId);
     }
 
     @Override
@@ -206,9 +238,16 @@ final class DefaultOperationalExceptionWorkbenchService implements OperationalEx
     }
 
     private void authorizeRead(
-            CurrentPrincipal principal, String correlationId, UUID exceptionId, UUID projectId
+            CurrentPrincipal principal,
+            String correlationId,
+            UUID exceptionId,
+            UUID projectId,
+            UUID taskId
     ) {
-        authorizeCapability(principal, correlationId, READ, exceptionId.toString(), projectId);
+        authorization.require(principal, capabilityRequest(
+                        READ, principal.tenantId(), "OperationalException", exceptionId.toString(),
+                        projectId, taskId),
+                correlationId);
     }
 
     private AuthorizationDecision authorizeCapability(
@@ -225,6 +264,27 @@ final class DefaultOperationalExceptionWorkbenchService implements OperationalEx
         }
         return authorization.require(principal, AuthorizationRequest.tenantCapability(
                 capability, principal.tenantId(), "OperationalException", resourceId), correlationId);
+    }
+
+    /**
+     * 同时携带 projectId 与 ACTIVE NETWORK 责任网点，使 PROJECT/NETWORK RoleGrant 均可匹配。
+     */
+    private AuthorizationRequest capabilityRequest(
+            String capability,
+            String tenantId,
+            String resourceType,
+            String resourceId,
+            UUID projectId,
+            UUID taskId
+    ) {
+        String networkId = taskId == null
+                ? null
+                : serviceResponsibilities.find(tenantId, taskId)
+                        .map(ActiveServiceResponsibility::networkId)
+                        .orElse(null);
+        return new AuthorizationRequest(
+                capability, tenantId, resourceType, resourceId,
+                projectId == null ? null : projectId.toString(), null, null, networkId);
     }
 
     private boolean canAcknowledge(

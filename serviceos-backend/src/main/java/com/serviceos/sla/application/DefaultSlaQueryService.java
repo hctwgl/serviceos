@@ -96,6 +96,34 @@ final class DefaultSlaQueryService implements SlaQueryService {
 
     @Override
     @Transactional(readOnly = true)
+    public SlaInstancePage listForWorkOrderOnNetwork(
+            CurrentPrincipal principal,
+            String correlationId,
+            UUID workOrderId,
+            UUID projectId,
+            UUID networkId,
+            String cursor,
+            int limit
+    ) {
+        Objects.requireNonNull(workOrderId, "workOrderId must not be null");
+        Objects.requireNonNull(projectId, "projectId must not be null");
+        Objects.requireNonNull(networkId, "networkId must not be null");
+        validateLimit(limit);
+        authorization.require(principal, AuthorizationRequest.networkCapability(
+                READ,
+                principal.tenantId(),
+                "SlaInstance",
+                workOrderId.toString(),
+                networkId.toString()), correlationId);
+        QueryScope queryScope = new QueryScope(
+                false,
+                List.of(projectId),
+                Sha256.digest("NETWORK:" + networkId + ":PROJECT:" + projectId));
+        return page(principal.tenantId(), queryScope, workOrderId, null, cursor, limit);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public SlaInstanceDetail get(
             CurrentPrincipal principal, String correlationId, UUID slaInstanceId
     ) {

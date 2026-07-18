@@ -56,6 +56,14 @@ export type MeNavigation = {
   asOf: string
 }
 
+export type MeCapabilities = {
+  contextId: string
+  portal: 'ADMIN' | 'NETWORK' | 'TECHNICIAN'
+  capabilityCodes: string[]
+  contextVersion: string
+  asOf: string
+}
+
 export function getMe() {
   return apiGet<MeProfile>('/me')
 }
@@ -70,4 +78,13 @@ export function listMeNavigation(contextId: string, expectedContextVersion?: str
     query.expectedContextVersion = expectedContextVersion
   }
   return apiGetWithMeta<MeNavigation>('/me/navigation', query)
+}
+
+/** M188/M219：当前上下文有效 Capability 集合（导航辅助；业务 API 仍须重鉴权）。 */
+export function listMeCapabilities(contextId: string, expectedContextVersion?: string) {
+  const query: Record<string, string | undefined> = { contextId }
+  if (expectedContextVersion) {
+    query.expectedContextVersion = expectedContextVersion
+  }
+  return apiGetWithMeta<MeCapabilities>('/me/capabilities', query)
 }

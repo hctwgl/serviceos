@@ -49,10 +49,19 @@ import NetworkPortalWorkOrdersPage from './pages/NetworkPortalWorkOrdersPage.vue
 import NetworkPortalTasksPage from './pages/NetworkPortalTasksPage.vue'
 import NetworkPortalTechniciansPage from './pages/NetworkPortalTechniciansPage.vue'
 import NetworkPortalCorrectionsPage from './pages/NetworkPortalCorrectionsPage.vue'
+import NetworkPortalCorrectionDetailPage from './pages/NetworkPortalCorrectionDetailPage.vue'
+import NetworkPortalExceptionDetailPage from './pages/NetworkPortalExceptionDetailPage.vue'
+import NetworkPortalQualificationDetailPage from './pages/NetworkPortalQualificationDetailPage.vue'
+import NetworkPortalMembershipDetailPage from './pages/NetworkPortalMembershipDetailPage.vue'
+import NetworkPortalWorkOrderWorkspacePage from './pages/NetworkPortalWorkOrderWorkspacePage.vue'
+import NetworkPortalExceptionsPage from './pages/NetworkPortalExceptionsPage.vue'
+import NetworkPortalQualificationsPage from './pages/NetworkPortalQualificationsPage.vue'
+import NetworkPortalCapacityPage from './pages/NetworkPortalCapacityPage.vue'
 import TechnicianPortalShell from './pages/TechnicianPortalShell.vue'
 import TechnicianPortalTaskFeedPage from './pages/TechnicianPortalTaskFeedPage.vue'
 import TechnicianPortalSchedulePage from './pages/TechnicianPortalSchedulePage.vue'
 import TechnicianPortalSyncSummaryPage from './pages/TechnicianPortalSyncSummaryPage.vue'
+import TechnicianPortalMePage from './pages/TechnicianPortalMePage.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -229,6 +238,12 @@ export const router = createRouter({
           meta: { pageId: 'NETWORK.WORKORDER.LIST' },
         },
         {
+          path: 'work-orders/:id',
+          name: 'NETWORK.WORKORDER.WORKSPACE',
+          component: NetworkPortalWorkOrderWorkspacePage,
+          meta: { pageId: 'NETWORK.WORKORDER.WORKSPACE' },
+        },
+        {
           path: 'tasks',
           name: 'NETWORK.TASK.QUEUE',
           component: NetworkPortalTasksPage,
@@ -241,10 +256,52 @@ export const router = createRouter({
           meta: { pageId: 'NETWORK.TECHNICIAN.LIST' },
         },
         {
+          path: 'technicians/memberships/:id',
+          name: 'NETWORK.TECHNICIAN.MEMBERSHIP.DETAIL',
+          component: NetworkPortalMembershipDetailPage,
+          meta: { pageId: 'NETWORK.TECHNICIAN.LIST' },
+        },
+        {
           path: 'corrections',
           name: 'NETWORK.CORRECTION.QUEUE',
           component: NetworkPortalCorrectionsPage,
           meta: { pageId: 'NETWORK.CORRECTION.QUEUE' },
+        },
+        {
+          path: 'corrections/:id',
+          name: 'NETWORK.CORRECTION.DETAIL',
+          component: NetworkPortalCorrectionDetailPage,
+          meta: { pageId: 'NETWORK.CORRECTION.QUEUE' },
+        },
+        {
+          path: 'exceptions',
+          name: 'NETWORK.EXCEPTION.QUEUE',
+          component: NetworkPortalExceptionsPage,
+          meta: { pageId: 'NETWORK.EXCEPTION.QUEUE' },
+        },
+        {
+          path: 'exceptions/:id',
+          name: 'NETWORK.EXCEPTION.DETAIL',
+          component: NetworkPortalExceptionDetailPage,
+          meta: { pageId: 'NETWORK.EXCEPTION.QUEUE' },
+        },
+        {
+          path: 'qualifications',
+          name: 'NETWORK.QUALIFICATION',
+          component: NetworkPortalQualificationsPage,
+          meta: { pageId: 'NETWORK.QUALIFICATION' },
+        },
+        {
+          path: 'qualifications/:id',
+          name: 'NETWORK.QUALIFICATION.DETAIL',
+          component: NetworkPortalQualificationDetailPage,
+          meta: { pageId: 'NETWORK.QUALIFICATION' },
+        },
+        {
+          path: 'capacity',
+          name: 'NETWORK.CAPACITY',
+          component: NetworkPortalCapacityPage,
+          meta: { pageId: 'NETWORK.CAPACITY' },
         },
       ],
     },
@@ -270,6 +327,12 @@ export const router = createRouter({
           name: 'TECHNICIAN.SYNC.SUMMARY',
           component: TechnicianPortalSyncSummaryPage,
           meta: { pageId: 'TECHNICIAN.SYNC.SUMMARY' },
+        },
+        {
+          path: 'me',
+          name: 'TECHNICIAN.ME',
+          component: TechnicianPortalMePage,
+          meta: { pageId: 'TECHNICIAN.ME' },
         },
       ],
     },

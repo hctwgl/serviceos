@@ -22,12 +22,16 @@ const forgeResult = ref('')
 const TEST_IDS: Record<string, string> = {
   'NETWORK.WORKBENCH': 'nav-network-workbench',
   'NETWORK.WORKORDER.LIST': 'nav-network-work-orders',
+  'NETWORK.WORKORDER.WORKSPACE': 'nav-network-work-order-workspace',
   'NETWORK.TASK.QUEUE': 'nav-network-tasks',
   'NETWORK.TECHNICIAN.LIST': 'nav-network-technicians',
+  'NETWORK.QUALIFICATION': 'nav-network-qualifications',
   'NETWORK.TECHNICIAN.ASSIGN': 'nav-network-assign-technician',
   'NETWORK.APPOINTMENT': 'nav-network-appointments',
   'NETWORK.CORRECTION.QUEUE': 'nav-network-corrections',
+  'NETWORK.EXCEPTION.QUEUE': 'nav-network-exceptions',
   'NETWORK.EVIDENCE.SUPPLEMENT': 'nav-network-evidence-supplement',
+  'NETWORK.CAPACITY': 'nav-network-capacity',
 }
 
 async function refreshNav(preferredContextId?: string | null) {

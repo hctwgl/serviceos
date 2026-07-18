@@ -10,7 +10,7 @@ import java.util.List;
  */
 @Component
 final class CodePageRegistry {
-    static final String CATALOG_VERSION = "page-registry-v9";
+    static final String CATALOG_VERSION = "page-registry-v16";
 
     private final List<RegisteredPage> pages = List.of(
             // ADMIN
@@ -54,10 +54,14 @@ final class CodePageRegistry {
                     List.of("networkTask.read"), null),
             page("NETWORK.WORKORDER.LIST", "NETWORK", "work-orders", "本网点工单", 15, "工单任务",
                     List.of("networkTask.read"), null),
+            page("NETWORK.WORKORDER.WORKSPACE", "NETWORK", "work-order-workspace", "工单工作区", 16, "工单任务",
+                    List.of("networkTask.read"), null),
             page("NETWORK.TASK.QUEUE", "NETWORK", "tasks", "工单任务", 20, "工单任务",
                     List.of("networkTask.read"), null),
             page("NETWORK.TECHNICIAN.LIST", "NETWORK", "technicians", "本网点师傅", 30, "人员与能力",
-                    List.of("technician.readOwnNetwork"), null),
+                    List.of("technician.readOwnNetwork", "networkPortal.manageTechnician"), null),
+            page("NETWORK.QUALIFICATION", "NETWORK", "technicians/qualifications", "资质与到期", 32, "人员与能力",
+                    List.of("networkPortal.manageTechnician", "technician.readOwnNetwork"), null),
             page("NETWORK.TECHNICIAN.ASSIGN", "NETWORK", "tasks/assign-technician", "分配师傅", 25, "工单任务",
                     List.of("networkPortal.assignTechnician", "networkPortal.reassignTechnician"), null),
             page("NETWORK.APPOINTMENT", "NETWORK", "tasks/appointments", "本网点预约", 28, "工单任务",
@@ -66,6 +70,10 @@ final class CodePageRegistry {
                     List.of("evidence.submitOnBehalf"), null),
             page("NETWORK.CORRECTION.QUEUE", "NETWORK", "corrections", "本网点整改", 27, "工单任务",
                     List.of("evidence.read"), null),
+            page("NETWORK.EXCEPTION.QUEUE", "NETWORK", "exceptions", "本网点异常", 26, "工单任务",
+                    List.of("operations.exception.read"), null),
+            page("NETWORK.CAPACITY", "NETWORK", "capacity", "本网点产能", 35, "人员与能力",
+                    List.of("networkTask.read"), null),
 
             // TECHNICIAN（M195：Feed / schedule / sync-summary 只读壳）
             page("TECHNICIAN.TASK.LIST", "TECHNICIAN", "task-feed", "任务 Feed", 10, "底部导航",

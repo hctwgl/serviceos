@@ -5,6 +5,8 @@ import com.serviceos.audit.api.AuditEntry;
 import com.serviceos.authorization.api.AuthorizationDecision;
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
+import com.serviceos.dispatch.api.ActiveServiceResponsibility;
+import com.serviceos.dispatch.api.ActiveServiceResponsibilityService;
 import com.serviceos.evidence.api.CorrectionCaseService;
 import com.serviceos.evidence.api.CreateClientReviewCaseCommand;
 import com.serviceos.evidence.api.CreateReviewCaseCommand;
@@ -58,6 +60,7 @@ final class DefaultReviewCaseService implements ReviewCaseService {
     private final EvidenceSetSnapshotRepository snapshots;
     private final CorrectionCaseService corrections;
     private final TaskFulfillmentContextService tasks;
+    private final ActiveServiceResponsibilityService serviceResponsibilities;
     private final AuthorizationService authorization;
     private final IdempotencyService idempotency;
     private final AuditAppender audit;
@@ -70,6 +73,7 @@ final class DefaultReviewCaseService implements ReviewCaseService {
             EvidenceSetSnapshotRepository snapshots,
             CorrectionCaseService corrections,
             TaskFulfillmentContextService tasks,
+            ActiveServiceResponsibilityService serviceResponsibilities,
             AuthorizationService authorization,
             IdempotencyService idempotency,
             AuditAppender audit,
@@ -81,6 +85,7 @@ final class DefaultReviewCaseService implements ReviewCaseService {
         this.snapshots = snapshots;
         this.corrections = corrections;
         this.tasks = tasks;
+        this.serviceResponsibilities = serviceResponsibilities;
         this.authorization = authorization;
         this.idempotency = idempotency;
         this.audit = audit;
@@ -516,10 +521,31 @@ final class DefaultReviewCaseService implements ReviewCaseService {
         TaskFulfillmentContext task = tasks.find(principal.tenantId(), taskId)
                 .orElseThrow(() -> new BusinessProblem(
                         ProblemCode.RESOURCE_NOT_FOUND, "Task does not exist"));
-        authorization.require(principal, AuthorizationRequest.projectCapability(
-                READ, principal.tenantId(), "Task", taskId.toString(), task.projectId().toString()),
+        // PROJECT + NETWORK 并入请求，使 Network Portal NETWORK scope evidence.read 可匹配（M229）。
+        authorization.require(principal, capabilityRequest(
+                        READ, principal.tenantId(), "Task", taskId.toString(),
+                        task.projectId(), taskId),
                 correlationId);
         return reviews.listByTask(principal.tenantId(), taskId);
+    }
+
+    /**
+     * 同时携带 projectId 与 ACTIVE NETWORK 责任网点，使 PROJECT/NETWORK RoleGrant 均可匹配。
+     */
+    private AuthorizationRequest capabilityRequest(
+            String capability,
+            String tenantId,
+            String resourceType,
+            String resourceId,
+            UUID projectId,
+            UUID taskId
+    ) {
+        String networkId = serviceResponsibilities.find(tenantId, taskId)
+                .map(ActiveServiceResponsibility::networkId)
+                .orElse(null);
+        return new AuthorizationRequest(
+                capability, tenantId, resourceType, resourceId,
+                projectId == null ? null : projectId.toString(), null, null, networkId);
     }
 
     private static String normalizePolicy(String policyVersion) {
