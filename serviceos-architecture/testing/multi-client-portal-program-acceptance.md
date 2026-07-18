@@ -27,24 +27,24 @@ lastUpdated: 2026-07-18
 
 | ID | 验收项 | 预期 | 证据 |
 |---|---|---|---|
-| MCP-APP-01 | Admin 独立构建 | 不依赖 Network/Technician 路由才能构建和运行 | M256 Admin build without Network routes |
+| MCP-APP-01 | Admin 独立构建 | 不依赖 Network/Technician 路由才能构建和运行 | M256/M257 Admin builds without formal Portal routes |
 | MCP-APP-02 | Network 独立构建 | 独立 AppShell、会话、环境和部署 | M255 shell + M256 OIDC/session/76 E2E/container smoke |
-| MCP-APP-03 | Technician H5 独立构建 | 独立 AppShell、Technician Context 和路由 | CI build + Playwright |
+| MCP-APP-03 | Technician H5 独立构建 | 独立 AppShell、Technician Context 和路由 | M257 build + 8 Playwright + container smoke |
 | MCP-APP-04 | Technician iOS 独立构建 | SwiftUI 工程可在模拟器和开发真机构建 | Xcode CI + device evidence |
 | MCP-APP-05 | 单仓库共享边界 | 共享包不包含角色菜单或数据范围假设 | M247-M254 independent consumers + source gates + aggregate gate |
-| MCP-APP-06 | 旧路由迁移 | 双运行验证后才删除 Admin 中正式 Portal 路由 | M256 75 migrated regressions + Admin build + route source gate |
+| MCP-APP-06 | 旧路由迁移 | 双运行验证后才删除 Admin 中正式 Portal 路由 | M256 Network + M257 Technician migrated regressions, Admin builds, route gates |
 | MCP-APP-07 | 无 WebView 替代 | iOS 核心现场能力为原生实现 | source/review/device test |
 
 ## 4. 身份、上下文与授权
 
 | ID | 验收项 | 预期 | 证据 |
 |---|---|---|---|
-| MCP-AUTH-01 | OIDC PKCE | Web/iOS 使用受控授权码流程 | M256 Network auth E2E; iOS pending |
-| MCP-AUTH-02 | Portal Context | ADMIN/NETWORK/TECHNICIAN Context 不可跨用 | M256 Network negative E2E/PostgreSQL; other apps ongoing |
-| MCP-AUTH-03 | Capability | 菜单和动作消费服务端 capability/allowedActions | UI + API tests |
-| MCP-AUTH-04 | 深链重鉴权 | 打开深链时重新验证身份、范围和当前责任 | security E2E |
+| MCP-AUTH-01 | OIDC PKCE | Web/iOS 使用受控授权码流程 | M256 Network + M257 Technician Web auth E2E; iOS pending |
+| MCP-AUTH-02 | Portal Context | ADMIN/NETWORK/TECHNICIAN Context 不可跨用 | M256 Network + M257 Technician negative E2E/PostgreSQL |
+| MCP-AUTH-03 | Capability | 菜单和动作消费服务端 capability/allowedActions | M256/M257 server navigation UI + API tests; write allowedActions ongoing |
+| MCP-AUTH-04 | 深链重鉴权 | 打开深链时重新验证身份、范围和当前责任 | M257 H5 PKCE return-path + PostgreSQL responsibility tests |
 | MCP-AUTH-05 | Token 存储 | Web 不持久化长效敏感 Token；iOS 使用 Keychain | M250 Web memory-token gate + M251 vault boundary + future Keychain security review |
-| MCP-AUTH-06 | Context 切换 | 切换后清理相关查询缓存和敏感状态 | M250 generic boundary + M256 A/B Network E2E |
+| MCP-AUTH-06 | Context 切换 | 切换后清理相关查询缓存和敏感状态 | M250 generic + M256 Network + M257 Technician A/B E2E |
 | MCP-AUTH-07 | 旧师傅失权 | 改派后旧 Context 无法读取或写入新事实 | end-to-end negative tests |
 
 ## 5. 契约与客户端生成
@@ -53,7 +53,7 @@ lastUpdated: 2026-07-18
 |---|---|---|---|
 | MCP-CONTRACT-01 | TypeScript Client | 可从 Core OpenAPI 重复生成且无手工漂移 | M247 reproducibility + independent consumer gate |
 | MCP-CONTRACT-02 | Swift Client | 可从同一 OpenAPI 重复生成 | M248 reproducibility + Swift 6 independent consumer gate |
-| MCP-CONTRACT-03 | Error Model | H5/iOS 对 Problem Details 和 errorCode 语义一致 | M250 Web + M251 iOS shared baselines; app contract tests pending |
+| MCP-CONTRACT-03 | Error Model | H5/iOS 对 Problem Details 和 errorCode 语义一致 | M250/M251 shared baselines + M257 H5 409/5xx safe-message E2E; iOS app pending |
 | MCP-CONTRACT-04 | Page/Action Identity | 同一业务目标复用 pageId/actionCode | M252 single-source registry + backend/OpenAPI alignment tests |
 | MCP-CONTRACT-05 | Unknown Action | 客户端未知 action 安全降级，不自行猜测 | M252 TypeScript/Swift negative probes |
 | MCP-CONTRACT-06 | Schema 版本 | 表单、Evidence 和 WorkPackage 版本可声明与校验 | schema tests |
@@ -64,15 +64,15 @@ lastUpdated: 2026-07-18
 
 | ID | 验收项 | 预期 | 证据 |
 |---|---|---|---|
-| MCP-H5-01 | Feed/日程/任务详情 | 当前责任、tombstone、深链和 asOf 正确 | Playwright |
+| MCP-H5-01 | Feed/日程/任务详情 | 当前责任、tombstone、深链和 asOf 正确 | M257 迁移/隔离 Playwright + PostgreSQL |
 | MCP-H5-02 | 联系/预约 | 仅使用已接受权威引用和服务端动作 | contract + E2E |
-| MCP-H5-03 | Visit | 明确浏览器定位限制，不伪造原生可信度 | E2E + UX review |
+| MCP-H5-03 | Visit | 明确浏览器定位限制，不伪造原生可信度 | M257 全局 H5 能力边界；Visit 写仍属 Track E |
 | MCP-H5-04 | 动态表单 | 按冻结 Schema 渲染和校验 | component/E2E |
 | MCP-H5-05 | Evidence | 在线会话、checksum、finalize 状态可见 | E2E |
 | MCP-H5-06 | 提交/整改 | exact versions、单项补传和多轮历史 | E2E |
 | MCP-H5-07 | 状态语义 | 本地、上传、服务器接收、业务接受不混淆 | UX assertions |
-| MCP-H5-08 | 能力边界 | 页面明确 H5 不承诺后台上传和完整离线 | content/UX review |
-| MCP-H5-09 | 异常恢复 | 403/404/409/412/5xx/投影延迟有可行动提示 | Playwright |
+| MCP-H5-08 | 能力边界 | 页面明确 H5 不承诺后台上传和完整离线 | M257 source gate + mobile Playwright |
+| MCP-H5-09 | 异常恢复 | 403/404/409/412/5xx/投影延迟有可行动提示 | M257 409/5xx + forged 403；404/412/投影延迟随 Track E 补齐 |
 
 ## 7. Technician iOS 工程基础
 

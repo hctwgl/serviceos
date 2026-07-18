@@ -5,6 +5,7 @@ import {
   getTechnicianSyncSummary,
   type TechnicianPortalSyncSummary,
 } from '../api/technicianPortal'
+import { userFacingError } from '../api/client'
 
 const props = defineProps<{ technicianContextId: string | null }>()
 const summary = ref<TechnicianPortalSyncSummary | null>(null)
@@ -21,7 +22,7 @@ async function load() {
     error.value = null
   } catch (err) {
     summary.value = null
-    error.value = err instanceof Error ? err.message : '同步摘要加载失败'
+    error.value = userFacingError(err, '同步摘要加载失败')
   }
 }
 

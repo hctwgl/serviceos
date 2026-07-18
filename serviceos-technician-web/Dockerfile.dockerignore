@@ -1,0 +1,16 @@
+**
+!serviceos-technician-web/
+!serviceos-technician-web/package.json
+!serviceos-technician-web/package-lock.json
+!serviceos-technician-web/index.html
+!serviceos-technician-web/tsconfig*.json
+!serviceos-technician-web/vite.config.ts
+!serviceos-technician-web/src/**
+!serviceos-technician-web/nginx/**
+!serviceos-web-core/
+!serviceos-web-core/package.json
+!serviceos-web-core/src/**
+serviceos-technician-web/node_modules/**
+serviceos-technician-web/dist/**
+serviceos-technician-web/target/**
+serviceos-technician-web/test-results/**

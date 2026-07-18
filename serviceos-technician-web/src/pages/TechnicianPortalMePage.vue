@@ -8,6 +8,7 @@ import {
   type MeContext,
   type MeProfile,
 } from '../api/me'
+import { userFacingError } from '../api/client'
 
 const props = defineProps<{ technicianContextId: string | null }>()
 const profile = ref<MeProfile | null>(null)
@@ -43,7 +44,7 @@ async function load() {
     profile.value = null
     activeContext.value = null
     capabilities.value = null
-    error.value = err instanceof Error ? err.message : '我的页加载失败'
+    error.value = userFacingError(err, '我的页加载失败')
   } finally {
     loading.value = false
   }

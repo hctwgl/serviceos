@@ -1,4 +1,4 @@
-import { expect, test, type Page, type Route } from '@playwright/test'
+import { navigateTechnician, expect, test, type Page, type Route } from './support/fixture'
 
 const NETWORK_ID = '019f84a0-3333-7f8c-9505-36fe5c0e8803'
 const CONTEXT_ID = `TECHNICIAN|NETWORK|${NETWORK_ID}`
@@ -115,9 +115,9 @@ async function stubTechnicianMe(page: Page) {
 
 test.describe('M219 Technician Portal TECHNICIAN.ME /me 页壳', () => {
   test('M219-01/02/03/04：导航进入 /me 并展示档案/上下文/能力', async ({ page }) => {
-    await loginWithLocalKeycloak(page)
     await stubTechnicianMe(page)
-    await page.goto('/technician-portal/me')
+    await loginWithLocalKeycloak(page)
+    await navigateTechnician(page, '/technician-portal/me')
     await expect(page.getByTestId('technician-portal-me')).toBeVisible({ timeout: 15_000 })
     await expect(page.getByTestId('technician-portal-me')).toHaveAttribute(
       'data-page-id',

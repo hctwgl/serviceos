@@ -1,4 +1,4 @@
-import { expect, test, type Page, type Route } from '@playwright/test'
+import { navigateTechnician, expect, test, type Page, type Route } from './support/fixture'
 
 const NETWORK_ID = '019f84b0-3333-7f8c-9505-36fe5c0e8803'
 const CONTEXT_ID = `TECHNICIAN|NETWORK|${NETWORK_ID}`
@@ -166,10 +166,10 @@ async function stubTechnicianContext(page: Page) {
 
 test.describe('M246 Technician Portal 表单提交安全摘要', () => {
   test('M246-01/02：详情展示表单校验摘要，不出现 values 和提交人', async ({ page }) => {
-    await loginWithLocalKeycloak(page)
     await stubTechnicianContext(page)
+    await loginWithLocalKeycloak(page)
 
-    await page.goto('/technician-portal/task-feed')
+    await navigateTechnician(page, '/technician-portal/task-feed')
     await expect(page.getByTestId('technician-feed-task-detail-deeplink')).toHaveAttribute(
       'href',
       `/technician-portal/tasks/${TASK_ID}`,

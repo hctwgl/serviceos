@@ -1,4 +1,4 @@
-import { expect, test, type Page, type Route } from '@playwright/test'
+import { navigateTechnician, expect, test, type Page, type Route } from './support/fixture'
 
 const NETWORK_ID = '019f84a0-3333-7f8c-9505-36fe5c0e8803'
 const CONTEXT_ID = `TECHNICIAN|NETWORK|${NETWORK_ID}`
@@ -169,9 +169,9 @@ async function stubTechnicianPortal(page: Page) {
 
 test.describe('M218 Technician Portal Feed/日程 Accepted 字段展示', () => {
   test('M218-01/02：Feed 展示字段并深链 schedule', async ({ page }) => {
-    await loginWithLocalKeycloak(page)
     await stubTechnicianPortal(page)
-    await page.goto('/technician-portal/task-feed')
+    await loginWithLocalKeycloak(page)
+    await navigateTechnician(page, '/technician-portal/task-feed')
     await expect(page.getByTestId('technician-portal-task-feed')).toBeVisible({
       timeout: 15_000,
     })
@@ -185,9 +185,9 @@ test.describe('M218 Technician Portal Feed/日程 Accepted 字段展示', () => 
   })
 
   test('M218-03：Schedule 水合 taskId 并展示 windowEnd/timezone', async ({ page }) => {
-    await loginWithLocalKeycloak(page)
     await stubTechnicianPortal(page)
-    await page.goto(`/technician-portal/schedule?taskId=${TASK_ID}`)
+    await loginWithLocalKeycloak(page)
+    await navigateTechnician(page, `/technician-portal/schedule?taskId=${TASK_ID}`)
     await expect(page.getByTestId('technician-portal-schedule')).toBeVisible({
       timeout: 15_000,
     })
@@ -199,9 +199,9 @@ test.describe('M218 Technician Portal Feed/日程 Accepted 字段展示', () => 
   })
 
   test('M218-04：SyncSummary 计数深链', async ({ page }) => {
-    await loginWithLocalKeycloak(page)
     await stubTechnicianPortal(page)
-    await page.goto('/technician-portal/sync-summary')
+    await loginWithLocalKeycloak(page)
+    await navigateTechnician(page, '/technician-portal/sync-summary')
     await expect(page.getByTestId('technician-portal-sync-summary')).toBeVisible({
       timeout: 15_000,
     })

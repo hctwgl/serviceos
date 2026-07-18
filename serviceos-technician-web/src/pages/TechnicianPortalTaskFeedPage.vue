@@ -5,6 +5,7 @@ import {
   listTechnicianTaskFeed,
   type TechnicianPortalFeedItem,
 } from '../api/technicianPortal'
+import { userFacingError } from '../api/client'
 
 const props = defineProps<{ technicianContextId: string | null }>()
 const items = ref<TechnicianPortalFeedItem[]>([])
@@ -40,7 +41,7 @@ async function load(options?: { append?: boolean; sinceCursor?: string }) {
       asOf.value = null
       nextCursor.value = null
     }
-    error.value = err instanceof Error ? err.message : '任务 Feed 加载失败'
+    error.value = userFacingError(err, '任务 Feed 加载失败')
   }
 }
 

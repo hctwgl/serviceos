@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { navigateTechnician, expect, test, type Page } from './support/fixture'
 
 async function loginWithLocalKeycloak(
   page: Page,
@@ -22,7 +22,7 @@ test.describe('M195 Technician Portal Feed', () => {
     page,
   }) => {
     await loginWithLocalKeycloak(page)
-    await page.goto('/technician-portal/task-feed')
+    await navigateTechnician(page, '/technician-portal/task-feed')
     await expect(page.getByTestId('technician-portal-shell')).toBeVisible({ timeout: 15_000 })
 
     await page.getByTestId('forge-technician-context').click()
