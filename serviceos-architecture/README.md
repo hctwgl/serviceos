@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M278 多实例任务运行时**，功能证据提交 `c9aa82e8174ec8463a1c262c35ae682787d1dea6`（合并入 `master` 后改为合并提交）。
+当前工程基线为 **M278 多实例任务运行时**，功能证据提交 `835f03ec2c31f67f152413e076c2e8f7360391e8`（合并入 `master` 后改为合并提交）。
 此前 M267 Connector SPI 证据为 `994cb46f1e31ddc8a4364a776cc4849e766c3b6d`；M266 仍为上一
 master 合并基线 `088018a6eac180f7fe36536fae9d073fa797757c`。
 
