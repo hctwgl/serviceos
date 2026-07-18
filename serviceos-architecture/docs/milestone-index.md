@@ -263,6 +263,7 @@ title: ServiceOS 里程碑索引
 | M252 | M252 多端 Page/Feature/Action 机器注册表 | [265-m252-cross-client-identity-registry.md](../architecture/265-m252-cross-client-identity-registry.md) | [249-m252-cross-client-identity-registry-acceptance.md](../testing/249-m252-cross-client-identity-registry-acceptance.md) |
 | M253 | M253 多端客户端元数据与可观测性 | [266-m253-client-metadata-observability.md](../architecture/266-m253-client-metadata-observability.md) | [250-m253-client-metadata-observability-acceptance.md](../testing/250-m253-client-metadata-observability-acceptance.md) |
 | M254 | M254 Track A 多端共享基础总门禁 | [267-m254-track-a-client-foundation-gate.md](../architecture/267-m254-track-a-client-foundation-gate.md) | [251-m254-track-a-client-foundation-gate-acceptance.md](../testing/251-m254-track-a-client-foundation-gate-acceptance.md) |
+| M255 | M255 独立 Network Web AppShell 与环境基础 | [268-m255-independent-network-web-shell.md](../architecture/268-m255-independent-network-web-shell.md) | [252-m255-independent-network-web-shell-acceptance.md](../testing/252-m255-independent-network-web-shell-acceptance.md) |
 
 ## 未关联里程碑的文档
 
