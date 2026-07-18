@@ -1,0 +1,12 @@
+**
+!serviceos-network-web/
+!serviceos-network-web/package.json
+!serviceos-network-web/package-lock.json
+!serviceos-network-web/index.html
+!serviceos-network-web/tsconfig*.json
+!serviceos-network-web/vite.config.ts
+!serviceos-network-web/src/**
+!serviceos-network-web/nginx/**
+!serviceos-web-core/
+!serviceos-web-core/package.json
+!serviceos-web-core/src/**

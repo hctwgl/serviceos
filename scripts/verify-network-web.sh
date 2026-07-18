@@ -80,4 +80,8 @@ if (!rejected || calls.length !== 4) process.exit(1)
 NODE
 
 test -f "${app_directory}/dist/index.html"
+test -f "${app_directory}/Dockerfile"
+test -f "${app_directory}/nginx/default.conf.template"
+rg -q 'location = /healthz' "${app_directory}/nginx/default.conf.template"
+rg -q 'try_files \$uri \$uri/ /index.html' "${app_directory}/nginx/default.conf.template"
 echo "Network Web 独立构建门禁通过。"
