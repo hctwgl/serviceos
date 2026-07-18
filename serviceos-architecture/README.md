@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M279 工单取消/重开与流程人工跳转**，功能证据提交待回填（合并入 `master` 后改为合并提交）。
+当前工程基线为 **M279 工单取消/重开与流程人工跳转**，功能证据提交 `c4f9bd3dcfd1bb1046fd5fc2b25ffa5d0a44c908`（合并入 `master` 后改为合并提交）。
 此前 M267 Connector SPI 证据为 `994cb46f1e31ddc8a4364a776cc4849e766c3b6d`；M266 仍为上一
 master 合并基线 `088018a6eac180f7fe36536fae9d073fa797757c`。
 
