@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M270 WAIT_EVENT 运行时**，功能证据提交 `13dd6392d8a382991ee088e023467d47eeafbbc7`（合并入 `master` 后改为合并提交）。
+当前工程基线为 **M270 WAIT_EVENT 运行时**，功能证据提交 `11482aee695f9d7e4a3dbe6f2608ca7973d9ed95`（合并入 `master` 后改为合并提交）。
 此前 M267 Connector SPI 证据为 `994cb46f1e31ddc8a4364a776cc4849e766c3b6d`；M266 仍为上一
 master 合并基线 `088018a6eac180f7fe36536fae9d073fa797757c`。
 
