@@ -4,16 +4,19 @@ import com.serviceos.appointment.api.TechnicianContactAttemptQuery;
 import com.serviceos.appointment.api.TechnicianScheduleAppointmentQuery;
 import com.serviceos.appointment.api.TechnicianScheduleAppointmentView;
 import com.serviceos.authorization.api.AuthorizationRequest;
+import com.serviceos.authorization.api.AuthorizationDecision;
 import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.dispatch.api.TechnicianActiveAssignmentQuery;
 import com.serviceos.dispatch.api.TechnicianActiveAssignmentView;
 import com.serviceos.fieldwork.api.TechnicianVisitHistoryQuery;
+import com.serviceos.forms.api.FormSubmissionQueryService;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.network.api.NetworkTechnicianMembershipView;
 import com.serviceos.network.api.PrincipalNetworkAffiliationQuery;
 import com.serviceos.network.api.TechnicianProfileView;
 import com.serviceos.readmodel.api.TechnicianPortalContactAttemptItem;
 import com.serviceos.readmodel.api.TechnicianPortalFeedItem;
+import com.serviceos.readmodel.api.TechnicianPortalFormSubmissionItem;
 import com.serviceos.readmodel.api.TechnicianPortalFeedPage;
 import com.serviceos.readmodel.api.TechnicianPortalQueryService;
 import com.serviceos.readmodel.api.TechnicianPortalScheduleItem;
@@ -53,6 +56,7 @@ import java.util.UUID;
 @Service
 final class DefaultTechnicianPortalQueryService implements TechnicianPortalQueryService {
     private static final String TASK_READ_ASSIGNED = "task.readAssigned";
+    private static final String FORM_READ = "form.read";
     private static final String CONTEXT_PREFIX = "TECHNICIAN|NETWORK|";
     private static final String ITEM_ASSIGNMENT = "ASSIGNMENT";
     private static final String ITEM_TOMBSTONE = "TOMBSTONE";
@@ -64,6 +68,7 @@ final class DefaultTechnicianPortalQueryService implements TechnicianPortalQuery
     private final TechnicianScheduleAppointmentQuery appointments;
     private final TechnicianContactAttemptQuery contactAttempts;
     private final TechnicianVisitHistoryQuery visits;
+    private final FormSubmissionQueryService formSubmissions;
     private final TaskFulfillmentContextService tasks;
     private final Clock clock;
 
@@ -75,6 +80,7 @@ final class DefaultTechnicianPortalQueryService implements TechnicianPortalQuery
             TechnicianScheduleAppointmentQuery appointments,
             TechnicianContactAttemptQuery contactAttempts,
             TechnicianVisitHistoryQuery visits,
+            FormSubmissionQueryService formSubmissions,
             TaskFulfillmentContextService tasks,
             Clock clock
     ) {
@@ -85,6 +91,7 @@ final class DefaultTechnicianPortalQueryService implements TechnicianPortalQuery
         this.appointments = appointments;
         this.contactAttempts = contactAttempts;
         this.visits = visits;
+        this.formSubmissions = formSubmissions;
         this.tasks = tasks;
         this.clock = clock;
     }
@@ -211,6 +218,14 @@ final class DefaultTechnicianPortalQueryService implements TechnicianPortalQuery
                         row.checkOutCapturedAt(), row.checkOutReceivedAt(), row.resultCode(), row.exceptionCode(),
                         row.aggregateVersion()))
                 .toList();
+        List<TechnicianPortalFormSubmissionItem> formSubmissionItems = null;
+        if (canReadForms(actor, correlationId, task)) {
+            formSubmissionItems = formSubmissions.listForTask(actor, correlationId, taskId).stream()
+                    .map(row -> new TechnicianPortalFormSubmissionItem(
+                            row.submissionId(), row.formVersionId(), row.formKey(), row.submissionVersion(),
+                            row.validationStatus(), row.errorCount(), row.warningCount(), row.submittedAt()))
+                    .toList();
+        }
 
         return new TechnicianPortalTaskDetail(
                 ctx.networkId(),
@@ -232,7 +247,17 @@ final class DefaultTechnicianPortalQueryService implements TechnicianPortalQuery
                 appointmentItems,
                 contactAttemptItems,
                 visitItems,
+                formSubmissionItems,
                 clock.instant());
+    }
+
+    private boolean canReadForms(CurrentPrincipal actor, String correlationId, TaskFulfillmentContext task) {
+        if (task.projectId() == null) {
+            return false;
+        }
+        return authorization.authorize(actor, AuthorizationRequest.projectCapability(
+                        FORM_READ, actor.tenantId(), "Task", task.taskId().toString(), task.projectId().toString()),
+                correlationId).effect() == AuthorizationDecision.Effect.ALLOW;
     }
 
     private List<TechnicianPortalFeedItem> snapshotFeed(String tenantId, AuthorizedTechnicianContext ctx) {

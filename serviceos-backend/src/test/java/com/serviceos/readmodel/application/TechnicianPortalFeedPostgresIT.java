@@ -111,6 +111,7 @@ class TechnicianPortalFeedPostgresIT {
         seedTechnician(TECH_PROFILE_A, TECH_PRINCIPAL, NETWORK_A, "师傅甲");
         seedTechnician(TECH_PROFILE_B, OTHER_TECH_PRINCIPAL, NETWORK_B, "师傅乙");
         seedGrant(TECH_PRINCIPAL, "task.readAssigned", "NETWORK", NETWORK_A.toString());
+        seedGrant(TECH_PRINCIPAL, "form.read", "PROJECT", PROJECT_A.toString());
         seedGrant(OTHER_TECH_PRINCIPAL, "task.readAssigned", "NETWORK", NETWORK_B.toString());
         seedHumanTask(TASK_A, WO_A, PROJECT_A);
         seedHumanTask(TASK_B, WO_B, UUID.randomUUID());
@@ -232,6 +233,7 @@ class TechnicianPortalFeedPostgresIT {
             assertThat(visit.policyDecision()).isEqualTo("ACCEPTED");
             assertThat(visit.aggregateVersion()).isEqualTo(1);
         });
+        assertThat(detail.formSubmissions()).isEmpty();
 
         // 同一合法 Portal 上下文下，其他师傅或其他网点任务统一按不存在处理，避免资源枚举。
         assertThatThrownBy(() -> portal.taskDetail(
@@ -242,6 +244,30 @@ class TechnicianPortalFeedPostgresIT {
                 actor(TECH_PRINCIPAL), "corr-other", context, TASK_OTHER))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.RESOURCE_NOT_FOUND));
+    }
+
+    @Test
+    void taskDetailOmitsFormSubmissionsWithoutIndependentFormReadCapability() {
+        jdbc.sql("""
+                DELETE FROM auth_role_grant
+                 WHERE tenant_id=:tenant
+                   AND principal_id=:principal
+                   AND role_id IN (
+                       SELECT rc.role_id FROM auth_role_capability rc
+                        WHERE rc.capability_code='form.read'
+                   )
+                """)
+                .param("tenant", TENANT)
+                .param("principal", TECH_PRINCIPAL.toString())
+                .update();
+        jdbc.sql("UPDATE auth_tenant_grant_generation SET generation=2, updated_at=now() WHERE tenant_id=:tenant")
+                .param("tenant", TENANT).update();
+
+        TechnicianPortalTaskDetail detail = portal.taskDetail(
+                actor(TECH_PRINCIPAL), "corr-no-form-read", "TECHNICIAN|NETWORK|" + NETWORK_A, TASK_A);
+
+        assertThat(detail.formSubmissions()).isNull();
+        assertThat(detail.visits()).hasSize(1);
     }
 
     private void seedContactAttempt(UUID attemptId, UUID taskId, UUID workOrderId, UUID projectId) {

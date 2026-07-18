@@ -217,6 +217,9 @@ status: Accepted
 - §11 Technician Portal Visit 历史安全摘要（M245 / ADR-083）：M243 详情增加 `visits[]`；仅含
   Visit/task/appointment ID、序次、状态、到离场时间、围栏分类/策略结论、结果/异常码和版本；
   禁止 GPS、距离、设备、离线命令、note、operation/evidence refs；OpenAPI → `1.0.19`；不接受写入。
+- §11 Technician Portal 表单提交安全摘要（M246 / ADR-084）：M243 详情增加可选
+  `formSubmissions`；独立 project scope `form.read` 软门禁，缺权为 null；仅含 ID、formKey、版本、
+  validationStatus、错误/警告计数和 submittedAt；禁止 values/message/digest/submittedBy；OpenAPI → `1.0.20`。
 - §10 Network Portal 队列/列表 Accepted 字段展示（M220 UI-only）：**不**新增 HTTP；整改/
   异常/资质/师傅列表与任务目录展示既有非 PII 字段；`correctionTaskId`/`handlingTaskId`/
   `workOrderId` 门户内深链；异常详情 `handlingTaskId` 深链。catalog 仍 `page-registry-v16`；

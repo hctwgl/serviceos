@@ -28,6 +28,7 @@ public record TechnicianPortalTaskDetail(
         List<TechnicianPortalScheduleItem> appointments,
         List<TechnicianPortalContactAttemptItem> contactAttempts,
         List<TechnicianPortalVisitItem> visits,
+        List<TechnicianPortalFormSubmissionItem> formSubmissions,
         Instant asOf
 ) {
     public TechnicianPortalTaskDetail {
@@ -37,5 +38,6 @@ public record TechnicianPortalTaskDetail(
         appointments = List.copyOf(appointments);
         contactAttempts = List.copyOf(contactAttempts);
         visits = List.copyOf(visits);
+        formSubmissions = formSubmissions == null ? null : List.copyOf(formSubmissions);
     }
 }
