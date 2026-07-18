@@ -124,9 +124,20 @@ final class WorkflowDefinitionParser {
                 optionalText(node, "formRef"), optionalText(node, "slaRef"));
     }
 
+    /**
+     * M268 起条件边必须是 {@code {language,source}} 对象；空/缺省视为无条件。
+     * 裸字符串不再被当作无条件旁路，避免双轨语义。
+     */
     private static boolean isUnconditional(JsonNode condition) {
-        return condition == null || condition.isNull()
-                || (condition.isTextual() && condition.asText().isBlank());
+        if (condition == null || condition.isNull()) {
+            return true;
+        }
+        if (condition.isObject()) {
+            JsonNode source = condition.get("source");
+            return source == null || source.isNull()
+                    || (source.isTextual() && source.asText().isBlank());
+        }
+        return false;
     }
 
     private static String requiredText(JsonNode node, String field) {

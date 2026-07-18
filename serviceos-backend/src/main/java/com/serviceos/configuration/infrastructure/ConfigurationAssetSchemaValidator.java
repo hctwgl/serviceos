@@ -29,8 +29,8 @@ import java.util.Set;
  * 已发布配置资产的结构门禁。
  *
  * <p>Schema 与解释器版本必须显式登记。未知版本一律拒绝，避免旧节点把无法理解的配置
- * 当作普通 JSON 持久化。表达式的静态类型和执行语义属于后续独立门禁；本类不猜测
- * {@code SERVICEOS_EXPR_V1} 的含义。</p>
+ * 当作普通 JSON 持久化。M268 起 WORKFLOW 增加条件边与 EXCLUSIVE_GATEWAY 出边的语义校验；
+ * 完整 Workflow JSON Schema 结构门禁仍待夹具与历史定义对齐后启用。</p>
  */
 @Component
 final class ConfigurationAssetSchemaValidator {
@@ -66,6 +66,10 @@ final class ConfigurationAssetSchemaValidator {
     }
 
     void validate(PublishConfigurationAssetCommand command) {
+        if (command.assetType() == ConfigurationAssetType.WORKFLOW) {
+            validateWorkflowSemantics(parse(command.definitionJson()), command.assetKey());
+            return;
+        }
         if (!SCHEMA_GOVERNED_TYPES.contains(command.assetType())) {
             return;
         }
@@ -152,6 +156,71 @@ final class ConfigurationAssetSchemaValidator {
             }
         }
         validateWorkflowSlaReferences(assets);
+        for (ConfigurationAssetDefinition asset : assets) {
+            if (asset.assetType() == ConfigurationAssetType.WORKFLOW) {
+                validateWorkflowSemantics(parse(asset.definitionJson()), asset.assetKey());
+            }
+        }
+    }
+
+    /**
+     * WORKFLOW 发布期语义：条件边必须是 SERVICEOS_EXPR_V1 对象；EXCLUSIVE_GATEWAY 至少两条
+     * 带条件的出边。网关运行时求值由后续里程碑实现，此处只做失败关闭的静态门禁。
+     */
+    private void validateWorkflowSemantics(JsonNode workflow, String workflowKey) {
+        Map<String, JsonNode> nodes = new LinkedHashMap<>();
+        for (JsonNode node : workflow.path("nodes")) {
+            String nodeId = node.path("nodeId").asText();
+            if (nodeId == null || nodeId.isBlank()) {
+                throw new ConfigurationPublicationException(
+                        "WORKFLOW nodeId 不能为空: " + workflowKey);
+            }
+            if (nodes.putIfAbsent(nodeId, node) != null) {
+                throw new ConfigurationPublicationException(
+                        "WORKFLOW nodeId 必须唯一: " + nodeId);
+            }
+        }
+        Map<String, List<JsonNode>> outgoing = new LinkedHashMap<>();
+        for (JsonNode transition : workflow.path("transitions")) {
+            String from = transition.path("from").asText();
+            String to = transition.path("to").asText();
+            if (!nodes.containsKey(from) || !nodes.containsKey(to)) {
+                throw new ConfigurationPublicationException(
+                        "WORKFLOW transition 引用未知节点: " + from + " -> " + to);
+            }
+            validateTransitionCondition(transition, from);
+            outgoing.computeIfAbsent(from, ignored -> new java.util.ArrayList<>()).add(transition);
+        }
+        for (Map.Entry<String, JsonNode> entry : nodes.entrySet()) {
+            String nodeType = entry.getValue().path("nodeType").asText();
+            if (!"EXCLUSIVE_GATEWAY".equals(nodeType)) {
+                continue;
+            }
+            List<JsonNode> edges = outgoing.getOrDefault(entry.getKey(), List.of());
+            if (edges.size() < 2) {
+                throw new ConfigurationPublicationException(
+                        "EXCLUSIVE_GATEWAY 至少需要两条出边: " + entry.getKey());
+            }
+            for (JsonNode edge : edges) {
+                if (!present(edge, "condition")) {
+                    throw new ConfigurationPublicationException(
+                            "EXCLUSIVE_GATEWAY 出边必须带 condition: " + entry.getKey());
+                }
+            }
+        }
+    }
+
+    private void validateTransitionCondition(JsonNode transition, String from) {
+        if (!transition.has("condition") || transition.path("condition").isNull()) {
+            return;
+        }
+        JsonNode condition = transition.path("condition");
+        if (!condition.isObject()) {
+            throw new ConfigurationPublicationException(
+                    "WORKFLOW condition 必须是 SERVICEOS_EXPR_V1 对象: " + from);
+        }
+        validateExpression(expression(condition), Map.of(),
+                "WORKFLOW transition condition", from);
     }
 
     /** Workflow 的 slaRef 必须在同一冻结 Bundle 中精确命中 SLA，并显式覆盖该节点 taskType。 */

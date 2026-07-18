@@ -33,6 +33,17 @@ class ConfigurationSchemaDriftTest {
         assertThat(Files.mismatch(architectureSchema, runtimeSchema)).isEqualTo(-1L);
     }
 
+    @Test
+    void embeddedWorkflowSchemaMatchesArchitectureSource() throws IOException {
+        Path repository = repositoryRoot();
+        Path architectureSchema = repository.resolve(
+                "serviceos-architecture/configuration/schemas/workflow.schema.json");
+        Path runtimeSchema = repository.resolve(
+                "serviceos-backend/src/main/resources/configuration-schemas/workflow-v1.schema.json");
+
+        assertThat(Files.mismatch(architectureSchema, runtimeSchema)).isEqualTo(-1L);
+    }
+
     private static Path repositoryRoot() {
         Path current = Path.of(System.getProperty("user.dir")).toAbsolutePath().normalize();
         if (Files.isDirectory(current.resolve("serviceos-architecture"))) {

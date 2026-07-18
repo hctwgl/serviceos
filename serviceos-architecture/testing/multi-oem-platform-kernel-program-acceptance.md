@@ -15,7 +15,7 @@ lastUpdated: 2026-07-18
 | MOK-02 | 通用 Connector SPI | Adapter → Envelope → Canonical → 领域命令；无空接口 | PASS（M267） |
 | MOK-03 | BYD 使用通用边界 | BYD CREATE_WORK_ORDER 委托 SPI/管道；外部契约不变 | PASS（M267） |
 | MOK-04 | 核心域无车企协议分叉 | 架构门禁阻止核心模块依赖 `integration.byd` / 未来 OEM 适配包 | PASS（M267） |
-| MOK-05 | 配置治理 MVP | 发布前依赖/条件静态校验失败关闭 | 后续 |
+| MOK-05 | 配置治理 MVP | 发布前依赖/条件静态校验失败关闭 | PASS（M268；审批 UI/回放仍后续） |
 | MOK-06 | 条件 Transition | SERVICEOS_EXPR_V1 求值；非法表达式失败关闭 | 后续 |
 | MOK-07 | EXCLUSIVE_GATEWAY | 唯一 true 出边推进；零/多命中失败关闭 | 后续 |
 | MOK-08 | WAIT_EVENT | 关联键幂等唤醒；重复事件不双推进 | 后续 |

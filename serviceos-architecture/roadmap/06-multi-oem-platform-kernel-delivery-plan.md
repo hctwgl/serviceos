@@ -60,4 +60,5 @@ BYD 和 OEM2（REFERENCE 或真实）使用独立 Connector
 | 切片 | 状态 | 证据 |
 |---|---|---|
 | 1～3（M267） | Implemented | ADR-085、`280-m267-*`、`264-m267-*`、BYD 入站 IT、ArchitectureTest |
-| 4～11 | 未开始 | 下一切片：配置治理 MVP（M268） |
+| 4（M268） | Implemented | workflow condition 对齐表达式、EXCLUSIVE_GATEWAY 静态校验、`281-m268-*` |
+| 5～11 | 未开始 | 下一切片：条件 Transition + EXCLUSIVE_GATEWAY 运行时（M269） |

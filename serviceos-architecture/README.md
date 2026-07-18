@@ -674,20 +674,22 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M267 通用 Connector SPI 与 BYD 入站边界归位**，功能证据提交
-`994cb46f1e31ddc8a4364a776cc4849e766c3b6d`（合并入 `master` 后改为合并提交）。
-M266 Technician 在线资料整改仍为上一 master 合并基线
+当前工程基线为 **M268 配置治理 MVP**（Workflow 条件静态校验；功能提交后回填 SHA，合并入
+`master` 后改为合并提交）。此前 M267 Connector SPI 证据为
+`994cb46f1e31ddc8a4364a776cc4849e766c3b6d`；M266 仍为上一 master 合并基线
 `088018a6eac180f7fe36536fae9d073fa797757c`。
 
-当前已具备 Admin、独立 Network Web、独立 Technician H5、原生 Technician iOS，以及统一主体/组织/授权治理、在线 Visit、冻结基础表单、Evidence 上传、Snapshot/Task 完成、多轮整改闭环，以及 CREATE_WORK_ORDER 通用 Connector SPI。下一主线是多车企平台内核剩余切片（配置治理 MVP、条件网关、REFERENCE_OEM 等，见 roadmap/06）；Track F 离线与签名真机仍待外部环境。
+当前已具备 Admin、独立 Network/Technician 客户端、在线履约闭环、CREATE_WORK_ORDER 通用 Connector SPI，
+以及 Workflow 条件/EXCLUSIVE_GATEWAY 发布期静态门禁。下一主线是网关运行时与 REFERENCE_OEM（见 roadmap/06）。
 
 权威进度入口：
 
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M268 实现文档](architecture/281-m268-configuration-governance-mvp.md)
+- [M268 验收矩阵](testing/265-m268-configuration-governance-mvp-acceptance.md)
 - [M267 实现文档](architecture/280-m267-generic-connector-spi.md)
-- [M267 验收矩阵](testing/264-m267-generic-connector-spi-acceptance.md)
 - [多车企平台内核交付计划](roadmap/06-multi-oem-platform-kernel-delivery-plan.md)
 - [多车企平台内核程序级验收矩阵](testing/multi-oem-platform-kernel-program-acceptance.md)
 - [多客户端 Portal 持续交付计划](roadmap/05-multi-client-portal-delivery-plan.md)

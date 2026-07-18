@@ -65,6 +65,14 @@ class WorkflowDefinitionParserTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("exactly one unconditional");
 
+        String objectCondition = linearDefinition().replace(
+                "\"from\":\"ASSIGN_COORDINATORS\",\"to\":\"INITIAL_REVIEW\"",
+                "\"from\":\"ASSIGN_COORDINATORS\",\"to\":\"INITIAL_REVIEW\","
+                        + "\"condition\":{\"language\":\"SERVICEOS_EXPR_V1\",\"source\":\"true\"}");
+        assertThatThrownBy(() -> parser.progression(asset(objectCondition), "ASSIGN_COORDINATORS"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("exactly one unconditional");
+
         assertThatThrownBy(() -> parser.progression(asset(validDefinition()), "ASSIGN_COORDINATORS"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("exactly one unconditional");
