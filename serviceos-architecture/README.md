@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M275 PARALLEL_GATEWAY 分叉与汇聚运行时**，功能证据提交 `0b285a5c254fea36ba03d6a33c96639f190f77f4`（合并入 `master` 后改为合并提交）。
+当前工程基线为 **M275 PARALLEL_GATEWAY 分叉与汇聚运行时**，功能证据提交 `3b753e74f8dfedd0f070fdf9d0b4f54a8baa5f6e`（合并入 `master` 后改为合并提交）。
 此前 M267 Connector SPI 证据为 `994cb46f1e31ddc8a4364a776cc4849e766c3b6d`；M266 仍为上一
 master 合并基线 `088018a6eac180f7fe36536fae9d073fa797757c`。
 
