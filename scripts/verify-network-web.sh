@@ -9,10 +9,17 @@ if rg -n 'localStorage.*(?:token|Token)|(?:token|Token).*localStorage' "${app_di
   exit 1
 fi
 
+if rg -n -i '\b(price|pricing|settlement|quote|quotedAmount|serviceFee)\b' \
+  "${app_directory}/src/api/networkPortal.ts" "${app_directory}/src/pages"; then
+  echo "Network Web 正式投影不得暴露价格或结算字段。" >&2
+  exit 1
+fi
+
 (
   cd "${app_directory}"
   npm ci --ignore-scripts --no-audit --no-fund --silent
   npm run build
+  npm run test:e2e
 )
 
 probe_directory="$(mktemp -d "${TMPDIR:-/tmp}/serviceos-network-env.XXXXXX")"

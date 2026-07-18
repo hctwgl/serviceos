@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { resolveNetworkEnvironment } from './environment'
-import { computed, ref } from 'vue'
-import { beginDevelopmentLogin, isDevelopmentLoginAvailable, logout } from './auth/session'
+import { computed, onMounted, ref } from 'vue'
+import { accessToken, beginLogin, isLoginAvailable, logout } from './auth/session'
 import { createNetworkApi } from './api/client'
 import { loadNetworkSession, type NavigationItem, type NetworkSession } from './networkSession'
 import { RouterLink, RouterView } from 'vue-router'
@@ -20,8 +20,9 @@ const groupedNavigation = computed(() => (session.value?.navigation ?? []).reduc
   return groups
 }, {}))
 async function refresh(contextId?: string) { try { error.value = null; session.value = await loadNetworkSession(api, contextId) } catch (cause) { session.value = null; error.value = cause instanceof Error ? cause.message : '上下文加载失败' } }
-async function login() { await beginDevelopmentLogin() }
+async function login() { await beginLogin() }
 function signOut() { logout(); session.value = null }
+onMounted(() => { if (accessToken()) void refresh() })
 </script>
 
 <template>
@@ -35,9 +36,9 @@ function signOut() { logout(); session.value = null }
       <section v-if="!session" class="boundary-card" aria-labelledby="foundation-title">
         <h2 id="foundation-title">连接网点上下文</h2>
         <p v-if="error" class="error">{{ error }}</p>
-        <button v-if="isDevelopmentLoginAvailable()" type="button" @click="login">开发环境登录</button>
+        <button v-if="isLoginAvailable()" type="button" @click="login">使用 OIDC 登录</button>
         <button type="button" @click="refresh()">加载当前会话</button>
-        <p v-if="!isDevelopmentLoginAvailable()">正式身份接入尚未配置，应用失败关闭，不接受手工 Token。</p>
+        <p v-if="!isLoginAvailable()">身份接入尚未配置，应用失败关闭，不接受手工 Token。</p>
       </section>
       <template v-else>
         <aside class="context-card">
@@ -56,7 +57,7 @@ function signOut() { logout(); session.value = null }
               <span v-else>{{ item.title }}（当前版本不可用）</span>
             </li></ul>
           </section>
-          <p>业务页面将在后续里程碑迁移；导航可见性不替代 API 授权。</p>
+          <p>导航可见性不替代 API 授权；所有业务请求仍由服务端按当前 Network Context 鉴权。</p>
         </section>
         <section class="page-content"><RouterView v-slot="{ Component }"><component :is="Component" :network-context-id="session.activeContextId" /></RouterView></section>
       </template>
