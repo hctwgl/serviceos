@@ -58,6 +58,7 @@ lastUpdated: 2026-07-18
 | MCP-CONTRACT-05 | Unknown Action | 客户端未知 action 安全降级，不自行猜测 | negative tests |
 | MCP-CONTRACT-06 | Schema 版本 | 表单、Evidence 和 WorkPackage 版本可声明与校验 | schema tests |
 | MCP-CONTRACT-07 | 兼容元数据 | clientKind/clientVersion/支持能力可观测 | API/telemetry evidence |
+| MCP-CONTRACT-08 | Design Token | Web/iOS 从同一无角色假设机器源生成 | M249 reproducibility + CSS/Swift compile gate |
 
 ## 6. Technician H5 在线参考实现
 

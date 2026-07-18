@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "color": {
+    "backgroundCanvas": "#F5F7FA",
+    "surface": "#FFFFFF",
+    "textPrimary": "#102A43",
+    "textSecondary": "#627D98",
+    "border": "#BCCCDC",
+    "actionPrimary": "#243B53",
+    "actionOnPrimary": "#FFFFFF",
+    "statusSuccess": "#054E31",
+    "statusDanger": "#9B1C1C",
+    "statusWarning": "#F0B429",
+    "focusRing": "#2684FF"
+  },
+  "spacing": {
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "xxl": 32
+  },
+  "radius": {
+    "sm": 4,
+    "md": 6,
+    "lg": 8,
+    "xl": 12
+  },
+  "typography": {
+    "fontBody": "Inter, system-ui, sans-serif",
+    "fontMono": "ui-monospace, SFMono-Regular, Menlo, monospace",
+    "lineHeightBody": 1.5,
+    "lineHeightCompact": 1.35
+  },
+  "shadow": {
+    "card": "0 1px 3px rgb(16 42 67 / 8%)"
+  }
+}

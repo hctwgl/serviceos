@@ -11,6 +11,7 @@ set -euo pipefail
 #   bash scripts/agent-verify.sh contracts [base]   契约兼容门禁（默认对当前分支与 origin/master 的 merge-base）
 #   bash scripts/agent-verify.sh client-ts          TypeScript Client 复现、编译、打包与消费门禁
 #   bash scripts/agent-verify.sh client-swift       Swift Client 复现、Swift 6 编译与消费门禁
+#   bash scripts/agent-verify.sh design-tokens      Web/Swift Design Token 复现与消费门禁
 #   bash scripts/agent-verify.sh docs               git diff --check + 脚本语法 + 里程碑索引新鲜度
 #
 # 全量 L3 验证统一走 bash scripts/verify-local.sh，不在本脚本内提供。
@@ -77,6 +78,9 @@ case "${command_name}" in
   client-swift)
     serviceos-contracts/scripts/verify-swift-client-generation-reproducibility.sh
     serviceos-contracts/scripts/verify-swift-client-consumer.sh
+    ;;
+  design-tokens)
+    serviceos-contracts/scripts/verify-design-tokens.sh
     ;;
   docs)
     git diff --check
