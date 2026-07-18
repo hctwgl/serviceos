@@ -704,3 +704,4 @@ OCR/CV、复杂工作流、BUSINESS 日历与 SLA 暂停/预警/升级/通知、
 - [M259 Technician iOS SwiftUI App 与 Xcode 交付批次](architecture/272-m259-technician-ios-swiftui-app-delivery-batch.md)
 - [M260 Technician iOS Simulator 运行验收批次](architecture/273-m260-technician-ios-simulator-runtime.md)
 - [M261 Technician iOS 签名与分发就绪基础](architecture/274-m261-technician-ios-distribution-readiness.md)
+- [M262 Technician 在线 Visit 交付批次](architecture/275-m262-technician-online-visit-batch.md)
