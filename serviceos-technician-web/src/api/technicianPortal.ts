@@ -127,6 +127,54 @@ export type TechnicianVisitLocation = {
   accuracyMeters: number
 }
 
+export type TechnicianTaskFormField = {
+  fieldKey: string
+  label: string
+  dataType: string
+  binding: string
+  required?: boolean
+  requiredWhen?: unknown
+  visibleWhen?: unknown
+  editableWhen?: unknown
+  defaultExpression?: unknown
+  optionsRef?: string
+  validators?: unknown[]
+}
+
+export type TechnicianTaskForm = {
+  taskId: string
+  formVersionId: string
+  formKey: string
+  semanticVersion: string
+  schemaVersion: string
+  definition: {
+    title?: string
+    sections: Array<{
+      sectionKey: string
+      title: string
+      visibility?: unknown
+      fields: TechnicianTaskFormField[]
+    }>
+    validationRules?: unknown[]
+  }
+  contentDigest: string
+}
+
+export type TechnicianFormSubmission = {
+  submissionId: string
+  taskId: string
+  projectId: string
+  formVersionId: string
+  formKey: string
+  submissionVersion: number
+  values: Record<string, unknown>
+  contentDigest: string
+  validationStatus: 'VALIDATED' | 'INVALID'
+  errors: Array<{ fieldKey: string; code: string; message: string }>
+  warnings: Array<{ fieldKey: string; code: string; message: string }>
+  submittedAt: string
+}
+
 function technicianHeaders(technicianContextId: string): Record<string, string> {
   return { 'X-Technician-Context': technicianContextId }
 }
@@ -160,6 +208,31 @@ export function getTechnicianTaskDetail(technicianContextId: string, taskId: str
     `/technician/me/tasks/${encodeURIComponent(taskId)}`,
     {},
     technicianHeaders(technicianContextId),
+  )
+}
+
+export function listTechnicianTaskForms(technicianContextId: string, taskId: string) {
+  return apiGet<TechnicianTaskForm[]>(
+    `/technician/me/tasks/${encodeURIComponent(taskId)}/forms`,
+    {},
+    technicianHeaders(technicianContextId),
+  )
+}
+
+/** 在线提交只产生不可变事实；草稿/prefill 冲突策略未接受，客户端不发送 prefillVersion。 */
+export function submitTechnicianTaskForm(
+  technicianContextId: string,
+  taskId: string,
+  formVersionId: string,
+  values: Record<string, unknown>,
+) {
+  return apiPost<TechnicianFormSubmission>(
+    `/technician/me/tasks/${encodeURIComponent(taskId)}/form-submissions`,
+    {
+      body: { formVersionId, values },
+      idempotencyKey: crypto.randomUUID(),
+      headers: technicianHeaders(technicianContextId),
+    },
   )
 }
 

@@ -5,7 +5,11 @@ import {
   getTechnicianTaskDetail,
   checkInTechnicianVisit,
   interruptTechnicianVisit,
+  listTechnicianTaskForms,
+  submitTechnicianTaskForm,
   type TechnicianPortalTaskDetail,
+  type TechnicianTaskForm,
+  type TechnicianTaskFormField,
 } from '../api/technicianPortal'
 import { userFacingError } from '../api/client'
 
@@ -17,6 +21,35 @@ const visitActionMessage = ref<string | null>(null)
 const visitActionBusy = ref(false)
 const interruptCode = ref('SITE_UNSAFE')
 const interruptNote = ref('')
+const taskForms = ref<TechnicianTaskForm[]>([])
+const formValues = ref<Record<string, string | boolean>>({})
+const formLoading = ref(false)
+const formSubmitting = ref(false)
+const formMessage = ref<string | null>(null)
+const formIssues = ref<Array<{ fieldKey: string; code: string; message: string }>>([])
+
+const supportedFormTypes = new Set(['STRING', 'TEXT', 'INTEGER', 'DECIMAL', 'BOOLEAN', 'DATE', 'DATETIME'])
+const activeForm = computed(() => taskForms.value[0] ?? null)
+const formFields = computed(() => activeForm.value?.definition.sections.flatMap((section) => section.fields) ?? [])
+const unsupportedFormReasons = computed(() => {
+  const form = activeForm.value
+  if (!form) return []
+  const reasons = new Set<string>()
+  if ((form.definition.validationRules?.length ?? 0) > 0) reasons.add('跨字段规则尚无 Web/iOS 共用执行器')
+  for (const section of form.definition.sections) {
+    if (section.visibility) reasons.add('分区条件显隐尚无 Web/iOS 共用执行器')
+    for (const field of section.fields) {
+      if (!supportedFormTypes.has(field.dataType)) reasons.add(`字段类型 ${field.dataType} 尚未接入`)
+      if (field.requiredWhen || field.visibleWhen || field.editableWhen || field.defaultExpression) {
+        reasons.add('字段条件/默认值尚无 Web/iOS 共用执行器')
+      }
+      if (field.optionsRef || (field.validators?.length ?? 0) > 0) {
+        reasons.add('选项或扩展校验器尚未接入')
+      }
+    }
+  }
+  return [...reasons]
+})
 
 const confirmedAppointment = computed(() =>
   detail.value?.appointments.find((appointment) => appointment.status === 'CONFIRMED') ?? null,
@@ -106,6 +139,104 @@ async function interrupt() {
   }
 }
 
+function inputType(field: TechnicianTaskFormField) {
+  if (field.dataType === 'INTEGER' || field.dataType === 'DECIMAL') return 'number'
+  if (field.dataType === 'DATE') return 'date'
+  if (field.dataType === 'DATETIME') return 'datetime-local'
+  return 'text'
+}
+
+function setTextValue(fieldKey: string, event: Event) {
+  formValues.value[fieldKey] = (event.target as HTMLInputElement | HTMLTextAreaElement).value
+}
+
+function submissionValues(): Record<string, unknown> | null {
+  const values: Record<string, unknown> = {}
+  const missing: string[] = []
+  for (const field of formFields.value) {
+    const raw = formValues.value[field.fieldKey]
+    if (field.dataType === 'BOOLEAN') {
+      values[field.fieldKey] = raw === true
+      continue
+    }
+    const text = typeof raw === 'string' ? raw.trim() : ''
+    if (!text) {
+      if (field.required) missing.push(field.label)
+      continue
+    }
+    if (field.dataType === 'INTEGER') {
+      if (!/^-?\d+$/.test(text)) {
+        formMessage.value = `${field.label} 必须是整数`
+        return null
+      }
+      values[field.fieldKey] = Number(text)
+    } else if (field.dataType === 'DECIMAL') {
+      const number = Number(text)
+      if (!Number.isFinite(number)) {
+        formMessage.value = `${field.label} 必须是数字`
+        return null
+      }
+      values[field.fieldKey] = number
+    } else if (field.dataType === 'DATETIME') {
+      values[field.fieldKey] = new Date(text).toISOString()
+    } else {
+      values[field.fieldKey] = text
+    }
+  }
+  if (missing.length > 0) {
+    formMessage.value = `请填写必填项：${missing.join('、')}`
+    return null
+  }
+  return values
+}
+
+async function submitForm() {
+  if (!props.technicianContextId || !detail.value || !activeForm.value || formSubmitting.value) return
+  if (unsupportedFormReasons.value.length > 0) return
+  const values = submissionValues()
+  if (!values) return
+  formSubmitting.value = true
+  formIssues.value = []
+  formMessage.value = '正在提交不可变表单事实…'
+  try {
+    const response = await submitTechnicianTaskForm(
+      props.technicianContextId, detail.value.taskId, activeForm.value.formVersionId, values,
+    )
+    const issues = response.data.errors
+    const message = response.data.validationStatus === 'VALIDATED'
+      ? `表单提交成功（版本 ${response.data.submissionVersion}）`
+      : '服务器已保留本次 INVALID 提交；请按错误修正后产生新版本'
+    await load()
+    formIssues.value = issues
+    formMessage.value = message
+  } catch (err) {
+    formMessage.value = userFacingError(err, '表单提交失败，请刷新任务后重试')
+  } finally {
+    formSubmitting.value = false
+  }
+}
+
+async function loadForms(taskId: string) {
+  taskForms.value = []
+  formValues.value = {}
+  formIssues.value = []
+  formMessage.value = null
+  if (!props.technicianContextId || detail.value?.formSubmissions === null) return
+  formLoading.value = true
+  try {
+    taskForms.value = await listTechnicianTaskForms(props.technicianContextId, taskId)
+    const initial: Record<string, string | boolean> = {}
+    for (const field of taskForms.value[0]?.definition.sections.flatMap((section) => section.fields) ?? []) {
+      initial[field.fieldKey] = field.dataType === 'BOOLEAN' ? false : ''
+    }
+    formValues.value = initial
+  } catch (err) {
+    formMessage.value = userFacingError(err, '任务表单加载失败')
+  } finally {
+    formLoading.value = false
+  }
+}
+
 async function load() {
   const taskId = String(route.params.id ?? '')
   if (!props.technicianContextId) {
@@ -121,6 +252,7 @@ async function load() {
   try {
     detail.value = await getTechnicianTaskDetail(props.technicianContextId, taskId)
     error.value = null
+    await loadForms(taskId)
   } catch (err) {
     detail.value = null
     error.value = userFacingError(err, '任务详情加载失败')
@@ -212,6 +344,59 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
           </tbody>
         </table>
         <p v-else data-testid="technician-task-detail-no-form-submissions">暂无表单提交</p>
+
+        <div class="online-form" data-testid="technician-online-form">
+          <h4>在线填写冻结表单</h4>
+          <p class="hint">输入仅保存在当前页面内存；草稿与 prefill 冲突策略未接受，不会伪装成已保存草稿。</p>
+          <p v-if="formLoading">正在加载冻结表单…</p>
+          <p v-else-if="detail.formSubmissions === null">当前上下文无表单读取权限</p>
+          <p v-else-if="!activeForm" data-testid="technician-online-form-empty">当前任务未锁定表单</p>
+          <template v-else>
+            <p><strong>{{ activeForm.definition.title ?? activeForm.formKey }}</strong> · {{ activeForm.semanticVersion }}</p>
+            <div v-if="unsupportedFormReasons.length > 0" class="error" data-testid="technician-online-form-unsupported">
+              当前表单不能由本客户端安全执行：{{ unsupportedFormReasons.join('；') }}。已阻止提交。
+            </div>
+            <form v-else class="dynamic-form" data-testid="technician-online-form-fields" @submit.prevent="submitForm">
+              <fieldset v-for="section in activeForm.definition.sections" :key="section.sectionKey">
+                <legend>{{ section.title }}</legend>
+                <label v-for="field in section.fields" :key="field.fieldKey">
+                  <span>{{ field.label }}<em v-if="field.required"> *</em></span>
+                  <input
+                    v-if="field.dataType === 'BOOLEAN'"
+                    v-model="formValues[field.fieldKey]"
+                    type="checkbox"
+                    :data-testid="`technician-form-field-${field.fieldKey}`"
+                  >
+                  <textarea
+                    v-else-if="field.dataType === 'TEXT'"
+                    :value="String(formValues[field.fieldKey] ?? '')"
+                    :data-testid="`technician-form-field-${field.fieldKey}`"
+                    @input="setTextValue(field.fieldKey, $event)"
+                  />
+                  <input
+                    v-else
+                    :value="String(formValues[field.fieldKey] ?? '')"
+                    :type="inputType(field)"
+                    :step="field.dataType === 'DECIMAL' ? 'any' : undefined"
+                    :data-testid="`technician-form-field-${field.fieldKey}`"
+                    @input="setTextValue(field.fieldKey, $event)"
+                  >
+                </label>
+              </fieldset>
+              <button
+                type="submit"
+                :disabled="formSubmitting || detail.executionGuarded || detail.taskStatus !== 'RUNNING'"
+                data-testid="technician-online-form-submit"
+              >{{ formSubmitting ? '提交中…' : '提交不可变表单' }}</button>
+            </form>
+          </template>
+          <ul v-if="formIssues.length > 0" class="error" data-testid="technician-online-form-errors">
+            <li v-for="issue in formIssues" :key="`${issue.fieldKey}-${issue.code}`">
+              {{ issue.fieldKey }}：{{ issue.message }}
+            </li>
+          </ul>
+          <p v-if="formMessage" role="status" data-testid="technician-online-form-message">{{ formMessage }}</p>
+        </div>
       </section>
 
       <section class="visits">
@@ -263,7 +448,7 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
             </button>
           </form>
           <p v-if="activeVisit" class="hint" data-testid="technician-visit-checkout-boundary">
-            签退必须引用已完成现场操作；动态表单/资料尚未接入前，不会生成占位 operationRefs 或伪造完成。
+            签退必须引用已完成现场操作；基础表单已接入，但 Evidence/作业引用尚未形成前不会生成占位 operationRefs。
           </p>
           <p v-if="visitActionMessage" class="action-message" role="status" data-testid="technician-visit-action-message">
             {{ visitActionMessage }}
@@ -294,7 +479,7 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
       </section>
 
       <p class="boundary" data-testid="technician-task-detail-boundary">
-        本切片不返回地址、联系人、联系对象引用、自由文本、录音引用、操作者标识、GPS、距离、设备、离线命令、现场备注、作业/资料引用、表单值、校验消息、提交人、资料文件、配置源码或离线工作包。
+        任务详情摘要不返回地址、联系人、联系对象引用、录音、GPS、设备、离线命令、现场资料引用或提交人；在线表单只读取任务冻结定义并回显本次提交结果，不提供草稿、prefill 或离线工作包。
       </p>
     </template>
   </section>
@@ -321,6 +506,28 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
   border: 1px solid #cbd5e1;
   border-radius: 8px;
   background: #f8fafc;
+}
+.online-form {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+.dynamic-form,
+.dynamic-form fieldset,
+.dynamic-form label {
+  display: grid;
+  gap: 0.75rem;
+}
+.dynamic-form fieldset {
+  margin: 0 0 1rem;
+  border: 1px solid #dbe3ec;
+}
+.dynamic-form input:not([type='checkbox']),
+.dynamic-form textarea {
+  min-height: 44px;
+  font: inherit;
 }
 .interrupt-form {
   display: grid;
