@@ -261,6 +261,7 @@ title: ServiceOS 里程碑索引
 | M250 | M250 Web auth/context/error/trace 共享基础 | [263-m250-web-core-auth-context-error-trace-foundation.md](../architecture/263-m250-web-core-auth-context-error-trace-foundation.md) | [247-m250-web-core-auth-context-error-trace-foundation-acceptance.md](../testing/247-m250-web-core-auth-context-error-trace-foundation-acceptance.md) |
 | M251 | M251 iOS auth/context/error/trace 共享基础 | [264-m251-ios-core-auth-context-error-trace-foundation.md](../architecture/264-m251-ios-core-auth-context-error-trace-foundation.md) | [248-m251-ios-core-auth-context-error-trace-foundation-acceptance.md](../testing/248-m251-ios-core-auth-context-error-trace-foundation-acceptance.md) |
 | M252 | M252 多端 Page/Feature/Action 机器注册表 | [265-m252-cross-client-identity-registry.md](../architecture/265-m252-cross-client-identity-registry.md) | [249-m252-cross-client-identity-registry-acceptance.md](../testing/249-m252-cross-client-identity-registry-acceptance.md) |
+| M253 | M253 多端客户端元数据与可观测性 | [266-m253-client-metadata-observability.md](../architecture/266-m253-client-metadata-observability.md) | [250-m253-client-metadata-observability-acceptance.md](../testing/250-m253-client-metadata-observability-acceptance.md) |
 
 ## 未关联里程碑的文档
 
