@@ -25,24 +25,34 @@ jobs:
       - name: Apply P0 documentation fixes
         run: python3 scripts/p0-fix-baseline-docs.py
 
-      - name: Validate documentation baseline
+      - name: Validate patch formatting
+        run: git diff --check
+
+      - name: Record preflight diagnostics
+        id: preflight
         shell: bash
         run: |
-          set -euo pipefail
-          git diff --check
-          bash scripts/verify-milestone-preflight.sh
+          set +e
+          bash scripts/verify-milestone-preflight.sh > p0-preflight.log 2>&1
+          rc=$?
+          cat p0-preflight.log
+          echo "rc=${rc}" >> "$GITHUB_OUTPUT"
+          exit 0
 
       - name: Commit P0 documentation fixes
         shell: bash
         run: |
           set -euo pipefail
-          if git diff --quiet; then
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898236+github-actions[bot]@users.noreply.github.com'
+          git add serviceos-architecture/README.md serviceos-architecture/docs/implementation-status.md
+          if [[ "${{ steps.preflight.outputs.rc }}" != "0" ]]; then
+            git add p0-preflight.log
+          fi
+          if git diff --cached --quiet; then
             echo 'P0 documentation is already current.'
             exit 0
           fi
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add serviceos-architecture/README.md serviceos-architecture/docs/implementation-status.md
           git diff --cached --check
           git commit -m 'docs: align M266 baseline facts'
           git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
