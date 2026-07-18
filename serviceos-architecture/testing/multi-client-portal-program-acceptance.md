@@ -28,7 +28,7 @@ lastUpdated: 2026-07-18
 | ID | 验收项 | 预期 | 证据 |
 |---|---|---|---|
 | MCP-APP-01 | Admin 独立构建 | 不依赖 Network/Technician 路由才能构建和运行 | CI build + route test |
-| MCP-APP-02 | Network 独立构建 | 独立 AppShell、会话、环境和部署 | CI build + E2E |
+| MCP-APP-02 | Network 独立构建 | 独立 AppShell、会话、环境和部署 | M255 local AppShell/build/environment; session/deploy/E2E pending |
 | MCP-APP-03 | Technician H5 独立构建 | 独立 AppShell、Technician Context 和路由 | CI build + Playwright |
 | MCP-APP-04 | Technician iOS 独立构建 | SwiftUI 工程可在模拟器和开发真机构建 | Xcode CI + device evidence |
 | MCP-APP-05 | 单仓库共享边界 | 共享包不包含角色菜单或数据范围假设 | M247-M254 independent consumers + source gates + aggregate gate |
