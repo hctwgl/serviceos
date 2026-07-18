@@ -239,4 +239,8 @@
 - [M236 Network Portal 目录页工单头字段验收矩阵](233-m236-network-portal-directory-work-order-header-acceptance.md)
 - [M237 Network Portal 工作台统计时间展示验收矩阵](234-m237-network-portal-workbench-stats-time-acceptance.md)
 - [M238 Network Portal 预约/联系历史 Accepted 字段展示验收矩阵](235-m238-network-portal-appointment-contact-history-fields-acceptance.md)
+- [M239 Network Portal 工作区 Visit/表单/Evidence Accepted 字段展示验收矩阵](236-m239-network-portal-workspace-visit-form-evidence-fields-acceptance.md)
+- [M240 Network Portal 工作区协作摘要 Accepted 字段展示验收矩阵](237-m240-network-portal-workspace-collaboration-summary-fields-acceptance.md)
+- [M241 Network Portal 预约/联系历史残余 Accepted 字段展示验收矩阵](238-m241-network-portal-appointment-contact-history-residual-fields-acceptance.md)
+- [M242 Network Portal 整改详情残余 Accepted 字段展示验收矩阵](239-m242-network-portal-correction-detail-residual-fields-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

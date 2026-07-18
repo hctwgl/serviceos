@@ -532,7 +532,13 @@ export type NetworkPortalAppointment = {
   currentRevisionNo: number
   /** OpenAPI Appointment.createdBy；product/03 §8「操作者」。 */
   createdBy?: string
-  /** OpenAPI Appointment.revisions；M216/M238 消费 current window/渠道。 */
+  /** M241：OpenAPI Appointment 既有非 PII 范围/时间/动作字段。 */
+  projectId?: string
+  workOrderId?: string
+  technicianId?: string | null
+  createdAt?: string
+  allowedActions?: string[]
+  /** OpenAPI Appointment.revisions；M216/M238/M241 消费 current window/渠道。 */
   revisions?: NetworkPortalAppointmentRevision[]
 }
 
@@ -637,6 +643,12 @@ export type NetworkPortalContactAttempt = {
   resultCode: string
   actorId: string
   createdAt: string
+  /** M240/M241：OpenAPI ContactAttempt 既有非 PII 字段；不渲染 party/note/recording。 */
+  projectId?: string
+  workOrderId?: string
+  startedAt?: string
+  endedAt?: string
+  nextContactAt?: string | null
 }
 
 /** M199：标记本网点预约爽约（CONFIRMED 且窗口已结束）。 */
