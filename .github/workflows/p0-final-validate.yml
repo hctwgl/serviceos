@@ -1,0 +1,30 @@
+name: p0-final-validate
+
+on:
+  pull_request:
+    branches:
+      - master
+    types:
+      - synchronize
+      - reopened
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    if: github.head_ref == 'docs/p0-baseline-consistency'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - name: Install ripgrep
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+      - name: Validate P0 documentation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check origin/master...HEAD
+          bash scripts/verify-milestone-preflight.sh
