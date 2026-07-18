@@ -108,6 +108,26 @@ final class DefaultVisitService implements VisitService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<VisitView> listByWorkOrderOnNetwork(
+            CurrentPrincipal principal, String correlationId, UUID workOrderId, UUID networkId
+    ) {
+        Objects.requireNonNull(workOrderId, "workOrderId must not be null");
+        Objects.requireNonNull(networkId, "networkId must not be null");
+        authorization.require(principal, AuthorizationRequest.networkCapability(
+                READ,
+                principal.tenantId(),
+                "WorkOrder",
+                workOrderId.toString(),
+                networkId.toString()), correlationId);
+        String networkRef = networkId.toString();
+        return repository.findByWorkOrder(principal.tenantId(), workOrderId).stream()
+                .filter(visit -> networkRef.equals(visit.networkId()))
+                .map(visit -> view(principal, correlationId, visit))
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public VisitView get(CurrentPrincipal principal, String correlationId, UUID visitId) {
         VisitAggregate visit = visit(principal.tenantId(), visitId);
         require(principal, READ, visit.projectId(), visit.networkId(), "Visit",

@@ -146,6 +146,16 @@ class NetworkPortalControllerSecurityTest {
                                 taskId, WORK_ORDER_ID, null, "INSTALL", "HUMAN", "S1",
                                 "READY", "INSTALLATION", "tech-1", now)),
                         null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
                         now));
 
         mvc.perform(get("/api/v1/network-portal/work-orders/" + WORK_ORDER_ID + "/workspace")
@@ -165,7 +175,7 @@ class NetworkPortalControllerSecurityTest {
         when(principals.current()).thenReturn(actor);
         when(queries.workbench(eq(actor), eq("corr-wb"), eq("NETWORK|NETWORK|" + NETWORK_ID)))
                 .thenReturn(new NetworkPortalWorkbenchView(
-                        NETWORK_ID, 1, 2, 3, List.of(), now, 0, null, null, null));
+                        NETWORK_ID, 1, 2, 3, List.of(), now, 0, null, null, null, null));
 
         mvc.perform(get("/api/v1/network-portal/workbench")
                         .with(jwt().jwt(token -> token.subject("external-subject")

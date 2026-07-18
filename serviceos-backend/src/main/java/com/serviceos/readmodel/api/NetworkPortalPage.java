@@ -1,16 +1,119 @@
 package com.serviceos.readmodel.api;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-/** Network Portal 通用列表包装。 */
+/**
+ * Network Portal 通用列表包装。
+ *
+ * <p>M230：可选 {@code technicians} 仅在工单/任务目录页填充；缺 NETWORK
+ * {@code technician.readOwnNetwork} 时为 null（经 {@link JsonInclude.Include#NON_NULL} 省略）。</p>
+ *
+ * <p>M231：可选 {@code appointments} 仅在工单/任务目录页填充；缺 NETWORK
+ * {@code networkPortal.manageAppointment} 时为 null（省略）。</p>
+ *
+ * <p>M232：可选 {@code contactAttempts} 仅在工单/任务目录页填充；缺 NETWORK
+ * {@code networkPortal.manageAppointment} 时为 null（省略）。</p>
+ *
+ * <p>M233：可选 {@code corrections} 仅在工单/任务目录页填充；缺 NETWORK
+ * {@code evidence.read} 时为 null（省略）。</p>
+ *
+ * <p>M235：可选 {@code evidenceSlots}/{@code evidenceItems} 仅在工单/任务目录页填充；缺 NETWORK
+ * {@code evidence.read} 时同时为 null（省略）。</p>
+ *
+ * <p>M234：可选 {@code slaRiskSummaries} 仅在工单/任务目录页填充；缺 NETWORK
+ * {@code sla.read} 时为 null（省略）。</p>
+ */
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record NetworkPortalPage<T>(
         UUID networkId,
         List<T> items,
-        Instant asOf
+        Instant asOf,
+        List<NetworkPortalTechnicianItem> technicians,
+        List<NetworkPortalWorkspaceAppointmentSummary> appointments,
+        List<NetworkPortalWorkspaceContactAttemptSummary> contactAttempts,
+        List<NetworkPortalWorkspaceCorrectionCaseSummary> corrections,
+        List<NetworkPortalWorkspaceEvidenceSlotSummary> evidenceSlots,
+        List<NetworkPortalWorkspaceEvidenceItemSummary> evidenceItems,
+        List<NetworkPortalDirectorySlaRiskSummary> slaRiskSummaries
 ) {
     public NetworkPortalPage {
         items = items == null ? List.of() : List.copyOf(items);
+        technicians = technicians == null ? null : List.copyOf(technicians);
+        appointments = appointments == null ? null : List.copyOf(appointments);
+        contactAttempts = contactAttempts == null ? null : List.copyOf(contactAttempts);
+        corrections = corrections == null ? null : List.copyOf(corrections);
+        evidenceSlots = evidenceSlots == null ? null : List.copyOf(evidenceSlots);
+        evidenceItems = evidenceItems == null ? null : List.copyOf(evidenceItems);
+        slaRiskSummaries = slaRiskSummaries == null ? null : List.copyOf(slaRiskSummaries);
+    }
+
+    /** 无旁载 enrichment 的列表页（纠正/异常/资质等）。 */
+    public NetworkPortalPage(UUID networkId, List<T> items, Instant asOf) {
+        this(networkId, items, asOf, null, null, null, null, null, null, null);
+    }
+
+    /** M230 兼容：仅师傅旁载。 */
+    public NetworkPortalPage(
+            UUID networkId,
+            List<T> items,
+            Instant asOf,
+            List<NetworkPortalTechnicianItem> technicians
+    ) {
+        this(networkId, items, asOf, technicians, null, null, null, null, null, null);
+    }
+
+    /** M231 兼容：师傅 + 预约旁载。 */
+    public NetworkPortalPage(
+            UUID networkId,
+            List<T> items,
+            Instant asOf,
+            List<NetworkPortalTechnicianItem> technicians,
+            List<NetworkPortalWorkspaceAppointmentSummary> appointments
+    ) {
+        this(networkId, items, asOf, technicians, appointments, null, null, null, null, null);
+    }
+
+    /** M232 兼容：师傅 + 预约 + 联系旁载。 */
+    public NetworkPortalPage(
+            UUID networkId,
+            List<T> items,
+            Instant asOf,
+            List<NetworkPortalTechnicianItem> technicians,
+            List<NetworkPortalWorkspaceAppointmentSummary> appointments,
+            List<NetworkPortalWorkspaceContactAttemptSummary> contactAttempts
+    ) {
+        this(networkId, items, asOf, technicians, appointments, contactAttempts, null, null, null, null);
+    }
+
+    /** M233 兼容：至整改旁载。 */
+    public NetworkPortalPage(
+            UUID networkId,
+            List<T> items,
+            Instant asOf,
+            List<NetworkPortalTechnicianItem> technicians,
+            List<NetworkPortalWorkspaceAppointmentSummary> appointments,
+            List<NetworkPortalWorkspaceContactAttemptSummary> contactAttempts,
+            List<NetworkPortalWorkspaceCorrectionCaseSummary> corrections
+    ) {
+        this(networkId, items, asOf, technicians, appointments, contactAttempts, corrections, null, null, null);
+    }
+
+    /** M234 兼容：至 SLA 风险旁载（无目录 evidence）。 */
+    public NetworkPortalPage(
+            UUID networkId,
+            List<T> items,
+            Instant asOf,
+            List<NetworkPortalTechnicianItem> technicians,
+            List<NetworkPortalWorkspaceAppointmentSummary> appointments,
+            List<NetworkPortalWorkspaceContactAttemptSummary> contactAttempts,
+            List<NetworkPortalWorkspaceCorrectionCaseSummary> corrections,
+            List<NetworkPortalDirectorySlaRiskSummary> slaRiskSummaries
+    ) {
+        this(networkId, items, asOf, technicians, appointments, contactAttempts, corrections,
+                null, null, slaRiskSummaries);
     }
 }

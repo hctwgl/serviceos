@@ -9,6 +9,7 @@ import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.readmodel.api.NetworkPortalQueryService;
 import com.serviceos.readmodel.api.NetworkPortalWorkbenchView;
+import com.serviceos.readmodel.api.NetworkPortalWorkOrderWorkspaceSlaSummary;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.shared.Sha256;
@@ -27,6 +28,8 @@ import org.testcontainers.utility.DockerImageName;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Set;
 import java.util.UUID;
 
@@ -52,6 +55,10 @@ class NetworkPortalWorkbenchEnrichmentPostgresIT {
     private static final UUID TASK_ASSIGNED = UUID.fromString("019f84a0-aaaa-7f8c-9505-36fe5c0e880b");
     private static final UUID TASK_UNASSIGNED = UUID.fromString("019f84a0-bbbb-7f8c-9505-36fe5c0e880c");
     private static final UUID QUAL_PENDING = UUID.fromString("019f84a0-cccc-7f8c-9505-36fe5c0e880d");
+    private static final UUID WO_FOREIGN = UUID.fromString("019f84a0-dddd-7f8c-9505-36fe5c0e880e");
+    private static final UUID TASK_FOREIGN = UUID.fromString("019f84a0-eeee-7f8c-9505-36fe5c0e880f");
+    private static final String SLA_REF = "install.sla";
+    private static final String SLA_POLICY_DIGEST = "d".repeat(64);
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(
@@ -88,6 +95,7 @@ class NetworkPortalWorkbenchEnrichmentPostgresIT {
                     dsp_assignment_command_result, dsp_capacity_command_result,
                     dsp_service_assignment_activation_saga, dsp_capacity_reservation,
                     dsp_service_assignment, dsp_capacity_counter,
+                    sla_milestone, sla_clock_segment, sla_instance,
                     tsk_task,
                     cfg_configuration_bundle_item, cfg_configuration_bundle,
                     cfg_configuration_asset_version,
@@ -152,6 +160,7 @@ class NetworkPortalWorkbenchEnrichmentPostgresIT {
         assertThat(wb.openCorrectionCaseCount()).isNull();
         assertThat(wb.openOperationalExceptionCount()).isNull();
         assertThat(wb.pendingQualificationCount()).isNull();
+        assertThat(wb.slaSummary()).isNull();
         assertThat(wb.capacity()).hasSize(1);
     }
 
@@ -210,6 +219,36 @@ class NetworkPortalWorkbenchEnrichmentPostgresIT {
         assertThat(wb.openCorrectionCaseCount()).isEqualTo(0);
         assertThat(wb.openOperationalExceptionCount()).isEqualTo(0);
         assertThat(wb.pendingQualificationCount()).isEqualTo(0);
+        assertThat(wb.slaSummary()).isNull();
+
+        seedGrant(PRINCIPAL, "sla.read", "NETWORK", NETWORK_B.toString());
+        bumpGrantGeneration();
+        NetworkPortalWorkbenchView withSla = portal.workbench(
+                actor(PRINCIPAL), "corr-zero-sla", "NETWORK|NETWORK|" + NETWORK_B);
+        assertThat(withSla.slaSummary()).isEqualTo(new NetworkPortalWorkOrderWorkspaceSlaSummary(0, 0));
+    }
+
+    @Test
+    void m224_slaSummaryIsCapabilityGatedAndNetworkScoped() {
+        // 他网点 BREACHED 不得计入本网点工作台
+        seedHumanTask(TASK_FOREIGN, WO_FOREIGN);
+        seedActiveNetworkAssignmentWithTech(NETWORK_B, WO_FOREIGN, TASK_FOREIGN, "tech-b");
+        UUID policyA = prepareSlaScopeForTask(TASK_ASSIGNED, "m224-a");
+        alignTaskSlaScope(TASK_UNASSIGNED, TASK_ASSIGNED);
+        UUID policyB = prepareSlaScopeForTask(TASK_FOREIGN, "m224-b");
+        seedSlaInstance(TASK_ASSIGNED, policyA, "RUNNING");
+        seedSlaInstance(TASK_UNASSIGNED, policyA, "BREACHED");
+        seedSlaInstance(TASK_FOREIGN, policyB, "BREACHED");
+
+        NetworkPortalWorkbenchView withoutCap = portal.workbench(
+                actor(PRINCIPAL), "corr-sla-omit", "NETWORK|NETWORK|" + NETWORK_A);
+        assertThat(withoutCap.slaSummary()).isNull();
+
+        seedGrant(PRINCIPAL, "sla.read", "NETWORK", NETWORK_A.toString());
+        bumpGrantGeneration();
+        NetworkPortalWorkbenchView withCap = portal.workbench(
+                actor(PRINCIPAL), "corr-sla", "NETWORK|NETWORK|" + NETWORK_A);
+        assertThat(withCap.slaSummary()).isEqualTo(new NetworkPortalWorkOrderWorkspaceSlaSummary(2, 1));
     }
 
     @Test
@@ -579,6 +618,140 @@ class NetworkPortalWorkbenchEnrichmentPostgresIT {
                 .param("id", UUID.randomUUID()).param("tenant", TENANT)
                 .param("assignee", networkId.toString())
                 .param("max", max).param("occupied", occupied)
+                .update();
+    }
+
+    private UUID prepareSlaScopeForTask(UUID taskId, String projectCodeSuffix) {
+        var task = jdbc.sql("""
+                SELECT project_id, configuration_bundle_id, configuration_bundle_digest
+                  FROM tsk_task WHERE task_id = :taskId
+                """)
+                .param("taskId", taskId)
+                .query((rs, rowNum) -> new Object[] {
+                        rs.getObject("project_id", UUID.class),
+                        rs.getObject("configuration_bundle_id", UUID.class),
+                        rs.getString("configuration_bundle_digest")
+                })
+                .single();
+        UUID projectId = (UUID) task[0];
+        UUID bundleId = (UUID) task[1];
+        String bundleDigest = (String) task[2];
+        UUID policyVersionId = UUID.randomUUID();
+        OffsetDateTime now = OffsetDateTime.ofInstant(Instant.parse("2026-07-17T00:00:00Z"), ZoneOffset.UTC);
+        jdbc.sql("""
+                INSERT INTO cfg_configuration_asset_version (
+                    version_id, tenant_id, asset_type, asset_key, semantic_version, schema_version,
+                    definition, content_digest, status, published_at)
+                VALUES (
+                    :versionId, :tenantId, 'SLA', :assetKey, '1.0.0', '1.0.0',
+                    CAST(:definition AS jsonb), :digest, 'PUBLISHED', :publishedAt)
+                """)
+                .param("versionId", policyVersionId)
+                .param("tenantId", TENANT)
+                .param("assetKey", SLA_REF + "." + projectCodeSuffix)
+                .param("definition", """
+                        {"policyKey":"%s","version":"1.0.0","subjectType":"TASK",
+                         "taskTypes":["INSTALLATION"],"startEvent":"TASK_CREATED",
+                         "stopEvent":"TASK_COMPLETED","clockMode":"ELAPSED","targetDurationSeconds":3600}
+                        """.formatted(SLA_REF).trim())
+                .param("digest", SLA_POLICY_DIGEST)
+                .param("publishedAt", now)
+                .update();
+        jdbc.sql("""
+                INSERT INTO cfg_configuration_bundle (
+                    bundle_id, tenant_id, project_id, bundle_code, bundle_version,
+                    brand_code, service_product_code, province_code, effective_from, effective_until,
+                    manifest_digest, status, published_at)
+                VALUES (
+                    :bundleId, :tenantId, :projectId, :bundleCode, '1.0.0',
+                    'BYD_OCEAN', 'HOME_CHARGING', NULL, :effectiveFrom, NULL,
+                    :manifestDigest, 'PUBLISHED', :publishedAt)
+                ON CONFLICT (bundle_id) DO NOTHING
+                """)
+                .param("bundleId", bundleId)
+                .param("tenantId", TENANT)
+                .param("projectId", projectId)
+                .param("bundleCode", "M224-BUNDLE-" + projectCodeSuffix)
+                .param("effectiveFrom", now)
+                .param("manifestDigest", bundleDigest)
+                .param("publishedAt", now)
+                .update();
+        jdbc.sql("""
+                INSERT INTO cfg_configuration_bundle_item (
+                    tenant_id, bundle_id, asset_type, asset_version_id, content_digest)
+                VALUES (:tenantId, :bundleId, 'SLA', :versionId, :digest)
+                ON CONFLICT DO NOTHING
+                """)
+                .param("tenantId", TENANT)
+                .param("bundleId", bundleId)
+                .param("versionId", policyVersionId)
+                .param("digest", SLA_POLICY_DIGEST)
+                .update();
+        jdbc.sql("UPDATE tsk_task SET sla_ref = :slaRef WHERE task_id = :taskId")
+                .param("slaRef", SLA_REF)
+                .param("taskId", taskId)
+                .update();
+        return policyVersionId;
+    }
+
+    private void alignTaskSlaScope(UUID siblingTaskId, UUID sourceTaskId) {
+        jdbc.sql("""
+                UPDATE tsk_task AS sibling
+                   SET project_id = source.project_id,
+                       configuration_bundle_id = source.configuration_bundle_id,
+                       configuration_bundle_digest = source.configuration_bundle_digest,
+                       sla_ref = source.sla_ref
+                  FROM tsk_task AS source
+                 WHERE sibling.task_id = :sibling
+                   AND source.task_id = :source
+                """)
+                .param("sibling", siblingTaskId)
+                .param("source", sourceTaskId)
+                .update();
+    }
+
+    private void seedSlaInstance(UUID taskId, UUID policyVersionId, String status) {
+        var scope = jdbc.sql("""
+                SELECT project_id, work_order_id FROM tsk_task WHERE task_id = :taskId
+                """)
+                .param("taskId", taskId)
+                .query((rs, rowNum) -> new Object[] {
+                        rs.getObject("project_id", UUID.class),
+                        rs.getObject("work_order_id", UUID.class)
+                })
+                .single();
+        Instant started = Instant.parse("2026-07-17T02:00:00Z");
+        Instant deadline = Instant.parse("2026-07-17T03:00:00Z");
+        OffsetDateTime startedAt = OffsetDateTime.ofInstant(started, ZoneOffset.UTC);
+        OffsetDateTime deadlineAt = OffsetDateTime.ofInstant(deadline, ZoneOffset.UTC);
+        OffsetDateTime breachedAt = "BREACHED".equals(status) ? deadlineAt : null;
+        jdbc.sql("""
+                INSERT INTO sla_instance (
+                    sla_instance_id, tenant_id, project_id, work_order_id, task_id, sla_ref,
+                    policy_version_id, policy_semantic_version, policy_content_digest,
+                    clock_mode, target_duration_seconds, start_event_id, started_at, deadline_at,
+                    status, breached_at, breach_detected_at, aggregate_version, correlation_id,
+                    created_at, updated_at)
+                VALUES (
+                    :instanceId, :tenantId, :projectId, :workOrderId, :taskId, :slaRef,
+                    :policyVersionId, '1.0.0', :policyDigest, 'ELAPSED', 3600, :eventId,
+                    :startedAt, :deadlineAt, :status, :breachedAt, :breachDetectedAt,
+                    1, 'corr-m224', :startedAt, :startedAt)
+                """)
+                .param("instanceId", UUID.randomUUID())
+                .param("tenantId", TENANT)
+                .param("projectId", (UUID) scope[0])
+                .param("workOrderId", (UUID) scope[1])
+                .param("taskId", taskId)
+                .param("slaRef", SLA_REF)
+                .param("policyVersionId", policyVersionId)
+                .param("policyDigest", SLA_POLICY_DIGEST)
+                .param("eventId", UUID.randomUUID())
+                .param("startedAt", startedAt)
+                .param("deadlineAt", deadlineAt)
+                .param("status", status)
+                .param("breachedAt", breachedAt)
+                .param("breachDetectedAt", breachedAt)
                 .update();
     }
 
