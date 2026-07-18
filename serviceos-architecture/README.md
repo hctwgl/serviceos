@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M279 工单取消/重开与流程人工跳转**，功能证据提交 `c4f9bd3dcfd1bb1046fd5fc2b25ffa5d0a44c908`（合并入 `master` 后改为合并提交）。
+当前工程基线为 **M280 取消时配置化补偿任务**，功能证据提交待回填（合并入 `master` 后改为合并提交）。
 此前 M267 Connector SPI 证据为 `994cb46f1e31ddc8a4364a776cc4849e766c3b6d`；M266 仍为上一
 master 合并基线 `088018a6eac180f7fe36536fae9d073fa797757c`。
 
@@ -690,6 +690,8 @@ master 合并基线 `088018a6eac180f7fe36536fae9d073fa797757c`。
 - [M278 验收矩阵](testing/275-m278-multi-instance-runtime-acceptance.md)
 - [M279 实现文档](architecture/292-m279-work-order-cancel-reopen-jump.md)
 - [M279 验收矩阵](testing/276-m279-work-order-cancel-reopen-jump-acceptance.md)
+- [M280 实现文档](architecture/293-m280-workflow-compensation-on-cancel.md)
+- [M280 验收矩阵](testing/277-m280-workflow-compensation-on-cancel-acceptance.md)
 - [M277 实现文档](architecture/290-m277-subprocess-runtime.md)
 - [M277 验收矩阵](testing/274-m277-subprocess-runtime-acceptance.md)
 - [M276 实现文档](architecture/289-m276-timer-runtime.md)

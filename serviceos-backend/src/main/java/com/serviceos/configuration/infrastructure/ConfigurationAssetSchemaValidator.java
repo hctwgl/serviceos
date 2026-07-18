@@ -249,7 +249,22 @@ final class ConfigurationAssetSchemaValidator {
             } else if (Set.of("USER_TASK", "SERVICE_TASK", "REVIEW_TASK", "MANUAL_INTERVENTION")
                     .contains(nodeType)) {
                 validateTaskMultiInstance(entry.getValue(), entry.getKey(), outgoing);
+                validateTaskCompensation(entry.getValue(), entry.getKey());
+            } else if (present(entry.getValue(), "compensation")) {
+                throw new ConfigurationPublicationException(
+                        "compensation 仅允许声明在任务节点上: " + entry.getKey());
             }
+        }
+    }
+
+    private void validateTaskCompensation(JsonNode node, String nodeId) {
+        if (!present(node, "compensation")) {
+            return;
+        }
+        JsonNode taskType = node.path("compensation").path("taskType");
+        if (!taskType.isTextual() || taskType.asText().isBlank()) {
+            throw new ConfigurationPublicationException(
+                    "compensation.taskType 不得为空: " + nodeId);
         }
     }
 

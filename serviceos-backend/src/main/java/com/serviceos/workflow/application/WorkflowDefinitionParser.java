@@ -17,6 +17,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -49,6 +50,34 @@ final class WorkflowDefinitionParser {
         return new BootstrapDefinition(
                 graph.workflowKey(), graph.semanticVersion(), task.nodeId(),
                 task.stageCode(), task.taskType(), task.taskKind(), task.formRef(), task.slaRef());
+    }
+
+    /**
+     * 读取任务节点上的取消补偿声明；非任务或不存在则返回 empty。
+     */
+    Optional<CompensationDefinition> compensationForNode(
+            ConfigurationAssetDefinition asset,
+            String nodeId
+    ) {
+        Graph graph = parseGraph(asset);
+        JsonNode node = graph.nodes().get(requiredValue(nodeId, "nodeId"));
+        if (node == null) {
+            return Optional.empty();
+        }
+        String nodeType = requiredText(node, "nodeType");
+        if (!TASK_NODE_TYPES.contains(nodeType)) {
+            return Optional.empty();
+        }
+        JsonNode compensation = node.get("compensation");
+        if (compensation == null || compensation.isNull()) {
+            return Optional.empty();
+        }
+        String taskType = requiredText(compensation, "taskType");
+        String stageCode = optionalText(compensation, "stageCode");
+        if (stageCode == null) {
+            stageCode = requiredText(node, "stageCode");
+        }
+        return Optional.of(new CompensationDefinition(nodeId, taskType, stageCode));
     }
 
     /**
@@ -446,6 +475,13 @@ final class WorkflowDefinitionParser {
             WorkflowTaskKind firstTaskKind,
             String firstFormRef,
             String firstSlaRef
+    ) {
+    }
+
+    record CompensationDefinition(
+            String sourceNodeId,
+            String taskType,
+            String stageCode
     ) {
     }
 

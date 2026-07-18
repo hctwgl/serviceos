@@ -82,6 +82,19 @@
             "cardinality": {"type": "integer", "minimum": 2, "maximum": 50}
           }
         },
+        "compensation": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["taskType"],
+          "properties": {
+            "taskType": {"type": "string", "minLength": 1, "maxLength": 100},
+            "stageCode": {
+              "type": ["string", "null"],
+              "pattern": "^[A-Z0-9][A-Z0-9_-]*$",
+              "maxLength": 100
+            }
+          }
+        },
         "entryActions": {"type": "array", "items": {"type": "string"}, "default": []},
         "exitActions": {"type": "array", "items": {"type": "string"}, "default": []},
         "retryPolicy": {"$ref": "#/$defs/retryPolicy"},

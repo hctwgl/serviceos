@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-18
-baselineCommit: c4f9bd3dcfd1bb1046fd5fc2b25ffa5d0a44c908
-latestMilestone: M279
+baselineCommit: TBD_AFTER_FEATURE_COMMIT
+latestMilestone: M280
 ---
 
 # ServiceOS 实施状态总览
@@ -39,12 +39,12 @@ latestMilestone: M279
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M279 工单取消/重开与流程人工跳转 |
-| 基线提交 | `c4f9bd3dcfd1bb1046fd5fc2b25ffa5d0a44c908`（功能证据；合并入 `master` 后改为合并提交） |
+| 最新实施里程碑 | M280 取消时配置化补偿任务 |
+| 基线提交 | `TBD_AFTER_FEATURE_COMMIT`（功能证据；合并入 `master` 后改为合并提交） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts`、`@serviceos/web-core`、`ServiceOSIOSCore`、独立且可部署的 `serviceos-network-web` 与 `serviceos-technician-web`、Swift 6 `TechnicianIOSFoundation`，以及已在 iPhone 17 Pro Simulator 安装启动、实跑 XCTest/XCUITest、形成 Production arm64 archive/dSYM，并接入当前任务、在线 Visit、冻结基础表单、前台 Evidence 采集上传、Snapshot/Task 完成与多轮资料整改的原生 `TechnicianIOS` SwiftUI App；由同一 Core OpenAPI 生成并经独立消费者门禁验证的 `@serviceos/core-client` 与 `ServiceOSCoreClient` |
 | 前端工程 | `serviceos-admin-web` 独立承载总部运营、统一用户中心、`/me` 导航、SavedView、UI Preference、受控搜索与最近访问；M256 后 Network 正式产品由独立 `serviceos-network-web` 承载，M257 后 Technician 正式产品由独立移动优先 `serviceos-technician-web` 承载，M262～M266 依次增加在线 Visit、冻结表单、Evidence 三段式上传、Snapshot/Task 完成与独立整改 Task 多轮补传/重新提交；Admin 仅保留可配置外链和 M188 诊断；两套独立 Web 均实际接入共享 Core、OIDC PKCE、服务端 Context/Capability/导航、Playwright 回归和独立容器镜像 |
-| 数据库 | PostgreSQL + Flyway（当前版本 108 / 110） |
+| 数据库 | PostgreSQL + Flyway（当前版本 109 / 111） |
 | 契约 | Core OpenAPI 1.0.27 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 `workorder.cancelled@v1`、`workorder.reopened@v1`、project.created@v3、project.scope-relations-revised@v1、`task.handling-completed@v1`、recovered/resolved 与 SLA started/breached/met@v1） |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
@@ -147,7 +147,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | 配置中心 | 不可变配置资产、Bundle 发布和版本锁定 | `PARTIAL` | FORM、EVIDENCE、SLA v1 资产发布基础；工单/任务冻结引用；SERVICEOS_EXPR_V1 布尔/类型比较子集；FORM/EVIDENCE 字段及 WORKFLOW/SLA 依赖闭包；**M268** Workflow 条件静态门禁；**M271** 平台中立家充勘安 WORKFLOW+SLA 模板（含 Gateway/WAIT） | 决策表/公式/脚本、完整审批 UI、通用依赖图、完整 FORM/EVIDENCE 模板包 | M16、M33、M36、M52～M53、M61、M268、M271 |
 | 外部接入 | BYD CPIM + REFERENCE_OEM SAMPLE | `PARTIAL` | BYD 入站/提审/回调切片；**M267** 通用 SPI 管道；**M272** REFERENCE_OEM SAMPLE 独立 Connector（明确 REFERENCE/SAMPLE/TBD_EXTERNAL_CONTRACT） | 真实第二家协议/Sandbox（BLOCKED_EXTERNAL）、回调/出站全面 SPI、人工标记已送达/放弃、生产凭据/对象存储 | M16、M56～M60、M77～M79、M99、M158、M267、M272、M273 |
 | 工单 | WorkOrder 接收、激活、履约完成与授权工作区投影 | `PARTIAL` | 权威工单、工作流启动、跨阶段和 END 完结；授权目录、非 PII 详情、Stage/Task 执行骨架及核心执行+现场履约时间线 | 完整取消、暂停、恢复、客户敏感详情审计、跨域完整时间线/动作与全部业务分支 | M16～M19、M68～M69、M73～M74 |
-| 工作流 | 线性 + 网关 + WAIT/TIMER + SUB_PROCESS + 多实例 + 取消/重开/跳转 | `PARTIAL` | 线性；EXCLUSIVE；WAIT；PARALLEL；TIMER；SUB_PROCESS；多实例；**M279** 取消级联/授权重开/人工跳转 | HTTP 命令面、FULFILLED 纠错重开、异常补偿、集合驱动 cardinality | M17～M19、M61、M69、M268～M270、M275～M279 |
+| 工作流 | 线性 + 网关 + WAIT/TIMER + SUB_PROCESS + 多实例 + 取消/重开/跳转/补偿 | `PARTIAL` | 线性；EXCLUSIVE；WAIT；PARALLEL；TIMER；SUB_PROCESS；多实例；取消/重开/跳转；**M280** 取消时配置化补偿任务 | HTTP 命令面、FULFILLED 纠错重开、补偿完成回写、集合驱动 cardinality | M17～M19、M61、M69、M268～M270、M275～M280 |
 | 人工任务与执行历史 | claim/start/complete、责任、执行保护与授权任务读取 | `IMPLEMENTED` | 人工命令、候选领取、唯一责任、release/reclaim、执行保护；表单/资料完成门禁；授权队列/详情、allowed-actions、自动 Attempt 历史及工单内核心 Task 生命周期与指派/Guard/人工接管时间线 | block/retry/cancel 等其他动作、Workflow Node 历史、跨工单/跨域完整历史和 Review 完成条件 | M20～M23、M35、M41、M43、M69～M73、M81 |
 | 应用只读投影 | 工作区、队列、时间线和投影运行时 | `PARTIAL` | 独立 readmodel 模块；核心执行、现场履约、SLA、资料/审核/整改（含外部回执与条件 KEEP/INVALIDATE 处置）、外发交付全链路、异常确认/闭环、ServiceAssignment 与 Task 指派/Guard/人工接管 Inbox 投影；授权时间线与稳定分页及最近活动摘要；时间线 checkpoint/dead letter/generation 重建与 FRESH/LAGGING/UNKNOWN/REBUILDING freshness；definition 登记、dead letter 幂等重放与旧/孤儿 generation 清理；工单工作区顶层实时组合、当前 ACTIVE 服务责任摘要与 TASKS/TIMELINE_AUDIT/APPOINTMENTS_VISITS（含联系尝试）/FORMS_EVIDENCE（含提交与资料项安全元数据）/REVIEWS_CORRECTIONS（含 CLIENT/重开血缘）/INTEGRATION 按需区块（敏感字段最小化；缺权次级区块降级）；授权跨项目 ReviewCase/CorrectionCase/OutboundDelivery/InboundEnvelope 专项队列；Admin 个人 SavedView（M189）、UI Preference（M190）、共享 SavedView（M191）、受控全局搜索 fan-in（M192）与最近访问（M193）；Network Portal 只读 fan-in（M194）；Technician Portal Feed fan-in（M195） | 试算合并、revision/slots 技术噪声、表单值与资料版本详情、FACTS_CALCULATIONS、完整事件 taxonomy/过滤、通用 work-queues、共享偏好、`search_document` 索引平台、多投影平台、Broker offset、离线工作包、Admin 重建/重放 HTTP | M73～M99、M158、M189～M195 |
 | 服务分配 | 网点分配、容量、改派 Saga、超时恢复 | `IMPLEMENTED` | ServiceAssignment、容量权威、改派、终止、对账和自动恢复 | 完整策略评分、全部异常分支和 UI | M24～M28 |
@@ -175,18 +175,17 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M279**。阶段一已闭合；复杂流程运行时已覆盖 EXCLUSIVE、PARALLEL、
-WAIT_EVENT、TIMER、SUB_PROCESS、多实例任务，以及 **工单取消级联 / 授权重开 / 人工跳转**（Flyway V106～V108）。
+ServiceOS 可靠纵向切片已推进到 **M280**。阶段一已闭合；复杂流程运行时已覆盖 EXCLUSIVE、PARALLEL、
+WAIT_EVENT、TIMER、SUB_PROCESS、多实例、取消/重开/跳转，以及 **取消时配置化补偿任务**（Flyway V109）。
 
-下一主线：异常补偿 → 标准模板扩展 → 阶段三配置设计器。
+下一主线：标准模板扩展 → 阶段三配置设计器。
 真实 OEM2/3 与签名真机仍为 `BLOCKED_EXTERNAL`。
 
 ```text
 已接受推进顺序：
-1. M280 异常补偿最小可靠切片；
-2. 安装/维修/移机/巡检标准模板；
-3. 阶段三领域配置设计器；
-4. Track F/G 与真实 OEM 外部证据。
+1. 安装/维修/移机/巡检标准模板；
+2. 阶段三领域配置设计器；
+3. Track F/G 与真实 OEM 外部证据。
 ```
 
 接手 Agent 必须先读取 `docs/autonomous-agent-handoff.md` 与本文件，验证 HEAD 后从断点继续。
