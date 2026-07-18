@@ -59,6 +59,10 @@ actor FakeOnlineTransport: ServiceHTTPTransporting {
         let body: String
         if request.url!.path.hasSuffix("/task-feed") {
             body = #"{"networkId":"20000000-0000-4000-8000-000000000262","items":[],"nextCursor":null,"asOf":"2026-07-18T10:00:00Z"}"#
+        } else if request.url!.path.hasSuffix("/forms") {
+            body = #"[{"taskId":"50000000-0000-4000-8000-000000000263","formVersionId":"60000000-0000-4000-8000-000000000263","formKey":"INSTALL_REPORT","semanticVersion":"1.0.0","schemaVersion":"FORM_V1","definition":{"title":"安装结果","sections":[{"sectionKey":"result","title":"现场结果","fields":[{"fieldKey":"survey.conclusion","label":"勘测结论","dataType":"STRING","binding":"task.input.survey.conclusion","required":true},{"fieldKey":"installation.count","label":"安装数量","dataType":"INTEGER","binding":"task.input.installation.count"},{"fieldKey":"site.safe","label":"现场安全","dataType":"BOOLEAN","binding":"task.input.site.safe"}]}]},"contentDigest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]"#
+        } else if request.url!.path.hasSuffix("/form-submissions") {
+            body = #"{"submissionId":"70000000-0000-4000-8000-000000000263","taskId":"50000000-0000-4000-8000-000000000263","projectId":"80000000-0000-4000-8000-000000000263","formVersionId":"60000000-0000-4000-8000-000000000263","formKey":"INSTALL_REPORT","submissionVersion":1,"values":{"survey.conclusion":"PASS","installation.count":2,"site.safe":true},"contentDigest":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","validationStatus":"VALIDATED","errors":[],"warnings":[],"submittedAt":"2026-07-18T10:00:01Z"}"#
         } else {
             body = #"{"visitId":"40000000-0000-4000-8000-000000000262","status":"IN_PROGRESS","aggregateVersion":1,"geofenceResult":"WITHIN_GEOFENCE","policyDecision":"ACCEPTED","occurredAt":"2026-07-18T10:00:01Z"}"#
         }
@@ -187,13 +191,35 @@ struct FoundationSmoke {
             exceptionCode: "SITE_UNSAFE",
             note: "现场存在安全风险"
         )
+        let formTaskID = UUID(uuidString: "50000000-0000-4000-8000-000000000263")!
+        let formVersionID = UUID(uuidString: "60000000-0000-4000-8000-000000000263")!
+        let forms = try await online.taskForms(contextID: contextID, taskID: formTaskID)
+        precondition(forms.first?.definition.sections.first?.fields.count == 3)
+        let submission = try await online.submitForm(
+            contextID: contextID,
+            taskID: formTaskID,
+            formVersionID: formVersionID,
+            values: [
+                "survey.conclusion": .string("PASS"),
+                "installation.count": .integer(2),
+                "site.safe": .boolean(true),
+            ]
+        )
+        precondition(submission.validationStatus == "VALIDATED")
         let onlineRequests = await onlineTransport.captured()
-        precondition(onlineRequests.count == 3)
+        precondition(onlineRequests.count == 5)
         precondition(onlineRequests.allSatisfy { $0.context == contextID })
         precondition(onlineRequests[1].idempotencyKey == "ios-command-262")
         precondition(!onlineRequests[1].body.contains("offline"))
         precondition(!onlineRequests[1].body.contains("receivedAt"))
         precondition(onlineRequests[2].ifMatch == "\"1\"")
         precondition(onlineRequests[2].body.contains(#""evidenceRefs":[]"#))
+        precondition(onlineRequests[3].method == "GET")
+        precondition(onlineRequests[3].path.hasSuffix("/forms"))
+        precondition(onlineRequests[4].idempotencyKey != nil)
+        precondition(onlineRequests[4].body.contains(#""installation.count":2"#))
+        precondition(onlineRequests[4].body.contains(#""site.safe":true"#))
+        precondition(!onlineRequests[4].body.contains("prefillVersion"))
+        precondition(!onlineRequests[4].body.contains("submittedBy"))
     }
 }

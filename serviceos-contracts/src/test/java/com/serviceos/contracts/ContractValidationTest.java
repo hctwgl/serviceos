@@ -47,6 +47,8 @@ class ContractValidationTest {
                         "/technician/me/appointments/{appointmentId}/visits:check-in",
                         "/technician/me/visits/{visitId}:check-out",
                         "/technician/me/visits/{visitId}:interrupt",
+                        "/technician/me/tasks/{taskId}/forms",
+                        "/technician/me/tasks/{taskId}/form-submissions",
                         "/internal/integration/byd/review-routes",
                         "/internal/integration/byd/review-submissions",
                         "/outbound-deliveries/{deliveryId}",

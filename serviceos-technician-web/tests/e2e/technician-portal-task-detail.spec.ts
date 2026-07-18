@@ -23,7 +23,10 @@ async function loginWithLocalKeycloak(
   await expect(page).toHaveURL(/\/work-orders$/)
 }
 
-async function stubTechnicianContext(page: Page, options: { visits?: Array<Record<string, unknown>> } = {}) {
+async function stubTechnicianContext(
+  page: Page,
+  options: { visits?: Array<Record<string, unknown>>; taskStatus?: string } = {},
+) {
   let visits = options.visits ?? [{
     visitId: '019f84b0-fffe-7f8c-9505-36fe5c0ee007',
     taskId: TASK_ID,
@@ -39,6 +42,16 @@ async function stubTechnicianContext(page: Page, options: { visits?: Array<Recor
     resultCode: null,
     exceptionCode: null,
     aggregateVersion: 1,
+  }]
+  let formSubmissions = [{
+    submissionId: '019f84b0-fffd-7f8c-9505-36fe5c0ee008',
+    formVersionId: '019f84b0-fffc-7f8c-9505-36fe5c0ee009',
+    formKey: 'INSTALL_REPORT',
+    submissionVersion: 2,
+    validationStatus: 'VALIDATED',
+    errorCount: 0,
+    warningCount: 1,
+    submittedAt: '2026-07-19T02:00:00Z',
   }]
   await page.route('**/api/v1/me/contexts**', async (route: Route) => {
     await route.fulfill({
@@ -109,6 +122,59 @@ async function stubTechnicianContext(page: Page, options: { visits?: Array<Recor
   })
   await page.route('**/api/v1/technician/me/tasks/**', async (route: Route) => {
     expect(route.request().headers()['x-technician-context']).toBe(CONTEXT_ID)
+    const pathname = new URL(route.request().url()).pathname
+    if (pathname.endsWith('/forms')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([{
+          taskId: TASK_ID,
+          formVersionId: '019f84b0-fffc-7f8c-9505-36fe5c0ee009',
+          formKey: 'INSTALL_REPORT',
+          semanticVersion: '1.0.0',
+          schemaVersion: 'FORM_V1',
+          contentDigest: 'a'.repeat(64),
+          definition: {
+            formKey: 'INSTALL_REPORT', version: '1.0.0', title: '安装结果',
+            sections: [{ sectionKey: 'result', title: '现场结果', fields: [
+              { fieldKey: 'survey.conclusion', label: '勘测结论', dataType: 'STRING',
+                binding: 'task.input.survey.conclusion', required: true },
+              { fieldKey: 'installation.count', label: '安装数量', dataType: 'INTEGER',
+                binding: 'task.input.installation.count' },
+              { fieldKey: 'site.safe', label: '现场安全', dataType: 'BOOLEAN',
+                binding: 'task.input.site.safe' },
+            ] }],
+          },
+        }]),
+      })
+      return
+    }
+    if (pathname.endsWith('/form-submissions') && route.request().method() === 'POST') {
+      const request = route.request()
+      const body = request.postDataJSON()
+      expect(request.headers()['idempotency-key']).toBeTruthy()
+      expect(body).not.toHaveProperty('prefillVersion')
+      expect(body).not.toHaveProperty('submittedBy')
+      expect(body.values).toEqual({
+        'survey.conclusion': 'PASS',
+        'installation.count': 2,
+        'site.safe': true,
+      })
+      formSubmissions = [...formSubmissions, {
+        submissionId: '019f84b0-fff0-7f8c-9505-36fe5c0ee010',
+        formVersionId: body.formVersionId,
+        formKey: 'INSTALL_REPORT', submissionVersion: 3, validationStatus: 'VALIDATED',
+        errorCount: 0, warningCount: 0, submittedAt: '2026-07-19T02:10:00Z',
+      }]
+      await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({
+        submissionId: formSubmissions.at(-1)?.submissionId, taskId: TASK_ID,
+        projectId: '019f84b0-dddd-7f8c-9505-36fe5c0ee004', formVersionId: body.formVersionId,
+        formKey: 'INSTALL_REPORT', submissionVersion: 3, values: body.values,
+        contentDigest: 'b'.repeat(64), validationStatus: 'VALIDATED', errors: [], warnings: [],
+        submittedAt: '2026-07-19T02:10:00Z',
+      }) })
+      return
+    }
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -122,7 +188,7 @@ async function stubTechnicianContext(page: Page, options: { visits?: Array<Recor
         taskType: 'INSTALLATION',
         taskKind: 'HUMAN',
         stageCode: 'INSTALL',
-        taskStatus: 'READY',
+        taskStatus: options.taskStatus ?? 'READY',
         businessType: 'INSTALLATION',
         effectiveFrom: '2026-07-18T02:00:00Z',
         executionGuarded: false,
@@ -149,16 +215,7 @@ async function stubTechnicianContext(page: Page, options: { visits?: Array<Recor
           createdAt: '2026-07-18T02:33:00Z',
         }],
         visits,
-        formSubmissions: [{
-          submissionId: '019f84b0-fffd-7f8c-9505-36fe5c0ee008',
-          formVersionId: '019f84b0-fffc-7f8c-9505-36fe5c0ee009',
-          formKey: 'INSTALL_REPORT',
-          submissionVersion: 2,
-          validationStatus: 'VALIDATED',
-          errorCount: 0,
-          warningCount: 1,
-          submittedAt: '2026-07-19T02:00:00Z',
-        }],
+        formSubmissions,
         asOf: '2026-07-18T03:00:00Z',
       }),
     })
@@ -225,7 +282,7 @@ test.describe('M246 Technician Portal 表单提交安全摘要', () => {
     await expect(page.getByTestId('technician-task-detail-boundary')).toContainText('不返回地址')
     await expect(page.getByTestId('technician-task-detail-boundary')).toContainText('联系对象引用')
     await expect(page.getByTestId('technician-task-detail-boundary')).toContainText('GPS')
-    await expect(page.getByTestId('technician-task-detail-boundary')).toContainText('表单值')
+    await expect(page.getByTestId('technician-task-detail-boundary')).toContainText('提交人')
     await expect(page.getByTestId('technician-task-detail-schedule-link')).toHaveAttribute(
       'href',
       `/technician-portal/schedule?taskId=${TASK_ID}`,
@@ -261,5 +318,20 @@ test.describe('M246 Technician Portal 表单提交安全摘要', () => {
     await expect(page.getByTestId('technician-visit-action-message')).toContainText('未伪造任何资料上传')
     await expect(page.getByTestId('technician-task-detail-visits')).toContainText('INTERRUPTED')
     await expect(page.getByTestId('technician-visit-checkout-boundary')).not.toBeVisible()
+  })
+
+  test('M263-01：固定冻结表单在线提交保持类型且不伪造草稿/prefill', async ({ page }) => {
+    await stubTechnicianContext(page, { taskStatus: 'RUNNING' })
+    await loginWithLocalKeycloak(page)
+    await navigateTechnician(page, `/technician-portal/tasks/${TASK_ID}`)
+
+    await page.getByTestId('technician-form-field-survey.conclusion').fill('PASS')
+    await page.getByTestId('technician-form-field-installation.count').fill('2')
+    await page.getByTestId('technician-form-field-site.safe').check()
+    await page.getByTestId('technician-online-form-submit').click()
+
+    await expect(page.getByTestId('technician-online-form-message')).toContainText('版本 3')
+    await expect(page.getByTestId('technician-task-detail-form-submissions')).toContainText('VALIDATED')
+    await expect(page.getByTestId('technician-online-form')).toContainText('不会伪装成已保存草稿')
   })
 })

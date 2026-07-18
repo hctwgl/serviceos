@@ -149,6 +149,14 @@ private struct TechnicianTaskDetailView: View {
                     LabeledContent("资源版本", value: "\(detail.resourceVersion)")
                 }
 
+                TechnicianOnlineFormSection(
+                    store: store,
+                    session: session,
+                    taskID: taskID,
+                    taskStatus: detail.taskStatus,
+                    executionGuarded: detail.executionGuarded
+                )
+
                 Section("预约与到场") {
                     if let appointment = confirmedAppointment {
                         LabeledContent("预约", value: appointment.type)
@@ -190,7 +198,7 @@ private struct TechnicianTaskDetailView: View {
                         Button("确认无法施工", role: .destructive) { confirmingInterrupt = true }
                             .disabled(store.onlineLoading)
                             .accessibilityIdentifier("technician.visit.interrupt")
-                        Text("签退必须引用已完成现场操作；动态表单/资料尚未接入前，不生成占位 operationRefs。")
+                        Text("签退必须引用已完成现场操作；基础表单已接入，但 Evidence/作业引用尚未形成前不生成占位 operationRefs。")
                             .font(.footnote).foregroundStyle(.secondary)
                             .accessibilityIdentifier("technician.visit.checkout-boundary")
                     }
@@ -231,5 +239,144 @@ private struct TechnicianTaskDetailView: View {
             Button("取消", role: .cancel) { }
         }
         .accessibilityIdentifier("technician.task.detail")
+    }
+}
+
+private struct TechnicianOnlineFormSection: View {
+    let store: TechnicianAppStore
+    let session: TechnicianSession
+    let taskID: UUID
+    let taskStatus: String
+    let executionGuarded: Bool
+    @State private var textValues: [String: String] = [:]
+    @State private var booleanValues: [String: Bool] = [:]
+    @State private var localMessage: String?
+
+    private let supportedTypes = Set(["STRING", "TEXT", "INTEGER", "DECIMAL", "BOOLEAN", "DATE", "DATETIME"])
+
+    private var form: TechnicianTaskForm? { store.taskForms.first }
+    private var fields: [TechnicianFormField] {
+        form?.definition.sections.flatMap(\.fields) ?? []
+    }
+    private var unsupportedReasons: [String] {
+        guard let form else { return [] }
+        var reasons = Set<String>()
+        if form.definition.hasValidationRules { reasons.insert("跨字段规则尚无 Web/iOS 共用执行器") }
+        for section in form.definition.sections {
+            if section.hasVisibility { reasons.insert("分区条件显隐尚无 Web/iOS 共用执行器") }
+            for field in section.fields {
+                if !supportedTypes.contains(field.dataType) { reasons.insert("字段类型 \(field.dataType) 尚未接入") }
+                if field.hasConditionalBehavior { reasons.insert("字段条件或默认值尚无 Web/iOS 共用执行器") }
+                if field.hasOptionsOrValidators { reasons.insert("选项或扩展校验器尚未接入") }
+            }
+        }
+        return reasons.sorted()
+    }
+
+    var body: some View {
+        Section("在线填写冻结表单") {
+            Text("输入只在当前页面内存中；草稿与 prefill 冲突策略未接受，不会伪装成已保存草稿。")
+                .font(.footnote).foregroundStyle(.secondary)
+            if let form {
+                LabeledContent("表单", value: form.definition.title ?? form.formKey)
+                LabeledContent("版本", value: form.semanticVersion)
+                if !unsupportedReasons.isEmpty {
+                    Label(unsupportedReasons.joined(separator: "；"), systemImage: "exclamationmark.shield")
+                        .foregroundStyle(.red)
+                        .accessibilityIdentifier("technician.form.unsupported")
+                } else {
+                    ForEach(form.definition.sections, id: \.sectionKey) { section in
+                        Text(section.title).font(.headline)
+                        ForEach(section.fields, id: \.fieldKey) { field in
+                            if field.dataType == "BOOLEAN" {
+                                Toggle(isOn: booleanBinding(field.fieldKey)) {
+                                    Text(field.label + (field.required ? " *" : ""))
+                                }
+                                .accessibilityIdentifier("technician.form.field.\(field.fieldKey)")
+                            } else {
+                                TextField(
+                                    field.label + (field.required ? " *" : ""),
+                                    text: textBinding(field.fieldKey),
+                                    axis: field.dataType == "TEXT" ? .vertical : .horizontal
+                                )
+                                .lineLimit(field.dataType == "TEXT" ? 2...6 : 1...1)
+                                .keyboardType(field.dataType == "INTEGER" || field.dataType == "DECIMAL"
+                                    ? .numbersAndPunctuation : .default)
+                                .accessibilityIdentifier("technician.form.field.\(field.fieldKey)")
+                            }
+                        }
+                    }
+                    Button("提交不可变表单") {
+                        guard let values = submissionValues() else { return }
+                        Task {
+                            await store.submitForm(
+                                session: session,
+                                taskID: taskID,
+                                formVersionID: form.formVersionId,
+                                values: values
+                            )
+                        }
+                    }
+                    .disabled(store.onlineLoading || executionGuarded || taskStatus != "RUNNING")
+                    .accessibilityIdentifier("technician.form.submit")
+                }
+            } else {
+                Text(store.formMessage ?? "当前任务未锁定可填写表单")
+                    .foregroundStyle(.secondary)
+            }
+            if let message = localMessage ?? store.formMessage {
+                Text(message).font(.callout).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("technician.form.message")
+            }
+            ForEach(Array(store.formIssues.enumerated()), id: \.offset) { _, issue in
+                Text("\(issue.fieldKey)：\(issue.message)").foregroundStyle(.red)
+            }
+        }
+        .task(id: form?.formVersionId) {
+            textValues = [:]
+            booleanValues = Dictionary(uniqueKeysWithValues:
+                fields.filter { $0.dataType == "BOOLEAN" }.map { ($0.fieldKey, false) })
+            localMessage = nil
+        }
+    }
+
+    private func textBinding(_ key: String) -> Binding<String> {
+        Binding(get: { textValues[key, default: ""] }, set: { textValues[key] = $0 })
+    }
+
+    private func booleanBinding(_ key: String) -> Binding<Bool> {
+        Binding(get: { booleanValues[key, default: false] }, set: { booleanValues[key] = $0 })
+    }
+
+    private func submissionValues() -> [String: TechnicianFormValue]? {
+        var result: [String: TechnicianFormValue] = [:]
+        var missing: [String] = []
+        for field in fields {
+            if field.dataType == "BOOLEAN" {
+                result[field.fieldKey] = .boolean(booleanValues[field.fieldKey, default: false])
+                continue
+            }
+            let text = textValues[field.fieldKey, default: ""].trimmingCharacters(in: .whitespacesAndNewlines)
+            if text.isEmpty {
+                if field.required { missing.append(field.label) }
+                continue
+            }
+            switch field.dataType {
+            case "INTEGER":
+                guard let value = Int(text) else { localMessage = "\(field.label) 必须是整数"; return nil }
+                result[field.fieldKey] = .integer(value)
+            case "DECIMAL":
+                guard let value = Double(text) else { localMessage = "\(field.label) 必须是数字"; return nil }
+                result[field.fieldKey] = .decimal(value)
+            default:
+                result[field.fieldKey] = .string(text)
+            }
+        }
+        if !missing.isEmpty {
+            localMessage = "请填写必填项：\(missing.joined(separator: "、"))"
+            return nil
+        }
+        localMessage = nil
+        return result
     }
 }
