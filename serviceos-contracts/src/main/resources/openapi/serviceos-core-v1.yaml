@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.2
+  version: 1.0.16
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1437,6 +1437,26 @@ paths:
         M194：需要有效 NETWORK 门户上下文（X-Network-Context）与 NETWORK scope networkTask.read。
         仅返回该网点 ACTIVE NETWORK ServiceAssignment 对应工单；禁止 query-param networkId。
         上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+        M230：可选 `technicians`（复用 NetworkPortalTechnicianItem）；
+        需 NETWORK `technician.readOwnNetwork`，缺能力时省略（不得用空数组伪装）；
+        仅含本页 items[].technicianId 命中的本网点 ACTIVE 师傅。
+        M231：可选 `appointments`（复用 Admin/NP 预约摘要字段集）；
+        需 NETWORK `networkPortal.manageAppointment`，缺能力时省略（不得用空数组伪装）；
+        覆盖本页 items[].taskIds；另按可信 networkId 过滤 assignedNetworkId。
+        M232：可选 `contactAttempts`（复用 Admin/NP 联系摘要字段集）；
+        需 NETWORK `networkPortal.manageAppointment`，缺能力时省略（不得用空数组伪装）；
+        覆盖本页 items[].taskIds。
+        M233：可选 `corrections`（复用 Admin WorkOrderWorkspaceCorrectionCaseSummary）；
+        需 NETWORK `evidence.read`，缺能力时省略（不得用空数组伪装）；
+        覆盖本页 items[].taskIds；含全部状态。
+        M234：可选 `slaRiskSummaries`（NetworkPortalDirectorySlaRiskSummary）；
+        需 NETWORK `sla.read`，缺能力时省略（不得用空数组伪装）；
+        按本页工单聚合 ACTIVE taskIds 的 open/breached；仅含 openCount>0 行。
+        M235：可选 `evidenceSlots` / `evidenceItems`（复用 Admin 工作区摘要字段集）；
+        需 NETWORK `evidence.read`，缺能力时同时省略（不得用空数组伪装）；
+        覆盖本页 items[].taskIds。
+        M236：items 含非 PII 工单头字段 brandCode/serviceProductCode/provinceCode/
+        cityCode/districtCode/receivedAt（对齐 Admin WorkOrder 子集；工单缺失时为 null）。
       parameters:
         - $ref: '#/components/parameters/NetworkContext'
         - $ref: '#/components/parameters/CorrelationId'
@@ -1462,6 +1482,24 @@ paths:
         M222：可选 `visits` / `formSubmissions`（复用 Admin 工作区摘要字段集）；
         分别需 NETWORK `visit.read` / `form.read`，缺能力时省略属性（不得用空数组伪装）；
         Visit 另按可信 networkId 过滤；表单提交仅覆盖 ACTIVE taskIds。
+        M223：可选 `evidenceSlots` / `evidenceItems`（复用 Admin 工作区摘要字段集）；
+        需 NETWORK `evidence.read`，缺能力时同时省略两属性（不得用空数组伪装）；
+        仅覆盖 ACTIVE taskIds；单任务未完成可靠解析时该任务贡献空结果（不抛冲突）。
+        M225：可选 `corrections`（复用 Admin WorkOrderWorkspaceCorrectionCaseSummary）；
+        需 NETWORK `evidence.read`，缺能力时省略（不得用空数组伪装）；仅覆盖 ACTIVE taskIds。
+        M226：可选 `exceptions`（复用 NetworkPortalExceptionItem）；
+        需 NETWORK `operations.exception.read`，缺能力时省略（不得用空数组伪装）；
+        仅覆盖 ACTIVE taskIds；含全部状态。
+        M227：可选 `appointments` / `contactAttempts`（复用 Admin 工作区摘要字段集）；
+        需 NETWORK `networkPortal.manageAppointment`，缺能力时同时省略两属性
+        （不得用空数组伪装）；仅覆盖 ACTIVE taskIds；预约另按可信 networkId 过滤
+        assignedNetworkId。
+        M228：可选 `technicians`（复用 NetworkPortalTechnicianItem）；
+        需 NETWORK `technician.readOwnNetwork`，缺能力时省略（不得用空数组伪装）；
+        仅含工作区头/tasks technicianId 命中的本网点 ACTIVE 师傅。
+        M229：可选 `reviews`（复用 Admin WorkOrderWorkspaceReviewCaseSummary）；
+        需 NETWORK `evidence.read`，缺能力时省略（不得用空数组伪装）；
+        仅覆盖 ACTIVE taskIds；含全部状态。
         上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
       parameters:
         - name: workOrderId
@@ -1485,6 +1523,26 @@ paths:
       summary: Network Portal 本网点 ACTIVE 责任任务
       description: |
         M194：X-Network-Context + networkTask.read。数据范围同 work-orders，按任务展开。
+        M230：可选 `technicians`（复用 NetworkPortalTechnicianItem）；
+        需 NETWORK `technician.readOwnNetwork`，缺能力时省略（不得用空数组伪装）；
+        仅含本页 items[].technicianId 命中的本网点 ACTIVE 师傅。
+        M231：可选 `appointments`（复用 Admin/NP 预约摘要字段集）；
+        需 NETWORK `networkPortal.manageAppointment`，缺能力时省略（不得用空数组伪装）；
+        覆盖本页 items[].taskId；另按可信 networkId 过滤 assignedNetworkId。
+        M232：可选 `contactAttempts`（复用 Admin/NP 联系摘要字段集）；
+        需 NETWORK `networkPortal.manageAppointment`，缺能力时省略（不得用空数组伪装）；
+        覆盖本页 items[].taskId。
+        M233：可选 `corrections`（复用 Admin WorkOrderWorkspaceCorrectionCaseSummary）；
+        需 NETWORK `evidence.read`，缺能力时省略（不得用空数组伪装）；
+        覆盖本页 items[].taskId；含全部状态。
+        M234：可选 `slaRiskSummaries`（NetworkPortalDirectorySlaRiskSummary）；
+        需 NETWORK `sla.read`，缺能力时省略（不得用空数组伪装）；
+        按本页 taskId 展开 open/breached；仅含 openCount>0 行。
+        M235：可选 `evidenceSlots` / `evidenceItems`（复用 Admin 工作区摘要字段集）；
+        需 NETWORK `evidence.read`，缺能力时同时省略（不得用空数组伪装）；
+        覆盖本页 items[].taskId。
+        M236：items 含非 PII 工单头字段 brandCode/serviceProductCode/provinceCode/
+        cityCode/districtCode/receivedAt（对齐 Admin WorkOrder 子集；工单缺失时为 null）。
       parameters:
         - $ref: '#/components/parameters/NetworkContext'
         - $ref: '#/components/parameters/CorrelationId'
@@ -1727,6 +1785,8 @@ paths:
         M194：X-Network-Context + networkTask.read。返回 ACTIVE 工单/任务/师傅计数与容量摘要。
         M207：附加能力门控发现计数；缺 enrichment 能力时省略对应可选属性（不得用 null/0 伪装无权限）；
         unassignedTechnicianTaskCount 在基座成功时始终返回。
+        M224：可选 `slaSummary`（openCount/breachedCount，语义同 M221）；需 NETWORK `sla.read`，
+        缺能力时省略该属性（不得用 0 伪装无权限）；按本网点全部 ACTIVE taskIds 聚合。
       parameters:
         - $ref: '#/components/parameters/NetworkContext'
         - $ref: '#/components/parameters/CorrelationId'
@@ -4901,6 +4961,30 @@ components:
         businessType: { type: [string, 'null'], maxLength: 100 }
         technicianId: { type: [string, 'null'], maxLength: 128 }
         effectiveFrom: { type: [string, 'null'], format: date-time }
+        brandCode:
+          type: [string, 'null']
+          maxLength: 64
+          description: M236：非 PII；工单权威头；缺失时为 null
+        serviceProductCode:
+          type: [string, 'null']
+          maxLength: 96
+          description: M236：非 PII 服务产品；对齐 Admin WorkOrder
+        provinceCode:
+          type: [string, 'null']
+          maxLength: 16
+          description: M236：非 PII 区域（省）
+        cityCode:
+          type: [string, 'null']
+          maxLength: 16
+          description: M236：非 PII 区域（市）
+        districtCode:
+          type: [string, 'null']
+          maxLength: 16
+          description: M236：非 PII 区域（区）
+        receivedAt:
+          type: [string, 'null']
+          format: date-time
+          description: M236：工单接收时间（Admin 对齐；产品「更新时间」MVP 映射）
     NetworkPortalWorkOrderPage:
       type: object
       additionalProperties: false
@@ -4908,7 +4992,79 @@ components:
       properties:
         networkId: { type: string, format: uuid }
         items: { type: array, items: { $ref: '#/components/schemas/NetworkPortalWorkOrderItem' } }
+        technicians:
+          description: |
+            M230：需 NETWORK technician.readOwnNetwork；缺能力时省略本属性；有能力且无命中时返回 []。
+            元素字段复用 NetworkPortalTechnicianItem；仅含本页 items[].technicianId 命中项。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/NetworkPortalTechnicianItem' }
+        appointments:
+          description: |
+            M231：需 NETWORK networkPortal.manageAppointment；缺能力时省略本属性；有能力且无实例时返回 []。
+            元素字段复用 WorkOrderWorkspaceAppointmentSummary（无 revisions/allowedActions/address）；
+            覆盖本页 items[].taskIds，并按可信 networkId 过滤 assignedNetworkId。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceAppointmentSummary' }
+        contactAttempts:
+          description: |
+            M232：需 NETWORK networkPortal.manageAppointment；缺能力时省略本属性；有能力且无实例时返回 []。
+            元素字段复用 WorkOrderWorkspaceContactAttemptSummary
+            （无 contactedPartyRef/note/recordingRef/actorId）；覆盖本页 items[].taskIds。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceContactAttemptSummary' }
+        corrections:
+          description: |
+            M233：需 NETWORK evidence.read；缺能力时省略本属性；有能力且无实例时返回 []。
+            元素字段复用 WorkOrderWorkspaceCorrectionCaseSummary（无 createdBy/waiveNote）；
+            覆盖本页 items[].taskIds；含全部状态。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceCorrectionCaseSummary' }
+        evidenceSlots:
+          description: |
+            M235：需 NETWORK evidence.read；缺能力时与 evidenceItems 同时省略；
+            有能力且无实例时返回 []。元素字段复用 WorkOrderWorkspaceEvidenceSlotSummary；
+            覆盖本页 items[].taskIds。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceEvidenceSlotSummary' }
+        evidenceItems:
+          description: |
+            M235：需 NETWORK evidence.read；缺能力时与 evidenceSlots 同时省略；
+            有能力且无实例时返回 []。元素字段复用 WorkOrderWorkspaceEvidenceItemSummary；
+            覆盖本页 items[].taskIds。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceEvidenceItemSummary' }
+        slaRiskSummaries:
+          description: |
+            M234：需 NETWORK sla.read；缺能力时省略本属性；有能力且无开放风险时返回 []。
+            按本页工单聚合；taskId 恒为 null；仅含 openCount>0 行。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/NetworkPortalDirectorySlaRiskSummary' }
         asOf: { type: string, format: date-time }
+    NetworkPortalDirectorySlaRiskSummary:
+      type: object
+      additionalProperties: false
+      required: [workOrderId, openCount, breachedCount]
+      properties:
+        workOrderId: { type: string, format: uuid }
+        taskId:
+          type: [string, 'null']
+          format: uuid
+          description: 工单目录恒为 null；任务目录为对应 taskId
+        openCount:
+          type: integer
+          minimum: 0
+          description: RUNNING∪BREACHED 实例数
+        breachedCount:
+          type: integer
+          minimum: 0
+          description: BREACHED 实例数（⊆ openCount）
     NetworkPortalWorkOrderWorkspaceSlaSummary:
       type: object
       additionalProperties: false
@@ -4956,6 +5112,66 @@ components:
           type: array
           maxItems: 100
           items: { $ref: '#/components/schemas/WorkOrderWorkspaceFormSubmissionSummary' }
+        evidenceSlots:
+          description: |
+            M223：需 NETWORK evidence.read；缺能力时与 evidenceItems 同时省略；
+            有能力且无实例时返回 []。元素字段复用 WorkOrderWorkspaceEvidenceSlotSummary
+            （无 definition/explanation JSON）。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceEvidenceSlotSummary' }
+        evidenceItems:
+          description: |
+            M223：需 NETWORK evidence.read；缺能力时与 evidenceSlots 同时省略；
+            有能力且无实例时返回 []。元素字段复用 WorkOrderWorkspaceEvidenceItemSummary
+            （无 Revision 图/file/captureMetadata）。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceEvidenceItemSummary' }
+        corrections:
+          description: |
+            M225：需 NETWORK evidence.read；缺能力时省略本属性；有能力且无实例时返回 []。
+            元素字段复用 WorkOrderWorkspaceCorrectionCaseSummary（无 createdBy/waiveNote）。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceCorrectionCaseSummary' }
+        reviews:
+          description: |
+            M229：需 NETWORK evidence.read；缺能力时省略本属性；有能力且无实例时返回 []。
+            元素字段复用 WorkOrderWorkspaceReviewCaseSummary（无 note/approvalRef/decidedBy/digest）。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceReviewCaseSummary' }
+        exceptions:
+          description: |
+            M226：需 NETWORK operations.exception.read；缺能力时省略本属性；有能力且无实例时返回 []。
+            元素字段复用 NetworkPortalExceptionItem（allowedActions 恒为空）。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/NetworkPortalExceptionItem' }
+        appointments:
+          description: |
+            M227：需 NETWORK networkPortal.manageAppointment；缺能力时与 contactAttempts 同时省略；
+            有能力且无实例时返回 []。元素字段复用 WorkOrderWorkspaceAppointmentSummary
+            （无 revisions/allowedActions/address）。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceAppointmentSummary' }
+        contactAttempts:
+          description: |
+            M227：需 NETWORK networkPortal.manageAppointment；缺能力时与 appointments 同时省略；
+            有能力且无实例时返回 []。元素字段复用 WorkOrderWorkspaceContactAttemptSummary
+            （无 contactedPartyRef/note/recordingRef/actorId）。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceContactAttemptSummary' }
+        technicians:
+          description: |
+            M228：需 NETWORK technician.readOwnNetwork；缺能力时省略本属性；有能力且无命中时返回 []。
+            元素字段复用 NetworkPortalTechnicianItem；仅含工作区 technicianId 命中项。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/NetworkPortalTechnicianItem' }
         asOf: { type: string, format: date-time }
     NetworkPortalTaskItem:
       type: object
@@ -4972,6 +5188,21 @@ components:
         businessType: { type: [string, 'null'], maxLength: 100 }
         technicianId: { type: [string, 'null'], maxLength: 128 }
         effectiveFrom: { type: [string, 'null'], format: date-time }
+        brandCode:
+          type: [string, 'null']
+          maxLength: 64
+          description: M236：所属工单非 PII 头
+        serviceProductCode:
+          type: [string, 'null']
+          maxLength: 96
+          description: M236：所属工单服务产品
+        provinceCode: { type: [string, 'null'], maxLength: 16 }
+        cityCode: { type: [string, 'null'], maxLength: 16 }
+        districtCode: { type: [string, 'null'], maxLength: 16 }
+        receivedAt:
+          type: [string, 'null']
+          format: date-time
+          description: M236：所属工单接收时间
     NetworkPortalTaskPage:
       type: object
       additionalProperties: false
@@ -4979,6 +5210,60 @@ components:
       properties:
         networkId: { type: string, format: uuid }
         items: { type: array, items: { $ref: '#/components/schemas/NetworkPortalTaskItem' } }
+        technicians:
+          description: |
+            M230：需 NETWORK technician.readOwnNetwork；缺能力时省略本属性；有能力且无命中时返回 []。
+            元素字段复用 NetworkPortalTechnicianItem；仅含本页 items[].technicianId 命中项。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/NetworkPortalTechnicianItem' }
+        appointments:
+          description: |
+            M231：需 NETWORK networkPortal.manageAppointment；缺能力时省略本属性；有能力且无实例时返回 []。
+            元素字段复用 WorkOrderWorkspaceAppointmentSummary（无 revisions/allowedActions/address）；
+            覆盖本页 items[].taskId，并按可信 networkId 过滤 assignedNetworkId。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceAppointmentSummary' }
+        contactAttempts:
+          description: |
+            M232：需 NETWORK networkPortal.manageAppointment；缺能力时省略本属性；有能力且无实例时返回 []。
+            元素字段复用 WorkOrderWorkspaceContactAttemptSummary
+            （无 contactedPartyRef/note/recordingRef/actorId）；覆盖本页 items[].taskId。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceContactAttemptSummary' }
+        corrections:
+          description: |
+            M233：需 NETWORK evidence.read；缺能力时省略本属性；有能力且无实例时返回 []。
+            元素字段复用 WorkOrderWorkspaceCorrectionCaseSummary（无 createdBy/waiveNote）；
+            覆盖本页 items[].taskId；含全部状态。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceCorrectionCaseSummary' }
+        evidenceSlots:
+          description: |
+            M235：需 NETWORK evidence.read；缺能力时与 evidenceItems 同时省略；
+            有能力且无实例时返回 []。元素字段复用 WorkOrderWorkspaceEvidenceSlotSummary；
+            覆盖本页 items[].taskId。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceEvidenceSlotSummary' }
+        evidenceItems:
+          description: |
+            M235：需 NETWORK evidence.read；缺能力时与 evidenceSlots 同时省略；
+            有能力且无实例时返回 []。元素字段复用 WorkOrderWorkspaceEvidenceItemSummary；
+            覆盖本页 items[].taskId。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderWorkspaceEvidenceItemSummary' }
+        slaRiskSummaries:
+          description: |
+            M234：需 NETWORK sla.read；缺能力时省略本属性；有能力且无开放风险时返回 []。
+            按本页 taskId 展开；仅含 openCount>0 行。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/NetworkPortalDirectorySlaRiskSummary' }
         asOf: { type: string, format: date-time }
     NetworkPortalTechnicianItem:
       type: object
@@ -5061,6 +5346,11 @@ components:
           description: |
             本网点 ACTIVE 师傅的 PENDING 资质数；需 NETWORK technician.readOwnNetwork；
             缺能力时省略本属性。
+        slaSummary:
+          description: |
+            M224：需 NETWORK sla.read；缺能力时省略本属性；有能力且无实例时返回 0/0。
+            字段语义同 NetworkPortalWorkOrderWorkspaceSlaSummary（跨本网点全部 ACTIVE taskIds）。
+          $ref: '#/components/schemas/NetworkPortalWorkOrderWorkspaceSlaSummary'
     NetworkPortalCorrectionItem:
       type: object
       additionalProperties: false

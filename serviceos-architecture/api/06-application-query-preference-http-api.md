@@ -6,7 +6,7 @@ status: Accepted
 
 # 应用工作区、队列与用户偏好 HTTP API
 
-## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158 / M189 / M190 / M191 / M192 / M193 / M194 / M195 / M202 / M203 / M205 / M206 / M207 / M213 / M214 / M215 / M216 / M217 / M218 / M219 / M220 / M221 / M222）
+## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158 / M189 / M190 / M191 / M192 / M193 / M194 / M195 / M202 / M203 / M205 / M206 / M207 / M213 / M214 / M215 / M216 / M217 / M218 / M219 / M220 / M221 / M222 / M223 / M224 / M225 / M226 / M227 / M228 / M229 / M230 / M231 / M232 / M233 / M234 / M235 / M236 / M237 / M238 / M239 / M240 / M241 / M242）
 
 **Accepted（可指导实现）**：
 
@@ -219,6 +219,111 @@ status: Accepted
   Core OpenAPI → `1.0.2`。catalog 仍 `page-registry-v16`；Flyway 仍 100/102。
   **不**接受 definition/values、Evidence 摘要、Admin workspace 复用、独立 NP Visit/表单列表 API、
   工作台 SLA 风险、notifications。
+- §10 Network Portal 工作区 Evidence 槽位/资料项摘要（M223 / ADR-061）：扩展同一 workspace 可选
+  `evidenceSlots`（`$ref` `WorkOrderWorkspaceEvidenceSlotSummary`）与
+  `evidenceItems`（`$ref` `WorkOrderWorkspaceEvidenceItemSummary`）；
+  共用 NETWORK `evidence.read` soft-gate（缺能力同时省略两属性，不得用空数组伪装）；
+  仅 ACTIVE taskIds；单任务未解析跳过。Core OpenAPI → `1.0.3`。catalog 仍
+  `page-registry-v16`；Flyway 仍 100/102。
+  **不**接受 Admin workspace 复用、独立 NP Evidence 列表、缩略图/下载、Revision 图、
+  definition JSON、工作台 SLA 风险、notifications。
+- §10 Network Portal 工作台薄 SLA 风险计数（M224 / ADR-062）：扩展
+  `GET /api/v1/network-portal/workbench` 可选 `slaSummary`（`$ref`
+  `NetworkPortalWorkOrderWorkspaceSlaSummary`）；NETWORK `sla.read` soft-gate；
+  跨本网点全部 ACTIVE taskIds 聚合 RUNNING/BREACHED。Core OpenAPI → `1.0.4`。
+  catalog 仍 `page-registry-v16`；Flyway 仍 100/102。
+  **不**接受即将超时时间窗、SLA 详情/deeplink、notifications、Portal ACK。
+- §10 Network Portal 工作区整改摘要（M225 / ADR-063）：扩展同一 workspace 可选
+  `corrections`（`$ref` `WorkOrderWorkspaceCorrectionCaseSummary`）；NETWORK
+  `evidence.read` soft-gate；ACTIVE taskIds；含全部状态。Core OpenAPI → `1.0.5`。
+  catalog 仍 `page-registry-v16`；Flyway 仍 100/102。
+  **不**接受 reviews[]、Portal ACK、Admin workspace 复用、notifications。
+- §10 Network Portal 工作区运营异常摘要（M226 / ADR-064）：扩展同一 workspace 可选
+  `exceptions`（`$ref` `NetworkPortalExceptionItem`）；NETWORK
+  `operations.exception.read` soft-gate；ACTIVE taskIds；含全部状态。Core OpenAPI → `1.0.6`。
+  catalog 仍 `page-registry-v16`；Flyway 仍 100/102。
+  **不**接受 Portal ACK/resolve、Admin exception-item 发明、notifications。
+- §10 Network Portal 工作区预约/联系服务端摘要（M227 / ADR-065）：扩展同一 workspace 可选
+  `appointments`/`contactAttempts`（`$ref` Admin 摘要）；NETWORK
+  `networkPortal.manageAppointment` soft-gate；ACTIVE taskIds；预约按 networkId 过滤。
+  Core OpenAPI → `1.0.7`。catalog 仍 `page-registry-v16`；Flyway 仍 100/102。
+  **不**接受完整 Appointment DTO、写控件、PII、notifications。
+- §10 Network Portal 工作区当前师傅服务端摘要（M228 / ADR-066）：扩展同一 workspace 可选
+  `technicians`（`$ref` `NetworkPortalTechnicianItem`）；NETWORK
+  `technician.readOwnNetwork` soft-gate；仅工作区 technicianId 命中项。
+  Core OpenAPI → `1.0.8`。catalog 仍 `page-registry-v16`；Flyway 仍 100/102。
+  **不**接受 PII、写控件、Admin workspace 复用、notifications。
+- §10 Network Portal 工作区审核案例服务端摘要（M229 / ADR-067）：扩展同一 workspace 可选
+  `reviews`（`$ref` `WorkOrderWorkspaceReviewCaseSummary` /
+  `WorkOrderWorkspaceReviewDecisionSummary`）；NETWORK `evidence.read` soft-gate；
+  ACTIVE taskIds；含全部状态；`ReviewCaseService.listForTask` 对齐 NETWORK scope。
+  Core OpenAPI → `1.0.9`。catalog 仍 `page-registry-v16`；Flyway 仍 100/102。
+  **不**接受独立 NP Review API/pageId、Portal ACK/decide、Admin Review 深链、
+  note/approvalRef/decidedBy、notifications。
+- §10 Network Portal 目录页师傅服务端摘要（M230 / ADR-068）：扩展
+  `GET /network-portal/work-orders` 与 `GET /network-portal/tasks` 可选 `technicians`
+  （`$ref` `NetworkPortalTechnicianItem`）；NETWORK `technician.readOwnNetwork` soft-gate；
+  仅本页 `items[].technicianId` 命中项。Core OpenAPI → `1.0.10`。catalog 仍
+  `page-registry-v16`；Flyway 仍 100/102。
+  **不**接受 PII、写控件字段发明、列表预约 N+1、notifications、Portal ACK。
+- §10 Network Portal 目录页预约服务端摘要（M231 / ADR-069）：扩展同一 work-orders/tasks
+  可选 `appointments`（`$ref` Admin/NP 预约摘要）；NETWORK
+  `networkPortal.manageAppointment` soft-gate；覆盖本页 taskIds 并按 networkId 过滤。
+  Core OpenAPI → `1.0.11`。catalog 仍 `page-registry-v16`；Flyway 仍 100/102。
+  **不**接受完整 Appointment DTO、写控件、PII、目录 contactAttempts、notifications、Portal ACK。
+- §10 Network Portal 目录页联系尝试服务端摘要（M232 / ADR-070）：扩展同一 work-orders/tasks
+  可选 `contactAttempts`（`$ref` Admin/NP 联系摘要）；NETWORK
+  `networkPortal.manageAppointment` soft-gate；覆盖本页 taskIds。
+  Core OpenAPI → `1.0.12`。catalog 仍 `page-registry-v16`；Flyway 仍 100/102。
+  **不**接受 PII/party/note/recording/actor、写控件、notifications、Portal ACK。
+- §10 Network Portal 目录页资料整改服务端摘要（M233 / ADR-071）：扩展同一 work-orders/tasks
+  可选 `corrections`（`$ref` Admin/NP 整改摘要）；NETWORK `evidence.read` soft-gate；
+  覆盖本页 taskIds；含全部状态。Core OpenAPI → `1.0.13`。catalog 仍
+  `page-registry-v16`；Flyway 仍 100/102。
+  **不**接受目录 SLA 风险、目录 evidence、独立 NP Correction CRUD、notifications、Portal ACK。
+- §10 Network Portal 目录页 SLA 风险服务端摘要（M234 / ADR-072）：扩展同一 work-orders/tasks
+  可选 `slaRiskSummaries`（`NetworkPortalDirectorySlaRiskSummary`）；NETWORK `sla.read` soft-gate；
+  工单目录按 WO 聚合、任务目录按 task 展开；仅 openCount>0。Core OpenAPI → `1.0.14`。
+  catalog 仍 `page-registry-v16`；Flyway 仍 100/102。
+  **不**接受即将超时窗口、完整 SlaInstance DTO、目录 evidence、notifications、Portal ACK。
+- §10 Network Portal 目录页资料 Evidence 服务端摘要（M235 / ADR-073）：扩展同一 work-orders/tasks
+  可选 `evidenceSlots`/`evidenceItems`（`$ref` Admin/NP 工作区摘要）；NETWORK `evidence.read` soft-gate；
+  覆盖本页 taskIds；与 `corrections` 同权可并存。Core OpenAPI → `1.0.15`。catalog 仍
+  `page-registry-v16`；Flyway 仍 100/102。
+  **不**接受缩略图/下载、Revision 图、definition JSON、独立 NP Evidence API、notifications、Portal ACK、用户脱敏列。
+- §10 Network Portal 目录页工单头字段（M236 / ADR-074）：扩展 work-orders/tasks items
+  非 PII 头 `brandCode`/`serviceProductCode`/`provinceCode`/`cityCode`/`districtCode`/`receivedAt`
+  （对齐 Admin WorkOrder 子集；「更新时间」MVP=`receivedAt`）。Core OpenAPI → `1.0.16`。
+  catalog 仍 `page-registry-v16`；Flyway 仍 100/102。
+  **不**接受用户脱敏 PII、独立 updatedAt、目录 reviews、notifications、Portal ACK。
+- §10 Network Portal 工作台统计时间展示（M237 UI-only / ADR-075）：**不**新增 HTTP；在 M194/M207
+  工作台渲染既有页级 `asOf`（产品文案「统计时间」）与 `capacity[].updatedAt`（对齐产能页）。
+  catalog 仍 `page-registry-v16`；OpenAPI 仍 `1.0.16`。**不**接受今日/明日预约计数、签约比例/评分、
+  PII、notifications、Portal ACK、产能申请。
+- §10 Network Portal 预约/联系历史 Accepted 字段展示（M238 UI-only / ADR-076）：**不**新增 HTTP；
+  在任务页预约/联系历史渲染既有 `Appointment.createdBy`、当前 revision `confirmationChannel`/
+  `confirmedPartyType`/window，以及 `ContactAttempt.actorId`/`channel`（product/03 §8）。
+  **禁止** addressRef/note/party/recording。catalog 仍 `page-registry-v16`；OpenAPI 仍 `1.0.16`。
+  **不**接受工作区/目录摘要扩 actor、今日/明日预约计数、notifications、Portal ACK、PII。
+- §10 Network Portal 工作区 Visit/表单/Evidence Accepted 字段展示（M239 UI-only / ADR-077）：
+  **不**新增 HTTP；在 M222/M223 工作区摘要行渲染既有非 PII 字段（Visit appointment/technician/
+  check-in-out/result；表单 project/formVersion/submittedAt/digest；Evidence template/required/
+  min-max/active/transition/disposition/resolved；资料项 project/latestRevisionNumber）。
+  catalog 仍 `page-registry-v16`；OpenAPI 仍 `1.0.16`。**不**接受 GPS/note/values/definition/file、
+  Admin workspace 复用、notifications、Portal ACK、PII。
+- §10 Network Portal 工作区协作摘要 Accepted 字段展示（M240 UI-only / ADR-078）：**不**新增 HTTP；
+  在工作区预约/联系/整改/审核/异常/师傅摘要行渲染既有非 PII 字段；correctionTaskId/handlingTaskId
+  门户内深链；附带任务页联系历史时间字段。catalog 仍 `page-registry-v16`；OpenAPI 仍 `1.0.16`。
+  **不**接受摘要扩 actor、PII、Portal ACK、notifications、Admin workspace 复用。
+- §10 Network Portal 预约/联系历史残余 Accepted 字段展示（M241 UI-only / ADR-079）：**不**新增 HTTP；
+  在任务页历史补齐 `Appointment.projectId/workOrderId/technicianId/assignedNetworkId/createdAt/
+  allowedActions` 与 `ContactAttempt.projectId/workOrderId/createdAt` 等既有非 PII 字段。
+  catalog 仍 `page-registry-v16`；OpenAPI 仍 `1.0.16`。**不**接受 addressRef/note/party/recording、
+  PII、Portal ACK、notifications、今日/明日预约计数。
+- §10 Network Portal 整改详情残余 Accepted 字段展示（M242 UI-only / ADR-080）：**不**新增 HTTP；
+  在整改详情渲染既有 `closedBy`/`waivedBy`/`waiveApprovalRef`/`waiveNote` 与
+  `resubmissions[].submittedBy`。catalog 仍 `page-registry-v16`；OpenAPI 仍 `1.0.16`。
+  **不**接受 Portal close/waive 写控件、摘要扩 waiveNote、PII、notifications。
 
 **仍为设计草案**：§3 中 `application-context`/`notifications`、§4 工作台与队列、§5 其余 section、
 §6 其余专项队列、§7 中 `VEHICLE`/`CHARGER` 与全文索引搜索、§8 ORGANIZATION 组织树共享与

@@ -1,5 +1,10 @@
 package com.serviceos.readmodel.application;
 
+import com.serviceos.appointment.api.AppointmentRevisionView;
+import com.serviceos.appointment.api.AppointmentService;
+import com.serviceos.appointment.api.AppointmentView;
+import com.serviceos.appointment.api.AppointmentWindow;
+import com.serviceos.appointment.api.ContactAttemptView;
 import com.serviceos.authorization.api.AuthorizationDecision;
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
@@ -11,6 +16,14 @@ import com.serviceos.dispatch.api.NetworkCapacityCounterView;
 import com.serviceos.dispatch.api.NetworkCapacitySummaryQuery;
 import com.serviceos.evidence.api.CorrectionCaseService;
 import com.serviceos.evidence.api.CorrectionCaseView;
+import com.serviceos.evidence.api.CorrectionResubmissionView;
+import com.serviceos.evidence.api.EvidenceItemQueryService;
+import com.serviceos.evidence.api.EvidenceItemSummaryView;
+import com.serviceos.evidence.api.EvidenceSlotQueryService;
+import com.serviceos.evidence.api.EvidenceSlotView;
+import com.serviceos.evidence.api.ReviewCaseService;
+import com.serviceos.evidence.api.ReviewCaseView;
+import com.serviceos.evidence.api.ReviewDecisionView;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.network.api.NetworkMembershipView;
 import com.serviceos.network.api.NetworkPortalMembershipQuery;
@@ -24,6 +37,7 @@ import com.serviceos.operations.api.OperationalExceptionItem;
 import com.serviceos.operations.api.OperationalExceptionWorkbenchService;
 import com.serviceos.readmodel.api.NetworkPortalCapacityItem;
 import com.serviceos.readmodel.api.NetworkPortalCorrectionItem;
+import com.serviceos.readmodel.api.NetworkPortalDirectorySlaRiskSummary;
 import com.serviceos.readmodel.api.NetworkPortalExceptionItem;
 import com.serviceos.readmodel.api.NetworkPortalMembershipItem;
 import com.serviceos.readmodel.api.NetworkPortalPage;
@@ -35,7 +49,15 @@ import com.serviceos.readmodel.api.NetworkPortalWorkbenchView;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderItem;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderWorkspace;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderWorkspaceSlaSummary;
+import com.serviceos.readmodel.api.NetworkPortalWorkspaceAppointmentSummary;
+import com.serviceos.readmodel.api.NetworkPortalWorkspaceContactAttemptSummary;
+import com.serviceos.readmodel.api.NetworkPortalWorkspaceCorrectionCaseSummary;
+import com.serviceos.readmodel.api.NetworkPortalWorkspaceCorrectionResubmissionSummary;
+import com.serviceos.readmodel.api.NetworkPortalWorkspaceEvidenceItemSummary;
+import com.serviceos.readmodel.api.NetworkPortalWorkspaceEvidenceSlotSummary;
 import com.serviceos.readmodel.api.NetworkPortalWorkspaceFormSubmissionSummary;
+import com.serviceos.readmodel.api.NetworkPortalWorkspaceReviewCaseSummary;
+import com.serviceos.readmodel.api.NetworkPortalWorkspaceReviewDecisionSummary;
 import com.serviceos.readmodel.api.NetworkPortalWorkspaceVisitSummary;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
@@ -47,6 +69,8 @@ import com.serviceos.forms.api.FormSubmissionQueryService;
 import com.serviceos.forms.api.FormSubmissionSummaryView;
 import com.serviceos.task.api.TaskFulfillmentContext;
 import com.serviceos.task.api.TaskFulfillmentContextService;
+import com.serviceos.workorder.api.WorkOrderDirectoryHeader;
+import com.serviceos.workorder.api.WorkOrderDirectoryHeaderQuery;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -78,6 +102,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     private static final String SLA_READ = "sla.read";
     private static final String VISIT_READ = "visit.read";
     private static final String FORM_READ = "form.read";
+    private static final String MANAGE_APPOINTMENT = "networkPortal.manageAppointment";
     private static final String CONTEXT_PREFIX = "NETWORK|NETWORK|";
     private static final int DEFAULT_CORRECTION_LIMIT = 50;
     private static final int MAX_CORRECTION_LIMIT = 100;
@@ -90,6 +115,12 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     private static final int SLA_WORKSPACE_LIMIT = 100;
     private static final int WORKSPACE_VISIT_LIMIT = 100;
     private static final int WORKSPACE_FORM_LIMIT = 100;
+    private static final int WORKSPACE_EVIDENCE_LIMIT = 100;
+    private static final int WORKSPACE_CORRECTION_LIMIT = 100;
+    private static final int WORKSPACE_REVIEW_LIMIT = 100;
+    private static final int WORKSPACE_EXCEPTION_LIMIT = 100;
+    private static final int WORKSPACE_APPOINTMENT_LIMIT = 100;
+    private static final int WORKSPACE_CONTACT_LIMIT = 100;
     private static final Set<String> OPEN_SLA_STATUSES = Set.of("RUNNING", "BREACHED");
 
     private final PrincipalNetworkAffiliationQuery affiliations;
@@ -101,11 +132,16 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     private final NetworkPortalMembershipQuery memberships;
     private final TaskFulfillmentContextService tasks;
     private final CorrectionCaseService corrections;
+    private final ReviewCaseService reviews;
     private final OperationalExceptionWorkbenchService exceptions;
     private final ActiveServiceResponsibilityService responsibilities;
     private final SlaQueryService slaQueries;
     private final VisitService visits;
     private final FormSubmissionQueryService formSubmissions;
+    private final EvidenceSlotQueryService evidenceSlots;
+    private final EvidenceItemQueryService evidenceItems;
+    private final AppointmentService appointments;
+    private final WorkOrderDirectoryHeaderQuery workOrderHeaders;
     private final Clock clock;
 
     DefaultNetworkPortalQueryService(
@@ -118,11 +154,16 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
             NetworkPortalMembershipQuery memberships,
             TaskFulfillmentContextService tasks,
             CorrectionCaseService corrections,
+            ReviewCaseService reviews,
             OperationalExceptionWorkbenchService exceptions,
             ActiveServiceResponsibilityService responsibilities,
             SlaQueryService slaQueries,
             VisitService visits,
             FormSubmissionQueryService formSubmissions,
+            EvidenceSlotQueryService evidenceSlots,
+            EvidenceItemQueryService evidenceItems,
+            AppointmentService appointments,
+            WorkOrderDirectoryHeaderQuery workOrderHeaders,
             Clock clock
     ) {
         this.affiliations = affiliations;
@@ -134,11 +175,16 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         this.memberships = memberships;
         this.tasks = tasks;
         this.corrections = corrections;
+        this.reviews = reviews;
         this.exceptions = exceptions;
         this.responsibilities = responsibilities;
         this.slaQueries = slaQueries;
         this.visits = visits;
         this.formSubmissions = formSubmissions;
+        this.evidenceSlots = evidenceSlots;
+        this.evidenceItems = evidenceItems;
+        this.appointments = appointments;
+        this.workOrderHeaders = workOrderHeaders;
         this.clock = clock;
     }
 
@@ -177,7 +223,53 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                         existing.effectiveFrom() != null ? existing.effectiveFrom() : row.effectiveFrom()));
             }
         }
-        return new NetworkPortalPage<>(networkId, List.copyOf(byWorkOrder.values()), clock.instant());
+        Map<UUID, WorkOrderDirectoryHeader> headers = loadWorkOrderHeaders(
+                actor.tenantId(), byWorkOrder.keySet());
+        List<NetworkPortalWorkOrderItem> workOrderItems = byWorkOrder.values().stream()
+                .map(item -> withWorkOrderHeader(item, headers.get(item.workOrderId())))
+                .toList();
+        List<NetworkPortalTechnicianItem> technicianSummaries = null;
+        if (hasNetworkCapability(actor, correlationId, TECHNICIAN_READ_OWN, networkId)) {
+            Set<String> wantedTechnicianIds = new LinkedHashSet<>();
+            for (NetworkPortalWorkOrderItem item : workOrderItems) {
+                if (item.technicianId() != null && !item.technicianId().isBlank()) {
+                    wantedTechnicianIds.add(item.technicianId());
+                }
+            }
+            technicianSummaries = loadTechnicianSummaries(
+                    actor.tenantId(), networkId, wantedTechnicianIds);
+        }
+        List<NetworkPortalWorkspaceAppointmentSummary> appointmentSummaries = null;
+        List<NetworkPortalWorkspaceContactAttemptSummary> contactAttemptSummaries = null;
+        Set<UUID> pageTaskIds = new LinkedHashSet<>();
+        for (NetworkPortalWorkOrderItem item : workOrderItems) {
+            pageTaskIds.addAll(item.taskIds());
+        }
+        if (hasNetworkCapability(actor, correlationId, MANAGE_APPOINTMENT, networkId)) {
+            appointmentSummaries = loadAppointmentSummaries(
+                    actor, correlationId, networkId, pageTaskIds);
+            contactAttemptSummaries = loadContactAttemptSummaries(
+                    actor, correlationId, pageTaskIds);
+        }
+        List<NetworkPortalWorkspaceCorrectionCaseSummary> correctionSummaries = null;
+        List<NetworkPortalWorkspaceEvidenceSlotSummary> evidenceSlotSummaries = null;
+        List<NetworkPortalWorkspaceEvidenceItemSummary> evidenceItemSummaries = null;
+        if (hasNetworkCapability(actor, correlationId, EVIDENCE_READ, networkId)) {
+            correctionSummaries = loadCorrectionSummaries(actor, correlationId, pageTaskIds);
+            evidenceSlotSummaries = loadEvidenceSlotSummaries(
+                    actor, correlationId, networkId, pageTaskIds);
+            evidenceItemSummaries = loadEvidenceItemSummaries(
+                    actor, correlationId, networkId, pageTaskIds);
+        }
+        List<NetworkPortalDirectorySlaRiskSummary> slaRiskSummaries = null;
+        if (hasNetworkCapability(actor, correlationId, SLA_READ, networkId)) {
+            slaRiskSummaries = loadDirectorySlaRiskSummariesForWorkOrders(
+                    actor, correlationId, networkId, workOrderItems);
+        }
+        return new NetworkPortalPage<>(
+                networkId, workOrderItems, clock.instant(),
+                technicianSummaries, appointmentSummaries, contactAttemptSummaries,
+                correctionSummaries, evidenceSlotSummaries, evidenceItemSummaries, slaRiskSummaries);
     }
 
     @Override
@@ -249,6 +341,44 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
             formSubmissionSummaries = loadFormSubmissionSummaries(
                     actor, correlationId, networkId, activeTaskIds);
         }
+        List<NetworkPortalWorkspaceEvidenceSlotSummary> evidenceSlotSummaries = null;
+        List<NetworkPortalWorkspaceEvidenceItemSummary> evidenceItemSummaries = null;
+        List<NetworkPortalWorkspaceCorrectionCaseSummary> correctionSummaries = null;
+        List<NetworkPortalWorkspaceReviewCaseSummary> reviewSummaries = null;
+        if (hasNetworkCapability(actor, correlationId, EVIDENCE_READ, networkId)) {
+            evidenceSlotSummaries = loadEvidenceSlotSummaries(
+                    actor, correlationId, networkId, activeTaskIds);
+            evidenceItemSummaries = loadEvidenceItemSummaries(
+                    actor, correlationId, networkId, activeTaskIds);
+            correctionSummaries = loadCorrectionSummaries(actor, correlationId, activeTaskIds);
+            reviewSummaries = loadReviewSummaries(actor, correlationId, activeTaskIds);
+        }
+        List<NetworkPortalExceptionItem> exceptionSummaries = null;
+        if (hasNetworkCapability(actor, correlationId, EXCEPTION_READ, networkId)) {
+            exceptionSummaries = loadExceptionSummaries(actor, correlationId, activeTaskIds);
+        }
+        List<NetworkPortalWorkspaceAppointmentSummary> appointmentSummaries = null;
+        List<NetworkPortalWorkspaceContactAttemptSummary> contactAttemptSummaries = null;
+        if (hasNetworkCapability(actor, correlationId, MANAGE_APPOINTMENT, networkId)) {
+            appointmentSummaries = loadAppointmentSummaries(
+                    actor, correlationId, networkId, activeTaskIds);
+            contactAttemptSummaries = loadContactAttemptSummaries(
+                    actor, correlationId, activeTaskIds);
+        }
+        List<NetworkPortalTechnicianItem> technicianSummaries = null;
+        if (hasNetworkCapability(actor, correlationId, TECHNICIAN_READ_OWN, networkId)) {
+            Set<String> wantedTechnicianIds = new LinkedHashSet<>();
+            if (technicianId != null && !technicianId.isBlank()) {
+                wantedTechnicianIds.add(technicianId);
+            }
+            for (NetworkPortalTaskItem task : taskItems) {
+                if (task.technicianId() != null && !task.technicianId().isBlank()) {
+                    wantedTechnicianIds.add(task.technicianId());
+                }
+            }
+            technicianSummaries = loadTechnicianSummaries(
+                    actor.tenantId(), networkId, wantedTechnicianIds);
+        }
         return new NetworkPortalWorkOrderWorkspace(
                 networkId,
                 workOrderId,
@@ -261,6 +391,14 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                 slaSummary,
                 visitSummaries,
                 formSubmissionSummaries,
+                evidenceSlotSummaries,
+                evidenceItemSummaries,
+                correctionSummaries,
+                reviewSummaries,
+                exceptionSummaries,
+                appointmentSummaries,
+                contactAttemptSummaries,
+                technicianSummaries,
                 clock.instant());
     }
 
@@ -374,6 +512,412 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                 submission.submittedAt());
     }
 
+    /**
+     * M223 / M235：NETWORK evidence.read 已 soft-gate；仅 fan-in 给定 taskIds。
+     * 工作台传入 ACTIVE taskIds；目录页传入当前页 taskIds。
+     * OnNetwork 端口对未解析任务返回空列表，避免污染只读事务。
+     */
+    private List<NetworkPortalWorkspaceEvidenceSlotSummary> loadEvidenceSlotSummaries(
+            CurrentPrincipal actor,
+            String correlationId,
+            UUID networkId,
+            Set<UUID> activeTaskIds
+    ) {
+        List<NetworkPortalWorkspaceEvidenceSlotSummary> collected = new ArrayList<>();
+        for (UUID taskId : activeTaskIds) {
+            for (EvidenceSlotView slot : evidenceSlots.listForTaskOnNetwork(
+                    actor, correlationId, taskId, networkId)) {
+                collected.add(toEvidenceSlotSummary(slot));
+            }
+        }
+        return collected.stream()
+                .sorted(Comparator
+                        .comparing(NetworkPortalWorkspaceEvidenceSlotSummary::templateKey)
+                        .thenComparing(NetworkPortalWorkspaceEvidenceSlotSummary::requirementCode)
+                        .thenComparing(NetworkPortalWorkspaceEvidenceSlotSummary::slotId))
+                .limit(WORKSPACE_EVIDENCE_LIMIT)
+                .toList();
+    }
+
+    /**
+     * M223 / M235：NETWORK evidence.read 已 soft-gate；仅 fan-in 给定 taskIds。
+     */
+    private List<NetworkPortalWorkspaceEvidenceItemSummary> loadEvidenceItemSummaries(
+            CurrentPrincipal actor,
+            String correlationId,
+            UUID networkId,
+            Set<UUID> activeTaskIds
+    ) {
+        List<NetworkPortalWorkspaceEvidenceItemSummary> collected = new ArrayList<>();
+        for (UUID taskId : activeTaskIds) {
+            evidenceItems.listSummariesForTaskOnNetwork(
+                            actor, correlationId, taskId, networkId)
+                    .stream()
+                    .map(this::toEvidenceItemSummary)
+                    .forEach(collected::add);
+        }
+        return collected.stream()
+                .sorted(Comparator
+                        .comparing(NetworkPortalWorkspaceEvidenceItemSummary::evidenceSlotId)
+                        .thenComparingInt(NetworkPortalWorkspaceEvidenceItemSummary::itemOrdinal)
+                        .thenComparing(NetworkPortalWorkspaceEvidenceItemSummary::evidenceItemId))
+                .limit(WORKSPACE_EVIDENCE_LIMIT)
+                .toList();
+    }
+
+    private NetworkPortalWorkspaceEvidenceSlotSummary toEvidenceSlotSummary(EvidenceSlotView slot) {
+        return new NetworkPortalWorkspaceEvidenceSlotSummary(
+                slot.slotId(),
+                slot.taskId(),
+                slot.projectId(),
+                slot.templateKey(),
+                slot.templateVersion(),
+                slot.requirementCode(),
+                slot.occurrenceKey(),
+                slot.requirementName(),
+                slot.mediaType(),
+                slot.required(),
+                slot.minCount(),
+                slot.maxCount(),
+                slot.status(),
+                slot.resolvedAt(),
+                slot.slotGeneration(),
+                slot.active(),
+                slot.transition(),
+                slot.requiredDisposition());
+    }
+
+    private NetworkPortalWorkspaceEvidenceItemSummary toEvidenceItemSummary(
+            EvidenceItemSummaryView item
+    ) {
+        return new NetworkPortalWorkspaceEvidenceItemSummary(
+                item.evidenceItemId(),
+                item.taskId(),
+                item.projectId(),
+                item.evidenceSlotId(),
+                item.itemOrdinal(),
+                item.status(),
+                item.revisionCount(),
+                item.latestRevisionNumber(),
+                item.latestRevisionStatus());
+    }
+
+    /** M236：为本页 workOrderIds 装载非 PII 工单头；缺失静默跳过。 */
+    private Map<UUID, WorkOrderDirectoryHeader> loadWorkOrderHeaders(
+            String tenantId,
+            Set<UUID> workOrderIds
+    ) {
+        Map<UUID, WorkOrderDirectoryHeader> headers = new LinkedHashMap<>();
+        for (UUID workOrderId : workOrderIds) {
+            workOrderHeaders.find(tenantId, workOrderId)
+                    .ifPresent(header -> headers.put(workOrderId, header));
+        }
+        return headers;
+    }
+
+    private static NetworkPortalWorkOrderItem withWorkOrderHeader(
+            NetworkPortalWorkOrderItem item,
+            WorkOrderDirectoryHeader header
+    ) {
+        if (header == null) {
+            return item;
+        }
+        return new NetworkPortalWorkOrderItem(
+                item.workOrderId(),
+                item.projectId(),
+                item.taskIds(),
+                item.businessType(),
+                item.technicianId(),
+                item.effectiveFrom(),
+                header.brandCode(),
+                header.serviceProductCode(),
+                header.provinceCode(),
+                header.cityCode(),
+                header.districtCode(),
+                header.receivedAt());
+    }
+
+    private static NetworkPortalTaskItem withTaskHeader(
+            NetworkPortalTaskItem item,
+            WorkOrderDirectoryHeader header
+    ) {
+        if (header == null) {
+            return item;
+        }
+        return new NetworkPortalTaskItem(
+                item.taskId(),
+                item.workOrderId(),
+                item.projectId(),
+                item.taskType(),
+                item.taskKind(),
+                item.stageCode(),
+                item.status(),
+                item.businessType(),
+                item.technicianId(),
+                item.effectiveFrom(),
+                header.brandCode(),
+                header.serviceProductCode(),
+                header.provinceCode(),
+                header.cityCode(),
+                header.districtCode(),
+                header.receivedAt());
+    }
+
+    /**
+     * M225 / M233：NETWORK evidence.read 已 soft-gate；仅 fan-in 给定 taskIds；含全部状态。
+     * 工作台传入 ACTIVE taskIds；目录页传入当前页 taskIds。
+     */
+    private List<NetworkPortalWorkspaceCorrectionCaseSummary> loadCorrectionSummaries(
+            CurrentPrincipal actor,
+            String correlationId,
+            Set<UUID> activeTaskIds
+    ) {
+        List<NetworkPortalWorkspaceCorrectionCaseSummary> collected = new ArrayList<>();
+        for (UUID taskId : activeTaskIds) {
+            for (CorrectionCaseView row : corrections.listForTask(actor, correlationId, taskId)) {
+                collected.add(toCorrectionCaseSummary(row));
+            }
+        }
+        return collected.stream()
+                .sorted(Comparator
+                        .comparing(NetworkPortalWorkspaceCorrectionCaseSummary::createdAt)
+                        .thenComparing(NetworkPortalWorkspaceCorrectionCaseSummary::correctionCaseId))
+                .limit(WORKSPACE_CORRECTION_LIMIT)
+                .toList();
+    }
+
+    /**
+     * M229：NETWORK evidence.read 已 soft-gate；仅 fan-in ACTIVE taskIds；含全部状态。
+     */
+    private List<NetworkPortalWorkspaceReviewCaseSummary> loadReviewSummaries(
+            CurrentPrincipal actor,
+            String correlationId,
+            Set<UUID> activeTaskIds
+    ) {
+        List<NetworkPortalWorkspaceReviewCaseSummary> collected = new ArrayList<>();
+        for (UUID taskId : activeTaskIds) {
+            for (ReviewCaseView row : reviews.listForTask(actor, correlationId, taskId)) {
+                collected.add(toReviewCaseSummary(row));
+            }
+        }
+        return collected.stream()
+                .sorted(Comparator
+                        .comparing(NetworkPortalWorkspaceReviewCaseSummary::createdAt)
+                        .thenComparing(NetworkPortalWorkspaceReviewCaseSummary::reviewCaseId))
+                .limit(WORKSPACE_REVIEW_LIMIT)
+                .toList();
+    }
+
+    /**
+     * M226：NETWORK operations.exception.read 已 soft-gate；仅 fan-in ACTIVE taskIds；含全部状态。
+     */
+    private List<NetworkPortalExceptionItem> loadExceptionSummaries(
+            CurrentPrincipal actor,
+            String correlationId,
+            Set<UUID> activeTaskIds
+    ) {
+        List<NetworkPortalExceptionItem> collected = new ArrayList<>();
+        for (UUID taskId : activeTaskIds) {
+            for (OperationalExceptionItem row : exceptions.listForTask(actor, correlationId, taskId)) {
+                collected.add(toExceptionItem(row));
+            }
+        }
+        return collected.stream()
+                .sorted(Comparator
+                        .comparing(NetworkPortalExceptionItem::openedAt)
+                        .thenComparing(NetworkPortalExceptionItem::exceptionId))
+                .limit(WORKSPACE_EXCEPTION_LIMIT)
+                .toList();
+    }
+
+    /**
+     * M227：NETWORK networkPortal.manageAppointment 已 soft-gate；仅 fan-in ACTIVE taskIds；
+     * 另按可信 networkId 过滤 assignedNetworkId。
+     */
+    private List<NetworkPortalWorkspaceAppointmentSummary> loadAppointmentSummaries(
+            CurrentPrincipal actor,
+            String correlationId,
+            UUID networkId,
+            Set<UUID> activeTaskIds
+    ) {
+        String trustedNetwork = networkId.toString();
+        List<NetworkPortalWorkspaceAppointmentSummary> collected = new ArrayList<>();
+        for (UUID taskId : activeTaskIds) {
+            for (AppointmentView row : appointments.listByTask(actor, correlationId, taskId)) {
+                if (!trustedNetwork.equals(row.assignedNetworkId())) {
+                    continue;
+                }
+                collected.add(toAppointmentSummary(row));
+            }
+        }
+        return collected.stream()
+                .sorted(Comparator
+                        .comparing(NetworkPortalWorkspaceAppointmentSummary::createdAt)
+                        .thenComparing(NetworkPortalWorkspaceAppointmentSummary::appointmentId))
+                .limit(WORKSPACE_APPOINTMENT_LIMIT)
+                .toList();
+    }
+
+    /**
+     * M227：NETWORK networkPortal.manageAppointment 已 soft-gate；仅 fan-in ACTIVE taskIds。
+     */
+    private List<NetworkPortalWorkspaceContactAttemptSummary> loadContactAttemptSummaries(
+            CurrentPrincipal actor,
+            String correlationId,
+            Set<UUID> activeTaskIds
+    ) {
+        List<NetworkPortalWorkspaceContactAttemptSummary> collected = new ArrayList<>();
+        for (UUID taskId : activeTaskIds) {
+            for (ContactAttemptView row : appointments.listContactAttempts(actor, correlationId, taskId)) {
+                collected.add(toContactAttemptSummary(row));
+            }
+        }
+        return collected.stream()
+                .sorted(Comparator
+                        .comparing(NetworkPortalWorkspaceContactAttemptSummary::startedAt,
+                                Comparator.reverseOrder())
+                        .thenComparing(NetworkPortalWorkspaceContactAttemptSummary::contactAttemptId))
+                .limit(WORKSPACE_CONTACT_LIMIT)
+                .toList();
+    }
+
+    private static NetworkPortalWorkspaceAppointmentSummary toAppointmentSummary(
+            AppointmentView appointment
+    ) {
+        AppointmentRevisionView current = appointment.revisions().stream()
+                .filter(revision -> revision.revisionNo() == appointment.currentRevisionNo())
+                .findFirst()
+                .orElse(appointment.revisions().isEmpty() ? null : appointment.revisions().getLast());
+        AppointmentWindow window = current == null ? null : current.window();
+        return new NetworkPortalWorkspaceAppointmentSummary(
+                appointment.appointmentId(),
+                appointment.taskId(),
+                appointment.type().name(),
+                appointment.status(),
+                appointment.assignedNetworkId(),
+                appointment.technicianId(),
+                appointment.currentRevisionNo(),
+                window == null ? null : window.start(),
+                window == null ? null : window.end(),
+                window == null ? null : window.timezone(),
+                window == null ? null : window.estimatedDurationMinutes(),
+                appointment.aggregateVersion(),
+                appointment.createdAt());
+    }
+
+    private static NetworkPortalWorkspaceContactAttemptSummary toContactAttemptSummary(
+            ContactAttemptView attempt
+    ) {
+        return new NetworkPortalWorkspaceContactAttemptSummary(
+                attempt.contactAttemptId(),
+                attempt.taskId(),
+                attempt.projectId(),
+                attempt.workOrderId(),
+                attempt.channel(),
+                attempt.startedAt(),
+                attempt.endedAt(),
+                attempt.resultCode().name(),
+                attempt.nextContactAt(),
+                attempt.createdAt());
+    }
+
+    /**
+     * M228：NETWORK technician.readOwnNetwork 已 soft-gate；仅返回工作区 technicianId 命中项。
+     */
+    private List<NetworkPortalTechnicianItem> loadTechnicianSummaries(
+            String tenantId,
+            UUID networkId,
+            Set<String> wantedTechnicianIds
+    ) {
+        if (wantedTechnicianIds.isEmpty()) {
+            return List.of();
+        }
+        return technicians.listActiveTechnicians(tenantId, networkId).stream()
+                .filter(row -> wantedTechnicianIds.contains(row.technicianProfileId().toString()))
+                .map(row -> new NetworkPortalTechnicianItem(
+                        row.membershipId(),
+                        row.technicianProfileId(),
+                        row.principalId(),
+                        row.displayName(),
+                        row.profileStatus(),
+                        row.membershipStatus(),
+                        row.validFrom(),
+                        row.validTo(),
+                        row.membershipVersion()))
+                .sorted(Comparator
+                        .comparing(NetworkPortalTechnicianItem::displayName,
+                                Comparator.nullsLast(String::compareTo))
+                        .thenComparing(NetworkPortalTechnicianItem::technicianProfileId))
+                .toList();
+    }
+
+    private NetworkPortalWorkspaceCorrectionCaseSummary toCorrectionCaseSummary(
+            CorrectionCaseView correction
+    ) {
+        return new NetworkPortalWorkspaceCorrectionCaseSummary(
+                correction.correctionCaseId(),
+                correction.taskId(),
+                correction.projectId(),
+                correction.sourceReviewCaseId(),
+                correction.sourceReviewDecisionId(),
+                correction.reasonCodes(),
+                correction.correctionTaskId(),
+                correction.status(),
+                correction.createdAt(),
+                correction.latestResubmissionSnapshotId(),
+                correction.closedAt(),
+                correction.waivedAt(),
+                correction.resubmissions().stream()
+                        .map(this::toCorrectionResubmissionSummary)
+                        .toList());
+    }
+
+    private NetworkPortalWorkspaceReviewCaseSummary toReviewCaseSummary(ReviewCaseView review) {
+        return new NetworkPortalWorkspaceReviewCaseSummary(
+                review.reviewCaseId(),
+                review.taskId(),
+                review.projectId(),
+                review.evidenceSetSnapshotId(),
+                review.scopeType(),
+                review.origin(),
+                review.policyVersion(),
+                review.status(),
+                review.createdAt(),
+                review.decidedAt(),
+                review.sourceReviewCaseId(),
+                review.externalSubmissionRef(),
+                review.callbackBatchRef(),
+                review.mappingVersionId(),
+                review.reopenedFromReviewCaseId(),
+                review.reopenTriggerRef(),
+                review.decisions() == null
+                        ? List.of()
+                        : review.decisions().stream().map(this::toReviewDecisionSummary).toList());
+    }
+
+    private NetworkPortalWorkspaceReviewDecisionSummary toReviewDecisionSummary(
+            ReviewDecisionView decision
+    ) {
+        // note / approvalRef / decidedBy 不进入工作区摘要，避免自由文本和操作者信息扩散。
+        return new NetworkPortalWorkspaceReviewDecisionSummary(
+                decision.reviewDecisionId(),
+                decision.decisionOrdinal(),
+                decision.decision(),
+                decision.decisionSource(),
+                decision.reasonCodes(),
+                decision.decidedAt());
+    }
+
+    private NetworkPortalWorkspaceCorrectionResubmissionSummary toCorrectionResubmissionSummary(
+            CorrectionResubmissionView resubmission
+    ) {
+        return new NetworkPortalWorkspaceCorrectionResubmissionSummary(
+                resubmission.correctionResubmissionId(),
+                resubmission.resubmissionOrdinal(),
+                resubmission.evidenceSetSnapshotId(),
+                resubmission.submittedAt());
+    }
+
     @Override
     @Transactional(readOnly = true)
     public NetworkPortalPage<NetworkPortalTaskItem> listTasks(
@@ -397,7 +941,57 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                     row.technicianId(),
                     row.effectiveFrom()));
         }
-        return new NetworkPortalPage<>(networkId, List.copyOf(items), clock.instant());
+        Set<UUID> workOrderIds = new LinkedHashSet<>();
+        for (NetworkPortalTaskItem item : items) {
+            workOrderIds.add(item.workOrderId());
+        }
+        Map<UUID, WorkOrderDirectoryHeader> headers = loadWorkOrderHeaders(
+                actor.tenantId(), workOrderIds);
+        List<NetworkPortalTaskItem> taskItems = items.stream()
+                .map(item -> withTaskHeader(item, headers.get(item.workOrderId())))
+                .toList();
+        List<NetworkPortalTechnicianItem> technicianSummaries = null;
+        if (hasNetworkCapability(actor, correlationId, TECHNICIAN_READ_OWN, networkId)) {
+            Set<String> wantedTechnicianIds = new LinkedHashSet<>();
+            for (NetworkPortalTaskItem item : taskItems) {
+                if (item.technicianId() != null && !item.technicianId().isBlank()) {
+                    wantedTechnicianIds.add(item.technicianId());
+                }
+            }
+            technicianSummaries = loadTechnicianSummaries(
+                    actor.tenantId(), networkId, wantedTechnicianIds);
+        }
+        List<NetworkPortalWorkspaceAppointmentSummary> appointmentSummaries = null;
+        List<NetworkPortalWorkspaceContactAttemptSummary> contactAttemptSummaries = null;
+        Set<UUID> pageTaskIds = new LinkedHashSet<>();
+        for (NetworkPortalTaskItem item : taskItems) {
+            pageTaskIds.add(item.taskId());
+        }
+        if (hasNetworkCapability(actor, correlationId, MANAGE_APPOINTMENT, networkId)) {
+            appointmentSummaries = loadAppointmentSummaries(
+                    actor, correlationId, networkId, pageTaskIds);
+            contactAttemptSummaries = loadContactAttemptSummaries(
+                    actor, correlationId, pageTaskIds);
+        }
+        List<NetworkPortalWorkspaceCorrectionCaseSummary> correctionSummaries = null;
+        List<NetworkPortalWorkspaceEvidenceSlotSummary> evidenceSlotSummaries = null;
+        List<NetworkPortalWorkspaceEvidenceItemSummary> evidenceItemSummaries = null;
+        if (hasNetworkCapability(actor, correlationId, EVIDENCE_READ, networkId)) {
+            correctionSummaries = loadCorrectionSummaries(actor, correlationId, pageTaskIds);
+            evidenceSlotSummaries = loadEvidenceSlotSummaries(
+                    actor, correlationId, networkId, pageTaskIds);
+            evidenceItemSummaries = loadEvidenceItemSummaries(
+                    actor, correlationId, networkId, pageTaskIds);
+        }
+        List<NetworkPortalDirectorySlaRiskSummary> slaRiskSummaries = null;
+        if (hasNetworkCapability(actor, correlationId, SLA_READ, networkId)) {
+            slaRiskSummaries = loadDirectorySlaRiskSummariesForTasks(
+                    actor, correlationId, networkId, taskItems);
+        }
+        return new NetworkPortalPage<>(
+                networkId, taskItems, clock.instant(),
+                technicianSummaries, appointmentSummaries, contactAttemptSummaries,
+                correctionSummaries, evidenceSlotSummaries, evidenceItemSummaries, slaRiskSummaries);
     }
 
     @Override
@@ -471,6 +1065,11 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         if (hasNetworkCapability(actor, correlationId, TECHNICIAN_READ_OWN, networkId)) {
             pendingQualificationCount = countPendingQualifications(actor.tenantId(), networkId);
         }
+        NetworkPortalWorkOrderWorkspaceSlaSummary slaSummary = null;
+        if (hasNetworkCapability(actor, correlationId, SLA_READ, networkId)) {
+            slaSummary = loadWorkbenchSlaSummary(
+                    actor, correlationId, networkId, workOrders, activeTaskIds);
+        }
 
         return new NetworkPortalWorkbenchView(
                 networkId,
@@ -482,7 +1081,155 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                 unassigned,
                 openCorrectionCaseCount,
                 openOperationalExceptionCount,
-                pendingQualificationCount);
+                pendingQualificationCount,
+                slaSummary);
+    }
+
+    /**
+     * M224：NETWORK sla.read 已 soft-gate；跨本网点 ACTIVE 工单 fan-in 后按 ACTIVE taskIds 计数。
+     */
+    private NetworkPortalWorkOrderWorkspaceSlaSummary loadWorkbenchSlaSummary(
+            CurrentPrincipal actor,
+            String correlationId,
+            UUID networkId,
+            Set<UUID> workOrderIds,
+            Set<UUID> activeTaskIds
+    ) {
+        Map<UUID, UUID> workOrderProjects = new LinkedHashMap<>();
+        for (UUID taskId : activeTaskIds) {
+            TaskFulfillmentContext task = tasks.find(actor.tenantId(), taskId).orElse(null);
+            if (task == null || task.projectId() == null || task.workOrderId() == null) {
+                continue;
+            }
+            if (!workOrderIds.contains(task.workOrderId())) {
+                continue;
+            }
+            workOrderProjects.putIfAbsent(task.workOrderId(), task.projectId());
+        }
+        int open = 0;
+        int breached = 0;
+        for (Map.Entry<UUID, UUID> entry : workOrderProjects.entrySet()) {
+            List<SlaInstanceItem> items = slaQueries.listForWorkOrderOnNetwork(
+                    actor,
+                    correlationId,
+                    entry.getKey(),
+                    entry.getValue(),
+                    networkId,
+                    null,
+                    SLA_WORKSPACE_LIMIT).items();
+            for (SlaInstanceItem item : items) {
+                if (item.taskId() == null || !activeTaskIds.contains(item.taskId())) {
+                    continue;
+                }
+                if (OPEN_SLA_STATUSES.contains(item.status())) {
+                    open++;
+                }
+                if ("BREACHED".equals(item.status())) {
+                    breached++;
+                }
+            }
+        }
+        return new NetworkPortalWorkOrderWorkspaceSlaSummary(open, breached);
+    }
+
+    /**
+     * M234：NETWORK sla.read 已 soft-gate；工单目录按 workOrderId 聚合本页 taskIds 计数。
+     * 仅返回 openCount&gt;0 的行（无风险时 UI 显示「暂无」）。
+     */
+    private List<NetworkPortalDirectorySlaRiskSummary> loadDirectorySlaRiskSummariesForWorkOrders(
+            CurrentPrincipal actor,
+            String correlationId,
+            UUID networkId,
+            List<NetworkPortalWorkOrderItem> workOrderItems
+    ) {
+        List<NetworkPortalDirectorySlaRiskSummary> collected = new ArrayList<>();
+        for (NetworkPortalWorkOrderItem item : workOrderItems) {
+            Set<UUID> taskIds = Set.copyOf(item.taskIds());
+            if (taskIds.isEmpty()) {
+                continue;
+            }
+            UUID projectId = null;
+            for (UUID taskId : taskIds) {
+                TaskFulfillmentContext task = tasks.find(actor.tenantId(), taskId).orElse(null);
+                if (task != null && task.projectId() != null) {
+                    projectId = task.projectId();
+                    break;
+                }
+            }
+            if (projectId == null) {
+                continue;
+            }
+            NetworkPortalWorkOrderWorkspaceSlaSummary counts = loadSlaSummary(
+                    actor, correlationId, item.workOrderId(), projectId, networkId, taskIds);
+            if (counts.openCount() > 0) {
+                collected.add(new NetworkPortalDirectorySlaRiskSummary(
+                        item.workOrderId(), null, counts.openCount(), counts.breachedCount()));
+            }
+        }
+        return List.copyOf(collected);
+    }
+
+    /**
+     * M234：NETWORK sla.read 已 soft-gate；任务目录按 taskId 展开本页计数。
+     * 仅返回 openCount&gt;0 的行。
+     */
+    private List<NetworkPortalDirectorySlaRiskSummary> loadDirectorySlaRiskSummariesForTasks(
+            CurrentPrincipal actor,
+            String correlationId,
+            UUID networkId,
+            List<NetworkPortalTaskItem> taskItems
+    ) {
+        Map<UUID, UUID> workOrderProjects = new LinkedHashMap<>();
+        Map<UUID, Set<UUID>> workOrderTaskIds = new LinkedHashMap<>();
+        for (NetworkPortalTaskItem item : taskItems) {
+            if (item.workOrderId() == null || item.taskId() == null) {
+                continue;
+            }
+            workOrderTaskIds.computeIfAbsent(item.workOrderId(), ignored -> new LinkedHashSet<>())
+                    .add(item.taskId());
+            if (item.projectId() != null) {
+                workOrderProjects.putIfAbsent(item.workOrderId(), item.projectId());
+            } else {
+                TaskFulfillmentContext task = tasks.find(actor.tenantId(), item.taskId()).orElse(null);
+                if (task != null && task.projectId() != null) {
+                    workOrderProjects.putIfAbsent(item.workOrderId(), task.projectId());
+                }
+            }
+        }
+        Map<UUID, int[]> perTask = new LinkedHashMap<>();
+        for (Map.Entry<UUID, Set<UUID>> entry : workOrderTaskIds.entrySet()) {
+            UUID workOrderId = entry.getKey();
+            UUID projectId = workOrderProjects.get(workOrderId);
+            if (projectId == null) {
+                continue;
+            }
+            Set<UUID> taskIds = entry.getValue();
+            List<SlaInstanceItem> items = slaQueries.listForWorkOrderOnNetwork(
+                    actor, correlationId, workOrderId, projectId, networkId, null, SLA_WORKSPACE_LIMIT)
+                    .items();
+            for (SlaInstanceItem item : items) {
+                if (item.taskId() == null || !taskIds.contains(item.taskId())) {
+                    continue;
+                }
+                int[] counts = perTask.computeIfAbsent(item.taskId(), ignored -> new int[2]);
+                if (OPEN_SLA_STATUSES.contains(item.status())) {
+                    counts[0]++;
+                }
+                if ("BREACHED".equals(item.status())) {
+                    counts[1]++;
+                }
+            }
+        }
+        List<NetworkPortalDirectorySlaRiskSummary> collected = new ArrayList<>();
+        for (NetworkPortalTaskItem item : taskItems) {
+            int[] counts = perTask.get(item.taskId());
+            if (counts == null || counts[0] <= 0) {
+                continue;
+            }
+            collected.add(new NetworkPortalDirectorySlaRiskSummary(
+                    item.workOrderId(), item.taskId(), counts[0], counts[1]));
+        }
+        return List.copyOf(collected);
     }
 
     /**
