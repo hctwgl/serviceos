@@ -699,3 +699,4 @@ OCR/CV、复杂工作流、BUSINESS 日历与 SLA 暂停/预警/升级/通知、
 仍属于明确未实现范围；也不代表所有 Proposed 文档均已接受。
 
 核心业务编码前，必须使用 `research/templates/` 中的模板完成首个试点项目基线，并用真实脱敏工单完成桌面演练。
+- [M257 独立 Technician H5 交付批次](architecture/270-m257-technician-h5-delivery-batch.md)
