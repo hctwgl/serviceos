@@ -3,72 +3,29 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import {
   getNetworkPortalWorkOrderWorkspace,
-  listNetworkPortalCorrections,
-  listNetworkPortalExceptions,
-  listNetworkPortalTaskAppointments,
-  listNetworkPortalTaskContactAttempts,
-  listNetworkPortalTechnicians,
-  type AppointmentWindow,
-  type NetworkPortalAppointment,
-  type NetworkPortalContactAttempt,
-  type NetworkPortalCorrectionItem,
-  type NetworkPortalExceptionItem,
-  type NetworkPortalTechnicianItem,
   type NetworkPortalWorkOrderWorkspace,
+  type NetworkPortalWorkspaceAppointmentSummary,
 } from '../api/networkPortal'
 
 const props = defineProps<{ networkContextId: string | null }>()
 const route = useRoute()
 const workOrderId = computed(() => String(route.params.id ?? ''))
 const detail = ref<NetworkPortalWorkOrderWorkspace | null>(null)
-const relatedCorrections = ref<NetworkPortalCorrectionItem[] | null>(null)
-const relatedExceptions = ref<NetworkPortalExceptionItem[] | null>(null)
-const relatedAppointments = ref<NetworkPortalAppointment[] | null>(null)
-const relatedContactAttempts = ref<NetworkPortalContactAttempt[] | null>(null)
-const techniciansByProfileId = ref<Map<string, NetworkPortalTechnicianItem> | null>(null)
 const error = ref<string | null>(null)
 const loading = ref(false)
 
-function appointmentWindow(item: NetworkPortalAppointment): AppointmentWindow | null {
-  const revisions = item.revisions
-  if (!revisions?.length) {
-    return null
-  }
-  const current =
-    revisions.find((revision) => revision.revisionNo === item.currentRevisionNo) ??
-    revisions[revisions.length - 1]
-  return current?.window ?? null
+function hasAppointmentWindow(item: NetworkPortalWorkspaceAppointmentSummary) {
+  return item.windowStart != null && item.windowEnd != null
 }
 
 function resolveTechnician(technicianId: string | null | undefined) {
-  if (!technicianId || !techniciansByProfileId.value) {
+  if (!technicianId || !detail.value?.technicians) {
     return null
   }
-  return techniciansByProfileId.value.get(technicianId) ?? null
+  return (
+    detail.value.technicians.find((tech) => tech.technicianProfileId === technicianId) ?? null
+  )
 }
-
-const currentTechnicians = computed(() => {
-  if (!detail.value || !techniciansByProfileId.value) {
-    return null
-  }
-  const ids = new Set<string>()
-  if (detail.value.technicianId) {
-    ids.add(detail.value.technicianId)
-  }
-  for (const task of detail.value.tasks) {
-    if (task.technicianId) {
-      ids.add(task.technicianId)
-    }
-  }
-  const items: NetworkPortalTechnicianItem[] = []
-  for (const id of ids) {
-    const tech = techniciansByProfileId.value.get(id)
-    if (tech) {
-      items.push(tech)
-    }
-  }
-  return items
-})
 
 const unassignedTaskIds = computed(() => {
   if (!detail.value) {
@@ -79,85 +36,9 @@ const unassignedTaskIds = computed(() => {
     .map((task) => task.taskId)
 })
 
-async function fanInByTaskId<T>(
-  taskIds: string[],
-  loader: (networkContextId: string, taskId: string) => Promise<T[]>,
-): Promise<T[] | null> {
-  if (!props.networkContextId || taskIds.length === 0) {
-    return null
-  }
-  const results = await Promise.allSettled(
-    taskIds.map((taskId) => loader(props.networkContextId!, taskId)),
-  )
-  if (results.some((result) => result.status === 'rejected')) {
-    return null
-  }
-  return results.flatMap((result) => (result.status === 'fulfilled' ? result.value : []))
-}
-
-async function loadTechnicians() {
-  techniciansByProfileId.value = null
-  if (!props.networkContextId) {
-    return
-  }
-  try {
-    const page = await listNetworkPortalTechnicians(props.networkContextId)
-    const map = new Map<string, NetworkPortalTechnicianItem>()
-    for (const item of page.items) {
-      map.set(item.technicianProfileId, item)
-    }
-    techniciansByProfileId.value = map
-  } catch {
-    techniciansByProfileId.value = null
-  }
-}
-
-async function loadRelated(taskIds: string[]) {
-  relatedCorrections.value = null
-  relatedExceptions.value = null
-  relatedAppointments.value = null
-  relatedContactAttempts.value = null
-  if (!props.networkContextId || taskIds.length === 0) {
-    return
-  }
-  const taskSet = new Set(taskIds)
-  try {
-    const page = await listNetworkPortalCorrections(props.networkContextId, { status: 'OPEN' })
-    relatedCorrections.value = page.items.filter(
-      (item) => item.taskId != null && taskSet.has(item.taskId),
-    )
-  } catch {
-    relatedCorrections.value = null
-  }
-  try {
-    const page = await listNetworkPortalExceptions(props.networkContextId, { status: 'OPEN' })
-    relatedExceptions.value = page.items.filter(
-      (item) => item.taskId != null && taskSet.has(item.taskId),
-    )
-  } catch {
-    relatedExceptions.value = null
-  }
-  // ADR-053：缺 manageAppointment 或任一次 403 时同时省略预约/联系区块，
-  // 不得用空列表伪装无权限。
-  const appointments = await fanInByTaskId(taskIds, listNetworkPortalTaskAppointments)
-  const contacts = await fanInByTaskId(taskIds, listNetworkPortalTaskContactAttempts)
-  if (appointments === null || contacts === null) {
-    relatedAppointments.value = null
-    relatedContactAttempts.value = null
-  } else {
-    relatedAppointments.value = appointments
-    relatedContactAttempts.value = contacts
-  }
-}
-
 async function load() {
   if (!props.networkContextId) {
     detail.value = null
-    relatedCorrections.value = null
-    relatedExceptions.value = null
-    relatedAppointments.value = null
-    relatedContactAttempts.value = null
-    techniciansByProfileId.value = null
     error.value = '请选择 NETWORK 上下文'
     return
   }
@@ -173,14 +54,8 @@ async function load() {
       workOrderId.value,
     )
     error.value = null
-    await Promise.all([loadRelated(detail.value.taskIds), loadTechnicians()])
   } catch (err) {
     detail.value = null
-    relatedCorrections.value = null
-    relatedExceptions.value = null
-    relatedAppointments.value = null
-    relatedContactAttempts.value = null
-    techniciansByProfileId.value = null
     error.value = err instanceof Error ? err.message : '工单工作区加载失败'
   } finally {
     loading.value = false
@@ -218,8 +93,7 @@ watch(
       </div>
     </header>
     <p class="hint">
-      只读薄快照（M213）+ 协作深链（M214）+ 预约/联系 fan-in（M215）+ 师傅 fan-in（M216）+
-      SLA 摘要（M221）+ Visit/表单提交摘要（M222）：缺能力时省略相关区块。
+      只读薄快照（M213）+ 协作深链（M214）+ 服务端摘要 enrichment（M221～M228）：缺能力时省略相关区块。
     </p>
     <p v-if="error" data-testid="network-portal-error">{{ error }}</p>
     <p v-else-if="loading" data-testid="workspace-loading">加载中…</p>
@@ -284,13 +158,33 @@ watch(
             <strong>{{ visit.visitId }}</strong>
             <span class="muted">
               （task {{ visit.taskId }} · seq {{ visit.visitSequence }} · {{ visit.status }} ·
-              {{ visit.geofenceResult }} / {{ visit.policyDecision }}）
+              {{ visit.geofenceResult }} / {{ visit.policyDecision }} · v{{ visit.aggregateVersion }}）
+            </span>
+            <span class="muted" data-testid="workspace-visit-appointment">
+              · appointment {{ visit.appointmentId }}
+            </span>
+            <span class="muted" data-testid="workspace-visit-technician">
+              · technician {{ visit.technicianId }}
+            </span>
+            <span class="muted" data-testid="workspace-visit-network">
+              · network {{ visit.networkId ?? '—' }}
+            </span>
+            <span class="muted" data-testid="workspace-visit-checkin">
+              · check-in {{ visit.checkInCapturedAt }} / recv {{ visit.checkInReceivedAt }}
+            </span>
+            <span class="muted" data-testid="workspace-visit-checkout">
+              · check-out {{ visit.checkOutCapturedAt ?? '—' }} / recv
+              {{ visit.checkOutReceivedAt ?? '—' }}
+            </span>
+            <span class="muted" data-testid="workspace-visit-result">
+              · result {{ visit.resultCode ?? '—' }} / exception {{ visit.exceptionCode ?? '—' }}
             </span>
           </li>
         </ul>
         <p v-else data-testid="workspace-visits-empty">暂无本网点 Visit</p>
         <p class="hint">
-          需 NETWORK <code>visit.read</code>。不含 GPS/note/device。无独立 Visit 详情页。
+          需 NETWORK <code>visit.read</code>。展示 Accepted 非 PII 摘要字段；不含
+          GPS/note/device。无独立 Visit 详情页。
         </p>
       </section>
 
@@ -312,11 +206,24 @@ watch(
               （{{ row.submissionId }} · task {{ row.taskId }} · v{{ row.submissionVersion }} ·
               {{ row.validationStatus }} · err {{ row.errorCount }} / warn {{ row.warningCount }}）
             </span>
+            <span class="muted" data-testid="workspace-form-project">
+              · project {{ row.projectId }}
+            </span>
+            <span class="muted" data-testid="workspace-form-version">
+              · formVersion {{ row.formVersionId }}
+            </span>
+            <span class="muted" data-testid="workspace-form-submitted-at">
+              · submittedAt {{ row.submittedAt }}
+            </span>
+            <span class="muted" data-testid="workspace-form-digest">
+              · digest {{ row.contentDigest }}
+            </span>
           </li>
         </ul>
         <p v-else data-testid="workspace-form-submissions-empty">暂无表单提交</p>
         <p class="hint">
-          需 NETWORK <code>form.read</code>。不含 values/submittedBy。无表单 definition。
+          需 NETWORK <code>form.read</code>。展示 Accepted 非 PII 摘要字段；不含
+          values/submittedBy。无表单 definition。
         </p>
       </section>
 
@@ -338,11 +245,27 @@ watch(
               （{{ slot.requirementCode }} · {{ slot.mediaType }} · {{ slot.status }} ·
               task {{ slot.taskId }} · gen {{ slot.slotGeneration }}）
             </span>
+            <span class="muted" data-testid="workspace-evidence-slot-template">
+              · template {{ slot.templateKey }}@{{ slot.templateVersion }}
+            </span>
+            <span class="muted" data-testid="workspace-evidence-slot-counts">
+              · required {{ slot.required }} · min {{ slot.minCount }} / max
+              {{ slot.maxCount ?? '—' }}
+            </span>
+            <span class="muted" data-testid="workspace-evidence-slot-state">
+              · active {{ slot.active }} · {{ slot.transition }} · disposition
+              {{ slot.requiredDisposition }}
+            </span>
+            <span class="muted" data-testid="workspace-evidence-slot-resolved">
+              · resolvedAt {{ slot.resolvedAt }} · occurrence {{ slot.occurrenceKey }} · project
+              {{ slot.projectId }}
+            </span>
           </li>
         </ul>
         <p v-else data-testid="workspace-evidence-slots-empty">暂无资料槽位</p>
         <p class="hint">
-          需 NETWORK <code>evidence.read</code>。不含 definition/explanation JSON。无缩略图/下载。
+          需 NETWORK <code>evidence.read</code>。展示 Accepted 非 PII 槽位摘要；不含
+          definition/explanation JSON。无缩略图/下载。
         </p>
       </section>
 
@@ -363,33 +286,50 @@ watch(
             <span class="muted">
               （slot {{ item.evidenceSlotId }} · #{{ item.itemOrdinal }} · {{ item.status }} ·
               rev {{ item.revisionCount }}
+              <template v-if="item.latestRevisionNumber != null">
+                / #{{ item.latestRevisionNumber }}
+              </template>
               <template v-if="item.latestRevisionStatus">
                 / {{ item.latestRevisionStatus }}
               </template>
               ）
             </span>
+            <span class="muted" data-testid="workspace-evidence-item-project">
+              · project {{ item.projectId }}
+            </span>
           </li>
         </ul>
         <p v-else data-testid="workspace-evidence-items-empty">暂无资料项</p>
         <p class="hint">
-          需 NETWORK <code>evidence.read</code>。不含 Revision 图/file/captureMetadata。
+          需 NETWORK <code>evidence.read</code>。展示 Accepted 非 PII 资料项摘要；不含
+          Revision 图/file/captureMetadata。
         </p>
       </section>
 
       <section
-        v-if="currentTechnicians"
+        v-if="detail.technicians"
         data-testid="workspace-current-technicians"
         class="related"
+        aria-label="Current technician summaries"
       >
         <h3>当前师傅</h3>
-        <ul v-if="currentTechnicians.length">
+        <ul v-if="detail.technicians.length">
           <li
-            v-for="tech in currentTechnicians"
+            v-for="tech in detail.technicians"
             :key="tech.technicianProfileId"
             :data-testid="`workspace-technician-${tech.technicianProfileId}`"
           >
             <strong data-testid="workspace-technician-display-name">{{ tech.displayName }}</strong>
             <span class="muted">（{{ tech.technicianProfileId }} · {{ tech.membershipStatus }}）</span>
+            <span class="muted" data-testid="workspace-technician-principal">
+              · principal {{ tech.principalId }} · profile {{ tech.profileStatus }}
+            </span>
+            <span class="muted" data-testid="workspace-technician-validity">
+              · valid {{ tech.validFrom }} → {{ tech.validTo ?? '—' }}
+              <template v-if="tech.membershipVersion != null">
+                · v{{ tech.membershipVersion }}
+              </template>
+            </span>
             <RouterLink
               :to="`/network-portal/technicians/memberships/${tech.membershipId}`"
               data-testid="workspace-technician-membership-deeplink"
@@ -416,6 +356,10 @@ watch(
             </RouterLink>
           </li>
         </ul>
+        <p class="hint">
+          需 NETWORK <code>technician.readOwnNetwork</code>。字段对齐
+          <code>NetworkPortalTechnicianItem</code>；仅含工作区 technicianId 命中项。
+        </p>
       </section>
 
       <h3>本网点 ACTIVE 任务</h3>
@@ -480,14 +424,15 @@ watch(
       <p v-if="detail.tasks.length === 0" data-testid="workspace-tasks-empty">暂无 ACTIVE 任务</p>
 
       <section
-        v-if="relatedAppointments"
+        v-if="detail.appointments"
         data-testid="workspace-related-appointments"
         class="related"
+        aria-label="Appointment summaries"
       >
-        <h3>相关预约</h3>
-        <ul v-if="relatedAppointments.length">
+        <h3>预约摘要</h3>
+        <ul v-if="detail.appointments.length">
           <li
-            v-for="item in relatedAppointments"
+            v-for="item in detail.appointments"
             :key="item.appointmentId"
             :data-testid="`workspace-related-appointment-${item.appointmentId}`"
           >
@@ -497,31 +442,46 @@ watch(
             >
               {{ item.appointmentId }}
             </RouterLink>
-            （task {{ item.taskId }} · {{ item.type }} · {{ item.status }} · rev
-            {{ item.currentRevisionNo }}）
+            <span class="muted">
+              （task {{ item.taskId }} · {{ item.type }} · {{ item.status }} · rev
+              {{ item.currentRevisionNo }} · v{{ item.aggregateVersion }}）
+            </span>
             <span
-              v-if="appointmentWindow(item)"
+              v-if="hasAppointmentWindow(item)"
               data-testid="workspace-appointment-window"
               class="window"
             >
-              window {{ appointmentWindow(item)!.start }} ~ {{ appointmentWindow(item)!.end }}
-              （{{ appointmentWindow(item)!.timezone }} ·
-              {{ appointmentWindow(item)!.estimatedDurationMinutes }}min）
+              window {{ item.windowStart }} ~ {{ item.windowEnd }}
+              （{{ item.timezone }} · {{ item.estimatedDurationMinutes }}min）
+            </span>
+            <span class="muted" data-testid="workspace-appointment-network">
+              · network {{ item.assignedNetworkId ?? '—' }}
+            </span>
+            <span class="muted" data-testid="workspace-appointment-technician">
+              · technician {{ item.technicianId ?? '—' }}
+            </span>
+            <span class="muted" data-testid="workspace-appointment-created-at">
+              · createdAt {{ item.createdAt }}
             </span>
           </li>
         </ul>
-        <p v-else data-testid="workspace-related-appointments-empty">暂无相关预约</p>
+        <p v-else data-testid="workspace-related-appointments-empty">暂无预约摘要</p>
+        <p class="hint">
+          需 NETWORK <code>networkPortal.manageAppointment</code>。展示 Accepted 非 PII
+          预约摘要字段；无 revisions/address/actor。
+        </p>
       </section>
 
       <section
-        v-if="relatedContactAttempts"
+        v-if="detail.contactAttempts"
         data-testid="workspace-related-contacts"
         class="related"
+        aria-label="Contact attempt summaries"
       >
-        <h3>相关联系尝试</h3>
-        <ul v-if="relatedContactAttempts.length">
+        <h3>联系尝试摘要</h3>
+        <ul v-if="detail.contactAttempts.length">
           <li
-            v-for="item in relatedContactAttempts"
+            v-for="item in detail.contactAttempts"
             :key="item.contactAttemptId"
             :data-testid="`workspace-related-contact-${item.contactAttemptId}`"
           >
@@ -531,53 +491,205 @@ watch(
             >
               {{ item.contactAttemptId }}
             </RouterLink>
-            （task {{ item.taskId }} · {{ item.channel }} · {{ item.resultCode }} ·
-            {{ item.createdAt }}）
+            <span class="muted">
+              （task {{ item.taskId }} · {{ item.channel }} · {{ item.resultCode }} ·
+              {{ item.createdAt }}）
+            </span>
+            <span class="muted" data-testid="workspace-contact-scope">
+              · project {{ item.projectId }} · workOrder {{ item.workOrderId }}
+            </span>
+            <span class="muted" data-testid="workspace-contact-window">
+              · {{ item.startedAt }} → {{ item.endedAt }}
+            </span>
+            <span class="muted" data-testid="workspace-contact-next">
+              · nextContactAt {{ item.nextContactAt ?? '—' }}
+            </span>
           </li>
         </ul>
-        <p v-else data-testid="workspace-related-contacts-empty">暂无相关联系尝试</p>
+        <p v-else data-testid="workspace-related-contacts-empty">暂无联系尝试摘要</p>
+        <p class="hint">
+          需 NETWORK <code>networkPortal.manageAppointment</code>。展示 Accepted 非 PII
+          联系摘要字段；无 party/note/recording/actor。
+        </p>
       </section>
 
       <section
-        v-if="relatedCorrections"
+        v-if="detail.corrections"
         data-testid="workspace-related-corrections"
         class="related"
+        aria-label="Correction case summaries"
       >
-        <h3>相关 OPEN 整改</h3>
-        <ul v-if="relatedCorrections.length">
+        <h3>整改摘要</h3>
+        <ul v-if="detail.corrections.length">
           <li
-            v-for="item in relatedCorrections"
+            v-for="item in detail.corrections"
             :key="item.correctionCaseId"
             :data-testid="`workspace-related-correction-${item.correctionCaseId}`"
           >
             <RouterLink :to="`/network-portal/corrections/${item.correctionCaseId}`">
               {{ item.correctionCaseId }}
             </RouterLink>
-            （task {{ item.taskId }} · {{ item.status }}）
+            <span class="muted">
+              （task {{ item.taskId }} · {{ item.status }} ·
+              reasons {{ item.reasonCodes.join(', ') || '—' }} ·
+              sourceReview {{ item.sourceReviewCaseId || '—' }} ·
+              resubmits {{ item.resubmissions.length }}）
+            </span>
+            <span class="muted" data-testid="workspace-correction-project">
+              · project {{ item.projectId }}
+            </span>
+            <span class="muted" data-testid="workspace-correction-decision">
+              · sourceDecision {{ item.sourceReviewDecisionId || '—' }}
+            </span>
+            <span class="muted" data-testid="workspace-correction-task">
+              · correctionTask
+              <RouterLink
+                v-if="item.correctionTaskId"
+                :to="{ path: '/network-portal/tasks', query: { taskId: item.correctionTaskId } }"
+                data-testid="workspace-correction-task-deeplink"
+              >
+                {{ item.correctionTaskId }}
+              </RouterLink>
+              <template v-else>—</template>
+            </span>
+            <span class="muted" data-testid="workspace-correction-times">
+              · createdAt {{ item.createdAt }} · closedAt {{ item.closedAt ?? '—' }} · waivedAt
+              {{ item.waivedAt ?? '—' }}
+            </span>
+            <span class="muted" data-testid="workspace-correction-snapshot">
+              · latestSnapshot {{ item.latestResubmissionSnapshotId ?? '—' }}
+            </span>
+            <span
+              v-if="item.resubmissions.length"
+              class="muted"
+              data-testid="workspace-correction-latest-resubmission"
+            >
+              · latestResubmit #{{ item.resubmissions[item.resubmissions.length - 1].resubmissionOrdinal }}
+              @ {{ item.resubmissions[item.resubmissions.length - 1].submittedAt }}
+            </span>
           </li>
         </ul>
-        <p v-else data-testid="workspace-related-corrections-empty">暂无相关 OPEN 整改</p>
+        <p v-else data-testid="workspace-related-corrections-empty">暂无整改摘要</p>
+        <p class="hint">
+          需 NETWORK <code>evidence.read</code>。展示 Accepted 非 PII 整改摘要字段；无
+          createdBy/waiveNote。
+        </p>
       </section>
 
       <section
-        v-if="relatedExceptions"
+        v-if="detail.reviews"
+        data-testid="workspace-related-reviews"
+        class="related"
+        aria-label="Review case summaries"
+      >
+        <h3>审核摘要</h3>
+        <ul v-if="detail.reviews.length">
+          <li
+            v-for="item in detail.reviews"
+            :key="item.reviewCaseId"
+            :data-testid="`workspace-related-review-${item.reviewCaseId}`"
+          >
+            <RouterLink
+              :to="{ path: '/network-portal/tasks', query: { taskId: item.taskId } }"
+              data-testid="workspace-review-task-deeplink"
+            >
+              {{ item.reviewCaseId }}
+            </RouterLink>
+            <span class="muted">
+              （task {{ item.taskId }} · {{ item.origin }} · {{ item.status }} ·
+              decisions {{ item.decisions.length }}）
+            </span>
+            <span class="muted" data-testid="workspace-review-project">
+              · project {{ item.projectId }} · scope {{ item.scopeType }} · policy
+              {{ item.policyVersion }}
+            </span>
+            <span class="muted" data-testid="workspace-review-snapshot">
+              · snapshot {{ item.evidenceSetSnapshotId }}
+            </span>
+            <span class="muted" data-testid="workspace-review-times">
+              · createdAt {{ item.createdAt }} · decidedAt {{ item.decidedAt ?? '—' }}
+            </span>
+            <span class="muted" data-testid="workspace-review-refs">
+              · sourceReview {{ item.sourceReviewCaseId ?? '—' }} · external
+              {{ item.externalSubmissionRef ?? '—' }} · callback
+              {{ item.callbackBatchRef ?? '—' }} · mapping {{ item.mappingVersionId ?? '—' }}
+            </span>
+            <span class="muted" data-testid="workspace-review-reopen">
+              · reopenedFrom {{ item.reopenedFromReviewCaseId ?? '—' }} · trigger
+              {{ item.reopenTriggerRef ?? '—' }}
+            </span>
+            <span
+              v-if="item.decisions.length"
+              class="muted"
+              data-testid="workspace-review-latest-decision"
+            >
+              · latestDecision
+              {{ item.decisions[item.decisions.length - 1].decision }} /
+              {{ item.decisions[item.decisions.length - 1].decisionSource }} @
+              {{ item.decisions[item.decisions.length - 1].decidedAt }}
+            </span>
+          </li>
+        </ul>
+        <p v-else data-testid="workspace-related-reviews-empty">暂无审核摘要</p>
+        <p class="hint">
+          需 NETWORK <code>evidence.read</code>。展示 Accepted 非 PII 审核摘要字段；无
+          note/approvalRef/decidedBy/createdBy；无独立 NP Review 详情页。
+        </p>
+      </section>
+
+      <section
+        v-if="detail.exceptions"
         data-testid="workspace-related-exceptions"
         class="related"
+        aria-label="Operational exception summaries"
       >
-        <h3>相关 OPEN 异常</h3>
-        <ul v-if="relatedExceptions.length">
+        <h3>异常摘要</h3>
+        <ul v-if="detail.exceptions.length">
           <li
-            v-for="item in relatedExceptions"
+            v-for="item in detail.exceptions"
             :key="item.exceptionId"
             :data-testid="`workspace-related-exception-${item.exceptionId}`"
           >
             <RouterLink :to="`/network-portal/exceptions/${item.exceptionId}`">
               {{ item.exceptionId }}
             </RouterLink>
-            （task {{ item.taskId || '—' }} · {{ item.severity }} · {{ item.status }}）
+            <span class="muted">
+              （task {{ item.taskId || '—' }} · {{ item.severity }} · {{ item.status }} ·
+              {{ item.errorCode }}）
+            </span>
+            <span class="muted" data-testid="workspace-exception-taxonomy">
+              · {{ item.sourceType }} / {{ item.category }} · project
+              {{ item.projectId ?? '—' }}
+            </span>
+            <span class="muted" data-testid="workspace-exception-work-order">
+              · workOrder {{ item.workOrderId ?? '—' }}
+            </span>
+            <span class="muted" data-testid="workspace-exception-handling">
+              · handlingTask
+              <RouterLink
+                v-if="item.handlingTaskId"
+                :to="{ path: '/network-portal/tasks', query: { taskId: item.handlingTaskId } }"
+                data-testid="workspace-exception-handling-deeplink"
+              >
+                {{ item.handlingTaskId }}
+              </RouterLink>
+              <template v-else>—</template>
+            </span>
+            <span class="muted" data-testid="workspace-exception-counts">
+              · occurrences {{ item.occurrenceCount }}
+            </span>
+            <span class="muted" data-testid="workspace-exception-times">
+              · openedAt {{ item.openedAt }} · lastDetectedAt {{ item.lastDetectedAt }} ·
+              resolvedAt {{ item.resolvedAt ?? '—' }} · resolution
+              {{ item.resolutionCode ?? '—' }}
+            </span>
           </li>
         </ul>
-        <p v-else data-testid="workspace-related-exceptions-empty">暂无相关 OPEN 异常</p>
+        <p v-else data-testid="workspace-related-exceptions-empty">暂无异常摘要</p>
+        <p class="hint">
+          需 NETWORK <code>operations.exception.read</code>。展示 Accepted 非 PII
+          异常摘要字段；allowedActions 恒为空；含全部状态。
+        </p>
       </section>
     </template>
   </section>
