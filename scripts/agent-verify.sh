@@ -19,6 +19,7 @@ set -euo pipefail
 #   bash scripts/agent-verify.sh technician-web      独立 Technician H5 构建、8 E2E、隔离与旧路由回流门禁
 #   bash scripts/agent-verify.sh technician-ios      Technician iOS Keychain/OIDC/Context/生成客户端基础门禁
 #   bash scripts/agent-verify.sh technician-ios-app  Technician iOS Xcode/Simulator App、XCTest 与 XCUITest 门禁
+#   bash scripts/agent-verify.sh technician-ios-distribution Technician iOS Production archive、隐私与签名失败关闭门禁
 #   bash scripts/agent-verify.sh web-core           Web auth/context/error/trace 基础构建与消费门禁
 #   bash scripts/agent-verify.sh ios-core           iOS auth/context/error/trace 基础构建与消费门禁
 #   bash scripts/agent-verify.sh docs               git diff --check + 脚本语法 + 里程碑索引新鲜度
@@ -116,6 +117,9 @@ case "${command_name}" in
     ;;
   technician-ios-app)
     scripts/verify-technician-ios-app.sh
+    ;;
+  technician-ios-distribution)
+    scripts/verify-technician-ios-distribution.sh
     ;;
   web-core)
     scripts/verify-web-core.sh
