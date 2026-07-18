@@ -202,6 +202,14 @@ status: Accepted
   `/technician-portal/me` 消费 Accepted `GET /me`、`/me/contexts`、`/me/capabilities`；
   修正此前 ME→sync-summary 别名。catalog 仍 `page-registry-v16`；OpenAPI 仍 `1.0.0`。
   **不**接受 PROFILE/TASK.DETAIL/MESSAGE、离线工作包、PII。
+- §11 Technician Portal 当前责任任务在线详情（M243 / ADR-081）：接受
+  `GET /api/v1/technician/me/tasks/{taskId}`；沿用 M195 可信 `X-Technician-Context`、ACTIVE
+  TechnicianProfile/NetworkTechnicianMembership 与 NETWORK scope `task.readAssigned`，并要求
+  taskId 属于当前主体 ACTIVE TECHNICIAN ServiceAssignment 或同网点 ACTIVE TaskAssignment。
+  其他师傅、其他网点、已撤权和不存在的任务统一 404。响应仅含非 PII Task 头、executionGuarded、
+  resourceVersion 与 M195 非敏感预约摘要。Core OpenAPI → `1.0.17`；catalog 仍
+  `page-registry-v16`；Flyway 仍 100/102。**不**接受地址/联系人/表单值/资料文件/配置源码、
+  Technician 写命令、客户端推导 allowed-actions、离线工作包、GPS/上传、MESSAGE/PROFILE。
 - §10 Network Portal 队列/列表 Accepted 字段展示（M220 UI-only）：**不**新增 HTTP；整改/
   异常/资质/师傅列表与任务目录展示既有非 PII 字段；`correctionTaskId`/`handlingTaskId`/
   `workOrderId` 门户内深链；异常详情 `handlingTaskId` 深链。catalog 仍 `page-registry-v16`；

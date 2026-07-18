@@ -51,6 +51,25 @@ export type TechnicianPortalSyncSummary = {
   asOf: string
 }
 
+export type TechnicianPortalTaskDetail = {
+  networkId: string
+  taskId: string
+  workOrderId: string
+  projectId: string | null
+  serviceAssignmentId: string | null
+  taskAssignmentId: string | null
+  taskType: string
+  taskKind: string
+  stageCode: string
+  taskStatus: string
+  businessType: string | null
+  effectiveFrom: string | null
+  executionGuarded: boolean
+  resourceVersion: number
+  appointments: TechnicianPortalScheduleItem[]
+  asOf: string
+}
+
 function technicianHeaders(technicianContextId: string): Record<string, string> {
   return { 'X-Technician-Context': technicianContextId }
 }
@@ -74,6 +93,14 @@ export function listTechnicianSchedule(technicianContextId: string) {
 export function getTechnicianSyncSummary(technicianContextId: string) {
   return apiGet<TechnicianPortalSyncSummary>(
     '/technician/me/sync-summary',
+    {},
+    technicianHeaders(technicianContextId),
+  )
+}
+
+export function getTechnicianTaskDetail(technicianContextId: string, taskId: string) {
+  return apiGet<TechnicianPortalTaskDetail>(
+    `/technician/me/tasks/${encodeURIComponent(taskId)}`,
     {},
     technicianHeaders(technicianContextId),
   )

@@ -7,6 +7,7 @@ import com.serviceos.readmodel.api.TechnicianPortalFeedPage;
 import com.serviceos.readmodel.api.TechnicianPortalQueryService;
 import com.serviceos.readmodel.api.TechnicianPortalSchedulePage;
 import com.serviceos.readmodel.api.TechnicianPortalSyncSummary;
+import com.serviceos.readmodel.api.TechnicianPortalTaskDetail;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
 import org.flywaydb.core.Flyway;
@@ -187,6 +188,41 @@ class TechnicianPortalFeedPostgresIT {
         assertThat(summary.pendingFeedItemCount()).isEqualTo(1);
         assertThat(summary.appointmentWindowCount()).isEqualTo(1);
         assertThat(summary.tombstoneCount()).isEqualTo(0);
+    }
+
+    @Test
+    void taskDetailContainsOnlyCurrentResponsibilityAndNonPiiAppointmentSummary() {
+        String context = "TECHNICIAN|NETWORK|" + NETWORK_A;
+
+        TechnicianPortalTaskDetail detail = portal.taskDetail(
+                actor(TECH_PRINCIPAL), "corr-detail", context, TASK_A);
+
+        assertThat(detail.networkId()).isEqualTo(NETWORK_A);
+        assertThat(detail.taskId()).isEqualTo(TASK_A);
+        assertThat(detail.workOrderId()).isEqualTo(WO_A);
+        assertThat(detail.projectId()).isEqualTo(PROJECT_A);
+        assertThat(detail.serviceAssignmentId()).isEqualTo(TECH_ASSIGNMENT_A);
+        assertThat(detail.taskType()).isEqualTo("INSTALLATION");
+        assertThat(detail.taskKind()).isEqualTo("HUMAN");
+        assertThat(detail.stageCode()).isEqualTo("INSTALL");
+        assertThat(detail.taskStatus()).isEqualTo("READY");
+        assertThat(detail.executionGuarded()).isFalse();
+        assertThat(detail.resourceVersion()).isEqualTo(1);
+        assertThat(detail.appointments()).singleElement().satisfies(appointment -> {
+            assertThat(appointment.appointmentId()).isEqualTo(APPOINTMENT_A);
+            assertThat(appointment.taskId()).isEqualTo(TASK_A);
+            assertThat(appointment.timezone()).isEqualTo("Asia/Shanghai");
+        });
+
+        // 同一合法 Portal 上下文下，其他师傅或其他网点任务统一按不存在处理，避免资源枚举。
+        assertThatThrownBy(() -> portal.taskDetail(
+                actor(TECH_PRINCIPAL), "corr-hidden", context, TASK_B))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.RESOURCE_NOT_FOUND));
+        assertThatThrownBy(() -> portal.taskDetail(
+                actor(TECH_PRINCIPAL), "corr-other", context, TASK_OTHER))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.RESOURCE_NOT_FOUND));
     }
 
     @Test

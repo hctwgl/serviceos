@@ -16,6 +16,7 @@ import com.serviceos.readmodel.api.TechnicianPortalQueryService;
 import com.serviceos.readmodel.api.TechnicianPortalScheduleItem;
 import com.serviceos.readmodel.api.TechnicianPortalSchedulePage;
 import com.serviceos.readmodel.api.TechnicianPortalSyncSummary;
+import com.serviceos.readmodel.api.TechnicianPortalTaskDetail;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.task.api.TaskFulfillmentContext;
@@ -138,6 +139,69 @@ final class DefaultTechnicianPortalQueryService implements TechnicianPortalQuery
         tombstones += networkScopedRevokedTaskAssignments(actor.tenantId(), ctx).size();
         return new TechnicianPortalSyncSummary(
                 ctx.networkId(), pending, appointmentWindows, tombstones, clock.instant());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public TechnicianPortalTaskDetail taskDetail(
+            CurrentPrincipal actor,
+            String correlationId,
+            String technicianContextHeader,
+            UUID taskId
+    ) {
+        AuthorizedTechnicianContext ctx = requireAuthorizedTechnician(
+                actor, correlationId, technicianContextHeader);
+
+        TechnicianActiveAssignmentView serviceAssignment = assignments.listActiveForTechnician(
+                        actor.tenantId(), ctx.networkId().toString(), ctx.assigneeIds()).stream()
+                .filter(row -> taskId.equals(row.taskId()))
+                .findFirst()
+                .orElse(null);
+        TechnicianTaskAssignmentFeedView taskAssignment = networkScopedActiveTaskAssignments(
+                        actor.tenantId(), ctx).stream()
+                .filter(row -> taskId.equals(row.taskId()))
+                .findFirst()
+                .orElse(null);
+
+        // 任务是否存在和是否属于其他师傅/网点不能形成可区分响应，统一按当前上下文不可见处理。
+        if (serviceAssignment == null && taskAssignment == null) {
+            throw new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "任务不存在");
+        }
+        TaskFulfillmentContext task = tasks.find(actor.tenantId(), taskId)
+                .orElseThrow(() -> new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "任务不存在"));
+        List<TechnicianPortalScheduleItem> appointmentItems = appointments
+                .listForTasks(actor.tenantId(), Set.of(taskId)).stream()
+                .map(row -> new TechnicianPortalScheduleItem(
+                        row.appointmentId(),
+                        row.taskId(),
+                        row.workOrderId(),
+                        row.projectId(),
+                        row.type(),
+                        row.status(),
+                        row.windowStart(),
+                        row.windowEnd(),
+                        row.timezone()))
+                .toList();
+
+        return new TechnicianPortalTaskDetail(
+                ctx.networkId(),
+                task.taskId(),
+                task.workOrderId(),
+                task.projectId(),
+                serviceAssignment == null ? null : serviceAssignment.serviceAssignmentId(),
+                taskAssignment == null ? null : taskAssignment.taskAssignmentId(),
+                task.taskType(),
+                task.taskKind(),
+                task.stageCode(),
+                task.status(),
+                serviceAssignment == null ? null : serviceAssignment.businessType(),
+                serviceAssignment != null
+                        ? serviceAssignment.effectiveFrom()
+                        : taskAssignment.effectiveFrom(),
+                task.executionGuarded(),
+                task.version(),
+                appointmentItems,
+                clock.instant());
     }
 
     private List<TechnicianPortalFeedItem> snapshotFeed(String tenantId, AuthorizedTechnicianContext ctx) {

@@ -243,4 +243,5 @@
 - [M240 Network Portal 工作区协作摘要 Accepted 字段展示验收矩阵](237-m240-network-portal-workspace-collaboration-summary-fields-acceptance.md)
 - [M241 Network Portal 预约/联系历史残余 Accepted 字段展示验收矩阵](238-m241-network-portal-appointment-contact-history-residual-fields-acceptance.md)
 - [M242 Network Portal 整改详情残余 Accepted 字段展示验收矩阵](239-m242-network-portal-correction-detail-residual-fields-acceptance.md)
+- [M243 Technician Portal 当前责任任务在线详情验收矩阵](240-m243-technician-portal-task-detail-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

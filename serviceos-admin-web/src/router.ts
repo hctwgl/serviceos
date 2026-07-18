@@ -62,6 +62,7 @@ import TechnicianPortalTaskFeedPage from './pages/TechnicianPortalTaskFeedPage.v
 import TechnicianPortalSchedulePage from './pages/TechnicianPortalSchedulePage.vue'
 import TechnicianPortalSyncSummaryPage from './pages/TechnicianPortalSyncSummaryPage.vue'
 import TechnicianPortalMePage from './pages/TechnicianPortalMePage.vue'
+import TechnicianPortalTaskDetailPage from './pages/TechnicianPortalTaskDetailPage.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -315,6 +316,12 @@ export const router = createRouter({
           name: 'TECHNICIAN.TASK.LIST',
           component: TechnicianPortalTaskFeedPage,
           meta: { pageId: 'TECHNICIAN.TASK.LIST' },
+        },
+        {
+          path: 'tasks/:id',
+          name: 'TECHNICIAN.TASK.DETAIL',
+          component: TechnicianPortalTaskDetailPage,
+          meta: { pageId: 'TECHNICIAN.TASK.DETAIL' },
         },
         {
           path: 'schedule',

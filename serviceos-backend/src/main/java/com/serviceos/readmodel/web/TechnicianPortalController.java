@@ -5,6 +5,7 @@ import com.serviceos.readmodel.api.TechnicianPortalFeedPage;
 import com.serviceos.readmodel.api.TechnicianPortalQueryService;
 import com.serviceos.readmodel.api.TechnicianPortalSchedulePage;
 import com.serviceos.readmodel.api.TechnicianPortalSyncSummary;
+import com.serviceos.readmodel.api.TechnicianPortalTaskDetail;
 import com.serviceos.shared.CorrelationIds;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,7 +13,10 @@ import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.UUID;
 
 /**
  * Technician Portal Feed HTTP 适配器。networkId 仅来自可信头 X-Technician-Context。
@@ -60,6 +64,19 @@ final class TechnicianPortalController {
     ) {
         TechnicianPortalSyncSummary body = queries.syncSummary(
                 principals.current(), correlationId, technicianContext);
+        return ResponseEntity.ok()
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(body);
+    }
+
+    @GetMapping("/tasks/{taskId}")
+    ResponseEntity<TechnicianPortalTaskDetail> taskDetail(
+            @PathVariable UUID taskId,
+            @RequestHeader(value = "X-Technician-Context", required = false) String technicianContext,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        TechnicianPortalTaskDetail body = queries.taskDetail(
+                principals.current(), correlationId, technicianContext, taskId);
         return ResponseEntity.ok()
                 .header(CorrelationIds.HEADER_NAME, correlationId)
                 .body(body);
