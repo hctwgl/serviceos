@@ -26,7 +26,10 @@ public struct ServiceRequestBuilder: Sendable {
         body: Data? = nil
     ) async -> URLRequest {
         precondition(path.hasPrefix("/"), "API path 必须以 / 开头")
-        var request = URLRequest(url: baseURL.appending(path: String(path.dropFirst())))
+        guard let resolvedURL = URL(string: String(path.dropFirst()), relativeTo: baseURL)?.absoluteURL else {
+            preconditionFailure("API path 无法解析")
+        }
+        var request = URLRequest(url: resolvedURL)
         request.httpMethod = method
         request.httpBody = body
         request.setValue("application/json", forHTTPHeaderField: "Accept")
