@@ -295,6 +295,7 @@ title: ServiceOS 里程碑索引
 | M284 | M284 Admin 配置设计器壳（结构预览 + JSON 编辑） | [297-m284-admin-configuration-designer-shell.md](../architecture/297-m284-admin-configuration-designer-shell.md) | [281-m284-admin-configuration-designer-shell-acceptance.md](../testing/281-m284-admin-configuration-designer-shell-acceptance.md) |
 | M285 | M285 配置草稿 Diff 与发布审批门禁 | [298-m285-configuration-draft-diff-approval.md](../architecture/298-m285-configuration-draft-diff-approval.md) | [282-m285-configuration-draft-diff-approval-acceptance.md](../testing/282-m285-configuration-draft-diff-approval-acceptance.md) |
 | M286 | M286 配置 Bundle 灰度（CANARY）与回滚 | [299-m286-configuration-canary-rollback.md](../architecture/299-m286-configuration-canary-rollback.md) | [283-m286-configuration-canary-rollback-acceptance.md](../testing/283-m286-configuration-canary-rollback-acceptance.md) |
+| M287 | M287 Workflow 可视化拖拽画布 | [300-m287-workflow-visual-canvas.md](../architecture/300-m287-workflow-visual-canvas.md) | [284-m287-workflow-visual-canvas-acceptance.md](../testing/284-m287-workflow-visual-canvas-acceptance.md) |
 
 ## 未关联里程碑的文档
 

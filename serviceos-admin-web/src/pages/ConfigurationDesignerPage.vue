@@ -12,6 +12,7 @@ import {
   type ConfigurationDraftDiff,
   type DesignerAssetType,
 } from '../api/configurationDrafts'
+import WorkflowCanvas from '../components/WorkflowCanvas.vue'
 
 const assetType = ref<DesignerAssetType>('WORKFLOW')
 const drafts = ref<ConfigurationDraft[]>([])
@@ -27,19 +28,7 @@ const message = ref<string | null>(null)
 const createKey = ref('platform.designer.demo')
 const createVersion = ref('1.0.0')
 
-const workflowNodes = computed(() => {
-  if (assetType.value !== 'WORKFLOW') {
-    return [] as Array<{ nodeId: string; nodeType: string; name?: string; stageCode?: string }>
-  }
-  try {
-    const parsed = JSON.parse(definitionText.value) as {
-      nodes?: Array<{ nodeId: string; nodeType: string; name?: string; stageCode?: string }>
-    }
-    return parsed.nodes ?? []
-  } catch {
-    return []
-  }
-})
+const showCanvas = computed(() => assetType.value === 'WORKFLOW')
 
 async function refreshList() {
   loading.value = true
@@ -91,6 +80,13 @@ function defaultDefinition(type: DesignerAssetType): string {
           { transitionId: 't1', from: 'START', to: 'TASK_A' },
           { transitionId: 't2', from: 'TASK_A', to: 'END' },
         ],
+        metadata: {
+          layout: {
+            START: { x: 40, y: 40 },
+            TASK_A: { x: 40, y: 160 },
+            END: { x: 40, y: 280 },
+          },
+        },
       },
       null,
       2,
@@ -310,7 +306,7 @@ onMounted(async () => {
   <section class="designer" data-testid="configuration-designer">
     <header>
       <h1>配置设计器</h1>
-      <p>草稿 → 校验 → 发布。设计模型与运行模型同为配置 JSON；WORKFLOW 提供节点结构预览。</p>
+      <p>草稿 → 校验 → 审批 → 发布。WORKFLOW 支持可视化拖拽画布（布局写入 metadata.layout）。</p>
     </header>
 
     <div class="toolbar">
@@ -347,7 +343,7 @@ onMounted(async () => {
     <p v-if="message" class="ok" data-testid="designer-message">{{ message }}</p>
     <p v-if="error" class="err" data-testid="designer-error">{{ error }}</p>
 
-    <div class="layout">
+    <div class="layout" :class="{ 'with-canvas': showCanvas }">
       <aside>
         <h2>草稿列表</h2>
         <ul data-testid="draft-list">
@@ -364,10 +360,16 @@ onMounted(async () => {
       </aside>
 
       <main>
+        <WorkflowCanvas
+          v-if="showCanvas"
+          :definition-json="definitionText"
+          data-testid="workflow-preview"
+          @update:definition-json="definitionText = $event"
+        />
         <h2>定义 JSON</h2>
         <textarea
           v-model="definitionText"
-          rows="22"
+          rows="16"
           data-testid="definition-json"
           spellcheck="false"
         />
@@ -382,17 +384,6 @@ onMounted(async () => {
         </ul>
         <pre v-if="diffView" class="diff" data-testid="draft-diff">{{ diffView.unifiedDiff }}</pre>
       </main>
-
-      <aside v-if="assetType === 'WORKFLOW'" class="preview" data-testid="workflow-preview">
-        <h2>节点结构预览</h2>
-        <article v-for="node in workflowNodes" :key="node.nodeId" class="node-card">
-          <strong>{{ node.nodeId }}</strong>
-          <span>{{ node.nodeType }}</span>
-          <span v-if="node.name">{{ node.name }}</span>
-          <span v-if="node.stageCode">stage={{ node.stageCode }}</span>
-        </article>
-        <p v-if="workflowNodes.length === 0" class="muted">无法解析 nodes；请修正 JSON。</p>
-      </aside>
     </div>
   </section>
 </template>
@@ -418,8 +409,13 @@ onMounted(async () => {
 }
 .layout {
   display: grid;
-  grid-template-columns: 16rem 1fr 16rem;
+  grid-template-columns: 16rem 1fr;
   gap: 1rem;
+}
+.layout.with-canvas main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 aside ul {
   list-style: none;
@@ -444,15 +440,6 @@ textarea {
   width: 100%;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.85rem;
-}
-.node-card {
-  border: 1px solid #d0d7de;
-  border-radius: 0.4rem;
-  padding: 0.5rem;
-  margin-bottom: 0.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
 }
 .ok { color: #1a7f37; }
 .err, .errors { color: #cf222e; }

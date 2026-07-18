@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M286 配置 Bundle 灰度与回滚**，功能证据提交 `110fe2438f427c16e90408077cae8cd1001d0fc6`（合并入 `master` 后改为合并提交）。
+当前工程基线为 **M287 Workflow 可视化拖拽画布**，功能证据提交待回填（合并入 `master` 后改为合并提交）。
 
 当前已具备多 OEM 内核、复杂流程运行时（含取消/重开/跳转/补偿）与标准服务模板族。下一主线是阶段三领域配置设计器。
 
@@ -683,6 +683,8 @@ serviceos-architecture/
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M287 实现文档](architecture/300-m287-workflow-visual-canvas.md)
+- [M287 验收矩阵](testing/284-m287-workflow-visual-canvas-acceptance.md)
 - [M286 实现文档](architecture/299-m286-configuration-canary-rollback.md)
 - [M286 验收矩阵](testing/283-m286-configuration-canary-rollback-acceptance.md)
 - [M285 实现文档](architecture/298-m285-configuration-draft-diff-approval.md)
