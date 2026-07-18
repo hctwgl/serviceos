@@ -19,6 +19,12 @@ const forgeResult = ref('')
 const switching = ref(false)
 const loginLabel = import.meta.env.DEV ? '使用本地 Keycloak 登录' : '使用 OIDC 登录'
 const devDiagnostics = import.meta.env.DEV
+const testIds: Record<string, string> = {
+  'TECHNICIAN.TASK.LIST': 'nav-technician-task-feed',
+  'TECHNICIAN.SCHEDULE': 'nav-technician-schedule',
+  'TECHNICIAN.SYNC.SUMMARY': 'nav-technician-sync-summary',
+  'TECHNICIAN.ME': 'nav-technician-me',
+}
 const groupedNavigation = computed(() => (session.value?.navigation ?? []).reduce<Record<string, NavigationItem[]>>((groups, item) => {
   ;(groups[item.section] ??= []).push(item)
   return groups
@@ -78,7 +84,7 @@ onMounted(() => { if (accessToken()) void refresh() })
           </select>
           <p>{{ session.capabilities.length }} 项服务端 Capability</p>
           <nav v-for="(items, section) in groupedNavigation" :key="section" :aria-label="section">
-            <RouterLink v-for="item in items" :key="item.pageId" :to="routeForPage(item.pageId) ?? '/technician-portal/task-feed'" :data-page-id="item.pageId">
+            <RouterLink v-for="item in items" :key="item.pageId" :to="routeForPage(item.pageId) ?? '/technician-portal/task-feed'" :data-testid="testIds[item.pageId]">
               {{ item.title }}<span v-if="!routeForPage(item.pageId)">（当前版本不可用）</span>
             </RouterLink>
           </nav>

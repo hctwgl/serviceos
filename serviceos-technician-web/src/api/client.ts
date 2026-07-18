@@ -1,4 +1,4 @@
-import { createWebApiClient } from '@serviceos/web-core'
+import { createWebApiClient, safeProblemMessage, WebApiError } from '@serviceos/web-core'
 import { accessToken } from '../auth/session'
 import type { TechnicianRuntimeEnvironment } from '../environment'
 import { resolveTechnicianEnvironment } from '../environment'
@@ -12,6 +12,12 @@ const defaultApi = createTechnicianApi(resolveTechnicianEnvironment({ mode: impo
   apiBaseUrl: import.meta.env.VITE_SERVICEOS_API_BASE_URL, clientVersion: import.meta.env.VITE_SERVICEOS_CLIENT_VERSION }))
 export type HttpStatusError = Error & { status?: number; problem?: { errorCode?: string; code?: string; title?: string; detail?: string } }
 export type ApiResult<T> = { data: T; etag: string | null; correlationId: string }
+
+/** HTTP 冲突、失权和服务故障只展示固定可行动文案，后端 detail 不直接回显到现场端。 */
+export function userFacingError(error: unknown, fallback: string) {
+  if (error instanceof WebApiError) return safeProblemMessage(error)
+  return error instanceof Error ? error.message : fallback
+}
 
 function queryPath(path: string, query: Record<string, string | undefined>) {
   const values = new URLSearchParams()

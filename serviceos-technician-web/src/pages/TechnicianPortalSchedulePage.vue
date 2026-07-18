@@ -5,6 +5,7 @@ import {
   listTechnicianSchedule,
   type TechnicianPortalScheduleItem,
 } from '../api/technicianPortal'
+import { userFacingError } from '../api/client'
 
 const props = defineProps<{ technicianContextId: string | null }>()
 const route = useRoute()
@@ -42,7 +43,7 @@ async function load() {
     items.value = []
     networkId.value = null
     asOf.value = null
-    error.value = err instanceof Error ? err.message : '日程加载失败'
+    error.value = userFacingError(err, '日程加载失败')
   }
 }
 
