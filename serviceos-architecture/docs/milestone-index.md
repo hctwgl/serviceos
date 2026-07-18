@@ -260,6 +260,7 @@ title: ServiceOS 里程碑索引
 | M249 | M249 多端共享 Design Token 基础 | [262-m249-shared-design-token-foundation.md](../architecture/262-m249-shared-design-token-foundation.md) | [246-m249-shared-design-token-foundation-acceptance.md](../testing/246-m249-shared-design-token-foundation-acceptance.md) |
 | M250 | M250 Web auth/context/error/trace 共享基础 | [263-m250-web-core-auth-context-error-trace-foundation.md](../architecture/263-m250-web-core-auth-context-error-trace-foundation.md) | [247-m250-web-core-auth-context-error-trace-foundation-acceptance.md](../testing/247-m250-web-core-auth-context-error-trace-foundation-acceptance.md) |
 | M251 | M251 iOS auth/context/error/trace 共享基础 | [264-m251-ios-core-auth-context-error-trace-foundation.md](../architecture/264-m251-ios-core-auth-context-error-trace-foundation.md) | [248-m251-ios-core-auth-context-error-trace-foundation-acceptance.md](../testing/248-m251-ios-core-auth-context-error-trace-foundation-acceptance.md) |
+| M252 | M252 多端 Page/Feature/Action 机器注册表 | [265-m252-cross-client-identity-registry.md](../architecture/265-m252-cross-client-identity-registry.md) | [249-m252-cross-client-identity-registry-acceptance.md](../testing/249-m252-cross-client-identity-registry-acceptance.md) |
 
 ## 未关联里程碑的文档
 

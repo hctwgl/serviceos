@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "client-identities-v1",
+  "pageIds": [
+    "ADMIN.WORKBENCH",
+    "ADMIN.SEARCH",
+    "ADMIN.WORK_ORDER.LIST",
+    "ADMIN.TASK.DIRECTORY",
+    "ADMIN.REVIEW.QUEUE",
+    "ADMIN.CORRECTION.QUEUE",
+    "ADMIN.EXCEPTION.QUEUE",
+    "ADMIN.INTEGRATION.INBOUND",
+    "ADMIN.INTEGRATION.OUTBOUND",
+    "ADMIN.SLA.WORKBENCH",
+    "ADMIN.PROJECT.DIRECTORY",
+    "ADMIN.USER.DIRECTORY",
+    "ADMIN.ORGANIZATION.DIRECTORY",
+    "ADMIN.NETWORK.DIRECTORY",
+    "ADMIN.TECHNICIAN.DIRECTORY",
+    "ADMIN.ROLE.DIRECTORY",
+    "ADMIN.GRANT.DIRECTORY",
+    "NETWORK.WORKBENCH",
+    "NETWORK.WORKORDER.LIST",
+    "NETWORK.WORKORDER.WORKSPACE",
+    "NETWORK.TASK.QUEUE",
+    "NETWORK.TECHNICIAN.LIST",
+    "NETWORK.QUALIFICATION",
+    "NETWORK.TECHNICIAN.ASSIGN",
+    "NETWORK.APPOINTMENT",
+    "NETWORK.EVIDENCE.SUPPLEMENT",
+    "NETWORK.CORRECTION.QUEUE",
+    "NETWORK.EXCEPTION.QUEUE",
+    "NETWORK.CAPACITY",
+    "TECHNICIAN.TASK.LIST",
+    "TECHNICIAN.SCHEDULE",
+    "TECHNICIAN.SYNC.SUMMARY",
+    "TECHNICIAN.ME"
+  ],
+  "featureIds": [
+    {
+      "id": "FORMAL_SETTLEMENT",
+      "defaultState": "DISABLED",
+      "lifecycle": "RESERVED"
+    }
+  ],
+  "actionCodes": [
+    "task.claim",
+    "task.start",
+    "task.complete",
+    "task.release",
+    "CONFIRM",
+    "RESCHEDULE",
+    "CANCEL",
+    "MARK_NO_SHOW",
+    "visit.checkOut",
+    "visit.interrupt",
+    "ACKNOWLEDGE"
+  ]
+}

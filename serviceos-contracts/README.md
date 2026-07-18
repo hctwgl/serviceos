@@ -4,6 +4,7 @@
 
 - `src/main/resources/openapi/`：HTTP OpenAPI 3.1；
 - `src/main/resources/events/`：版本化事件 JSON Schema；
+- `src/main/resources/client-identities/`：Page ID、Feature ID、Action Code 单一机器注册源；
 - `ContractValidationTest`：解析 OpenAPI，并用正式 Schema 校验事件样本；
 - `EventSchemaGovernanceTest`：校验事件文件名、版本元数据、唯一身份和同名有效样本；
 - `GeneratedClientContractTest`：证明 Maven 生命周期从同一 Core OpenAPI 产出固定版本的 TypeScript Fetch 与 Swift 6 客户端；
@@ -13,6 +14,7 @@
 - `scripts/verify-swift-client-generation-reproducibility.sh`：验证同一 Core OpenAPI 的 Swift 6 Client 两次干净生成摘要一致。
 - `scripts/verify-swift-client-consumer.sh`：以 Swift 6 严格模式编译完整生成源码，并由独立 executable 导入和实例化配置。
 - `scripts/verify-design-tokens.sh`：从无角色假设的单一 JSON 源重复生成 Web CSS 与 Swift 常量，并执行 CSS 探针和 Swift 6 编译。
+- `scripts/verify-client-identities.sh`：确定性生成 TypeScript/Swift 身份常量，并验证未知 Action 默认过滤和后端 Page Registry 对齐。
 
 当前文件事件包含 `file.scan-completed.v1`；事件只发布 fileId、摘要、检测 MIME、生命周期和 scanner 版本，不发布 object key 或短期 URL。
 
@@ -30,6 +32,7 @@ scripts/verify-client-generation-reproducibility.sh
 scripts/verify-typescript-client-consumer.sh
 bash ../scripts/agent-verify.sh client-swift
 bash ../scripts/agent-verify.sh design-tokens
+bash ../scripts/agent-verify.sh client-identities
 ```
 
 生成客户端位于 `target/generated-clients/typescript-fetch` 与 `target/generated-clients/swift6`，来源清单位于对应的 `target/client-artifacts/*`。它们都是本地门禁构建产物，不提交 Git；远端门禁关闭期间不宣称已有远端制品留存。
