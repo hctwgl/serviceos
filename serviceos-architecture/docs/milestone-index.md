@@ -286,6 +286,7 @@ title: ServiceOS 里程碑索引
 | M275 | M275 PARALLEL_GATEWAY 分叉与汇聚运行时 | [288-m275-parallel-gateway-runtime.md](../architecture/288-m275-parallel-gateway-runtime.md) | [272-m275-parallel-gateway-runtime-acceptance.md](../testing/272-m275-parallel-gateway-runtime-acceptance.md) |
 | M276 | M276 TIMER 到期捕获运行时 | [289-m276-timer-runtime.md](../architecture/289-m276-timer-runtime.md) | [273-m276-timer-runtime-acceptance.md](../testing/273-m276-timer-runtime-acceptance.md) |
 | M277 | M277 SUB_PROCESS 运行时 | [290-m277-subprocess-runtime.md](../architecture/290-m277-subprocess-runtime.md) | [274-m277-subprocess-runtime-acceptance.md](../testing/274-m277-subprocess-runtime-acceptance.md) |
+| M278 | M278 多实例任务运行时 | [291-m278-multi-instance-runtime.md](../architecture/291-m278-multi-instance-runtime.md) | [275-m278-multi-instance-runtime-acceptance.md](../testing/275-m278-multi-instance-runtime-acceptance.md) |
 
 ## 未关联里程碑的文档
 

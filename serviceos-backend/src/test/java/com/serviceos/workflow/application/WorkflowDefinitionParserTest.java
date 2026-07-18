@@ -70,6 +70,14 @@ class WorkflowDefinitionParserTest {
     }
 
     @Test
+    void multiInstanceTaskCarriesCardinality() {
+        var result = parser.progression(asset(multiDefinition()), "INTAKE", oceanContext());
+        assertThat(result.multiInstance()).isTrue();
+        assertThat(result.multiInstanceCardinality()).isEqualTo(3);
+        assertThat(result.nodeId()).isEqualTo("MULTI_TASK");
+    }
+
+    @Test
     void parallelGatewayForksAndJoinPending() {
         var fork = parser.progression(asset(parallelDefinition()), "INTAKE_TASK", oceanContext());
         assertThat(fork.fork()).isTrue();
@@ -180,6 +188,25 @@ class WorkflowDefinitionParserTest {
                  "transitions":[
                    {"transitionId":"t1","from":"START","to":"ASSIGN_COORDINATORS"},
                    {"transitionId":"t2","from":"ASSIGN_COORDINATORS","to":"INITIAL_REVIEW"}]}
+                """;
+    }
+
+    private static String multiDefinition() {
+        return """
+                {"workflowKey":"multi.demo","semanticVersion":"1.0.0","startNodeId":"START",
+                 "nodes":[
+                   {"nodeId":"START","nodeType":"START","name":"开始"},
+                   {"nodeId":"INTAKE","nodeType":"SERVICE_TASK","name":"受理",
+                    "stageCode":"INTAKE","taskType":"ASSIGN_COORDINATORS"},
+                   {"nodeId":"MULTI_TASK","nodeType":"SERVICE_TASK","name":"多实例",
+                    "stageCode":"WORK","taskType":"MULTI_WORK",
+                    "multiInstance":{"cardinality":3}},
+                   {"nodeId":"AFTER","nodeType":"SERVICE_TASK","name":"之后",
+                    "stageCode":"CLOSE","taskType":"AFTER"}],
+                 "transitions":[
+                   {"transitionId":"t1","from":"START","to":"INTAKE"},
+                   {"transitionId":"t2","from":"INTAKE","to":"MULTI_TASK"},
+                   {"transitionId":"t3","from":"MULTI_TASK","to":"AFTER"}]}
                 """;
     }
 

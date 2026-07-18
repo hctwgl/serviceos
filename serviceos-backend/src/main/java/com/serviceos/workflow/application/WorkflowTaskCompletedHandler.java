@@ -104,12 +104,6 @@ final class WorkflowTaskCompletedHandler
         NodeRuntime current = lockCurrentNode(message.tenantId(), completed.workflowNodeInstanceId());
         validateFrozenContext(completed, current);
 
-        var asset = configurations.requireAssetVersion(
-                message.tenantId(), current.workflowDefinitionVersionId(),
-                ConfigurationAssetType.WORKFLOW, current.workflowDefinitionDigest());
-        ExpressionContext expressionContext = expressionContext(message.tenantId(), current);
-        var progression = parser.progression(asset, current.nodeId(), expressionContext);
-
         int completedRows = jdbc.sql("""
                         UPDATE wfl_node_instance
                            SET status = 'COMPLETED', completion_event_id = :completionEventId,
@@ -128,6 +122,20 @@ final class WorkflowTaskCompletedHandler
         }
 
         Instant activatedAt = clock.instant();
+        Boolean multiComplete = completeMultiInstanceSlotIfPresent(
+                message.tenantId(), current, activatedAt);
+        if (Boolean.FALSE.equals(multiComplete)) {
+            inbox.complete(
+                    message.tenantId(), CONSUMER, message.eventId(),
+                    Sha256.digest(current.workflowNodeInstanceId() + "|MI_WAIT|" + current.nodeId()));
+            return;
+        }
+
+        var asset = configurations.requireAssetVersion(
+                message.tenantId(), current.workflowDefinitionVersionId(),
+                ConfigurationAssetType.WORKFLOW, current.workflowDefinitionDigest());
+        ExpressionContext expressionContext = expressionContext(message.tenantId(), current);
+        var progression = parser.progression(asset, current.nodeId(), expressionContext);
         String progressionDigest = activateProgression(
                 message.tenantId(),
                 message.eventId(),
@@ -438,6 +446,12 @@ final class WorkflowTaskCompletedHandler
                     + "|" + progression.durationSeconds());
         }
 
+        if (progression.multiInstance()) {
+            return activateMultiInstanceTasks(
+                    tenantId, activationEventId, correlationId, payloadDigest, current,
+                    nextStageInstanceId, progression, activatedAt);
+        }
+
         ScheduledTaskView nextTask = tasks.createWorkflowTask(new CreateWorkflowTaskCommand(
                 tenantId, current.projectId(), current.workOrderId(),
                 current.workflowInstanceId(), nextStageInstanceId, nextNodeInstanceId,
@@ -471,6 +485,172 @@ final class WorkflowTaskCompletedHandler
                 .update();
         return Sha256.digest(current.workflowNodeInstanceId() + "|" + nextNodeInstanceId
                 + "|" + nextTask.taskId());
+    }
+
+    private String activateMultiInstanceTasks(
+            String tenantId,
+            UUID activationEventId,
+            String correlationId,
+            String payloadDigest,
+            NodeRuntime current,
+            UUID stageInstanceId,
+            WorkflowDefinitionParser.ProgressionDefinition progression,
+            Instant activatedAt
+    ) {
+        UUID collectionId = UUID.randomUUID();
+        int cardinality = progression.multiInstanceCardinality();
+        jdbc.sql("""
+                        INSERT INTO wfl_multi_instance (
+                            multi_instance_id, tenant_id, workflow_instance_id, node_id,
+                            expected_instances, completed_instances, status, activation_event_id,
+                            version, opened_at
+                        ) VALUES (
+                            :collectionId, :tenantId, :workflowId, :nodeId,
+                            :expected, 0, 'OPEN', :activationEventId, 1, :openedAt
+                        )
+                        """)
+                .param("collectionId", collectionId)
+                .param("tenantId", tenantId)
+                .param("workflowId", current.workflowInstanceId())
+                .param("nodeId", progression.nodeId())
+                .param("expected", cardinality)
+                .param("activationEventId", activationEventId)
+                .param("openedAt", java.sql.Timestamp.from(activatedAt))
+                .update();
+        StringBuilder digest = new StringBuilder();
+        for (int index = 0; index < cardinality; index++) {
+            UUID nodeInstanceId = UUID.randomUUID();
+            ScheduledTaskView task = tasks.createWorkflowTask(new CreateWorkflowTaskCommand(
+                    tenantId, current.projectId(), current.workOrderId(),
+                    current.workflowInstanceId(), stageInstanceId, nodeInstanceId,
+                    progression.nodeId(), current.workflowDefinitionVersionId(),
+                    current.workflowDefinitionDigest(), current.configurationBundleId(),
+                    current.configurationBundleDigest(), progression.stageCode(),
+                    progression.taskType(), progression.taskKind(),
+                    progression.formRef(), progression.slaRef(),
+                    "work-order:" + current.workOrderId() + "|mi:" + index,
+                    Sha256.digest(payloadDigest + "|" + index), 100, activatedAt, 3,
+                    correlationId, activationEventId.toString()));
+            jdbc.sql("""
+                            INSERT INTO wfl_node_instance (
+                                workflow_node_instance_id, tenant_id, workflow_instance_id,
+                                stage_instance_id, work_order_id, node_id, task_id, status,
+                                activation_event_id, version, activated_at
+                            ) VALUES (
+                                :nodeInstanceId, :tenantId, :workflowId,
+                                :stageId, :workOrderId, :nodeId, :taskId, 'ACTIVE',
+                                :activationEventId, 1, :activatedAt
+                            )
+                            """)
+                    .param("nodeInstanceId", nodeInstanceId)
+                    .param("tenantId", tenantId)
+                    .param("workflowId", current.workflowInstanceId())
+                    .param("stageId", stageInstanceId)
+                    .param("workOrderId", current.workOrderId())
+                    .param("nodeId", progression.nodeId())
+                    .param("taskId", task.taskId())
+                    .param("activationEventId", activationEventId)
+                    .param("activatedAt", java.sql.Timestamp.from(activatedAt))
+                    .update();
+            jdbc.sql("""
+                            INSERT INTO wfl_multi_instance_slot (
+                                multi_instance_id, tenant_id, instance_index,
+                                workflow_node_instance_id, task_id, status
+                            ) VALUES (
+                                :collectionId, :tenantId, :instanceIndex,
+                                :nodeInstanceId, :taskId, 'ACTIVE'
+                            )
+                            """)
+                    .param("collectionId", collectionId)
+                    .param("tenantId", tenantId)
+                    .param("instanceIndex", index)
+                    .param("nodeInstanceId", nodeInstanceId)
+                    .param("taskId", task.taskId())
+                    .update();
+            digest.append('|').append(nodeInstanceId).append(':').append(task.taskId());
+        }
+        return Sha256.digest(current.workflowNodeInstanceId() + "|MI|" + progression.nodeId()
+                + "|" + cardinality + digest);
+    }
+
+    /**
+     * @return null 非多实例；false 未到齐；true 已全部完成
+     */
+    private Boolean completeMultiInstanceSlotIfPresent(
+            String tenantId,
+            NodeRuntime current,
+            Instant completedAt
+    ) {
+        UUID collectionId = jdbc.sql("""
+                        SELECT multi_instance_id
+                          FROM wfl_multi_instance_slot
+                         WHERE tenant_id = :tenantId
+                           AND workflow_node_instance_id = :nodeInstanceId
+                           AND status = 'ACTIVE'
+                         FOR UPDATE
+                        """)
+                .param("tenantId", tenantId)
+                .param("nodeInstanceId", current.workflowNodeInstanceId())
+                .query(UUID.class)
+                .optional()
+                .orElse(null);
+        if (collectionId == null) {
+            return null;
+        }
+        var slot = jdbc.sql("""
+                        SELECT multi_instance_id, expected_instances, completed_instances
+                          FROM wfl_multi_instance
+                         WHERE multi_instance_id = :collectionId
+                           AND status = 'OPEN'
+                         FOR UPDATE
+                        """)
+                .param("collectionId", collectionId)
+                .query((rs, row) -> new MultiInstanceSlotRow(
+                        rs.getObject("multi_instance_id", UUID.class),
+                        rs.getInt("expected_instances"),
+                        rs.getInt("completed_instances")))
+                .single();
+        int slotUpdated = jdbc.sql("""
+                        UPDATE wfl_multi_instance_slot
+                           SET status = 'COMPLETED', completed_at = :completedAt
+                         WHERE multi_instance_id = :collectionId
+                           AND workflow_node_instance_id = :nodeInstanceId
+                           AND status = 'ACTIVE'
+                        """)
+                .param("completedAt", java.sql.Timestamp.from(completedAt))
+                .param("collectionId", slot.collectionId())
+                .param("nodeInstanceId", current.workflowNodeInstanceId())
+                .update();
+        if (slotUpdated != 1) {
+            throw new IllegalStateException("multi-instance slot already completed");
+        }
+        int completed = slot.completedInstances() + 1;
+        int miUpdated = jdbc.sql("""
+                        UPDATE wfl_multi_instance
+                           SET completed_instances = :completed,
+                               status = CASE WHEN :completed = expected_instances THEN 'COMPLETED' ELSE status END,
+                               completed_at = CASE WHEN :completed = expected_instances THEN :completedAt ELSE completed_at END,
+                               version = version + 1
+                         WHERE multi_instance_id = :collectionId
+                           AND status = 'OPEN'
+                           AND completed_instances = :previous
+                        """)
+                .param("completed", completed)
+                .param("completedAt", java.sql.Timestamp.from(completedAt))
+                .param("collectionId", slot.collectionId())
+                .param("previous", slot.completedInstances())
+                .update();
+        if (miUpdated != 1) {
+            throw new IllegalStateException("multi-instance counter update lost race");
+        }
+        return completed == slot.expectedInstances();
+    }
+
+    private record MultiInstanceSlotRow(
+            UUID collectionId,
+            int expectedInstances,
+            int completedInstances
+    ) {
     }
 
     private String activateSubProcess(

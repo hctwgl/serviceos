@@ -74,6 +74,14 @@
           "pattern": "^[a-z0-9][a-z0-9._-]*$",
           "maxLength": 160
         },
+        "multiInstance": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["cardinality"],
+          "properties": {
+            "cardinality": {"type": "integer", "minimum": 2, "maximum": 50}
+          }
+        },
         "entryActions": {"type": "array", "items": {"type": "string"}, "default": []},
         "exitActions": {"type": "array", "items": {"type": "string"}, "default": []},
         "retryPolicy": {"$ref": "#/$defs/retryPolicy"},

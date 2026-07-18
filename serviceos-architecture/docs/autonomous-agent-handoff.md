@@ -8,15 +8,13 @@ lastUpdated: 2026-07-18
 ## 当前
 
 - PR：https://github.com/hctwgl/serviceos/pull/146
-- latestMilestone：**M277**（提交后回填）
-- Flyway：**104 / 106**
+- latestMilestone：**M278**（提交后回填）
+- Flyway：**105 / 107**
 
-## 已完成（阶段二续）
+## 已完成（阶段二）
 
-- M275 PARALLEL_GATEWAY
-- M276 TIMER
-- M277 SUB_PROCESS
+M275 PARALLEL · M276 TIMER · M277 SUB_PROCESS · M278 多实例
 
 ## 下一步
 
-M278 多实例任务运行时
+M279 撤回/取消/重开（或人工跳转）最小可靠切片

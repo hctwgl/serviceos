@@ -97,7 +97,7 @@ final class WorkflowDefinitionParser {
             TaskNode next = requireTaskNode(target, "next executable node");
             return ProgressionDefinition.task(
                     next.nodeId(), next.stageCode(), next.taskType(), next.taskKind(),
-                    next.formRef(), next.slaRef());
+                    next.formRef(), next.slaRef(), next.multiInstanceCardinality());
         }
         if ("EXCLUSIVE_GATEWAY".equals(targetType)) {
             String chosen = chooseExclusiveGatewayTarget(graph, targetNodeId, context);
@@ -374,7 +374,22 @@ final class WorkflowDefinitionParser {
                 requiredText(node, "nodeId"), requiredText(node, "stageCode"),
                 requiredText(node, "taskType"),
                 "SERVICE_TASK".equals(nodeType) ? WorkflowTaskKind.AUTOMATED : WorkflowTaskKind.HUMAN,
-                optionalText(node, "formRef"), optionalText(node, "slaRef"));
+                optionalText(node, "formRef"), optionalText(node, "slaRef"),
+                readMultiInstanceCardinality(node));
+    }
+
+    private static int readMultiInstanceCardinality(JsonNode node) {
+        JsonNode multi = node.get("multiInstance");
+        if (multi == null || multi.isNull()) {
+            return 1;
+        }
+        JsonNode cardinality = multi.get("cardinality");
+        if (cardinality == null || !cardinality.isIntegralNumber()
+                || cardinality.asInt() < 2 || cardinality.asInt() > 50) {
+            throw new IllegalArgumentException(
+                    "multiInstance.cardinality must be between 2 and 50");
+        }
+        return cardinality.asInt();
     }
 
     private static String requiredText(JsonNode node, String field) {
@@ -434,22 +449,27 @@ final class WorkflowDefinitionParser {
             List<ProgressionDefinition> forkBranches,
             boolean joinPending,
             String joinFromNodeId,
-            int expectedJoinTokens
+            int expectedJoinTokens,
+            int multiInstanceCardinality
     ) {
+        boolean multiInstance() {
+            return multiInstanceCardinality >= 2;
+        }
+
         static ProgressionDefinition task(
                 String nodeId, String stageCode, String taskType, WorkflowTaskKind taskKind,
-                String formRef, String slaRef) {
+                String formRef, String slaRef, int multiInstanceCardinality) {
             return new ProgressionDefinition(
                     nodeId, stageCode, taskType, taskKind, formRef, slaRef,
                     false, false, null, null, false, 0, false, null,
-                    false, List.of(), false, null, 0);
+                    false, List.of(), false, null, 0, multiInstanceCardinality);
         }
 
         static ProgressionDefinition end(String nodeId) {
             return new ProgressionDefinition(
                     nodeId, null, null, null, null, null,
                     true, false, null, null, false, 0, false, null,
-                    false, List.of(), false, null, 0);
+                    false, List.of(), false, null, 0, 1);
         }
 
         static ProgressionDefinition waiting(
@@ -461,21 +481,21 @@ final class WorkflowDefinitionParser {
             return new ProgressionDefinition(
                     nodeId, stageCode, null, null, null, null,
                     false, true, waitEventType, correlationKeyTemplate,
-                    false, 0, false, null, false, List.of(), false, null, 0);
+                    false, 0, false, null, false, List.of(), false, null, 0, 1);
         }
 
         static ProgressionDefinition timer(String nodeId, String stageCode, int durationSeconds) {
             return new ProgressionDefinition(
                     nodeId, stageCode, null, null, null, null,
                     false, false, null, null, true, durationSeconds, false, null,
-                    false, List.of(), false, null, 0);
+                    false, List.of(), false, null, 0, 1);
         }
 
         static ProgressionDefinition subProcess(String nodeId, String stageCode, String subProcessRef) {
             return new ProgressionDefinition(
                     nodeId, stageCode, null, null, null, null,
                     false, false, null, null, false, 0, true, subProcessRef,
-                    false, List.of(), false, null, 0);
+                    false, List.of(), false, null, 0, 1);
         }
 
         static ProgressionDefinition fork(
@@ -486,7 +506,7 @@ final class WorkflowDefinitionParser {
             return new ProgressionDefinition(
                     forkNodeId, stageCode, null, null, null, null,
                     false, false, null, null, false, 0, false, null,
-                    true, List.copyOf(branches), false, null, 0);
+                    true, List.copyOf(branches), false, null, 0, 1);
         }
 
         static ProgressionDefinition joinPending(
@@ -497,7 +517,7 @@ final class WorkflowDefinitionParser {
             return new ProgressionDefinition(
                     joinNodeId, null, null, null, null, null,
                     false, false, null, null, false, 0, false, null,
-                    false, List.of(), true, fromNodeId, expectedTokens);
+                    false, List.of(), true, fromNodeId, expectedTokens, 1);
         }
     }
 
@@ -527,7 +547,8 @@ final class WorkflowDefinitionParser {
             String taskType,
             WorkflowTaskKind taskKind,
             String formRef,
-            String slaRef
+            String slaRef,
+            int multiInstanceCardinality
     ) {
     }
 }

@@ -246,7 +246,30 @@ final class ConfigurationAssetSchemaValidator {
                 validateSubProcessNode(entry.getValue(), entry.getKey(), outgoing);
             } else if ("PARALLEL_GATEWAY".equals(nodeType)) {
                 validateParallelGatewayNode(entry.getKey(), outgoing, incoming, nodes);
+            } else if (Set.of("USER_TASK", "SERVICE_TASK", "REVIEW_TASK", "MANUAL_INTERVENTION")
+                    .contains(nodeType)) {
+                validateTaskMultiInstance(entry.getValue(), entry.getKey(), outgoing);
             }
+        }
+    }
+
+    private void validateTaskMultiInstance(
+            JsonNode node,
+            String nodeId,
+            Map<String, List<JsonNode>> outgoing
+    ) {
+        if (!present(node, "multiInstance")) {
+            return;
+        }
+        JsonNode cardinality = node.path("multiInstance").path("cardinality");
+        if (!cardinality.isIntegralNumber() || cardinality.asInt() < 2 || cardinality.asInt() > 50) {
+            throw new ConfigurationPublicationException(
+                    "multiInstance.cardinality 必须在 2～50: " + nodeId);
+        }
+        List<JsonNode> edges = outgoing.getOrDefault(nodeId, List.of());
+        if (edges.size() != 1 || present(edges.getFirst(), "condition")) {
+            throw new ConfigurationPublicationException(
+                    "多实例任务必须恰好一条无条件出边: " + nodeId);
         }
     }
 
