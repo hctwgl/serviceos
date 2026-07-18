@@ -4,6 +4,8 @@ import { computed, ref } from 'vue'
 import { beginDevelopmentLogin, isDevelopmentLoginAvailable, logout } from './auth/session'
 import { createNetworkApi } from './api/client'
 import { loadNetworkSession, type NavigationItem, type NetworkSession } from './networkSession'
+import { RouterLink, RouterView } from 'vue-router'
+import { routeForPage } from './router'
 
 const environment = resolveNetworkEnvironment({
   mode: import.meta.env.MODE,
@@ -49,10 +51,14 @@ function signOut() { logout(); session.value = null }
         <section class="boundary-card">
           <h2>服务端导航</h2>
           <section v-for="(items, section) in groupedNavigation" :key="section"><h3>{{ section }}</h3>
-            <ul><li v-for="item in items" :key="item.pageId" :data-page-id="item.pageId">{{ item.title }}</li></ul>
+            <ul><li v-for="item in items" :key="item.pageId" :data-page-id="item.pageId">
+              <RouterLink v-if="routeForPage(item.pageId)" :to="routeForPage(item.pageId)!">{{ item.title }}</RouterLink>
+              <span v-else>{{ item.title }}（当前版本不可用）</span>
+            </li></ul>
           </section>
           <p>业务页面将在后续里程碑迁移；导航可见性不替代 API 授权。</p>
         </section>
+        <section class="page-content"><RouterView v-slot="{ Component }"><component :is="Component" :network-context-id="session.activeContextId" /></RouterView></section>
       </template>
     </main>
   </div>
