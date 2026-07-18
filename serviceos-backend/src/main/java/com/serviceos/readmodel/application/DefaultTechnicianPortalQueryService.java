@@ -7,6 +7,7 @@ import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.dispatch.api.TechnicianActiveAssignmentQuery;
 import com.serviceos.dispatch.api.TechnicianActiveAssignmentView;
+import com.serviceos.fieldwork.api.TechnicianVisitHistoryQuery;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.network.api.NetworkTechnicianMembershipView;
 import com.serviceos.network.api.PrincipalNetworkAffiliationQuery;
@@ -19,6 +20,7 @@ import com.serviceos.readmodel.api.TechnicianPortalScheduleItem;
 import com.serviceos.readmodel.api.TechnicianPortalSchedulePage;
 import com.serviceos.readmodel.api.TechnicianPortalSyncSummary;
 import com.serviceos.readmodel.api.TechnicianPortalTaskDetail;
+import com.serviceos.readmodel.api.TechnicianPortalVisitItem;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.task.api.TaskFulfillmentContext;
@@ -61,6 +63,7 @@ final class DefaultTechnicianPortalQueryService implements TechnicianPortalQuery
     private final TechnicianTaskAssignmentFeedQuery taskAssignments;
     private final TechnicianScheduleAppointmentQuery appointments;
     private final TechnicianContactAttemptQuery contactAttempts;
+    private final TechnicianVisitHistoryQuery visits;
     private final TaskFulfillmentContextService tasks;
     private final Clock clock;
 
@@ -71,6 +74,7 @@ final class DefaultTechnicianPortalQueryService implements TechnicianPortalQuery
             TechnicianTaskAssignmentFeedQuery taskAssignments,
             TechnicianScheduleAppointmentQuery appointments,
             TechnicianContactAttemptQuery contactAttempts,
+            TechnicianVisitHistoryQuery visits,
             TaskFulfillmentContextService tasks,
             Clock clock
     ) {
@@ -80,6 +84,7 @@ final class DefaultTechnicianPortalQueryService implements TechnicianPortalQuery
         this.taskAssignments = taskAssignments;
         this.appointments = appointments;
         this.contactAttempts = contactAttempts;
+        this.visits = visits;
         this.tasks = tasks;
         this.clock = clock;
     }
@@ -199,6 +204,13 @@ final class DefaultTechnicianPortalQueryService implements TechnicianPortalQuery
                         row.nextContactAt(),
                         row.createdAt()))
                 .toList();
+        List<TechnicianPortalVisitItem> visitItems = visits.listForTasks(actor.tenantId(), Set.of(taskId)).stream()
+                .map(row -> new TechnicianPortalVisitItem(
+                        row.visitId(), row.taskId(), row.appointmentId(), row.visitSequence(), row.status(),
+                        row.checkInCapturedAt(), row.checkInReceivedAt(), row.geofenceResult(), row.policyDecision(),
+                        row.checkOutCapturedAt(), row.checkOutReceivedAt(), row.resultCode(), row.exceptionCode(),
+                        row.aggregateVersion()))
+                .toList();
 
         return new TechnicianPortalTaskDetail(
                 ctx.networkId(),
@@ -219,6 +231,7 @@ final class DefaultTechnicianPortalQueryService implements TechnicianPortalQuery
                 task.version(),
                 appointmentItems,
                 contactAttemptItems,
+                visitItems,
                 clock.instant());
     }
 

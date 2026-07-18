@@ -27,6 +27,7 @@ public record TechnicianPortalTaskDetail(
         long resourceVersion,
         List<TechnicianPortalScheduleItem> appointments,
         List<TechnicianPortalContactAttemptItem> contactAttempts,
+        List<TechnicianPortalVisitItem> visits,
         Instant asOf
 ) {
     public TechnicianPortalTaskDetail {
@@ -35,5 +36,6 @@ public record TechnicianPortalTaskDetail(
         }
         appointments = List.copyOf(appointments);
         contactAttempts = List.copyOf(contactAttempts);
+        visits = List.copyOf(visits);
     }
 }

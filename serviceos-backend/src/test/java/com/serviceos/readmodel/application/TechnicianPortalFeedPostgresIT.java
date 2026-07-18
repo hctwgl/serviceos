@@ -55,6 +55,7 @@ class TechnicianPortalFeedPostgresIT {
     private static final UUID PROJECT_A = UUID.fromString("019f83b0-cccc-7f8c-9505-36fe5c0e880e");
     private static final UUID APPOINTMENT_A = UUID.fromString("019f83b0-dddd-7f8c-9505-36fe5c0e880f");
     private static final UUID CONTACT_ATTEMPT_A = UUID.fromString("019f83b0-ddde-7f8c-9505-36fe5c0e8811");
+    private static final UUID VISIT_A = UUID.fromString("019f83b0-dddf-7f8c-9505-36fe5c0e8812");
     private static final UUID TECH_ASSIGNMENT_A = UUID.fromString("019f83b0-eeee-7f8c-9505-36fe5c0e8810");
 
     @Container
@@ -122,6 +123,7 @@ class TechnicianPortalFeedPostgresIT {
         seedActivePair(NETWORK_B, WO_B, TASK_B, OTHER_TECH_PRINCIPAL.toString(), UUID.randomUUID());
         seedAppointment(APPOINTMENT_A, TASK_A, WO_A, PROJECT_A);
         seedContactAttempt(CONTACT_ATTEMPT_A, TASK_A, WO_A, PROJECT_A);
+        seedVisit(VISIT_A, APPOINTMENT_A, TASK_A, WO_A, PROJECT_A);
         jdbc.sql("""
                 INSERT INTO auth_tenant_grant_generation (tenant_id, generation, updated_at)
                 VALUES (:tenant, 1, now())
@@ -222,6 +224,14 @@ class TechnicianPortalFeedPostgresIT {
             assertThat(attempt.resultCode()).isEqualTo("NO_ANSWER");
             assertThat(attempt.nextContactAt()).isEqualTo(Instant.parse("2026-07-17T04:00:00Z"));
         });
+        assertThat(detail.visits()).singleElement().satisfies(visit -> {
+            assertThat(visit.visitId()).isEqualTo(VISIT_A);
+            assertThat(visit.appointmentId()).isEqualTo(APPOINTMENT_A);
+            assertThat(visit.status()).isEqualTo("IN_PROGRESS");
+            assertThat(visit.geofenceResult()).isEqualTo("WITHIN_GEOFENCE");
+            assertThat(visit.policyDecision()).isEqualTo("ACCEPTED");
+            assertThat(visit.aggregateVersion()).isEqualTo(1);
+        });
 
         // 同一合法 Portal 上下文下，其他师傅或其他网点任务统一按不存在处理，避免资源枚举。
         assertThatThrownBy(() -> portal.taskDetail(
@@ -254,6 +264,38 @@ class TechnicianPortalFeedPostgresIT {
                 .param("project", projectId)
                 .param("workOrder", workOrderId)
                 .param("task", taskId)
+                .update();
+    }
+
+    private void seedVisit(UUID visitId, UUID appointmentId, UUID taskId, UUID workOrderId, UUID projectId) {
+        // 坐标、距离、设备和 note 均有真实值，用于证明 Technician 安全投影不会读取这些敏感列。
+        jdbc.sql("""
+                INSERT INTO fld_visit (
+                    visit_id, tenant_id, project_id, work_order_id, task_id, appointment_id,
+                    visit_sequence, technician_id, network_id, status,
+                    check_in_captured_at, check_in_received_at,
+                    check_in_latitude, check_in_longitude, check_in_accuracy_meters,
+                    geofence_result, geofence_distance_meters, geofence_policy_version,
+                    policy_decision, device_id, device_command_id, offline_flag,
+                    note, aggregate_version, created_by, created_at, updated_at
+                ) VALUES (
+                    :id, :tenant, :project, :workOrder, :task, :appointment,
+                    1, :technician, :network, 'IN_PROGRESS',
+                    '2026-07-17 05:00:00+00', '2026-07-17 05:00:05+00',
+                    36.067000, 120.382000, 18.50,
+                    'WITHIN_GEOFENCE', 12.40, 'GEO-V1',
+                    'ACCEPTED', 'sensitive-device-id', 'sensitive-device-command', false,
+                    'sensitive visit note', 1, :technician, now(), now()
+                )
+                """)
+                .param("id", visitId)
+                .param("tenant", TENANT)
+                .param("project", projectId)
+                .param("workOrder", workOrderId)
+                .param("task", taskId)
+                .param("appointment", appointmentId)
+                .param("technician", TECH_PRINCIPAL.toString())
+                .param("network", NETWORK_A.toString())
                 .update();
     }
 

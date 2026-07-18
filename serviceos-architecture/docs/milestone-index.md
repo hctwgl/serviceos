@@ -253,6 +253,7 @@ title: ServiceOS 里程碑索引
 | M242 | M242 Network Portal 整改详情残余 Accepted 字段展示 | [255-m242-network-portal-correction-detail-residual-fields.md](../architecture/255-m242-network-portal-correction-detail-residual-fields.md) | [239-m242-network-portal-correction-detail-residual-fields-acceptance.md](../testing/239-m242-network-portal-correction-detail-residual-fields-acceptance.md) |
 | M243 | M243 Technician Portal 当前责任任务在线详情 | [256-m243-technician-portal-task-detail.md](../architecture/256-m243-technician-portal-task-detail.md) | [240-m243-technician-portal-task-detail-acceptance.md](../testing/240-m243-technician-portal-task-detail-acceptance.md) |
 | M244 | M244 Technician Portal 联系历史安全摘要 | [257-m244-technician-portal-contact-history.md](../architecture/257-m244-technician-portal-contact-history.md) | [241-m244-technician-portal-contact-history-acceptance.md](../testing/241-m244-technician-portal-contact-history-acceptance.md) |
+| M245 | M245 Technician Portal Visit 历史安全摘要 | [258-m245-technician-portal-visit-history.md](../architecture/258-m245-technician-portal-visit-history.md) | [242-m245-technician-portal-visit-history-acceptance.md](../testing/242-m245-technician-portal-visit-history-acceptance.md) |
 
 ## 未关联里程碑的文档
 

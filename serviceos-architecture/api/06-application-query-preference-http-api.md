@@ -214,6 +214,9 @@ status: Accepted
   `contactAttempts[]`；仅含联系事实 ID、taskId、channel、startedAt/endedAt、resultCode、
   nextContactAt、createdAt。禁止 `contactedPartyRef`、note、recordingRef、actorId；Core OpenAPI →
   `1.0.18`；catalog/Flyway 不变；不接受联系写入。
+- §11 Technician Portal Visit 历史安全摘要（M245 / ADR-083）：M243 详情增加 `visits[]`；仅含
+  Visit/task/appointment ID、序次、状态、到离场时间、围栏分类/策略结论、结果/异常码和版本；
+  禁止 GPS、距离、设备、离线命令、note、operation/evidence refs；OpenAPI → `1.0.19`；不接受写入。
 - §10 Network Portal 队列/列表 Accepted 字段展示（M220 UI-only）：**不**新增 HTTP；整改/
   异常/资质/师傅列表与任务目录展示既有非 PII 字段；`correctionTaskId`/`handlingTaskId`/
   `workOrderId` 门户内深链；异常详情 `handlingTaskId` 深链。catalog 仍 `page-registry-v16`；

@@ -245,4 +245,5 @@
 - [M242 Network Portal 整改详情残余 Accepted 字段展示验收矩阵](239-m242-network-portal-correction-detail-residual-fields-acceptance.md)
 - [M243 Technician Portal 当前责任任务在线详情验收矩阵](240-m243-technician-portal-task-detail-acceptance.md)
 - [M244 Technician Portal 联系历史安全摘要验收矩阵](241-m244-technician-portal-contact-history-acceptance.md)
+- [M245 Technician Portal Visit 历史安全摘要验收矩阵](242-m245-technician-portal-visit-history-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)
