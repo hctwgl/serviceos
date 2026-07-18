@@ -674,38 +674,18 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线推进至 **M182**：Admin 已证明补传复审完结、预约上门、BYD 提审外发 ACK、厂端回调，入站→激活→Admin HTTP 人工初派→同单预约上门→表单/资料/驳回整改补传复审/外发/完结（`ADMIN-PILOT-09`，派单为窄化 Manual Assign），工作区各区块详情或 Task 旁路、预约/表单/资料/上门/联系详情页、核心时间线与最近活动资源深链、外部审核回执详情、审核/整改交叉深链、异常摘要→异常队列 query 水合与 handlingTaskId 深链、工作区审核/整改关联资源深链、Task 面板资源详情深链、Canonical Message 独立详情页、专项队列与目录页 query 水合及关联资源深链（含外发/异常/入站源资源、目录/SLA 项目与 Correction/Review 剩余 Accepted 字段、QueueTable 行内单元格深链、外发 executionTaskId / 快照成员深链）、外发关联资源与回执入站交叉深链、详情页明文 projectId（含剩余详情页） / 源资源 / 现场与 SLA scope 字段深链与项目/SLA 任务交叉深链，入站 Envelope 授权队列，以及专项队列与目录/SLA Accepted OpenAPI 筛选；Evidence 已覆盖条件槽位初次解析、表单事实只追加重解析、槽位世代、
-条件变化人工处置、不可变 Item/Revision、机器校验、Snapshot、Task 完成门禁、作废与
-Review/Correction，并建立 INTERNAL→CLIENT 审核来源及回执批次/mapping 冻结门禁；BYD 创建工单入口
-已具备权威 InboundEnvelope、CanonicalMessage、私有原文留存、业务键幂等和崩溃恢复事实；BYD 厂端
-审核结果已按显式订单路由、逐项 Canonical 和部分成功语义可靠进入 CLIENT ReviewCase；
-BYD 提审已建立不可变 Delivery/Attempt/Acknowledgement，明确成功后自动创建 CLIENT Case/Route；
-UNKNOWN 自动链路失败关闭，并可由获权 USER 携带原因、审批引用和预期版本创建不可变 ReplayRequest，
-复用冻结 payload 由新 Task 人工重发，旧 UNKNOWN Attempt 不覆盖；重发取得严格 ACK 后会以恢复事件
-幂等关闭该 Delivery 历次 UNKNOWN Task 的运营异常，且恢复/失败事件乱序时不产生无效 HUMAN Task；
-Task 已可按 Workflow 显式 `slaRef` 锁定 ELAPSED SLA 策略，以创建/完成事件驱动开始、到期、MET 与
-MET_LATE，并由 PostgreSQL 对账避免重复或完成事件延迟造成误报；SLA 实例现可经 `sla.read` 与实时
-Project Scope 授权进入工作台、工单时间线和详情查询；Project REGION/NETWORK 有效期关系可将对应
-RoleGrant 映射为同一工作台的精确项目集合，并可通过显式整组命令即时修订且保留历史；当前主体还可通过
-`project.read` 安全查询授权项目目录、详情和范围修订历史；`task.read` 还提供实时授权范围内的独立
-Task 队列、现有责任事实筛选和冻结执行引用详情；动态时间统一使用服务端
-`asOf`，并可按现有人工命令的 capability、状态、责任与 execution guard 获取服务端 allowed-actions；
-自动 Task 已持久化的执行 Attempt 还可在同一实时授权边界下按序查询，且不暴露 worker、payload 或错误正文。
-独立 `readmodel` 模块现通过 Inbox 可靠消费 WorkOrder/Workflow/Stage/Task、
-Appointment/Visit/ContactAttempt、SLA、资料/审核/整改、外发交付、运营异常、ServiceAssignment
-激活生命周期、Task 指派/执行保护/人工接管、外部审核回执与条件 KEEP/INVALIDATE 处置公开事件，提供实时授权、稳定分页且不含 PII/原始 payload 的工单执行时间线；时间线投影已具备 checkpoint/dead letter/generation 重建、definition 登记、dead letter 幂等重放与旧/孤儿 generation 清理，以及 freshness 语义；并提供不含客户 PII 的工单工作区顶层实时组合与 TASKS/TIMELINE_AUDIT 按需区块查询（缺权 SLA/异常区块降级）；Evidence 还提供授权跨项目 ReviewCase/CorrectionCase/OutboundDelivery 专项队列。试算完整合并、通用 work-queues、共享 UI Preference、`search_document` 索引与其余 section 仍未实现；Admin 个人/共享 SavedView（M189/M191）、受控全局搜索（M192）、最近访问（M193）、Network Portal 只读查询（M194）、Technician Portal Feed（M195）、Network Portal 指派师傅（M196）、预约协作（M197）、预约改约/取消（M198）、爽约/联系尝试（M199）、改派师傅（M200）、资料代补 onBehalf（M201）、整改队列只读（M202）、运营异常队列只读（M203）、师傅关系/资质提交（M204）、本网点资质只读列表（M205）、师傅关系只读列表（M206）、工作台能力门控 enrichment（M207）、产能页（M208）、整改详情只读 UI（M209）、运营异常详情只读 UI（M210）、资质详情只读 UI（M211）、师傅关系详情只读 UI（M212）、限定工单工作区（M213）、工作区协作队列深链（M214）、预约/联系 fan-in（M215）、当前师傅 fan-in（M216）、目录页师傅 fan-in（M217）、Technician Portal Feed 字段展示（M218）、TECHNICIAN.ME 页壳（M219）、Network Portal 队列字段展示（M220）、工作区薄 SLA 摘要（M221）、工作区 Visit/表单提交摘要（M222）、工作区 Evidence 槽位/资料项摘要（M223）、工作台薄 SLA 风险计数（M224）、工作区整改摘要（M225）、工作区运营异常摘要（M226）、工作区预约/联系服务端摘要（M227）与工作区当前师傅服务端摘要（M228）、工作区审核案例服务端摘要（M229）、目录页师傅服务端摘要（M230）、目录页预约服务端摘要（M231）、目录页联系尝试服务端摘要（M232）、目录页资料整改服务端摘要（M233）、目录页 SLA 风险服务端摘要（M234）、目录页资料 Evidence 服务端摘要（M235）、目录页工单头字段（M236）、工作台统计时间展示（M237）、预约/联系历史 Accepted 字段展示（M238）、工作区 Visit/表单/Evidence Accepted 字段展示（M239）、工作区协作摘要 Accepted 字段展示（M240）、预约/联系历史残余 Accepted 字段展示（M241）、整改详情残余 Accepted 字段展示（M242）已交付。
-完整平台仍未完成：计算字段/脚本、
-OCR/CV、复杂工作流、BUSINESS 日历与 SLA 暂停/预警/升级/通知、结算、正式基础设施和各 Portal 工程
-仍属于明确未实现范围；也不代表所有 Proposed 文档均已接受。
+当前 `master` 基线为 **M266 Technician 在线资料整改交付批次**，最终合并提交为
+`088018a6eac180f7fe36536fae9d073fa797757c`。
 
-核心业务编码前，必须使用 `research/templates/` 中的模板完成首个试点项目基线，并用真实脱敏工单完成桌面演练。
-- [M257 独立 Technician H5 交付批次](architecture/270-m257-technician-h5-delivery-batch.md)
-- [M258 Technician iOS 仓库内安全基础](architecture/271-m258-technician-ios-security-foundation.md)
-- [M259 Technician iOS SwiftUI App 与 Xcode 交付批次](architecture/272-m259-technician-ios-swiftui-app-delivery-batch.md)
-- [M260 Technician iOS Simulator 运行验收批次](architecture/273-m260-technician-ios-simulator-runtime.md)
-- [M261 Technician iOS 签名与分发就绪基础](architecture/274-m261-technician-ios-distribution-readiness.md)
-- [M262 Technician 在线 Visit 交付批次](architecture/275-m262-technician-online-visit-batch.md)
-- [M263 Technician 在线基础表单交付批次](architecture/276-m263-technician-online-form-batch.md)
-- [M264 Technician 在线资料上传交付批次](architecture/277-m264-technician-online-evidence-batch.md)
-- [M265 Technician 资料快照与任务完成交付批次](architecture/278-m265-technician-task-submission-batch.md)
-- [M266 Technician 在线资料整改交付批次](architecture/279-m266-technician-correction-batch.md)
+当前已具备 Admin、独立 Network Web、独立 Technician H5、原生 Technician iOS，以及统一主体/组织/授权治理、在线 Visit、冻结基础表单、Evidence 上传、Snapshot/Task 完成和多轮整改闭环。下一已接受优先级是 Track F：iOS 离线工作包、持久化命令/上传队列、同步、冲突、改派失权和恢复。
+
+权威进度入口：
+
+- [实施状态总览](docs/implementation-status.md)
+- [里程碑索引](docs/milestone-index.md)
+- [M266 实现文档](architecture/279-m266-technician-correction-batch.md)
+- [M266 验收矩阵](testing/263-m266-technician-correction-batch-acceptance.md)
+- [多客户端 Portal 持续交付计划](roadmap/05-multi-client-portal-delivery-plan.md)
+- [多客户端 Portal 程序级验收矩阵](testing/multi-client-portal-program-acceptance.md)
+
+本 README 只保留当前基线摘要；逐能力完成范围、明确未实现项、OpenAPI/Flyway 版本和后续顺序统一由 `implementation-status.md` 维护，避免重复叙事再次过期。

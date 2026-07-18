@@ -3,7 +3,7 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-18
-baselineCommit: df343390c9924f1b75d09080c46369091a5fb744
+baselineCommit: 088018a6eac180f7fe36536fae9d073fa797757c
 latestMilestone: M266
 ---
 
@@ -40,7 +40,7 @@ latestMilestone: M266
 | 项目 | 当前值 |
 |---|---|
 | 最新实施里程碑 | M266 Technician 在线资料整改交付批次 |
-| 基线提交 | `df343390c9924f1b75d09080c46369091a5fb744` |
+| 基线提交 | `088018a6eac180f7fe36536fae9d073fa797757c` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts`、`@serviceos/web-core`、`ServiceOSIOSCore`、独立且可部署的 `serviceos-network-web` 与 `serviceos-technician-web`、Swift 6 `TechnicianIOSFoundation`，以及已在 iPhone 17 Pro Simulator 安装启动、实跑 XCTest/XCUITest、形成 Production arm64 archive/dSYM，并接入当前任务、在线 Visit、冻结基础表单、前台 Evidence 采集上传、Snapshot/Task 完成与多轮资料整改的原生 `TechnicianIOS` SwiftUI App；由同一 Core OpenAPI 生成并经独立消费者门禁验证的 `@serviceos/core-client` 与 `ServiceOSCoreClient` |
 | 前端工程 | `serviceos-admin-web` 独立承载总部运营、统一用户中心、`/me` 导航、SavedView、UI Preference、受控搜索与最近访问；M256 后 Network 正式产品由独立 `serviceos-network-web` 承载，M257 后 Technician 正式产品由独立移动优先 `serviceos-technician-web` 承载，M262～M266 依次增加在线 Visit、冻结表单、Evidence 三段式上传、Snapshot/Task 完成与独立整改 Task 多轮补传/重新提交；Admin 仅保留可配置外链和 M188 诊断；两套独立 Web 均实际接入共享 Core、OIDC PKCE、服务端 Context/Capability/导航、Playwright 回归和独立容器镜像 |
@@ -48,6 +48,8 @@ latestMilestone: M266
 | 契约 | Core OpenAPI 1.0.26 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、`task.handling-completed@v1`、recovered/resolved 与 SLA started/breached/met@v1） |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
+
+`baselineCommit` 统一指向包含 `latestMilestone` 全部最终证据、且已经进入 `master` 的合并提交；里程碑分支中的中间实现提交只记录在对应实现文档和验收证据中，不再作为本文件的当前基线。
 
 ## 2.1 已接受的实施序列：身份与组织治理
 
@@ -77,7 +79,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | 领域 | 能力 | 状态 | 已完成范围 | 主要未完成范围 | 最近证据 |
 |---|---|---|---|---|---|
 | 工程基础 | 构建、测试、契约、可观测性、容器发布 | `IMPLEMENTED` | Maven、PostgreSQL IT、契约门禁、Trace/指标、单镜像迁移和回滚演练；Track A 同源 TS/Swift Client、Token、Web/iOS Core、身份注册和有界客户端元数据；M256/M257 独立 Web；M258～M260 iOS Foundation/App/Simulator；M261 Production archive/dSYM、隐私/AppIcon 与签名失败关闭 | 签名真机/TestFlight、能力协商、生产 IdP/BFF、正式 K8s、多故障域、PITR、远端制品发布/SBOM/签名、正式 Secret Manager | M8～M14、M247～M261 |
-| 身份授权 | OIDC/JWT、Capability、Tenant/Project/REGION/NETWORK Scope、拒绝审计 | `IMPLEMENTED` | 后端认证授权和范围校验基线；实时 TENANT/PROJECT/REGION/NETWORK 集合；Project 有效期关系、整组修订与授权目录读取 | 组织关系、Region 层级后代、计划修订/审批、正式企业 IdP、完整组织治理 UI | M9、M63～M67 |
+| 身份授权 | OIDC/JWT、Capability、Tenant/Project/REGION/NETWORK Scope、拒绝审计 | `IMPLEMENTED` | 后端认证授权和范围校验基线；实时 TENANT/PROJECT/REGION/NETWORK 集合；Project 有效期关系、整组修订与授权目录读取；M183～M188 已补齐 Principal、企业组织任职、RoleGrant 治理、统一用户中心与 `/me` 上下文/导航 | Region 层级后代、Project 计划修订/审批、正式企业 IdP、HR Connector、ORGANIZATION DataScope、MFA obligation 执行器 | M9、M63～M67、M183～M188 |
 | 统一主体目录 | Principal、IdentityLink、PersonProfile、Persona 与生命周期 | `IMPLEMENTED` | 稳定内部 Principal；受控并发 JIT；多 IdentityLink/Persona；Profile；启停实时失权；安全目录与敏感身份分权查询；幂等、If-Match、审计和 PostgreSQL 不可变事实 | 身份解绑、密码管理、身份缓存与跨服务身份事件；网点、授权治理和 Portal 上下文由 M185～M188 承接 | M183 |
 | 企业组织目录 | Organization、OrgUnit、closure、任职与主数据同步 | `IMPLEMENTED` | 独立 `organization` 模块；closure；主职/兼职/负责人；LOCAL/EXTERNAL_AUTHORITATIVE；同步批次幂等与乱序；离职停用/撤权/待重分配；治理 API；Admin 组织页（M187） | 正式 HR Connector、双向回写、ORGANIZATION DataScope | M184、M187 |
 | 网点人员与师傅身份 | NetworkMembership、TechnicianProfile、网点关系与资质 | `IMPLEMENTED` | 独立 `network` 模块；PartnerOrganization/ServiceNetwork；成员邀请；TechnicianProfile/多网点关系；资质只追加审核；可接单查询；清退/停用 clearance 与 ACTIVE 派单影响摘要；Admin 网点/师傅页（M187）；Network Portal 师傅只读列表（M194）；Network Portal 师傅关系绑定/终止与资质 PENDING 提交（M204）；Network Portal 本网点资质只读列表（M205）；Network Portal 师傅关系只读列表含 version（M206） | Coverage/Capability 地理硬过滤、离线工作包回收、自动改派、Portal decide/FileObject | M185、M187、M194、M204～M206 |
