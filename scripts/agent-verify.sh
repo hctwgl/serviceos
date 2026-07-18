@@ -13,6 +13,7 @@ set -euo pipefail
 #   bash scripts/agent-verify.sh client-swift       Swift Client 复现、Swift 6 编译与消费门禁
 #   bash scripts/agent-verify.sh design-tokens      Web/Swift Design Token 复现与消费门禁
 #   bash scripts/agent-verify.sh web-core           Web auth/context/error/trace 基础构建与消费门禁
+#   bash scripts/agent-verify.sh ios-core           iOS auth/context/error/trace 基础构建与消费门禁
 #   bash scripts/agent-verify.sh docs               git diff --check + 脚本语法 + 里程碑索引新鲜度
 #
 # 全量 L3 验证统一走 bash scripts/verify-local.sh，不在本脚本内提供。
@@ -85,6 +86,9 @@ case "${command_name}" in
     ;;
   web-core)
     scripts/verify-web-core.sh
+    ;;
+  ios-core)
+    scripts/verify-ios-core.sh
     ;;
   docs)
     git diff --check
