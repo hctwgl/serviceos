@@ -80,6 +80,22 @@ struct FoundationSmoke {
         try await lifecycle.exchange(code: authorizationCode, transaction: transaction)
         let refreshToken = await keychain.currentRefreshToken()
         precondition(refreshToken == "refresh-1")
+        let expiredKeychain = KeychainAccessTokenVault(
+            service: "com.serviceos.technician.tests.\(UUID().uuidString)",
+            account: "expired-oidc-token",
+            now: { now },
+            expirySkew: 30
+        )
+        try await expiredKeychain.store(.init(
+            accessToken: "expired-access",
+            refreshToken: "retained-refresh",
+            expiresAt: now.addingTimeInterval(-1)
+        ))
+        let expiredAccessToken = await expiredKeychain.currentAccessToken()
+        let retainedRefreshToken = await expiredKeychain.currentRefreshToken()
+        precondition(expiredAccessToken == nil)
+        precondition(retainedRefreshToken == "retained-refresh")
+        await expiredKeychain.clear()
         try await lifecycle.refresh()
         let tokenBodies = await oidcTransport.capturedBodies()
         precondition(tokenBodies.count == 2)
