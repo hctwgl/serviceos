@@ -68,7 +68,25 @@ export type TechnicianPortalTaskDetail = {
   resourceVersion: number
   appointments: TechnicianPortalScheduleItem[]
   contactAttempts: TechnicianPortalContactAttemptItem[]
+  visits: TechnicianPortalVisitItem[]
   asOf: string
+}
+
+export type TechnicianPortalVisitItem = {
+  visitId: string
+  taskId: string
+  appointmentId: string
+  visitSequence: number
+  status: 'IN_PROGRESS' | 'COMPLETED' | 'INTERRUPTED'
+  checkInCapturedAt: string
+  checkInReceivedAt: string
+  geofenceResult: 'WITHIN_GEOFENCE' | 'OUTSIDE_GEOFENCE' | 'LOCATION_UNAVAILABLE' | 'LOW_ACCURACY'
+  policyDecision: 'ACCEPTED' | 'WARNING'
+  checkOutCapturedAt: string | null
+  checkOutReceivedAt: string | null
+  resultCode: string | null
+  exceptionCode: string | null
+  aggregateVersion: number
 }
 
 export type TechnicianPortalContactAttemptItem = {

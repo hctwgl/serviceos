@@ -46,7 +46,7 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
       <div>
         <RouterLink to="/technician-portal/task-feed">← 返回任务 Feed</RouterLink>
         <h2>任务详情</h2>
-        <p class="hint">M244：当前 ACTIVE 责任任务的在线非 PII 详情与联系历史；执行授权仍以服务端命令为准。</p>
+        <p class="hint">M245：当前 ACTIVE 责任任务的在线非 PII 详情、联系与 Visit 历史；执行授权仍以服务端命令为准。</p>
       </div>
       <button type="button" data-testid="technician-task-detail-refresh" @click="load">刷新</button>
     </header>
@@ -93,6 +93,30 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
         <p v-else>暂无预约</p>
       </section>
 
+      <section class="visits">
+        <div class="section-title">
+          <h3>上门历史</h3>
+          <span>不含定位与设备明细</span>
+        </div>
+        <table v-if="detail.visits.length > 0" data-testid="technician-task-detail-visits">
+          <thead>
+            <tr><th>序次</th><th>状态</th><th>到场</th><th>围栏</th><th>策略</th><th>结果/异常</th><th>版本</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="visit in detail.visits" :key="visit.visitId">
+              <td>{{ visit.visitSequence }}</td>
+              <td>{{ visit.status }}</td>
+              <td>{{ visit.checkInCapturedAt }}</td>
+              <td>{{ visit.geofenceResult }}</td>
+              <td>{{ visit.policyDecision }}</td>
+              <td>{{ visit.resultCode ?? visit.exceptionCode ?? '—' }}</td>
+              <td>{{ visit.aggregateVersion }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-else data-testid="technician-task-detail-no-visits">暂无上门记录</p>
+      </section>
+
       <section class="contacts">
         <div class="section-title">
           <h3>联系历史</h3>
@@ -116,7 +140,7 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
       </section>
 
       <p class="boundary" data-testid="technician-task-detail-boundary">
-        本切片不返回地址、联系人、联系对象引用、自由文本、录音引用、操作者标识、表单值、资料文件、配置源码或离线工作包。
+        本切片不返回地址、联系人、联系对象引用、自由文本、录音引用、操作者标识、GPS、距离、设备、离线命令、现场备注、作业/资料引用、表单值、资料文件、配置源码或离线工作包。
       </p>
     </template>
   </section>
