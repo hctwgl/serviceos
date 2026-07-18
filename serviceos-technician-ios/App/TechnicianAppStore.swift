@@ -76,6 +76,10 @@ final class TechnicianAppStore {
     private(set) var taskForms: [TechnicianTaskForm] = []
     private(set) var formMessage: String?
     private(set) var formIssues: [TechnicianIOSFoundation.TechnicianFormValidationIssue] = []
+    private(set) var evidenceSlots: [TechnicianOnlineEvidenceSlot] = []
+    private(set) var evidenceItems: [TechnicianOnlineEvidenceItem] = []
+    private(set) var evidenceMessage: String?
+    private(set) var evidenceUploading = false
     private(set) var onlineMessage: String?
     private(set) var onlineLoading = false
     var selectedTab: TechnicianAppTab = .taskFeed
@@ -190,11 +194,70 @@ final class TechnicianAppStore {
                 taskForms = []
                 formMessage = Self.safeMessage(for: error)
             }
+            await loadEvidence(using: dependencies, session: session, taskID: taskID)
             onlineMessage = nil
         } catch {
             taskDetail = nil
             taskForms = []
+            evidenceSlots = []
+            evidenceItems = []
             onlineMessage = Self.safeMessage(for: error)
+        }
+    }
+
+    /// Evidence 是任务详情的次级资源；加载失败只关闭上传区域，不得抹掉任务与表单事实。
+    private func loadEvidence(
+        using dependencies: TechnicianAppDependencies,
+        session: TechnicianSession,
+        taskID: UUID
+    ) async {
+        do {
+            let onlineService = dependencies.onlineService
+            let contextID = session.activeContext.contextId
+            async let slots = onlineService.evidenceSlots(
+                contextID: contextID,
+                taskID: taskID
+            )
+            async let items = onlineService.evidenceItems(
+                contextID: contextID,
+                taskID: taskID
+            )
+            (evidenceSlots, evidenceItems) = try await (slots, items)
+            evidenceMessage = nil
+        } catch {
+            evidenceSlots = []
+            evidenceItems = []
+            evidenceMessage = Self.safeMessage(for: error)
+        }
+    }
+
+    func uploadEvidence(
+        session: TechnicianSession,
+        taskID: UUID,
+        slot: TechnicianOnlineEvidenceSlot,
+        asset: TechnicianEvidenceUploadAsset
+    ) async {
+        guard let dependencies else { return }
+        evidenceUploading = true
+        evidenceMessage = "正在校验并上传现场资料…"
+        defer { evidenceUploading = false }
+        do {
+            let currentItems = evidenceItems
+                .filter { $0.evidenceSlotId == slot.slotId }
+                .sorted { $0.itemOrdinal < $1.itemOrdinal }
+            // 槽位达到 maxCount 后追加最后一项的新 revision；未达到时创建新 EvidenceItem。
+            let targetItem = slot.maxCount.map { currentItems.count >= $0 ? currentItems.last : nil } ?? nil
+            let item = try await dependencies.onlineService.uploadEvidence(
+                contextID: session.activeContext.contextId,
+                taskID: taskID,
+                slotID: slot.slotId,
+                evidenceItemID: targetItem?.evidenceItemId,
+                asset: asset
+            )
+            evidenceMessage = "资料已提交，当前状态：\(item.status)；扫描与校验完成前不视为可用证据"
+            await loadEvidence(using: dependencies, session: session, taskID: taskID)
+        } catch {
+            evidenceMessage = Self.safeMessage(for: error)
         }
     }
 
@@ -334,6 +397,10 @@ final class TechnicianAppStore {
         taskForms = []
         formMessage = nil
         formIssues = []
+        evidenceSlots = []
+        evidenceItems = []
+        evidenceMessage = nil
+        evidenceUploading = false
         onlineMessage = nil
         onlineLoading = false
     }

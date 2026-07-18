@@ -42,6 +42,8 @@ actor FakeOnlineTransport: ServiceHTTPTransporting {
         let context: String?
         let idempotencyKey: String?
         let ifMatch: String?
+        let authorization: String?
+        let clientKind: String?
         let body: String
     }
 
@@ -54,6 +56,8 @@ actor FakeOnlineTransport: ServiceHTTPTransporting {
             context: request.value(forHTTPHeaderField: "X-Technician-Context"),
             idempotencyKey: request.value(forHTTPHeaderField: "Idempotency-Key"),
             ifMatch: request.value(forHTTPHeaderField: "If-Match"),
+            authorization: request.value(forHTTPHeaderField: "Authorization"),
+            clientKind: request.value(forHTTPHeaderField: "X-ServiceOS-Client-Kind"),
             body: String(data: request.httpBody ?? Data(), encoding: .utf8) ?? ""
         ))
         let body: String
@@ -63,6 +67,16 @@ actor FakeOnlineTransport: ServiceHTTPTransporting {
             body = #"[{"taskId":"50000000-0000-4000-8000-000000000263","formVersionId":"60000000-0000-4000-8000-000000000263","formKey":"INSTALL_REPORT","semanticVersion":"1.0.0","schemaVersion":"FORM_V1","definition":{"title":"安装结果","sections":[{"sectionKey":"result","title":"现场结果","fields":[{"fieldKey":"survey.conclusion","label":"勘测结论","dataType":"STRING","binding":"task.input.survey.conclusion","required":true},{"fieldKey":"installation.count","label":"安装数量","dataType":"INTEGER","binding":"task.input.installation.count"},{"fieldKey":"site.safe","label":"现场安全","dataType":"BOOLEAN","binding":"task.input.site.safe"}]}]},"contentDigest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]"#
         } else if request.url!.path.hasSuffix("/form-submissions") {
             body = #"{"submissionId":"70000000-0000-4000-8000-000000000263","taskId":"50000000-0000-4000-8000-000000000263","projectId":"80000000-0000-4000-8000-000000000263","formVersionId":"60000000-0000-4000-8000-000000000263","formKey":"INSTALL_REPORT","submissionVersion":1,"values":{"survey.conclusion":"PASS","installation.count":2,"site.safe":true},"contentDigest":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","validationStatus":"VALIDATED","errors":[],"warnings":[],"submittedAt":"2026-07-18T10:00:01Z"}"#
+        } else if request.url!.path.hasSuffix("/evidence-slots") {
+            body = #"[{"slotId":"90000000-0000-4000-8000-000000000264","requirementCode":"SITE_PHOTO","occurrenceKey":"default","requirementName":"现场照片","mediaType":"PHOTO","required":true,"minCount":1,"maxCount":2,"status":"OPEN","active":true,"transition":"CREATE","requiredDisposition":"SUBMIT"}]"#
+        } else if request.url!.path.hasSuffix("/evidence-items") {
+            body = #"[]"#
+        } else if request.url!.path.hasSuffix("/upload-sessions") {
+            body = #"{"uploadSessionId":"91000000-0000-4000-8000-000000000264","evidenceSlotId":"90000000-0000-4000-8000-000000000264","evidenceItemId":null,"status":"AUTHORIZED","uploadMethod":"PUT","uploadUrl":"https://uploads.example/once","requiredHeaders":{"Content-Type":"image/jpeg"},"uploadAuthorizationExpiresAt":"2026-07-18T10:05:00Z","sessionExpiresAt":"2026-07-18T10:10:00Z"}"#
+        } else if request.url!.path.hasSuffix("/once") {
+            body = #"{}"#
+        } else if request.url!.path.hasSuffix(":finalize") {
+            body = #"{"evidenceItemId":"92000000-0000-4000-8000-000000000264","taskId":"50000000-0000-4000-8000-000000000263","evidenceSlotId":"90000000-0000-4000-8000-000000000264","itemOrdinal":1,"status":"STORED","createdAt":"2026-07-18T10:00:02Z","revisions":[{"evidenceRevisionId":"93000000-0000-4000-8000-000000000264","revisionNumber":1,"contentDigest":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","mimeType":"image/jpeg","sizeBytes":10,"status":"STORED","createdAt":"2026-07-18T10:00:02Z"}]}"#
         } else {
             body = #"{"visitId":"40000000-0000-4000-8000-000000000262","status":"IN_PROGRESS","aggregateVersion":1,"geofenceResult":"WITHIN_GEOFENCE","policyDecision":"ACCEPTED","occurredAt":"2026-07-18T10:00:01Z"}"#
         }
@@ -172,6 +186,7 @@ struct FoundationSmoke {
         precondition(GeneratedContractBoundary.primaryActionColor == "#243B53")
 
         let onlineTransport = FakeOnlineTransport()
+        await tokenVault.store(.init(accessToken: "online-access", expiresAt: now.addingTimeInterval(60)))
         let online = TechnicianOnlineService(requestBuilder: builder, transport: onlineTransport)
         let contextID = "TECHNICIAN|NETWORK|20000000-0000-4000-8000-000000000262"
         let feed = try await online.taskFeed(contextID: contextID)
@@ -221,5 +236,37 @@ struct FoundationSmoke {
         precondition(onlineRequests[4].body.contains(#""site.safe":true"#))
         precondition(!onlineRequests[4].body.contains("prefillVersion"))
         precondition(!onlineRequests[4].body.contains("submittedBy"))
+        let evidenceSlots = try await online.evidenceSlots(contextID: contextID, taskID: formTaskID)
+        precondition(evidenceSlots.first?.requirementCode == "SITE_PHOTO")
+        let evidenceItems = try await online.evidenceItems(contextID: contextID, taskID: formTaskID)
+        precondition(evidenceItems.isEmpty)
+        let uploaded = try await online.uploadEvidence(
+            contextID: contextID,
+            taskID: formTaskID,
+            slotID: evidenceSlots[0].slotId,
+            evidenceItemID: nil,
+            asset: .init(
+                data: Data("0123456789".utf8),
+                fileName: "现场照片.jpg",
+                mimeType: "image/jpeg",
+                source: .camera,
+                capturedAt: Date(timeIntervalSince1970: 1_800_000_001)
+            )
+        )
+        precondition(uploaded.status == "STORED")
+        let evidenceRequests = await onlineTransport.captured()
+        precondition(evidenceRequests.count == 10)
+        precondition(evidenceRequests[7].body.contains(#""captureSource":"CAMERA""#))
+        precondition(evidenceRequests[7].body.contains(#""expectedSize":10"#))
+        precondition(!evidenceRequests[7].body.contains("offline"))
+        precondition(!evidenceRequests[7].body.contains("uploader"))
+        precondition(!evidenceRequests[7].body.contains("locationVerified"))
+        precondition(evidenceRequests[8].method == "PUT")
+        precondition(evidenceRequests[8].context == nil)
+        precondition(evidenceRequests[8].authorization == nil)
+        precondition(evidenceRequests[8].clientKind == nil)
+        precondition(evidenceRequests[8].idempotencyKey == nil)
+        precondition(evidenceRequests[9].body.contains("actualSha256"))
+        precondition(evidenceRequests[9].body.contains("finalizeCommandId"))
     }
 }

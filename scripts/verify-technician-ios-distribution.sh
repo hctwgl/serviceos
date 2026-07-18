@@ -41,9 +41,11 @@ plutil -convert json -o - "${privacy_manifest}" | jq -e '
     {type:"NSPrivacyCollectedDataTypePreciseLocation",linked:true,tracking:false,
      purposes:["NSPrivacyCollectedDataTypePurposeAppFunctionality"]},
     {type:"NSPrivacyCollectedDataTypeDeviceID",linked:true,tracking:false,
+     purposes:["NSPrivacyCollectedDataTypePurposeAppFunctionality"]},
+    {type:"NSPrivacyCollectedDataTypePhotosorVideos",linked:true,tracking:false,
      purposes:["NSPrivacyCollectedDataTypePurposeAppFunctionality"]}
   ]' >/dev/null || {
-  echo "隐私清单必须精确声明主动签到使用的位置与设备标识，且仅用于 App 功能、不追踪。" >&2
+  echo "隐私清单必须精确声明主动签到位置、设备标识和现场照片/视频，且仅用于 App 功能、不追踪。" >&2
   exit 1
 }
 rg -q 'ASSETCATALOG_COMPILER_APPICON_NAME[[:space:]]*=[[:space:]]*AppIcon' \

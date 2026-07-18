@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import ServiceOSCoreClient
 import ServiceOSIOSCore
@@ -125,6 +126,82 @@ public struct TechnicianFormSubmissionResult: Sendable, Decodable, Equatable {
     public let warnings: [TechnicianFormValidationIssue]
 }
 
+public struct TechnicianOnlineEvidenceSlot: Sendable, Decodable, Equatable, Identifiable {
+    public let slotId: UUID
+    public let requirementCode: String
+    public let occurrenceKey: String
+    public let requirementName: String
+    public let mediaType: String
+    public let required: Bool
+    public let minCount: Int
+    public let maxCount: Int?
+    public let status: String
+    public let active: Bool
+    public let transition: String
+    public let requiredDisposition: String
+
+    public var id: UUID { slotId }
+}
+
+public struct TechnicianOnlineEvidenceRevision: Sendable, Decodable, Equatable, Identifiable {
+    public let evidenceRevisionId: UUID
+    public let revisionNumber: Int
+    public let contentDigest: String
+    public let mimeType: String
+    public let sizeBytes: Int64
+    public let status: String
+    public let createdAt: Date
+
+    public var id: UUID { evidenceRevisionId }
+}
+
+public struct TechnicianOnlineEvidenceItem: Sendable, Decodable, Equatable, Identifiable {
+    public let evidenceItemId: UUID
+    public let taskId: UUID
+    public let evidenceSlotId: UUID
+    public let itemOrdinal: Int
+    public let status: String
+    public let createdAt: Date
+    public let revisions: [TechnicianOnlineEvidenceRevision]
+
+    public var id: UUID { evidenceItemId }
+}
+
+public struct TechnicianEvidenceUploadAsset: Sendable, Equatable {
+    public enum Source: String, Sendable, Equatable, Encodable { case camera = "CAMERA", gallery = "GALLERY", file = "FILE" }
+
+    public let data: Data
+    public let fileName: String
+    public let mimeType: String
+    public let source: Source
+    public let capturedAt: Date
+
+    public init(data: Data, fileName: String, mimeType: String, source: Source, capturedAt: Date) {
+        self.data = data
+        self.fileName = fileName
+        self.mimeType = mimeType
+        self.source = source
+        self.capturedAt = capturedAt
+    }
+}
+
+public struct TechnicianEvidenceUploadSession: Sendable, Decodable, Equatable {
+    public let uploadSessionId: UUID
+    public let evidenceSlotId: UUID
+    public let evidenceItemId: UUID?
+    public let status: String
+    public let uploadMethod: String?
+    public let uploadUrl: String?
+    public let requiredHeaders: [String: String]
+    public let uploadAuthorizationExpiresAt: Date
+    public let sessionExpiresAt: Date
+}
+
+public enum TechnicianEvidenceUploadError: Error, Equatable {
+    case emptyFile
+    case invalidUploadAuthorization
+}
+
 public struct TechnicianOnlineService: Sendable {
     private let requestBuilder: ServiceRequestBuilder
     private let transport: any ServiceHTTPTransporting
@@ -163,6 +240,78 @@ public struct TechnicianOnlineService: Sendable {
             ifMatch: nil,
             body: SubmitFormBody(formVersionId: formVersionID, values: values)
         )
+    }
+
+    public func evidenceSlots(contextID: String, taskID: UUID) async throws -> [TechnicianOnlineEvidenceSlot] {
+        try await get(
+            "/technician/me/tasks/\(taskID.uuidString.lowercased())/evidence-slots",
+            contextID: contextID
+        )
+    }
+
+    public func evidenceItems(contextID: String, taskID: UUID) async throws -> [TechnicianOnlineEvidenceItem] {
+        try await get(
+            "/technician/me/tasks/\(taskID.uuidString.lowercased())/evidence-items",
+            contextID: contextID
+        )
+    }
+
+    /**
+     * 在线三段式上传：Begin 与 Finalize 使用可信 API；中间 PUT 只携带短期 URL/headers，
+     * 不携带 Bearer Token、Portal Context 或任何离线队列状态。
+     */
+    public func uploadEvidence(
+        contextID: String,
+        taskID: UUID,
+        slotID: UUID,
+        evidenceItemID: UUID?,
+        asset: TechnicianEvidenceUploadAsset
+    ) async throws -> TechnicianOnlineEvidenceItem {
+        guard !asset.data.isEmpty else { throw TechnicianEvidenceUploadError.emptyFile }
+        let digest = Self.sha256(asset.data)
+        let session: TechnicianEvidenceUploadSession = try await post(
+            "/technician/me/tasks/\(taskID.uuidString.lowercased())/evidence-slots/\(slotID.uuidString.lowercased())/upload-sessions",
+            contextID: contextID,
+            idempotencyKey: UUID().uuidString.lowercased(),
+            ifMatch: nil,
+            body: BeginEvidenceBody(
+                evidenceItemId: evidenceItemID,
+                originalFileName: asset.fileName,
+                declaredMimeType: asset.mimeType,
+                expectedSize: asset.data.count,
+                expectedSha256: digest,
+                captureSource: asset.source,
+                capturedAt: asset.capturedAt
+            )
+        )
+        try await putAuthorized(session: session, data: asset.data)
+        return try await post(
+            "/technician/me/tasks/\(taskID.uuidString.lowercased())/evidence-slots/\(slotID.uuidString.lowercased())"
+                + "/upload-sessions/\(session.uploadSessionId.uuidString.lowercased()):finalize",
+            contextID: contextID,
+            idempotencyKey: UUID().uuidString.lowercased(),
+            ifMatch: nil,
+            body: FinalizeEvidenceBody(
+                actualSha256: digest,
+                finalizeCommandId: UUID().uuidString.lowercased()
+            )
+        )
+    }
+
+    private func putAuthorized(session: TechnicianEvidenceUploadSession, data: Data) async throws {
+        guard session.uploadMethod == "PUT", let raw = session.uploadUrl, let url = URL(string: raw),
+              url.scheme == "https" || (url.scheme == "http" && ["localhost", "127.0.0.1"].contains(url.host)) else {
+            throw TechnicianEvidenceUploadError.invalidUploadAuthorization
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.httpBody = data
+        for (name, value) in session.requiredHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        _ = try await transport.execute(request)
+    }
+
+    private static func sha256(_ data: Data) -> String {
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
     /// 签到只接受本次主动采集的位置；receivedAt、师傅和网点都由服务端权威生成。
@@ -282,6 +431,21 @@ public struct TechnicianOnlineService: Sendable {
     private struct SubmitFormBody: Encodable {
         let formVersionId: UUID
         let values: [String: TechnicianFormValue]
+    }
+
+    private struct BeginEvidenceBody: Encodable {
+        let evidenceItemId: UUID?
+        let originalFileName: String
+        let declaredMimeType: String
+        let expectedSize: Int
+        let expectedSha256: String
+        let captureSource: TechnicianEvidenceUploadAsset.Source
+        let capturedAt: Date
+    }
+
+    private struct FinalizeEvidenceBody: Encodable {
+        let actualSha256: String
+        let finalizeCommandId: String
     }
 }
 
