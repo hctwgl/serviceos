@@ -12,7 +12,7 @@ use_existing="${1:-}"
 if [[ "${use_existing}" != "--use-existing" ]]; then
   generation_log="${module_directory}/target/swift-client-generation.log"
   if ! "${repository_root}/mvnw" --batch-mode --no-transfer-progress \
-    -pl serviceos-contracts -am generate-sources >"${generation_log}" 2>&1; then
+    -pl serviceos-contracts openapi-generator:generate@generate-swift6-client >"${generation_log}" 2>&1; then
     tail -n 100 "${generation_log}" >&2
     exit 1
   fi

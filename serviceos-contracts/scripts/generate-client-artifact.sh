@@ -12,7 +12,7 @@ use_existing="${1:-}"
 if [[ "${use_existing}" != "--use-existing" ]]; then
   rm -rf "${generated_directory}"
   "${repository_root}/mvnw" --batch-mode --no-transfer-progress \
-    -pl serviceos-contracts -am generate-sources
+    -pl serviceos-contracts openapi-generator:generate@generate-typescript-fetch-client
 fi
 
 if [[ ! -f "${generated_directory}/package.json" ]]; then
