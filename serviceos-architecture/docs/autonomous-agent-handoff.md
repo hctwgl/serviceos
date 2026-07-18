@@ -8,15 +8,14 @@ lastUpdated: 2026-07-18
 ## 当前
 
 - PR：https://github.com/hctwgl/serviceos/pull/146
-- latestMilestone：**M285**
-- Flyway：**113 / 115**
-- OpenAPI：**1.0.30**
-- Page Registry：**page-registry-v17**
+- latestMilestone：**M286**（提交后回填 baselineCommit）
+- Flyway：**115 / 117**
+- OpenAPI：**1.0.31**
 
 ## 已完成
 
-阶段三设计器：**M282～M285**（草稿 API、多资产类型、Admin 壳、Diff/审批门禁）
+阶段三设计器与发布治理：**M282～M286**（草稿 API、多类型、Admin 壳、Diff/审批、CANARY/回滚）
 
 ## 下一步
 
-拖拽画布；灰度发布/回滚
+拖拽画布；百分比流量灰度

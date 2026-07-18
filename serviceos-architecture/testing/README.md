@@ -286,5 +286,6 @@
 - [M283 FORM/EVIDENCE/SLA 配置设计器 API 验收矩阵](280-m283-form-evidence-sla-designer-api-acceptance.md)
 - [M284 Admin 配置设计器壳验收矩阵](281-m284-admin-configuration-designer-shell-acceptance.md)
 - [M285 配置草稿 Diff 与发布审批验收矩阵](282-m285-configuration-draft-diff-approval-acceptance.md)
+- [M286 配置 Bundle 灰度与回滚验收矩阵](283-m286-configuration-canary-rollback-acceptance.md)
 - [多车企平台内核程序级验收矩阵](multi-oem-platform-kernel-program-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

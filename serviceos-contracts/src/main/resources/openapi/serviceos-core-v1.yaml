@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.30
+  version: 1.0.31
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -5144,6 +5144,109 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /configuration/bundle-activations:
+    get:
+      operationId: listBundleChannelActivations
+      summary: 列出项目 Bundle 通道激活
+      description: 需要 configuration.release.manage。
+      parameters:
+        - name: projectId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 激活历史（新到旧）
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/BundleChannelActivation' } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: activateBundleChannel
+      summary: 激活 STABLE/CANARY 通道
+      description: 需要 configuration.release.manage；指向已发布 Bundle，不修改 Bundle 内容。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ActivateBundleChannelRequest' }
+      responses:
+        '200':
+          description: 新 ACTIVE 激活
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BundleChannelActivation' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /configuration/bundle-activations/{activationId}:promote:
+    post:
+      operationId: promoteCanaryBundleActivation
+      summary: 将 ACTIVE CANARY 晋级为 STABLE
+      parameters:
+        - name: activationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BundleActivationApprovalRequest' }
+      responses:
+        '200':
+          description: 新 STABLE 激活
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BundleChannelActivation' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /configuration/bundle-activations/{activationId}:rollback:
+    post:
+      operationId: rollbackStableBundleActivation
+      summary: 回滚 ACTIVE STABLE 到上一激活
+      parameters:
+        - name: activationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BundleActivationApprovalRequest' }
+      responses:
+        '200':
+          description: 回滚后的 STABLE 激活
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BundleChannelActivation' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
 components:
   securitySchemes:
     bearerAuth:
@@ -5346,6 +5449,40 @@ components:
       required: [approvalRef]
       properties:
         approvalRef: { type: string, minLength: 1, maxLength: 128 }
+    ActivateBundleChannelRequest:
+      type: object
+      additionalProperties: false
+      required: [projectId, channel, bundleId, approvalRef]
+      properties:
+        projectId: { type: string, format: uuid }
+        channel: { type: string, enum: [STABLE, CANARY] }
+        bundleId: { type: string, format: uuid }
+        approvalRef: { type: string, minLength: 1, maxLength: 128 }
+    BundleActivationApprovalRequest:
+      type: object
+      additionalProperties: false
+      required: [approvalRef]
+      properties:
+        approvalRef: { type: string, minLength: 1, maxLength: 128 }
+    BundleChannelActivation:
+      type: object
+      additionalProperties: false
+      required: [activationId, projectId, channel, bundleId, bundleCode, bundleVersion,
+                 status, approvalRef, activatedBy, activatedAt, aggregateVersion]
+      properties:
+        activationId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        channel: { type: string, enum: [STABLE, CANARY] }
+        bundleId: { type: string, format: uuid }
+        bundleCode: { type: string }
+        bundleVersion: { type: string }
+        previousActivationId: { type: [string, 'null'], format: uuid }
+        status: { enum: [ACTIVE, SUPERSEDED] }
+        approvalRef: { type: string }
+        activatedBy: { type: string }
+        activatedAt: { type: string, format: date-time }
+        supersededAt: { type: [string, 'null'], format: date-time }
+        aggregateVersion: { type: integer, format: int64, minimum: 1 }
     ConfigurationDraftDiff:
       type: object
       additionalProperties: false

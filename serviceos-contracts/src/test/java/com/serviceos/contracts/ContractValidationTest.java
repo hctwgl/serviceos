@@ -65,7 +65,10 @@ class ContractValidationTest {
                         "/configuration/drafts/{draftId}:validate",
                         "/configuration/drafts/{draftId}:diff",
                         "/configuration/drafts/{draftId}:approve",
-                        "/configuration/drafts/{draftId}:publish");
+                        "/configuration/drafts/{draftId}:publish",
+                        "/configuration/bundle-activations",
+                        "/configuration/bundle-activations/{activationId}:promote",
+                        "/configuration/bundle-activations/{activationId}:rollback");
     }
 
     @Test

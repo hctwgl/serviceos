@@ -191,6 +191,20 @@ final class JdbcConfigurationService implements ConfigurationService {
                     "project is missing, inactive, or outside its validity window");
         }
 
+        // M286：通道激活优先于兼容扫描；CANARY 仅在 preferCanary=true 时参与。
+        if (query.preferCanary()) {
+            ConfigurationBundleReference canary = resolveActiveChannel(
+                    query, project.projectId(), "CANARY");
+            if (canary != null) {
+                return canary;
+            }
+        }
+        ConfigurationBundleReference stable = resolveActiveChannel(
+                query, project.projectId(), "STABLE");
+        if (stable != null) {
+            return stable;
+        }
+
         List<ResolvedBundle> candidates = jdbc.sql("""
                 SELECT bundle_id, project_id, bundle_code, bundle_version, manifest_digest,
                        CASE WHEN province_code = :provinceCode THEN 1 ELSE 0 END AS region_rank
@@ -235,6 +249,40 @@ final class JdbcConfigurationService implements ConfigurationService {
                     "multiple published configuration bundles match the same priority");
         }
         return preferred.getFirst().reference();
+    }
+
+    private ConfigurationBundleReference resolveActiveChannel(
+            ResolveConfigurationBundleQuery query,
+            UUID projectId,
+            String channel
+    ) {
+        // 通道激活是项目级发布指针：命中后不再做 province/时间窗扫描，避免与兼容扫描的互斥生效窗冲突。
+        return jdbc.sql("""
+                        SELECT b.bundle_id, b.project_id, b.bundle_code, b.bundle_version, b.manifest_digest
+                          FROM cfg_bundle_channel_activation a
+                          JOIN cfg_configuration_bundle b
+                            ON b.tenant_id = a.tenant_id AND b.bundle_id = a.bundle_id
+                         WHERE a.tenant_id = :tenantId
+                           AND a.project_id = :projectId
+                           AND a.channel = :channel
+                           AND a.status = 'ACTIVE'
+                           AND b.status = 'PUBLISHED'
+                           AND b.brand_code = :brandCode
+                           AND b.service_product_code = :serviceProductCode
+                        """)
+                .param("tenantId", query.tenantId())
+                .param("projectId", projectId)
+                .param("channel", channel)
+                .param("brandCode", query.brandCode())
+                .param("serviceProductCode", query.serviceProductCode())
+                .query((rs, rowNum) -> new ConfigurationBundleReference(
+                        rs.getObject("bundle_id", UUID.class),
+                        rs.getObject("project_id", UUID.class),
+                        rs.getString("bundle_code"),
+                        rs.getString("bundle_version"),
+                        rs.getString("manifest_digest")))
+                .optional()
+                .orElse(null);
     }
 
     @Override

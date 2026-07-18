@@ -10,8 +10,20 @@ public record ResolveConfigurationBundleQuery(
         String brandCode,
         String serviceProductCode,
         String provinceCode,
-        Instant effectiveAt
+        Instant effectiveAt,
+        boolean preferCanary
 ) {
+    public ResolveConfigurationBundleQuery(
+            String tenantId,
+            String projectCode,
+            String brandCode,
+            String serviceProductCode,
+            String provinceCode,
+            Instant effectiveAt
+    ) {
+        this(tenantId, projectCode, brandCode, serviceProductCode, provinceCode, effectiveAt, false);
+    }
+
     public ResolveConfigurationBundleQuery {
         tenantId = PublishConfigurationAssetCommand.text(tenantId, "tenantId", 64);
         projectCode = PublishConfigurationAssetCommand.text(projectCode, "projectCode", 64);
