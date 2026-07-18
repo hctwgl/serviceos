@@ -258,6 +258,7 @@ title: ServiceOS 里程碑索引
 | M247 | M247 TypeScript OpenAPI Client 消费基础 | [260-m247-typescript-openapi-client-consumer-foundation.md](../architecture/260-m247-typescript-openapi-client-consumer-foundation.md) | [244-m247-typescript-openapi-client-consumer-foundation-acceptance.md](../testing/244-m247-typescript-openapi-client-consumer-foundation-acceptance.md) |
 | M248 | M248 Swift OpenAPI Client 消费基础 | [261-m248-swift-openapi-client-consumer-foundation.md](../architecture/261-m248-swift-openapi-client-consumer-foundation.md) | [245-m248-swift-openapi-client-consumer-foundation-acceptance.md](../testing/245-m248-swift-openapi-client-consumer-foundation-acceptance.md) |
 | M249 | M249 多端共享 Design Token 基础 | [262-m249-shared-design-token-foundation.md](../architecture/262-m249-shared-design-token-foundation.md) | [246-m249-shared-design-token-foundation-acceptance.md](../testing/246-m249-shared-design-token-foundation-acceptance.md) |
+| M250 | M250 Web auth/context/error/trace 共享基础 | [263-m250-web-core-auth-context-error-trace-foundation.md](../architecture/263-m250-web-core-auth-context-error-trace-foundation.md) | [247-m250-web-core-auth-context-error-trace-foundation-acceptance.md](../testing/247-m250-web-core-auth-context-error-trace-foundation-acceptance.md) |
 
 ## 未关联里程碑的文档
 

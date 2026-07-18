@@ -250,4 +250,5 @@
 - [M247 TypeScript OpenAPI Client 消费基础验收矩阵](244-m247-typescript-openapi-client-consumer-foundation-acceptance.md)
 - [M248 Swift OpenAPI Client 消费基础验收矩阵](245-m248-swift-openapi-client-consumer-foundation-acceptance.md)
 - [M249 多端共享 Design Token 基础验收矩阵](246-m249-shared-design-token-foundation-acceptance.md)
+- [M250 Web auth/context/error/trace 共享基础验收矩阵](247-m250-web-core-auth-context-error-trace-foundation-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)
