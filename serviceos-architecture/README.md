@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M280 取消时配置化补偿任务**，功能证据提交 `3ecc3c5d64b13cd28cf98c6329f0fa3b11f01dc7`（合并入 `master` 后改为合并提交）。
+当前工程基线为 **M281 标准维修/移机/巡检配置模板**，功能证据提交待回填`PLACEHOLDER64b13cd28cf98c6329f0fa3b11f01dc7`（合并入 `master` 后改为合并提交）。
 此前 M267 Connector SPI 证据为 `994cb46f1e31ddc8a4364a776cc4849e766c3b6d`；M266 仍为上一
 master 合并基线 `088018a6eac180f7fe36536fae9d073fa797757c`。
 

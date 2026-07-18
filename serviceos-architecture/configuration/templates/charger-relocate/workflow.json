@@ -1,0 +1,49 @@
+{
+  "workflowKey": "platform.charger.relocate",
+  "semanticVersion": "1.0.0",
+  "name": "标准充电桩移机",
+  "startNodeId": "START",
+  "nodes": [
+    {"nodeId": "START", "nodeType": "START", "name": "开始"},
+    {
+      "nodeId": "INTAKE",
+      "nodeType": "SERVICE_TASK",
+      "name": "移机受理",
+      "stageCode": "INTAKE",
+      "taskType": "RELOCATE_INTAKE",
+      "slaRef": "platform.charger.relocate.task-elapsed"
+    },
+    {
+      "nodeId": "DISMANTLE",
+      "nodeType": "SERVICE_TASK",
+      "name": "原址拆机",
+      "stageCode": "DISMANTLE",
+      "taskType": "RELOCATE_DISMANTLE",
+      "slaRef": "platform.charger.relocate.task-elapsed"
+    },
+    {
+      "nodeId": "INSTALL_NEW_SITE",
+      "nodeType": "SERVICE_TASK",
+      "name": "新址安装",
+      "stageCode": "INSTALL",
+      "taskType": "RELOCATE_INSTALL",
+      "slaRef": "platform.charger.relocate.task-elapsed"
+    },
+    {
+      "nodeId": "WAIT_OEM_ACK",
+      "nodeType": "WAIT_EVENT",
+      "name": "等待车企确认",
+      "stageCode": "HANDOFF",
+      "waitEventType": "platform.oem.acknowledged",
+      "correlationKeyTemplate": "workOrder:{workOrderId}"
+    },
+    {"nodeId": "END", "nodeType": "END", "name": "结束"}
+  ],
+  "transitions": [
+    {"transitionId": "t1", "from": "START", "to": "INTAKE"},
+    {"transitionId": "t2", "from": "INTAKE", "to": "DISMANTLE"},
+    {"transitionId": "t3", "from": "DISMANTLE", "to": "INSTALL_NEW_SITE"},
+    {"transitionId": "t4", "from": "INSTALL_NEW_SITE", "to": "WAIT_OEM_ACK"},
+    {"transitionId": "t5", "from": "WAIT_OEM_ACK", "to": "END"}
+  ]
+}

@@ -46,15 +46,25 @@ class ConfigurationSchemaDriftTest {
 
     @Test
     void embeddedHomeChargingTemplateMatchesArchitectureSource() throws IOException {
+        assertTemplateSynced("home-charging-survey-install");
+    }
+
+    @Test
+    void embeddedChargerServiceTemplatesMatchArchitectureSource() throws IOException {
+        assertTemplateSynced("charger-maintenance");
+        assertTemplateSynced("charger-relocate");
+        assertTemplateSynced("charger-inspection");
+    }
+
+    private void assertTemplateSynced(String templateDir) throws IOException {
         Path repository = repositoryRoot();
         for (String file : java.util.List.of("workflow.json", "sla.json")) {
             Path architecture = repository.resolve(
-                    "serviceos-architecture/configuration/templates/home-charging-survey-install/" + file);
+                    "serviceos-architecture/configuration/templates/" + templateDir + "/" + file);
             Path runtime = repository.resolve(
-                    "serviceos-backend/src/main/resources/configuration-templates/home-charging-survey-install/"
-                            + file);
+                    "serviceos-backend/src/main/resources/configuration-templates/" + templateDir + "/" + file);
             assertThat(Files.mismatch(architecture, runtime))
-                    .as(file)
+                    .as(templateDir + "/" + file)
                     .isEqualTo(-1L);
         }
     }

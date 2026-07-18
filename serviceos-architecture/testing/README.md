@@ -281,5 +281,6 @@
 - [M278 多实例任务运行时验收矩阵](275-m278-multi-instance-runtime-acceptance.md)
 - [M279 工单取消/重开与流程人工跳转验收矩阵](276-m279-work-order-cancel-reopen-jump-acceptance.md)
 - [M280 取消时配置化补偿任务验收矩阵](277-m280-workflow-compensation-on-cancel-acceptance.md)
+- [M281 标准维修/移机/巡检配置模板验收矩阵](278-m281-standard-charger-service-templates-acceptance.md)
 - [多车企平台内核程序级验收矩阵](multi-oem-platform-kernel-program-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

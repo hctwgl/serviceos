@@ -8,14 +8,14 @@ lastUpdated: 2026-07-18
 ## 当前
 
 - PR：https://github.com/hctwgl/serviceos/pull/146
-- latestMilestone：**M280**
+- latestMilestone：**M281**（提交后回填 baselineCommit）
 - Flyway：**109 / 111**
 - OpenAPI：**1.0.27**
 
-## 已完成（阶段二）
+## 已完成
 
-M275 PARALLEL · M276 TIMER · M277 SUB_PROCESS · M278 多实例 · M279 取消/重开/跳转 · **M280 取消补偿**
+阶段一 M267～M274；阶段二 M275～M280；**M281** 标准维修/移机/巡检模板（家充勘安已在 M271）
 
 ## 下一步
 
-安装/维修/移机/巡检标准模板扩展；随后进入阶段三领域配置设计器。
+阶段三：领域配置设计器（流程/表单/资料/SLA/映射等）最小纵向切片

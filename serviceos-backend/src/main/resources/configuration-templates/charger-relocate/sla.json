@@ -1,0 +1,10 @@
+{
+  "policyKey": "platform.charger.relocate.task-elapsed",
+  "version": "1.0.0",
+  "subjectType": "TASK",
+  "taskTypes": ["RELOCATE_INTAKE", "RELOCATE_DISMANTLE", "RELOCATE_INSTALL"],
+  "startEvent": "TASK_CREATED",
+  "stopEvent": "TASK_COMPLETED",
+  "clockMode": "ELAPSED",
+  "targetDurationSeconds": 172800
+}

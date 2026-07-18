@@ -375,3 +375,4 @@ Feature gate/authority: if applicable
 | M278 | 多实例任务：multiInstance.cardinality 并行创建 N 实例；slot 到齐后推进；Flyway V105 | schema + V105 + Handler + MultiInstance IT + `291-m278-*` + `275-m278-*` | 集合驱动 cardinality、顺序多实例、多实例子流程 |
 | M279 | 工单取消级联、授权重开新建 ROOT、人工跳转到任务节点；Flyway V106～V108；事件 cancelled/reopened@v1 | Command + Cancel/Reopen Handlers + JumpService + CancelReopenJump IT + `292-m279-*` + `276-m279-*` | HTTP 命令面、FULFILLED 纠错重开、跳转网关/等待、异常补偿 |
 | M280 | 取消时配置化补偿：节点 `compensation.taskType`；COMPLETED 节点生成补偿请求与任务；Flyway V109 | schema + Validator + CancelledHandler + Compensation IT + `293-m280-*` + `277-m280-*` | 补偿完成回写、失败重试、边界事件、补偿编排图 |
+| M281 | 标准维修/移机/巡检配置模板（平台中立）+ 架构/运行时同步 + 发布冒烟 | templates + Drift + StandardChargerServiceTemplates IT + `294-m281-*` + `278-m281-*` | 表单/资料完整包、设计器、真实 OEM Bundle 绑定 |
