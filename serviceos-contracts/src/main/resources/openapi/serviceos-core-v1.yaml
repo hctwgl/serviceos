@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.21
+  version: 1.0.22
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -2376,6 +2376,74 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+  /technician/me/appointments/{appointmentId}/visits:check-in:
+    post:
+      operationId: checkInTechnicianVisit
+      summary: 当前师傅在已确认预约主动签到
+      description: |
+        M262：X-Technician-Context 必须是当前主体 ACTIVE 网点关系，预约必须属于同一网点且当前
+        ServiceAssignment 仍由该师傅承担。客户端只在用户主动操作时采集位置；服务端固定 offline=false，
+        receivedAt、technician 与 network 均来自可信上下文。Idempotency-Key 必须等于 deviceCommandId。
+      parameters:
+        - $ref: '#/components/parameters/AppointmentId'
+        - $ref: '#/components/parameters/TechnicianContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TechnicianCheckInVisitRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/VisitCommandReceipt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /technician/me/visits/{visitId}:check-out:
+    post:
+      operationId: checkOutTechnicianVisit
+      summary: 当前师傅完成本次上门
+      description: M262：上下文与当前责任实时复核；operationRefs 必须引用已完成现场操作，客户端不得填充占位值。
+      parameters:
+        - $ref: '#/components/parameters/VisitId'
+        - $ref: '#/components/parameters/TechnicianContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CheckOutVisitRequest' } } }
+      responses:
+        '200': { $ref: '#/components/responses/VisitCommandReceipt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /technician/me/visits/{visitId}:interrupt:
+    post:
+      operationId: interruptTechnicianVisit
+      summary: 当前师傅记录无法施工并中断本次上门
+      description: M262：上下文与当前责任实时复核；异常码必填，证据引用可为空且不会伪造上传完成。
+      parameters:
+        - $ref: '#/components/parameters/VisitId'
+        - $ref: '#/components/parameters/TechnicianContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/InterruptVisitRequest' } } }
+      responses:
+        '200': { $ref: '#/components/responses/VisitCommandReceipt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
   /technician/me/schedule:
     get:
       operationId: listTechnicianSchedule
@@ -8733,6 +8801,15 @@ components:
         deviceId: { type: string, minLength: 1, maxLength: 160 }
         location: { $ref: '#/components/schemas/VisitLocation' }
         offline: { type: boolean }
+    TechnicianCheckInVisitRequest:
+      type: object
+      additionalProperties: false
+      required: [capturedAt, deviceCommandId, deviceId, location]
+      properties:
+        capturedAt: { type: string, format: date-time }
+        deviceCommandId: { type: string, minLength: 1, maxLength: 160 }
+        deviceId: { type: string, minLength: 1, maxLength: 160 }
+        location: { $ref: '#/components/schemas/VisitLocation' }
     CheckOutVisitRequest:
       type: object
       additionalProperties: false
