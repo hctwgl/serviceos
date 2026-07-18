@@ -21,6 +21,7 @@ import com.serviceos.reliability.api.OutboxAppender;
 import com.serviceos.reliability.api.OutboxEvent;
 import com.serviceos.task.api.CancelHandlingTaskCommand;
 import com.serviceos.task.api.CreateHandlingTaskCommand;
+import com.serviceos.task.api.CompleteHandlingTaskCommand;
 import com.serviceos.task.api.ScheduledTaskView;
 import com.serviceos.task.api.TaskFulfillmentContext;
 import com.serviceos.task.api.TaskFulfillmentContextService;
@@ -325,6 +326,18 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
         }
         corrections.saveCommandResult(
                 principal.tenantId(), CLOSE_OPERATION, context.idempotencyKey(), current.correctionCaseId());
+        if (current.correctionTaskId() != null) {
+            CorrectionResubmissionView latest = current.resubmissions().stream()
+                    .max(java.util.Comparator.comparingInt(CorrectionResubmissionView::resubmissionOrdinal))
+                    .orElseThrow(() -> new BusinessProblem(
+                            ProblemCode.INTERNAL_ERROR, "RESUBMITTED CorrectionCase has no resubmission round"));
+            // Case CLOSED 才是整改工作真正完成；多轮 RESUBMITTED 期间保持 handling Task 活跃。
+            tasks.completeHandlingTask(new CompleteHandlingTaskCommand(
+                    principal.tenantId(), current.correctionTaskId(), CORRECTION_TASK_TYPE,
+                    current.correctionCaseId().toString(),
+                    "correction-case://" + current.correctionCaseId(), latest.snapshotContentDigest(),
+                    principal.principalId(), now, metadata.correlationId()));
+        }
 
         String payload = serialize(new CorrectionClosedPayload(
                 current.correctionCaseId(), current.latestResubmissionSnapshotId(),

@@ -9,6 +9,9 @@ import com.serviceos.task.api.CreateHandlingTaskCommand;
 import com.serviceos.task.api.CancelHandlingTaskCommand;
 import com.serviceos.task.api.CreateWorkflowTaskCommand;
 import com.serviceos.task.api.HandlingTaskCancellationReceipt;
+import com.serviceos.task.api.CompleteHandlingTaskCommand;
+import com.serviceos.task.api.HandlingTaskCompletedPayload;
+import com.serviceos.task.api.HandlingTaskCompletionReceipt;
 import com.serviceos.task.api.ScheduleAutomatedTaskCommand;
 import com.serviceos.task.api.ScheduledTaskView;
 import com.serviceos.task.api.TaskCompletedPayload;
@@ -245,6 +248,90 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
         return new HandlingTaskCancellationReceipt(
                 state.taskId(), "CANCELLED", nextVersion,
                 command.sourceEventId(), command.cancelledAt());
+    }
+
+    @Override
+    public HandlingTaskCompletionReceipt completeHandlingTask(CompleteHandlingTaskCommand command) {
+        CompletionState state = jdbc.sql("""
+                        SELECT task_id, task_type, business_key, task_kind, status, version,
+                               result_ref, result_digest, completed_at
+                          FROM tsk_task
+                         WHERE tenant_id = :tenantId AND task_id = :taskId
+                         FOR UPDATE
+                        """)
+                .param("tenantId", command.tenantId()).param("taskId", command.taskId())
+                .query(CompletionState.class).optional()
+                .orElseThrow(() -> new BusinessProblem(
+                        ProblemCode.RESOURCE_NOT_FOUND, "Handling task does not exist"));
+        if (!"HUMAN".equals(state.taskKind())
+                || !command.taskType().equals(state.taskType())
+                || !command.businessKey().equals(state.businessKey())) {
+            throw new BusinessProblem(ProblemCode.TASK_SCHEDULE_CONFLICT,
+                    "Task identity does not match the handling task completion command");
+        }
+        if ("COMPLETED".equals(state.status())) {
+            if (!command.resultRef().equals(state.resultRef())
+                    || !command.resultDigest().equals(state.resultDigest())) {
+                throw new BusinessProblem(ProblemCode.TASK_SCHEDULE_CONFLICT,
+                        "Completed handling task is bound to another result");
+            }
+            return new HandlingTaskCompletionReceipt(
+                    state.taskId(), state.status(), state.version(), state.resultRef(), state.completedAt());
+        }
+        if (!java.util.Set.of("READY", "CLAIMED", "RUNNING", "MANUAL_INTERVENTION")
+                .contains(state.status())) {
+            throw new BusinessProblem(ProblemCode.TASK_SCHEDULE_CONFLICT,
+                    "Handling task cannot be completed from status " + state.status());
+        }
+        int updated = jdbc.sql("""
+                        UPDATE tsk_task
+                           SET status = 'COMPLETED', result_ref = :resultRef,
+                               result_digest = :resultDigest, completed_at = :completedAt,
+                               claim_owner = NULL, claim_until = NULL, current_attempt_id = NULL,
+                               version = version + 1, updated_at = :completedAt
+                         WHERE tenant_id = :tenantId AND task_id = :taskId
+                           AND version = :version AND status = :status
+                        """)
+                .param("resultRef", command.resultRef()).param("resultDigest", command.resultDigest())
+                .param("completedAt", timestamptz(command.completedAt()))
+                .param("tenantId", command.tenantId()).param("taskId", command.taskId())
+                .param("version", state.version()).param("status", state.status()).update();
+        if (updated != 1) {
+            throw new BusinessProblem(ProblemCode.TASK_SCHEDULE_CONFLICT,
+                    "Handling task changed concurrently during completion");
+        }
+        // 权威业务终态完成后撤销所有活动分配，避免已结束整改仍出现在候选/责任队列。
+        jdbc.sql("""
+                        UPDATE tsk_task_assignment
+                           SET status = 'EXPIRED', effective_to = :completedAt,
+                               revoked_by = :completedBy, revoke_reason_code = 'HANDLING_COMPLETED'
+                         WHERE tenant_id = :tenantId AND task_id = :taskId AND status = 'ACTIVE'
+                        """)
+                .param("completedAt", timestamptz(command.completedAt()))
+                .param("completedBy", command.completedBy())
+                .param("tenantId", command.tenantId()).param("taskId", command.taskId()).update();
+
+        long nextVersion = state.version() + 1;
+        appendHandlingTaskCompleted(command, nextVersion);
+        return new HandlingTaskCompletionReceipt(
+                state.taskId(), "COMPLETED", nextVersion, command.resultRef(), command.completedAt());
+    }
+
+    private void appendHandlingTaskCompleted(CompleteHandlingTaskCommand command, long taskVersion) {
+        HandlingTaskCompletedPayload payload = new HandlingTaskCompletedPayload(
+                command.taskId(), command.taskType(), command.businessKey(), command.resultRef(),
+                command.resultDigest(), command.completedBy(), command.completedAt());
+        String json;
+        try {
+            json = objectMapper.writeValueAsString(payload);
+        } catch (JacksonException exception) {
+            throw new IllegalStateException("Handling task completion payload serialization failed", exception);
+        }
+        outbox.append(new OutboxEvent(
+                UUID.randomUUID(), UUID.randomUUID(), "task", "task.handling-completed", 1,
+                "Task", command.taskId().toString(), taskVersion, command.tenantId(),
+                command.correlationId(), command.correlationId(), command.taskId().toString(),
+                json, Sha256.digest(json), command.completedAt()));
     }
 
     private void appendTaskCancelled(CancelHandlingTaskCommand command, long taskVersion) {
@@ -724,6 +811,19 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
             long version,
             UUID cancellationSourceEventId,
             Instant cancelledAt
+    ) {
+    }
+
+    private record CompletionState(
+            UUID taskId,
+            String taskType,
+            String businessKey,
+            String taskKind,
+            String status,
+            long version,
+            String resultRef,
+            String resultDigest,
+            Instant completedAt
     ) {
     }
 

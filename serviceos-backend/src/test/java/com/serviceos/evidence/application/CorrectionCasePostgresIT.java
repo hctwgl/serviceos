@@ -7,6 +7,7 @@ import com.serviceos.configuration.api.ConfigurationService;
 import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
 import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
 import com.serviceos.evidence.api.BeginEvidenceUploadCommand;
+import com.serviceos.evidence.api.BeginCorrectionEvidenceUploadCommand;
 import com.serviceos.evidence.api.CloseCorrectionCaseCommand;
 import com.serviceos.evidence.api.CorrectionCaseQueryService;
 import com.serviceos.evidence.api.CorrectionCaseQueueQuery;
@@ -19,6 +20,7 @@ import com.serviceos.evidence.api.EvidenceCommandService;
 import com.serviceos.evidence.api.EvidenceSetSnapshotService;
 import com.serviceos.evidence.api.EvidenceSetSnapshotView;
 import com.serviceos.evidence.api.FinalizeEvidenceUploadCommand;
+import com.serviceos.evidence.api.FinalizeCorrectionEvidenceUploadCommand;
 import com.serviceos.evidence.api.ResubmitCorrectionCaseCommand;
 import com.serviceos.evidence.api.ReviewCaseService;
 import com.serviceos.evidence.api.ReviewCaseView;
@@ -32,6 +34,9 @@ import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.shared.Sha256;
 import com.serviceos.task.application.TaskExecutionWorker;
+import com.serviceos.task.api.ClaimHumanTaskCommand;
+import com.serviceos.task.api.HumanTaskCommandService;
+import com.serviceos.task.api.StartHumanTaskCommand;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -94,6 +99,7 @@ class CorrectionCasePostgresIT {
     @Autowired ReviewCaseService reviews;
     @Autowired CorrectionCaseService corrections;
     @Autowired CorrectionCaseQueryService correctionQueries;
+    @Autowired HumanTaskCommandService humanTasks;
     @Autowired LocalObjectTransferService transfers;
     @Autowired TaskExecutionWorker worker;
     @Autowired List<OutboxMessageHandler> handlers;
@@ -132,7 +138,8 @@ class CorrectionCasePostgresIT {
                     :startsOn, 'ACTIVE', 1, now())
                 """).param("projectId", projectId).param("tenantId", TENANT)
                 .param("startsOn", LocalDate.now().minusDays(1)).update();
-        grant(TECHNICIAN, "evidence.submit", "evidence.read", "file.upload", "file.download");
+        grant(TECHNICIAN, "evidence.submit", "evidence.read", "file.upload", "file.download",
+                "task.claim", "task.start");
         grant(REVIEWER, "evidence.review", "evidence.read");
         grant(WAIVER, "evidence.waiveCorrection", "evidence.read");
         seedResolvedSlot();
@@ -179,13 +186,28 @@ class CorrectionCasePostgresIT {
         assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type='evidence.correction-case-created'")
                 .query(Long.class).single()).isOne();
 
+        // M265 已完成源业务 Task；M266 只能通过独立整改 Task 写新资料，严禁重开源 Task。
+        jdbc.sql("""
+                UPDATE tsk_task
+                   SET status='COMPLETED', completed_at=now(), version=version+1,
+                       result_ref=:resultRef, result_digest=:resultDigest
+                 WHERE task_id=:task
+                """).param("task", taskId)
+                .param("resultRef", "evidence-set-snapshot://" + first.evidenceSetSnapshotId())
+                .param("resultDigest", first.contentDigest()).update();
+        var claimed = humanTasks.claim(technician(), metadata("correction-claim"),
+                new ClaimHumanTaskCommand(opened.correctionTaskId(), 1));
+        var started = humanTasks.start(technician(), metadata("correction-start"),
+                new StartHumanTaskCommand(opened.correctionTaskId(), claimed.version()));
+        assertThat(started.status()).isEqualTo("RUNNING");
+
         assertThatThrownBy(() -> corrections.close(reviewer(), metadata("close-too-early"),
                 new CloseCorrectionCaseCommand(correctionId, "early")))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code())
                                 .isEqualTo(ProblemCode.CORRECTION_CASE_STATE_CONFLICT));
 
-        EvidenceSetSnapshotView second = createSnapshot("second");
+        EvidenceSetSnapshotView second = createCorrectionSnapshot(opened, "second");
         CorrectionCaseView resubmitted = corrections.resubmit(technician(), metadata("resubmit-1"),
                 new ResubmitCorrectionCaseCommand(correctionId, second.evidenceSetSnapshotId()));
         CorrectionCaseView resubmitReplay = corrections.resubmit(technician(), metadata("resubmit-1"),
@@ -206,6 +228,22 @@ class CorrectionCasePostgresIT {
         assertThat(closed.closedBy()).isEqualTo(REVIEWER);
         assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type='evidence.correction-closed'")
                 .query(Long.class).single()).isOne();
+        assertThat(jdbc.sql("""
+                SELECT status, result_ref, result_digest FROM tsk_task WHERE task_id=:task
+                """).param("task", opened.correctionTaskId()).query().singleRow())
+                .satisfies(row -> {
+                    assertThat(row.get("status")).isEqualTo("COMPLETED");
+                    assertThat(row.get("result_ref")).isEqualTo("correction-case://" + correctionId);
+                    assertThat(row.get("result_digest")).isEqualTo(second.contentDigest());
+                });
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM tsk_task_assignment
+                 WHERE task_id=:task AND status='ACTIVE'
+                """).param("task", opened.correctionTaskId()).query(Long.class).single()).isZero();
+        assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type='task.handling-completed'")
+                .query(Long.class).single()).isOne();
+        assertThat(jdbc.sql("SELECT status FROM tsk_task WHERE task_id=:task")
+                .param("task", taskId).query(String.class).single()).isEqualTo("COMPLETED");
 
         assertThatThrownBy(() -> corrections.resubmit(technician(), metadata("resubmit-after-close"),
                 new ResubmitCorrectionCaseCommand(correctionId, second.evidenceSetSnapshotId())))
@@ -368,6 +406,30 @@ class CorrectionCasePostgresIT {
         UUID revisionId = uploadScanAndValidate(pngBytes(marker), "begin-" + marker, "cmd-" + marker);
         return snapshots.create(technician(), metadata("snap-" + marker),
                 new CreateEvidenceSetSnapshotCommand(taskId, "TASK_SUBMISSION", List.of(revisionId)));
+    }
+
+    private EvidenceSetSnapshotView createCorrectionSnapshot(CorrectionCaseView correction, String marker)
+            throws Exception {
+        byte[] content = pngBytes(marker);
+        String checksum = sha256(content);
+        var session = evidence.beginCorrectionUpload(technician(), metadata("begin-" + marker),
+                new BeginCorrectionEvidenceUploadCommand(
+                        correction.correctionCaseId(), correction.correctionTaskId(), taskId, slotId,
+                        null, "site-correction.png", "image/png", content.length, checksum,
+                        "CAMERA", Instant.parse("2026-07-18T12:00:00Z")));
+        transfers.upload(token(session.uploadUrl()), "image/png", content.length,
+                new ByteArrayInputStream(content));
+        var item = evidence.finalizeCorrectionUpload(technician(), metadata("fin-" + marker),
+                new FinalizeCorrectionEvidenceUploadCommand(
+                        correction.correctionCaseId(), correction.correctionTaskId(), taskId, slotId,
+                        session.uploadSessionId(), checksum, "cmd-" + marker));
+        assertThat(worker.runOnce()).isEqualTo(TaskExecutionWorker.RunResult.SUCCEEDED);
+        handlers.stream().filter(handler -> handler.supports("file.scan-completed", 1))
+                .forEach(handler -> handler.handle(latestScanCompletedEvent()));
+        assertThat(worker.runOnce()).isEqualTo(TaskExecutionWorker.RunResult.SUCCEEDED);
+        UUID revisionId = item.revisions().getFirst().evidenceRevisionId();
+        return snapshots.createForCorrection(technician(), metadata("snap-" + marker),
+                correction.correctionCaseId(), correction.correctionTaskId(), taskId, List.of(revisionId));
     }
 
     private UUID uploadScanAndValidate(byte[] content, String beginKey, String commandId)

@@ -114,6 +114,24 @@
          ORDER BY created_at ASC, correction_case_id ASC
     </select>
 
+    <select id="findCaseByCorrectionTaskId" resultType="map">
+        SELECT correction_case_id AS "correctionCaseId", project_id AS "projectId",
+               task_id AS "taskId", source_review_case_id AS "sourceReviewCaseId",
+               source_review_decision_id AS "sourceReviewDecisionId",
+               source_evidence_set_snapshot_id AS "sourceEvidenceSetSnapshotId",
+               source_snapshot_content_digest AS "sourceSnapshotContentDigest",
+               reason_codes::text AS "reasonCodes",
+               correction_task_id AS "correctionTaskId", status AS "status",
+               created_by AS "createdBy", created_at AS "createdAt",
+               latest_resubmission_snapshot_id AS "latestResubmissionSnapshotId",
+               closed_by AS "closedBy", closed_at AS "closedAt",
+               waived_by AS "waivedBy", waived_at AS "waivedAt",
+               waive_approval_ref AS "waiveApprovalRef", waive_note AS "waiveNote"
+          FROM evd_correction_case
+         WHERE tenant_id = #{tenantId}
+           AND correction_task_id = CAST(#{correctionTaskId} AS uuid)
+    </select>
+
     <select id="findQueuePage" resultType="map">
         SELECT correction.correction_case_id AS "correctionCaseId",
                correction.project_id AS "projectId",

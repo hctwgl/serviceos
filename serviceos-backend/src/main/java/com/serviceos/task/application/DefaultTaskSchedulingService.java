@@ -4,6 +4,8 @@ import com.serviceos.task.api.ScheduleAutomatedTaskCommand;
 import com.serviceos.task.api.CancelHandlingTaskCommand;
 import com.serviceos.task.api.CreateHandlingTaskCommand;
 import com.serviceos.task.api.HandlingTaskCancellationReceipt;
+import com.serviceos.task.api.CompleteHandlingTaskCommand;
+import com.serviceos.task.api.HandlingTaskCompletionReceipt;
 import com.serviceos.task.api.ScheduledTaskView;
 import com.serviceos.task.api.TaskSchedulingService;
 import com.serviceos.task.api.CreateWorkflowTaskCommand;
@@ -79,6 +81,25 @@ final class DefaultTaskSchedulingService implements TaskSchedulingService {
         Objects.requireNonNull(command.cancelledAt(), "cancelledAt must not be null");
         requireText(command.correlationId(), "correlationId");
         return store.cancelHandlingTask(command);
+    }
+
+    @Override
+    @Transactional
+    public HandlingTaskCompletionReceipt completeHandlingTask(CompleteHandlingTaskCommand command) {
+        Objects.requireNonNull(command, "command must not be null");
+        requireText(command.tenantId(), "tenantId");
+        Objects.requireNonNull(command.taskId(), "taskId must not be null");
+        requireText(command.taskType(), "taskType");
+        requireText(command.businessKey(), "businessKey");
+        requireText(command.resultRef(), "resultRef");
+        requireText(command.resultDigest(), "resultDigest");
+        requireText(command.completedBy(), "completedBy");
+        Objects.requireNonNull(command.completedAt(), "completedAt must not be null");
+        requireText(command.correlationId(), "correlationId");
+        if (!isSha256(command.resultDigest())) {
+            throw new IllegalArgumentException("resultDigest must be a SHA-256 hex digest");
+        }
+        return store.completeHandlingTask(command);
     }
 
     @Override

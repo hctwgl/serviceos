@@ -43,6 +43,18 @@ public interface EvidenceCommandService {
             java.util.UUID networkId
     );
 
+    EvidenceUploadSessionView beginCorrectionUpload(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            BeginCorrectionEvidenceUploadCommand command
+    );
+
+    EvidenceItemView finalizeCorrectionUpload(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            FinalizeCorrectionEvidenceUploadCommand command
+    );
+
     EvidenceRevisionView invalidate(
             CurrentPrincipal principal,
             CommandMetadata metadata,

@@ -47,6 +47,9 @@ interface CorrectionCaseMapper {
     Map<String, Object> findCase(
             @Param("tenantId") String tenantId, @Param("correctionCaseId") String correctionCaseId);
 
+    Map<String, Object> findCaseByCorrectionTaskId(
+            @Param("tenantId") String tenantId, @Param("correctionTaskId") String correctionTaskId);
+
     List<Map<String, Object>> listCasesByTask(
             @Param("tenantId") String tenantId, @Param("taskId") String taskId);
 
