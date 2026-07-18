@@ -17,11 +17,14 @@ struct IOSCoreSmoke {
         let builder = ServiceRequestBuilder(
             baseURL: URL(string: "https://serviceos.invalid/api/v1/")!,
             tokenProvider: vault,
+            clientMetadata: .init(kind: .technicianIOS, version: "1.2.3+42"),
             correlationId: { UUID(uuidString: "11111111-1111-1111-1111-111111111111")! }
         )
         let request = await builder.build(path: "/me", contextHeaders: ["X-Service-Context": "ctx-1"])
         precondition(request.value(forHTTPHeaderField: "Authorization") == "Bearer secret")
         precondition(request.value(forHTTPHeaderField: "X-Service-Context") == "ctx-1")
+        precondition(request.value(forHTTPHeaderField: "X-ServiceOS-Client-Kind") == "TECHNICIAN_IOS")
+        precondition(request.value(forHTTPHeaderField: "X-ServiceOS-Client-Version") == "1.2.3+42")
 
         let counter = Counter()
         let contexts = ContextSelectionStore { await counter.increment() }
