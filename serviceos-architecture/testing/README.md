@@ -263,4 +263,5 @@
 - [M260 Technician iOS Simulator 运行验收矩阵](257-m260-technician-ios-simulator-runtime-acceptance.md)
 - [M261 Technician iOS 签名与分发就绪基础验收矩阵](258-m261-technician-ios-distribution-readiness-acceptance.md)
 - [M262 Technician 在线 Visit 交付批次验收矩阵](259-m262-technician-online-visit-batch-acceptance.md)
+- [M263 Technician 在线基础表单交付批次验收矩阵](260-m263-technician-online-form-batch-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)
