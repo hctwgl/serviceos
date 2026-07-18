@@ -11,7 +11,8 @@ public record ResolveConfigurationBundleQuery(
         String serviceProductCode,
         String provinceCode,
         Instant effectiveAt,
-        boolean preferCanary
+        boolean preferCanary,
+        String canaryRoutingKey
 ) {
     public ResolveConfigurationBundleQuery(
             String tenantId,
@@ -21,7 +22,19 @@ public record ResolveConfigurationBundleQuery(
             String provinceCode,
             Instant effectiveAt
     ) {
-        this(tenantId, projectCode, brandCode, serviceProductCode, provinceCode, effectiveAt, false);
+        this(tenantId, projectCode, brandCode, serviceProductCode, provinceCode, effectiveAt, false, null);
+    }
+
+    public ResolveConfigurationBundleQuery(
+            String tenantId,
+            String projectCode,
+            String brandCode,
+            String serviceProductCode,
+            String provinceCode,
+            Instant effectiveAt,
+            boolean preferCanary
+    ) {
+        this(tenantId, projectCode, brandCode, serviceProductCode, provinceCode, effectiveAt, preferCanary, null);
     }
 
     public ResolveConfigurationBundleQuery {
@@ -32,5 +45,11 @@ public record ResolveConfigurationBundleQuery(
                 serviceProductCode, "serviceProductCode", 96);
         provinceCode = PublishConfigurationAssetCommand.text(provinceCode, "provinceCode", 16);
         effectiveAt = Objects.requireNonNull(effectiveAt, "effectiveAt");
+        if (canaryRoutingKey != null) {
+            canaryRoutingKey = canaryRoutingKey.trim();
+            if (canaryRoutingKey.isEmpty() || canaryRoutingKey.length() > 256) {
+                throw new IllegalArgumentException("canaryRoutingKey must be 1..256 chars when provided");
+            }
+        }
     }
 }

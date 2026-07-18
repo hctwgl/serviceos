@@ -13,6 +13,7 @@ public record BundleChannelActivationView(
         UUID previousActivationId,
         String status,
         String approvalRef,
+        int trafficPercent,
         String activatedBy,
         Instant activatedAt,
         Instant supersededAt,

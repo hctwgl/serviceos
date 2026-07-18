@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.31
+  version: 1.0.32
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -5458,6 +5458,11 @@ components:
         channel: { type: string, enum: [STABLE, CANARY] }
         bundleId: { type: string, format: uuid }
         approvalRef: { type: string, minLength: 1, maxLength: 128 }
+        trafficPercent:
+          type: [integer, 'null']
+          minimum: 0
+          maximum: 100
+          description: CANARY 分流百分比；省略时 CANARY 默认 0，STABLE 固定 100。
     BundleActivationApprovalRequest:
       type: object
       additionalProperties: false
@@ -5468,7 +5473,7 @@ components:
       type: object
       additionalProperties: false
       required: [activationId, projectId, channel, bundleId, bundleCode, bundleVersion,
-                 status, approvalRef, activatedBy, activatedAt, aggregateVersion]
+                 status, approvalRef, trafficPercent, activatedBy, activatedAt, aggregateVersion]
       properties:
         activationId: { type: string, format: uuid }
         projectId: { type: string, format: uuid }
@@ -5479,6 +5484,7 @@ components:
         previousActivationId: { type: [string, 'null'], format: uuid }
         status: { enum: [ACTIVE, SUPERSEDED] }
         approvalRef: { type: string }
+        trafficPercent: { type: integer, minimum: 0, maximum: 100 }
         activatedBy: { type: string }
         activatedAt: { type: string, format: date-time }
         supersededAt: { type: [string, 'null'], format: date-time }

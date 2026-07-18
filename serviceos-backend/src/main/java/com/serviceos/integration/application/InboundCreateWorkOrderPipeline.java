@@ -108,7 +108,8 @@ public class InboundCreateWorkOrderPipeline {
         try {
             bundle = configurationService.resolve(new ResolveConfigurationBundleQuery(
                     safeTenant, safeProjectCode, mapped.brandCode(), mapped.serviceProductCode(),
-                    mapped.provinceCode(), envelope.receivedAt()));
+                    mapped.provinceCode(), envelope.receivedAt(), false,
+                    mapped.externalOrderCode()));
         } catch (ConfigurationResolutionException exception) {
             String code = "CONFIGURATION_" + exception.reason().name();
             return reject(

@@ -60,7 +60,8 @@ final class BundleChannelActivationController {
                         request.projectId(),
                         BundleChannel.valueOf(request.channel()),
                         request.bundleId(),
-                        request.approvalRef()));
+                        request.approvalRef(),
+                        request.trafficPercent()));
         return ok(view, correlationId);
     }
 
@@ -108,11 +109,17 @@ final class BundleChannelActivationController {
         return new ActivationResponse(
                 view.activationId(), view.projectId(), view.channel().name(), view.bundleId(),
                 view.bundleCode(), view.bundleVersion(), view.previousActivationId(), view.status(),
-                view.approvalRef(), view.activatedBy(), view.activatedAt(), view.supersededAt(),
-                view.aggregateVersion());
+                view.approvalRef(), view.trafficPercent(), view.activatedBy(), view.activatedAt(),
+                view.supersededAt(), view.aggregateVersion());
     }
 
-    record ActivateRequest(UUID projectId, String channel, UUID bundleId, String approvalRef) {
+    record ActivateRequest(
+            UUID projectId,
+            String channel,
+            UUID bundleId,
+            String approvalRef,
+            Integer trafficPercent
+    ) {
     }
 
     record ApprovalRequest(String approvalRef) {
@@ -128,6 +135,7 @@ final class BundleChannelActivationController {
             UUID previousActivationId,
             String status,
             String approvalRef,
+            int trafficPercent,
             String activatedBy,
             Instant activatedAt,
             Instant supersededAt,

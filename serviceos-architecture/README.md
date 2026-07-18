@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M287 Workflow 可视化拖拽画布**，功能证据提交 `47ea7ad4bbbde10d74244d5ea4d3f4fd7c4c11e7`（合并入 `master` 后改为合并提交）。
+当前工程基线为 **M288 CANARY 百分比流量灰度**，功能证据提交待回填（合并入 `master` 后改为合并提交）。
 
 当前已具备多 OEM 内核、复杂流程运行时（含取消/重开/跳转/补偿）与标准服务模板族。下一主线是阶段三领域配置设计器。
 
@@ -683,6 +683,8 @@ serviceos-architecture/
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M288 实现文档](architecture/301-m288-percentage-canary-traffic.md)
+- [M288 验收矩阵](testing/285-m288-percentage-canary-traffic-acceptance.md)
 - [M287 实现文档](architecture/300-m287-workflow-visual-canvas.md)
 - [M287 验收矩阵](testing/284-m287-workflow-visual-canvas-acceptance.md)
 - [M286 实现文档](architecture/299-m286-configuration-canary-rollback.md)

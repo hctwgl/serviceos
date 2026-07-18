@@ -382,3 +382,4 @@ Feature gate/authority: if applicable
 | M285 | 草稿 Diff + APPROVED 审批门禁；发布仅 APPROVED；OpenAPI 1.0.30；Flyway V112～V113 | DraftService + Controller + DiffApproval IT + Admin UI + `298-m285-*` + `282-m285-*` | 拖拽画布、灰度/回滚、多级审批 |
 | M286 | Bundle STABLE/CANARY 通道激活、晋级与回滚；resolve preferCanary；OpenAPI 1.0.31；Flyway V114～V115 | ActivationService + Controller + CanaryRollback IT + `299-m286-*` + `283-m286-*` | 百分比流量灰度、拖拽画布 |
 | M287 | Admin Workflow 可视化拖拽画布；布局 metadata.layout | WorkflowCanvas + Designer + Playwright + build + `300-m287-*` + `284-m287-*` | 画布建边、条件编辑、百分比灰度 |
+| M288 | CANARY trafficPercent 哈希分流；preferCanary 强制；OpenAPI 1.0.32；Flyway V116 | resolve + Activation + PercentageCanary IT + `301-m288-*` + `285-m288-*` | 多 CANARY、动态调比例 UI、自动晋级 |

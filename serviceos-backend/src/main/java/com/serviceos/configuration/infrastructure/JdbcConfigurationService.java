@@ -191,18 +191,17 @@ final class JdbcConfigurationService implements ConfigurationService {
                     "project is missing, inactive, or outside its validity window");
         }
 
-        // M286：通道激活优先于兼容扫描；CANARY 仅在 preferCanary=true 时参与。
-        if (query.preferCanary()) {
-            ConfigurationBundleReference canary = resolveActiveChannel(
-                    query, project.projectId(), "CANARY");
-            if (canary != null) {
-                return canary;
-            }
+        // M286/M288：通道激活优先；preferCanary 强制 CANARY；否则按 trafficPercent 哈希分流。
+        ChannelBundle canary = resolveActiveChannel(query, project.projectId(), "CANARY");
+        ChannelBundle stable = resolveActiveChannel(query, project.projectId(), "STABLE");
+        if (query.preferCanary() && canary != null) {
+            return canary.reference();
         }
-        ConfigurationBundleReference stable = resolveActiveChannel(
-                query, project.projectId(), "STABLE");
+        if (canary != null && canary.trafficPercent() > 0 && selectCanaryBucket(query, canary.trafficPercent())) {
+            return canary.reference();
+        }
         if (stable != null) {
-            return stable;
+            return stable.reference();
         }
 
         List<ResolvedBundle> candidates = jdbc.sql("""
@@ -251,14 +250,15 @@ final class JdbcConfigurationService implements ConfigurationService {
         return preferred.getFirst().reference();
     }
 
-    private ConfigurationBundleReference resolveActiveChannel(
+    private ChannelBundle resolveActiveChannel(
             ResolveConfigurationBundleQuery query,
             UUID projectId,
             String channel
     ) {
         // 通道激活是项目级发布指针：命中后不再做 province/时间窗扫描，避免与兼容扫描的互斥生效窗冲突。
         return jdbc.sql("""
-                        SELECT b.bundle_id, b.project_id, b.bundle_code, b.bundle_version, b.manifest_digest
+                        SELECT b.bundle_id, b.project_id, b.bundle_code, b.bundle_version, b.manifest_digest,
+                               a.traffic_percent
                           FROM cfg_bundle_channel_activation a
                           JOIN cfg_configuration_bundle b
                             ON b.tenant_id = a.tenant_id AND b.bundle_id = a.bundle_id
@@ -275,14 +275,34 @@ final class JdbcConfigurationService implements ConfigurationService {
                 .param("channel", channel)
                 .param("brandCode", query.brandCode())
                 .param("serviceProductCode", query.serviceProductCode())
-                .query((rs, rowNum) -> new ConfigurationBundleReference(
-                        rs.getObject("bundle_id", UUID.class),
-                        rs.getObject("project_id", UUID.class),
-                        rs.getString("bundle_code"),
-                        rs.getString("bundle_version"),
-                        rs.getString("manifest_digest")))
+                .query((rs, rowNum) -> new ChannelBundle(
+                        new ConfigurationBundleReference(
+                                rs.getObject("bundle_id", UUID.class),
+                                rs.getObject("project_id", UUID.class),
+                                rs.getString("bundle_code"),
+                                rs.getString("bundle_version"),
+                                rs.getString("manifest_digest")),
+                        rs.getInt("traffic_percent")))
                 .optional()
                 .orElse(null);
+    }
+
+    private static boolean selectCanaryBucket(ResolveConfigurationBundleQuery query, int trafficPercent) {
+        if (trafficPercent >= 100) {
+            return true;
+        }
+        if (trafficPercent <= 0) {
+            return false;
+        }
+        String key = query.canaryRoutingKey() != null
+                ? query.canaryRoutingKey()
+                : String.join("|", query.tenantId(), query.projectCode(), query.brandCode(),
+                query.serviceProductCode(), query.provinceCode());
+        int bucket = Math.floorMod(Sha256.digest(key).hashCode(), 100);
+        return bucket < trafficPercent;
+    }
+
+    private record ChannelBundle(ConfigurationBundleReference reference, int trafficPercent) {
     }
 
     @Override

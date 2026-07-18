@@ -6,6 +6,15 @@ public record ActivateBundleChannelCommand(
         UUID projectId,
         BundleChannel channel,
         UUID bundleId,
-        String approvalRef
+        String approvalRef,
+        Integer trafficPercent
 ) {
+    public ActivateBundleChannelCommand(
+            UUID projectId,
+            BundleChannel channel,
+            UUID bundleId,
+            String approvalRef
+    ) {
+        this(projectId, channel, bundleId, approvalRef, null);
+    }
 }

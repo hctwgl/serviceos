@@ -64,6 +64,7 @@ final class DefaultBundleChannelActivationService implements BundleChannelActiva
                 command.projectId().toString()), metadata.correlationId());
 
         requirePublishedBundle(principal.tenantId(), command.projectId(), command.bundleId());
+        int trafficPercent = resolveTrafficPercent(command.channel(), command.trafficPercent());
         UUID previous = findActiveId(principal.tenantId(), command.projectId(), command.channel());
         Instant now = clock.instant();
         if (previous != null) {
@@ -71,7 +72,7 @@ final class DefaultBundleChannelActivationService implements BundleChannelActiva
         }
         UUID activationId = UUID.randomUUID();
         insertActive(activationId, principal.tenantId(), command.projectId(), command.channel(),
-                command.bundleId(), previous, approvalRef, principal.principalId(), now);
+                command.bundleId(), previous, approvalRef, trafficPercent, principal.principalId(), now);
         return requireView(principal.tenantId(), activationId);
     }
 
@@ -101,7 +102,7 @@ final class DefaultBundleChannelActivationService implements BundleChannelActiva
         supersede(principal.tenantId(), canaryActivationId, now);
         UUID stableId = UUID.randomUUID();
         insertActive(stableId, principal.tenantId(), canary.projectId(), BundleChannel.STABLE,
-                canary.bundleId(), previousStable, normalizedApproval, principal.principalId(), now);
+                canary.bundleId(), previousStable, normalizedApproval, 100, principal.principalId(), now);
         return requireView(principal.tenantId(), stableId);
     }
 
@@ -132,7 +133,7 @@ final class DefaultBundleChannelActivationService implements BundleChannelActiva
         supersede(principal.tenantId(), stableActivationId, now);
         UUID rollbackId = UUID.randomUUID();
         insertActive(rollbackId, principal.tenantId(), current.projectId(), BundleChannel.STABLE,
-                previous.bundleId(), stableActivationId, normalizedApproval,
+                previous.bundleId(), stableActivationId, normalizedApproval, 100,
                 principal.principalId(), now);
         return requireView(principal.tenantId(), rollbackId);
     }
@@ -225,18 +226,19 @@ final class DefaultBundleChannelActivationService implements BundleChannelActiva
             UUID bundleId,
             UUID previousActivationId,
             String approvalRef,
+            int trafficPercent,
             String actor,
             Instant now
     ) {
         jdbc.sql("""
                         INSERT INTO cfg_bundle_channel_activation (
                             activation_id, tenant_id, project_id, channel, bundle_id,
-                            previous_activation_id, status, approval_ref, activated_by,
-                            activated_at, superseded_at, aggregate_version
+                            previous_activation_id, status, approval_ref, traffic_percent,
+                            activated_by, activated_at, superseded_at, aggregate_version
                         ) VALUES (
                             :activationId, :tenantId, :projectId, :channel, :bundleId,
-                            :previousId, 'ACTIVE', :approvalRef, :actor,
-                            :now, NULL, 1
+                            :previousId, 'ACTIVE', :approvalRef, :trafficPercent,
+                            :actor, :now, NULL, 1
                         )
                         """)
                 .param("activationId", activationId)
@@ -246,9 +248,25 @@ final class DefaultBundleChannelActivationService implements BundleChannelActiva
                 .param("bundleId", bundleId)
                 .param("previousId", previousActivationId)
                 .param("approvalRef", approvalRef)
+                .param("trafficPercent", trafficPercent)
                 .param("actor", actor)
                 .param("now", PostgresJdbcParameters.timestamptz(now))
                 .update();
+    }
+
+    private static int resolveTrafficPercent(BundleChannel channel, Integer trafficPercent) {
+        if (channel == BundleChannel.STABLE) {
+            if (trafficPercent != null && trafficPercent != 100) {
+                throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, "STABLE 通道 trafficPercent 必须为 100");
+            }
+            return 100;
+        }
+        // 未显式声明时 CANARY 默认 0%（仅 preferCanary 强制命中），避免无意全量切流。
+        int value = trafficPercent == null ? 0 : trafficPercent;
+        if (value < 0 || value > 100) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, "CANARY trafficPercent 必须在 0～100");
+        }
+        return value;
     }
 
     private BundleChannelActivationView requireView(String tenantId, UUID activationId) {
@@ -277,6 +295,7 @@ final class DefaultBundleChannelActivationService implements BundleChannelActiva
                 rs.getObject("previous_activation_id", UUID.class),
                 rs.getString("status"),
                 rs.getString("approval_ref"),
+                rs.getInt("traffic_percent"),
                 rs.getString("activated_by"),
                 rs.getTimestamp("activated_at").toInstant(),
                 rs.getTimestamp("superseded_at") == null
