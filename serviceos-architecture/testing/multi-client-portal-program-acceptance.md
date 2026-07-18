@@ -52,7 +52,7 @@ lastUpdated: 2026-07-18
 | ID | 验收项 | 预期 | 证据 |
 |---|---|---|---|
 | MCP-CONTRACT-01 | TypeScript Client | 可从 Core OpenAPI 重复生成且无手工漂移 | M247 reproducibility + independent consumer gate |
-| MCP-CONTRACT-02 | Swift Client | 可从同一 OpenAPI 重复生成 | reproducibility CI |
+| MCP-CONTRACT-02 | Swift Client | 可从同一 OpenAPI 重复生成 | M248 reproducibility + Swift 6 independent consumer gate |
 | MCP-CONTRACT-03 | Error Model | H5/iOS 对 Problem Details 和 errorCode 语义一致 | contract/client tests |
 | MCP-CONTRACT-04 | Page/Action Identity | 同一业务目标复用 pageId/actionCode | registry tests |
 | MCP-CONTRACT-05 | Unknown Action | 客户端未知 action 安全降级，不自行猜测 | negative tests |

@@ -1,0 +1,42 @@
+// swift-tools-version:6.0
+
+import PackageDescription
+
+let package = Package(
+    name: "{{projectName}}",
+    platforms: [
+        {{#useVapor}}
+        .macOS(.v10_15),
+        {{/useVapor}}
+        {{^useVapor}}
+        .iOS(.v13),
+        .macOS(.v10_15),
+        .tvOS(.v13),
+        .watchOS(.v6),
+        {{/useVapor}}
+    ],
+    products: [
+        .library(name: "{{projectName}}", targets: ["{{projectName}}"]),
+    ],
+    dependencies: [
+        {{#useAlamofire}}
+        .package(url: "https://github.com/Alamofire/Alamofire", .upToNextMajor(from: "5.10.2")),
+        {{/useAlamofire}}
+        {{#usePromiseKit}}
+        .package(url: "https://github.com/mxcl/PromiseKit", .upToNextMajor(from: "8.1.2")),
+        {{/usePromiseKit}}
+        {{#useRxSwift}}
+        .package(url: "https://github.com/ReactiveX/RxSwift", .upToNextMajor(from: "6.8.0")),
+        {{/useRxSwift}}
+        {{#useVapor}}
+        .package(url: "https://github.com/vapor/vapor", from: "4.99.0"),
+        {{/useVapor}}
+    ],
+    targets: [
+        .target(
+            name: "{{projectName}}",
+            dependencies: [{{#useVapor}}.product(name: "Vapor", package: "vapor"){{/useVapor}}{{#useAlamofire}}"Alamofire", {{/useAlamofire}}{{#usePromiseKit}}"PromiseKit", {{/usePromiseKit}}{{#useRxSwift}}"RxSwift"{{/useRxSwift}}],
+            path: "{{swiftPackagePath}}{{^swiftPackagePath}}{{#useSPMFileStructure}}Sources/{{projectName}}{{/useSPMFileStructure}}{{^useSPMFileStructure}}{{projectName}}/Classes{{/useSPMFileStructure}}{{/swiftPackagePath}}"
+        ),
+    ]
+)

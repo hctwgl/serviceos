@@ -256,6 +256,7 @@ title: ServiceOS 里程碑索引
 | M245 | M245 Technician Portal Visit 历史安全摘要 | [258-m245-technician-portal-visit-history.md](../architecture/258-m245-technician-portal-visit-history.md) | [242-m245-technician-portal-visit-history-acceptance.md](../testing/242-m245-technician-portal-visit-history-acceptance.md) |
 | M246 | M246 Technician Portal 表单提交安全摘要 | [259-m246-technician-portal-form-submission-history.md](../architecture/259-m246-technician-portal-form-submission-history.md) | [243-m246-technician-portal-form-submission-history-acceptance.md](../testing/243-m246-technician-portal-form-submission-history-acceptance.md) |
 | M247 | M247 TypeScript OpenAPI Client 消费基础 | [260-m247-typescript-openapi-client-consumer-foundation.md](../architecture/260-m247-typescript-openapi-client-consumer-foundation.md) | [244-m247-typescript-openapi-client-consumer-foundation-acceptance.md](../testing/244-m247-typescript-openapi-client-consumer-foundation-acceptance.md) |
+| M248 | M248 Swift OpenAPI Client 消费基础 | [261-m248-swift-openapi-client-consumer-foundation.md](../architecture/261-m248-swift-openapi-client-consumer-foundation.md) | [245-m248-swift-openapi-client-consumer-foundation-acceptance.md](../testing/245-m248-swift-openapi-client-consumer-foundation-acceptance.md) |
 
 ## 未关联里程碑的文档
 
