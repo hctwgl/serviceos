@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.22
+  version: 1.0.23
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -2444,6 +2444,56 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /technician/me/tasks/{taskId}/forms:
+    get:
+      operationId: listTechnicianTaskForms
+      summary: 查询当前责任任务锁定的表单版本
+      description: |
+        M263：先验证 X-Technician-Context、ACTIVE 师傅网点关系、task.readAssigned 和当前责任，
+        再按 form.read 解析 Task 冻结 Bundle 中唯一 FormVersion；不回退到最新配置。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/TechnicianContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 当前任务锁定表单；无 formRef 时返回空数组
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/TaskForm' } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /technician/me/tasks/{taskId}/form-submissions:
+    post:
+      operationId: submitTechnicianTaskForm
+      summary: 当前师傅在线提交任务锁定表单
+      description: |
+        M263：Context 与当前责任实时重验；formVersionId 必须匹配冻结版本。提交为不可变事实且不隐式完成 Task。
+        请求不接受 prefillVersion、tenant、actor 或 submittedBy；草稿/prefill 冲突策略未接受前继续失败关闭。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/TechnicianContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TechnicianSubmitFormRequest' }
+      responses:
+        '201':
+          description: 首次不可变提交或首次幂等冻结结果
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TechnicianFormSubmission' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /technician/me/schedule:
     get:
       operationId: listTechnicianSchedule
@@ -8750,6 +8800,13 @@ components:
         formVersionId: { type: string, format: uuid }
         values: { type: object, additionalProperties: true }
         prefillVersion: { type: [string, 'null'], minLength: 1, maxLength: 160 }
+    TechnicianSubmitFormRequest:
+      type: object
+      additionalProperties: false
+      required: [formVersionId, values]
+      properties:
+        formVersionId: { type: string, format: uuid }
+        values: { type: object, additionalProperties: true }
     FormValidationIssue:
       type: object
       additionalProperties: false
@@ -8757,6 +8814,17 @@ components:
       properties:
         fieldKey: { type: string }
         code: { enum: [FIELD_REQUIRED, FIELD_UNKNOWN, FIELD_TYPE_INVALID] }
+        message: { type: string }
+    TechnicianFormValidationIssue:
+      type: object
+      additionalProperties: false
+      required: [fieldKey, code, message]
+      properties:
+        fieldKey: { type: string }
+        code:
+          enum: [FIELD_REQUIRED, FIELD_UNKNOWN, FIELD_TYPE_INVALID, FIELD_NOT_VISIBLE,
+                 FIELD_REQUIRED_CONDITION_INVALID, FIELD_VISIBILITY_INVALID,
+                 SECTION_VISIBILITY_INVALID, FORM_RULE_FAILED, FORM_RULE_INPUT_INVALID]
         message: { type: string }
     FormSubmission:
       type: object
@@ -8782,6 +8850,28 @@ components:
           items: { $ref: '#/components/schemas/FormValidationIssue' }
         prefillVersion: { type: [string, 'null'] }
         submittedBy: { type: string }
+        submittedAt: { type: string, format: date-time }
+    TechnicianFormSubmission:
+      type: object
+      additionalProperties: false
+      required: [submissionId, taskId, projectId, formVersionId, formKey, submissionVersion,
+                 values, contentDigest, validationStatus, errors, warnings, submittedAt]
+      properties:
+        submissionId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        formVersionId: { type: string, format: uuid }
+        formKey: { type: string, minLength: 1, maxLength: 120 }
+        submissionVersion: { type: integer, minimum: 1 }
+        values: { type: object, additionalProperties: true }
+        contentDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
+        validationStatus: { enum: [VALIDATED, INVALID] }
+        errors:
+          type: array
+          items: { $ref: '#/components/schemas/TechnicianFormValidationIssue' }
+        warnings:
+          type: array
+          items: { $ref: '#/components/schemas/TechnicianFormValidationIssue' }
         submittedAt: { type: string, format: date-time }
     VisitLocation:
       type: object

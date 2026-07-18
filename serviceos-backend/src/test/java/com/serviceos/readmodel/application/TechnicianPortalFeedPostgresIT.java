@@ -5,6 +5,7 @@ import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.fieldwork.api.CheckInVisitCommand;
 import com.serviceos.fieldwork.api.TechnicianVisitCommandService;
 import com.serviceos.fieldwork.api.VisitLocation;
+import com.serviceos.forms.api.TechnicianFormService;
 import com.serviceos.readmodel.api.TechnicianPortalFeedItem;
 import com.serviceos.readmodel.api.TechnicianPortalFeedPage;
 import com.serviceos.readmodel.api.TechnicianPortalQueryService;
@@ -80,6 +81,7 @@ class TechnicianPortalFeedPostgresIT {
 
     @Autowired TechnicianPortalQueryService portal;
     @Autowired TechnicianVisitCommandService technicianVisits;
+    @Autowired TechnicianFormService technicianForms;
     @Autowired JdbcClient jdbc;
     @Autowired Flyway flyway;
     @Autowired PlatformTransactionManager transactionManager;
@@ -202,6 +204,34 @@ class TechnicianPortalFeedPostgresIT {
                 .containsExactlyInAnyOrder(NETWORK_A.toString(), TECH_PRINCIPAL.toString(), "false");
         assertThat(jdbc.sql("SELECT status FROM apt_appointment WHERE appointment_id = :id")
                 .param("id", appointmentId).query(String.class).single()).isEqualTo("IN_PROGRESS");
+    }
+
+    @Test
+    void technicianContextFormQueryUsesCurrentTaskAndRejectsForgedNetwork() {
+        UUID taskId = UUID.randomUUID();
+        UUID workOrderId = UUID.randomUUID();
+        UUID projectId = UUID.randomUUID();
+        seedHumanTask(taskId, workOrderId, projectId);
+        seedActivePair(NETWORK_A, workOrderId, taskId, TECH_PRINCIPAL.toString(), UUID.randomUUID());
+        jdbc.sql("""
+                INSERT INTO tsk_task_assignment (
+                    task_assignment_id, tenant_id, task_id, assignment_kind,
+                    principal_type, principal_id, status, source_type, source_id,
+                    effective_from, created_by, created_at)
+                VALUES (:id, :tenant, :task, 'RESPONSIBLE', 'USER', :principal,
+                    'ACTIVE', 'MANUAL', 'M263-FIXTURE', now(), 'test', now())
+                """).param("id", UUID.randomUUID()).param("tenant", TENANT).param("task", taskId)
+                .param("principal", TECH_PRINCIPAL.toString()).update();
+        seedGrant(TECH_PRINCIPAL, "form.read", "PROJECT", projectId.toString());
+
+        assertThat(technicianForms.listForTask(
+                actor(TECH_PRINCIPAL), "corr-m263", "TECHNICIAN|NETWORK|" + NETWORK_A, taskId))
+                .isEmpty();
+        assertThatThrownBy(() -> technicianForms.listForTask(
+                actor(TECH_PRINCIPAL), "corr-m263-forged",
+                "TECHNICIAN|NETWORK|" + NETWORK_B, taskId))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.PORTAL_CONTEXT_INVALID));
     }
 
     @Test
