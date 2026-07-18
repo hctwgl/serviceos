@@ -5,6 +5,7 @@ import TechnicianPortalTaskDetailPage from './pages/TechnicianPortalTaskDetailPa
 import TechnicianPortalSchedulePage from './pages/TechnicianPortalSchedulePage.vue'
 import TechnicianPortalSyncSummaryPage from './pages/TechnicianPortalSyncSummaryPage.vue'
 import TechnicianPortalMePage from './pages/TechnicianPortalMePage.vue'
+import TechnicianPortalCorrectionPage from './pages/TechnicianPortalCorrectionPage.vue'
 
 const MigrationTestEntry = defineComponent({
   name: 'MigrationTestEntry',
@@ -19,6 +20,7 @@ export const router = createRouter({ history: createWebHistory(), routes: [
   { path: '/technician-portal', redirect: '/technician-portal/task-feed' },
   { path: '/technician-portal/task-feed', component: TechnicianPortalTaskFeedPage },
   { path: '/technician-portal/tasks/:id', component: TechnicianPortalTaskDetailPage },
+  { path: '/technician-portal/corrections/:id', component: TechnicianPortalCorrectionPage },
   { path: '/technician-portal/schedule', component: TechnicianPortalSchedulePage },
   { path: '/technician-portal/sync-summary', component: TechnicianPortalSyncSummaryPage },
   { path: '/technician-portal/me', component: TechnicianPortalMePage },
