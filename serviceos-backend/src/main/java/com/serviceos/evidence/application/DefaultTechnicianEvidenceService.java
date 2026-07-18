@@ -1,0 +1,201 @@
+package com.serviceos.evidence.application;
+
+import com.serviceos.authorization.api.AuthorizationRequest;
+import com.serviceos.authorization.api.AuthorizationService;
+import com.serviceos.dispatch.api.TechnicianActiveAssignmentQuery;
+import com.serviceos.evidence.api.BeginEvidenceUploadCommand;
+import com.serviceos.evidence.api.EvidenceCommandService;
+import com.serviceos.evidence.api.EvidenceItemView;
+import com.serviceos.evidence.api.EvidenceSlotQueryService;
+import com.serviceos.evidence.api.EvidenceSlotView;
+import com.serviceos.evidence.api.EvidenceUploadSessionView;
+import com.serviceos.evidence.api.FinalizeEvidenceUploadCommand;
+import com.serviceos.evidence.api.TechnicianBeginEvidenceUploadCommand;
+import com.serviceos.evidence.api.TechnicianEvidenceService;
+import com.serviceos.identity.api.CurrentPrincipal;
+import com.serviceos.network.api.NetworkTechnicianMembershipView;
+import com.serviceos.network.api.PrincipalNetworkAffiliationQuery;
+import com.serviceos.network.api.TechnicianProfileView;
+import com.serviceos.shared.BusinessProblem;
+import com.serviceos.shared.CommandMetadata;
+import com.serviceos.shared.ProblemCode;
+import com.serviceos.task.api.TaskFulfillmentContext;
+import com.serviceos.task.api.TaskFulfillmentContextService;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
+
+import java.time.Clock;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+import java.util.UUID;
+
+/** Technician Portal 资料适配层；安全文件与不可变 Revision 仍由既有 Evidence/Files 服务维护。 */
+@Service
+final class DefaultTechnicianEvidenceService implements TechnicianEvidenceService {
+    private static final String CONTEXT_PREFIX = "TECHNICIAN|NETWORK|";
+    private static final String TASK_READ_ASSIGNED = "task.readAssigned";
+    private static final Set<String> ONLINE_SOURCES = Set.of("CAMERA", "GALLERY", "FILE");
+
+    private final PrincipalNetworkAffiliationQuery affiliations;
+    private final TechnicianActiveAssignmentQuery assignments;
+    private final TaskFulfillmentContextService tasks;
+    private final EvidenceSlotQueryService slots;
+    private final EvidenceCommandService evidence;
+    private final AuthorizationService authorization;
+    private final ObjectMapper objectMapper;
+    private final Clock clock;
+
+    DefaultTechnicianEvidenceService(
+            PrincipalNetworkAffiliationQuery affiliations,
+            TechnicianActiveAssignmentQuery assignments,
+            TaskFulfillmentContextService tasks,
+            EvidenceSlotQueryService slots,
+            EvidenceCommandService evidence,
+            AuthorizationService authorization,
+            ObjectMapper objectMapper,
+            Clock clock
+    ) {
+        this.affiliations = affiliations;
+        this.assignments = assignments;
+        this.tasks = tasks;
+        this.slots = slots;
+        this.evidence = evidence;
+        this.authorization = authorization;
+        this.objectMapper = objectMapper;
+        this.clock = clock;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<EvidenceSlotView> listSlots(
+            CurrentPrincipal principal, String correlationId, String context, UUID taskId
+    ) {
+        requireCurrentTask(principal, correlationId, context, taskId);
+        return slots.listForTask(principal, correlationId, taskId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<EvidenceItemView> listItems(
+            CurrentPrincipal principal, String correlationId, String context, UUID taskId
+    ) {
+        requireCurrentTask(principal, correlationId, context, taskId);
+        return evidence.listForTask(principal, correlationId, taskId);
+    }
+
+    @Override
+    public EvidenceUploadSessionView beginUpload(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            String context,
+            TechnicianBeginEvidenceUploadCommand command
+    ) {
+        requireCurrentTask(principal, metadata.correlationId(), context, command.taskId());
+        return evidence.beginUpload(principal, metadata, new BeginEvidenceUploadCommand(
+                command.taskId(), command.slotId(), command.evidenceItemId(),
+                command.originalFileName(), command.declaredMimeType(), command.expectedSize(),
+                command.expectedSha256(), captureMetadata(command)));
+    }
+
+    @Override
+    public EvidenceItemView finalizeUpload(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            String context,
+            FinalizeEvidenceUploadCommand command
+    ) {
+        requireCurrentTask(principal, metadata.correlationId(), context, command.taskId());
+        return evidence.finalizeUpload(principal, metadata, command);
+    }
+
+    /**
+     * Portal 上下文和当前责任先于领域写命令重验；领域服务随后还会重验 RUNNING/guard、
+     * evidence/file capability、上传会话归属、checksum 与幂等，避免适配层成为授权旁路。
+     */
+    private void requireCurrentTask(
+            CurrentPrincipal principal, String correlationId, String header, UUID taskId
+    ) {
+        UUID networkId = parseContext(header);
+        UUID principalId = principalUuid(principal);
+        TechnicianProfileView profile = affiliations.findActiveTechnicianProfile(
+                        principal.tenantId(), principalId)
+                .orElseThrow(() -> new BusinessProblem(ProblemCode.PORTAL_CONTEXT_INVALID,
+                        "当前主体没有有效的 TechnicianProfile"));
+        boolean activeMember = affiliations.listActiveTechnicianMemberships(
+                        principal.tenantId(), profile.id(), clock.instant()).stream()
+                .map(NetworkTechnicianMembershipView::serviceNetworkId)
+                .anyMatch(networkId::equals);
+        if (!activeMember) {
+            throw new BusinessProblem(ProblemCode.PORTAL_CONTEXT_INVALID,
+                    "当前主体不能使用请求的 Technician Portal 上下文");
+        }
+        authorization.require(principal, AuthorizationRequest.networkCapability(
+                        TASK_READ_ASSIGNED, principal.tenantId(), "ServiceNetwork",
+                        networkId.toString(), networkId.toString()), correlationId);
+
+        TaskFulfillmentContext task = tasks.find(principal.tenantId(), taskId)
+                .orElseThrow(DefaultTechnicianEvidenceService::taskNotFound);
+        List<String> assigneeIds = List.of(principalId.toString(), profile.id().toString());
+        boolean currentResponsible = assigneeIds.contains(task.responsiblePrincipalId());
+        boolean sameNetwork = assignments.filterTaskIdsForNetwork(
+                principal.tenantId(), networkId.toString(), List.of(taskId)).contains(taskId);
+        if (!currentResponsible || !sameNetwork) {
+            throw taskNotFound();
+        }
+    }
+
+    /** 在线端不接受 offline/locationVerified/uploader 等事实，只组装允许的最小声明。 */
+    private String captureMetadata(TechnicianBeginEvidenceUploadCommand command) {
+        String source = command.captureSource() == null
+                ? "" : command.captureSource().trim().toUpperCase(Locale.ROOT);
+        if (!ONLINE_SOURCES.contains(source)) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                    "captureSource 必须是 CAMERA、GALLERY 或 FILE");
+        }
+        if (command.capturedAt() == null) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, "capturedAt 不能为空");
+        }
+        ObjectNode metadata = objectMapper.createObjectNode();
+        metadata.put("captureSource", source);
+        metadata.put("capturedAt", command.capturedAt().toString());
+        metadata.put("offlineFlag", false);
+        try {
+            return objectMapper.writeValueAsString(metadata);
+        } catch (JacksonException exception) {
+            throw new IllegalStateException("Technician CaptureMetadata serialization failed", exception);
+        }
+    }
+
+    private static BusinessProblem taskNotFound() {
+        return new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "任务不存在");
+    }
+
+    private static UUID parseContext(String header) {
+        if (header == null || header.isBlank()) {
+            throw new BusinessProblem(ProblemCode.PORTAL_CONTEXT_INVALID, "缺少 X-Technician-Context");
+        }
+        String raw = header.trim();
+        String uuid = raw.startsWith(CONTEXT_PREFIX) ? raw.substring(CONTEXT_PREFIX.length()) : raw;
+        if (!raw.startsWith(CONTEXT_PREFIX) && raw.contains("|")) {
+            throw new BusinessProblem(ProblemCode.PORTAL_CONTEXT_INVALID, "Technician Portal 上下文形态无效");
+        }
+        try {
+            return UUID.fromString(uuid);
+        } catch (IllegalArgumentException exception) {
+            throw new BusinessProblem(ProblemCode.PORTAL_CONTEXT_INVALID, "Technician Portal 上下文形态无效");
+        }
+    }
+
+    private static UUID principalUuid(CurrentPrincipal principal) {
+        try {
+            return UUID.fromString(principal.principalId());
+        } catch (IllegalArgumentException exception) {
+            throw new BusinessProblem(ProblemCode.PORTAL_CONTEXT_INVALID,
+                    "当前主体无法形成 Technician Portal 上下文");
+        }
+    }
+}
