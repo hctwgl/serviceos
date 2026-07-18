@@ -371,3 +371,4 @@ Feature gate/authority: if applicable
 | M274 | 第三家车企接入手册：Connector+Mapping+Bundle 标准路径 | `integration/04-third-oem-onboarding-handbook.md` + `287-m274-*` + `271-m274-*` | 真实 OEM3 接入 |
 | M275 | PARALLEL_GATEWAY fork/join：多分支激活、汇聚计数、重复 token 失败关闭；Flyway V102 | Parser + Handler + ParallelGateway/Linear IT + Validator + `288-m275-*` + `272-m275-*` | 子流程、多实例、包容网关 |
 | M276 | TIMER 到期捕获：durationSeconds 挂起、worker claim/lease 点火推进；Flyway V103 | schema + V103 + TimerWorker + Timer IT + `289-m276-*` + `273-m276-*` | 边界定时器、业务日历、超时转人工 UI |
+| M277 | SUB_PROCESS：Bundle 内 subProcessRef 启动子实例；子 END 恢复父节点；仅根 fulfill；Flyway V104 | schema + V104 + Handler + SubProcess/Linear IT + `290-m277-*` + `274-m277-*` | 嵌套取消传播、多实例调用同一子流程 |

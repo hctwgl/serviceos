@@ -161,6 +161,37 @@ final class ConfigurationAssetSchemaValidator {
                 validateWorkflowSemantics(parse(asset.definitionJson()), asset.assetKey());
             }
         }
+        validateSubProcessReferences(assets);
+    }
+
+    /** SUB_PROCESS.subProcessRef 必须在同一 Bundle 精确命中另一个 WORKFLOW assetKey。 */
+    private void validateSubProcessReferences(List<ConfigurationAssetDefinition> assets) {
+        Set<String> workflowKeys = new HashSet<>();
+        for (ConfigurationAssetDefinition asset : assets) {
+            if (asset.assetType() == ConfigurationAssetType.WORKFLOW) {
+                workflowKeys.add(asset.assetKey());
+            }
+        }
+        for (ConfigurationAssetDefinition asset : assets) {
+            if (asset.assetType() != ConfigurationAssetType.WORKFLOW) {
+                continue;
+            }
+            JsonNode workflow = parse(asset.definitionJson());
+            for (JsonNode node : workflow.path("nodes")) {
+                if (!"SUB_PROCESS".equals(node.path("nodeType").asText())) {
+                    continue;
+                }
+                String ref = node.path("subProcessRef").asText();
+                if (!workflowKeys.contains(ref)) {
+                    throw new ConfigurationPublicationException(
+                            "SUB_PROCESS subProcessRef 未在同一 Bundle 命中 WORKFLOW: " + ref);
+                }
+                if (ref.equals(asset.assetKey())) {
+                    throw new ConfigurationPublicationException(
+                            "SUB_PROCESS 不得引用自身 Workflow: " + ref);
+                }
+            }
+        }
     }
 
     /**
@@ -211,9 +242,27 @@ final class ConfigurationAssetSchemaValidator {
                 validateWaitEventNode(entry.getValue(), entry.getKey(), outgoing);
             } else if ("TIMER".equals(nodeType)) {
                 validateTimerNode(entry.getValue(), entry.getKey(), outgoing);
+            } else if ("SUB_PROCESS".equals(nodeType)) {
+                validateSubProcessNode(entry.getValue(), entry.getKey(), outgoing);
             } else if ("PARALLEL_GATEWAY".equals(nodeType)) {
                 validateParallelGatewayNode(entry.getKey(), outgoing, incoming, nodes);
             }
+        }
+    }
+
+    private void validateSubProcessNode(JsonNode node, String nodeId, Map<String, List<JsonNode>> outgoing) {
+        if (!present(node, "subProcessRef")) {
+            throw new ConfigurationPublicationException(
+                    "SUB_PROCESS 必须声明 subProcessRef: " + nodeId);
+        }
+        if (!present(node, "stageCode")) {
+            throw new ConfigurationPublicationException(
+                    "SUB_PROCESS 必须声明 stageCode: " + nodeId);
+        }
+        List<JsonNode> edges = outgoing.getOrDefault(nodeId, List.of());
+        if (edges.size() != 1 || present(edges.getFirst(), "condition")) {
+            throw new ConfigurationPublicationException(
+                    "SUB_PROCESS 必须恰好一条无条件出边: " + nodeId);
         }
     }
 

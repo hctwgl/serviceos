@@ -351,6 +351,11 @@ final class WorkflowTaskCompletedHandler
                     nextStageInstanceId, progression.stageCode(), nextStageSequence, activatedAt);
         }
         UUID nextNodeInstanceId = UUID.randomUUID();
+        if (progression.subProcess()) {
+            return activateSubProcess(
+                    tenantId, activationEventId, correlationId, current,
+                    nextStageInstanceId, progression, activatedAt);
+        }
         if (progression.waiting() || progression.timer()) {
             jdbc.sql("""
                             INSERT INTO wfl_node_instance (
@@ -466,6 +471,158 @@ final class WorkflowTaskCompletedHandler
                 .update();
         return Sha256.digest(current.workflowNodeInstanceId() + "|" + nextNodeInstanceId
                 + "|" + nextTask.taskId());
+    }
+
+    private String activateSubProcess(
+            String tenantId,
+            UUID activationEventId,
+            String correlationId,
+            NodeRuntime current,
+            UUID stageInstanceId,
+            WorkflowDefinitionParser.ProgressionDefinition progression,
+            Instant activatedAt
+    ) {
+        UUID parentNodeInstanceId = UUID.randomUUID();
+        jdbc.sql("""
+                        INSERT INTO wfl_node_instance (
+                            workflow_node_instance_id, tenant_id, workflow_instance_id,
+                            stage_instance_id, work_order_id, node_id, task_id, status,
+                            activation_event_id, version, activated_at
+                        ) VALUES (
+                            :nodeInstanceId, :tenantId, :workflowId,
+                            :stageId, :workOrderId, :nodeId, NULL, 'WAITING',
+                            :activationEventId, 1, :activatedAt
+                        )
+                        """)
+                .param("nodeInstanceId", parentNodeInstanceId)
+                .param("tenantId", tenantId)
+                .param("workflowId", current.workflowInstanceId())
+                .param("stageId", stageInstanceId)
+                .param("workOrderId", current.workOrderId())
+                .param("nodeId", progression.nodeId())
+                .param("activationEventId", activationEventId)
+                .param("activatedAt", java.sql.Timestamp.from(activatedAt))
+                .update();
+
+        var childAsset = configurations.listBundleAssets(
+                        tenantId, current.configurationBundleId(),
+                        current.configurationBundleDigest(), ConfigurationAssetType.WORKFLOW)
+                .stream()
+                .filter(asset -> progression.subProcessRef().equals(asset.assetKey()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "SUB_PROCESS ref missing from frozen bundle: " + progression.subProcessRef()));
+        var childBootstrap = parser.parse(childAsset);
+        UUID childWorkflowId = UUID.randomUUID();
+        UUID childStageId = UUID.randomUUID();
+        UUID childNodeInstanceId = UUID.randomUUID();
+        UUID linkId = UUID.randomUUID();
+
+        jdbc.sql("""
+                        INSERT INTO wfl_workflow_instance (
+                            workflow_instance_id, tenant_id, project_id, work_order_id,
+                            configuration_bundle_id, configuration_bundle_digest,
+                            workflow_definition_version_id, workflow_key, workflow_version,
+                            definition_digest, status, start_event_id, correlation_id, version,
+                            started_at, instance_role
+                        ) VALUES (
+                            :workflowId, :tenantId, :projectId, :workOrderId,
+                            :bundleId, :bundleDigest, :definitionVersionId, :workflowKey, :workflowVersion,
+                            :definitionDigest, 'ACTIVE', :startEventId, :correlationId, 1,
+                            :startedAt, 'SUBPROCESS'
+                        )
+                        """)
+                .param("workflowId", childWorkflowId)
+                .param("tenantId", tenantId)
+                .param("projectId", current.projectId())
+                .param("workOrderId", current.workOrderId())
+                .param("bundleId", current.configurationBundleId())
+                .param("bundleDigest", current.configurationBundleDigest())
+                .param("definitionVersionId", childAsset.versionId())
+                .param("workflowKey", childBootstrap.workflowKey())
+                .param("workflowVersion", childBootstrap.workflowVersion())
+                .param("definitionDigest", childAsset.contentDigest())
+                .param("startEventId", activationEventId)
+                .param("correlationId", correlationId)
+                .param("startedAt", java.sql.Timestamp.from(activatedAt))
+                .update();
+
+        jdbc.sql("""
+                        INSERT INTO wfl_subprocess_link (
+                            subprocess_link_id, tenant_id, parent_workflow_instance_id,
+                            parent_node_instance_id, parent_node_id, child_workflow_instance_id,
+                            child_workflow_key, child_definition_version_id, child_definition_digest,
+                            status, activation_event_id, version, started_at
+                        ) VALUES (
+                            :linkId, :tenantId, :parentWorkflowId, :parentNodeId, :parentNode,
+                            :childWorkflowId, :childKey, :childVersionId, :childDigest,
+                            'RUNNING', :activationEventId, 1, :startedAt
+                        )
+                        """)
+                .param("linkId", linkId)
+                .param("tenantId", tenantId)
+                .param("parentWorkflowId", current.workflowInstanceId())
+                .param("parentNodeId", parentNodeInstanceId)
+                .param("parentNode", progression.nodeId())
+                .param("childWorkflowId", childWorkflowId)
+                .param("childKey", childBootstrap.workflowKey())
+                .param("childVersionId", childAsset.versionId())
+                .param("childDigest", childAsset.contentDigest())
+                .param("activationEventId", activationEventId)
+                .param("startedAt", java.sql.Timestamp.from(activatedAt))
+                .update();
+
+        jdbc.sql("""
+                        INSERT INTO wfl_stage_instance (
+                            stage_instance_id, tenant_id, workflow_instance_id, work_order_id,
+                            stage_code, sequence_no, status, activation_event_id, version, activated_at
+                        ) VALUES (
+                            :stageId, :tenantId, :workflowId, :workOrderId,
+                            :stageCode, 1, 'ACTIVE', :activationEventId, 1, :activatedAt
+                        )
+                        """)
+                .param("stageId", childStageId)
+                .param("tenantId", tenantId)
+                .param("workflowId", childWorkflowId)
+                .param("workOrderId", current.workOrderId())
+                .param("stageCode", childBootstrap.firstStageCode())
+                .param("activationEventId", activationEventId)
+                .param("activatedAt", java.sql.Timestamp.from(activatedAt))
+                .update();
+
+        ScheduledTaskView childTask = tasks.createWorkflowTask(new CreateWorkflowTaskCommand(
+                tenantId, current.projectId(), current.workOrderId(),
+                childWorkflowId, childStageId, childNodeInstanceId,
+                childBootstrap.firstNodeId(), childAsset.versionId(), childAsset.contentDigest(),
+                current.configurationBundleId(), current.configurationBundleDigest(),
+                childBootstrap.firstStageCode(), childBootstrap.firstTaskType(),
+                childBootstrap.firstTaskKind(), childBootstrap.firstFormRef(), childBootstrap.firstSlaRef(),
+                "work-order:" + current.workOrderId(), Sha256.digest(linkId.toString()),
+                100, activatedAt, 3, correlationId, activationEventId.toString()));
+        jdbc.sql("""
+                        INSERT INTO wfl_node_instance (
+                            workflow_node_instance_id, tenant_id, workflow_instance_id,
+                            stage_instance_id, work_order_id, node_id, task_id, status,
+                            activation_event_id, version, activated_at
+                        ) VALUES (
+                            :nodeInstanceId, :tenantId, :workflowId,
+                            :stageId, :workOrderId, :nodeId, :taskId, 'ACTIVE',
+                            :activationEventId, 1, :activatedAt
+                        )
+                        """)
+                .param("nodeInstanceId", childNodeInstanceId)
+                .param("tenantId", tenantId)
+                .param("workflowId", childWorkflowId)
+                .param("stageId", childStageId)
+                .param("workOrderId", current.workOrderId())
+                .param("nodeId", childBootstrap.firstNodeId())
+                .param("taskId", childTask.taskId())
+                .param("activationEventId", activationEventId)
+                .param("activatedAt", java.sql.Timestamp.from(activatedAt))
+                .update();
+
+        return Sha256.digest(current.workflowNodeInstanceId() + "|SUB|" + parentNodeInstanceId
+                + "|" + childWorkflowId);
     }
 
     /**
@@ -634,6 +791,14 @@ final class WorkflowTaskCompletedHandler
             NodeRuntime current,
             Instant completedAt
     ) {
+        String instanceRole = jdbc.sql("""
+                        SELECT instance_role FROM wfl_workflow_instance
+                         WHERE tenant_id = :tenantId AND workflow_instance_id = :workflowId
+                        """)
+                .param("tenantId", tenantId)
+                .param("workflowId", current.workflowInstanceId())
+                .query(String.class)
+                .single();
         int updated = jdbc.sql("""
                         UPDATE wfl_workflow_instance
                            SET status = 'COMPLETED', completed_at = :completedAt, version = version + 1
@@ -654,6 +819,10 @@ final class WorkflowTaskCompletedHandler
                         current.workflowInstanceId(), current.projectId(), current.workOrderId(),
                         current.workflowDefinitionVersionId(), current.workflowDefinitionDigest(), completedAt),
                 completedAt);
+        if ("SUBPROCESS".equals(instanceRole)) {
+            resumeParentAfterSubProcess(tenantId, activationEventId, correlationId, current, completedAt);
+            return;
+        }
         List<String> completedStageCodes = jdbc.sql("""
                         SELECT stage_code
                           FROM wfl_stage_instance
@@ -668,6 +837,82 @@ final class WorkflowTaskCompletedHandler
         workOrders.fulfill(new FulfillWorkOrderCommand(
                 tenantId, current.workOrderId(), current.workflowInstanceId(),
                 activationEventId, correlationId, completedStageCodes));
+    }
+
+    private void resumeParentAfterSubProcess(
+            String tenantId,
+            UUID activationEventId,
+            String correlationId,
+            NodeRuntime childCurrent,
+            Instant completedAt
+    ) {
+        var link = jdbc.sql("""
+                        SELECT subprocess_link_id, parent_workflow_instance_id, parent_node_instance_id,
+                               parent_node_id
+                          FROM wfl_subprocess_link
+                         WHERE tenant_id = :tenantId
+                           AND child_workflow_instance_id = :childWorkflowId
+                           AND status = 'RUNNING'
+                         FOR UPDATE
+                        """)
+                .param("tenantId", tenantId)
+                .param("childWorkflowId", childCurrent.workflowInstanceId())
+                .query((rs, row) -> new SubProcessLink(
+                        rs.getObject("subprocess_link_id", UUID.class),
+                        rs.getObject("parent_workflow_instance_id", UUID.class),
+                        rs.getObject("parent_node_instance_id", UUID.class),
+                        rs.getString("parent_node_id")))
+                .single();
+        // 父节点 completion_event_id 不得与子任务 completion 冲突（租户内唯一）。
+        UUID parentCompletionEventId = UUID.nameUUIDFromBytes(
+                ("subprocess-complete:" + link.linkId() + ":" + activationEventId).getBytes());
+        int linkUpdated = jdbc.sql("""
+                        UPDATE wfl_subprocess_link
+                           SET status = 'COMPLETED', completion_event_id = :completionEventId,
+                               completed_at = :completedAt, version = version + 1
+                         WHERE subprocess_link_id = :linkId AND status = 'RUNNING'
+                        """)
+                .param("completionEventId", parentCompletionEventId)
+                .param("completedAt", java.sql.Timestamp.from(completedAt))
+                .param("linkId", link.linkId())
+                .update();
+        if (linkUpdated != 1) {
+            throw new IllegalStateException("SUB_PROCESS link is no longer running");
+        }
+        int parentNodeUpdated = jdbc.sql("""
+                        UPDATE wfl_node_instance
+                           SET status = 'COMPLETED', completion_event_id = :completionEventId,
+                               completed_at = :completedAt, version = version + 1
+                         WHERE tenant_id = :tenantId
+                           AND workflow_node_instance_id = :nodeInstanceId
+                           AND status = 'WAITING'
+                        """)
+                .param("completionEventId", parentCompletionEventId)
+                .param("completedAt", java.sql.Timestamp.from(completedAt))
+                .param("tenantId", tenantId)
+                .param("nodeInstanceId", link.parentNodeInstanceId())
+                .update();
+        if (parentNodeUpdated != 1) {
+            throw new IllegalStateException("SUB_PROCESS parent node is no longer waiting");
+        }
+        NodeRuntime parent = lockWaitNodeRuntime(tenantId, link.parentNodeInstanceId());
+        var parentAsset = configurations.requireAssetVersion(
+                tenantId, parent.workflowDefinitionVersionId(),
+                ConfigurationAssetType.WORKFLOW, parent.workflowDefinitionDigest());
+        ExpressionContext expressionContext = expressionContext(tenantId, parent);
+        var progression = parser.progressionAfterSubProcess(
+                parentAsset, link.parentNodeId(), expressionContext);
+        activateProgression(
+                tenantId, parentCompletionEventId, correlationId,
+                Sha256.digest(link.linkId().toString()), parent, progression, completedAt);
+    }
+
+    private record SubProcessLink(
+            UUID linkId,
+            UUID parentWorkflowInstanceId,
+            UUID parentNodeInstanceId,
+            String parentNodeId
+    ) {
     }
 
     private void append(

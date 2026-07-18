@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M276 TIMER 到期捕获运行时**，功能证据提交 `cc4881290ba08f38debb6031d4ad3954805ae121`（合并入 `master` 后改为合并提交）。
+当前工程基线为 **M277 SUB_PROCESS 运行时**，功能证据提交 `cc4881290ba08f38debb6031d4ad3954805ae121`（合并入 `master` 后改为合并提交）。
 此前 M267 Connector SPI 证据为 `994cb46f1e31ddc8a4364a776cc4849e766c3b6d`；M266 仍为上一
 master 合并基线 `088018a6eac180f7fe36536fae9d073fa797757c`。
 
@@ -686,6 +686,8 @@ master 合并基线 `088018a6eac180f7fe36536fae9d073fa797757c`。
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M277 实现文档](architecture/290-m277-subprocess-runtime.md)
+- [M277 验收矩阵](testing/274-m277-subprocess-runtime-acceptance.md)
 - [M276 实现文档](architecture/289-m276-timer-runtime.md)
 - [M276 验收矩阵](testing/273-m276-timer-runtime-acceptance.md)
 - [M275 实现文档](architecture/288-m275-parallel-gateway-runtime.md)

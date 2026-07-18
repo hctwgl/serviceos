@@ -277,5 +277,6 @@
 - [M274 第三家车企接入手册验收矩阵](271-m274-third-oem-onboarding-handbook-acceptance.md)
 - [M275 PARALLEL_GATEWAY 运行时验收矩阵](272-m275-parallel-gateway-runtime-acceptance.md)
 - [M276 TIMER 运行时验收矩阵](273-m276-timer-runtime-acceptance.md)
+- [M277 SUB_PROCESS 运行时验收矩阵](274-m277-subprocess-runtime-acceptance.md)
 - [多车企平台内核程序级验收矩阵](multi-oem-platform-kernel-program-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

@@ -17,10 +17,15 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -34,6 +39,7 @@ final class JdbcConfigurationService implements ConfigurationService {
     private final JdbcClient jdbc;
     private final Clock clock;
     private final ConfigurationAssetSchemaValidator schemaValidator;
+    private final ObjectMapper definitionMapper = new ObjectMapper();
 
     @Autowired
     JdbcConfigurationService(JdbcClient jdbc, ConfigurationAssetSchemaValidator schemaValidator) {
@@ -241,11 +247,42 @@ final class JdbcConfigurationService implements ConfigurationService {
     ) {
         List<ConfigurationAssetDefinition> assets = listBundleAssets(
                 tenantId, bundleId, expectedManifestDigest, assetType);
+        if (assets.isEmpty()) {
+            throw new ConfigurationResolutionException(
+                    ConfigurationResolutionException.Reason.NO_MATCH,
+                    "published configuration bundle must contain the required asset type");
+        }
+        if (assetType == ConfigurationAssetType.WORKFLOW && assets.size() > 1) {
+            // M277：Bundle 可含多个 WORKFLOW；根流程是未被任何 SUB_PROCESS 引用的那一个。
+            Set<String> referenced = new HashSet<>();
+            for (ConfigurationAssetDefinition asset : assets) {
+                try {
+                    JsonNode root = definitionMapper.readTree(asset.definitionJson());
+                    for (JsonNode node : root.path("nodes")) {
+                        if ("SUB_PROCESS".equals(node.path("nodeType").asText())
+                                && node.hasNonNull("subProcessRef")) {
+                            referenced.add(node.path("subProcessRef").asText());
+                        }
+                    }
+                } catch (Exception exception) {
+                    throw new ConfigurationResolutionException(
+                            ConfigurationResolutionException.Reason.NO_MATCH,
+                            "cannot inspect workflow definition for subprocess roots");
+                }
+            }
+            List<ConfigurationAssetDefinition> roots = assets.stream()
+                    .filter(asset -> !referenced.contains(asset.assetKey()))
+                    .toList();
+            if (roots.size() != 1) {
+                throw new ConfigurationResolutionException(
+                        ConfigurationResolutionException.Reason.AMBIGUOUS_MATCH,
+                        "published configuration bundle must contain exactly one root WORKFLOW");
+            }
+            return roots.getFirst();
+        }
         if (assets.size() != 1) {
             throw new ConfigurationResolutionException(
-                    assets.isEmpty()
-                            ? ConfigurationResolutionException.Reason.NO_MATCH
-                            : ConfigurationResolutionException.Reason.AMBIGUOUS_MATCH,
+                    ConfigurationResolutionException.Reason.AMBIGUOUS_MATCH,
                     "published configuration bundle must contain exactly one required asset type");
         }
         return assets.getFirst();

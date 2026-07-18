@@ -23,7 +23,7 @@ import java.util.Set;
  * 受控 JSON 工作流的最小可执行解释器。
  *
  * <p>M17～M19 线性推进；M269 EXCLUSIVE_GATEWAY；M270 WAIT_EVENT；M275 PARALLEL_GATEWAY
- * 分叉/汇聚；M276 TIMER 到期捕获。子流程仍未实现。</p>
+ * 分叉/汇聚；M276 TIMER；M277 SUB_PROCESS。多实例仍未实现。</p>
  */
 @Component
 final class WorkflowDefinitionParser {
@@ -120,6 +120,12 @@ final class WorkflowDefinitionParser {
                     requiredText(target, "stageCode"),
                     duration.asInt());
         }
+        if ("SUB_PROCESS".equals(targetType)) {
+            return ProgressionDefinition.subProcess(
+                    targetNodeId,
+                    requiredText(target, "stageCode"),
+                    requiredText(target, "subProcessRef"));
+        }
         if ("PARALLEL_GATEWAY".equals(targetType)) {
             return resolveParallelGateway(graph, targetNodeId, context, visiting, arrivalFromNodeId);
         }
@@ -197,6 +203,24 @@ final class WorkflowDefinitionParser {
             throw new IllegalArgumentException("wait node must be WAIT_EVENT: " + requiredNodeId);
         }
         JsonNode target = requireSingleUnconditionalTarget(graph, requiredNodeId, "WAIT_EVENT node");
+        return resolveTarget(
+                graph, requiredText(target, "nodeId"), context, new HashSet<>(), requiredNodeId);
+    }
+
+    /** 子流程完成后，沿父节点唯一出边继续。 */
+    ProgressionDefinition progressionAfterSubProcess(
+            ConfigurationAssetDefinition asset,
+            String subProcessNodeId,
+            ExpressionContext context
+    ) {
+        Objects.requireNonNull(context, "expression context must not be null");
+        Graph graph = parseGraph(asset);
+        String requiredNodeId = requiredValue(subProcessNodeId, "subProcessNodeId");
+        JsonNode sub = graph.nodes().get(requiredNodeId);
+        if (sub == null || !"SUB_PROCESS".equals(requiredText(sub, "nodeType"))) {
+            throw new IllegalArgumentException("node must be SUB_PROCESS: " + requiredNodeId);
+        }
+        JsonNode target = requireSingleUnconditionalTarget(graph, requiredNodeId, "SUB_PROCESS node");
         return resolveTarget(
                 graph, requiredText(target, "nodeId"), context, new HashSet<>(), requiredNodeId);
     }
@@ -404,6 +428,8 @@ final class WorkflowDefinitionParser {
             String correlationKeyTemplate,
             boolean timer,
             int durationSeconds,
+            boolean subProcess,
+            String subProcessRef,
             boolean fork,
             List<ProgressionDefinition> forkBranches,
             boolean joinPending,
@@ -415,13 +441,15 @@ final class WorkflowDefinitionParser {
                 String formRef, String slaRef) {
             return new ProgressionDefinition(
                     nodeId, stageCode, taskType, taskKind, formRef, slaRef,
-                    false, false, null, null, false, 0, false, List.of(), false, null, 0);
+                    false, false, null, null, false, 0, false, null,
+                    false, List.of(), false, null, 0);
         }
 
         static ProgressionDefinition end(String nodeId) {
             return new ProgressionDefinition(
                     nodeId, null, null, null, null, null,
-                    true, false, null, null, false, 0, false, List.of(), false, null, 0);
+                    true, false, null, null, false, 0, false, null,
+                    false, List.of(), false, null, 0);
         }
 
         static ProgressionDefinition waiting(
@@ -433,13 +461,20 @@ final class WorkflowDefinitionParser {
             return new ProgressionDefinition(
                     nodeId, stageCode, null, null, null, null,
                     false, true, waitEventType, correlationKeyTemplate,
-                    false, 0, false, List.of(), false, null, 0);
+                    false, 0, false, null, false, List.of(), false, null, 0);
         }
 
         static ProgressionDefinition timer(String nodeId, String stageCode, int durationSeconds) {
             return new ProgressionDefinition(
                     nodeId, stageCode, null, null, null, null,
-                    false, false, null, null, true, durationSeconds,
+                    false, false, null, null, true, durationSeconds, false, null,
+                    false, List.of(), false, null, 0);
+        }
+
+        static ProgressionDefinition subProcess(String nodeId, String stageCode, String subProcessRef) {
+            return new ProgressionDefinition(
+                    nodeId, stageCode, null, null, null, null,
+                    false, false, null, null, false, 0, true, subProcessRef,
                     false, List.of(), false, null, 0);
         }
 
@@ -450,7 +485,8 @@ final class WorkflowDefinitionParser {
         ) {
             return new ProgressionDefinition(
                     forkNodeId, stageCode, null, null, null, null,
-                    false, false, null, null, false, 0, true, List.copyOf(branches), false, null, 0);
+                    false, false, null, null, false, 0, false, null,
+                    true, List.copyOf(branches), false, null, 0);
         }
 
         static ProgressionDefinition joinPending(
@@ -460,7 +496,8 @@ final class WorkflowDefinitionParser {
         ) {
             return new ProgressionDefinition(
                     joinNodeId, null, null, null, null, null,
-                    false, false, null, null, false, 0, false, List.of(), true, fromNodeId, expectedTokens);
+                    false, false, null, null, false, 0, false, null,
+                    false, List.of(), true, fromNodeId, expectedTokens);
         }
     }
 
