@@ -69,7 +69,10 @@ watch(
         </button>
       </div>
     </header>
-    <p class="hint">只读详情（复用 M202 GET）；写操作请经任务页资料代补，不提供 close/waive。</p>
+    <p class="hint">
+      只读详情（复用 M202 GET）；展示 Accepted CorrectionCase 非 PII 字段含 closed/waived 操作者与
+      补传 submittedBy；写操作请经任务页资料代补，不提供 close/waive。
+    </p>
     <p v-if="error" data-testid="network-portal-error">{{ error }}</p>
     <p v-else-if="loading" data-testid="correction-detail-loading">加载中…</p>
     <template v-else-if="detail">
@@ -116,14 +119,32 @@ watch(
             <span v-else>—</span>
           </dd>
         </div>
-        <div><dt>createdBy</dt><dd>{{ detail.createdBy }}</dd></div>
+        <div><dt>createdBy</dt><dd data-testid="correction-detail-created-by">{{ detail.createdBy }}</dd></div>
         <div><dt>createdAt</dt><dd>{{ detail.createdAt }}</dd></div>
         <div>
           <dt>latestResubmissionSnapshotId</dt>
           <dd>{{ detail.latestResubmissionSnapshotId ?? '—' }}</dd>
         </div>
-        <div><dt>closedAt</dt><dd>{{ detail.closedAt ?? '—' }}</dd></div>
-        <div><dt>waivedAt</dt><dd>{{ detail.waivedAt ?? '—' }}</dd></div>
+        <div>
+          <dt>closedBy</dt>
+          <dd data-testid="correction-detail-closed-by">{{ detail.closedBy ?? '—' }}</dd>
+        </div>
+        <div><dt>closedAt</dt><dd data-testid="correction-detail-closed-at">{{ detail.closedAt ?? '—' }}</dd></div>
+        <div>
+          <dt>waivedBy</dt>
+          <dd data-testid="correction-detail-waived-by">{{ detail.waivedBy ?? '—' }}</dd>
+        </div>
+        <div><dt>waivedAt</dt><dd data-testid="correction-detail-waived-at">{{ detail.waivedAt ?? '—' }}</dd></div>
+        <div>
+          <dt>waiveApprovalRef</dt>
+          <dd data-testid="correction-detail-waive-approval-ref">
+            {{ detail.waiveApprovalRef ?? '—' }}
+          </dd>
+        </div>
+        <div>
+          <dt>waiveNote</dt>
+          <dd data-testid="correction-detail-waive-note">{{ detail.waiveNote ?? '—' }}</dd>
+        </div>
       </dl>
 
       <h3>补传历史</h3>
@@ -133,6 +154,7 @@ watch(
             <th>#</th>
             <th>snapshotId</th>
             <th>digest</th>
+            <th>submittedBy</th>
             <th>submittedAt</th>
           </tr>
         </thead>
@@ -145,6 +167,9 @@ watch(
             <td>{{ item.resubmissionOrdinal }}</td>
             <td>{{ item.evidenceSetSnapshotId }}</td>
             <td>{{ item.snapshotContentDigest }}</td>
+            <td data-testid="correction-resubmission-submitted-by">
+              {{ item.submittedBy ?? '—' }}
+            </td>
             <td>{{ item.submittedAt ?? '—' }}</td>
           </tr>
         </tbody>

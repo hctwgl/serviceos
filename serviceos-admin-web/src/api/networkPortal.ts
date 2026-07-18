@@ -45,6 +45,14 @@ export type NetworkPortalWorkspaceContactAttemptSummary = {
   createdAt: string
 }
 
+/** M234：目录页薄 SLA 风险摘要（计数语义同工作台/工作区）。 */
+export type NetworkPortalDirectorySlaRiskSummary = {
+  workOrderId: string
+  taskId: string | null
+  openCount: number
+  breachedCount: number
+}
+
 export type NetworkPortalPage<T> = {
   networkId: string
   items: T[]
@@ -55,6 +63,14 @@ export type NetworkPortalPage<T> = {
   appointments?: NetworkPortalWorkspaceAppointmentSummary[]
   /** Soft-gated；缺 NETWORK `networkPortal.manageAppointment` 时省略（工单/任务目录页）。 */
   contactAttempts?: NetworkPortalWorkspaceContactAttemptSummary[]
+  /** Soft-gated；缺 NETWORK `evidence.read` 时省略（工单/任务目录页）。 */
+  corrections?: NetworkPortalWorkspaceCorrectionCaseSummary[]
+  /** Soft-gated；缺 NETWORK `evidence.read` 时与 evidenceItems 同时省略（工单/任务目录页）。 */
+  evidenceSlots?: NetworkPortalWorkspaceEvidenceSlotSummary[]
+  /** Soft-gated；缺 NETWORK `evidence.read` 时与 evidenceSlots 同时省略（工单/任务目录页）。 */
+  evidenceItems?: NetworkPortalWorkspaceEvidenceItemSummary[]
+  /** Soft-gated；缺 NETWORK `sla.read` 时省略（工单/任务目录页）。 */
+  slaRiskSummaries?: NetworkPortalDirectorySlaRiskSummary[]
 }
 
 export type NetworkPortalWorkOrderItem = {
@@ -64,6 +80,14 @@ export type NetworkPortalWorkOrderItem = {
   businessType: string | null
   technicianId: string | null
   effectiveFrom: string | null
+  /** M236：非 PII 工单头；缺失时为 null。 */
+  brandCode?: string | null
+  serviceProductCode?: string | null
+  provinceCode?: string | null
+  cityCode?: string | null
+  districtCode?: string | null
+  /** M236：工单接收时间（产品「更新时间」MVP 映射）。 */
+  receivedAt?: string | null
 }
 
 export type NetworkPortalTaskItem = {
@@ -77,6 +101,13 @@ export type NetworkPortalTaskItem = {
   businessType: string | null
   technicianId: string | null
   effectiveFrom: string | null
+  /** M236：所属工单非 PII 头。 */
+  brandCode?: string | null
+  serviceProductCode?: string | null
+  provinceCode?: string | null
+  cityCode?: string | null
+  districtCode?: string | null
+  receivedAt?: string | null
 }
 
 export type NetworkPortalMembershipItem = {
@@ -480,10 +511,15 @@ export type NetworkPortalAppointmentRevision = {
   revisionId?: string
   revisionNo: number
   window: AppointmentWindow
-  /** 契约含 addressRef；UI 禁止渲染（ADR-054）。 */
+  /** 契约含 addressRef；UI 禁止渲染（ADR-054 / ADR-076）。 */
   addressRef?: string
   addressVersion?: string
   note?: string | null
+  /** M238：确认渠道 / 确认方类型（非 PII）；缺省表示尚未确认。 */
+  confirmationChannel?: string | null
+  confirmedPartyType?: string | null
+  /** 修订操作者；与 Appointment.createdBy 可不同。 */
+  createdBy?: string
 }
 
 export type NetworkPortalAppointment = {
@@ -494,7 +530,15 @@ export type NetworkPortalAppointment = {
   assignedNetworkId: string | null
   aggregateVersion: number
   currentRevisionNo: number
-  /** OpenAPI Appointment.revisions；M216 仅消费 current window。 */
+  /** OpenAPI Appointment.createdBy；product/03 §8「操作者」。 */
+  createdBy?: string
+  /** M241：OpenAPI Appointment 既有非 PII 范围/时间/动作字段。 */
+  projectId?: string
+  workOrderId?: string
+  technicianId?: string | null
+  createdAt?: string
+  allowedActions?: string[]
+  /** OpenAPI Appointment.revisions；M216/M238/M241 消费 current window/渠道。 */
   revisions?: NetworkPortalAppointmentRevision[]
 }
 
@@ -599,6 +643,12 @@ export type NetworkPortalContactAttempt = {
   resultCode: string
   actorId: string
   createdAt: string
+  /** M240/M241：OpenAPI ContactAttempt 既有非 PII 字段；不渲染 party/note/recording。 */
+  projectId?: string
+  workOrderId?: string
+  startedAt?: string
+  endedAt?: string
+  nextContactAt?: string | null
 }
 
 /** M199：标记本网点预约爽约（CONFIRMED 且窗口已结束）。 */
