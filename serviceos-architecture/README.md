@@ -674,10 +674,10 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M268 配置治理 MVP**（Workflow 条件静态校验；功能提交后回填 SHA，合并入
-`master` 后改为合并提交）。此前 M267 Connector SPI 证据为
-`994cb46f1e31ddc8a4364a776cc4849e766c3b6d`；M266 仍为上一 master 合并基线
-`088018a6eac180f7fe36536fae9d073fa797757c`。
+当前工程基线为 **M268 配置治理 MVP**（Workflow 条件静态校验），功能证据提交
+`2015ae56310eba9905877a93e356fe317ffeb705`（合并入 `master` 后改为合并提交）。
+此前 M267 Connector SPI 证据为 `994cb46f1e31ddc8a4364a776cc4849e766c3b6d`；M266 仍为上一
+master 合并基线 `088018a6eac180f7fe36536fae9d073fa797757c`。
 
 当前已具备 Admin、独立 Network/Technician 客户端、在线履约闭环、CREATE_WORK_ORDER 通用 Connector SPI，
 以及 Workflow 条件/EXCLUSIVE_GATEWAY 发布期静态门禁。下一主线是网关运行时与 REFERENCE_OEM（见 roadmap/06）。
