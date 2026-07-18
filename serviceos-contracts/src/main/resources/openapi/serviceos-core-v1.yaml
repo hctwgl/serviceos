@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.15
+  version: 1.0.16
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 servers:
   - url: /api/v1
@@ -1455,6 +1455,8 @@ paths:
         M235：可选 `evidenceSlots` / `evidenceItems`（复用 Admin 工作区摘要字段集）；
         需 NETWORK `evidence.read`，缺能力时同时省略（不得用空数组伪装）；
         覆盖本页 items[].taskIds。
+        M236：items 含非 PII 工单头字段 brandCode/serviceProductCode/provinceCode/
+        cityCode/districtCode/receivedAt（对齐 Admin WorkOrder 子集；工单缺失时为 null）。
       parameters:
         - $ref: '#/components/parameters/NetworkContext'
         - $ref: '#/components/parameters/CorrelationId'
@@ -1539,6 +1541,8 @@ paths:
         M235：可选 `evidenceSlots` / `evidenceItems`（复用 Admin 工作区摘要字段集）；
         需 NETWORK `evidence.read`，缺能力时同时省略（不得用空数组伪装）；
         覆盖本页 items[].taskId。
+        M236：items 含非 PII 工单头字段 brandCode/serviceProductCode/provinceCode/
+        cityCode/districtCode/receivedAt（对齐 Admin WorkOrder 子集；工单缺失时为 null）。
       parameters:
         - $ref: '#/components/parameters/NetworkContext'
         - $ref: '#/components/parameters/CorrelationId'
@@ -4957,6 +4961,30 @@ components:
         businessType: { type: [string, 'null'], maxLength: 100 }
         technicianId: { type: [string, 'null'], maxLength: 128 }
         effectiveFrom: { type: [string, 'null'], format: date-time }
+        brandCode:
+          type: [string, 'null']
+          maxLength: 64
+          description: M236：非 PII；工单权威头；缺失时为 null
+        serviceProductCode:
+          type: [string, 'null']
+          maxLength: 96
+          description: M236：非 PII 服务产品；对齐 Admin WorkOrder
+        provinceCode:
+          type: [string, 'null']
+          maxLength: 16
+          description: M236：非 PII 区域（省）
+        cityCode:
+          type: [string, 'null']
+          maxLength: 16
+          description: M236：非 PII 区域（市）
+        districtCode:
+          type: [string, 'null']
+          maxLength: 16
+          description: M236：非 PII 区域（区）
+        receivedAt:
+          type: [string, 'null']
+          format: date-time
+          description: M236：工单接收时间（Admin 对齐；产品「更新时间」MVP 映射）
     NetworkPortalWorkOrderPage:
       type: object
       additionalProperties: false
@@ -5160,6 +5188,21 @@ components:
         businessType: { type: [string, 'null'], maxLength: 100 }
         technicianId: { type: [string, 'null'], maxLength: 128 }
         effectiveFrom: { type: [string, 'null'], format: date-time }
+        brandCode:
+          type: [string, 'null']
+          maxLength: 64
+          description: M236：所属工单非 PII 头
+        serviceProductCode:
+          type: [string, 'null']
+          maxLength: 96
+          description: M236：所属工单服务产品
+        provinceCode: { type: [string, 'null'], maxLength: 16 }
+        cityCode: { type: [string, 'null'], maxLength: 16 }
+        districtCode: { type: [string, 'null'], maxLength: 16 }
+        receivedAt:
+          type: [string, 'null']
+          format: date-time
+          description: M236：所属工单接收时间
     NetworkPortalTaskPage:
       type: object
       additionalProperties: false

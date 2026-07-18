@@ -35,6 +35,7 @@ watch(() => props.networkContextId, () => {
     <h2>本网点工作台</h2>
     <p v-if="error" data-testid="network-portal-error">{{ error }}</p>
     <template v-else-if="data">
+      <p class="as-of" data-testid="network-workbench-as-of">统计时间：{{ data.asOf }}</p>
       <ul data-testid="network-workbench-counts">
         <li>
           <RouterLink to="/network-portal/work-orders" data-testid="workbench-active-work-orders">
@@ -102,6 +103,9 @@ watch(() => props.networkContextId, () => {
           >
             {{ row.businessType }}：占用 {{ row.occupiedUnits }} / 上限 {{ row.maxUnits }}
             （可用 {{ row.availableUnits }}，v{{ row.version }}）
+            <span class="muted" data-testid="workbench-capacity-updated-at">
+              · 更新时间 {{ row.updatedAt }}
+            </span>
           </li>
         </ul>
         <p v-else data-testid="workbench-capacity-empty">暂无容量计数</p>
@@ -109,3 +113,15 @@ watch(() => props.networkContextId, () => {
     </template>
   </section>
 </template>
+
+<style scoped>
+.as-of,
+.muted,
+.hint {
+  color: #5b6573;
+  font-size: 0.9rem;
+}
+.hint {
+  margin: 0.25rem 0 0;
+}
+</style>
