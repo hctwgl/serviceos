@@ -110,12 +110,19 @@ watch(() => props.technicianContextId, () => {
             <td>
               <RouterLink
                 v-if="item.itemType === 'ASSIGNMENT'"
-                :to="{ path: '/technician-portal/schedule', query: { taskId: item.taskId } }"
-                data-testid="technician-feed-schedule-deeplink"
+                :to="`/technician-portal/tasks/${item.taskId}`"
+                data-testid="technician-feed-task-detail-deeplink"
               >
                 {{ item.taskId }}
               </RouterLink>
               <span v-else>{{ item.taskId }}</span>
+              <RouterLink
+                v-if="item.itemType === 'ASSIGNMENT'"
+                :to="{ path: '/technician-portal/schedule', query: { taskId: item.taskId } }"
+                data-testid="technician-feed-schedule-deeplink"
+              >
+                日程
+              </RouterLink>
             </td>
             <td>{{ item.workOrderId ?? '—' }}</td>
             <td data-testid="technician-feed-project-id">{{ item.projectId ?? '—' }}</td>

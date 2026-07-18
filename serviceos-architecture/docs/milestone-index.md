@@ -251,6 +251,7 @@ title: ServiceOS 里程碑索引
 | M240 | M240 Network Portal 工作区协作摘要 Accepted 字段展示 | [253-m240-network-portal-workspace-collaboration-summary-fields.md](../architecture/253-m240-network-portal-workspace-collaboration-summary-fields.md) | [237-m240-network-portal-workspace-collaboration-summary-fields-acceptance.md](../testing/237-m240-network-portal-workspace-collaboration-summary-fields-acceptance.md) |
 | M241 | M241 Network Portal 预约/联系历史残余 Accepted 字段展示 | [254-m241-network-portal-appointment-contact-history-residual-fields.md](../architecture/254-m241-network-portal-appointment-contact-history-residual-fields.md) | [238-m241-network-portal-appointment-contact-history-residual-fields-acceptance.md](../testing/238-m241-network-portal-appointment-contact-history-residual-fields-acceptance.md) |
 | M242 | M242 Network Portal 整改详情残余 Accepted 字段展示 | [255-m242-network-portal-correction-detail-residual-fields.md](../architecture/255-m242-network-portal-correction-detail-residual-fields.md) | [239-m242-network-portal-correction-detail-residual-fields-acceptance.md](../testing/239-m242-network-portal-correction-detail-residual-fields-acceptance.md) |
+| M243 | M243 Technician Portal 当前责任任务在线详情 | [256-m243-technician-portal-task-detail.md](../architecture/256-m243-technician-portal-task-detail.md) | [240-m243-technician-portal-task-detail-acceptance.md](../testing/240-m243-technician-portal-task-detail-acceptance.md) |
 
 ## 未关联里程碑的文档
 
