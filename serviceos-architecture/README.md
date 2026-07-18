@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M272 REFERENCE_OEM SAMPLE Connector**，功能证据提交 `7a651ddf567d949dc56946ae6c362e72f74c9d4f`（合并入 `master` 后改为合并提交）。
+当前工程基线为 **M272 REFERENCE_OEM SAMPLE Connector**，功能证据提交 `e0c159df3b8619634dde765e1a4726a06b619a75`（合并入 `master` 后改为合并提交）。
 此前 M267 Connector SPI 证据为 `994cb46f1e31ddc8a4364a776cc4849e766c3b6d`；M266 仍为上一
 master 合并基线 `088018a6eac180f7fe36536fae9d073fa797757c`。
 
