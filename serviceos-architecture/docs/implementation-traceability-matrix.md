@@ -367,3 +367,5 @@ Feature gate/authority: if applicable
 | M270 | WAIT_EVENT 运行时：挂起订阅、关联键模板、信号幂等唤醒并继续推进；Flyway V101 | schema + V101 + WaitSignalService + WaitEvent/Linear/Gateway IT + `283-m270-*` + `267-m270-*` | 定时器超时唤醒、全量外部事件自动 fan-in、PARALLEL |
 | M271 | 标准家充勘安平台模板：中立 WORKFLOW+SLA；EXCLUSIVE_GATEWAY+WAIT_EVENT；classpath 漂移门禁与发布冒烟 | template JSON + DriftTest + HomeChargingSurveyInstallTemplatePostgresIT + `284-m271-*` + `268-m271-*` | FORM/EVIDENCE 完整模板包、Admin 模板 UI、真实 OEM 回传 |
 | M272 | REFERENCE_OEM SAMPLE Connector：独立适配器经通用 SPI 建单；SAMPLE HMAC；明确 TBD_EXTERNAL_CONTRACT | referenceoem + Security permitAll + ReferenceOemInboundOrderPostgresIT + ArchitectureTest + `285-m272-*` + `269-m272-*` | 真实第二家协议/Sandbox、出站/回调 |
+| M273 | 双车企入站回归：BYD + REFERENCE_OEM 独立 Connector/Bundle；冲突失败关闭 | DualOemInboundRegressionPostgresIT + `286-m273-*` + `270-m273-*` | 双车企提审/回调全矩阵、真实 OEM2 |
+| M274 | 第三家车企接入手册：Connector+Mapping+Bundle 标准路径 | `integration/04-third-oem-onboarding-handbook.md` + `287-m274-*` + `271-m274-*` | 真实 OEM3 接入 |

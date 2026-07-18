@@ -281,6 +281,8 @@ title: ServiceOS 里程碑索引
 | M270 | M270 WAIT_EVENT 运行时 | [283-m270-wait-event-runtime.md](../architecture/283-m270-wait-event-runtime.md) | [267-m270-wait-event-runtime-acceptance.md](../testing/267-m270-wait-event-runtime-acceptance.md) |
 | M271 | M271 标准家充勘测安装配置模板 | [284-m271-home-charging-survey-install-template.md](../architecture/284-m271-home-charging-survey-install-template.md) | [268-m271-home-charging-survey-install-template-acceptance.md](../testing/268-m271-home-charging-survey-install-template-acceptance.md) |
 | M272 | M272 REFERENCE_OEM SAMPLE Connector | [285-m272-reference-oem-sample-connector.md](../architecture/285-m272-reference-oem-sample-connector.md) | [269-m272-reference-oem-sample-connector-acceptance.md](../testing/269-m272-reference-oem-sample-connector-acceptance.md) |
+| M273 | M273 双车企入站端到端回归 | [286-m273-dual-oem-inbound-regression.md](../architecture/286-m273-dual-oem-inbound-regression.md) | [270-m273-dual-oem-inbound-regression-acceptance.md](../testing/270-m273-dual-oem-inbound-regression-acceptance.md) |
+| M274 | M274 第三家车企接入手册 | [287-m274-third-oem-onboarding-handbook.md](../architecture/287-m274-third-oem-onboarding-handbook.md) | [271-m274-third-oem-onboarding-handbook-acceptance.md](../testing/271-m274-third-oem-onboarding-handbook-acceptance.md) |
 
 ## 未关联里程碑的文档
 

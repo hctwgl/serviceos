@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-18
-baselineCommit: e0c159df3b8619634dde765e1a4726a06b619a75
-latestMilestone: M272
+baselineCommit: TBD_AFTER_M274_COMMIT
+latestMilestone: M274
 ---
 
 # ServiceOS 实施状态总览
@@ -39,8 +39,8 @@ latestMilestone: M272
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M272 REFERENCE_OEM SAMPLE Connector |
-| 基线提交 | `e0c159df3b8619634dde765e1a4726a06b619a75`（功能证据；合并入 `master` 后改为合并提交） |
+| 最新实施里程碑 | M274 第三家车企接入手册（阶段一收口） |
+| 基线提交 | M273/M274 功能提交后回填；合并入 `master` 后改为合并提交 |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts`、`@serviceos/web-core`、`ServiceOSIOSCore`、独立且可部署的 `serviceos-network-web` 与 `serviceos-technician-web`、Swift 6 `TechnicianIOSFoundation`，以及已在 iPhone 17 Pro Simulator 安装启动、实跑 XCTest/XCUITest、形成 Production arm64 archive/dSYM，并接入当前任务、在线 Visit、冻结基础表单、前台 Evidence 采集上传、Snapshot/Task 完成与多轮资料整改的原生 `TechnicianIOS` SwiftUI App；由同一 Core OpenAPI 生成并经独立消费者门禁验证的 `@serviceos/core-client` 与 `ServiceOSCoreClient` |
 | 前端工程 | `serviceos-admin-web` 独立承载总部运营、统一用户中心、`/me` 导航、SavedView、UI Preference、受控搜索与最近访问；M256 后 Network 正式产品由独立 `serviceos-network-web` 承载，M257 后 Technician 正式产品由独立移动优先 `serviceos-technician-web` 承载，M262～M266 依次增加在线 Visit、冻结表单、Evidence 三段式上传、Snapshot/Task 完成与独立整改 Task 多轮补传/重新提交；Admin 仅保留可配置外链和 M188 诊断；两套独立 Web 均实际接入共享 Core、OIDC PKCE、服务端 Context/Capability/导航、Playwright 回归和独立容器镜像 |
@@ -145,7 +145,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | 项目治理 | Project 核心事实、范围关系与授权目录 | `PARTIAL` | 项目创建；REGION/NETWORK 当前关系整组修订和不可变历史；`project.read` 授权目录、详情及历史查询 | owners、品牌/服务产品/配置绑定、生命周期、计划修订审批、目录治理 UI | M8、M64～M67 |
 | 可靠消息 | Inbox、Outbox、Worker claim/lease/retry | `IMPLEMENTED` | 本地可靠发布消费、恢复和人工接管基础 | 正式 Broker 和跨服务运行 | M9～M10 |
 | 配置中心 | 不可变配置资产、Bundle 发布和版本锁定 | `PARTIAL` | FORM、EVIDENCE、SLA v1 资产发布基础；工单/任务冻结引用；SERVICEOS_EXPR_V1 布尔/类型比较子集；FORM/EVIDENCE 字段及 WORKFLOW/SLA 依赖闭包；**M268** Workflow 条件静态门禁；**M271** 平台中立家充勘安 WORKFLOW+SLA 模板（含 Gateway/WAIT） | 决策表/公式/脚本、完整审批 UI、通用依赖图、完整 FORM/EVIDENCE 模板包 | M16、M33、M36、M52～M53、M61、M268、M271 |
-| 外部接入 | BYD CPIM + REFERENCE_OEM SAMPLE | `PARTIAL` | BYD 入站/提审/回调切片；**M267** 通用 SPI 管道；**M272** REFERENCE_OEM SAMPLE 独立 Connector（明确 REFERENCE/SAMPLE/TBD_EXTERNAL_CONTRACT） | 真实第二家协议/Sandbox（BLOCKED_EXTERNAL）、回调/出站全面 SPI、人工标记已送达/放弃、生产凭据/对象存储 | M16、M56～M60、M77～M79、M99、M158、M267、M272 |
+| 外部接入 | BYD CPIM + REFERENCE_OEM SAMPLE | `PARTIAL` | BYD 入站/提审/回调切片；**M267** 通用 SPI 管道；**M272** REFERENCE_OEM SAMPLE 独立 Connector（明确 REFERENCE/SAMPLE/TBD_EXTERNAL_CONTRACT） | 真实第二家协议/Sandbox（BLOCKED_EXTERNAL）、回调/出站全面 SPI、人工标记已送达/放弃、生产凭据/对象存储 | M16、M56～M60、M77～M79、M99、M158、M267、M272、M273 |
 | 工单 | WorkOrder 接收、激活、履约完成与授权工作区投影 | `PARTIAL` | 权威工单、工作流启动、跨阶段和 END 完结；授权目录、非 PII 详情、Stage/Task 执行骨架及核心执行+现场履约时间线 | 完整取消、暂停、恢复、客户敏感详情审计、跨域完整时间线/动作与全部业务分支 | M16～M19、M68～M69、M73～M74 |
 | 工作流 | 线性 Stage/Task + 互斥网关 + 等待事件运行时 | `PARTIAL` | 精确版本启动、线性推进、唯一跨阶段推进、完成事件；节点 `slaRef` 传递；授权 Workflow/Stage 当前投影；**M269** EXCLUSIVE_GATEWAY；**M270** WAIT_EVENT 挂起/幂等唤醒 | 并行/汇聚网关、定时器超时唤醒、Node/Attempt 历史和更复杂流程语义 | M17～M19、M61、M69、M268～M270 |
 | 人工任务与执行历史 | claim/start/complete、责任、执行保护与授权任务读取 | `IMPLEMENTED` | 人工命令、候选领取、唯一责任、release/reclaim、执行保护；表单/资料完成门禁；授权队列/详情、allowed-actions、自动 Attempt 历史及工单内核心 Task 生命周期与指派/Guard/人工接管时间线 | block/retry/cancel 等其他动作、Workflow Node 历史、跨工单/跨域完整历史和 Review 完成条件 | M20～M23、M35、M41、M43、M69～M73、M81 |
@@ -175,18 +175,17 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M272**。M267～M271 保持有效；**M272** 已交付 REFERENCE_OEM
-SAMPLE Connector（经通用 SPI；明确非真实车企接入）。
+ServiceOS 可靠纵向切片已推进到 **M274**。阶段一多车企平台内核声明范围已闭合：通用 SPI、配置
+治理、EXCLUSIVE_GATEWAY、WAIT_EVENT、标准家充模板、REFERENCE_OEM SAMPLE、双车企入站回归与第三家
+接入手册。真实第二家/第三家协议与 Sandbox 仍为 `BLOCKED_EXTERNAL`。
 
-下一主线：双车企端到端回归 → 第三家接入手册。真实第二家协议/Sandbox 仍为 `BLOCKED_EXTERNAL`。
-Track F / 签名真机仍为后续与 `BLOCKED_EXTERNAL`。
+下一主线进入阶段二：PARALLEL_GATEWAY 与复杂流程运行时；并行推进 Track F（签名真机仍 BLOCKED_EXTERNAL）。
 
 ```text
-已接受推进顺序（多车企内核优先，见 roadmap/06）：
-1. M273 双车企端到端回归；
-2. M274 第三家接入手册；
-3. 阶段二复杂流程（PARALLEL 等）与阶段三领域配置设计器；
-4. Track F/G 与签名真机证据按外部环境并行补齐。
+已接受推进顺序：
+1. 阶段二 PARALLEL_GATEWAY / 汇聚 / 定时器 / 子流程 / 多实例（roadmap 用户提示词）；
+2. 阶段三领域配置设计器；
+3. Track F/G 与真实 OEM 外部证据按环境补齐。
 ```
 
 接手 Agent 必须先读取 `docs/autonomous-agent-handoff.md` 与本文件，验证 HEAD 后从断点继续。

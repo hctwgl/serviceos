@@ -57,6 +57,9 @@ BYD 和 OEM2（REFERENCE 或真实）使用独立 Connector
 
 ## 6. 当前进度
 
+阶段一声明范围已闭合（真实 OEM2/OEM3 协议仍 BLOCKED_EXTERNAL）。
+
+
 | 切片 | 状态 | 证据 |
 |---|---|---|
 | 1～3（M267） | Implemented | ADR-085、`280-m267-*`、`264-m267-*`、BYD 入站 IT、ArchitectureTest |
@@ -65,4 +68,5 @@ BYD 和 OEM2（REFERENCE 或真实）使用独立 Connector
 | 7（M270） | Implemented | WAIT_EVENT 挂起/幂等唤醒、`283-m270-*` |
 | 8（M271） | Implemented | 标准家充勘安模板、`284-m271-*` |
 | 9（M272） | Implemented | REFERENCE_OEM SAMPLE Connector、`285-m272-*` |
-| 10～11 | 未开始 | 下一切片：双车企回归（M273） |
+| 10（M273） | Implemented | 双车企入站回归、`286-m273-*` |
+| 11（M274） | Implemented | 第三家接入手册、`287-m274-*` |
