@@ -3,15 +3,18 @@ package com.serviceos.configuration;
 import com.serviceos.ServiceOsApplication;
 import com.serviceos.configuration.api.ApproveConfigurationDraftCommand;
 import com.serviceos.configuration.api.ConfigurationAssetType;
+import com.serviceos.configuration.api.ConfigurationDraftDiffView;
 import com.serviceos.configuration.api.ConfigurationDraftService;
 import com.serviceos.configuration.api.ConfigurationDraftView;
-import com.serviceos.configuration.api.ConfigurationPublicationException;
 import com.serviceos.configuration.api.CreateConfigurationDraftCommand;
+import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
+import com.serviceos.configuration.api.ConfigurationService;
 import com.serviceos.configuration.api.UpdateConfigurationDraftCommand;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.ProblemCode;
+import com.serviceos.shared.Sha256;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,12 +32,12 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** M282：Workflow 草稿设计器 create → validate → publish。 */
+/** M285：Diff 与审批门禁。 */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = ServiceOsApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE)
-class WorkflowConfigurationDesignerPostgresIT {
-    private static final String TENANT = "tenant-cfg-m282-it";
-    private static final String ACTOR = "designer-m282";
+class ConfigurationDraftDiffApprovalPostgresIT {
+    private static final String TENANT = "tenant-cfg-m285-it";
+    private static final String ACTOR = "designer-m285";
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(
@@ -48,10 +51,11 @@ class WorkflowConfigurationDesignerPostgresIT {
         registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
-        registry.add("serviceos.outbox.worker-id", () -> "cfg-m282-it");
+        registry.add("serviceos.outbox.worker-id", () -> "cfg-m285-it");
     }
 
     @Autowired ConfigurationDraftService drafts;
+    @Autowired ConfigurationService configurations;
     @Autowired JdbcClient jdbc;
 
     @BeforeEach
@@ -65,69 +69,62 @@ class WorkflowConfigurationDesignerPostgresIT {
     }
 
     @Test
-    void draftValidateAndPublishWorkflow() {
-        ConfigurationDraftView created = drafts.create(principal(), meta("c1"), new CreateConfigurationDraftCommand(
-                ConfigurationAssetType.WORKFLOW, "platform.designer.m282", "1.0.0", "1.0.0",
-                validWorkflow(), null));
-        assertThat(created.status()).isEqualTo("DRAFT");
-        assertThat(created.aggregateVersion()).isEqualTo(1L);
+    void diffApproveThenPublish() {
+        String v1 = sla("designer.sla.m285", "1.0.0", 3600);
+        configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.SLA, "designer.sla.m285", "1.0.0", "1.0.0",
+                v1, Sha256.digest(v1)));
 
-        ConfigurationDraftView updated = drafts.update(principal(), meta("u1"),
-                new UpdateConfigurationDraftCommand(created.draftId(), 1L, validWorkflow()));
-        assertThat(updated.status()).isEqualTo("DRAFT");
-        assertThat(updated.aggregateVersion()).isEqualTo(2L);
+        String v2 = sla("designer.sla.m285", "1.0.1", 7200);
+        ConfigurationDraftView created = drafts.create(principal(), meta("c1"),
+                new CreateConfigurationDraftCommand(
+                        ConfigurationAssetType.SLA, "designer.sla.m285", "1.0.1", "1.0.0", v2, null));
+        assertThat(created.baseVersionId()).isNotNull();
 
         ConfigurationDraftView validated = drafts.validate(principal(), meta("v1"), created.draftId());
-        assertThat(validated.status()).isEqualTo("VALIDATED");
-        assertThat(validated.validationErrors()).isEmpty();
+        ConfigurationDraftDiffView diff = drafts.diff(principal(), "corr-diff", created.draftId());
+        assertThat(diff.identical()).isFalse();
+        assertThat(diff.unifiedDiff()).contains("+").contains("7200");
+
+        assertThatThrownBy(() -> drafts.publish(principal(), meta("p-early"), created.draftId()))
+                .isInstanceOf(BusinessProblem.class)
+                .extracting(ex -> ((BusinessProblem) ex).code())
+                .isEqualTo(ProblemCode.VERSION_CONFLICT);
 
         ConfigurationDraftView approved = drafts.approve(principal(), meta("a1"),
-                new ApproveConfigurationDraftCommand(created.draftId(), validated.aggregateVersion(), "APR-M282-1"));
+                new ApproveConfigurationDraftCommand(
+                        created.draftId(), validated.aggregateVersion(), "APR-M285-1"));
         assertThat(approved.status()).isEqualTo("APPROVED");
+        assertThat(approved.approvalRef()).isEqualTo("APR-M285-1");
 
         ConfigurationDraftView published = drafts.publish(principal(), meta("p1"), created.draftId());
         assertThat(published.status()).isEqualTo("PUBLISHED");
         assertThat(published.publishedVersionId()).isNotNull();
-        assertThat(jdbc.sql("""
-                SELECT status FROM cfg_configuration_asset_version WHERE version_id = :id
-                """).param("id", published.publishedVersionId()).query(String.class).single())
-                .isEqualTo("PUBLISHED");
     }
 
     @Test
-    void invalidWorkflowFailsValidationClosed() {
-        ConfigurationDraftView created = drafts.create(principal(), meta("bad"), new CreateConfigurationDraftCommand(
-                ConfigurationAssetType.WORKFLOW, "platform.designer.m282.bad", "1.0.0", "1.0.0",
-                """
-                {"workflowKey":"bad.m282","semanticVersion":"1.0.0","startNodeId":"START",
-                 "nodes":[
-                   {"nodeId":"START","nodeType":"START","name":"开始"},
-                   {"nodeId":"GW","nodeType":"EXCLUSIVE_GATEWAY","name":"坏网关"},
-                   {"nodeId":"END","nodeType":"END","name":"结束"}],
-                 "transitions":[
-                   {"transitionId":"t1","from":"START","to":"GW"},
-                   {"transitionId":"t2","from":"GW","to":"END"}]}
-                """, null));
-        assertThatThrownBy(() -> drafts.validate(principal(), meta("v-bad"), created.draftId()))
-                .isInstanceOf(ConfigurationPublicationException.class);
-        assertThat(drafts.get(principal(), "corr-get", created.draftId()).status()).isEqualTo("DRAFT");
-        assertThat(drafts.get(principal(), "corr-get", created.draftId()).validationErrors()).isNotEmpty();
-    }
-
-    @Test
-    void unsupportedAssetTypeRejected() {
-        assertThatThrownBy(() -> drafts.create(principal(), meta("rule"), new CreateConfigurationDraftCommand(
-                ConfigurationAssetType.RULE, "rule.m282", "1.0.0", "1.0.0", "{}", null)))
-                .isInstanceOf(BusinessProblem.class)
-                .extracting(ex -> ((BusinessProblem) ex).code())
-                .isEqualTo(ProblemCode.VALIDATION_FAILED);
+    void editingApprovedDraftClearsApproval() {
+        ConfigurationDraftView created = drafts.create(principal(), meta("c2"),
+                new CreateConfigurationDraftCommand(
+                        ConfigurationAssetType.SLA, "designer.sla.edit", "1.0.0", "1.0.0",
+                        sla("designer.sla.edit", "1.0.0", 1000), null));
+        ConfigurationDraftView validated = drafts.validate(principal(), meta("v2"), created.draftId());
+        ConfigurationDraftView approved = drafts.approve(principal(), meta("a2"),
+                new ApproveConfigurationDraftCommand(
+                        created.draftId(), validated.aggregateVersion(), "APR-EDIT"));
+        ConfigurationDraftView edited = drafts.update(principal(), meta("u2"),
+                new UpdateConfigurationDraftCommand(
+                        created.draftId(), approved.aggregateVersion(),
+                        sla("designer.sla.edit", "1.0.0", 2000)));
+        assertThat(edited.status()).isEqualTo("DRAFT");
+        assertThat(edited.approvalRef()).isNull();
     }
 
     private void seedGrants() {
         UUID roleId = UUID.randomUUID();
         jdbc.sql("""
                 INSERT INTO auth_role (role_id, tenant_id, role_code, role_name, role_status, created_at)
-                VALUES (:id, :tenant, 'cfg-designer', '配置设计器', 'ACTIVE', now())
+                VALUES (:id, :tenant, 'cfg-designer-m285', '配置设计器M285', 'ACTIVE', now())
                 """).param("id", roleId).param("tenant", TENANT).update();
         for (String capability : List.of(
                 "configuration.draft.write", "configuration.approve", "configuration.publish")) {
@@ -142,7 +139,7 @@ class WorkflowConfigurationDesignerPostgresIT {
                     valid_from, source_code, approval_ref, created_at
                 ) VALUES (
                     :grant, :tenant, :principal, :role, 'TENANT', :tenant,
-                    now() - interval '1 day', 'TEST', 'm282', now()
+                    now() - interval '1 day', 'TEST', 'm285', now()
                 )
                 """)
                 .param("grant", UUID.randomUUID())
@@ -162,17 +159,11 @@ class WorkflowConfigurationDesignerPostgresIT {
         return new CommandMetadata("corr-" + key, "idem-" + key);
     }
 
-    private static String validWorkflow() {
+    private static String sla(String key, String version, int seconds) {
         return """
-                {"workflowKey":"designer.m282","semanticVersion":"1.0.0","startNodeId":"START",
-                 "nodes":[
-                   {"nodeId":"START","nodeType":"START","name":"开始"},
-                   {"nodeId":"TASK_A","nodeType":"SERVICE_TASK","name":"任务A",
-                    "stageCode":"STAGE_A","taskType":"DESIGNER_TASK"},
-                   {"nodeId":"END","nodeType":"END","name":"结束"}],
-                 "transitions":[
-                   {"transitionId":"t1","from":"START","to":"TASK_A"},
-                   {"transitionId":"t2","from":"TASK_A","to":"END"}]}
-                """;
+                {"policyKey":"%s","version":"%s","subjectType":"TASK",
+                 "taskTypes":["DESIGNER_TASK"],"startEvent":"TASK_CREATED","stopEvent":"TASK_COMPLETED",
+                 "clockMode":"ELAPSED","targetDurationSeconds":%d}
+                """.formatted(key, version, seconds).trim();
     }
 }

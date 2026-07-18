@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.29
+  version: 1.0.30
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -5065,11 +5065,64 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /configuration/drafts/{draftId}:diff:
+    get:
+      operationId: diffConfigurationDraft
+      summary: 对比草稿与基线发布版本
+      description: 返回相对 baseVersionId（或空基线）的统一文本 Diff。
+      parameters:
+        - name: draftId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Diff 结果
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConfigurationDraftDiff' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /configuration/drafts/{draftId}:approve:
+    post:
+      operationId: approveConfigurationDraft
+      summary: 审批已校验配置草稿
+      description: 需要 configuration.approve（HIGH）；仅 VALIDATED → APPROVED。
+      parameters:
+        - name: draftId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ApproveConfigurationDraftRequest' }
+      responses:
+        '200':
+          description: 已审批草稿
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConfigurationDraft' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
   /configuration/drafts/{draftId}:publish:
     post:
       operationId: publishConfigurationDraft
-      summary: 发布已校验的配置草稿
-      description: 需要 configuration.publish（HIGH）；仅 VALIDATED 可发布，生成不可变资产版本。
+      summary: 发布已审批配置草稿
+      description: 需要 configuration.publish（HIGH）；仅 APPROVED 可发布，生成不可变资产版本。
       parameters:
         - name: draftId
           in: path
@@ -5287,6 +5340,23 @@ components:
       required: [definitionJson]
       properties:
         definitionJson: { type: string, minLength: 2, maxLength: 1000000 }
+    ApproveConfigurationDraftRequest:
+      type: object
+      additionalProperties: false
+      required: [approvalRef]
+      properties:
+        approvalRef: { type: string, minLength: 1, maxLength: 128 }
+    ConfigurationDraftDiff:
+      type: object
+      additionalProperties: false
+      required: [draftId, baseLabel, draftLabel, unifiedDiff, identical]
+      properties:
+        draftId: { type: string, format: uuid }
+        baseVersionId: { type: [string, 'null'], format: uuid }
+        baseLabel: { type: string }
+        draftLabel: { type: string }
+        unifiedDiff: { type: string }
+        identical: { type: boolean }
     ConfigurationDraft:
       type: object
       additionalProperties: false
@@ -5301,10 +5371,13 @@ components:
         schemaVersion: { type: string }
         definitionJson: { type: string }
         contentDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
-        status: { enum: [DRAFT, VALIDATED, PUBLISHED, DISCARDED] }
+        status: { enum: [DRAFT, VALIDATED, APPROVED, PUBLISHED, DISCARDED] }
         baseVersionId: { type: [string, 'null'], format: uuid }
         publishedVersionId: { type: [string, 'null'], format: uuid }
         validationErrors: { type: array, items: { type: string } }
+        approvalRef: { type: [string, 'null'], maxLength: 128 }
+        approvedBy: { type: [string, 'null'] }
+        approvedAt: { type: [string, 'null'], format: date-time }
         aggregateVersion: { type: integer, format: int64, minimum: 1 }
         createdBy: { type: string }
         updatedBy: { type: string }

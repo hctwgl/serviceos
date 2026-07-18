@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import {
+  approveConfigurationDraft,
   createConfigurationDraft,
+  diffConfigurationDraft,
   listConfigurationDrafts,
   publishConfigurationDraft,
   updateConfigurationDraft,
   validateConfigurationDraft,
   type ConfigurationDraft,
+  type ConfigurationDraftDiff,
   type DesignerAssetType,
 } from '../api/configurationDrafts'
 
@@ -14,6 +17,8 @@ const assetType = ref<DesignerAssetType>('WORKFLOW')
 const drafts = ref<ConfigurationDraft[]>([])
 const selected = ref<ConfigurationDraft | null>(null)
 const definitionText = ref('')
+const diffView = ref<ConfigurationDraftDiff | null>(null)
+const approvalRef = ref('APR-LOCAL-1')
 const loading = ref(false)
 const busy = ref(false)
 const error = ref<string | null>(null)
@@ -51,6 +56,7 @@ async function refreshList() {
 function selectDraft(draft: ConfigurationDraft) {
   selected.value = draft
   definitionText.value = prettyJson(draft.definitionJson)
+  diffView.value = null
   message.value = null
   error.value = null
 }
@@ -237,6 +243,40 @@ async function validateDraft() {
   }
 }
 
+async function loadDiff() {
+  if (!selected.value) return
+  busy.value = true
+  error.value = null
+  try {
+    diffView.value = await diffConfigurationDraft(selected.value.draftId)
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '加载 Diff 失败'
+  } finally {
+    busy.value = false
+  }
+}
+
+async function approveDraft() {
+  if (!selected.value) return
+  busy.value = true
+  error.value = null
+  message.value = null
+  try {
+    const approved = await approveConfigurationDraft(
+      selected.value.draftId,
+      approvalRef.value.trim(),
+      selected.value.aggregateVersion,
+    )
+    selectDraft(approved.data)
+    message.value = '审批通过'
+    await refreshList()
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '审批失败'
+  } finally {
+    busy.value = false
+  }
+}
+
 async function publishDraft() {
   if (!selected.value) return
   busy.value = true
@@ -294,7 +334,13 @@ onMounted(async () => {
       <button type="button" :disabled="busy" data-testid="create-draft" @click="createDraft">新建草稿</button>
       <button type="button" :disabled="busy || !selected" data-testid="save-draft" @click="saveDraft">保存</button>
       <button type="button" :disabled="busy || !selected" data-testid="validate-draft" @click="validateDraft">校验</button>
-      <button type="button" :disabled="busy || !selected || selected.status !== 'VALIDATED'" data-testid="publish-draft" @click="publishDraft">发布</button>
+      <button type="button" :disabled="busy || !selected" data-testid="diff-draft" @click="loadDiff">Diff</button>
+      <label>
+        approvalRef
+        <input v-model="approvalRef" data-testid="approval-ref" />
+      </label>
+      <button type="button" :disabled="busy || !selected || selected.status !== 'VALIDATED'" data-testid="approve-draft" @click="approveDraft">审批</button>
+      <button type="button" :disabled="busy || !selected || selected.status !== 'APPROVED'" data-testid="publish-draft" @click="publishDraft">发布</button>
     </div>
 
     <p v-if="loading">加载中…</p>
@@ -328,11 +374,13 @@ onMounted(async () => {
         <div v-if="selected" class="meta">
           <span>状态：{{ selected.status }}</span>
           <span>版本：{{ selected.aggregateVersion }}</span>
+          <span v-if="selected.approvalRef">审批：{{ selected.approvalRef }}</span>
           <span v-if="selected.publishedVersionId">已发布：{{ selected.publishedVersionId }}</span>
         </div>
         <ul v-if="selected?.validationErrors?.length" class="errors" data-testid="validation-errors">
           <li v-for="(item, index) in selected.validationErrors" :key="index">{{ item }}</li>
         </ul>
+        <pre v-if="diffView" class="diff" data-testid="draft-diff">{{ diffView.unifiedDiff }}</pre>
       </main>
 
       <aside v-if="assetType === 'WORKFLOW'" class="preview" data-testid="workflow-preview">
@@ -409,7 +457,17 @@ textarea {
 .ok { color: #1a7f37; }
 .err, .errors { color: #cf222e; }
 .muted { color: #656d76; }
-.meta { display: flex; gap: 1rem; font-size: 0.85rem; margin-top: 0.5rem; }
+.meta { display: flex; gap: 1rem; font-size: 0.85rem; margin-top: 0.5rem; flex-wrap: wrap; }
+.diff {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: #f6f8fa;
+  border: 1px solid #d0d7de;
+  border-radius: 0.4rem;
+  overflow: auto;
+  max-height: 20rem;
+  font-size: 0.8rem;
+}
 @media (max-width: 1100px) {
   .layout { grid-template-columns: 1fr; }
 }

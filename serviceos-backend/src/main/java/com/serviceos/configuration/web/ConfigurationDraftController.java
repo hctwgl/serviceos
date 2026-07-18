@@ -1,6 +1,8 @@
 package com.serviceos.configuration.web;
 
+import com.serviceos.configuration.api.ApproveConfigurationDraftCommand;
 import com.serviceos.configuration.api.ConfigurationAssetType;
+import com.serviceos.configuration.api.ConfigurationDraftDiffView;
 import com.serviceos.configuration.api.ConfigurationDraftService;
 import com.serviceos.configuration.api.ConfigurationDraftView;
 import com.serviceos.configuration.api.CreateConfigurationDraftCommand;
@@ -24,7 +26,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-/** Workflow 配置设计器协议适配：草稿保存、校验与发布。 */
+/** 配置设计器协议适配：草稿保存、校验、Diff、审批与发布。 */
 @RestController
 @RequestMapping("/api/v1/configuration/drafts")
 final class ConfigurationDraftController {
@@ -105,6 +107,34 @@ final class ConfigurationDraftController {
         return ok(view, correlationId);
     }
 
+    @GetMapping("/{draftId}:diff")
+    ResponseEntity<DiffResponse> diff(
+            @PathVariable UUID draftId,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        ConfigurationDraftDiffView view = drafts.diff(principals.current(), correlationId, draftId);
+        return ResponseEntity.ok()
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(new DiffResponse(
+                        view.draftId(), view.baseVersionId(), view.baseLabel(),
+                        view.draftLabel(), view.unifiedDiff(), view.identical()));
+    }
+
+    @PostMapping("/{draftId}:approve")
+    ResponseEntity<DraftResponse> approve(
+            @PathVariable UUID draftId,
+            @RequestHeader("If-Match") String ifMatch,
+            @RequestBody ApproveDraftRequest request,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        ConfigurationDraftView view = drafts.approve(
+                principals.current(),
+                new CommandMetadata(correlationId, idempotencyKey == null ? correlationId : idempotencyKey),
+                new ApproveConfigurationDraftCommand(draftId, version(ifMatch), request.approvalRef()));
+        return ok(view, correlationId);
+    }
+
     @PostMapping("/{draftId}:publish")
     ResponseEntity<DraftResponse> publish(
             @PathVariable UUID draftId,
@@ -130,7 +160,8 @@ final class ConfigurationDraftController {
                 view.draftId(), view.assetType().name(), view.assetKey(),
                 view.intendedSemanticVersion(), view.schemaVersion(), view.definitionJson(),
                 view.contentDigest(), view.status(), view.baseVersionId(), view.publishedVersionId(),
-                view.validationErrors(), view.aggregateVersion(), view.createdBy(), view.updatedBy(),
+                view.validationErrors(), view.approvalRef(), view.approvedBy(), view.approvedAt(),
+                view.aggregateVersion(), view.createdBy(), view.updatedBy(),
                 view.createdAt(), view.updatedAt());
     }
 
@@ -155,6 +186,19 @@ final class ConfigurationDraftController {
     record UpdateDraftRequest(String definitionJson) {
     }
 
+    record ApproveDraftRequest(String approvalRef) {
+    }
+
+    record DiffResponse(
+            UUID draftId,
+            UUID baseVersionId,
+            String baseLabel,
+            String draftLabel,
+            String unifiedDiff,
+            boolean identical
+    ) {
+    }
+
     record DraftResponse(
             UUID draftId,
             String assetType,
@@ -167,6 +211,9 @@ final class ConfigurationDraftController {
             UUID baseVersionId,
             UUID publishedVersionId,
             List<String> validationErrors,
+            String approvalRef,
+            String approvedBy,
+            Instant approvedAt,
             long aggregateVersion,
             String createdBy,
             String updatedBy,

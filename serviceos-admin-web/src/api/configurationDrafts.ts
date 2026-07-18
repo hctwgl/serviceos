@@ -10,15 +10,27 @@ export type ConfigurationDraft = {
   schemaVersion: string
   definitionJson: string
   contentDigest: string
-  status: 'DRAFT' | 'VALIDATED' | 'PUBLISHED' | 'DISCARDED'
+  status: 'DRAFT' | 'VALIDATED' | 'APPROVED' | 'PUBLISHED' | 'DISCARDED'
   baseVersionId: string | null
   publishedVersionId: string | null
   validationErrors: string[]
+  approvalRef: string | null
+  approvedBy: string | null
+  approvedAt: string | null
   aggregateVersion: number
   createdBy: string
   updatedBy: string
   createdAt: string
   updatedAt: string
+}
+
+export type ConfigurationDraftDiff = {
+  draftId: string
+  baseVersionId: string | null
+  baseLabel: string
+  draftLabel: string
+  unifiedDiff: string
+  identical: boolean
 }
 
 export type CreateConfigurationDraftRequest = {
@@ -55,6 +67,18 @@ export function updateConfigurationDraft(draftId: string, definitionJson: string
 export function validateConfigurationDraft(draftId: string) {
   return apiPost<ConfigurationDraft>(`/configuration/drafts/${draftId}:validate`, {
     idempotencyKey: newIdempotencyKey('cfg-draft-validate'),
+  })
+}
+
+export function diffConfigurationDraft(draftId: string) {
+  return apiGet<ConfigurationDraftDiff>(`/configuration/drafts/${draftId}:diff`)
+}
+
+export function approveConfigurationDraft(draftId: string, approvalRef: string, aggregateVersion: number) {
+  return apiPost<ConfigurationDraft>(`/configuration/drafts/${draftId}:approve`, {
+    idempotencyKey: newIdempotencyKey('cfg-draft-approve'),
+    ifMatch: quotedVersion(aggregateVersion),
+    body: { approvalRef },
   })
 }
 

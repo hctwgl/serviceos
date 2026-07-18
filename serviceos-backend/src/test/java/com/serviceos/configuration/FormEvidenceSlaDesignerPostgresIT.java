@@ -1,6 +1,7 @@
 package com.serviceos.configuration;
 
 import com.serviceos.ServiceOsApplication;
+import com.serviceos.configuration.api.ApproveConfigurationDraftCommand;
 import com.serviceos.configuration.api.ConfigurationAssetType;
 import com.serviceos.configuration.api.ConfigurationDraftService;
 import com.serviceos.configuration.api.ConfigurationDraftView;
@@ -97,6 +98,10 @@ class FormEvidenceSlaDesignerPostgresIT {
                 new CreateConfigurationDraftCommand(type, key, "1.0.0", "1.0.0", definition, null));
         ConfigurationDraftView validated = drafts.validate(principal(), meta("v-" + key), created.draftId());
         assertThat(validated.status()).isEqualTo("VALIDATED");
+        ConfigurationDraftView approved = drafts.approve(principal(), meta("a-" + key),
+                new ApproveConfigurationDraftCommand(
+                        created.draftId(), validated.aggregateVersion(), "APR-" + key));
+        assertThat(approved.status()).isEqualTo("APPROVED");
         ConfigurationDraftView published = drafts.publish(principal(), meta("p-" + key), created.draftId());
         assertThat(published.status()).isEqualTo("PUBLISHED");
         assertThat(published.publishedVersionId()).isNotNull();
@@ -112,7 +117,8 @@ class FormEvidenceSlaDesignerPostgresIT {
                 INSERT INTO auth_role (role_id, tenant_id, role_code, role_name, role_status, created_at)
                 VALUES (:id, :tenant, 'cfg-designer-m283', '配置设计器M283', 'ACTIVE', now())
                 """).param("id", roleId).param("tenant", TENANT).update();
-        for (String capability : List.of("configuration.draft.write", "configuration.publish")) {
+        for (String capability : List.of(
+                "configuration.draft.write", "configuration.approve", "configuration.publish")) {
             jdbc.sql("""
                     INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
                     VALUES (:id, :cap, now())
@@ -136,7 +142,8 @@ class FormEvidenceSlaDesignerPostgresIT {
 
     private static CurrentPrincipal principal() {
         return new CurrentPrincipal(ACTOR, TENANT, CurrentPrincipal.PrincipalType.USER,
-                "admin-web", Set.of("configuration.draft.write", "configuration.publish"));
+                "admin-web", Set.of(
+                        "configuration.draft.write", "configuration.approve", "configuration.publish"));
     }
 
     private static CommandMetadata meta(String key) {

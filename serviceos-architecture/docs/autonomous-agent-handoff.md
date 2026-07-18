@@ -8,15 +8,15 @@ lastUpdated: 2026-07-18
 ## 当前
 
 - PR：https://github.com/hctwgl/serviceos/pull/146
-- latestMilestone：**M284**
-- Flyway：**111 / 113**
-- OpenAPI：**1.0.29**
+- latestMilestone：**M285**（提交后回填 baselineCommit）
+- Flyway：**113 / 115**
+- OpenAPI：**1.0.30**
 - Page Registry：**page-registry-v17**
 
 ## 已完成
 
-阶段一/二；阶段三 M282～M283 设计器 API；**M284** Admin 配置设计器壳（JSON 编辑 + WORKFLOW 结构预览）
+阶段三设计器：**M282～M285**（草稿 API、多资产类型、Admin 壳、Diff/审批门禁）
 
 ## 下一步
 
-拖拽画布；Diff/审批/灰度；其余资产类型
+拖拽画布；灰度发布/回滚

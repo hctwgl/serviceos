@@ -2,8 +2,10 @@ package com.serviceos.configuration.application;
 
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
+import com.serviceos.configuration.api.ApproveConfigurationDraftCommand;
 import com.serviceos.configuration.api.ConfigurationAssetType;
 import com.serviceos.configuration.api.ConfigurationAssetVersionReference;
+import com.serviceos.configuration.api.ConfigurationDraftDiffView;
 import com.serviceos.configuration.api.ConfigurationDraftService;
 import com.serviceos.configuration.api.ConfigurationDraftView;
 import com.serviceos.configuration.api.ConfigurationPublicationException;
@@ -32,14 +34,15 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Workflow 配置设计器草稿服务。
+ * 配置设计器草稿服务。
  *
- * <p>事务边界：草稿写与发布同事务；发布成功后草稿标记 PUBLISHED 并绑定不可变 versionId。
- * M282 开放 WORKFLOW；M283 扩展 FORM/EVIDENCE/SLA。其余类型失败关闭。</p>
+ * <p>事务边界：草稿写/审批/发布同事务；发布成功后标记 PUBLISHED 并绑定不可变 versionId。
+ * 生命周期：DRAFT → VALIDATED → APPROVED → PUBLISHED。其余资产类型失败关闭。</p>
  */
 @Service
 final class DefaultConfigurationDraftService implements ConfigurationDraftService {
     private static final String WRITE = "configuration.draft.write";
+    private static final String APPROVE = "configuration.approve";
     private static final String PUBLISH = "configuration.publish";
     private static final String RESOURCE = "ConfigurationDraft";
     private static final Set<ConfigurationAssetType> DESIGNER_TYPES = Set.of(
@@ -92,6 +95,9 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
         UUID draftId = UUID.randomUUID();
         Instant now = clock.instant();
         String digest = Sha256.digest(definition);
+        UUID baseVersionId = command.baseVersionId() != null
+                ? command.baseVersionId()
+                : findLatestPublishedVersionId(principal.tenantId(), command.assetType(), assetKey);
         jdbc.sql("""
                         INSERT INTO cfg_configuration_asset_draft (
                             draft_id, tenant_id, asset_type, asset_key, intended_semantic_version,
@@ -112,7 +118,7 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
                 .param("schemaVersion", schemaVersion)
                 .param("definition", definition)
                 .param("digest", digest)
-                .param("baseVersionId", command.baseVersionId())
+                .param("baseVersionId", baseVersionId)
                 .param("actor", principal.principalId())
                 .param("now", PostgresJdbcParameters.timestamptz(now))
                 .update();
@@ -131,9 +137,9 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
         Objects.requireNonNull(command, "command");
         ConfigurationDraftView current = requireDraft(principal.tenantId(), command.draftId());
         requireDesignerSupported(current.assetType());
-        if (!"DRAFT".equals(current.status()) && !"VALIDATED".equals(current.status())) {
+        if (!Set.of("DRAFT", "VALIDATED", "APPROVED").contains(current.status())) {
             throw new BusinessProblem(ProblemCode.VERSION_CONFLICT,
-                    "仅 DRAFT/VALIDATED 草稿可更新，当前状态=" + current.status());
+                    "仅 DRAFT/VALIDATED/APPROVED 草稿可更新，当前状态=" + current.status());
         }
         authorization.require(principal, AuthorizationRequest.tenantCapability(
                 WRITE, principal.tenantId(), RESOURCE, current.draftId().toString()),
@@ -141,19 +147,23 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
         String definition = requireDefinition(command.definitionJson());
         String digest = Sha256.digest(definition);
         Instant now = clock.instant();
+        // 编辑会使审批失效，强制回到 DRAFT。
         int updated = jdbc.sql("""
                         UPDATE cfg_configuration_asset_draft
                            SET definition = CAST(:definition AS jsonb),
                                content_digest = :digest,
                                status = 'DRAFT',
                                validation_errors = NULL,
+                               approval_ref = NULL,
+                               approved_by = NULL,
+                               approved_at = NULL,
                                aggregate_version = aggregate_version + 1,
                                updated_by = :actor,
                                updated_at = :now
                          WHERE tenant_id = :tenantId
                            AND draft_id = :draftId
                            AND aggregate_version = :expectedVersion
-                           AND status IN ('DRAFT', 'VALIDATED')
+                           AND status IN ('DRAFT', 'VALIDATED', 'APPROVED')
                         """)
                 .param("definition", definition)
                 .param("digest", digest)
@@ -193,7 +203,7 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
                         SELECT * FROM cfg_configuration_asset_draft
                          WHERE tenant_id = :tenantId
                            AND asset_type = :assetType
-                           AND status IN ('DRAFT', 'VALIDATED', 'PUBLISHED')
+                           AND status IN ('DRAFT', 'VALIDATED', 'APPROVED', 'PUBLISHED')
                          ORDER BY updated_at DESC
                          LIMIT 100
                         """)
@@ -260,6 +270,77 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public ConfigurationDraftDiffView diff(
+            CurrentPrincipal principal,
+            String correlationId,
+            UUID draftId
+    ) {
+        ConfigurationDraftView current = requireDraft(principal.tenantId(), draftId);
+        requireDesignerSupported(current.assetType());
+        authorization.require(principal, AuthorizationRequest.tenantCapability(
+                WRITE, principal.tenantId(), RESOURCE, draftId.toString()), correlationId);
+        String baseJson = "";
+        String baseLabel = "empty-base";
+        if (current.baseVersionId() != null) {
+            baseJson = loadPublishedDefinition(principal.tenantId(), current.baseVersionId());
+            baseLabel = "published:" + current.baseVersionId();
+        }
+        String draftPretty = pretty(current.definitionJson());
+        String basePretty = pretty(baseJson.isBlank() ? "{}" : baseJson);
+        String unified = unifiedDiff(basePretty, draftPretty, baseLabel, "draft:" + draftId);
+        return new ConfigurationDraftDiffView(
+                draftId, current.baseVersionId(), baseLabel, "draft:" + draftId,
+                unified, basePretty.equals(draftPretty));
+    }
+
+    @Override
+    @Transactional
+    public ConfigurationDraftView approve(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            ApproveConfigurationDraftCommand command
+    ) {
+        Objects.requireNonNull(command, "command");
+        ConfigurationDraftView current = requireDraft(principal.tenantId(), command.draftId());
+        requireDesignerSupported(current.assetType());
+        if (!"VALIDATED".equals(current.status())) {
+            throw new BusinessProblem(ProblemCode.VERSION_CONFLICT,
+                    "仅 VALIDATED 草稿可审批，当前状态=" + current.status());
+        }
+        String approvalRef = requireText(command.approvalRef(), "approvalRef", 128);
+        authorization.require(principal, AuthorizationRequest.tenantCapability(
+                APPROVE, principal.tenantId(), RESOURCE, command.draftId().toString()),
+                metadata.correlationId());
+        Instant now = clock.instant();
+        int updated = jdbc.sql("""
+                        UPDATE cfg_configuration_asset_draft
+                           SET status = 'APPROVED',
+                               approval_ref = :approvalRef,
+                               approved_by = :actor,
+                               approved_at = :now,
+                               aggregate_version = aggregate_version + 1,
+                               updated_by = :actor,
+                               updated_at = :now
+                         WHERE tenant_id = :tenantId
+                           AND draft_id = :draftId
+                           AND aggregate_version = :expectedVersion
+                           AND status = 'VALIDATED'
+                        """)
+                .param("approvalRef", approvalRef)
+                .param("actor", principal.principalId())
+                .param("now", PostgresJdbcParameters.timestamptz(now))
+                .param("tenantId", principal.tenantId())
+                .param("draftId", command.draftId())
+                .param("expectedVersion", command.expectedVersion())
+                .update();
+        if (updated != 1) {
+            throw new BusinessProblem(ProblemCode.VERSION_CONFLICT, "配置草稿审批时版本或状态冲突");
+        }
+        return requireDraft(principal.tenantId(), command.draftId());
+    }
+
+    @Override
     @Transactional
     public ConfigurationDraftView publish(
             CurrentPrincipal principal,
@@ -268,9 +349,12 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
     ) {
         ConfigurationDraftView current = requireDraft(principal.tenantId(), draftId);
         requireDesignerSupported(current.assetType());
-        if (!"VALIDATED".equals(current.status())) {
+        if (!"APPROVED".equals(current.status())) {
             throw new BusinessProblem(ProblemCode.VERSION_CONFLICT,
-                    "仅 VALIDATED 草稿可发布，当前状态=" + current.status());
+                    "仅 APPROVED 草稿可发布，当前状态=" + current.status());
+        }
+        if (current.approvalRef() == null || current.approvalRef().isBlank()) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, "发布前必须存在审批引用");
         }
         authorization.require(principal, AuthorizationRequest.tenantCapability(
                 PUBLISH, principal.tenantId(), RESOURCE, draftId.toString()),
@@ -295,7 +379,7 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
                                updated_at = :now
                          WHERE tenant_id = :tenantId
                            AND draft_id = :draftId
-                           AND status = 'VALIDATED'
+                           AND status = 'APPROVED'
                         """)
                 .param("versionId", published.versionId())
                 .param("actor", principal.principalId())
@@ -334,11 +418,99 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
                 rs.getObject("base_version_id", UUID.class),
                 rs.getObject("published_version_id", UUID.class),
                 readErrors(rs.getString("validation_errors")),
+                rs.getString("approval_ref"),
+                rs.getString("approved_by"),
+                rs.getTimestamp("approved_at") == null
+                        ? null : rs.getTimestamp("approved_at").toInstant(),
                 rs.getLong("aggregate_version"),
                 rs.getString("created_by"),
                 rs.getString("updated_by"),
                 rs.getTimestamp("created_at").toInstant(),
                 rs.getTimestamp("updated_at").toInstant());
+    }
+
+    private UUID findLatestPublishedVersionId(
+            String tenantId,
+            ConfigurationAssetType assetType,
+            String assetKey
+    ) {
+        return jdbc.sql("""
+                        SELECT version_id
+                          FROM cfg_configuration_asset_version
+                         WHERE tenant_id = :tenantId
+                           AND asset_type = :assetType
+                           AND asset_key = :assetKey
+                           AND status = 'PUBLISHED'
+                         ORDER BY published_at DESC
+                         LIMIT 1
+                        """)
+                .param("tenantId", tenantId)
+                .param("assetType", assetType.name())
+                .param("assetKey", assetKey)
+                .query(UUID.class)
+                .optional()
+                .orElse(null);
+    }
+
+    private String loadPublishedDefinition(String tenantId, UUID versionId) {
+        return jdbc.sql("""
+                        SELECT definition::text
+                          FROM cfg_configuration_asset_version
+                         WHERE tenant_id = :tenantId AND version_id = :versionId
+                        """)
+                .param("tenantId", tenantId)
+                .param("versionId", versionId)
+                .query(String.class)
+                .optional()
+                .orElseThrow(() -> new BusinessProblem(
+                        ProblemCode.RESOURCE_NOT_FOUND, "基线发布版本不存在"));
+    }
+
+    private String pretty(String json) {
+        try {
+            var tree = objectMapper.readTree(json == null || json.isBlank() ? "{}" : json);
+            return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(tree);
+        } catch (JacksonException exception) {
+            return json == null ? "" : json;
+        }
+    }
+
+    /** 最小统一 diff：按行 Myers 简化为 LCS 标记，足够审计对照。 */
+    private static String unifiedDiff(String left, String right, String leftLabel, String rightLabel) {
+        String[] a = left.split("\\R", -1);
+        String[] b = right.split("\\R", -1);
+        StringBuilder out = new StringBuilder();
+        out.append("--- ").append(leftLabel).append('\n');
+        out.append("+++ ").append(rightLabel).append('\n');
+        int i = 0;
+        int j = 0;
+        while (i < a.length || j < b.length) {
+            if (i < a.length && j < b.length && Objects.equals(a[i], b[j])) {
+                out.append(' ').append(a[i]).append('\n');
+                i++;
+                j++;
+                continue;
+            }
+            if (j < b.length && (i >= a.length || !containsFrom(a, i, b[j]))) {
+                out.append('+').append(b[j]).append('\n');
+                j++;
+                continue;
+            }
+            if (i < a.length) {
+                out.append('-').append(a[i]).append('\n');
+                i++;
+            }
+        }
+        return out.toString();
+    }
+
+    private static boolean containsFrom(String[] lines, int start, String value) {
+        for (int i = start; i < Math.min(lines.length, start + 20); i++) {
+            if (Objects.equals(lines[i], value)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private List<String> readErrors(String json) {

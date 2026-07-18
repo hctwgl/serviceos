@@ -293,6 +293,7 @@ title: ServiceOS 里程碑索引
 | M282 | M282 Workflow 配置设计器 API（草稿→校验→发布） | [295-m282-workflow-configuration-designer-api.md](../architecture/295-m282-workflow-configuration-designer-api.md) | [279-m282-workflow-configuration-designer-api-acceptance.md](../testing/279-m282-workflow-configuration-designer-api-acceptance.md) |
 | M283 | M283 FORM/EVIDENCE/SLA 配置设计器 API | [296-m283-form-evidence-sla-designer-api.md](../architecture/296-m283-form-evidence-sla-designer-api.md) | [280-m283-form-evidence-sla-designer-api-acceptance.md](../testing/280-m283-form-evidence-sla-designer-api-acceptance.md) |
 | M284 | M284 Admin 配置设计器壳（结构预览 + JSON 编辑） | [297-m284-admin-configuration-designer-shell.md](../architecture/297-m284-admin-configuration-designer-shell.md) | [281-m284-admin-configuration-designer-shell-acceptance.md](../testing/281-m284-admin-configuration-designer-shell-acceptance.md) |
+| M285 | M285 配置草稿 Diff 与发布审批门禁 | [298-m285-configuration-draft-diff-approval.md](../architecture/298-m285-configuration-draft-diff-approval.md) | [282-m285-configuration-draft-diff-approval-acceptance.md](../testing/282-m285-configuration-draft-diff-approval-acceptance.md) |
 
 ## 未关联里程碑的文档
 

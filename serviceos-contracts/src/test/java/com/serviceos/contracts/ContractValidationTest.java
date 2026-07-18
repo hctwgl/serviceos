@@ -63,6 +63,8 @@ class ContractValidationTest {
                         "/configuration/drafts",
                         "/configuration/drafts/{draftId}",
                         "/configuration/drafts/{draftId}:validate",
+                        "/configuration/drafts/{draftId}:diff",
+                        "/configuration/drafts/{draftId}:approve",
                         "/configuration/drafts/{draftId}:publish");
     }
 
