@@ -3,7 +3,7 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-18
-baselineCommit: 964b8ad7ca2b87285c395acde66db9f84f8e0868
+baselineCommit: 1e6b1b0b5733271553d7c16623bda81b93fe9984
 latestMilestone: M256
 ---
 
@@ -40,7 +40,7 @@ latestMilestone: M256
 | 项目 | 当前值 |
 |---|---|
 | 最新实施里程碑 | M256 独立 Network Web 交付批次 |
-| 基线提交 | `964b8ad7ca2b87285c395acde66db9f84f8e0868` |
+| 基线提交 | `1e6b1b0b5733271553d7c16623bda81b93fe9984` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts`、`@serviceos/web-core`、`ServiceOSIOSCore`、独立且可部署的 `serviceos-network-web`；由同一 Core OpenAPI 生成并经独立消费者门禁验证的 `@serviceos/core-client` 与 `ServiceOSCoreClient` |
 | 前端工程 | `serviceos-admin-web`（Vue+TS+Vite）已纳入构建并承载总部运营、统一用户中心、`/me` 导航、SavedView、UI Preference、受控搜索与最近访问等 Admin 能力；M194～M242 形成的 Network 协作产品能力已由 M256 完整迁移至独立 `serviceos-network-web`，Admin 不再承载正式 `/network-portal/*` 路由；独立 Network Web 真实接入 `@serviceos/web-core`、OIDC PKCE、NETWORK Context、Capability/服务端导航，具备 76 项 Playwright 回归和独立容器镜像；Technician Portal 已具备 Feed、ME 与当前责任任务在线只读详情（M195、M218～M219、M243～M246），独立 Technician H5 属下一 Track C 交付批次 |
