@@ -3,7 +3,7 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-18
-baselineCommit: 454f65f12419d08e53c52fe6726374a26f205763
+baselineCommit: a2048b2fd627f2dfa9a8d6b246734720194db384
 latestMilestone: M257
 ---
 
@@ -40,7 +40,7 @@ latestMilestone: M257
 | 项目 | 当前值 |
 |---|---|
 | 最新实施里程碑 | M257 独立 Technician H5 交付批次 |
-| 基线提交 | `454f65f12419d08e53c52fe6726374a26f205763` |
+| 基线提交 | `a2048b2fd627f2dfa9a8d6b246734720194db384` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts`、`@serviceos/web-core`、`ServiceOSIOSCore`、独立且可部署的 `serviceos-network-web` 与 `serviceos-technician-web`；由同一 Core OpenAPI 生成并经独立消费者门禁验证的 `@serviceos/core-client` 与 `ServiceOSCoreClient` |
 | 前端工程 | `serviceos-admin-web` 独立承载总部运营、统一用户中心、`/me` 导航、SavedView、UI Preference、受控搜索与最近访问；M256 后 Network 正式产品由独立 `serviceos-network-web` 承载，M257 后 Technician Feed/Schedule/Sync/Me/Task Detail 由独立移动优先 `serviceos-technician-web` 承载，Admin 仅保留可配置外链和 M188 诊断；两套独立 Web 均实际接入 `@serviceos/web-core`、OIDC PKCE、服务端 Context/Capability/导航、Playwright 回归和独立容器镜像 |
