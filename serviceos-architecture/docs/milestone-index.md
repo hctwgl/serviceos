@@ -267,6 +267,7 @@ title: ServiceOS 里程碑索引
 | M256 | M256 独立 Network Web 完整交付批次 | [269-m256-network-web-delivery-batch.md](../architecture/269-m256-network-web-delivery-batch.md) | [253-m256-network-web-delivery-batch-acceptance.md](../testing/253-m256-network-web-delivery-batch-acceptance.md) |
 | M257 | M257 独立 Technician H5 交付批次 | [270-m257-technician-h5-delivery-batch.md](../architecture/270-m257-technician-h5-delivery-batch.md) | [254-m257-technician-h5-delivery-batch-acceptance.md](../testing/254-m257-technician-h5-delivery-batch-acceptance.md) |
 | M258 | M258 Technician iOS 仓库内安全基础 | [271-m258-technician-ios-security-foundation.md](../architecture/271-m258-technician-ios-security-foundation.md) | [255-m258-technician-ios-security-foundation-acceptance.md](../testing/255-m258-technician-ios-security-foundation-acceptance.md) |
+| M259 | M259 Technician iOS SwiftUI App 与 Xcode 交付批次 | [272-m259-technician-ios-swiftui-app-delivery-batch.md](../architecture/272-m259-technician-ios-swiftui-app-delivery-batch.md) | [256-m259-technician-ios-swiftui-app-delivery-batch-acceptance.md](../testing/256-m259-technician-ios-swiftui-app-delivery-batch-acceptance.md) |
 
 ## 未关联里程碑的文档
 

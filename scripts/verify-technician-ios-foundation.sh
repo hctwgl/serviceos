@@ -24,6 +24,11 @@ if rg -n 'print\(|debugPrint\(|NSLog\(' "${foundation_sources}"; then
   echo "Technician iOS Foundation 禁止直接打印潜在敏感数据。" >&2
   exit 1
 fi
+rg -q 'kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly' \
+  "${foundation_sources}/KeychainAccessTokenVault.swift" || {
+  echo "Technician iOS 生产 Keychain 必须使用 ThisDeviceOnly 等级。" >&2
+  exit 1
+}
 
 find "${core_sources}" -name '*.swift' -print0 | xargs -0 swiftc \
   -swift-version 6 -parse-as-library -module-name ServiceOSIOSCore \

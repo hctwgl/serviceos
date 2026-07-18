@@ -65,7 +65,13 @@ public actor KeychainAccessTokenVault: OIDCTokenPersisting {
         SecItemDelete(baseQuery() as CFDictionary)
         var query = baseQuery()
         query[kSecValueData as String] = data
+#if os(iOS)
         query[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+#else
+        // macOS 仅作为仓库内 Swift smoke 宿主，不接受 iOS 的 ThisDeviceOnly 参数；生产 iOS 编译分支
+        // 始终使用不可随备份迁移的等级，并由 Simulator/真机测试再次证明。
+        query[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+#endif
         let status = SecItemAdd(query as CFDictionary, nil)
         guard status == errSecSuccess else { throw KeychainVaultError.writeFailed(status) }
     }
@@ -82,11 +88,10 @@ public actor KeychainAccessTokenVault: OIDCTokenPersisting {
         let status = SecItemCopyMatching(query as CFDictionary, &result)
         guard status == errSecSuccess,
               let data = result as? Data,
-              let stored = try? JSONDecoder().decode(StoredToken.self, from: data),
-              stored.expiresAt.timeIntervalSince(now()) > expirySkew else {
-            if status == errSecSuccess { clear() }
-            return nil
-        }
+              let stored = try? JSONDecoder().decode(StoredToken.self, from: data) else { return nil }
+        // Access Token 到期不等于整个 OIDC 会话失效。这里必须保留同一 Keychain 项中的 Refresh Token，
+        // 让 App 冷启动时可以受控刷新；只有 refresh 明确失败或用户注销时才清理完整 TokenSet。
+        guard stored.expiresAt.timeIntervalSince(now()) > expirySkew else { return nil }
         return AccessTokenSnapshot(accessToken: stored.accessToken, expiresAt: stored.expiresAt)
     }
 

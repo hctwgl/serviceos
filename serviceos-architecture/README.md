@@ -701,3 +701,4 @@ OCR/CV、复杂工作流、BUSINESS 日历与 SLA 暂停/预警/升级/通知、
 核心业务编码前，必须使用 `research/templates/` 中的模板完成首个试点项目基线，并用真实脱敏工单完成桌面演练。
 - [M257 独立 Technician H5 交付批次](architecture/270-m257-technician-h5-delivery-batch.md)
 - [M258 Technician iOS 仓库内安全基础](architecture/271-m258-technician-ios-security-foundation.md)
+- [M259 Technician iOS SwiftUI App 与 Xcode 交付批次](architecture/272-m259-technician-ios-swiftui-app-delivery-batch.md)

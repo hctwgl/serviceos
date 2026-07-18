@@ -259,4 +259,5 @@
 - [M256 独立 Network Web 完整交付批次验收矩阵](253-m256-network-web-delivery-batch-acceptance.md)
 - [M257 独立 Technician H5 交付批次验收矩阵](254-m257-technician-h5-delivery-batch-acceptance.md)
 - [M258 Technician iOS 仓库内安全基础验收矩阵](255-m258-technician-ios-security-foundation-acceptance.md)
+- [M259 Technician iOS SwiftUI App 与 Xcode 交付批次验收矩阵](256-m259-technician-ios-swiftui-app-delivery-batch-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

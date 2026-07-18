@@ -1,0 +1,8 @@
+#include "Base.xcconfig"
+SERVICEOS_ENV = test
+// `.invalid` 是保留域名：UI 测试可验证未登录 AppShell，同时绝不会误连真实环境。
+SERVICEOS_API_BASE_URL = https:/$()/api.test.invalid/
+SERVICEOS_OIDC_ISSUER = https:/$()/identity.test.invalid/realms/serviceos/
+SERVICEOS_OIDC_CLIENT_ID = serviceos-technician-ios-test
+// Test 配置只用于自动化与无签名设备编译证明；Development/Staging/Production 仍必须走真实团队签名。
+CODE_SIGNING_ALLOWED[sdk=iphoneos*] = NO
