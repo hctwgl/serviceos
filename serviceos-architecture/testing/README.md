@@ -267,4 +267,6 @@
 - [M264 Technician 在线资料上传交付批次验收矩阵](261-m264-technician-online-evidence-batch-acceptance.md)
 - [M265 Technician 资料快照与任务完成交付批次验收矩阵](262-m265-technician-task-submission-batch-acceptance.md)
 - [M266 Technician 在线资料整改交付批次验收矩阵](263-m266-technician-correction-batch-acceptance.md)
+- [M267 通用 Connector SPI 验收矩阵](264-m267-generic-connector-spi-acceptance.md)
+- [多车企平台内核程序级验收矩阵](multi-oem-platform-kernel-program-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

@@ -674,17 +674,21 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前 `master` 基线为 **M266 Technician 在线资料整改交付批次**，最终合并提交为
+当前工程基线为 **M267 通用 Connector SPI 与 BYD 入站边界归位**（功能分支证据；合并入 `master`
+后回填合并提交）。M266 Technician 在线资料整改仍为上一合并基线
 `088018a6eac180f7fe36536fae9d073fa797757c`。
 
-当前已具备 Admin、独立 Network Web、独立 Technician H5、原生 Technician iOS，以及统一主体/组织/授权治理、在线 Visit、冻结基础表单、Evidence 上传、Snapshot/Task 完成和多轮整改闭环。下一已接受优先级是 Track F：iOS 离线工作包、持久化命令/上传队列、同步、冲突、改派失权和恢复。
+当前已具备 Admin、独立 Network Web、独立 Technician H5、原生 Technician iOS，以及统一主体/组织/授权治理、在线 Visit、冻结基础表单、Evidence 上传、Snapshot/Task 完成、多轮整改闭环，以及 CREATE_WORK_ORDER 通用 Connector SPI。下一主线是多车企平台内核剩余切片（配置治理 MVP、条件网关、REFERENCE_OEM 等，见 roadmap/06）；Track F 离线与签名真机仍待外部环境。
 
 权威进度入口：
 
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
-- [M266 实现文档](architecture/279-m266-technician-correction-batch.md)
-- [M266 验收矩阵](testing/263-m266-technician-correction-batch-acceptance.md)
+- [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M267 实现文档](architecture/280-m267-generic-connector-spi.md)
+- [M267 验收矩阵](testing/264-m267-generic-connector-spi-acceptance.md)
+- [多车企平台内核交付计划](roadmap/06-multi-oem-platform-kernel-delivery-plan.md)
+- [多车企平台内核程序级验收矩阵](testing/multi-oem-platform-kernel-program-acceptance.md)
 - [多客户端 Portal 持续交付计划](roadmap/05-multi-client-portal-delivery-plan.md)
 - [多客户端 Portal 程序级验收矩阵](testing/multi-client-portal-program-acceptance.md)
 

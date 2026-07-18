@@ -275,6 +275,7 @@ title: ServiceOS 里程碑索引
 | M264 | M264 Technician 在线资料上传交付批次 | [277-m264-technician-online-evidence-batch.md](../architecture/277-m264-technician-online-evidence-batch.md) | [261-m264-technician-online-evidence-batch-acceptance.md](../testing/261-m264-technician-online-evidence-batch-acceptance.md) |
 | M265 | M265 Technician 资料快照与任务完成交付批次 | [278-m265-technician-task-submission-batch.md](../architecture/278-m265-technician-task-submission-batch.md) | [262-m265-technician-task-submission-batch-acceptance.md](../testing/262-m265-technician-task-submission-batch-acceptance.md) |
 | M266 | M266 Technician 在线资料整改交付批次 | [279-m266-technician-correction-batch.md](../architecture/279-m266-technician-correction-batch.md) | [263-m266-technician-correction-batch-acceptance.md](../testing/263-m266-technician-correction-batch-acceptance.md) |
+| M267 | M267 通用 Connector SPI 与 BYD 入站边界归位 | [280-m267-generic-connector-spi.md](../architecture/280-m267-generic-connector-spi.md) | [264-m267-generic-connector-spi-acceptance.md](../testing/264-m267-generic-connector-spi-acceptance.md) |
 
 ## 未关联里程碑的文档
 
@@ -307,3 +308,4 @@ title: ServiceOS 里程碑索引
 - `serviceos-architecture/testing/admin-pilot-readiness-acceptance.md`
 - `serviceos-architecture/testing/identity-organization-governance-program-acceptance.md`
 - `serviceos-architecture/testing/multi-client-portal-program-acceptance.md`
+- `serviceos-architecture/testing/multi-oem-platform-kernel-program-acceptance.md`

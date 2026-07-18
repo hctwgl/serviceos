@@ -11,7 +11,9 @@ status: Proposed
 > `ExternalAcknowledgement`、Task 唯一重试时钟和 UNKNOWN 人工接管的最小纵向切片。
 > M59 已实现 UNKNOWN Delivery 的单笔授权人工重发、不可变 ReplayRequest 与版本/审批门禁。
 > M60 已在该重发取得严格 ACK 后发布恢复事实，并幂等闭环对应运营异常及处理乱序事件。
-> 其他人工处置、其他 CPIM 消息、通用 Connector 和批量重放仍未实现；本章其余 Proposed 设计不能据此视为已完成。
+> M267 已抽出 CREATE_WORK_ORDER 通用 `integration.spi` 与 `InboundCreateWorkOrderPipeline`，
+> BYD 入站委托该管道；Outbound/回调全面 SPI 化、其他 CPIM 消息、REFERENCE_OEM 与批量重放仍未实现。
+> 本章其余 Proposed 设计不能据此视为已完成。
 
 ## 1. 目标
 
