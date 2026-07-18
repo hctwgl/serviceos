@@ -30,7 +30,7 @@ lastUpdated: 2026-07-18
 | MCP-APP-01 | Admin 独立构建 | 不依赖 Network/Technician 路由才能构建和运行 | M256/M257 Admin builds without formal Portal routes |
 | MCP-APP-02 | Network 独立构建 | 独立 AppShell、会话、环境和部署 | M255 shell + M256 OIDC/session/76 E2E/container smoke |
 | MCP-APP-03 | Technician H5 独立构建 | 独立 AppShell、Technician Context 和路由 | M257 build + 8 Playwright + container smoke |
-| MCP-APP-04 | Technician iOS 独立构建 | SwiftUI 工程可在模拟器和开发真机构建 | M260 Test/Production Simulator 构建和运行、无签名 generic iPhoneOS arm64 构建通过；签名开发真机待补 |
+| MCP-APP-04 | Technician iOS 独立构建 | SwiftUI 工程可在模拟器和开发真机构建 | M260 Test/Production Simulator 构建运行 + M261 Production arm64 archive/dSYM 通过；签名开发真机待补 |
 | MCP-APP-05 | 单仓库共享边界 | 共享包不包含角色菜单或数据范围假设 | M247-M254 independent consumers + source gates + aggregate gate |
 | MCP-APP-06 | 旧路由迁移 | 双运行验证后才删除 Admin 中正式 Portal 路由 | M256 Network + M257 Technician migrated regressions, Admin builds, route gates |
 | MCP-APP-07 | 无 WebView 替代 | iOS 核心现场能力为原生实现 | source/review/device test |
@@ -82,9 +82,9 @@ lastUpdated: 2026-07-18
 | MCP-IOS-02 | 登录和刷新 | 登录、刷新、过期、注销和撤销可靠 | M258 Foundation lifecycle smoke + M260 Simulator Keychain 恢复 XCTest；真实 IdP 登录、真机与撤销待补 |
 | MCP-IOS-03 | Keychain | Token/密钥不进入普通偏好或日志 | M258 real ThisDeviceOnly Keychain smoke + M260 本地签名 App 宿主 Keychain XCTest；真机运行态待补 |
 | MCP-IOS-04 | Swift Client | 生成客户端与服务端契约一致 | M248 可复现生成 + M258 Foundation 实际链接生成 Client |
-| MCP-IOS-05 | Trace/日志 | 错误可定位且无 PII/Token/文件路径 | M251 diagnostic baseline + M258 redaction smoke + M259 App 禁止直接输出与普通偏好 Token；运行态 log review 待补 |
+| MCP-IOS-05 | Trace/日志 | 错误可定位且无 PII/Token/文件路径 | M251 diagnostic baseline + M258 redaction smoke + M259 App 静态门禁 + M261 dSYM；正式崩溃采集/符号化待补 |
 | MCP-IOS-06 | 可访问性 | Dynamic Type、VoiceOver、触控区域通过 | M260 Accessibility XXXL XCUITest 已在 Simulator 实跑；VoiceOver 人工听读与真机待补 |
-| MCP-IOS-07 | TestFlight | 内部测试包可安装、升级和回滚 | distribution evidence |
+| MCP-IOS-07 | TestFlight | 内部测试包可安装、升级和回滚 | M261 archive/IPA 导出入口与失败关闭已具备；真实签名、上传、安装/升级/回滚待补 |
 
 ## 8. Technician iOS 在线履约
 

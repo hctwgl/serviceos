@@ -269,6 +269,7 @@ title: ServiceOS 里程碑索引
 | M258 | M258 Technician iOS 仓库内安全基础 | [271-m258-technician-ios-security-foundation.md](../architecture/271-m258-technician-ios-security-foundation.md) | [255-m258-technician-ios-security-foundation-acceptance.md](../testing/255-m258-technician-ios-security-foundation-acceptance.md) |
 | M259 | M259 Technician iOS SwiftUI App 与 Xcode 交付批次 | [272-m259-technician-ios-swiftui-app-delivery-batch.md](../architecture/272-m259-technician-ios-swiftui-app-delivery-batch.md) | [256-m259-technician-ios-swiftui-app-delivery-batch-acceptance.md](../testing/256-m259-technician-ios-swiftui-app-delivery-batch-acceptance.md) |
 | M260 | M260 Technician iOS Simulator 运行验收批次 | [273-m260-technician-ios-simulator-runtime.md](../architecture/273-m260-technician-ios-simulator-runtime.md) | [257-m260-technician-ios-simulator-runtime-acceptance.md](../testing/257-m260-technician-ios-simulator-runtime-acceptance.md) |
+| M261 | M261 Technician iOS 签名与分发就绪基础 | [274-m261-technician-ios-distribution-readiness.md](../architecture/274-m261-technician-ios-distribution-readiness.md) | [258-m261-technician-ios-distribution-readiness-acceptance.md](../testing/258-m261-technician-ios-distribution-readiness-acceptance.md) |
 
 ## 未关联里程碑的文档
 
