@@ -110,7 +110,6 @@ common_xcodebuild_arguments=(
   -workspace "${workspace}"
   -scheme "${scheme}"
   -derivedDataPath "${derived_data}"
-  CODE_SIGNING_ALLOWED=NO
 )
 
 run_xcodebuild simulator-build \
