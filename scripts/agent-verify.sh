@@ -13,6 +13,7 @@ set -euo pipefail
 #   bash scripts/agent-verify.sh client-swift       Swift Client 复现、Swift 6 编译与消费门禁
 #   bash scripts/agent-verify.sh design-tokens      Web/Swift Design Token 复现与消费门禁
 #   bash scripts/agent-verify.sh client-identities  Page/Feature/Action 注册、跨端生成与未知动作门禁
+#   bash scripts/agent-verify.sh client-metadata    Web/iOS Header、后端低基数观测与 OpenAPI 元数据门禁
 #   bash scripts/agent-verify.sh web-core           Web auth/context/error/trace 基础构建与消费门禁
 #   bash scripts/agent-verify.sh ios-core           iOS auth/context/error/trace 基础构建与消费门禁
 #   bash scripts/agent-verify.sh docs               git diff --check + 脚本语法 + 里程碑索引新鲜度
@@ -89,6 +90,12 @@ case "${command_name}" in
     serviceos-contracts/scripts/verify-client-identities.sh
     ./mvnw --no-transfer-progress -pl serviceos-contracts -Dtest=ClientIdentityContractTest test
     ./mvnw --no-transfer-progress -pl serviceos-backend -Dtest=ClientIdentityPageRegistryAlignmentTest test
+    ;;
+  client-metadata)
+    scripts/verify-web-core.sh
+    scripts/verify-ios-core.sh
+    ./mvnw --no-transfer-progress -pl serviceos-backend -Dtest=CorrelationContextFilterTest test
+    ./mvnw --no-transfer-progress -pl serviceos-contracts -Dtest=ClientMetadataContractTest test
     ;;
   web-core)
     scripts/verify-web-core.sh

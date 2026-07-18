@@ -1,6 +1,7 @@
 package com.serviceos.bootstrap;
 
 import com.serviceos.shared.CorrelationIds;
+import com.serviceos.shared.ClientMetadata;
 import io.opentelemetry.api.baggage.Baggage;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.context.Context;
@@ -27,14 +28,22 @@ final class CorrelationContextFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
         String correlationId = CorrelationIds.normalizeOrCreate(request.getHeader(CorrelationIds.HEADER_NAME));
+        ClientMetadata.Normalized client = ClientMetadata.normalize(
+                request.getHeader(ClientMetadata.KIND_HEADER), request.getHeader(ClientMetadata.VERSION_HEADER));
         request.setAttribute(CorrelationIds.REQUEST_ATTRIBUTE, correlationId);
+        request.setAttribute(ClientMetadata.KIND_ATTRIBUTE, client.kind());
+        request.setAttribute(ClientMetadata.VERSION_ATTRIBUTE, client.version());
         response.setHeader(CorrelationIds.HEADER_NAME, correlationId);
 
         Span.current().setAttribute(BAGGAGE_FIELD, correlationId);
+        Span.current().setAttribute("serviceos.client.kind", client.kind());
+        Span.current().setAttribute("serviceos.client.version", client.version());
         Baggage baggage = Baggage.current().toBuilder().put(BAGGAGE_FIELD, correlationId).build();
         Context context = baggage.storeInContext(Context.current());
-        try (Scope ignored = context.makeCurrent(); MDC.MDCCloseable ignoredMdc = MDC.putCloseable(
-                "correlationId", correlationId)) {
+        try (Scope ignored = context.makeCurrent();
+             MDC.MDCCloseable ignoredCorrelation = MDC.putCloseable("correlationId", correlationId);
+             MDC.MDCCloseable ignoredKind = MDC.putCloseable("clientKind", client.kind());
+             MDC.MDCCloseable ignoredVersion = MDC.putCloseable("clientVersion", client.version())) {
             filterChain.doFilter(request, response);
         }
     }

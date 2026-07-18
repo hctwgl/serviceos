@@ -30,6 +30,7 @@ test('http client carries bearer, caller context and diagnostic identifiers', as
   let captured
   const client = createWebApiClient({
     baseUrl: 'https://serviceos.invalid/api/v1',
+    clientMetadata: { kind: 'TECHNICIAN_WEB', version: '1.2.3-test.1' },
     accessToken: () => ({ accessToken: 'token', expiresAtEpochMs: 9_999 }),
     createCorrelationId: () => 'correlation-request',
     fetch: async (input, init) => {
@@ -51,6 +52,8 @@ test('http client carries bearer, caller context and diagnostic identifiers', as
   assert.equal(captured.headers.get('Authorization'), 'Bearer token')
   assert.equal(captured.headers.get('X-Service-Context'), 'ctx-1')
   assert.equal(captured.headers.get('X-Correlation-Id'), 'correlation-request')
+  assert.equal(captured.headers.get('X-ServiceOS-Client-Kind'), 'TECHNICIAN_WEB')
+  assert.equal(captured.headers.get('X-ServiceOS-Client-Version'), '1.2.3-test.1')
   assert.equal(result.diagnostics.traceId, 'trace-response')
   assert.equal(result.etag, '"3"')
 })
@@ -59,6 +62,7 @@ test('problem detail is retained for diagnostics but user message is fixed', asy
   let authenticationRequired = 0
   const client = createWebApiClient({
     baseUrl: 'https://serviceos.invalid/api/v1',
+    clientMetadata: { kind: 'ADMIN_WEB', version: '1.0.0' },
     accessToken: () => null,
     onAuthenticationRequired: () => { authenticationRequired += 1 },
     fetch: async () => new Response(JSON.stringify({

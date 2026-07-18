@@ -20,10 +20,18 @@ export type WebApiClient = Readonly<{
 
 export type WebApiClientOptions = Readonly<{
   baseUrl: string
+  clientMetadata: WebClientMetadata
   accessToken: AccessTokenProvider
   fetch?: typeof globalThis.fetch
   createCorrelationId?: () => string
   onAuthenticationRequired?: () => void
+}>
+
+export type WebClientKind = 'ADMIN_WEB' | 'NETWORK_WEB' | 'TECHNICIAN_WEB'
+
+export type WebClientMetadata = Readonly<{
+  kind: WebClientKind
+  version: string
 }>
 
 export function createWebApiClient(options: WebApiClientOptions): WebApiClient {
@@ -32,6 +40,9 @@ export function createWebApiClient(options: WebApiClientOptions): WebApiClient {
   const baseUrl = options.baseUrl.replace(/\/$/, '')
 
   if (!baseUrl) throw new Error('Web API baseUrl 不得为空')
+  if (!/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]{1,32})?$/.test(options.clientMetadata.version)) {
+    throw new Error('Web clientVersion 必须是受支持的语义版本')
+  }
 
   return {
     async request<T>(request: WebApiRequest): Promise<WebApiResult<T>> {
@@ -40,6 +51,8 @@ export function createWebApiClient(options: WebApiClientOptions): WebApiClient {
       const headers = new Headers(request.headers)
       headers.set('Accept', 'application/json')
       headers.set('X-Correlation-Id', createCorrelationId())
+      headers.set('X-ServiceOS-Client-Kind', options.clientMetadata.kind)
+      headers.set('X-ServiceOS-Client-Version', options.clientMetadata.version)
       if (token) headers.set('Authorization', `Bearer ${token.accessToken}`)
 
       const hasBody = request.body !== undefined
