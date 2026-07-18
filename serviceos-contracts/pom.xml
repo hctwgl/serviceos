@@ -54,6 +54,7 @@
                         <configuration>
                             <inputSpec>${project.basedir}/src/main/resources/openapi/serviceos-core-v1.yaml</inputSpec>
                             <generatorName>typescript-fetch</generatorName>
+                            <templateDirectory>${project.basedir}/src/main/openapi-templates/typescript-fetch</templateDirectory>
                             <output>${project.build.directory}/generated-clients/typescript-fetch</output>
                             <cleanupOutput>true</cleanupOutput>
                             <skipValidateSpec>false</skipValidateSpec>
