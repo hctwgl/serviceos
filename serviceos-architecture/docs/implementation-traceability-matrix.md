@@ -387,3 +387,4 @@ Feature gate/authority: if applicable
 | M290 | 多槽位 CANARY、流量预算、adjust-traffic 满量自动晋级；OpenAPI 1.0.33；Flyway V117 | ActivationService + MultiSlot IT + `303-m290-*` + `287-m290-*` | 指标驱动晋级、区域槽位 UI |
 | M291 | WORKFLOW 依赖分析（draft/analyze API + Admin 报告）；OpenAPI 1.0.34 | DependencyAnalysisService + PostgresIT + `304-m291-*` + `288-m291-*` | 跨资产图 UI |
 | M292 | WORKFLOW 干跑模拟（线性/EXCLUSIVE/WAIT 暂停）；OpenAPI 1.0.35 | WorkflowSimulationService + PostgresIT + `305-m292-*` + `289-m292-*` | 历史回放、并行展开 |
+| M293 | Bundle 通道停用 + 通道托管项目 resolve 失败关闭；OpenAPI 1.0.36 | ActivationService.deactivate + Deactivate IT + `306-m293-*` + `290-m293-*` | Admin 发布控制台 |

@@ -20,6 +20,10 @@ public interface BundleChannelActivationService {
     BundleChannelActivationView rollbackStable(
             CurrentPrincipal principal, CommandMetadata metadata, UUID stableActivationId, String approvalRef);
 
+    /** 显式停用 ACTIVE STABLE/CANARY；不自动回滚、不猜测下一激活。 */
+    BundleChannelActivationView deactivate(
+            CurrentPrincipal principal, CommandMetadata metadata, DeactivateBundleChannelCommand command);
+
     List<BundleChannelActivationView> list(
             CurrentPrincipal principal, String correlationId, UUID projectId);
 }

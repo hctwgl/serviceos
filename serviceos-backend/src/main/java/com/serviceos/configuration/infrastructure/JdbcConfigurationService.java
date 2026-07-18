@@ -209,6 +209,12 @@ final class JdbcConfigurationService implements ConfigurationService {
         if (stable != null) {
             return stable.reference();
         }
+        // M293：项目一旦进入通道激活模型，停用后不得回退到模糊 Bundle 扫描。
+        if (isChannelManagedProject(query.tenantId(), project.projectId())) {
+            throw new ConfigurationResolutionException(
+                    ConfigurationResolutionException.Reason.NO_MATCH,
+                    "project uses bundle channel activations but no ACTIVE STABLE/CANARY matches");
+        }
 
         List<ResolvedBundle> candidates = jdbc.sql("""
                 SELECT bundle_id, project_id, bundle_code, bundle_version, manifest_digest,
@@ -254,6 +260,20 @@ final class JdbcConfigurationService implements ConfigurationService {
                     "multiple published configuration bundles match the same priority");
         }
         return preferred.getFirst().reference();
+    }
+
+    private boolean isChannelManagedProject(String tenantId, UUID projectId) {
+        Integer count = jdbc.sql("""
+                        SELECT COUNT(1)
+                          FROM cfg_bundle_channel_activation
+                         WHERE tenant_id = :tenantId
+                           AND project_id = :projectId
+                        """)
+                .param("tenantId", tenantId)
+                .param("projectId", projectId)
+                .query(Integer.class)
+                .single();
+        return count != null && count > 0;
     }
 
     private List<ChannelBundle> resolveActiveChannels(

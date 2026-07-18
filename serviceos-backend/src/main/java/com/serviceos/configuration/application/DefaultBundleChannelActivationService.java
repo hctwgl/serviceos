@@ -7,6 +7,7 @@ import com.serviceos.configuration.api.AdjustCanaryTrafficCommand;
 import com.serviceos.configuration.api.BundleChannel;
 import com.serviceos.configuration.api.BundleChannelActivationService;
 import com.serviceos.configuration.api.BundleChannelActivationView;
+import com.serviceos.configuration.api.DeactivateBundleChannelCommand;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.CommandMetadata;
@@ -201,6 +202,51 @@ final class DefaultBundleChannelActivationService implements BundleChannelActiva
                 previous.bundleId(), stableActivationId, normalizedApproval, 100,
                 principal.principalId(), now);
         return requireView(principal.tenantId(), rollbackId);
+    }
+
+    @Override
+    @Transactional
+    public BundleChannelActivationView deactivate(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            DeactivateBundleChannelCommand command
+    ) {
+        Objects.requireNonNull(command, "command");
+        Objects.requireNonNull(command.activationId(), "activationId");
+        String normalizedApproval = requireText(command.approvalRef(), "approvalRef", 128);
+        BundleChannelActivationView current = requireView(principal.tenantId(), command.activationId());
+        if (!"ACTIVE".equals(current.status())) {
+            throw new BusinessProblem(ProblemCode.VERSION_CONFLICT, "仅 ACTIVE 通道激活可停用");
+        }
+        if (current.aggregateVersion() != command.expectedVersion()) {
+            throw new BusinessProblem(ProblemCode.VERSION_CONFLICT, "通道激活版本冲突，无法停用");
+        }
+        authorization.require(principal, AuthorizationRequest.projectCapability(
+                MANAGE, principal.tenantId(), RESOURCE, command.activationId().toString(),
+                current.projectId().toString()), metadata.correlationId());
+
+        Instant now = clock.instant();
+        int updated = jdbc.sql("""
+                        UPDATE cfg_bundle_channel_activation
+                           SET status = 'SUPERSEDED',
+                               superseded_at = :now,
+                               approval_ref = :approvalRef,
+                               aggregate_version = aggregate_version + 1
+                         WHERE tenant_id = :tenantId
+                           AND activation_id = :activationId
+                           AND status = 'ACTIVE'
+                           AND aggregate_version = :expectedVersion
+                        """)
+                .param("now", PostgresJdbcParameters.timestamptz(now))
+                .param("approvalRef", normalizedApproval)
+                .param("tenantId", principal.tenantId())
+                .param("activationId", command.activationId())
+                .param("expectedVersion", command.expectedVersion())
+                .update();
+        if (updated != 1) {
+            throw new BusinessProblem(ProblemCode.VERSION_CONFLICT, "通道激活已变更，无法停用");
+        }
+        return requireView(principal.tenantId(), command.activationId());
     }
 
     @Override

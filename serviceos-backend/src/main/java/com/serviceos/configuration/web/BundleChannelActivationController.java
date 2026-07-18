@@ -5,6 +5,7 @@ import com.serviceos.configuration.api.AdjustCanaryTrafficCommand;
 import com.serviceos.configuration.api.BundleChannel;
 import com.serviceos.configuration.api.BundleChannelActivationService;
 import com.serviceos.configuration.api.BundleChannelActivationView;
+import com.serviceos.configuration.api.DeactivateBundleChannelCommand;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.CorrelationIds;
@@ -114,6 +115,21 @@ final class BundleChannelActivationController {
                 new CommandMetadata(correlationId, idempotencyKey == null ? correlationId : idempotencyKey),
                 activationId,
                 request.approvalRef());
+        return ok(view, correlationId);
+    }
+
+    @PostMapping("/{activationId}:deactivate")
+    ResponseEntity<ActivationResponse> deactivate(
+            @PathVariable UUID activationId,
+            @RequestHeader("If-Match") String ifMatch,
+            @RequestBody ApprovalRequest request,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        BundleChannelActivationView view = activations.deactivate(
+                principals.current(),
+                new CommandMetadata(correlationId, idempotencyKey == null ? correlationId : idempotencyKey),
+                new DeactivateBundleChannelCommand(activationId, version(ifMatch), request.approvalRef()));
         return ok(view, correlationId);
     }
 

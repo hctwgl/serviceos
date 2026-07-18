@@ -73,7 +73,8 @@ class ContractValidationTest {
                         "/configuration/bundle-activations",
                         "/configuration/bundle-activations/{activationId}:adjust-traffic",
                         "/configuration/bundle-activations/{activationId}:promote",
-                        "/configuration/bundle-activations/{activationId}:rollback");
+                        "/configuration/bundle-activations/{activationId}:rollback",
+                        "/configuration/bundle-activations/{activationId}:deactivate");
     }
 
     @Test

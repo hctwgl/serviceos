@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.35
+  version: 1.0.36
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -5361,6 +5361,39 @@ paths:
       responses:
         '200':
           description: 回滚后的 STABLE 激活
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BundleChannelActivation' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /configuration/bundle-activations/{activationId}:deactivate:
+    post:
+      operationId: deactivateBundleChannelActivation
+      summary: 停用 ACTIVE STABLE/CANARY 通道激活
+      description: |
+        将激活置为 SUPERSEDED；不自动回滚、不猜测下一激活。
+        项目一旦进入通道模型，停用后若无 ACTIVE STABLE/CANARY，解析失败关闭。
+      parameters:
+        - name: activationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BundleActivationApprovalRequest' }
+      responses:
+        '200':
+          description: 已停用激活
           headers:
             ETag: { required: true, schema: { type: string } }
             X-Correlation-Id: { required: true, schema: { type: string } }

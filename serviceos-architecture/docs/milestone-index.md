@@ -301,6 +301,7 @@ title: ServiceOS 里程碑索引
 | M290 | M290 多槽位 CANARY 与满量自动晋级 | [303-m290-multi-slot-canary-auto-promote.md](../architecture/303-m290-multi-slot-canary-auto-promote.md) | [287-m290-multi-slot-canary-auto-promote-acceptance.md](../testing/287-m290-multi-slot-canary-auto-promote-acceptance.md) |
 | M291 | M291 配置依赖分析 | [304-m291-configuration-dependency-analysis.md](../architecture/304-m291-configuration-dependency-analysis.md) | [288-m291-configuration-dependency-analysis-acceptance.md](../testing/288-m291-configuration-dependency-analysis-acceptance.md) |
 | M292 | M292 WORKFLOW 配置干跑模拟 | [305-m292-configuration-workflow-simulation.md](../architecture/305-m292-configuration-workflow-simulation.md) | [289-m292-configuration-workflow-simulation-acceptance.md](../testing/289-m292-configuration-workflow-simulation-acceptance.md) |
+| M293 | M293 Bundle 通道停用 | [306-m293-bundle-channel-deactivate.md](../architecture/306-m293-bundle-channel-deactivate.md) | [290-m293-bundle-channel-deactivate-acceptance.md](../testing/290-m293-bundle-channel-deactivate-acceptance.md) |
 
 ## 未关联里程碑的文档
 

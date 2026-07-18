@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M292 WORKFLOW 干跑模拟**，功能证据提交 `cbe487d2b083e32cfc339ffe4c3554f1097d1345`（合并入 `master` 后改为合并提交）。
+当前工程基线为 **M293 Bundle 通道停用**，功能证据提交待回填（合并入 `master` 后改为合并提交）。
 
 当前已具备多 OEM 内核、复杂流程运行时（含取消/重开/跳转/补偿）与标准服务模板族。下一主线是阶段三领域配置设计器。
 
@@ -689,6 +689,8 @@ serviceos-architecture/
 - [M291 验收矩阵](testing/288-m291-configuration-dependency-analysis-acceptance.md)
 - [M292 实现文档](architecture/305-m292-configuration-workflow-simulation.md)
 - [M292 验收矩阵](testing/289-m292-configuration-workflow-simulation-acceptance.md)
+- [M293 实现文档](architecture/306-m293-bundle-channel-deactivate.md)
+- [M293 验收矩阵](testing/290-m293-bundle-channel-deactivate-acceptance.md)
 - [M289 实现文档](architecture/302-m289-workflow-canvas-edges-conditions.md)
 - [M289 验收矩阵](testing/286-m289-workflow-canvas-edges-conditions-acceptance.md)
 - [M288 实现文档](architecture/301-m288-percentage-canary-traffic.md)
