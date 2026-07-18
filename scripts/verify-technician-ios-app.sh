@@ -109,14 +109,21 @@ run_xcodebuild() {
 common_xcodebuild_arguments=(
   -workspace "${workspace}"
   -scheme "${scheme}"
-  -configuration "${configuration}"
   -derivedDataPath "${derived_data}"
   CODE_SIGNING_ALLOWED=NO
 )
 
 run_xcodebuild simulator-build \
   "${common_xcodebuild_arguments[@]}" \
+  -configuration "${configuration}" \
   -destination 'generic/platform=iOS Simulator' \
+  build
+
+# 无签名 device build 证明 arm64 iPhoneOS 编译链成立；它不替代开发证书、安装或真机登录证据。
+run_xcodebuild device-build \
+  "${common_xcodebuild_arguments[@]}" \
+  -configuration "${configuration}" \
+  -destination 'generic/platform=iOS' \
   build
 
 built_info_plist="${derived_data}/Build/Products/Test-iphonesimulator/TechnicianIOS.app/Info.plist"
@@ -136,8 +143,28 @@ built_info_plist="${derived_data}/Build/Products/Test-iphonesimulator/Technician
 
 run_xcodebuild test-build \
   "${common_xcodebuild_arguments[@]}" \
+  -configuration "${configuration}" \
   -destination 'generic/platform=iOS Simulator' \
   build-for-testing
+
+# Production 使用保留域名注入构建设置，验证优化配置可编译且不会接触真实环境。
+run_xcodebuild production-simulator-build \
+  "${common_xcodebuild_arguments[@]}" \
+  -configuration Production \
+  -destination 'generic/platform=iOS Simulator' \
+  SERVICEOS_PRODUCTION_API_BASE_URL=https://api.production.invalid/ \
+  SERVICEOS_PRODUCTION_OIDC_ISSUER=https://identity.production.invalid/realms/serviceos/ \
+  build
+
+production_info_plist="${derived_data}/Build/Products/Production-iphonesimulator/TechnicianIOS.app/Info.plist"
+[[ "$(plutil -extract SERVICEOS_ENV raw -o - "${production_info_plist}")" == "production" ]] || {
+  echo "Production App 环境标识错误。" >&2
+  exit 1
+}
+[[ "$(plutil -extract SERVICEOS_API_BASE_URL raw -o - "${production_info_plist}")" == "https://api.production.invalid/" ]] || {
+  echo "Production App 未使用显式注入的 API 地址。" >&2
+  exit 1
+}
 
 booted_simulator_id="$(xcrun simctl list devices booted | sed -n 's/.*(\([0-9A-Fa-f-]\{36\}\)) (Booted).*/\1/p' | head -1)"
 if [[ -z "${booted_simulator_id}" ]]; then
@@ -149,6 +176,7 @@ if [[ -z "${booted_simulator_id}" ]]; then
 else
   run_xcodebuild simulator-tests \
     "${common_xcodebuild_arguments[@]}" \
+    -configuration "${configuration}" \
     -destination "platform=iOS Simulator,id=${booted_simulator_id}" \
     test
 fi
