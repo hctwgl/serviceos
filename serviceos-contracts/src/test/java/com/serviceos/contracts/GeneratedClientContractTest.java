@@ -10,7 +10,8 @@ import java.nio.file.Path;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 验证 Maven 生命周期确实产出约定的 Portal 客户端，而不是只声明了一个未执行的生成插件。
+ * 验证 Maven 生命周期确实从同一 Core OpenAPI 产出约定的 Web/iOS 客户端，
+ * 而不是只声明未执行的生成插件或维护一份会漂移的手工 SDK。
  */
 class GeneratedClientContractTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -58,5 +59,35 @@ class GeneratedClientContractTest {
                 .contains("listSlaInstances")
                 .contains("listWorkOrderSlaInstances")
                 .contains("getSlaInstance");
+    }
+
+    @Test
+    void pinnedGeneratorMustProduceTheExpectedSwiftClientSurface() throws Exception {
+        Path clientDirectory = Path.of("target/generated-clients/swift6");
+        Path packageManifest = clientDirectory.resolve("Package.swift");
+        Path generatorVersion = clientDirectory.resolve(".openapi-generator/VERSION");
+        Path defaultApi = clientDirectory.resolve("Sources/ServiceOSCoreClient/APIs/DefaultAPI.swift");
+        Path preferenceValue = clientDirectory.resolve(
+                "Sources/ServiceOSCoreClient/Models/UiPreferenceEntryValue.swift");
+
+        assertThat(packageManifest).exists();
+        assertThat(generatorVersion).hasContent("7.22.0");
+        assertThat(Files.readString(packageManifest))
+                .contains("name: \"ServiceOSCoreClient\"")
+                .contains(".library(name: \"ServiceOSCoreClient\"");
+
+        String apiSource = Files.readString(defaultApi);
+        assertThat(apiSource)
+                .contains("open class DefaultAPI")
+                .contains("listTechnicianTaskFeed")
+                .contains("getTechnicianTaskDetail")
+                .contains("checkInVisit")
+                .contains("finalizeEvidenceUpload");
+
+        // 上游 swift6 oneOf 模板会把 Dictionary 类型拼进 case 名；受控模板必须保持合法 Swift 标识符。
+        assertThat(Files.readString(preferenceValue))
+                .contains("case value5([String: JSONValue])")
+                .doesNotContain("&#x60;")
+                .doesNotContain("case typeArrayOfString:");
     }
 }
