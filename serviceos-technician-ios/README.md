@@ -13,8 +13,25 @@ Technician iOS 的仓库内安全基础，当前提供：
 
 ```bash
 bash scripts/agent-verify.sh technician-ios
+bash scripts/agent-verify.sh technician-ios-app
+bash scripts/agent-verify.sh technician-ios-distribution
 ```
 
-本机当前只有 Apple Command Line Tools，因此门禁只证明 Swift 6 严格编译与仓库内安全边界。完整 SwiftUI App、
-Xcode project、Simulator、开发真机、签名和 TestFlight 必须在安装完整 Xcode 后由后续交付批次验证；本目录不把
-Command Line Tools 结果冒充为 iOS App 可运行证据。
+完整 Xcode 已用于 Simulator App、XCTest/XCUITest 和无签名 Production arm64 archive 门禁。发布就绪门禁还会
+校验 1024x1024 无 Alpha AppIcon、`PrivacyInfo.xcprivacy`、dSYM 与生产配置失败关闭；其 archive 刻意不签名，
+不能当作可安装或可上传制品。
+
+真实签名 archive/IPA 使用：
+
+```bash
+SERVICEOS_IOS_DEVELOPMENT_TEAM=<10 位 Team ID> \
+SERVICEOS_IOS_BUILD_NUMBER=<递增正整数> \
+SERVICEOS_PRODUCTION_API_BASE_URL=https://api.example.com/ \
+SERVICEOS_PRODUCTION_OIDC_ISSUER=https://identity.example.com/realms/serviceos/ \
+bash scripts/archive-technician-ios-release.sh
+```
+
+设置 `SERVICEOS_IOS_EXPORT_APP_STORE_CONNECT=true` 才会从已签名 archive 导出 App Store Connect IPA；脚本不会
+自动上传。真实执行还要求 Keychain 中已有有效 Apple Development/Distribution 身份和匹配 provisioning；缺少
+Team、证书、生产 HTTPS 地址或 build number 时立即失败。当前仍未声明开发真机、真实 IdP、VoiceOver 人工走查
+或 TestFlight 安装/升级/回滚已通过。
