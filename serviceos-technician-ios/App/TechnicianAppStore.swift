@@ -2,7 +2,8 @@ import Foundation
 import Observation
 import ServiceOSCoreClient
 import ServiceOSIOSCore
-import TechnicianIOSFoundation
+// Hosted XCTest 复用 App 已链接的 Foundation，避免静态 Swift Package 在宿主与测试 bundle 中重复装载。
+@_exported import TechnicianIOSFoundation
 
 enum TechnicianAppPhase {
     case launching

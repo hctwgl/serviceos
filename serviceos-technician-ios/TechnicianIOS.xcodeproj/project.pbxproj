@@ -8,11 +8,17 @@
 
 /* Begin PBXBuildFile section */
 		100000000000000000000101 /* TechnicianIOSFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 100000000000000000000501 /* TechnicianIOSFoundation */; };
-		100000000000000000000102 /* TechnicianIOSFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 100000000000000000000502 /* TechnicianIOSFoundation */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
 		100000000000000000000201 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 100000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 100000000000000000000011;
+			remoteInfo = TechnicianIOS;
+		};
+		100000000000000000000203 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 100000000000000000000001 /* Project object */;
 			proxyType = 1;
@@ -78,7 +84,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				100000000000000000000102 /* TechnicianIOSFoundation in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -164,13 +169,13 @@
 			buildRules = (
 			);
 			dependencies = (
+				100000000000000000000204 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				100000000000000000000042 /* Tests/TechnicianIOSAppTests */,
 			);
 			name = TechnicianIOSAppTests;
 			packageProductDependencies = (
-				100000000000000000000502 /* TechnicianIOSFoundation */,
 			);
 			productName = TechnicianIOSAppTests;
 			productReference = 100000000000000000000022 /* TechnicianIOSAppTests.xctest */;
@@ -298,6 +303,11 @@
 			isa = PBXTargetDependency;
 			target = 100000000000000000000011 /* TechnicianIOS */;
 			targetProxy = 100000000000000000000201 /* PBXContainerItemProxy */;
+		};
+		100000000000000000000204 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 100000000000000000000011 /* TechnicianIOS */;
+			targetProxy = 100000000000000000000203 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -456,11 +466,13 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 100000000000000000000034 /* Test.xcconfig */;
 			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
 				GENERATE_INFOPLIST_FILE = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.serviceos.technician.tests;
 				PRODUCT_NAME = TechnicianIOSAppTests;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TechnicianIOS.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/TechnicianIOS";
 			};
 			name = Local;
 		};
@@ -468,11 +480,13 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 100000000000000000000034 /* Test.xcconfig */;
 			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
 				GENERATE_INFOPLIST_FILE = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.serviceos.technician.tests;
 				PRODUCT_NAME = TechnicianIOSAppTests;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TechnicianIOS.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/TechnicianIOS";
 			};
 			name = Development;
 		};
@@ -480,11 +494,13 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 100000000000000000000034 /* Test.xcconfig */;
 			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
 				GENERATE_INFOPLIST_FILE = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.serviceos.technician.tests;
 				PRODUCT_NAME = TechnicianIOSAppTests;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TechnicianIOS.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/TechnicianIOS";
 			};
 			name = Test;
 		};
@@ -492,11 +508,13 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 100000000000000000000034 /* Test.xcconfig */;
 			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
 				GENERATE_INFOPLIST_FILE = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.serviceos.technician.tests;
 				PRODUCT_NAME = TechnicianIOSAppTests;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TechnicianIOS.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/TechnicianIOS";
 			};
 			name = Staging;
 		};
@@ -504,11 +522,13 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 100000000000000000000034 /* Test.xcconfig */;
 			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
 				GENERATE_INFOPLIST_FILE = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.serviceos.technician.tests;
 				PRODUCT_NAME = TechnicianIOSAppTests;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TechnicianIOS.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/TechnicianIOS";
 			};
 			name = Production;
 		};
@@ -639,11 +659,6 @@
 
 /* Begin XCSwiftPackageProductDependency section */
 		100000000000000000000501 /* TechnicianIOSFoundation */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 100000000000000000000500 /* XCLocalSwiftPackageReference "." */;
-			productName = TechnicianIOSFoundation;
-		};
-		100000000000000000000502 /* TechnicianIOSFoundation */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 100000000000000000000500 /* XCLocalSwiftPackageReference "." */;
 			productName = TechnicianIOSFoundation;

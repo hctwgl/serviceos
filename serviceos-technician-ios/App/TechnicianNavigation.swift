@@ -28,9 +28,14 @@ enum TechnicianAppTab: String, CaseIterable, Hashable, Identifiable {
     }
 
     static func visibleTabs(for session: TechnicianSession) -> [TechnicianAppTab] {
-        let capabilities = Set(session.capabilities.capabilityCodes)
-        let allowedPageIDs = Set(session.navigation.items.lazy
-            .filter { item in item.requiredCapabilities.allSatisfy(capabilities.contains) }
+        visibleTabs(navigation: session.navigation, capabilities: session.capabilities)
+    }
+
+    /// 菜单同时受服务端导航与 Capability 约束；未知 Page ID 和缺失 Capability 一律不渲染。
+    static func visibleTabs(navigation: MeNavigation, capabilities: MeCapabilities) -> [TechnicianAppTab] {
+        let capabilityCodes = Set(capabilities.capabilityCodes)
+        let allowedPageIDs = Set(navigation.items.lazy
+            .filter { item in item.requiredCapabilities.allSatisfy(capabilityCodes.contains) }
             .map(\.pageId))
         return allCases.filter { allowedPageIDs.contains($0.rawValue) }
     }

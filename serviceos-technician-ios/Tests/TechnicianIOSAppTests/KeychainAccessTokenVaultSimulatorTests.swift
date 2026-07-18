@@ -1,6 +1,6 @@
 import Foundation
 import XCTest
-import TechnicianIOSFoundation
+@testable import TechnicianIOS
 
 final class KeychainAccessTokenVaultSimulatorTests: XCTestCase {
     func testExpiredAccessTokenKeepsRefreshTokenUntilRefreshOrLogout() async throws {
