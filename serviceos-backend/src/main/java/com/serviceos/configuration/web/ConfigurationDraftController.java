@@ -7,7 +7,10 @@ import com.serviceos.configuration.api.ConfigurationDependencyReport;
 import com.serviceos.configuration.api.ConfigurationDraftDiffView;
 import com.serviceos.configuration.api.ConfigurationDraftService;
 import com.serviceos.configuration.api.ConfigurationDraftView;
+import com.serviceos.configuration.api.ConfigurationSimulationReport;
+import com.serviceos.configuration.api.ConfigurationWorkflowSimulationService;
 import com.serviceos.configuration.api.CreateConfigurationDraftCommand;
+import com.serviceos.configuration.api.ExpressionContext;
 import com.serviceos.configuration.api.UpdateConfigurationDraftCommand;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
 import com.serviceos.shared.CommandMetadata;
@@ -34,15 +37,18 @@ import java.util.UUID;
 final class ConfigurationDraftController {
     private final ConfigurationDraftService drafts;
     private final ConfigurationDependencyAnalysisService dependencies;
+    private final ConfigurationWorkflowSimulationService simulations;
     private final CurrentPrincipalProvider principals;
 
     ConfigurationDraftController(
             ConfigurationDraftService drafts,
             ConfigurationDependencyAnalysisService dependencies,
+            ConfigurationWorkflowSimulationService simulations,
             CurrentPrincipalProvider principals
     ) {
         this.drafts = drafts;
         this.dependencies = dependencies;
+        this.simulations = simulations;
         this.principals = principals;
     }
 
@@ -150,6 +156,22 @@ final class ConfigurationDraftController {
         return ResponseEntity.ok()
                 .header(CorrelationIds.HEADER_NAME, correlationId)
                 .body(toDependencyResponse(report));
+    }
+
+    @PostMapping("/{draftId}:simulate")
+    ResponseEntity<SimulationHttpModels.SimulationReportResponse> simulate(
+            @PathVariable UUID draftId,
+            @RequestBody(required = false) SimulationHttpModels.SimulateRequest request,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        SimulationHttpModels.SimulateRequest body = request == null
+                ? new SimulationHttpModels.SimulateRequest(null, null) : request;
+        ConfigurationSimulationReport report = simulations.simulateDraft(
+                principals.current(), correlationId, draftId,
+                SimulationHttpModels.toContext(body.context()), body.maxSteps());
+        return ResponseEntity.ok()
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(SimulationHttpModels.toResponse(report));
     }
 
     @PostMapping("/{draftId}:publish")

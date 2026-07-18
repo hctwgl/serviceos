@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.34
+  version: 1.0.35
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -5130,6 +5130,55 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+  /configuration/drafts/{draftId}:simulate:
+    post:
+      operationId: simulateConfigurationDraft
+      summary: 干跑模拟配置草稿
+      description: 对 WORKFLOW 草稿做无副作用干跑；需要 configuration.draft.write。
+      parameters:
+        - name: draftId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SimulateConfigurationRequest' }
+      responses:
+        '200':
+          description: 模拟报告
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConfigurationSimulationReport' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /configuration/simulations:run:
+    post:
+      operationId: runConfigurationSimulation
+      summary: 干跑模拟原始 WORKFLOW 定义
+      description: 无副作用；不写运行时表、不伪造 WAIT_EVENT 信号。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RunConfigurationSimulationRequest' }
+      responses:
+        '200':
+          description: 模拟报告
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConfigurationSimulationReport' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
   /configuration/drafts/{draftId}:approve:
     post:
       operationId: approveConfigurationDraft
@@ -5614,6 +5663,72 @@ components:
           enum: [WORKFLOW, FORM, EVIDENCE, RULE, SLA, DISPATCH, PRICING, INTEGRATION, ASSIGNEE_POLICY, NOTIFICATION]
         status: { type: string, enum: [SATISFIED, MISSING, UNKNOWN_TYPE] }
         satisfiedVersionId: { type: [string, 'null'], format: uuid }
+        detail: { type: string }
+    SimulateConfigurationRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        context: { $ref: '#/components/schemas/ConfigurationSimulationContext' }
+        maxSteps: { type: integer, minimum: 1, maximum: 256 }
+    RunConfigurationSimulationRequest:
+      type: object
+      additionalProperties: false
+      required: [assetType, definitionJson]
+      properties:
+        assetType: { type: string, enum: [WORKFLOW] }
+        assetKey: { type: [string, 'null'] }
+        definitionJson: { type: string }
+        context: { $ref: '#/components/schemas/ConfigurationSimulationContext' }
+        maxSteps: { type: integer, minimum: 1, maximum: 256 }
+    ConfigurationSimulationContext:
+      type: object
+      additionalProperties: false
+      properties:
+        workOrder:
+          type: object
+          additionalProperties: false
+          properties:
+            clientCode: { type: [string, 'null'] }
+            brandCode: { type: [string, 'null'] }
+            serviceProductCode: { type: [string, 'null'] }
+        region:
+          type: object
+          additionalProperties: false
+          properties:
+            provinceCode: { type: [string, 'null'] }
+            cityCode: { type: [string, 'null'] }
+            districtCode: { type: [string, 'null'] }
+        task:
+          type: object
+          additionalProperties: false
+          properties:
+            stageCode: { type: [string, 'null'] }
+            taskType: { type: [string, 'null'] }
+        formValues:
+          type: object
+          additionalProperties: true
+    ConfigurationSimulationReport:
+      type: object
+      additionalProperties: false
+      required: [assetType, assetKey, outcome, message, steps]
+      properties:
+        assetType: { type: string, enum: [WORKFLOW] }
+        assetKey: { type: string }
+        draftId: { type: [string, 'null'], format: uuid }
+        outcome: { type: string, enum: [COMPLETED, WAITING, FAIL_CLOSED, STEP_LIMIT] }
+        message: { type: string }
+        steps:
+          type: array
+          items: { $ref: '#/components/schemas/ConfigurationSimulationStep' }
+    ConfigurationSimulationStep:
+      type: object
+      additionalProperties: false
+      required: [index, nodeId, nodeType, action, detail]
+      properties:
+        index: { type: integer }
+        nodeId: { type: string }
+        nodeType: { type: string }
+        action: { type: string }
         detail: { type: string }
     ConfigurationDraftDiff:
       type: object

@@ -7,11 +7,13 @@ import {
   diffConfigurationDraft,
   listConfigurationDrafts,
   publishConfigurationDraft,
+  simulateConfigurationDraft,
   updateConfigurationDraft,
   validateConfigurationDraft,
   type ConfigurationDependencyReport,
   type ConfigurationDraft,
   type ConfigurationDraftDiff,
+  type ConfigurationSimulationReport,
   type DesignerAssetType,
 } from '../api/configurationDrafts'
 import WorkflowCanvas from '../components/WorkflowCanvas.vue'
@@ -22,6 +24,8 @@ const selected = ref<ConfigurationDraft | null>(null)
 const definitionText = ref('')
 const diffView = ref<ConfigurationDraftDiff | null>(null)
 const dependencyReport = ref<ConfigurationDependencyReport | null>(null)
+const simulationReport = ref<ConfigurationSimulationReport | null>(null)
+const simClientCode = ref('OEM_A')
 const approvalRef = ref('APR-LOCAL-1')
 const loading = ref(false)
 const busy = ref(false)
@@ -50,6 +54,7 @@ function selectDraft(draft: ConfigurationDraft) {
   definitionText.value = prettyJson(draft.definitionJson)
   diffView.value = null
   dependencyReport.value = null
+  simulationReport.value = null
   message.value = null
   error.value = null
 }
@@ -301,6 +306,29 @@ async function loadDependencies() {
   }
 }
 
+async function runSimulation() {
+  if (!selected.value || selected.value.assetType !== 'WORKFLOW') return
+  busy.value = true
+  error.value = null
+  try {
+    const result = await simulateConfigurationDraft(selected.value.draftId, {
+      context: {
+        workOrder: { clientCode: simClientCode.value || null, brandCode: null, serviceProductCode: null },
+        region: { provinceCode: null, cityCode: null, districtCode: null },
+        task: { stageCode: null, taskType: null },
+        formValues: {},
+      },
+      maxSteps: 64,
+    })
+    simulationReport.value = result.data
+    message.value = `模拟结果：${result.data.outcome}`
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '模拟失败'
+  } finally {
+    busy.value = false
+  }
+}
+
 async function approveDraft() {
   if (!selected.value) return
   busy.value = true
@@ -389,6 +417,18 @@ onMounted(async () => {
         依赖分析
       </button>
       <label>
+        模拟 clientCode
+        <input v-model="simClientCode" data-testid="sim-client-code" />
+      </label>
+      <button
+        type="button"
+        :disabled="busy || !selected || selected.assetType !== 'WORKFLOW'"
+        data-testid="simulate-draft"
+        @click="runSimulation"
+      >
+        干跑模拟
+      </button>
+      <label>
         approvalRef
         <input v-model="approvalRef" data-testid="approval-ref" />
       </label>
@@ -454,6 +494,15 @@ onMounted(async () => {
               — {{ item.detail }}
             </li>
           </ul>
+        </div>
+        <div v-if="simulationReport" class="sim" data-testid="simulation-report">
+          <h3>干跑轨迹 · {{ simulationReport.outcome }}</h3>
+          <p>{{ simulationReport.message }}</p>
+          <ol>
+            <li v-for="step in simulationReport.steps" :key="step.index">
+              [{{ step.nodeType }} {{ step.nodeId }}] {{ step.action }} — {{ step.detail }}
+            </li>
+          </ol>
         </div>
       </main>
     </div>
@@ -523,6 +572,16 @@ aside li.active {
 }
 .deps li[data-status='SATISFIED'] {
   color: #1a7f37;
+}
+.sim {
+  border: 1px solid #d0d7de;
+  border-radius: 0.4rem;
+  padding: 0.75rem;
+  background: #fff8c5;
+}
+.sim ol {
+  margin: 0.5rem 0 0;
+  padding-left: 1.2rem;
 }
 textarea {
   width: 100%;

@@ -52,6 +52,30 @@ export type ConfigurationDependencyReport = {
   dependencies: ConfigurationDependencyItem[]
 }
 
+export type ConfigurationSimulationStep = {
+  index: number
+  nodeId: string
+  nodeType: string
+  action: string
+  detail: string
+}
+
+export type ConfigurationSimulationReport = {
+  assetType: string
+  assetKey: string
+  draftId: string | null
+  outcome: 'COMPLETED' | 'WAITING' | 'FAIL_CLOSED' | 'STEP_LIMIT'
+  message: string
+  steps: ConfigurationSimulationStep[]
+}
+
+export type ConfigurationSimulationContext = {
+  workOrder?: { clientCode?: string | null; brandCode?: string | null; serviceProductCode?: string | null }
+  region?: { provinceCode?: string | null; cityCode?: string | null; districtCode?: string | null }
+  task?: { stageCode?: string | null; taskType?: string | null }
+  formValues?: Record<string, unknown>
+}
+
 export type CreateConfigurationDraftRequest = {
   assetType: DesignerAssetType
   assetKey: string
@@ -95,6 +119,15 @@ export function diffConfigurationDraft(draftId: string) {
 
 export function analyzeConfigurationDraftDependencies(draftId: string) {
   return apiGet<ConfigurationDependencyReport>(`/configuration/drafts/${draftId}:dependencies`)
+}
+
+export function simulateConfigurationDraft(
+  draftId: string,
+  body: { context?: ConfigurationSimulationContext; maxSteps?: number } = {},
+) {
+  return apiPost<ConfigurationSimulationReport>(`/configuration/drafts/${draftId}:simulate`, {
+    body,
+  })
 }
 
 export function approveConfigurationDraft(draftId: string, approvalRef: string, aggregateVersion: number) {
