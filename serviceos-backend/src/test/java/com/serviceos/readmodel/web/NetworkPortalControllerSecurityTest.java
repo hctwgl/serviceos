@@ -150,6 +150,12 @@ class NetworkPortalControllerSecurityTest {
                         null,
                         null,
                         null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
                         now));
 
         mvc.perform(get("/api/v1/network-portal/work-orders/" + WORK_ORDER_ID + "/workspace")
