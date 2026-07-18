@@ -7,12 +7,14 @@ import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.evidence.api.BeginEvidenceUploadCommand;
 import com.serviceos.evidence.api.BeginEvidenceUploadOnBehalfCommand;
+import com.serviceos.evidence.api.BeginCorrectionEvidenceUploadCommand;
 import com.serviceos.evidence.api.EvidenceCommandService;
 import com.serviceos.evidence.api.EvidenceItemView;
 import com.serviceos.evidence.api.EvidenceRevisionView;
 import com.serviceos.evidence.api.EvidenceSlotView;
 import com.serviceos.evidence.api.EvidenceUploadSessionView;
 import com.serviceos.evidence.api.FinalizeEvidenceUploadCommand;
+import com.serviceos.evidence.api.FinalizeCorrectionEvidenceUploadCommand;
 import com.serviceos.evidence.api.InvalidateEvidenceRevisionCommand;
 import com.serviceos.files.api.BeginUploadCommand;
 import com.serviceos.files.api.FileCommandService;
@@ -37,6 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -71,6 +74,7 @@ final class DefaultEvidenceCommandService implements EvidenceCommandService {
     private final TransactionTemplate transactions;
     private final ObjectMapper objectMapper;
     private final Clock clock;
+    private final CorrectionTaskAccessValidator correctionAccess;
 
     DefaultEvidenceCommandService(
             EvidenceItemRepository repository,
@@ -83,7 +87,8 @@ final class DefaultEvidenceCommandService implements EvidenceCommandService {
             OutboxAppender outbox,
             TransactionTemplate transactions,
             ObjectMapper objectMapper,
-            Clock clock
+            Clock clock,
+            CorrectionTaskAccessValidator correctionAccess
     ) {
         this.repository = repository;
         this.slots = slots;
@@ -96,6 +101,7 @@ final class DefaultEvidenceCommandService implements EvidenceCommandService {
         this.transactions = transactions;
         this.objectMapper = objectMapper;
         this.clock = clock;
+        this.correctionAccess = correctionAccess;
     }
 
     @Override
@@ -159,6 +165,49 @@ final class DefaultEvidenceCommandService implements EvidenceCommandService {
                 principal, metadata.correlationId(), SUBMIT_ON_BEHALF, command.slotId(),
                 task.projectId(), networkId);
         return finalizeUploadInternal(principal, metadata, command, task, auth, SUBMIT_ON_BEHALF);
+    }
+
+    @Override
+    public EvidenceUploadSessionView beginCorrectionUpload(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            BeginCorrectionEvidenceUploadCommand command
+    ) {
+        CorrectionTaskAccessValidator.Access access = correctionAccess.requireWritable(
+                principal, command.correctionCaseId(), command.correctionTaskId(), command.sourceTaskId());
+        TaskFulfillmentContext sourceTask = access.sourceTask();
+        AuthorizationDecision auth = requireSubmitAuth(
+                principal, metadata.correlationId(), SUBMIT, command.slotId(), sourceTask.projectId(), null);
+        ObjectNode capture = objectMapper.createObjectNode();
+        capture.put("captureSource", command.captureSource());
+        if (command.capturedAt() != null) {
+            capture.put("capturedAt", command.capturedAt().toString());
+        }
+        capture.put("offlineFlag", false);
+        String captureMetadata = CaptureMetadataValidator.normalize(
+                objectMapper, capture, clock.instant(), principal.principalId());
+        // 源业务 Task 已完成且不可重开；整改 handling Task 已由专用门禁证明当前责任与运行状态。
+        return beginUploadInternal(
+                principal, metadata, sourceTask, command.slotId(), command.evidenceItemId(),
+                command.originalFileName(), command.declaredMimeType(), command.expectedSize(),
+                command.expectedSha256(), captureMetadata, auth, SUBMIT);
+    }
+
+    @Override
+    public EvidenceItemView finalizeCorrectionUpload(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            FinalizeCorrectionEvidenceUploadCommand command
+    ) {
+        CorrectionTaskAccessValidator.Access access = correctionAccess.requireWritable(
+                principal, command.correctionCaseId(), command.correctionTaskId(), command.sourceTaskId());
+        AuthorizationDecision auth = requireSubmitAuth(
+                principal, metadata.correlationId(), SUBMIT, command.slotId(),
+                access.sourceTask().projectId(), null);
+        return finalizeUploadInternal(principal, metadata, new FinalizeEvidenceUploadCommand(
+                        command.sourceTaskId(), command.slotId(), command.uploadSessionId(),
+                        command.actualSha256(), command.finalizeCommandId()),
+                access.sourceTask(), auth, SUBMIT);
     }
 
     private EvidenceUploadSessionView beginUploadInternal(

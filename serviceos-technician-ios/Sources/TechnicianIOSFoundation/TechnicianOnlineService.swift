@@ -213,6 +213,20 @@ public struct TechnicianTaskCompletionReceipt: Sendable, Decodable, Equatable {
     public let occurredAt: Date
 }
 
+public struct TechnicianCorrection: Sendable, Decodable, Equatable, Identifiable {
+    public let correctionCaseId: UUID
+    public let sourceTaskId: UUID
+    public let correctionTaskId: UUID
+    public let caseStatus: String
+    public let reasonCodes: [String]
+    public let taskStatus: String
+    public let taskVersion: Int64
+    public let latestResubmissionSnapshotId: UUID?
+    public let resubmissionCount: Int
+
+    public var id: UUID { correctionCaseId }
+}
+
 public enum TechnicianEvidenceUploadError: Error, Equatable {
     case emptyFile
     case invalidUploadAuthorization
@@ -233,6 +247,116 @@ public struct TechnicianOnlineService: Sendable {
 
     public func taskDetail(contextID: String, taskID: UUID) async throws -> TechnicianPortalTaskDetail {
         try await get("/technician/me/tasks/\(taskID.uuidString.lowercased())", contextID: contextID)
+    }
+
+    public func corrections(contextID: String) async throws -> [TechnicianCorrection] {
+        try await get("/technician/me/corrections", contextID: contextID)
+    }
+
+    public func claimCorrection(
+        contextID: String, correctionCaseID: UUID, taskVersion: Int64
+    ) async throws -> TechnicianCorrection {
+        try await post(
+            "/technician/me/corrections/\(correctionCaseID.uuidString.lowercased()):claim",
+            contextID: contextID,
+            idempotencyKey: UUID().uuidString.lowercased(),
+            ifMatch: "\"\(taskVersion)\"",
+            body: EmptyBody()
+        )
+    }
+
+    public func startCorrection(
+        contextID: String, correctionCaseID: UUID, taskVersion: Int64
+    ) async throws -> TechnicianCorrection {
+        try await post(
+            "/technician/me/corrections/\(correctionCaseID.uuidString.lowercased()):start",
+            contextID: contextID,
+            idempotencyKey: UUID().uuidString.lowercased(),
+            ifMatch: "\"\(taskVersion)\"",
+            body: EmptyBody()
+        )
+    }
+
+    public func correctionEvidenceSlots(
+        contextID: String, correctionCaseID: UUID
+    ) async throws -> [TechnicianOnlineEvidenceSlot] {
+        try await get(
+            "/technician/me/corrections/\(correctionCaseID.uuidString.lowercased())/evidence-slots",
+            contextID: contextID
+        )
+    }
+
+    public func correctionEvidenceItems(
+        contextID: String, correctionCaseID: UUID
+    ) async throws -> [TechnicianOnlineEvidenceItem] {
+        try await get(
+            "/technician/me/corrections/\(correctionCaseID.uuidString.lowercased())/evidence-items",
+            contextID: contextID
+        )
+    }
+
+    /** 整改上传只提交案例/槽位路径与最小文件声明；源 Task、处理 Task 和 uploader 均由服务端重建。 */
+    public func uploadCorrectionEvidence(
+        contextID: String,
+        correctionCaseID: UUID,
+        slotID: UUID,
+        evidenceItemID: UUID?,
+        asset: TechnicianEvidenceUploadAsset
+    ) async throws -> TechnicianOnlineEvidenceItem {
+        guard !asset.data.isEmpty else { throw TechnicianEvidenceUploadError.emptyFile }
+        let digest = Self.sha256(asset.data)
+        let base = "/technician/me/corrections/\(correctionCaseID.uuidString.lowercased())"
+            + "/evidence-slots/\(slotID.uuidString.lowercased())"
+        let session: TechnicianEvidenceUploadSession = try await post(
+            base + "/upload-sessions",
+            contextID: contextID,
+            idempotencyKey: UUID().uuidString.lowercased(),
+            ifMatch: nil,
+            body: BeginEvidenceBody(
+                evidenceItemId: evidenceItemID,
+                originalFileName: asset.fileName,
+                declaredMimeType: asset.mimeType,
+                expectedSize: asset.data.count,
+                expectedSha256: digest,
+                captureSource: asset.source,
+                capturedAt: asset.capturedAt
+            )
+        )
+        try await putAuthorized(session: session, data: asset.data)
+        return try await post(
+            base + "/upload-sessions/\(session.uploadSessionId.uuidString.lowercased()):finalize",
+            contextID: contextID,
+            idempotencyKey: UUID().uuidString.lowercased(),
+            ifMatch: nil,
+            body: FinalizeEvidenceBody(
+                actualSha256: digest,
+                finalizeCommandId: UUID().uuidString.lowercased()
+            )
+        )
+    }
+
+    public func createCorrectionSnapshot(
+        contextID: String, correctionCaseID: UUID, revisionIDs: [UUID]
+    ) async throws -> TechnicianEvidenceSetSnapshot {
+        try await post(
+            "/technician/me/corrections/\(correctionCaseID.uuidString.lowercased())/evidence-set-snapshots",
+            contextID: contextID,
+            idempotencyKey: UUID().uuidString.lowercased(),
+            ifMatch: nil,
+            body: CreateEvidenceSetSnapshotBody(memberRevisionIds: revisionIDs)
+        )
+    }
+
+    public func resubmitCorrection(
+        contextID: String, correctionCaseID: UUID, snapshotID: UUID
+    ) async throws -> TechnicianCorrection {
+        try await post(
+            "/technician/me/corrections/\(correctionCaseID.uuidString.lowercased()):resubmit",
+            contextID: contextID,
+            idempotencyKey: UUID().uuidString.lowercased(),
+            ifMatch: nil,
+            body: ResubmitCorrectionBody(evidenceSetSnapshotId: snapshotID)
+        )
     }
 
     public func taskForms(contextID: String, taskID: UUID) async throws -> [TechnicianTaskForm] {
@@ -509,6 +633,12 @@ public struct TechnicianOnlineService: Sendable {
     private struct CompleteTaskBody: Encodable {
         let evidenceSetSnapshotId: UUID
         let formSubmissionId: UUID?
+    }
+
+    private struct EmptyBody: Encodable {}
+
+    private struct ResubmitCorrectionBody: Encodable {
+        let evidenceSetSnapshotId: UUID
     }
 }
 

@@ -63,6 +63,14 @@ actor FakeOnlineTransport: ServiceHTTPTransporting {
         let body: String
         if request.url!.path.hasSuffix("/task-feed") {
             body = #"{"networkId":"20000000-0000-4000-8000-000000000262","items":[],"nextCursor":null,"asOf":"2026-07-18T10:00:00Z"}"#
+        } else if request.url!.path.hasSuffix("/corrections") {
+            body = #"[{"correctionCaseId":"a0000000-0000-4000-8000-000000000266","sourceTaskId":"50000000-0000-4000-8000-000000000263","correctionTaskId":"b0000000-0000-4000-8000-000000000266","caseStatus":"IN_PROGRESS","reasonCodes":["IMAGE.BLUR"],"taskStatus":"READY","taskVersion":1,"latestResubmissionSnapshotId":null,"resubmissionCount":0}]"#
+        } else if request.url!.path.hasSuffix(":claim") {
+            body = #"{"correctionCaseId":"a0000000-0000-4000-8000-000000000266","sourceTaskId":"50000000-0000-4000-8000-000000000263","correctionTaskId":"b0000000-0000-4000-8000-000000000266","caseStatus":"IN_PROGRESS","reasonCodes":["IMAGE.BLUR"],"taskStatus":"CLAIMED","taskVersion":2,"latestResubmissionSnapshotId":null,"resubmissionCount":0}"#
+        } else if request.url!.path.hasSuffix(":start") {
+            body = #"{"correctionCaseId":"a0000000-0000-4000-8000-000000000266","sourceTaskId":"50000000-0000-4000-8000-000000000263","correctionTaskId":"b0000000-0000-4000-8000-000000000266","caseStatus":"IN_PROGRESS","reasonCodes":["IMAGE.BLUR"],"taskStatus":"RUNNING","taskVersion":3,"latestResubmissionSnapshotId":null,"resubmissionCount":0}"#
+        } else if request.url!.path.hasSuffix(":resubmit") {
+            body = #"{"correctionCaseId":"a0000000-0000-4000-8000-000000000266","sourceTaskId":"50000000-0000-4000-8000-000000000263","correctionTaskId":"b0000000-0000-4000-8000-000000000266","caseStatus":"RESUBMITTED","reasonCodes":["IMAGE.BLUR"],"taskStatus":"RUNNING","taskVersion":3,"latestResubmissionSnapshotId":"94000000-0000-4000-8000-000000000265","resubmissionCount":1}"#
         } else if request.url!.path.hasSuffix("/forms") {
             body = #"[{"taskId":"50000000-0000-4000-8000-000000000263","formVersionId":"60000000-0000-4000-8000-000000000263","formKey":"INSTALL_REPORT","semanticVersion":"1.0.0","schemaVersion":"FORM_V1","definition":{"title":"安装结果","sections":[{"sectionKey":"result","title":"现场结果","fields":[{"fieldKey":"survey.conclusion","label":"勘测结论","dataType":"STRING","binding":"task.input.survey.conclusion","required":true},{"fieldKey":"installation.count","label":"安装数量","dataType":"INTEGER","binding":"task.input.installation.count"},{"fieldKey":"site.safe","label":"现场安全","dataType":"BOOLEAN","binding":"task.input.site.safe"}]}]},"contentDigest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]"#
         } else if request.url!.path.hasSuffix("/form-submissions") {
@@ -297,5 +305,56 @@ struct FoundationSmoke {
         precondition(taskSubmissionRequests[11].body.contains(#""formSubmissionId":"70000000-0000-4000-8000-000000000263""#))
         precondition(!taskSubmissionRequests[11].body.contains("resultRef"))
         precondition(!taskSubmissionRequests[11].body.contains("inputVersionRefs"))
+
+        let correctionCaseID = UUID(uuidString: "a0000000-0000-4000-8000-000000000266")!
+        let availableCorrections = try await online.corrections(contextID: contextID)
+        precondition(availableCorrections.first?.reasonCodes == ["IMAGE.BLUR"])
+        let claimed = try await online.claimCorrection(
+            contextID: contextID, correctionCaseID: correctionCaseID, taskVersion: 1
+        )
+        precondition(claimed.taskStatus == "CLAIMED")
+        let started = try await online.startCorrection(
+            contextID: contextID, correctionCaseID: correctionCaseID, taskVersion: 2
+        )
+        precondition(started.taskStatus == "RUNNING")
+        let correctionSlots = try await online.correctionEvidenceSlots(
+            contextID: contextID, correctionCaseID: correctionCaseID
+        )
+        _ = try await online.correctionEvidenceItems(
+            contextID: contextID, correctionCaseID: correctionCaseID
+        )
+        let corrected = try await online.uploadCorrectionEvidence(
+            contextID: contextID,
+            correctionCaseID: correctionCaseID,
+            slotID: correctionSlots[0].slotId,
+            evidenceItemID: nil,
+            asset: .init(
+                data: Data("correction".utf8), fileName: "整改照片.jpg", mimeType: "image/jpeg",
+                source: .camera, capturedAt: Date(timeIntervalSince1970: 1_800_000_002)
+            )
+        )
+        let correctionSnapshot = try await online.createCorrectionSnapshot(
+            contextID: contextID,
+            correctionCaseID: correctionCaseID,
+            revisionIDs: [corrected.revisions[0].evidenceRevisionId]
+        )
+        let resubmitted = try await online.resubmitCorrection(
+            contextID: contextID,
+            correctionCaseID: correctionCaseID,
+            snapshotID: correctionSnapshot.evidenceSetSnapshotId
+        )
+        precondition(resubmitted.caseStatus == "RESUBMITTED")
+        precondition(resubmitted.taskStatus == "RUNNING")
+        let correctionRequests = await onlineTransport.captured()
+            .filter { $0.path.contains("/technician/me/corrections/") }
+        precondition(correctionRequests.first { $0.path.hasSuffix(":claim") }?.ifMatch == "\"1\"")
+        precondition(correctionRequests.first { $0.path.hasSuffix(":start") }?.ifMatch == "\"2\"")
+        let correctionBegin = correctionRequests.first { $0.path.hasSuffix("/upload-sessions") }!
+        precondition(!correctionBegin.body.contains("sourceTaskId"))
+        precondition(!correctionBegin.body.contains("correctionTaskId"))
+        precondition(!correctionBegin.body.contains("uploader"))
+        let correctionResubmit = correctionRequests.first { $0.path.hasSuffix(":resubmit") }!
+        precondition(correctionResubmit.body.contains(#""evidenceSetSnapshotId":"94000000-0000-4000-8000-000000000265""#))
+        precondition(!correctionResubmit.body.contains("resultDigest"))
     }
 }

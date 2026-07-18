@@ -266,4 +266,5 @@
 - [M263 Technician 在线基础表单交付批次验收矩阵](260-m263-technician-online-form-batch-acceptance.md)
 - [M264 Technician 在线资料上传交付批次验收矩阵](261-m264-technician-online-evidence-batch-acceptance.md)
 - [M265 Technician 资料快照与任务完成交付批次验收矩阵](262-m265-technician-task-submission-batch-acceptance.md)
+- [M266 Technician 在线资料整改交付批次验收矩阵](263-m266-technician-correction-batch-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

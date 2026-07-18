@@ -53,6 +53,7 @@ final class DefaultEvidenceSetSnapshotService implements EvidenceSetSnapshotServ
     private final EvidenceSetSnapshotValidator validator;
     private final ObjectMapper objectMapper;
     private final Clock clock;
+    private final CorrectionTaskAccessValidator correctionAccess;
 
     DefaultEvidenceSetSnapshotService(
             EvidenceSetSnapshotRepository snapshots,
@@ -64,7 +65,8 @@ final class DefaultEvidenceSetSnapshotService implements EvidenceSetSnapshotServ
             AuditAppender audit,
             OutboxAppender outbox,
             ObjectMapper objectMapper,
-            Clock clock
+            Clock clock,
+            CorrectionTaskAccessValidator correctionAccess
     ) {
         this.snapshots = snapshots;
         this.items = items;
@@ -77,6 +79,7 @@ final class DefaultEvidenceSetSnapshotService implements EvidenceSetSnapshotServ
         this.validator = new EvidenceSetSnapshotValidator(objectMapper);
         this.objectMapper = objectMapper;
         this.clock = clock;
+        this.correctionAccess = correctionAccess;
     }
 
     @Override
@@ -86,6 +89,33 @@ final class DefaultEvidenceSetSnapshotService implements EvidenceSetSnapshotServ
     ) {
         TaskFulfillmentContext task = requireTask(principal.tenantId(), command.taskId());
         validateExecutableTask(principal, task);
+        return createInternal(principal, metadata, command, task);
+    }
+
+    @Override
+    @Transactional
+    public EvidenceSetSnapshotView createForCorrection(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            UUID correctionCaseId,
+            UUID correctionTaskId,
+            UUID sourceTaskId,
+            List<UUID> memberRevisionIds
+    ) {
+        CorrectionTaskAccessValidator.Access access = correctionAccess.requireWritable(
+                principal, correctionCaseId, correctionTaskId, sourceTaskId);
+        // 整改 Snapshot 仍冻结源 Task 的资料集合，但其写权限来自独立 correction Task。
+        return createInternal(principal, metadata,
+                new CreateEvidenceSetSnapshotCommand(sourceTaskId, "TASK_SUBMISSION", memberRevisionIds),
+                access.sourceTask());
+    }
+
+    private EvidenceSetSnapshotView createInternal(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            CreateEvidenceSetSnapshotCommand command,
+            TaskFulfillmentContext task
+    ) {
         AuthorizationDecision auth = authorization.require(principal,
                 AuthorizationRequest.projectCapability(SUBMIT, principal.tenantId(), "Task",
                         task.taskId().toString(), task.projectId().toString()),

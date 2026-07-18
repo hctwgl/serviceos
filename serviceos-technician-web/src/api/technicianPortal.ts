@@ -239,6 +239,18 @@ export type TechnicianTaskCompletionReceipt = {
   occurredAt: string
 }
 
+export type TechnicianCorrection = {
+  correctionCaseId: string
+  sourceTaskId: string
+  correctionTaskId: string
+  caseStatus: 'IN_PROGRESS' | 'RESUBMITTED'
+  reasonCodes: string[]
+  taskStatus: 'READY' | 'CLAIMED' | 'RUNNING'
+  taskVersion: number
+  latestResubmissionSnapshotId: string | null
+  resubmissionCount: number
+}
+
 function technicianHeaders(technicianContextId: string): Record<string, string> {
   return { 'X-Technician-Context': technicianContextId }
 }
@@ -391,6 +403,101 @@ export function completeTechnicianTask(
       idempotencyKey: crypto.randomUUID(), ifMatch: `"${resourceVersion}"`,
       headers: technicianHeaders(technicianContextId),
     },
+  )
+}
+
+export function listTechnicianCorrections(technicianContextId: string) {
+  return apiGet<TechnicianCorrection[]>(
+    '/technician/me/corrections', {}, technicianHeaders(technicianContextId),
+  )
+}
+
+export function claimTechnicianCorrection(
+  technicianContextId: string, correctionCaseId: string, taskVersion: number,
+) {
+  return apiPost<TechnicianCorrection>(
+    `/technician/me/corrections/${encodeURIComponent(correctionCaseId)}:claim`,
+    { idempotencyKey: crypto.randomUUID(), ifMatch: `"${taskVersion}"`, headers: technicianHeaders(technicianContextId) },
+  )
+}
+
+export function startTechnicianCorrection(
+  technicianContextId: string, correctionCaseId: string, taskVersion: number,
+) {
+  return apiPost<TechnicianCorrection>(
+    `/technician/me/corrections/${encodeURIComponent(correctionCaseId)}:start`,
+    { idempotencyKey: crypto.randomUUID(), ifMatch: `"${taskVersion}"`, headers: technicianHeaders(technicianContextId) },
+  )
+}
+
+export function listTechnicianCorrectionEvidenceSlots(
+  technicianContextId: string, correctionCaseId: string,
+) {
+  return apiGet<TechnicianEvidenceSlot[]>(
+    `/technician/me/corrections/${encodeURIComponent(correctionCaseId)}/evidence-slots`,
+    {}, technicianHeaders(technicianContextId),
+  )
+}
+
+export function listTechnicianCorrectionEvidenceItems(
+  technicianContextId: string, correctionCaseId: string,
+) {
+  return apiGet<TechnicianEvidenceItem[]>(
+    `/technician/me/corrections/${encodeURIComponent(correctionCaseId)}/evidence-items`,
+    {}, technicianHeaders(technicianContextId),
+  )
+}
+
+export function beginTechnicianCorrectionEvidenceUpload(
+  technicianContextId: string,
+  correctionCaseId: string,
+  slotId: string,
+  body: {
+    evidenceItemId?: string | null
+    originalFileName: string
+    declaredMimeType: string
+    expectedSize: number
+    expectedSha256: string
+    captureSource: 'CAMERA' | 'GALLERY' | 'FILE'
+    capturedAt: string
+  },
+) {
+  return apiPost<TechnicianEvidenceUploadSession>(
+    `/technician/me/corrections/${encodeURIComponent(correctionCaseId)}`
+      + `/evidence-slots/${encodeURIComponent(slotId)}/upload-sessions`,
+    { body, idempotencyKey: crypto.randomUUID(), headers: technicianHeaders(technicianContextId) },
+  )
+}
+
+export function finalizeTechnicianCorrectionEvidenceUpload(
+  technicianContextId: string,
+  correctionCaseId: string,
+  slotId: string,
+  uploadSessionId: string,
+  actualSha256: string,
+) {
+  return apiPost<TechnicianEvidenceItem>(
+    `/technician/me/corrections/${encodeURIComponent(correctionCaseId)}`
+      + `/evidence-slots/${encodeURIComponent(slotId)}/upload-sessions/${encodeURIComponent(uploadSessionId)}:finalize`,
+    { body: { actualSha256, finalizeCommandId: crypto.randomUUID() }, headers: technicianHeaders(technicianContextId) },
+  )
+}
+
+export function createTechnicianCorrectionEvidenceSetSnapshot(
+  technicianContextId: string, correctionCaseId: string, memberRevisionIds: string[],
+) {
+  return apiPost<TechnicianEvidenceSetSnapshot>(
+    `/technician/me/corrections/${encodeURIComponent(correctionCaseId)}/evidence-set-snapshots`,
+    { body: { memberRevisionIds }, idempotencyKey: crypto.randomUUID(), headers: technicianHeaders(technicianContextId) },
+  )
+}
+
+export function resubmitTechnicianCorrection(
+  technicianContextId: string, correctionCaseId: string, evidenceSetSnapshotId: string,
+) {
+  return apiPost<TechnicianCorrection>(
+    `/technician/me/corrections/${encodeURIComponent(correctionCaseId)}:resubmit`,
+    { body: { evidenceSetSnapshotId }, idempotencyKey: crypto.randomUUID(), headers: technicianHeaders(technicianContextId) },
   )
 }
 

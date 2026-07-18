@@ -2,7 +2,9 @@
 import { onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
+  listTechnicianCorrections,
   listTechnicianTaskFeed,
+  type TechnicianCorrection,
   type TechnicianPortalFeedItem,
 } from '../api/technicianPortal'
 import { userFacingError } from '../api/client'
@@ -14,6 +16,22 @@ const asOf = ref<string | null>(null)
 const nextCursor = ref<string | null>(null)
 const error = ref<string | null>(null)
 const loadingMore = ref(false)
+const corrections = ref<TechnicianCorrection[]>([])
+const correctionError = ref<string | null>(null)
+
+async function loadCorrections() {
+  if (!props.technicianContextId) {
+    corrections.value = []
+    return
+  }
+  try {
+    corrections.value = await listTechnicianCorrections(props.technicianContextId)
+    correctionError.value = null
+  } catch (err) {
+    corrections.value = []
+    correctionError.value = userFacingError(err, '整改任务加载失败')
+  }
+}
 
 async function load(options?: { append?: boolean; sinceCursor?: string }) {
   if (!props.technicianContextId) {
@@ -59,9 +77,11 @@ async function loadMore() {
 
 onMounted(() => {
   void load()
+  void loadCorrections()
 })
 watch(() => props.technicianContextId, () => {
   void load()
+  void loadCorrections()
 })
 </script>
 
@@ -79,6 +99,27 @@ watch(() => props.technicianContextId, () => {
         刷新
       </button>
     </header>
+    <section class="corrections" data-testid="technician-corrections">
+      <div class="correction-heading">
+        <h3>整改任务</h3>
+        <button type="button" data-testid="technician-corrections-refresh" @click="loadCorrections">刷新整改</button>
+      </div>
+      <p v-if="correctionError" data-testid="technician-corrections-error">{{ correctionError }}</p>
+      <p v-else-if="corrections.length === 0" data-testid="technician-corrections-empty">暂无待处理整改</p>
+      <article
+        v-for="correction in corrections"
+        v-else
+        :key="correction.correctionCaseId"
+        class="correction-card"
+        :data-testid="`technician-correction-${correction.correctionCaseId}`"
+      >
+        <div>
+          <strong>{{ correction.reasonCodes.join(' / ') }}</strong>
+          <p>整改 {{ correction.caseStatus }} · 任务 {{ correction.taskStatus }} · 已重提 {{ correction.resubmissionCount }} 次</p>
+        </div>
+        <RouterLink :to="`/technician-portal/corrections/${correction.correctionCaseId}`">处理整改</RouterLink>
+      </article>
+    </section>
     <p v-if="error" data-testid="technician-portal-error">{{ error }}</p>
     <template v-else>
       <dl v-if="asOf" data-testid="technician-feed-meta" class="meta">
@@ -163,6 +204,23 @@ watch(() => props.technicianContextId, () => {
   color: #5b6573;
   font-size: 0.9rem;
 }
+.corrections {
+  margin: 1rem 0;
+  padding: 0.9rem;
+  border: 1px solid #f3c780;
+  border-radius: 0.75rem;
+  background: #fffaf0;
+}
+.correction-heading,
+.correction-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.correction-heading h3,
+.correction-card p { margin: 0; }
+.correction-card { padding: 0.7rem 0; border-top: 1px solid #f3dfbd; }
 .meta {
   display: grid;
   gap: 0.25rem;

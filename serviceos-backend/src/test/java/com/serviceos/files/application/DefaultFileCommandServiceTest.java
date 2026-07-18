@@ -219,6 +219,12 @@ class DefaultFileCommandServiceTest {
         }
 
         @Override
+        public com.serviceos.task.api.HandlingTaskCompletionReceipt completeHandlingTask(
+                com.serviceos.task.api.CompleteHandlingTaskCommand command) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public ScheduledTaskView createWorkflowTask(
                 com.serviceos.task.api.CreateWorkflowTaskCommand command) {
             throw new UnsupportedOperationException();

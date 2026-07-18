@@ -72,6 +72,11 @@ final class TechnicianAppStore {
     private(set) var phase: TechnicianAppPhase = .launching
     private(set) var configuration: TechnicianIOSConfiguration?
     private(set) var taskFeed: TechnicianPortalFeedPage?
+    private(set) var corrections: [TechnicianIOSFoundation.TechnicianCorrection] = []
+    private(set) var correctionEvidenceSlots: [TechnicianOnlineEvidenceSlot] = []
+    private(set) var correctionEvidenceItems: [TechnicianOnlineEvidenceItem] = []
+    private(set) var correctionMessage: String?
+    private(set) var correctionLoading = false
     private(set) var taskDetail: TechnicianPortalTaskDetail?
     private(set) var taskForms: [TechnicianTaskForm] = []
     private(set) var formMessage: String?
@@ -168,6 +173,15 @@ final class TechnicianAppStore {
             taskFeed = try await dependencies.onlineService.taskFeed(
                 contextID: session.activeContext.contextId
             )
+            do {
+                corrections = try await dependencies.onlineService.corrections(
+                    contextID: session.activeContext.contextId
+                )
+            } catch {
+                // 普通任务 Feed 与整改候选是两个独立读模型；整改失败不抹掉已经加载的现场任务。
+                corrections = []
+                correctionMessage = Self.safeMessage(for: error)
+            }
             onlineMessage = nil
         } catch {
             taskFeed = nil
@@ -309,6 +323,157 @@ final class TechnicianAppStore {
         }
     }
 
+    func advanceCorrection(session: TechnicianSession, correctionCaseID: UUID) async {
+        guard let dependencies,
+              let current = corrections.first(where: { $0.correctionCaseId == correctionCaseID }) else { return }
+        correctionLoading = true
+        defer { correctionLoading = false }
+        do {
+            let updated = current.taskStatus == "READY"
+                ? try await dependencies.onlineService.claimCorrection(
+                    contextID: session.activeContext.contextId,
+                    correctionCaseID: correctionCaseID,
+                    taskVersion: current.taskVersion
+                )
+                : try await dependencies.onlineService.startCorrection(
+                    contextID: session.activeContext.contextId,
+                    correctionCaseID: correctionCaseID,
+                    taskVersion: current.taskVersion
+                )
+            replaceCorrection(updated)
+            correctionMessage = updated.taskStatus == "RUNNING"
+                ? "整改任务已启动，可以补传资料"
+                : "整改任务已领取，请继续启动"
+            if updated.taskStatus == "RUNNING" {
+                await loadCorrectionEvidence(
+                    using: dependencies, session: session, correctionCaseID: correctionCaseID
+                )
+            }
+        } catch {
+            correctionMessage = Self.safeMessage(for: error)
+        }
+    }
+
+    func loadCorrection(session: TechnicianSession, correctionCaseID: UUID) async {
+        guard let dependencies else { return }
+        correctionLoading = true
+        defer { correctionLoading = false }
+        do {
+            corrections = try await dependencies.onlineService.corrections(
+                contextID: session.activeContext.contextId
+            )
+            guard let current = corrections.first(where: { $0.correctionCaseId == correctionCaseID }) else {
+                correctionEvidenceSlots = []
+                correctionEvidenceItems = []
+                correctionMessage = "整改任务不存在或当前责任已失效"
+                return
+            }
+            if current.taskStatus == "RUNNING" {
+                await loadCorrectionEvidence(
+                    using: dependencies, session: session, correctionCaseID: correctionCaseID
+                )
+            } else {
+                correctionEvidenceSlots = []
+                correctionEvidenceItems = []
+            }
+        } catch {
+            correctionMessage = Self.safeMessage(for: error)
+        }
+    }
+
+    private func loadCorrectionEvidence(
+        using dependencies: TechnicianAppDependencies,
+        session: TechnicianSession,
+        correctionCaseID: UUID
+    ) async {
+        do {
+            let onlineService = dependencies.onlineService
+            let contextID = session.activeContext.contextId
+            async let slots = onlineService.correctionEvidenceSlots(
+                contextID: contextID, correctionCaseID: correctionCaseID
+            )
+            async let items = onlineService.correctionEvidenceItems(
+                contextID: contextID, correctionCaseID: correctionCaseID
+            )
+            (correctionEvidenceSlots, correctionEvidenceItems) = try await (slots, items)
+        } catch {
+            correctionEvidenceSlots = []
+            correctionEvidenceItems = []
+            correctionMessage = Self.safeMessage(for: error)
+        }
+    }
+
+    func uploadCorrectionEvidence(
+        session: TechnicianSession,
+        correctionCaseID: UUID,
+        slot: TechnicianOnlineEvidenceSlot,
+        asset: TechnicianEvidenceUploadAsset
+    ) async {
+        guard let dependencies else { return }
+        evidenceUploading = true
+        correctionMessage = "正在校验并上传整改资料…"
+        defer { evidenceUploading = false }
+        do {
+            let currentItems = correctionEvidenceItems
+                .filter { $0.evidenceSlotId == slot.slotId }
+                .sorted { $0.itemOrdinal < $1.itemOrdinal }
+            let target = slot.maxCount.map { currentItems.count >= $0 ? currentItems.last : nil } ?? nil
+            _ = try await dependencies.onlineService.uploadCorrectionEvidence(
+                contextID: session.activeContext.contextId,
+                correctionCaseID: correctionCaseID,
+                slotID: slot.slotId,
+                evidenceItemID: target?.evidenceItemId,
+                asset: asset
+            )
+            correctionMessage = "整改资料已提交；服务器扫描与校验完成前不能重提"
+            await loadCorrectionEvidence(
+                using: dependencies, session: session, correctionCaseID: correctionCaseID
+            )
+        } catch {
+            correctionMessage = Self.safeMessage(for: error)
+        }
+    }
+
+    func resubmitCorrection(session: TechnicianSession, correctionCaseID: UUID) async {
+        guard let dependencies else { return }
+        let revisionIDs = correctionEvidenceItems
+            .filter { $0.status == "ACTIVE" }
+            .compactMap { item in
+                item.revisions.filter { $0.status == "VALIDATED" }
+                    .max { $0.revisionNumber < $1.revisionNumber }?.evidenceRevisionId
+            }
+        guard !revisionIDs.isEmpty else {
+            correctionMessage = "没有可冻结的已校验资料版本，请等待服务器扫描与校验"
+            return
+        }
+        correctionLoading = true
+        defer { correctionLoading = false }
+        do {
+            let snapshot = try await dependencies.onlineService.createCorrectionSnapshot(
+                contextID: session.activeContext.contextId,
+                correctionCaseID: correctionCaseID,
+                revisionIDs: revisionIDs
+            )
+            let updated = try await dependencies.onlineService.resubmitCorrection(
+                contextID: session.activeContext.contextId,
+                correctionCaseID: correctionCaseID,
+                snapshotID: snapshot.evidenceSetSnapshotId
+            )
+            replaceCorrection(updated)
+            correctionMessage = "整改已第 \(updated.resubmissionCount) 次重提；审核关闭前任务保持进行中"
+        } catch {
+            correctionMessage = Self.safeMessage(for: error)
+        }
+    }
+
+    private func replaceCorrection(_ updated: TechnicianIOSFoundation.TechnicianCorrection) {
+        if let index = corrections.firstIndex(where: { $0.correctionCaseId == updated.correctionCaseId }) {
+            corrections[index] = updated
+        } else {
+            corrections.append(updated)
+        }
+    }
+
     func checkIn(session: TechnicianSession, appointmentID: UUID, taskID: UUID) async {
         guard let dependencies else { return }
         onlineLoading = true
@@ -441,6 +606,11 @@ final class TechnicianAppStore {
 
     private func clearOnlineState() {
         taskFeed = nil
+        corrections = []
+        correctionEvidenceSlots = []
+        correctionEvidenceItems = []
+        correctionMessage = nil
+        correctionLoading = false
         taskDetail = nil
         taskForms = []
         formMessage = nil

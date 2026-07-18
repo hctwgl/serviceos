@@ -13,6 +13,15 @@ public interface EvidenceSetSnapshotService {
             CreateEvidenceSetSnapshotCommand command
     );
 
+    EvidenceSetSnapshotView createForCorrection(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            UUID correctionCaseId,
+            UUID correctionTaskId,
+            UUID sourceTaskId,
+            java.util.List<UUID> memberRevisionIds
+    );
+
     EvidenceSetSnapshotView get(
             CurrentPrincipal principal,
             String correlationId,

@@ -274,6 +274,7 @@ title: ServiceOS 里程碑索引
 | M263 | M263 Technician 在线基础表单交付批次 | [276-m263-technician-online-form-batch.md](../architecture/276-m263-technician-online-form-batch.md) | [260-m263-technician-online-form-batch-acceptance.md](../testing/260-m263-technician-online-form-batch-acceptance.md) |
 | M264 | M264 Technician 在线资料上传交付批次 | [277-m264-technician-online-evidence-batch.md](../architecture/277-m264-technician-online-evidence-batch.md) | [261-m264-technician-online-evidence-batch-acceptance.md](../testing/261-m264-technician-online-evidence-batch-acceptance.md) |
 | M265 | M265 Technician 资料快照与任务完成交付批次 | [278-m265-technician-task-submission-batch.md](../architecture/278-m265-technician-task-submission-batch.md) | [262-m265-technician-task-submission-batch-acceptance.md](../testing/262-m265-technician-task-submission-batch-acceptance.md) |
+| M266 | M266 Technician 在线资料整改交付批次 | [279-m266-technician-correction-batch.md](../architecture/279-m266-technician-correction-batch.md) | [263-m266-technician-correction-batch-acceptance.md](../testing/263-m266-technician-correction-batch-acceptance.md) |
 
 ## 未关联里程碑的文档
 

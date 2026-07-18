@@ -91,6 +91,26 @@ private struct TechnicianTaskFeedSection: View {
     let session: TechnicianSession
 
     var body: some View {
+        Section("整改任务") {
+            if store.corrections.isEmpty {
+                Text("暂无待处理整改").foregroundStyle(.secondary)
+            } else {
+                ForEach(store.corrections) { correction in
+                    NavigationLink {
+                        TechnicianCorrectionView(
+                            store: store, session: session, correctionCaseID: correction.correctionCaseId
+                        )
+                    } label: {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(correction.reasonCodes.joined(separator: " / ")).font(.headline)
+                            Text("\(correction.caseStatus) · \(correction.taskStatus) · 重提 \(correction.resubmissionCount) 次")
+                                .font(.subheadline).foregroundStyle(.secondary)
+                        }
+                    }
+                    .accessibilityIdentifier("technician.correction.\(correction.correctionCaseId.uuidString.lowercased())")
+                }
+            }
+        }
         Section("当前责任任务") {
             if store.onlineLoading, store.taskFeed == nil {
                 ProgressView("正在加载任务…")
@@ -119,6 +139,168 @@ private struct TechnicianTaskFeedSection: View {
         if let message = store.onlineMessage {
             Section { Text(message).foregroundStyle(.secondary) }
         }
+    }
+}
+
+private struct TechnicianCorrectionView: View {
+    let store: TechnicianAppStore
+    let session: TechnicianSession
+    let correctionCaseID: UUID
+
+    private var correction: TechnicianIOSFoundation.TechnicianCorrection? {
+        store.corrections.first { $0.correctionCaseId == correctionCaseID }
+    }
+
+    var body: some View {
+        List {
+            if let correction {
+                Section("整改") {
+                    LabeledContent("原因", value: correction.reasonCodes.joined(separator: " / "))
+                    LabeledContent("案例状态", value: correction.caseStatus)
+                    LabeledContent("任务状态", value: correction.taskStatus)
+                    LabeledContent("历史重提", value: "\(correction.resubmissionCount) 次")
+                }
+                if correction.taskStatus != "RUNNING" {
+                    Section {
+                        Button(correction.taskStatus == "READY" ? "领取整改任务" : "启动整改任务") {
+                            Task { await store.advanceCorrection(session: session, correctionCaseID: correctionCaseID) }
+                        }
+                        .disabled(store.correctionLoading)
+                        .accessibilityIdentifier("technician.correction.lifecycle")
+                    }
+                } else {
+                    Section("补传资料") {
+                        Text("源业务任务保持完成状态；本页只通过整改任务追加新 Revision。")
+                            .font(.footnote).foregroundStyle(.secondary)
+                        if store.correctionEvidenceSlots.isEmpty {
+                            Text("暂无资料槽位").foregroundStyle(.secondary)
+                        }
+                        ForEach(store.correctionEvidenceSlots) { slot in
+                            TechnicianCorrectionEvidenceRow(
+                                store: store,
+                                session: session,
+                                correctionCaseID: correctionCaseID,
+                                slot: slot,
+                                items: store.correctionEvidenceItems.filter { $0.evidenceSlotId == slot.slotId }
+                            )
+                        }
+                    }
+                    Section("冻结快照并重提") {
+                        Text("只发送 VALIDATED Revision ID；Snapshot 摘要与整改责任由服务器重建。")
+                            .font(.footnote).foregroundStyle(.secondary)
+                        Button("冻结资料并重提") {
+                            Task { await store.resubmitCorrection(session: session, correctionCaseID: correctionCaseID) }
+                        }
+                        .disabled(store.correctionLoading || store.evidenceUploading)
+                        .accessibilityIdentifier("technician.correction.resubmit")
+                    }
+                }
+                if let message = store.correctionMessage {
+                    Section { Text(message).foregroundStyle(.secondary) }
+                }
+            } else {
+                ContentUnavailableView("整改任务不可用", systemImage: "exclamationmark.shield")
+            }
+        }
+        .navigationTitle("整改处理")
+        .task { await store.loadCorrection(session: session, correctionCaseID: correctionCaseID) }
+        .refreshable { await store.loadCorrection(session: session, correctionCaseID: correctionCaseID) }
+        .accessibilityIdentifier("technician.correction.detail")
+    }
+}
+
+private struct TechnicianCorrectionEvidenceRow: View {
+    let store: TechnicianAppStore
+    let session: TechnicianSession
+    let correctionCaseID: UUID
+    let slot: TechnicianOnlineEvidenceSlot
+    let items: [TechnicianOnlineEvidenceItem]
+    @State private var galleryItem: PhotosPickerItem?
+    @State private var importingFile = false
+    @State private var localMessage: String?
+
+    private var mediaPicker: Bool { slot.mediaType == "PHOTO" || slot.mediaType == "VIDEO" }
+    private var contentTypes: [UTType] {
+        if slot.mediaType == "PHOTO" { return [.image] }
+        if slot.mediaType == "VIDEO" { return [.movie] }
+        return [.pdf, .plainText, .data]
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(slot.requirementName).font(.headline)
+                Spacer()
+                Text(slot.status).font(.caption).foregroundStyle(.secondary)
+            }
+            ForEach(items.sorted { $0.itemOrdinal < $1.itemOrdinal }) { item in
+                let latest = item.revisions.max { $0.revisionNumber < $1.revisionNumber }
+                Text("第 \(item.itemOrdinal) 项 · \(latest?.status ?? item.status)")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            if mediaPicker {
+                PhotosPicker(
+                    selection: $galleryItem,
+                    matching: slot.mediaType == "VIDEO" ? .videos : .images
+                ) { Label("选择整改资料", systemImage: "photo.on.rectangle") }
+                .disabled(store.evidenceUploading)
+            } else {
+                Button { importingFile = true } label: { Label("选择整改文件", systemImage: "doc") }
+                    .disabled(store.evidenceUploading)
+            }
+            if let localMessage { Text(localMessage).font(.caption).foregroundStyle(.red) }
+        }
+        .task(id: galleryItem) {
+            guard let galleryItem else { return }
+            defer { self.galleryItem = nil }
+            do {
+                guard let data = try await galleryItem.loadTransferable(type: Data.self), !data.isEmpty else {
+                    throw TechnicianEvidenceSelectionError.emptySelection
+                }
+                await upload(
+                    data: data,
+                    fileName: slot.mediaType == "VIDEO" ? "整改视频.mov" : "整改照片.jpg",
+                    mimeType: galleryItem.supportedContentTypes.first?.preferredMIMEType
+                        ?? (slot.mediaType == "VIDEO" ? "video/quicktime" : "image/jpeg"),
+                    source: .gallery
+                )
+            } catch {
+                localMessage = "无法读取所选整改资料，请重新选择"
+            }
+        }
+        .fileImporter(isPresented: $importingFile, allowedContentTypes: contentTypes) { result in
+            do {
+                let url = try result.get()
+                let scoped = url.startAccessingSecurityScopedResource()
+                defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+                let data = try Data(contentsOf: url)
+                Task { await upload(
+                    data: data,
+                    fileName: url.lastPathComponent,
+                    mimeType: UTType(filenameExtension: url.pathExtension)?.preferredMIMEType
+                        ?? "application/octet-stream",
+                    source: .file
+                ) }
+            } catch {
+                localMessage = "无法读取所选整改文件，请重新选择"
+            }
+        }
+        .accessibilityIdentifier("technician.correction.slot.\(slot.slotId.uuidString.lowercased())")
+    }
+
+    @MainActor
+    private func upload(
+        data: Data, fileName: String, mimeType: String, source: TechnicianEvidenceUploadAsset.Source
+    ) async {
+        localMessage = nil
+        await store.uploadCorrectionEvidence(
+            session: session,
+            correctionCaseID: correctionCaseID,
+            slot: slot,
+            asset: .init(
+                data: data, fileName: fileName, mimeType: mimeType, source: source, capturedAt: Date()
+            )
+        )
     }
 }
 

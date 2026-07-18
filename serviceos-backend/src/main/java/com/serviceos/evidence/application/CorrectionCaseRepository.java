@@ -47,6 +47,8 @@ public interface CorrectionCaseRepository {
 
     Optional<CorrectionCaseView> find(String tenantId, UUID correctionCaseId);
 
+    Optional<CorrectionCaseView> findByCorrectionTaskId(String tenantId, UUID correctionTaskId);
+
     List<CorrectionCaseView> listByTask(String tenantId, UUID taskId);
 
     List<CorrectionCaseQueueItem> findQueuePage(

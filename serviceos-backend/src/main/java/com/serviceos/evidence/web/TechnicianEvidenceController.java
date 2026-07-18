@@ -126,28 +126,28 @@ final class TechnicianEvidenceController {
     }
 
 
-    private static TechnicianEvidenceSlotResponse slotResponse(EvidenceSlotView slot) {
+    static TechnicianEvidenceSlotResponse slotResponse(EvidenceSlotView slot) {
         return new TechnicianEvidenceSlotResponse(
                 slot.slotId(), slot.requirementCode(), slot.occurrenceKey(), slot.requirementName(),
                 slot.mediaType(), slot.required(), slot.minCount(), slot.maxCount(), slot.status(),
                 slot.active(), slot.transition(), slot.requiredDisposition());
     }
 
-    private static TechnicianEvidenceUploadSessionResponse sessionResponse(EvidenceUploadSessionView session) {
+    static TechnicianEvidenceUploadSessionResponse sessionResponse(EvidenceUploadSessionView session) {
         return new TechnicianEvidenceUploadSessionResponse(
                 session.uploadSessionId(), session.evidenceSlotId(), session.evidenceItemId(),
                 session.status(), session.uploadMethod(), session.uploadUrl(), session.requiredHeaders(),
                 session.uploadAuthorizationExpiresAt(), session.sessionExpiresAt());
     }
 
-    private static TechnicianEvidenceItemResponse itemResponse(EvidenceItemView item) {
+    static TechnicianEvidenceItemResponse itemResponse(EvidenceItemView item) {
         return new TechnicianEvidenceItemResponse(
                 item.evidenceItemId(), item.taskId(), item.evidenceSlotId(), item.itemOrdinal(),
                 item.status(), item.createdAt(), item.revisions().stream()
                         .map(TechnicianEvidenceController::revisionResponse).toList());
     }
 
-    private static TechnicianEvidenceSetSnapshotResponse snapshotResponse(EvidenceSetSnapshotView snapshot) {
+    static TechnicianEvidenceSetSnapshotResponse snapshotResponse(EvidenceSetSnapshotView snapshot) {
         return new TechnicianEvidenceSetSnapshotResponse(
                 snapshot.evidenceSetSnapshotId(), snapshot.taskId(), snapshot.purpose(),
                 snapshot.memberCount(), snapshot.contentDigest(), snapshot.createdAt(),

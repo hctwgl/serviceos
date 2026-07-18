@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.25
+  version: 1.0.26
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -2651,6 +2651,161 @@ paths:
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
         '422': { $ref: '#/components/responses/Problem' }
+  /technician/me/corrections:
+    get:
+      operationId: listTechnicianCorrections
+      summary: 查询当前师傅候选或负责中的整改任务
+      description: M266：独立 correction Task 提供实时责任；源业务 Task 保持 COMPLETED。仅返回当前网点来源任务的最小整改投影。
+      parameters:
+        - $ref: '#/components/parameters/TechnicianContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 当前候选/责任整改任务
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/TechnicianCorrection' } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /technician/me/corrections/{correctionCaseId}:claim:
+    post:
+      operationId: claimTechnicianCorrection
+      summary: 当前候选师傅领取整改任务
+      parameters:
+        - $ref: '#/components/parameters/CorrectionCaseId'
+        - $ref: '#/components/parameters/TechnicianContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200': { description: 已领取, content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianCorrection' } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /technician/me/corrections/{correctionCaseId}:start:
+    post:
+      operationId: startTechnicianCorrection
+      summary: 当前负责人启动整改任务
+      parameters:
+        - $ref: '#/components/parameters/CorrectionCaseId'
+        - $ref: '#/components/parameters/TechnicianContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200': { description: 已启动, content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianCorrection' } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /technician/me/corrections/{correctionCaseId}/evidence-slots:
+    get:
+      operationId: listTechnicianCorrectionEvidenceSlots
+      summary: 查询整改源任务的活动资料槽位
+      parameters:
+        - $ref: '#/components/parameters/CorrectionCaseId'
+        - $ref: '#/components/parameters/TechnicianContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200': { description: 槽位列表, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/TechnicianEvidenceSlot' } } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /technician/me/corrections/{correctionCaseId}/evidence-items:
+    get:
+      operationId: listTechnicianCorrectionEvidenceItems
+      summary: 查询整改源任务的安全资料版本摘要
+      parameters:
+        - $ref: '#/components/parameters/CorrectionCaseId'
+        - $ref: '#/components/parameters/TechnicianContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200': { description: 资料列表, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/TechnicianEvidenceItem' } } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /technician/me/corrections/{correctionCaseId}/evidence-slots/{slotId}/upload-sessions:
+    post:
+      operationId: beginTechnicianCorrectionEvidenceUpload
+      summary: 为已完成源 Task 创建整改资料受限上传会话
+      description: 仅 RUNNING correction Task 的当前负责人可调用；不放宽普通 Evidence RUNNING Task 门禁。
+      parameters:
+        - $ref: '#/components/parameters/CorrectionCaseId'
+        - { name: slotId, in: path, required: true, schema: { type: string, format: uuid } }
+        - $ref: '#/components/parameters/TechnicianContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianBeginEvidenceUploadRequest' } } }
+      responses:
+        '201': { description: 受限上传会话, content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianEvidenceUploadSession' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /technician/me/corrections/{correctionCaseId}/evidence-slots/{slotId}/upload-sessions/{uploadSessionId}:finalize:
+    post:
+      operationId: finalizeTechnicianCorrectionEvidenceUpload
+      summary: Finalize 整改资料并追加不可变 Revision
+      parameters:
+        - $ref: '#/components/parameters/CorrectionCaseId'
+        - { name: slotId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: uploadSessionId, in: path, required: true, schema: { type: string, format: uuid } }
+        - $ref: '#/components/parameters/TechnicianContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianFinalizeEvidenceUploadRequest' } } }
+      responses:
+        '201': { description: 不可变资料版本, content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianEvidenceItem' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /technician/me/corrections/{correctionCaseId}/evidence-set-snapshots:
+    post:
+      operationId: createTechnicianCorrectionEvidenceSetSnapshot
+      summary: 冻结整改源任务的新 TASK_SUBMISSION Snapshot
+      parameters:
+        - $ref: '#/components/parameters/CorrectionCaseId'
+        - $ref: '#/components/parameters/TechnicianContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianCreateEvidenceSetSnapshotRequest' } } }
+      responses:
+        '201': { description: 新整改 Snapshot, content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianEvidenceSetSnapshot' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /technician/me/corrections/{correctionCaseId}:resubmit:
+    post:
+      operationId: resubmitTechnicianCorrection
+      summary: 以新 Snapshot 重提整改案例
+      description: 可多轮重提；correction Task 保持 RUNNING，审核 CLOSED 时才完成。
+      parameters:
+        - $ref: '#/components/parameters/CorrectionCaseId'
+        - $ref: '#/components/parameters/TechnicianContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianResubmitCorrectionRequest' } } }
+      responses:
+        '200': { description: 已重提, content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianCorrection' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
   /technician/me/schedule:
     get:
       operationId: listTechnicianSchedule
@@ -4867,6 +5022,11 @@ components:
       schema: { type: string, format: uuid }
     TaskId:
       name: taskId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    CorrectionCaseId:
+      name: correctionCaseId
       in: path
       required: true
       schema: { type: string, format: uuid }
@@ -9165,6 +9325,30 @@ components:
         status: { enum: [COMPLETED] }
         resourceVersion: { type: integer, format: int64, minimum: 1 }
         occurredAt: { type: string, format: date-time }
+    TechnicianCorrection:
+      type: object
+      additionalProperties: false
+      required: [correctionCaseId, sourceTaskId, correctionTaskId, caseStatus, reasonCodes,
+                 taskStatus, taskVersion, resubmissionCount]
+      properties:
+        correctionCaseId: { type: string, format: uuid }
+        sourceTaskId: { type: string, format: uuid }
+        correctionTaskId: { type: string, format: uuid }
+        caseStatus: { enum: [IN_PROGRESS, RESUBMITTED] }
+        reasonCodes:
+          type: array
+          minItems: 1
+          items: { type: string, minLength: 1, maxLength: 128 }
+        taskStatus: { enum: [READY, CLAIMED, RUNNING] }
+        taskVersion: { type: integer, format: int64, minimum: 1 }
+        latestResubmissionSnapshotId: { type: [string, 'null'], format: uuid }
+        resubmissionCount: { type: integer, minimum: 0 }
+    TechnicianResubmitCorrectionRequest:
+      type: object
+      additionalProperties: false
+      required: [evidenceSetSnapshotId]
+      properties:
+        evidenceSetSnapshotId: { type: string, format: uuid }
     VisitLocation:
       type: object
       additionalProperties: false

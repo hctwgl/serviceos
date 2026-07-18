@@ -7,5 +7,7 @@ public interface TaskSchedulingService {
 
     HandlingTaskCancellationReceipt cancelHandlingTask(CancelHandlingTaskCommand command);
 
+    HandlingTaskCompletionReceipt completeHandlingTask(CompleteHandlingTaskCommand command);
+
     ScheduledTaskView createWorkflowTask(CreateWorkflowTaskCommand command);
 }
