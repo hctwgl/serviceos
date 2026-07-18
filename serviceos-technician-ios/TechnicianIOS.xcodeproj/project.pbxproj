@@ -1,0 +1,654 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		100000000000000000000101 /* TechnicianIOSFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 100000000000000000000501 /* TechnicianIOSFoundation */; };
+		100000000000000000000102 /* TechnicianIOSFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 100000000000000000000502 /* TechnicianIOSFoundation */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		100000000000000000000201 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 100000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 100000000000000000000011;
+			remoteInfo = TechnicianIOS;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		100000000000000000000021 /* TechnicianIOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TechnicianIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		100000000000000000000022 /* TechnicianIOSAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TechnicianIOSAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		100000000000000000000023 /* TechnicianIOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TechnicianIOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		100000000000000000000031 /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Base.xcconfig; sourceTree = "<group>"; };
+		100000000000000000000032 /* Local.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Local.xcconfig; sourceTree = "<group>"; };
+		100000000000000000000033 /* Development.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Development.xcconfig; sourceTree = "<group>"; };
+		100000000000000000000034 /* Test.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Test.xcconfig; sourceTree = "<group>"; };
+		100000000000000000000035 /* Staging.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Staging.xcconfig; sourceTree = "<group>"; };
+		100000000000000000000036 /* Production.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Production.xcconfig; sourceTree = "<group>"; };
+		100000000000000000000037 /* TechnicianIOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TechnicianIOS.entitlements; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		100000000000000000000301 /* Exceptions for "App" folder in "TechnicianIOS" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 100000000000000000000011 /* TechnicianIOS */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		100000000000000000000041 /* App */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				100000000000000000000301 /* Exceptions for "App" folder in "TechnicianIOS" target */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		100000000000000000000042 /* Tests/TechnicianIOSAppTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Tests/TechnicianIOSAppTests;
+			sourceTree = "<group>";
+		};
+		100000000000000000000043 /* Tests/TechnicianIOSUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Tests/TechnicianIOSUITests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		100000000000000000000111 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				100000000000000000000101 /* TechnicianIOSFoundation in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		100000000000000000000121 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				100000000000000000000102 /* TechnicianIOSFoundation in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		100000000000000000000131 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		100000000000000000000002 = {
+			isa = PBXGroup;
+			children = (
+				100000000000000000000041 /* App */,
+				100000000000000000000042 /* Tests/TechnicianIOSAppTests */,
+				100000000000000000000043 /* Tests/TechnicianIOSUITests */,
+				100000000000000000000044 /* Configuration */,
+				100000000000000000000003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		100000000000000000000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				100000000000000000000021 /* TechnicianIOS.app */,
+				100000000000000000000022 /* TechnicianIOSAppTests.xctest */,
+				100000000000000000000023 /* TechnicianIOSUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		100000000000000000000044 /* Configuration */ = {
+			isa = PBXGroup;
+			children = (
+				100000000000000000000031 /* Base.xcconfig */,
+				100000000000000000000032 /* Local.xcconfig */,
+				100000000000000000000033 /* Development.xcconfig */,
+				100000000000000000000034 /* Test.xcconfig */,
+				100000000000000000000035 /* Staging.xcconfig */,
+				100000000000000000000036 /* Production.xcconfig */,
+				100000000000000000000037 /* TechnicianIOS.entitlements */,
+			);
+			path = Configuration;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		100000000000000000000011 /* TechnicianIOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 100000000000000000000401 /* Build configuration list for PBXNativeTarget "TechnicianIOS" */;
+			buildPhases = (
+				100000000000000000000110 /* Sources */,
+				100000000000000000000111 /* Frameworks */,
+				100000000000000000000112 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				100000000000000000000041 /* App */,
+			);
+			name = TechnicianIOS;
+			packageProductDependencies = (
+				100000000000000000000501 /* TechnicianIOSFoundation */,
+			);
+			productName = TechnicianIOS;
+			productReference = 100000000000000000000021 /* TechnicianIOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+		100000000000000000000012 /* TechnicianIOSAppTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 100000000000000000000402 /* Build configuration list for PBXNativeTarget "TechnicianIOSAppTests" */;
+			buildPhases = (
+				100000000000000000000120 /* Sources */,
+				100000000000000000000121 /* Frameworks */,
+				100000000000000000000122 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				100000000000000000000042 /* Tests/TechnicianIOSAppTests */,
+			);
+			name = TechnicianIOSAppTests;
+			packageProductDependencies = (
+				100000000000000000000502 /* TechnicianIOSFoundation */,
+			);
+			productName = TechnicianIOSAppTests;
+			productReference = 100000000000000000000022 /* TechnicianIOSAppTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		100000000000000000000013 /* TechnicianIOSUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 100000000000000000000403 /* Build configuration list for PBXNativeTarget "TechnicianIOSUITests" */;
+			buildPhases = (
+				100000000000000000000130 /* Sources */,
+				100000000000000000000131 /* Frameworks */,
+				100000000000000000000132 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				100000000000000000000202 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				100000000000000000000043 /* Tests/TechnicianIOSUITests */,
+			);
+			name = TechnicianIOSUITests;
+			packageProductDependencies = (
+			);
+			productName = TechnicianIOSUITests;
+			productReference = 100000000000000000000023 /* TechnicianIOSUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		100000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2700;
+				LastUpgradeCheck = 2700;
+				TargetAttributes = {
+					100000000000000000000011 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					100000000000000000000012 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					100000000000000000000013 = {
+						CreatedOnToolsVersion = 27.0;
+						TestTargetID = 100000000000000000000011;
+					};
+				};
+			};
+			buildConfigurationList = 100000000000000000000400 /* Build configuration list for PBXProject "TechnicianIOS" */;
+			developmentRegion = zh_CN;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				zh_CN,
+				Base,
+			);
+			mainGroup = 100000000000000000000002;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				100000000000000000000500 /* XCLocalSwiftPackageReference "." */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 100000000000000000000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				100000000000000000000011 /* TechnicianIOS */,
+				100000000000000000000012 /* TechnicianIOSAppTests */,
+				100000000000000000000013 /* TechnicianIOSUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		100000000000000000000112 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		100000000000000000000122 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		100000000000000000000132 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		100000000000000000000110 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		100000000000000000000120 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		100000000000000000000130 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		100000000000000000000202 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 100000000000000000000011 /* TechnicianIOS */;
+			targetProxy = 100000000000000000000201 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		100000000000000000000601 /* Local */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Local;
+		};
+		100000000000000000000602 /* Development */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Development;
+		};
+		100000000000000000000603 /* Test */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Test;
+		};
+		100000000000000000000604 /* Staging */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Staging;
+		};
+		100000000000000000000605 /* Production */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_VERSION = 6.0;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Production;
+		};
+		100000000000000000000611 /* Local */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 100000000000000000000032 /* Local.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Configuration/TechnicianIOS.entitlements;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_MODULE_NAME = TechnicianIOS;
+				PRODUCT_NAME = TechnicianIOS;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Local;
+		};
+		100000000000000000000612 /* Development */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 100000000000000000000033 /* Development.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Configuration/TechnicianIOS.entitlements;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_MODULE_NAME = TechnicianIOS;
+				PRODUCT_NAME = TechnicianIOS;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Development;
+		};
+		100000000000000000000613 /* Test */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 100000000000000000000034 /* Test.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Configuration/TechnicianIOS.entitlements;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_MODULE_NAME = TechnicianIOS;
+				PRODUCT_NAME = TechnicianIOS;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Test;
+		};
+		100000000000000000000614 /* Staging */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 100000000000000000000035 /* Staging.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Configuration/TechnicianIOS.entitlements;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_MODULE_NAME = TechnicianIOS;
+				PRODUCT_NAME = TechnicianIOS;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Staging;
+		};
+		100000000000000000000615 /* Production */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 100000000000000000000036 /* Production.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Configuration/TechnicianIOS.entitlements;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_MODULE_NAME = TechnicianIOS;
+				PRODUCT_NAME = TechnicianIOS;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Production;
+		};
+		100000000000000000000621 /* Local */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 100000000000000000000034 /* Test.xcconfig */;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.serviceos.technician.tests;
+				PRODUCT_NAME = TechnicianIOSAppTests;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Local;
+		};
+		100000000000000000000622 /* Development */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 100000000000000000000034 /* Test.xcconfig */;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.serviceos.technician.tests;
+				PRODUCT_NAME = TechnicianIOSAppTests;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Development;
+		};
+		100000000000000000000623 /* Test */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 100000000000000000000034 /* Test.xcconfig */;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.serviceos.technician.tests;
+				PRODUCT_NAME = TechnicianIOSAppTests;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Test;
+		};
+		100000000000000000000624 /* Staging */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 100000000000000000000034 /* Test.xcconfig */;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.serviceos.technician.tests;
+				PRODUCT_NAME = TechnicianIOSAppTests;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Staging;
+		};
+		100000000000000000000625 /* Production */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 100000000000000000000034 /* Test.xcconfig */;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.serviceos.technician.tests;
+				PRODUCT_NAME = TechnicianIOSAppTests;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Production;
+		};
+		100000000000000000000631 /* Local */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 100000000000000000000034 /* Test.xcconfig */;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.serviceos.technician.uitests;
+				PRODUCT_NAME = TechnicianIOSUITests;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = TechnicianIOS;
+			};
+			name = Local;
+		};
+		100000000000000000000632 /* Development */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 100000000000000000000034 /* Test.xcconfig */;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.serviceos.technician.uitests;
+				PRODUCT_NAME = TechnicianIOSUITests;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = TechnicianIOS;
+			};
+			name = Development;
+		};
+		100000000000000000000633 /* Test */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 100000000000000000000034 /* Test.xcconfig */;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.serviceos.technician.uitests;
+				PRODUCT_NAME = TechnicianIOSUITests;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = TechnicianIOS;
+			};
+			name = Test;
+		};
+		100000000000000000000634 /* Staging */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 100000000000000000000034 /* Test.xcconfig */;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.serviceos.technician.uitests;
+				PRODUCT_NAME = TechnicianIOSUITests;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = TechnicianIOS;
+			};
+			name = Staging;
+		};
+		100000000000000000000635 /* Production */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 100000000000000000000034 /* Test.xcconfig */;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.serviceos.technician.uitests;
+				PRODUCT_NAME = TechnicianIOSUITests;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = TechnicianIOS;
+			};
+			name = Production;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		100000000000000000000400 /* Build configuration list for PBXProject "TechnicianIOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				100000000000000000000601 /* Local */,
+				100000000000000000000602 /* Development */,
+				100000000000000000000603 /* Test */,
+				100000000000000000000604 /* Staging */,
+				100000000000000000000605 /* Production */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Test;
+		};
+		100000000000000000000401 /* Build configuration list for PBXNativeTarget "TechnicianIOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				100000000000000000000611 /* Local */,
+				100000000000000000000612 /* Development */,
+				100000000000000000000613 /* Test */,
+				100000000000000000000614 /* Staging */,
+				100000000000000000000615 /* Production */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Test;
+		};
+		100000000000000000000402 /* Build configuration list for PBXNativeTarget "TechnicianIOSAppTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				100000000000000000000621 /* Local */,
+				100000000000000000000622 /* Development */,
+				100000000000000000000623 /* Test */,
+				100000000000000000000624 /* Staging */,
+				100000000000000000000625 /* Production */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Test;
+		};
+		100000000000000000000403 /* Build configuration list for PBXNativeTarget "TechnicianIOSUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				100000000000000000000631 /* Local */,
+				100000000000000000000632 /* Development */,
+				100000000000000000000633 /* Test */,
+				100000000000000000000634 /* Staging */,
+				100000000000000000000635 /* Production */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Test;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		100000000000000000000500 /* XCLocalSwiftPackageReference "." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = .;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		100000000000000000000501 /* TechnicianIOSFoundation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 100000000000000000000500 /* XCLocalSwiftPackageReference "." */;
+			productName = TechnicianIOSFoundation;
+		};
+		100000000000000000000502 /* TechnicianIOSFoundation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 100000000000000000000500 /* XCLocalSwiftPackageReference "." */;
+			productName = TechnicianIOSFoundation;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 100000000000000000000001 /* Project object */;
+}

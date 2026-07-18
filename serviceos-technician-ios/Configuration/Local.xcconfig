@@ -1,0 +1,5 @@
+#include "Base.xcconfig"
+SERVICEOS_ENV = local
+SERVICEOS_API_BASE_URL = http:/$()/127.0.0.1:8080
+SERVICEOS_OIDC_ISSUER = http:/$()/127.0.0.1:8081/realms/serviceos
+SERVICEOS_OIDC_CLIENT_ID = serviceos-technician-ios-local

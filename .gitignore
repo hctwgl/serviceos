@@ -8,6 +8,7 @@ dist/
 target/
 **/target/
 **/.build/
+**/.swiftpm/
 **/DerivedData/
 **/xcuserdata/
 *.log

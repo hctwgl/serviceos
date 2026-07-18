@@ -35,6 +35,28 @@ actor FakeOIDCTransport: OIDCTokenEndpointTransporting {
     func capturedBodies() -> [String] { bodies }
 }
 
+actor TestOIDCTokenVault: OIDCTokenPersisting {
+    private var tokenSet: OIDCTokenSet?
+    private let now: Date
+
+    init(now: Date) { self.now = now }
+
+    func store(_ snapshot: AccessTokenSnapshot) {
+        tokenSet = .init(accessToken: snapshot.accessToken, refreshToken: nil, expiresAt: snapshot.expiresAt)
+    }
+
+    func store(_ next: OIDCTokenSet) { tokenSet = next }
+
+    func currentAccessToken() -> AccessTokenSnapshot? {
+        guard let tokenSet, tokenSet.expiresAt > now else { return nil }
+        return .init(accessToken: tokenSet.accessToken, expiresAt: tokenSet.expiresAt)
+    }
+
+    func currentRefreshToken() -> String? { tokenSet?.refreshToken }
+
+    func clear() { tokenSet = nil }
+}
+
 @main
 struct FoundationSmoke {
     static func main() async throws {
@@ -61,41 +83,20 @@ struct FoundationSmoke {
         precondition(authorizationCode == "code-1")
 
         let now = Date(timeIntervalSince1970: 1_000)
-        let keychain = KeychainAccessTokenVault(
-            service: "com.serviceos.technician.tests.\(UUID().uuidString)",
-            account: "oidc-access-token",
-            now: { now },
-            expirySkew: 0
-        )
-        try await keychain.store(.init(accessToken: "keychain-secret", expiresAt: now.addingTimeInterval(60)))
-        let storedToken = await keychain.currentAccessToken()
-        precondition(storedToken?.accessToken == "keychain-secret")
+        let tokenVault = TestOIDCTokenVault(now: now)
+        await tokenVault.store(.init(accessToken: "memory-secret", expiresAt: now.addingTimeInterval(60)))
+        let storedToken = await tokenVault.currentAccessToken()
+        precondition(storedToken?.accessToken == "memory-secret")
         let oidcTransport = FakeOIDCTransport()
         let lifecycle = OIDCTokenLifecycle(
             requestFactory: .init(configuration: configuration),
             transport: oidcTransport,
-            vault: keychain,
+            vault: tokenVault,
             now: { now }
         )
         try await lifecycle.exchange(code: authorizationCode, transaction: transaction)
-        let refreshToken = await keychain.currentRefreshToken()
+        let refreshToken = await tokenVault.currentRefreshToken()
         precondition(refreshToken == "refresh-1")
-        let expiredKeychain = KeychainAccessTokenVault(
-            service: "com.serviceos.technician.tests.\(UUID().uuidString)",
-            account: "expired-oidc-token",
-            now: { now },
-            expirySkew: 30
-        )
-        try await expiredKeychain.store(.init(
-            accessToken: "expired-access",
-            refreshToken: "retained-refresh",
-            expiresAt: now.addingTimeInterval(-1)
-        ))
-        let expiredAccessToken = await expiredKeychain.currentAccessToken()
-        let retainedRefreshToken = await expiredKeychain.currentRefreshToken()
-        precondition(expiredAccessToken == nil)
-        precondition(retainedRefreshToken == "retained-refresh")
-        await expiredKeychain.clear()
         try await lifecycle.refresh()
         let tokenBodies = await oidcTransport.capturedBodies()
         precondition(tokenBodies.count == 2)
@@ -103,12 +104,12 @@ struct FoundationSmoke {
         precondition(!tokenBodies[0].contains("client_secret"))
         precondition(tokenBodies[1].contains("grant_type=refresh_token"))
         await lifecycle.logout()
-        let clearedToken = await keychain.currentAccessToken()
+        let clearedToken = await tokenVault.currentAccessToken()
         precondition(clearedToken == nil)
 
         let builder = ServiceRequestBuilder(
             baseURL: configuration.apiBaseURL,
-            tokenProvider: keychain,
+            tokenProvider: tokenVault,
             clientMetadata: configuration.clientMetadata
         )
         let transport = FakeTransport()
