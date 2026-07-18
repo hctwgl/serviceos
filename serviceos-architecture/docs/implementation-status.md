@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-18
-baselineCommit: a2048b2fd627f2dfa9a8d6b246734720194db384
-latestMilestone: M257
+baselineCommit: 8581eea2416a861e5f329d57e627e1898d5658be
+latestMilestone: M258
 ---
 
 # ServiceOS 实施状态总览
@@ -39,10 +39,10 @@ latestMilestone: M257
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M257 独立 Technician H5 交付批次 |
-| 基线提交 | `a2048b2fd627f2dfa9a8d6b246734720194db384` |
+| 最新实施里程碑 | M258 Technician iOS 仓库内安全基础 |
+| 基线提交 | `8581eea2416a861e5f329d57e627e1898d5658be` |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
-| 当前可构建工程 | `serviceos-backend`、`serviceos-contracts`、`@serviceos/web-core`、`ServiceOSIOSCore`、独立且可部署的 `serviceos-network-web` 与 `serviceos-technician-web`；由同一 Core OpenAPI 生成并经独立消费者门禁验证的 `@serviceos/core-client` 与 `ServiceOSCoreClient` |
+| 当前可构建工程 | `serviceos-backend`、`serviceos-contracts`、`@serviceos/web-core`、`ServiceOSIOSCore`、独立且可部署的 `serviceos-network-web` 与 `serviceos-technician-web`、Swift 6 可编译的 `TechnicianIOSFoundation`；由同一 Core OpenAPI 生成并经独立消费者门禁验证的 `@serviceos/core-client` 与 `ServiceOSCoreClient` |
 | 前端工程 | `serviceos-admin-web` 独立承载总部运营、统一用户中心、`/me` 导航、SavedView、UI Preference、受控搜索与最近访问；M256 后 Network 正式产品由独立 `serviceos-network-web` 承载，M257 后 Technician Feed/Schedule/Sync/Me/Task Detail 由独立移动优先 `serviceos-technician-web` 承载，Admin 仅保留可配置外链和 M188 诊断；两套独立 Web 均实际接入 `@serviceos/web-core`、OIDC PKCE、服务端 Context/Capability/导航、Playwright 回归和独立容器镜像 |
 | 数据库 | PostgreSQL + Flyway（当前版本 100 / 102） |
 | 契约 | Core OpenAPI 1.0.21 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、recovered/resolved 与 SLA started/breached/met@v1） |
@@ -76,7 +76,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 
 | 领域 | 能力 | 状态 | 已完成范围 | 主要未完成范围 | 最近证据 |
 |---|---|---|---|---|---|
-| 工程基础 | 构建、测试、契约、可观测性、容器发布 | `IMPLEMENTED` | Maven、PostgreSQL IT、契约门禁、Trace/指标、单镜像迁移和回滚演练；Track A 同源 TS/Swift Client、Token、Web/iOS Core、身份注册和有界客户端元数据；9 项本地总门禁；M256/M257 完成 Network Web 与 Technician H5 对 `@serviceos/web-core` 的真实导入及独立镜像 | iOS App 实际导入、能力/版本协商、生产 IdP/BFF、Keychain/Xcode/真机、正式 K8s、多故障域、PITR、远端制品发布/SBOM/签名、正式 Secret Manager | M8～M14、M247～M257 |
+| 工程基础 | 构建、测试、契约、可观测性、容器发布 | `IMPLEMENTED` | Maven、PostgreSQL IT、契约门禁、Trace/指标、单镜像迁移和回滚演练；Track A 同源 TS/Swift Client、Token、Web/iOS Core、身份注册和有界客户端元数据；M256/M257 独立 Web 实际导入；M258 iOS Foundation 实际链接生成 Client/Token，并实跑 Keychain/OIDC/Context | 完整 Xcode App/Simulator/真机/TestFlight、能力协商、生产 IdP/BFF、正式 K8s、多故障域、PITR、远端制品发布/SBOM/签名、正式 Secret Manager | M8～M14、M247～M258 |
 | 身份授权 | OIDC/JWT、Capability、Tenant/Project/REGION/NETWORK Scope、拒绝审计 | `IMPLEMENTED` | 后端认证授权和范围校验基线；实时 TENANT/PROJECT/REGION/NETWORK 集合；Project 有效期关系、整组修订与授权目录读取 | 组织关系、Region 层级后代、计划修订/审批、正式企业 IdP、完整组织治理 UI | M9、M63～M67 |
 | 统一主体目录 | Principal、IdentityLink、PersonProfile、Persona 与生命周期 | `IMPLEMENTED` | 稳定内部 Principal；受控并发 JIT；多 IdentityLink/Persona；Profile；启停实时失权；安全目录与敏感身份分权查询；幂等、If-Match、审计和 PostgreSQL 不可变事实 | 身份解绑、密码管理、身份缓存与跨服务身份事件；网点、授权治理和 Portal 上下文由 M185～M188 承接 | M183 |
 | 企业组织目录 | Organization、OrgUnit、closure、任职与主数据同步 | `IMPLEMENTED` | 独立 `organization` 模块；closure；主职/兼职/负责人；LOCAL/EXTERNAL_AUTHORITATIVE；同步批次幂等与乱序；离职停用/撤权/待重分配；治理 API；Admin 组织页（M187） | 正式 HR Connector、双向回写、ORGANIZATION DataScope | M184、M187 |
@@ -162,7 +162,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | 对账结算 | 对账、结算、争议与调整 | `PROPOSED` | 已有边界设计 | 正式运行时和页面 | `architecture/16-*` |
 | Admin Portal | 总部运营后台 | `PARTIAL` | M101～M182：队列/任务/SLA/异常/入站/外发/工单/项目目录、工作区、allowed-actions；CI 阻断构建；开发态 Keycloak PKCE；真实只读与写链路 PR 阻断 E2E；M187～M188 用户中心与 `/me` 导航；**M189 个人 SavedView**；**M190 UI Preferences**；**M191 共享 SavedView**；**M192 受控全局搜索**；**M193 最近访问** | 设计系统、共享偏好、正式企业 OIDC/BFF、生产对象存储/专业扫描、评分/硬过滤派单与 ServiceNetwork 生命周期 | M7 设计、M101～M182、M187～M193、Admin 试点基线 |
 | Network Portal | 网点协作端 | `PARTIAL` | M194～M242 已交付 workbench、工单/任务、限定工作区、师傅关系/资质、产能、整改和运营异常等受控读写切片；M256 将全部正式产品页迁入独立 `serviceos-network-web`，接入 OIDC PKCE、`/me` NETWORK 上下文、Capability/服务端导航、跨网点失败关闭、76 项 Playwright 回归与独立容器镜像；Admin 不再承载正式 `/network-portal/*` 路由 | 槽位策略表、完整 product/03 设计系统、评分/容量策略引擎、Portal ACK/resolve/decide、产能申请、notifications/消息页、生产 IdP 与集群发布 | M7 设计、M194～M242、M255～M256 |
-| Technician App / Portal | 师傅移动端与 Feed | `PARTIAL` | M195/M218/M219/M243～M246：Feed、日程、同步、我的、当前任务及预约/联系/Visit/表单只读安全摘要；M257 迁入独立移动优先 H5，接入 PKCE、TECHNICIAN Context、Capability/服务端导航、tombstone/隔离/异常回归与独立镜像；Admin 正式路由退役 | Track D iOS 工程；Track E 在线写命令、Evidence、提交/整改；Track F 离线工作包/后台上传；GPS/相机/真机；MESSAGE/PROFILE | M7 设计、M195、M218～M219、M243～M246、M257 |
+| Technician App / Portal | 师傅移动端与 Feed | `PARTIAL` | M195/M218/M219/M243～M246 只读安全切片；M257 独立移动优先 H5；M258 iOS 五环境、OIDC PKCE、ThisDeviceOnly Keychain、Token 生命周期、URLSession/Problem Details、TECHNICIAN Context、生成 Client/Token 链接与日志脱敏仓库基础 | 完整 Xcode SwiftUI App、Simulator/真机/签名/TestFlight；Track E 在线写命令、Evidence、提交/整改；Track F 离线工作包/后台上传；GPS/相机；MESSAGE/PROFILE | M7 设计、M195、M218～M219、M243～M246、M257～M258 |
 | External Portal | 用户/车企受控页面 | `PROPOSED` | 最小边界规划 | 二期页面和工程实现 | M7 设计 |
 
 ## 4. 里程碑历史摘要
@@ -173,7 +173,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M257**。身份治理 M183～M188、Admin 个人/共享 SavedView、Admin UI
+ServiceOS 可靠纵向切片已推进到 **M258**。身份治理 M183～M188、Admin 个人/共享 SavedView、Admin UI
 Preference、受控全局搜索、最近访问、Network Portal 只读查询、Technician Portal Feed、Network Portal
 指派/改派师傅、预约协作/改约取消/爽约与联系尝试、资料代补 onBehalf、整改队列只读、运营异常队列只读、
 师傅关系与资质提交、本网点资质只读列表、师傅关系只读列表（含 terminate version）、工作台能力门控
@@ -188,8 +188,9 @@ Track A 仓库内工程基础；M255 已建立独立 Network Web AppShell，M256
 `@serviceos/web-core`，接入 OIDC PKCE、`/me` NETWORK Context、Capability 与服务端导航，将 M194～M242
 正式页面和回归测试从 Admin 迁入独立 Network Web，并交付可运行容器镜像；M257 已闭合 Track C 独立
 Technician H5 迁移边界，迁入 Feed/Schedule/Sync/Me/Task Detail、8 条移动端 E2E 和独立容器，并退役
-Admin 正式 Technician 路由。下一批次进入 Track D Technician iOS 工程基础；Network 独立页壳剩余主要是
-`NETWORK.NOTIFICATION`（notifications 仍 deferred）。
+Admin 正式 Technician 路由；M258 已交付 Track D 当前环境可验证的 iOS 仓库内安全基础。下一批次仍属于
+Track D，必须在安装完整 Xcode 后建立 SwiftUI App、Simulator、真机与签名/TestFlight 门禁；不能用当前
+Command Line Tools 结果替代。Network 独立页壳剩余主要是 `NETWORK.NOTIFICATION`（notifications 仍 deferred）。
 目录「用户脱敏」属 PII 边界；Accepted NP 目录非 PII 默认列、工作台「统计时间」、预约/联系历史
 （操作者/渠道/范围/动作）、工作区现场/协作摘要与整改详情残余字段 MVP 已闭合。
 没有实现 `search_document` 索引平台、VEHICLE/CHARGER 搜索、共享 UI Preference、notifications、
