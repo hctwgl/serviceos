@@ -1,0 +1,128 @@
+{
+  "workflowKey": "platform.home-charging.survey-install",
+  "semanticVersion": "1.0.0",
+  "name": "标准家充勘测安装",
+  "startNodeId": "START",
+  "nodes": [
+    {
+      "nodeId": "START",
+      "nodeType": "START",
+      "name": "开始"
+    },
+    {
+      "nodeId": "INTAKE_COORDINATE",
+      "nodeType": "SERVICE_TASK",
+      "name": "受理协调",
+      "stageCode": "INTAKE",
+      "taskType": "ASSIGN_COORDINATORS",
+      "slaRef": "platform.home-charging.task-elapsed"
+    },
+    {
+      "nodeId": "GW_NEED_SURVEY",
+      "nodeType": "EXCLUSIVE_GATEWAY",
+      "name": "是否需要勘测"
+    },
+    {
+      "nodeId": "SURVEY_TASK",
+      "nodeType": "SERVICE_TASK",
+      "name": "上门勘测",
+      "stageCode": "SURVEY",
+      "taskType": "FIELD_SURVEY",
+      "slaRef": "platform.home-charging.task-elapsed"
+    },
+    {
+      "nodeId": "WAIT_SURVEY_CONFIRM",
+      "nodeType": "WAIT_EVENT",
+      "name": "等待勘测确认",
+      "stageCode": "SURVEY",
+      "waitEventType": "platform.survey.confirmed",
+      "correlationKeyTemplate": "workOrder:{workOrderId}"
+    },
+    {
+      "nodeId": "SKIP_SURVEY",
+      "nodeType": "SERVICE_TASK",
+      "name": "跳过勘测",
+      "stageCode": "SURVEY",
+      "taskType": "SKIP_SURVEY",
+      "slaRef": "platform.home-charging.task-elapsed"
+    },
+    {
+      "nodeId": "INSTALL_TASK",
+      "nodeType": "SERVICE_TASK",
+      "name": "上门安装",
+      "stageCode": "INSTALL",
+      "taskType": "FIELD_INSTALL",
+      "slaRef": "platform.home-charging.task-elapsed"
+    },
+    {
+      "nodeId": "WAIT_OEM_ACK",
+      "nodeType": "WAIT_EVENT",
+      "name": "等待车企确认",
+      "stageCode": "HANDOFF",
+      "waitEventType": "platform.oem.acknowledged",
+      "correlationKeyTemplate": "workOrder:{workOrderId}"
+    },
+    {
+      "nodeId": "END",
+      "nodeType": "END",
+      "name": "结束"
+    }
+  ],
+  "transitions": [
+    {
+      "transitionId": "t_start_intake",
+      "from": "START",
+      "to": "INTAKE_COORDINATE"
+    },
+    {
+      "transitionId": "t_intake_gw",
+      "from": "INTAKE_COORDINATE",
+      "to": "GW_NEED_SURVEY"
+    },
+    {
+      "transitionId": "t_gw_survey",
+      "from": "GW_NEED_SURVEY",
+      "to": "SURVEY_TASK",
+      "priority": 10,
+      "condition": {
+        "language": "SERVICEOS_EXPR_V1",
+        "source": "workOrder.serviceProductCode == \"HOME_CHARGING_SURVEY_INSTALL\""
+      }
+    },
+    {
+      "transitionId": "t_gw_skip",
+      "from": "GW_NEED_SURVEY",
+      "to": "SKIP_SURVEY",
+      "priority": 20,
+      "condition": {
+        "language": "SERVICEOS_EXPR_V1",
+        "source": "workOrder.serviceProductCode != \"HOME_CHARGING_SURVEY_INSTALL\""
+      }
+    },
+    {
+      "transitionId": "t_survey_wait",
+      "from": "SURVEY_TASK",
+      "to": "WAIT_SURVEY_CONFIRM"
+    },
+    {
+      "transitionId": "t_wait_install",
+      "from": "WAIT_SURVEY_CONFIRM",
+      "to": "INSTALL_TASK"
+    },
+    {
+      "transitionId": "t_skip_install",
+      "from": "SKIP_SURVEY",
+      "to": "INSTALL_TASK"
+    },
+    {
+      "transitionId": "t_install_oem_wait",
+      "from": "INSTALL_TASK",
+      "to": "WAIT_OEM_ACK"
+    },
+    {
+      "transitionId": "t_oem_end",
+      "from": "WAIT_OEM_ACK",
+      "to": "END"
+    }
+  ]
+}

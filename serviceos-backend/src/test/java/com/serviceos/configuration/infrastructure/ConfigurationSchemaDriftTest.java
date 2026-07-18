@@ -44,6 +44,21 @@ class ConfigurationSchemaDriftTest {
         assertThat(Files.mismatch(architectureSchema, runtimeSchema)).isEqualTo(-1L);
     }
 
+    @Test
+    void embeddedHomeChargingTemplateMatchesArchitectureSource() throws IOException {
+        Path repository = repositoryRoot();
+        for (String file : java.util.List.of("workflow.json", "sla.json")) {
+            Path architecture = repository.resolve(
+                    "serviceos-architecture/configuration/templates/home-charging-survey-install/" + file);
+            Path runtime = repository.resolve(
+                    "serviceos-backend/src/main/resources/configuration-templates/home-charging-survey-install/"
+                            + file);
+            assertThat(Files.mismatch(architecture, runtime))
+                    .as(file)
+                    .isEqualTo(-1L);
+        }
+    }
+
     private static Path repositoryRoot() {
         Path current = Path.of(System.getProperty("user.dir")).toAbsolutePath().normalize();
         if (Files.isDirectory(current.resolve("serviceos-architecture"))) {

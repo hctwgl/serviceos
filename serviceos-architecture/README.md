@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M270 WAIT_EVENT 运行时**，功能证据提交 `11482aee695f9d7e4a3dbe6f2608ca7973d9ed95`（合并入 `master` 后改为合并提交）。
+当前工程基线为 **M271 标准家充勘测安装配置模板**，功能证据提交 `11482aee695f9d7e4a3dbe6f2608ca7973d9ed95`（合并入 `master` 后改为合并提交）。
 此前 M267 Connector SPI 证据为 `994cb46f1e31ddc8a4364a776cc4849e766c3b6d`；M266 仍为上一
 master 合并基线 `088018a6eac180f7fe36536fae9d073fa797757c`。
 
@@ -686,6 +686,8 @@ master 合并基线 `088018a6eac180f7fe36536fae9d073fa797757c`。
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M271 实现文档](architecture/284-m271-home-charging-survey-install-template.md)
+- [M271 验收矩阵](testing/268-m271-home-charging-survey-install-template-acceptance.md)
 - [M270 实现文档](architecture/283-m270-wait-event-runtime.md)
 - [M270 验收矩阵](testing/267-m270-wait-event-runtime-acceptance.md)
 - [M269 实现文档](architecture/282-m269-exclusive-gateway-runtime.md)

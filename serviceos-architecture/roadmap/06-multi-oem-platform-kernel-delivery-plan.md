@@ -63,4 +63,5 @@ BYD 和 OEM2（REFERENCE 或真实）使用独立 Connector
 | 4（M268） | Implemented | workflow condition 对齐表达式、EXCLUSIVE_GATEWAY 静态校验、`281-m268-*` |
 | 5～6（M269） | Implemented | EXCLUSIVE_GATEWAY 运行时零/多命中失败关闭、`282-m269-*` |
 | 7（M270） | Implemented | WAIT_EVENT 挂起/幂等唤醒、`283-m270-*` |
-| 8～11 | 未开始 | 下一切片：标准家充安装模板（M271） |
+| 8（M271） | Implemented | 标准家充勘安模板、`284-m271-*` |
+| 9～11 | 未开始 | 下一切片：REFERENCE_OEM（M272） |

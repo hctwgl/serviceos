@@ -1,0 +1,15 @@
+{
+  "policyKey": "platform.home-charging.task-elapsed",
+  "version": "1.0.0",
+  "subjectType": "TASK",
+  "taskTypes": [
+    "ASSIGN_COORDINATORS",
+    "FIELD_SURVEY",
+    "SKIP_SURVEY",
+    "FIELD_INSTALL"
+  ],
+  "startEvent": "TASK_CREATED",
+  "stopEvent": "TASK_COMPLETED",
+  "clockMode": "ELAPSED",
+  "targetDurationSeconds": 86400
+}

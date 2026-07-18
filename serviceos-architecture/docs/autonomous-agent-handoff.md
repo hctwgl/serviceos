@@ -9,31 +9,18 @@ lastUpdated: 2026-07-18
 
 - 分支：`cursor/bc-71d073b6-2d93-418e-a750-0b73ee12db1c-0a6a`
 - PR：https://github.com/hctwgl/serviceos/pull/146
-- latestMilestone：**M270**（提交后回填 SHA）
+- latestMilestone：**M271**（提交后回填 SHA）
 
 ## 当前目标
 
-M270 已完成（待提交）。下一目标：**M271 标准家充安装模板**。
+M271 已完成（待提交）。下一目标：**M272 REFERENCE_OEM**。
 
-## 已完成内容
+## 已完成
 
-- M267 Connector SPI + BYD 入站
-- M268 Workflow condition 静态治理
-- M269 EXCLUSIVE_GATEWAY 运行时
-- M270 WAIT_EVENT 挂起/幂等唤醒（V101 + signal API + IT）
+M267 SPI → M268 配置治理 → M269 EXCLUSIVE_GATEWAY → M270 WAIT_EVENT → M271 标准家充模板
 
-## 未完成内容
+## 下一步
 
-标准安装模板、REFERENCE_OEM、双车企回归、第三家手册、Track F、签名真机
-
-## 已执行验证（M270）
-
-```text
-ConfigurationSchemaDriftTest / ConfigurationAssetSchemaValidatorTest / WorkflowDefinitionParserTest PASS
-WorkflowWaitEventPostgresIT / ExclusiveGateway / LinearProgression PASS
-```
-
-## 下一步具体入口
-
-1. 标准家充安装 Workflow/FORM/EVIDENCE/SLA Bundle 模板（可用 WAIT_EVENT/GATEWAY）
-2. `284-m271-*` / `268-m271-*`
+1. `integration.referenceoem` SAMPLE/REFERENCE 适配器实现 SPI
+2. 独立 Bundle + 标记 `TBD_EXTERNAL_CONTRACT`
+3. `285-m272-*` / `269-m272-*`

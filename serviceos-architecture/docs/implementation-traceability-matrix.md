@@ -365,3 +365,4 @@ Feature gate/authority: if applicable
 | M268 | 配置治理 MVP：Workflow condition 对齐 SERVICEOS_EXPR_V1 对象；EXCLUSIVE_GATEWAY 出边静态校验；schema 漂移门禁；线性运行时仍拒绝条件边 | workflow.schema + embedded workflow-v1 + ConfigurationAssetSchemaValidator + Parser + Publication/Workflow IT + `281-m268-*` + `265-m268-*` | 完整 Workflow JSON Schema 强制、审批 UI、回放/灰度 |
 | M269 | EXCLUSIVE_GATEWAY 运行时：冻结定义条件求值；唯一命中推进；零/多命中失败关闭；工单冻结表达式上下文 | Parser + TaskCompletedHandler + Gateway/Linear IT + `282-m269-*` + `266-m269-*` | PARALLEL、默认边、网关审计轨迹增强 |
 | M270 | WAIT_EVENT 运行时：挂起订阅、关联键模板、信号幂等唤醒并继续推进；Flyway V101 | schema + V101 + WaitSignalService + WaitEvent/Linear/Gateway IT + `283-m270-*` + `267-m270-*` | 定时器超时唤醒、全量外部事件自动 fan-in、PARALLEL |
+| M271 | 标准家充勘安平台模板：中立 WORKFLOW+SLA；EXCLUSIVE_GATEWAY+WAIT_EVENT；classpath 漂移门禁与发布冒烟 | template JSON + DriftTest + HomeChargingSurveyInstallTemplatePostgresIT + `284-m271-*` + `268-m271-*` | FORM/EVIDENCE 完整模板包、Admin 模板 UI、真实 OEM 回传 |
