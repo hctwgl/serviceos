@@ -1,0 +1,10 @@
+{
+  "policyKey": "platform.charger.maintenance.task-elapsed",
+  "version": "1.0.0",
+  "subjectType": "TASK",
+  "taskTypes": ["MAINT_INTAKE", "MAINT_ONSITE_REPAIR", "MAINT_UNDO_PARTS"],
+  "startEvent": "TASK_CREATED",
+  "stopEvent": "TASK_COMPLETED",
+  "clockMode": "ELAPSED",
+  "targetDurationSeconds": 86400
+}

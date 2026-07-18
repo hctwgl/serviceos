@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.dev/schema/dispatch/v1",
+  "title": "ServiceOS Dispatch Policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["policyKey", "version", "scope", "hardFilters", "scoring", "fallback"],
+  "properties": {
+    "policyKey": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]+$"},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["brandCodes", "businessTypes", "regionCodes"],
+      "properties": {
+        "brandCodes": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "businessTypes": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "regionCodes": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+      }
+    },
+    "hardFilters": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/filter"}
+    },
+    "scoring": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/scoreFactor"}
+    },
+    "capacity": {"$ref": "#/$defs/capacity"},
+    "allocationRatio": {"$ref": "#/$defs/ratio"},
+    "fallback": {"$ref": "#/$defs/fallback"},
+    "manualOverride": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean", "default": true},
+        "capability": {"type": "string"},
+        "reasonRequired": {"type": "boolean", "default": true},
+        "approvalRequiredForPolicyChange": {"type": "boolean", "default": true}
+      }
+    }
+  },
+  "$defs": {
+    "filter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["filterKey", "order", "expression", "failureCode"],
+      "properties": {
+        "filterKey": {"type": "string", "enum": ["BLACKLIST", "ENABLED", "BRAND_SCOPE", "REGION_SCOPE", "BUSINESS_CAPABILITY", "QUALIFICATION", "CAPACITY", "CUSTOM"]},
+        "order": {"type": "integer", "minimum": 1},
+        "expression": {"$ref": "#/$defs/expression"},
+        "failureCode": {"type": "string"},
+        "explainTemplate": {"type": "string"}
+      }
+    },
+    "scoreFactor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["factorKey", "weight", "expression"],
+      "properties": {
+        "factorKey": {"type": "string", "enum": ["REMAINING_CAPACITY", "FULFILLMENT_RATE", "NETWORK_SCORE", "ALLOCATION_RATIO_GAP", "CURRENT_LOAD", "CUSTOM"]},
+        "weight": {"type": "number", "minimum": -1000, "maximum": 1000},
+        "expression": {"$ref": "#/$defs/expression"},
+        "explainTemplate": {"type": "string"}
+      }
+    },
+    "capacity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {"type": "string", "enum": ["IN_PROGRESS", "DAILY", "WEEKLY", "MONTHLY", "COMPOSITE"], "default": "IN_PROGRESS"},
+        "limitByBusinessType": {"type": "boolean", "default": true},
+        "reservationRequired": {"type": "boolean", "default": true},
+        "reservationTtlSeconds": {"type": "integer", "minimum": 1, "default": 300}
+      }
+    },
+    "ratio": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean", "default": true},
+        "period": {"type": "string", "enum": ["MONTH"]},
+        "measure": {"type": "string", "enum": ["ORDER_COUNT", "AMOUNT", "WEIGHTED_VOLUME"]},
+        "qualityMayOverride": {"type": "boolean", "default": true}
+      }
+    },
+    "fallback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["onNoCandidate", "manualRole", "resolutionHours"],
+      "properties": {
+        "onNoCandidate": {"type": "string", "enum": ["MANUAL_INTERVENTION", "CROSS_REGION", "FALLBACK_NETWORK"]},
+        "manualRole": {"type": "string"},
+        "resolutionHours": {"type": "integer", "minimum": 1},
+        "preWarningMinutes": {"type": "integer", "minimum": 0}
+      }
+    },
+    "expression": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["language", "source"],
+      "properties": {
+        "language": {"type": "string", "enum": ["SERVICEOS_EXPR_V1"]},
+        "source": {"type": "string", "maxLength": 2000}
+      }
+    }
+  }
+}

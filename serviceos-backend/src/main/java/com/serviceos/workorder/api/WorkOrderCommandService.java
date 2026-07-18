@@ -6,4 +6,8 @@ public interface WorkOrderCommandService {
     WorkOrderActivationReceipt activate(ActivateWorkOrderCommand command);
 
     WorkOrderFulfillmentReceipt fulfill(FulfillWorkOrderCommand command);
+
+    WorkOrderCancellationReceipt cancel(CancelWorkOrderCommand command);
+
+    WorkOrderReopenReceipt reopen(ReopenWorkOrderCommand command);
 }

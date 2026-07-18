@@ -17,10 +17,15 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -34,6 +39,7 @@ final class JdbcConfigurationService implements ConfigurationService {
     private final JdbcClient jdbc;
     private final Clock clock;
     private final ConfigurationAssetSchemaValidator schemaValidator;
+    private final ObjectMapper definitionMapper = new ObjectMapper();
 
     @Autowired
     JdbcConfigurationService(JdbcClient jdbc, ConfigurationAssetSchemaValidator schemaValidator) {
@@ -185,6 +191,31 @@ final class JdbcConfigurationService implements ConfigurationService {
                     "project is missing, inactive, or outside its validity window");
         }
 
+        // M286/M288/M290：多槽位 CANARY 累计分流；preferCanary 取 primary 或首个槽位。
+        List<ChannelBundle> canaries = resolveActiveChannels(query, project.projectId(), "CANARY");
+        ChannelBundle stable = resolveActiveChannels(query, project.projectId(), "STABLE").stream()
+                .findFirst().orElse(null);
+        if (query.preferCanary() && !canaries.isEmpty()) {
+            ChannelBundle forced = canaries.stream()
+                    .filter(item -> "primary".equals(item.slotCode()))
+                    .findFirst()
+                    .orElse(canaries.getFirst());
+            return forced.reference();
+        }
+        ChannelBundle selectedCanary = selectCanaryByTraffic(query, canaries);
+        if (selectedCanary != null) {
+            return selectedCanary.reference();
+        }
+        if (stable != null) {
+            return stable.reference();
+        }
+        // M293：项目一旦进入通道激活模型，停用后不得回退到模糊 Bundle 扫描。
+        if (isChannelManagedProject(query.tenantId(), project.projectId())) {
+            throw new ConfigurationResolutionException(
+                    ConfigurationResolutionException.Reason.NO_MATCH,
+                    "project uses bundle channel activations but no ACTIVE STABLE/CANARY matches");
+        }
+
         List<ResolvedBundle> candidates = jdbc.sql("""
                 SELECT bundle_id, project_id, bundle_code, bundle_version, manifest_digest,
                        CASE WHEN province_code = :provinceCode THEN 1 ELSE 0 END AS region_rank
@@ -231,6 +262,91 @@ final class JdbcConfigurationService implements ConfigurationService {
         return preferred.getFirst().reference();
     }
 
+    private boolean isChannelManagedProject(String tenantId, UUID projectId) {
+        Integer count = jdbc.sql("""
+                        SELECT COUNT(1)
+                          FROM cfg_bundle_channel_activation
+                         WHERE tenant_id = :tenantId
+                           AND project_id = :projectId
+                        """)
+                .param("tenantId", tenantId)
+                .param("projectId", projectId)
+                .query(Integer.class)
+                .single();
+        return count != null && count > 0;
+    }
+
+    private List<ChannelBundle> resolveActiveChannels(
+            ResolveConfigurationBundleQuery query,
+            UUID projectId,
+            String channel
+    ) {
+        // 通道激活是项目级发布指针：命中后不再做 province/时间窗扫描，避免与兼容扫描的互斥生效窗冲突。
+        return jdbc.sql("""
+                        SELECT b.bundle_id, b.project_id, b.bundle_code, b.bundle_version, b.manifest_digest,
+                               a.traffic_percent, a.slot_code
+                          FROM cfg_bundle_channel_activation a
+                          JOIN cfg_configuration_bundle b
+                            ON b.tenant_id = a.tenant_id AND b.bundle_id = a.bundle_id
+                         WHERE a.tenant_id = :tenantId
+                           AND a.project_id = :projectId
+                           AND a.channel = :channel
+                           AND a.status = 'ACTIVE'
+                           AND b.status = 'PUBLISHED'
+                           AND b.brand_code = :brandCode
+                           AND b.service_product_code = :serviceProductCode
+                         ORDER BY a.slot_code
+                        """)
+                .param("tenantId", query.tenantId())
+                .param("projectId", projectId)
+                .param("channel", channel)
+                .param("brandCode", query.brandCode())
+                .param("serviceProductCode", query.serviceProductCode())
+                .query((rs, rowNum) -> new ChannelBundle(
+                        new ConfigurationBundleReference(
+                                rs.getObject("bundle_id", UUID.class),
+                                rs.getObject("project_id", UUID.class),
+                                rs.getString("bundle_code"),
+                                rs.getString("bundle_version"),
+                                rs.getString("manifest_digest")),
+                        rs.getInt("traffic_percent"),
+                        rs.getString("slot_code")))
+                .list();
+    }
+
+    private static ChannelBundle selectCanaryByTraffic(
+            ResolveConfigurationBundleQuery query,
+            List<ChannelBundle> canaries
+    ) {
+        if (canaries.isEmpty()) {
+            return null;
+        }
+        int total = canaries.stream().mapToInt(ChannelBundle::trafficPercent).sum();
+        if (total <= 0) {
+            return null;
+        }
+        String key = query.canaryRoutingKey() != null
+                ? query.canaryRoutingKey()
+                : String.join("|", query.tenantId(), query.projectCode(), query.brandCode(),
+                query.serviceProductCode(), query.provinceCode());
+        int bucket = Math.floorMod(Sha256.digest(key).hashCode(), 100);
+        int cursor = 0;
+        for (ChannelBundle canary : canaries) {
+            cursor += canary.trafficPercent();
+            if (bucket < cursor) {
+                return canary;
+            }
+        }
+        return null;
+    }
+
+    private record ChannelBundle(
+            ConfigurationBundleReference reference,
+            int trafficPercent,
+            String slotCode
+    ) {
+    }
+
     @Override
     @Transactional(readOnly = true)
     public ConfigurationAssetDefinition requireBundleAsset(
@@ -241,11 +357,42 @@ final class JdbcConfigurationService implements ConfigurationService {
     ) {
         List<ConfigurationAssetDefinition> assets = listBundleAssets(
                 tenantId, bundleId, expectedManifestDigest, assetType);
+        if (assets.isEmpty()) {
+            throw new ConfigurationResolutionException(
+                    ConfigurationResolutionException.Reason.NO_MATCH,
+                    "published configuration bundle must contain the required asset type");
+        }
+        if (assetType == ConfigurationAssetType.WORKFLOW && assets.size() > 1) {
+            // M277：Bundle 可含多个 WORKFLOW；根流程是未被任何 SUB_PROCESS 引用的那一个。
+            Set<String> referenced = new HashSet<>();
+            for (ConfigurationAssetDefinition asset : assets) {
+                try {
+                    JsonNode root = definitionMapper.readTree(asset.definitionJson());
+                    for (JsonNode node : root.path("nodes")) {
+                        if ("SUB_PROCESS".equals(node.path("nodeType").asText())
+                                && node.hasNonNull("subProcessRef")) {
+                            referenced.add(node.path("subProcessRef").asText());
+                        }
+                    }
+                } catch (Exception exception) {
+                    throw new ConfigurationResolutionException(
+                            ConfigurationResolutionException.Reason.NO_MATCH,
+                            "cannot inspect workflow definition for subprocess roots");
+                }
+            }
+            List<ConfigurationAssetDefinition> roots = assets.stream()
+                    .filter(asset -> !referenced.contains(asset.assetKey()))
+                    .toList();
+            if (roots.size() != 1) {
+                throw new ConfigurationResolutionException(
+                        ConfigurationResolutionException.Reason.AMBIGUOUS_MATCH,
+                        "published configuration bundle must contain exactly one root WORKFLOW");
+            }
+            return roots.getFirst();
+        }
         if (assets.size() != 1) {
             throw new ConfigurationResolutionException(
-                    assets.isEmpty()
-                            ? ConfigurationResolutionException.Reason.NO_MATCH
-                            : ConfigurationResolutionException.Reason.AMBIGUOUS_MATCH,
+                    ConfigurationResolutionException.Reason.AMBIGUOUS_MATCH,
                     "published configuration bundle must contain exactly one required asset type");
         }
         return assets.getFirst();

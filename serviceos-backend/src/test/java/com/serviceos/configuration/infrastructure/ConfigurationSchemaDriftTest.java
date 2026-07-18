@@ -33,6 +33,93 @@ class ConfigurationSchemaDriftTest {
         assertThat(Files.mismatch(architectureSchema, runtimeSchema)).isEqualTo(-1L);
     }
 
+    @Test
+    void embeddedWorkflowSchemaMatchesArchitectureSource() throws IOException {
+        Path repository = repositoryRoot();
+        Path architectureSchema = repository.resolve(
+                "serviceos-architecture/configuration/schemas/workflow.schema.json");
+        Path runtimeSchema = repository.resolve(
+                "serviceos-backend/src/main/resources/configuration-schemas/workflow-v1.schema.json");
+
+        assertThat(Files.mismatch(architectureSchema, runtimeSchema)).isEqualTo(-1L);
+    }
+
+    @Test
+    void embeddedRuleSchemaMatchesArchitectureSource() throws IOException {
+        Path repository = repositoryRoot();
+        Path architectureSchema = repository.resolve(
+                "serviceos-architecture/configuration/schemas/rule.schema.json");
+        Path runtimeSchema = repository.resolve(
+                "serviceos-backend/src/main/resources/configuration-schemas/rule-v1.schema.json");
+
+        assertThat(Files.mismatch(architectureSchema, runtimeSchema)).isEqualTo(-1L);
+    }
+
+    @Test
+    void embeddedDispatchSchemaMatchesArchitectureSource() throws IOException {
+        Path repository = repositoryRoot();
+        Path architectureSchema = repository.resolve(
+                "serviceos-architecture/configuration/schemas/dispatch.schema.json");
+        Path runtimeSchema = repository.resolve(
+                "serviceos-backend/src/main/resources/configuration-schemas/dispatch-v1.schema.json");
+
+        assertThat(Files.mismatch(architectureSchema, runtimeSchema)).isEqualTo(-1L);
+    }
+
+    @Test
+    void embeddedNotificationSchemaMatchesArchitectureSource() throws IOException {
+        assertSchemaSynced("notification.schema.json", "notification-v1.schema.json");
+    }
+
+    @Test
+    void embeddedAssigneePolicySchemaMatchesArchitectureSource() throws IOException {
+        assertSchemaSynced("assignee-policy.schema.json", "assignee-policy-v1.schema.json");
+    }
+
+    @Test
+    void embeddedIntegrationSchemaMatchesArchitectureSource() throws IOException {
+        assertSchemaSynced("integration.schema.json", "integration-v1.schema.json");
+    }
+
+    @Test
+    void embeddedPricingSchemaMatchesArchitectureSource() throws IOException {
+        assertSchemaSynced("pricing.schema.json", "pricing-v1.schema.json");
+    }
+
+    private void assertSchemaSynced(String architectureFile, String runtimeFile) throws IOException {
+        Path repository = repositoryRoot();
+        Path architectureSchema = repository.resolve(
+                "serviceos-architecture/configuration/schemas/" + architectureFile);
+        Path runtimeSchema = repository.resolve(
+                "serviceos-backend/src/main/resources/configuration-schemas/" + runtimeFile);
+        assertThat(Files.mismatch(architectureSchema, runtimeSchema)).isEqualTo(-1L);
+    }
+
+    @Test
+    void embeddedHomeChargingTemplateMatchesArchitectureSource() throws IOException {
+        assertTemplateSynced("home-charging-survey-install");
+    }
+
+    @Test
+    void embeddedChargerServiceTemplatesMatchArchitectureSource() throws IOException {
+        assertTemplateSynced("charger-maintenance");
+        assertTemplateSynced("charger-relocate");
+        assertTemplateSynced("charger-inspection");
+    }
+
+    private void assertTemplateSynced(String templateDir) throws IOException {
+        Path repository = repositoryRoot();
+        for (String file : java.util.List.of("workflow.json", "sla.json")) {
+            Path architecture = repository.resolve(
+                    "serviceos-architecture/configuration/templates/" + templateDir + "/" + file);
+            Path runtime = repository.resolve(
+                    "serviceos-backend/src/main/resources/configuration-templates/" + templateDir + "/" + file);
+            assertThat(Files.mismatch(architecture, runtime))
+                    .as(templateDir + "/" + file)
+                    .isEqualTo(-1L);
+        }
+    }
+
     private static Path repositoryRoot() {
         Path current = Path.of(System.getProperty("user.dir")).toAbsolutePath().normalize();
         if (Files.isDirectory(current.resolve("serviceos-architecture"))) {

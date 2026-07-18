@@ -3,6 +3,10 @@
  */
 @org.springframework.modulith.ApplicationModule(
         displayName = "Configuration",
-        allowedDependencies = "shared"
+        allowedDependencies = {
+                "shared",
+                "identity::api",
+                "authorization::api"
+        }
 )
 package com.serviceos.configuration;

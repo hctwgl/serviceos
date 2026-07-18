@@ -30,7 +30,8 @@ import java.util.UUID;
 @Service
 final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
     private static final String READ = "workOrder.read";
-    private static final Set<String> STATUSES = Set.of("RECEIVED", "ACTIVE", "FULFILLED");
+    private static final Set<String> STATUSES = Set.of(
+            "RECEIVED", "ACTIVE", "SUSPENDED", "FULFILLED", "CANCELLED", "CLOSED");
     private final WorkOrderQueryRepository queries;
     private final AuthorizationService authorization;
     private final ProjectScopeAuthorizationService projectScopes;

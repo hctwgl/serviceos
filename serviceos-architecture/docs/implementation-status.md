@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-18
-baselineCommit: 088018a6eac180f7fe36536fae9d073fa797757c
-latestMilestone: M266
+baselineCommit: 7b981191dd168c210484483d7443fea446e7ce73
+latestMilestone: M296
 ---
 
 # ServiceOS 实施状态总览
@@ -39,13 +39,13 @@ latestMilestone: M266
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M266 Technician 在线资料整改交付批次 |
-| 基线提交 | `088018a6eac180f7fe36536fae9d073fa797757c` |
+| 最新实施里程碑 | M296 配置历史回放 |
+| 基线提交 | `7b981191dd168c210484483d7443fea446e7ce73`（功能证据；合并入 `master` 后改为合并提交） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts`、`@serviceos/web-core`、`ServiceOSIOSCore`、独立且可部署的 `serviceos-network-web` 与 `serviceos-technician-web`、Swift 6 `TechnicianIOSFoundation`，以及已在 iPhone 17 Pro Simulator 安装启动、实跑 XCTest/XCUITest、形成 Production arm64 archive/dSYM，并接入当前任务、在线 Visit、冻结基础表单、前台 Evidence 采集上传、Snapshot/Task 完成与多轮资料整改的原生 `TechnicianIOS` SwiftUI App；由同一 Core OpenAPI 生成并经独立消费者门禁验证的 `@serviceos/core-client` 与 `ServiceOSCoreClient` |
 | 前端工程 | `serviceos-admin-web` 独立承载总部运营、统一用户中心、`/me` 导航、SavedView、UI Preference、受控搜索与最近访问；M256 后 Network 正式产品由独立 `serviceos-network-web` 承载，M257 后 Technician 正式产品由独立移动优先 `serviceos-technician-web` 承载，M262～M266 依次增加在线 Visit、冻结表单、Evidence 三段式上传、Snapshot/Task 完成与独立整改 Task 多轮补传/重新提交；Admin 仅保留可配置外链和 M188 诊断；两套独立 Web 均实际接入共享 Core、OIDC PKCE、服务端 Context/Capability/导航、Playwright 回归和独立容器镜像 |
-| 数据库 | PostgreSQL + Flyway（当前版本 100 / 102） |
-| 契约 | Core OpenAPI 1.0.26 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 project.created@v3、project.scope-relations-revised@v1、`task.handling-completed@v1`、recovered/resolved 与 SLA started/breached/met@v1） |
+| 数据库 | PostgreSQL + Flyway（当前版本 117 / 119） |
+| 契约 | Core OpenAPI 1.0.39 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 `workorder.cancelled@v1`、`workorder.reopened@v1`、project.created@v3、project.scope-relations-revised@v1、`task.handling-completed@v1`、recovered/resolved 与 SLA started/breached/met@v1） |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -144,10 +144,10 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | Consumer Identity | CustomerProfile、用户资源关系和 C 端身份 | `ACCEPTED` | Principal/IdentityLink/API Schema 已预留 Consumer Persona | 身份治理序列之后的独立 Epic；待登录、隐私、客户主数据与注销策略确认；不得宣称已实现 | 后续正式 Epic |
 | 项目治理 | Project 核心事实、范围关系与授权目录 | `PARTIAL` | 项目创建；REGION/NETWORK 当前关系整组修订和不可变历史；`project.read` 授权目录、详情及历史查询 | owners、品牌/服务产品/配置绑定、生命周期、计划修订审批、目录治理 UI | M8、M64～M67 |
 | 可靠消息 | Inbox、Outbox、Worker claim/lease/retry | `IMPLEMENTED` | 本地可靠发布消费、恢复和人工接管基础 | 正式 Broker 和跨服务运行 | M9～M10 |
-| 配置中心 | 不可变配置资产、Bundle 发布和版本锁定 | `PARTIAL` | FORM、EVIDENCE、SLA v1 资产发布基础；工单/任务冻结引用；SERVICEOS_EXPR_V1 布尔/类型比较子集；FORM/EVIDENCE 字段及 WORKFLOW/SLA 依赖闭包 | 决策表/公式/脚本、完整审批和通用依赖图 | M16、M33、M36、M52～M53、M61 |
-| 外部接入 | BYD CPIM V7.3.1 入站、提审与审核回调 | `PARTIAL` | 协议日期验签、防重放、私有原文、Envelope/Canonical、工单创建；显式审核路由与逐订单回调；不可变 OutboundDelivery/Attempt/Acknowledgement、Task 可靠执行、UNKNOWN 人工接管与授权人工重发；重发严格 ACK 后发布恢复事实；交付创建/确认/恢复/重发请求与异常确认已并入工单时间线；授权跨项目外发交付队列与入站 Envelope 队列 | 其他 CPIM 消息、人工标记已送达/放弃、通用 Connector、生产凭据/对象存储和真实 sandbox、null-project 入站可见性 | M16、M56～M60、M77～M79、M99、M158 |
+| 配置中心 | 不可变配置资产、Bundle 发布、设计器与灰度通道 | `PARTIAL` | M282～M295 + **M296** 冻结 Bundle 历史回放（OpenAPI 1.0.39）；十大资产设计器 + 校验/依赖/模拟/回放/Diff/审批/灰度/发布/停用/回滚齐备 | 条件积木、指标驱动晋级、资产运行时引擎 | M16、M33、M36、M52～M53、M61、M268、M271、M281～M296 |
+| 外部接入 | BYD CPIM + REFERENCE_OEM SAMPLE | `PARTIAL` | BYD 入站/提审/回调切片；**M267** 通用 SPI 管道；**M272** REFERENCE_OEM SAMPLE 独立 Connector（明确 REFERENCE/SAMPLE/TBD_EXTERNAL_CONTRACT） | 真实第二家协议/Sandbox（BLOCKED_EXTERNAL）、回调/出站全面 SPI、人工标记已送达/放弃、生产凭据/对象存储 | M16、M56～M60、M77～M79、M99、M158、M267、M272、M273 |
 | 工单 | WorkOrder 接收、激活、履约完成与授权工作区投影 | `PARTIAL` | 权威工单、工作流启动、跨阶段和 END 完结；授权目录、非 PII 详情、Stage/Task 执行骨架及核心执行+现场履约时间线 | 完整取消、暂停、恢复、客户敏感详情审计、跨域完整时间线/动作与全部业务分支 | M16～M19、M68～M69、M73～M74 |
-| 工作流 | 线性 Stage/Task 运行时 | `PARTIAL` | 精确版本启动、线性推进、唯一跨阶段推进、完成事件；节点 `slaRef` 传递；授权 Workflow/Stage 当前投影 | 并行/汇聚网关、流程条件表达式、Node/Attempt 历史和复杂流程语义 | M17～M19、M61、M69 |
+| 工作流 | 线性 + 网关 + WAIT/TIMER + SUB_PROCESS + 多实例 + 取消/重开/跳转/补偿 + 标准模板 | `PARTIAL` | 上项 + **M281** 维修/移机/巡检标准模板（含家充勘安） | HTTP 命令面、表单/资料完整模板包、设计器 | M17～M19、M61、M69、M268～M271、M275～M281 |
 | 人工任务与执行历史 | claim/start/complete、责任、执行保护与授权任务读取 | `IMPLEMENTED` | 人工命令、候选领取、唯一责任、release/reclaim、执行保护；表单/资料完成门禁；授权队列/详情、allowed-actions、自动 Attempt 历史及工单内核心 Task 生命周期与指派/Guard/人工接管时间线 | block/retry/cancel 等其他动作、Workflow Node 历史、跨工单/跨域完整历史和 Review 完成条件 | M20～M23、M35、M41、M43、M69～M73、M81 |
 | 应用只读投影 | 工作区、队列、时间线和投影运行时 | `PARTIAL` | 独立 readmodel 模块；核心执行、现场履约、SLA、资料/审核/整改（含外部回执与条件 KEEP/INVALIDATE 处置）、外发交付全链路、异常确认/闭环、ServiceAssignment 与 Task 指派/Guard/人工接管 Inbox 投影；授权时间线与稳定分页及最近活动摘要；时间线 checkpoint/dead letter/generation 重建与 FRESH/LAGGING/UNKNOWN/REBUILDING freshness；definition 登记、dead letter 幂等重放与旧/孤儿 generation 清理；工单工作区顶层实时组合、当前 ACTIVE 服务责任摘要与 TASKS/TIMELINE_AUDIT/APPOINTMENTS_VISITS（含联系尝试）/FORMS_EVIDENCE（含提交与资料项安全元数据）/REVIEWS_CORRECTIONS（含 CLIENT/重开血缘）/INTEGRATION 按需区块（敏感字段最小化；缺权次级区块降级）；授权跨项目 ReviewCase/CorrectionCase/OutboundDelivery/InboundEnvelope 专项队列；Admin 个人 SavedView（M189）、UI Preference（M190）、共享 SavedView（M191）、受控全局搜索 fan-in（M192）与最近访问（M193）；Network Portal 只读 fan-in（M194）；Technician Portal Feed fan-in（M195） | 试算合并、revision/slots 技术噪声、表单值与资料版本详情、FACTS_CALCULATIONS、完整事件 taxonomy/过滤、通用 work-queues、共享偏好、`search_document` 索引平台、多投影平台、Broker offset、离线工作包、Admin 重建/重放 HTTP | M73～M99、M158、M189～M195 |
 | 服务分配 | 网点分配、容量、改派 Saga、超时恢复 | `IMPLEMENTED` | ServiceAssignment、容量权威、改派、终止、对账和自动恢复 | 完整策略评分、全部异常分支和 UI | M24～M28 |
@@ -162,7 +162,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | 通知 | 通知与运营异常中心 | `PROPOSED` | 已有总体设计 | 通知通道、模板、可靠发送和 UI | `architecture/14-*` |
 | 履约事实与试算 | 事实提取和双向试算 | `PROPOSED` | 已有设计、API 和数据规划 | 运行时、投影和前端工作区 | M5 设计 |
 | 对账结算 | 对账、结算、争议与调整 | `PROPOSED` | 已有边界设计 | 正式运行时和页面 | `architecture/16-*` |
-| Admin Portal | 总部运营后台 | `PARTIAL` | M101～M182：队列/任务/SLA/异常/入站/外发/工单/项目目录、工作区、allowed-actions；CI 阻断构建；开发态 Keycloak PKCE；真实只读与写链路 PR 阻断 E2E；M187～M188 用户中心与 `/me` 导航；**M189 个人 SavedView**；**M190 UI Preferences**；**M191 共享 SavedView**；**M192 受控全局搜索**；**M193 最近访问** | 设计系统、共享偏好、正式企业 OIDC/BFF、生产对象存储/专业扫描、评分/硬过滤派单与 ServiceNetwork 生命周期 | M7 设计、M101～M182、M187～M193、Admin 试点基线 |
+| Admin Portal | 总部运营后台 | `PARTIAL` | **M284/M287/M289/M291/M292/M294/M295/M296** 配置设计器壳、拖拽画布、建边/条件、依赖报告、干跑/历史回放、全资产类型；M101～M182：队列/任务/SLA/异常/入站/外发/工单/项目目录、工作区、allowed-actions；CI 阻断构建；开发态 Keycloak PKCE；真实只读与写链路 PR 阻断 E2E；M187～M188 用户中心与 `/me` 导航；**M189 个人 SavedView**；**M190 UI Preferences**；**M191 共享 SavedView**；**M192 受控全局搜索**；**M193 最近访问** | 条件积木 UI、设计系统、正式企业 OIDC/BFF | M7 设计、M101～M182、M187～M193、M284、M287、M289、M291、M292、M294、M295、M296、Admin 试点基线 |
 | Network Portal | 网点协作端 | `PARTIAL` | M194～M242 已交付 workbench、工单/任务、限定工作区、师傅关系/资质、产能、整改和运营异常等受控读写切片；M256 将全部正式产品页迁入独立 `serviceos-network-web`，接入 OIDC PKCE、`/me` NETWORK 上下文、Capability/服务端导航、跨网点失败关闭、76 项 Playwright 回归与独立容器镜像；Admin 不再承载正式 `/network-portal/*` 路由 | 槽位策略表、完整 product/03 设计系统、评分/容量策略引擎、Portal ACK/resolve/decide、产能申请、notifications/消息页、生产 IdP 与集群发布 | M7 设计、M194～M242、M255～M256 |
 | Technician App / Portal | 师傅移动端与 Feed | `PARTIAL` | M195/M218/M219/M243～M246 只读安全切片；M257 独立 H5；M258～M261 iOS 基础；M262 在线 Visit；M263 冻结基础表单；M264 Evidence 采集上传；M265 Snapshot 与 Task 完成；M266 在线整改 | 联系/预约、完整表单草稿、真实 operationRefs 签退；弱网/后台/Track F 离线；签名真机/真实 IdP/VoiceOver/崩溃采集/TestFlight | M7 设计、M195、M218～M219、M243～M246、M257～M266 |
 | External Portal | 用户/车企受控页面 | `PROPOSED` | 最小边界规划 | 二期页面和工程实现 | M7 设计 |
@@ -175,56 +175,18 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M266**。身份治理 M183～M188、Admin 个人/共享 SavedView、Admin UI
-Preference、受控全局搜索、最近访问、Network Portal 只读查询、Technician Portal Feed、Network Portal
-指派/改派师傅、预约协作/改约取消/爽约与联系尝试、资料代补 onBehalf、整改队列只读、运营异常队列只读、
-师傅关系与资质提交、本网点资质只读列表、师傅关系只读列表（含 terminate version）、工作台能力门控
-enrichment 计数、Network Portal 产能页（`NETWORK.CAPACITY`）、整改详情只读 UI、运营异常详情只读 UI、资质详情只读 UI、师傅关系详情只读 UI、限定工单工作区（`NETWORK.WORKORDER.WORKSPACE`）、工作区协作队列深链/水合、预约/联系 fan-in、当前师傅 fan-in、目录页师傅 fan-in/工作台基数深链、Technician Portal Feed Accepted 字段展示、TECHNICIAN.ME 页壳、Network Portal 队列/列表 Accepted 字段展示、工作区薄 SLA 摘要（`slaSummary`）、工作区 Visit/表单提交摘要（`visits`/`formSubmissions`）、工作区 Evidence 槽位/资料项摘要（`evidenceSlots`/`evidenceItems`）、工作台薄 SLA 风险计数（workbench `slaSummary`）、工作区整改摘要（`corrections`）、工作区运营异常摘要（`exceptions`）、工作区预约/联系服务端摘要（`appointments`/`contactAttempts`）、工作区当前师傅服务端摘要（`technicians`）、工作区审核案例服务端摘要（`reviews`）、目录页师傅服务端摘要（work-orders/tasks `technicians`）、目录页预约服务端摘要（work-orders/tasks `appointments`）、目录页联系尝试服务端摘要（work-orders/tasks `contactAttempts`）、目录页资料整改服务端摘要（work-orders/tasks `corrections`）、目录页 SLA 风险服务端摘要（work-orders/tasks `slaRiskSummaries`）、目录页资料 Evidence 服务端摘要（work-orders/tasks `evidenceSlots`/`evidenceItems`）、目录页工单头字段（服务产品/区域/`receivedAt`）、工作台统计时间展示（页级 `asOf` + 容量行 `updatedAt`）、预约/联系历史 Accepted 字段展示（操作者/渠道）、工作区 Visit/表单/Evidence Accepted 字段展示、工作区协作摘要 Accepted 字段展示、预约/联系历史残余 Accepted 字段展示、整改详情残余 Accepted 字段展示与 Technician 当前责任任务在线详情已交付。product/03
-M244～M246 已补齐 Technician 当前详情的联系、Visit 与表单提交安全摘要；M247 已完成多端 Track A 的
-TypeScript OpenAPI Client 可复现、可编译、可打包和独立消费基础；M248 已完成同源 Swift 6 Client
-可复现、严格编译和独立消费基础；M249 已完成 Web/Swift 单源 Design Token 生成基础；M250 已完成
-无角色 Web auth/context/error/trace 共享包；M251 已完成对称 iOS Core 协议、请求与诊断基础；M252 已完成
-Page/Feature/Action 单源机器注册、Web/Swift 生成与未知动作失败关闭基础；M253 已完成 Web/iOS 客户端
-元数据发送、OpenAPI 约定与服务端低基数 MDC/Trace 观测；M254 已用 9 项独立消费者/兼容门禁闭合
-Track A 仓库内工程基础；M255 已建立独立 Network Web AppShell，M256 已完成 Track B：真实导入
-`@serviceos/web-core`，接入 OIDC PKCE、`/me` NETWORK Context、Capability 与服务端导航，将 M194～M242
-正式页面和回归测试从 Admin 迁入独立 Network Web，并交付可运行容器镜像；M257 已闭合 Track C 独立
-Technician H5 迁移边界，迁入 Feed/Schedule/Sync/Me/Task Detail、8 条移动端 E2E 和独立容器，并退役
-Admin 正式 Technician 路由；M258 已交付 iOS 仓库内安全 Foundation；M259 已使用完整 Xcode 交付原生
-SwiftUI App、五环境工程、generic Simulator/iPhoneOS 构建和测试 bundle；M260 已在 iPhone 17 Pro
-Simulator 完成安装启动、3 项 App XCTest 和 1 项 Accessibility XXXL XCUITest；M261 已交付 AppIcon、
-PrivacyInfo、Production arm64 archive/dSYM 和真实发布失败关闭入口；M262 已开始 Track E，交付 H5/iOS 当前
-任务上的在线定位签到与无法施工中断，并以 Technician Context、当前责任和 Capability 双重失败关闭；M263
-已交付冻结 FormVersion 基础字段的 H5/iOS 在线渲染和不可变提交，不支持的条件/选项/高级控件失败关闭，
-页面内存输入不冒充草稿；M264 已交付 H5/iOS 当前责任任务的安全 Evidence Slot/Item、SHA-256、Begin、
-无凭证 PUT 和 Finalize，STORED 不冒充扫描完成，iOS 相机/相册/文件均不建立后台或离线队列；M265 已交付
-TASK_SUBMISSION Snapshot，并由服务端重读 FormSubmission/Snapshot 生成规范引用、摘要和双输入版本后完成 Task；
-M266 已交付独立 `evidence.correction` Task 的 H5/iOS 领取、开始、资料补传、Snapshot 与多轮 resubmit，源 Task
-保持 COMPLETED，只有 reviewer close 才完成整改 Task。
-由于 ADR-082 尚无权威联系人引用，联系/预约写未实施；由于尚无 Accepted FieldOperation operationRef 映射，
-客户端签退仍未开放。当前机器没有有效 Apple 签名身份或物理 iPhone，因此下一优先级进入 Track F 离线工作包、命令队列、同步、冲突与恢复；operationRef 映射需先完成事实源接受。Track D/G 外部证据仍必须补齐开发团队签名真机、真实 IdP、VoiceOver 人工听读、崩溃
-采集与 TestFlight；不能用 Simulator 本地签名或无签名 archive 替代。Network 独立页壳剩余主要是
-`NETWORK.NOTIFICATION`（notifications 仍 deferred）。
-目录「用户脱敏」属 PII 边界；Accepted NP 目录非 PII 默认列、工作台「统计时间」、预约/联系历史
-（操作者/渠道/范围/动作）、工作区现场/协作摘要与整改详情残余字段 MVP 已闭合。
-没有实现 `search_document` 索引平台、VEHICLE/CHARGER 搜索、共享 UI Preference、notifications、
-Consumer Identity、正式 HR Connector、ORGANIZATION DataScope、槽位 allowOnBehalf 配置表、Portal
-ACK/resolve/decide、产能申请或离线工作包；其余仍属需另接受契约后的 deferred invent 项。
+ServiceOS 可靠纵向切片已推进到 **M296**。阶段一已闭合；复杂流程运行时已覆盖 EXCLUSIVE、PARALLEL、
+WAIT_EVENT、TIMER、SUB_PROCESS、多实例、取消/重开/跳转，取消时配置化补偿任务（Flyway V109），标准模板族，十大配置资产类型设计器，Admin 设计器壳，Diff/审批门禁，Bundle 灰度/回滚/停用，Workflow 拖拽画布，百分比流量灰度，画布建边/条件编辑，多槽位 CANARY 与满量自动晋级（Flyway V117），WORKFLOW 配置依赖分析，干跑模拟，**冻结 Bundle 历史回放**，通道停用失败关闭（OpenAPI 1.0.39）。
+
+下一主线：Track F/G（iOS 离线/生产就绪，外部阻塞项）。
+真实 OEM2/3 与签名真机仍为 `BLOCKED_EXTERNAL`。
 
 ```text
-已接受推进顺序（以 roadmap/05 与程序级验收矩阵为准）：
-1. 完成 Track A：Swift Client、设计 Token、Web/iOS auth/context/error/trace、稳定 Page/Feature/Action ID 与客户端兼容元数据；
-2. Track B/C：独立 Network Web 与 Technician H5，不再把 Admin 内嵌路由当正式产品；
-3. Track D：Technician iOS 工程、环境、Keychain、网络与安全基础；
-4. Track E：联系/预约 → Visit → 动态表单 → Evidence → 提交/整改在线闭环；
-5. Track F：iOS 离线工作包、队列、同步、冲突与恢复；
-6. Track G：多端并行试点、可观测性、安全与生产就绪。
-
-notifications / Portal ACK、Consumer Identity、BUSINESS 日历增强、自动派单评分与 FieldOperation 详情仍需按各自
-Accepted 事实源或另行接受契约推进，不混入多端基础里程碑。
+已接受推进顺序：
+1. Track F/G 与真实 OEM 外部证据（BLOCKED_EXTERNAL 项如实登记）。
 ```
 
-接手 Agent 必须先检查仓库是否已有更新的里程碑文档、ADR 或提交；在收到明确批准前不得猜测业务策略并实现上述候选项。
+接手 Agent 必须先读取 `docs/autonomous-agent-handoff.md` 与本文件，验证 HEAD 后从断点继续。
 
 ## 6. 证据阅读方法
 

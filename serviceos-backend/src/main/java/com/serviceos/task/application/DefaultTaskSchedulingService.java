@@ -2,6 +2,7 @@ package com.serviceos.task.application;
 
 import com.serviceos.task.api.ScheduleAutomatedTaskCommand;
 import com.serviceos.task.api.CancelHandlingTaskCommand;
+import com.serviceos.task.api.CancelOpenWorkflowTasksCommand;
 import com.serviceos.task.api.CreateHandlingTaskCommand;
 import com.serviceos.task.api.HandlingTaskCancellationReceipt;
 import com.serviceos.task.api.CompleteHandlingTaskCommand;
@@ -137,6 +138,13 @@ final class DefaultTaskSchedulingService implements TaskSchedulingService {
             throw new IllegalArgumentException("invalid workflow task priority or maxAttempts");
         }
         return store.createWorkflowTask(command);
+    }
+
+    @Override
+    @Transactional
+    public int cancelOpenTasksForWorkflows(CancelOpenWorkflowTasksCommand command) {
+        Objects.requireNonNull(command, "command must not be null");
+        return store.cancelOpenTasksForWorkflows(command);
     }
 
     private static void requireText(String value, String field) {

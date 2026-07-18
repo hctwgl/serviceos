@@ -1,0 +1,74 @@
+{
+  "workflowKey": "platform.charger.inspection",
+  "semanticVersion": "1.0.0",
+  "name": "标准充电桩巡检",
+  "startNodeId": "START",
+  "nodes": [
+    {"nodeId": "START", "nodeType": "START", "name": "开始"},
+    {
+      "nodeId": "SCHEDULE",
+      "nodeType": "SERVICE_TASK",
+      "name": "巡检排程",
+      "stageCode": "SCHEDULE",
+      "taskType": "INSPECT_SCHEDULE",
+      "slaRef": "platform.charger.inspection.task-elapsed"
+    },
+    {
+      "nodeId": "ONSITE_INSPECT",
+      "nodeType": "SERVICE_TASK",
+      "name": "现场巡检",
+      "stageCode": "INSPECT",
+      "taskType": "INSPECT_ONSITE",
+      "slaRef": "platform.charger.inspection.task-elapsed"
+    },
+    {
+      "nodeId": "GW_NEED_FOLLOWUP",
+      "nodeType": "EXCLUSIVE_GATEWAY",
+      "name": "是否需要跟进维修"
+    },
+    {
+      "nodeId": "OPEN_MAINT_HANDOFF",
+      "nodeType": "SERVICE_TASK",
+      "name": "转维修交接",
+      "stageCode": "HANDOFF",
+      "taskType": "INSPECT_OPEN_MAINT",
+      "slaRef": "platform.charger.inspection.task-elapsed"
+    },
+    {
+      "nodeId": "CLOSE_CLEAN",
+      "nodeType": "SERVICE_TASK",
+      "name": "无异常结案",
+      "stageCode": "CLOSE",
+      "taskType": "INSPECT_CLOSE",
+      "slaRef": "platform.charger.inspection.task-elapsed"
+    },
+    {"nodeId": "END", "nodeType": "END", "name": "结束"}
+  ],
+  "transitions": [
+    {"transitionId": "t1", "from": "START", "to": "SCHEDULE"},
+    {"transitionId": "t2", "from": "SCHEDULE", "to": "ONSITE_INSPECT"},
+    {"transitionId": "t3", "from": "ONSITE_INSPECT", "to": "GW_NEED_FOLLOWUP"},
+    {
+      "transitionId": "t4",
+      "from": "GW_NEED_FOLLOWUP",
+      "to": "OPEN_MAINT_HANDOFF",
+      "priority": 10,
+      "condition": {
+        "language": "SERVICEOS_EXPR_V1",
+        "source": "workOrder.serviceProductCode == \"CHARGER_INSPECTION\""
+      }
+    },
+    {
+      "transitionId": "t5",
+      "from": "GW_NEED_FOLLOWUP",
+      "to": "CLOSE_CLEAN",
+      "priority": 20,
+      "condition": {
+        "language": "SERVICEOS_EXPR_V1",
+        "source": "workOrder.serviceProductCode != \"CHARGER_INSPECTION\""
+      }
+    },
+    {"transitionId": "t6", "from": "OPEN_MAINT_HANDOFF", "to": "END"},
+    {"transitionId": "t7", "from": "CLOSE_CLEAN", "to": "END"}
+  ]
+}

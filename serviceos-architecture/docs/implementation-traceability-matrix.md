@@ -361,3 +361,33 @@ Feature gate/authority: if applicable
 | M264 | Track E 在线资料上传批次：当前责任双重校验；安全 Slot/Item；H5 与 iOS SHA-256/Begin/无凭证 PUT/Finalize；可信采集字段服务端生成；状态不冒充扫描完成 | Core OpenAPI 1.0.24 + Evidence PostgreSQL/MVC/ArchitectureTest + H5 12 Playwright + iOS Foundation/App/Distribution + contract/client gates + `277-m264-*` + `261-m264-*` | 真机采集、弱网/断点/后台/离线、生产对象存储/扫描；EvidenceSetSnapshot、真实签退/整改未实现 |
 | M265 | Track E 资料提交批次：Technician 只提交权威 Revision/Snapshot/FormSubmission ID；服务端冻结 TASK_SUBMISSION Snapshot 并重建规范引用、摘要和双输入版本后完成 Task | Core OpenAPI 1.0.25 + Snapshot/DualInput PostgreSQL IT + MVC/ArchitectureTest + H5 13 Playwright + iOS Foundation/App + contract/client gates + `278-m265-*` + `262-m265-*` | 真实 FieldOperation operationRefs/check-out、在线整改、完整表单草稿、弱网/后台/离线与真机未实现 |
 | M266 | Track E 在线整改批次：源 Task 保持 COMPLETED；独立 correction Task 承载多轮上传/Snapshot/resubmit；历史责任精确回派；reviewer close 才权威完成整改 Task | Core OpenAPI 1.0.26 + `task.handling-completed@v1` + Correction PostgreSQL IT + MVC/ArchitectureTest + H5/iOS + contract/client gates + `279-m266-*` + `263-m266-*` | 审核人移动端、自动目标、多候选/转派、通知、完整表单草稿、真实签退、弱网/后台/离线与真机未实现 |
+| M267 | 多车企内核起点：程序验收标准 + ADR-085 通用 Connector SPI + `InboundCreateWorkOrderPipeline`；BYD CREATE_WORK_ORDER 入站委托管道；核心域禁止依赖 OEM 适配包 | ADR-085 + `integration.spi` + BYD 入站 PostgreSQL IT + ArchitectureTest 防污染 + 无 OpenAPI/Flyway 变更 + `280-m267-*` + `264-m267-*` | 回调/出站全面 SPI、条件网关运行时、REFERENCE_OEM、双车企 E2E、第三家手册 |
+| M268 | 配置治理 MVP：Workflow condition 对齐 SERVICEOS_EXPR_V1 对象；EXCLUSIVE_GATEWAY 出边静态校验；schema 漂移门禁；线性运行时仍拒绝条件边 | workflow.schema + embedded workflow-v1 + ConfigurationAssetSchemaValidator + Parser + Publication/Workflow IT + `281-m268-*` + `265-m268-*` | 完整 Workflow JSON Schema 强制、审批 UI、回放/灰度 |
+| M269 | EXCLUSIVE_GATEWAY 运行时：冻结定义条件求值；唯一命中推进；零/多命中失败关闭；工单冻结表达式上下文 | Parser + TaskCompletedHandler + Gateway/Linear IT + `282-m269-*` + `266-m269-*` | PARALLEL、默认边、网关审计轨迹增强 |
+| M270 | WAIT_EVENT 运行时：挂起订阅、关联键模板、信号幂等唤醒并继续推进；Flyway V101 | schema + V101 + WaitSignalService + WaitEvent/Linear/Gateway IT + `283-m270-*` + `267-m270-*` | 定时器超时唤醒、全量外部事件自动 fan-in、PARALLEL |
+| M271 | 标准家充勘安平台模板：中立 WORKFLOW+SLA；EXCLUSIVE_GATEWAY+WAIT_EVENT；classpath 漂移门禁与发布冒烟 | template JSON + DriftTest + HomeChargingSurveyInstallTemplatePostgresIT + `284-m271-*` + `268-m271-*` | FORM/EVIDENCE 完整模板包、Admin 模板 UI、真实 OEM 回传 |
+| M272 | REFERENCE_OEM SAMPLE Connector：独立适配器经通用 SPI 建单；SAMPLE HMAC；明确 TBD_EXTERNAL_CONTRACT | referenceoem + Security permitAll + ReferenceOemInboundOrderPostgresIT + ArchitectureTest + `285-m272-*` + `269-m272-*` | 真实第二家协议/Sandbox、出站/回调 |
+| M273 | 双车企入站回归：BYD + REFERENCE_OEM 独立 Connector/Bundle；冲突失败关闭 | DualOemInboundRegressionPostgresIT + `286-m273-*` + `270-m273-*` | 双车企提审/回调全矩阵、真实 OEM2 |
+| M274 | 第三家车企接入手册：Connector+Mapping+Bundle 标准路径 | `integration/04-third-oem-onboarding-handbook.md` + `287-m274-*` + `271-m274-*` | 真实 OEM3 接入 |
+| M275 | PARALLEL_GATEWAY fork/join：多分支激活、汇聚计数、重复 token 失败关闭；Flyway V102 | Parser + Handler + ParallelGateway/Linear IT + Validator + `288-m275-*` + `272-m275-*` | 子流程、多实例、包容网关 |
+| M276 | TIMER 到期捕获：durationSeconds 挂起、worker claim/lease 点火推进；Flyway V103 | schema + V103 + TimerWorker + Timer IT + `289-m276-*` + `273-m276-*` | 边界定时器、业务日历、超时转人工 UI |
+| M277 | SUB_PROCESS：Bundle 内 subProcessRef 启动子实例；子 END 恢复父节点；仅根 fulfill；Flyway V104 | schema + V104 + Handler + SubProcess/Linear IT + `290-m277-*` + `274-m277-*` | 嵌套取消传播 |
+| M278 | 多实例任务：multiInstance.cardinality 并行创建 N 实例；slot 到齐后推进；Flyway V105 | schema + V105 + Handler + MultiInstance IT + `291-m278-*` + `275-m278-*` | 集合驱动 cardinality、顺序多实例、多实例子流程 |
+| M279 | 工单取消级联、授权重开新建 ROOT、人工跳转到任务节点；Flyway V106～V108；事件 cancelled/reopened@v1 | Command + Cancel/Reopen Handlers + JumpService + CancelReopenJump IT + `292-m279-*` + `276-m279-*` | HTTP 命令面、FULFILLED 纠错重开、跳转网关/等待、异常补偿 |
+| M280 | 取消时配置化补偿：节点 `compensation.taskType`；COMPLETED 节点生成补偿请求与任务；Flyway V109 | schema + Validator + CancelledHandler + Compensation IT + `293-m280-*` + `277-m280-*` | 补偿完成回写、失败重试、边界事件、补偿编排图 |
+| M281 | 标准维修/移机/巡检配置模板（平台中立）+ 架构/运行时同步 + 发布冒烟 | templates + Drift + StandardChargerServiceTemplates IT + `294-m281-*` + `278-m281-*` | 表单/资料完整包、设计器、真实 OEM Bundle 绑定 |
+| M282 | Workflow 配置设计器草稿→校验→发布 API；Flyway V110～V111；OpenAPI 1.0.28 | DraftService + Controller + Designer IT + ArchitectureTest + `295-m282-*` + `279-m282-*` | 可视化画布、FORM/EVIDENCE/SLA 设计器、Diff/审批/灰度 |
+| M283 | FORM/EVIDENCE/SLA 纳入同一设计器 API；OpenAPI 1.0.29 | DraftService 类型扩展 + FormEvidenceSlaDesigner IT + `296-m283-*` + `280-m283-*` | Admin 画布、Diff/审批/灰度、其余资产类型 |
+| M284 | Admin 配置设计器壳：Page Registry v17、JSON 编辑、WORKFLOW 结构预览 | Admin Vue + PortalContext IT + build + Playwright + `297-m284-*` + `281-m284-*` | 拖拽画布、Diff/审批/灰度 |
+| M285 | 草稿 Diff + APPROVED 审批门禁；发布仅 APPROVED；OpenAPI 1.0.30；Flyway V112～V113 | DraftService + Controller + DiffApproval IT + Admin UI + `298-m285-*` + `282-m285-*` | 拖拽画布、灰度/回滚、多级审批 |
+| M286 | Bundle STABLE/CANARY 通道激活、晋级与回滚；resolve preferCanary；OpenAPI 1.0.31；Flyway V114～V115 | ActivationService + Controller + CanaryRollback IT + `299-m286-*` + `283-m286-*` | 百分比流量灰度、拖拽画布 |
+| M287 | Admin Workflow 可视化拖拽画布；布局 metadata.layout | WorkflowCanvas + Designer + Playwright + build + `300-m287-*` + `284-m287-*` | 画布建边、条件编辑、百分比灰度 |
+| M288 | CANARY trafficPercent 哈希分流；preferCanary 强制；OpenAPI 1.0.32；Flyway V116 | resolve + Activation + PercentageCanary IT + `301-m288-*` + `285-m288-*` | 多 CANARY、动态调比例 UI、自动晋级 |
+| M289 | Workflow 画布建边/删边与 EXCLUSIVE_GATEWAY 条件编辑 | WorkflowCanvas + Playwright + build + `302-m289-*` + `286-m289-*` | 条件积木、并行网关向导、自动晋级 |
+| M290 | 多槽位 CANARY、流量预算、adjust-traffic 满量自动晋级；OpenAPI 1.0.33；Flyway V117 | ActivationService + MultiSlot IT + `303-m290-*` + `287-m290-*` | 指标驱动晋级、区域槽位 UI |
+| M291 | WORKFLOW 依赖分析（draft/analyze API + Admin 报告）；OpenAPI 1.0.34 | DependencyAnalysisService + PostgresIT + `304-m291-*` + `288-m291-*` | 跨资产图 UI |
+| M292 | WORKFLOW 干跑模拟（线性/EXCLUSIVE/WAIT 暂停）；OpenAPI 1.0.35 | WorkflowSimulationService + PostgresIT + `305-m292-*` + `289-m292-*` | 历史回放、并行展开 |
+| M293 | Bundle 通道停用 + 通道托管项目 resolve 失败关闭；OpenAPI 1.0.36 | ActivationService.deactivate + Deactivate IT + `306-m293-*` + `290-m293-*` | Admin 发布控制台 |
+| M294 | RULE/DISPATCH Schema 设计器；OpenAPI 1.0.37 | rule/dispatch schemas + RuleDispatchDesignerPostgresIT + `307-m294-*` + `291-m294-*` | — |
+| M295 | NOTIFICATION/ASSIGNEE/INTEGRATION/PRICING 设计器；OpenAPI 1.0.38 | RemainingAssetDesignersPostgresIT + 4 schemas + `308-m295-*` + `292-m295-*` | 运行时引擎 |
+| M296 | 冻结 Bundle WORKFLOW 历史回放；OpenAPI 1.0.39 | HistoricalReplayService + PostgresIT + `309-m296-*` + `293-m296-*` | 事件时间轴回放 |

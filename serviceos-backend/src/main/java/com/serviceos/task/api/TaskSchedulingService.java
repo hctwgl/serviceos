@@ -10,4 +10,6 @@ public interface TaskSchedulingService {
     HandlingTaskCompletionReceipt completeHandlingTask(CompleteHandlingTaskCommand command);
 
     ScheduledTaskView createWorkflowTask(CreateWorkflowTaskCommand command);
+
+    int cancelOpenTasksForWorkflows(CancelOpenWorkflowTasksCommand command);
 }

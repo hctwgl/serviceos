@@ -7,6 +7,7 @@ import com.serviceos.shared.ProblemCode;
 import com.serviceos.shared.Sha256;
 import com.serviceos.task.api.CreateHandlingTaskCommand;
 import com.serviceos.task.api.CancelHandlingTaskCommand;
+import com.serviceos.task.api.CancelOpenWorkflowTasksCommand;
 import com.serviceos.task.api.CreateWorkflowTaskCommand;
 import com.serviceos.task.api.HandlingTaskCancellationReceipt;
 import com.serviceos.task.api.CompleteHandlingTaskCommand;
@@ -421,6 +422,61 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
             appendTaskCreated(command, taskId, status, now);
         }
         return stored.toView();
+    }
+
+    @Override
+    public int cancelOpenTasksForWorkflows(CancelOpenWorkflowTasksCommand command) {
+        // 工单取消/跳转级联：批量关闭仍开放任务并撤消分配；已完成任务保持不变。
+        int updated = jdbc.sql("""
+                        UPDATE tsk_task
+                           SET status = 'CANCELLED',
+                               claimed_by = NULL,
+                               claimed_at = NULL,
+                               started_at = NULL,
+                               claim_owner = NULL,
+                               claim_until = NULL,
+                               current_attempt_id = NULL,
+                               cancelled_at = :cancelledAt,
+                               cancellation_reason_code = :reasonCode,
+                               cancellation_source_event_id = :sourceEventId,
+                               version = version + 1,
+                               updated_at = :cancelledAt
+                         WHERE tenant_id = :tenantId
+                           AND workflow_instance_id IN (:workflowIds)
+                           AND status IN ('PENDING', 'READY', 'CLAIMED', 'RUNNING',
+                                          'RETRY_WAIT', 'MANUAL_INTERVENTION')
+                        """)
+                .param("cancelledAt", timestamptz(command.cancelledAt()))
+                .param("reasonCode", command.reasonCode())
+                .param("sourceEventId", command.sourceEventId())
+                .param("tenantId", command.tenantId())
+                .param("workflowIds", command.workflowInstanceIds())
+                .update();
+        if (updated > 0) {
+            jdbc.sql("""
+                            UPDATE tsk_task_assignment
+                               SET status = 'REVOKED',
+                                   effective_to = :cancelledAt,
+                                   revoked_by = 'SYSTEM_WORKFLOW_CASCADE',
+                                   revoke_reason_code = :reasonCode
+                             WHERE tenant_id = :tenantId
+                               AND status = 'ACTIVE'
+                               AND task_id IN (
+                                   SELECT task_id FROM tsk_task
+                                    WHERE tenant_id = :tenantId
+                                      AND workflow_instance_id IN (:workflowIds)
+                                      AND status = 'CANCELLED'
+                                      AND cancellation_source_event_id = :sourceEventId
+                               )
+                            """)
+                    .param("cancelledAt", timestamptz(command.cancelledAt()))
+                    .param("reasonCode", command.reasonCode())
+                    .param("tenantId", command.tenantId())
+                    .param("workflowIds", command.workflowInstanceIds())
+                    .param("sourceEventId", command.sourceEventId())
+                    .update();
+        }
+        return updated;
     }
 
     private void appendTaskCreated(

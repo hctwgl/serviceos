@@ -59,7 +59,23 @@ class ContractValidationTest {
                         "/sla-instances", "/sla-instances/{slaInstanceId}",
                         "/work-orders/{workOrderId}/sla-instances",
                         "/inbound-envelopes", "/inbound-envelopes/{envelopeId}",
-                        "/canonical-messages/{messageId}");
+                        "/canonical-messages/{messageId}",
+                        "/configuration/drafts",
+                        "/configuration/drafts/{draftId}",
+                        "/configuration/drafts/{draftId}:validate",
+                        "/configuration/drafts/{draftId}:diff",
+                        "/configuration/drafts/{draftId}:dependencies",
+                        "/configuration/drafts/{draftId}:simulate",
+                        "/configuration/drafts/{draftId}:approve",
+                        "/configuration/drafts/{draftId}:publish",
+                        "/configuration/dependency-reports:analyze",
+                        "/configuration/simulations:run",
+                        "/configuration/replays:run",
+                        "/configuration/bundle-activations",
+                        "/configuration/bundle-activations/{activationId}:adjust-traffic",
+                        "/configuration/bundle-activations/{activationId}:promote",
+                        "/configuration/bundle-activations/{activationId}:rollback",
+                        "/configuration/bundle-activations/{activationId}:deactivate");
     }
 
     @Test
@@ -232,6 +248,20 @@ class ContractValidationTest {
         assertValidEvent(
                 "/events/operational-exception-resolved-v2.schema.json",
                 "/events/operational-exception-resolved-v2.valid.json");
+    }
+
+    @Test
+    void workOrderCancelledExampleMustMatchPublishedSchema() throws Exception {
+        assertValidEvent(
+                "/events/work-order-cancelled-v1.schema.json",
+                "/events/work-order-cancelled-v1.valid.json");
+    }
+
+    @Test
+    void workOrderReopenedExampleMustMatchPublishedSchema() throws Exception {
+        assertValidEvent(
+                "/events/work-order-reopened-v1.schema.json",
+                "/events/work-order-reopened-v1.valid.json");
     }
 
     @Test

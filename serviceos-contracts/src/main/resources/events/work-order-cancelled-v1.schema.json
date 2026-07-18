@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/work-order-cancelled-v1.schema.json",
+  "title": "WorkOrderCancelledV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId", "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"},
+    "eventType": {"const": "workorder.cancelled"},
+    "schemaVersion": {"const": 1},
+    "tenantId": {"type": "string"},
+    "correlationId": {"type": "string"},
+    "causationId": {"type": "string"},
+    "aggregateType": {"const": "WorkOrder"},
+    "aggregateId": {"type": "string", "format": "uuid"},
+    "aggregateVersion": {"type": "integer", "minimum": 1},
+    "occurredAt": {"type": "string", "format": "date-time"},
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workOrderId", "reasonCode", "cancelledAt"],
+      "properties": {
+        "workOrderId": {"type": "string", "format": "uuid"},
+        "reasonCode": {"type": "string", "minLength": 1, "maxLength": 64},
+        "approvalRef": {"type": ["string", "null"], "maxLength": 128},
+        "cancelledAt": {"type": "string", "format": "date-time"}
+      }
+    }
+  }
+}

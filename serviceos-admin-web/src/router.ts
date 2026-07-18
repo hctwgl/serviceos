@@ -43,6 +43,7 @@ import GrantDirectoryPage from './pages/GrantDirectoryPage.vue'
 import PortalStubsPage from './pages/PortalStubsPage.vue'
 import UiPreferencesPage from './pages/UiPreferencesPage.vue'
 import SearchPage from './pages/SearchPage.vue'
+import ConfigurationDesignerPage from './pages/ConfigurationDesignerPage.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -127,6 +128,12 @@ export const router = createRouter({
         { path: 'sla/:id', name: 'ADMIN.SLA.DETAIL', component: SlaInstanceDetailPage },
         { path: 'projects', name: 'ADMIN.PROJECT.LIST', component: ProjectDirectoryPage },
         { path: 'projects/:id', name: 'ADMIN.PROJECT.DETAIL', component: ProjectDetailPage },
+        {
+          path: 'configuration/designer',
+          name: 'ADMIN.CONFIGURATION.DESIGNER',
+          component: ConfigurationDesignerPage,
+          meta: { pageId: 'ADMIN.CONFIGURATION.DESIGNER' },
+        },
         { path: 'work-orders', name: 'ADMIN.WORKORDER.LIST', component: WorkOrderDirectoryPage },
         { path: 'work-orders/lookup', name: 'ADMIN.WORKORDER.LOOKUP', component: WorkOrderLookupPage },
         {

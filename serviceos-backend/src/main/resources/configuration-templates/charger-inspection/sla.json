@@ -1,0 +1,10 @@
+{
+  "policyKey": "platform.charger.inspection.task-elapsed",
+  "version": "1.0.0",
+  "subjectType": "TASK",
+  "taskTypes": ["INSPECT_SCHEDULE", "INSPECT_ONSITE", "INSPECT_OPEN_MAINT", "INSPECT_CLOSE"],
+  "startEvent": "TASK_CREATED",
+  "stopEvent": "TASK_COMPLETED",
+  "clockMode": "ELAPSED",
+  "targetDurationSeconds": 43200
+}

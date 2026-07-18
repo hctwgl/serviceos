@@ -229,6 +229,12 @@ class DefaultFileCommandServiceTest {
                 com.serviceos.task.api.CreateWorkflowTaskCommand command) {
             throw new UnsupportedOperationException();
         }
+
+        @Override
+        public int cancelOpenTasksForWorkflows(
+                com.serviceos.task.api.CancelOpenWorkflowTasksCommand command) {
+            throw new UnsupportedOperationException();
+        }
     }
 
     private static final class FakeStorage implements ObjectStorageGateway {

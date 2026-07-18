@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.26
+  version: 1.0.39
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -4942,6 +4942,493 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /configuration/drafts:
+    get:
+      operationId: listConfigurationDrafts
+      summary: 列出配置资产草稿
+      description: M282/M283 支持 WORKFLOW/FORM/EVIDENCE/SLA；需要 configuration.draft.write。
+      parameters:
+        - name: assetType
+          in: query
+          schema: { type: string, enum: [WORKFLOW, FORM, EVIDENCE, SLA, RULE, DISPATCH, NOTIFICATION, ASSIGNEE_POLICY, INTEGRATION, PRICING], default: WORKFLOW }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 草稿列表（按更新时间倒序，最多 100）
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/ConfigurationDraft' } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createConfigurationDraft
+      summary: 创建配置资产草稿
+      description: M282/M283 支持 WORKFLOW/FORM/EVIDENCE/SLA；需要 configuration.draft.write。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateConfigurationDraftRequest' }
+      responses:
+        '200':
+          description: 新建草稿
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConfigurationDraft' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /configuration/drafts/{draftId}:
+    get:
+      operationId: getConfigurationDraft
+      summary: 读取配置资产草稿
+      parameters:
+        - name: draftId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 草稿当前事实
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConfigurationDraft' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    put:
+      operationId: updateConfigurationDraft
+      summary: 更新配置资产草稿定义
+      parameters:
+        - name: draftId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateConfigurationDraftRequest' }
+      responses:
+        '200':
+          description: 更新后的草稿
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConfigurationDraft' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /configuration/drafts/{draftId}:validate:
+    post:
+      operationId: validateConfigurationDraft
+      summary: 静态校验配置草稿
+      description: 校验通过后状态变为 VALIDATED；失败保持 DRAFT 并写入 validationErrors。
+      parameters:
+        - name: draftId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 校验通过的草稿
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConfigurationDraft' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /configuration/drafts/{draftId}:diff:
+    get:
+      operationId: diffConfigurationDraft
+      summary: 对比草稿与基线发布版本
+      description: 返回相对 baseVersionId（或空基线）的统一文本 Diff。
+      parameters:
+        - name: draftId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Diff 结果
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConfigurationDraftDiff' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /configuration/drafts/{draftId}:dependencies:
+    get:
+      operationId: analyzeConfigurationDraftDependencies
+      summary: 分析配置草稿依赖
+      description: 扫描 WORKFLOW 草稿中的资产引用，对照租户已发布版本；需要 configuration.draft.write。
+      parameters:
+        - name: draftId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 依赖报告
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConfigurationDependencyReport' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /configuration/dependency-reports:analyze:
+    post:
+      operationId: analyzeConfigurationDependencies
+      summary: 分析原始配置定义依赖
+      description: 对 WORKFLOW 定义做确定性依赖扫描；可选 bundleId 限定在 Bundle 内命中。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AnalyzeConfigurationDependenciesRequest' }
+      responses:
+        '200':
+          description: 依赖报告
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConfigurationDependencyReport' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /configuration/drafts/{draftId}:simulate:
+    post:
+      operationId: simulateConfigurationDraft
+      summary: 干跑模拟配置草稿
+      description: 对 WORKFLOW 草稿做无副作用干跑；需要 configuration.draft.write。
+      parameters:
+        - name: draftId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SimulateConfigurationRequest' }
+      responses:
+        '200':
+          description: 模拟报告
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConfigurationSimulationReport' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /configuration/simulations:run:
+    post:
+      operationId: runConfigurationSimulation
+      summary: 干跑模拟原始 WORKFLOW 定义
+      description: 无副作用；不写运行时表、不伪造 WAIT_EVENT 信号。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RunConfigurationSimulationRequest' }
+      responses:
+        '200':
+          description: 模拟报告
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConfigurationSimulationReport' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /configuration/replays:run:
+    post:
+      operationId: runConfigurationHistoricalReplay
+      summary: 历史回放冻结 Bundle 中的 WORKFLOW
+      description: |
+        仅读取已发布 Bundle 冻结清单中的 WORKFLOW 定义并干跑；
+        不读取草稿、不读取当前通道激活、不写运行时表。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RunConfigurationHistoricalReplayRequest' }
+      responses:
+        '200':
+          description: 历史回放报告
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConfigurationHistoricalReplayReport' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /configuration/drafts/{draftId}:approve:
+    post:
+      operationId: approveConfigurationDraft
+      summary: 审批已校验配置草稿
+      description: 需要 configuration.approve（HIGH）；仅 VALIDATED → APPROVED。
+      parameters:
+        - name: draftId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ApproveConfigurationDraftRequest' }
+      responses:
+        '200':
+          description: 已审批草稿
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConfigurationDraft' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /configuration/drafts/{draftId}:publish:
+    post:
+      operationId: publishConfigurationDraft
+      summary: 发布已审批配置草稿
+      description: 需要 configuration.publish（HIGH）；仅 APPROVED 可发布，生成不可变资产版本。
+      parameters:
+        - name: draftId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 已发布草稿（含 publishedVersionId）
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConfigurationDraft' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /configuration/bundle-activations:
+    get:
+      operationId: listBundleChannelActivations
+      summary: 列出项目 Bundle 通道激活
+      description: 需要 configuration.release.manage。
+      parameters:
+        - name: projectId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 激活历史（新到旧）
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/BundleChannelActivation' } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: activateBundleChannel
+      summary: 激活 STABLE/CANARY 通道
+      description: 需要 configuration.release.manage；指向已发布 Bundle，不修改 Bundle 内容。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ActivateBundleChannelRequest' }
+      responses:
+        '200':
+          description: 新 ACTIVE 激活
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BundleChannelActivation' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /configuration/bundle-activations/{activationId}:adjust-traffic:
+    post:
+      operationId: adjustCanaryTraffic
+      summary: 调整 ACTIVE CANARY 槽位流量
+      description: 可设 autoPromoteWhenFull；调至 100% 时自动晋级并停用其它 CANARY 槽位。
+      parameters:
+        - name: activationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdjustCanaryTrafficRequest' }
+      responses:
+        '200':
+          description: 调整后的激活（或晋级后的 STABLE）
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BundleChannelActivation' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /configuration/bundle-activations/{activationId}:promote:
+    post:
+      operationId: promoteCanaryBundleActivation
+      summary: 将 ACTIVE CANARY 晋级为 STABLE
+      parameters:
+        - name: activationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BundleActivationApprovalRequest' }
+      responses:
+        '200':
+          description: 新 STABLE 激活
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BundleChannelActivation' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /configuration/bundle-activations/{activationId}:rollback:
+    post:
+      operationId: rollbackStableBundleActivation
+      summary: 回滚 ACTIVE STABLE 到上一激活
+      parameters:
+        - name: activationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BundleActivationApprovalRequest' }
+      responses:
+        '200':
+          description: 回滚后的 STABLE 激活
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BundleChannelActivation' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /configuration/bundle-activations/{activationId}:deactivate:
+    post:
+      operationId: deactivateBundleChannelActivation
+      summary: 停用 ACTIVE STABLE/CANARY 通道激活
+      description: |
+        将激活置为 SUPERSEDED；不自动回滚、不猜测下一激活。
+        项目一旦进入通道模型，停用后若无 ACTIVE STABLE/CANARY，解析失败关闭。
+      parameters:
+        - name: activationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BundleActivationApprovalRequest' }
+      responses:
+        '200':
+          description: 已停用激活
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BundleChannelActivation' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
 components:
   securitySchemes:
     bearerAuth:
@@ -5121,6 +5608,251 @@ components:
         type: string
         pattern: '^"[1-9][0-9]*"$'
   schemas:
+    CreateConfigurationDraftRequest:
+      type: object
+      additionalProperties: false
+      required: [assetType, assetKey, intendedSemanticVersion, schemaVersion, definitionJson]
+      properties:
+        assetType: { type: string, enum: [WORKFLOW, FORM, EVIDENCE, SLA, RULE, DISPATCH, NOTIFICATION, ASSIGNEE_POLICY, INTEGRATION, PRICING] }
+        assetKey: { type: string, minLength: 1, maxLength: 128 }
+        intendedSemanticVersion: { type: string, minLength: 1, maxLength: 64 }
+        schemaVersion: { type: string, minLength: 1, maxLength: 64 }
+        definitionJson: { type: string, minLength: 2, maxLength: 1000000 }
+        baseVersionId: { type: [string, 'null'], format: uuid }
+    UpdateConfigurationDraftRequest:
+      type: object
+      additionalProperties: false
+      required: [definitionJson]
+      properties:
+        definitionJson: { type: string, minLength: 2, maxLength: 1000000 }
+    ApproveConfigurationDraftRequest:
+      type: object
+      additionalProperties: false
+      required: [approvalRef]
+      properties:
+        approvalRef: { type: string, minLength: 1, maxLength: 128 }
+    ActivateBundleChannelRequest:
+      type: object
+      additionalProperties: false
+      required: [projectId, channel, bundleId, approvalRef]
+      properties:
+        projectId: { type: string, format: uuid }
+        channel: { type: string, enum: [STABLE, CANARY] }
+        bundleId: { type: string, format: uuid }
+        approvalRef: { type: string, minLength: 1, maxLength: 128 }
+        trafficPercent:
+          type: [integer, 'null']
+          minimum: 0
+          maximum: 100
+          description: CANARY 分流百分比；省略时 CANARY 默认 0，STABLE 固定 100。
+        slotCode:
+          type: [string, 'null']
+          pattern: '^[a-z][a-z0-9_-]{0,63}$'
+          description: CANARY 槽位名；STABLE 固定 primary。
+        autoPromoteWhenFull:
+          type: [boolean, 'null']
+          description: CANARY 以 100% 激活时是否立即晋级 STABLE。
+    AdjustCanaryTrafficRequest:
+      type: object
+      additionalProperties: false
+      required: [trafficPercent]
+      properties:
+        trafficPercent: { type: integer, minimum: 0, maximum: 100 }
+        autoPromoteWhenFull: { type: [boolean, 'null'] }
+    BundleActivationApprovalRequest:
+      type: object
+      additionalProperties: false
+      required: [approvalRef]
+      properties:
+        approvalRef: { type: string, minLength: 1, maxLength: 128 }
+    BundleChannelActivation:
+      type: object
+      additionalProperties: false
+      required: [activationId, projectId, channel, slotCode, bundleId, bundleCode, bundleVersion,
+                 status, approvalRef, trafficPercent, activatedBy, activatedAt, aggregateVersion]
+      properties:
+        activationId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        channel: { type: string, enum: [STABLE, CANARY] }
+        slotCode: { type: string }
+        bundleId: { type: string, format: uuid }
+        bundleCode: { type: string }
+        bundleVersion: { type: string }
+        previousActivationId: { type: [string, 'null'], format: uuid }
+        status: { enum: [ACTIVE, SUPERSEDED] }
+        approvalRef: { type: string }
+        trafficPercent: { type: integer, minimum: 0, maximum: 100 }
+        activatedBy: { type: string }
+        activatedAt: { type: string, format: date-time }
+        supersededAt: { type: [string, 'null'], format: date-time }
+        aggregateVersion: { type: integer, format: int64, minimum: 1 }
+    AnalyzeConfigurationDependenciesRequest:
+      type: object
+      additionalProperties: false
+      required: [assetType, definitionJson]
+      properties:
+        assetType: { type: string, enum: [WORKFLOW] }
+        assetKey: { type: [string, 'null'] }
+        definitionJson: { type: string }
+        bundleId: { type: [string, 'null'], format: uuid }
+    ConfigurationDependencyReport:
+      type: object
+      additionalProperties: false
+      required: [assetType, assetKey, complete, dependencies]
+      properties:
+        assetType: { type: string, enum: [WORKFLOW] }
+        assetKey: { type: string }
+        draftId: { type: [string, 'null'], format: uuid }
+        bundleId: { type: [string, 'null'], format: uuid }
+        complete: { type: boolean }
+        dependencies:
+          type: array
+          items: { $ref: '#/components/schemas/ConfigurationDependencyItem' }
+    ConfigurationDependencyItem:
+      type: object
+      additionalProperties: false
+      required: [refField, refValue, expectedAssetType, status, detail]
+      properties:
+        refField: { type: string }
+        refValue: { type: string }
+        sourceNodeId: { type: [string, 'null'] }
+        expectedAssetType:
+          type: string
+          enum: [WORKFLOW, FORM, EVIDENCE, RULE, SLA, DISPATCH, PRICING, INTEGRATION, ASSIGNEE_POLICY, NOTIFICATION]
+        status: { type: string, enum: [SATISFIED, MISSING, UNKNOWN_TYPE] }
+        satisfiedVersionId: { type: [string, 'null'], format: uuid }
+        detail: { type: string }
+    SimulateConfigurationRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        context: { $ref: '#/components/schemas/ConfigurationSimulationContext' }
+        maxSteps: { type: integer, minimum: 1, maximum: 256 }
+    RunConfigurationSimulationRequest:
+      type: object
+      additionalProperties: false
+      required: [assetType, definitionJson]
+      properties:
+        assetType: { type: string, enum: [WORKFLOW] }
+        assetKey: { type: [string, 'null'] }
+        definitionJson: { type: string }
+        context: { $ref: '#/components/schemas/ConfigurationSimulationContext' }
+        maxSteps: { type: integer, minimum: 1, maximum: 256 }
+    ConfigurationSimulationContext:
+      type: object
+      additionalProperties: false
+      properties:
+        workOrder:
+          type: object
+          additionalProperties: false
+          properties:
+            clientCode: { type: [string, 'null'] }
+            brandCode: { type: [string, 'null'] }
+            serviceProductCode: { type: [string, 'null'] }
+        region:
+          type: object
+          additionalProperties: false
+          properties:
+            provinceCode: { type: [string, 'null'] }
+            cityCode: { type: [string, 'null'] }
+            districtCode: { type: [string, 'null'] }
+        task:
+          type: object
+          additionalProperties: false
+          properties:
+            stageCode: { type: [string, 'null'] }
+            taskType: { type: [string, 'null'] }
+        formValues:
+          type: object
+          additionalProperties: true
+    ConfigurationSimulationReport:
+      type: object
+      additionalProperties: false
+      required: [assetType, assetKey, outcome, message, steps]
+      properties:
+        assetType: { type: string, enum: [WORKFLOW] }
+        assetKey: { type: string }
+        draftId: { type: [string, 'null'], format: uuid }
+        outcome: { type: string, enum: [COMPLETED, WAITING, FAIL_CLOSED, STEP_LIMIT] }
+        message: { type: string }
+        steps:
+          type: array
+          items: { $ref: '#/components/schemas/ConfigurationSimulationStep' }
+    ConfigurationSimulationStep:
+      type: object
+      additionalProperties: false
+      required: [index, nodeId, nodeType, action, detail]
+      properties:
+        index: { type: integer }
+        nodeId: { type: string }
+        nodeType: { type: string }
+        action: { type: string }
+        detail: { type: string }
+    RunConfigurationHistoricalReplayRequest:
+      type: object
+      additionalProperties: false
+      required: [bundleId]
+      properties:
+        bundleId: { type: string, format: uuid }
+        workflowAssetKey: { type: [string, 'null'] }
+        context: { $ref: '#/components/schemas/ConfigurationSimulationContext' }
+        maxSteps: { type: integer, minimum: 1, maximum: 256 }
+    ConfigurationHistoricalReplayReport:
+      type: object
+      additionalProperties: false
+      required: [bundleId, bundleCode, bundleVersion, manifestDigest, workflowVersionId,
+                 workflowAssetKey, workflowSemanticVersion, outcome, message, steps]
+      properties:
+        bundleId: { type: string, format: uuid }
+        bundleCode: { type: string }
+        bundleVersion: { type: string }
+        manifestDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
+        workflowVersionId: { type: string, format: uuid }
+        workflowAssetKey: { type: string }
+        workflowSemanticVersion: { type: string }
+        outcome: { type: string, enum: [COMPLETED, WAITING, FAIL_CLOSED, STEP_LIMIT] }
+        message: { type: string }
+        steps:
+          type: array
+          items: { $ref: '#/components/schemas/ConfigurationSimulationStep' }
+    ConfigurationDraftDiff:
+      type: object
+      additionalProperties: false
+      required: [draftId, baseLabel, draftLabel, unifiedDiff, identical]
+      properties:
+        draftId: { type: string, format: uuid }
+        baseVersionId: { type: [string, 'null'], format: uuid }
+        baseLabel: { type: string }
+        draftLabel: { type: string }
+        unifiedDiff: { type: string }
+        identical: { type: boolean }
+    ConfigurationDraft:
+      type: object
+      additionalProperties: false
+      required: [draftId, assetType, assetKey, intendedSemanticVersion, schemaVersion,
+                 definitionJson, contentDigest, status, validationErrors, aggregateVersion,
+                 createdBy, updatedBy, createdAt, updatedAt]
+      properties:
+        draftId: { type: string, format: uuid }
+        assetType: { type: string, enum: [WORKFLOW, FORM, EVIDENCE, SLA, RULE, DISPATCH, NOTIFICATION, ASSIGNEE_POLICY, INTEGRATION, PRICING] }
+        assetKey: { type: string }
+        intendedSemanticVersion: { type: string }
+        schemaVersion: { type: string }
+        definitionJson: { type: string }
+        contentDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
+        status: { enum: [DRAFT, VALIDATED, APPROVED, PUBLISHED, DISCARDED] }
+        baseVersionId: { type: [string, 'null'], format: uuid }
+        publishedVersionId: { type: [string, 'null'], format: uuid }
+        validationErrors: { type: array, items: { type: string } }
+        approvalRef: { type: [string, 'null'], maxLength: 128 }
+        approvedBy: { type: [string, 'null'] }
+        approvedAt: { type: [string, 'null'], format: date-time }
+        aggregateVersion: { type: integer, format: int64, minimum: 1 }
+        createdBy: { type: string }
+        updatedBy: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
     SecurityPrincipal:
       type: object
       additionalProperties: false
@@ -6971,6 +7703,7 @@ components:
         category: { x-extensible-enum: [WORK_ORDER, WORKFLOW, STAGE, TASK, APPOINTMENT, VISIT, CONTACT_ATTEMPT, SLA, FORM, EVIDENCE, REVIEW, CORRECTION, DELIVERY, EXCEPTION, ASSIGNMENT] }
         eventType:
           x-extensible-enum: [workorder.received, workorder.activated, workorder.fulfilled,
+            workorder.cancelled, workorder.reopened,
             workflow.started, workflow.completed, stage.activated, stage.completed,
             task.created, task.claimed, task.started, task.released, task.cancelled, task.completed,
             task.assigned, task.assignment-prepared, task.assignment-activated, task.assignment-aborted,
