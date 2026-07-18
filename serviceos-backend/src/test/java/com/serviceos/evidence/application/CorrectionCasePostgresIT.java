@@ -208,8 +208,18 @@ class CorrectionCasePostgresIT {
         assertThat(resubmitted.status()).isEqualTo("RESUBMITTED");
         assertThat(resubmitted.resubmissions()).hasSize(1);
         assertThat(resubmitted.latestResubmissionSnapshotId()).isEqualTo(second.evidenceSetSnapshotId());
+
+        // resubmit 只产生新审核候选，不结束整改 Task；同一责任人可在下一轮继续补传。
+        assertThat(jdbc.sql("SELECT status FROM tsk_task WHERE task_id=:task")
+                .param("task", opened.correctionTaskId()).query(String.class).single()).isEqualTo("RUNNING");
+        EvidenceSetSnapshotView third = createCorrectionSnapshot(opened, "third");
+        CorrectionCaseView secondRound = corrections.resubmit(technician(), metadata("resubmit-2"),
+                new ResubmitCorrectionCaseCommand(correctionId, third.evidenceSetSnapshotId()));
+        assertThat(secondRound.status()).isEqualTo("RESUBMITTED");
+        assertThat(secondRound.resubmissions()).hasSize(2);
+        assertThat(secondRound.latestResubmissionSnapshotId()).isEqualTo(third.evidenceSetSnapshotId());
         assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type='evidence.correction-resubmitted'")
-                .query(Long.class).single()).isOne();
+                .query(Long.class).single()).isEqualTo(2);
 
         CorrectionCaseView closed = corrections.close(reviewer(), metadata("close-1"),
                 new CloseCorrectionCaseCommand(correctionId, "verified close"));
@@ -226,7 +236,7 @@ class CorrectionCasePostgresIT {
                 .satisfies(row -> {
                     assertThat(row.get("status")).isEqualTo("COMPLETED");
                     assertThat(row.get("result_ref")).isEqualTo("correction-case://" + correctionId);
-                    assertThat(row.get("result_digest")).isEqualTo(second.contentDigest());
+                    assertThat(row.get("result_digest")).isEqualTo(third.contentDigest());
                 });
         assertThat(jdbc.sql("""
                 SELECT count(*) FROM tsk_task_assignment
@@ -423,10 +433,21 @@ class CorrectionCasePostgresIT {
             throws Exception {
         byte[] content = pngBytes(marker);
         String checksum = sha256(content);
+        Long itemCount = jdbc.sql("""
+                SELECT count(*) FROM evd_evidence_item
+                 WHERE tenant_id=:tenant AND task_id=:task AND slot_id=:slot
+                """).param("tenant", TENANT).param("task", taskId).param("slot", slotId)
+                .query(Long.class).single();
+        UUID evidenceItemId = itemCount >= 2 ? jdbc.sql("""
+                SELECT evidence_item_id FROM evd_evidence_item
+                 WHERE tenant_id=:tenant AND task_id=:task AND slot_id=:slot
+                 ORDER BY item_ordinal DESC LIMIT 1
+                """).param("tenant", TENANT).param("task", taskId).param("slot", slotId)
+                .query(UUID.class).single() : null;
         var session = evidence.beginCorrectionUpload(technician(), metadata("begin-" + marker),
                 new BeginCorrectionEvidenceUploadCommand(
                         correction.correctionCaseId(), correction.correctionTaskId(), taskId, slotId,
-                        null, "site-correction.png", "image/png", content.length, checksum,
+                        evidenceItemId, "site-correction.png", "image/png", content.length, checksum,
                         "CAMERA", Instant.parse("2026-07-18T12:00:00Z")));
         transfers.upload(token(session.uploadUrl()), "image/png", content.length,
                 new ByteArrayInputStream(content));

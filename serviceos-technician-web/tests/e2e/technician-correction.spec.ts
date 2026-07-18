@@ -19,7 +19,7 @@ async function login(page: import('@playwright/test').Page) {
   await expect(page).toHaveURL(/\/work-orders$/)
 }
 
-test('师傅领取启动整改、补传资料并以权威 Snapshot 重提', async ({ page }) => {
+test('师傅领取启动整改、补传资料并以权威 Snapshot 多轮重提', async ({ page }) => {
   let taskStatus: 'READY' | 'CLAIMED' | 'RUNNING' = 'READY'
   let taskVersion = 1
   let revisionStatus = 'STORED'
@@ -62,7 +62,7 @@ test('师傅领取启动整改、补传资料并以权威 Snapshot 重提', asyn
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{
         slotId: SLOT, requirementCode: 'site.photo', occurrenceKey: 'default',
         requirementName: '整改现场照片', mediaType: 'PHOTO', required: true,
-        minCount: 1, maxCount: 2, status: revisionStatus === 'VALIDATED' ? 'SATISFIED' : 'MISSING',
+        minCount: 1, maxCount: 1, status: revisionStatus === 'VALIDATED' ? 'SATISFIED' : 'MISSING',
         active: true, transition: 'UNCHANGED_ACTIVE', requiredDisposition: 'NONE',
       }]) })
       return
@@ -151,5 +151,15 @@ test('师傅领取启动整改、补传资料并以权威 Snapshot 重提', asyn
   await expect(page.getByTestId(`technician-correction-slot-${SLOT}`)).toContainText('VALIDATED')
   await page.getByTestId('technician-correction-resubmit').click()
   await expect(page.getByTestId('technician-correction-message')).toContainText('第 1 次重提')
+  await expect(page.getByTestId('technician-correction-task-status')).toHaveText('RUNNING')
+
+  // 第二轮不能突破 Slot maxCount 创建新 Item，必须在既有整改 Item 上追加 Revision。
+  revisionStatus = 'STORED'
+  await page.getByTestId(`technician-correction-file-${SLOT}`).setInputFiles({
+    name: 'fix-round-2.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('correction-image-round-2'),
+  })
+  await page.getByTestId(`technician-correction-upload-${SLOT}`).click()
+  await expect.poll(() => commandBodies.length).toBe(4)
+  expect(commandBodies[2]).toMatchObject({ evidenceItemId: ITEM })
   await expect(page.getByTestId('technician-correction-task-status')).toHaveText('RUNNING')
 })
