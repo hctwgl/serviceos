@@ -222,6 +222,23 @@ export type TechnicianEvidenceUploadSession = {
   sessionExpiresAt: string
 }
 
+export type TechnicianEvidenceSetSnapshot = {
+  evidenceSetSnapshotId: string
+  taskId: string
+  purpose: 'TASK_SUBMISSION'
+  memberCount: number
+  contentDigest: string
+  createdAt: string
+  members: Array<{ evidenceSlotId: string; evidenceItemId: string; evidenceRevisionId: string; revisionNumber: number; revisionStatus: 'VALIDATED'; contentDigest: string; memberOrdinal: number }>
+}
+
+export type TechnicianTaskCompletionReceipt = {
+  taskId: string
+  status: 'COMPLETED'
+  resourceVersion: number
+  occurredAt: string
+}
+
 function technicianHeaders(technicianContextId: string): Record<string, string> {
   return { 'X-Technician-Context': technicianContextId }
 }
@@ -349,6 +366,29 @@ export function finalizeTechnicianEvidenceUpload(
       + `/upload-sessions/${encodeURIComponent(uploadSessionId)}:finalize`,
     {
       body: { actualSha256, finalizeCommandId: crypto.randomUUID() },
+      headers: technicianHeaders(technicianContextId),
+    },
+  )
+}
+
+export function createTechnicianTaskEvidenceSetSnapshot(
+  technicianContextId: string, taskId: string, memberRevisionIds: string[],
+) {
+  return apiPost<TechnicianEvidenceSetSnapshot>(
+    `/technician/me/tasks/${encodeURIComponent(taskId)}/evidence-set-snapshots`,
+    { body: { memberRevisionIds }, idempotencyKey: crypto.randomUUID(), headers: technicianHeaders(technicianContextId) },
+  )
+}
+
+export function completeTechnicianTask(
+  technicianContextId: string, taskId: string, resourceVersion: number,
+  evidenceSetSnapshotId: string, formSubmissionId: string | null,
+) {
+  return apiPost<TechnicianTaskCompletionReceipt>(
+    `/technician/me/tasks/${encodeURIComponent(taskId)}:complete`,
+    {
+      body: { evidenceSetSnapshotId, ...(formSubmissionId ? { formSubmissionId } : {}) },
+      idempotencyKey: crypto.randomUUID(), ifMatch: `"${resourceVersion}"`,
       headers: technicianHeaders(technicianContextId),
     },
   )

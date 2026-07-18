@@ -5,8 +5,13 @@ import com.serviceos.dispatch.api.TechnicianActiveAssignmentQuery;
 import com.serviceos.evidence.api.BeginEvidenceUploadCommand;
 import com.serviceos.evidence.api.EvidenceCommandService;
 import com.serviceos.evidence.api.EvidenceSlotQueryService;
+import com.serviceos.evidence.api.EvidenceSetSnapshotService;
+import com.serviceos.evidence.api.EvidenceSetSnapshotView;
 import com.serviceos.evidence.api.EvidenceUploadSessionView;
 import com.serviceos.evidence.api.TechnicianBeginEvidenceUploadCommand;
+import com.serviceos.evidence.api.TechnicianCompleteTaskCommand;
+import com.serviceos.forms.api.FormSubmissionService;
+import com.serviceos.forms.api.FormSubmissionView;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.network.api.NetworkTechnicianMembershipView;
 import com.serviceos.network.api.PrincipalNetworkAffiliationQuery;
@@ -16,6 +21,9 @@ import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.task.api.TaskFulfillmentContext;
 import com.serviceos.task.api.TaskFulfillmentContextService;
+import com.serviceos.task.api.CompleteHumanTaskCommand;
+import com.serviceos.task.api.HumanTaskCommandReceipt;
+import com.serviceos.task.api.HumanTaskCommandService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -52,13 +60,17 @@ class DefaultTechnicianEvidenceServiceTest {
     private final TaskFulfillmentContextService tasks = mock(TaskFulfillmentContextService.class);
     private final EvidenceSlotQueryService slots = mock(EvidenceSlotQueryService.class);
     private final EvidenceCommandService evidence = mock(EvidenceCommandService.class);
+    private final EvidenceSetSnapshotService snapshots = mock(EvidenceSetSnapshotService.class);
+    private final FormSubmissionService formSubmissions = mock(FormSubmissionService.class);
+    private final HumanTaskCommandService humanTasks = mock(HumanTaskCommandService.class);
     private final AuthorizationService authorization = mock(AuthorizationService.class);
     private DefaultTechnicianEvidenceService service;
 
     @BeforeEach
     void setUp() {
         service = new DefaultTechnicianEvidenceService(
-                affiliations, assignments, tasks, slots, evidence, authorization,
+                affiliations, assignments, tasks, slots, evidence, snapshots, formSubmissions, humanTasks,
+                authorization,
                 new ObjectMapper(), Clock.fixed(NOW, ZoneOffset.UTC));
         when(affiliations.findActiveTechnicianProfile("tenant-264", PRINCIPAL))
                 .thenReturn(Optional.of(new TechnicianProfileView(
@@ -117,10 +129,49 @@ class DefaultTechnicianEvidenceServiceTest {
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
     }
 
+    @Test
+    void dualInputCompletionRebuildsTrustedRefsAndDigestsOnServer() {
+        UUID snapshotId = UUID.randomUUID();
+        UUID submissionId = UUID.randomUUID();
+        String snapshotDigest = "c".repeat(64);
+        String formDigest = "d".repeat(64);
+        TaskFulfillmentContext dualTask = task(PROFILE.toString(), "survey.form");
+        when(tasks.find("tenant-264", TASK)).thenReturn(Optional.of(dualTask));
+        when(snapshots.get(principal(), "corr-complete", snapshotId)).thenReturn(
+                new EvidenceSetSnapshotView(snapshotId, TASK, PROJECT, UUID.randomUUID(),
+                        "TASK_SUBMISSION", 1, snapshotDigest, "{}", PRINCIPAL.toString(), NOW, List.of()));
+        when(formSubmissions.get(principal(), "corr-complete", submissionId)).thenReturn(
+                new FormSubmissionView(submissionId, TASK, PROJECT, UUID.randomUUID(), "survey.form",
+                        1, "{}", formDigest, "VALIDATED", List.of(), List.of(), null,
+                        PRINCIPAL.toString(), NOW));
+        when(humanTasks.complete(eq(principal()), any(), any())).thenReturn(
+                new HumanTaskCommandReceipt(TASK, "COMPLETED", PRINCIPAL.toString(), 2, NOW));
+
+        HumanTaskCommandReceipt receipt = service.completeTask(
+                principal(), new CommandMetadata("corr-complete", "complete-265"), context(),
+                new TechnicianCompleteTaskCommand(TASK, 1, snapshotId, submissionId));
+
+        assertThat(receipt.status()).isEqualTo("COMPLETED");
+        ArgumentCaptor<CompleteHumanTaskCommand> completion =
+                ArgumentCaptor.forClass(CompleteHumanTaskCommand.class);
+        verify(humanTasks).complete(eq(principal()), any(), completion.capture());
+        assertThat(completion.getValue().resultRef()).isEqualTo("form-submission://" + submissionId);
+        assertThat(completion.getValue().resultDigest()).isEqualTo(formDigest);
+        assertThat(completion.getValue().inputVersionRefs())
+                .extracting(ref -> ref.kind() + ":" + ref.digest())
+                .containsExactlyInAnyOrder(
+                        "FORM_SUBMISSION:" + formDigest,
+                        "EVIDENCE_SET_SNAPSHOT:" + snapshotDigest);
+    }
+
     private static TaskFulfillmentContext task(String responsible) {
+        return task(responsible, null);
+    }
+
+    private static TaskFulfillmentContext task(String responsible, String formRef) {
         return new TaskFulfillmentContext(
                 TASK, PROJECT, UUID.randomUUID(), UUID.randomUUID(), "bundle-digest",
-                "SURVEY", "SURVEY", "HUMAN", null, "evidence-ref",
+                "SURVEY", "SURVEY", "HUMAN", formRef, "evidence-ref",
                 "RUNNING", responsible, false, 1);
     }
 

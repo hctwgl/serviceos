@@ -197,6 +197,22 @@ public struct TechnicianEvidenceUploadSession: Sendable, Decodable, Equatable {
     public let sessionExpiresAt: Date
 }
 
+public struct TechnicianEvidenceSetSnapshot: Sendable, Decodable, Equatable {
+    public let evidenceSetSnapshotId: UUID
+    public let taskId: UUID
+    public let purpose: String
+    public let memberCount: Int
+    public let contentDigest: String
+    public let createdAt: Date
+}
+
+public struct TechnicianTaskCompletionReceipt: Sendable, Decodable, Equatable {
+    public let taskId: UUID
+    public let status: String
+    public let resourceVersion: Int64
+    public let occurredAt: Date
+}
+
 public enum TechnicianEvidenceUploadError: Error, Equatable {
     case emptyFile
     case invalidUploadAuthorization
@@ -294,6 +310,44 @@ public struct TechnicianOnlineService: Sendable {
             body: FinalizeEvidenceBody(
                 actualSha256: digest,
                 finalizeCommandId: UUID().uuidString.lowercased()
+            )
+        )
+    }
+
+    /// 客户端只选择已校验 Revision；Snapshot 成员排序、摘要与不可变引用均由服务器权威生成。
+    public func createTaskSubmissionSnapshot(
+        contextID: String,
+        taskID: UUID,
+        revisionIDs: [UUID]
+    ) async throws -> TechnicianEvidenceSetSnapshot {
+        try await post(
+            "/technician/me/tasks/\(taskID.uuidString.lowercased())/evidence-set-snapshots",
+            contextID: contextID,
+            idempotencyKey: UUID().uuidString.lowercased(),
+            ifMatch: nil,
+            body: CreateEvidenceSetSnapshotBody(memberRevisionIds: revisionIDs)
+        )
+    }
+
+    /**
+     * 任务完成只发送权威对象 ID。resultRef、digest 与 inputVersionRefs 由服务端重读 Snapshot/FormSubmission
+     * 后构造，避免受篡改客户端把未校验内容伪装成冻结输入。
+     */
+    public func completeTask(
+        contextID: String,
+        taskID: UUID,
+        resourceVersion: Int64,
+        snapshotID: UUID,
+        formSubmissionID: UUID?
+    ) async throws -> TechnicianTaskCompletionReceipt {
+        try await post(
+            "/technician/me/tasks/\(taskID.uuidString.lowercased()):complete",
+            contextID: contextID,
+            idempotencyKey: UUID().uuidString.lowercased(),
+            ifMatch: "\"\(resourceVersion)\"",
+            body: CompleteTaskBody(
+                evidenceSetSnapshotId: snapshotID,
+                formSubmissionId: formSubmissionID
             )
         )
     }
@@ -446,6 +500,15 @@ public struct TechnicianOnlineService: Sendable {
     private struct FinalizeEvidenceBody: Encodable {
         let actualSha256: String
         let finalizeCommandId: String
+    }
+
+    private struct CreateEvidenceSetSnapshotBody: Encodable {
+        let memberRevisionIds: [UUID]
+    }
+
+    private struct CompleteTaskBody: Encodable {
+        let evidenceSetSnapshotId: UUID
+        let formSubmissionId: UUID?
     }
 }
 

@@ -2,6 +2,7 @@ package com.serviceos.evidence.api;
 
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.shared.CommandMetadata;
+import com.serviceos.task.api.HumanTaskCommandReceipt;
 
 import java.util.List;
 import java.util.UUID;
@@ -25,4 +26,17 @@ public interface TechnicianEvidenceService {
             CommandMetadata metadata,
             String technicianContextHeader,
             FinalizeEvidenceUploadCommand command);
+
+    EvidenceSetSnapshotView createTaskSubmissionSnapshot(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            String technicianContextHeader,
+            UUID taskId,
+            List<UUID> memberRevisionIds);
+
+    HumanTaskCommandReceipt completeTask(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            String technicianContextHeader,
+            TechnicianCompleteTaskCommand command);
 }

@@ -4,14 +4,20 @@ import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.dispatch.api.TechnicianActiveAssignmentQuery;
 import com.serviceos.evidence.api.BeginEvidenceUploadCommand;
+import com.serviceos.evidence.api.CreateEvidenceSetSnapshotCommand;
 import com.serviceos.evidence.api.EvidenceCommandService;
 import com.serviceos.evidence.api.EvidenceItemView;
 import com.serviceos.evidence.api.EvidenceSlotQueryService;
 import com.serviceos.evidence.api.EvidenceSlotView;
+import com.serviceos.evidence.api.EvidenceSetSnapshotService;
+import com.serviceos.evidence.api.EvidenceSetSnapshotView;
 import com.serviceos.evidence.api.EvidenceUploadSessionView;
 import com.serviceos.evidence.api.FinalizeEvidenceUploadCommand;
 import com.serviceos.evidence.api.TechnicianBeginEvidenceUploadCommand;
+import com.serviceos.evidence.api.TechnicianCompleteTaskCommand;
 import com.serviceos.evidence.api.TechnicianEvidenceService;
+import com.serviceos.forms.api.FormSubmissionService;
+import com.serviceos.forms.api.FormSubmissionView;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.network.api.NetworkTechnicianMembershipView;
 import com.serviceos.network.api.PrincipalNetworkAffiliationQuery;
@@ -21,6 +27,10 @@ import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.task.api.TaskFulfillmentContext;
 import com.serviceos.task.api.TaskFulfillmentContextService;
+import com.serviceos.task.api.CompleteHumanTaskCommand;
+import com.serviceos.task.api.HumanTaskCommandReceipt;
+import com.serviceos.task.api.HumanTaskCommandService;
+import com.serviceos.task.api.InputVersionRef;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
@@ -45,6 +55,9 @@ final class DefaultTechnicianEvidenceService implements TechnicianEvidenceServic
     private final TaskFulfillmentContextService tasks;
     private final EvidenceSlotQueryService slots;
     private final EvidenceCommandService evidence;
+    private final EvidenceSetSnapshotService snapshots;
+    private final FormSubmissionService formSubmissions;
+    private final HumanTaskCommandService humanTasks;
     private final AuthorizationService authorization;
     private final ObjectMapper objectMapper;
     private final Clock clock;
@@ -55,6 +68,9 @@ final class DefaultTechnicianEvidenceService implements TechnicianEvidenceServic
             TaskFulfillmentContextService tasks,
             EvidenceSlotQueryService slots,
             EvidenceCommandService evidence,
+            EvidenceSetSnapshotService snapshots,
+            FormSubmissionService formSubmissions,
+            HumanTaskCommandService humanTasks,
             AuthorizationService authorization,
             ObjectMapper objectMapper,
             Clock clock
@@ -64,6 +80,9 @@ final class DefaultTechnicianEvidenceService implements TechnicianEvidenceServic
         this.tasks = tasks;
         this.slots = slots;
         this.evidence = evidence;
+        this.snapshots = snapshots;
+        this.formSubmissions = formSubmissions;
+        this.humanTasks = humanTasks;
         this.authorization = authorization;
         this.objectMapper = objectMapper;
         this.clock = clock;
@@ -112,11 +131,73 @@ final class DefaultTechnicianEvidenceService implements TechnicianEvidenceServic
         return evidence.finalizeUpload(principal, metadata, command);
     }
 
+    @Override
+    @Transactional
+    public EvidenceSetSnapshotView createTaskSubmissionSnapshot(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            String context,
+            UUID taskId,
+            List<UUID> memberRevisionIds
+    ) {
+        requireCurrentTask(principal, metadata.correlationId(), context, taskId);
+        return snapshots.create(principal, metadata,
+                new CreateEvidenceSetSnapshotCommand(taskId, "TASK_SUBMISSION", memberRevisionIds));
+    }
+
+    @Override
+    @Transactional
+    public HumanTaskCommandReceipt completeTask(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            String context,
+            TechnicianCompleteTaskCommand command
+    ) {
+        TaskFulfillmentContext task = requireCurrentTask(
+                principal, metadata.correlationId(), context, command.taskId());
+        EvidenceSetSnapshotView snapshot = snapshots.get(
+                principal, metadata.correlationId(), command.evidenceSetSnapshotId());
+        if (!task.taskId().equals(snapshot.taskId())) {
+            throw new BusinessProblem(ProblemCode.EVIDENCE_SET_NOT_VALIDATED,
+                    "资料快照不属于当前任务");
+        }
+
+        String snapshotRef = "evidence-set-snapshot://" + snapshot.evidenceSetSnapshotId();
+        CompleteHumanTaskCommand completion;
+        if (task.formRef() == null) {
+            if (command.formSubmissionId() != null) {
+                throw new BusinessProblem(ProblemCode.TASK_INPUT_REFS_INVALID,
+                        "无表单任务不能提交 FormSubmission 引用");
+            }
+            completion = new CompleteHumanTaskCommand(
+                    task.taskId(), command.expectedTaskVersion(), snapshotRef, snapshot.contentDigest());
+        } else {
+            if (command.formSubmissionId() == null) {
+                throw new BusinessProblem(ProblemCode.TASK_INPUT_REFS_INVALID,
+                        "表单与资料双输入任务缺少 FormSubmission");
+            }
+            FormSubmissionView submission = formSubmissions.get(
+                    principal, metadata.correlationId(), command.formSubmissionId());
+            if (!task.taskId().equals(submission.taskId())) {
+                throw new BusinessProblem(ProblemCode.FORM_SUBMISSION_NOT_VALIDATED,
+                        "表单提交不属于当前任务");
+            }
+            String formRef = "form-submission://" + submission.submissionId();
+            completion = new CompleteHumanTaskCommand(
+                    task.taskId(), command.expectedTaskVersion(), formRef, submission.contentDigest(), List.of(
+                    new InputVersionRef(InputVersionRef.FORM_SUBMISSION, formRef, submission.contentDigest()),
+                    new InputVersionRef(InputVersionRef.EVIDENCE_SET_SNAPSHOT,
+                            snapshotRef, snapshot.contentDigest())));
+        }
+        // Task 内核仍在同一事务内复核状态、责任、版本、表单冻结版本和 Snapshot 最新解析代次。
+        return humanTasks.complete(principal, metadata, completion);
+    }
+
     /**
      * Portal 上下文和当前责任先于领域写命令重验；领域服务随后还会重验 RUNNING/guard、
      * evidence/file capability、上传会话归属、checksum 与幂等，避免适配层成为授权旁路。
      */
-    private void requireCurrentTask(
+    private TaskFulfillmentContext requireCurrentTask(
             CurrentPrincipal principal, String correlationId, String header, UUID taskId
     ) {
         UUID networkId = parseContext(header);
@@ -146,6 +227,7 @@ final class DefaultTechnicianEvidenceService implements TechnicianEvidenceServic
         if (!currentResponsible || !sameNetwork) {
             throw taskNotFound();
         }
+        return task;
     }
 
     /** 在线端不接受 offline/locationVerified/uploader 等事实，只组装允许的最小声明。 */

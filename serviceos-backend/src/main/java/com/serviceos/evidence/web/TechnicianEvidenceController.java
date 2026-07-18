@@ -3,6 +3,8 @@ package com.serviceos.evidence.web;
 import com.serviceos.evidence.api.EvidenceItemView;
 import com.serviceos.evidence.api.EvidenceRevisionView;
 import com.serviceos.evidence.api.EvidenceSlotView;
+import com.serviceos.evidence.api.EvidenceSetSnapshotMemberView;
+import com.serviceos.evidence.api.EvidenceSetSnapshotView;
 import com.serviceos.evidence.api.EvidenceUploadSessionView;
 import com.serviceos.evidence.api.FinalizeEvidenceUploadCommand;
 import com.serviceos.evidence.api.TechnicianBeginEvidenceUploadCommand;
@@ -106,6 +108,24 @@ final class TechnicianEvidenceController {
                 .body(itemResponse(item));
     }
 
+    @PostMapping("/evidence-set-snapshots")
+    ResponseEntity<TechnicianEvidenceSetSnapshotResponse> createSnapshot(
+            @PathVariable UUID taskId,
+            @RequestHeader("X-Technician-Context") String context,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @Valid @RequestBody TechnicianCreateEvidenceSetSnapshotRequest request
+    ) {
+        EvidenceSetSnapshotView snapshot = evidence.createTaskSubmissionSnapshot(
+                principals.current(), new CommandMetadata(correlationId, idempotencyKey), context,
+                taskId, request.memberRevisionIds());
+        return ResponseEntity.created(URI.create("/api/v1/evidence-set-snapshots/"
+                        + snapshot.evidenceSetSnapshotId()))
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(snapshotResponse(snapshot));
+    }
+
+
     private static TechnicianEvidenceSlotResponse slotResponse(EvidenceSlotView slot) {
         return new TechnicianEvidenceSlotResponse(
                 slot.slotId(), slot.requirementCode(), slot.occurrenceKey(), slot.requirementName(),
@@ -126,6 +146,20 @@ final class TechnicianEvidenceController {
                 item.status(), item.createdAt(), item.revisions().stream()
                         .map(TechnicianEvidenceController::revisionResponse).toList());
     }
+
+    private static TechnicianEvidenceSetSnapshotResponse snapshotResponse(EvidenceSetSnapshotView snapshot) {
+        return new TechnicianEvidenceSetSnapshotResponse(
+                snapshot.evidenceSetSnapshotId(), snapshot.taskId(), snapshot.purpose(),
+                snapshot.memberCount(), snapshot.contentDigest(), snapshot.createdAt(),
+                snapshot.members().stream().map(TechnicianEvidenceController::snapshotMemberResponse).toList());
+    }
+
+    private static TechnicianEvidenceSetMemberResponse snapshotMemberResponse(EvidenceSetSnapshotMemberView member) {
+        return new TechnicianEvidenceSetMemberResponse(
+                member.evidenceSlotId(), member.evidenceItemId(), member.evidenceRevisionId(),
+                member.revisionNumber(), member.revisionStatus(), member.contentDigest(), member.memberOrdinal());
+    }
+
 
     private static TechnicianEvidenceRevisionResponse revisionResponse(EvidenceRevisionView revision) {
         return new TechnicianEvidenceRevisionResponse(
@@ -149,6 +183,12 @@ final class TechnicianEvidenceController {
             @NotBlank @Size(max = 160) String finalizeCommandId
     ) {
     }
+
+    record TechnicianCreateEvidenceSetSnapshotRequest(
+            @NotNull @Size(min = 1, max = 100) List<@NotNull UUID> memberRevisionIds
+    ) {
+    }
+
 
     record TechnicianEvidenceSlotResponse(
             UUID slotId,
@@ -200,4 +240,27 @@ final class TechnicianEvidenceController {
             Instant createdAt
     ) {
     }
+
+    record TechnicianEvidenceSetSnapshotResponse(
+            UUID evidenceSetSnapshotId,
+            UUID taskId,
+            String purpose,
+            int memberCount,
+            String contentDigest,
+            Instant createdAt,
+            List<TechnicianEvidenceSetMemberResponse> members
+    ) {
+    }
+
+    record TechnicianEvidenceSetMemberResponse(
+            UUID evidenceSlotId,
+            UUID evidenceItemId,
+            UUID evidenceRevisionId,
+            int revisionNumber,
+            String revisionStatus,
+            String contentDigest,
+            int memberOrdinal
+    ) {
+    }
+
 }

@@ -707,3 +707,4 @@ OCR/CV、复杂工作流、BUSINESS 日历与 SLA 暂停/预警/升级/通知、
 - [M262 Technician 在线 Visit 交付批次](architecture/275-m262-technician-online-visit-batch.md)
 - [M263 Technician 在线基础表单交付批次](architecture/276-m263-technician-online-form-batch.md)
 - [M264 Technician 在线资料上传交付批次](architecture/277-m264-technician-online-evidence-batch.md)
+- [M265 Technician 资料快照与任务完成交付批次](architecture/278-m265-technician-task-submission-batch.md)
