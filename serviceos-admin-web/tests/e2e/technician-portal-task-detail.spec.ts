@@ -122,14 +122,24 @@ async function stubTechnicianContext(page: Page) {
           windowEnd: '2026-07-19T03:00:00Z',
           timezone: 'Asia/Shanghai',
         }],
+        contactAttempts: [{
+          contactAttemptId: '019f84b0-ffff-7f8c-9505-36fe5c0ee006',
+          taskId: TASK_ID,
+          channel: 'PHONE',
+          startedAt: '2026-07-18T02:30:00Z',
+          endedAt: '2026-07-18T02:32:00Z',
+          resultCode: 'NO_ANSWER',
+          nextContactAt: '2026-07-18T05:00:00Z',
+          createdAt: '2026-07-18T02:33:00Z',
+        }],
         asOf: '2026-07-18T03:00:00Z',
       }),
     })
   })
 }
 
-test.describe('M243 Technician Portal 当前责任任务在线详情', () => {
-  test('M243-01/02：Feed 深链详情，携带可信上下文且只展示非 PII 摘要', async ({ page }) => {
+test.describe('M244 Technician Portal 联系历史安全摘要', () => {
+  test('M244-01/02：Feed 深链详情展示非 PII 联系事实，不出现敏感列', async ({ page }) => {
     await loginWithLocalKeycloak(page)
     await stubTechnicianContext(page)
 
@@ -145,7 +155,10 @@ test.describe('M243 Technician Portal 当前责任任务在线详情', () => {
     await expect(page.getByTestId('technician-task-detail-task-id')).toHaveText(TASK_ID)
     await expect(page.getByTestId('technician-task-detail-status')).toHaveText('READY')
     await expect(page.getByTestId('technician-task-detail-appointments')).toContainText('CONFIRMED')
+    await expect(page.getByTestId('technician-task-detail-contact-attempts')).toContainText('NO_ANSWER')
+    await expect(page.getByTestId('technician-task-detail-contact-attempts')).toContainText('PHONE')
     await expect(page.getByTestId('technician-task-detail-boundary')).toContainText('不返回地址')
+    await expect(page.getByTestId('technician-task-detail-boundary')).toContainText('联系对象引用')
     await expect(page.getByTestId('technician-task-detail-schedule-link')).toHaveAttribute(
       'href',
       `/technician-portal/schedule?taskId=${TASK_ID}`,

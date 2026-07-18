@@ -67,7 +67,19 @@ export type TechnicianPortalTaskDetail = {
   executionGuarded: boolean
   resourceVersion: number
   appointments: TechnicianPortalScheduleItem[]
+  contactAttempts: TechnicianPortalContactAttemptItem[]
   asOf: string
+}
+
+export type TechnicianPortalContactAttemptItem = {
+  contactAttemptId: string
+  taskId: string
+  channel: string
+  startedAt: string
+  endedAt: string
+  resultCode: 'CONNECTED' | 'NO_ANSWER' | 'BUSY' | 'WRONG_NUMBER' | 'USER_REQUESTED_LATER' | 'INVALID_CONTACT'
+  nextContactAt: string | null
+  createdAt: string
 }
 
 function technicianHeaders(technicianContextId: string): Record<string, string> {
