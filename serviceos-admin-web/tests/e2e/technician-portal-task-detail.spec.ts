@@ -148,14 +148,24 @@ async function stubTechnicianContext(page: Page) {
           exceptionCode: null,
           aggregateVersion: 1,
         }],
+        formSubmissions: [{
+          submissionId: '019f84b0-fffd-7f8c-9505-36fe5c0ee008',
+          formVersionId: '019f84b0-fffc-7f8c-9505-36fe5c0ee009',
+          formKey: 'INSTALL_REPORT',
+          submissionVersion: 2,
+          validationStatus: 'VALIDATED',
+          errorCount: 0,
+          warningCount: 1,
+          submittedAt: '2026-07-19T02:00:00Z',
+        }],
         asOf: '2026-07-18T03:00:00Z',
       }),
     })
   })
 }
 
-test.describe('M245 Technician Portal Visit 历史安全摘要', () => {
-  test('M245-01/02：详情展示 Visit 生命周期，不出现定位和设备明细', async ({ page }) => {
+test.describe('M246 Technician Portal 表单提交安全摘要', () => {
+  test('M246-01/02：详情展示表单校验摘要，不出现 values 和提交人', async ({ page }) => {
     await loginWithLocalKeycloak(page)
     await stubTechnicianContext(page)
 
@@ -175,9 +185,12 @@ test.describe('M245 Technician Portal Visit 历史安全摘要', () => {
     await expect(page.getByTestId('technician-task-detail-contact-attempts')).toContainText('PHONE')
     await expect(page.getByTestId('technician-task-detail-visits')).toContainText('IN_PROGRESS')
     await expect(page.getByTestId('technician-task-detail-visits')).toContainText('WITHIN_GEOFENCE')
+    await expect(page.getByTestId('technician-task-detail-form-submissions')).toContainText('INSTALL_REPORT')
+    await expect(page.getByTestId('technician-task-detail-form-submissions')).toContainText('VALIDATED')
     await expect(page.getByTestId('technician-task-detail-boundary')).toContainText('不返回地址')
     await expect(page.getByTestId('technician-task-detail-boundary')).toContainText('联系对象引用')
     await expect(page.getByTestId('technician-task-detail-boundary')).toContainText('GPS')
+    await expect(page.getByTestId('technician-task-detail-boundary')).toContainText('表单值')
     await expect(page.getByTestId('technician-task-detail-schedule-link')).toHaveAttribute(
       'href',
       `/technician-portal/schedule?taskId=${TASK_ID}`,

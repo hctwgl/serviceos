@@ -46,7 +46,7 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
       <div>
         <RouterLink to="/technician-portal/task-feed">← 返回任务 Feed</RouterLink>
         <h2>任务详情</h2>
-        <p class="hint">M245：当前 ACTIVE 责任任务的在线非 PII 详情、联系与 Visit 历史；执行授权仍以服务端命令为准。</p>
+        <p class="hint">M246：当前 ACTIVE 责任任务的在线非 PII 详情与协作历史；表单摘要另受 form.read 门禁。</p>
       </div>
       <button type="button" data-testid="technician-task-detail-refresh" @click="load">刷新</button>
     </header>
@@ -91,6 +91,32 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
           </tbody>
         </table>
         <p v-else>暂无预约</p>
+      </section>
+
+      <section class="forms">
+        <div class="section-title">
+          <h3>表单提交</h3>
+          <span>不含表单值与提交人</span>
+        </div>
+        <p v-if="detail.formSubmissions === null" data-testid="technician-task-detail-forms-hidden">
+          当前上下文无表单读取权限
+        </p>
+        <table v-else-if="detail.formSubmissions.length > 0" data-testid="technician-task-detail-form-submissions">
+          <thead>
+            <tr><th>表单</th><th>版本</th><th>校验</th><th>错误</th><th>警告</th><th>提交时间</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="submission in detail.formSubmissions" :key="submission.submissionId">
+              <td>{{ submission.formKey }}</td>
+              <td>{{ submission.submissionVersion }}</td>
+              <td>{{ submission.validationStatus }}</td>
+              <td>{{ submission.errorCount }}</td>
+              <td>{{ submission.warningCount }}</td>
+              <td>{{ submission.submittedAt }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-else data-testid="technician-task-detail-no-form-submissions">暂无表单提交</p>
       </section>
 
       <section class="visits">
@@ -140,7 +166,7 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
       </section>
 
       <p class="boundary" data-testid="technician-task-detail-boundary">
-        本切片不返回地址、联系人、联系对象引用、自由文本、录音引用、操作者标识、GPS、距离、设备、离线命令、现场备注、作业/资料引用、表单值、资料文件、配置源码或离线工作包。
+        本切片不返回地址、联系人、联系对象引用、自由文本、录音引用、操作者标识、GPS、距离、设备、离线命令、现场备注、作业/资料引用、表单值、校验消息、提交人、资料文件、配置源码或离线工作包。
       </p>
     </template>
   </section>

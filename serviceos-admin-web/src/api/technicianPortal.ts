@@ -69,7 +69,19 @@ export type TechnicianPortalTaskDetail = {
   appointments: TechnicianPortalScheduleItem[]
   contactAttempts: TechnicianPortalContactAttemptItem[]
   visits: TechnicianPortalVisitItem[]
+  formSubmissions: TechnicianPortalFormSubmissionItem[] | null
   asOf: string
+}
+
+export type TechnicianPortalFormSubmissionItem = {
+  submissionId: string
+  formVersionId: string
+  formKey: string
+  submissionVersion: number
+  validationStatus: 'VALIDATED' | 'INVALID'
+  errorCount: number
+  warningCount: number
+  submittedAt: string
 }
 
 export type TechnicianPortalVisitItem = {
