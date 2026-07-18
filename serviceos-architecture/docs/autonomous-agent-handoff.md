@@ -8,13 +8,14 @@ lastUpdated: 2026-07-18
 ## 当前
 
 - PR：https://github.com/hctwgl/serviceos/pull/146
-- latestMilestone：**M278**（提交后回填）
-- Flyway：**105 / 107**
+- latestMilestone：**M279**（提交后回填 baselineCommit）
+- Flyway：**108 / 110**
+- OpenAPI：**1.0.27**
 
 ## 已完成（阶段二）
 
-M275 PARALLEL · M276 TIMER · M277 SUB_PROCESS · M278 多实例
+M275 PARALLEL · M276 TIMER · M277 SUB_PROCESS · M278 多实例 · **M279 取消/重开/人工跳转**
 
 ## 下一步
 
-M279 撤回/取消/重开（或人工跳转）最小可靠切片
+M280 异常补偿最小可靠切片
