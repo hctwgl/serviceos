@@ -30,6 +30,9 @@ import java.util.UUID;
  *
  * <p>M228：可选 {@code technicians} 在无 NETWORK {@code technician.readOwnNetwork} 时为 null
  * （省略）；有能力时可为空列表。</p>
+ *
+ * <p>M229：可选 {@code reviews} 在无 NETWORK {@code evidence.read} 时为 null（省略）；
+ * 有能力时可为空列表。</p>
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record NetworkPortalWorkOrderWorkspace(
@@ -47,6 +50,7 @@ public record NetworkPortalWorkOrderWorkspace(
         List<NetworkPortalWorkspaceEvidenceSlotSummary> evidenceSlots,
         List<NetworkPortalWorkspaceEvidenceItemSummary> evidenceItems,
         List<NetworkPortalWorkspaceCorrectionCaseSummary> corrections,
+        List<NetworkPortalWorkspaceReviewCaseSummary> reviews,
         List<NetworkPortalExceptionItem> exceptions,
         List<NetworkPortalWorkspaceAppointmentSummary> appointments,
         List<NetworkPortalWorkspaceContactAttemptSummary> contactAttempts,
@@ -61,6 +65,7 @@ public record NetworkPortalWorkOrderWorkspace(
         evidenceSlots = evidenceSlots == null ? null : List.copyOf(evidenceSlots);
         evidenceItems = evidenceItems == null ? null : List.copyOf(evidenceItems);
         corrections = corrections == null ? null : List.copyOf(corrections);
+        reviews = reviews == null ? null : List.copyOf(reviews);
         exceptions = exceptions == null ? null : List.copyOf(exceptions);
         appointments = appointments == null ? null : List.copyOf(appointments);
         contactAttempts = contactAttempts == null ? null : List.copyOf(contactAttempts);
