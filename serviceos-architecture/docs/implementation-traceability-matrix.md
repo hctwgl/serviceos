@@ -369,4 +369,5 @@ Feature gate/authority: if applicable
 | M272 | REFERENCE_OEM SAMPLE Connector：独立适配器经通用 SPI 建单；SAMPLE HMAC；明确 TBD_EXTERNAL_CONTRACT | referenceoem + Security permitAll + ReferenceOemInboundOrderPostgresIT + ArchitectureTest + `285-m272-*` + `269-m272-*` | 真实第二家协议/Sandbox、出站/回调 |
 | M273 | 双车企入站回归：BYD + REFERENCE_OEM 独立 Connector/Bundle；冲突失败关闭 | DualOemInboundRegressionPostgresIT + `286-m273-*` + `270-m273-*` | 双车企提审/回调全矩阵、真实 OEM2 |
 | M274 | 第三家车企接入手册：Connector+Mapping+Bundle 标准路径 | `integration/04-third-oem-onboarding-handbook.md` + `287-m274-*` + `271-m274-*` | 真实 OEM3 接入 |
-| M275 | PARALLEL_GATEWAY fork/join：多分支激活、汇聚计数、重复 token 失败关闭；Flyway V102 | Parser + Handler + ParallelGateway/Linear IT + Validator + `288-m275-*` + `272-m275-*` | 定时器、子流程、多实例、包容网关 |
+| M275 | PARALLEL_GATEWAY fork/join：多分支激活、汇聚计数、重复 token 失败关闭；Flyway V102 | Parser + Handler + ParallelGateway/Linear IT + Validator + `288-m275-*` + `272-m275-*` | 子流程、多实例、包容网关 |
+| M276 | TIMER 到期捕获：durationSeconds 挂起、worker claim/lease 点火推进；Flyway V103 | schema + V103 + TimerWorker + Timer IT + `289-m276-*` + `273-m276-*` | 边界定时器、业务日历、超时转人工 UI |

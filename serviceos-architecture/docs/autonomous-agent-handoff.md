@@ -5,19 +5,17 @@ lastUpdated: 2026-07-18
 
 # ServiceOS 自主 Agent 交接
 
-## 当前分支 / PR
+## 当前
 
-- `cursor/bc-71d073b6-2d93-418e-a750-0b73ee12db1c-0a6a`
-- https://github.com/hctwgl/serviceos/pull/146
-- latestMilestone：**M275**（提交后回填 SHA）
-- Flyway：**102 / 104**
+- 分支/PR：`cursor/bc-71d073b6-...` / https://github.com/hctwgl/serviceos/pull/146
+- latestMilestone：**M276**（提交后回填）
+- Flyway：**103 / 105**
 
-## 已完成
+## 已完成（本轮续）
 
-- 阶段一 M267～M274
-- **M275** PARALLEL_GATEWAY fork/join + V102
+- M275 PARALLEL_GATEWAY
+- M276 TIMER + WorkflowTimerWorker
 
 ## 下一步
 
-1. M276 定时器 / 超时事件运行时
-2. 子流程 → 多实例 → 撤回/取消/重开
+M277 子流程（SUB_PROCESS）运行时

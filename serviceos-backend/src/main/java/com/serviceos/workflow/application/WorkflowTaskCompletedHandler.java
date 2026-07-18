@@ -18,6 +18,7 @@ import com.serviceos.workflow.api.SignalWorkflowWaitCommand;
 import com.serviceos.workflow.api.StageActivatedPayload;
 import com.serviceos.workflow.api.StageCompletedPayload;
 import com.serviceos.workflow.api.WorkflowCompletedPayload;
+import com.serviceos.workflow.api.WorkflowTimerFireService;
 import com.serviceos.workflow.api.WorkflowWaitSignalResult;
 import com.serviceos.workflow.api.WorkflowWaitSignalService;
 import com.serviceos.workorder.api.FulfillWorkOrderCommand;
@@ -43,7 +44,8 @@ import java.util.UUID;
  * 并行网关仍未实现。</p>
  */
 @Service
-final class WorkflowTaskCompletedHandler implements OutboxMessageHandler, WorkflowWaitSignalService {
+final class WorkflowTaskCompletedHandler
+        implements OutboxMessageHandler, WorkflowWaitSignalService, WorkflowTimerFireService {
     private static final String CONSUMER = "workflow.task-completed.v1";
 
     private final JdbcClient jdbc;
@@ -135,6 +137,78 @@ final class WorkflowTaskCompletedHandler implements OutboxMessageHandler, Workfl
                 progression,
                 activatedAt);
         inbox.complete(message.tenantId(), CONSUMER, message.eventId(), progressionDigest);
+    }
+
+    /**
+     * TIMER worker 到期唤醒：完成 WAITING 节点并推进后继。
+     */
+    @Transactional
+    public void fireTimer(UUID timerSubscriptionId, String correlationId) {
+        var timer = jdbc.sql("""
+                        SELECT timer_subscription_id, tenant_id, project_id, workflow_instance_id,
+                               workflow_node_instance_id, work_order_id, node_id, status
+                          FROM wfl_timer_subscription
+                         WHERE timer_subscription_id = :timerId
+                         FOR UPDATE
+                        """)
+                .param("timerId", timerSubscriptionId)
+                .query((rs, row) -> new TimerSubscription(
+                        rs.getObject("timer_subscription_id", UUID.class),
+                        rs.getString("tenant_id"),
+                        rs.getObject("project_id", UUID.class),
+                        rs.getObject("workflow_instance_id", UUID.class),
+                        rs.getObject("workflow_node_instance_id", UUID.class),
+                        rs.getObject("work_order_id", UUID.class),
+                        rs.getString("node_id"),
+                        rs.getString("status")))
+                .single();
+        if ("FIRED".equals(timer.status())) {
+            return;
+        }
+        if (!"CLAIMED".equals(timer.status()) && !"WAITING".equals(timer.status())) {
+            throw new IllegalStateException("TIMER subscription not firable: " + timer.status());
+        }
+        Instant now = clock.instant();
+        UUID fireEventId = UUID.nameUUIDFromBytes(("timer-fire:" + timerSubscriptionId).getBytes());
+        int timerUpdated = jdbc.sql("""
+                        UPDATE wfl_timer_subscription
+                           SET status = 'FIRED', fire_event_id = :fireEventId, fired_at = :firedAt,
+                               claim_owner = NULL, claim_until = NULL, version = version + 1
+                         WHERE timer_subscription_id = :timerId
+                           AND status IN ('WAITING', 'CLAIMED')
+                        """)
+                .param("fireEventId", fireEventId)
+                .param("firedAt", java.sql.Timestamp.from(now))
+                .param("timerId", timerSubscriptionId)
+                .update();
+        if (timerUpdated != 1) {
+            throw new IllegalStateException("TIMER subscription fire lost race");
+        }
+        int nodeUpdated = jdbc.sql("""
+                        UPDATE wfl_node_instance
+                           SET status = 'COMPLETED', completion_event_id = :completionEventId,
+                               completed_at = :completedAt, version = version + 1
+                         WHERE tenant_id = :tenantId
+                           AND workflow_node_instance_id = :nodeInstanceId
+                           AND status = 'WAITING'
+                        """)
+                .param("completionEventId", fireEventId)
+                .param("completedAt", java.sql.Timestamp.from(now))
+                .param("tenantId", timer.tenantId())
+                .param("nodeInstanceId", timer.workflowNodeInstanceId())
+                .update();
+        if (nodeUpdated != 1) {
+            throw new IllegalStateException("TIMER node is no longer waiting");
+        }
+        NodeRuntime current = lockWaitNodeRuntime(timer.tenantId(), timer.workflowNodeInstanceId());
+        var asset = configurations.requireAssetVersion(
+                timer.tenantId(), current.workflowDefinitionVersionId(),
+                ConfigurationAssetType.WORKFLOW, current.workflowDefinitionDigest());
+        ExpressionContext expressionContext = expressionContext(timer.tenantId(), current);
+        var progression = parser.progressionAfterTimer(asset, current.nodeId(), expressionContext);
+        activateProgression(
+                timer.tenantId(), fireEventId, correlationId,
+                Sha256.digest(timerSubscriptionId.toString()), current, progression, now);
     }
 
     @Override
@@ -277,13 +351,7 @@ final class WorkflowTaskCompletedHandler implements OutboxMessageHandler, Workfl
                     nextStageInstanceId, progression.stageCode(), nextStageSequence, activatedAt);
         }
         UUID nextNodeInstanceId = UUID.randomUUID();
-        if (progression.waiting()) {
-            String correlationKey = WorkflowCorrelationKeys.resolve(
-                    progression.correlationKeyTemplate(),
-                    tenantId,
-                    current.projectId(),
-                    current.workOrderId(),
-                    current.workflowInstanceId());
+        if (progression.waiting() || progression.timer()) {
             jdbc.sql("""
                             INSERT INTO wfl_node_instance (
                                 workflow_node_instance_id, tenant_id, workflow_instance_id,
@@ -304,31 +372,65 @@ final class WorkflowTaskCompletedHandler implements OutboxMessageHandler, Workfl
                     .param("activationEventId", activationEventId)
                     .param("activatedAt", java.sql.Timestamp.from(activatedAt))
                     .update();
+            if (progression.waiting()) {
+                String correlationKey = WorkflowCorrelationKeys.resolve(
+                        progression.correlationKeyTemplate(),
+                        tenantId,
+                        current.projectId(),
+                        current.workOrderId(),
+                        current.workflowInstanceId());
+                jdbc.sql("""
+                                INSERT INTO wfl_wait_subscription (
+                                    wait_subscription_id, tenant_id, project_id, workflow_instance_id,
+                                    workflow_node_instance_id, work_order_id, node_id, wait_event_type,
+                                    correlation_key, status, activation_event_id, version, activated_at
+                                ) VALUES (
+                                    :waitId, :tenantId, :projectId, :workflowId,
+                                    :nodeInstanceId, :workOrderId, :nodeId, :waitEventType,
+                                    :correlationKey, 'WAITING', :activationEventId, 1, :activatedAt
+                                )
+                                """)
+                        .param("waitId", UUID.randomUUID())
+                        .param("tenantId", tenantId)
+                        .param("projectId", current.projectId())
+                        .param("workflowId", current.workflowInstanceId())
+                        .param("nodeInstanceId", nextNodeInstanceId)
+                        .param("workOrderId", current.workOrderId())
+                        .param("nodeId", progression.nodeId())
+                        .param("waitEventType", progression.waitEventType())
+                        .param("correlationKey", correlationKey)
+                        .param("activationEventId", activationEventId)
+                        .param("activatedAt", java.sql.Timestamp.from(activatedAt))
+                        .update();
+                return Sha256.digest(current.workflowNodeInstanceId() + "|WAIT|" + nextNodeInstanceId
+                        + "|" + correlationKey);
+            }
+            Instant fireAt = activatedAt.plusSeconds(progression.durationSeconds());
             jdbc.sql("""
-                            INSERT INTO wfl_wait_subscription (
-                                wait_subscription_id, tenant_id, project_id, workflow_instance_id,
-                                workflow_node_instance_id, work_order_id, node_id, wait_event_type,
-                                correlation_key, status, activation_event_id, version, activated_at
+                            INSERT INTO wfl_timer_subscription (
+                                timer_subscription_id, tenant_id, project_id, workflow_instance_id,
+                                workflow_node_instance_id, work_order_id, node_id, duration_seconds,
+                                fire_at, status, activation_event_id, version, activated_at
                             ) VALUES (
-                                :waitId, :tenantId, :projectId, :workflowId,
-                                :nodeInstanceId, :workOrderId, :nodeId, :waitEventType,
-                                :correlationKey, 'WAITING', :activationEventId, 1, :activatedAt
+                                :timerId, :tenantId, :projectId, :workflowId,
+                                :nodeInstanceId, :workOrderId, :nodeId, :durationSeconds,
+                                :fireAt, 'WAITING', :activationEventId, 1, :activatedAt
                             )
                             """)
-                    .param("waitId", UUID.randomUUID())
+                    .param("timerId", UUID.randomUUID())
                     .param("tenantId", tenantId)
                     .param("projectId", current.projectId())
                     .param("workflowId", current.workflowInstanceId())
                     .param("nodeInstanceId", nextNodeInstanceId)
                     .param("workOrderId", current.workOrderId())
                     .param("nodeId", progression.nodeId())
-                    .param("waitEventType", progression.waitEventType())
-                    .param("correlationKey", correlationKey)
+                    .param("durationSeconds", progression.durationSeconds())
+                    .param("fireAt", java.sql.Timestamp.from(fireAt))
                     .param("activationEventId", activationEventId)
                     .param("activatedAt", java.sql.Timestamp.from(activatedAt))
                     .update();
-            return Sha256.digest(current.workflowNodeInstanceId() + "|WAIT|" + nextNodeInstanceId
-                    + "|" + correlationKey);
+            return Sha256.digest(current.workflowNodeInstanceId() + "|TIMER|" + nextNodeInstanceId
+                    + "|" + progression.durationSeconds());
         }
 
         ScheduledTaskView nextTask = tasks.createWorkflowTask(new CreateWorkflowTaskCommand(
@@ -797,6 +899,18 @@ final class WorkflowTaskCompletedHandler implements OutboxMessageHandler, Workfl
                 new ExpressionContext.RegionContext(
                         workOrder.provinceCode(), workOrder.cityCode(), workOrder.districtCode()),
                 new ExpressionContext.TaskContext(current.stageCode(), taskType));
+    }
+
+    private record TimerSubscription(
+            UUID timerSubscriptionId,
+            String tenantId,
+            UUID projectId,
+            UUID workflowInstanceId,
+            UUID workflowNodeInstanceId,
+            UUID workOrderId,
+            String nodeId,
+            String status
+    ) {
     }
 
     private record ParallelJoinRow(

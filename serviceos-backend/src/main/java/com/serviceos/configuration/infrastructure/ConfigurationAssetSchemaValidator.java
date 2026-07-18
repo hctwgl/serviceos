@@ -209,9 +209,28 @@ final class ConfigurationAssetSchemaValidator {
                 }
             } else if ("WAIT_EVENT".equals(nodeType)) {
                 validateWaitEventNode(entry.getValue(), entry.getKey(), outgoing);
+            } else if ("TIMER".equals(nodeType)) {
+                validateTimerNode(entry.getValue(), entry.getKey(), outgoing);
             } else if ("PARALLEL_GATEWAY".equals(nodeType)) {
                 validateParallelGatewayNode(entry.getKey(), outgoing, incoming, nodes);
             }
+        }
+    }
+
+    private void validateTimerNode(JsonNode node, String nodeId, Map<String, List<JsonNode>> outgoing) {
+        JsonNode duration = node.get("durationSeconds");
+        if (duration == null || duration.isNull() || !duration.isIntegralNumber() || duration.asInt() < 1) {
+            throw new ConfigurationPublicationException(
+                    "TIMER 必须声明正整数 durationSeconds: " + nodeId);
+        }
+        if (!present(node, "stageCode")) {
+            throw new ConfigurationPublicationException(
+                    "TIMER 必须声明 stageCode: " + nodeId);
+        }
+        List<JsonNode> edges = outgoing.getOrDefault(nodeId, List.of());
+        if (edges.size() != 1 || present(edges.getFirst(), "condition")) {
+            throw new ConfigurationPublicationException(
+                    "TIMER 必须恰好一条无条件出边: " + nodeId);
         }
     }
 
@@ -244,10 +263,10 @@ final class ConfigurationAssetSchemaValidator {
             for (JsonNode edge : outs) {
                 JsonNode target = nodes.get(edge.path("to").asText());
                 String targetType = target.path("nodeType").asText();
-                if (!Set.of("USER_TASK", "SERVICE_TASK", "REVIEW_TASK", "MANUAL_INTERVENTION", "WAIT_EVENT")
-                        .contains(targetType)) {
+                if (!Set.of("USER_TASK", "SERVICE_TASK", "REVIEW_TASK", "MANUAL_INTERVENTION",
+                        "WAIT_EVENT", "TIMER").contains(targetType)) {
                     throw new ConfigurationPublicationException(
-                            "PARALLEL fork 目标必须是任务或 WAIT_EVENT: " + edge.path("to").asText());
+                            "PARALLEL fork 目标必须是任务/WAIT_EVENT/TIMER: " + edge.path("to").asText());
                 }
                 String stage = target.path("stageCode").asText();
                 if (stage == null || stage.isBlank()) {

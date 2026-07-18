@@ -23,7 +23,7 @@ import java.util.Set;
  * 受控 JSON 工作流的最小可执行解释器。
  *
  * <p>M17～M19 线性推进；M269 EXCLUSIVE_GATEWAY；M270 WAIT_EVENT；M275 PARALLEL_GATEWAY
- * 分叉/汇聚。子流程与定时器仍未实现。</p>
+ * 分叉/汇聚；M276 TIMER 到期捕获。子流程仍未实现。</p>
  */
 @Component
 final class WorkflowDefinitionParser {
@@ -110,6 +110,16 @@ final class WorkflowDefinitionParser {
                     requiredText(target, "waitEventType"),
                     requiredText(target, "correlationKeyTemplate"));
         }
+        if ("TIMER".equals(targetType)) {
+            JsonNode duration = target.get("durationSeconds");
+            if (duration == null || duration.isNull() || !duration.isIntegralNumber() || duration.asInt() < 1) {
+                throw new IllegalArgumentException("TIMER durationSeconds must be positive: " + targetNodeId);
+            }
+            return ProgressionDefinition.timer(
+                    targetNodeId,
+                    requiredText(target, "stageCode"),
+                    duration.asInt());
+        }
         if ("PARALLEL_GATEWAY".equals(targetType)) {
             return resolveParallelGateway(graph, targetNodeId, context, visiting, arrivalFromNodeId);
         }
@@ -144,7 +154,7 @@ final class WorkflowDefinitionParser {
                         graph, transition.to(), context, new HashSet<>(visiting), gatewayNodeId);
                 if (branch.end() || branch.joinPending() || branch.fork()) {
                     throw new IllegalArgumentException(
-                            "PARALLEL fork branch must be task or WAIT_EVENT: " + transition.to());
+                            "PARALLEL fork branch must be task, WAIT_EVENT or TIMER: " + transition.to());
                 }
                 if (sharedStage == null) {
                     sharedStage = branch.stageCode();
@@ -187,6 +197,24 @@ final class WorkflowDefinitionParser {
             throw new IllegalArgumentException("wait node must be WAIT_EVENT: " + requiredNodeId);
         }
         JsonNode target = requireSingleUnconditionalTarget(graph, requiredNodeId, "WAIT_EVENT node");
+        return resolveTarget(
+                graph, requiredText(target, "nodeId"), context, new HashSet<>(), requiredNodeId);
+    }
+
+    /** TIMER 到期后，沿唯一出边继续。 */
+    ProgressionDefinition progressionAfterTimer(
+            ConfigurationAssetDefinition asset,
+            String timerNodeId,
+            ExpressionContext context
+    ) {
+        Objects.requireNonNull(context, "expression context must not be null");
+        Graph graph = parseGraph(asset);
+        String requiredNodeId = requiredValue(timerNodeId, "timerNodeId");
+        JsonNode timerNode = graph.nodes().get(requiredNodeId);
+        if (timerNode == null || !"TIMER".equals(requiredText(timerNode, "nodeType"))) {
+            throw new IllegalArgumentException("timer node must be TIMER: " + requiredNodeId);
+        }
+        JsonNode target = requireSingleUnconditionalTarget(graph, requiredNodeId, "TIMER node");
         return resolveTarget(
                 graph, requiredText(target, "nodeId"), context, new HashSet<>(), requiredNodeId);
     }
@@ -374,6 +402,8 @@ final class WorkflowDefinitionParser {
             boolean waiting,
             String waitEventType,
             String correlationKeyTemplate,
+            boolean timer,
+            int durationSeconds,
             boolean fork,
             List<ProgressionDefinition> forkBranches,
             boolean joinPending,
@@ -385,13 +415,13 @@ final class WorkflowDefinitionParser {
                 String formRef, String slaRef) {
             return new ProgressionDefinition(
                     nodeId, stageCode, taskType, taskKind, formRef, slaRef,
-                    false, false, null, null, false, List.of(), false, null, 0);
+                    false, false, null, null, false, 0, false, List.of(), false, null, 0);
         }
 
         static ProgressionDefinition end(String nodeId) {
             return new ProgressionDefinition(
                     nodeId, null, null, null, null, null,
-                    true, false, null, null, false, List.of(), false, null, 0);
+                    true, false, null, null, false, 0, false, List.of(), false, null, 0);
         }
 
         static ProgressionDefinition waiting(
@@ -403,6 +433,13 @@ final class WorkflowDefinitionParser {
             return new ProgressionDefinition(
                     nodeId, stageCode, null, null, null, null,
                     false, true, waitEventType, correlationKeyTemplate,
+                    false, 0, false, List.of(), false, null, 0);
+        }
+
+        static ProgressionDefinition timer(String nodeId, String stageCode, int durationSeconds) {
+            return new ProgressionDefinition(
+                    nodeId, stageCode, null, null, null, null,
+                    false, false, null, null, true, durationSeconds,
                     false, List.of(), false, null, 0);
         }
 
@@ -413,7 +450,7 @@ final class WorkflowDefinitionParser {
         ) {
             return new ProgressionDefinition(
                     forkNodeId, stageCode, null, null, null, null,
-                    false, false, null, null, true, List.copyOf(branches), false, null, 0);
+                    false, false, null, null, false, 0, true, List.copyOf(branches), false, null, 0);
         }
 
         static ProgressionDefinition joinPending(
@@ -423,7 +460,7 @@ final class WorkflowDefinitionParser {
         ) {
             return new ProgressionDefinition(
                     joinNodeId, null, null, null, null, null,
-                    false, false, null, null, false, List.of(), true, fromNodeId, expectedTokens);
+                    false, false, null, null, false, 0, false, List.of(), true, fromNodeId, expectedTokens);
         }
     }
 

@@ -44,7 +44,7 @@
       "properties": {
         "nodeId": {"type": "string", "pattern": "^[A-Z0-9][A-Z0-9_-]*$", "maxLength": 100},
         "nodeType": {
-          "enum": ["START", "END", "USER_TASK", "SERVICE_TASK", "REVIEW_TASK", "WAIT_EVENT", "EXCLUSIVE_GATEWAY", "PARALLEL_GATEWAY", "SUB_PROCESS", "MANUAL_INTERVENTION"]
+          "enum": ["START", "END", "USER_TASK", "SERVICE_TASK", "REVIEW_TASK", "WAIT_EVENT", "TIMER", "EXCLUSIVE_GATEWAY", "PARALLEL_GATEWAY", "SUB_PROCESS", "MANUAL_INTERVENTION"]
         },
         "name": {"type": "string", "minLength": 1, "maxLength": 200},
         "taskType": {"type": ["string", "null"], "maxLength": 100},
@@ -63,6 +63,11 @@
           "type": ["string", "null"],
           "minLength": 1,
           "maxLength": 300
+        },
+        "durationSeconds": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "maximum": 31536000
         },
         "entryActions": {"type": "array", "items": {"type": "string"}, "default": []},
         "exitActions": {"type": "array", "items": {"type": "string"}, "default": []},
