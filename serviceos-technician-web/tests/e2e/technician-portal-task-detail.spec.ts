@@ -23,7 +23,23 @@ async function loginWithLocalKeycloak(
   await expect(page).toHaveURL(/\/work-orders$/)
 }
 
-async function stubTechnicianContext(page: Page) {
+async function stubTechnicianContext(page: Page, options: { visits?: Array<Record<string, unknown>> } = {}) {
+  let visits = options.visits ?? [{
+    visitId: '019f84b0-fffe-7f8c-9505-36fe5c0ee007',
+    taskId: TASK_ID,
+    appointmentId: APPOINTMENT_ID,
+    visitSequence: 1,
+    status: 'IN_PROGRESS',
+    checkInCapturedAt: '2026-07-19T01:05:00Z',
+    checkInReceivedAt: '2026-07-19T01:05:05Z',
+    geofenceResult: 'WITHIN_GEOFENCE',
+    policyDecision: 'ACCEPTED',
+    checkOutCapturedAt: null,
+    checkOutReceivedAt: null,
+    resultCode: null,
+    exceptionCode: null,
+    aggregateVersion: 1,
+  }]
   await page.route('**/api/v1/me/contexts**', async (route: Route) => {
     await route.fulfill({
       status: 200,
@@ -132,22 +148,7 @@ async function stubTechnicianContext(page: Page) {
           nextContactAt: '2026-07-18T05:00:00Z',
           createdAt: '2026-07-18T02:33:00Z',
         }],
-        visits: [{
-          visitId: '019f84b0-fffe-7f8c-9505-36fe5c0ee007',
-          taskId: TASK_ID,
-          appointmentId: APPOINTMENT_ID,
-          visitSequence: 1,
-          status: 'IN_PROGRESS',
-          checkInCapturedAt: '2026-07-19T01:05:00Z',
-          checkInReceivedAt: '2026-07-19T01:05:05Z',
-          geofenceResult: 'WITHIN_GEOFENCE',
-          policyDecision: 'ACCEPTED',
-          checkOutCapturedAt: null,
-          checkOutReceivedAt: null,
-          resultCode: null,
-          exceptionCode: null,
-          aggregateVersion: 1,
-        }],
+        visits,
         formSubmissions: [{
           submissionId: '019f84b0-fffd-7f8c-9505-36fe5c0ee008',
           formVersionId: '019f84b0-fffc-7f8c-9505-36fe5c0ee009',
@@ -161,6 +162,40 @@ async function stubTechnicianContext(page: Page) {
         asOf: '2026-07-18T03:00:00Z',
       }),
     })
+  })
+  await page.route('**/api/v1/technician/me/appointments/*/visits:check-in', async (route: Route) => {
+    const request = route.request()
+    expect(request.headers()['x-technician-context']).toBe(CONTEXT_ID)
+    const body = request.postDataJSON()
+    expect(request.headers()['idempotency-key']).toBe(body.deviceCommandId)
+    expect(body).not.toHaveProperty('offline')
+    expect(body.location).toEqual({ latitude: 31.2304, longitude: 121.4737, accuracyMeters: 8 })
+    visits = [{
+      visitId: '019f84b0-fffe-7f8c-9505-36fe5c0ee007', taskId: TASK_ID,
+      appointmentId: APPOINTMENT_ID, visitSequence: 1, status: 'IN_PROGRESS',
+      checkInCapturedAt: body.capturedAt, checkInReceivedAt: '2026-07-19T01:05:05Z',
+      geofenceResult: 'WITHIN_GEOFENCE', policyDecision: 'ACCEPTED',
+      checkOutCapturedAt: null, checkOutReceivedAt: null, resultCode: null,
+      exceptionCode: null, aggregateVersion: 1,
+    }]
+    await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({
+      visitId: visits[0].visitId, status: 'IN_PROGRESS', aggregateVersion: 1,
+      geofenceResult: 'WITHIN_GEOFENCE', policyDecision: 'ACCEPTED', occurredAt: '2026-07-19T01:05:05Z',
+    }) })
+  })
+  await page.route('**/api/v1/technician/me/visits/*:interrupt', async (route: Route) => {
+    const request = route.request()
+    expect(request.headers()['x-technician-context']).toBe(CONTEXT_ID)
+    expect(request.headers()['if-match']).toBe('"1"')
+    const body = request.postDataJSON()
+    expect(body.exceptionCode).toBe('SITE_UNSAFE')
+    expect(body.evidenceRefs).toEqual([])
+    visits = visits.map((visit) => ({ ...visit, status: 'INTERRUPTED', exceptionCode: body.exceptionCode,
+      aggregateVersion: 2 }))
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+      visitId: visits[0].visitId, status: 'INTERRUPTED', aggregateVersion: 2,
+      geofenceResult: 'WITHIN_GEOFENCE', policyDecision: 'ACCEPTED', occurredAt: '2026-07-19T02:00:00Z',
+    }) })
   })
 }
 
@@ -195,5 +230,36 @@ test.describe('M246 Technician Portal 表单提交安全摘要', () => {
       'href',
       `/technician-portal/schedule?taskId=${TASK_ID}`,
     )
+  })
+
+  test('M262-01：用户主动定位后在线签到，不发送 offline 或伪造 receivedAt', async ({ page }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'geolocation', { configurable: true, value: {
+        getCurrentPosition: (success: PositionCallback) => success({
+          coords: { latitude: 31.2304, longitude: 121.4737, accuracy: 8,
+            altitude: null, altitudeAccuracy: null, heading: null, speed: null },
+          timestamp: Date.parse('2026-07-19T01:05:00Z'),
+        } as GeolocationPosition),
+      } })
+    })
+    await stubTechnicianContext(page, { visits: [] })
+    await loginWithLocalKeycloak(page)
+    await navigateTechnician(page, `/technician-portal/tasks/${TASK_ID}`)
+
+    await page.getByTestId('technician-visit-check-in').click()
+    await expect(page.getByTestId('technician-visit-action-message')).toHaveText('到场已由服务器确认')
+    await expect(page.getByTestId('technician-task-detail-visits')).toContainText('IN_PROGRESS')
+  })
+
+  test('M262-02：无法施工携带 If-Match 并明确不伪造 Evidence', async ({ page }) => {
+    await stubTechnicianContext(page)
+    await loginWithLocalKeycloak(page)
+    await navigateTechnician(page, `/technician-portal/tasks/${TASK_ID}`)
+
+    await page.getByTestId('technician-visit-interrupt-note').fill('现场存在安全风险')
+    await page.getByTestId('technician-visit-interrupt').click()
+    await expect(page.getByTestId('technician-visit-action-message')).toContainText('未伪造任何资料上传')
+    await expect(page.getByTestId('technician-task-detail-visits')).toContainText('INTERRUPTED')
+    await expect(page.getByTestId('technician-visit-checkout-boundary')).not.toBeVisible()
   })
 })

@@ -1,5 +1,5 @@
 /** Technician Portal Feed API：networkId 只经 X-Technician-Context。 */
-import { apiGet, type HttpStatusError } from './client'
+import { apiGet, apiPost, type HttpStatusError } from './client'
 
 export type TechnicianPortalFeedItem = {
   itemType: 'ASSIGNMENT' | 'TOMBSTONE'
@@ -112,6 +112,21 @@ export type TechnicianPortalContactAttemptItem = {
   createdAt: string
 }
 
+export type VisitCommandReceipt = {
+  visitId: string
+  status: 'IN_PROGRESS' | 'COMPLETED' | 'INTERRUPTED'
+  aggregateVersion: number
+  geofenceResult: 'WITHIN_GEOFENCE' | 'OUTSIDE_GEOFENCE' | 'LOCATION_UNAVAILABLE' | 'LOW_ACCURACY'
+  policyDecision: 'ACCEPTED' | 'WARNING'
+  occurredAt: string
+}
+
+export type TechnicianVisitLocation = {
+  latitude: number
+  longitude: number
+  accuracyMeters: number
+}
+
 function technicianHeaders(technicianContextId: string): Record<string, string> {
   return { 'X-Technician-Context': technicianContextId }
 }
@@ -145,6 +160,42 @@ export function getTechnicianTaskDetail(technicianContextId: string, taskId: str
     `/technician/me/tasks/${encodeURIComponent(taskId)}`,
     {},
     technicianHeaders(technicianContextId),
+  )
+}
+
+/**
+ * H5 只在用户主动点击后采集一次浏览器位置；服务端端点固定 online，不能由 Web 冒充离线工作包。
+ * Idempotency-Key 与 deviceCommandId 保持一致，网络超时后可以安全重放同一请求。
+ */
+export function checkInTechnicianVisit(
+  technicianContextId: string,
+  appointmentId: string,
+  command: { capturedAt: string; deviceCommandId: string; deviceId: string; location: TechnicianVisitLocation },
+) {
+  return apiPost<VisitCommandReceipt>(
+    `/technician/me/appointments/${encodeURIComponent(appointmentId)}/visits:check-in`,
+    {
+      body: command,
+      idempotencyKey: command.deviceCommandId,
+      headers: technicianHeaders(technicianContextId),
+    },
+  )
+}
+
+export function interruptTechnicianVisit(
+  technicianContextId: string,
+  visitId: string,
+  aggregateVersion: number,
+  command: { capturedAt: string; exceptionCode: string; note: string | null; evidenceRefs: string[] },
+) {
+  return apiPost<VisitCommandReceipt>(
+    `/technician/me/visits/${encodeURIComponent(visitId)}:interrupt`,
+    {
+      body: command,
+      idempotencyKey: crypto.randomUUID(),
+      ifMatch: `"${aggregateVersion}"`,
+      headers: technicianHeaders(technicianContextId),
+    },
   )
 }
 
