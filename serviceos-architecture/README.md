@@ -674,24 +674,23 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M281 标准维修/移机/巡检配置模板**，功能证据提交 `PLACEHOLDER64b13cd28cf98c6329f0fa3b11f01dc7`（合并入 `master` 后改为合并提交）。
-此前 M267 Connector SPI 证据为 `994cb46f1e31ddc8a4364a776cc4849e766c3b6d`；M266 仍为上一
-master 合并基线 `088018a6eac180f7fe36536fae9d073fa797757c`。
+当前工程基线为 **M281 标准维修/移机/巡检配置模板**，功能证据提交 `6b0e3d338ad445db73529c84aa01d04a2980d318`（合并入 `master` 后改为合并提交）。
 
-当前已具备 Admin、独立 Network/Technician 客户端、在线履约闭环、CREATE_WORK_ORDER 通用 Connector SPI，
-以及 Workflow 条件/EXCLUSIVE_GATEWAY 发布期静态门禁。下一主线是网关运行时与 REFERENCE_OEM（见 roadmap/06）。
+当前已具备多 OEM 内核、复杂流程运行时（含取消/重开/跳转/补偿）与标准服务模板族。下一主线是阶段三领域配置设计器。
 
 权威进度入口：
 
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
-- [M278 实现文档](architecture/291-m278-multi-instance-runtime.md)
-- [M278 验收矩阵](testing/275-m278-multi-instance-runtime-acceptance.md)
-- [M279 实现文档](architecture/292-m279-work-order-cancel-reopen-jump.md)
-- [M279 验收矩阵](testing/276-m279-work-order-cancel-reopen-jump-acceptance.md)
+- [M281 实现文档](architecture/294-m281-standard-charger-service-templates.md)
+- [M281 验收矩阵](testing/278-m281-standard-charger-service-templates-acceptance.md)
 - [M280 实现文档](architecture/293-m280-workflow-compensation-on-cancel.md)
 - [M280 验收矩阵](testing/277-m280-workflow-compensation-on-cancel-acceptance.md)
+- [M279 实现文档](architecture/292-m279-work-order-cancel-reopen-jump.md)
+- [M279 验收矩阵](testing/276-m279-work-order-cancel-reopen-jump-acceptance.md)
+- [M278 实现文档](architecture/291-m278-multi-instance-runtime.md)
+- [M278 验收矩阵](testing/275-m278-multi-instance-runtime-acceptance.md)
 - [M277 实现文档](architecture/290-m277-subprocess-runtime.md)
 - [M277 验收矩阵](testing/274-m277-subprocess-runtime-acceptance.md)
 - [M276 实现文档](architecture/289-m276-timer-runtime.md)
