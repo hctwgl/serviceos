@@ -297,6 +297,7 @@ title: ServiceOS 里程碑索引
 | M286 | M286 配置 Bundle 灰度（CANARY）与回滚 | [299-m286-configuration-canary-rollback.md](../architecture/299-m286-configuration-canary-rollback.md) | [283-m286-configuration-canary-rollback-acceptance.md](../testing/283-m286-configuration-canary-rollback-acceptance.md) |
 | M287 | M287 Workflow 可视化拖拽画布 | [300-m287-workflow-visual-canvas.md](../architecture/300-m287-workflow-visual-canvas.md) | [284-m287-workflow-visual-canvas-acceptance.md](../testing/284-m287-workflow-visual-canvas-acceptance.md) |
 | M288 | M288 CANARY 百分比流量灰度 | [301-m288-percentage-canary-traffic.md](../architecture/301-m288-percentage-canary-traffic.md) | [285-m288-percentage-canary-traffic-acceptance.md](../testing/285-m288-percentage-canary-traffic-acceptance.md) |
+| M289 | M289 Workflow 画布建边与网关条件编辑 | [302-m289-workflow-canvas-edges-conditions.md](../architecture/302-m289-workflow-canvas-edges-conditions.md) | [286-m289-workflow-canvas-edges-conditions-acceptance.md](../testing/286-m289-workflow-canvas-edges-conditions-acceptance.md) |
 
 ## 未关联里程碑的文档
 
