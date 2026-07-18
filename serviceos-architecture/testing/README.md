@@ -258,4 +258,5 @@
 - [M255 独立 Network Web AppShell 与环境基础验收矩阵](252-m255-independent-network-web-shell-acceptance.md)
 - [M256 独立 Network Web 完整交付批次验收矩阵](253-m256-network-web-delivery-batch-acceptance.md)
 - [M257 独立 Technician H5 交付批次验收矩阵](254-m257-technician-h5-delivery-batch-acceptance.md)
+- [M258 Technician iOS 仓库内安全基础验收矩阵](255-m258-technician-ios-security-foundation-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

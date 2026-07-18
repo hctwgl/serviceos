@@ -30,7 +30,7 @@ lastUpdated: 2026-07-18
 | MCP-APP-01 | Admin 独立构建 | 不依赖 Network/Technician 路由才能构建和运行 | M256/M257 Admin builds without formal Portal routes |
 | MCP-APP-02 | Network 独立构建 | 独立 AppShell、会话、环境和部署 | M255 shell + M256 OIDC/session/76 E2E/container smoke |
 | MCP-APP-03 | Technician H5 独立构建 | 独立 AppShell、Technician Context 和路由 | M257 build + 8 Playwright + container smoke |
-| MCP-APP-04 | Technician iOS 独立构建 | SwiftUI 工程可在模拟器和开发真机构建 | Xcode CI + device evidence |
+| MCP-APP-04 | Technician iOS 独立构建 | SwiftUI 工程可在模拟器和开发真机构建 | M258 仓库内 Foundation 已通过 Swift 6 严格编译；完整 Xcode/Simulator/开发真机证据待补 |
 | MCP-APP-05 | 单仓库共享边界 | 共享包不包含角色菜单或数据范围假设 | M247-M254 independent consumers + source gates + aggregate gate |
 | MCP-APP-06 | 旧路由迁移 | 双运行验证后才删除 Admin 中正式 Portal 路由 | M256 Network + M257 Technician migrated regressions, Admin builds, route gates |
 | MCP-APP-07 | 无 WebView 替代 | iOS 核心现场能力为原生实现 | source/review/device test |
@@ -39,11 +39,11 @@ lastUpdated: 2026-07-18
 
 | ID | 验收项 | 预期 | 证据 |
 |---|---|---|---|
-| MCP-AUTH-01 | OIDC PKCE | Web/iOS 使用受控授权码流程 | M256 Network + M257 Technician Web auth E2E; iOS pending |
+| MCP-AUTH-01 | OIDC PKCE | Web/iOS 使用受控授权码流程 | M256 Network + M257 Technician Web auth E2E；M258 iOS Code+PKCE/state/token lifecycle smoke；App 回调待完整 Xcode |
 | MCP-AUTH-02 | Portal Context | ADMIN/NETWORK/TECHNICIAN Context 不可跨用 | M256 Network + M257 Technician negative E2E/PostgreSQL |
 | MCP-AUTH-03 | Capability | 菜单和动作消费服务端 capability/allowedActions | M256/M257 server navigation UI + API tests; write allowedActions ongoing |
 | MCP-AUTH-04 | 深链重鉴权 | 打开深链时重新验证身份、范围和当前责任 | M257 H5 PKCE return-path + PostgreSQL responsibility tests |
-| MCP-AUTH-05 | Token 存储 | Web 不持久化长效敏感 Token；iOS 使用 Keychain | M250 Web memory-token gate + M251 vault boundary + future Keychain security review |
+| MCP-AUTH-05 | Token 存储 | Web 不持久化长效敏感 Token；iOS 使用 Keychain | M250 Web memory-token gate + M251 vault boundary + M258 real ThisDeviceOnly Keychain smoke；真机安全复核待补 |
 | MCP-AUTH-06 | Context 切换 | 切换后清理相关查询缓存和敏感状态 | M250 generic + M256 Network + M257 Technician A/B E2E |
 | MCP-AUTH-07 | 旧师傅失权 | 改派后旧 Context 无法读取或写入新事实 | end-to-end negative tests |
 
@@ -52,13 +52,13 @@ lastUpdated: 2026-07-18
 | ID | 验收项 | 预期 | 证据 |
 |---|---|---|---|
 | MCP-CONTRACT-01 | TypeScript Client | 可从 Core OpenAPI 重复生成且无手工漂移 | M247 reproducibility + independent consumer gate |
-| MCP-CONTRACT-02 | Swift Client | 可从同一 OpenAPI 重复生成 | M248 reproducibility + Swift 6 independent consumer gate |
-| MCP-CONTRACT-03 | Error Model | H5/iOS 对 Problem Details 和 errorCode 语义一致 | M250/M251 shared baselines + M257 H5 409/5xx safe-message E2E; iOS app pending |
+| MCP-CONTRACT-02 | Swift Client | 可从同一 OpenAPI 重复生成 | M248 reproducibility + Swift 6 independent consumer gate + M258 Foundation 实际编译链接生成 Client |
+| MCP-CONTRACT-03 | Error Model | H5/iOS 对 Problem Details 和 errorCode 语义一致 | M250/M251 shared baselines + M257 H5 409/5xx safe-message E2E + M258 iOS Problem Details 安全消息/诊断 smoke；App UI 待补 |
 | MCP-CONTRACT-04 | Page/Action Identity | 同一业务目标复用 pageId/actionCode | M252 single-source registry + backend/OpenAPI alignment tests |
 | MCP-CONTRACT-05 | Unknown Action | 客户端未知 action 安全降级，不自行猜测 | M252 TypeScript/Swift negative probes |
 | MCP-CONTRACT-06 | Schema 版本 | 表单、Evidence 和 WorkPackage 版本可声明与校验 | schema tests |
-| MCP-CONTRACT-07 | 兼容元数据 | clientKind/clientVersion/支持能力可观测 | M253 bounded headers + Web/iOS emission + backend MDC/Trace; capability negotiation pending |
-| MCP-CONTRACT-08 | Design Token | Web/iOS 从同一无角色假设机器源生成 | M249 reproducibility + CSS/Swift compile gate |
+| MCP-CONTRACT-07 | 兼容元数据 | clientKind/clientVersion/支持能力可观测 | M253 bounded headers + Web/iOS emission + backend MDC/Trace；M258 固定 `TECHNICIAN_IOS`/语义版本；capability negotiation pending |
+| MCP-CONTRACT-08 | Design Token | Web/iOS 从同一无角色假设机器源生成 | M249 reproducibility + CSS/Swift compile gate + M258 Foundation 实际编译链接生成 Swift Token |
 
 ## 6. Technician H5 在线参考实现
 
@@ -78,11 +78,11 @@ lastUpdated: 2026-07-18
 
 | ID | 验收项 | 预期 | 证据 |
 |---|---|---|---|
-| MCP-IOS-01 | 环境配置 | Local/Dev/Test/Staging/Prod 不可误混 | build/config tests |
-| MCP-IOS-02 | 登录和刷新 | 登录、刷新、过期、注销和撤销可靠 | XCTest/XCUITest |
-| MCP-IOS-03 | Keychain | Token/密钥不进入普通偏好或日志 | security tests |
-| MCP-IOS-04 | Swift Client | 生成客户端与服务端契约一致 | CI |
-| MCP-IOS-05 | Trace/日志 | 错误可定位且无 PII/Token/文件路径 | M251 diagnostic baseline + future app log review/tests |
+| MCP-IOS-01 | 环境配置 | Local/Dev/Test/Staging/Prod 不可误混 | M258 五环境与非 Local HTTPS 失败关闭 smoke；Xcode scheme/config 待补 |
+| MCP-IOS-02 | 登录和刷新 | 登录、刷新、过期、注销和撤销可靠 | M258 PKCE/exchange/refresh/expiry/logout Foundation smoke；App XCTest/XCUITest 待补 |
+| MCP-IOS-03 | Keychain | Token/密钥不进入普通偏好或日志 | M258 real ThisDeviceOnly Keychain + diagnostics redaction smoke；真机复核待补 |
+| MCP-IOS-04 | Swift Client | 生成客户端与服务端契约一致 | M248 可复现生成 + M258 Foundation 实际链接生成 Client |
+| MCP-IOS-05 | Trace/日志 | 错误可定位且无 PII/Token/文件路径 | M251 diagnostic baseline + M258 token/联系人/地址/VIN/照片/文件/表单/payload 脱敏 smoke；App log review 待补 |
 | MCP-IOS-06 | 可访问性 | Dynamic Type、VoiceOver、触控区域通过 | accessibility tests |
 | MCP-IOS-07 | TestFlight | 内部测试包可安装、升级和回滚 | distribution evidence |
 
