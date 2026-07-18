@@ -674,8 +674,9 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M267 通用 Connector SPI 与 BYD 入站边界归位**（功能分支证据；合并入 `master`
-后回填合并提交）。M266 Technician 在线资料整改仍为上一合并基线
+当前工程基线为 **M267 通用 Connector SPI 与 BYD 入站边界归位**，功能证据提交
+`994cb46f1e31ddc8a4364a776cc4849e766c3b6d`（合并入 `master` 后改为合并提交）。
+M266 Technician 在线资料整改仍为上一 master 合并基线
 `088018a6eac180f7fe36536fae9d073fa797757c`。
 
 当前已具备 Admin、独立 Network Web、独立 Technician H5、原生 Technician iOS，以及统一主体/组织/授权治理、在线 Visit、冻结基础表单、Evidence 上传、Snapshot/Task 完成、多轮整改闭环，以及 CREATE_WORK_ORDER 通用 Connector SPI。下一主线是多车企平台内核剩余切片（配置治理 MVP、条件网关、REFERENCE_OEM 等，见 roadmap/06）；Track F 离线与签名真机仍待外部环境。
