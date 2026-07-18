@@ -148,6 +148,7 @@ class CorrectionCasePostgresIT {
     @Test
     void rejectOpensCorrectionThenResubmitAndClose() throws Exception {
         EvidenceSetSnapshotView first = createSnapshot("first");
+        completeSourceTask(first);
         ReviewCaseView review = reviews.create(reviewer(), metadata("review-create"),
                 new CreateReviewCaseCommand(first.evidenceSetSnapshotId(), null));
         ReviewCaseView rejected = reviews.decide(reviewer(), metadata("review-reject"),
@@ -186,15 +187,6 @@ class CorrectionCasePostgresIT {
         assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type='evidence.correction-case-created'")
                 .query(Long.class).single()).isOne();
 
-        // M265 已完成源业务 Task；M266 只能通过独立整改 Task 写新资料，严禁重开源 Task。
-        jdbc.sql("""
-                UPDATE tsk_task
-                   SET status='COMPLETED', completed_at=now(), version=version+1,
-                       result_ref=:resultRef, result_digest=:resultDigest
-                 WHERE task_id=:task
-                """).param("task", taskId)
-                .param("resultRef", "evidence-set-snapshot://" + first.evidenceSetSnapshotId())
-                .param("resultDigest", first.contentDigest()).update();
         var claimed = humanTasks.claim(technician(), metadata("correction-claim"),
                 new ClaimHumanTaskCommand(opened.correctionTaskId(), 1));
         var started = humanTasks.start(technician(), metadata("correction-start"),
@@ -255,6 +247,7 @@ class CorrectionCasePostgresIT {
     @Test
     void waiveMarksTerminalAndCancelsCorrectionTask() throws Exception {
         EvidenceSetSnapshotView first = createSnapshot("waive-first");
+        completeSourceTask(first);
         ReviewCaseView review = reviews.create(reviewer(), metadata("waive-review-create"),
                 new CreateReviewCaseCommand(first.evidenceSetSnapshotId(), null));
         reviews.decide(reviewer(), metadata("waive-review-reject"),
@@ -301,9 +294,8 @@ class CorrectionCasePostgresIT {
         assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type='evidence.correction-waived'")
                 .query(Long.class).single()).isOne();
 
-        EvidenceSetSnapshotView second = createSnapshot("waive-second");
         assertThatThrownBy(() -> corrections.resubmit(technician(), metadata("resubmit-after-waive"),
-                new ResubmitCorrectionCaseCommand(correctionId, second.evidenceSetSnapshotId())))
+                new ResubmitCorrectionCaseCommand(correctionId, first.evidenceSetSnapshotId())))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code())
                                 .isEqualTo(ProblemCode.CORRECTION_CASE_STATE_CONFLICT));
@@ -406,6 +398,25 @@ class CorrectionCasePostgresIT {
         UUID revisionId = uploadScanAndValidate(pngBytes(marker), "begin-" + marker, "cmd-" + marker);
         return snapshots.create(technician(), metadata("snap-" + marker),
                 new CreateEvidenceSetSnapshotCommand(taskId, "TASK_SUBMISSION", List.of(revisionId)));
+    }
+
+    private void completeSourceTask(EvidenceSetSnapshotView snapshot) {
+        // M265 提交先把源业务 Task 终态化并撤销活动分派；随后审核拒绝仍应从历史责任链
+        // 精确派生整改候选人，而不是重开源 Task 或恢复旧分派。
+        jdbc.sql("""
+                UPDATE tsk_task
+                   SET status='COMPLETED', completed_at=now(), version=version+1,
+                       result_ref=:resultRef, result_digest=:resultDigest
+                 WHERE task_id=:task
+                """).param("task", taskId)
+                .param("resultRef", "evidence-set-snapshot://" + snapshot.evidenceSetSnapshotId())
+                .param("resultDigest", snapshot.contentDigest()).update();
+        jdbc.sql("""
+                UPDATE tsk_task_assignment
+                   SET status='EXPIRED', effective_to=now(), revoked_by=:actor,
+                       revoke_reason_code='TASK_COMPLETED'
+                 WHERE task_id=:task AND status='ACTIVE'
+                """).param("task", taskId).param("actor", TECHNICIAN).update();
     }
 
     private EvidenceSetSnapshotView createCorrectionSnapshot(CorrectionCaseView correction, String marker)

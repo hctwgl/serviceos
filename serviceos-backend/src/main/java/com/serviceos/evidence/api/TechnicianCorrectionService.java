@@ -27,7 +27,8 @@ public interface TechnicianCorrectionService {
 
     EvidenceUploadSessionView beginUpload(
             CurrentPrincipal principal, CommandMetadata metadata, String context,
-            UUID correctionCaseId, UUID slotId, TechnicianBeginEvidenceUploadCommand command);
+            UUID correctionCaseId, UUID slotId,
+            TechnicianBeginCorrectionEvidenceUploadCommand command);
 
     EvidenceItemView finalizeUpload(
             CurrentPrincipal principal, CommandMetadata metadata, String context,

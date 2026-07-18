@@ -3,7 +3,7 @@ package com.serviceos.evidence.web;
 import com.serviceos.evidence.api.EvidenceItemView;
 import com.serviceos.evidence.api.EvidenceSetSnapshotView;
 import com.serviceos.evidence.api.EvidenceUploadSessionView;
-import com.serviceos.evidence.api.TechnicianBeginEvidenceUploadCommand;
+import com.serviceos.evidence.api.TechnicianBeginCorrectionEvidenceUploadCommand;
 import com.serviceos.evidence.api.TechnicianCorrectionService;
 import com.serviceos.evidence.api.TechnicianCorrectionView;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
@@ -107,8 +107,8 @@ final class TechnicianCorrectionController {
     ) {
         EvidenceUploadSessionView session = corrections.beginUpload(
                 principals.current(), new CommandMetadata(correlationId, idempotencyKey), context,
-                correctionCaseId, slotId, new TechnicianBeginEvidenceUploadCommand(
-                        null, slotId, request.evidenceItemId(), request.originalFileName(),
+                correctionCaseId, slotId, new TechnicianBeginCorrectionEvidenceUploadCommand(
+                        request.evidenceItemId(), request.originalFileName(),
                         request.declaredMimeType(), request.expectedSize(), request.expectedSha256(),
                         request.captureSource(), request.capturedAt()));
         return ResponseEntity.created(URI.create("/api/v1/technician/me/corrections/"

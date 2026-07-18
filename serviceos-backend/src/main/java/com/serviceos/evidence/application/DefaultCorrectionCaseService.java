@@ -130,7 +130,9 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
 
         String payloadDigest = Sha256.digest(
                 correctionCaseId + "|" + reviewDecisionId + "|" + evidenceSetSnapshotId);
-        List<String> candidates = responsibilities.findActiveResponsibleUser(tenantId, taskId)
+        // 源业务 Task 在 M265 提交后已终态完成并撤销活动分派。整改任务必须回派给完成该
+        // Task 的最后责任人，不能要求重开源 Task，也不能把失效分派恢复为活动权限。
+        List<String> candidates = responsibilities.findCorrectionCandidateUser(tenantId, taskId)
                 .map(List::of)
                 .orElse(List.of());
         ScheduledTaskView correctionTask = tasks.createHandlingTask(new CreateHandlingTaskCommand(

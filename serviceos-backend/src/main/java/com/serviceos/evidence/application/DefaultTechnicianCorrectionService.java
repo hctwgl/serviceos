@@ -15,7 +15,7 @@ import com.serviceos.evidence.api.EvidenceSlotView;
 import com.serviceos.evidence.api.EvidenceUploadSessionView;
 import com.serviceos.evidence.api.FinalizeCorrectionEvidenceUploadCommand;
 import com.serviceos.evidence.api.ResubmitCorrectionCaseCommand;
-import com.serviceos.evidence.api.TechnicianBeginEvidenceUploadCommand;
+import com.serviceos.evidence.api.TechnicianBeginCorrectionEvidenceUploadCommand;
 import com.serviceos.evidence.api.TechnicianCorrectionService;
 import com.serviceos.evidence.api.TechnicianCorrectionView;
 import com.serviceos.identity.api.CurrentPrincipal;
@@ -151,7 +151,8 @@ final class DefaultTechnicianCorrectionService implements TechnicianCorrectionSe
     @Override
     public EvidenceUploadSessionView beginUpload(
             CurrentPrincipal principal, CommandMetadata metadata, String context,
-            UUID correctionCaseId, UUID slotId, TechnicianBeginEvidenceUploadCommand command
+            UUID correctionCaseId, UUID slotId,
+            TechnicianBeginCorrectionEvidenceUploadCommand command
     ) {
         Access access = requireWritableCase(principal, metadata.correlationId(), context, correctionCaseId);
         return evidence.beginCorrectionUpload(principal, metadata, new BeginCorrectionEvidenceUploadCommand(
