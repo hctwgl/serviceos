@@ -9,6 +9,8 @@ import com.serviceos.evidence.api.CorrectionCaseService;
 import com.serviceos.evidence.api.CorrectionCaseView;
 import com.serviceos.evidence.api.EvidenceCommandService;
 import com.serviceos.evidence.api.EvidenceItemView;
+import com.serviceos.evidence.api.EvidenceSetSnapshotService;
+import com.serviceos.evidence.api.EvidenceSetSnapshotView;
 import com.serviceos.evidence.api.EvidenceUploadSessionView;
 import com.serviceos.evidence.api.FinalizeEvidenceUploadCommand;
 import com.serviceos.evidence.api.NetworkPortalEvidenceService;
@@ -48,6 +50,7 @@ final class DefaultNetworkPortalEvidenceService implements NetworkPortalEvidence
     private final ActiveServiceResponsibilityService responsibilities;
     private final NetworkPortalTechnicianQuery technicians;
     private final EvidenceCommandService evidence;
+    private final EvidenceSetSnapshotService snapshots;
     private final CorrectionCaseService corrections;
     private final Clock clock;
 
@@ -57,6 +60,7 @@ final class DefaultNetworkPortalEvidenceService implements NetworkPortalEvidence
             ActiveServiceResponsibilityService responsibilities,
             NetworkPortalTechnicianQuery technicians,
             EvidenceCommandService evidence,
+            EvidenceSetSnapshotService snapshots,
             CorrectionCaseService corrections,
             Clock clock
     ) {
@@ -65,6 +69,7 @@ final class DefaultNetworkPortalEvidenceService implements NetworkPortalEvidence
         this.responsibilities = responsibilities;
         this.technicians = technicians;
         this.evidence = evidence;
+        this.snapshots = snapshots;
         this.corrections = corrections;
         this.clock = clock;
     }
@@ -125,6 +130,24 @@ final class DefaultNetworkPortalEvidenceService implements NetworkPortalEvidence
         requireNetworkOwnedTask(principal.tenantId(), taskId, networkId);
         requireOpenCorrection(principal, metadata.correlationId(), taskId);
         return evidence.finalizeUploadOnBehalf(principal, metadata, command, networkId);
+    }
+
+    @Override
+    @Transactional
+    public EvidenceSetSnapshotView createSnapshotOnBehalf(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            String networkContextHeader,
+            UUID correctionCaseId,
+            java.util.List<UUID> memberRevisionIds
+    ) {
+        Objects.requireNonNull(correctionCaseId, "correctionCaseId");
+        UUID networkId = requireAuthorizedNetwork(principal, metadata.correlationId(), networkContextHeader);
+        CorrectionCaseView current = corrections.get(principal, metadata.correlationId(), correctionCaseId);
+        requireNetworkOwnedTask(principal.tenantId(), current.taskId(), networkId);
+        requireOpenCorrection(principal, metadata.correlationId(), current.taskId());
+        return snapshots.createOnBehalf(
+                principal, metadata, correctionCaseId, memberRevisionIds, networkId);
     }
 
     @Override

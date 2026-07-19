@@ -19,6 +19,13 @@ const forgeResult = ref('')
 const switching = ref(false)
 const loginLabel = import.meta.env.DEV ? '使用本地 Keycloak 登录' : '使用 OIDC 登录'
 const devDiagnostics = import.meta.env.DEV
+const DEMO_NETWORK_ID = 'd3500000-1000-4000-8000-000000000002'
+function technicianContextLabel(scopeRef: string) {
+  if (scopeRef === DEMO_NETWORK_ID) {
+    return '张师傅 · 济南恒通新能源服务中心'
+  }
+  return `师傅网点 ${scopeRef.slice(0, 8)}…`
+}
 const testIds: Record<string, string> = {
   'TECHNICIAN.TASK.LIST': 'nav-technician-task-feed',
   'TECHNICIAN.SCHEDULE': 'nav-technician-schedule',
@@ -78,9 +85,11 @@ onMounted(() => { if (accessToken()) void refresh() })
       </section>
       <template v-else>
         <aside class="context-card" data-testid="technician-portal-shell">
-          <label for="technician-context">师傅上下文</label>
+          <label for="technician-context">当前身份</label>
           <select id="technician-context" data-testid="technician-context-select" :value="session.activeContextId" @change="refresh(($event.target as HTMLSelectElement).value)">
-            <option v-for="context in session.contexts" :key="context.contextId" :value="context.contextId">{{ context.scopeRef }}</option>
+            <option v-for="context in session.contexts" :key="context.contextId" :value="context.contextId">
+              {{ technicianContextLabel(context.scopeRef) }}
+            </option>
           </select>
           <p>{{ session.capabilities.length }} 项服务端 Capability</p>
           <nav v-for="(items, section) in groupedNavigation" :key="section" :aria-label="section">

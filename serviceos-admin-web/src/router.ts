@@ -1,5 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import AppShell from './pages/AppShell.vue'
+import WorkbenchPage from './pages/WorkbenchPage.vue'
+import GoldenPathPage from './pages/GoldenPathPage.vue'
+import DemoDataPage from './pages/DemoDataPage.vue'
+import NotFoundPage from './pages/NotFoundPage.vue'
 import ReviewQueuePage from './pages/ReviewQueuePage.vue'
 import ReviewCaseDetailPage from './pages/ReviewCaseDetailPage.vue'
 import CorrectionQueuePage from './pages/CorrectionQueuePage.vue'
@@ -59,7 +63,13 @@ export const router = createRouter({
           component: SearchPage,
           meta: { pageId: 'ADMIN.SEARCH' },
         },
-        { path: '', redirect: '/reviews' },
+        { path: '', redirect: '/workbench' },
+        {
+          path: 'workbench',
+          name: 'ADMIN.WORKBENCH',
+          component: WorkbenchPage,
+          meta: { pageId: 'ADMIN.WORKBENCH' },
+        },
         { path: 'reviews', name: 'ADMIN.REVIEW.QUEUE', component: ReviewQueuePage },
         { path: 'reviews/:id', name: 'ADMIN.REVIEW.DETAIL', component: ReviewCaseDetailPage },
         { path: 'corrections', name: 'ADMIN.CORRECTION.QUEUE', component: CorrectionQueuePage },
@@ -137,9 +147,21 @@ export const router = createRouter({
         { path: 'work-orders', name: 'ADMIN.WORKORDER.LIST', component: WorkOrderDirectoryPage },
         { path: 'work-orders/lookup', name: 'ADMIN.WORKORDER.LOOKUP', component: WorkOrderLookupPage },
         {
+          path: 'work-orders/golden-path',
+          name: 'ADMIN.WORKORDER.GOLDEN_PATH',
+          component: GoldenPathPage,
+          meta: { pageId: 'ADMIN.WORKORDER.GOLDEN_PATH' },
+        },
+        {
           path: 'work-orders/:id',
           name: 'ADMIN.WORKORDER.WORKSPACE',
           component: WorkOrderWorkspacePage,
+        },
+        {
+          path: 'system/demo-data',
+          name: 'ADMIN.SYSTEM.DEMO_DATA',
+          component: DemoDataPage,
+          meta: { pageId: 'ADMIN.SYSTEM.DEMO_DATA' },
         },
         // M187 Admin 统一用户中心：稳定 pageId = route name
         { path: 'users', name: 'ADMIN.USER.DIRECTORY', component: UserDirectoryPage, meta: { pageId: 'ADMIN.USER.DIRECTORY' } },
@@ -206,6 +228,11 @@ export const router = createRouter({
         },
         { path: 'settings/preferences', name: 'ADMIN.UI.PREFERENCES', component: UiPreferencesPage },
         { path: 'settings/token', name: 'ADMIN.TOKEN', component: TokenPage },
+        {
+          path: ':pathMatch(.*)*',
+          name: 'ADMIN.NOT_FOUND',
+          component: NotFoundPage,
+        },
       ],
     },
   ],

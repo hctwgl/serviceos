@@ -10,6 +10,8 @@ import {
 } from '../api/reviews'
 import { createBydReviewSubmission } from '../api/integrationCommands'
 import QueueTable from './QueueTable.vue'
+import StatusBadge from '../components/StatusBadge.vue'
+import { statusLabel } from '../product/statusLabels'
 
 const route = useRoute()
 const router = useRouter()
@@ -63,7 +65,7 @@ async function decide() {
     // 裁决命令只负责追加不可变决定；随后重新读取权威详情，避免命令响应与队列/详情投影
     // 在字段演进或异步扩展时让页面残留半更新状态。
     await load()
-    message.value = `已裁决为 ${decided.status}`
+    message.value = `已裁决为 ${statusLabel(decided.status)}`
   } catch (err) {
     error.value = err instanceof Error ? err.message : '裁决失败'
   } finally {
@@ -87,7 +89,7 @@ async function forceApprove() {
         note: note.value || null,
       })
     ).data
-    message.value = `已强制通过：${detail.value.status}`
+    message.value = `已强制通过：${statusLabel(detail.value.status)}`
   } catch (err) {
     error.value = err instanceof Error ? err.message : '强制通过失败'
   } finally {
@@ -117,7 +119,7 @@ async function reopen() {
       params: { id: reopened.reviewCaseId },
     })
     await load()
-    message.value = `重开结果：${reopened.status} / ${reopened.reviewCaseId}`
+    message.value = `重开结果：${statusLabel(reopened.status)} / ${reopened.reviewCaseId}`
   } catch (err) {
     error.value = err instanceof Error ? err.message : '重开失败'
   } finally {
@@ -131,7 +133,7 @@ async function submitOutbound() {
   error.value = null
   try {
     const result = await createBydReviewSubmission(reviewCaseId.value)
-    message.value = `已创建外发交付 ${result.data.deliveryId} / ${result.data.status}`
+    message.value = `已创建外发交付 ${result.data.deliveryId} / ${statusLabel(result.data.status)}`
   } catch (err) {
     error.value = err instanceof Error ? err.message : '创建提审外发失败'
   } finally {
@@ -172,8 +174,8 @@ onMounted(() => {
     <template v-else-if="detail">
       <article class="card">
         <dl>
-          <div><dt>status</dt><dd>{{ detail.status }}</dd></div>
-          <div><dt>origin</dt><dd>{{ detail.origin }}</dd></div>
+          <div><dt>状态</dt><dd><StatusBadge :status="detail.status" /></dd></div>
+          <div><dt>来源</dt><dd>{{ statusLabel(detail.origin) }}</dd></div>
           <div>
             <dt>taskId</dt>
             <dd>

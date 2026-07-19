@@ -16,6 +16,8 @@ import { isConflictError, safeAccessDeniedMessage } from '../api/client'
 import ImpactPanel from '../components/ImpactPanel.vue'
 import PrincipalPicker from '../components/PrincipalPicker.vue'
 import VersionedCommandForm from '../components/VersionedCommandForm.vue'
+import StatusBadge from '../components/StatusBadge.vue'
+import { statusLabel } from '../product/statusLabels'
 import { recordRecentVisit } from '../recent/recordRecentVisit'
 
 const route = useRoute()
@@ -166,7 +168,7 @@ onMounted(() => {
         <h3>{{ network.networkName }}</h3>
         <dl>
           <div><dt>code</dt><dd>{{ network.networkCode }}</dd></div>
-          <div><dt>status</dt><dd data-testid="network-status">{{ network.status }}</dd></div>
+          <div><dt>状态</dt><dd data-testid="network-status"><StatusBadge :status="network.status" /></dd></div>
           <div><dt>version</dt><dd>{{ network.version }}</dd></div>
         </dl>
       </article>
@@ -195,7 +197,7 @@ onMounted(() => {
                 name="network-membership"
                 :value="item.id"
               />
-              {{ item.role }} · {{ item.status }} · v{{ item.version }}
+              {{ statusLabel(item.role) }} · <StatusBadge :status="item.status" /> · v{{ item.version }}
             </label>
           </li>
         </ul>

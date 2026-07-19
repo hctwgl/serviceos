@@ -6,6 +6,7 @@ import TechnicianPortalSchedulePage from './pages/TechnicianPortalSchedulePage.v
 import TechnicianPortalSyncSummaryPage from './pages/TechnicianPortalSyncSummaryPage.vue'
 import TechnicianPortalMePage from './pages/TechnicianPortalMePage.vue'
 import TechnicianPortalCorrectionPage from './pages/TechnicianPortalCorrectionPage.vue'
+import TechnicianPortalNotFoundPage from './pages/TechnicianPortalNotFoundPage.vue'
 
 const MigrationTestEntry = defineComponent({
   name: 'MigrationTestEntry',
@@ -24,6 +25,7 @@ export const router = createRouter({ history: createWebHistory(), routes: [
   { path: '/technician-portal/schedule', component: TechnicianPortalSchedulePage },
   { path: '/technician-portal/sync-summary', component: TechnicianPortalSyncSummaryPage },
   { path: '/technician-portal/me', component: TechnicianPortalMePage },
+  { path: '/:pathMatch(.*)*', component: TechnicianPortalNotFoundPage },
 ] })
 
 export function routeForPage(pageId: string) {

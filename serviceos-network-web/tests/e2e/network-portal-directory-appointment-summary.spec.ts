@@ -125,7 +125,7 @@ test.describe('M231 Network Portal 目录页预约服务端摘要', () => {
     })
     await navigateNetwork(page, '/network-portal/work-orders')
     await expect(page.getByTestId('network-work-orders-table')).toBeVisible({ timeout: 15_000 })
-    await expect(page.getByTestId('work-order-appointment-window')).toContainText('CONFIRMED')
+    await expect(page.getByTestId('work-order-appointment-window')).toContainText('已确认')
     await expect(page.getByTestId('work-order-appointment-window')).toContainText(
       '2026-07-18T02:00:00Z',
     )
@@ -209,6 +209,6 @@ test.describe('M231 Network Portal 目录页预约服务端摘要', () => {
     })
     await navigateNetwork(page, '/network-portal/tasks')
     await expect(page.getByTestId('network-tasks-table')).toBeVisible({ timeout: 15_000 })
-    await expect(page.getByTestId('task-appointment-window')).toContainText('CONFIRMED')
+    await expect(page.getByTestId('task-appointment-window')).toContainText('已确认')
   })
 })

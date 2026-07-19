@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { statusLabel } from '../product/labels'
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+
 import {
   listNetworkPortalExceptions,
   type NetworkPortalExceptionItem,
@@ -116,8 +118,8 @@ watch(
           <td data-testid="exception-source-category">
             {{ item.sourceType }} / {{ item.category }}
           </td>
-          <td>{{ item.severity }}</td>
-          <td>{{ item.status }}</td>
+          <td>{{ item.severity ? statusLabel(item.severity) : '—' }}</td>
+          <td>{{ item.status ? statusLabel(item.status) : '—' }}</td>
           <td>{{ item.errorCode }}</td>
           <td data-testid="exception-occurrence-count">{{ item.occurrenceCount }}</td>
           <td data-testid="exception-opened-last">

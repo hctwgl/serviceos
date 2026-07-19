@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { statusLabel } from '../product/labels'
 import { onMounted, ref, watch } from 'vue'
 import {
   getMe,
@@ -9,6 +10,7 @@ import {
   type MeProfile,
 } from '../api/me'
 import { userFacingError } from '../api/client'
+import {formatDateTime} from '@serviceos/web-core'
 
 const props = defineProps<{ technicianContextId: string | null }>()
 const profile = ref<MeProfile | null>(null)
@@ -93,16 +95,16 @@ watch(() => props.technicianContextId, () => {
           <dd>{{ profile.contextVersion }}</dd>
         </div>
         <div>
-          <dt>asOf</dt>
-          <dd data-testid="technician-me-as-of">{{ profile.asOf }}</dd>
+          <dt>统计时间</dt>
+          <dd data-testid="technician-me-as-of">{{ formatDateTime(profile.asOf) }}</dd>
         </div>
       </dl>
 
       <h3>Personas</h3>
       <ul data-testid="technician-me-personas">
         <li v-for="persona in profile.personas" :key="persona.id">
-          {{ persona.personaType }} · {{ persona.status }}
-          （{{ persona.validFrom }} → {{ persona.validTo ?? '—' }}）
+          {{ statusLabel(persona.personaType) }} · {{ statusLabel(persona.status) }}
+          （{{ formatDateTime(persona.validFrom) }} → {{ formatDateTime(persona.validTo) }}）
         </li>
       </ul>
       <p v-if="profile.personas.length === 0">暂无 persona</p>
@@ -114,16 +116,16 @@ watch(() => props.technicianContextId, () => {
           <dd data-testid="technician-me-context-id">{{ activeContext.contextId }}</dd>
         </div>
         <div>
-          <dt>portal</dt>
-          <dd>{{ activeContext.portal }}</dd>
+          <dt>门户</dt>
+          <dd>{{ statusLabel(activeContext.portal) }}</dd>
         </div>
         <div>
-          <dt>personaType</dt>
-          <dd>{{ activeContext.personaType }}</dd>
+          <dt>身份类型</dt>
+          <dd>{{ statusLabel(activeContext.personaType) }}</dd>
         </div>
         <div>
-          <dt>scopeType</dt>
-          <dd>{{ activeContext.scopeType }}</dd>
+          <dt>范围类型</dt>
+          <dd>{{ statusLabel(activeContext.scopeType) }}</dd>
         </div>
         <div>
           <dt>scopeRef</dt>
@@ -155,8 +157,8 @@ watch(() => props.technicianContextId, () => {
           <dd>{{ capabilities.contextVersion }}</dd>
         </div>
         <div>
-          <dt>asOf</dt>
-          <dd>{{ capabilities.asOf }}</dd>
+          <dt>统计时间</dt>
+          <dd>{{ formatDateTime(capabilities.asOf) }}</dd>
         </div>
       </dl>
       <ul v-if="capabilities" data-testid="technician-me-capability-codes">

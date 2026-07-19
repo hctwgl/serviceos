@@ -100,3 +100,29 @@ export function listWorkOrderCoreTimeline(
 ) {
   return apiGet<WorkOrderTimelinePage>(`/work-orders/${workOrderId}/timeline`, query)
 }
+
+export type PricingShadowSnapshotItem = {
+  snapshotId: string
+  workOrderId: string
+  projectId: string
+  sourceEventId: string
+  sourceEventType: string
+  pricingKey: string
+  currency: string
+  totalAmountMinor: number
+  mode: 'SHADOW'
+  correlationId: string
+  createdAt: string
+}
+
+export type PricingShadowSnapshotPage = {
+  workOrderId: string
+  items: PricingShadowSnapshotItem[]
+  queriedAt: string
+  emptyHint?: string | null
+}
+
+/** 影子定价试算只读（非结算）。 */
+export function listWorkOrderPricingSnapshots(workOrderId: string) {
+  return apiGet<PricingShadowSnapshotPage>(`/work-orders/${workOrderId}/pricing-snapshots`)
+}

@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { statusLabel } from '../product/labels'
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+
 import {
   getNetworkPortalException,
   type NetworkPortalExceptionItem,
@@ -72,8 +74,8 @@ watch(
     <p v-if="error" data-testid="network-portal-error">{{ error }}</p>
     <p v-else-if="loading" data-testid="exception-detail-loading">加载中…</p>
     <dl v-else-if="detail" data-testid="exception-detail-fields">
-      <div><dt>status</dt><dd data-testid="exception-detail-status">{{ detail.status }}</dd></div>
-      <div><dt>severity</dt><dd data-testid="exception-detail-severity">{{ detail.severity }}</dd></div>
+      <div><dt>状态</dt><dd data-testid="exception-detail-status">{{ detail.status ? statusLabel(detail.status) : '—' }}</dd></div>
+      <div><dt>severity</dt><dd data-testid="exception-detail-severity">{{ detail.severity ? statusLabel(detail.severity) : '—' }}</dd></div>
       <div><dt>errorCode</dt><dd data-testid="exception-detail-error-code">{{ detail.errorCode }}</dd></div>
       <div><dt>category</dt><dd>{{ detail.category }}</dd></div>
       <div><dt>sourceType</dt><dd>{{ detail.sourceType }}</dd></div>

@@ -9,6 +9,7 @@ import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
 import com.serviceos.evidence.api.BeginEvidenceUploadOnBehalfCommand;
 import com.serviceos.evidence.api.CorrectionCaseView;
 import com.serviceos.evidence.api.EvidenceItemView;
+import com.serviceos.evidence.api.EvidenceSetSnapshotView;
 import com.serviceos.evidence.api.EvidenceUploadSessionView;
 import com.serviceos.evidence.api.FinalizeEvidenceUploadCommand;
 import com.serviceos.evidence.api.NetworkPortalEvidenceService;
@@ -126,8 +127,8 @@ class NetworkPortalEvidenceOnBehalfPostgresIT {
         deleteRecursively(STORAGE_ROOT);
         Files.createDirectories(STORAGE_ROOT);
 
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("125");
-        assertThat(flyway.info().applied()).hasSize(127);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("129");
+        assertThat(flyway.info().applied()).hasSize(131);
         assertThat(jdbc.sql("""
                         SELECT risk_level FROM auth_capability
                          WHERE capability_code='evidence.submitOnBehalf'
@@ -276,6 +277,70 @@ class NetworkPortalEvidenceOnBehalfPostgresIT {
                 actor(PRINCIPAL), metadata("m201-resubmit"), context, correctionCaseId, secondSnapshot);
         assertThat(replay.correctionCaseId()).isEqualTo(correctionCaseId);
         assertThat(replay.resubmissions()).hasSize(1);
+    }
+
+    @Test
+    void m201_10_createSnapshotOnBehalfThenResubmit() throws Exception {
+        byte[] content = pngBytes("m201-snapshot");
+        String checksum = sha256(content);
+        String context = "NETWORK|NETWORK|" + NETWORK_A;
+
+        EvidenceUploadSessionView session = portalEvidence.beginUploadOnBehalf(
+                actor(PRINCIPAL), metadata("m201-snap-begin"), context, TASK, slotId,
+                beginCommand(checksum, content.length, TECH_A.toString(), "整改代补"));
+        transfers.upload(token(session.uploadUrl()), "image/png", content.length,
+                new ByteArrayInputStream(content));
+        EvidenceItemView item = portalEvidence.finalizeUploadOnBehalf(
+                actor(PRINCIPAL), metadata("m201-snap-fin"), context, TASK, slotId,
+                session.uploadSessionId(),
+                new FinalizeEvidenceUploadCommand(
+                        TASK, slotId, session.uploadSessionId(), checksum, "m201-snap-finalize"));
+        UUID revisionId = item.revisions().getFirst().evidenceRevisionId();
+        markRevisionValidated(revisionId, item.evidenceItemId());
+
+        jdbc.sql("""
+                UPDATE tsk_task
+                   SET status='COMPLETED', updated_at=now(), version=version+1,
+                       completed_at=now(), result_ref='m201-snapshot',
+                       result_digest=:digest
+                 WHERE tenant_id=:tenant AND task_id=:task
+                """)
+                .param("tenant", TENANT).param("task", TASK)
+                .param("digest", Sha256.digest("m201-snapshot-complete")).update();
+
+        EvidenceSetSnapshotView snapshot = portalEvidence.createSnapshotOnBehalf(
+                actor(PRINCIPAL), metadata("m201-snap-create"), context, correctionCaseId,
+                List.of(revisionId));
+        assertThat(snapshot.evidenceSetSnapshotId()).isNotNull();
+        assertThat(snapshot.memberCount()).isOne();
+
+        CorrectionCaseView resubmitted = portalEvidence.resubmit(
+                actor(PRINCIPAL), metadata("m201-snap-resubmit"), context, correctionCaseId,
+                snapshot.evidenceSetSnapshotId());
+        assertThat(resubmitted.status()).isEqualTo("RESUBMITTED");
+        assertThat(resubmitted.latestResubmissionSnapshotId()).isEqualTo(snapshot.evidenceSetSnapshotId());
+    }
+
+    private void markRevisionValidated(UUID revisionId, UUID evidenceItemId) {
+        jdbc.sql("""
+                UPDATE evd_evidence_revision
+                   SET status='VALIDATED'
+                 WHERE tenant_id=:tenant AND evidence_revision_id=:revision
+                """).param("tenant", TENANT).param("revision", revisionId).update();
+        jdbc.sql("""
+                INSERT INTO evd_evidence_validation (
+                    validation_id, tenant_id, project_id, task_id, slot_id, evidence_item_id,
+                    evidence_revision_id, check_type, severity, result, reason_code, message,
+                    details, validator_name, validator_version, created_at)
+                VALUES (
+                    :validationId, :tenant, :project, :task, :slot, :item, :revision,
+                    'FORMAT', 'BLOCK', 'PASSED', NULL, NULL, '{}'::jsonb,
+                    'M201-IT', '1', now())
+                ON CONFLICT (tenant_id, evidence_revision_id, check_type) DO NOTHING
+                """)
+                .param("validationId", UUID.randomUUID()).param("tenant", TENANT)
+                .param("project", PROJECT).param("task", TASK).param("slot", slotId)
+                .param("item", evidenceItemId).param("revision", revisionId).update();
     }
 
     private BeginEvidenceUploadOnBehalfCommand beginCommand(

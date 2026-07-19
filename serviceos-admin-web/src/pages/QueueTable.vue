@@ -1,17 +1,25 @@
 <script setup lang="ts">
 import { RouterLink, type RouteLocationRaw } from 'vue-router'
+import { fieldLabel } from '../product/terms'
+import { statusLabel } from '../product/statusLabels'
+import { formatDateTime } from '../product/formatTime'
+import PageState from '../components/PageState.vue'
+import StatusBadge from '../components/StatusBadge.vue'
 
 const props = defineProps<{
   title: string
   columns: string[]
+  /** 可选：覆盖列中文标题 */
+  columnLabels?: Record<string, string>
   rows: Array<Record<string, unknown>>
   loading: boolean
   error: string | null
+  errorCode?: string | null
   asOf?: string | null
   nextCursor?: string | null
+  emptyGuide?: string
   /**
    * 可选列深链：仅当解析结果非 null 时渲染 RouterLink。
-   * 默认保持明文，避免影响 Attempt/里程碑等非资源队列。
    */
   linkColumns?: Record<
     string,
@@ -21,12 +29,65 @@ const props = defineProps<{
 
 const emit = defineEmits<{ refresh: []; next: [] }>()
 
+const TIME_COLUMNS = new Set([
+  'createdAt',
+  'updatedAt',
+  'receivedAt',
+  'openedAt',
+  'deadlineAt',
+  'startedAt',
+  'completedAt',
+  'asOf',
+])
+
 function linkFor(column: string, row: Record<string, unknown>): RouteLocationRaw | null {
   const resolver = props.linkColumns?.[column]
   if (!resolver) {
     return null
   }
   return resolver(row) ?? null
+}
+
+function headerFor(column: string): string {
+  return props.columnLabels?.[column] ?? fieldLabel(column)
+}
+
+const ENUM_LABEL_COLUMNS = new Set([
+  'taskType',
+  'taskKind',
+  'stageCode',
+  'businessType',
+  'type',
+  'origin',
+  'decision',
+])
+
+function usesEnumLabel(column: string): boolean {
+  return column === 'status' || column.endsWith('Status') || ENUM_LABEL_COLUMNS.has(column)
+}
+
+function displayValue(column: string, value: unknown): string {
+  if (value == null || value === '') {
+    return '—'
+  }
+  if (usesEnumLabel(column)) {
+    return statusLabel(String(value))
+  }
+  if (TIME_COLUMNS.has(column) || column.endsWith('At')) {
+    return formatDateTime(String(value))
+  }
+  if (Array.isArray(value)) {
+    return value.length ? value.join(', ') : '—'
+  }
+  return String(value)
+}
+
+function isStatusColumn(column: string): boolean {
+  return column === 'status' || column.endsWith('Status')
+}
+
+function isBadgeColumn(column: string): boolean {
+  return isStatusColumn(column)
 }
 </script>
 
@@ -35,35 +96,47 @@ function linkFor(column: string, row: Record<string, unknown>): RouteLocationRaw
     <header>
       <div>
         <h2>{{ title }}</h2>
-        <p v-if="asOf" class="meta">asOf {{ asOf }}</p>
+        <p v-if="asOf" class="meta">统计时间 {{ formatDateTime(asOf) }}</p>
       </div>
       <div class="actions">
         <button type="button" :disabled="loading" @click="emit('refresh')">刷新</button>
         <button type="button" :disabled="loading || !nextCursor" @click="emit('next')">下一页</button>
       </div>
     </header>
-    <p v-if="error" class="error">{{ error }}</p>
-    <p v-else-if="loading">加载中…</p>
+    <PageState
+      v-if="error"
+      kind="error"
+      :description="error"
+      :error-code="errorCode ?? undefined"
+      @reload="emit('refresh')"
+    />
+    <PageState v-else-if="loading" kind="loading" />
+    <PageState
+      v-else-if="rows.length === 0"
+      kind="empty"
+      :guide="emptyGuide ?? '当前没有相关数据，可以调整筛选条件或初始化演示数据。'"
+    />
     <table v-else>
       <thead>
         <tr>
-          <th v-for="column in columns" :key="column">{{ column }}</th>
+          <th v-for="column in columns" :key="column">{{ headerFor(column) }}</th>
         </tr>
       </thead>
       <tbody>
-        <tr v-if="rows.length === 0">
-          <td :colspan="columns.length">暂无数据</td>
-        </tr>
         <tr v-for="(row, index) in rows" :key="index">
           <td v-for="column in columns" :key="column">
+            <StatusBadge
+              v-if="isBadgeColumn(column) && !linkFor(column, row)"
+              :status="String(row[column] ?? '')"
+            />
             <RouterLink
-              v-if="linkFor(column, row)"
+              v-else-if="linkFor(column, row)"
               :to="linkFor(column, row)!"
               class="queue-cell-link"
             >
-              {{ row[column] ?? '—' }}
+              {{ displayValue(column, row[column]) }}
             </RouterLink>
-            <template v-else>{{ row[column] ?? '—' }}</template>
+            <template v-else>{{ displayValue(column, row[column]) }}</template>
           </td>
         </tr>
       </tbody>
@@ -107,9 +180,6 @@ button {
 button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-.error {
-  color: #9b1c1c;
 }
 table {
   width: 100%;

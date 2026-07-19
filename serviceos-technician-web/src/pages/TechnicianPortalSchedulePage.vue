@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { statusLabel } from '../product/labels'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import {
@@ -6,6 +7,7 @@ import {
   type TechnicianPortalScheduleItem,
 } from '../api/technicianPortal'
 import { userFacingError } from '../api/client'
+import {formatDateTime} from '@serviceos/web-core'
 
 const props = defineProps<{ technicianContextId: string | null }>()
 const route = useRoute()
@@ -69,8 +71,8 @@ watch(() => props.technicianContextId, () => {
     <p v-if="error" data-testid="technician-portal-error">{{ error }}</p>
     <template v-else>
       <dl v-if="asOf" data-testid="technician-schedule-meta" class="meta">
-        <div><dt>networkId</dt><dd data-testid="technician-schedule-network-id">{{ networkId }}</dd></div>
-        <div><dt>asOf</dt><dd data-testid="technician-schedule-as-of">{{ asOf }}</dd></div>
+        <div><dt>所属网点</dt><dd data-testid="technician-schedule-network-id">{{ networkId }}</dd></div>
+        <div><dt>统计时间</dt><dd data-testid="technician-schedule-as-of">{{ formatDateTime(asOf) }}</dd></div>
       </dl>
       <table data-testid="technician-schedule-table">
         <thead>
@@ -97,10 +99,10 @@ watch(() => props.technicianContextId, () => {
             <td data-testid="technician-schedule-task-id">{{ item.taskId }}</td>
             <td data-testid="technician-schedule-work-order-id">{{ item.workOrderId }}</td>
             <td data-testid="technician-schedule-project-id">{{ item.projectId ?? '—' }}</td>
-            <td>{{ item.type }}</td>
-            <td>{{ item.status }}</td>
-            <td>{{ item.windowStart ?? '—' }}</td>
-            <td data-testid="technician-schedule-window-end">{{ item.windowEnd ?? '—' }}</td>
+            <td>{{ statusLabel(item.type) }}</td>
+            <td>{{ statusLabel(item.status) }}</td>
+            <td>{{ formatDateTime(item.windowStart) }}</td>
+            <td data-testid="technician-schedule-window-end">{{ formatDateTime(item.windowEnd) }}</td>
             <td data-testid="technician-schedule-timezone">{{ item.timezone ?? '—' }}</td>
           </tr>
         </tbody>

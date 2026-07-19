@@ -491,6 +491,31 @@ export function assignNetworkPortalTechnician(
   )
 }
 
+export type NetworkPortalAcceptAssignmentReceipt = {
+  taskId: string
+  workOrderId: string
+  networkServiceAssignmentId: string
+  networkAssigneeId: string
+  occurredAt: string
+}
+
+/** 网点接单：仅激活 ACTIVE NETWORK，不强制同时指派师傅。 */
+export function acceptNetworkPortalAssignment(
+  networkContextId: string,
+  taskId: string,
+  body: { businessType: string },
+  idempotencyKey = crypto.randomUUID(),
+) {
+  return apiPost<NetworkPortalAcceptAssignmentReceipt>(
+    `/network-portal/tasks/${taskId}:accept-assignment`,
+    {
+      body,
+      idempotencyKey,
+      headers: networkHeaders(networkContextId),
+    },
+  )
+}
+
 export type AppointmentWindow = {
   start: string
   end: string
@@ -724,6 +749,7 @@ export type NetworkPortalEvidenceItem = {
   taskId: string
   evidenceSlotId: string
   status: string
+  revisions?: Array<{ evidenceRevisionId: string }>
 }
 
 export type NetworkPortalCorrectionCase = {
@@ -963,6 +989,35 @@ export function getNetworkPortalTechnicianMembership(
     {},
     networkHeaders(networkContextId),
   )
+}
+
+/** M201：整改代补创建资料快照。 */
+export function createNetworkPortalCorrectionEvidenceSnapshot(
+  networkContextId: string,
+  correctionCaseId: string,
+  body: { memberRevisionIds: string[] },
+  idempotencyKey = crypto.randomUUID(),
+) {
+  return apiPost<NetworkPortalEvidenceSetSnapshot>(
+    `/network-portal/correction-cases/${correctionCaseId}/evidence-set-snapshots`,
+    {
+      body,
+      idempotencyKey,
+      headers: networkHeaders(networkContextId),
+    },
+  )
+}
+
+export type NetworkPortalEvidenceSetSnapshot = {
+  evidenceSetSnapshotId: string
+  taskId: string
+  projectId: string
+  resolutionId: string
+  purpose: string
+  memberCount: number
+  contentDigest: string
+  createdBy: string
+  createdAt: string
 }
 
 /** M201：整改补传 resubmit。 */

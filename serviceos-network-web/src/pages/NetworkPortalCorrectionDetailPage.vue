@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { statusLabel } from '../product/labels'
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+
 import {
   getNetworkPortalCorrection,
   type NetworkPortalCorrectionDetail,
@@ -77,7 +79,7 @@ watch(
     <p v-else-if="loading" data-testid="correction-detail-loading">加载中…</p>
     <template v-else-if="detail">
       <dl data-testid="correction-detail-fields">
-        <div><dt>status</dt><dd data-testid="correction-detail-status">{{ detail.status }}</dd></div>
+        <div><dt>状态</dt><dd data-testid="correction-detail-status">{{ detail.status ? statusLabel(detail.status) : '—' }}</dd></div>
         <div><dt>projectId</dt><dd>{{ detail.projectId }}</dd></div>
         <div>
           <dt>taskId</dt>

@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { statusLabel } from '../product/labels'
 import { onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
+
 import {
   listNetworkPortalQualifications,
   type NetworkPortalQualificationItem,
@@ -65,7 +67,7 @@ watch(() => props.networkContextId, () => {
           </td>
           <td>{{ item.technicianProfileId }}</td>
           <td>{{ item.qualificationCode }}</td>
-          <td>{{ item.status }}</td>
+          <td>{{ item.status ? statusLabel(item.status) : '—' }}</td>
           <td>{{ item.validFrom }} → {{ item.validTo ?? '—' }}</td>
           <td data-testid="qualification-submitted">
             {{ item.submittedBy }} / {{ item.submittedAt }}

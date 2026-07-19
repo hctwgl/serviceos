@@ -8,6 +8,7 @@ import {
 } from '../api/organizations'
 import { safeAccessDeniedMessage } from '../api/client'
 import ExternalAuthoritativeBadge from '../components/ExternalAuthoritativeBadge.vue'
+import StatusBadge from '../components/StatusBadge.vue'
 
 const loading = ref(false)
 const busy = ref(false)
@@ -111,7 +112,7 @@ onMounted(() => {
               :last-synced-at="item.updatedAt"
             />
           </td>
-          <td>{{ item.status }}</td>
+          <td><StatusBadge :status="item.status" /></td>
           <td>
             <RouterLink :to="{ name: 'ADMIN.ORGANIZATION.DETAIL', params: { id: item.id } }">
               打开

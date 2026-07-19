@@ -9,6 +9,8 @@ import {
   type CorrectionCase,
 } from '../api/corrections'
 import QueueTable from './QueueTable.vue'
+import StatusBadge from '../components/StatusBadge.vue'
+import { statusLabel } from '../product/statusLabels'
 
 const route = useRoute()
 const correctionCaseId = computed(() => String(route.params.id ?? ''))
@@ -48,7 +50,7 @@ async function resubmit() {
     ).data
     // 命令成功后重新读取权威详情，避免补传轮次与 Case 投影停留在命令响应快照。
     await load()
-    message.value = `已补传，status=${resubmitted.status}`
+    message.value = `已补传，${statusLabel(resubmitted.status)}`
   } catch (err) {
     error.value = err instanceof Error ? err.message : '补传失败'
   } finally {
@@ -65,7 +67,7 @@ async function closeCase() {
       await closeCorrectionCase(correctionCaseId.value, closeNote.value || undefined)
     ).data
     await load()
-    message.value = `已关闭，status=${closed.status}`
+    message.value = `已关闭，${statusLabel(closed.status)}`
   } catch (err) {
     error.value = err instanceof Error ? err.message : '关闭失败'
   } finally {
@@ -90,7 +92,7 @@ async function waive() {
     // 豁免会在同一事务取消整改 Task；重新读取详情后继续展示权威 Case，
     // 成功提示不能遮蔽 status、任务引用和补传历史。
     await load()
-    message.value = `已豁免，status=${waived.status}`
+    message.value = `已豁免，${statusLabel(waived.status)}`
   } catch (err) {
     error.value = err instanceof Error ? err.message : '豁免失败'
   } finally {
@@ -130,7 +132,7 @@ onMounted(() => {
     <template v-else-if="detail">
       <article class="card">
         <dl>
-          <div><dt>status</dt><dd>{{ detail.status }}</dd></div>
+          <div><dt>状态</dt><dd><StatusBadge :status="detail.status" /></dd></div>
           <div>
             <dt>projectId</dt>
             <dd>

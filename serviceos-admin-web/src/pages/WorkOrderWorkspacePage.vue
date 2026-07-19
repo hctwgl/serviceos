@@ -16,15 +16,23 @@ import {
   getAuthorizedWorkOrderStages,
   listAuthorizedWorkOrderTasks,
   listWorkOrderCoreTimeline,
+  listWorkOrderPricingSnapshots,
+  type PricingShadowSnapshotPage,
   type WorkOrderDetail,
   type WorkOrderTaskPage,
   type WorkOrderTimelinePage,
   type WorkflowExecutionProjection,
 } from '../api/workOrderDetail'
 import { getTaskAllowedActions, type TaskAllowedActions } from '../api/tasks'
-import { manualAssignServiceAssignments } from '../api/dispatch'
+import {
+  manualAssignNetworkServiceAssignment,
+  manualAssignServiceAssignments,
+} from '../api/dispatch'
 import TaskCommandPanel from '../components/TaskCommandPanel.vue'
+import StatusBadge from '../components/StatusBadge.vue'
 import { recordRecentVisit } from '../recent/recordRecentVisit'
+import { statusLabel } from '../product/statusLabels'
+import { formatDateTime } from '../product/formatTime'
 import QueueTable from './QueueTable.vue'
 
 const route = useRoute()
@@ -47,12 +55,83 @@ const stages = ref<WorkflowExecutionProjection | null>(null)
 const taskPage = ref<WorkOrderTaskPage | null>(null)
 const timelinePage = ref<WorkOrderTimelinePage | null>(null)
 const authorityError = ref<string | null>(null)
-const networkAssigneeId = ref('admin-pilot-network-1')
-const technicianAssigneeId = ref('06b612f3-a901-4b0e-bd90-86b4259cc087')
+/** 本地演示默认：济南恒通网点 / 张师傅档案（见 serviceos-deploy/demo）。 */
+const DEMO_NETWORK_ID = 'd3500000-1000-4000-8000-000000000002'
+const DEMO_TECHNICIAN_PROFILE_ID = 'd3500000-1000-4000-8000-000000000004'
+const networkAssigneeId = ref(DEMO_NETWORK_ID)
+const technicianAssigneeId = ref(DEMO_TECHNICIAN_PROFILE_ID)
 const assignBusinessType = ref('INSTALLATION')
 const manualAssignBusy = ref(false)
 const manualAssignError = ref<string | null>(null)
 const manualAssignMessage = ref<string | null>(null)
+const assignNetworkBusy = ref(false)
+const assignNetworkError = ref<string | null>(null)
+const assignNetworkMessage = ref<string | null>(null)
+const handoffCopied = ref(false)
+const pricingSnapshots = ref<PricingShadowSnapshotPage | null>(null)
+const pricingSnapshotsError = ref<string | null>(null)
+
+const networkPortalBase =
+  import.meta.env.VITE_NETWORK_PORTAL_URL?.trim() ||
+  (import.meta.env.DEV ? 'http://127.0.0.1:5174' : '')
+
+const networkAcceptHandoffUrl = computed(() => {
+  const taskId = workspace.value?.currentTaskSummary?.taskId
+  if (!taskId || !networkPortalBase) {
+    return null
+  }
+  const url = new URL('/network-portal/tasks', networkPortalBase)
+  url.searchParams.set('taskId', taskId)
+  return url.toString()
+})
+
+async function copyTaskHandoff() {
+  const taskId = workspace.value?.currentTaskSummary?.taskId
+  if (!taskId) {
+    return
+  }
+  const orderCode = workspace.value?.header.externalOrderCode || workOrderId.value
+  const text = [
+    `工单 ${orderCode}`,
+    `任务编号 ${taskId}`,
+    networkAcceptHandoffUrl.value ? `网点接单入口 ${networkAcceptHandoffUrl.value}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n')
+  try {
+    await navigator.clipboard?.writeText(text)
+    handoffCopied.value = true
+    window.setTimeout(() => {
+      handoffCopied.value = false
+    }, 2000)
+  } catch {
+    handoffCopied.value = false
+  }
+}
+
+async function runAssignNetwork() {
+  const taskId = workspace.value?.currentTaskSummary?.taskId
+  if (!taskId) {
+    assignNetworkError.value = '无当前任务，无法派给网点'
+    return
+  }
+  assignNetworkBusy.value = true
+  assignNetworkError.value = null
+  assignNetworkMessage.value = null
+  try {
+    const result = await manualAssignNetworkServiceAssignment(taskId, {
+      networkAssigneeId: networkAssigneeId.value.trim(),
+      businessType: assignBusinessType.value.trim(),
+    })
+    assignNetworkMessage.value =
+      `初审派网点成功：${result.data.networkAssigneeId}。网点端任务列表应可见，可继续确认接单或指派师傅。`
+    await loadWorkspace()
+  } catch (err) {
+    assignNetworkError.value = err instanceof Error ? err.message : '派网点失败'
+  } finally {
+    assignNetworkBusy.value = false
+  }
+}
 
 async function runManualAssign() {
   const taskId = workspace.value?.currentTaskSummary?.taskId
@@ -71,7 +150,7 @@ async function runManualAssign() {
     })
     const receipt = result.data
     manualAssignMessage.value =
-      `已初派 network=${receipt.networkAssigneeId} tech=${receipt.technicianAssigneeId}`
+      `已初派：网点 ${receipt.networkAssigneeId}，师傅 ${receipt.technicianAssigneeId}`
     await loadWorkspace()
   } catch (err) {
     manualAssignError.value = err instanceof Error ? err.message : '人工初派失败'
@@ -135,6 +214,17 @@ async function loadAuthorityProjections() {
   }
 }
 
+async function loadPricingSnapshots() {
+  pricingSnapshotsError.value = null
+  try {
+    const result = await listWorkOrderPricingSnapshots(workOrderId.value)
+    pricingSnapshots.value = result
+  } catch (err) {
+    pricingSnapshotsError.value = err instanceof Error ? err.message : '加载影子试算失败'
+    pricingSnapshots.value = null
+  }
+}
+
 async function loadWorkspace() {
   loading.value = true
   error.value = null
@@ -149,6 +239,7 @@ async function loadWorkspace() {
       loadAllowedActions(ws.currentTaskSummary?.taskId),
       loadSlaInstances(),
       loadAuthorityProjections(),
+      loadPricingSnapshots(),
     ])
     const firstAvailable = sections.find(
       (code) => ws.sectionAvailability[code] === 'AVAILABLE' || ws.sectionAvailability[code] === 'EMPTY',
@@ -172,6 +263,7 @@ async function loadWorkspace() {
     stages.value = null
     taskPage.value = null
     timelinePage.value = null
+    pricingSnapshots.value = null
   } finally {
     loading.value = false
   }
@@ -733,11 +825,11 @@ const appointmentVisitTaskLinks = computed((): RelatedTaskLink[] => {
   const section = sectionData.value?.appointmentsVisits
   if (!section || activeSection.value !== 'APPOINTMENTS_VISITS') return []
   const fromAppointments = collectRelatedTaskLinks(section.appointments, (row, taskId) => {
-    return `appointment / ${String(row.type ?? '—')} / ${String(row.status ?? '—')} / ${taskId}`
+    return `appointment / ${statusLabel(String(row.type ?? '—'))} / ${statusLabel(String(row.status ?? '—'))} / ${taskId}`
   })
   if (fromAppointments.length) return fromAppointments
   const fromVisits = collectRelatedTaskLinks(section.visits, (row, taskId) => {
-    return `visit / ${String(row.status ?? '—')} / ${taskId}`
+    return `visit / ${statusLabel(String(row.status ?? '—'))} / ${taskId}`
   })
   if (fromVisits.length) return fromVisits
   return collectRelatedTaskLinks(section.contactAttempts, (row, taskId) => {
@@ -795,7 +887,7 @@ const formsEvidenceTaskLinks = computed((): RelatedTaskLink[] => {
   const section = sectionData.value?.formsEvidence
   if (!section || activeSection.value !== 'FORMS_EVIDENCE') return []
   const fromSubmissions = collectRelatedTaskLinks(section.formSubmissions, (row, taskId) => {
-    return `submission / ${String(row.formKey ?? '—')} / ${String(row.validationStatus ?? '—')} / ${taskId}`
+    return `submission / ${String(row.formKey ?? '—')} / ${statusLabel(String(row.validationStatus ?? '—'))} / ${taskId}`
   })
   if (fromSubmissions.length) return fromSubmissions
   const fromForms = collectRelatedTaskLinks(section.forms, (row, taskId) => {
@@ -803,7 +895,7 @@ const formsEvidenceTaskLinks = computed((): RelatedTaskLink[] => {
   })
   if (fromForms.length) return fromForms
   const fromItems = collectRelatedTaskLinks(section.evidenceItems, (row, taskId) => {
-    return `evidence-item / ${String(row.status ?? '—')} / ${taskId}`
+    return `evidence-item / ${statusLabel(String(row.status ?? '—'))} / ${taskId}`
   })
   if (fromItems.length) return fromItems
   return collectRelatedTaskLinks(section.evidenceSlots, (row, taskId) => {
@@ -855,6 +947,22 @@ const timelineRows = computed(() =>
   })),
 )
 
+const currentActionBanner = computed(() => {
+  const ws = workspace.value
+  if (!ws) {
+    return null
+  }
+  const woStatus = statusLabel(ws.header.status)
+  if (!ws.currentTaskSummary) {
+    return `工单${woStatus}，暂无进行中的任务。`
+  }
+  const task = ws.currentTaskSummary
+  const taskStatus = statusLabel(task.status)
+  const taskName = statusLabel(task.taskType ?? '')
+  const stageHint = task.stageCode ? `（阶段 ${statusLabel(task.stageCode)}）` : ''
+  return `工单${woStatus} · 当前任务：${taskName}${stageHint}（${taskStatus}）`
+})
+
 watch(workOrderId, () => {
   if (workOrderId.value) {
     void loadWorkspace()
@@ -882,11 +990,18 @@ onMounted(() => {
     <p v-else-if="loading">加载中…</p>
 
     <template v-else-if="workspace">
+      <div v-if="currentActionBanner" class="action-banner">
+        <strong>当前动作</strong>
+        <span>{{ currentActionBanner }}</span>
+      </div>
       <div class="grid">
         <article class="card">
           <h3>概览</h3>
           <dl>
-            <div><dt>状态</dt><dd>{{ workspace.header.status }}</dd></div>
+            <div>
+              <dt>状态</dt>
+              <dd><StatusBadge :status="workspace.header.status" /></dd>
+            </div>
             <div>
               <dt>项目</dt>
               <dd>
@@ -902,9 +1017,31 @@ onMounted(() => {
             </div>
             <div><dt>外部单号</dt><dd>{{ workspace.header.externalOrderCode || '—' }}</dd></div>
             <div><dt>时间线 freshness</dt><dd>{{ workspace.timelineFreshnessStatus }}</dd></div>
-            <div><dt>asOf</dt><dd>{{ workspace.meta.asOf }}</dd></div>
+            <div><dt>统计时间</dt><dd>{{ formatDateTime(workspace.meta.asOf) }}</dd></div>
             <div><dt>allowed-actions</dt><dd>{{ workspace.allowedActionLink || '—' }}</dd></div>
           </dl>
+        </article>
+
+        <article class="card" data-testid="pricing-shadow-panel">
+          <h3>影子试算（非结算）</h3>
+          <p class="handoff-hint">
+            只读 SHADOW 定价试算；不提供进入结算、落账或 Statement 写命令。
+          </p>
+          <p v-if="pricingSnapshotsError" class="error">{{ pricingSnapshotsError }}</p>
+          <template v-else-if="pricingSnapshots">
+            <p v-if="pricingSnapshots.emptyHint && !pricingSnapshots.items.length" class="muted">
+              {{ pricingSnapshots.emptyHint }}
+            </p>
+            <ul v-if="pricingSnapshots.items.length" class="pricing-list">
+              <li v-for="item in pricingSnapshots.items" :key="item.snapshotId">
+                {{ item.pricingKey }} · {{ item.currency }}
+                {{ (item.totalAmountMinor / 100).toFixed(2) }} · {{ item.mode }}
+                <small>{{ formatDateTime(item.createdAt) }}</small>
+              </li>
+            </ul>
+            <p v-else-if="!pricingSnapshots.emptyHint" class="muted">暂无影子试算快照。</p>
+          </template>
+          <p v-else class="muted">加载中…</p>
         </article>
 
         <article class="card">
@@ -913,8 +1050,8 @@ onMounted(() => {
             <div>
               <dt>当前任务</dt>
               <dd v-if="workspace.currentTaskSummary">
-                {{ workspace.currentTaskSummary.taskType }} /
-                {{ workspace.currentTaskSummary.status }}
+                {{ statusLabel(workspace.currentTaskSummary.taskType) }}
+                <StatusBadge :status="workspace.currentTaskSummary.status" />
                 <small>
                   <RouterLink
                     :to="{
@@ -937,38 +1074,72 @@ onMounted(() => {
               <dd v-else>不可用或缺失权</dd>
             </div>
             <div class="manual-assign">
-              <dt>人工初派</dt>
+              <dt>初审 → 派网点</dt>
               <dd>
+                <p class="handoff-hint">
+                  主路径：平台确认后将当前任务派给服务网点（仅 NETWORK 责任）。派成功后网点端列表可见，再由网点确认接单或指派师傅。
+                </p>
                 <label>
-                  networkAssigneeId
+                  服务网点
                   <input
                     v-model="networkAssigneeId"
-                    aria-label="manual-assign networkAssigneeId"
+                    aria-label="assign-network networkAssigneeId"
                   />
                 </label>
                 <label>
-                  technicianAssigneeId
-                  <input
-                    v-model="technicianAssigneeId"
-                    aria-label="manual-assign technicianAssigneeId"
-                  />
-                </label>
-                <label>
-                  businessType
+                  业务类型
                   <input
                     v-model="assignBusinessType"
-                    aria-label="manual-assign businessType"
+                    aria-label="assign-network businessType"
                   />
                 </label>
-                <button
-                  type="button"
-                  :disabled="manualAssignBusy || !workspace.currentTaskSummary"
-                  @click="runManualAssign"
-                >
-                  manual-assign
-                </button>
-                <p v-if="manualAssignError" class="error">{{ manualAssignError }}</p>
-                <p v-if="manualAssignMessage" class="meta">{{ manualAssignMessage }}</p>
+                <div class="handoff-actions">
+                  <button
+                    type="button"
+                    data-testid="assign-network"
+                    :disabled="assignNetworkBusy || !workspace.currentTaskSummary"
+                    @click="runAssignNetwork"
+                  >
+                    {{ assignNetworkBusy ? '派网点中…' : '初审通过：派给服务网点' }}
+                  </button>
+                  <a
+                    v-if="networkAcceptHandoffUrl"
+                    class="handoff-link"
+                    :href="networkAcceptHandoffUrl"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    打开网点端
+                  </a>
+                  <button
+                    type="button"
+                    :disabled="!workspace.currentTaskSummary"
+                    @click="copyTaskHandoff"
+                  >
+                    {{ handoffCopied ? '已复制' : '复制交接信息' }}
+                  </button>
+                </div>
+                <p v-if="assignNetworkError" class="error">{{ assignNetworkError }}</p>
+                <p v-if="assignNetworkMessage" class="meta">{{ assignNetworkMessage }}</p>
+                <details class="assign-advanced">
+                  <summary>高级：一次初派网点+师傅（跳过网点接单）</summary>
+                  <label>
+                    服务师傅档案编号
+                    <input
+                      v-model="technicianAssigneeId"
+                      aria-label="manual-assign technicianAssigneeId"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    :disabled="manualAssignBusy || !workspace.currentTaskSummary"
+                    @click="runManualAssign"
+                  >
+                    确认双责任初派
+                  </button>
+                  <p v-if="manualAssignError" class="error">{{ manualAssignError }}</p>
+                  <p v-if="manualAssignMessage" class="meta">{{ manualAssignMessage }}</p>
+                </details>
               </dd>
             </div>
             <div>
@@ -1056,7 +1227,10 @@ onMounted(() => {
       <article v-if="workOrderDetail" class="card">
         <h3>工单权威事实</h3>
         <dl>
-          <div><dt>status</dt><dd>{{ workOrderDetail.workOrder.status }}</dd></div>
+          <div>
+            <dt>状态</dt>
+            <dd><StatusBadge :status="workOrderDetail.workOrder.status" /></dd>
+          </div>
           <div><dt>clientCode</dt><dd>{{ workOrderDetail.workOrder.clientCode }}</dd></div>
           <div><dt>brandCode</dt><dd>{{ workOrderDetail.workOrder.brandCode }}</dd></div>
           <div><dt>serviceProductCode</dt><dd>{{ workOrderDetail.workOrder.serviceProductCode }}</dd></div>
@@ -1071,7 +1245,7 @@ onMounted(() => {
         <h3>Workflow / Stage</h3>
         <p class="meta">
           workflow={{ stages.workflow?.workflowKey || '—' }} /
-          {{ stages.workflow?.status || '未初始化' }} /
+          {{ stages.workflow?.status ? statusLabel(stages.workflow.status) : '未初始化' }} /
           asOf {{ stages.asOf }}
         </p>
       </article>
@@ -1105,7 +1279,7 @@ onMounted(() => {
           :key="item.id"
           :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: item.id } }"
         >
-          {{ item.taskType }} / {{ item.id }}
+          {{ statusLabel(item.taskType) }} / {{ item.id }}
         </RouterLink>
       </p>
 
@@ -1199,7 +1373,7 @@ onMounted(() => {
                 params: { id: item.inboundEnvelopeId },
               }"
             >
-              {{ item.messageType }} / {{ item.processingStatus }}
+              {{ item.messageType }} / {{ statusLabel(item.processingStatus) }}
               <template v-if="item.resultCode"> / {{ item.resultCode }}</template>
             </RouterLink>
           </p>
@@ -1213,7 +1387,7 @@ onMounted(() => {
                 params: { id: item.canonicalMessageId },
               }"
             >
-              {{ item.messageType }} / {{ item.processingStatus }} /
+              {{ item.messageType }} / {{ statusLabel(item.processingStatus) }} /
               {{ item.canonicalMessageId }}
             </RouterLink>
           </p>
@@ -1227,7 +1401,7 @@ onMounted(() => {
                 params: { id: item.deliveryId },
               }"
             >
-              {{ item.businessMessageType }} / {{ item.status }} / {{ item.externalOrderCode }}
+              {{ item.businessMessageType }} / {{ statusLabel(item.status) }} / {{ item.externalOrderCode }}
             </RouterLink>
           </p>
           <p v-if="outboundCrossLinks.length" class="links outbound-cross-links">
@@ -1253,7 +1427,7 @@ onMounted(() => {
                 params: { id: item.reviewCaseId },
               }"
             >
-              {{ item.origin }} / {{ item.status }} / {{ item.reviewCaseId }}
+              {{ statusLabel(item.origin) }} / {{ statusLabel(item.status) }} / {{ item.reviewCaseId }}
             </RouterLink>
           </p>
           <p v-if="correctionCaseLinks.length" class="links correction-links">
@@ -1266,7 +1440,7 @@ onMounted(() => {
                 params: { id: item.correctionCaseId },
               }"
             >
-              {{ item.status }} / {{ item.correctionCaseId }}
+              {{ statusLabel(item.status) }} / {{ item.correctionCaseId }}
             </RouterLink>
           </p>
           <p
@@ -1295,7 +1469,7 @@ onMounted(() => {
                 params: { id: item.taskId },
               }"
             >
-              {{ item.taskType }} / {{ item.taskKind }} / {{ item.status }} / {{ item.taskId }}
+              {{ statusLabel(item.taskType) }} / {{ statusLabel(item.taskKind) }} / {{ statusLabel(item.status) }} / {{ item.taskId }}
             </RouterLink>
           </p>
           <p v-if="timelineResourceLinks.length" class="links timeline-resource-links">
@@ -1321,7 +1495,7 @@ onMounted(() => {
                 params: { id: item.appointmentId },
               }"
             >
-              {{ item.type }} / {{ item.status }} / {{ item.appointmentId }}
+              {{ statusLabel(item.type) }} / {{ statusLabel(item.status) }} / {{ item.appointmentId }}
             </RouterLink>
           </p>
           <p v-if="visitDetailLinks.length" class="links visit-detail-links">
@@ -1334,7 +1508,7 @@ onMounted(() => {
                 params: { id: item.visitId },
               }"
             >
-              {{ item.status }} / seq={{ item.visitSequence }} / {{ item.visitId }}
+              {{ statusLabel(item.status) }} / seq={{ item.visitSequence }} / {{ item.visitId }}
             </RouterLink>
           </p>
           <p v-if="contactAttemptDetailLinks.length" class="links contact-attempt-detail-links">
@@ -1373,7 +1547,7 @@ onMounted(() => {
                 params: { id: item.submissionId },
               }"
             >
-              {{ item.formKey }} / {{ item.validationStatus }} / {{ item.submissionId }}
+              {{ item.formKey }} / {{ statusLabel(item.validationStatus) }} / {{ item.submissionId }}
             </RouterLink>
           </p>
           <p v-if="evidenceItemDetailLinks.length" class="links evidence-item-detail-links">
@@ -1386,7 +1560,7 @@ onMounted(() => {
                 params: { id: item.evidenceItemId },
               }"
             >
-              #{{ item.itemOrdinal }} / {{ item.status }} / {{ item.evidenceItemId }}
+              #{{ item.itemOrdinal }} / {{ statusLabel(item.status) }} / {{ item.evidenceItemId }}
             </RouterLink>
           </p>
           <p v-if="formsEvidenceTaskLinks.length" class="links forms-evidence-task-links">
@@ -1419,6 +1593,21 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+}
+.action-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  padding: 0.75rem 1rem;
+  background: #eef4ff;
+  border: 1px solid #c3dafe;
+  border-radius: 10px;
+  color: #243b53;
+  font-size: 0.95rem;
+}
+.action-banner strong {
+  color: #1864ab;
 }
 .meta {
   margin: 0.25rem 0 0;
@@ -1558,5 +1747,29 @@ button {
   border-radius: 6px;
   padding: 0.35rem 0.5rem;
   font-family: ui-monospace, monospace;
+}
+.handoff-hint {
+  margin: 0;
+  color: #486581;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+.handoff-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.handoff-link {
+  color: #0b6e4f;
+  font-weight: 600;
+}
+.assign-advanced {
+  margin-top: 0.35rem;
+}
+.assign-advanced summary {
+  cursor: pointer;
+  color: #627d98;
+  font-size: 0.85rem;
 }
 </style>

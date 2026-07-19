@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { statusLabel } from '../product/labels'
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import {
+  acceptNetworkPortalAssignment,
   assignNetworkPortalTechnician,
   beginNetworkPortalEvidenceUploadOnBehalf,
   cancelNetworkPortalAppointment,
@@ -17,6 +19,7 @@ import {
   reassignNetworkPortalTechnician,
   rescheduleNetworkPortalAppointment,
   resubmitNetworkPortalCorrectionCase,
+  createNetworkPortalCorrectionEvidenceSnapshot,
   type NetworkPortalAppointment,
   type NetworkPortalContactAttempt,
   type NetworkPortalTaskItem,
@@ -29,6 +32,7 @@ import {
   type NetworkPortalWorkspaceEvidenceSlotSummary,
 } from '../api/networkPortal'
 import { getMe } from '../api/me'
+import {formatDateTime} from '@serviceos/web-core'
 
 const props = defineProps<{ networkContextId: string | null }>()
 const route = useRoute()
@@ -74,9 +78,9 @@ function directoryAppointmentWindowLabel(taskId: string) {
   }
   const first = matched[0]
   if (!first.windowStart && !first.windowEnd) {
-    return first.status
+    return first.status ? statusLabel(first.status) : '—'
   }
-  return `${first.windowStart ?? '?'} → ${first.windowEnd ?? '?'}（${first.status}）`
+  return `${first.windowStart ?? '?'} → ${first.windowEnd ?? '?'}（${first.status ? statusLabel(first.status) : '—'}）`
 }
 
 function directoryContactLabel(taskId: string) {
@@ -102,9 +106,9 @@ function directoryCorrectionLabel(taskId: string) {
   const openCount = matched.filter((row) => row.status === 'OPEN').length
   const first = matched[0]
   if (openCount > 0) {
-    return `OPEN ×${openCount} · ${first.reasonCodes.join(',') || first.status}`
+    return `${statusLabel('OPEN')} ×${openCount} · ${first.reasonCodes.map((code) => statusLabel(code)).join('、') || (first.status ? statusLabel(first.status) : '—')}`
   }
-  return `${first.status} · ${first.reasonCodes.join(',') || first.correctionCaseId}`
+  return `${first.status ? statusLabel(first.status) : '—'} · ${first.reasonCodes.map((code) => statusLabel(code)).join('、') || first.correctionCaseId}`
 }
 
 function directoryEvidenceLabel(taskId: string) {
@@ -120,14 +124,16 @@ function directoryEvidenceLabel(taskId: string) {
   const openItems = items.filter((row) => row.status === 'OPEN').length
   const parts: string[] = []
   if (missing > 0) {
-    parts.push(`MISSING ×${missing}`)
+    parts.push(`${statusLabel('MISSING')} ×${missing}`)
   }
   if (openItems > 0) {
-    parts.push(`OPEN项 ×${openItems}`)
+    parts.push(`${statusLabel('OPEN')}项 ×${openItems}`)
   }
   if (parts.length === 0) {
     const first = slots[0]
-    return first ? `${first.status} · ${first.requirementCode}` : `项 ×${items.length}`
+    return first
+      ? `${first.status ? statusLabel(first.status) : '—'} · ${first.requirementCode ? statusLabel(first.requirementCode) : '—'}`
+      : `项 ×${items.length}`
   }
   return parts.join(' · ')
 }
@@ -147,7 +153,15 @@ function taskRegionLabel(item: NetworkPortalTaskItem) {
   const parts = [item.provinceCode, item.cityCode, item.districtCode].filter(Boolean)
   return parts.length ? parts.join('/') : '—'
 }
+
+function taskOptionLabel(item: NetworkPortalTaskItem) {
+  const type = item.taskType ? statusLabel(item.taskType) : '任务'
+  const wo = item.workOrderId ? item.workOrderId.slice(0, 8) : '—'
+  return `${type} · 工单 ${wo}…`
+}
 const selectedTaskId = ref('')
+/** 接单可用任务 ID：允许填写尚未 ACTIVE 到本网点的任务（不能只从 ACTIVE 列表选）。 */
+const acceptTaskId = ref('')
 const selectedTechnicianId = ref('')
 const businessType = ref('INSTALLATION')
 const assignBusy = ref(false)
@@ -190,6 +204,7 @@ const evidenceSha256 = ref('a'.repeat(64))
 const evidenceFileName = ref('site.png')
 const evidenceExpectedSize = ref(128)
 const uploadSessionId = ref('')
+const lastRevisionId = ref('')
 const evidenceBusy = ref(false)
 const evidenceError = ref<string | null>(null)
 const evidenceMessage = ref<string | null>(null)
@@ -198,6 +213,17 @@ const evidenceSetSnapshotId = ref('')
 const resubmitBusy = ref(false)
 const resubmitError = ref<string | null>(null)
 const resubmitMessage = ref<string | null>(null)
+const snapshotResubmitBusy = ref(false)
+
+watch(selectedTaskId, (taskId) => {
+  if (!taskId || directoryCorrections.value === null) {
+    return
+  }
+  const matched = directoryCorrections.value.find((row) => row.taskId === taskId)
+  if (matched?.correctionCaseId) {
+    correctionCaseId.value = matched.correctionCaseId
+  }
+})
 
 async function load() {
   if (!props.networkContextId) {
@@ -243,11 +269,15 @@ async function load() {
       : null
     if (fromQuery) {
       selectedTaskId.value = fromQuery.taskId
+      acceptTaskId.value = fromQuery.taskId
       if (fromQuery.businessType) {
         businessType.value = fromQuery.businessType
       }
     } else if (!selectedTaskId.value && items.value.length > 0) {
       selectedTaskId.value = items.value[0].taskId
+      if (!acceptTaskId.value) {
+        acceptTaskId.value = items.value[0].taskId
+      }
       if (items.value[0].businessType) {
         businessType.value = items.value[0].businessType
       }
@@ -257,6 +287,10 @@ async function load() {
       && items.value.length > 0
     ) {
       selectedTaskId.value = items.value[0].taskId
+    }
+    // query 中的 taskId 即使尚未 ACTIVE 到本网点，也作为接单候选
+    if (queryTaskId.value) {
+      acceptTaskId.value = queryTaskId.value
     }
   } catch (err) {
     items.value = []
@@ -356,6 +390,38 @@ function appointmentHistoryAllowedActionsLabel(item: NetworkPortalAppointment) {
   return item.allowedActions.join(', ')
 }
 
+const acceptBusy = ref(false)
+const acceptError = ref<string | null>(null)
+const acceptMessage = ref<string | null>(null)
+
+async function submitAccept() {
+  if (!props.networkContextId) {
+    acceptError.value = '请选择网点上下文'
+    return
+  }
+  const taskId = acceptTaskId.value.trim()
+  if (!taskId) {
+    acceptError.value = '请填写要接单的任务编号'
+    return
+  }
+  acceptBusy.value = true
+  acceptError.value = null
+  acceptMessage.value = null
+  try {
+    const result = await acceptNetworkPortalAssignment(props.networkContextId, taskId, {
+      businessType: businessType.value.trim() || 'INSTALLATION',
+    })
+    acceptMessage.value = '接单成功，任务已归属本网点。请继续指派服务师傅。'
+    selectedTaskId.value = taskId
+    void result
+    await load()
+  } catch (err) {
+    acceptError.value = err instanceof Error ? err.message : '网点接单失败'
+  } finally {
+    acceptBusy.value = false
+  }
+}
+
 async function submitAssign() {
   if (!props.networkContextId) {
     assignError.value = '请选择 NETWORK 上下文'
@@ -446,6 +512,9 @@ async function submitEvidenceFinalize() {
       },
     )
     evidenceMessage.value = `已 Finalize evidenceItem=${result.data.evidenceItemId}`
+    if (result.data.revisions?.length) {
+      lastRevisionId.value = result.data.revisions.at(-1)?.evidenceRevisionId ?? ''
+    }
   } catch (err) {
     evidenceError.value = err instanceof Error ? err.message : '代补 Finalize 失败'
   } finally {
@@ -476,6 +545,42 @@ async function submitCorrectionResubmit() {
     resubmitError.value = err instanceof Error ? err.message : '整改 resubmit 失败'
   } finally {
     resubmitBusy.value = false
+  }
+}
+
+async function submitSnapshotAndResubmit() {
+  if (!props.networkContextId) {
+    resubmitError.value = '请选择 NETWORK 上下文'
+    return
+  }
+  if (!correctionCaseId.value.trim()) {
+    resubmitError.value = '请填写整改案例 ID（可从任务列表整改列自动带入）'
+    return
+  }
+  if (!lastRevisionId.value.trim()) {
+    resubmitError.value = '请先 Finalize 代补上传以产生资料修订'
+    return
+  }
+  snapshotResubmitBusy.value = true
+  resubmitError.value = null
+  resubmitMessage.value = null
+  try {
+    const snapshot = await createNetworkPortalCorrectionEvidenceSnapshot(
+      props.networkContextId,
+      correctionCaseId.value.trim(),
+      { memberRevisionIds: [lastRevisionId.value.trim()] },
+    )
+    evidenceSetSnapshotId.value = snapshot.data.evidenceSetSnapshotId
+    const result = await resubmitNetworkPortalCorrectionCase(
+      props.networkContextId,
+      correctionCaseId.value.trim(),
+      { evidenceSetSnapshotId: snapshot.data.evidenceSetSnapshotId },
+    )
+    resubmitMessage.value = `已创建快照并重提 status=${result.data.status}`
+  } catch (err) {
+    resubmitError.value = err instanceof Error ? err.message : '创建快照并重提失败'
+  } finally {
+    snapshotResubmitBusy.value = false
   }
 }
 
@@ -731,53 +836,49 @@ watch(selectedTaskId, () => {
       class="filter"
       data-testid="tasks-task-filter"
     >
-      已按 query 选中 taskId：{{ selectedTaskId || queryTaskId }}
+      已从管理端带入待接单任务：{{ acceptTaskId || queryTaskId }}
     </p>
     <p v-if="error" data-testid="network-portal-error">{{ error }}</p>
     <table v-else data-testid="network-tasks-table">
       <thead>
         <tr>
           <th>任务</th>
-          <th>工单</th>
-          <th>项目</th>
+          <th>关联工单</th>
           <th>服务产品</th>
           <th>区域</th>
           <th>状态</th>
-          <th>阶段</th>
-          <th>类型</th>
-          <th>种类</th>
-          <th>业务</th>
+          <th>当前阶段</th>
+          <th>任务类型</th>
+          <th>业务类型</th>
           <th>接收时间</th>
-          <th>生效自</th>
-          <th>师傅</th>
+          <th>生效时间</th>
+          <th>服务师傅</th>
           <th v-if="directoryAppointments !== null">预约窗口</th>
           <th v-if="directoryContactAttempts !== null">最近联系</th>
           <th v-if="directoryEvidenceSlots !== null">资料</th>
           <th v-if="directoryCorrections !== null">整改</th>
-          <th v-if="directorySlaRiskSummaries !== null">SLA 风险</th>
+          <th v-if="directorySlaRiskSummaries !== null">服务时效风险</th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="item in items" :key="item.taskId" :data-testid="`task-row-${item.taskId}`">
-          <td>{{ item.taskId }}</td>
+          <td>{{ taskOptionLabel(item) }}</td>
           <td>
             <RouterLink
               :to="`/network-portal/work-orders/${item.workOrderId}`"
               data-testid="task-work-order-workspace-deeplink"
             >
-              {{ item.workOrderId }}
+              打开工单
             </RouterLink>
           </td>
-          <td data-testid="task-project-id">{{ item.projectId ?? '—' }}</td>
           <td data-testid="task-service-product">{{ item.serviceProductCode ?? '—' }}</td>
           <td data-testid="task-region">{{ taskRegionLabel(item) }}</td>
-          <td>{{ item.status ?? '—' }}</td>
-          <td data-testid="task-stage-code">{{ item.stageCode ?? '—' }}</td>
-          <td>{{ item.taskType ?? '—' }}</td>
-          <td data-testid="task-kind">{{ item.taskKind ?? '—' }}</td>
-          <td data-testid="task-business-type">{{ item.businessType ?? '—' }}</td>
-          <td data-testid="task-received-at">{{ item.receivedAt ?? '—' }}</td>
-          <td data-testid="task-effective-from">{{ item.effectiveFrom ?? '—' }}</td>
+          <td>{{ item.status ? statusLabel(item.status) : '—' }}</td>
+          <td data-testid="task-stage-code">{{ item.stageCode ? statusLabel(item.stageCode) : '—' }}</td>
+          <td>{{ item.taskType ? statusLabel(item.taskType) : '—' }}</td>
+          <td data-testid="task-business-type">{{ item.businessType ? statusLabel(item.businessType) : '—' }}</td>
+          <td data-testid="task-received-at">{{ formatDateTime(item.receivedAt) }}</td>
+          <td data-testid="task-effective-from">{{ formatDateTime(item.effectiveFrom) }}</td>
           <td data-testid="task-technician-label">{{ technicianLabel(item.technicianId) }}</td>
           <td
             v-if="directoryAppointments !== null"
@@ -816,18 +917,55 @@ watch(selectedTaskId, () => {
 
     <form
       class="assign"
+      data-testid="network-accept-assignment-form"
+      @submit.prevent="submitAccept"
+    >
+      <h3>网点接单</h3>
+      <p class="hint">
+        填写管理端下发的任务编号并确认承接。接单前任务通常还不在下方 ACTIVE 列表中——这是正常现象。
+      </p>
+      <label>
+        任务编号
+        <input
+          v-model="acceptTaskId"
+          list="accept-task-suggestions"
+          data-testid="accept-task-input"
+          aria-label="accept task"
+          placeholder="例如从管理端工单详情复制"
+        />
+        <datalist id="accept-task-suggestions">
+          <option v-for="item in items" :key="`accept-${item.taskId}`" :value="item.taskId" />
+        </datalist>
+      </label>
+      <label>
+        业务类型
+        <input v-model="businessType" data-testid="accept-business-type" aria-label="accept business type" />
+      </label>
+      <button
+        type="submit"
+        data-testid="accept-assignment-submit"
+        :disabled="acceptBusy || !props.networkContextId"
+      >
+        确认接单
+      </button>
+      <p v-if="acceptError" class="error" data-testid="accept-assignment-error">{{ acceptError }}</p>
+      <p v-if="acceptMessage" class="ok" data-testid="accept-assignment-message">{{ acceptMessage }}</p>
+    </form>
+
+    <form
+      class="assign"
       data-testid="network-assign-technician-form"
       data-page-id="NETWORK.TECHNICIAN.ASSIGN"
       @submit.prevent="submitAssign"
     >
       <h3>指派师傅</h3>
-      <p class="hint">调用 Network Portal 写命令；networkAssigneeId 由服务端强制为当前上下文网点。</p>
+      <p class="hint">接单后可为任务选择服务师傅；网点由服务端强制为当前上下文。</p>
       <label>
         任务
         <select v-model="selectedTaskId" data-testid="assign-task-select" aria-label="assign task">
           <option disabled value="">选择任务</option>
           <option v-for="item in items" :key="item.taskId" :value="item.taskId">
-            {{ item.taskId }}
+            {{ taskOptionLabel(item) }}
           </option>
         </select>
       </label>
@@ -902,7 +1040,7 @@ watch(selectedTaskId, () => {
         >
           <option disabled value="">选择任务</option>
           <option v-for="item in items" :key="item.taskId" :value="item.taskId">
-            {{ item.taskId }}
+            {{ taskOptionLabel(item) }}
           </option>
         </select>
       </label>
@@ -1006,7 +1144,7 @@ watch(selectedTaskId, () => {
           :data-testid="`appointment-history-${item.appointmentId}`"
         >
           <span data-testid="appointment-history-summary">
-            {{ item.appointmentId }} · {{ item.type }} · {{ item.status }} · rev
+            {{ item.appointmentId }} · {{ item.type ? statusLabel(item.type) : '—' }} · {{ item.status ? statusLabel(item.status) : '—' }} · rev
             {{ item.currentRevisionNo }} · v{{ item.aggregateVersion }}
             · 操作者
             <span data-testid="appointment-history-created-by">{{ item.createdBy ?? '—' }}</span>
@@ -1188,7 +1326,7 @@ watch(selectedTaskId, () => {
     >
       <h3>资料代补</h3>
       <p class="hint">
-        调用 Network Portal begin/finalize on-behalf 与 correction resubmit；
+        网点代补协作（非独立裁决）：Begin/Finalize 后一键创建快照并重提；总部审核仍为裁决步。
         onBehalfOf 须为 ACTIVE TECHNICIAN。
       </p>
       <label>
@@ -1196,7 +1334,7 @@ watch(selectedTaskId, () => {
         <select v-model="selectedTaskId" data-testid="evidence-task-select" aria-label="evidence task">
           <option disabled value="">选择任务</option>
           <option v-for="item in items" :key="item.taskId" :value="item.taskId">
-            {{ item.taskId }}
+            {{ taskOptionLabel(item) }}
           </option>
         </select>
       </label>
@@ -1274,6 +1412,14 @@ watch(selectedTaskId, () => {
           aria-label="evidence set snapshot id"
         />
       </label>
+      <button
+        type="button"
+        data-testid="correction-snapshot-resubmit-submit"
+        :disabled="snapshotResubmitBusy || !props.networkContextId"
+        @click="submitSnapshotAndResubmit"
+      >
+        创建快照并重提
+      </button>
       <button
         type="button"
         data-testid="correction-resubmit-submit"

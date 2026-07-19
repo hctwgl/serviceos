@@ -15,6 +15,8 @@ import { listOpenReassignmentWorkItems, type ReassignmentWorkItem } from '../api
 import { isConflictError, safeAccessDeniedMessage } from '../api/client'
 import ImpactPanel from '../components/ImpactPanel.vue'
 import VersionedCommandForm from '../components/VersionedCommandForm.vue'
+import StatusBadge from '../components/StatusBadge.vue'
+import { statusLabel } from '../product/statusLabels'
 
 const route = useRoute()
 const principalId = computed(() => String(route.params.id ?? ''))
@@ -38,7 +40,7 @@ const impactItems = computed(() => {
   if (!detail.value) return []
   const p = detail.value.principal
   return [
-    `主体状态将变为 ${p.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE'}`,
+    `主体状态将变为 ${statusLabel(p.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE')}`,
     '停用后已签发 JWT 在下次请求立即失败关闭',
     `当前有效 Persona ${detail.value.personas.filter((x) => x.status === 'ACTIVE').length} 条`,
     `相关授权记录 ${grants.value.length} 条（启停不替代撤权）`,
@@ -190,8 +192,8 @@ onMounted(() => {
         <dl>
           <div><dt>displayName</dt><dd data-testid="principal-display-name">{{ detail.principal.displayName }}</dd></div>
           <div><dt>employeeNumber</dt><dd>{{ detail.principal.employeeNumber || '—' }}</dd></div>
-          <div><dt>status</dt><dd data-testid="principal-status">{{ detail.principal.status }}</dd></div>
-          <div><dt>type</dt><dd>{{ detail.principal.type }}</dd></div>
+          <div><dt>状态</dt><dd data-testid="principal-status"><StatusBadge :status="detail.principal.status" /></dd></div>
+          <div><dt>类型</dt><dd>{{ statusLabel(detail.principal.type) }}</dd></div>
           <div><dt>version</dt><dd data-testid="principal-version">{{ detail.principal.version }}</dd></div>
         </dl>
       </article>
@@ -200,7 +202,7 @@ onMounted(() => {
         <h3>Persona</h3>
         <ul v-if="detail.personas.length">
           <li v-for="persona in detail.personas" :key="persona.id">
-            {{ persona.personaType }} · {{ persona.status }} · {{ persona.validFrom }}
+            {{ statusLabel(persona.personaType) }} · <StatusBadge :status="persona.status" /> · {{ persona.validFrom }}
             <span v-if="persona.validTo"> → {{ persona.validTo }}</span>
           </li>
         </ul>

@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { statusLabel } from '../product/labels'
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+
 import {
   listNetworkPortalCorrections,
   type NetworkPortalCorrectionItem,
@@ -102,7 +104,7 @@ watch(
             </RouterLink>
             <span v-else>—</span>
           </td>
-          <td>{{ item.status }}</td>
+          <td>{{ item.status ? statusLabel(item.status) : '—' }}</td>
           <td>{{ item.reasonCodes.join(', ') || '—' }}</td>
           <td data-testid="correction-source-review">
             {{ item.sourceReviewCaseId }} / {{ item.sourceReviewDecisionId }}

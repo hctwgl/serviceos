@@ -6,6 +6,8 @@ import {
   getOperationalException,
   type OperationalException,
 } from '../api/exceptions'
+import StatusBadge from '../components/StatusBadge.vue'
+import { statusLabel } from '../product/statusLabels'
 
 const route = useRoute()
 const exceptionId = computed(() => String(route.params.id ?? ''))
@@ -73,7 +75,7 @@ onMounted(() => {
 
     <template v-else-if="detail">
       <article class="card">
-        <h3>{{ detail.errorCode }} / {{ detail.status }}</h3>
+        <h3>{{ detail.errorCode }} / <StatusBadge :status="detail.status" /></h3>
         <dl>
           <div><dt>severity</dt><dd>{{ detail.severity }}</dd></div>
           <div><dt>category</dt><dd>{{ detail.category }}</dd></div>
@@ -129,7 +131,7 @@ onMounted(() => {
           <div><dt>sourceType</dt><dd>{{ detail.sourceType }}</dd></div>
           <div><dt>sourceId</dt><dd>{{ detail.sourceId }}</dd></div>
           <div><dt>sourceAttemptId</dt><dd>{{ detail.sourceAttemptId }}</dd></div>
-          <div><dt>sourceTaskType</dt><dd>{{ detail.sourceTaskType }}</dd></div>
+          <div><dt>sourceTaskType</dt><dd>{{ statusLabel(detail.sourceTaskType) }}</dd></div>
           <div><dt>occurrenceCount</dt><dd>{{ detail.occurrenceCount }}</dd></div>
           <div><dt>aggregateVersion</dt><dd>{{ detail.aggregateVersion }}</dd></div>
           <div><dt>openedAt</dt><dd>{{ detail.openedAt }}</dd></div>

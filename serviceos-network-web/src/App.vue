@@ -18,6 +18,13 @@ const devDiagnostics = import.meta.env.DEV
 const session = ref<NetworkSession | null>(null)
 const error = ref<string | null>(null)
 const forgeResult = ref('')
+const DEMO_NETWORK_ID = 'd3500000-1000-4000-8000-000000000002'
+function networkContextLabel(scopeRef: string) {
+  if (scopeRef === DEMO_NETWORK_ID) {
+    return '济南恒通新能源服务中心'
+  }
+  return `网点 ${scopeRef.slice(0, 8)}…`
+}
 const groupedNavigation = computed(() => (session.value?.navigation ?? []).reduce<Record<string, NavigationItem[]>>((groups, item) => {
   ;(groups[item.section] ??= []).push(item)
   return groups
@@ -58,9 +65,11 @@ onMounted(() => { if (accessToken()) void refresh() })
       </section>
       <template v-else>
         <aside class="context-card" data-testid="network-portal-shell">
-          <label for="network-context">网点上下文</label>
+          <label for="network-context">当前网点</label>
           <select id="network-context" :value="session.activeContextId" @change="refresh(($event.target as HTMLSelectElement).value)">
-            <option v-for="context in session.contexts" :key="context.contextId" :value="context.contextId">{{ context.scopeRef }}</option>
+            <option v-for="context in session.contexts" :key="context.contextId" :value="context.contextId">
+              {{ networkContextLabel(context.scopeRef) }}
+            </option>
           </select>
           <p>{{ session.capabilities.length }} 项服务端 Capability</p>
           <template v-if="devDiagnostics">

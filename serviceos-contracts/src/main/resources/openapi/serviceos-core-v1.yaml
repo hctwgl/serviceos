@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.44
+  version: 1.0.47
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -1808,6 +1808,38 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+  /network-portal/tasks/{taskId}:accept-assignment:
+    post:
+      operationId: acceptNetworkPortalAssignment
+      summary: Network Portal 为本网点任务确认接单
+      description: |
+        产品可用性：X-Network-Context + NETWORK scope networkPortal.acceptAssignment。
+        仅激活 ACTIVE NETWORK；请求体不含 networkAssigneeId；服务端强制等于可信上下文网点。
+        已有相同网点 ACTIVE NETWORK 时幂等回放；其他网点 ACTIVE 返回 SERVICE_ASSIGNMENT_CONFLICT（409）。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NetworkPortalAcceptAssignmentRequest' }
+      responses:
+        '200':
+          description: NETWORK 责任已激活或幂等回放
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NetworkPortalAcceptAssignmentReceipt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
   /network-portal/tasks/{taskId}:assign-technician:
     post:
       operationId: assignNetworkPortalTechnician
@@ -2318,6 +2350,46 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/CorrectionCase' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /network-portal/correction-cases/{correctionCaseId}/evidence-set-snapshots:
+    post:
+      operationId: createNetworkPortalCorrectionEvidenceSetSnapshot
+      summary: Network Portal 整改代补创建资料快照
+      description: |
+        M201 扩展：X-Network-Context + NETWORK scope evidence.submitOnBehalf 门禁后，
+        冻结整改源 Task 当前可提交资料集合并创建 EvidenceSetSnapshot；不要求师傅 correction Task 认领。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - name: correctionCaseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [memberRevisionIds]
+              properties:
+                memberRevisionIds:
+                  type: array
+                  items: { type: string, format: uuid }
+      responses:
+        '201':
+          description: 资料快照已创建
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EvidenceSetSnapshot' }
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
@@ -3030,6 +3102,53 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+  /work-orders/{workOrderId}/pricing-snapshots:
+    get:
+      operationId: listWorkOrderPricingSnapshots
+      summary: 读取工单影子定价试算快照（非结算）
+      description: |
+        只读返回 cfg_calculation_snapshot（mode=SHADOW）。需要 pricing.snapshot.read 与工单 Project Scope。
+        无快照时返回空列表与 emptyHint；SQL 种子 FULFILLED 不会有快照。不提供结算、落账或进入结算写命令。
+      parameters:
+        - { name: workOrderId, in: path, required: true, schema: { type: string, format: uuid } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 影子试算快照列表
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [workOrderId, items, queriedAt]
+                properties:
+                  workOrderId: { type: string, format: uuid }
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        [snapshotId, workOrderId, projectId, sourceEventId, sourceEventType,
+                         pricingKey, currency, totalAmountMinor, mode, correlationId, createdAt]
+                      properties:
+                        snapshotId: { type: string, format: uuid }
+                        workOrderId: { type: string, format: uuid }
+                        projectId: { type: string, format: uuid }
+                        sourceEventId: { type: string, format: uuid }
+                        sourceEventType: { type: string }
+                        pricingKey: { type: string }
+                        currency: { type: string }
+                        totalAmountMinor: { type: integer, format: int64, minimum: 0 }
+                        mode: { type: string, enum: [SHADOW] }
+                        correlationId: { type: string }
+                        createdAt: { type: string, format: date-time }
+                  queriedAt: { type: string, format: date-time }
+                  emptyHint: { type: string, nullable: true }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
   /work-orders/{workOrderId}/workspace:
     get:
       operationId: getWorkOrderWorkspace
@@ -3393,6 +3512,38 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ManualServiceAssignmentReceipt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /tasks/{taskId}/service-assignments:manual-assign-network:
+    post:
+      operationId: manualAssignNetworkServiceAssignment
+      summary: Admin 初审派网点（仅 NETWORK 责任）
+      description: >-
+        产品可用性：确保容量后仅激活 ACTIVE NETWORK，不强制同时指派师傅。
+        复用 ManualAssignNetwork 编排；能力为 dispatch.assignment.manage 与
+        dispatch.capacity.configure。已有相同网点 ACTIVE NETWORK 时幂等回放；
+        其他网点 ACTIVE 返回 SERVICE_ASSIGNMENT_CONFLICT（409）。
+        派网点后网点端列表可见，可再确认接单或指派师傅。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ManualAssignNetworkRequest' }
+      responses:
+        '200':
+          description: NETWORK 责任已激活或幂等回放
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NetworkPortalAcceptAssignmentReceipt' }
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
@@ -9165,6 +9316,29 @@ components:
         networkAssigneeId: { type: string, minLength: 1, maxLength: 128 }
         technicianAssigneeId: { type: string, minLength: 1, maxLength: 128 }
         businessType: { type: string, minLength: 1, maxLength: 100 }
+    ManualAssignNetworkRequest:
+      type: object
+      additionalProperties: false
+      required: [networkAssigneeId, businessType]
+      properties:
+        networkAssigneeId: { type: string, minLength: 1, maxLength: 128 }
+        businessType: { type: string, minLength: 1, maxLength: 100 }
+    NetworkPortalAcceptAssignmentRequest:
+      type: object
+      additionalProperties: false
+      required: [businessType]
+      properties:
+        businessType: { type: string, minLength: 1, maxLength: 100 }
+    NetworkPortalAcceptAssignmentReceipt:
+      type: object
+      additionalProperties: false
+      required: [taskId, workOrderId, networkServiceAssignmentId, networkAssigneeId, occurredAt]
+      properties:
+        taskId: { type: string, format: uuid }
+        workOrderId: { type: string, format: uuid }
+        networkServiceAssignmentId: { type: string, format: uuid }
+        networkAssigneeId: { type: string, minLength: 1, maxLength: 128 }
+        occurredAt: { type: string, format: date-time }
     NetworkPortalAssignTechnicianRequest:
       type: object
       additionalProperties: false

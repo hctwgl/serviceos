@@ -8,6 +8,7 @@ import {
 } from '../api/technicians'
 import { safeAccessDeniedMessage } from '../api/client'
 import PrincipalPicker from '../components/PrincipalPicker.vue'
+import StatusBadge from '../components/StatusBadge.vue'
 
 const loading = ref(false)
 const busy = ref(false)
@@ -86,7 +87,7 @@ onMounted(() => {
       <tbody>
         <tr v-for="item in page.items" :key="item.id">
           <td>{{ item.displayName }}</td>
-          <td>{{ item.status }}</td>
+          <td><StatusBadge :status="item.status" /></td>
           <td>
             <RouterLink :to="{ name: 'ADMIN.TECHNICIAN.DETAIL', params: { id: item.id } }">
               打开

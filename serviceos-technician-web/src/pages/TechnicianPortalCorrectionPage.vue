@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { statusLabel } from '../product/labels'
 import { onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import {
@@ -18,6 +19,7 @@ import {
   type TechnicianEvidenceSlot,
 } from '../api/technicianPortal'
 import { userFacingError } from '../api/client'
+
 
 const props = defineProps<{ technicianContextId: string | null }>()
 const route = useRoute()
@@ -176,9 +178,9 @@ watch(() => [props.technicianContextId, route.params.id], () => { void load() })
     <p v-if="error" data-testid="technician-correction-error">{{ error }}</p>
     <template v-else-if="correction">
       <dl class="summary">
-        <div><dt>整改状态</dt><dd>{{ correction.caseStatus }}</dd></div>
-        <div><dt>任务状态</dt><dd data-testid="technician-correction-task-status">{{ correction.taskStatus }}</dd></div>
-        <div><dt>原因</dt><dd data-testid="technician-correction-reasons">{{ correction.reasonCodes.join(' / ') }}</dd></div>
+        <div><dt>整改状态</dt><dd>{{ statusLabel(correction.caseStatus) }}</dd></div>
+        <div><dt>任务状态</dt><dd data-testid="technician-correction-task-status">{{ statusLabel(correction.taskStatus) }}</dd></div>
+        <div><dt>原因</dt><dd data-testid="technician-correction-reasons">{{ correction.reasonCodes.map((code) => statusLabel(code)).join(' / ') }}</dd></div>
         <div><dt>历史重提</dt><dd>{{ correction.resubmissionCount }} 次</dd></div>
       </dl>
       <button
@@ -197,12 +199,12 @@ watch(() => [props.technicianContextId, route.params.id], () => { void load() })
         <article v-for="slot in slots" :key="slot.slotId" class="slot" :data-testid="`technician-correction-slot-${slot.slotId}`">
           <div>
             <strong>{{ slot.requirementName }}</strong>
-            <span>{{ slot.status }} · {{ itemsForSlot(slot.slotId).length }} 项</span>
+            <span>{{ statusLabel(slot.status) }} · {{ itemsForSlot(slot.slotId).length }} 项</span>
           </div>
           <ul>
             <li v-for="item in itemsForSlot(slot.slotId)" :key="item.evidenceItemId">
               Item {{ item.itemOrdinal }} ·
-              {{ item.revisions.at(-1)?.status }} / Revision {{ item.revisions.at(-1)?.revisionNumber }}
+              {{ statusLabel(item.revisions.at(-1)?.status) }} / Revision {{ item.revisions.at(-1)?.revisionNumber }}
             </li>
           </ul>
           <input type="file" :data-testid="`technician-correction-file-${slot.slotId}`" @change="selectFile(slot.slotId, $event)">

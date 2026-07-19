@@ -67,8 +67,8 @@ class UiPreferencePostgresIT {
     @BeforeEach
     void clean() {
         jdbc.sql("TRUNCATE TABLE rdm_ui_preference CASCADE").update();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("125");
-        assertThat(flyway.info().applied()).hasSize(127);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("129");
+        assertThat(flyway.info().applied()).hasSize(131);
     }
 
     @Test
