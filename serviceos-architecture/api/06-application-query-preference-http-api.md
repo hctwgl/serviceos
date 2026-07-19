@@ -6,7 +6,7 @@ status: Accepted
 
 # 应用工作区、队列与用户偏好 HTTP API
 
-## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158 / M189 / M190 / M191 / M192 / M193 / M194 / M195 / M202 / M203 / M205 / M206 / M207 / M213 / M214 / M215 / M216 / M217 / M218 / M219 / M220 / M221 / M222 / M223 / M224 / M225 / M226 / M227 / M228 / M229 / M230 / M231 / M232 / M233 / M234 / M235 / M236 / M237 / M238 / M239 / M240 / M241 / M242）
+## 0. 接受范围（M85 / M87 / M88 / M89 / M90 / M91 / M92 / M93 / M94 / M95 / M96 / M97 / M98 / M99 / M100 / M158 / M189 / M190 / M191 / M192 / M193 / M194 / M195 / M202 / M203 / M205 / M206 / M207 / M213 / M214 / M215 / M216 / M217 / M218 / M219 / M220 / M221 / M222 / M223 / M224 / M225 / M226 / M227 / M228 / M229 / M230 / M231 / M232 / M233 / M234 / M235 / M236 / M237 / M238 / M239 / M240 / M241 / M242 / M350）
 
 **Accepted（可指导实现）**：
 
@@ -220,6 +220,11 @@ status: Accepted
 - §11 Technician Portal 表单提交安全摘要（M246 / ADR-084）：M243 详情增加可选
   `formSubmissions`；独立 project scope `form.read` 软门禁，缺权为 null；仅含 ID、formKey、版本、
   validationStatus、错误/警告计数和 submittedAt；禁止 values/message/digest/submittedBy；OpenAPI → `1.0.20`。
+- §11 Technician Portal 任务详情表达式上下文头（M350）：M243 详情增加非 PII
+  `clientCode`/`brandCode`/`serviceProductCode`/`provinceCode`/`cityCode`/`districtCode`
+  （与 `WorkOrderExpressionContext` / SERVICEOS_EXPR_V1 白名单对齐；缺工单失败关闭）。
+  H5 同步执行 `validationRules[].assert`。Core OpenAPI → `1.0.44`。**不**接受地址正文/联系人/
+  editableWhen/defaultExpression 运行时、iOS 共用执行器、PII。
 - §10 Network Portal 队列/列表 Accepted 字段展示（M220 UI-only）：**不**新增 HTTP；整改/
   异常/资质/师傅列表与任务目录展示既有非 PII 字段；`correctionTaskId`/`handlingTaskId`/
   `workOrderId` 门户内深链；异常详情 `handlingTaskId` 深链。catalog 仍 `page-registry-v16`；

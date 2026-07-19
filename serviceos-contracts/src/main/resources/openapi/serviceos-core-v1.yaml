@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.43
+  version: 1.0.44
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -6851,7 +6851,8 @@ components:
       type: object
       additionalProperties: false
       required: [networkId, taskId, workOrderId, taskType, taskKind, stageCode, taskStatus,
-                 executionGuarded, resourceVersion, appointments, contactAttempts, visits, asOf]
+                 executionGuarded, resourceVersion, clientCode, brandCode, serviceProductCode,
+                 provinceCode, cityCode, districtCode, appointments, contactAttempts, visits, asOf]
       properties:
         networkId: { type: string, format: uuid }
         taskId: { type: string, format: uuid }
@@ -6867,6 +6868,36 @@ components:
         effectiveFrom: { type: [string, 'null'], format: date-time }
         executionGuarded: { type: boolean }
         resourceVersion: { type: integer, format: int64, minimum: 1 }
+        clientCode:
+          description: M350；SERVICEOS_EXPR_V1 workOrder.clientCode 权威非 PII 头。
+          type: string
+          minLength: 1
+          maxLength: 64
+        brandCode:
+          description: M350；SERVICEOS_EXPR_V1 workOrder.brandCode 权威非 PII 头。
+          type: string
+          minLength: 1
+          maxLength: 64
+        serviceProductCode:
+          description: M350；SERVICEOS_EXPR_V1 workOrder.serviceProductCode 权威非 PII 头。
+          type: string
+          minLength: 1
+          maxLength: 100
+        provinceCode:
+          description: M350；SERVICEOS_EXPR_V1 region.provinceCode 权威非 PII 头。
+          type: string
+          minLength: 1
+          maxLength: 32
+        cityCode:
+          description: M350；SERVICEOS_EXPR_V1 region.cityCode 权威非 PII 头。
+          type: string
+          minLength: 1
+          maxLength: 32
+        districtCode:
+          description: M350；SERVICEOS_EXPR_V1 region.districtCode 权威非 PII 头。
+          type: string
+          minLength: 1
+          maxLength: 32
         appointments:
           type: array
           items: { $ref: '#/components/schemas/TechnicianPortalScheduleItem' }

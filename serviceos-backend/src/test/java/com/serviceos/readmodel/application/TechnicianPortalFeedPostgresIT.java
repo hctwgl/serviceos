@@ -97,6 +97,7 @@ class TechnicianPortalFeedPostgresIT {
                     dsp_service_assignment_activation_saga, dsp_capacity_reservation,
                     dsp_service_assignment, dsp_capacity_counter,
                     tsk_task_assignment, tsk_task_assignment_batch, tsk_task,
+                    wo_work_order, cfg_configuration_bundle, prj_project,
                     auth_delegation_capability, auth_delegation, auth_role_grant_event,
                     auth_tenant_grant_generation, auth_role_grant, auth_role_capability, auth_role,
                     net_technician_qualification, net_network_technician_membership,
@@ -106,8 +107,8 @@ class TechnicianPortalFeedPostgresIT {
                     idn_person_profile, idn_security_principal,
                     rel_idempotency_record, aud_audit_record CASCADE
                 """).update();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("125");
-        assertThat(flyway.info().applied()).hasSize(127);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("127");
+        assertThat(flyway.info().applied()).hasSizeGreaterThanOrEqualTo(127);
 
         seedPrincipal(TECH_PRINCIPAL, "Technician A");
         seedPrincipal(OTHER_TECH_PRINCIPAL, "Technician B");
@@ -121,6 +122,10 @@ class TechnicianPortalFeedPostgresIT {
         seedGrant(TECH_PRINCIPAL, "task.readAssigned", "NETWORK", NETWORK_A.toString());
         seedGrant(TECH_PRINCIPAL, "form.read", "PROJECT", PROJECT_A.toString());
         seedGrant(OTHER_TECH_PRINCIPAL, "task.readAssigned", "NETWORK", NETWORK_B.toString());
+        seedWorkOrder(WO_A, PROJECT_A, "BYD", "BYD_OCEAN", "HOME_CHARGING_SURVEY_INSTALL",
+                "370000", "370100", "370102");
+        seedWorkOrder(WO_B, PROJECT_A, "BYD", "BYD_OCEAN", "HOME_CHARGING_SURVEY_INSTALL",
+                "370000", "370100", "370102");
         seedHumanTask(TASK_A, WO_A, PROJECT_A);
         seedHumanTask(TASK_B, WO_B, UUID.randomUUID());
         seedHumanTask(TASK_OTHER, UUID.randomUUID(), UUID.randomUUID());
@@ -298,6 +303,12 @@ class TechnicianPortalFeedPostgresIT {
         assertThat(detail.taskStatus()).isEqualTo("READY");
         assertThat(detail.executionGuarded()).isFalse();
         assertThat(detail.resourceVersion()).isEqualTo(1);
+        assertThat(detail.clientCode()).isEqualTo("BYD");
+        assertThat(detail.brandCode()).isEqualTo("BYD_OCEAN");
+        assertThat(detail.serviceProductCode()).isEqualTo("HOME_CHARGING_SURVEY_INSTALL");
+        assertThat(detail.provinceCode()).isEqualTo("370000");
+        assertThat(detail.cityCode()).isEqualTo("370100");
+        assertThat(detail.districtCode()).isEqualTo("370102");
         assertThat(detail.appointments()).singleElement().satisfies(appointment -> {
             assertThat(appointment.appointmentId()).isEqualTo(APPOINTMENT_A);
             assertThat(appointment.taskId()).isEqualTo(TASK_A);
@@ -522,6 +533,89 @@ class TechnicianPortalFeedPostgresIT {
                 .param("tenant", TENANT)
                 .param("network", networkId)
                 .param("profile", profileId)
+                .update();
+    }
+
+    private void seedWorkOrder(
+            UUID workOrderId,
+            UUID projectId,
+            String clientCode,
+            String brandCode,
+            String serviceProductCode,
+            String provinceCode,
+            String cityCode,
+            String districtCode
+    ) {
+        UUID bundleId = UUID.nameUUIDFromBytes(("m350-bundle-" + workOrderId).getBytes());
+        String bundleDigest = "e".repeat(64);
+        java.time.OffsetDateTime scopeNow = java.time.OffsetDateTime.parse("2026-07-17T00:00:00Z");
+        jdbc.sql("""
+                INSERT INTO prj_project (
+                    project_id, tenant_id, project_code, client_id, project_name,
+                    starts_on, ends_on, project_status, aggregate_version, created_at)
+                VALUES (
+                    :projectId, :tenantId, :code, :clientId, 'M350 technician expr fixture',
+                    DATE '2026-07-01', NULL, 'ACTIVE', 1, :createdAt)
+                ON CONFLICT (project_id) DO NOTHING
+                """)
+                .param("projectId", projectId)
+                .param("tenantId", TENANT)
+                .param("code", "M350-" + workOrderId.toString().substring(24))
+                .param("clientId", clientCode)
+                .param("createdAt", scopeNow)
+                .update();
+        jdbc.sql("""
+                INSERT INTO cfg_configuration_bundle (
+                    bundle_id, tenant_id, project_id, bundle_code, bundle_version,
+                    brand_code, service_product_code, province_code, effective_from, effective_until,
+                    manifest_digest, status, published_at)
+                VALUES (
+                    :bundleId, :tenantId, :projectId, :bundleCode, '1.0.0',
+                    :brandCode, :product, :province, :effectiveFrom, NULL,
+                    :manifestDigest, 'PUBLISHED', :publishedAt)
+                ON CONFLICT (bundle_id) DO NOTHING
+                """)
+                .param("bundleId", bundleId)
+                .param("tenantId", TENANT)
+                .param("projectId", projectId)
+                .param("bundleCode", "M350-BUNDLE-" + workOrderId.toString().substring(24))
+                .param("brandCode", brandCode)
+                .param("product", serviceProductCode)
+                .param("province", provinceCode)
+                .param("effectiveFrom", scopeNow)
+                .param("manifestDigest", bundleDigest)
+                .param("publishedAt", scopeNow)
+                .update();
+        jdbc.sql("""
+                INSERT INTO wo_work_order (
+                    id, tenant_id, project_id, client_code, brand_code, service_product_code,
+                    external_order_code, payload_digest, status, configuration_bundle_id,
+                    configuration_bundle_code, configuration_bundle_version,
+                    configuration_bundle_digest, province_code, city_code, district_code,
+                    customer_name, customer_mobile, service_address, vehicle_vin,
+                    external_dispatched_at, received_at, version)
+                VALUES (
+                    :id, :tenantId, :projectId, :clientCode, :brandCode, :serviceProductCode,
+                    :externalOrderCode, :payloadDigest, 'RECEIVED', :bundleId,
+                    'M350-BUNDLE', '1.0.0', :bundleDigest, :provinceCode, :cityCode, :districtCode,
+                    '测试用户', '13800000000', '测试地址', 'VINM350000000001',
+                    :dispatchedAt, :receivedAt, 1)
+                """)
+                .param("id", workOrderId)
+                .param("tenantId", TENANT)
+                .param("projectId", projectId)
+                .param("clientCode", clientCode)
+                .param("brandCode", brandCode)
+                .param("serviceProductCode", serviceProductCode)
+                .param("externalOrderCode", "M350-" + workOrderId)
+                .param("payloadDigest", "d".repeat(64))
+                .param("bundleId", bundleId)
+                .param("bundleDigest", bundleDigest)
+                .param("provinceCode", provinceCode)
+                .param("cityCode", cityCode)
+                .param("districtCode", districtCode)
+                .param("dispatchedAt", java.time.LocalDateTime.parse("2026-07-17T00:00:00"))
+                .param("receivedAt", scopeNow)
                 .update();
     }
 

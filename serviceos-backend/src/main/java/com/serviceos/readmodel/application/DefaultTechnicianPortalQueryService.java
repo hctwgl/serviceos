@@ -30,6 +30,8 @@ import com.serviceos.task.api.TaskFulfillmentContext;
 import com.serviceos.task.api.TaskFulfillmentContextService;
 import com.serviceos.task.api.TechnicianTaskAssignmentFeedQuery;
 import com.serviceos.task.api.TechnicianTaskAssignmentFeedView;
+import com.serviceos.workorder.api.WorkOrderExpressionContext;
+import com.serviceos.workorder.api.WorkOrderExpressionContextQuery;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -70,6 +72,7 @@ final class DefaultTechnicianPortalQueryService implements TechnicianPortalQuery
     private final TechnicianVisitHistoryQuery visits;
     private final FormSubmissionQueryService formSubmissions;
     private final TaskFulfillmentContextService tasks;
+    private final WorkOrderExpressionContextQuery workOrderExpressions;
     private final Clock clock;
 
     DefaultTechnicianPortalQueryService(
@@ -82,6 +85,7 @@ final class DefaultTechnicianPortalQueryService implements TechnicianPortalQuery
             TechnicianVisitHistoryQuery visits,
             FormSubmissionQueryService formSubmissions,
             TaskFulfillmentContextService tasks,
+            WorkOrderExpressionContextQuery workOrderExpressions,
             Clock clock
     ) {
         this.affiliations = affiliations;
@@ -93,6 +97,7 @@ final class DefaultTechnicianPortalQueryService implements TechnicianPortalQuery
         this.visits = visits;
         this.formSubmissions = formSubmissions;
         this.tasks = tasks;
+        this.workOrderExpressions = workOrderExpressions;
         this.clock = clock;
     }
 
@@ -186,6 +191,11 @@ final class DefaultTechnicianPortalQueryService implements TechnicianPortalQuery
         }
         TaskFulfillmentContext task = tasks.find(actor.tenantId(), taskId)
                 .orElseThrow(() -> new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "任务不存在"));
+        // 表达式白名单工单/区域头与服务端 FormValueValidator 同源；缺失则失败关闭，避免 H5 用空上下文假通过。
+        WorkOrderExpressionContext workOrder = workOrderExpressions.find(actor.tenantId(), task.workOrderId())
+                .orElseThrow(() -> new BusinessProblem(
+                        ProblemCode.RESOURCE_NOT_FOUND,
+                        "任务关联工单不存在"));
         List<TechnicianPortalScheduleItem> appointmentItems = appointments
                 .listForTasks(actor.tenantId(), Set.of(taskId)).stream()
                 .map(row -> new TechnicianPortalScheduleItem(
@@ -244,6 +254,12 @@ final class DefaultTechnicianPortalQueryService implements TechnicianPortalQuery
                         : taskAssignment.effectiveFrom(),
                 task.executionGuarded(),
                 task.version(),
+                workOrder.clientCode(),
+                workOrder.brandCode(),
+                workOrder.serviceProductCode(),
+                workOrder.provinceCode(),
+                workOrder.cityCode(),
+                workOrder.districtCode(),
                 appointmentItems,
                 contactAttemptItems,
                 visitItems,

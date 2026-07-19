@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M349 Technician Web FORM 条件执行器**（已合入 `master`（`c54c98ee` / PR #177）；
+当前工程基线为 **M350 Technician 表达式上下文与 validationRules**（基线含 M349（`c54c98ee`）；M350 Draft 于本切片；
 见 `implementation-status.md`；合入 `master` 后回填合并提交）。M320 合并基线为
 `32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147）。
 
@@ -694,6 +694,8 @@ Track F/G 仍为 `BLOCKED_EXTERNAL`。
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M350 实现文档](architecture/363-m350-technician-expr-context-validation-rules.md)
+- [M350 验收矩阵](testing/347-m350-technician-expr-context-validation-rules-acceptance.md)
 - [M349 实现文档](architecture/362-m349-technician-form-condition-executor.md)
 - [M349 验收矩阵](testing/346-m349-technician-form-condition-executor-acceptance.md)
 - [M348 实现文档](architecture/361-m348-dispatch-residual-editor.md)
