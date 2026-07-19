@@ -674,19 +674,22 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M306 DISPATCH 运行时**（功能证据见 `implementation-status.md` 的
+当前工程基线为 **M307 NOTIFICATION 运行时**（功能证据见 `implementation-status.md` 的
 `baselineCommit`；合入 `master` 后改为合并提交）。M296 及之前基线合并提交为
 `f3b623453a33ece91a691438b0c541e53c3282df`。
 
-当前已具备多 OEM 入站建单/审核回调管道 SPI、出站提审通用 SPI、复杂流程运行时与十大配置资产设计器。
-下一主线是 Update/Cancel/远端查询 SPI、配置资产运行时引擎与业务低代码设计器；真实 OEM Sandbox 与
-Track F/G 仍为 `BLOCKED_EXTERNAL`。
+当前已具备多 OEM 入站建单/审核回调管道 SPI、出站提审通用 SPI、复杂流程运行时、十大配置资产设计器，
+以及 INTEGRATION/ASSIGNEE/DISPATCH/NOTIFICATION 冻结 Bundle 运行时。
+下一主线是 RULE/PRICING 运行时与业务低代码设计器；真实 OEM Sandbox 与 Track F/G 仍为
+`BLOCKED_EXTERNAL`。
 
 权威进度入口：
 
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M307 实现文档](architecture/320-m307-notification-runtime.md)
+- [M307 验收矩阵](testing/304-m307-notification-runtime-acceptance.md)
 - [M298 实现文档](architecture/311-m298-inbound-review-callback-spi.md)
 - [M298 验收矩阵](testing/295-m298-inbound-review-callback-spi-acceptance.md)
 - [M299 实现文档](architecture/312-m299-outbound-review-submission-profile-registry.md)

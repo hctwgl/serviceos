@@ -401,3 +401,4 @@ Feature gate/authority: if applicable
 | M304 | 建单主路径冻结 INTEGRATION Mapping 闸门；零 Mapping 兼容；审计 APPLIED | Create pipeline + BYD IT + `317-m304-*` + `301-m304-*` | 替代 OEM Mapper、出站 Mapping、ASSIGNEE 运行时 |
 | M305 | ASSIGNEE_POLICY 运行时：冻结 Bundle + when 求值 + 候选/Fallback 解释；不写 TaskAssignment | AssigneePolicyRuntime + unit/IT + `318-m305-*` + `302-m305-*` | 组织/网点实时成员解析、自动 assignCandidates、DISPATCH 评分 |
 | M306 | DISPATCH 运行时：硬过滤/评分/并列/无候选 Fallback；确定性解释；不写 ServiceAssignment | DispatchRuntime + unit/IT + `319-m306-*` + `303-m306-*` | 自动派单落账、比例分配闭环、NOTIFICATION 运行时 |
+| M307 | NOTIFICATION 运行时：冻结触发器/when/收件人角色/通道 SPI/幂等/UNKNOWN 人工接管；LocalReference Adapter | NotificationRuntime + LocalReference + unit/IT + `320-m307-*` + `304-m307-*` | 真实短信/邮件 Adapter、模板引擎、Outbox 投递、RULE/PRICING 运行时 |
