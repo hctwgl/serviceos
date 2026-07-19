@@ -325,5 +325,8 @@
 - [M320 多 OEM 并行建单冒烟验收矩阵](317-m320-multi-oem-parallel-create-smoke-acceptance.md)
 - [M351 平台终审工作区只读组合查询验收矩阵](348-m351-final-review-workspace-section-acceptance.md)
 - [M352 Admin 终审只读 UI 验收矩阵](349-m352-final-review-admin-ui-acceptance.md)
+- [M353 targetDecisions 裁决验收矩阵](350-m353-review-target-decide-acceptance.md)
+- [M354 整改深链验收矩阵](351-m354-final-review-correction-deeplink-acceptance.md)
+- [M355 终审 E2E 验收矩阵](352-m355-final-review-e2e-gate-acceptance.md)
 - [多车企平台内核程序级验收矩阵](multi-oem-platform-kernel-program-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

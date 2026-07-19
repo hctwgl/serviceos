@@ -674,8 +674,8 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M352 Admin 终审只读 UI 与 Ant Design 定型**（见 `implementation-status.md`；
-OpenAPI 1.0.48；M351 API + M352 UI）。本序列后续为 M353～M355（decide、深链、E2E）。
+当前工程基线为 **M355 平台终审工作台纵向切片**（见 `implementation-status.md`；
+OpenAPI 1.0.49；Flyway 130；M351～M355）。
 
 当前已具备多 OEM SPI、远端查询、UNKNOWN/批量重放、复杂流程、十大资产设计器、六类 Runtime，
 入站/出站 Mapping（M321～M339）、FORM/EVIDENCE ConditionBuilder（M340～M349）、
@@ -688,10 +688,12 @@ ASSIGNEE/DISPATCH/RULE/NOTIFICATION/PRICING SHADOW，以及 **M351 FINAL_REVIEW 
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M355 实现文档](architecture/368-m355-final-review-e2e-gate.md)
+- [M355 验收矩阵](testing/352-m355-final-review-e2e-gate-acceptance.md)
+- [M354 实现文档](architecture/367-m354-final-review-correction-deeplink.md)
+- [M353 实现文档](architecture/366-m353-review-target-decide.md)
 - [M352 实现文档](architecture/365-m352-final-review-admin-ui.md)
-- [M352 验收矩阵](testing/349-m352-final-review-admin-ui-acceptance.md)
 - [M351 实现文档](architecture/364-m351-final-review-workspace-section.md)
-- [M351 验收矩阵](testing/348-m351-final-review-workspace-section-acceptance.md)
 - [M350 实现文档](architecture/363-m350-technician-expr-context-validation-rules.md)
 - [M350 验收矩阵](testing/347-m350-technician-expr-context-validation-rules-acceptance.md)
 - [M349 实现文档](architecture/362-m349-technician-form-condition-executor.md)

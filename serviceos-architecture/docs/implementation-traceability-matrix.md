@@ -447,3 +447,6 @@ Feature gate/authority: if applicable
 | M350 | Technician 任务详情表达式上下文头 + H5 validationRules | WorkOrderExpressionContextQuery + TechnicianPortalTaskDetail + OpenAPI 1.0.44 + H5 + IT + 363-m350-* + 347-m350-* + PR #179 | editableWhen/defaultExpression、iOS 共用执行器 |
 | M351 | 平台终审工作区只读组合查询 + Revision 短时下载授权 | FINAL_REVIEW section + FinalReviewWorkspaceQueryService + masked contact + OpenAPI 1.0.48 + IT/SecurityTest + 364-m351-* + 348-m351-* | 终审 UI（M352）、targetDecisions decide（M353）、aggregate_version |
 | M352 | Admin 终审只读 UI + Ant Design Vue 定型 | ant-design-vue + ConfigProvider/zhCN/Token + AppShell + FinalReviewWorkspace + sessionStorage 草稿 + build/unit + 365-m352-* + 349-m352-* | 正式提交 UI（M353）、完整视觉 8 态实拍（M355） |
+| M353 | ReviewCase targetDecisions 正式裁决 | OpenAPI 1.0.49 + V130 + DefaultReviewCaseService.decide + Admin 提交 + Review/Correction/RuleGate IT + 366-m353-* + 350-m353-* | 独立审核 Task 模板分离；完整 28 场景 E2E（M355） |
+| M354 | 终审驳回整改深链与版本链 | Correction 同事务创建 + CorrectionCaseDetail 深链 + Correction/Review IT + 367-m354-* + 351-m354-* | 终审后更正批次 |
+| M355 | 平台终审真实端到端门禁收口 | IT/Client/Admin build 证据矩阵 + 368-m355-* + 352-m355-* | 完整视觉 8 态人工基线、admin-pilot 全量 28 场景实拍 |

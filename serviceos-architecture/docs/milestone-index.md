@@ -361,6 +361,9 @@ title: ServiceOS 里程碑索引
 | M350 | M350 Technician 表达式上下文与 validationRules | [363-m350-technician-expr-context-validation-rules.md](../architecture/363-m350-technician-expr-context-validation-rules.md) | [347-m350-technician-expr-context-validation-rules-acceptance.md](../testing/347-m350-technician-expr-context-validation-rules-acceptance.md) |
 | M351 | M351 平台终审工作区只读组合查询 | [364-m351-final-review-workspace-section.md](../architecture/364-m351-final-review-workspace-section.md) | [348-m351-final-review-workspace-section-acceptance.md](../testing/348-m351-final-review-workspace-section-acceptance.md) |
 | M352 | M352 Admin 终审工作台只读 UI 与 Ant Design 定型 | [365-m352-final-review-admin-ui.md](../architecture/365-m352-final-review-admin-ui.md) | [349-m352-final-review-admin-ui-acceptance.md](../testing/349-m352-final-review-admin-ui-acceptance.md) |
+| M353 | M353 ReviewCase targetDecisions 正式裁决 | [366-m353-review-target-decide.md](../architecture/366-m353-review-target-decide.md) | [350-m353-review-target-decide-acceptance.md](../testing/350-m353-review-target-decide-acceptance.md) |
+| M354 | M354 终审驳回整改深链与版本链 | [367-m354-final-review-correction-deeplink.md](../architecture/367-m354-final-review-correction-deeplink.md) | [351-m354-final-review-correction-deeplink-acceptance.md](../testing/351-m354-final-review-correction-deeplink-acceptance.md) |
+| M355 | M355 平台终审真实端到端门禁 | [368-m355-final-review-e2e-gate.md](../architecture/368-m355-final-review-e2e-gate.md) | [352-m355-final-review-e2e-gate-acceptance.md](../testing/352-m355-final-review-e2e-gate-acceptance.md) |
 
 ## 未关联里程碑的文档
 

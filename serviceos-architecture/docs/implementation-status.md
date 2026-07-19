@@ -4,7 +4,7 @@ version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-19
 baselineCommit: "9acc73940f0b0d1f590e9e5de4e165ad2f2bef91"
-latestMilestone: "M352"
+latestMilestone: "M355"
 ---
 
 # ServiceOS 实施状态总览
@@ -39,13 +39,13 @@ latestMilestone: "M352"
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M352 Admin 终审工作台只读 UI 与 Ant Design 定型 |
+| 最新实施里程碑 | M355 平台终审真实端到端门禁 |
 | 基线提交 | `a4dd25cc564fa6f0496bd127d07b9e1338b923cf`（功能提交后回填） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts`、`@serviceos/web-core`、`ServiceOSIOSCore`、独立且可部署的 `serviceos-network-web` 与 `serviceos-technician-web`、Swift 6 `TechnicianIOSFoundation`，以及已在 iPhone 17 Pro Simulator 安装启动、实跑 XCTest/XCUITest、形成 Production arm64 archive/dSYM，并接入当前任务、在线 Visit、冻结基础表单、前台 Evidence 采集上传、Snapshot/Task 完成与多轮资料整改的原生 `TechnicianIOS` SwiftUI App；由同一 Core OpenAPI 生成并经独立消费者门禁验证的 `@serviceos/core-client` 与 `ServiceOSCoreClient` |
 | 前端工程 | `serviceos-admin-web` 独立承载总部运营、统一用户中心、`/me` 导航、SavedView、UI Preference、受控搜索与最近访问；M256 后 Network 正式产品由独立 `serviceos-network-web` 承载，M257 后 Technician 正式产品由独立移动优先 `serviceos-technician-web` 承载，M262～M266 依次增加在线 Visit、冻结表单、Evidence 三段式上传、Snapshot/Task 完成与独立整改 Task 多轮补传/重新提交；Admin 仅保留可配置外链和 M188 诊断；两套独立 Web 均实际接入共享 Core、OIDC PKCE、服务端 Context/Capability/导航、Playwright 回归和独立容器镜像 |
-| 数据库 | PostgreSQL + Flyway（当前版本 127） |
-| 契约 | Core OpenAPI 1.0.48 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 `workorder.cancelled@v1`、`workorder.reopened@v1`、`workorder.external-details-updated@v1`、project.created@v3、project.scope-relations-revised@v1、`task.handling-completed@v1`、recovered/resolved 与 SLA started/breached/met@v1） |
+| 数据库 | PostgreSQL + Flyway（当前版本 130） |
+| 契约 | Core OpenAPI 1.0.49 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 `workorder.cancelled@v1`、`workorder.reopened@v1`、`workorder.external-details-updated@v1`、project.created@v3、project.scope-relations-revised@v1、`task.handling-completed@v1`、recovered/resolved 与 SLA started/breached/met@v1） |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -175,16 +175,14 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M352**（Admin 终审只读 UI + Ant Design 定型）。
-M351 API 已落地；M350 master 基线 `9acc7394`。
+ServiceOS 可靠纵向切片已推进到 **M355**（平台终审工作台纵向切片收口：M351～M355）。
+OpenAPI **1.0.49**（`:decide` 改为 `targetDecisions`，相对旧客户端为破坏性演进，新系统直接修正）；Flyway **130**。
 
-当前契约/迁移：OpenAPI **1.0.48**；Flyway **129**。
+下一阶段：
 
-下一阶段（本序列续作）：
-
-1. **M353** `targetDecisions` 正式 `:decide` + If-Match + 同事务 Task/Correction；
-2. **M354** 整改深链与版本链；
-3. **M355** 真实 OIDC + PostgreSQL + Chrome E2E 门禁。
+1. 完整 8 态视觉基线人工采信与 admin-pilot 全场景 Chrome 冒烟加固；
+2. 独立审核 HUMAN Task 与提交 Task 分离的工作流模板；
+3. 既有硬门禁：吉利联调 / AMOUNT/加权 / BUSINESS 日历 SLA。
 
 仍为 **硬门禁 / 外部阻塞**（不可发明推进）：
 
