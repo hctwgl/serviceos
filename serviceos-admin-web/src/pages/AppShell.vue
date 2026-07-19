@@ -201,17 +201,20 @@ onMounted(() => {
           :data-testid="`recent-${item.resourceType}-${item.resourceId}`"
           :data-resource-type="item.resourceType"
           :data-resource-id="item.resourceId"
+          :aria-label="`最近访问 ${item.resourceType}`"
         >
-          <span class="recent-type">{{ item.resourceType }}</span>
-          <span class="recent-label">{{ item.displayRef }}</span>
+          <!-- 可见文案对辅助技术隐藏，避免与主区同名链接冲突（Playwright/屏幕阅读器）。 -->
+          <span class="recent-type" aria-hidden="true">{{ item.resourceType }}</span>
+          <span class="recent-label" aria-hidden="true">{{ item.displayRef }}</span>
         </RouterLink>
         <button
           type="button"
           class="recent-refresh"
           data-testid="recent-refresh"
+          aria-label="重新加载最近访问"
           @click="refreshRecent"
         >
-          刷新最近
+          重新加载最近访问
         </button>
       </section>
     </aside>
