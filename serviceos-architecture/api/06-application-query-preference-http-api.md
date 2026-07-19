@@ -447,6 +447,14 @@ sourceVersions
 
 `section` 枚举：`TASKS`、`APPOINTMENTS_VISITS`、`FORMS_EVIDENCE`、`REVIEWS_CORRECTIONS`、`INTEGRATION`、`FACTS_CALCULATIONS`、`TIMELINE_AUDIT`。
 
+M351 另接受固定路径只读终审区块（独立 operationId，响应为 `{data, meta}`）：
+
+| 方法与路径 | 用途 |
+|---|---|
+| `GET /api/v1/work-orders/{id}/workspace/sections/FINAL_REVIEW` | 平台终审工作区 Fan-in（脱敏工单摘要、审核 Task/SLA、门禁、Snapshot targets、驳回原因、allowedActions） |
+
+顶层 `sectionAvailability` 同步探测 `FINAL_REVIEW`（AVAILABLE/EMPTY/UNAVAILABLE）。查询不落物理投影表，不推进业务状态。
+
 组合响应只引用权威对象版本；它自身是可重建投影，不能被 PATCH。
 
 ## 6. 专项队列查询

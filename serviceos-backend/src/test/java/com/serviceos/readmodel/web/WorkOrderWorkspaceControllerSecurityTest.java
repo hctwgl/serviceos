@@ -3,6 +3,13 @@ package com.serviceos.readmodel.web;
 import com.serviceos.bootstrap.SecurityConfiguration;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
+import com.serviceos.readmodel.api.FinalReviewWorkspaceQueryService;
+import com.serviceos.readmodel.api.FinalReviewWorkspaceSectionResponse;
+import com.serviceos.readmodel.api.FinalReviewWorkspaceSectionResponse.FinalReviewAllowedAction;
+import com.serviceos.readmodel.api.FinalReviewWorkspaceSectionResponse.FinalReviewGateCheck;
+import com.serviceos.readmodel.api.FinalReviewWorkspaceSectionResponse.FinalReviewWorkOrderSummary;
+import com.serviceos.readmodel.api.FinalReviewWorkspaceSectionResponse.FinalReviewWorkspaceData;
+import com.serviceos.readmodel.api.FinalReviewWorkspaceSectionResponse.FinalReviewWorkspaceMeta;
 import com.serviceos.readmodel.api.WorkOrderWorkspace;
 import com.serviceos.readmodel.api.WorkOrderWorkspace.WorkOrderWorkspaceMeta;
 import com.serviceos.readmodel.api.WorkOrderWorkspace.WorkOrderWorkspaceServiceAssignmentSummary;
@@ -54,6 +61,9 @@ class WorkOrderWorkspaceControllerSecurityTest {
 
     @MockitoBean
     private WorkOrderWorkspaceQueryService workspaces;
+
+    @MockitoBean
+    private FinalReviewWorkspaceQueryService finalReviews;
 
     @MockitoBean
     private CurrentPrincipalProvider principals;
@@ -368,5 +378,47 @@ class WorkOrderWorkspaceControllerSecurityTest {
                 .andExpect(jsonPath("$.reviewsCorrections").value(nullValue()));
         verify(workspaces).getSection(
                 principal, "corr-int", workOrderId, "INTEGRATION", null, 50);
+    }
+
+    @Test
+    void finalReviewWorkspaceSectionContractIsEnforced() throws Exception {
+        UUID workOrderId = UUID.randomUUID();
+        UUID projectId = UUID.randomUUID();
+        CurrentPrincipal principal = new CurrentPrincipal(
+                "reviewer", "tenant", CurrentPrincipal.PrincipalType.USER, "m351", Set.of());
+        Instant now = Instant.parse("2026-07-19T10:00:00Z");
+        FinalReviewWorkspaceSectionResponse response = new FinalReviewWorkspaceSectionResponse(
+                new FinalReviewWorkspaceData(
+                        new FinalReviewWorkOrderSummary(
+                                workOrderId, "EXT-351", projectId, "试点项目", "ACTIVE", "履约中",
+                                "HOME_CHARGING_SURVEY_INSTALL", "HOME_CHARGING_SURVEY_INSTALL",
+                                "张**", "*******5678", "山东省济南市***",
+                                "济南网点", "张师傅", null, "提交平台终审"),
+                        null,
+                        null,
+                        null,
+                        List.of(new FinalReviewGateCheck(
+                                "REVIEW_CASE_OPEN", "审核案例待审", "FAIL", true, "当前无 OPEN 的平台审核案例")),
+                        List.of(),
+                        List.of(),
+                        List.of(new FinalReviewAllowedAction("DECIDE", false, "当前状态不允许提交终审")),
+                        null),
+                new FinalReviewWorkspaceMeta(now, "final-review.v1:live", "FRESH", 3L, "frq-1"));
+        when(principals.current()).thenReturn(principal);
+        when(finalReviews.get(principal, "corr-fr", workOrderId)).thenReturn(response);
+
+        mvc.perform(get("/api/v1/work-orders/{id}/workspace/sections/FINAL_REVIEW", workOrderId)
+                        .with(jwt())
+                        .header("X-Correlation-Id", "corr-fr"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("ETag", "\"3\""))
+                .andExpect(jsonPath("$.data.workOrder.displayNo").value("EXT-351"))
+                .andExpect(jsonPath("$.data.workOrder.maskedCustomerPhone").value("*******5678"))
+                .andExpect(jsonPath("$.data.workOrder.maskedCustomerPhone").value(org.hamcrest.Matchers.not("13812345678")))
+                .andExpect(jsonPath("$.meta.freshnessStatus").value("FRESH"))
+                .andExpect(jsonPath("$.data.gateChecks[0].code").value("REVIEW_CASE_OPEN"))
+                .andExpect(jsonPath("$.data.objectKey").doesNotExist())
+                .andExpect(jsonPath("$.data.workOrder.customerMobile").doesNotExist());
+        verify(finalReviews).get(principal, "corr-fr", workOrderId);
     }
 }

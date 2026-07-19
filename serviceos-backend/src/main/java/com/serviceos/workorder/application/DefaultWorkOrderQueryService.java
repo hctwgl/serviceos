@@ -9,6 +9,7 @@ import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.shared.Sha256;
 import com.serviceos.workorder.api.WorkOrderDetail;
+import com.serviceos.workorder.api.WorkOrderMaskedContactView;
 import com.serviceos.workorder.api.WorkOrderPage;
 import com.serviceos.workorder.api.WorkOrderQuery;
 import com.serviceos.workorder.api.WorkOrderQueryService;
@@ -81,6 +82,63 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
         authorization.require(principal, AuthorizationRequest.projectCapability(READ, principal.tenantId(),
                 "WorkOrder", workOrder.id().toString(), workOrder.projectId().toString()), correlationId);
         return new WorkOrderDetail(workOrder, clock.instant());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public WorkOrderMaskedContactView getMaskedContact(
+            CurrentPrincipal principal, String correlationId, UUID workOrderId
+    ) {
+        Objects.requireNonNull(workOrderId, "workOrderId must not be null");
+        // 先按非 PII 概要鉴权，失败关闭时不暴露工单是否含联系字段。
+        WorkOrderView workOrder = queries.findById(principal.tenantId(), workOrderId)
+                .orElseThrow(() -> new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "工单不存在"));
+        authorization.require(principal, AuthorizationRequest.projectCapability(READ, principal.tenantId(),
+                "WorkOrder", workOrder.id().toString(), workOrder.projectId().toString()), correlationId);
+        WorkOrderQueryRepository.RawCustomerContact raw = queries
+                .findRawCustomerContact(principal.tenantId(), workOrderId)
+                .orElseThrow(() -> new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "工单不存在"));
+        return new WorkOrderMaskedContactView(
+                raw.workOrderId(),
+                maskName(raw.customerName()),
+                maskPhone(raw.customerMobile()),
+                maskAddress(raw.serviceAddress()));
+    }
+
+    /** 姓名仅保留首字，其余以 * 代替。 */
+    static String maskName(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (trimmed.length() == 1) {
+            return "*";
+        }
+        return trimmed.charAt(0) + "*".repeat(Math.min(trimmed.length() - 1, 3));
+    }
+
+    /** 手机号保留后四位。 */
+    static String maskPhone(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String digits = value.trim();
+        if (digits.length() <= 4) {
+            return "****";
+        }
+        return "*".repeat(Math.min(digits.length() - 4, 7)) + digits.substring(digits.length() - 4);
+    }
+
+    /** 地址仅保留前 6 个可见字符。 */
+    static String maskAddress(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (trimmed.length() <= 6) {
+            return trimmed.charAt(0) + "***";
+        }
+        return trimmed.substring(0, 6) + "***";
     }
 
     private static String normalizeCode(String value, String field) {

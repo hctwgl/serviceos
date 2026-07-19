@@ -674,26 +674,22 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M350 Technician 表达式上下文与 validationRules**（基线含 M349（`c54c98ee`）；M350 Draft 于本切片；
-见 `implementation-status.md`；合入 `master` 后回填合并提交）。M320 合并基线为
-`32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147）。
+当前工程基线为 **M351 平台终审工作区只读组合查询**（见 `implementation-status.md`；
+OpenAPI 1.0.48；M350 master 基线 `9acc7394`）。本序列后续为 M352～M355（终审 UI、decide、深链、E2E）。
 
 当前已具备多 OEM SPI、远端查询、UNKNOWN/批量重放、复杂流程、十大资产设计器、六类 Runtime，
-入站/出站 Mapping（M321～M339，含 CREATE/UPDATE/CANCEL 强制 Mapping + messageType）、
-FORM/EVIDENCE ConditionBuilder（M340/M341）与嵌套条件组（M342）、REFERENCE_OEM Update/Cancel（M343）、
-Admin Mapping DSL UI（M347）、DISPATCH scope/fallback/allocationRatio 编辑器（M348）、
-Technician FORM 条件执行器（M349）、
-ASSIGNEE/DISPATCH NETWORK+TECHNICIAN+Coverage+比例缺口（M323/M324/M332/M337/M338）、
-RULE（M325/M329/M330）、NOTIFICATION（M326）、PRICING SHADOW Snapshot（M327），以及 Admin
-UNKNOWN 人工处置与批量 Replay 工作台（M328）。
-下一主线进入硬门禁：吉利材料到位后优先联调；AMOUNT/加权（待业务确认）与 BUSINESS 日历 SLA；
-Track F/G 仍为 `BLOCKED_EXTERNAL`。
+入站/出站 Mapping（M321～M339）、FORM/EVIDENCE ConditionBuilder（M340～M349）、
+ASSIGNEE/DISPATCH/RULE/NOTIFICATION/PRICING SHADOW，以及 **M351 FINAL_REVIEW 终审 Fan-in API**。
+下一主线：管理端终审工作台 UI 与 targetDecisions 正式裁决；吉利联调 / AMOUNT/加权 / BUSINESS 日历 SLA
+仍为硬门禁；Track F/G 仍为 `BLOCKED_EXTERNAL`。
 
 权威进度入口：
 
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M351 实现文档](architecture/364-m351-final-review-workspace-section.md)
+- [M351 验收矩阵](testing/348-m351-final-review-workspace-section-acceptance.md)
 - [M350 实现文档](architecture/363-m350-technician-expr-context-validation-rules.md)
 - [M350 验收矩阵](testing/347-m350-technician-expr-context-validation-rules-acceptance.md)
 - [M349 实现文档](architecture/362-m349-technician-form-condition-executor.md)

@@ -7,9 +7,12 @@ import com.serviceos.evidence.api.EvidenceRevisionView;
 import com.serviceos.evidence.api.EvidenceUploadSessionView;
 import com.serviceos.evidence.api.FinalizeEvidenceUploadCommand;
 import com.serviceos.evidence.api.InvalidateEvidenceRevisionCommand;
+import com.serviceos.files.api.DownloadAuthorizationView;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.CorrelationIds;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -106,6 +109,28 @@ final class EvidenceItemController {
         return itemResponse(evidence.get(principals.current(), correlationId, itemId));
     }
 
+    @PostMapping("/evidence-revisions/{revisionId}/download-authorizations")
+    ResponseEntity<DownloadAuthorizationResponse> authorizeDownload(
+            @PathVariable UUID revisionId,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestBody AuthorizeRevisionDownloadRequest request
+    ) {
+        DownloadAuthorizationView authorization = evidence.authorizeRevisionDownload(
+                principals.current(), correlationId, revisionId, request.purpose());
+        // 不在日志中打印 downloadUrl；响应体短时有效。
+        return ResponseEntity
+                .created(URI.create("/api/v1/evidence-revisions/" + revisionId
+                        + "/download-authorizations/" + authorization.authorizationId()))
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(new DownloadAuthorizationResponse(
+                        authorization.authorizationId(),
+                        authorization.fileId(),
+                        authorization.method(),
+                        authorization.downloadUrl(),
+                        authorization.requiredHeaders(),
+                        authorization.expiresAt()));
+    }
+
     @PostMapping("/evidence-revisions/{revisionId}:invalidate")
     EvidenceRevisionResponse invalidate(
             @PathVariable UUID revisionId,
@@ -190,6 +215,21 @@ final class EvidenceItemController {
     }
 
     record InvalidateEvidenceRevisionRequest(String reasonCode, String approvalRef) {
+    }
+
+    record AuthorizeRevisionDownloadRequest(
+            @NotBlank @Size(max = 500) String purpose
+    ) {
+    }
+
+    record DownloadAuthorizationResponse(
+            UUID authorizationId,
+            UUID fileId,
+            String method,
+            String downloadUrl,
+            Map<String, String> requiredHeaders,
+            Instant expiresAt
+    ) {
     }
 
     record EvidenceUploadSessionResponse(

@@ -1,6 +1,8 @@
 package com.serviceos.readmodel.web;
 
 import com.serviceos.identity.api.CurrentPrincipalProvider;
+import com.serviceos.readmodel.api.FinalReviewWorkspaceQueryService;
+import com.serviceos.readmodel.api.FinalReviewWorkspaceSectionResponse;
 import com.serviceos.readmodel.api.WorkOrderWorkspace;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceQueryService;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceSection;
@@ -19,13 +21,16 @@ import java.util.UUID;
 @RequestMapping("/api/v1/work-orders")
 final class WorkOrderWorkspaceController {
     private final WorkOrderWorkspaceQueryService workspaces;
+    private final FinalReviewWorkspaceQueryService finalReviews;
     private final CurrentPrincipalProvider principals;
 
     WorkOrderWorkspaceController(
             WorkOrderWorkspaceQueryService workspaces,
+            FinalReviewWorkspaceQueryService finalReviews,
             CurrentPrincipalProvider principals
     ) {
         this.workspaces = workspaces;
+        this.finalReviews = finalReviews;
         this.principals = principals;
     }
 
@@ -53,6 +58,19 @@ final class WorkOrderWorkspaceController {
                 principals.current(), correlationId, workOrderId, section, cursor, limit);
         return ResponseEntity.ok()
                 .eTag(Long.toString(result.sourceVersions().workOrderVersion()))
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(result);
+    }
+
+    @GetMapping("/{workOrderId}/workspace/sections/FINAL_REVIEW")
+    ResponseEntity<FinalReviewWorkspaceSectionResponse> getFinalReview(
+            @PathVariable UUID workOrderId,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        FinalReviewWorkspaceSectionResponse result = finalReviews.get(
+                principals.current(), correlationId, workOrderId);
+        return ResponseEntity.ok()
+                .eTag(Long.toString(result.meta().scopeVersion()))
                 .header(CorrelationIds.HEADER_NAME, correlationId)
                 .body(result);
     }
