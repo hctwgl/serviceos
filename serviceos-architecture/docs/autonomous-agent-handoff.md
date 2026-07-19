@@ -12,7 +12,7 @@ lastUpdated: 2026-07-19
 - PR #150：https://github.com/hctwgl/serviceos/pull/150 — **M323** ASSIGNEE→TaskAssignment（Draft，base=#149）
 - PR #151：https://github.com/hctwgl/serviceos/pull/151 — **M324** DISPATCH→ServiceAssignment（Draft，base=#150）
 - PR #152：https://github.com/hctwgl/serviceos/pull/152 — **M325** RULE→ReviewCase.decide（Draft，base=#151）
-- **M326** NOTIFICATION 可靠投递 Draft PR pending（base=#152）
+- PR #153：https://github.com/hctwgl/serviceos/pull/153 — **M326** NOTIFICATION 可靠投递（Draft，base=#152）
 - `master`：`32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147 已合并）
 - latestMilestone：**M326**
 - Flyway：**124**；OpenAPI：**1.0.43**
@@ -39,6 +39,8 @@ bash scripts/agent-verify.sh it NotificationReliableDeliveryPostgresIT
 bash scripts/agent-verify.sh test ArchitectureTest,DefaultNotificationRuntimeTest
 ```
 
+均 PASS。未跑全量 verify-local.sh（切片级精准验证）。
+
 ## BLOCKED_EXTERNAL
 
 - 吉利 Sandbox/OpenAPI 签名/真实脱敏报文
@@ -57,4 +59,4 @@ bash scripts/agent-verify.sh test ArchitectureTest,DefaultNotificationRuntimeTes
 2. CalculationSnapshot 持久化（不落账）
 3. 不做：对账结算、Admin 计价工作台、真实供应商通知
 
-**合并顺序**：#148 → #149 → #150 → #151 → #152 → M326 Draft PR。
+**合并顺序**：#148 → #149 → #150 → #151 → #152 → #153。
