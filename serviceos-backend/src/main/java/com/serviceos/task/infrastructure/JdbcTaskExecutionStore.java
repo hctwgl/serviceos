@@ -284,10 +284,15 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
             throw new BusinessProblem(ProblemCode.TASK_SCHEDULE_CONFLICT,
                     "Handling task cannot be completed from status " + state.status());
         }
+        // HUMAN 完成必须满足 ck_tsk_human_lifecycle（claimed_by/claimed_at/started_at 非空）。
+        // 整改 handling Task 可能仍停留在 READY；系统关闭 Case 时补齐最小生命周期字段。
         int updated = jdbc.sql("""
                         UPDATE tsk_task
                            SET status = 'COMPLETED', result_ref = :resultRef,
                                result_digest = :resultDigest, completed_at = :completedAt,
+                               claimed_by = COALESCE(claimed_by, :completedBy),
+                               claimed_at = COALESCE(claimed_at, :completedAt),
+                               started_at = COALESCE(started_at, :completedAt),
                                claim_owner = NULL, claim_until = NULL, current_attempt_id = NULL,
                                version = version + 1, updated_at = :completedAt
                          WHERE tenant_id = :tenantId AND task_id = :taskId
@@ -295,6 +300,7 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
                         """)
                 .param("resultRef", command.resultRef()).param("resultDigest", command.resultDigest())
                 .param("completedAt", timestamptz(command.completedAt()))
+                .param("completedBy", command.completedBy())
                 .param("tenantId", command.tenantId()).param("taskId", command.taskId())
                 .param("version", state.version()).param("status", state.status()).update();
         if (updated != 1) {
