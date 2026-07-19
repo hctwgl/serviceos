@@ -30,6 +30,7 @@ import {
   type NetworkPortalWorkspaceEvidenceSlotSummary,
 } from '../api/networkPortal'
 import { getMe } from '../api/me'
+import { formatDateTime, statusLabel } from '@serviceos/web-core'
 
 const props = defineProps<{ networkContextId: string | null }>()
 const route = useRoute()
@@ -147,6 +148,12 @@ function directorySlaRiskLabel(taskId: string) {
 function taskRegionLabel(item: NetworkPortalTaskItem) {
   const parts = [item.provinceCode, item.cityCode, item.districtCode].filter(Boolean)
   return parts.length ? parts.join('/') : '—'
+}
+
+function taskOptionLabel(item: NetworkPortalTaskItem) {
+  const type = item.taskType ? statusLabel(item.taskType) : '任务'
+  const wo = item.workOrderId ? item.workOrderId.slice(0, 8) : '—'
+  return `${type} · 工单 ${wo}…`
 }
 const selectedTaskId = ref('')
 /** 接单可用任务 ID：允许填写尚未 ACTIVE 到本网点的任务（不能只从 ACTIVE 列表选）。 */
@@ -266,7 +273,7 @@ async function load() {
       selectedTaskId.value = items.value[0].taskId
     }
     // query 中的 taskId 即使尚未 ACTIVE 到本网点，也作为接单候选
-    if (queryTaskId.value && !acceptTaskId.value) {
+    if (queryTaskId.value) {
       acceptTaskId.value = queryTaskId.value
     }
   } catch (err) {
@@ -774,53 +781,49 @@ watch(selectedTaskId, () => {
       class="filter"
       data-testid="tasks-task-filter"
     >
-      已按 query 选中 taskId：{{ selectedTaskId || queryTaskId }}
+      已从管理端带入待接单任务：{{ acceptTaskId || queryTaskId }}
     </p>
     <p v-if="error" data-testid="network-portal-error">{{ error }}</p>
     <table v-else data-testid="network-tasks-table">
       <thead>
         <tr>
           <th>任务</th>
-          <th>工单</th>
-          <th>项目</th>
+          <th>关联工单</th>
           <th>服务产品</th>
           <th>区域</th>
           <th>状态</th>
-          <th>阶段</th>
-          <th>类型</th>
-          <th>种类</th>
-          <th>业务</th>
+          <th>当前阶段</th>
+          <th>任务类型</th>
+          <th>业务类型</th>
           <th>接收时间</th>
-          <th>生效自</th>
-          <th>师傅</th>
+          <th>生效时间</th>
+          <th>服务师傅</th>
           <th v-if="directoryAppointments !== null">预约窗口</th>
           <th v-if="directoryContactAttempts !== null">最近联系</th>
           <th v-if="directoryEvidenceSlots !== null">资料</th>
           <th v-if="directoryCorrections !== null">整改</th>
-          <th v-if="directorySlaRiskSummaries !== null">SLA 风险</th>
+          <th v-if="directorySlaRiskSummaries !== null">服务时效风险</th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="item in items" :key="item.taskId" :data-testid="`task-row-${item.taskId}`">
-          <td>{{ item.taskId }}</td>
+          <td>{{ taskOptionLabel(item) }}</td>
           <td>
             <RouterLink
               :to="`/network-portal/work-orders/${item.workOrderId}`"
               data-testid="task-work-order-workspace-deeplink"
             >
-              {{ item.workOrderId }}
+              打开工单
             </RouterLink>
           </td>
-          <td data-testid="task-project-id">{{ item.projectId ?? '—' }}</td>
           <td data-testid="task-service-product">{{ item.serviceProductCode ?? '—' }}</td>
           <td data-testid="task-region">{{ taskRegionLabel(item) }}</td>
-          <td>{{ item.status ?? '—' }}</td>
-          <td data-testid="task-stage-code">{{ item.stageCode ?? '—' }}</td>
-          <td>{{ item.taskType ?? '—' }}</td>
-          <td data-testid="task-kind">{{ item.taskKind ?? '—' }}</td>
-          <td data-testid="task-business-type">{{ item.businessType ?? '—' }}</td>
-          <td data-testid="task-received-at">{{ item.receivedAt ?? '—' }}</td>
-          <td data-testid="task-effective-from">{{ item.effectiveFrom ?? '—' }}</td>
+          <td>{{ item.status ? statusLabel(item.status) : '—' }}</td>
+          <td data-testid="task-stage-code">{{ item.stageCode ? statusLabel(item.stageCode) : '—' }}</td>
+          <td>{{ item.taskType ? statusLabel(item.taskType) : '—' }}</td>
+          <td data-testid="task-business-type">{{ item.businessType ? statusLabel(item.businessType) : '—' }}</td>
+          <td data-testid="task-received-at">{{ formatDateTime(item.receivedAt) }}</td>
+          <td data-testid="task-effective-from">{{ formatDateTime(item.effectiveFrom) }}</td>
           <td data-testid="task-technician-label">{{ technicianLabel(item.technicianId) }}</td>
           <td
             v-if="directoryAppointments !== null"
@@ -907,7 +910,7 @@ watch(selectedTaskId, () => {
         <select v-model="selectedTaskId" data-testid="assign-task-select" aria-label="assign task">
           <option disabled value="">选择任务</option>
           <option v-for="item in items" :key="item.taskId" :value="item.taskId">
-            {{ item.taskId }}
+            {{ taskOptionLabel(item) }}
           </option>
         </select>
       </label>
@@ -982,7 +985,7 @@ watch(selectedTaskId, () => {
         >
           <option disabled value="">选择任务</option>
           <option v-for="item in items" :key="item.taskId" :value="item.taskId">
-            {{ item.taskId }}
+            {{ taskOptionLabel(item) }}
           </option>
         </select>
       </label>
@@ -1276,7 +1279,7 @@ watch(selectedTaskId, () => {
         <select v-model="selectedTaskId" data-testid="evidence-task-select" aria-label="evidence task">
           <option disabled value="">选择任务</option>
           <option v-for="item in items" :key="item.taskId" :value="item.taskId">
-            {{ item.taskId }}
+            {{ taskOptionLabel(item) }}
           </option>
         </select>
       </label>

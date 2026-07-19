@@ -14,6 +14,19 @@ docker compose -f serviceos-deploy/compose.yaml exec -T postgres \
   < serviceos-deploy/keycloak/grant-local-project-admin.sql
 ```
 
+4. 三门户本地 OIDC（首次克隆后执行一次，再重启对应 `npm run dev`）：
+
+```bash
+cp serviceos-admin-web/.env.development.example \
+   serviceos-admin-web/.env.development.local
+cp serviceos-network-web/.env.development.example \
+   serviceos-network-web/.env.development.local
+cp serviceos-technician-web/.env.development.example \
+   serviceos-technician-web/.env.development.local
+```
+
+若登录页提示「身份接入尚未配置」，通常是缺少上述 `.env.development.local`。
+
 ## 命令
 
 ```bash
@@ -68,11 +81,11 @@ export SERVICEOS_DEMO_TECHNICIAN_PASSWORD='local-dev-change-me'
 **完整跨门户写链路需人工登录 Keycloak**，建议按下列顺序：
 
 1. **管理端** →「工单全流程演练」确认 `ADMIN-PILOT-001` / `WO-DEMO-*` 可见  
-2. **管理端** → 工单中心打开 `ADMIN-PILOT-001`，记下 READY 任务 ID  
-   （本地种子任务：`70000000-0000-4000-8000-000000000001`，类型 `PILOT_SURVEY`）  
-3. **网点端** → 任务页「确认接单」：填入上述 taskId，`businessType` 可用 `INSTALLATION`  
+2. **管理端** → 工单中心打开 `ADMIN-PILOT-001` →「交给网点」→ **打开网点接单**  
+   （会自动带上当前任务；也可点「复制任务交接信息」）  
+3. **网点端** 用 `developer` 登录，选「济南恒通新能源服务中心」→ 任务页确认接单  
 4. **网点端** → 指派师傅（张师傅 / 李师傅）  
-5. **师傅端** → 当前任务：查看指派、预约/上门（取决于试点模板已实现能力）  
+5. **师傅端** 用同一账号登录 → 今日任务应出现已指派任务  
 6. **管理端** → 审核中心 / 整改中心继续平台侧操作  
 
 ### 明确仍阻塞（不得伪造成功）

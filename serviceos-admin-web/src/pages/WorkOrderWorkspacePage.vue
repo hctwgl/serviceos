@@ -50,12 +50,54 @@ const stages = ref<WorkflowExecutionProjection | null>(null)
 const taskPage = ref<WorkOrderTaskPage | null>(null)
 const timelinePage = ref<WorkOrderTimelinePage | null>(null)
 const authorityError = ref<string | null>(null)
-const networkAssigneeId = ref('admin-pilot-network-1')
-const technicianAssigneeId = ref('06b612f3-a901-4b0e-bd90-86b4259cc087')
+/** 本地演示默认：济南恒通网点 / 张师傅档案（见 serviceos-deploy/demo）。 */
+const DEMO_NETWORK_ID = 'd3500000-1000-4000-8000-000000000002'
+const DEMO_TECHNICIAN_PROFILE_ID = 'd3500000-1000-4000-8000-000000000004'
+const networkAssigneeId = ref(DEMO_NETWORK_ID)
+const technicianAssigneeId = ref(DEMO_TECHNICIAN_PROFILE_ID)
 const assignBusinessType = ref('INSTALLATION')
 const manualAssignBusy = ref(false)
 const manualAssignError = ref<string | null>(null)
 const manualAssignMessage = ref<string | null>(null)
+const handoffCopied = ref(false)
+
+const networkPortalBase =
+  import.meta.env.VITE_NETWORK_PORTAL_URL?.trim() ||
+  (import.meta.env.DEV ? 'http://127.0.0.1:5174' : '')
+
+const networkAcceptHandoffUrl = computed(() => {
+  const taskId = workspace.value?.currentTaskSummary?.taskId
+  if (!taskId || !networkPortalBase) {
+    return null
+  }
+  const url = new URL('/network-portal/tasks', networkPortalBase)
+  url.searchParams.set('taskId', taskId)
+  return url.toString()
+})
+
+async function copyTaskHandoff() {
+  const taskId = workspace.value?.currentTaskSummary?.taskId
+  if (!taskId) {
+    return
+  }
+  const orderCode = workspace.value?.header.externalOrderCode || workOrderId.value
+  const text = [
+    `工单 ${orderCode}`,
+    `任务编号 ${taskId}`,
+    networkAcceptHandoffUrl.value ? `网点接单入口 ${networkAcceptHandoffUrl.value}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n')
+  try {
+    await navigator.clipboard?.writeText(text)
+    handoffCopied.value = true
+    window.setTimeout(() => {
+      handoffCopied.value = false
+    }, 2000)
+  } catch {
+    handoffCopied.value = false
+  }
+}
 
 async function runManualAssign() {
   const taskId = workspace.value?.currentTaskSummary?.taskId
@@ -74,7 +116,7 @@ async function runManualAssign() {
     })
     const receipt = result.data
     manualAssignMessage.value =
-      `已初派 network=${receipt.networkAssigneeId} tech=${receipt.technicianAssigneeId}`
+      `已初派：网点 ${receipt.networkAssigneeId}，师傅 ${receipt.technicianAssigneeId}`
     await loadWorkspace()
   } catch (err) {
     manualAssignError.value = err instanceof Error ? err.message : '人工初派失败'
@@ -963,38 +1005,62 @@ onMounted(() => {
               <dd v-else>不可用或缺失权</dd>
             </div>
             <div class="manual-assign">
-              <dt>人工初派</dt>
+              <dt>交给网点</dt>
               <dd>
-                <label>
-                  networkAssigneeId
-                  <input
-                    v-model="networkAssigneeId"
-                    aria-label="manual-assign networkAssigneeId"
-                  />
-                </label>
-                <label>
-                  technicianAssigneeId
-                  <input
-                    v-model="technicianAssigneeId"
-                    aria-label="manual-assign technicianAssigneeId"
-                  />
-                </label>
-                <label>
-                  businessType
-                  <input
-                    v-model="assignBusinessType"
-                    aria-label="manual-assign businessType"
-                  />
-                </label>
-                <button
-                  type="button"
-                  :disabled="manualAssignBusy || !workspace.currentTaskSummary"
-                  @click="runManualAssign"
-                >
-                  manual-assign
-                </button>
-                <p v-if="manualAssignError" class="error">{{ manualAssignError }}</p>
-                <p v-if="manualAssignMessage" class="meta">{{ manualAssignMessage }}</p>
+                <p class="handoff-hint">
+                  推荐：复制任务交接信息，或打开网点端「确认接单」（无需在管理端先 UUID 初派）。
+                </p>
+                <div class="handoff-actions">
+                  <button
+                    type="button"
+                    :disabled="!workspace.currentTaskSummary"
+                    @click="copyTaskHandoff"
+                  >
+                    {{ handoffCopied ? '已复制' : '复制任务交接信息' }}
+                  </button>
+                  <a
+                    v-if="networkAcceptHandoffUrl"
+                    class="handoff-link"
+                    :href="networkAcceptHandoffUrl"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    打开网点接单
+                  </a>
+                </div>
+                <details class="assign-advanced">
+                  <summary>高级：管理端一次初派网点+师傅</summary>
+                  <label>
+                    服务网点编号
+                    <input
+                      v-model="networkAssigneeId"
+                      aria-label="manual-assign networkAssigneeId"
+                    />
+                  </label>
+                  <label>
+                    服务师傅档案编号
+                    <input
+                      v-model="technicianAssigneeId"
+                      aria-label="manual-assign technicianAssigneeId"
+                    />
+                  </label>
+                  <label>
+                    业务类型
+                    <input
+                      v-model="assignBusinessType"
+                      aria-label="manual-assign businessType"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    :disabled="manualAssignBusy || !workspace.currentTaskSummary"
+                    @click="runManualAssign"
+                  >
+                    确认初派
+                  </button>
+                  <p v-if="manualAssignError" class="error">{{ manualAssignError }}</p>
+                  <p v-if="manualAssignMessage" class="meta">{{ manualAssignMessage }}</p>
+                </details>
               </dd>
             </div>
             <div>
@@ -1602,5 +1668,29 @@ button {
   border-radius: 6px;
   padding: 0.35rem 0.5rem;
   font-family: ui-monospace, monospace;
+}
+.handoff-hint {
+  margin: 0;
+  color: #486581;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+.handoff-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.handoff-link {
+  color: #0b6e4f;
+  font-weight: 600;
+}
+.assign-advanced {
+  margin-top: 0.35rem;
+}
+.assign-advanced summary {
+  cursor: pointer;
+  color: #627d98;
+  font-size: 0.85rem;
 }
 </style>
