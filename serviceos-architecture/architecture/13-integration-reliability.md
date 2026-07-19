@@ -16,8 +16,8 @@ status: Proposed
 > `TBD_EXTERNAL_CONTRACT`）。M297 已抽出出站提审 `OutboundSubmissionConnector` 与
 > `OutboundSubmissionPipeline`，BYD 提审委托该管道；技术 ACK 与业务 ACK 在模型上分离。
 > M298 已抽出审核回调逐单 `InboundReviewCallbackItemPipeline`（`ReviewCallbackMappedItem`），
-> BYD 回调适配器保留验签/防重放/batch Envelope。Update/Cancel、远端查询、创建面 connector 注册表、
-> 批量重放与真实第二家 Sandbox 仍未实现。
+> BYD 回调适配器保留验签/防重放/batch Envelope。M300 已抽出入站取消管道与 BYD cancel-orders。
+> Update/远端查询、Route 服务注册表化、批量重放与真实第二家 Sandbox 仍未实现。
 > 本章其余 Proposed 设计不能据此视为已完成。
 
 ## 1. 目标
