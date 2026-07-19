@@ -1,8 +1,11 @@
 package com.serviceos.configuration.application;
 
+import com.serviceos.audit.api.AuditAppender;
+import com.serviceos.audit.api.AuditEntry;
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.configuration.api.ApproveConfigurationDraftCommand;
+import com.serviceos.configuration.api.ClientCompatibilityReport;
 import com.serviceos.configuration.api.ConfigurationAssetType;
 import com.serviceos.configuration.api.ConfigurationAssetVersionReference;
 import com.serviceos.configuration.api.ConfigurationDraftDiffView;
@@ -61,6 +64,8 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
     private final AuthorizationService authorization;
     private final ConfigurationService configurations;
     private final ConfigurationAssetSchemaValidator schemaValidator;
+    private final ConfigurationClientCapabilityGate clientCapabilityGate;
+    private final AuditAppender audit;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
@@ -69,6 +74,8 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
             AuthorizationService authorization,
             ConfigurationService configurations,
             ConfigurationAssetSchemaValidator schemaValidator,
+            ConfigurationClientCapabilityGate clientCapabilityGate,
+            AuditAppender audit,
             ObjectMapper objectMapper,
             Clock clock
     ) {
@@ -76,6 +83,8 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
         this.authorization = authorization;
         this.configurations = configurations;
         this.schemaValidator = schemaValidator;
+        this.clientCapabilityGate = clientCapabilityGate;
+        this.audit = audit;
         this.objectMapper = objectMapper;
         this.clock = clock;
     }
@@ -128,7 +137,7 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
                 .param("actor", principal.principalId())
                 .param("now", PostgresJdbcParameters.timestamptz(now))
                 .update();
-        return requireDraft(principal.tenantId(), draftId);
+        return enrich(requireDraft(principal.tenantId(), draftId));
     }
 
     @Override
@@ -182,7 +191,7 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
         if (updated != 1) {
             throw new BusinessProblem(ProblemCode.VERSION_CONFLICT, "配置草稿版本冲突或状态已变更");
         }
-        return requireDraft(principal.tenantId(), command.draftId());
+        return enrich(requireDraft(principal.tenantId(), command.draftId()));
     }
 
     @Override
@@ -191,7 +200,7 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
         ConfigurationDraftView draft = requireDraft(principal.tenantId(), draftId);
         authorization.require(principal, AuthorizationRequest.tenantCapability(
                 WRITE, principal.tenantId(), RESOURCE, draftId.toString()), correlationId);
-        return draft;
+        return enrich(draft);
     }
 
     @Override
@@ -216,7 +225,10 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
                 .param("tenantId", principal.tenantId())
                 .param("assetType", assetType.name())
                 .query((rs, rowNum) -> map(rs))
-                .list();
+                .list()
+                .stream()
+                .map(this::enrich)
+                .toList();
     }
 
     @Override
@@ -236,7 +248,7 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
                 WRITE, principal.tenantId(), RESOURCE, draftId.toString()),
                 metadata.correlationId());
 
-        List<String> errors = List.of();
+        List<String> errors = new java.util.ArrayList<>();
         String nextStatus = "VALIDATED";
         try {
             schemaValidator.validate(new PublishConfigurationAssetCommand(
@@ -244,7 +256,13 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
                     current.intendedSemanticVersion(), current.schemaVersion(),
                     current.definitionJson(), current.contentDigest()));
         } catch (ConfigurationPublicationException | IllegalArgumentException exception) {
-            errors = List.of(exception.getMessage());
+            errors.add(exception.getMessage());
+            nextStatus = "DRAFT";
+        }
+        ClientCompatibilityReport compatibility = clientCapabilityGate.evaluate(
+                current.assetType(), current.definitionJson());
+        if (compatibility.blocking()) {
+            errors.addAll(compatibility.blockingErrors());
             nextStatus = "DRAFT";
         }
 
@@ -267,7 +285,10 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
                 .param("tenantId", principal.tenantId())
                 .param("draftId", draftId)
                 .update();
-        ConfigurationDraftView result = requireDraft(principal.tenantId(), draftId);
+        ConfigurationDraftView result = enrich(requireDraft(principal.tenantId(), draftId));
+        auditCapability("CONFIGURATION_DRAFT_CLIENT_COMPAT_VALIDATED",
+                principal, metadata.correlationId(), result, compatibility,
+                errors.isEmpty() ? "ALLOW" : "DENY");
         if (!errors.isEmpty()) {
             throw new ConfigurationPublicationException(
                     "配置草稿校验失败: " + String.join("; ", errors));
@@ -343,7 +364,7 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
         if (updated != 1) {
             throw new BusinessProblem(ProblemCode.VERSION_CONFLICT, "配置草稿审批时版本或状态冲突");
         }
-        return requireDraft(principal.tenantId(), command.draftId());
+        return enrich(requireDraft(principal.tenantId(), command.draftId()));
     }
 
     @Override
@@ -365,6 +386,17 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
         authorization.require(principal, AuthorizationRequest.tenantCapability(
                 PUBLISH, principal.tenantId(), RESOURCE, draftId.toString()),
                 metadata.correlationId());
+
+        // 发布前复检：防止 APPROVED 后定义被旁路篡改或能力目录收紧后误放行。
+        ClientCompatibilityReport compatibility = clientCapabilityGate.evaluate(
+                current.assetType(), current.definitionJson());
+        if (compatibility.blocking()) {
+            auditCapability("CONFIGURATION_DRAFT_CLIENT_COMPAT_PUBLISH",
+                    principal, metadata.correlationId(), current, compatibility, "DENY");
+            throw new ConfigurationPublicationException(
+                    "配置发布被客户端能力门禁拒绝: "
+                            + String.join("; ", compatibility.blockingErrors()));
+        }
 
         // jsonb 回读可能改变空白/键序；发布摘要必须以当前 definition 文本重算。
         String publishDefinition = current.definitionJson().trim();
@@ -396,7 +428,10 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
         if (updated != 1) {
             throw new BusinessProblem(ProblemCode.VERSION_CONFLICT, "配置草稿发布时状态已变更");
         }
-        return requireDraft(principal.tenantId(), draftId);
+        ConfigurationDraftView publishedView = enrich(requireDraft(principal.tenantId(), draftId));
+        auditCapability("CONFIGURATION_DRAFT_CLIENT_COMPAT_PUBLISH",
+                principal, metadata.correlationId(), publishedView, compatibility, "ALLOW");
+        return publishedView;
     }
 
     private ConfigurationDraftView requireDraft(String tenantId, UUID draftId) {
@@ -432,7 +467,46 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
                 rs.getString("created_by"),
                 rs.getString("updated_by"),
                 rs.getTimestamp("created_at").toInstant(),
-                rs.getTimestamp("updated_at").toInstant());
+                rs.getTimestamp("updated_at").toInstant(),
+                null);
+    }
+
+    private ConfigurationDraftView enrich(ConfigurationDraftView view) {
+        ClientCompatibilityReport report = clientCapabilityGate.evaluate(
+                view.assetType(), view.definitionJson());
+        return view.withClientCompatibility(report);
+    }
+
+    private void auditCapability(
+            String action,
+            CurrentPrincipal principal,
+            String correlationId,
+            ConfigurationDraftView draft,
+            ClientCompatibilityReport report,
+            String decision
+    ) {
+        String digest = Sha256.digest(
+                draft.draftId() + "|"
+                        + draft.assetType() + "|"
+                        + String.join(",", report.requiredCapabilities()) + "|"
+                        + String.join(",", report.blockingErrors()) + "|"
+                        + decision);
+        audit.append(new AuditEntry(
+                UUID.randomUUID(),
+                principal.tenantId(),
+                principal.principalId(),
+                action,
+                PUBLISH,
+                RESOURCE,
+                draft.draftId().toString(),
+                decision,
+                List.of(),
+                "client-capability-gate-v1",
+                report.blocking() ? "BLOCKED" : "COMPAT_OK",
+                report.blocking() ? "CLIENT_CAPABILITY_INCOMPATIBLE" : null,
+                digest,
+                correlationId,
+                clock.instant()));
     }
 
     private UUID findLatestPublishedVersionId(

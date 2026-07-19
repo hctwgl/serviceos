@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.49
+  version: 1.0.50
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -6199,6 +6199,25 @@ components:
         updatedBy: { type: string }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+        clientCompatibility:
+          type: [object, 'null']
+          description: FORM/EVIDENCE 相对生产师傅端的客户端能力兼容报告；其他资产类型可为 null。
+          additionalProperties: false
+          required: [requiredCapabilities, blockingErrors, clientReports]
+          properties:
+            requiredCapabilities: { type: array, items: { type: string, minLength: 1, maxLength: 120 } }
+            blockingErrors: { type: array, items: { type: string, minLength: 1, maxLength: 500 } }
+            clientReports:
+              type: array
+              items:
+                type: object
+                additionalProperties: false
+                required: [clientKind, compatible, missingCapabilities, notes]
+                properties:
+                  clientKind: { type: string, enum: [TECHNICIAN_WEB, TECHNICIAN_IOS] }
+                  compatible: { type: boolean }
+                  missingCapabilities: { type: array, items: { type: string, minLength: 1, maxLength: 120 } }
+                  notes: { type: array, items: { type: string, minLength: 1, maxLength: 300 } }
 
     SecurityPrincipal:
       type: object

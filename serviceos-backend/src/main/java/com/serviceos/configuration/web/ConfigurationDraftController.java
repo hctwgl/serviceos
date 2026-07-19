@@ -1,6 +1,7 @@
 package com.serviceos.configuration.web;
 
 import com.serviceos.configuration.api.ApproveConfigurationDraftCommand;
+import com.serviceos.configuration.api.ClientCompatibilityReport;
 import com.serviceos.configuration.api.ConfigurationAssetType;
 import com.serviceos.configuration.api.ConfigurationDependencyAnalysisService;
 import com.serviceos.configuration.api.ConfigurationDependencyReport;
@@ -201,7 +202,26 @@ final class ConfigurationDraftController {
                 view.contentDigest(), view.status(), view.baseVersionId(), view.publishedVersionId(),
                 view.validationErrors(), view.approvalRef(), view.approvedBy(), view.approvedAt(),
                 view.aggregateVersion(), view.createdBy(), view.updatedBy(),
-                view.createdAt(), view.updatedAt());
+                view.createdAt(), view.updatedAt(),
+                toCompatibilityResponse(view.clientCompatibility()));
+    }
+
+    private static ClientCompatibilityResponse toCompatibilityResponse(
+            ClientCompatibilityReport report
+    ) {
+        if (report == null) {
+            return null;
+        }
+        return new ClientCompatibilityResponse(
+                report.requiredCapabilities(),
+                report.blockingErrors(),
+                report.clientReports().stream()
+                        .map(item -> new ClientCompatibilityClientResponse(
+                                item.clientKind(),
+                                item.compatible(),
+                                item.missingCapabilities(),
+                                item.notes()))
+                        .toList());
     }
 
     private static long version(String ifMatch) {
@@ -274,7 +294,23 @@ final class ConfigurationDraftController {
             String createdBy,
             String updatedBy,
             Instant createdAt,
-            Instant updatedAt
+            Instant updatedAt,
+            ClientCompatibilityResponse clientCompatibility
+    ) {
+    }
+
+    record ClientCompatibilityResponse(
+            List<String> requiredCapabilities,
+            List<String> blockingErrors,
+            List<ClientCompatibilityClientResponse> clientReports
+    ) {
+    }
+
+    record ClientCompatibilityClientResponse(
+            String clientKind,
+            boolean compatible,
+            List<String> missingCapabilities,
+            List<String> notes
     ) {
     }
 }

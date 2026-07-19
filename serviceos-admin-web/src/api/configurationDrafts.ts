@@ -12,6 +12,19 @@ export type DesignerAssetType =
   | 'INTEGRATION'
   | 'PRICING'
 
+export type ClientCompatibilityClientReport = {
+  clientKind: 'TECHNICIAN_WEB' | 'TECHNICIAN_IOS'
+  compatible: boolean
+  missingCapabilities: string[]
+  notes: string[]
+}
+
+export type ClientCompatibilityReport = {
+  requiredCapabilities: string[]
+  blockingErrors: string[]
+  clientReports: ClientCompatibilityClientReport[]
+}
+
 export type ConfigurationDraft = {
   draftId: string
   assetType: DesignerAssetType
@@ -32,6 +45,7 @@ export type ConfigurationDraft = {
   updatedBy: string
   createdAt: string
   updatedAt: string
+  clientCompatibility?: ClientCompatibilityReport | null
 }
 
 export type ConfigurationDraftDiff = {

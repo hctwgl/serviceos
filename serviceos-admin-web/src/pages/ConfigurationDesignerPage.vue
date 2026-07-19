@@ -44,6 +44,12 @@ const message = ref<string | null>(null)
 const createKey = ref('platform.designer.demo')
 const createVersion = ref('1.0.0')
 
+function clientKindLabel(kind: string): string {
+  if (kind === 'TECHNICIAN_WEB') return '师傅 H5'
+  if (kind === 'TECHNICIAN_IOS') return '师傅 iOS'
+  return kind
+}
+
 const showCanvas = computed(() => assetType.value === 'WORKFLOW')
 const showStructuredEditor = computed(() =>
   ['FORM', 'EVIDENCE', 'SLA'].includes(assetType.value),
@@ -753,6 +759,29 @@ onMounted(async () => {
         <ul v-if="selected?.validationErrors?.length" class="errors" data-testid="validation-errors">
           <li v-for="(item, index) in selected.validationErrors" :key="index">{{ item }}</li>
         </ul>
+        <div
+          v-if="selected?.clientCompatibility"
+          class="compat"
+          data-testid="client-compatibility-report"
+        >
+          <h3>客户端兼容性</h3>
+          <p v-if="selected.clientCompatibility.blockingErrors.length" class="err">
+            存在阻断项，禁止发布到生产师傅端。
+          </p>
+          <p v-else class="ok">无全端阻断项；分端缺口如下（灰度通道尚未开放）。</p>
+          <ul>
+            <li
+              v-for="report in selected.clientCompatibility.clientReports"
+              :key="report.clientKind"
+              :data-compatible="report.compatible"
+              :data-testid="`compat-${report.clientKind}`"
+            >
+              <strong>{{ clientKindLabel(report.clientKind) }}</strong>
+              · {{ report.compatible ? '兼容' : '存在缺口' }}
+              <span v-if="report.notes.length"> — {{ report.notes.join('；') }}</span>
+            </li>
+          </ul>
+        </div>
         <pre v-if="diffView" class="diff" data-testid="draft-diff">{{ diffView.unifiedDiff }}</pre>
         <div v-if="dependencyReport" class="deps" data-testid="dependency-report">
           <h3>依赖报告 · {{ dependencyReport.complete ? '完整' : '不完整' }}</h3>
@@ -844,6 +873,23 @@ aside li {
 aside li.active {
   border-color: #0969da;
   background: #ddf4ff;
+}
+.compat {
+  border: 1px solid #d0d7de;
+  border-radius: 0.4rem;
+  padding: 0.75rem;
+  background: #f0f7ff;
+  margin-top: 0.75rem;
+}
+.compat ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.2rem;
+}
+.compat li[data-compatible='false'] {
+  color: #9a6700;
+}
+.compat li[data-compatible='true'] {
+  color: #1a7f37;
 }
 .deps {
   border: 1px solid #d0d7de;
