@@ -10,6 +10,8 @@ import com.serviceos.evidence.api.TechnicianCorrectionService;
 import com.serviceos.evidence.api.TechnicianCorrectionView;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
+import com.serviceos.shared.BusinessProblem;
+import com.serviceos.shared.ProblemCode;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -80,7 +82,7 @@ class TechnicianCorrectionControllerSecurityTest {
                 .thenReturn(view("CLAIMED", 2));
         when(corrections.start(eq(principal()), any(), eq(CONTEXT), eq(CASE), eq(2L)))
                 .thenReturn(view("RUNNING", 3));
-        when(corrections.resubmit(eq(principal()), any(), eq(CONTEXT), eq(CASE), eq(SNAPSHOT)))
+        when(corrections.resubmit(eq(principal()), any(), eq(CONTEXT), any(), eq(CASE), eq(SNAPSHOT)))
                 .thenReturn(new TechnicianCorrectionView(
                         CASE, SOURCE_TASK, CORRECTION_TASK, "RESUBMITTED", List.of("IMAGE.BLUR"),
                         "RUNNING", 3, SNAPSHOT, 1));
@@ -110,19 +112,19 @@ class TechnicianCorrectionControllerSecurityTest {
 
         verify(corrections).claim(eq(principal()), any(), eq(CONTEXT), eq(CASE), eq(1L));
         verify(corrections).start(eq(principal()), any(), eq(CONTEXT), eq(CASE), eq(2L));
-        verify(corrections).resubmit(eq(principal()), any(), eq(CONTEXT), eq(CASE), eq(SNAPSHOT));
+        verify(corrections).resubmit(eq(principal()), any(), eq(CONTEXT), any(), eq(CASE), eq(SNAPSHOT));
     }
 
     @Test
     void uploadAndSnapshotResponsesStayOnSafeTechnicianShape() throws Exception {
         when(principals.current()).thenReturn(principal());
-        when(corrections.beginUpload(eq(principal()), any(), eq(CONTEXT), eq(CASE), eq(SLOT), any()))
+        when(corrections.beginUpload(eq(principal()), any(), eq(CONTEXT), any(), eq(CASE), eq(SLOT), any()))
                 .thenReturn(new EvidenceUploadSessionView(
                         SESSION, UUID.randomUUID(), SOURCE_TASK, SLOT, null, "CREATED", "PUT",
                         "https://upload.invalid/once", Map.of(), NOW.plusSeconds(60), NOW.plusSeconds(600)));
-        when(corrections.finalizeUpload(eq(principal()), any(), eq(CONTEXT), eq(CASE), eq(SLOT),
+        when(corrections.finalizeUpload(eq(principal()), any(), eq(CONTEXT), any(), eq(CASE), eq(SLOT),
                 eq(SESSION), any(), any())).thenReturn(item());
-        when(corrections.createSnapshot(eq(principal()), any(), eq(CONTEXT), eq(CASE), any()))
+        when(corrections.createSnapshot(eq(principal()), any(), eq(CONTEXT), any(), eq(CASE), any()))
                 .thenReturn(snapshot());
 
         String begin = """
@@ -160,6 +162,24 @@ class TechnicianCorrectionControllerSecurityTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.evidenceSetSnapshotId").value(SNAPSHOT.toString()))
                 .andExpect(jsonPath("$.createdBy").doesNotExist());
+    }
+
+    @Test
+    void correctionEvidenceSlotsCapabilityUnsupportedReturns422() throws Exception {
+        when(principals.current()).thenReturn(principal());
+        when(corrections.listSlots(eq(principal()), eq("corr-cap"), eq(CONTEXT), any(), eq(CASE)))
+                .thenThrow(new BusinessProblem(
+                        ProblemCode.CLIENT_CAPABILITY_UNSUPPORTED,
+                        "当前客户端（师傅 iOS）不支持本任务资料所需能力：evidence.media.signature"));
+
+        mvc.perform(get("/api/v1/technician/me/corrections/{id}/evidence-slots", CASE)
+                        .with(jwt().jwt(token -> token.subject(PRINCIPAL.toString())
+                                .claim("tenant_id", "tenant-266")))
+                        .header("X-Technician-Context", CONTEXT)
+                        .header("X-Correlation-Id", "corr-cap")
+                        .header("X-ServiceOS-Client-Kind", "TECHNICIAN_IOS"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errorCode").value("CLIENT_CAPABILITY_UNSUPPORTED"));
     }
 
     private static TechnicianCorrectionView view(String status, long version) {

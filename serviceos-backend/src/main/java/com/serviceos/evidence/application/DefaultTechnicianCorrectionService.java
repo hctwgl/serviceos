@@ -2,6 +2,10 @@ package com.serviceos.evidence.application;
 
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
+import com.serviceos.configuration.api.ClientCapabilityRuntimeGate;
+import com.serviceos.configuration.api.ConfigurationAssetDefinition;
+import com.serviceos.configuration.api.ConfigurationAssetType;
+import com.serviceos.configuration.api.ConfigurationService;
 import com.serviceos.dispatch.api.TechnicianActiveAssignmentQuery;
 import com.serviceos.evidence.api.BeginCorrectionEvidenceUploadCommand;
 import com.serviceos.evidence.api.CorrectionCaseService;
@@ -30,6 +34,8 @@ import com.serviceos.task.api.HandlingTaskContextQuery;
 import com.serviceos.task.api.HandlingTaskContextView;
 import com.serviceos.task.api.HumanTaskCommandService;
 import com.serviceos.task.api.StartHumanTaskCommand;
+import com.serviceos.task.api.TaskFulfillmentContext;
+import com.serviceos.task.api.TaskFulfillmentContextService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +46,9 @@ import java.util.UUID;
 /**
  * Technician 整改适配层。源 Task 的网络归属只用于收窄 Portal 上下文；实际写权限始终来自
  * 独立 correction Task 的 CANDIDATE/RESPONSIBLE 快照，避免把已完成源 Task 重新置为 RUNNING。
+ *
+ * <p>M361：整改资料路径复用主 Evidence 的客户端能力门禁与定向目标，禁止以整改旁路绕过
+ * {@code CLIENT_CAPABILITY_UNSUPPORTED}。</p>
  */
 @Service
 final class DefaultTechnicianCorrectionService implements TechnicianCorrectionService {
@@ -56,6 +65,9 @@ final class DefaultTechnicianCorrectionService implements TechnicianCorrectionSe
     private final EvidenceCommandService evidence;
     private final EvidenceSetSnapshotService snapshots;
     private final AuthorizationService authorization;
+    private final ClientCapabilityRuntimeGate clientCapabilityRuntimeGate;
+    private final ConfigurationService configurations;
+    private final TaskFulfillmentContextService sourceTasks;
     private final Clock clock;
 
     DefaultTechnicianCorrectionService(
@@ -69,6 +81,9 @@ final class DefaultTechnicianCorrectionService implements TechnicianCorrectionSe
             EvidenceCommandService evidence,
             EvidenceSetSnapshotService snapshots,
             AuthorizationService authorization,
+            ClientCapabilityRuntimeGate clientCapabilityRuntimeGate,
+            ConfigurationService configurations,
+            TaskFulfillmentContextService sourceTasks,
             Clock clock
     ) {
         this.affiliations = affiliations;
@@ -81,6 +96,9 @@ final class DefaultTechnicianCorrectionService implements TechnicianCorrectionSe
         this.evidence = evidence;
         this.snapshots = snapshots;
         this.authorization = authorization;
+        this.clientCapabilityRuntimeGate = clientCapabilityRuntimeGate;
+        this.configurations = configurations;
+        this.sourceTasks = sourceTasks;
         this.clock = clock;
     }
 
@@ -133,28 +151,43 @@ final class DefaultTechnicianCorrectionService implements TechnicianCorrectionSe
     @Override
     @Transactional(readOnly = true)
     public List<EvidenceSlotView> listSlots(
-            CurrentPrincipal principal, String correlationId, String context, UUID correctionCaseId
+            CurrentPrincipal principal, String correlationId, String context,
+            String clientKind, UUID correctionCaseId
     ) {
         Access access = requireCase(principal, correlationId, context, correctionCaseId);
-        return slots.listForTask(principal, correlationId, access.correction().taskId());
+        List<EvidenceSlotView> resolved = slots.listForTask(
+                principal, correlationId, access.correction().taskId());
+        requireClientCompatible(principal.tenantId(), access.correction().taskId(), clientKind, resolved);
+        return resolved;
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<EvidenceItemView> listItems(
-            CurrentPrincipal principal, String correlationId, String context, UUID correctionCaseId
+            CurrentPrincipal principal, String correlationId, String context,
+            String clientKind, UUID correctionCaseId
     ) {
         Access access = requireCase(principal, correlationId, context, correctionCaseId);
+        requireClientCompatible(
+                principal.tenantId(),
+                access.correction().taskId(),
+                clientKind,
+                slots.listForTask(principal, correlationId, access.correction().taskId()));
         return evidence.listForTask(principal, correlationId, access.correction().taskId());
     }
 
     @Override
     public EvidenceUploadSessionView beginUpload(
             CurrentPrincipal principal, CommandMetadata metadata, String context,
-            UUID correctionCaseId, UUID slotId,
+            String clientKind, UUID correctionCaseId, UUID slotId,
             TechnicianBeginCorrectionEvidenceUploadCommand command
     ) {
         Access access = requireWritableCase(principal, metadata.correlationId(), context, correctionCaseId);
+        requireClientCompatible(
+                principal.tenantId(),
+                access.correction().taskId(),
+                clientKind,
+                slots.listForTask(principal, metadata.correlationId(), access.correction().taskId()));
         return evidence.beginCorrectionUpload(principal, metadata, new BeginCorrectionEvidenceUploadCommand(
                 correctionCaseId, access.task().taskId(), access.correction().taskId(), slotId,
                 command.evidenceItemId(), command.originalFileName(), command.declaredMimeType(),
@@ -164,10 +197,15 @@ final class DefaultTechnicianCorrectionService implements TechnicianCorrectionSe
     @Override
     public EvidenceItemView finalizeUpload(
             CurrentPrincipal principal, CommandMetadata metadata, String context,
-            UUID correctionCaseId, UUID slotId, UUID uploadSessionId,
+            String clientKind, UUID correctionCaseId, UUID slotId, UUID uploadSessionId,
             String actualSha256, String finalizeCommandId
     ) {
         Access access = requireWritableCase(principal, metadata.correlationId(), context, correctionCaseId);
+        requireClientCompatible(
+                principal.tenantId(),
+                access.correction().taskId(),
+                clientKind,
+                slots.listForTask(principal, metadata.correlationId(), access.correction().taskId()));
         return evidence.finalizeCorrectionUpload(principal, metadata, new FinalizeCorrectionEvidenceUploadCommand(
                 correctionCaseId, access.task().taskId(), access.correction().taskId(), slotId,
                 uploadSessionId, actualSha256, finalizeCommandId));
@@ -176,9 +214,14 @@ final class DefaultTechnicianCorrectionService implements TechnicianCorrectionSe
     @Override
     public EvidenceSetSnapshotView createSnapshot(
             CurrentPrincipal principal, CommandMetadata metadata, String context,
-            UUID correctionCaseId, List<UUID> memberRevisionIds
+            String clientKind, UUID correctionCaseId, List<UUID> memberRevisionIds
     ) {
         Access access = requireWritableCase(principal, metadata.correlationId(), context, correctionCaseId);
+        requireClientCompatible(
+                principal.tenantId(),
+                access.correction().taskId(),
+                clientKind,
+                slots.listForTask(principal, metadata.correlationId(), access.correction().taskId()));
         return snapshots.createForCorrection(principal, metadata, correctionCaseId,
                 access.task().taskId(), access.correction().taskId(), memberRevisionIds);
     }
@@ -187,13 +230,55 @@ final class DefaultTechnicianCorrectionService implements TechnicianCorrectionSe
     @Transactional
     public TechnicianCorrectionView resubmit(
             CurrentPrincipal principal, CommandMetadata metadata, String context,
-            UUID correctionCaseId, UUID evidenceSetSnapshotId
+            String clientKind, UUID correctionCaseId, UUID evidenceSetSnapshotId
     ) {
         Access access = requireWritableCase(principal, metadata.correlationId(), context, correctionCaseId);
+        // 重提前复检：禁止客户端在上传时兼容、重提时换成不兼容端绕过。
+        requireClientCompatible(
+                principal.tenantId(),
+                access.correction().taskId(),
+                clientKind,
+                slots.listForTask(principal, metadata.correlationId(), access.correction().taskId()));
         CorrectionCaseView updated = corrections.resubmit(principal, metadata,
                 new ResubmitCorrectionCaseCommand(correctionCaseId, evidenceSetSnapshotId));
         // 重提可能发生多轮，不能在此完成 handling Task；审核 CLOSED 才是其权威终态。
         return view(updated, access.task());
+    }
+
+    /**
+     * 对整改源 Task 冻结 Bundle 的 EVIDENCE 槽位做能力门禁；源 Task 缺失 Bundle 时仍按槽位 mediaType/条件校验。
+     */
+    private void requireClientCompatible(
+            String tenantId,
+            UUID sourceTaskId,
+            String clientKind,
+            List<EvidenceSlotView> resolvedSlots
+    ) {
+        TaskFulfillmentContext sourceTask = sourceTasks.find(tenantId, sourceTaskId).orElse(null);
+        clientCapabilityRuntimeGate.requireCompatibleEvidenceSlots(
+                clientKind,
+                resolvedSlots.stream().map(EvidenceSlotView::mediaType).toList(),
+                resolvedSlots.stream().map(EvidenceSlotView::requirementDefinitionJson).toList(),
+                resolveEvidenceSupportedClientKinds(tenantId, sourceTask));
+    }
+
+    private List<String> resolveEvidenceSupportedClientKinds(
+            String tenantId, TaskFulfillmentContext task
+    ) {
+        if (task == null
+                || task.configurationBundleId() == null
+                || task.configurationBundleDigest() == null
+                || task.configurationBundleDigest().isBlank()) {
+            return List.of();
+        }
+        return configurations.listBundleAssets(
+                        tenantId, task.configurationBundleId(), task.configurationBundleDigest(),
+                        ConfigurationAssetType.EVIDENCE)
+                .stream()
+                .map(ConfigurationAssetDefinition::supportedClientKinds)
+                .filter(kinds -> kinds != null && !kinds.isEmpty())
+                .findFirst()
+                .orElse(List.of());
     }
 
     private Access requireWritableCase(

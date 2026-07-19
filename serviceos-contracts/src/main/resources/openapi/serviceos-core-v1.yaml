@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.53
+  version: 1.0.54
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -2789,6 +2789,9 @@ paths:
     get:
       operationId: listTechnicianCorrectionEvidenceSlots
       summary: 查询整改源任务的活动资料槽位
+      description: |
+        M266：独立 correction Task 责任下查询源 Task 槽位。
+        M361：对已知 TECHNICIAN_WEB/IOS 复检客户端能力；不兼容返回 422 `CLIENT_CAPABILITY_UNSUPPORTED`。
       parameters:
         - $ref: '#/components/parameters/CorrectionCaseId'
         - $ref: '#/components/parameters/TechnicianContext'
@@ -2798,10 +2801,13 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /technician/me/corrections/{correctionCaseId}/evidence-items:
     get:
       operationId: listTechnicianCorrectionEvidenceItems
       summary: 查询整改源任务的安全资料版本摘要
+      description: |
+        M361：不兼容客户端能力时返回 422 `CLIENT_CAPABILITY_UNSUPPORTED`。
       parameters:
         - $ref: '#/components/parameters/CorrectionCaseId'
         - $ref: '#/components/parameters/TechnicianContext'
@@ -2811,11 +2817,14 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /technician/me/corrections/{correctionCaseId}/evidence-slots/{slotId}/upload-sessions:
     post:
       operationId: beginTechnicianCorrectionEvidenceUpload
       summary: 为已完成源 Task 创建整改资料受限上传会话
-      description: 仅 RUNNING correction Task 的当前负责人可调用；不放宽普通 Evidence RUNNING Task 门禁。
+      description: |
+        仅 RUNNING correction Task 的当前负责人可调用；不放宽普通 Evidence RUNNING Task 门禁。
+        M361：不兼容客户端能力时返回 422 `CLIENT_CAPABILITY_UNSUPPORTED`。
       parameters:
         - $ref: '#/components/parameters/CorrectionCaseId'
         - { name: slotId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -2832,10 +2841,13 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /technician/me/corrections/{correctionCaseId}/evidence-slots/{slotId}/upload-sessions/{uploadSessionId}:finalize:
     post:
       operationId: finalizeTechnicianCorrectionEvidenceUpload
       summary: Finalize 整改资料并追加不可变 Revision
+      description: |
+        M361：不兼容客户端能力时返回 422 `CLIENT_CAPABILITY_UNSUPPORTED`。
       parameters:
         - $ref: '#/components/parameters/CorrectionCaseId'
         - { name: slotId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -2852,10 +2864,14 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /technician/me/corrections/{correctionCaseId}/evidence-set-snapshots:
     post:
       operationId: createTechnicianCorrectionEvidenceSetSnapshot
       summary: 冻结整改源任务的新 TASK_SUBMISSION Snapshot
+      description: |
+        M361：Snapshot 前复检客户端能力；不兼容返回 422 `CLIENT_CAPABILITY_UNSUPPORTED`
+        （与资料校验 422 共用同一 Problem 响应，detail/`errorCode` 区分）。
       parameters:
         - $ref: '#/components/parameters/CorrectionCaseId'
         - $ref: '#/components/parameters/TechnicianContext'
@@ -2876,7 +2892,9 @@ paths:
     post:
       operationId: resubmitTechnicianCorrection
       summary: 以新 Snapshot 重提整改案例
-      description: 可多轮重提；correction Task 保持 RUNNING，审核 CLOSED 时才完成。
+      description: |
+        可多轮重提；correction Task 保持 RUNNING，审核 CLOSED 时才完成。
+        M361：重提前复检客户端能力；不兼容返回 422 `CLIENT_CAPABILITY_UNSUPPORTED`。
       parameters:
         - $ref: '#/components/parameters/CorrectionCaseId'
         - $ref: '#/components/parameters/TechnicianContext'
@@ -2892,6 +2910,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /technician/me/schedule:
     get:
       operationId: listTechnicianSchedule
