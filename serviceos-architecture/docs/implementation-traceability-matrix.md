@@ -414,3 +414,4 @@ Feature gate/authority: if applicable
 | M317 | 远端状态查询 SPI：UNKNOWN Delivery 探询；BYD NotSupported / Geely StillUnknown；OpenAPI 1.0.41 | RemoteStatusQueryConnector + HTTP + unit/security/Arch/contracts + `330-m317-*` + `314-m317-*` | 查询结果自动收敛、人工已送达/放弃 |
 | M318 | UNKNOWN Delivery 人工确认/放弃：disposition 不可变；状态保持 UNKNOWN；OpenAPI 1.0.42；Flyway V119 | record-manual-ack + ManualDispositionPostgresIT + contracts + `331-m318-*` + `315-m318-*` | 批量 ReplayRequest、查询自动改状态 |
 | M319 | 批量 ReplayRequest：PREVIEW/SUBMIT/approve；逐条调度单笔 retry；OpenAPI 1.0.43；Flyway V120 | BatchReplayService + PostgresIT + contracts + `332-m319-*` + `316-m319-*` | 1000 条压测、二级审批/MFA |
+| M320 | 多 OEM 并行建单冒烟：BYD + REFERENCE_OEM + GEELY 同运行时 | MultiOemParallelCreateSmokePostgresIT + `333-m320-*` + `317-m320-*` | Sandbox 真实联调 |

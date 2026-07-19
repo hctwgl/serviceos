@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M319 批量 ReplayRequest 预演与审批**（功能证据见 `implementation-status.md` 的
+当前工程基线为 **M320 多 OEM 并行建单冒烟**（功能证据见 `implementation-status.md` 的
 `baselineCommit`；合入 `master` 后改为合并提交）。M296 及之前基线合并提交为
 `f3b623453a33ece91a691438b0c541e53c3282df`。
 
@@ -688,6 +688,8 @@ serviceos-architecture/
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M320 实现文档](architecture/333-m320-multi-oem-parallel-create-smoke.md)
+- [M320 验收矩阵](testing/317-m320-multi-oem-parallel-create-smoke-acceptance.md)
 - [M319 实现文档](architecture/332-m319-batch-replay-request.md)
 - [M319 验收矩阵](testing/316-m319-batch-replay-request-acceptance.md)
 - [M318 实现文档](architecture/331-m318-manual-outbound-disposition.md)

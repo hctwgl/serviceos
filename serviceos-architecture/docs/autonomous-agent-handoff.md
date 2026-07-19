@@ -8,9 +8,9 @@ lastUpdated: 2026-07-19
 ## 当前
 
 - PR：https://github.com/hctwgl/serviceos/pull/147
-- latestMilestone：**M319**
+- latestMilestone：**M320**
 - Flyway：**120 / 122**；OpenAPI：**1.0.43**
-- **PLAN 可执行范围已全部完成**（含批量 ReplayRequest）
+- PLAN 可执行范围已完成（含 P4 并行冒烟）；正在/已跑 `verify-local.sh` 阶段门禁
 
 ## BLOCKED_EXTERNAL
 
@@ -18,8 +18,8 @@ lastUpdated: 2026-07-19
 
 ## 已完成
 
-P0～P4 本地能力；P1 余量（远端查询/人工处置/批量重放）已闭合
+P0～P4 本地能力；P1 余量；M320 三 OEM 并行建单冒烟
 
 ## 停止条件
 
-真实吉利联调仍缺 Sandbox。可选：全量 `verify-local.sh` 阶段门禁。
+真实吉利联调仍缺 Sandbox。

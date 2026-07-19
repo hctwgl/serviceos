@@ -328,6 +328,7 @@ title: ServiceOS 里程碑索引
 | M317 | M317 远端状态查询 Connector SPI | [330-m317-remote-status-query-spi.md](../architecture/330-m317-remote-status-query-spi.md) | [314-m317-remote-status-query-spi-acceptance.md](../testing/314-m317-remote-status-query-spi-acceptance.md) |
 | M318 | M318 UNKNOWN Delivery 人工确认/放弃 | [331-m318-manual-outbound-disposition.md](../architecture/331-m318-manual-outbound-disposition.md) | [315-m318-manual-outbound-disposition-acceptance.md](../testing/315-m318-manual-outbound-disposition-acceptance.md) |
 | M319 | M319 批量 ReplayRequest 预演与审批 | [332-m319-batch-replay-request.md](../architecture/332-m319-batch-replay-request.md) | [316-m319-batch-replay-request-acceptance.md](../testing/316-m319-batch-replay-request-acceptance.md) |
+| M320 | M320 多 OEM 并行建单冒烟 | [333-m320-multi-oem-parallel-create-smoke.md](../architecture/333-m320-multi-oem-parallel-create-smoke.md) | [317-m320-multi-oem-parallel-create-smoke-acceptance.md](../testing/317-m320-multi-oem-parallel-create-smoke-acceptance.md) |
 
 ## 未关联里程碑的文档
 
