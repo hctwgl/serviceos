@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.39
+  version: 1.0.43
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -4942,6 +4942,139 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /outbound-deliveries/{deliveryId}:query-remote-status:
+    post:
+      operationId: queryOutboundDeliveryRemoteStatus
+      summary: 查询 UNKNOWN 外部交付的远端权威状态
+      description: >-
+        仅允许具备 integration.retryUnknownDelivery 的 USER principal 调用。必须携带原因。
+        结果为观察值，不自动改写 Delivery 状态；协议不支持时返回 NOT_SUPPORTED，不得猜 ACK。
+      parameters:
+        - name: deliveryId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/QueryRemoteStatusRequest' }
+      responses:
+        '202':
+          description: 远端状态查询观察结果
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RemoteStatusQueryResult' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /replay-requests:
+    post:
+      operationId: createBatchReplayRequest
+      summary: 批量预演或提交 UNKNOWN 外部交付重放
+      description: >-
+        USER + integration.batchReplayUnknownDelivery。mode=PREVIEW 仅审计资格；
+        mode=SUBMIT 生成 PENDING_APPROVAL。单批最多 50 条，默认 20。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateBatchReplayRequest' }
+      responses:
+        '202':
+          description: 批次已创建
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BatchReplayRequest' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /replay-requests/{batchId}:
+    get:
+      operationId: getBatchReplayRequest
+      summary: 查询批量重放申请
+      parameters:
+        - name: batchId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 批次摘要
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BatchReplayRequest' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /replay-requests/{batchId}:approve:
+    post:
+      operationId: approveBatchReplayRequest
+      summary: 批准或拒绝批量重放
+      description: >-
+        APPROVE 后对 ELIGIBLE 条目逐条调度单笔 :retry（调度方还需 integration.retryUnknownDelivery）。
+      parameters:
+        - name: batchId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ApproveBatchReplayRequest' }
+      responses:
+        '200':
+          description: 批次决策结果
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BatchReplayRequest' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /outbound-deliveries/{deliveryId}:record-manual-ack:
+    post:
+      operationId: recordManualOutboundAcknowledgement
+      summary: 人工确认或放弃 UNKNOWN 外部交付
+      description: >-
+        仅允许具备 integration.recordManualOutboundAck 的 USER principal 调用。
+        MANUAL_CONFIRMED 表示外部已人工确认处理（需 externalRef 或 evidenceRefs）；
+        ABANDONED 表示放弃交付。不创建 CLIENT Case/Route，不得伪装技术 ACK。
+      parameters:
+        - name: deliveryId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecordManualOutboundAckRequest' }
+      responses:
+        '200':
+          description: 人工处置已登记且 Delivery 已终结
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ManualOutboundDisposition' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
   /configuration/drafts:
     get:
       operationId: listConfigurationDrafts
@@ -7703,7 +7836,7 @@ components:
         category: { x-extensible-enum: [WORK_ORDER, WORKFLOW, STAGE, TASK, APPOINTMENT, VISIT, CONTACT_ATTEMPT, SLA, FORM, EVIDENCE, REVIEW, CORRECTION, DELIVERY, EXCEPTION, ASSIGNMENT] }
         eventType:
           x-extensible-enum: [workorder.received, workorder.activated, workorder.fulfilled,
-            workorder.cancelled, workorder.reopened,
+            workorder.cancelled, workorder.reopened, workorder.external-details-updated,
             workflow.started, workflow.completed, stage.activated, stage.completed,
             task.created, task.claimed, task.started, task.released, task.cancelled, task.completed,
             task.assigned, task.assignment-prepared, task.assignment-activated, task.assignment-aborted,
@@ -8589,6 +8722,112 @@ components:
         expectedAggregateVersion: { type: integer, format: int64, minimum: 1 }
         reason: { type: string, minLength: 1, maxLength: 1000 }
         approvalRef: { type: string, minLength: 1, maxLength: 160 }
+    QueryRemoteStatusRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 1000 }
+    RemoteStatusQueryResult:
+      type: object
+      additionalProperties: false
+      required: [deliveryId, connectorVersionId, outcome, reasonCode, queriedAt]
+      properties:
+        deliveryId: { type: string, format: uuid }
+        connectorVersionId: { type: string, minLength: 1, maxLength: 160 }
+        outcome:
+          type: string
+          enum: [CONFIRMED_ACCEPTED, CONFIRMED_REJECTED, STILL_UNKNOWN, NOT_SUPPORTED]
+        reasonCode: { type: string, minLength: 1, maxLength: 120 }
+        detail: { type: [string, 'null'], maxLength: 2000 }
+        externalRef: { type: [string, 'null'], maxLength: 200 }
+        queriedAt: { type: string, format: date-time }
+    RecordManualOutboundAckRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedAggregateVersion, result, reason, approvalRef]
+      properties:
+        expectedAggregateVersion: { type: integer, format: int64, minimum: 1 }
+        result: { type: string, enum: [MANUAL_CONFIRMED, ABANDONED] }
+        reason: { type: string, minLength: 1, maxLength: 1000 }
+        approvalRef: { type: string, minLength: 1, maxLength: 160 }
+        externalRef: { type: [string, 'null'], maxLength: 200 }
+        evidenceRefs:
+          type: array
+          maxItems: 20
+          items: { type: string, minLength: 1, maxLength: 200 }
+    ManualOutboundDisposition:
+      type: object
+      additionalProperties: false
+      required: [dispositionId, deliveryId, result, reason, approvalRef, evidenceRefs, requestedBy, requestedAt, deliveryAggregateVersion]
+      properties:
+        dispositionId: { type: string, format: uuid }
+        deliveryId: { type: string, format: uuid }
+        result: { type: string, enum: [MANUAL_CONFIRMED, ABANDONED] }
+        reason: { type: string, minLength: 1, maxLength: 1000 }
+        approvalRef: { type: string, minLength: 1, maxLength: 160 }
+        externalRef: { type: [string, 'null'], maxLength: 200 }
+        evidenceRefs:
+          type: array
+          items: { type: string, minLength: 1, maxLength: 200 }
+        requestedBy: { type: string, minLength: 1, maxLength: 160 }
+        requestedAt: { type: string, format: date-time }
+        deliveryAggregateVersion: { type: integer, format: int64, minimum: 1 }
+    CreateBatchReplayRequest:
+      type: object
+      additionalProperties: false
+      required: [deliveryIds, mode, reason]
+      properties:
+        deliveryIds:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: { type: string, format: uuid }
+        mode: { type: string, enum: [PREVIEW, SUBMIT] }
+        reason: { type: string, minLength: 1, maxLength: 1000 }
+        approvalRef: { type: [string, 'null'], maxLength: 160 }
+        maxItems: { type: [integer, 'null'], minimum: 1, maximum: 50 }
+    ApproveBatchReplayRequest:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties:
+        decision: { type: string, enum: [APPROVE, REJECT] }
+        decisionNote: { type: [string, 'null'], maxLength: 1000 }
+        maxItems: { type: [integer, 'null'], minimum: 1, maximum: 50 }
+    BatchReplayRequest:
+      type: object
+      additionalProperties: false
+      required: [batchId, mode, status, reason, requestedBy, maxItems, createdAt, items]
+      properties:
+        batchId: { type: string, format: uuid }
+        mode: { type: string, enum: [PREVIEW, SUBMIT] }
+        status: { type: string, enum: [PREVIEWED, PENDING_APPROVAL, APPROVED, REJECTED, COMPLETED] }
+        reason: { type: string, minLength: 1, maxLength: 1000 }
+        approvalRef: { type: [string, 'null'], maxLength: 160 }
+        requestedBy: { type: string, minLength: 1, maxLength: 160 }
+        decidedBy: { type: [string, 'null'], maxLength: 160 }
+        decision: { type: [string, 'null'], enum: [APPROVE, REJECT] }
+        decisionNote: { type: [string, 'null'], maxLength: 1000 }
+        maxItems: { type: integer, minimum: 1, maximum: 50 }
+        createdAt: { type: string, format: date-time }
+        decidedAt: { type: [string, 'null'], format: date-time }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/BatchReplayItem' }
+    BatchReplayItem:
+      type: object
+      additionalProperties: false
+      required: [deliveryId, eligibility, itemStatus]
+      properties:
+        deliveryId: { type: string, format: uuid }
+        projectId: { type: [string, 'null'], format: uuid }
+        eligibility: { type: string, enum: [ELIGIBLE, INELIGIBLE] }
+        ineligibilityCode: { type: [string, 'null'], maxLength: 100 }
+        expectedDeliveryVersion: { type: [integer, 'null'], format: int64, minimum: 1 }
+        itemStatus: { type: string, enum: [PREVIEWED, PENDING, SCHEDULED, SKIPPED, FAILED] }
+        singleReplayRequestId: { type: [string, 'null'], format: uuid }
+        errorCode: { type: [string, 'null'], maxLength: 100 }
     DeliveryReplayRequest:
       type: object
       additionalProperties: false

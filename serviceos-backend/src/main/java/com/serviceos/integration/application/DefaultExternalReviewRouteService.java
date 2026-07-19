@@ -29,10 +29,13 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
 
-/** 已确认提审成功后登记唯一回调路由；不从订单号猜测 ReviewCase。 */
+/**
+ * 已确认提审成功后登记唯一回调路由；不从订单号猜测 ReviewCase。
+ *
+ * <p>connectorVersion 由回调 mappingVersion 经 Profile 注册表唯一解析，禁止本类硬编码车企常量。</p>
+ */
 @Service
 final class DefaultExternalReviewRouteService implements ExternalReviewRouteService {
-    static final String CONNECTOR_VERSION = "byd-cpim-v7.3.1";
     private static final String CAPABILITY = "integration.registerExternalReviewRoute";
     private static final String OPERATION = "integration.externalReviewRoute.register";
 
@@ -44,6 +47,7 @@ final class DefaultExternalReviewRouteService implements ExternalReviewRouteServ
     private final OutboxAppender outbox;
     private final ObjectMapper objectMapper;
     private final Clock clock;
+    private final OutboundReviewSubmissionProfiles profiles;
 
     DefaultExternalReviewRouteService(
             InboundMessageRepository messages,
@@ -53,7 +57,8 @@ final class DefaultExternalReviewRouteService implements ExternalReviewRouteServ
             AuditAppender audit,
             OutboxAppender outbox,
             ObjectMapper objectMapper,
-            Clock clock
+            Clock clock,
+            OutboundReviewSubmissionProfiles profiles
     ) {
         this.messages = messages;
         this.reviews = reviews;
@@ -63,6 +68,7 @@ final class DefaultExternalReviewRouteService implements ExternalReviewRouteServ
         this.outbox = outbox;
         this.objectMapper = objectMapper;
         this.clock = clock;
+        this.profiles = profiles;
     }
 
     @Override
@@ -101,8 +107,10 @@ final class DefaultExternalReviewRouteService implements ExternalReviewRouteServ
                     "External review route must match the CLIENT ReviewCase frozen lineage");
         }
 
+        var profile = profiles.requireForRouteRegistration(mappingVersion);
+        String connectorVersion = profile.identity().connectorVersionId();
         String requestDigest = Sha256.digest(
-                CONNECTOR_VERSION + "|" + orderCode + "|" + reviewCase.reviewCaseId() + "|"
+                connectorVersion + "|" + orderCode + "|" + reviewCase.reviewCaseId() + "|"
                         + submissionRef + "|" + batchRef + "|" + mappingVersion);
         CommandContext context = new CommandContext(
                 principal.tenantId(), principal.principalId(),
@@ -120,7 +128,7 @@ final class DefaultExternalReviewRouteService implements ExternalReviewRouteServ
         Instant now = clock.instant();
         var registration = messages.registerExternalReviewRoute(
                 new InboundMessageRepository.NewExternalReviewRoute(
-                        UUID.randomUUID(), principal.tenantId(), reviewCase.projectId(), CONNECTOR_VERSION,
+                        UUID.randomUUID(), principal.tenantId(), reviewCase.projectId(), connectorVersion,
                         orderCode, reviewCase.reviewCaseId(), submissionRef, batchRef, mappingVersion,
                         principal.principalId(), now));
         ExternalReviewRouteView route = registration.route();

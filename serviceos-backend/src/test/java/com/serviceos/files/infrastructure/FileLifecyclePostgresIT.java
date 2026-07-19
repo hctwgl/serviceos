@@ -223,7 +223,7 @@ class FileLifecyclePostgresIT {
 
     @Test
     void migrationIsRepeatableNoOpAtCurrentVersion() {
-        assertThat(flyway.info().applied()).hasSize(102);
+        assertThat(flyway.info().applied()).hasSize(122);
         assertThat(flyway.migrate().migrationsExecuted).isZero();
     }
 

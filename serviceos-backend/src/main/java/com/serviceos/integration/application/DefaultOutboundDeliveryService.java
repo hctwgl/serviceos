@@ -13,9 +13,16 @@ import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.integration.api.CanonicalMessageView;
 import com.serviceos.integration.api.CreateReviewSubmissionCommand;
 import com.serviceos.integration.api.DeliveryReplayRequestView;
+import com.serviceos.integration.api.ManualDispositionView;
 import com.serviceos.integration.api.OutboundDeliveryService;
 import com.serviceos.integration.api.OutboundDeliveryView;
+import com.serviceos.integration.api.QueryRemoteStatusCommand;
+import com.serviceos.integration.api.RecordManualAckCommand;
+import com.serviceos.integration.api.RemoteStatusQueryView;
 import com.serviceos.integration.api.RetryOutboundDeliveryCommand;
+import com.serviceos.integration.spi.RemoteStatusQueryConnector;
+import com.serviceos.integration.spi.RemoteStatusQueryRequest;
+import com.serviceos.integration.spi.RemoteStatusQueryResult;
 import com.serviceos.reliability.api.IdempotencyDecision;
 import com.serviceos.reliability.api.IdempotencyService;
 import com.serviceos.reliability.api.OutboxAppender;
@@ -42,28 +49,25 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
-/** 创建 BYD 提审的不可变交付意图；不在命令事务内调用外部网络。 */
+/**
+ * 创建提审不可变交付意图；不在命令事务内调用外部网络。
+ *
+ * <p>车企差异通过 {@link OutboundReviewSubmissionProfiles} 解析，禁止本类按 clientCode 分支。</p>
+ */
 @Service
 final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
-    static final String CONNECTOR_VERSION = "byd-cpim-v7.3.1";
-    static final String OUTBOUND_MAPPING_VERSION = "byd-ocean-shandong-submit-review-v1";
-    static final String CALLBACK_MAPPING_VERSION = "byd-ocean-shandong-review-callback-v1";
-    static final String BUSINESS_MESSAGE_TYPE = "SUBMIT_CLIENT_REVIEW";
-    static final String TASK_TYPE = "integration.byd.submit-review";
-    static final String FAILURE_POLICY = "byd-submit-review-fail-closed-v1";
-    static final String CLIENT_POLICY = "byd-client-review-v1";
     private static final String CREATE = "integration.outboundDelivery.createReviewSubmission";
     private static final String RETRY = "integration.outboundDelivery.retryUnknown";
     private static final String SUBMIT_CAPABILITY = "integration.submitClientReview";
     private static final String RETRY_CAPABILITY = "integration.retryUnknownDelivery";
+    private static final String MANUAL_ACK_CAPABILITY = "integration.recordManualOutboundAck";
+    private static final String MANUAL_ACK = "integration.outboundDelivery.recordManualAck";
     private static final String READ_CAPABILITY = "integration.readOutbound";
-    private static final String INSTALL_BUSINESS_PREFIX = "BYD:INSTALL:";
-    private static final DateTimeFormatter CPIM_DATE_TIME = DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm:ss");
 
     private final ReviewCaseService reviews;
     private final TaskFulfillmentContextService taskContexts;
@@ -80,6 +84,8 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
     private final TransactionTemplate transactions;
     private final Clock clock;
     private final ZoneId protocolZone;
+    private final OutboundReviewSubmissionProfiles profiles;
+    private final RemoteStatusQueryConnectors remoteStatusQueries;
 
     DefaultOutboundDeliveryService(
             ReviewCaseService reviews,
@@ -97,7 +103,9 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
             TransactionTemplate transactions,
             Clock clock,
             @org.springframework.beans.factory.annotation.Value("${serviceos.integration.byd.cpim.zone-id}")
-            ZoneId protocolZone
+            ZoneId protocolZone,
+            OutboundReviewSubmissionProfiles profiles,
+            RemoteStatusQueryConnectors remoteStatusQueries
     ) {
         this.reviews = reviews;
         this.taskContexts = taskContexts;
@@ -114,6 +122,8 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
         this.transactions = transactions;
         this.clock = clock;
         this.protocolZone = protocolZone;
+        this.profiles = profiles;
+        this.remoteStatusQueries = remoteStatusQueries;
     }
 
     @Override
@@ -148,31 +158,24 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
             throw new BusinessProblem(ProblemCode.REVIEW_CASE_CONFLICT,
                     "Source ReviewCase Task ownership conflicts");
         }
-        CanonicalMessageView canonical = inbound.findCanonicalByResult(
-                        principal.tenantId(), CONNECTOR_VERSION, "CREATE_WORK_ORDER",
-                        "WORK_ORDER", task.workOrderId().toString())
-                .map(InboundMessageRepository.CanonicalMessageRecord::view)
-                .orElseThrow(() -> new BusinessProblem(
-                        ProblemCode.RESOURCE_NOT_FOUND,
-                        "Source WorkOrder has no authoritative BYD inbound CanonicalMessage"));
-        if (!source.projectId().equals(canonical.projectId()) || !"COMPLETED".equals(canonical.processingStatus())) {
-            throw new BusinessProblem(ProblemCode.REVIEW_CASE_CONFLICT,
-                    "BYD inbound lineage does not match the ReviewCase project");
-        }
+        ResolvedLineage lineage = resolveInboundLineage(
+                principal.tenantId(), source.projectId(), task.workOrderId());
+        var profile = lineage.profile();
+        CanonicalMessageView canonical = lineage.canonical();
 
         ReviewDecisionView decision = source.decisions().stream()
                 .max(java.util.Comparator.comparingInt(ReviewDecisionView::decisionOrdinal))
                 .orElseThrow(() -> new BusinessProblem(
                         ProblemCode.REVIEW_CASE_STATE_CONFLICT, "Approved ReviewCase has no decision"));
         String operator = exactText(decision.decidedBy(), "decidedBy", 50);
-        String orderCode = orderCode(canonical.businessKey());
-        String businessKey = "BYD:SUBMIT_REVIEW:" + orderCode + ":" + source.snapshotContentDigest();
+        String orderCode = profile.extractExternalOrderCode(canonical.businessKey());
+        String businessKey = profile.submitBusinessKey(orderCode, source.snapshotContentDigest());
         String requestDigest = Sha256.digest(
                 source.reviewCaseId() + "|" + source.evidenceSetSnapshotId() + "|"
                         + source.snapshotContentDigest() + "|" + decision.reviewDecisionId() + "|"
-                        + operator + "|" + orderCode + "|" + OUTBOUND_MAPPING_VERSION);
+                        + operator + "|" + orderCode + "|" + profile.outboundMappingVersion());
         OutboundDeliveryRepository.DeliveryRecord existing = deliveries.findBySourceReview(
-                principal.tenantId(), source.reviewCaseId(), BUSINESS_MESSAGE_TYPE).orElse(null);
+                principal.tenantId(), source.reviewCaseId(), profile.businessMessageType()).orElse(null);
         if (existing != null) {
             if (!businessKey.equals(existing.view().businessKey())) {
                 throw new BusinessProblem(ProblemCode.REVIEW_CASE_CONFLICT,
@@ -183,13 +186,11 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
 
         UUID deliveryId = UUID.randomUUID();
         Instant createdAt = clock.instant();
-        SubmitReviewPayload payload = new SubmitReviewPayload(
-                operator, orderCode, CPIM_DATE_TIME.format(createdAt.atZone(protocolZone)));
-        byte[] payloadBytes = jsonBytes(payload);
+        byte[] payloadBytes = profile.buildSubmitPayload(operator, orderCode, createdAt, protocolZone);
         String payloadDigest = Sha256.digest(payloadBytes);
         String tenantPrefix = Sha256.digest(principal.tenantId()).substring(0, 16);
-        String objectRef = "integration/outbound/" + tenantPrefix
-                + "/byd-cpim/submit-review/" + deliveryId + "/" + payloadDigest + ".json";
+        String objectRef = "integration/outbound/" + tenantPrefix + "/"
+                + profile.payloadStorageSegment() + "/" + deliveryId + "/" + payloadDigest + ".json";
         store(objectRef, payloadBytes, payloadDigest);
 
         OutboundDeliveryView created = Objects.requireNonNull(transactions.execute(status -> {
@@ -207,12 +208,13 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
                                 ProblemCode.INTERNAL_ERROR, "OutboundDelivery replay result missing"));
             }
             var registration = deliveries.register(new OutboundDeliveryRepository.NewDelivery(
-                    deliveryId, principal.tenantId(), source.projectId(), CONNECTOR_VERSION,
-                    OUTBOUND_MAPPING_VERSION, BUSINESS_MESSAGE_TYPE, businessKey,
+                    deliveryId, principal.tenantId(), source.projectId(),
+                    profile.identity().connectorVersionId(),
+                    profile.outboundMappingVersion(), profile.businessMessageType(), businessKey,
                     source.reviewCaseId(), source.taskId(), task.workOrderId(),
                     source.evidenceSetSnapshotId(), source.snapshotContentDigest(), orderCode,
                     decision.decidedBy(), operator, objectRef, payloadDigest,
-                    Sha256.digest(businessKey + "|" + source.reviewCaseId()), FAILURE_POLICY,
+                    Sha256.digest(businessKey + "|" + source.reviewCaseId()), profile.failurePolicy(),
                     principal.principalId(), createdAt));
             OutboundDeliveryView delivery = registration.delivery().view();
             if (!businessKey.equals(delivery.businessKey())
@@ -222,7 +224,7 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
             }
             if (delivery.executionTaskId() == null) {
                 ScheduledTaskView executionTask = tasks.schedule(new ScheduleAutomatedTaskCommand(
-                        principal.tenantId(), TASK_TYPE, delivery.deliveryId().toString(),
+                        principal.tenantId(), profile.taskType(), delivery.deliveryId().toString(),
                         "outbound-delivery:" + delivery.deliveryId(), delivery.payloadDigest(),
                         700, createdAt, 3, metadata.correlationId()));
                 deliveries.attachExecutionTask(
@@ -244,6 +246,31 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
             return delivery;
         }));
         return created;
+    }
+
+    private ResolvedLineage resolveInboundLineage(String tenantId, UUID projectId, UUID workOrderId) {
+        List<ResolvedLineage> matches = profiles.all().stream()
+                .map(profile -> inbound.findCanonicalByResult(
+                                tenantId, profile.identity().connectorVersionId(), "CREATE_WORK_ORDER",
+                                "WORK_ORDER", workOrderId.toString())
+                        .map(InboundMessageRepository.CanonicalMessageRecord::view)
+                        .filter(canonical -> projectId.equals(canonical.projectId())
+                                && "COMPLETED".equals(canonical.processingStatus())
+                                && profile.supportsInboundLineage(
+                                        canonical.connectorVersionId(), canonical.messageType()))
+                        .map(canonical -> new ResolvedLineage(profile, canonical))
+                        .orElse(null))
+                .filter(Objects::nonNull)
+                .toList();
+        if (matches.isEmpty()) {
+            throw new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND,
+                    "Source WorkOrder has no authoritative inbound CREATE_WORK_ORDER CanonicalMessage");
+        }
+        if (matches.size() > 1) {
+            throw new BusinessProblem(ProblemCode.INTERNAL_ERROR,
+                    "Multiple outbound profiles matched inbound CREATE_WORK_ORDER lineage");
+        }
+        return matches.getFirst();
     }
 
     @Override
@@ -309,6 +336,10 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
             throw new BusinessProblem(ProblemCode.VERSION_CONFLICT,
                     "OutboundDelivery aggregate version changed");
         }
+        if (deliveries.hasManualDisposition(principal.tenantId(), delivery.deliveryId())) {
+            throw new BusinessProblem(ProblemCode.VERSION_CONFLICT,
+                    "OutboundDelivery already has a manual disposition");
+        }
 
         String requestDigest = Sha256.digest(delivery.deliveryId() + "|"
                 + command.expectedAggregateVersion() + "|" + reason + "|" + approvalRef);
@@ -329,8 +360,9 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
             UUID replayId = UUID.randomUUID();
             Instant requestedAt = clock.instant();
             String replayBusinessKey = delivery.deliveryId() + ":replay:" + replayId;
+            var profile = profiles.requireByConnectorVersion(delivery.connectorVersionId());
             ScheduledTaskView task = tasks.schedule(new ScheduleAutomatedTaskCommand(
-                    principal.tenantId(), TASK_TYPE, replayBusinessKey,
+                    principal.tenantId(), profile.taskType(), replayBusinessKey,
                     "outbound-delivery:" + replayBusinessKey, delivery.payloadDigest(),
                     900, requestedAt, 3, metadata.correlationId()));
             DeliveryReplayRequestView replay = deliveries.registerReplay(
@@ -351,6 +383,214 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
         }));
     }
 
+    @Override
+    public RemoteStatusQueryView queryRemoteStatus(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            QueryRemoteStatusCommand command
+    ) {
+        if (principal.principalType() != CurrentPrincipal.PrincipalType.USER) {
+            throw new BusinessProblem(ProblemCode.ACCESS_DENIED,
+                    "Remote status query requires a USER principal");
+        }
+        if (command == null || command.deliveryId() == null) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, "deliveryId is required");
+        }
+        String reason = requiredText(command.reason(), "reason", 1000);
+        var record = deliveries.find(principal.tenantId(), command.deliveryId())
+                .orElseThrow(() -> new BusinessProblem(
+                        ProblemCode.RESOURCE_NOT_FOUND, "OutboundDelivery does not exist"));
+        OutboundDeliveryView delivery = record.view();
+        AuthorizationDecision auth = authorization.require(principal,
+                AuthorizationRequest.projectCapability(
+                        RETRY_CAPABILITY, principal.tenantId(), "OutboundDelivery",
+                        delivery.deliveryId().toString(), delivery.projectId().toString()),
+                metadata.correlationId());
+        if (!"UNKNOWN".equals(delivery.status())) {
+            throw new BusinessProblem(ProblemCode.VERSION_CONFLICT,
+                    "Only UNKNOWN OutboundDelivery can be queried for remote status");
+        }
+
+        byte[] frozenPayload;
+        try (var input = storage.openForScan(record.payloadObjectRef())) {
+            frozenPayload = input.readAllBytes();
+        } catch (IOException exception) {
+            throw new BusinessProblem(ProblemCode.INTERNAL_ERROR,
+                    "Cannot load frozen outbound payload: " + exception.getMessage());
+        }
+        if (!Sha256.digest(frozenPayload).equals(delivery.payloadDigest())) {
+            throw new BusinessProblem(ProblemCode.INTERNAL_ERROR,
+                    "Frozen outbound payload digest mismatch");
+        }
+
+        RemoteStatusQueryConnector connector = remoteStatusQueries.requireForConnectorVersion(
+                delivery.connectorVersionId());
+        // 网络探询在事务外；结果只审计观察，不自动改写 Delivery 状态。
+        RemoteStatusQueryResult result = connector.query(new RemoteStatusQueryRequest(
+                principal.tenantId(),
+                delivery.deliveryId(),
+                delivery.connectorVersionId(),
+                delivery.externalOrderCode(),
+                delivery.businessKey(),
+                delivery.payloadDigest(),
+                frozenPayload));
+        Instant queriedAt = clock.instant();
+        RemoteStatusQueryView view = toView(delivery, result, queriedAt);
+        String requestDigest = Sha256.digest(delivery.deliveryId() + "|" + reason + "|"
+                + view.outcome() + "|" + view.reasonCode());
+        transactions.executeWithoutResult(status -> audit.append(new AuditEntry(
+                UUID.randomUUID(), principal.tenantId(), principal.principalId(),
+                "OUTBOUND_DELIVERY_REMOTE_STATUS_QUERIED", RETRY_CAPABILITY,
+                "OutboundDelivery", delivery.deliveryId().toString(), "ALLOW",
+                auth.matchedGrantIds(), auth.policyVersion(), view.outcome(), null,
+                requestDigest, metadata.correlationId(), queriedAt)));
+        return view;
+    }
+
+    @Override
+    public ManualDispositionView recordManualAck(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            RecordManualAckCommand command
+    ) {
+        if (principal.principalType() != CurrentPrincipal.PrincipalType.USER) {
+            throw new BusinessProblem(ProblemCode.ACCESS_DENIED,
+                    "Manual outbound disposition requires a USER principal");
+        }
+        if (command == null || command.deliveryId() == null || command.expectedAggregateVersion() < 1) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                    "deliveryId and positive expectedAggregateVersion are required");
+        }
+        String result = requiredText(command.result(), "result", 32);
+        if (!"MANUAL_CONFIRMED".equals(result) && !"ABANDONED".equals(result)) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                    "result must be MANUAL_CONFIRMED or ABANDONED");
+        }
+        String reason = requiredText(command.reason(), "reason", 1000);
+        String approvalRef = requiredText(command.approvalRef(), "approvalRef", 160);
+        String externalRef = command.externalRef() == null || command.externalRef().isBlank()
+                ? null : requiredText(command.externalRef(), "externalRef", 200);
+        List<String> evidenceRefs = command.evidenceRefs() == null
+                ? List.of() : List.copyOf(command.evidenceRefs());
+        for (String ref : evidenceRefs) {
+            requiredText(ref, "evidenceRefs[]", 200);
+        }
+        if ("MANUAL_CONFIRMED".equals(result) && evidenceRefs.isEmpty() && externalRef == null) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                    "MANUAL_CONFIRMED requires externalRef or evidenceRefs");
+        }
+
+        OutboundDeliveryView delivery = deliveries.find(principal.tenantId(), command.deliveryId())
+                .map(OutboundDeliveryRepository.DeliveryRecord::view)
+                .orElseThrow(() -> new BusinessProblem(
+                        ProblemCode.RESOURCE_NOT_FOUND, "OutboundDelivery does not exist"));
+        AuthorizationDecision auth = authorization.require(principal,
+                AuthorizationRequest.projectCapability(
+                        MANUAL_ACK_CAPABILITY, principal.tenantId(), "OutboundDelivery",
+                        delivery.deliveryId().toString(), delivery.projectId().toString()),
+                metadata.correlationId());
+        if (!"UNKNOWN".equals(delivery.status())) {
+            throw new BusinessProblem(ProblemCode.VERSION_CONFLICT,
+                    "Only UNKNOWN OutboundDelivery can receive manual disposition");
+        }
+        if (delivery.aggregateVersion() != command.expectedAggregateVersion()) {
+            throw new BusinessProblem(ProblemCode.VERSION_CONFLICT,
+                    "OutboundDelivery aggregate version changed");
+        }
+
+        String evidenceJson = json(evidenceRefs);
+        String requestDigest = Sha256.digest(delivery.deliveryId() + "|"
+                + command.expectedAggregateVersion() + "|" + result + "|" + reason + "|"
+                + approvalRef + "|" + (externalRef == null ? "" : externalRef) + "|" + evidenceJson);
+        return Objects.requireNonNull(transactions.execute(status -> {
+            CommandContext context = new CommandContext(
+                    principal.tenantId(), principal.principalId(),
+                    metadata.correlationId(), metadata.idempotencyKey());
+            IdempotencyDecision decision = idempotency.begin(context, MANUAL_ACK, requestDigest);
+            if (decision.kind() == IdempotencyDecision.Kind.REPLAY) {
+                UUID dispositionId = decision.resourceId().map(UUID::fromString)
+                        .orElseThrow(() -> new BusinessProblem(
+                                ProblemCode.INTERNAL_ERROR, "Manual disposition id missing"));
+                OutboundDeliveryView current = deliveries.find(principal.tenantId(), command.deliveryId())
+                        .map(OutboundDeliveryRepository.DeliveryRecord::view)
+                        .orElseThrow(() -> new BusinessProblem(
+                                ProblemCode.INTERNAL_ERROR, "OutboundDelivery disappeared"));
+                return new ManualDispositionView(
+                        dispositionId, current.deliveryId(), current.status(), reason, approvalRef,
+                        externalRef, evidenceRefs, principal.principalId(), clock.instant(),
+                        current.aggregateVersion());
+            }
+
+            UUID dispositionId = UUID.randomUUID();
+            Instant requestedAt = clock.instant();
+            ManualDispositionView disposition = deliveries.recordManualDisposition(
+                    new OutboundDeliveryRepository.NewManualDisposition(
+                            dispositionId, delivery.deliveryId(), principal.tenantId(),
+                            command.expectedAggregateVersion(), result, reason, approvalRef,
+                            externalRef, evidenceJson, principal.principalId(), requestedAt));
+            // 复用 recovered 事件关闭 UNKNOWN 相关运营异常；不创建 CLIENT Case/Route。
+            LinkedHashSet<UUID> recoveredTaskIds = new LinkedHashSet<>();
+            if (delivery.executionTaskId() != null) {
+                recoveredTaskIds.add(delivery.executionTaskId());
+            }
+            delivery.replayRequests().forEach(replay -> {
+                if (replay.executionTaskId() != null) {
+                    recoveredTaskIds.add(replay.executionTaskId());
+                }
+            });
+            if (!recoveredTaskIds.isEmpty()) {
+                String sourceTaskType = delivery.connectorVersionId() != null
+                        && delivery.connectorVersionId().startsWith("geely")
+                        ? "integration.geely.submit-settlement"
+                        : "integration.byd.submit-review";
+                String recoveryPayload = json(new ManualRecoveryPayload(
+                        delivery.deliveryId(),
+                        recoveredTaskIds.iterator().next(),
+                        List.copyOf(recoveredTaskIds),
+                        requestedAt,
+                        sourceTaskType));
+                outbox.append(new OutboxEvent(
+                        UUID.randomUUID(), UUID.randomUUID(), "integration",
+                        "integration.outbound-delivery-recovered", 1,
+                        "OutboundDelivery", delivery.deliveryId().toString(),
+                        disposition.deliveryAggregateVersion(),
+                        principal.tenantId(), metadata.correlationId(), dispositionId.toString(),
+                        delivery.deliveryId().toString(), recoveryPayload,
+                        Sha256.digest(recoveryPayload), requestedAt));
+            }
+            audit.append(new AuditEntry(
+                    UUID.randomUUID(), principal.tenantId(), principal.principalId(),
+                    "OUTBOUND_DELIVERY_MANUAL_DISPOSITION", MANUAL_ACK_CAPABILITY,
+                    "OutboundDelivery", delivery.deliveryId().toString(), "ALLOW",
+                    auth.matchedGrantIds(), auth.policyVersion(), result, null,
+                    requestDigest, metadata.correlationId(), requestedAt));
+            idempotency.complete(context, MANUAL_ACK, dispositionId.toString(),
+                    Sha256.digest(json(disposition)));
+            return disposition;
+        }));
+    }
+
+    private static RemoteStatusQueryView toView(
+            OutboundDeliveryView delivery,
+            RemoteStatusQueryResult result,
+            Instant queriedAt
+    ) {
+        return switch (result) {
+            case RemoteStatusQueryResult.ConfirmedAccepted accepted -> new RemoteStatusQueryView(
+                    delivery.deliveryId(), delivery.connectorVersionId(), "CONFIRMED_ACCEPTED",
+                    "REMOTE_CONFIRMED_ACCEPTED", accepted.detail(), accepted.externalRef(), queriedAt);
+            case RemoteStatusQueryResult.ConfirmedRejected rejected -> new RemoteStatusQueryView(
+                    delivery.deliveryId(), delivery.connectorVersionId(), "CONFIRMED_REJECTED",
+                    "REMOTE_CONFIRMED_REJECTED", rejected.detail(), rejected.externalRef(), queriedAt);
+            case RemoteStatusQueryResult.StillUnknown unknown -> new RemoteStatusQueryView(
+                    delivery.deliveryId(), delivery.connectorVersionId(), "STILL_UNKNOWN",
+                    unknown.reasonCode(), unknown.detail(), null, queriedAt);
+            case RemoteStatusQueryResult.NotSupported unsupported -> new RemoteStatusQueryView(
+                    delivery.deliveryId(), delivery.connectorVersionId(), "NOT_SUPPORTED",
+                    unsupported.reasonCode(), unsupported.detail(), null, queriedAt);
+        };
+    }
+
     private static void requireApprovedInternal(ReviewCaseView source) {
         if (!"INTERNAL".equals(source.origin())) {
             throw new BusinessProblem(ProblemCode.REVIEW_CASE_STATE_CONFLICT,
@@ -360,14 +600,6 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
             throw new BusinessProblem(ProblemCode.REVIEW_CASE_STATE_CONFLICT,
                     "Review submission source must be APPROVED or FORCE_APPROVED");
         }
-    }
-
-    private static String orderCode(String businessKey) {
-        if (businessKey == null || !businessKey.startsWith(INSTALL_BUSINESS_PREFIX)) {
-            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
-                    "BYD inbound CanonicalMessage has an invalid business key");
-        }
-        return exactText(businessKey.substring(INSTALL_BUSINESS_PREFIX.length()), "orderCode", 50);
     }
 
     private static String exactText(String value, String field, int maximum) {
@@ -432,14 +664,6 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
         }
     }
 
-    private byte[] jsonBytes(Object value) {
-        try {
-            return objectMapper.writeValueAsBytes(value);
-        } catch (JacksonException exception) {
-            throw new IllegalStateException("OutboundDelivery payload serialization failed", exception);
-        }
-    }
-
     private String json(Object value) {
         try {
             return objectMapper.writeValueAsString(value);
@@ -448,7 +672,10 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
         }
     }
 
-    private record SubmitReviewPayload(String operatePerson, String orderCode, String commitDate) {
+    private record ResolvedLineage(
+            com.serviceos.integration.spi.OutboundReviewSubmissionProfile profile,
+            CanonicalMessageView canonical
+    ) {
     }
 
     private record DeliveryCreatedPayload(
@@ -478,6 +705,16 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
             String approvalRef,
             String requestedBy,
             Instant requestedAt
+    ) {
+    }
+
+    /** 与 OutboundDeliveryRecoveryHandler.Payload 字段对齐；sourceTaskType 供多 OEM 异常闭环。 */
+    private record ManualRecoveryPayload(
+            UUID deliveryId,
+            UUID successfulExecutionTaskId,
+            List<UUID> recoveredTaskIds,
+            Instant acknowledgedAt,
+            String sourceTaskType
     ) {
     }
 }

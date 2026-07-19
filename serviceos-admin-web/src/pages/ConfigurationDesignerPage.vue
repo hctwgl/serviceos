@@ -19,6 +19,8 @@ import {
   type DesignerAssetType,
 } from '../api/configurationDrafts'
 import WorkflowCanvas from '../components/WorkflowCanvas.vue'
+import StructuredAssetEditor from '../components/StructuredAssetEditor.vue'
+import PolicyAssetEditor from '../components/PolicyAssetEditor.vue'
 
 const assetType = ref<DesignerAssetType>('WORKFLOW')
 const drafts = ref<ConfigurationDraft[]>([])
@@ -40,6 +42,25 @@ const createKey = ref('platform.designer.demo')
 const createVersion = ref('1.0.0')
 
 const showCanvas = computed(() => assetType.value === 'WORKFLOW')
+const showStructuredEditor = computed(() =>
+  ['FORM', 'EVIDENCE', 'SLA'].includes(assetType.value),
+)
+const showPolicyEditor = computed(() =>
+  ['RULE', 'DISPATCH', 'NOTIFICATION', 'ASSIGNEE_POLICY', 'INTEGRATION', 'PRICING'].includes(
+    assetType.value,
+  ),
+)
+const structuredAssetType = computed(() => assetType.value as 'FORM' | 'EVIDENCE' | 'SLA')
+const policyAssetType = computed(
+  () =>
+    assetType.value as
+      | 'RULE'
+      | 'DISPATCH'
+      | 'NOTIFICATION'
+      | 'ASSIGNEE_POLICY'
+      | 'INTEGRATION'
+      | 'PRICING',
+)
 
 async function refreshList() {
   loading.value = true
@@ -574,7 +595,10 @@ onMounted(async () => {
   <section class="designer" data-testid="configuration-designer">
     <header>
       <h1>配置设计器</h1>
-      <p>草稿 → 校验 → 审批 → 发布。WORKFLOW 支持可视化拖拽画布（布局写入 metadata.layout）。</p>
+      <p>
+        草稿 → 校验 → 审批 → 发布。WORKFLOW 画布、FORM/EVIDENCE/SLA 结构编辑，以及
+        RULE/DISPATCH/ASSIGNEE/NOTIFICATION/INTEGRATION/PRICING 策略设计器均已接入。
+      </p>
     </header>
 
     <div class="toolbar">
@@ -666,6 +690,16 @@ onMounted(async () => {
           :definition-json="definitionText"
           data-testid="workflow-preview"
           @update:definition-json="definitionText = $event"
+        />
+        <StructuredAssetEditor
+          v-if="showStructuredEditor"
+          v-model="definitionText"
+          :asset-type="structuredAssetType"
+        />
+        <PolicyAssetEditor
+          v-if="showPolicyEditor"
+          v-model="definitionText"
+          :asset-type="policyAssetType"
         />
         <h2>定义 JSON</h2>
         <textarea

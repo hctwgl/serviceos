@@ -56,7 +56,8 @@ class OutboundDeliveryQueuePostgresIT {
     void setUp() {
         jdbc.sql("""
                 TRUNCATE TABLE
-                    int_delivery_replay_request, int_external_acknowledgement, int_delivery_attempt,
+                    int_delivery_manual_disposition, int_delivery_replay_request,
+                    int_external_acknowledgement, int_delivery_attempt,
                     int_outbound_delivery,
                     aud_audit_record, rel_outbox_publish_attempt, rel_outbox_event,
                     rel_inbox_record, rel_idempotency_record,

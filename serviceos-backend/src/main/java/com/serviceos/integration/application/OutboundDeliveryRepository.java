@@ -1,6 +1,7 @@
 package com.serviceos.integration.application;
 
 import com.serviceos.integration.api.DeliveryTimelineContext;
+import com.serviceos.integration.api.ManualDispositionView;
 import com.serviceos.integration.api.OutboundDeliveryQueueItem;
 import com.serviceos.integration.api.OutboundDeliveryView;
 import com.serviceos.integration.api.DeliveryReplayRequestView;
@@ -115,6 +116,13 @@ public interface OutboundDeliveryRepository {
             UUID reviewRouteId,
             Instant acknowledgedAt);
 
+    /**
+     * 为 UNKNOWN Delivery 登记不可变人工处置（状态保持 UNKNOWN）。
+     */
+    ManualDispositionView recordManualDisposition(NewManualDisposition disposition);
+
+    boolean hasManualDisposition(String tenantId, UUID deliveryId);
+
     boolean markSendingUnknownByTaskAttempt(
             String tenantId, UUID taskExecutionAttemptId, String resultCode, Instant finishedAt);
 
@@ -166,6 +174,21 @@ public interface OutboundDeliveryRepository {
             String approvalRef,
             String requestedBy,
             UUID executionTaskId,
+            Instant requestedAt
+    ) {
+    }
+
+    record NewManualDisposition(
+            UUID dispositionId,
+            UUID deliveryId,
+            String tenantId,
+            long expectedDeliveryVersion,
+            String result,
+            String reason,
+            String approvalRef,
+            String externalRef,
+            String evidenceRefsJson,
+            String requestedBy,
             Instant requestedAt
     ) {
     }

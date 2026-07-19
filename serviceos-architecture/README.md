@@ -674,15 +674,55 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M296 配置历史回放**，功能证据提交 `7b981191dd168c210484483d7443fea446e7ce73`（合并入 `master` 后改为合并提交）。
+当前工程基线为 **M320 多 OEM 并行建单冒烟**（功能证据见 `implementation-status.md` 的
+`baselineCommit`；合入 `master` 后改为合并提交）。M296 及之前基线合并提交为
+`f3b623453a33ece91a691438b0c541e53c3282df`。
 
-当前已具备多 OEM 内核、复杂流程运行时（含取消/重开/跳转/补偿）与标准服务模板族。下一主线是阶段三领域配置设计器。
+当前已具备多 OEM 入站建单/审核回调管道 SPI、出站提审通用 SPI、复杂流程运行时、十大配置资产设计器，
+以及 INTEGRATION/ASSIGNEE/DISPATCH/NOTIFICATION/RULE/PRICING 冻结 Bundle 运行时。
+下一主线是 P3 设计器深化与第二 OEM（P4；缺 Sandbox 则 BLOCKED_EXTERNAL）；真实 OEM Sandbox 与 Track F/G 仍为
+`BLOCKED_EXTERNAL`。
 
 权威进度入口：
 
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M320 实现文档](architecture/333-m320-multi-oem-parallel-create-smoke.md)
+- [M320 验收矩阵](testing/317-m320-multi-oem-parallel-create-smoke-acceptance.md)
+- [M319 实现文档](architecture/332-m319-batch-replay-request.md)
+- [M319 验收矩阵](testing/316-m319-batch-replay-request-acceptance.md)
+- [M318 实现文档](architecture/331-m318-manual-outbound-disposition.md)
+- [M318 验收矩阵](testing/315-m318-manual-outbound-disposition-acceptance.md)
+- [M317 实现文档](architecture/330-m317-remote-status-query-spi.md)
+- [M317 验收矩阵](testing/314-m317-remote-status-query-spi-acceptance.md)
+- [M316 实现文档](architecture/329-m316-geely-outbound-and-review-callback.md)
+- [M316 验收矩阵](testing/313-m316-geely-outbound-and-review-callback-acceptance.md)
+- [M315 实现文档](architecture/328-m315-remaining-policy-asset-designers.md)
+- [M315 验收矩阵](testing/312-m315-remaining-policy-asset-designers-acceptance.md)
+- [M314 实现文档](architecture/327-m314-geely-cancel-update-local-inbound.md)
+- [M314 验收矩阵](testing/311-m314-geely-cancel-update-local-inbound-acceptance.md)
+- [M313 实现文档](architecture/326-m313-form-evidence-sla-visual-editors.md)
+- [M313 验收矩阵](testing/310-m313-form-evidence-sla-visual-editors-acceptance.md)
+- [M312 实现文档](architecture/325-m312-workflow-canvas-property-panel.md)
+- [M312 验收矩阵](testing/309-m312-workflow-canvas-property-panel-acceptance.md)
+- [M311 实现文档](architecture/324-m311-geely-local-inbound-adapter.md)
+- [M311 验收矩阵](testing/308-m311-geely-local-inbound-adapter-acceptance.md)
+- [M310 实现文档](architecture/323-m310-condition-builder.md)
+- [M310 验收矩阵](testing/307-m310-condition-builder-acceptance.md)
+- [M309 实现文档](architecture/322-m309-pricing-runtime.md)
+- [M309 验收矩阵](testing/306-m309-pricing-runtime-acceptance.md)
+- [M308 实现文档](architecture/321-m308-rule-runtime.md)
+- [M308 验收矩阵](testing/305-m308-rule-runtime-acceptance.md)
+- [M307 实现文档](architecture/320-m307-notification-runtime.md)
+- [M307 验收矩阵](testing/304-m307-notification-runtime-acceptance.md)
+- [M298 实现文档](architecture/311-m298-inbound-review-callback-spi.md)
+- [M298 验收矩阵](testing/295-m298-inbound-review-callback-spi-acceptance.md)
+- [M299 实现文档](architecture/312-m299-outbound-review-submission-profile-registry.md)
+- [M299 验收矩阵](testing/296-m299-outbound-review-submission-profile-registry-acceptance.md)
+- [M297 实现文档](architecture/310-m297-outbound-submission-connector-spi.md)
+- [M297 验收矩阵](testing/294-m297-outbound-submission-connector-spi-acceptance.md)
+- [ADR-086 出站提审 Connector SPI](decisions/ADR-086-outbound-submission-connector-spi.md)
 - [M290 实现文档](architecture/303-m290-multi-slot-canary-auto-promote.md)
 - [M290 验收矩阵](testing/287-m290-multi-slot-canary-auto-promote-acceptance.md)
 - [M291 实现文档](architecture/304-m291-configuration-dependency-analysis.md)

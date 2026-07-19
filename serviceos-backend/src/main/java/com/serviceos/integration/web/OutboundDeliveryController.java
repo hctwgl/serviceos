@@ -3,8 +3,12 @@ package com.serviceos.integration.web;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
 import com.serviceos.integration.api.CreateReviewSubmissionCommand;
 import com.serviceos.integration.api.DeliveryReplayRequestView;
+import com.serviceos.integration.api.ManualDispositionView;
 import com.serviceos.integration.api.OutboundDeliveryService;
 import com.serviceos.integration.api.OutboundDeliveryView;
+import com.serviceos.integration.api.QueryRemoteStatusCommand;
+import com.serviceos.integration.api.RecordManualAckCommand;
+import com.serviceos.integration.api.RemoteStatusQueryView;
 import com.serviceos.integration.api.RetryOutboundDeliveryCommand;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.CorrelationIds;
@@ -13,6 +17,8 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
+
+import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -72,6 +78,39 @@ final class OutboundDeliveryController {
         return ResponseEntity.accepted().body(replay);
     }
 
+    @PostMapping("/outbound-deliveries/{deliveryId}:query-remote-status")
+    ResponseEntity<RemoteStatusQueryView> queryRemoteStatus(
+            @PathVariable UUID deliveryId,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @Valid @RequestBody QueryRemoteStatusRequest request
+    ) {
+        RemoteStatusQueryView view = deliveries.queryRemoteStatus(
+                principals.current(), new CommandMetadata(correlationId, idempotencyKey),
+                new QueryRemoteStatusCommand(deliveryId, request.reason()));
+        return ResponseEntity.accepted().body(view);
+    }
+
+    @PostMapping("/outbound-deliveries/{deliveryId}:record-manual-ack")
+    ResponseEntity<ManualDispositionView> recordManualAck(
+            @PathVariable UUID deliveryId,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @Valid @RequestBody RecordManualAckRequest request
+    ) {
+        ManualDispositionView disposition = deliveries.recordManualAck(
+                principals.current(), new CommandMetadata(correlationId, idempotencyKey),
+                new RecordManualAckCommand(
+                        deliveryId,
+                        request.expectedAggregateVersion(),
+                        request.result(),
+                        request.reason(),
+                        request.approvalRef(),
+                        request.externalRef(),
+                        request.evidenceRefs() == null ? List.of() : request.evidenceRefs()));
+        return ResponseEntity.ok(disposition);
+    }
+
     record CreateRequest(@NotNull UUID sourceReviewCaseId) {
     }
 
@@ -79,6 +118,21 @@ final class OutboundDeliveryController {
             @Positive long expectedAggregateVersion,
             @NotBlank @Size(max = 1000) String reason,
             @NotBlank @Size(max = 160) String approvalRef
+    ) {
+    }
+
+    record QueryRemoteStatusRequest(
+            @NotBlank @Size(max = 1000) String reason
+    ) {
+    }
+
+    record RecordManualAckRequest(
+            @Positive long expectedAggregateVersion,
+            @NotBlank @Size(max = 32) String result,
+            @NotBlank @Size(max = 1000) String reason,
+            @NotBlank @Size(max = 160) String approvalRef,
+            @Size(max = 200) String externalRef,
+            List<@NotBlank @Size(max = 200) String> evidenceRefs
     ) {
     }
 }

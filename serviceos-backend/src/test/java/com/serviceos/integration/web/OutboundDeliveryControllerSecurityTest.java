@@ -43,6 +43,19 @@ class OutboundDeliveryControllerSecurityTest {
                                  "approvalRef":"approval://ops/1"}
                                 """))
                 .andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/v1/outbound-deliveries/{id}:query-remote-status", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("Idempotency-Key", "idem-query")
+                        .content("{\"reason\":\"探询远端\"}"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/v1/outbound-deliveries/{id}:record-manual-ack", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("Idempotency-Key", "idem-manual")
+                        .content("""
+                                {"expectedAggregateVersion":1,"result":"ABANDONED",
+                                 "reason":"放弃","approvalRef":"approval://ops/1"}
+                                """))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

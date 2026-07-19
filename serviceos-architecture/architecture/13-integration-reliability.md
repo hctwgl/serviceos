@@ -12,7 +12,13 @@ status: Proposed
 > M59 已实现 UNKNOWN Delivery 的单笔授权人工重发、不可变 ReplayRequest 与版本/审批门禁。
 > M60 已在该重发取得严格 ACK 后发布恢复事实，并幂等闭环对应运营异常及处理乱序事件。
 > M267 已抽出 CREATE_WORK_ORDER 通用 `integration.spi` 与 `InboundCreateWorkOrderPipeline`，
-> BYD 入站委托该管道；Outbound/回调全面 SPI 化、其他 CPIM 消息、REFERENCE_OEM 与批量重放仍未实现。
+> BYD 入站委托该管道。M272 已交付 REFERENCE_OEM SAMPLE 入站 Connector（经同一管道；明确
+> `TBD_EXTERNAL_CONTRACT`）。M297 已抽出出站提审 `OutboundSubmissionConnector` 与
+> `OutboundSubmissionPipeline`，BYD 提审委托该管道；技术 ACK 与业务 ACK 在模型上分离。
+> M298 已抽出审核回调逐单 `InboundReviewCallbackItemPipeline`（`ReviewCallbackMappedItem`），
+> BYD 回调适配器保留验签/防重放/batch Envelope。M300/M302 已抽出入站取消/更新管道与 BYD
+> cancel-orders/update-orders；M299/M301 已将出站创建与 Route 的 connectorVersion 注册表化。
+> 远端查询 SPI（M317）、人工处置（M318）、批量 ReplayRequest（M319）已落地；真实第二家 Sandbox 仍未实现。
 > 本章其余 Proposed 设计不能据此视为已完成。
 
 ## 1. 目标
@@ -199,13 +205,12 @@ M60 的 BYD 提审重发只有在严格 ACK 落账后才发布恢复事件；发
 
 ## 13. 人工修复与重放
 
-人工处理不能直接把 delivery 状态改为成功。M59 已实现下列第一项的单笔 BYD 提审切片；其余仍未实现：
+人工处理不能直接把 delivery 状态改为技术成功。M59 单笔重发、M317 远端查询、M318 人工确认/放弃已落地：
 
-- 修复配置后重试原 payload；
-- 基于新对象版本创建新的 delivery；
-- 查询外部状态并登记确认；
-- 标记外部已人工处理并附证据；
-- 放弃交付并说明业务影响。
+- 修复配置后重试原 payload（M59）；
+- 查询外部状态并登记观察（M317）；
+- 标记外部已人工处理并附证据 / 放弃交付（M318，状态保持 UNKNOWN + disposition）；
+- 基于新对象版本创建新的 delivery 仍未实现；批量 ReplayRequest（M319）已落地。
 
 ReplayRequest 保存申请人、范围、原因、审批、原 delivery、是否复用幂等键和执行结果。批量重放需限流和预演。
 

@@ -391,3 +391,27 @@ Feature gate/authority: if applicable
 | M294 | RULE/DISPATCH Schema 设计器；OpenAPI 1.0.37 | rule/dispatch schemas + RuleDispatchDesignerPostgresIT + `307-m294-*` + `291-m294-*` | — |
 | M295 | NOTIFICATION/ASSIGNEE/INTEGRATION/PRICING 设计器；OpenAPI 1.0.38 | RemainingAssetDesignersPostgresIT + 4 schemas + `308-m295-*` + `292-m295-*` | 运行时引擎 |
 | M296 | 冻结 Bundle WORKFLOW 历史回放；OpenAPI 1.0.39 | HistoricalReplayService + PostgresIT + `309-m296-*` + `293-m296-*` | 事件时间轴回放 |
+| M297 | 出站提审 Connector SPI + BYD 归位：`OutboundSubmissionPipeline`；技术 ACK 分离；无 OpenAPI/Flyway 变更 | ADR-086 + Outbound SPI + BydOutboundSubmissionConnector + ArchitectureTest + unit/IT + `310-m297-*` + `294-m297-*` | 回调 SPI、创建面注册表、REFERENCE 出站样本、远端查询 |
+| M298 | 入站审核回调逐单管道 SPI：`ReviewCallbackMappedItem` + `InboundReviewCallbackItemPipeline`；BYD 委托；无 OpenAPI/Flyway 变更 | SPI + Pipeline + BydCpimReviewCallbackService + ArchitectureTest + unit/IT + `311-m298-*` + `295-m298-*` | Update/Cancel、远端查询、REFERENCE 回调样本 |
+| M299 | 出站提审 Profile 注册表：按入站 lineage/connectorVersion 唯一解析；零/多命中失败关闭；无 OpenAPI/Flyway | Profile SPI + Registry + BYD Profile + unit/IT + `312-m299-*` + `296-m299-*` | Update/Cancel、Route 注册表化、远端查询 |
+| M300 | 入站取消工单 SPI：`CancelWorkOrderMappedInbound` + 管道 + BYD cancel-orders；WorkOrderExternalLookup；无 Core OpenAPI/Flyway 变更 | SPI + Pipeline + BYD HTTP IT + ArchitectureTest + `313-m300-*` + `297-m300-*` | Update/远端查询、REFERENCE 取消样本 |
+| M301 | ExternalReviewRoute connectorVersion 经 Profile 注册表解析；单 OEM mapping 回退；无 OpenAPI/Flyway | Profiles.requireForRouteRegistration + ReviewCase IT + `314-m301-*` + `298-m301-*` | Update/远端查询、INTEGRATION 运行时 |
+| M302 | 入站更新工单 SPI：UpdateExternalWorkOrder + V118 digest + BYD update-orders；事件 external-details-updated@v1；OpenAPI 1.0.40 | SPI + Pipeline + BYD HTTP IT + ContractValidation + `315-m302-*` + `299-m302-*` | 远端查询、INTEGRATION Mapping 运行时 |
+| M303 | INTEGRATION Mapping 运行时：冻结 Bundle 加载 + 白名单 Transform + 解释；无 Flyway；OpenAPI 仍 1.0.40 | IntegrationMappingRuntime + unit/IT + `316-m303-*` + `300-m303-*` | 出站 Mapping、接入建单主路径、其他资产运行时 |
+| M304 | 建单主路径冻结 INTEGRATION Mapping 闸门；零 Mapping 兼容；审计 APPLIED | Create pipeline + BYD IT + `317-m304-*` + `301-m304-*` | 替代 OEM Mapper、出站 Mapping、ASSIGNEE 运行时 |
+| M305 | ASSIGNEE_POLICY 运行时：冻结 Bundle + when 求值 + 候选/Fallback 解释；不写 TaskAssignment | AssigneePolicyRuntime + unit/IT + `318-m305-*` + `302-m305-*` | 组织/网点实时成员解析、自动 assignCandidates、DISPATCH 评分 |
+| M306 | DISPATCH 运行时：硬过滤/评分/并列/无候选 Fallback；确定性解释；不写 ServiceAssignment | DispatchRuntime + unit/IT + `319-m306-*` + `303-m306-*` | 自动派单落账、比例分配闭环、NOTIFICATION 运行时 |
+| M307 | NOTIFICATION 运行时：冻结触发器/when/收件人角色/通道 SPI/幂等/UNKNOWN 人工接管；LocalReference Adapter | NotificationRuntime + LocalReference + unit/IT + `320-m307-*` + `304-m307-*` | 真实短信/邮件 Adapter、模板引擎、Outbox 投递、RULE/PRICING 运行时 |
+| M308 | RULE 运行时：冻结规则 when 求值 + 严重级别聚合（BLOCK>REQUIRE_APPROVAL>WARN>default）；无领域副作用 | RuleRuntime + unit/IT + `321-m308-*` + `305-m308-*` | ReviewCase 自动驱动、PRICING 运行时 |
+| M309 | PRICING 运行时：冻结价目 when 匹配 + amountMinor 合计；试算不落账 | PricingRuntime + unit/IT + `322-m309-*` + `306-m309-*` | 结算落账、对账、动态公式、P3 低代码增强 |
+| M310 | SERVICEOS_EXPR_V1 条件积木：字段/运算符/值/AND-OR → 白名单表达式；设计器与网关边接入 | ConditionBuilder + blocks TS + Admin build + Playwright + `323-m310-*` + `307-m310-*` | 嵌套括号 round-trip、FORM 字段积木、全资产属性面板 |
+| M311 | 吉利浩瀚本地入站：AES 解密 + 7.1 建单映射 + 通用管道；Sandbox/签名 BLOCKED_EXTERNAL | Geely adapter + AES/IT + `324-m311-*` + `308-m311-*` + `05-geely-*` | OpenAPI 签名、Sandbox 联调、7.2～7.22 |
+| M312 | Workflow 画布：节点面板/属性（formRef/slaRef/WAIT/TIMER/SUB_PROCESS）/校验高亮/小地图/撤销重做 | WorkflowCanvas + model TS + Admin build + Playwright + `325-m312-*` + `309-m312-*` | FORM/EVIDENCE/SLA 可视配置器、多实例 UI |
+| M313 | FORM/EVIDENCE/SLA 可视结构编辑器：分组/字段/资料项/SLA 时长双向同步 JSON | StructuredAssetEditor + Admin build + Playwright + `326-m313-*` + `310-m313-*` | visibility 积木内嵌、qualityChecks UI、RULE/DISPATCH 全属性面板 |
+| M314 | 吉利本地取消/更新：AES notify_close_order / notify_update_order_info → 通用管道 | Geely cancel/update + IT + `327-m314-*` + `311-m314-*` | OpenAPI 签名、Sandbox、其余 7.x |
+| M315 | RULE/DISPATCH/ASSIGNEE/NOTIFICATION/INTEGRATION/PRICING 结构化设计器 + 条目条件积木 | PolicyAssetEditor + Admin build + Playwright + `328-m315-*` + `312-m315-*` | DISPATCH scope 地图、BUSINESS 日历 |
+| M316 | 吉利提审出站 Profile/Connector 本地 stub + 7.13 审核回调；多 OEM mapping 精确解析 | Geely outbound/callback + ProfilesTest + ReviewCase IT + `329-m316-*` + `313-m316-*` | Sandbox/OpenAPI 真实联调 |
+| M317 | 远端状态查询 SPI：UNKNOWN Delivery 探询；BYD NotSupported / Geely StillUnknown；OpenAPI 1.0.41 | RemoteStatusQueryConnector + HTTP + unit/security/Arch/contracts + `330-m317-*` + `314-m317-*` | 查询结果自动收敛、人工已送达/放弃 |
+| M318 | UNKNOWN Delivery 人工确认/放弃：disposition 不可变；状态保持 UNKNOWN；OpenAPI 1.0.42；Flyway V119 | record-manual-ack + ManualDispositionPostgresIT + contracts + `331-m318-*` + `315-m318-*` | 批量 ReplayRequest、查询自动改状态 |
+| M319 | 批量 ReplayRequest：PREVIEW/SUBMIT/approve；逐条调度单笔 retry；OpenAPI 1.0.43；Flyway V120 | BatchReplayService + PostgresIT + contracts + `332-m319-*` + `316-m319-*` | 1000 条压测、二级审批/MFA |
+| M320 | 多 OEM 并行建单冒烟：BYD + REFERENCE_OEM + GEELY 同运行时 | MultiOemParallelCreateSmokePostgresIT + `333-m320-*` + `317-m320-*` | Sandbox 真实联调 |

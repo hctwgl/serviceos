@@ -25,7 +25,8 @@ class ArchitectureTest {
 
     private static final List<String> FORBIDDEN_OEM_ADAPTER_PACKAGES = List.of(
             "com.serviceos.integration.byd",
-            "com.serviceos.integration.referenceoem");
+            "com.serviceos.integration.referenceoem",
+            "com.serviceos.integration.geely");
 
     private final ApplicationModules modules = ApplicationModules.of(ServiceOsApplication.class);
 
@@ -53,6 +54,39 @@ class ArchitectureTest {
                 .isTrue();
         assertThat(Files.exists(Path.of(
                 "src/main/java/com/serviceos/integration/application/InboundCreateWorkOrderPipeline.java")))
+                .isTrue();
+        assertThat(Files.exists(Path.of(
+                "src/main/java/com/serviceos/integration/spi/OutboundSubmissionConnector.java")))
+                .isTrue();
+        assertThat(Files.exists(Path.of(
+                "src/main/java/com/serviceos/integration/application/OutboundSubmissionPipeline.java")))
+                .isTrue();
+        assertThat(Files.exists(Path.of(
+                "src/main/java/com/serviceos/integration/spi/ReviewCallbackMappedItem.java")))
+                .isTrue();
+        assertThat(Files.exists(Path.of(
+                "src/main/java/com/serviceos/integration/application/InboundReviewCallbackItemPipeline.java")))
+                .isTrue();
+        assertThat(Files.exists(Path.of(
+                "src/main/java/com/serviceos/integration/spi/OutboundReviewSubmissionProfile.java")))
+                .isTrue();
+        assertThat(Files.exists(Path.of(
+                "src/main/java/com/serviceos/integration/application/OutboundReviewSubmissionProfiles.java")))
+                .isTrue();
+        assertThat(Files.exists(Path.of(
+                "src/main/java/com/serviceos/integration/spi/CancelWorkOrderMappedInbound.java")))
+                .isTrue();
+        assertThat(Files.exists(Path.of(
+                "src/main/java/com/serviceos/integration/application/InboundCancelWorkOrderPipeline.java")))
+                .isTrue();
+        assertThat(Files.exists(Path.of(
+                "src/main/java/com/serviceos/integration/spi/UpdateWorkOrderMappedInbound.java")))
+                .isTrue();
+        assertThat(Files.exists(Path.of(
+                "src/main/java/com/serviceos/integration/spi/RemoteStatusQueryConnector.java")))
+                .isTrue();
+        assertThat(Files.exists(Path.of(
+                "src/main/java/com/serviceos/integration/application/InboundUpdateWorkOrderPipeline.java")))
                 .isTrue();
     }
 

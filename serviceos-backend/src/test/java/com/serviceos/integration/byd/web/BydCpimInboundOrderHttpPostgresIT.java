@@ -163,6 +163,10 @@ class BydCpimInboundOrderHttpPostgresIT {
                  WHERE action_name='INBOUND_MESSAGE_PROCESSED'
                 """).query(Long.class).single()).isOne();
         assertThat(jdbc.sql("""
+                SELECT count(*) FROM aud_audit_record
+                 WHERE action_name='INBOUND_INTEGRATION_MAPPING_APPLIED'
+                """).query(Long.class).single()).isGreaterThanOrEqualTo(1);
+        assertThat(jdbc.sql("""
                 SELECT tenant_id, project_id, configuration_bundle_code,
                        configuration_bundle_version, status
                   FROM wo_work_order WHERE external_order_code = 'BYD-SD-HTTP-001'
@@ -382,6 +386,16 @@ class BydCpimInboundOrderHttpPostgresIT {
                 "1.0.0",
                 workflow,
                 Sha256.digest(workflow)));
+        // M304：冻结 Bundle 内 INBOUND INTEGRATION Mapping；建单管道必须施加闸门。
+        String integration = "{\"mappingKey\":\"byd-create-http\",\"version\":\"1.0.0\",\"connectorCode\":\"BYD_CPIM\",\"direction\":\"INBOUND\",\"fieldMappings\":[{\"mappingId\":\"order\",\"externalPath\":\"orderCode\",\"internalPath\":\"externalOrderCode\",\"required\":true,\"transform\":\"TRIM\"},{\"mappingId\":\"mobile\",\"externalPath\":\"contactMobile\",\"internalPath\":\"customerMobile\",\"required\":true,\"transform\":\"NONE\"}]}";
+        var integrationAsset = configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT_ID,
+                ConfigurationAssetType.INTEGRATION,
+                "byd-create-http",
+                "1.0.0",
+                "1.0.0",
+                integration,
+                Sha256.digest(integration)));
         configurations.publishBundle(new PublishConfigurationBundleCommand(
                 TENANT_ID,
                 projectId,
@@ -392,7 +406,7 @@ class BydCpimInboundOrderHttpPostgresIT {
                 "370000",
                 Instant.now().minusSeconds(3600),
                 null,
-                java.util.List.of(asset.versionId())));
+                java.util.List.of(asset.versionId(), integrationAsset.versionId())));
     }
 
     private static Map<String, Object> validPayload() {

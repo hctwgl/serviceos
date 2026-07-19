@@ -1,0 +1,20 @@
+{
+  "eventId": "11111111-1111-4111-8111-111111111141",
+  "eventType": "workorder.external-details-updated",
+  "schemaVersion": 1,
+  "tenantId": "tenant-example",
+  "correlationId": "corr-wo-updated",
+  "causationId": "cause-wo-updated",
+  "aggregateType": "WorkOrder",
+  "aggregateId": "22222222-2222-4222-8222-222222222222",
+  "aggregateVersion": 4,
+  "occurredAt": "2026-07-19T12:00:00Z",
+  "payload": {
+    "workOrderId": "22222222-2222-4222-8222-222222222222",
+    "updateDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "provinceCode": "370000",
+    "cityCode": "370100",
+    "districtCode": "370102",
+    "updatedAt": "2026-07-19T12:00:00Z"
+  }
+}

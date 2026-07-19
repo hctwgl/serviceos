@@ -9,17 +9,20 @@ import com.serviceos.workorder.api.ExternalWorkOrderConflictException;
 import com.serviceos.workorder.api.FulfillWorkOrderCommand;
 import com.serviceos.workorder.api.ReceiveExternalWorkOrderCommand;
 import com.serviceos.workorder.api.ReopenWorkOrderCommand;
+import com.serviceos.workorder.api.UpdateExternalWorkOrderCommand;
 import com.serviceos.workorder.api.WorkOrderActivatedPayload;
 import com.serviceos.workorder.api.WorkOrderActivationReceipt;
 import com.serviceos.workorder.api.WorkOrderCancellationReceipt;
 import com.serviceos.workorder.api.WorkOrderCancelledPayload;
 import com.serviceos.workorder.api.WorkOrderCommandService;
+import com.serviceos.workorder.api.WorkOrderExternalDetailsUpdatedPayload;
 import com.serviceos.workorder.api.WorkOrderFulfilledPayload;
 import com.serviceos.workorder.api.WorkOrderFulfillmentReceipt;
 import com.serviceos.workorder.api.WorkOrderReceipt;
 import com.serviceos.workorder.api.WorkOrderReceivedPayload;
 import com.serviceos.workorder.api.WorkOrderReopenReceipt;
 import com.serviceos.workorder.api.WorkOrderReopenedPayload;
+import com.serviceos.workorder.api.WorkOrderUpdateReceipt;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
@@ -39,6 +42,7 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
     private static final String FULFILLED_EVENT = "workorder.fulfilled";
     private static final String CANCELLED_EVENT = "workorder.cancelled";
     private static final String REOPENED_EVENT = "workorder.reopened";
+    private static final String EXTERNAL_DETAILS_UPDATED_EVENT = "workorder.external-details-updated";
 
     private final JdbcClient jdbc;
     private final OutboxAppender outbox;
@@ -203,6 +207,60 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
                 command.correlationId(), command.triggerEventId().toString(), payload, fulfilledAt);
         return new WorkOrderFulfillmentReceipt(
                 row.workOrderId(), row.status(), row.version(), false, row.fulfilledAt());
+    }
+
+    @Override
+    @Transactional
+    public WorkOrderUpdateReceipt updateExternalDetails(UpdateExternalWorkOrderCommand command) {
+        Instant updatedAt = clock.instant();
+        UpdateRow current = findUpdateRow(command.tenantId(), command.workOrderId());
+        if (command.updateDigest().equals(current.lastExternalUpdateDigest())) {
+            return new WorkOrderUpdateReceipt(
+                    current.workOrderId(), current.status(), current.version(), true, updatedAt);
+        }
+        int updated = jdbc.sql("""
+                UPDATE wo_work_order
+                   SET customer_name = :customerName,
+                       customer_mobile = :customerMobile,
+                       service_address = :serviceAddress,
+                       province_code = :provinceCode,
+                       city_code = :cityCode,
+                       district_code = :districtCode,
+                       last_external_update_digest = :updateDigest,
+                       version = version + 1
+                 WHERE tenant_id = :tenantId AND id = :workOrderId
+                   AND status IN ('RECEIVED', 'ACTIVE')
+                   AND version = :expectedVersion
+                """)
+                .param("customerName", command.customerName())
+                .param("customerMobile", command.customerMobile())
+                .param("serviceAddress", command.serviceAddress())
+                .param("provinceCode", command.provinceCode())
+                .param("cityCode", command.cityCode())
+                .param("districtCode", command.districtCode())
+                .param("updateDigest", command.updateDigest())
+                .param("tenantId", command.tenantId())
+                .param("workOrderId", command.workOrderId())
+                .param("expectedVersion", command.expectedVersion())
+                .update();
+        UpdateRow row = findUpdateRow(command.tenantId(), command.workOrderId());
+        if (updated == 0) {
+            if (command.updateDigest().equals(row.lastExternalUpdateDigest())) {
+                return new WorkOrderUpdateReceipt(
+                        row.workOrderId(), row.status(), row.version(), true, updatedAt);
+            }
+            throw new ExternalWorkOrderConflictException(
+                    "work order cannot be updated from status " + row.status()
+                            + " at version " + row.version());
+        }
+        WorkOrderExternalDetailsUpdatedPayload payload = new WorkOrderExternalDetailsUpdatedPayload(
+                row.workOrderId(), command.updateDigest(), command.provinceCode(),
+                command.cityCode(), command.districtCode(), updatedAt);
+        appendEvent(
+                command.tenantId(), row.workOrderId(), row.version(), EXTERNAL_DETAILS_UPDATED_EVENT,
+                command.correlationId(), command.causationId(), payload, updatedAt);
+        return new WorkOrderUpdateReceipt(
+                row.workOrderId(), row.status(), row.version(), false, updatedAt);
     }
 
     @Override
@@ -426,6 +484,22 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
                 .single();
     }
 
+    private UpdateRow findUpdateRow(String tenantId, UUID workOrderId) {
+        return jdbc.sql("""
+                SELECT id, status, version, last_external_update_digest
+                  FROM wo_work_order
+                 WHERE tenant_id = :tenantId AND id = :workOrderId
+                """)
+                .param("tenantId", tenantId)
+                .param("workOrderId", workOrderId)
+                .query((rs, rowNum) -> new UpdateRow(
+                        rs.getObject("id", UUID.class),
+                        rs.getString("status"),
+                        rs.getLong("version"),
+                        rs.getString("last_external_update_digest")))
+                .single();
+    }
+
     private ReopenRow findReopen(String tenantId, UUID workOrderId) {
         return jdbc.sql("""
                 SELECT id, project_id, status, version, reopened_at, reopen_approval_ref,
@@ -500,6 +574,14 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
             Instant cancelledAt,
             String cancelReasonCode,
             String cancelApprovalRef
+    ) {
+    }
+
+    private record UpdateRow(
+            UUID workOrderId,
+            String status,
+            long version,
+            String lastExternalUpdateDigest
     ) {
     }
 

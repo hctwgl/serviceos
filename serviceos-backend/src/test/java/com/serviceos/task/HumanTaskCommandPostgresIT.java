@@ -188,8 +188,8 @@ class HumanTaskCommandPostgresIT {
 
     @Test
     void migrationSetIsCurrentAndRepeatable() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("100");
-        assertThat(flyway.info().applied()).hasSize(102);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("120");
+        assertThat(flyway.info().applied()).hasSize(122);
         assertThat(flyway.migrate().migrationsExecuted).isZero();
     }
 

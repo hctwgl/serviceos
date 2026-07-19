@@ -28,11 +28,13 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
-/** 已收到 BYD errno=0 后，只执行本地幂等落账，不再次调用外部接口。 */
+/**
+ * 技术接受（DELIVERED）后的本地幂等落账：创建 CLIENT ReviewCase 与回调路由。
+ *
+ * <p>不再次调用外部接口；mapping/clientPolicy 由出站 Profile 解析，禁止本类硬编码车企常量。</p>
+ */
 @Service
 public class OutboundDeliveryCompletionService {
-    private static final String AUTH_POLICY = "BYD_CPIM_SUBMIT_REVIEW_V7_3_1";
-
     private final OutboundDeliveryRepository deliveries;
     private final ReviewCaseService reviews;
     private final ExternalReviewRouteService routes;
@@ -41,6 +43,7 @@ public class OutboundDeliveryCompletionService {
     private final ObjectMapper objectMapper;
     private final Clock clock;
     private final String adapterPrincipalId;
+    private final OutboundReviewSubmissionProfiles profiles;
 
     public OutboundDeliveryCompletionService(
             OutboundDeliveryRepository deliveries,
@@ -50,7 +53,8 @@ public class OutboundDeliveryCompletionService {
             OutboxAppender outbox,
             ObjectMapper objectMapper,
             Clock clock,
-            @Value("${serviceos.integration.byd.cpim.adapter-principal-id}") String adapterPrincipalId
+            @Value("${serviceos.integration.byd.cpim.adapter-principal-id}") String adapterPrincipalId,
+            OutboundReviewSubmissionProfiles profiles
     ) {
         this.deliveries = deliveries;
         this.reviews = reviews;
@@ -60,6 +64,7 @@ public class OutboundDeliveryCompletionService {
         this.objectMapper = objectMapper;
         this.clock = clock;
         this.adapterPrincipalId = requireText(adapterPrincipalId, "adapterPrincipalId");
+        this.profiles = profiles;
     }
 
     @Transactional
@@ -80,22 +85,23 @@ public class OutboundDeliveryCompletionService {
             throw new IllegalStateException("Only DELIVERED OutboundDelivery can be finalized");
         }
 
+        var profile = profiles.requireByConnectorVersion(delivery.connectorVersionId());
         CurrentPrincipal adapter = new CurrentPrincipal(
                 adapterPrincipalId, tenantId, CurrentPrincipal.PrincipalType.SERVICE,
-                "byd-cpim-adapter", Set.of());
-        String submissionRef = "BYD:SUBMIT_REVIEW:" + delivery.deliveryId();
-        String callbackBatchRef = "BYD:REVIEW_CALLBACK:" + delivery.deliveryId();
+                "outbound-submission-adapter", Set.of());
+        String submissionRef = profile.clientSubmissionRef(delivery.deliveryId());
+        String callbackBatchRef = profile.callbackBatchRef(delivery.deliveryId());
         ReviewCaseView clientCase = reviews.createClient(
                 adapter, new CommandMetadata(correlationId, "delivery-client:" + delivery.deliveryId()),
                 new CreateClientReviewCaseCommand(
                         delivery.sourceReviewCaseId(), submissionRef, callbackBatchRef,
-                        DefaultOutboundDeliveryService.CALLBACK_MAPPING_VERSION,
-                        DefaultOutboundDeliveryService.CLIENT_POLICY));
+                        profile.callbackMappingVersion(),
+                        profile.clientPolicy()));
         ExternalReviewRouteView route = routes.register(
                 adapter, new CommandMetadata(correlationId, "delivery-route:" + delivery.deliveryId()),
                 new RegisterExternalReviewRouteCommand(
                         delivery.externalOrderCode(), clientCase.reviewCaseId(), submissionRef,
-                        callbackBatchRef, DefaultOutboundDeliveryService.CALLBACK_MAPPING_VERSION));
+                        callbackBatchRef, profile.callbackMappingVersion()));
         Instant now = clock.instant();
         deliveries.acknowledge(tenantId, delivery.deliveryId(), clientCase.reviewCaseId(), route.reviewRouteId(), now);
         OutboundDeliveryView acknowledged = deliveries.find(tenantId, delivery.deliveryId()).orElseThrow().view();
@@ -116,9 +122,9 @@ public class OutboundDeliveryCompletionService {
                 acknowledgedEventId, correlationId, now);
         audit.append(new AuditEntry(
                 UUID.randomUUID(), tenantId, adapterPrincipalId,
-                "OUTBOUND_REVIEW_SUBMISSION_ACKNOWLEDGED", AUTH_POLICY,
+                "OUTBOUND_REVIEW_SUBMISSION_ACKNOWLEDGED", "OUTBOUND_SUBMIT_REVIEW_TECHNICAL_ACK",
                 "OutboundDelivery", acknowledged.deliveryId().toString(), "ALLOW",
-                List.of(), AUTH_POLICY, "ACKNOWLEDGED", null,
+                List.of(), "OUTBOUND_SUBMIT_REVIEW_TECHNICAL_ACK", "ACKNOWLEDGED", null,
                 Sha256.digest(acknowledged.payloadDigest() + "|" + clientCase.reviewCaseId()),
                 correlationId, now));
         return acknowledged;

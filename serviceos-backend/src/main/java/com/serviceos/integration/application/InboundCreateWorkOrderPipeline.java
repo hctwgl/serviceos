@@ -5,6 +5,8 @@ import com.serviceos.audit.api.AuditEntry;
 import com.serviceos.configuration.api.ConfigurationBundleReference;
 import com.serviceos.configuration.api.ConfigurationResolutionException;
 import com.serviceos.configuration.api.ConfigurationService;
+import com.serviceos.configuration.api.IntegrationMappingResult;
+import com.serviceos.configuration.api.IntegrationMappingRuntime;
 import com.serviceos.configuration.api.ResolveConfigurationBundleQuery;
 import com.serviceos.files.spi.ObjectStorageGateway;
 import com.serviceos.integration.api.CanonicalMessageView;
@@ -15,6 +17,7 @@ import com.serviceos.integration.spi.InboundConnectorAuditContext;
 import com.serviceos.integration.spi.InboundCreateWorkOrderResult;
 import com.serviceos.reliability.api.OutboxAppender;
 import com.serviceos.reliability.api.OutboxEvent;
+import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.Sha256;
 import com.serviceos.workorder.api.ExternalWorkOrderConflictException;
 import com.serviceos.workorder.api.ReceiveExternalWorkOrderCommand;
@@ -29,15 +32,18 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
  * CREATE_WORK_ORDER 通用入站管道。
  *
  * <p>适配器完成协议验签、transport Envelope 登记与反腐映射后进入本管道。管道负责：
- * Bundle 唯一解析 → Canonical 私有存储 → CanonicalMessage 登记 → 领域建单命令 →
- * Envelope/Canonical 完成 → Outbox/审计。适配器不得直接写工单表。</p>
+ * Bundle 唯一解析 →（可选）冻结 INTEGRATION Mapping 校验 → Canonical 私有存储 →
+ * CanonicalMessage 登记 → 领域建单命令 → Envelope/Canonical 完成 → Outbox/审计。
+ * 适配器不得直接写工单表。</p>
  *
  * <p>事务：调用方应已独立提交 RECEIVED Envelope；本管道在单一本地事务中提交
  * Canonical、工单、审计与 Outbox。配置失败或业务键冲突会 reject Envelope。</p>
@@ -45,6 +51,7 @@ import java.util.UUID;
 @Service
 public class InboundCreateWorkOrderPipeline {
     private final ConfigurationService configurationService;
+    private final IntegrationMappingRuntime integrationMappingRuntime;
     private final InboundMessageRepository messages;
     private final ObjectStorageGateway storage;
     private final WorkOrderCommandService workOrderCommandService;
@@ -56,6 +63,7 @@ public class InboundCreateWorkOrderPipeline {
 
     public InboundCreateWorkOrderPipeline(
             ConfigurationService configurationService,
+            IntegrationMappingRuntime integrationMappingRuntime,
             InboundMessageRepository messages,
             ObjectStorageGateway storage,
             WorkOrderCommandService workOrderCommandService,
@@ -66,6 +74,7 @@ public class InboundCreateWorkOrderPipeline {
             Clock clock
     ) {
         this.configurationService = configurationService;
+        this.integrationMappingRuntime = integrationMappingRuntime;
         this.messages = messages;
         this.storage = storage;
         this.workOrderCommandService = workOrderCommandService;
@@ -77,9 +86,7 @@ public class InboundCreateWorkOrderPipeline {
     }
 
     /**
-     * 处理已映射的建单意图。
-     *
-     * @param objectNamespace 对象键命名空间，例如 {@code byd-cpim}，不得包含租户明文
+     * 处理已映射的建单意图（无外部原文时跳过 INTEGRATION Mapping 闸门）。
      */
     public InboundCreateWorkOrderResult processMappedCreateWorkOrder(
             InboundEnvelopeView envelope,
@@ -90,6 +97,29 @@ public class InboundCreateWorkOrderPipeline {
             InboundConnectorAuditContext auditContext,
             String correlationId,
             String objectNamespace
+    ) {
+        return processMappedCreateWorkOrder(
+                envelope, connector, tenantId, projectCode, mapped, auditContext,
+                correlationId, objectNamespace, null);
+    }
+
+    /**
+     * 处理已映射的建单意图。
+     *
+     * @param objectNamespace 对象键命名空间，例如 {@code byd-cpim}，不得包含租户明文
+     * @param externalSourcePayload OEM 原文 Map；当冻结 Bundle 含该 connector 的 INBOUND
+     *        INTEGRATION Mapping 时必须提供，用于冻结 Mapping 校验
+     */
+    public InboundCreateWorkOrderResult processMappedCreateWorkOrder(
+            InboundEnvelopeView envelope,
+            ConnectorIdentity connector,
+            String tenantId,
+            String projectCode,
+            CreateWorkOrderMappedInbound mapped,
+            InboundConnectorAuditContext auditContext,
+            String correlationId,
+            String objectNamespace,
+            Map<String, Object> externalSourcePayload
     ) {
         Objects.requireNonNull(envelope, "envelope must not be null");
         Objects.requireNonNull(connector, "connector must not be null");
@@ -117,6 +147,16 @@ public class InboundCreateWorkOrderPipeline {
                     "INVALID_ORDER", code + ": " + exception.getMessage(), auditContext);
         }
 
+        final Optional<IntegrationMappingResult> mappingResult;
+        try {
+            mappingResult = applyFrozenIntegrationMapping(
+                    safeTenant, connector, bundle, externalSourcePayload);
+        } catch (BusinessProblem exception) {
+            return reject(
+                    envelope, safeTenant, bundle.projectId(), null, mapped.mappingVersionId(),
+                    "INTEGRATION_MAPPING_FAILED", exception.getMessage(), auditContext);
+        }
+
         byte[] canonicalPayload = mapped.canonicalPayload();
         String canonicalPayloadDigest = Sha256.digest(canonicalPayload);
         String tenantObjectPrefix = Sha256.digest(safeTenant).substring(0, 16);
@@ -125,15 +165,65 @@ public class InboundCreateWorkOrderPipeline {
         store(canonicalObjectRef, canonicalPayload, canonicalPayloadDigest);
 
         try {
-            return Objects.requireNonNull(transactions.execute(status -> completeCreateWorkOrder(
-                    envelope, connector, safeTenant, mapped, bundle, canonicalObjectRef,
-                    canonicalPayloadDigest, auditContext, safeCorrelationId)));
+            return Objects.requireNonNull(transactions.execute(status -> {
+                InboundCreateWorkOrderResult result = completeCreateWorkOrder(
+                        envelope, connector, safeTenant, mapped, bundle, canonicalObjectRef,
+                        canonicalPayloadDigest, auditContext, safeCorrelationId);
+                mappingResult.ifPresent(applied -> appendMappingAudit(
+                        safeTenant, auditContext, envelope.inboundEnvelopeId(), bundle.projectId(),
+                        applied, safeCorrelationId, clock.instant()));
+                return result;
+            }));
         } catch (ExternalWorkOrderConflictException exception) {
             return reject(
                     envelope, safeTenant, bundle.projectId(), canonicalPayloadDigest,
                     mapped.mappingVersionId(), "REPLAY_CONFLICT",
                     "ORDER_CONFLICT: " + exception.getMessage(), auditContext);
         }
+    }
+
+    private Optional<IntegrationMappingResult> applyFrozenIntegrationMapping(
+            String tenantId,
+            ConnectorIdentity connector,
+            ConfigurationBundleReference bundle,
+            Map<String, Object> externalSourcePayload
+    ) {
+        boolean mappingConfigured = integrationMappingRuntime.hasInboundMappingForConnector(
+                tenantId, bundle.bundleId(), bundle.manifestDigest(), connector.connectorCode());
+        if (!mappingConfigured) {
+            return Optional.empty();
+        }
+        if (externalSourcePayload == null || externalSourcePayload.isEmpty()) {
+            throw new BusinessProblem(
+                    com.serviceos.shared.ProblemCode.VALIDATION_FAILED,
+                    "Frozen INTEGRATION mapping requires external source payload");
+        }
+        return integrationMappingRuntime.applyInboundForConnectorIfPresent(
+                tenantId, bundle.bundleId(), bundle.manifestDigest(),
+                connector.connectorCode(), externalSourcePayload);
+    }
+
+    private void appendMappingAudit(
+            String tenantId,
+            InboundConnectorAuditContext auditContext,
+            UUID envelopeId,
+            UUID projectId,
+            IntegrationMappingResult mapping,
+            String correlationId,
+            Instant now
+    ) {
+        String explanation = String.join("; ", mapping.explanations());
+        if (explanation.length() > 1800) {
+            explanation = explanation.substring(0, 1800);
+        }
+        audit.append(new AuditEntry(
+                UUID.randomUUID(), tenantId, auditContext.actorId(),
+                "INBOUND_INTEGRATION_MAPPING_APPLIED", auditContext.authPolicy(),
+                "InboundEnvelope", envelopeId.toString(), "ALLOW", List.of(),
+                mapping.mappingKey(), "APPLIED", null,
+                Sha256.digest(mapping.contentDigest() + "|" + mapping.assetVersionId()
+                        + "|" + explanation),
+                correlationId, now));
     }
 
     /**

@@ -45,9 +45,24 @@ public class SecurityConfiguration {
                     authorize.requestMatchers("/api/v1/file-transfers/**").permitAll();
                     // 车企回调使用各自协议签名认证，不使用 OIDC JWT；业务验签必须在适配器服务内完成。
                     authorize.requestMatchers("/api/v1/integrations/byd/cpim/v7.3.1/install-orders").permitAll();
+                    authorize.requestMatchers("/api/v1/integrations/byd/cpim/v7.3.1/cancel-orders").permitAll();
+                    authorize.requestMatchers("/api/v1/integrations/byd/cpim/v7.3.1/update-orders").permitAll();
                     authorize.requestMatchers("/api/v1/integrations/byd/cpim/v7.3.1/review-results").permitAll();
                     // REFERENCE / SAMPLE 第二家车企演示端点；非生产协议（TBD_EXTERNAL_CONTRACT）。
                     authorize.requestMatchers("/api/v1/integrations/reference-oem/sample/v1/install-orders")
+                            .permitAll();
+                    // 吉利浩瀚本地 AES 入站切片；开放平台签名/Sandbox 仍 BLOCKED_EXTERNAL。
+                    authorize.requestMatchers(
+                                    "/api/v1/integrations/geely/haohan/v1.3/notify_create_order")
+                            .permitAll();
+                    authorize.requestMatchers(
+                                    "/api/v1/integrations/geely/haohan/v1.3/notify_close_order")
+                            .permitAll();
+                    authorize.requestMatchers(
+                                    "/api/v1/integrations/geely/haohan/v1.3/notify_update_order_info")
+                            .permitAll();
+                    authorize.requestMatchers(
+                                    "/api/v1/integrations/geely/haohan/v1.3/notify_settlement_audit_result")
                             .permitAll();
                     authorize.anyRequest().authenticated();
                 })
