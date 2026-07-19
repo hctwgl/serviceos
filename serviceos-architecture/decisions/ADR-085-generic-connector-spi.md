@@ -26,7 +26,7 @@ Connector Adapter
 ```
 
 5. 核心模块（workorder/workflow/task/dispatch/sla/forms/evidence/fieldwork/appointment 等）不得依赖任何 `integration.<oem>` 包；允许持有通用 `clientCode` 业务属性，禁止协议级分支。
-6. M267 仅强制 CREATE_WORK_ORDER 入站归位；BYD 审核回调与出站 Delivery 可在后续里程碑继续迁入同一 SPI 族，不得在本 ADR 留下空的 Outbound 接口冒充完成。
+6. M267 仅强制 CREATE_WORK_ORDER 入站归位；出站提审 SPI 由 ADR-086 / M297 承接；BYD 审核回调与其他消息类型可在后续里程碑继续迁入同一 SPI 族，不得留下空接口冒充完成。
 
 ## 后果
 

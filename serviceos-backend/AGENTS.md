@@ -38,7 +38,7 @@ com.serviceos.<module>/
 | identity | OIDC/JWT 主体上下文、统一主体目录与任职终止停用端口 | `idn_` | api |
 | organization | 企业组织、OrgUnit closure、任职与目录同步收据 | `org_` | api |
 | network | 合作组织、ServiceNetwork、网点成员、师傅档案与资质 | `net_` | api |
-| integration | BYD CPIM 入站 Envelope/Canonical、OutboundDelivery/Attempt/Ack；M267 起 CREATE_WORK_ORDER 通用管道与 `spi` | `int_` | api、spi；`byd` 为模块内 OEM 适配器 |
+| integration | BYD CPIM 入站 Envelope/Canonical、OutboundDelivery/Attempt/Ack；M267 入站 SPI；M297 出站提审 SPI/`OutboundSubmissionPipeline` | `int_` | api、spi；`byd`/`referenceoem` 为模块内 OEM 适配器 |
 | operations | OperationalException 运营异常工作台 | `ops_` | api |
 | project | Project 核心事实、REGION/NETWORK 范围关系与修订收据 | `prj_` | api |
 | readmodel | 工单时间线/工作区/专项队列只读投影（不回写领域事实） | `rdm_` | api |

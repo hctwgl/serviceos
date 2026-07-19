@@ -13,8 +13,9 @@ status: Proposed
 > M60 已在该重发取得严格 ACK 后发布恢复事实，并幂等闭环对应运营异常及处理乱序事件。
 > M267 已抽出 CREATE_WORK_ORDER 通用 `integration.spi` 与 `InboundCreateWorkOrderPipeline`，
 > BYD 入站委托该管道。M272 已交付 REFERENCE_OEM SAMPLE 入站 Connector（经同一管道；明确
-> `TBD_EXTERNAL_CONTRACT`）。Outbound/回调全面 SPI 化、其他 CPIM 消息类型、技术 ACK 与业务 ACK
-> 统一边界、批量重放与真实第二家 Sandbox 仍未实现。
+> `TBD_EXTERNAL_CONTRACT`）。M297 已抽出出站提审 `OutboundSubmissionConnector` 与
+> `OutboundSubmissionPipeline`，BYD 提审委托该管道；技术 ACK 与业务 ACK 在模型上分离。
+> 审核回调 SPI、其他 CPIM 消息类型、创建面 connector 注册表、批量重放与真实第二家 Sandbox 仍未实现。
 > 本章其余 Proposed 设计不能据此视为已完成。
 
 ## 1. 目标

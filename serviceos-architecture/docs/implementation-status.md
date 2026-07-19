@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-19
-baselineCommit: f3b623453a33ece91a691438b0c541e53c3282df
-latestMilestone: M296
+baselineCommit: PENDING_M297_FEATURE_EVIDENCE
+latestMilestone: M297
 ---
 
 # ServiceOS 实施状态总览
@@ -39,8 +39,8 @@ latestMilestone: M296
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M296 配置历史回放 |
-| 基线提交 | `f3b623453a33ece91a691438b0c541e53c3282df`（PR #146 合入 `master`；功能证据 `7b981191dd168c210484483d7443fea446e7ce73`） |
+| 最新实施里程碑 | M297 出站提审 Connector SPI |
+| 基线提交 | `PENDING_M297_FEATURE_EVIDENCE`（功能证据提交后回填；合入 `master` 后改为合并提交） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts`、`@serviceos/web-core`、`ServiceOSIOSCore`、独立且可部署的 `serviceos-network-web` 与 `serviceos-technician-web`、Swift 6 `TechnicianIOSFoundation`，以及已在 iPhone 17 Pro Simulator 安装启动、实跑 XCTest/XCUITest、形成 Production arm64 archive/dSYM，并接入当前任务、在线 Visit、冻结基础表单、前台 Evidence 采集上传、Snapshot/Task 完成与多轮资料整改的原生 `TechnicianIOS` SwiftUI App；由同一 Core OpenAPI 生成并经独立消费者门禁验证的 `@serviceos/core-client` 与 `ServiceOSCoreClient` |
 | 前端工程 | `serviceos-admin-web` 独立承载总部运营、统一用户中心、`/me` 导航、SavedView、UI Preference、受控搜索与最近访问；M256 后 Network 正式产品由独立 `serviceos-network-web` 承载，M257 后 Technician 正式产品由独立移动优先 `serviceos-technician-web` 承载，M262～M266 依次增加在线 Visit、冻结表单、Evidence 三段式上传、Snapshot/Task 完成与独立整改 Task 多轮补传/重新提交；Admin 仅保留可配置外链和 M188 诊断；两套独立 Web 均实际接入共享 Core、OIDC PKCE、服务端 Context/Capability/导航、Playwright 回归和独立容器镜像 |
@@ -145,7 +145,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | 项目治理 | Project 核心事实、范围关系与授权目录 | `PARTIAL` | 项目创建；REGION/NETWORK 当前关系整组修订和不可变历史；`project.read` 授权目录、详情及历史查询 | owners、品牌/服务产品/配置绑定、生命周期、计划修订审批、目录治理 UI | M8、M64～M67 |
 | 可靠消息 | Inbox、Outbox、Worker claim/lease/retry | `IMPLEMENTED` | 本地可靠发布消费、恢复和人工接管基础 | 正式 Broker 和跨服务运行 | M9～M10 |
 | 配置中心 | 不可变配置资产、Bundle 发布、设计器与灰度通道 | `PARTIAL` | M282～M295 + **M296** 冻结 Bundle 历史回放（OpenAPI 1.0.39）；十大资产设计器 + 校验/依赖/模拟/回放/Diff/审批/灰度/发布/停用/回滚齐备 | 条件积木、指标驱动晋级、资产运行时引擎 | M16、M33、M36、M52～M53、M61、M268、M271、M281～M296 |
-| 外部接入 | BYD CPIM + REFERENCE_OEM SAMPLE | `PARTIAL` | BYD 入站/提审/回调切片；**M267** 通用 SPI 管道；**M272** REFERENCE_OEM SAMPLE 独立 Connector（明确 REFERENCE/SAMPLE/TBD_EXTERNAL_CONTRACT） | 真实第二家协议/Sandbox（BLOCKED_EXTERNAL）、回调/出站全面 SPI、人工标记已送达/放弃、生产凭据/对象存储 | M16、M56～M60、M77～M79、M99、M158、M267、M272、M273 |
+| 外部接入 | BYD CPIM + REFERENCE_OEM SAMPLE | `PARTIAL` | BYD 入站/提审/回调切片；**M267** 入站 SPI 管道；**M272** REFERENCE_OEM SAMPLE；**M297** 出站提审 SPI + BYD 归位（技术 ACK 与业务 ACK 分离） | 真实第二家协议/Sandbox（BLOCKED_EXTERNAL）、回调 SPI、创建面 connector 注册表、人工标记已送达/放弃、生产凭据/对象存储 | M16、M56～M60、M77～M79、M99、M158、M267、M272、M273、M297 |
 | 工单 | WorkOrder 接收、激活、履约完成与授权工作区投影 | `PARTIAL` | 权威工单、工作流启动、跨阶段和 END 完结；授权目录、非 PII 详情、Stage/Task 执行骨架及核心执行+现场履约时间线 | 完整取消、暂停、恢复、客户敏感详情审计、跨域完整时间线/动作与全部业务分支 | M16～M19、M68～M69、M73～M74 |
 | 工作流 | 线性 + 网关 + WAIT/TIMER + SUB_PROCESS + 多实例 + 取消/重开/跳转/补偿 + 标准模板 | `PARTIAL` | 上项 + **M281** 维修/移机/巡检标准模板（含家充勘安） | HTTP 命令面、表单/资料完整模板包、设计器 | M17～M19、M61、M69、M268～M271、M275～M281 |
 | 人工任务与执行历史 | claim/start/complete、责任、执行保护与授权任务读取 | `IMPLEMENTED` | 人工命令、候选领取、唯一责任、release/reclaim、执行保护；表单/资料完成门禁；授权队列/详情、allowed-actions、自动 Attempt 历史及工单内核心 Task 生命周期与指派/Guard/人工接管时间线 | block/retry/cancel 等其他动作、Workflow Node 历史、跨工单/跨域完整历史和 Review 完成条件 | M20～M23、M35、M41、M43、M69～M73、M81 |
@@ -175,21 +175,20 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M296**。阶段一已闭合；复杂流程运行时已覆盖 EXCLUSIVE、PARALLEL、
-WAIT_EVENT、TIMER、SUB_PROCESS、多实例、取消/重开/跳转，取消时配置化补偿任务（Flyway V109），标准模板族，十大配置资产类型设计器，Admin 设计器壳，Diff/审批门禁，Bundle 灰度/回滚/停用，Workflow 拖拽画布，百分比流量灰度，画布建边/条件编辑，多槽位 CANARY 与满量自动晋级（Flyway V117），WORKFLOW 配置依赖分析，干跑模拟，**冻结 Bundle 历史回放**，通道停用失败关闭（OpenAPI 1.0.39）。
+ServiceOS 可靠纵向切片已推进到 **M297**。M267～M296 基线已稳定（文档对齐 + 本地全量 verify）；
+**M297** 交付出站提审 Connector SPI 与 BYD 归位（OpenAPI 仍 1.0.39；Flyway 仍 117/119）。
 
-下一主线（已批准）：完整通用 Connector SPI → 配置资产运行时引擎 → 业务低代码设计器 →
-真实第二家车企（吉利 PDF 已入库；Sandbox/凭据仍缺）。Track F/G（iOS 离线/签名真机/TestFlight/
-生产 IdP）与真实 OEM Sandbox 仍为 `BLOCKED_EXTERNAL`，不阻塞通用能力推进。
+下一主线（已批准）：继续完整通用 Connector SPI（回调 / Update-Cancel / 远端查询）→ 配置资产运行时
+引擎 → 业务低代码设计器 → 真实第二家车企（吉利 PDF 已入库；Sandbox/凭据仍缺）。Track F/G 与真实
+OEM Sandbox 仍为 `BLOCKED_EXTERNAL`。
 
 ```text
 已接受推进顺序：
-1. P0：M296 稳定基线收口（文档对齐 + 本地全量验证）；
-2. P1：完整通用 Connector SPI（Outbound/回调/ACK/Failure；自 M297）；
-3. P2：INTEGRATION → ASSIGNEE_POLICY → DISPATCH → NOTIFICATION → RULE → PRICING 运行时；
-4. P3：Workflow/条件积木/FORM/EVIDENCE/SLA 等低代码设计器；
-5. P4：吉利真实接入（缺 Sandbox/凭据则 BLOCKED_EXTERNAL，继续 P1～P3）；
-6. Track F/G 外部证据（签名真机/TestFlight/生产 IdP）如实登记，不阻塞上述主线。
+1. P1 续：审核回调 SPI、Update/Cancel、远端查询、创建面 connector 注册表；
+2. P2：INTEGRATION → ASSIGNEE_POLICY → DISPATCH → NOTIFICATION → RULE → PRICING 运行时；
+3. P3：Workflow/条件积木/FORM/EVIDENCE/SLA 等低代码设计器；
+4. P4：吉利真实接入（缺 Sandbox/凭据则 BLOCKED_EXTERNAL，继续 P1～P3）；
+5. Track F/G 外部证据如实登记，不阻塞上述主线。
 ```
 
 接手 Agent 必须先读取 `docs/autonomous-agent-handoff.md` 与本文件，验证 HEAD 后从断点继续。
