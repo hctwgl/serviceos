@@ -306,6 +306,7 @@ title: ServiceOS 里程碑索引
 | M295 | M295 NOTIFICATION/ASSIGNEE/INTEGRATION/PRICING 设计器 | [308-m295-remaining-asset-designers.md](../architecture/308-m295-remaining-asset-designers.md) | [292-m295-remaining-asset-designers-acceptance.md](../testing/292-m295-remaining-asset-designers-acceptance.md) |
 | M296 | M296 配置历史回放 | [309-m296-configuration-historical-replay.md](../architecture/309-m296-configuration-historical-replay.md) | [293-m296-configuration-historical-replay-acceptance.md](../testing/293-m296-configuration-historical-replay-acceptance.md) |
 | M297 | M297 出站提审 Connector SPI 与 BYD 归位 | [310-m297-outbound-submission-connector-spi.md](../architecture/310-m297-outbound-submission-connector-spi.md) | [294-m297-outbound-submission-connector-spi-acceptance.md](../testing/294-m297-outbound-submission-connector-spi-acceptance.md) |
+| M298 | M298 入站审核回调 SPI 与 BYD 归位 | [311-m298-inbound-review-callback-spi.md](../architecture/311-m298-inbound-review-callback-spi.md) | [295-m298-inbound-review-callback-spi-acceptance.md](../testing/295-m298-inbound-review-callback-spi-acceptance.md) |
 
 ## 未关联里程碑的文档
 

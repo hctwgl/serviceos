@@ -392,3 +392,4 @@ Feature gate/authority: if applicable
 | M295 | NOTIFICATION/ASSIGNEE/INTEGRATION/PRICING 设计器；OpenAPI 1.0.38 | RemainingAssetDesignersPostgresIT + 4 schemas + `308-m295-*` + `292-m295-*` | 运行时引擎 |
 | M296 | 冻结 Bundle WORKFLOW 历史回放；OpenAPI 1.0.39 | HistoricalReplayService + PostgresIT + `309-m296-*` + `293-m296-*` | 事件时间轴回放 |
 | M297 | 出站提审 Connector SPI + BYD 归位：`OutboundSubmissionPipeline`；技术 ACK 分离；无 OpenAPI/Flyway 变更 | ADR-086 + Outbound SPI + BydOutboundSubmissionConnector + ArchitectureTest + unit/IT + `310-m297-*` + `294-m297-*` | 回调 SPI、创建面注册表、REFERENCE 出站样本、远端查询 |
+| M298 | 入站审核回调逐单管道 SPI：`ReviewCallbackMappedItem` + `InboundReviewCallbackItemPipeline`；BYD 委托；无 OpenAPI/Flyway 变更 | SPI + Pipeline + BydCpimReviewCallbackService + ArchitectureTest + unit/IT + `311-m298-*` + `295-m298-*` | Update/Cancel、远端查询、REFERENCE 回调样本 |

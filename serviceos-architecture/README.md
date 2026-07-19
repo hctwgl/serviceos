@@ -674,19 +674,21 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M297 出站提审 Connector SPI**（功能证据见 `implementation-status.md` 的
+当前工程基线为 **M298 入站审核回调 SPI**（功能证据见 `implementation-status.md` 的
 `baselineCommit`；合入 `master` 后改为合并提交）。M296 及之前基线合并提交为
 `f3b623453a33ece91a691438b0c541e53c3282df`。
 
-当前已具备多 OEM 入站内核、出站提审通用 SPI、复杂流程运行时（含取消/重开/跳转/补偿）、标准服务模板族，
-以及十大配置资产设计器与发布治理。下一主线是回调/扩展 Connector SPI、配置资产运行时引擎与业务低代码
-设计器；真实 OEM Sandbox 与 Track F/G 仍为 `BLOCKED_EXTERNAL`。
+当前已具备多 OEM 入站建单/审核回调管道 SPI、出站提审通用 SPI、复杂流程运行时与十大配置资产设计器。
+下一主线是 Update/Cancel/远端查询 SPI、配置资产运行时引擎与业务低代码设计器；真实 OEM Sandbox 与
+Track F/G 仍为 `BLOCKED_EXTERNAL`。
 
 权威进度入口：
 
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M298 实现文档](architecture/311-m298-inbound-review-callback-spi.md)
+- [M298 验收矩阵](testing/295-m298-inbound-review-callback-spi-acceptance.md)
 - [M297 实现文档](architecture/310-m297-outbound-submission-connector-spi.md)
 - [M297 验收矩阵](testing/294-m297-outbound-submission-connector-spi-acceptance.md)
 - [ADR-086 出站提审 Connector SPI](decisions/ADR-086-outbound-submission-connector-spi.md)
