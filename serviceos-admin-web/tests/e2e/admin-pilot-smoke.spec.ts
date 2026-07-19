@@ -2191,7 +2191,7 @@ test('真实 OIDC 登录后可完成预约提议确认与上门签到签退', as
     .locator('.task-fieldops-appointment-links')
     .getByRole('link', {
       name: new RegExp(
-        `task\\s*/\\s*Appointment\\s*/\\s*INSTALLATION\\s*/\\s*CONFIRMED\\s*/\\s*${proposed.appointmentId}`,
+        `task\\s*/\\s*Appointment\\s*/\\s*(INSTALLATION|安装)\\s*/\\s*(CONFIRMED|已确认)\\s*/\\s*${proposed.appointmentId}`,
       ),
     })
     .click()
@@ -2216,7 +2216,7 @@ test('真实 OIDC 登录后可完成预约提议确认与上门签到签退', as
   await page
     .getByRole('link', {
       name: new RegExp(
-        `INSTALLATION\\s*/\\s*CONFIRMED\\s*/\\s*${proposed.appointmentId}`,
+        `(INSTALLATION|安装)\\s*/\\s*(CONFIRMED|已确认)\\s*/\\s*${proposed.appointmentId}`,
       ),
     })
     .click()
@@ -2425,12 +2425,11 @@ test('真实 OIDC 登录后可通过审核外发并经厂端回调关闭 CLIENT 
     )
     .toBeGreaterThan(0)
 
-  const clientReviewCaseId = (
-    await reviewPage
-      .locator('dt', { hasText: /^clientReviewCaseId$/ })
-      .locator('xpath=../dd')
-      .innerText()
-  ).trim()
+  const clientReviewHref = await reviewPage
+    .getByRole('link', { name: /CLIENT\s*审核案例/ })
+    .getAttribute('href')
+  expect(clientReviewHref, 'CLIENT 审核案例深链缺失').toBeTruthy()
+  const clientReviewCaseId = clientReviewHref!.split('/').filter(Boolean).at(-1)!
   const externalOrderCode = (
     await reviewPage
       .locator('dt', { hasText: /^externalOrderCode$/ })
