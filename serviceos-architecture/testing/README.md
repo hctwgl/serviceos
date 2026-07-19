@@ -306,5 +306,6 @@
 - [M303 INTEGRATION Mapping 运行时验收矩阵](300-m303-integration-mapping-runtime-acceptance.md)
 - [M304 建单 INTEGRATION Mapping 闸门验收矩阵](301-m304-create-work-order-integration-mapping-gate-acceptance.md)
 - [M305 ASSIGNEE_POLICY 运行时验收矩阵](302-m305-assignee-policy-runtime-acceptance.md)
+- [M306 DISPATCH 运行时验收矩阵](303-m306-dispatch-runtime-acceptance.md)
 - [多车企平台内核程序级验收矩阵](multi-oem-platform-kernel-program-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

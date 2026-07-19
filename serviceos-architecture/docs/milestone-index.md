@@ -314,6 +314,7 @@ title: ServiceOS 里程碑索引
 | M303 | M303 INTEGRATION Mapping 运行时 | [316-m303-integration-mapping-runtime.md](../architecture/316-m303-integration-mapping-runtime.md) | [300-m303-integration-mapping-runtime-acceptance.md](../testing/300-m303-integration-mapping-runtime-acceptance.md) |
 | M304 | M304 建单主路径冻结 INTEGRATION Mapping 闸门 | [317-m304-create-work-order-integration-mapping-gate.md](../architecture/317-m304-create-work-order-integration-mapping-gate.md) | [301-m304-create-work-order-integration-mapping-gate-acceptance.md](../testing/301-m304-create-work-order-integration-mapping-gate-acceptance.md) |
 | M305 | M305 ASSIGNEE_POLICY 运行时 | [318-m305-assignee-policy-runtime.md](../architecture/318-m305-assignee-policy-runtime.md) | [302-m305-assignee-policy-runtime-acceptance.md](../testing/302-m305-assignee-policy-runtime-acceptance.md) |
+| M306 | M306 DISPATCH 运行时 | [319-m306-dispatch-runtime.md](../architecture/319-m306-dispatch-runtime.md) | [303-m306-dispatch-runtime-acceptance.md](../testing/303-m306-dispatch-runtime-acceptance.md) |
 
 ## 未关联里程碑的文档
 
