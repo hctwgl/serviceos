@@ -312,6 +312,7 @@ title: ServiceOS 里程碑索引
 | M301 | M301 ExternalReviewRoute Profile 解析 | [314-m301-external-review-route-profile-resolution.md](../architecture/314-m301-external-review-route-profile-resolution.md) | [298-m301-external-review-route-profile-resolution-acceptance.md](../testing/298-m301-external-review-route-profile-resolution-acceptance.md) |
 | M302 | M302 入站更新工单 Connector SPI | [315-m302-inbound-update-work-order-spi.md](../architecture/315-m302-inbound-update-work-order-spi.md) | [299-m302-inbound-update-work-order-spi-acceptance.md](../testing/299-m302-inbound-update-work-order-spi-acceptance.md) |
 | M303 | M303 INTEGRATION Mapping 运行时 | [316-m303-integration-mapping-runtime.md](../architecture/316-m303-integration-mapping-runtime.md) | [300-m303-integration-mapping-runtime-acceptance.md](../testing/300-m303-integration-mapping-runtime-acceptance.md) |
+| M304 | M304 建单主路径冻结 INTEGRATION Mapping 闸门 | [317-m304-create-work-order-integration-mapping-gate.md](../architecture/317-m304-create-work-order-integration-mapping-gate.md) | [301-m304-create-work-order-integration-mapping-gate-acceptance.md](../testing/301-m304-create-work-order-integration-mapping-gate-acceptance.md) |
 
 ## 未关联里程碑的文档
 
