@@ -7,32 +7,32 @@ lastUpdated: 2026-07-19
 
 ## 当前
 
-- PR #148～#154：M321～M327 Draft stacked（base 链至 master）
-- PR #155：https://github.com/hctwgl/serviceos/pull/155 — **M328** UNKNOWN/Replay Admin（Draft，base=#154）
+- PR #148～#155：M321～M328 Draft stacked（base 链至 master）
+- PR #156：待创建 — **M329** RULE CLIENT 外部回执门禁（Draft，base=#155 / `cursor/m328-admin-unknown-replay-workbench-88d5`）
 - `master`：`32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147 已合并）
-- latestMilestone：**M328**
+- latestMilestone：**M329**
 - Flyway：**125**；OpenAPI：**1.0.43**（本切片无契约/迁移变更）
+- 功能提交：`d76c26dd9f024eba51d049f0b45660ce3ec015cc`
 
 ## 本回合完成
 
-### M328 UNKNOWN / Replay Admin 工作台
+### M329 RULE → CLIENT 外部回执门禁
 
-- 详情页：`record-manual-ack` → MANUAL_CONFIRMED / ABANDONED
-- 队列页：勾选 UNKNOWN → PREVIEW / SUBMIT → APPROVE / REJECT
-- Capability 软门禁；后端鉴权仍失败关闭
-- 文档：`341-m328-*` / `325-m328-*`
+- `DefaultExternalReviewReceiptService.record` 在 `markDecided` 前调用 `ReviewRuleGate`
+- 复用 Task 冻结 `ruleRef` + Bundle；解析 stage 仍为 `INTERNAL`（与 M325 同资产）
+- IT：`ClientReviewRuleGatePostgresIT`；ArchitectureTest PASS
+- 文档：`342-m329-*` / `326-m329-*`
 
 ### 既有 Draft 栈
 
-- M321～M327（PR #148～#154）
+- M321～M328（PR #148～#155）
 
 ## 验证
 
 ```text
-cd serviceos-admin-web && npm run build
+bash scripts/agent-verify.sh it ClientReviewRuleGatePostgresIT
+bash scripts/agent-verify.sh test ArchitectureTest
 ```
-
-PASS。后端处置/批量证据沿用 ManualDispositionPostgresIT / BatchReplayPostgresIT。
 
 ## BLOCKED_EXTERNAL
 
@@ -41,9 +41,7 @@ PASS。后端处置/批量证据沿用 ManualDispositionPostgresIT / BatchReplay
 
 ## 下一步
 
-本地 Configuration-Driven Runtime 主线（Mapping→ASSIGNEE→DISPATCH→RULE→NOTIFICATION→PRICING→Admin UNKNOWN）
-已交付至 M328 Draft 栈。后续优先：
-
-1. 合并 Draft 栈 #148→#154→M328；
-2. 吉利材料到位后提升联调优先级；
-3. 否则按需深化 Admin 设计系统 / 低代码高级能力。
+1. Evidence finalize / Task complete RULE 门禁（M330+）
+2. Mapping：拆除 Profile 硬编码；defaults / enum / condition DSL
+3. DISPATCH：TECHNICIAN 自动指派
+4. 低代码深化；吉利材料齐备后联调

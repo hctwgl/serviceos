@@ -690,6 +690,8 @@ PRICING SHADOW Snapshot（M327），以及 Admin UNKNOWN 人工处置与批量 R
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
 - [M328 实现文档](architecture/341-m328-unknown-replay-admin-workbench.md)
 - [M328 验收矩阵](testing/325-m328-unknown-replay-admin-workbench-acceptance.md)
+- [M329 实现文档](architecture/342-m329-rule-client-external-receipt-gate.md)
+- [M329 验收矩阵](testing/326-m329-rule-client-external-receipt-gate-acceptance.md)
 - [M327 实现文档](architecture/340-m327-pricing-fulfillment-calculation-snapshot.md)
 - [M327 验收矩阵](testing/324-m327-pricing-fulfillment-calculation-snapshot-acceptance.md)
 - [M326 实现文档](architecture/339-m326-notification-reliable-delivery.md)
