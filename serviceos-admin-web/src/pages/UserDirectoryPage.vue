@@ -3,6 +3,8 @@ import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { listSecurityPrincipals, type SecurityPrincipalPage } from '../api/securityPrincipals'
 import { safeAccessDeniedMessage } from '../api/client'
+import StatusBadge from '../components/StatusBadge.vue'
+import { statusLabel, statusOptions } from '../product/statusLabels'
 
 const loading = ref(false)
 const error = ref<string | null>(null)
@@ -52,8 +54,9 @@ onMounted(() => {
         状态
         <select v-model="status" aria-label="user status filter">
           <option value="">全部</option>
-          <option value="ACTIVE">ACTIVE</option>
-          <option value="DISABLED">DISABLED</option>
+          <option v-for="opt in statusOptions(['ACTIVE', 'DISABLED'])" :key="opt.value" :value="opt.value">
+            {{ opt.label }}
+          </option>
         </select>
       </label>
       <button type="submit" :disabled="loading">查询</button>
@@ -74,8 +77,8 @@ onMounted(() => {
         <tr v-for="item in page.items" :key="item.id">
           <td>{{ item.displayName }}</td>
           <td>{{ item.employeeNumber || '—' }}</td>
-          <td>{{ item.status }}</td>
-          <td>{{ item.type }}</td>
+          <td><StatusBadge :status="item.status" /></td>
+          <td>{{ statusLabel(item.type) }}</td>
           <td>
             <RouterLink :to="{ name: 'ADMIN.USER.DETAIL', params: { id: item.id } }">
               打开

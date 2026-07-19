@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { statusLabel } from '../product/labels'
 import { onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
@@ -8,7 +9,7 @@ import {
   type TechnicianPortalFeedItem,
 } from '../api/technicianPortal'
 import { userFacingError } from '../api/client'
-import { formatDateTime, statusLabel } from '@serviceos/web-core'
+import {formatDateTime} from '@serviceos/web-core'
 
 const props = defineProps<{ technicianContextId: string | null }>()
 const items = ref<TechnicianPortalFeedItem[]>([])
@@ -126,7 +127,7 @@ watch(() => props.technicianContextId, () => {
         :data-testid="`technician-correction-${correction.correctionCaseId}`"
       >
         <div>
-          <strong>{{ correction.reasonCodes.join(' / ') }}</strong>
+          <strong>{{ correction.reasonCodes.map((code) => statusLabel(code)).join(' / ') }}</strong>
           <p>
             整改状态 {{ statusLabel(correction.caseStatus) }}
             · 任务 {{ statusLabel(correction.taskStatus) }}
@@ -177,7 +178,7 @@ watch(() => props.technicianContextId, () => {
             :key="item.cursor"
             :data-testid="`technician-feed-row-${item.taskId}`"
           >
-            <td>{{ item.itemType === 'ASSIGNMENT' ? '责任任务' : item.itemType }}</td>
+            <td>{{ item.itemType === 'ASSIGNMENT' ? '责任任务' : statusLabel(item.itemType) }}</td>
             <td>
               <RouterLink
                 v-if="item.itemType === 'ASSIGNMENT'"
@@ -191,10 +192,10 @@ watch(() => props.technicianContextId, () => {
             <td>{{ item.workOrderId ? '关联工单' : '—' }}</td>
             <td data-testid="technician-feed-project-id">{{ item.projectId ?? '—' }}</td>
             <td>{{ statusLabel(item.taskStatus) }}</td>
-            <td data-testid="technician-feed-stage-code">{{ item.stageCode ?? '—' }}</td>
-            <td data-testid="technician-feed-task-type">{{ item.taskType ?? '—' }}</td>
-            <td data-testid="technician-feed-task-kind">{{ item.taskKind ?? '—' }}</td>
-            <td data-testid="technician-feed-business-type">{{ item.businessType ?? '—' }}</td>
+            <td data-testid="technician-feed-stage-code">{{ item.stageCode ? statusLabel(item.stageCode) : '—' }}</td>
+            <td data-testid="technician-feed-task-type">{{ item.taskType ? statusLabel(item.taskType) : '—' }}</td>
+            <td data-testid="technician-feed-task-kind">{{ item.taskKind ? statusLabel(item.taskKind) : '—' }}</td>
+            <td data-testid="technician-feed-business-type">{{ item.businessType ? statusLabel(item.businessType) : '—' }}</td>
             <td data-testid="technician-feed-effective-from">
               {{ formatDateTime(item.effectiveFrom) }}
             </td>

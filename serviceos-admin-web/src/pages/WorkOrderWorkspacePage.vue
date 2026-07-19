@@ -778,11 +778,11 @@ const appointmentVisitTaskLinks = computed((): RelatedTaskLink[] => {
   const section = sectionData.value?.appointmentsVisits
   if (!section || activeSection.value !== 'APPOINTMENTS_VISITS') return []
   const fromAppointments = collectRelatedTaskLinks(section.appointments, (row, taskId) => {
-    return `appointment / ${String(row.type ?? '—')} / ${String(row.status ?? '—')} / ${taskId}`
+    return `appointment / ${statusLabel(String(row.type ?? '—'))} / ${statusLabel(String(row.status ?? '—'))} / ${taskId}`
   })
   if (fromAppointments.length) return fromAppointments
   const fromVisits = collectRelatedTaskLinks(section.visits, (row, taskId) => {
-    return `visit / ${String(row.status ?? '—')} / ${taskId}`
+    return `visit / ${statusLabel(String(row.status ?? '—'))} / ${taskId}`
   })
   if (fromVisits.length) return fromVisits
   return collectRelatedTaskLinks(section.contactAttempts, (row, taskId) => {
@@ -840,7 +840,7 @@ const formsEvidenceTaskLinks = computed((): RelatedTaskLink[] => {
   const section = sectionData.value?.formsEvidence
   if (!section || activeSection.value !== 'FORMS_EVIDENCE') return []
   const fromSubmissions = collectRelatedTaskLinks(section.formSubmissions, (row, taskId) => {
-    return `submission / ${String(row.formKey ?? '—')} / ${String(row.validationStatus ?? '—')} / ${taskId}`
+    return `submission / ${String(row.formKey ?? '—')} / ${statusLabel(String(row.validationStatus ?? '—'))} / ${taskId}`
   })
   if (fromSubmissions.length) return fromSubmissions
   const fromForms = collectRelatedTaskLinks(section.forms, (row, taskId) => {
@@ -848,7 +848,7 @@ const formsEvidenceTaskLinks = computed((): RelatedTaskLink[] => {
   })
   if (fromForms.length) return fromForms
   const fromItems = collectRelatedTaskLinks(section.evidenceItems, (row, taskId) => {
-    return `evidence-item / ${String(row.status ?? '—')} / ${taskId}`
+    return `evidence-item / ${statusLabel(String(row.status ?? '—'))} / ${taskId}`
   })
   if (fromItems.length) return fromItems
   return collectRelatedTaskLinks(section.evidenceSlots, (row, taskId) => {
@@ -911,8 +911,8 @@ const currentActionBanner = computed(() => {
   }
   const task = ws.currentTaskSummary
   const taskStatus = statusLabel(task.status)
-  const taskName = task.taskType ?? '任务'
-  const stageHint = task.stageCode ? `（阶段 ${task.stageCode}）` : ''
+  const taskName = statusLabel(task.taskType ?? '')
+  const stageHint = task.stageCode ? `（阶段 ${statusLabel(task.stageCode)}）` : ''
   return `工单${woStatus} · 当前任务：${taskName}${stageHint}（${taskStatus}）`
 })
 
@@ -981,7 +981,7 @@ onMounted(() => {
             <div>
               <dt>当前任务</dt>
               <dd v-if="workspace.currentTaskSummary">
-                {{ workspace.currentTaskSummary.taskType }}
+                {{ statusLabel(workspace.currentTaskSummary.taskType) }}
                 <StatusBadge :status="workspace.currentTaskSummary.status" />
                 <small>
                   <RouterLink
@@ -1166,7 +1166,7 @@ onMounted(() => {
         <h3>Workflow / Stage</h3>
         <p class="meta">
           workflow={{ stages.workflow?.workflowKey || '—' }} /
-          {{ stages.workflow?.status || '未初始化' }} /
+          {{ stages.workflow?.status ? statusLabel(stages.workflow.status) : '未初始化' }} /
           asOf {{ stages.asOf }}
         </p>
       </article>
@@ -1200,7 +1200,7 @@ onMounted(() => {
           :key="item.id"
           :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: item.id } }"
         >
-          {{ item.taskType }} / {{ item.id }}
+          {{ statusLabel(item.taskType) }} / {{ item.id }}
         </RouterLink>
       </p>
 
@@ -1294,7 +1294,7 @@ onMounted(() => {
                 params: { id: item.inboundEnvelopeId },
               }"
             >
-              {{ item.messageType }} / {{ item.processingStatus }}
+              {{ item.messageType }} / {{ statusLabel(item.processingStatus) }}
               <template v-if="item.resultCode"> / {{ item.resultCode }}</template>
             </RouterLink>
           </p>
@@ -1308,7 +1308,7 @@ onMounted(() => {
                 params: { id: item.canonicalMessageId },
               }"
             >
-              {{ item.messageType }} / {{ item.processingStatus }} /
+              {{ item.messageType }} / {{ statusLabel(item.processingStatus) }} /
               {{ item.canonicalMessageId }}
             </RouterLink>
           </p>
@@ -1322,7 +1322,7 @@ onMounted(() => {
                 params: { id: item.deliveryId },
               }"
             >
-              {{ item.businessMessageType }} / {{ item.status }} / {{ item.externalOrderCode }}
+              {{ item.businessMessageType }} / {{ statusLabel(item.status) }} / {{ item.externalOrderCode }}
             </RouterLink>
           </p>
           <p v-if="outboundCrossLinks.length" class="links outbound-cross-links">
@@ -1348,7 +1348,7 @@ onMounted(() => {
                 params: { id: item.reviewCaseId },
               }"
             >
-              {{ item.origin }} / {{ item.status }} / {{ item.reviewCaseId }}
+              {{ statusLabel(item.origin) }} / {{ statusLabel(item.status) }} / {{ item.reviewCaseId }}
             </RouterLink>
           </p>
           <p v-if="correctionCaseLinks.length" class="links correction-links">
@@ -1361,7 +1361,7 @@ onMounted(() => {
                 params: { id: item.correctionCaseId },
               }"
             >
-              {{ item.status }} / {{ item.correctionCaseId }}
+              {{ statusLabel(item.status) }} / {{ item.correctionCaseId }}
             </RouterLink>
           </p>
           <p
@@ -1390,7 +1390,7 @@ onMounted(() => {
                 params: { id: item.taskId },
               }"
             >
-              {{ item.taskType }} / {{ item.taskKind }} / {{ item.status }} / {{ item.taskId }}
+              {{ statusLabel(item.taskType) }} / {{ statusLabel(item.taskKind) }} / {{ statusLabel(item.status) }} / {{ item.taskId }}
             </RouterLink>
           </p>
           <p v-if="timelineResourceLinks.length" class="links timeline-resource-links">
@@ -1416,7 +1416,7 @@ onMounted(() => {
                 params: { id: item.appointmentId },
               }"
             >
-              {{ item.type }} / {{ item.status }} / {{ item.appointmentId }}
+              {{ statusLabel(item.type) }} / {{ statusLabel(item.status) }} / {{ item.appointmentId }}
             </RouterLink>
           </p>
           <p v-if="visitDetailLinks.length" class="links visit-detail-links">
@@ -1429,7 +1429,7 @@ onMounted(() => {
                 params: { id: item.visitId },
               }"
             >
-              {{ item.status }} / seq={{ item.visitSequence }} / {{ item.visitId }}
+              {{ statusLabel(item.status) }} / seq={{ item.visitSequence }} / {{ item.visitId }}
             </RouterLink>
           </p>
           <p v-if="contactAttemptDetailLinks.length" class="links contact-attempt-detail-links">
@@ -1468,7 +1468,7 @@ onMounted(() => {
                 params: { id: item.submissionId },
               }"
             >
-              {{ item.formKey }} / {{ item.validationStatus }} / {{ item.submissionId }}
+              {{ item.formKey }} / {{ statusLabel(item.validationStatus) }} / {{ item.submissionId }}
             </RouterLink>
           </p>
           <p v-if="evidenceItemDetailLinks.length" class="links evidence-item-detail-links">
@@ -1481,7 +1481,7 @@ onMounted(() => {
                 params: { id: item.evidenceItemId },
               }"
             >
-              #{{ item.itemOrdinal }} / {{ item.status }} / {{ item.evidenceItemId }}
+              #{{ item.itemOrdinal }} / {{ statusLabel(item.status) }} / {{ item.evidenceItemId }}
             </RouterLink>
           </p>
           <p v-if="formsEvidenceTaskLinks.length" class="links forms-evidence-task-links">

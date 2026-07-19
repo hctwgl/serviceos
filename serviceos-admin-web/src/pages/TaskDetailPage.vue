@@ -12,6 +12,8 @@ import TaskCommandPanel from '../components/TaskCommandPanel.vue'
 import TaskFieldOpsPanel from '../components/TaskFieldOpsPanel.vue'
 import TaskFormsEvidencePanel from '../components/TaskFormsEvidencePanel.vue'
 import { recordRecentVisit } from '../recent/recordRecentVisit'
+import StatusBadge from '../components/StatusBadge.vue'
+import { statusLabel } from '../product/statusLabels'
 import QueueTable from './QueueTable.vue'
 
 const route = useRoute()
@@ -105,11 +107,14 @@ onMounted(() => {
         <article class="card">
           <h3>当前事实</h3>
           <dl>
-            <div><dt>类型</dt><dd>{{ detail.task.taskType }} / {{ detail.task.taskKind }}</dd></div>
-            <div><dt>状态</dt><dd>{{ detail.task.status }}</dd></div>
+            <div>
+              <dt>类型</dt>
+              <dd>{{ statusLabel(detail.task.taskType) }} / {{ statusLabel(detail.task.taskKind) }}</dd>
+            </div>
+            <div><dt>状态</dt><dd><StatusBadge :status="detail.task.status" /></dd></div>
             <div><dt>优先级</dt><dd>{{ detail.task.priority }}</dd></div>
             <div>
-              <dt>projectId</dt>
+              <dt>所属项目</dt>
               <dd>
                 <RouterLink
                   v-if="detail.task.projectId"

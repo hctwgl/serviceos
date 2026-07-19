@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { statusLabel } from '../product/labels'
 import { onMounted, ref, watch } from 'vue'
+
 import {
   listNetworkPortalCapacity,
   type NetworkPortalCapacityItem,
@@ -60,7 +62,7 @@ watch(() => props.networkContextId, () => {
           :key="item.capacityCounterId"
           :data-testid="`capacity-row-${item.businessType}`"
         >
-          <td>{{ item.businessType }}</td>
+          <td>{{ item.businessType ? statusLabel(item.businessType) : '—' }}</td>
           <td>{{ item.occupiedUnits }}</td>
           <td>{{ item.maxUnits }}</td>
           <td>{{ item.availableUnits }}</td>

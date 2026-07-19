@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import { statusLabel } from '../product/labels'
 import { onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { getNetworkPortalWorkbench, type NetworkPortalWorkbench } from '../api/networkPortal'
-import { formatDateTime, safeProblemMessage } from '@serviceos/web-core'
+import {formatDateTime, safeProblemMessage} from '@serviceos/web-core'
 import PageState from '../components/PageState.vue'
 
 const props = defineProps<{ networkContextId: string | null }>()
@@ -123,7 +124,7 @@ watch(() => props.networkContextId, () => {
             :key="row.capacityCounterId"
             :data-testid="`workbench-capacity-${row.businessType}`"
           >
-            {{ row.businessType }}：占用 {{ row.occupiedUnits }} / 上限 {{ row.maxUnits }}
+            {{ row.businessType ? statusLabel(row.businessType) : '—' }}：占用 {{ row.occupiedUnits }} / 上限 {{ row.maxUnits }}
             （可用 {{ row.availableUnits }}）
             <span class="muted" data-testid="workbench-capacity-updated-at">
               · 更新时间 {{ formatDateTime(row.updatedAt) }}

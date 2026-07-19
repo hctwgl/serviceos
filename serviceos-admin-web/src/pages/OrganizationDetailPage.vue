@@ -18,6 +18,8 @@ import ExternalAuthoritativeBadge from '../components/ExternalAuthoritativeBadge
 import ImpactPanel from '../components/ImpactPanel.vue'
 import PrincipalPicker from '../components/PrincipalPicker.vue'
 import VersionedCommandForm from '../components/VersionedCommandForm.vue'
+import StatusBadge from '../components/StatusBadge.vue'
+import { statusLabel } from '../product/statusLabels'
 
 const route = useRoute()
 const organizationId = computed(() => String(route.params.id ?? ''))
@@ -220,7 +222,7 @@ onMounted(() => {
         />
         <dl>
           <div><dt>code</dt><dd>{{ detail.organization.code }}</dd></div>
-          <div><dt>status</dt><dd>{{ detail.organization.status }}</dd></div>
+          <div><dt>状态</dt><dd><StatusBadge :status="detail.organization.status" /></dd></div>
           <div><dt>version</dt><dd>{{ detail.organization.version }}</dd></div>
         </dl>
       </article>
@@ -283,7 +285,7 @@ onMounted(() => {
                 name="membership"
                 :value="item.id"
               />
-              {{ item.membershipType }} · {{ item.status }} · unit={{ item.orgUnitId }} · v{{ item.version }}
+              {{ statusLabel(item.membershipType) }} · <StatusBadge :status="item.status" /> · unit={{ item.orgUnitId }} · v{{ item.version }}
             </label>
           </li>
         </ul>

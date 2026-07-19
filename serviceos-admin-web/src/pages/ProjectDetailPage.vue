@@ -10,6 +10,7 @@ import {
 } from '../api/projectDetail'
 import { recordRecentVisit } from '../recent/recordRecentVisit'
 import QueueTable from './QueueTable.vue'
+import StatusBadge from '../components/StatusBadge.vue'
 
 const route = useRoute()
 const projectId = computed(() => String(route.params.id ?? ''))
@@ -129,7 +130,7 @@ onMounted(() => {
         <dl>
           <div><dt>code</dt><dd>{{ detail.project.code }}</dd></div>
           <div><dt>clientId</dt><dd>{{ detail.project.clientId }}</dd></div>
-          <div><dt>status</dt><dd>{{ detail.project.status }}</dd></div>
+          <div><dt>状态</dt><dd><StatusBadge :status="detail.project.status" /></dd></div>
           <div><dt>startsOn</dt><dd>{{ detail.project.startsOn }}</dd></div>
           <div><dt>endsOn</dt><dd>{{ detail.project.endsOn || '—' }}</dd></div>
           <div><dt>version</dt><dd>{{ detail.project.version }}</dd></div>

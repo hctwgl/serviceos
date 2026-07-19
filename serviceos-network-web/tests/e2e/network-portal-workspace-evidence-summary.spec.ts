@@ -172,7 +172,7 @@ test.describe('M223 Network Portal 工作区 Evidence 摘要', () => {
     await expect(page.getByTestId('workspace-evidence-slots')).toBeVisible()
     await expect(page.getByTestId(`workspace-evidence-slot-${SLOT_ID}`)).toContainText('现场照片')
     await expect(page.getByTestId('workspace-evidence-items')).toBeVisible()
-    await expect(page.getByTestId(`workspace-evidence-item-${ITEM_ID}`)).toContainText('OPEN')
+    await expect(page.getByTestId(`workspace-evidence-item-${ITEM_ID}`)).toContainText('待处理')
   })
 
   test('M223-06b：缺字段时省略区块（不得伪装为空列表）', async ({ page }) => {

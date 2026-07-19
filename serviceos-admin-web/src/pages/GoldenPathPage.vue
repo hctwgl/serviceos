@@ -9,6 +9,7 @@ import PageState from '../components/PageState.vue'
 import { listAuthorizedWorkOrders } from '../api/workOrders'
 import { toUserFacingError } from '../product/errorMessages'
 import { formatDateTime } from '../product/formatTime'
+import { statusLabel } from '../product/statusLabels'
 
 type StepStatus = 'done' | 'current' | 'todo' | 'blocked' | 'optional'
 
@@ -251,7 +252,7 @@ onMounted(() => {
           <select v-model="selectedCode" data-testid="golden-order-select">
             <option v-if="!demoOrders.length" value="ADMIN-PILOT-001">ADMIN-PILOT-001（待初始化）</option>
             <option v-for="order in demoOrders" :key="order.id" :value="order.code">
-              {{ order.code }}（{{ order.status }}）
+              {{ order.code }}（{{ statusLabel(order.status) }}）
             </option>
           </select>
         </label>

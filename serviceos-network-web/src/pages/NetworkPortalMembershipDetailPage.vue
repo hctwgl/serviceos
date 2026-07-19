@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { statusLabel } from '../product/labels'
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+
 import {
   getNetworkPortalTechnicianMembership,
   type NetworkPortalMembershipItem,
@@ -80,7 +82,7 @@ watch(
     <p v-if="error" data-testid="network-portal-error">{{ error }}</p>
     <p v-else-if="loading" data-testid="membership-detail-loading">加载中…</p>
     <dl v-else-if="detail" data-testid="membership-detail-fields">
-      <div><dt>status</dt><dd data-testid="membership-detail-status">{{ detail.status }}</dd></div>
+      <div><dt>状态</dt><dd data-testid="membership-detail-status">{{ detail.status ? statusLabel(detail.status) : '—' }}</dd></div>
       <div><dt>serviceNetworkId</dt><dd>{{ detail.serviceNetworkId }}</dd></div>
       <div><dt>technicianProfileId</dt><dd>{{ detail.technicianProfileId }}</dd></div>
       <div><dt>validFrom</dt><dd>{{ detail.validFrom }}</dd></div>

@@ -125,8 +125,8 @@ test.describe('M233 Network Portal 目录页资料整改服务端摘要', () => 
     })
     await navigateNetwork(page, '/network-portal/work-orders')
     await expect(page.getByTestId('network-work-orders-table')).toBeVisible({ timeout: 15_000 })
-    await expect(page.getByTestId('work-order-correction-summary')).toContainText('OPEN')
-    await expect(page.getByTestId('work-order-correction-summary')).toContainText('MISSING_PHOTO')
+    await expect(page.getByTestId('work-order-correction-summary')).toContainText('待处理')
+    await expect(page.getByTestId('work-order-correction-summary')).toContainText('缺少照片')
   })
 
   test('M233-05b：缺 corrections 时省略整改列', async ({ page }) => {
@@ -207,6 +207,6 @@ test.describe('M233 Network Portal 目录页资料整改服务端摘要', () => 
     })
     await navigateNetwork(page, '/network-portal/tasks')
     await expect(page.getByTestId('network-tasks-table')).toBeVisible({ timeout: 15_000 })
-    await expect(page.getByTestId('task-correction-summary')).toContainText('MISSING_PHOTO')
+    await expect(page.getByTestId('task-correction-summary')).toContainText('缺少照片')
   })
 })

@@ -372,14 +372,14 @@ test.describe('M246 Technician Portal 表单提交安全摘要', () => {
     await expect(page).toHaveURL(new RegExp(`/technician-portal/tasks/${TASK_ID}$`))
     await expect(page.getByTestId('technician-portal-task-detail')).toBeVisible()
     await expect(page.getByTestId('technician-task-detail-task-id')).toHaveText(TASK_ID)
-    await expect(page.getByTestId('technician-task-detail-status')).toHaveText('READY')
-    await expect(page.getByTestId('technician-task-detail-appointments')).toContainText('CONFIRMED')
-    await expect(page.getByTestId('technician-task-detail-contact-attempts')).toContainText('NO_ANSWER')
-    await expect(page.getByTestId('technician-task-detail-contact-attempts')).toContainText('PHONE')
-    await expect(page.getByTestId('technician-task-detail-visits')).toContainText('IN_PROGRESS')
-    await expect(page.getByTestId('technician-task-detail-visits')).toContainText('WITHIN_GEOFENCE')
+    await expect(page.getByTestId('technician-task-detail-status')).toHaveText('待开始')
+    await expect(page.getByTestId('technician-task-detail-appointments')).toContainText('已确认')
+    await expect(page.getByTestId('technician-task-detail-contact-attempts')).toContainText('未接听')
+    await expect(page.getByTestId('technician-task-detail-contact-attempts')).toContainText('电话')
+    await expect(page.getByTestId('technician-task-detail-visits')).toContainText('处理中')
+    await expect(page.getByTestId('technician-task-detail-visits')).toContainText('围栏内')
     await expect(page.getByTestId('technician-task-detail-form-submissions')).toContainText('INSTALL_REPORT')
-    await expect(page.getByTestId('technician-task-detail-form-submissions')).toContainText('VALIDATED')
+    await expect(page.getByTestId('technician-task-detail-form-submissions')).toContainText('已校验')
     await expect(page.getByTestId('technician-task-detail-boundary')).toContainText('不返回地址')
     await expect(page.getByTestId('technician-task-detail-boundary')).toContainText('联系对象引用')
     await expect(page.getByTestId('technician-task-detail-boundary')).toContainText('GPS')
@@ -406,7 +406,7 @@ test.describe('M246 Technician Portal 表单提交安全摘要', () => {
 
     await page.getByTestId('technician-visit-check-in').click()
     await expect(page.getByTestId('technician-visit-action-message')).toHaveText('到场已由服务器确认')
-    await expect(page.getByTestId('technician-task-detail-visits')).toContainText('IN_PROGRESS')
+    await expect(page.getByTestId('technician-task-detail-visits')).toContainText('处理中')
   })
 
   test('M262-02：无法施工携带 If-Match 并明确不伪造 Evidence', async ({ page }) => {
@@ -417,7 +417,7 @@ test.describe('M246 Technician Portal 表单提交安全摘要', () => {
     await page.getByTestId('technician-visit-interrupt-note').fill('现场存在安全风险')
     await page.getByTestId('technician-visit-interrupt').click()
     await expect(page.getByTestId('technician-visit-action-message')).toContainText('未伪造任何资料上传')
-    await expect(page.getByTestId('technician-task-detail-visits')).toContainText('INTERRUPTED')
+    await expect(page.getByTestId('technician-task-detail-visits')).toContainText('已中断')
     await expect(page.getByTestId('technician-visit-checkout-boundary')).not.toBeVisible()
   })
 
@@ -432,7 +432,7 @@ test.describe('M246 Technician Portal 表单提交安全摘要', () => {
     await page.getByTestId('technician-online-form-submit').click()
 
     await expect(page.getByTestId('technician-online-form-message')).toContainText('版本 3')
-    await expect(page.getByTestId('technician-task-detail-form-submissions')).toContainText('VALIDATED')
+    await expect(page.getByTestId('technician-task-detail-form-submissions')).toContainText('已校验')
     await expect(page.getByTestId('technician-online-form')).toContainText('不会伪装成已保存草稿')
   })
 
@@ -441,14 +441,14 @@ test.describe('M246 Technician Portal 表单提交安全摘要', () => {
     await loginWithLocalKeycloak(page)
     await navigateTechnician(page, `/technician-portal/tasks/${TASK_ID}`)
 
-    await expect(page.getByTestId(`technician-evidence-slot-${EVIDENCE_SLOT_ID}`)).toContainText('MISSING')
+    await expect(page.getByTestId(`technician-evidence-slot-${EVIDENCE_SLOT_ID}`)).toContainText('缺失')
     await page.getByTestId(`technician-evidence-file-${EVIDENCE_SLOT_ID}`).setInputFiles({
       name: 'site.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('0123456789'),
     })
     await page.getByTestId(`technician-evidence-upload-${EVIDENCE_SLOT_ID}`).click()
 
     await expect(page.getByTestId('technician-evidence-message')).toContainText('等待扫描与机器校验')
-    await expect(page.getByTestId(`technician-evidence-slot-${EVIDENCE_SLOT_ID}`)).toContainText('Revision 1 · STORED')
+    await expect(page.getByTestId(`technician-evidence-slot-${EVIDENCE_SLOT_ID}`)).toContainText('Revision 1 · 已存储')
     await expect(page.getByTestId('technician-online-evidence')).toContainText('不后台重试')
   })
 
@@ -460,7 +460,7 @@ test.describe('M246 Technician Portal 表单提交安全摘要', () => {
     await page.getByTestId('technician-task-complete').click()
 
     await expect(page.getByTestId('technician-task-submission-message')).toContainText('输入版本引用均已冻结')
-    await expect(page.getByTestId('technician-task-detail-status')).toHaveText('COMPLETED')
+    await expect(page.getByTestId('technician-task-detail-status')).toHaveText('已完成')
     await expect(page.getByTestId('technician-task-submission')).toContainText('服务器重新读取并冻结')
   })
 })

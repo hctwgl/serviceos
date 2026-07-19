@@ -16,6 +16,7 @@ import { listServiceNetworks, type ServiceNetwork } from '../api/networks'
 import { isConflictError, safeAccessDeniedMessage } from '../api/client'
 import ImpactPanel from '../components/ImpactPanel.vue'
 import VersionedCommandForm from '../components/VersionedCommandForm.vue'
+import StatusBadge from '../components/StatusBadge.vue'
 import { recordRecentVisit } from '../recent/recordRecentVisit'
 
 const route = useRoute()
@@ -143,7 +144,7 @@ onMounted(() => {
       <article class="card">
         <h3>{{ profile.displayName }}</h3>
         <dl>
-          <div><dt>status</dt><dd data-testid="technician-status">{{ profile.status }}</dd></div>
+          <div><dt>状态</dt><dd data-testid="technician-status"><StatusBadge :status="profile.status" /></dd></div>
           <div><dt>version</dt><dd>{{ profile.version }}</dd></div>
         </dl>
       </article>
@@ -152,7 +153,7 @@ onMounted(() => {
         <h3>资质</h3>
         <ul v-if="qualifications.length">
           <li v-for="item in qualifications" :key="item.id">
-            {{ item.qualificationCode }} · {{ item.status }}
+            {{ item.qualificationCode }} · <StatusBadge :status="item.status" />
           </li>
         </ul>
         <p v-else class="muted">无资质记录</p>
@@ -162,7 +163,7 @@ onMounted(() => {
         <h3>网点服务关系</h3>
         <ul>
           <li v-for="item in memberships" :key="item.id">
-            network={{ item.serviceNetworkId }} · {{ item.status }}
+            network={{ item.serviceNetworkId }} · <StatusBadge :status="item.status" />
           </li>
         </ul>
         <label>

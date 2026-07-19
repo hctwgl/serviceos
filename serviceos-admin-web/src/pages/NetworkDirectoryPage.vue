@@ -11,6 +11,7 @@ import {
 } from '../api/networks'
 import { safeAccessDeniedMessage } from '../api/client'
 import PrincipalPicker from '../components/PrincipalPicker.vue'
+import StatusBadge from '../components/StatusBadge.vue'
 
 const loading = ref(false)
 const busy = ref(false)
@@ -138,7 +139,7 @@ onMounted(() => {
         <tr v-for="item in networks.items" :key="item.id">
           <td>{{ item.networkName }}</td>
           <td>{{ item.networkCode }}</td>
-          <td>{{ item.status }}</td>
+          <td><StatusBadge :status="item.status" /></td>
           <td>
             <RouterLink :to="{ name: 'ADMIN.NETWORK.DETAIL', params: { id: item.id } }">
               打开

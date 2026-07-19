@@ -5,7 +5,7 @@ import SavedViewBar from '../components/SavedViewBar.vue'
 import QueueTable from './QueueTable.vue'
 import { listAuthorizedTasks, type TaskDirectoryPage } from '../api/tasksDirectory'
 import { firstRouteQuery, uuidRoute } from '../routeQuery'
-import { statusOptions } from '../product/statusLabels'
+import { statusLabel, statusOptions } from '../product/statusLabels'
 import { toUserFacingError } from '../product/errorMessages'
 
 const linkColumns: Record<
@@ -213,7 +213,7 @@ onMounted(() => {
         :key="item.id"
         :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: item.id } }"
       >
-        {{ item.taskType }}
+        {{ statusLabel(item.taskType) }}
       </RouterLink>
     </p>
     <p v-if="page?.items?.some((i) => i.workOrderId)" class="links">
@@ -223,7 +223,7 @@ onMounted(() => {
         :key="`wo-${item.id}`"
         :to="{ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: item.workOrderId } }"
       >
-        {{ item.taskType }}
+        {{ statusLabel(item.taskType) }}
       </RouterLink>
     </p>
     <p

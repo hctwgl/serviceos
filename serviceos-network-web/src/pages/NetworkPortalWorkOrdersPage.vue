@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { statusLabel } from '../product/labels'
 import { onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
+
 import {
   listNetworkPortalTechnicians,
   listNetworkPortalWorkOrders,
@@ -57,9 +59,9 @@ function appointmentWindowLabel(taskIds: string[]) {
   }
   const first = matched[0]
   if (!first.windowStart && !first.windowEnd) {
-    return first.status
+    return first.status ? statusLabel(first.status) : '—'
   }
-  return `${first.windowStart ?? '?'} → ${first.windowEnd ?? '?'}（${first.status}）`
+  return `${first.windowStart ?? '?'} → ${first.windowEnd ?? '?'}（${first.status ? statusLabel(first.status) : '—'}）`
 }
 
 function contactLabel(taskIds: string[]) {
@@ -85,9 +87,9 @@ function correctionLabel(taskIds: string[]) {
   const openCount = matched.filter((row) => row.status === 'OPEN').length
   const first = matched[0]
   if (openCount > 0) {
-    return `OPEN ×${openCount} · ${first.reasonCodes.join(',') || first.status}`
+    return `${statusLabel('OPEN')} ×${openCount} · ${first.reasonCodes.map((code) => statusLabel(code)).join('、') || (first.status ? statusLabel(first.status) : '—')}`
   }
-  return `${first.status} · ${first.reasonCodes.join(',') || first.correctionCaseId}`
+  return `${first.status ? statusLabel(first.status) : '—'} · ${first.reasonCodes.map((code) => statusLabel(code)).join('、') || first.correctionCaseId}`
 }
 
 function evidenceLabel(taskIds: string[]) {
@@ -103,14 +105,16 @@ function evidenceLabel(taskIds: string[]) {
   const openItems = items.filter((row) => row.status === 'OPEN').length
   const parts: string[] = []
   if (missing > 0) {
-    parts.push(`MISSING ×${missing}`)
+    parts.push(`${statusLabel('MISSING')} ×${missing}`)
   }
   if (openItems > 0) {
-    parts.push(`OPEN项 ×${openItems}`)
+    parts.push(`${statusLabel('OPEN')}项 ×${openItems}`)
   }
   if (parts.length === 0) {
     const first = slots[0]
-    return first ? `${first.status} · ${first.requirementCode}` : `项 ×${items.length}`
+    return first
+      ? `${first.status ? statusLabel(first.status) : '—'} · ${first.requirementCode ? statusLabel(first.requirementCode) : '—'}`
+      : `项 ×${items.length}`
   }
   return parts.join(' · ')
 }
@@ -233,7 +237,7 @@ watch(() => props.networkContextId, () => {
           <td data-testid="work-order-service-product">{{ item.serviceProductCode ?? '—' }}</td>
           <td data-testid="work-order-region">{{ regionLabel(item) }}</td>
           <td>{{ item.taskIds.length }}</td>
-          <td>{{ item.businessType ?? '—' }}</td>
+          <td>{{ item.businessType ? statusLabel(item.businessType) : '—' }}</td>
           <td data-testid="work-order-technician-label">
             {{ technicianLabel(item.technicianId) }}
           </td>

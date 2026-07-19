@@ -173,7 +173,7 @@ test.describe('M222 Network Portal 工作区 Visit/表单提交摘要', () => {
       timeout: 15_000,
     })
     await expect(page.getByTestId('workspace-visits')).toBeVisible()
-    await expect(page.getByTestId(`workspace-visit-${VISIT_ID}`)).toContainText('IN_PROGRESS')
+    await expect(page.getByTestId(`workspace-visit-${VISIT_ID}`)).toContainText('处理中')
     await expect(page.getByTestId('workspace-form-submissions')).toBeVisible()
     await expect(page.getByTestId(`workspace-form-submission-${SUBMISSION_ID}`)).toContainText(
       'install.form',

@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { statusLabel } from '../product/labels'
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+
 import {
   getNetworkPortalWorkOrderWorkspace,
   type NetworkPortalWorkOrderWorkspace,
@@ -103,7 +105,7 @@ watch(
         <div><dt>projectId</dt><dd>{{ detail.projectId ?? '—' }}</dd></div>
         <div>
           <dt>businessType</dt>
-          <dd data-testid="workspace-business-type">{{ detail.businessType ?? '—' }}</dd>
+          <dd data-testid="workspace-business-type">{{ detail.businessType ? statusLabel(detail.businessType) : '—' }}</dd>
         </div>
         <div>
           <dt>technicianId</dt>
@@ -157,7 +159,7 @@ watch(
           >
             <strong>{{ visit.visitId }}</strong>
             <span class="muted">
-              （task {{ visit.taskId }} · seq {{ visit.visitSequence }} · {{ visit.status }} ·
+              （task {{ visit.taskId }} · seq {{ visit.visitSequence }} · {{ visit.status ? statusLabel(visit.status) : '—' }} ·
               {{ visit.geofenceResult }} / {{ visit.policyDecision }} · v{{ visit.aggregateVersion }}）
             </span>
             <span class="muted" data-testid="workspace-visit-appointment">
@@ -242,7 +244,7 @@ watch(
           >
             <strong>{{ slot.requirementName }}</strong>
             <span class="muted">
-              （{{ slot.requirementCode }} · {{ slot.mediaType }} · {{ slot.status }} ·
+              （{{ slot.requirementCode ? statusLabel(slot.requirementCode) : '—' }} · {{ slot.mediaType ? statusLabel(slot.mediaType) : '—' }} · {{ slot.status ? statusLabel(slot.status) : '—' }} ·
               task {{ slot.taskId }} · gen {{ slot.slotGeneration }}）
             </span>
             <span class="muted" data-testid="workspace-evidence-slot-template">
@@ -284,13 +286,13 @@ watch(
           >
             <strong>{{ item.evidenceItemId }}</strong>
             <span class="muted">
-              （slot {{ item.evidenceSlotId }} · #{{ item.itemOrdinal }} · {{ item.status }} ·
+              （slot {{ item.evidenceSlotId }} · #{{ item.itemOrdinal }} · {{ item.status ? statusLabel(item.status) : '—' }} ·
               rev {{ item.revisionCount }}
               <template v-if="item.latestRevisionNumber != null">
                 / #{{ item.latestRevisionNumber }}
               </template>
               <template v-if="item.latestRevisionStatus">
-                / {{ item.latestRevisionStatus }}
+                / {{ statusLabel(item.latestRevisionStatus) }}
               </template>
               ）
             </span>
@@ -381,9 +383,9 @@ watch(
             :data-testid="`workspace-task-${task.taskId}`"
           >
             <td>{{ task.taskId }}</td>
-            <td>{{ task.status ?? '—' }}</td>
-            <td>{{ task.stageCode ?? '—' }}</td>
-            <td>{{ task.taskType ?? '—' }}</td>
+            <td>{{ task.status ? statusLabel(task.status) : '—' }}</td>
+            <td>{{ task.stageCode ? statusLabel(task.stageCode) : '—' }}</td>
+            <td>{{ task.taskType ? statusLabel(task.taskType) : '—' }}</td>
             <td :data-testid="`workspace-task-technician-${task.taskId}`">
               <template v-if="resolveTechnician(task.technicianId)">
                 {{ resolveTechnician(task.technicianId)!.displayName }}
@@ -443,7 +445,7 @@ watch(
               {{ item.appointmentId }}
             </RouterLink>
             <span class="muted">
-              （task {{ item.taskId }} · {{ item.type }} · {{ item.status }} · rev
+              （task {{ item.taskId }} · {{ item.type ? statusLabel(item.type) : '—' }} · {{ item.status ? statusLabel(item.status) : '—' }} · rev
               {{ item.currentRevisionNo }} · v{{ item.aggregateVersion }}）
             </span>
             <span
@@ -530,7 +532,7 @@ watch(
               {{ item.correctionCaseId }}
             </RouterLink>
             <span class="muted">
-              （task {{ item.taskId }} · {{ item.status }} ·
+              （task {{ item.taskId }} · {{ item.status ? statusLabel(item.status) : '—' }} ·
               reasons {{ item.reasonCodes.join(', ') || '—' }} ·
               sourceReview {{ item.sourceReviewCaseId || '—' }} ·
               resubmits {{ item.resubmissions.length }}）
@@ -596,7 +598,7 @@ watch(
               {{ item.reviewCaseId }}
             </RouterLink>
             <span class="muted">
-              （task {{ item.taskId }} · {{ item.origin }} · {{ item.status }} ·
+              （task {{ item.taskId }} · {{ item.origin ? statusLabel(item.origin) : '—' }} · {{ item.status ? statusLabel(item.status) : '—' }} ·
               decisions {{ item.decisions.length }}）
             </span>
             <span class="muted" data-testid="workspace-review-project">
@@ -654,7 +656,7 @@ watch(
               {{ item.exceptionId }}
             </RouterLink>
             <span class="muted">
-              （task {{ item.taskId || '—' }} · {{ item.severity }} · {{ item.status }} ·
+              （task {{ item.taskId || '—' }} · {{ item.severity ? statusLabel(item.severity) : '—' }} · {{ item.status ? statusLabel(item.status) : '—' }} ·
               {{ item.errorCode }}）
             </span>
             <span class="muted" data-testid="workspace-exception-taxonomy">

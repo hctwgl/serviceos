@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { getVisit, type Visit } from '../api/appointments'
+import StatusBadge from '../components/StatusBadge.vue'
 
 const route = useRoute()
 const visitId = computed(() => String(route.params.id ?? ''))
@@ -48,7 +49,7 @@ onMounted(() => {
     <template v-else-if="detail">
       <article class="card">
         <dl>
-          <div><dt>status</dt><dd>{{ detail.status }}</dd></div>
+          <div><dt>状态</dt><dd><StatusBadge :status="detail.status" /></dd></div>
           <div><dt>visitSequence</dt><dd>{{ detail.visitSequence }}</dd></div>
           <div>
             <dt>projectId</dt>

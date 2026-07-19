@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { statusLabel } from '../product/labels'
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import {
@@ -22,6 +23,7 @@ import {
   type TechnicianTaskFormField,
 } from '../api/technicianPortal'
 import { userFacingError } from '../api/client'
+import {formatDateTime} from '@serviceos/web-core'
 import {
   coerceFormValuesForExpr,
   evaluateServiceOsExprV1,
@@ -589,13 +591,13 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
         <div><dt>taskId</dt><dd data-testid="technician-task-detail-task-id">{{ detail.taskId }}</dd></div>
         <div><dt>workOrderId</dt><dd>{{ detail.workOrderId }}</dd></div>
         <div><dt>projectId</dt><dd>{{ detail.projectId ?? '—' }}</dd></div>
-        <div><dt>状态</dt><dd data-testid="technician-task-detail-status">{{ detail.taskStatus }}</dd></div>
-        <div><dt>阶段</dt><dd>{{ detail.stageCode }}</dd></div>
-        <div><dt>任务类型</dt><dd>{{ detail.taskType }} / {{ detail.taskKind }}</dd></div>
-        <div><dt>业务类型</dt><dd>{{ detail.businessType ?? '—' }}</dd></div>
+        <div><dt>状态</dt><dd data-testid="technician-task-detail-status">{{ statusLabel(detail.taskStatus) }}</dd></div>
+        <div><dt>阶段</dt><dd>{{ statusLabel(detail.stageCode) }}</dd></div>
+        <div><dt>任务类型</dt><dd>{{ statusLabel(detail.taskType) }} / {{ statusLabel(detail.taskKind) }}</dd></div>
+        <div><dt>业务类型</dt><dd>{{ detail.businessType ? statusLabel(detail.businessType) : '—' }}</dd></div>
         <div><dt>执行保护</dt><dd>{{ detail.executionGuarded ? '已保护，暂不可执行' : '未保护' }}</dd></div>
         <div><dt>资源版本</dt><dd>{{ detail.resourceVersion }}</dd></div>
-        <div><dt>asOf</dt><dd>{{ detail.asOf }}</dd></div>
+        <div><dt>统计时间</dt><dd>{{ formatDateTime(detail.asOf) }}</dd></div>
       </dl>
 
       <section class="appointments">
@@ -614,10 +616,10 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
           </thead>
           <tbody>
             <tr v-for="appointment in detail.appointments" :key="appointment.appointmentId">
-              <td>{{ appointment.type }}</td>
-              <td>{{ appointment.status }}</td>
-              <td>{{ appointment.windowStart ?? '—' }}</td>
-              <td>{{ appointment.windowEnd ?? '—' }}</td>
+              <td>{{ statusLabel(appointment.type) }}</td>
+              <td>{{ statusLabel(appointment.status) }}</td>
+              <td>{{ formatDateTime(appointment.windowStart) }}</td>
+              <td>{{ formatDateTime(appointment.windowEnd) }}</td>
               <td>{{ appointment.timezone ?? '—' }}</td>
             </tr>
           </tbody>
@@ -641,10 +643,10 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
             <tr v-for="submission in detail.formSubmissions" :key="submission.submissionId">
               <td>{{ submission.formKey }}</td>
               <td>{{ submission.submissionVersion }}</td>
-              <td>{{ submission.validationStatus }}</td>
+              <td>{{ statusLabel(submission.validationStatus) }}</td>
               <td>{{ submission.errorCount }}</td>
               <td>{{ submission.warningCount }}</td>
-              <td>{{ submission.submittedAt }}</td>
+              <td>{{ formatDateTime(submission.submittedAt) }}</td>
             </tr>
           </tbody>
         </table>
@@ -752,14 +754,14 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
           >
             <div>
               <strong>{{ slot.requirementName }}</strong>
-              <span>{{ slot.required ? '必需' : '可选' }} · {{ slot.mediaType }} · {{ slot.status }}</span>
+              <span>{{ slot.required ? '必需' : '可选' }} · {{ statusLabel(slot.mediaType) }} · {{ statusLabel(slot.status) }}</span>
             </div>
             <p>数量 {{ itemsForSlot(slot.slotId).length }} / {{ slot.maxCount ?? '不限' }}，最低 {{ slot.minCount }}</p>
             <ul v-if="itemsForSlot(slot.slotId).length > 0" class="revision-list">
               <li v-for="item in itemsForSlot(slot.slotId)" :key="item.evidenceItemId">
                 Item {{ item.itemOrdinal }}：
                 <span v-if="item.revisions.length > 0">
-                  Revision {{ item.revisions.at(-1)?.revisionNumber }} · {{ item.revisions.at(-1)?.status }}
+                  Revision {{ item.revisions.at(-1)?.revisionNumber }} · {{ statusLabel(item.revisions.at(-1)?.status) }}
                 </span>
                 <span v-else>尚无 Revision</span>
               </li>
@@ -821,11 +823,11 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
           <tbody>
             <tr v-for="visit in detail.visits" :key="visit.visitId">
               <td>{{ visit.visitSequence }}</td>
-              <td>{{ visit.status }}</td>
-              <td>{{ visit.checkInCapturedAt }}</td>
-              <td>{{ visit.geofenceResult }}</td>
-              <td>{{ visit.policyDecision }}</td>
-              <td>{{ visit.resultCode ?? visit.exceptionCode ?? '—' }}</td>
+              <td>{{ statusLabel(visit.status) }}</td>
+              <td>{{ formatDateTime(visit.checkInCapturedAt) }}</td>
+              <td>{{ statusLabel(visit.geofenceResult) }}</td>
+              <td>{{ statusLabel(visit.policyDecision) }}</td>
+              <td>{{ statusLabel(visit.resultCode ?? visit.exceptionCode) }}</td>
               <td>{{ visit.aggregateVersion }}</td>
             </tr>
           </tbody>
@@ -877,11 +879,11 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
           </thead>
           <tbody>
             <tr v-for="attempt in detail.contactAttempts" :key="attempt.contactAttemptId">
-              <td>{{ attempt.channel }}</td>
-              <td>{{ attempt.resultCode }}</td>
-              <td>{{ attempt.startedAt }}</td>
-              <td>{{ attempt.endedAt }}</td>
-              <td>{{ attempt.nextContactAt ?? '—' }}</td>
+              <td>{{ statusLabel(attempt.channel) }}</td>
+              <td>{{ statusLabel(attempt.resultCode) }}</td>
+              <td>{{ formatDateTime(attempt.startedAt) }}</td>
+              <td>{{ formatDateTime(attempt.endedAt) }}</td>
+              <td>{{ formatDateTime(attempt.nextContactAt) }}</td>
             </tr>
           </tbody>
         </table>

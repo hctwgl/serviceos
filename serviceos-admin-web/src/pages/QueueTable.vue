@@ -52,11 +52,25 @@ function headerFor(column: string): string {
   return props.columnLabels?.[column] ?? fieldLabel(column)
 }
 
+const ENUM_LABEL_COLUMNS = new Set([
+  'taskType',
+  'taskKind',
+  'stageCode',
+  'businessType',
+  'type',
+  'origin',
+  'decision',
+])
+
+function usesEnumLabel(column: string): boolean {
+  return column === 'status' || column.endsWith('Status') || ENUM_LABEL_COLUMNS.has(column)
+}
+
 function displayValue(column: string, value: unknown): string {
   if (value == null || value === '') {
     return '—'
   }
-  if (column === 'status' || column.endsWith('Status')) {
+  if (usesEnumLabel(column)) {
     return statusLabel(String(value))
   }
   if (TIME_COLUMNS.has(column) || column.endsWith('At')) {
@@ -70,6 +84,10 @@ function displayValue(column: string, value: unknown): string {
 
 function isStatusColumn(column: string): boolean {
   return column === 'status' || column.endsWith('Status')
+}
+
+function isBadgeColumn(column: string): boolean {
+  return isStatusColumn(column)
 }
 </script>
 
@@ -108,7 +126,7 @@ function isStatusColumn(column: string): boolean {
         <tr v-for="(row, index) in rows" :key="index">
           <td v-for="column in columns" :key="column">
             <StatusBadge
-              v-if="isStatusColumn(column) && !linkFor(column, row)"
+              v-if="isBadgeColumn(column) && !linkFor(column, row)"
               :status="String(row[column] ?? '')"
             />
             <RouterLink

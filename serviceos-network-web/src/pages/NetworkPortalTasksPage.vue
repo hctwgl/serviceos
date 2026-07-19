@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { statusLabel } from '../product/labels'
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import {
@@ -30,7 +31,7 @@ import {
   type NetworkPortalWorkspaceEvidenceSlotSummary,
 } from '../api/networkPortal'
 import { getMe } from '../api/me'
-import { formatDateTime, statusLabel } from '@serviceos/web-core'
+import {formatDateTime} from '@serviceos/web-core'
 
 const props = defineProps<{ networkContextId: string | null }>()
 const route = useRoute()
@@ -76,9 +77,9 @@ function directoryAppointmentWindowLabel(taskId: string) {
   }
   const first = matched[0]
   if (!first.windowStart && !first.windowEnd) {
-    return first.status
+    return first.status ? statusLabel(first.status) : '—'
   }
-  return `${first.windowStart ?? '?'} → ${first.windowEnd ?? '?'}（${first.status}）`
+  return `${first.windowStart ?? '?'} → ${first.windowEnd ?? '?'}（${first.status ? statusLabel(first.status) : '—'}）`
 }
 
 function directoryContactLabel(taskId: string) {
@@ -104,9 +105,9 @@ function directoryCorrectionLabel(taskId: string) {
   const openCount = matched.filter((row) => row.status === 'OPEN').length
   const first = matched[0]
   if (openCount > 0) {
-    return `OPEN ×${openCount} · ${first.reasonCodes.join(',') || first.status}`
+    return `${statusLabel('OPEN')} ×${openCount} · ${first.reasonCodes.map((code) => statusLabel(code)).join('、') || (first.status ? statusLabel(first.status) : '—')}`
   }
-  return `${first.status} · ${first.reasonCodes.join(',') || first.correctionCaseId}`
+  return `${first.status ? statusLabel(first.status) : '—'} · ${first.reasonCodes.map((code) => statusLabel(code)).join('、') || first.correctionCaseId}`
 }
 
 function directoryEvidenceLabel(taskId: string) {
@@ -122,14 +123,16 @@ function directoryEvidenceLabel(taskId: string) {
   const openItems = items.filter((row) => row.status === 'OPEN').length
   const parts: string[] = []
   if (missing > 0) {
-    parts.push(`MISSING ×${missing}`)
+    parts.push(`${statusLabel('MISSING')} ×${missing}`)
   }
   if (openItems > 0) {
-    parts.push(`OPEN项 ×${openItems}`)
+    parts.push(`${statusLabel('OPEN')}项 ×${openItems}`)
   }
   if (parts.length === 0) {
     const first = slots[0]
-    return first ? `${first.status} · ${first.requirementCode}` : `项 ×${items.length}`
+    return first
+      ? `${first.status ? statusLabel(first.status) : '—'} · ${first.requirementCode ? statusLabel(first.requirementCode) : '—'}`
+      : `项 ×${items.length}`
   }
   return parts.join(' · ')
 }
@@ -1089,7 +1092,7 @@ watch(selectedTaskId, () => {
           :data-testid="`appointment-history-${item.appointmentId}`"
         >
           <span data-testid="appointment-history-summary">
-            {{ item.appointmentId }} · {{ item.type }} · {{ item.status }} · rev
+            {{ item.appointmentId }} · {{ item.type ? statusLabel(item.type) : '—' }} · {{ item.status ? statusLabel(item.status) : '—' }} · rev
             {{ item.currentRevisionNo }} · v{{ item.aggregateVersion }}
             · 操作者
             <span data-testid="appointment-history-created-by">{{ item.createdBy ?? '—' }}</span>

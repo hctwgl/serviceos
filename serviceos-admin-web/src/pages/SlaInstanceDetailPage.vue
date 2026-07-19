@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { getSlaInstance, type SlaInstanceDetail } from '../api/slaDetail'
 import QueueTable from './QueueTable.vue'
+import StatusBadge from '../components/StatusBadge.vue'
 
 const route = useRoute()
 const slaInstanceId = computed(() => String(route.params.id ?? ''))
@@ -52,7 +53,7 @@ onMounted(() => {
     <template v-else-if="detail">
       <article class="card">
         <dl>
-          <div><dt>status</dt><dd>{{ detail.instance.status }}</dd></div>
+          <div><dt>状态</dt><dd><StatusBadge :status="detail.instance.status" /></dd></div>
           <div><dt>slaRef</dt><dd>{{ detail.instance.slaRef }}</dd></div>
           <div>
             <dt>projectId</dt>
