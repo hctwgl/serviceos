@@ -2254,7 +2254,7 @@ test('真实 OIDC 登录后可完成预约提议确认与上门签到签退', as
   await page
     .getByRole('link', {
       name: new RegExp(
-        `appointment\\s*/\\s*INSTALLATION\\s*/\\s*CONFIRMED\\s*/\\s*${taskId}`,
+        `appointment\\s*/\\s*(INSTALLATION|安装)\\s*/\\s*(CONFIRMED|已确认)\\s*/\\s*${taskId}`,
       ),
     })
     .click()
@@ -2442,18 +2442,16 @@ test('真实 OIDC 登录后可通过审核外发并经厂端回调关闭 CLIENT 
       .locator('xpath=../dd')
       .innerText()
   ).trim()
-  const sourceTaskId = (
-    await reviewPage
-      .locator('dt', { hasText: /^sourceTaskId$/ })
-      .locator('xpath=../dd')
-      .innerText()
-  ).trim()
-  const sourceSnapshotId = (
-    await reviewPage
-      .locator('dt', { hasText: /^sourceSnapshotId$/ })
-      .locator('xpath=../dd')
-      .innerText()
-  ).trim()
+  const sourceTaskHref = await reviewPage
+    .getByRole('link', { name: /打开源任务/ })
+    .getAttribute('href')
+  expect(sourceTaskHref, '源任务深链缺失').toBeTruthy()
+  const sourceTaskId = sourceTaskHref!.split('/').filter(Boolean).at(-1)!
+  const sourceSnapshotHref = await reviewPage
+    .getByRole('link', { name: /打开源资料快照/ })
+    .getAttribute('href')
+  expect(sourceSnapshotHref, '源资料快照深链缺失').toBeTruthy()
+  const sourceSnapshotId = sourceSnapshotHref!.split('/').filter(Boolean).at(-1)!
   expect(clientReviewCaseId).toMatch(
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
   )
@@ -2468,17 +2466,13 @@ test('真实 OIDC 登录后可通过审核外发并经厂端回调关闭 CLIENT 
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
   )
 
-  // M173：外发详情事实格明文 sourceTaskId → 任务详情（与下方「打开源任务」链接并列）。
+  // M173：外发详情「打开源任务」深链 → 任务详情。
   const outboundInlineTaskPromise = reviewPage.waitForResponse(
     (response) =>
       response.request().method() === 'GET' &&
       new URL(response.url()).pathname === `/api/v1/tasks/${sourceTaskId}`,
   )
-  await reviewPage
-    .locator('dt', { hasText: /^sourceTaskId$/ })
-    .locator('xpath=../dd')
-    .getByRole('link', { name: sourceTaskId, exact: true })
-    .click()
+  await reviewPage.getByRole('link', { name: /打开源任务/ }).click()
   expect((await outboundInlineTaskPromise).status()).toBe(200)
   await expect(reviewPage.getByRole('heading', { name: '任务详情' })).toBeVisible()
   await reviewPage.goto(
