@@ -364,6 +364,7 @@ title: ServiceOS 里程碑索引
 | M353 | M353 ReviewCase targetDecisions 正式裁决 | [366-m353-review-target-decide.md](../architecture/366-m353-review-target-decide.md) | [350-m353-review-target-decide-acceptance.md](../testing/350-m353-review-target-decide-acceptance.md) |
 | M354 | M354 终审驳回整改深链与版本链 | [367-m354-final-review-correction-deeplink.md](../architecture/367-m354-final-review-correction-deeplink.md) | [351-m354-final-review-correction-deeplink-acceptance.md](../testing/351-m354-final-review-correction-deeplink-acceptance.md) |
 | M355 | M355 平台终审真实端到端门禁 | [368-m355-final-review-e2e-gate.md](../architecture/368-m355-final-review-e2e-gate.md) | [352-m355-final-review-e2e-gate-acceptance.md](../testing/352-m355-final-review-e2e-gate-acceptance.md) |
+| M356 | M356 客户端能力兼容发布门禁 | [369-m356-client-capability-compat-gate.md](../architecture/369-m356-client-capability-compat-gate.md) | [353-m356-client-capability-compat-gate-acceptance.md](../testing/353-m356-client-capability-compat-gate-acceptance.md) |
 
 ## 未关联里程碑的文档
 

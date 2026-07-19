@@ -1,6 +1,6 @@
 ---
 title: M356 客户端能力兼容发布门禁
-status: Draft
+status: Implemented
 milestone: M356
 lastUpdated: 2026-07-19
 relatedMilestones: [M253, M252, M349, M350, M283]
@@ -24,12 +24,12 @@ flywayVersion: "130"
   - `validate` / `publish` 失败关闭：全客户端均不支持的能力禁止进入 `VALIDATED`/`PUBLISHED`；
   - OpenAPI `ConfigurationDraft.clientCompatibility` 报告；
   - Admin 配置设计器展示兼容性报告；
-  - 发布审计记录能力判断摘要；
+  - 发布/校验审计记录能力判断摘要；
   - 单元测试 + PostgreSQL IT。
 - 明确不做：
   - 灰度通道 / `supportedClientKinds` 定向发布；
   - 强制升级策略与最低 runtime 版本策略表持久化；
-  - 任务详情运行时 Problem Details 拒单（后续里程碑）；
+  - 任务详情运行时 Problem Details 拒单；
   - iOS 条件表达式共用执行器补齐；
   - `editableWhen` / `defaultExpression` / 远程选项（仍由既有 schema 门禁拒绝）；
   - Android / Consumer / Admin 作为履约执行客户端；
@@ -55,7 +55,13 @@ flywayVersion: "130"
 
 ## 已实现
 
-（实施完成后回填）
+- `ConfigurationClientCapabilityGate` / `ClientCapabilityCatalog` / Analyzer
+- `DefaultConfigurationDraftService.validate/publish` 接入门禁与审计
+- OpenAPI 1.0.50 `clientCompatibility`
+- Admin `ConfigurationDesignerPage` 兼容报告面板
+- `ConfigurationClientCapabilityGateTest`（5）
+- `ClientCapabilityCompatGatePostgresIT`（4）
+- 既有 `FormEvidenceSlaDesignerPostgresIT` 回归通过
 
 ## 明确未实现
 
@@ -67,7 +73,15 @@ flywayVersion: "130"
 
 ## 工程证据
 
-（实施完成后回填）
+| 类别 | 证据 |
+|---|---|
+| OpenAPI | 1.0.50；契约兼容门禁通过 |
+| Flyway | 130（无新迁移） |
+| 单元 | `ConfigurationClientCapabilityGateTest` |
+| PostgreSQL IT | `ClientCapabilityCompatGatePostgresIT` + `FormEvidenceSlaDesignerPostgresIT` |
+| ArchitectureTest | 通过 |
+| Admin | `npm run build` / `npm run test:unit` |
+| Client | `bash scripts/agent-verify.sh client-ts` |
 
 ## 验证命令
 
@@ -75,4 +89,7 @@ flywayVersion: "130"
 bash scripts/agent-verify.sh test ConfigurationClientCapabilityGateTest
 bash scripts/agent-verify.sh it FormEvidenceSlaDesignerPostgresIT,ClientCapabilityCompatGatePostgresIT
 bash scripts/agent-verify.sh contracts
+bash scripts/agent-verify.sh client-ts
+bash scripts/agent-verify.sh arch
+cd serviceos-admin-web && npm ci && npm run build && npm run test:unit
 ```

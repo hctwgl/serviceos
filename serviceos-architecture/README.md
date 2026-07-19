@@ -674,13 +674,14 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M355 平台终审工作台纵向切片**（见 `implementation-status.md`；
-OpenAPI 1.0.49；Flyway 130；M351～M355）。
+当前工程基线为 **M356 客户端能力兼容发布门禁**（见 `implementation-status.md`；
+OpenAPI 1.0.50；Flyway 130；承接 M351～M355 终审工作台）。
 
 当前已具备多 OEM SPI、远端查询、UNKNOWN/批量重放、复杂流程、十大资产设计器、六类 Runtime，
 入站/出站 Mapping（M321～M339）、FORM/EVIDENCE ConditionBuilder（M340～M349）、
-ASSIGNEE/DISPATCH/RULE/NOTIFICATION/PRICING SHADOW，以及 **M351 FINAL_REVIEW 终审 Fan-in API**。
-下一主线：管理端终审工作台 UI 与 targetDecisions 正式裁决；吉利联调 / AMOUNT/加权 / BUSINESS 日历 SLA
+ASSIGNEE/DISPATCH/RULE/NOTIFICATION/PRICING SHADOW、**M351～M355 终审工作台**，以及
+**M356 FORM/EVIDENCE 客户端能力兼容发布门禁**。
+下一主线：灰度/运行时拒单、iOS 条件执行器对齐；吉利联调 / AMOUNT/加权 / BUSINESS 日历 SLA
 仍为硬门禁；Track F/G 仍为 `BLOCKED_EXTERNAL`。
 
 权威进度入口：
@@ -688,6 +689,8 @@ ASSIGNEE/DISPATCH/RULE/NOTIFICATION/PRICING SHADOW，以及 **M351 FINAL_REVIEW 
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M356 实现文档](architecture/369-m356-client-capability-compat-gate.md)
+- [M356 验收矩阵](testing/353-m356-client-capability-compat-gate-acceptance.md)
 - [M355 实现文档](architecture/368-m355-final-review-e2e-gate.md)
 - [M355 验收矩阵](testing/352-m355-final-review-e2e-gate-acceptance.md)
 - [M354 实现文档](architecture/367-m354-final-review-correction-deeplink.md)
