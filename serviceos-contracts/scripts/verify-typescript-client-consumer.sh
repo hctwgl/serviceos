@@ -13,6 +13,10 @@ if [[ ! -x "${typescript_bin}" ]]; then
   exit 1
 fi
 
+# OpenAPI 生成物 package.json 含 prepare→tsc；部分 npm 版本在 pack 时仍会触发。
+# 将仓库锁定的 .bin 置于 PATH，避免依赖全局 tsc。
+export PATH="$(dirname "${typescript_bin}"):${PATH}"
+
 if [[ ! -f "${generated_directory}/package.json" ]]; then
   "${script_directory}/generate-client-artifact.sh"
 fi
