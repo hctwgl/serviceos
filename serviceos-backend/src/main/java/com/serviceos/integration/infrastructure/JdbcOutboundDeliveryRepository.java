@@ -4,6 +4,7 @@ import com.serviceos.integration.api.DeliveryAttemptView;
 import com.serviceos.integration.api.DeliveryReplayRequestView;
 import com.serviceos.integration.api.DeliveryTimelineContext;
 import com.serviceos.integration.api.ExternalAcknowledgementView;
+import com.serviceos.integration.api.ManualDispositionView;
 import com.serviceos.integration.api.OutboundDeliveryQueueItem;
 import com.serviceos.integration.api.OutboundDeliveryView;
 import com.serviceos.integration.application.OutboundDeliveryRepository;
@@ -11,6 +12,8 @@ import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -39,9 +42,11 @@ final class JdbcOutboundDeliveryRepository implements OutboundDeliveryRepository
             """;
 
     private final JdbcClient jdbc;
+    private final ObjectMapper objectMapper;
 
-    JdbcOutboundDeliveryRepository(JdbcClient jdbc) {
+    JdbcOutboundDeliveryRepository(JdbcClient jdbc, ObjectMapper objectMapper) {
         this.jdbc = jdbc;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -426,6 +431,81 @@ final class JdbcOutboundDeliveryRepository implements OutboundDeliveryRepository
                     .param("tenant", tenantId).param("id", deliveryId).param("taskId", taskId).update();
         }
         requireOne(updated, "OutboundDelivery preflight failure has no authorized execution");
+    }
+
+    @Override
+    public ManualDispositionView recordManualDisposition(NewManualDisposition disposition) {
+        // 状态与版本保持不变：Delivery 仍为 UNKNOWN，以 disposition 唯一约束保证一次性处置。
+        Integer matched = jdbc.sql("""
+                SELECT count(*)::int FROM int_outbound_delivery
+                 WHERE tenant_id=:tenant AND delivery_id=:id
+                   AND status='UNKNOWN' AND aggregate_version=:expectedVersion
+                   AND NOT EXISTS (
+                       SELECT 1 FROM int_delivery_replay_request replay
+                        WHERE replay.delivery_id=:id
+                          AND replay.status IN ('REQUESTED', 'EXECUTING'))
+                """).param("tenant", disposition.tenantId())
+                .param("id", disposition.deliveryId())
+                .param("expectedVersion", disposition.expectedDeliveryVersion())
+                .query(Integer.class).single();
+        if (matched == null || matched != 1) {
+            throw new BusinessProblem(ProblemCode.VERSION_CONFLICT,
+                    "UNKNOWN OutboundDelivery changed or has an active replay request");
+        }
+        int inserted = jdbc.sql("""
+                INSERT INTO int_delivery_manual_disposition (
+                    disposition_id, delivery_id, tenant_id, expected_delivery_version,
+                    result, reason, approval_ref, external_ref, evidence_refs_json,
+                    requested_by, requested_at
+                ) VALUES (
+                    :dispositionId, :deliveryId, :tenant, :expectedVersion,
+                    :result, :reason, :approvalRef, :externalRef, :evidenceJson,
+                    :requestedBy, :requestedAt
+                )
+                """).param("dispositionId", disposition.dispositionId())
+                .param("deliveryId", disposition.deliveryId())
+                .param("tenant", disposition.tenantId())
+                .param("expectedVersion", disposition.expectedDeliveryVersion())
+                .param("result", disposition.result())
+                .param("reason", disposition.reason())
+                .param("approvalRef", disposition.approvalRef())
+                .param("externalRef", disposition.externalRef())
+                .param("evidenceJson", disposition.evidenceRefsJson())
+                .param("requestedBy", disposition.requestedBy())
+                .param("requestedAt", timestamptz(disposition.requestedAt()))
+                .update();
+        if (inserted == 0) {
+            throw new BusinessProblem(ProblemCode.VERSION_CONFLICT,
+                    "Manual disposition already exists for OutboundDelivery");
+        }
+        List<String> evidenceRefs;
+        try {
+            evidenceRefs = objectMapper.readValue(
+                    disposition.evidenceRefsJson(), new TypeReference<>() { });
+        } catch (RuntimeException exception) {
+            throw new IllegalStateException("Invalid evidenceRefs JSON", exception);
+        }
+        return new ManualDispositionView(
+                disposition.dispositionId(),
+                disposition.deliveryId(),
+                disposition.result(),
+                disposition.reason(),
+                disposition.approvalRef(),
+                disposition.externalRef(),
+                List.copyOf(evidenceRefs),
+                disposition.requestedBy(),
+                disposition.requestedAt(),
+                disposition.expectedDeliveryVersion());
+    }
+
+    @Override
+    public boolean hasManualDisposition(String tenantId, UUID deliveryId) {
+        Integer count = jdbc.sql("""
+                SELECT count(*)::int FROM int_delivery_manual_disposition
+                 WHERE tenant_id=:tenant AND delivery_id=:id
+                """).param("tenant", tenantId).param("id", deliveryId)
+                .query(Integer.class).single();
+        return count != null && count > 0;
     }
 
     @Override

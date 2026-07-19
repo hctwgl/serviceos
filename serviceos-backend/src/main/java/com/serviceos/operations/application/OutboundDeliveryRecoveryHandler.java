@@ -14,10 +14,10 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.UUID;
 
-/** 将 M60 的明确外部 ACK 恢复事实映射为 Operations 异常闭环命令。 */
+/** 将明确外部 ACK 或人工处置后的恢复事实映射为 Operations 异常闭环命令。 */
 @Service
 final class OutboundDeliveryRecoveryHandler implements OutboxMessageHandler {
-    private static final String TASK_TYPE = "integration.byd.submit-review";
+    private static final String DEFAULT_TASK_TYPE = "integration.byd.submit-review";
     private static final String RECOVERY_TYPE = "OUTBOUND_DELIVERY_ACKNOWLEDGED";
 
     private final OperationalExceptionService exceptions;
@@ -56,9 +56,11 @@ final class OutboundDeliveryRecoveryHandler implements OutboxMessageHandler {
                 || !sameInstant(payload.acknowledgedAt(), message.occurredAt())) {
             throw new IllegalArgumentException("OutboundDelivery recovery identity mismatch");
         }
+        String taskType = payload.sourceTaskType() == null || payload.sourceTaskType().isBlank()
+                ? DEFAULT_TASK_TYPE : payload.sourceTaskType().trim();
         exceptions.resolveTaskFailures(new ResolveTaskFailureExceptionsCommand(
                 message.tenantId(), message.eventId(), message.schemaVersion(), message.payloadDigest(),
-                TASK_TYPE, List.copyOf(taskIds), RECOVERY_TYPE, payload.deliveryId().toString(),
+                taskType, List.copyOf(taskIds), RECOVERY_TYPE, payload.deliveryId().toString(),
                 payload.acknowledgedAt(), message.correlationId()));
     }
 
@@ -74,7 +76,8 @@ final class OutboundDeliveryRecoveryHandler implements OutboxMessageHandler {
             UUID deliveryId,
             UUID successfulExecutionTaskId,
             List<UUID> recoveredTaskIds,
-            Instant acknowledgedAt
+            Instant acknowledgedAt,
+            String sourceTaskType
     ) {
     }
     private static boolean sameInstant(Instant left, Instant right) {

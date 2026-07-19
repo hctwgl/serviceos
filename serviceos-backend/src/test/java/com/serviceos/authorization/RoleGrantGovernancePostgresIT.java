@@ -81,8 +81,8 @@ class RoleGrantGovernancePostgresIT {
                 "authorization.approveGrant", "authorization.read", "project.create"));
         seedGovernanceActor(REQUESTER, List.of(
                 "authorization.requestGrant", "authorization.approveGrant", "authorization.read"));
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("118");
-        assertThat(flyway.info().applied()).hasSize(120);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("119");
+        assertThat(flyway.info().applied()).hasSize(121);
     }
 
     @Test

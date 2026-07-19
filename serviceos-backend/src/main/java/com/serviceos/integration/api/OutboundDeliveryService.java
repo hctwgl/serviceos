@@ -26,6 +26,14 @@ public interface OutboundDeliveryService {
             CommandMetadata metadata,
             QueryRemoteStatusCommand command);
 
+    /**
+     * 人工确认外部已处理或放弃 UNKNOWN Delivery；不创建 CLIENT Case/Route。
+     */
+    ManualDispositionView recordManualAck(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            RecordManualAckCommand command);
+
     OutboundDeliveryView get(CurrentPrincipal principal, String correlationId, UUID deliveryId);
 
     /**

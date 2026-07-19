@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.41
+  version: 1.0.42
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -4972,6 +4972,37 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /outbound-deliveries/{deliveryId}:record-manual-ack:
+    post:
+      operationId: recordManualOutboundAcknowledgement
+      summary: 人工确认或放弃 UNKNOWN 外部交付
+      description: >-
+        仅允许具备 integration.recordManualOutboundAck 的 USER principal 调用。
+        MANUAL_CONFIRMED 表示外部已人工确认处理（需 externalRef 或 evidenceRefs）；
+        ABANDONED 表示放弃交付。不创建 CLIENT Case/Route，不得伪装技术 ACK。
+      parameters:
+        - name: deliveryId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecordManualOutboundAckRequest' }
+      responses:
+        '200':
+          description: 人工处置已登记且 Delivery 已终结
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ManualOutboundDisposition' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
   /configuration/drafts:
     get:
       operationId: listConfigurationDrafts
@@ -8639,6 +8670,37 @@ components:
         detail: { type: [string, 'null'], maxLength: 2000 }
         externalRef: { type: [string, 'null'], maxLength: 200 }
         queriedAt: { type: string, format: date-time }
+    RecordManualOutboundAckRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedAggregateVersion, result, reason, approvalRef]
+      properties:
+        expectedAggregateVersion: { type: integer, format: int64, minimum: 1 }
+        result: { type: string, enum: [MANUAL_CONFIRMED, ABANDONED] }
+        reason: { type: string, minLength: 1, maxLength: 1000 }
+        approvalRef: { type: string, minLength: 1, maxLength: 160 }
+        externalRef: { type: [string, 'null'], maxLength: 200 }
+        evidenceRefs:
+          type: array
+          maxItems: 20
+          items: { type: string, minLength: 1, maxLength: 200 }
+    ManualOutboundDisposition:
+      type: object
+      additionalProperties: false
+      required: [dispositionId, deliveryId, result, reason, approvalRef, evidenceRefs, requestedBy, requestedAt, deliveryAggregateVersion]
+      properties:
+        dispositionId: { type: string, format: uuid }
+        deliveryId: { type: string, format: uuid }
+        result: { type: string, enum: [MANUAL_CONFIRMED, ABANDONED] }
+        reason: { type: string, minLength: 1, maxLength: 1000 }
+        approvalRef: { type: string, minLength: 1, maxLength: 160 }
+        externalRef: { type: [string, 'null'], maxLength: 200 }
+        evidenceRefs:
+          type: array
+          items: { type: string, minLength: 1, maxLength: 200 }
+        requestedBy: { type: string, minLength: 1, maxLength: 160 }
+        requestedAt: { type: string, format: date-time }
+        deliveryAggregateVersion: { type: integer, format: int64, minimum: 1 }
     DeliveryReplayRequest:
       type: object
       additionalProperties: false
