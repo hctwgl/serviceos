@@ -111,7 +111,10 @@ class TechnicianPortalControllerSecurityTest {
                 .thenReturn(new TechnicianPortalTaskDetail(
                         NETWORK_ID, taskId, workOrderId, projectId,
                         null, null, "INSTALLATION", "HUMAN", "INSTALL", "READY",
-                        "INSTALLATION", now, false, 1, List.of(), List.of(), List.of(), null, now));
+                        "INSTALLATION", now, false, 1,
+                        "BYD", "BYD_OCEAN", "HOME_CHARGING_SURVEY_INSTALL",
+                        "370000", "370100", "370102",
+                        List.of(), List.of(), List.of(), null, now));
 
         mvc.perform(get("/api/v1/technician/me/tasks/{taskId}", taskId)
                         .with(jwt().jwt(token -> token.subject("external-subject")

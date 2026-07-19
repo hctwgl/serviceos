@@ -7,8 +7,8 @@ import java.util.UUID;
 /**
  * Technician Portal 当前责任任务的非 PII 在线详情。
  *
- * <p>该 DTO 只暴露师傅完成下一步导航所需的任务头、执行保护状态、预约和联系安全摘要；不包含地址、
- * 联系人、表单值、资料文件、配置源码或其他网点信息。写动作仍由后续领域命令及实时授权决定。</p>
+ * <p>M350：额外暴露 SERVICEOS_EXPR_V1 白名单所需的工单/区域非 PII 头，供 H5 条件与
+ * validationRules 与服务端共用同一权威上下文；仍不包含地址正文、联系人、表单值或资料文件。</p>
  */
 public record TechnicianPortalTaskDetail(
         UUID networkId,
@@ -25,6 +25,12 @@ public record TechnicianPortalTaskDetail(
         Instant effectiveFrom,
         boolean executionGuarded,
         long resourceVersion,
+        String clientCode,
+        String brandCode,
+        String serviceProductCode,
+        String provinceCode,
+        String cityCode,
+        String districtCode,
         List<TechnicianPortalScheduleItem> appointments,
         List<TechnicianPortalContactAttemptItem> contactAttempts,
         List<TechnicianPortalVisitItem> visits,

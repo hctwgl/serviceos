@@ -66,6 +66,13 @@ export type TechnicianPortalTaskDetail = {
   effectiveFrom: string | null
   executionGuarded: boolean
   resourceVersion: number
+  /** M350：SERVICEOS_EXPR_V1 白名单权威非 PII 头 */
+  clientCode: string
+  brandCode: string
+  serviceProductCode: string
+  provinceCode: string
+  cityCode: string
+  districtCode: string
   appointments: TechnicianPortalScheduleItem[]
   contactAttempts: TechnicianPortalContactAttemptItem[]
   visits: TechnicianPortalVisitItem[]

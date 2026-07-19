@@ -60,6 +60,17 @@ assert.equal(
   true,
 )
 
+assert.equal(
+  evaluateServiceOsExprV1('workOrder.brandCode == "BYD_OCEAN" && region.cityCode == "370100"', {
+    formValues: {},
+    paths: {
+      'workOrder.brandCode': 'BYD_OCEAN',
+      'region.cityCode': '370100',
+    },
+  }),
+  true,
+)
+
 assert.throws(
   () =>
     evaluateServiceOsExprV1('workOrder.brandCode == "BYD"', {

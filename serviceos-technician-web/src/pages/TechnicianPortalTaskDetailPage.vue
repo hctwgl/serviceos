@@ -53,44 +53,42 @@ const taskSubmitting = ref(false)
 const taskSubmissionMessage = ref<string | null>(null)
 
 const supportedFormTypes = new Set(['STRING', 'TEXT', 'INTEGER', 'DECIMAL', 'BOOLEAN', 'DATE', 'DATETIME'])
-const UNAVAILABLE_CONTEXT_PATH_RE = /\b(?:workOrder|region)\./
 const activeForm = computed(() => taskForms.value[0] ?? null)
 const formFields = computed(() => activeForm.value?.definition.sections.flatMap((section) => section.fields) ?? [])
 
-function exprUsesUnavailableContext(raw: unknown): boolean {
-  const source = expressionSource(raw)
-  return source != null && UNAVAILABLE_CONTEXT_PATH_RE.test(source)
+function requireServiceOsExpr(raw: unknown, owner: string, reasons: Set<string>): void {
+  if (!expressionSource(raw)) {
+    reasons.add(`${owner} 条件语言不是 SERVICEOS_EXPR_V1`)
+  }
 }
 
 const unsupportedFormReasons = computed(() => {
   const form = activeForm.value
   if (!form) return []
   const reasons = new Set<string>()
-  if ((form.definition.validationRules?.length ?? 0) > 0) {
-    reasons.add('跨字段规则尚无 Web/iOS 共用执行器')
+  for (const rule of form.definition.validationRules ?? []) {
+    const assertExpr = (rule as { assert?: unknown }).assert
+    if (!assertExpr) {
+      reasons.add('跨字段规则缺少 assert')
+      continue
+    }
+    requireServiceOsExpr(assertExpr, `规则 ${(rule as { ruleKey?: string }).ruleKey ?? '?'}`, reasons)
   }
   for (const section of form.definition.sections) {
     if (section.visibility) {
-      if (!expressionSource(section.visibility)) {
-        reasons.add('分区条件语言不是 SERVICEOS_EXPR_V1')
-      } else if (exprUsesUnavailableContext(section.visibility)) {
-        reasons.add('分区条件引用工单/区域上下文，本客户端尚无权威值')
-      }
+      requireServiceOsExpr(section.visibility, `分区 ${section.sectionKey}`, reasons)
     }
     for (const field of section.fields) {
       if (!supportedFormTypes.has(field.dataType)) {
         reasons.add(`字段类型 ${field.dataType} 尚未接入`)
       }
       if (field.editableWhen || field.defaultExpression) {
-        reasons.add('字段 editableWhen/默认值尚无 Web/iOS 共用执行器')
+        // 后端 ConfigurationAssetSchemaValidator / FormValueValidator 仍拒绝发布与提交
+        reasons.add('字段 editableWhen/默认值运行时尚未接受')
       }
       for (const cond of [field.visibleWhen, field.requiredWhen]) {
         if (!cond) continue
-        if (!expressionSource(cond)) {
-          reasons.add('字段条件语言不是 SERVICEOS_EXPR_V1')
-        } else if (exprUsesUnavailableContext(cond)) {
-          reasons.add('字段条件引用工单/区域上下文，本客户端尚无权威值')
-        }
+        requireServiceOsExpr(cond, `字段 ${field.fieldKey}`, reasons)
       }
       if (field.optionsRef || (field.validators?.length ?? 0) > 0) {
         reasons.add('选项或扩展校验器尚未接入')
@@ -104,6 +102,12 @@ function taskExprPaths(): Partial<Record<string, string>> {
   const task = detail.value
   if (!task) return {}
   return {
+    'workOrder.clientCode': task.clientCode,
+    'workOrder.brandCode': task.brandCode,
+    'workOrder.serviceProductCode': task.serviceProductCode,
+    'region.provinceCode': task.provinceCode,
+    'region.cityCode': task.cityCode,
+    'region.districtCode': task.districtCode,
     'task.stageCode': task.stageCode,
     'task.taskType': task.taskType,
   }
@@ -134,22 +138,23 @@ function evalCondition(raw: unknown | undefined, formValueMap: Record<string, un
   }
 }
 
-/** 当前草稿下各分区/字段显隐与必填；求值失败失败关闭（隐藏 + 阻断提交）。 */
+/** 当前草稿下各分区/字段显隐、必填与跨字段规则；求值失败失败关闭并阻断提交。 */
 const formConditionState = computed(() => {
   const form = activeForm.value
   const errors: string[] = []
+  const ruleFailures: string[] = []
   const sectionVisible = new Map<string, boolean>()
   const fieldVisible = new Map<string, boolean>()
   const fieldRequired = new Map<string, boolean>()
   if (!form || unsupportedFormReasons.value.length > 0) {
-    return { errors, sectionVisible, fieldVisible, fieldRequired }
+    return { errors, ruleFailures, sectionVisible, fieldVisible, fieldRequired }
   }
   let formValueMap: Record<string, unknown> = {}
   try {
     formValueMap = coerceFormValuesForExpr(formFields.value, formValues.value).values
   } catch (err) {
     errors.push(err instanceof Error ? err.message : '表单值无法用于条件求值')
-    return { errors, sectionVisible, fieldVisible, fieldRequired }
+    return { errors, ruleFailures, sectionVisible, fieldVisible, fieldRequired }
   }
   for (const section of form.definition.sections) {
     const sectionEval = evalCondition(section.visibility, formValueMap)
@@ -196,7 +201,19 @@ const formConditionState = computed(() => {
       fieldRequired.set(field.fieldKey, Boolean(field.required) || requiredEval.value)
     }
   }
-  return { errors, sectionVisible, fieldVisible, fieldRequired }
+  for (const rule of form.definition.validationRules ?? []) {
+    const ruleKey = String((rule as { ruleKey?: unknown }).ruleKey ?? 'rule')
+    const message = String((rule as { message?: unknown }).message ?? '表单跨字段规则未通过')
+    const assertEval = evalCondition((rule as { assert?: unknown }).assert, formValueMap)
+    if (!assertEval.ok) {
+      errors.push(`规则 ${ruleKey}：${assertEval.error}`)
+      continue
+    }
+    if (!assertEval.value) {
+      ruleFailures.push(`${ruleKey}：${message}`)
+    }
+  }
+  return { errors, ruleFailures, sectionVisible, fieldVisible, fieldRequired }
 })
 
 function isSectionVisible(sectionKey: string): boolean {
@@ -358,6 +375,10 @@ async function submitForm() {
   if (unsupportedFormReasons.value.length > 0) return
   if (formConditionState.value.errors.length > 0) {
     formMessage.value = `条件求值失败，已阻止提交：${formConditionState.value.errors.join('；')}`
+    return
+  }
+  if (formConditionState.value.ruleFailures.length > 0) {
+    formMessage.value = `跨字段规则未通过：${formConditionState.value.ruleFailures.join('；')}`
     return
   }
   const values = submissionValues()
@@ -648,6 +669,13 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
               >
                 条件求值失败（失败关闭）：{{ formConditionState.errors.join('；') }}
               </p>
+              <p
+                v-if="formConditionState.ruleFailures.length > 0"
+                class="error"
+                data-testid="technician-online-form-rule-failures"
+              >
+                跨字段规则未通过：{{ formConditionState.ruleFailures.join('；') }}
+              </p>
               <fieldset
                 v-for="section in activeForm.definition.sections"
                 v-show="isSectionVisible(section.sectionKey)"
@@ -690,6 +718,7 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
                     || detail.executionGuarded
                     || detail.taskStatus !== 'RUNNING'
                     || formConditionState.errors.length > 0
+                    || formConditionState.ruleFailures.length > 0
                 "
                 data-testid="technician-online-form-submit"
               >{{ formSubmitting ? '提交中…' : '提交不可变表单' }}</button>
