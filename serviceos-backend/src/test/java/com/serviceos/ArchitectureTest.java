@@ -25,7 +25,8 @@ class ArchitectureTest {
 
     private static final List<String> FORBIDDEN_OEM_ADAPTER_PACKAGES = List.of(
             "com.serviceos.integration.byd",
-            "com.serviceos.integration.referenceoem");
+            "com.serviceos.integration.referenceoem",
+            "com.serviceos.integration.geely");
 
     private final ApplicationModules modules = ApplicationModules.of(ServiceOsApplication.class);
 
