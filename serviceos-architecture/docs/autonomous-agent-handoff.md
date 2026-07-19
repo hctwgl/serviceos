@@ -8,7 +8,7 @@ lastUpdated: 2026-07-19
 ## 当前
 
 - PR #148～#156：M321～M329 Draft stacked（base 链至 master）
-- PR #157：待创建 — **M330** RULE Task complete / Evidence Snapshot 门禁（Draft，base=#156）
+- PR #157：https://github.com/hctwgl/serviceos/pull/157 — **M330** RULE Task complete / Evidence Snapshot 门禁（Draft，base=#156）
 - `master`：`32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147 已合并）
 - latestMilestone：**M330**
 - Flyway：**125**；OpenAPI：**1.0.43**（本切片无契约/迁移变更）
