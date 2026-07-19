@@ -89,6 +89,7 @@ class BydCpimInboundOrderHttpPostgresIT {
     ConfigurationService configurations;
 
     UUID projectId;
+    UUID integrationAssetVersionId;
 
     @BeforeEach
     void clean() throws IOException {
@@ -118,7 +119,7 @@ class BydCpimInboundOrderHttpPostgresIT {
                 .param("startsOn", LocalDate.now().minusDays(1))
                 .param("createdAt", java.time.OffsetDateTime.now())
                 .update();
-        publishPilotBundle();
+        integrationAssetVersionId = publishPilotBundle();
     }
 
     @Test
@@ -166,6 +167,11 @@ class BydCpimInboundOrderHttpPostgresIT {
                 SELECT count(*) FROM aud_audit_record
                  WHERE action_name='INBOUND_INTEGRATION_MAPPING_APPLIED'
                 """).query(Long.class).single()).isGreaterThanOrEqualTo(1);
+        // M321：Mapping 物化后 mappingVersionId 必须是冻结资产 versionId，而非 OEM 常量。
+        assertThat(jdbc.sql("""
+                SELECT mapping_version_id FROM int_canonical_message
+                """).query(String.class).single())
+                .isEqualTo(integrationAssetVersionId.toString());
         assertThat(jdbc.sql("""
                 SELECT tenant_id, project_id, configuration_bundle_code,
                        configuration_bundle_version, status
@@ -376,7 +382,7 @@ class BydCpimInboundOrderHttpPostgresIT {
         return LocalDate.now(ZoneId.of("Asia/Shanghai")).toString();
     }
 
-    private void publishPilotBundle() {
+    private UUID publishPilotBundle() {
         String workflow = "{\"workflowCode\":\"BYD_SURVEY_INSTALL_V1\"}";
         var asset = configurations.publishAsset(new PublishConfigurationAssetCommand(
                 TENANT_ID,
@@ -386,8 +392,9 @@ class BydCpimInboundOrderHttpPostgresIT {
                 "1.0.0",
                 workflow,
                 Sha256.digest(workflow)));
-        // M304：冻结 Bundle 内 INBOUND INTEGRATION Mapping；建单管道必须施加闸门。
-        String integration = "{\"mappingKey\":\"byd-create-http\",\"version\":\"1.0.0\",\"connectorCode\":\"BYD_CPIM\",\"direction\":\"INBOUND\",\"fieldMappings\":[{\"mappingId\":\"order\",\"externalPath\":\"orderCode\",\"internalPath\":\"externalOrderCode\",\"required\":true,\"transform\":\"TRIM\"},{\"mappingId\":\"mobile\",\"externalPath\":\"contactMobile\",\"internalPath\":\"customerMobile\",\"required\":true,\"transform\":\"NONE\"}]}";
+        // M304/M321：冻结 Bundle 内 INBOUND INTEGRATION Mapping；闸门后物化为建单命令。
+        // UPPER 用于证明 Mapping 输出（而非适配器 trim）写入工单。
+        String integration = "{\"mappingKey\":\"byd-create-http\",\"version\":\"1.0.0\",\"connectorCode\":\"BYD_CPIM\",\"direction\":\"INBOUND\",\"fieldMappings\":[{\"mappingId\":\"order\",\"externalPath\":\"orderCode\",\"internalPath\":\"externalOrderCode\",\"required\":true,\"transform\":\"UPPER\"},{\"mappingId\":\"mobile\",\"externalPath\":\"contactMobile\",\"internalPath\":\"customerMobile\",\"required\":true,\"transform\":\"NONE\"}]}";
         var integrationAsset = configurations.publishAsset(new PublishConfigurationAssetCommand(
                 TENANT_ID,
                 ConfigurationAssetType.INTEGRATION,
@@ -407,6 +414,39 @@ class BydCpimInboundOrderHttpPostgresIT {
                 Instant.now().minusSeconds(3600),
                 null,
                 java.util.List.of(asset.versionId(), integrationAsset.versionId())));
+        return integrationAsset.versionId();
+    }
+
+    @Test
+    void mappingUpperMaterializesExternalOrderCodeOntoWorkOrder() throws Exception {
+        Map<String, Object> payload = validPayload();
+        payload.put("orderCode", "byd-sd-http-upper");
+        String currentTime = protocolDate();
+        String nonce = "nonce-http-upper-001";
+        String sign = sign(nonce, currentTime, payload);
+
+        perform(payload, nonce, currentTime, sign)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.code").value("ACCEPTED"));
+
+        // 适配器兼容层保留原文大小写；Mapping UPPER 才是工单权威值。
+        assertThat(jdbc.sql("""
+                SELECT external_order_code FROM wo_work_order
+                """).query(String.class).single()).isEqualTo("BYD-SD-HTTP-UPPER");
+        assertThat(jdbc.sql("""
+                SELECT business_key, mapping_version_id FROM int_canonical_message
+                """).query().singleRow())
+                .containsEntry("business_key", "BYD:INSTALL:BYD-SD-HTTP-UPPER")
+                .containsEntry("mapping_version_id", integrationAssetVersionId.toString());
+        String canonicalObjectRef = jdbc.sql("""
+                SELECT payload_object_ref FROM int_canonical_message
+                """).query(String.class).single();
+        String canonicalJson = Files.readString(STORAGE_ROOT.resolve(canonicalObjectRef));
+        assertThat(canonicalJson)
+                .contains("\"mappingContentDigest\"")
+                .contains(integrationAssetVersionId.toString())
+                .contains("BYD-SD-HTTP-UPPER");
     }
 
     private static Map<String, Object> validPayload() {

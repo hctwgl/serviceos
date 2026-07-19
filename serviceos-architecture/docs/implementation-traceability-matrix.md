@@ -415,3 +415,4 @@ Feature gate/authority: if applicable
 | M318 | UNKNOWN Delivery 人工确认/放弃：disposition 不可变；状态保持 UNKNOWN；OpenAPI 1.0.42；Flyway V119 | record-manual-ack + ManualDispositionPostgresIT + contracts + `331-m318-*` + `315-m318-*` | 批量 ReplayRequest、查询自动改状态 |
 | M319 | 批量 ReplayRequest：PREVIEW/SUBMIT/approve；逐条调度单笔 retry；OpenAPI 1.0.43；Flyway V120 | BatchReplayService + PostgresIT + contracts + `332-m319-*` + `316-m319-*` | 1000 条压测、二级审批/MFA |
 | M320 | 多 OEM 并行建单冒烟：BYD + REFERENCE_OEM + GEELY 同运行时 | MultiOemParallelCreateSmokePostgresIT + `333-m320-*` + `317-m320-*` | Sandbox 真实联调 |
+| M321 | 入站 INTEGRATION Mapping 物化为建单 Canonical/领域命令；mappingVersionId=assetVersionId；Canonical 嵌 contentDigest | CreateWorkOrderMappingMaterializer + pipeline + unit/BYD HTTP IT + `334-m321-*` + `318-m321-*` | 出站 Mapping、全量字段仅 Mapping、默认值/枚举/条件 DSL |
