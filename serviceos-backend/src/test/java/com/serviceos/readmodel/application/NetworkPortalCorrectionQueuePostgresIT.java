@@ -102,8 +102,8 @@ class NetworkPortalCorrectionQueuePostgresIT {
                     prj_project,
                     rel_idempotency_record, aud_audit_record CASCADE
                 """).update();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("119");
-        assertThat(flyway.info().applied()).hasSize(121);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("120");
+        assertThat(flyway.info().applied()).hasSize(122);
 
         jdbc.sql("""
                 INSERT INTO prj_project (

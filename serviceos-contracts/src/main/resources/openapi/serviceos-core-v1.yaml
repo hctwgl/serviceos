@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.42
+  version: 1.0.43
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -4967,6 +4967,78 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/RemoteStatusQueryResult' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /replay-requests:
+    post:
+      operationId: createBatchReplayRequest
+      summary: 批量预演或提交 UNKNOWN 外部交付重放
+      description: >-
+        USER + integration.batchReplayUnknownDelivery。mode=PREVIEW 仅审计资格；
+        mode=SUBMIT 生成 PENDING_APPROVAL。单批最多 50 条，默认 20。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateBatchReplayRequest' }
+      responses:
+        '202':
+          description: 批次已创建
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BatchReplayRequest' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /replay-requests/{batchId}:
+    get:
+      operationId: getBatchReplayRequest
+      summary: 查询批量重放申请
+      parameters:
+        - name: batchId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 批次摘要
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BatchReplayRequest' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /replay-requests/{batchId}:approve:
+    post:
+      operationId: approveBatchReplayRequest
+      summary: 批准或拒绝批量重放
+      description: >-
+        APPROVE 后对 ELIGIBLE 条目逐条调度单笔 :retry（调度方还需 integration.retryUnknownDelivery）。
+      parameters:
+        - name: batchId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ApproveBatchReplayRequest' }
+      responses:
+        '200':
+          description: 批次决策结果
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BatchReplayRequest' }
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
