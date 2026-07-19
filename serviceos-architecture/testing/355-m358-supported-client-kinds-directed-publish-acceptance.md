@@ -20,4 +20,4 @@ lastUpdated: 2026-07-19
 
 ## 明确不在本矩阵
 
-- Bundle CANARY；Feed 拒单；iOS 条件执行器。
+- Bundle CANARY；Feed 拒单（见 M359）；iOS 条件执行器。
