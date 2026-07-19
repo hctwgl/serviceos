@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M348 DISPATCH 残留结构化编辑器**（Draft stacked 于 `#148→…→#174` + 本切片；
+当前工程基线为 **M349 Technician Web FORM 条件执行器**（Draft stacked 于 `#148→…→#175` + 本切片；
 见 `implementation-status.md`；合入 `master` 后回填合并提交）。M320 合并基线为
 `32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147）。
 
@@ -682,11 +682,11 @@ serviceos-architecture/
 入站/出站 Mapping（M321～M339，含 CREATE/UPDATE/CANCEL 强制 Mapping + messageType）、
 FORM/EVIDENCE ConditionBuilder（M340/M341）与嵌套条件组（M342）、REFERENCE_OEM Update/Cancel（M343）、
 Admin Mapping DSL UI（M347）、DISPATCH scope/fallback/allocationRatio 编辑器（M348）、
+Technician FORM 条件执行器（M349）、
 ASSIGNEE/DISPATCH NETWORK+TECHNICIAN+Coverage+比例缺口（M323/M324/M332/M337/M338）、
 RULE（M325/M329/M330）、NOTIFICATION（M326）、PRICING SHADOW Snapshot（M327），以及 Admin
 UNKNOWN 人工处置与批量 Replay 工作台（M328）。
-下一主线：M349 Technician 条件执行器；
-吉利材料到位后优先联调；AMOUNT/加权（待业务确认）与 BUSINESS 日历 SLA 硬门禁；
+下一主线进入硬门禁：吉利材料到位后优先联调；AMOUNT/加权（待业务确认）与 BUSINESS 日历 SLA；
 Track F/G 仍为 `BLOCKED_EXTERNAL`。
 
 权威进度入口：
@@ -694,6 +694,8 @@ Track F/G 仍为 `BLOCKED_EXTERNAL`。
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M349 实现文档](architecture/362-m349-technician-form-condition-executor.md)
+- [M349 验收矩阵](testing/346-m349-technician-form-condition-executor-acceptance.md)
 - [M348 实现文档](architecture/361-m348-dispatch-residual-editor.md)
 - [M348 验收矩阵](testing/345-m348-dispatch-residual-editor-acceptance.md)
 - [M347 实现文档](architecture/360-m347-integration-mapping-dsl-ui.md)

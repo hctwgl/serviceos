@@ -22,6 +22,12 @@ import {
   type TechnicianTaskFormField,
 } from '../api/technicianPortal'
 import { userFacingError } from '../api/client'
+import {
+  coerceFormValuesForExpr,
+  evaluateServiceOsExprV1,
+  expressionSource,
+  ExpressionEvaluationError,
+} from '../expression/serviceosExprV1Evaluate'
 
 const props = defineProps<{ technicianContextId: string | null }>()
 const route = useRoute()
@@ -47,19 +53,44 @@ const taskSubmitting = ref(false)
 const taskSubmissionMessage = ref<string | null>(null)
 
 const supportedFormTypes = new Set(['STRING', 'TEXT', 'INTEGER', 'DECIMAL', 'BOOLEAN', 'DATE', 'DATETIME'])
+const UNAVAILABLE_CONTEXT_PATH_RE = /\b(?:workOrder|region)\./
 const activeForm = computed(() => taskForms.value[0] ?? null)
 const formFields = computed(() => activeForm.value?.definition.sections.flatMap((section) => section.fields) ?? [])
+
+function exprUsesUnavailableContext(raw: unknown): boolean {
+  const source = expressionSource(raw)
+  return source != null && UNAVAILABLE_CONTEXT_PATH_RE.test(source)
+}
+
 const unsupportedFormReasons = computed(() => {
   const form = activeForm.value
   if (!form) return []
   const reasons = new Set<string>()
-  if ((form.definition.validationRules?.length ?? 0) > 0) reasons.add('跨字段规则尚无 Web/iOS 共用执行器')
+  if ((form.definition.validationRules?.length ?? 0) > 0) {
+    reasons.add('跨字段规则尚无 Web/iOS 共用执行器')
+  }
   for (const section of form.definition.sections) {
-    if (section.visibility) reasons.add('分区条件显隐尚无 Web/iOS 共用执行器')
+    if (section.visibility) {
+      if (!expressionSource(section.visibility)) {
+        reasons.add('分区条件语言不是 SERVICEOS_EXPR_V1')
+      } else if (exprUsesUnavailableContext(section.visibility)) {
+        reasons.add('分区条件引用工单/区域上下文，本客户端尚无权威值')
+      }
+    }
     for (const field of section.fields) {
-      if (!supportedFormTypes.has(field.dataType)) reasons.add(`字段类型 ${field.dataType} 尚未接入`)
-      if (field.requiredWhen || field.visibleWhen || field.editableWhen || field.defaultExpression) {
-        reasons.add('字段条件/默认值尚无 Web/iOS 共用执行器')
+      if (!supportedFormTypes.has(field.dataType)) {
+        reasons.add(`字段类型 ${field.dataType} 尚未接入`)
+      }
+      if (field.editableWhen || field.defaultExpression) {
+        reasons.add('字段 editableWhen/默认值尚无 Web/iOS 共用执行器')
+      }
+      for (const cond of [field.visibleWhen, field.requiredWhen]) {
+        if (!cond) continue
+        if (!expressionSource(cond)) {
+          reasons.add('字段条件语言不是 SERVICEOS_EXPR_V1')
+        } else if (exprUsesUnavailableContext(cond)) {
+          reasons.add('字段条件引用工单/区域上下文，本客户端尚无权威值')
+        }
       }
       if (field.optionsRef || (field.validators?.length ?? 0) > 0) {
         reasons.add('选项或扩展校验器尚未接入')
@@ -68,6 +99,117 @@ const unsupportedFormReasons = computed(() => {
   }
   return [...reasons]
 })
+
+function taskExprPaths(): Partial<Record<string, string>> {
+  const task = detail.value
+  if (!task) return {}
+  return {
+    'task.stageCode': task.stageCode,
+    'task.taskType': task.taskType,
+  }
+}
+
+type CondEval = { ok: true; value: boolean } | { ok: false; error: string }
+
+function evalCondition(raw: unknown | undefined, formValueMap: Record<string, unknown>): CondEval {
+  if (!raw) return { ok: true, value: true }
+  const source = expressionSource(raw)
+  if (!source) return { ok: false, error: '条件不是 SERVICEOS_EXPR_V1' }
+  try {
+    return {
+      ok: true,
+      value: evaluateServiceOsExprV1(source, {
+        formValues: formValueMap,
+        paths: taskExprPaths(),
+      }),
+    }
+  } catch (err) {
+    const message =
+      err instanceof ExpressionEvaluationError
+        ? err.message
+        : err instanceof Error
+          ? err.message
+          : '条件求值失败'
+    return { ok: false, error: message }
+  }
+}
+
+/** 当前草稿下各分区/字段显隐与必填；求值失败失败关闭（隐藏 + 阻断提交）。 */
+const formConditionState = computed(() => {
+  const form = activeForm.value
+  const errors: string[] = []
+  const sectionVisible = new Map<string, boolean>()
+  const fieldVisible = new Map<string, boolean>()
+  const fieldRequired = new Map<string, boolean>()
+  if (!form || unsupportedFormReasons.value.length > 0) {
+    return { errors, sectionVisible, fieldVisible, fieldRequired }
+  }
+  let formValueMap: Record<string, unknown> = {}
+  try {
+    formValueMap = coerceFormValuesForExpr(formFields.value, formValues.value).values
+  } catch (err) {
+    errors.push(err instanceof Error ? err.message : '表单值无法用于条件求值')
+    return { errors, sectionVisible, fieldVisible, fieldRequired }
+  }
+  for (const section of form.definition.sections) {
+    const sectionEval = evalCondition(section.visibility, formValueMap)
+    if (!sectionEval.ok) {
+      errors.push(`分区 ${section.sectionKey}：${sectionEval.error}`)
+      sectionVisible.set(section.sectionKey, false)
+      for (const field of section.fields) {
+        fieldVisible.set(field.fieldKey, false)
+        fieldRequired.set(field.fieldKey, false)
+      }
+      continue
+    }
+    sectionVisible.set(section.sectionKey, sectionEval.value)
+    for (const field of section.fields) {
+      if (!sectionEval.value) {
+        fieldVisible.set(field.fieldKey, false)
+        fieldRequired.set(field.fieldKey, false)
+        continue
+      }
+      const visibleEval = evalCondition(field.visibleWhen, formValueMap)
+      if (!visibleEval.ok) {
+        errors.push(`字段 ${field.fieldKey} visibleWhen：${visibleEval.error}`)
+        fieldVisible.set(field.fieldKey, false)
+        fieldRequired.set(field.fieldKey, false)
+        continue
+      }
+      const visible = visibleEval.value
+      fieldVisible.set(field.fieldKey, visible)
+      if (!visible) {
+        fieldRequired.set(field.fieldKey, false)
+        continue
+      }
+      if (!field.requiredWhen) {
+        fieldRequired.set(field.fieldKey, Boolean(field.required))
+        continue
+      }
+      const requiredEval = evalCondition(field.requiredWhen, formValueMap)
+      if (!requiredEval.ok) {
+        errors.push(`字段 ${field.fieldKey} requiredWhen：${requiredEval.error}`)
+        // 无法判定必填时按必填处理，并阻断提交
+        fieldRequired.set(field.fieldKey, true)
+        continue
+      }
+      fieldRequired.set(field.fieldKey, Boolean(field.required) || requiredEval.value)
+    }
+  }
+  return { errors, sectionVisible, fieldVisible, fieldRequired }
+})
+
+function isSectionVisible(sectionKey: string): boolean {
+  return formConditionState.value.sectionVisible.get(sectionKey) !== false
+}
+
+function isFieldVisible(fieldKey: string): boolean {
+  return formConditionState.value.fieldVisible.get(fieldKey) !== false
+}
+
+function isFieldRequired(field: TechnicianTaskFormField): boolean {
+  return formConditionState.value.fieldRequired.get(field.fieldKey) === true
+}
 
 const confirmedAppointment = computed(() =>
   detail.value?.appointments.find((appointment) => appointment.status === 'CONFIRMED') ?? null,
@@ -172,6 +314,9 @@ function submissionValues(): Record<string, unknown> | null {
   const values: Record<string, unknown> = {}
   const missing: string[] = []
   for (const field of formFields.value) {
+    if (!isFieldVisible(field.fieldKey)) {
+      continue
+    }
     const raw = formValues.value[field.fieldKey]
     if (field.dataType === 'BOOLEAN') {
       values[field.fieldKey] = raw === true
@@ -179,7 +324,7 @@ function submissionValues(): Record<string, unknown> | null {
     }
     const text = typeof raw === 'string' ? raw.trim() : ''
     if (!text) {
-      if (field.required) missing.push(field.label)
+      if (isFieldRequired(field)) missing.push(field.label)
       continue
     }
     if (field.dataType === 'INTEGER') {
@@ -211,6 +356,10 @@ function submissionValues(): Record<string, unknown> | null {
 async function submitForm() {
   if (!props.technicianContextId || !detail.value || !activeForm.value || formSubmitting.value) return
   if (unsupportedFormReasons.value.length > 0) return
+  if (formConditionState.value.errors.length > 0) {
+    formMessage.value = `条件求值失败，已阻止提交：${formConditionState.value.errors.join('；')}`
+    return
+  }
   const values = submissionValues()
   if (!values) return
   formSubmitting.value = true
@@ -492,10 +641,26 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
               当前表单不能由本客户端安全执行：{{ unsupportedFormReasons.join('；') }}。已阻止提交。
             </div>
             <form v-else class="dynamic-form" data-testid="technician-online-form-fields" @submit.prevent="submitForm">
-              <fieldset v-for="section in activeForm.definition.sections" :key="section.sectionKey">
+              <p
+                v-if="formConditionState.errors.length > 0"
+                class="error"
+                data-testid="technician-online-form-condition-error"
+              >
+                条件求值失败（失败关闭）：{{ formConditionState.errors.join('；') }}
+              </p>
+              <fieldset
+                v-for="section in activeForm.definition.sections"
+                v-show="isSectionVisible(section.sectionKey)"
+                :key="section.sectionKey"
+                :data-testid="`technician-form-section-${section.sectionKey}`"
+              >
                 <legend>{{ section.title }}</legend>
-                <label v-for="field in section.fields" :key="field.fieldKey">
-                  <span>{{ field.label }}<em v-if="field.required"> *</em></span>
+                <label
+                  v-for="field in section.fields"
+                  v-show="isFieldVisible(field.fieldKey)"
+                  :key="field.fieldKey"
+                >
+                  <span>{{ field.label }}<em v-if="isFieldRequired(field)"> *</em></span>
                   <input
                     v-if="field.dataType === 'BOOLEAN'"
                     v-model="formValues[field.fieldKey]"
@@ -520,7 +685,12 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
               </fieldset>
               <button
                 type="submit"
-                :disabled="formSubmitting || detail.executionGuarded || detail.taskStatus !== 'RUNNING'"
+                :disabled="
+                  formSubmitting
+                    || detail.executionGuarded
+                    || detail.taskStatus !== 'RUNNING'
+                    || formConditionState.errors.length > 0
+                "
                 data-testid="technician-online-form-submit"
               >{{ formSubmitting ? '提交中…' : '提交不可变表单' }}</button>
             </form>
