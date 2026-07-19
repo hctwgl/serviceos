@@ -33,7 +33,7 @@ relatedMilestones: [M324, M306, M331]
 
 ## 明确未实现
 
-- Mapping DSL、入站仅 Mapping、低代码深化、吉利联调
+- Mapping DSL、defaults/enum/condition；入站无 fallback 见 **M333**；低代码深化、吉利联调
 
 ## 验证命令
 

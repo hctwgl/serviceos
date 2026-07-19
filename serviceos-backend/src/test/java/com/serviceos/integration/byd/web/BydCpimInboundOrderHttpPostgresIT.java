@@ -392,9 +392,21 @@ class BydCpimInboundOrderHttpPostgresIT {
                 "1.0.0",
                 workflow,
                 Sha256.digest(workflow)));
-        // M304/M321：冻结 Bundle 内 INBOUND INTEGRATION Mapping；闸门后物化为建单命令。
-        // UPPER 用于证明 Mapping 输出（而非适配器 trim）写入工单。
-        String integration = "{\"mappingKey\":\"byd-create-http\",\"version\":\"1.0.0\",\"connectorCode\":\"BYD_CPIM\",\"direction\":\"INBOUND\",\"fieldMappings\":[{\"mappingId\":\"order\",\"externalPath\":\"orderCode\",\"internalPath\":\"externalOrderCode\",\"required\":true,\"transform\":\"UPPER\"},{\"mappingId\":\"mobile\",\"externalPath\":\"contactMobile\",\"internalPath\":\"customerMobile\",\"required\":true,\"transform\":\"NONE\"}]}";
+        // M333：建单必填字段均由 INBOUND Mapping 提供；UPPER 证明 Mapping 权威。
+        String integration = """
+                {"mappingKey":"byd-create-http","version":"1.0.0","connectorCode":"BYD_CPIM","direction":"INBOUND","fieldMappings":[
+                  {"mappingId":"order","externalPath":"orderCode","internalPath":"externalOrderCode","required":true,"transform":"UPPER"},
+                  {"mappingId":"brand","externalPath":"brandCode","internalPath":"brandCode","required":true,"transform":"NONE"},
+                  {"mappingId":"product","externalPath":"serviceProductCode","internalPath":"serviceProductCode","required":true,"transform":"NONE"},
+                  {"mappingId":"province","externalPath":"provinceCode","internalPath":"provinceCode","required":true,"transform":"NONE"},
+                  {"mappingId":"city","externalPath":"cityCode","internalPath":"cityCode","required":true,"transform":"NONE"},
+                  {"mappingId":"district","externalPath":"areaCode","internalPath":"districtCode","required":true,"transform":"NONE"},
+                  {"mappingId":"name","externalPath":"contactName","internalPath":"customerName","required":false,"transform":"TRIM"},
+                  {"mappingId":"mobile","externalPath":"contactMobile","internalPath":"customerMobile","required":true,"transform":"NONE"},
+                  {"mappingId":"address","externalPath":"contactAddress","internalPath":"serviceAddress","required":false,"transform":"TRIM"},
+                  {"mappingId":"vin","externalPath":"vin","internalPath":"vehicleVin","required":false,"transform":"NONE"},
+                  {"mappingId":"dispatch","externalPath":"dispatchTime","internalPath":"dispatchedAt","required":false,"transform":"DATE_ISO"}]}
+                """.replaceAll("\\s+", "");
         var integrationAsset = configurations.publishAsset(new PublishConfigurationAssetCommand(
                 TENANT_ID,
                 ConfigurationAssetType.INTEGRATION,

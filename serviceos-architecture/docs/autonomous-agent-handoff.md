@@ -7,30 +7,33 @@ lastUpdated: 2026-07-19
 
 ## 当前
 
-- PR #148～#158：M321～M331 Draft stacked
-- PR #159：https://github.com/hctwgl/serviceos/pull/159 — **M332** DISPATCH TECHNICIAN 自动指派（Draft，base=#158）
+- PR #148～#159：M321～M332 Draft stacked
+- 本切片分支：`cursor/m333-inbound-mapping-no-fallback-88d5` — **M333** 入站 Mapping 无适配器 fallback（Draft，base=#159）
 - `master`：`32b902f897d19d2c906acac899990bf1aa2bb056`
-- latestMilestone：**M332**
+- latestMilestone：**M333**
 - Flyway：**125**；OpenAPI：**1.0.43**
 
 ## 本回合完成
 
-### M332 DISPATCH → TECHNICIAN 自动指派
+### M333 入站 Mapping 物化无适配器 fallback
 
-- NETWORK 成功后解析网点师傅 + TECHNICIAN 容量 → DispatchRuntime → ACTIVE TECHNICIAN
-- 空师傅池 / 无容量：TECHNICIAN MANUAL，保留 NETWORK
-- API：`ActivateTechnicianFromFrozenDispatchCommand`
-- IT：`DispatchPolicyServiceAssignmentPostgresIT`
-- 文档：`345-m332-*` / `329-m332-*`
+- `CreateWorkOrderMappingMaterializer`：命中 INBOUND 后建单字段仅 Mapping；可选省略 → null
+- `clientCode` 仍来自 connector；`businessKey` 按 Mapping `externalOrderCode` 重写
+- Pipeline：Mapping 输入临时播种 brand/product（待 defaults DSL）
+- 零 Mapping 路径保留
+- IT：`CreateWorkOrderMappingMaterializerTest`、`BydCpimInboundOrderHttpPostgresIT`、
+  `MultiOemParallelCreateSmokePostgresIT`
+- 文档：`346-m333-*` / `330-m333-*`
 
 ### 既有 Draft 栈
 
-- M321～M331（PR #148～#158）
+- M321～M332（PR #148～#159）
 
 ## 验证
 
 ```text
-bash scripts/agent-verify.sh it DispatchPolicyServiceAssignmentPostgresIT
+bash scripts/agent-verify.sh test CreateWorkOrderMappingMaterializerTest
+bash scripts/agent-verify.sh it MultiOemParallelCreateSmokePostgresIT,BydCpimInboundOrderHttpPostgresIT
 bash scripts/agent-verify.sh test ArchitectureTest
 ```
 
@@ -41,9 +44,9 @@ bash scripts/agent-verify.sh test ArchitectureTest
 
 ## 下一步
 
-本地 Configuration-Driven Runtime 主线（Mapping→ASSIGNEE→DISPATCH NETWORK/TECH→RULE→NOTIFICATION→PRICING→Admin）
-已交付至 M332 Draft 栈。后续优先：
+本地 Configuration-Driven Runtime 主线已交付至 M333 Draft 栈。后续优先：
 
-1. Mapping：入站全量字段仅 Mapping；defaults / enum / condition DSL
-2. DISPATCH 地图/比例分配；低代码深化
-3. 吉利材料齐备后联调
+1. Mapping：defaults / enum / condition DSL（移除 brand/product 播种）
+2. 强制全部 connector INBOUND Mapping / 删除 OEM 入站 Java Mapper
+3. DISPATCH 地图/比例分配；低代码深化
+4. 吉利材料齐备后联调

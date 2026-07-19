@@ -32,7 +32,7 @@ Task 冻结 Bundle 的唯一 OUTBOUND INTEGRATION Mapping 生成 OEM Payload。
 
 ## 明确未实现
 
-- 入站 adapter fallback 拆除、Mapping DSL、DISPATCH TECHNICIAN
+- 入站 adapter fallback 拆除见 **M333**；Mapping DSL；DISPATCH TECHNICIAN 见 **M332**
 
 ## 验证命令
 

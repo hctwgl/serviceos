@@ -341,6 +341,7 @@ title: ServiceOS 里程碑索引
 | M330 | M330 RULE 接入 Task complete / Evidence Snapshot 门禁 | [343-m330-rule-task-evidence-fulfillment-gate.md](../architecture/343-m330-rule-task-evidence-fulfillment-gate.md) | [327-m330-rule-task-evidence-fulfillment-gate-acceptance.md](../testing/327-m330-rule-task-evidence-fulfillment-gate-acceptance.md) |
 | M331 | M331 出站提审仅 Mapping 生成 Payload | [344-m331-outbound-mapping-only-payload.md](../architecture/344-m331-outbound-mapping-only-payload.md) | [328-m331-outbound-mapping-only-payload-acceptance.md](../testing/328-m331-outbound-mapping-only-payload-acceptance.md) |
 | M332 | M332 DISPATCH 自动激活 TECHNICIAN ServiceAssignment | [345-m332-dispatch-technician-auto-assign.md](../architecture/345-m332-dispatch-technician-auto-assign.md) | [329-m332-dispatch-technician-auto-assign-acceptance.md](../testing/329-m332-dispatch-technician-auto-assign-acceptance.md) |
+| M333 | M333 入站 Mapping 物化无适配器 fallback | [346-m333-inbound-mapping-no-fallback.md](../architecture/346-m333-inbound-mapping-no-fallback.md) | [330-m333-inbound-mapping-no-fallback-acceptance.md](../testing/330-m333-inbound-mapping-no-fallback-acceptance.md) |
 
 ## 未关联里程碑的文档
 

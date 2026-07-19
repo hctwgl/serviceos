@@ -279,10 +279,21 @@ class MultiOemParallelCreateSmokePostgresIT {
                 tenantId, ConfigurationAssetType.WORKFLOW, workflowKey,
                 "1.0.0", "1.0.0", workflow, Sha256.digest(workflow)));
         if ("BYD".equals(clientId)) {
+            // M333：有 INBOUND Mapping 时建单字段仅取 Mapping，不得依赖适配器 fallback。
             String integration = "{\"mappingKey\":\"byd-multi\",\"version\":\"1.0.0\","
-                    + "\"connectorCode\":\"BYD_CPIM\",\"direction\":\"INBOUND\","
-                    + "\"fieldMappings\":[{\"mappingId\":\"order\",\"externalPath\":\"orderCode\","
-                    + "\"internalPath\":\"externalOrderCode\",\"required\":true,\"transform\":\"TRIM\"}]}";
+                    + "\"connectorCode\":\"BYD_CPIM\",\"direction\":\"INBOUND\",\"fieldMappings\":["
+                    + "{\"mappingId\":\"order\",\"externalPath\":\"orderCode\",\"internalPath\":\"externalOrderCode\",\"required\":true,\"transform\":\"TRIM\"},"
+                    + "{\"mappingId\":\"brand\",\"externalPath\":\"brandCode\",\"internalPath\":\"brandCode\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"product\",\"externalPath\":\"serviceProductCode\",\"internalPath\":\"serviceProductCode\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"province\",\"externalPath\":\"provinceCode\",\"internalPath\":\"provinceCode\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"city\",\"externalPath\":\"cityCode\",\"internalPath\":\"cityCode\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"district\",\"externalPath\":\"areaCode\",\"internalPath\":\"districtCode\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"name\",\"externalPath\":\"contactName\",\"internalPath\":\"customerName\",\"required\":true,\"transform\":\"TRIM\"},"
+                    + "{\"mappingId\":\"mobile\",\"externalPath\":\"contactMobile\",\"internalPath\":\"customerMobile\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"address\",\"externalPath\":\"contactAddress\",\"internalPath\":\"serviceAddress\",\"required\":true,\"transform\":\"TRIM\"},"
+                    + "{\"mappingId\":\"vin\",\"externalPath\":\"vin\",\"internalPath\":\"vehicleVin\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"dispatch\",\"externalPath\":\"dispatchTime\",\"internalPath\":\"dispatchedAt\",\"required\":true,\"transform\":\"DATE_ISO\"}"
+                    + "]}";
             var integrationAsset = configurations.publishAsset(new PublishConfigurationAssetCommand(
                     tenantId, ConfigurationAssetType.INTEGRATION, "byd-multi",
                     "1.0.0", "1.0.0", integration, Sha256.digest(integration)));

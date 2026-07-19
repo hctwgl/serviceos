@@ -18,7 +18,7 @@ class CreateWorkOrderMappingMaterializerTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
-    void mappingFieldsAuthoritativelyOverlayAdapterCompatMapping() {
+    void mappingFieldsAreSoleSourceWithoutAdapterFallback() {
         CreateWorkOrderMappedInbound adapter = seedAdapter("  ORD-RAW  ", "13800000000");
         IntegrationMappingResult mapping = new IntegrationMappingResult(
                 "byd-create-v1",
@@ -28,8 +28,12 @@ class CreateWorkOrderMappingMaterializerTest {
                 "INBOUND",
                 Map.of(
                         "externalOrderCode", "ORD-TRIMMED",
-                        "customerMobile", "13900000000",
-                        "provinceCode", "370000"),
+                        "brandCode", "BYD_OCEAN",
+                        "serviceProductCode", "HOME_CHARGING_SURVEY_INSTALL",
+                        "provinceCode", "370000",
+                        "cityCode", "370100",
+                        "districtCode", "370102",
+                        "customerMobile", "13900000000"),
                 Map.of(),
                 List.of("order: orderCode -> externalOrderCode [TRIM]"));
 
@@ -39,14 +43,44 @@ class CreateWorkOrderMappingMaterializerTest {
         assertThat(materialized.externalOrderCode()).isEqualTo("ORD-TRIMMED");
         assertThat(materialized.customerMobile()).isEqualTo("13900000000");
         assertThat(materialized.provinceCode()).isEqualTo("370000");
-        assertThat(materialized.brandCode()).isEqualTo(adapter.brandCode());
+        assertThat(materialized.brandCode()).isEqualTo("BYD_OCEAN");
+        assertThat(materialized.customerName()).isNull();
+        assertThat(materialized.serviceAddress()).isNull();
+        assertThat(materialized.vehicleVin()).isNull();
+        assertThat(materialized.dispatchedAt()).isNull();
         assertThat(materialized.businessKey()).isEqualTo("BYD:INSTALL:ORD-TRIMMED");
         assertThat(materialized.mappingVersionId())
                 .isEqualTo("11111111-1111-1111-1111-111111111111");
         assertThat(new String(materialized.canonicalPayload()))
                 .contains("digest-aaa")
                 .contains("ORD-TRIMMED")
-                .contains("mappingAssetVersionId");
+                .contains("mappingAssetVersionId")
+                .doesNotContain("地址")
+                .doesNotContain("姓名");
+    }
+
+    @Test
+    void missingRequiredMappedFieldFailsClosedEvenWhenAdapterHasValue() {
+        CreateWorkOrderMappedInbound adapter = seedAdapter("ORD-1", "13800000000");
+        IntegrationMappingResult mapping = new IntegrationMappingResult(
+                "byd-create-v1",
+                UUID.randomUUID(),
+                "digest-bbb",
+                "BYD_CPIM",
+                "INBOUND",
+                Map.of(
+                        "externalOrderCode", "ORD-1",
+                        "brandCode", "BYD_OCEAN",
+                        "serviceProductCode", "HOME_CHARGING_SURVEY_INSTALL",
+                        "provinceCode", "370000",
+                        "cityCode", "370100"),
+                Map.of(),
+                List.of());
+
+        assertThatThrownBy(() -> CreateWorkOrderMappingMaterializer.materialize(
+                adapter, mapping, objectMapper))
+                .isInstanceOf(BusinessProblem.class)
+                .hasMessageContaining("missing required field: districtCode");
     }
 
     @Test
