@@ -27,7 +27,8 @@ relatedMilestones: [M24, M295, M306]
 
 ## 明确未实现
 
-- 真实短信/邮件供应商 Adapter；模板渲染引擎；持久化投递 Outbox；事件总线自动订阅；RULE / PRICING 运行时
+- 真实短信/邮件供应商 Adapter；模板渲染引擎；RULE / PRICING 运行时
+- 事件自动订阅与 Intent/Delivery/Attempt 持久化：见 **M326**
 
 ## 验证
 

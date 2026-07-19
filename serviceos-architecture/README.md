@@ -674,16 +674,17 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M325 RULE 接入 INTERNAL ReviewCase.decide 门禁**（功能证据见
+当前工程基线为 **M326 NOTIFICATION 可靠投递闭环**（功能证据见
 `implementation-status.md`；合入 `master` 后回填合并提交）。M320 合并基线为
 `32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147）。
 
 当前已具备多 OEM SPI、远端查询、UNKNOWN/批量重放、复杂流程、十大资产设计器、六类 Runtime，
 入站 Mapping 物化（M321）、出站 Mapping 提审 Payload（M322）、ASSIGNEE_POLICY → TaskAssignment
-CANDIDATE（M323）、DISPATCH → ServiceAssignment ACTIVE NETWORK（M324），以及 RULE → INTERNAL
-ReviewCase.decide 门禁（M325）。
-下一主线继续 **Configuration-Driven Fulfillment Runtime**（NOTIFICATION/PRICING
-自动接入业务、UNKNOWN/Replay Admin 工作台）；
+CANDIDATE（M323）、DISPATCH → ServiceAssignment ACTIVE NETWORK（M324）、RULE → INTERNAL
+ReviewCase.decide 门禁（M325），以及 NOTIFICATION 事件自动订阅与 Intent/Delivery/Attempt
+持久化（M326）。
+下一主线继续 **Configuration-Driven Fulfillment Runtime**（PRICING 自动接入、
+UNKNOWN/Replay Admin 工作台）；
 真实吉利 Sandbox 与 Track F/G 仍为 `BLOCKED_EXTERNAL`，不阻塞本地主线。
 
 权威进度入口：
@@ -691,6 +692,8 @@ ReviewCase.decide 门禁（M325）。
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M326 实现文档](architecture/339-m326-notification-reliable-delivery.md)
+- [M326 验收矩阵](testing/323-m326-notification-reliable-delivery-acceptance.md)
 - [M325 实现文档](architecture/338-m325-rule-review-decide-gate.md)
 - [M325 验收矩阵](testing/322-m325-rule-review-decide-gate-acceptance.md)
 - [M324 实现文档](architecture/337-m324-dispatch-policy-service-assignment.md)

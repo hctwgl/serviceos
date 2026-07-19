@@ -6,7 +6,9 @@
         allowedDependencies = {
                 "shared",
                 "identity::api",
-                "authorization::api"
+                "authorization::api",
+                "audit::api",
+                "reliability::api"
         }
 )
 package com.serviceos.configuration;

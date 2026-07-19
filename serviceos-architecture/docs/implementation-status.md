@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-19
-baselineCommit: f32dd3516a827c2c2b7756667ab3ff43a80f7cba
-latestMilestone: M325
+baselineCommit: pending-m326-feature
+latestMilestone: M326
 ---
 
 # ServiceOS 实施状态总览
@@ -39,12 +39,12 @@ latestMilestone: M325
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M325 RULE 接入 INTERNAL ReviewCase.decide 门禁 |
-| 基线提交 | `f32dd3516a827c2c2b7756667ab3ff43a80f7cba`（功能证据；合入 `master` 后改为合并提交） |
+| 最新实施里程碑 | M326 NOTIFICATION 可靠投递闭环 |
+| 基线提交 | （功能证据提交后回填；合入 `master` 后改为合并提交） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts`、`@serviceos/web-core`、`ServiceOSIOSCore`、独立且可部署的 `serviceos-network-web` 与 `serviceos-technician-web`、Swift 6 `TechnicianIOSFoundation`，以及已在 iPhone 17 Pro Simulator 安装启动、实跑 XCTest/XCUITest、形成 Production arm64 archive/dSYM，并接入当前任务、在线 Visit、冻结基础表单、前台 Evidence 采集上传、Snapshot/Task 完成与多轮资料整改的原生 `TechnicianIOS` SwiftUI App；由同一 Core OpenAPI 生成并经独立消费者门禁验证的 `@serviceos/core-client` 与 `ServiceOSCoreClient` |
 | 前端工程 | `serviceos-admin-web` 独立承载总部运营、统一用户中心、`/me` 导航、SavedView、UI Preference、受控搜索与最近访问；M256 后 Network 正式产品由独立 `serviceos-network-web` 承载，M257 后 Technician 正式产品由独立移动优先 `serviceos-technician-web` 承载，M262～M266 依次增加在线 Visit、冻结表单、Evidence 三段式上传、Snapshot/Task 完成与独立整改 Task 多轮补传/重新提交；Admin 仅保留可配置外链和 M188 诊断；两套独立 Web 均实际接入共享 Core、OIDC PKCE、服务端 Context/Capability/导航、Playwright 回归和独立容器镜像 |
-| 数据库 | PostgreSQL + Flyway（当前版本 123） |
+| 数据库 | PostgreSQL + Flyway（当前版本 124） |
 | 契约 | Core OpenAPI 1.0.43 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 `workorder.cancelled@v1`、`workorder.reopened@v1`、`workorder.external-details-updated@v1`、project.created@v3、project.scope-relations-revised@v1、`task.handling-completed@v1`、recovered/resolved 与 SLA started/breached/met@v1） |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
@@ -159,7 +159,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | 安全文件 | Begin/Finalize/隔离/扫描/授权下载/作废 | `IMPLEMENTED` | 独立安全文件生命周期；Evidence 编排 Begin/Finalize/Invalidate 联动 | 正式对象存储、专业扫描服务、物理删除 | M11、M38、M46 |
 | 审核整改 | ReviewCase、ReviewDecision、CorrectionCase | `PARTIAL` | Review + Correction + 整改 Task + 强制通过/重开 + 车企回执 + WAIVED；CLIENT Case 来源、批次/mapping 冻结；交付明确成功后自动创建 CLIENT Case/Route，UNKNOWN 可授权人工重发并在严格 ACK 后闭环异常；授权跨项目 ReviewCase 与 CorrectionCase 队列；M266 H5/iOS 领取、开始、多轮补传、Snapshot 与 resubmit，reviewer close 权威完成整改 Task | SLA/assignee enrich、多候选人/转派策略、审核人移动端、人工标记已送达/放弃、自动 Evidence target 映射 | M44～M60、M97～M98、M266 |
 | SLA | 时钟、预警、升级 | `PARTIAL` | Task `TASK_CREATED→TASK_COMPLETED` ELAPSED 时钟；显式策略版本/摘要锁定；TARGET_DUE 对账；RUNNING/BREACHED/MET/MET_LATE；Inbox/Outbox 与不可变 segment/milestone；`sla.read` + 实时 TENANT/PROJECT/REGION/NETWORK 授权集合的跨项目工作台、工单时间线与详情查询；关系修订使旧游标失败关闭；公开 started/breached/met 已并入工单执行时间线 | BUSINESS 日历、暂停/恢复、免责/重算、预警/升级/通知、其他 subject、组织关系、Portal 前端、考核结算 | M61～M66、M75 |
-| 通知 | 通知策略运行时与投递 | `PARTIAL` | **M307** 冻结 Bundle `NotificationRuntime`：事件触发匹配、when 求值、角色收件人快照、通道 SPI；本地参考 Adapter 对 IN_APP/PUSH 记 SENT，SMS/EMAIL 无凭据记 UNKNOWN（不伪造成功）；幂等与人工接管标记 | 领域事件自动订阅、模板渲染、持久化 Notification Outbox、真实短信/邮件/Push 供应商、Admin 投递工作台 | M307、`architecture/14-*` |
+| 通知 | 通知策略运行时与投递 | `PARTIAL` | **M307** 冻结 Bundle `NotificationRuntime`；**M326** `task.created`/`task.completed` 自动订阅 → Inbox + RoleGrant 收件人 → resolveAndDispatch → Intent/Delivery/Attempt 持久化；LocalReference SENT 本地 ACK，UNKNOWN/FAILED 人工接管 | 模板渲染、真实短信/邮件/Push 供应商、Admin 投递工作台、网络 I/O 移出事务与业务重试 Task 时钟 | M307、M326、`architecture/14-*` |
 | 履约事实与试算 | 事实提取和双向试算 | `PARTIAL` | **M309** 冻结 Bundle `PricingRuntime`：条件命中计费行、`amountMinor` 合计、币种与可审计解释；不落账 | FulfillmentFact 提取、CalculationSnapshot 持久化、应收/应付试算接入履约、对账结算、工作区投影 | M309、M5 设计 |
 | 对账结算 | 对账、结算、争议与调整 | `PROPOSED` | 已有边界设计 | 正式运行时和页面 | `architecture/16-*` |
 | Admin Portal | 总部运营后台 | `PARTIAL` | **M284/M287/M289/M291/M292/M294/M295/M296** 配置设计器壳、拖拽画布、建边/条件、依赖报告、干跑/历史回放、全资产类型；M101～M182：队列/任务/SLA/异常/入站/外发/工单/项目目录、工作区、allowed-actions；CI 阻断构建；开发态 Keycloak PKCE；真实只读与写链路 PR 阻断 E2E；M187～M188 用户中心与 `/me` 导航；**M189 个人 SavedView**；**M190 UI Preferences**；**M191 共享 SavedView**；**M192 受控全局搜索**；**M193 最近访问** | 条件积木 UI、设计系统、正式企业 OIDC/BFF | M7 设计、M101～M182、M187～M193、M284、M287、M289、M291、M292、M294、M295、M296、Admin 试点基线 |
@@ -175,18 +175,17 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M325**（RULE 接入 INTERNAL ReviewCase.decide 门禁）。
-M321～M325 均在 Draft stacked PRs 中；M320 已合入 `master`（`32b902f8`）。
+ServiceOS 可靠纵向切片已推进到 **M326**（NOTIFICATION 可靠投递闭环）。
+M321～M326 均在 Draft stacked PRs 中；M320 已合入 `master`（`32b902f8`）。
 
-当前契约/迁移：OpenAPI **1.0.43**；Flyway **123**。
+当前契约/迁移：OpenAPI **1.0.43**；Flyway **124**。
 
 下一阶段继续 **Configuration-Driven Fulfillment Runtime**：
 
-1. **NOTIFICATION** 可靠投递闭环（Outbox/Attempt/ACK）；
-2. **PRICING** 履约事实与 CalculationSnapshot；
-3. **UNKNOWN / Replay Admin 工作台**；
-4. 吉利真实联调材料到位后提升为最高优先级；否则保持 `BLOCKED_EXTERNAL`；
-5. 低代码高级能力仅在对应运行时已接入业务主链路后深化。
+1. **PRICING** 履约事实与 CalculationSnapshot；
+2. **UNKNOWN / Replay Admin 工作台**；
+3. 吉利真实联调材料到位后提升为最高优先级；否则保持 `BLOCKED_EXTERNAL`；
+4. 低代码高级能力仅在对应运行时已接入业务主链路后深化。
 
 仍为 **`BLOCKED_EXTERNAL`**（不阻塞上述本地主线）：
 

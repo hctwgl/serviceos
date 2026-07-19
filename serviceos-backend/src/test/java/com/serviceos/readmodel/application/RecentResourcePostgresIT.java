@@ -82,8 +82,8 @@ class RecentResourcePostgresIT {
                     cfg_configuration_asset_version, prj_project,
                     auth_tenant_grant_generation, auth_role_grant, auth_role_capability, auth_role CASCADE
                 """).update();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("123");
-        assertThat(flyway.info().applied()).hasSize(125);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("124");
+        assertThat(flyway.info().applied()).hasSize(126);
     }
 
     @Test
