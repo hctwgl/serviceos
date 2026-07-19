@@ -175,22 +175,30 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M306**。M267～M296 基线已稳定；**M297～M302** 已交付出站提审、
-审核回调、取消/更新入站、Profile/Route 注册表（OpenAPI **1.0.43**；Flyway **120 / 122**）。
+ServiceOS 可靠纵向切片已推进到 **M320**。批准主线 P0～P4 的**可执行范围已闭合**：
 
-下一主线（已批准）：吉利 Sandbox/OpenAPI 签名真实联调（BLOCKED_EXTERNAL）→
-真实第二家车企。远端查询 SPI 与 Track F/G 仍为 `BLOCKED_EXTERNAL`。
+- P0：M296 基线稳定 + `verify-local.sh` 阶段门禁通过；
+- P1：Connector SPI（M297～M302）+ 远端查询（M317）+ 人工确认/放弃（M318）+ 批量重放（M319）；
+- P2：六类配置运行时（M303～M309）；
+- P3：低代码设计器（M310～M315）；
+- P4 本地：吉利 AES 生命周期 stub（M311/M314/M316）+ 三 OEM 并行建单冒烟（M320）。
+
+当前契约/迁移：OpenAPI **1.0.43**；Flyway **120 / 122**。
+
+下一主线依赖外部材料，登记为 **`BLOCKED_EXTERNAL`**：
+
+- 吉利 Sandbox URL / 生产或联调 AK·SK·IV / OpenAPI 平台统一签名；
+- Swift/Xcode、签名真机、远端 `verify.yml`（已删除，不以恢复为默认）；
+- Track F/G 外部证据。
 
 ```text
-已接受推进顺序：
-1. P2 续：NOTIFICATION → RULE → PRICING 运行时；
-2. P1 余量：已闭合（单笔/批量重放、远端查询、人工处置）；
-3. P3：Workflow/条件积木/FORM/EVIDENCE/SLA 等低代码设计器；
-4. P4：吉利真实接入（缺 Sandbox/凭据则 BLOCKED_EXTERNAL）；
-5. Track F/G 外部证据如实登记，不阻塞上述主线。
+不可替代阻塞解除前不得宣称：
+- 真实吉利全链路 IMPLEMENTED；
+- 签名真机 / TestFlight / 正式企业 IdP 已验收。
 ```
 
-接手 Agent 必须先读取 `docs/autonomous-agent-handoff.md` 与本文件，验证 HEAD 后从断点继续。
+接手 Agent 必须先读取 `docs/autonomous-agent-handoff.md` 与本文件；在 Sandbox/凭据到位前以
+`BLOCKED_EXTERNAL` 停止，不要发明无事实源支持的新里程碑。
 
 ## 6. 证据阅读方法
 
