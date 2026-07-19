@@ -8,7 +8,7 @@ lastUpdated: 2026-07-19
 ## 当前
 
 - PR #148～#175：M321～M348 Draft stacked
-- 本分支：`cursor/m349-technician-form-condition-executor-88d5` — **M349** Technician FORM 条件执行器（Draft，base=#175）
+- PR #176：https://github.com/hctwgl/serviceos/pull/176 — **M349** Technician FORM 条件执行器（Draft，base=#175）
 - latestMilestone：**M349**
 - Flyway：**127**；OpenAPI：**1.0.43**
 - `baselineCommit`：功能提交后回填
@@ -19,10 +19,10 @@ lastUpdated: 2026-07-19
 |---|---|
 | #174 | M347 INTEGRATION Mapping DSL UI |
 | #175 | M348 DISPATCH residual editor |
-| （本 PR） | M349 Technician FORM condition executor |
+|  #176 | M349 Technician FORM condition executor |
 
 本地可无阻塞二次接线（Mapping DSL UI → DISPATCH 残留编辑器 → Technician 条件执行器）已收口。
-栈尖：`#148 → … → #175 → M349`。
+栈尖：`#148 → … → #175 → #176`。
 
 ## 下一（均为硬门禁，不可发明推进）
 
