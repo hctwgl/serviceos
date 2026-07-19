@@ -9,6 +9,8 @@ import {
 } from '../api/queues'
 import { acknowledgeOperationalException } from '../api/exceptions'
 import { firstRouteQuery, uuidRoute } from '../routeQuery'
+import { statusOptions } from '../product/statusLabels'
+import { toUserFacingError } from '../product/errorMessages'
 
 const linkColumns: Record<
   string,
@@ -22,6 +24,7 @@ const route = useRoute()
 
 const loading = ref(false)
 const error = ref<string | null>(null)
+const errorCode = ref<string | null>(null)
 const message = ref<string | null>(null)
 const page = ref<OperationalExceptionPage | null>(null)
 const cursor = ref<string | undefined>()
@@ -39,6 +42,8 @@ const category = ref('')
 const projectId = ref('')
 const workOrderId = ref('')
 const taskId = ref('')
+
+const statusChoices = statusOptions(['OPEN', 'ACKNOWLEDGED', 'RESOLVED'])
 
 /**
  * 从 URL query 水合筛选表单。
@@ -87,11 +92,14 @@ function queryParams(next?: string): OperationalExceptionQueueQuery {
 async function load(next?: string) {
   loading.value = true
   error.value = null
+  errorCode.value = null
   try {
     page.value = await listOperationalExceptions(queryParams(next))
     cursor.value = page.value.nextCursor ?? undefined
   } catch (err) {
-    error.value = err instanceof Error ? err.message : '加载异常队列失败'
+    const facing = toUserFacingError(err)
+    error.value = facing.message
+    errorCode.value = facing.errorCode
   } finally {
     loading.value = false
   }
@@ -102,20 +110,33 @@ function search() {
   return load()
 }
 
+function resetFilters() {
+  status.value = 'OPEN'
+  severity.value = ''
+  category.value = ''
+  projectId.value = ''
+  workOrderId.value = ''
+  taskId.value = ''
+  return search()
+}
+
 async function acknowledge(exceptionId: string, aggregateVersion: number) {
   busyId.value = exceptionId
   message.value = null
   error.value = null
+  errorCode.value = null
   try {
     const result = await acknowledgeOperationalException(
       exceptionId,
       aggregateVersion,
       note.value || null,
     )
-    message.value = `已确认 ${result.data.exceptionId}，version=${result.data.aggregateVersion}`
+    message.value = `已确认异常 ${result.data.exceptionId}`
     await load()
   } catch (err) {
-    error.value = err instanceof Error ? err.message : '确认异常失败'
+    const facing = toUserFacingError(err)
+    error.value = facing.message
+    errorCode.value = facing.errorCode
   } finally {
     busyId.value = null
   }
@@ -148,59 +169,66 @@ onMounted(() => {
 
 <template>
   <section>
+    <header class="page-head">
+      <h1>异常中心</h1>
+      <p class="desc">
+        处理运营异常与自动化失败。默认展示待处理异常，可按严重程度、类别、项目或关联工单筛选。
+      </p>
+    </header>
     <form class="filters" @submit.prevent="search">
       <label>
-        status
+        异常状态
         <select v-model="status" aria-label="exception status filter">
           <option value="">（不限）</option>
-          <option value="OPEN">OPEN</option>
-          <option value="ACKNOWLEDGED">ACKNOWLEDGED</option>
-          <option value="RESOLVED">RESOLVED</option>
+          <option v-for="opt in statusChoices" :key="opt.value" :value="opt.value">
+            {{ opt.label }}
+          </option>
         </select>
       </label>
       <label>
-        severity
+        严重程度
         <select v-model="severity" aria-label="exception severity filter">
           <option value="">（不限）</option>
-          <option value="P0">P0</option>
-          <option value="P1">P1</option>
-          <option value="P2">P2</option>
-          <option value="P3">P3</option>
+          <option value="P0">P0（紧急）</option>
+          <option value="P1">P1（高）</option>
+          <option value="P2">P2（中）</option>
+          <option value="P3">P3（低）</option>
         </select>
       </label>
       <label>
-        category
+        异常类别
         <input
           v-model="category"
           aria-label="exception category filter"
-          placeholder="e.g. AUTOMATION_FINAL_FAILURE"
+          placeholder="如 AUTOMATION_FINAL_FAILURE"
         />
       </label>
       <label>
-        projectId
+        所属项目
         <input
           v-model="projectId"
           aria-label="exception projectId filter"
-          placeholder="uuid"
+          placeholder="项目名称或编号"
         />
       </label>
       <label>
-        workOrderId
+        关联工单
         <input
           v-model="workOrderId"
           aria-label="exception workOrderId filter"
-          placeholder="uuid"
+          placeholder="工单编号"
         />
       </label>
       <label>
-        taskId
+        关联任务
         <input
           v-model="taskId"
           aria-label="exception taskId filter"
-          placeholder="uuid"
+          placeholder="任务编号"
         />
       </label>
       <button type="submit" :disabled="loading">查询</button>
+      <button type="button" :disabled="loading" @click="resetFilters">重置筛选</button>
     </form>
 
     <label class="note">
@@ -220,11 +248,23 @@ onMounted(() => {
         'openedAt',
         'aggregateVersion',
       ]"
+      :column-labels="{
+        exceptionId: '异常单号',
+        projectId: '所属项目',
+        severity: '严重程度',
+        category: '异常类别',
+        status: '异常状态',
+        errorCode: '错误码',
+        openedAt: '打开时间',
+        aggregateVersion: '版本',
+      }"
       :rows="rows"
       :link-columns="linkColumns"
       :loading="loading"
       :error="error"
+      :error-code="errorCode"
       :next-cursor="cursor ?? null"
+      empty-guide="当前没有运营异常，系统运行正常；或可调整筛选条件查看历史记录。"
       @refresh="load()"
       @next="load(cursor)"
     />
@@ -250,7 +290,7 @@ onMounted(() => {
         :key="item.exceptionId"
         :to="{ name: 'ADMIN.EXCEPTION.DETAIL', params: { id: item.exceptionId } }"
       >
-        打开异常 {{ item.exceptionId }}
+        打开异常
       </RouterLink>
     </p>
     <p v-if="page?.items?.some((i) => i.workOrderId)" class="links">
@@ -260,7 +300,7 @@ onMounted(() => {
         :key="`wo-${item.exceptionId}`"
         :to="{ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: item.workOrderId } }"
       >
-        {{ item.workOrderId }}
+        打开工单
       </RouterLink>
     </p>
     <p
@@ -277,27 +317,39 @@ onMounted(() => {
         :key="`project-${item.exceptionId}`"
         :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: item.projectId! } }"
       >
-        打开项目 {{ item.projectId }}
+        打开项目
       </RouterLink>
       <RouterLink
         v-for="item in page.items.filter((i) => i.taskId)"
         :key="`task-${item.exceptionId}`"
         :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: item.taskId! } }"
       >
-        打开任务 {{ item.taskId }}
+        打开任务
       </RouterLink>
       <RouterLink
         v-for="item in page.items.filter((i) => i.handlingTaskId)"
         :key="`handling-${item.exceptionId}`"
         :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: item.handlingTaskId! } }"
       >
-        打开人工接管任务 {{ item.handlingTaskId }}
+        打开人工接管任务
       </RouterLink>
     </p>
   </section>
 </template>
 
 <style scoped>
+.page-head {
+  margin-bottom: 0.75rem;
+}
+.page-head h1 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+.desc {
+  margin: 0.35rem 0 0;
+  color: #627d98;
+  font-size: 0.92rem;
+}
 .filters {
   display: flex;
   flex-wrap: wrap;
@@ -328,7 +380,6 @@ button {
 }
 input {
   min-width: 12rem;
-  font-family: ui-monospace, monospace;
 }
 .acks {
   margin-top: 0.75rem;

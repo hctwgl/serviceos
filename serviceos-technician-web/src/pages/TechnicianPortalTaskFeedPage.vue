@@ -8,6 +8,7 @@ import {
   type TechnicianPortalFeedItem,
 } from '../api/technicianPortal'
 import { userFacingError } from '../api/client'
+import { formatDateTime, statusLabel } from '@serviceos/web-core'
 
 const props = defineProps<{ technicianContextId: string | null }>()
 const items = ref<TechnicianPortalFeedItem[]>([])
@@ -15,6 +16,7 @@ const networkId = ref<string | null>(null)
 const asOf = ref<string | null>(null)
 const nextCursor = ref<string | null>(null)
 const error = ref<string | null>(null)
+const loading = ref(false)
 const loadingMore = ref(false)
 const corrections = ref<TechnicianCorrection[]>([])
 const correctionError = ref<string | null>(null)
@@ -39,8 +41,12 @@ async function load(options?: { append?: boolean; sinceCursor?: string }) {
     networkId.value = null
     asOf.value = null
     nextCursor.value = null
-    error.value = '请选择 TECHNICIAN 上下文'
+    error.value = '请选择师傅上下文'
+    loading.value = false
     return
+  }
+  if (!options?.append) {
+    loading.value = true
   }
   try {
     const page = await listTechnicianTaskFeed(
@@ -59,7 +65,11 @@ async function load(options?: { append?: boolean; sinceCursor?: string }) {
       asOf.value = null
       nextCursor.value = null
     }
-    error.value = userFacingError(err, '任务 Feed 加载失败')
+    error.value = userFacingError(err, '今日任务加载失败')
+  } finally {
+    if (!options?.append) {
+      loading.value = false
+    }
   }
 }
 
@@ -92,8 +102,8 @@ watch(() => props.technicianContextId, () => {
   >
     <header class="top">
       <div>
-        <h2>任务 Feed</h2>
-        <p class="hint">M218：展示 M195 Accepted 非 PII 字段；支持 sinceCursor 增量。</p>
+        <h2>今日任务</h2>
+        <p class="hint">我下一步需要做什么：联系客户、预约、上门、上传资料、处理整改。</p>
       </div>
       <button type="button" data-testid="technician-feed-refresh" @click="load()">
         刷新
@@ -101,11 +111,13 @@ watch(() => props.technicianContextId, () => {
     </header>
     <section class="corrections" data-testid="technician-corrections">
       <div class="correction-heading">
-        <h3>整改任务</h3>
+        <h3>待整改任务</h3>
         <button type="button" data-testid="technician-corrections-refresh" @click="loadCorrections">刷新整改</button>
       </div>
       <p v-if="correctionError" data-testid="technician-corrections-error">{{ correctionError }}</p>
-      <p v-else-if="corrections.length === 0" data-testid="technician-corrections-empty">暂无待处理整改</p>
+      <p v-else-if="corrections.length === 0" data-testid="technician-corrections-empty">
+        当前没有整改任务，所有资料均已处理完成。
+      </p>
       <article
         v-for="correction in corrections"
         v-else
@@ -115,31 +127,48 @@ watch(() => props.technicianContextId, () => {
       >
         <div>
           <strong>{{ correction.reasonCodes.join(' / ') }}</strong>
-          <p>整改 {{ correction.caseStatus }} · 任务 {{ correction.taskStatus }} · 已重提 {{ correction.resubmissionCount }} 次</p>
+          <p>
+            整改状态 {{ statusLabel(correction.caseStatus) }}
+            · 任务 {{ statusLabel(correction.taskStatus) }}
+            · 重新提交 {{ correction.resubmissionCount }} 次
+          </p>
         </div>
-        <RouterLink :to="`/technician-portal/corrections/${correction.correctionCaseId}`">处理整改</RouterLink>
+        <RouterLink :to="`/technician-portal/corrections/${correction.correctionCaseId}`">
+          查看整改要求
+        </RouterLink>
       </article>
     </section>
-    <p v-if="error" data-testid="technician-portal-error">{{ error }}</p>
+    <p v-if="loading" data-testid="technician-feed-loading">正在加载数据，请稍候……</p>
+    <p v-else-if="error" data-testid="technician-portal-error">{{ error }}</p>
     <template v-else>
       <dl v-if="asOf" data-testid="technician-feed-meta" class="meta">
-        <div><dt>networkId</dt><dd data-testid="technician-feed-network-id">{{ networkId }}</dd></div>
-        <div><dt>asOf</dt><dd data-testid="technician-feed-as-of">{{ asOf }}</dd></div>
+        <div>
+          <dt>所属网点</dt>
+          <dd data-testid="technician-feed-network-id">{{ networkId }}</dd>
+        </div>
+        <div>
+          <dt>统计时间</dt>
+          <dd>
+            <span data-testid="technician-feed-as-of">{{ asOf }}</span>
+            <span class="muted">（{{ formatDateTime(asOf) }}）</span>
+          </dd>
+        </div>
       </dl>
       <table data-testid="technician-feed-table">
         <thead>
           <tr>
-            <th>类型</th>
+            <th>事项</th>
             <th>任务</th>
-            <th>工单</th>
-            <th>项目</th>
+            <th>关联工单</th>
+            <th>所属项目</th>
             <th>状态</th>
-            <th>阶段</th>
-            <th>类型码</th>
-            <th>种类</th>
-            <th>业务</th>
-            <th>生效自</th>
-            <th>失效原因</th>
+            <th>当前阶段</th>
+            <th>任务类型</th>
+            <th>任务种类</th>
+            <th>业务类型</th>
+            <th>生效时间</th>
+            <th>说明</th>
+            <th>操作</th>
           </tr>
         </thead>
         <tbody>
@@ -148,37 +177,49 @@ watch(() => props.technicianContextId, () => {
             :key="item.cursor"
             :data-testid="`technician-feed-row-${item.taskId}`"
           >
-            <td>{{ item.itemType }}</td>
+            <td>{{ item.itemType === 'ASSIGNMENT' ? '责任任务' : item.itemType }}</td>
             <td>
               <RouterLink
                 v-if="item.itemType === 'ASSIGNMENT'"
                 :to="`/technician-portal/tasks/${item.taskId}`"
                 data-testid="technician-feed-task-detail-deeplink"
               >
-                {{ item.taskId }}
+                打开任务
               </RouterLink>
-              <span v-else>{{ item.taskId }}</span>
+              <span v-else>查看</span>
+            </td>
+            <td>{{ item.workOrderId ? '关联工单' : '—' }}</td>
+            <td data-testid="technician-feed-project-id">{{ item.projectId ?? '—' }}</td>
+            <td>{{ statusLabel(item.taskStatus) }}</td>
+            <td data-testid="technician-feed-stage-code">{{ item.stageCode ?? '—' }}</td>
+            <td data-testid="technician-feed-task-type">{{ item.taskType ?? '—' }}</td>
+            <td data-testid="technician-feed-task-kind">{{ item.taskKind ?? '—' }}</td>
+            <td data-testid="technician-feed-business-type">{{ item.businessType ?? '—' }}</td>
+            <td data-testid="technician-feed-effective-from">
+              {{ formatDateTime(item.effectiveFrom) }}
+            </td>
+            <td>{{ item.invalidationReason ?? '—' }}</td>
+            <td>
+              <RouterLink
+                v-if="item.itemType === 'ASSIGNMENT'"
+                :to="`/technician-portal/tasks/${item.taskId}`"
+              >
+                开始处理
+              </RouterLink>
               <RouterLink
                 v-if="item.itemType === 'ASSIGNMENT'"
                 :to="{ path: '/technician-portal/schedule', query: { taskId: item.taskId } }"
                 data-testid="technician-feed-schedule-deeplink"
               >
-                日程
+                查看日程
               </RouterLink>
             </td>
-            <td>{{ item.workOrderId ?? '—' }}</td>
-            <td data-testid="technician-feed-project-id">{{ item.projectId ?? '—' }}</td>
-            <td>{{ item.taskStatus ?? '—' }}</td>
-            <td data-testid="technician-feed-stage-code">{{ item.stageCode ?? '—' }}</td>
-            <td data-testid="technician-feed-task-type">{{ item.taskType ?? '—' }}</td>
-            <td data-testid="technician-feed-task-kind">{{ item.taskKind ?? '—' }}</td>
-            <td data-testid="technician-feed-business-type">{{ item.businessType ?? '—' }}</td>
-            <td data-testid="technician-feed-effective-from">{{ item.effectiveFrom ?? '—' }}</td>
-            <td>{{ item.invalidationReason ?? '—' }}</td>
           </tr>
         </tbody>
       </table>
-      <p v-if="items.length === 0" data-testid="technician-feed-empty">暂无 ACTIVE 责任任务</p>
+      <p v-if="items.length === 0" data-testid="technician-feed-empty">
+        当前没有待办任务。请等待网点指派，或刷新后重试。
+      </p>
       <button
         v-if="nextCursor"
         type="button"

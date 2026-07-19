@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.44
+  version: 1.0.45
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -1808,6 +1808,38 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+  /network-portal/tasks/{taskId}:accept-assignment:
+    post:
+      operationId: acceptNetworkPortalAssignment
+      summary: Network Portal 为本网点任务确认接单
+      description: |
+        产品可用性：X-Network-Context + NETWORK scope networkPortal.acceptAssignment。
+        仅激活 ACTIVE NETWORK；请求体不含 networkAssigneeId；服务端强制等于可信上下文网点。
+        已有相同网点 ACTIVE NETWORK 时幂等回放；其他网点 ACTIVE 返回 SERVICE_ASSIGNMENT_CONFLICT（409）。
+        上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NetworkPortalAcceptAssignmentRequest' }
+      responses:
+        '200':
+          description: NETWORK 责任已激活或幂等回放
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NetworkPortalAcceptAssignmentReceipt' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
   /network-portal/tasks/{taskId}:assign-technician:
     post:
       operationId: assignNetworkPortalTechnician
@@ -9165,6 +9197,22 @@ components:
         networkAssigneeId: { type: string, minLength: 1, maxLength: 128 }
         technicianAssigneeId: { type: string, minLength: 1, maxLength: 128 }
         businessType: { type: string, minLength: 1, maxLength: 100 }
+    NetworkPortalAcceptAssignmentRequest:
+      type: object
+      additionalProperties: false
+      required: [businessType]
+      properties:
+        businessType: { type: string, minLength: 1, maxLength: 100 }
+    NetworkPortalAcceptAssignmentReceipt:
+      type: object
+      additionalProperties: false
+      required: [taskId, workOrderId, networkServiceAssignmentId, networkAssigneeId, occurredAt]
+      properties:
+        taskId: { type: string, format: uuid }
+        workOrderId: { type: string, format: uuid }
+        networkServiceAssignmentId: { type: string, format: uuid }
+        networkAssigneeId: { type: string, minLength: 1, maxLength: 128 }
+        occurredAt: { type: string, format: date-time }
     NetworkPortalAssignTechnicianRequest:
       type: object
       additionalProperties: false

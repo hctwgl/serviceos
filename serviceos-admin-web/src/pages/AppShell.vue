@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink, RouterView } from 'vue-router'
 import {
   loadAdminPortalNavigation,
@@ -12,6 +12,27 @@ import {
   listRecentResources,
   type RecentResourceItem,
 } from '../api/recentResources'
+import ErrorBoundary from '../components/ErrorBoundary.vue'
+
+/** 将服务端导航按运营场景分组；技术菜单收入「运维工具」。 */
+const SECTION_RULES: Array<{ title: string; match: RegExp }> = [
+  { title: '工作台', match: /WORKBENCH|SEARCH/i },
+  { title: '工单运营', match: /WORK_?ORDER|REVIEW|CORRECTION/i },
+  { title: '服务履约', match: /TASK|APPOINTMENT|VISIT|SLA/i },
+  { title: '质量与时效', match: /EXCEPTION|SLA/i },
+  { title: '基础资料', match: /PROJECT|NETWORK|TECHNICIAN|ORGANIZATION|USER/i },
+  { title: '系统管理', match: /ROLE|GRANT|CONFIGURATION|PREFERENCE/i },
+]
+
+const DEVOPS_PAGE_IDS = new Set([
+  'ADMIN.INTEGRATION.OUTBOUND',
+  'ADMIN.INTEGRATION.INBOUND',
+  'ADMIN.INTEGRATION.DETAIL',
+  'ADMIN.INTEGRATION.INBOUND.DETAIL',
+  'ADMIN.INTEGRATION.CANONICAL.DETAIL',
+  'ADMIN.PORTAL.STUBS',
+  'ADMIN.TOKEN',
+])
 
 const nav = ref<PortalNavState>({
   contexts: [],
@@ -30,6 +51,7 @@ const technicianPortalUrl = import.meta.env.VITE_TECHNICIAN_PORTAL_URL?.trim()
   || (import.meta.env.DEV ? 'http://localhost:5175' : '')
 
 const TEST_IDS: Record<string, string> = {
+  'ADMIN.WORKBENCH': 'nav-workbench',
   'ADMIN.SEARCH': 'nav-search',
   'ADMIN.USER.DIRECTORY': 'nav-users',
   'ADMIN.ORGANIZATION.DIRECTORY': 'nav-organizations',
@@ -38,6 +60,23 @@ const TEST_IDS: Record<string, string> = {
   'ADMIN.ROLE.DIRECTORY': 'nav-roles',
   'ADMIN.GRANT.DIRECTORY': 'nav-grants',
 }
+
+const showDevTools = import.meta.env.DEV
+
+const groupedNav = computed(() => {
+  const groups = new Map<string, typeof nav.value.items>()
+  for (const item of nav.value.items) {
+    if (DEVOPS_PAGE_IDS.has(item.pageId)) {
+      continue
+    }
+    const section =
+      SECTION_RULES.find((rule) => rule.match.test(item.pageId))?.title ?? '其他'
+    const list = groups.get(section) ?? []
+    list.push(item)
+    groups.set(section, list)
+  }
+  return [...groups.entries()]
+})
 
 async function refreshNav(preferredContextId?: string | null) {
   nav.value = await loadAdminPortalNavigation(preferredContextId)
@@ -95,8 +134,8 @@ onMounted(() => {
 <template>
   <div class="shell">
     <aside class="nav">
-      <h1>ServiceOS Admin</h1>
-      <p class="hint">运营外壳（M101～M188）。导航来自 `/me/navigation`，写操作仍走服务端命令与 Capability。</p>
+      <h1>ServiceOS 管理端</h1>
+      <p class="hint">按工作场景组织导航。菜单可见性来自服务端，写操作仍由 Capability 校验。</p>
       <div
         v-if="nav.contexts.filter((c) => c.portal === 'ADMIN').length > 1"
         class="context"
@@ -119,21 +158,37 @@ onMounted(() => {
       </div>
       <p v-if="nav.stale" class="stale" data-testid="context-stale-banner">上下文已刷新（旧版本失效）</p>
       <p v-if="nav.error" class="error" data-testid="nav-error">{{ nav.error }}</p>
-      <template v-for="item in nav.items" :key="item.pageId">
+      <section v-for="[section, items] in groupedNav" :key="section" class="nav-section">
+        <h2>{{ section }}</h2>
         <RouterLink
+          v-for="item in items"
+          :key="item.pageId"
           :to="routePathFor(item)"
           :data-testid="TEST_IDS[item.pageId] ?? `nav-${item.routeKey.replaceAll('/', '-')}`"
           :data-page-id="item.pageId"
         >
           {{ item.title }}
         </RouterLink>
-      </template>
-      <RouterLink to="/work-orders/lookup">按 ID 打开</RouterLink>
-      <RouterLink to="/settings/preferences" data-testid="nav-ui-preferences">界面偏好</RouterLink>
-      <RouterLink to="/settings/token">身份登录</RouterLink>
-      <RouterLink to="/portal-stubs" data-testid="nav-portal-stubs">Portal stubs</RouterLink>
-      <a v-if="networkPortalUrl" :href="networkPortalUrl" data-testid="nav-network-portal">独立 Network Portal</a>
-      <a v-if="technicianPortalUrl" :href="technicianPortalUrl" data-testid="nav-technician-portal">独立 Technician H5</a>
+      </section>
+      <section class="nav-section">
+        <h2>工单运营</h2>
+        <RouterLink to="/work-orders/golden-path" data-testid="nav-golden-path">工单全流程演练</RouterLink>
+      </section>
+      <section class="nav-section">
+        <h2>系统管理</h2>
+        <RouterLink to="/settings/preferences" data-testid="nav-ui-preferences">界面偏好</RouterLink>
+        <RouterLink v-if="showDevTools" to="/system/demo-data" data-testid="nav-demo-data">演示数据管理</RouterLink>
+        <RouterLink to="/settings/token">身份登录</RouterLink>
+      </section>
+      <section v-if="showDevTools" class="nav-section">
+        <h2>运维与开发者工具</h2>
+        <RouterLink to="/work-orders/lookup">按 ID 打开</RouterLink>
+        <RouterLink to="/integration/inbound">入站队列</RouterLink>
+        <RouterLink to="/integration/outbound">外发队列</RouterLink>
+        <RouterLink to="/portal-stubs" data-testid="nav-portal-stubs">Portal 诊断</RouterLink>
+        <a v-if="networkPortalUrl" :href="networkPortalUrl" data-testid="nav-network-portal">网点端</a>
+        <a v-if="technicianPortalUrl" :href="technicianPortalUrl" data-testid="nav-technician-portal">师傅端</a>
+      </section>
       <section class="recent" data-testid="recent-resources">
         <h2>最近访问</h2>
         <p v-if="recentError" class="error" data-testid="recent-error">{{ recentError }}</p>
@@ -161,7 +216,9 @@ onMounted(() => {
       </section>
     </aside>
     <main class="content">
-      <RouterView />
+      <ErrorBoundary scope="shell-page">
+        <RouterView />
+      </ErrorBoundary>
     </main>
   </div>
 </template>
@@ -197,6 +254,20 @@ onMounted(() => {
 .nav h1 {
   margin: 0;
   font-size: 1.1rem;
+}
+.nav-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-top: 0.35rem;
+}
+.nav-section h2 {
+  margin: 0.35rem 0 0.15rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: #9fb3c8;
 }
 .hint {
   margin: 0 0 0.5rem;

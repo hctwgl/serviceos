@@ -6,7 +6,10 @@ import {
   createContextSelectionStore,
   createMemoryAccessTokenStore,
   createWebApiClient,
+  fieldLabel,
+  formatDateTime,
   safeProblemMessage,
+  statusLabel,
 } from '../dist/index.js'
 
 test('memory token store expires fail-closed without browser persistence', () => {
@@ -81,4 +84,19 @@ test('problem detail is retained for diagnostics but user message is fixed', asy
     return true
   })
   assert.equal(authenticationRequired, 1)
+})
+
+test('product status and field labels are Chinese for operators', () => {
+  assert.equal(statusLabel('IN_PROGRESS'), '处理中')
+  assert.equal(statusLabel('WAITING_REVIEW'), '待审核')
+  assert.equal(statusLabel('BREACHED'), '已超时')
+  assert.equal(fieldLabel('createdAt'), '创建时间')
+  assert.equal(fieldLabel('projectId'), '所属项目')
+})
+
+test('formatDateTime renders local wall clock without ISO Z suffix', () => {
+  const formatted = formatDateTime('2026-07-19T09:00:15.613824Z')
+  assert.match(formatted, /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
+  assert.ok(!formatted.includes('T'))
+  assert.ok(!formatted.includes('Z'))
 })

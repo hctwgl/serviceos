@@ -109,8 +109,8 @@ class NetworkPortalWorkbenchEnrichmentPostgresIT {
                     prj_project,
                     rel_idempotency_record, aud_audit_record CASCADE
                 """).update();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("125");
-        assertThat(flyway.info().applied()).hasSize(127);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("128");
+        assertThat(flyway.info().applied()).hasSize(130);
 
         jdbc.sql("""
                 INSERT INTO prj_project (

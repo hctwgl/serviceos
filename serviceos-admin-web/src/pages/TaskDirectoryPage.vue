@@ -5,6 +5,8 @@ import SavedViewBar from '../components/SavedViewBar.vue'
 import QueueTable from './QueueTable.vue'
 import { listAuthorizedTasks, type TaskDirectoryPage } from '../api/tasksDirectory'
 import { firstRouteQuery, uuidRoute } from '../routeQuery'
+import { statusOptions } from '../product/statusLabels'
+import { toUserFacingError } from '../product/errorMessages'
 
 const linkColumns: Record<
   string,
@@ -18,6 +20,7 @@ const route = useRoute()
 
 const loading = ref(false)
 const error = ref<string | null>(null)
+const errorCode = ref<string | null>(null)
 const page = ref<TaskDirectoryPage | null>(null)
 const cursor = ref<string | undefined>()
 /** 默认不限；显式 route.query 可覆盖。 */
@@ -25,6 +28,18 @@ const status = ref('')
 const taskKind = ref('')
 const assigneeMe = ref(false)
 const projectId = ref('')
+
+const statusChoices = statusOptions([
+  'READY',
+  'CLAIMED',
+  'RUNNING',
+  'PENDING',
+  'RETRY_WAIT',
+  'SUCCEEDED',
+  'MANUAL_INTERVENTION',
+  'COMPLETED',
+  'CANCELLED',
+])
 
 function hydrateFiltersFromRoute() {
   const nextStatus = firstRouteQuery(route, 'status')
@@ -49,6 +64,7 @@ function hydrateFiltersFromRoute() {
 async function load(next?: string) {
   loading.value = true
   error.value = null
+  errorCode.value = null
   try {
     page.value = await listAuthorizedTasks({
       cursor: next,
@@ -60,7 +76,9 @@ async function load(next?: string) {
     })
     cursor.value = page.value.nextCursor ?? undefined
   } catch (err) {
-    error.value = err instanceof Error ? err.message : '加载任务目录失败'
+    const facing = toUserFacingError(err)
+    error.value = facing.message
+    errorCode.value = facing.errorCode
   } finally {
     loading.value = false
   }
@@ -69,6 +87,14 @@ async function load(next?: string) {
 function search() {
   cursor.value = undefined
   return load()
+}
+
+function resetFilters() {
+  status.value = ''
+  taskKind.value = ''
+  assigneeMe.value = false
+  projectId.value = ''
+  return search()
 }
 
 function currentFilters() {
@@ -109,6 +135,12 @@ onMounted(() => {
 
 <template>
   <section>
+    <header class="page-head">
+      <h1>任务中心</h1>
+      <p class="desc">
+        浏览授权范围内的任务。可按任务状态、类型、项目筛选，或仅查看分配给我的任务。
+      </p>
+    </header>
     <SavedViewBar
       page-id="ADMIN.TASK.QUEUE"
       :schema-version="1"
@@ -117,52 +149,59 @@ onMounted(() => {
     />
     <form class="filters" @submit.prevent="search">
       <label>
-        status
+        任务状态
         <select v-model="status" aria-label="task status filter">
           <option value="">（不限）</option>
-          <option value="READY">READY</option>
-          <option value="CLAIMED">CLAIMED</option>
-          <option value="RUNNING">RUNNING</option>
-          <option value="PENDING">PENDING</option>
-          <option value="RETRY_WAIT">RETRY_WAIT</option>
-          <option value="SUCCEEDED">SUCCEEDED</option>
-          <option value="MANUAL_INTERVENTION">MANUAL_INTERVENTION</option>
-          <option value="COMPLETED">COMPLETED</option>
-          <option value="CANCELLED">CANCELLED</option>
+          <option v-for="opt in statusChoices" :key="opt.value" :value="opt.value">
+            {{ opt.label }}
+          </option>
         </select>
       </label>
       <label>
-        taskKind
+        任务类型
         <select v-model="taskKind" aria-label="task taskKind filter">
           <option value="">（不限）</option>
-          <option value="HUMAN">HUMAN</option>
-          <option value="AUTOMATED">AUTOMATED</option>
+          <option value="HUMAN">人工任务</option>
+          <option value="AUTOMATED">自动任务</option>
         </select>
       </label>
       <label>
-        projectId
+        所属项目
         <input
           v-model="projectId"
           aria-label="task projectId filter"
-          placeholder="uuid"
+          placeholder="项目名称或编号"
         />
       </label>
       <label class="check">
         <input v-model="assigneeMe" type="checkbox" aria-label="task assignee me filter" />
-        assignee=me
+        仅看我的任务
       </label>
       <button type="submit" :disabled="loading">查询</button>
+      <button type="button" :disabled="loading" @click="resetFilters">重置筛选</button>
     </form>
 
     <QueueTable
       title="授权任务目录"
       :columns="['id', 'taskType', 'taskKind', 'status', 'priority', 'claimedBy', 'workOrderId', 'nextRunAt']"
+      :column-labels="{
+        id: '任务编号',
+        taskType: '任务类型',
+        taskKind: '执行方式',
+        status: '任务状态',
+        priority: '优先级',
+        claimedBy: '认领人',
+        workOrderId: '关联工单',
+        nextRunAt: '下次执行时间',
+      }"
       :rows="rows"
       :link-columns="linkColumns"
       :loading="loading"
       :error="error"
+      :error-code="errorCode"
       :as-of="page?.asOf"
       :next-cursor="cursor ?? null"
+      empty-guide="当前没有符合条件的任务；可调整筛选条件或查看其他项目。"
       @refresh="load()"
       @next="load(cursor)"
     />
@@ -197,13 +236,25 @@ onMounted(() => {
         :key="`project-${item.id}`"
         :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: item.projectId! } }"
       >
-        打开项目 {{ item.projectId }}
+        打开项目
       </RouterLink>
     </p>
   </section>
 </template>
 
 <style scoped>
+.page-head {
+  margin-bottom: 0.75rem;
+}
+.page-head h1 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+.desc {
+  margin: 0.35rem 0 0;
+  color: #627d98;
+  font-size: 0.92rem;
+}
 .filters {
   display: flex;
   flex-wrap: wrap;
@@ -223,6 +274,7 @@ label {
   gap: 0.4rem;
 }
 select,
+input,
 button {
   border: 1px solid #bcccdc;
   border-radius: 6px;
@@ -233,6 +285,9 @@ button {
   color: #fff;
   border-color: #243b53;
   cursor: pointer;
+}
+button:disabled {
+  opacity: 0.5;
 }
 .links {
   margin-top: 0.75rem;

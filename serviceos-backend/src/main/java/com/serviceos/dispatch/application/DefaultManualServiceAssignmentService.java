@@ -9,6 +9,7 @@ import com.serviceos.dispatch.api.ManualAssignServiceAssignmentCommand;
 import com.serviceos.dispatch.api.ManualReassignTechnicianCommand;
 import com.serviceos.dispatch.api.ManualServiceAssignmentReceipt;
 import com.serviceos.dispatch.api.ManualServiceAssignmentService;
+import com.serviceos.dispatch.api.NetworkPortalAcceptAssignmentReceipt;
 import com.serviceos.dispatch.api.PrepareServiceAssignmentCommand;
 import com.serviceos.dispatch.api.ResponsibilityLevel;
 import com.serviceos.dispatch.api.ServiceAssignmentReceipt;
@@ -91,6 +92,36 @@ final class DefaultManualServiceAssignmentService implements ManualServiceAssign
                 command.taskId(), task.workOrderId(),
                 network.serviceAssignmentId(), technician.serviceAssignmentId(),
                 command.networkAssigneeId(), command.technicianAssigneeId(),
+                clock.instant());
+    }
+
+    @Override
+    @Transactional
+    public NetworkPortalAcceptAssignmentReceipt manualAssignNetwork(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            UUID taskId,
+            String networkAssigneeId,
+            String businessType
+    ) {
+        TaskFulfillmentContext task = tasks.find(principal.tenantId(), taskId)
+                .orElseThrow(() -> new BusinessProblem(
+                        ProblemCode.RESOURCE_NOT_FOUND, "Task does not exist"));
+        if (!"HUMAN".equals(task.taskKind())) {
+            throw new BusinessProblem(ProblemCode.TASK_STATE_CONFLICT,
+                    "Only a HUMAN Task supports network acceptance");
+        }
+
+        String key = metadata.idempotencyKey();
+        ensureCapacity(principal, metadata, ResponsibilityLevel.NETWORK,
+                networkAssigneeId, businessType, key + "-cap-network");
+        ServiceAssignmentReceipt network = activateLevel(
+                principal, metadata, task.workOrderId(), taskId,
+                ResponsibilityLevel.NETWORK, networkAssigneeId,
+                businessType, key + "-network");
+        return new NetworkPortalAcceptAssignmentReceipt(
+                taskId, task.workOrderId(),
+                network.serviceAssignmentId(), networkAssigneeId,
                 clock.instant());
     }
 

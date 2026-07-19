@@ -491,6 +491,31 @@ export function assignNetworkPortalTechnician(
   )
 }
 
+export type NetworkPortalAcceptAssignmentReceipt = {
+  taskId: string
+  workOrderId: string
+  networkServiceAssignmentId: string
+  networkAssigneeId: string
+  occurredAt: string
+}
+
+/** 网点接单：仅激活 ACTIVE NETWORK，不强制同时指派师傅。 */
+export function acceptNetworkPortalAssignment(
+  networkContextId: string,
+  taskId: string,
+  body: { businessType: string },
+  idempotencyKey = crypto.randomUUID(),
+) {
+  return apiPost<NetworkPortalAcceptAssignmentReceipt>(
+    `/network-portal/tasks/${taskId}:accept-assignment`,
+    {
+      body,
+      idempotencyKey,
+      headers: networkHeaders(networkContextId),
+    },
+  )
+}
+
 export type AppointmentWindow = {
   start: string
   end: string

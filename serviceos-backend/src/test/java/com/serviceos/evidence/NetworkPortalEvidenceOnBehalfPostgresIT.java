@@ -126,8 +126,8 @@ class NetworkPortalEvidenceOnBehalfPostgresIT {
         deleteRecursively(STORAGE_ROOT);
         Files.createDirectories(STORAGE_ROOT);
 
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("125");
-        assertThat(flyway.info().applied()).hasSize(127);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("128");
+        assertThat(flyway.info().applied()).hasSize(130);
         assertThat(jdbc.sql("""
                         SELECT risk_level FROM auth_capability
                          WHERE capability_code='evidence.submitOnBehalf'

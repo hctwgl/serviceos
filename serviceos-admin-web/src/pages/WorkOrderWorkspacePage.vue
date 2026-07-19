@@ -24,7 +24,10 @@ import {
 import { getTaskAllowedActions, type TaskAllowedActions } from '../api/tasks'
 import { manualAssignServiceAssignments } from '../api/dispatch'
 import TaskCommandPanel from '../components/TaskCommandPanel.vue'
+import StatusBadge from '../components/StatusBadge.vue'
 import { recordRecentVisit } from '../recent/recordRecentVisit'
+import { statusLabel } from '../product/statusLabels'
+import { formatDateTime } from '../product/formatTime'
 import QueueTable from './QueueTable.vue'
 
 const route = useRoute()
@@ -855,6 +858,22 @@ const timelineRows = computed(() =>
   })),
 )
 
+const currentActionBanner = computed(() => {
+  const ws = workspace.value
+  if (!ws) {
+    return null
+  }
+  const woStatus = statusLabel(ws.header.status)
+  if (!ws.currentTaskSummary) {
+    return `工单${woStatus}，暂无进行中的任务。`
+  }
+  const task = ws.currentTaskSummary
+  const taskStatus = statusLabel(task.status)
+  const taskName = task.taskType ?? '任务'
+  const stageHint = task.stageCode ? `（阶段 ${task.stageCode}）` : ''
+  return `工单${woStatus} · 当前任务：${taskName}${stageHint}（${taskStatus}）`
+})
+
 watch(workOrderId, () => {
   if (workOrderId.value) {
     void loadWorkspace()
@@ -882,11 +901,18 @@ onMounted(() => {
     <p v-else-if="loading">加载中…</p>
 
     <template v-else-if="workspace">
+      <div v-if="currentActionBanner" class="action-banner">
+        <strong>当前动作</strong>
+        <span>{{ currentActionBanner }}</span>
+      </div>
       <div class="grid">
         <article class="card">
           <h3>概览</h3>
           <dl>
-            <div><dt>状态</dt><dd>{{ workspace.header.status }}</dd></div>
+            <div>
+              <dt>状态</dt>
+              <dd><StatusBadge :status="workspace.header.status" /></dd>
+            </div>
             <div>
               <dt>项目</dt>
               <dd>
@@ -902,7 +928,7 @@ onMounted(() => {
             </div>
             <div><dt>外部单号</dt><dd>{{ workspace.header.externalOrderCode || '—' }}</dd></div>
             <div><dt>时间线 freshness</dt><dd>{{ workspace.timelineFreshnessStatus }}</dd></div>
-            <div><dt>asOf</dt><dd>{{ workspace.meta.asOf }}</dd></div>
+            <div><dt>统计时间</dt><dd>{{ formatDateTime(workspace.meta.asOf) }}</dd></div>
             <div><dt>allowed-actions</dt><dd>{{ workspace.allowedActionLink || '—' }}</dd></div>
           </dl>
         </article>
@@ -913,8 +939,8 @@ onMounted(() => {
             <div>
               <dt>当前任务</dt>
               <dd v-if="workspace.currentTaskSummary">
-                {{ workspace.currentTaskSummary.taskType }} /
-                {{ workspace.currentTaskSummary.status }}
+                {{ workspace.currentTaskSummary.taskType }}
+                <StatusBadge :status="workspace.currentTaskSummary.status" />
                 <small>
                   <RouterLink
                     :to="{
@@ -1056,7 +1082,10 @@ onMounted(() => {
       <article v-if="workOrderDetail" class="card">
         <h3>工单权威事实</h3>
         <dl>
-          <div><dt>status</dt><dd>{{ workOrderDetail.workOrder.status }}</dd></div>
+          <div>
+            <dt>状态</dt>
+            <dd><StatusBadge :status="workOrderDetail.workOrder.status" /></dd>
+          </div>
           <div><dt>clientCode</dt><dd>{{ workOrderDetail.workOrder.clientCode }}</dd></div>
           <div><dt>brandCode</dt><dd>{{ workOrderDetail.workOrder.brandCode }}</dd></div>
           <div><dt>serviceProductCode</dt><dd>{{ workOrderDetail.workOrder.serviceProductCode }}</dd></div>
@@ -1419,6 +1448,21 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+}
+.action-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  padding: 0.75rem 1rem;
+  background: #eef4ff;
+  border: 1px solid #c3dafe;
+  border-radius: 10px;
+  color: #243b53;
+  font-size: 0.95rem;
+}
+.action-banner strong {
+  color: #1864ab;
 }
 .meta {
   margin: 0.25rem 0 0;

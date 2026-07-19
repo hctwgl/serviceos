@@ -1,0 +1,77 @@
+/**
+ * 全平台业务术语（管理端）。普通业务页必须使用此处中文名，禁止直接展示英文领域词。
+ * 技术词（Outbox、Capability 等）仅允许出现在「运维与开发者工具」。
+ */
+export const TERMS = {
+  workOrder: '工单',
+  task: '任务',
+  assignment: '分配',
+  dispatch: '派单',
+  claim: '接单',
+  appointment: '预约',
+  survey: '勘测',
+  installation: '安装',
+  review: '审核',
+  correction: '整改',
+  resubmission: '重新提交',
+  completion: '完工',
+  settlement: '结算',
+  network: '服务网点',
+  technician: '服务师傅',
+  capability: '操作权限',
+  status: '状态',
+  createdAt: '创建时间',
+  updatedAt: '更新时间',
+  project: '项目',
+  organization: '组织',
+  customer: '客户',
+  vehicle: '车辆',
+  serviceArea: '服务区域',
+  operationLog: '操作日志',
+  reviewCase: '审核单',
+  correctionCase: '整改单',
+  correctionTask: '整改任务',
+  sla: '服务时效',
+  workbench: '工作台',
+} as const
+
+/** 列表/详情字段 → 业务中文标签（禁止把后端字段名直接当表头）。 */
+export const FIELD_LABELS: Record<string, string> = {
+  status: '状态',
+  projectId: '所属项目',
+  taskId: '关联任务',
+  workOrderId: '关联工单',
+  id: '业务标识',
+  externalOrderCode: '工单编号',
+  clientCode: '车企',
+  sourceReviewCaseId: '来源审核单',
+  reviewCaseId: '审核单号',
+  correctionCaseId: '整改单号',
+  correctionTaskId: '整改任务',
+  createdAt: '创建时间',
+  updatedAt: '更新时间',
+  receivedAt: '接收时间',
+  resubmissionCount: '重新提交次数',
+  organizationId: '组织',
+  networkId: '服务网点',
+  technicianId: '服务师傅',
+  tenantId: '租户',
+  capabilityCode: '操作权限',
+  eventId: '事件标识',
+  aggregateId: '聚合标识',
+  asOf: '统计时间',
+  origin: '来源',
+  latestDecision: '最近审核结论',
+  reasonCodes: '原因码',
+  severity: '严重程度',
+  category: '异常类别',
+  errorCode: '错误码',
+  openedAt: '打开时间',
+  deadlineAt: '截止时间',
+  remainingSeconds: '剩余秒数',
+  overdueSeconds: '超时秒数',
+}
+
+export function fieldLabel(key: string): string {
+  return FIELD_LABELS[key] ?? key
+}

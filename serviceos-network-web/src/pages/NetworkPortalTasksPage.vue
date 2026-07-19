@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import {
+  acceptNetworkPortalAssignment,
   assignNetworkPortalTechnician,
   beginNetworkPortalEvidenceUploadOnBehalf,
   cancelNetworkPortalAppointment,
@@ -354,6 +355,36 @@ function appointmentHistoryAllowedActionsLabel(item: NetworkPortalAppointment) {
     return '—'
   }
   return item.allowedActions.join(', ')
+}
+
+const acceptBusy = ref(false)
+const acceptError = ref<string | null>(null)
+const acceptMessage = ref<string | null>(null)
+
+async function submitAccept() {
+  if (!props.networkContextId) {
+    acceptError.value = '请选择网点上下文'
+    return
+  }
+  if (!selectedTaskId.value) {
+    acceptError.value = '请选择任务'
+    return
+  }
+  acceptBusy.value = true
+  acceptError.value = null
+  acceptMessage.value = null
+  try {
+    const result = await acceptNetworkPortalAssignment(props.networkContextId, selectedTaskId.value, {
+      businessType: businessType.value.trim() || 'INSTALLATION',
+    })
+    acceptMessage.value = `接单成功，任务已归属本网点。请继续指派服务师傅。`
+    void result
+    await load()
+  } catch (err) {
+    acceptError.value = err instanceof Error ? err.message : '网点接单失败'
+  } finally {
+    acceptBusy.value = false
+  }
 }
 
 async function submitAssign() {
@@ -816,12 +847,43 @@ watch(selectedTaskId, () => {
 
     <form
       class="assign"
+      data-testid="network-accept-assignment-form"
+      @submit.prevent="submitAccept"
+    >
+      <h3>网点接单</h3>
+      <p class="hint">确认本网点承接任务（仅激活网点责任，不强制同时指派师傅）。</p>
+      <label>
+        任务
+        <select v-model="selectedTaskId" data-testid="accept-task-select" aria-label="accept task">
+          <option disabled value="">选择任务</option>
+          <option v-for="item in items" :key="`accept-${item.taskId}`" :value="item.taskId">
+            {{ item.taskId }}
+          </option>
+        </select>
+      </label>
+      <label>
+        业务类型
+        <input v-model="businessType" data-testid="accept-business-type" aria-label="accept business type" />
+      </label>
+      <button
+        type="submit"
+        data-testid="accept-assignment-submit"
+        :disabled="acceptBusy || !props.networkContextId"
+      >
+        确认接单
+      </button>
+      <p v-if="acceptError" class="error" data-testid="accept-assignment-error">{{ acceptError }}</p>
+      <p v-if="acceptMessage" class="ok" data-testid="accept-assignment-message">{{ acceptMessage }}</p>
+    </form>
+
+    <form
+      class="assign"
       data-testid="network-assign-technician-form"
       data-page-id="NETWORK.TECHNICIAN.ASSIGN"
       @submit.prevent="submitAssign"
     >
       <h3>指派师傅</h3>
-      <p class="hint">调用 Network Portal 写命令；networkAssigneeId 由服务端强制为当前上下文网点。</p>
+      <p class="hint">接单后可为任务选择服务师傅；网点由服务端强制为当前上下文。</p>
       <label>
         任务
         <select v-model="selectedTaskId" data-testid="assign-task-select" aria-label="assign task">

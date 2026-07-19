@@ -5,12 +5,16 @@ import SavedViewBar from '../components/SavedViewBar.vue'
 import QueueTable from './QueueTable.vue'
 import { listAuthorizedWorkOrders, type WorkOrderPage } from '../api/workOrders'
 import { firstRouteQuery, uuidRoute } from '../routeQuery'
+import { statusOptions } from '../product/statusLabels'
+import { toUserFacingError } from '../product/errorMessages'
+
+const statusChoices = statusOptions(['RECEIVED', 'ACTIVE', 'FULFILLED', 'CANCELLED'])
 
 const linkColumns: Record<
   string,
   (row: Record<string, unknown>) => RouteLocationRaw | null
 > = {
-  id: (row) => uuidRoute(row.id, 'ADMIN.WORKORDER.WORKSPACE'),
+  externalOrderCode: (row) => uuidRoute(row.id, 'ADMIN.WORKORDER.WORKSPACE'),
   projectId: (row) => uuidRoute(row.projectId, 'ADMIN.PROJECT.DETAIL'),
 }
 
@@ -18,12 +22,14 @@ const route = useRoute()
 
 const loading = ref(false)
 const error = ref<string | null>(null)
+const errorCode = ref<string | null>(null)
 const page = ref<WorkOrderPage | null>(null)
 const cursor = ref<string | undefined>()
 /** 默认不限；显式 route.query 可覆盖。 */
 const status = ref('')
 const clientCode = ref('')
-const projectId = ref('')
+const projectKeyword = ref('')
+const keyword = ref('')
 
 function hydrateFiltersFromRoute() {
   const nextStatus = firstRouteQuery(route, 'status')
@@ -36,24 +42,39 @@ function hydrateFiltersFromRoute() {
   }
   const nextProjectId = firstRouteQuery(route, 'projectId')
   if (nextProjectId !== undefined) {
-    projectId.value = nextProjectId
+    projectKeyword.value = nextProjectId
   }
+  const nextKeyword = firstRouteQuery(route, 'q')
+  if (nextKeyword !== undefined) {
+    keyword.value = nextKeyword
+  }
+}
+
+function looksLikeUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value.trim(),
+  )
 }
 
 async function load(next?: string) {
   loading.value = true
   error.value = null
+  errorCode.value = null
   try {
     page.value = await listAuthorizedWorkOrders({
       cursor: next,
       limit: '20',
       status: status.value || undefined,
       clientCode: clientCode.value.trim() || undefined,
-      projectId: projectId.value.trim() || undefined,
+      projectId: looksLikeUuid(projectKeyword.value)
+        ? projectKeyword.value.trim()
+        : undefined,
     })
     cursor.value = page.value.nextCursor ?? undefined
   } catch (err) {
-    error.value = err instanceof Error ? err.message : '加载工单目录失败'
+    const facing = toUserFacingError(err)
+    error.value = facing.message
+    errorCode.value = facing.errorCode
   } finally {
     loading.value = false
   }
@@ -68,27 +89,54 @@ function currentFilters() {
   return {
     status: status.value || undefined,
     clientCode: clientCode.value.trim() || undefined,
-    projectId: projectId.value.trim() || undefined,
+    projectId: looksLikeUuid(projectKeyword.value)
+      ? projectKeyword.value.trim()
+      : undefined,
   }
 }
 
 function applySavedView(filters: Record<string, string>) {
   status.value = filters.status ?? ''
   clientCode.value = filters.clientCode ?? ''
-  projectId.value = filters.projectId ?? ''
+  projectKeyword.value = filters.projectId ?? ''
   return search()
 }
 
-const rows = computed(() =>
-  (page.value?.items ?? []).map((item) => ({
-    id: item.id,
-    externalOrderCode: item.externalOrderCode,
-    status: item.status,
-    clientCode: item.clientCode,
-    projectId: item.projectId,
-    receivedAt: item.receivedAt,
-  })),
-)
+function resetFilters() {
+  status.value = ''
+  clientCode.value = ''
+  projectKeyword.value = ''
+  keyword.value = ''
+  return search()
+}
+
+const rows = computed(() => {
+  const q = keyword.value.trim().toLowerCase()
+  const project = projectKeyword.value.trim().toLowerCase()
+  return (page.value?.items ?? [])
+    .filter((item) => {
+      if (q) {
+        const hay = `${item.externalOrderCode} ${item.clientCode} ${item.id}`.toLowerCase()
+        if (!hay.includes(q)) {
+          return false
+        }
+      }
+      if (project && !looksLikeUuid(projectKeyword.value)) {
+        if (!item.projectId.toLowerCase().includes(project) && !item.clientCode.toLowerCase().includes(project)) {
+          return false
+        }
+      }
+      return true
+    })
+    .map((item) => ({
+      externalOrderCode: item.externalOrderCode,
+      status: item.status,
+      clientCode: item.clientCode,
+      projectId: item.projectId,
+      receivedAt: item.receivedAt,
+      id: item.id,
+    }))
+})
 
 onMounted(() => {
   hydrateFiltersFromRoute()
@@ -98,6 +146,10 @@ onMounted(() => {
 
 <template>
   <section>
+    <header class="page-head">
+      <h1>工单中心</h1>
+      <p class="desc">按状态与关键字查找工单，第一列展示业务工单编号而非内部 ID。</p>
+    </header>
     <SavedViewBar
       page-id="ADMIN.WORKORDER.LIST"
       :schema-version="1"
@@ -106,70 +158,90 @@ onMounted(() => {
     />
     <form class="filters" @submit.prevent="search">
       <label>
-        status
+        工单状态
         <select v-model="status" aria-label="workOrder status filter">
           <option value="">（不限）</option>
-          <option value="RECEIVED">RECEIVED</option>
-          <option value="ACTIVE">ACTIVE</option>
-          <option value="FULFILLED">FULFILLED</option>
+          <option v-for="opt in statusChoices" :key="opt.value" :value="opt.value">
+            {{ opt.label }}
+          </option>
         </select>
       </label>
       <label>
-        clientCode
+        车企
         <input
           v-model="clientCode"
           aria-label="workOrder clientCode filter"
-          placeholder="可选"
+          placeholder="如 GEELY / BYD"
         />
       </label>
       <label>
-        projectId
+        所属项目
         <input
-          v-model="projectId"
+          v-model="projectKeyword"
           aria-label="workOrder projectId filter"
-          placeholder="uuid"
+          placeholder="项目名称或编号"
+        />
+      </label>
+      <label>
+        关键字
+        <input
+          v-model="keyword"
+          aria-label="workOrder keyword filter"
+          placeholder="工单编号 / 车企"
         />
       </label>
       <button type="submit" :disabled="loading">查询</button>
+      <button type="button" :disabled="loading" @click="resetFilters">重置筛选</button>
     </form>
 
     <QueueTable
-      title="授权工单目录"
-      :columns="['id', 'externalOrderCode', 'status', 'clientCode', 'projectId', 'receivedAt']"
+      title="工单列表"
+      :columns="['externalOrderCode', 'status', 'clientCode', 'projectId', 'receivedAt']"
+      :column-labels="{
+        externalOrderCode: '工单编号',
+        status: '当前状态',
+        clientCode: '车企',
+        projectId: '所属项目',
+        receivedAt: '创建时间',
+      }"
       :rows="rows"
       :link-columns="linkColumns"
       :loading="loading"
       :error="error"
+      :error-code="errorCode"
       :as-of="page?.asOf"
       :next-cursor="cursor ?? null"
+      empty-guide="当前没有工单。可到「演示数据管理」初始化演示工单，或调整筛选条件。"
       @refresh="load()"
       @next="load(cursor)"
     />
 
-    <p v-if="page?.items?.length" class="links">
-      打开工作区：
+    <p v-if="rows.length" class="links">
+      打开工单：
       <RouterLink
-        v-for="item in page.items"
-        :key="item.id"
-        :to="{ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: item.id } }"
+        v-for="item in rows"
+        :key="String(item.id)"
+        :to="{ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: String(item.id) } }"
       >
         {{ item.externalOrderCode }}
-      </RouterLink>
-    </p>
-    <p v-if="page?.items?.length" class="links work-order-directory-cross-links">
-      打开关联资源：
-      <RouterLink
-        v-for="item in page.items"
-        :key="`project-${item.id}`"
-        :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: item.projectId } }"
-      >
-        打开项目 {{ item.projectId }}
       </RouterLink>
     </p>
   </section>
 </template>
 
 <style scoped>
+.page-head {
+  margin-bottom: 0.75rem;
+}
+.page-head h1 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+.desc {
+  margin: 0.35rem 0 0;
+  color: #627d98;
+  font-size: 0.92rem;
+}
 .filters {
   display: flex;
   flex-wrap: wrap;

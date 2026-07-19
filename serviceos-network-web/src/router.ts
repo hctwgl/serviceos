@@ -13,6 +13,7 @@ import NetworkPortalCorrectionsPage from './pages/NetworkPortalCorrectionsPage.v
 import NetworkPortalCorrectionDetailPage from './pages/NetworkPortalCorrectionDetailPage.vue'
 import NetworkPortalExceptionsPage from './pages/NetworkPortalExceptionsPage.vue'
 import NetworkPortalExceptionDetailPage from './pages/NetworkPortalExceptionDetailPage.vue'
+import NetworkPortalNotFoundPage from './pages/NetworkPortalNotFoundPage.vue'
 
 const MigrationTestEntry = defineComponent({
   name: 'MigrationTestEntry',
@@ -37,6 +38,7 @@ export const router = createRouter({ history: createWebHistory(), routes: [
   { path: '/network-portal/corrections/:id', component: NetworkPortalCorrectionDetailPage },
   { path: '/network-portal/exceptions', component: NetworkPortalExceptionsPage },
   { path: '/network-portal/exceptions/:id', component: NetworkPortalExceptionDetailPage },
+  { path: '/:pathMatch(.*)*', component: NetworkPortalNotFoundPage },
 ] })
 
 export function routeForPage(pageId: string) {
