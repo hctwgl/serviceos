@@ -350,6 +350,7 @@ title: ServiceOS 里程碑索引
 | M339 | M339 UPDATE/CANCEL 强制 INBOUND Mapping | [352-m339-inbound-update-cancel-mapping-required.md](../architecture/352-m339-inbound-update-cancel-mapping-required.md) | [336-m339-inbound-update-cancel-mapping-required-acceptance.md](../testing/336-m339-inbound-update-cancel-mapping-required-acceptance.md) |
 | M340 | M340 FORM ConditionBuilder 条件积木嵌入 | [353-m340-form-condition-builder.md](../architecture/353-m340-form-condition-builder.md) | [337-m340-form-condition-builder-acceptance.md](../testing/337-m340-form-condition-builder-acceptance.md) |
 | M341 | M341 EVIDENCE requiredWhen 条件积木嵌入 | [354-m341-evidence-required-when-builder.md](../architecture/354-m341-evidence-required-when-builder.md) | [338-m341-evidence-required-when-builder-acceptance.md](../testing/338-m341-evidence-required-when-builder-acceptance.md) |
+| M342 | M342 嵌套条件组 round-trip | [355-m342-nested-condition-groups.md](../architecture/355-m342-nested-condition-groups.md) | [339-m342-nested-condition-groups-acceptance.md](../testing/339-m342-nested-condition-groups-acceptance.md) |
 
 ## 未关联里程碑的文档
 

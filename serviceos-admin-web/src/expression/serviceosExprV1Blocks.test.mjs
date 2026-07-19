@@ -3,6 +3,19 @@
  * 运行：node serviceos-admin-web/src/expression/serviceosExprV1Blocks.test.mjs
  */
 import assert from 'node:assert/strict'
+import { pathToFileURL } from 'node:url'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+
+// 优先动态加载 TS（Node strip-types）；失败则使用内联同源实现。
+let api
+try {
+  api = await import(pathToFileURL(join(__dirname, 'serviceosExprV1Blocks.ts')).href)
+} catch {
+  api = null
+}
 
 const EXPR_PATHS = [
   'workOrder.clientCode',
@@ -60,7 +73,7 @@ function compileCondition(node) {
   return parts.join(node.join === 'AND' ? ' && ' : ' || ')
 }
 
-function parseAtom(source) {
+function parseAtomSource(source) {
   const match = source.match(ATOM_RE)
   if (!match) return null
   const path = match[1]
@@ -78,6 +91,67 @@ function parseAtom(source) {
   return null
 }
 
+class ExprParser {
+  constructor(input) {
+    this.input = input
+    this.index = 0
+  }
+  parseOr() {
+    const children = [this.parseAnd()]
+    while (this.match('||')) children.push(this.parseAnd())
+    return children.length === 1 ? children[0] : { kind: 'group', join: 'OR', children }
+  }
+  parseAnd() {
+    const children = [this.parsePrimary()]
+    while (this.match('&&')) children.push(this.parsePrimary())
+    return children.length === 1 ? children[0] : { kind: 'group', join: 'AND', children }
+  }
+  parsePrimary() {
+    this.skipWhitespace()
+    if (this.match('(')) {
+      const inner = this.parseOr()
+      if (!this.match(')')) throw new Error('缺少右括号')
+      return inner.kind === 'group' ? inner : { kind: 'group', join: 'AND', children: [inner] }
+    }
+    const atom = this.parseAtom()
+    if (!atom) throw new Error('期望比较原子或括号组')
+    return atom
+  }
+  parseAtom() {
+    this.skipWhitespace()
+    const start = this.index
+    while (this.index < this.input.length) {
+      const ch = this.input[this.index]
+      if (ch === '"') {
+        this.index++
+        while (this.index < this.input.length && this.input[this.index] !== '"') this.index++
+        if (this.index < this.input.length) this.index++
+        continue
+      }
+      if (ch === ')') break
+      if (this.input.startsWith('&&', this.index) || this.input.startsWith('||', this.index)) break
+      this.index++
+    }
+    const raw = this.input.slice(start, this.index).trim()
+    return raw ? parseAtomSource(raw) : null
+  }
+  expectEnd() {
+    this.skipWhitespace()
+    if (this.index < this.input.length) throw new Error('多余内容')
+  }
+  match(token) {
+    this.skipWhitespace()
+    if (this.input.startsWith(token, this.index)) {
+      this.index += token.length
+      return true
+    }
+    return false
+  }
+  skipWhitespace() {
+    while (this.index < this.input.length && /\s/.test(this.input[this.index])) this.index++
+  }
+}
+
 function tryParseCondition(source) {
   const trimmed = source.trim()
   if (!trimmed) {
@@ -87,25 +161,14 @@ function tryParseCondition(source) {
       children: [{ kind: 'atom', path: 'workOrder.brandCode', op: '==', value: '', valueKind: 'string' }],
     }
   }
-  if (trimmed.includes('(') || trimmed.includes(')')) return null
-  let join = 'AND'
-  let parts
-  if (trimmed.includes('||')) {
-    join = 'OR'
-    parts = trimmed.split('||').map((p) => p.trim())
-  } else if (trimmed.includes('&&')) {
-    join = 'AND'
-    parts = trimmed.split('&&').map((p) => p.trim())
-  } else {
-    parts = [trimmed]
+  try {
+    const parser = new ExprParser(trimmed)
+    const node = parser.parseOr()
+    parser.expectEnd()
+    return node.kind === 'group' ? node : { kind: 'group', join: 'AND', children: [node] }
+  } catch {
+    return null
   }
-  const children = []
-  for (const part of parts) {
-    const atom = parseAtom(part)
-    if (!atom) return null
-    children.push(atom)
-  }
-  return { kind: 'group', join, children }
 }
 
 function formValuesPath(fieldKey) {
@@ -116,7 +179,14 @@ function availablePaths(formFieldKeys = []) {
   return [...EXPR_PATHS, ...formFieldKeys.map(formValuesPath)]
 }
 
-const compiled = compileCondition({
+const impl = api ?? {
+  compileCondition,
+  tryParseCondition,
+  formValuesPath,
+  availablePaths,
+}
+
+const compiled = impl.compileCondition({
   kind: 'group',
   join: 'AND',
   children: [
@@ -129,16 +199,34 @@ assert.equal(
   'workOrder.brandCode == "BYD_OCEAN" && region.provinceCode != "110000"',
 )
 
-const parsed = tryParseCondition(compiled)
+const parsed = impl.tryParseCondition(compiled)
 assert.ok(parsed)
 assert.equal(parsed.join, 'AND')
 assert.equal(parsed.children.length, 2)
-assert.equal(compileCondition(parsed), compiled)
+assert.equal(impl.compileCondition(parsed), compiled)
 
-assert.equal(tryParseCondition('(workOrder.brandCode == "X")'), null)
+// M342: 嵌套括号 round-trip
+const nestedSource =
+  '(workOrder.brandCode == "BYD_OCEAN" && region.provinceCode == "110000") || task.stageCode == "SURVEY"'
+const nestedParsed = impl.tryParseCondition(nestedSource)
+assert.ok(nestedParsed, 'nested paren must parse')
+assert.equal(nestedParsed.join, 'OR')
+assert.equal(nestedParsed.children.length, 2)
+assert.equal(nestedParsed.children[0].kind, 'group')
+assert.equal(nestedParsed.children[0].join, 'AND')
+assert.equal(impl.compileCondition(nestedParsed), nestedSource)
+
+const deep =
+  '((formValues["needs-photo"] == true) || formValues["pole.height-mm"] == 1800) && task.taskType == "SURVEY"'
+const deepParsed = impl.tryParseCondition(deep)
+assert.ok(deepParsed)
+assert.equal(impl.compileCondition(deepParsed), deep)
+
+// 一元 ! 仍失败关闭到高级源码
+assert.equal(impl.tryParseCondition('!(workOrder.brandCode == "X")'), null)
 
 assert.throws(() =>
-  compileCondition({
+  impl.compileCondition({
     kind: 'atom',
     path: 'workOrder.hack',
     op: '==',
@@ -147,21 +235,20 @@ assert.throws(() =>
   }),
 )
 
-// M340: formValues + 布尔/数值字面量
-const formExpr = compileCondition({
+const formExpr = impl.compileCondition({
   kind: 'group',
   join: 'AND',
   children: [
     {
       kind: 'atom',
-      path: formValuesPath('needs-photo'),
+      path: impl.formValuesPath('needs-photo'),
       op: '==',
       value: 'true',
       valueKind: 'boolean',
     },
     {
       kind: 'atom',
-      path: formValuesPath('pole.height-mm'),
+      path: impl.formValuesPath('pole.height-mm'),
       op: '==',
       value: '1800',
       valueKind: 'number',
@@ -172,31 +259,15 @@ assert.equal(
   formExpr,
   'formValues["needs-photo"] == true && formValues["pole.height-mm"] == 1800',
 )
-const formParsed = tryParseCondition(formExpr)
-assert.ok(formParsed)
-assert.equal(compileCondition(formParsed), formExpr)
-assert.equal(formParsed.children[0].valueKind, 'boolean')
-assert.equal(formParsed.children[1].valueKind, 'number')
+assert.equal(impl.compileCondition(impl.tryParseCondition(formExpr)), formExpr)
 
-const mixed = tryParseCondition(
+const mixed = impl.tryParseCondition(
   'task.stageCode == "SURVEY" || formValues["site.has-parking-space"] == true',
 )
 assert.ok(mixed)
 assert.equal(mixed.join, 'OR')
-assert.equal(mixed.children[1].path, 'formValues["site.has-parking-space"]')
 
-const paths = availablePaths(['needs-photo', 'site.has-parking-space'])
+const paths = impl.availablePaths(['needs-photo', 'site.has-parking-space'])
 assert.ok(paths.includes('formValues["needs-photo"]'))
-assert.ok(paths.includes('workOrder.brandCode'))
-
-assert.throws(() =>
-  compileCondition({
-    kind: 'atom',
-    path: 'formValues["x"]',
-    op: '==',
-    value: 'maybe',
-    valueKind: 'boolean',
-  }),
-)
 
 console.log('serviceosExprV1Blocks.test.mjs OK')

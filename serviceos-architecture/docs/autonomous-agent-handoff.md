@@ -7,20 +7,20 @@ lastUpdated: 2026-07-19
 
 ## 当前
 
-- PR #148～#167：M321～M340 Draft stacked
-- PR #168：https://github.com/hctwgl/serviceos/pull/168 — **M341** EVIDENCE requiredWhen ConditionBuilder（Draft，base=#167）
+- PR #148～#168：M321～M341 Draft stacked
+- 本切片：**M342** 嵌套条件组 round-trip（Draft，base=#168）
 - `master`：`32b902f897d19d2c906acac899990bf1aa2bb056`
-- latestMilestone：**M341**
+- latestMilestone：**M342**
 - Flyway：**127**；OpenAPI：**1.0.43**（无本里程碑变更）
-- `baselineCommit`：`b236777a`（功能证据）
+- `baselineCommit`：功能提交后回填
 
 ## 本回合完成
 
-### M341 EVIDENCE requiredWhen 条件积木嵌入
+### M342 嵌套条件组 round-trip
 
-- `StructuredAssetEditor` EVIDENCE 项嵌入 `ConditionBuilder` 编辑 `requiredWhen`
-- 空源码清除可选表达式；上下文路径积木；formValues 高级源码
-- 文档：`354-m341-*` / `338-m341-*`
+- ExprParser 递归下降：括号 / && / ||；formValues 方括号不干扰
+- `ConditionGroupBlock` 递归 UI；一元 `!` 仍高级源码
+- 文档：`355-m342-*` / `339-m342-*`
 
 ## 验证
 
@@ -31,7 +31,7 @@ cd serviceos-admin-web && npm run build
 
 ## 下一本地主线
 
-1. 嵌套 SERVICEOS_EXPR_V1 round-trip / 递归条件组（M342）
+1. REFERENCE_OEM Update/Cancel 或 AMOUNT/加权比例
 2. 吉利联调 — `BLOCKED_EXTERNAL`
 
 ## BLOCKED_EXTERNAL

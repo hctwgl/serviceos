@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-19
-baselineCommit: "b236777a07d899e1af69829c199718e26eefe604"
-latestMilestone: "M341"
+baselineCommit: "PENDING_M342_FEATURE_COMMIT"
+latestMilestone: "M342"
 ---
 
 # ServiceOS 实施状态总览
@@ -39,8 +39,8 @@ latestMilestone: "M341"
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M341 EVIDENCE requiredWhen 条件积木嵌入 |
-| 基线提交 | `b236777a07d899e1af69829c199718e26eefe604`（功能提交后回填） |
+| 最新实施里程碑 | M342 嵌套条件组 round-trip |
+| 基线提交 | `PENDING_M342_FEATURE_COMMIT`（功能提交后回填） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts`、`@serviceos/web-core`、`ServiceOSIOSCore`、独立且可部署的 `serviceos-network-web` 与 `serviceos-technician-web`、Swift 6 `TechnicianIOSFoundation`，以及已在 iPhone 17 Pro Simulator 安装启动、实跑 XCTest/XCUITest、形成 Production arm64 archive/dSYM，并接入当前任务、在线 Visit、冻结基础表单、前台 Evidence 采集上传、Snapshot/Task 完成与多轮资料整改的原生 `TechnicianIOS` SwiftUI App；由同一 Core OpenAPI 生成并经独立消费者门禁验证的 `@serviceos/core-client` 与 `ServiceOSCoreClient` |
 | 前端工程 | `serviceos-admin-web` 独立承载总部运营、统一用户中心、`/me` 导航、SavedView、UI Preference、受控搜索与最近访问；M256 后 Network 正式产品由独立 `serviceos-network-web` 承载，M257 后 Technician 正式产品由独立移动优先 `serviceos-technician-web` 承载，M262～M266 依次增加在线 Visit、冻结表单、Evidence 三段式上传、Snapshot/Task 完成与独立整改 Task 多轮补传/重新提交；Admin 仅保留可配置外链和 M188 诊断；两套独立 Web 均实际接入共享 Core、OIDC PKCE、服务端 Context/Capability/导航、Playwright 回归和独立容器镜像 |
@@ -144,7 +144,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | Consumer Identity | CustomerProfile、用户资源关系和 C 端身份 | `ACCEPTED` | Principal/IdentityLink/API Schema 已预留 Consumer Persona | 身份治理序列之后的独立 Epic；待登录、隐私、客户主数据与注销策略确认；不得宣称已实现 | 后续正式 Epic |
 | 项目治理 | Project 核心事实、范围关系与授权目录 | `PARTIAL` | 项目创建；REGION/NETWORK 当前关系整组修订和不可变历史；`project.read` 授权目录、详情及历史查询 | owners、品牌/服务产品/配置绑定、生命周期、计划修订审批、目录治理 UI | M8、M64～M67 |
 | 可靠消息 | Inbox、Outbox、Worker claim/lease/retry | `IMPLEMENTED` | 本地可靠发布消费、恢复和人工接管基础 | 正式 Broker 和跨服务运行 | M9～M10 |
-| 配置中心 | 不可变配置资产、Bundle 发布、设计器与灰度通道 | `PARTIAL` | M282～M296 设计器/治理 + **M303～M309** 六类运行时 + **M310～M315** 设计器 + **M321～M341** 配置驱动履约主链路（含 Mapping + DISPATCH Coverage/比例 + FORM/EVIDENCE ConditionBuilder） | 嵌套表达式 round-trip、AMOUNT/加权比例口径、BUSINESS 日历 SLA、结算落账 | M16、M33、M36、M52～M53、M61、M268、M271、M281～M296、M303～M315、M321～M341 |
+| 配置中心 | 不可变配置资产、Bundle 发布、设计器与灰度通道 | `PARTIAL` | M282～M296 设计器/治理 + **M303～M309** 六类运行时 + **M310～M315** 设计器 + **M321～M342** 配置驱动履约主链路（含 Mapping + DISPATCH Coverage/比例 + FORM/EVIDENCE ConditionBuilder + 嵌套条件组） | AMOUNT/加权比例口径、BUSINESS 日历 SLA、结算落账 | M16、M33、M36、M52～M53、M61、M268、M271、M281～M296、M303～M315、M321～M342 |
 | 外部接入 | BYD CPIM + REFERENCE_OEM SAMPLE + Geely 本地切片 | `PARTIAL` | BYD 入站建单/更新/取消、提审、回调；**M267/M297～M302** 通用 SPI；**M311/M314/M316/M320** 吉利本地 + 三 OEM 并行冒烟 + **M317～M319** 远端查询/人工处置/批量重放；**M321～M339** 冻结 Mapping（出站仅 Mapping；入站无 fallback + DSL；CREATE/UPDATE/CANCEL 强制 Mapping + RouteHint） | 吉利 Sandbox/OpenAPI 签名联调（BLOCKED_EXTERNAL）、REFERENCE_OEM Update/Cancel、生产凭据/对象存储 | M16、M56～M60、M77～M79、M99、M158、M267、M272、M311、M314、M316、M317、M318、M319、M320、M321～M339、M273、M297～M302 |
 | 工单 | WorkOrder 接收、激活、履约完成与授权工作区投影 | `PARTIAL` | 权威工单、工作流启动、跨阶段和 END 完结；授权目录、非 PII 详情、Stage/Task 执行骨架及核心执行+现场履约时间线 | 完整取消、暂停、恢复、客户敏感详情审计、跨域完整时间线/动作与全部业务分支 | M16～M19、M68～M69、M73～M74 |
 | 工作流 | 线性 + 网关 + WAIT/TIMER + SUB_PROCESS + 多实例 + 取消/重开/跳转/补偿 + 标准模板 | `PARTIAL` | 上项 + **M281** 维修/移机/巡检标准模板（含家充勘安） | HTTP 命令面、表单/资料完整模板包、设计器 | M17～M19、M61、M69、M268～M271、M275～M281 |
@@ -175,15 +175,15 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M341**（EVIDENCE requiredWhen ConditionBuilder）。
-M321～M341 均在 Draft stacked PRs 中（`#148→…→#168`；本切片 https://github.com/hctwgl/serviceos/pull/168）；M320 已合入 `master`（`32b902f8`）。
+ServiceOS 可靠纵向切片已推进到 **M342**（嵌套条件组 round-trip / 递归 UI）。
+M321～M342 均在 Draft stacked PRs 中（`#148→…→#168→本切片`）；M320 已合入 `master`（`32b902f8`）。
 
 当前契约/迁移：OpenAPI **1.0.43**；Flyway **127**（无本里程碑迁移/契约变更）。
 
 下一阶段继续 **Configuration-Driven Fulfillment Runtime**：
 
-1. 嵌套 SERVICEOS_EXPR_V1 round-trip / 递归条件组；
-2. REFERENCE_OEM Update/Cancel（若需要）或其它 OEM 扩展；
+1. REFERENCE_OEM Update/Cancel（若需要）或 AMOUNT/加权比例等运行时深化；
+2. BUSINESS 日历 SLA / 结算落账（按风险另开里程碑）；
 3. 吉利真实联调材料到位后提升为最高优先级；否则保持 `BLOCKED_EXTERNAL`。
 
 仍为 **`BLOCKED_EXTERNAL`**（不阻塞上述本地主线）：

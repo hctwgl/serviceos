@@ -1,6 +1,6 @@
 /**
  * SERVICEOS_EXPR_V1 条件积木：字段/运算符/值/AND-OR 组 → 合法表达式源码。
- * 路径白名单与后端 ServiceOsExprV1Evaluator 对齐；M340 起支持 formValues["fieldKey"]。
+ * 路径白名单与后端 ServiceOsExprV1Evaluator 对齐；M340 formValues；M342 嵌套括号 round-trip。
  */
 
 export const EXPR_PATHS = [
@@ -146,41 +146,140 @@ function compileLiteral(atom: ConditionAtom): string {
 }
 
 /**
- * 尽力解析简单比较与顶层 AND/OR（不含嵌套括号混合）。
- * 无法解析时返回 null，调用方保留高级源码编辑。
+ * 尽力解析比较、AND/OR 与嵌套括号组。
+ * 不支持一元 !；无法解析时返回 null，调用方保留高级源码编辑。
  */
 export function tryParseCondition(source: string): ConditionGroup | null {
   const trimmed = source.trim()
   if (!trimmed) {
     return emptyGroup()
   }
-  // 仅支持不含括号的平面 AND/OR 或单个比较
-  if (trimmed.includes('(') || trimmed.includes(')')) {
+  try {
+    const parser = new ExprParser(trimmed)
+    const node = parser.parseOr()
+    parser.expectEnd()
+    return asRootGroup(node)
+  } catch {
     return null
   }
-  let join: JoinOp = 'AND'
-  let parts: string[]
-  if (trimmed.includes('||')) {
-    join = 'OR'
-    parts = trimmed.split('||').map((p) => p.trim())
-  } else if (trimmed.includes('&&')) {
-    join = 'AND'
-    parts = trimmed.split('&&').map((p) => p.trim())
-  } else {
-    parts = [trimmed]
-  }
-  const children: ConditionAtom[] = []
-  for (const part of parts) {
-    const atom = parseAtom(part)
-    if (!atom) {
-      return null
-    }
-    children.push(atom)
-  }
-  return { kind: 'group', join, children }
 }
 
-function parseAtom(source: string): ConditionAtom | null {
+function asRootGroup(node: ConditionNode): ConditionGroup {
+  if (node.kind === 'group') {
+    return node
+  }
+  return { kind: 'group', join: 'AND', children: [node] }
+}
+
+/**
+ * 递归下降：or → and → primary；primary 为原子或括号组。
+ * formValues["…"] 中的方括号不参与分组；字符串内括号忽略。
+ */
+class ExprParser {
+  private readonly input: string
+  private index = 0
+
+  constructor(input: string) {
+    this.input = input
+  }
+
+  parseOr(): ConditionNode {
+    const children: ConditionNode[] = [this.parseAnd()]
+    while (this.match('||')) {
+      children.push(this.parseAnd())
+    }
+    if (children.length === 1) {
+      return children[0]
+    }
+    return { kind: 'group', join: 'OR', children }
+  }
+
+  parseAnd(): ConditionNode {
+    const children: ConditionNode[] = [this.parsePrimary()]
+    while (this.match('&&')) {
+      children.push(this.parsePrimary())
+    }
+    if (children.length === 1) {
+      return children[0]
+    }
+    return { kind: 'group', join: 'AND', children }
+  }
+
+  parsePrimary(): ConditionNode {
+    this.skipWhitespace()
+    if (this.match('(')) {
+      const inner = this.parseOr()
+      if (!this.match(')')) {
+        throw new Error('缺少右括号')
+      }
+      // 括号强制成组，便于 UI 与编译对称保留嵌套
+      if (inner.kind === 'group') {
+        return inner
+      }
+      return { kind: 'group', join: 'AND', children: [inner] }
+    }
+    const atom = this.parseAtom()
+    if (!atom) {
+      throw new Error('期望比较原子或括号组')
+    }
+    return atom
+  }
+
+  parseAtom(): ConditionAtom | null {
+    this.skipWhitespace()
+    const start = this.index
+    // 扫描到 && / || / ) / 末尾，但不拆开 formValues["…"] 与字符串
+    while (this.index < this.input.length) {
+      const ch = this.input[this.index]
+      if (ch === '"' ) {
+        this.index++
+        while (this.index < this.input.length && this.input[this.index] !== '"') {
+          this.index++
+        }
+        if (this.index < this.input.length) {
+          this.index++
+        }
+        continue
+      }
+      if (ch === ')') {
+        break
+      }
+      if (this.input.startsWith('&&', this.index) || this.input.startsWith('||', this.index)) {
+        break
+      }
+      this.index++
+    }
+    const raw = this.input.slice(start, this.index).trim()
+    if (!raw) {
+      return null
+    }
+    return parseAtomSource(raw)
+  }
+
+  expectEnd() {
+    this.skipWhitespace()
+    if (this.index < this.input.length) {
+      throw new Error('表达式末尾存在多余内容')
+    }
+  }
+
+  private match(token: string): boolean {
+    this.skipWhitespace()
+    if (this.input.startsWith(token, this.index)) {
+      this.index += token.length
+      return true
+    }
+    return false
+  }
+
+  private skipWhitespace() {
+    while (this.index < this.input.length && /\s/.test(this.input[this.index])) {
+      this.index++
+    }
+  }
+}
+
+function parseAtomSource(source: string): ConditionAtom | null {
   const match = source.match(ATOM_RE)
   if (!match) {
     return null
@@ -194,7 +293,6 @@ function parseAtom(source: string): ConditionAtom | null {
   if (/^-?\d+(?:\.\d+)?$/.test(rawRight)) {
     return { kind: 'atom', path, op, value: rawRight, valueKind: 'number' }
   }
-  // 带引号字符串：捕获组 5 为去引号内容
   if (match[5] !== undefined) {
     return { kind: 'atom', path, op, value: match[5], valueKind: 'string' }
   }
@@ -215,6 +313,8 @@ export function validateCompiledSource(source: string): string[] {
     const parsed = tryParseCondition(source)
     if (parsed) {
       compileCondition(parsed)
+    } else {
+      errors.push('表达式无法解析为条件积木')
     }
   } catch (err) {
     errors.push(err instanceof Error ? err.message : '表达式无效')

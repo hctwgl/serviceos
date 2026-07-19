@@ -674,17 +674,17 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M341 EVIDENCE requiredWhen 条件积木嵌入**（https://github.com/hctwgl/serviceos/pull/168；栈 `#148→…→#168`；
-见 `implementation-status.md`；合入 `master` 后回填合并提交）。M320 合并基线为
+当前工程基线为 **M342 嵌套条件组 round-trip**（栈 `#148→…→#168→本切片`；
+见 `implementation-status.md`；Draft PR URL 与合入 `master` 后回填）。M320 合并基线为
 `32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147）。
 
 当前已具备多 OEM SPI、远端查询、UNKNOWN/批量重放、复杂流程、十大资产设计器、六类 Runtime，
 入站/出站 Mapping（M321～M339，含 CREATE/UPDATE/CANCEL 强制 Mapping + messageType）、
-FORM/EVIDENCE ConditionBuilder（M340/M341）、
+FORM/EVIDENCE ConditionBuilder（M340/M341）与嵌套条件组（M342）、
 ASSIGNEE/DISPATCH NETWORK+TECHNICIAN+Coverage+比例缺口（M323/M324/M332/M337/M338）、
 RULE（M325/M329/M330）、NOTIFICATION（M326）、PRICING SHADOW Snapshot（M327），以及 Admin
 UNKNOWN 人工处置与批量 Replay 工作台（M328）。
-下一主线：吉利材料到位后优先联调；否则继续嵌套表达式 round-trip 等低代码深化；
+下一主线：吉利材料到位后优先联调；否则继续 REFERENCE_OEM Update/Cancel 或 AMOUNT/加权等深化；
 Track F/G 仍为 `BLOCKED_EXTERNAL`。
 
 权威进度入口：
@@ -692,6 +692,8 @@ Track F/G 仍为 `BLOCKED_EXTERNAL`。
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M342 实现文档](architecture/355-m342-nested-condition-groups.md)
+- [M342 验收矩阵](testing/339-m342-nested-condition-groups-acceptance.md)
 - [M341 实现文档](architecture/354-m341-evidence-required-when-builder.md)
 - [M341 验收矩阵](testing/338-m341-evidence-required-when-builder-acceptance.md)
 - [M340 实现文档](architecture/353-m340-form-condition-builder.md)
