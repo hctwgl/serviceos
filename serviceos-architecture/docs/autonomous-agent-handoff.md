@@ -10,7 +10,7 @@ lastUpdated: 2026-07-19
 - PR #148：https://github.com/hctwgl/serviceos/pull/148 — **M321** 入站 Mapping 物化（Draft，base=master）
 - PR #149：https://github.com/hctwgl/serviceos/pull/149 — **M322** 出站 Mapping（Draft，base=#148）
 - PR #150：https://github.com/hctwgl/serviceos/pull/150 — **M323** ASSIGNEE→TaskAssignment（Draft，base=#149）
-- **M324** DISPATCH→ServiceAssignment Draft PR pending（base=#150）
+- PR #151：https://github.com/hctwgl/serviceos/pull/151 — **M324** DISPATCH→ServiceAssignment（Draft，base=#150）
 - `master`：`32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147 已合并）
 - latestMilestone：**M324**
 - Flyway：**122**；OpenAPI：**1.0.43**
