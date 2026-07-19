@@ -468,7 +468,8 @@ class ReviewCasePostgresIT {
     @Test
     void bydReviewCallbackProcessesRegisteredOrderAndPersistsPartialFailure() throws Exception {
         ReviewCaseView routedCase = createClientCase(
-                createSnapshot("callback-routed"), "callback-routed", "BATCH-CB-1", "MAP-CB-1");
+                createSnapshot("callback-routed"), "callback-routed", "BATCH-CB-1",
+                        "byd-ocean-shandong-review-callback-v1");
         reviewRoutes.register(adapter(), metadata("route-callback-routed"),
                 new RegisterExternalReviewRouteCommand(
                         "ORDER-CB-1", routedCase.reviewCaseId(), routedCase.externalSubmissionRef(),
@@ -564,7 +565,8 @@ class ReviewCasePostgresIT {
     @Test
     void bydReviewCallbackRejectsClientCaseAndKeepsPrivateRemarkOutOfDomainFacts() throws Exception {
         ReviewCaseView client = createClientCase(
-                createSnapshot("callback-reject"), "callback-reject", "BATCH-CB-REJECT", "MAP-CB-REJECT");
+                createSnapshot("callback-reject"), "callback-reject", "BATCH-CB-REJECT",
+                        "byd-ocean-shandong-review-callback-v1");
         reviewRoutes.register(adapter(), metadata("route-callback-reject"),
                 new RegisterExternalReviewRouteCommand(
                         "ORDER-CB-REJECT", client.reviewCaseId(), client.externalSubmissionRef(),
@@ -587,7 +589,8 @@ class ReviewCasePostgresIT {
     @Test
     void bydReviewCallbackLeavesEnvelopeReceivedUntilAuthorizationFailureIsRepaired() throws Exception {
         ReviewCaseView client = createClientCase(
-                createSnapshot("callback-recovery"), "callback-recovery", "BATCH-CB-REC", "MAP-CB-REC");
+                createSnapshot("callback-recovery"), "callback-recovery", "BATCH-CB-REC",
+                        "byd-ocean-shandong-review-callback-v1");
         reviewRoutes.register(adapter(), metadata("route-callback-recovery"),
                 new RegisterExternalReviewRouteCommand(
                         "ORDER-CB-REC", client.reviewCaseId(), client.externalSubmissionRef(),

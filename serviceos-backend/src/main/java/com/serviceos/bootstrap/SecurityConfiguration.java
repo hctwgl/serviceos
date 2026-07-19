@@ -61,6 +61,9 @@ public class SecurityConfiguration {
                     authorize.requestMatchers(
                                     "/api/v1/integrations/geely/haohan/v1.3/notify_update_order_info")
                             .permitAll();
+                    authorize.requestMatchers(
+                                    "/api/v1/integrations/geely/haohan/v1.3/notify_settlement_audit_result")
+                            .permitAll();
                     authorize.anyRequest().authenticated();
                 })
                 .oauth2ResourceServer(oauth2 -> oauth2

@@ -51,4 +51,20 @@ class OutboundReviewSubmissionProfilesTest {
         var registry = new OutboundReviewSubmissionProfiles(List.of(byd));
         assertThat(registry.requireForRouteRegistration("MAP-TEST-ONLY")).isSameAs(byd);
     }
+
+    @Test
+    void routeRegistrationFailsClosedWhenMappingUnknownAndMultipleProfiles() {
+        var byd = new BydOutboundReviewSubmissionProfile(JsonMapper.builder().build());
+        var geely = new com.serviceos.integration.geely.application.GeelyOutboundReviewSubmissionProfile(
+                JsonMapper.builder().build());
+        var registry = new OutboundReviewSubmissionProfiles(List.of(byd, geely));
+        assertThat(registry.requireForRouteRegistration("byd-ocean-shandong-review-callback-v1"))
+                .isSameAs(byd);
+        assertThat(registry.requireForRouteRegistration("geely-haohan-v1.3-settlement-audit-callback-v1"))
+                .isSameAs(geely);
+        assertThatThrownBy(() -> registry.requireForRouteRegistration("MAP-AMBIGUOUS"))
+                .isInstanceOf(BusinessProblem.class)
+                .extracting(ex -> ((BusinessProblem) ex).code())
+                .isEqualTo(ProblemCode.RESOURCE_NOT_FOUND);
+    }
 }
