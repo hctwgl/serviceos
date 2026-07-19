@@ -326,6 +326,7 @@ title: ServiceOS 里程碑索引
 | M315 | M315 剩余策略资产结构化设计器 | [328-m315-remaining-policy-asset-designers.md](../architecture/328-m315-remaining-policy-asset-designers.md) | [312-m315-remaining-policy-asset-designers-acceptance.md](../testing/312-m315-remaining-policy-asset-designers-acceptance.md) |
 | M316 | M316 吉利提审出站 stub 与审核回调 | [329-m316-geely-outbound-and-review-callback.md](../architecture/329-m316-geely-outbound-and-review-callback.md) | [313-m316-geely-outbound-and-review-callback-acceptance.md](../testing/313-m316-geely-outbound-and-review-callback-acceptance.md) |
 | M317 | M317 远端状态查询 Connector SPI | [330-m317-remote-status-query-spi.md](../architecture/330-m317-remote-status-query-spi.md) | [314-m317-remote-status-query-spi-acceptance.md](../testing/314-m317-remote-status-query-spi-acceptance.md) |
+| M318 | M318 UNKNOWN Delivery 人工确认/放弃 | [331-m318-manual-outbound-disposition.md](../architecture/331-m318-manual-outbound-disposition.md) | [315-m318-manual-outbound-disposition-acceptance.md](../testing/315-m318-manual-outbound-disposition-acceptance.md) |
 
 ## 未关联里程碑的文档
 

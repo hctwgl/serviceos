@@ -8,9 +8,9 @@ lastUpdated: 2026-07-19
 ## 当前
 
 - PR：https://github.com/hctwgl/serviceos/pull/147
-- latestMilestone：**M317**
-- Flyway：**118 / 120**；OpenAPI：**1.0.41**
-- PLAN 可执行范围内 P1 远端查询 SPI 已补齐
+- latestMilestone：**M318**
+- Flyway：**119 / 121**；OpenAPI：**1.0.42**
+- PLAN 可执行范围（含人工确认/放弃）已完成
 
 ## BLOCKED_EXTERNAL
 
@@ -18,8 +18,8 @@ lastUpdated: 2026-07-19
 
 ## 已完成
 
-P0～P4 本地能力 + M317 RemoteStatusQuery SPI（BYD NotSupported / Geely StillUnknown stub）
+P0～P4 本地能力；M317 远端查询；M318 人工确认/放弃（状态保持 UNKNOWN + disposition）
 
 ## 停止条件
 
-真实吉利联调仍缺 Sandbox/凭据。下一批可选：人工标记已送达/放弃，或等待外部材料。
+真实吉利联调仍缺 Sandbox。可选后续：批量 ReplayRequest；或阶段门禁 `verify-local.sh`。
