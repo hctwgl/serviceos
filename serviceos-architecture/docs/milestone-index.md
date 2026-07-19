@@ -309,6 +309,7 @@ title: ServiceOS 里程碑索引
 | M298 | M298 入站审核回调 SPI 与 BYD 归位 | [311-m298-inbound-review-callback-spi.md](../architecture/311-m298-inbound-review-callback-spi.md) | [295-m298-inbound-review-callback-spi-acceptance.md](../testing/295-m298-inbound-review-callback-spi-acceptance.md) |
 | M299 | M299 出站提审 Profile 注册表 | [312-m299-outbound-review-submission-profile-registry.md](../architecture/312-m299-outbound-review-submission-profile-registry.md) | [296-m299-outbound-review-submission-profile-registry-acceptance.md](../testing/296-m299-outbound-review-submission-profile-registry-acceptance.md) |
 | M300 | M300 入站取消工单 Connector SPI | [313-m300-inbound-cancel-work-order-spi.md](../architecture/313-m300-inbound-cancel-work-order-spi.md) | [297-m300-inbound-cancel-work-order-spi-acceptance.md](../testing/297-m300-inbound-cancel-work-order-spi-acceptance.md) |
+| M301 | M301 ExternalReviewRoute Profile 解析 | [314-m301-external-review-route-profile-resolution.md](../architecture/314-m301-external-review-route-profile-resolution.md) | [298-m301-external-review-route-profile-resolution-acceptance.md](../testing/298-m301-external-review-route-profile-resolution-acceptance.md) |
 
 ## 未关联里程碑的文档
 
