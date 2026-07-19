@@ -331,6 +331,7 @@ title: ServiceOS 里程碑索引
 | M320 | M320 多 OEM 并行建单冒烟 | [333-m320-multi-oem-parallel-create-smoke.md](../architecture/333-m320-multi-oem-parallel-create-smoke.md) | [317-m320-multi-oem-parallel-create-smoke-acceptance.md](../testing/317-m320-multi-oem-parallel-create-smoke-acceptance.md) |
 | M321 | M321 入站 INTEGRATION Mapping 物化为建单命令 | [334-m321-inbound-integration-mapping-materialization.md](../architecture/334-m321-inbound-integration-mapping-materialization.md) | [318-m321-inbound-integration-mapping-materialization-acceptance.md](../testing/318-m321-inbound-integration-mapping-materialization-acceptance.md) |
 | M322 | M322 出站 INTEGRATION Mapping 生成提审 Payload | [335-m322-outbound-integration-mapping.md](../architecture/335-m322-outbound-integration-mapping.md) | [319-m322-outbound-integration-mapping-acceptance.md](../testing/319-m322-outbound-integration-mapping-acceptance.md) |
+| M323 | M323 ASSIGNEE_POLICY 自动接入 TaskAssignment | [336-m323-assignee-policy-task-assignment.md](../architecture/336-m323-assignee-policy-task-assignment.md) | [320-m323-assignee-policy-task-assignment-acceptance.md](../testing/320-m323-assignee-policy-task-assignment-acceptance.md) |
 
 ## 未关联里程碑的文档
 

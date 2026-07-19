@@ -5,7 +5,8 @@
         displayName = "Task Execution",
         allowedDependencies = {
                 "shared", "identity::api", "authorization::api",
-                "audit::api", "reliability::api", "reliability::spi", "workorder::api"
+                "audit::api", "reliability::api", "reliability::spi", "workorder::api",
+                "configuration::api"
         }
 )
 package com.serviceos.task;

@@ -543,7 +543,7 @@ class SlaClockPostgresIT {
                 TENANT, projectId, workOrderId, UUID.randomUUID(), UUID.randomUUID(),
                 UUID.randomUUID(), "survey", workflowVersionId, workflowDigest,
                 bundle.bundleId(), bundle.manifestDigest(), "SURVEY", "SURVEY_RESPONSE",
-                WorkflowTaskKind.HUMAN, null, "survey.response.sla",
+                WorkflowTaskKind.HUMAN, null, "survey.response.sla", null,
                 "work-order://" + businessKey, Sha256.digest(businessKey),
                 500, clock.instant(), 1, "corr-" + businessKey, "cause-" + businessKey));
     }

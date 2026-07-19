@@ -674,13 +674,14 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M322 出站 INTEGRATION Mapping 生成提审 Payload**（功能证据见
+当前工程基线为 **M323 ASSIGNEE_POLICY 自动接入 TaskAssignment**（功能证据见
 `implementation-status.md`；合入 `master` 后回填合并提交）。M320 合并基线为
 `32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147）。
 
 当前已具备多 OEM SPI、远端查询、UNKNOWN/批量重放、复杂流程、十大资产设计器、六类 Runtime，
-以及入站 Mapping 物化（M321）与出站 Mapping 提审 Payload（M322）。
-下一主线继续 **Configuration-Driven Fulfillment Runtime**（ASSIGNEE/DISPATCH/RULE/
+入站 Mapping 物化（M321）、出站 Mapping 提审 Payload（M322），以及 ASSIGNEE_POLICY → TaskAssignment
+CANDIDATE（M323）。
+下一主线继续 **Configuration-Driven Fulfillment Runtime**（DISPATCH/RULE/
 NOTIFICATION/PRICING 自动接入业务、UNKNOWN/Replay Admin 工作台）；
 真实吉利 Sandbox 与 Track F/G 仍为 `BLOCKED_EXTERNAL`，不阻塞本地主线。
 
@@ -689,6 +690,8 @@ NOTIFICATION/PRICING 自动接入业务、UNKNOWN/Replay Admin 工作台）；
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M323 实现文档](architecture/336-m323-assignee-policy-task-assignment.md)
+- [M323 验收矩阵](testing/320-m323-assignee-policy-task-assignment-acceptance.md)
 - [M322 实现文档](architecture/335-m322-outbound-integration-mapping.md)
 - [M322 验收矩阵](testing/319-m322-outbound-integration-mapping-acceptance.md)
 - [M321 实现文档](architecture/334-m321-inbound-integration-mapping-materialization.md)
