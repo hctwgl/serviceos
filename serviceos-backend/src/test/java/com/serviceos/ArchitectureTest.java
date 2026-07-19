@@ -54,6 +54,12 @@ class ArchitectureTest {
         assertThat(Files.exists(Path.of(
                 "src/main/java/com/serviceos/integration/application/InboundCreateWorkOrderPipeline.java")))
                 .isTrue();
+        assertThat(Files.exists(Path.of(
+                "src/main/java/com/serviceos/integration/spi/OutboundSubmissionConnector.java")))
+                .isTrue();
+        assertThat(Files.exists(Path.of(
+                "src/main/java/com/serviceos/integration/application/OutboundSubmissionPipeline.java")))
+                .isTrue();
     }
 
     @Test
