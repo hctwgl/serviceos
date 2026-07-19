@@ -250,7 +250,7 @@ onMounted(() => {
     </form>
 
     <QueueTable
-      title="整改跟踪"
+      title="整改列表"
       :columns="[
         'correctionCaseId',
         'sourceReviewCaseId',

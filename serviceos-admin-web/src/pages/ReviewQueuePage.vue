@@ -152,7 +152,7 @@ onMounted(() => {
     </form>
 
     <QueueTable
-      title="审核队列"
+      title="审核列表"
       :columns="['reviewCaseId', 'projectId', 'status', 'origin', 'createdAt', 'latestDecision']"
       :column-labels="{
         reviewCaseId: '审核单号',

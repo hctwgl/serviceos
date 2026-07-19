@@ -96,6 +96,19 @@ INSERT INTO cfg_configuration_bundle (
     repeat('9', 64), 'PUBLISHED', now()
 ) ON CONFLICT DO NOTHING;
 
+-- 出站提审需要冻结 BYD_CPIM OUTBOUND INTEGRATION（与 seed-admin-pilot 共用资产版本）。
+INSERT INTO cfg_configuration_asset_version (
+    version_id, tenant_id, asset_type, asset_key, semantic_version, schema_version,
+    definition, content_digest, status, published_at
+) VALUES (
+    '20000000-0000-4000-8000-000000000009', 'tenant-local', 'INTEGRATION',
+    'admin-pilot-byd-submit', '1.0.0', '1.0.0',
+    '{"mappingKey":"admin-pilot-byd-submit","version":"1.0.0","connectorCode":"BYD_CPIM","direction":"OUTBOUND","fieldMappings":[{"mappingId":"operator","internalPath":"operator","externalPath":"operatePerson","required":true,"transform":"TRIM"},{"mappingId":"order","internalPath":"externalOrderCode","externalPath":"orderCode","required":true,"transform":"NONE"},{"mappingId":"commit","internalPath":"commitDate","externalPath":"commitDate","required":true,"transform":"NONE"}]}',
+    'c257c0099d12b014caae998adaa87903d2bae81e3625b3c9d8d39e2a09dedb6a',
+    'PUBLISHED', now()
+) ON CONFLICT (version_id) DO NOTHING;
+
+ALTER TABLE cfg_configuration_bundle_item DISABLE TRIGGER trg_cfg_bundle_item_immutable;
 INSERT INTO cfg_configuration_bundle_item (
     tenant_id, bundle_id, asset_type, asset_version_id, content_digest
 ) VALUES
@@ -110,7 +123,13 @@ INSERT INTO cfg_configuration_bundle_item (
 (
     'tenant-local', '30000000-0000-4000-8000-000000000002', 'EVIDENCE',
     '20000000-0000-4000-8000-000000000005', repeat('6', 64)
+),
+(
+    'tenant-local', '30000000-0000-4000-8000-000000000002', 'INTEGRATION',
+    '20000000-0000-4000-8000-000000000009',
+    'c257c0099d12b014caae998adaa87903d2bae81e3625b3c9d8d39e2a09dedb6a'
 ) ON CONFLICT DO NOTHING;
+ALTER TABLE cfg_configuration_bundle_item ENABLE TRIGGER trg_cfg_bundle_item_immutable;
 
 INSERT INTO wo_work_order (
     id, tenant_id, project_id, client_code, brand_code, service_product_code,

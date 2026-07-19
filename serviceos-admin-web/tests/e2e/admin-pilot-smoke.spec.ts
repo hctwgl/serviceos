@@ -58,7 +58,7 @@ async function openInProgressCorrectionFromFilteredQueue(
 ) {
   const correctionPage = await hostPage.context().newPage()
   await correctionPage.goto(new URL('/corrections', hostPage.url()).toString())
-  await expect(correctionPage.getByRole('heading', { name: /整改跟踪|整改中心/ })).toBeVisible()
+  await expect(correctionPage.getByRole('heading', { name: '整改中心', level: 1 })).toBeVisible()
   await correctionPage.getByLabel('correction status filter').selectOption('IN_PROGRESS')
   await correctionPage
     .getByLabel('correction sourceReviewCaseId filter')
@@ -107,7 +107,7 @@ async function openInProgressCorrectionFromFilteredQueue(
   expect((await queueSourceReviewPromise).status()).toBe(200)
   await expect(correctionPage.getByRole('heading', { name: '审核案例' })).toBeVisible()
   await correctionPage.goBack()
-  await expect(correctionPage.getByRole('heading', { name: /整改跟踪|整改中心/ })).toBeVisible()
+  await expect(correctionPage.getByRole('heading', { name: '整改中心', level: 1 })).toBeVisible()
 
   const queueCorrectionTaskPromise = correctionPage.waitForResponse(
     (response) =>
@@ -124,7 +124,7 @@ async function openInProgressCorrectionFromFilteredQueue(
   expect((await queueCorrectionTaskPromise).status()).toBe(200)
   await expect(correctionPage.getByRole('heading', { name: '任务详情' })).toBeVisible()
   await correctionPage.goBack()
-  await expect(correctionPage.getByRole('heading', { name: /整改跟踪|整改中心/ })).toBeVisible()
+  await expect(correctionPage.getByRole('heading', { name: '整改中心', level: 1 })).toBeVisible()
 
   // M180：整改队列剩余 Accepted 关联字段（项目 / 来源任务）。
   const queueProjectPromise = correctionPage.waitForResponse(
@@ -141,7 +141,7 @@ async function openInProgressCorrectionFromFilteredQueue(
   expect((await queueProjectPromise).status()).toBe(200)
   await expect(correctionPage.getByRole('heading', { name: '项目详情' })).toBeVisible()
   await correctionPage.goBack()
-  await expect(correctionPage.getByRole('heading', { name: /整改跟踪|整改中心/ })).toBeVisible()
+  await expect(correctionPage.getByRole('heading', { name: '整改中心', level: 1 })).toBeVisible()
 
   const queueSourceTaskPromise = correctionPage.waitForResponse(
     (response) =>
@@ -157,7 +157,7 @@ async function openInProgressCorrectionFromFilteredQueue(
   expect((await queueSourceTaskPromise).status()).toBe(200)
   await expect(correctionPage.getByRole('heading', { name: '任务详情' })).toBeVisible()
   await correctionPage.goBack()
-  await expect(correctionPage.getByRole('heading', { name: /整改跟踪|整改中心/ })).toBeVisible()
+  await expect(correctionPage.getByRole('heading', { name: '整改中心', level: 1 })).toBeVisible()
 
   await correctionPage
     .getByRole('link', { name: `打开整改案例 ${correction!.correctionCaseId}` })
@@ -454,9 +454,8 @@ test('真实 OIDC 登录后可读取核心投影并完成 Task 分配领取释�
       new URL(response.url()).pathname === `/api/v1/projects/${pilotProjectId}`,
   )
   await page
-    .getByRole('main')
-    .getByRole('table')
-    .getByRole('link', { name: pilotProjectId, exact: true })
+    .locator('.task-directory-cross-links')
+    .getByRole('link', { name: new RegExp(`打开项目\\s+${pilotProjectId}`) })
     .first()
     .click()
   expect((await taskDirectoryProjectPromise).status()).toBe(200)
@@ -640,7 +639,7 @@ test('真实 OIDC 登录后可读取核心投影并完成 Task 分配领取释�
   )
   await page.goto(`/reviews?status=OPEN&taskId=${pilotTaskIdForQueue}`)
   expect((await reviewHydratePromise).status()).toBe(200)
-  await expect(page.getByRole('heading', { name: /审核队列|审核中心/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '审核中心', level: 1 })).toBeVisible()
   await expect(page.getByLabel('review status filter')).toHaveValue('OPEN')
   await expect(page.getByLabel('review taskId filter')).toHaveValue(pilotTaskIdForQueue)
 
@@ -653,7 +652,7 @@ test('真实 OIDC 登录后可读取核心投影并完成 Task 分配领取释�
   )
   await page.goto(`/corrections?status=IN_PROGRESS&taskId=${pilotTaskIdForQueue}`)
   expect((await correctionHydratePromise).status()).toBe(200)
-  await expect(page.getByRole('heading', { name: /整改跟踪|整改中心/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '整改中心', level: 1 })).toBeVisible()
   await expect(page.getByLabel('correction status filter')).toHaveValue('IN_PROGRESS')
   await expect(page.getByLabel('correction taskId filter')).toHaveValue(pilotTaskIdForQueue)
 
@@ -1307,7 +1306,7 @@ test('真实 OIDC 登录后审核驳回可进入整改队列并授权豁免整�
   )
   await page.goto(`/reviews?status=OPEN&taskId=${taskId}`)
   expect((await reviewQueuePromise).status()).toBe(200)
-  await expect(page.getByRole('heading', { name: /审核队列|审核中心/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '审核中心', level: 1 })).toBeVisible()
 
   // M181：QueueTable 行内 projectId 单元格深链（opt-in linkColumns）。
   const pilotProjectIdForQueueCell = '10000000-0000-4000-8000-000000000001'
@@ -1325,7 +1324,7 @@ test('真实 OIDC 登录后审核驳回可进入整改队列并授权豁免整�
   expect((await queueCellProjectPromise).status()).toBe(200)
   await expect(page.getByRole('heading', { name: '项目详情' })).toBeVisible()
   await page.goto(`/reviews?status=OPEN&taskId=${taskId}`)
-  await expect(page.getByRole('heading', { name: /审核队列|审核中心/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '审核中心', level: 1 })).toBeVisible()
 
   const reviewQueueSnapshotPromise = page.waitForResponse(
     (response) =>
@@ -1594,7 +1593,7 @@ test('真实 OIDC 登录后可强制通过并导航到重开的后继审核案�
 
   // M148：审核队列按 OPEN + taskId 收窄可见本轮 OPEN Case。
   await reviewPage.goto(new URL('/reviews', page.url()).toString())
-  await expect(reviewPage.getByRole('heading', { name: /审核队列|审核中心/ })).toBeVisible()
+  await expect(reviewPage.getByRole('heading', { name: '审核中心', level: 1 })).toBeVisible()
   await reviewPage.getByLabel('review status filter').selectOption('OPEN')
   await reviewPage.getByLabel('review taskId filter').fill(taskId!)
   const reviewQueuePromise = reviewPage.waitForResponse(
