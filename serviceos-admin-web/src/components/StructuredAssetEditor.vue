@@ -197,6 +197,16 @@ function updateEvidenceItem(index: number, patch: Record<string, unknown>) {
   setRoot('items', next)
 }
 
+function setEvidenceItemExpression(
+  index: number,
+  exprField: 'requiredWhen',
+  source: string,
+) {
+  const item = evidenceItems.value[index]
+  if (!item) return
+  updateEvidenceItem(index, withOptionalExpression(item, exprField, source))
+}
+
 function removeEvidenceItem(index: number) {
   setRoot(
     'items',
@@ -452,6 +462,15 @@ const MEDIA_TYPES = ['PHOTO', 'VIDEO', 'DOCUMENT', 'SIGNATURE', 'GENERATED_REPOR
             删除
           </button>
         </div>
+        <ConditionBuilder
+          :model-value="exprSource(item, 'requiredWhen')"
+          :label="`资料项 ${String(item.evidenceKey ?? index)} requiredWhen`"
+          data-testid="evidence-required-when-builder"
+          @update:model-value="setEvidenceItemExpression(index, 'requiredWhen', $event)"
+        />
+        <p class="hint">
+          上下文路径可直接积木编辑；同 Bundle 同 stage FORM 的 formValues["…"] 可用高级源码（字段键自动发现递延）。
+        </p>
       </article>
       <button type="button" data-testid="add-evidence-item" @click="addEvidenceItem">
         添加资料项
