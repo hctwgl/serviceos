@@ -149,6 +149,8 @@ function taskRegionLabel(item: NetworkPortalTaskItem) {
   return parts.length ? parts.join('/') : '—'
 }
 const selectedTaskId = ref('')
+/** 接单可用任务 ID：允许填写尚未 ACTIVE 到本网点的任务（不能只从 ACTIVE 列表选）。 */
+const acceptTaskId = ref('')
 const selectedTechnicianId = ref('')
 const businessType = ref('INSTALLATION')
 const assignBusy = ref(false)
@@ -244,11 +246,15 @@ async function load() {
       : null
     if (fromQuery) {
       selectedTaskId.value = fromQuery.taskId
+      acceptTaskId.value = fromQuery.taskId
       if (fromQuery.businessType) {
         businessType.value = fromQuery.businessType
       }
     } else if (!selectedTaskId.value && items.value.length > 0) {
       selectedTaskId.value = items.value[0].taskId
+      if (!acceptTaskId.value) {
+        acceptTaskId.value = items.value[0].taskId
+      }
       if (items.value[0].businessType) {
         businessType.value = items.value[0].businessType
       }
@@ -258,6 +264,10 @@ async function load() {
       && items.value.length > 0
     ) {
       selectedTaskId.value = items.value[0].taskId
+    }
+    // query 中的 taskId 即使尚未 ACTIVE 到本网点，也作为接单候选
+    if (queryTaskId.value && !acceptTaskId.value) {
+      acceptTaskId.value = queryTaskId.value
     }
   } catch (err) {
     items.value = []
@@ -366,18 +376,20 @@ async function submitAccept() {
     acceptError.value = '请选择网点上下文'
     return
   }
-  if (!selectedTaskId.value) {
-    acceptError.value = '请选择任务'
+  const taskId = acceptTaskId.value.trim()
+  if (!taskId) {
+    acceptError.value = '请填写要接单的任务编号'
     return
   }
   acceptBusy.value = true
   acceptError.value = null
   acceptMessage.value = null
   try {
-    const result = await acceptNetworkPortalAssignment(props.networkContextId, selectedTaskId.value, {
+    const result = await acceptNetworkPortalAssignment(props.networkContextId, taskId, {
       businessType: businessType.value.trim() || 'INSTALLATION',
     })
-    acceptMessage.value = `接单成功，任务已归属本网点。请继续指派服务师傅。`
+    acceptMessage.value = '接单成功，任务已归属本网点。请继续指派服务师傅。'
+    selectedTaskId.value = taskId
     void result
     await load()
   } catch (err) {
@@ -851,15 +863,21 @@ watch(selectedTaskId, () => {
       @submit.prevent="submitAccept"
     >
       <h3>网点接单</h3>
-      <p class="hint">确认本网点承接任务（仅激活网点责任，不强制同时指派师傅）。</p>
+      <p class="hint">
+        填写管理端下发的任务编号并确认承接。接单前任务通常还不在下方 ACTIVE 列表中——这是正常现象。
+      </p>
       <label>
-        任务
-        <select v-model="selectedTaskId" data-testid="accept-task-select" aria-label="accept task">
-          <option disabled value="">选择任务</option>
-          <option v-for="item in items" :key="`accept-${item.taskId}`" :value="item.taskId">
-            {{ item.taskId }}
-          </option>
-        </select>
+        任务编号
+        <input
+          v-model="acceptTaskId"
+          list="accept-task-suggestions"
+          data-testid="accept-task-input"
+          aria-label="accept task"
+          placeholder="例如从管理端工单详情复制"
+        />
+        <datalist id="accept-task-suggestions">
+          <option v-for="item in items" :key="`accept-${item.taskId}`" :value="item.taskId" />
+        </datalist>
       </label>
       <label>
         业务类型

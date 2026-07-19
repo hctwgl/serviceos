@@ -18,23 +18,23 @@ const technicianPortalUrl =
 const accounts = [
   {
     portal: '管理端',
-    username: 'local-admin（或 Keycloak 本地运营账号）',
+    username: 'developer',
     role: '平台运营 / 项目管理员',
     org: '本地租户 tenant-local',
     actions: '初审、分配网点、平台审核、整改跟踪、SLA、演示数据',
   },
   {
     portal: '网点端',
-    username: '见 serviceos-deploy/demo/README.md',
+    username: 'developer（同一账号，选济南网点上下文）',
     role: '网点调度',
     org: '济南恒通新能源服务中心（演示）',
-    actions: '查看待办、指派师傅、预约、代补资料',
+    actions: '确认接单、指派师傅、预约、代补资料',
   },
   {
     portal: '师傅端',
-    username: '见 serviceos-deploy/demo/README.md',
+    username: 'developer（同一账号，选师傅上下文；张师傅）',
     role: '服务师傅',
-    org: '张师傅 / 李师傅（演示）',
+    org: '张师傅（可登录）/ 李师傅（仅指派目标）',
     actions: '联系客户、预约、上门、提交资料、整改重提',
   },
 ]

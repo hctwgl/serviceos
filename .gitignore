@@ -16,4 +16,6 @@ target/
 .env.*
 !.env.example
 !*.env.example
+!.env.development.example
+!**/.env.development.example
 /tmp/
