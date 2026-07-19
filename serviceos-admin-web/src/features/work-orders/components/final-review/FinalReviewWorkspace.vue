@@ -116,6 +116,10 @@ async function load() {
   error.value = null
   try {
     section.value = await getFinalReviewWorkspaceSection(props.workOrderId)
+    // 无 Fan-in 数据时保持 empty（不抛错伪装成失败），供运营区分「暂无」与「加载失败」。
+    if (!section.value?.data) {
+      return
+    }
     const reviewCase = section.value.data.reviewCase
     const defaultId =
       (typeof route.query.targetId === 'string' && route.query.targetId)
@@ -313,7 +317,12 @@ watch(
 
 <template>
   <div class="final-review-workspace" data-testid="final-review-workspace">
-    <AsyncContent :loading="loading" :error="error" :empty="!data">
+    <AsyncContent
+      :loading="loading"
+      :error="error"
+      :empty="!data"
+      empty-description="暂无终审数据"
+    >
       <PermissionBoundary :readonly-mode="readonlyMode" :reason="decideAction?.reason">
         <Card size="small" class="summary-card">
           <Descriptions :column="4" size="small">
@@ -359,6 +368,7 @@ watch(
 
         <Alert
           v-if="staleDraft"
+          data-testid="final-review-stale-draft"
           type="warning"
           show-icon
           style="margin: 12px 0"
