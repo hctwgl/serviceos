@@ -49,8 +49,8 @@ public interface IntegrationMappingRuntime {
     /**
      * 按 connectorCode 在冻结 Bundle 中唯一选择 OUTBOUND Mapping 并应用。
      *
-     * <p>零命中返回 empty（兼容 Profile 硬编码 payload）；多命中失败关闭。
-     * 输出 OEM 字段在 {@link IntegrationMappingResult#externalFields()}。</p>
+     * <p>零命中返回 empty，由提审创建路径失败关闭（M331 起不再回退 Profile 硬编码 payload）；
+     * 多命中失败关闭。输出 OEM 字段在 {@link IntegrationMappingResult#externalFields()}。</p>
      */
     Optional<IntegrationMappingResult> applyOutboundForConnectorIfPresent(
             String tenantId,

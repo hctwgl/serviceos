@@ -7,30 +7,30 @@ lastUpdated: 2026-07-19
 
 ## 当前
 
-- PR #148～#156：M321～M329 Draft stacked（base 链至 master）
-- PR #157：https://github.com/hctwgl/serviceos/pull/157 — **M330** RULE Task complete / Evidence Snapshot 门禁（Draft，base=#156）
-- `master`：`32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147 已合并）
-- latestMilestone：**M330**
-- Flyway：**125**；OpenAPI：**1.0.43**（本切片无契约/迁移变更）
+- PR #148～#157：M321～M330 Draft stacked
+- PR #158：待创建 — **M331** 出站提审仅 Mapping（Draft，base=#157）
+- `master`：`32b902f897d19d2c906acac899990bf1aa2bb056`
+- latestMilestone：**M331**
+- Flyway：**125**；OpenAPI：**1.0.43**
 
 ## 本回合完成
 
-### M330 RULE → Task complete / Evidence Snapshot 门禁
+### M331 出站提审仅 Mapping Payload
 
-- 抽取 `FrozenTaskRuleEvaluator`（M325/M329/M330 共用）
-- `TaskFulfillmentRuleGate` + `RuleTaskCompletionValidator`
-- `DefaultEvidenceSetSnapshotService` 在 `TASK_SUBMISSION` 创建前失败关闭
-- IT：`TaskFulfillmentRuleGatePostgresIT`；回归 M325/M329 IT PASS
-- 文档：`343-m330-*` / `327-m330-*`
+- 删除 `buildSubmitPayload` / `outboundMappingVersion`（SPI + BYD/Geely Profile）
+- 零 OUTBOUND Mapping → `VALIDATION_FAILED`
+- ReviewCase IT：夹具补齐 Mapping；失败关闭用例；`mappingVersionId` 为资产 UUID
+- 文档：`344-m331-*` / `328-m331-*`
 
 ### 既有 Draft 栈
 
-- M321～M329（PR #148～#156）
+- M321～M330（PR #148～#157）
 
 ## 验证
 
 ```text
-bash scripts/agent-verify.sh it TaskFulfillmentRuleGatePostgresIT,ReviewRuleGatePostgresIT,ClientReviewRuleGatePostgresIT
+bash scripts/agent-verify.sh test OutboundReviewSubmissionProfilesTest,GeelyOutboundSubmissionConnectorTest
+bash scripts/agent-verify.sh it ReviewCasePostgresIT
 bash scripts/agent-verify.sh test ArchitectureTest
 ```
 
@@ -41,9 +41,6 @@ bash scripts/agent-verify.sh test ArchitectureTest
 
 ## 下一步
 
-本地 Configuration-Driven Runtime 主线 RULE 门禁已覆盖 INTERNAL decide / CLIENT 回执 /
-Snapshot 创建 / Task complete。后续优先：
-
-1. Mapping：拆除 Profile 硬编码；defaults / enum / condition DSL
+1. Mapping：入站全量字段仅 Mapping；defaults / enum / condition DSL
 2. DISPATCH：TECHNICIAN 自动指派
 3. 低代码深化；吉利材料齐备后联调

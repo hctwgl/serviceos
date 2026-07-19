@@ -21,7 +21,7 @@ relatedMilestones: [M303, M304, M321, M297]
   - `DefaultOutboundDeliveryService`：零 Mapping 兼容 Profile；有 Mapping 则序列化 `externalFields`
   - `mappingVersionId` = `assetVersionId`；幂等摘要含 `contentDigest`；审计 `OUTBOUND_INTEGRATION_MAPPING_APPLIED`
 - 明确不做：
-  - 删除 Profile `buildSubmitPayload` 兼容层
+  - 删除 Profile `buildSubmitPayload` 兼容层（见 **M331**）
   - Geely 专用 OUTBOUND 资产夹具强制
   - Pipeline/Connector 重建 payload
   - 默认值/枚举/条件 DSL
@@ -41,8 +41,8 @@ relatedMilestones: [M303, M304, M321, M297]
 
 ## 明确未实现
 
-- 全量 OEM 出站字段仅 Mapping
-- ASSIGNEE/DISPATCH/RULE/NOTIFICATION/PRICING 主链路
+- Profile `buildSubmitPayload` 兼容层拆除：见 **M331**
+- 入站全量字段仅 Mapping、defaults/enum/condition DSL
 - 吉利真实 Sandbox
 
 ## 验证命令

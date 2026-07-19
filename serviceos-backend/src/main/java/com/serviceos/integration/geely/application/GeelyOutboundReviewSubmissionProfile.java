@@ -5,38 +5,23 @@ import com.serviceos.integration.spi.OutboundReviewSubmissionProfile;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
 import org.springframework.stereotype.Component;
-import tools.jackson.databind.ObjectMapper;
 
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.UUID;
 
-/** 吉利浩瀚提审创建档案（本地 stub）；真实 OpenAPI 签名仍 BLOCKED_EXTERNAL。 */
+/**
+ * 吉利浩瀚提审创建档案（本地 stub）；真实 OpenAPI 签名仍 BLOCKED_EXTERNAL。
+ *
+ * <p>提审 Payload 形状由冻结 Bundle OUTBOUND INTEGRATION Mapping 生成（M331）。</p>
+ */
 @Component
 public class GeelyOutboundReviewSubmissionProfile implements OutboundReviewSubmissionProfile {
     private static final ConnectorIdentity IDENTITY = new ConnectorIdentity(
             GeelyInboundCreateOrderService.CONNECTOR_CODE,
             GeelyInboundCreateOrderService.ADAPTER_VERSION);
-    private static final DateTimeFormatter TS =
-            DateTimeFormatter.ofPattern("uuuuMMddHHmmss");
-
-    private final ObjectMapper objectMapper;
-
-    public GeelyOutboundReviewSubmissionProfile(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
-    }
 
     @Override
     public ConnectorIdentity identity() {
         return IDENTITY;
-    }
-
-    @Override
-    public String outboundMappingVersion() {
-        return "geely-haohan-v1.3-submit-settlement-v1";
     }
 
     @Override
@@ -102,25 +87,5 @@ public class GeelyOutboundReviewSubmissionProfile implements OutboundReviewSubmi
     @Override
     public String callbackBatchRef(UUID deliveryId) {
         return "GEELY:SETTLEMENT_CB:" + deliveryId;
-    }
-
-    @Override
-    public byte[] buildSubmitPayload(
-            String operator,
-            String externalOrderCode,
-            Instant createdAt,
-            ZoneId protocolZone
-    ) {
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("installProcessNo", externalOrderCode);
-        body.put("operateName", operator == null ? "system" : operator);
-        body.put("timestamp", TS.format(createdAt.atZone(protocolZone)));
-        body.put("localStub", true);
-        try {
-            return objectMapper.writeValueAsBytes(body);
-        } catch (RuntimeException exception) {
-            throw new BusinessProblem(ProblemCode.INTERNAL_ERROR,
-                    "Cannot build GEELY submit payload: " + exception.getMessage());
-        }
     }
 }
