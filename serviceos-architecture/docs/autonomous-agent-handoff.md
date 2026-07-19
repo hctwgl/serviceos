@@ -8,7 +8,7 @@ lastUpdated: 2026-07-19
 ## 当前
 
 - PR #148～#154：M321～M327 Draft stacked（base 链至 master）
-- **M328** UNKNOWN/Replay Admin 工作台 Draft PR pending（base=#154）
+- PR #155：https://github.com/hctwgl/serviceos/pull/155 — **M328** UNKNOWN/Replay Admin（Draft，base=#154）
 - `master`：`32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147 已合并）
 - latestMilestone：**M328**
 - Flyway：**125**；OpenAPI：**1.0.43**（本切片无契约/迁移变更）
@@ -31,6 +31,8 @@ lastUpdated: 2026-07-19
 ```text
 cd serviceos-admin-web && npm run build
 ```
+
+PASS。后端处置/批量证据沿用 ManualDispositionPostgresIT / BatchReplayPostgresIT。
 
 ## BLOCKED_EXTERNAL
 
