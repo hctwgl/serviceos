@@ -8,7 +8,8 @@ lastUpdated: 2026-07-19
 ## 当前
 
 - **进行中 Draft PR**：M359 Feed/详情头客户端能力拒单（依赖 M356 #183、M357 #184、M358 #185）
-- 分支：`cursor/m359-portal-header-capability-reject-6a78`
+- PR：https://github.com/hctwgl/serviceos/pull/186
+- 分支：`cursor/m359-portal-header-capability-reject-6a78`（base：`cursor/m358-supported-client-kinds-6a78`）
 - latestMilestone（本 PR）：**M359**
 - Flyway：**131**；OpenAPI：**1.0.53**
 - `baselineCommit`：合并后回填
