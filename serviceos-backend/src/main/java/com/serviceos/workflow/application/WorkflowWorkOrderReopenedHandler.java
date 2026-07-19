@@ -166,7 +166,8 @@ final class WorkflowWorkOrderReopenedHandler implements OutboxMessageHandler {
                 nodeInstanceId, definition.firstNodeId(), asset.versionId(), asset.contentDigest(),
                 reopened.bundleRef().bundleId(), reopened.bundleRef().manifestDigest(),
                 definition.firstStageCode(), definition.firstTaskType(), definition.firstTaskKind(),
-                definition.firstFormRef(), definition.firstSlaRef(),
+                definition.firstFormRef(), definition.firstSlaRef(), definition.firstAssigneePolicyRef(),
+                definition.firstDispatchPolicyRef(), definition.firstRuleRef(),
                 "work-order-reopen:" + reopened.workOrderId() + ":" + message.eventId(),
                 message.payloadDigest(), 100, now, 3,
                 message.correlationId(), message.eventId().toString()));

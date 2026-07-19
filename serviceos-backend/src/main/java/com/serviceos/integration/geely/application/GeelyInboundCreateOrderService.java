@@ -10,6 +10,7 @@ import com.serviceos.integration.geely.api.GeelyNotifyResponse;
 import com.serviceos.integration.geely.infrastructure.GeelyAesCipher;
 import com.serviceos.integration.spi.ConnectorIdentity;
 import com.serviceos.integration.spi.CreateWorkOrderMappedInbound;
+import com.serviceos.integration.spi.CreateWorkOrderRouteHint;
 import com.serviceos.integration.spi.InboundConnectorAuditContext;
 import com.serviceos.integration.spi.InboundCreateWorkOrderResult;
 import com.serviceos.shared.Sha256;
@@ -141,9 +142,9 @@ public class GeelyInboundCreateOrderService {
             return GeelyNotifyResponse.fail("invalid create-order payload");
         }
 
-        final CreateWorkOrderMappedInbound inbound;
+        final CreateWorkOrderRouteHint routeHint;
         try {
-            inbound = GeelyCreateOrderMapper.map(payload, objectMapper);
+            routeHint = GeelyCreateOrderMapper.toRouteHint(payload);
         } catch (RuntimeException exception) {
             createWorkOrderPipeline.reject(
                     envelope, tenantId, null, null, null, "MAPPING_FAILED",
@@ -168,7 +169,7 @@ public class GeelyInboundCreateOrderService {
                 new ConnectorIdentity(CONNECTOR_CODE, ADAPTER_VERSION),
                 tenantId,
                 projectCode,
-                inbound,
+                routeHint,
                 audit,
                 safeCorrelationId,
                 OBJECT_NAMESPACE,

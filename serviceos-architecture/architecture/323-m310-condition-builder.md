@@ -23,7 +23,8 @@ relatedMilestones: [M287, M289, M294, M295, M309]
 
 ## 明确未实现
 
-- 嵌套括号混合组的完整 round-trip 解析；FORM 字段 `formValues["…"]` 积木；全资产专用属性面板深化；吉利 OEM
+- 嵌套括号混合组的完整 round-trip 解析；全资产专用属性面板深化；吉利 OEM
+- FORM 字段 `formValues["…"]` 积木与 FORM visibility/visibleWhen/requiredWhen 嵌入已由 **M340** 承接
 
 ## 验证
 

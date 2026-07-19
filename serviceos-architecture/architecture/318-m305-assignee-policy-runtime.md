@@ -21,7 +21,8 @@ relatedMilestones: [M21, M295, M303]
 
 ## 明确未实现
 
-- 运行时直读组织/网点当前成员表；自动调用 assignCandidates；DISPATCH 评分引擎
+- 运行时直读组织/网点当前成员表；DISPATCH 评分引擎
+- 自动调用 assignCandidates：已由 **M323** 在 `task.created` 路径交付（本切片仍只保证 Runtime）
 
 ## 验证
 

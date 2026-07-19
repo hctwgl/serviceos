@@ -28,7 +28,8 @@ final class JdbcWorkOrderExternalLookup implements WorkOrderExternalLookup {
         String safeClient = required(clientCode, "clientCode");
         String safeOrder = required(externalOrderCode, "externalOrderCode");
         return jdbc.sql("""
-                SELECT id, project_id, status, version
+                SELECT id, project_id, status, version,
+                       configuration_bundle_id, configuration_bundle_digest
                   FROM wo_work_order
                  WHERE tenant_id = :tenantId
                    AND client_code = :clientCode
@@ -41,7 +42,9 @@ final class JdbcWorkOrderExternalLookup implements WorkOrderExternalLookup {
                         rs.getObject("id", UUID.class),
                         rs.getObject("project_id", UUID.class),
                         rs.getString("status"),
-                        rs.getLong("version")))
+                        rs.getLong("version"),
+                        rs.getObject("configuration_bundle_id", UUID.class),
+                        rs.getString("configuration_bundle_digest")))
                 .optional();
     }
 

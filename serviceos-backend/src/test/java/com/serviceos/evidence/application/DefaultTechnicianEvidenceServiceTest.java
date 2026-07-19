@@ -171,7 +171,7 @@ class DefaultTechnicianEvidenceServiceTest {
     private static TaskFulfillmentContext task(String responsible, String formRef) {
         return new TaskFulfillmentContext(
                 TASK, PROJECT, UUID.randomUUID(), UUID.randomUUID(), "bundle-digest",
-                "SURVEY", "SURVEY", "HUMAN", formRef, "evidence-ref",
+                "SURVEY", "SURVEY", "HUMAN", formRef, "evidence-ref", null, null, null,
                 "RUNNING", responsible, false, 1);
     }
 

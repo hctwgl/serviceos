@@ -654,6 +654,7 @@ public final class ConfigurationAssetSchemaValidator {
     }
 
     private void validateIntegrationSemantics(JsonNode definition) {
+        String direction = definition.path("direction").asText();
         Set<String> ids = new HashSet<>();
         for (JsonNode mapping : definition.path("fieldMappings")) {
             String mappingId = mapping.path("mappingId").asText();
@@ -661,6 +662,69 @@ public final class ConfigurationAssetSchemaValidator {
                 throw new ConfigurationPublicationException(
                         "INTEGRATION mappingId must be unique: " + mappingId);
             }
+            boolean hasConstant = mapping.hasNonNull("constantValue");
+            boolean hasDefault = mapping.hasNonNull("defaultValue");
+            boolean hasEnumMap = mapping.has("enumMap") && mapping.path("enumMap").isObject()
+                    && !mapping.path("enumMap").isEmpty();
+            if (hasConstant && hasDefault) {
+                throw new ConfigurationPublicationException(
+                        "INTEGRATION mapping cannot combine constantValue and defaultValue: "
+                                + mappingId);
+            }
+            if (hasConstant && hasEnumMap) {
+                throw new ConfigurationPublicationException(
+                        "INTEGRATION mapping cannot combine constantValue and enumMap: "
+                                + mappingId);
+            }
+            boolean hasExternal = mapping.hasNonNull("externalPath")
+                    && !mapping.path("externalPath").asText("").isBlank();
+            boolean hasInternal = mapping.hasNonNull("internalPath")
+                    && !mapping.path("internalPath").asText("").isBlank();
+            if (hasConstant) {
+                if ("INBOUND".equals(direction) && !hasInternal) {
+                    throw new ConfigurationPublicationException(
+                            "INBOUND constant mapping requires internalPath: " + mappingId);
+                }
+                if ("OUTBOUND".equals(direction) && !hasExternal) {
+                    throw new ConfigurationPublicationException(
+                            "OUTBOUND constant mapping requires externalPath: " + mappingId);
+                }
+            } else if (!hasExternal || !hasInternal) {
+                throw new ConfigurationPublicationException(
+                        "Path mapping requires externalPath and internalPath: " + mappingId);
+            }
+            if (mapping.has("condition") && !mapping.path("condition").isNull()) {
+                validateIntegrationCondition(mapping.path("condition"), mappingId);
+            }
+        }
+    }
+
+    private void validateIntegrationCondition(JsonNode condition, String mappingId) {
+        String operator = condition.path("operator").asText("");
+        boolean hasValue = condition.has("value") && !condition.path("value").isNull();
+        boolean hasValues = condition.has("values") && condition.path("values").isArray()
+                && !condition.path("values").isEmpty();
+        switch (operator) {
+            case "PRESENT" -> {
+                if (hasValue || hasValues) {
+                    throw new ConfigurationPublicationException(
+                            "PRESENT condition must not declare value/values: " + mappingId);
+                }
+            }
+            case "EQUALS", "NOT_EQUALS" -> {
+                if (!hasValue || hasValues) {
+                    throw new ConfigurationPublicationException(
+                            operator + " condition requires value only: " + mappingId);
+                }
+            }
+            case "IN", "NOT_IN" -> {
+                if (!hasValues || hasValue) {
+                    throw new ConfigurationPublicationException(
+                            operator + " condition requires values only: " + mappingId);
+                }
+            }
+            default -> throw new ConfigurationPublicationException(
+                    "Unsupported INTEGRATION condition operator: " + operator);
         }
     }
 

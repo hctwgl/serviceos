@@ -5,6 +5,8 @@ import com.serviceos.audit.api.AuditEntry;
 import com.serviceos.authorization.api.AuthorizationDecision;
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
+import com.serviceos.configuration.api.IntegrationMappingResult;
+import com.serviceos.configuration.api.IntegrationMappingRuntime;
 import com.serviceos.evidence.api.ReviewCaseService;
 import com.serviceos.evidence.api.ReviewCaseView;
 import com.serviceos.evidence.api.ReviewDecisionView;
@@ -49,15 +51,20 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
 /**
  * 创建提审不可变交付意图；不在命令事务内调用外部网络。
  *
- * <p>车企差异通过 {@link OutboundReviewSubmissionProfiles} 解析，禁止本类按 clientCode 分支。</p>
+ * <p>车企差异通过 {@link OutboundReviewSubmissionProfiles} 解析，禁止本类按 clientCode 分支。
+ * 提审 Payload 必须由 Task 冻结 Bundle 的唯一 OUTBOUND INTEGRATION Mapping 生成；
+ * {@code mappingVersionId} 取资产 versionId。零 Mapping / 无冻结 Bundle 失败关闭（M331）。</p>
  */
 @Service
 final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
@@ -68,6 +75,8 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
     private static final String MANUAL_ACK_CAPABILITY = "integration.recordManualOutboundAck";
     private static final String MANUAL_ACK = "integration.outboundDelivery.recordManualAck";
     private static final String READ_CAPABILITY = "integration.readOutbound";
+    private static final DateTimeFormatter COMMIT_DATE_TIME =
+            DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm:ss");
 
     private final ReviewCaseService reviews;
     private final TaskFulfillmentContextService taskContexts;
@@ -86,6 +95,7 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
     private final ZoneId protocolZone;
     private final OutboundReviewSubmissionProfiles profiles;
     private final RemoteStatusQueryConnectors remoteStatusQueries;
+    private final IntegrationMappingRuntime integrationMappingRuntime;
 
     DefaultOutboundDeliveryService(
             ReviewCaseService reviews,
@@ -105,7 +115,8 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
             @org.springframework.beans.factory.annotation.Value("${serviceos.integration.byd.cpim.zone-id}")
             ZoneId protocolZone,
             OutboundReviewSubmissionProfiles profiles,
-            RemoteStatusQueryConnectors remoteStatusQueries
+            RemoteStatusQueryConnectors remoteStatusQueries,
+            IntegrationMappingRuntime integrationMappingRuntime
     ) {
         this.reviews = reviews;
         this.taskContexts = taskContexts;
@@ -124,6 +135,7 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
         this.protocolZone = protocolZone;
         this.profiles = profiles;
         this.remoteStatusQueries = remoteStatusQueries;
+        this.integrationMappingRuntime = integrationMappingRuntime;
     }
 
     @Override
@@ -170,10 +182,6 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
         String operator = exactText(decision.decidedBy(), "decidedBy", 50);
         String orderCode = profile.extractExternalOrderCode(canonical.businessKey());
         String businessKey = profile.submitBusinessKey(orderCode, source.snapshotContentDigest());
-        String requestDigest = Sha256.digest(
-                source.reviewCaseId() + "|" + source.evidenceSetSnapshotId() + "|"
-                        + source.snapshotContentDigest() + "|" + decision.reviewDecisionId() + "|"
-                        + operator + "|" + orderCode + "|" + profile.outboundMappingVersion());
         OutboundDeliveryRepository.DeliveryRecord existing = deliveries.findBySourceReview(
                 principal.tenantId(), source.reviewCaseId(), profile.businessMessageType()).orElse(null);
         if (existing != null) {
@@ -186,7 +194,31 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
 
         UUID deliveryId = UUID.randomUUID();
         Instant createdAt = clock.instant();
-        byte[] payloadBytes = profile.buildSubmitPayload(operator, orderCode, createdAt, protocolZone);
+
+        final IntegrationMappingResult mappingResult;
+        final byte[] payloadBytes;
+        final String mappingVersionId;
+        try {
+            // M331：禁止 Profile 硬编码 payload；零 Mapping 失败关闭。
+            mappingResult = requireFrozenOutboundMapping(
+                    principal.tenantId(), task, profile.identity().connectorCode(),
+                    operator, orderCode, createdAt);
+            payloadBytes = objectMapper.writeValueAsBytes(mappingResult.externalFields());
+            mappingVersionId = mappingResult.assetVersionId().toString();
+        } catch (BusinessProblem exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
+            throw new BusinessProblem(ProblemCode.INTERNAL_ERROR,
+                    "OUTBOUND INTEGRATION mapping payload serialization failed: "
+                            + exception.getMessage());
+        }
+
+        String requestDigest = Sha256.digest(
+                source.reviewCaseId() + "|" + source.evidenceSetSnapshotId() + "|"
+                        + source.snapshotContentDigest() + "|" + decision.reviewDecisionId() + "|"
+                        + operator + "|" + orderCode + "|" + mappingVersionId
+                        + "|" + mappingResult.contentDigest());
+
         String payloadDigest = Sha256.digest(payloadBytes);
         String tenantPrefix = Sha256.digest(principal.tenantId()).substring(0, 16);
         String objectRef = "integration/outbound/" + tenantPrefix + "/"
@@ -210,7 +242,7 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
             var registration = deliveries.register(new OutboundDeliveryRepository.NewDelivery(
                     deliveryId, principal.tenantId(), source.projectId(),
                     profile.identity().connectorVersionId(),
-                    profile.outboundMappingVersion(), profile.businessMessageType(), businessKey,
+                    mappingVersionId, profile.businessMessageType(), businessKey,
                     source.reviewCaseId(), source.taskId(), task.workOrderId(),
                     source.evidenceSetSnapshotId(), source.snapshotContentDigest(), orderCode,
                     decision.decidedBy(), operator, objectRef, payloadDigest,
@@ -240,12 +272,73 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
                         "OutboundDelivery", delivery.deliveryId().toString(), "ALLOW",
                         auth.matchedGrantIds(), auth.policyVersion(), "PENDING", null,
                         requestDigest, metadata.correlationId(), createdAt));
+                UUID auditedDeliveryId = delivery.deliveryId();
+                appendOutboundMappingAudit(
+                        principal, auth, auditedDeliveryId, mappingResult,
+                        metadata.correlationId(), createdAt);
             }
             idempotency.complete(context, CREATE, delivery.deliveryId().toString(),
                     Sha256.digest(json(delivery)));
             return delivery;
         }));
         return created;
+    }
+
+    /**
+     * 从 Task 冻结 Bundle 施加唯一 OUTBOUND Mapping；缺 Bundle / 零命中失败关闭。
+     */
+    private IntegrationMappingResult requireFrozenOutboundMapping(
+            String tenantId,
+            TaskFulfillmentContext task,
+            String connectorCode,
+            String operator,
+            String orderCode,
+            Instant createdAt
+    ) {
+        if (task.configurationBundleId() == null
+                || task.configurationBundleDigest() == null
+                || task.configurationBundleDigest().isBlank()) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                    "提审要求 Task 冻结 Configuration Bundle 含唯一 OUTBOUND INTEGRATION Mapping");
+        }
+        if (!integrationMappingRuntime.hasOutboundMappingForConnector(
+                tenantId, task.configurationBundleId(), task.configurationBundleDigest(),
+                connectorCode)) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                    "提审要求冻结 Bundle 含 connector=" + connectorCode
+                            + " 的唯一 OUTBOUND INTEGRATION Mapping");
+        }
+        Map<String, Object> internal = new LinkedHashMap<>();
+        internal.put("operator", operator);
+        internal.put("externalOrderCode", orderCode);
+        internal.put("commitDate", COMMIT_DATE_TIME.format(createdAt.atZone(protocolZone)));
+        return integrationMappingRuntime.applyOutboundForConnectorIfPresent(
+                tenantId, task.configurationBundleId(), task.configurationBundleDigest(),
+                connectorCode, internal)
+                .orElseThrow(() -> new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                        "OUTBOUND INTEGRATION Mapping 解析失败：connector=" + connectorCode));
+    }
+
+    private void appendOutboundMappingAudit(
+            CurrentPrincipal principal,
+            AuthorizationDecision auth,
+            UUID deliveryId,
+            IntegrationMappingResult mapping,
+            String correlationId,
+            Instant now
+    ) {
+        String explanation = String.join("; ", mapping.explanations());
+        if (explanation.length() > 1800) {
+            explanation = explanation.substring(0, 1800);
+        }
+        audit.append(new AuditEntry(
+                UUID.randomUUID(), principal.tenantId(), principal.principalId(),
+                "OUTBOUND_INTEGRATION_MAPPING_APPLIED", SUBMIT_CAPABILITY,
+                "OutboundDelivery", deliveryId.toString(), "ALLOW",
+                auth.matchedGrantIds(), auth.policyVersion(), "APPLIED", null,
+                Sha256.digest(mapping.contentDigest() + "|" + mapping.assetVersionId()
+                        + "|" + explanation),
+                correlationId, now));
     }
 
     private ResolvedLineage resolveInboundLineage(String tenantId, UUID projectId, UUID workOrderId) {

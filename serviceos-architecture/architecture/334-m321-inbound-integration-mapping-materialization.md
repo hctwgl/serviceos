@@ -50,10 +50,10 @@ relatedMilestones: [M303, M304, M320]
 
 ## 明确未实现
 
-- 出站 Mapping 生成 OEM Payload
-- 全量字段仅由 Mapping 提供（无适配器 fallback）
+- 全量字段仅由 Mapping 提供（无适配器 fallback）→ 见 **M333**
 - 默认值、枚举、条件、错误码映射扩展
-- ASSIGNEE / DISPATCH / RULE / NOTIFICATION / PRICING 业务主链路接入
+- ASSIGNEE / DISPATCH / RULE / NOTIFICATION / PRICING 业务主链路接入（后续里程碑已部分交付）
+- 出站 Mapping 见 **M322** / 仅 Mapping 见 **M331**
 
 ## 工程证据
 

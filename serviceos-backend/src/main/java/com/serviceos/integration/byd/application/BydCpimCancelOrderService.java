@@ -11,6 +11,7 @@ import com.serviceos.integration.byd.infrastructure.BydCpimReplayConflictExcepti
 import com.serviceos.integration.byd.infrastructure.BydCpimSignatureVerifier;
 import com.serviceos.integration.byd.infrastructure.JdbcBydCpimReplayGuard;
 import com.serviceos.integration.spi.CancelWorkOrderMappedInbound;
+import com.serviceos.integration.spi.CancelWorkOrderRouteHint;
 import com.serviceos.integration.spi.ConnectorIdentity;
 import com.serviceos.integration.spi.InboundCancelWorkOrderResult;
 import com.serviceos.integration.spi.InboundConnectorAuditContext;
@@ -25,7 +26,11 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -33,8 +38,8 @@ import java.util.UUID;
 /**
  * BYD 用户取消订单入站适配器。
  *
- * <p>验签/Nonce 防重放留在本类；取消 Canonical 与领域命令委托
- * {@link InboundCancelWorkOrderPipeline}。</p>
+ * <p>M339：验签/Nonce 防重放留在本类；领域 reasonCode/approvalRef 由冻结 CANCEL Mapping 物化。
+ * {@code cancelDate} 仅用于 businessKey 后缀，写入 RouteHint。</p>
  */
 @Service
 public class BydCpimCancelOrderService {
@@ -43,6 +48,9 @@ public class BydCpimCancelOrderService {
     private static final String MESSAGE_TYPE = CancelWorkOrderMappedInbound.MESSAGE_TYPE_CANCEL_WORK_ORDER;
     private static final String AUTH_POLICY = "BYD_CPIM_SIGNATURE_V7_3_1";
     private static final String OBJECT_NAMESPACE = "byd-cpim/cancel";
+    private static final String CANCEL_BUSINESS_PREFIX = "BYD:CANCEL:";
+    private static final DateTimeFormatter DATE_TIME = DateTimeFormatter
+            .ofPattern("uuuu-MM-dd HH:mm:ss").withResolverStyle(ResolverStyle.STRICT);
 
     private final ObjectMapper objectMapper;
     private final JdbcBydCpimReplayGuard replayGuard;
@@ -50,7 +58,6 @@ public class BydCpimCancelOrderService {
     private final ObjectStorageGateway storage;
     private final InboundCancelWorkOrderPipeline cancelPipeline;
     private final BydCpimSignatureVerifier signatureVerifier;
-    private final BydCpimCancelOrderMapper mapper = new BydCpimCancelOrderMapper();
     private final TransactionTemplate transactions;
     private final Clock clock;
     private final String tenantId;
@@ -135,28 +142,52 @@ public class BydCpimCancelOrderService {
         }
 
         store(rawObjectRef, rawPayload, rawDigest);
-        final CancelWorkOrderMappedInbound mapped;
+
+        InboundConnectorAuditContext auditContext = new InboundConnectorAuditContext(
+                adapterPrincipalId, AUTH_POLICY, "integration.receiveInbound", requestDigest);
+        final CancelWorkOrderRouteHint routeHint;
         try {
-            mapped = mapper.map(raw, objectMapper);
+            routeHint = toRouteHint(raw);
         } catch (IllegalArgumentException exception) {
-            InboundConnectorAuditContext auditContext = new InboundConnectorAuditContext(
-                    adapterPrincipalId, AUTH_POLICY, "integration.receiveInbound", requestDigest);
-            cancelPipeline.reject(envelope, tenantId, null, null, BydCpimCancelOrderMapper.MAPPING_VERSION,
+            cancelPipeline.reject(envelope, tenantId, null, null, null,
                     "INVALID_CANCEL_PAYLOAD", exception.getMessage(), auditContext);
             return BydCpimInboundOrderResponse.rejected("INVALID_CANCEL_PAYLOAD", exception.getMessage());
         }
 
-        InboundConnectorAuditContext auditContext = new InboundConnectorAuditContext(
-                adapterPrincipalId, AUTH_POLICY, "integration.receiveInbound", requestDigest);
-        InboundCancelWorkOrderResult result = cancelPipeline.processMappedCancel(
-                envelope, CONNECTOR, tenantId, mapped, auditContext, safeCorrelationId, OBJECT_NAMESPACE);
+        InboundCancelWorkOrderResult result = cancelPipeline.processCancel(
+                envelope, CONNECTOR, tenantId, routeHint, Map.copyOf(raw),
+                auditContext, safeCorrelationId, OBJECT_NAMESPACE);
         return switch (result) {
             case InboundCancelWorkOrderResult.Accepted accepted -> BydCpimInboundOrderResponse.accepted(
-                    mapped.externalOrderCode(), CONNECTOR.connectorVersionId(),
+                    routeHint.externalOrderCode(), CONNECTOR.connectorVersionId(),
                     accepted.mappingVersionId(), accepted.replay());
             case InboundCancelWorkOrderResult.Rejected rejected -> BydCpimInboundOrderResponse.rejected(
                     rejected.code(), rejected.message());
         };
+    }
+
+    private static CancelWorkOrderRouteHint toRouteHint(Map<String, Object> source) {
+        String orderCode = requiredText(source.get("orderCode"), "orderCode", 50);
+        String cancelDate = requiredText(source.get("cancelDate"), "cancelDate", 50);
+        try {
+            LocalDateTime.parse(cancelDate, DATE_TIME);
+        } catch (DateTimeParseException exception) {
+            throw new IllegalArgumentException("cancelDate must use yyyy-MM-dd HH:mm:ss", exception);
+        }
+        return new CancelWorkOrderRouteHint(
+                BydCpimOrderMapper.CLIENT_CODE,
+                orderCode,
+                BydCpimOrderMapper.BUSINESS_PREFIX + orderCode,
+                CANCEL_BUSINESS_PREFIX + orderCode,
+                cancelDate);
+    }
+
+    private static String requiredText(Object raw, String field, int maximum) {
+        if (!(raw instanceof String value) || value.isBlank()
+                || !value.equals(value.trim()) || value.length() > maximum) {
+            throw new IllegalArgumentException(field + " is invalid");
+        }
+        return value;
     }
 
     private void store(String objectRef, byte[] content, String digest) {

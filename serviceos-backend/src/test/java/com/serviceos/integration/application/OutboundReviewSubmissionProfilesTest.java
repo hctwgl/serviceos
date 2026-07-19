@@ -4,7 +4,6 @@ import com.serviceos.integration.byd.application.BydOutboundReviewSubmissionProf
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
 import org.junit.jupiter.api.Test;
-import tools.jackson.databind.json.JsonMapper;
 
 import java.util.List;
 
@@ -15,7 +14,7 @@ class OutboundReviewSubmissionProfilesTest {
 
     @Test
     void resolvesUniqueBydProfileByInboundLineageAndConnectorVersion() {
-        var byd = new BydOutboundReviewSubmissionProfile(JsonMapper.builder().build());
+        var byd = new BydOutboundReviewSubmissionProfile();
         var registry = new OutboundReviewSubmissionProfiles(List.of(byd));
         assertThat(registry.requireForInboundLineage("byd-cpim-v7.3.1", "CREATE_WORK_ORDER"))
                 .isSameAs(byd);
@@ -26,7 +25,7 @@ class OutboundReviewSubmissionProfilesTest {
     @Test
     void failsClosedWhenLineageUnknown() {
         var registry = new OutboundReviewSubmissionProfiles(List.of(
-                new BydOutboundReviewSubmissionProfile(JsonMapper.builder().build())));
+                new BydOutboundReviewSubmissionProfile()));
         assertThatThrownBy(() -> registry.requireForInboundLineage("unknown-connector", "CREATE_WORK_ORDER"))
                 .isInstanceOf(BusinessProblem.class)
                 .extracting(ex -> ((BusinessProblem) ex).code())
@@ -35,7 +34,7 @@ class OutboundReviewSubmissionProfilesTest {
 
     @Test
     void resolvesUniqueProfileByCallbackMappingVersion() {
-        var byd = new BydOutboundReviewSubmissionProfile(JsonMapper.builder().build());
+        var byd = new BydOutboundReviewSubmissionProfile();
         var registry = new OutboundReviewSubmissionProfiles(List.of(byd));
         assertThat(registry.requireByCallbackMappingVersion("byd-ocean-shandong-review-callback-v1"))
                 .isSameAs(byd);
@@ -47,16 +46,15 @@ class OutboundReviewSubmissionProfilesTest {
 
     @Test
     void routeRegistrationFallsBackToSoleProfileWhenMappingUnknown() {
-        var byd = new BydOutboundReviewSubmissionProfile(JsonMapper.builder().build());
+        var byd = new BydOutboundReviewSubmissionProfile();
         var registry = new OutboundReviewSubmissionProfiles(List.of(byd));
         assertThat(registry.requireForRouteRegistration("MAP-TEST-ONLY")).isSameAs(byd);
     }
 
     @Test
     void routeRegistrationFailsClosedWhenMappingUnknownAndMultipleProfiles() {
-        var byd = new BydOutboundReviewSubmissionProfile(JsonMapper.builder().build());
-        var geely = new com.serviceos.integration.geely.application.GeelyOutboundReviewSubmissionProfile(
-                JsonMapper.builder().build());
+        var byd = new BydOutboundReviewSubmissionProfile();
+        var geely = new com.serviceos.integration.geely.application.GeelyOutboundReviewSubmissionProfile();
         var registry = new OutboundReviewSubmissionProfiles(List.of(byd, geely));
         assertThat(registry.requireForRouteRegistration("byd-ocean-shandong-review-callback-v1"))
                 .isSameAs(byd);

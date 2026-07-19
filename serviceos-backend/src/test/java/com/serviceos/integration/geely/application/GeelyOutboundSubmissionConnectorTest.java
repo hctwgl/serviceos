@@ -43,7 +43,7 @@ class GeelyOutboundSubmissionConnectorTest {
 
     @Test
     void profileClaimsGeelyCreateLineage() {
-        var profile = new GeelyOutboundReviewSubmissionProfile(JsonMapper.builder().build());
+        var profile = new GeelyOutboundReviewSubmissionProfile();
         assertThat(profile.supportsInboundLineage("geely-haohan-v1.3-local", "CREATE_WORK_ORDER"))
                 .isTrue();
         assertThat(profile.supportsInboundLineage("byd-cpim-v7.3.1", "CREATE_WORK_ORDER")).isFalse();

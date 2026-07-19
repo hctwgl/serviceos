@@ -674,22 +674,82 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M321 入站 INTEGRATION Mapping 物化为建单命令**（功能证据见
-`implementation-status.md`；合入 `master` 后回填合并提交）。M320 合并基线为
+当前工程基线为 **M349 Technician Web FORM 条件执行器**（Draft stacked 于 `#148→…→#175` + 本切片；
+见 `implementation-status.md`；合入 `master` 后回填合并提交）。M320 合并基线为
 `32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147）。
 
-当前已具备多 OEM 入站建单/更新/取消/审核回调管道 SPI、出站提审通用 SPI、远端状态查询、
-UNKNOWN 人工处置、批量重放、复杂流程运行时、十大配置资产设计器、六类冻结 Bundle 运行时，
-以及入站 Mapping 物化建单主路径（M321）。
-下一主线继续 **Configuration-Driven Fulfillment Runtime**（出站 Mapping、
-ASSIGNEE/DISPATCH/RULE/NOTIFICATION/PRICING 自动接入业务、UNKNOWN/Replay Admin 工作台）；
-真实吉利 Sandbox 与 Track F/G 仍为 `BLOCKED_EXTERNAL`，不阻塞本地主线。
+当前已具备多 OEM SPI、远端查询、UNKNOWN/批量重放、复杂流程、十大资产设计器、六类 Runtime，
+入站/出站 Mapping（M321～M339，含 CREATE/UPDATE/CANCEL 强制 Mapping + messageType）、
+FORM/EVIDENCE ConditionBuilder（M340/M341）与嵌套条件组（M342）、REFERENCE_OEM Update/Cancel（M343）、
+Admin Mapping DSL UI（M347）、DISPATCH scope/fallback/allocationRatio 编辑器（M348）、
+Technician FORM 条件执行器（M349）、
+ASSIGNEE/DISPATCH NETWORK+TECHNICIAN+Coverage+比例缺口（M323/M324/M332/M337/M338）、
+RULE（M325/M329/M330）、NOTIFICATION（M326）、PRICING SHADOW Snapshot（M327），以及 Admin
+UNKNOWN 人工处置与批量 Replay 工作台（M328）。
+下一主线进入硬门禁：吉利材料到位后优先联调；AMOUNT/加权（待业务确认）与 BUSINESS 日历 SLA；
+Track F/G 仍为 `BLOCKED_EXTERNAL`。
 
 权威进度入口：
 
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M349 实现文档](architecture/362-m349-technician-form-condition-executor.md)
+- [M349 验收矩阵](testing/346-m349-technician-form-condition-executor-acceptance.md)
+- [M348 实现文档](architecture/361-m348-dispatch-residual-editor.md)
+- [M348 验收矩阵](testing/345-m348-dispatch-residual-editor-acceptance.md)
+- [M347 实现文档](architecture/360-m347-integration-mapping-dsl-ui.md)
+- [M347 验收矩阵](testing/344-m347-integration-mapping-dsl-ui-acceptance.md)
+- [M346 实现文档](architecture/359-m346-evidence-quality-checks-editor.md)
+- [M346 验收矩阵](testing/343-m346-evidence-quality-checks-editor-acceptance.md)
+- [M345 实现文档](architecture/358-m345-unary-not-condition.md)
+- [M345 验收矩阵](testing/342-m345-unary-not-condition-acceptance.md)
+- [M344 实现文档](architecture/357-m344-evidence-form-fieldkey-discovery.md)
+- [M344 验收矩阵](testing/341-m344-evidence-form-fieldkey-discovery-acceptance.md)
+- [M343 实现文档](architecture/356-m343-reference-oem-update-cancel.md)
+- [M343 验收矩阵](testing/340-m343-reference-oem-update-cancel-acceptance.md)
+- [M342 实现文档](architecture/355-m342-nested-condition-groups.md)
+- [M342 验收矩阵](testing/339-m342-nested-condition-groups-acceptance.md)
+- [M341 实现文档](architecture/354-m341-evidence-required-when-builder.md)
+- [M341 验收矩阵](testing/338-m341-evidence-required-when-builder-acceptance.md)
+- [M340 实现文档](architecture/353-m340-form-condition-builder.md)
+- [M340 验收矩阵](testing/337-m340-form-condition-builder-acceptance.md)
+- [M339 实现文档](architecture/352-m339-inbound-update-cancel-mapping-required.md)
+- [M339 验收矩阵](testing/336-m339-inbound-update-cancel-mapping-required-acceptance.md)
+- [M338 实现文档](architecture/351-m338-dispatch-allocation-ratio.md)
+- [M338 验收矩阵](testing/335-m338-dispatch-allocation-ratio-acceptance.md)
+- [M337 实现文档](architecture/350-m337-dispatch-map-scope-coverage.md)
+- [M337 验收矩阵](testing/334-m337-dispatch-map-scope-coverage-acceptance.md)
+- [M336 实现文档](architecture/349-m336-create-work-order-route-hint.md)
+- [M336 验收矩阵](testing/333-m336-create-work-order-route-hint-acceptance.md)
+- [M335 实现文档](architecture/348-m335-inbound-create-work-order-mapping-required.md)
+- [M335 验收矩阵](testing/332-m335-inbound-create-work-order-mapping-required-acceptance.md)
+- [M334 实现文档](architecture/347-m334-inbound-mapping-default-enum-condition.md)
+- [M334 验收矩阵](testing/331-m334-inbound-mapping-default-enum-condition-acceptance.md)
+- [M333 实现文档](architecture/346-m333-inbound-mapping-no-fallback.md)
+- [M333 验收矩阵](testing/330-m333-inbound-mapping-no-fallback-acceptance.md)
+- [M328 实现文档](architecture/341-m328-unknown-replay-admin-workbench.md)
+- [M328 验收矩阵](testing/325-m328-unknown-replay-admin-workbench-acceptance.md)
+- [M329 实现文档](architecture/342-m329-rule-client-external-receipt-gate.md)
+- [M329 验收矩阵](testing/326-m329-rule-client-external-receipt-gate-acceptance.md)
+- [M330 实现文档](architecture/343-m330-rule-task-evidence-fulfillment-gate.md)
+- [M330 验收矩阵](testing/327-m330-rule-task-evidence-fulfillment-gate-acceptance.md)
+- [M331 实现文档](architecture/344-m331-outbound-mapping-only-payload.md)
+- [M331 验收矩阵](testing/328-m331-outbound-mapping-only-payload-acceptance.md)
+- [M332 实现文档](architecture/345-m332-dispatch-technician-auto-assign.md)
+- [M332 验收矩阵](testing/329-m332-dispatch-technician-auto-assign-acceptance.md)
+- [M327 实现文档](architecture/340-m327-pricing-fulfillment-calculation-snapshot.md)
+- [M327 验收矩阵](testing/324-m327-pricing-fulfillment-calculation-snapshot-acceptance.md)
+- [M326 实现文档](architecture/339-m326-notification-reliable-delivery.md)
+- [M326 验收矩阵](testing/323-m326-notification-reliable-delivery-acceptance.md)
+- [M325 实现文档](architecture/338-m325-rule-review-decide-gate.md)
+- [M325 验收矩阵](testing/322-m325-rule-review-decide-gate-acceptance.md)
+- [M324 实现文档](architecture/337-m324-dispatch-policy-service-assignment.md)
+- [M324 验收矩阵](testing/321-m324-dispatch-policy-service-assignment-acceptance.md)
+- [M323 实现文档](architecture/336-m323-assignee-policy-task-assignment.md)
+- [M323 验收矩阵](testing/320-m323-assignee-policy-task-assignment-acceptance.md)
+- [M322 实现文档](architecture/335-m322-outbound-integration-mapping.md)
+- [M322 验收矩阵](testing/319-m322-outbound-integration-mapping-acceptance.md)
 - [M321 实现文档](architecture/334-m321-inbound-integration-mapping-materialization.md)
 - [M321 验收矩阵](testing/318-m321-inbound-integration-mapping-materialization-acceptance.md)
 - [M320 实现文档](architecture/333-m320-multi-oem-parallel-create-smoke.md)

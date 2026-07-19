@@ -16,6 +16,7 @@ import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.shared.Sha256;
 import com.serviceos.task.api.AssignTaskCandidatesCommand;
+import com.serviceos.task.api.AssignmentSourceType;
 import com.serviceos.task.api.TaskAssignedPayload;
 import com.serviceos.task.api.TaskAssignmentBatchReceipt;
 import com.serviceos.task.api.TaskAssignmentService;
@@ -27,6 +28,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timestamptz;
@@ -36,10 +38,15 @@ import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timesta
  *
  * <p>M21 只接受已经解析成稳定 USER ID 的候选列表；角色、组织和网点策略解析属于后续配置/派单适配器，
  * 不能在 Task 模块运行时临时读取组织“当前值”并造成历史漂移。</p>
+ *
+ * <p>M323：Inbox 路径 {@link #assignCandidatesFromFrozenPolicy} 在已解析冻结 ASSIGNEE_POLICY
+ * 后写入候选；不暴露 HTTP，审计 actor 为 system:assignee-policy。</p>
  */
 @Service
 final class DefaultTaskAssignmentService implements TaskAssignmentService {
     private static final String OPERATION = "task.assignment.assign-candidates";
+    private static final String POLICY_OPERATION = "task.assignment.assign-candidates-from-policy";
+    private static final String SYSTEM_ACTOR = "system:assignee-policy";
 
     private final JdbcClient jdbc;
     private final AuthorizationService authorization;
@@ -77,10 +84,7 @@ final class DefaultTaskAssignmentService implements TaskAssignmentService {
         CommandContext context = new CommandContext(
                 principal.tenantId(), principal.principalId(),
                 metadata.correlationId(), metadata.idempotencyKey());
-        String requestDigest = Sha256.digest(
-                command.taskId() + "|" + command.expectedVersion() + "|"
-                        + String.join(",", command.candidatePrincipalIds()) + "|"
-                        + command.sourceType() + "|" + command.sourceId());
+        String requestDigest = requestDigest(command);
         AuthorizationDecision authorizationDecision = authorization.require(
                 principal,
                 AuthorizationRequest.tenantCapability(
@@ -90,7 +94,50 @@ final class DefaultTaskAssignmentService implements TaskAssignmentService {
         if (decision.kind() == IdempotencyDecision.Kind.REPLAY) {
             return findBatch(context.tenantId(), UUID.fromString(decision.resourceId().orElseThrow()));
         }
+        TaskAssignmentBatchReceipt receipt = writeCandidateSnapshot(
+                context, command, requestDigest,
+                authorizationDecision.matchedGrantIds(), authorizationDecision.policyVersion(),
+                "TASK_ASSIGN_CANDIDATES");
+        idempotency.complete(context, OPERATION, receipt.assignmentBatchId().toString(),
+                Sha256.digest(serialize(receipt)));
+        return receipt;
+    }
 
+    @Override
+    @Transactional
+    public TaskAssignmentBatchReceipt assignCandidatesFromFrozenPolicy(
+            String tenantId,
+            String correlationId,
+            AssignTaskCandidatesCommand command
+    ) {
+        if (command.sourceType() != AssignmentSourceType.ASSIGNEE_POLICY) {
+            throw new IllegalArgumentException(
+                    "assignCandidatesFromFrozenPolicy requires ASSIGNEE_POLICY sourceType");
+        }
+        CommandContext context = new CommandContext(
+                tenantId, SYSTEM_ACTOR, correlationId,
+                "assignee-policy:" + command.taskId() + ":" + command.sourceId());
+        String requestDigest = requestDigest(command);
+        IdempotencyDecision decision = idempotency.begin(context, POLICY_OPERATION, requestDigest);
+        if (decision.kind() == IdempotencyDecision.Kind.REPLAY) {
+            return findBatch(context.tenantId(), UUID.fromString(decision.resourceId().orElseThrow()));
+        }
+        TaskAssignmentBatchReceipt receipt = writeCandidateSnapshot(
+                context, command, requestDigest, List.of(), "assignee-policy-runtime-v1",
+                "TASK_ASSIGN_CANDIDATES_FROM_POLICY");
+        idempotency.complete(context, POLICY_OPERATION, receipt.assignmentBatchId().toString(),
+                Sha256.digest(serialize(receipt)));
+        return receipt;
+    }
+
+    private TaskAssignmentBatchReceipt writeCandidateSnapshot(
+            CommandContext context,
+            AssignTaskCandidatesCommand command,
+            String requestDigest,
+            List<String> matchedGrantIds,
+            String policyVersion,
+            String auditAction
+    ) {
         Instant assignedAt = clock.instant();
         int updated = jdbc.sql("""
                         UPDATE tsk_task
@@ -175,14 +222,19 @@ final class DefaultTaskAssignmentService implements TaskAssignmentService {
                 payloadJson, Sha256.digest(payloadJson), assignedAt));
         audit.append(new AuditEntry(
                 UUID.randomUUID(), context.tenantId(), context.actorId(),
-                "TASK_ASSIGN_CANDIDATES", "task.assign", "Task", command.taskId().toString(),
-                "ALLOW", authorizationDecision.matchedGrantIds(), authorizationDecision.policyVersion(),
+                auditAction, "task.assign", "Task", command.taskId().toString(),
+                "ALLOW", matchedGrantIds, policyVersion,
                 "SUCCEEDED", null, requestDigest, context.correlationId(), assignedAt));
 
-        TaskAssignmentBatchReceipt receipt = new TaskAssignmentBatchReceipt(
+        return new TaskAssignmentBatchReceipt(
                 batchId, command.taskId(), command.candidatePrincipalIds().size(), taskVersion, assignedAt);
-        idempotency.complete(context, OPERATION, batchId.toString(), Sha256.digest(serialize(receipt)));
-        return receipt;
+    }
+
+    private static String requestDigest(AssignTaskCandidatesCommand command) {
+        return Sha256.digest(
+                command.taskId() + "|" + command.expectedVersion() + "|"
+                        + String.join(",", command.candidatePrincipalIds()) + "|"
+                        + command.sourceType() + "|" + command.sourceId());
     }
 
     private void throwAssignmentConflict(String tenantId, UUID taskId, long expectedVersion) {

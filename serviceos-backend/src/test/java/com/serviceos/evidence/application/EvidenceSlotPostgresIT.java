@@ -576,7 +576,7 @@ class EvidenceSlotPostgresIT {
                 TENANT, projectId, workOrderId, UUID.randomUUID(), UUID.randomUUID(),
                 UUID.randomUUID(), "SITE_SURVEY", UUID.randomUUID(), "a".repeat(64),
                 bundle.bundleId(), bundle.manifestDigest(), stageCode,
-                "SITE_SURVEY", WorkflowTaskKind.HUMAN, null, null, "work-order:evidence-slot",
+                "SITE_SURVEY", WorkflowTaskKind.HUMAN, null, null, null, null, null, "work-order:evidence-slot",
                 "b".repeat(64), 100, Instant.now(), 1,
                 "corr-evidence-slot", "cause-evidence-slot")).taskId();
     }

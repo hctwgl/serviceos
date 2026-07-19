@@ -459,7 +459,8 @@ final class WorkflowTaskCompletedHandler
                 current.workflowDefinitionDigest(), current.configurationBundleId(),
                 current.configurationBundleDigest(), progression.stageCode(),
                 progression.taskType(), progression.taskKind(),
-                progression.formRef(), progression.slaRef(),
+                progression.formRef(), progression.slaRef(), progression.assigneePolicyRef(),
+                progression.dispatchPolicyRef(), progression.ruleRef(),
                 "work-order:" + current.workOrderId(), payloadDigest, 100, activatedAt, 3,
                 correlationId, activationEventId.toString()));
         jdbc.sql("""
@@ -527,7 +528,8 @@ final class WorkflowTaskCompletedHandler
                     current.workflowDefinitionDigest(), current.configurationBundleId(),
                     current.configurationBundleDigest(), progression.stageCode(),
                     progression.taskType(), progression.taskKind(),
-                    progression.formRef(), progression.slaRef(),
+                    progression.formRef(), progression.slaRef(), progression.assigneePolicyRef(),
+                    progression.dispatchPolicyRef(), progression.ruleRef(),
                     "work-order:" + current.workOrderId() + "|mi:" + index,
                     Sha256.digest(payloadDigest + "|" + index), 100, activatedAt, 3,
                     correlationId, activationEventId.toString()));
@@ -777,6 +779,8 @@ final class WorkflowTaskCompletedHandler
                 current.configurationBundleId(), current.configurationBundleDigest(),
                 childBootstrap.firstStageCode(), childBootstrap.firstTaskType(),
                 childBootstrap.firstTaskKind(), childBootstrap.firstFormRef(), childBootstrap.firstSlaRef(),
+                childBootstrap.firstAssigneePolicyRef(), childBootstrap.firstDispatchPolicyRef(),
+                childBootstrap.firstRuleRef(),
                 "work-order:" + current.workOrderId(), Sha256.digest(linkId.toString()),
                 100, activatedAt, 3, correlationId, activationEventId.toString()));
         jdbc.sql("""

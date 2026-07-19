@@ -116,6 +116,21 @@ final class DefaultTaskSchedulingService implements TaskSchedulingService {
         if (command.slaRef() != null && (command.slaRef().isBlank() || command.slaRef().length() > 120)) {
             throw new IllegalArgumentException("slaRef must be null or non-blank text up to 120 characters");
         }
+        if (command.assigneePolicyRef() != null
+                && (command.assigneePolicyRef().isBlank() || command.assigneePolicyRef().length() > 120)) {
+            throw new IllegalArgumentException(
+                    "assigneePolicyRef must be null or non-blank text up to 120 characters");
+        }
+        if (command.dispatchPolicyRef() != null
+                && (command.dispatchPolicyRef().isBlank() || command.dispatchPolicyRef().length() > 120)) {
+            throw new IllegalArgumentException(
+                    "dispatchPolicyRef must be null or non-blank text up to 120 characters");
+        }
+        if (command.ruleRef() != null
+                && (command.ruleRef().isBlank() || command.ruleRef().length() > 120)) {
+            throw new IllegalArgumentException(
+                    "ruleRef must be null or non-blank text up to 120 characters");
+        }
         requireText(command.payloadDigest(), "payloadDigest");
         requireText(command.workflowDefinitionDigest(), "workflowDefinitionDigest");
         requireText(command.configurationBundleDigest(), "configurationBundleDigest");

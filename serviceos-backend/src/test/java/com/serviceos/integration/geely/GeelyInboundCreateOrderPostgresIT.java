@@ -120,10 +120,28 @@ class GeelyInboundCreateOrderPostgresIT {
         UUID workflowId = configurations.publishAsset(new PublishConfigurationAssetCommand(
                 TENANT, ConfigurationAssetType.WORKFLOW, "geely.linear", "1.0.0", "1.0.0",
                 workflow, Sha256.digest(workflow))).versionId();
+        // M335：CREATE_WORK_ORDER 强制 INBOUND Mapping。
+        String integration = """
+                {"mappingKey":"geely-create","version":"1.0.0","connectorCode":"GEELY","direction":"INBOUND","messageType":"CREATE_WORK_ORDER","fieldMappings":[
+                  {"mappingId":"order","externalPath":"installProcessNo","internalPath":"externalOrderCode","required":true,"transform":"TRIM"},
+                  {"mappingId":"brand","internalPath":"brandCode","required":true,"constantValue":"GEELY","transform":"NONE"},
+                  {"mappingId":"product","internalPath":"serviceProductCode","required":true,"constantValue":"HOME_CHARGING_SURVEY_INSTALL","transform":"NONE"},
+                  {"mappingId":"province","externalPath":"province","internalPath":"provinceCode","required":true,"transform":"NONE"},
+                  {"mappingId":"city","externalPath":"city","internalPath":"cityCode","required":true,"transform":"NONE"},
+                  {"mappingId":"district","externalPath":"district","internalPath":"districtCode","required":true,"transform":"NONE"},
+                  {"mappingId":"name","externalPath":"contactName","internalPath":"customerName","required":true,"transform":"TRIM"},
+                  {"mappingId":"mobile","externalPath":"contactPhone","internalPath":"customerMobile","required":true,"transform":"NONE"},
+                  {"mappingId":"address","externalPath":"address","internalPath":"serviceAddress","required":true,"transform":"TRIM"},
+                  {"mappingId":"vin","externalPath":"vin","internalPath":"vehicleVin","required":true,"defaultValue":"GINGEELY0000000001","transform":"UPPER"},
+                  {"mappingId":"dispatch","externalPath":"assignProviderTime","internalPath":"dispatchedAt","required":true,"transform":"DATE_ISO"}]}
+                """.replaceAll("\\s+", "");
+        UUID integrationId = configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.INTEGRATION, "geely-create", "1.0.0", "1.0.0",
+                integration, Sha256.digest(integration))).versionId();
         configurations.publishBundle(new PublishConfigurationBundleCommand(
                 TENANT, projectId, "GEELY-BUNDLE", "1.0.0", "GEELY",
                 "HOME_CHARGING_SURVEY_INSTALL", "370000", Instant.now().minusSeconds(60),
-                null, List.of(workflowId)));
+                null, List.of(workflowId, integrationId)));
     }
 
     @Test

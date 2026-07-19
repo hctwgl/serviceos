@@ -278,23 +278,68 @@ class MultiOemParallelCreateSmokePostgresIT {
         var workflowAsset = configurations.publishAsset(new PublishConfigurationAssetCommand(
                 tenantId, ConfigurationAssetType.WORKFLOW, workflowKey,
                 "1.0.0", "1.0.0", workflow, Sha256.digest(workflow)));
+        // M335：三 OEM CREATE_WORK_ORDER 均强制 INBOUND Mapping。
+        String mappingKey;
+        String connectorCode;
+        String integration;
         if ("BYD".equals(clientId)) {
-            String integration = "{\"mappingKey\":\"byd-multi\",\"version\":\"1.0.0\","
-                    + "\"connectorCode\":\"BYD_CPIM\",\"direction\":\"INBOUND\","
-                    + "\"fieldMappings\":[{\"mappingId\":\"order\",\"externalPath\":\"orderCode\","
-                    + "\"internalPath\":\"externalOrderCode\",\"required\":true,\"transform\":\"TRIM\"}]}";
-            var integrationAsset = configurations.publishAsset(new PublishConfigurationAssetCommand(
-                    tenantId, ConfigurationAssetType.INTEGRATION, "byd-multi",
-                    "1.0.0", "1.0.0", integration, Sha256.digest(integration)));
-            configurations.publishBundle(new PublishConfigurationBundleCommand(
-                    tenantId, projectId, projectCode + "-BUNDLE", "1.0.0", brandCode,
-                    "HOME_CHARGING_SURVEY_INSTALL", "370000", Instant.now().minusSeconds(60),
-                    null, List.of(workflowAsset.versionId(), integrationAsset.versionId())));
+            mappingKey = "byd-multi";
+            connectorCode = "BYD_CPIM";
+            integration = "{\"mappingKey\":\"" + mappingKey + "\",\"version\":\"1.0.0\","
+                    + "\"connectorCode\":\"" + connectorCode + "\",\"direction\":\"INBOUND\",\"messageType\":\"CREATE_WORK_ORDER\",\"fieldMappings\":["
+                    + "{\"mappingId\":\"order\",\"externalPath\":\"orderCode\",\"internalPath\":\"externalOrderCode\",\"required\":true,\"transform\":\"TRIM\"},"
+                    + "{\"mappingId\":\"brand\",\"internalPath\":\"brandCode\",\"required\":true,\"constantValue\":\"BYD_OCEAN\",\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"product\",\"internalPath\":\"serviceProductCode\",\"required\":true,\"constantValue\":\"HOME_CHARGING_SURVEY_INSTALL\",\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"province\",\"externalPath\":\"provinceCode\",\"internalPath\":\"provinceCode\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"city\",\"externalPath\":\"cityCode\",\"internalPath\":\"cityCode\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"district\",\"externalPath\":\"areaCode\",\"internalPath\":\"districtCode\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"name\",\"externalPath\":\"contactName\",\"internalPath\":\"customerName\",\"required\":true,\"transform\":\"TRIM\"},"
+                    + "{\"mappingId\":\"mobile\",\"externalPath\":\"contactMobile\",\"internalPath\":\"customerMobile\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"address\",\"externalPath\":\"contactAddress\",\"internalPath\":\"serviceAddress\",\"required\":true,\"transform\":\"TRIM\"},"
+                    + "{\"mappingId\":\"vin\",\"externalPath\":\"vin\",\"internalPath\":\"vehicleVin\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"dispatch\",\"externalPath\":\"dispatchTime\",\"internalPath\":\"dispatchedAt\",\"required\":true,\"transform\":\"DATE_ISO\"}"
+                    + "]}";
+        } else if ("GEELY".equals(clientId)) {
+            mappingKey = "geely-multi";
+            connectorCode = "GEELY";
+            integration = "{\"mappingKey\":\"" + mappingKey + "\",\"version\":\"1.0.0\","
+                    + "\"connectorCode\":\"" + connectorCode + "\",\"direction\":\"INBOUND\",\"messageType\":\"CREATE_WORK_ORDER\",\"fieldMappings\":["
+                    + "{\"mappingId\":\"order\",\"externalPath\":\"installProcessNo\",\"internalPath\":\"externalOrderCode\",\"required\":true,\"transform\":\"TRIM\"},"
+                    + "{\"mappingId\":\"brand\",\"internalPath\":\"brandCode\",\"required\":true,\"constantValue\":\"GEELY\",\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"product\",\"internalPath\":\"serviceProductCode\",\"required\":true,\"constantValue\":\"HOME_CHARGING_SURVEY_INSTALL\",\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"province\",\"externalPath\":\"province\",\"internalPath\":\"provinceCode\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"city\",\"externalPath\":\"city\",\"internalPath\":\"cityCode\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"district\",\"externalPath\":\"district\",\"internalPath\":\"districtCode\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"name\",\"externalPath\":\"contactName\",\"internalPath\":\"customerName\",\"required\":true,\"transform\":\"TRIM\"},"
+                    + "{\"mappingId\":\"mobile\",\"externalPath\":\"contactPhone\",\"internalPath\":\"customerMobile\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"address\",\"externalPath\":\"address\",\"internalPath\":\"serviceAddress\",\"required\":true,\"transform\":\"TRIM\"},"
+                    + "{\"mappingId\":\"vin\",\"externalPath\":\"vin\",\"internalPath\":\"vehicleVin\",\"required\":true,\"defaultValue\":\"GINGEELY0000000001\",\"transform\":\"UPPER\"},"
+                    + "{\"mappingId\":\"dispatch\",\"externalPath\":\"assignProviderTime\",\"internalPath\":\"dispatchedAt\",\"required\":true,\"transform\":\"DATE_ISO\"}"
+                    + "]}";
         } else {
-            configurations.publishBundle(new PublishConfigurationBundleCommand(
-                    tenantId, projectId, projectCode + "-BUNDLE", "1.0.0", brandCode,
-                    "HOME_CHARGING_SURVEY_INSTALL", "370000", Instant.now().minusSeconds(60),
-                    null, List.of(workflowAsset.versionId())));
+            mappingKey = "ref-multi";
+            connectorCode = "REFERENCE_OEM";
+            integration = "{\"mappingKey\":\"" + mappingKey + "\",\"version\":\"1.0.0\","
+                    + "\"connectorCode\":\"" + connectorCode + "\",\"direction\":\"INBOUND\",\"messageType\":\"CREATE_WORK_ORDER\",\"fieldMappings\":["
+                    + "{\"mappingId\":\"order\",\"externalPath\":\"externalOrderCode\",\"internalPath\":\"externalOrderCode\",\"required\":true,\"transform\":\"TRIM\"},"
+                    + "{\"mappingId\":\"brand\",\"externalPath\":\"brandCode\",\"internalPath\":\"brandCode\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"product\",\"externalPath\":\"serviceProductCode\",\"internalPath\":\"serviceProductCode\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"province\",\"externalPath\":\"provinceCode\",\"internalPath\":\"provinceCode\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"city\",\"externalPath\":\"cityCode\",\"internalPath\":\"cityCode\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"district\",\"externalPath\":\"districtCode\",\"internalPath\":\"districtCode\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"name\",\"externalPath\":\"customerName\",\"internalPath\":\"customerName\",\"required\":true,\"transform\":\"TRIM\"},"
+                    + "{\"mappingId\":\"mobile\",\"externalPath\":\"customerMobile\",\"internalPath\":\"customerMobile\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"address\",\"externalPath\":\"serviceAddress\",\"internalPath\":\"serviceAddress\",\"required\":true,\"transform\":\"TRIM\"},"
+                    + "{\"mappingId\":\"vin\",\"externalPath\":\"vehicleVin\",\"internalPath\":\"vehicleVin\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"dispatch\",\"externalPath\":\"dispatchedAt\",\"internalPath\":\"dispatchedAt\",\"required\":true,\"transform\":\"NONE\"}"
+                    + "]}";
         }
+        var integrationAsset = configurations.publishAsset(new PublishConfigurationAssetCommand(
+                tenantId, ConfigurationAssetType.INTEGRATION, mappingKey,
+                "1.0.0", "1.0.0", integration, Sha256.digest(integration)));
+        configurations.publishBundle(new PublishConfigurationBundleCommand(
+                tenantId, projectId, projectCode + "-BUNDLE", "1.0.0", brandCode,
+                "HOME_CHARGING_SURVEY_INSTALL", "370000", Instant.now().minusSeconds(60),
+                null, List.of(workflowAsset.versionId(), integrationAsset.versionId())));
     }
 }

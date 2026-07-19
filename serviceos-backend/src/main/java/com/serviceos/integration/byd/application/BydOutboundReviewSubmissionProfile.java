@@ -5,36 +5,23 @@ import com.serviceos.integration.spi.OutboundReviewSubmissionProfile;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
 import org.springframework.stereotype.Component;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.ObjectMapper;
 
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.UUID;
 
-/** BYD CPIM 提审创建档案：payload 形状与业务键前缀仅留在 OEM 适配包。 */
+/**
+ * BYD CPIM 提审创建档案：业务键前缀与 lineage 认领仅留在 OEM 适配包。
+ *
+ * <p>提审 Payload 形状由冻结 Bundle OUTBOUND INTEGRATION Mapping 生成（M331）。</p>
+ */
 @Component
 public class BydOutboundReviewSubmissionProfile implements OutboundReviewSubmissionProfile {
     private static final ConnectorIdentity IDENTITY = new ConnectorIdentity(
             "BYD_CPIM", "byd-cpim-v7.3.1");
     private static final String INSTALL_BUSINESS_PREFIX = "BYD:INSTALL:";
-    private static final DateTimeFormatter CPIM_DATE_TIME = DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm:ss");
-
-    private final ObjectMapper objectMapper;
-
-    public BydOutboundReviewSubmissionProfile(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
-    }
 
     @Override
     public ConnectorIdentity identity() {
         return IDENTITY;
-    }
-
-    @Override
-    public String outboundMappingVersion() {
-        return "byd-ocean-shandong-submit-review-v1";
     }
 
     @Override
@@ -99,24 +86,5 @@ public class BydOutboundReviewSubmissionProfile implements OutboundReviewSubmiss
     @Override
     public String callbackBatchRef(UUID deliveryId) {
         return "BYD:REVIEW_CALLBACK:" + deliveryId;
-    }
-
-    @Override
-    public byte[] buildSubmitPayload(
-            String operator,
-            String externalOrderCode,
-            Instant createdAt,
-            ZoneId protocolZone
-    ) {
-        SubmitReviewPayload payload = new SubmitReviewPayload(
-                operator, externalOrderCode, CPIM_DATE_TIME.format(createdAt.atZone(protocolZone)));
-        try {
-            return objectMapper.writeValueAsBytes(payload);
-        } catch (JacksonException exception) {
-            throw new IllegalStateException("BYD submit-review payload serialization failed", exception);
-        }
-    }
-
-    private record SubmitReviewPayload(String operatePerson, String orderCode, String commitDate) {
     }
 }

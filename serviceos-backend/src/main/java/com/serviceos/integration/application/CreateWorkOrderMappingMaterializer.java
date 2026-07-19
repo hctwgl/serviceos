@@ -2,6 +2,7 @@ package com.serviceos.integration.application;
 
 import com.serviceos.configuration.api.IntegrationMappingResult;
 import com.serviceos.integration.spi.CreateWorkOrderMappedInbound;
+import com.serviceos.integration.spi.CreateWorkOrderRouteHint;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
 import tools.jackson.databind.ObjectMapper;
@@ -18,9 +19,9 @@ import java.util.Objects;
 /**
  * 将冻结 INTEGRATION Mapping 输出物化为建单 Canonical 意图。
  *
- * <p>Mapping 命中字段对领域命令权威；未映射字段保留适配器薄兼容层取值，
- * 以便分阶段用配置 Mapping 替代硬编码 Mapper。mappingVersionId 固定为资产
- * {@code assetVersionId}；Canonical JSON 嵌入 {@code mappingContentDigest}。</p>
+ * <p>M333/M336：领域建单字段仅取自 Mapping {@code internalFields}；路由提示仅提供
+ * {@code clientCode} 与 {@code businessKey} 后缀重写基底。{@code mappingVersionId}
+ * 固定为资产 {@code assetVersionId}；Canonical JSON 嵌入 {@code mappingContentDigest}。</p>
  */
 public final class CreateWorkOrderMappingMaterializer {
     private static final DateTimeFormatter DATE_TIME = DateTimeFormatter
@@ -34,11 +35,11 @@ public final class CreateWorkOrderMappingMaterializer {
     }
 
     public static CreateWorkOrderMappedInbound materialize(
-            CreateWorkOrderMappedInbound adapterMapped,
+            CreateWorkOrderRouteHint routeHint,
             IntegrationMappingResult mapping,
             ObjectMapper objectMapper
     ) {
-        Objects.requireNonNull(adapterMapped, "adapterMapped");
+        Objects.requireNonNull(routeHint, "routeHint");
         Objects.requireNonNull(mapping, "mapping");
         Objects.requireNonNull(objectMapper, "objectMapper");
         if (!"INBOUND".equals(mapping.direction())) {
@@ -47,22 +48,20 @@ public final class CreateWorkOrderMappingMaterializer {
         }
 
         Map<String, Object> fields = mapping.internalFields();
-        String externalOrderCode = requiredOverlay(
-                fields, "externalOrderCode", adapterMapped.externalOrderCode());
-        String brandCode = requiredOverlay(fields, "brandCode", adapterMapped.brandCode());
-        String serviceProductCode = requiredOverlay(
-                fields, "serviceProductCode", adapterMapped.serviceProductCode());
-        String provinceCode = requiredOverlay(fields, "provinceCode", adapterMapped.provinceCode());
-        String cityCode = requiredOverlay(fields, "cityCode", adapterMapped.cityCode());
-        String districtCode = requiredOverlay(fields, "districtCode", adapterMapped.districtCode());
-        String customerName = optionalText(fields, "customerName", adapterMapped.customerName());
-        String customerMobile = optionalText(fields, "customerMobile", adapterMapped.customerMobile());
-        String serviceAddress = optionalText(fields, "serviceAddress", adapterMapped.serviceAddress());
-        String vehicleVin = optionalText(fields, "vehicleVin", adapterMapped.vehicleVin());
-        LocalDateTime dispatchedAt = overlayDispatchedAt(fields, adapterMapped.dispatchedAt());
+        String externalOrderCode = requiredField(fields, "externalOrderCode");
+        String brandCode = requiredField(fields, "brandCode");
+        String serviceProductCode = requiredField(fields, "serviceProductCode");
+        String provinceCode = requiredField(fields, "provinceCode");
+        String cityCode = requiredField(fields, "cityCode");
+        String districtCode = requiredField(fields, "districtCode");
+        String customerName = optionalText(fields, "customerName");
+        String customerMobile = optionalText(fields, "customerMobile");
+        String serviceAddress = optionalText(fields, "serviceAddress");
+        String vehicleVin = optionalText(fields, "vehicleVin");
+        LocalDateTime dispatchedAt = overlayDispatchedAt(fields);
 
         String businessKey = rebuildBusinessKey(
-                adapterMapped.businessKey(), adapterMapped.externalOrderCode(), externalOrderCode);
+                routeHint.businessKey(), routeHint.externalOrderCode(), externalOrderCode);
         String mappingVersionId = mapping.assetVersionId().toString();
 
         Map<String, Object> canonical = new LinkedHashMap<>();
@@ -71,7 +70,7 @@ public final class CreateWorkOrderMappingMaterializer {
         canonical.put("mappingContentDigest", mapping.contentDigest());
         canonical.put("connectorCode", mapping.connectorCode());
         canonical.put("direction", mapping.direction());
-        canonical.put("clientCode", adapterMapped.clientCode());
+        canonical.put("clientCode", routeHint.clientCode());
         canonical.put("businessKey", businessKey);
         canonical.put("externalOrderCode", externalOrderCode);
         canonical.put("brandCode", brandCode);
@@ -108,7 +107,7 @@ public final class CreateWorkOrderMappingMaterializer {
         return new CreateWorkOrderMappedInbound(
                 businessKey,
                 externalOrderCode,
-                adapterMapped.clientCode(),
+                routeHint.clientCode(),
                 brandCode,
                 serviceProductCode,
                 provinceCode,
@@ -123,46 +122,43 @@ public final class CreateWorkOrderMappingMaterializer {
                 canonicalPayload);
     }
 
-    static String rebuildBusinessKey(String adapterBusinessKey, String adapterOrderCode, String newOrderCode) {
-        if (adapterBusinessKey != null && adapterOrderCode != null
-                && adapterBusinessKey.endsWith(adapterOrderCode)) {
-            return adapterBusinessKey.substring(0, adapterBusinessKey.length() - adapterOrderCode.length())
+    static String rebuildBusinessKey(String routeBusinessKey, String routeOrderCode, String newOrderCode) {
+        if (routeBusinessKey != null && routeOrderCode != null
+                && routeBusinessKey.endsWith(routeOrderCode)) {
+            return routeBusinessKey.substring(0, routeBusinessKey.length() - routeOrderCode.length())
                     + newOrderCode;
         }
         throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
                 "Cannot rebuild businessKey after INTEGRATION mapping materialization");
     }
 
-    private static String requiredOverlay(Map<String, Object> fields, String key, String fallback) {
-        if (fields.containsKey(key)) {
-            Object value = fields.get(key);
-            if (value == null || String.valueOf(value).isBlank()) {
-                throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
-                        "INTEGRATION mapping produced blank required field: " + key);
-            }
-            return String.valueOf(value).trim();
-        }
-        if (fallback == null || fallback.isBlank()) {
+    private static String requiredField(Map<String, Object> fields, String key) {
+        if (!fields.containsKey(key)) {
             throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
-                    "INTEGRATION mapping missing required field and adapter fallback: " + key);
+                    "INTEGRATION mapping missing required field: " + key);
         }
-        return fallback.trim();
+        Object value = fields.get(key);
+        if (value == null || String.valueOf(value).isBlank()) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                    "INTEGRATION mapping produced blank required field: " + key);
+        }
+        return String.valueOf(value).trim();
     }
 
-    private static String optionalText(Map<String, Object> fields, String key, String fallback) {
-        if (fields.containsKey(key)) {
-            Object value = fields.get(key);
-            if (value == null || String.valueOf(value).isBlank()) {
-                return null;
-            }
-            return String.valueOf(value).trim();
+    private static String optionalText(Map<String, Object> fields, String key) {
+        if (!fields.containsKey(key)) {
+            return null;
         }
-        return fallback == null || fallback.isBlank() ? null : fallback.trim();
+        Object value = fields.get(key);
+        if (value == null || String.valueOf(value).isBlank()) {
+            return null;
+        }
+        return String.valueOf(value).trim();
     }
 
-    private static LocalDateTime overlayDispatchedAt(Map<String, Object> fields, LocalDateTime fallback) {
+    private static LocalDateTime overlayDispatchedAt(Map<String, Object> fields) {
         if (!fields.containsKey("dispatchedAt")) {
-            return fallback;
+            return null;
         }
         Object value = fields.get("dispatchedAt");
         if (value == null || String.valueOf(value).isBlank()) {

@@ -61,6 +61,7 @@ final class DefaultReviewCaseService implements ReviewCaseService {
     private final CorrectionCaseService corrections;
     private final TaskFulfillmentContextService tasks;
     private final ActiveServiceResponsibilityService serviceResponsibilities;
+    private final ReviewRuleGate reviewRuleGate;
     private final AuthorizationService authorization;
     private final IdempotencyService idempotency;
     private final AuditAppender audit;
@@ -74,6 +75,7 @@ final class DefaultReviewCaseService implements ReviewCaseService {
             CorrectionCaseService corrections,
             TaskFulfillmentContextService tasks,
             ActiveServiceResponsibilityService serviceResponsibilities,
+            ReviewRuleGate reviewRuleGate,
             AuthorizationService authorization,
             IdempotencyService idempotency,
             AuditAppender audit,
@@ -86,6 +88,7 @@ final class DefaultReviewCaseService implements ReviewCaseService {
         this.corrections = corrections;
         this.tasks = tasks;
         this.serviceResponsibilities = serviceResponsibilities;
+        this.reviewRuleGate = reviewRuleGate;
         this.authorization = authorization;
         this.idempotency = idempotency;
         this.audit = audit;
@@ -301,6 +304,11 @@ final class DefaultReviewCaseService implements ReviewCaseService {
             throw new BusinessProblem(ProblemCode.REVIEW_CASE_ALREADY_DECIDED,
                     "ReviewCase has already been decided");
         }
+
+        // M325：冻结 RULE 门禁必须在 markDecided 之前；失败关闭不改变 Case 状态。
+        reviewRuleGate.assertDecideAllowed(
+                principal.tenantId(), principal.principalId(), metadata.correlationId(),
+                current.reviewCaseId(), current.taskId(), decision);
 
         Instant now = clock.instant();
         int updated = reviews.markDecided(

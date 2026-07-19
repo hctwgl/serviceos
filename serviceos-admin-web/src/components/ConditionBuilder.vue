@@ -1,21 +1,18 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import {
-  EXPR_PATHS,
   compileCondition,
-  emptyAtom,
   emptyGroup,
   tryParseCondition,
-  type ConditionAtom,
   type ConditionGroup,
-  type ConditionNode,
-  type ExprPath,
-  type JoinOp,
 } from '../expression/serviceosExprV1Blocks'
+import ConditionGroupBlock from './ConditionGroupBlock.vue'
 
 const props = defineProps<{
   modelValue: string
   label?: string
+  /** 当前 FORM 资产内已声明字段键；用于生成 formValues["…"] 积木选项 */
+  formFieldKeys?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -74,35 +71,8 @@ function emitCompiled() {
   }
 }
 
-function updateAtom(index: number, patch: Partial<ConditionAtom>) {
-  const child = root.value.children[index]
-  if (!child || child.kind !== 'atom') return
-  root.value.children[index] = { ...child, ...patch }
-  emitCompiled()
-}
-
-function setJoin(join: JoinOp) {
-  root.value = { ...root.value, join }
-  emitCompiled()
-}
-
-function addAtom() {
-  root.value = {
-    ...root.value,
-    children: [...root.value.children, emptyAtom()],
-  }
-  emitCompiled()
-}
-
-function removeAtom(index: number) {
-  if (root.value.children.length <= 1) {
-    root.value = emptyGroup()
-  } else {
-    root.value = {
-      ...root.value,
-      children: root.value.children.filter((_, i) => i !== index),
-    }
-  }
+function onRootChange(group: ConditionGroup) {
+  root.value = group
   emitCompiled()
 }
 
@@ -121,10 +91,6 @@ const preview = computed(() => {
     return err instanceof Error ? err.message : ''
   }
 })
-
-function asAtom(node: ConditionNode): ConditionAtom | null {
-  return node.kind === 'atom' ? node : null
-}
 </script>
 
 <template>
@@ -141,61 +107,12 @@ function asAtom(node: ConditionNode): ConditionAtom | null {
     </header>
 
     <div v-if="!advancedMode" class="blocks">
-      <label class="join">
-        组合
-        <select
-          :value="root.join"
-          data-testid="condition-join"
-          @change="setJoin(($event.target as HTMLSelectElement).value as JoinOp)"
-        >
-          <option value="AND">AND (&&)</option>
-          <option value="OR">OR (||)</option>
-        </select>
-      </label>
-      <div
-        v-for="(child, index) in root.children"
-        :key="index"
-        class="atom-row"
-        :data-testid="`condition-atom-${index}`"
-      >
-        <template v-if="asAtom(child)">
-          <select
-            :value="asAtom(child)!.path"
-            data-testid="condition-path"
-            @change="
-              updateAtom(index, {
-                path: ($event.target as HTMLSelectElement).value as ExprPath,
-              })
-            "
-          >
-            <option v-for="path in EXPR_PATHS" :key="path" :value="path">{{ path }}</option>
-          </select>
-          <select
-            :value="asAtom(child)!.op"
-            data-testid="condition-op"
-            @change="
-              updateAtom(index, {
-                op: ($event.target as HTMLSelectElement).value as '==' | '!=',
-              })
-            "
-          >
-            <option value="==">==</option>
-            <option value="!=">!=</option>
-          </select>
-          <input
-            :value="asAtom(child)!.value"
-            data-testid="condition-value"
-            placeholder="字面量"
-            @input="
-              updateAtom(index, {
-                value: ($event.target as HTMLInputElement).value,
-              })
-            "
-          />
-          <button type="button" data-testid="remove-atom" @click="removeAtom(index)">删除</button>
-        </template>
-      </div>
-      <button type="button" data-testid="add-atom" @click="addAtom">添加条件</button>
+      <ConditionGroupBlock
+        :group="root"
+        :path="[]"
+        :form-field-keys="formFieldKeys"
+        @change="onRootChange"
+      />
     </div>
 
     <div v-else class="advanced">
@@ -237,20 +154,8 @@ header {
   flex-direction: column;
   gap: 0.5rem;
 }
-.atom-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  align-items: center;
-}
-.atom-row select,
-.atom-row input,
-.join select,
 .advanced textarea {
   font: inherit;
-}
-.atom-row input {
-  min-width: 8rem;
 }
 .preview {
   margin: 0;

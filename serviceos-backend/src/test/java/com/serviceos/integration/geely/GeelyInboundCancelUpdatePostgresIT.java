@@ -120,10 +120,49 @@ class GeelyInboundCancelUpdatePostgresIT {
         UUID workflowId = configurations.publishAsset(new PublishConfigurationAssetCommand(
                 TENANT, ConfigurationAssetType.WORKFLOW, "geely.cu.linear", "1.0.0", "1.0.0",
                 workflow, Sha256.digest(workflow))).versionId();
+        // M339：同一 Bundle 共存 CREATE + UPDATE + CANCEL Mapping。
+        String createIntegration = """
+                {"mappingKey":"geely-cu-create","version":"1.0.0","connectorCode":"GEELY","direction":"INBOUND","messageType":"CREATE_WORK_ORDER","fieldMappings":[
+                  {"mappingId":"order","externalPath":"installProcessNo","internalPath":"externalOrderCode","required":true,"transform":"TRIM"},
+                  {"mappingId":"brand","internalPath":"brandCode","required":true,"constantValue":"GEELY","transform":"NONE"},
+                  {"mappingId":"product","internalPath":"serviceProductCode","required":true,"constantValue":"HOME_CHARGING_SURVEY_INSTALL","transform":"NONE"},
+                  {"mappingId":"province","externalPath":"province","internalPath":"provinceCode","required":true,"transform":"NONE"},
+                  {"mappingId":"city","externalPath":"city","internalPath":"cityCode","required":true,"transform":"NONE"},
+                  {"mappingId":"district","externalPath":"district","internalPath":"districtCode","required":true,"transform":"NONE"},
+                  {"mappingId":"name","externalPath":"contactName","internalPath":"customerName","required":true,"transform":"TRIM"},
+                  {"mappingId":"mobile","externalPath":"contactPhone","internalPath":"customerMobile","required":true,"transform":"NONE"},
+                  {"mappingId":"address","externalPath":"address","internalPath":"serviceAddress","required":true,"transform":"TRIM"},
+                  {"mappingId":"vin","externalPath":"vin","internalPath":"vehicleVin","required":true,"defaultValue":"GINGEELY0000000001","transform":"UPPER"},
+                  {"mappingId":"dispatch","externalPath":"assignProviderTime","internalPath":"dispatchedAt","required":true,"transform":"DATE_ISO"}]}
+                """.replaceAll("\\s+", "");
+        String updateIntegration = """
+                {"mappingKey":"geely-cu-update","version":"1.0.0","connectorCode":"GEELY","direction":"INBOUND","messageType":"UPDATE_WORK_ORDER","fieldMappings":[
+                  {"mappingId":"order","externalPath":"installProcessNo","internalPath":"externalOrderCode","required":true,"transform":"TRIM"},
+                  {"mappingId":"name","externalPath":"contactName","internalPath":"customerName","required":true,"transform":"TRIM"},
+                  {"mappingId":"mobile","externalPath":"contactPhone","internalPath":"customerMobile","required":true,"transform":"NONE"},
+                  {"mappingId":"address","externalPath":"address","internalPath":"serviceAddress","required":true,"transform":"TRIM"},
+                  {"mappingId":"province","externalPath":"province","internalPath":"provinceCode","required":true,"transform":"NONE"},
+                  {"mappingId":"city","externalPath":"city","internalPath":"cityCode","required":true,"transform":"NONE"},
+                  {"mappingId":"district","externalPath":"district","internalPath":"districtCode","required":true,"transform":"NONE"}]}
+                """.replaceAll("\\s+", "");
+        String cancelIntegration = """
+                {"mappingKey":"geely-cu-cancel","version":"1.0.0","connectorCode":"GEELY","direction":"INBOUND","messageType":"CANCEL_WORK_ORDER","fieldMappings":[
+                  {"mappingId":"order","externalPath":"installProcessNo","internalPath":"externalOrderCode","required":true,"transform":"TRIM"},
+                  {"mappingId":"reason","externalPath":"closeReasonCode","internalPath":"reasonCode","required":true,"defaultValue":"GEELY_CLOSE","transform":"NONE"}]}
+                """.replaceAll("\\s+", "");
+        UUID createId = configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.INTEGRATION, "geely-cu-create", "1.0.0", "1.0.0",
+                createIntegration, Sha256.digest(createIntegration))).versionId();
+        UUID updateId = configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.INTEGRATION, "geely-cu-update", "1.0.0", "1.0.0",
+                updateIntegration, Sha256.digest(updateIntegration))).versionId();
+        UUID cancelId = configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.INTEGRATION, "geely-cu-cancel", "1.0.0", "1.0.0",
+                cancelIntegration, Sha256.digest(cancelIntegration))).versionId();
         configurations.publishBundle(new PublishConfigurationBundleCommand(
                 TENANT, projectId, "GEELY-CU-BUNDLE", "1.0.0", "GEELY",
                 "HOME_CHARGING_SURVEY_INSTALL", "370000", Instant.now().minusSeconds(60),
-                null, List.of(workflowId)));
+                null, List.of(workflowId, createId, updateId, cancelId)));
     }
 
     @Test

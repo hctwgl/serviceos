@@ -51,6 +51,10 @@ public class SecurityConfiguration {
                     // REFERENCE / SAMPLE 第二家车企演示端点；非生产协议（TBD_EXTERNAL_CONTRACT）。
                     authorize.requestMatchers("/api/v1/integrations/reference-oem/sample/v1/install-orders")
                             .permitAll();
+                    authorize.requestMatchers("/api/v1/integrations/reference-oem/sample/v1/update-orders")
+                            .permitAll();
+                    authorize.requestMatchers("/api/v1/integrations/reference-oem/sample/v1/cancel-orders")
+                            .permitAll();
                     // 吉利浩瀚本地 AES 入站切片；开放平台签名/Sandbox 仍 BLOCKED_EXTERNAL。
                     authorize.requestMatchers(
                                     "/api/v1/integrations/geely/haohan/v1.3/notify_create_order")

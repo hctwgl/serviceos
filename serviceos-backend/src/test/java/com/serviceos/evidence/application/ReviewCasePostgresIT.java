@@ -187,6 +187,42 @@ class ReviewCasePostgresIT {
     }
 
     @Test
+    void bydReviewSubmissionFailsClosedWhenFrozenBundleLacksOutboundMapping() throws Exception {
+        ReviewCaseView source = createApprovedInternalWithBydLineage("outbound-no-mapping", "ORDER-OUT-0");
+        // M331：切换到仅含 EVIDENCE 的冻结 Bundle，不得回退 Profile 硬编码 payload。
+        String evidenceOnly = """
+                {"templateKey":"survey.site.nomap","version":"1.0.0","stage":"SURVEY",
+                 "items":[{"evidenceKey":"site.photo","name":"现场照片","mediaType":"PHOTO","required":true,
+                   "capture":{"minCount":1,"maxCount":2}}]}
+                """;
+        UUID evidenceOnlyAsset = configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.EVIDENCE, "survey.site.nomap", "1.0.0", "1.0.0",
+                evidenceOnly.trim(), Sha256.digest(evidenceOnly.trim()))).versionId();
+        ConfigurationBundleReference noOutboundBundle = configurations.publishBundle(
+                new PublishConfigurationBundleCommand(
+                        TENANT, projectId, "EVD-REV-NO-OUTBOUND", "1.0.0", "BYD_NO_OUTBOUND", "HOME",
+                        null, Instant.now().minusSeconds(30), null, List.of(evidenceOnlyAsset)));
+        jdbc.sql("""
+                UPDATE tsk_task
+                   SET configuration_bundle_id = :bundle,
+                       configuration_bundle_digest = :digest
+                 WHERE task_id = :task
+                """)
+                .param("bundle", noOutboundBundle.bundleId())
+                .param("digest", noOutboundBundle.manifestDigest())
+                .param("task", taskId)
+                .update();
+
+        assertThatThrownBy(() -> outboundDeliveries.createReviewSubmission(
+                adapter(), metadata("outbound-no-mapping"),
+                new CreateReviewSubmissionCommand(source.reviewCaseId())))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
+        assertThat(jdbc.sql("SELECT count(*) FROM int_outbound_delivery").query(Long.class).single())
+                .isZero();
+    }
+
+    @Test
     void bydReviewSubmissionCreatesImmutableDeliveryAndClientReviewRouteAfterErrnoZero() throws Exception {
         ReviewCaseView source = createApprovedInternalWithBydLineage("outbound-success", "ORDER-OUT-1");
         when(submitReviewGateway.send(any())).thenReturn(new BydCpimSubmitReviewGateway.Response(
@@ -198,6 +234,13 @@ class ReviewCasePostgresIT {
 
         assertThat(created.status()).isEqualTo("PENDING");
         assertThat(created.executionTaskId()).isNotNull();
+        // mappingVersionId 必须是 Mapping 资产 UUID，不再是 Profile 字符串常量。
+        assertThat(created.mappingVersionId()).matches(
+                "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM aud_audit_record
+                 WHERE action_name = 'OUTBOUND_INTEGRATION_MAPPING_APPLIED'
+                """).query(Long.class).single()).isGreaterThanOrEqualTo(1);
         assertThat(worker.runOnce()).isEqualTo(TaskExecutionWorker.RunResult.SUCCEEDED);
 
         OutboundDeliveryView completed = outboundDeliveries.get(
@@ -1181,10 +1224,21 @@ class ReviewCasePostgresIT {
         UUID assetId = configurations.publishAsset(new PublishConfigurationAssetCommand(
                 TENANT, ConfigurationAssetType.EVIDENCE, "survey.site", "1.0.0", "1.0.0",
                 definition.trim(), Sha256.digest(definition.trim()))).versionId();
+        // M331：提审创建强制 OUTBOUND Mapping；夹具对齐原 BYD Profile 硬编码字段。
+        String outbound = """
+                {"mappingKey":"byd-submit-review","version":"1.0.0","connectorCode":"BYD_CPIM",
+                 "direction":"OUTBOUND","fieldMappings":[
+                   {"mappingId":"operator","internalPath":"operator","externalPath":"operatePerson","required":true,"transform":"TRIM"},
+                   {"mappingId":"order","internalPath":"externalOrderCode","externalPath":"orderCode","required":true,"transform":"NONE"},
+                   {"mappingId":"commit","internalPath":"commitDate","externalPath":"commitDate","required":true,"transform":"NONE"}]}
+                """.replaceAll("\\s+", "");
+        UUID outboundId = configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.INTEGRATION, "byd-submit-review",
+                "1.0.0", "1.0.0", outbound, Sha256.digest(outbound))).versionId();
         ConfigurationBundleReference bundle = configurations.publishBundle(
                 new PublishConfigurationBundleCommand(
                         TENANT, projectId, "EVD-REV-BUNDLE", "1.0.0", "BYD", "HOME",
-                        null, Instant.now().minusSeconds(60), null, List.of(assetId)));
+                        null, Instant.now().minusSeconds(60), null, List.of(assetId, outboundId)));
         taskId = UUID.randomUUID();
         workOrderId = UUID.randomUUID();
         // OutboundDelivery.sourceWorkOrderId 指向此工单；时间线投影经 WorkOrderScopeQuery 解析时必须存在。

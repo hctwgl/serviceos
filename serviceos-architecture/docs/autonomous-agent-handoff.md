@@ -7,50 +7,38 @@ lastUpdated: 2026-07-19
 
 ## 当前
 
-- PR：https://github.com/hctwgl/serviceos/pull/148（Draft）
-- 分支：`cursor/m321-integration-mapping-mainpath-88d5`
-- HEAD：见分支 tip；功能证据 `e6bb6cb8`；status 回填提交随后
-- `master`：`32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147 **已合并**）
-- latestMilestone：**M321**
-- Flyway：**120 / 122**；OpenAPI：**1.0.43**
+- PR #148～#175：M321～M348 Draft stacked
+- PR #176：https://github.com/hctwgl/serviceos/pull/176 — **M349** Technician FORM 条件执行器（Draft，base=#175）
+- latestMilestone：**M349**
+- Flyway：**127**；OpenAPI：**1.0.43**
+- `baselineCommit`：功能提交后回填
 
-## 本回合完成
+## 本会话新增
 
-### P0 基线收口
+| PR | Milestone |
+|---|---|
+| #174 | M347 INTEGRATION Mapping DSL UI |
+| #175 | M348 DISPATCH residual editor |
+|  #176 | M349 Technician FORM condition executor |
 
-- `baselineCommit` / README / status 下一方向对齐 Configuration-Driven Fulfillment Runtime
-- Notification（M307）、Pricing（M309）状态改为 `PARTIAL`
-- handoff 标记 PR #147 已合并；删除过期「远端查询 SPI 未实现 / 下一主线 P3」描述
+本地可无阻塞二次接线（Mapping DSL UI → DISPATCH 残留编辑器 → Technician 条件执行器）已收口。
+栈尖：`#148 → … → #175 → #176`。
 
-### M321 入站 Mapping 物化
+## 下一（均为硬门禁，不可发明推进）
 
-- `CreateWorkOrderMappingMaterializer` + `InboundCreateWorkOrderPipeline` 主路径
-- Mapping 命中字段权威；`mappingVersionId`=`assetVersionId`；Canonical 嵌 `mappingContentDigest`
-- 零 Mapping 兼容旧路径；OEM Mapper 降级为未映射字段兼容层
+1. **AMOUNT/加权比例** — 需业务确认口径
+2. **BUSINESS 日历 SLA / 结算落账** — R3，需独立批准
+3. **吉利联调** — `BLOCKED_EXTERNAL`
 
-## 验证
-
-```text
-bash scripts/agent-verify.sh docs   # PASS
-bash scripts/agent-verify.sh test CreateWorkOrderMappingMaterializerTest,DefaultIntegrationMappingRuntimeTest,InboundCreateWorkOrderPipelineTest  # PASS
-bash scripts/agent-verify.sh it BydCpimInboundOrderHttpPostgresIT,IntegrationMappingRuntimePostgresIT  # PASS
-bash scripts/agent-verify.sh arch   # 进行中/见后续
-bash scripts/agent-verify.sh it MultiOemParallelCreateSmokePostgresIT  # 进行中/见后续
-```
+可选后续（需明确批准）：Coverage/allocation CRUD OpenAPI、NOTIFICATION/PRICING 工作台、
+iOS 共用表达式执行器、workOrder/region Portal 权威上下文。
 
 ## BLOCKED_EXTERNAL
 
 - 吉利 Sandbox/OpenAPI 签名/真实脱敏报文
 - Swift/Xcode、签名真机、TestFlight
 
-## 下一步入口
+## 诚实边界
 
-1. 合并 PR #148 后将 `baselineCommit` 改为 master 合并提交
-2. **M322 候选**：出站 OUTBOUND INTEGRATION Mapping → OEM Payload → Connector
-3. 随后 ASSIGNEE_POLICY 自动 TaskAssignment（P2）
-
-## 关键代码入口
-
-- `serviceos-backend/.../CreateWorkOrderMappingMaterializer.java`
-- `serviceos-backend/.../InboundCreateWorkOrderPipeline.java`
-- `serviceos-architecture/architecture/334-m321-inbound-integration-mapping-materialization.md`
+“完成整个项目全部功能”在上述硬门禁与外部材料缺失下**不可宣称**。当前可靠停止点是
+M349 本地接线收口；继续推进需负责人确认口径或外部材料。
