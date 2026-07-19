@@ -77,4 +77,16 @@ test.describe('M284/M287/M289 Admin 配置设计器与画布', () => {
     const jsonAfterCondition = await page.getByTestId('definition-json').inputValue()
     expect(jsonAfterCondition).toContain('workOrder.brandCode == "PLATFORM"')
   })
+
+  test('M310 条件积木可为 RULE 首条 when 生成 SERVICEOS_EXPR_V1', async ({ page }) => {
+    await openDesigner(page)
+    await page.getByTestId('asset-type').selectOption('RULE')
+    await expect(page.getByTestId('condition-builder')).toBeVisible({ timeout: 15_000 })
+    await page.getByTestId('condition-value').first().fill('BYD_OCEAN')
+    await expect(page.getByTestId('condition-preview')).toContainText(
+      'workOrder.brandCode == "BYD_OCEAN"',
+    )
+    const json = await page.getByTestId('definition-json').inputValue()
+    expect(json).toContain('workOrder.brandCode == "BYD_OCEAN"')
+  })
 })

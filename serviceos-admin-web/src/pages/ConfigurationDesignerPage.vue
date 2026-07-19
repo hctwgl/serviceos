@@ -19,6 +19,7 @@ import {
   type DesignerAssetType,
 } from '../api/configurationDrafts'
 import WorkflowCanvas from '../components/WorkflowCanvas.vue'
+import ConditionBuilder from '../components/ConditionBuilder.vue'
 
 const assetType = ref<DesignerAssetType>('WORKFLOW')
 const drafts = ref<ConfigurationDraft[]>([])
@@ -40,6 +41,74 @@ const createKey = ref('platform.designer.demo')
 const createVersion = ref('1.0.0')
 
 const showCanvas = computed(() => assetType.value === 'WORKFLOW')
+const showConditionBuilder = computed(() =>
+  ['RULE', 'DISPATCH', 'NOTIFICATION', 'ASSIGNEE_POLICY', 'PRICING'].includes(assetType.value),
+)
+
+/** 从定义 JSON 提取首个 when/expression.source，供条件积木双向编辑。 */
+const firstExprSource = computed({
+  get(): string {
+    try {
+      const root = JSON.parse(definitionText.value) as Record<string, unknown>
+      return extractFirstExprSource(root) ?? ''
+    } catch {
+      return ''
+    }
+  },
+  set(value: string) {
+    try {
+      const root = JSON.parse(definitionText.value) as Record<string, unknown>
+      if (patchFirstExprSource(root, value)) {
+        definitionText.value = JSON.stringify(root, null, 2)
+      }
+    } catch {
+      // JSON 无效时不覆盖
+    }
+  },
+})
+
+function extractFirstExprSource(root: Record<string, unknown>): string | null {
+  const arrays = ['rules', 'triggers', 'strategies', 'lines', 'hardFilters', 'scoring'] as const
+  for (const key of arrays) {
+    const list = root[key]
+    if (!Array.isArray(list)) continue
+    for (const item of list) {
+      if (!item || typeof item !== 'object') continue
+      const obj = item as Record<string, unknown>
+      for (const exprKey of ['when', 'expression'] as const) {
+        const expr = obj[exprKey]
+        if (expr && typeof expr === 'object') {
+          const source = (expr as { source?: unknown }).source
+          if (typeof source === 'string') {
+            return source
+          }
+        }
+      }
+    }
+  }
+  return null
+}
+
+function patchFirstExprSource(root: Record<string, unknown>, source: string): boolean {
+  const arrays = ['rules', 'triggers', 'strategies', 'lines', 'hardFilters', 'scoring'] as const
+  for (const key of arrays) {
+    const list = root[key]
+    if (!Array.isArray(list)) continue
+    for (const item of list) {
+      if (!item || typeof item !== 'object') continue
+      const obj = item as Record<string, unknown>
+      for (const exprKey of ['when', 'expression'] as const) {
+        const expr = obj[exprKey]
+        if (expr && typeof expr === 'object') {
+          ;(expr as { language: string; source: string }).language = 'SERVICEOS_EXPR_V1'
+          ;(expr as { language: string; source: string }).source = source
+          return true
+        }
+      }
+    }
+  }
+  return false
+}
 
 async function refreshList() {
   loading.value = true
@@ -574,7 +643,10 @@ onMounted(async () => {
   <section class="designer" data-testid="configuration-designer">
     <header>
       <h1>配置设计器</h1>
-      <p>草稿 → 校验 → 审批 → 发布。WORKFLOW 支持可视化拖拽画布（布局写入 metadata.layout）。</p>
+      <p>
+        草稿 → 校验 → 审批 → 发布。WORKFLOW 支持可视化拖拽画布；RULE/DISPATCH 等资产支持条件积木生成
+        SERVICEOS_EXPR_V1。
+      </p>
     </header>
 
     <div class="toolbar">
@@ -666,6 +738,11 @@ onMounted(async () => {
           :definition-json="definitionText"
           data-testid="workflow-preview"
           @update:definition-json="definitionText = $event"
+        />
+        <ConditionBuilder
+          v-if="showConditionBuilder"
+          v-model="firstExprSource"
+          label="首条条件积木（写入定义 JSON 第一个 when/expression）"
         />
         <h2>定义 JSON</h2>
         <textarea

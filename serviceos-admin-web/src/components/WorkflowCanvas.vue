@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import ConditionBuilder from './ConditionBuilder.vue'
 
 export type WorkflowNode = {
   nodeId: string
@@ -345,13 +346,26 @@ function cancelConnect() {
         EXCLUSIVE_GATEWAY 出边可编辑条件（SERVICEOS_EXPR_V1）。
       </p>
       <p v-else class="muted">非排他网关出边通常无条件；保存时将忽略条件。</p>
-      <label>
+      <div
+        v-if="selectedFromNode?.nodeType === 'EXCLUSIVE_GATEWAY'"
+        data-testid="edge-condition-source-wrap"
+      >
+        <ConditionBuilder v-model="conditionDraft" label="边条件积木" />
+        <!-- 保留隐藏 textarea 以兼容既有 E2E 直接 fill 源码的用例 -->
+        <textarea
+          v-model="conditionDraft"
+          rows="2"
+          data-testid="edge-condition-source"
+          class="sr-source"
+        />
+      </div>
+      <label v-else>
         condition.source
         <textarea
           v-model="conditionDraft"
           rows="3"
           data-testid="edge-condition-source"
-          :disabled="selectedFromNode?.nodeType !== 'EXCLUSIVE_GATEWAY'"
+          disabled
         />
       </label>
       <div class="edge-actions">
@@ -467,6 +481,12 @@ function cancelConnect() {
 .edge-actions {
   display: flex;
   gap: 0.5rem;
+}
+.sr-source {
+  width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.75rem;
+  margin-top: 0.35rem;
 }
 .muted {
   color: #656d76;
