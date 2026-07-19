@@ -674,21 +674,22 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M327 PRICING 履约事实与 CalculationSnapshot**（功能证据见
+当前工程基线为 **M328 UNKNOWN / Replay Admin 工作台**（功能证据见
 `implementation-status.md`；合入 `master` 后回填合并提交）。M320 合并基线为
 `32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147）。
 
 当前已具备多 OEM SPI、远端查询、UNKNOWN/批量重放、复杂流程、十大资产设计器、六类 Runtime，
-入站/出站 Mapping（M321/M322）、ASSIGNEE/DISPATCH/RULE 主链路接入（M323～M325）、
-NOTIFICATION 可靠投递（M326），以及 PRICING 履约事实与 SHADOW CalculationSnapshot（M327）。
-下一主线继续 **Configuration-Driven Fulfillment Runtime**（UNKNOWN/Replay Admin 工作台）；
-真实吉利 Sandbox 与 Track F/G 仍为 `BLOCKED_EXTERNAL`，不阻塞本地主线。
+入站/出站 Mapping（M321/M322）、ASSIGNEE/DISPATCH/RULE（M323～M325）、NOTIFICATION（M326）、
+PRICING SHADOW Snapshot（M327），以及 Admin UNKNOWN 人工处置与批量 Replay 工作台（M328）。
+下一主线：吉利材料到位后优先联调；否则继续低代码/运营深化；Track F/G 仍为 `BLOCKED_EXTERNAL`。
 
 权威进度入口：
 
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M328 实现文档](architecture/341-m328-unknown-replay-admin-workbench.md)
+- [M328 验收矩阵](testing/325-m328-unknown-replay-admin-workbench-acceptance.md)
 - [M327 实现文档](architecture/340-m327-pricing-fulfillment-calculation-snapshot.md)
 - [M327 验收矩阵](testing/324-m327-pricing-fulfillment-calculation-snapshot-acceptance.md)
 - [M326 实现文档](architecture/339-m326-notification-reliable-delivery.md)

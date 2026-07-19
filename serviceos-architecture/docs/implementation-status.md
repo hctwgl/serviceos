@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-19
-baselineCommit: f564792b33df8bd697d951c6206abcffc53c9cc5
-latestMilestone: M327
+baselineCommit: pending-m328-feature
+latestMilestone: M328
 ---
 
 # ServiceOS 实施状态总览
@@ -39,8 +39,8 @@ latestMilestone: M327
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M327 PRICING 履约事实与 CalculationSnapshot |
-| 基线提交 | `f564792b33df8bd697d951c6206abcffc53c9cc5`（功能证据；合入 `master` 后改为合并提交） |
+| 最新实施里程碑 | M328 UNKNOWN / Replay Admin 工作台 |
+| 基线提交 | （功能证据提交后回填；合入 `master` 后改为合并提交） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts`、`@serviceos/web-core`、`ServiceOSIOSCore`、独立且可部署的 `serviceos-network-web` 与 `serviceos-technician-web`、Swift 6 `TechnicianIOSFoundation`，以及已在 iPhone 17 Pro Simulator 安装启动、实跑 XCTest/XCUITest、形成 Production arm64 archive/dSYM，并接入当前任务、在线 Visit、冻结基础表单、前台 Evidence 采集上传、Snapshot/Task 完成与多轮资料整改的原生 `TechnicianIOS` SwiftUI App；由同一 Core OpenAPI 生成并经独立消费者门禁验证的 `@serviceos/core-client` 与 `ServiceOSCoreClient` |
 | 前端工程 | `serviceos-admin-web` 独立承载总部运营、统一用户中心、`/me` 导航、SavedView、UI Preference、受控搜索与最近访问；M256 后 Network 正式产品由独立 `serviceos-network-web` 承载，M257 后 Technician 正式产品由独立移动优先 `serviceos-technician-web` 承载，M262～M266 依次增加在线 Visit、冻结表单、Evidence 三段式上传、Snapshot/Task 完成与独立整改 Task 多轮补传/重新提交；Admin 仅保留可配置外链和 M188 诊断；两套独立 Web 均实际接入共享 Core、OIDC PKCE、服务端 Context/Capability/导航、Playwright 回归和独立容器镜像 |
@@ -162,7 +162,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | 通知 | 通知策略运行时与投递 | `PARTIAL` | **M307** 冻结 Bundle `NotificationRuntime`；**M326** `task.created`/`task.completed` 自动订阅 → Inbox + RoleGrant 收件人 → resolveAndDispatch → Intent/Delivery/Attempt 持久化；LocalReference SENT 本地 ACK，UNKNOWN/FAILED 人工接管 | 模板渲染、真实短信/邮件/Push 供应商、Admin 投递工作台、网络 I/O 移出事务与业务重试 Task 时钟 | M307、M326、`architecture/14-*` |
 | 履约事实与试算 | 事实提取和双向试算 | `PARTIAL` | **M309** `PricingRuntime`；**M327** `workorder.fulfilled` → 最小履约事实 + SHADOW `CalculationSnapshot`（不落账） | 完整 FactDefinition/CalculationRun、应收/应付双轨、对账结算、Admin 计价工作台、AUTHORITATIVE | M309、M327、M5 设计 |
 | 对账结算 | 对账、结算、争议与调整 | `PROPOSED` | 已有边界设计 | 正式运行时和页面 | `architecture/16-*` |
-| Admin Portal | 总部运营后台 | `PARTIAL` | **M284/M287/M289/M291/M292/M294/M295/M296** 配置设计器壳、拖拽画布、建边/条件、依赖报告、干跑/历史回放、全资产类型；M101～M182：队列/任务/SLA/异常/入站/外发/工单/项目目录、工作区、allowed-actions；CI 阻断构建；开发态 Keycloak PKCE；真实只读与写链路 PR 阻断 E2E；M187～M188 用户中心与 `/me` 导航；**M189 个人 SavedView**；**M190 UI Preferences**；**M191 共享 SavedView**；**M192 受控全局搜索**；**M193 最近访问** | 条件积木 UI、设计系统、正式企业 OIDC/BFF | M7 设计、M101～M182、M187～M193、M284、M287、M289、M291、M292、M294、M295、M296、Admin 试点基线 |
+| Admin Portal | 总部运营后台 | `PARTIAL` | **M284/M287/M289/M291/M292/M294/M295/M296** 配置设计器；M101～M193 运营基线；**M328** UNKNOWN 人工确认/放弃与批量 Replay 工作台接入 Admin 外发队列/详情 | 条件积木 UI、设计系统、正式企业 OIDC/BFF、批量压测/MFA | M7 设计、M101～M193、M284～M296、M328、Admin 试点基线 |
 | Network Portal | 网点协作端 | `PARTIAL` | M194～M242 已交付 workbench、工单/任务、限定工作区、师傅关系/资质、产能、整改和运营异常等受控读写切片；M256 将全部正式产品页迁入独立 `serviceos-network-web`，接入 OIDC PKCE、`/me` NETWORK 上下文、Capability/服务端导航、跨网点失败关闭、76 项 Playwright 回归与独立容器镜像；Admin 不再承载正式 `/network-portal/*` 路由 | 槽位策略表、完整 product/03 设计系统、评分/容量策略引擎、Portal ACK/resolve/decide、产能申请、notifications/消息页、生产 IdP 与集群发布 | M7 设计、M194～M242、M255～M256 |
 | Technician App / Portal | 师傅移动端与 Feed | `PARTIAL` | M195/M218/M219/M243～M246 只读安全切片；M257 独立 H5；M258～M261 iOS 基础；M262 在线 Visit；M263 冻结基础表单；M264 Evidence 采集上传；M265 Snapshot 与 Task 完成；M266 在线整改 | 联系/预约、完整表单草稿、真实 operationRefs 签退；弱网/后台/Track F 离线；签名真机/真实 IdP/VoiceOver/崩溃采集/TestFlight | M7 设计、M195、M218～M219、M243～M246、M257～M266 |
 | External Portal | 用户/车企受控页面 | `PROPOSED` | 最小边界规划 | 二期页面和工程实现 | M7 设计 |
@@ -175,16 +175,16 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M327**（PRICING 履约事实与 CalculationSnapshot）。
-M321～M327 均在 Draft stacked PRs 中；M320 已合入 `master`（`32b902f8`）。
+ServiceOS 可靠纵向切片已推进到 **M328**（UNKNOWN / Replay Admin 工作台）。
+M321～M328 均在 Draft stacked PRs 中；M320 已合入 `master`（`32b902f8`）。
 
-当前契约/迁移：OpenAPI **1.0.43**；Flyway **125**。
+当前契约/迁移：OpenAPI **1.0.43**；Flyway **125**（本切片无迁移）。
 
 下一阶段继续 **Configuration-Driven Fulfillment Runtime**：
 
-1. **UNKNOWN / Replay Admin 工作台**；
-2. 吉利真实联调材料到位后提升为最高优先级；否则保持 `BLOCKED_EXTERNAL`；
-3. 低代码高级能力仅在对应运行时已接入业务主链路后深化。
+1. 吉利真实联调材料到位后提升为最高优先级；否则保持 `BLOCKED_EXTERNAL`；
+2. 低代码高级能力仅在对应运行时已接入业务主链路后深化；
+3. Admin 设计系统与高级批量运营能力按需深化。
 
 仍为 **`BLOCKED_EXTERNAL`**（不阻塞上述本地主线）：
 

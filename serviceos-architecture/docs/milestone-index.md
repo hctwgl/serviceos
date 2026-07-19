@@ -336,6 +336,7 @@ title: ServiceOS 里程碑索引
 | M325 | M325 RULE 接入 INTERNAL ReviewCase.decide 门禁 | [338-m325-rule-review-decide-gate.md](../architecture/338-m325-rule-review-decide-gate.md) | [322-m325-rule-review-decide-gate-acceptance.md](../testing/322-m325-rule-review-decide-gate-acceptance.md) |
 | M326 | M326 NOTIFICATION 可靠投递闭环 | [339-m326-notification-reliable-delivery.md](../architecture/339-m326-notification-reliable-delivery.md) | [323-m326-notification-reliable-delivery-acceptance.md](../testing/323-m326-notification-reliable-delivery-acceptance.md) |
 | M327 | M327 PRICING 履约事实与 CalculationSnapshot | [340-m327-pricing-fulfillment-calculation-snapshot.md](../architecture/340-m327-pricing-fulfillment-calculation-snapshot.md) | [324-m327-pricing-fulfillment-calculation-snapshot-acceptance.md](../testing/324-m327-pricing-fulfillment-calculation-snapshot-acceptance.md) |
+| M328 | M328 UNKNOWN / Replay Admin 工作台 | [341-m328-unknown-replay-admin-workbench.md](../architecture/341-m328-unknown-replay-admin-workbench.md) | [325-m328-unknown-replay-admin-workbench-acceptance.md](../testing/325-m328-unknown-replay-admin-workbench-acceptance.md) |
 
 ## 未关联里程碑的文档
 

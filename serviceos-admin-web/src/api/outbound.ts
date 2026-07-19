@@ -49,3 +49,37 @@ export function retryUnknownOutboundDelivery(
     body,
   })
 }
+
+export type ManualOutboundDisposition = {
+  dispositionId: string
+  deliveryId: string
+  result: 'MANUAL_CONFIRMED' | 'ABANDONED'
+  reason: string
+  approvalRef: string
+  externalRef: string | null
+  evidenceRefs: string[]
+  requestedBy: string
+  requestedAt: string
+  deliveryAggregateVersion: number
+}
+
+/** M318/M328：UNKNOWN Delivery 人工确认或放弃；状态保持 UNKNOWN。 */
+export function recordManualOutboundAck(
+  deliveryId: string,
+  body: {
+    expectedAggregateVersion: number
+    result: 'MANUAL_CONFIRMED' | 'ABANDONED'
+    reason: string
+    approvalRef: string
+    externalRef?: string | null
+    evidenceRefs?: string[]
+  },
+) {
+  return apiPost<ManualOutboundDisposition>(
+    `/outbound-deliveries/${deliveryId}:record-manual-ack`,
+    {
+      idempotencyKey: newIdempotencyKey('outbound-manual-ack'),
+      body,
+    },
+  )
+}
