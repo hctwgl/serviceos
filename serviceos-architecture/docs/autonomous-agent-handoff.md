@@ -8,7 +8,7 @@ lastUpdated: 2026-07-19
 ## 当前
 
 - PR #148～#164：M321～M337 Draft stacked
-- PR #PENDING：`cursor/m338-dispatch-allocation-ratio-88d5` — **M338** DISPATCH 比例缺口（Draft，base=#164）
+- PR #165：https://github.com/hctwgl/serviceos/pull/165 — **M338** DISPATCH 比例缺口（Draft，base=#164）
 - `master`：`32b902f897d19d2c906acac899990bf1aa2bb056`
 - latestMilestone：**M338**
 - Flyway：**127**；OpenAPI：**1.0.43**

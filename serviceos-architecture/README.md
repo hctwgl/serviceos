@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M338 DISPATCH 签约比例缺口评分**（Draft stacked；栈 `#148→…→#164→本切片`；
+当前工程基线为 **M338 DISPATCH 签约比例缺口评分**（https://github.com/hctwgl/serviceos/pull/165；栈 `#148→…→#165`；
 见 `implementation-status.md`；合入 `master` 后回填合并提交）。M320 合并基线为
 `32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147）。
 
