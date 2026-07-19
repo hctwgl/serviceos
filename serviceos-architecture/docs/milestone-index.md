@@ -320,6 +320,7 @@ title: ServiceOS 里程碑索引
 | M309 | M309 PRICING 运行时 | [322-m309-pricing-runtime.md](../architecture/322-m309-pricing-runtime.md) | [306-m309-pricing-runtime-acceptance.md](../testing/306-m309-pricing-runtime-acceptance.md) |
 | M310 | M310 SERVICEOS_EXPR_V1 条件积木 | [323-m310-condition-builder.md](../architecture/323-m310-condition-builder.md) | [307-m310-condition-builder-acceptance.md](../testing/307-m310-condition-builder-acceptance.md) |
 | M311 | M311 吉利浩瀚本地入站适配器 | [324-m311-geely-local-inbound-adapter.md](../architecture/324-m311-geely-local-inbound-adapter.md) | [308-m311-geely-local-inbound-adapter-acceptance.md](../testing/308-m311-geely-local-inbound-adapter-acceptance.md) |
+| M312 | M312 Workflow 画布属性面板与撤销重做 | [325-m312-workflow-canvas-property-panel.md](../architecture/325-m312-workflow-canvas-property-panel.md) | [309-m312-workflow-canvas-property-panel-acceptance.md](../testing/309-m312-workflow-canvas-property-panel-acceptance.md) |
 
 ## 未关联里程碑的文档
 
