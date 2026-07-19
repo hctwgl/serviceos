@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M335 CREATE_WORK_ORDER 强制 INBOUND Mapping**（Draft 栈 `#148→…→#161→本切片`；
+当前工程基线为 **M335 CREATE_WORK_ORDER 强制 INBOUND Mapping**（https://github.com/hctwgl/serviceos/pull/162；栈 `#148→…→#162`；
 见 `implementation-status.md`；合入 `master` 后回填合并提交）。M320 合并基线为
 `32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147）。
 

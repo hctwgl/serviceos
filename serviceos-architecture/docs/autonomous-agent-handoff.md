@@ -8,7 +8,7 @@ lastUpdated: 2026-07-19
 ## 当前
 
 - PR #148～#161：M321～M334 Draft stacked
-- 本切片分支：`cursor/m335-inbound-create-mapping-required-88d5` — **M335** CREATE 强制 Mapping（Draft，base=#161）
+- PR #162：https://github.com/hctwgl/serviceos/pull/162 — **M335** CREATE 强制 Mapping（Draft，base=#161）
 - `master`：`32b902f897d19d2c906acac899990bf1aa2bb056`
 - latestMilestone：**M335**
 - Flyway：**125**；OpenAPI：**1.0.43**
