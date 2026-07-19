@@ -35,7 +35,7 @@ relatedMilestones: [M303, M321, M333]
 ## 明确未实现
 
 - 嵌套表达式、错误码映射扩展
-- 强制 INBOUND Mapping / OEM Mapper 拆除
+- 强制 INBOUND Mapping → 见 **M335**；OEM Mapper 拆除仍待后续
 - DISPATCH 地图/比例、吉利联调
 
 ## 验证命令

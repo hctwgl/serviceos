@@ -674,15 +674,15 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M334 入站 Mapping defaults/enum/condition DSL**（https://github.com/hctwgl/serviceos/pull/161；栈 `#148→…→#161`；
+当前工程基线为 **M335 CREATE_WORK_ORDER 强制 INBOUND Mapping**（Draft 栈 `#148→…→#161→本切片`；
 见 `implementation-status.md`；合入 `master` 后回填合并提交）。M320 合并基线为
 `32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147）。
 
 当前已具备多 OEM SPI、远端查询、UNKNOWN/批量重放、复杂流程、十大资产设计器、六类 Runtime，
-入站/出站 Mapping（M321/M322/M331/M333/M334）、ASSIGNEE/DISPATCH NETWORK+TECHNICIAN（M323/M324/M332）、
+入站/出站 Mapping（M321/M322/M331/M333/M334/M335）、ASSIGNEE/DISPATCH NETWORK+TECHNICIAN（M323/M324/M332）、
 RULE（M325/M329/M330）、NOTIFICATION（M326）、PRICING SHADOW Snapshot（M327），以及 Admin
 UNKNOWN 人工处置与批量 Replay 工作台（M328）。
-下一主线：吉利材料到位后优先联调；否则继续强制 INBOUND Mapping / DISPATCH 地图与低代码深化；
+下一主线：吉利材料到位后优先联调；否则继续 OEM Mapper 拆除 / DISPATCH 地图与低代码深化；
 Track F/G 仍为 `BLOCKED_EXTERNAL`。
 
 权威进度入口：
@@ -690,6 +690,8 @@ Track F/G 仍为 `BLOCKED_EXTERNAL`。
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M335 实现文档](architecture/348-m335-inbound-create-work-order-mapping-required.md)
+- [M335 验收矩阵](testing/332-m335-inbound-create-work-order-mapping-required-acceptance.md)
 - [M334 实现文档](architecture/347-m334-inbound-mapping-default-enum-condition.md)
 - [M334 验收矩阵](testing/331-m334-inbound-mapping-default-enum-condition-acceptance.md)
 - [M333 实现文档](architecture/346-m333-inbound-mapping-no-fallback.md)

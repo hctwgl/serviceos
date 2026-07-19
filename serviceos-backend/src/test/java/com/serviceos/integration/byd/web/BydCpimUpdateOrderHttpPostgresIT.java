@@ -117,10 +117,28 @@ class BydCpimUpdateOrderHttpPostgresIT {
         var asset = configurations.publishAsset(new PublishConfigurationAssetCommand(
                 TENANT_ID, ConfigurationAssetType.WORKFLOW, "BYD_SURVEY_INSTALL",
                 "1.0.0", "1.0.0", workflow, Sha256.digest(workflow)));
+        // M335：CREATE_WORK_ORDER 强制 INBOUND Mapping。
+        String integration = """
+                {"mappingKey":"byd-update-create","version":"1.0.0","connectorCode":"BYD_CPIM","direction":"INBOUND","fieldMappings":[
+                  {"mappingId":"order","externalPath":"orderCode","internalPath":"externalOrderCode","required":true,"transform":"TRIM"},
+                  {"mappingId":"brand","internalPath":"brandCode","required":true,"constantValue":"BYD_OCEAN","transform":"NONE"},
+                  {"mappingId":"product","internalPath":"serviceProductCode","required":true,"constantValue":"HOME_CHARGING_SURVEY_INSTALL","transform":"NONE"},
+                  {"mappingId":"province","externalPath":"provinceCode","internalPath":"provinceCode","required":true,"transform":"NONE"},
+                  {"mappingId":"city","externalPath":"cityCode","internalPath":"cityCode","required":true,"transform":"NONE"},
+                  {"mappingId":"district","externalPath":"areaCode","internalPath":"districtCode","required":true,"transform":"NONE"},
+                  {"mappingId":"name","externalPath":"contactName","internalPath":"customerName","required":true,"transform":"TRIM"},
+                  {"mappingId":"mobile","externalPath":"contactMobile","internalPath":"customerMobile","required":true,"transform":"NONE"},
+                  {"mappingId":"address","externalPath":"contactAddress","internalPath":"serviceAddress","required":true,"transform":"TRIM"},
+                  {"mappingId":"vin","externalPath":"vin","internalPath":"vehicleVin","required":true,"transform":"NONE"},
+                  {"mappingId":"dispatch","externalPath":"dispatchTime","internalPath":"dispatchedAt","required":true,"transform":"DATE_ISO"}]}
+                """.replaceAll("\\s+", "");
+        var integrationAsset = configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT_ID, ConfigurationAssetType.INTEGRATION, "byd-update-create",
+                "1.0.0", "1.0.0", integration, Sha256.digest(integration)));
         configurations.publishBundle(new PublishConfigurationBundleCommand(
                 TENANT_ID, projectId, "BYD-OCEAN-SD-PILOT", "1.0.0", "BYD_OCEAN",
                 "HOME_CHARGING_SURVEY_INSTALL", "370000", Instant.now().minusSeconds(3600),
-                null, java.util.List.of(asset.versionId())));
+                null, java.util.List.of(asset.versionId(), integrationAsset.versionId())));
     }
 
     @Test

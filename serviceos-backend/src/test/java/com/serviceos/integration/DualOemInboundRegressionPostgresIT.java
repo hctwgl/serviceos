@@ -175,10 +175,52 @@ class DualOemInboundRegressionPostgresIT {
         UUID workflowId = configurations.publishAsset(new PublishConfigurationAssetCommand(
                 tenant, ConfigurationAssetType.WORKFLOW, workflowKey, "1.0.0", "1.0.0",
                 workflow, Sha256.digest(workflow))).versionId();
+        // M335：CREATE_WORK_ORDER 强制 INBOUND Mapping。
+        String mappingKey;
+        String connectorCode;
+        String integration;
+        if ("BYD".equals(clientId)) {
+            mappingKey = "byd-dual";
+            connectorCode = "BYD_CPIM";
+            integration = "{\"mappingKey\":\"" + mappingKey + "\",\"version\":\"1.0.0\","
+                    + "\"connectorCode\":\"" + connectorCode + "\",\"direction\":\"INBOUND\",\"fieldMappings\":["
+                    + "{\"mappingId\":\"order\",\"externalPath\":\"orderCode\",\"internalPath\":\"externalOrderCode\",\"required\":true,\"transform\":\"TRIM\"},"
+                    + "{\"mappingId\":\"brand\",\"internalPath\":\"brandCode\",\"required\":true,\"constantValue\":\"BYD_OCEAN\",\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"product\",\"internalPath\":\"serviceProductCode\",\"required\":true,\"constantValue\":\"HOME_CHARGING_SURVEY_INSTALL\",\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"province\",\"externalPath\":\"provinceCode\",\"internalPath\":\"provinceCode\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"city\",\"externalPath\":\"cityCode\",\"internalPath\":\"cityCode\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"district\",\"externalPath\":\"areaCode\",\"internalPath\":\"districtCode\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"name\",\"externalPath\":\"contactName\",\"internalPath\":\"customerName\",\"required\":true,\"transform\":\"TRIM\"},"
+                    + "{\"mappingId\":\"mobile\",\"externalPath\":\"contactMobile\",\"internalPath\":\"customerMobile\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"address\",\"externalPath\":\"contactAddress\",\"internalPath\":\"serviceAddress\",\"required\":true,\"transform\":\"TRIM\"},"
+                    + "{\"mappingId\":\"vin\",\"externalPath\":\"vin\",\"internalPath\":\"vehicleVin\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"dispatch\",\"externalPath\":\"dispatchTime\",\"internalPath\":\"dispatchedAt\",\"required\":true,\"transform\":\"DATE_ISO\"}"
+                    + "]}";
+        } else {
+            mappingKey = "ref-dual";
+            connectorCode = "REFERENCE_OEM";
+            integration = "{\"mappingKey\":\"" + mappingKey + "\",\"version\":\"1.0.0\","
+                    + "\"connectorCode\":\"" + connectorCode + "\",\"direction\":\"INBOUND\",\"fieldMappings\":["
+                    + "{\"mappingId\":\"order\",\"externalPath\":\"externalOrderCode\",\"internalPath\":\"externalOrderCode\",\"required\":true,\"transform\":\"TRIM\"},"
+                    + "{\"mappingId\":\"brand\",\"externalPath\":\"brandCode\",\"internalPath\":\"brandCode\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"product\",\"externalPath\":\"serviceProductCode\",\"internalPath\":\"serviceProductCode\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"province\",\"externalPath\":\"provinceCode\",\"internalPath\":\"provinceCode\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"city\",\"externalPath\":\"cityCode\",\"internalPath\":\"cityCode\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"district\",\"externalPath\":\"districtCode\",\"internalPath\":\"districtCode\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"name\",\"externalPath\":\"customerName\",\"internalPath\":\"customerName\",\"required\":true,\"transform\":\"TRIM\"},"
+                    + "{\"mappingId\":\"mobile\",\"externalPath\":\"customerMobile\",\"internalPath\":\"customerMobile\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"address\",\"externalPath\":\"serviceAddress\",\"internalPath\":\"serviceAddress\",\"required\":true,\"transform\":\"TRIM\"},"
+                    + "{\"mappingId\":\"vin\",\"externalPath\":\"vehicleVin\",\"internalPath\":\"vehicleVin\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"dispatch\",\"externalPath\":\"dispatchedAt\",\"internalPath\":\"dispatchedAt\",\"required\":true,\"transform\":\"NONE\"}"
+                    + "]}";
+        }
+        UUID integrationId = configurations.publishAsset(new PublishConfigurationAssetCommand(
+                tenant, ConfigurationAssetType.INTEGRATION, mappingKey, "1.0.0", "1.0.0",
+                integration, Sha256.digest(integration))).versionId();
         configurations.publishBundle(new PublishConfigurationBundleCommand(
                 tenant, projectId, projectCode + "-BUNDLE", "1.0.0", brand,
                 "HOME_CHARGING_SURVEY_INSTALL", "370000", Instant.now().minusSeconds(60),
-                null, List.of(workflowId)));
+                null, List.of(workflowId, integrationId)));
     }
 
     private void postByd(String orderCode) throws Exception {

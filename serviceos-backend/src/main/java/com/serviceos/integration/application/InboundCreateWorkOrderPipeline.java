@@ -34,21 +34,21 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.UUID;
 
 /**
  * CREATE_WORK_ORDER 通用入站管道。
  *
  * <p>适配器完成协议验签、transport Envelope 登记与薄兼容映射后进入本管道。管道负责：
- * Bundle 唯一解析 →（可选）冻结 INTEGRATION Mapping 应用并物化为领域命令 →
+ * Bundle 唯一解析 → 强制冻结 INTEGRATION Mapping 应用并物化为领域命令 →
  * Canonical 私有存储 → CanonicalMessage 登记 → 领域建单命令 → Envelope/Canonical 完成 →
  * Outbox/审计。适配器不得直接写工单表。</p>
  *
- * <p>当冻结 Bundle 含该 connector 的唯一 INBOUND Mapping 时，建单领域字段仅由 Mapping
- * 物化（M333，无适配器 fallback），{@code mappingVersionId} 取资产 versionId，Canonical
- * 嵌入 contentDigest。零 Mapping 时兼容旧适配器路径。brand/product 等常量由 Mapping
- * {@code constantValue} 提供（M334），管道不再播种适配器字段。</p>
+ * <p>M335：CREATE_WORK_ORDER 必须命中 connector 唯一 INBOUND Mapping；缺失则失败关闭。
+ * 建单领域字段仅由 Mapping 物化（M333，无适配器 fallback）；{@code mappingVersionId}
+ * 取资产 versionId，Canonical 嵌入 contentDigest。适配器 {@code CreateWorkOrderMappedInbound}
+ * 仅作 Bundle 路由提示（brand/product/province）与 businessKey 后缀重写基底。
+ * brand/product 常量由 Mapping {@code constantValue} 提供（M334）。</p>
  *
  * <p>事务：调用方应已独立提交 RECEIVED Envelope；本管道在单一本地事务中提交
  * Canonical、工单、审计与 Outbox。配置失败或业务键冲突会 reject Envelope。</p>
@@ -152,18 +152,14 @@ public class InboundCreateWorkOrderPipeline {
                     "INVALID_ORDER", code + ": " + exception.getMessage(), auditContext);
         }
 
-        final Optional<IntegrationMappingResult> mappingResult;
+        final IntegrationMappingResult mappingResult;
         final CreateWorkOrderMappedInbound effectiveMapped;
         try {
-            mappingResult = applyFrozenIntegrationMapping(
+            // M335：CREATE_WORK_ORDER 强制 INBOUND Mapping；适配器字段不再作为领域权威。
+            mappingResult = requireFrozenIntegrationMapping(
                     safeTenant, connector, bundle, externalSourcePayload);
-            if (mappingResult.isPresent()) {
-                // M333：Mapping 物化后不再回退适配器字段。
-                effectiveMapped = CreateWorkOrderMappingMaterializer.materialize(
-                        mapped, mappingResult.get(), objectMapper);
-            } else {
-                effectiveMapped = mapped;
-            }
+            effectiveMapped = CreateWorkOrderMappingMaterializer.materialize(
+                    mapped, mappingResult, objectMapper);
         } catch (BusinessProblem exception) {
             return reject(
                     envelope, safeTenant, bundle.projectId(), null, mapped.mappingVersionId(),
@@ -182,9 +178,9 @@ public class InboundCreateWorkOrderPipeline {
                 InboundCreateWorkOrderResult result = completeCreateWorkOrder(
                         envelope, connector, safeTenant, effectiveMapped, bundle, canonicalObjectRef,
                         canonicalPayloadDigest, auditContext, safeCorrelationId);
-                mappingResult.ifPresent(applied -> appendMappingAudit(
+                appendMappingAudit(
                         safeTenant, auditContext, envelope.inboundEnvelopeId(), bundle.projectId(),
-                        applied, safeCorrelationId, clock.instant()));
+                        mappingResult, safeCorrelationId, clock.instant());
                 return result;
             }));
         } catch (ExternalWorkOrderConflictException exception) {
@@ -195,7 +191,7 @@ public class InboundCreateWorkOrderPipeline {
         }
     }
 
-    private Optional<IntegrationMappingResult> applyFrozenIntegrationMapping(
+    private IntegrationMappingResult requireFrozenIntegrationMapping(
             String tenantId,
             ConnectorIdentity connector,
             ConfigurationBundleReference bundle,
@@ -204,17 +200,23 @@ public class InboundCreateWorkOrderPipeline {
         boolean mappingConfigured = integrationMappingRuntime.hasInboundMappingForConnector(
                 tenantId, bundle.bundleId(), bundle.manifestDigest(), connector.connectorCode());
         if (!mappingConfigured) {
-            return Optional.empty();
+            throw new BusinessProblem(
+                    com.serviceos.shared.ProblemCode.VALIDATION_FAILED,
+                    "CREATE_WORK_ORDER requires frozen INBOUND INTEGRATION mapping for connector: "
+                            + connector.connectorCode());
         }
         if (externalSourcePayload == null || externalSourcePayload.isEmpty()) {
             throw new BusinessProblem(
                     com.serviceos.shared.ProblemCode.VALIDATION_FAILED,
                     "Frozen INTEGRATION mapping requires external source payload");
         }
-        // M334：不再播种 brand/product；常量由 Mapping constantValue 提供。
         return integrationMappingRuntime.applyInboundForConnectorIfPresent(
                 tenantId, bundle.bundleId(), bundle.manifestDigest(),
-                connector.connectorCode(), externalSourcePayload);
+                connector.connectorCode(), externalSourcePayload)
+                .orElseThrow(() -> new BusinessProblem(
+                        com.serviceos.shared.ProblemCode.VALIDATION_FAILED,
+                        "CREATE_WORK_ORDER requires frozen INBOUND INTEGRATION mapping for connector: "
+                                + connector.connectorCode()));
     }
 
     private void appendMappingAudit(
