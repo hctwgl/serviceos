@@ -674,8 +674,8 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M342 嵌套条件组 round-trip**（栈 `#148→…→#168→本切片`；
-见 `implementation-status.md`；Draft PR URL 与合入 `master` 后回填）。M320 合并基线为
+当前工程基线为 **M342 嵌套条件组 round-trip**（https://github.com/hctwgl/serviceos/pull/169；栈 `#148→…→#169`；
+见 `implementation-status.md`；合入 `master` 后回填合并提交）。M320 合并基线为
 `32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147）。
 
 当前已具备多 OEM SPI、远端查询、UNKNOWN/批量重放、复杂流程、十大资产设计器、六类 Runtime，
