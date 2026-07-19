@@ -8,7 +8,7 @@ lastUpdated: 2026-07-19
 ## 当前
 
 - PR #148～#159：M321～M332 Draft stacked
-- 本切片分支：`cursor/m333-inbound-mapping-no-fallback-88d5` — **M333** 入站 Mapping 无适配器 fallback（Draft，base=#159）
+- PR #160：https://github.com/hctwgl/serviceos/pull/160 — **M333** 入站 Mapping 无适配器 fallback（Draft，base=#159）
 - `master`：`32b902f897d19d2c906acac899990bf1aa2bb056`
 - latestMilestone：**M333**
 - Flyway：**125**；OpenAPI：**1.0.43**

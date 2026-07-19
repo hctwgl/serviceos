@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M333 入站 Mapping 物化无适配器 fallback**（Draft 栈 `#148→…→#159→本切片`；
+当前工程基线为 **M333 入站 Mapping 物化无适配器 fallback**（https://github.com/hctwgl/serviceos/pull/160；栈 `#148→…→#160`；
 见 `implementation-status.md`；合入 `master` 后回填合并提交）。M320 合并基线为
 `32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147）。
 
