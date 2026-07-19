@@ -368,6 +368,7 @@ title: ServiceOS 里程碑索引
 | M357 | M357 师傅端运行时客户端能力拒单 | [370-m357-technician-runtime-client-capability-gate.md](../architecture/370-m357-technician-runtime-client-capability-gate.md) | [354-m357-technician-runtime-client-capability-gate-acceptance.md](../testing/354-m357-technician-runtime-client-capability-gate-acceptance.md) |
 | M358 | M358 supportedClientKinds 定向发布 | [371-m358-supported-client-kinds-directed-publish.md](../architecture/371-m358-supported-client-kinds-directed-publish.md) | [355-m358-supported-client-kinds-directed-publish-acceptance.md](../testing/355-m358-supported-client-kinds-directed-publish-acceptance.md) |
 | M359 | M359 Feed/详情头客户端能力拒单 | [372-m359-portal-header-client-capability-reject.md](../architecture/372-m359-portal-header-client-capability-reject.md) | [356-m359-portal-header-client-capability-reject-acceptance.md](../testing/356-m359-portal-header-client-capability-reject-acceptance.md) |
+| M360 | M360 终审 8 态视觉基线与 admin-pilot 冒烟加固 | [373-m360-final-review-visual-admin-pilot.md](../architecture/373-m360-final-review-visual-admin-pilot.md) | [357-m360-final-review-visual-admin-pilot-acceptance.md](../testing/357-m360-final-review-visual-admin-pilot-acceptance.md) |
 
 ## 未关联里程碑的文档
 

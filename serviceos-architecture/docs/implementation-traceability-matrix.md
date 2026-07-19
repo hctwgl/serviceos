@@ -454,3 +454,4 @@ Feature gate/authority: if applicable
 | M357 | 师傅端运行时客户端能力拒单 | OpenAPI 1.0.51 `CLIENT_CAPABILITY_UNSUPPORTED` + ClientCapabilityRuntimeGate + Technician Form/Evidence 适配层复检 + H5 detail 展示 + Unit/Security + 370-m357-* + 354-m357-* | UNKNOWN 强制升级、iOS 条件全量硬阻断、整改路径专用增强（定向发布见 M358；Feed/详情头见 M359） |
 | M358 | supportedClientKinds 定向发布 | OpenAPI 1.0.52 + Flyway V131 + Draft/侧表持久化 + 子集硬兼容门禁 + 运行时目标外拒单 + Admin 勾选 + Unit/PostgresIT + 371-m358-* + 355-m358-* | 派单级过滤、clientVersion 下限、iOS 条件全量硬阻断、动态能力注册（Feed/详情头见 M359） |
 | M359 | Feed/详情头客户端能力拒单 | OpenAPI 1.0.53 + FrozenBundleClientCapabilityProbe + Feed `clientCapabilityUnsupportedDetail` + 详情 422 + H5 阻断深链 + Unit/Security + 372-m359-* + 356-m359-* | 派单级过滤、iOS 条件全量硬阻断、UNKNOWN 强制升级、整改头级专用增强 |
+| M360 | 终审 8 态视觉基线与 admin-pilot 冒烟加固 | Mock Playwright 8 态金标 + stale-draft + empty 失败关闭修正 + verify-admin-smoke 纳入 visual；无 OpenAPI/Flyway；373-m360-* + 357-m360-* | iOS 执行器、派单过滤、REVIEW_TASK 模板分离 |

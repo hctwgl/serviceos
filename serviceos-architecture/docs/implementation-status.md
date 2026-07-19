@@ -4,7 +4,7 @@ version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-19
 baselineCommit: "PENDING_MERGE"
-latestMilestone: M359
+latestMilestone: M360
 ---
 
 # ServiceOS 实施状态总览
@@ -39,7 +39,7 @@ latestMilestone: M359
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M359 Feed/详情头客户端能力拒单 |
+| 最新实施里程碑 | M360 终审 8 态视觉基线与 admin-pilot 冒烟加固 |
 | 基线提交 | `PENDING_MERGE`（合并后回填；依赖 M356/M357） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts`、`@serviceos/web-core`、`ServiceOSIOSCore`、独立且可部署的 `serviceos-network-web` 与 `serviceos-technician-web`、Swift 6 `TechnicianIOSFoundation`，以及已在 iPhone 17 Pro Simulator 安装启动、实跑 XCTest/XCUITest、形成 Production arm64 archive/dSYM，并接入当前任务、在线 Visit、冻结基础表单、前台 Evidence 采集上传、Snapshot/Task 完成与多轮资料整改的原生 `TechnicianIOS` SwiftUI App；由同一 Core OpenAPI 生成并经独立消费者门禁验证的 `@serviceos/core-client` 与 `ServiceOSCoreClient` |
@@ -157,7 +157,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | 动态表单 | 资产、冻结版本、不可变提交和 Task 完成门禁 | `PARTIAL` | 固定/条件 required、visible 与布尔 validation rule，基础类型校验、精确版本提交和完成引用；form.submitted 已并入工单时间线；M263 H5/iOS 冻结基础字段在线提交 | 可移植客户端条件/选项/高级控件、复杂 validator、计算字段、草稿、冲突、更正和审核 | M33～M35、M53、M76、M263 |
 | 资料 Evidence | 资产、槽位、Item/Revision、机器校验、Snapshot、完成门禁、作废、Review、Correction | `PARTIAL` | 固定/条件槽位、表单触发只追加重解析、槽位世代/lineage、REVIEW_REQUIRED 与 KEEP/INVALIDATE、安全文件联动、Snapshot/完成门禁及审核整改；M264 H5/iOS 在线前台 Begin/PUT/Finalize；M265 在线 Snapshot 与 Task 完成；M266 在线整改上传/Snapshot/resubmit | OCR/CV、GPS 权威距离、长期归档、生产扫描/对象存储、弱网/后台/离线上传、自动整改目标 | M36～M53、M76、M82～M83、M264～M266 |
 | 安全文件 | Begin/Finalize/隔离/扫描/授权下载/作废 | `IMPLEMENTED` | 独立安全文件生命周期；Evidence 编排 Begin/Finalize/Invalidate 联动 | 正式对象存储、专业扫描服务、物理删除 | M11、M38、M46 |
-| 审核整改 | ReviewCase、ReviewDecision、CorrectionCase | `PARTIAL` | Review + Correction + 整改 Task + 强制通过/重开 + 车企回执 + WAIVED；CLIENT Case 来源、批次/mapping 冻结；交付明确成功后自动创建 CLIENT Case/Route，UNKNOWN 可授权人工重发并在严格 ACK 后闭环异常；授权跨项目 ReviewCase 与 CorrectionCase 队列；M266 H5/iOS 领取、开始、多轮补传、Snapshot 与 resubmit，reviewer close 权威完成整改 Task；**M351 终审工作区只读组合查询与 Revision 短时下载授权** | targetDecisions 正式 decide、aggregate_version、终审 UI、整改深链 E2E；SLA/assignee enrich、多候选人/转派策略、审核人移动端、人工标记已送达/放弃、自动 Evidence target 映射 | M44～M60、M97～M98、M266、M351 |
+| 审核整改 | ReviewCase、ReviewDecision、CorrectionCase | `PARTIAL` | Review + Correction + 整改 Task + 强制通过/重开 + 车企回执 + WAIVED；CLIENT Case 来源、批次/mapping 冻结；交付明确成功后自动创建 CLIENT Case/Route，UNKNOWN 可授权人工重发并在严格 ACK 后闭环异常；授权跨项目 ReviewCase 与 CorrectionCase 队列；M266 H5/iOS 领取、开始、多轮补传、Snapshot 与 resubmit，reviewer close 权威完成整改 Task；**M351～M355** 终审 Fan-in/UI/decide/整改深链/E2E；**M360** 终审 8 态视觉基线与 admin-pilot 冒烟纳入 visual | 独立审核 HUMAN Task 模板分离；SLA/assignee enrich、多候选人/转派策略、审核人移动端、人工标记已送达/放弃、自动 Evidence target 映射 | M44～M60、M97～M98、M266、M351～M355、M360 |
 | SLA | 时钟、预警、升级 | `PARTIAL` | Task `TASK_CREATED→TASK_COMPLETED` ELAPSED 时钟；显式策略版本/摘要锁定；TARGET_DUE 对账；RUNNING/BREACHED/MET/MET_LATE；Inbox/Outbox 与不可变 segment/milestone；`sla.read` + 实时 TENANT/PROJECT/REGION/NETWORK 授权集合的跨项目工作台、工单时间线与详情查询；关系修订使旧游标失败关闭；公开 started/breached/met 已并入工单执行时间线 | BUSINESS 日历、暂停/恢复、免责/重算、预警/升级/通知、其他 subject、组织关系、Portal 前端、考核结算 | M61～M66、M75 |
 | 通知 | 通知策略运行时与投递 | `PARTIAL` | **M307** 冻结 Bundle `NotificationRuntime`；**M326** `task.created`/`task.completed` 自动订阅 → Inbox + RoleGrant 收件人 → resolveAndDispatch → Intent/Delivery/Attempt 持久化；LocalReference SENT 本地 ACK，UNKNOWN/FAILED 人工接管 | 模板渲染、真实短信/邮件/Push 供应商、Admin 投递工作台、网络 I/O 移出事务与业务重试 Task 时钟 | M307、M326、`architecture/14-*` |
 | 履约事实与试算 | 事实提取和双向试算 | `PARTIAL` | **M309** `PricingRuntime`；**M327** `workorder.fulfilled` → 最小履约事实 + SHADOW `CalculationSnapshot`（不落账） | 完整 FactDefinition/CalculationRun、应收/应付双轨、对账结算、Admin 计价工作台、AUTHORITATIVE | M309、M327、M5 设计 |
@@ -175,15 +175,14 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M359**（Feed/详情头客户端能力拒单；承接 M356～M358）。
-OpenAPI **1.0.53**；Flyway **131**。
+ServiceOS 可靠纵向切片已推进到 **M360**（终审 8 态视觉基线与 admin-pilot 冒烟加固；承接 M352/M355/M359）。
+OpenAPI **1.0.53**；Flyway **131**（本里程碑无契约/迁移变更）。
 
 下一阶段：
 
 1. 客户端能力协商后续：iOS 条件执行器对齐后的全量硬阻断、派单过滤（iOS 执行器在本 Linux 环境为 BLOCKED_EXTERNAL）；
-2. 完整 8 态视觉基线人工采信与 admin-pilot 全场景 Chrome 冒烟加固；
-3. 独立审核 HUMAN Task 与提交 Task 分离的工作流模板；
-4. 既有硬门禁：吉利联调 / AMOUNT/加权 / BUSINESS 日历 SLA。
+2. 独立审核 HUMAN Task 与提交 Task 分离的工作流模板；
+3. 既有硬门禁：吉利联调 / AMOUNT/加权 / BUSINESS 日历 SLA。
 
 仍为 **硬门禁 / 外部阻塞**（不可发明推进）：
 
