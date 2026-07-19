@@ -302,5 +302,6 @@
 - [M299 出站提审 Profile 注册表验收矩阵](296-m299-outbound-review-submission-profile-registry-acceptance.md)
 - [M300 入站取消工单 SPI 验收矩阵](297-m300-inbound-cancel-work-order-spi-acceptance.md)
 - [M301 ExternalReviewRoute Profile 解析验收矩阵](298-m301-external-review-route-profile-resolution-acceptance.md)
+- [M302 入站更新工单 SPI 验收矩阵](299-m302-inbound-update-work-order-spi-acceptance.md)
 - [多车企平台内核程序级验收矩阵](multi-oem-platform-kernel-program-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

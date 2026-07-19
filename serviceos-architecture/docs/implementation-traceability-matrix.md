@@ -396,3 +396,4 @@ Feature gate/authority: if applicable
 | M299 | 出站提审 Profile 注册表：按入站 lineage/connectorVersion 唯一解析；零/多命中失败关闭；无 OpenAPI/Flyway | Profile SPI + Registry + BYD Profile + unit/IT + `312-m299-*` + `296-m299-*` | Update/Cancel、Route 注册表化、远端查询 |
 | M300 | 入站取消工单 SPI：`CancelWorkOrderMappedInbound` + 管道 + BYD cancel-orders；WorkOrderExternalLookup；无 Core OpenAPI/Flyway 变更 | SPI + Pipeline + BYD HTTP IT + ArchitectureTest + `313-m300-*` + `297-m300-*` | Update/远端查询、REFERENCE 取消样本 |
 | M301 | ExternalReviewRoute connectorVersion 经 Profile 注册表解析；单 OEM mapping 回退；无 OpenAPI/Flyway | Profiles.requireForRouteRegistration + ReviewCase IT + `314-m301-*` + `298-m301-*` | Update/远端查询、INTEGRATION 运行时 |
+| M302 | 入站更新工单 SPI：UpdateExternalWorkOrder + V118 digest + BYD update-orders；事件 external-details-updated@v1；OpenAPI 1.0.40 | SPI + Pipeline + BYD HTTP IT + ContractValidation + `315-m302-*` + `299-m302-*` | 远端查询、INTEGRATION Mapping 运行时 |
