@@ -84,7 +84,7 @@ async function decide() {
       await decideReviewCase(
         reviewCaseId.value,
         { targetDecisions, note: overallNote },
-        String(detail.value.aggregateVersion),
+        detail.value.aggregateVersion,
       )
     ).data
     message.value = `已裁决为 ${statusLabel(detail.value.status)}`

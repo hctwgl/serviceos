@@ -265,7 +265,7 @@ async function submitDecide() {
         const result = await decideReviewCase(
           reviewCase.reviewCaseId,
           body,
-          `"${reviewCase.aggregateVersion}"`,
+          reviewCase.aggregateVersion,
         )
         draftStatus.value = '已暂存到当前浏览器'
         const decided = result.data

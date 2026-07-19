@@ -1,4 +1,4 @@
-import { apiGet, apiPost, newIdempotencyKey } from './client'
+import { apiGet, apiPost, newIdempotencyKey, quotedVersion } from './client'
 
 export type ReviewDecision = {
   reviewDecisionId: string
@@ -56,11 +56,11 @@ export function createReviewCase(
 export function decideReviewCase(
   reviewCaseId: string,
   body: { targetDecisions: ReviewTargetDecisionRequest[]; note?: string | null },
-  ifMatch: string,
+  aggregateVersion: number,
 ) {
   return apiPost<ReviewCase>(`/review-cases/${reviewCaseId}:decide`, {
     idempotencyKey: newIdempotencyKey('review-decide'),
-    ifMatch,
+    ifMatch: quotedVersion(aggregateVersion),
     body,
   })
 }
