@@ -218,7 +218,14 @@ class WorkflowLinearProgressionPostgresIT {
         assertThat(taskWorker().runOnce()).isEqualTo(TaskExecutionWorker.RunResult.SUCCEEDED);
 
         // 模拟任务完成前工单已被其他业务路径取消，验证 END 推进与履约必须保持同一事务边界。
-        jdbc.sql("UPDATE wo_work_order SET status = 'CANCELLED' WHERE tenant_id = :tenantId")
+        // V106 ck_wo_cancel_state 要求 CANCELLED 必须同时写入 cancelled_at 与 cancel_reason_code。
+        jdbc.sql("""
+                UPDATE wo_work_order
+                   SET status = 'CANCELLED',
+                       cancelled_at = CURRENT_TIMESTAMP,
+                       cancel_reason_code = 'TEST_PREEMPTIVE_CANCEL'
+                 WHERE tenant_id = :tenantId
+                """)
                 .param("tenantId", TENANT)
                 .update();
         publishUntilAttempted("task.completed");
