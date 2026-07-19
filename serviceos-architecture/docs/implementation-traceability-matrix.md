@@ -409,3 +409,4 @@ Feature gate/authority: if applicable
 | M312 | Workflow 画布：节点面板/属性（formRef/slaRef/WAIT/TIMER/SUB_PROCESS）/校验高亮/小地图/撤销重做 | WorkflowCanvas + model TS + Admin build + Playwright + `325-m312-*` + `309-m312-*` | FORM/EVIDENCE/SLA 可视配置器、多实例 UI |
 | M313 | FORM/EVIDENCE/SLA 可视结构编辑器：分组/字段/资料项/SLA 时长双向同步 JSON | StructuredAssetEditor + Admin build + Playwright + `326-m313-*` + `310-m313-*` | visibility 积木内嵌、qualityChecks UI、RULE/DISPATCH 全属性面板 |
 | M314 | 吉利本地取消/更新：AES notify_close_order / notify_update_order_info → 通用管道 | Geely cancel/update + IT + `327-m314-*` + `311-m314-*` | OpenAPI 签名、Sandbox、其余 7.x |
+| M315 | RULE/DISPATCH/ASSIGNEE/NOTIFICATION/INTEGRATION/PRICING 结构化设计器 + 条目条件积木 | PolicyAssetEditor + Admin build + Playwright + `328-m315-*` + `312-m315-*` | DISPATCH scope 地图、BUSINESS 日历 |
