@@ -3,7 +3,7 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-19
-baselineCommit: "1e15baae98c662454a4bb504a285e2cf9464cff5"
+baselineCommit: "428ec88a4706b5ef80690cd7fca3767dd2834c66"
 latestMilestone: M355
 ---
 
