@@ -316,6 +316,7 @@ title: ServiceOS 里程碑索引
 | M305 | M305 ASSIGNEE_POLICY 运行时 | [318-m305-assignee-policy-runtime.md](../architecture/318-m305-assignee-policy-runtime.md) | [302-m305-assignee-policy-runtime-acceptance.md](../testing/302-m305-assignee-policy-runtime-acceptance.md) |
 | M306 | M306 DISPATCH 运行时 | [319-m306-dispatch-runtime.md](../architecture/319-m306-dispatch-runtime.md) | [303-m306-dispatch-runtime-acceptance.md](../testing/303-m306-dispatch-runtime-acceptance.md) |
 | M307 | M307 NOTIFICATION 运行时 | [320-m307-notification-runtime.md](../architecture/320-m307-notification-runtime.md) | [304-m307-notification-runtime-acceptance.md](../testing/304-m307-notification-runtime-acceptance.md) |
+| M308 | M308 RULE 运行时 | [321-m308-rule-runtime.md](../architecture/321-m308-rule-runtime.md) | [305-m308-rule-runtime-acceptance.md](../testing/305-m308-rule-runtime-acceptance.md) |
 
 ## 未关联里程碑的文档
 
