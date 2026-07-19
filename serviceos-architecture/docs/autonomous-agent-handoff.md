@@ -8,6 +8,7 @@ lastUpdated: 2026-07-19
 ## 当前
 
 - **进行中 Draft PR**：M357 师傅端运行时客户端能力拒单（依赖 M356 #183）
+- PR：https://github.com/hctwgl/serviceos/pull/184
 - 分支：`cursor/m357-technician-runtime-capability-gate-6a78`
 - latestMilestone（本 PR）：**M357**
 - Flyway：**130**；OpenAPI：**1.0.51**
