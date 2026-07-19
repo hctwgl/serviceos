@@ -32,6 +32,14 @@ public interface NetworkPortalEvidenceService {
             FinalizeEvidenceUploadCommand command
     );
 
+    EvidenceSetSnapshotView createSnapshotOnBehalf(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            String networkContextHeader,
+            UUID correctionCaseId,
+            java.util.List<UUID> memberRevisionIds
+    );
+
     CorrectionCaseView resubmit(
             CurrentPrincipal principal,
             CommandMetadata metadata,

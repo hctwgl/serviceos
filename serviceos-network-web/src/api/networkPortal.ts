@@ -749,6 +749,7 @@ export type NetworkPortalEvidenceItem = {
   taskId: string
   evidenceSlotId: string
   status: string
+  revisions?: Array<{ evidenceRevisionId: string }>
 }
 
 export type NetworkPortalCorrectionCase = {
@@ -988,6 +989,35 @@ export function getNetworkPortalTechnicianMembership(
     {},
     networkHeaders(networkContextId),
   )
+}
+
+/** M201：整改代补创建资料快照。 */
+export function createNetworkPortalCorrectionEvidenceSnapshot(
+  networkContextId: string,
+  correctionCaseId: string,
+  body: { memberRevisionIds: string[] },
+  idempotencyKey = crypto.randomUUID(),
+) {
+  return apiPost<NetworkPortalEvidenceSetSnapshot>(
+    `/network-portal/correction-cases/${correctionCaseId}/evidence-set-snapshots`,
+    {
+      body,
+      idempotencyKey,
+      headers: networkHeaders(networkContextId),
+    },
+  )
+}
+
+export type NetworkPortalEvidenceSetSnapshot = {
+  evidenceSetSnapshotId: string
+  taskId: string
+  projectId: string
+  resolutionId: string
+  purpose: string
+  memberCount: number
+  contentDigest: string
+  createdBy: string
+  createdAt: string
 }
 
 /** M201：整改补传 resubmit。 */

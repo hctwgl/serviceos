@@ -6,6 +6,7 @@ import com.serviceos.authorization.api.AuthorizationDecision;
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.evidence.api.CreateEvidenceSetSnapshotCommand;
+import com.serviceos.evidence.api.CorrectionCaseView;
 import com.serviceos.evidence.api.EvidenceRevisionView;
 import com.serviceos.evidence.api.EvidenceSetSnapshotMemberView;
 import com.serviceos.evidence.api.EvidenceSetSnapshotService;
@@ -33,19 +34,25 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 /** EvidenceSetSnapshot 创建与查询；成员资格、审计、Outbox 与幂等同事务。 */
 @Service
 final class DefaultEvidenceSetSnapshotService implements EvidenceSetSnapshotService {
     private static final String SUBMIT = "evidence.submit";
+    private static final String SUBMIT_ON_BEHALF = "evidence.submitOnBehalf";
     private static final String READ = "evidence.read";
     private static final String OPERATION = "evidence.snapshot.create";
+    private static final Set<String> OPEN_CORRECTION_STATUSES = Set.of(
+            "OPEN", "IN_PROGRESS", "RESUBMITTED");
 
     private final EvidenceSetSnapshotRepository snapshots;
     private final EvidenceItemRepository items;
     private final EvidenceSlotRepository slots;
     private final TaskFulfillmentContextService tasks;
+    private final CorrectionCaseRepository corrections;
     private final AuthorizationService authorization;
     private final IdempotencyService idempotency;
     private final AuditAppender audit;
@@ -61,6 +68,7 @@ final class DefaultEvidenceSetSnapshotService implements EvidenceSetSnapshotServ
             EvidenceItemRepository items,
             EvidenceSlotRepository slots,
             TaskFulfillmentContextService tasks,
+            CorrectionCaseRepository corrections,
             AuthorizationService authorization,
             IdempotencyService idempotency,
             AuditAppender audit,
@@ -74,6 +82,7 @@ final class DefaultEvidenceSetSnapshotService implements EvidenceSetSnapshotServ
         this.items = items;
         this.slots = slots;
         this.tasks = tasks;
+        this.corrections = corrections;
         this.authorization = authorization;
         this.idempotency = idempotency;
         this.audit = audit;
@@ -92,7 +101,7 @@ final class DefaultEvidenceSetSnapshotService implements EvidenceSetSnapshotServ
     ) {
         TaskFulfillmentContext task = requireTask(principal.tenantId(), command.taskId());
         validateExecutableTask(principal, task);
-        return createInternal(principal, metadata, command, task);
+        return createInternal(principal, metadata, command, task, SnapshotAuthorizationMode.PROJECT_SUBMIT, null);
     }
 
     @Override
@@ -110,19 +119,43 @@ final class DefaultEvidenceSetSnapshotService implements EvidenceSetSnapshotServ
         // 整改 Snapshot 仍冻结源 Task 的资料集合，但其写权限来自独立 correction Task。
         return createInternal(principal, metadata,
                 new CreateEvidenceSetSnapshotCommand(sourceTaskId, "TASK_SUBMISSION", memberRevisionIds),
-                access.sourceTask());
+                access.sourceTask(), SnapshotAuthorizationMode.PROJECT_SUBMIT, null);
+    }
+
+    @Override
+    @Transactional
+    public EvidenceSetSnapshotView createOnBehalf(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            UUID correctionCaseId,
+            List<UUID> memberRevisionIds,
+            UUID networkId
+    ) {
+        Objects.requireNonNull(correctionCaseId, "correctionCaseId must not be null");
+        Objects.requireNonNull(networkId, "networkId must not be null");
+        CorrectionCaseView correction = corrections.find(principal.tenantId(), correctionCaseId)
+                .orElseThrow(() -> new BusinessProblem(
+                        ProblemCode.RESOURCE_NOT_FOUND, "CorrectionCase does not exist"));
+        if (!OPEN_CORRECTION_STATUSES.contains(correction.status())) {
+            throw new BusinessProblem(ProblemCode.CORRECTION_CASE_STATE_CONFLICT,
+                    "网点代补快照要求整改案例处于未关闭状态");
+        }
+        TaskFulfillmentContext source = requireTask(principal.tenantId(), correction.taskId());
+        validateOnBehalfSnapshotSource(source);
+        return createInternal(principal, metadata,
+                new CreateEvidenceSetSnapshotCommand(correction.taskId(), "TASK_SUBMISSION", memberRevisionIds),
+                source, SnapshotAuthorizationMode.NETWORK_ON_BEHALF, networkId);
     }
 
     private EvidenceSetSnapshotView createInternal(
             CurrentPrincipal principal,
             CommandMetadata metadata,
             CreateEvidenceSetSnapshotCommand command,
-            TaskFulfillmentContext task
+            TaskFulfillmentContext task,
+            SnapshotAuthorizationMode authorizationMode,
+            UUID networkId
     ) {
-        AuthorizationDecision auth = authorization.require(principal,
-                AuthorizationRequest.projectCapability(SUBMIT, principal.tenantId(), "Task",
-                        task.taskId().toString(), task.projectId().toString()),
-                metadata.correlationId());
+        AuthorizationDecision auth = authorize(principal, metadata, task, authorizationMode, networkId);
         if (!slots.resolutionExists(principal.tenantId(), task.taskId())) {
             throw new BusinessProblem(ProblemCode.TASK_STATE_CONFLICT,
                     "Task evidence slots have not completed reliable resolution");
@@ -200,7 +233,7 @@ final class DefaultEvidenceSetSnapshotService implements EvidenceSetSnapshotServ
                 payload, Sha256.digest(payload), now));
         audit.append(new AuditEntry(
                 UUID.randomUUID(), principal.tenantId(), principal.principalId(),
-                "EVIDENCE_SET_SNAPSHOT_CREATED", SUBMIT, "EvidenceSetSnapshot",
+                "EVIDENCE_SET_SNAPSHOT_CREATED", auditCapability(authorizationMode), "EvidenceSetSnapshot",
                 snapshotId.toString(), "ALLOW", auth.matchedGrantIds(),
                 auth.policyVersion(), command.purpose(), null, requestDigest,
                 metadata.correlationId(), now));
@@ -226,6 +259,49 @@ final class DefaultEvidenceSetSnapshotService implements EvidenceSetSnapshotServ
     private TaskFulfillmentContext requireTask(String tenantId, UUID taskId) {
         return tasks.find(tenantId, taskId).orElseThrow(() ->
                 new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "Task does not exist"));
+    }
+
+    private static void validateOnBehalfSnapshotSource(TaskFulfillmentContext task) {
+        if (!"HUMAN".equals(task.taskKind())) {
+            throw new BusinessProblem(ProblemCode.TASK_STATE_CONFLICT,
+                    "EvidenceSetSnapshot requires a HUMAN Task");
+        }
+        if (!"COMPLETED".equals(task.status())) {
+            throw new BusinessProblem(ProblemCode.TASK_STATE_CONFLICT,
+                    "网点代补快照要求源业务 Task 已完成");
+        }
+        if (task.executionGuarded()) {
+            throw new BusinessProblem(ProblemCode.TASK_EXECUTION_GUARDED,
+                    "EvidenceSetSnapshot is disabled while a Task execution guard is ACTIVE");
+        }
+    }
+
+    private AuthorizationDecision authorize(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            TaskFulfillmentContext task,
+            SnapshotAuthorizationMode authorizationMode,
+            UUID networkId
+    ) {
+        return switch (authorizationMode) {
+            case PROJECT_SUBMIT -> authorization.require(principal,
+                    AuthorizationRequest.projectCapability(SUBMIT, principal.tenantId(), "Task",
+                            task.taskId().toString(), task.projectId().toString()),
+                    metadata.correlationId());
+            case NETWORK_ON_BEHALF -> authorization.require(principal,
+                    AuthorizationRequest.networkCapability(SUBMIT_ON_BEHALF, principal.tenantId(), "Task",
+                            task.taskId().toString(), networkId.toString()),
+                    metadata.correlationId());
+        };
+    }
+
+    private static String auditCapability(SnapshotAuthorizationMode authorizationMode) {
+        return authorizationMode == SnapshotAuthorizationMode.NETWORK_ON_BEHALF ? SUBMIT_ON_BEHALF : SUBMIT;
+    }
+
+    private enum SnapshotAuthorizationMode {
+        PROJECT_SUBMIT,
+        NETWORK_ON_BEHALF
     }
 
     private static void validateExecutableTask(CurrentPrincipal principal, TaskFulfillmentContext task) {

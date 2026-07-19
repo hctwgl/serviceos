@@ -19,6 +19,7 @@ import {
   reassignNetworkPortalTechnician,
   rescheduleNetworkPortalAppointment,
   resubmitNetworkPortalCorrectionCase,
+  createNetworkPortalCorrectionEvidenceSnapshot,
   type NetworkPortalAppointment,
   type NetworkPortalContactAttempt,
   type NetworkPortalTaskItem,
@@ -203,6 +204,7 @@ const evidenceSha256 = ref('a'.repeat(64))
 const evidenceFileName = ref('site.png')
 const evidenceExpectedSize = ref(128)
 const uploadSessionId = ref('')
+const lastRevisionId = ref('')
 const evidenceBusy = ref(false)
 const evidenceError = ref<string | null>(null)
 const evidenceMessage = ref<string | null>(null)
@@ -211,6 +213,17 @@ const evidenceSetSnapshotId = ref('')
 const resubmitBusy = ref(false)
 const resubmitError = ref<string | null>(null)
 const resubmitMessage = ref<string | null>(null)
+const snapshotResubmitBusy = ref(false)
+
+watch(selectedTaskId, (taskId) => {
+  if (!taskId || directoryCorrections.value === null) {
+    return
+  }
+  const matched = directoryCorrections.value.find((row) => row.taskId === taskId)
+  if (matched?.correctionCaseId) {
+    correctionCaseId.value = matched.correctionCaseId
+  }
+})
 
 async function load() {
   if (!props.networkContextId) {
@@ -499,6 +512,9 @@ async function submitEvidenceFinalize() {
       },
     )
     evidenceMessage.value = `已 Finalize evidenceItem=${result.data.evidenceItemId}`
+    if (result.data.revisions?.length) {
+      lastRevisionId.value = result.data.revisions.at(-1)?.evidenceRevisionId ?? ''
+    }
   } catch (err) {
     evidenceError.value = err instanceof Error ? err.message : '代补 Finalize 失败'
   } finally {
@@ -529,6 +545,42 @@ async function submitCorrectionResubmit() {
     resubmitError.value = err instanceof Error ? err.message : '整改 resubmit 失败'
   } finally {
     resubmitBusy.value = false
+  }
+}
+
+async function submitSnapshotAndResubmit() {
+  if (!props.networkContextId) {
+    resubmitError.value = '请选择 NETWORK 上下文'
+    return
+  }
+  if (!correctionCaseId.value.trim()) {
+    resubmitError.value = '请填写整改案例 ID（可从任务列表整改列自动带入）'
+    return
+  }
+  if (!lastRevisionId.value.trim()) {
+    resubmitError.value = '请先 Finalize 代补上传以产生资料修订'
+    return
+  }
+  snapshotResubmitBusy.value = true
+  resubmitError.value = null
+  resubmitMessage.value = null
+  try {
+    const snapshot = await createNetworkPortalCorrectionEvidenceSnapshot(
+      props.networkContextId,
+      correctionCaseId.value.trim(),
+      { memberRevisionIds: [lastRevisionId.value.trim()] },
+    )
+    evidenceSetSnapshotId.value = snapshot.data.evidenceSetSnapshotId
+    const result = await resubmitNetworkPortalCorrectionCase(
+      props.networkContextId,
+      correctionCaseId.value.trim(),
+      { evidenceSetSnapshotId: snapshot.data.evidenceSetSnapshotId },
+    )
+    resubmitMessage.value = `已创建快照并重提 status=${result.data.status}`
+  } catch (err) {
+    resubmitError.value = err instanceof Error ? err.message : '创建快照并重提失败'
+  } finally {
+    snapshotResubmitBusy.value = false
   }
 }
 
@@ -1274,7 +1326,7 @@ watch(selectedTaskId, () => {
     >
       <h3>资料代补</h3>
       <p class="hint">
-        调用 Network Portal begin/finalize on-behalf 与 correction resubmit；
+        网点代补协作（非独立裁决）：Begin/Finalize 后一键创建快照并重提；总部审核仍为裁决步。
         onBehalfOf 须为 ACTIVE TECHNICIAN。
       </p>
       <label>
@@ -1360,6 +1412,14 @@ watch(selectedTaskId, () => {
           aria-label="evidence set snapshot id"
         />
       </label>
+      <button
+        type="button"
+        data-testid="correction-snapshot-resubmit-submit"
+        :disabled="snapshotResubmitBusy || !props.networkContextId"
+        @click="submitSnapshotAndResubmit"
+      >
+        创建快照并重提
+      </button>
       <button
         type="button"
         data-testid="correction-resubmit-submit"

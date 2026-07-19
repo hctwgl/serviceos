@@ -2,6 +2,7 @@ package com.serviceos.evidence.web;
 
 import com.serviceos.bootstrap.SecurityConfiguration;
 import com.serviceos.evidence.api.CorrectionCaseView;
+import com.serviceos.evidence.api.EvidenceSetSnapshotView;
 import com.serviceos.evidence.api.EvidenceUploadSessionView;
 import com.serviceos.evidence.api.NetworkPortalEvidenceService;
 import com.serviceos.identity.api.CurrentPrincipal;
@@ -100,6 +101,30 @@ class NetworkPortalEvidenceControllerSecurityTest {
                         .content(beginBody()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.uploadSessionId").value(SESSION_ID.toString()));
+    }
+
+    @Test
+    void authenticatedCreateSnapshotReturnsCreated() throws Exception {
+        CurrentPrincipal actor = actor();
+        when(principals.current()).thenReturn(actor);
+        when(portalEvidence.createSnapshotOnBehalf(
+                eq(actor), any(), eq("NETWORK|NETWORK|" + NETWORK_ID), eq(CORRECTION_ID), any()))
+                .thenReturn(new EvidenceSetSnapshotView(
+                        SNAPSHOT_ID, TASK_ID, UUID.randomUUID(), UUID.randomUUID(),
+                        "TASK_SUBMISSION", 1, "d".repeat(64), "{}",
+                        actor.principalId(), Instant.parse("2026-07-17T03:00:00Z"), List.of()));
+
+        mvc.perform(post("/api/v1/network-portal/correction-cases/{correctionCaseId}/evidence-set-snapshots",
+                        CORRECTION_ID)
+                        .with(jwt().jwt(token -> token.subject("external-subject")
+                                .claim("tenant_id", "tenant-a")))
+                        .header("X-Correlation-Id", "corr-snapshot")
+                        .header("X-Network-Context", "NETWORK|NETWORK|" + NETWORK_ID)
+                        .header("Idempotency-Key", "m201-snapshot")
+                        .contentType("application/json")
+                        .content("{\"memberRevisionIds\":[\"" + UUID.randomUUID() + "\"]}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.evidenceSetSnapshotId").value(SNAPSHOT_ID.toString()));
     }
 
     @Test

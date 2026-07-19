@@ -1,7 +1,39 @@
 -- 仅删除演示标记数据（不动结构、不动非演示业务）
 \set ON_ERROR_STOP on
 
--- 0) 演示任务链路（须先于工单 / 网点夹具删除）
+-- 0) 演示审核/整改与任务链路（须先于工单 / 网点夹具删除）
+DELETE FROM evd_correction_resubmission
+ WHERE correction_case_id::text LIKE 'd3500000-29%'
+    OR correction_case_id IN (
+        SELECT correction_case_id FROM evd_correction_case
+         WHERE source_review_case_id::text LIKE 'd3500000-2920-%'
+    );
+
+DELETE FROM evd_correction_case
+ WHERE correction_case_id::text LIKE 'd3500000-29%'
+    OR source_review_case_id::text LIKE 'd3500000-2920-%'
+    OR task_id::text LIKE 'd3500000-2000-%';
+
+-- review_case 触发器禁止 DELETE；演示清理在复制角色下绕过（仅本地演示脚本）
+SET session_replication_role = replica;
+DELETE FROM evd_review_decision
+ WHERE review_case_id::text LIKE 'd3500000-2920-%';
+
+DELETE FROM evd_review_case
+ WHERE review_case_id::text LIKE 'd3500000-2920-%'
+    OR task_id::text LIKE 'd3500000-2000-%';
+SET session_replication_role = DEFAULT;
+
+SET session_replication_role = replica;
+DELETE FROM evd_evidence_set_snapshot
+ WHERE evidence_set_snapshot_id::text LIKE 'd3500000-2910-%'
+    OR task_id::text LIKE 'd3500000-2000-%';
+
+DELETE FROM evd_task_evidence_resolution
+ WHERE resolution_id::text LIKE 'd3500000-2900-%'
+    OR task_id::text LIKE 'd3500000-2000-%';
+SET session_replication_role = DEFAULT;
+
 DELETE FROM dsp_capacity_reservation
  WHERE capacity_reservation_id::text LIKE 'd3500000-2420-%'
     OR capacity_reservation_id::text LIKE 'd3500000-2520-%';
@@ -13,11 +45,34 @@ DELETE FROM dsp_service_assignment
 DELETE FROM dsp_capacity_counter
  WHERE capacity_counter_id::text LIKE 'd3500000-2700-%';
 
+-- SLA 实例触发器禁止 DELETE；演示清理在复制角色下绕过（仅本地演示脚本）
+SET session_replication_role = replica;
 DELETE FROM sla_instance
  WHERE sla_instance_id::text LIKE 'd3500000-2600-%';
+SET session_replication_role = DEFAULT;
 
 DELETE FROM ops_operational_exception
  WHERE exception_id::text LIKE 'd3500000-2800-%';
+
+DELETE FROM apt_contact_attempt
+ WHERE contact_attempt_id::text LIKE 'd3500000-2b00-%'
+    OR task_id::text LIKE 'd3500000-2000-%';
+
+DELETE FROM apt_appointment_status_history
+ WHERE history_id::text LIKE 'd3500000-2a20-%'
+    OR appointment_id::text LIKE 'd3500000-2a00-%';
+
+DELETE FROM apt_appointment_revision
+ WHERE revision_id::text LIKE 'd3500000-2a10-%'
+    OR appointment_id::text LIKE 'd3500000-2a00-%';
+
+DELETE FROM apt_appointment
+ WHERE appointment_id::text LIKE 'd3500000-2a00-%';
+
+-- 驳回开整改时可能创建 evidence.correction 任务；按演示工单清理附属 HUMAN 任务
+DELETE FROM tsk_task
+ WHERE work_order_id::text LIKE 'd3500000-0000-%'
+   AND task_id::text NOT LIKE 'd3500000-2000-%';
 
 DELETE FROM tsk_task
  WHERE task_id::text LIKE 'd3500000-2000-%';

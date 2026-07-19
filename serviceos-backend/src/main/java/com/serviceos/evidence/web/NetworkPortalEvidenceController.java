@@ -5,6 +5,7 @@ import com.serviceos.evidence.api.CorrectionCaseView;
 import com.serviceos.evidence.api.CorrectionResubmissionView;
 import com.serviceos.evidence.api.EvidenceItemView;
 import com.serviceos.evidence.api.EvidenceRevisionView;
+import com.serviceos.evidence.api.EvidenceSetSnapshotView;
 import com.serviceos.evidence.api.EvidenceUploadSessionView;
 import com.serviceos.evidence.api.FinalizeEvidenceUploadCommand;
 import com.serviceos.evidence.api.NetworkPortalEvidenceService;
@@ -107,6 +108,26 @@ final class NetworkPortalEvidenceController {
                 .body(itemResponse(item));
     }
 
+    @PostMapping("/correction-cases/{correctionCaseId}/evidence-set-snapshots")
+    ResponseEntity<EvidenceSetSnapshotResponse> createSnapshotOnBehalf(
+            @PathVariable UUID correctionCaseId,
+            @RequestHeader(value = "X-Network-Context", required = false) String networkContext,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @Valid @RequestBody CreateEvidenceSetSnapshotOnBehalfRequest request
+    ) {
+        EvidenceSetSnapshotView snapshot = portalEvidence.createSnapshotOnBehalf(
+                principals.current(),
+                new CommandMetadata(correlationId, idempotencyKey),
+                networkContext,
+                correctionCaseId,
+                request.memberRevisionIds());
+        return ResponseEntity
+                .created(URI.create("/api/v1/evidence-set-snapshots/" + snapshot.evidenceSetSnapshotId()))
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(snapshotResponse(snapshot));
+    }
+
     @PostMapping("/correction-cases/{correctionCaseId}:resubmit")
     CorrectionCaseResponse resubmit(
             @PathVariable UUID correctionCaseId,
@@ -162,6 +183,29 @@ final class NetworkPortalEvidenceController {
                 view.resubmissions().stream().map(this::resubmissionResponse).toList());
     }
 
+    private EvidenceSetSnapshotResponse snapshotResponse(EvidenceSetSnapshotView snapshot) {
+        try {
+            return new EvidenceSetSnapshotResponse(
+                    snapshot.evidenceSetSnapshotId(), snapshot.taskId(), snapshot.projectId(),
+                    snapshot.resolutionId(), snapshot.purpose(), snapshot.memberCount(),
+                    snapshot.contentDigest(),
+                    objectMapper.readTree(snapshot.eligibilitySummaryJson()),
+                    snapshot.createdBy(), snapshot.createdAt(),
+                    snapshot.members().stream().map(this::snapshotMemberResponse).toList());
+        } catch (JacksonException exception) {
+            throw new IllegalStateException("EvidenceSetSnapshot eligibilitySummary is invalid", exception);
+        }
+    }
+
+    private EvidenceSetSnapshotMemberResponse snapshotMemberResponse(
+            com.serviceos.evidence.api.EvidenceSetSnapshotMemberView member
+    ) {
+        return new EvidenceSetSnapshotMemberResponse(
+                member.memberId(), member.evidenceSlotId(), member.evidenceItemId(),
+                member.evidenceRevisionId(), member.revisionNumber(), member.revisionStatus(),
+                member.contentDigest(), member.validationDigest(), member.memberOrdinal());
+    }
+
     private CorrectionResubmissionResponse resubmissionResponse(CorrectionResubmissionView round) {
         return new CorrectionResubmissionResponse(
                 round.correctionResubmissionId(), round.correctionCaseId(),
@@ -196,6 +240,37 @@ final class NetworkPortalEvidenceController {
     }
 
     record ResubmitCorrectionCaseRequest(@NotNull UUID evidenceSetSnapshotId) {
+    }
+
+    record CreateEvidenceSetSnapshotOnBehalfRequest(@NotNull List<UUID> memberRevisionIds) {
+    }
+
+    record EvidenceSetSnapshotResponse(
+            UUID evidenceSetSnapshotId,
+            UUID taskId,
+            UUID projectId,
+            UUID resolutionId,
+            String purpose,
+            int memberCount,
+            String contentDigest,
+            JsonNode eligibilitySummary,
+            String createdBy,
+            Instant createdAt,
+            List<EvidenceSetSnapshotMemberResponse> members
+    ) {
+    }
+
+    record EvidenceSetSnapshotMemberResponse(
+            UUID memberId,
+            UUID evidenceSlotId,
+            UUID evidenceItemId,
+            UUID evidenceRevisionId,
+            int revisionNumber,
+            String revisionStatus,
+            String contentDigest,
+            String validationDigest,
+            int memberOrdinal
+    ) {
     }
 
     record EvidenceUploadSessionResponse(

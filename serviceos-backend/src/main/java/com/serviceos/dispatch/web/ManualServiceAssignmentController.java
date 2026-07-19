@@ -3,6 +3,7 @@ package com.serviceos.dispatch.web;
 import com.serviceos.dispatch.api.ManualAssignServiceAssignmentCommand;
 import com.serviceos.dispatch.api.ManualServiceAssignmentReceipt;
 import com.serviceos.dispatch.api.ManualServiceAssignmentService;
+import com.serviceos.dispatch.api.NetworkPortalAcceptAssignmentReceipt;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
 import com.serviceos.shared.CommandMetadata;
@@ -52,6 +53,31 @@ final class ManualServiceAssignmentController {
                 new ManualAssignServiceAssignmentCommand(
                         taskId, request.networkAssigneeId(), request.technicianAssigneeId(),
                         request.businessType()));
+        return ResponseEntity.ok()
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(receipt);
+    }
+
+    /**
+     * 平台初审派网点：仅激活 ACTIVE NETWORK，不强制同时指派师傅。
+     * <p>
+     * 复用 {@link ManualServiceAssignmentService#manualAssignNetwork}；能力与双责任初派相同。
+     * 网点列表可见后，网点端可幂等确认接单或继续指派师傅。
+     */
+    @PostMapping("/{taskId}/service-assignments:manual-assign-network")
+    ResponseEntity<NetworkPortalAcceptAssignmentReceipt> manualAssignNetwork(
+            @PathVariable UUID taskId,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @Valid @RequestBody ManualAssignNetworkRequest request
+    ) {
+        CurrentPrincipal principal = principals.current();
+        NetworkPortalAcceptAssignmentReceipt receipt = manualAssignments.manualAssignNetwork(
+                principal,
+                new CommandMetadata(correlationId, idempotencyKey),
+                taskId,
+                request.networkAssigneeId(),
+                request.businessType());
         return ResponseEntity.ok()
                 .header(CorrelationIds.HEADER_NAME, correlationId)
                 .body(receipt);

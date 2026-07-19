@@ -8,7 +8,8 @@
                 "identity::api",
                 "authorization::api",
                 "audit::api",
-                "reliability::api"
+                "reliability::api",
+                "workorder::api"
         }
 )
 package com.serviceos.configuration;

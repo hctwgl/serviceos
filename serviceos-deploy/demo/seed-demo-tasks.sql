@@ -31,7 +31,8 @@ CREATE TEMP TABLE demo_scenario (
 );
 
 INSERT INTO demo_scenario VALUES
-(1,  '待初审',           'RECEIVED',  'READY',     'PILOT_SURVEY', 'PILOT_SURVEY', false, false, false, false, false, false, 'NONE',     false),
+-- 001/002/003：平台初审派网点写链路（Admin manual-assign-network → 网点列表可见）
+(1,  '待初审',           'ACTIVE',    'READY',     'PILOT_SURVEY', 'PILOT_SURVEY', false, false, false, false, false, false, 'NONE',     false),
 (2,  '待分配网点',       'ACTIVE',    'READY',     'PILOT_SURVEY', 'PILOT_SURVEY', false, false, false, false, false, false, 'NONE',     false),
 (3,  '网点待接单',       'ACTIVE',    'READY',     'PILOT_SURVEY', 'PILOT_SURVEY', false, false, false, false, false, false, 'NONE',     false),
 (4,  '待指派师傅',       'ACTIVE',    'READY',     'PILOT_SURVEY', 'PILOT_SURVEY', true,  false, false, false, false, false, 'NONE',     false),

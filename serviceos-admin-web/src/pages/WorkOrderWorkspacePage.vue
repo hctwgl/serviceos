@@ -16,13 +16,18 @@ import {
   getAuthorizedWorkOrderStages,
   listAuthorizedWorkOrderTasks,
   listWorkOrderCoreTimeline,
+  listWorkOrderPricingSnapshots,
+  type PricingShadowSnapshotPage,
   type WorkOrderDetail,
   type WorkOrderTaskPage,
   type WorkOrderTimelinePage,
   type WorkflowExecutionProjection,
 } from '../api/workOrderDetail'
 import { getTaskAllowedActions, type TaskAllowedActions } from '../api/tasks'
-import { manualAssignServiceAssignments } from '../api/dispatch'
+import {
+  manualAssignNetworkServiceAssignment,
+  manualAssignServiceAssignments,
+} from '../api/dispatch'
 import TaskCommandPanel from '../components/TaskCommandPanel.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import { recordRecentVisit } from '../recent/recordRecentVisit'
@@ -59,7 +64,12 @@ const assignBusinessType = ref('INSTALLATION')
 const manualAssignBusy = ref(false)
 const manualAssignError = ref<string | null>(null)
 const manualAssignMessage = ref<string | null>(null)
+const assignNetworkBusy = ref(false)
+const assignNetworkError = ref<string | null>(null)
+const assignNetworkMessage = ref<string | null>(null)
 const handoffCopied = ref(false)
+const pricingSnapshots = ref<PricingShadowSnapshotPage | null>(null)
+const pricingSnapshotsError = ref<string | null>(null)
 
 const networkPortalBase =
   import.meta.env.VITE_NETWORK_PORTAL_URL?.trim() ||
@@ -96,6 +106,30 @@ async function copyTaskHandoff() {
     }, 2000)
   } catch {
     handoffCopied.value = false
+  }
+}
+
+async function runAssignNetwork() {
+  const taskId = workspace.value?.currentTaskSummary?.taskId
+  if (!taskId) {
+    assignNetworkError.value = '无当前任务，无法派给网点'
+    return
+  }
+  assignNetworkBusy.value = true
+  assignNetworkError.value = null
+  assignNetworkMessage.value = null
+  try {
+    const result = await manualAssignNetworkServiceAssignment(taskId, {
+      networkAssigneeId: networkAssigneeId.value.trim(),
+      businessType: assignBusinessType.value.trim(),
+    })
+    assignNetworkMessage.value =
+      `初审派网点成功：${result.data.networkAssigneeId}。网点端任务列表应可见，可继续确认接单或指派师傅。`
+    await loadWorkspace()
+  } catch (err) {
+    assignNetworkError.value = err instanceof Error ? err.message : '派网点失败'
+  } finally {
+    assignNetworkBusy.value = false
   }
 }
 
@@ -180,6 +214,17 @@ async function loadAuthorityProjections() {
   }
 }
 
+async function loadPricingSnapshots() {
+  pricingSnapshotsError.value = null
+  try {
+    const result = await listWorkOrderPricingSnapshots(workOrderId.value)
+    pricingSnapshots.value = result
+  } catch (err) {
+    pricingSnapshotsError.value = err instanceof Error ? err.message : '加载影子试算失败'
+    pricingSnapshots.value = null
+  }
+}
+
 async function loadWorkspace() {
   loading.value = true
   error.value = null
@@ -194,6 +239,7 @@ async function loadWorkspace() {
       loadAllowedActions(ws.currentTaskSummary?.taskId),
       loadSlaInstances(),
       loadAuthorityProjections(),
+      loadPricingSnapshots(),
     ])
     const firstAvailable = sections.find(
       (code) => ws.sectionAvailability[code] === 'AVAILABLE' || ws.sectionAvailability[code] === 'EMPTY',
@@ -217,6 +263,7 @@ async function loadWorkspace() {
     stages.value = null
     taskPage.value = null
     timelinePage.value = null
+    pricingSnapshots.value = null
   } finally {
     loading.value = false
   }
@@ -975,6 +1022,28 @@ onMounted(() => {
           </dl>
         </article>
 
+        <article class="card" data-testid="pricing-shadow-panel">
+          <h3>影子试算（非结算）</h3>
+          <p class="handoff-hint">
+            只读 SHADOW 定价试算；不提供进入结算、落账或 Statement 写命令。
+          </p>
+          <p v-if="pricingSnapshotsError" class="error">{{ pricingSnapshotsError }}</p>
+          <template v-else-if="pricingSnapshots">
+            <p v-if="pricingSnapshots.emptyHint && !pricingSnapshots.items.length" class="muted">
+              {{ pricingSnapshots.emptyHint }}
+            </p>
+            <ul v-if="pricingSnapshots.items.length" class="pricing-list">
+              <li v-for="item in pricingSnapshots.items" :key="item.snapshotId">
+                {{ item.pricingKey }} · {{ item.currency }}
+                {{ (item.totalAmountMinor / 100).toFixed(2) }} · {{ item.mode }}
+                <small>{{ formatDateTime(item.createdAt) }}</small>
+              </li>
+            </ul>
+            <p v-else-if="!pricingSnapshots.emptyHint" class="muted">暂无影子试算快照。</p>
+          </template>
+          <p v-else class="muted">加载中…</p>
+        </article>
+
         <article class="card">
           <h3>当前任务 / 责任 / SLA / 异常</h3>
           <dl>
@@ -1005,18 +1074,33 @@ onMounted(() => {
               <dd v-else>不可用或缺失权</dd>
             </div>
             <div class="manual-assign">
-              <dt>交给网点</dt>
+              <dt>初审 → 派网点</dt>
               <dd>
                 <p class="handoff-hint">
-                  推荐：复制任务交接信息，或打开网点端「确认接单」（无需在管理端先 UUID 初派）。
+                  主路径：平台确认后将当前任务派给服务网点（仅 NETWORK 责任）。派成功后网点端列表可见，再由网点确认接单或指派师傅。
                 </p>
+                <label>
+                  服务网点
+                  <input
+                    v-model="networkAssigneeId"
+                    aria-label="assign-network networkAssigneeId"
+                  />
+                </label>
+                <label>
+                  业务类型
+                  <input
+                    v-model="assignBusinessType"
+                    aria-label="assign-network businessType"
+                  />
+                </label>
                 <div class="handoff-actions">
                   <button
                     type="button"
-                    :disabled="!workspace.currentTaskSummary"
-                    @click="copyTaskHandoff"
+                    data-testid="assign-network"
+                    :disabled="assignNetworkBusy || !workspace.currentTaskSummary"
+                    @click="runAssignNetwork"
                   >
-                    {{ handoffCopied ? '已复制' : '复制任务交接信息' }}
+                    {{ assignNetworkBusy ? '派网点中…' : '初审通过：派给服务网点' }}
                   </button>
                   <a
                     v-if="networkAcceptHandoffUrl"
@@ -1025,18 +1109,20 @@ onMounted(() => {
                     target="_blank"
                     rel="noreferrer"
                   >
-                    打开网点接单
+                    打开网点端
                   </a>
+                  <button
+                    type="button"
+                    :disabled="!workspace.currentTaskSummary"
+                    @click="copyTaskHandoff"
+                  >
+                    {{ handoffCopied ? '已复制' : '复制交接信息' }}
+                  </button>
                 </div>
+                <p v-if="assignNetworkError" class="error">{{ assignNetworkError }}</p>
+                <p v-if="assignNetworkMessage" class="meta">{{ assignNetworkMessage }}</p>
                 <details class="assign-advanced">
-                  <summary>高级：管理端一次初派网点+师傅</summary>
-                  <label>
-                    服务网点编号
-                    <input
-                      v-model="networkAssigneeId"
-                      aria-label="manual-assign networkAssigneeId"
-                    />
-                  </label>
+                  <summary>高级：一次初派网点+师傅（跳过网点接单）</summary>
                   <label>
                     服务师傅档案编号
                     <input
@@ -1044,19 +1130,12 @@ onMounted(() => {
                       aria-label="manual-assign technicianAssigneeId"
                     />
                   </label>
-                  <label>
-                    业务类型
-                    <input
-                      v-model="assignBusinessType"
-                      aria-label="manual-assign businessType"
-                    />
-                  </label>
                   <button
                     type="button"
                     :disabled="manualAssignBusy || !workspace.currentTaskSummary"
                     @click="runManualAssign"
                   >
-                    确认初派
+                    确认双责任初派
                   </button>
                   <p v-if="manualAssignError" class="error">{{ manualAssignError }}</p>
                   <p v-if="manualAssignMessage" class="meta">{{ manualAssignMessage }}</p>

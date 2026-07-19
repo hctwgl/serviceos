@@ -78,8 +78,8 @@ class NetworkPortalAcceptAssignmentPostgresIT {
                     idn_person_profile, idn_security_principal,
                     rel_idempotency_record, aud_audit_record CASCADE
                 """).update();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("128");
-        assertThat(flyway.info().applied()).hasSize(130);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("129");
+        assertThat(flyway.info().applied()).hasSize(131);
         assertThat(jdbc.sql("""
                         SELECT risk_level FROM auth_capability
                          WHERE capability_code='networkPortal.acceptAssignment'

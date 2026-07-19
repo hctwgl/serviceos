@@ -23,5 +23,12 @@ docker compose -f "${COMPOSE_FILE}" exec -T postgres \
 docker compose -f "${COMPOSE_FILE}" exec -T postgres \
   psql -U serviceos_app -d serviceos \
   < "${ROOT}/serviceos-deploy/demo/seed-demo-tasks.sql"
+docker compose -f "${COMPOSE_FILE}" exec -T postgres \
+  psql -U serviceos_app -d serviceos \
+  < "${ROOT}/serviceos-deploy/demo/seed-demo-review-correction.sql"
+docker compose -f "${COMPOSE_FILE}" exec -T postgres \
+  psql -U serviceos_app -d serviceos \
+  < "${ROOT}/serviceos-deploy/demo/seed-demo-appointments.sql"
 echo "完成。可在管理端「演示数据管理」查看 WO-DEMO-* 的 20 态场景任务。"
+echo "现场演练：007/008 有 CONFIRMED 勘测预约；009/013 有 OPEN 审核单。"
 echo "网点/师傅门户本地账号：Keycloak developer / local-dev-change-me（需已执行 grant-local-project-admin.sql）。"

@@ -6,6 +6,11 @@ export type ManualAssignServiceAssignmentRequest = {
   businessType: string
 }
 
+export type ManualAssignNetworkRequest = {
+  networkAssigneeId: string
+  businessType: string
+}
+
 export type ManualServiceAssignmentReceipt = {
   taskId: string
   workOrderId: string
@@ -13,6 +18,14 @@ export type ManualServiceAssignmentReceipt = {
   technicianServiceAssignmentId: string
   networkAssigneeId: string
   technicianAssigneeId: string
+  occurredAt: string
+}
+
+export type ManualAssignNetworkReceipt = {
+  taskId: string
+  workOrderId: string
+  networkServiceAssignmentId: string
+  networkAssigneeId: string
   occurredAt: string
 }
 
@@ -25,6 +38,20 @@ export function manualAssignServiceAssignments(
     `/tasks/${taskId}/service-assignments:manual-assign`,
     {
       idempotencyKey: newIdempotencyKey('manual-assign'),
+      body,
+    },
+  )
+}
+
+/** Admin 初审派网点：仅激活 ACTIVE NETWORK，不强制师傅。 */
+export function manualAssignNetworkServiceAssignment(
+  taskId: string,
+  body: ManualAssignNetworkRequest,
+) {
+  return apiPost<ManualAssignNetworkReceipt>(
+    `/tasks/${taskId}/service-assignments:manual-assign-network`,
+    {
+      idempotencyKey: newIdempotencyKey('manual-assign-network'),
       body,
     },
   )

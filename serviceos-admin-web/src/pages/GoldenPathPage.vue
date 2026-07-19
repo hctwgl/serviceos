@@ -60,23 +60,23 @@ const steps = computed<GoldenStep[]>(() => {
     },
     {
       id: 3,
-      name: '分配网点',
+      name: '初审通过：派给服务网点',
       portal: '管理端',
       role: '平台调度',
-      nextAction: '将任务分配给服务网点',
-      entry: '管理端 → 工单详情 → 分配',
+      nextAction: '将当前任务派给服务网点（仅 NETWORK）',
+      entry: '管理端 → 工单工作区 → 初审通过：派给服务网点',
       status: fulfilled ? 'done' : 'todo',
-      note: '对应接口：任务人工分配网点（manual-assign）',
+      note: '接口：POST /tasks/{taskId}/service-assignments:manual-assign-network',
     },
     {
       id: 4,
       name: '网点接单',
       portal: '网点端',
       role: '网点调度',
-      nextAction: '网点确认接单',
-      entry: '网点端 → 任务 → 确认接单',
+      nextAction: '网点确认接单（幂等）或直接指派师傅',
+      entry: '网点端 → 任务',
       status: fulfilled ? 'done' : 'todo',
-      note: '接口：POST /network-portal/tasks/{taskId}:accept-assignment（仅激活 ACTIVE NETWORK）。',
+      note: 'Admin 已派网点后列表可见；接单接口 accept-assignment 可幂等确认。',
     },
     {
       id: 5,
@@ -89,21 +89,23 @@ const steps = computed<GoldenStep[]>(() => {
     },
     {
       id: 6,
-      name: '客户预约',
-      portal: '网点端 / 师傅端',
-      role: '网点或师傅',
-      nextAction: '联系客户并确认上门时间',
-      entry: '网点端预约 / 师傅端待预约',
+      name: '网点联系与预约',
+      portal: '网点端',
+      role: '网点调度',
+      nextAction: '联系客户并确认上门时间（师傅端无预约写入口）',
+      entry: '网点端 → 任务 → 预约/联系',
       status: fulfilled ? 'done' : 'todo',
+      note: '演示 WO-DEMO-007/008 已种子 CONFIRMED 勘测预约。',
     },
     {
       id: 7,
-      name: '上门勘测',
+      name: '上门勘测 / 交资料',
       portal: '师傅端',
       role: '服务师傅',
-      nextAction: '签到、勘测并提交资料',
-      entry: '师傅端 → 当前任务',
+      nextAction: '签到、表单与资料提交后完成任务',
+      entry: '师傅端 → 当前任务（WO-DEMO-008 为 RUNNING）',
       status: fulfilled ? 'done' : 'todo',
+      note: '联系/预约在网点端；签退需 operationRefs，本切片不做假签退。',
     },
     {
       id: 8,
@@ -126,13 +128,13 @@ const steps = computed<GoldenStep[]>(() => {
     },
     {
       id: 10,
-      name: '资料复核',
+      name: '网点代补 / 整改协作',
       portal: '网点端',
-      role: '网点质检',
-      nextAction: '复核师傅提交资料',
-      entry: '网点端 → 整改/工作区',
-      status: 'blocked',
-      note: '阻塞：尚无独立「网点复核」写命令；网点可只读查看并代补资料。',
+      role: '网点调度',
+      nextAction: '代补资料、创建快照并重提（非独立裁决）',
+      entry: '网点端 → 任务 → 资料代补',
+      status: fulfilled ? 'done' : 'todo',
+      note: '可走：代补上传 + 一键快照重提；总部审核仍为裁决步。',
     },
     {
       id: 11,
@@ -146,11 +148,12 @@ const steps = computed<GoldenStep[]>(() => {
     {
       id: 12,
       name: '整改处理',
-      portal: '师傅端',
-      role: '服务师傅',
-      nextAction: '查看整改要求并重新提交',
-      entry: '师傅端 → 整改任务',
+      portal: '师傅端 / 网点端',
+      role: '服务师傅 / 网点调度',
+      nextAction: '师傅重提或网点代补后重提',
+      entry: '师傅端整改 / 网点端资料代补',
       status: 'optional',
+      note: 'WO-DEMO-009/013 已种子 OPEN 审核，驳回后可走整改链路。',
     },
     {
       id: 13,
@@ -169,7 +172,7 @@ const steps = computed<GoldenStep[]>(() => {
       nextAction: '进入结算',
       entry: '结算管理（设计中）',
       status: 'blocked',
-      note: '阻塞：正式结算域仍为 PROPOSED；当前仅有定价影子快照。',
+      note: '阻塞：正式结算域仍为 PROPOSED。真实完工后可读影子试算（非结算）；演示 FULFILLED 种子无快照。',
     },
   ]
 })
@@ -301,9 +304,8 @@ onMounted(() => {
       <section class="legend">
         <h2>能力边界（如实说明）</h2>
         <ul>
-          <li>网点接单：分配激活后即可操作，无独立 accept API。</li>
-          <li>网点复核写命令：尚未实现，网点可只读与代补资料。</li>
-          <li>结算归档：正式结算域未实现，工单完成后仅触发定价影子快照。</li>
+          <li>网点独立裁决（DecideReview）：不开放；网点仅代补/整改协作，总部审核为裁决步。</li>
+          <li>结算归档：正式结算域未实现；工单真实完工后触发 SHADOW 影子试算，可在工作区只读查看。</li>
           <li>完整家充 20 状态矩阵依赖演示种子；本地可先用 ADMIN-PILOT 单阶段流验证。</li>
         </ul>
         <p class="muted">页面生成时间：{{ formatDateTime(new Date()) }}</p>

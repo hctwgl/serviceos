@@ -634,8 +634,8 @@ watch(
         </ul>
         <p v-else data-testid="workspace-related-reviews-empty">暂无审核摘要</p>
         <p class="hint">
-          需 NETWORK <code>evidence.read</code>。展示 Accepted 非 PII 审核摘要字段；无
-          note/approvalRef/decidedBy/createdBy；无独立 NP Review 详情页。
+          需 NETWORK <code>evidence.read</code>。总部审核中：网点可代补/整改协作，不可独立裁决（无 DecideReview）。
+          展示 Accepted 非 PII 审核摘要；无 note/approvalRef/decidedBy/createdBy。
         </p>
       </section>
 
