@@ -53,15 +53,22 @@ final class MyBatisReviewCaseRepository implements ReviewCaseRepository {
         values.put("reopenedFromReviewCaseId", reviewCase.reopenedFromReviewCaseId() == null
                 ? null : reviewCase.reopenedFromReviewCaseId().toString());
         values.put("reopenTriggerRef", reviewCase.reopenTriggerRef());
+        values.put("aggregateVersion", reviewCase.aggregateVersion() <= 0 ? 1L : reviewCase.aggregateVersion());
         mapper.insertCase(values);
     }
 
     @Override
     public int markDecided(
-            String tenantId, UUID reviewCaseId, String expectedStatus, String status, Instant decidedAt
+            String tenantId,
+            UUID reviewCaseId,
+            String expectedStatus,
+            long expectedAggregateVersion,
+            String status,
+            Instant decidedAt
     ) {
         return mapper.markDecided(
-                tenantId, reviewCaseId.toString(), expectedStatus, status, decidedAt);
+                tenantId, reviewCaseId.toString(), expectedStatus, expectedAggregateVersion,
+                status, decidedAt);
     }
 
     @Override
@@ -85,6 +92,36 @@ final class MyBatisReviewCaseRepository implements ReviewCaseRepository {
         values.put("decidedBy", decision.decidedBy());
         values.put("decidedAt", decision.decidedAt());
         mapper.insertDecision(values);
+    }
+
+    @Override
+    public void insertTargetDecision(
+            String tenantId,
+            UUID projectId,
+            UUID reviewCaseId,
+            UUID reviewDecisionId,
+            String targetType,
+            UUID targetId,
+            int targetVersion,
+            String decision,
+            List<String> reasonCodes,
+            String note,
+            Instant createdAt
+    ) {
+        Map<String, Object> values = new HashMap<>();
+        values.put("reviewTargetDecisionId", UUID.randomUUID().toString());
+        values.put("tenantId", tenantId);
+        values.put("projectId", projectId.toString());
+        values.put("reviewCaseId", reviewCaseId.toString());
+        values.put("reviewDecisionId", reviewDecisionId.toString());
+        values.put("targetType", targetType);
+        values.put("targetId", targetId.toString());
+        values.put("targetVersion", targetVersion);
+        values.put("decision", decision);
+        values.put("reasonCodes", writeJson(reasonCodes == null ? List.of() : reasonCodes));
+        values.put("note", note);
+        values.put("createdAt", createdAt);
+        mapper.insertTargetDecision(values);
     }
 
     @Override
@@ -195,7 +232,9 @@ final class MyBatisReviewCaseRepository implements ReviewCaseRepository {
                 nullableText(row, "mappingVersionId"),
                 row.get("reopenedFromReviewCaseId") == null ? null : uuid(row, "reopenedFromReviewCaseId"),
                 row.get("reopenTriggerRef") == null ? null : text(row, "reopenTriggerRef"),
-                decisions);
+                decisions,
+                row.get("aggregateVersion") == null
+                        ? 1L : ((Number) row.get("aggregateVersion")).longValue());
     }
 
     private ReviewDecisionView decisionView(Map<String, Object> row) {

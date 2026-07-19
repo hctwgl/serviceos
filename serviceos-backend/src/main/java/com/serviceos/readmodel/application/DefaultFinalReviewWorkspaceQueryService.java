@@ -193,7 +193,7 @@ final class DefaultFinalReviewWorkspaceQueryService implements FinalReviewWorksp
                         reviewCase.reviewCaseId(),
                         reviewCase.origin(),
                         reviewCase.status(),
-                        1L,
+                        reviewCase.aggregateVersion(),
                         reviewCase.evidenceSetSnapshotId(),
                         reviewCase.snapshotContentDigest(),
                         reviewCase.policyVersion(),

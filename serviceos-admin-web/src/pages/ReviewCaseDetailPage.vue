@@ -2,7 +2,6 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import {
-  decideReviewCase,
   forceApproveReviewCase,
   getReviewCase,
   reopenReviewCase,
@@ -49,28 +48,10 @@ function codes() {
 }
 
 async function decide() {
-  busy.value = true
+  // M353：正式裁决改为按 Snapshot targetDecisions 提交；本页不再接受整案 decision body。
+  error.value =
+    '请前往工单详情「平台终审」工作台提交逐项审核决定（targetDecisions）。'
   message.value = null
-  error.value = null
-  try {
-    const body = {
-      decision: decision.value,
-      reasonCodes: codes(),
-      note: note.value || null,
-    }
-    if (decision.value === 'REJECTED' && body.reasonCodes.length === 0) {
-      throw new Error('REJECTED 至少需要一个 reasonCode')
-    }
-    const decided = (await decideReviewCase(reviewCaseId.value, body)).data
-    // 裁决命令只负责追加不可变决定；随后重新读取权威详情，避免命令响应与队列/详情投影
-    // 在字段演进或异步扩展时让页面残留半更新状态。
-    await load()
-    message.value = `已裁决为 ${statusLabel(decided.status)}`
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : '裁决失败'
-  } finally {
-    busy.value = false
-  }
 }
 
 async function forceApprove() {

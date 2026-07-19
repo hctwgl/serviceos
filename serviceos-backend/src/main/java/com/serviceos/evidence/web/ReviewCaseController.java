@@ -8,6 +8,7 @@ import com.serviceos.evidence.api.ReopenReviewCaseCommand;
 import com.serviceos.evidence.api.ReviewCaseService;
 import com.serviceos.evidence.api.ReviewCaseView;
 import com.serviceos.evidence.api.ReviewDecisionView;
+import com.serviceos.evidence.api.ReviewTargetDecisionCommand;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.CorrelationIds;
@@ -83,15 +84,23 @@ final class ReviewCaseController {
     @PostMapping("/review-cases/{reviewCaseId}:decide")
     ReviewCaseResponse decide(
             @PathVariable UUID reviewCaseId,
+            @RequestHeader("If-Match") String ifMatch,
             @RequestHeader("Idempotency-Key") String idempotencyKey,
             @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
             @RequestBody DecideReviewCaseRequest request
     ) {
+        List<ReviewTargetDecisionCommand> targets = request.targetDecisions() == null
+                ? List.of()
+                : request.targetDecisions().stream()
+                        .map(item -> new ReviewTargetDecisionCommand(
+                                item.targetType(), item.targetId(), item.targetVersion(),
+                                item.decision(), item.reasonCodes(), item.note()))
+                        .toList();
         return response(reviews.decide(
                 principals.current(),
                 new CommandMetadata(correlationId, idempotencyKey),
                 new DecideReviewCaseCommand(
-                        reviewCaseId, request.decision(), request.reasonCodes(), request.note())));
+                        reviewCaseId, targets, request.note(), aggregateVersion(ifMatch))));
     }
 
     @PostMapping("/review-cases/{reviewCaseId}:force-approve")
@@ -135,7 +144,15 @@ final class ReviewCaseController {
                 reviewCase.sourceReviewCaseId(), reviewCase.externalSubmissionRef(),
                 reviewCase.callbackBatchRef(), reviewCase.mappingVersionId(),
                 reviewCase.reopenedFromReviewCaseId(), reviewCase.reopenTriggerRef(),
-                reviewCase.decisions().stream().map(this::decision).toList());
+                reviewCase.decisions().stream().map(this::decision).toList(),
+                reviewCase.aggregateVersion());
+    }
+
+    private static long aggregateVersion(String ifMatch) {
+        if (ifMatch == null || !ifMatch.matches("\"[1-9][0-9]*\"")) {
+            throw new IllegalArgumentException("If-Match must contain one quoted positive aggregate version");
+        }
+        return Long.parseLong(ifMatch.substring(1, ifMatch.length() - 1));
     }
 
     private ReviewDecisionResponse decision(ReviewDecisionView decision) {
@@ -157,7 +174,17 @@ final class ReviewCaseController {
     ) {
     }
 
-    record DecideReviewCaseRequest(String decision, List<String> reasonCodes, String note) {
+    record DecideReviewCaseRequest(List<TargetDecisionRequest> targetDecisions, String note) {
+    }
+
+    record TargetDecisionRequest(
+            String targetType,
+            UUID targetId,
+            int targetVersion,
+            String decision,
+            List<String> reasonCodes,
+            String note
+    ) {
     }
 
     record ForceApproveReviewCaseRequest(List<String> reasonCodes, String approvalRef, String note) {
@@ -185,7 +212,8 @@ final class ReviewCaseController {
             String mappingVersionId,
             UUID reopenedFromReviewCaseId,
             String reopenTriggerRef,
-            List<ReviewDecisionResponse> decisions
+            List<ReviewDecisionResponse> decisions,
+            long aggregateVersion
     ) {
     }
 

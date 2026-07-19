@@ -7,6 +7,10 @@ import com.serviceos.configuration.api.ConfigurationService;
 import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
 import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
 import com.serviceos.evidence.api.DecideReviewCaseCommand;
+import com.serviceos.evidence.api.ReviewCaseView;
+import com.serviceos.evidence.api.ReviewTargetDecisionCommand;
+import com.serviceos.evidence.api.EvidenceSetSnapshotView;
+import com.serviceos.evidence.api.EvidenceSetSnapshotService;
 import com.serviceos.evidence.api.ReviewCaseService;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.shared.BusinessProblem;
@@ -57,6 +61,7 @@ class ReviewRuleGatePostgresIT {
     }
 
     @Autowired ReviewCaseService reviews;
+    @Autowired EvidenceSetSnapshotService snapshots;
     @Autowired ConfigurationService configurations;
     @Autowired JdbcClient jdbc;
 
@@ -101,7 +106,7 @@ class ReviewRuleGatePostgresIT {
     void approvedBlockedByFrozenRuleLeaveCaseOpen() {
         assertThatThrownBy(() -> reviews.decide(
                 reviewer(), metadata("m325-approve-block"),
-                new DecideReviewCaseCommand(reviewCaseId, "APPROVED", List.of(), "ok")))
+                decideCommand(reviewCaseId, "APPROVED", List.of(), "ok")))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.REVIEW_RULE_BLOCKED));
 
@@ -119,8 +124,7 @@ class ReviewRuleGatePostgresIT {
     void rejectedAllowedEvenWhenRuleWouldBlockApprove() {
         var decided = reviews.decide(
                 reviewer(), metadata("m325-reject-ok"),
-                new DecideReviewCaseCommand(reviewCaseId, "REJECTED",
-                        List.of("IMAGE.BLUR"), "reject for rework"));
+                decideCommand(reviewCaseId, "REJECTED", List.of("IMAGE.BLUR"), "reject for rework"));
         assertThat(decided.status()).isEqualTo("REJECTED");
         assertThat(jdbc.sql("""
                 SELECT count(*) FROM aud_audit_record
@@ -285,4 +289,16 @@ class ReviewRuleGatePostgresIT {
     private static CommandMetadata metadata(String key) {
         return new CommandMetadata("corr-" + key, key);
     }
+
+    private DecideReviewCaseCommand decideCommand(
+            UUID reviewCaseId, String overall, List<String> reasonCodes, String note
+    ) {
+        long aggregateVersion = jdbc.sql("""
+                SELECT aggregate_version FROM evd_review_case WHERE review_case_id = :id
+                """).param("id", reviewCaseId).query(Long.class).single();
+        // 空 Snapshot 夹具：targetDecisions 为空，由服务端按 note 派生整组结果（仅 RULE 门禁 IT）。
+        return new DecideReviewCaseCommand(reviewCaseId, List.of(), note, aggregateVersion);
+    }
+
 }
+

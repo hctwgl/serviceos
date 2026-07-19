@@ -164,7 +164,8 @@ final class DefaultExternalReviewReceiptService implements ExternalReviewReceipt
                 result);
 
         int updated = reviews.markDecided(
-                principal.tenantId(), current.reviewCaseId(), "OPEN", result, now);
+                principal.tenantId(), current.reviewCaseId(), "OPEN",
+                current.aggregateVersion(), result, now);
         if (updated != 1) {
             throw new BusinessProblem(ProblemCode.REVIEW_CASE_ALREADY_DECIDED,
                     "ReviewCase has already been decided");

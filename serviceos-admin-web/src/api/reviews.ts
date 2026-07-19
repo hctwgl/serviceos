@@ -26,6 +26,16 @@ export type ReviewCase = {
   reopenedFromReviewCaseId: string | null
   reopenTriggerRef: string | null
   decisions: ReviewDecision[]
+  aggregateVersion: number
+}
+
+export type ReviewTargetDecisionRequest = {
+  targetType: 'EvidenceRevision'
+  targetId: string
+  targetVersion: number
+  decision: 'APPROVED' | 'REJECTED'
+  reasonCodes?: string[]
+  note?: string | null
 }
 
 export function getReviewCase(reviewCaseId: string) {
@@ -43,10 +53,12 @@ export function createReviewCase(
 
 export function decideReviewCase(
   reviewCaseId: string,
-  body: { decision: 'APPROVED' | 'REJECTED'; reasonCodes?: string[]; note?: string | null },
+  body: { targetDecisions: ReviewTargetDecisionRequest[]; note?: string | null },
+  ifMatch: string,
 ) {
   return apiPost<ReviewCase>(`/review-cases/${reviewCaseId}:decide`, {
     idempotencyKey: newIdempotencyKey('review-decide'),
+    ifMatch,
     body,
   })
 }

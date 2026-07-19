@@ -10,6 +10,7 @@ import {
   Empty,
   Image,
   Input,
+  Modal,
   Radio,
   Space,
   Tag,
@@ -27,6 +28,7 @@ import {
   type FinalReviewTarget,
   type FinalReviewWorkspaceSection,
 } from '../../../../api/finalReview'
+import { decideReviewCase } from '../../../../api/reviews'
 import {
   clearFinalReviewDraftsForPrincipal,
   loadFinalReviewDraft,
@@ -82,6 +84,27 @@ const primaryLabel = computed(() => {
   if (decidedCount.value < targets.value.length) return '提交终审'
   if (rejectedCount.value > 0) return '驳回整改'
   return '审核通过'
+})
+const submitEnabled = computed(() => {
+  if (readonlyMode.value) return false
+  if (!data.value?.reviewCase) return false
+  if (targets.value.length === 0) return false
+  if (decidedCount.value < targets.value.length) return false
+  for (const target of targets.value) {
+    const decision = decisions.value[target.targetId]
+    if (!decision?.decision) return false
+    if (decision.decision === 'REJECTED') {
+      if (!decision.reasonCodes.length || !decision.note.trim()) return false
+    }
+  }
+  return !!decideAction.value?.enabled
+})
+const submitBusy = ref(false)
+const submitBlockReason = computed(() => {
+  if (readonlyMode.value) return decideAction.value?.reason || '当前不可提交终审'
+  if (decidedCount.value < targets.value.length) return '仍有未处理的审核目标'
+  if (!submitEnabled.value) return '请补全驳回原因与说明'
+  return null
 })
 
 async function load() {
@@ -195,6 +218,45 @@ function toggleReason(code: string, checked: boolean) {
 
 function onLogoutClear() {
   clearFinalReviewDraftsForPrincipal()
+}
+
+async function submitDecide() {
+  const reviewCase = data.value?.reviewCase
+  if (!reviewCase || !submitEnabled.value) return
+  Modal.confirm({
+    title: primaryLabel.value,
+    content: `将提交 ${targets.value.length} 项目标决定（通过 ${decidedCount.value - rejectedCount.value} / 驳回 ${rejectedCount.value}）。整组结果由服务端派生。`,
+    okText: '确认提交',
+    cancelText: '取消',
+    async onOk() {
+      submitBusy.value = true
+      try {
+        const body = {
+          targetDecisions: targets.value.map((target) => {
+            const local = decisions.value[target.targetId]
+            return {
+              targetType: 'EvidenceRevision' as const,
+              targetId: target.targetId,
+              targetVersion: target.targetVersion,
+              decision: local.decision as 'APPROVED' | 'REJECTED',
+              reasonCodes: local.decision === 'REJECTED' ? local.reasonCodes : [],
+              note: local.decision === 'REJECTED' ? local.note : null,
+            }
+          }),
+          note: overallNote.value || null,
+        }
+        await decideReviewCase(
+          reviewCase.reviewCaseId,
+          body,
+          `"${reviewCase.aggregateVersion}"`,
+        )
+        draftStatus.value = '已暂存到当前浏览器'
+        await load()
+      } finally {
+        submitBusy.value = false
+      }
+    },
+  })
 }
 
 onMounted(() => {
@@ -421,9 +483,11 @@ watch(
             <div class="primary-action" data-testid="review-primary-action">
               <AllowedActionButton
                 :label="primaryLabel"
-                :enabled="false"
-                reason="本切片为只读工作台，正式提交将在后续里程碑开放"
+                :enabled="submitEnabled"
+                :reason="submitBlockReason"
+                :loading="submitBusy"
                 primary
+                @click="submitDecide"
               />
               <Button style="margin-top: 8px" @click="$router.push(`/work-orders/${workOrderId}`)">
                 返回工单

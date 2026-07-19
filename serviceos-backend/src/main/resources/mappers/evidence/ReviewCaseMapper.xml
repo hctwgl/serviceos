@@ -9,7 +9,7 @@
             snapshot_content_digest, scope_type, origin, policy_version, status,
             created_by, created_at, decided_at,
             source_review_case_id, external_submission_ref, callback_batch_ref, mapping_version_id,
-            reopened_from_review_case_id, reopen_trigger_ref)
+            reopened_from_review_case_id, reopen_trigger_ref, aggregate_version)
         VALUES (
             CAST(#{reviewCaseId} AS uuid), #{tenantId}, CAST(#{projectId} AS uuid),
             CAST(#{taskId} AS uuid), CAST(#{evidenceSetSnapshotId} AS uuid),
@@ -17,16 +17,31 @@
             #{createdBy}, #{createdAt}, #{decidedAt},
             CAST(#{sourceReviewCaseId} AS uuid), #{externalSubmissionRef},
             #{callbackBatchRef}, #{mappingVersionId},
-            CAST(#{reopenedFromReviewCaseId} AS uuid), #{reopenTriggerRef})
+            CAST(#{reopenedFromReviewCaseId} AS uuid), #{reopenTriggerRef},
+            #{aggregateVersion})
     </insert>
 
     <update id="markDecided">
         UPDATE evd_review_case
-           SET status = #{status}, decided_at = #{decidedAt}
+           SET status = #{status},
+               decided_at = #{decidedAt},
+               aggregate_version = aggregate_version + 1
          WHERE tenant_id = #{tenantId}
            AND review_case_id = CAST(#{reviewCaseId} AS uuid)
            AND status = #{expectedStatus}
+           AND aggregate_version = #{expectedAggregateVersion}
     </update>
+
+    <insert id="insertTargetDecision" parameterType="map">
+        INSERT INTO evd_review_target_decision (
+            review_target_decision_id, tenant_id, project_id, review_case_id, review_decision_id,
+            target_type, target_id, target_version, decision, reason_codes, note, created_at)
+        VALUES (
+            CAST(#{reviewTargetDecisionId} AS uuid), #{tenantId}, CAST(#{projectId} AS uuid),
+            CAST(#{reviewCaseId} AS uuid), CAST(#{reviewDecisionId} AS uuid),
+            #{targetType}, CAST(#{targetId} AS uuid), #{targetVersion}, #{decision},
+            CAST(#{reasonCodes} AS jsonb), #{note}, #{createdAt})
+    </insert>
 
     <update id="markReopened">
         UPDATE evd_review_case
@@ -58,7 +73,8 @@
                callback_batch_ref AS "callbackBatchRef",
                mapping_version_id AS "mappingVersionId",
                reopened_from_review_case_id AS "reopenedFromReviewCaseId",
-               reopen_trigger_ref AS "reopenTriggerRef"
+               reopen_trigger_ref AS "reopenTriggerRef",
+               aggregate_version AS "aggregateVersion"
           FROM evd_review_case
          WHERE tenant_id = #{tenantId}
            AND review_case_id = CAST(#{reviewCaseId} AS uuid)
@@ -76,7 +92,8 @@
                callback_batch_ref AS "callbackBatchRef",
                mapping_version_id AS "mappingVersionId",
                reopened_from_review_case_id AS "reopenedFromReviewCaseId",
-               reopen_trigger_ref AS "reopenTriggerRef"
+               reopen_trigger_ref AS "reopenTriggerRef",
+               aggregate_version AS "aggregateVersion"
           FROM evd_review_case
          WHERE tenant_id = #{tenantId}
            AND task_id = CAST(#{taskId} AS uuid)
