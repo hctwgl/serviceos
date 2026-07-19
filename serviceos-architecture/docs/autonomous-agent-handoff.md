@@ -11,6 +11,7 @@ lastUpdated: 2026-07-19
 - PR #149：https://github.com/hctwgl/serviceos/pull/149 — **M322** 出站 Mapping（Draft，base=#148）
 - PR #150：https://github.com/hctwgl/serviceos/pull/150 — **M323** ASSIGNEE→TaskAssignment（Draft，base=#149）
 - PR #151：https://github.com/hctwgl/serviceos/pull/151 — **M324** DISPATCH→ServiceAssignment（Draft，base=#150）
+- PR #152：https://github.com/hctwgl/serviceos/pull/152 — **M325** RULE→ReviewCase.decide（Draft，base=#151）
 - **M325** RULE→INTERNAL ReviewCase.decide Draft PR pending（base=#151）
 - `master`：`32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147 已合并）
 - latestMilestone：**M325**
