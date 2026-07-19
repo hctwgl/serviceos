@@ -176,7 +176,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 ## 5. 下一实施方向
 
 ServiceOS 可靠纵向切片已推进到 **M350**（Technician 表达式上下文与 validationRules）。
-M321～M349 已在 `master`（`c54c98ee`）；本切片 Draft PR 指向 master。
+M321～M349 已在 `master`（`c54c98ee`）；本切片 Draft PR：https://github.com/hctwgl/serviceos/pull/179（base=master）。
 
 当前契约/迁移：OpenAPI **1.0.44**；Flyway **127**（无本里程碑迁移）。
 

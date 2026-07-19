@@ -8,7 +8,7 @@ lastUpdated: 2026-07-19
 ## 当前
 
 - master：M321～M349（`c54c98ee`）
-- 本分支：`cursor/m350-technician-expr-context-validation-rules-88d5` — **M350**
+- PR #179：https://github.com/hctwgl/serviceos/pull/179 — **M350**
 - latestMilestone：**M350**
 - Flyway：**127**；OpenAPI：**1.0.44**
 
