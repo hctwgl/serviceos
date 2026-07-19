@@ -674,20 +674,24 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M320 多 OEM 并行建单冒烟**（功能证据见 `implementation-status.md` 的
-`baselineCommit`；合入 `master` 后改为合并提交）。M296 及之前基线合并提交为
-`f3b623453a33ece91a691438b0c541e53c3282df`。
+当前工程基线为 **M321 入站 INTEGRATION Mapping 物化为建单命令**（功能证据见
+`implementation-status.md`；合入 `master` 后回填合并提交）。M320 合并基线为
+`32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147）。
 
-当前已具备多 OEM 入站建单/审核回调管道 SPI、出站提审通用 SPI、复杂流程运行时、十大配置资产设计器，
-以及 INTEGRATION/ASSIGNEE/DISPATCH/NOTIFICATION/RULE/PRICING 冻结 Bundle 运行时。
-下一主线是 P3 设计器深化与第二 OEM（P4；缺 Sandbox 则 BLOCKED_EXTERNAL）；真实 OEM Sandbox 与 Track F/G 仍为
-`BLOCKED_EXTERNAL`。
+当前已具备多 OEM 入站建单/更新/取消/审核回调管道 SPI、出站提审通用 SPI、远端状态查询、
+UNKNOWN 人工处置、批量重放、复杂流程运行时、十大配置资产设计器、六类冻结 Bundle 运行时，
+以及入站 Mapping 物化建单主路径（M321）。
+下一主线继续 **Configuration-Driven Fulfillment Runtime**（出站 Mapping、
+ASSIGNEE/DISPATCH/RULE/NOTIFICATION/PRICING 自动接入业务、UNKNOWN/Replay Admin 工作台）；
+真实吉利 Sandbox 与 Track F/G 仍为 `BLOCKED_EXTERNAL`，不阻塞本地主线。
 
 权威进度入口：
 
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M321 实现文档](architecture/334-m321-inbound-integration-mapping-materialization.md)
+- [M321 验收矩阵](testing/318-m321-inbound-integration-mapping-materialization-acceptance.md)
 - [M320 实现文档](architecture/333-m320-multi-oem-parallel-create-smoke.md)
 - [M320 验收矩阵](testing/317-m320-multi-oem-parallel-create-smoke-acceptance.md)
 - [M319 实现文档](architecture/332-m319-batch-replay-request.md)

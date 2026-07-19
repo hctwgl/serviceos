@@ -21,7 +21,7 @@ relatedMilestones: [M267, M303]
 
 ## 明确未实现
 
-- 用 Mapping 输出完全替代 OEM Java Mapper；出站 Mapping；ASSIGNEE_POLICY 运行时
+- 出站 Mapping；ASSIGNEE_POLICY 运行时自动接入（入站 Mapping 物化见 **M321**）
 
 ## 验证
 

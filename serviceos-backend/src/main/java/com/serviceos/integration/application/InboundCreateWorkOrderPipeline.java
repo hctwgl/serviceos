@@ -40,10 +40,14 @@ import java.util.UUID;
 /**
  * CREATE_WORK_ORDER 通用入站管道。
  *
- * <p>适配器完成协议验签、transport Envelope 登记与反腐映射后进入本管道。管道负责：
- * Bundle 唯一解析 →（可选）冻结 INTEGRATION Mapping 校验 → Canonical 私有存储 →
- * CanonicalMessage 登记 → 领域建单命令 → Envelope/Canonical 完成 → Outbox/审计。
- * 适配器不得直接写工单表。</p>
+ * <p>适配器完成协议验签、transport Envelope 登记与薄兼容映射后进入本管道。管道负责：
+ * Bundle 唯一解析 →（可选）冻结 INTEGRATION Mapping 应用并物化为领域命令 →
+ * Canonical 私有存储 → CanonicalMessage 登记 → 领域建单命令 → Envelope/Canonical 完成 →
+ * Outbox/审计。适配器不得直接写工单表。</p>
+ *
+ * <p>当冻结 Bundle 含该 connector 的唯一 INBOUND Mapping 时，Mapping 命中字段对建单命令
+ * 权威，{@code mappingVersionId} 取资产 versionId，Canonical 嵌入 contentDigest；
+ * 未映射字段暂保留适配器兼容取值。零 Mapping 时兼容旧路径。</p>
  *
  * <p>事务：调用方应已独立提交 RECEIVED Envelope；本管道在单一本地事务中提交
  * Canonical、工单、审计与 Outbox。配置失败或业务键冲突会 reject Envelope。</p>
@@ -108,7 +112,7 @@ public class InboundCreateWorkOrderPipeline {
      *
      * @param objectNamespace 对象键命名空间，例如 {@code byd-cpim}，不得包含租户明文
      * @param externalSourcePayload OEM 原文 Map；当冻结 Bundle 含该 connector 的 INBOUND
-     *        INTEGRATION Mapping 时必须提供，用于冻结 Mapping 校验
+     *        INTEGRATION Mapping 时必须提供，用于冻结 Mapping 应用与物化
      */
     public InboundCreateWorkOrderResult processMappedCreateWorkOrder(
             InboundEnvelopeView envelope,
@@ -148,16 +152,24 @@ public class InboundCreateWorkOrderPipeline {
         }
 
         final Optional<IntegrationMappingResult> mappingResult;
+        final CreateWorkOrderMappedInbound effectiveMapped;
         try {
             mappingResult = applyFrozenIntegrationMapping(
                     safeTenant, connector, bundle, externalSourcePayload);
+            if (mappingResult.isPresent()) {
+                // Mapping 命中字段权威物化为建单命令；适配器映射降级为未映射字段兼容层。
+                effectiveMapped = CreateWorkOrderMappingMaterializer.materialize(
+                        mapped, mappingResult.get(), objectMapper);
+            } else {
+                effectiveMapped = mapped;
+            }
         } catch (BusinessProblem exception) {
             return reject(
                     envelope, safeTenant, bundle.projectId(), null, mapped.mappingVersionId(),
                     "INTEGRATION_MAPPING_FAILED", exception.getMessage(), auditContext);
         }
 
-        byte[] canonicalPayload = mapped.canonicalPayload();
+        byte[] canonicalPayload = effectiveMapped.canonicalPayload();
         String canonicalPayloadDigest = Sha256.digest(canonicalPayload);
         String tenantObjectPrefix = Sha256.digest(safeTenant).substring(0, 16);
         String canonicalObjectRef = "integration/inbound/" + tenantObjectPrefix
@@ -167,7 +179,7 @@ public class InboundCreateWorkOrderPipeline {
         try {
             return Objects.requireNonNull(transactions.execute(status -> {
                 InboundCreateWorkOrderResult result = completeCreateWorkOrder(
-                        envelope, connector, safeTenant, mapped, bundle, canonicalObjectRef,
+                        envelope, connector, safeTenant, effectiveMapped, bundle, canonicalObjectRef,
                         canonicalPayloadDigest, auditContext, safeCorrelationId);
                 mappingResult.ifPresent(applied -> appendMappingAudit(
                         safeTenant, auditContext, envelope.inboundEnvelopeId(), bundle.projectId(),
@@ -177,7 +189,7 @@ public class InboundCreateWorkOrderPipeline {
         } catch (ExternalWorkOrderConflictException exception) {
             return reject(
                     envelope, safeTenant, bundle.projectId(), canonicalPayloadDigest,
-                    mapped.mappingVersionId(), "REPLAY_CONFLICT",
+                    effectiveMapped.mappingVersionId(), "REPLAY_CONFLICT",
                     "ORDER_CONFLICT: " + exception.getMessage(), auditContext);
         }
     }

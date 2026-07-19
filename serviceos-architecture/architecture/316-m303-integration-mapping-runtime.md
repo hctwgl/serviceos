@@ -21,7 +21,7 @@ relatedMilestones: [M16, M295, M302]
 
 ## 明确未实现
 
-- 出站 Mapping 应用；接入 BYD 建单主路径替换硬编码 Mapper；任意脚本
+- 出站 Mapping 应用；任意脚本（入站建单物化见 **M321**）
 
 ## 验证
 
