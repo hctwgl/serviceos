@@ -8,11 +8,11 @@ lastUpdated: 2026-07-19
 ## 当前
 
 - PR #148～#167：M321～M340 Draft stacked
-- 本切片：**M341** EVIDENCE requiredWhen ConditionBuilder（Draft，base=#167）
+- PR #168：https://github.com/hctwgl/serviceos/pull/168 — **M341** EVIDENCE requiredWhen ConditionBuilder（Draft，base=#167）
 - `master`：`32b902f897d19d2c906acac899990bf1aa2bb056`
 - latestMilestone：**M341**
 - Flyway：**127**；OpenAPI：**1.0.43**（无本里程碑变更）
-- `baselineCommit`：功能提交后回填
+- `baselineCommit`：`b236777a`（功能证据）
 
 ## 本回合完成
 
