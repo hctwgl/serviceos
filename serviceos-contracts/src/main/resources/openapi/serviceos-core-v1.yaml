@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.40
+  version: 1.0.41
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -4942,6 +4942,36 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /outbound-deliveries/{deliveryId}:query-remote-status:
+    post:
+      operationId: queryOutboundDeliveryRemoteStatus
+      summary: 查询 UNKNOWN 外部交付的远端权威状态
+      description: >-
+        仅允许具备 integration.retryUnknownDelivery 的 USER principal 调用。必须携带原因。
+        结果为观察值，不自动改写 Delivery 状态；协议不支持时返回 NOT_SUPPORTED，不得猜 ACK。
+      parameters:
+        - name: deliveryId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/QueryRemoteStatusRequest' }
+      responses:
+        '202':
+          description: 远端状态查询观察结果
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RemoteStatusQueryResult' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
   /configuration/drafts:
     get:
       operationId: listConfigurationDrafts
@@ -8589,6 +8619,26 @@ components:
         expectedAggregateVersion: { type: integer, format: int64, minimum: 1 }
         reason: { type: string, minLength: 1, maxLength: 1000 }
         approvalRef: { type: string, minLength: 1, maxLength: 160 }
+    QueryRemoteStatusRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 1000 }
+    RemoteStatusQueryResult:
+      type: object
+      additionalProperties: false
+      required: [deliveryId, connectorVersionId, outcome, reasonCode, queriedAt]
+      properties:
+        deliveryId: { type: string, format: uuid }
+        connectorVersionId: { type: string, minLength: 1, maxLength: 160 }
+        outcome:
+          type: string
+          enum: [CONFIRMED_ACCEPTED, CONFIRMED_REJECTED, STILL_UNKNOWN, NOT_SUPPORTED]
+        reasonCode: { type: string, minLength: 1, maxLength: 120 }
+        detail: { type: [string, 'null'], maxLength: 2000 }
+        externalRef: { type: [string, 'null'], maxLength: 200 }
+        queriedAt: { type: string, format: date-time }
     DeliveryReplayRequest:
       type: object
       additionalProperties: false

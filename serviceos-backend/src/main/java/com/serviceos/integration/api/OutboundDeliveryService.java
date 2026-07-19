@@ -18,6 +18,14 @@ public interface OutboundDeliveryService {
             CommandMetadata metadata,
             RetryOutboundDeliveryCommand command);
 
+    /**
+     * 对 UNKNOWN Delivery 发起远端状态查询（观察结果，不自动改写状态）。
+     */
+    RemoteStatusQueryView queryRemoteStatus(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            QueryRemoteStatusCommand command);
+
     OutboundDeliveryView get(CurrentPrincipal principal, String correlationId, UUID deliveryId);
 
     /**

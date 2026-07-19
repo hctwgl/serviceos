@@ -5,6 +5,8 @@ import com.serviceos.integration.api.CreateReviewSubmissionCommand;
 import com.serviceos.integration.api.DeliveryReplayRequestView;
 import com.serviceos.integration.api.OutboundDeliveryService;
 import com.serviceos.integration.api.OutboundDeliveryView;
+import com.serviceos.integration.api.QueryRemoteStatusCommand;
+import com.serviceos.integration.api.RemoteStatusQueryView;
 import com.serviceos.integration.api.RetryOutboundDeliveryCommand;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.CorrelationIds;
@@ -72,6 +74,19 @@ final class OutboundDeliveryController {
         return ResponseEntity.accepted().body(replay);
     }
 
+    @PostMapping("/outbound-deliveries/{deliveryId}:query-remote-status")
+    ResponseEntity<RemoteStatusQueryView> queryRemoteStatus(
+            @PathVariable UUID deliveryId,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @Valid @RequestBody QueryRemoteStatusRequest request
+    ) {
+        RemoteStatusQueryView view = deliveries.queryRemoteStatus(
+                principals.current(), new CommandMetadata(correlationId, idempotencyKey),
+                new QueryRemoteStatusCommand(deliveryId, request.reason()));
+        return ResponseEntity.accepted().body(view);
+    }
+
     record CreateRequest(@NotNull UUID sourceReviewCaseId) {
     }
 
@@ -79,6 +94,11 @@ final class OutboundDeliveryController {
             @Positive long expectedAggregateVersion,
             @NotBlank @Size(max = 1000) String reason,
             @NotBlank @Size(max = 160) String approvalRef
+    ) {
+    }
+
+    record QueryRemoteStatusRequest(
+            @NotBlank @Size(max = 1000) String reason
     ) {
     }
 }

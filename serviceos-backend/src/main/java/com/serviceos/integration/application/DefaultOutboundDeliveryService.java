@@ -15,7 +15,12 @@ import com.serviceos.integration.api.CreateReviewSubmissionCommand;
 import com.serviceos.integration.api.DeliveryReplayRequestView;
 import com.serviceos.integration.api.OutboundDeliveryService;
 import com.serviceos.integration.api.OutboundDeliveryView;
+import com.serviceos.integration.api.QueryRemoteStatusCommand;
+import com.serviceos.integration.api.RemoteStatusQueryView;
 import com.serviceos.integration.api.RetryOutboundDeliveryCommand;
+import com.serviceos.integration.spi.RemoteStatusQueryConnector;
+import com.serviceos.integration.spi.RemoteStatusQueryRequest;
+import com.serviceos.integration.spi.RemoteStatusQueryResult;
 import com.serviceos.reliability.api.IdempotencyDecision;
 import com.serviceos.reliability.api.IdempotencyService;
 import com.serviceos.reliability.api.OutboxAppender;
@@ -75,6 +80,7 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
     private final Clock clock;
     private final ZoneId protocolZone;
     private final OutboundReviewSubmissionProfiles profiles;
+    private final RemoteStatusQueryConnectors remoteStatusQueries;
 
     DefaultOutboundDeliveryService(
             ReviewCaseService reviews,
@@ -93,7 +99,8 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
             Clock clock,
             @org.springframework.beans.factory.annotation.Value("${serviceos.integration.byd.cpim.zone-id}")
             ZoneId protocolZone,
-            OutboundReviewSubmissionProfiles profiles
+            OutboundReviewSubmissionProfiles profiles,
+            RemoteStatusQueryConnectors remoteStatusQueries
     ) {
         this.reviews = reviews;
         this.taskContexts = taskContexts;
@@ -111,6 +118,7 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
         this.clock = clock;
         this.protocolZone = protocolZone;
         this.profiles = profiles;
+        this.remoteStatusQueries = remoteStatusQueries;
     }
 
     @Override
@@ -364,6 +372,91 @@ final class DefaultOutboundDeliveryService implements OutboundDeliveryService {
                     Sha256.digest(json(replay)));
             return replay;
         }));
+    }
+
+    @Override
+    public RemoteStatusQueryView queryRemoteStatus(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            QueryRemoteStatusCommand command
+    ) {
+        if (principal.principalType() != CurrentPrincipal.PrincipalType.USER) {
+            throw new BusinessProblem(ProblemCode.ACCESS_DENIED,
+                    "Remote status query requires a USER principal");
+        }
+        if (command == null || command.deliveryId() == null) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, "deliveryId is required");
+        }
+        String reason = requiredText(command.reason(), "reason", 1000);
+        var record = deliveries.find(principal.tenantId(), command.deliveryId())
+                .orElseThrow(() -> new BusinessProblem(
+                        ProblemCode.RESOURCE_NOT_FOUND, "OutboundDelivery does not exist"));
+        OutboundDeliveryView delivery = record.view();
+        AuthorizationDecision auth = authorization.require(principal,
+                AuthorizationRequest.projectCapability(
+                        RETRY_CAPABILITY, principal.tenantId(), "OutboundDelivery",
+                        delivery.deliveryId().toString(), delivery.projectId().toString()),
+                metadata.correlationId());
+        if (!"UNKNOWN".equals(delivery.status())) {
+            throw new BusinessProblem(ProblemCode.VERSION_CONFLICT,
+                    "Only UNKNOWN OutboundDelivery can be queried for remote status");
+        }
+
+        byte[] frozenPayload;
+        try (var input = storage.openForScan(record.payloadObjectRef())) {
+            frozenPayload = input.readAllBytes();
+        } catch (IOException exception) {
+            throw new BusinessProblem(ProblemCode.INTERNAL_ERROR,
+                    "Cannot load frozen outbound payload: " + exception.getMessage());
+        }
+        if (!Sha256.digest(frozenPayload).equals(delivery.payloadDigest())) {
+            throw new BusinessProblem(ProblemCode.INTERNAL_ERROR,
+                    "Frozen outbound payload digest mismatch");
+        }
+
+        RemoteStatusQueryConnector connector = remoteStatusQueries.requireForConnectorVersion(
+                delivery.connectorVersionId());
+        // 网络探询在事务外；结果只审计观察，不自动改写 Delivery 状态。
+        RemoteStatusQueryResult result = connector.query(new RemoteStatusQueryRequest(
+                principal.tenantId(),
+                delivery.deliveryId(),
+                delivery.connectorVersionId(),
+                delivery.externalOrderCode(),
+                delivery.businessKey(),
+                delivery.payloadDigest(),
+                frozenPayload));
+        Instant queriedAt = clock.instant();
+        RemoteStatusQueryView view = toView(delivery, result, queriedAt);
+        String requestDigest = Sha256.digest(delivery.deliveryId() + "|" + reason + "|"
+                + view.outcome() + "|" + view.reasonCode());
+        transactions.executeWithoutResult(status -> audit.append(new AuditEntry(
+                UUID.randomUUID(), principal.tenantId(), principal.principalId(),
+                "OUTBOUND_DELIVERY_REMOTE_STATUS_QUERIED", RETRY_CAPABILITY,
+                "OutboundDelivery", delivery.deliveryId().toString(), "ALLOW",
+                auth.matchedGrantIds(), auth.policyVersion(), view.outcome(), null,
+                requestDigest, metadata.correlationId(), queriedAt)));
+        return view;
+    }
+
+    private static RemoteStatusQueryView toView(
+            OutboundDeliveryView delivery,
+            RemoteStatusQueryResult result,
+            Instant queriedAt
+    ) {
+        return switch (result) {
+            case RemoteStatusQueryResult.ConfirmedAccepted accepted -> new RemoteStatusQueryView(
+                    delivery.deliveryId(), delivery.connectorVersionId(), "CONFIRMED_ACCEPTED",
+                    "REMOTE_CONFIRMED_ACCEPTED", accepted.detail(), accepted.externalRef(), queriedAt);
+            case RemoteStatusQueryResult.ConfirmedRejected rejected -> new RemoteStatusQueryView(
+                    delivery.deliveryId(), delivery.connectorVersionId(), "CONFIRMED_REJECTED",
+                    "REMOTE_CONFIRMED_REJECTED", rejected.detail(), rejected.externalRef(), queriedAt);
+            case RemoteStatusQueryResult.StillUnknown unknown -> new RemoteStatusQueryView(
+                    delivery.deliveryId(), delivery.connectorVersionId(), "STILL_UNKNOWN",
+                    unknown.reasonCode(), unknown.detail(), null, queriedAt);
+            case RemoteStatusQueryResult.NotSupported unsupported -> new RemoteStatusQueryView(
+                    delivery.deliveryId(), delivery.connectorVersionId(), "NOT_SUPPORTED",
+                    unsupported.reasonCode(), unsupported.detail(), null, queriedAt);
+        };
     }
 
     private static void requireApprovedInternal(ReviewCaseView source) {
