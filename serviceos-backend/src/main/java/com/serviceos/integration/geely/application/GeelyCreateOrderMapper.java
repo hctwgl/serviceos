@@ -2,6 +2,7 @@ package com.serviceos.integration.geely.application;
 
 import com.serviceos.integration.geely.api.GeelyCreateOrderPayload;
 import com.serviceos.integration.spi.CreateWorkOrderMappedInbound;
+import com.serviceos.shared.Sha256;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDateTime;
@@ -43,6 +44,11 @@ final class GeelyCreateOrderMapper {
         if (payload.assignProviderTime() != null && !payload.assignProviderTime().isBlank()) {
             dispatchedAt = LocalDateTime.parse(payload.assignProviderTime().trim(), ASSIGN_FMT);
         }
+        // 协议 VIN 可选，但领域 ReceiveExternalWorkOrderCommand 要求 vehicleVin；
+        // 缺省时用安装单号派生稳定占位，避免伪造真实 VIN。
+        String vin = payload.vin() == null || payload.vin().isBlank()
+                ? ("G" + Sha256.digest(payload.installProcessNo().trim()).substring(0, 16)).toUpperCase(Locale.ROOT)
+                : payload.vin().trim();
         byte[] canonical = objectMapper.writeValueAsBytes(payload);
         return new CreateWorkOrderMappedInbound(
                 BUSINESS_PREFIX + payload.installProcessNo().trim(),
@@ -56,7 +62,7 @@ final class GeelyCreateOrderMapper {
                 payload.contactName().trim(),
                 payload.contactPhone().trim(),
                 payload.address().trim(),
-                payload.vin() == null ? null : payload.vin().trim(),
+                vin,
                 dispatchedAt,
                 MAPPING_VERSION,
                 canonical);
