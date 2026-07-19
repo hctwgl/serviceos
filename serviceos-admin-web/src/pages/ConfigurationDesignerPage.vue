@@ -21,9 +21,12 @@ import {
 import WorkflowCanvas from '../components/WorkflowCanvas.vue'
 import StructuredAssetEditor from '../components/StructuredAssetEditor.vue'
 import PolicyAssetEditor from '../components/PolicyAssetEditor.vue'
+import { discoverFormFieldKeysForStage } from '../expression/extractFormFieldKeys'
 
 const assetType = ref<DesignerAssetType>('WORKFLOW')
 const drafts = ref<ConfigurationDraft[]>([])
+/** EVIDENCE 编辑时加载的 FORM 草稿，用于同 stage fieldKey 发现 */
+const siblingFormDrafts = ref<ConfigurationDraft[]>([])
 const selected = ref<ConfigurationDraft | null>(null)
 const definitionText = ref('')
 const diffView = ref<ConfigurationDraftDiff | null>(null)
@@ -67,12 +70,43 @@ async function refreshList() {
   error.value = null
   try {
     drafts.value = await listConfigurationDrafts(assetType.value)
+    if (assetType.value === 'EVIDENCE') {
+      try {
+        siblingFormDrafts.value = await listConfigurationDrafts('FORM')
+      } catch {
+        siblingFormDrafts.value = []
+      }
+    } else {
+      siblingFormDrafts.value = []
+    }
   } catch (err) {
     error.value = err instanceof Error ? err.message : '加载草稿失败'
   } finally {
     loading.value = false
   }
 }
+
+const evidenceStage = computed(() => {
+  if (assetType.value !== 'EVIDENCE') return null
+  try {
+    const definition = JSON.parse(definitionText.value) as { stage?: unknown }
+    return typeof definition.stage === 'string' ? definition.stage : null
+  } catch {
+    return null
+  }
+})
+
+const discoveredFormFields = computed(() =>
+  discoverFormFieldKeysForStage(evidenceStage.value, siblingFormDrafts.value),
+)
+
+const discoveredFormFieldKeys = computed(() => discoveredFormFields.value.fieldKeys)
+
+const discoveredFormFieldSourceLabel = computed(() => {
+  const keys = discoveredFormFields.value.sourceAssetKeys
+  if (!keys.length) return ''
+  return keys.length <= 3 ? keys.join('、') : `${keys.slice(0, 3).join('、')} 等 ${keys.length} 个`
+})
 
 function selectDraft(draft: ConfigurationDraft) {
   selected.value = draft
@@ -695,6 +729,8 @@ onMounted(async () => {
           v-if="showStructuredEditor"
           v-model="definitionText"
           :asset-type="structuredAssetType"
+          :discovered-form-field-keys="discoveredFormFieldKeys"
+          :discovered-form-field-source-label="discoveredFormFieldSourceLabel"
         />
         <PolicyAssetEditor
           v-if="showPolicyEditor"

@@ -674,8 +674,8 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M343 REFERENCE_OEM SAMPLE Update/Cancel Mapping**（https://github.com/hctwgl/serviceos/pull/170；栈 `#148→…→#170`；
-见 `implementation-status.md`；合入 `master` 后回填合并提交）。M320 合并基线为
+当前工程基线为 **M344 EVIDENCE 同 stage FORM fieldKey 发现**（栈 `#148→…→#170→本切片`；
+见 `implementation-status.md`；Draft PR URL 与合入 `master` 后回填）。M320 合并基线为
 `32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147）。
 
 当前已具备多 OEM SPI、远端查询、UNKNOWN/批量重放、复杂流程、十大资产设计器、六类 Runtime，
@@ -692,6 +692,8 @@ Track F/G 仍为 `BLOCKED_EXTERNAL`。
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M344 实现文档](architecture/357-m344-evidence-form-fieldkey-discovery.md)
+- [M344 验收矩阵](testing/341-m344-evidence-form-fieldkey-discovery-acceptance.md)
 - [M343 实现文档](architecture/356-m343-reference-oem-update-cancel.md)
 - [M343 验收矩阵](testing/340-m343-reference-oem-update-cancel-acceptance.md)
 - [M342 实现文档](architecture/355-m342-nested-condition-groups.md)

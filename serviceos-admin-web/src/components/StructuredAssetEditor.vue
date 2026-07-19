@@ -5,6 +5,10 @@ import ConditionBuilder from './ConditionBuilder.vue'
 const props = defineProps<{
   assetType: 'FORM' | 'EVIDENCE' | 'SLA'
   modelValue: string
+  /** EVIDENCE：同 stage FORM 草稿发现的 fieldKey（供 formValues 积木） */
+  discoveredFormFieldKeys?: string[]
+  /** EVIDENCE：发现来源 FORM assetKey 展示 */
+  discoveredFormFieldSourceLabel?: string
 }>()
 
 const emit = defineEmits<{
@@ -44,7 +48,7 @@ const formSections = computed(() => {
 })
 
 /** 当前 FORM 全部 fieldKey，供 formValues["…"] 积木下拉。 */
-const formFieldKeys = computed(() => {
+const localFormFieldKeys = computed(() => {
   const keys: string[] = []
   for (const section of formSections.value) {
     if (!Array.isArray(section.fields)) continue
@@ -56,6 +60,14 @@ const formFieldKeys = computed(() => {
     }
   }
   return keys
+})
+
+/** FORM 用本地字段；EVIDENCE 用同 stage 发现结果。 */
+const formFieldKeys = computed(() => {
+  if (props.assetType === 'EVIDENCE') {
+    return props.discoveredFormFieldKeys ?? []
+  }
+  return localFormFieldKeys.value
 })
 
 const evidenceItems = computed(() => {
@@ -465,11 +477,19 @@ const MEDIA_TYPES = ['PHOTO', 'VIDEO', 'DOCUMENT', 'SIGNATURE', 'GENERATED_REPOR
         <ConditionBuilder
           :model-value="exprSource(item, 'requiredWhen')"
           :label="`资料项 ${String(item.evidenceKey ?? index)} requiredWhen`"
+          :form-field-keys="formFieldKeys"
           data-testid="evidence-required-when-builder"
           @update:model-value="setEvidenceItemExpression(index, 'requiredWhen', $event)"
         />
-        <p class="hint">
-          上下文路径可直接积木编辑；同 Bundle 同 stage FORM 的 formValues["…"] 可用高级源码（字段键自动发现递延）。
+        <p class="hint" data-testid="evidence-form-fieldkey-hint">
+          <template v-if="formFieldKeys.length">
+            已发现同 stage FORM 字段 {{ formFieldKeys.length }} 个
+            <span v-if="discoveredFormFieldSourceLabel">（{{ discoveredFormFieldSourceLabel }}）</span>；
+            可积木选择 formValues["…"]。
+          </template>
+          <template v-else>
+            未发现同 stage FORM 草稿字段；可用高级源码写 formValues["…"]，或先创建同 stage FORM 草稿。
+          </template>
         </p>
       </article>
       <button type="button" data-testid="add-evidence-item" @click="addEvidenceItem">
