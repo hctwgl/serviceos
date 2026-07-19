@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M311 吉利浩瀚本地入站适配器**（功能证据见 `implementation-status.md` 的
+当前工程基线为 **M312 Workflow 画布属性面板与撤销重做**（功能证据见 `implementation-status.md` 的
 `baselineCommit`；合入 `master` 后改为合并提交）。M296 及之前基线合并提交为
 `f3b623453a33ece91a691438b0c541e53c3282df`。
 
@@ -688,6 +688,8 @@ serviceos-architecture/
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M312 实现文档](architecture/325-m312-workflow-canvas-property-panel.md)
+- [M312 验收矩阵](testing/309-m312-workflow-canvas-property-panel-acceptance.md)
 - [M311 实现文档](architecture/324-m311-geely-local-inbound-adapter.md)
 - [M311 验收矩阵](testing/308-m311-geely-local-inbound-adapter-acceptance.md)
 - [M310 实现文档](architecture/323-m310-condition-builder.md)

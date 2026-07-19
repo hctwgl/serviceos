@@ -8,22 +8,19 @@ lastUpdated: 2026-07-19
 ## 当前
 
 - PR：https://github.com/hctwgl/serviceos/pull/147
-- latestMilestone：**M311**
+- latestMilestone：**M312**
 - Flyway：**118 / 120**；OpenAPI：**1.0.40**
-- 程序主线 P0～P2 完成；P3 首刀（M310）完成；P4 本地吉利切片（M311）完成
+- 下一刀：**M313** FORM/EVIDENCE/SLA 可视配置器（或吉利 7.2 本地 stub）
 
-## BLOCKED_EXTERNAL（不可替代）
+## 已完成
 
-- 吉利 Sandbox URL / 生产 AK·SK·IV / OpenAPI 平台统一签名联调
-- Swift/Xcode、签名真机、远端 verify.yml
+P0～P2；P3：M310 条件积木 + M312 Workflow 属性面板/撤销重做/小地图；P4：M311 吉利本地 7.1
 
-## 已完成摘要
+## BLOCKED_EXTERNAL
 
-- P0 M296 基线；P1 Connector SPI M297～M302
-- P2 六类运行时 M303～M309；P3 条件积木 M310
-- P4 吉利本地 AES+7.1 建单 M311（真实联调仍阻塞）
+吉利 Sandbox/OpenAPI 签名、Swift/Xcode、签名真机、远端 verify.yml
 
-## 下一步（有外部材料时）
+## 下一步入口
 
-- 吉利 7.2+ 接口与 Sandbox 联调里程碑
-- 或继续 P3 设计器属性面板/小地图/撤销重做
+- ConfigurationDesignerPage：FORM/EVIDENCE/SLA 结构化编辑器
+- 或 integration.geely：7.14 cancel / 7.18 update 本地 AES 通知
