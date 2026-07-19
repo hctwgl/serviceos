@@ -9,4 +9,13 @@ import com.serviceos.identity.api.CurrentPrincipal;
  */
 public interface HumanTaskCompletionValidator {
     void validate(CurrentPrincipal principal, CompleteHumanTaskCommand command);
+
+    /**
+     * 带关联 ID 的完成校验；默认回退到无关联版本，便于既有校验器逐步迁移。
+     */
+    default void validate(
+            CurrentPrincipal principal, String correlationId, CompleteHumanTaskCommand command
+    ) {
+        validate(principal, command);
+    }
 }

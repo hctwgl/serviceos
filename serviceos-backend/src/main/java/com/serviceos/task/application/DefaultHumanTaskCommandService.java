@@ -145,7 +145,9 @@ final class DefaultHumanTaskCommandService implements HumanTaskCommandService {
             return frozenReceipt(context, operation);
         }
         if (completion != null) {
-            completionValidators.forEach(validator -> validator.validate(principal, completion));
+            // M330：校验器可取得 correlationId，便于 RULE 拒绝审计与命令关联。
+            completionValidators.forEach(validator ->
+                    validator.validate(principal, context.correlationId(), completion));
         }
 
         Instant occurredAt = clock.instant();

@@ -51,6 +51,7 @@ final class DefaultEvidenceSetSnapshotService implements EvidenceSetSnapshotServ
     private final AuditAppender audit;
     private final OutboxAppender outbox;
     private final EvidenceSetSnapshotValidator validator;
+    private final TaskFulfillmentRuleGate ruleGate;
     private final ObjectMapper objectMapper;
     private final Clock clock;
     private final CorrectionTaskAccessValidator correctionAccess;
@@ -64,6 +65,7 @@ final class DefaultEvidenceSetSnapshotService implements EvidenceSetSnapshotServ
             IdempotencyService idempotency,
             AuditAppender audit,
             OutboxAppender outbox,
+            TaskFulfillmentRuleGate ruleGate,
             ObjectMapper objectMapper,
             Clock clock,
             CorrectionTaskAccessValidator correctionAccess
@@ -77,6 +79,7 @@ final class DefaultEvidenceSetSnapshotService implements EvidenceSetSnapshotServ
         this.audit = audit;
         this.outbox = outbox;
         this.validator = new EvidenceSetSnapshotValidator(objectMapper);
+        this.ruleGate = ruleGate;
         this.objectMapper = objectMapper;
         this.clock = clock;
         this.correctionAccess = correctionAccess;
@@ -128,6 +131,15 @@ final class DefaultEvidenceSetSnapshotService implements EvidenceSetSnapshotServ
         if (slots.hasPendingDisposition(principal.tenantId(), task.taskId())) {
             throw new BusinessProblem(ProblemCode.TASK_STATE_CONFLICT,
                     "Task 存在未处置的资料条件变化，不能创建资料快照");
+        }
+
+        // M330：TASK_SUBMISSION Snapshot 创建前复用冻结 RULE；失败关闭不落快照。
+        if ("TASK_SUBMISSION".equals(command.purpose())) {
+            ruleGate.assertSnapshotCreateAllowed(
+                    principal.tenantId(),
+                    principal.principalId(),
+                    metadata.correlationId(),
+                    task.taskId());
         }
 
         // Snapshot 冻结的是“当前可提交集合”，不能遍历全部历史 Slot。M53 重解析可能合法复用

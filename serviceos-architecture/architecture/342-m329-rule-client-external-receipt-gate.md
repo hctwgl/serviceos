@@ -22,7 +22,7 @@ CLIENT `ExternalReviewReceipt.record(APPROVED)` 前复用 Task 冻结 `ruleRef` 
   - PostgreSQL IT：`ClientReviewRuleGatePostgresIT`
 - 明确不做：
   - `clientRuleRef` 双阶段冻结列
-  - Evidence finalize / Task complete RULE 门禁
+  - Evidence Snapshot / Task complete RULE 门禁（见 **M330**）
   - formValues 条件
   - OpenAPI / Flyway 变更
 
@@ -32,7 +32,8 @@ CLIENT `ExternalReviewReceipt.record(APPROVED)` 前复用 Task 冻结 `ruleRef` 
 
 ## 明确未实现
 
-- Evidence/Task RULE 门禁、独立 CLIENT-stage 资产、吉利联调
+- Evidence Snapshot / Task complete RULE 门禁：见 **M330**
+- 独立 CLIENT-stage 资产、吉利联调
 
 ## 验证命令
 

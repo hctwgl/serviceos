@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M329 RULE CLIENT 外部回执门禁**（https://github.com/hctwgl/serviceos/pull/156；栈 `#148→…→#156`）
+当前工程基线为 **M330 RULE Task complete / Evidence Snapshot 门禁**（Draft PR 待回填；栈 `#148→…→#157`）
 `implementation-status.md`；合入 `master` 后回填合并提交）。M320 合并基线为
 `32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147）。
 
@@ -692,6 +692,8 @@ PRICING SHADOW Snapshot（M327），以及 Admin UNKNOWN 人工处置与批量 R
 - [M328 验收矩阵](testing/325-m328-unknown-replay-admin-workbench-acceptance.md)
 - [M329 实现文档](architecture/342-m329-rule-client-external-receipt-gate.md)
 - [M329 验收矩阵](testing/326-m329-rule-client-external-receipt-gate-acceptance.md)
+- [M330 实现文档](architecture/343-m330-rule-task-evidence-fulfillment-gate.md)
+- [M330 验收矩阵](testing/327-m330-rule-task-evidence-fulfillment-gate-acceptance.md)
 - [M327 实现文档](architecture/340-m327-pricing-fulfillment-calculation-snapshot.md)
 - [M327 验收矩阵](testing/324-m327-pricing-fulfillment-calculation-snapshot-acceptance.md)
 - [M326 实现文档](architecture/339-m326-notification-reliable-delivery.md)
