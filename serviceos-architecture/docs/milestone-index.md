@@ -337,6 +337,7 @@ title: ServiceOS 里程碑索引
 | M326 | M326 NOTIFICATION 可靠投递闭环 | [339-m326-notification-reliable-delivery.md](../architecture/339-m326-notification-reliable-delivery.md) | [323-m326-notification-reliable-delivery-acceptance.md](../testing/323-m326-notification-reliable-delivery-acceptance.md) |
 | M327 | M327 PRICING 履约事实与 CalculationSnapshot | [340-m327-pricing-fulfillment-calculation-snapshot.md](../architecture/340-m327-pricing-fulfillment-calculation-snapshot.md) | [324-m327-pricing-fulfillment-calculation-snapshot-acceptance.md](../testing/324-m327-pricing-fulfillment-calculation-snapshot-acceptance.md) |
 | M328 | M328 UNKNOWN / Replay Admin 工作台 | [341-m328-unknown-replay-admin-workbench.md](../architecture/341-m328-unknown-replay-admin-workbench.md) | [325-m328-unknown-replay-admin-workbench-acceptance.md](../testing/325-m328-unknown-replay-admin-workbench-acceptance.md) |
+| M329 | M329 RULE 接入 CLIENT 外部回执门禁 | [342-m329-rule-client-external-receipt-gate.md](../architecture/342-m329-rule-client-external-receipt-gate.md) | [326-m329-rule-client-external-receipt-gate-acceptance.md](../testing/326-m329-rule-client-external-receipt-gate-acceptance.md) |
 
 ## 未关联里程碑的文档
 

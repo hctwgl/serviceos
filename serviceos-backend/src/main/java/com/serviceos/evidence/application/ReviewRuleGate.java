@@ -22,11 +22,12 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * M325：INTERNAL ReviewCase.decide 前的冻结 RULE 门禁。
+ * M325/M329：ReviewCase APPROVED 前的冻结 RULE 门禁。
  *
- * <p>无 ruleRef：放行。forceApprove 调用方不进入本门禁。
- * BLOCK / REQUIRE_APPROVAL 仅拦截 APPROVED；REJECTED 始终放行。
- * REQUIRE_MANUAL / PASS / PASS_WITH_WARNINGS 放行（人工裁决即 manual）。</p>
+ * <p>INTERNAL {@code decide} 与 CLIENT 外部回执共用：解析仍使用资产 stage={@code INTERNAL}
+ * （与 Task 冻结 {@code ruleRef} 同一资产；Case origin 只体现在审计调用方）。
+ * 无 ruleRef：放行。forceApprove / REJECTED 不进入阻断。
+ * BLOCK / REQUIRE_APPROVAL 仅拦截 APPROVED。</p>
  */
 @Component
 final class ReviewRuleGate {

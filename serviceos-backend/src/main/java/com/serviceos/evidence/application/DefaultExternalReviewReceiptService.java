@@ -55,6 +55,7 @@ final class DefaultExternalReviewReceiptService implements ExternalReviewReceipt
     private final IdempotencyService idempotency;
     private final AuditAppender audit;
     private final OutboxAppender outbox;
+    private final ReviewRuleGate reviewRuleGate;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
@@ -67,6 +68,7 @@ final class DefaultExternalReviewReceiptService implements ExternalReviewReceipt
             IdempotencyService idempotency,
             AuditAppender audit,
             OutboxAppender outbox,
+            ReviewRuleGate reviewRuleGate,
             ObjectMapper objectMapper,
             Clock clock
     ) {
@@ -78,6 +80,7 @@ final class DefaultExternalReviewReceiptService implements ExternalReviewReceipt
         this.idempotency = idempotency;
         this.audit = audit;
         this.outbox = outbox;
+        this.reviewRuleGate = reviewRuleGate;
         this.objectMapper = objectMapper;
         this.clock = clock;
     }
@@ -149,6 +152,16 @@ final class DefaultExternalReviewReceiptService implements ExternalReviewReceipt
             throw new BusinessProblem(ProblemCode.REVIEW_CASE_ALREADY_DECIDED,
                     "ExternalReviewReceipt requires an OPEN ReviewCase");
         }
+
+        // M329：CLIENT APPROVED 回执前复用冻结 RULE 门禁；REJECTED 不阻断。
+        // 与 Inbox/幂等结果同事务：阻断时整笔回滚，拒绝审计由 REQUIRES_NEW 独立提交。
+        reviewRuleGate.assertDecideAllowed(
+                principal.tenantId(),
+                principal.principalId(),
+                metadata.correlationId(),
+                current.reviewCaseId(),
+                current.taskId(),
+                result);
 
         int updated = reviews.markDecided(
                 principal.tenantId(), current.reviewCaseId(), "OPEN", result, now);
