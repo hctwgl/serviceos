@@ -177,7 +177,12 @@ INSERT INTO wfl_node_instance (
 
 -- 通过真实 task.created Outbox 消费生成 EvidenceSlot；夹具不直接写 evd_* 内部表，
 -- 从而证明冻结 Bundle、Stage 匹配、Inbox 去重与资料解析事务共同成立。
-WITH task_created_payload AS (
+-- createdAt 必须与 outbox.occurred_at 同一毫秒瞬时：Dispatch/Assignee/SLA 消费者会校验
+-- payload.createdAt.equals(message.occurredAt())，否则 IllegalArgumentException 失败关闭整条投递。
+WITH constants AS (
+    SELECT date_trunc('milliseconds', timezone('UTC', clock_timestamp())) AS occurred_ts
+),
+task_created_payload AS (
     SELECT jsonb_build_object(
         'taskId', :'completion_task_id',
         'projectId', '10000000-0000-4000-8000-000000000001',
@@ -191,8 +196,10 @@ WITH task_created_payload AS (
         'status', 'READY',
         'workflowDefinitionVersionId', '20000000-0000-4000-8000-000000000003',
         'workflowDefinitionDigest', repeat('f', 64),
-        'createdAt', to_char(clock_timestamp(), 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
-    ) AS payload
+        'createdAt', to_char(occurred_ts, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+    ) AS payload,
+    occurred_ts
+    FROM constants
 )
 INSERT INTO rel_outbox_event (
     outbox_id, event_id, module_name, event_type, schema_version,
@@ -205,5 +212,5 @@ SELECT
     'task', 'task.created', 1, 'Task', :'completion_task_id', 1, 'tenant-local',
     :'completion_correlation_id', :'completion_start_event_id', :'completion_task_id',
     payload, encode(sha256(convert_to(payload::text, 'UTF8')), 'hex'),
-    'PENDING', now(), 0, now(), now()
+    'PENDING', occurred_ts, 0, occurred_ts, occurred_ts
 FROM task_created_payload;
