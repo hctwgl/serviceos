@@ -30,7 +30,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * M324：冻结 DISPATCH 在 task.created 后自动激活 NETWORK ServiceAssignment。
+ * M324/M332：冻结 DISPATCH 在 task.created 后自动激活 NETWORK，再激活 TECHNICIAN。
  */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = ServiceOsApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE)
@@ -39,6 +39,8 @@ class DispatchPolicyServiceAssignmentPostgresIT {
     private static final UUID PARTNER = UUID.fromString("32400000-0000-4000-8000-000000000001");
     private static final UUID NETWORK_STRONG = UUID.fromString("32400000-0000-4000-8000-0000000000a1");
     private static final UUID NETWORK_WEAK = UUID.fromString("32400000-0000-4000-8000-0000000000a2");
+    private static final UUID TECH_STRONG = UUID.fromString("32400000-0000-4000-8000-0000000000b1");
+    private static final UUID TECH_PRINCIPAL = UUID.fromString("32400000-0000-4000-8000-0000000000c1");
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(
@@ -75,6 +77,7 @@ class DispatchPolicyServiceAssignmentPostgresIT {
                     wfl_node_instance, wfl_stage_instance, wfl_workflow_instance, wo_work_order,
                     cfg_configuration_bundle_item, cfg_configuration_bundle, cfg_configuration_asset_version,
                     prj_project_network, prj_project, aud_audit_record,
+                    net_network_technician_membership, net_technician_profile,
                     net_service_network, net_partner_organization CASCADE
                 """).update();
         projectId = UUID.randomUUID();
@@ -110,11 +113,15 @@ class DispatchPolicyServiceAssignmentPostgresIT {
                 """).query().singleRow())
                 .containsEntry("assignee_id", NETWORK_STRONG.toString())
                 .containsEntry("status", "ACTIVE");
+        // 无师傅夹具时 NETWORK 仍成立，TECHNICIAN 进入 MANUAL。
         assertThat(jdbc.sql("""
-                SELECT status FROM dsp_capacity_reservation
-                 WHERE tenant_id = :tenantId
-                """).param("tenantId", TENANT).query(String.class).single())
-                .isEqualTo("CONFIRMED");
+                SELECT count(*) FROM dsp_service_assignment
+                 WHERE responsibility_level = 'TECHNICIAN'
+                """).query(Long.class).single()).isZero();
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM aud_audit_record
+                 WHERE action_name = 'SERVICE_DISPATCH_TECHNICIAN_POLICY_MANUAL'
+                """).query(Long.class).single()).isGreaterThanOrEqualTo(1);
         assertThat(jdbc.sql("""
                 SELECT count(*) FROM rel_inbox_record
                  WHERE consumer_name = 'task.dispatch-policy.created.v1'
@@ -125,6 +132,30 @@ class DispatchPolicyServiceAssignmentPostgresIT {
                  WHERE action_name = 'SERVICE_DISPATCH_POLICY_APPLIED'
                 """).query(Long.class).single()).isGreaterThanOrEqualTo(1);
         assertThat(dispatchVersionId).isNotNull();
+    }
+
+    @Test
+    void taskCreatedActivatesTechnicianUnderTopNetworkWhenCapacityExists() {
+        seedTechnician(TECH_STRONG, TECH_PRINCIPAL, NETWORK_STRONG, "Strong Tech");
+        seedCapacity("TECHNICIAN", TECH_STRONG.toString(), 5, 0);
+        workOrders.receive(receiveCommand(
+                "M332-ORD-1", "c".repeat(64), "VINM3320001", "corr-m332", "cause-m332"));
+        drainOutbox(50);
+
+        assertThat(jdbc.sql("""
+                SELECT assignee_id FROM dsp_service_assignment
+                 WHERE responsibility_level = 'NETWORK' AND status = 'ACTIVE'
+                """).query(String.class).single()).isEqualTo(NETWORK_STRONG.toString());
+        assertThat(jdbc.sql("""
+                SELECT assignee_id, status FROM dsp_service_assignment
+                 WHERE responsibility_level = 'TECHNICIAN'
+                """).query().singleRow())
+                .containsEntry("assignee_id", TECH_STRONG.toString())
+                .containsEntry("status", "ACTIVE");
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM aud_audit_record
+                 WHERE action_name = 'SERVICE_DISPATCH_TECHNICIAN_POLICY_APPLIED'
+                """).query(Long.class).single()).isGreaterThanOrEqualTo(1);
     }
 
     @Test
@@ -241,22 +272,53 @@ class DispatchPolicyServiceAssignmentPostgresIT {
                     .param("networkId", networkId.toString())
                     .update();
         }
-        seedCapacity(NETWORK_STRONG.toString(), 10, 1);
-        seedCapacity(NETWORK_WEAK.toString(), 3, 1);
+        seedCapacity("NETWORK", NETWORK_STRONG.toString(), 10, 1);
+        seedCapacity("NETWORK", NETWORK_WEAK.toString(), 3, 1);
     }
 
-    private void seedCapacity(String assigneeId, int maxUnits, int occupied) {
+    private void seedTechnician(UUID profileId, UUID principalId, UUID networkId, String name) {
+        jdbc.sql("""
+                INSERT INTO net_technician_profile (
+                    technician_profile_id, tenant_id, principal_id, display_name, profile_status,
+                    aggregate_version, created_at, updated_at
+                ) VALUES (
+                    :id, :tenant, :principal, :name, 'ACTIVE', 1, now(), now()
+                )
+                """)
+                .param("id", profileId)
+                .param("tenant", TENANT)
+                .param("principal", principalId)
+                .param("name", name)
+                .update();
+        jdbc.sql("""
+                INSERT INTO net_network_technician_membership (
+                    membership_id, tenant_id, service_network_id, technician_profile_id,
+                    membership_status, valid_from, created_by, created_at, aggregate_version
+                ) VALUES (
+                    :id, :tenant, :network, :profile,
+                    'ACTIVE', now() - interval '1 day', 'm332', now(), 1
+                )
+                """)
+                .param("id", UUID.randomUUID())
+                .param("tenant", TENANT)
+                .param("network", networkId)
+                .param("profile", profileId)
+                .update();
+    }
+
+    private void seedCapacity(String level, String assigneeId, int maxUnits, int occupied) {
         jdbc.sql("""
                 INSERT INTO dsp_capacity_counter (
                     capacity_counter_id, tenant_id, responsibility_level, assignee_id,
                     business_type, max_units, occupied_units, version, updated_by, updated_at
                 ) VALUES (
-                    :id, :tenant, 'NETWORK', :assignee,
+                    :id, :tenant, :level, :assignee,
                     'HOME_CHARGING_SURVEY_INSTALL', :maxUnits, :occupied, 1, 'm324', now()
                 )
                 """)
                 .param("id", UUID.randomUUID())
                 .param("tenant", TENANT)
+                .param("level", level)
                 .param("assignee", assigneeId)
                 .param("maxUnits", maxUnits)
                 .param("occupied", occupied)

@@ -8,6 +8,7 @@ import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.dispatch.api.AbortServiceAssignmentActivationCommand;
 import com.serviceos.dispatch.api.ActivateNetworkFromFrozenDispatchCommand;
 import com.serviceos.dispatch.api.ActivateServiceAssignmentCommand;
+import com.serviceos.dispatch.api.ActivateTechnicianFromFrozenDispatchCommand;
 import com.serviceos.dispatch.api.CompleteServiceAssignmentActivationCommand;
 import com.serviceos.dispatch.api.CompleteServiceAssignmentAbortCommand;
 import com.serviceos.dispatch.api.ConfirmTaskAssignmentPreparedCommand;
@@ -60,6 +61,7 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
     private static final String CAPABILITY = "dispatch.assignment.manage";
     private static final String SYSTEM_ACTOR = "system:dispatch-policy";
     private static final String POLICY_OPERATION = "dispatch.assignment.activate-from-policy";
+    private static final String POLICY_TECH_OPERATION = "dispatch.assignment.activate-tech-from-policy";
 
     private final JdbcClient jdbc;
     private final AuthorizationService authorization;
@@ -179,6 +181,94 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
         }
         insertFrozenReceipt(context, POLICY_OPERATION, completed);
         idempotency.complete(context, POLICY_OPERATION, completed.serviceAssignmentId().toString(),
+                Sha256.digest(serialize(completed)));
+        return completed;
+    }
+
+    @Override
+    @Transactional
+    public ServiceAssignmentReceipt activateTechnicianFromFrozenDispatchPolicy(
+            String tenantId,
+            String correlationId,
+            ActivateTechnicianFromFrozenDispatchCommand command
+    ) {
+        // Inbox 系统路径：与 NETWORK 同构，责任级别改为 TECHNICIAN。
+        CurrentPrincipal system = new CurrentPrincipal(
+                SYSTEM_ACTOR, tenantId, CurrentPrincipal.PrincipalType.USER,
+                "dispatch-policy", Set.of());
+        String stem = "dpt:" + Sha256.digest(command.taskId() + "|" + command.sourceDecisionId())
+                .substring(0, 40);
+        CommandContext context = new CommandContext(tenantId, SYSTEM_ACTOR, correlationId, stem);
+        String digest = Sha256.digest(command.workOrderId() + "|" + command.taskId() + "|"
+                + command.technicianAssigneeId() + "|" + command.businessType() + "|"
+                + command.sourceDecisionId() + "|" + command.expectedCapacityVersion());
+        IdempotencyDecision decision = idempotency.begin(context, POLICY_TECH_OPERATION, digest);
+        if (decision.kind() == IdempotencyDecision.Kind.REPLAY) {
+            return frozenReceipt(context, POLICY_TECH_OPERATION);
+        }
+
+        var existing = jdbc.sql("""
+                        SELECT a.service_assignment_id AS "serviceAssignmentId",
+                               a.activation_saga_id AS "sagaId",
+                               a.assignee_id AS "assigneeId",
+                               r.capacity_reservation_id AS "reservationId",
+                               coalesce(s.version, 0) AS "sagaVersion"
+                          FROM dsp_service_assignment a
+                          JOIN dsp_capacity_reservation r
+                            ON r.tenant_id = a.tenant_id
+                           AND r.service_assignment_id = a.service_assignment_id
+                           AND r.status = 'CONFIRMED'
+                          LEFT JOIN dsp_service_assignment_activation_saga s
+                            ON s.tenant_id = a.tenant_id
+                           AND s.activation_saga_id = a.activation_saga_id
+                         WHERE a.tenant_id = :tenantId AND a.task_id = :taskId
+                           AND a.responsibility_level = 'TECHNICIAN' AND a.status = 'ACTIVE'
+                         ORDER BY a.created_at
+                         LIMIT 1
+                        """)
+                .param("tenantId", tenantId)
+                .param("taskId", command.taskId())
+                .query(ActiveNetworkRow.class)
+                .optional();
+        ServiceAssignmentReceipt completed;
+        if (existing.isPresent()) {
+            ActiveNetworkRow row = existing.get();
+            if (!row.assigneeId().equals(command.technicianAssigneeId())) {
+                throw new BusinessProblem(ProblemCode.SERVICE_ASSIGNMENT_CONFLICT,
+                        "ACTIVE TECHNICIAN responsibility already belongs to another assignee");
+            }
+            completed = new ServiceAssignmentReceipt(
+                    row.serviceAssignmentId(), row.sagaId(), command.taskId(),
+                    row.reservationId(), "ACTIVE", "COMPLETED",
+                    row.sagaVersion(), clock.instant());
+        } else {
+            ServiceAssignmentReceipt pending = prepare(
+                    system, child(correlationId, stem + "-p"),
+                    new PrepareServiceAssignmentCommand(
+                            UUID.randomUUID(), command.workOrderId(), command.taskId(),
+                            ResponsibilityLevel.TECHNICIAN, command.technicianAssigneeId(),
+                            command.businessType(), command.sourceDecisionId(),
+                            null, null, command.expectedCapacityVersion()));
+            UUID preparedId = UUID.randomUUID();
+            confirmTaskPrepared(
+                    system, child(correlationId, stem + "-t"),
+                    new ConfirmTaskAssignmentPreparedCommand(
+                            pending.sagaId(), pending.serviceAssignmentId(), command.taskId(),
+                            UUID.randomUUID(), preparedId, 1));
+            ServiceAssignmentReceipt activated = activate(
+                    system, child(correlationId, stem + "-a"),
+                    new ActivateServiceAssignmentCommand(
+                            pending.sagaId(), pending.serviceAssignmentId(), 2,
+                            "authority://dispatch-policy/" + command.technicianAssigneeId(), 1,
+                            "fence://dispatch-policy/" + command.technicianAssigneeId(),
+                            "dispatch-policy-geo-v1"));
+            completed = complete(
+                    system, child(correlationId, stem + "-c"),
+                    new CompleteServiceAssignmentActivationCommand(
+                            activated.sagaId(), activated.serviceAssignmentId(), preparedId, 3));
+        }
+        insertFrozenReceipt(context, POLICY_TECH_OPERATION, completed);
+        idempotency.complete(context, POLICY_TECH_OPERATION, completed.serviceAssignmentId().toString(),
                 Sha256.digest(serialize(completed)));
         return completed;
     }

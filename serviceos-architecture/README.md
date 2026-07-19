@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M331 出站提审仅 Mapping Payload**（https://github.com/hctwgl/serviceos/pull/158；栈 `#148→…→#158`）
+当前工程基线为 **M332 DISPATCH TECHNICIAN 自动指派**（Draft PR 待回填；栈 `#148→…→#159`）
 `implementation-status.md`；合入 `master` 后回填合并提交）。M320 合并基线为
 `32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147）。
 
@@ -696,6 +696,8 @@ PRICING SHADOW Snapshot（M327），以及 Admin UNKNOWN 人工处置与批量 R
 - [M330 验收矩阵](testing/327-m330-rule-task-evidence-fulfillment-gate-acceptance.md)
 - [M331 实现文档](architecture/344-m331-outbound-mapping-only-payload.md)
 - [M331 验收矩阵](testing/328-m331-outbound-mapping-only-payload-acceptance.md)
+- [M332 实现文档](architecture/345-m332-dispatch-technician-auto-assign.md)
+- [M332 验收矩阵](testing/329-m332-dispatch-technician-auto-assign-acceptance.md)
 - [M327 实现文档](architecture/340-m327-pricing-fulfillment-calculation-snapshot.md)
 - [M327 验收矩阵](testing/324-m327-pricing-fulfillment-calculation-snapshot-acceptance.md)
 - [M326 实现文档](architecture/339-m326-notification-reliable-delivery.md)

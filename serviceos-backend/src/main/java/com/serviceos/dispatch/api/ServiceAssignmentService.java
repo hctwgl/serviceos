@@ -16,6 +16,17 @@ public interface ServiceAssignmentService {
             String correlationId,
             ActivateNetworkFromFrozenDispatchCommand command);
 
+    /**
+     * Inbox 可靠消费路径：冻结 DISPATCH 决议后激活 TECHNICIAN 责任（M332）。
+     *
+     * <p>仅供 {@code task.created} 派单消费者在 ACTIVE NETWORK 之后调用；审计 actor 固定为
+     * {@code system:dispatch-policy}；走 protocol v1 初始指派。</p>
+     */
+    ServiceAssignmentReceipt activateTechnicianFromFrozenDispatchPolicy(
+            String tenantId,
+            String correlationId,
+            ActivateTechnicianFromFrozenDispatchCommand command);
+
     ServiceAssignmentReceipt prepare(
             CurrentPrincipal principal,
             CommandMetadata metadata,

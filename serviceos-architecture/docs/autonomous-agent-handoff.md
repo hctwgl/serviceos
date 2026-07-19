@@ -7,30 +7,30 @@ lastUpdated: 2026-07-19
 
 ## 当前
 
-- PR #148～#157：M321～M330 Draft stacked
-- PR #158：https://github.com/hctwgl/serviceos/pull/158 — **M331** 出站提审仅 Mapping（Draft，base=#157）
+- PR #148～#158：M321～M331 Draft stacked
+- PR #159：待创建 — **M332** DISPATCH TECHNICIAN 自动指派（Draft，base=#158）
 - `master`：`32b902f897d19d2c906acac899990bf1aa2bb056`
-- latestMilestone：**M331**
+- latestMilestone：**M332**
 - Flyway：**125**；OpenAPI：**1.0.43**
 
 ## 本回合完成
 
-### M331 出站提审仅 Mapping Payload
+### M332 DISPATCH → TECHNICIAN 自动指派
 
-- 删除 `buildSubmitPayload` / `outboundMappingVersion`（SPI + BYD/Geely Profile）
-- 零 OUTBOUND Mapping → `VALIDATION_FAILED`
-- ReviewCase IT：夹具补齐 Mapping；失败关闭用例；`mappingVersionId` 为资产 UUID
-- 文档：`344-m331-*` / `328-m331-*`
+- NETWORK 成功后解析网点师傅 + TECHNICIAN 容量 → DispatchRuntime → ACTIVE TECHNICIAN
+- 空师傅池 / 无容量：TECHNICIAN MANUAL，保留 NETWORK
+- API：`ActivateTechnicianFromFrozenDispatchCommand`
+- IT：`DispatchPolicyServiceAssignmentPostgresIT`
+- 文档：`345-m332-*` / `329-m332-*`
 
 ### 既有 Draft 栈
 
-- M321～M330（PR #148～#157）
+- M321～M331（PR #148～#158）
 
 ## 验证
 
 ```text
-bash scripts/agent-verify.sh test OutboundReviewSubmissionProfilesTest,GeelyOutboundSubmissionConnectorTest
-bash scripts/agent-verify.sh it ReviewCasePostgresIT
+bash scripts/agent-verify.sh it DispatchPolicyServiceAssignmentPostgresIT
 bash scripts/agent-verify.sh test ArchitectureTest
 ```
 
@@ -41,6 +41,9 @@ bash scripts/agent-verify.sh test ArchitectureTest
 
 ## 下一步
 
+本地 Configuration-Driven Runtime 主线（Mapping→ASSIGNEE→DISPATCH NETWORK/TECH→RULE→NOTIFICATION→PRICING→Admin）
+已交付至 M332 Draft 栈。后续优先：
+
 1. Mapping：入站全量字段仅 Mapping；defaults / enum / condition DSL
-2. DISPATCH：TECHNICIAN 自动指派
-3. 低代码深化；吉利材料齐备后联调
+2. DISPATCH 地图/比例分配；低代码深化
+3. 吉利材料齐备后联调

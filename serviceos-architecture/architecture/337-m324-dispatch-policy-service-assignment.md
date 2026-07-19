@@ -23,7 +23,7 @@ HUMAN Task 创建时，若工作流节点冻结了 `dispatchPolicyRef`，则在 
   - 非空 rank=1 → `activateNetworkFromFrozenDispatchPolicy`（protocol v1：prepare→confirm→activate→complete）
   - 空池 / MANUAL_INTERVENTION / 无容量计数 → 审计 `SERVICE_DISPATCH_POLICY_MANUAL`，不写派单
 - 明确不做：
-  - TECHNICIAN 自动指派
+  - TECHNICIAN 自动指派（见 **M332**）
   - ServiceCoverage / 指标快照权威
   - 比例分配闭环、地图 scope
   - 自动 `CapacityAuthorityService.configure` 扩容
