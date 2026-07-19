@@ -674,13 +674,13 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M309 PRICING 运行时**（功能证据见 `implementation-status.md` 的
+当前工程基线为 **M310 SERVICEOS_EXPR_V1 条件积木**（功能证据见 `implementation-status.md` 的
 `baselineCommit`；合入 `master` 后改为合并提交）。M296 及之前基线合并提交为
 `f3b623453a33ece91a691438b0c541e53c3282df`。
 
 当前已具备多 OEM 入站建单/审核回调管道 SPI、出站提审通用 SPI、复杂流程运行时、十大配置资产设计器，
 以及 INTEGRATION/ASSIGNEE/DISPATCH/NOTIFICATION/RULE/PRICING 冻结 Bundle 运行时。
-下一主线是业务低代码设计器增强（P3）与第二 OEM（P4）；真实 OEM Sandbox 与 Track F/G 仍为
+下一主线是 P3 设计器深化与第二 OEM（P4；缺 Sandbox 则 BLOCKED_EXTERNAL）；真实 OEM Sandbox 与 Track F/G 仍为
 `BLOCKED_EXTERNAL`。
 
 权威进度入口：
@@ -688,6 +688,8 @@ serviceos-architecture/
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M310 实现文档](architecture/323-m310-condition-builder.md)
+- [M310 验收矩阵](testing/307-m310-condition-builder-acceptance.md)
 - [M309 实现文档](architecture/322-m309-pricing-runtime.md)
 - [M309 验收矩阵](testing/306-m309-pricing-runtime-acceptance.md)
 - [M308 实现文档](architecture/321-m308-rule-runtime.md)
