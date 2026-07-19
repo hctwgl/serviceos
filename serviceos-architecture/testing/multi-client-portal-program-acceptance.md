@@ -57,7 +57,7 @@ lastUpdated: 2026-07-18
 | MCP-CONTRACT-04 | Page/Action Identity | 同一业务目标复用 pageId/actionCode | M252 single-source registry + backend/OpenAPI alignment tests |
 | MCP-CONTRACT-05 | Unknown Action | 客户端未知 action 安全降级，不自行猜测 | M252 TypeScript/Swift negative probes |
 | MCP-CONTRACT-06 | Schema 版本 | 表单、Evidence 和 WorkPackage 版本可声明与校验 | schema tests |
-| MCP-CONTRACT-07 | 兼容元数据 | clientKind/clientVersion/支持能力可观测 | M253 bounded headers + Web/iOS emission + backend MDC/Trace；M258 固定 `TECHNICIAN_IOS`/语义版本；**M356** FORM/EVIDENCE 发布能力门禁与分端报告（灰度/运行时拒单仍 pending） |
+| MCP-CONTRACT-07 | 兼容元数据 | clientKind/clientVersion/支持能力可观测 | M253 bounded headers + Web/iOS emission + backend MDC/Trace；M258 固定 `TECHNICIAN_IOS`/语义版本；**M356** FORM/EVIDENCE 发布能力门禁与分端报告；**M357** 师傅端运行时拒单（灰度/`supportedClientKinds` 仍 pending） |
 | MCP-CONTRACT-08 | Design Token | Web/iOS 从同一无角色假设机器源生成 | M249 reproducibility + CSS/Swift compile gate + M258 Foundation 实际编译链接生成 Swift Token |
 
 ## 6. Technician H5 在线参考实现

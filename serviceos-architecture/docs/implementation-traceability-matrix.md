@@ -450,4 +450,5 @@ Feature gate/authority: if applicable
 | M353 | ReviewCase targetDecisions 正式裁决 | OpenAPI 1.0.49 + V130 + DefaultReviewCaseService.decide + Admin 提交 + Review/Correction/RuleGate IT + 366-m353-* + 350-m353-* | 独立审核 Task 模板分离；完整 28 场景 E2E（M355） |
 | M354 | 终审驳回整改深链与版本链 | Correction 同事务创建 + CorrectionCaseDetail 深链 + Correction/Review IT + 367-m354-* + 351-m354-* | 终审后更正批次 |
 | M355 | 平台终审真实端到端门禁收口 | IT/Client/Admin build 证据矩阵 + 368-m355-* + 352-m355-* | 完整视觉 8 态人工基线、admin-pilot 全量 28 场景实拍 |
-| M356 | FORM/EVIDENCE 客户端能力兼容发布门禁 | OpenAPI 1.0.50 `clientCompatibility` + ClientCapabilityCatalog/Gate + Draft validate/publish 复检 + Admin 设计器报告 + 审计 + Unit/PostgresIT + 369-m356-* + 353-m356-* | 灰度定向发布、任务详情运行时拒单、iOS 条件全量硬阻断、动态能力注册 |
+| M356 | FORM/EVIDENCE 客户端能力兼容发布门禁 | OpenAPI 1.0.50 `clientCompatibility` + ClientCapabilityCatalog/Gate + Draft validate/publish 复检 + Admin 设计器报告 + 审计 + Unit/PostgresIT + 369-m356-* + 353-m356-* | 灰度定向发布、iOS 条件全量硬阻断、动态能力注册（运行时拒单见 M357） |
+| M357 | 师傅端运行时客户端能力拒单 | OpenAPI 1.0.51 `CLIENT_CAPABILITY_UNSUPPORTED` + ClientCapabilityRuntimeGate + Technician Form/Evidence 适配层复检 + H5 detail 展示 + Unit/Security + 370-m357-* + 354-m357-* | 灰度定向发布、UNKNOWN 强制升级、Feed/详情头拒单、iOS 条件全量硬阻断、整改路径专用增强 |
