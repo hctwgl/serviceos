@@ -674,8 +674,8 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M339 UPDATE/CANCEL 强制 INBOUND Mapping**（栈 `#148→…→#165` + 本切片；
-见 `implementation-status.md`；`baselineCommit=PENDING_FEATURE_COMMIT`）。M320 合并基线为
+当前工程基线为 **M339 UPDATE/CANCEL 强制 INBOUND Mapping**（https://github.com/hctwgl/serviceos/pull/166；栈 `#148→…→#166`；
+见 `implementation-status.md`；合入 `master` 后回填合并提交）。M320 合并基线为
 `32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147）。
 
 当前已具备多 OEM SPI、远端查询、UNKNOWN/批量重放、复杂流程、十大资产设计器、六类 Runtime，
