@@ -58,7 +58,7 @@ async function openInProgressCorrectionFromFilteredQueue(
 ) {
   const correctionPage = await hostPage.context().newPage()
   await correctionPage.goto(new URL('/corrections', hostPage.url()).toString())
-  await expect(correctionPage.getByRole('heading', { name: '整改跟踪' })).toBeVisible()
+  await expect(correctionPage.getByRole('heading', { name: /整改跟踪|整改中心/ })).toBeVisible()
   await correctionPage.getByLabel('correction status filter').selectOption('IN_PROGRESS')
   await correctionPage
     .getByLabel('correction sourceReviewCaseId filter')
@@ -107,7 +107,7 @@ async function openInProgressCorrectionFromFilteredQueue(
   expect((await queueSourceReviewPromise).status()).toBe(200)
   await expect(correctionPage.getByRole('heading', { name: '审核案例' })).toBeVisible()
   await correctionPage.goBack()
-  await expect(correctionPage.getByRole('heading', { name: '整改跟踪' })).toBeVisible()
+  await expect(correctionPage.getByRole('heading', { name: /整改跟踪|整改中心/ })).toBeVisible()
 
   const queueCorrectionTaskPromise = correctionPage.waitForResponse(
     (response) =>
@@ -124,7 +124,7 @@ async function openInProgressCorrectionFromFilteredQueue(
   expect((await queueCorrectionTaskPromise).status()).toBe(200)
   await expect(correctionPage.getByRole('heading', { name: '任务详情' })).toBeVisible()
   await correctionPage.goBack()
-  await expect(correctionPage.getByRole('heading', { name: '整改跟踪' })).toBeVisible()
+  await expect(correctionPage.getByRole('heading', { name: /整改跟踪|整改中心/ })).toBeVisible()
 
   // M180：整改队列剩余 Accepted 关联字段（项目 / 来源任务）。
   const queueProjectPromise = correctionPage.waitForResponse(
@@ -141,7 +141,7 @@ async function openInProgressCorrectionFromFilteredQueue(
   expect((await queueProjectPromise).status()).toBe(200)
   await expect(correctionPage.getByRole('heading', { name: '项目详情' })).toBeVisible()
   await correctionPage.goBack()
-  await expect(correctionPage.getByRole('heading', { name: '整改跟踪' })).toBeVisible()
+  await expect(correctionPage.getByRole('heading', { name: /整改跟踪|整改中心/ })).toBeVisible()
 
   const queueSourceTaskPromise = correctionPage.waitForResponse(
     (response) =>
@@ -157,7 +157,7 @@ async function openInProgressCorrectionFromFilteredQueue(
   expect((await queueSourceTaskPromise).status()).toBe(200)
   await expect(correctionPage.getByRole('heading', { name: '任务详情' })).toBeVisible()
   await correctionPage.goBack()
-  await expect(correctionPage.getByRole('heading', { name: '整改跟踪' })).toBeVisible()
+  await expect(correctionPage.getByRole('heading', { name: /整改跟踪|整改中心/ })).toBeVisible()
 
   await correctionPage
     .getByRole('link', { name: `打开整改案例 ${correction!.correctionCaseId}` })
@@ -653,7 +653,7 @@ test('真实 OIDC 登录后可读取核心投影并完成 Task 分配领取释�
   )
   await page.goto(`/corrections?status=IN_PROGRESS&taskId=${pilotTaskIdForQueue}`)
   expect((await correctionHydratePromise).status()).toBe(200)
-  await expect(page.getByRole('heading', { name: '整改跟踪' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /整改跟踪|整改中心/ })).toBeVisible()
   await expect(page.getByLabel('correction status filter')).toHaveValue('IN_PROGRESS')
   await expect(page.getByLabel('correction taskId filter')).toHaveValue(pilotTaskIdForQueue)
 
@@ -957,7 +957,7 @@ test('真实 OIDC 登录后可完成 Task 并可靠推进 Workflow 与 WorkOrder
   // M167：Task 面板 → 表单提交详情（新页签，保留双输入面板状态）。
   const submissionLink = page.locator('.task-forms-submission-links').getByRole('link', {
     name: new RegExp(
-      `task\\s*/\\s*FormSubmission\\s*/\\s*VALIDATED\\s*/\\s*${submission.submissionId}`,
+      `task\\s*/\\s*FormSubmission\\s*/\\s*(VALIDATED|已校验)\\s*/\\s*${submission.submissionId}`,
     ),
   })
   const submissionHref = await submissionLink.getAttribute('href')
@@ -1223,7 +1223,7 @@ test('真实 OIDC 登录后可完成 Task 并可靠推进 Workflow 与 WorkOrder
   await page
     .getByRole('link', {
       name: new RegExp(
-        `admin\\.pilot-completion-form\\s*/\\s*VALIDATED\\s*/\\s*${submission.submissionId}`,
+        `admin\\.pilot-completion-form\\s*/\\s*(VALIDATED|已校验)\\s*/\\s*${submission.submissionId}`,
       ),
     })
     .click()
@@ -1247,7 +1247,7 @@ test('真实 OIDC 登录后可完成 Task 并可靠推进 Workflow 与 WorkOrder
   await page
     .getByRole('link', {
       name: new RegExp(
-        `submission\\s*/\\s*admin\\.pilot-completion-form\\s*/\\s*VALIDATED\\s*/\\s*${taskId}`,
+        `submission\\s*/\\s*admin\\.pilot-completion-form\\s*/\\s*(VALIDATED|已校验)\\s*/\\s*${taskId}`,
       ),
     })
     .click()

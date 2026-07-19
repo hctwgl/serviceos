@@ -285,7 +285,41 @@ onMounted(() => {
         :key="item.correctionCaseId"
         :to="{ name: 'ADMIN.CORRECTION.DETAIL', params: { id: item.correctionCaseId } }"
       >
-        打开整改单
+        打开整改案例 {{ item.correctionCaseId }}
+      </RouterLink>
+    </p>
+    <p
+      v-if="clientFilter(page?.items ?? []).length"
+      class="links correction-queue-cross-links"
+    >
+      打开关联资源：
+      <RouterLink
+        v-for="item in clientFilter(page?.items ?? [])"
+        :key="`src-review-${item.correctionCaseId}`"
+        :to="{ name: 'ADMIN.REVIEW.DETAIL', params: { id: item.sourceReviewCaseId } }"
+      >
+        打开源审核 {{ item.sourceReviewCaseId }}
+      </RouterLink>
+      <RouterLink
+        v-for="item in clientFilter(page?.items ?? []).filter((i) => i.correctionTaskId)"
+        :key="`corr-task-${item.correctionCaseId}`"
+        :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: item.correctionTaskId! } }"
+      >
+        打开整改任务 {{ item.correctionTaskId }}
+      </RouterLink>
+      <RouterLink
+        v-for="item in clientFilter(page?.items ?? [])"
+        :key="`project-${item.correctionCaseId}`"
+        :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: item.projectId } }"
+      >
+        打开项目 {{ item.projectId }}
+      </RouterLink>
+      <RouterLink
+        v-for="item in clientFilter(page?.items ?? [])"
+        :key="`src-task-${item.correctionCaseId}`"
+        :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: item.taskId } }"
+      >
+        打开来源任务 {{ item.taskId }}
       </RouterLink>
     </p>
   </section>

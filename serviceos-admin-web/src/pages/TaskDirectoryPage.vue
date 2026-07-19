@@ -14,6 +14,7 @@ const linkColumns: Record<
 > = {
   id: (row) => uuidRoute(row.id, 'ADMIN.TASK.DETAIL'),
   workOrderId: (row) => uuidRoute(row.workOrderId, 'ADMIN.WORKORDER.WORKSPACE'),
+  projectId: (row) => uuidRoute(row.projectId, 'ADMIN.PROJECT.DETAIL'),
 }
 
 const route = useRoute()
@@ -236,7 +237,7 @@ onMounted(() => {
         :key="`project-${item.id}`"
         :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: item.projectId! } }"
       >
-        打开项目
+        打开项目 {{ item.projectId }}
       </RouterLink>
     </p>
   </section>
