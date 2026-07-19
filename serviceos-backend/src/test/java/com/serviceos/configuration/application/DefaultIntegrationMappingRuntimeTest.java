@@ -53,6 +53,23 @@ class DefaultIntegrationMappingRuntimeTest {
     }
 
     @Test
+    void selectsInboundMappingByConnectorCode() {
+        String definition = """
+                {"mappingKey":"byd-create-v1","version":"1.0.0","connectorCode":"BYD_CPIM","direction":"INBOUND",
+                 "fieldMappings":[{"mappingId":"order","externalPath":"orderCode","internalPath":"externalOrderCode","required":true,"transform":"TRIM"}]}
+                """;
+        var runtime = runtimeWith(definition);
+        assertThat(runtime.hasInboundMappingForConnector(
+                "tenant-a", UUID.randomUUID(), "a".repeat(64), "BYD_CPIM")).isTrue();
+        assertThat(runtime.hasInboundMappingForConnector(
+                "tenant-a", UUID.randomUUID(), "a".repeat(64), "OTHER")).isFalse();
+        assertThat(runtime.applyInboundForConnectorIfPresent(
+                "tenant-a", UUID.randomUUID(), "a".repeat(64), "BYD_CPIM",
+                Map.of("orderCode", "  X  ")).orElseThrow().internalFields().get("externalOrderCode"))
+                .isEqualTo("X");
+    }
+
+    @Test
     void failsClosedWhenRequiredMissingOrUnknownTransform() {
         String missingRequired = """
                 {"mappingKey":"m1","version":"1.0.0","connectorCode":"BYD_CPIM","direction":"INBOUND",

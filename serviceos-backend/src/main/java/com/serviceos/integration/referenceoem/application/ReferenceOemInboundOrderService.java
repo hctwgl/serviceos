@@ -21,6 +21,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -156,6 +157,8 @@ public class ReferenceOemInboundOrderService {
                 MAPPING_VERSION,
                 canonicalPayload);
 
+        @SuppressWarnings("unchecked")
+        Map<String, Object> externalSource = objectMapper.convertValue(payload, Map.class);
         InboundCreateWorkOrderResult result = createWorkOrderPipeline.processMappedCreateWorkOrder(
                 envelope,
                 new ConnectorIdentity(CONNECTOR_CODE, ADAPTER_VERSION),
@@ -164,7 +167,8 @@ public class ReferenceOemInboundOrderService {
                 inbound,
                 audit,
                 safeCorrelationId,
-                OBJECT_NAMESPACE);
+                OBJECT_NAMESPACE,
+                Map.copyOf(externalSource));
         return toResponse(result, payload.externalOrderCode());
     }
 

@@ -200,7 +200,7 @@ public class BydCpimInboundOrderService {
 
         InboundCreateWorkOrderResult result = createWorkOrderPipeline.processMappedCreateWorkOrder(
                 envelope, CONNECTOR, tenantId, projectCode, inbound, auditContext,
-                safeCorrelationId, OBJECT_NAMESPACE);
+                safeCorrelationId, OBJECT_NAMESPACE, Map.copyOf(rawParameters));
         return finish(toResponse(result, mapped.externalOrderCode()), headers);
     }
 

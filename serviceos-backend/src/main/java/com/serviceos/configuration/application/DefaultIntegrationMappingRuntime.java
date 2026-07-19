@@ -23,7 +23,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * 冻结 Bundle INTEGRATION Mapping 执行器。
@@ -67,7 +69,65 @@ public class DefaultIntegrationMappingRuntime implements IntegrationMappingRunti
             throw new BusinessProblem(ProblemCode.INTERNAL_ERROR,
                     "Multiple INTEGRATION assets share mappingKey in frozen bundle: " + command.mappingKey());
         }
-        ConfigurationAssetDefinition asset = matches.getFirst();
+        return executeInbound(matches.getFirst(), command.externalPayload());
+    }
+
+    @Override
+    public boolean hasInboundMappingForConnector(
+            String tenantId,
+            UUID bundleId,
+            String expectedManifestDigest,
+            String connectorCode
+    ) {
+        return findInboundAssetsForConnector(
+                tenantId, bundleId, expectedManifestDigest, connectorCode).isPresent();
+    }
+
+    @Override
+    public Optional<IntegrationMappingResult> applyInboundForConnectorIfPresent(
+            String tenantId,
+            UUID bundleId,
+            String expectedManifestDigest,
+            String connectorCode,
+            Map<String, Object> externalPayload
+    ) {
+        Objects.requireNonNull(externalPayload, "externalPayload");
+        return findInboundAssetsForConnector(
+                tenantId, bundleId, expectedManifestDigest, connectorCode)
+                .map(asset -> executeInbound(asset, externalPayload));
+    }
+
+    private Optional<ConfigurationAssetDefinition> findInboundAssetsForConnector(
+            String tenantId,
+            UUID bundleId,
+            String expectedManifestDigest,
+            String connectorCode
+    ) {
+        String safeConnector = requiredText(connectorCode, "connectorCode");
+        List<ConfigurationAssetDefinition> assets = configurations.listBundleAssets(
+                tenantId, bundleId, expectedManifestDigest, ConfigurationAssetType.INTEGRATION);
+        List<ConfigurationAssetDefinition> matches = assets.stream()
+                .filter(asset -> {
+                    MappingDefinition definition = parse(asset.definitionJson());
+                    return "INBOUND".equals(definition.direction())
+                            && safeConnector.equals(definition.connectorCode());
+                })
+                .toList();
+        if (matches.isEmpty()) {
+            return Optional.empty();
+        }
+        if (matches.size() > 1) {
+            throw new BusinessProblem(ProblemCode.INTERNAL_ERROR,
+                    "Multiple INBOUND INTEGRATION mappings for connector in frozen bundle: "
+                            + safeConnector);
+        }
+        return Optional.of(matches.getFirst());
+    }
+
+    private IntegrationMappingResult executeInbound(
+            ConfigurationAssetDefinition asset,
+            Map<String, Object> externalPayload
+    ) {
         MappingDefinition definition = parse(asset.definitionJson());
         if (!"INBOUND".equals(definition.direction())) {
             throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
@@ -76,7 +136,7 @@ public class DefaultIntegrationMappingRuntime implements IntegrationMappingRunti
         Map<String, Object> internal = new LinkedHashMap<>();
         List<String> explanations = new ArrayList<>();
         for (FieldMapping mapping : definition.fieldMappings()) {
-            Object raw = readPath(command.externalPayload(), mapping.externalPath());
+            Object raw = readPath(externalPayload, mapping.externalPath());
             if (raw == null || (raw instanceof String s && s.isBlank())) {
                 if (mapping.required()) {
                     throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
@@ -104,6 +164,13 @@ public class DefaultIntegrationMappingRuntime implements IntegrationMappingRunti
                 definition.direction(),
                 internal,
                 explanations);
+    }
+
+    private static String requiredText(String value, String field) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(field + " must not be blank");
+        }
+        return value.trim();
     }
 
     private String readMappingKey(ConfigurationAssetDefinition asset) {
