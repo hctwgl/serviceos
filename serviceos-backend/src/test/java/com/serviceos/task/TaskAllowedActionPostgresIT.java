@@ -164,8 +164,8 @@ class TaskAllowedActionPostgresIT {
                 principal("reader", "another-tenant"), "corr-cross", humanTask))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.RESOURCE_NOT_FOUND));
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("120");
-        assertThat(flyway.info().applied()).hasSize(122);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("122");
+        assertThat(flyway.info().applied()).hasSize(124);
     }
 
     private void assertActionCodes(CurrentPrincipal principal, UUID taskId, String... codes) {

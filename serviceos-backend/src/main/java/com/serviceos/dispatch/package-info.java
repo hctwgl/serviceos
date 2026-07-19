@@ -5,7 +5,8 @@
         displayName = "Dispatch and Service Assignment",
         allowedDependencies = {
                 "shared", "identity::api", "authorization::api",
-                "audit::api", "reliability::api", "reliability::spi", "task::api", "network::api"
+                "audit::api", "reliability::api", "reliability::spi", "task::api",
+                "network::api", "project::api", "configuration::api", "workorder::api"
         }
 )
 package com.serviceos.dispatch;

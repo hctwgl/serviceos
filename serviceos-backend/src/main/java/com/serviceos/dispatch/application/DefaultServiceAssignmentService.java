@@ -6,11 +6,13 @@ import com.serviceos.authorization.api.AuthorizationDecision;
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.dispatch.api.AbortServiceAssignmentActivationCommand;
+import com.serviceos.dispatch.api.ActivateNetworkFromFrozenDispatchCommand;
 import com.serviceos.dispatch.api.ActivateServiceAssignmentCommand;
 import com.serviceos.dispatch.api.CompleteServiceAssignmentActivationCommand;
 import com.serviceos.dispatch.api.CompleteServiceAssignmentAbortCommand;
 import com.serviceos.dispatch.api.ConfirmTaskAssignmentPreparedCommand;
 import com.serviceos.dispatch.api.PrepareServiceAssignmentCommand;
+import com.serviceos.dispatch.api.ResponsibilityLevel;
 import com.serviceos.dispatch.api.ServiceAssignmentChangedPayload;
 import com.serviceos.dispatch.api.ServiceAssignmentHandshakePayload;
 import com.serviceos.dispatch.api.ServiceAssignmentReceipt;
@@ -35,6 +37,8 @@ import tools.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timestamptz;
@@ -54,6 +58,8 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
     private static final String COMPLETE_ABORT = "dispatch.assignment.complete-abort";
     private static final String COMPLETE = "dispatch.assignment.complete";
     private static final String CAPABILITY = "dispatch.assignment.manage";
+    private static final String SYSTEM_ACTOR = "system:dispatch-policy";
+    private static final String POLICY_OPERATION = "dispatch.assignment.activate-from-policy";
 
     private final JdbcClient jdbc;
     private final AuthorizationService authorization;
@@ -86,6 +92,95 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
             throw new IllegalArgumentException("activationStageTimeout must be positive");
         }
         this.activationStageTimeout = activationStageTimeout;
+    }
+
+    @Override
+    @Transactional
+    public ServiceAssignmentReceipt activateNetworkFromFrozenDispatchPolicy(
+            String tenantId,
+            String correlationId,
+            ActivateNetworkFromFrozenDispatchCommand command
+    ) {
+        // Inbox 系统路径：复用 protocol v1 初始指派四步，但鉴权短路为系统 actor。
+        CurrentPrincipal system = new CurrentPrincipal(
+                SYSTEM_ACTOR, tenantId, CurrentPrincipal.PrincipalType.USER,
+                "dispatch-policy", Set.of());
+        // 幂等键有 160 上限；决策细节进入 digest，键本身用短摘要。
+        String stem = "dp:" + Sha256.digest(command.taskId() + "|" + command.sourceDecisionId())
+                .substring(0, 40);
+        CommandContext context = new CommandContext(tenantId, SYSTEM_ACTOR, correlationId, stem);
+        String digest = Sha256.digest(command.workOrderId() + "|" + command.taskId() + "|"
+                + command.networkAssigneeId() + "|" + command.businessType() + "|"
+                + command.sourceDecisionId() + "|" + command.expectedCapacityVersion());
+        IdempotencyDecision decision = idempotency.begin(context, POLICY_OPERATION, digest);
+        if (decision.kind() == IdempotencyDecision.Kind.REPLAY) {
+            return frozenReceipt(context, POLICY_OPERATION);
+        }
+
+        var existing = jdbc.sql("""
+                        SELECT a.service_assignment_id AS "serviceAssignmentId",
+                               a.activation_saga_id AS "sagaId",
+                               a.assignee_id AS "assigneeId",
+                               r.capacity_reservation_id AS "reservationId",
+                               coalesce(s.version, 0) AS "sagaVersion"
+                          FROM dsp_service_assignment a
+                          JOIN dsp_capacity_reservation r
+                            ON r.tenant_id = a.tenant_id
+                           AND r.service_assignment_id = a.service_assignment_id
+                           AND r.status = 'CONFIRMED'
+                          LEFT JOIN dsp_service_assignment_activation_saga s
+                            ON s.tenant_id = a.tenant_id
+                           AND s.activation_saga_id = a.activation_saga_id
+                         WHERE a.tenant_id = :tenantId AND a.task_id = :taskId
+                           AND a.responsibility_level = 'NETWORK' AND a.status = 'ACTIVE'
+                         ORDER BY a.created_at
+                         LIMIT 1
+                        """)
+                .param("tenantId", tenantId)
+                .param("taskId", command.taskId())
+                .query(ActiveNetworkRow.class)
+                .optional();
+        ServiceAssignmentReceipt completed;
+        if (existing.isPresent()) {
+            ActiveNetworkRow row = existing.get();
+            if (!row.assigneeId().equals(command.networkAssigneeId())) {
+                throw new BusinessProblem(ProblemCode.SERVICE_ASSIGNMENT_CONFLICT,
+                        "ACTIVE NETWORK responsibility already belongs to another assignee");
+            }
+            completed = new ServiceAssignmentReceipt(
+                    row.serviceAssignmentId(), row.sagaId(), command.taskId(),
+                    row.reservationId(), "ACTIVE", "COMPLETED",
+                    row.sagaVersion(), clock.instant());
+        } else {
+            ServiceAssignmentReceipt pending = prepare(
+                    system, child(correlationId, stem + "-p"),
+                    new PrepareServiceAssignmentCommand(
+                            UUID.randomUUID(), command.workOrderId(), command.taskId(),
+                            ResponsibilityLevel.NETWORK, command.networkAssigneeId(),
+                            command.businessType(), command.sourceDecisionId(),
+                            null, null, command.expectedCapacityVersion()));
+            UUID preparedId = UUID.randomUUID();
+            confirmTaskPrepared(
+                    system, child(correlationId, stem + "-t"),
+                    new ConfirmTaskAssignmentPreparedCommand(
+                            pending.sagaId(), pending.serviceAssignmentId(), command.taskId(),
+                            UUID.randomUUID(), preparedId, 1));
+            ServiceAssignmentReceipt activated = activate(
+                    system, child(correlationId, stem + "-a"),
+                    new ActivateServiceAssignmentCommand(
+                            pending.sagaId(), pending.serviceAssignmentId(), 2,
+                            "authority://dispatch-policy/" + command.networkAssigneeId(), 1,
+                            "fence://dispatch-policy/" + command.networkAssigneeId(),
+                            "dispatch-policy-geo-v1"));
+            completed = complete(
+                    system, child(correlationId, stem + "-c"),
+                    new CompleteServiceAssignmentActivationCommand(
+                            activated.sagaId(), activated.serviceAssignmentId(), preparedId, 3));
+        }
+        insertFrozenReceipt(context, POLICY_OPERATION, completed);
+        idempotency.complete(context, POLICY_OPERATION, completed.serviceAssignmentId().toString(),
+                Sha256.digest(serialize(completed)));
+        return completed;
     }
 
     @Override
@@ -515,6 +610,16 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
     }
 
     private AuthorizationDecision authorize(CurrentPrincipal principal, CommandContext context, UUID taskId) {
+        // M324：仅 Inbox 系统 actor 可短路；HTTP 身份始终来自 JWT，客户端无法伪造该 principalId。
+        if (SYSTEM_ACTOR.equals(principal.principalId())) {
+            return new AuthorizationDecision(
+                    AuthorizationDecision.Effect.ALLOW,
+                    List.of("SYSTEM_DISPATCH_POLICY"),
+                    List.of(),
+                    List.of(),
+                    List.of(),
+                    "dispatch-policy-runtime-v1");
+        }
         // M196：Network Portal 委托期间按 NETWORK scope 鉴权；Admin TENANT 路径不变。
         String networkScope = NetworkScopedDispatchAuthorization.currentNetworkId();
         if (networkScope != null) {
@@ -528,6 +633,19 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
                 AuthorizationRequest.tenantCapability(
                         CAPABILITY, context.tenantId(), "ServiceAssignment", taskId.toString()),
                 context.correlationId());
+    }
+
+    private static CommandMetadata child(String correlationId, String idempotencyKey) {
+        return new CommandMetadata(correlationId, idempotencyKey);
+    }
+
+    private record ActiveNetworkRow(
+            UUID serviceAssignmentId,
+            UUID sagaId,
+            String assigneeId,
+            UUID reservationId,
+            long sagaVersion
+    ) {
     }
 
     private void validateOldAssignment(String tenantId, PrepareServiceAssignmentCommand command) {
