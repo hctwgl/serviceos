@@ -14,6 +14,7 @@ import com.serviceos.integration.spi.ConnectorIdentity;
 import com.serviceos.integration.spi.InboundConnectorAuditContext;
 import com.serviceos.integration.spi.InboundUpdateWorkOrderResult;
 import com.serviceos.integration.spi.UpdateWorkOrderMappedInbound;
+import com.serviceos.integration.spi.UpdateWorkOrderRouteHint;
 import com.serviceos.shared.Sha256;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -33,7 +34,8 @@ import java.util.UUID;
 /**
  * BYD 安装订单更新入站适配器。
  *
- * <p>验签/Nonce 防重放留在本类；详情更新委托 {@link InboundUpdateWorkOrderPipeline}。</p>
+ * <p>M339：验签/Nonce 防重放留在本类；领域字段由冻结 UPDATE Mapping 物化，
+ * 本类仅构造 {@link UpdateWorkOrderRouteHint}。</p>
  */
 @Service
 public class BydCpimUpdateOrderService {
@@ -42,6 +44,7 @@ public class BydCpimUpdateOrderService {
     private static final String MESSAGE_TYPE = UpdateWorkOrderMappedInbound.MESSAGE_TYPE_UPDATE_WORK_ORDER;
     private static final String AUTH_POLICY = "BYD_CPIM_SIGNATURE_V7_3_1";
     private static final String OBJECT_NAMESPACE = "byd-cpim/update";
+    private static final String UPDATE_BUSINESS_PREFIX = "BYD:INSTALL-UPDATE:";
 
     private final ObjectMapper objectMapper;
     private final JdbcBydCpimReplayGuard replayGuard;
@@ -49,7 +52,6 @@ public class BydCpimUpdateOrderService {
     private final ObjectStorageGateway storage;
     private final InboundUpdateWorkOrderPipeline updatePipeline;
     private final BydCpimSignatureVerifier signatureVerifier;
-    private final BydCpimUpdateOrderMapper mapper = new BydCpimUpdateOrderMapper();
     private final TransactionTemplate transactions;
     private final Clock clock;
     private final String tenantId;
@@ -134,28 +136,44 @@ public class BydCpimUpdateOrderService {
         }
 
         store(rawObjectRef, rawPayload, rawDigest);
-        final UpdateWorkOrderMappedInbound mapped;
+
+        InboundConnectorAuditContext auditContext = new InboundConnectorAuditContext(
+                adapterPrincipalId, AUTH_POLICY, "integration.receiveInbound", requestDigest);
+        final UpdateWorkOrderRouteHint routeHint;
         try {
-            mapped = mapper.map(raw, objectMapper);
+            routeHint = toRouteHint(raw);
         } catch (IllegalArgumentException exception) {
-            InboundConnectorAuditContext auditContext = new InboundConnectorAuditContext(
-                    adapterPrincipalId, AUTH_POLICY, "integration.receiveInbound", requestDigest);
-            updatePipeline.reject(envelope, tenantId, null, null, BydCpimUpdateOrderMapper.MAPPING_VERSION,
+            updatePipeline.reject(envelope, tenantId, null, null, null,
                     "INVALID_UPDATE_PAYLOAD", exception.getMessage(), auditContext);
             return BydCpimInboundOrderResponse.rejected("INVALID_UPDATE_PAYLOAD", exception.getMessage());
         }
 
-        InboundConnectorAuditContext auditContext = new InboundConnectorAuditContext(
-                adapterPrincipalId, AUTH_POLICY, "integration.receiveInbound", requestDigest);
-        InboundUpdateWorkOrderResult result = updatePipeline.processMappedUpdate(
-                envelope, CONNECTOR, tenantId, mapped, auditContext, safeCorrelationId, OBJECT_NAMESPACE);
+        InboundUpdateWorkOrderResult result = updatePipeline.processUpdate(
+                envelope, CONNECTOR, tenantId, routeHint, Map.copyOf(raw),
+                auditContext, safeCorrelationId, OBJECT_NAMESPACE);
         return switch (result) {
             case InboundUpdateWorkOrderResult.Accepted accepted -> BydCpimInboundOrderResponse.accepted(
-                    mapped.externalOrderCode(), CONNECTOR.connectorVersionId(),
+                    routeHint.externalOrderCode(), CONNECTOR.connectorVersionId(),
                     accepted.mappingVersionId(), accepted.replay());
             case InboundUpdateWorkOrderResult.Rejected rejected -> BydCpimInboundOrderResponse.rejected(
                     rejected.code(), rejected.message());
         };
+    }
+
+    private static UpdateWorkOrderRouteHint toRouteHint(Map<String, Object> source) {
+        String orderCode = requiredText(source.get("orderCode"), "orderCode", 50);
+        return new UpdateWorkOrderRouteHint(
+                BydCpimOrderMapper.CLIENT_CODE,
+                orderCode,
+                UPDATE_BUSINESS_PREFIX + orderCode);
+    }
+
+    private static String requiredText(Object raw, String field, int maximum) {
+        if (!(raw instanceof String value) || value.isBlank()
+                || !value.equals(value.trim()) || value.length() > maximum) {
+            throw new IllegalArgumentException(field + " is invalid");
+        }
+        return value;
     }
 
     private void store(String objectRef, byte[] content, String digest) {

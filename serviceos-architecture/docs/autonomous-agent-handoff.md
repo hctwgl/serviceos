@@ -7,38 +7,33 @@ lastUpdated: 2026-07-19
 
 ## 当前
 
-- PR #148～#164：M321～M337 Draft stacked
-- PR #165：https://github.com/hctwgl/serviceos/pull/165 — **M338** DISPATCH 比例缺口（Draft，base=#164）
+- PR #148～#165：M321～M338 Draft stacked
+- 本切片：**M339** UPDATE/CANCEL 强制 INBOUND Mapping（branch `cursor/m339-inbound-update-cancel-mapping-required-88d5`）
 - `master`：`32b902f897d19d2c906acac899990bf1aa2bb056`
-- latestMilestone：**M338**
+- latestMilestone：**M339**
 - Flyway：**127**；OpenAPI：**1.0.43**
+- `baselineCommit`：`PENDING_FEATURE_COMMIT`
 
 ## 本回合完成
 
-### M338 DISPATCH 签约比例缺口
+### M339 UPDATE/CANCEL 强制 INBOUND Mapping
 
-- Flyway `V127`：`dsp_network_allocation_target`
-- Target/Actual 查询（ORDER_COUNT / MONTH）；Consumer 填 gap
-- Runtime：`allocationRatio` 门禁；仅 ORDER_COUNT
-- 文档：`351-m338-*` / `335-m338-*`
-
-### M337（同会话先交付）
-
-- PR #164：https://github.com/hctwgl/serviceos/pull/164 — ServiceCoverage 地图
+- Schema `messageType`；INBOUND 选择键 `(connector, direction, messageType)`
+- Update/Cancel RouteHint + Materializer + 管道强制 Mapping/审计
+- 删除 BYD Update/Cancel Java Mapper；GEELY Update/Cancel RouteHint 化
+- 文档：`352-m339-*` / `336-m339-*`
 
 ## 验证
 
 ```text
-bash scripts/agent-verify.sh test DefaultDispatchRuntimeTest
-bash scripts/agent-verify.sh it DispatchPolicyServiceAssignmentPostgresIT
-bash scripts/agent-verify.sh test ArchitectureTest
+bash scripts/agent-verify.sh test DefaultIntegrationMappingRuntimeTest,CreateWorkOrderMappingMaterializerTest,UpdateWorkOrderMappingMaterializerTest,CancelWorkOrderMappingMaterializerTest,ConfigurationSchemaDriftTest,ArchitectureTest
+bash scripts/agent-verify.sh it BydCpimUpdateOrderHttpPostgresIT,BydCpimCancelOrderHttpPostgresIT,GeelyInboundCancelUpdatePostgresIT,BydCpimInboundOrderHttpPostgresIT,GeelyInboundCreateOrderPostgresIT,ReferenceOemInboundOrderPostgresIT,DualOemInboundRegressionPostgresIT,MultiOemParallelCreateSmokePostgresIT
 ```
 
 ## 下一本地主线
 
-1. Update/Cancel Mapping 强制 / Mapper 拆除
-2. 低代码深化（运行时已接入后再做）
-3. 吉利联调 — `BLOCKED_EXTERNAL`
+1. 低代码深化（运行时已接入后再做）
+2. 吉利联调 — `BLOCKED_EXTERNAL`
 
 ## BLOCKED_EXTERNAL
 

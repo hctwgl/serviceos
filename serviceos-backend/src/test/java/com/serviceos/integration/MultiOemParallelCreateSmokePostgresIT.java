@@ -286,7 +286,7 @@ class MultiOemParallelCreateSmokePostgresIT {
             mappingKey = "byd-multi";
             connectorCode = "BYD_CPIM";
             integration = "{\"mappingKey\":\"" + mappingKey + "\",\"version\":\"1.0.0\","
-                    + "\"connectorCode\":\"" + connectorCode + "\",\"direction\":\"INBOUND\",\"fieldMappings\":["
+                    + "\"connectorCode\":\"" + connectorCode + "\",\"direction\":\"INBOUND\",\"messageType\":\"CREATE_WORK_ORDER\",\"fieldMappings\":["
                     + "{\"mappingId\":\"order\",\"externalPath\":\"orderCode\",\"internalPath\":\"externalOrderCode\",\"required\":true,\"transform\":\"TRIM\"},"
                     + "{\"mappingId\":\"brand\",\"internalPath\":\"brandCode\",\"required\":true,\"constantValue\":\"BYD_OCEAN\",\"transform\":\"NONE\"},"
                     + "{\"mappingId\":\"product\",\"internalPath\":\"serviceProductCode\",\"required\":true,\"constantValue\":\"HOME_CHARGING_SURVEY_INSTALL\",\"transform\":\"NONE\"},"
@@ -303,7 +303,7 @@ class MultiOemParallelCreateSmokePostgresIT {
             mappingKey = "geely-multi";
             connectorCode = "GEELY";
             integration = "{\"mappingKey\":\"" + mappingKey + "\",\"version\":\"1.0.0\","
-                    + "\"connectorCode\":\"" + connectorCode + "\",\"direction\":\"INBOUND\",\"fieldMappings\":["
+                    + "\"connectorCode\":\"" + connectorCode + "\",\"direction\":\"INBOUND\",\"messageType\":\"CREATE_WORK_ORDER\",\"fieldMappings\":["
                     + "{\"mappingId\":\"order\",\"externalPath\":\"installProcessNo\",\"internalPath\":\"externalOrderCode\",\"required\":true,\"transform\":\"TRIM\"},"
                     + "{\"mappingId\":\"brand\",\"internalPath\":\"brandCode\",\"required\":true,\"constantValue\":\"GEELY\",\"transform\":\"NONE\"},"
                     + "{\"mappingId\":\"product\",\"internalPath\":\"serviceProductCode\",\"required\":true,\"constantValue\":\"HOME_CHARGING_SURVEY_INSTALL\",\"transform\":\"NONE\"},"
@@ -320,7 +320,7 @@ class MultiOemParallelCreateSmokePostgresIT {
             mappingKey = "ref-multi";
             connectorCode = "REFERENCE_OEM";
             integration = "{\"mappingKey\":\"" + mappingKey + "\",\"version\":\"1.0.0\","
-                    + "\"connectorCode\":\"" + connectorCode + "\",\"direction\":\"INBOUND\",\"fieldMappings\":["
+                    + "\"connectorCode\":\"" + connectorCode + "\",\"direction\":\"INBOUND\",\"messageType\":\"CREATE_WORK_ORDER\",\"fieldMappings\":["
                     + "{\"mappingId\":\"order\",\"externalPath\":\"externalOrderCode\",\"internalPath\":\"externalOrderCode\",\"required\":true,\"transform\":\"TRIM\"},"
                     + "{\"mappingId\":\"brand\",\"externalPath\":\"brandCode\",\"internalPath\":\"brandCode\",\"required\":true,\"transform\":\"NONE\"},"
                     + "{\"mappingId\":\"product\",\"externalPath\":\"serviceProductCode\",\"internalPath\":\"serviceProductCode\",\"required\":true,\"transform\":\"NONE\"},"

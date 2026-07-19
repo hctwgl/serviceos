@@ -9,6 +9,7 @@ import com.serviceos.integration.spi.ConnectorIdentity;
 import com.serviceos.integration.spi.InboundConnectorAuditContext;
 import com.serviceos.integration.spi.InboundUpdateWorkOrderResult;
 import com.serviceos.integration.spi.UpdateWorkOrderMappedInbound;
+import com.serviceos.integration.spi.UpdateWorkOrderRouteHint;
 import com.serviceos.shared.Sha256;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -25,14 +26,16 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * 吉利 7.18 用户信息更新通知本地切片：AES 解密后委托通用更新管道。
+ * 吉利 7.18 用户信息更新通知本地切片。
+ *
+ * <p>M339：AES 解密后仅构造 RouteHint；领域字段由冻结 UPDATE Mapping 物化。</p>
  */
 @Service
 public class GeelyInboundUpdateOrderService {
     public static final String ADAPTER_VERSION = GeelyInboundCreateOrderService.ADAPTER_VERSION;
-    public static final String MAPPING_VERSION = "geely-haohan-v1.3-update-order-v1";
     private static final String OBJECT_NAMESPACE = "geely-update";
     private static final String AUTH_POLICY = "GEELY_AES_CBC_V1_LOCAL";
+    private static final String UPDATE_BUSINESS_PREFIX = "GEELY:UPDATE:";
 
     private final ObjectMapper objectMapper;
     private final InboundMessageRepository messages;
@@ -83,24 +86,15 @@ public class GeelyInboundUpdateOrderService {
         }
 
         String installProcessNo = text(payload.get("installProcessNo"));
-        String contactName = text(payload.get("contactName"));
-        String contactPhone = text(payload.get("contactPhone"));
-        String address = text(payload.get("address"));
-        String province = text(payload.get("province"));
-        String city = text(payload.get("city"));
-        String district = text(payload.get("district"));
-        if (installProcessNo == null || contactName == null || contactPhone == null
-                || address == null || province == null || city == null || district == null) {
+        if (installProcessNo == null) {
             return GeelyNotifyResponse.fail("required update fields missing");
         }
 
-        String updateDigest = Sha256.digest(installProcessNo + "|" + contactName + "|"
-                + contactPhone + "|" + address + "|" + province + "|" + city + "|" + district);
         String rawPayloadDigest = Sha256.digest(decrypted.plainBytes());
         String transportDedupKey = Sha256.digest(
                 "UPDATE|" + nullToEmpty(decrypted.envelope().providerNo())
                         + "|" + nullToEmpty(decrypted.envelope().timestamp())
-                        + "|" + updateDigest);
+                        + "|" + rawPayloadDigest);
         String tenantObjectPrefix = Sha256.digest(tenantId).substring(0, 16);
         String rawObjectRef = "integration/inbound/" + tenantObjectPrefix
                 + "/" + OBJECT_NAMESPACE + "/raw/" + rawPayloadDigest + ".json";
@@ -129,25 +123,17 @@ public class GeelyInboundUpdateOrderService {
         }
         store(rawObjectRef, decrypted.plainBytes(), rawPayloadDigest);
 
-        UpdateWorkOrderMappedInbound inbound = new UpdateWorkOrderMappedInbound(
-                "GEELY:UPDATE:" + installProcessNo + ":" + updateDigest.substring(0, 12),
-                installProcessNo,
+        UpdateWorkOrderRouteHint routeHint = new UpdateWorkOrderRouteHint(
                 GeelyCreateOrderMapper.CLIENT_CODE,
-                contactName,
-                contactPhone,
-                address,
-                province,
-                city,
-                district,
-                updateDigest,
-                MAPPING_VERSION,
-                decrypted.plainBytes());
+                installProcessNo,
+                UPDATE_BUSINESS_PREFIX + installProcessNo);
 
-        InboundUpdateWorkOrderResult result = updatePipeline.processMappedUpdate(
+        InboundUpdateWorkOrderResult result = updatePipeline.processUpdate(
                 envelope,
                 new ConnectorIdentity(GeelyInboundCreateOrderService.CONNECTOR_CODE, ADAPTER_VERSION),
                 tenantId,
-                inbound,
+                routeHint,
+                Map.copyOf(payload),
                 audit,
                 safeCorrelationId,
                 OBJECT_NAMESPACE);

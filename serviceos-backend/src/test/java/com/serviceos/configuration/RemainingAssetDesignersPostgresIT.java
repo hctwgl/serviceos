@@ -159,7 +159,7 @@ class RemainingAssetDesignersPostgresIT {
     private static String validIntegration() {
         return """
                 {"mappingKey":"designer.integration.m295","version":"1.0.0","connectorCode":"REFERENCE_OEM",
-                 "direction":"INBOUND",
+                 "direction":"INBOUND","messageType":"CREATE_WORK_ORDER",
                  "fieldMappings":[{"mappingId":"order-code","externalPath":"orderNo",
                    "internalPath":"externalOrderCode","required":true,"transform":"TRIM"}]}
                 """;

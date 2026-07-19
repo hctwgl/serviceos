@@ -83,7 +83,7 @@ class IntegrationMappingRuntimePostgresIT {
 
         String workflow = "{\"workflowCode\":\"LINEAR_V1\",\"schemaVersion\":\"1.0.0\",\"stages\":[{\"stageCode\":\"S1\",\"tasks\":[{\"taskCode\":\"T1\",\"taskType\":\"HUMAN\"}]}]}";
         // 使用与发布方一致的紧凑 JSON，避免 text-block 空白导致 digest 不一致。
-        String integration = "{\"mappingKey\":\"byd-create-runtime\",\"version\":\"1.0.0\",\"connectorCode\":\"BYD_CPIM\",\"direction\":\"INBOUND\",\"fieldMappings\":[{\"mappingId\":\"order\",\"externalPath\":\"orderCode\",\"internalPath\":\"externalOrderCode\",\"required\":true,\"transform\":\"TRIM\"},{\"mappingId\":\"mobile\",\"externalPath\":\"contactMobile\",\"internalPath\":\"customerMobile\",\"required\":true,\"transform\":\"NONE\"}]}";
+        String integration = "{\"mappingKey\":\"byd-create-runtime\",\"version\":\"1.0.0\",\"connectorCode\":\"BYD_CPIM\",\"direction\":\"INBOUND\",\"messageType\":\"CREATE_WORK_ORDER\",\"fieldMappings\":[{\"mappingId\":\"order\",\"externalPath\":\"orderCode\",\"internalPath\":\"externalOrderCode\",\"required\":true,\"transform\":\"TRIM\"},{\"mappingId\":\"mobile\",\"externalPath\":\"contactMobile\",\"internalPath\":\"customerMobile\",\"required\":true,\"transform\":\"NONE\"}]}";
         var workflowAsset = configurations.publishAsset(new PublishConfigurationAssetCommand(
                 TENANT, ConfigurationAssetType.WORKFLOW, "LINEAR_V1",
                 "1.0.0", "1.0.0", workflow, Sha256.digest(workflow)));

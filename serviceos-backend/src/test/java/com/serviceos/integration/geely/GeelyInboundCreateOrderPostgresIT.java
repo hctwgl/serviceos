@@ -122,7 +122,7 @@ class GeelyInboundCreateOrderPostgresIT {
                 workflow, Sha256.digest(workflow))).versionId();
         // M335：CREATE_WORK_ORDER 强制 INBOUND Mapping。
         String integration = """
-                {"mappingKey":"geely-create","version":"1.0.0","connectorCode":"GEELY","direction":"INBOUND","fieldMappings":[
+                {"mappingKey":"geely-create","version":"1.0.0","connectorCode":"GEELY","direction":"INBOUND","messageType":"CREATE_WORK_ORDER","fieldMappings":[
                   {"mappingId":"order","externalPath":"installProcessNo","internalPath":"externalOrderCode","required":true,"transform":"TRIM"},
                   {"mappingId":"brand","internalPath":"brandCode","required":true,"constantValue":"GEELY","transform":"NONE"},
                   {"mappingId":"product","internalPath":"serviceProductCode","required":true,"constantValue":"HOME_CHARGING_SURVEY_INSTALL","transform":"NONE"},

@@ -81,10 +81,11 @@ public class DefaultIntegrationMappingRuntime implements IntegrationMappingRunti
             String tenantId,
             UUID bundleId,
             String expectedManifestDigest,
-            String connectorCode
+            String connectorCode,
+            String messageType
     ) {
         return findInboundAssetsForConnector(
-                tenantId, bundleId, expectedManifestDigest, connectorCode).isPresent();
+                tenantId, bundleId, expectedManifestDigest, connectorCode, messageType).isPresent();
     }
 
     @Override
@@ -93,24 +94,50 @@ public class DefaultIntegrationMappingRuntime implements IntegrationMappingRunti
             UUID bundleId,
             String expectedManifestDigest,
             String connectorCode,
+            String messageType,
             Map<String, Object> externalPayload
     ) {
         Objects.requireNonNull(externalPayload, "externalPayload");
         return findInboundAssetsForConnector(
-                tenantId, bundleId, expectedManifestDigest, connectorCode)
+                tenantId, bundleId, expectedManifestDigest, connectorCode, messageType)
                 .map(asset -> executeInbound(asset, externalPayload));
     }
 
+    /**
+     * INBOUND 唯一键：(connectorCode, direction=INBOUND, messageType)。
+     * 同一 Bundle 可共存 CREATE/UPDATE/CANCEL。
+     */
     private Optional<ConfigurationAssetDefinition> findInboundAssetsForConnector(
             String tenantId,
             UUID bundleId,
             String expectedManifestDigest,
-            String connectorCode
+            String connectorCode,
+            String messageType
     ) {
-        return findDirectionAssetsForConnector(
-                tenantId, bundleId, expectedManifestDigest, connectorCode, "INBOUND");
+        String safeConnector = requiredText(connectorCode, "connectorCode");
+        String safeMessageType = requiredText(messageType, "messageType");
+        List<ConfigurationAssetDefinition> assets = configurations.listBundleAssets(
+                tenantId, bundleId, expectedManifestDigest, ConfigurationAssetType.INTEGRATION);
+        List<ConfigurationAssetDefinition> matches = assets.stream()
+                .filter(asset -> {
+                    MappingDefinition definition = parse(asset.definitionJson());
+                    return "INBOUND".equals(definition.direction())
+                            && safeConnector.equals(definition.connectorCode())
+                            && safeMessageType.equals(definition.messageType());
+                })
+                .toList();
+        if (matches.isEmpty()) {
+            return Optional.empty();
+        }
+        if (matches.size() > 1) {
+            throw new BusinessProblem(ProblemCode.INTERNAL_ERROR,
+                    "Multiple INBOUND INTEGRATION mappings for connector/messageType in frozen bundle: "
+                            + safeConnector + "/" + safeMessageType);
+        }
+        return Optional.of(matches.getFirst());
     }
 
+    /** OUTBOUND 唯一键仍为 (connectorCode, direction=OUTBOUND)。 */
     private Optional<ConfigurationAssetDefinition> findDirectionAssetsForConnector(
             String tenantId,
             UUID bundleId,
@@ -340,6 +367,13 @@ public class DefaultIntegrationMappingRuntime implements IntegrationMappingRunti
             String mappingKey = text(root.get("mappingKey"), "mappingKey");
             String connectorCode = text(root.get("connectorCode"), "connectorCode");
             String direction = text(root.get("direction"), "direction");
+            // M339：INBOUND 必须声明 messageType，否则无法与同 connector 的多条 Mapping 区分。
+            String messageType = null;
+            if ("INBOUND".equals(direction)) {
+                messageType = text(root.get("messageType"), "messageType");
+            } else if (root.get("messageType") != null) {
+                messageType = text(root.get("messageType"), "messageType");
+            }
             Object mappingsRaw = root.get("fieldMappings");
             if (!(mappingsRaw instanceof List<?> list) || list.isEmpty()) {
                 throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
@@ -355,7 +389,7 @@ public class DefaultIntegrationMappingRuntime implements IntegrationMappingRunti
                 Map<String, Object> field = (Map<String, Object>) map;
                 mappings.add(parseFieldMapping(field, direction));
             }
-            return new MappingDefinition(mappingKey, connectorCode, direction, mappings);
+            return new MappingDefinition(mappingKey, connectorCode, direction, messageType, mappings);
         } catch (BusinessProblem problem) {
             throw problem;
         } catch (RuntimeException exception) {
@@ -573,6 +607,7 @@ public class DefaultIntegrationMappingRuntime implements IntegrationMappingRunti
             String mappingKey,
             String connectorCode,
             String direction,
+            String messageType,
             List<FieldMapping> fieldMappings
     ) {
     }

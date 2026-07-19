@@ -122,7 +122,7 @@ class ReferenceOemInboundOrderPostgresIT {
                 workflow, Sha256.digest(workflow))).versionId();
         // M335：CREATE_WORK_ORDER 强制 INBOUND Mapping。
         String integration = """
-                {"mappingKey":"ref-create","version":"1.0.0","connectorCode":"REFERENCE_OEM","direction":"INBOUND","fieldMappings":[
+                {"mappingKey":"ref-create","version":"1.0.0","connectorCode":"REFERENCE_OEM","direction":"INBOUND","messageType":"CREATE_WORK_ORDER","fieldMappings":[
                   {"mappingId":"order","externalPath":"externalOrderCode","internalPath":"externalOrderCode","required":true,"transform":"TRIM"},
                   {"mappingId":"brand","externalPath":"brandCode","internalPath":"brandCode","required":true,"transform":"NONE"},
                   {"mappingId":"product","externalPath":"serviceProductCode","internalPath":"serviceProductCode","required":true,"transform":"NONE"},

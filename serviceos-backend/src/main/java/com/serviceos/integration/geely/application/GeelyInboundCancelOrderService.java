@@ -6,6 +6,7 @@ import com.serviceos.integration.application.InboundCancelWorkOrderPipeline;
 import com.serviceos.integration.application.InboundMessageRepository;
 import com.serviceos.integration.geely.api.GeelyNotifyResponse;
 import com.serviceos.integration.spi.CancelWorkOrderMappedInbound;
+import com.serviceos.integration.spi.CancelWorkOrderRouteHint;
 import com.serviceos.integration.spi.ConnectorIdentity;
 import com.serviceos.integration.spi.InboundCancelWorkOrderResult;
 import com.serviceos.integration.spi.InboundConnectorAuditContext;
@@ -25,16 +26,17 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * 吉利 7.14/7.17 关闭/取消类通知本地切片：AES 解密后委托通用取消管道。
+ * 吉利 7.14/7.17 关闭/取消类通知本地切片。
  *
- * <p>Sandbox/开放平台签名仍 BLOCKED_EXTERNAL。</p>
+ * <p>M339：AES 解密后仅构造 RouteHint；reasonCode 由冻结 CANCEL Mapping 物化。
+ * Sandbox/开放平台签名仍 BLOCKED_EXTERNAL。</p>
  */
 @Service
 public class GeelyInboundCancelOrderService {
     public static final String ADAPTER_VERSION = GeelyInboundCreateOrderService.ADAPTER_VERSION;
-    public static final String MAPPING_VERSION = "geely-haohan-v1.3-cancel-order-v1";
     private static final String OBJECT_NAMESPACE = "geely-cancel";
     private static final String AUTH_POLICY = "GEELY_AES_CBC_V1_LOCAL";
+    private static final String CANCEL_BUSINESS_PREFIX = "GEELY:CANCEL:";
 
     private final ObjectMapper objectMapper;
     private final InboundMessageRepository messages;
@@ -87,16 +89,6 @@ public class GeelyInboundCancelOrderService {
         if (installProcessNo == null) {
             return GeelyNotifyResponse.fail("installProcessNo required");
         }
-        String reasonCode = text(payload.get("closeReasonCode"));
-        if (reasonCode == null) {
-            reasonCode = text(payload.get("cancelReasonCode"));
-        }
-        if (reasonCode == null) {
-            reasonCode = "GEELY_CLOSE";
-        }
-        if (reasonCode.length() > 64) {
-            reasonCode = reasonCode.substring(0, 64);
-        }
 
         String rawPayloadDigest = Sha256.digest(decrypted.plainBytes());
         String transportDedupKey = Sha256.digest(
@@ -131,22 +123,20 @@ public class GeelyInboundCancelOrderService {
         }
         store(rawObjectRef, decrypted.plainBytes(), rawPayloadDigest);
 
-        String createBusinessKey = GeelyCreateOrderMapper.BUSINESS_PREFIX + installProcessNo;
-        CancelWorkOrderMappedInbound inbound = new CancelWorkOrderMappedInbound(
-                "GEELY:CANCEL:" + installProcessNo + ":" + rawPayloadDigest.substring(0, 12),
-                createBusinessKey,
-                installProcessNo,
+        // businessKey 后缀用原文 digest 前缀，保证同报文幂等且不依赖 Mapping 输出。
+        CancelWorkOrderRouteHint routeHint = new CancelWorkOrderRouteHint(
                 GeelyCreateOrderMapper.CLIENT_CODE,
-                reasonCode,
-                null,
-                MAPPING_VERSION,
-                decrypted.plainBytes());
+                installProcessNo,
+                GeelyCreateOrderMapper.BUSINESS_PREFIX + installProcessNo,
+                CANCEL_BUSINESS_PREFIX + installProcessNo,
+                rawPayloadDigest.substring(0, 12));
 
-        InboundCancelWorkOrderResult result = cancelPipeline.processMappedCancel(
+        InboundCancelWorkOrderResult result = cancelPipeline.processCancel(
                 envelope,
                 new ConnectorIdentity(GeelyInboundCreateOrderService.CONNECTOR_CODE, ADAPTER_VERSION),
                 tenantId,
-                inbound,
+                routeHint,
+                Map.copyOf(payload),
                 audit,
                 safeCorrelationId,
                 OBJECT_NAMESPACE);

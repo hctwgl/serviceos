@@ -117,9 +117,9 @@ class BydCpimCancelOrderHttpPostgresIT {
         var asset = configurations.publishAsset(new PublishConfigurationAssetCommand(
                 TENANT_ID, ConfigurationAssetType.WORKFLOW, "BYD_SURVEY_INSTALL",
                 "1.0.0", "1.0.0", workflow, Sha256.digest(workflow)));
-        // M335：CREATE_WORK_ORDER 强制 INBOUND Mapping。
-        String integration = """
-                {"mappingKey":"byd-cancel-create","version":"1.0.0","connectorCode":"BYD_CPIM","direction":"INBOUND","fieldMappings":[
+        // M339：同一 Bundle 共存 CREATE + CANCEL Mapping（按 messageType 区分）。
+        String createIntegration = """
+                {"mappingKey":"byd-cancel-create","version":"1.0.0","connectorCode":"BYD_CPIM","direction":"INBOUND","messageType":"CREATE_WORK_ORDER","fieldMappings":[
                   {"mappingId":"order","externalPath":"orderCode","internalPath":"externalOrderCode","required":true,"transform":"TRIM"},
                   {"mappingId":"brand","internalPath":"brandCode","required":true,"constantValue":"BYD_OCEAN","transform":"NONE"},
                   {"mappingId":"product","internalPath":"serviceProductCode","required":true,"constantValue":"HOME_CHARGING_SURVEY_INSTALL","transform":"NONE"},
@@ -132,13 +132,22 @@ class BydCpimCancelOrderHttpPostgresIT {
                   {"mappingId":"vin","externalPath":"vin","internalPath":"vehicleVin","required":true,"transform":"NONE"},
                   {"mappingId":"dispatch","externalPath":"dispatchTime","internalPath":"dispatchedAt","required":true,"transform":"DATE_ISO"}]}
                 """.replaceAll("\\s+", "");
-        var integrationAsset = configurations.publishAsset(new PublishConfigurationAssetCommand(
+        String cancelIntegration = """
+                {"mappingKey":"byd-cancel-cancel","version":"1.0.0","connectorCode":"BYD_CPIM","direction":"INBOUND","messageType":"CANCEL_WORK_ORDER","fieldMappings":[
+                  {"mappingId":"order","externalPath":"orderCode","internalPath":"externalOrderCode","required":true,"transform":"TRIM"},
+                  {"mappingId":"reason","internalPath":"reasonCode","required":true,"constantValue":"EXTERNAL_USER_CANCEL","transform":"NONE"},
+                  {"mappingId":"approval","externalPath":"cancelReason","internalPath":"approvalRef","required":false,"transform":"TRIM"}]}
+                """.replaceAll("\\s+", "");
+        var createAsset = configurations.publishAsset(new PublishConfigurationAssetCommand(
                 TENANT_ID, ConfigurationAssetType.INTEGRATION, "byd-cancel-create",
-                "1.0.0", "1.0.0", integration, Sha256.digest(integration)));
+                "1.0.0", "1.0.0", createIntegration, Sha256.digest(createIntegration)));
+        var cancelAsset = configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT_ID, ConfigurationAssetType.INTEGRATION, "byd-cancel-cancel",
+                "1.0.0", "1.0.0", cancelIntegration, Sha256.digest(cancelIntegration)));
         configurations.publishBundle(new PublishConfigurationBundleCommand(
                 TENANT_ID, projectId, "BYD-OCEAN-SD-PILOT", "1.0.0", "BYD_OCEAN",
                 "HOME_CHARGING_SURVEY_INSTALL", "370000", Instant.now().minusSeconds(3600),
-                null, java.util.List.of(asset.versionId(), integrationAsset.versionId())));
+                null, java.util.List.of(asset.versionId(), createAsset.versionId(), cancelAsset.versionId())));
     }
 
     @Test

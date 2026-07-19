@@ -10,6 +10,10 @@
     "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
     "connectorCode": {"type": "string", "pattern": "^[A-Z0-9][A-Z0-9._-]{1,63}$"},
     "direction": {"type": "string", "enum": ["INBOUND", "OUTBOUND"]},
+    "messageType": {
+      "type": "string",
+      "enum": ["CREATE_WORK_ORDER", "UPDATE_WORK_ORDER", "CANCEL_WORK_ORDER"]
+    },
     "title": {"type": "string", "maxLength": 200},
     "fieldMappings": {
       "type": "array",
@@ -17,6 +21,17 @@
       "items": {"$ref": "#/$defs/fieldMapping"}
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"direction": {"const": "INBOUND"}},
+        "required": ["direction"]
+      },
+      "then": {
+        "required": ["messageType"]
+      }
+    }
+  ],
   "$defs": {
     "scalar": {
       "type": ["string", "number", "boolean"]

@@ -177,8 +177,10 @@ public class InboundCreateWorkOrderPipeline {
             ConfigurationBundleReference bundle,
             Map<String, Object> externalSourcePayload
     ) {
+        String messageType = CreateWorkOrderMappedInbound.MESSAGE_TYPE_CREATE_WORK_ORDER;
         boolean mappingConfigured = integrationMappingRuntime.hasInboundMappingForConnector(
-                tenantId, bundle.bundleId(), bundle.manifestDigest(), connector.connectorCode());
+                tenantId, bundle.bundleId(), bundle.manifestDigest(),
+                connector.connectorCode(), messageType);
         if (!mappingConfigured) {
             throw new BusinessProblem(
                     com.serviceos.shared.ProblemCode.VALIDATION_FAILED,
@@ -192,7 +194,7 @@ public class InboundCreateWorkOrderPipeline {
         }
         return integrationMappingRuntime.applyInboundForConnectorIfPresent(
                 tenantId, bundle.bundleId(), bundle.manifestDigest(),
-                connector.connectorCode(), externalSourcePayload)
+                connector.connectorCode(), messageType, externalSourcePayload)
                 .orElseThrow(() -> new BusinessProblem(
                         com.serviceos.shared.ProblemCode.VALIDATION_FAILED,
                         "CREATE_WORK_ORDER requires frozen INBOUND INTEGRATION mapping for connector: "

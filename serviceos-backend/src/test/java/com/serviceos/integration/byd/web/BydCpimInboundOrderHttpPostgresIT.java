@@ -394,7 +394,7 @@ class BydCpimInboundOrderHttpPostgresIT {
                 Sha256.digest(workflow)));
         // M333/M334：建单字段仅 Mapping；brand/product 用 constantValue（无管道播种）。
         String integration = """
-                {"mappingKey":"byd-create-http","version":"1.0.0","connectorCode":"BYD_CPIM","direction":"INBOUND","fieldMappings":[
+                {"mappingKey":"byd-create-http","version":"1.0.0","connectorCode":"BYD_CPIM","direction":"INBOUND","messageType":"CREATE_WORK_ORDER","fieldMappings":[
                   {"mappingId":"order","externalPath":"orderCode","internalPath":"externalOrderCode","required":true,"transform":"UPPER"},
                   {"mappingId":"brand","internalPath":"brandCode","required":true,"constantValue":"BYD_OCEAN","transform":"NONE"},
                   {"mappingId":"product","internalPath":"serviceProductCode","required":true,"constantValue":"HOME_CHARGING_SURVEY_INSTALL","transform":"NONE"},

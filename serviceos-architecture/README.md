@@ -674,15 +674,16 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M338 DISPATCH 签约比例缺口评分**（https://github.com/hctwgl/serviceos/pull/165；栈 `#148→…→#165`；
-见 `implementation-status.md`；合入 `master` 后回填合并提交）。M320 合并基线为
+当前工程基线为 **M339 UPDATE/CANCEL 强制 INBOUND Mapping**（栈 `#148→…→#165` + 本切片；
+见 `implementation-status.md`；`baselineCommit=PENDING_FEATURE_COMMIT`）。M320 合并基线为
 `32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147）。
 
 当前已具备多 OEM SPI、远端查询、UNKNOWN/批量重放、复杂流程、十大资产设计器、六类 Runtime，
-入站/出站 Mapping（M321～M336）、ASSIGNEE/DISPATCH NETWORK+TECHNICIAN+Coverage+比例缺口（M323/M324/M332/M337/M338）、
+入站/出站 Mapping（M321～M339，含 CREATE/UPDATE/CANCEL 强制 Mapping + messageType）、
+ASSIGNEE/DISPATCH NETWORK+TECHNICIAN+Coverage+比例缺口（M323/M324/M332/M337/M338）、
 RULE（M325/M329/M330）、NOTIFICATION（M326）、PRICING SHADOW Snapshot（M327），以及 Admin
 UNKNOWN 人工处置与批量 Replay 工作台（M328）。
-下一主线：吉利材料到位后优先联调；否则继续 Update/Cancel Mapping 与低代码深化；
+下一主线：吉利材料到位后优先联调；否则继续低代码深化；
 Track F/G 仍为 `BLOCKED_EXTERNAL`。
 
 权威进度入口：
@@ -690,6 +691,8 @@ Track F/G 仍为 `BLOCKED_EXTERNAL`。
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M339 实现文档](architecture/352-m339-inbound-update-cancel-mapping-required.md)
+- [M339 验收矩阵](testing/336-m339-inbound-update-cancel-mapping-required-acceptance.md)
 - [M338 实现文档](architecture/351-m338-dispatch-allocation-ratio.md)
 - [M338 验收矩阵](testing/335-m338-dispatch-allocation-ratio-acceptance.md)
 - [M337 实现文档](architecture/350-m337-dispatch-map-scope-coverage.md)
