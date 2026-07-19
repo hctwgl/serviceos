@@ -60,6 +60,12 @@ class ArchitectureTest {
         assertThat(Files.exists(Path.of(
                 "src/main/java/com/serviceos/integration/application/OutboundSubmissionPipeline.java")))
                 .isTrue();
+        assertThat(Files.exists(Path.of(
+                "src/main/java/com/serviceos/integration/spi/ReviewCallbackMappedItem.java")))
+                .isTrue();
+        assertThat(Files.exists(Path.of(
+                "src/main/java/com/serviceos/integration/application/InboundReviewCallbackItemPipeline.java")))
+                .isTrue();
     }
 
     @Test
