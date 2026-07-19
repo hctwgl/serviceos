@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M316 吉利提审出站 stub 与审核回调**（功能证据见 `implementation-status.md` 的
+当前工程基线为 **M317 远端状态查询 Connector SPI**（功能证据见 `implementation-status.md` 的
 `baselineCommit`；合入 `master` 后改为合并提交）。M296 及之前基线合并提交为
 `f3b623453a33ece91a691438b0c541e53c3282df`。
 
@@ -688,6 +688,8 @@ serviceos-architecture/
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M317 实现文档](architecture/330-m317-remote-status-query-spi.md)
+- [M317 验收矩阵](testing/314-m317-remote-status-query-spi-acceptance.md)
 - [M316 实现文档](architecture/329-m316-geely-outbound-and-review-callback.md)
 - [M316 验收矩阵](testing/313-m316-geely-outbound-and-review-callback-acceptance.md)
 - [M315 实现文档](architecture/328-m315-remaining-policy-asset-designers.md)

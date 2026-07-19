@@ -411,3 +411,4 @@ Feature gate/authority: if applicable
 | M314 | 吉利本地取消/更新：AES notify_close_order / notify_update_order_info → 通用管道 | Geely cancel/update + IT + `327-m314-*` + `311-m314-*` | OpenAPI 签名、Sandbox、其余 7.x |
 | M315 | RULE/DISPATCH/ASSIGNEE/NOTIFICATION/INTEGRATION/PRICING 结构化设计器 + 条目条件积木 | PolicyAssetEditor + Admin build + Playwright + `328-m315-*` + `312-m315-*` | DISPATCH scope 地图、BUSINESS 日历 |
 | M316 | 吉利提审出站 Profile/Connector 本地 stub + 7.13 审核回调；多 OEM mapping 精确解析 | Geely outbound/callback + ProfilesTest + ReviewCase IT + `329-m316-*` + `313-m316-*` | Sandbox/OpenAPI 真实联调 |
+| M317 | 远端状态查询 SPI：UNKNOWN Delivery 探询；BYD NotSupported / Geely StillUnknown；OpenAPI 1.0.41 | RemoteStatusQueryConnector + HTTP + unit/security/Arch/contracts + `330-m317-*` + `314-m317-*` | 查询结果自动收敛、人工已送达/放弃 |

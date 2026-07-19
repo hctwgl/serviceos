@@ -18,7 +18,7 @@ status: Proposed
 > M298 已抽出审核回调逐单 `InboundReviewCallbackItemPipeline`（`ReviewCallbackMappedItem`），
 > BYD 回调适配器保留验签/防重放/batch Envelope。M300/M302 已抽出入站取消/更新管道与 BYD
 > cancel-orders/update-orders；M299/M301 已将出站创建与 Route 的 connectorVersion 注册表化。
-> 远端查询、INTEGRATION Mapping 运行时、批量重放与真实第二家 Sandbox 仍未实现。
+> 远端查询 SPI（M317）已落地（协议不支持则 NOT_SUPPORTED）；批量重放与真实第二家 Sandbox 仍未实现。
 > 本章其余 Proposed 设计不能据此视为已完成。
 
 ## 1. 目标
