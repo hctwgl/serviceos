@@ -21,6 +21,7 @@ import com.serviceos.task.api.TaskSchedulingService;
 import com.serviceos.task.api.WorkflowTaskKind;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataAccessException;
@@ -617,14 +618,26 @@ class EvidenceSlotPostgresIT {
         return workOrderId;
     }
 
+    /**
+     * 多个模块都消费 task.created@v1；不得依赖 List 注入顺序的 findFirst。
+     * EvidenceTaskCreatedHandler 因 @Transactional 可能是 JDK 代理，需按目标类型筛选。
+     */
     private OutboxMessageHandler handler() {
-        return handlers.stream().filter(handler -> handler.supports("task.created", 1))
-                .findFirst().orElseThrow();
+        return handlers.stream()
+                .filter(candidate -> candidate.supports("task.created", 1))
+                .filter(candidate -> EvidenceTaskCreatedHandler.class
+                        .equals(AopUtils.getTargetClass(candidate)))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("未注册 EvidenceTaskCreatedHandler"));
     }
 
     private OutboxMessageHandler formHandler() {
-        return handlers.stream().filter(handler -> handler.supports("form.submitted", 1))
-                .findFirst().orElseThrow();
+        return handlers.stream()
+                .filter(candidate -> candidate.supports("form.submitted", 1))
+                .filter(candidate -> EvidenceFormSubmittedHandler.class
+                        .equals(AopUtils.getTargetClass(candidate)))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("未注册 EvidenceFormSubmittedHandler"));
     }
 
     private OutboxMessage taskCreated(UUID taskId) {
