@@ -3,7 +3,7 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-19
-baselineCommit: "PENDING_M350_FEATURE_COMMIT"
+baselineCommit: "ab56762ef611929f32226f1f75bf978445b3d525"
 latestMilestone: "M350"
 ---
 
