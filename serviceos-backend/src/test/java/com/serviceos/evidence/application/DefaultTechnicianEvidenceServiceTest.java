@@ -1,6 +1,7 @@
 package com.serviceos.evidence.application;
 
 import com.serviceos.authorization.api.AuthorizationService;
+import com.serviceos.configuration.api.ClientCapabilityRuntimeGate;
 import com.serviceos.dispatch.api.TechnicianActiveAssignmentQuery;
 import com.serviceos.evidence.api.BeginEvidenceUploadCommand;
 import com.serviceos.evidence.api.EvidenceCommandService;
@@ -64,13 +65,15 @@ class DefaultTechnicianEvidenceServiceTest {
     private final FormSubmissionService formSubmissions = mock(FormSubmissionService.class);
     private final HumanTaskCommandService humanTasks = mock(HumanTaskCommandService.class);
     private final AuthorizationService authorization = mock(AuthorizationService.class);
+    private final ClientCapabilityRuntimeGate clientCapabilityRuntimeGate =
+            mock(ClientCapabilityRuntimeGate.class);
     private DefaultTechnicianEvidenceService service;
 
     @BeforeEach
     void setUp() {
         service = new DefaultTechnicianEvidenceService(
                 affiliations, assignments, tasks, slots, evidence, snapshots, formSubmissions, humanTasks,
-                authorization,
+                authorization, clientCapabilityRuntimeGate,
                 new ObjectMapper(), Clock.fixed(NOW, ZoneOffset.UTC));
         when(affiliations.findActiveTechnicianProfile("tenant-264", PRINCIPAL))
                 .thenReturn(Optional.of(new TechnicianProfileView(
@@ -83,6 +86,7 @@ class DefaultTechnicianEvidenceServiceTest {
         when(tasks.find("tenant-264", TASK)).thenReturn(Optional.of(task(PROFILE.toString())));
         when(assignments.filterTaskIdsForNetwork("tenant-264", NETWORK.toString(), List.of(TASK)))
                 .thenReturn(List.of(TASK));
+        when(slots.listForTask(eq(principal()), any(), eq(TASK))).thenReturn(List.of());
     }
 
     @Test
@@ -93,7 +97,7 @@ class DefaultTechnicianEvidenceServiceTest {
         when(evidence.beginUpload(eq(principal()), any(), any())).thenReturn(session);
 
         assertThat(service.beginUpload(
-                principal(), new CommandMetadata("corr-264", "begin-264"), context(),
+                principal(), new CommandMetadata("corr-264", "begin-264"), context(), "TECHNICIAN_WEB",
                 new TechnicianBeginEvidenceUploadCommand(
                         TASK, SLOT, null, "现场.jpg", "image/jpeg", 4,
                         "a".repeat(64), "CAMERA", NOW))).isEqualTo(session);
@@ -110,18 +114,20 @@ class DefaultTechnicianEvidenceServiceTest {
     void forgedContextChangedResponsibilityAndOfflineSourceFailClosed() {
         UUID forged = UUID.fromString("70000000-0000-4000-8000-000000000264");
         assertThatThrownBy(() -> service.listItems(
-                principal(), "corr-forged", "TECHNICIAN|NETWORK|" + forged, TASK))
+                principal(), "corr-forged", "TECHNICIAN|NETWORK|" + forged, "TECHNICIAN_WEB", TASK))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.PORTAL_CONTEXT_INVALID));
 
         when(tasks.find("tenant-264", TASK)).thenReturn(Optional.of(task("another-technician")));
-        assertThatThrownBy(() -> service.listSlots(principal(), "corr-changed", context(), TASK))
+        assertThatThrownBy(() -> service.listSlots(
+                principal(), "corr-changed", context(), "TECHNICIAN_WEB", TASK))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.RESOURCE_NOT_FOUND));
 
         when(tasks.find("tenant-264", TASK)).thenReturn(Optional.of(task(PROFILE.toString())));
         assertThatThrownBy(() -> service.beginUpload(
-                principal(), new CommandMetadata("corr-offline", "begin-offline"), context(),
+                principal(), new CommandMetadata("corr-offline", "begin-offline"),
+                context(), "TECHNICIAN_WEB",
                 new TechnicianBeginEvidenceUploadCommand(
                         TASK, SLOT, null, "offline.jpg", "image/jpeg", 4,
                         "b".repeat(64), "EXTERNAL", NOW)))
@@ -148,7 +154,8 @@ class DefaultTechnicianEvidenceServiceTest {
                 new HumanTaskCommandReceipt(TASK, "COMPLETED", PRINCIPAL.toString(), 2, NOW));
 
         HumanTaskCommandReceipt receipt = service.completeTask(
-                principal(), new CommandMetadata("corr-complete", "complete-265"), context(),
+                principal(), new CommandMetadata("corr-complete", "complete-265"),
+                context(), "TECHNICIAN_WEB",
                 new TechnicianCompleteTaskCommand(TASK, 1, snapshotId, submissionId));
 
         assertThat(receipt.status()).isEqualTo("COMPLETED");

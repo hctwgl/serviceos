@@ -1,6 +1,8 @@
 package com.serviceos.forms.application;
 
 import com.serviceos.authorization.api.AuthorizationService;
+import com.serviceos.configuration.api.ClientCapabilityRuntimeGate;
+import com.serviceos.configuration.api.ConfigurationAssetType;
 import com.serviceos.dispatch.api.TechnicianActiveAssignmentQuery;
 import com.serviceos.forms.api.FormSubmissionService;
 import com.serviceos.forms.api.TaskFormDefinition;
@@ -28,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -45,12 +48,15 @@ class DefaultTechnicianFormServiceTest {
     private final TaskFormQueryService forms = mock(TaskFormQueryService.class);
     private final FormSubmissionService submissions = mock(FormSubmissionService.class);
     private final AuthorizationService authorization = mock(AuthorizationService.class);
+    private final ClientCapabilityRuntimeGate clientCapabilityRuntimeGate =
+            mock(ClientCapabilityRuntimeGate.class);
     private DefaultTechnicianFormService service;
 
     @BeforeEach
     void setUp() {
         service = new DefaultTechnicianFormService(
                 affiliations, assignments, tasks, forms, submissions, authorization,
+                clientCapabilityRuntimeGate,
                 Clock.fixed(Instant.parse("2026-07-18T12:00:00Z"), ZoneOffset.UTC));
         when(affiliations.findActiveTechnicianProfile("tenant-263", PRINCIPAL))
                 .thenReturn(Optional.of(new TechnicianProfileView(
@@ -73,22 +79,38 @@ class DefaultTechnicianFormServiceTest {
         when(forms.listForTask(principal(), "corr-263", TASK)).thenReturn(List.of(definition));
 
         assertThat(service.listForTask(
-                principal(), "corr-263", "TECHNICIAN|NETWORK|" + NETWORK, TASK))
+                principal(), "corr-263", "TECHNICIAN|NETWORK|" + NETWORK, "TECHNICIAN_WEB", TASK))
                 .containsExactly(definition);
         verify(forms).listForTask(principal(), "corr-263", TASK);
+    }
+
+    @Test
+    void iosClientRejectsConditionalFormAtRuntime() {
+        TaskFormDefinition definition = new TaskFormDefinition(
+                TASK, UUID.randomUUID(), "survey", "1.0.0", "FORM_V1", "{\"formKey\":\"survey\"}", "digest");
+        when(forms.listForTask(principal(), "corr-ios", TASK)).thenReturn(List.of(definition));
+        doThrow(new BusinessProblem(ProblemCode.CLIENT_CAPABILITY_UNSUPPORTED,
+                "当前客户端（师傅 iOS）不支持本任务所需配置能力：表单字段条件显隐 visibleWhen（form.condition.visibleWhen）"))
+                .when(clientCapabilityRuntimeGate)
+                .requireCompatible(eq("TECHNICIAN_IOS"), eq(ConfigurationAssetType.FORM), any());
+        assertThatThrownBy(() -> service.listForTask(
+                principal(), "corr-ios", "TECHNICIAN|NETWORK|" + NETWORK, "TECHNICIAN_IOS", TASK))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code())
+                                .isEqualTo(ProblemCode.CLIENT_CAPABILITY_UNSUPPORTED));
     }
 
     @Test
     void forgedContextAndChangedResponsibilityFailClosed() {
         UUID forged = UUID.fromString("60000000-0000-4000-8000-000000000263");
         assertThatThrownBy(() -> service.listForTask(
-                principal(), "corr-forged", "TECHNICIAN|NETWORK|" + forged, TASK))
+                principal(), "corr-forged", "TECHNICIAN|NETWORK|" + forged, "TECHNICIAN_WEB", TASK))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.PORTAL_CONTEXT_INVALID));
 
         when(tasks.find("tenant-263", TASK)).thenReturn(Optional.of(task("another-technician")));
         assertThatThrownBy(() -> service.listForTask(
-                principal(), "corr-changed", "TECHNICIAN|NETWORK|" + NETWORK, TASK))
+                principal(), "corr-changed", "TECHNICIAN|NETWORK|" + NETWORK, "TECHNICIAN_WEB", TASK))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.RESOURCE_NOT_FOUND));
     }

@@ -2,6 +2,7 @@ package com.serviceos.evidence.application;
 
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
+import com.serviceos.configuration.api.ClientCapabilityRuntimeGate;
 import com.serviceos.dispatch.api.TechnicianActiveAssignmentQuery;
 import com.serviceos.evidence.api.BeginEvidenceUploadCommand;
 import com.serviceos.evidence.api.CreateEvidenceSetSnapshotCommand;
@@ -59,6 +60,7 @@ final class DefaultTechnicianEvidenceService implements TechnicianEvidenceServic
     private final FormSubmissionService formSubmissions;
     private final HumanTaskCommandService humanTasks;
     private final AuthorizationService authorization;
+    private final ClientCapabilityRuntimeGate clientCapabilityRuntimeGate;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
@@ -72,6 +74,7 @@ final class DefaultTechnicianEvidenceService implements TechnicianEvidenceServic
             FormSubmissionService formSubmissions,
             HumanTaskCommandService humanTasks,
             AuthorizationService authorization,
+            ClientCapabilityRuntimeGate clientCapabilityRuntimeGate,
             ObjectMapper objectMapper,
             Clock clock
     ) {
@@ -84,6 +87,7 @@ final class DefaultTechnicianEvidenceService implements TechnicianEvidenceServic
         this.formSubmissions = formSubmissions;
         this.humanTasks = humanTasks;
         this.authorization = authorization;
+        this.clientCapabilityRuntimeGate = clientCapabilityRuntimeGate;
         this.objectMapper = objectMapper;
         this.clock = clock;
     }
@@ -91,18 +95,29 @@ final class DefaultTechnicianEvidenceService implements TechnicianEvidenceServic
     @Override
     @Transactional(readOnly = true)
     public List<EvidenceSlotView> listSlots(
-            CurrentPrincipal principal, String correlationId, String context, UUID taskId
+            CurrentPrincipal principal,
+            String correlationId,
+            String context,
+            String clientKind,
+            UUID taskId
     ) {
         requireCurrentTask(principal, correlationId, context, taskId);
-        return slots.listForTask(principal, correlationId, taskId);
+        List<EvidenceSlotView> resolved = slots.listForTask(principal, correlationId, taskId);
+        requireClientCompatible(clientKind, resolved);
+        return resolved;
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<EvidenceItemView> listItems(
-            CurrentPrincipal principal, String correlationId, String context, UUID taskId
+            CurrentPrincipal principal,
+            String correlationId,
+            String context,
+            String clientKind,
+            UUID taskId
     ) {
         requireCurrentTask(principal, correlationId, context, taskId);
+        requireClientCompatible(clientKind, slots.listForTask(principal, correlationId, taskId));
         return evidence.listForTask(principal, correlationId, taskId);
     }
 
@@ -111,9 +126,13 @@ final class DefaultTechnicianEvidenceService implements TechnicianEvidenceServic
             CurrentPrincipal principal,
             CommandMetadata metadata,
             String context,
+            String clientKind,
             TechnicianBeginEvidenceUploadCommand command
     ) {
         requireCurrentTask(principal, metadata.correlationId(), context, command.taskId());
+        requireClientCompatible(
+                clientKind,
+                slots.listForTask(principal, metadata.correlationId(), command.taskId()));
         return evidence.beginUpload(principal, metadata, new BeginEvidenceUploadCommand(
                 command.taskId(), command.slotId(), command.evidenceItemId(),
                 command.originalFileName(), command.declaredMimeType(), command.expectedSize(),
@@ -125,9 +144,13 @@ final class DefaultTechnicianEvidenceService implements TechnicianEvidenceServic
             CurrentPrincipal principal,
             CommandMetadata metadata,
             String context,
+            String clientKind,
             FinalizeEvidenceUploadCommand command
     ) {
         requireCurrentTask(principal, metadata.correlationId(), context, command.taskId());
+        requireClientCompatible(
+                clientKind,
+                slots.listForTask(principal, metadata.correlationId(), command.taskId()));
         return evidence.finalizeUpload(principal, metadata, command);
     }
 
@@ -137,10 +160,13 @@ final class DefaultTechnicianEvidenceService implements TechnicianEvidenceServic
             CurrentPrincipal principal,
             CommandMetadata metadata,
             String context,
+            String clientKind,
             UUID taskId,
             List<UUID> memberRevisionIds
     ) {
         requireCurrentTask(principal, metadata.correlationId(), context, taskId);
+        requireClientCompatible(
+                clientKind, slots.listForTask(principal, metadata.correlationId(), taskId));
         return snapshots.create(principal, metadata,
                 new CreateEvidenceSetSnapshotCommand(taskId, "TASK_SUBMISSION", memberRevisionIds));
     }
@@ -151,10 +177,14 @@ final class DefaultTechnicianEvidenceService implements TechnicianEvidenceServic
             CurrentPrincipal principal,
             CommandMetadata metadata,
             String context,
+            String clientKind,
             TechnicianCompleteTaskCommand command
     ) {
         TaskFulfillmentContext task = requireCurrentTask(
                 principal, metadata.correlationId(), context, command.taskId());
+        requireClientCompatible(
+                clientKind,
+                slots.listForTask(principal, metadata.correlationId(), command.taskId()));
         EvidenceSetSnapshotView snapshot = snapshots.get(
                 principal, metadata.correlationId(), command.evidenceSetSnapshotId());
         if (!task.taskId().equals(snapshot.taskId())) {
@@ -191,6 +221,13 @@ final class DefaultTechnicianEvidenceService implements TechnicianEvidenceServic
         }
         // Task 内核仍在同一事务内复核状态、责任、版本、表单冻结版本和 Snapshot 最新解析代次。
         return humanTasks.complete(principal, metadata, completion);
+    }
+
+    private void requireClientCompatible(String clientKind, List<EvidenceSlotView> resolvedSlots) {
+        clientCapabilityRuntimeGate.requireCompatibleEvidenceSlots(
+                clientKind,
+                resolvedSlots.stream().map(EvidenceSlotView::mediaType).toList(),
+                resolvedSlots.stream().map(EvidenceSlotView::requirementDefinitionJson).toList());
     }
 
     /**

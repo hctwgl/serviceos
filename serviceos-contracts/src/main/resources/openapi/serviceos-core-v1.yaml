@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.50
+  version: 1.0.51
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -2523,6 +2523,8 @@ paths:
       description: |
         M263：先验证 X-Technician-Context、ACTIVE 师傅网点关系、task.readAssigned 和当前责任，
         再按 form.read 解析 Task 冻结 Bundle 中唯一 FormVersion；不回退到最新配置。
+        M357：对已知 TECHNICIAN_WEB/TECHNICIAN_IOS，服务端权威校验冻结表单所需客户端能力；
+        不兼容时返回 422 `CLIENT_CAPABILITY_UNSUPPORTED`，客户端不得静默忽略。
       parameters:
         - $ref: '#/components/parameters/TaskId'
         - $ref: '#/components/parameters/TechnicianContext'
@@ -2537,6 +2539,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /technician/me/tasks/{taskId}/form-submissions:
     post:
       operationId: submitTechnicianTaskForm
@@ -2544,6 +2547,7 @@ paths:
       description: |
         M263：Context 与当前责任实时重验；formVersionId 必须匹配冻结版本。提交为不可变事实且不隐式完成 Task。
         请求不接受 prefillVersion、tenant、actor 或 submittedBy；草稿/prefill 冲突策略未接受前继续失败关闭。
+        M357：提交前复检客户端能力；不兼容返回 422 `CLIENT_CAPABILITY_UNSUPPORTED`。
       parameters:
         - $ref: '#/components/parameters/TaskId'
         - $ref: '#/components/parameters/TechnicianContext'
@@ -2573,6 +2577,7 @@ paths:
       description: |
         M264：先实时验证 Technician Context、ACTIVE 网点关系、task.readAssigned、资源网点与当前责任，
         再按 evidence.read 查询可靠解析结果。仅返回移动端展示所需槽位元数据，不返回冻结规则 JSON。
+        M357：对已知师傅端校验槽位 mediaType/条件所需能力；不兼容返回 422 `CLIENT_CAPABILITY_UNSUPPORTED`。
       parameters:
         - $ref: '#/components/parameters/TaskId'
         - $ref: '#/components/parameters/TechnicianContext'
@@ -2587,11 +2592,14 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /technician/me/tasks/{taskId}/evidence-items:
     get:
       operationId: listTechnicianTaskEvidenceItems
       summary: 查询当前责任任务的安全资料版本摘要
-      description: M264：不返回 fileObjectId、上传者、原始 CaptureMetadata、扫描详情或永久 URL。
+      description: |
+        M264：不返回 fileObjectId、上传者、原始 CaptureMetadata、扫描详情或永久 URL。
+        M357：不兼容客户端能力时返回 422 `CLIENT_CAPABILITY_UNSUPPORTED`。
       parameters:
         - $ref: '#/components/parameters/TaskId'
         - $ref: '#/components/parameters/TechnicianContext'
@@ -2606,6 +2614,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /technician/me/tasks/{taskId}/evidence-slots/{slotId}/upload-sessions:
     post:
       operationId: beginTechnicianEvidenceUpload

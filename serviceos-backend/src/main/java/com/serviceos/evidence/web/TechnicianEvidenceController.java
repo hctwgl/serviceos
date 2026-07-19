@@ -10,6 +10,7 @@ import com.serviceos.evidence.api.FinalizeEvidenceUploadCommand;
 import com.serviceos.evidence.api.TechnicianBeginEvidenceUploadCommand;
 import com.serviceos.evidence.api.TechnicianEvidenceService;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
+import com.serviceos.shared.ClientMetadata;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.CorrelationIds;
 import jakarta.validation.Valid;
@@ -50,9 +51,10 @@ final class TechnicianEvidenceController {
     List<TechnicianEvidenceSlotResponse> listSlots(
             @PathVariable UUID taskId,
             @RequestHeader("X-Technician-Context") String context,
-            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestAttribute(value = ClientMetadata.KIND_ATTRIBUTE, required = false) String clientKind
     ) {
-        return evidence.listSlots(principals.current(), correlationId, context, taskId).stream()
+        return evidence.listSlots(principals.current(), correlationId, context, clientKind, taskId).stream()
                 .map(TechnicianEvidenceController::slotResponse)
                 .toList();
     }
@@ -61,9 +63,10 @@ final class TechnicianEvidenceController {
     List<TechnicianEvidenceItemResponse> listItems(
             @PathVariable UUID taskId,
             @RequestHeader("X-Technician-Context") String context,
-            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestAttribute(value = ClientMetadata.KIND_ATTRIBUTE, required = false) String clientKind
     ) {
-        return evidence.listItems(principals.current(), correlationId, context, taskId).stream()
+        return evidence.listItems(principals.current(), correlationId, context, clientKind, taskId).stream()
                 .map(TechnicianEvidenceController::itemResponse)
                 .toList();
     }
@@ -75,10 +78,12 @@ final class TechnicianEvidenceController {
             @RequestHeader("X-Technician-Context") String context,
             @RequestHeader("Idempotency-Key") String idempotencyKey,
             @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestAttribute(value = ClientMetadata.KIND_ATTRIBUTE, required = false) String clientKind,
             @Valid @RequestBody TechnicianBeginEvidenceUploadRequest request
     ) {
         EvidenceUploadSessionView session = evidence.beginUpload(
-                principals.current(), new CommandMetadata(correlationId, idempotencyKey), context,
+                principals.current(), new CommandMetadata(correlationId, idempotencyKey),
+                context, clientKind,
                 new TechnicianBeginEvidenceUploadCommand(
                         taskId, slotId, request.evidenceItemId(), request.originalFileName(),
                         request.declaredMimeType(), request.expectedSize(), request.expectedSha256(),
@@ -96,10 +101,12 @@ final class TechnicianEvidenceController {
             @PathVariable UUID uploadSessionId,
             @RequestHeader("X-Technician-Context") String context,
             @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestAttribute(value = ClientMetadata.KIND_ATTRIBUTE, required = false) String clientKind,
             @Valid @RequestBody TechnicianFinalizeEvidenceUploadRequest request
     ) {
         EvidenceItemView item = evidence.finalizeUpload(
-                principals.current(), new CommandMetadata(correlationId, request.finalizeCommandId()), context,
+                principals.current(), new CommandMetadata(correlationId, request.finalizeCommandId()),
+                context, clientKind,
                 new FinalizeEvidenceUploadCommand(taskId, slotId, uploadSessionId,
                         request.actualSha256(), request.finalizeCommandId()));
         return ResponseEntity.created(URI.create("/api/v1/technician/me/tasks/" + taskId
@@ -114,11 +121,12 @@ final class TechnicianEvidenceController {
             @RequestHeader("X-Technician-Context") String context,
             @RequestHeader("Idempotency-Key") String idempotencyKey,
             @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestAttribute(value = ClientMetadata.KIND_ATTRIBUTE, required = false) String clientKind,
             @Valid @RequestBody TechnicianCreateEvidenceSetSnapshotRequest request
     ) {
         EvidenceSetSnapshotView snapshot = evidence.createTaskSubmissionSnapshot(
-                principals.current(), new CommandMetadata(correlationId, idempotencyKey), context,
-                taskId, request.memberRevisionIds());
+                principals.current(), new CommandMetadata(correlationId, idempotencyKey),
+                context, clientKind, taskId, request.memberRevisionIds());
         return ResponseEntity.created(URI.create("/api/v1/evidence-set-snapshots/"
                         + snapshot.evidenceSetSnapshotId()))
                 .header(CorrelationIds.HEADER_NAME, correlationId)

@@ -48,13 +48,15 @@ class TechnicianFormControllerSecurityTest {
                 .andExpect(status().isUnauthorized());
 
         when(principals.current()).thenReturn(principal());
-        when(forms.listForTask(principal(), "corr-263", CONTEXT, TASK)).thenReturn(List.of(
+        when(forms.listForTask(eq(principal()), eq("corr-263"), eq(CONTEXT), any(), eq(TASK))).thenReturn(List.of(
                 new TaskFormDefinition(TASK, FORM, "survey", "1.0.0", "FORM_V1",
                         "{\"formKey\":\"survey\",\"version\":\"1.0.0\",\"sections\":[]}", "digest")));
         mvc.perform(get("/api/v1/technician/me/tasks/{taskId}/forms", TASK)
                         .with(jwt().jwt(token -> token.subject(PRINCIPAL.toString())
                                 .claim("tenant_id", "tenant-263")))
                         .header("X-Technician-Context", CONTEXT)
+                        .header("X-ServiceOS-Client-Kind", "TECHNICIAN_WEB")
+                        .header("X-ServiceOS-Client-Version", "0.1.0")
                         .header("X-Correlation-Id", "corr-263"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].formVersionId").value(FORM.toString()))
@@ -64,7 +66,7 @@ class TechnicianFormControllerSecurityTest {
     @Test
     void onlineSubmitDoesNotAcceptPrefillOrTrustedIdentityFields() throws Exception {
         when(principals.current()).thenReturn(principal());
-        when(forms.submit(eq(principal()), any(), eq(CONTEXT), any())).thenReturn(
+        when(forms.submit(eq(principal()), any(), eq(CONTEXT), any(), any())).thenReturn(
                 new FormSubmissionView(
                         UUID.randomUUID(), TASK, UUID.randomUUID(), FORM, "survey", 1,
                         "{\"result\":\"PASS\"}", "digest", "VALIDATED",
@@ -74,6 +76,8 @@ class TechnicianFormControllerSecurityTest {
                         .with(jwt().jwt(token -> token.subject(PRINCIPAL.toString())
                                 .claim("tenant_id", "tenant-263")))
                         .header("X-Technician-Context", CONTEXT)
+                        .header("X-ServiceOS-Client-Kind", "TECHNICIAN_WEB")
+                        .header("X-ServiceOS-Client-Version", "0.1.0")
                         .header("Idempotency-Key", "form-command-263")
                         .contentType("application/json")
                         .content("{\"formVersionId\":\"" + FORM + "\",\"values\":{\"result\":\"PASS\"}}"))
@@ -84,7 +88,7 @@ class TechnicianFormControllerSecurityTest {
 
         verify(forms).submit(eq(principal()),
                 argThat(metadata -> metadata.idempotencyKey().equals("form-command-263")),
-                eq(CONTEXT), argThat(command -> command.taskId().equals(TASK)
+                eq(CONTEXT), any(), argThat(command -> command.taskId().equals(TASK)
                         && command.prefillVersion() == null));
     }
 

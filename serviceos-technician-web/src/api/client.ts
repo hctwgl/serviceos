@@ -13,9 +13,19 @@ const defaultApi = createTechnicianApi(resolveTechnicianEnvironment({ mode: impo
 export type HttpStatusError = Error & { status?: number; problem?: { errorCode?: string; code?: string; title?: string; detail?: string } }
 export type ApiResult<T> = { data: T; etag: string | null; correlationId: string }
 
-/** HTTP 冲突、失权和服务故障只展示固定可行动文案，后端 detail 不直接回显到现场端。 */
+/**
+ * HTTP 冲突、失权和服务故障只展示固定可行动文案。
+ * 例外：CLIENT_CAPABILITY_UNSUPPORTED 的服务端中文 detail 是权威能力说明，允许展示。
+ */
 export function userFacingError(error: unknown, fallback: string) {
-  if (error instanceof WebApiError) return safeProblemMessage(error)
+  if (error instanceof WebApiError) {
+    const code = String(error.problem.errorCode ?? error.problem.code ?? '')
+    const detail = error.problem.detail
+    if (code === 'CLIENT_CAPABILITY_UNSUPPORTED' && typeof detail === 'string' && detail.trim()) {
+      return detail.trim()
+    }
+    return safeProblemMessage(error)
+  }
   return error instanceof Error ? error.message : fallback
 }
 

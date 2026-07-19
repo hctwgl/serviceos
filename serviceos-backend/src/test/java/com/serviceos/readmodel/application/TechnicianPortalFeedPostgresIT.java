@@ -230,11 +230,12 @@ class TechnicianPortalFeedPostgresIT {
         seedGrant(TECH_PRINCIPAL, "form.read", "PROJECT", projectId.toString());
 
         assertThat(technicianForms.listForTask(
-                actor(TECH_PRINCIPAL), "corr-m263", "TECHNICIAN|NETWORK|" + NETWORK_A, taskId))
+                actor(TECH_PRINCIPAL), "corr-m263", "TECHNICIAN|NETWORK|" + NETWORK_A,
+                "TECHNICIAN_WEB", taskId))
                 .isEmpty();
         assertThatThrownBy(() -> technicianForms.listForTask(
                 actor(TECH_PRINCIPAL), "corr-m263-forged",
-                "TECHNICIAN|NETWORK|" + NETWORK_B, taskId))
+                "TECHNICIAN|NETWORK|" + NETWORK_B, "TECHNICIAN_WEB", taskId))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.PORTAL_CONTEXT_INVALID));
     }

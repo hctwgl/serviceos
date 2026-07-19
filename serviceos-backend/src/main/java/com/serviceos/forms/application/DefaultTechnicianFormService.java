@@ -2,6 +2,8 @@ package com.serviceos.forms.application;
 
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
+import com.serviceos.configuration.api.ClientCapabilityRuntimeGate;
+import com.serviceos.configuration.api.ConfigurationAssetType;
 import com.serviceos.dispatch.api.TechnicianActiveAssignmentQuery;
 import com.serviceos.forms.api.FormSubmissionService;
 import com.serviceos.forms.api.FormSubmissionView;
@@ -37,6 +39,7 @@ final class DefaultTechnicianFormService implements TechnicianFormService {
     private final TaskFormQueryService forms;
     private final FormSubmissionService submissions;
     private final AuthorizationService authorization;
+    private final ClientCapabilityRuntimeGate clientCapabilityRuntimeGate;
     private final Clock clock;
 
     DefaultTechnicianFormService(
@@ -46,6 +49,7 @@ final class DefaultTechnicianFormService implements TechnicianFormService {
             TaskFormQueryService forms,
             FormSubmissionService submissions,
             AuthorizationService authorization,
+            ClientCapabilityRuntimeGate clientCapabilityRuntimeGate,
             Clock clock
     ) {
         this.affiliations = affiliations;
@@ -54,16 +58,26 @@ final class DefaultTechnicianFormService implements TechnicianFormService {
         this.forms = forms;
         this.submissions = submissions;
         this.authorization = authorization;
+        this.clientCapabilityRuntimeGate = clientCapabilityRuntimeGate;
         this.clock = clock;
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<TaskFormDefinition> listForTask(
-            CurrentPrincipal principal, String correlationId, String technicianContextHeader, UUID taskId
+            CurrentPrincipal principal,
+            String correlationId,
+            String technicianContextHeader,
+            String clientKind,
+            UUID taskId
     ) {
         requireCurrentTask(principal, correlationId, technicianContextHeader, taskId);
-        return forms.listForTask(principal, correlationId, taskId);
+        List<TaskFormDefinition> definitions = forms.listForTask(principal, correlationId, taskId);
+        for (TaskFormDefinition definition : definitions) {
+            clientCapabilityRuntimeGate.requireCompatible(
+                    clientKind, ConfigurationAssetType.FORM, definition.definitionJson());
+        }
+        return definitions;
     }
 
     @Override
@@ -72,9 +86,18 @@ final class DefaultTechnicianFormService implements TechnicianFormService {
             CurrentPrincipal principal,
             CommandMetadata metadata,
             String technicianContextHeader,
+            String clientKind,
             SubmitFormCommand command
     ) {
         requireCurrentTask(principal, metadata.correlationId(), technicianContextHeader, command.taskId());
+        // 提交前复检：防止仅绕过 GET 或客户端本地忽略后写入不兼容配置。
+        for (TaskFormDefinition definition : forms.listForTask(
+                principal, metadata.correlationId(), command.taskId())) {
+            if (definition.formVersionId().equals(command.formVersionId())) {
+                clientCapabilityRuntimeGate.requireCompatible(
+                        clientKind, ConfigurationAssetType.FORM, definition.definitionJson());
+            }
+        }
         return submissions.submit(principal, metadata, command);
     }
 
