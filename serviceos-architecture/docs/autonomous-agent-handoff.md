@@ -7,32 +7,33 @@ lastUpdated: 2026-07-19
 
 ## 当前
 
-- PR #148～#165：M321～M338 Draft stacked
-- PR #166：https://github.com/hctwgl/serviceos/pull/166 — **M339** UPDATE/CANCEL 强制 INBOUND Mapping（Draft，base=#165）
+- PR #148～#166：M321～M339 Draft stacked
+- 本切片：**M340** FORM ConditionBuilder（Draft，base=#166 / `cursor/m339-inbound-update-cancel-mapping-required-88d5`）
 - `master`：`32b902f897d19d2c906acac899990bf1aa2bb056`
-- latestMilestone：**M339**
-- Flyway：**127**；OpenAPI：**1.0.43**
-- `baselineCommit`：`4410b11d`（功能证据）
+- latestMilestone：**M340**
+- Flyway：**127**；OpenAPI：**1.0.43**（无本里程碑变更）
+- `baselineCommit`：功能提交后回填
 
 ## 本回合完成
 
-### M339 UPDATE/CANCEL 强制 INBOUND Mapping
+### M340 FORM ConditionBuilder 条件积木嵌入
 
-- Schema `messageType`；INBOUND 选择键 `(connector, direction, messageType)`
-- Update/Cancel RouteHint + Materializer + 管道强制 Mapping/审计
-- 删除 BYD Update/Cancel Java Mapper；GEELY Update/Cancel RouteHint 化
-- 文档：`352-m339-*` / `336-m339-*`
+- `formValues["fieldKey"]` 积木编译/解析；布尔/数值字面量
+- `ConditionBuilder` 支持 `formFieldKeys`；FORM `StructuredAssetEditor` 嵌入
+  section `visibility`、field `visibleWhen` / `requiredWhen`
+- 空源码清除可选表达式；Node 冒烟 + Admin `npm run build`
+- 文档：`353-m340-*` / `337-m340-*`
 
 ## 验证
 
 ```text
-bash scripts/agent-verify.sh test DefaultIntegrationMappingRuntimeTest,CreateWorkOrderMappingMaterializerTest,UpdateWorkOrderMappingMaterializerTest,CancelWorkOrderMappingMaterializerTest,ConfigurationSchemaDriftTest,ArchitectureTest
-bash scripts/agent-verify.sh it BydCpimUpdateOrderHttpPostgresIT,BydCpimCancelOrderHttpPostgresIT,GeelyInboundCancelUpdatePostgresIT,BydCpimInboundOrderHttpPostgresIT,GeelyInboundCreateOrderPostgresIT,ReferenceOemInboundOrderPostgresIT,DualOemInboundRegressionPostgresIT,MultiOemParallelCreateSmokePostgresIT
+node serviceos-admin-web/src/expression/serviceosExprV1Blocks.test.mjs
+cd serviceos-admin-web && npm run build
 ```
 
 ## 下一本地主线
 
-1. 低代码深化（运行时已接入后再做）
+1. 嵌套 SERVICEOS_EXPR_V1 round-trip / 递归条件组，或 EVIDENCE requiredWhen 积木
 2. 吉利联调 — `BLOCKED_EXTERNAL`
 
 ## BLOCKED_EXTERNAL

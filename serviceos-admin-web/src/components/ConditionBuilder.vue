@@ -1,21 +1,24 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import {
-  EXPR_PATHS,
+  availablePaths,
   compileCondition,
   emptyAtom,
   emptyGroup,
+  isFormValuesPath,
   tryParseCondition,
   type ConditionAtom,
   type ConditionGroup,
   type ConditionNode,
-  type ExprPath,
   type JoinOp,
+  type LiteralKind,
 } from '../expression/serviceosExprV1Blocks'
 
 const props = defineProps<{
   modelValue: string
   label?: string
+  /** 当前 FORM 资产内已声明字段键；用于生成 formValues["…"] 积木选项 */
+  formFieldKeys?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -26,6 +29,8 @@ const root = ref<ConditionGroup>(emptyGroup())
 const compileError = ref<string | null>(null)
 const advancedMode = ref(false)
 const advancedDraft = ref(props.modelValue)
+
+const pathOptions = computed(() => availablePaths(props.formFieldKeys ?? []))
 
 function syncFromSource(source: string) {
   const parsed = tryParseCondition(source)
@@ -77,7 +82,22 @@ function emitCompiled() {
 function updateAtom(index: number, patch: Partial<ConditionAtom>) {
   const child = root.value.children[index]
   if (!child || child.kind !== 'atom') return
-  root.value.children[index] = { ...child, ...patch }
+  const next: ConditionAtom = { ...child, ...patch }
+  // 切换到 formValues 路径时默认布尔字面量；切回上下文路径时默认字符串
+  if (patch.path != null && patch.valueKind == null) {
+    if (isFormValuesPath(patch.path) && !isFormValuesPath(child.path)) {
+      next.valueKind = 'boolean'
+      if (next.value !== 'true' && next.value !== 'false') {
+        next.value = 'true'
+      }
+    } else if (!isFormValuesPath(patch.path) && isFormValuesPath(child.path)) {
+      next.valueKind = 'string'
+      if (next.value === 'true' || next.value === 'false') {
+        next.value = ''
+      }
+    }
+  }
+  root.value.children[index] = next
   emitCompiled()
 }
 
@@ -87,9 +107,10 @@ function setJoin(join: JoinOp) {
 }
 
 function addAtom() {
+  const defaultPath = pathOptions.value[0] ?? 'workOrder.brandCode'
   root.value = {
     ...root.value,
-    children: [...root.value.children, emptyAtom()],
+    children: [...root.value.children, emptyAtom(defaultPath)],
   }
   emitCompiled()
 }
@@ -124,6 +145,10 @@ const preview = computed(() => {
 
 function asAtom(node: ConditionNode): ConditionAtom | null {
   return node.kind === 'atom' ? node : null
+}
+
+function valueKindOf(atom: ConditionAtom): LiteralKind {
+  return atom.valueKind ?? 'string'
 }
 </script>
 
@@ -164,11 +189,18 @@ function asAtom(node: ConditionNode): ConditionAtom | null {
             data-testid="condition-path"
             @change="
               updateAtom(index, {
-                path: ($event.target as HTMLSelectElement).value as ExprPath,
+                path: ($event.target as HTMLSelectElement).value,
               })
             "
           >
-            <option v-for="path in EXPR_PATHS" :key="path" :value="path">{{ path }}</option>
+            <option v-for="path in pathOptions" :key="path" :value="path">{{ path }}</option>
+            <!-- 解析出的路径若不在当前选项中，仍保留可选以免丢失 -->
+            <option
+              v-if="!pathOptions.includes(asAtom(child)!.path)"
+              :value="asAtom(child)!.path"
+            >
+              {{ asAtom(child)!.path }}
+            </option>
           </select>
           <select
             :value="asAtom(child)!.op"
@@ -182,10 +214,43 @@ function asAtom(node: ConditionNode): ConditionAtom | null {
             <option value="==">==</option>
             <option value="!=">!=</option>
           </select>
+          <select
+            :value="valueKindOf(asAtom(child)!)"
+            data-testid="condition-value-kind"
+            @change="
+              updateAtom(index, {
+                valueKind: ($event.target as HTMLSelectElement).value as LiteralKind,
+                value:
+                  ($event.target as HTMLSelectElement).value === 'boolean'
+                    ? 'true'
+                    : ($event.target as HTMLSelectElement).value === 'number'
+                      ? '0'
+                      : '',
+              })
+            "
+          >
+            <option value="string">字符串</option>
+            <option value="boolean">布尔</option>
+            <option value="number">数值</option>
+          </select>
+          <select
+            v-if="valueKindOf(asAtom(child)!) === 'boolean'"
+            :value="asAtom(child)!.value || 'true'"
+            data-testid="condition-value"
+            @change="
+              updateAtom(index, {
+                value: ($event.target as HTMLSelectElement).value,
+              })
+            "
+          >
+            <option value="true">true</option>
+            <option value="false">false</option>
+          </select>
           <input
+            v-else
             :value="asAtom(child)!.value"
             data-testid="condition-value"
-            placeholder="字面量"
+            :placeholder="valueKindOf(asAtom(child)!) === 'number' ? '数值' : '字面量'"
             @input="
               updateAtom(index, {
                 value: ($event.target as HTMLInputElement).value,

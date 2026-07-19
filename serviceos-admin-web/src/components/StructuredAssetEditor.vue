@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import ConditionBuilder from './ConditionBuilder.vue'
 
 const props = defineProps<{
   assetType: 'FORM' | 'EVIDENCE' | 'SLA'
@@ -42,6 +43,21 @@ const formSections = computed(() => {
   return Array.isArray(sections) ? (sections as Array<Record<string, unknown>>) : []
 })
 
+/** 当前 FORM 全部 fieldKey，供 formValues["…"] 积木下拉。 */
+const formFieldKeys = computed(() => {
+  const keys: string[] = []
+  for (const section of formSections.value) {
+    if (!Array.isArray(section.fields)) continue
+    for (const field of section.fields as Array<Record<string, unknown>>) {
+      const key = field.fieldKey
+      if (typeof key === 'string' && key.trim()) {
+        keys.push(key.trim())
+      }
+    }
+  }
+  return keys
+})
+
 const evidenceItems = computed(() => {
   const items = draft.value.items
   return Array.isArray(items) ? (items as Array<Record<string, unknown>>) : []
@@ -52,11 +68,43 @@ const slaTaskTypes = computed(() => {
   return Array.isArray(types) ? (types as string[]).join(',') : ''
 })
 
+function exprSource(item: Record<string, unknown>, field: string): string {
+  const expr = item[field]
+  if (expr && typeof expr === 'object') {
+    const source = (expr as { source?: unknown }).source
+    return typeof source === 'string' ? source : ''
+  }
+  return ''
+}
+
+/** 空源码清除可选表达式，避免发布期留下空 SERVICEOS_EXPR_V1。 */
+function withOptionalExpression(
+  item: Record<string, unknown>,
+  field: string,
+  source: string,
+): Record<string, unknown> {
+  if (!source.trim()) {
+    const next = { ...item }
+    delete next[field]
+    return next
+  }
+  return {
+    ...item,
+    [field]: { language: 'SERVICEOS_EXPR_V1', source },
+  }
+}
+
 function updateSection(index: number, patch: Record<string, unknown>) {
   const next = formSections.value.map((section, i) =>
     i === index ? { ...section, ...patch } : section,
   )
   setRoot('sections', next)
+}
+
+function setSectionExpression(index: number, field: 'visibility', source: string) {
+  const section = formSections.value[index]
+  if (!section) return
+  updateSection(index, withOptionalExpression(section, field, source))
 }
 
 function addSection() {
@@ -104,6 +152,20 @@ function updateField(
   if (!section || !Array.isArray(section.fields)) return
   const fields = (section.fields as Array<Record<string, unknown>>).map((field, i) =>
     i === fieldIndex ? { ...field, ...patch } : field,
+  )
+  updateSection(sectionIndex, { fields })
+}
+
+function setFieldExpression(
+  sectionIndex: number,
+  fieldIndex: number,
+  exprField: 'visibleWhen' | 'requiredWhen',
+  source: string,
+) {
+  const section = formSections.value[sectionIndex]
+  if (!section || !Array.isArray(section.fields)) return
+  const fields = (section.fields as Array<Record<string, unknown>>).map((field, i) =>
+    i === fieldIndex ? withOptionalExpression(field, exprField, source) : field,
   )
   updateSection(sectionIndex, { fields })
 }
@@ -218,65 +280,92 @@ const MEDIA_TYPES = ['PHOTO', 'VIDEO', 'DOCUMENT', 'SIGNATURE', 'GENERATED_REPOR
             />
           </label>
         </div>
+        <ConditionBuilder
+          :model-value="exprSource(section, 'visibility')"
+          :label="`分组 ${String(section.sectionKey ?? sIndex)} visibility`"
+          :form-field-keys="formFieldKeys"
+          data-testid="section-visibility-builder"
+          @update:model-value="setSectionExpression(sIndex, 'visibility', $event)"
+        />
         <div
           v-for="(field, fIndex) in (Array.isArray(section.fields) ? section.fields : []) as Array<
             Record<string, unknown>
           >"
           :key="fIndex"
-          class="field-row"
+          class="field-block"
           :data-testid="`form-field-${sIndex}-${fIndex}`"
         >
-          <input
-            data-testid="form-field-key"
-            :value="String(field.fieldKey ?? '')"
-            placeholder="fieldKey"
-            @change="
-              updateField(sIndex, fIndex, { fieldKey: ($event.target as HTMLInputElement).value })
-            "
-          />
-          <input
-            data-testid="form-field-label"
-            :value="String(field.label ?? '')"
-            placeholder="label"
-            @change="
-              updateField(sIndex, fIndex, { label: ($event.target as HTMLInputElement).value })
-            "
-          />
-          <select
-            data-testid="form-field-datatype"
-            :value="String(field.dataType ?? 'STRING')"
-            @change="
-              updateField(sIndex, fIndex, {
-                dataType: ($event.target as HTMLSelectElement).value,
-              })
-            "
-          >
-            <option v-for="dt in DATA_TYPES" :key="dt" :value="dt">{{ dt }}</option>
-          </select>
-          <input
-            data-testid="form-field-binding"
-            :value="String(field.binding ?? '')"
-            placeholder="binding"
-            @change="
-              updateField(sIndex, fIndex, { binding: ($event.target as HTMLInputElement).value })
-            "
-          />
-          <label class="check">
+          <div class="field-row">
             <input
-              type="checkbox"
-              data-testid="form-field-required"
-              :checked="Boolean(field.required)"
+              data-testid="form-field-key"
+              :value="String(field.fieldKey ?? '')"
+              placeholder="fieldKey"
               @change="
-                updateField(sIndex, fIndex, {
-                  required: ($event.target as HTMLInputElement).checked,
-                })
+                updateField(sIndex, fIndex, { fieldKey: ($event.target as HTMLInputElement).value })
               "
             />
-            required
-          </label>
-          <button type="button" data-testid="remove-form-field" @click="removeField(sIndex, fIndex)">
-            删除字段
-          </button>
+            <input
+              data-testid="form-field-label"
+              :value="String(field.label ?? '')"
+              placeholder="label"
+              @change="
+                updateField(sIndex, fIndex, { label: ($event.target as HTMLInputElement).value })
+              "
+            />
+            <select
+              data-testid="form-field-datatype"
+              :value="String(field.dataType ?? 'STRING')"
+              @change="
+                updateField(sIndex, fIndex, {
+                  dataType: ($event.target as HTMLSelectElement).value,
+                })
+              "
+            >
+              <option v-for="dt in DATA_TYPES" :key="dt" :value="dt">{{ dt }}</option>
+            </select>
+            <input
+              data-testid="form-field-binding"
+              :value="String(field.binding ?? '')"
+              placeholder="binding"
+              @change="
+                updateField(sIndex, fIndex, { binding: ($event.target as HTMLInputElement).value })
+              "
+            />
+            <label class="check">
+              <input
+                type="checkbox"
+                data-testid="form-field-required"
+                :checked="Boolean(field.required)"
+                @change="
+                  updateField(sIndex, fIndex, {
+                    required: ($event.target as HTMLInputElement).checked,
+                  })
+                "
+              />
+              required
+            </label>
+            <button
+              type="button"
+              data-testid="remove-form-field"
+              @click="removeField(sIndex, fIndex)"
+            >
+              删除字段
+            </button>
+          </div>
+          <ConditionBuilder
+            :model-value="exprSource(field, 'visibleWhen')"
+            :label="`字段 ${String(field.fieldKey ?? fIndex)} visibleWhen`"
+            :form-field-keys="formFieldKeys"
+            data-testid="field-visible-when-builder"
+            @update:model-value="setFieldExpression(sIndex, fIndex, 'visibleWhen', $event)"
+          />
+          <ConditionBuilder
+            :model-value="exprSource(field, 'requiredWhen')"
+            :label="`字段 ${String(field.fieldKey ?? fIndex)} requiredWhen`"
+            :form-field-keys="formFieldKeys"
+            data-testid="field-required-when-builder"
+            @update:model-value="setFieldExpression(sIndex, fIndex, 'requiredWhen', $event)"
+          />
         </div>
         <button type="button" data-testid="add-form-field" @click="addField(sIndex)">
           添加字段
@@ -446,6 +535,13 @@ header {
   flex-wrap: wrap;
   gap: 0.35rem;
   align-items: center;
+}
+.field-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.4rem 0;
+  border-top: 1px dashed #d0d7de;
 }
 label {
   display: flex;
