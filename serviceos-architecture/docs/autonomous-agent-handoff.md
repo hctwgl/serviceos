@@ -8,7 +8,7 @@ lastUpdated: 2026-07-19
 ## 当前
 
 - PR #148～#163：M321～M336 Draft stacked
-- PR #PENDING：`cursor/m337-dispatch-map-scope-coverage-88d5` — **M337** DISPATCH ServiceCoverage 地图（Draft，base=#163）
+- PR #164：https://github.com/hctwgl/serviceos/pull/164 — **M337** DISPATCH ServiceCoverage 地图（Draft，base=#163）
 - `master`：`32b902f897d19d2c906acac899990bf1aa2bb056`
 - latestMilestone：**M337**
 - Flyway：**126**；OpenAPI：**1.0.43**

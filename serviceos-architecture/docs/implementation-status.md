@@ -176,7 +176,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 ## 5. 下一实施方向
 
 ServiceOS 可靠纵向切片已推进到 **M337**（DISPATCH ServiceCoverage 地图 scope）。
-M321～M337 均在 Draft stacked PRs 中（`#148→…→#163→本切片`）；M320 已合入 `master`（`32b902f8`）。
+M321～M337 均在 Draft stacked PRs 中（`#148→…→#164`；本切片 https://github.com/hctwgl/serviceos/pull/164）；M320 已合入 `master`（`32b902f8`）。
 
 当前契约/迁移：OpenAPI **1.0.43**；Flyway **126**（`net_service_network_coverage`）。
 
