@@ -175,17 +175,17 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M302**。M267～M296 基线已稳定；**M297** 出站提审 SPI、
-**M298** 审核回调逐单管道 SPI 已交付（OpenAPI 1.0.40；Flyway 118/120）。
+ServiceOS 可靠纵向切片已推进到 **M302**。M267～M296 基线已稳定；**M297～M302** 已交付出站提审、
+审核回调、取消/更新入站、Profile/Route 注册表（OpenAPI **1.0.40**；Flyway **118 / 120**）。
 
-下一主线（已批准）：继续完整通用 Connector SPI（Update/Cancel / 远端查询 / 创建面注册表）→ 配置资产
-运行时引擎 → 业务低代码设计器 → 真实第二家车企（吉利 PDF 已入库；Sandbox/凭据仍缺）。Track F/G
-与真实 OEM Sandbox 仍为 `BLOCKED_EXTERNAL`。
+下一主线（已批准）：P2 配置资产运行时引擎（先 INTEGRATION Mapping）→ 业务低代码设计器 →
+真实第二家车企（吉利 PDF 已入库；Sandbox/凭据仍缺）。远端查询 SPI 与 Track F/G 仍为
+`BLOCKED_EXTERNAL`。
 
 ```text
 已接受推进顺序：
-1. P1 续：Update/Cancel、远端查询、创建面 connector 注册表；
-2. P2：INTEGRATION → ASSIGNEE_POLICY → DISPATCH → NOTIFICATION → RULE → PRICING 运行时；
+1. P2：INTEGRATION → ASSIGNEE_POLICY → DISPATCH → NOTIFICATION → RULE → PRICING 运行时；
+2. P1 余量：远端状态查询 SPI（可与 P2 并行小切片）；
 3. P3：Workflow/条件积木/FORM/EVIDENCE/SLA 等低代码设计器；
 4. P4：吉利真实接入（缺 Sandbox/凭据则 BLOCKED_EXTERNAL，继续 P1～P3）；
 5. Track F/G 外部证据如实登记，不阻塞上述主线。
