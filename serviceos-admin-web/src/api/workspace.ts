@@ -6,6 +6,7 @@ export type SectionCode =
   | 'APPOINTMENTS_VISITS'
   | 'FORMS_EVIDENCE'
   | 'REVIEWS_CORRECTIONS'
+  | 'FINAL_REVIEW'
   | 'INTEGRATION'
 
 export type WorkOrderWorkspace = {

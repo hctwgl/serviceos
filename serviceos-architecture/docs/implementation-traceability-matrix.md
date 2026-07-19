@@ -446,3 +446,4 @@ Feature gate/authority: if applicable
 | M349 | Technician Web FORM 条件执行器：visibility/requiredWhen SERVICEOS_EXPR_V1 子集 | serviceosExprV1Evaluate + TechnicianPortalTaskDetailPage + Node 冒烟 + technician build + 362-m349-* + 346-m349-* + PR #176 | editableWhen/默认值、iOS 共用执行器、workOrder/region 权威上下文 |
 | M350 | Technician 任务详情表达式上下文头 + H5 validationRules | WorkOrderExpressionContextQuery + TechnicianPortalTaskDetail + OpenAPI 1.0.44 + H5 + IT + 363-m350-* + 347-m350-* + PR #179 | editableWhen/defaultExpression、iOS 共用执行器 |
 | M351 | 平台终审工作区只读组合查询 + Revision 短时下载授权 | FINAL_REVIEW section + FinalReviewWorkspaceQueryService + masked contact + OpenAPI 1.0.48 + IT/SecurityTest + 364-m351-* + 348-m351-* | 终审 UI（M352）、targetDecisions decide（M353）、aggregate_version |
+| M352 | Admin 终审只读 UI + Ant Design Vue 定型 | ant-design-vue + ConfigProvider/zhCN/Token + AppShell + FinalReviewWorkspace + sessionStorage 草稿 + build/unit + 365-m352-* + 349-m352-* | 正式提交 UI（M353）、完整视觉 8 态实拍（M355） |

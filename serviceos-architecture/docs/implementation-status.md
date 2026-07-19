@@ -4,7 +4,7 @@ version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-19
 baselineCommit: "9acc73940f0b0d1f590e9e5de4e165ad2f2bef91"
-latestMilestone: "M351"
+latestMilestone: "M352"
 ---
 
 # ServiceOS 实施状态总览
@@ -39,7 +39,7 @@ latestMilestone: "M351"
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M351 平台终审工作区只读组合查询 |
+| 最新实施里程碑 | M352 Admin 终审工作台只读 UI 与 Ant Design 定型 |
 | 基线提交 | `a4dd25cc564fa6f0496bd127d07b9e1338b923cf`（功能提交后回填） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts`、`@serviceos/web-core`、`ServiceOSIOSCore`、独立且可部署的 `serviceos-network-web` 与 `serviceos-technician-web`、Swift 6 `TechnicianIOSFoundation`，以及已在 iPhone 17 Pro Simulator 安装启动、实跑 XCTest/XCUITest、形成 Production arm64 archive/dSYM，并接入当前任务、在线 Visit、冻结基础表单、前台 Evidence 采集上传、Snapshot/Task 完成与多轮资料整改的原生 `TechnicianIOS` SwiftUI App；由同一 Core OpenAPI 生成并经独立消费者门禁验证的 `@serviceos/core-client` 与 `ServiceOSCoreClient` |
@@ -175,18 +175,16 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M351**（平台终审工作区只读组合查询）。
-M350 已合入 `master`（https://github.com/hctwgl/serviceos/pull/179，squash `9acc7394`）。
-可用性黄金路径合并于 `1da3165d`（非正式里程碑号）。
+ServiceOS 可靠纵向切片已推进到 **M352**（Admin 终审只读 UI + Ant Design 定型）。
+M351 API 已落地；M350 master 基线 `9acc7394`。
 
-当前契约/迁移：OpenAPI **1.0.48**；Flyway **129**（M351 无新迁移）。
+当前契约/迁移：OpenAPI **1.0.48**；Flyway **129**。
 
 下一阶段（本序列续作）：
 
-1. **M352** Ant Design Vue 定型 + 终审只读三栏 UI；
-2. **M353** `targetDecisions` 正式 `:decide` + If-Match + 同事务 Task/Correction；
-3. **M354** 整改深链与版本链；
-4. **M355** 真实 OIDC + PostgreSQL + Chrome E2E 门禁。
+1. **M353** `targetDecisions` 正式 `:decide` + If-Match + 同事务 Task/Correction；
+2. **M354** 整改深链与版本链；
+3. **M355** 真实 OIDC + PostgreSQL + Chrome E2E 门禁。
 
 仍为 **硬门禁 / 外部阻塞**（不可发明推进）：
 

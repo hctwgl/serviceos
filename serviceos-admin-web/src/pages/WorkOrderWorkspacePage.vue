@@ -30,6 +30,7 @@ import {
 } from '../api/dispatch'
 import TaskCommandPanel from '../components/TaskCommandPanel.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import FinalReviewWorkspace from '../features/work-orders/components/final-review/FinalReviewWorkspace.vue'
 import { recordRecentVisit } from '../recent/recordRecentVisit'
 import { statusLabel } from '../product/statusLabels'
 import { formatDateTime } from '../product/formatTime'
@@ -165,8 +166,19 @@ const sections: SectionCode[] = [
   'APPOINTMENTS_VISITS',
   'FORMS_EVIDENCE',
   'REVIEWS_CORRECTIONS',
+  'FINAL_REVIEW',
   'INTEGRATION',
 ]
+
+const sectionLabels: Record<SectionCode, string> = {
+  TASKS: '任务',
+  TIMELINE_AUDIT: '时间线',
+  APPOINTMENTS_VISITS: '预约到场',
+  FORMS_EVIDENCE: '表单资料',
+  REVIEWS_CORRECTIONS: '审核整改',
+  FINAL_REVIEW: '平台终审',
+  INTEGRATION: '集成',
+}
 
 async function loadAllowedActions(taskId: string | undefined) {
   allowedActions.value = null
@@ -271,6 +283,12 @@ async function loadWorkspace() {
 
 async function loadSection(section: SectionCode) {
   activeSection.value = section
+  if (section === 'FINAL_REVIEW') {
+    sectionLoading.value = false
+    sectionError.value = null
+    sectionData.value = null
+    return
+  }
   sectionLoading.value = true
   sectionError.value = null
   try {
@@ -1356,11 +1374,15 @@ onMounted(() => {
             :disabled="workspace.sectionAvailability[code] === 'UNAVAILABLE'"
             @click="loadSection(code)"
           >
-            {{ code }}
+            {{ sectionLabels[code] }}
             <em>{{ workspace.sectionAvailability[code] || '?' }}</em>
           </button>
         </div>
-        <p v-if="sectionError" class="error">{{ sectionError }}</p>
+        <FinalReviewWorkspace
+          v-if="activeSection === 'FINAL_REVIEW'"
+          :work-order-id="workOrderId"
+        />
+        <p v-else-if="sectionError" class="error">{{ sectionError }}</p>
         <p v-else-if="sectionLoading">区块加载中…</p>
         <template v-else>
           <p v-if="inboundEnvelopeLinks.length" class="links inbound-links">

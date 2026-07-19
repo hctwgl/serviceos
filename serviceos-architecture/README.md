@@ -674,8 +674,8 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M351 平台终审工作区只读组合查询**（见 `implementation-status.md`；
-OpenAPI 1.0.48；M350 master 基线 `9acc7394`）。本序列后续为 M352～M355（终审 UI、decide、深链、E2E）。
+当前工程基线为 **M352 Admin 终审只读 UI 与 Ant Design 定型**（见 `implementation-status.md`；
+OpenAPI 1.0.48；M351 API + M352 UI）。本序列后续为 M353～M355（decide、深链、E2E）。
 
 当前已具备多 OEM SPI、远端查询、UNKNOWN/批量重放、复杂流程、十大资产设计器、六类 Runtime，
 入站/出站 Mapping（M321～M339）、FORM/EVIDENCE ConditionBuilder（M340～M349）、
@@ -688,6 +688,8 @@ ASSIGNEE/DISPATCH/RULE/NOTIFICATION/PRICING SHADOW，以及 **M351 FINAL_REVIEW 
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M352 实现文档](architecture/365-m352-final-review-admin-ui.md)
+- [M352 验收矩阵](testing/349-m352-final-review-admin-ui-acceptance.md)
 - [M351 实现文档](architecture/364-m351-final-review-workspace-section.md)
 - [M351 验收矩阵](testing/348-m351-final-review-workspace-section-acceptance.md)
 - [M350 实现文档](architecture/363-m350-technician-expr-context-validation-rules.md)

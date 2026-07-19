@@ -1,0 +1,46 @@
+@import './tokens.css';
+
+:root {
+  font-family: var(--sos-font-stack);
+  line-height: 1.5;
+  color: var(--sos-text-primary);
+  background: var(--sos-bg-page);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--sos-bg-page);
+  color: var(--sos-text-primary);
+}
+
+a {
+  color: var(--sos-primary-600);
+}
+
+/* M190：由 /me/ui-preferences 驱动的展示类 */
+html.theme-dark {
+  color-scheme: dark;
+  background: var(--sos-primary-900);
+  color: #f0f4f8;
+}
+
+html.theme-dark body {
+  background: var(--sos-primary-900);
+  color: #f0f4f8;
+}
+
+html.density-compact body {
+  line-height: 1.35;
+}
+
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
