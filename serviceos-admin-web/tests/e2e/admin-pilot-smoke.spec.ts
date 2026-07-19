@@ -2496,12 +2496,11 @@ test('真实 OIDC 登录后可通过审核外发并经厂端回调关闭 CLIENT 
   )
   await expect(reviewPage.getByRole('heading', { name: '外发交付' })).toBeVisible()
   // M182：外发详情 → 执行任务（OpenAPI executionTaskId）。
-  const executionTaskId = (
-    await reviewPage
-      .locator('dt', { hasText: /^executionTaskId$/ })
-      .locator('xpath=../dd')
-      .innerText()
-  ).trim()
+  const executionTaskHref = await reviewPage
+    .getByRole('link', { name: /打开执行任务/ })
+    .getAttribute('href')
+  expect(executionTaskHref, '执行任务深链缺失').toBeTruthy()
+  const executionTaskId = executionTaskHref!.split('/').filter(Boolean).at(-1)!
   expect(executionTaskId).toMatch(
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
   )
@@ -2510,9 +2509,7 @@ test('真实 OIDC 登录后可通过审核外发并经厂端回调关闭 CLIENT 
       response.request().method() === 'GET' &&
       new URL(response.url()).pathname === `/api/v1/tasks/${executionTaskId}`,
   )
-  await reviewPage
-    .getByRole('link', { name: new RegExp(`打开执行任务\\s+${executionTaskId}`) })
-    .click()
+  await reviewPage.getByRole('link', { name: /打开执行任务/ }).click()
   expect((await outboundExecutionTaskPromise).status()).toBe(200)
   await expect(reviewPage.getByRole('heading', { name: '任务详情' })).toBeVisible()
   await reviewPage.goto(
