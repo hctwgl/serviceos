@@ -8,11 +8,11 @@ lastUpdated: 2026-07-19
 ## 当前
 
 - PR #148～#165：M321～M338 Draft stacked
-- 本切片：**M339** UPDATE/CANCEL 强制 INBOUND Mapping（branch `cursor/m339-inbound-update-cancel-mapping-required-88d5`）
+- PR #166：https://github.com/hctwgl/serviceos/pull/166 — **M339** UPDATE/CANCEL 强制 INBOUND Mapping（Draft，base=#165）
 - `master`：`32b902f897d19d2c906acac899990bf1aa2bb056`
 - latestMilestone：**M339**
 - Flyway：**127**；OpenAPI：**1.0.43**
-- `baselineCommit`：`PENDING_FEATURE_COMMIT`
+- `baselineCommit`：`4410b11d`（功能证据）
 
 ## 本回合完成
 
