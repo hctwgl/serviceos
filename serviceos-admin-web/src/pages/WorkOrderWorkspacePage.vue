@@ -253,10 +253,12 @@ async function loadWorkspace() {
       loadAuthorityProjections(),
       loadPricingSnapshots(),
     ])
+    const requestedTab = String(route.query.tab ?? '')
+    const tabSection = sections.find((code) => code === requestedTab)
     const firstAvailable = sections.find(
       (code) => ws.sectionAvailability[code] === 'AVAILABLE' || ws.sectionAvailability[code] === 'EMPTY',
     )
-    activeSection.value = firstAvailable ?? 'TASKS'
+    activeSection.value = tabSection ?? firstAvailable ?? 'TASKS'
     await loadSection(activeSection.value)
     recordRecentVisit({
       resourceType: 'WORK_ORDER',

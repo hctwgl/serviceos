@@ -153,8 +153,9 @@ class CorrectionCasePostgresIT {
         completeSourceTask(first);
         ReviewCaseView review = reviews.create(reviewer(), metadata("review-create"),
                 new CreateReviewCaseCommand(first.evidenceSetSnapshotId(), null));
-        ReviewCaseView rejected = reviews.decide(reviewer(), metadata("review-reject"),
+        var rejectedResult = reviews.decide(reviewer(), metadata("review-reject"),
                 decideCommand(review.reviewCaseId(), "REJECTED", List.of("IMAGE.BLUR"), "blurry"));
+        ReviewCaseView rejected = rejectedResult.reviewCase();
         assertThat(rejected.status()).isEqualTo("REJECTED");
 
         UUID correctionId = jdbc.sql("""

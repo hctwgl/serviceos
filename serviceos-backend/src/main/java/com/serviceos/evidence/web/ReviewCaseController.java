@@ -3,6 +3,7 @@ package com.serviceos.evidence.web;
 import com.serviceos.evidence.api.CreateReviewCaseCommand;
 import com.serviceos.evidence.api.CreateClientReviewCaseCommand;
 import com.serviceos.evidence.api.DecideReviewCaseCommand;
+import com.serviceos.evidence.api.DecideReviewCaseResult;
 import com.serviceos.evidence.api.ForceApproveReviewCaseCommand;
 import com.serviceos.evidence.api.ReopenReviewCaseCommand;
 import com.serviceos.evidence.api.ReviewCaseService;
@@ -96,11 +97,12 @@ final class ReviewCaseController {
                                 item.targetType(), item.targetId(), item.targetVersion(),
                                 item.decision(), item.reasonCodes(), item.note()))
                         .toList();
-        return response(reviews.decide(
+        DecideReviewCaseResult result = reviews.decide(
                 principals.current(),
                 new CommandMetadata(correlationId, idempotencyKey),
                 new DecideReviewCaseCommand(
-                        reviewCaseId, targets, request.note(), aggregateVersion(ifMatch))));
+                        reviewCaseId, targets, request.note(), aggregateVersion(ifMatch)));
+        return response(result.reviewCase(), result.correctionCaseId());
     }
 
     @PostMapping("/review-cases/{reviewCaseId}:force-approve")
@@ -136,6 +138,13 @@ final class ReviewCaseController {
     }
 
     private ReviewCaseResponse response(ReviewCaseView reviewCase) {
+        return response(reviewCase, null);
+    }
+
+    private ReviewCaseResponse response(ReviewCaseView reviewCase, UUID correctionCaseId) {
+        String derived = "OPEN".equals(reviewCase.status()) || "REOPENED".equals(reviewCase.status())
+                ? null
+                : reviewCase.status();
         return new ReviewCaseResponse(
                 reviewCase.reviewCaseId(), reviewCase.projectId(), reviewCase.taskId(),
                 reviewCase.evidenceSetSnapshotId(), reviewCase.snapshotContentDigest(),
@@ -145,7 +154,9 @@ final class ReviewCaseController {
                 reviewCase.callbackBatchRef(), reviewCase.mappingVersionId(),
                 reviewCase.reopenedFromReviewCaseId(), reviewCase.reopenTriggerRef(),
                 reviewCase.decisions().stream().map(this::decision).toList(),
-                reviewCase.aggregateVersion());
+                reviewCase.aggregateVersion(),
+                derived,
+                correctionCaseId);
     }
 
     private static long aggregateVersion(String ifMatch) {
@@ -213,7 +224,9 @@ final class ReviewCaseController {
             UUID reopenedFromReviewCaseId,
             String reopenTriggerRef,
             List<ReviewDecisionResponse> decisions,
-            long aggregateVersion
+            long aggregateVersion,
+            String derivedOverallDecision,
+            UUID correctionCaseId
     ) {
     }
 

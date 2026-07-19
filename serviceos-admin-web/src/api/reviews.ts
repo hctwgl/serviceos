@@ -27,6 +27,8 @@ export type ReviewCase = {
   reopenTriggerRef: string | null
   decisions: ReviewDecision[]
   aggregateVersion: number
+  derivedOverallDecision?: string | null
+  correctionCaseId?: string | null
 }
 
 export type ReviewTargetDecisionRequest = {

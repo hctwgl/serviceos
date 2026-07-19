@@ -693,9 +693,11 @@ class ReviewCasePostgresIT {
 
         DecideReviewCaseCommand approveCommand = decideCommand(
                 created.reviewCaseId(), "APPROVED", List.of(), "ok");
-        ReviewCaseView decided = reviews.decide(reviewer(), metadata("decide-approve"), approveCommand);
-        ReviewCaseView decideReplay = reviews.decide(
+        var decidedResult = reviews.decide(reviewer(), metadata("decide-approve"), approveCommand);
+        ReviewCaseView decided = decidedResult.reviewCase();
+        var decideReplayResult = reviews.decide(
                 reviewer(), metadata("decide-approve"), approveCommand);
+        ReviewCaseView decideReplay = decideReplayResult.reviewCase();
 
         assertThat(decideReplay.reviewCaseId()).isEqualTo(created.reviewCaseId());
         assertThat(decided.status()).isEqualTo("APPROVED");
@@ -771,8 +773,9 @@ class ReviewCasePostgresIT {
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
 
-        ReviewCaseView rejected = reviews.decide(reviewer(), metadata("reject-ok"),
+        var rejectedResult = reviews.decide(reviewer(), metadata("reject-ok"),
                 decideCommand(created.reviewCaseId(), "REJECTED", List.of("MISSING_PHOTO", "BLURRY"), "fix"));
+        ReviewCaseView rejected = rejectedResult.reviewCase();
         assertThat(rejected.status()).isEqualTo("REJECTED");
         assertThat(rejected.decisions().getFirst().reasonCodes())
                 .containsExactly("MISSING_PHOTO", "BLURRY");
@@ -858,8 +861,9 @@ class ReviewCasePostgresIT {
         EvidenceSetSnapshotView snapshot = createSnapshot("reopen");
         ReviewCaseView created = reviews.create(reviewer(), metadata("create-reopen"),
                 new CreateReviewCaseCommand(snapshot.evidenceSetSnapshotId(), null));
-        ReviewCaseView approved = reviews.decide(reviewer(), metadata("approve-reopen"),
+        var approvedResult = reviews.decide(reviewer(), metadata("approve-reopen"),
                 decideCommand(created.reviewCaseId(), "APPROVED", List.of(), "ok"));
+        ReviewCaseView approved = approvedResult.reviewCase();
 
         assertThatThrownBy(() -> reviews.reopen(reviewer(), metadata("reopen-denied"),
                 new ReopenReviewCaseCommand(approved.reviewCaseId(), "oem reject", "OEM-1", null)))
@@ -895,8 +899,9 @@ class ReviewCasePostgresIT {
         assertThat(source.decisions()).hasSize(1);
         assertThat(source.decisions().getFirst().decision()).isEqualTo("APPROVED");
 
-        ReviewCaseView decidedAgain = reviews.decide(reviewer(), metadata("decide-after-reopen"),
+        var decidedAgainResult = reviews.decide(reviewer(), metadata("decide-after-reopen"),
                 decideCommand(reopened.reviewCaseId(), "REJECTED", List.of("FAKE_PHOTO"), "again"));
+        ReviewCaseView decidedAgain = decidedAgainResult.reviewCase();
         assertThat(decidedAgain.status()).isEqualTo("REJECTED");
         assertThat(jdbc.sql("SELECT count(*) FROM evd_review_case").query(Long.class).single()).isEqualTo(2);
         assertThat(jdbc.sql("SELECT count(*) FROM evd_review_decision").query(Long.class).single()).isEqualTo(2);
@@ -919,8 +924,9 @@ class ReviewCasePostgresIT {
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.REVIEW_CASE_STATE_CONFLICT));
 
-        ReviewCaseView approved = reviews.decide(reviewer(), metadata("approve-client-source"),
+        var approvedResult = reviews.decide(reviewer(), metadata("approve-client-source"),
                 decideCommand(source.reviewCaseId(), "APPROVED", List.of(), "send to client"));
+        ReviewCaseView approved = approvedResult.reviewCase();
         CurrentPrincipal ungrantedAdapter = new CurrentPrincipal(
                 "ungranted-adapter", TENANT, CurrentPrincipal.PrincipalType.SERVICE,
                 "ungranted-adapter", Set.of());
@@ -989,8 +995,9 @@ class ReviewCasePostgresIT {
         EvidenceSetSnapshotView rejectedSnapshot = createSnapshot("client-rejected-source");
         ReviewCaseView rejectedSource = reviews.create(reviewer(), metadata("create-rejected-source"),
                 new CreateReviewCaseCommand(rejectedSnapshot.evidenceSetSnapshotId(), null));
-        ReviewCaseView rejected = reviews.decide(reviewer(), metadata("reject-client-source"),
+        var rejectedResult = reviews.decide(reviewer(), metadata("reject-client-source"),
                 decideCommand(rejectedSource.reviewCaseId(), "REJECTED", List.of("CLIENT.NOT_READY"), null));
+        ReviewCaseView rejected = rejectedResult.reviewCase();
         assertThatThrownBy(() -> reviews.createClient(adapter(), metadata("client-from-rejected"),
                 new CreateClientReviewCaseCommand(
                         rejected.reviewCaseId(), "SUBMISSION-REJECTED", "BATCH-REJECTED",
@@ -1122,8 +1129,9 @@ class ReviewCasePostgresIT {
         EvidenceSetSnapshotView snapshot = createSnapshot(marker);
         ReviewCaseView internal = reviews.create(reviewer(), metadata("create-internal-" + marker),
                 new CreateReviewCaseCommand(snapshot.evidenceSetSnapshotId(), null));
-        ReviewCaseView approved = reviews.decide(reviewer(), metadata("approve-internal-" + marker),
+        var approvedResult = reviews.decide(reviewer(), metadata("approve-internal-" + marker),
                 decideCommand(internal.reviewCaseId(), "APPROVED", List.of(), "send to BYD"));
+        ReviewCaseView approved = approvedResult.reviewCase();
         UUID workOrderId = jdbc.sql("SELECT work_order_id FROM tsk_task WHERE task_id=:task")
                 .param("task", taskId).query(UUID.class).single();
         UUID envelopeId = UUID.randomUUID();

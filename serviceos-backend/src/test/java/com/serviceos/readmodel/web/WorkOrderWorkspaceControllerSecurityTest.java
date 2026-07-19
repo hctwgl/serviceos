@@ -402,6 +402,7 @@ class WorkOrderWorkspaceControllerSecurityTest {
                         List.of(),
                         List.of(),
                         List.of(new FinalReviewAllowedAction("DECIDE", false, "当前状态不允许提交终审")),
+                        null,
                         null),
                 new FinalReviewWorkspaceMeta(now, "final-review.v1:live", "FRESH", 3L, "frq-1"));
         when(principals.current()).thenReturn(principal);

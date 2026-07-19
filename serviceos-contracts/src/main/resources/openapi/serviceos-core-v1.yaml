@@ -8209,7 +8209,7 @@ components:
       type: object
       additionalProperties: false
       required: [workOrder, reviewTask, reviewCase, sla, gateChecks, targetGroups,
-                 rejectionReasons, allowedActions, defaultTargetRef]
+                 rejectionReasons, allowedActions, defaultTargetRef, openCorrectionCaseId]
       properties:
         workOrder: { $ref: '#/components/schemas/FinalReviewWorkOrderSummary' }
         reviewTask:
@@ -8240,6 +8240,10 @@ components:
           oneOf:
             - { $ref: '#/components/schemas/FinalReviewTargetRef' }
             - { type: 'null' }
+        openCorrectionCaseId:
+          type: [string, 'null']
+          format: uuid
+          description: M354：当前 ReviewCase 关联的未关闭 CorrectionCase（若有）
     FinalReviewWorkOrderSummary:
       type: object
       additionalProperties: false
@@ -10497,6 +10501,12 @@ components:
         decisions:
           type: array
           items: { $ref: '#/components/schemas/ReviewDecision' }
+        aggregateVersion: { type: integer, format: int64, minimum: 1 }
+        derivedOverallDecision: { type: [string, 'null'], enum: [APPROVED, REJECTED, null] }
+        correctionCaseId:
+          type: [string, 'null']
+          format: uuid
+          description: M354：REJECTED 同事务创建的 CorrectionCase；APPROVED 时为 null
 
     InvalidateEvidenceRevisionRequest:
       type: object

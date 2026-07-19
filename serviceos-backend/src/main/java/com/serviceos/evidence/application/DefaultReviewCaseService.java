@@ -11,6 +11,8 @@ import com.serviceos.evidence.api.CorrectionCaseService;
 import com.serviceos.evidence.api.CreateClientReviewCaseCommand;
 import com.serviceos.evidence.api.CreateReviewCaseCommand;
 import com.serviceos.evidence.api.DecideReviewCaseCommand;
+import com.serviceos.evidence.api.DecideReviewCaseResult;
+import com.serviceos.evidence.api.CorrectionCaseView;
 import com.serviceos.evidence.api.EvidenceSetSnapshotMemberView;
 import com.serviceos.evidence.api.EvidenceSetSnapshotView;
 import com.serviceos.evidence.api.ForceApproveReviewCaseCommand;
@@ -287,7 +289,7 @@ final class DefaultReviewCaseService implements ReviewCaseService {
 
     @Override
     @Transactional
-    public ReviewCaseView decide(
+    public DecideReviewCaseResult decide(
             CurrentPrincipal principal, CommandMetadata metadata, DecideReviewCaseCommand command
     ) {
         ReviewCaseView current = reviews.find(principal.tenantId(), command.reviewCaseId())
@@ -312,10 +314,19 @@ final class DefaultReviewCaseService implements ReviewCaseService {
                 metadata.correlationId(), metadata.idempotencyKey());
         IdempotencyDecision idempotencyDecision = idempotency.begin(context, DECIDE_OPERATION, requestDigest);
         if (idempotencyDecision.kind() == IdempotencyDecision.Kind.REPLAY) {
-            return reviews.findCommandResult(context.tenantId(), DECIDE_OPERATION, context.idempotencyKey())
+            ReviewCaseView replayed = reviews.findCommandResult(
+                            context.tenantId(), DECIDE_OPERATION, context.idempotencyKey())
                     .flatMap(id -> reviews.find(context.tenantId(), id))
                     .orElseThrow(() -> new BusinessProblem(
                             ProblemCode.INTERNAL_ERROR, "ReviewDecision replay result missing"));
+            UUID replayCorrectionId = null;
+            if ("REJECTED".equals(replayed.status()) && !replayed.decisions().isEmpty()) {
+                replayCorrectionId = corrections.findBySourceDecision(
+                                principal.tenantId(),
+                                replayed.decisions().getFirst().reviewDecisionId())
+                        .orElse(null);
+            }
+            return new DecideReviewCaseResult(replayed, replayCorrectionId);
         }
         // If-Match 在幂等重放之后校验，避免成功决定后同 Key 重放被误判为版本冲突。
         if (current.aggregateVersion() != command.expectedAggregateVersion()) {
@@ -366,13 +377,15 @@ final class DefaultReviewCaseService implements ReviewCaseService {
         }
         reviews.saveCommandResult(
                 principal.tenantId(), DECIDE_OPERATION, context.idempotencyKey(), current.reviewCaseId());
+        UUID correctionCaseId = null;
         if ("REJECTED".equals(decision)) {
-            corrections.openFromRejectedDecision(
+            CorrectionCaseView opened = corrections.openFromRejectedDecision(
                     principal.tenantId(), principal.principalId(),
                     metadata.correlationId(), metadata.idempotencyKey(),
                     current.projectId(), current.taskId(), current.reviewCaseId(),
                     decisionView.reviewDecisionId(), current.evidenceSetSnapshotId(),
                     current.snapshotContentDigest(), reasonCodes);
+            correctionCaseId = opened.correctionCaseId();
         } else {
             // APPROVED：同事务完成审核 Task，禁止浏览器串调 decide→complete。
             completeReviewTask(principal, metadata, current.taskId(), decisionView.reviewDecisionId());
@@ -397,7 +410,7 @@ final class DefaultReviewCaseService implements ReviewCaseService {
                         ProblemCode.INTERNAL_ERROR, "Decided ReviewCase missing"));
         idempotency.complete(context, DECIDE_OPERATION, current.reviewCaseId().toString(),
                 Sha256.digest(serialize(decided)));
-        return decided;
+        return new DecideReviewCaseResult(decided, correctionCaseId);
     }
 
     private List<ReviewTargetDecisionCommand> normalizeTargetDecisions(

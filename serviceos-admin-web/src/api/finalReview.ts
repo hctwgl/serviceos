@@ -98,6 +98,7 @@ export type FinalReviewWorkspaceSection = {
     rejectionReasons: Array<{ code: string; label: string; requiresNote: boolean }>
     allowedActions: FinalReviewAllowedAction[]
     defaultTargetRef: { targetType: 'EvidenceRevision'; targetId: string } | null
+    openCorrectionCaseId?: string | null
   }
   meta: {
     asOf: string

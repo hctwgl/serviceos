@@ -125,7 +125,8 @@ class ReviewRuleGatePostgresIT {
         var decided = reviews.decide(
                 reviewer(), metadata("m325-reject-ok"),
                 decideCommand(reviewCaseId, "REJECTED", List.of("IMAGE.BLUR"), "reject for rework"));
-        assertThat(decided.status()).isEqualTo("REJECTED");
+        assertThat(decided.reviewCase().status()).isEqualTo("REJECTED");
+        assertThat(decided.correctionCaseId()).isNotNull();
         assertThat(jdbc.sql("""
                 SELECT count(*) FROM aud_audit_record
                  WHERE action_name = 'REVIEW_RULE_PASSED'

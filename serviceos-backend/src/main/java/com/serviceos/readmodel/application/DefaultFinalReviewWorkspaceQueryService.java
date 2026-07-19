@@ -223,10 +223,18 @@ final class DefaultFinalReviewWorkspaceQueryService implements FinalReviewWorksp
         }
 
         List<CorrectionCaseView> openCorrections = listOpenCorrections(principal, correlationId, tasks);
+        UUID openCorrectionCaseId = null;
+        if (reviewCase != null) {
+            openCorrectionCaseId = openCorrections.stream()
+                    .filter(c -> reviewCase.reviewCaseId().equals(c.sourceReviewCaseId()))
+                    .map(CorrectionCaseView::correctionCaseId)
+                    .findFirst()
+                    .orElse(null);
+        }
         List<FinalReviewGateCheck> gates = buildGates(
                 reviewCase, reviewTask, targetGroups, openCorrections, authorizationValid, evidenceReadable);
         List<FinalReviewAllowedAction> actions = buildAllowedActions(
-                principal, correlationId, reviewCase, reviewTask, gates);
+                principal, correlationId, reviewCase, reviewTask, gates, openCorrectionCaseId);
 
         FinalReviewWorkOrderSummary workOrderSummary = new FinalReviewWorkOrderSummary(
                 header.id(),
@@ -255,7 +263,8 @@ final class DefaultFinalReviewWorkspaceQueryService implements FinalReviewWorksp
                 targetGroups,
                 REJECTION_REASONS,
                 actions,
-                defaultTarget);
+                defaultTarget,
+                openCorrectionCaseId);
         FinalReviewWorkspaceMeta meta = new FinalReviewWorkspaceMeta(
                 asOf,
                 "final-review.v1:live",
@@ -419,7 +428,8 @@ final class DefaultFinalReviewWorkspaceQueryService implements FinalReviewWorksp
             String correlationId,
             ReviewCaseView reviewCase,
             FinalReviewTaskSummary reviewTask,
-            List<FinalReviewGateCheck> gates
+            List<FinalReviewGateCheck> gates,
+            UUID openCorrectionCaseId
     ) {
         boolean blockingFail = gates.stream().anyMatch(g -> g.blocking() && "FAIL".equals(g.status()));
         boolean canDecide = reviewCase != null
@@ -447,7 +457,10 @@ final class DefaultFinalReviewWorkspaceQueryService implements FinalReviewWorksp
         }
         actions.add(new FinalReviewAllowedAction(
                 "PREVIEW_EVIDENCE", preview, preview ? null : "无可预览资料"));
-        actions.add(new FinalReviewAllowedAction("OPEN_CORRECTION", false, "驳回后由服务端自动创建"));
+        actions.add(new FinalReviewAllowedAction(
+                "OPEN_CORRECTION",
+                openCorrectionCaseId != null,
+                openCorrectionCaseId != null ? "打开关联整改案例" : "驳回后由服务端自动创建"));
         return actions;
     }
 

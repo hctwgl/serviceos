@@ -30,7 +30,8 @@ public record FinalReviewWorkspaceSectionResponse(
             List<FinalReviewTargetGroup> targetGroups,
             List<FinalReviewRejectionReason> rejectionReasons,
             List<FinalReviewAllowedAction> allowedActions,
-            FinalReviewTargetRef defaultTargetRef
+            FinalReviewTargetRef defaultTargetRef,
+            UUID openCorrectionCaseId
     ) {
         public FinalReviewWorkspaceData {
             gateChecks = List.copyOf(gateChecks);

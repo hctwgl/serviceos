@@ -100,12 +100,16 @@ const submitEnabled = computed(() => {
   return !!decideAction.value?.enabled
 })
 const submitBusy = ref(false)
+const conflictVisible = ref(false)
+const conflictMessage = ref('')
+const copiedOpinions = ref('')
 const submitBlockReason = computed(() => {
   if (readonlyMode.value) return decideAction.value?.reason || '当前不可提交终审'
   if (decidedCount.value < targets.value.length) return '仍有未处理的审核目标'
   if (!submitEnabled.value) return '请补全驳回原因与说明'
   return null
 })
+const openCorrectionId = computed(() => data.value?.openCorrectionCaseId ?? null)
 
 async function load() {
   loading.value = true
@@ -220,12 +224,25 @@ function onLogoutClear() {
   clearFinalReviewDraftsForPrincipal()
 }
 
+function copyUnsavedOpinions() {
+  const lines = targets.value.map((target) => {
+    const local = decisions.value[target.targetId]
+    if (!local?.decision) return `${target.requirementLabel}: 未处理`
+    if (local.decision === 'APPROVED') return `${target.requirementLabel}: 通过`
+    return `${target.requirementLabel}: 驳回 (${local.reasonCodes.join(',')}) ${local.note}`
+  })
+  if (overallNote.value) lines.push(`整单说明: ${overallNote.value}`)
+  copiedOpinions.value = lines.join('\n')
+  void navigator.clipboard?.writeText(copiedOpinions.value)
+}
+
 async function submitDecide() {
   const reviewCase = data.value?.reviewCase
   if (!reviewCase || !submitEnabled.value) return
+  const approved = decidedCount.value - rejectedCount.value
   Modal.confirm({
     title: primaryLabel.value,
-    content: `将提交 ${targets.value.length} 项目标决定（通过 ${decidedCount.value - rejectedCount.value} / 驳回 ${rejectedCount.value}）。整组结果由服务端派生。`,
+    content: `审核目标 ${targets.value.length} 项：通过 ${approved}，驳回 ${rejectedCount.value}，未处理 ${targets.value.length - decidedCount.value}。整组结果由服务端派生，不会伪造预结算。`,
     okText: '确认提交',
     cancelText: '取消',
     async onOk() {
@@ -245,13 +262,32 @@ async function submitDecide() {
           }),
           note: overallNote.value || null,
         }
-        await decideReviewCase(
+        const result = await decideReviewCase(
           reviewCase.reviewCaseId,
           body,
           `"${reviewCase.aggregateVersion}"`,
         )
         draftStatus.value = '已暂存到当前浏览器'
+        const decided = result.data
+        if (decided.status === 'REJECTED' && decided.correctionCaseId) {
+          await router.push({
+            name: 'ADMIN.CORRECTION.DETAIL',
+            params: { id: decided.correctionCaseId },
+          })
+          return
+        }
         await load()
+      } catch (err) {
+        const status = (err as { status?: number }).status
+        if (status === 409) {
+          persistDraft()
+          conflictVisible.value = true
+          conflictMessage.value =
+            '审核案例版本冲突或已被他人处理。本地草稿已保留，不会自动覆盖服务端最新数据。'
+          await load()
+          return
+        }
+        error.value = err instanceof Error ? err.message : '提交终审失败'
       } finally {
         submitBusy.value = false
       }
@@ -328,6 +364,34 @@ watch(
           style="margin: 12px 0"
           message="审核案例内容已经更新，旧草稿不会自动覆盖最新数据。"
         />
+        <Alert
+          v-if="openCorrectionId"
+          type="info"
+          show-icon
+          style="margin: 12px 0"
+          message="已关联整改案例"
+        >
+          <template #action>
+            <Button
+              type="link"
+              data-testid="open-correction-link"
+              @click="$router.push({ name: 'ADMIN.CORRECTION.DETAIL', params: { id: openCorrectionId } })"
+            >
+              打开整改详情
+            </Button>
+          </template>
+        </Alert>
+        <Modal
+          v-model:open="conflictVisible"
+          title="版本冲突"
+          ok-text="复制未保存意见"
+          cancel-text="关闭"
+          data-testid="review-conflict-dialog"
+          @ok="copyUnsavedOpinions"
+        >
+          <p>{{ conflictMessage }}</p>
+          <p v-if="copiedOpinions" class="draft-status">意见已复制到剪贴板。</p>
+        </Modal>
 
         <div class="tri-pane">
           <aside class="pane left" data-testid="review-target-list">

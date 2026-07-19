@@ -41,6 +41,7 @@ import tools.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /** CorrectionCase 打开、补传与关闭；补传轮次只追加。 */
@@ -199,6 +200,12 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
                         task.projectId(), taskId),
                 correlationId);
         return corrections.listByTask(principal.tenantId(), taskId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<UUID> findBySourceDecision(String tenantId, UUID reviewDecisionId) {
+        return corrections.findBySourceDecision(tenantId, reviewDecisionId);
     }
 
     @Override
