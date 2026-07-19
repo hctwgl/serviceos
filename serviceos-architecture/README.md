@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M349 Technician Web FORM 条件执行器**（Draft stacked 于 `#148→…→#175` + 本切片；
+当前工程基线为 **M349 Technician Web FORM 条件执行器**（已合入 `master`（`c54c98ee` / PR #177）；
 见 `implementation-status.md`；合入 `master` 后回填合并提交）。M320 合并基线为
 `32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147）。
 

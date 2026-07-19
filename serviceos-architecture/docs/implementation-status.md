@@ -3,7 +3,7 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-19
-baselineCommit: "c2e919aa04dcca557f3c2242f71ed5179f3b44c6"
+baselineCommit: "c54c98ee86c756635abc3955e8201341cca2867f"
 latestMilestone: "M349"
 ---
 
@@ -176,7 +176,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 ## 5. 下一实施方向
 
 ServiceOS 可靠纵向切片已推进到 **M349**（Technician Web FORM 条件执行器）。
-M321～M349 均在 Draft stacked PRs 中（`#148→…→#175` + https://github.com/hctwgl/serviceos/pull/176）；M320 已合入 `master`（`32b902f8`）。
+M321～M349 已合入 `master`（落地 squash `c54c98ee`，经 `#148` + 恢复 PR `#177`；中间 `#149`～`#176` 曾误合入侧分支后由 `#177` 收口）。M320 基线 `32b902f8`。
 
 当前契约/迁移：OpenAPI **1.0.43**；Flyway **127**（无本里程碑迁移/契约变更）。
 
