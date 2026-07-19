@@ -8,6 +8,7 @@ lastUpdated: 2026-07-19
 ## 当前
 
 - **进行中 Draft PR**：M358 supportedClientKinds 定向发布（依赖 M356 #183、M357 #184）
+- PR：https://github.com/hctwgl/serviceos/pull/185
 - 分支：`cursor/m358-supported-client-kinds-6a78`
 - latestMilestone（本 PR）：**M358**
 - Flyway：**131**；OpenAPI：**1.0.52**
