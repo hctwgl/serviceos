@@ -9,6 +9,7 @@ lastUpdated: 2026-07-19
 
 - **进行中 Draft PR**：M360 终审 8 态视觉基线与 admin-pilot 冒烟加固
   （依赖 M356～M359：#183～#186）
+- PR：https://github.com/hctwgl/serviceos/pull/187
 - 分支：`cursor/m360-final-review-visual-admin-pilot-6a78`
   （base：`cursor/m359-portal-header-capability-reject-6a78`）
 - latestMilestone（本 PR）：**M360**
