@@ -4,6 +4,7 @@ import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.shared.CommandMetadata;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /** CorrectionCase 命令与查询端口。 */
@@ -12,6 +13,9 @@ public interface CorrectionCaseService {
 
     /** 按 Task 列出整改案例；要求 evidence.read 与实时 Project Scope。 */
     List<CorrectionCaseView> listForTask(CurrentPrincipal principal, String correlationId, UUID taskId);
+
+    /** 按源 ReviewDecision 查找 CorrectionCase（同租户内部查询，供 decide 结果投影）。 */
+    Optional<UUID> findBySourceDecision(String tenantId, UUID reviewDecisionId);
 
     CorrectionCaseView resubmit(
             CurrentPrincipal principal, CommandMetadata metadata, ResubmitCorrectionCaseCommand command);

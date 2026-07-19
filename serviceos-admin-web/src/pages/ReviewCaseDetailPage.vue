@@ -8,6 +8,7 @@ import {
   reopenReviewCase,
   type ReviewCase,
 } from '../api/reviews'
+import { getEvidenceSetSnapshot } from '../api/formsEvidence'
 import { createBydReviewSubmission } from '../api/integrationCommands'
 import QueueTable from './QueueTable.vue'
 import StatusBadge from '../components/StatusBadge.vue'
@@ -49,23 +50,44 @@ function codes() {
 }
 
 async function decide() {
+  // M353：详情页兼容整案同裁决；服务端仍只接受 targetDecisions（按 Snapshot 成员展开）。
+  // 混合通过/驳回请走工单「平台终审」工作台。
   busy.value = true
   message.value = null
   error.value = null
   try {
-    const body = {
+    if (!detail.value) {
+      throw new Error('审核案例尚未加载')
+    }
+    if (decision.value === 'REJECTED' && codes().length === 0) {
+      throw new Error('驳回需要 reasonCodes')
+    }
+    if (decision.value === 'REJECTED' && !note.value.trim()) {
+      throw new Error('驳回需要 note')
+    }
+    const snapshot = await getEvidenceSetSnapshot(detail.value.evidenceSetSnapshotId)
+    const members = snapshot.members ?? []
+    const targetDecisions = members.map((member) => ({
+      targetType: 'EvidenceRevision' as const,
+      targetId: member.evidenceRevisionId,
+      targetVersion: member.revisionNumber,
       decision: decision.value,
-      reasonCodes: codes(),
-      note: note.value || null,
-    }
-    if (decision.value === 'REJECTED' && body.reasonCodes.length === 0) {
-      throw new Error('REJECTED 至少需要一个 reasonCode')
-    }
-    const decided = (await decideReviewCase(reviewCaseId.value, body)).data
-    // 裁决命令只负责追加不可变决定；随后重新读取权威详情，避免命令响应与队列/详情投影
-    // 在字段演进或异步扩展时让页面残留半更新状态。
-    await load()
-    message.value = `已裁决为 ${statusLabel(decided.status)}`
+      reasonCodes: decision.value === 'REJECTED' ? codes() : [],
+      note: decision.value === 'REJECTED' ? note.value.trim() : note.value.trim() || null,
+    }))
+    // 空 Snapshot（RULE 门禁夹具）：用 overall note 派生；驳回 note 需含 reject。
+    const overallNote =
+      decision.value === 'REJECTED' && members.length === 0
+        ? note.value.trim() || 'reject'
+        : note.value.trim() || null
+    detail.value = (
+      await decideReviewCase(
+        reviewCaseId.value,
+        { targetDecisions, note: overallNote },
+        detail.value.aggregateVersion,
+      )
+    ).data
+    message.value = `已裁决为 ${statusLabel(detail.value.status)}`
   } catch (err) {
     error.value = err instanceof Error ? err.message : '裁决失败'
   } finally {

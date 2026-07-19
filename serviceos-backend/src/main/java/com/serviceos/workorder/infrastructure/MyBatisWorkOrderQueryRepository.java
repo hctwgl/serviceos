@@ -26,6 +26,19 @@ final class MyBatisWorkOrderQueryRepository implements WorkOrderQueryRepository 
     @Override public Optional<WorkOrderView> findById(String tenantId, UUID workOrderId) {
         return Optional.ofNullable(mapper.findById(tenantId, workOrderId)).map(MyBatisWorkOrderQueryRepository::view);
     }
+
+    @Override
+    public Optional<RawCustomerContact> findRawCustomerContact(String tenantId, UUID workOrderId) {
+        Map<String, Object> row = mapper.findRawCustomerContact(tenantId, workOrderId);
+        if (row == null) {
+            return Optional.empty();
+        }
+        return Optional.of(new RawCustomerContact(
+                uuid(row, "workOrderId"),
+                string(row, "customerName"),
+                string(row, "customerMobile"),
+                string(row, "serviceAddress")));
+    }
     private static WorkOrderView view(Map<String,Object> r) {
         return new WorkOrderView(uuid(r,"id"), string(r,"tenantId"), uuid(r,"projectId"),
                 string(r,"clientCode"), string(r,"brandCode"), string(r,"serviceProductCode"),

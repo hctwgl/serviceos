@@ -14,8 +14,11 @@ interface ReviewCaseMapper {
             @Param("tenantId") String tenantId,
             @Param("reviewCaseId") String reviewCaseId,
             @Param("expectedStatus") String expectedStatus,
+            @Param("expectedAggregateVersion") long expectedAggregateVersion,
             @Param("status") String status,
             @Param("decidedAt") Object decidedAt);
+
+    void insertTargetDecision(Map<String, Object> values);
 
     int markReopened(
             @Param("tenantId") String tenantId,

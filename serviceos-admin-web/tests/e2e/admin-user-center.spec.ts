@@ -100,7 +100,7 @@ test.describe('M187 Admin 统一用户中心', () => {
       .getByRole('link', { name: '打开' })
       .click()
     await expect(page.getByTestId('organization-detail-page')).toBeVisible()
-    await page.getByRole('button', { name: '刷新' }).click()
+    await page.getByTestId('organization-detail-page').getByRole('button', { name: '刷新', exact: true }).click()
     await expect(page.getByTestId('organization-detail-page')).toBeVisible()
 
     await page.getByLabel('unit code').fill(`U-${suffix}`)

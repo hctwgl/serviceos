@@ -25,4 +25,12 @@
   <select id="findById" resultType="map">
     SELECT <include refid="columns"/> FROM wo_work_order WHERE tenant_id=#{tenantId} AND id=#{workOrderId}
   </select>
+  <select id="findRawCustomerContact" resultType="map">
+    SELECT id AS "workOrderId",
+           customer_name AS "customerName",
+           customer_mobile AS "customerMobile",
+           service_address AS "serviceAddress"
+      FROM wo_work_order
+     WHERE tenant_id=#{tenantId} AND id=#{workOrderId}
+  </select>
 </mapper>

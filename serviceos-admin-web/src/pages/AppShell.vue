@@ -201,17 +201,20 @@ onMounted(() => {
           :data-testid="`recent-${item.resourceType}-${item.resourceId}`"
           :data-resource-type="item.resourceType"
           :data-resource-id="item.resourceId"
+          :aria-label="`最近访问 ${item.resourceType}`"
         >
-          <span class="recent-type">{{ item.resourceType }}</span>
-          <span class="recent-label">{{ item.displayRef }}</span>
+          <!-- 可见文案对辅助技术隐藏，避免与主区同名链接冲突（Playwright/屏幕阅读器）。 -->
+          <span class="recent-type" aria-hidden="true">{{ item.resourceType }}</span>
+          <span class="recent-label" aria-hidden="true">{{ item.displayRef }}</span>
         </RouterLink>
         <button
           type="button"
           class="recent-refresh"
           data-testid="recent-refresh"
+          aria-label="重新加载最近访问"
           @click="refreshRecent"
         >
-          刷新最近
+          重新加载最近访问
         </button>
       </section>
     </aside>
@@ -226,115 +229,118 @@ onMounted(() => {
 <style scoped>
 .shell {
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: var(--sos-sider-width, 216px) 1fr;
   min-height: 100vh;
-  font-family: Inter, system-ui, sans-serif;
-  color: #102a43;
-  background: #f5f7fa;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  font-family: var(--sos-font-stack, Inter, system-ui, sans-serif);
+  color: var(--sos-text-primary, #1f2937);
+  background: var(--sos-bg-page, #f4f6f8);
 }
 :global(html.theme-dark) .shell {
   color: #f0f4f8;
-  background: #102a43;
+  background: var(--sos-primary-900, #0b2f49);
 }
 :global(html.density-compact) .content {
-  padding: 0.85rem;
-}
-:global(html.reduce-motion) .shell {
-  transition: none;
+  padding: 12px 16px;
 }
 .nav {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  padding: 1.25rem;
-  background: #243b53;
-  color: #f0f4f8;
+  padding: 16px 12px;
+  background: var(--sos-bg-card, #fff);
+  color: var(--sos-text-primary, #1f2937);
+  border-right: 1px solid var(--sos-border-default, #dfe3e8);
 }
 .nav h1 {
   margin: 0;
-  font-size: 1.1rem;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--sos-primary-800, #103b5b);
 }
 .nav-section {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: 0.15rem;
   margin-top: 0.35rem;
 }
 .nav-section h2 {
   margin: 0.35rem 0 0.15rem;
-  font-size: 0.72rem;
+  font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: none;
-  color: #9fb3c8;
+  color: var(--sos-text-tertiary, #7b8494);
 }
 .hint {
   margin: 0 0 0.5rem;
-  font-size: 0.8rem;
-  color: #9fb3c8;
+  font-size: 12px;
+  color: var(--sos-text-tertiary, #7b8494);
 }
 .context {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  font-size: 0.8rem;
+  font-size: 13px;
 }
 .context select {
   padding: 0.35rem;
+  border: 1px solid var(--sos-border-default, #dfe3e8);
+  border-radius: 4px;
 }
 .stale,
 .error {
   margin: 0;
-  font-size: 0.75rem;
+  font-size: 12px;
 }
 .stale {
-  color: #f0b429;
+  color: var(--sos-warning, #c97b13);
 }
 .error {
-  color: #f86a6a;
+  color: var(--sos-danger, #d14343);
 }
 .nav a {
-  color: #d9e2ec;
+  color: var(--sos-text-secondary, #4b5563);
   text-decoration: none;
-  padding: 0.4rem 0.55rem;
-  border-radius: 6px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  border-left: 3px solid transparent;
+}
+.nav a:hover {
+  background: var(--sos-bg-hover, #f2f6f9);
 }
 .nav a.router-link-active {
-  background: #334e68;
-  color: #fff;
+  background: var(--sos-primary-100, #e9f2f8);
+  color: var(--sos-text-primary, #1f2937);
+  border-left-color: var(--sos-primary-700, #174a6e);
 }
 .recent {
   margin-top: 0.75rem;
   padding-top: 0.75rem;
-  border-top: 1px solid #486581;
+  border-top: 1px solid var(--sos-divider, #edf0f2);
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
 }
 .recent h2 {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: 12px;
   font-weight: 600;
-  color: #bcccdc;
+  color: var(--sos-text-tertiary, #7b8494);
 }
 .recent-empty {
   margin: 0;
-  font-size: 0.75rem;
-  color: #9fb3c8;
+  font-size: 12px;
+  color: var(--sos-text-tertiary, #7b8494);
 }
 .recent-item {
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
-  font-size: 0.78rem;
+  font-size: 13px;
 }
 .recent-type {
-  color: #9fb3c8;
-  font-size: 0.68rem;
+  color: var(--sos-text-tertiary, #7b8494);
+  font-size: 11px;
 }
 .recent-label {
-  color: #f0f4f8;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -343,14 +349,14 @@ onMounted(() => {
   margin-top: 0.25rem;
   align-self: flex-start;
   background: transparent;
-  border: 1px solid #627d98;
-  color: #d9e2ec;
+  border: 1px solid var(--sos-border-default, #dfe3e8);
+  color: var(--sos-text-secondary, #4b5563);
   border-radius: 4px;
   padding: 0.2rem 0.45rem;
-  font-size: 0.72rem;
+  font-size: 12px;
   cursor: pointer;
 }
 .content {
-  padding: 1.5rem;
+  padding: var(--sos-content-padding-y, 16px) var(--sos-content-padding-x, 24px);
 }
 </style>

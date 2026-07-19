@@ -193,6 +193,9 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
                 "REVIEWS_CORRECTIONS",
                 probeReviewsCorrectionsAvailability(principal, correlationId, tasks));
         availability.put(
+                "FINAL_REVIEW",
+                probeFinalReviewAvailability(principal, correlationId, tasks));
+        availability.put(
                 "INTEGRATION",
                 probeIntegrationAvailability(principal, correlationId, workOrderId));
         availability.put("FACTS_CALCULATIONS", "UNAVAILABLE");
@@ -370,6 +373,40 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
                 correctionsDenied,
                 reviewsDenied || loaded.reviews().isEmpty(),
                 correctionsDenied || loaded.corrections().isEmpty());
+    }
+
+    /** M351：有 OPEN INTERNAL ReviewCase 为 AVAILABLE；有权但无案例为 EMPTY；完全无 evidence.read 为 UNAVAILABLE。 */
+    private String probeFinalReviewAvailability(
+            CurrentPrincipal principal,
+            String correlationId,
+            List<WorkOrderTaskSummary> tasks
+    ) {
+        boolean denied = false;
+        boolean any = false;
+        boolean openInternal = false;
+        for (WorkOrderTaskSummary task : tasks) {
+            try {
+                for (var review : reviews.listForTask(principal, correlationId, task.id())) {
+                    any = true;
+                    if ("INTERNAL".equals(review.origin()) && "OPEN".equals(review.status())) {
+                        openInternal = true;
+                    }
+                }
+            } catch (BusinessProblem problem) {
+                if (problem.code() == ProblemCode.ACCESS_DENIED) {
+                    denied = true;
+                    continue;
+                }
+                throw problem;
+            }
+        }
+        if (openInternal) {
+            return "AVAILABLE";
+        }
+        if (any) {
+            return "EMPTY";
+        }
+        return denied ? "UNAVAILABLE" : "EMPTY";
     }
 
     private String probeIntegrationAvailability(

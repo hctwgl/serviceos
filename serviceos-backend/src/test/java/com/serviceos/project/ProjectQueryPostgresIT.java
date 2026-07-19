@@ -223,7 +223,7 @@ class ProjectQueryPostgresIT {
                 .query(String.class).single()).isEqualTo("NORMAL");
         assertThat(jdbc.sql("SELECT count(*) FROM pg_indexes WHERE indexname='ix_prj_project_directory_cursor'")
                 .query(Long.class).single()).isOne();
-        assertThat(flyway.info().applied()).hasSize(130);
+        assertThat(flyway.info().applied()).hasSize(132);
         assertThat(flyway.migrate().migrationsExecuted).isZero();
     }
 

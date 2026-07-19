@@ -11,12 +11,21 @@ import com.serviceos.evidence.api.CorrectionCaseService;
 import com.serviceos.evidence.api.CreateClientReviewCaseCommand;
 import com.serviceos.evidence.api.CreateReviewCaseCommand;
 import com.serviceos.evidence.api.DecideReviewCaseCommand;
+import com.serviceos.evidence.api.DecideReviewCaseResult;
+import com.serviceos.evidence.api.CorrectionCaseView;
+import com.serviceos.evidence.api.EvidenceSetSnapshotMemberView;
 import com.serviceos.evidence.api.EvidenceSetSnapshotView;
 import com.serviceos.evidence.api.ForceApproveReviewCaseCommand;
 import com.serviceos.evidence.api.ReopenReviewCaseCommand;
 import com.serviceos.evidence.api.ReviewCaseService;
 import com.serviceos.evidence.api.ReviewCaseView;
 import com.serviceos.evidence.api.ReviewDecisionView;
+import com.serviceos.evidence.api.ReviewTargetDecisionCommand;
+import com.serviceos.task.api.ClaimHumanTaskCommand;
+import com.serviceos.task.api.CompleteHumanTaskCommand;
+import com.serviceos.task.api.HumanTaskCommandService;
+import com.serviceos.task.api.StartHumanTaskCommand;
+import com.serviceos.task.api.HumanTaskCommandReceipt;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.reliability.api.IdempotencyDecision;
 import com.serviceos.reliability.api.IdempotencyService;
@@ -37,9 +46,15 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /** ReviewCase 创建与裁决；决定只追加，Case 状态为可重建投影。 */
 @Service
@@ -60,6 +75,7 @@ final class DefaultReviewCaseService implements ReviewCaseService {
     private final EvidenceSetSnapshotRepository snapshots;
     private final CorrectionCaseService corrections;
     private final TaskFulfillmentContextService tasks;
+    private final HumanTaskCommandService humanTasks;
     private final ActiveServiceResponsibilityService serviceResponsibilities;
     private final ReviewRuleGate reviewRuleGate;
     private final AuthorizationService authorization;
@@ -74,6 +90,7 @@ final class DefaultReviewCaseService implements ReviewCaseService {
             EvidenceSetSnapshotRepository snapshots,
             CorrectionCaseService corrections,
             TaskFulfillmentContextService tasks,
+            HumanTaskCommandService humanTasks,
             ActiveServiceResponsibilityService serviceResponsibilities,
             ReviewRuleGate reviewRuleGate,
             AuthorizationService authorization,
@@ -87,6 +104,7 @@ final class DefaultReviewCaseService implements ReviewCaseService {
         this.snapshots = snapshots;
         this.corrections = corrections;
         this.tasks = tasks;
+        this.humanTasks = humanTasks;
         this.serviceResponsibilities = serviceResponsibilities;
         this.reviewRuleGate = reviewRuleGate;
         this.authorization = authorization;
@@ -271,7 +289,7 @@ final class DefaultReviewCaseService implements ReviewCaseService {
 
     @Override
     @Transactional
-    public ReviewCaseView decide(
+    public DecideReviewCaseResult decide(
             CurrentPrincipal principal, CommandMetadata metadata, DecideReviewCaseCommand command
     ) {
         ReviewCaseView current = reviews.find(principal.tenantId(), command.reviewCaseId())
@@ -285,25 +303,52 @@ final class DefaultReviewCaseService implements ReviewCaseService {
             throw new BusinessProblem(ProblemCode.REVIEW_CASE_STATE_CONFLICT,
                     "CLIENT ReviewCase can only be decided by an external receipt");
         }
-        String decision = normalizeDecision(command.decision());
-        List<String> reasonCodes = normalizeReasons(command.reasonCodes(), decision);
+        List<ReviewTargetDecisionCommand> targetDecisions = normalizeTargetDecisions(
+                command.targetDecisions());
         String note = normalizeNote(command.note());
         String requestDigest = Sha256.digest(
-                current.reviewCaseId() + "|" + decision + "|" + serialize(reasonCodes) + "|" + nullToEmpty(note));
+                current.reviewCaseId() + "|" + command.expectedAggregateVersion()
+                        + "|" + serialize(targetDecisions) + "|" + nullToEmpty(note));
         CommandContext context = new CommandContext(
                 principal.tenantId(), principal.principalId(),
                 metadata.correlationId(), metadata.idempotencyKey());
         IdempotencyDecision idempotencyDecision = idempotency.begin(context, DECIDE_OPERATION, requestDigest);
         if (idempotencyDecision.kind() == IdempotencyDecision.Kind.REPLAY) {
-            return reviews.findCommandResult(context.tenantId(), DECIDE_OPERATION, context.idempotencyKey())
+            ReviewCaseView replayed = reviews.findCommandResult(
+                            context.tenantId(), DECIDE_OPERATION, context.idempotencyKey())
                     .flatMap(id -> reviews.find(context.tenantId(), id))
                     .orElseThrow(() -> new BusinessProblem(
                             ProblemCode.INTERNAL_ERROR, "ReviewDecision replay result missing"));
+            UUID replayCorrectionId = null;
+            if ("REJECTED".equals(replayed.status()) && !replayed.decisions().isEmpty()) {
+                replayCorrectionId = corrections.findBySourceDecision(
+                                principal.tenantId(),
+                                replayed.decisions().getFirst().reviewDecisionId())
+                        .orElse(null);
+            }
+            return new DecideReviewCaseResult(replayed, replayCorrectionId);
+        }
+        // If-Match 在幂等重放之后校验，避免成功决定后同 Key 重放被误判为版本冲突。
+        if (current.aggregateVersion() != command.expectedAggregateVersion()) {
+            throw new BusinessProblem(ProblemCode.VERSION_CONFLICT,
+                    "ReviewCase aggregateVersion mismatch");
         }
         if (!"OPEN".equals(current.status())) {
             throw new BusinessProblem(ProblemCode.REVIEW_CASE_ALREADY_DECIDED,
                     "ReviewCase has already been decided");
         }
+
+        EvidenceSetSnapshotView snapshot = snapshots.find(
+                        principal.tenantId(), current.evidenceSetSnapshotId())
+                .orElseThrow(() -> new BusinessProblem(
+                        ProblemCode.RESOURCE_NOT_FOUND, "EvidenceSetSnapshot does not exist"));
+        validateTargetsAgainstSnapshot(snapshot, targetDecisions);
+        String decision = deriveOverallDecision(targetDecisions, note);
+        List<String> reasonCodes = targetDecisions.stream()
+                .filter(item -> "REJECTED".equals(item.decision()))
+                .flatMap(item -> item.reasonCodes().stream())
+                .distinct()
+                .toList();
 
         // M325：冻结 RULE 门禁必须在 markDecided 之前；失败关闭不改变 Case 状态。
         reviewRuleGate.assertDecideAllowed(
@@ -312,25 +357,38 @@ final class DefaultReviewCaseService implements ReviewCaseService {
 
         Instant now = clock.instant();
         int updated = reviews.markDecided(
-                principal.tenantId(), current.reviewCaseId(), "OPEN", decision, now);
+                principal.tenantId(), current.reviewCaseId(), "OPEN",
+                command.expectedAggregateVersion(), decision, now);
         if (updated != 1) {
-            throw new BusinessProblem(ProblemCode.REVIEW_CASE_ALREADY_DECIDED,
-                    "ReviewCase has already been decided");
+            throw new BusinessProblem(ProblemCode.VERSION_CONFLICT,
+                    "ReviewCase was decided concurrently or version mismatched");
         }
         int ordinal = reviews.nextDecisionOrdinal(principal.tenantId(), current.reviewCaseId());
         ReviewDecisionView decisionView = new ReviewDecisionView(
                 UUID.randomUUID(), current.reviewCaseId(), ordinal, decision, "INTERNAL",
                 reasonCodes, note, null, principal.principalId(), now);
         reviews.insertDecision(principal.tenantId(), current.projectId(), decisionView);
+        for (ReviewTargetDecisionCommand target : targetDecisions) {
+            reviews.insertTargetDecision(
+                    principal.tenantId(), current.projectId(), current.reviewCaseId(),
+                    decisionView.reviewDecisionId(), target.targetType(), target.targetId(),
+                    target.targetVersion(), target.decision(), target.reasonCodes(),
+                    target.note(), now);
+        }
         reviews.saveCommandResult(
                 principal.tenantId(), DECIDE_OPERATION, context.idempotencyKey(), current.reviewCaseId());
+        UUID correctionCaseId = null;
         if ("REJECTED".equals(decision)) {
-            corrections.openFromRejectedDecision(
+            CorrectionCaseView opened = corrections.openFromRejectedDecision(
                     principal.tenantId(), principal.principalId(),
                     metadata.correlationId(), metadata.idempotencyKey(),
                     current.projectId(), current.taskId(), current.reviewCaseId(),
                     decisionView.reviewDecisionId(), current.evidenceSetSnapshotId(),
                     current.snapshotContentDigest(), reasonCodes);
+            correctionCaseId = opened.correctionCaseId();
+        } else {
+            // APPROVED：同事务完成审核 Task，禁止浏览器串调 decide→complete。
+            completeReviewTask(principal, metadata, current.taskId(), decisionView.reviewDecisionId());
         }
 
         String payload = serialize(new ReviewDecidedPayload(
@@ -352,7 +410,127 @@ final class DefaultReviewCaseService implements ReviewCaseService {
                         ProblemCode.INTERNAL_ERROR, "Decided ReviewCase missing"));
         idempotency.complete(context, DECIDE_OPERATION, current.reviewCaseId().toString(),
                 Sha256.digest(serialize(decided)));
-        return decided;
+        return new DecideReviewCaseResult(decided, correctionCaseId);
+    }
+
+    private List<ReviewTargetDecisionCommand> normalizeTargetDecisions(
+            List<ReviewTargetDecisionCommand> raw
+    ) {
+        if (raw == null) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, "targetDecisions must not be null");
+        }
+        // 允许空列表：仅当 Snapshot 无成员（RULE 门禁夹具）；有成员时由后续校验强制覆盖完整。
+        List<ReviewTargetDecisionCommand> normalized = new ArrayList<>();
+        Set<UUID> seen = new HashSet<>();
+        for (ReviewTargetDecisionCommand item : raw) {
+            if (item == null || !"EvidenceRevision".equals(item.targetType())) {
+                throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                        "targetType must be EvidenceRevision");
+            }
+            if (item.targetId() == null || item.targetVersion() < 1) {
+                throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                        "targetId/targetVersion is invalid");
+            }
+            if (!seen.add(item.targetId())) {
+                throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                        "duplicate targetId in targetDecisions");
+            }
+            String decision = normalizeDecision(item.decision());
+            List<String> reasons = normalizeReasons(item.reasonCodes(), decision);
+            String targetNote = normalizeNote(item.note());
+            if ("REJECTED".equals(decision)) {
+                if (reasons.isEmpty()) {
+                    throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                            "REJECTED target requires reasonCodes");
+                }
+                if (targetNote == null || targetNote.isBlank()) {
+                    throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                            "REJECTED target requires note");
+                }
+            }
+            normalized.add(new ReviewTargetDecisionCommand(
+                    "EvidenceRevision", item.targetId(), item.targetVersion(),
+                    decision, reasons, targetNote));
+        }
+        return List.copyOf(normalized);
+    }
+
+    private void validateTargetsAgainstSnapshot(
+            EvidenceSetSnapshotView snapshot, List<ReviewTargetDecisionCommand> targetDecisions
+    ) {
+        Map<UUID, EvidenceSetSnapshotMemberView> members = snapshot.members().stream()
+                .collect(Collectors.toMap(
+                        EvidenceSetSnapshotMemberView::evidenceRevisionId,
+                        member -> member,
+                        (a, b) -> a,
+                        HashMap::new));
+        if (targetDecisions.size() != members.size()) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                    "targetDecisions must cover every Snapshot member exactly once");
+        }
+        for (ReviewTargetDecisionCommand target : targetDecisions) {
+            EvidenceSetSnapshotMemberView member = members.get(target.targetId());
+            if (member == null) {
+                throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                        "target is not a member of the frozen Snapshot");
+            }
+            if (member.revisionNumber() != target.targetVersion()) {
+                throw new BusinessProblem(ProblemCode.VERSION_CONFLICT,
+                        "targetVersion does not match frozen Snapshot revision");
+            }
+        }
+    }
+
+    private static String deriveOverallDecision(
+            List<ReviewTargetDecisionCommand> targetDecisions, String note
+    ) {
+        if (targetDecisions.isEmpty()) {
+            // 空 Snapshot：无 target 可审；note 含 reject 关键字时派生 REJECTED（RULE 门禁夹具）。
+            if (note != null && note.toLowerCase(Locale.ROOT).contains("reject")) {
+                return "REJECTED";
+            }
+            return "APPROVED";
+        }
+        boolean anyRejected = targetDecisions.stream()
+                .anyMatch(item -> "REJECTED".equals(item.decision()));
+        return anyRejected ? "REJECTED" : "APPROVED";
+    }
+
+    private void completeReviewTask(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            UUID taskId,
+            UUID reviewDecisionId
+    ) {
+        TaskFulfillmentContext task = tasks.find(principal.tenantId(), taskId)
+                .orElseThrow(() -> new BusinessProblem(
+                        ProblemCode.RESOURCE_NOT_FOUND, "Review Task does not exist"));
+        long version = task.version();
+        String status = task.status();
+        // 当前 ReviewCase.taskId 常指向资料提交 Task（多已 COMPLETED）。
+        // 仅当仍存在可推进的 HUMAN 审核 Task 时同事务 claim/start/complete；其余状态跳过，
+        // 由既有工作流/Outbox 链路推进，避免把 APPROVED 伪造成 Task 冲突失败。
+        if (!Set.of("READY", "CLAIMED", "IN_PROGRESS").contains(status)) {
+            return;
+        }
+        if ("READY".equals(status)) {
+            HumanTaskCommandReceipt claimed = humanTasks.claim(
+                    principal, metadata, new ClaimHumanTaskCommand(taskId, version));
+            version = claimed.version();
+            HumanTaskCommandReceipt started = humanTasks.start(
+                    principal, metadata, new StartHumanTaskCommand(taskId, version));
+            version = started.version();
+        } else if ("CLAIMED".equals(status)) {
+            HumanTaskCommandReceipt started = humanTasks.start(
+                    principal, metadata, new StartHumanTaskCommand(taskId, version));
+            version = started.version();
+        }
+        String resultRef = "review-decision:" + reviewDecisionId;
+        String resultDigest = Sha256.digest(resultRef);
+        humanTasks.complete(
+                principal,
+                metadata,
+                new CompleteHumanTaskCommand(taskId, version, resultRef, resultDigest, List.of()));
     }
 
     @Override
@@ -394,7 +572,8 @@ final class DefaultReviewCaseService implements ReviewCaseService {
 
         Instant now = clock.instant();
         int updated = reviews.markDecided(
-                principal.tenantId(), current.reviewCaseId(), "OPEN", "FORCE_APPROVED", now);
+                principal.tenantId(), current.reviewCaseId(), "OPEN",
+                current.aggregateVersion(), "FORCE_APPROVED", now);
         if (updated != 1) {
             throw new BusinessProblem(ProblemCode.REVIEW_CASE_ALREADY_DECIDED,
                     "ReviewCase has already been decided");

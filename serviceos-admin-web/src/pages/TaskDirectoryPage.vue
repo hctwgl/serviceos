@@ -14,6 +14,7 @@ const linkColumns: Record<
 > = {
   id: (row) => uuidRoute(row.id, 'ADMIN.TASK.DETAIL'),
   workOrderId: (row) => uuidRoute(row.workOrderId, 'ADMIN.WORKORDER.WORKSPACE'),
+  projectId: (row) => uuidRoute(row.projectId, 'ADMIN.PROJECT.DETAIL'),
 }
 
 const route = useRoute()
@@ -182,8 +183,8 @@ onMounted(() => {
     </form>
 
     <QueueTable
-      title="授权任务目录"
-      :columns="['id', 'taskType', 'taskKind', 'status', 'priority', 'claimedBy', 'workOrderId', 'nextRunAt']"
+      title="任务列表"
+      :columns="['id', 'taskType', 'taskKind', 'status', 'priority', 'claimedBy', 'workOrderId', 'projectId', 'nextRunAt']"
       :column-labels="{
         id: '任务编号',
         taskType: '任务类型',
@@ -236,7 +237,7 @@ onMounted(() => {
         :key="`project-${item.id}`"
         :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: item.projectId! } }"
       >
-        打开项目
+        打开项目 {{ item.projectId }}
       </RouterLink>
     </p>
   </section>

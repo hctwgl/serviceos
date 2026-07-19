@@ -13,7 +13,8 @@ public interface ReviewCaseService {
     ReviewCaseView createClient(
             CurrentPrincipal principal, CommandMetadata metadata, CreateClientReviewCaseCommand command);
 
-    ReviewCaseView decide(CurrentPrincipal principal, CommandMetadata metadata, DecideReviewCaseCommand command);
+    DecideReviewCaseResult decide(
+            CurrentPrincipal principal, CommandMetadata metadata, DecideReviewCaseCommand command);
 
     ReviewCaseView forceApprove(
             CurrentPrincipal principal, CommandMetadata metadata, ForceApproveReviewCaseCommand command);

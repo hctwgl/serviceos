@@ -216,16 +216,6 @@ onMounted(() => {
       @next="load(cursor)"
     />
 
-    <p v-if="rows.length" class="links">
-      打开工单：
-      <RouterLink
-        v-for="item in rows"
-        :key="String(item.id)"
-        :to="{ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: String(item.id) } }"
-      >
-        {{ item.externalOrderCode }}
-      </RouterLink>
-    </p>
   </section>
 </template>
 

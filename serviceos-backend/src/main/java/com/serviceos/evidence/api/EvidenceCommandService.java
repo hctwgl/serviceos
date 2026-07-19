@@ -1,5 +1,6 @@
 package com.serviceos.evidence.api;
 
+import com.serviceos.files.api.DownloadAuthorizationView;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.shared.CommandMetadata;
 
@@ -64,4 +65,17 @@ public interface EvidenceCommandService {
     List<EvidenceItemView> listForTask(CurrentPrincipal principal, String correlationId, UUID taskId);
 
     EvidenceItemView get(CurrentPrincipal principal, String correlationId, UUID evidenceItemId);
+
+    /** M351：按 ID 读取 Revision（含 validations）；授权复用 evidence.read。 */
+    EvidenceRevisionView getRevision(CurrentPrincipal principal, String correlationId, UUID revisionId);
+
+    /**
+     * M351：为 Revision 关联文件签发短时下载授权；purpose 如 {@code FINAL_REVIEW_PREVIEW}。
+     */
+    DownloadAuthorizationView authorizeRevisionDownload(
+            CurrentPrincipal principal,
+            String correlationId,
+            UUID revisionId,
+            String purpose
+    );
 }

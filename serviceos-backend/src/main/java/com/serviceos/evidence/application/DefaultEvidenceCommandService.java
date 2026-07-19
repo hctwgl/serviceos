@@ -16,7 +16,9 @@ import com.serviceos.evidence.api.EvidenceUploadSessionView;
 import com.serviceos.evidence.api.FinalizeEvidenceUploadCommand;
 import com.serviceos.evidence.api.FinalizeCorrectionEvidenceUploadCommand;
 import com.serviceos.evidence.api.InvalidateEvidenceRevisionCommand;
+import com.serviceos.files.api.AuthorizeDownloadCommand;
 import com.serviceos.files.api.BeginUploadCommand;
+import com.serviceos.files.api.DownloadAuthorizationView;
 import com.serviceos.files.api.FileCommandService;
 import com.serviceos.files.api.FinalizeUploadCommand;
 import com.serviceos.files.api.InvalidateStoredFileCommand;
@@ -383,6 +385,38 @@ final class DefaultEvidenceCommandService implements EvidenceCommandService {
                 READ, principal.tenantId(), "EvidenceItem", evidenceItemId.toString(),
                 item.projectId().toString()), correlationId);
         return item;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public EvidenceRevisionView getRevision(
+            CurrentPrincipal principal, String correlationId, UUID revisionId
+    ) {
+        EvidenceRevisionView revision = repository.findRevision(principal.tenantId(), revisionId)
+                .orElseThrow(() -> new BusinessProblem(
+                        ProblemCode.RESOURCE_NOT_FOUND, "EvidenceRevision does not exist"));
+        authorization.require(principal, AuthorizationRequest.projectCapability(
+                READ, principal.tenantId(), "EvidenceRevision", revisionId.toString(),
+                revision.projectId().toString()), correlationId);
+        return revision;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DownloadAuthorizationView authorizeRevisionDownload(
+            CurrentPrincipal principal, String correlationId, UUID revisionId, String purpose
+    ) {
+        EvidenceRevisionView revision = getRevision(principal, correlationId, revisionId);
+        if (revision.fileObjectId() == null) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                    "EvidenceRevision has no associated file object");
+        }
+        // 委托 files 签发短时 URL；evidence 不拼接 objectKey，也不记录 downloadUrl。
+        return files.authorizeDownload(
+                principal,
+                correlationId,
+                revision.fileObjectId(),
+                new AuthorizeDownloadCommand(purpose));
     }
 
     private EvidenceItemView persistFinalizedRevision(

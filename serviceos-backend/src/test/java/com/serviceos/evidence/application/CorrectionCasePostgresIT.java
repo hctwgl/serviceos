@@ -16,6 +16,8 @@ import com.serviceos.evidence.api.CorrectionCaseView;
 import com.serviceos.evidence.api.CreateEvidenceSetSnapshotCommand;
 import com.serviceos.evidence.api.CreateReviewCaseCommand;
 import com.serviceos.evidence.api.DecideReviewCaseCommand;
+import com.serviceos.evidence.api.ReviewTargetDecisionCommand;
+import com.serviceos.evidence.api.EvidenceSetSnapshotView;
 import com.serviceos.evidence.api.EvidenceCommandService;
 import com.serviceos.evidence.api.EvidenceSetSnapshotService;
 import com.serviceos.evidence.api.EvidenceSetSnapshotView;
@@ -151,9 +153,9 @@ class CorrectionCasePostgresIT {
         completeSourceTask(first);
         ReviewCaseView review = reviews.create(reviewer(), metadata("review-create"),
                 new CreateReviewCaseCommand(first.evidenceSetSnapshotId(), null));
-        ReviewCaseView rejected = reviews.decide(reviewer(), metadata("review-reject"),
-                new DecideReviewCaseCommand(review.reviewCaseId(), "REJECTED",
-                        List.of("IMAGE.BLUR"), "blurry"));
+        var rejectedResult = reviews.decide(reviewer(), metadata("review-reject"),
+                decideCommand(review.reviewCaseId(), "REJECTED", List.of("IMAGE.BLUR"), "blurry"));
+        ReviewCaseView rejected = rejectedResult.reviewCase();
         assertThat(rejected.status()).isEqualTo("REJECTED");
 
         UUID correctionId = jdbc.sql("""
@@ -261,8 +263,7 @@ class CorrectionCasePostgresIT {
         ReviewCaseView review = reviews.create(reviewer(), metadata("waive-review-create"),
                 new CreateReviewCaseCommand(first.evidenceSetSnapshotId(), null));
         reviews.decide(reviewer(), metadata("waive-review-reject"),
-                new DecideReviewCaseCommand(review.reviewCaseId(), "REJECTED",
-                        List.of("IMAGE.BLUR"), "blurry"));
+                decideCommand(review.reviewCaseId(), "REJECTED", List.of("IMAGE.BLUR"), "blurry"));
         UUID correctionId = jdbc.sql("""
                 SELECT correction_case_id FROM evd_correction_case
                  WHERE source_review_case_id = :review
@@ -327,7 +328,7 @@ class CorrectionCasePostgresIT {
         ReviewCaseView review = reviews.create(reviewer(), metadata("approve-create"),
                 new CreateReviewCaseCommand(snapshot.evidenceSetSnapshotId(), null));
         reviews.decide(reviewer(), metadata("approve-decide"),
-                new DecideReviewCaseCommand(review.reviewCaseId(), "APPROVED", List.of(), "ok"));
+                decideCommand(review.reviewCaseId(), "APPROVED", List.of(), "ok"));
         assertThat(jdbc.sql("SELECT count(*) FROM evd_correction_case").query(Long.class).single()).isZero();
         assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type='evidence.correction-case-created'")
                 .query(Long.class).single()).isZero();
@@ -396,8 +397,7 @@ class CorrectionCasePostgresIT {
         ReviewCaseView review = reviews.create(reviewer(), metadata("queue-review-" + marker),
                 new CreateReviewCaseCommand(snapshot.evidenceSetSnapshotId(), null));
         reviews.decide(reviewer(), metadata("queue-reject-" + marker),
-                new DecideReviewCaseCommand(review.reviewCaseId(), "REJECTED",
-                        List.of("IMAGE.BLUR"), "blurry"));
+                decideCommand(review.reviewCaseId(), "REJECTED", List.of("IMAGE.BLUR"), "blurry"));
         return jdbc.sql("""
                 SELECT correction_case_id FROM evd_correction_case
                  WHERE source_review_case_id = :review
@@ -720,4 +720,26 @@ class CorrectionCasePostgresIT {
             });
         }
     }
+
+    private DecideReviewCaseCommand decideCommand(
+            UUID reviewCaseId, String overall, List<String> reasonCodes, String note
+    ) {
+        ReviewCaseView reviewCase = reviews.get(reviewer(), "corr-decide-load", reviewCaseId);
+        EvidenceSetSnapshotView snapshot = snapshots.get(
+                reviewer(), "corr-decide-targets", reviewCase.evidenceSetSnapshotId());
+        List<ReviewTargetDecisionCommand> targets = snapshot.members().stream()
+                .map(member -> new ReviewTargetDecisionCommand(
+                        "EvidenceRevision",
+                        member.evidenceRevisionId(),
+                        member.revisionNumber(),
+                        overall,
+                        "REJECTED".equals(overall) ? reasonCodes : List.of(),
+                        "REJECTED".equals(overall)
+                                ? (note == null || note.isBlank() ? "需要整改" : note)
+                                : null))
+                .toList();
+        return new DecideReviewCaseCommand(
+                reviewCase.reviewCaseId(), targets, note, reviewCase.aggregateVersion());
+    }
+
 }

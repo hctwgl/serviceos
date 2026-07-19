@@ -152,7 +152,7 @@ onMounted(() => {
     </form>
 
     <QueueTable
-      title="审核队列"
+      title="审核列表"
       :columns="['reviewCaseId', 'projectId', 'status', 'origin', 'createdAt', 'latestDecision']"
       :column-labels="{
         reviewCaseId: '审核单号',
@@ -180,7 +180,7 @@ onMounted(() => {
         :key="item.reviewCaseId"
         :to="{ name: 'ADMIN.REVIEW.DETAIL', params: { id: item.reviewCaseId } }"
       >
-        打开审核单
+        打开审核案例 {{ item.reviewCaseId }}
       </RouterLink>
     </p>
     <p v-if="page?.items?.length" class="links review-queue-cross-links">
@@ -190,14 +190,14 @@ onMounted(() => {
         :key="`project-${item.reviewCaseId}`"
         :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: item.projectId } }"
       >
-        打开项目
+        打开项目 {{ item.projectId }}
       </RouterLink>
       <RouterLink
         v-for="item in page.items"
         :key="`task-${item.reviewCaseId}`"
         :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: item.taskId } }"
       >
-        打开任务
+        打开任务 {{ item.taskId }}
       </RouterLink>
       <RouterLink
         v-for="item in page.items"
@@ -207,21 +207,21 @@ onMounted(() => {
           params: { id: item.evidenceSetSnapshotId },
         }"
       >
-        打开资料快照
+        打开资料快照 {{ item.evidenceSetSnapshotId }}
       </RouterLink>
       <RouterLink
         v-for="item in page.items.filter((i) => i.sourceReviewCaseId)"
         :key="`src-review-${item.reviewCaseId}`"
         :to="{ name: 'ADMIN.REVIEW.DETAIL', params: { id: item.sourceReviewCaseId! } }"
       >
-        打开源审核
+        打开源审核 {{ item.sourceReviewCaseId }}
       </RouterLink>
       <RouterLink
         v-for="item in page.items.filter((i) => i.reopenedFromReviewCaseId)"
         :key="`reopened-from-${item.reviewCaseId}`"
         :to="{ name: 'ADMIN.REVIEW.DETAIL', params: { id: item.reopenedFromReviewCaseId! } }"
       >
-        打开重开来源
+        打开重开来源 {{ item.reopenedFromReviewCaseId }}
       </RouterLink>
     </p>
   </section>

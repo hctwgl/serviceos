@@ -209,7 +209,10 @@ onMounted(() => {
           >
             打开项目 {{ detail.projectId }}
           </RouterLink>
-          <RouterLink :to="{ name: 'ADMIN.REVIEW.DETAIL', params: { id: detail.sourceReviewCaseId } }">
+          <RouterLink
+            data-testid="correction-source-review-link"
+            :to="{ name: 'ADMIN.REVIEW.DETAIL', params: { id: detail.sourceReviewCaseId } }"
+          >
             源审核案例
           </RouterLink>
           <RouterLink :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: detail.taskId } }">

@@ -13,4 +13,15 @@ public interface WorkOrderQueryRepository {
             String clientCode, UUID projectId, String status, String externalOrderCode,
             Instant cursorReceivedAt, UUID cursorId, int fetchSize);
     Optional<WorkOrderView> findById(String tenantId, UUID workOrderId);
+
+    /** 读取客户联系原文供模块内脱敏；不得跨模块直接暴露。 */
+    Optional<RawCustomerContact> findRawCustomerContact(String tenantId, UUID workOrderId);
+
+    record RawCustomerContact(
+            UUID workOrderId,
+            String customerName,
+            String customerMobile,
+            String serviceAddress
+    ) {
+    }
 }

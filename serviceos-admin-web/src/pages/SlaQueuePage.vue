@@ -186,7 +186,7 @@ onMounted(() => {
         :key="`task-${item.slaInstanceId}`"
         :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: item.taskId } }"
       >
-        SLA / {{ item.slaRef || item.slaInstanceId }}
+        SLA / {{ item.slaRef || item.slaInstanceId }} / {{ item.taskId }}
       </RouterLink>
     </p>
     <p v-if="page?.items?.length" class="links sla-queue-cross-links">
@@ -196,7 +196,7 @@ onMounted(() => {
         :key="`project-${item.slaInstanceId}`"
         :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: item.projectId } }"
       >
-        打开项目
+        打开项目 {{ item.projectId }}
       </RouterLink>
     </p>
   </section>

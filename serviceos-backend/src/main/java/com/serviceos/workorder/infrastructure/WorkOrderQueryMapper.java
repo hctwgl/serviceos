@@ -16,4 +16,7 @@ interface WorkOrderQueryMapper {
             @Param("cursorReceivedAt") Instant cursorReceivedAt,
             @Param("cursorId") UUID cursorId, @Param("fetchSize") int fetchSize);
     Map<String,Object> findById(@Param("tenantId") String tenantId, @Param("workOrderId") UUID workOrderId);
+
+    Map<String,Object> findRawCustomerContact(
+            @Param("tenantId") String tenantId, @Param("workOrderId") UUID workOrderId);
 }

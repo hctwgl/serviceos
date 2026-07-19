@@ -7,8 +7,12 @@ import com.serviceos.configuration.api.ConfigurationService;
 import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
 import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
 import com.serviceos.identity.api.CurrentPrincipal;
+import com.serviceos.readmodel.api.FinalReviewWorkspaceQueryService;
+import com.serviceos.readmodel.api.FinalReviewWorkspaceSectionResponse;
 import com.serviceos.readmodel.api.WorkOrderWorkspace;
 import com.serviceos.readmodel.api.WorkOrderWorkspaceQueryService;
+import com.serviceos.workorder.api.WorkOrderMaskedContactView;
+import com.serviceos.workorder.api.WorkOrderQueryService;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.shared.Sha256;
@@ -61,6 +65,12 @@ class WorkOrderWorkspacePostgresIT {
 
     @Autowired
     private WorkOrderWorkspaceQueryService workspaces;
+
+    @Autowired
+    private FinalReviewWorkspaceQueryService finalReviews;
+
+    @Autowired
+    private WorkOrderQueryService workOrderQueries;
 
     @Autowired
     private WorkOrderCommandService workOrders;
@@ -138,6 +148,7 @@ class WorkOrderWorkspacePostgresIT {
         assertThat(workspace.sectionAvailability().get("APPOINTMENTS_VISITS")).isEqualTo("UNAVAILABLE");
         assertThat(workspace.sectionAvailability().get("FORMS_EVIDENCE")).isEqualTo("UNAVAILABLE");
         assertThat(workspace.sectionAvailability().get("REVIEWS_CORRECTIONS")).isEqualTo("UNAVAILABLE");
+        assertThat(workspace.sectionAvailability().get("FINAL_REVIEW")).isIn("EMPTY", "UNAVAILABLE");
         assertThat(workspace.sectionAvailability().get("INTEGRATION")).isEqualTo("UNAVAILABLE");
         assertThat(workspace.sectionAvailability().get("SERVICE_ASSIGNMENT")).isEqualTo("UNAVAILABLE");
         assertThat(workspace.sectionAvailability().get("SLA")).isEqualTo("UNAVAILABLE");
@@ -166,6 +177,33 @@ class WorkOrderWorkspacePostgresIT {
                 "corr-cross", workOrderId))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.RESOURCE_NOT_FOUND));
+    }
+
+    @Test
+    void finalReviewSectionReturnsMaskedContactAndOmitsRawPii() {
+        WorkOrderMaskedContactView contact = workOrderQueries.getMaskedContact(
+                principal("reader"), "corr-mask", workOrderId);
+        assertThat(contact.maskedCustomerName()).isNotBlank();
+        assertThat(contact.maskedCustomerPhone()).doesNotContain("138");
+        assertThat(contact.maskedServiceAddress()).endsWith("***");
+
+        FinalReviewWorkspaceSectionResponse section = finalReviews.get(
+                principal("reader"), "corr-final-review", workOrderId);
+        assertThat(section.data().workOrder().workOrderId()).isEqualTo(workOrderId);
+        assertThat(section.data().workOrder().maskedCustomerPhone())
+                .isEqualTo(contact.maskedCustomerPhone());
+        assertThat(section.data().gateChecks()).extracting(gate -> gate.code())
+                .contains(
+                        "REVIEW_CASE_OPEN", "TASK_ACTIONABLE", "SNAPSHOT_COMPLETE",
+                        "REQUIRED_EVIDENCE_READY", "NO_QUARANTINED_EVIDENCE",
+                        "ALL_TARGETS_DECIDED", "REJECTED_TARGET_COMPLETE",
+                        "NO_OPEN_CORRECTION", "AUTHORIZATION_VALID");
+        assertThat(section.data().rejectionReasons()).isNotEmpty();
+        assertThat(section.meta().freshnessStatus()).isEqualTo("FRESH");
+        String json = section.toString();
+        assertThat(json).doesNotContain("objectKey", "customerMobile", "vehicleVin");
+        assertThat(json).doesNotContain("13800000000");
+        assertThat(json).doesNotContain("山东省济南市历下区测试路1号");
     }
 
     @Test

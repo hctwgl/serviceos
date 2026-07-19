@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.47
+  version: 1.0.49
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -3201,6 +3201,32 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+  /work-orders/{workOrderId}/workspace/sections/FINAL_REVIEW:
+    get:
+      operationId: getWorkOrderFinalReviewWorkspaceSection
+      summary: 工单平台终审工作区只读组合查询
+      description: >-
+        M351：对已授权工单返回 OPEN INTERNAL ReviewCase 的终审 Fan-in 投影（工单脱敏摘要、
+        审核 Task/SLA、门禁、冻结 Snapshot EvidenceRevision 目标、驳回原因库与 allowedActions）。
+        实时组合，不落物理投影表；禁止返回 objectKey、永久 URL、完整手机号/地址、原始 GPS、
+        完整表单值或异常堆栈。CLIENT ReviewCase 只读且不返回普通 decide 操作。
+        复用 workOrder.read；次级 evidence.read/sla.read/dispatch.read 缺权时对应字段降级或门禁失败关闭。
+      parameters:
+        - { name: workOrderId, in: path, required: true, schema: { type: string, format: uuid } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 终审工作区快照
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FinalReviewWorkspaceSectionResponse' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
   /projects:
     get:
       operationId: listAuthorizedProjects
@@ -4096,6 +4122,38 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+  /evidence-revisions/{revisionId}/download-authorizations:
+    post:
+      operationId: authorizeEvidenceRevisionDownload
+      summary: 申请资料版本短时下载授权
+      description: >-
+        M351：实时校验 evidence.read 与项目范围；解析 Revision 关联 fileObjectId 后委托安全文件签发短时 URL。
+        终审预览 purpose 使用 FINAL_REVIEW_PREVIEW。响应不含 objectKey；日志不得打印 downloadUrl。
+      parameters:
+        - name: revisionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AuthorizeDownloadRequest' }
+      responses:
+        '201':
+          description: 短期下载授权已签发
+          headers:
+            Location: { schema: { type: string } }
+            X-Correlation-Id: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DownloadAuthorization' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '423': { $ref: '#/components/responses/Problem' }
   /evidence-revisions/{revisionId}:invalidate:
     post:
       operationId: invalidateEvidenceRevision
@@ -4265,6 +4323,11 @@ paths:
           in: path
           required: true
           schema: { type: string, format: uuid }
+        - name: If-Match
+          in: header
+          required: true
+          description: M353：绑定 ReviewCase.aggregateVersion 的强 ETag（引号整数）
+          schema: { type: string, pattern: '^"[1-9][0-9]*"$' }
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/CorrelationId'
       requestBody:
@@ -8124,6 +8187,210 @@ components:
         technicianId: { type: [string, 'null'], maxLength: 128 }
         technicianEffectiveFrom: { type: [string, 'null'], format: date-time }
         technicianReassignmentReasonCode: { type: [string, 'null'], maxLength: 100 }
+
+    FinalReviewWorkspaceSectionResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data: { $ref: '#/components/schemas/FinalReviewWorkspaceData' }
+        meta: { $ref: '#/components/schemas/FinalReviewWorkspaceMeta' }
+    FinalReviewWorkspaceMeta:
+      type: object
+      additionalProperties: false
+      required: [asOf, projectionCheckpoint, freshnessStatus, scopeVersion, queryId]
+      properties:
+        asOf: { type: string, format: date-time }
+        projectionCheckpoint: { type: string, minLength: 1, maxLength: 160 }
+        freshnessStatus: { enum: [FRESH, LAGGING, UNKNOWN, REBUILDING] }
+        scopeVersion: { type: integer, format: int64, minimum: 0 }
+        queryId: { type: string, minLength: 1, maxLength: 64 }
+    FinalReviewWorkspaceData:
+      type: object
+      additionalProperties: false
+      required: [workOrder, reviewTask, reviewCase, sla, gateChecks, targetGroups,
+                 rejectionReasons, allowedActions, defaultTargetRef, openCorrectionCaseId]
+      properties:
+        workOrder: { $ref: '#/components/schemas/FinalReviewWorkOrderSummary' }
+        reviewTask:
+          oneOf:
+            - { $ref: '#/components/schemas/FinalReviewTaskSummary' }
+            - { type: 'null' }
+        reviewCase:
+          oneOf:
+            - { $ref: '#/components/schemas/FinalReviewCaseSummary' }
+            - { type: 'null' }
+        sla:
+          oneOf:
+            - { $ref: '#/components/schemas/FinalReviewSlaSummary' }
+            - { type: 'null' }
+        gateChecks:
+          type: array
+          items: { $ref: '#/components/schemas/FinalReviewGateCheck' }
+        targetGroups:
+          type: array
+          items: { $ref: '#/components/schemas/FinalReviewTargetGroup' }
+        rejectionReasons:
+          type: array
+          items: { $ref: '#/components/schemas/FinalReviewRejectionReason' }
+        allowedActions:
+          type: array
+          items: { $ref: '#/components/schemas/FinalReviewAllowedAction' }
+        defaultTargetRef:
+          oneOf:
+            - { $ref: '#/components/schemas/FinalReviewTargetRef' }
+            - { type: 'null' }
+        openCorrectionCaseId:
+          type: [string, 'null']
+          format: uuid
+          description: M354：当前 ReviewCase 关联的未关闭 CorrectionCase（若有）
+    FinalReviewWorkOrderSummary:
+      type: object
+      additionalProperties: false
+      required: [workOrderId, displayNo, projectId, projectName, statusCode, statusLabel,
+                 serviceProductCode, serviceProductName, maskedCustomerName, maskedCustomerPhone,
+                 maskedServiceAddress, networkName, technicianName, deviceModel, nextActionLabel]
+      properties:
+        workOrderId: { type: string, format: uuid }
+        displayNo: { type: string, minLength: 1, maxLength: 128 }
+        projectId: { type: string, format: uuid }
+        projectName: { type: [string, 'null'], maxLength: 200 }
+        statusCode: { type: string, minLength: 1, maxLength: 40 }
+        statusLabel: { type: string, minLength: 1, maxLength: 40 }
+        serviceProductCode: { type: string, minLength: 1, maxLength: 96 }
+        serviceProductName: { type: [string, 'null'], maxLength: 200 }
+        maskedCustomerName: { type: [string, 'null'], maxLength: 64 }
+        maskedCustomerPhone: { type: [string, 'null'], maxLength: 32 }
+        maskedServiceAddress: { type: [string, 'null'], maxLength: 200 }
+        networkName: { type: [string, 'null'], maxLength: 200 }
+        technicianName: { type: [string, 'null'], maxLength: 200 }
+        deviceModel: { type: [string, 'null'], maxLength: 120 }
+        nextActionLabel: { type: string, minLength: 1, maxLength: 80 }
+    FinalReviewTaskSummary:
+      type: object
+      additionalProperties: false
+      required: [taskId, status, statusLabel, assigneeDisplayName, resourceVersion, executionGuarded]
+      properties:
+        taskId: { type: string, format: uuid }
+        status: { type: string, minLength: 1, maxLength: 40 }
+        statusLabel: { type: string, minLength: 1, maxLength: 40 }
+        assigneeDisplayName: { type: [string, 'null'], maxLength: 200 }
+        resourceVersion: { type: integer, format: int64, minimum: 1 }
+        executionGuarded: { type: boolean }
+    FinalReviewCaseSummary:
+      type: object
+      additionalProperties: false
+      required: [reviewCaseId, origin, status, aggregateVersion, snapshotId, snapshotDigest,
+                 policyVersionId, targetCount]
+      properties:
+        reviewCaseId: { type: string, format: uuid }
+        origin: { enum: [INTERNAL, CLIENT] }
+        status: { type: string, minLength: 1, maxLength: 40 }
+        aggregateVersion: { type: integer, format: int64, minimum: 1 }
+        snapshotId: { type: string, format: uuid }
+        snapshotDigest: { type: string, minLength: 64, maxLength: 64 }
+        policyVersionId: { type: string, minLength: 1, maxLength: 80 }
+        targetCount: { type: integer, minimum: 0 }
+    FinalReviewSlaSummary:
+      type: object
+      additionalProperties: false
+      required: [status, startedAt, dueAt, displayText]
+      properties:
+        status: { type: string, minLength: 1, maxLength: 40 }
+        startedAt: { type: [string, 'null'], format: date-time }
+        dueAt: { type: [string, 'null'], format: date-time }
+        displayText: { type: string, minLength: 1, maxLength: 120 }
+    FinalReviewGateCheck:
+      type: object
+      additionalProperties: false
+      required: [code, label, status, blocking, detail]
+      properties:
+        code:
+          enum: [REVIEW_CASE_OPEN, TASK_ACTIONABLE, SNAPSHOT_COMPLETE, REQUIRED_EVIDENCE_READY,
+                 NO_QUARANTINED_EVIDENCE, ALL_TARGETS_DECIDED, REJECTED_TARGET_COMPLETE,
+                 NO_OPEN_CORRECTION, AUTHORIZATION_VALID]
+        label: { type: string, minLength: 1, maxLength: 80 }
+        status: { enum: [PASS, FAIL, WARN, PENDING, NOT_APPLICABLE] }
+        blocking: { type: boolean }
+        detail: { type: [string, 'null'], maxLength: 240 }
+    FinalReviewTargetGroup:
+      type: object
+      additionalProperties: false
+      required: [groupCode, groupLabel, displayOrder, targets]
+      properties:
+        groupCode: { type: string, minLength: 1, maxLength: 80 }
+        groupLabel: { type: string, minLength: 1, maxLength: 120 }
+        displayOrder: { type: integer, minimum: 0 }
+        targets:
+          type: array
+          items: { $ref: '#/components/schemas/FinalReviewTarget' }
+    FinalReviewTarget:
+      type: object
+      additionalProperties: false
+      required: [targetType, targetId, targetVersion, requirementCode, requirementLabel,
+                 requirementDescription, groupCode, groupLabel, displayOrder, required,
+                 slotId, evidenceItemId, revisionId, revisionNo, mimeType, lifecycleStatus,
+                 capturedAt, captureSource, uploaderDisplayName, offline, locationVerdict,
+                 validationReadiness, validationResult, validationCodes, validationMessages,
+                 structuredValues]
+      properties:
+        targetType: { const: EvidenceRevision }
+        targetId: { type: string, format: uuid }
+        targetVersion: { type: integer, minimum: 1 }
+        requirementCode: { type: string, minLength: 1, maxLength: 80 }
+        requirementLabel: { type: string, minLength: 1, maxLength: 120 }
+        requirementDescription: { type: [string, 'null'], maxLength: 500 }
+        groupCode: { type: string, minLength: 1, maxLength: 80 }
+        groupLabel: { type: string, minLength: 1, maxLength: 120 }
+        displayOrder: { type: integer, minimum: 0 }
+        required: { type: boolean }
+        slotId: { type: string, format: uuid }
+        evidenceItemId: { type: string, format: uuid }
+        revisionId: { type: string, format: uuid }
+        revisionNo: { type: integer, minimum: 1 }
+        mimeType: { type: [string, 'null'], maxLength: 120 }
+        lifecycleStatus: { type: string, minLength: 1, maxLength: 40 }
+        capturedAt: { type: [string, 'null'], format: date-time }
+        captureSource: { type: [string, 'null'], maxLength: 40 }
+        uploaderDisplayName: { type: [string, 'null'], maxLength: 200 }
+        offline: { type: [boolean, 'null'] }
+        locationVerdict: { type: [string, 'null'], maxLength: 80 }
+        validationReadiness: { type: string, minLength: 1, maxLength: 40 }
+        validationResult: { type: [string, 'null'], maxLength: 40 }
+        validationCodes:
+          type: array
+          items: { type: string, minLength: 1, maxLength: 80 }
+        validationMessages:
+          type: array
+          items: { type: string, minLength: 1, maxLength: 240 }
+        structuredValues:
+          type: object
+          additionalProperties:
+            type: [string, number, boolean, 'null']
+    FinalReviewRejectionReason:
+      type: object
+      additionalProperties: false
+      required: [code, label, requiresNote]
+      properties:
+        code: { type: string, minLength: 1, maxLength: 80 }
+        label: { type: string, minLength: 1, maxLength: 120 }
+        requiresNote: { type: boolean }
+    FinalReviewAllowedAction:
+      type: object
+      additionalProperties: false
+      required: [action, enabled, reason]
+      properties:
+        action: { enum: [DECIDE, PREVIEW_EVIDENCE, OPEN_CORRECTION, VIEW_ONLY] }
+        enabled: { type: boolean }
+        reason: { type: [string, 'null'], maxLength: 240 }
+    FinalReviewTargetRef:
+      type: object
+      additionalProperties: false
+      required: [targetType, targetId]
+      properties:
+        targetType: { const: EvidenceRevision }
+        targetId: { type: string, format: uuid }
+
     WorkOrderWorkspaceSourceVersions:
       type: object
       additionalProperties: false
@@ -9921,16 +10188,33 @@ components:
         callbackBatchRef: { type: string, minLength: 1, maxLength: 160 }
         mappingVersionId: { type: string, minLength: 1, maxLength: 160 }
         policyVersion: { type: string, minLength: 1, maxLength: 80 }
-    DecideReviewCaseRequest:
+    ReviewTargetDecisionRequest:
       type: object
       additionalProperties: false
-      required: [decision]
+      required: [targetType, targetId, targetVersion, decision]
       properties:
+        targetType: { const: EvidenceRevision }
+        targetId: { type: string, format: uuid }
+        targetVersion: { type: integer, minimum: 1 }
         decision: { enum: [APPROVED, REJECTED] }
         reasonCodes:
           type: array
           maxItems: 20
           items: { type: string, minLength: 1, maxLength: 80 }
+        note: { type: [string, 'null'], maxLength: 1000 }
+    DecideReviewCaseRequest:
+      type: object
+      additionalProperties: false
+      required: [targetDecisions]
+      description: >-
+        M353：客户端只提交 targetDecisions；不得提交 overallDecision。
+        服务端按冻结 Snapshot 与 policyVersion 派生整组 APPROVED/REJECTED。
+      properties:
+        targetDecisions:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items: { $ref: '#/components/schemas/ReviewTargetDecisionRequest' }
         note: { type: [string, 'null'], maxLength: 1000 }
     ForceApproveReviewCaseRequest:
       type: object
@@ -10194,7 +10478,7 @@ components:
       type: object
       additionalProperties: false
       required: [reviewCaseId, projectId, taskId, evidenceSetSnapshotId, snapshotContentDigest,
-                 scopeType, origin, policyVersion, status, createdBy, createdAt, decisions]
+                 scopeType, origin, policyVersion, status, createdBy, createdAt, decisions, aggregateVersion]
       properties:
         reviewCaseId: { type: string, format: uuid }
         projectId: { type: string, format: uuid }
@@ -10217,6 +10501,12 @@ components:
         decisions:
           type: array
           items: { $ref: '#/components/schemas/ReviewDecision' }
+        aggregateVersion: { type: integer, format: int64, minimum: 1 }
+        derivedOverallDecision: { type: [string, 'null'], enum: [APPROVED, REJECTED, null] }
+        correctionCaseId:
+          type: [string, 'null']
+          format: uuid
+          description: M354：REJECTED 同事务创建的 CorrectionCase；APPROVED 时为 null
 
     InvalidateEvidenceRevisionRequest:
       type: object

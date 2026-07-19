@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+// List already imported for queue/target decisions
 
 /** ReviewCase / ReviewDecision 持久化端口。 */
 public interface ReviewCaseRepository {
@@ -17,6 +18,7 @@ public interface ReviewCaseRepository {
             String tenantId,
             UUID reviewCaseId,
             String expectedStatus,
+            long expectedAggregateVersion,
             String status,
             Instant decidedAt
     );
@@ -24,6 +26,20 @@ public interface ReviewCaseRepository {
     int markReopened(String tenantId, UUID reviewCaseId, String expectedStatus);
 
     void insertDecision(String tenantId, UUID projectId, ReviewDecisionView decision);
+
+    void insertTargetDecision(
+            String tenantId,
+            UUID projectId,
+            UUID reviewCaseId,
+            UUID reviewDecisionId,
+            String targetType,
+            UUID targetId,
+            int targetVersion,
+            String decision,
+            List<String> reasonCodes,
+            String note,
+            Instant createdAt
+    );
 
     Optional<ReviewCaseView> find(String tenantId, UUID reviewCaseId);
 

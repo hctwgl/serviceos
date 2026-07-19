@@ -1,0 +1,45 @@
+:root {
+  --sos-primary-900: #0b2f49;
+  --sos-primary-800: #103b5b;
+  --sos-primary-700: #174a6e;
+  --sos-primary-600: #1e5b84;
+  --sos-primary-500: #276d99;
+  --sos-primary-100: #e9f2f8;
+  --sos-primary-050: #f3f8fb;
+
+  --sos-accent-700: #087f73;
+  --sos-accent-600: #0b9485;
+  --sos-accent-500: #10a897;
+  --sos-accent-100: #dff7f3;
+  --sos-accent-050: #f0fbf9;
+
+  --sos-success: #2f9461;
+  --sos-success-bg: #eaf7f0;
+  --sos-warning: #c97b13;
+  --sos-warning-bg: #fff6e6;
+  --sos-danger: #d14343;
+  --sos-danger-bg: #fff0f0;
+  --sos-info: #3578c6;
+  --sos-info-bg: #edf5ff;
+
+  --sos-text-primary: #1f2937;
+  --sos-text-secondary: #4b5563;
+  --sos-text-tertiary: #7b8494;
+  --sos-text-disabled: #a7adb7;
+
+  --sos-border-default: #dfe3e8;
+  --sos-border-light: #eaedf0;
+  --sos-divider: #edf0f2;
+
+  --sos-bg-page: #f4f6f8;
+  --sos-bg-card: #ffffff;
+  --sos-bg-muted: #f8f9fa;
+  --sos-bg-hover: #f2f6f9;
+
+  --sos-header-height: 56px;
+  --sos-sider-width: 216px;
+  --sos-sider-collapsed: 64px;
+  --sos-content-padding-x: 24px;
+  --sos-content-padding-y: 16px;
+  --sos-font-stack: Inter, 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', Arial, sans-serif;
+}
