@@ -407,3 +407,4 @@ Feature gate/authority: if applicable
 | M310 | SERVICEOS_EXPR_V1 条件积木：字段/运算符/值/AND-OR → 白名单表达式；设计器与网关边接入 | ConditionBuilder + blocks TS + Admin build + Playwright + `323-m310-*` + `307-m310-*` | 嵌套括号 round-trip、FORM 字段积木、全资产属性面板 |
 | M311 | 吉利浩瀚本地入站：AES 解密 + 7.1 建单映射 + 通用管道；Sandbox/签名 BLOCKED_EXTERNAL | Geely adapter + AES/IT + `324-m311-*` + `308-m311-*` + `05-geely-*` | OpenAPI 签名、Sandbox 联调、7.2～7.22 |
 | M312 | Workflow 画布：节点面板/属性（formRef/slaRef/WAIT/TIMER/SUB_PROCESS）/校验高亮/小地图/撤销重做 | WorkflowCanvas + model TS + Admin build + Playwright + `325-m312-*` + `309-m312-*` | FORM/EVIDENCE/SLA 可视配置器、多实例 UI |
+| M313 | FORM/EVIDENCE/SLA 可视结构编辑器：分组/字段/资料项/SLA 时长双向同步 JSON | StructuredAssetEditor + Admin build + Playwright + `326-m313-*` + `310-m313-*` | visibility 积木内嵌、qualityChecks UI、RULE/DISPATCH 全属性面板 |
