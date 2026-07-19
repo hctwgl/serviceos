@@ -7,15 +7,16 @@ lastUpdated: 2026-07-19
 
 ## 当前
 
-- master：M321～M349（`c54c98ee`）
-- PR #179：https://github.com/hctwgl/serviceos/pull/179 — **M350**
+- **master 已收口 M321～M350**
+- M350：https://github.com/hctwgl/serviceos/pull/179 → squash `9acc7394`
 - latestMilestone：**M350**
 - Flyway：**127**；OpenAPI：**1.0.44**
+- `baselineCommit`：`9acc7394`
 
-## 下一（硬门禁）
+## 负责人决策（已确认）
 
-1. AMOUNT/加权 — 需业务确认
-2. BUSINESS 日历 SLA / 结算 — 需批准
-3. 吉利联调 — BLOCKED_EXTERNAL
+业务规则先都不动（AMOUNT/加权、BUSINESS SLA/结算、吉利联调均不推进）。
 
-可选：Coverage CRUD、NOTIFICATION/PRICING 工作台、iOS 执行器、editableWhen/defaultExpression 接受。
+## 下一
+
+等待负责人新指令；硬门禁项未确认前不自主开新里程碑。
