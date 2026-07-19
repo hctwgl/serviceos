@@ -177,7 +177,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 
 ServiceOS 可靠纵向切片已推进到 **M340**（FORM ConditionBuilder：`formValues["…"]` +
 visibility/visibleWhen/requiredWhen）。
-M321～M340 均在 Draft stacked PRs 中（`#148→…→#166→本切片`）；M320 已合入 `master`（`32b902f8`）。
+M321～M340 均在 Draft stacked PRs 中（`#148→…→#167`；本切片 https://github.com/hctwgl/serviceos/pull/167）；M320 已合入 `master`（`32b902f8`）。
 
 当前契约/迁移：OpenAPI **1.0.43**；Flyway **127**（无本里程碑迁移/契约变更）。
 

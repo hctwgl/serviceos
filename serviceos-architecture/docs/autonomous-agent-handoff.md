@@ -8,11 +8,11 @@ lastUpdated: 2026-07-19
 ## 当前
 
 - PR #148～#166：M321～M339 Draft stacked
-- 本切片：**M340** FORM ConditionBuilder（Draft，base=#166 / `cursor/m339-inbound-update-cancel-mapping-required-88d5`）
+- PR #167：https://github.com/hctwgl/serviceos/pull/167 — **M340** FORM ConditionBuilder（Draft，base=#166）
 - `master`：`32b902f897d19d2c906acac899990bf1aa2bb056`
 - latestMilestone：**M340**
 - Flyway：**127**；OpenAPI：**1.0.43**（无本里程碑变更）
-- `baselineCommit`：功能提交后回填
+- `baselineCommit`：`038e15b6`（功能证据）
 
 ## 本回合完成
 
