@@ -20,6 +20,7 @@ import {
 } from '../api/configurationDrafts'
 import WorkflowCanvas from '../components/WorkflowCanvas.vue'
 import ConditionBuilder from '../components/ConditionBuilder.vue'
+import StructuredAssetEditor from '../components/StructuredAssetEditor.vue'
 
 const assetType = ref<DesignerAssetType>('WORKFLOW')
 const drafts = ref<ConfigurationDraft[]>([])
@@ -44,6 +45,10 @@ const showCanvas = computed(() => assetType.value === 'WORKFLOW')
 const showConditionBuilder = computed(() =>
   ['RULE', 'DISPATCH', 'NOTIFICATION', 'ASSIGNEE_POLICY', 'PRICING'].includes(assetType.value),
 )
+const showStructuredEditor = computed(() =>
+  ['FORM', 'EVIDENCE', 'SLA'].includes(assetType.value),
+)
+const structuredAssetType = computed(() => assetType.value as 'FORM' | 'EVIDENCE' | 'SLA')
 
 /** 从定义 JSON 提取首个 when/expression.source，供条件积木双向编辑。 */
 const firstExprSource = computed({
@@ -644,8 +649,8 @@ onMounted(async () => {
     <header>
       <h1>配置设计器</h1>
       <p>
-        草稿 → 校验 → 审批 → 发布。WORKFLOW 支持可视化拖拽画布；RULE/DISPATCH 等资产支持条件积木生成
-        SERVICEOS_EXPR_V1。
+        草稿 → 校验 → 审批 → 发布。WORKFLOW 支持画布与属性面板；FORM/EVIDENCE/SLA 支持可视结构编辑；
+        RULE/DISPATCH 等资产支持条件积木生成 SERVICEOS_EXPR_V1。
       </p>
     </header>
 
@@ -743,6 +748,11 @@ onMounted(async () => {
           v-if="showConditionBuilder"
           v-model="firstExprSource"
           label="首条条件积木（写入定义 JSON 第一个 when/expression）"
+        />
+        <StructuredAssetEditor
+          v-if="showStructuredEditor"
+          v-model="definitionText"
+          :asset-type="structuredAssetType"
         />
         <h2>定义 JSON</h2>
         <textarea
