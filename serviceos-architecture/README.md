@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M332 DISPATCH TECHNICIAN 自动指派**（Draft PR 待回填；栈 `#148→…→#159`）
+当前工程基线为 **M332 DISPATCH TECHNICIAN 自动指派**（https://github.com/hctwgl/serviceos/pull/159；栈 `#148→…→#159`）
 `implementation-status.md`；合入 `master` 后回填合并提交）。M320 合并基线为
 `32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147）。
 

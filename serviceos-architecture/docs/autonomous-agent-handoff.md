@@ -8,7 +8,7 @@ lastUpdated: 2026-07-19
 ## 当前
 
 - PR #148～#158：M321～M331 Draft stacked
-- PR #159：待创建 — **M332** DISPATCH TECHNICIAN 自动指派（Draft，base=#158）
+- PR #159：https://github.com/hctwgl/serviceos/pull/159 — **M332** DISPATCH TECHNICIAN 自动指派（Draft，base=#158）
 - `master`：`32b902f897d19d2c906acac899990bf1aa2bb056`
 - latestMilestone：**M332**
 - Flyway：**125**；OpenAPI：**1.0.43**
