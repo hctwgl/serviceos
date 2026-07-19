@@ -21,7 +21,7 @@ relatedMilestones: [M267, M303]
 
 ## 明确未实现
 
-- 出站 Mapping；ASSIGNEE_POLICY 运行时自动接入（入站 Mapping 物化见 **M321**）
+- ASSIGNEE_POLICY 运行时自动接入（入站物化见 **M321**；出站 Mapping 见 **M322**）
 
 ## 验证
 

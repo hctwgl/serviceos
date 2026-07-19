@@ -320,6 +320,7 @@
 - [M317 远端状态查询 SPI 验收矩阵](314-m317-remote-status-query-spi-acceptance.md)
 - [M318 人工确认/放弃验收矩阵](315-m318-manual-outbound-disposition-acceptance.md)
 - [M319 批量 ReplayRequest 验收矩阵](316-m319-batch-replay-request-acceptance.md)
+- [M322 出站 INTEGRATION Mapping 验收矩阵](319-m322-outbound-integration-mapping-acceptance.md)
 - [M321 入站 INTEGRATION Mapping 物化验收矩阵](318-m321-inbound-integration-mapping-materialization-acceptance.md)
 - [M320 多 OEM 并行建单冒烟验收矩阵](317-m320-multi-oem-parallel-create-smoke-acceptance.md)
 - [多车企平台内核程序级验收矩阵](multi-oem-platform-kernel-program-acceptance.md)

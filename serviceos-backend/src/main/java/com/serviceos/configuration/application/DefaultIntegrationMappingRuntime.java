@@ -103,13 +103,25 @@ public class DefaultIntegrationMappingRuntime implements IntegrationMappingRunti
             String expectedManifestDigest,
             String connectorCode
     ) {
+        return findDirectionAssetsForConnector(
+                tenantId, bundleId, expectedManifestDigest, connectorCode, "INBOUND");
+    }
+
+    private Optional<ConfigurationAssetDefinition> findDirectionAssetsForConnector(
+            String tenantId,
+            UUID bundleId,
+            String expectedManifestDigest,
+            String connectorCode,
+            String direction
+    ) {
         String safeConnector = requiredText(connectorCode, "connectorCode");
+        String safeDirection = requiredText(direction, "direction");
         List<ConfigurationAssetDefinition> assets = configurations.listBundleAssets(
                 tenantId, bundleId, expectedManifestDigest, ConfigurationAssetType.INTEGRATION);
         List<ConfigurationAssetDefinition> matches = assets.stream()
                 .filter(asset -> {
                     MappingDefinition definition = parse(asset.definitionJson());
-                    return "INBOUND".equals(definition.direction())
+                    return safeDirection.equals(definition.direction())
                             && safeConnector.equals(definition.connectorCode());
                 })
                 .toList();
@@ -118,7 +130,7 @@ public class DefaultIntegrationMappingRuntime implements IntegrationMappingRunti
         }
         if (matches.size() > 1) {
             throw new BusinessProblem(ProblemCode.INTERNAL_ERROR,
-                    "Multiple INBOUND INTEGRATION mappings for connector in frozen bundle: "
+                    "Multiple " + safeDirection + " INTEGRATION mappings for connector in frozen bundle: "
                             + safeConnector);
         }
         return Optional.of(matches.getFirst());
@@ -163,6 +175,75 @@ public class DefaultIntegrationMappingRuntime implements IntegrationMappingRunti
                 definition.connectorCode(),
                 definition.direction(),
                 internal,
+                Map.of(),
+                explanations);
+    }
+
+    @Override
+    public boolean hasOutboundMappingForConnector(
+            String tenantId,
+            UUID bundleId,
+            String expectedManifestDigest,
+            String connectorCode
+    ) {
+        return findDirectionAssetsForConnector(
+                tenantId, bundleId, expectedManifestDigest, connectorCode, "OUTBOUND").isPresent();
+    }
+
+    @Override
+    public Optional<IntegrationMappingResult> applyOutboundForConnectorIfPresent(
+            String tenantId,
+            UUID bundleId,
+            String expectedManifestDigest,
+            String connectorCode,
+            Map<String, Object> internalPayload
+    ) {
+        Objects.requireNonNull(internalPayload, "internalPayload");
+        return findDirectionAssetsForConnector(
+                tenantId, bundleId, expectedManifestDigest, connectorCode, "OUTBOUND")
+                .map(asset -> executeOutbound(asset, internalPayload));
+    }
+
+    private IntegrationMappingResult executeOutbound(
+            ConfigurationAssetDefinition asset,
+            Map<String, Object> internalPayload
+    ) {
+        MappingDefinition definition = parse(asset.definitionJson());
+        if (!"OUTBOUND".equals(definition.direction())) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                    "INTEGRATION mapping direction must be OUTBOUND for applyOutbound");
+        }
+        Map<String, Object> external = new LinkedHashMap<>();
+        List<String> explanations = new ArrayList<>();
+        for (FieldMapping mapping : definition.fieldMappings()) {
+            Object raw = readPath(internalPayload, mapping.internalPath());
+            if (raw == null || (raw instanceof String s && s.isBlank())) {
+                if (mapping.required()) {
+                    throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                            "Required OUTBOUND INTEGRATION mapping missing: " + mapping.mappingId()
+                                    + " path=" + mapping.internalPath());
+                }
+                explanations.add(mapping.mappingId() + ": skipped optional empty");
+                continue;
+            }
+            String transform = mapping.transform() == null ? "NONE" : mapping.transform();
+            if (!ALLOWED_TRANSFORMS.contains(transform)) {
+                throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                        "Unsupported INTEGRATION transform: " + transform);
+            }
+            Object transformed = applyTransform(raw, transform, mapping.mappingId());
+            writePath(external, mapping.externalPath(), transformed);
+            explanations.add(mapping.mappingId() + ": " + mapping.internalPath()
+                    + " -> " + mapping.externalPath() + " [" + transform + "]");
+        }
+        return new IntegrationMappingResult(
+                definition.mappingKey(),
+                asset.versionId(),
+                asset.contentDigest(),
+                definition.connectorCode(),
+                definition.direction(),
+                Map.of(),
+                external,
                 explanations);
     }
 

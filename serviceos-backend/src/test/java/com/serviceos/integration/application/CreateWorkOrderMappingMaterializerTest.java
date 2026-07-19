@@ -30,6 +30,7 @@ class CreateWorkOrderMappingMaterializerTest {
                         "externalOrderCode", "ORD-TRIMMED",
                         "customerMobile", "13900000000",
                         "provinceCode", "370000"),
+                Map.of(),
                 List.of("order: orderCode -> externalOrderCode [TRIM]"));
 
         CreateWorkOrderMappedInbound materialized = CreateWorkOrderMappingMaterializer.materialize(
@@ -58,6 +59,7 @@ class CreateWorkOrderMappingMaterializerTest {
                 "BYD_CPIM",
                 "INBOUND",
                 Map.of("externalOrderCode", "  "),
+                Map.of(),
                 List.of());
 
         assertThatThrownBy(() -> CreateWorkOrderMappingMaterializer.materialize(

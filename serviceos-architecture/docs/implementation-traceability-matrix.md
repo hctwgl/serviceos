@@ -416,3 +416,4 @@ Feature gate/authority: if applicable
 | M319 | 批量 ReplayRequest：PREVIEW/SUBMIT/approve；逐条调度单笔 retry；OpenAPI 1.0.43；Flyway V120 | BatchReplayService + PostgresIT + contracts + `332-m319-*` + `316-m319-*` | 1000 条压测、二级审批/MFA |
 | M320 | 多 OEM 并行建单冒烟：BYD + REFERENCE_OEM + GEELY 同运行时 | MultiOemParallelCreateSmokePostgresIT + `333-m320-*` + `317-m320-*` | Sandbox 真实联调 |
 | M321 | 入站 INTEGRATION Mapping 物化为建单 Canonical/领域命令；mappingVersionId=assetVersionId；Canonical 嵌 contentDigest | CreateWorkOrderMappingMaterializer + pipeline + unit/BYD HTTP IT + `334-m321-*` + `318-m321-*` | 出站 Mapping、全量字段仅 Mapping、默认值/枚举/条件 DSL |
+| M322 | 出站 INTEGRATION Mapping 生成提审 OEM Payload；零 Mapping 兼容 Profile；mappingVersionId=assetVersionId | IntegrationMappingRuntime OUTBOUND + DefaultOutboundDeliveryService + unit/IT + `335-m322-*` + `319-m322-*` | 删除 Profile 硬编码、默认值/枚举/条件 DSL、ASSIGNEE 自动分配 |

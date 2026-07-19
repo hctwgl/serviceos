@@ -120,4 +120,39 @@ class IntegrationMappingRuntimePostgresIT {
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.RESOURCE_NOT_FOUND));
     }
+
+    @Test
+    void appliesFrozenOutboundMappingToExternalFields() {
+        String outbound = "{\"mappingKey\":\"byd-submit-runtime\",\"version\":\"1.0.0\",\"connectorCode\":\"BYD_CPIM\",\"direction\":\"OUTBOUND\",\"fieldMappings\":[{\"mappingId\":\"operator\",\"internalPath\":\"operator\",\"externalPath\":\"operatePerson\",\"required\":true,\"transform\":\"TRIM\"},{\"mappingId\":\"order\",\"internalPath\":\"externalOrderCode\",\"externalPath\":\"orderCode\",\"required\":true,\"transform\":\"NONE\"},{\"mappingId\":\"commit\",\"internalPath\":\"commitDate\",\"externalPath\":\"commitDate\",\"required\":true,\"transform\":\"NONE\"}]}";
+        var outboundAsset = configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.INTEGRATION, "byd-submit-runtime",
+                "1.0.0", "1.0.0", outbound, Sha256.digest(outbound)));
+        String workflow = "{\"workflowCode\":\"LINEAR_V1\",\"schemaVersion\":\"1.0.0\",\"stages\":[{\"stageCode\":\"S1\",\"tasks\":[{\"taskCode\":\"T1\",\"taskType\":\"HUMAN\"}]}]}";
+        var workflowAsset = configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.WORKFLOW, "LINEAR_V1_OUT",
+                "1.0.0", "1.0.0", workflow, Sha256.digest(workflow)));
+        // 使用不同 province 避免与 setUp 中 INBOUND Bundle 解析范围重叠。
+        ConfigurationBundleReference outboundBundle = configurations.publishBundle(
+                new PublishConfigurationBundleCommand(
+                        TENANT, projectId, "INT-OUTBOUND-BUNDLE", "1.0.0", "BYD_OCEAN",
+                        "HOME_CHARGING_SURVEY_INSTALL", "110000", Instant.now().minusSeconds(30),
+                        null, java.util.List.of(workflowAsset.versionId(), outboundAsset.versionId())));
+
+        assertThat(mappingRuntime.hasOutboundMappingForConnector(
+                TENANT, outboundBundle.bundleId(), outboundBundle.manifestDigest(), "BYD_CPIM"))
+                .isTrue();
+        IntegrationMappingResult result = mappingRuntime.applyOutboundForConnectorIfPresent(
+                TENANT, outboundBundle.bundleId(), outboundBundle.manifestDigest(), "BYD_CPIM",
+                Map.of(
+                        "operator", "  op-1  ",
+                        "externalOrderCode", "ORD-OUT-1",
+                        "commitDate", "2026-07-19 12:00:00"))
+                .orElseThrow();
+        assertThat(result.externalFields())
+                .containsEntry("operatePerson", "op-1")
+                .containsEntry("orderCode", "ORD-OUT-1")
+                .containsEntry("commitDate", "2026-07-19 12:00:00");
+        assertThat(result.assetVersionId()).isEqualTo(outboundAsset.versionId());
+        assertThat(result.contentDigest()).isEqualTo(Sha256.digest(outbound));
+    }
 }

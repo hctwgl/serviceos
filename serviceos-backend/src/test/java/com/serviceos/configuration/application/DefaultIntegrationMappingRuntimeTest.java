@@ -70,6 +70,38 @@ class DefaultIntegrationMappingRuntimeTest {
     }
 
     @Test
+    void appliesOutboundMappingInternalToExternalPaths() {
+        String definition = """
+                {"mappingKey":"byd-submit-v1","version":"1.0.0","connectorCode":"BYD_CPIM","direction":"OUTBOUND",
+                 "fieldMappings":[
+                   {"mappingId":"operator","internalPath":"operator","externalPath":"operatePerson","required":true,"transform":"TRIM"},
+                   {"mappingId":"order","internalPath":"externalOrderCode","externalPath":"orderCode","required":true,"transform":"UPPER"},
+                   {"mappingId":"commit","internalPath":"commitDate","externalPath":"commitDate","required":true,"transform":"NONE"}
+                 ]}
+                """;
+        var runtime = runtimeWith(definition);
+        assertThat(runtime.hasOutboundMappingForConnector(
+                "tenant-a", UUID.randomUUID(), "a".repeat(64), "BYD_CPIM")).isTrue();
+        assertThat(runtime.hasInboundMappingForConnector(
+                "tenant-a", UUID.randomUUID(), "a".repeat(64), "BYD_CPIM")).isFalse();
+        IntegrationMappingResult result = runtime.applyOutboundForConnectorIfPresent(
+                "tenant-a", UUID.randomUUID(), "a".repeat(64), "BYD_CPIM",
+                Map.of(
+                        "operator", "  reviewer-1  ",
+                        "externalOrderCode", "ord-9",
+                        "commitDate", "2026-07-19 10:00:00"))
+                .orElseThrow();
+        assertThat(result.direction()).isEqualTo("OUTBOUND");
+        assertThat(result.externalFields())
+                .containsEntry("operatePerson", "reviewer-1")
+                .containsEntry("orderCode", "ORD-9")
+                .containsEntry("commitDate", "2026-07-19 10:00:00");
+        assertThat(result.internalFields()).isEmpty();
+        assertThat(result.assetVersionId()).isNotNull();
+        assertThat(result.contentDigest()).hasSize(64);
+    }
+
+    @Test
     void failsClosedWhenRequiredMissingOrUnknownTransform() {
         String missingRequired = """
                 {"mappingKey":"m1","version":"1.0.0","connectorCode":"BYD_CPIM","direction":"INBOUND",
