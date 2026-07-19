@@ -78,16 +78,33 @@ test.describe('M284/M287/M289 Admin 配置设计器与画布', () => {
     expect(jsonAfterCondition).toContain('workOrder.brandCode == "PLATFORM"')
   })
 
-  test('M310 条件积木可为 RULE 首条 when 生成 SERVICEOS_EXPR_V1', async ({ page }) => {
+  test('M310/M315 RULE 策略设计器条件积木写入 when', async ({ page }) => {
     await openDesigner(page)
     await page.getByTestId('asset-type').selectOption('RULE')
-    await expect(page.getByTestId('condition-builder')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByTestId('rule-structure-editor')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByTestId('condition-builder').first()).toBeVisible()
     await page.getByTestId('condition-value').first().fill('BYD_OCEAN')
-    await expect(page.getByTestId('condition-preview')).toContainText(
+    await expect(page.getByTestId('condition-preview').first()).toContainText(
       'workOrder.brandCode == "BYD_OCEAN"',
     )
     const json = await page.getByTestId('definition-json').inputValue()
     expect(json).toContain('workOrder.brandCode == "BYD_OCEAN"')
+  })
+
+  test('M315 PRICING/INTEGRATION 结构化设计器同步 JSON', async ({ page }) => {
+    await openDesigner(page)
+    await page.getByTestId('asset-type').selectOption('PRICING')
+    await expect(page.getByTestId('pricing-structure-editor')).toBeVisible({ timeout: 15_000 })
+    await page.getByTestId('pricing-amount').first().fill('28800')
+    await page.getByTestId('pricing-amount').first().dispatchEvent('change')
+    let json = await page.getByTestId('definition-json').inputValue()
+    expect(json).toContain('28800')
+
+    await page.getByTestId('asset-type').selectOption('INTEGRATION')
+    await expect(page.getByTestId('integration-structure-editor')).toBeVisible()
+    await page.getByTestId('add-field-mapping').click()
+    json = await page.getByTestId('definition-json').inputValue()
+    expect(json).toContain('map_')
   })
 
   test('M312 节点属性面板与撤销重做', async ({ page }) => {
