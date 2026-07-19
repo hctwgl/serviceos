@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M336 CREATE_WORK_ORDER RouteHint**（Draft 栈 `#148→…→#162→本切片`；
+当前工程基线为 **M336 CREATE_WORK_ORDER RouteHint**（https://github.com/hctwgl/serviceos/pull/163；栈 `#148→…→#163`；
 见 `implementation-status.md`；合入 `master` 后回填合并提交）。M320 合并基线为
 `32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147）。
 

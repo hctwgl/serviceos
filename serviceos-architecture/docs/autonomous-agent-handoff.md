@@ -8,7 +8,7 @@ lastUpdated: 2026-07-19
 ## 当前
 
 - PR #148～#162：M321～M335 Draft stacked
-- 本切片分支：`cursor/m336-create-work-order-route-hint-88d5` — **M336** RouteHint（Draft，base=#162）
+- PR #163：https://github.com/hctwgl/serviceos/pull/163 — **M336** RouteHint（Draft，base=#162）
 - `master`：`32b902f897d19d2c906acac899990bf1aa2bb056`
 - latestMilestone：**M336**
 - Flyway：**125**；OpenAPI：**1.0.43**
