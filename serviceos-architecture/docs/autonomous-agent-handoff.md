@@ -8,8 +8,8 @@ lastUpdated: 2026-07-19
 ## 当前
 
 - PR #148：https://github.com/hctwgl/serviceos/pull/148 — **M321** 入站 Mapping 物化（Draft）
-- PR #149（本分支）：**M322** 出站 Mapping（stacked on M321）
-- 分支：`cursor/m322-outbound-integration-mapping-88d5`
+- PR #149：https://github.com/hctwgl/serviceos/pull/149 — **M322** 出站 Mapping（base=#148）
+- 分支 tip：`cursor/m322-outbound-integration-mapping-88d5`
 - `master`：`32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147 已合并）
 - latestMilestone：**M322**
 - Flyway：**120 / 122**；OpenAPI：**1.0.43**
