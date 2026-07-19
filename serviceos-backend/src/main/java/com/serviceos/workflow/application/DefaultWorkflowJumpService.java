@@ -133,7 +133,7 @@ final class DefaultWorkflowJumpService implements WorkflowJumpService {
                 target.nodeId(), root.definitionVersionId(), root.definitionDigest(),
                 root.bundleId(), root.bundleDigest(), target.stageCode(),
                 target.taskType(), target.taskKind(), target.formRef(), target.slaRef(),
-                target.assigneePolicyRef(), target.dispatchPolicyRef(),
+                target.assigneePolicyRef(), target.dispatchPolicyRef(), target.ruleRef(),
                 "work-order:" + root.workOrderId() + "|jump:" + jumpEventId,
                 payloadDigest, 100, now, 3,
                 command.correlationId(), jumpEventId.toString()));

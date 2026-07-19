@@ -444,7 +444,7 @@ class DispatchTaskReassignmentSagaPostgresIT {
                 TENANT, evidence.projectId(), workOrderId, UUID.randomUUID(), UUID.randomUUID(),
                 UUID.randomUUID(), "SITE_SURVEY", UUID.randomUUID(), "a".repeat(64),
                 evidence.bundleId(), "c".repeat(64),
-                "SURVEY", BUSINESS_TYPE, WorkflowTaskKind.HUMAN, null, null, null, null,
+                "SURVEY", BUSINESS_TYPE, WorkflowTaskKind.HUMAN, null, null, null, null, null,
                 "work-order:m25-" + key, "b".repeat(64),
                 500, Instant.now(), 1, "corr-task-" + key, "cause-task-" + key)).taskId();
         taskAssignments.assignCandidates(

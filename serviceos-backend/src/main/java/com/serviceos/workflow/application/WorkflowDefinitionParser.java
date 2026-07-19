@@ -50,7 +50,7 @@ final class WorkflowDefinitionParser {
         return new BootstrapDefinition(
                 graph.workflowKey(), graph.semanticVersion(), task.nodeId(),
                 task.stageCode(), task.taskType(), task.taskKind(), task.formRef(), task.slaRef(),
-                task.assigneePolicyRef(), task.dispatchPolicyRef());
+                task.assigneePolicyRef(), task.dispatchPolicyRef(), task.ruleRef());
     }
 
     /**
@@ -97,7 +97,8 @@ final class WorkflowDefinitionParser {
         }
         return ProgressionDefinition.task(
                 task.nodeId(), task.stageCode(), task.taskType(), task.taskKind(),
-                task.formRef(), task.slaRef(), task.assigneePolicyRef(), task.dispatchPolicyRef(), 1);
+                task.formRef(), task.slaRef(), task.assigneePolicyRef(), task.dispatchPolicyRef(),
+                task.ruleRef(), 1);
     }
 
     /**
@@ -147,7 +148,7 @@ final class WorkflowDefinitionParser {
             return ProgressionDefinition.task(
                     next.nodeId(), next.stageCode(), next.taskType(), next.taskKind(),
                     next.formRef(), next.slaRef(), next.assigneePolicyRef(), next.dispatchPolicyRef(),
-                    next.multiInstanceCardinality());
+                    next.ruleRef(), next.multiInstanceCardinality());
         }
         if ("EXCLUSIVE_GATEWAY".equals(targetType)) {
             String chosen = chooseExclusiveGatewayTarget(graph, targetNodeId, context);
@@ -427,6 +428,7 @@ final class WorkflowDefinitionParser {
                 optionalText(node, "formRef"), optionalText(node, "slaRef"),
                 optionalText(node, "assigneePolicyRef"),
                 optionalText(node, "dispatchPolicyRef"),
+                optionalText(node, "ruleRef"),
                 readMultiInstanceCardinality(node));
     }
 
@@ -480,7 +482,8 @@ final class WorkflowDefinitionParser {
             String firstFormRef,
             String firstSlaRef,
             String firstAssigneePolicyRef,
-            String firstDispatchPolicyRef
+            String firstDispatchPolicyRef,
+            String firstRuleRef
     ) {
     }
 
@@ -500,6 +503,7 @@ final class WorkflowDefinitionParser {
             String slaRef,
             String assigneePolicyRef,
             String dispatchPolicyRef,
+            String ruleRef,
             boolean end,
             boolean waiting,
             String waitEventType,
@@ -522,17 +526,17 @@ final class WorkflowDefinitionParser {
         static ProgressionDefinition task(
                 String nodeId, String stageCode, String taskType, WorkflowTaskKind taskKind,
                 String formRef, String slaRef, String assigneePolicyRef, String dispatchPolicyRef,
-                int multiInstanceCardinality) {
+                String ruleRef, int multiInstanceCardinality) {
             return new ProgressionDefinition(
                     nodeId, stageCode, taskType, taskKind, formRef, slaRef, assigneePolicyRef,
-                    dispatchPolicyRef,
+                    dispatchPolicyRef, ruleRef,
                     false, false, null, null, false, 0, false, null,
                     false, List.of(), false, null, 0, multiInstanceCardinality);
         }
 
         static ProgressionDefinition end(String nodeId) {
             return new ProgressionDefinition(
-                    nodeId, null, null, null, null, null, null, null,
+                    nodeId, null, null, null, null, null, null, null, null,
                     true, false, null, null, false, 0, false, null,
                     false, List.of(), false, null, 0, 1);
         }
@@ -544,21 +548,21 @@ final class WorkflowDefinitionParser {
                 String correlationKeyTemplate
         ) {
             return new ProgressionDefinition(
-                    nodeId, stageCode, null, null, null, null, null, null,
+                    nodeId, stageCode, null, null, null, null, null, null, null,
                     false, true, waitEventType, correlationKeyTemplate,
                     false, 0, false, null, false, List.of(), false, null, 0, 1);
         }
 
         static ProgressionDefinition timer(String nodeId, String stageCode, int durationSeconds) {
             return new ProgressionDefinition(
-                    nodeId, stageCode, null, null, null, null, null, null,
+                    nodeId, stageCode, null, null, null, null, null, null, null,
                     false, false, null, null, true, durationSeconds, false, null,
                     false, List.of(), false, null, 0, 1);
         }
 
         static ProgressionDefinition subProcess(String nodeId, String stageCode, String subProcessRef) {
             return new ProgressionDefinition(
-                    nodeId, stageCode, null, null, null, null, null, null,
+                    nodeId, stageCode, null, null, null, null, null, null, null,
                     false, false, null, null, false, 0, true, subProcessRef,
                     false, List.of(), false, null, 0, 1);
         }
@@ -569,7 +573,7 @@ final class WorkflowDefinitionParser {
                 List<ProgressionDefinition> branches
         ) {
             return new ProgressionDefinition(
-                    forkNodeId, stageCode, null, null, null, null, null, null,
+                    forkNodeId, stageCode, null, null, null, null, null, null, null,
                     false, false, null, null, false, 0, false, null,
                     true, List.copyOf(branches), false, null, 0, 1);
         }
@@ -580,7 +584,7 @@ final class WorkflowDefinitionParser {
                 int expectedTokens
         ) {
             return new ProgressionDefinition(
-                    joinNodeId, null, null, null, null, null, null, null,
+                    joinNodeId, null, null, null, null, null, null, null, null,
                     false, false, null, null, false, 0, false, null,
                     false, List.of(), true, fromNodeId, expectedTokens, 1);
         }
@@ -615,6 +619,7 @@ final class WorkflowDefinitionParser {
             String slaRef,
             String assigneePolicyRef,
             String dispatchPolicyRef,
+            String ruleRef,
             int multiInstanceCardinality
     ) {
     }

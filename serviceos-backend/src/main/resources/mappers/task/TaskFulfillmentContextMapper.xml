@@ -9,7 +9,8 @@
                t.stage_code AS "stageCode", t.task_kind AS "taskKind",
                t.form_ref AS "formRef", t.sla_ref AS "slaRef",
                t.assignee_policy_ref AS "assigneePolicyRef",
-               t.dispatch_policy_ref AS "dispatchPolicyRef", t.status, t.version,
+               t.dispatch_policy_ref AS "dispatchPolicyRef",
+               t.rule_ref AS "ruleRef", t.status, t.version,
                a.principal_id AS "responsiblePrincipalId",
                EXISTS (
                    SELECT 1 FROM tsk_task_execution_guard g

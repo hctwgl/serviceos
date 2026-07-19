@@ -236,7 +236,7 @@ class HumanTaskCommandPostgresIT {
                 TENANT, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
                 nodeInstanceId, "SITE_SURVEY", UUID.randomUUID(), "a".repeat(64),
                 UUID.randomUUID(), "c".repeat(64),
-                "SURVEY", "SITE_SURVEY", WorkflowTaskKind.HUMAN, formRef, null, null, null,
+                "SURVEY", "SITE_SURVEY", WorkflowTaskKind.HUMAN, formRef, null, null, null, null,
                 "work-order:test", "b".repeat(64),
                 500, Instant.now(), 1, "corr-task-create", "cause-task-create");
     }

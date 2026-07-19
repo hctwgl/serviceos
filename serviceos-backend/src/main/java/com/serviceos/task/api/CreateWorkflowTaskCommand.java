@@ -25,6 +25,7 @@ public record CreateWorkflowTaskCommand(
         String slaRef,
         String assigneePolicyRef,
         String dispatchPolicyRef,
+        String ruleRef,
         String payloadRef,
         String payloadDigest,
         int priority,

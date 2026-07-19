@@ -367,7 +367,7 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
                             workflow_node_instance_id, workflow_node_id,
                             workflow_definition_version_id, workflow_definition_digest,
                             configuration_bundle_id, configuration_bundle_digest, stage_code, form_ref, sla_ref,
-                            assignee_policy_ref, dispatch_policy_ref
+                            assignee_policy_ref, dispatch_policy_ref, rule_ref
                         ) VALUES (
                             :taskId, :tenantId, :taskType, :taskKind, :businessKey,
                             :payloadRef, :payloadDigest, :priority, :status, :readyAt,
@@ -376,7 +376,7 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
                             :workflowNodeInstanceId, :workflowNodeId,
                             :workflowDefinitionVersionId, :workflowDefinitionDigest,
                             :configurationBundleId, :configurationBundleDigest, :stageCode, :formRef, :slaRef,
-                            :assigneePolicyRef, :dispatchPolicyRef
+                            :assigneePolicyRef, :dispatchPolicyRef, :ruleRef
                         )
                         ON CONFLICT (tenant_id, task_type, business_key) DO NOTHING
                         """)
@@ -408,6 +408,7 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
                 .param("slaRef", command.slaRef(), java.sql.Types.VARCHAR)
                 .param("assigneePolicyRef", command.assigneePolicyRef(), java.sql.Types.VARCHAR)
                 .param("dispatchPolicyRef", command.dispatchPolicyRef(), java.sql.Types.VARCHAR)
+                .param("ruleRef", command.ruleRef(), java.sql.Types.VARCHAR)
                 .update();
 
         StoredTask stored = findByBusinessKey(
@@ -417,6 +418,7 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
                 || !Objects.equals(stored.slaRef(), command.slaRef())
                 || !Objects.equals(stored.assigneePolicyRef(), command.assigneePolicyRef())
                 || !Objects.equals(stored.dispatchPolicyRef(), command.dispatchPolicyRef())
+                || !Objects.equals(stored.ruleRef(), command.ruleRef())
                 || !Objects.equals(stored.stageCode(), command.stageCode())
                 || !Objects.equals(stored.configurationBundleId(), command.configurationBundleId())
                 || !Objects.equals(stored.configurationBundleDigest(), command.configurationBundleDigest()))) {
@@ -811,7 +813,7 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
     private StoredTask findByBusinessKey(String tenantId, String taskType, String businessKey) {
         return jdbc.sql("""
                         SELECT task_id, tenant_id, task_type, business_key, payload_digest, form_ref, sla_ref,
-                               assignee_policy_ref, dispatch_policy_ref, configuration_bundle_id,
+                               assignee_policy_ref, dispatch_policy_ref, rule_ref, configuration_bundle_id,
                                configuration_bundle_digest, stage_code,
                                status, next_run_at, attempt_count, max_attempts, version
                           FROM tsk_task
@@ -855,6 +857,7 @@ final class JdbcTaskExecutionStore implements TaskSchedulingStore, TaskExecution
     private record StoredTask(
             UUID taskId, String tenantId, String taskType, String businessKey, String payloadDigest,
             String formRef, String slaRef, String assigneePolicyRef, String dispatchPolicyRef,
+            String ruleRef,
             UUID configurationBundleId, String configurationBundleDigest, String stageCode,
             String status, Instant nextRunAt, int attemptCount, int maxAttempts, long version
     ) {

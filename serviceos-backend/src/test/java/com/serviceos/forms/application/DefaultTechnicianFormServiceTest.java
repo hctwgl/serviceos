@@ -96,7 +96,7 @@ class DefaultTechnicianFormServiceTest {
     private static TaskFulfillmentContext task(String responsible) {
         return new TaskFulfillmentContext(
                 TASK, PROJECT, UUID.randomUUID(), UUID.randomUUID(), "bundle-digest",
-                "SURVEY", "SURVEY", "HUMAN", "survey", null, null, null,
+                "SURVEY", "SURVEY", "HUMAN", "survey", null, null, null, null,
                 "RUNNING", responsible, false, 1);
     }
 
