@@ -2511,7 +2511,6 @@ test('真实 OIDC 登录后可通过审核外发并经厂端回调关闭 CLIENT 
       new URL(response.url()).pathname === `/api/v1/tasks/${executionTaskId}`,
   )
   await reviewPage
-    .locator('.outbound-cross-links')
     .getByRole('link', { name: new RegExp(`打开执行任务\\s+${executionTaskId}`) })
     .click()
   expect((await outboundExecutionTaskPromise).status()).toBe(200)
