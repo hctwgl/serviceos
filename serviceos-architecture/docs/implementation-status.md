@@ -3,8 +3,8 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-19
-baselineCommit: fa929d289c561150f7387a365c91970050bca029
-latestMilestone: M310
+baselineCommit: 464733ee171d283e06cbfeaf790460908c8087c0
+latestMilestone: M311
 ---
 
 # ServiceOS 实施状态总览
@@ -39,8 +39,8 @@ latestMilestone: M310
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M310 SERVICEOS_EXPR_V1 条件积木 |
-| 基线提交 | `fa929d289c561150f7387a365c91970050bca029`（功能证据提交后回填；合入 `master` 后改为合并提交） |
+| 最新实施里程碑 | M311 吉利浩瀚本地入站适配器 |
+| 基线提交 | `464733ee171d283e06cbfeaf790460908c8087c0`（功能证据提交后回填；合入 `master` 后改为合并提交） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts`、`@serviceos/web-core`、`ServiceOSIOSCore`、独立且可部署的 `serviceos-network-web` 与 `serviceos-technician-web`、Swift 6 `TechnicianIOSFoundation`，以及已在 iPhone 17 Pro Simulator 安装启动、实跑 XCTest/XCUITest、形成 Production arm64 archive/dSYM，并接入当前任务、在线 Visit、冻结基础表单、前台 Evidence 采集上传、Snapshot/Task 完成与多轮资料整改的原生 `TechnicianIOS` SwiftUI App；由同一 Core OpenAPI 生成并经独立消费者门禁验证的 `@serviceos/core-client` 与 `ServiceOSCoreClient` |
 | 前端工程 | `serviceos-admin-web` 独立承载总部运营、统一用户中心、`/me` 导航、SavedView、UI Preference、受控搜索与最近访问；M256 后 Network 正式产品由独立 `serviceos-network-web` 承载，M257 后 Technician 正式产品由独立移动优先 `serviceos-technician-web` 承载，M262～M266 依次增加在线 Visit、冻结表单、Evidence 三段式上传、Snapshot/Task 完成与独立整改 Task 多轮补传/重新提交；Admin 仅保留可配置外链和 M188 诊断；两套独立 Web 均实际接入共享 Core、OIDC PKCE、服务端 Context/Capability/导航、Playwright 回归和独立容器镜像 |
@@ -145,7 +145,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | 项目治理 | Project 核心事实、范围关系与授权目录 | `PARTIAL` | 项目创建；REGION/NETWORK 当前关系整组修订和不可变历史；`project.read` 授权目录、详情及历史查询 | owners、品牌/服务产品/配置绑定、生命周期、计划修订审批、目录治理 UI | M8、M64～M67 |
 | 可靠消息 | Inbox、Outbox、Worker claim/lease/retry | `IMPLEMENTED` | 本地可靠发布消费、恢复和人工接管基础 | 正式 Broker 和跨服务运行 | M9～M10 |
 | 配置中心 | 不可变配置资产、Bundle 发布、设计器与灰度通道 | `PARTIAL` | M282～M296 设计器/治理 + **M303～M309** 六类运行时 + **M310** 条件积木 | 嵌套表达式 round-trip、FORM 字段积木、出站 Mapping、真实短信/邮件 Adapter、结算落账 | M16、M33、M36、M52～M53、M61、M268、M271、M281～M296、M303～M310 |
-| 外部接入 | BYD CPIM + REFERENCE_OEM SAMPLE | `PARTIAL` | BYD 入站建单/更新/取消、提审、回调；**M267/M297～M302** 通用 SPI（建单、更新、取消、出站、回调、Profile/Route） | 真实第二家协议/Sandbox（BLOCKED_EXTERNAL）、远端查询 SPI、人工标记已送达/放弃、生产凭据/对象存储 | M16、M56～M60、M77～M79、M99、M158、M267、M272、M273、M297～M302 |
+| 外部接入 | BYD CPIM + REFERENCE_OEM SAMPLE + Geely 本地切片 | `PARTIAL` | BYD 入站建单/更新/取消、提审、回调；**M267/M297～M302** 通用 SPI（建单、更新、取消、出站、回调、Profile/Route）；**M311** 吉利 AES+7.1 本地建单 | 吉利 Sandbox/OpenAPI 签名联调（BLOCKED_EXTERNAL）、7.2～7.22、远端查询 SPI、人工标记已送达/放弃、生产凭据/对象存储 | M16、M56～M60、M77～M79、M99、M158、M267、M272、M311、M273、M297～M302 |
 | 工单 | WorkOrder 接收、激活、履约完成与授权工作区投影 | `PARTIAL` | 权威工单、工作流启动、跨阶段和 END 完结；授权目录、非 PII 详情、Stage/Task 执行骨架及核心执行+现场履约时间线 | 完整取消、暂停、恢复、客户敏感详情审计、跨域完整时间线/动作与全部业务分支 | M16～M19、M68～M69、M73～M74 |
 | 工作流 | 线性 + 网关 + WAIT/TIMER + SUB_PROCESS + 多实例 + 取消/重开/跳转/补偿 + 标准模板 | `PARTIAL` | 上项 + **M281** 维修/移机/巡检标准模板（含家充勘安） | HTTP 命令面、表单/资料完整模板包、设计器 | M17～M19、M61、M69、M268～M271、M275～M281 |
 | 人工任务与执行历史 | claim/start/complete、责任、执行保护与授权任务读取 | `IMPLEMENTED` | 人工命令、候选领取、唯一责任、release/reclaim、执行保护；表单/资料完成门禁；授权队列/详情、allowed-actions、自动 Attempt 历史及工单内核心 Task 生命周期与指派/Guard/人工接管时间线 | block/retry/cancel 等其他动作、Workflow Node 历史、跨工单/跨域完整历史和 Review 完成条件 | M20～M23、M35、M41、M43、M69～M73、M81 |
@@ -178,7 +178,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 ServiceOS 可靠纵向切片已推进到 **M306**。M267～M296 基线已稳定；**M297～M302** 已交付出站提审、
 审核回调、取消/更新入站、Profile/Route 注册表（OpenAPI **1.0.40**；Flyway **118 / 120**）。
 
-下一主线（已批准）：P3 续（设计器属性面板深化）→ P4 第二 OEM（Geely；缺 Sandbox 则 BLOCKED_EXTERNAL）→
+下一主线（已批准）：P3 设计器深化；P4 吉利其余接口与 Sandbox 联调（仍 BLOCKED_EXTERNAL）→
 真实第二家车企。远端查询 SPI 与 Track F/G 仍为 `BLOCKED_EXTERNAL`。
 
 ```text

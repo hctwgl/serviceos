@@ -405,3 +405,4 @@ Feature gate/authority: if applicable
 | M308 | RULE 运行时：冻结规则 when 求值 + 严重级别聚合（BLOCK>REQUIRE_APPROVAL>WARN>default）；无领域副作用 | RuleRuntime + unit/IT + `321-m308-*` + `305-m308-*` | ReviewCase 自动驱动、PRICING 运行时 |
 | M309 | PRICING 运行时：冻结价目 when 匹配 + amountMinor 合计；试算不落账 | PricingRuntime + unit/IT + `322-m309-*` + `306-m309-*` | 结算落账、对账、动态公式、P3 低代码增强 |
 | M310 | SERVICEOS_EXPR_V1 条件积木：字段/运算符/值/AND-OR → 白名单表达式；设计器与网关边接入 | ConditionBuilder + blocks TS + Admin build + Playwright + `323-m310-*` + `307-m310-*` | 嵌套括号 round-trip、FORM 字段积木、全资产属性面板 |
+| M311 | 吉利浩瀚本地入站：AES 解密 + 7.1 建单映射 + 通用管道；Sandbox/签名 BLOCKED_EXTERNAL | Geely adapter + AES/IT + `324-m311-*` + `308-m311-*` + `05-geely-*` | OpenAPI 签名、Sandbox 联调、7.2～7.22 |

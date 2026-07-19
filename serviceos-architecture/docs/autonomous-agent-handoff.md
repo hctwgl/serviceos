@@ -8,19 +8,22 @@ lastUpdated: 2026-07-19
 ## 当前
 
 - PR：https://github.com/hctwgl/serviceos/pull/147
-- latestMilestone：**M310**
+- latestMilestone：**M311**
 - Flyway：**118 / 120**；OpenAPI：**1.0.40**
-- 下一刀：**M311** P3 设计器属性面板深化 / 或 P4 吉利协议映射（Sandbox 仍 BLOCKED_EXTERNAL）
+- 程序主线 P0～P2 完成；P3 首刀（M310）完成；P4 本地吉利切片（M311）完成
 
-## 已完成
+## BLOCKED_EXTERNAL（不可替代）
 
-P0；P1 Connector SPI（M297～M302）；P2 六类运行时（M303～M309）；P3 首刀条件积木（M310）
+- 吉利 Sandbox URL / 生产 AK·SK·IV / OpenAPI 平台统一签名联调
+- Swift/Xcode、签名真机、远端 verify.yml
 
-## BLOCKED_EXTERNAL
+## 已完成摘要
 
-Swift/Xcode、签名真机、吉利 Sandbox/凭据、远端 verify.yml
+- P0 M296 基线；P1 Connector SPI M297～M302
+- P2 六类运行时 M303～M309；P3 条件积木 M310
+- P4 吉利本地 AES+7.1 建单 M311（真实联调仍阻塞）
 
-## 下一步入口
+## 下一步（有外部材料时）
 
-- P3 续：FORM/EVIDENCE/SLA/RULE 等资产属性面板与画布小地图/撤销重做
-- P4：吉利 PDF → 映射表 + `integration.geely` 本地契约测试（无 Sandbox 不得声称真实接入）
+- 吉利 7.2+ 接口与 Sandbox 联调里程碑
+- 或继续 P3 设计器属性面板/小地图/撤销重做
