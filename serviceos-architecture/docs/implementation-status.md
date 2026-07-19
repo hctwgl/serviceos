@@ -176,7 +176,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 ## 5. 下一实施方向
 
 ServiceOS 可靠纵向切片已推进到 **M334**（入站 Mapping defaults/enum/condition DSL）。
-M321～M334 均在 Draft stacked PRs 中（`#148→…→#160→本切片`）；M320 已合入 `master`（`32b902f8`）。
+M321～M334 均在 Draft stacked PRs 中（`#148→…→#161`；本切片 https://github.com/hctwgl/serviceos/pull/161）；M320 已合入 `master`（`32b902f8`）。
 
 当前契约/迁移：OpenAPI **1.0.43**；Flyway **125**（本切片无迁移；configuration schema 已扩展）。
 

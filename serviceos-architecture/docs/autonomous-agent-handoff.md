@@ -8,7 +8,7 @@ lastUpdated: 2026-07-19
 ## 当前
 
 - PR #148～#160：M321～M333 Draft stacked
-- 本切片分支：`cursor/m334-inbound-mapping-default-enum-condition-88d5` — **M334** Mapping DSL（Draft，base=#160）
+- PR #161：https://github.com/hctwgl/serviceos/pull/161 — **M334** Mapping DSL（Draft，base=#160）
 - `master`：`32b902f897d19d2c906acac899990bf1aa2bb056`
 - latestMilestone：**M334**
 - Flyway：**125**；OpenAPI：**1.0.43**
