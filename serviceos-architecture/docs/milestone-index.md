@@ -356,6 +356,7 @@ title: ServiceOS 里程碑索引
 | M345 | M345 一元取反条件积木 | [358-m345-unary-not-condition.md](../architecture/358-m345-unary-not-condition.md) | [342-m345-unary-not-condition-acceptance.md](../testing/342-m345-unary-not-condition-acceptance.md) |
 | M346 | M346 EVIDENCE qualityChecks 可视编辑 | [359-m346-evidence-quality-checks-editor.md](../architecture/359-m346-evidence-quality-checks-editor.md) | [343-m346-evidence-quality-checks-editor-acceptance.md](../testing/343-m346-evidence-quality-checks-editor-acceptance.md) |
 | M347 | M347 Admin INTEGRATION Mapping DSL 可视编辑 | [360-m347-integration-mapping-dsl-ui.md](../architecture/360-m347-integration-mapping-dsl-ui.md) | [344-m347-integration-mapping-dsl-ui-acceptance.md](../testing/344-m347-integration-mapping-dsl-ui-acceptance.md) |
+| M348 | M348 DISPATCH 残留结构化编辑器 | [361-m348-dispatch-residual-editor.md](../architecture/361-m348-dispatch-residual-editor.md) | [345-m348-dispatch-residual-editor-acceptance.md](../testing/345-m348-dispatch-residual-editor-acceptance.md) |
 
 ## 未关联里程碑的文档
 

@@ -128,11 +128,35 @@ function addStrategy() {
   ])
 }
 
+const FILTER_KEYS = [
+  'BLACKLIST',
+  'ENABLED',
+  'BRAND_SCOPE',
+  'REGION_SCOPE',
+  'BUSINESS_CAPABILITY',
+  'QUALIFICATION',
+  'CAPACITY',
+  'CUSTOM',
+] as const
+const SCORE_FACTOR_KEYS = [
+  'REMAINING_CAPACITY',
+  'FULFILLMENT_RATE',
+  'NETWORK_SCORE',
+  'ALLOCATION_RATIO_GAP',
+  'CURRENT_LOAD',
+  'CUSTOM',
+] as const
+const FALLBACK_ON_NO_CANDIDATE = [
+  'MANUAL_INTERVENTION',
+  'CROSS_REGION',
+  'FALLBACK_NETWORK',
+] as const
+
 function addHardFilter() {
   setRoot('hardFilters', [
     ...hardFilters.value,
     {
-      filterKey: `FILTER_${hardFilters.value.length + 1}`,
+      filterKey: 'CUSTOM',
       order: hardFilters.value.length + 1,
       expression: {
         language: 'SERVICEOS_EXPR_V1',
@@ -147,7 +171,7 @@ function addScoring() {
   setRoot('scoring', [
     ...scoring.value,
     {
-      factorKey: `FACTOR_${scoring.value.length + 1}`,
+      factorKey: 'REMAINING_CAPACITY',
       weight: 1.0,
       expression: {
         language: 'SERVICEOS_EXPR_V1',
@@ -155,6 +179,80 @@ function addScoring() {
       },
     },
   ])
+}
+
+function csvToList(raw: string): string[] {
+  return raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)
+}
+
+function listToCsv(value: unknown): string {
+  return Array.isArray(value) ? value.map(String).join(', ') : ''
+}
+
+function scopeObject(): Record<string, unknown> {
+  const scope = draft.value.scope
+  if (scope && typeof scope === 'object') {
+    return { ...(scope as Record<string, unknown>) }
+  }
+  return { brandCodes: ['*'], businessTypes: ['*'], regionCodes: ['*'] }
+}
+
+/** schema 要求数组至少 1 项；空输入拒绝写入以免产生非法定义。 */
+function setScopeCodes(
+  field: 'brandCodes' | 'businessTypes' | 'regionCodes',
+  raw: string,
+) {
+  const codes = csvToList(raw)
+  if (codes.length === 0) {
+    return
+  }
+  setRoot('scope', { ...scopeObject(), [field]: codes })
+}
+
+function fallbackObject(): Record<string, unknown> {
+  const fallback = draft.value.fallback
+  if (fallback && typeof fallback === 'object') {
+    return { ...(fallback as Record<string, unknown>) }
+  }
+  return {
+    onNoCandidate: 'MANUAL_INTERVENTION',
+    manualRole: 'PROJECT_MANAGER',
+    resolutionHours: 4,
+  }
+}
+
+function setFallbackField(field: string, value: unknown) {
+  const next = { ...fallbackObject(), [field]: value }
+  if (field === 'preWarningMinutes' && (value === '' || value === null || value === undefined)) {
+    delete next.preWarningMinutes
+  }
+  setRoot('fallback', next)
+}
+
+/**
+ * M348：Admin 仅暴露 ORDER_COUNT + MONTH（与 Runtime M338 门禁一致）。
+ * 不提供 AMOUNT / WEIGHTED_VOLUME 选项，避免配置出尚未业务确认的口径。
+ */
+function setAllocationRatioEnabled(enabled: boolean) {
+  const current =
+    draft.value.allocationRatio && typeof draft.value.allocationRatio === 'object'
+      ? { ...(draft.value.allocationRatio as Record<string, unknown>) }
+      : {}
+  setRoot('allocationRatio', {
+    ...current,
+    enabled,
+    period: 'MONTH',
+    measure: 'ORDER_COUNT',
+  })
+}
+
+function allocationRatioEnabled(): boolean {
+  const ratio = draft.value.allocationRatio
+  if (!ratio || typeof ratio !== 'object') return false
+  return Boolean((ratio as { enabled?: unknown }).enabled)
 }
 
 function addFieldMapping() {
@@ -523,6 +621,117 @@ const BILLABLE = ['OEM', 'NETWORK', 'PLATFORM', 'CUSTOMER']
     </div>
 
     <div v-else-if="assetType === 'DISPATCH'" data-testid="dispatch-structure-editor">
+      <h4>scope</h4>
+      <p class="hint">逗号分隔；至少保留一项。`*` 表示通配（与 Runtime 相交语义一致）。</p>
+      <div class="row">
+        <label>
+          brandCodes
+          <input
+            data-testid="dispatch-scope-brands"
+            :value="listToCsv(scopeObject().brandCodes)"
+            @change="setScopeCodes('brandCodes', ($event.target as HTMLInputElement).value)"
+          />
+        </label>
+        <label>
+          businessTypes
+          <input
+            data-testid="dispatch-scope-business"
+            :value="listToCsv(scopeObject().businessTypes)"
+            @change="setScopeCodes('businessTypes', ($event.target as HTMLInputElement).value)"
+          />
+        </label>
+        <label>
+          regionCodes
+          <input
+            data-testid="dispatch-scope-regions"
+            :value="listToCsv(scopeObject().regionCodes)"
+            @change="setScopeCodes('regionCodes', ($event.target as HTMLInputElement).value)"
+          />
+        </label>
+      </div>
+
+      <h4>fallback</h4>
+      <div class="row">
+        <label>
+          onNoCandidate
+          <select
+            data-testid="dispatch-fallback-on-no-candidate"
+            :value="String(fallbackObject().onNoCandidate ?? 'MANUAL_INTERVENTION')"
+            @change="
+              setFallbackField('onNoCandidate', ($event.target as HTMLSelectElement).value)
+            "
+          >
+            <option v-for="opt in FALLBACK_ON_NO_CANDIDATE" :key="opt" :value="opt">
+              {{ opt }}
+            </option>
+          </select>
+        </label>
+        <label>
+          manualRole
+          <input
+            data-testid="dispatch-fallback-manual-role"
+            :value="String(fallbackObject().manualRole ?? '')"
+            @change="setFallbackField('manualRole', ($event.target as HTMLInputElement).value)"
+          />
+        </label>
+        <label>
+          resolutionHours
+          <input
+            type="number"
+            min="1"
+            data-testid="dispatch-fallback-resolution-hours"
+            :value="Number(fallbackObject().resolutionHours ?? 4)"
+            @change="
+              setFallbackField(
+                'resolutionHours',
+                Math.max(1, Number(($event.target as HTMLInputElement).value) || 1),
+              )
+            "
+          />
+        </label>
+        <label>
+          preWarningMinutes（可选）
+          <input
+            type="number"
+            min="0"
+            data-testid="dispatch-fallback-pre-warning"
+            :value="
+              fallbackObject().preWarningMinutes === undefined
+                ? ''
+                : Number(fallbackObject().preWarningMinutes)
+            "
+            @change="
+              ($event.target as HTMLInputElement).value.trim() === ''
+                ? setFallbackField('preWarningMinutes', '')
+                : setFallbackField(
+                    'preWarningMinutes',
+                    Math.max(0, Number(($event.target as HTMLInputElement).value) || 0),
+                  )
+            "
+          />
+        </label>
+      </div>
+
+      <h4>allocationRatio</h4>
+      <p class="hint">
+        M348：仅 ORDER_COUNT + MONTH（与 M338 Runtime 门禁一致）。AMOUNT / WEIGHTED_VOLUME
+        未业务确认，不提供选项。
+      </p>
+      <div class="row">
+        <label class="check">
+          <input
+            type="checkbox"
+            data-testid="dispatch-allocation-enabled"
+            :checked="allocationRatioEnabled()"
+            @change="setAllocationRatioEnabled(($event.target as HTMLInputElement).checked)"
+          />
+          enabled
+        </label>
+        <span class="hint" data-testid="dispatch-allocation-locked">
+          period=MONTH · measure=ORDER_COUNT
+        </span>
+      </div>
+
       <h4>硬过滤</h4>
       <article
         v-for="(filter, index) in hardFilters"
@@ -531,17 +740,31 @@ const BILLABLE = ['OEM', 'NETWORK', 'PLATFORM', 'CUSTOMER']
         :data-testid="`dispatch-filter-${index}`"
       >
         <div class="row">
-          <input
+          <select
             data-testid="filter-key"
-            :value="String(filter.filterKey ?? '')"
-            placeholder="filterKey"
+            :value="String(filter.filterKey ?? 'CUSTOM')"
             @change="
               updateArrayItem('hardFilters', index, {
-                filterKey: ($event.target as HTMLInputElement).value,
+                filterKey: ($event.target as HTMLSelectElement).value,
+              })
+            "
+          >
+            <option v-for="key in FILTER_KEYS" :key="key" :value="key">{{ key }}</option>
+          </select>
+          <input
+            type="number"
+            min="1"
+            data-testid="filter-order"
+            :value="Number(filter.order ?? index + 1)"
+            placeholder="order"
+            @change="
+              updateArrayItem('hardFilters', index, {
+                order: Math.max(1, Number(($event.target as HTMLInputElement).value) || 1),
               })
             "
           />
           <input
+            data-testid="filter-failure-code"
             :value="String(filter.failureCode ?? '')"
             placeholder="failureCode"
             @change="
@@ -568,15 +791,17 @@ const BILLABLE = ['OEM', 'NETWORK', 'PLATFORM', 'CUSTOMER']
         :data-testid="`dispatch-score-${index}`"
       >
         <div class="row">
-          <input
-            :value="String(factor.factorKey ?? '')"
-            placeholder="factorKey"
+          <select
+            data-testid="score-factor-key"
+            :value="String(factor.factorKey ?? 'REMAINING_CAPACITY')"
             @change="
               updateArrayItem('scoring', index, {
-                factorKey: ($event.target as HTMLInputElement).value,
+                factorKey: ($event.target as HTMLSelectElement).value,
               })
             "
-          />
+          >
+            <option v-for="key in SCORE_FACTOR_KEYS" :key="key" :value="key">{{ key }}</option>
+          </select>
           <input
             type="number"
             step="0.1"
@@ -590,6 +815,11 @@ const BILLABLE = ['OEM', 'NETWORK', 'PLATFORM', 'CUSTOMER']
           />
           <button type="button" @click="removeArrayItem('scoring', index)">删除</button>
         </div>
+        <ConditionBuilder
+          :model-value="exprSource(factor, 'expression')"
+          label="评分表达式"
+          @update:model-value="setItemExpression('scoring', index, 'expression', $event)"
+        />
       </article>
       <button type="button" data-testid="add-scoring" @click="addScoring">添加评分因子</button>
     </div>
