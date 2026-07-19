@@ -345,6 +345,7 @@ title: ServiceOS 里程碑索引
 | M334 | M334 入站 Mapping defaults/enum/condition DSL | [347-m334-inbound-mapping-default-enum-condition.md](../architecture/347-m334-inbound-mapping-default-enum-condition.md) | [331-m334-inbound-mapping-default-enum-condition-acceptance.md](../testing/331-m334-inbound-mapping-default-enum-condition-acceptance.md) |
 | M335 | M335 CREATE_WORK_ORDER 强制 INBOUND Mapping | [348-m335-inbound-create-work-order-mapping-required.md](../architecture/348-m335-inbound-create-work-order-mapping-required.md) | [332-m335-inbound-create-work-order-mapping-required-acceptance.md](../testing/332-m335-inbound-create-work-order-mapping-required-acceptance.md) |
 | M336 | M336 CREATE_WORK_ORDER RouteHint 与 OEM 字段 Mapper 瘦身 | [349-m336-create-work-order-route-hint.md](../architecture/349-m336-create-work-order-route-hint.md) | [333-m336-create-work-order-route-hint-acceptance.md](../testing/333-m336-create-work-order-route-hint-acceptance.md) |
+| M337 | M337 DISPATCH 地图 scope 与 ServiceCoverage | [350-m337-dispatch-map-scope-coverage.md](../architecture/350-m337-dispatch-map-scope-coverage.md) | [334-m337-dispatch-map-scope-coverage-acceptance.md](../testing/334-m337-dispatch-map-scope-coverage-acceptance.md) |
 
 ## 未关联里程碑的文档
 

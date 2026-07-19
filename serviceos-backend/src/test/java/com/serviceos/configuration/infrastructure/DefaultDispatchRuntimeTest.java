@@ -95,6 +95,70 @@ class DefaultDispatchRuntimeTest {
     }
 
     @Test
+    void policyScopeMismatchFailsClosed() {
+        String definition = """
+                {
+                  "policyKey":"scope-miss",
+                  "version":"1.0.0",
+                  "scope":{"brandCodes":["OTHER_BRAND"],"businessTypes":["HOME_CHARGING_SURVEY_INSTALL"],"regionCodes":["370000"]},
+                  "hardFilters":[
+                    {"filterKey":"ENABLED","order":1,
+                     "expression":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.brandCode == \\"BYD_OCEAN\\""},
+                     "failureCode":"DISABLED"}
+                  ],
+                  "scoring":[],
+                  "capacity":{"reservationRequired":false},
+                  "fallback":{"onNoCandidate":"MANUAL_INTERVENTION","manualRole":"OPS","resolutionHours":2}
+                }
+                """;
+        var runtime = runtimeWith(definition);
+        DispatchResolution resolution = runtime.resolve(new DispatchResolveCommand(
+                "tenant-a", UUID.randomUUID(), "a".repeat(64), "scope-miss",
+                context(), List.of(candidate("net-x", true, false, true, 5, 1.0, 1.0))));
+        assertThat(resolution.rankedCandidates()).isEmpty();
+        assertThat(resolution.requiresManualIntervention()).isTrue();
+        assertThat(resolution.rejectedCandidates())
+                .extracting(DispatchResolution.RejectedCandidate::failureCode)
+                .containsOnly("POLICY_SCOPE_MISMATCH");
+    }
+
+    @Test
+    void regionScopeMatchesCityOrDistrictCodes() {
+        String definition = """
+                {
+                  "policyKey":"region-city",
+                  "version":"1.0.0",
+                  "scope":{"brandCodes":["BYD_OCEAN"],"businessTypes":["HOME_CHARGING_SURVEY_INSTALL"],"regionCodes":["370000"]},
+                  "hardFilters":[
+                    {"filterKey":"REGION_SCOPE","order":1,
+                     "expression":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.brandCode == \\"BYD_OCEAN\\""},
+                     "failureCode":"REGION_MISMATCH"}
+                  ],
+                  "scoring":[{"factorKey":"REMAINING_CAPACITY","weight":1.0,
+                     "expression":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.brandCode == \\"BYD_OCEAN\\""}}],
+                  "capacity":{"reservationRequired":false},
+                  "fallback":{"onNoCandidate":"MANUAL_INTERVENTION","manualRole":"OPS","resolutionHours":2}
+                }
+                """;
+        var runtime = runtimeWith(definition);
+        DispatchCandidate cityMatch = new DispatchCandidate(
+                "net-city", true, false, true,
+                Set.of("BYD_OCEAN"), Set.of("370100"), Set.of("HOME_CHARGING_SURVEY_INSTALL"),
+                4, 0.0, 0.0, 0.0, 0.0);
+        DispatchCandidate miss = new DispatchCandidate(
+                "net-miss", true, false, true,
+                Set.of("BYD_OCEAN"), Set.of("110000"), Set.of("HOME_CHARGING_SURVEY_INSTALL"),
+                9, 0.0, 0.0, 0.0, 0.0);
+        DispatchResolution resolution = runtime.resolve(new DispatchResolveCommand(
+                "tenant-a", UUID.randomUUID(), "a".repeat(64), "region-city",
+                context(), List.of(cityMatch, miss)));
+        assertThat(resolution.rankedCandidates()).extracting(DispatchResolution.RankedCandidate::candidateId)
+                .containsExactly("net-city");
+        assertThat(resolution.rejectedCandidates()).extracting(DispatchResolution.RejectedCandidate::candidateId)
+                .contains("net-miss");
+    }
+
+    @Test
     void failsClosedWhenPolicyMissing() {
         var runtime = runtimeWith("""
                 {"policyKey":"exists","version":"1.0.0",

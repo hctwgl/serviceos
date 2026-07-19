@@ -30,7 +30,8 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * M324/M332：冻结 DISPATCH 在 task.created 后自动激活 NETWORK，再激活 TECHNICIAN。
+ * M324/M332/M337：冻结 DISPATCH 在 task.created 后自动激活 NETWORK（含 ServiceCoverage），
+ * 再激活 TECHNICIAN。
  */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = ServiceOsApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE)
@@ -78,7 +79,7 @@ class DispatchPolicyServiceAssignmentPostgresIT {
                     cfg_configuration_bundle_item, cfg_configuration_bundle, cfg_configuration_asset_version,
                     prj_project_network, prj_project, aud_audit_record,
                     net_network_technician_membership, net_technician_profile,
-                    net_service_network, net_partner_organization CASCADE
+                    net_service_network_coverage, net_service_network, net_partner_organization CASCADE
                 """).update();
         projectId = UUID.randomUUID();
         jdbc.sql("""
@@ -175,6 +176,42 @@ class DispatchPolicyServiceAssignmentPostgresIT {
                 """).query(Long.class).single()).isGreaterThanOrEqualTo(1);
     }
 
+    @Test
+    void missingCoverageFailsClosedWithoutNetworkAssignment() {
+        jdbc.sql("DELETE FROM net_service_network_coverage").update();
+        workOrders.receive(receiveCommand(
+                "M337-ORD-NOCOV", "d".repeat(64), "VINM3370001", "corr-m337-nocov", "cause-m337-nocov"));
+        drainOutbox(50);
+
+        assertThat(jdbc.sql("SELECT count(*) FROM dsp_service_assignment")
+                .query(Long.class).single()).isZero();
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM aud_audit_record
+                 WHERE action_name = 'SERVICE_DISPATCH_POLICY_MANUAL'
+                """).query(Long.class).single()).isGreaterThanOrEqualTo(1);
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM rel_inbox_record
+                 WHERE consumer_name = 'task.dispatch-policy.created.v1'
+                   AND status = 'SUCCEEDED'
+                """).query(Long.class).single()).isGreaterThanOrEqualTo(1);
+    }
+
+    @Test
+    void coveragePreferMatchingCityOverHigherCapacityOutOfRegion() {
+        jdbc.sql("DELETE FROM net_service_network_coverage").update();
+        // STRONG only covers another province; WEAK covers work-order city.
+        seedCoverage(NETWORK_STRONG, "110000");
+        seedCoverage(NETWORK_WEAK, "370100");
+        workOrders.receive(receiveCommand(
+                "M337-ORD-SCOPE", "e".repeat(64), "VINM3370002", "corr-m337-scope", "cause-m337-scope"));
+        drainOutbox(50);
+
+        assertThat(jdbc.sql("""
+                SELECT assignee_id FROM dsp_service_assignment
+                 WHERE responsibility_level = 'NETWORK' AND status = 'ACTIVE'
+                """).query(String.class).single()).isEqualTo(NETWORK_WEAK.toString());
+    }
+
     private ReceiveExternalWorkOrderCommand receiveCommand(
             String externalOrderCode,
             String payloadDigest,
@@ -216,7 +253,10 @@ class DispatchPolicyServiceAssignmentPostgresIT {
                     "failureCode":"NO_CAPACITY"},
                    {"filterKey":"BRAND_SCOPE","order":3,
                     "expression":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.brandCode == \\"BYD_OCEAN\\""},
-                    "failureCode":"BRAND_MISMATCH"}],
+                    "failureCode":"BRAND_MISMATCH"},
+                   {"filterKey":"REGION_SCOPE","order":4,
+                    "expression":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.brandCode == \\"BYD_OCEAN\\""},
+                    "failureCode":"REGION_MISMATCH"}],
                  "scoring":[{"factorKey":"REMAINING_CAPACITY","weight":1.0,
                     "expression":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.brandCode == \\"BYD_OCEAN\\""}}],
                  "capacity":{"reservationRequired":true},
@@ -274,6 +314,26 @@ class DispatchPolicyServiceAssignmentPostgresIT {
         }
         seedCapacity("NETWORK", NETWORK_STRONG.toString(), 10, 1);
         seedCapacity("NETWORK", NETWORK_WEAK.toString(), 3, 1);
+        // M337：默认覆盖工单城市，使既有 NETWORK 自动指派回归保持绿色。
+        seedCoverage(NETWORK_STRONG, "370100");
+        seedCoverage(NETWORK_WEAK, "370100");
+    }
+
+    private void seedCoverage(UUID networkId, String regionCode) {
+        jdbc.sql("""
+                INSERT INTO net_service_network_coverage (
+                    coverage_id, tenant_id, service_network_id, brand_code, business_type,
+                    region_code, coverage_status, valid_from, valid_to, created_at
+                ) VALUES (
+                    :id, :tenant, :network, 'BYD_OCEAN', 'HOME_CHARGING_SURVEY_INSTALL',
+                    :region, 'ACTIVE', now() - interval '1 day', NULL, now()
+                )
+                """)
+                .param("id", UUID.randomUUID())
+                .param("tenant", TENANT)
+                .param("network", networkId)
+                .param("region", regionCode)
+                .update();
     }
 
     private void seedTechnician(UUID profileId, UUID principalId, UUID networkId, String name) {

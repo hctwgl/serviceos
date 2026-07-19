@@ -12,6 +12,8 @@ import com.serviceos.dispatch.api.ActivateTechnicianFromFrozenDispatchCommand;
 import com.serviceos.dispatch.api.ServiceAssignmentService;
 import com.serviceos.network.api.NetworkPortalTechnicianQuery;
 import com.serviceos.network.api.NetworkPortalTechnicianView;
+import com.serviceos.network.api.ServiceNetworkCoverageQuery;
+import com.serviceos.network.api.ServiceNetworkCoverageView;
 import com.serviceos.network.api.ServiceNetworkDirectoryQuery;
 import com.serviceos.project.api.ProjectNetworkDirectoryQuery;
 import com.serviceos.reliability.api.InboxDecision;
@@ -29,17 +31,20 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 /**
- * M324/M332：task.created → 冻结 DISPATCH → ACTIVE NETWORK，再 → ACTIVE TECHNICIAN。
+ * M324/M332/M337：task.created → 冻结 DISPATCH → ACTIVE NETWORK，再 → ACTIVE TECHNICIAN。
  *
- * <p>无 dispatchPolicyRef：N/A 完成 Inbox。NETWORK 无存活候选或 requiresManualIntervention：
- * 失败关闭不写派单，审计 MANUAL，不进入师傅阶段。NETWORK 成功后解析网点内师傅；
- * 空池/无容量审计 TECHNICIAN MANUAL，保留 NETWORK。非空候选取 rank=1 激活 TECHNICIAN。
- * PARTIAL：候选 brand/region/business 使用 {@code *} 通配；复用同一 {@code dispatchPolicyRef}。</p>
+ * <p>无 dispatchPolicyRef：N/A 完成 Inbox。NETWORK 候选来自项目网点 ∩ ACTIVE 网点 ∩
+ * ACTIVE ServiceCoverage（品牌/业务/省市区精确匹配）∩ 容量；无覆盖失败关闭 MANUAL。
+ * NETWORK 成功后解析网点内师傅；空池/无容量审计 TECHNICIAN MANUAL，保留 NETWORK。
+ * TECHNICIAN 阶段仍用 {@code *} 通配候选（师傅覆盖未建模）。</p>
  */
 @Service
 final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicyEventConsumer {
@@ -50,6 +55,7 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
     private final WorkOrderExpressionContextQuery workOrderContexts;
     private final ProjectNetworkDirectoryQuery projectNetworks;
     private final ServiceNetworkDirectoryQuery serviceNetworks;
+    private final ServiceNetworkCoverageQuery coverages;
     private final NetworkPortalTechnicianQuery technicians;
     private final DispatchRuntime dispatchRuntime;
     private final ServiceAssignmentService assignments;
@@ -63,6 +69,7 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
             WorkOrderExpressionContextQuery workOrderContexts,
             ProjectNetworkDirectoryQuery projectNetworks,
             ServiceNetworkDirectoryQuery serviceNetworks,
+            ServiceNetworkCoverageQuery coverages,
             NetworkPortalTechnicianQuery technicians,
             DispatchRuntime dispatchRuntime,
             ServiceAssignmentService assignments,
@@ -75,6 +82,7 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
         this.workOrderContexts = workOrderContexts;
         this.projectNetworks = projectNetworks;
         this.serviceNetworks = serviceNetworks;
+        this.coverages = coverages;
         this.technicians = technicians;
         this.dispatchRuntime = dispatchRuntime;
         this.assignments = assignments;
@@ -171,14 +179,41 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
                 message.tenantId(), task.projectId(), asOf);
         List<String> activeNetworkIds = serviceNetworks.listActiveNetworkIds(
                 message.tenantId(), projectNetworkIds);
+        List<ServiceNetworkCoverageView> coverageRows = coverages.listActiveCoverage(
+                message.tenantId(), activeNetworkIds, wo.brandCode(), wo.serviceProductCode(), asOf);
+        Map<String, Set<String>> regionsByNetwork = new LinkedHashMap<>();
+        // 省/市/区任一码命中即纳入候选；空值忽略，避免 Set.of(null) NPE 导致 Inbox 回滚。
+        Set<String> workOrderRegions = new LinkedHashSet<>();
+        if (wo.provinceCode() != null && !wo.provinceCode().isBlank()) {
+            workOrderRegions.add(wo.provinceCode().trim());
+        }
+        if (wo.cityCode() != null && !wo.cityCode().isBlank()) {
+            workOrderRegions.add(wo.cityCode().trim());
+        }
+        if (wo.districtCode() != null && !wo.districtCode().isBlank()) {
+            workOrderRegions.add(wo.districtCode().trim());
+        }
+        for (ServiceNetworkCoverageView row : coverageRows) {
+            if (row.regionCode() == null || !workOrderRegions.contains(row.regionCode())) {
+                continue;
+            }
+            String networkId = row.serviceNetworkId().toString();
+            regionsByNetwork.computeIfAbsent(networkId, ignored -> new LinkedHashSet<>())
+                    .add(row.regionCode());
+        }
         List<DispatchCandidate> candidates = new ArrayList<>();
-        for (String networkId : activeNetworkIds) {
+        for (Map.Entry<String, Set<String>> entry : regionsByNetwork.entrySet()) {
             CapacitySnapshot capacity = capacitySnapshot(
-                    message.tenantId(), "NETWORK", networkId, wo.serviceProductCode());
+                    message.tenantId(), "NETWORK", entry.getKey(), wo.serviceProductCode());
             if (capacity == null) {
                 continue;
             }
-            candidates.add(wildcardCandidate(networkId, capacity.remaining()));
+            candidates.add(coverageCandidate(
+                    entry.getKey(),
+                    wo.brandCode(),
+                    wo.serviceProductCode(),
+                    entry.getValue(),
+                    capacity.remaining()));
         }
 
         DispatchResolution resolution = dispatchRuntime.resolve(new DispatchResolveCommand(
@@ -378,6 +413,28 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
                         rs.getInt("maxUnits") - rs.getInt("occupiedUnits")))
                 .optional()
                 .orElse(null);
+    }
+
+    private static DispatchCandidate coverageCandidate(
+            String candidateId,
+            String brandCode,
+            String businessType,
+            Set<String> regionCodes,
+            int remaining
+    ) {
+        return new DispatchCandidate(
+                candidateId,
+                true,
+                false,
+                true,
+                Set.of(brandCode),
+                Set.copyOf(regionCodes),
+                Set.of(businessType),
+                remaining,
+                0.0,
+                0.0,
+                0.0,
+                0.0);
     }
 
     private static DispatchCandidate wildcardCandidate(String candidateId, int remaining) {

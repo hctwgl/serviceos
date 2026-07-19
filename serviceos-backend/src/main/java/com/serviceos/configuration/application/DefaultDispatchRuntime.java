@@ -28,8 +28,9 @@ import java.util.Set;
  * 冻结 Bundle DISPATCH 执行器。
  *
  * <p>硬过滤：order 升序；结构化 filterKey 对候选求值，CUSTOM 仅用工单上下文表达式。
- * 评分：结构化 factorKey × weight 求和；同分按 candidateId 字典序。
- * 无候选：按 fallback.onNoCandidate 降级并标记人工接管。</p>
+ * M337：先校验 policy.scope（brand/business/region）与工单是否相交，再求值 REGION_SCOPE
+ * （候选 regionCodes 命中省/市/区任一码）。评分：结构化 factorKey × weight 求和；
+ * 同分按 candidateId 字典序。无候选：按 fallback.onNoCandidate 降级并标记人工接管。</p>
  */
 @Service
 public class DefaultDispatchRuntime implements DispatchRuntime {
@@ -70,6 +71,15 @@ public class DefaultDispatchRuntime implements DispatchRuntime {
 
         List<String> explanations = new ArrayList<>();
         ExpressionContext woContext = command.expressionContext();
+
+        if (!policyScopeMatches(policy, woContext)) {
+            List<DispatchResolution.RejectedCandidate> rejected = command.candidates().stream()
+                    .map(c -> new DispatchResolution.RejectedCandidate(
+                            c.candidateId(), "POLICY_SCOPE_MISMATCH", "SCOPE"))
+                    .toList();
+            return emptyWithFallback(policy, asset, rejected, explanations, true,
+                    "policy scope mismatch for work order brand/business/region");
+        }
 
         // 工单级 CUSTOM 硬过滤：任一失败则全体拒绝。
         for (FilterDefinition filter : policy.hardFilters()) {
@@ -205,14 +215,12 @@ public class DefaultDispatchRuntime implements DispatchRuntime {
     ) {
         String brand = context.workOrder().brandCode();
         String product = context.workOrder().serviceProductCode();
-        String province = context.region().provinceCode();
         return switch (filterKey) {
             case "BLACKLIST" -> !candidate.blacklisted();
             case "ENABLED" -> candidate.enabled();
             case "BRAND_SCOPE" -> candidate.brandCodes().contains(brand)
                     || candidate.brandCodes().contains("*");
-            case "REGION_SCOPE" -> candidate.regionCodes().contains(province)
-                    || candidate.regionCodes().contains("*");
+            case "REGION_SCOPE" -> regionMatches(candidate.regionCodes(), context.region());
             case "BUSINESS_CAPABILITY" -> candidate.businessTypes().contains(product)
                     || candidate.businessTypes().contains("*");
             case "QUALIFICATION" -> candidate.qualified();
@@ -220,6 +228,28 @@ public class DefaultDispatchRuntime implements DispatchRuntime {
             default -> throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
                     "Unsupported DISPATCH hardFilter key for structured eval: " + filterKey);
         };
+    }
+
+    private static boolean policyScopeMatches(PolicyDefinition policy, ExpressionContext context) {
+        String brand = context.workOrder().brandCode();
+        String product = context.workOrder().serviceProductCode();
+        if (!policy.scopeBrandCodes().contains(brand) && !policy.scopeBrandCodes().contains("*")) {
+            return false;
+        }
+        if (!policy.scopeBusinessTypes().contains(product)
+                && !policy.scopeBusinessTypes().contains("*")) {
+            return false;
+        }
+        return regionMatches(policy.scopeRegionCodes(), context.region());
+    }
+
+    private static boolean regionMatches(Set<String> allowed, ExpressionContext.RegionContext region) {
+        if (allowed.contains("*")) {
+            return true;
+        }
+        return allowed.contains(region.provinceCode())
+                || allowed.contains(region.cityCode())
+                || allowed.contains(region.districtCode());
     }
 
     private static double structuredFactorValue(String factorKey, DispatchCandidate candidate) {
@@ -295,8 +325,12 @@ public class DefaultDispatchRuntime implements DispatchRuntime {
                     capacityReservationRequired = bool;
                 }
             }
+            Map<String, Object> scope = asObject(root.get("scope"), "scope");
             return new PolicyDefinition(
                     policyKey,
+                    stringSet(scope.get("brandCodes"), "scope.brandCodes"),
+                    stringSet(scope.get("businessTypes"), "scope.businessTypes"),
+                    stringSet(scope.get("regionCodes"), "scope.regionCodes"),
                     filters,
                     scoring,
                     capacityReservationRequired,
@@ -309,6 +343,18 @@ public class DefaultDispatchRuntime implements DispatchRuntime {
             throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
                     "DISPATCH definitionJson is invalid: " + exception.getMessage());
         }
+    }
+
+    private static Set<String> stringSet(Object value, String field) {
+        if (!(value instanceof List<?> list) || list.isEmpty()) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                    field + " must be a non-empty array");
+        }
+        java.util.LinkedHashSet<String> result = new java.util.LinkedHashSet<>();
+        for (Object item : list) {
+            result.add(text(item, field));
+        }
+        return Set.copyOf(result);
     }
 
     @SuppressWarnings("unchecked")
@@ -342,6 +388,9 @@ public class DefaultDispatchRuntime implements DispatchRuntime {
 
     private record PolicyDefinition(
             String policyKey,
+            Set<String> scopeBrandCodes,
+            Set<String> scopeBusinessTypes,
+            Set<String> scopeRegionCodes,
             List<FilterDefinition> hardFilters,
             List<ScoreFactor> scoring,
             boolean capacityReservationRequired,
