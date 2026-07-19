@@ -8,7 +8,7 @@ lastUpdated: 2026-07-19
 ## 当前
 
 - PR #148～#173：M321～M346 Draft stacked
-- 本分支：`cursor/m347-integration-mapping-dsl-ui-88d5` — **M347** Admin INTEGRATION Mapping DSL UI（Draft，base=#173）
+- PR #174：https://github.com/hctwgl/serviceos/pull/174 — **M347** Admin INTEGRATION Mapping DSL UI（Draft，base=#173）
 - latestMilestone：**M347**
 - Flyway：**127**；OpenAPI：**1.0.43**
 - `baselineCommit`：功能提交后回填
@@ -20,10 +20,10 @@ lastUpdated: 2026-07-19
 | #171 | M344 EVIDENCE FORM fieldKey 发现 |
 | #172 | M345 一元取反 `!` |
 | #173 | M346 qualityChecks 可视编辑 |
-| （本 PR） | M347 INTEGRATION Mapping DSL UI |
+|  #174 | M347 INTEGRATION Mapping DSL UI |
 
 低代码 ConditionBuilder / FORM / EVIDENCE 深化主线（M340～M346）已收口；Admin Mapping DSL UI（M347）已交付。
-栈尖：`#148 → … → #173 → M347`。
+栈尖：`#148 → … → #173 → #174`。
 
 ## 下一（可无阻塞推进）
 

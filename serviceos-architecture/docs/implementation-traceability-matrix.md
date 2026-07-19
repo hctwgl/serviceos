@@ -441,4 +441,4 @@ Feature gate/authority: if applicable
 | M344 | EVIDENCE 同 stage FORM fieldKey 发现 → formValues 积木 | extractFormFieldKeys + DesignerPage + StructuredAssetEditor + Node 冒烟 + Admin build + 357-m344-* + 341-m344-* + PR #171 | qualityChecks UI、Bundle 运行时解析 |
 | M345 | 一元取反 `!` 条件积木 round-trip + UI | ConditionNot + parseNot + ConditionGroupBlock + Node 冒烟 + Admin build + 358-m345-* + 342-m345-* + PR #172 | De Morgan 规范化、Technician 执行器 |
 | M346 | EVIDENCE qualityChecks 可视编辑（checkType/severity） | StructuredAssetEditor qualityChecks UI + Admin build + 359-m346-* + 343-m346-* + PR #173 | parameters/expression、OCR/CV 运行时 |
-| M347 | Admin INTEGRATION Mapping DSL 可视编辑：messageType + constantValue/defaultValue/enumMap/condition | PolicyAssetEditor INTEGRATION DSL UI + Admin build + 360-m347-* + 344-m347-* | DISPATCH scope/fallback/allocationRatio 编辑器、Technician 条件执行器、吉利联调 |
+| M347 | Admin INTEGRATION Mapping DSL 可视编辑：messageType + constantValue/defaultValue/enumMap/condition | PolicyAssetEditor INTEGRATION DSL UI + Admin build + 360-m347-* + 344-m347-* + PR #174 | DISPATCH scope/fallback/allocationRatio 编辑器、Technician 条件执行器、吉利联调 |
