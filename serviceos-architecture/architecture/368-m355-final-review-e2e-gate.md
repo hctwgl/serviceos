@@ -24,7 +24,8 @@ flywayVersion: "130"
 | 终审查询与脱敏 | `WorkOrderWorkspacePostgresIT` / SecurityTest / MaskedContactTest |
 | 契约与 Client | OpenAPI 1.0.49；`bash scripts/agent-verify.sh client-ts`（decide 破坏性演进已记录） |
 | Admin | `npm run build` / `npm run test:unit` / FinalReviewWorkspace |
-| 冒烟 | `serviceos-deploy/admin-pilot/verify-admin-smoke.sh`（环境可用时） |
+| Playwright（Mock API） | `npx playwright test tests/e2e/final-review-workspace.spec.ts`：三栏加载、主操作禁用/驳回整改、只读无权限；截图 `tests/e2e/__screenshots__/final-review-*.png` |
+| 冒烟 | `serviceos-deploy/admin-pilot/verify-admin-smoke.sh`（需 compose+Keycloak；本环境未完整实跑） |
 
 ## 明确未实现 / 限制
 
