@@ -38,7 +38,7 @@ INSERT INTO cfg_configuration_asset_version (
 DELETE FROM cfg_configuration_bundle_item
  WHERE tenant_id = 'tenant-local'
    AND bundle_id = '30000000-0000-4000-8000-000000000001'
-   AND asset_type IN ('WORKFLOW', 'FORM', 'EVIDENCE', 'SLA');
+   AND asset_type IN ('WORKFLOW', 'FORM', 'EVIDENCE', 'SLA', 'INTEGRATION');
 
 UPDATE cfg_configuration_asset_version
    SET definition = '{"workflowKey":"ADMIN_PILOT","semanticVersion":"1.0.0","startNodeId":"START","terminalNodeIds":["END"],"nodes":[{"nodeId":"START","nodeType":"START","name":"开始"},{"nodeId":"PILOT_FIELD_OPS","nodeType":"USER_TASK","name":"现场履约","stageCode":"PILOT_SURVEY","taskType":"PILOT_SURVEY","slaRef":"PILOT_RESPONSE","formRef":"admin.pilot-inbound-form"},{"nodeId":"END","nodeType":"END","name":"结束"}],"transitions":[{"transitionId":"t1","from":"START","to":"PILOT_FIELD_OPS"},{"transitionId":"t2","from":"PILOT_FIELD_OPS","to":"END"}]}',
@@ -78,6 +78,32 @@ SET definition = EXCLUDED.definition,
     asset_key = EXCLUDED.asset_key,
     published_at = now();
 
+
+-- M335/M355：ADMIN-PILOT Bundle 必须冻结 BYD_CPIM INBOUND/OUTBOUND INTEGRATION，
+-- 否则入站 CREATE_WORK_ORDER / 出站提审会失败关闭（INTEGRATION_MAPPING_FAILED）。
+INSERT INTO cfg_configuration_asset_version (
+    version_id, tenant_id, asset_type, asset_key, semantic_version, schema_version,
+    definition, content_digest, status, published_at
+) VALUES
+(
+    '20000000-0000-4000-8000-000000000008', 'tenant-local', 'INTEGRATION',
+    'admin-pilot-byd-create', '1.0.0', '1.0.0',
+    '{"mappingKey":"admin-pilot-byd-create","version":"1.0.0","connectorCode":"BYD_CPIM","direction":"INBOUND","messageType":"CREATE_WORK_ORDER","fieldMappings":[{"mappingId":"order","externalPath":"orderCode","internalPath":"externalOrderCode","required":true,"transform":"TRIM"},{"mappingId":"brand","internalPath":"brandCode","required":true,"constantValue":"BYD_OCEAN","transform":"NONE"},{"mappingId":"product","internalPath":"serviceProductCode","required":true,"constantValue":"HOME_CHARGING_SURVEY_INSTALL","transform":"NONE"},{"mappingId":"province","externalPath":"provinceCode","internalPath":"provinceCode","required":true,"transform":"NONE"},{"mappingId":"city","externalPath":"cityCode","internalPath":"cityCode","required":true,"transform":"NONE"},{"mappingId":"district","externalPath":"areaCode","internalPath":"districtCode","required":true,"transform":"NONE"},{"mappingId":"name","externalPath":"contactName","internalPath":"customerName","required":false,"transform":"TRIM"},{"mappingId":"mobile","externalPath":"contactMobile","internalPath":"customerMobile","required":true,"transform":"NONE"},{"mappingId":"address","externalPath":"contactAddress","internalPath":"serviceAddress","required":false,"transform":"TRIM"},{"mappingId":"vin","externalPath":"vin","internalPath":"vehicleVin","required":false,"transform":"UPPER"},{"mappingId":"dispatch","externalPath":"dispatchTime","internalPath":"dispatchedAt","required":false,"transform":"NONE"}]}',
+    '2604f037f7cdb5d47c18dcc13d7f88ded11c72bca355ff9cf1936145d4102ed6',
+    'PUBLISHED', now()
+),
+(
+    '20000000-0000-4000-8000-000000000009', 'tenant-local', 'INTEGRATION',
+    'admin-pilot-byd-submit', '1.0.0', '1.0.0',
+    '{"mappingKey":"admin-pilot-byd-submit","version":"1.0.0","connectorCode":"BYD_CPIM","direction":"OUTBOUND","fieldMappings":[{"mappingId":"operator","internalPath":"operator","externalPath":"operatePerson","required":true,"transform":"TRIM"},{"mappingId":"order","internalPath":"externalOrderCode","externalPath":"orderCode","required":true,"transform":"NONE"},{"mappingId":"commit","internalPath":"commitDate","externalPath":"commitDate","required":true,"transform":"NONE"}]}',
+    'c257c0099d12b014caae998adaa87903d2bae81e3625b3c9d8d39e2a09dedb6a',
+    'PUBLISHED', now()
+) ON CONFLICT (version_id) DO UPDATE
+SET definition = EXCLUDED.definition,
+    content_digest = EXCLUDED.content_digest,
+    asset_key = EXCLUDED.asset_key,
+    published_at = now();
+
 INSERT INTO cfg_configuration_bundle (
     bundle_id, tenant_id, project_id, bundle_code, bundle_version, brand_code,
     service_product_code, province_code, effective_from, manifest_digest, status, published_at
@@ -110,6 +136,16 @@ INSERT INTO cfg_configuration_bundle_item (
     'tenant-local', '30000000-0000-4000-8000-000000000001', 'EVIDENCE',
     '20000000-0000-4000-8000-000000000007',
     'ece3e8cdb6a96a9c0ed709173345ed9c75dc2b37da6e4ca37fbbe70a3440322c'
+),
+(
+    'tenant-local', '30000000-0000-4000-8000-000000000001', 'INTEGRATION',
+    '20000000-0000-4000-8000-000000000008',
+    '2604f037f7cdb5d47c18dcc13d7f88ded11c72bca355ff9cf1936145d4102ed6'
+),
+(
+    'tenant-local', '30000000-0000-4000-8000-000000000001', 'INTEGRATION',
+    '20000000-0000-4000-8000-000000000009',
+    'c257c0099d12b014caae998adaa87903d2bae81e3625b3c9d8d39e2a09dedb6a'
 ) ON CONFLICT DO NOTHING;
 
 ALTER TABLE cfg_configuration_bundle_item ENABLE TRIGGER trg_cfg_bundle_item_immutable;
