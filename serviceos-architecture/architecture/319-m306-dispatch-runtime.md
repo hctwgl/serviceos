@@ -22,7 +22,8 @@ relatedMilestones: [M24, M295, M305]
 
 ## 明确未实现
 
-- 自动创建 ServiceAssignment；比例分配闭环；实时容量权威写入；NOTIFICATION 运行时
+- 比例分配闭环；实时容量权威写入；NOTIFICATION 运行时
+- 自动创建 ServiceAssignment：已由 **M324** 在 `task.created` 路径交付（本切片仍只保证 Runtime）
 
 ## 验证
 

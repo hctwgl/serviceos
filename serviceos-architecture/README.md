@@ -674,15 +674,15 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M323 ASSIGNEE_POLICY 自动接入 TaskAssignment**（功能证据见
+当前工程基线为 **M324 DISPATCH 自动接入 ServiceAssignment**（功能证据见
 `implementation-status.md`；合入 `master` 后回填合并提交）。M320 合并基线为
 `32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147）。
 
 当前已具备多 OEM SPI、远端查询、UNKNOWN/批量重放、复杂流程、十大资产设计器、六类 Runtime，
-入站 Mapping 物化（M321）、出站 Mapping 提审 Payload（M322），以及 ASSIGNEE_POLICY → TaskAssignment
-CANDIDATE（M323）。
-下一主线继续 **Configuration-Driven Fulfillment Runtime**（DISPATCH/RULE/
-NOTIFICATION/PRICING 自动接入业务、UNKNOWN/Replay Admin 工作台）；
+入站 Mapping 物化（M321）、出站 Mapping 提审 Payload（M322）、ASSIGNEE_POLICY → TaskAssignment
+CANDIDATE（M323），以及 DISPATCH → ServiceAssignment ACTIVE NETWORK（M324）。
+下一主线继续 **Configuration-Driven Fulfillment Runtime**（RULE/NOTIFICATION/PRICING
+自动接入业务、UNKNOWN/Replay Admin 工作台）；
 真实吉利 Sandbox 与 Track F/G 仍为 `BLOCKED_EXTERNAL`，不阻塞本地主线。
 
 权威进度入口：
@@ -690,6 +690,8 @@ NOTIFICATION/PRICING 自动接入业务、UNKNOWN/Replay Admin 工作台）；
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M324 实现文档](architecture/337-m324-dispatch-policy-service-assignment.md)
+- [M324 验收矩阵](testing/321-m324-dispatch-policy-service-assignment-acceptance.md)
 - [M323 实现文档](architecture/336-m323-assignee-policy-task-assignment.md)
 - [M323 验收矩阵](testing/320-m323-assignee-policy-task-assignment-acceptance.md)
 - [M322 实现文档](architecture/335-m322-outbound-integration-mapping.md)
