@@ -290,7 +290,7 @@ onMounted(() => {
         :key="item.exceptionId"
         :to="{ name: 'ADMIN.EXCEPTION.DETAIL', params: { id: item.exceptionId } }"
       >
-        打开异常
+        打开异常 {{ item.exceptionId }}
       </RouterLink>
     </p>
     <p v-if="page?.items?.some((i) => i.workOrderId)" class="links">
@@ -317,21 +317,21 @@ onMounted(() => {
         :key="`project-${item.exceptionId}`"
         :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: item.projectId! } }"
       >
-        打开项目
+        打开项目 {{ item.projectId }}
       </RouterLink>
       <RouterLink
         v-for="item in page.items.filter((i) => i.taskId)"
         :key="`task-${item.exceptionId}`"
         :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: item.taskId! } }"
       >
-        打开任务
+        打开任务 {{ item.taskId }}
       </RouterLink>
       <RouterLink
         v-for="item in page.items.filter((i) => i.handlingTaskId)"
         :key="`handling-${item.exceptionId}`"
         :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: item.handlingTaskId! } }"
       >
-        打开人工接管任务
+        打开人工接管任务 {{ item.handlingTaskId }}
       </RouterLink>
     </p>
   </section>
