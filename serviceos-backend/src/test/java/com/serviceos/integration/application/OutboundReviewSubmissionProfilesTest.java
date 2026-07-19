@@ -32,4 +32,23 @@ class OutboundReviewSubmissionProfilesTest {
                 .extracting(ex -> ((BusinessProblem) ex).code())
                 .isEqualTo(ProblemCode.RESOURCE_NOT_FOUND);
     }
+
+    @Test
+    void resolvesUniqueProfileByCallbackMappingVersion() {
+        var byd = new BydOutboundReviewSubmissionProfile(JsonMapper.builder().build());
+        var registry = new OutboundReviewSubmissionProfiles(List.of(byd));
+        assertThat(registry.requireByCallbackMappingVersion("byd-ocean-shandong-review-callback-v1"))
+                .isSameAs(byd);
+        assertThatThrownBy(() -> registry.requireByCallbackMappingVersion("unknown-mapping"))
+                .isInstanceOf(BusinessProblem.class)
+                .extracting(ex -> ((BusinessProblem) ex).code())
+                .isEqualTo(ProblemCode.RESOURCE_NOT_FOUND);
+    }
+
+    @Test
+    void routeRegistrationFallsBackToSoleProfileWhenMappingUnknown() {
+        var byd = new BydOutboundReviewSubmissionProfile(JsonMapper.builder().build());
+        var registry = new OutboundReviewSubmissionProfiles(List.of(byd));
+        assertThat(registry.requireForRouteRegistration("MAP-TEST-ONLY")).isSameAs(byd);
+    }
 }
