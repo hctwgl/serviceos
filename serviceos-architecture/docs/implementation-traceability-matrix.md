@@ -399,3 +399,4 @@ Feature gate/authority: if applicable
 | M302 | 入站更新工单 SPI：UpdateExternalWorkOrder + V118 digest + BYD update-orders；事件 external-details-updated@v1；OpenAPI 1.0.40 | SPI + Pipeline + BYD HTTP IT + ContractValidation + `315-m302-*` + `299-m302-*` | 远端查询、INTEGRATION Mapping 运行时 |
 | M303 | INTEGRATION Mapping 运行时：冻结 Bundle 加载 + 白名单 Transform + 解释；无 Flyway；OpenAPI 仍 1.0.40 | IntegrationMappingRuntime + unit/IT + `316-m303-*` + `300-m303-*` | 出站 Mapping、接入建单主路径、其他资产运行时 |
 | M304 | 建单主路径冻结 INTEGRATION Mapping 闸门；零 Mapping 兼容；审计 APPLIED | Create pipeline + BYD IT + `317-m304-*` + `301-m304-*` | 替代 OEM Mapper、出站 Mapping、ASSIGNEE 运行时 |
+| M305 | ASSIGNEE_POLICY 运行时：冻结 Bundle + when 求值 + 候选/Fallback 解释；不写 TaskAssignment | AssigneePolicyRuntime + unit/IT + `318-m305-*` + `302-m305-*` | 组织/网点实时成员解析、自动 assignCandidates、DISPATCH 评分 |
