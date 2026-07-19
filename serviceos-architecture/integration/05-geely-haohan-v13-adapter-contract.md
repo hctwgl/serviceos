@@ -16,6 +16,8 @@ lastUpdated: 2026-07-19
 | 7.1 安装单创建通知 | `POST /api/v1/integrations/geely/haohan/v1.3/notify_create_order` | 解密 → Canonical → `InboundCreateWorkOrderPipeline` |
 | 7.18 用户信息更新 | `POST .../notify_update_order_info` | → `InboundUpdateWorkOrderPipeline`（M314） |
 | 7.17 安装单关闭 | `POST .../notify_close_order` | → `InboundCancelWorkOrderPipeline`（M314） |
+| 提审出站（本地 stub） | `integration.geely.submit-settlement` | AES 包装 + LOCAL_ACCEPT 技术 ACK（M316） |
+| 7.13 核销审核回调 | `POST .../notify_settlement_audit_result` | → `InboundReviewCallbackItemPipeline`（M316） |
 | 映射版本 | `geely-haohan-v1.3-create-order-v1` | `installProcessNo` → externalOrderCode；省市区/联系人/地址/VIN |
 
 ## BLOCKED_EXTERNAL / TBD_EXTERNAL_CONTRACT

@@ -324,6 +324,7 @@ title: ServiceOS 里程碑索引
 | M313 | M313 FORM/EVIDENCE/SLA 可视配置器 | [326-m313-form-evidence-sla-visual-editors.md](../architecture/326-m313-form-evidence-sla-visual-editors.md) | [310-m313-form-evidence-sla-visual-editors-acceptance.md](../testing/310-m313-form-evidence-sla-visual-editors-acceptance.md) |
 | M314 | M314 吉利取消/更新本地入站 | [327-m314-geely-cancel-update-local-inbound.md](../architecture/327-m314-geely-cancel-update-local-inbound.md) | [311-m314-geely-cancel-update-local-inbound-acceptance.md](../testing/311-m314-geely-cancel-update-local-inbound-acceptance.md) |
 | M315 | M315 剩余策略资产结构化设计器 | [328-m315-remaining-policy-asset-designers.md](../architecture/328-m315-remaining-policy-asset-designers.md) | [312-m315-remaining-policy-asset-designers-acceptance.md](../testing/312-m315-remaining-policy-asset-designers-acceptance.md) |
+| M316 | M316 吉利提审出站 stub 与审核回调 | [329-m316-geely-outbound-and-review-callback.md](../architecture/329-m316-geely-outbound-and-review-callback.md) | [313-m316-geely-outbound-and-review-callback-acceptance.md](../testing/313-m316-geely-outbound-and-review-callback-acceptance.md) |
 
 ## 未关联里程碑的文档
 
