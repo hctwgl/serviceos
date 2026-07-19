@@ -35,32 +35,67 @@ function setJoin(join: JoinOp) {
   emitGroup({ ...props.group, join })
 }
 
+function replaceChild(index: number, node: ConditionNode) {
+  const children = [...props.group.children]
+  children[index] = node
+  emitGroup({ ...props.group, children })
+}
+
+function unwrapAtom(node: ConditionNode): ConditionAtom | null {
+  if (node.kind === 'atom') return node
+  if (node.kind === 'not' && node.child.kind === 'atom') return node.child
+  return null
+}
+
+function isNegated(node: ConditionNode): boolean {
+  return node.kind === 'not'
+}
+
 function patchAtom(index: number, patch: Partial<ConditionAtom>) {
   const child = props.group.children[index]
-  if (!child || child.kind !== 'atom') return
-  const next: ConditionAtom = { ...child, ...patch }
+  if (!child) return
+  const atom = unwrapAtom(child)
+  if (!atom) return
+  const next: ConditionAtom = { ...atom, ...patch }
   if (patch.path != null && patch.valueKind == null) {
-    if (isFormValuesPath(patch.path) && !isFormValuesPath(child.path)) {
+    if (isFormValuesPath(patch.path) && !isFormValuesPath(atom.path)) {
       next.valueKind = 'boolean'
       if (next.value !== 'true' && next.value !== 'false') {
         next.value = 'true'
       }
-    } else if (!isFormValuesPath(patch.path) && isFormValuesPath(child.path)) {
+    } else if (!isFormValuesPath(patch.path) && isFormValuesPath(atom.path)) {
       next.valueKind = 'string'
       if (next.value === 'true' || next.value === 'false') {
         next.value = ''
       }
     }
   }
-  const children = [...props.group.children]
-  children[index] = next
-  emitGroup({ ...props.group, children })
+  replaceChild(index, child.kind === 'not' ? { kind: 'not', child: next } : next)
 }
 
-function replaceChild(index: number, node: ConditionNode) {
-  const children = [...props.group.children]
-  children[index] = node
-  emitGroup({ ...props.group, children })
+function toggleNot(index: number) {
+  const child = props.group.children[index]
+  if (!child) return
+  if (child.kind === 'not') {
+    replaceChild(index, child.child)
+  } else {
+    replaceChild(index, { kind: 'not', child })
+  }
+}
+
+function groupChild(node: ConditionNode): ConditionGroup | null {
+  if (node.kind === 'group') return node
+  if (node.kind === 'not' && node.child.kind === 'group') return node.child
+  return null
+}
+
+function onGroupChange(index: number, next: ConditionGroup) {
+  const child = props.group.children[index]
+  if (child?.kind === 'not') {
+    replaceChild(index, { kind: 'not', child: next })
+  } else {
+    replaceChild(index, next)
+  }
 }
 
 function addAtom() {
@@ -136,12 +171,22 @@ function pathKey(p: number[]): string {
       class="child"
     >
       <div
-        v-if="child.kind === 'atom'"
+        v-if="unwrapAtom(child)"
         class="atom-row"
         :data-testid="`condition-atom-${pathKey(childPath(index))}`"
+        :data-negated="isNegated(child) ? 'true' : 'false'"
       >
+        <label class="not-toggle">
+          <input
+            type="checkbox"
+            data-testid="condition-not"
+            :checked="isNegated(child)"
+            @change="toggleNot(index)"
+          />
+          !
+        </label>
         <select
-          :value="child.path"
+          :value="unwrapAtom(child)!.path"
           data-testid="condition-path"
           @change="
             patchAtom(index, {
@@ -150,12 +195,15 @@ function pathKey(p: number[]): string {
           "
         >
           <option v-for="p in pathOptions()" :key="p" :value="p">{{ p }}</option>
-          <option v-if="!pathOptions().includes(child.path)" :value="child.path">
-            {{ child.path }}
+          <option
+            v-if="!pathOptions().includes(unwrapAtom(child)!.path)"
+            :value="unwrapAtom(child)!.path"
+          >
+            {{ unwrapAtom(child)!.path }}
           </option>
         </select>
         <select
-          :value="child.op"
+          :value="unwrapAtom(child)!.op"
           data-testid="condition-op"
           @change="
             patchAtom(index, {
@@ -167,7 +215,7 @@ function pathKey(p: number[]): string {
           <option value="!=">!=</option>
         </select>
         <select
-          :value="valueKindOf(child)"
+          :value="valueKindOf(unwrapAtom(child)!)"
           data-testid="condition-value-kind"
           @change="
             patchAtom(index, {
@@ -186,8 +234,8 @@ function pathKey(p: number[]): string {
           <option value="number">数值</option>
         </select>
         <select
-          v-if="valueKindOf(child) === 'boolean'"
-          :value="child.value || 'true'"
+          v-if="valueKindOf(unwrapAtom(child)!) === 'boolean'"
+          :value="unwrapAtom(child)!.value || 'true'"
           data-testid="condition-value"
           @change="
             patchAtom(index, {
@@ -200,32 +248,44 @@ function pathKey(p: number[]): string {
         </select>
         <input
           v-else
-          :value="child.value"
+          :value="unwrapAtom(child)!.value"
           data-testid="condition-value"
-          :placeholder="valueKindOf(child) === 'number' ? '数值' : '字面量'"
+          :placeholder="valueKindOf(unwrapAtom(child)!) === 'number' ? '数值' : '字面量'"
           @input="
             patchAtom(index, {
               value: ($event.target as HTMLInputElement).value,
             })
           "
         />
-        <button
-          type="button"
-          data-testid="remove-atom"
-          @click="removeChild(index)"
-        >
-          删除
-        </button>
+        <button type="button" data-testid="remove-atom" @click="removeChild(index)">删除</button>
       </div>
-      <ConditionGroupBlock
-        v-else
-        :group="child"
-        :path="childPath(index)"
-        :form-field-keys="formFieldKeys"
-        removable
-        @change="replaceChild(index, $event)"
-        @remove="removeChild(index)"
-      />
+      <div v-else-if="groupChild(child)" class="nested-group">
+        <label v-if="isNegated(child)" class="not-toggle nested-not">
+          <input
+            type="checkbox"
+            data-testid="condition-not"
+            :checked="true"
+            @change="toggleNot(index)"
+          />
+          !（取反本组）
+        </label>
+        <button
+          v-else
+          type="button"
+          data-testid="negate-group"
+          @click="toggleNot(index)"
+        >
+          取反本组
+        </button>
+        <ConditionGroupBlock
+          :group="groupChild(child)!"
+          :path="childPath(index)"
+          :form-field-keys="formFieldKeys"
+          removable
+          @change="onGroupChange(index, $event)"
+          @remove="removeChild(index)"
+        />
+      </div>
     </div>
 
     <div class="actions">
@@ -257,15 +317,17 @@ function pathKey(p: number[]): string {
   gap: 0.35rem;
   align-items: center;
 }
-.child {
+.child,
+.nested-group {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
 }
-.join {
+.join,
+.not-toggle {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.25rem;
   font-size: 0.85rem;
 }
 .atom-row select,
@@ -275,5 +337,10 @@ function pathKey(p: number[]): string {
 }
 .atom-row input {
   min-width: 8rem;
+}
+.atom-row[data-negated='true'] {
+  outline: 1px dashed #0969da;
+  border-radius: 0.25rem;
+  padding: 0.2rem;
 }
 </style>

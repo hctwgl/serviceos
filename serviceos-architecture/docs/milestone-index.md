@@ -353,6 +353,7 @@ title: ServiceOS 里程碑索引
 | M342 | M342 嵌套条件组 round-trip | [355-m342-nested-condition-groups.md](../architecture/355-m342-nested-condition-groups.md) | [339-m342-nested-condition-groups-acceptance.md](../testing/339-m342-nested-condition-groups-acceptance.md) |
 | M343 | M343 REFERENCE_OEM SAMPLE Update/Cancel Mapping | [356-m343-reference-oem-update-cancel.md](../architecture/356-m343-reference-oem-update-cancel.md) | [340-m343-reference-oem-update-cancel-acceptance.md](../testing/340-m343-reference-oem-update-cancel-acceptance.md) |
 | M344 | M344 EVIDENCE 同 stage FORM fieldKey 发现 | [357-m344-evidence-form-fieldkey-discovery.md](../architecture/357-m344-evidence-form-fieldkey-discovery.md) | [341-m344-evidence-form-fieldkey-discovery-acceptance.md](../testing/341-m344-evidence-form-fieldkey-discovery-acceptance.md) |
+| M345 | M345 一元取反条件积木 | [358-m345-unary-not-condition.md](../architecture/358-m345-unary-not-condition.md) | [342-m345-unary-not-condition-acceptance.md](../testing/342-m345-unary-not-condition-acceptance.md) |
 
 ## 未关联里程碑的文档
 

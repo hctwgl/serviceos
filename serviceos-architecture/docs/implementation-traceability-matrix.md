@@ -438,4 +438,5 @@ Feature gate/authority: if applicable
 | M341 | EVIDENCE requiredWhen ConditionBuilder 嵌入 | StructuredAssetEditor EVIDENCE + ConditionBuilder + Node 冒烟 + Admin build + 354-m341-* + 338-m341-* + PR #168 | 嵌套括号 round-trip 见 M342、Bundle FORM fieldKey 自动发现 |
 | M342 | 嵌套条件组 round-trip：递归解析 `( )/&&/||` + ConditionGroupBlock UI | serviceosExprV1Blocks ExprParser + ConditionGroupBlock + Node 冒烟 + Admin build + 355-m342-* + 339-m342-* + PR #169 | 一元 ! 积木、Technician 共用执行器 |
 | M343 | REFERENCE_OEM SAMPLE Update/Cancel Mapping：RouteHint + 强制 INBOUND Mapping | Update/Cancel Service/Controller + Security + ReferenceOemInboundUpdateCancelPostgresIT + 356-m343-* + 340-m343-* + PR #170 | 真实 OEM 合同、OpenAPI、吉利联调 |
-| M344 | EVIDENCE 同 stage FORM fieldKey 发现 → formValues 积木 | extractFormFieldKeys + DesignerPage + StructuredAssetEditor + Node 冒烟 + Admin build + 357-m344-* + 341-m344-* + PR #171 | 一元 !、qualityChecks UI、Bundle 运行时解析 |
+| M344 | EVIDENCE 同 stage FORM fieldKey 发现 → formValues 积木 | extractFormFieldKeys + DesignerPage + StructuredAssetEditor + Node 冒烟 + Admin build + 357-m344-* + 341-m344-* + PR #171 | qualityChecks UI、Bundle 运行时解析 |
+| M345 | 一元取反 `!` 条件积木 round-trip + UI | ConditionNot + parseNot + ConditionGroupBlock + Node 冒烟 + Admin build + 358-m345-* + 342-m345-* | De Morgan 规范化、Technician 执行器 |

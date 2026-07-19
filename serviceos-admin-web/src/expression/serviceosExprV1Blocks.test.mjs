@@ -65,6 +65,10 @@ function compileAtom(atom) {
 
 function compileCondition(node) {
   if (node.kind === 'atom') return compileAtom(node)
+  if (node.kind === 'not') {
+    const inner = compileCondition(node.child)
+    return node.child.kind === 'atom' ? `!${inner}` : `!(${inner})`
+  }
   if (!node.children.length) throw new Error('条件组不能为空')
   const parts = node.children.map((child) => {
     const compiled = compileCondition(child)
@@ -102,9 +106,15 @@ class ExprParser {
     return children.length === 1 ? children[0] : { kind: 'group', join: 'OR', children }
   }
   parseAnd() {
-    const children = [this.parsePrimary()]
-    while (this.match('&&')) children.push(this.parsePrimary())
+    const children = [this.parseNot()]
+    while (this.match('&&')) children.push(this.parseNot())
     return children.length === 1 ? children[0] : { kind: 'group', join: 'AND', children }
+  }
+  parseNot() {
+    this.skipWhitespace()
+    if (this.input.startsWith('!=', this.index)) return this.parsePrimary()
+    if (this.match('!')) return { kind: 'not', child: this.parseNot() }
+    return this.parsePrimary()
   }
   parsePrimary() {
     this.skipWhitespace()
@@ -222,8 +232,21 @@ const deepParsed = impl.tryParseCondition(deep)
 assert.ok(deepParsed)
 assert.equal(impl.compileCondition(deepParsed), deep)
 
-// 一元 ! 仍失败关闭到高级源码
-assert.equal(impl.tryParseCondition('!(workOrder.brandCode == "X")'), null)
+// M345: 一元 !
+const notAtom = '!workOrder.brandCode == "BYD_OCEAN"'
+const notParsed = impl.tryParseCondition(notAtom)
+assert.ok(notParsed)
+assert.equal(notParsed.children[0].kind, 'not')
+assert.equal(impl.compileCondition(notParsed), notAtom)
+
+const notGroup = '!(workOrder.brandCode == "BYD_OCEAN" && region.provinceCode == "110000")'
+const notGroupParsed = impl.tryParseCondition(notGroup)
+assert.ok(notGroupParsed)
+assert.equal(impl.compileCondition(notGroupParsed), notGroup)
+
+const mixedNot =
+  '!formValues["needs-photo"] == true || task.stageCode == "SURVEY"'
+assert.equal(impl.compileCondition(impl.tryParseCondition(mixedNot)), mixedNot)
 
 assert.throws(() =>
   impl.compileCondition({

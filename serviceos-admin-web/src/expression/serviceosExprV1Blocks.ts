@@ -1,6 +1,6 @@
 /**
  * SERVICEOS_EXPR_V1 条件积木：字段/运算符/值/AND-OR 组 → 合法表达式源码。
- * 路径白名单与后端 ServiceOsExprV1Evaluator 对齐；M340 formValues；M342 嵌套括号 round-trip。
+ * 路径白名单与后端 ServiceOsExprV1Evaluator 对齐；M340 formValues；M342 嵌套括号；M345 一元 !。
  */
 
 export const EXPR_PATHS = [
@@ -43,7 +43,13 @@ export interface ConditionGroup {
   children: ConditionNode[]
 }
 
-export type ConditionNode = ConditionAtom | ConditionGroup
+/** 一元取反；对齐后端 parseNot。 */
+export interface ConditionNot {
+  kind: 'not'
+  child: ConditionNode
+}
+
+export type ConditionNode = ConditionAtom | ConditionGroup | ConditionNot
 
 export function formValuesPath(fieldKey: string): string {
   if (!fieldKey || fieldKey.includes('"') || fieldKey.includes('\\')) {
@@ -104,6 +110,14 @@ function compileNode(node: ConditionNode): string {
   if (node.kind === 'atom') {
     return compileAtom(node)
   }
+  if (node.kind === 'not') {
+    const inner = compileNode(node.child)
+    // 原子比较可写成 !path == "v"（与后端 parseNot→parseComparison 一致）；组/嵌套取反需括号。
+    if (node.child.kind === 'atom') {
+      return `!${inner}`
+    }
+    return `!(${inner})`
+  }
   if (node.children.length === 0) {
     throw new Error('条件组不能为空')
   }
@@ -146,8 +160,8 @@ function compileLiteral(atom: ConditionAtom): string {
 }
 
 /**
- * 尽力解析比较、AND/OR 与嵌套括号组。
- * 不支持一元 !；无法解析时返回 null，调用方保留高级源码编辑。
+ * 尽力解析比较、AND/OR、嵌套括号与一元 !。
+ * 无法解析时返回 null，调用方保留高级源码编辑。
  */
 export function tryParseCondition(source: string): ConditionGroup | null {
   const trimmed = source.trim()
@@ -172,7 +186,7 @@ function asRootGroup(node: ConditionNode): ConditionGroup {
 }
 
 /**
- * 递归下降：or → and → primary；primary 为原子或括号组。
+ * 递归下降：or → and → not → primary；primary 为原子或括号组。
  * formValues["…"] 中的方括号不参与分组；字符串内括号忽略。
  */
 class ExprParser {
@@ -195,14 +209,26 @@ class ExprParser {
   }
 
   parseAnd(): ConditionNode {
-    const children: ConditionNode[] = [this.parsePrimary()]
+    const children: ConditionNode[] = [this.parseNot()]
     while (this.match('&&')) {
-      children.push(this.parsePrimary())
+      children.push(this.parseNot())
     }
     if (children.length === 1) {
       return children[0]
     }
     return { kind: 'group', join: 'AND', children }
+  }
+
+  parseNot(): ConditionNode {
+    this.skipWhitespace()
+    // 不得把比较运算符 != 的前缀 ! 当成一元取反
+    if (this.input.startsWith('!=', this.index)) {
+      return this.parsePrimary()
+    }
+    if (this.match('!')) {
+      return { kind: 'not', child: this.parseNot() }
+    }
+    return this.parsePrimary()
   }
 
   parsePrimary(): ConditionNode {
