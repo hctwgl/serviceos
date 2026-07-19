@@ -397,3 +397,4 @@ Feature gate/authority: if applicable
 | M300 | 入站取消工单 SPI：`CancelWorkOrderMappedInbound` + 管道 + BYD cancel-orders；WorkOrderExternalLookup；无 Core OpenAPI/Flyway 变更 | SPI + Pipeline + BYD HTTP IT + ArchitectureTest + `313-m300-*` + `297-m300-*` | Update/远端查询、REFERENCE 取消样本 |
 | M301 | ExternalReviewRoute connectorVersion 经 Profile 注册表解析；单 OEM mapping 回退；无 OpenAPI/Flyway | Profiles.requireForRouteRegistration + ReviewCase IT + `314-m301-*` + `298-m301-*` | Update/远端查询、INTEGRATION 运行时 |
 | M302 | 入站更新工单 SPI：UpdateExternalWorkOrder + V118 digest + BYD update-orders；事件 external-details-updated@v1；OpenAPI 1.0.40 | SPI + Pipeline + BYD HTTP IT + ContractValidation + `315-m302-*` + `299-m302-*` | 远端查询、INTEGRATION Mapping 运行时 |
+| M303 | INTEGRATION Mapping 运行时：冻结 Bundle 加载 + 白名单 Transform + 解释；无 Flyway；OpenAPI 仍 1.0.40 | IntegrationMappingRuntime + unit/IT + `316-m303-*` + `300-m303-*` | 出站 Mapping、接入建单主路径、其他资产运行时 |

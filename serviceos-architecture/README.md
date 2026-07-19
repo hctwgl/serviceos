@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M302 入站更新工单 SPI**（功能证据见 `implementation-status.md` 的
+当前工程基线为 **M303 INTEGRATION Mapping 运行时**（功能证据见 `implementation-status.md` 的
 `baselineCommit`；合入 `master` 后改为合并提交）。M296 及之前基线合并提交为
 `f3b623453a33ece91a691438b0c541e53c3282df`。
 
