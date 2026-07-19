@@ -23,7 +23,8 @@ relatedMilestones: [M24, M294, M307]
 
 ## 明确未实现
 
-- 自动驱动 ReviewCase 状态机；规则动作副作用写入；PRICING 运行时；条件积木 UI
+- 规则动作副作用写入；PRICING 运行时；条件积木 UI
+- 自动驱动 ReviewCase 状态机：已由 **M325** 在 INTERNAL decide 门禁交付（本切片仍只保证 Runtime）
 
 ## 验证
 

@@ -70,8 +70,8 @@ class SharedSavedViewPostgresIT {
                 TRUNCATE TABLE auth_delegation_capability, auth_delegation, auth_role_grant_event,
                     auth_tenant_grant_generation, auth_role_grant, auth_role_capability, auth_role CASCADE
                 """).update();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("122");
-        assertThat(flyway.info().applied()).hasSize(124);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("123");
+        assertThat(flyway.info().applied()).hasSize(125);
         assertThat(jdbc.sql(
                         "SELECT risk_level FROM auth_capability WHERE capability_code='preference.shareSavedView'")
                 .query(String.class).single()).isEqualTo("HIGH");

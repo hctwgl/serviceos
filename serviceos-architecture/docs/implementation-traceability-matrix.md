@@ -402,7 +402,7 @@ Feature gate/authority: if applicable
 | M305 | ASSIGNEE_POLICY 运行时：冻结 Bundle + when 求值 + 候选/Fallback 解释；不写 TaskAssignment | AssigneePolicyRuntime + unit/IT + `318-m305-*` + `302-m305-*` | 组织/网点实时成员解析、DISPATCH 评分；自动写入见 M323 |
 | M306 | DISPATCH 运行时：硬过滤/评分/并列/无候选 Fallback；确定性解释；不写 ServiceAssignment | DispatchRuntime + unit/IT + `319-m306-*` + `303-m306-*` | 比例分配闭环、NOTIFICATION 运行时；自动 ServiceAssignment 见 M324 |
 | M307 | NOTIFICATION 运行时：冻结触发器/when/收件人角色/通道 SPI/幂等/UNKNOWN 人工接管；LocalReference Adapter | NotificationRuntime + LocalReference + unit/IT + `320-m307-*` + `304-m307-*` | 真实短信/邮件 Adapter、模板引擎、Outbox 投递、RULE/PRICING 运行时 |
-| M308 | RULE 运行时：冻结规则 when 求值 + 严重级别聚合（BLOCK>REQUIRE_APPROVAL>WARN>default）；无领域副作用 | RuleRuntime + unit/IT + `321-m308-*` + `305-m308-*` | ReviewCase 自动驱动、PRICING 运行时 |
+| M308 | RULE 运行时：冻结规则 when 求值 + 严重级别聚合（BLOCK>REQUIRE_APPROVAL>WARN>default）；无领域副作用 | RuleRuntime + unit/IT + `321-m308-*` + `305-m308-*` | ReviewCase.decide 门禁见 M325、PRICING 运行时 |
 | M309 | PRICING 运行时：冻结价目 when 匹配 + amountMinor 合计；试算不落账 | PricingRuntime + unit/IT + `322-m309-*` + `306-m309-*` | 结算落账、对账、动态公式、P3 低代码增强 |
 | M310 | SERVICEOS_EXPR_V1 条件积木：字段/运算符/值/AND-OR → 白名单表达式；设计器与网关边接入 | ConditionBuilder + blocks TS + Admin build + Playwright + `323-m310-*` + `307-m310-*` | 嵌套括号 round-trip、FORM 字段积木、全资产属性面板 |
 | M311 | 吉利浩瀚本地入站：AES 解密 + 7.1 建单映射 + 通用管道；Sandbox/签名 BLOCKED_EXTERNAL | Geely adapter + AES/IT + `324-m311-*` + `308-m311-*` + `05-geely-*` | OpenAPI 签名、Sandbox 联调、7.2～7.22 |
@@ -419,3 +419,4 @@ Feature gate/authority: if applicable
 | M322 | 出站 INTEGRATION Mapping 生成提审 OEM Payload；零 Mapping 兼容 Profile；mappingVersionId=assetVersionId | IntegrationMappingRuntime OUTBOUND + DefaultOutboundDeliveryService + unit/IT + `335-m322-*` + `319-m322-*` | 删除 Profile 硬编码、默认值/枚举/条件 DSL、ASSIGNEE 自动分配 |
 | M323 | ASSIGNEE_POLICY 自动接入 TaskAssignment：冻结 assigneePolicyRef + task.created Inbox + RoleGrant 主体目录 → CANDIDATE；空池 MANUAL | RolePrincipalDirectoryQuery + TaskAssigneePolicy* + V121 + AssigneePolicyTaskAssignmentPostgresIT + 336-m323-* + 320-m323-* | ORGANIZATION/NETWORK 实时成员、auto-claim、DISPATCH |
 | M324 | DISPATCH 自动接入 ServiceAssignment：冻结 dispatchPolicyRef + task.created Inbox + 项目/网点目录 → ACTIVE NETWORK；空池/无容量 MANUAL | ProjectNetworkDirectoryQuery + ServiceNetworkDirectoryQuery + TaskDispatchPolicy* + V122 + DispatchPolicyServiceAssignmentPostgresIT + 337-m324-* + 321-m324-* | TECHNICIAN 自动指派、比例分配闭环、地图 scope、Admin 派单工作台、RULE |
+| M325 | RULE 接入 INTERNAL ReviewCase.decide：冻结 ruleRef + decide 前门禁；BLOCK/REQUIRE_APPROVAL 拒绝 APPROVED；REJECTED/forceApprove 不受阻 | ReviewRuleGate + ReviewRuleDenyAuditor + V123 + ReviewRuleGatePostgresIT + 338-m325-* + 322-m325-* | CLIENT/Evidence/Task RULE 门禁、NOTIFICATION/PRICING |
