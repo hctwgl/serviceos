@@ -13,7 +13,7 @@ lastUpdated: 2026-07-19
 - PR #151：https://github.com/hctwgl/serviceos/pull/151 — **M324** DISPATCH→ServiceAssignment（Draft，base=#150）
 - PR #152：https://github.com/hctwgl/serviceos/pull/152 — **M325** RULE→ReviewCase.decide（Draft，base=#151）
 - PR #153：https://github.com/hctwgl/serviceos/pull/153 — **M326** NOTIFICATION 可靠投递（Draft，base=#152）
-- **M327** PRICING CalculationSnapshot Draft PR pending（base=#153）
+- PR #154：https://github.com/hctwgl/serviceos/pull/154 — **M327** PRICING CalculationSnapshot（Draft，base=#153）
 - `master`：`32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147 已合并）
 - latestMilestone：**M327**
 - Flyway：**125**；OpenAPI：**1.0.43**
@@ -39,6 +39,8 @@ bash scripts/agent-verify.sh it PricingCalculationSnapshotPostgresIT
 bash scripts/agent-verify.sh test ArchitectureTest,DefaultPricingRuntimeTest
 ```
 
+均 PASS。未跑全量 verify-local.sh（切片级精准验证）。
+
 ## BLOCKED_EXTERNAL
 
 - 吉利 Sandbox/OpenAPI 签名/真实脱敏报文
@@ -57,4 +59,4 @@ bash scripts/agent-verify.sh test ArchitectureTest,DefaultPricingRuntimeTest
 2. Capability 门禁与失败关闭
 3. 不做：自动改状态、二级审批/MFA、PRICING 落账
 
-**合并顺序**：#148 → … → #153 → M327 Draft PR。
+**合并顺序**：#148 → … → #153 → #154。
