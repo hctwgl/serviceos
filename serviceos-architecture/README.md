@@ -674,17 +674,14 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M326 NOTIFICATION 可靠投递闭环**（功能证据见
+当前工程基线为 **M327 PRICING 履约事实与 CalculationSnapshot**（功能证据见
 `implementation-status.md`；合入 `master` 后回填合并提交）。M320 合并基线为
 `32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147）。
 
 当前已具备多 OEM SPI、远端查询、UNKNOWN/批量重放、复杂流程、十大资产设计器、六类 Runtime，
-入站 Mapping 物化（M321）、出站 Mapping 提审 Payload（M322）、ASSIGNEE_POLICY → TaskAssignment
-CANDIDATE（M323）、DISPATCH → ServiceAssignment ACTIVE NETWORK（M324）、RULE → INTERNAL
-ReviewCase.decide 门禁（M325），以及 NOTIFICATION 事件自动订阅与 Intent/Delivery/Attempt
-持久化（M326）。
-下一主线继续 **Configuration-Driven Fulfillment Runtime**（PRICING 自动接入、
-UNKNOWN/Replay Admin 工作台）；
+入站/出站 Mapping（M321/M322）、ASSIGNEE/DISPATCH/RULE 主链路接入（M323～M325）、
+NOTIFICATION 可靠投递（M326），以及 PRICING 履约事实与 SHADOW CalculationSnapshot（M327）。
+下一主线继续 **Configuration-Driven Fulfillment Runtime**（UNKNOWN/Replay Admin 工作台）；
 真实吉利 Sandbox 与 Track F/G 仍为 `BLOCKED_EXTERNAL`，不阻塞本地主线。
 
 权威进度入口：
@@ -692,6 +689,8 @@ UNKNOWN/Replay Admin 工作台）；
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M327 实现文档](architecture/340-m327-pricing-fulfillment-calculation-snapshot.md)
+- [M327 验收矩阵](testing/324-m327-pricing-fulfillment-calculation-snapshot-acceptance.md)
 - [M326 实现文档](architecture/339-m326-notification-reliable-delivery.md)
 - [M326 验收矩阵](testing/323-m326-notification-reliable-delivery-acceptance.md)
 - [M325 实现文档](architecture/338-m325-rule-review-decide-gate.md)

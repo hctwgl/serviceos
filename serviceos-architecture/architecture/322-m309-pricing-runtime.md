@@ -23,6 +23,7 @@ relatedMilestones: [M24, M295, M308]
 ## 明确未实现
 
 - 结算落账；对账；动态计价公式；税务；低代码条件积木增强
+- 履约事实提取与 CalculationSnapshot 持久化：见 **M327**
 
 ## 验证
 
