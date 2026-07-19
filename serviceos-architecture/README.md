@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M329 RULE CLIENT 外部回执门禁**（Draft PR 待回填；栈 `#148→…→#156`）
+当前工程基线为 **M329 RULE CLIENT 外部回执门禁**（https://github.com/hctwgl/serviceos/pull/156；栈 `#148→…→#156`）
 `implementation-status.md`；合入 `master` 后回填合并提交）。M320 合并基线为
 `32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147）。
 

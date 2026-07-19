@@ -8,7 +8,7 @@ lastUpdated: 2026-07-19
 ## 当前
 
 - PR #148～#155：M321～M328 Draft stacked（base 链至 master）
-- PR #156：待创建 — **M329** RULE CLIENT 外部回执门禁（Draft，base=#155 / `cursor/m328-admin-unknown-replay-workbench-88d5`）
+- PR #156：https://github.com/hctwgl/serviceos/pull/156 — **M329** RULE CLIENT 外部回执门禁（Draft，base=#155 / `cursor/m328-admin-unknown-replay-workbench-88d5`）
 - `master`：`32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147 已合并）
 - latestMilestone：**M329**
 - Flyway：**125**；OpenAPI：**1.0.43**（本切片无契约/迁移变更）
