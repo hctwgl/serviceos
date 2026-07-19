@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/work-order-external-details-updated-v1.schema.json",
+  "title": "WorkOrderExternalDetailsUpdatedV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId", "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"},
+    "eventType": {"const": "workorder.external-details-updated"},
+    "schemaVersion": {"const": 1},
+    "tenantId": {"type": "string"},
+    "correlationId": {"type": "string"},
+    "causationId": {"type": "string"},
+    "aggregateType": {"const": "WorkOrder"},
+    "aggregateId": {"type": "string", "format": "uuid"},
+    "aggregateVersion": {"type": "integer", "minimum": 1},
+    "occurredAt": {"type": "string", "format": "date-time"},
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workOrderId", "updateDigest", "provinceCode", "cityCode", "districtCode", "updatedAt"],
+      "properties": {
+        "workOrderId": {"type": "string", "format": "uuid"},
+        "updateDigest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "provinceCode": {"type": "string", "minLength": 1, "maxLength": 16},
+        "cityCode": {"type": "string", "minLength": 1, "maxLength": 16},
+        "districtCode": {"type": "string", "minLength": 1, "maxLength": 16},
+        "updatedAt": {"type": "string", "format": "date-time"}
+      }
+    }
+  }
+}

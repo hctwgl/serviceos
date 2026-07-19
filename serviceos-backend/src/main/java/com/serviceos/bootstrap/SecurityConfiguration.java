@@ -46,6 +46,7 @@ public class SecurityConfiguration {
                     // 车企回调使用各自协议签名认证，不使用 OIDC JWT；业务验签必须在适配器服务内完成。
                     authorize.requestMatchers("/api/v1/integrations/byd/cpim/v7.3.1/install-orders").permitAll();
                     authorize.requestMatchers("/api/v1/integrations/byd/cpim/v7.3.1/cancel-orders").permitAll();
+                    authorize.requestMatchers("/api/v1/integrations/byd/cpim/v7.3.1/update-orders").permitAll();
                     authorize.requestMatchers("/api/v1/integrations/byd/cpim/v7.3.1/review-results").permitAll();
                     // REFERENCE / SAMPLE 第二家车企演示端点；非生产协议（TBD_EXTERNAL_CONTRACT）。
                     authorize.requestMatchers("/api/v1/integrations/reference-oem/sample/v1/install-orders")

@@ -258,6 +258,13 @@ class ContractValidationTest {
     }
 
     @Test
+    void workOrderExternalDetailsUpdatedExampleMustMatchPublishedSchema() throws Exception {
+        assertValidEvent(
+                "/events/work-order-external-details-updated-v1.schema.json",
+                "/events/work-order-external-details-updated-v1.valid.json");
+    }
+
+    @Test
     void workOrderReopenedExampleMustMatchPublishedSchema() throws Exception {
         assertValidEvent(
                 "/events/work-order-reopened-v1.schema.json",
