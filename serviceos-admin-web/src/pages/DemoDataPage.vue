@@ -39,6 +39,30 @@ const accounts = [
   },
 ]
 
+/** 与 seed-demo-tasks.sql 一一对应；客户名形如「王先生·待网点接单」 */
+const scenarios = [
+  { code: '001', label: '待初审', hint: '工单 RECEIVED，无网点责任' },
+  { code: '002', label: '待分配网点', hint: '任务 READY，待平台派网点' },
+  { code: '003', label: '网点待接单', hint: '无 ACTIVE 网点责任，适合接单演练' },
+  { code: '004', label: '待指派师傅', hint: '已有网点责任，无师傅责任' },
+  { code: '005', label: '待联系客户', hint: '网点+张师傅已指派，任务 READY' },
+  { code: '006', label: '待预约', hint: '任务 CLAIMED' },
+  { code: '007', label: '待上门', hint: '任务 CLAIMED' },
+  { code: '008', label: '勘测中', hint: '任务 RUNNING' },
+  { code: '009', label: '待审核勘测资料', hint: '任务 COMPLETED（审核写链路仍走真实命令）' },
+  { code: '010', label: '待安装', hint: '安装阶段 READY' },
+  { code: '011', label: '安装中', hint: '安装阶段 RUNNING' },
+  { code: '012', label: '待提交完工资料', hint: '安装阶段 RUNNING' },
+  { code: '013', label: '待审核完工资料', hint: '任务 COMPLETED' },
+  { code: '014', label: '整改中', hint: 'CORRECTION 阶段 READY（无伪造整改单）' },
+  { code: '015', label: '已重新提交', hint: 'CORRECTION 阶段 COMPLETED' },
+  { code: '016', label: '已完成', hint: '工单 FULFILLED' },
+  { code: '017', label: '已取消', hint: '工单/任务 CANCELLED' },
+  { code: '018', label: 'SLA即将超时', hint: 'SLA RUNNING，截止约 30 分钟后' },
+  { code: '019', label: 'SLA已超时', hint: 'SLA BREACHED' },
+  { code: '020', label: '运营异常', hint: 'OPEN 运营异常投影' },
+]
+
 const commands = computed(() => [
   {
     title: '初始化演示数据',
@@ -138,9 +162,30 @@ function copy(text: string) {
       </section>
 
       <section class="panel">
-        <h2>演示工单编号约定</h2>
-        <p>业务编号形如 <code>WO-DEMO-20260719-001</code>，禁止要求用户用 UUID 查找。</p>
-        <p>兼容既有试点单：<code>ADMIN-PILOT-001</code>。</p>
+        <h2>演示工单编号与 20 态场景</h2>
+        <p>
+          业务编号形如 <code>WO-DEMO-20260719-001</code>；列表客户名带场景后缀（如「王先生·网点待接单」）。
+          兼容试点单：<code>ADMIN-PILOT-001</code>。
+        </p>
+        <p class="hint">
+          场景由任务状态 + 网点/师傅责任 + SLA/异常表达，便于列表与接单指派演练；审核/整改/预约完整写链路仍须走真实命令。
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>编号</th>
+              <th>场景</th>
+              <th>说明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in scenarios" :key="item.code">
+              <td><code>WO-DEMO-20260719-{{ item.code }}</code></td>
+              <td>{{ item.label }}</td>
+              <td>{{ item.hint }}</td>
+            </tr>
+          </tbody>
+        </table>
       </section>
     </template>
   </section>

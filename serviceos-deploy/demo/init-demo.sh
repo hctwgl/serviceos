@@ -10,7 +10,7 @@ if [[ "${SERVICEOS_DEMO_ALLOW_PROD:-}" == "true" ]]; then
 fi
 
 echo "初始化演示数据（幂等）…"
-# 先保证 admin-pilot 项目/Bundle 存在，再写入 WO-DEMO-* 工单与网点 Portal 夹具
+# admin-pilot → 工单壳 → 网点 Portal → 多状态任务/责任/SLA
 docker compose -f "${COMPOSE_FILE}" exec -T postgres \
   psql -U serviceos_app -d serviceos \
   < "${ROOT}/serviceos-deploy/admin-pilot/seed-admin-pilot.sql"
@@ -20,5 +20,8 @@ docker compose -f "${COMPOSE_FILE}" exec -T postgres \
 docker compose -f "${COMPOSE_FILE}" exec -T postgres \
   psql -U serviceos_app -d serviceos \
   < "${ROOT}/serviceos-deploy/demo/seed-demo-network-portal.sql"
-echo "完成。可在管理端「演示数据管理」与「工单全流程演练」查看 WO-DEMO-* 工单。"
+docker compose -f "${COMPOSE_FILE}" exec -T postgres \
+  psql -U serviceos_app -d serviceos \
+  < "${ROOT}/serviceos-deploy/demo/seed-demo-tasks.sql"
+echo "完成。可在管理端「演示数据管理」查看 WO-DEMO-* 的 20 态场景任务。"
 echo "网点/师傅门户本地账号：Keycloak developer / local-dev-change-me（需已执行 grant-local-project-admin.sql）。"

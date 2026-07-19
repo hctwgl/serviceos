@@ -1,6 +1,33 @@
 -- 仅删除演示标记数据（不动结构、不动非演示业务）
 \set ON_ERROR_STOP on
 
+-- 0) 演示任务链路（须先于工单 / 网点夹具删除）
+DELETE FROM dsp_capacity_reservation
+ WHERE capacity_reservation_id::text LIKE 'd3500000-2420-%'
+    OR capacity_reservation_id::text LIKE 'd3500000-2520-%';
+
+DELETE FROM dsp_service_assignment
+ WHERE service_assignment_id::text LIKE 'd3500000-2400-%'
+    OR service_assignment_id::text LIKE 'd3500000-2500-%';
+
+DELETE FROM dsp_capacity_counter
+ WHERE capacity_counter_id::text LIKE 'd3500000-2700-%';
+
+DELETE FROM sla_instance
+ WHERE sla_instance_id::text LIKE 'd3500000-2600-%';
+
+DELETE FROM ops_operational_exception
+ WHERE exception_id::text LIKE 'd3500000-2800-%';
+
+DELETE FROM tsk_task
+ WHERE task_id::text LIKE 'd3500000-2000-%';
+
+DELETE FROM wfl_stage_instance
+ WHERE stage_instance_id::text LIKE 'd3500000-2200-%';
+
+DELETE FROM wfl_workflow_instance
+ WHERE workflow_instance_id::text LIKE 'd3500000-2100-%';
+
 -- 1) 演示工单
 DELETE FROM wo_work_order
  WHERE tenant_id = 'tenant-local'
