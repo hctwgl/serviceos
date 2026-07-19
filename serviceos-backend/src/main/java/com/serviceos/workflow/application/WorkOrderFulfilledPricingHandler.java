@@ -52,9 +52,10 @@ final class WorkOrderFulfilledPricingHandler implements OutboxMessageHandler {
             throw new IllegalArgumentException("unsupported WorkOrder pricing event envelope");
         }
         WorkOrderFulfilled payload = read(message.payload(), WorkOrderFulfilled.class);
-        if (payload.workOrderId() == null || payload.fulfilledAt() == null
-                || !payload.workOrderId().toString().equals(message.aggregateId())
-                || !payload.fulfilledAt().equals(message.occurredAt())) {
+        // 只校验聚合身份：PostgreSQL timestamptz 会截断纳秒，载荷 fulfilledAt 与
+        // 信封 occurredAt 不宜做 Instant.equals（与 WorkOrderCoreTimelineHandler 一致）。
+        if (payload.workOrderId() == null
+                || !payload.workOrderId().toString().equals(message.aggregateId())) {
             throw new IllegalArgumentException("WorkOrder pricing event identity mismatch");
         }
 
