@@ -4,9 +4,10 @@ import java.time.LocalDateTime;
 import java.util.Objects;
 
 /**
- * 适配器完成反腐映射后的建单 Canonical 意图。
+ * Mapping 物化后的建单 Canonical / 领域意图。
  *
- * <p>字段使用 ServiceOS 统一语义；不得把 OEM 协议原文字段名当作权威模型。</p>
+ * <p>M336 起由 {@code CreateWorkOrderMappingMaterializer} 产出；适配器仅提供
+ * {@link CreateWorkOrderRouteHint}。字段使用 ServiceOS 统一语义。</p>
  */
 public record CreateWorkOrderMappedInbound(
         String businessKey,

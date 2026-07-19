@@ -13,6 +13,7 @@ import com.serviceos.integration.api.CanonicalMessageView;
 import com.serviceos.integration.api.InboundEnvelopeView;
 import com.serviceos.integration.spi.ConnectorIdentity;
 import com.serviceos.integration.spi.CreateWorkOrderMappedInbound;
+import com.serviceos.integration.spi.CreateWorkOrderRouteHint;
 import com.serviceos.integration.spi.InboundConnectorAuditContext;
 import com.serviceos.integration.spi.InboundCreateWorkOrderResult;
 import com.serviceos.reliability.api.OutboxAppender;
@@ -44,11 +45,9 @@ import java.util.UUID;
  * Canonical 私有存储 → CanonicalMessage 登记 → 领域建单命令 → Envelope/Canonical 完成 →
  * Outbox/审计。适配器不得直接写工单表。</p>
  *
- * <p>M335：CREATE_WORK_ORDER 必须命中 connector 唯一 INBOUND Mapping；缺失则失败关闭。
- * 建单领域字段仅由 Mapping 物化（M333，无适配器 fallback）；{@code mappingVersionId}
- * 取资产 versionId，Canonical 嵌入 contentDigest。适配器 {@code CreateWorkOrderMappedInbound}
- * 仅作 Bundle 路由提示（brand/product/province）与 businessKey 后缀重写基底。
- * brand/product 常量由 Mapping {@code constantValue} 提供（M334）。</p>
+ * <p>M335/M336：CREATE_WORK_ORDER 必须命中 connector 唯一 INBOUND Mapping；缺失则失败关闭。
+ * 适配器只提交 {@link CreateWorkOrderRouteHint}（Bundle 路由 + businessKey 基底）；
+ * 领域字段由 Mapping 物化（M333），常量可用 {@code constantValue}（M334）。</p>
  *
  * <p>事务：调用方应已独立提交 RECEIVED Envelope；本管道在单一本地事务中提交
  * Canonical、工单、审计与 Outbox。配置失败或业务键冲突会 reject Envelope。</p>
@@ -91,36 +90,17 @@ public class InboundCreateWorkOrderPipeline {
     }
 
     /**
-     * 处理已映射的建单意图（无外部原文时跳过 INTEGRATION Mapping 闸门）。
-     */
-    public InboundCreateWorkOrderResult processMappedCreateWorkOrder(
-            InboundEnvelopeView envelope,
-            ConnectorIdentity connector,
-            String tenantId,
-            String projectCode,
-            CreateWorkOrderMappedInbound mapped,
-            InboundConnectorAuditContext auditContext,
-            String correlationId,
-            String objectNamespace
-    ) {
-        return processMappedCreateWorkOrder(
-                envelope, connector, tenantId, projectCode, mapped, auditContext,
-                correlationId, objectNamespace, null);
-    }
-
-    /**
-     * 处理已映射的建单意图。
+     * 处理建单路由提示 + OEM 原文（强制 INBOUND Mapping 物化）。
      *
      * @param objectNamespace 对象键命名空间，例如 {@code byd-cpim}，不得包含租户明文
-     * @param externalSourcePayload OEM 原文 Map；当冻结 Bundle 含该 connector 的 INBOUND
-     *        INTEGRATION Mapping 时必须提供，用于冻结 Mapping 应用与物化
+     * @param externalSourcePayload OEM 原文 Map；CREATE_WORK_ORDER 强制 Mapping 时必须提供
      */
     public InboundCreateWorkOrderResult processMappedCreateWorkOrder(
             InboundEnvelopeView envelope,
             ConnectorIdentity connector,
             String tenantId,
             String projectCode,
-            CreateWorkOrderMappedInbound mapped,
+            CreateWorkOrderRouteHint routeHint,
             InboundConnectorAuditContext auditContext,
             String correlationId,
             String objectNamespace,
@@ -128,7 +108,7 @@ public class InboundCreateWorkOrderPipeline {
     ) {
         Objects.requireNonNull(envelope, "envelope must not be null");
         Objects.requireNonNull(connector, "connector must not be null");
-        Objects.requireNonNull(mapped, "mapped must not be null");
+        Objects.requireNonNull(routeHint, "routeHint must not be null");
         Objects.requireNonNull(auditContext, "auditContext must not be null");
         String safeTenant = requiredText(tenantId, "tenantId");
         String safeProjectCode = requiredText(projectCode, "projectCode");
@@ -142,27 +122,27 @@ public class InboundCreateWorkOrderPipeline {
         final ConfigurationBundleReference bundle;
         try {
             bundle = configurationService.resolve(new ResolveConfigurationBundleQuery(
-                    safeTenant, safeProjectCode, mapped.brandCode(), mapped.serviceProductCode(),
-                    mapped.provinceCode(), envelope.receivedAt(), false,
-                    mapped.externalOrderCode()));
+                    safeTenant, safeProjectCode, routeHint.brandCode(), routeHint.serviceProductCode(),
+                    routeHint.provinceCode(), envelope.receivedAt(), false,
+                    routeHint.externalOrderCode()));
         } catch (ConfigurationResolutionException exception) {
             String code = "CONFIGURATION_" + exception.reason().name();
             return reject(
-                    envelope, safeTenant, null, null, mapped.mappingVersionId(),
+                    envelope, safeTenant, null, null, null,
                     "INVALID_ORDER", code + ": " + exception.getMessage(), auditContext);
         }
 
         final IntegrationMappingResult mappingResult;
         final CreateWorkOrderMappedInbound effectiveMapped;
         try {
-            // M335：CREATE_WORK_ORDER 强制 INBOUND Mapping；适配器字段不再作为领域权威。
+            // M335/M336：强制 INBOUND Mapping；RouteHint 仅作路由与 businessKey 基底。
             mappingResult = requireFrozenIntegrationMapping(
                     safeTenant, connector, bundle, externalSourcePayload);
             effectiveMapped = CreateWorkOrderMappingMaterializer.materialize(
-                    mapped, mappingResult, objectMapper);
+                    routeHint, mappingResult, objectMapper);
         } catch (BusinessProblem exception) {
             return reject(
-                    envelope, safeTenant, bundle.projectId(), null, mapped.mappingVersionId(),
+                    envelope, safeTenant, bundle.projectId(), null, null,
                     "INTEGRATION_MAPPING_FAILED", exception.getMessage(), auditContext);
         }
 

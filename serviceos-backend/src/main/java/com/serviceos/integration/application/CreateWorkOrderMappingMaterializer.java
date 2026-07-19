@@ -2,6 +2,7 @@ package com.serviceos.integration.application;
 
 import com.serviceos.configuration.api.IntegrationMappingResult;
 import com.serviceos.integration.spi.CreateWorkOrderMappedInbound;
+import com.serviceos.integration.spi.CreateWorkOrderRouteHint;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
 import tools.jackson.databind.ObjectMapper;
@@ -18,10 +19,9 @@ import java.util.Objects;
 /**
  * 将冻结 INTEGRATION Mapping 输出物化为建单 Canonical 意图。
  *
- * <p>M333：一旦进入物化，领域建单字段仅取自 Mapping {@code internalFields}，不再回退适配器
- * 兼容取值。{@code clientCode} 仍来自 connector 身份；{@code businessKey} 仅按 Mapping 的
- * {@code externalOrderCode} 重写后缀。{@code mappingVersionId} 固定为资产
- * {@code assetVersionId}；Canonical JSON 嵌入 {@code mappingContentDigest}。</p>
+ * <p>M333/M336：领域建单字段仅取自 Mapping {@code internalFields}；路由提示仅提供
+ * {@code clientCode} 与 {@code businessKey} 后缀重写基底。{@code mappingVersionId}
+ * 固定为资产 {@code assetVersionId}；Canonical JSON 嵌入 {@code mappingContentDigest}。</p>
  */
 public final class CreateWorkOrderMappingMaterializer {
     private static final DateTimeFormatter DATE_TIME = DateTimeFormatter
@@ -35,11 +35,11 @@ public final class CreateWorkOrderMappingMaterializer {
     }
 
     public static CreateWorkOrderMappedInbound materialize(
-            CreateWorkOrderMappedInbound adapterMapped,
+            CreateWorkOrderRouteHint routeHint,
             IntegrationMappingResult mapping,
             ObjectMapper objectMapper
     ) {
-        Objects.requireNonNull(adapterMapped, "adapterMapped");
+        Objects.requireNonNull(routeHint, "routeHint");
         Objects.requireNonNull(mapping, "mapping");
         Objects.requireNonNull(objectMapper, "objectMapper");
         if (!"INBOUND".equals(mapping.direction())) {
@@ -61,7 +61,7 @@ public final class CreateWorkOrderMappingMaterializer {
         LocalDateTime dispatchedAt = overlayDispatchedAt(fields);
 
         String businessKey = rebuildBusinessKey(
-                adapterMapped.businessKey(), adapterMapped.externalOrderCode(), externalOrderCode);
+                routeHint.businessKey(), routeHint.externalOrderCode(), externalOrderCode);
         String mappingVersionId = mapping.assetVersionId().toString();
 
         Map<String, Object> canonical = new LinkedHashMap<>();
@@ -70,7 +70,7 @@ public final class CreateWorkOrderMappingMaterializer {
         canonical.put("mappingContentDigest", mapping.contentDigest());
         canonical.put("connectorCode", mapping.connectorCode());
         canonical.put("direction", mapping.direction());
-        canonical.put("clientCode", adapterMapped.clientCode());
+        canonical.put("clientCode", routeHint.clientCode());
         canonical.put("businessKey", businessKey);
         canonical.put("externalOrderCode", externalOrderCode);
         canonical.put("brandCode", brandCode);
@@ -107,7 +107,7 @@ public final class CreateWorkOrderMappingMaterializer {
         return new CreateWorkOrderMappedInbound(
                 businessKey,
                 externalOrderCode,
-                adapterMapped.clientCode(),
+                routeHint.clientCode(),
                 brandCode,
                 serviceProductCode,
                 provinceCode,
@@ -122,10 +122,10 @@ public final class CreateWorkOrderMappingMaterializer {
                 canonicalPayload);
     }
 
-    static String rebuildBusinessKey(String adapterBusinessKey, String adapterOrderCode, String newOrderCode) {
-        if (adapterBusinessKey != null && adapterOrderCode != null
-                && adapterBusinessKey.endsWith(adapterOrderCode)) {
-            return adapterBusinessKey.substring(0, adapterBusinessKey.length() - adapterOrderCode.length())
+    static String rebuildBusinessKey(String routeBusinessKey, String routeOrderCode, String newOrderCode) {
+        if (routeBusinessKey != null && routeOrderCode != null
+                && routeBusinessKey.endsWith(routeOrderCode)) {
+            return routeBusinessKey.substring(0, routeBusinessKey.length() - routeOrderCode.length())
                     + newOrderCode;
         }
         throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,

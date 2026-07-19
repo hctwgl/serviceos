@@ -9,6 +9,7 @@ import com.serviceos.integration.referenceoem.api.ReferenceOemInstallOrderPayloa
 import com.serviceos.integration.referenceoem.infrastructure.ReferenceOemSampleSignature;
 import com.serviceos.integration.spi.ConnectorIdentity;
 import com.serviceos.integration.spi.CreateWorkOrderMappedInbound;
+import com.serviceos.integration.spi.CreateWorkOrderRouteHint;
 import com.serviceos.integration.spi.InboundConnectorAuditContext;
 import com.serviceos.integration.spi.InboundCreateWorkOrderResult;
 import com.serviceos.shared.Sha256;
@@ -35,7 +36,6 @@ import java.util.UUID;
 public class ReferenceOemInboundOrderService {
     public static final String CONNECTOR_CODE = "REFERENCE_OEM";
     public static final String ADAPTER_VERSION = "reference-oem-sample-v1";
-    public static final String MAPPING_VERSION = "reference-oem-sample-mapping-v1";
     public static final String CLIENT_CODE = "REFERENCE_OEM";
     private static final String BUSINESS_PREFIX = "REFERENCE_OEM:INSTALL:";
     private static final String OBJECT_NAMESPACE = "reference-oem";
@@ -133,38 +133,31 @@ public class ReferenceOemInboundOrderService {
             return toResponse(rejected, null);
         }
 
-        byte[] canonicalPayload;
-        try {
-            canonicalPayload = objectMapper.writeValueAsBytes(payload);
-        } catch (RuntimeException exception) {
-            throw new IllegalStateException("Cannot serialize REFERENCE_OEM canonical payload", exception);
-        }
-
-        CreateWorkOrderMappedInbound inbound = new CreateWorkOrderMappedInbound(
+        // M336：仅提交路由提示；领域字段由冻结 INBOUND Mapping 物化。
+        CreateWorkOrderRouteHint routeHint = new CreateWorkOrderRouteHint(
                 BUSINESS_PREFIX + payload.externalOrderCode(),
                 payload.externalOrderCode(),
                 CLIENT_CODE,
                 payload.brandCode(),
                 payload.serviceProductCode(),
-                payload.provinceCode(),
-                payload.cityCode(),
-                payload.districtCode(),
-                payload.customerName(),
-                payload.customerMobile(),
-                payload.serviceAddress(),
-                payload.vehicleVin(),
-                payload.dispatchedAt(),
-                MAPPING_VERSION,
-                canonicalPayload);
+                payload.provinceCode());
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> externalSource = objectMapper.convertValue(payload, Map.class);
+        Map<String, Object> converted = objectMapper.convertValue(payload, Map.class);
+        Map<String, Object> externalSource = new java.util.LinkedHashMap<>();
+        if (converted != null) {
+            converted.forEach((key, value) -> {
+                if (key != null && value != null) {
+                    externalSource.put(key, value);
+                }
+            });
+        }
         InboundCreateWorkOrderResult result = createWorkOrderPipeline.processMappedCreateWorkOrder(
                 envelope,
                 new ConnectorIdentity(CONNECTOR_CODE, ADAPTER_VERSION),
                 tenantId,
                 projectCode,
-                inbound,
+                routeHint,
                 audit,
                 safeCorrelationId,
                 OBJECT_NAMESPACE,

@@ -31,7 +31,7 @@ connector 唯一 INBOUND INTEGRATION Mapping；缺失则失败关闭，不再回
 
 ## 明确未实现
 
-- 删除 OEM Java Mapper / 引入纯 RouteHint DTO
+- 删除 OEM Java Mapper / 引入纯 RouteHint DTO → 见 **M336**
 - Update/Cancel Mapping 强制
 - DISPATCH 地图/比例、吉利联调
 

@@ -14,6 +14,7 @@ import com.serviceos.integration.byd.infrastructure.BydCpimSignatureVerifier;
 import com.serviceos.integration.byd.infrastructure.JdbcBydCpimReplayGuard;
 import com.serviceos.integration.spi.ConnectorIdentity;
 import com.serviceos.integration.spi.CreateWorkOrderMappedInbound;
+import com.serviceos.integration.spi.CreateWorkOrderRouteHint;
 import com.serviceos.integration.spi.InboundConnectorAuditContext;
 import com.serviceos.integration.spi.InboundCreateWorkOrderResult;
 import com.serviceos.shared.Sha256;
@@ -35,9 +36,9 @@ import java.util.UUID;
 /**
  * BYD CPIM 安装订单入站适配器。
  *
- * <p>M267 起协议验签、Nonce 防重放与 CPIM DTO 映射留在本适配器；Envelope 登记后的
- * Bundle 解析、Canonical 登记、领域建单、Outbox/审计委托 {@link InboundCreateWorkOrderPipeline}。
- * 适配器不直接写工单表。</p>
+ * <p>M267/M336：协议验签、Nonce 防重放与路由提示留在本适配器；领域字段由冻结 Mapping
+ * 物化。Envelope 登记后的 Bundle 解析、Canonical、建单、Outbox/审计委托
+ * {@link InboundCreateWorkOrderPipeline}。适配器不直接写工单表。</p>
  *
  * <p>事务仍保持 M56 两段式：Envelope/Nonce 先独立提交；Canonical 与领域命令在管道事务中提交。</p>
  */
@@ -47,7 +48,7 @@ public class BydCpimInboundOrderService {
             "BYD_CPIM", BydCpimOrderMapper.ADAPTER_VERSION);
     private static final String MESSAGE_TYPE = CreateWorkOrderMappedInbound.MESSAGE_TYPE_CREATE_WORK_ORDER;
     /** 与出站提审、适配契约一致：Canonical business_key = BYD:INSTALL:{orderCode}。 */
-    private static final String INSTALL_BUSINESS_PREFIX = "BYD:INSTALL:";
+    private static final String INSTALL_BUSINESS_PREFIX = BydCpimOrderMapper.BUSINESS_PREFIX;
     private static final String RECEIVE_CAPABILITY = "integration.receiveInbound";
     private static final String AUTH_POLICY = "BYD_CPIM_SIGNATURE_V7_3_1";
     private static final String OBJECT_NAMESPACE = "byd-cpim";
@@ -165,11 +166,11 @@ public class BydCpimInboundOrderService {
 
         store(rawObjectRef, rawPayload, rawPayloadDigest);
 
-        final BydCpimMappedOrder mapped;
+        final CreateWorkOrderRouteHint routeHint;
         try {
             BydCpimInstallOrderPayload payload = objectMapper.convertValue(
                     rawParameters, BydCpimInstallOrderPayload.class);
-            mapped = mapper.map(payload);
+            routeHint = mapper.toRouteHint(payload);
         } catch (RuntimeException exception) {
             if (!isPayloadMappingFailure(exception)) {
                 throw exception;
@@ -180,28 +181,10 @@ public class BydCpimInboundOrderService {
             return finish(toResponse(rejected, null), headers);
         }
 
-        byte[] canonicalPayload = writeCanonical(mapped);
-        CreateWorkOrderMappedInbound inbound = new CreateWorkOrderMappedInbound(
-                installBusinessKey(mapped.externalOrderCode()),
-                mapped.externalOrderCode(),
-                mapped.clientCode(),
-                mapped.brandCode(),
-                mapped.serviceProductCode(),
-                mapped.provinceCode(),
-                mapped.cityCode(),
-                mapped.districtCode(),
-                mapped.customerName(),
-                mapped.customerMobile(),
-                mapped.serviceAddress(),
-                mapped.vehicleVin(),
-                mapped.dispatchedAt(),
-                mapped.mappingVersion(),
-                canonicalPayload);
-
         InboundCreateWorkOrderResult result = createWorkOrderPipeline.processMappedCreateWorkOrder(
-                envelope, CONNECTOR, tenantId, projectCode, inbound, auditContext,
+                envelope, CONNECTOR, tenantId, projectCode, routeHint, auditContext,
                 safeCorrelationId, OBJECT_NAMESPACE, Map.copyOf(rawParameters));
-        return finish(toResponse(result, mapped.externalOrderCode()), headers);
+        return finish(toResponse(result, routeHint.externalOrderCode()), headers);
     }
 
     private BydCpimInboundOrderResponse finish(
@@ -245,10 +228,6 @@ public class BydCpimInboundOrderService {
                 envelope.resultCode(), "request was already rejected by the inbound pipeline");
     }
 
-    private static String installBusinessKey(String externalOrderCode) {
-        return INSTALL_BUSINESS_PREFIX + requiredText(externalOrderCode, "externalOrderCode");
-    }
-
     private static String orderCodeFromBusinessKey(String businessKey) {
         String normalized = requiredText(businessKey, "businessKey");
         if (normalized.startsWith(INSTALL_BUSINESS_PREFIX)) {
@@ -265,14 +244,6 @@ public class BydCpimInboundOrderService {
                     objectRef, input, content.length, digest, "application/json");
         } catch (IOException exception) {
             throw new IllegalStateException("Cannot persist authenticated inbound payload", exception);
-        }
-    }
-
-    private byte[] writeCanonical(BydCpimMappedOrder mapped) {
-        try {
-            return objectMapper.writeValueAsBytes(mapped);
-        } catch (RuntimeException exception) {
-            throw new IllegalStateException("Cannot serialize canonical inbound message", exception);
         }
     }
 
