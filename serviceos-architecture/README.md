@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M298 入站审核回调 SPI**（功能证据见 `implementation-status.md` 的
+当前工程基线为 **M299 出站提审 Profile 注册表**（功能证据见 `implementation-status.md` 的
 `baselineCommit`；合入 `master` 后改为合并提交）。M296 及之前基线合并提交为
 `f3b623453a33ece91a691438b0c541e53c3282df`。
 
@@ -689,6 +689,8 @@ Track F/G 仍为 `BLOCKED_EXTERNAL`。
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
 - [M298 实现文档](architecture/311-m298-inbound-review-callback-spi.md)
 - [M298 验收矩阵](testing/295-m298-inbound-review-callback-spi-acceptance.md)
+- [M299 实现文档](architecture/312-m299-outbound-review-submission-profile-registry.md)
+- [M299 验收矩阵](testing/296-m299-outbound-review-submission-profile-registry-acceptance.md)
 - [M297 实现文档](architecture/310-m297-outbound-submission-connector-spi.md)
 - [M297 验收矩阵](testing/294-m297-outbound-submission-connector-spi-acceptance.md)
 - [ADR-086 出站提审 Connector SPI](decisions/ADR-086-outbound-submission-connector-spi.md)

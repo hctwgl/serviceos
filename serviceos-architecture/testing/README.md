@@ -299,5 +299,6 @@
 - [M296 配置历史回放验收矩阵](293-m296-configuration-historical-replay-acceptance.md)
 - [M297 出站提审 Connector SPI 验收矩阵](294-m297-outbound-submission-connector-spi-acceptance.md)
 - [M298 入站审核回调 SPI 验收矩阵](295-m298-inbound-review-callback-spi-acceptance.md)
+- [M299 出站提审 Profile 注册表验收矩阵](296-m299-outbound-review-submission-profile-registry-acceptance.md)
 - [多车企平台内核程序级验收矩阵](multi-oem-platform-kernel-program-acceptance.md)
 - [Admin 试点可运行基线验收](admin-pilot-readiness-acceptance.md)

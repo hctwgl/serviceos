@@ -393,3 +393,4 @@ Feature gate/authority: if applicable
 | M296 | 冻结 Bundle WORKFLOW 历史回放；OpenAPI 1.0.39 | HistoricalReplayService + PostgresIT + `309-m296-*` + `293-m296-*` | 事件时间轴回放 |
 | M297 | 出站提审 Connector SPI + BYD 归位：`OutboundSubmissionPipeline`；技术 ACK 分离；无 OpenAPI/Flyway 变更 | ADR-086 + Outbound SPI + BydOutboundSubmissionConnector + ArchitectureTest + unit/IT + `310-m297-*` + `294-m297-*` | 回调 SPI、创建面注册表、REFERENCE 出站样本、远端查询 |
 | M298 | 入站审核回调逐单管道 SPI：`ReviewCallbackMappedItem` + `InboundReviewCallbackItemPipeline`；BYD 委托；无 OpenAPI/Flyway 变更 | SPI + Pipeline + BydCpimReviewCallbackService + ArchitectureTest + unit/IT + `311-m298-*` + `295-m298-*` | Update/Cancel、远端查询、REFERENCE 回调样本 |
+| M299 | 出站提审 Profile 注册表：按入站 lineage/connectorVersion 唯一解析；零/多命中失败关闭；无 OpenAPI/Flyway | Profile SPI + Registry + BYD Profile + unit/IT + `312-m299-*` + `296-m299-*` | Update/Cancel、Route 注册表化、远端查询 |
