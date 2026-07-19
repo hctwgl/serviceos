@@ -8,9 +8,9 @@ lastUpdated: 2026-07-19
 ## 当前
 
 - PR：https://github.com/hctwgl/serviceos/pull/147
-- latestMilestone：**M318**
-- Flyway：**119 / 121**；OpenAPI：**1.0.42**
-- PLAN 可执行范围（含人工确认/放弃）已完成
+- latestMilestone：**M319**
+- Flyway：**120 / 122**；OpenAPI：**1.0.43**
+- **PLAN 可执行范围已全部完成**（含批量 ReplayRequest）
 
 ## BLOCKED_EXTERNAL
 
@@ -18,8 +18,8 @@ lastUpdated: 2026-07-19
 
 ## 已完成
 
-P0～P4 本地能力；M317 远端查询；M318 人工确认/放弃（状态保持 UNKNOWN + disposition）
+P0～P4 本地能力；P1 余量（远端查询/人工处置/批量重放）已闭合
 
 ## 停止条件
 
-真实吉利联调仍缺 Sandbox。可选后续：批量 ReplayRequest；或阶段门禁 `verify-local.sh`。
+真实吉利联调仍缺 Sandbox。可选：全量 `verify-local.sh` 阶段门禁。

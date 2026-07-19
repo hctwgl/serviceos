@@ -413,3 +413,4 @@ Feature gate/authority: if applicable
 | M316 | 吉利提审出站 Profile/Connector 本地 stub + 7.13 审核回调；多 OEM mapping 精确解析 | Geely outbound/callback + ProfilesTest + ReviewCase IT + `329-m316-*` + `313-m316-*` | Sandbox/OpenAPI 真实联调 |
 | M317 | 远端状态查询 SPI：UNKNOWN Delivery 探询；BYD NotSupported / Geely StillUnknown；OpenAPI 1.0.41 | RemoteStatusQueryConnector + HTTP + unit/security/Arch/contracts + `330-m317-*` + `314-m317-*` | 查询结果自动收敛、人工已送达/放弃 |
 | M318 | UNKNOWN Delivery 人工确认/放弃：disposition 不可变；状态保持 UNKNOWN；OpenAPI 1.0.42；Flyway V119 | record-manual-ack + ManualDispositionPostgresIT + contracts + `331-m318-*` + `315-m318-*` | 批量 ReplayRequest、查询自动改状态 |
+| M319 | 批量 ReplayRequest：PREVIEW/SUBMIT/approve；逐条调度单笔 retry；OpenAPI 1.0.43；Flyway V120 | BatchReplayService + PostgresIT + contracts + `332-m319-*` + `316-m319-*` | 1000 条压测、二级审批/MFA |

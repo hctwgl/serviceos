@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M318 UNKNOWN Delivery 人工确认/放弃**（功能证据见 `implementation-status.md` 的
+当前工程基线为 **M319 批量 ReplayRequest 预演与审批**（功能证据见 `implementation-status.md` 的
 `baselineCommit`；合入 `master` 后改为合并提交）。M296 及之前基线合并提交为
 `f3b623453a33ece91a691438b0c541e53c3282df`。
 
@@ -688,6 +688,8 @@ serviceos-architecture/
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M319 实现文档](architecture/332-m319-batch-replay-request.md)
+- [M319 验收矩阵](testing/316-m319-batch-replay-request-acceptance.md)
 - [M318 实现文档](architecture/331-m318-manual-outbound-disposition.md)
 - [M318 验收矩阵](testing/315-m318-manual-outbound-disposition-acceptance.md)
 - [M317 实现文档](architecture/330-m317-remote-status-query-spi.md)

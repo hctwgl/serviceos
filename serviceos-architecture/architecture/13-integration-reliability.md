@@ -18,7 +18,7 @@ status: Proposed
 > M298 已抽出审核回调逐单 `InboundReviewCallbackItemPipeline`（`ReviewCallbackMappedItem`），
 > BYD 回调适配器保留验签/防重放/batch Envelope。M300/M302 已抽出入站取消/更新管道与 BYD
 > cancel-orders/update-orders；M299/M301 已将出站创建与 Route 的 connectorVersion 注册表化。
-> 远端查询 SPI（M317）已落地（协议不支持则 NOT_SUPPORTED）；批量重放与真实第二家 Sandbox 仍未实现。
+> 远端查询 SPI（M317）、人工处置（M318）、批量 ReplayRequest（M319）已落地；真实第二家 Sandbox 仍未实现。
 > 本章其余 Proposed 设计不能据此视为已完成。
 
 ## 1. 目标
@@ -210,7 +210,7 @@ M60 的 BYD 提审重发只有在严格 ACK 落账后才发布恢复事件；发
 - 修复配置后重试原 payload（M59）；
 - 查询外部状态并登记观察（M317）；
 - 标记外部已人工处理并附证据 / 放弃交付（M318，状态保持 UNKNOWN + disposition）；
-- 基于新对象版本创建新的 delivery、批量 ReplayRequest 仍未实现。
+- 基于新对象版本创建新的 delivery 仍未实现；批量 ReplayRequest（M319）已落地。
 
 ReplayRequest 保存申请人、范围、原因、审批、原 delivery、是否复用幂等键和执行结果。批量重放需限流和预演。
 

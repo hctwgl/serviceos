@@ -327,6 +327,7 @@ title: ServiceOS 里程碑索引
 | M316 | M316 吉利提审出站 stub 与审核回调 | [329-m316-geely-outbound-and-review-callback.md](../architecture/329-m316-geely-outbound-and-review-callback.md) | [313-m316-geely-outbound-and-review-callback-acceptance.md](../testing/313-m316-geely-outbound-and-review-callback-acceptance.md) |
 | M317 | M317 远端状态查询 Connector SPI | [330-m317-remote-status-query-spi.md](../architecture/330-m317-remote-status-query-spi.md) | [314-m317-remote-status-query-spi-acceptance.md](../testing/314-m317-remote-status-query-spi-acceptance.md) |
 | M318 | M318 UNKNOWN Delivery 人工确认/放弃 | [331-m318-manual-outbound-disposition.md](../architecture/331-m318-manual-outbound-disposition.md) | [315-m318-manual-outbound-disposition-acceptance.md](../testing/315-m318-manual-outbound-disposition-acceptance.md) |
+| M319 | M319 批量 ReplayRequest 预演与审批 | [332-m319-batch-replay-request.md](../architecture/332-m319-batch-replay-request.md) | [316-m319-batch-replay-request-acceptance.md](../testing/316-m319-batch-replay-request-acceptance.md) |
 
 ## 未关联里程碑的文档
 
