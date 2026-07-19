@@ -8,7 +8,7 @@ lastUpdated: 2026-07-19
 ## 当前
 
 - PR #148～#174：M321～M347 Draft stacked
-- 本分支：`cursor/m348-dispatch-residual-editor-88d5` — **M348** DISPATCH 残留编辑器（Draft，base=#174）
+- PR #175：https://github.com/hctwgl/serviceos/pull/175 — **M348** DISPATCH 残留编辑器（Draft，base=#174）
 - latestMilestone：**M348**
 - Flyway：**127**；OpenAPI：**1.0.43**
 - `baselineCommit`：功能提交后回填
@@ -18,10 +18,10 @@ lastUpdated: 2026-07-19
 | PR | Milestone |
 |---|---|
 | #174 | M347 INTEGRATION Mapping DSL UI |
-| （本 PR） | M348 DISPATCH scope/fallback/allocationRatio 编辑器 |
+|  #175 | M348 DISPATCH scope/fallback/allocationRatio 编辑器 |
 
 Admin Mapping DSL（M347）与 DISPATCH 残留编辑器（M348）已交付。
-栈尖：`#148 → … → #174 → M348`。
+栈尖：`#148 → … → #174 → #175`。
 
 ## 下一（可无阻塞推进）
 
