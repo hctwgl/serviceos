@@ -6,6 +6,7 @@ import com.serviceos.appointment.api.TechnicianScheduleAppointmentView;
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationDecision;
 import com.serviceos.authorization.api.AuthorizationService;
+import com.serviceos.configuration.api.FrozenBundleClientCapabilityProbe;
 import com.serviceos.dispatch.api.TechnicianActiveAssignmentQuery;
 import com.serviceos.dispatch.api.TechnicianActiveAssignmentView;
 import com.serviceos.fieldwork.api.TechnicianVisitHistoryQuery;
@@ -73,6 +74,7 @@ final class DefaultTechnicianPortalQueryService implements TechnicianPortalQuery
     private final FormSubmissionQueryService formSubmissions;
     private final TaskFulfillmentContextService tasks;
     private final WorkOrderExpressionContextQuery workOrderExpressions;
+    private final FrozenBundleClientCapabilityProbe clientCapabilityProbe;
     private final Clock clock;
 
     DefaultTechnicianPortalQueryService(
@@ -86,6 +88,7 @@ final class DefaultTechnicianPortalQueryService implements TechnicianPortalQuery
             FormSubmissionQueryService formSubmissions,
             TaskFulfillmentContextService tasks,
             WorkOrderExpressionContextQuery workOrderExpressions,
+            FrozenBundleClientCapabilityProbe clientCapabilityProbe,
             Clock clock
     ) {
         this.affiliations = affiliations;
@@ -98,6 +101,7 @@ final class DefaultTechnicianPortalQueryService implements TechnicianPortalQuery
         this.formSubmissions = formSubmissions;
         this.tasks = tasks;
         this.workOrderExpressions = workOrderExpressions;
+        this.clientCapabilityProbe = clientCapabilityProbe;
         this.clock = clock;
     }
 
@@ -107,15 +111,16 @@ final class DefaultTechnicianPortalQueryService implements TechnicianPortalQuery
             CurrentPrincipal actor,
             String correlationId,
             String technicianContextHeader,
+            String clientKind,
             String sinceCursor
     ) {
         AuthorizedTechnicianContext ctx = requireAuthorizedTechnician(
                 actor, correlationId, technicianContextHeader);
         List<TechnicianPortalFeedItem> items;
         if (sinceCursor == null || sinceCursor.isBlank()) {
-            items = snapshotFeed(actor.tenantId(), ctx);
+            items = snapshotFeed(actor.tenantId(), ctx, clientKind);
         } else {
-            items = deltaFeed(actor.tenantId(), ctx, sinceCursor);
+            items = deltaFeed(actor.tenantId(), ctx, clientKind, sinceCursor);
         }
         String nextCursor = items.isEmpty() ? null : items.getLast().cursor();
         return new TechnicianPortalFeedPage(ctx.networkId(), items, nextCursor, clock.instant());
@@ -169,6 +174,7 @@ final class DefaultTechnicianPortalQueryService implements TechnicianPortalQuery
             CurrentPrincipal actor,
             String correlationId,
             String technicianContextHeader,
+            String clientKind,
             UUID taskId
     ) {
         AuthorizedTechnicianContext ctx = requireAuthorizedTechnician(
@@ -191,6 +197,13 @@ final class DefaultTechnicianPortalQueryService implements TechnicianPortalQuery
         }
         TaskFulfillmentContext task = tasks.find(actor.tenantId(), taskId)
                 .orElseThrow(() -> new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "任务不存在"));
+        // M359：详情头级能力预检，避免进入表单/资料路径后才拒单。
+        clientCapabilityProbe.requireCompatible(
+                actor.tenantId(),
+                clientKind,
+                task.configurationBundleId(),
+                task.configurationBundleDigest(),
+                task.formRef());
         // 表达式白名单工单/区域头与服务端 FormValueValidator 同源；缺失则失败关闭，避免 H5 用空上下文假通过。
         WorkOrderExpressionContext workOrder = workOrderExpressions.find(actor.tenantId(), task.workOrderId())
                 .orElseThrow(() -> new BusinessProblem(
@@ -276,20 +289,22 @@ final class DefaultTechnicianPortalQueryService implements TechnicianPortalQuery
                 correlationId).effect() == AuthorizationDecision.Effect.ALLOW;
     }
 
-    private List<TechnicianPortalFeedItem> snapshotFeed(String tenantId, AuthorizedTechnicianContext ctx) {
+    private List<TechnicianPortalFeedItem> snapshotFeed(
+            String tenantId, AuthorizedTechnicianContext ctx, String clientKind
+    ) {
         Map<UUID, TechnicianPortalFeedItem> byTask = new LinkedHashMap<>();
         for (TechnicianActiveAssignmentView row : assignments.listActiveForTechnician(
                 tenantId, ctx.networkId().toString(), ctx.assigneeIds())) {
-            byTask.put(row.taskId(), toAssignmentItem(tenantId, row));
+            byTask.put(row.taskId(), toAssignmentItem(tenantId, clientKind, row));
         }
         for (TechnicianTaskAssignmentFeedView row : networkScopedActiveTaskAssignments(tenantId, ctx)) {
-            byTask.putIfAbsent(row.taskId(), toTaskAssignmentItem(tenantId, row));
+            byTask.putIfAbsent(row.taskId(), toTaskAssignmentItem(tenantId, clientKind, row));
         }
         return List.copyOf(byTask.values());
     }
 
     private List<TechnicianPortalFeedItem> deltaFeed(
-            String tenantId, AuthorizedTechnicianContext ctx, String sinceCursor
+            String tenantId, AuthorizedTechnicianContext ctx, String clientKind, String sinceCursor
     ) {
         FeedCursor cursor = decodeCursor(sinceCursor);
         List<TechnicianPortalFeedItem> items = new ArrayList<>();
@@ -302,7 +317,7 @@ final class DefaultTechnicianPortalQueryService implements TechnicianPortalQuery
                         row.endReasonCode() == null ? "SERVICE_ASSIGNMENT_ENDED" : row.endReasonCode(),
                         encodeCursor(row.effectiveTo(), row.serviceAssignmentId())));
             } else {
-                items.add(toAssignmentItem(tenantId, row));
+                items.add(toAssignmentItem(tenantId, clientKind, row));
             }
         }
         for (TechnicianTaskAssignmentFeedView row : networkScopedRevokedTaskAssignments(tenantId, ctx)) {
@@ -361,7 +376,9 @@ final class DefaultTechnicianPortalQueryService implements TechnicianPortalQuery
                 tenantId, networkId.toString(), candidates));
     }
 
-    private TechnicianPortalFeedItem toAssignmentItem(String tenantId, TechnicianActiveAssignmentView row) {
+    private TechnicianPortalFeedItem toAssignmentItem(
+            String tenantId, String clientKind, TechnicianActiveAssignmentView row
+    ) {
         TaskFulfillmentContext task = tasks.find(tenantId, row.taskId()).orElse(null);
         String cursor = encodeCursor(row.effectiveFrom(), row.serviceAssignmentId());
         return new TechnicianPortalFeedItem(
@@ -378,11 +395,12 @@ final class DefaultTechnicianPortalQueryService implements TechnicianPortalQuery
                 row.businessType(),
                 row.effectiveFrom(),
                 cursor,
-                null);
+                null,
+                capabilityDetail(tenantId, clientKind, task));
     }
 
     private TechnicianPortalFeedItem toTaskAssignmentItem(
-            String tenantId, TechnicianTaskAssignmentFeedView row
+            String tenantId, String clientKind, TechnicianTaskAssignmentFeedView row
     ) {
         TaskFulfillmentContext task = tasks.find(tenantId, row.taskId()).orElse(null);
         String cursor = encodeCursor(row.effectiveFrom(), row.taskAssignmentId());
@@ -400,7 +418,21 @@ final class DefaultTechnicianPortalQueryService implements TechnicianPortalQuery
                 null,
                 row.effectiveFrom(),
                 cursor,
-                null);
+                null,
+                capabilityDetail(tenantId, clientKind, task));
+    }
+
+    private String capabilityDetail(String tenantId, String clientKind, TaskFulfillmentContext task) {
+        if (task == null) {
+            return null;
+        }
+        return clientCapabilityProbe.findIncompatibilityDetail(
+                        tenantId,
+                        clientKind,
+                        task.configurationBundleId(),
+                        task.configurationBundleDigest(),
+                        task.formRef())
+                .orElse(null);
     }
 
     private static TechnicianPortalFeedItem toTombstone(UUID taskId, String reason, String cursor) {
@@ -418,7 +450,8 @@ final class DefaultTechnicianPortalQueryService implements TechnicianPortalQuery
                 null,
                 null,
                 cursor,
-                reason);
+                reason,
+                null);
     }
 
     private AuthorizedTechnicianContext requireAuthorizedTechnician(

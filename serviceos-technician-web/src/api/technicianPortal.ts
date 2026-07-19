@@ -16,6 +16,8 @@ export type TechnicianPortalFeedItem = {
   effectiveFrom: string | null
   cursor: string
   invalidationReason: string | null
+  /** M359：当前客户端无法履约冻结 FORM/EVIDENCE 时的权威中文说明 */
+  clientCapabilityUnsupportedDetail?: string | null
 }
 
 export type TechnicianPortalFeedPage = {

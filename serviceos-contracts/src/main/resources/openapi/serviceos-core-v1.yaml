@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.51
+  version: 1.0.53
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -2404,6 +2404,8 @@ paths:
         返回当前师傅 ACTIVE TECHNICIAN ServiceAssignment / TaskAssignment；可选 sinceCursor 增量，
         含撤权/结束 tombstone（仅 taskId + invalidationReason）。禁止离线工作包 runtime。
         上下文缺失/伪造/非师傅成员返回 PORTAL_CONTEXT_INVALID（403）。
+        M359：ASSIGNMENT 项可含 `clientCapabilityUnsupportedDetail`；当前 clientKind 无法履约冻结
+        FORM/EVIDENCE 时给出中文说明，客户端应展示并阻止进入详情执行（不静默忽略）。
       parameters:
         - $ref: '#/components/parameters/TechnicianContext'
         - name: sinceCursor
@@ -2432,6 +2434,8 @@ paths:
         Visit 摘要不含 GPS、距离、设备、离线命令、note、operation/evidence refs；
         不返回地址、联系人、表单值、资料文件、配置源码或离线工作包。
         其他师傅、其他网点、已撤权或不存在的 taskId 均返回 404，避免资源枚举。
+        M359：对已知 TECHNICIAN_WEB/IOS，若冻结 FORM/EVIDENCE 与当前客户端不兼容，
+        返回 422 `CLIENT_CAPABILITY_UNSUPPORTED`，禁止进入现场中途执行。
       parameters:
         - name: taskId
           in: path
@@ -2448,6 +2452,7 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /technician/me/appointments/{appointmentId}/visits:check-in:
     post:
       operationId: checkInTechnicianVisit
@@ -7098,6 +7103,12 @@ components:
         effectiveFrom: { type: [string, 'null'], format: date-time }
         cursor: { type: string, minLength: 1, maxLength: 256 }
         invalidationReason: { type: [string, 'null'], maxLength: 100 }
+        clientCapabilityUnsupportedDetail:
+          type: [string, 'null']
+          maxLength: 500
+          description: |
+            M359：当前客户端无法履约该任务冻结 FORM/EVIDENCE 时的权威中文说明；
+            null 表示兼容或未强制预检（如 UNKNOWN clientKind / TOMBSTONE）。
     TechnicianPortalFeedPage:
       type: object
       additionalProperties: false

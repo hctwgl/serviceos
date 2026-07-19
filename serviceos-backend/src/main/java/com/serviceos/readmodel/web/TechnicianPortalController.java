@@ -6,6 +6,7 @@ import com.serviceos.readmodel.api.TechnicianPortalQueryService;
 import com.serviceos.readmodel.api.TechnicianPortalSchedulePage;
 import com.serviceos.readmodel.api.TechnicianPortalSyncSummary;
 import com.serviceos.readmodel.api.TechnicianPortalTaskDetail;
+import com.serviceos.shared.ClientMetadata;
 import com.serviceos.shared.CorrelationIds;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -36,10 +37,11 @@ final class TechnicianPortalController {
     ResponseEntity<TechnicianPortalFeedPage> taskFeed(
             @RequestHeader(value = "X-Technician-Context", required = false) String technicianContext,
             @RequestParam(value = "sinceCursor", required = false) String sinceCursor,
-            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestAttribute(value = ClientMetadata.KIND_ATTRIBUTE, required = false) String clientKind
     ) {
         TechnicianPortalFeedPage body = queries.taskFeed(
-                principals.current(), correlationId, technicianContext, sinceCursor);
+                principals.current(), correlationId, technicianContext, clientKind, sinceCursor);
         return ResponseEntity.ok()
                 .header(CorrelationIds.HEADER_NAME, correlationId)
                 .body(body);
@@ -73,10 +75,11 @@ final class TechnicianPortalController {
     ResponseEntity<TechnicianPortalTaskDetail> taskDetail(
             @PathVariable UUID taskId,
             @RequestHeader(value = "X-Technician-Context", required = false) String technicianContext,
-            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestAttribute(value = ClientMetadata.KIND_ATTRIBUTE, required = false) String clientKind
     ) {
         TechnicianPortalTaskDetail body = queries.taskDetail(
-                principals.current(), correlationId, technicianContext, taskId);
+                principals.current(), correlationId, technicianContext, clientKind, taskId);
         return ResponseEntity.ok()
                 .header(CorrelationIds.HEADER_NAME, correlationId)
                 .body(body);
