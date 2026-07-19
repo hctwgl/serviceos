@@ -221,7 +221,7 @@ final class WorkflowWorkOrderCancelledHandler implements OutboxMessageHandler {
                 "COMPENSATE_" + candidate.nodeId(), candidate.definitionVersionId(),
                 candidate.definitionDigest(), candidate.bundleId(), candidate.bundleDigest(),
                 definition.stageCode(), definition.taskType(), WorkflowTaskKind.AUTOMATED,
-                null, null, null,
+                null, null, null, null,
                 "compensation:" + candidate.nodeInstanceId() + ":" + message.eventId(),
                 payloadDigest, 100, now, 3,
                 message.correlationId(), message.eventId().toString()));

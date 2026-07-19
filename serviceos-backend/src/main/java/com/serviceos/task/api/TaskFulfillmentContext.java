@@ -15,6 +15,7 @@ public record TaskFulfillmentContext(
         String formRef,
         String slaRef,
         String assigneePolicyRef,
+        String dispatchPolicyRef,
         String status,
         String responsiblePrincipalId,
         boolean executionGuarded,

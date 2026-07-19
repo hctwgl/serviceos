@@ -42,7 +42,8 @@ final class DefaultConfigurationDependencyAnalysisService implements Configurati
             "evidenceRef", ConfigurationAssetType.EVIDENCE,
             "subProcessRef", ConfigurationAssetType.WORKFLOW,
             "integrationRef", ConfigurationAssetType.INTEGRATION,
-            "assigneePolicyRef", ConfigurationAssetType.ASSIGNEE_POLICY);
+            "assigneePolicyRef", ConfigurationAssetType.ASSIGNEE_POLICY,
+            "dispatchPolicyRef", ConfigurationAssetType.DISPATCH);
 
     private final JdbcClient jdbc;
     private final AuthorizationService authorization;

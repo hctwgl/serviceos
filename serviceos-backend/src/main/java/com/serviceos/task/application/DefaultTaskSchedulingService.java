@@ -121,6 +121,11 @@ final class DefaultTaskSchedulingService implements TaskSchedulingService {
             throw new IllegalArgumentException(
                     "assigneePolicyRef must be null or non-blank text up to 120 characters");
         }
+        if (command.dispatchPolicyRef() != null
+                && (command.dispatchPolicyRef().isBlank() || command.dispatchPolicyRef().length() > 120)) {
+            throw new IllegalArgumentException(
+                    "dispatchPolicyRef must be null or non-blank text up to 120 characters");
+        }
         requireText(command.payloadDigest(), "payloadDigest");
         requireText(command.workflowDefinitionDigest(), "workflowDefinitionDigest");
         requireText(command.configurationBundleDigest(), "configurationBundleDigest");
