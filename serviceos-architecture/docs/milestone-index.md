@@ -366,6 +366,7 @@ title: ServiceOS 里程碑索引
 | M355 | M355 平台终审真实端到端门禁 | [368-m355-final-review-e2e-gate.md](../architecture/368-m355-final-review-e2e-gate.md) | [352-m355-final-review-e2e-gate-acceptance.md](../testing/352-m355-final-review-e2e-gate-acceptance.md) |
 | M356 | M356 客户端能力兼容发布门禁 | [369-m356-client-capability-compat-gate.md](../architecture/369-m356-client-capability-compat-gate.md) | [353-m356-client-capability-compat-gate-acceptance.md](../testing/353-m356-client-capability-compat-gate-acceptance.md) |
 | M357 | M357 师傅端运行时客户端能力拒单 | [370-m357-technician-runtime-client-capability-gate.md](../architecture/370-m357-technician-runtime-client-capability-gate.md) | [354-m357-technician-runtime-client-capability-gate-acceptance.md](../testing/354-m357-technician-runtime-client-capability-gate-acceptance.md) |
+| M358 | M358 supportedClientKinds 定向发布 | [371-m358-supported-client-kinds-directed-publish.md](../architecture/371-m358-supported-client-kinds-directed-publish.md) | [355-m358-supported-client-kinds-directed-publish-acceptance.md](../testing/355-m358-supported-client-kinds-directed-publish-acceptance.md) |
 
 ## 未关联里程碑的文档
 

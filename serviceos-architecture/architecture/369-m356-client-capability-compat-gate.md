@@ -65,7 +65,7 @@ flywayVersion: "130"
 
 ## 明确未实现
 
-- 仅发布到兼容客户端 / 灰度 cohort；
+- 仅发布到兼容客户端 / 灰度 cohort（定向 `supportedClientKinds` 见 **M358**）；
 - 任务分配与详情头级运行时能力拒单（表单/资料路径运行时拒单见 **M357**）；
 - 条件类能力对 iOS 的全量发布硬阻断；
 - 客户端主动上报 SupportedCapabilities[] 动态注册；

@@ -58,7 +58,7 @@ flywayVersion: "130"
 
 ## 明确未实现
 
-- 灰度通道 / `supportedClientKinds`；
+- 灰度通道 / `supportedClientKinds`（定向发布见 **M358**）；
 - UNKNOWN 强制升级策略；
 - iOS 条件共用执行器与全量发布硬阻断；
 - Feed/任务详情头级拒单；
