@@ -29,8 +29,10 @@ import java.util.Set;
  *
  * <p>硬过滤：order 升序；结构化 filterKey 对候选求值，CUSTOM 仅用工单上下文表达式。
  * M337：先校验 policy.scope（brand/business/region）与工单是否相交，再求值 REGION_SCOPE
- * （候选 regionCodes 命中省/市/区任一码）。评分：结构化 factorKey × weight 求和；
- * 同分按 candidateId 字典序。无候选：按 fallback.onNoCandidate 降级并标记人工接管。</p>
+ * （候选 regionCodes 命中省/市/区任一码）。M338：ALLOCATION_RATIO_GAP 仅在
+ * allocationRatio.enabled 且 measure=ORDER_COUNT 时取候选缺口；禁用则贡献 0。
+ * 评分：结构化 factorKey × weight 求和；同分按 candidateId 字典序。
+ * 无候选：按 fallback.onNoCandidate 降级并标记人工接管。</p>
  */
 @Service
 public class DefaultDispatchRuntime implements DispatchRuntime {
@@ -139,7 +141,7 @@ public class DefaultDispatchRuntime implements DispatchRuntime {
             double score = 0.0;
             List<String> breakdown = new ArrayList<>();
             for (ScoreFactor factor : policy.scoring()) {
-                double factorValue = structuredFactorValue(factor.factorKey(), candidate);
+                double factorValue = structuredFactorValue(factor.factorKey(), candidate, policy);
                 double contribution = factorValue * factor.weight();
                 score += contribution;
                 breakdown.add(factor.factorKey() + "=" + factorValue
@@ -252,12 +254,18 @@ public class DefaultDispatchRuntime implements DispatchRuntime {
                 || allowed.contains(region.districtCode());
     }
 
-    private static double structuredFactorValue(String factorKey, DispatchCandidate candidate) {
+    private static double structuredFactorValue(
+            String factorKey,
+            DispatchCandidate candidate,
+            PolicyDefinition policy
+    ) {
         return switch (factorKey) {
             case "REMAINING_CAPACITY" -> candidate.remainingCapacity();
             case "FULFILLMENT_RATE" -> candidate.fulfillmentRate();
             case "NETWORK_SCORE" -> candidate.networkScore();
-            case "ALLOCATION_RATIO_GAP" -> candidate.allocationRatioGap();
+            case "ALLOCATION_RATIO_GAP" -> policy.allocationRatioEnabled()
+                    ? candidate.allocationRatioGap()
+                    : 0.0;
             case "CURRENT_LOAD" -> candidate.currentLoad();
             case "CUSTOM" -> 0.0;
             default -> throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
@@ -326,6 +334,7 @@ public class DefaultDispatchRuntime implements DispatchRuntime {
                 }
             }
             Map<String, Object> scope = asObject(root.get("scope"), "scope");
+            boolean allocationRatioEnabled = parseAllocationRatioEnabled(root.get("allocationRatio"));
             return new PolicyDefinition(
                     policyKey,
                     stringSet(scope.get("brandCodes"), "scope.brandCodes"),
@@ -334,6 +343,7 @@ public class DefaultDispatchRuntime implements DispatchRuntime {
                     filters,
                     scoring,
                     capacityReservationRequired,
+                    allocationRatioEnabled,
                     text(fallback.get("onNoCandidate"), "fallback.onNoCandidate"),
                     text(fallback.get("manualRole"), "fallback.manualRole"),
                     number(fallback.get("resolutionHours"), "fallback.resolutionHours"));
@@ -343,6 +353,33 @@ public class DefaultDispatchRuntime implements DispatchRuntime {
             throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
                     "DISPATCH definitionJson is invalid: " + exception.getMessage());
         }
+    }
+
+    /**
+     * allocationRatio 缺省或 enabled=false → 关闭比例评分贡献。
+     * 启用时仅接受 period=MONTH + measure=ORDER_COUNT；其它口径失败关闭（不静默猜测）。
+     */
+    private static boolean parseAllocationRatioEnabled(Object raw) {
+        if (raw == null) {
+            return false;
+        }
+        Map<String, Object> ratio = asObject(raw, "allocationRatio");
+        Object enabledRaw = ratio.get("enabled");
+        boolean enabled = !(enabledRaw instanceof Boolean bool) || bool;
+        if (!enabled) {
+            return false;
+        }
+        Object period = ratio.get("period");
+        if (period != null && !"MONTH".equals(text(period, "allocationRatio.period"))) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                    "allocationRatio.period only MONTH is supported");
+        }
+        Object measure = ratio.get("measure");
+        if (measure != null && !"ORDER_COUNT".equals(text(measure, "allocationRatio.measure"))) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED,
+                    "allocationRatio.measure only ORDER_COUNT is supported in M338");
+        }
+        return true;
     }
 
     private static Set<String> stringSet(Object value, String field) {
@@ -394,6 +431,7 @@ public class DefaultDispatchRuntime implements DispatchRuntime {
             List<FilterDefinition> hardFilters,
             List<ScoreFactor> scoring,
             boolean capacityReservationRequired,
+            boolean allocationRatioEnabled,
             String fallbackOnNoCandidate,
             String fallbackManualRole,
             int fallbackResolutionHours

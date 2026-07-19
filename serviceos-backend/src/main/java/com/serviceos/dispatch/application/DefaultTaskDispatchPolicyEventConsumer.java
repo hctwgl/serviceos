@@ -9,6 +9,8 @@ import com.serviceos.configuration.api.DispatchRuntime;
 import com.serviceos.configuration.api.ExpressionContext;
 import com.serviceos.dispatch.api.ActivateNetworkFromFrozenDispatchCommand;
 import com.serviceos.dispatch.api.ActivateTechnicianFromFrozenDispatchCommand;
+import com.serviceos.dispatch.api.NetworkAllocationActualQuery;
+import com.serviceos.dispatch.api.NetworkAllocationTargetQuery;
 import com.serviceos.dispatch.api.ServiceAssignmentService;
 import com.serviceos.network.api.NetworkPortalTechnicianQuery;
 import com.serviceos.network.api.NetworkPortalTechnicianView;
@@ -39,10 +41,11 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * M324/M332/M337：task.created → 冻结 DISPATCH → ACTIVE NETWORK，再 → ACTIVE TECHNICIAN。
+ * M324/M332/M337/M338：task.created → 冻结 DISPATCH → ACTIVE NETWORK，再 → ACTIVE TECHNICIAN。
  *
  * <p>无 dispatchPolicyRef：N/A 完成 Inbox。NETWORK 候选来自项目网点 ∩ ACTIVE 网点 ∩
  * ACTIVE ServiceCoverage（品牌/业务/省市区精确匹配）∩ 容量；无覆盖失败关闭 MANUAL。
+ * M338：候选附带月度签约比例缺口（committedShare − actualShare，ORDER_COUNT）。
  * NETWORK 成功后解析网点内师傅；空池/无容量审计 TECHNICIAN MANUAL，保留 NETWORK。
  * TECHNICIAN 阶段仍用 {@code *} 通配候选（师傅覆盖未建模）。</p>
  */
@@ -56,6 +59,8 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
     private final ProjectNetworkDirectoryQuery projectNetworks;
     private final ServiceNetworkDirectoryQuery serviceNetworks;
     private final ServiceNetworkCoverageQuery coverages;
+    private final NetworkAllocationTargetQuery allocationTargets;
+    private final NetworkAllocationActualQuery allocationActuals;
     private final NetworkPortalTechnicianQuery technicians;
     private final DispatchRuntime dispatchRuntime;
     private final ServiceAssignmentService assignments;
@@ -70,6 +75,8 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
             ProjectNetworkDirectoryQuery projectNetworks,
             ServiceNetworkDirectoryQuery serviceNetworks,
             ServiceNetworkCoverageQuery coverages,
+            NetworkAllocationTargetQuery allocationTargets,
+            NetworkAllocationActualQuery allocationActuals,
             NetworkPortalTechnicianQuery technicians,
             DispatchRuntime dispatchRuntime,
             ServiceAssignmentService assignments,
@@ -83,6 +90,8 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
         this.projectNetworks = projectNetworks;
         this.serviceNetworks = serviceNetworks;
         this.coverages = coverages;
+        this.allocationTargets = allocationTargets;
+        this.allocationActuals = allocationActuals;
         this.technicians = technicians;
         this.dispatchRuntime = dispatchRuntime;
         this.assignments = assignments;
@@ -201,6 +210,8 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
             regionsByNetwork.computeIfAbsent(networkId, ignored -> new LinkedHashSet<>())
                     .add(row.regionCode());
         }
+        Map<String, Double> ratioGaps = allocationRatioGaps(
+                message.tenantId(), task.projectId(), wo.brandCode(), wo.serviceProductCode(), asOf);
         List<DispatchCandidate> candidates = new ArrayList<>();
         for (Map.Entry<String, Set<String>> entry : regionsByNetwork.entrySet()) {
             CapacitySnapshot capacity = capacitySnapshot(
@@ -213,7 +224,8 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
                     wo.brandCode(),
                     wo.serviceProductCode(),
                     entry.getValue(),
-                    capacity.remaining()));
+                    capacity.remaining(),
+                    ratioGaps.getOrDefault(entry.getKey(), 0.0)));
         }
 
         DispatchResolution resolution = dispatchRuntime.resolve(new DispatchResolveCommand(
@@ -415,12 +427,42 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
                 .orElse(null);
     }
 
+    /**
+     * gap = committedShare − actualShare；缺口越大越欠配，正权重下优先。
+     * 无目标行的网点 gap=0（中性）；当月总派单为 0 时 actualShare=0。
+     */
+    private Map<String, Double> allocationRatioGaps(
+            String tenantId,
+            UUID projectId,
+            String brandCode,
+            String businessType,
+            Instant asOf
+    ) {
+        Map<String, Double> targets = allocationTargets.listCommittedShares(
+                tenantId, projectId, brandCode, businessType, asOf);
+        if (targets.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, Long> actuals = allocationActuals.countMonthlyNetworkAssignments(
+                tenantId, projectId, brandCode, businessType, asOf);
+        long total = actuals.values().stream().mapToLong(Long::longValue).sum();
+        Map<String, Double> gaps = new LinkedHashMap<>();
+        for (Map.Entry<String, Double> target : targets.entrySet()) {
+            double actualShare = total <= 0
+                    ? 0.0
+                    : actuals.getOrDefault(target.getKey(), 0L) / (double) total;
+            gaps.put(target.getKey(), target.getValue() - actualShare);
+        }
+        return gaps;
+    }
+
     private static DispatchCandidate coverageCandidate(
             String candidateId,
             String brandCode,
             String businessType,
             Set<String> regionCodes,
-            int remaining
+            int remaining,
+            double allocationRatioGap
     ) {
         return new DispatchCandidate(
                 candidateId,
@@ -434,7 +476,7 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
                 0.0,
                 0.0,
                 0.0,
-                0.0);
+                allocationRatioGap);
     }
 
     private static DispatchCandidate wildcardCandidate(String candidateId, int remaining) {

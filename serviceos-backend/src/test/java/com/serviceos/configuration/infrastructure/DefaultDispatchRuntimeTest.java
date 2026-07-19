@@ -159,6 +159,82 @@ class DefaultDispatchRuntimeTest {
     }
 
     @Test
+    void allocationRatioGapPrefersUnderAllocatedCandidate() {
+        String definition = """
+                {
+                  "policyKey":"ratio",
+                  "version":"1.0.0",
+                  "scope":{"brandCodes":["BYD_OCEAN"],"businessTypes":["HOME_CHARGING_SURVEY_INSTALL"],"regionCodes":["370000"]},
+                  "hardFilters":[
+                    {"filterKey":"ENABLED","order":1,
+                     "expression":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.brandCode == \\"BYD_OCEAN\\""},
+                     "failureCode":"DISABLED"}
+                  ],
+                  "scoring":[
+                    {"factorKey":"ALLOCATION_RATIO_GAP","weight":10.0,
+                     "expression":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.brandCode == \\"BYD_OCEAN\\""}},
+                    {"factorKey":"REMAINING_CAPACITY","weight":0.01,
+                     "expression":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.brandCode == \\"BYD_OCEAN\\""}}
+                  ],
+                  "allocationRatio":{"enabled":true,"period":"MONTH","measure":"ORDER_COUNT"},
+                  "capacity":{"reservationRequired":false},
+                  "fallback":{"onNoCandidate":"MANUAL_INTERVENTION","manualRole":"OPS","resolutionHours":2}
+                }
+                """;
+        var runtime = runtimeWith(definition);
+        DispatchCandidate strongCapacity = new DispatchCandidate(
+                "net-strong", true, false, true,
+                Set.of("BYD_OCEAN"), Set.of("370000"), Set.of("HOME_CHARGING_SURVEY_INSTALL"),
+                10, 0.0, 0.0, 0.0, 0.1);
+        DispatchCandidate weakCapacity = new DispatchCandidate(
+                "net-weak", true, false, true,
+                Set.of("BYD_OCEAN"), Set.of("370000"), Set.of("HOME_CHARGING_SURVEY_INSTALL"),
+                2, 0.0, 0.0, 0.0, 0.8);
+        DispatchResolution resolution = runtime.resolve(new DispatchResolveCommand(
+                "tenant-a", UUID.randomUUID(), "a".repeat(64), "ratio",
+                context(), List.of(strongCapacity, weakCapacity)));
+        assertThat(resolution.rankedCandidates().getFirst().candidateId()).isEqualTo("net-weak");
+    }
+
+    @Test
+    void allocationRatioDisabledZerosGapFactor() {
+        String definition = """
+                {
+                  "policyKey":"ratio-off",
+                  "version":"1.0.0",
+                  "scope":{"brandCodes":["BYD_OCEAN"],"businessTypes":["HOME_CHARGING_SURVEY_INSTALL"],"regionCodes":["370000"]},
+                  "hardFilters":[
+                    {"filterKey":"ENABLED","order":1,
+                     "expression":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.brandCode == \\"BYD_OCEAN\\""},
+                     "failureCode":"DISABLED"}
+                  ],
+                  "scoring":[
+                    {"factorKey":"ALLOCATION_RATIO_GAP","weight":100.0,
+                     "expression":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.brandCode == \\"BYD_OCEAN\\""}},
+                    {"factorKey":"REMAINING_CAPACITY","weight":1.0,
+                     "expression":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.brandCode == \\"BYD_OCEAN\\""}}
+                  ],
+                  "allocationRatio":{"enabled":false,"period":"MONTH","measure":"ORDER_COUNT"},
+                  "capacity":{"reservationRequired":false},
+                  "fallback":{"onNoCandidate":"MANUAL_INTERVENTION","manualRole":"OPS","resolutionHours":2}
+                }
+                """;
+        var runtime = runtimeWith(definition);
+        DispatchCandidate strongCapacity = new DispatchCandidate(
+                "net-strong", true, false, true,
+                Set.of("BYD_OCEAN"), Set.of("370000"), Set.of("HOME_CHARGING_SURVEY_INSTALL"),
+                10, 0.0, 0.0, 0.0, 0.1);
+        DispatchCandidate weakCapacity = new DispatchCandidate(
+                "net-weak", true, false, true,
+                Set.of("BYD_OCEAN"), Set.of("370000"), Set.of("HOME_CHARGING_SURVEY_INSTALL"),
+                2, 0.0, 0.0, 0.0, 0.9);
+        DispatchResolution resolution = runtime.resolve(new DispatchResolveCommand(
+                "tenant-a", UUID.randomUUID(), "a".repeat(64), "ratio-off",
+                context(), List.of(strongCapacity, weakCapacity)));
+        assertThat(resolution.rankedCandidates().getFirst().candidateId()).isEqualTo("net-strong");
+    }
+
+    @Test
     void failsClosedWhenPolicyMissing() {
         var runtime = runtimeWith("""
                 {"policyKey":"exists","version":"1.0.0",

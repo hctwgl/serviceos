@@ -7,26 +7,24 @@ lastUpdated: 2026-07-19
 
 ## 当前
 
-- PR #148～#163：M321～M336 Draft stacked
-- PR #164：https://github.com/hctwgl/serviceos/pull/164 — **M337** DISPATCH ServiceCoverage 地图（Draft，base=#163）
+- PR #148～#164：M321～M337 Draft stacked
+- PR #PENDING：`cursor/m338-dispatch-allocation-ratio-88d5` — **M338** DISPATCH 比例缺口（Draft，base=#164）
 - `master`：`32b902f897d19d2c906acac899990bf1aa2bb056`
-- latestMilestone：**M337**
-- Flyway：**126**；OpenAPI：**1.0.43**
+- latestMilestone：**M338**
+- Flyway：**127**；OpenAPI：**1.0.43**
 
 ## 本回合完成
 
-### M337 DISPATCH 地图 scope / ServiceCoverage
+### M338 DISPATCH 签约比例缺口
 
-- Flyway `V126`：`net_service_network_coverage`
-- `ServiceNetworkCoverageQuery`：ACTIVE 覆盖按 brand/business/时间窗查询
-- NETWORK 候选 = 项目网点 ∩ ACTIVE ∩ Coverage（省/市/区精确匹配）∩ 容量
-- `DefaultDispatchRuntime`：policy.scope 门禁；REGION_SCOPE 省市区任一命中
-- 无覆盖失败关闭 MANUAL；同城弱网优先于异地高容量
-- 文档：`350-m337-*` / `334-m337-*`
+- Flyway `V127`：`dsp_network_allocation_target`
+- Target/Actual 查询（ORDER_COUNT / MONTH）；Consumer 填 gap
+- Runtime：`allocationRatio` 门禁；仅 ORDER_COUNT
+- 文档：`351-m338-*` / `335-m338-*`
 
-### 既有 Draft 栈
+### M337（同会话先交付）
 
-- M321～M336（PR #148～#163）
+- PR #164：https://github.com/hctwgl/serviceos/pull/164 — ServiceCoverage 地图
 
 ## 验证
 
@@ -38,10 +36,9 @@ bash scripts/agent-verify.sh test ArchitectureTest
 
 ## 下一本地主线
 
-1. DISPATCH 比例分配
-2. Update/Cancel Mapping 强制 / Mapper 拆除
-3. 低代码深化（运行时已接入后再做）
-4. 吉利联调 — `BLOCKED_EXTERNAL`
+1. Update/Cancel Mapping 强制 / Mapper 拆除
+2. 低代码深化（运行时已接入后再做）
+3. 吉利联调 — `BLOCKED_EXTERNAL`
 
 ## BLOCKED_EXTERNAL
 

@@ -346,6 +346,7 @@ title: ServiceOS 里程碑索引
 | M335 | M335 CREATE_WORK_ORDER 强制 INBOUND Mapping | [348-m335-inbound-create-work-order-mapping-required.md](../architecture/348-m335-inbound-create-work-order-mapping-required.md) | [332-m335-inbound-create-work-order-mapping-required-acceptance.md](../testing/332-m335-inbound-create-work-order-mapping-required-acceptance.md) |
 | M336 | M336 CREATE_WORK_ORDER RouteHint 与 OEM 字段 Mapper 瘦身 | [349-m336-create-work-order-route-hint.md](../architecture/349-m336-create-work-order-route-hint.md) | [333-m336-create-work-order-route-hint-acceptance.md](../testing/333-m336-create-work-order-route-hint-acceptance.md) |
 | M337 | M337 DISPATCH 地图 scope 与 ServiceCoverage | [350-m337-dispatch-map-scope-coverage.md](../architecture/350-m337-dispatch-map-scope-coverage.md) | [334-m337-dispatch-map-scope-coverage-acceptance.md](../testing/334-m337-dispatch-map-scope-coverage-acceptance.md) |
+| M338 | M338 DISPATCH 签约比例缺口评分 | [351-m338-dispatch-allocation-ratio.md](../architecture/351-m338-dispatch-allocation-ratio.md) | [335-m338-dispatch-allocation-ratio-acceptance.md](../testing/335-m338-dispatch-allocation-ratio-acceptance.md) |
 
 ## 未关联里程碑的文档
 

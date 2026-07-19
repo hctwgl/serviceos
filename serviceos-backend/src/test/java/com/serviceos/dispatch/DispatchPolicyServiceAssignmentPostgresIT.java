@@ -30,8 +30,8 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * M324/M332/M337：冻结 DISPATCH 在 task.created 后自动激活 NETWORK（含 ServiceCoverage），
- * 再激活 TECHNICIAN。
+ * M324/M332/M337/M338：冻结 DISPATCH 在 task.created 后自动激活 NETWORK
+ * （ServiceCoverage + 签约比例缺口），再激活 TECHNICIAN。
  */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = ServiceOsApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE)
@@ -73,7 +73,7 @@ class DispatchPolicyServiceAssignmentPostgresIT {
                 TRUNCATE TABLE rdm_work_order_timeline_entry, rel_outbox_publish_attempt, rel_outbox_event,
                     rel_inbox_record, rel_idempotency_record, dsp_assignment_command_result,
                     dsp_capacity_reservation, dsp_service_assignment_activation_saga,
-                    dsp_service_assignment, dsp_capacity_counter,
+                    dsp_service_assignment, dsp_capacity_counter, dsp_network_allocation_target,
                     tsk_task_assignment, tsk_task_assignment_batch, tsk_task_execution_attempt, tsk_task,
                     wfl_node_instance, wfl_stage_instance, wfl_workflow_instance, wo_work_order,
                     cfg_configuration_bundle_item, cfg_configuration_bundle, cfg_configuration_asset_version,
@@ -97,7 +97,7 @@ class DispatchPolicyServiceAssignmentPostgresIT {
                 .param("createdAt", OffsetDateTime.now())
                 .update();
         seedNetworksAndCapacity();
-        dispatchVersionId = publishBundleWithDispatchPolicy();
+        dispatchVersionId = publishBundleWithDispatchPolicy(false);
     }
 
     @Test
@@ -212,6 +212,24 @@ class DispatchPolicyServiceAssignmentPostgresIT {
                 """).query(String.class).single()).isEqualTo(NETWORK_WEAK.toString());
     }
 
+    @Test
+    void allocationRatioPreferUnderAllocatedNetworkDespiteLowerCapacity() {
+        // 重发 Bundle：比例缺口权重大于剩余产能。
+        jdbc.sql("TRUNCATE TABLE cfg_configuration_bundle_item, cfg_configuration_bundle, cfg_configuration_asset_version CASCADE")
+                .update();
+        dispatchVersionId = publishBundleWithDispatchPolicy(true);
+        seedAllocationTarget(NETWORK_STRONG, 0.20);
+        seedAllocationTarget(NETWORK_WEAK, 0.80);
+        workOrders.receive(receiveCommand(
+                "M338-ORD-RATIO", "f".repeat(64), "VINM3380001", "corr-m338-ratio", "cause-m338-ratio"));
+        drainOutbox(50);
+
+        assertThat(jdbc.sql("""
+                SELECT assignee_id FROM dsp_service_assignment
+                 WHERE responsibility_level = 'NETWORK' AND status = 'ACTIVE'
+                """).query(String.class).single()).isEqualTo(NETWORK_WEAK.toString());
+    }
+
     private ReceiveExternalWorkOrderCommand receiveCommand(
             String externalOrderCode,
             String payloadDigest,
@@ -227,7 +245,7 @@ class DispatchPolicyServiceAssignmentPostgresIT {
                 LocalDateTime.of(2026, 7, 19, 10, 0), correlationId, causationId);
     }
 
-    private UUID publishBundleWithDispatchPolicy() {
+    private UUID publishBundleWithDispatchPolicy(boolean withAllocationRatio) {
         String workflow = """
                 {"workflowKey":"M324_DISPATCH","semanticVersion":"1.0.0","startNodeId":"START",
                  "nodes":[
@@ -240,7 +258,21 @@ class DispatchPolicyServiceAssignmentPostgresIT {
                    {"transitionId":"t1","from":"START","to":"HUMAN"},
                    {"transitionId":"t2","from":"HUMAN","to":"END"}]}
                 """.replaceAll("\\s+", "");
-        String dispatch = """
+        String scoring = withAllocationRatio
+                ? """
+                  "scoring":[
+                    {"factorKey":"ALLOCATION_RATIO_GAP","weight":100.0,
+                     "expression":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.brandCode == \\"BYD_OCEAN\\""}},
+                    {"factorKey":"REMAINING_CAPACITY","weight":0.01,
+                     "expression":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.brandCode == \\"BYD_OCEAN\\""}}],
+                  "allocationRatio":{"enabled":true,"period":"MONTH","measure":"ORDER_COUNT",
+                                    "qualityMayOverride":true},
+                  """
+                : """
+                  "scoring":[{"factorKey":"REMAINING_CAPACITY","weight":1.0,
+                     "expression":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.brandCode == \\"BYD_OCEAN\\""}}],
+                  """;
+        String dispatch = ("""
                 {"policyKey":"default-dispatch","version":"1.0.0",
                  "scope":{"brandCodes":["BYD_OCEAN"],"businessTypes":["HOME_CHARGING_SURVEY_INSTALL"],
                           "regionCodes":["370000"]},
@@ -257,11 +289,10 @@ class DispatchPolicyServiceAssignmentPostgresIT {
                    {"filterKey":"REGION_SCOPE","order":4,
                     "expression":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.brandCode == \\"BYD_OCEAN\\""},
                     "failureCode":"REGION_MISMATCH"}],
-                 "scoring":[{"factorKey":"REMAINING_CAPACITY","weight":1.0,
-                    "expression":{"language":"SERVICEOS_EXPR_V1","source":"workOrder.brandCode == \\"BYD_OCEAN\\""}}],
+                 """ + scoring + """
                  "capacity":{"reservationRequired":true},
                  "fallback":{"onNoCandidate":"MANUAL_INTERVENTION","manualRole":"OPS","resolutionHours":4}}
-                """.replaceAll("\\s+", "");
+                """).replaceAll("\\s+", "");
         var workflowAsset = configurations.publishAsset(new PublishConfigurationAssetCommand(
                 TENANT, ConfigurationAssetType.WORKFLOW, "M324_DISPATCH",
                 "1.0.0", "1.0.0", workflow, Sha256.digest(workflow)));
@@ -273,6 +304,24 @@ class DispatchPolicyServiceAssignmentPostgresIT {
                 "HOME_CHARGING_SURVEY_INSTALL", "370000", Instant.now().minusSeconds(60),
                 null, List.of(workflowAsset.versionId(), dispatchAsset.versionId())));
         return dispatchAsset.versionId();
+    }
+
+    private void seedAllocationTarget(UUID networkId, double committedShare) {
+        jdbc.sql("""
+                INSERT INTO dsp_network_allocation_target (
+                    target_id, tenant_id, project_id, network_id, brand_code, business_type,
+                    committed_share, valid_from, valid_to, created_at
+                ) VALUES (
+                    :id, :tenant, :projectId, :networkId, 'BYD_OCEAN', 'HOME_CHARGING_SURVEY_INSTALL',
+                    :share, now() - interval '1 day', NULL, now()
+                )
+                """)
+                .param("id", UUID.randomUUID())
+                .param("tenant", TENANT)
+                .param("projectId", projectId)
+                .param("networkId", networkId.toString())
+                .param("share", committedShare)
+                .update();
     }
 
     private void seedNetworksAndCapacity() {
