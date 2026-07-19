@@ -440,3 +440,4 @@ Feature gate/authority: if applicable
 | M343 | REFERENCE_OEM SAMPLE Update/Cancel Mapping：RouteHint + 强制 INBOUND Mapping | Update/Cancel Service/Controller + Security + ReferenceOemInboundUpdateCancelPostgresIT + 356-m343-* + 340-m343-* + PR #170 | 真实 OEM 合同、OpenAPI、吉利联调 |
 | M344 | EVIDENCE 同 stage FORM fieldKey 发现 → formValues 积木 | extractFormFieldKeys + DesignerPage + StructuredAssetEditor + Node 冒烟 + Admin build + 357-m344-* + 341-m344-* + PR #171 | qualityChecks UI、Bundle 运行时解析 |
 | M345 | 一元取反 `!` 条件积木 round-trip + UI | ConditionNot + parseNot + ConditionGroupBlock + Node 冒烟 + Admin build + 358-m345-* + 342-m345-* + PR #172 | De Morgan 规范化、Technician 执行器 |
+| M346 | EVIDENCE qualityChecks 可视编辑（checkType/severity） | StructuredAssetEditor qualityChecks UI + Admin build + 359-m346-* + 343-m346-* | parameters/expression、OCR/CV 运行时 |

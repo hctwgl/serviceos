@@ -249,6 +249,63 @@ const DATA_TYPES = [
   'FILE_REF',
 ]
 const MEDIA_TYPES = ['PHOTO', 'VIDEO', 'DOCUMENT', 'SIGNATURE', 'GENERATED_REPORT']
+const QUALITY_CHECK_TYPES = [
+  'BLUR',
+  'DARK',
+  'GLARE',
+  'DUPLICATE',
+  'HISTORICAL_IMAGE',
+  'GPS_DISTANCE',
+  'OCR',
+  'SN_MATCH',
+  'VIN_MATCH',
+  'CUSTOM_RULE',
+] as const
+const QUALITY_SEVERITIES = ['WARN', 'BLOCK'] as const
+
+function qualityChecksOf(item: Record<string, unknown>): Array<Record<string, unknown>> {
+  return Array.isArray(item.qualityChecks)
+    ? (item.qualityChecks as Array<Record<string, unknown>>)
+    : []
+}
+
+function addQualityCheck(itemIndex: number) {
+  const item = evidenceItems.value[itemIndex]
+  if (!item) return
+  updateEvidenceItem(itemIndex, {
+    qualityChecks: [
+      ...qualityChecksOf(item),
+      { checkType: 'BLUR', severity: 'WARN' },
+    ],
+  })
+}
+
+function updateQualityCheck(
+  itemIndex: number,
+  checkIndex: number,
+  patch: Record<string, unknown>,
+) {
+  const item = evidenceItems.value[itemIndex]
+  if (!item) return
+  const next = qualityChecksOf(item).map((check, i) =>
+    i === checkIndex ? { ...check, ...patch } : check,
+  )
+  updateEvidenceItem(itemIndex, { qualityChecks: next })
+}
+
+function removeQualityCheck(itemIndex: number, checkIndex: number) {
+  const item = evidenceItems.value[itemIndex]
+  if (!item) return
+  const next = qualityChecksOf(item).filter((_, i) => i !== checkIndex)
+  if (next.length === 0) {
+    const cleared = { ...item }
+    delete cleared.qualityChecks
+    const items = evidenceItems.value.map((entry, i) => (i === itemIndex ? cleared : entry))
+    setRoot('items', items)
+    return
+  }
+  updateEvidenceItem(itemIndex, { qualityChecks: next })
+}
 </script>
 
 <template>
@@ -491,6 +548,53 @@ const MEDIA_TYPES = ['PHOTO', 'VIDEO', 'DOCUMENT', 'SIGNATURE', 'GENERATED_REPOR
             未发现同 stage FORM 草稿字段；可用高级源码写 formValues["…"]，或先创建同 stage FORM 草稿。
           </template>
         </p>
+        <div class="quality-checks" data-testid="evidence-quality-checks">
+          <strong>qualityChecks</strong>
+          <p class="hint">仅编辑 checkType/severity；parameters/expression 与 OCR/CV 运行时仍未接受。</p>
+          <div
+            v-for="(check, cIndex) in qualityChecksOf(item)"
+            :key="cIndex"
+            class="row"
+            :data-testid="`evidence-quality-check-${index}-${cIndex}`"
+          >
+            <select
+              data-testid="quality-check-type"
+              :value="String(check.checkType ?? 'BLUR')"
+              @change="
+                updateQualityCheck(index, cIndex, {
+                  checkType: ($event.target as HTMLSelectElement).value,
+                })
+              "
+            >
+              <option v-for="ct in QUALITY_CHECK_TYPES" :key="ct" :value="ct">{{ ct }}</option>
+            </select>
+            <select
+              data-testid="quality-check-severity"
+              :value="String(check.severity ?? 'WARN')"
+              @change="
+                updateQualityCheck(index, cIndex, {
+                  severity: ($event.target as HTMLSelectElement).value,
+                })
+              "
+            >
+              <option v-for="sv in QUALITY_SEVERITIES" :key="sv" :value="sv">{{ sv }}</option>
+            </select>
+            <button
+              type="button"
+              data-testid="remove-quality-check"
+              @click="removeQualityCheck(index, cIndex)"
+            >
+              删除校验
+            </button>
+          </div>
+          <button
+            type="button"
+            data-testid="add-quality-check"
+            @click="addQualityCheck(index)"
+          >
+            添加 qualityCheck
+          </button>
+        </div>
       </article>
       <button type="button" data-testid="add-evidence-item" @click="addEvidenceItem">
         添加资料项
@@ -575,7 +679,8 @@ header {
   gap: 0.35rem;
   align-items: center;
 }
-.field-block {
+.field-block,
+.quality-checks {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
