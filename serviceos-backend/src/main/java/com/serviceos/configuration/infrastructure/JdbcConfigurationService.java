@@ -413,7 +413,8 @@ final class JdbcConfigurationService implements ConfigurationService {
         return jdbc.sql("""
                 SELECT asset.version_id, asset.asset_type, asset.asset_key,
                        asset.semantic_version, asset.schema_version,
-                       asset.definition::text AS definition_json, asset.content_digest
+                       asset.definition::text AS definition_json, asset.content_digest,
+                       target.supported_client_kinds::text AS supported_client_kinds
                   FROM cfg_configuration_bundle bundle
                   JOIN cfg_configuration_bundle_item item
                     ON item.tenant_id = bundle.tenant_id
@@ -423,6 +424,9 @@ final class JdbcConfigurationService implements ConfigurationService {
                    AND asset.version_id = item.asset_version_id
                    AND asset.asset_type = item.asset_type
                    AND asset.content_digest = item.content_digest
+                  LEFT JOIN cfg_configuration_asset_client_target target
+                    ON target.version_id = asset.version_id
+                   AND target.tenant_id = asset.tenant_id
                  WHERE bundle.tenant_id = :tenantId
                    AND bundle.bundle_id = :bundleId
                    AND bundle.manifest_digest = :manifestDigest
@@ -442,7 +446,8 @@ final class JdbcConfigurationService implements ConfigurationService {
                         rs.getString("semantic_version"),
                         rs.getString("schema_version"),
                         rs.getString("definition_json"),
-                        rs.getString("content_digest")))
+                        rs.getString("content_digest"),
+                        readSupportedClientKinds(rs.getString("supported_client_kinds"))))
                 .list();
     }
 
@@ -459,12 +464,17 @@ final class JdbcConfigurationService implements ConfigurationService {
         ConfigurationAssetType requiredType = java.util.Objects.requireNonNull(assetType, "assetType");
         String requiredDigest = requiredText(expectedContentDigest, "expectedContentDigest", 64);
         return jdbc.sql("""
-                SELECT version_id, asset_type, asset_key, semantic_version, schema_version,
-                       definition::text AS definition_json, content_digest
-                  FROM cfg_configuration_asset_version
-                 WHERE tenant_id = :tenantId AND version_id = :versionId
-                   AND asset_type = :assetType AND content_digest = :contentDigest
-                   AND status = 'PUBLISHED'
+                SELECT asset.version_id, asset.asset_type, asset.asset_key,
+                       asset.semantic_version, asset.schema_version,
+                       asset.definition::text AS definition_json, asset.content_digest,
+                       target.supported_client_kinds::text AS supported_client_kinds
+                  FROM cfg_configuration_asset_version asset
+                  LEFT JOIN cfg_configuration_asset_client_target target
+                    ON target.version_id = asset.version_id
+                   AND target.tenant_id = asset.tenant_id
+                 WHERE asset.tenant_id = :tenantId AND asset.version_id = :versionId
+                   AND asset.asset_type = :assetType AND asset.content_digest = :contentDigest
+                   AND asset.status = 'PUBLISHED'
                 """)
                 .param("tenantId", requiredTenant)
                 .param("versionId", requiredVersion)
@@ -475,11 +485,33 @@ final class JdbcConfigurationService implements ConfigurationService {
                         ConfigurationAssetType.valueOf(rs.getString("asset_type")),
                         rs.getString("asset_key"), rs.getString("semantic_version"),
                         rs.getString("schema_version"), rs.getString("definition_json"),
-                        rs.getString("content_digest")))
+                        rs.getString("content_digest"),
+                        readSupportedClientKinds(rs.getString("supported_client_kinds"))))
                 .optional()
                 .orElseThrow(() -> new ConfigurationResolutionException(
                         ConfigurationResolutionException.Reason.NO_MATCH,
                         "published configuration asset version does not match the frozen identity"));
+    }
+
+    private List<String> readSupportedClientKinds(String json) {
+        if (json == null || json.isBlank() || "null".equals(json)) {
+            return List.of();
+        }
+        try {
+            JsonNode node = definitionMapper.readTree(json);
+            if (!node.isArray()) {
+                return List.of();
+            }
+            java.util.ArrayList<String> kinds = new java.util.ArrayList<>();
+            node.forEach(item -> {
+                if (item.isTextual() && !item.asText().isBlank()) {
+                    kinds.add(item.asText());
+                }
+            });
+            return List.copyOf(kinds);
+        } catch (Exception exception) {
+            throw new IllegalStateException("supported_client_kinds 无法解码", exception);
+        }
     }
 
     private AssetRow findAsset(PublishConfigurationAssetCommand command) {

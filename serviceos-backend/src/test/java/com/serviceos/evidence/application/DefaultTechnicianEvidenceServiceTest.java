@@ -74,6 +74,7 @@ class DefaultTechnicianEvidenceServiceTest {
         service = new DefaultTechnicianEvidenceService(
                 affiliations, assignments, tasks, slots, evidence, snapshots, formSubmissions, humanTasks,
                 authorization, clientCapabilityRuntimeGate,
+                mock(com.serviceos.configuration.api.ConfigurationService.class),
                 new ObjectMapper(), Clock.fixed(NOW, ZoneOffset.UTC));
         when(affiliations.findActiveTechnicianProfile("tenant-264", PRINCIPAL))
                 .thenReturn(Optional.of(new TechnicianProfileView(

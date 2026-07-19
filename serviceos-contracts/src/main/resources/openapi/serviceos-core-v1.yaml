@@ -5975,12 +5975,26 @@ components:
         schemaVersion: { type: string, minLength: 1, maxLength: 64 }
         definitionJson: { type: string, minLength: 2, maxLength: 1000000 }
         baseVersionId: { type: [string, 'null'], format: uuid }
+        supportedClientKinds:
+          type: [array, 'null']
+          description: |
+            M358：FORM/EVIDENCE 定向发布目标客户端。省略或 null 表示全部生产师傅端（M356 默认）；
+            非空时仅对声明集合做并集阻断，且集合内每一端必须完全兼容。
+          minItems: 1
+          uniqueItems: true
+          items: { type: string, enum: [TECHNICIAN_WEB, TECHNICIAN_IOS] }
     UpdateConfigurationDraftRequest:
       type: object
       additionalProperties: false
       required: [definitionJson]
       properties:
         definitionJson: { type: string, minLength: 2, maxLength: 1000000 }
+        supportedClientKinds:
+          type: [array, 'null']
+          description: |
+            省略则保留原值；空数组清除为全端默认；非空覆盖定向目标。
+          uniqueItems: true
+          items: { type: string, enum: [TECHNICIAN_WEB, TECHNICIAN_IOS] }
     ApproveConfigurationDraftRequest:
       type: object
       additionalProperties: false
@@ -6208,6 +6222,10 @@ components:
         updatedBy: { type: string }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+        supportedClientKinds:
+          type: [array, 'null']
+          description: M358 定向发布目标；null 表示未声明（全部生产师傅端）。
+          items: { type: string, enum: [TECHNICIAN_WEB, TECHNICIAN_IOS] }
         clientCompatibility:
           type: [object, 'null']
           description: FORM/EVIDENCE 相对生产师傅端的客户端能力兼容报告；其他资产类型可为 null。

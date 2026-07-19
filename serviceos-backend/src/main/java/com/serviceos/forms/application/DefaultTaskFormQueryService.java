@@ -69,6 +69,7 @@ final class DefaultTaskFormQueryService implements TaskFormQueryService {
         ConfigurationAssetDefinition asset = matches.getFirst();
         return List.of(new TaskFormDefinition(
                 taskId, asset.versionId(), asset.assetKey(), asset.semanticVersion(),
-                asset.schemaVersion(), asset.definitionJson(), asset.contentDigest()));
+                asset.schemaVersion(), asset.definitionJson(), asset.contentDigest(),
+                asset.supportedClientKinds()));
     }
 }

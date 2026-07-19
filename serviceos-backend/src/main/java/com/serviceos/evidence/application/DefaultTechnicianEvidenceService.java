@@ -3,6 +3,9 @@ package com.serviceos.evidence.application;
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.configuration.api.ClientCapabilityRuntimeGate;
+import com.serviceos.configuration.api.ConfigurationAssetDefinition;
+import com.serviceos.configuration.api.ConfigurationAssetType;
+import com.serviceos.configuration.api.ConfigurationService;
 import com.serviceos.dispatch.api.TechnicianActiveAssignmentQuery;
 import com.serviceos.evidence.api.BeginEvidenceUploadCommand;
 import com.serviceos.evidence.api.CreateEvidenceSetSnapshotCommand;
@@ -61,6 +64,7 @@ final class DefaultTechnicianEvidenceService implements TechnicianEvidenceServic
     private final HumanTaskCommandService humanTasks;
     private final AuthorizationService authorization;
     private final ClientCapabilityRuntimeGate clientCapabilityRuntimeGate;
+    private final ConfigurationService configurations;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
@@ -75,6 +79,7 @@ final class DefaultTechnicianEvidenceService implements TechnicianEvidenceServic
             HumanTaskCommandService humanTasks,
             AuthorizationService authorization,
             ClientCapabilityRuntimeGate clientCapabilityRuntimeGate,
+            ConfigurationService configurations,
             ObjectMapper objectMapper,
             Clock clock
     ) {
@@ -88,6 +93,7 @@ final class DefaultTechnicianEvidenceService implements TechnicianEvidenceServic
         this.humanTasks = humanTasks;
         this.authorization = authorization;
         this.clientCapabilityRuntimeGate = clientCapabilityRuntimeGate;
+        this.configurations = configurations;
         this.objectMapper = objectMapper;
         this.clock = clock;
     }
@@ -101,9 +107,9 @@ final class DefaultTechnicianEvidenceService implements TechnicianEvidenceServic
             String clientKind,
             UUID taskId
     ) {
-        requireCurrentTask(principal, correlationId, context, taskId);
+        TaskFulfillmentContext task = requireCurrentTask(principal, correlationId, context, taskId);
         List<EvidenceSlotView> resolved = slots.listForTask(principal, correlationId, taskId);
-        requireClientCompatible(clientKind, resolved);
+        requireClientCompatible(principal.tenantId(), task, clientKind, resolved);
         return resolved;
     }
 
@@ -116,8 +122,9 @@ final class DefaultTechnicianEvidenceService implements TechnicianEvidenceServic
             String clientKind,
             UUID taskId
     ) {
-        requireCurrentTask(principal, correlationId, context, taskId);
-        requireClientCompatible(clientKind, slots.listForTask(principal, correlationId, taskId));
+        TaskFulfillmentContext task = requireCurrentTask(principal, correlationId, context, taskId);
+        requireClientCompatible(principal.tenantId(), task, clientKind,
+                slots.listForTask(principal, correlationId, taskId));
         return evidence.listForTask(principal, correlationId, taskId);
     }
 
@@ -129,9 +136,9 @@ final class DefaultTechnicianEvidenceService implements TechnicianEvidenceServic
             String clientKind,
             TechnicianBeginEvidenceUploadCommand command
     ) {
-        requireCurrentTask(principal, metadata.correlationId(), context, command.taskId());
-        requireClientCompatible(
-                clientKind,
+        TaskFulfillmentContext task = requireCurrentTask(
+                principal, metadata.correlationId(), context, command.taskId());
+        requireClientCompatible(principal.tenantId(), task, clientKind,
                 slots.listForTask(principal, metadata.correlationId(), command.taskId()));
         return evidence.beginUpload(principal, metadata, new BeginEvidenceUploadCommand(
                 command.taskId(), command.slotId(), command.evidenceItemId(),
@@ -147,9 +154,9 @@ final class DefaultTechnicianEvidenceService implements TechnicianEvidenceServic
             String clientKind,
             FinalizeEvidenceUploadCommand command
     ) {
-        requireCurrentTask(principal, metadata.correlationId(), context, command.taskId());
-        requireClientCompatible(
-                clientKind,
+        TaskFulfillmentContext task = requireCurrentTask(
+                principal, metadata.correlationId(), context, command.taskId());
+        requireClientCompatible(principal.tenantId(), task, clientKind,
                 slots.listForTask(principal, metadata.correlationId(), command.taskId()));
         return evidence.finalizeUpload(principal, metadata, command);
     }
@@ -164,9 +171,10 @@ final class DefaultTechnicianEvidenceService implements TechnicianEvidenceServic
             UUID taskId,
             List<UUID> memberRevisionIds
     ) {
-        requireCurrentTask(principal, metadata.correlationId(), context, taskId);
-        requireClientCompatible(
-                clientKind, slots.listForTask(principal, metadata.correlationId(), taskId));
+        TaskFulfillmentContext task = requireCurrentTask(
+                principal, metadata.correlationId(), context, taskId);
+        requireClientCompatible(principal.tenantId(), task, clientKind,
+                slots.listForTask(principal, metadata.correlationId(), taskId));
         return snapshots.create(principal, metadata,
                 new CreateEvidenceSetSnapshotCommand(taskId, "TASK_SUBMISSION", memberRevisionIds));
     }
@@ -182,8 +190,7 @@ final class DefaultTechnicianEvidenceService implements TechnicianEvidenceServic
     ) {
         TaskFulfillmentContext task = requireCurrentTask(
                 principal, metadata.correlationId(), context, command.taskId());
-        requireClientCompatible(
-                clientKind,
+        requireClientCompatible(principal.tenantId(), task, clientKind,
                 slots.listForTask(principal, metadata.correlationId(), command.taskId()));
         EvidenceSetSnapshotView snapshot = snapshots.get(
                 principal, metadata.correlationId(), command.evidenceSetSnapshotId());
@@ -223,11 +230,36 @@ final class DefaultTechnicianEvidenceService implements TechnicianEvidenceServic
         return humanTasks.complete(principal, metadata, completion);
     }
 
-    private void requireClientCompatible(String clientKind, List<EvidenceSlotView> resolvedSlots) {
+    private void requireClientCompatible(
+            String tenantId,
+            TaskFulfillmentContext task,
+            String clientKind,
+            List<EvidenceSlotView> resolvedSlots
+    ) {
         clientCapabilityRuntimeGate.requireCompatibleEvidenceSlots(
                 clientKind,
                 resolvedSlots.stream().map(EvidenceSlotView::mediaType).toList(),
-                resolvedSlots.stream().map(EvidenceSlotView::requirementDefinitionJson).toList());
+                resolvedSlots.stream().map(EvidenceSlotView::requirementDefinitionJson).toList(),
+                resolveEvidenceSupportedClientKinds(tenantId, task));
+    }
+
+    /** 从冻结 Bundle 的 EVIDENCE 资产读取定向目标；未声明则空列表（全端默认）。 */
+    private List<String> resolveEvidenceSupportedClientKinds(
+            String tenantId, TaskFulfillmentContext task
+    ) {
+        if (task.configurationBundleId() == null
+                || task.configurationBundleDigest() == null
+                || task.configurationBundleDigest().isBlank()) {
+            return List.of();
+        }
+        return configurations.listBundleAssets(
+                        tenantId, task.configurationBundleId(), task.configurationBundleDigest(),
+                        ConfigurationAssetType.EVIDENCE)
+                .stream()
+                .map(ConfigurationAssetDefinition::supportedClientKinds)
+                .filter(kinds -> kinds != null && !kinds.isEmpty())
+                .findFirst()
+                .orElse(List.of());
     }
 
     /**

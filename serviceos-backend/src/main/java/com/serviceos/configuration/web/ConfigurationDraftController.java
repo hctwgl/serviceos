@@ -68,7 +68,8 @@ final class ConfigurationDraftController {
                         request.intendedSemanticVersion(),
                         request.schemaVersion(),
                         request.definitionJson(),
-                        request.baseVersionId()));
+                        request.baseVersionId(),
+                        request.supportedClientKinds()));
         return ok(view, correlationId);
     }
 
@@ -83,7 +84,9 @@ final class ConfigurationDraftController {
         ConfigurationDraftView view = drafts.update(
                 principals.current(),
                 new CommandMetadata(correlationId, idempotencyKey == null ? correlationId : idempotencyKey),
-                new UpdateConfigurationDraftCommand(draftId, version(ifMatch), request.definitionJson()));
+                new UpdateConfigurationDraftCommand(
+                        draftId, version(ifMatch), request.definitionJson(),
+                        request.supportedClientKinds()));
         return ok(view, correlationId);
     }
 
@@ -203,6 +206,7 @@ final class ConfigurationDraftController {
                 view.validationErrors(), view.approvalRef(), view.approvedBy(), view.approvedAt(),
                 view.aggregateVersion(), view.createdBy(), view.updatedBy(),
                 view.createdAt(), view.updatedAt(),
+                view.supportedClientKinds(),
                 toCompatibilityResponse(view.clientCompatibility()));
     }
 
@@ -255,11 +259,12 @@ final class ConfigurationDraftController {
             String intendedSemanticVersion,
             String schemaVersion,
             String definitionJson,
-            UUID baseVersionId
+            UUID baseVersionId,
+            List<String> supportedClientKinds
     ) {
     }
 
-    record UpdateDraftRequest(String definitionJson) {
+    record UpdateDraftRequest(String definitionJson, List<String> supportedClientKinds) {
     }
 
     record ApproveDraftRequest(String approvalRef) {
@@ -295,6 +300,7 @@ final class ConfigurationDraftController {
             String updatedBy,
             Instant createdAt,
             Instant updatedAt,
+            List<String> supportedClientKinds,
             ClientCompatibilityResponse clientCompatibility
     ) {
     }

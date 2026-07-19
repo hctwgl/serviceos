@@ -61,4 +61,18 @@ class DefaultClientCapabilityRuntimeGateTest {
                 .isInstanceOfSatisfying(BusinessProblem.class, problem ->
                         assertThat(problem.code()).isEqualTo(ProblemCode.CLIENT_CAPABILITY_UNSUPPORTED));
     }
+
+    @Test
+    void iosRejectedWhenOutsideWebOnlyTarget() {
+        assertThatThrownBy(() -> gate.requireCompatible(
+                "TECHNICIAN_IOS", ConfigurationAssetType.FORM, """
+                        {"sections":[{"sectionKey":"s","title":"S","fields":[
+                          {"fieldKey":"a","label":"A","dataType":"STRING","binding":"task.input.a"}]}]}
+                        """,
+                List.of("TECHNICIAN_WEB")))
+                .isInstanceOfSatisfying(BusinessProblem.class, problem -> {
+                    assertThat(problem.code()).isEqualTo(ProblemCode.CLIENT_CAPABILITY_UNSUPPORTED);
+                    assertThat(problem.getMessage()).contains("定向发布目标");
+                });
+    }
 }

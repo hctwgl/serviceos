@@ -17,7 +17,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * 运行时能力门禁实现。与发布门禁共用能力目录与提取器，但按单一 clientKind 失败关闭。
+ * 运行时能力门禁实现。与发布门禁共用能力目录与提取器，但按单一 clientKind 失败关闭；
+ * 若资产声明了 supportedClientKinds，则先校验客户端是否在目标集合内。
  */
 @Service
 final class DefaultClientCapabilityRuntimeGate implements ClientCapabilityRuntimeGate {
@@ -37,11 +38,22 @@ final class DefaultClientCapabilityRuntimeGate implements ClientCapabilityRuntim
     public void requireCompatible(
             String clientKind, ConfigurationAssetType assetType, String definitionJson
     ) {
+        requireCompatible(clientKind, assetType, definitionJson, List.of());
+    }
+
+    @Override
+    public void requireCompatible(
+            String clientKind,
+            ConfigurationAssetType assetType,
+            String definitionJson,
+            List<String> supportedClientKinds
+    ) {
         if (!enforceable(clientKind)
                 || (assetType != ConfigurationAssetType.FORM
                 && assetType != ConfigurationAssetType.EVIDENCE)) {
             return;
         }
+        denyIfOutsideTarget(clientKind, supportedClientKinds);
         Set<String> required = analyzer.requiredCapabilities(assetType, definitionJson);
         denyIfMissing(clientKind, required);
     }
@@ -50,11 +62,37 @@ final class DefaultClientCapabilityRuntimeGate implements ClientCapabilityRuntim
     public void requireCompatibleEvidenceSlots(
             String clientKind, List<String> mediaTypes, List<String> requirementDefinitionJsons
     ) {
+        requireCompatibleEvidenceSlots(clientKind, mediaTypes, requirementDefinitionJsons, List.of());
+    }
+
+    @Override
+    public void requireCompatibleEvidenceSlots(
+            String clientKind,
+            List<String> mediaTypes,
+            List<String> requirementDefinitionJsons,
+            List<String> supportedClientKinds
+    ) {
         if (!enforceable(clientKind)) {
             return;
         }
+        denyIfOutsideTarget(clientKind, supportedClientKinds);
         requireCompatible(clientKind, ConfigurationAssetType.EVIDENCE,
                 synthesizeEvidenceDefinition(mediaTypes, requirementDefinitionJsons));
+    }
+
+    private void denyIfOutsideTarget(String clientKind, List<String> supportedClientKinds) {
+        if (supportedClientKinds == null || supportedClientKinds.isEmpty()) {
+            return;
+        }
+        if (supportedClientKinds.contains(clientKind)) {
+            return;
+        }
+        String detail = "当前客户端（" + clientKindLabel(clientKind)
+                + "）不在本任务配置的定向发布目标（"
+                + supportedClientKinds.stream().map(DefaultClientCapabilityRuntimeGate::clientKindLabel)
+                .collect(Collectors.joining("、"))
+                + "）内。请使用兼容端处理，或由配置调整 supportedClientKinds。";
+        throw new BusinessProblem(ProblemCode.CLIENT_CAPABILITY_UNSUPPORTED, detail);
     }
 
     private void denyIfMissing(String clientKind, Set<String> required) {

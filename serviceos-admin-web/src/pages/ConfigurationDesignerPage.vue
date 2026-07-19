@@ -17,6 +17,7 @@ import {
   type ConfigurationHistoricalReplayReport,
   type ConfigurationSimulationReport,
   type DesignerAssetType,
+  type TechnicianClientKind,
 } from '../api/configurationDrafts'
 import WorkflowCanvas from '../components/WorkflowCanvas.vue'
 import StructuredAssetEditor from '../components/StructuredAssetEditor.vue'
@@ -43,11 +44,41 @@ const message = ref<string | null>(null)
 
 const createKey = ref('platform.designer.demo')
 const createVersion = ref('1.0.0')
+/** null = 未定向（全部生产师傅端）；非空 = 显式定向目标 */
+const supportedClientKinds = ref<TechnicianClientKind[] | null>(null)
+
+const showClientTargetEditor = computed(
+  () => assetType.value === 'FORM' || assetType.value === 'EVIDENCE',
+)
 
 function clientKindLabel(kind: string): string {
   if (kind === 'TECHNICIAN_WEB') return '师傅 H5'
   if (kind === 'TECHNICIAN_IOS') return '师傅 iOS'
   return kind
+}
+
+function toggleSupportedKind(kind: TechnicianClientKind, checked: boolean) {
+  const current = new Set<TechnicianClientKind>(
+    supportedClientKinds.value ?? ['TECHNICIAN_WEB', 'TECHNICIAN_IOS'],
+  )
+  if (checked) current.add(kind)
+  else current.delete(kind)
+  // 两端都选 = 恢复全端默认（null）；至少保留一端。
+  if (current.size === 0) {
+    current.add(kind === 'TECHNICIAN_WEB' ? 'TECHNICIAN_IOS' : 'TECHNICIAN_WEB')
+  }
+  supportedClientKinds.value =
+    current.size === 2 ? null : ([...current] as TechnicianClientKind[])
+}
+
+function isKindSelected(kind: TechnicianClientKind): boolean {
+  // 未定向时 UI 展示为两端均勾选（语义=全端默认），保存时仍传 null。
+  if (supportedClientKinds.value == null) return true
+  return supportedClientKinds.value.includes(kind)
+}
+
+function kindsPayloadForWrite(): TechnicianClientKind[] | null {
+  return supportedClientKinds.value
 }
 
 const showCanvas = computed(() => assetType.value === 'WORKFLOW')
@@ -117,6 +148,9 @@ const discoveredFormFieldSourceLabel = computed(() => {
 function selectDraft(draft: ConfigurationDraft) {
   selected.value = draft
   definitionText.value = prettyJson(draft.definitionJson)
+  supportedClientKinds.value = draft.supportedClientKinds?.length
+    ? [...draft.supportedClientKinds]
+    : null
   diffView.value = null
   dependencyReport.value = null
   simulationReport.value = null
@@ -442,6 +476,9 @@ async function createDraft() {
       intendedSemanticVersion: createVersion.value.trim(),
       schemaVersion: '1.0.0',
       definitionJson,
+      supportedClientKinds: showClientTargetEditor.value
+        ? (kindsPayloadForWrite() ?? undefined)
+        : undefined,
     })
     selectDraft(created.data)
     message.value = '草稿已创建'
@@ -463,6 +500,7 @@ async function saveDraft() {
       selected.value.draftId,
       definitionText.value,
       selected.value.aggregateVersion,
+      showClientTargetEditor.value ? (kindsPayloadForWrite() ?? []) : undefined,
     )
     selectDraft(updated.data)
     message.value = '草稿已保存'
@@ -485,6 +523,7 @@ async function validateDraft() {
         selected.value.draftId,
         definitionText.value,
         selected.value.aggregateVersion,
+        showClientTargetEditor.value ? (kindsPayloadForWrite() ?? []) : undefined,
       )
       selectDraft(updated.data)
     }
@@ -760,6 +799,41 @@ onMounted(async () => {
           <li v-for="(item, index) in selected.validationErrors" :key="index">{{ item }}</li>
         </ul>
         <div
+          v-if="showClientTargetEditor"
+          class="client-targets"
+          data-testid="supported-client-kinds"
+        >
+          <h3>定向发布目标</h3>
+          <p class="hint">
+            未缩小目标时保持全端默认（M356）。勾选子集后，声明端必须完全兼容方可校验/发布。
+          </p>
+          <label>
+            <input
+              type="checkbox"
+              :checked="isKindSelected('TECHNICIAN_WEB')"
+              data-testid="target-TECHNICIAN_WEB"
+              @change="toggleSupportedKind('TECHNICIAN_WEB', ($event.target as HTMLInputElement).checked)"
+            />
+            师傅 H5
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              :checked="isKindSelected('TECHNICIAN_IOS')"
+              data-testid="target-TECHNICIAN_IOS"
+              @change="toggleSupportedKind('TECHNICIAN_IOS', ($event.target as HTMLInputElement).checked)"
+            />
+            师傅 iOS
+          </label>
+          <p class="meta">
+            当前：{{
+              supportedClientKinds == null
+                ? '全部生产师傅端（默认）'
+                : supportedClientKinds.map(clientKindLabel).join('、')
+            }}
+          </p>
+        </div>
+        <div
           v-if="selected?.clientCompatibility"
           class="compat"
           data-testid="client-compatibility-report"
@@ -768,7 +842,7 @@ onMounted(async () => {
           <p v-if="selected.clientCompatibility.blockingErrors.length" class="err">
             存在阻断项，禁止发布到生产师傅端。
           </p>
-          <p v-else class="ok">无全端阻断项；分端缺口如下（灰度通道尚未开放）。</p>
+          <p v-else class="ok">无阻断项；分端缺口如下（定向目标内硬校验，未定向仍为报告）。</p>
           <ul>
             <li
               v-for="report in selected.clientCompatibility.clientReports"

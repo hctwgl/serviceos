@@ -25,6 +25,8 @@ export type ClientCompatibilityReport = {
   clientReports: ClientCompatibilityClientReport[]
 }
 
+export type TechnicianClientKind = 'TECHNICIAN_WEB' | 'TECHNICIAN_IOS'
+
 export type ConfigurationDraft = {
   draftId: string
   assetType: DesignerAssetType
@@ -45,6 +47,7 @@ export type ConfigurationDraft = {
   updatedBy: string
   createdAt: string
   updatedAt: string
+  supportedClientKinds?: TechnicianClientKind[] | null
   clientCompatibility?: ClientCompatibilityReport | null
 }
 
@@ -107,6 +110,7 @@ export type CreateConfigurationDraftRequest = {
   schemaVersion: string
   definitionJson: string
   baseVersionId?: string | null
+  supportedClientKinds?: TechnicianClientKind[] | null
 }
 
 export function listConfigurationDrafts(assetType: DesignerAssetType = 'WORKFLOW') {
@@ -124,10 +128,15 @@ export function createConfigurationDraft(body: CreateConfigurationDraftRequest) 
   })
 }
 
-export function updateConfigurationDraft(draftId: string, definitionJson: string, aggregateVersion: number) {
+export function updateConfigurationDraft(
+  draftId: string,
+  definitionJson: string,
+  aggregateVersion: number,
+  supportedClientKinds?: TechnicianClientKind[] | null,
+) {
   return apiPut<ConfigurationDraft>(`/configuration/drafts/${draftId}`, {
     ifMatch: quotedVersion(aggregateVersion),
-    body: { definitionJson },
+    body: { definitionJson, supportedClientKinds },
   })
 }
 

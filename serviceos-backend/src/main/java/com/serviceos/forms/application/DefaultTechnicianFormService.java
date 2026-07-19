@@ -75,7 +75,8 @@ final class DefaultTechnicianFormService implements TechnicianFormService {
         List<TaskFormDefinition> definitions = forms.listForTask(principal, correlationId, taskId);
         for (TaskFormDefinition definition : definitions) {
             clientCapabilityRuntimeGate.requireCompatible(
-                    clientKind, ConfigurationAssetType.FORM, definition.definitionJson());
+                    clientKind, ConfigurationAssetType.FORM, definition.definitionJson(),
+                    definition.supportedClientKinds());
         }
         return definitions;
     }
@@ -95,7 +96,8 @@ final class DefaultTechnicianFormService implements TechnicianFormService {
                 principal, metadata.correlationId(), command.taskId())) {
             if (definition.formVersionId().equals(command.formVersionId())) {
                 clientCapabilityRuntimeGate.requireCompatible(
-                        clientKind, ConfigurationAssetType.FORM, definition.definitionJson());
+                        clientKind, ConfigurationAssetType.FORM, definition.definitionJson(),
+                        definition.supportedClientKinds());
             }
         }
         return submissions.submit(principal, metadata, command);

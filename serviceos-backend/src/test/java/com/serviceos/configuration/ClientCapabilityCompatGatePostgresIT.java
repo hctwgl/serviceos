@@ -54,8 +54,9 @@ class ClientCapabilityCompatGatePostgresIT {
     @BeforeEach
     void clean() {
         jdbc.sql("""
-                TRUNCATE TABLE cfg_configuration_asset_draft, cfg_configuration_bundle_item,
-                    cfg_configuration_bundle, cfg_configuration_asset_version,
+                TRUNCATE TABLE cfg_configuration_asset_client_target, cfg_configuration_asset_draft,
+                    cfg_configuration_bundle_item, cfg_configuration_bundle,
+                    cfg_configuration_asset_version,
                     auth_role_grant, auth_role_capability, auth_role, aud_audit_record CASCADE
                 """).update();
         seedGrants();
@@ -127,6 +128,41 @@ class ClientCapabilityCompatGatePostgresIT {
         assertThatThrownBy(() -> drafts.validate(principal(), meta("v-sig"), created.draftId()))
                 .isInstanceOf(ConfigurationPublicationException.class)
                 .hasMessageContaining("evidence.mediaType.SIGNATURE");
+    }
+
+    @Test
+    void webOnlyVisibleWhenValidatesAndPublishesWithClientTarget() {
+        ConfigurationDraftView created = drafts.create(principal(), meta("web-only"),
+                new CreateConfigurationDraftCommand(
+                        ConfigurationAssetType.FORM, "designer.form.webonly.m358", "1.0.0", "1.0.0",
+                        """
+                        {"formKey":"designer.form.webonly.m358","version":"1.0.0","stage":"SURVEY",
+                         "sections":[{"sectionKey":"base","title":"基础","fields":[
+                           {"fieldKey":"need","label":"需要","dataType":"BOOLEAN","binding":"task.input.need"},
+                           {"fieldKey":"detail","label":"详情","dataType":"STRING","binding":"task.input.detail",
+                            "visibleWhen":{"language":"SERVICEOS_EXPR_V1","source":"formValues[\\"need\\"] == true"}}]}]}
+                        """,
+                        null,
+                        List.of("TECHNICIAN_WEB")));
+        assertThat(created.supportedClientKinds()).containsExactly("TECHNICIAN_WEB");
+        ConfigurationDraftView validated = drafts.validate(principal(), meta("v-web"), created.draftId());
+        assertThat(validated.status()).isEqualTo("VALIDATED");
+        assertThat(validated.clientCompatibility().blocking()).isFalse();
+        assertThat(validated.clientCompatibility().clientReports()).hasSize(1);
+        drafts.approve(principal(), meta("a-web"),
+                new ApproveConfigurationDraftCommand(
+                        created.draftId(), validated.aggregateVersion(), "APR-M358-WEB"));
+        ConfigurationDraftView published = drafts.publish(principal(), meta("p-web"), created.draftId());
+        assertThat(published.status()).isEqualTo("PUBLISHED");
+        Integer targets = jdbc.sql("""
+                SELECT count(*) FROM cfg_configuration_asset_client_target
+                 WHERE tenant_id = :tenant AND version_id = :versionId
+                """)
+                .param("tenant", TENANT)
+                .param("versionId", published.publishedVersionId())
+                .query(Integer.class)
+                .single();
+        assertThat(targets).isEqualTo(1);
     }
 
     @Test

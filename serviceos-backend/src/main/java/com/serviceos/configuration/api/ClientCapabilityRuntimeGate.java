@@ -14,6 +14,15 @@ public interface ClientCapabilityRuntimeGate {
             String clientKind, ConfigurationAssetType assetType, String definitionJson);
 
     /**
+     * 带定向目标的运行时校验：若 {@code supportedClientKinds} 非空且当前客户端不在其中，直接拒单。
+     */
+    void requireCompatible(
+            String clientKind,
+            ConfigurationAssetType assetType,
+            String definitionJson,
+            List<String> supportedClientKinds);
+
+    /**
      * 由已解析槽位构造合成 EVIDENCE 定义后校验。
      *
      * @param requirementDefinitionJsons 各槽位的 requirement 定义（可含 requiredWhen）
@@ -21,4 +30,10 @@ public interface ClientCapabilityRuntimeGate {
      */
     void requireCompatibleEvidenceSlots(
             String clientKind, List<String> mediaTypes, List<String> requirementDefinitionJsons);
+
+    void requireCompatibleEvidenceSlots(
+            String clientKind,
+            List<String> mediaTypes,
+            List<String> requirementDefinitionJsons,
+            List<String> supportedClientKinds);
 }

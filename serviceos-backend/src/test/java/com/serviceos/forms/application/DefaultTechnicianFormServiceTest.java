@@ -92,7 +92,7 @@ class DefaultTechnicianFormServiceTest {
         doThrow(new BusinessProblem(ProblemCode.CLIENT_CAPABILITY_UNSUPPORTED,
                 "当前客户端（师傅 iOS）不支持本任务所需配置能力：表单字段条件显隐 visibleWhen（form.condition.visibleWhen）"))
                 .when(clientCapabilityRuntimeGate)
-                .requireCompatible(eq("TECHNICIAN_IOS"), eq(ConfigurationAssetType.FORM), any());
+                .requireCompatible(eq("TECHNICIAN_IOS"), eq(ConfigurationAssetType.FORM), any(), any());
         assertThatThrownBy(() -> service.listForTask(
                 principal(), "corr-ios", "TECHNICIAN|NETWORK|" + NETWORK, "TECHNICIAN_IOS", TASK))
                 .isInstanceOfSatisfying(BusinessProblem.class,
