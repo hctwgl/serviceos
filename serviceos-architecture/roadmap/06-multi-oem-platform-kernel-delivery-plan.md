@@ -2,7 +2,7 @@
 title: 多车企平台内核持续交付计划
 version: 0.1.0
 status: Accepted
-lastUpdated: 2026-07-18
+lastUpdated: 2026-07-19
 ---
 
 # 多车企平台内核持续交付计划
@@ -57,10 +57,14 @@ BYD 和 OEM2（REFERENCE 或真实）使用独立 Connector
 
 ## 6. 当前进度
 
-阶段一声明范围已闭合（真实 OEM2/OEM3 协议仍 BLOCKED_EXTERNAL）。
+阶段一声明范围已闭合（真实 OEM2/OEM3 Sandbox 协议仍 BLOCKED_EXTERNAL）。
 
-阶段二已开始：M275 PARALLEL_GATEWAY Implemented。
+阶段二（复杂流程运行时）与阶段三（十大配置资产设计器 / 校验 / Diff / 审批 / 灰度 / 回放）已交付至
+**M296**，并已合入 `master`（`f3b623453a33ece91a691438b0c541e53c3282df`）。
 
+下一程序（不在本表阶段一 1～11 切片内，另开里程碑）：完整通用 Connector SPI（Outbound/回调/
+技术与业务 ACK / Failure 分类）、配置资产运行时引擎、业务低代码设计器；吉利 PDF 可作为协议输入，
+缺 Sandbox/凭据时不得声称真实第二家已接入。
 
 | 切片 | 状态 | 证据 |
 |---|---|---|
@@ -72,3 +76,5 @@ BYD 和 OEM2（REFERENCE 或真实）使用独立 Connector
 | 9（M272） | Implemented | REFERENCE_OEM SAMPLE Connector、`285-m272-*` |
 | 10（M273） | Implemented | 双车企入站回归、`286-m273-*` |
 | 11（M274） | Implemented | 第三家接入手册、`287-m274-*` |
+| 阶段二 M275～M281 | Implemented | PARALLEL/TIMER/SUB_PROCESS/多实例、取消重开跳转/补偿、标准服务模板 |
+| 阶段三 M282～M296 | Implemented | 十大资产设计器、依赖/模拟/回放、Diff/审批、CANARY/回滚/停用 |

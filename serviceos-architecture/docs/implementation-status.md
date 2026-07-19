@@ -2,8 +2,8 @@
 title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
-lastUpdated: 2026-07-18
-baselineCommit: 7b981191dd168c210484483d7443fea446e7ce73
+lastUpdated: 2026-07-19
+baselineCommit: f3b623453a33ece91a691438b0c541e53c3282df
 latestMilestone: M296
 ---
 
@@ -40,7 +40,7 @@ latestMilestone: M296
 | 项目 | 当前值 |
 |---|---|
 | 最新实施里程碑 | M296 配置历史回放 |
-| 基线提交 | `7b981191dd168c210484483d7443fea446e7ce73`（功能证据；合并入 `master` 后改为合并提交） |
+| 基线提交 | `f3b623453a33ece91a691438b0c541e53c3282df`（PR #146 合入 `master`；功能证据 `7b981191dd168c210484483d7443fea446e7ce73`） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts`、`@serviceos/web-core`、`ServiceOSIOSCore`、独立且可部署的 `serviceos-network-web` 与 `serviceos-technician-web`、Swift 6 `TechnicianIOSFoundation`，以及已在 iPhone 17 Pro Simulator 安装启动、实跑 XCTest/XCUITest、形成 Production arm64 archive/dSYM，并接入当前任务、在线 Visit、冻结基础表单、前台 Evidence 采集上传、Snapshot/Task 完成与多轮资料整改的原生 `TechnicianIOS` SwiftUI App；由同一 Core OpenAPI 生成并经独立消费者门禁验证的 `@serviceos/core-client` 与 `ServiceOSCoreClient` |
 | 前端工程 | `serviceos-admin-web` 独立承载总部运营、统一用户中心、`/me` 导航、SavedView、UI Preference、受控搜索与最近访问；M256 后 Network 正式产品由独立 `serviceos-network-web` 承载，M257 后 Technician 正式产品由独立移动优先 `serviceos-technician-web` 承载，M262～M266 依次增加在线 Visit、冻结表单、Evidence 三段式上传、Snapshot/Task 完成与独立整改 Task 多轮补传/重新提交；Admin 仅保留可配置外链和 M188 诊断；两套独立 Web 均实际接入共享 Core、OIDC PKCE、服务端 Context/Capability/导航、Playwright 回归和独立容器镜像 |
@@ -178,12 +178,18 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 ServiceOS 可靠纵向切片已推进到 **M296**。阶段一已闭合；复杂流程运行时已覆盖 EXCLUSIVE、PARALLEL、
 WAIT_EVENT、TIMER、SUB_PROCESS、多实例、取消/重开/跳转，取消时配置化补偿任务（Flyway V109），标准模板族，十大配置资产类型设计器，Admin 设计器壳，Diff/审批门禁，Bundle 灰度/回滚/停用，Workflow 拖拽画布，百分比流量灰度，画布建边/条件编辑，多槽位 CANARY 与满量自动晋级（Flyway V117），WORKFLOW 配置依赖分析，干跑模拟，**冻结 Bundle 历史回放**，通道停用失败关闭（OpenAPI 1.0.39）。
 
-下一主线：Track F/G（iOS 离线/生产就绪，外部阻塞项）。
-真实 OEM2/3 与签名真机仍为 `BLOCKED_EXTERNAL`。
+下一主线（已批准）：完整通用 Connector SPI → 配置资产运行时引擎 → 业务低代码设计器 →
+真实第二家车企（吉利 PDF 已入库；Sandbox/凭据仍缺）。Track F/G（iOS 离线/签名真机/TestFlight/
+生产 IdP）与真实 OEM Sandbox 仍为 `BLOCKED_EXTERNAL`，不阻塞通用能力推进。
 
 ```text
 已接受推进顺序：
-1. Track F/G 与真实 OEM 外部证据（BLOCKED_EXTERNAL 项如实登记）。
+1. P0：M296 稳定基线收口（文档对齐 + 本地全量验证）；
+2. P1：完整通用 Connector SPI（Outbound/回调/ACK/Failure；自 M297）；
+3. P2：INTEGRATION → ASSIGNEE_POLICY → DISPATCH → NOTIFICATION → RULE → PRICING 运行时；
+4. P3：Workflow/条件积木/FORM/EVIDENCE/SLA 等低代码设计器；
+5. P4：吉利真实接入（缺 Sandbox/凭据则 BLOCKED_EXTERNAL，继续 P1～P3）；
+6. Track F/G 外部证据（签名真机/TestFlight/生产 IdP）如实登记，不阻塞上述主线。
 ```
 
 接手 Agent 必须先读取 `docs/autonomous-agent-handoff.md` 与本文件，验证 HEAD 后从断点继续。
