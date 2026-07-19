@@ -35,7 +35,7 @@ relatedMilestones: [M321, M304, M331, M332]
 
 ## 明确未实现
 
-- defaults/enum/condition DSL（并移除 brand/product 播种）
+- defaults/enum/condition DSL（并移除 brand/product 播种）→ 见 **M334**
 - 强制全部 connector 配置 INBOUND Mapping
 - 删除 OEM 入站 Mapper、吉利联调、DISPATCH 地图/比例
 

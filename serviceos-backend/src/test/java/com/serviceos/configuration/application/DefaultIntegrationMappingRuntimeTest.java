@@ -102,6 +102,71 @@ class DefaultIntegrationMappingRuntimeTest {
     }
 
     @Test
+    void appliesConstantDefaultEnumAndConditionDsl() {
+        String definition = """
+                {
+                  "mappingKey":"byd-dsl-v1",
+                  "version":"1.0.0",
+                  "connectorCode":"BYD_CPIM",
+                  "direction":"INBOUND",
+                  "fieldMappings":[
+                    {"mappingId":"order","externalPath":"orderCode","internalPath":"externalOrderCode","required":true,"transform":"TRIM"},
+                    {"mappingId":"brand","internalPath":"brandCode","required":true,"constantValue":"BYD_OCEAN","transform":"NONE"},
+                    {"mappingId":"product","internalPath":"serviceProductCode","required":true,"constantValue":"HOME_CHARGING_SURVEY_INSTALL","transform":"NONE"},
+                    {"mappingId":"mobile","externalPath":"contactMobile","internalPath":"customerMobile","required":true,"defaultValue":"13800000000","transform":"NONE"},
+                    {"mappingId":"type","externalPath":"carOwnerType","internalPath":"ownerType","required":true,"transform":"NONE",
+                     "enumMap":{"1":"PERSONAL","2":"CORPORATE"}},
+                    {"mappingId":"dealer","externalPath":"dealerName","internalPath":"dealer","required":false,"transform":"TRIM",
+                     "condition":{"sourcePath":"channel","operator":"EQUALS","value":"CPIM"}},
+                    {"mappingId":"skip","externalPath":"wallboxName","internalPath":"wallbox","required":true,"transform":"NONE",
+                     "condition":{"sourcePath":"channel","operator":"EQUALS","value":"OTHER"}}
+                  ]
+                }
+                """;
+        var runtime = runtimeWith(definition);
+        Map<String, Object> external = new LinkedHashMap<>();
+        external.put("orderCode", "  ORD-DSL  ");
+        external.put("carOwnerType", "1");
+        external.put("channel", "CPIM");
+        external.put("dealerName", "  济南店  ");
+        IntegrationMappingResult result = runtime.applyInbound(new IntegrationMappingApplyCommand(
+                "tenant-a", UUID.randomUUID(), "a".repeat(64), "byd-dsl-v1", external));
+        assertThat(result.internalFields())
+                .containsEntry("externalOrderCode", "ORD-DSL")
+                .containsEntry("brandCode", "BYD_OCEAN")
+                .containsEntry("serviceProductCode", "HOME_CHARGING_SURVEY_INSTALL")
+                .containsEntry("customerMobile", "13800000000")
+                .containsEntry("ownerType", "PERSONAL")
+                .containsEntry("dealer", "济南店")
+                .doesNotContainKey("wallbox");
+        assertThat(result.explanations()).anyMatch(text -> text.contains("skipped by condition"));
+    }
+
+    @Test
+    void enumMapMissAndConditionPresentFailClosedOrSkip() {
+        String enumMiss = """
+                {"mappingKey":"m-enum","version":"1.0.0","connectorCode":"BYD_CPIM","direction":"INBOUND",
+                 "fieldMappings":[{"mappingId":"type","externalPath":"carOwnerType","internalPath":"ownerType","required":true,"transform":"NONE",
+                  "enumMap":{"1":"PERSONAL"}}]}
+                """;
+        var runtime = runtimeWith(enumMiss);
+        assertThatThrownBy(() -> runtime.applyInbound(new IntegrationMappingApplyCommand(
+                "tenant-a", UUID.randomUUID(), "a".repeat(64), "m-enum", Map.of("carOwnerType", "9"))))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        p -> assertThat(p.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
+
+        String present = """
+                {"mappingKey":"m-present","version":"1.0.0","connectorCode":"BYD_CPIM","direction":"INBOUND",
+                 "fieldMappings":[{"mappingId":"note","externalPath":"remark","internalPath":"note","required":false,"transform":"TRIM",
+                  "condition":{"sourcePath":"remark","operator":"PRESENT"}}]}
+                """;
+        var presentRuntime = runtimeWith(present);
+        assertThat(presentRuntime.applyInbound(new IntegrationMappingApplyCommand(
+                "tenant-a", UUID.randomUUID(), "a".repeat(64), "m-present", Map.of()))
+                .internalFields()).isEmpty();
+    }
+
+    @Test
     void failsClosedWhenRequiredMissingOrUnknownTransform() {
         String missingRequired = """
                 {"mappingKey":"m1","version":"1.0.0","connectorCode":"BYD_CPIM","direction":"INBOUND",

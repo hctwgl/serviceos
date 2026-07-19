@@ -31,7 +31,6 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -48,8 +47,8 @@ import java.util.UUID;
  *
  * <p>当冻结 Bundle 含该 connector 的唯一 INBOUND Mapping 时，建单领域字段仅由 Mapping
  * 物化（M333，无适配器 fallback），{@code mappingVersionId} 取资产 versionId，Canonical
- * 嵌入 contentDigest。零 Mapping 时兼容旧适配器路径。brand/product 在 Mapping 输入侧由
- * 适配器意图播种（待 defaults DSL 退出）。</p>
+ * 嵌入 contentDigest。零 Mapping 时兼容旧适配器路径。brand/product 等常量由 Mapping
+ * {@code constantValue} 提供（M334），管道不再播种适配器字段。</p>
  *
  * <p>事务：调用方应已独立提交 RECEIVED Envelope；本管道在单一本地事务中提交
  * Canonical、工单、审计与 Outbox。配置失败或业务键冲突会 reject Envelope。</p>
@@ -157,7 +156,7 @@ public class InboundCreateWorkOrderPipeline {
         final CreateWorkOrderMappedInbound effectiveMapped;
         try {
             mappingResult = applyFrozenIntegrationMapping(
-                    safeTenant, connector, bundle, mapped, externalSourcePayload);
+                    safeTenant, connector, bundle, externalSourcePayload);
             if (mappingResult.isPresent()) {
                 // M333：Mapping 物化后不再回退适配器字段。
                 effectiveMapped = CreateWorkOrderMappingMaterializer.materialize(
@@ -200,7 +199,6 @@ public class InboundCreateWorkOrderPipeline {
             String tenantId,
             ConnectorIdentity connector,
             ConfigurationBundleReference bundle,
-            CreateWorkOrderMappedInbound adapterMapped,
             Map<String, Object> externalSourcePayload
     ) {
         boolean mappingConfigured = integrationMappingRuntime.hasInboundMappingForConnector(
@@ -213,14 +211,10 @@ public class InboundCreateWorkOrderPipeline {
                     com.serviceos.shared.ProblemCode.VALIDATION_FAILED,
                     "Frozen INTEGRATION mapping requires external source payload");
         }
-        // brand/product 常不在 OEM 原文；播种为 Mapping 输入，使资产可显式映射到内部字段。
-        // 删除条件：defaults/constant DSL 落地且全部 INBOUND 资产不再依赖播种键。
-        Map<String, Object> mappingInput = new LinkedHashMap<>(externalSourcePayload);
-        mappingInput.putIfAbsent("brandCode", adapterMapped.brandCode());
-        mappingInput.putIfAbsent("serviceProductCode", adapterMapped.serviceProductCode());
+        // M334：不再播种 brand/product；常量由 Mapping constantValue 提供。
         return integrationMappingRuntime.applyInboundForConnectorIfPresent(
                 tenantId, bundle.bundleId(), bundle.manifestDigest(),
-                connector.connectorCode(), mappingInput);
+                connector.connectorCode(), externalSourcePayload);
     }
 
     private void appendMappingAudit(

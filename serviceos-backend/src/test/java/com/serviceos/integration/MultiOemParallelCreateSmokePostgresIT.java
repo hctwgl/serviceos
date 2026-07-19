@@ -279,12 +279,12 @@ class MultiOemParallelCreateSmokePostgresIT {
                 tenantId, ConfigurationAssetType.WORKFLOW, workflowKey,
                 "1.0.0", "1.0.0", workflow, Sha256.digest(workflow)));
         if ("BYD".equals(clientId)) {
-            // M333：有 INBOUND Mapping 时建单字段仅取 Mapping，不得依赖适配器 fallback。
+            // M333/M334：建单字段仅 Mapping；brand/product 用 constantValue。
             String integration = "{\"mappingKey\":\"byd-multi\",\"version\":\"1.0.0\","
                     + "\"connectorCode\":\"BYD_CPIM\",\"direction\":\"INBOUND\",\"fieldMappings\":["
                     + "{\"mappingId\":\"order\",\"externalPath\":\"orderCode\",\"internalPath\":\"externalOrderCode\",\"required\":true,\"transform\":\"TRIM\"},"
-                    + "{\"mappingId\":\"brand\",\"externalPath\":\"brandCode\",\"internalPath\":\"brandCode\",\"required\":true,\"transform\":\"NONE\"},"
-                    + "{\"mappingId\":\"product\",\"externalPath\":\"serviceProductCode\",\"internalPath\":\"serviceProductCode\",\"required\":true,\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"brand\",\"internalPath\":\"brandCode\",\"required\":true,\"constantValue\":\"BYD_OCEAN\",\"transform\":\"NONE\"},"
+                    + "{\"mappingId\":\"product\",\"internalPath\":\"serviceProductCode\",\"required\":true,\"constantValue\":\"HOME_CHARGING_SURVEY_INSTALL\",\"transform\":\"NONE\"},"
                     + "{\"mappingId\":\"province\",\"externalPath\":\"provinceCode\",\"internalPath\":\"provinceCode\",\"required\":true,\"transform\":\"NONE\"},"
                     + "{\"mappingId\":\"city\",\"externalPath\":\"cityCode\",\"internalPath\":\"cityCode\",\"required\":true,\"transform\":\"NONE\"},"
                     + "{\"mappingId\":\"district\",\"externalPath\":\"areaCode\",\"internalPath\":\"districtCode\",\"required\":true,\"transform\":\"NONE\"},"

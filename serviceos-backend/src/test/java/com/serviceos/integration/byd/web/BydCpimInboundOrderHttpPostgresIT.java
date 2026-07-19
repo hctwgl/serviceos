@@ -392,12 +392,12 @@ class BydCpimInboundOrderHttpPostgresIT {
                 "1.0.0",
                 workflow,
                 Sha256.digest(workflow)));
-        // M333：建单必填字段均由 INBOUND Mapping 提供；UPPER 证明 Mapping 权威。
+        // M333/M334：建单字段仅 Mapping；brand/product 用 constantValue（无管道播种）。
         String integration = """
                 {"mappingKey":"byd-create-http","version":"1.0.0","connectorCode":"BYD_CPIM","direction":"INBOUND","fieldMappings":[
                   {"mappingId":"order","externalPath":"orderCode","internalPath":"externalOrderCode","required":true,"transform":"UPPER"},
-                  {"mappingId":"brand","externalPath":"brandCode","internalPath":"brandCode","required":true,"transform":"NONE"},
-                  {"mappingId":"product","externalPath":"serviceProductCode","internalPath":"serviceProductCode","required":true,"transform":"NONE"},
+                  {"mappingId":"brand","internalPath":"brandCode","required":true,"constantValue":"BYD_OCEAN","transform":"NONE"},
+                  {"mappingId":"product","internalPath":"serviceProductCode","required":true,"constantValue":"HOME_CHARGING_SURVEY_INSTALL","transform":"NONE"},
                   {"mappingId":"province","externalPath":"provinceCode","internalPath":"provinceCode","required":true,"transform":"NONE"},
                   {"mappingId":"city","externalPath":"cityCode","internalPath":"cityCode","required":true,"transform":"NONE"},
                   {"mappingId":"district","externalPath":"areaCode","internalPath":"districtCode","required":true,"transform":"NONE"},
