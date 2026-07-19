@@ -403,3 +403,4 @@ Feature gate/authority: if applicable
 | M306 | DISPATCH 运行时：硬过滤/评分/并列/无候选 Fallback；确定性解释；不写 ServiceAssignment | DispatchRuntime + unit/IT + `319-m306-*` + `303-m306-*` | 自动派单落账、比例分配闭环、NOTIFICATION 运行时 |
 | M307 | NOTIFICATION 运行时：冻结触发器/when/收件人角色/通道 SPI/幂等/UNKNOWN 人工接管；LocalReference Adapter | NotificationRuntime + LocalReference + unit/IT + `320-m307-*` + `304-m307-*` | 真实短信/邮件 Adapter、模板引擎、Outbox 投递、RULE/PRICING 运行时 |
 | M308 | RULE 运行时：冻结规则 when 求值 + 严重级别聚合（BLOCK>REQUIRE_APPROVAL>WARN>default）；无领域副作用 | RuleRuntime + unit/IT + `321-m308-*` + `305-m308-*` | ReviewCase 自动驱动、PRICING 运行时 |
+| M309 | PRICING 运行时：冻结价目 when 匹配 + amountMinor 合计；试算不落账 | PricingRuntime + unit/IT + `322-m309-*` + `306-m309-*` | 结算落账、对账、动态公式、P3 低代码增强 |
