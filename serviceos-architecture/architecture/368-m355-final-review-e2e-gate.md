@@ -26,7 +26,7 @@ flywayVersion: "130"
 | Admin | `npm run build` / `npm run test:unit` / FinalReviewWorkspace |
 | Playwright（Mock API） | `npx playwright test tests/e2e/final-review-workspace.spec.ts`：三栏加载、主操作禁用/驳回整改、只读无权限；截图 `tests/e2e/__screenshots__/final-review-*.png` |
 | L3 全量 | `bash scripts/verify-local.sh` → **BUILD SUCCESS**（含 `EvidenceSlotPostgresIT` 8/8；日志 `target/verification-logs/verify-20260719T135820-150345.log`） |
-| 冒烟 | `serviceos-deploy/admin-pilot/verify-admin-smoke.sh`（需 compose+Keycloak；本环境未完整实跑） |
+| 冒烟 | `verify-admin-smoke.sh`：已拉起 compose+Keycloak+Backend；入站 CREATE_WORK_ORDER **ACCEPTED**（补齐 ADMIN-PILOT INTEGRATION 种子）。Playwright 全量仍有可用性改造遗留失败（目录标题双 heading、资料槽位单元格文案、配置设计器等），终审 Mock E2E 与 L3 verify 已绿；真实 28 场景全绿需后续对齐目录/任务详情选择器。 |
 
 ## 明确未实现 / 限制
 

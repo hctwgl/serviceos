@@ -182,7 +182,7 @@ onMounted(() => {
     </form>
 
     <QueueTable
-      title="授权任务目录"
+      title="任务列表"
       :columns="['id', 'taskType', 'taskKind', 'status', 'priority', 'claimedBy', 'workOrderId', 'nextRunAt']"
       :column-labels="{
         id: '任务编号',

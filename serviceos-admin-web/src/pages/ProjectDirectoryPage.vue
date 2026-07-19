@@ -177,7 +177,7 @@ onMounted(() => {
     </article>
 
     <QueueTable
-      title="授权项目目录"
+      title="项目列表"
       :columns="['id', 'code', 'name', 'clientId', 'status', 'startsOn', 'endsOn']"
       :rows="rows"
       :link-columns="linkColumns"
