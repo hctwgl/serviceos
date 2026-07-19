@@ -9,6 +9,7 @@ lastUpdated: 2026-07-19
 
 - **进行中 Draft PR**：M361 整改路径客户端能力门禁对齐
   （依赖 M356～M360：#183～#187）
+- PR：https://github.com/hctwgl/serviceos/pull/188
 - 分支：`cursor/m361-correction-capability-gate-6a78`
   （base：`cursor/m360-final-review-visual-admin-pilot-6a78`）
 - latestMilestone（本 PR）：**M361**
