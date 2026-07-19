@@ -8773,6 +8773,61 @@ components:
         requestedBy: { type: string, minLength: 1, maxLength: 160 }
         requestedAt: { type: string, format: date-time }
         deliveryAggregateVersion: { type: integer, format: int64, minimum: 1 }
+    CreateBatchReplayRequest:
+      type: object
+      additionalProperties: false
+      required: [deliveryIds, mode, reason]
+      properties:
+        deliveryIds:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: { type: string, format: uuid }
+        mode: { type: string, enum: [PREVIEW, SUBMIT] }
+        reason: { type: string, minLength: 1, maxLength: 1000 }
+        approvalRef: { type: [string, 'null'], maxLength: 160 }
+        maxItems: { type: [integer, 'null'], minimum: 1, maximum: 50 }
+    ApproveBatchReplayRequest:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties:
+        decision: { type: string, enum: [APPROVE, REJECT] }
+        decisionNote: { type: [string, 'null'], maxLength: 1000 }
+        maxItems: { type: [integer, 'null'], minimum: 1, maximum: 50 }
+    BatchReplayRequest:
+      type: object
+      additionalProperties: false
+      required: [batchId, mode, status, reason, requestedBy, maxItems, createdAt, items]
+      properties:
+        batchId: { type: string, format: uuid }
+        mode: { type: string, enum: [PREVIEW, SUBMIT] }
+        status: { type: string, enum: [PREVIEWED, PENDING_APPROVAL, APPROVED, REJECTED, COMPLETED] }
+        reason: { type: string, minLength: 1, maxLength: 1000 }
+        approvalRef: { type: [string, 'null'], maxLength: 160 }
+        requestedBy: { type: string, minLength: 1, maxLength: 160 }
+        decidedBy: { type: [string, 'null'], maxLength: 160 }
+        decision: { type: [string, 'null'], enum: [APPROVE, REJECT] }
+        decisionNote: { type: [string, 'null'], maxLength: 1000 }
+        maxItems: { type: integer, minimum: 1, maximum: 50 }
+        createdAt: { type: string, format: date-time }
+        decidedAt: { type: [string, 'null'], format: date-time }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/BatchReplayItem' }
+    BatchReplayItem:
+      type: object
+      additionalProperties: false
+      required: [deliveryId, eligibility, itemStatus]
+      properties:
+        deliveryId: { type: string, format: uuid }
+        projectId: { type: [string, 'null'], format: uuid }
+        eligibility: { type: string, enum: [ELIGIBLE, INELIGIBLE] }
+        ineligibilityCode: { type: [string, 'null'], maxLength: 100 }
+        expectedDeliveryVersion: { type: [integer, 'null'], format: int64, minimum: 1 }
+        itemStatus: { type: string, enum: [PREVIEWED, PENDING, SCHEDULED, SKIPPED, FAILED] }
+        singleReplayRequestId: { type: [string, 'null'], format: uuid }
+        errorCode: { type: [string, 'null'], maxLength: 100 }
     DeliveryReplayRequest:
       type: object
       additionalProperties: false
