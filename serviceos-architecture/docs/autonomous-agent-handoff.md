@@ -7,11 +7,11 @@ lastUpdated: 2026-07-19
 
 ## 当前
 
-- PR #148～#172：M321～M345 Draft stacked
-- PR #173：https://github.com/hctwgl/serviceos/pull/173 — **M346** EVIDENCE qualityChecks（Draft，base=#172）
-- latestMilestone：**M346**
+- PR #148～#173：M321～M346 Draft stacked
+- 本分支：`cursor/m347-integration-mapping-dsl-ui-88d5` — **M347** Admin INTEGRATION Mapping DSL UI（Draft，base=#173）
+- latestMilestone：**M347**
 - Flyway：**127**；OpenAPI：**1.0.43**
-- `baselineCommit`：`a4dd25cc`（功能证据）
+- `baselineCommit`：功能提交后回填
 
 ## 本会话新增
 
@@ -20,11 +20,17 @@ lastUpdated: 2026-07-19
 | #171 | M344 EVIDENCE FORM fieldKey 发现 |
 | #172 | M345 一元取反 `!` |
 | #173 | M346 qualityChecks 可视编辑 |
+| （本 PR） | M347 INTEGRATION Mapping DSL UI |
 
-低代码 ConditionBuilder / FORM / EVIDENCE 深化主线（M340～M346）已收口。
-栈尖：`#148 → … → #173`。
+低代码 ConditionBuilder / FORM / EVIDENCE 深化主线（M340～M346）已收口；Admin Mapping DSL UI（M347）已交付。
+栈尖：`#148 → … → #173 → M347`。
 
-## 下一（均非可无阻塞推进）
+## 下一（可无阻塞推进）
+
+1. **M348** — DISPATCH 残留编辑器：`scope`、`fallback`、`allocationRatio`（锁定 ORDER_COUNT + MONTH；不暴露 AMOUNT/WEIGHTED）
+2. **M349** — Technician Web FORM 条件执行器（H5 当前对 visibility/requiredWhen fail-close）
+
+## 硬门禁（不可发明推进）
 
 1. **AMOUNT/加权比例** — 需业务确认口径，暂停
 2. **BUSINESS 日历 SLA / 结算落账** — R3，需独立批准

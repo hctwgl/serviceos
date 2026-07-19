@@ -674,17 +674,19 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M346 EVIDENCE qualityChecks 可视编辑**（https://github.com/hctwgl/serviceos/pull/173；栈 `#148→…→#173`；
+当前工程基线为 **M347 Admin INTEGRATION Mapping DSL 可视编辑**（Draft stacked 于 `#148→…→#173` + 本切片；
 见 `implementation-status.md`；合入 `master` 后回填合并提交）。M320 合并基线为
 `32b902f897d19d2c906acac899990bf1aa2bb056`（PR #147）。
 
 当前已具备多 OEM SPI、远端查询、UNKNOWN/批量重放、复杂流程、十大资产设计器、六类 Runtime，
 入站/出站 Mapping（M321～M339，含 CREATE/UPDATE/CANCEL 强制 Mapping + messageType）、
 FORM/EVIDENCE ConditionBuilder（M340/M341）与嵌套条件组（M342）、REFERENCE_OEM Update/Cancel（M343）、
+Admin Mapping DSL UI（M347）、
 ASSIGNEE/DISPATCH NETWORK+TECHNICIAN+Coverage+比例缺口（M323/M324/M332/M337/M338）、
 RULE（M325/M329/M330）、NOTIFICATION（M326）、PRICING SHADOW Snapshot（M327），以及 Admin
 UNKNOWN 人工处置与批量 Replay 工作台（M328）。
-下一主线：吉利材料到位后优先联调；否则 AMOUNT/加权（待业务确认）或 BUSINESS 日历 SLA；
+下一主线：M348 DISPATCH 残留编辑器 → M349 Technician 条件执行器；
+吉利材料到位后优先联调；AMOUNT/加权（待业务确认）与 BUSINESS 日历 SLA 硬门禁；
 Track F/G 仍为 `BLOCKED_EXTERNAL`。
 
 权威进度入口：
@@ -692,6 +694,8 @@ Track F/G 仍为 `BLOCKED_EXTERNAL`。
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M347 实现文档](architecture/360-m347-integration-mapping-dsl-ui.md)
+- [M347 验收矩阵](testing/344-m347-integration-mapping-dsl-ui-acceptance.md)
 - [M346 实现文档](architecture/359-m346-evidence-quality-checks-editor.md)
 - [M346 验收矩阵](testing/343-m346-evidence-quality-checks-editor-acceptance.md)
 - [M345 实现文档](architecture/358-m345-unary-not-condition.md)

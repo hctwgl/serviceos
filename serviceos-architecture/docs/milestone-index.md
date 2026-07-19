@@ -355,6 +355,7 @@ title: ServiceOS 里程碑索引
 | M344 | M344 EVIDENCE 同 stage FORM fieldKey 发现 | [357-m344-evidence-form-fieldkey-discovery.md](../architecture/357-m344-evidence-form-fieldkey-discovery.md) | [341-m344-evidence-form-fieldkey-discovery-acceptance.md](../testing/341-m344-evidence-form-fieldkey-discovery-acceptance.md) |
 | M345 | M345 一元取反条件积木 | [358-m345-unary-not-condition.md](../architecture/358-m345-unary-not-condition.md) | [342-m345-unary-not-condition-acceptance.md](../testing/342-m345-unary-not-condition-acceptance.md) |
 | M346 | M346 EVIDENCE qualityChecks 可视编辑 | [359-m346-evidence-quality-checks-editor.md](../architecture/359-m346-evidence-quality-checks-editor.md) | [343-m346-evidence-quality-checks-editor-acceptance.md](../testing/343-m346-evidence-quality-checks-editor-acceptance.md) |
+| M347 | M347 Admin INTEGRATION Mapping DSL 可视编辑 | [360-m347-integration-mapping-dsl-ui.md](../architecture/360-m347-integration-mapping-dsl-ui.md) | [344-m347-integration-mapping-dsl-ui-acceptance.md](../testing/344-m347-integration-mapping-dsl-ui-acceptance.md) |
 
 ## 未关联里程碑的文档
 

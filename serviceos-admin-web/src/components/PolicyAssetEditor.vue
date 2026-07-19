@@ -170,6 +170,137 @@ function addFieldMapping() {
   ])
 }
 
+const MESSAGE_TYPES = ['CREATE_WORK_ORDER', 'UPDATE_WORK_ORDER', 'CANCEL_WORK_ORDER'] as const
+const CONDITION_OPS = ['PRESENT', 'EQUALS', 'NOT_EQUALS', 'IN', 'NOT_IN'] as const
+
+function parseScalar(raw: string): string | number | boolean {
+  const trimmed = raw.trim()
+  if (trimmed === 'true') return true
+  if (trimmed === 'false') return false
+  if (/^-?\d+(\.\d+)?$/.test(trimmed)) return Number(trimmed)
+  return trimmed
+}
+
+function scalarToInput(value: unknown): string {
+  if (value === undefined || value === null) return ''
+  return String(value)
+}
+
+/** 空值删除可选标量字段；constantValue 与 defaultValue/enumMap 互斥。 */
+function setMappingOptionalScalar(
+  index: number,
+  field: 'constantValue' | 'defaultValue',
+  raw: string,
+) {
+  const item = { ...fieldMappings.value[index] }
+  if (!raw.trim()) {
+    delete item[field]
+    // updateArrayItem 是 merge patch，无法删除键；必须整项替换
+    replaceFieldMapping(index, item)
+    return
+  }
+  if (field === 'constantValue') {
+    delete item.defaultValue
+    delete item.enumMap
+  } else {
+    delete item.constantValue
+  }
+  item[field] = parseScalar(raw)
+  replaceFieldMapping(index, item)
+}
+
+function replaceFieldMapping(index: number, next: Record<string, unknown>) {
+  const list = fieldMappings.value.map((item, i) => (i === index ? next : item))
+  setRoot('fieldMappings', list)
+}
+
+function enumMapToText(mapping: Record<string, unknown>): string {
+  const enumMap = mapping.enumMap
+  if (!enumMap || typeof enumMap !== 'object') return ''
+  return Object.entries(enumMap as Record<string, string>)
+    .map(([k, v]) => `${k}=${v}`)
+    .join('\n')
+}
+
+function setMappingEnumMap(index: number, text: string) {
+  const item = { ...fieldMappings.value[index] }
+  const lines = text
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
+  if (lines.length === 0) {
+    delete item.enumMap
+    replaceFieldMapping(index, item)
+    return
+  }
+  const enumMap: Record<string, string> = {}
+  for (const line of lines) {
+    const eq = line.indexOf('=')
+    if (eq <= 0) continue
+    const key = line.slice(0, eq).trim()
+    const value = line.slice(eq + 1).trim()
+    if (key && value) enumMap[key] = value
+  }
+  delete item.constantValue
+  if (Object.keys(enumMap).length === 0) {
+    delete item.enumMap
+  } else {
+    item.enumMap = enumMap
+  }
+  replaceFieldMapping(index, item)
+}
+
+function mappingCondition(mapping: Record<string, unknown>): Record<string, unknown> | null {
+  const condition = mapping.condition
+  return condition && typeof condition === 'object' ? (condition as Record<string, unknown>) : null
+}
+
+function setMappingCondition(index: number, patch: Record<string, unknown> | null) {
+  const item = { ...fieldMappings.value[index] }
+  if (patch == null) {
+    delete item.condition
+  } else {
+    item.condition = patch
+  }
+  replaceFieldMapping(index, item)
+}
+
+function updateMappingCondition(index: number, patch: Record<string, unknown>) {
+  const current = mappingCondition(fieldMappings.value[index] ?? {}) ?? {
+    sourcePath: 'external.field',
+    operator: 'PRESENT',
+  }
+  const next = { ...current, ...patch }
+  const op = String(next.operator ?? 'PRESENT')
+  if (op === 'PRESENT') {
+    delete next.value
+    delete next.values
+  } else if (op === 'EQUALS' || op === 'NOT_EQUALS') {
+    delete next.values
+    if (next.value === undefined) next.value = ''
+  } else {
+    delete next.value
+    if (!Array.isArray(next.values)) next.values = []
+  }
+  setMappingCondition(index, next)
+}
+
+function setDirection(direction: string) {
+  if (direction === 'OUTBOUND') {
+    const next: Record<string, unknown> = { ...draft.value, direction }
+    delete next.messageType
+    draft.value = next
+    commit()
+    return
+  }
+  const next: Record<string, unknown> = { ...draft.value, direction }
+  if (!next.messageType) {
+    next.messageType = 'CREATE_WORK_ORDER'
+  }
+  draft.value = next
+  commit()
+}
+
 function addPricingLine() {
   setRoot('lines', [
     ...lines.value,
@@ -478,13 +609,27 @@ const BILLABLE = ['OEM', 'NETWORK', 'PLATFORM', 'CUSTOMER']
           <select
             data-testid="integration-direction"
             :value="String(draft.direction ?? 'INBOUND')"
-            @change="setRoot('direction', ($event.target as HTMLSelectElement).value)"
+            @change="setDirection(($event.target as HTMLSelectElement).value)"
           >
             <option value="INBOUND">INBOUND</option>
             <option value="OUTBOUND">OUTBOUND</option>
           </select>
         </label>
+        <label v-if="String(draft.direction ?? 'INBOUND') === 'INBOUND'">
+          messageType
+          <select
+            data-testid="integration-message-type"
+            :value="String(draft.messageType ?? 'CREATE_WORK_ORDER')"
+            @change="setRoot('messageType', ($event.target as HTMLSelectElement).value)"
+          >
+            <option v-for="mt in MESSAGE_TYPES" :key="mt" :value="mt">{{ mt }}</option>
+          </select>
+        </label>
       </div>
+      <p class="hint">
+        M347：支持 constantValue / defaultValue / enumMap / condition；constantValue 与
+        defaultValue/enumMap 互斥。INBOUND 必须选择 messageType。
+      </p>
       <article
         v-for="(mapping, index) in fieldMappings"
         :key="index"
@@ -503,6 +648,7 @@ const BILLABLE = ['OEM', 'NETWORK', 'PLATFORM', 'CUSTOMER']
             "
           />
           <input
+            data-testid="mapping-external-path"
             :value="String(mapping.externalPath ?? '')"
             placeholder="externalPath"
             @change="
@@ -512,6 +658,7 @@ const BILLABLE = ['OEM', 'NETWORK', 'PLATFORM', 'CUSTOMER']
             "
           />
           <input
+            data-testid="mapping-internal-path"
             :value="String(mapping.internalPath ?? '')"
             placeholder="internalPath"
             @change="
@@ -521,6 +668,7 @@ const BILLABLE = ['OEM', 'NETWORK', 'PLATFORM', 'CUSTOMER']
             "
           />
           <select
+            data-testid="mapping-transform"
             :value="String(mapping.transform ?? 'TRIM')"
             @change="
               updateArrayItem('fieldMappings', index, {
@@ -533,6 +681,7 @@ const BILLABLE = ['OEM', 'NETWORK', 'PLATFORM', 'CUSTOMER']
           <label class="check">
             <input
               type="checkbox"
+              data-testid="mapping-required"
               :checked="Boolean(mapping.required)"
               @change="
                 updateArrayItem('fieldMappings', index, {
@@ -543,6 +692,127 @@ const BILLABLE = ['OEM', 'NETWORK', 'PLATFORM', 'CUSTOMER']
             required
           </label>
           <button type="button" @click="removeArrayItem('fieldMappings', index)">删除</button>
+        </div>
+        <div class="row dsl-row">
+          <label>
+            constantValue
+            <input
+              data-testid="mapping-constant-value"
+              :value="scalarToInput(mapping.constantValue)"
+              placeholder="空=清除；true/false/数字/字符串"
+              @change="
+                setMappingOptionalScalar(
+                  index,
+                  'constantValue',
+                  ($event.target as HTMLInputElement).value,
+                )
+              "
+            />
+          </label>
+          <label>
+            defaultValue
+            <input
+              data-testid="mapping-default-value"
+              :value="scalarToInput(mapping.defaultValue)"
+              placeholder="空=清除"
+              @change="
+                setMappingOptionalScalar(
+                  index,
+                  'defaultValue',
+                  ($event.target as HTMLInputElement).value,
+                )
+              "
+            />
+          </label>
+        </div>
+        <label>
+          enumMap（每行 from=to）
+          <textarea
+            data-testid="mapping-enum-map"
+            rows="2"
+            :value="enumMapToText(mapping)"
+            spellcheck="false"
+            @change="setMappingEnumMap(index, ($event.target as HTMLTextAreaElement).value)"
+          />
+        </label>
+        <div class="condition-box" data-testid="mapping-condition">
+          <div class="row">
+            <strong>condition</strong>
+            <button
+              v-if="!mappingCondition(mapping)"
+              type="button"
+              data-testid="add-mapping-condition"
+              @click="
+                setMappingCondition(index, {
+                  sourcePath: String(mapping.externalPath ?? 'external.field'),
+                  operator: 'PRESENT',
+                })
+              "
+            >
+              添加条件
+            </button>
+            <button
+              v-else
+              type="button"
+              data-testid="clear-mapping-condition"
+              @click="setMappingCondition(index, null)"
+            >
+              清除条件
+            </button>
+          </div>
+          <div v-if="mappingCondition(mapping)" class="row">
+            <input
+              data-testid="condition-source-path"
+              :value="String(mappingCondition(mapping)!.sourcePath ?? '')"
+              placeholder="sourcePath"
+              @change="
+                updateMappingCondition(index, {
+                  sourcePath: ($event.target as HTMLInputElement).value,
+                })
+              "
+            />
+            <select
+              data-testid="condition-operator"
+              :value="String(mappingCondition(mapping)!.operator ?? 'PRESENT')"
+              @change="
+                updateMappingCondition(index, {
+                  operator: ($event.target as HTMLSelectElement).value,
+                })
+              "
+            >
+              <option v-for="op in CONDITION_OPS" :key="op" :value="op">{{ op }}</option>
+            </select>
+            <input
+              v-if="['EQUALS', 'NOT_EQUALS'].includes(String(mappingCondition(mapping)!.operator))"
+              data-testid="condition-value"
+              :value="scalarToInput(mappingCondition(mapping)!.value)"
+              placeholder="value"
+              @change="
+                updateMappingCondition(index, {
+                  value: parseScalar(($event.target as HTMLInputElement).value),
+                })
+              "
+            />
+            <input
+              v-if="['IN', 'NOT_IN'].includes(String(mappingCondition(mapping)!.operator))"
+              data-testid="condition-values"
+              :value="
+                Array.isArray(mappingCondition(mapping)!.values)
+                  ? (mappingCondition(mapping)!.values as unknown[]).join(',')
+                  : ''
+              "
+              placeholder="values 逗号分隔"
+              @change="
+                updateMappingCondition(index, {
+                  values: ($event.target as HTMLInputElement).value
+                    .split(',')
+                    .map((s) => s.trim())
+                    .filter(Boolean)
+                    .map(parseScalar),
+                })
+              "
+            />
+          </div>
         </div>
       </article>
       <button type="button" data-testid="add-field-mapping" @click="addFieldMapping">
@@ -677,7 +947,23 @@ h4 {
 }
 input,
 select,
-button {
+button,
+textarea {
   font: inherit;
+}
+.dsl-row label {
+  flex: 1;
+  min-width: 12rem;
+}
+.condition-box {
+  border-top: 1px dashed #d0d7de;
+  padding-top: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+textarea {
+  width: 100%;
+  box-sizing: border-box;
 }
 </style>
