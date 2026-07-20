@@ -133,10 +133,27 @@ watch(() => props.technicianContextId, () => {
             · 任务 {{ statusLabel(correction.taskStatus) }}
             · 重新提交 {{ correction.resubmissionCount }} 次
           </p>
+          <p
+            v-if="correction.clientCapabilityUnsupportedDetail"
+            class="capability-warn"
+            :data-testid="`technician-correction-capability-${correction.correctionCaseId}`"
+          >
+            {{ correction.clientCapabilityUnsupportedDetail }}
+          </p>
         </div>
-        <RouterLink :to="`/technician-portal/corrections/${correction.correctionCaseId}`">
+        <RouterLink
+          v-if="!correction.clientCapabilityUnsupportedDetail"
+          :to="`/technician-portal/corrections/${correction.correctionCaseId}`"
+        >
           查看整改要求
         </RouterLink>
+        <span
+          v-else
+          class="capability-blocked"
+          :data-testid="`technician-correction-blocked-${correction.correctionCaseId}`"
+        >
+          当前客户端无法履约，请更换兼容端
+        </span>
       </article>
     </section>
     <p v-if="loading" data-testid="technician-feed-loading">正在加载数据，请稍候……</p>
@@ -280,6 +297,16 @@ watch(() => props.technicianContextId, () => {
 .correction-heading h3,
 .correction-card p { margin: 0; }
 .correction-card { padding: 0.7rem 0; border-top: 1px solid #f3dfbd; }
+.capability-warn {
+  margin-top: 0.4rem;
+  color: #9a3412;
+  font-size: 0.88rem;
+}
+.capability-blocked {
+  color: #9a3412;
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
 .meta {
   display: grid;
   gap: 0.25rem;

@@ -6,6 +6,7 @@ import com.serviceos.configuration.api.ClientCapabilityRuntimeGate;
 import com.serviceos.configuration.api.ConfigurationAssetDefinition;
 import com.serviceos.configuration.api.ConfigurationAssetType;
 import com.serviceos.configuration.api.ConfigurationService;
+import com.serviceos.configuration.api.FrozenBundleClientCapabilityProbe;
 import com.serviceos.dispatch.api.TechnicianActiveAssignmentQuery;
 import com.serviceos.evidence.api.BeginCorrectionEvidenceUploadCommand;
 import com.serviceos.evidence.api.CorrectionCaseService;
@@ -49,6 +50,9 @@ import java.util.UUID;
  *
  * <p>M361：整改资料路径复用主 Evidence 的客户端能力门禁与定向目标，禁止以整改旁路绕过
  * {@code CLIENT_CAPABILITY_UNSUPPORTED}。</p>
+ *
+ * <p>M362：列表/生命周期投影对源 Task 冻结 Bundle 做能力预检软注解，避免师傅进入领取/开工/
+ * 补传中途才发现不兼容；不整表 422、不隐藏整改责任。</p>
  */
 @Service
 final class DefaultTechnicianCorrectionService implements TechnicianCorrectionService {
@@ -66,6 +70,7 @@ final class DefaultTechnicianCorrectionService implements TechnicianCorrectionSe
     private final EvidenceSetSnapshotService snapshots;
     private final AuthorizationService authorization;
     private final ClientCapabilityRuntimeGate clientCapabilityRuntimeGate;
+    private final FrozenBundleClientCapabilityProbe clientCapabilityProbe;
     private final ConfigurationService configurations;
     private final TaskFulfillmentContextService sourceTasks;
     private final Clock clock;
@@ -82,6 +87,7 @@ final class DefaultTechnicianCorrectionService implements TechnicianCorrectionSe
             EvidenceSetSnapshotService snapshots,
             AuthorizationService authorization,
             ClientCapabilityRuntimeGate clientCapabilityRuntimeGate,
+            FrozenBundleClientCapabilityProbe clientCapabilityProbe,
             ConfigurationService configurations,
             TaskFulfillmentContextService sourceTasks,
             Clock clock
@@ -97,6 +103,7 @@ final class DefaultTechnicianCorrectionService implements TechnicianCorrectionSe
         this.snapshots = snapshots;
         this.authorization = authorization;
         this.clientCapabilityRuntimeGate = clientCapabilityRuntimeGate;
+        this.clientCapabilityProbe = clientCapabilityProbe;
         this.configurations = configurations;
         this.sourceTasks = sourceTasks;
         this.clock = clock;
@@ -105,7 +112,7 @@ final class DefaultTechnicianCorrectionService implements TechnicianCorrectionSe
     @Override
     @Transactional(readOnly = true)
     public List<TechnicianCorrectionView> list(
-            CurrentPrincipal principal, String correlationId, String context
+            CurrentPrincipal principal, String correlationId, String context, String clientKind
     ) {
         PortalActor actor = requirePortalActor(principal, correlationId, context);
         return handlingTasks.listForActor(
@@ -114,7 +121,7 @@ final class DefaultTechnicianCorrectionService implements TechnicianCorrectionSe
                 .filter(task -> List.of("READY", "CLAIMED", "RUNNING").contains(task.status()))
                 .map(task -> correctionRepository.findByCorrectionTaskId(principal.tenantId(), task.taskId())
                         .map(correction -> visibleInNetwork(principal, actor.networkId(), correction)
-                                ? view(correction, task) : null)
+                                ? view(principal.tenantId(), correction, task, clientKind) : null)
                         .orElse(null))
                 .filter(java.util.Objects::nonNull)
                 .toList();
@@ -123,7 +130,7 @@ final class DefaultTechnicianCorrectionService implements TechnicianCorrectionSe
     @Override
     public TechnicianCorrectionView claim(
             CurrentPrincipal principal, CommandMetadata metadata, String context,
-            UUID correctionCaseId, long expectedVersion
+            String clientKind, UUID correctionCaseId, long expectedVersion
     ) {
         Access access = requireCase(principal, metadata.correlationId(), context, correctionCaseId);
         if (!access.task().actorCandidate()) {
@@ -131,13 +138,13 @@ final class DefaultTechnicianCorrectionService implements TechnicianCorrectionSe
         }
         humanTasks.claim(principal, metadata,
                 new ClaimHumanTaskCommand(access.task().taskId(), expectedVersion));
-        return currentView(principal, correctionCaseId, access.task().taskId());
+        return currentView(principal, clientKind, correctionCaseId, access.task().taskId());
     }
 
     @Override
     public TechnicianCorrectionView start(
             CurrentPrincipal principal, CommandMetadata metadata, String context,
-            UUID correctionCaseId, long expectedVersion
+            String clientKind, UUID correctionCaseId, long expectedVersion
     ) {
         Access access = requireCase(principal, metadata.correlationId(), context, correctionCaseId);
         if (!access.task().actorResponsible()) {
@@ -145,7 +152,7 @@ final class DefaultTechnicianCorrectionService implements TechnicianCorrectionSe
         }
         humanTasks.start(principal, metadata,
                 new StartHumanTaskCommand(access.task().taskId(), expectedVersion));
-        return currentView(principal, correctionCaseId, access.task().taskId());
+        return currentView(principal, clientKind, correctionCaseId, access.task().taskId());
     }
 
     @Override
@@ -242,7 +249,7 @@ final class DefaultTechnicianCorrectionService implements TechnicianCorrectionSe
         CorrectionCaseView updated = corrections.resubmit(principal, metadata,
                 new ResubmitCorrectionCaseCommand(correctionCaseId, evidenceSetSnapshotId));
         // 重提可能发生多轮，不能在此完成 handling Task；审核 CLOSED 才是其权威终态。
-        return view(updated, access.task());
+        return view(principal.tenantId(), updated, access.task(), clientKind);
     }
 
     /**
@@ -345,7 +352,7 @@ final class DefaultTechnicianCorrectionService implements TechnicianCorrectionSe
     }
 
     private TechnicianCorrectionView currentView(
-            CurrentPrincipal principal, UUID correctionCaseId, UUID correctionTaskId
+            CurrentPrincipal principal, String clientKind, UUID correctionCaseId, UUID correctionTaskId
     ) {
         CorrectionCaseView correction = correctionRepository.find(principal.tenantId(), correctionCaseId)
                 .orElseThrow(DefaultTechnicianCorrectionService::notFound);
@@ -353,16 +360,40 @@ final class DefaultTechnicianCorrectionService implements TechnicianCorrectionSe
                         principal.tenantId(), correctionTaskId, principal.principalId(),
                         CorrectionTaskAccessValidator.TASK_TYPE)
                 .orElseThrow(DefaultTechnicianCorrectionService::notFound);
-        return view(correction, task);
+        return view(principal.tenantId(), correction, task, clientKind);
     }
 
-    private static TechnicianCorrectionView view(
-            CorrectionCaseView correction, HandlingTaskContextView task
+    /**
+     * 投影最小整改视图，并按源业务 Task 冻结 Bundle 注解能力不兼容说明。
+     *
+     * <p>失败关闭语义：注解只告知、不删除责任项；UNKNOWN/非师傅端由 Probe 短路跳过（M253）。
+     * 资料读写仍由 M361 RuntimeGate 硬拒单，本注解用于领取/开工前预检。</p>
+     */
+    private TechnicianCorrectionView view(
+            String tenantId,
+            CorrectionCaseView correction,
+            HandlingTaskContextView task,
+            String clientKind
     ) {
         return new TechnicianCorrectionView(
                 correction.correctionCaseId(), correction.taskId(), correction.correctionTaskId(),
                 correction.status(), correction.reasonCodes(), task.status(), task.version(),
-                correction.latestResubmissionSnapshotId(), correction.resubmissions().size());
+                correction.latestResubmissionSnapshotId(), correction.resubmissions().size(),
+                capabilityDetail(tenantId, clientKind, correction.taskId()));
+    }
+
+    private String capabilityDetail(String tenantId, String clientKind, UUID sourceTaskId) {
+        TaskFulfillmentContext sourceTask = sourceTasks.find(tenantId, sourceTaskId).orElse(null);
+        if (sourceTask == null) {
+            return null;
+        }
+        return clientCapabilityProbe.findIncompatibilityDetail(
+                        tenantId,
+                        clientKind,
+                        sourceTask.configurationBundleId(),
+                        sourceTask.configurationBundleDigest(),
+                        sourceTask.formRef())
+                .orElse(null);
     }
 
     private static UUID parseContext(String header) {

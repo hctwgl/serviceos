@@ -35,6 +35,7 @@ import java.util.UUID;
  * Technician Portal 整改 HTTP 边界；请求只接受资源 ID、乐观锁版本和最小上传声明。
  *
  * <p>M361：资料路径透传 {@code X-ServiceOS-Client-Kind}，由应用层权威复检能力。</p>
+ * <p>M362：列表/claim/start 同样透传 clientKind，供源 Task 冻结 Bundle 能力预检注解。</p>
  */
 @RestController
 @RequestMapping("/api/v1/technician/me/corrections")
@@ -52,9 +53,10 @@ final class TechnicianCorrectionController {
     @GetMapping
     List<TechnicianCorrectionView> list(
             @RequestHeader("X-Technician-Context") String context,
-            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestAttribute(value = ClientMetadata.KIND_ATTRIBUTE, required = false) String clientKind
     ) {
-        return corrections.list(principals.current(), correlationId, context);
+        return corrections.list(principals.current(), correlationId, context, clientKind);
     }
 
     @PostMapping("/{correctionCaseId}:claim")
@@ -63,10 +65,11 @@ final class TechnicianCorrectionController {
             @RequestHeader("X-Technician-Context") String context,
             @RequestHeader("Idempotency-Key") String idempotencyKey,
             @RequestHeader("If-Match") @Pattern(regexp = "^\"[1-9][0-9]*\"$") String ifMatch,
-            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestAttribute(value = ClientMetadata.KIND_ATTRIBUTE, required = false) String clientKind
     ) {
         return corrections.claim(principals.current(), new CommandMetadata(correlationId, idempotencyKey),
-                context, correctionCaseId, version(ifMatch));
+                context, clientKind, correctionCaseId, version(ifMatch));
     }
 
     @PostMapping("/{correctionCaseId}:start")
@@ -75,10 +78,11 @@ final class TechnicianCorrectionController {
             @RequestHeader("X-Technician-Context") String context,
             @RequestHeader("Idempotency-Key") String idempotencyKey,
             @RequestHeader("If-Match") @Pattern(regexp = "^\"[1-9][0-9]*\"$") String ifMatch,
-            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestAttribute(value = ClientMetadata.KIND_ATTRIBUTE, required = false) String clientKind
     ) {
         return corrections.start(principals.current(), new CommandMetadata(correlationId, idempotencyKey),
-                context, correctionCaseId, version(ifMatch));
+                context, clientKind, correctionCaseId, version(ifMatch));
     }
 
     @GetMapping("/{correctionCaseId}/evidence-slots")

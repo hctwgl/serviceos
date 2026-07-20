@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.54
+  version: 1.0.55
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -2741,7 +2741,10 @@ paths:
     get:
       operationId: listTechnicianCorrections
       summary: 查询当前师傅候选或负责中的整改任务
-      description: M266：独立 correction Task 提供实时责任；源业务 Task 保持 COMPLETED。仅返回当前网点来源任务的最小整改投影。
+      description: |
+        M266：独立 correction Task 提供实时责任；源业务 Task 保持 COMPLETED。仅返回当前网点来源任务的最小整改投影。
+        M362：项可含 `clientCapabilityUnsupportedDetail`；当前 clientKind 无法履约源 Task 冻结 FORM/EVIDENCE
+        时给出权威中文说明（软注解，不隐藏整改、不整表 422）。
       parameters:
         - $ref: '#/components/parameters/TechnicianContext'
         - $ref: '#/components/parameters/CorrelationId'
@@ -10886,6 +10889,12 @@ components:
         taskVersion: { type: integer, format: int64, minimum: 1 }
         latestResubmissionSnapshotId: { type: [string, 'null'], format: uuid }
         resubmissionCount: { type: integer, minimum: 0 }
+        clientCapabilityUnsupportedDetail:
+          type: [string, 'null']
+          maxLength: 500
+          description: |
+            M362：当前客户端无法履约该整改源 Task 冻结 FORM/EVIDENCE 时的权威中文说明；
+            null 表示兼容或未强制预检（如 UNKNOWN clientKind）。
     TechnicianResubmitCorrectionRequest:
       type: object
       additionalProperties: false
