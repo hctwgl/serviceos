@@ -675,13 +675,14 @@ serviceos-architecture/
 ## 当前基线
 
 当前工程基线为 **M369 BUSINESS 日历 SLA 截止时间**（见 `implementation-status.md`；
-OpenAPI 1.0.59；Flyway 134；承接 M367；ADR-089）。
+OpenAPI 1.0.59；Flyway 135 / 137；承接 M368；ADR-090）。
 
 当前已具备多 OEM SPI、远端查询、UNKNOWN/批量重放、复杂流程、十大资产设计器、六类 Runtime，
 入站/出站 Mapping（M321～M339）、FORM/EVIDENCE ConditionBuilder（M340～M349）、
 ASSIGNEE/DISPATCH/RULE/NOTIFICATION/PRICING SHADOW、**M351～M355 终审工作台**、
 **M356～M363 客户端能力门禁**、**M364 reviewTaskId**、**M365 REVIEW_TASK 门闸唤醒**、
-**M366 自动 TECHNICIAN 池 kind 硬过滤**、**M367 Manual/Network assign kind 硬拒绝** 与
+**M366 自动 TECHNICIAN 池 kind 硬过滤**、**M367 Manual/Network assign kind 硬拒绝**、
+**M368 Network on-behalf NETWORK_WEB 门禁** 与
 **M369 BUSINESS 日历 SLA 截止时间**。
 下一主线需负责人选型：iOS 条件执行器；
 吉利联调 / AMOUNT/加权仍为硬门禁；BUSINESS 暂停/预警仍未交付（M369 已交截止切片）；Track F/G 仍为 `BLOCKED_EXTERNAL`。

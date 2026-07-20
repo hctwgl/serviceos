@@ -211,14 +211,15 @@ class PricingShadowSnapshotPostgresIT {
                 INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
                 VALUES (:roleId, :capability, now())
                 """).param("roleId", roleId).param("capability", capability).update();
+        // valid_from 回拨一天，避免 DB now() 与应用 Clock 微秒级时序导致偶发 CAPABILITY_MISSING。
         jdbc.sql("""
                 INSERT INTO auth_role_grant (
                     grant_id, tenant_id, principal_id, role_id, scope_type, scope_ref,
-                    valid_from, source_code, approval_ref, created_at)
-                VALUES (:grantId, :tenant, :principal, :roleId, 'PROJECT', :project,
-                    now(), 'IT', 'it', now())
+                    valid_from, source_code, approval_ref, created_at, grant_status, grant_effect
+                ) VALUES (:grantId, :tenant, :principal, :roleId, 'PROJECT', :project,
+                    now() - interval '1 day', 'IT', 'it', now(), 'ACTIVE', 'ALLOW')
                 """).param("grantId", UUID.randomUUID()).param("tenant", TENANT)
-                .param("principal", principalId).param("roleId", roleId)
+                .param("principal", principalId.toString()).param("roleId", roleId)
                 .param("project", projectId.toString()).update();
     }
 }

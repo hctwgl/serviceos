@@ -242,18 +242,39 @@ class ReviewRuleGatePostgresIT {
                 .param("task", taskId).param("resolution", resolutionId).param("digest", snapshotDigest)
                 .update();
 
+        // M364：INTERNAL Case 必须绑定独立 evidence.review handling Task（reviewTaskId），
+        // 否则 REJECTED/APPROVED 决定路径在 completeReviewHandlingTask 失败关闭。
+        UUID reviewTaskId = UUID.randomUUID();
+        jdbc.sql("""
+                INSERT INTO tsk_task (
+                    task_id, tenant_id, task_type, task_kind, business_key, payload_ref,
+                    payload_digest, priority, status, next_run_at, attempt_count, max_attempts,
+                    correlation_id, version, created_at, updated_at
+                ) VALUES (
+                    :task, :tenant, 'evidence.review', 'HUMAN', :businessKey,
+                    :payloadRef, :digest, 700, 'READY', now(), 0, 1,
+                    'corr-m325-review', 1, now(), now())
+                """)
+                .param("task", reviewTaskId).param("tenant", TENANT)
+                .param("businessKey", reviewCaseId.toString())
+                .param("payloadRef", "review-case:" + reviewCaseId)
+                .param("digest", Sha256.digest(
+                        reviewCaseId + "|" + snapshotId + "|" + snapshotDigest))
+                .update();
+
         jdbc.sql("""
                 INSERT INTO evd_review_case (
-                    review_case_id, tenant_id, project_id, task_id, evidence_set_snapshot_id,
-                    snapshot_content_digest, scope_type, origin, policy_version, status,
-                    created_by, created_at, decided_at
+                    review_case_id, tenant_id, project_id, task_id, review_task_id,
+                    evidence_set_snapshot_id, snapshot_content_digest, scope_type, origin,
+                    policy_version, status, created_by, created_at, decided_at
                 ) VALUES (
-                    :id, :tenant, :project, :task, :snapshot, :digest,
+                    :id, :tenant, :project, :task, :reviewTask, :snapshot, :digest,
                     'EVIDENCE_SET_SNAPSHOT', 'INTERNAL', 'POLICY_V1', 'OPEN',
                     'fixture', now(), NULL)
                 """)
                 .param("id", reviewCaseId).param("tenant", TENANT).param("project", projectId)
-                .param("task", taskId).param("snapshot", snapshotId)
+                .param("task", taskId).param("reviewTask", reviewTaskId)
+                .param("snapshot", snapshotId)
                 .param("digest", snapshotDigest)
                 .update();
     }
