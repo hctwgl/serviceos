@@ -402,6 +402,7 @@ title: ServiceOS 里程碑索引
 | M393 | M393 Technician H5 今日任务产品化 | [404-m393-technician-h5-today-tasks-productization.md](../architecture/404-m393-technician-h5-today-tasks-productization.md) | [387-m393-technician-h5-today-tasks-acceptance.md](../testing/387-m393-technician-h5-today-tasks-acceptance.md) |
 | M394 | M394 Technician H5 任务详情作业闭环产品化 | [405-m394-technician-h5-task-detail-workloop.md](../architecture/405-m394-technician-h5-task-detail-workloop.md) | [388-m394-technician-h5-task-detail-workloop-acceptance.md](../testing/388-m394-technician-h5-task-detail-workloop-acceptance.md) |
 | M395 | M395 Technician H5 整改与同步冲突中心产品化 | [406-m395-technician-h5-corrections-sync-conflict.md](../architecture/406-m395-technician-h5-corrections-sync-conflict.md) | [389-m395-technician-h5-corrections-sync-conflict-acceptance.md](../testing/389-m395-technician-h5-corrections-sync-conflict-acceptance.md) |
+| M396 | M396 Network 师傅与产能产品化 | [407-m396-network-technicians-capacity-productization.md](../architecture/407-m396-network-technicians-capacity-productization.md) | [390-m396-network-technicians-capacity-acceptance.md](../testing/390-m396-network-technicians-capacity-acceptance.md) |
 
 ## 未关联里程碑的文档
 

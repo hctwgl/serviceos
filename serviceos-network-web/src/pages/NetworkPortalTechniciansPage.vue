@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { statusLabel } from '../product/labels'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
+import { formatDateTime, safeProblemMessage } from '@serviceos/web-core'
 import {
   createNetworkPortalTechnicianMembership,
   listNetworkPortalTechnicianMemberships,
@@ -10,12 +12,16 @@ import {
   type NetworkPortalMembershipItem,
   type NetworkPortalTechnicianItem,
 } from '../api/networkPortal'
+import SummaryStrip, { type SummaryStripItem } from '../components/SummaryStrip.vue'
+import PageState from '../components/PageState.vue'
 
 const props = defineProps<{ networkContextId: string | null }>()
 const items = ref<NetworkPortalTechnicianItem[]>([])
 const memberships = ref<NetworkPortalMembershipItem[]>([])
 const error = ref<string | null>(null)
 const actionMessage = ref<string | null>(null)
+const loading = ref(false)
+const showManage = ref(false)
 
 const createProfileId = ref('')
 const createValidFrom = ref(new Date().toISOString())
@@ -26,6 +32,32 @@ const qualProfileId = ref('')
 const qualCode = ref('EV-INSTALL')
 const qualValidFrom = ref(new Date().toISOString())
 const qualValidTo = ref('')
+
+const summaryItems = computed<SummaryStripItem[]>(() => {
+  const active = items.value.filter((item) => item.membershipStatus === 'ACTIVE').length
+  const profileActive = items.value.filter((item) => item.profileStatus === 'ACTIVE').length
+  return [
+    {
+      key: 'active',
+      label: '可接单关系',
+      value: active,
+      testId: 'technicians-summary-active',
+    },
+    {
+      key: 'profile',
+      label: '档案启用',
+      value: profileActive,
+      testId: 'technicians-summary-profile-active',
+    },
+    {
+      key: 'qual',
+      label: '资质入口',
+      value: '待审提交',
+      to: '/network-portal/qualifications',
+      testId: 'technicians-summary-qualifications',
+    },
+  ]
+})
 
 function versionForMembership(membershipId: string): string {
   const fromList = memberships.value.find((row) => row.id === membershipId)
@@ -44,8 +76,10 @@ async function load() {
     items.value = []
     memberships.value = []
     error.value = '请选择 NETWORK 上下文'
+    loading.value = false
     return
   }
+  loading.value = true
   try {
     const [techPage, memPage] = await Promise.all([
       listNetworkPortalTechnicians(props.networkContextId),
@@ -57,7 +91,9 @@ async function load() {
   } catch (err) {
     items.value = []
     memberships.value = []
-    error.value = err instanceof Error ? err.message : '师傅列表加载失败'
+    error.value = safeProblemMessage(err) || '师傅列表加载失败'
+  } finally {
+    loading.value = false
   }
 }
 
@@ -72,7 +108,7 @@ async function onCreateMembership() {
     actionMessage.value = `已绑定关系 ${result.data.id}`
     await load()
   } catch (err) {
-    actionMessage.value = err instanceof Error ? err.message : '绑定失败'
+    actionMessage.value = safeProblemMessage(err) || '绑定失败'
   }
 }
 
@@ -89,7 +125,7 @@ async function onTerminateMembership() {
     actionMessage.value = `已终止关系 ${result.data.id}`
     await load()
   } catch (err) {
-    actionMessage.value = err instanceof Error ? err.message : '终止失败'
+    actionMessage.value = safeProblemMessage(err) || '终止失败'
   }
 }
 
@@ -103,157 +139,176 @@ async function onSubmitQualification() {
       validFrom: qualValidFrom.value.trim(),
       validTo: qualValidTo.value.trim() || null,
     })
-    actionMessage.value = `已提交资质 ${result.data.id}（${result.data.status}）`
+    actionMessage.value = `已提交资质 ${result.data.id}（${statusLabel(result.data.status)}）`
   } catch (err) {
-    actionMessage.value = err instanceof Error ? err.message : '资质提交失败'
+    actionMessage.value = safeProblemMessage(err) || '资质提交失败'
   }
 }
 
 function fillTerminate(item: NetworkPortalTechnicianItem) {
   terminateMembershipId.value = item.membershipId
-  // M206：必须从 memberships 列表（或 technicians.membershipVersion）取真实 version，禁止硬编码 1
   terminateVersion.value = versionForMembership(item.membershipId)
   terminateReason.value = '网点调整'
   qualProfileId.value = item.technicianProfileId
+  showManage.value = true
 }
 
 onMounted(() => {
   void load()
 })
-watch(() => props.networkContextId, () => {
-  void load()
-})
+watch(
+  () => props.networkContextId,
+  () => {
+    void load()
+  },
+)
 </script>
 
 <template>
-  <section data-testid="network-portal-technicians" data-page-id="NETWORK.TECHNICIAN.LIST">
-    <h2>本网点师傅</h2>
-    <p v-if="error" data-testid="network-portal-error">{{ error }}</p>
-    <table v-else data-testid="network-technicians-table">
-      <thead>
-        <tr>
-          <th>关系 ID</th>
-          <th>姓名</th>
-          <th>主体</th>
-          <th>档案状态</th>
-          <th>关系状态</th>
-          <th>有效期</th>
-          <th>版本</th>
-          <th>档案 ID</th>
-          <th>操作</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr
-          v-for="item in items"
-          :key="item.membershipId"
-          :data-testid="`technician-row-${item.membershipId}`"
-        >
-          <td>
-            <RouterLink
-              :to="`/network-portal/technicians/memberships/${item.membershipId}`"
-              data-testid="membership-case-deeplink"
-            >
-              {{ item.membershipId }}
-            </RouterLink>
-          </td>
-          <td>{{ item.displayName }}</td>
-          <td data-testid="technician-principal-id">{{ item.principalId }}</td>
-          <td>{{ item.profileStatus }}</td>
-          <td>{{ item.membershipStatus }}</td>
-          <td data-testid="technician-valid-range">
-            {{ item.validFrom }} → {{ item.validTo ?? '—' }}
-          </td>
-          <td data-testid="technician-membership-version">
-            {{ versionForMembership(item.membershipId) }}
-          </td>
-          <td>{{ item.technicianProfileId }}</td>
-          <td>
-            <button
-              type="button"
-              data-testid="fill-terminate-from-row"
-              @click="fillTerminate(item)"
-            >
-              填入终止/资质
-            </button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-    <p v-if="!error && items.length === 0">暂无 ACTIVE 师傅关系</p>
+  <section
+    data-testid="network-portal-technicians"
+    data-page-id="NETWORK.TECHNICIAN.LIST"
+    class="tech-page"
+  >
+    <header class="hero">
+      <div>
+        <p class="eyebrow">师傅与资质</p>
+        <h2>本网点师傅</h2>
+        <p class="hint">
+          管理本网点师傅关系与资质提交。停用前请确认未完成任务与预约；资质提交不等于总部审核通过。
+        </p>
+      </div>
+      <div class="hero-actions">
+        <button type="button" @click="load">刷新</button>
+        <button type="button" class="primary" data-testid="technicians-toggle-manage" @click="showManage = !showManage">
+          {{ showManage ? '收起管理' : '关系与资质管理' }}
+        </button>
+      </div>
+    </header>
 
-    <section data-testid="network-manage-technician-forms" data-page-id="NETWORK.QUALIFICATION">
-      <h3>师傅关系与资质（M204/M206）</h3>
+    <PageState v-if="loading && !items.length && !error" kind="loading" />
+    <p v-else-if="error" data-testid="network-portal-error">{{ error }}</p>
+    <template v-else>
+      <SummaryStrip :items="summaryItems" />
+
+      <div class="panel">
+        <table data-testid="network-technicians-table">
+          <thead>
+            <tr>
+              <th>师傅</th>
+              <th>主体</th>
+              <th>档案 / 关系</th>
+              <th>有效期</th>
+              <th>版本</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="item in items"
+              :key="item.membershipId"
+              :data-testid="`technician-row-${item.membershipId}`"
+            >
+              <td>
+                <strong>{{ item.displayName }}</strong>
+                <div class="muted">
+                  <RouterLink
+                    :to="`/network-portal/technicians/memberships/${item.membershipId}`"
+                    data-testid="membership-case-deeplink"
+                  >
+                    打开关系详情
+                  </RouterLink>
+                </div>
+              </td>
+              <td data-testid="technician-principal-id">{{ item.principalId }}</td>
+              <td>
+                {{ statusLabel(item.profileStatus) }} /
+                {{ statusLabel(item.membershipStatus) }}
+              </td>
+              <td data-testid="technician-valid-range">
+                <div>{{ formatDateTime(item.validFrom) }} → {{ item.validTo ? formatDateTime(item.validTo) : '—' }}</div>
+                <div class="muted">{{ item.validFrom }} → {{ item.validTo ?? '—' }}</div>
+              </td>
+              <td data-testid="technician-membership-version">
+                {{ versionForMembership(item.membershipId) }}
+              </td>
+              <td>
+                <button
+                  type="button"
+                  data-testid="fill-terminate-from-row"
+                  @click="fillTerminate(item)"
+                >
+                  填入终止/资质
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <PageState
+          v-if="!items.length"
+          kind="empty"
+          guide="暂无 ACTIVE 师傅关系。可通过下方管理区绑定师傅档案。"
+        />
+      </div>
+
+      <p class="muted gap-note">
+        UI_DATA_GAP：技能、服务区域、当前任务量、最近同步与资质到期提醒尚未由专用读模型完整交付；当前展示服务端关系/档案状态。
+      </p>
+    </template>
+
+    <section
+      v-show="showManage"
+      data-testid="network-manage-technician-forms"
+      data-page-id="NETWORK.QUALIFICATION"
+      class="manage"
+    >
+      <h3>师傅关系与资质管理</h3>
+      <p class="hint">终止关系前请确认未完成任务与预约的重新分配计划；资质提交后进入 PENDING 审核。</p>
       <p v-if="actionMessage" data-testid="manage-technician-message">{{ actionMessage }}</p>
 
-      <form
-        data-testid="network-create-membership-form"
-        @submit.prevent="onCreateMembership"
-      >
+      <form data-testid="network-create-membership-form" class="form-card" @submit.prevent="onCreateMembership">
         <h4>绑定师傅关系</h4>
         <label>
           师傅档案 ID
-          <input
-            v-model="createProfileId"
-            data-testid="create-membership-profile-id"
-            required
-          />
+          <input v-model="createProfileId" data-testid="create-membership-profile-id" required />
         </label>
         <label>
           生效时间
-          <input
-            v-model="createValidFrom"
-            data-testid="create-membership-valid-from"
-            required
-          />
+          <input v-model="createValidFrom" data-testid="create-membership-valid-from" required />
         </label>
         <button type="submit" data-testid="create-membership-submit">绑定</button>
       </form>
 
       <form
         data-testid="network-terminate-membership-form"
+        class="form-card"
         @submit.prevent="onTerminateMembership"
       >
         <h4>终止师傅关系</h4>
         <label>
           关系 ID
-          <input
-            v-model="terminateMembershipId"
-            data-testid="terminate-membership-id"
-            required
-          />
+          <input v-model="terminateMembershipId" data-testid="terminate-membership-id" required />
         </label>
         <label>
           版本
-          <input
-            v-model="terminateVersion"
-            data-testid="terminate-membership-version"
-            required
-          />
+          <input v-model="terminateVersion" data-testid="terminate-membership-version" required />
         </label>
         <label>
           原因
-          <input
-            v-model="terminateReason"
-            data-testid="terminate-membership-reason"
-            required
-          />
+          <input v-model="terminateReason" data-testid="terminate-membership-reason" required />
         </label>
         <button type="submit" data-testid="terminate-membership-submit">终止</button>
       </form>
 
       <form
         data-testid="network-submit-qualification-form"
+        class="form-card"
         @submit.prevent="onSubmitQualification"
       >
         <h4>提交资质（PENDING）</h4>
         <label>
           师傅档案 ID
-          <input
-            v-model="qualProfileId"
-            data-testid="submit-qualification-profile-id"
-            required
-          />
+          <input v-model="qualProfileId" data-testid="submit-qualification-profile-id" required />
         </label>
         <label>
           资质代码
@@ -261,11 +316,7 @@ watch(() => props.networkContextId, () => {
         </label>
         <label>
           生效时间
-          <input
-            v-model="qualValidFrom"
-            data-testid="submit-qualification-valid-from"
-            required
-          />
+          <input v-model="qualValidFrom" data-testid="submit-qualification-valid-from" required />
         </label>
         <label>
           失效时间（可选）
@@ -276,3 +327,84 @@ watch(() => props.networkContextId, () => {
     </section>
   </section>
 </template>
+
+<style scoped>
+.tech-page {
+  display: grid;
+  gap: 14px;
+}
+.hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--sos-primary-600);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+.hero h2 {
+  margin: 0 0 6px;
+  font-size: 22px;
+}
+.hero-actions {
+  display: flex;
+  gap: 8px;
+}
+.hint,
+.muted,
+.gap-note {
+  color: var(--sos-color-text-tertiary);
+  font-size: 13px;
+}
+.panel,
+.manage {
+  border: 1px solid var(--sos-color-border-default);
+  border-radius: var(--sos-radius-md);
+  background: var(--sos-color-surface-card);
+  padding: 12px 14px;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+th,
+td {
+  text-align: left;
+  padding: 0.55rem 0.4rem;
+  border-bottom: 1px solid var(--sos-color-border-light);
+  font-size: 13px;
+  vertical-align: top;
+}
+.form-card {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--sos-color-border-light);
+}
+.form-card label {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+}
+.form-card input {
+  border: 1px solid var(--sos-color-border-default);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+button {
+  border: 1px solid var(--sos-color-border-default);
+  background: #fff;
+  border-radius: 6px;
+  padding: 0.4rem 0.75rem;
+  cursor: pointer;
+}
+button.primary {
+  background: var(--sos-primary-600);
+  border-color: var(--sos-primary-600);
+  color: #fff;
+}
+</style>

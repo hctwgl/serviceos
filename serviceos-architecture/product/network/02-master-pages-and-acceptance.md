@@ -690,3 +690,37 @@ productOwnerDecision: null
 knownGaps:
   - DOMAIN_GAP: Portal ACK/resolve/decide 仍未批准交付
 ```
+
+## 48. M396 验收记录（师傅与产能）
+
+```yaml
+pageId: NETWORK.TECHNICIAN.LIST
+route: /network-portal/technicians
+visualProfile: CLASSIC_PROFESSIONAL_COLLABORATION
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: 技能、服务区域、当前任务量、最近同步读模型未就绪
+```
+
+```yaml
+pageId: NETWORK.CAPACITY
+route: /network-portal/capacity
+visualProfile: CLASSIC_PROFESSIONAL_COLLABORATION
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - DOMAIN_GAP: 产能调整申请写流程尚未产品化交付
+```
