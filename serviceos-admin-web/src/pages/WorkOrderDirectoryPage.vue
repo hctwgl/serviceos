@@ -338,6 +338,7 @@ onMounted(() => {
           allow-clear
           placeholder="不限"
           style="width: 160px"
+          aria-label="工单状态筛选"
           :options="statusChoices.map((o) => ({ value: o.value, label: o.label }))"
         />
       </label>
@@ -348,6 +349,7 @@ onMounted(() => {
           allow-clear
           placeholder="选择车企"
           style="width: 160px"
+          aria-label="车企筛选"
           :options="[
             { value: 'GEELY', label: '吉利汽车' },
             { value: 'BYD', label: '比亚迪' },
