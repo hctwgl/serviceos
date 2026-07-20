@@ -7,20 +7,19 @@ lastUpdated: 2026-07-20
 
 ## 当前
 
-- **状态**：**PARTIAL** — M378～M383 主能力持续推进；完整 §四十 收口未闭合
+- **状态**：**PARTIAL** — 履约主链路可运行；真实 OIDC 全链路与表单/资料级阻塞仍未闭合
 - OpenAPI **1.0.61** / Flyway **138** / ADR-091
 - PR：https://github.com/hctwgl/serviceos/pull/204
 
-## 本轮追加
+## 最新追加
 
-- 正式建单无 Profile **失败关闭**（入站 IT 已种子 Profile）
-- 发布链 `effective_to` 可关闭（V138），v1/v2 隔离 + 暂停拒单 IT
-- `TaskAllowedActions.blockedActions` + 中文阻塞原因
-- 工单详情「配置来源」+ `/configuration-snapshot` 页
+- Admin 履约 API 经 `@serviceos/core-client`（`prebuild` 生成）；禁止页面手写 URL
+- `ProjectFulfillmentWorkOrderFreezePostgresIT`：工单 A 冻 v1、B 冻 v2
+- Playwright 列表/键盘聚焦 + axe a11y（mock）
 
 ## 仍未闭合
 
-1. 真实 OIDC + 全链路 Playwright（发布→建单 A/B）
-2. a11y/视觉全量
-3. `@serviceos/core-client` 替换 Admin 薄封装
-4. 表单/资料缺项级阻塞原因（当前为状态/权限/责任层）
+1. 真实 Keycloak OIDC smoke（可能 `BLOCKED_EXTERNAL`）
+2. 真实后端驱动的发布→建单 Playwright（非 mock）
+3. 表单字段/资料槽位级 `blockingReasons`
+4. Admin 其他页面迁移到 core-client（仅履约模块已切换）

@@ -181,7 +181,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 - **M380 Implemented**：三栏草稿阶段编排工作区。
 - **M381 Implemented**：DedicatedFlow 四步发布。
 - **M382 Implemented**：建单 Resolver 接入、工单冻结、快照 API。
-- **M383 Progress**：无 Profile 建单失败关闭；v1/v2 生效隔离 IT；`blockedActions`；工单配置来源/快照页；Playwright mock 冒烟。仍缺真实全链路 E2E、a11y/OIDC、core-client 替换。
+- **M383 Progress**：无 Profile 建单失败关闭；v1/v2 生效隔离与工单 A/B 冻结 IT；`blockedActions`；工单配置来源/快照页；Admin 履约 API 改走 `@serviceos/core-client`；Playwright + a11y mock。仍缺真实 OIDC 全链路与表单/资料级阻塞原因。
 
 OpenAPI **1.0.61**；Flyway **138**。
 

@@ -11,10 +11,9 @@ import {
   validateProjectFulfillmentDraft,
   type ProjectFulfillmentManifest,
   type ProjectFulfillmentProfileDetail,
-  type ProjectFulfillmentRevision,
   type ProjectFulfillmentValidationIssue,
 } from '../api/fulfillmentProfiles'
-import { apiPost, newIdempotencyKey, quotedVersion } from '../api/client'
+import { createCoreApi, fromRaw, newIdempotencyKey, quotedVersion } from '../api/coreApi'
 import { toUserFacingError } from '../product/errorMessages'
 
 const route = useRoute()
@@ -59,18 +58,19 @@ async function publish() {
   publishing.value = true
   error.value = null
   try {
-    const revision = await apiPost<ProjectFulfillmentRevision>(
-      `/projects/${projectId.value}/fulfillment-profiles/${profileId.value}:publish`,
-      {
+    const revision = await fromRaw(
+      createCoreApi().publishProjectFulfillmentRevisionRaw({
+        projectId: projectId.value,
+        profileId: profileId.value,
         idempotencyKey: newIdempotencyKey('pfp-publish'),
         ifMatch: quotedVersion(detail.value.aggregateVersion),
-        body: {
-          effectiveFrom: effectiveFrom.value.toISOString(),
+        publishProjectFulfillmentRevisionRequest: {
+          effectiveFrom: effectiveFrom.value.toDate(),
           publishNote: publishNote.value || '发布履约配置',
         },
-      },
+      }),
     )
-    publishedVersion.value = revision.data.versionNo
+    publishedVersion.value = revision.data.versionNo ?? null
     step.value = 4
   } catch (err) {
     error.value = toUserFacingError(err).message

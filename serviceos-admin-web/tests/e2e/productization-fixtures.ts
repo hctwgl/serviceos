@@ -221,6 +221,89 @@ export async function mockProductizationApis(
       ])
       return
     }
+    if (url.includes('/fulfillment-profiles/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:compile-preview')) {
+      await fulfillJson(route, {
+        manifestJson: JSON.stringify({
+          profileName: '标准家充履约方案',
+          stages: [
+            {
+              stageCode: 'SURVEY',
+              stageName: '现场勘测',
+              ownerType: 'TECHNICIAN',
+              formRefs: [],
+              evidenceRefs: [],
+              actions: [{ actionLabel: '提交勘测' }],
+              transitions: [{ targetStage: 'INSTALLATION' }],
+              exceptionPaths: [],
+            },
+          ],
+        }),
+        contentDigest: 'a'.repeat(64),
+      })
+      return
+    }
+    if (url.includes('/fulfillment-profiles/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/revisions')) {
+      await fulfillJson(route, [
+        {
+          revisionId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          profileId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          versionNo: 1,
+          revisionStatus: 'PUBLISHED',
+          documentJson: '{"stages":[]}',
+          createdAt: '2026-07-20T00:00:00Z',
+        },
+      ])
+      return
+    }
+    if (url.includes('/fulfillment-profiles/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/draft')) {
+      await fulfillJson(route, {
+        profileId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        revisionId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        serviceProductCode: 'HOME_CHARGING_SURVEY_INSTALL',
+        profileName: '标准家充履约方案',
+        documentJson: JSON.stringify({
+          stages: [
+            {
+              stageCode: 'SURVEY',
+              stageName: '现场勘测',
+              sequence: 1,
+              ownerType: 'TECHNICIAN',
+              formRefs: [],
+              evidenceRefs: [],
+              actions: [],
+            },
+          ],
+        }),
+        aggregateVersion: 2,
+        updatedAt: '2026-07-20T04:00:00Z',
+      })
+      return
+    }
+    if (
+      url.includes('/fulfillment-profiles/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')
+      && !url.includes('/draft')
+      && !url.includes('/revisions')
+      && !url.includes(':')
+    ) {
+      await fulfillJson(route, {
+        profileId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        projectId: '22222222-2222-4222-8222-222222222222',
+        serviceProductCode: 'HOME_CHARGING_SURVEY_INSTALL',
+        profileName: '标准家充履约方案',
+        description: '演示方案',
+        status: 'ACTIVE',
+        draftRevisionId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        activeRevisionId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        activeVersion: '1',
+        activeEffectiveFrom: '2026-07-20T00:00:00Z',
+        allowedActions: ['VIEW', 'EDIT_DRAFT', 'COMPILE_PREVIEW', 'PUBLISH'],
+        aggregateVersion: 2,
+        createdAt: '2026-07-19T00:00:00Z',
+        updatedAt: '2026-07-20T04:00:00Z',
+        asOf: '2026-07-20T04:00:00Z',
+      })
+      return
+    }
     if (url.includes('/projects/22222222-2222-4222-8222-222222222222')) {
       await fulfillJson(route, {
         project: {
