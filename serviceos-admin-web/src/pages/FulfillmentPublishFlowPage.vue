@@ -5,6 +5,7 @@ import { Alert, Button, DatePicker, Input, Result, Space, Steps, Table } from 'a
 import { ArrowLeftOutlined } from '@ant-design/icons-vue'
 import dayjs, { type Dayjs } from 'dayjs'
 import DedicatedFlowLayout from '../patterns/templates/DedicatedFlowLayout.vue'
+import FulfillmentRunbookTable from '../components/fulfillment/FulfillmentRunbookTable.vue'
 import {
   compileProjectFulfillmentPreview,
   getProjectFulfillmentProfile,
@@ -33,8 +34,13 @@ const publishNote = ref('')
 const publishedVersion = ref<number | null>(null)
 
 const blockingErrors = computed(() => issues.value.filter((i) => i.severity === 'ERROR'))
+const publishAllowed = computed(() => detail.value?.allowedActions?.includes('PUBLISH') ?? false)
 const canPublish = computed(
-  () => blockingErrors.value.length === 0 && !!manifest.value && !!effectiveFrom.value,
+  () =>
+    publishAllowed.value &&
+    blockingErrors.value.length === 0 &&
+    !!manifest.value &&
+    !!effectiveFrom.value,
 )
 
 async function loadStepData() {
@@ -42,6 +48,11 @@ async function loadStepData() {
   error.value = null
   try {
     detail.value = (await getProjectFulfillmentProfile(projectId.value, profileId.value)).data
+    if (!detail.value.allowedActions?.includes('PUBLISH')) {
+      issues.value = []
+      manifest.value = null
+      return
+    }
     issues.value = (await validateProjectFulfillmentDraft(projectId.value, profileId.value)).data
     manifest.value = (
       await compileProjectFulfillmentPreview(projectId.value, profileId.value)
@@ -54,7 +65,7 @@ async function loadStepData() {
 }
 
 async function publish() {
-  if (!detail.value || !effectiveFrom.value) return
+  if (!detail.value || !effectiveFrom.value || !canPublish.value) return
   publishing.value = true
   error.value = null
   try {
@@ -102,6 +113,14 @@ onMounted(loadStepData)
     </template>
     <template #feedback>
       <Alert v-if="error" type="error" show-icon :message="error" style="margin-bottom: 12px" />
+      <Alert
+        v-else-if="detail && !publishAllowed"
+        type="info"
+        show-icon
+        message="当前配置不可发布"
+        description="当前状态或权限未允许发布新版本。请返回配置详情查看可执行操作。"
+        style="margin-bottom: 12px"
+      />
     </template>
 
     <Steps
@@ -122,7 +141,9 @@ onMounted(loadStepData)
         :message="
           blockingErrors.length
             ? `存在 ${blockingErrors.length} 个阻断错误，无法发布`
-            : '未发现阻断错误'
+            : publishAllowed
+              ? '未发现阻断错误'
+              : '当前状态或权限不允许发布'
         "
         style="margin-bottom: 12px"
       />
@@ -140,7 +161,11 @@ onMounted(loadStepData)
         ]"
       />
       <Space style="margin-top: 16px">
-        <Button type="primary" :disabled="!!blockingErrors.length" @click="step = 1">
+        <Button
+          type="primary"
+          :disabled="!publishAllowed || !!blockingErrors.length"
+          @click="step = 1"
+        >
           下一步
         </Button>
       </Space>
@@ -150,10 +175,11 @@ onMounted(loadStepData)
       <Alert
         type="info"
         show-icon
-        :message="`Manifest 摘要 ${manifest?.contentDigest?.slice(0, 16) ?? ''}…`"
+        message="请确认本版本的工单运行说明"
+        description="普通发布流程不展示 Manifest JSON、Digest 或内部配置引用。"
         style="margin-bottom: 12px"
       />
-      <pre class="manifest-preview">{{ manifest?.manifestJson }}</pre>
+      <FulfillmentRunbookTable :manifest-json="manifest?.manifestJson" :loading="loading" />
       <Space style="margin-top: 16px">
         <Button @click="step = 0">上一步</Button>
         <Button type="primary" @click="step = 2">下一步</Button>
@@ -168,14 +194,15 @@ onMounted(loadStepData)
         description="新工单在生效时间后命中本版本。不会自动迁移历史工单阶段、表单或资料要求。"
         style="margin-bottom: 12px"
       />
-      <ul>
-        <li>相比当前版本：发布新的不可变 Revision</li>
-        <li>受影响对象：仅新建工单</li>
-        <li>既有工单：保持原 Bundle / Profile Revision 冻结</li>
-      </ul>
+      <Alert
+        type="info"
+        show-icon
+        message="版本差异明细尚未由服务端返回"
+        description="本步骤当前只确认版本隔离与生效范围。M385 后续将接入服务端 Revision Compare / Impact DTO，届时逐项展示阶段、表单、资料、动作和 SLA 的真实变化。"
+      />
       <Space style="margin-top: 16px">
         <Button @click="step = 1">上一步</Button>
-        <Button type="primary" @click="step = 3">下一步</Button>
+        <Button type="primary" @click="step = 3">已核对运行说明，继续</Button>
       </Space>
     </div>
 
@@ -236,13 +263,5 @@ onMounted(loadStepData)
   flex-direction: column;
   gap: 6px;
   margin-bottom: 12px;
-}
-.manifest-preview {
-  max-height: 360px;
-  overflow: auto;
-  padding: 12px;
-  background: var(--sos-color-surface-subtle, #f7f8fa);
-  border-radius: 8px;
-  font-size: 12px;
 }
 </style>
