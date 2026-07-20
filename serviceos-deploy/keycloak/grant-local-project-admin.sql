@@ -123,6 +123,17 @@ VALUES
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'preference.shareSavedView', now()),
     -- M192 Admin 受控全局搜索
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'search.read', now()),
+    -- M378+ 项目履约配置
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'project.fulfillment.read', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'project.fulfillment.create', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'project.fulfillment.draft.write', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'project.fulfillment.validate', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'project.fulfillment.publish', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'project.fulfillment.suspend', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'project.fulfillment.resume', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'project.fulfillment.revision.read', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'project.fulfillment.snapshot.read', now()),
+    ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'project.fulfillment.techRef.read', now()),
     ('bf64aa35-11cb-40bc-b301-10b5853049b3', 'pricing.snapshot.read', now())
 ON CONFLICT (role_id, capability_code) DO NOTHING;
 
