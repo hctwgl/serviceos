@@ -211,34 +211,42 @@ async function clickWorkOrderQuery(page: import('@playwright/test').Page) {
   await page.getByTestId('query-panel').getByRole('button', { name: '查询' }).click()
 }
 
-async function locateTaskCommandCard(page: import('@playwright/test').Page) {
-  // 工作区使用 Ant Card「当前任务命令」；任务详情仍为 article.card「命令」。
-  const workspace = page.locator('.ant-card').filter({ hasText: '当前任务命令' })
-  if ((await workspace.count()) > 0) return workspace.first()
-  return page.locator('article.card').filter({ hasText: '命令' }).first()
-}
-
 async function clickTaskCommandButton(
   page: import('@playwright/test').Page,
   name: string | RegExp,
 ) {
-  const card = await locateTaskCommandCard(page)
-  const button = card.getByRole('button', { name })
-  if ((await button.count()) > 0) {
-    await button.first().click()
-    return
+  const scoped = [
+    page.locator('.ant-card').filter({ hasText: '当前任务命令' }).getByRole('button', { name }),
+    page.locator('article.card').filter({ hasText: '命令' }).getByRole('button', { name }),
+    page.getByRole('main').getByRole('button', { name }),
+  ]
+  for (const locator of scoped) {
+    if ((await locator.count()) > 0) {
+      // 页头主操作与命令面板可能同名；优先作用域内最后一个（命令面板）。
+      await locator.last().click()
+      return
+    }
   }
-  // 任务详情按钮文案来自 allowed-actions.label，可能是「完成」而非「完成任务」。
-  await page.getByRole('button', { name }).first().click()
+  throw new Error(`未找到任务命令按钮: ${String(name)}`)
 }
 
 async function expectTaskCommandButton(
   page: import('@playwright/test').Page,
   name: string | RegExp,
 ) {
-  const card = await locateTaskCommandCard(page)
-  await expect(card.getByRole('button', { name }).first()).toBeVisible()
+  const scoped = page
+    .locator('.ant-card')
+    .filter({ hasText: '当前任务命令' })
+    .getByRole('button', { name })
+  if ((await scoped.count()) > 0) {
+    await expect(scoped.last()).toBeVisible()
+    return
+  }
+  await expect(
+    page.locator('article.card').filter({ hasText: '命令' }).getByRole('button', { name }).last(),
+  ).toBeVisible()
 }
+
 
 
 async function prepareOpenReviewCase(
