@@ -38,6 +38,10 @@ import {
 } from '../api/workOrderDetail'
 import { getTaskAllowedActions, type TaskAllowedActions } from '../api/tasks'
 import {
+  getWorkOrderFulfillmentSnapshot,
+  type WorkOrderFulfillmentSnapshot,
+} from '../api/fulfillmentProfiles'
+import {
   manualAssignNetworkServiceAssignment,
   manualAssignServiceAssignments,
 } from '../api/dispatch'
@@ -55,6 +59,7 @@ const workOrderId = computed(() => String(route.params.id ?? ''))
 const networkOptions = ref<ServiceNetwork[]>([])
 const showTechTab = import.meta.env.DEV
 const productTab = ref('overview')
+const fulfillmentSnapshot = ref<WorkOrderFulfillmentSnapshot | null>(null)
 
 async function loadNetworks() {
   try {
@@ -271,6 +276,14 @@ async function loadPricingSnapshots() {
   }
 }
 
+async function loadFulfillmentSnapshot() {
+  try {
+    fulfillmentSnapshot.value = await getWorkOrderFulfillmentSnapshot(workOrderId.value)
+  } catch {
+    fulfillmentSnapshot.value = null
+  }
+}
+
 async function loadWorkspace() {
   loading.value = true
   error.value = null
@@ -286,6 +299,7 @@ async function loadWorkspace() {
       loadSlaInstances(),
       loadAuthorityProjections(),
       loadPricingSnapshots(),
+      loadFulfillmentSnapshot(),
     ])
     const requestedTab = String(route.query.tab ?? '')
     const tabSection = sections.find((code) => code === requestedTab)
@@ -1167,6 +1181,43 @@ onMounted(() => {
     <Tabs v-if="workspace" v-model:activeKey="productTab" @change="onProductTabChange">
       <TabPane key="overview" tab="概览">
         <Space direction="vertical" style="width: 100%" :size="16">
+          <Card title="配置来源" size="small">
+            <template v-if="fulfillmentSnapshot">
+              <Descriptions bordered size="small" :column="2">
+                <Descriptions.Item label="工单类型">
+                  {{ labelServiceProduct(fulfillmentSnapshot.serviceProductCode) }}
+                </Descriptions.Item>
+                <Descriptions.Item label="履约方案">
+                  {{ fulfillmentSnapshot.profileName || '历史 Bundle 冻结' }}
+                </Descriptions.Item>
+                <Descriptions.Item label="履约版本">
+                  {{ fulfillmentSnapshot.fulfillmentVersion || '—' }}
+                </Descriptions.Item>
+                <Descriptions.Item label="Bundle 版本">
+                  {{ fulfillmentSnapshot.configurationBundleVersion || '—' }}
+                </Descriptions.Item>
+              </Descriptions>
+              <Alert
+                v-if="fulfillmentSnapshot.legacyExplanation"
+                type="warning"
+                show-icon
+                :message="fulfillmentSnapshot.legacyExplanation"
+                style="margin-top: 12px"
+              />
+              <Button
+                style="margin-top: 12px"
+                @click="
+                  router.push({
+                    name: 'ADMIN.WORKORDER.FULFILLMENT_SNAPSHOT',
+                    params: { id: workOrderId },
+                  })
+                "
+              >
+                查看本工单配置快照
+              </Button>
+            </template>
+            <p v-else class="muted">配置来源暂不可用（可能缺少 snapshot 读权限）。</p>
+          </Card>
           <Card title="分配服务网点" size="small">
             <p class="muted">系统推荐：当前目录未返回推荐原因时，请搜索并确认网点（UI_DATA_GAP）。</p>
             <label class="field">

@@ -22,7 +22,6 @@ import com.serviceos.integration.spi.InboundCreateWorkOrderResult;
 import com.serviceos.reliability.api.OutboxAppender;
 import com.serviceos.reliability.api.OutboxEvent;
 import com.serviceos.shared.BusinessProblem;
-import com.serviceos.shared.ProblemCode;
 import com.serviceos.shared.Sha256;
 import com.serviceos.workorder.api.ExternalWorkOrderConflictException;
 import com.serviceos.workorder.api.ReceiveExternalWorkOrderCommand;
@@ -50,8 +49,8 @@ import java.util.UUID;
  * Canonical 私有存储 → CanonicalMessage 登记 → 领域建单命令 → Envelope/Canonical 完成 →
  * Outbox/审计。适配器不得直接写工单表。</p>
  *
- * <p>M382：已配置 Profile 的项目必须命中有效 Revision（失败关闭）；尚未配置 Profile 的项目
- * 仍走 Bundle 解析并冻结为 LEGACY_BUNDLE，不得回退草稿或默认流程。</p>
+ * <p>M382/M383：正式建单必须命中有效履约 Profile Revision 并冻结 PROFILE_REVISION；
+ * 无 Profile / 暂停 / 无生效版本失败关闭。LEGACY_BUNDLE 仅用于迁移前已存在工单，不得用于新建。</p>
  *
  * <p>M335/M336：CREATE_WORK_ORDER 必须命中 connector 唯一 INBOUND Mapping；缺失则失败关闭。
  * 适配器只提交 {@link CreateWorkOrderRouteHint}（Bundle 路由 + businessKey 基底）；
@@ -321,34 +320,23 @@ public class InboundCreateWorkOrderPipeline {
                     canonical.connectorVersionId(), canonical.mappingVersionId(), true);
         }
 
-        WorkOrderReceipt receipt = workOrderCommandService.receive(
-                fulfillment == null
-                        ? new ReceiveExternalWorkOrderCommand(
-                        tenantId, bundle.projectId(), mapped.clientCode(), mapped.brandCode(),
-                        mapped.serviceProductCode(), mapped.externalOrderCode(),
-                        auditContext.requestDigest(),
-                        bundle.bundleId(), bundle.bundleCode(), bundle.bundleVersion(),
-                        bundle.manifestDigest(),
-                        mapped.provinceCode(), mapped.cityCode(), mapped.districtCode(),
-                        mapped.customerName(), mapped.customerMobile(), mapped.serviceAddress(),
-                        mapped.vehicleVin(), mapped.dispatchedAt(),
-                        correlationId, "canonical-message:" + canonical.canonicalMessageId())
-                        : new ReceiveExternalWorkOrderCommand(
-                        tenantId, bundle.projectId(), mapped.clientCode(), mapped.brandCode(),
-                        mapped.serviceProductCode(), mapped.externalOrderCode(),
-                        auditContext.requestDigest(),
-                        fulfillment.configurationBundleId(),
-                        fulfillment.configurationBundleCode(),
-                        fulfillment.configurationBundleVersion(),
-                        fulfillment.configurationBundleDigest(),
-                        mapped.provinceCode(), mapped.cityCode(), mapped.districtCode(),
-                        mapped.customerName(), mapped.customerMobile(), mapped.serviceAddress(),
-                        mapped.vehicleVin(), mapped.dispatchedAt(),
-                        correlationId, "canonical-message:" + canonical.canonicalMessageId(),
-                        "PROFILE_REVISION",
-                        fulfillment.profileId(),
-                        fulfillment.revisionId(),
-                        fulfillment.fulfillmentVersion()));
+        Objects.requireNonNull(fulfillment, "fulfillment");
+        WorkOrderReceipt receipt = workOrderCommandService.receive(new ReceiveExternalWorkOrderCommand(
+                tenantId, bundle.projectId(), mapped.clientCode(), mapped.brandCode(),
+                mapped.serviceProductCode(), mapped.externalOrderCode(),
+                auditContext.requestDigest(),
+                fulfillment.configurationBundleId(),
+                fulfillment.configurationBundleCode(),
+                fulfillment.configurationBundleVersion(),
+                fulfillment.configurationBundleDigest(),
+                mapped.provinceCode(), mapped.cityCode(), mapped.districtCode(),
+                mapped.customerName(), mapped.customerMobile(), mapped.serviceAddress(),
+                mapped.vehicleVin(), mapped.dispatchedAt(),
+                correlationId, "canonical-message:" + canonical.canonicalMessageId(),
+                "PROFILE_REVISION",
+                fulfillment.profileId(),
+                fulfillment.revisionId(),
+                fulfillment.fulfillmentVersion()));
 
         String resultId = receipt.workOrderId().toString();
         messages.completeCanonical(
@@ -441,8 +429,8 @@ public class InboundCreateWorkOrderPipeline {
     }
 
     /**
-     * 先解析 Bundle 得到 projectId；若项目已配置履约 Profile 则必须命中有效 Revision，
-     * 并以 Profile 冻结的 Bundle 为准。尚未配置 Profile 时保留 Bundle 解析结果并标记 LEGACY。
+     * 先解析 Bundle 得到 projectId，再强制命中有效履约 Profile Revision。
+     * 无 Profile / 暂停 / 无生效版本一律失败关闭，不得回退草稿或任意 Bundle。
      */
     private ResolvedConfiguration resolveFulfillmentOrBundle(
             String tenantId,
@@ -455,29 +443,22 @@ public class InboundCreateWorkOrderPipeline {
                         tenantId, projectCode, routeHint.brandCode(),
                         routeHint.serviceProductCode(), routeHint.provinceCode(),
                         receivedAt, false, routeHint.externalOrderCode()));
-        try {
-            ProjectFulfillmentResolveResult fulfillment = fulfillmentResolver.resolve(
-                    new ProjectFulfillmentResolveQuery(
-                            tenantId,
-                            bundle.projectId(),
-                            routeHint.serviceProductCode(),
-                            receivedAt,
-                            null,
-                            routeHint.brandCode(),
-                            routeHint.provinceCode()));
-            ConfigurationBundleReference frozenBundle = new ConfigurationBundleReference(
-                    fulfillment.configurationBundleId(),
-                    bundle.projectId(),
-                    fulfillment.configurationBundleCode(),
-                    fulfillment.configurationBundleVersion(),
-                    fulfillment.configurationBundleDigest());
-            return new ResolvedConfiguration(frozenBundle, fulfillment);
-        } catch (BusinessProblem problem) {
-            if (problem.code() != ProblemCode.PROJECT_FULFILLMENT_PROFILE_NOT_FOUND) {
-                throw problem;
-            }
-            return new ResolvedConfiguration(bundle, null);
-        }
+        ProjectFulfillmentResolveResult fulfillment = fulfillmentResolver.resolve(
+                new ProjectFulfillmentResolveQuery(
+                        tenantId,
+                        bundle.projectId(),
+                        routeHint.serviceProductCode(),
+                        receivedAt,
+                        null,
+                        routeHint.brandCode(),
+                        routeHint.provinceCode()));
+        ConfigurationBundleReference frozenBundle = new ConfigurationBundleReference(
+                fulfillment.configurationBundleId(),
+                bundle.projectId(),
+                fulfillment.configurationBundleCode(),
+                fulfillment.configurationBundleVersion(),
+                fulfillment.configurationBundleDigest());
+        return new ResolvedConfiguration(frozenBundle, fulfillment);
     }
 
     private static String requiredText(String value, String field) {

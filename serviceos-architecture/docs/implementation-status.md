@@ -44,8 +44,8 @@ latestMilestone: M383
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts`、`@serviceos/web-core`、`ServiceOSIOSCore`、独立且可部署的 `serviceos-network-web` 与 `serviceos-technician-web`、Swift 6 `TechnicianIOSFoundation`，以及已在 iPhone 17 Pro Simulator 安装启动、实跑 XCTest/XCUITest、形成 Production arm64 archive/dSYM，并接入当前任务、在线 Visit、冻结基础表单、前台 Evidence 采集上传、Snapshot/Task 完成与多轮资料整改的原生 `TechnicianIOS` SwiftUI App；由同一 Core OpenAPI 生成并经独立消费者门禁验证的 `@serviceos/core-client` 与 `ServiceOSCoreClient` |
 | 前端工程 | `serviceos-admin-web` 独立承载总部运营；**M370～M377** 完成设计系统 Presenter、产品化 AppShell（ScopeBar/Freshness/诊断抽屉）、标准页模板、工单中心/详情、项目详情与主导航页壳迁移及视觉关闭；仍消费服务端 Navigation 与 allowed-actions；M256 后 Network 正式产品由独立 `serviceos-network-web` 承载，M257 后 Technician 正式产品由独立移动优先 `serviceos-technician-web` 承载；两套独立 Web 均实际接入共享 Core、OIDC PKCE、服务端 Context/Capability/导航、Playwright 回归和独立容器镜像 |
-| 数据库 | PostgreSQL + Flyway（当前版本 **137**；M378 新增 V136 Profile/Revision + V137 工单冻结列） |
-| 契约 | Core OpenAPI **1.0.60** + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含项目履约 Profile API；`workorder.cancelled@v1`、`workorder.reopened@v1`、`workorder.external-details-updated@v1`、project.created@v3、project.scope-relations-revised@v1、`task.handling-completed@v1`、recovered/resolved 与 SLA started/breached/met@v1；ConfigurationDraft.clientCompatibility/`supportedClientKinds`；Feed/整改 `clientCapabilityUnsupportedDetail`；整改/主 Evidence/`Manual assign`/Network on-behalf `CLIENT_CAPABILITY_UNSUPPORTED`；`ReviewCase.reviewTaskId`；`TechnicianProfile.supportedClientKinds` / declare） |
+| 数据库 | PostgreSQL + Flyway（当前版本 **138**；M378 V136/V137 + M383 V138 effective_to 关闭窗口） |
+| 契约 | Core OpenAPI **1.0.61** + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含项目履约 Profile API、`TaskBlockedAction`；`workorder.cancelled@v1`、`workorder.reopened@v1`、`workorder.external-details-updated@v1`、project.created@v3、project.scope-relations-revised@v1、`task.handling-completed@v1`、recovered/resolved 与 SLA started/breached/met@v1；ConfigurationDraft.clientCompatibility/`supportedClientKinds`；Feed/整改 `clientCapabilityUnsupportedDetail`；整改/主 Evidence/`Manual assign`/Network on-behalf `CLIENT_CAPABILITY_UNSUPPORTED`；`ReviewCase.reviewTaskId`；`TechnicianProfile.supportedClientKinds` / declare） |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -181,9 +181,9 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 - **M380 Implemented**：三栏草稿阶段编排工作区。
 - **M381 Implemented**：DedicatedFlow 四步发布。
 - **M382 Implemented**：建单 Resolver 接入、工单冻结、快照 API。
-- **M383 Partial**：Playwright mock 冒烟（去空壳+列表）；全链路 E2E/a11y/OIDC/core-client/阻塞原因/强制无 Profile 失败仍未闭合。
+- **M383 Progress**：无 Profile 建单失败关闭；v1/v2 生效隔离 IT；`blockedActions`；工单配置来源/快照页；Playwright mock 冒烟。仍缺真实全链路 E2E、a11y/OIDC、core-client 替换。
 
-OpenAPI **1.0.60**；Flyway **137**。
+OpenAPI **1.0.61**；Flyway **138**。
 
 仍为 **硬门禁 / 外部阻塞**（不可发明推进）：
 

@@ -3,6 +3,8 @@ package com.serviceos.integration.byd.web;
 import com.serviceos.ServiceOsApplication;
 import com.serviceos.configuration.api.ConfigurationAssetType;
 import com.serviceos.configuration.api.ConfigurationService;
+import com.serviceos.configuration.ProjectFulfillmentTestSupport;
+import com.serviceos.configuration.api.ConfigurationBundleReference;
 import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
 import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
 import com.serviceos.integration.byd.infrastructure.BydCpimSignatureVerifier;
@@ -95,6 +97,7 @@ class BydCpimInboundOrderHttpPostgresIT {
     void clean() throws IOException {
         jdbc.sql("""
                 TRUNCATE TABLE rel_outbox_publish_attempt, rel_outbox_event, wo_work_order,
+                    cfg_project_fulfillment_revision, cfg_project_fulfillment_profile,
                     cfg_configuration_bundle_item,
                     cfg_configuration_bundle, cfg_configuration_asset_version,
                     prj_project, int_inbound_replay_guard,
@@ -415,7 +418,7 @@ class BydCpimInboundOrderHttpPostgresIT {
                 "1.0.0",
                 integration,
                 Sha256.digest(integration)));
-        configurations.publishBundle(new PublishConfigurationBundleCommand(
+        ConfigurationBundleReference fulfillmentBundle = configurations.publishBundle(new PublishConfigurationBundleCommand(
                 TENANT_ID,
                 projectId,
                 "BYD-OCEAN-SD-PILOT",
@@ -426,6 +429,9 @@ class BydCpimInboundOrderHttpPostgresIT {
                 Instant.now().minusSeconds(3600),
                 null,
                 java.util.List.of(asset.versionId(), integrationAsset.versionId())));
+        ProjectFulfillmentTestSupport.seedPublishedProfile(
+                jdbc, TENANT_ID, projectId, "HOME_CHARGING_SURVEY_INSTALL",
+                fulfillmentBundle, asset.versionId(), Instant.now().minusSeconds(30));
         return integrationAsset.versionId();
     }
 

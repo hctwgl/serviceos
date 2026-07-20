@@ -3,6 +3,8 @@ package com.serviceos.integration;
 import com.serviceos.ServiceOsApplication;
 import com.serviceos.configuration.api.ConfigurationAssetType;
 import com.serviceos.configuration.api.ConfigurationService;
+import com.serviceos.configuration.ProjectFulfillmentTestSupport;
+import com.serviceos.configuration.api.ConfigurationBundleReference;
 import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
 import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
 import com.serviceos.integration.byd.infrastructure.BydCpimSignatureVerifier;
@@ -97,6 +99,7 @@ class DualOemInboundRegressionPostgresIT {
     void setUp() throws Exception {
         jdbc.sql("""
                 TRUNCATE TABLE rel_outbox_publish_attempt, rel_outbox_event, wo_work_order,
+                    cfg_project_fulfillment_revision, cfg_project_fulfillment_profile,
                     cfg_configuration_bundle_item, cfg_configuration_bundle,
                     cfg_configuration_asset_version, prj_project, int_inbound_replay_guard,
                     int_canonical_message, int_inbound_envelope CASCADE
@@ -217,10 +220,13 @@ class DualOemInboundRegressionPostgresIT {
         UUID integrationId = configurations.publishAsset(new PublishConfigurationAssetCommand(
                 tenant, ConfigurationAssetType.INTEGRATION, mappingKey, "1.0.0", "1.0.0",
                 integration, Sha256.digest(integration))).versionId();
-        configurations.publishBundle(new PublishConfigurationBundleCommand(
+        ConfigurationBundleReference fulfillmentBundle = configurations.publishBundle(new PublishConfigurationBundleCommand(
                 tenant, projectId, projectCode + "-BUNDLE", "1.0.0", brand,
                 "HOME_CHARGING_SURVEY_INSTALL", "370000", Instant.now().minusSeconds(60),
                 null, List.of(workflowId, integrationId)));
+        ProjectFulfillmentTestSupport.seedPublishedProfile(
+                jdbc, tenant, projectId, "HOME_CHARGING_SURVEY_INSTALL",
+                fulfillmentBundle, workflowId, Instant.now().minusSeconds(30));
     }
 
     private void postByd(String orderCode) throws Exception {

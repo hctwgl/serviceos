@@ -180,3 +180,25 @@ export function getProjectFulfillmentRevision(
     `/projects/${projectId}/fulfillment-profiles/${profileId}/revisions/${revisionId}`,
   )
 }
+
+export type WorkOrderFulfillmentSnapshot = {
+  workOrderId: string
+  projectId: string
+  serviceProductCode: string
+  configKind: 'PROFILE_REVISION' | 'LEGACY_BUNDLE'
+  profileId?: string | null
+  profileName?: string | null
+  revisionId?: string | null
+  fulfillmentVersion?: string | null
+  configurationBundleId?: string | null
+  configurationBundleVersion?: string | null
+  configurationBundleDigest?: string | null
+  manifestJson?: string | null
+  contentDigest?: string | null
+  frozenAt?: string | null
+  legacyExplanation?: string | null
+}
+
+export function getWorkOrderFulfillmentSnapshot(workOrderId: string) {
+  return apiGet<WorkOrderFulfillmentSnapshot>(`/work-orders/${workOrderId}/fulfillment-snapshot`)
+}

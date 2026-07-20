@@ -181,6 +181,67 @@ class ProjectFulfillmentProfilePostgresIT {
     }
 
     @Test
+    void suspendBlocksResolveAndPublishedVersionsStayIsolated() {
+        ProjectFulfillmentProfileDetail created = profiles.create(principal(), meta("c-iso"),
+                new CreateProjectFulfillmentProfileCommand(
+                        projectId, "HOME_CHARGING_SURVEY_INSTALL", "隔离测试",
+                        null, "HOME_CHARGING_SURVEY_INSTALL", null));
+        ProjectFulfillmentDraftView draft = profiles.getDraft(
+                principal(), "corr-iso", projectId, created.profileId());
+        profiles.updateDraft(principal(), meta("u-iso"),
+                new UpdateProjectFulfillmentDraftCommand(
+                        created.profileId(), draft.aggregateVersion(),
+                        "隔离测试", null, draft.documentJson(),
+                        workflowVersionId, bundle.bundleId()));
+        ProjectFulfillmentProfileDetail ready = profiles.get(
+                principal(), "corr-iso2", projectId, created.profileId());
+        Instant t1 = Instant.now().plusSeconds(5);
+        ProjectFulfillmentRevisionView v1 = profiles.publish(
+                principal(), meta("p-iso1"), projectId, created.profileId(),
+                ready.aggregateVersion(), t1, "v1");
+        var resolvedV1 = resolver.resolve(new ProjectFulfillmentResolveQuery(
+                TENANT, projectId, "HOME_CHARGING_SURVEY_INSTALL",
+                t1.plusSeconds(1), null, "BYD_OCEAN", "370000"));
+        assertThat(resolvedV1.revisionId()).isEqualTo(v1.revisionId());
+
+        ProjectFulfillmentProfileDetail afterV1 = profiles.get(
+                principal(), "corr-iso3", projectId, created.profileId());
+        ProjectFulfillmentDraftView draft2 = profiles.getDraft(
+                principal(), "corr-iso4", projectId, created.profileId());
+        profiles.updateDraft(principal(), meta("u-iso2"),
+                new UpdateProjectFulfillmentDraftCommand(
+                        created.profileId(), draft2.aggregateVersion(),
+                        "隔离测试 v2", "变更说明", draft2.documentJson(),
+                        workflowVersionId, bundle.bundleId()));
+        ProjectFulfillmentProfileDetail ready2 = profiles.get(
+                principal(), "corr-iso5", projectId, created.profileId());
+        Instant t2 = Instant.now().plusSeconds(60);
+        ProjectFulfillmentRevisionView v2 = profiles.publish(
+                principal(), meta("p-iso2"), projectId, created.profileId(),
+                ready2.aggregateVersion(), t2, "v2");
+        assertThat(v2.versionNo()).isEqualTo(2);
+        assertThat(resolver.resolve(new ProjectFulfillmentResolveQuery(
+                TENANT, projectId, "HOME_CHARGING_SURVEY_INSTALL",
+                t1.plusSeconds(10), null, "BYD_OCEAN", "370000")).revisionId())
+                .isEqualTo(v1.revisionId());
+        assertThat(resolver.resolve(new ProjectFulfillmentResolveQuery(
+                TENANT, projectId, "HOME_CHARGING_SURVEY_INSTALL",
+                t2.plusSeconds(1), null, "BYD_OCEAN", "370000")).revisionId())
+                .isEqualTo(v2.revisionId());
+
+        ProjectFulfillmentProfileDetail active = profiles.get(
+                principal(), "corr-iso6", projectId, created.profileId());
+        profiles.suspend(principal(), meta("s-iso"), projectId, created.profileId(),
+                active.aggregateVersion());
+        assertThatThrownBy(() -> resolver.resolve(new ProjectFulfillmentResolveQuery(
+                TENANT, projectId, "HOME_CHARGING_SURVEY_INSTALL",
+                t2.plusSeconds(30), null, "BYD_OCEAN", "370000")))
+                .isInstanceOf(BusinessProblem.class)
+                .extracting(ex -> ((BusinessProblem) ex).code())
+                .isEqualTo(ProblemCode.PROJECT_FULFILLMENT_PROFILE_SUSPENDED);
+    }
+
+    @Test
     void publishWithoutBundleFailsClosed() {
         ProjectFulfillmentProfileDetail created = profiles.create(principal(), meta("c2"),
                 new CreateProjectFulfillmentProfileCommand(

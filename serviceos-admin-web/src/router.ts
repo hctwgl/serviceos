@@ -37,6 +37,7 @@ import FulfillmentProfileDetailPage from './pages/FulfillmentProfileDetailPage.v
 import FulfillmentPreviewPage from './pages/FulfillmentPreviewPage.vue'
 import FulfillmentProfileEditorPage from './pages/FulfillmentProfileEditorPage.vue'
 import FulfillmentPublishFlowPage from './pages/FulfillmentPublishFlowPage.vue'
+import WorkOrderFulfillmentSnapshotPage from './pages/WorkOrderFulfillmentSnapshotPage.vue'
 import OidcCallbackPage from './pages/OidcCallbackPage.vue'
 import UserDirectoryPage from './pages/UserDirectoryPage.vue'
 import UserDetailPage from './pages/UserDetailPage.vue'
@@ -191,6 +192,12 @@ export const router = createRouter({
           path: 'work-orders/:id',
           name: 'ADMIN.WORKORDER.WORKSPACE',
           component: WorkOrderWorkspacePage,
+        },
+        {
+          path: 'work-orders/:id/configuration-snapshot',
+          name: 'ADMIN.WORKORDER.FULFILLMENT_SNAPSHOT',
+          component: WorkOrderFulfillmentSnapshotPage,
+          meta: { pageId: 'ADMIN.WORKORDER.FULFILLMENT_SNAPSHOT' },
         },
         {
           path: 'system/demo-data',
