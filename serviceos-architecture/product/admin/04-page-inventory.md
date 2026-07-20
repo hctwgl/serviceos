@@ -1,6 +1,6 @@
 ---
 title: Admin 目标页面清单
-version: 0.1.0
+version: 0.2.0
 status: Proposed
 lastUpdated: 2026-07-20
 ---
@@ -8,6 +8,8 @@ lastUpdated: 2026-07-20
 # Admin 目标页面清单
 
 本清单描述目标产品页面，不等同于当前路由清单。实施阶段必须把现有 Router、Page Registry、服务端 Navigation 和深链页面逐一映射到本清单，并给出保留、合并、重命名、迁移或删除入口的结论。
+
+所有正式页面遵守 [经典专业风视觉与页面基线](12-classic-professional-visual-baseline.md)。
 
 ## 1. 工作台
 
@@ -23,9 +25,9 @@ lastUpdated: 2026-07-20
 | 页面 | 类型 | 核心任务 | 主要操作 |
 |---|---|---|---|
 | 工单中心 | List | 查询全部授权范围内工单 | 查看、新建（有能力时）、批量导出（有能力时） |
-| 工单详情 | Detail/Workspace | 理解当前阶段、责任、资料、SLA 和下一步 | allowed-actions 主动作 |
+| 工单详情 | Detail/Workspace | 在单一工作区理解 Workflow、Task、责任、资料、SLA、审核和外部回传 | allowed-actions 主动作 |
 | 工单时间线 | Detail | 追溯业务事件 | 查看来源对象 |
-| 待初审/待分配/待预约/暂停/已完成 | Saved View | 快速进入特定业务队列 | 与工单中心一致 |
+| 待初审/待分配/待预约/上门中/待审核/整改中/已完成 | Saved View | 快速进入特定业务队列 | 与工单中心一致 |
 
 ## 3. 服务履约
 
@@ -61,12 +63,12 @@ lastUpdated: 2026-07-20
 | 项目管理 | List | 管理车企项目 | 新建项目、查看详情 |
 | 项目新建/编辑 | Form | 维护项目基本信息 | 保存 |
 | 项目详情 | Detail | 查看项目范围、网点、履约方案和版本 | 编辑、进入履约配置 |
-| 工单类型与履约配置 | List | 查看项目每类工单使用的方案 | 新增、编辑、预览、发布 |
-| 履约配置工作区 | Configuration/Dedicated Flow | 配置阶段、表单、资料、动作、审核和 SLA | 保存、校验、预览、发布 |
+| 项目履约配置中心 | Configuration/Workbench | 查看项目配置包、工单类型、版本、草稿、影响和发布记录 | 编辑草稿、版本对比、发布、运行快照 |
+| 工单类型配置 | List/Configuration | 查看并配置项目每类工单使用的 Workflow、Task、表单、资料、SLA 和策略 | 新增、编辑、预览 |
 | 服务范围 | Configuration | 维护项目服务区域 | 保存调整 |
 | 合作网点绑定 | Configuration | 维护项目可用网点 | 保存调整 |
 | 接口与字段映射 | Configuration | 管理车企收单/回传映射 | 编辑草稿、校验、发布 |
-| 配置发布记录 | List/Detail | 查看项目相关配置版本 | 查看版本、比较 |
+| 配置发布记录 | List/Detail | 查看项目相关配置版本 | 查看版本、比较、影响分析 |
 
 ## 6. 组织与资源
 
@@ -86,13 +88,19 @@ lastUpdated: 2026-07-20
 
 | 页面 | 类型 | 核心任务 | 主要操作 |
 |---|---|---|---|
+| 配置中心首页 | Workbench | 查看跨项目配置资产、草稿、校验错误、发布和依赖风险 | 下钻资产或项目 |
 | 履约方案模板 | List | 管理可复用标准履约方案 | 新建、复制、查看版本 |
-| 流程模板 | List/Configuration | 管理 Workflow 模板 | 新建草稿、校验、发布 |
+| 工作流目录 | List | 查询 Workflow 模板、项目引用、版本和校验状态 | 新建草稿、复制、打开设计器 |
+| 工作流设计器 | Configuration/Dedicated Flow | 可视化配置节点、分支、Task 引用、SLA、异常和结束条件 | 保存、校验、试运行、版本对比、发布 |
+| 任务模板中心 | List/Configuration | 管理 Task 执行角色、分配、表单、资料、SLA、动作和引用关系 | 新建、复制、版本对比、发布 |
+| 任务模板详情/编辑 | Detail/Configuration | 查看或编辑单个任务模板及 Workflow 引用 | 保存草稿、校验、发布 |
 | 表单模板 | List/Configuration | 管理 FORM 模板 | 新建草稿、预览、发布 |
 | 资料模板 | List/Configuration | 管理 EVIDENCE 模板 | 新建草稿、预览、发布 |
 | SLA 模板 | List/Configuration | 管理 SLA 策略 | 新建草稿、校验、发布 |
 | 业务日历 | List/Configuration | 管理 BUSINESS 时钟日历 | 新建、编辑、发布 |
 | 派单规则 | List/Configuration | 管理候选与评分规则 | 新建草稿、试算、发布 |
+| 通知策略 | List/Configuration | 管理业务通知触发、渠道和升级 | 新建草稿、预览、发布 |
+| 集成映射 | List/Configuration | 管理入站与出站业务字段映射 | 新建草稿、校验、发布 |
 | 配置版本 | List/Detail | 跨资产查询 Bundle、版本和生效状态 | 查看、比较、审计 |
 
 ## 8. 系统管理
@@ -138,6 +146,8 @@ lastUpdated: 2026-07-20
 - 后端 API；
 - 正常/空/错/无权限/冲突状态；
 - 产品状态；
-- 视觉验收状态。
+- 视觉验收状态；
+- 适用的经典专业风页面模式；
+- 1440×1024 和 1280px 截图证据。
 
-未完成页面不得仅凭“路由可访问”标记为已完成。
+未完成页面不得仅凭“路由可访问”或“样式接近概念图”标记为已完成。
