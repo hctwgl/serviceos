@@ -17,11 +17,13 @@ test.describe('M385 项目履约配置中心', () => {
 
     await page.getByRole('button', { name: '打开工单类型与履约配置' }).click()
     await expect(page.getByRole('heading', { name: '项目履约配置中心' })).toBeVisible()
-    await expect(page.getByText('标准家充履约方案')).toBeVisible()
-    await expect(page.getByText('家充勘测安装')).toBeVisible()
+    await expect(page.getByRole('cell', { name: '标准家充履约方案' })).toBeVisible()
+    await expect(page.getByRole('cell', { name: '家充勘测安装' })).toBeVisible()
     await expect(page.getByTestId('summary-strip')).toBeVisible()
     await expect(page.getByTestId('configuration-subnav')).toBeVisible()
     await expect(page.getByTestId('fulfillment-compare-impact')).toBeVisible()
+    await expect(page.getByTestId('fulfillment-version-timeline')).toBeVisible()
+    await expect(page.getByTestId('fulfillment-version-timeline')).toContainText('标准家充履约方案')
   })
 
   test('新增工单类型进入向导而非硬编码创建', async ({ page }) => {

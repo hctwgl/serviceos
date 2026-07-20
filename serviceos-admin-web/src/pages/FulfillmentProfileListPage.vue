@@ -27,11 +27,26 @@ const projectId = computed(() => String(route.params.id ?? ''))
 const loading = ref(false)
 const railLoading = ref(false)
 const error = ref<string | null>(null)
+const railError = ref<string | null>(null)
 const project = ref<ProjectDetail | null>(null)
 const items = ref<ProjectFulfillmentProfileSummary[]>([])
 const activeNavKey = ref('work-order-types')
 const compareImpact = ref<ProjectFulfillmentCompareImpact | null>(null)
 const selectedProfileId = ref<string | null>(null)
+
+const versionTimeline = computed(() =>
+  items.value
+    .filter((item) => !!item.activeVersion || item.status === 'DRAFT')
+    .map((item) => ({
+      key: item.profileId,
+      title: `${labelServiceProduct(item.serviceProductCode)} · ${item.profileName}`,
+      versionLabel: item.activeVersion ? `已发布 ${item.activeVersion}` : '仅草稿',
+      effectiveFromLabel: item.effectiveFrom
+        ? formatDateTimeDisplay(item.effectiveFrom)
+        : '尚未生效',
+      status: item.status,
+    })),
+)
 
 const navItems = computed<ConfigurationNavItem[]>(() => [
   { key: 'basics', label: '基础信息' },
@@ -120,11 +135,13 @@ const publishedRows = computed(() =>
 
 async function loadCompare(profileId: string) {
   railLoading.value = true
+  railError.value = null
+  selectedProfileId.value = profileId
   try {
     compareImpact.value = await compareProjectFulfillmentImpact(projectId.value, profileId)
-    selectedProfileId.value = profileId
-  } catch {
+  } catch (err) {
     compareImpact.value = null
+    railError.value = toUserFacingError(err).message
   } finally {
     railLoading.value = false
   }
@@ -308,7 +325,25 @@ onMounted(load)
     </section>
 
     <template #rail>
+      <Alert
+        v-if="railError"
+        type="error"
+        show-icon
+        :message="railError"
+        style="margin-bottom: 12px"
+      />
       <FulfillmentCompareImpactPanel :impact="compareImpact" :loading="railLoading" />
+      <section class="timeline" data-testid="fulfillment-version-timeline">
+        <h3>版本时间线</h3>
+        <ul v-if="versionTimeline.length">
+          <li v-for="entry in versionTimeline" :key="entry.key">
+            <strong>{{ entry.title }}</strong>
+            <div>{{ entry.versionLabel }}</div>
+            <div class="muted">{{ entry.effectiveFromLabel }}</div>
+          </li>
+        </ul>
+        <p v-else class="muted">暂无版本记录</p>
+      </section>
       <p class="rail-hint">
         点击左侧工单类型行可刷新该方案相对当前发布版的真实差异。使用中工单计数仍为 UI_DATA_GAP。
       </p>
@@ -334,5 +369,22 @@ h2 {
   margin: 0;
   font-size: 12px;
   color: var(--sos-color-text-tertiary);
+}
+.timeline h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: var(--sos-color-text-primary);
+}
+.timeline ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--sos-color-text-secondary);
+}
+.timeline li + li {
+  margin-top: 10px;
+}
+.muted {
+  color: var(--sos-color-text-tertiary);
+  font-size: 12px;
 }
 </style>
