@@ -58,7 +58,8 @@ class TechnicianEvidenceControllerSecurityTest {
                 .andExpect(status().isUnauthorized());
 
         when(principals.current()).thenReturn(principal());
-        when(evidence.listSlots(principal(), "corr-264", CONTEXT, TASK)).thenReturn(List.of(slot()));
+        when(evidence.listSlots(eq(principal()), eq("corr-264"), eq(CONTEXT), any(), eq(TASK)))
+                .thenReturn(List.of(slot()));
         mvc.perform(get("/api/v1/technician/me/tasks/{taskId}/evidence-slots", TASK)
                         .with(jwt().jwt(token -> token.subject(PRINCIPAL.toString())
                                 .claim("tenant_id", "tenant-264")))
@@ -74,12 +75,12 @@ class TechnicianEvidenceControllerSecurityTest {
     @Test
     void beginAndFinalizeExposeOnlyConstrainedUploadAndSafeRevisionMetadata() throws Exception {
         when(principals.current()).thenReturn(principal());
-        when(evidence.beginUpload(eq(principal()), any(), eq(CONTEXT), any())).thenReturn(
+        when(evidence.beginUpload(eq(principal()), any(), eq(CONTEXT), any(), any())).thenReturn(
                 new EvidenceUploadSessionView(
                         SESSION, UUID.randomUUID(), TASK, SLOT, null, "CREATED", "PUT",
                         "https://upload.invalid/once", Map.of("Content-Type", "image/jpeg"),
                         NOW.plusSeconds(60), NOW.plusSeconds(600)));
-        when(evidence.finalizeUpload(eq(principal()), any(), eq(CONTEXT), any())).thenReturn(item());
+        when(evidence.finalizeUpload(eq(principal()), any(), eq(CONTEXT), any(), any())).thenReturn(item());
 
         String body = """
                 {"originalFileName":"site.jpg","declaredMimeType":"image/jpeg","expectedSize":4,
@@ -110,16 +111,17 @@ class TechnicianEvidenceControllerSecurityTest {
                 .andExpect(jsonPath("$.revisions[0].captureMetadata").doesNotExist())
                 .andExpect(jsonPath("$.createdBy").doesNotExist());
 
-        verify(evidence).beginUpload(eq(principal()), any(), eq(CONTEXT), any());
-        verify(evidence).finalizeUpload(eq(principal()), any(), eq(CONTEXT), any());
+        verify(evidence).beginUpload(eq(principal()), any(), eq(CONTEXT), any(), any());
+        verify(evidence).finalizeUpload(eq(principal()), any(), eq(CONTEXT), any(), any());
     }
 
     @Test
     void snapshotAndCompleteAcceptOnlyAuthorityObjectIdsAndQuotedVersion() throws Exception {
         when(principals.current()).thenReturn(principal());
-        when(evidence.createTaskSubmissionSnapshot(eq(principal()), any(), eq(CONTEXT), eq(TASK), any()))
+        when(evidence.createTaskSubmissionSnapshot(
+                eq(principal()), any(), eq(CONTEXT), any(), eq(TASK), any()))
                 .thenReturn(snapshot());
-        when(evidence.completeTask(eq(principal()), any(), eq(CONTEXT), any())).thenReturn(
+        when(evidence.completeTask(eq(principal()), any(), eq(CONTEXT), any(), any())).thenReturn(
                 new HumanTaskCommandReceipt(TASK, "COMPLETED", PRINCIPAL.toString(), 8, NOW));
 
         mvc.perform(post("/api/v1/technician/me/tasks/{taskId}/evidence-set-snapshots", TASK)

@@ -36,15 +36,15 @@ final class DefaultConfigurationDependencyAnalysisService implements Configurati
     private static final String WRITE = "configuration.draft.write";
     private static final String RESOURCE = "ConfigurationDependency";
 
-    private static final Map<String, ConfigurationAssetType> REF_FIELDS = Map.of(
-            "formRef", ConfigurationAssetType.FORM,
-            "slaRef", ConfigurationAssetType.SLA,
-            "evidenceRef", ConfigurationAssetType.EVIDENCE,
-            "subProcessRef", ConfigurationAssetType.WORKFLOW,
-            "integrationRef", ConfigurationAssetType.INTEGRATION,
-            "assigneePolicyRef", ConfigurationAssetType.ASSIGNEE_POLICY,
-            "dispatchPolicyRef", ConfigurationAssetType.DISPATCH,
-            "ruleRef", ConfigurationAssetType.RULE);
+    private static final Map<String, ConfigurationAssetType> REF_FIELDS = Map.ofEntries(
+            Map.entry("formRef", ConfigurationAssetType.FORM),
+            Map.entry("slaRef", ConfigurationAssetType.SLA),
+            Map.entry("evidenceRef", ConfigurationAssetType.EVIDENCE),
+            Map.entry("subProcessRef", ConfigurationAssetType.WORKFLOW),
+            Map.entry("integrationRef", ConfigurationAssetType.INTEGRATION),
+            Map.entry("assigneePolicyRef", ConfigurationAssetType.ASSIGNEE_POLICY),
+            Map.entry("dispatchPolicyRef", ConfigurationAssetType.DISPATCH),
+            Map.entry("ruleRef", ConfigurationAssetType.RULE));
 
     private final JdbcClient jdbc;
     private final AuthorizationService authorization;

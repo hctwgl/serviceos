@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.49
+  version: 1.0.59
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -685,6 +685,35 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+  /technician-profiles/{profileId}:declare-supported-client-kinds:
+    post:
+      operationId: declareTechnicianSupportedClientKinds
+      summary: 声明或清除师傅履约端能力
+      description: |
+        M366 / ADR-088 A2-R：更新师傅档案 `supportedClientKinds` 声明，供自动 TECHNICIAN 派单硬过滤。
+        需要 network.manageTechnician；请求体 `supportedClientKinds` 为 null 表示清除为未声明。
+      parameters:
+        - $ref: '#/components/parameters/TechnicianProfileId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeclareTechnicianSupportedClientKindsRequest' }
+      responses:
+        '200':
+          description: 已更新声明
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianProfile' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
   /technician-profiles/{profileId}:disable:
     post:
       operationId: disableTechnicianProfile
@@ -2143,6 +2172,8 @@ paths:
         onBehalfOf/delegationRef/onBehalfReason 仍失败关闭。
         要求任务存在未关闭 CorrectionCase，且 onBehalfOf = ACTIVE TECHNICIAN 且为本网点 ACTIVE 师傅。
         上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+        M368 / ADR-089：要求 X-ServiceOS-Client-Kind=NETWORK_WEB，并对源 Task EVIDENCE 槽位做
+        网点端能力门禁；不兼容或非 NETWORK_WEB 返回 422 CLIENT_CAPABILITY_UNSUPPORTED。
       parameters:
         - $ref: '#/components/parameters/TaskId'
         - name: slotId
@@ -2150,6 +2181,8 @@ paths:
           required: true
           schema: { type: string, format: uuid }
         - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/ClientKind'
+        - $ref: '#/components/parameters/ClientVersion'
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/CorrelationId'
       requestBody:
@@ -2170,6 +2203,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /network-portal/tasks/{taskId}/evidence-slots/{slotId}/upload-sessions/{uploadSessionId}:finalize:
     post:
       operationId: finalizeNetworkPortalEvidenceUploadOnBehalf
@@ -2178,6 +2212,7 @@ paths:
         M201：X-Network-Context + NETWORK scope evidence.submitOnBehalf。
         Body 与 FinalizeEvidenceUploadRequest 同形；会话 createdBy 必须为当前主体。
         上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+        M368 / ADR-089：要求 NETWORK_WEB 客户端能力门禁；不兼容返回 422 CLIENT_CAPABILITY_UNSUPPORTED。
       parameters:
         - $ref: '#/components/parameters/TaskId'
         - name: slotId
@@ -2189,6 +2224,8 @@ paths:
           required: true
           schema: { type: string, format: uuid }
         - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/ClientKind'
+        - $ref: '#/components/parameters/ClientVersion'
         - $ref: '#/components/parameters/CorrelationId'
       requestBody:
         required: true
@@ -2329,12 +2366,15 @@ paths:
         M201：X-Network-Context + NETWORK scope evidence.submitOnBehalf 门禁后，
         委托 CorrectionCase.resubmit（底层另需 evidence.submit）；整改任务须为本网点 ACTIVE NETWORK。
         上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+        M368 / ADR-089：要求 NETWORK_WEB 客户端能力门禁；不兼容返回 422 CLIENT_CAPABILITY_UNSUPPORTED。
       parameters:
         - name: correctionCaseId
           in: path
           required: true
           schema: { type: string, format: uuid }
         - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/ClientKind'
+        - $ref: '#/components/parameters/ClientVersion'
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/CorrelationId'
       requestBody:
@@ -2355,6 +2395,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /network-portal/correction-cases/{correctionCaseId}/evidence-set-snapshots:
     post:
       operationId: createNetworkPortalCorrectionEvidenceSetSnapshot
@@ -2363,12 +2404,15 @@ paths:
         M201 扩展：X-Network-Context + NETWORK scope evidence.submitOnBehalf 门禁后，
         冻结整改源 Task 当前可提交资料集合并创建 EvidenceSetSnapshot；不要求师傅 correction Task 认领。
         上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+        M368 / ADR-089：要求 NETWORK_WEB 客户端能力门禁；不兼容返回 422 CLIENT_CAPABILITY_UNSUPPORTED。
       parameters:
         - name: correctionCaseId
           in: path
           required: true
           schema: { type: string, format: uuid }
         - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/ClientKind'
+        - $ref: '#/components/parameters/ClientVersion'
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/CorrelationId'
       requestBody:
@@ -2395,6 +2439,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /technician/me/task-feed:
     get:
       operationId: listTechnicianTaskFeed
@@ -2404,6 +2449,8 @@ paths:
         返回当前师傅 ACTIVE TECHNICIAN ServiceAssignment / TaskAssignment；可选 sinceCursor 增量，
         含撤权/结束 tombstone（仅 taskId + invalidationReason）。禁止离线工作包 runtime。
         上下文缺失/伪造/非师傅成员返回 PORTAL_CONTEXT_INVALID（403）。
+        M359：ASSIGNMENT 项可含 `clientCapabilityUnsupportedDetail`；当前 clientKind 无法履约冻结
+        FORM/EVIDENCE 时给出中文说明，客户端应展示并阻止进入详情执行（不静默忽略）。
       parameters:
         - $ref: '#/components/parameters/TechnicianContext'
         - name: sinceCursor
@@ -2432,6 +2479,8 @@ paths:
         Visit 摘要不含 GPS、距离、设备、离线命令、note、operation/evidence refs；
         不返回地址、联系人、表单值、资料文件、配置源码或离线工作包。
         其他师傅、其他网点、已撤权或不存在的 taskId 均返回 404，避免资源枚举。
+        M359：对已知 TECHNICIAN_WEB/IOS，若冻结 FORM/EVIDENCE 与当前客户端不兼容，
+        返回 422 `CLIENT_CAPABILITY_UNSUPPORTED`，禁止进入现场中途执行。
       parameters:
         - name: taskId
           in: path
@@ -2448,6 +2497,7 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /technician/me/appointments/{appointmentId}/visits:check-in:
     post:
       operationId: checkInTechnicianVisit
@@ -2523,6 +2573,8 @@ paths:
       description: |
         M263：先验证 X-Technician-Context、ACTIVE 师傅网点关系、task.readAssigned 和当前责任，
         再按 form.read 解析 Task 冻结 Bundle 中唯一 FormVersion；不回退到最新配置。
+        M357：对已知 TECHNICIAN_WEB/TECHNICIAN_IOS，服务端权威校验冻结表单所需客户端能力；
+        不兼容时返回 422 `CLIENT_CAPABILITY_UNSUPPORTED`，客户端不得静默忽略。
       parameters:
         - $ref: '#/components/parameters/TaskId'
         - $ref: '#/components/parameters/TechnicianContext'
@@ -2537,6 +2589,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /technician/me/tasks/{taskId}/form-submissions:
     post:
       operationId: submitTechnicianTaskForm
@@ -2544,6 +2597,7 @@ paths:
       description: |
         M263：Context 与当前责任实时重验；formVersionId 必须匹配冻结版本。提交为不可变事实且不隐式完成 Task。
         请求不接受 prefillVersion、tenant、actor 或 submittedBy；草稿/prefill 冲突策略未接受前继续失败关闭。
+        M357：提交前复检客户端能力；不兼容返回 422 `CLIENT_CAPABILITY_UNSUPPORTED`。
       parameters:
         - $ref: '#/components/parameters/TaskId'
         - $ref: '#/components/parameters/TechnicianContext'
@@ -2573,6 +2627,7 @@ paths:
       description: |
         M264：先实时验证 Technician Context、ACTIVE 网点关系、task.readAssigned、资源网点与当前责任，
         再按 evidence.read 查询可靠解析结果。仅返回移动端展示所需槽位元数据，不返回冻结规则 JSON。
+        M357：对已知师傅端校验槽位 mediaType/条件所需能力；不兼容返回 422 `CLIENT_CAPABILITY_UNSUPPORTED`。
       parameters:
         - $ref: '#/components/parameters/TaskId'
         - $ref: '#/components/parameters/TechnicianContext'
@@ -2587,11 +2642,14 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /technician/me/tasks/{taskId}/evidence-items:
     get:
       operationId: listTechnicianTaskEvidenceItems
       summary: 查询当前责任任务的安全资料版本摘要
-      description: M264：不返回 fileObjectId、上传者、原始 CaptureMetadata、扫描详情或永久 URL。
+      description: |
+        M264：不返回 fileObjectId、上传者、原始 CaptureMetadata、扫描详情或永久 URL。
+        M357：不兼容客户端能力时返回 422 `CLIENT_CAPABILITY_UNSUPPORTED`。
       parameters:
         - $ref: '#/components/parameters/TaskId'
         - $ref: '#/components/parameters/TechnicianContext'
@@ -2606,6 +2664,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /technician/me/tasks/{taskId}/evidence-slots/{slotId}/upload-sessions:
     post:
       operationId: beginTechnicianEvidenceUpload
@@ -2727,7 +2786,10 @@ paths:
     get:
       operationId: listTechnicianCorrections
       summary: 查询当前师傅候选或负责中的整改任务
-      description: M266：独立 correction Task 提供实时责任；源业务 Task 保持 COMPLETED。仅返回当前网点来源任务的最小整改投影。
+      description: |
+        M266：独立 correction Task 提供实时责任；源业务 Task 保持 COMPLETED。仅返回当前网点来源任务的最小整改投影。
+        M362：项可含 `clientCapabilityUnsupportedDetail`；当前 clientKind 无法履约源 Task 冻结 FORM/EVIDENCE
+        时给出权威中文说明（软注解，不隐藏整改、不整表 422）。
       parameters:
         - $ref: '#/components/parameters/TechnicianContext'
         - $ref: '#/components/parameters/CorrelationId'
@@ -2743,6 +2805,9 @@ paths:
     post:
       operationId: claimTechnicianCorrection
       summary: 当前候选师傅领取整改任务
+      description: |
+        M363：已知 TECHNICIAN_* 相对源 Task 冻结 FORM/EVIDENCE 不兼容时，在状态迁移前返回 422
+        `CLIENT_CAPABILITY_UNSUPPORTED`（与任务详情头硬拒同构）。
       parameters:
         - $ref: '#/components/parameters/CorrectionCaseId'
         - $ref: '#/components/parameters/TechnicianContext'
@@ -2755,10 +2820,14 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /technician/me/corrections/{correctionCaseId}:start:
     post:
       operationId: startTechnicianCorrection
       summary: 当前负责人启动整改任务
+      description: |
+        M363：已知 TECHNICIAN_* 相对源 Task 冻结 FORM/EVIDENCE 不兼容时，在进入 RUNNING 前返回 422
+        `CLIENT_CAPABILITY_UNSUPPORTED`。
       parameters:
         - $ref: '#/components/parameters/CorrectionCaseId'
         - $ref: '#/components/parameters/TechnicianContext'
@@ -2771,10 +2840,14 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /technician/me/corrections/{correctionCaseId}/evidence-slots:
     get:
       operationId: listTechnicianCorrectionEvidenceSlots
       summary: 查询整改源任务的活动资料槽位
+      description: |
+        M266：独立 correction Task 责任下查询源 Task 槽位。
+        M361：对已知 TECHNICIAN_WEB/IOS 复检客户端能力；不兼容返回 422 `CLIENT_CAPABILITY_UNSUPPORTED`。
       parameters:
         - $ref: '#/components/parameters/CorrectionCaseId'
         - $ref: '#/components/parameters/TechnicianContext'
@@ -2784,10 +2857,13 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /technician/me/corrections/{correctionCaseId}/evidence-items:
     get:
       operationId: listTechnicianCorrectionEvidenceItems
       summary: 查询整改源任务的安全资料版本摘要
+      description: |
+        M361：不兼容客户端能力时返回 422 `CLIENT_CAPABILITY_UNSUPPORTED`。
       parameters:
         - $ref: '#/components/parameters/CorrectionCaseId'
         - $ref: '#/components/parameters/TechnicianContext'
@@ -2797,11 +2873,14 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /technician/me/corrections/{correctionCaseId}/evidence-slots/{slotId}/upload-sessions:
     post:
       operationId: beginTechnicianCorrectionEvidenceUpload
       summary: 为已完成源 Task 创建整改资料受限上传会话
-      description: 仅 RUNNING correction Task 的当前负责人可调用；不放宽普通 Evidence RUNNING Task 门禁。
+      description: |
+        仅 RUNNING correction Task 的当前负责人可调用；不放宽普通 Evidence RUNNING Task 门禁。
+        M361：不兼容客户端能力时返回 422 `CLIENT_CAPABILITY_UNSUPPORTED`。
       parameters:
         - $ref: '#/components/parameters/CorrectionCaseId'
         - { name: slotId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -2818,10 +2897,13 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /technician/me/corrections/{correctionCaseId}/evidence-slots/{slotId}/upload-sessions/{uploadSessionId}:finalize:
     post:
       operationId: finalizeTechnicianCorrectionEvidenceUpload
       summary: Finalize 整改资料并追加不可变 Revision
+      description: |
+        M361：不兼容客户端能力时返回 422 `CLIENT_CAPABILITY_UNSUPPORTED`。
       parameters:
         - $ref: '#/components/parameters/CorrectionCaseId'
         - { name: slotId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -2838,10 +2920,14 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /technician/me/corrections/{correctionCaseId}/evidence-set-snapshots:
     post:
       operationId: createTechnicianCorrectionEvidenceSetSnapshot
       summary: 冻结整改源任务的新 TASK_SUBMISSION Snapshot
+      description: |
+        M361：Snapshot 前复检客户端能力；不兼容返回 422 `CLIENT_CAPABILITY_UNSUPPORTED`
+        （与资料校验 422 共用同一 Problem 响应，detail/`errorCode` 区分）。
       parameters:
         - $ref: '#/components/parameters/CorrectionCaseId'
         - $ref: '#/components/parameters/TechnicianContext'
@@ -2862,7 +2948,9 @@ paths:
     post:
       operationId: resubmitTechnicianCorrection
       summary: 以新 Snapshot 重提整改案例
-      description: 可多轮重提；correction Task 保持 RUNNING，审核 CLOSED 时才完成。
+      description: |
+        可多轮重提；correction Task 保持 RUNNING，审核 CLOSED 时才完成。
+        M361：重提前复检客户端能力；不兼容返回 422 `CLIENT_CAPABILITY_UNSUPPORTED`。
       parameters:
         - $ref: '#/components/parameters/CorrectionCaseId'
         - $ref: '#/components/parameters/TechnicianContext'
@@ -2878,6 +2966,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /technician/me/schedule:
     get:
       operationId: listTechnicianSchedule
@@ -5913,7 +6002,9 @@ components:
       name: X-ServiceOS-Client-Kind
       in: header
       required: false
-      description: 仅用于版本兼容与低基数可观测性，不参与身份、Capability 或 Scope 判断。
+      description: |
+        用于客户端兼容门禁与低基数可观测性；不参与身份认证或 Tenant/Project Scope 判定。
+        已知 TECHNICIAN_* / NETWORK_WEB 在对应 Portal 写路径上参与 ClientCapability 校验。
       schema: { enum: [ADMIN_WEB, NETWORK_WEB, TECHNICIAN_WEB, TECHNICIAN_IOS] }
     ClientVersion:
       name: X-ServiceOS-Client-Version
@@ -5966,12 +6057,26 @@ components:
         schemaVersion: { type: string, minLength: 1, maxLength: 64 }
         definitionJson: { type: string, minLength: 2, maxLength: 1000000 }
         baseVersionId: { type: [string, 'null'], format: uuid }
+        supportedClientKinds:
+          type: [array, 'null']
+          description: |
+            M358：FORM/EVIDENCE 定向发布目标客户端。省略或 null 表示全部生产师傅端（M356 默认）；
+            非空时仅对声明集合做并集阻断，且集合内每一端必须完全兼容。
+          minItems: 1
+          uniqueItems: true
+          items: { type: string, enum: [TECHNICIAN_WEB, TECHNICIAN_IOS] }
     UpdateConfigurationDraftRequest:
       type: object
       additionalProperties: false
       required: [definitionJson]
       properties:
         definitionJson: { type: string, minLength: 2, maxLength: 1000000 }
+        supportedClientKinds:
+          type: [array, 'null']
+          description: |
+            省略则保留原值；空数组清除为全端默认；非空覆盖定向目标。
+          uniqueItems: true
+          items: { type: string, enum: [TECHNICIAN_WEB, TECHNICIAN_IOS] }
     ApproveConfigurationDraftRequest:
       type: object
       additionalProperties: false
@@ -6199,6 +6304,29 @@ components:
         updatedBy: { type: string }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+        supportedClientKinds:
+          type: [array, 'null']
+          description: M358 定向发布目标；null 表示未声明（全部生产师傅端）。
+          items: { type: string, enum: [TECHNICIAN_WEB, TECHNICIAN_IOS] }
+        clientCompatibility:
+          type: [object, 'null']
+          description: FORM/EVIDENCE 相对生产师傅端的客户端能力兼容报告；其他资产类型可为 null。
+          additionalProperties: false
+          required: [requiredCapabilities, blockingErrors, clientReports]
+          properties:
+            requiredCapabilities: { type: array, items: { type: string, minLength: 1, maxLength: 120 } }
+            blockingErrors: { type: array, items: { type: string, minLength: 1, maxLength: 500 } }
+            clientReports:
+              type: array
+              items:
+                type: object
+                additionalProperties: false
+                required: [clientKind, compatible, missingCapabilities, notes]
+                properties:
+                  clientKind: { type: string, enum: [TECHNICIAN_WEB, TECHNICIAN_IOS] }
+                  compatible: { type: boolean }
+                  missingCapabilities: { type: array, items: { type: string, minLength: 1, maxLength: 120 } }
+                  notes: { type: array, items: { type: string, minLength: 1, maxLength: 300 } }
 
     SecurityPrincipal:
       type: object
@@ -7052,6 +7180,12 @@ components:
         effectiveFrom: { type: [string, 'null'], format: date-time }
         cursor: { type: string, minLength: 1, maxLength: 256 }
         invalidationReason: { type: [string, 'null'], maxLength: 100 }
+        clientCapabilityUnsupportedDetail:
+          type: [string, 'null']
+          maxLength: 500
+          description: |
+            M359：当前客户端无法履约该任务冻结 FORM/EVIDENCE 时的权威中文说明；
+            null 表示兼容或未强制预检（如 UNKNOWN clientKind / TOMBSTONE）。
     TechnicianPortalFeedPage:
       type: object
       additionalProperties: false
@@ -7558,13 +7692,21 @@ components:
     TechnicianProfile:
       type: object
       additionalProperties: false
-      required: [id, principalId, displayName, status, version, createdAt, updatedAt,
+      required: [id, principalId, displayName, status, supportedClientKinds, version, createdAt, updatedAt,
         disabledAt, disabledBy, disabledReason]
       properties:
         id: { type: string, format: uuid }
         principalId: { type: string, format: uuid }
         displayName: { type: string, minLength: 1, maxLength: 200 }
         status: { enum: [ACTIVE, DISABLED] }
+        supportedClientKinds:
+          type: [array, 'null']
+          description: |
+            M366 / ADR-088 A2-R：师傅履约端声明。null=未声明（定向发布任务自动派单剔除）；
+            非空=可被派往的 TECHNICIAN_WEB / TECHNICIAN_IOS 子集。
+          minItems: 1
+          uniqueItems: true
+          items: { type: string, enum: [TECHNICIAN_WEB, TECHNICIAN_IOS] }
         version: { type: integer, format: int64, minimum: 1 }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
@@ -7884,6 +8026,25 @@ components:
       properties:
         principalId: { type: string, format: uuid }
         displayName: { type: string, minLength: 1, maxLength: 200 }
+        supportedClientKinds:
+          type: [array, 'null']
+          description: |
+            可选创建时声明履约端；省略或 null 表示未声明。
+          minItems: 1
+          uniqueItems: true
+          items: { type: string, enum: [TECHNICIAN_WEB, TECHNICIAN_IOS] }
+    DeclareTechnicianSupportedClientKindsRequest:
+      type: object
+      additionalProperties: false
+      required: [supportedClientKinds]
+      properties:
+        supportedClientKinds:
+          type: [array, 'null']
+          description: |
+            null 清除为未声明；非空覆盖声明子集。空数组非法。
+          minItems: 1
+          uniqueItems: true
+          items: { type: string, enum: [TECHNICIAN_WEB, TECHNICIAN_IOS] }
     CreateNetworkTechnicianMembershipRequest:
       type: object
       additionalProperties: false
@@ -10442,6 +10603,10 @@ components:
         reviewCaseId: { type: string, format: uuid }
         projectId: { type: string, format: uuid }
         taskId: { type: string, format: uuid }
+        reviewTaskId:
+          type: [string, 'null']
+          format: uuid
+          description: M364：独立审核 HUMAN Task；CLIENT 或迁移前历史行可为 null
         evidenceSetSnapshotId: { type: string, format: uuid }
         scopeType: { const: EVIDENCE_SET_SNAPSHOT }
         origin: { enum: [INTERNAL, CLIENT] }
@@ -10483,6 +10648,10 @@ components:
         reviewCaseId: { type: string, format: uuid }
         projectId: { type: string, format: uuid }
         taskId: { type: string, format: uuid }
+        reviewTaskId:
+          type: [string, 'null']
+          format: uuid
+          description: M364：独立审核 HUMAN Task；CLIENT Case 可为 null
         evidenceSetSnapshotId: { type: string, format: uuid }
         snapshotContentDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
         scopeType: { enum: [EVIDENCE_SET_SNAPSHOT] }
@@ -10810,6 +10979,12 @@ components:
         taskVersion: { type: integer, format: int64, minimum: 1 }
         latestResubmissionSnapshotId: { type: [string, 'null'], format: uuid }
         resubmissionCount: { type: integer, minimum: 0 }
+        clientCapabilityUnsupportedDetail:
+          type: [string, 'null']
+          maxLength: 500
+          description: |
+            M362：当前客户端无法履约该整改源 Task 冻结 FORM/EVIDENCE 时的权威中文说明；
+            null 表示兼容或未强制预检（如 UNKNOWN clientKind）。
     TechnicianResubmitCorrectionRequest:
       type: object
       additionalProperties: false

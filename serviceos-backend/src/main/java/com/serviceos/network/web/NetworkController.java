@@ -36,6 +36,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 /** 网点与师傅目录 HTTP 适配器；tenant/actor 只来自受信 CurrentPrincipal。 */
@@ -172,7 +173,22 @@ final class NetworkController {
             @Valid @RequestBody CreateTechnicianRequest request
     ) {
         TechnicianProfileView result = commands.createTechnicianProfile(principals.current(),
-                metadata(correlationId, idempotencyKey), request.principalId(), request.displayName());
+                metadata(correlationId, idempotencyKey), request.principalId(), request.displayName(),
+                request.supportedClientKinds());
+        return versionedResponse(result, result.version(), correlationId);
+    }
+
+    @PostMapping("/technician-profiles/{profileId}:declare-supported-client-kinds")
+    ResponseEntity<TechnicianProfileView> declareTechnicianSupportedClientKinds(
+            @PathVariable UUID profileId,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestHeader("If-Match") String ifMatch,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @Valid @RequestBody DeclareTechnicianClientKindsRequest request
+    ) {
+        TechnicianProfileView result = commands.declareTechnicianSupportedClientKinds(
+                principals.current(), metadata(correlationId, idempotencyKey),
+                profileId, version(ifMatch), request.supportedClientKinds());
         return versionedResponse(result, result.version(), correlationId);
     }
 
@@ -358,8 +374,11 @@ record DeactivateRequest(@NotBlank @Size(max = 500) String reason) {}
 
 record CreateTechnicianRequest(
         @NotNull UUID principalId,
-        @NotBlank @Size(max = 200) String displayName
+        @NotBlank @Size(max = 200) String displayName,
+        List<String> supportedClientKinds
 ) {}
+
+record DeclareTechnicianClientKindsRequest(List<String> supportedClientKinds) {}
 
 record DisableTechnicianRequest(@NotBlank @Size(max = 500) String reason) {}
 

@@ -681,6 +681,15 @@ class ReviewCasePostgresIT {
         assertThat(replay.reviewCaseId()).isEqualTo(created.reviewCaseId());
         assertThat(created.status()).isEqualTo("OPEN");
         assertThat(created.decisions()).isEmpty();
+        assertThat(created.reviewTaskId()).isNotNull();
+        assertThat(created.taskId()).isEqualTo(snapshot.taskId());
+        assertThat(created.reviewTaskId()).isNotEqualTo(created.taskId());
+        assertThat(jdbc.sql("""
+                        SELECT status FROM tsk_task
+                         WHERE tenant_id = :tenant AND task_id = :taskId
+                        """)
+                .param("tenant", TENANT).param("taskId", created.reviewTaskId())
+                .query(String.class).single()).isEqualTo("READY");
         assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type='evidence.review-case-created'")
                 .query(Long.class).single()).isOne();
         assertThat(jdbc.sql("SELECT count(*) FROM aud_audit_record WHERE action_name='REVIEW_CASE_CREATED'")
@@ -690,6 +699,13 @@ class ReviewCasePostgresIT {
                 new CreateReviewCaseCommand(snapshot.evidenceSetSnapshotId(), null)))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.REVIEW_CASE_CONFLICT));
+
+        String sourceStatusBefore = jdbc.sql("""
+                        SELECT status FROM tsk_task
+                         WHERE tenant_id = :tenant AND task_id = :taskId
+                        """)
+                .param("tenant", TENANT).param("taskId", created.taskId())
+                .query(String.class).single();
 
         DecideReviewCaseCommand approveCommand = decideCommand(
                 created.reviewCaseId(), "APPROVED", List.of(), "ok");
@@ -704,6 +720,18 @@ class ReviewCasePostgresIT {
         assertThat(decided.decidedAt()).isNotNull();
         assertThat(decided.decisions()).hasSize(1);
         assertThat(decided.decisions().getFirst().decision()).isEqualTo("APPROVED");
+        assertThat(jdbc.sql("""
+                        SELECT status FROM tsk_task
+                         WHERE tenant_id = :tenant AND task_id = :taskId
+                        """)
+                .param("tenant", TENANT).param("taskId", created.reviewTaskId())
+                .query(String.class).single()).isEqualTo("COMPLETED");
+        assertThat(jdbc.sql("""
+                        SELECT status FROM tsk_task
+                         WHERE tenant_id = :tenant AND task_id = :taskId
+                        """)
+                .param("tenant", TENANT).param("taskId", created.taskId())
+                .query(String.class).single()).isEqualTo(sourceStatusBefore);
         assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type='evidence.review-decided'")
                 .query(Long.class).single()).isOne();
         assertThat(jdbc.sql("SELECT count(*) FROM aud_audit_record WHERE action_name='REVIEW_CASE_DECIDED'")

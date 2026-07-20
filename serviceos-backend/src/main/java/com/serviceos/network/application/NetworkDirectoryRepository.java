@@ -38,6 +38,9 @@ public interface NetworkDirectoryRepository {
     Optional<TechnicianProfile> findTechnicianProfileByPrincipal(String tenantId, UUID principalId);
     List<TechnicianProfile> listTechnicianProfiles(String tenantId);
     void insertTechnicianProfile(TechnicianProfile profile);
+    boolean declareTechnicianSupportedClientKinds(
+            String tenantId, UUID profileId, long expectedVersion,
+            List<String> supportedClientKinds, Instant now);
     boolean disableTechnicianProfile(String tenantId, UUID profileId, long expectedVersion,
             String reason, String actorId, Instant now);
     boolean enableTechnicianProfile(String tenantId, UUID profileId, long expectedVersion, Instant now);

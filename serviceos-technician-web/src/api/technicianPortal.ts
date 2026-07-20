@@ -16,6 +16,8 @@ export type TechnicianPortalFeedItem = {
   effectiveFrom: string | null
   cursor: string
   invalidationReason: string | null
+  /** M359：当前客户端无法履约冻结 FORM/EVIDENCE 时的权威中文说明 */
+  clientCapabilityUnsupportedDetail?: string | null
 }
 
 export type TechnicianPortalFeedPage = {
@@ -256,6 +258,8 @@ export type TechnicianCorrection = {
   taskVersion: number
   latestResubmissionSnapshotId: string | null
   resubmissionCount: number
+  /** M362：源 Task 冻结 Bundle 能力预检不兼容说明；有值时客户端应阻断领取/开工/补传。 */
+  clientCapabilityUnsupportedDetail?: string | null
 }
 
 function technicianHeaders(technicianContextId: string): Record<string, string> {

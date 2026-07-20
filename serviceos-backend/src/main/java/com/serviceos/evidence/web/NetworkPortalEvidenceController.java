@@ -10,6 +10,7 @@ import com.serviceos.evidence.api.EvidenceUploadSessionView;
 import com.serviceos.evidence.api.FinalizeEvidenceUploadCommand;
 import com.serviceos.evidence.api.NetworkPortalEvidenceService;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
+import com.serviceos.shared.ClientMetadata;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.CorrelationIds;
 import jakarta.validation.Valid;
@@ -38,6 +39,7 @@ import java.util.UUID;
  * Network Portal 资料代补 HTTP 适配器。
  * <p>
  * networkId 仅来自可信头 X-Network-Context；onBehalf 字段为命令级权威值。
+ * M368：透传 {@code X-ServiceOS-Client-Kind}，由应用层按 {@code NETWORK_WEB} 做能力门禁。
  */
 @RestController
 @RequestMapping("/api/v1/network-portal")
@@ -63,12 +65,14 @@ final class NetworkPortalEvidenceController {
             @RequestHeader(value = "X-Network-Context", required = false) String networkContext,
             @RequestHeader("Idempotency-Key") String idempotencyKey,
             @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestAttribute(value = ClientMetadata.KIND_ATTRIBUTE, required = false) String clientKind,
             @Valid @RequestBody NetworkPortalBeginEvidenceUploadRequest request
     ) {
         EvidenceUploadSessionView session = portalEvidence.beginUploadOnBehalf(
                 principals.current(),
                 new CommandMetadata(correlationId, idempotencyKey),
                 networkContext,
+                clientKind,
                 taskId,
                 slotId,
                 new BeginEvidenceUploadOnBehalfCommand(
@@ -90,12 +94,14 @@ final class NetworkPortalEvidenceController {
             @PathVariable UUID uploadSessionId,
             @RequestHeader(value = "X-Network-Context", required = false) String networkContext,
             @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestAttribute(value = ClientMetadata.KIND_ATTRIBUTE, required = false) String clientKind,
             @Valid @RequestBody FinalizeEvidenceUploadRequest request
     ) {
         EvidenceItemView item = portalEvidence.finalizeUploadOnBehalf(
                 principals.current(),
                 new CommandMetadata(correlationId, request.finalizeCommandId()),
                 networkContext,
+                clientKind,
                 taskId,
                 slotId,
                 uploadSessionId,
@@ -114,12 +120,14 @@ final class NetworkPortalEvidenceController {
             @RequestHeader(value = "X-Network-Context", required = false) String networkContext,
             @RequestHeader("Idempotency-Key") String idempotencyKey,
             @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestAttribute(value = ClientMetadata.KIND_ATTRIBUTE, required = false) String clientKind,
             @Valid @RequestBody CreateEvidenceSetSnapshotOnBehalfRequest request
     ) {
         EvidenceSetSnapshotView snapshot = portalEvidence.createSnapshotOnBehalf(
                 principals.current(),
                 new CommandMetadata(correlationId, idempotencyKey),
                 networkContext,
+                clientKind,
                 correctionCaseId,
                 request.memberRevisionIds());
         return ResponseEntity
@@ -134,12 +142,14 @@ final class NetworkPortalEvidenceController {
             @RequestHeader(value = "X-Network-Context", required = false) String networkContext,
             @RequestHeader("Idempotency-Key") String idempotencyKey,
             @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestAttribute(value = ClientMetadata.KIND_ATTRIBUTE, required = false) String clientKind,
             @Valid @RequestBody ResubmitCorrectionCaseRequest request
     ) {
         CorrectionCaseView view = portalEvidence.resubmit(
                 principals.current(),
                 new CommandMetadata(correlationId, idempotencyKey),
                 networkContext,
+                clientKind,
                 correctionCaseId,
                 request.evidenceSetSnapshotId());
         return correctionResponse(view);

@@ -1,0 +1,174 @@
+package com.serviceos.configuration.application;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.serviceos.configuration.api.ClientCapabilityRuntimeGate;
+import com.serviceos.configuration.api.ConfigurationAssetType;
+import com.serviceos.shared.BusinessProblem;
+import com.serviceos.shared.ClientMetadata;
+import com.serviceos.shared.ProblemCode;
+import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+/**
+ * 运行时能力门禁实现。与发布门禁共用能力目录与提取器，但按单一 clientKind 失败关闭；
+ * 若资产声明了 supportedClientKinds，则先校验客户端是否在目标集合内。
+ *
+ * <p>M368：{@code NETWORK_WEB} 可强制（能力码），但定向目标仅约束师傅执行/派单，
+ * 对 {@code NETWORK_WEB} 跳过 {@code supportedClientKinds} 集合校验（ADR-089）。</p>
+ */
+@Service
+final class DefaultClientCapabilityRuntimeGate implements ClientCapabilityRuntimeGate {
+    private final ConfigurationClientCapabilityAnalyzer analyzer;
+    private final ObjectMapper objectMapper;
+
+    DefaultClientCapabilityRuntimeGate() {
+        this(new ObjectMapper());
+    }
+
+    DefaultClientCapabilityRuntimeGate(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+        this.analyzer = new ConfigurationClientCapabilityAnalyzer(objectMapper);
+    }
+
+    @Override
+    public void requireCompatible(
+            String clientKind, ConfigurationAssetType assetType, String definitionJson
+    ) {
+        requireCompatible(clientKind, assetType, definitionJson, List.of());
+    }
+
+    @Override
+    public void requireCompatible(
+            String clientKind,
+            ConfigurationAssetType assetType,
+            String definitionJson,
+            List<String> supportedClientKinds
+    ) {
+        if (!enforceable(clientKind)
+                || (assetType != ConfigurationAssetType.FORM
+                && assetType != ConfigurationAssetType.EVIDENCE)) {
+            return;
+        }
+        denyIfOutsideTarget(clientKind, supportedClientKinds);
+        Set<String> required = analyzer.requiredCapabilities(assetType, definitionJson);
+        denyIfMissing(clientKind, required);
+    }
+
+    @Override
+    public void requireCompatibleEvidenceSlots(
+            String clientKind, List<String> mediaTypes, List<String> requirementDefinitionJsons
+    ) {
+        requireCompatibleEvidenceSlots(clientKind, mediaTypes, requirementDefinitionJsons, List.of());
+    }
+
+    @Override
+    public void requireCompatibleEvidenceSlots(
+            String clientKind,
+            List<String> mediaTypes,
+            List<String> requirementDefinitionJsons,
+            List<String> supportedClientKinds
+    ) {
+        if (!enforceable(clientKind)) {
+            return;
+        }
+        denyIfOutsideTarget(clientKind, supportedClientKinds);
+        requireCompatible(clientKind, ConfigurationAssetType.EVIDENCE,
+                synthesizeEvidenceDefinition(mediaTypes, requirementDefinitionJsons));
+    }
+
+    private void denyIfOutsideTarget(String clientKind, List<String> supportedClientKinds) {
+        if (supportedClientKinds == null || supportedClientKinds.isEmpty()) {
+            return;
+        }
+        // 定向目标约束师傅执行端；网点代补权威不来自 supportedClientKinds（ADR-089）。
+        if (ClientCapabilityCatalog.NETWORK_WEB.equals(clientKind)) {
+            return;
+        }
+        if (supportedClientKinds.contains(clientKind)) {
+            return;
+        }
+        String detail = "当前客户端（" + clientKindLabel(clientKind)
+                + "）不在本任务配置的定向发布目标（"
+                + supportedClientKinds.stream().map(DefaultClientCapabilityRuntimeGate::clientKindLabel)
+                .collect(Collectors.joining("、"))
+                + "）内。请使用兼容端处理，或由配置调整 supportedClientKinds。";
+        throw new BusinessProblem(ProblemCode.CLIENT_CAPABILITY_UNSUPPORTED, detail);
+    }
+
+    private void denyIfMissing(String clientKind, Set<String> required) {
+        Set<String> supported = ClientCapabilityCatalog.capabilitiesOf(clientKind);
+        List<String> missing = required.stream()
+                .filter(code -> !supported.contains(code))
+                .sorted()
+                .collect(Collectors.toCollection(ArrayList::new));
+        if (missing.isEmpty()) {
+            return;
+        }
+        String detail = "当前客户端（" + clientKindLabel(clientKind) + "）不支持本任务所需配置能力："
+                + missing.stream()
+                .map(code -> ClientCapabilityCodes.label(code) + "（" + code + "）")
+                .collect(Collectors.joining("；"))
+                + "。请升级客户端，或由兼容端处理该任务。";
+        throw new BusinessProblem(ProblemCode.CLIENT_CAPABILITY_UNSUPPORTED, detail);
+    }
+
+    private String synthesizeEvidenceDefinition(
+            List<String> mediaTypes, List<String> requirementDefinitionJsons
+    ) {
+        ObjectNode root = objectMapper.createObjectNode();
+        ArrayNode items = root.putArray("items");
+        int size = Math.max(
+                mediaTypes == null ? 0 : mediaTypes.size(),
+                requirementDefinitionJsons == null ? 0 : requirementDefinitionJsons.size());
+        for (int i = 0; i < size; i++) {
+            ObjectNode item = items.addObject();
+            if (mediaTypes != null && i < mediaTypes.size() && mediaTypes.get(i) != null) {
+                item.put("mediaType", mediaTypes.get(i));
+            }
+            if (requirementDefinitionJsons != null
+                    && i < requirementDefinitionJsons.size()
+                    && requirementDefinitionJsons.get(i) != null
+                    && !requirementDefinitionJsons.get(i).isBlank()) {
+                try {
+                    JsonNode definition = objectMapper.readTree(requirementDefinitionJsons.get(i));
+                    if (definition.has("requiredWhen") && !definition.get("requiredWhen").isNull()) {
+                        item.set("requiredWhen", definition.get("requiredWhen"));
+                    }
+                    if ((!item.has("mediaType") || item.path("mediaType").asText().isBlank())
+                            && definition.has("mediaType")) {
+                        item.put("mediaType", definition.path("mediaType").asText());
+                    }
+                } catch (Exception ignored) {
+                    // 槽位定义损坏时仍用 mediaType 做最低门禁；解析失败不伪装成功。
+                }
+            }
+        }
+        return root.toString();
+    }
+
+    private static boolean enforceable(String clientKind) {
+        return ClientCapabilityCatalog.TECHNICIAN_WEB.equals(clientKind)
+                || ClientCapabilityCatalog.TECHNICIAN_IOS.equals(clientKind)
+                || ClientCapabilityCatalog.NETWORK_WEB.equals(clientKind);
+    }
+
+    private static String clientKindLabel(String clientKind) {
+        if (ClientCapabilityCatalog.TECHNICIAN_WEB.equals(clientKind)) {
+            return "师傅 H5";
+        }
+        if (ClientCapabilityCatalog.TECHNICIAN_IOS.equals(clientKind)) {
+            return "师傅 iOS";
+        }
+        if (ClientCapabilityCatalog.NETWORK_WEB.equals(clientKind)) {
+            return "网点 Web";
+        }
+        return clientKind == null ? ClientMetadata.UNKNOWN_KIND : clientKind;
+    }
+}

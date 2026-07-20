@@ -1,10 +1,14 @@
 package com.serviceos.configuration.infrastructure;
 
+import com.serviceos.configuration.api.ConfigurationAssetDefinition;
 import com.serviceos.configuration.api.ConfigurationAssetType;
 import com.serviceos.configuration.api.ConfigurationPublicationException;
 import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
 import com.serviceos.shared.Sha256;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -142,9 +146,105 @@ class ConfigurationAssetSchemaValidatorTest {
                 .hasMessageContaining("SERVICEOS_EXPR_V1 对象");
     }
 
+    @Test
+    void calendarAssetPublishesWithValidTimezoneAndWindows() {
+        String definition = sampleCalendar("Asia/Shanghai");
+        assertThatCode(() -> validator.validate(assetCommand(
+                ConfigurationAssetType.CALENDAR, "cn.workdays.sample", definition)))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void calendarRejectsInvalidTimezone() {
+        String definition = sampleCalendar("Not/AZone");
+        assertThatThrownBy(() -> validator.validate(assetCommand(
+                ConfigurationAssetType.CALENDAR, "cn.workdays.sample", definition)))
+                .isInstanceOf(ConfigurationPublicationException.class)
+                .hasMessageContaining("timeZone");
+    }
+
+    @Test
+    void calendarRejectsWindowEndNotAfterStart() {
+        String definition = """
+                {"calendarKey":"cn.workdays.sample","version":"1.0.0","timeZone":"Asia/Shanghai",
+                 "weeklyWindows":[{"dayOfWeek":"MONDAY","start":"18:00","end":"09:00"}]}
+                """.trim();
+        assertThatThrownBy(() -> validator.validate(assetCommand(
+                ConfigurationAssetType.CALENDAR, "cn.workdays.sample", definition)))
+                .isInstanceOf(ConfigurationPublicationException.class)
+                .hasMessageContaining("end");
+    }
+
+    @Test
+    void businessSlaRequiresCalendarRefInSchema() {
+        String definition = """
+                {"policyKey":"survey.response.sla","version":"1.0.0","subjectType":"TASK",
+                 "taskTypes":["SURVEY_RESPONSE"],"startEvent":"TASK_CREATED",
+                 "stopEvent":"TASK_COMPLETED","clockMode":"BUSINESS","targetDurationSeconds":3600}
+                """.trim();
+        assertThatThrownBy(() -> validator.validate(assetCommand(
+                ConfigurationAssetType.SLA, "survey.response.sla", definition)))
+                .isInstanceOf(ConfigurationPublicationException.class);
+    }
+
+    @Test
+    void elapsedSlaRejectsCalendarRefInSchema() {
+        String definition = """
+                {"policyKey":"survey.response.sla","version":"1.0.0","subjectType":"TASK",
+                 "taskTypes":["SURVEY_RESPONSE"],"startEvent":"TASK_CREATED",
+                 "stopEvent":"TASK_COMPLETED","clockMode":"ELAPSED","targetDurationSeconds":3600,
+                 "calendarRef":"cn.workdays.sample"}
+                """.trim();
+        assertThatThrownBy(() -> validator.validate(assetCommand(
+                ConfigurationAssetType.SLA, "survey.response.sla", definition)))
+                .isInstanceOf(ConfigurationPublicationException.class);
+    }
+
+    @Test
+    void businessSlaBundleRequiresExactCalendarRef() {
+        String calendar = sampleCalendar("Asia/Shanghai");
+        String sla = """
+                {"policyKey":"survey.response.sla","version":"1.0.0","subjectType":"TASK",
+                 "taskTypes":["SURVEY_RESPONSE"],"startEvent":"TASK_CREATED",
+                 "stopEvent":"TASK_COMPLETED","clockMode":"BUSINESS","targetDurationSeconds":3600,
+                 "calendarRef":"missing.calendar"}
+                """.trim();
+        assertThatThrownBy(() -> validator.validateBundle(List.of(
+                assetDefinition(ConfigurationAssetType.CALENDAR, "cn.workdays.sample", calendar),
+                assetDefinition(ConfigurationAssetType.SLA, "survey.response.sla", sla))))
+                .isInstanceOf(ConfigurationPublicationException.class)
+                .hasMessageContaining("calendarRef");
+    }
+
     private static PublishConfigurationAssetCommand command(String definition) {
         return new PublishConfigurationAssetCommand(
                 "tenant-test", ConfigurationAssetType.WORKFLOW, "demo", "1.0.0", "1.0.0",
                 definition, Sha256.digest(definition));
+    }
+
+    private static PublishConfigurationAssetCommand assetCommand(
+            ConfigurationAssetType type, String key, String definition
+    ) {
+        return new PublishConfigurationAssetCommand(
+                "tenant-test", type, key, "1.0.0", "1.0.0", definition, Sha256.digest(definition));
+    }
+
+    private static ConfigurationAssetDefinition assetDefinition(
+            ConfigurationAssetType type, String key, String definition
+    ) {
+        return new ConfigurationAssetDefinition(
+                UUID.randomUUID(), type, key, "1.0.0", "1.0.0", definition, Sha256.digest(definition));
+    }
+
+    private static String sampleCalendar(String timeZone) {
+        return """
+                {"calendarKey":"cn.workdays.sample","version":"1.0.0","timeZone":"%s",
+                 "weeklyWindows":[
+                   {"dayOfWeek":"MONDAY","start":"09:00","end":"18:00"},
+                   {"dayOfWeek":"TUESDAY","start":"09:00","end":"18:00"},
+                   {"dayOfWeek":"WEDNESDAY","start":"09:00","end":"18:00"},
+                   {"dayOfWeek":"THURSDAY","start":"09:00","end":"18:00"},
+                   {"dayOfWeek":"FRIDAY","start":"09:00","end":"18:00"}]}
+                """.formatted(timeZone).trim();
     }
 }

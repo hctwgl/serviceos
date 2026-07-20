@@ -24,6 +24,22 @@ public record ConfigurationDraftView(
         String createdBy,
         String updatedBy,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        List<String> supportedClientKinds,
+        ClientCompatibilityReport clientCompatibility
 ) {
+    public ConfigurationDraftView {
+        validationErrors = validationErrors == null ? List.of() : List.copyOf(validationErrors);
+        supportedClientKinds = supportedClientKinds == null
+                ? null : List.copyOf(supportedClientKinds);
+    }
+
+    /** 附加或覆盖客户端兼容报告（派生视图，不落库）。 */
+    public ConfigurationDraftView withClientCompatibility(ClientCompatibilityReport report) {
+        return new ConfigurationDraftView(
+                draftId, assetType, assetKey, intendedSemanticVersion, schemaVersion,
+                definitionJson, contentDigest, status, baseVersionId, publishedVersionId,
+                validationErrors, approvalRef, approvedBy, approvedAt, aggregateVersion,
+                createdBy, updatedBy, createdAt, updatedAt, supportedClientKinds, report);
+    }
 }

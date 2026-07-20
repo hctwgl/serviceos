@@ -7,6 +7,7 @@ import com.serviceos.evidence.api.TechnicianBeginCorrectionEvidenceUploadCommand
 import com.serviceos.evidence.api.TechnicianCorrectionService;
 import com.serviceos.evidence.api.TechnicianCorrectionView;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
+import com.serviceos.shared.ClientMetadata;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.CorrelationIds;
 import jakarta.validation.Valid;
@@ -30,7 +31,12 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-/** Technician Portal 整改 HTTP 边界；请求只接受资源 ID、乐观锁版本和最小上传声明。 */
+/**
+ * Technician Portal 整改 HTTP 边界；请求只接受资源 ID、乐观锁版本和最小上传声明。
+ *
+ * <p>M361：资料路径透传 {@code X-ServiceOS-Client-Kind}，由应用层权威复检能力。</p>
+ * <p>M362/M363：列表/claim/start 透传 clientKind；列表软注解，claim/start 可硬拒单。</p>
+ */
 @RestController
 @RequestMapping("/api/v1/technician/me/corrections")
 final class TechnicianCorrectionController {
@@ -47,9 +53,10 @@ final class TechnicianCorrectionController {
     @GetMapping
     List<TechnicianCorrectionView> list(
             @RequestHeader("X-Technician-Context") String context,
-            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestAttribute(value = ClientMetadata.KIND_ATTRIBUTE, required = false) String clientKind
     ) {
-        return corrections.list(principals.current(), correlationId, context);
+        return corrections.list(principals.current(), correlationId, context, clientKind);
     }
 
     @PostMapping("/{correctionCaseId}:claim")
@@ -58,10 +65,11 @@ final class TechnicianCorrectionController {
             @RequestHeader("X-Technician-Context") String context,
             @RequestHeader("Idempotency-Key") String idempotencyKey,
             @RequestHeader("If-Match") @Pattern(regexp = "^\"[1-9][0-9]*\"$") String ifMatch,
-            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestAttribute(value = ClientMetadata.KIND_ATTRIBUTE, required = false) String clientKind
     ) {
         return corrections.claim(principals.current(), new CommandMetadata(correlationId, idempotencyKey),
-                context, correctionCaseId, version(ifMatch));
+                context, clientKind, correctionCaseId, version(ifMatch));
     }
 
     @PostMapping("/{correctionCaseId}:start")
@@ -70,19 +78,22 @@ final class TechnicianCorrectionController {
             @RequestHeader("X-Technician-Context") String context,
             @RequestHeader("Idempotency-Key") String idempotencyKey,
             @RequestHeader("If-Match") @Pattern(regexp = "^\"[1-9][0-9]*\"$") String ifMatch,
-            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestAttribute(value = ClientMetadata.KIND_ATTRIBUTE, required = false) String clientKind
     ) {
         return corrections.start(principals.current(), new CommandMetadata(correlationId, idempotencyKey),
-                context, correctionCaseId, version(ifMatch));
+                context, clientKind, correctionCaseId, version(ifMatch));
     }
 
     @GetMapping("/{correctionCaseId}/evidence-slots")
     List<TechnicianEvidenceController.TechnicianEvidenceSlotResponse> listSlots(
             @PathVariable UUID correctionCaseId,
             @RequestHeader("X-Technician-Context") String context,
-            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestAttribute(value = ClientMetadata.KIND_ATTRIBUTE, required = false) String clientKind
     ) {
-        return corrections.listSlots(principals.current(), correlationId, context, correctionCaseId)
+        return corrections.listSlots(
+                        principals.current(), correlationId, context, clientKind, correctionCaseId)
                 .stream().map(TechnicianEvidenceController::slotResponse).toList();
     }
 
@@ -90,9 +101,11 @@ final class TechnicianCorrectionController {
     List<TechnicianEvidenceController.TechnicianEvidenceItemResponse> listItems(
             @PathVariable UUID correctionCaseId,
             @RequestHeader("X-Technician-Context") String context,
-            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestAttribute(value = ClientMetadata.KIND_ATTRIBUTE, required = false) String clientKind
     ) {
-        return corrections.listItems(principals.current(), correlationId, context, correctionCaseId)
+        return corrections.listItems(
+                        principals.current(), correlationId, context, clientKind, correctionCaseId)
                 .stream().map(TechnicianEvidenceController::itemResponse).toList();
     }
 
@@ -103,11 +116,12 @@ final class TechnicianCorrectionController {
             @RequestHeader("X-Technician-Context") String context,
             @RequestHeader("Idempotency-Key") String idempotencyKey,
             @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestAttribute(value = ClientMetadata.KIND_ATTRIBUTE, required = false) String clientKind,
             @Valid @RequestBody BeginUploadRequest request
     ) {
         EvidenceUploadSessionView session = corrections.beginUpload(
                 principals.current(), new CommandMetadata(correlationId, idempotencyKey), context,
-                correctionCaseId, slotId, new TechnicianBeginCorrectionEvidenceUploadCommand(
+                clientKind, correctionCaseId, slotId, new TechnicianBeginCorrectionEvidenceUploadCommand(
                         request.evidenceItemId(), request.originalFileName(),
                         request.declaredMimeType(), request.expectedSize(), request.expectedSha256(),
                         request.captureSource(), request.capturedAt()));
@@ -125,11 +139,12 @@ final class TechnicianCorrectionController {
             @PathVariable UUID uploadSessionId,
             @RequestHeader("X-Technician-Context") String context,
             @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestAttribute(value = ClientMetadata.KIND_ATTRIBUTE, required = false) String clientKind,
             @Valid @RequestBody FinalizeUploadRequest request
     ) {
         EvidenceItemView item = corrections.finalizeUpload(
                 principals.current(), new CommandMetadata(correlationId, request.finalizeCommandId()),
-                context, correctionCaseId, slotId, uploadSessionId,
+                context, clientKind, correctionCaseId, slotId, uploadSessionId,
                 request.actualSha256(), request.finalizeCommandId());
         return ResponseEntity.created(URI.create("/api/v1/technician/me/corrections/"
                         + correctionCaseId + "/evidence-items/" + item.evidenceItemId()))
@@ -143,11 +158,12 @@ final class TechnicianCorrectionController {
             @RequestHeader("X-Technician-Context") String context,
             @RequestHeader("Idempotency-Key") String idempotencyKey,
             @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestAttribute(value = ClientMetadata.KIND_ATTRIBUTE, required = false) String clientKind,
             @Valid @RequestBody SnapshotRequest request
     ) {
         EvidenceSetSnapshotView snapshot = corrections.createSnapshot(
                 principals.current(), new CommandMetadata(correlationId, idempotencyKey), context,
-                correctionCaseId, request.memberRevisionIds());
+                clientKind, correctionCaseId, request.memberRevisionIds());
         return ResponseEntity.created(URI.create("/api/v1/evidence-set-snapshots/"
                         + snapshot.evidenceSetSnapshotId()))
                 .header(CorrelationIds.HEADER_NAME, correlationId)
@@ -160,10 +176,12 @@ final class TechnicianCorrectionController {
             @RequestHeader("X-Technician-Context") String context,
             @RequestHeader("Idempotency-Key") String idempotencyKey,
             @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestAttribute(value = ClientMetadata.KIND_ATTRIBUTE, required = false) String clientKind,
             @Valid @RequestBody ResubmitRequest request
     ) {
-        return corrections.resubmit(principals.current(), new CommandMetadata(correlationId, idempotencyKey),
-                context, correctionCaseId, request.evidenceSetSnapshotId());
+        return corrections.resubmit(
+                principals.current(), new CommandMetadata(correlationId, idempotencyKey),
+                context, clientKind, correctionCaseId, request.evidenceSetSnapshotId());
     }
 
     private static long version(String ifMatch) {

@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://serviceos.example/schemas/events/sla-started-v2.schema.json",
+  "title": "SlaStartedV2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "schemaVersion", "tenantId", "correlationId", "causationId", "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "payload"],
+  "properties": {
+    "eventId": {"type": "string", "format": "uuid"},
+    "eventType": {"const": "sla.started"},
+    "schemaVersion": {"const": 2},
+    "tenantId": {"type": "string", "minLength": 1},
+    "correlationId": {"type": "string", "minLength": 1},
+    "causationId": {"type": "string", "format": "uuid"},
+    "aggregateType": {"const": "SlaInstance"},
+    "aggregateId": {"type": "string", "format": "uuid"},
+    "aggregateVersion": {"const": 1},
+    "occurredAt": {"type": "string", "format": "date-time"},
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["slaInstanceId", "taskId", "projectId", "workOrderId", "slaRef", "policyVersionId", "policySemanticVersion", "policyContentDigest", "clockMode", "targetDurationSeconds", "startedAt", "deadlineAt"],
+      "properties": {
+        "slaInstanceId": {"type": "string", "format": "uuid"},
+        "taskId": {"type": "string", "format": "uuid"},
+        "projectId": {"type": "string", "format": "uuid"},
+        "workOrderId": {"type": "string", "format": "uuid"},
+        "slaRef": {"type": "string", "minLength": 1, "maxLength": 120},
+        "policyVersionId": {"type": "string", "format": "uuid"},
+        "policySemanticVersion": {"type": "string", "minLength": 1},
+        "policyContentDigest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "clockMode": {"enum": ["ELAPSED", "BUSINESS"]},
+        "targetDurationSeconds": {"type": "integer", "minimum": 1, "maximum": 31536000},
+        "startedAt": {"type": "string", "format": "date-time"},
+        "deadlineAt": {"type": "string", "format": "date-time"},
+        "calendarRef": {"type": ["string", "null"], "maxLength": 128},
+        "calendarVersionId": {"type": ["string", "null"], "format": "uuid"},
+        "calendarSemanticVersion": {"type": ["string", "null"], "maxLength": 64},
+        "calendarContentDigest": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"clockMode": {"const": "BUSINESS"}}, "required": ["clockMode"]},
+          "then": {
+            "required": ["calendarRef", "calendarVersionId", "calendarSemanticVersion", "calendarContentDigest"],
+            "properties": {
+              "calendarRef": {"type": "string", "minLength": 1, "maxLength": 128},
+              "calendarVersionId": {"type": "string", "format": "uuid"},
+              "calendarSemanticVersion": {"type": "string", "minLength": 1, "maxLength": 64},
+              "calendarContentDigest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"clockMode": {"const": "ELAPSED"}}, "required": ["clockMode"]},
+          "then": {
+            "properties": {
+              "calendarRef": {"type": "null"},
+              "calendarVersionId": {"type": "null"},
+              "calendarSemanticVersion": {"type": "null"},
+              "calendarContentDigest": {"type": "null"}
+            }
+          }
+        }
+      ]
+    }
+  }
+}

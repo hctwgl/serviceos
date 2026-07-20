@@ -12,6 +12,7 @@ public interface TechnicianPortalQueryService {
             CurrentPrincipal actor,
             String correlationId,
             String technicianContextHeader,
+            String clientKind,
             String sinceCursor);
 
     TechnicianPortalSchedulePage schedule(
@@ -22,10 +23,14 @@ public interface TechnicianPortalQueryService {
 
     /**
      * 返回当前师傅在指定网点上下文中的 ACTIVE 责任任务详情；非本人或已撤权任务按不存在处理。
+     *
+     * <p>M359：对已知 TECHNICIAN_WEB/IOS，若冻结 FORM/EVIDENCE 与当前客户端不兼容，
+     * 抛出 {@code CLIENT_CAPABILITY_UNSUPPORTED}，禁止进入现场中途执行。</p>
      */
     TechnicianPortalTaskDetail taskDetail(
             CurrentPrincipal actor,
             String correlationId,
             String technicianContextHeader,
+            String clientKind,
             UUID taskId);
 }

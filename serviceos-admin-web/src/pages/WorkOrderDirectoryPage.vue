@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink, useRoute, type RouteLocationRaw } from 'vue-router'
+import { useRoute, type RouteLocationRaw } from 'vue-router'
 import SavedViewBar from '../components/SavedViewBar.vue'
 import QueueTable from './QueueTable.vue'
 import { listAuthorizedWorkOrders, type WorkOrderPage } from '../api/workOrders'

@@ -107,7 +107,7 @@ class TechnicianPortalFeedPostgresIT {
                     idn_person_profile, idn_security_principal,
                     rel_idempotency_record, aud_audit_record CASCADE
                 """).update();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("130");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("135");
         assertThat(flyway.info().applied()).hasSizeGreaterThanOrEqualTo(127);
 
         seedPrincipal(TECH_PRINCIPAL, "Technician A");
@@ -148,7 +148,7 @@ class TechnicianPortalFeedPostgresIT {
     @Test
     void feedContainsOnlyCurrentTechnicianAssignments() {
         String context = "TECHNICIAN|NETWORK|" + NETWORK_A;
-        TechnicianPortalFeedPage feed = portal.taskFeed(actor(TECH_PRINCIPAL), "corr-feed", context, null);
+        TechnicianPortalFeedPage feed = portal.taskFeed(actor(TECH_PRINCIPAL), "corr-feed", context, null, null);
         assertThat(feed.networkId()).isEqualTo(NETWORK_A);
         assertThat(feed.items()).extracting(TechnicianPortalFeedItem::taskId).containsExactly(TASK_A);
         assertThat(feed.items()).noneMatch(item -> TASK_B.equals(item.taskId()) || TASK_OTHER.equals(item.taskId()));
@@ -158,7 +158,7 @@ class TechnicianPortalFeedPostgresIT {
 
         // 纯 UUID 形态在 ACTIVE 师傅成员下也可接受
         TechnicianPortalFeedPage byUuid =
-                portal.taskFeed(actor(TECH_PRINCIPAL), "corr-uuid", NETWORK_A.toString(), null);
+                portal.taskFeed(actor(TECH_PRINCIPAL), "corr-uuid", NETWORK_A.toString(), null, null);
         assertThat(byUuid.items()).hasSize(1);
     }
 
@@ -230,11 +230,12 @@ class TechnicianPortalFeedPostgresIT {
         seedGrant(TECH_PRINCIPAL, "form.read", "PROJECT", projectId.toString());
 
         assertThat(technicianForms.listForTask(
-                actor(TECH_PRINCIPAL), "corr-m263", "TECHNICIAN|NETWORK|" + NETWORK_A, taskId))
+                actor(TECH_PRINCIPAL), "corr-m263", "TECHNICIAN|NETWORK|" + NETWORK_A,
+                "TECHNICIAN_WEB", taskId))
                 .isEmpty();
         assertThatThrownBy(() -> technicianForms.listForTask(
                 actor(TECH_PRINCIPAL), "corr-m263-forged",
-                "TECHNICIAN|NETWORK|" + NETWORK_B, taskId))
+                "TECHNICIAN|NETWORK|" + NETWORK_B, "TECHNICIAN_WEB", taskId))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.PORTAL_CONTEXT_INVALID));
     }
@@ -242,7 +243,7 @@ class TechnicianPortalFeedPostgresIT {
     @Test
     void tombstoneAppearsAfterAssignmentEndedWithCursor() {
         String context = "TECHNICIAN|NETWORK|" + NETWORK_A;
-        TechnicianPortalFeedPage before = portal.taskFeed(actor(TECH_PRINCIPAL), "corr-before", context, null);
+        TechnicianPortalFeedPage before = portal.taskFeed(actor(TECH_PRINCIPAL), "corr-before", context, null, null);
         String cursor = before.items().getFirst().cursor();
 
         Instant endedAt = Instant.parse("2026-07-17T03:00:00Z");
@@ -259,7 +260,7 @@ class TechnicianPortalFeedPostgresIT {
                 .update();
 
         TechnicianPortalFeedPage delta =
-                portal.taskFeed(actor(TECH_PRINCIPAL), "corr-tomb", context, cursor);
+                portal.taskFeed(actor(TECH_PRINCIPAL), "corr-tomb", context, null, cursor);
         assertThat(delta.items()).hasSize(1);
         assertThat(delta.items().getFirst().itemType()).isEqualTo("TOMBSTONE");
         assertThat(delta.items().getFirst().taskId()).isEqualTo(TASK_A);
@@ -290,7 +291,7 @@ class TechnicianPortalFeedPostgresIT {
         String context = "TECHNICIAN|NETWORK|" + NETWORK_A;
 
         TechnicianPortalTaskDetail detail = portal.taskDetail(
-                actor(TECH_PRINCIPAL), "corr-detail", context, TASK_A);
+                actor(TECH_PRINCIPAL), "corr-detail", context, "TECHNICIAN_WEB", TASK_A);
 
         assertThat(detail.networkId()).isEqualTo(NETWORK_A);
         assertThat(detail.taskId()).isEqualTo(TASK_A);
@@ -333,11 +334,11 @@ class TechnicianPortalFeedPostgresIT {
 
         // 同一合法 Portal 上下文下，其他师傅或其他网点任务统一按不存在处理，避免资源枚举。
         assertThatThrownBy(() -> portal.taskDetail(
-                actor(TECH_PRINCIPAL), "corr-hidden", context, TASK_B))
+                actor(TECH_PRINCIPAL), "corr-hidden", context, "TECHNICIAN_WEB", TASK_B))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.RESOURCE_NOT_FOUND));
         assertThatThrownBy(() -> portal.taskDetail(
-                actor(TECH_PRINCIPAL), "corr-other", context, TASK_OTHER))
+                actor(TECH_PRINCIPAL), "corr-other", context, "TECHNICIAN_WEB", TASK_OTHER))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.RESOURCE_NOT_FOUND));
     }
@@ -360,7 +361,8 @@ class TechnicianPortalFeedPostgresIT {
                 .param("tenant", TENANT).update();
 
         TechnicianPortalTaskDetail detail = portal.taskDetail(
-                actor(TECH_PRINCIPAL), "corr-no-form-read", "TECHNICIAN|NETWORK|" + NETWORK_A, TASK_A);
+                actor(TECH_PRINCIPAL), "corr-no-form-read", "TECHNICIAN|NETWORK|" + NETWORK_A,
+                "TECHNICIAN_WEB", TASK_A);
 
         assertThat(detail.formSubmissions()).isNull();
         assertThat(detail.visits()).hasSize(1);
@@ -424,22 +426,22 @@ class TechnicianPortalFeedPostgresIT {
     @Test
     void crossNetworkAndNonTechnicianArePortalContextInvalid() {
         assertThatThrownBy(() -> portal.taskFeed(
-                actor(TECH_PRINCIPAL), "corr-cross", "TECHNICIAN|NETWORK|" + NETWORK_B, null))
+                actor(TECH_PRINCIPAL), "corr-cross", "TECHNICIAN|NETWORK|" + NETWORK_B, null, null))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         p -> assertThat(p.code()).isEqualTo(ProblemCode.PORTAL_CONTEXT_INVALID));
 
         assertThatThrownBy(() -> portal.taskFeed(
-                actor(NON_TECH_PRINCIPAL), "corr-non", "TECHNICIAN|NETWORK|" + NETWORK_A, null))
+                actor(NON_TECH_PRINCIPAL), "corr-non", "TECHNICIAN|NETWORK|" + NETWORK_A, null, null))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         p -> assertThat(p.code()).isEqualTo(ProblemCode.PORTAL_CONTEXT_INVALID));
 
         assertThatThrownBy(() -> portal.taskFeed(
-                actor(TECH_PRINCIPAL), "corr-forged", "TECHNICIAN|NETWORK|" + UUID.randomUUID(), null))
+                actor(TECH_PRINCIPAL), "corr-forged", "TECHNICIAN|NETWORK|" + UUID.randomUUID(), null, null))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         p -> assertThat(p.code()).isEqualTo(ProblemCode.PORTAL_CONTEXT_INVALID));
 
         assertThatThrownBy(() -> portal.taskFeed(
-                actor(TECH_PRINCIPAL), "corr-net-ctx", "NETWORK|NETWORK|" + NETWORK_A, null))
+                actor(TECH_PRINCIPAL), "corr-net-ctx", "NETWORK|NETWORK|" + NETWORK_A, null, null))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         p -> assertThat(p.code()).isEqualTo(ProblemCode.PORTAL_CONTEXT_INVALID));
     }

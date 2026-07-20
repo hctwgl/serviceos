@@ -21,11 +21,10 @@ import com.serviceos.evidence.api.ReviewCaseService;
 import com.serviceos.evidence.api.ReviewCaseView;
 import com.serviceos.evidence.api.ReviewDecisionView;
 import com.serviceos.evidence.api.ReviewTargetDecisionCommand;
-import com.serviceos.task.api.ClaimHumanTaskCommand;
-import com.serviceos.task.api.CompleteHumanTaskCommand;
-import com.serviceos.task.api.HumanTaskCommandService;
-import com.serviceos.task.api.StartHumanTaskCommand;
-import com.serviceos.task.api.HumanTaskCommandReceipt;
+import com.serviceos.task.api.CompleteHandlingTaskCommand;
+import com.serviceos.task.api.CreateHandlingTaskCommand;
+import com.serviceos.task.api.ScheduledTaskView;
+import com.serviceos.task.api.TaskSchedulingService;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.reliability.api.IdempotencyDecision;
 import com.serviceos.reliability.api.IdempotencyService;
@@ -56,9 +55,14 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-/** ReviewCase 创建与裁决；决定只追加，Case 状态为可重建投影。 */
+/**
+ * ReviewCase 创建与裁决；决定只追加，Case 状态为可重建投影。
+ *
+ * <p>M364：INTERNAL Case 同事务创建独立审核 HUMAN Task（{@code reviewTaskId}），
+ * APPROVED/FORCE_APPROVED 只完成该 Task，不再触碰源提交 Task。</p>
+ */
 @Service
-final class DefaultReviewCaseService implements ReviewCaseService {
+final class DefaultReviewCaseService implements ReviewCaseService, ReviewCaseHandlingBootstrap {
     private static final String REVIEW = "evidence.review";
     private static final String CREATE_CLIENT = "evidence.createClientReviewCase";
     private static final String FORCE_APPROVE = "evidence.forceApprove";
@@ -70,12 +74,13 @@ final class DefaultReviewCaseService implements ReviewCaseService {
     private static final String FORCE_OPERATION = "evidence.review.forceApprove";
     private static final String REOPEN_OPERATION = "evidence.review.reopen";
     private static final String DEFAULT_POLICY = "REVIEW_POLICY_V1";
+    private static final String REVIEW_TASK_TYPE = "evidence.review";
 
     private final ReviewCaseRepository reviews;
     private final EvidenceSetSnapshotRepository snapshots;
     private final CorrectionCaseService corrections;
-    private final TaskFulfillmentContextService tasks;
-    private final HumanTaskCommandService humanTasks;
+    private final TaskFulfillmentContextService taskContexts;
+    private final TaskSchedulingService taskScheduling;
     private final ActiveServiceResponsibilityService serviceResponsibilities;
     private final ReviewRuleGate reviewRuleGate;
     private final AuthorizationService authorization;
@@ -89,8 +94,8 @@ final class DefaultReviewCaseService implements ReviewCaseService {
             ReviewCaseRepository reviews,
             EvidenceSetSnapshotRepository snapshots,
             CorrectionCaseService corrections,
-            TaskFulfillmentContextService tasks,
-            HumanTaskCommandService humanTasks,
+            TaskFulfillmentContextService taskContexts,
+            TaskSchedulingService taskScheduling,
             ActiveServiceResponsibilityService serviceResponsibilities,
             ReviewRuleGate reviewRuleGate,
             AuthorizationService authorization,
@@ -103,8 +108,8 @@ final class DefaultReviewCaseService implements ReviewCaseService {
         this.reviews = reviews;
         this.snapshots = snapshots;
         this.corrections = corrections;
-        this.tasks = tasks;
-        this.humanTasks = humanTasks;
+        this.taskContexts = taskContexts;
+        this.taskScheduling = taskScheduling;
         this.serviceResponsibilities = serviceResponsibilities;
         this.reviewRuleGate = reviewRuleGate;
         this.authorization = authorization;
@@ -153,13 +158,18 @@ final class DefaultReviewCaseService implements ReviewCaseService {
 
         Instant now = clock.instant();
         UUID reviewCaseId = UUID.randomUUID();
+        // A2-R：OPEN INTERNAL Case 与独立审核 HUMAN Task 必须同事务创建并绑定；
+        // 禁止先落 Case 再异步建 Task，否则队列会出现“有 Case 无可领取审核责任”。
+        ScheduledTaskView reviewTask = createReviewHandlingTask(
+                principal.tenantId(), reviewCaseId, snapshot.evidenceSetSnapshotId(),
+                snapshot.contentDigest(), metadata.correlationId(), now);
         ReviewCaseView created = new ReviewCaseView(
-                reviewCaseId, snapshot.projectId(), snapshot.taskId(),
+                reviewCaseId, snapshot.projectId(), snapshot.taskId(), reviewTask.taskId(),
                 snapshot.evidenceSetSnapshotId(), snapshot.contentDigest(),
                 "EVIDENCE_SET_SNAPSHOT", "INTERNAL", policyVersion, "OPEN",
                 principal.principalId(), now, null,
                 null, null, null, null,
-                null, null, List.of());
+                null, null, List.of(), 1L);
         try {
             reviews.insertCase(principal.tenantId(), created);
         } catch (DuplicateKeyException exception) {
@@ -170,7 +180,7 @@ final class DefaultReviewCaseService implements ReviewCaseService {
 
         String payload = serialize(new ReviewCaseCreatedPayload(
                 reviewCaseId, snapshot.evidenceSetSnapshotId(), snapshot.taskId(),
-                snapshot.projectId(), snapshot.contentDigest(), policyVersion, now));
+                reviewTask.taskId(), snapshot.projectId(), snapshot.contentDigest(), policyVersion, now));
         outbox.append(new OutboxEvent(
                 UUID.randomUUID(), UUID.randomUUID(), "evidence", "evidence.review-case-created", 1,
                 "ReviewCase", reviewCaseId.toString(), 1L,
@@ -386,10 +396,13 @@ final class DefaultReviewCaseService implements ReviewCaseService {
                     decisionView.reviewDecisionId(), current.evidenceSetSnapshotId(),
                     current.snapshotContentDigest(), reasonCodes);
             correctionCaseId = opened.correctionCaseId();
-        } else {
-            // APPROVED：同事务完成审核 Task，禁止浏览器串调 decide→complete。
-            completeReviewTask(principal, metadata, current.taskId(), decisionView.reviewDecisionId());
         }
+        // A5-R：决定落库后同事务完成 reviewTaskId（APPROVED/REJECTED 均结束审核责任）；
+        // 绝不 complete 源提交 Task。使用 handling complete，因审核 Task 无 workflow 节点。
+        completeReviewHandlingTask(
+                principal.tenantId(), principal.principalId(), metadata.correlationId(),
+                current.reviewCaseId(), current.reviewTaskId(),
+                decisionView.reviewDecisionId(), now);
 
         String payload = serialize(new ReviewDecidedPayload(
                 current.reviewCaseId(), decisionView.reviewDecisionId(), current.evidenceSetSnapshotId(),
@@ -496,41 +509,46 @@ final class DefaultReviewCaseService implements ReviewCaseService {
         return anyRejected ? "REJECTED" : "APPROVED";
     }
 
-    private void completeReviewTask(
-            CurrentPrincipal principal,
-            CommandMetadata metadata,
-            UUID taskId,
-            UUID reviewDecisionId
+    /**
+     * 同事务完成独立审核 handling Task。
+     *
+     * <p>失败关闭：INTERNAL Case 缺少 {@code reviewTaskId} 时不得静默跳过，否则会出现
+     * “Case 已决定但审核队列仍可领取”的不一致。</p>
+     */
+    private void completeReviewHandlingTask(
+            String tenantId,
+            String actorId,
+            String correlationId,
+            UUID reviewCaseId,
+            UUID reviewTaskId,
+            UUID reviewDecisionId,
+            Instant now
     ) {
-        TaskFulfillmentContext task = tasks.find(principal.tenantId(), taskId)
-                .orElseThrow(() -> new BusinessProblem(
-                        ProblemCode.RESOURCE_NOT_FOUND, "Review Task does not exist"));
-        long version = task.version();
-        String status = task.status();
-        // 当前 ReviewCase.taskId 常指向资料提交 Task（多已 COMPLETED）。
-        // 仅当仍存在可推进的 HUMAN 审核 Task 时同事务 claim/start/complete；其余状态跳过，
-        // 由既有工作流/Outbox 链路推进，避免把 APPROVED 伪造成 Task 冲突失败。
-        if (!Set.of("READY", "CLAIMED", "IN_PROGRESS").contains(status)) {
-            return;
-        }
-        if ("READY".equals(status)) {
-            HumanTaskCommandReceipt claimed = humanTasks.claim(
-                    principal, metadata, new ClaimHumanTaskCommand(taskId, version));
-            version = claimed.version();
-            HumanTaskCommandReceipt started = humanTasks.start(
-                    principal, metadata, new StartHumanTaskCommand(taskId, version));
-            version = started.version();
-        } else if ("CLAIMED".equals(status)) {
-            HumanTaskCommandReceipt started = humanTasks.start(
-                    principal, metadata, new StartHumanTaskCommand(taskId, version));
-            version = started.version();
+        if (reviewTaskId == null) {
+            throw new BusinessProblem(ProblemCode.REVIEW_CASE_STATE_CONFLICT,
+                    "INTERNAL ReviewCase is missing reviewTaskId; cannot complete review task");
         }
         String resultRef = "review-decision:" + reviewDecisionId;
         String resultDigest = Sha256.digest(resultRef);
-        humanTasks.complete(
-                principal,
-                metadata,
-                new CompleteHumanTaskCommand(taskId, version, resultRef, resultDigest, List.of()));
+        taskScheduling.completeHandlingTask(new CompleteHandlingTaskCommand(
+                tenantId, reviewTaskId, REVIEW_TASK_TYPE, reviewCaseId.toString(),
+                resultRef, resultDigest, actorId, now, correlationId));
+    }
+
+    private ScheduledTaskView createReviewHandlingTask(
+            String tenantId,
+            UUID reviewCaseId,
+            UUID evidenceSetSnapshotId,
+            String snapshotContentDigest,
+            String correlationId,
+            Instant now
+    ) {
+        String payloadDigest = Sha256.digest(
+                reviewCaseId + "|" + evidenceSetSnapshotId + "|" + snapshotContentDigest);
+        return taskScheduling.createHandlingTask(new CreateHandlingTaskCommand(
+                tenantId, REVIEW_TASK_TYPE, reviewCaseId.toString(),
+                "review-case:" + reviewCaseId, payloadDigest,
+                700, now, correlationId, List.of()));
     }
 
     @Override
@@ -585,6 +603,11 @@ final class DefaultReviewCaseService implements ReviewCaseService {
         reviews.insertDecision(principal.tenantId(), current.projectId(), decisionView);
         reviews.saveCommandResult(
                 principal.tenantId(), FORCE_OPERATION, context.idempotencyKey(), current.reviewCaseId());
+        // A5-R：强制通过同样只结束 reviewTaskId，不触碰源提交 Task。
+        completeReviewHandlingTask(
+                principal.tenantId(), principal.principalId(), metadata.correlationId(),
+                current.reviewCaseId(), current.reviewTaskId(),
+                decisionView.reviewDecisionId(), now);
 
         String payload = serialize(new ReviewDecidedPayload(
                 current.reviewCaseId(), decisionView.reviewDecisionId(), current.evidenceSetSnapshotId(),
@@ -654,14 +677,17 @@ final class DefaultReviewCaseService implements ReviewCaseService {
         }
 
         UUID newCaseId = UUID.randomUUID();
+        ScheduledTaskView reviewTask = createReviewHandlingTask(
+                principal.tenantId(), newCaseId, current.evidenceSetSnapshotId(),
+                current.snapshotContentDigest(), metadata.correlationId(), now);
         ReviewCaseView created = new ReviewCaseView(
-                newCaseId, current.projectId(), current.taskId(),
+                newCaseId, current.projectId(), current.taskId(), reviewTask.taskId(),
                 current.evidenceSetSnapshotId(), current.snapshotContentDigest(),
                 current.scopeType(), current.origin(), current.policyVersion(), "OPEN",
                 principal.principalId(), now, null,
                 current.sourceReviewCaseId(), current.externalSubmissionRef(),
                 current.callbackBatchRef(), current.mappingVersionId(),
-                current.reviewCaseId(), triggerRef, List.of());
+                current.reviewCaseId(), triggerRef, List.of(), 1L);
         try {
             reviews.insertCase(principal.tenantId(), created);
         } catch (DuplicateKeyException exception) {
@@ -705,7 +731,7 @@ final class DefaultReviewCaseService implements ReviewCaseService {
     public List<ReviewCaseView> listForTask(
             CurrentPrincipal principal, String correlationId, UUID taskId
     ) {
-        TaskFulfillmentContext task = tasks.find(principal.tenantId(), taskId)
+        TaskFulfillmentContext task = taskContexts.find(principal.tenantId(), taskId)
                 .orElseThrow(() -> new BusinessProblem(
                         ProblemCode.RESOURCE_NOT_FOUND, "Task does not exist"));
         // PROJECT + NETWORK 并入请求，使 Network Portal NETWORK scope evidence.read 可匹配（M229）。
@@ -714,6 +740,66 @@ final class DefaultReviewCaseService implements ReviewCaseService {
                         task.projectId(), taskId),
                 correlationId);
         return reviews.listByTask(principal.tenantId(), taskId);
+    }
+
+    @Override
+    @Transactional
+    public ReviewCaseView openInternalForSnapshot(
+            String tenantId,
+            String actorId,
+            String correlationId,
+            String causationId,
+            UUID evidenceSetSnapshotId,
+            String policyVersion
+    ) {
+        EvidenceSetSnapshotView snapshot = snapshots.find(tenantId, evidenceSetSnapshotId)
+                .orElseThrow(() -> new BusinessProblem(
+                        ProblemCode.RESOURCE_NOT_FOUND, "EvidenceSetSnapshot does not exist"));
+        if (!"TASK_SUBMISSION".equals(snapshot.purpose())) {
+            throw new BusinessProblem(ProblemCode.EVIDENCE_SNAPSHOT_PURPOSE_UNSUPPORTED,
+                    "ReviewCase only accepts TASK_SUBMISSION EvidenceSetSnapshot");
+        }
+        if (reviews.findActiveBySnapshot(
+                tenantId, snapshot.evidenceSetSnapshotId(), "INTERNAL").isPresent()) {
+            throw new BusinessProblem(ProblemCode.REVIEW_CASE_CONFLICT,
+                    "A ReviewCase already exists for this EvidenceSetSnapshot");
+        }
+        String normalizedPolicy = normalizePolicy(policyVersion);
+        Instant now = clock.instant();
+        UUID reviewCaseId = UUID.randomUUID();
+        // A4-R：整改 CLOSED 后为新 Snapshot 打开新 Case + 新 reviewTaskId；旧决定只读。
+        ScheduledTaskView reviewTask = createReviewHandlingTask(
+                tenantId, reviewCaseId, snapshot.evidenceSetSnapshotId(),
+                snapshot.contentDigest(), correlationId, now);
+        ReviewCaseView created = new ReviewCaseView(
+                reviewCaseId, snapshot.projectId(), snapshot.taskId(), reviewTask.taskId(),
+                snapshot.evidenceSetSnapshotId(), snapshot.contentDigest(),
+                "EVIDENCE_SET_SNAPSHOT", "INTERNAL", normalizedPolicy, "OPEN",
+                actorId, now, null,
+                null, null, null, null,
+                null, null, List.of(), 1L);
+        try {
+            reviews.insertCase(tenantId, created);
+        } catch (DuplicateKeyException exception) {
+            throw new BusinessProblem(ProblemCode.REVIEW_CASE_CONFLICT,
+                    "A ReviewCase already exists for this EvidenceSetSnapshot");
+        }
+        String payload = serialize(new ReviewCaseCreatedPayload(
+                reviewCaseId, snapshot.evidenceSetSnapshotId(), snapshot.taskId(),
+                reviewTask.taskId(), snapshot.projectId(), snapshot.contentDigest(),
+                normalizedPolicy, now));
+        outbox.append(new OutboxEvent(
+                UUID.randomUUID(), UUID.randomUUID(), "evidence", "evidence.review-case-created", 1,
+                "ReviewCase", reviewCaseId.toString(), 1L,
+                tenantId, correlationId, causationId,
+                snapshot.taskId().toString(), payload, Sha256.digest(payload), now));
+        audit.append(new AuditEntry(
+                UUID.randomUUID(), tenantId, actorId,
+                "REVIEW_CASE_CREATED", REVIEW, "ReviewCase", reviewCaseId.toString(),
+                "ALLOW", List.of(), null, "OPEN", null,
+                Sha256.digest(snapshot.evidenceSetSnapshotId() + "|" + normalizedPolicy),
+                correlationId, now));
+        return created;
     }
 
     /**
@@ -821,6 +907,7 @@ final class DefaultReviewCaseService implements ReviewCaseService {
             UUID reviewCaseId,
             UUID evidenceSetSnapshotId,
             UUID taskId,
+            UUID reviewTaskId,
             UUID projectId,
             String snapshotContentDigest,
             String policyVersion,

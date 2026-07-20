@@ -133,10 +133,27 @@ watch(() => props.technicianContextId, () => {
             · 任务 {{ statusLabel(correction.taskStatus) }}
             · 重新提交 {{ correction.resubmissionCount }} 次
           </p>
+          <p
+            v-if="correction.clientCapabilityUnsupportedDetail"
+            class="capability-warn"
+            :data-testid="`technician-correction-capability-${correction.correctionCaseId}`"
+          >
+            {{ correction.clientCapabilityUnsupportedDetail }}
+          </p>
         </div>
-        <RouterLink :to="`/technician-portal/corrections/${correction.correctionCaseId}`">
+        <RouterLink
+          v-if="!correction.clientCapabilityUnsupportedDetail"
+          :to="`/technician-portal/corrections/${correction.correctionCaseId}`"
+        >
           查看整改要求
         </RouterLink>
+        <span
+          v-else
+          class="capability-blocked"
+          :data-testid="`technician-correction-blocked-${correction.correctionCaseId}`"
+        >
+          当前客户端无法履约，请更换兼容端
+        </span>
       </article>
     </section>
     <p v-if="loading" data-testid="technician-feed-loading">正在加载数据，请稍候……</p>
@@ -181,12 +198,16 @@ watch(() => props.technicianContextId, () => {
             <td>{{ item.itemType === 'ASSIGNMENT' ? '责任任务' : statusLabel(item.itemType) }}</td>
             <td>
               <RouterLink
-                v-if="item.itemType === 'ASSIGNMENT'"
+                v-if="item.itemType === 'ASSIGNMENT' && !item.clientCapabilityUnsupportedDetail"
                 :to="`/technician-portal/tasks/${item.taskId}`"
                 data-testid="technician-feed-task-detail-deeplink"
               >
                 打开任务
               </RouterLink>
+              <span
+                v-else-if="item.itemType === 'ASSIGNMENT'"
+                data-testid="technician-feed-task-detail-blocked"
+              >不可打开</span>
               <span v-else>查看</span>
             </td>
             <td>{{ item.workOrderId ? '关联工单' : '—' }}</td>
@@ -199,21 +220,34 @@ watch(() => props.technicianContextId, () => {
             <td data-testid="technician-feed-effective-from">
               {{ formatDateTime(item.effectiveFrom) }}
             </td>
-            <td>{{ item.invalidationReason ?? '—' }}</td>
             <td>
-              <RouterLink
-                v-if="item.itemType === 'ASSIGNMENT'"
-                :to="`/technician-portal/tasks/${item.taskId}`"
+              <span
+                v-if="item.clientCapabilityUnsupportedDetail"
+                class="capability-block"
+                :data-testid="`technician-feed-capability-unsupported-${item.taskId}`"
               >
-                开始处理
-              </RouterLink>
-              <RouterLink
-                v-if="item.itemType === 'ASSIGNMENT'"
-                :to="{ path: '/technician-portal/schedule', query: { taskId: item.taskId } }"
-                data-testid="technician-feed-schedule-deeplink"
-              >
-                查看日程
-              </RouterLink>
+                {{ item.clientCapabilityUnsupportedDetail }}
+              </span>
+              <template v-else>{{ item.invalidationReason ?? '—' }}</template>
+            </td>
+            <td>
+              <template v-if="item.itemType === 'ASSIGNMENT' && item.clientCapabilityUnsupportedDetail">
+                <span
+                  class="capability-blocked"
+                  data-testid="technician-feed-capability-blocked"
+                >当前客户端无法履约</span>
+              </template>
+              <template v-else-if="item.itemType === 'ASSIGNMENT'">
+                <RouterLink :to="`/technician-portal/tasks/${item.taskId}`">
+                  开始处理
+                </RouterLink>
+                <RouterLink
+                  :to="{ path: '/technician-portal/schedule', query: { taskId: item.taskId } }"
+                  data-testid="technician-feed-schedule-deeplink"
+                >
+                  查看日程
+                </RouterLink>
+              </template>
             </td>
           </tr>
         </tbody>
@@ -263,6 +297,16 @@ watch(() => props.technicianContextId, () => {
 .correction-heading h3,
 .correction-card p { margin: 0; }
 .correction-card { padding: 0.7rem 0; border-top: 1px solid #f3dfbd; }
+.capability-warn {
+  margin-top: 0.4rem;
+  color: #9a3412;
+  font-size: 0.88rem;
+}
+.capability-blocked {
+  color: #9a3412;
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
 .meta {
   display: grid;
   gap: 0.25rem;
@@ -284,5 +328,14 @@ td {
   padding: 0.45rem 0.35rem;
   text-align: left;
   font-size: 0.8rem;
+}
+.capability-block {
+  color: #9a3412;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+.capability-blocked {
+  color: #9a3412;
+  font-size: 0.78rem;
 }
 </style>

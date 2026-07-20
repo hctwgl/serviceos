@@ -5,14 +5,14 @@
 
     <insert id="insertCase" parameterType="map">
         INSERT INTO evd_review_case (
-            review_case_id, tenant_id, project_id, task_id, evidence_set_snapshot_id,
+            review_case_id, tenant_id, project_id, task_id, review_task_id, evidence_set_snapshot_id,
             snapshot_content_digest, scope_type, origin, policy_version, status,
             created_by, created_at, decided_at,
             source_review_case_id, external_submission_ref, callback_batch_ref, mapping_version_id,
             reopened_from_review_case_id, reopen_trigger_ref, aggregate_version)
         VALUES (
             CAST(#{reviewCaseId} AS uuid), #{tenantId}, CAST(#{projectId} AS uuid),
-            CAST(#{taskId} AS uuid), CAST(#{evidenceSetSnapshotId} AS uuid),
+            CAST(#{taskId} AS uuid), CAST(#{reviewTaskId} AS uuid), CAST(#{evidenceSetSnapshotId} AS uuid),
             #{snapshotContentDigest}, #{scopeType}, #{origin}, #{policyVersion}, #{status},
             #{createdBy}, #{createdAt}, #{decidedAt},
             CAST(#{sourceReviewCaseId} AS uuid), #{externalSubmissionRef},
@@ -63,6 +63,7 @@
 
     <select id="findCase" resultType="map">
         SELECT review_case_id AS "reviewCaseId", project_id AS "projectId", task_id AS "taskId",
+               review_task_id AS "reviewTaskId",
                evidence_set_snapshot_id AS "evidenceSetSnapshotId",
                snapshot_content_digest AS "snapshotContentDigest",
                scope_type AS "scopeType", origin AS "origin", policy_version AS "policyVersion",
@@ -82,6 +83,7 @@
 
     <select id="listCasesByTask" resultType="map">
         SELECT review_case_id AS "reviewCaseId", project_id AS "projectId", task_id AS "taskId",
+               review_task_id AS "reviewTaskId",
                evidence_set_snapshot_id AS "evidenceSetSnapshotId",
                snapshot_content_digest AS "snapshotContentDigest",
                scope_type AS "scopeType", origin AS "origin", policy_version AS "policyVersion",
@@ -104,6 +106,7 @@
         SELECT review.review_case_id AS "reviewCaseId",
                review.project_id AS "projectId",
                review.task_id AS "taskId",
+               review.review_task_id AS "reviewTaskId",
                review.evidence_set_snapshot_id AS "evidenceSetSnapshotId",
                review.scope_type AS "scopeType",
                review.origin AS "origin",

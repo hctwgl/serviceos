@@ -48,7 +48,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * M201 Network Portal 资料代补：begin/finalize on-behalf、无整改/错误师傅/跨网点/伪造上下文失败关闭、resubmit。
+ * M201/M368 Network Portal 资料代补：begin/finalize on-behalf、NETWORK_WEB 能力门禁、
+ * 无整改/错误师傅/跨网点/伪造上下文失败关闭、resubmit。
  */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = ServiceOsApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE)
@@ -127,8 +128,8 @@ class NetworkPortalEvidenceOnBehalfPostgresIT {
         deleteRecursively(STORAGE_ROOT);
         Files.createDirectories(STORAGE_ROOT);
 
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("130");
-        assertThat(flyway.info().applied()).hasSize(132);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("135");
+        assertThat(flyway.info().applied()).hasSize(137);
         assertThat(jdbc.sql("""
                         SELECT risk_level FROM auth_capability
                          WHERE capability_code='evidence.submitOnBehalf'
@@ -172,13 +173,14 @@ class NetworkPortalEvidenceOnBehalfPostgresIT {
         String context = "NETWORK|NETWORK|" + NETWORK_A;
 
         EvidenceUploadSessionView session = portalEvidence.beginUploadOnBehalf(
-                actor(PRINCIPAL), metadata("m201-begin"), context, TASK, slotId,
+                actor(PRINCIPAL), metadata("m201-begin"), context,
+                "NETWORK_WEB", TASK, slotId,
                 beginCommand(checksum, content.length, TECH_A.toString(), "整改代补"));
         transfers.upload(token(session.uploadUrl()), "image/png", content.length,
                 new ByteArrayInputStream(content));
 
         EvidenceItemView item = portalEvidence.finalizeUploadOnBehalf(
-                actor(PRINCIPAL), metadata("m201-fin"), context, TASK, slotId,
+                actor(PRINCIPAL), metadata("m201-fin"), context, "NETWORK_WEB", TASK, slotId,
                 session.uploadSessionId(),
                 new FinalizeEvidenceUploadCommand(
                         TASK, slotId, session.uploadSessionId(), checksum, "m201-finalize-1"));
@@ -200,7 +202,7 @@ class NetworkPortalEvidenceOnBehalfPostgresIT {
     void m201_02_withoutOpenCorrectionIsValidationFailed() {
         jdbc.sql("TRUNCATE TABLE evd_correction_resubmission, evd_correction_case CASCADE").update();
         assertThatThrownBy(() -> portalEvidence.beginUploadOnBehalf(
-                actor(PRINCIPAL), metadata("m201-no-corr"), "NETWORK|NETWORK|" + NETWORK_A, TASK, slotId,
+                actor(PRINCIPAL), metadata("m201-no-corr"), "NETWORK|NETWORK|" + NETWORK_A, "NETWORK_WEB", TASK, slotId,
                 beginCommand("b".repeat(64), 10, TECH_A.toString(), "x")))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         p -> assertThat(p.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
@@ -209,7 +211,7 @@ class NetworkPortalEvidenceOnBehalfPostgresIT {
     @Test
     void m201_03_onBehalfOfNotActiveTechnicianIsRejected() {
         assertThatThrownBy(() -> portalEvidence.beginUploadOnBehalf(
-                actor(PRINCIPAL), metadata("m201-wrong-tech"), "NETWORK|NETWORK|" + NETWORK_A, TASK, slotId,
+                actor(PRINCIPAL), metadata("m201-wrong-tech"), "NETWORK|NETWORK|" + NETWORK_A, "NETWORK_WEB", TASK, slotId,
                 beginCommand("c".repeat(64), 10, TECH_B.toString(), "wrong")))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         p -> assertThat(p.code()).isEqualTo(ProblemCode.VALIDATION_FAILED));
@@ -225,7 +227,7 @@ class NetworkPortalEvidenceOnBehalfPostgresIT {
                 """).param("tenant", TENANT).param("task", TASK).update();
         seedActiveAssignment(NETWORK_B.toString(), "NETWORK", TASK, WO);
         assertThatThrownBy(() -> portalEvidence.beginUploadOnBehalf(
-                actor(PRINCIPAL), metadata("m201-cross"), "NETWORK|NETWORK|" + NETWORK_A, TASK, slotId,
+                actor(PRINCIPAL), metadata("m201-cross"), "NETWORK|NETWORK|" + NETWORK_A, "NETWORK_WEB", TASK, slotId,
                 beginCommand("d".repeat(64), 10, TECH_A.toString(), "cross")))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         p -> assertThat(p.code()).isEqualTo(ProblemCode.ACCESS_DENIED));
@@ -234,7 +236,7 @@ class NetworkPortalEvidenceOnBehalfPostgresIT {
     @Test
     void m201_05_forgedContextIsPortalContextInvalid() {
         assertThatThrownBy(() -> portalEvidence.beginUploadOnBehalf(
-                actor(PRINCIPAL), metadata("m201-forged"), "NETWORK|NETWORK|" + UUID.randomUUID(), TASK, slotId,
+                actor(PRINCIPAL), metadata("m201-forged"), "NETWORK|NETWORK|" + UUID.randomUUID(), "NETWORK_WEB", TASK, slotId,
                 beginCommand("e".repeat(64), 10, TECH_A.toString(), "forged")))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         p -> assertThat(p.code()).isEqualTo(ProblemCode.PORTAL_CONTEXT_INVALID));
@@ -258,7 +260,7 @@ class NetworkPortalEvidenceOnBehalfPostgresIT {
                 .param("network", NETWORK_A.toString())
                 .update();
         assertThatThrownBy(() -> portalEvidence.beginUploadOnBehalf(
-                actor(PRINCIPAL), metadata("m201-cap"), "NETWORK|NETWORK|" + NETWORK_A, TASK, slotId,
+                actor(PRINCIPAL), metadata("m201-cap"), "NETWORK|NETWORK|" + NETWORK_A, "NETWORK_WEB", TASK, slotId,
                 beginCommand("f".repeat(64), 10, TECH_A.toString(), "cap")))
                 .isInstanceOfSatisfying(BusinessProblem.class,
                         p -> assertThat(p.code()).isEqualTo(ProblemCode.ACCESS_DENIED));
@@ -269,14 +271,84 @@ class NetworkPortalEvidenceOnBehalfPostgresIT {
         UUID secondSnapshot = seedExtraSnapshot("second");
         String context = "NETWORK|NETWORK|" + NETWORK_A;
         CorrectionCaseView resubmitted = portalEvidence.resubmit(
-                actor(PRINCIPAL), metadata("m201-resubmit"), context, correctionCaseId, secondSnapshot);
+                actor(PRINCIPAL), metadata("m201-resubmit"), context, "NETWORK_WEB", correctionCaseId, secondSnapshot);
         assertThat(resubmitted.status()).isEqualTo("RESUBMITTED");
         assertThat(resubmitted.latestResubmissionSnapshotId()).isEqualTo(secondSnapshot);
 
         CorrectionCaseView replay = portalEvidence.resubmit(
-                actor(PRINCIPAL), metadata("m201-resubmit"), context, correctionCaseId, secondSnapshot);
+                actor(PRINCIPAL), metadata("m201-resubmit"), context, "NETWORK_WEB", correctionCaseId, secondSnapshot);
         assertThat(replay.correctionCaseId()).isEqualTo(correctionCaseId);
         assertThat(replay.resubmissions()).hasSize(1);
+    }
+
+    @Test
+    void m368_01_unknownClientKindIsCapabilityUnsupported() {
+        assertThatThrownBy(() -> portalEvidence.beginUploadOnBehalf(
+                actor(PRINCIPAL), metadata("m368-unknown"), "NETWORK|NETWORK|" + NETWORK_A, "UNKNOWN", TASK, slotId,
+                beginCommand("a".repeat(64), 10, TECH_A.toString(), "unknown-kind")))
+                .isInstanceOfSatisfying(BusinessProblem.class, p -> {
+                    assertThat(p.code()).isEqualTo(ProblemCode.CLIENT_CAPABILITY_UNSUPPORTED);
+                    assertThat(p.getMessage()).contains("NETWORK_WEB");
+                });
+    }
+
+    @Test
+    void m368_02_signatureSlotRejectedForNetworkWeb() {
+        // 槽位定义不可变；发布 SIGNATURE 资产并插入额外槽位以证明 NETWORK_WEB 目录拒单。
+        String definition = """
+                {"templateKey":"survey.sign","version":"1.0.0","stage":"INSTALLATION",
+                 "items":[{"evidenceKey":"site.sign","name":"现场签名","mediaType":"SIGNATURE","required":true,
+                   "capture":{"minCount":1,"maxCount":1}}]}
+                """;
+        UUID assetId = configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.EVIDENCE, "survey.sign", "1.0.0", "1.0.0",
+                definition.trim(), Sha256.digest(definition.trim()))).versionId();
+        UUID signatureSlot = UUID.randomUUID();
+        String templateDigest = Sha256.digest(definition.trim());
+        jdbc.sql("""
+                INSERT INTO evd_evidence_slot (
+                    slot_id, tenant_id, project_id, task_id, resolution_id, template_version_id,
+                    template_key, template_version, template_digest, requirement_code, occurrence_key,
+                    requirement_name, media_type, required_flag, min_count, max_count,
+                    condition_input_digest, resolution_explanation, requirement_definition,
+                    requirement_digest, status_projection, resolved_at, slot_generation)
+                VALUES (
+                    :slot, :tenant, :project, :task, :resolution, :template,
+                    'survey.sign', '1.0.0', :templateDigest, 'site.sign', 'default',
+                    '现场签名', 'SIGNATURE', true, 1, 1, :conditionDigest,
+                    CAST('{"kind":"FIXED"}' AS jsonb), CAST(:definition AS jsonb),
+                    :reqDigest, 'MISSING', now(), 1)
+                """)
+                .param("slot", signatureSlot).param("tenant", TENANT).param("project", PROJECT)
+                .param("task", TASK).param("resolution", resolutionId)
+                .param("template", assetId)
+                .param("templateDigest", templateDigest)
+                .param("conditionDigest", "e".repeat(64))
+                .param("definition",
+                        "{\"evidenceKey\":\"site.sign\",\"mediaType\":\"SIGNATURE\",\"required\":true}")
+                .param("reqDigest", "f".repeat(64)).update();
+        jdbc.sql("""
+                INSERT INTO evd_evidence_resolution_member (
+                    member_id, tenant_id, project_id, task_id, resolution_id, template_version_id,
+                    requirement_code, occurrence_key, condition_result, active_slot_id,
+                    previous_slot_id, transition, required_disposition, counting_item_count,
+                    condition_input_digest, resolution_explanation, created_at)
+                VALUES (
+                    :slot, :tenant, :project, :task, :resolution, :template,
+                    'site.sign', 'default', true, :slot, NULL, 'ACTIVATED', 'NONE', 0,
+                    :conditionDigest, CAST('{"kind":"FIXED"}' AS jsonb), now())
+                """)
+                .param("slot", signatureSlot).param("tenant", TENANT).param("project", PROJECT)
+                .param("task", TASK).param("resolution", resolutionId)
+                .param("template", assetId)
+                .param("conditionDigest", "e".repeat(64)).update();
+        assertThatThrownBy(() -> portalEvidence.beginUploadOnBehalf(
+                actor(PRINCIPAL), metadata("m368-sign"), "NETWORK|NETWORK|" + NETWORK_A, "NETWORK_WEB", TASK, slotId,
+                beginCommand("b".repeat(64), 10, TECH_A.toString(), "signature")))
+                .isInstanceOfSatisfying(BusinessProblem.class, p -> {
+                    assertThat(p.code()).isEqualTo(ProblemCode.CLIENT_CAPABILITY_UNSUPPORTED);
+                    assertThat(p.getMessage()).contains("SIGNATURE");
+                });
     }
 
     @Test
@@ -286,12 +358,13 @@ class NetworkPortalEvidenceOnBehalfPostgresIT {
         String context = "NETWORK|NETWORK|" + NETWORK_A;
 
         EvidenceUploadSessionView session = portalEvidence.beginUploadOnBehalf(
-                actor(PRINCIPAL), metadata("m201-snap-begin"), context, TASK, slotId,
+                actor(PRINCIPAL), metadata("m201-snap-begin"), context,
+                "NETWORK_WEB", TASK, slotId,
                 beginCommand(checksum, content.length, TECH_A.toString(), "整改代补"));
         transfers.upload(token(session.uploadUrl()), "image/png", content.length,
                 new ByteArrayInputStream(content));
         EvidenceItemView item = portalEvidence.finalizeUploadOnBehalf(
-                actor(PRINCIPAL), metadata("m201-snap-fin"), context, TASK, slotId,
+                actor(PRINCIPAL), metadata("m201-snap-fin"), context, "NETWORK_WEB", TASK, slotId,
                 session.uploadSessionId(),
                 new FinalizeEvidenceUploadCommand(
                         TASK, slotId, session.uploadSessionId(), checksum, "m201-snap-finalize"));
@@ -309,13 +382,13 @@ class NetworkPortalEvidenceOnBehalfPostgresIT {
                 .param("digest", Sha256.digest("m201-snapshot-complete")).update();
 
         EvidenceSetSnapshotView snapshot = portalEvidence.createSnapshotOnBehalf(
-                actor(PRINCIPAL), metadata("m201-snap-create"), context, correctionCaseId,
+                actor(PRINCIPAL), metadata("m201-snap-create"), context, "NETWORK_WEB", correctionCaseId,
                 List.of(revisionId));
         assertThat(snapshot.evidenceSetSnapshotId()).isNotNull();
         assertThat(snapshot.memberCount()).isOne();
 
         CorrectionCaseView resubmitted = portalEvidence.resubmit(
-                actor(PRINCIPAL), metadata("m201-snap-resubmit"), context, correctionCaseId,
+                actor(PRINCIPAL), metadata("m201-snap-resubmit"), context, "NETWORK_WEB", correctionCaseId,
                 snapshot.evidenceSetSnapshotId());
         assertThat(resubmitted.status()).isEqualTo("RESUBMITTED");
         assertThat(resubmitted.latestResubmissionSnapshotId()).isEqualTo(snapshot.evidenceSetSnapshotId());

@@ -674,20 +674,54 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M355 平台终审工作台纵向切片**（见 `implementation-status.md`；
-OpenAPI 1.0.49；Flyway 130；M351～M355）。
+当前工程基线为 **M369 BUSINESS 日历 SLA 截止时间**（见 `implementation-status.md`；
+OpenAPI 1.0.59；Flyway 134；承接 M367；ADR-089）。
 
 当前已具备多 OEM SPI、远端查询、UNKNOWN/批量重放、复杂流程、十大资产设计器、六类 Runtime，
 入站/出站 Mapping（M321～M339）、FORM/EVIDENCE ConditionBuilder（M340～M349）、
-ASSIGNEE/DISPATCH/RULE/NOTIFICATION/PRICING SHADOW，以及 **M351 FINAL_REVIEW 终审 Fan-in API**。
-下一主线：管理端终审工作台 UI 与 targetDecisions 正式裁决；吉利联调 / AMOUNT/加权 / BUSINESS 日历 SLA
-仍为硬门禁；Track F/G 仍为 `BLOCKED_EXTERNAL`。
+ASSIGNEE/DISPATCH/RULE/NOTIFICATION/PRICING SHADOW、**M351～M355 终审工作台**、
+**M356～M363 客户端能力门禁**、**M364 reviewTaskId**、**M365 REVIEW_TASK 门闸唤醒**、
+**M366 自动 TECHNICIAN 池 kind 硬过滤**、**M367 Manual/Network assign kind 硬拒绝** 与
+**M369 BUSINESS 日历 SLA 截止时间**。
+下一主线需负责人选型：iOS 条件执行器；
+吉利联调 / AMOUNT/加权仍为硬门禁；BUSINESS 暂停/预警仍未交付（M369 已交截止切片）；Track F/G 仍为 `BLOCKED_EXTERNAL`。
 
 权威进度入口：
 
 - [实施状态总览](docs/implementation-status.md)
 - [里程碑索引](docs/milestone-index.md)
 - [自主 Agent 交接](docs/autonomous-agent-handoff.md)
+- [M361 实现文档](architecture/374-m361-correction-client-capability-gate.md)
+- [M361 验收矩阵](testing/358-m361-correction-client-capability-gate-acceptance.md)
+- [M362 实现文档](architecture/375-m362-correction-header-capability-reject.md)
+- [M362 验收矩阵](testing/359-m362-correction-header-capability-reject-acceptance.md)
+- [M363 实现文档](architecture/376-m363-correction-lifecycle-capability-hard-reject.md)
+- [M363 验收矩阵](testing/360-m363-correction-lifecycle-capability-hard-reject-acceptance.md)
+- [ADR-087 REVIEW_TASK 分离（Accepted）](decisions/ADR-087-review-task-template-separation.md)
+- [ADR-088 派单级 supportedClientKinds 过滤（Accepted）](decisions/ADR-088-dispatch-supported-client-kinds-filter.md)
+- [ADR-089 Network Portal on-behalf NETWORK_WEB 能力门禁（Accepted）](decisions/ADR-089-network-portal-onbehalf-network-web-capability.md)
+- [M369 实现文档](architecture/382-m369-business-calendar-sla.md)
+- [M369 验收矩阵](testing/366-m369-business-calendar-sla-acceptance.md)
+- [M368 实现文档](architecture/381-m368-network-portal-onbehalf-network-web-capability.md)
+- [M368 验收矩阵](testing/365-m368-network-portal-onbehalf-network-web-capability-acceptance.md)
+- [M367 实现文档](architecture/380-m367-manual-network-assign-client-kind-reject.md)
+- [M367 验收矩阵](testing/364-m367-manual-network-assign-client-kind-reject-acceptance.md)
+- [M366 实现文档](architecture/379-m366-dispatch-supported-client-kinds-filter.md)
+- [M366 验收矩阵](testing/363-m366-dispatch-supported-client-kinds-filter-acceptance.md)
+- [M365 实现文档](architecture/378-m365-review-task-workflow-gate.md)
+- [M365 验收矩阵](testing/362-m365-review-task-workflow-gate-acceptance.md)
+- [M364 实现文档](architecture/377-m364-review-task-template-separation.md)
+- [M364 验收矩阵](testing/361-m364-review-task-template-separation-acceptance.md)
+- [M360 实现文档](architecture/373-m360-final-review-visual-admin-pilot.md)
+- [M360 验收矩阵](testing/357-m360-final-review-visual-admin-pilot-acceptance.md)
+- [M359 实现文档](architecture/372-m359-portal-header-client-capability-reject.md)
+- [M359 验收矩阵](testing/356-m359-portal-header-client-capability-reject-acceptance.md)
+- [M358 实现文档](architecture/371-m358-supported-client-kinds-directed-publish.md)
+- [M358 验收矩阵](testing/355-m358-supported-client-kinds-directed-publish-acceptance.md)
+- [M357 实现文档](architecture/370-m357-technician-runtime-client-capability-gate.md)
+- [M357 验收矩阵](testing/354-m357-technician-runtime-client-capability-gate-acceptance.md)
+- [M356 实现文档](architecture/369-m356-client-capability-compat-gate.md)
+- [M356 验收矩阵](testing/353-m356-client-capability-compat-gate-acceptance.md)
 - [M355 实现文档](architecture/368-m355-final-review-e2e-gate.md)
 - [M355 验收矩阵](testing/352-m355-final-review-e2e-gate-acceptance.md)
 - [M354 实现文档](architecture/367-m354-final-review-correction-deeplink.md)

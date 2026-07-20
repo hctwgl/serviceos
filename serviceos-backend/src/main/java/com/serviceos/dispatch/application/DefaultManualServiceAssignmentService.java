@@ -28,11 +28,12 @@ import java.time.Clock;
 import java.util.UUID;
 
 /**
- * M144/M200：将已 Implemented 的容量与激活 saga SPI 编排为 Admin/Portal 人工初派与改派用例。
+ * M144/M200/M367：将已 Implemented 的容量与激活 saga SPI 编排为 Admin/Portal 人工初派与改派用例。
  * <p>
  * 事务边界：双责任激活/改派同事务提交，避免 NETWORK 已 ACTIVE 而 TECHNICIAN 失败的半成品。
  * 幂等：子步骤键由 HTTP Idempotency-Key 派生，重复请求走 SPI 冻结回放。
- * 明确不做：硬过滤重跑、评分、DispatchDecision、ServiceNetwork 生命周期、跨网点改派。
+ * M367/ADR-088 A1-B：TECHNICIAN 激活前按冻结 Bundle 定向目标硬校验师傅声明；不兼容 422。
+ * 明确不做：评分、DispatchDecision、ServiceNetwork 生命周期、跨网点改派。
  */
 @Service
 final class DefaultManualServiceAssignmentService implements ManualServiceAssignmentService {
@@ -41,6 +42,7 @@ final class DefaultManualServiceAssignmentService implements ManualServiceAssign
     private final TaskFulfillmentContextService tasks;
     private final CapacityAuthorityService capacities;
     private final ServiceAssignmentService assignments;
+    private final ManualTechnicianClientKindGate clientKindGate;
     private final JdbcClient jdbc;
     private final Clock clock;
 
@@ -48,12 +50,14 @@ final class DefaultManualServiceAssignmentService implements ManualServiceAssign
             TaskFulfillmentContextService tasks,
             CapacityAuthorityService capacities,
             ServiceAssignmentService assignments,
+            ManualTechnicianClientKindGate clientKindGate,
             JdbcClient jdbc,
             Clock clock
     ) {
         this.tasks = tasks;
         this.capacities = capacities;
         this.assignments = assignments;
+        this.clientKindGate = clientKindGate;
         this.jdbc = jdbc;
         this.clock = clock;
     }
@@ -72,6 +76,10 @@ final class DefaultManualServiceAssignmentService implements ManualServiceAssign
             throw new BusinessProblem(ProblemCode.TASK_STATE_CONFLICT,
                     "Only a HUMAN Task supports manual service assignment");
         }
+
+        // A1-B：在容量/激活前硬拒绝，避免半成品 NETWORK ACTIVE。
+        clientKindGate.requireCompatible(
+                principal, metadata.correlationId(), task, command.technicianAssigneeId());
 
         String key = metadata.idempotencyKey();
         ensureCapacity(principal, metadata, ResponsibilityLevel.NETWORK,
@@ -158,6 +166,10 @@ final class DefaultManualServiceAssignmentService implements ManualServiceAssign
                     command.networkAssigneeId(), command.technicianAssigneeId(),
                     clock.instant());
         }
+
+        // A1-B：改派目标师傅同样硬校验（幂等同师傅早退已跳过）。
+        clientKindGate.requireCompatible(
+                principal, metadata.correlationId(), task, command.technicianAssigneeId());
 
         String key = metadata.idempotencyKey();
         ensureCapacity(principal, metadata, ResponsibilityLevel.TECHNICIAN,

@@ -541,7 +541,11 @@ export ADMIN_PILOT_OUTBOUND_WORK_ORDER_CODE="${outbound_external_code}"
 export ADMIN_PILOT_OUTBOUND_TASK_ID="${outbound_task_id}"
 export ADMIN_PILOT_INBOUND_ORDER_CODE="${inbound_order_code}"
 export ADMIN_PILOT_INBOUND_TASK_ID="${inbound_task_id}"
-npm run test:e2e -- tests/e2e/admin-pilot-smoke.spec.ts tests/e2e/final-review-workspace.spec.ts
+# M360：真实 OIDC 冒烟 + 终审 Mock 功能回归 + 8 态视觉基线同门禁
+npm run test:e2e -- \
+  tests/e2e/admin-pilot-smoke.spec.ts \
+  tests/e2e/final-review-workspace.spec.ts \
+  tests/e2e/final-review-visual.spec.ts
 
 task_state="$(query_db "
   SELECT status || ':' || version || ':' || COALESCE(claimed_by, '')

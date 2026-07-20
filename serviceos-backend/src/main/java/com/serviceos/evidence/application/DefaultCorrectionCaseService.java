@@ -32,6 +32,7 @@ import com.serviceos.shared.CommandContext;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.shared.Sha256;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -62,6 +63,7 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
     private final TaskFulfillmentContextService taskContexts;
     private final TaskResponsibilityQuery responsibilities;
     private final ActiveServiceResponsibilityService serviceResponsibilities;
+    private final ReviewCaseHandlingBootstrap reviewBootstrap;
     private final AuthorizationService authorization;
     private final IdempotencyService idempotency;
     private final AuditAppender audit;
@@ -76,6 +78,7 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
             TaskFulfillmentContextService taskContexts,
             TaskResponsibilityQuery responsibilities,
             ActiveServiceResponsibilityService serviceResponsibilities,
+            @Lazy ReviewCaseHandlingBootstrap reviewBootstrap,
             AuthorizationService authorization,
             IdempotencyService idempotency,
             AuditAppender audit,
@@ -89,6 +92,7 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
         this.taskContexts = taskContexts;
         this.responsibilities = responsibilities;
         this.serviceResponsibilities = serviceResponsibilities;
+        this.reviewBootstrap = reviewBootstrap;
         this.authorization = authorization;
         this.idempotency = idempotency;
         this.audit = audit;
@@ -346,6 +350,14 @@ final class DefaultCorrectionCaseService implements CorrectionCaseService {
                     current.correctionCaseId().toString(),
                     "correction-case://" + current.correctionCaseId(), latest.snapshotContentDigest(),
                     principal.principalId(), now, metadata.correlationId()));
+        }
+        // A4-R：权威 CLOSED 后为补传 Snapshot 打开新 INTERNAL ReviewCase + reviewTaskId；
+        // 经 bootstrap 避免 Correction↔Review 循环依赖；失败关闭回滚本事务。
+        if (current.latestResubmissionSnapshotId() != null) {
+            reviewBootstrap.openInternalForSnapshot(
+                    principal.tenantId(), principal.principalId(),
+                    metadata.correlationId(), metadata.idempotencyKey(),
+                    current.latestResubmissionSnapshotId(), null);
         }
 
         String payload = serialize(new CorrectionClosedPayload(

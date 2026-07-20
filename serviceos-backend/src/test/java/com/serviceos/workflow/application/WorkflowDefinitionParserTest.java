@@ -8,6 +8,7 @@ import com.serviceos.configuration.api.ExpressionEvaluation;
 import com.serviceos.configuration.api.ExpressionEvaluator;
 import com.serviceos.shared.Sha256;
 import com.serviceos.task.api.WorkflowTaskKind;
+import com.serviceos.workflow.api.ReviewGateWait;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
@@ -105,6 +106,22 @@ class WorkflowDefinitionParserTest {
         var after = parser.progressionAfterWait(asset(waitDefinition()), "WAIT_ACK", oceanContext());
         assertThat(after.nodeId()).isEqualTo("INSTALL_TASK");
         assertThat(after.waiting()).isFalse();
+    }
+
+    @Test
+    void reviewTaskProgressionIsWaitingGateNotHumanWorkflowTask() {
+        var result = parser.progression(asset(reviewGateDefinition()), "INSTALL_TASK", oceanContext());
+        assertThat(result.waiting()).isTrue();
+        assertThat(result.nodeId()).isEqualTo("REVIEW_TASK");
+        assertThat(result.waitEventType()).isEqualTo(ReviewGateWait.WAIT_EVENT_TYPE);
+        assertThat(result.correlationKeyTemplate()).isEqualTo(ReviewGateWait.CORRELATION_KEY_TEMPLATE);
+        assertThat(result.taskType()).isNull();
+        assertThat(result.taskKind()).isNull();
+
+        var after = parser.progressionAfterWait(
+                asset(reviewGateDefinition()), "REVIEW_TASK", oceanContext());
+        assertThat(after.nodeId()).isEqualTo("WAIT_OEM");
+        assertThat(after.waiting()).isTrue();
     }
 
     @Test
@@ -252,6 +269,25 @@ class WorkflowDefinitionParserTest {
                    {"transitionId":"t1","from":"START","to":"SURVEY_TASK"},
                    {"transitionId":"t2","from":"SURVEY_TASK","to":"WAIT_ACK"},
                    {"transitionId":"t3","from":"WAIT_ACK","to":"INSTALL_TASK"}]}
+                """;
+    }
+
+    private static String reviewGateDefinition() {
+        return """
+                {"workflowKey":"review.gate.demo","semanticVersion":"1.0.0","startNodeId":"START",
+                 "nodes":[
+                   {"nodeId":"START","nodeType":"START","name":"开始"},
+                   {"nodeId":"INSTALL_TASK","nodeType":"SERVICE_TASK","name":"安装",
+                    "stageCode":"INSTALL","taskType":"FIELD_INSTALL"},
+                   {"nodeId":"REVIEW_TASK","nodeType":"REVIEW_TASK","name":"资料审核",
+                    "stageCode":"REVIEW"},
+                   {"nodeId":"WAIT_OEM","nodeType":"WAIT_EVENT","name":"等待车企",
+                    "stageCode":"HANDOFF","waitEventType":"platform.oem.acknowledged",
+                    "correlationKeyTemplate":"workOrder:{workOrderId}"}],
+                 "transitions":[
+                   {"transitionId":"t1","from":"START","to":"INSTALL_TASK"},
+                   {"transitionId":"t2","from":"INSTALL_TASK","to":"REVIEW_TASK"},
+                   {"transitionId":"t3","from":"REVIEW_TASK","to":"WAIT_OEM"}]}
                 """;
     }
 

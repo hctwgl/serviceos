@@ -9,6 +9,7 @@ public record ReviewCaseQueueItem(
         UUID reviewCaseId,
         UUID projectId,
         UUID taskId,
+        UUID reviewTaskId,
         UUID evidenceSetSnapshotId,
         String scopeType,
         String origin,

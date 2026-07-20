@@ -6,6 +6,7 @@ import com.serviceos.forms.api.SubmitFormCommand;
 import com.serviceos.forms.api.TaskFormDefinition;
 import com.serviceos.forms.api.TechnicianFormService;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
+import com.serviceos.shared.ClientMetadata;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.CorrelationIds;
 import jakarta.validation.Valid;
@@ -48,9 +49,11 @@ final class TechnicianFormController {
     List<TaskFormResponse> list(
             @PathVariable UUID taskId,
             @RequestHeader(value = "X-Technician-Context", required = false) String technicianContext,
-            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestAttribute(value = ClientMetadata.KIND_ATTRIBUTE, required = false) String clientKind
     ) {
-        return forms.listForTask(principals.current(), correlationId, technicianContext, taskId)
+        return forms.listForTask(
+                        principals.current(), correlationId, technicianContext, clientKind, taskId)
                 .stream().map(this::formResponse).toList();
     }
 
@@ -61,10 +64,12 @@ final class TechnicianFormController {
             @RequestHeader(value = "X-Technician-Context", required = false) String technicianContext,
             @RequestHeader("Idempotency-Key") String idempotencyKey,
             @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestAttribute(value = ClientMetadata.KIND_ATTRIBUTE, required = false) String clientKind,
             @Valid @RequestBody SubmitFormRequest request
     ) {
         FormSubmissionView result = forms.submit(
-                principals.current(), new CommandMetadata(correlationId, idempotencyKey), technicianContext,
+                principals.current(), new CommandMetadata(correlationId, idempotencyKey),
+                technicianContext, clientKind,
                 new SubmitFormCommand(taskId, request.formVersionId(), json(request.values()), null));
         return submissionResponse(result);
     }

@@ -3,6 +3,7 @@ package com.serviceos.evidence.web;
 import com.serviceos.evidence.api.TechnicianCompleteTaskCommand;
 import com.serviceos.evidence.api.TechnicianEvidenceService;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
+import com.serviceos.shared.ClientMetadata;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.CorrelationIds;
 import com.serviceos.task.api.HumanTaskCommandReceipt;
@@ -33,10 +34,12 @@ final class TechnicianTaskCompletionController {
             @RequestHeader("Idempotency-Key") String idempotencyKey,
             @RequestHeader("If-Match") String ifMatch,
             @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestAttribute(value = ClientMetadata.KIND_ATTRIBUTE, required = false) String clientKind,
             @Valid @RequestBody TechnicianCompleteTaskRequest request
     ) {
         HumanTaskCommandReceipt receipt = evidence.completeTask(
-                principals.current(), new CommandMetadata(correlationId, idempotencyKey), context,
+                principals.current(), new CommandMetadata(correlationId, idempotencyKey),
+                context, clientKind,
                 new TechnicianCompleteTaskCommand(taskId, version(ifMatch),
                         request.evidenceSetSnapshotId(), request.formSubmissionId()));
         return ResponseEntity.ok().eTag(Long.toString(receipt.version()))

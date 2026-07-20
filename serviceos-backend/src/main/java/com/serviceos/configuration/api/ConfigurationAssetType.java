@@ -11,5 +11,6 @@ public enum ConfigurationAssetType {
     PRICING,
     INTEGRATION,
     ASSIGNEE_POLICY,
-    NOTIFICATION
+    NOTIFICATION,
+    CALENDAR
 }

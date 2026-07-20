@@ -38,7 +38,7 @@ class TechnicianTaskCompletionControllerSecurityTest {
         CurrentPrincipal principal = new CurrentPrincipal(PRINCIPAL.toString(), "tenant-265",
                 CurrentPrincipal.PrincipalType.USER, "test", Set.of());
         when(principals.current()).thenReturn(principal);
-        when(evidence.completeTask(eq(principal), any(), anyString(), any())).thenReturn(
+        when(evidence.completeTask(eq(principal), any(), anyString(), any(), any())).thenReturn(
                 new HumanTaskCommandReceipt(TASK, "COMPLETED", PRINCIPAL.toString(), 8, Instant.EPOCH));
         mvc.perform(post("/api/v1/technician/me/tasks/{taskId}:complete", TASK)
                         .with(jwt().jwt(j -> j.subject(PRINCIPAL.toString()).claim("tenant_id", "tenant-265")))

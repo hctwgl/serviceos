@@ -43,7 +43,9 @@ function selectFile(slotId: string, event: Event) {
 async function loadEvidence() {
   const context = props.technicianContextId
   const current = correction.value
-  if (!context || !current || current.taskStatus !== 'RUNNING') {
+  // M362：能力不兼容时不进入资料读写，避免中途 422。
+  if (!context || !current || current.taskStatus !== 'RUNNING'
+      || current.clientCapabilityUnsupportedDetail) {
     slots.value = []
     items.value = []
     return
@@ -78,7 +80,7 @@ async function load() {
 async function claimOrStart() {
   const context = props.technicianContextId
   const current = correction.value
-  if (!context || !current || busy.value) return
+  if (!context || !current || busy.value || current.clientCapabilityUnsupportedDetail) return
   busy.value = true
   try {
     const result = current.taskStatus === 'READY'
@@ -98,7 +100,8 @@ async function upload(slot: TechnicianEvidenceSlot) {
   const context = props.technicianContextId
   const current = correction.value
   const file = files.value[slot.slotId]
-  if (!context || !current || !file || uploadingSlotId.value) return
+  if (!context || !current || !file || uploadingSlotId.value
+      || current.clientCapabilityUnsupportedDetail) return
   uploadingSlotId.value = slot.slotId
   try {
     message.value = '正在计算文件摘要并创建受限上传会话…'
@@ -134,7 +137,7 @@ async function upload(slot: TechnicianEvidenceSlot) {
 async function resubmit() {
   const context = props.technicianContextId
   const current = correction.value
-  if (!context || !current || busy.value) return
+  if (!context || !current || busy.value || current.clientCapabilityUnsupportedDetail) return
   const revisionIds = items.value
     .filter((item) => item.status === 'ACTIVE')
     .map((item) => item.revisions.filter((revision) => revision.status === 'VALIDATED')
@@ -183,8 +186,16 @@ watch(() => [props.technicianContextId, route.params.id], () => { void load() })
         <div><dt>原因</dt><dd data-testid="technician-correction-reasons">{{ correction.reasonCodes.map((code) => statusLabel(code)).join(' / ') }}</dd></div>
         <div><dt>历史重提</dt><dd>{{ correction.resubmissionCount }} 次</dd></div>
       </dl>
+      <p
+        v-if="correction.clientCapabilityUnsupportedDetail"
+        class="capability-warn"
+        data-testid="technician-correction-capability"
+        role="alert"
+      >
+        {{ correction.clientCapabilityUnsupportedDetail }}
+      </p>
       <button
-        v-if="correction.taskStatus !== 'RUNNING'"
+        v-if="correction.taskStatus !== 'RUNNING' && !correction.clientCapabilityUnsupportedDetail"
         type="button"
         :disabled="busy"
         data-testid="technician-correction-lifecycle"
@@ -192,7 +203,10 @@ watch(() => [props.technicianContextId, route.params.id], () => { void load() })
       >
         {{ correction.taskStatus === 'READY' ? '领取整改任务' : '启动整改任务' }}
       </button>
-      <section v-else data-testid="technician-correction-evidence">
+      <section
+        v-else-if="correction.taskStatus === 'RUNNING' && !correction.clientCapabilityUnsupportedDetail"
+        data-testid="technician-correction-evidence"
+      >
         <h3>补传资料</h3>
         <p>源业务任务保持完成状态；本页仅通过整改任务追加新 Revision。</p>
         <p v-if="slots.length === 0">暂无资料槽位</p>
@@ -232,4 +246,12 @@ watch(() => [props.technicianContextId, route.params.id], () => { void load() })
 .summary dd { margin: 0.25rem 0 0; }
 .slot { margin: 0.75rem 0; }
 .slot span { color: #667085; }
+.capability-warn {
+  margin: 0.75rem 0;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid #fdba74;
+  border-radius: 0.7rem;
+  background: #fff7ed;
+  color: #9a3412;
+}
 </style>

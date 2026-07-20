@@ -51,7 +51,7 @@ class ReviewCaseQueryControllerSecurityTest {
         Instant now = Instant.parse("2026-07-16T17:00:00Z");
         ReviewCaseQueuePage page = new ReviewCaseQueuePage(
                 List.of(new ReviewCaseQueueItem(
-                        reviewCaseId, projectId, UUID.randomUUID(), UUID.randomUUID(),
+                        reviewCaseId, projectId, UUID.randomUUID(), null, UUID.randomUUID(),
                         "EVIDENCE_SET_SNAPSHOT", "INTERNAL", "POLICY_V1", "OPEN",
                         now, null, null, null, null, null, null, null,
                         null, null, null, List.of(), null)),

@@ -6,6 +6,8 @@ import com.serviceos.configuration.api.DispatchCandidate;
 import com.serviceos.configuration.api.DispatchResolution;
 import com.serviceos.configuration.api.DispatchResolveCommand;
 import com.serviceos.configuration.api.DispatchRuntime;
+import com.serviceos.configuration.api.EffectiveDispatchClientKinds;
+import com.serviceos.configuration.api.FrozenBundleClientCapabilityProbe;
 import com.serviceos.configuration.api.ExpressionContext;
 import com.serviceos.dispatch.api.ActivateNetworkFromFrozenDispatchCommand;
 import com.serviceos.dispatch.api.ActivateTechnicianFromFrozenDispatchCommand;
@@ -47,12 +49,14 @@ import java.util.UUID;
  * ACTIVE ServiceCoverage（品牌/业务/省市区精确匹配）∩ 容量；无覆盖失败关闭 MANUAL。
  * M338：候选附带月度签约比例缺口（committedShare − actualShare，ORDER_COUNT）。
  * NETWORK 成功后解析网点内师傅；空池/无容量审计 TECHNICIAN MANUAL，保留 NETWORK。
- * TECHNICIAN 阶段仍用 {@code *} 通配候选（师傅覆盖未建模）。</p>
+ * TECHNICIAN 阶段仍用 {@code *} 通配候选（师傅覆盖未建模）。
+ * M366/ADR-088：自动 TECHNICIAN 池按冻结 Bundle FORM∩EVIDENCE 定向目标硬过滤师傅声明。</p>
  */
 @Service
 final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicyEventConsumer {
     private static final String CONSUMER = "task.dispatch-policy.created.v1";
     private static final String SYSTEM_ACTOR = "system:dispatch-policy";
+    private static final String CLIENT_KIND_TARGET_EMPTY = "CLIENT_KIND_TARGET_EMPTY";
 
     private final TaskFulfillmentContextService tasks;
     private final WorkOrderExpressionContextQuery workOrderContexts;
@@ -62,6 +66,7 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
     private final NetworkAllocationTargetQuery allocationTargets;
     private final NetworkAllocationActualQuery allocationActuals;
     private final NetworkPortalTechnicianQuery technicians;
+    private final FrozenBundleClientCapabilityProbe clientCapabilityProbe;
     private final DispatchRuntime dispatchRuntime;
     private final ServiceAssignmentService assignments;
     private final InboxService inbox;
@@ -78,6 +83,7 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
             NetworkAllocationTargetQuery allocationTargets,
             NetworkAllocationActualQuery allocationActuals,
             NetworkPortalTechnicianQuery technicians,
+            FrozenBundleClientCapabilityProbe clientCapabilityProbe,
             DispatchRuntime dispatchRuntime,
             ServiceAssignmentService assignments,
             InboxService inbox,
@@ -93,6 +99,7 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
         this.allocationTargets = allocationTargets;
         this.allocationActuals = allocationActuals;
         this.technicians = technicians;
+        this.clientCapabilityProbe = clientCapabilityProbe;
         this.dispatchRuntime = dispatchRuntime;
         this.assignments = assignments;
         this.inbox = inbox;
@@ -290,10 +297,21 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
     ) {
         UUID taskId = task.taskId();
         UUID networkId = UUID.fromString(networkAssigneeId);
+        // ADR-088 A1-R/A4-R：仅自动 TECHNICIAN 池硬过滤；Manual/Network assign 不走此路径。
+        EffectiveDispatchClientKinds kindTarget = clientCapabilityProbe.resolveDispatchTargetClientKinds(
+                message.tenantId(),
+                task.configurationBundleId(),
+                task.configurationBundleDigest(),
+                task.formRef());
         List<NetworkPortalTechnicianView> techViews = technicians.listActiveTechnicians(
                 message.tenantId(), networkId);
         List<DispatchCandidate> candidates = new ArrayList<>();
         for (NetworkPortalTechnicianView tech : techViews) {
+            if (kindTarget.applyFilter()
+                    && !DispatchClientKindCompatibility.matchesDeclaredClientKinds(
+                            tech.supportedClientKinds(), kindTarget.targetKinds())) {
+                continue;
+            }
             String assigneeId = tech.technicianProfileId().toString();
             CapacitySnapshot capacity = capacitySnapshot(
                     message.tenantId(), "TECHNICIAN", assigneeId, wo.serviceProductCode());
@@ -301,6 +319,23 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
                 continue;
             }
             candidates.add(wildcardCandidate(assigneeId, capacity.remaining()));
+        }
+
+        if (kindTarget.applyFilter() && candidates.isEmpty()) {
+            // A3-R：可解释原因写入 error_code，便于运营与 IT 断言（不仅哈希进 request_digest）。
+            String policyEvidence = "client-kind|" + String.join(",", kindTarget.targetKinds());
+            audit.append(new AuditEntry(
+                    UUID.randomUUID(), message.tenantId(), SYSTEM_ACTOR,
+                    "SERVICE_DISPATCH_TECHNICIAN_POLICY_MANUAL", "dispatch.assignment.manage",
+                    "Task", taskId.toString(),
+                    "ALLOW", List.of(), "dispatch-policy-runtime-v1", "MANUAL",
+                    CLIENT_KIND_TARGET_EMPTY,
+                    Sha256.digest(policyEvidence + "|" + CLIENT_KIND_TARGET_EMPTY),
+                    message.correlationId(), asOf));
+            inbox.complete(message.tenantId(), CONSUMER, message.eventId(),
+                    Sha256.digest(taskId + "|NET_APPLIED|TECH_MANUAL|" + networkPolicyEvidence
+                            + "|" + policyEvidence + "|" + CLIENT_KIND_TARGET_EMPTY));
+            return;
         }
 
         DispatchResolution resolution = dispatchRuntime.resolve(new DispatchResolveCommand(

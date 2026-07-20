@@ -145,6 +145,7 @@ final class WorkOrderCoreTimelineHandler implements OutboxMessageHandler, WorkOr
         return schemaVersion == 2
                 && ("task.completed".equals(eventType)
                 || "operational.exception.resolved".equals(eventType)
+                || "sla.started".equals(eventType)
                 || ASSIGNMENT_V2_EVENTS.contains(eventType));
     }
 

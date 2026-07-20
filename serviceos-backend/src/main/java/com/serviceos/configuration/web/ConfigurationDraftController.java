@@ -1,6 +1,7 @@
 package com.serviceos.configuration.web;
 
 import com.serviceos.configuration.api.ApproveConfigurationDraftCommand;
+import com.serviceos.configuration.api.ClientCompatibilityReport;
 import com.serviceos.configuration.api.ConfigurationAssetType;
 import com.serviceos.configuration.api.ConfigurationDependencyAnalysisService;
 import com.serviceos.configuration.api.ConfigurationDependencyReport;
@@ -67,7 +68,8 @@ final class ConfigurationDraftController {
                         request.intendedSemanticVersion(),
                         request.schemaVersion(),
                         request.definitionJson(),
-                        request.baseVersionId()));
+                        request.baseVersionId(),
+                        request.supportedClientKinds()));
         return ok(view, correlationId);
     }
 
@@ -82,7 +84,9 @@ final class ConfigurationDraftController {
         ConfigurationDraftView view = drafts.update(
                 principals.current(),
                 new CommandMetadata(correlationId, idempotencyKey == null ? correlationId : idempotencyKey),
-                new UpdateConfigurationDraftCommand(draftId, version(ifMatch), request.definitionJson()));
+                new UpdateConfigurationDraftCommand(
+                        draftId, version(ifMatch), request.definitionJson(),
+                        request.supportedClientKinds()));
         return ok(view, correlationId);
     }
 
@@ -201,7 +205,27 @@ final class ConfigurationDraftController {
                 view.contentDigest(), view.status(), view.baseVersionId(), view.publishedVersionId(),
                 view.validationErrors(), view.approvalRef(), view.approvedBy(), view.approvedAt(),
                 view.aggregateVersion(), view.createdBy(), view.updatedBy(),
-                view.createdAt(), view.updatedAt());
+                view.createdAt(), view.updatedAt(),
+                view.supportedClientKinds(),
+                toCompatibilityResponse(view.clientCompatibility()));
+    }
+
+    private static ClientCompatibilityResponse toCompatibilityResponse(
+            ClientCompatibilityReport report
+    ) {
+        if (report == null) {
+            return null;
+        }
+        return new ClientCompatibilityResponse(
+                report.requiredCapabilities(),
+                report.blockingErrors(),
+                report.clientReports().stream()
+                        .map(item -> new ClientCompatibilityClientResponse(
+                                item.clientKind(),
+                                item.compatible(),
+                                item.missingCapabilities(),
+                                item.notes()))
+                        .toList());
     }
 
     private static long version(String ifMatch) {
@@ -235,11 +259,12 @@ final class ConfigurationDraftController {
             String intendedSemanticVersion,
             String schemaVersion,
             String definitionJson,
-            UUID baseVersionId
+            UUID baseVersionId,
+            List<String> supportedClientKinds
     ) {
     }
 
-    record UpdateDraftRequest(String definitionJson) {
+    record UpdateDraftRequest(String definitionJson, List<String> supportedClientKinds) {
     }
 
     record ApproveDraftRequest(String approvalRef) {
@@ -274,7 +299,24 @@ final class ConfigurationDraftController {
             String createdBy,
             String updatedBy,
             Instant createdAt,
-            Instant updatedAt
+            Instant updatedAt,
+            List<String> supportedClientKinds,
+            ClientCompatibilityResponse clientCompatibility
+    ) {
+    }
+
+    record ClientCompatibilityResponse(
+            List<String> requiredCapabilities,
+            List<String> blockingErrors,
+            List<ClientCompatibilityClientResponse> clientReports
+    ) {
+    }
+
+    record ClientCompatibilityClientResponse(
+            String clientKind,
+            boolean compatible,
+            List<String> missingCapabilities,
+            List<String> notes
     ) {
     }
 }

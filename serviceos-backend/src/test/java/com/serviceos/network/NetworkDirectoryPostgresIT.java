@@ -118,7 +118,7 @@ class NetworkDirectoryPostgresIT {
         var networkA = commands.createServiceNetwork(actor(), metadata("net-a"), partner.id(), "MA", "Net A");
         var networkB = commands.createServiceNetwork(actor(), metadata("net-b"), partner.id(), "MB", "Net B");
         UUID techPrincipal = seedPrincipal("tech-multi", "多网点师傅");
-        var profile = commands.createTechnicianProfile(actor(), metadata("profile"), techPrincipal, "多网点师傅");
+        var profile = commands.createTechnicianProfile(actor(), metadata("profile"), techPrincipal, "多网点师傅", null);
         approveQualification(profile.id());
 
         var membershipA = commands.createNetworkTechnicianMembership(actor(), metadata("mem-a"),
@@ -139,7 +139,7 @@ class NetworkDirectoryPostgresIT {
         var partner = commands.createPartnerOrganization(actor(), metadata("partner"), "ELIG", "Elig Partner");
         var network = commands.createServiceNetwork(actor(), metadata("network"), partner.id(), "ELIG-NET", "Elig Net");
         UUID techPrincipal = seedPrincipal("tech-elig", "资质师傅");
-        var profile = commands.createTechnicianProfile(actor(), metadata("profile"), techPrincipal, "资质师傅");
+        var profile = commands.createTechnicianProfile(actor(), metadata("profile"), techPrincipal, "资质师傅", null);
         commands.createNetworkTechnicianMembership(actor(), metadata("membership"), network.id(), profile.id(), NOW);
 
         assertThat(eligibility.canAcceptAssignment(TENANT, techPrincipal, network.id(), NOW)).isFalse();
@@ -162,7 +162,7 @@ class NetworkDirectoryPostgresIT {
         var partner = commands.createPartnerOrganization(actor(), metadata("partner"), "DEACT", "Deact Partner");
         var network = commands.createServiceNetwork(actor(), metadata("network"), partner.id(), "DEACT-NET", "Deact Net");
         UUID techPrincipal = seedPrincipal("tech-deact", "清退师傅");
-        var profile = commands.createTechnicianProfile(actor(), metadata("profile"), techPrincipal, "清退师傅");
+        var profile = commands.createTechnicianProfile(actor(), metadata("profile"), techPrincipal, "清退师傅", null);
         approveQualification(profile.id());
         commands.createNetworkTechnicianMembership(actor(), metadata("membership"), network.id(), profile.id(), NOW);
         assertThat(eligibility.canAcceptAssignment(TENANT, techPrincipal, network.id(), NOW)).isTrue();
@@ -177,7 +177,7 @@ class NetworkDirectoryPostgresIT {
     @Test
     void m185_06_qualificationDecisionRequiresReviewCapability() {
         UUID techPrincipal = seedPrincipal("tech-qual", "资质审核师傅");
-        var profile = commands.createTechnicianProfile(actor(), metadata("profile"), techPrincipal, "资质审核师傅");
+        var profile = commands.createTechnicianProfile(actor(), metadata("profile"), techPrincipal, "资质审核师傅", null);
         var qualification = commands.submitQualification(actor(), metadata("submit"), profile.id(),
                 "HIGH_VOLTAGE", NOW, null);
 

@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
@@ -50,7 +51,7 @@ class TechnicianPortalControllerSecurityTest {
     void forgedContextReturnsPortalContextInvalid() throws Exception {
         CurrentPrincipal actor = actor();
         when(principals.current()).thenReturn(actor);
-        when(queries.taskFeed(eq(actor), eq("corr-deny"), eq("TECHNICIAN|NETWORK|forged"), isNull()))
+        when(queries.taskFeed(eq(actor), eq("corr-deny"), eq("TECHNICIAN|NETWORK|forged"), any(), isNull()))
                 .thenThrow(new BusinessProblem(ProblemCode.PORTAL_CONTEXT_INVALID,
                         "当前主体不能使用请求的 Technician Portal 上下文"));
 
@@ -68,7 +69,7 @@ class TechnicianPortalControllerSecurityTest {
         CurrentPrincipal actor = actor();
         Instant now = Instant.parse("2026-07-17T12:00:00Z");
         when(principals.current()).thenReturn(actor);
-        when(queries.taskFeed(eq(actor), eq("corr-ok"), eq("TECHNICIAN|NETWORK|" + NETWORK_ID), isNull()))
+        when(queries.taskFeed(eq(actor), eq("corr-ok"), eq("TECHNICIAN|NETWORK|" + NETWORK_ID), any(), isNull()))
                 .thenReturn(new TechnicianPortalFeedPage(NETWORK_ID, List.of(), null, now));
 
         mvc.perform(get("/api/v1/technician/me/task-feed")
@@ -107,7 +108,7 @@ class TechnicianPortalControllerSecurityTest {
         Instant now = Instant.parse("2026-07-17T12:00:00Z");
         when(principals.current()).thenReturn(actor);
         when(queries.taskDetail(
-                eq(actor), eq("corr-detail"), eq("TECHNICIAN|NETWORK|" + NETWORK_ID), eq(taskId)))
+                eq(actor), eq("corr-detail"), eq("TECHNICIAN|NETWORK|" + NETWORK_ID), any(), eq(taskId)))
                 .thenReturn(new TechnicianPortalTaskDetail(
                         NETWORK_ID, taskId, workOrderId, projectId,
                         null, null, "INSTALLATION", "HUMAN", "INSTALL", "READY",
@@ -129,6 +130,27 @@ class TechnicianPortalControllerSecurityTest {
                 .andExpect(jsonPath("$.contactAttempts").isArray())
                 .andExpect(jsonPath("$.visits").isArray())
                 .andExpect(jsonPath("$.formSubmissions").doesNotExist());
+    }
+
+    @Test
+    void taskDetailCapabilityUnsupportedReturns422() throws Exception {
+        CurrentPrincipal actor = actor();
+        UUID taskId = UUID.fromString("019f83b0-9999-7f8c-9505-36fe5c0e8809");
+        when(principals.current()).thenReturn(actor);
+        when(queries.taskDetail(
+                eq(actor), eq("corr-cap"), eq("TECHNICIAN|NETWORK|" + NETWORK_ID), any(), eq(taskId)))
+                .thenThrow(new BusinessProblem(
+                        ProblemCode.CLIENT_CAPABILITY_UNSUPPORTED,
+                        "当前客户端（师傅 iOS）不支持本任务冻结表单所需能力：form.condition.visibleWhen"));
+
+        mvc.perform(get("/api/v1/technician/me/tasks/{taskId}", taskId)
+                        .with(jwt().jwt(token -> token.subject("external-subject")
+                                .claim("tenant_id", "tenant-a")))
+                        .header("X-Correlation-Id", "corr-cap")
+                        .header("X-Technician-Context", "TECHNICIAN|NETWORK|" + NETWORK_ID)
+                        .header("X-ServiceOS-Client-Kind", "TECHNICIAN_IOS"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errorCode").value("CLIENT_CAPABILITY_UNSUPPORTED"));
     }
 
     private static CurrentPrincipal actor() {

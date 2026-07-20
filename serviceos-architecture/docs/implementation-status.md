@@ -2,9 +2,9 @@
 title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
-lastUpdated: 2026-07-19
-baselineCommit: "428ec88a4706b5ef80690cd7fca3767dd2834c66"
-latestMilestone: M355
+lastUpdated: 2026-07-20
+baselineCommit: "PENDING_MERGE"
+latestMilestone: M369
 ---
 
 # ServiceOS 实施状态总览
@@ -39,13 +39,13 @@ latestMilestone: M355
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M355 平台终审真实端到端门禁 |
-| 基线提交 | `a4dd25cc564fa6f0496bd127d07b9e1338b923cf`（功能提交后回填） |
+| 最新实施里程碑 | M369 BUSINESS 日历 SLA 截止时间（ADR-090 D1-R/D2-R/D4-R） |
+| 基线提交 | `PENDING_MERGE`（合并后回填；依赖 M367） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts`、`@serviceos/web-core`、`ServiceOSIOSCore`、独立且可部署的 `serviceos-network-web` 与 `serviceos-technician-web`、Swift 6 `TechnicianIOSFoundation`，以及已在 iPhone 17 Pro Simulator 安装启动、实跑 XCTest/XCUITest、形成 Production arm64 archive/dSYM，并接入当前任务、在线 Visit、冻结基础表单、前台 Evidence 采集上传、Snapshot/Task 完成与多轮资料整改的原生 `TechnicianIOS` SwiftUI App；由同一 Core OpenAPI 生成并经独立消费者门禁验证的 `@serviceos/core-client` 与 `ServiceOSCoreClient` |
 | 前端工程 | `serviceos-admin-web` 独立承载总部运营、统一用户中心、`/me` 导航、SavedView、UI Preference、受控搜索与最近访问；M256 后 Network 正式产品由独立 `serviceos-network-web` 承载，M257 后 Technician 正式产品由独立移动优先 `serviceos-technician-web` 承载，M262～M266 依次增加在线 Visit、冻结表单、Evidence 三段式上传、Snapshot/Task 完成与独立整改 Task 多轮补传/重新提交；Admin 仅保留可配置外链和 M188 诊断；两套独立 Web 均实际接入共享 Core、OIDC PKCE、服务端 Context/Capability/导航、Playwright 回归和独立容器镜像 |
-| 数据库 | PostgreSQL + Flyway（当前版本 130 / 132） |
-| 契约 | Core OpenAPI 1.0.49 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 `workorder.cancelled@v1`、`workorder.reopened@v1`、`workorder.external-details-updated@v1`、project.created@v3、project.scope-relations-revised@v1、`task.handling-completed@v1`、recovered/resolved 与 SLA started/breached/met@v1） |
+| 数据库 | PostgreSQL + Flyway（当前版本 135） |
+| 契约 | Core OpenAPI 1.0.59 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 `workorder.cancelled@v1`、`workorder.reopened@v1`、`workorder.external-details-updated@v1`、project.created@v3、project.scope-relations-revised@v1、`task.handling-completed@v1`、recovered/resolved 与 SLA started/breached/met@v1；ConfigurationDraft.clientCompatibility/`supportedClientKinds`；Feed/整改 `clientCapabilityUnsupportedDetail`；整改/主 Evidence/`Manual assign`/Network on-behalf `CLIENT_CAPABILITY_UNSUPPORTED`；`ReviewCase.reviewTaskId`；`TechnicianProfile.supportedClientKinds` / declare） |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -78,11 +78,11 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 
 | 领域 | 能力 | 状态 | 已完成范围 | 主要未完成范围 | 最近证据 |
 |---|---|---|---|---|---|
-| 工程基础 | 构建、测试、契约、可观测性、容器发布 | `IMPLEMENTED` | Maven、PostgreSQL IT、契约门禁、Trace/指标、单镜像迁移和回滚演练；Track A 同源 TS/Swift Client、Token、Web/iOS Core、身份注册和有界客户端元数据；M256/M257 独立 Web；M258～M260 iOS Foundation/App/Simulator；M261 Production archive/dSYM、隐私/AppIcon 与签名失败关闭 | 签名真机/TestFlight、能力协商、生产 IdP/BFF、正式 K8s、多故障域、PITR、远端制品发布/SBOM/签名、正式 Secret Manager | M8～M14、M247～M261 |
+| 工程基础 | 构建、测试、契约、可观测性、容器发布 | `IMPLEMENTED` | Maven、PostgreSQL IT、契约门禁、Trace/指标、单镜像迁移和回滚演练；Track A 同源 TS/Swift Client、Token、Web/iOS Core、身份注册和有界客户端元数据；M256/M257 独立 Web；M258～M260 iOS Foundation/App/Simulator；M261 Production archive/dSYM、隐私/AppIcon 与签名失败关闭；**M356～M363** 客户端能力发布门禁、运行时拒单、定向发布、Feed/详情头拒单、整改路径对齐、整改列表预检与领取/启动硬拒 | 签名真机/TestFlight、生产 IdP/BFF、正式 K8s、多故障域、PITR、远端制品发布/SBOM/签名、正式 Secret Manager | M8～M14、M247～M261、M356～M363 |
 | 身份授权 | OIDC/JWT、Capability、Tenant/Project/REGION/NETWORK Scope、拒绝审计 | `IMPLEMENTED` | 后端认证授权和范围校验基线；实时 TENANT/PROJECT/REGION/NETWORK 集合；Project 有效期关系、整组修订与授权目录读取；M183～M188 已补齐 Principal、企业组织任职、RoleGrant 治理、统一用户中心与 `/me` 上下文/导航 | Region 层级后代、Project 计划修订/审批、正式企业 IdP、HR Connector、ORGANIZATION DataScope、MFA obligation 执行器 | M9、M63～M67、M183～M188 |
 | 统一主体目录 | Principal、IdentityLink、PersonProfile、Persona 与生命周期 | `IMPLEMENTED` | 稳定内部 Principal；受控并发 JIT；多 IdentityLink/Persona；Profile；启停实时失权；安全目录与敏感身份分权查询；幂等、If-Match、审计和 PostgreSQL 不可变事实 | 身份解绑、密码管理、身份缓存与跨服务身份事件；网点、授权治理和 Portal 上下文由 M185～M188 承接 | M183 |
 | 企业组织目录 | Organization、OrgUnit、closure、任职与主数据同步 | `IMPLEMENTED` | 独立 `organization` 模块；closure；主职/兼职/负责人；LOCAL/EXTERNAL_AUTHORITATIVE；同步批次幂等与乱序；离职停用/撤权/待重分配；治理 API；Admin 组织页（M187） | 正式 HR Connector、双向回写、ORGANIZATION DataScope | M184、M187 |
-| 网点人员与师傅身份 | NetworkMembership、TechnicianProfile、网点关系与资质 | `IMPLEMENTED` | 独立 `network` 模块；PartnerOrganization/ServiceNetwork；成员邀请；TechnicianProfile/多网点关系；资质只追加审核；可接单查询；清退/停用 clearance 与 ACTIVE 派单影响摘要；Admin 网点/师傅页（M187）；Network Portal 师傅只读列表（M194）；Network Portal 师傅关系绑定/终止与资质 PENDING 提交（M204）；Network Portal 本网点资质只读列表（M205）；Network Portal 师傅关系只读列表含 version（M206） | Coverage/Capability 地理硬过滤、离线工作包回收、自动改派、Portal decide/FileObject | M185、M187、M194、M204～M206 |
+| 网点人员与师傅身份 | NetworkMembership、TechnicianProfile、网点关系与资质 | `IMPLEMENTED` | 独立 `network` 模块；PartnerOrganization/ServiceNetwork；成员邀请；TechnicianProfile/多网点关系；资质只追加审核；可接单查询；清退/停用 clearance 与 ACTIVE 派单影响摘要；Admin 网点/师傅页（M187）；Network Portal 师傅只读列表（M194）；Network Portal 师傅关系绑定/终止与资质 PENDING 提交（M204）；Network Portal 本网点资质只读列表（M205）；Network Portal 师傅关系只读列表含 version（M206）；**M366** 师傅 `supportedClientKinds` 声明（V134 + declare API） | Coverage/Capability 地理硬过滤、离线工作包回收、自动改派、Portal decide/FileObject | M185、M187、M194、M204～M206、M366、M367 |
 | 角色与授权治理 | Role/Capability/RoleGrant 管理、审批、撤销与 Delegation | `IMPLEMENTED` | 扩展 `authorization`：角色/能力目录、申请/审批/拒绝/撤销、Delegation、SoD 与可授予范围、DENY 优先、grant generation、授权解释与治理 HTTP；Admin 角色/授权页（M187）；`/me*` 上下文与导航（M188） | MFA obligation 执行器 | M186～M188 |
 | 统一用户中心 | Admin 用户、组织、网点人员、师傅、角色和授权治理 | `IMPLEMENTED` | 目录选择器、分区详情、影响面板、If-Match 写流、EXTERNAL 只读徽章、Capability 探测导航、真实 Keycloak PKCE E2E（含低权限深链）；M188 起导航改消费 `/me/navigation` | 正式企业 IdP / HR Connector | M187、M188 |
 | Portal 上下文与导航 | `/me`、contexts、capabilities、navigation 与多 Persona | `IMPLEMENTED` | 服务端上下文；代码 Page Registry + V090 覆盖；contextVersion 失权；Admin 消费；Network Portal 只读消费（M194）；Technician Feed 消费（M195）；CONSUMER 不暴露入口 | 完整 Technician App；Consumer Identity | M188、M194、M195 |
@@ -94,7 +94,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | Network Portal 只读查询 | 网点协作只读列表与工作台 | `IMPLEMENTED` | API-06 §10 子集；`X-Network-Context`；ACTIVE NETWORK assignment 工单/任务；ACTIVE 师傅；capacity；M256 起由独立 Network Web 正式承载 | 完整 product/03、评分引擎；其余写命令 | M194、M256 |
 | Network Portal 指派师傅 | 网点协作写命令（指派） | `IMPLEMENTED` | `POST .../tasks/{taskId}:assign-technician`；强制 networkAssigneeId；委托 ManualAssign；`networkPortal.assignTechnician`；Admin Web 表单 | 评分/硬过滤、资料 Network 写（改派见 M200） | M196 |
 | Network Portal 改派师傅 | 网点协作写命令（改派） | `IMPLEMENTED` | `POST .../tasks/{taskId}:reassign-technician`；supersedes ACTIVE TECHNICIAN；`networkPortal.reassignTechnician`；委托 ManualReassign；Admin Web 动作 | 跨网点改派、资料补传、评分 | M200 |
-| Network Portal 资料代补 | 网点协作写命令（onBehalf） | `IMPLEMENTED` | begin/finalize on-behalf + correction resubmit；`evidence.submitOnBehalf`；CaptureMetadata 服务端写入；Page Registry `NETWORK.EVIDENCE.SUPPLEMENT`；Admin Web 控件 | 槽位 allowOnBehalf、表单代改、Visit | M201 |
+| Network Portal 资料代补 | 网点协作写命令（onBehalf） | `IMPLEMENTED` | begin/finalize on-behalf + correction resubmit；`evidence.submitOnBehalf`；CaptureMetadata 服务端写入；Page Registry `NETWORK.EVIDENCE.SUPPLEMENT`；Admin Web 控件；M368 `NETWORK_WEB` 能力门禁（ADR-089） | 槽位 allowOnBehalf、表单代改、Visit | M201、M368 |
 | Network Portal 整改队列 | 网点协作只读整改发现面 | `IMPLEMENTED` | list/get correction-cases；复用 `evidence.read` NETWORK；Page Registry `NETWORK.CORRECTION.QUEUE`；Admin Web `/network-portal/corrections` | Admin cursor 队列、资质/产能写、异常队列 | M202 |
 | Network Portal 整改详情 | 网点协作只读整改详情 UI | `IMPLEMENTED` | 复用 M202 GET correction-cases/{id}（`CorrectionCase`）；Admin Web `/network-portal/corrections/:id`（source snapshot + resubmissions）；列表深链；catalog 仍 v15；OpenAPI 仍 0.99.0；Flyway 仍 100/102 | Portal close/waive/ACK、新 pageId | M209 |
 | Network Portal 运营异常详情 | 网点协作只读异常详情 UI | `IMPLEMENTED` | 复用 M203 GET operational-exceptions/{id}（`NetworkPortalExceptionItem`）；Admin Web `/network-portal/exceptions/:id`；列表深链；allowedActions=[]；catalog 仍 v15；OpenAPI 仍 0.99.0；Flyway 仍 100/102 | Portal ACK/resolve、新 pageId | M210 |
@@ -140,31 +140,31 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | Network Portal 预约协作 | 网点协作写命令（预约） | `IMPLEMENTED` | propose/confirm/list；`networkPortal.manageAppointment`；拒绝 TECHNICIAN 确认伪装；委托 AppointmentService；Admin Web 表单 | 资料补传（爽约/联系见 M199） | M197 |
 | Network Portal 预约生命周期 | 网点协作写命令（改约/取消） | `IMPLEMENTED` | reschedule/cancel；复用 `networkPortal.manageAppointment`；If-Match；委托 AppointmentService；Admin Web 动作 | 资料补传（爽约/联系见 M199） | M198 |
 | Network Portal 爽约与联系 | 网点协作写命令（爽约/联系） | `IMPLEMENTED` | mark-no-show + contact-attempts list/record；复用 `networkPortal.manageAppointment`；委托 AppointmentService；Admin Web 动作 | 资料补传、Visit（改派见 M200） | M199 |
-| Technician Portal Feed | 师傅任务 Feed / 日程 / 同步摘要 / 我的 / 当前任务详情 / 在线整改 | `IMPLEMENTED` | API-06 §11 子集；`X-Technician-Context`；本人 ACTIVE TECHNICIAN assignment Feed；tombstone；schedule；sync-summary；独立 H5/iOS；M218/M219/M243～M246 只读详情；M262 在线 Visit；M263 表单；M264 Evidence 上传；M265 Snapshot/Task 完成；M266 整改 Task | 离线工作包、mobile sync commands、MESSAGE、PROFILE、联系/预约、完整表单、真实签退 | M195、M218、M219、M243～M246、M257～M266 |
+| Technician Portal Feed | 师傅任务 Feed / 日程 / 同步摘要 / 我的 / 当前任务详情 / 在线整改 | `IMPLEMENTED` | API-06 §11 子集；`X-Technician-Context`；本人 ACTIVE TECHNICIAN assignment Feed；tombstone；schedule；sync-summary；独立 H5/iOS；M218/M219/M243～M246 只读详情；M262 在线 Visit；M263 表单；M264 Evidence 上传；M265 Snapshot/Task 完成；M266 整改 Task；**M359** Feed 注解/详情头能力预检拒单 | 离线工作包、mobile sync commands、MESSAGE、PROFILE、联系/预约、完整表单、真实签退 | M195、M218、M219、M243～M246、M257～M266、M359 |
 | Consumer Identity | CustomerProfile、用户资源关系和 C 端身份 | `ACCEPTED` | Principal/IdentityLink/API Schema 已预留 Consumer Persona | 身份治理序列之后的独立 Epic；待登录、隐私、客户主数据与注销策略确认；不得宣称已实现 | 后续正式 Epic |
 | 项目治理 | Project 核心事实、范围关系与授权目录 | `PARTIAL` | 项目创建；REGION/NETWORK 当前关系整组修订和不可变历史；`project.read` 授权目录、详情及历史查询 | owners、品牌/服务产品/配置绑定、生命周期、计划修订审批、目录治理 UI | M8、M64～M67 |
 | 可靠消息 | Inbox、Outbox、Worker claim/lease/retry | `IMPLEMENTED` | 本地可靠发布消费、恢复和人工接管基础 | 正式 Broker 和跨服务运行 | M9～M10 |
-| 配置中心 | 不可变配置资产、Bundle 发布、设计器与灰度通道 | `PARTIAL` | M282～M296 设计器/治理 + **M303～M309** 六类运行时 + **M310～M315** 设计器 + **M321～M350** 配置驱动履约主链路（含 Mapping DSL Admin UI + DISPATCH 编辑器 + FORM/EVIDENCE ConditionBuilder + Technician 条件/规则执行器） | AMOUNT/加权（待确认）、BUSINESS 日历 SLA、editableWhen/defaultExpression | M16、M33、M36、M52～M53、M61、M268、M271、M281～M296、M303～M315、M321～M350 |
+| 配置中心 | 不可变配置资产、Bundle 发布、设计器与灰度通道 | `PARTIAL` | M282～M296 设计器/治理 + **M303～M309** 六类运行时 + **M310～M315** 设计器 + **M321～M350** 配置驱动履约主链路（含 Mapping DSL Admin UI + DISPATCH 编辑器 + FORM/EVIDENCE ConditionBuilder + Technician 条件/规则执行器）；**M356～M363** 客户端能力发布门禁、运行时拒单、定向发布、Feed/详情头拒单、整改路径对齐、整改列表预检与领取/启动硬拒；**M366** Bundle 定向目标派单求交 | AMOUNT/加权（待确认）、editableWhen/defaultExpression、iOS 条件全量硬阻断；BUSINESS 暂停/预警仍未交付 | M16、M33、M36、M52～M53、M61、M268、M271、M281～M296、M303～M315、M321～M350、M356～M363、M366 |
 | 外部接入 | BYD CPIM + REFERENCE_OEM SAMPLE + Geely 本地切片 | `PARTIAL` | BYD 入站建单/更新/取消、提审、回调；**M267/M297～M302** 通用 SPI；**M311/M314/M316/M320** 吉利本地 + 三 OEM 并行冒烟 + **M317～M319** 远端查询/人工处置/批量重放；**M321～M347** 冻结 Mapping（含 REFERENCE_OEM SAMPLE CREATE/UPDATE/CANCEL + Admin Mapping DSL UI） | 吉利 Sandbox/OpenAPI 签名联调（BLOCKED_EXTERNAL）、生产凭据/对象存储 | M16、M56～M60、M77～M79、M99、M158、M267、M272、M311、M314、M316、M317、M318、M319、M320、M321～M347、M273、M297～M302 |
 | 工单 | WorkOrder 接收、激活、履约完成与授权工作区投影 | `PARTIAL` | 权威工单、工作流启动、跨阶段和 END 完结；授权目录、非 PII 详情、Stage/Task 执行骨架及核心执行+现场履约时间线 | 完整取消、暂停、恢复、客户敏感详情审计、跨域完整时间线/动作与全部业务分支 | M16～M19、M68～M69、M73～M74 |
 | 工作流 | 线性 + 网关 + WAIT/TIMER + SUB_PROCESS + 多实例 + 取消/重开/跳转/补偿 + 标准模板 | `PARTIAL` | 上项 + **M281** 维修/移机/巡检标准模板（含家充勘安） | HTTP 命令面、表单/资料完整模板包、设计器 | M17～M19、M61、M69、M268～M271、M275～M281 |
 | 人工任务与执行历史 | claim/start/complete、责任、执行保护与授权任务读取 | `IMPLEMENTED` | 人工命令、候选领取、唯一责任、release/reclaim、执行保护；表单/资料完成门禁；授权队列/详情、allowed-actions、自动 Attempt 历史及工单内核心 Task 生命周期与指派/Guard/人工接管时间线 | block/retry/cancel 等其他动作、Workflow Node 历史、跨工单/跨域完整历史和 Review 完成条件 | M20～M23、M35、M41、M43、M69～M73、M81 |
 | 应用只读投影 | 工作区、队列、时间线和投影运行时 | `PARTIAL` | 独立 readmodel 模块；核心执行、现场履约、SLA、资料/审核/整改（含外部回执与条件 KEEP/INVALIDATE 处置）、外发交付全链路、异常确认/闭环、ServiceAssignment 与 Task 指派/Guard/人工接管 Inbox 投影；授权时间线与稳定分页及最近活动摘要；时间线 checkpoint/dead letter/generation 重建与 FRESH/LAGGING/UNKNOWN/REBUILDING freshness；definition 登记、dead letter 幂等重放与旧/孤儿 generation 清理；工单工作区顶层实时组合、当前 ACTIVE 服务责任摘要与 TASKS/TIMELINE_AUDIT/APPOINTMENTS_VISITS（含联系尝试）/FORMS_EVIDENCE（含提交与资料项安全元数据）/REVIEWS_CORRECTIONS（含 CLIENT/重开血缘）/INTEGRATION 按需区块（敏感字段最小化；缺权次级区块降级）；**M351 FINAL_REVIEW 终审 Fan-in（脱敏摘要 + Snapshot targets + 门禁）**；授权跨项目 ReviewCase/CorrectionCase/OutboundDelivery/InboundEnvelope 专项队列；Admin 个人 SavedView（M189）、UI Preference（M190）、共享 SavedView（M191）、受控全局搜索 fan-in（M192）与最近访问（M193）；Network Portal 只读 fan-in（M194）；Technician Portal Feed fan-in（M195） | 试算合并、revision/slots 技术噪声、表单值与资料版本详情、FACTS_CALCULATIONS、完整事件 taxonomy/过滤、通用 work-queues、共享偏好、`search_document` 索引平台、多投影平台、Broker offset、离线工作包、Admin 重建/重放 HTTP；终审 UI/decide（M352～M353） | M73～M99、M158、M189～M195、M351 |
-| 服务分配 | 网点分配、容量、改派 Saga、超时恢复 | `IMPLEMENTED` | ServiceAssignment、容量权威、改派、终止、对账和自动恢复；**M324/M332/M337/M338/M348** 冻结 DISPATCH → ACTIVE NETWORK（Coverage 地图 + ORDER_COUNT 比例缺口）+ TECHNICIAN + Admin scope/fallback/allocationRatio 编辑器 | 完整策略评分、金额/加权比例、师傅 Coverage、全部异常分支和 Coverage CRUD UI | M24～M28、M324、M332、M337、M338、M348 |
+| 服务分配 | 网点分配、容量、改派 Saga、超时恢复 | `IMPLEMENTED` | ServiceAssignment、容量权威、改派、终止、对账和自动恢复；**M324/M332/M337/M338/M348** 冻结 DISPATCH → ACTIVE NETWORK（Coverage 地图 + ORDER_COUNT 比例缺口）+ TECHNICIAN + Admin scope/fallback/allocationRatio 编辑器；**M366** 自动 TECHNICIAN 池 `supportedClientKinds` 硬过滤 + MANUAL/`CLIENT_KIND_TARGET_EMPTY`；**M367** Manual/Network assign/reassign kind 硬拒绝（422 + DENY） | 完整策略评分、金额/加权比例、师傅 Coverage、全部异常分支和 Coverage CRUD UI | M24～M28、M324、M332、M337、M338、M348、M366、M367 |
 | 运营异常 | 异常工作台基础 | `PARTIAL` | 异常记录和恢复入口；M58 将外发 UNKNOWN 与 Task 最终人工事件汇入 OperationalException + HUMAN Task；M59 提供高风险人工重发事实；M60 在严格 ACK 后幂等闭环对应异常并处理事件乱序；列表/详情/确认已硬化为实时项目范围 | 其他异常类型自动闭环、完整通知、运营中心前端和跨域异常目录 | M29、M58～M60、M100 |
 | 预约 | 预约修订、联系终态动作 | `PARTIAL` | Revision、并发和终态动作基础；公开事件已并入工单时间线；Admin propose/confirm E2E；`GET /contact-attempts/{id}` 与详情页；Network Portal propose/confirm（M197）；reschedule/cancel（M198）；mark-no-show/contact（M199） | 用户确认渠道、完整日程、资料 Network 写 | M30～M31、M74、M136、M160、M197～M199 |
 | 现场作业 | Visit 生命周期 | `PARTIAL` | Visit 运行时基础；签到/签退/中断事件已并入工单时间线；Admin check-in/check-out E2E；`GET /visits/{id}` 与详情页；M262 Technician Context/当前责任双校验、H5/iOS 一次性定位签到与中断 | GPS 策略增强、真实 operationRefs 签退、完整现场提交、离线同步、真机定位 | M32、M74、M136、M159、M262 |
 | 动态表单 | 资产、冻结版本、不可变提交和 Task 完成门禁 | `PARTIAL` | 固定/条件 required、visible 与布尔 validation rule，基础类型校验、精确版本提交和完成引用；form.submitted 已并入工单时间线；M263 H5/iOS 冻结基础字段在线提交 | 可移植客户端条件/选项/高级控件、复杂 validator、计算字段、草稿、冲突、更正和审核 | M33～M35、M53、M76、M263 |
 | 资料 Evidence | 资产、槽位、Item/Revision、机器校验、Snapshot、完成门禁、作废、Review、Correction | `PARTIAL` | 固定/条件槽位、表单触发只追加重解析、槽位世代/lineage、REVIEW_REQUIRED 与 KEEP/INVALIDATE、安全文件联动、Snapshot/完成门禁及审核整改；M264 H5/iOS 在线前台 Begin/PUT/Finalize；M265 在线 Snapshot 与 Task 完成；M266 在线整改上传/Snapshot/resubmit | OCR/CV、GPS 权威距离、长期归档、生产扫描/对象存储、弱网/后台/离线上传、自动整改目标 | M36～M53、M76、M82～M83、M264～M266 |
 | 安全文件 | Begin/Finalize/隔离/扫描/授权下载/作废 | `IMPLEMENTED` | 独立安全文件生命周期；Evidence 编排 Begin/Finalize/Invalidate 联动 | 正式对象存储、专业扫描服务、物理删除 | M11、M38、M46 |
-| 审核整改 | ReviewCase、ReviewDecision、CorrectionCase | `PARTIAL` | Review + Correction + 整改 Task + 强制通过/重开 + 车企回执 + WAIVED；CLIENT Case 来源、批次/mapping 冻结；交付明确成功后自动创建 CLIENT Case/Route，UNKNOWN 可授权人工重发并在严格 ACK 后闭环异常；授权跨项目 ReviewCase 与 CorrectionCase 队列；M266 H5/iOS 领取、开始、多轮补传、Snapshot 与 resubmit，reviewer close 权威完成整改 Task；**M351 终审工作区只读组合查询与 Revision 短时下载授权** | targetDecisions 正式 decide、aggregate_version、终审 UI、整改深链 E2E；SLA/assignee enrich、多候选人/转派策略、审核人移动端、人工标记已送达/放弃、自动 Evidence target 映射 | M44～M60、M97～M98、M266、M351 |
-| SLA | 时钟、预警、升级 | `PARTIAL` | Task `TASK_CREATED→TASK_COMPLETED` ELAPSED 时钟；显式策略版本/摘要锁定；TARGET_DUE 对账；RUNNING/BREACHED/MET/MET_LATE；Inbox/Outbox 与不可变 segment/milestone；`sla.read` + 实时 TENANT/PROJECT/REGION/NETWORK 授权集合的跨项目工作台、工单时间线与详情查询；关系修订使旧游标失败关闭；公开 started/breached/met 已并入工单执行时间线 | BUSINESS 日历、暂停/恢复、免责/重算、预警/升级/通知、其他 subject、组织关系、Portal 前端、考核结算 | M61～M66、M75 |
+| 审核整改 | ReviewCase、ReviewDecision、CorrectionCase | `PARTIAL` | Review + Correction + 整改 Task + 强制通过/重开 + 车企回执 + WAIVED；CLIENT Case 来源、批次/mapping 冻结；交付明确成功后自动创建 CLIENT Case/Route，UNKNOWN 可授权人工重发并在严格 ACK 后闭环异常；授权跨项目 ReviewCase 与 CorrectionCase 队列；M266 H5/iOS 领取、开始、多轮补传、Snapshot 与 resubmit，reviewer close 权威完成整改 Task；**M351～M355** 终审 Fan-in/UI/decide/整改深链/E2E；**M360** 终审 8 态视觉基线；**M364** INTERNAL `reviewTaskId` handling Task；**M365** 试点 `REVIEW_TASK` WAITING 门闸 + `evidence.review-decided` 唤醒（A5-B） | CLIENT `reviewTaskId`、全量模板、SLA/assignee enrich、多候选人/转派、审核人移动端、自动 Evidence target 映射 | M44～M60、M97～M98、M266、M351～M355、M360、M364、M365 |
+| SLA | 时钟、预警、升级 | `PARTIAL` | Task `TASK_CREATED→TASK_COMPLETED` ELAPSED 时钟；**M369** Bundle 锁定 `CALENDAR` 的 BUSINESS 截止纯函数与业务已用时长（ADR-090 D1-R）；显式策略/日历版本摘要锁定；TARGET_DUE 对账；RUNNING/BREACHED/MET/MET_LATE；Inbox/Outbox 与不可变 segment/milestone；`sla.read` 跨项目工作台/时间线/详情；`sla.started@v2` | 暂停/恢复、免责/重算、预警/升级/通知、其他 subject、组织关系、Portal 前端、考核结算、外部节假日 API | M61～M66、M75、M369 |
 | 通知 | 通知策略运行时与投递 | `PARTIAL` | **M307** 冻结 Bundle `NotificationRuntime`；**M326** `task.created`/`task.completed` 自动订阅 → Inbox + RoleGrant 收件人 → resolveAndDispatch → Intent/Delivery/Attempt 持久化；LocalReference SENT 本地 ACK，UNKNOWN/FAILED 人工接管 | 模板渲染、真实短信/邮件/Push 供应商、Admin 投递工作台、网络 I/O 移出事务与业务重试 Task 时钟 | M307、M326、`architecture/14-*` |
 | 履约事实与试算 | 事实提取和双向试算 | `PARTIAL` | **M309** `PricingRuntime`；**M327** `workorder.fulfilled` → 最小履约事实 + SHADOW `CalculationSnapshot`（不落账） | 完整 FactDefinition/CalculationRun、应收/应付双轨、对账结算、Admin 计价工作台、AUTHORITATIVE | M309、M327、M5 设计 |
 | 对账结算 | 对账、结算、争议与调整 | `PROPOSED` | 已有边界设计 | 正式运行时和页面 | `architecture/16-*` |
 | Admin Portal | 总部运营后台 | `PARTIAL` | **M284/M287/M289/M291/M292/M294/M295/M296** 配置设计器；M101～M193 运营基线；**M328** UNKNOWN 人工确认/放弃与批量 Replay 工作台接入 Admin 外发队列/详情；**M351** 终审工作区 API（UI 见 M352） | Ant Design 定型与终审三栏 UI、targetDecisions 提交、整改深链、真实 E2E；正式企业 OIDC/BFF、批量压测/MFA | M7 设计、M101～M193、M284～M296、M328、M351、Admin 试点基线 |
 | Network Portal | 网点协作端 | `PARTIAL` | M194～M242 已交付 workbench、工单/任务、限定工作区、师傅关系/资质、产能、整改和运营异常等受控读写切片；M256 将全部正式产品页迁入独立 `serviceos-network-web`，接入 OIDC PKCE、`/me` NETWORK 上下文、Capability/服务端导航、跨网点失败关闭、76 项 Playwright 回归与独立容器镜像；Admin 不再承载正式 `/network-portal/*` 路由 | 槽位策略表、完整 product/03 设计系统、评分/容量策略引擎、Portal ACK/resolve/decide、产能申请、notifications/消息页、生产 IdP 与集群发布 | M7 设计、M194～M242、M255～M256 |
-| Technician App / Portal | 师傅移动端与 Feed | `PARTIAL` | M195/M218/M219/M243～M246 只读安全切片；M257 独立 H5；M258～M261 iOS 基础；M262 在线 Visit；M263 冻结基础表单；**M349/M350** H5 条件执行器 + 工单/区域权威头 + validationRules；M264 Evidence 采集上传；M265 Snapshot 与 Task 完成；M266 在线整改 | 联系/预约、完整表单草稿、editableWhen/默认值（未接受）、iOS 共用执行器、真实 operationRefs 签退；弱网/后台/Track F 离线；签名真机/真实 IdP/VoiceOver/崩溃采集/TestFlight | M7 设计、M195、M218～M219、M243～M246、M257～M266、M349、M350 |
+| Technician App / Portal | 师傅移动端与 Feed | `PARTIAL` | M195/M218/M219/M243～M246 只读安全切片；M257 独立 H5；M258～M261 iOS 基础；M262 在线 Visit；M263 冻结基础表单；**M349/M350** H5 条件执行器 + 工单/区域权威头 + validationRules；M264 Evidence 采集上传；M265 Snapshot 与 Task 完成；M266 在线整改；**M357～M363** 运行时能力拒单、定向目标外拒单、Feed/详情头预检、整改路径门禁、列表预检与领取/启动硬拒 | 联系/预约、完整表单草稿、editableWhen/默认值（未接受）、iOS 共用执行器、真实 operationRefs 签退；弱网/后台/Track F 离线；签名真机/真实 IdP/VoiceOver/崩溃采集/TestFlight | M7 设计、M195、M218～M219、M243～M246、M257～M266、M349、M350、M357～M363 |
 | External Portal | 用户/车企受控页面 | `PROPOSED` | 最小边界规划 | 二期页面和工程实现 | M7 设计 |
 
 ## 4. 里程碑历史摘要
@@ -175,19 +175,23 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M355**（平台终审工作台纵向切片收口：M351～M355）。
-OpenAPI **1.0.49**（`:decide` 改为 `targetDecisions`，相对旧客户端为破坏性演进，新系统直接修正）；Flyway **130**。
+ServiceOS 可靠纵向切片已推进到 **M369**（BUSINESS 日历 SLA 截止时间 / ADR-090 D1-R/D2-R/D4-R；承接 M368）。
+OpenAPI **仍 1.0.59**；Flyway **135**。
+Technician 能力门禁（M356～M363）、审核 handling Task（M364）、工作流门闸（M365）、派单自动池过滤（M366）、人工指派硬拒绝（M367）、Network on-behalf `NETWORK_WEB` 门禁（M368）与 BUSINESS 截止切片（M369）已闭环。
 
-下一阶段：
+**状态：`AWAITING_OWNER_SELECTION`** — 下一切片须负责人在交接文档中选型（A–F），未选型不得开 M370。
 
-1. 完整 8 态视觉基线人工采信与 admin-pilot 全场景 Chrome 冒烟加固；
-2. 独立审核 HUMAN Task 与提交 Task 分离的工作流模板；
-3. 既有硬门禁：吉利联调 / AMOUNT/加权 / BUSINESS 日历 SLA。
+下一阶段候选（均需负责人确认后才能推进，不得发明规则）：
+
+1. iOS 条件执行器全量硬阻断（本 Linux 环境多为 BLOCKED_EXTERNAL）；
+2. 吉利联调 / AMOUNT/加权（硬门禁）；
+3. BUSINESS 暂停/恢复/预警/升级（需另接受 ADR-090 D1-B 或 ARCH-12 子集）；
+4. OpenAPI 放宽 `clockMode`/`CALENDAR`（闭合 M369 HTTP 契约缺口；需批准破坏性演进或新主版本）。
 
 仍为 **硬门禁 / 外部阻塞**（不可发明推进）：
 
 1. AMOUNT/加权比例 — **需业务确认口径**后方可实施；
-2. BUSINESS 日历 SLA / 结算落账 — R3 大切片，需独立批准；
+2. BUSINESS 暂停/预警/升级或结算落账 — R3 大切片，需独立批准；
 3. 吉利真实联调材料到位后提升为最高优先级；否则保持 `BLOCKED_EXTERNAL`。
 
 仍为 **`BLOCKED_EXTERNAL`**：

@@ -62,7 +62,7 @@ class PricingShadowSnapshotPostgresIT {
                     auth_role_grant, auth_role_capability, auth_role, idn_security_principal CASCADE
                 """).update();
 
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("130");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("135");
 
         jdbc.sql("""
                 INSERT INTO prj_project (

@@ -43,6 +43,7 @@ public final class ConfigurationAssetSchemaValidator {
     private static final String ASSIGNEE_POLICY_SCHEMA_VERSION = "1.0.0";
     private static final String INTEGRATION_SCHEMA_VERSION = "1.0.0";
     private static final String PRICING_SCHEMA_VERSION = "1.0.0";
+    private static final String CALENDAR_SCHEMA_VERSION = "1.0.0";
     private static final Set<ConfigurationAssetType> SCHEMA_GOVERNED_TYPES = Set.of(
             ConfigurationAssetType.FORM,
             ConfigurationAssetType.EVIDENCE,
@@ -52,7 +53,8 @@ public final class ConfigurationAssetSchemaValidator {
             ConfigurationAssetType.NOTIFICATION,
             ConfigurationAssetType.ASSIGNEE_POLICY,
             ConfigurationAssetType.INTEGRATION,
-            ConfigurationAssetType.PRICING);
+            ConfigurationAssetType.PRICING,
+            ConfigurationAssetType.CALENDAR);
 
     private final ObjectMapper objectMapper;
     private final Map<SchemaKey, JsonSchema> schemas;
@@ -89,6 +91,8 @@ public final class ConfigurationAssetSchemaValidator {
                 loadSchema("configuration-schemas/integration-v1.schema.json"));
         loaded.put(new SchemaKey(ConfigurationAssetType.PRICING, PRICING_SCHEMA_VERSION),
                 loadSchema("configuration-schemas/pricing-v1.schema.json"));
+        loaded.put(new SchemaKey(ConfigurationAssetType.CALENDAR, CALENDAR_SCHEMA_VERSION),
+                loadSchema("configuration-schemas/calendar-v1.schema.json"));
         this.schemas = Map.copyOf(loaded);
     }
 
@@ -127,6 +131,7 @@ public final class ConfigurationAssetSchemaValidator {
             case RULE -> "ruleKey";
             case INTEGRATION -> "mappingKey";
             case PRICING -> "pricingKey";
+            case CALENDAR -> "calendarKey";
             default -> throw new IllegalStateException("schema-governed asset type has no identity field");
         };
         if (!command.assetKey().equals(definition.path(identityField).asText())) {
@@ -153,6 +158,8 @@ public final class ConfigurationAssetSchemaValidator {
             validateIntegrationSemantics(definition);
         } else if (command.assetType() == ConfigurationAssetType.PRICING) {
             validatePricingSemantics(definition);
+        } else if (command.assetType() == ConfigurationAssetType.CALENDAR) {
+            validateCalendarSemantics(definition);
         }
     }
 
@@ -198,6 +205,7 @@ public final class ConfigurationAssetSchemaValidator {
             }
         }
         validateWorkflowSlaReferences(assets);
+        validateSlaCalendarReferences(assets);
         for (ConfigurationAssetDefinition asset : assets) {
             if (asset.assetType() == ConfigurationAssetType.WORKFLOW) {
                 validateWorkflowSemantics(parse(asset.definitionJson()), asset.assetKey());
@@ -461,6 +469,57 @@ public final class ConfigurationAssetSchemaValidator {
         }
         validateExpression(expression(condition), Map.of(),
                 "WORKFLOW transition condition", from);
+    }
+
+    /**
+     * BUSINESS SLA 的 calendarRef 必须在同一 Bundle 精确命中一个 CALENDAR；
+     * ELAPSED 不得携带 calendarRef（schema 已约束，此处双保险）。
+     */
+    private void validateSlaCalendarReferences(List<ConfigurationAssetDefinition> assets) {
+        Set<String> calendarKeys = new HashSet<>();
+        for (ConfigurationAssetDefinition asset : assets) {
+            if (asset.assetType() == ConfigurationAssetType.CALENDAR) {
+                calendarKeys.add(asset.assetKey());
+            }
+        }
+        for (ConfigurationAssetDefinition asset : assets) {
+            if (asset.assetType() != ConfigurationAssetType.SLA) {
+                continue;
+            }
+            JsonNode sla = parse(asset.definitionJson());
+            String clockMode = sla.path("clockMode").asText();
+            boolean hasCalendarRef = sla.hasNonNull("calendarRef")
+                    && !sla.path("calendarRef").asText("").isBlank();
+            if ("BUSINESS".equals(clockMode)) {
+                String calendarRef = sla.path("calendarRef").asText();
+                long matches = calendarKeys.stream().filter(calendarRef::equals).count();
+                if (matches != 1) {
+                    throw new ConfigurationPublicationException(
+                            "BUSINESS SLA calendarRef 必须在同一 Bundle 精确命中一个 CALENDAR: "
+                                    + calendarRef);
+                }
+            } else if (hasCalendarRef) {
+                throw new ConfigurationPublicationException(
+                        "ELAPSED SLA 不得声明 calendarRef: " + asset.assetKey());
+            }
+        }
+    }
+
+    private void validateCalendarSemantics(JsonNode definition) {
+        try {
+            java.time.ZoneId.of(definition.path("timeZone").asText());
+        } catch (RuntimeException exception) {
+            throw new ConfigurationPublicationException(
+                    "CALENDAR timeZone 无效: " + definition.path("timeZone").asText());
+        }
+        for (JsonNode window : definition.path("weeklyWindows")) {
+            java.time.LocalTime start = java.time.LocalTime.parse(window.path("start").asText());
+            java.time.LocalTime end = java.time.LocalTime.parse(window.path("end").asText());
+            if (!end.isAfter(start)) {
+                throw new ConfigurationPublicationException(
+                        "CALENDAR weeklyWindows end 必须晚于 start");
+            }
+        }
     }
 
     /** Workflow 的 slaRef 必须在同一冻结 Bundle 中精确命中 SLA，并显式覆盖该节点 taskType。 */
