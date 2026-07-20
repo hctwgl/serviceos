@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.55
+  version: 1.0.56
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -2760,6 +2760,9 @@ paths:
     post:
       operationId: claimTechnicianCorrection
       summary: 当前候选师傅领取整改任务
+      description: |
+        M363：已知 TECHNICIAN_* 相对源 Task 冻结 FORM/EVIDENCE 不兼容时，在状态迁移前返回 422
+        `CLIENT_CAPABILITY_UNSUPPORTED`（与任务详情头硬拒同构）。
       parameters:
         - $ref: '#/components/parameters/CorrectionCaseId'
         - $ref: '#/components/parameters/TechnicianContext'
@@ -2772,10 +2775,14 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /technician/me/corrections/{correctionCaseId}:start:
     post:
       operationId: startTechnicianCorrection
       summary: 当前负责人启动整改任务
+      description: |
+        M363：已知 TECHNICIAN_* 相对源 Task 冻结 FORM/EVIDENCE 不兼容时，在进入 RUNNING 前返回 422
+        `CLIENT_CAPABILITY_UNSUPPORTED`。
       parameters:
         - $ref: '#/components/parameters/CorrectionCaseId'
         - $ref: '#/components/parameters/TechnicianContext'
@@ -2788,6 +2795,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /technician/me/corrections/{correctionCaseId}/evidence-slots:
     get:
       operationId: listTechnicianCorrectionEvidenceSlots

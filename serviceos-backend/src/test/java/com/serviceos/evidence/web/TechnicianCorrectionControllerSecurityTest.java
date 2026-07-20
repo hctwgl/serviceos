@@ -211,6 +211,26 @@ class TechnicianCorrectionControllerSecurityTest {
                 .andExpect(jsonPath("$.errorCode").value("CLIENT_CAPABILITY_UNSUPPORTED"));
     }
 
+    @Test
+    void claimCapabilityUnsupportedReturns422() throws Exception {
+        when(principals.current()).thenReturn(principal());
+        when(corrections.claim(eq(principal()), any(), eq(CONTEXT), eq("TECHNICIAN_IOS"), eq(CASE), eq(1L)))
+                .thenThrow(new BusinessProblem(
+                        ProblemCode.CLIENT_CAPABILITY_UNSUPPORTED,
+                        "当前客户端（师傅 iOS）不支持本任务表单所需能力：form.widget.signature"));
+
+        mvc.perform(post("/api/v1/technician/me/corrections/{id}:claim", CASE)
+                        .with(jwt().jwt(token -> token.subject(PRINCIPAL.toString())
+                                .claim("tenant_id", "tenant-266")))
+                        .header("X-Technician-Context", CONTEXT)
+                        .header("Idempotency-Key", "claim-cap")
+                        .header("If-Match", "\"1\"")
+                        .header("X-ServiceOS-Client-Kind", "TECHNICIAN_IOS")
+                        .header("X-ServiceOS-Client-Version", "1.0.0"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errorCode").value("CLIENT_CAPABILITY_UNSUPPORTED"));
+    }
+
     private static TechnicianCorrectionView view(String status, long version) {
         return new TechnicianCorrectionView(
                 CASE, SOURCE_TASK, CORRECTION_TASK, "IN_PROGRESS", List.of("IMAGE.BLUR"),

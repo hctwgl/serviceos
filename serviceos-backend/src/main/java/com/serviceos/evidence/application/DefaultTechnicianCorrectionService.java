@@ -51,8 +51,10 @@ import java.util.UUID;
  * <p>M361：整改资料路径复用主 Evidence 的客户端能力门禁与定向目标，禁止以整改旁路绕过
  * {@code CLIENT_CAPABILITY_UNSUPPORTED}。</p>
  *
- * <p>M362：列表/生命周期投影对源 Task 冻结 Bundle 做能力预检软注解，避免师傅进入领取/开工/
- * 补传中途才发现不兼容；不整表 422、不隐藏整改责任。</p>
+ * <p>M362：列表投影对源 Task 冻结 Bundle 做能力预检软注解，不整表 422、不隐藏整改责任。</p>
+ *
+ * <p>M363：claim/start 在变更状态前对源 Task 冻结 Bundle 硬拒单（与 M359 任务详情同构），
+ * 对齐 Product/08「不允许执行到现场中途才发现必需能力缺失」；UNKNOWN 仍由 Probe 短路。</p>
  */
 @Service
 final class DefaultTechnicianCorrectionService implements TechnicianCorrectionService {
@@ -136,6 +138,8 @@ final class DefaultTechnicianCorrectionService implements TechnicianCorrectionSe
         if (!access.task().actorCandidate()) {
             throw new BusinessProblem(ProblemCode.TASK_ASSIGNMENT_CONFLICT, "当前主体不是整改任务候选人");
         }
+        // 先硬拒再 claim，避免不兼容端把任务推进到 CLAIMED 后再失败。
+        requireSourceTaskClientCompatible(principal.tenantId(), clientKind, access.correction().taskId());
         humanTasks.claim(principal, metadata,
                 new ClaimHumanTaskCommand(access.task().taskId(), expectedVersion));
         return currentView(principal, clientKind, correctionCaseId, access.task().taskId());
@@ -150,6 +154,8 @@ final class DefaultTechnicianCorrectionService implements TechnicianCorrectionSe
         if (!access.task().actorResponsible()) {
             throw new BusinessProblem(ProblemCode.TASK_ASSIGNMENT_CONFLICT, "当前主体不负责整改任务");
         }
+        // 已 CLAIMED 的不兼容端在 start 前仍失败关闭，禁止进入 RUNNING 补传。
+        requireSourceTaskClientCompatible(principal.tenantId(), clientKind, access.correction().taskId());
         humanTasks.start(principal, metadata,
                 new StartHumanTaskCommand(access.task().taskId(), expectedVersion));
         return currentView(principal, clientKind, correctionCaseId, access.task().taskId());
@@ -394,6 +400,24 @@ final class DefaultTechnicianCorrectionService implements TechnicianCorrectionSe
                         sourceTask.configurationBundleDigest(),
                         sourceTask.formRef())
                 .orElse(null);
+    }
+
+    /**
+     * claim/start 入口硬预检：与列表软注解同源 Probe，但在状态迁移前失败关闭。
+     *
+     * <p>源 Task 缺失时不在此发明额外拒单（沿用后续资料路径/404 语义）；Probe 对 UNKNOWN 短路。</p>
+     */
+    private void requireSourceTaskClientCompatible(String tenantId, String clientKind, UUID sourceTaskId) {
+        TaskFulfillmentContext sourceTask = sourceTasks.find(tenantId, sourceTaskId).orElse(null);
+        if (sourceTask == null) {
+            return;
+        }
+        clientCapabilityProbe.requireCompatible(
+                tenantId,
+                clientKind,
+                sourceTask.configurationBundleId(),
+                sourceTask.configurationBundleDigest(),
+                sourceTask.formRef());
     }
 
     private static UUID parseContext(String header) {

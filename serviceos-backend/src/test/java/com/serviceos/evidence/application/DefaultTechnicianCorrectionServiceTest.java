@@ -17,6 +17,7 @@ import com.serviceos.network.api.NetworkTechnicianMembershipView;
 import com.serviceos.network.api.PrincipalNetworkAffiliationQuery;
 import com.serviceos.network.api.TechnicianProfileView;
 import com.serviceos.shared.BusinessProblem;
+import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.task.api.HandlingTaskContextQuery;
 import com.serviceos.task.api.HandlingTaskContextView;
@@ -40,6 +41,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -152,6 +154,48 @@ class DefaultTechnicianCorrectionServiceTest {
         assertThat(views.getFirst().clientCapabilityUnsupportedDetail()).isNull();
         verify(capabilityProbe).findIncompatibilityDetail(
                 eq("tenant-361"), eq("UNKNOWN"), eq(BUNDLE), eq(DIGEST), eq("form.install"));
+    }
+
+    @Test
+    void claimRejectsBeforeStateChangeWhenProbeDenies() {
+        when(handlingTasks.findForActor(
+                "tenant-361", CORRECTION_TASK, PRINCIPAL.toString(),
+                CorrectionTaskAccessValidator.TASK_TYPE))
+                .thenReturn(Optional.of(handlingTask("READY")));
+        doThrow(new BusinessProblem(
+                ProblemCode.CLIENT_CAPABILITY_UNSUPPORTED,
+                "当前客户端（师傅 iOS）不支持本任务表单所需能力：form.widget.signature"))
+                .when(capabilityProbe)
+                .requireCompatible(eq("tenant-361"), eq("TECHNICIAN_IOS"), eq(BUNDLE), eq(DIGEST),
+                        eq("form.install"));
+
+        assertThatThrownBy(() -> service.claim(
+                principal(), new CommandMetadata("corr-claim", "idem-claim"),
+                "TECHNICIAN|NETWORK|" + NETWORK, "TECHNICIAN_IOS", CASE, 2L))
+                .isInstanceOfSatisfying(BusinessProblem.class, problem ->
+                        assertThat(problem.code()).isEqualTo(ProblemCode.CLIENT_CAPABILITY_UNSUPPORTED));
+        verify(humanTasks, never()).claim(any(), any(), any());
+    }
+
+    @Test
+    void startRejectsBeforeStateChangeWhenProbeDenies() {
+        when(handlingTasks.findForActor(
+                "tenant-361", CORRECTION_TASK, PRINCIPAL.toString(),
+                CorrectionTaskAccessValidator.TASK_TYPE))
+                .thenReturn(Optional.of(handlingTask("CLAIMED")));
+        doThrow(new BusinessProblem(
+                ProblemCode.CLIENT_CAPABILITY_UNSUPPORTED,
+                "当前客户端（师傅 Web）不支持本任务资料所需能力：evidence.media.signature"))
+                .when(capabilityProbe)
+                .requireCompatible(eq("tenant-361"), eq("TECHNICIAN_WEB"), eq(BUNDLE), eq(DIGEST),
+                        eq("form.install"));
+
+        assertThatThrownBy(() -> service.start(
+                principal(), new CommandMetadata("corr-start", "idem-start"),
+                "TECHNICIAN|NETWORK|" + NETWORK, "TECHNICIAN_WEB", CASE, 2L))
+                .isInstanceOfSatisfying(BusinessProblem.class, problem ->
+                        assertThat(problem.code()).isEqualTo(ProblemCode.CLIENT_CAPABILITY_UNSUPPORTED));
+        verify(humanTasks, never()).start(any(), any(), any());
     }
 
     private static CurrentPrincipal principal() {

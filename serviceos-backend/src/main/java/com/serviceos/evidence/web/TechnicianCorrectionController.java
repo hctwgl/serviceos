@@ -35,7 +35,7 @@ import java.util.UUID;
  * Technician Portal 整改 HTTP 边界；请求只接受资源 ID、乐观锁版本和最小上传声明。
  *
  * <p>M361：资料路径透传 {@code X-ServiceOS-Client-Kind}，由应用层权威复检能力。</p>
- * <p>M362：列表/claim/start 同样透传 clientKind，供源 Task 冻结 Bundle 能力预检注解。</p>
+ * <p>M362/M363：列表/claim/start 透传 clientKind；列表软注解，claim/start 可硬拒单。</p>
  */
 @RestController
 @RequestMapping("/api/v1/technician/me/corrections")

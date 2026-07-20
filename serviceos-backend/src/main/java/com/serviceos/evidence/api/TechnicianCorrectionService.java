@@ -10,7 +10,8 @@ import java.util.UUID;
  * Technician Portal 整改闭环；所有写入均同时校验 Portal 网点上下文和 correction Task 实时责任。
  *
  * <p>M361：资料读写路径对已知 {@code TECHNICIAN_*} 复检客户端能力（与主 Evidence 路径同门禁）。</p>
- * <p>M362：列表/生命周期投影可带源 Task 冻结 Bundle 能力预检注解（软标注，不整表 422）。</p>
+ * <p>M362：列表投影可带源 Task 冻结 Bundle 能力预检注解（软标注，不整表 422）。</p>
+ * <p>M363：claim/start 对已知 TECHNICIAN_* 硬拒 {@code CLIENT_CAPABILITY_UNSUPPORTED}。</p>
  */
 public interface TechnicianCorrectionService {
     List<TechnicianCorrectionView> list(
