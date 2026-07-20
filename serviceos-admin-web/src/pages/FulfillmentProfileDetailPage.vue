@@ -30,15 +30,31 @@ const draft = ref<ProjectFulfillmentDraft | null>(null)
 const revisions = ref<ProjectFulfillmentRevision[]>([])
 const activeTab = ref('overview')
 
+const allowedActionSet = computed(() => new Set(detail.value?.allowedActions ?? []))
+const canEdit = computed(() => allowedActionSet.value.has('EDIT_DRAFT'))
+const canPreview = computed(() => allowedActionSet.value.has('COMPILE_PREVIEW'))
+const canPublish = computed(() => allowedActionSet.value.has('PUBLISH'))
+const isReadOnly = computed(
+  () => !!detail.value && !canEdit.value && !canPreview.value && !canPublish.value,
+)
+
 type StageRow = {
   stageCode: string
   stageName: string
   sequence: number
-  ownerType: string
+  ownerLabel: string
   formCount: number
   evidenceCount: number
   actionCount: number
-  slaRef: string
+  slaLabel: string
+}
+
+function ownerLabel(ownerType: unknown): string {
+  const normalized = String(ownerType ?? '')
+  if (normalized === 'PLATFORM') return '平台运营'
+  if (normalized === 'NETWORK') return '合作网点'
+  if (normalized === 'TECHNICIAN') return '服务师傅'
+  return '责任方待配置'
 }
 
 const stageRows = computed<StageRow[]>(() => {
@@ -51,11 +67,11 @@ const stageRows = computed<StageRow[]>(() => {
       stageCode: String(stage.stageCode ?? ''),
       stageName: String(stage.stageName ?? ''),
       sequence: Number(stage.sequence ?? 0),
-      ownerType: String(stage.ownerType ?? '—'),
+      ownerLabel: ownerLabel(stage.ownerType),
       formCount: Array.isArray(stage.formRefs) ? stage.formRefs.length : 0,
       evidenceCount: Array.isArray(stage.evidenceRefs) ? stage.evidenceRefs.length : 0,
       actionCount: Array.isArray(stage.actions) ? stage.actions.length : 0,
-      slaRef: stage.slaRef ? String(stage.slaRef) : '未绑定',
+      slaLabel: stage.slaRef ? '已绑定' : '未绑定',
     }))
   } catch {
     return []
@@ -109,8 +125,9 @@ onMounted(load)
       </Button>
     </template>
     <template #primary-action>
-      <Space>
+      <Space v-if="canEdit || canPreview || canPublish">
         <Button
+          v-if="canEdit"
           @click="
             router.push({
               name: 'ADMIN.PROJECT.FULFILLMENT.EDIT',
@@ -121,6 +138,7 @@ onMounted(load)
           编辑草稿
         </Button>
         <Button
+          v-if="canPreview"
           @click="
             router.push({
               name: 'ADMIN.PROJECT.FULFILLMENT.PREVIEW',
@@ -131,6 +149,7 @@ onMounted(load)
           运行预览
         </Button>
         <Button
+          v-if="canPublish"
           type="primary"
           @click="
             router.push({
@@ -145,6 +164,14 @@ onMounted(load)
     </template>
     <template #feedback>
       <Alert v-if="error" type="error" show-icon :message="error" style="margin-bottom: 12px" />
+      <Alert
+        v-else-if="isReadOnly"
+        type="info"
+        show-icon
+        message="当前配置为只读"
+        description="当前状态或权限不允许编辑、预览或发布。可继续查看阶段和历史发布版本。"
+        style="margin-bottom: 12px"
+      />
     </template>
 
     <template v-if="detail">
@@ -180,11 +207,11 @@ onMounted(load)
             :columns="[
               { title: '顺序', dataIndex: 'sequence', width: 80 },
               { title: '阶段', dataIndex: 'stageName' },
-              { title: '责任类型', dataIndex: 'ownerType' },
+              { title: '责任方', dataIndex: 'ownerLabel' },
               { title: '表单', dataIndex: 'formCount', width: 80 },
               { title: '资料', dataIndex: 'evidenceCount', width: 80 },
               { title: '动作', dataIndex: 'actionCount', width: 80 },
-              { title: 'SLA', dataIndex: 'slaRef' },
+              { title: 'SLA', dataIndex: 'slaLabel' },
             ]"
           />
         </TabPane>
