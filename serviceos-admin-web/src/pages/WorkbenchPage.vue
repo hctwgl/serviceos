@@ -13,9 +13,15 @@ import { Button } from 'ant-design-vue'
 import { listReviewCases, listCorrectionCases, listOperationalExceptions } from '../api/queues'
 import { listAuthorizedWorkOrders } from '../api/workOrders'
 import { listSlaInstances } from '../api/sla'
+import {
+  listFollowedProjects,
+  unfollowProject,
+  type FollowedProjectItem,
+} from '../api/followedProjects'
 import { toUserFacingError } from '../product/errorMessages'
 import { formatDateTime, formatRemainingSeconds } from '../product/formatTime'
 import { statusLabel } from '../product/statusLabels'
+import { labelClientCode } from '../presentation/enum-labels'
 
 type CardState<T> = {
   loading: boolean
@@ -46,6 +52,8 @@ const corrections = ref(emptyCard<{ count: number; items: TodoItem[] }>())
 const slaRisk = ref(emptyCard<{ running: number; breached: number; items: TodoItem[] }>())
 const exceptions = ref(emptyCard<{ count: number }>())
 const recent = ref(emptyCard<{ items: TodoItem[] }>())
+const followed = ref(emptyCard<{ items: FollowedProjectItem[] }>())
+const unfollowBusyId = ref<string | null>(null)
 
 async function loadCard<T>(
   target: { value: CardState<T> },
@@ -171,6 +179,30 @@ async function loadRecent() {
   })
 }
 
+async function loadFollowed() {
+  await loadCard(followed, async () => {
+    const page = await listFollowedProjects(10)
+    return { items: page.items }
+  })
+}
+
+async function removeFollow(projectId: string) {
+  unfollowBusyId.value = projectId
+  try {
+    await unfollowProject(projectId)
+    await loadFollowed()
+  } catch (err) {
+    const facing = toUserFacingError(err)
+    followed.value = {
+      ...followed.value,
+      error: facing.message,
+      errorCode: facing.errorCode,
+    }
+  } finally {
+    unfollowBusyId.value = null
+  }
+}
+
 async function loadAll() {
   pageBootError.value = null
   await Promise.allSettled([
@@ -180,6 +212,7 @@ async function loadAll() {
     loadSla(),
     loadExceptions(),
     loadRecent(),
+    loadFollowed(),
   ])
 }
 
@@ -401,7 +434,7 @@ onMounted(() => {
     </template>
 
     <template #recent-activity>
-      <section class="recent" data-testid="workbench-recent">
+      <section class="recent" data-testid="workbench-recent-list">
         <PageState v-if="recent.loading" kind="loading" compact />
         <PageState
           v-else-if="recent.error"
@@ -422,6 +455,50 @@ onMounted(() => {
             <RouterLink :to="item.to">{{ item.workOrderLabel }}</RouterLink>
             <StatusBadge :status="item.status" />
             <span class="muted">{{ statusLabel(item.status) }} · {{ item.remaining }}</span>
+          </li>
+        </ul>
+      </section>
+    </template>
+
+    <template #followed-projects>
+      <section class="followed" data-testid="workbench-followed-list">
+        <PageState v-if="followed.loading" kind="loading" compact />
+        <PageState
+          v-else-if="followed.error"
+          kind="error"
+          compact
+          :description="followed.error"
+          :error-code="followed.errorCode ?? undefined"
+          @reload="loadFollowed"
+        />
+        <PageState
+          v-else-if="followed.data && followed.data.items.length === 0"
+          kind="empty"
+          compact
+          guide="尚未关注项目。打开项目详情后可点击「关注项目」。"
+        />
+        <ul v-else-if="followed.data">
+          <li v-for="item in followed.data.items" :key="item.projectId">
+            <RouterLink
+              :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: item.projectId } }"
+              data-testid="workbench-followed-link"
+            >
+              {{ item.displayRef }}
+            </RouterLink>
+            <StatusBadge v-if="item.status" :status="item.status" />
+            <span class="muted">
+              {{ item.projectCode || '—' }}
+              · {{ labelClientCode(item.clientId) }}
+            </span>
+            <Button
+              size="small"
+              type="link"
+              :loading="unfollowBusyId === item.projectId"
+              data-testid="workbench-followed-unfollow"
+              @click="removeFollow(item.projectId)"
+            >
+              取消关注
+            </Button>
           </li>
         </ul>
       </section>
@@ -494,11 +571,12 @@ button,
   text-decoration: none;
 }
 .todo,
-.recent {
-  background: #fff;
-  border-radius: 12px;
-  padding: 1rem 1.25rem;
-  box-shadow: 0 1px 3px rgb(16 42 67 / 8%);
+.recent,
+.followed {
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
 }
 table {
   width: 100%;

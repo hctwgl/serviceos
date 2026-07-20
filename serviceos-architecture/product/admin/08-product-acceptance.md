@@ -375,7 +375,7 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 关注项目读模型尚未交付
+  - UI_DATA_GAP: 关注项目待办/SLA 角标聚合（关注列表本身已由 M401 交付）
 ```
 
 ### 9.5 M399 记录（项目列表方案聚合）
@@ -412,6 +412,24 @@ qualityStatus:
 productOwnerDecision: null
 knownGaps:
   - UI_DATA_GAP: 完整行政区名称树 / 独立车企主数据目录（聚合选择器已交付）
+```
+
+### 9.7 M401 记录（关注项目）
+
+```yaml
+pageId: ADMIN.WORKBENCH
+route: /workbench
+visualProfile: CLASSIC_PROFESSIONAL
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: 关注项目上的待办/SLA 角标聚合
 ```
 
 ## 10. GAP 规则

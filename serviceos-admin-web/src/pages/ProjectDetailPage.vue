@@ -37,6 +37,11 @@ import { statusLabel } from '../product/statusLabels'
 import { toUserFacingError } from '../product/errorMessages'
 import ProjectRegionPicker from '../components/ProjectRegionPicker.vue'
 import NetworkEntityPicker from '../components/NetworkEntityPicker.vue'
+import {
+  followProject,
+  getFollowedProjectStatus,
+  unfollowProject,
+} from '../api/followedProjects'
 
 const route = useRoute()
 const router = useRouter()
@@ -62,6 +67,8 @@ const showDevTools = import.meta.env.DEV
 const baselineRegionCodes = ref<string[]>([])
 const baselineNetworkIds = ref<string[]>([])
 const fulfillmentProfiles = ref<ProjectFulfillmentProfileSummary[]>([])
+const followed = ref(false)
+const followBusy = ref(false)
 
 const fulfillmentPublishedCount = computed(
   () => fulfillmentProfiles.value.filter((p) => p.status === 'ACTIVE').length,
@@ -116,6 +123,12 @@ async function loadDetail() {
       pageId: 'ADMIN.PROJECT.DETAIL',
       displayRef: detail.value.project.name || detail.value.project.code,
     })
+    try {
+      const status = await getFollowedProjectStatus(projectId.value)
+      followed.value = status.followed
+    } catch {
+      followed.value = false
+    }
     diagnostics.pushDiagnostic({
       title: '项目详情技术上下文',
       fields: {
@@ -143,6 +156,36 @@ async function loadRevisions(next?: string) {
   })
   revisions.value = page
   revisionCursor.value = page.nextCursor ?? undefined
+}
+
+async function toggleFollow() {
+  if (!detail.value) {
+    return
+  }
+  followBusy.value = true
+  error.value = null
+  errorCode.value = null
+  message.value = null
+  try {
+    if (followed.value) {
+      await unfollowProject(projectId.value)
+      followed.value = false
+      message.value = '已取消关注'
+    } else {
+      await followProject({
+        projectId: projectId.value,
+        displayRef: detail.value.project.name || detail.value.project.code,
+      })
+      followed.value = true
+      message.value = '已关注项目，可在运营工作台查看'
+    }
+  } catch (err) {
+    const facing = toUserFacingError(err)
+    error.value = facing.message
+    errorCode.value = facing.errorCode
+  } finally {
+    followBusy.value = false
+  }
 }
 
 const addedRegions = computed(() =>
@@ -310,6 +353,15 @@ onMounted(() => {
     </template>
     <template #secondary-actions>
       <Button :loading="loading" @click="loadDetail">刷新</Button>
+      <Button
+        data-testid="project-follow-toggle"
+        :loading="followBusy"
+        :type="followed ? 'default' : 'primary'"
+        ghost
+        @click="toggleFollow"
+      >
+        {{ followed ? '取消关注' : '关注项目' }}
+      </Button>
       <Button v-if="showDevTools" type="link" @click="diagnostics.openDrawer()">技术诊断</Button>
     </template>
     <template #primary-action>

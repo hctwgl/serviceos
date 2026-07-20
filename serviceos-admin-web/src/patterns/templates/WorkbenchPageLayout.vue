@@ -37,10 +37,16 @@ defineProps<{
           <slot name="today-queue" />
         </section>
       </div>
-      <section class="workbench__panel" data-testid="workbench-recent">
-        <h2>最近处理</h2>
-        <slot name="recent-activity" />
-      </section>
+      <div class="workbench__bottom-row">
+        <section class="workbench__panel" data-testid="workbench-recent">
+          <h2>最近处理</h2>
+          <slot name="recent-activity" />
+        </section>
+        <section class="workbench__panel" data-testid="workbench-followed-projects">
+          <h2>关注项目</h2>
+          <slot name="followed-projects" />
+        </section>
+      </div>
       <slot />
     </div>
   </PageContainer>
@@ -84,5 +90,15 @@ defineProps<{
 }
 .workbench__panel--risk {
   border-color: var(--sos-color-status-warning-border);
+}
+.workbench__bottom-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 1024px) {
+  .workbench__bottom-row {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

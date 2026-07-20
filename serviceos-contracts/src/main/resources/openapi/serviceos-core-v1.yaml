@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.66
+  version: 1.0.67
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -1468,6 +1468,104 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '422': { $ref: '#/components/responses/Problem' }
+
+  /me/followed-projects:
+    get:
+      operationId: listMyFollowedProjects
+      summary: 列出当前主体的 Admin 关注项目
+      description: |
+        M401：仅 Portal=ADMIN。任意已认证主体可读自己的关注项目；不要求新 capability。
+        服务端对每项经 project.read 重新鉴权，失权项省略并清理；不整列表 403。
+      parameters:
+        - name: portal
+          in: query
+          required: false
+          schema: { type: string, enum: [ADMIN], default: ADMIN }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 已按当前授权过滤的关注项目列表
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/FollowedProjectPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+    put:
+      operationId: followMyProject
+      summary: 关注一个项目（幂等 upsert）
+      description: |
+        M401：先经 project.read 鉴权再写入本人关注行。同 projectId 覆盖 followedAt/displayRef。
+        portal 必须为 ADMIN。不要求新 capability。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FollowProjectRequest' }
+      responses:
+        '200':
+          description: 已关注项目项
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/FollowedProjectItem' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /me/followed-projects/{projectId}/status:
+    get:
+      operationId: getMyFollowedProjectStatus
+      summary: 查询当前主体是否已关注指定项目
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: portal
+          in: query
+          required: false
+          schema: { type: string, enum: [ADMIN], default: ADMIN }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 关注状态
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [projectId, followed]
+                properties:
+                  projectId: { type: string, format: uuid }
+                  followed: { type: boolean }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+  /me/followed-projects/{projectId}:
+    delete:
+      operationId: unfollowMyProject
+      summary: 取消关注项目
+      description: 即使已失权也可清理本人关注行；幂等成功。
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: portal
+          in: query
+          required: false
+          schema: { type: string, enum: [ADMIN], default: ADMIN }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '204':
+          description: 已取消关注
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
   /network-portal/work-orders:
     get:
       operationId: listNetworkPortalWorkOrders
@@ -7120,6 +7218,33 @@ components:
       properties:
         items: { type: array, items: { $ref: '#/components/schemas/RecentResourceItem' } }
         asOf: { type: string, format: date-time }
+    FollowedProjectItem:
+      type: object
+      additionalProperties: false
+      required: [projectId, displayRef, followedAt, deepLink]
+      properties:
+        projectId: { type: string, format: uuid }
+        displayRef: { type: string, minLength: 1, maxLength: 120 }
+        projectCode: { type: [string, 'null'] }
+        clientId: { type: [string, 'null'] }
+        status: { type: [string, 'null'] }
+        followedAt: { type: string, format: date-time }
+        deepLink: { type: string, minLength: 1 }
+    FollowedProjectPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/FollowedProjectItem' } }
+        asOf: { type: string, format: date-time }
+    FollowProjectRequest:
+      type: object
+      additionalProperties: false
+      required: [projectId]
+      properties:
+        portal: { type: string, enum: [ADMIN], default: ADMIN }
+        projectId: { type: string, format: uuid }
+        displayRef: { type: [string, 'null'], maxLength: 120 }
     NetworkPortalWorkOrderItem:
       type: object
       additionalProperties: false

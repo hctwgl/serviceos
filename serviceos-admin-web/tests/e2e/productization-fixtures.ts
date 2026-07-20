@@ -33,6 +33,7 @@ export async function mockProductizationApis(
 ) {
   await page.route('**/api/v1/**', async (route) => {
     const url = route.request().url()
+    const method = route.request().method()
     if (url.includes('/me/contexts')) {
       await fulfillJson(route, {
         contexts: [
@@ -180,6 +181,46 @@ export async function mockProductizationApis(
       await fulfillJson(route, {
         clients: [{ clientId: 'client-geely', projectCount: 1 }],
         regions: [{ regionCode: 'CN-3702', projectCount: 1 }],
+        asOf: '2026-07-20T04:00:00Z',
+      })
+      return
+    }
+    if (url.includes('/me/followed-projects/') && url.includes('/status')) {
+      await fulfillJson(route, {
+        projectId: '22222222-2222-4222-8222-222222222222',
+        followed: true,
+      })
+      return
+    }
+    if (url.includes('/me/followed-projects')) {
+      if (method === 'DELETE') {
+        await fulfillJson(route, null, 204)
+        return
+      }
+      if (method === 'PUT') {
+        await fulfillJson(route, {
+          projectId: '22222222-2222-4222-8222-222222222222',
+          displayRef: '演示家充项目',
+          projectCode: 'PRJ-DEMO',
+          clientId: 'client-geely',
+          status: 'ACTIVE',
+          followedAt: '2026-07-20T04:00:00Z',
+          deepLink: '/projects/22222222-2222-4222-8222-222222222222',
+        })
+        return
+      }
+      await fulfillJson(route, {
+        items: [
+          {
+            projectId: '22222222-2222-4222-8222-222222222222',
+            displayRef: '演示家充项目',
+            projectCode: 'PRJ-DEMO',
+            clientId: 'client-geely',
+            status: 'ACTIVE',
+            followedAt: '2026-07-20T04:00:00Z',
+            deepLink: '/projects/22222222-2222-4222-8222-222222222222',
+          },
+        ],
         asOf: '2026-07-20T04:00:00Z',
       })
       return
