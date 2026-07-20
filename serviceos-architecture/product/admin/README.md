@@ -32,9 +32,6 @@ lastUpdated: 2026-07-20
 9. [实施路线图](09-roadmap.md)
 10. [当前路由到目标产品映射](10-current-to-target-matrix.md)
 11. [M383 项目履约配置产品审查](11-m383-product-review.md)
-12. [M384 项目履约配置逐路由验收矩阵](12-m384-fulfillment-route-acceptance-matrix.md)
-13. [M385 Manifest 展示适配器删除计划](13-m385-manifest-adapter-removal-plan.md)
-14. [M385 documentJson 编辑适配器删除计划](14-m385-draft-adapter-removal-plan.md)
 
 ## 规范优先级
 
