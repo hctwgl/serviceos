@@ -4,7 +4,7 @@ version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-20
 baselineCommit: "9a05be9b9e22be216542260f0979d85ee2cf2bab"
-latestMilestone: M396
+latestMilestone: M397
 ---
 
 # ServiceOS 实施状态总览
@@ -39,7 +39,7 @@ latestMilestone: M396
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M396 Network 师傅与产能产品化 |
+| 最新实施里程碑 | M397 Admin 用户管理母版产品化 |
 | 基线提交 | `9a05be9b9e22be216542260f0979d85ee2cf2bab`（历史基线；合入 master 后回填） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts`、`@serviceos/web-core`、`ServiceOSIOSCore`、独立且可部署的 `serviceos-network-web` 与 `serviceos-technician-web`、Swift 6 `TechnicianIOSFoundation`，以及已在 iPhone 17 Pro Simulator 安装启动、实跑 XCTest/XCUITest、形成 Production arm64 archive/dSYM，并接入当前任务、在线 Visit、冻结基础表单、前台 Evidence 采集上传、Snapshot/Task 完成与多轮资料整改的原生 `TechnicianIOS` SwiftUI App；由同一 Core OpenAPI 生成并经独立消费者门禁验证的 `@serviceos/core-client` 与 `ServiceOSCoreClient` |
@@ -162,7 +162,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | 通知 | 通知策略运行时与投递 | `PARTIAL` | **M307** 冻结 Bundle `NotificationRuntime`；**M326** `task.created`/`task.completed` 自动订阅 → Inbox + RoleGrant 收件人 → resolveAndDispatch → Intent/Delivery/Attempt 持久化；LocalReference SENT 本地 ACK，UNKNOWN/FAILED 人工接管 | 模板渲染、真实短信/邮件/Push 供应商、Admin 投递工作台、网络 I/O 移出事务与业务重试 Task 时钟 | M307、M326、`architecture/14-*` |
 | 履约事实与试算 | 事实提取和双向试算 | `PARTIAL` | **M309** `PricingRuntime`；**M327** `workorder.fulfilled` → 最小履约事实 + SHADOW `CalculationSnapshot`（不落账） | 完整 FactDefinition/CalculationRun、应收/应付双轨、对账结算、Admin 计价工作台、AUTHORITATIVE | M309、M327、M5 设计 |
 | 对账结算 | 对账、结算、争议与调整 | `PROPOSED` | 已有边界设计 | 正式运行时和页面 | `architecture/16-*` |
-| Admin Portal | 总部运营后台 | `PARTIAL` | **M284/M287/M289/M291/M292/M294/M295/M296** 配置设计器；M101～M193 运营基线；**M328** UNKNOWN 人工确认/放弃与批量 Replay；**M351** 终审工作区；**M370～M377** 设计系统/AppShell；**M384** 产品蓝图与经典专业风基线；**M385/M388** 履约配置中心与结构化 Draft；**M386** 工作流设计器；**M387** 任务模板中心；**M389** 工单详情履约工作区（`READY_FOR_REVIEW`） | 工作台/用户/项目母版深化、正式企业 OIDC/BFF、批量压测/MFA；不得宣称 PRODUCT_ACCEPTED | M7 设计、M101～M193、M284～M296、M328、M351、M370～M377、M384～M389、Admin 试点基线 |
+| Admin Portal | 总部运营后台 | `PARTIAL` | **M284/M287/M289/M291/M292/M294/M295/M296** 配置设计器；M101～M193 运营基线；**M328** UNKNOWN 人工确认/放弃与批量 Replay；**M351** 终审工作区；**M370～M377** 设计系统/AppShell；**M384～M389** 配置四核与工单详情；**M397** 用户管理母版（`READY_FOR_REVIEW`） | 工作台/项目母版深化、新建用户写流程、正式企业 OIDC/BFF；不得宣称 PRODUCT_ACCEPTED | M7 设计、M101～M193、M284～M296、M328、M351、M370～M377、M384～M389、M397、Admin 试点基线 |
 | Network Portal | 网点协作端 | `PARTIAL` | M194～M242 读写切片；M256 独立 `serviceos-network-web`；**M390～M392** 工作台/工作区/整改异常；**M396** 师傅与产能产品化（`READY_FOR_REVIEW`） | 师傅技能/任务量读模型、产能申请写、评分引擎、Portal ACK/resolve/decide、notifications、生产 IdP | M7 设计、M194～M242、M255～M256、M390～M392、M396 |
 | Technician App / Portal | 师傅移动端与 Feed | `PARTIAL` | M195/M218/M219/M243～M246 只读安全切片；M257 独立 H5；M258～M261 iOS 基础；M262 在线 Visit；M263 冻结基础表单；**M349/M350** H5 条件执行器 + 工单/区域权威头 + validationRules；M264 Evidence 采集上传；M265 Snapshot 与 Task 完成；M266 在线整改；**M357～M363** 运行时能力拒单、定向目标外拒单、Feed/详情头预检、整改路径门禁、列表预检与领取/启动硬拒 | 联系/预约、完整表单草稿、editableWhen/默认值（未接受）、iOS 共用执行器、真实 operationRefs 签退；弱网/后台/Track F 离线；签名真机/真实 IdP/VoiceOver/崩溃采集/TestFlight | M7 设计、M195、M218～M219、M243～M246、M257～M266、M349、M350、M357～M363 |
 | External Portal | 用户/车企受控页面 | `PROPOSED` | 最小边界规划 | 二期页面和工程实现 | M7 设计 |
@@ -190,13 +190,14 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 - **M394 Implemented**：Technician H5 任务详情作业闭环产品化（步骤条/签到前置/提交前检查/底部主操作）；`READY_FOR_REVIEW`。
 - **M395 Implemented**：Technician H5 整改与同步冲突中心产品化；`READY_FOR_REVIEW`。
 - **M396 Implemented**：Network 师傅与产能产品化；`READY_FOR_REVIEW`。本轮曾评估 Technician iOS，但当前环境无 Xcode，改为本切片。
+- **M397 Implemented**：Admin 用户管理母版产品化（目录 ListPageLayout + 详情 Tabs）；`READY_FOR_REVIEW`。
 - **M383** 长链路 test 7/8 仍未闭合，不阻塞本切片。
 
 建议下一批（按优先级）：
 
-1. Technician iOS 正式离线闭环（需 macOS/Xcode 环境）；
-2. Admin 工作台/用户/项目母版深化；
-3. Network 产能申请写流程 / 师傅技能读模型。
+1. Admin 运营工作台 / 项目管理母版深化；
+2. Technician iOS 正式离线闭环（需 macOS/Xcode 环境）；
+3. 新建用户写流程 / 组织角色列表读模型。
 
 仍为 **硬门禁 / 外部阻塞**（不可发明推进）：
 

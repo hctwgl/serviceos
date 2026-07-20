@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { Alert, Button, Tabs, TabPane } from 'ant-design-vue'
+import { ArrowLeftOutlined } from '@ant-design/icons-vue'
 import {
   disableSecurityPrincipal,
   enableSecurityPrincipal,
@@ -16,9 +18,12 @@ import { isConflictError, safeAccessDeniedMessage } from '../api/client'
 import ImpactPanel from '../components/ImpactPanel.vue'
 import VersionedCommandForm from '../components/VersionedCommandForm.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import DetailPageLayout from '../patterns/templates/DetailPageLayout.vue'
 import { statusLabel } from '../product/statusLabels'
+import { formatDateTimeDisplay } from '../presentation/date-time.presenter'
 
 const route = useRoute()
+const router = useRouter()
 const principalId = computed(() => String(route.params.id ?? ''))
 
 const loading = ref(false)
@@ -35,6 +40,7 @@ const displayName = ref('')
 const employeeNumber = ref('')
 const lifecycleReason = ref('ADMIN_USER_CENTER')
 const staleVersion = ref<number | null>(null)
+const activeTab = ref('basic')
 
 const impactItems = computed(() => {
   if (!detail.value) return []
@@ -170,130 +176,178 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="page" data-testid="user-detail-page">
-    <header class="top">
-      <div>
-        <h2>主体详情</h2>
-        <p class="meta">分区显示身份、Persona、任职/网点关系与授权来源</p>
-      </div>
-      <button type="button" :disabled="loading" @click="load">刷新</button>
-    </header>
+  <div data-testid="user-detail-page">
+    <DetailPageLayout
+      :title="detail?.principal.displayName || '用户详情'"
+      description="基本信息、组织归属、角色权限、登录与安全及变更相关分区。"
+      :eyebrow="detail ? statusLabel(detail.principal.type) : undefined"
+    >
+      <template #back>
+        <Button type="text" aria-label="返回用户目录" @click="router.push({ name: 'ADMIN.USER.DIRECTORY' })">
+          <template #icon><ArrowLeftOutlined /></template>
+          返回用户目录
+        </Button>
+      </template>
+      <template #status>
+        <StatusBadge v-if="detail" :status="detail.principal.status" />
+      </template>
+      <template #secondary-actions>
+        <Button :loading="loading" @click="load">刷新</Button>
+      </template>
+      <template #feedback>
+        <Alert v-if="denied" type="error" show-icon :message="error" data-testid="access-denied" />
+        <Alert v-else-if="loading && !detail" type="info" show-icon message="正在加载用户…" />
+        <Alert v-else-if="!detail && error" type="error" show-icon :message="error" />
+        <Alert v-if="message" type="success" show-icon :message="message" data-testid="command-message" />
+        <Alert
+          v-if="detail && error && !denied"
+          type="error"
+          show-icon
+          :message="error"
+          style="margin-top: 8px"
+        />
+      </template>
 
-    <p v-if="denied" class="error" data-testid="access-denied">{{ error }}</p>
-    <p v-else-if="loading && !detail">加载中…</p>
-    <p v-else-if="!detail && error" class="error">{{ error }}</p>
+      <template v-if="detail" #summary>
+        <p>
+          工号 {{ detail.principal.employeeNumber || '—' }} · Persona
+          {{ detail.personas.filter((x) => x.status === 'ACTIVE').length }} · 授权
+          {{ grants.length }} · 聚合版本 {{ detail.principal.version }}
+        </p>
+      </template>
 
-    <template v-else-if="detail">
-      <p v-if="error" class="error">{{ error }}</p>
-      <p v-if="message" class="ok" data-testid="command-message">{{ message }}</p>
+      <Tabs v-if="detail" v-model:activeKey="activeTab">
+        <TabPane key="basic" tab="基本信息">
+          <article class="card" data-testid="section-identity">
+            <h3>基本信息</h3>
+            <dl>
+              <div>
+                <dt>姓名</dt>
+                <dd data-testid="principal-display-name">{{ detail.principal.displayName }}</dd>
+              </div>
+              <div>
+                <dt>工号</dt>
+                <dd>{{ detail.principal.employeeNumber || '—' }}</dd>
+              </div>
+              <div>
+                <dt>状态</dt>
+                <dd data-testid="principal-status"><StatusBadge :status="detail.principal.status" /></dd>
+              </div>
+              <div>
+                <dt>类型</dt>
+                <dd>{{ statusLabel(detail.principal.type) }}</dd>
+              </div>
+              <div>
+                <dt>版本</dt>
+                <dd data-testid="principal-version">{{ detail.principal.version }}</dd>
+              </div>
+            </dl>
+          </article>
 
-      <article class="card" data-testid="section-identity">
-        <h3>身份</h3>
-        <dl>
-          <div><dt>displayName</dt><dd data-testid="principal-display-name">{{ detail.principal.displayName }}</dd></div>
-          <div><dt>employeeNumber</dt><dd>{{ detail.principal.employeeNumber || '—' }}</dd></div>
-          <div><dt>状态</dt><dd data-testid="principal-status"><StatusBadge :status="detail.principal.status" /></dd></div>
-          <div><dt>类型</dt><dd>{{ statusLabel(detail.principal.type) }}</dd></div>
-          <div><dt>version</dt><dd data-testid="principal-version">{{ detail.principal.version }}</dd></div>
-        </dl>
-      </article>
+          <VersionedCommandForm
+            title="编辑档案"
+            :version="detail.principal.version"
+            :busy="busy"
+            submit-label="保存档案"
+            hint="成功后重读权威 API；并发冲突返回 409。"
+            @submit="saveProfile"
+          >
+            <label>姓名<input v-model="displayName" aria-label="profile displayName" /></label>
+            <label>工号<input v-model="employeeNumber" aria-label="profile employeeNumber" /></label>
+            <button
+              type="button"
+              data-testid="prepare-stale-if-match"
+              :disabled="busy"
+              @click="() => void useStaleVersionForTest()"
+            >
+              准备过期 If-Match（E2E）
+            </button>
+          </VersionedCommandForm>
+        </TabPane>
 
-      <article class="card" data-testid="section-personas">
-        <h3>Persona</h3>
-        <ul v-if="detail.personas.length">
-          <li v-for="persona in detail.personas" :key="persona.id">
-            {{ statusLabel(persona.personaType) }} · <StatusBadge :status="persona.status" /> · {{ persona.validFrom }}
-            <span v-if="persona.validTo"> → {{ persona.validTo }}</span>
-          </li>
-        </ul>
-        <p v-else class="muted">无 Persona</p>
-      </article>
+        <TabPane key="org" tab="组织归属">
+          <article class="card" data-testid="section-personas">
+            <h3>Persona / 归属</h3>
+            <ul v-if="detail.personas.length">
+              <li v-for="persona in detail.personas" :key="persona.id">
+                {{ statusLabel(persona.personaType) }} ·
+                <StatusBadge :status="persona.status" /> ·
+                {{ formatDateTimeDisplay(persona.validFrom) }}
+                <span v-if="persona.validTo"> → {{ formatDateTimeDisplay(persona.validTo) }}</span>
+              </li>
+            </ul>
+            <p v-else class="muted">无 Persona</p>
+            <p class="muted">UI_DATA_GAP：组织树任职读模型尚未产品化接入本页。</p>
+          </article>
+        </TabPane>
 
-      <article class="card" data-testid="section-identity-links">
-        <h3>身份绑定</h3>
-        <p v-if="identities === null" class="muted">无 identity.readSensitive，不展示敏感绑定</p>
-        <ul v-else-if="identities.length">
-          <li v-for="link in identities" :key="link.id">
-            issuer={{ link.issuer }} · linkedAt={{ link.linkedAt }}
-          </li>
-        </ul>
-        <p v-else class="muted">无绑定</p>
-      </article>
+        <TabPane key="roles" tab="角色与权限">
+          <article class="card" data-testid="section-grants">
+            <h3>角色与权限</h3>
+            <ul v-if="grants.length">
+              <li v-for="grant in grants" :key="grant.grantId">
+                {{ grant.roleCode }} · {{ statusLabel(grant.grantStatus) }} /
+                {{ statusLabel(grant.grantEffect) }} ·
+                {{ statusLabel(grant.scopeType) }}={{ grant.scopeRef }}
+              </li>
+            </ul>
+            <p v-else class="muted">无授权记录或无权读取</p>
+          </article>
+        </TabPane>
 
-      <article class="card" data-testid="section-grants">
-        <h3>授权来源</h3>
-        <ul v-if="grants.length">
-          <li v-for="grant in grants" :key="grant.grantId">
-            {{ grant.roleCode }} · {{ grant.grantStatus }}/{{ grant.grantEffect }} ·
-            {{ grant.scopeType }}={{ grant.scopeRef }}
-          </li>
-        </ul>
-        <p v-else class="muted">无授权记录或无权读取</p>
-      </article>
+        <TabPane key="security" tab="登录与安全">
+          <article class="card" data-testid="section-identity-links">
+            <h3>身份绑定</h3>
+            <p v-if="identities === null" class="muted">无 identity.readSensitive，不展示敏感绑定</p>
+            <ul v-else-if="identities.length">
+              <li v-for="link in identities" :key="link.id">
+                发行方 {{ link.issuer }} · 绑定于 {{ formatDateTimeDisplay(link.linkedAt) }}
+              </li>
+            </ul>
+            <p v-else class="muted">无绑定</p>
+          </article>
 
-      <article class="card" data-testid="section-reassignment">
-        <h3>待重分配</h3>
-        <ul v-if="reassignments.length">
-          <li v-for="item in reassignments" :key="item.id">
-            {{ item.workItemStatus }} · {{ item.reason }} · {{ item.createdAt }}
-          </li>
-        </ul>
-        <p v-else class="muted">无 OPEN 待重分配项</p>
-      </article>
+          <VersionedCommandForm
+            :title="detail.principal.status === 'ACTIVE' ? '停用用户' : '启用用户'"
+            :version="detail.principal.version"
+            :busy="busy"
+            :submit-label="detail.principal.status === 'ACTIVE' ? '确认停用' : '确认启用'"
+            @submit="toggleLifecycle"
+          >
+            <ImpactPanel :items="impactItems" :obligations="['记录审计原因', '确认未完成工作已交接']" />
+            <label>原因<input v-model="lifecycleReason" aria-label="lifecycle reason" /></label>
+          </VersionedCommandForm>
+        </TabPane>
 
-      <VersionedCommandForm
-        title="更新 PersonProfile"
-        :version="detail.principal.version"
-        :busy="busy"
-        submit-label="保存档案"
-        hint="成功后重读权威 API；并发冲突返回 409。"
-        @submit="saveProfile"
-      >
-        <label>displayName<input v-model="displayName" aria-label="profile displayName" /></label>
-        <label>employeeNumber<input v-model="employeeNumber" aria-label="profile employeeNumber" /></label>
-        <button
-          type="button"
-          data-testid="prepare-stale-if-match"
-          :disabled="busy"
-          @click="() => void useStaleVersionForTest()"
-        >
-          准备过期 If-Match（E2E）
-        </button>
-      </VersionedCommandForm>
-
-      <VersionedCommandForm
-        :title="detail.principal.status === 'ACTIVE' ? '停用主体' : '启用主体'"
-        :version="detail.principal.version"
-        :busy="busy"
-        :submit-label="detail.principal.status === 'ACTIVE' ? '确认停用' : '确认启用'"
-        @submit="toggleLifecycle"
-      >
-        <ImpactPanel :items="impactItems" :obligations="['记录审计原因', '确认未完成工作已交接']" />
-        <label>reason<input v-model="lifecycleReason" aria-label="lifecycle reason" /></label>
-      </VersionedCommandForm>
-    </template>
-  </section>
+        <TabPane key="changes" tab="变更记录">
+          <article class="card" data-testid="section-reassignment">
+            <h3>待重分配</h3>
+            <ul v-if="reassignments.length">
+              <li v-for="item in reassignments" :key="item.id">
+                {{ statusLabel(item.workItemStatus) }} · {{ item.reason }} ·
+                {{ formatDateTimeDisplay(item.createdAt) }}
+              </li>
+            </ul>
+            <p v-else class="muted">无 OPEN 待重分配项</p>
+            <p class="muted">UI_DATA_GAP：完整变更审计时间线读模型尚未产品化接入本页。</p>
+          </article>
+        </TabPane>
+      </Tabs>
+    </DetailPageLayout>
+  </div>
 </template>
 
 <style scoped>
-.page {
-  display: grid;
-  gap: 1rem;
-}
-.top {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-}
-.meta {
-  margin: 0.25rem 0 0;
-  color: #627d98;
-}
 .card {
   background: #fff;
-  border-radius: 12px;
+  border: 1px solid var(--sos-color-border-default, #e5e7eb);
+  border-radius: 8px;
   padding: 1rem 1.15rem;
-  box-shadow: 0 1px 3px rgb(16 42 67 / 8%);
+  margin-bottom: 12px;
+}
+.card h3 {
+  margin: 0 0 12px;
+  font-size: 15px;
 }
 dl {
   margin: 0;
@@ -306,7 +360,7 @@ dl div {
   gap: 0.5rem;
 }
 dt {
-  color: #627d98;
+  color: var(--sos-color-text-tertiary, #6b7280);
 }
 dd {
   margin: 0;
@@ -326,20 +380,7 @@ input {
   border-radius: 6px;
   padding: 0.4rem 0.65rem;
 }
-button {
-  border: 1px solid #bcccdc;
-  background: #243b53;
-  color: #fff;
-  border-radius: 6px;
-  padding: 0.45rem 0.9rem;
-}
-.error {
-  color: #b42318;
-}
-.ok {
-  color: #054e31;
-}
 .muted {
-  color: #627d98;
+  color: var(--sos-color-text-tertiary, #6b7280);
 }
 </style>

@@ -485,4 +485,5 @@ Feature gate/authority: if applicable
 | M394 | Technician H5 任务详情作业闭环：步骤条/签到/提交前检查/底部主操作 | 405-m394-* + 388-m394-*；Playwright + M262～M265 | 客户地址导航读模型；原生签退；离线；人工视觉批准 |
 | M395 | Technician H5 整改详情 + 同步冲突中心产品化 | 406-m395-* + 389-m395-*；Playwright + correction 回归 | OfflineCommand 队列读模型；正确示例；人工视觉批准 |
 | M396 | Network 师傅列表 + 产能状态产品化 | 407-m396-* + 390-m396-*；Playwright + M220 字段兼容 | 技能/任务量读模型；产能申请写；人工视觉批准 |
+| M397 | Admin 用户管理目录/详情母版产品化 | 408-m397-* + 391-m397-*；Playwright 截图 | 新建用户写流程；组织/角色/最近登录读模型；人工视觉批准 |
 

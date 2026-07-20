@@ -310,6 +310,40 @@ knownGaps:
   - UI_DATA_GAP: 表单资料缩略图与完整审核记录产品化未完成
 ```
 
+### 9.3 M397 记录（用户管理）
+
+```yaml
+pageId: ADMIN.USER.DIRECTORY
+route: /users
+visualProfile: CLASSIC_PROFESSIONAL
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: 新建用户写流程、组织/角色摘要、最近登录列表读模型
+```
+
+```yaml
+pageId: ADMIN.USER.DETAIL
+route: /users/:id
+visualProfile: CLASSIC_PROFESSIONAL
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: 组织树任职与完整变更审计时间线
+```
+
 ## 10. GAP 规则
 
 - `UI_DATA_GAP`：后端缺少显示名、聚合摘要、total、差异、影响、引用关系或 allowed-actions 等页面需要的数据；
