@@ -3,6 +3,7 @@ package com.serviceos.organization.web;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
 import com.serviceos.organization.api.DirectorySyncBatchView;
 import com.serviceos.organization.api.OrgMembershipPage;
+import com.serviceos.organization.api.OrgMembershipSummaryPage;
 import com.serviceos.organization.api.OrgMembershipView;
 import com.serviceos.organization.api.OrgUnitView;
 import com.serviceos.organization.api.OrganizationCommandService;
@@ -126,6 +127,21 @@ final class OrganizationController {
     ) {
         return response(queries.listMemberships(principals.current(), correlationId,
                 organizationId, null, principalId), correlationId);
+    }
+
+    /**
+     * 按主体聚合任职摘要；必须注册在带 path 变量的 /org-memberships/{id}:* 之前无冲突风险。
+     */
+    @GetMapping("/org-memberships")
+    ResponseEntity<OrgMembershipSummaryPage> listMembershipSummaries(
+            @RequestParam UUID principalId,
+            @RequestParam(required = false) String status,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        return response(
+                queries.listMembershipSummariesForPrincipal(
+                        principals.current(), correlationId, principalId, status),
+                correlationId);
     }
 
     @PostMapping("/organizations/{organizationId}/memberships")

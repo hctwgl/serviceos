@@ -341,7 +341,7 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 组织树任职与完整变更审计时间线
+  - UI_DATA_GAP: 完整变更审计时间线（组织任职编辑已由 M404 关闭主路径）
 ```
 
 ### 9.4 M398 记录（项目管理 / 工作台）
@@ -466,6 +466,24 @@ qualityStatus:
 productOwnerDecision: null
 knownGaps:
   - UI_DATA_GAP: 失败登录与设备指纹尚未交付
+```
+
+### 9.10 M404 记录（组织任职）
+
+```yaml
+pageId: ADMIN.USER.DETAIL
+route: /users/:id
+visualProfile: CLASSIC_PROFESSIONAL
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: 完整变更审计时间线
 ```
 
 ## 10. GAP 规则

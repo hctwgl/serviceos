@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.69
+  version: 1.0.70
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -404,6 +404,30 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /org-memberships:
+    get:
+      operationId: listOrgMembershipSummaries
+      summary: 按主体查询组织任职摘要
+      description: |
+        M404：需要 organization.read。返回组织/单元显示名，供 Admin 用户详情组织归属使用。
+      parameters:
+        - name: principalId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+        - name: status
+          in: query
+          required: false
+          schema: { enum: [ACTIVE, TERMINATED] }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 任职摘要页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/OrgMembershipSummaryPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
   /org-memberships/{membershipId}:transfer:
     post:
       operationId: transferOrganizationMembership
@@ -8219,6 +8243,47 @@ components:
       required: [items, asOf]
       properties:
         items: { type: array, items: { $ref: '#/components/schemas/OrgMembership' } }
+        asOf: { type: string, format: date-time }
+    OrgMembershipSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - organizationId
+        - organizationCode
+        - organizationName
+        - organizationAuthorityMode
+        - orgUnitId
+        - unitCode
+        - unitName
+        - principalId
+        - membershipType
+        - status
+        - validFrom
+        - version
+        - createdAt
+      properties:
+        id: { type: string, format: uuid }
+        organizationId: { type: string, format: uuid }
+        organizationCode: { type: string, minLength: 1 }
+        organizationName: { type: string, minLength: 1 }
+        organizationAuthorityMode: { enum: [LOCAL, EXTERNAL_AUTHORITATIVE] }
+        orgUnitId: { type: string, format: uuid }
+        unitCode: { type: string, minLength: 1 }
+        unitName: { type: string, minLength: 1 }
+        principalId: { type: string, format: uuid }
+        membershipType: { enum: [PRIMARY, SECONDARY, MANAGER] }
+        status: { enum: [ACTIVE, TERMINATED] }
+        validFrom: { type: string, format: date-time }
+        validTo: { type: [string, 'null'], format: date-time }
+        version: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+    OrgMembershipSummaryPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/OrgMembershipSummary' } }
         asOf: { type: string, format: date-time }
     DirectorySyncItem:
       type: object

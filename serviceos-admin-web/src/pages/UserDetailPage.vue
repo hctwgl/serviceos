@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Alert, Button, Tabs, TabPane } from 'ant-design-vue'
+import { Alert, Button, Input, Select, Space, Tabs, TabPane, Tag } from 'ant-design-vue'
 import { ArrowLeftOutlined } from '@ant-design/icons-vue'
 import {
   disableSecurityPrincipal,
@@ -15,7 +15,19 @@ import {
   type SecurityPrincipalDetail,
 } from '../api/securityPrincipals'
 import { listRoleGrants, type RoleGrant } from '../api/authorizationGovernance'
-import { listOpenReassignmentWorkItems, type ReassignmentWorkItem } from '../api/organizations'
+import {
+  createOrganizationMembership,
+  getOrganization,
+  listOpenReassignmentWorkItems,
+  listOrganizations,
+  listOrgMembershipSummaries,
+  terminateOrganizationMembership,
+  transferOrganizationMembership,
+  type Organization,
+  type OrgMembershipSummary,
+  type OrgUnit,
+  type ReassignmentWorkItem,
+} from '../api/organizations'
 import { isConflictError, safeAccessDeniedMessage } from '../api/client'
 import ImpactPanel from '../components/ImpactPanel.vue'
 import VersionedCommandForm from '../components/VersionedCommandForm.vue'
@@ -40,11 +52,50 @@ const recentLogins = ref<PrincipalLoginEvent[] | null>(null)
 const recentLoginsError = ref<string | null>(null)
 const grants = ref<RoleGrant[]>([])
 const reassignments = ref<ReassignmentWorkItem[]>([])
+const memberships = ref<OrgMembershipSummary[]>([])
+const membershipsError = ref<string | null>(null)
+const organizations = ref<Organization[]>([])
+const createOrgId = ref<string | undefined>(undefined)
+const createUnits = ref<OrgUnit[]>([])
+const createUnitId = ref<string | undefined>(undefined)
+const createMembershipType = ref<'PRIMARY' | 'SECONDARY' | 'MANAGER'>('PRIMARY')
+const selectedMembershipId = ref<string | undefined>(undefined)
+const transferUnitId = ref<string | undefined>(undefined)
+const transferUnits = ref<OrgUnit[]>([])
+const terminateReason = ref('用户详情调整任职')
 const displayName = ref('')
 const employeeNumber = ref('')
 const lifecycleReason = ref('ADMIN_USER_CENTER')
 const staleVersion = ref<number | null>(null)
 const activeTab = ref('basic')
+
+const selectedMembership = computed(() =>
+  memberships.value.find((item) => item.id === selectedMembershipId.value) ?? null,
+)
+const createOrgOptions = computed(() =>
+  organizations.value
+    .filter((item) => item.status === 'ACTIVE')
+    .map((item) => ({
+      value: item.id,
+      label: `${item.name}（${item.code}）${item.authorityMode === 'EXTERNAL_AUTHORITATIVE' ? ' · 外部权威只读结构' : ''}`,
+    })),
+)
+const createUnitOptions = computed(() =>
+  createUnits.value
+    .filter((item) => item.status === 'ACTIVE')
+    .map((item) => ({
+      value: item.id,
+      label: `${item.unitName}（${item.unitCode}）`,
+    })),
+)
+const transferUnitOptions = computed(() =>
+  transferUnits.value
+    .filter((item) => item.status === 'ACTIVE' && item.id !== selectedMembership.value?.orgUnitId)
+    .map((item) => ({
+      value: item.id,
+      label: `${item.unitName}（${item.unitCode}）`,
+    })),
+)
 
 const impactItems = computed(() => {
   if (!detail.value) return []
@@ -92,6 +143,7 @@ async function load() {
     } catch {
       reassignments.value = []
     }
+    await loadMembershipContext()
   } catch (err) {
     detail.value = null
     denied.value = true
@@ -100,6 +152,154 @@ async function load() {
     loading.value = false
   }
 }
+
+async function loadMembershipContext() {
+  membershipsError.value = null
+  try {
+    const [orgPage, membershipPage] = await Promise.all([
+      listOrganizations(),
+      listOrgMembershipSummaries({ principalId: principalId.value, status: 'ACTIVE' }),
+    ])
+    organizations.value = orgPage.items
+    memberships.value = membershipPage.items
+    if (!createOrgId.value && orgPage.items[0]) {
+      createOrgId.value = orgPage.items[0].id
+      await loadCreateUnits()
+    }
+  } catch (err) {
+    organizations.value = []
+    memberships.value = []
+    membershipsError.value = safeAccessDeniedMessage(err)
+  }
+}
+
+async function loadCreateUnits() {
+  createUnits.value = []
+  createUnitId.value = undefined
+  if (!createOrgId.value) return
+  try {
+    const detailResult = await getOrganization(createOrgId.value)
+    createUnits.value = detailResult.data.units
+    createUnitId.value = detailResult.data.units.find((item) => item.status === 'ACTIVE')?.id
+  } catch (err) {
+    membershipsError.value = safeAccessDeniedMessage(err)
+  }
+}
+
+async function loadTransferUnits(organizationId: string) {
+  transferUnits.value = []
+  transferUnitId.value = undefined
+  try {
+    const detailResult = await getOrganization(organizationId)
+    transferUnits.value = detailResult.data.units
+  } catch (err) {
+    membershipsError.value = safeAccessDeniedMessage(err)
+  }
+}
+
+async function createMembership() {
+  if (!createOrgId.value || !createUnitId.value) {
+    membershipsError.value = '请选择组织与组织单元'
+    return
+  }
+  busy.value = true
+  membershipsError.value = null
+  message.value = null
+  try {
+    await createOrganizationMembership(createOrgId.value, {
+      unitId: createUnitId.value,
+      principalId: principalId.value,
+      membershipType: createMembershipType.value,
+      validFrom: new Date().toISOString(),
+    })
+    message.value = '任职已创建'
+    selectedMembershipId.value = undefined
+    await loadMembershipContext()
+  } catch (err) {
+    membershipsError.value = safeAccessDeniedMessage(err)
+  } finally {
+    busy.value = false
+  }
+}
+
+async function transferSelectedMembership() {
+  if (!selectedMembership.value || !transferUnitId.value) {
+    membershipsError.value = '请选择任职与目标单元'
+    return
+  }
+  if (selectedMembership.value.organizationAuthorityMode === 'EXTERNAL_AUTHORITATIVE') {
+    membershipsError.value = '外部权威组织结构不可在此调动任职'
+    return
+  }
+  busy.value = true
+  membershipsError.value = null
+  message.value = null
+  try {
+    await transferOrganizationMembership(
+      selectedMembership.value.id,
+      selectedMembership.value.version,
+      { targetUnitId: transferUnitId.value },
+    )
+    message.value = '任职已调动'
+    selectedMembershipId.value = undefined
+    await loadMembershipContext()
+  } catch (err) {
+    if (isConflictError(err)) {
+      membershipsError.value = '版本冲突（409），请刷新后重试'
+      await loadMembershipContext()
+    } else {
+      membershipsError.value = safeAccessDeniedMessage(err)
+    }
+  } finally {
+    busy.value = false
+  }
+}
+
+async function terminateSelectedMembership() {
+  if (!selectedMembership.value) {
+    membershipsError.value = '请先选择任职'
+    return
+  }
+  busy.value = true
+  membershipsError.value = null
+  message.value = null
+  try {
+    await terminateOrganizationMembership(
+      selectedMembership.value.id,
+      selectedMembership.value.version,
+      {
+        reason: terminateReason.value.trim() || '用户详情调整任职',
+        disablePrincipal: false,
+      },
+    )
+    message.value = '任职已终止'
+    selectedMembershipId.value = undefined
+    await loadMembershipContext()
+  } catch (err) {
+    if (isConflictError(err)) {
+      membershipsError.value = '版本冲突（409），请刷新后重试'
+      await loadMembershipContext()
+    } else {
+      membershipsError.value = safeAccessDeniedMessage(err)
+    }
+  } finally {
+    busy.value = false
+  }
+}
+
+watch(createOrgId, () => {
+  void loadCreateUnits()
+})
+
+watch(selectedMembershipId, (id) => {
+  const membership = memberships.value.find((item) => item.id === id)
+  if (membership) {
+    void loadTransferUnits(membership.organizationId)
+  } else {
+    transferUnits.value = []
+    transferUnitId.value = undefined
+  }
+})
 
 async function saveProfile() {
   if (!detail.value) return
@@ -279,7 +479,7 @@ onMounted(() => {
 
         <TabPane key="org" tab="组织归属">
           <article class="card" data-testid="section-personas">
-            <h3>Persona / 归属</h3>
+            <h3>Persona</h3>
             <ul v-if="detail.personas.length">
               <li v-for="persona in detail.personas" :key="persona.id">
                 {{ statusLabel(persona.personaType) }} ·
@@ -289,7 +489,117 @@ onMounted(() => {
               </li>
             </ul>
             <p v-else class="muted">无 Persona</p>
-            <p class="muted">UI_DATA_GAP：组织树任职读模型尚未产品化接入本页。</p>
+          </article>
+
+          <article class="card" data-testid="section-org-memberships">
+            <h3>组织任职</h3>
+            <Alert
+              v-if="membershipsError"
+              type="error"
+              show-icon
+              :message="membershipsError"
+              style="margin-bottom: 12px"
+            />
+            <ul v-if="memberships.length" data-testid="user-org-membership-list">
+              <li v-for="item in memberships" :key="item.id">
+                <label class="membership-row">
+                  <input
+                    v-model="selectedMembershipId"
+                    type="radio"
+                    name="user-membership"
+                    :value="item.id"
+                  />
+                  <span>
+                    {{ item.organizationName }} / {{ item.unitName }}
+                    （{{ item.unitCode }}）
+                    · {{ statusLabel(item.membershipType) }}
+                    · <StatusBadge :status="item.status" />
+                    <Tag
+                      v-if="item.organizationAuthorityMode === 'EXTERNAL_AUTHORITATIVE'"
+                      color="default"
+                    >
+                      外部权威
+                    </Tag>
+                  </span>
+                </label>
+              </li>
+            </ul>
+            <p v-else class="muted">当前无有效组织任职</p>
+
+            <div class="membership-form" data-testid="user-org-membership-create">
+              <h4>创建任职</h4>
+              <label>
+                <span>组织</span>
+                <Select
+                  v-model:value="createOrgId"
+                  style="width: 100%"
+                  :options="createOrgOptions"
+                  aria-label="membership organization"
+                />
+              </label>
+              <label>
+                <span>组织单元</span>
+                <Select
+                  v-model:value="createUnitId"
+                  style="width: 100%"
+                  :options="createUnitOptions"
+                  aria-label="membership unit"
+                />
+              </label>
+              <label>
+                <span>任职类型</span>
+                <Select
+                  v-model:value="createMembershipType"
+                  style="width: 100%"
+                  :options="[
+                    { value: 'PRIMARY', label: '主任职' },
+                    { value: 'SECONDARY', label: '兼任' },
+                    { value: 'MANAGER', label: '管理者' },
+                  ]"
+                  aria-label="membership type"
+                />
+              </label>
+              <Button type="primary" :loading="busy" data-testid="user-org-membership-create-submit" @click="createMembership">
+                创建任职
+              </Button>
+            </div>
+
+            <div class="membership-form" data-testid="user-org-membership-actions">
+              <h4>调动 / 终止选中任职</h4>
+              <label>
+                <span>目标单元</span>
+                <Select
+                  v-model:value="transferUnitId"
+                  style="width: 100%"
+                  :options="transferUnitOptions"
+                  :disabled="!selectedMembership"
+                  aria-label="transfer target unit"
+                />
+              </label>
+              <label>
+                <span>终止原因</span>
+                <Input v-model:value="terminateReason" aria-label="terminate reason" />
+              </label>
+              <Space wrap>
+                <Button
+                  :loading="busy"
+                  :disabled="!selectedMembership"
+                  data-testid="user-org-membership-transfer"
+                  @click="transferSelectedMembership"
+                >
+                  调动到目标单元
+                </Button>
+                <Button
+                  danger
+                  :loading="busy"
+                  :disabled="!selectedMembership"
+                  data-testid="user-org-membership-terminate"
+                  @click="terminateSelectedMembership"
+                >
+                  终止任职
+                </Button>
+              </Space>
+            </div>
           </article>
         </TabPane>
 
@@ -409,5 +719,23 @@ input {
 }
 .muted {
   color: var(--sos-color-text-tertiary, #6b7280);
+}
+.membership-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+.membership-form {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--sos-color-border-light, #e5e7eb);
+  display: grid;
+  gap: 10px;
+  max-width: 520px;
+}
+.membership-form h4 {
+  margin: 0;
+  font-size: 14px;
 }
 </style>

@@ -71,7 +71,7 @@ class OrganizationDirectoryPostgresIT {
                 TRUNCATE TABLE org_structure_event, org_reassignment_work_item,
                     org_directory_sync_item, org_directory_sync_batch,
                     org_membership, org_unit_closure, org_unit, org_organization,
-                    idn_principal_lifecycle_event, idn_principal_persona,
+                    idn_principal_login_event, idn_principal_lifecycle_event, idn_principal_persona,
                     idn_identity_link, idn_person_profile, idn_security_principal,
                     rel_idempotency_record, aud_audit_record,
                     auth_role_grant, auth_role_capability, auth_role CASCADE
@@ -117,6 +117,14 @@ class OrganizationDirectoryPostgresIT {
                 principal, "PRIMARY", NOW);
         var secondary = commands.createMembership(actor(), metadata("secondary"), org.id(), unitA.id(),
                 principal, "SECONDARY", NOW);
+        var summaries = queries.listMembershipSummariesForPrincipal(
+                actor(), "corr-summary", principal, "ACTIVE");
+        assertThat(summaries.items()).extracting(item -> item.membershipType())
+                .containsExactlyInAnyOrder("PRIMARY", "SECONDARY");
+        assertThat(summaries.items()).allSatisfy(item -> {
+            assertThat(item.organizationName()).isEqualTo("Acme");
+            assertThat(item.unitName()).isEqualTo("Dept A");
+        });
 
         assertThatThrownBy(() -> commands.createMembership(actor(), metadata("dup-primary"), org.id(),
                 unitB.id(), principal, "PRIMARY", NOW))

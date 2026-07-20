@@ -521,6 +521,128 @@ export async function mockProductizationApis(
       })
       return
     }
+    if (
+      url.includes('/org-memberships') &&
+      !url.includes(':transfer') &&
+      !url.includes(':terminate')
+    ) {
+      await fulfillJson(route, {
+        items: [
+          {
+            id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+            organizationId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+            organizationCode: 'DEMO-HQ',
+            organizationName: '演示总部',
+            organizationAuthorityMode: 'LOCAL',
+            orgUnitId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+            unitCode: 'OPS',
+            unitName: '运营部',
+            principalId: '66666666-6666-4666-8666-666666666666',
+            membershipType: 'PRIMARY',
+            status: 'ACTIVE',
+            validFrom: '2026-07-01T00:00:00Z',
+            validTo: null,
+            version: 1,
+            createdAt: '2026-07-01T00:00:00Z',
+          },
+        ],
+        asOf: '2026-07-20T04:00:00Z',
+      })
+      return
+    }
+    if (url.includes('/organizations/') && url.includes('/memberships') && method === 'POST') {
+      await fulfillJson(route, {
+        id: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+        organizationId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        orgUnitId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+        principalId: '66666666-6666-4666-8666-666666666666',
+        membershipType: 'PRIMARY',
+        status: 'ACTIVE',
+        validFrom: '2026-07-20T04:00:00Z',
+        validTo: null,
+        sourceSystem: null,
+        sourceKey: null,
+        sourceVersion: null,
+        version: 1,
+        createdBy: 'demo',
+        createdAt: '2026-07-20T04:00:00Z',
+        terminatedBy: null,
+        terminatedAt: null,
+        terminateReason: null,
+      })
+      return
+    }
+    if (
+      (url.endsWith('/organizations') || url.includes('/organizations?')) &&
+      !url.includes('/organizations/')
+    ) {
+      await fulfillJson(route, {
+        items: [
+          {
+            id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+            code: 'DEMO-HQ',
+            name: '演示总部',
+            authorityMode: 'LOCAL',
+            status: 'ACTIVE',
+            sourceSystem: null,
+            sourceKey: null,
+            version: 1,
+            createdAt: '2026-01-01T00:00:00Z',
+            updatedAt: '2026-07-01T00:00:00Z',
+          },
+        ],
+        asOf: '2026-07-20T04:00:00Z',
+      })
+      return
+    }
+    if (url.includes('/organizations/dddddddd-dddd-4ddd-8ddd-dddddddddddd') && method === 'GET') {
+      await fulfillJson(route, {
+        organization: {
+          id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+          code: 'DEMO-HQ',
+          name: '演示总部',
+          authorityMode: 'LOCAL',
+          status: 'ACTIVE',
+          sourceSystem: null,
+          sourceKey: null,
+          version: 1,
+          createdAt: '2026-01-01T00:00:00Z',
+          updatedAt: '2026-07-01T00:00:00Z',
+        },
+        units: [
+          {
+            id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+            organizationId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+            parentUnitId: null,
+            unitCode: 'OPS',
+            unitName: '运营部',
+            status: 'ACTIVE',
+            sourceSystem: null,
+            sourceKey: null,
+            sourceVersion: null,
+            version: 1,
+            createdAt: '2026-01-01T00:00:00Z',
+            updatedAt: '2026-07-01T00:00:00Z',
+          },
+          {
+            id: '99999999-9999-4999-8999-999999999999',
+            organizationId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+            parentUnitId: null,
+            unitCode: 'FLD',
+            unitName: '现场部',
+            status: 'ACTIVE',
+            sourceSystem: null,
+            sourceKey: null,
+            sourceVersion: null,
+            version: 1,
+            createdAt: '2026-01-01T00:00:00Z',
+            updatedAt: '2026-07-01T00:00:00Z',
+          },
+        ],
+        asOf: '2026-07-20T04:00:00Z',
+      })
+      return
+    }
     if (url.includes('/recent-logins')) {
       await fulfillJson(route, {
         items: [

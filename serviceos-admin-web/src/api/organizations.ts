@@ -71,6 +71,29 @@ export type OrgMembershipPage = {
   asOf: string
 }
 
+export type OrgMembershipSummary = {
+  id: string
+  organizationId: string
+  organizationCode: string
+  organizationName: string
+  organizationAuthorityMode: Organization['authorityMode']
+  orgUnitId: string
+  unitCode: string
+  unitName: string
+  principalId: string
+  membershipType: OrgMembership['membershipType']
+  status: OrgMembership['status']
+  validFrom: string
+  validTo: string | null
+  version: number
+  createdAt: string
+}
+
+export type OrgMembershipSummaryPage = {
+  items: OrgMembershipSummary[]
+  asOf: string
+}
+
 export type ReassignmentWorkItem = {
   id: string
   organizationId: string
@@ -139,6 +162,16 @@ export function listOrganizationMemberships(
   query: Record<string, string | undefined> = {},
 ) {
   return apiGet<OrgMembershipPage>(`/organizations/${organizationId}/memberships`, query)
+}
+
+export function listOrgMembershipSummaries(query: {
+  principalId: string
+  status?: OrgMembership['status']
+}) {
+  return apiGet<OrgMembershipSummaryPage>('/org-memberships', {
+    principalId: query.principalId,
+    status: query.status,
+  })
 }
 
 export function createOrganizationMembership(

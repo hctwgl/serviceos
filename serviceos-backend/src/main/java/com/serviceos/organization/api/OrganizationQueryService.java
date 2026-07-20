@@ -17,6 +17,12 @@ public interface OrganizationQueryService {
             CurrentPrincipal actor, String correlationId, UUID organizationId,
             UUID unitId, UUID principalId);
 
+    /**
+     * 按主体聚合任职摘要（含组织/单元显示名）；需要 organization.read。
+     */
+    OrgMembershipSummaryPage listMembershipSummariesForPrincipal(
+            CurrentPrincipal actor, String correlationId, UUID principalId, String status);
+
     DirectorySyncBatchView getSyncBatch(CurrentPrincipal actor, String correlationId, UUID batchId);
 
     ReassignmentWorkItemPage listOpenReassignmentWorkItems(CurrentPrincipal actor, String correlationId);

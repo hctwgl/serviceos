@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test'
 import { mockProductizationApis, seedLocalSession } from './productization-fixtures'
 
-test.describe('M402/M403 Admin 用户登记、目录摘要与最近登录', () => {
-  test('用户目录摘要与最近登录，并可进入新建/详情', async ({ page }) => {
+test.describe('M402–M404 Admin 用户登记、摘要、最近登录与组织任职', () => {
+  test('用户目录与详情组织任职/最近登录产品化', async ({ page }) => {
     await seedLocalSession(page)
     await mockProductizationApis(page)
 
@@ -42,6 +42,17 @@ test.describe('M402/M403 Admin 用户登记、目录摘要与最近登录', () =
     await expect(page.getByTestId('user-recent-login-list')).toContainText('admin-web')
     await page.screenshot({
       path: 'tests/e2e/__screenshots__/admin-user-recent-logins-1440.png',
+      fullPage: true,
+    })
+
+    await page.getByRole('tab', { name: '组织归属' }).click()
+    await expect(page.getByTestId('section-org-memberships')).toBeVisible()
+    await expect(page.getByTestId('user-org-membership-list')).toContainText('演示总部')
+    await expect(page.getByTestId('user-org-membership-list')).toContainText('运营部')
+    await expect(page.getByTestId('user-org-membership-create')).toBeVisible()
+    await expect(page.getByTestId('user-org-membership-create-submit')).toBeVisible()
+    await page.screenshot({
+      path: 'tests/e2e/__screenshots__/admin-user-org-memberships-1440.png',
       fullPage: true,
     })
   })
