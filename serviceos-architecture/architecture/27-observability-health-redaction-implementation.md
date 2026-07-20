@@ -34,7 +34,7 @@ correlationId 用于跨日志定位，不是授权凭证，也不能代替 trace
 
 ## 3. 异步 Trace 连续性
 
-HTTP Span 不能依赖线程本地上下文跨越 Outbox 事务边界。`JdbcOutboxAppender` 在写入消息时捕获 `traceparent`/`tracestate`，Flyway V011 把它们持久化到 Outbox。Worker 发布时由 `OpenTelemetryOutboxTelemetry` 恢复父上下文，并创建 `CONSUMER` 类型的 `outbox publish` Span。
+HTTP Span 不能依赖线程本地上下文跨越 Outbox 事务边界。`JooqOutboxAppender` 在写入消息时捕获 `traceparent`/`tracestate`，Flyway V011 把它们持久化到 Outbox。Worker 发布时由 `OpenTelemetryOutboxTelemetry` 恢复父上下文，并创建 `CONSUMER` 类型的 `outbox publish` Span。
 
 ```mermaid
 sequenceDiagram
