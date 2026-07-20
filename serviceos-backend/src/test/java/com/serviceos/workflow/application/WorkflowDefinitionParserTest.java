@@ -280,7 +280,7 @@ class WorkflowDefinitionParserTest {
                    {"nodeId":"INSTALL_TASK","nodeType":"SERVICE_TASK","name":"安装",
                     "stageCode":"INSTALL","taskType":"FIELD_INSTALL"},
                    {"nodeId":"REVIEW_TASK","nodeType":"REVIEW_TASK","name":"资料审核",
-                    "stageCode":"REVIEW","taskType":"evidence.review"},
+                    "stageCode":"REVIEW"},
                    {"nodeId":"WAIT_OEM","nodeType":"WAIT_EVENT","name":"等待车企",
                     "stageCode":"HANDOFF","waitEventType":"platform.oem.acknowledged",
                     "correlationKeyTemplate":"workOrder:{workOrderId}"}],
