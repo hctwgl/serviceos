@@ -6,7 +6,6 @@ import { ArrowLeftOutlined, PlusOutlined } from '@ant-design/icons-vue'
 import ListPageLayout from '../patterns/templates/ListPageLayout.vue'
 import SemanticStatusTag from '../components/business/SemanticStatusTag.vue'
 import {
-  createProjectFulfillmentProfile,
   listProjectFulfillmentProfiles,
   type ProjectFulfillmentProfileSummary,
 } from '../api/fulfillmentProfiles'
@@ -21,7 +20,6 @@ const router = useRouter()
 const projectId = computed(() => String(route.params.id ?? ''))
 
 const loading = ref(false)
-const creating = ref(false)
 const error = ref<string | null>(null)
 const project = ref<ProjectDetail | null>(null)
 const items = ref<ProjectFulfillmentProfileSummary[]>([])
@@ -63,25 +61,11 @@ async function load() {
   }
 }
 
-async function createStandard() {
-  creating.value = true
-  error.value = null
-  try {
-    const created = await createProjectFulfillmentProfile(projectId.value, {
-      serviceProductCode: 'HOME_CHARGING_SURVEY_INSTALL',
-      profileName: '标准家充履约方案',
-      description: '基于标准勘测安装模板创建',
-      templateCode: 'HOME_CHARGING_SURVEY_INSTALL',
-    })
-    await router.push({
-      name: 'ADMIN.PROJECT.FULFILLMENT.DETAIL',
-      params: { id: projectId.value, profileId: created.data.profileId },
-    })
-  } catch (err) {
-    error.value = toUserFacingError(err).message
-  } finally {
-    creating.value = false
-  }
+function openCreate() {
+  router.push({
+    name: 'ADMIN.PROJECT.FULFILLMENT.NEW',
+    params: { id: projectId.value },
+  })
 }
 
 function openDetail(profileId: string) {
@@ -126,7 +110,7 @@ onMounted(load)
       </Button>
     </template>
     <template #primary-action>
-      <Button type="primary" :loading="creating" @click="createStandard">
+      <Button type="primary" @click="openCreate">
         <template #icon><PlusOutlined /></template>
         新增工单类型
       </Button>
@@ -168,7 +152,7 @@ onMounted(load)
       v-else-if="!loading"
       description="当前项目还没有工单类型配置。创建后即可定义该类工单的流程、表单、资料要求和 SLA。"
     >
-      <Button type="primary" :loading="creating" @click="createStandard">新增工单类型</Button>
+      <Button type="primary" @click="openCreate">新增工单类型</Button>
     </Empty>
   </ListPageLayout>
 </template>
