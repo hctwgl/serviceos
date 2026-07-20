@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, h, onMounted, ref } from 'vue'
+import { computed, h, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Table, Select, Input, Button, Space, Alert, Tooltip } from 'ant-design-vue'
 import type { TableColumnsType } from 'ant-design-vue'
@@ -302,6 +302,21 @@ onMounted(() => {
   hydrateFiltersFromRoute()
   return load()
 })
+
+// 同组件复用时（例如从工作区返回目录深链）必须重新水合并查询，否则 route.query 失效。
+watch(
+  () =>
+    [
+      firstRouteQuery(route, 'projectId'),
+      firstRouteQuery(route, 'status'),
+      firstRouteQuery(route, 'clientCode'),
+      firstRouteQuery(route, 'q'),
+    ] as const,
+  () => {
+    hydrateFiltersFromRoute()
+    return search()
+  },
+)
 </script>
 
 <template>
