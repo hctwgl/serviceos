@@ -9,7 +9,7 @@ lastUpdated: 2026-07-20
 
 - **状态**：**AWAITING_ADR_ACCEPT**（D 已选型；实现未开工）
 - 进行中 Draft PR：M364 REVIEW_TASK 分离 **设计提案**（非 Implemented）
-- PR：（创建后回填）
+- PR：https://github.com/hctwgl/serviceos/pull/191
 - 分支：`cursor/m364-review-task-separation-design-6a78`
   （base：`cursor/m363-correction-lifecycle-capability-hard-reject-6a78`）
 - 工程基线仍为 **M363**（OpenAPI 1.0.56 / Flyway 131）
