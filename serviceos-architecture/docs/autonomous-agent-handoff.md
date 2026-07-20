@@ -7,41 +7,36 @@ lastUpdated: 2026-07-20
 
 ## 当前
 
-- **状态**：**PAUSED_AWAITING_OWNER**（无未阻塞可实施切片）
-- 最近完成 Draft PR 栈：M356～M363（#183～#190）
-- 栈尖：https://github.com/hctwgl/serviceos/pull/190
-  （`cursor/m363-correction-lifecycle-capability-hard-reject-6a78`）
-- latestMilestone（栈尖）：**M363**
-- Flyway：**131**；OpenAPI：**1.0.56**
-- `baselineCommit`：合并后回填
+- **状态**：**AWAITING_ADR_ACCEPT**（D 已选型；实现未开工）
+- 进行中 Draft PR：M364 REVIEW_TASK 分离 **设计提案**（非 Implemented）
+- PR：（创建后回填）
+- 分支：`cursor/m364-review-task-separation-design-6a78`
+  （base：`cursor/m363-correction-lifecycle-capability-hard-reject-6a78`）
+- 工程基线仍为 **M363**（OpenAPI 1.0.56 / Flyway 131）
+- 决策包：`decisions/ADR-087-review-task-template-separation.md`（**Proposed**）
 
-## 已闭环
+## 负责人已选型
 
-Technician 客户端能力门禁垂直切片 **M356～M363**：
+- **D**：独立审核 HUMAN Task / REVIEW_TASK 模板分离
+
+## 阻塞实现的确认项（请一次性回复）
+
+请确认或改写 ADR-087 推荐组合：
 
 ```text
-发布门禁 → 运行时拒单 → 定向发布 → Feed/详情头
-→ 整改资料路径 → 列表预检 → 领取/启动硬拒
+Accept ADR-087 with: A1-R, A2-R, A3-R, A4-R, A5-R
 ```
 
-## 负责人决策（已确认，不得发明）
+| 点 | 推荐 | 一句话 |
+|---|---|---|
+| A1 | A1-R | 保留 `taskId`=源提交 Task；新增 `reviewTaskId` |
+| A2 | A2-R | ReviewCase.create 同事务创建审核 Task（类比 Correction） |
+| A3 | A3-R | 仅试点模板 `home-charging-survey-install` 加 REVIEW_TASK |
+| A4 | A4-R | 整改 CLOSED 后新 ReviewCase + 新 review Task |
+| A5 | A5-R | APPROVED 只 complete `reviewTaskId` |
 
-| 项 | 状态 |
-|---|---|
-| AMOUNT/加权、BUSINESS SLA、吉利联调 | 不推进 |
-| iOS 条件执行器 / catalog 硬阻断翻转 | `BLOCKED_EXTERNAL`（需 Mac/Xcode） |
-| 派单级 `supportedClientKinds` 过滤 | 需 Accepted 派单亲和规则 |
-| Network Portal on-behalf 能力门禁 | 需 Accepted：`NETWORK_WEB` vs 代师傅 clientKind |
-| REVIEW_TASK 模板分离 | 需 Accepted：taskId 绑定/触发/模板范围 |
+未接受前 **不得** 改 ReviewCase/Task 绑定代码，也不得推进 `latestMilestone`→M364。
 
-## 下一（请负责人明示选项后再开工）
+## 已闭环（能力门禁）
 
-| 选项 | 说明 |
-|---|---|
-| A | iOS 条件执行器（换 Mac/Xcode 环境） |
-| B | 派单过滤（先给 Accepted 规则或批准起草 Proposed ADR） |
-| C | Network Portal on-behalf 门禁（先确认 clientKind 语义或批准起草 Proposed ADR） |
-| D | REVIEW_TASK 模板分离（先给 Accepted 设计） |
-| E | 其他模块/合并栈/文档收口（请点名） |
-
-未选型前 **停止实施**，避免发明授权/派单/审核状态机规则。
+M356～M363（#183～#190）：Technician 客户端能力门禁垂直切片。
