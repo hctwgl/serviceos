@@ -9,7 +9,10 @@ import com.serviceos.dispatch.api.CapacityAuthorityService;
 import com.serviceos.dispatch.api.CapacityConfiguredPayload;
 import com.serviceos.dispatch.api.CapacityCounterReceipt;
 import com.serviceos.dispatch.api.ConfigureCapacityCommand;
+import com.serviceos.dispatch.api.ResponsibilityLevel;
 import com.serviceos.identity.api.CurrentPrincipal;
+import com.serviceos.jooq.generated.tables.DspCapacityCommandResult;
+import com.serviceos.jooq.generated.tables.DspCapacityCounter;
 import com.serviceos.reliability.api.IdempotencyDecision;
 import com.serviceos.reliability.api.IdempotencyService;
 import com.serviceos.reliability.api.OutboxAppender;
@@ -19,8 +22,10 @@ import com.serviceos.shared.CommandContext;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.shared.Sha256;
+import org.jooq.DSLContext;
+import org.jooq.Record3;
+import org.jooq.Record8;
 import org.springframework.dao.DuplicateKeyException;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
@@ -30,15 +35,16 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
 
-import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timestamptz;
+import static com.serviceos.jooq.generated.tables.DspCapacityCommandResult.DSP_CAPACITY_COMMAND_RESULT;
+import static com.serviceos.jooq.generated.tables.DspCapacityCounter.DSP_CAPACITY_COUNTER;
 
 /** 容量硬门禁的权威配置服务；占用量只能由 reservation 事务修改。 */
 @Service
-final class DefaultCapacityAuthorityService implements CapacityAuthorityService {
+final class JooqCapacityAuthorityService implements CapacityAuthorityService {
     private static final String OPERATION = "dispatch.capacity.configure";
     private static final String CAPABILITY = "dispatch.capacity.configure";
 
-    private final JdbcClient jdbc;
+    private final DSLContext dsl;
     private final AuthorizationService authorization;
     private final IdempotencyService idempotency;
     private final AuditAppender audit;
@@ -46,8 +52,8 @@ final class DefaultCapacityAuthorityService implements CapacityAuthorityService 
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
-    DefaultCapacityAuthorityService(
-            JdbcClient jdbc,
+    JooqCapacityAuthorityService(
+            DSLContext dsl,
             AuthorizationService authorization,
             IdempotencyService idempotency,
             AuditAppender audit,
@@ -55,7 +61,7 @@ final class DefaultCapacityAuthorityService implements CapacityAuthorityService 
             ObjectMapper objectMapper,
             Clock clock
     ) {
-        this.jdbc = jdbc;
+        this.dsl = dsl;
         this.authorization = authorization;
         this.idempotency = idempotency;
         this.audit = audit;
@@ -115,24 +121,24 @@ final class DefaultCapacityAuthorityService implements CapacityAuthorityService 
     private CapacityCounterReceipt create(
             CommandContext context, ConfigureCapacityCommand command, Instant now) {
         UUID counterId = UUID.randomUUID();
+        DspCapacityCounter counter = DSP_CAPACITY_COUNTER;
         try {
-            jdbc.sql("""
-                            INSERT INTO dsp_capacity_counter (
-                                capacity_counter_id, tenant_id, responsibility_level,
-                                assignee_id, business_type, max_units, occupied_units,
-                                version, updated_by, updated_at
-                            ) VALUES (
-                                :counterId, :tenantId, :level,
-                                :assigneeId, :businessType, :maxUnits, 0,
-                                1, :actorId, :now
-                            )
-                            """)
-                    .param("counterId", counterId).param("tenantId", context.tenantId())
-                    .param("level", command.responsibilityLevel().name())
-                    .param("assigneeId", command.assigneeId())
-                    .param("businessType", command.businessType()).param("maxUnits", command.maxUnits())
-                    .param("actorId", context.actorId()).param("now", timestamptz(now)).update();
+            dsl.insertInto(counter)
+                    .set(counter.CAPACITY_COUNTER_ID, counterId)
+                    .set(counter.TENANT_ID, context.tenantId())
+                    .set(counter.RESPONSIBILITY_LEVEL, command.responsibilityLevel().name())
+                    .set(counter.ASSIGNEE_ID, command.assigneeId())
+                    .set(counter.BUSINESS_TYPE, command.businessType())
+                    .set(counter.MAX_UNITS, command.maxUnits())
+                    .set(counter.OCCUPIED_UNITS, 0)
+                    .set(counter.VERSION, 1L)
+                    .set(counter.UPDATED_BY, context.actorId())
+                    .set(counter.UPDATED_AT, now)
+                    .execute();
         } catch (DuplicateKeyException exception) {
+            // 唯一键 (tenant, level, assignee, businessType) 冲突即“计数器已存在”，
+            // 与原实现一致地翻译为版本冲突语义。jOOQ 异常由 Boot 注册的
+            // ExceptionTranslatorExecuteListener 转译为 Spring DuplicateKeyException。
             throw new BusinessProblem(
                     ProblemCode.VERSION_CONFLICT,
                     "Capacity counter already exists and must be changed with its current version");
@@ -144,20 +150,20 @@ final class DefaultCapacityAuthorityService implements CapacityAuthorityService 
 
     private CapacityCounterReceipt update(
             CommandContext context, ConfigureCapacityCommand command, Instant now) {
-        int updated = jdbc.sql("""
-                        UPDATE dsp_capacity_counter
-                           SET max_units = :maxUnits, version = version + 1,
-                               updated_by = :actorId, updated_at = :now
-                         WHERE tenant_id = :tenantId AND responsibility_level = :level
-                           AND assignee_id = :assigneeId AND business_type = :businessType
-                           AND version = :expectedVersion AND occupied_units <= :maxUnits
-                        """)
-                .param("maxUnits", command.maxUnits()).param("actorId", context.actorId())
-                .param("now", timestamptz(now)).param("tenantId", context.tenantId())
-                .param("level", command.responsibilityLevel().name())
-                .param("assigneeId", command.assigneeId())
-                .param("businessType", command.businessType())
-                .param("expectedVersion", command.expectedVersion()).update();
+        DspCapacityCounter counter = DSP_CAPACITY_COUNTER;
+        // 乐观并发：版本条件 + 不允许把上限调到当前占用之下，影响行数不为 1 即失败关闭。
+        int updated = dsl.update(counter)
+                .set(counter.MAX_UNITS, command.maxUnits())
+                .set(counter.VERSION, counter.VERSION.plus(1))
+                .set(counter.UPDATED_BY, context.actorId())
+                .set(counter.UPDATED_AT, now)
+                .where(counter.TENANT_ID.eq(context.tenantId()))
+                .and(counter.RESPONSIBILITY_LEVEL.eq(command.responsibilityLevel().name()))
+                .and(counter.ASSIGNEE_ID.eq(command.assigneeId()))
+                .and(counter.BUSINESS_TYPE.eq(command.businessType()))
+                .and(counter.VERSION.eq(command.expectedVersion()))
+                .and(counter.OCCUPIED_UNITS.le(command.maxUnits()))
+                .execute();
         if (updated != 1) {
             CapacityState state = findState(context.tenantId(), command);
             if (state.version() != command.expectedVersion()) {
@@ -175,54 +181,51 @@ final class DefaultCapacityAuthorityService implements CapacityAuthorityService 
     }
 
     private CapacityState findState(String tenantId, ConfigureCapacityCommand command) {
-        return jdbc.sql("""
-                        SELECT capacity_counter_id, occupied_units, version
-                          FROM dsp_capacity_counter
-                         WHERE tenant_id = :tenantId AND responsibility_level = :level
-                           AND assignee_id = :assigneeId AND business_type = :businessType
-                        """)
-                .param("tenantId", tenantId).param("level", command.responsibilityLevel().name())
-                .param("assigneeId", command.assigneeId())
-                .param("businessType", command.businessType())
-                .query(CapacityState.class).optional()
+        DspCapacityCounter counter = DSP_CAPACITY_COUNTER;
+        return dsl.select(counter.CAPACITY_COUNTER_ID, counter.OCCUPIED_UNITS, counter.VERSION)
+                .from(counter)
+                .where(counter.TENANT_ID.eq(tenantId))
+                .and(counter.RESPONSIBILITY_LEVEL.eq(command.responsibilityLevel().name()))
+                .and(counter.ASSIGNEE_ID.eq(command.assigneeId()))
+                .and(counter.BUSINESS_TYPE.eq(command.businessType()))
+                .fetchOptional(JooqCapacityAuthorityService::mapState)
                 .orElseThrow(() -> new BusinessProblem(
                         ProblemCode.RESOURCE_NOT_FOUND, "Capacity counter does not exist"));
     }
 
     private void insertFrozenReceipt(CommandContext context, CapacityCounterReceipt receipt) {
-        jdbc.sql("""
-                        INSERT INTO dsp_capacity_command_result (
-                            tenant_id, operation_type, idempotency_key, capacity_counter_id,
-                            responsibility_level, assignee_id, business_type, max_units,
-                            occupied_units, counter_version, occurred_at
-                        ) VALUES (
-                            :tenantId, :operation, :idempotencyKey, :counterId,
-                            :level, :assigneeId, :businessType, :maxUnits,
-                            :occupiedUnits, :version, :occurredAt
-                        )
-                        """)
-                .param("tenantId", context.tenantId()).param("operation", OPERATION)
-                .param("idempotencyKey", context.idempotencyKey())
-                .param("counterId", receipt.capacityCounterId())
-                .param("level", receipt.responsibilityLevel().name())
-                .param("assigneeId", receipt.assigneeId()).param("businessType", receipt.businessType())
-                .param("maxUnits", receipt.maxUnits()).param("occupiedUnits", receipt.occupiedUnits())
-                .param("version", receipt.version()).param("occurredAt", timestamptz(receipt.occurredAt()))
-                .update();
+        DspCapacityCommandResult result = DSP_CAPACITY_COMMAND_RESULT;
+        dsl.insertInto(result)
+                .set(result.TENANT_ID, context.tenantId())
+                .set(result.OPERATION_TYPE, OPERATION)
+                .set(result.IDEMPOTENCY_KEY, context.idempotencyKey())
+                .set(result.CAPACITY_COUNTER_ID, receipt.capacityCounterId())
+                .set(result.RESPONSIBILITY_LEVEL, receipt.responsibilityLevel().name())
+                .set(result.ASSIGNEE_ID, receipt.assigneeId())
+                .set(result.BUSINESS_TYPE, receipt.businessType())
+                .set(result.MAX_UNITS, receipt.maxUnits())
+                .set(result.OCCUPIED_UNITS, receipt.occupiedUnits())
+                .set(result.COUNTER_VERSION, receipt.version())
+                .set(result.OCCURRED_AT, receipt.occurredAt())
+                .execute();
     }
 
     private CapacityCounterReceipt frozenReceipt(CommandContext context) {
-        return jdbc.sql("""
-                        SELECT capacity_counter_id, responsibility_level,
-                               assignee_id, business_type, max_units, occupied_units,
-                               counter_version AS version, occurred_at
-                          FROM dsp_capacity_command_result
-                         WHERE tenant_id = :tenantId AND operation_type = :operation
-                           AND idempotency_key = :idempotencyKey
-                        """)
-                .param("tenantId", context.tenantId()).param("operation", OPERATION)
-                .param("idempotencyKey", context.idempotencyKey())
-                .query(CapacityCounterReceipt.class).single();
+        DspCapacityCommandResult result = DSP_CAPACITY_COMMAND_RESULT;
+        return dsl.select(
+                        result.CAPACITY_COUNTER_ID,
+                        result.RESPONSIBILITY_LEVEL,
+                        result.ASSIGNEE_ID,
+                        result.BUSINESS_TYPE,
+                        result.MAX_UNITS,
+                        result.OCCUPIED_UNITS,
+                        result.COUNTER_VERSION,
+                        result.OCCURRED_AT)
+                .from(result)
+                .where(result.TENANT_ID.eq(context.tenantId()))
+                .and(result.OPERATION_TYPE.eq(OPERATION))
+                .and(result.IDEMPOTENCY_KEY.eq(context.idempotencyKey()))
+                .fetchSingle(JooqCapacityAuthorityService::mapReceipt);
     }
 
     private void appendEvent(CommandContext context, CapacityCounterReceipt receipt) {
@@ -244,6 +247,17 @@ final class DefaultCapacityAuthorityService implements CapacityAuthorityService 
         } catch (JacksonException exception) {
             throw new IllegalArgumentException("Capacity payload cannot be serialized", exception);
         }
+    }
+
+    private static CapacityState mapState(Record3<UUID, Integer, Long> row) {
+        return new CapacityState(row.value1(), row.value2(), row.value3());
+    }
+
+    private static CapacityCounterReceipt mapReceipt(Record8<
+            UUID, String, String, String, Integer, Integer, Long, Instant> row) {
+        return new CapacityCounterReceipt(
+                row.value1(), ResponsibilityLevel.valueOf(row.value2()), row.value3(), row.value4(),
+                row.value5(), row.value6(), row.value7(), row.value8());
     }
 
     private record CapacityState(UUID capacityCounterId, int occupiedUnits, long version) {

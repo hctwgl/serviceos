@@ -23,7 +23,7 @@ M366 自动池过滤。
 ## 已实现范围
 
 1. `ManualTechnicianClientKindGate`：复用 `resolveDispatchTargetClientKinds` + 师傅声明；
-2. `DefaultManualServiceAssignmentService.manualAssign` / `reassignTechnician` 激活前调用
+2. `JooqManualServiceAssignmentService.manualAssign` / `reassignTechnician` 激活前调用
    （Network Portal 路径委托 Manual，一并覆盖）；
 3. 不兼容 → `CLIENT_CAPABILITY_UNSUPPORTED` + 审计
    `SERVICE_DISPATCH_TECHNICIAN_CLIENT_KIND_REJECT` / `error_code=CLIENT_KIND_INCOMPATIBLE`；

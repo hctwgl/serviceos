@@ -15,17 +15,30 @@ import com.serviceos.dispatch.api.ResponsibilityLevel;
 import com.serviceos.dispatch.api.ServiceAssignmentReceipt;
 import com.serviceos.dispatch.api.ServiceAssignmentService;
 import com.serviceos.identity.api.CurrentPrincipal;
+import com.serviceos.jooq.generated.tables.DspCapacityCounter;
+import com.serviceos.jooq.generated.tables.DspCapacityReservation;
+import com.serviceos.jooq.generated.tables.DspServiceAssignment;
+import com.serviceos.jooq.generated.tables.DspServiceAssignmentActivationSaga;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.task.api.TaskFulfillmentContext;
 import com.serviceos.task.api.TaskFulfillmentContextService;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import org.jooq.DSLContext;
+import org.jooq.Record3;
+import org.jooq.Record5;
+import org.jooq.impl.DSL;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.util.Optional;
 import java.util.UUID;
+
+import static com.serviceos.jooq.generated.tables.DspCapacityCounter.DSP_CAPACITY_COUNTER;
+import static com.serviceos.jooq.generated.tables.DspCapacityReservation.DSP_CAPACITY_RESERVATION;
+import static com.serviceos.jooq.generated.tables.DspServiceAssignment.DSP_SERVICE_ASSIGNMENT;
+import static com.serviceos.jooq.generated.tables.DspServiceAssignmentActivationSaga.DSP_SERVICE_ASSIGNMENT_ACTIVATION_SAGA;
 
 /**
  * M144/M200/M367：将已 Implemented 的容量与激活 saga SPI 编排为 Admin/Portal 人工初派与改派用例。
@@ -36,29 +49,29 @@ import java.util.UUID;
  * 明确不做：评分、DispatchDecision、ServiceNetwork 生命周期、跨网点改派。
  */
 @Service
-final class DefaultManualServiceAssignmentService implements ManualServiceAssignmentService {
+final class JooqManualServiceAssignmentService implements ManualServiceAssignmentService {
     private static final int CAPACITY_HEADROOM = 50;
 
     private final TaskFulfillmentContextService tasks;
     private final CapacityAuthorityService capacities;
     private final ServiceAssignmentService assignments;
     private final ManualTechnicianClientKindGate clientKindGate;
-    private final JdbcClient jdbc;
+    private final DSLContext dsl;
     private final Clock clock;
 
-    DefaultManualServiceAssignmentService(
+    JooqManualServiceAssignmentService(
             TaskFulfillmentContextService tasks,
             CapacityAuthorityService capacities,
             ServiceAssignmentService assignments,
             ManualTechnicianClientKindGate clientKindGate,
-            JdbcClient jdbc,
+            DSLContext dsl,
             Clock clock
     ) {
         this.tasks = tasks;
         this.capacities = capacities;
         this.assignments = assignments;
         this.clientKindGate = clientKindGate;
-        this.jdbc = jdbc;
+        this.dsl = dsl;
         this.clock = clock;
     }
 
@@ -280,18 +293,15 @@ final class DefaultManualServiceAssignmentService implements ManualServiceAssign
             String businessType,
             String key
     ) {
-        var existing = jdbc.sql("""
-                        SELECT max_units AS "maxUnits", occupied_units AS "occupiedUnits",
-                               version AS "version"
-                          FROM dsp_capacity_counter
-                         WHERE tenant_id = :tenantId AND responsibility_level = :level
-                           AND assignee_id = :assigneeId AND business_type = :businessType
-                        """)
-                .param("tenantId", principal.tenantId())
-                .param("level", level.name())
-                .param("assigneeId", assigneeId)
-                .param("businessType", businessType)
-                .query(CapacityRow.class).optional();
+        DspCapacityCounter counter = DSP_CAPACITY_COUNTER;
+        Optional<CapacityRow> existing = dsl.select(
+                        counter.MAX_UNITS, counter.OCCUPIED_UNITS, counter.VERSION)
+                .from(counter)
+                .where(counter.TENANT_ID.eq(principal.tenantId()))
+                .and(counter.RESPONSIBILITY_LEVEL.eq(level.name()))
+                .and(counter.ASSIGNEE_ID.eq(assigneeId))
+                .and(counter.BUSINESS_TYPE.eq(businessType))
+                .fetchOptional(JooqManualServiceAssignmentService::mapCapacityRow);
         if (existing.isEmpty()) {
             capacities.configure(principal, child(metadata, key + "-create"),
                     new ConfigureCapacityCommand(level, assigneeId, businessType, CAPACITY_HEADROOM, 0));
@@ -309,48 +319,55 @@ final class DefaultManualServiceAssignmentService implements ManualServiceAssign
     private long capacityVersion(
             String tenantId, ResponsibilityLevel level, String assigneeId, String businessType
     ) {
-        return jdbc.sql("""
-                        SELECT version FROM dsp_capacity_counter
-                         WHERE tenant_id = :tenantId AND responsibility_level = :level
-                           AND assignee_id = :assigneeId AND business_type = :businessType
-                        """)
-                .param("tenantId", tenantId)
-                .param("level", level.name())
-                .param("assigneeId", assigneeId)
-                .param("businessType", businessType)
-                .query(Long.class).single();
+        DspCapacityCounter counter = DSP_CAPACITY_COUNTER;
+        return dsl.select(counter.VERSION)
+                .from(counter)
+                .where(counter.TENANT_ID.eq(tenantId))
+                .and(counter.RESPONSIBILITY_LEVEL.eq(level.name()))
+                .and(counter.ASSIGNEE_ID.eq(assigneeId))
+                .and(counter.BUSINESS_TYPE.eq(businessType))
+                .fetchSingle(counter.VERSION);
     }
 
-    private java.util.Optional<ActiveRow> activeAssignee(
+    private Optional<ActiveRow> activeAssignee(
             String tenantId, UUID taskId, ResponsibilityLevel level
     ) {
-        return jdbc.sql("""
-                        SELECT a.service_assignment_id AS "serviceAssignmentId",
-                               a.activation_saga_id AS "sagaId",
-                               a.assignee_id AS "assigneeId",
-                               r.capacity_reservation_id AS "reservationId",
-                               coalesce(s.version, 0) AS "sagaVersion"
-                          FROM dsp_service_assignment a
-                          JOIN dsp_capacity_reservation r
-                            ON r.tenant_id = a.tenant_id
-                           AND r.service_assignment_id = a.service_assignment_id
-                           AND r.status = 'CONFIRMED'
-                          LEFT JOIN dsp_service_assignment_activation_saga s
-                            ON s.tenant_id = a.tenant_id
-                           AND s.activation_saga_id = a.activation_saga_id
-                         WHERE a.tenant_id = :tenantId AND a.task_id = :taskId
-                           AND a.responsibility_level = :level AND a.status = 'ACTIVE'
-                         ORDER BY a.created_at
-                         LIMIT 1
-                        """)
-                .param("tenantId", tenantId)
-                .param("taskId", taskId)
-                .param("level", level.name())
-                .query(ActiveRow.class).optional();
+        DspServiceAssignment a = DSP_SERVICE_ASSIGNMENT.as("a");
+        DspServiceAssignmentActivationSaga s = DSP_SERVICE_ASSIGNMENT_ACTIVATION_SAGA.as("s");
+        DspCapacityReservation r = DSP_CAPACITY_RESERVATION.as("r");
+        return dsl.select(
+                        a.SERVICE_ASSIGNMENT_ID,
+                        a.ACTIVATION_SAGA_ID,
+                        a.ASSIGNEE_ID,
+                        r.CAPACITY_RESERVATION_ID,
+                        DSL.coalesce(s.VERSION, 0L))
+                .from(a)
+                .join(r)
+                .on(r.TENANT_ID.eq(a.TENANT_ID))
+                .and(r.SERVICE_ASSIGNMENT_ID.eq(a.SERVICE_ASSIGNMENT_ID))
+                .and(r.STATUS.eq("CONFIRMED"))
+                .leftJoin(s)
+                .on(s.TENANT_ID.eq(a.TENANT_ID))
+                .and(s.ACTIVATION_SAGA_ID.eq(a.ACTIVATION_SAGA_ID))
+                .where(a.TENANT_ID.eq(tenantId))
+                .and(a.TASK_ID.eq(taskId))
+                .and(a.RESPONSIBILITY_LEVEL.eq(level.name()))
+                .and(a.STATUS.eq("ACTIVE"))
+                .orderBy(a.CREATED_AT)
+                .limit(1)
+                .fetchOptional(JooqManualServiceAssignmentService::mapActiveRow);
     }
 
     private static CommandMetadata child(CommandMetadata metadata, String suffix) {
         return new CommandMetadata(metadata.correlationId(), metadata.idempotencyKey() + ":" + suffix);
+    }
+
+    private static CapacityRow mapCapacityRow(Record3<Integer, Integer, Long> row) {
+        return new CapacityRow(row.value1(), row.value2(), row.value3());
+    }
+
+    private static ActiveRow mapActiveRow(Record5<UUID, UUID, String, UUID, Long> row) {
+        return new ActiveRow(row.value1(), row.value2(), row.value3(), row.value4(), row.value5());
     }
 
     private record CapacityRow(int maxUnits, int occupiedUnits, long version) {
