@@ -1,6 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import {
+  Alert,
+  Button,
+  Descriptions,
+  Input,
+  Select,
+  Space,
+  Tabs,
+  TabPane,
+  Tag,
+  Table,
+} from 'ant-design-vue'
+import { ArrowLeftOutlined } from '@ant-design/icons-vue'
 import {
   getAuthorizedProject,
   listAuthorizedProjectScopeRevisions,
@@ -8,46 +21,84 @@ import {
   type ProjectDetail,
   type ProjectScopeRelationRevisionPage,
 } from '../api/projectDetail'
+import { listServiceNetworks, type ServiceNetwork } from '../api/networks'
 import { recordRecentVisit } from '../recent/recordRecentVisit'
-import QueueTable from './QueueTable.vue'
-import StatusBadge from '../components/StatusBadge.vue'
+import DetailPageLayout from '../patterns/templates/DetailPageLayout.vue'
+import DedicatedFlowLayout from '../patterns/templates/DedicatedFlowLayout.vue'
+import SemanticStatusTag from '../components/business/SemanticStatusTag.vue'
+import { presentEmptyValue } from '../presentation/empty-value.presenter'
+import { formatDateTimeDisplay } from '../presentation/date-time.presenter'
+import { presentEntityName } from '../presentation/entity-name.presenter'
+import { useDeveloperDiagnostics } from '../composables/useDeveloperDiagnostics'
+import { statusLabel } from '../product/statusLabels'
+import { toUserFacingError } from '../product/errorMessages'
 
 const route = useRoute()
+const router = useRouter()
+const diagnostics = useDeveloperDiagnostics()
 const projectId = computed(() => String(route.params.id ?? ''))
 
 const loading = ref(false)
 const busy = ref(false)
 const error = ref<string | null>(null)
+const errorCode = ref<string | null>(null)
 const message = ref<string | null>(null)
 const detail = ref<ProjectDetail | null>(null)
 const revisions = ref<ProjectScopeRelationRevisionPage | null>(null)
 const revisionCursor = ref<string | undefined>()
-const regionCodes = ref('')
-const networkIds = ref('')
-const reason = ref('ADMIN_SCOPE_ADJUST')
+const networks = ref<ServiceNetwork[]>([])
+const selectedRegionCodes = ref<string[]>([])
+const selectedNetworkIds = ref<string[]>([])
+const reason = ref('运营调整服务范围')
+const flowOpen = ref(false)
+const activeTab = ref('basic')
+const showDevTools = import.meta.env.DEV
+
+const baselineRegionCodes = ref<string[]>([])
+const baselineNetworkIds = ref<string[]>([])
+
+async function loadNetworks() {
+  try {
+    const page = await listServiceNetworks()
+    networks.value = page.items
+  } catch {
+    networks.value = []
+  }
+}
 
 async function loadDetail() {
   loading.value = true
   error.value = null
+  errorCode.value = null
   try {
     detail.value = await getAuthorizedProject(projectId.value)
     await loadRevisions()
     const latest = revisions.value?.items?.[0]
-    if (latest) {
-      regionCodes.value = latest.regionCodes.join(',')
-      networkIds.value = latest.networkIds.join(',')
-    } else if (detail.value.project.regionCodes || detail.value.project.networkIds) {
-      regionCodes.value = (detail.value.project.regionCodes ?? []).join(',')
-      networkIds.value = (detail.value.project.networkIds ?? []).join(',')
-    }
+    const regions = latest?.regionCodes ?? detail.value.project.regionCodes ?? []
+    const nets = latest?.networkIds ?? detail.value.project.networkIds ?? []
+    selectedRegionCodes.value = [...regions]
+    selectedNetworkIds.value = [...nets]
+    baselineRegionCodes.value = [...regions]
+    baselineNetworkIds.value = [...nets]
     recordRecentVisit({
       resourceType: 'PROJECT',
       resourceId: projectId.value,
       pageId: 'ADMIN.PROJECT.DETAIL',
       displayRef: detail.value.project.name || detail.value.project.code,
     })
+    diagnostics.pushDiagnostic({
+      title: '项目详情技术上下文',
+      fields: {
+        projectId: projectId.value,
+        version: detail.value.project.version,
+        asOf: detail.value.asOf,
+        clientId: detail.value.project.clientId,
+      },
+    })
   } catch (err) {
-    error.value = err instanceof Error ? err.message : '加载项目详情失败'
+    const facing = toUserFacingError(err)
+    error.value = facing.message
+    errorCode.value = facing.errorCode
     detail.value = null
     revisions.value = null
   } finally {
@@ -64,174 +115,304 @@ async function loadRevisions(next?: string) {
   revisionCursor.value = page.nextCursor ?? undefined
 }
 
-async function reviseScope() {
+const addedRegions = computed(() =>
+  selectedRegionCodes.value.filter((c) => !baselineRegionCodes.value.includes(c)),
+)
+const removedRegions = computed(() =>
+  baselineRegionCodes.value.filter((c) => !selectedRegionCodes.value.includes(c)),
+)
+const addedNetworks = computed(() =>
+  selectedNetworkIds.value.filter((id) => !baselineNetworkIds.value.includes(id)),
+)
+const removedNetworks = computed(() =>
+  baselineNetworkIds.value.filter((id) => !selectedNetworkIds.value.includes(id)),
+)
+
+const hasScopeChanges = computed(
+  () =>
+    addedRegions.value.length +
+      removedRegions.value.length +
+      addedNetworks.value.length +
+      removedNetworks.value.length >
+    0,
+)
+
+const networkOptions = computed(() =>
+  networks.value.map((n) => ({
+    value: n.id,
+    label: `${n.networkName} · ${n.networkCode} · ${statusLabel(n.status)}`,
+  })),
+)
+
+const statusPresentation = computed(() => {
+  const status = detail.value?.project.status
+  if (status === 'ACTIVE') {
+    return { label: statusLabel(status), semantic: 'info' as const, icon: 'info' as const }
+  }
+  if (status === 'CLOSED') {
+    return { label: statusLabel(status), semantic: 'neutral' as const, icon: 'check' as const }
+  }
+  if (status === 'SUSPENDED') {
+    return { label: statusLabel(status), semantic: 'warning' as const, icon: 'warning' as const }
+  }
+  return { label: statusLabel(status), semantic: 'warning' as const, icon: 'clock' as const }
+})
+
+const revisionRows = computed(() =>
+  (revisions.value?.items ?? []).map((item) => ({
+    key: item.revisionId,
+    revisedAt: formatDateTimeDisplay(item.revisedAt),
+    reason: item.reason,
+    regions: item.regionCodes.length ? item.regionCodes.join('、') : presentEmptyValue('no_records'),
+    networks: item.networkIds.length
+      ? item.networkIds
+          .map((id) => presentEntityName({ id, loaded: true }).label)
+          .join('、')
+      : presentEmptyValue('no_records'),
+  })),
+)
+
+function openImpactFlow() {
+  if (!hasScopeChanges.value) {
+    message.value = '未检测到服务范围或网点变更'
+    return
+  }
+  flowOpen.value = true
+}
+
+async function confirmReviseScope() {
   busy.value = true
   message.value = null
   error.value = null
   try {
     const aggregateVersion =
       revisions.value?.items?.[0]?.aggregateVersion ?? detail.value?.project.version
-    if (!aggregateVersion) throw new Error('缺少 aggregateVersion')
+    if (!aggregateVersion) throw new Error('缺少版本信息，请刷新后重试')
     const result = await reviseProjectScopeRelations(projectId.value, aggregateVersion, {
-      regionCodes: regionCodes.value
-        .split(/[,\s]+/)
-        .map((v) => v.trim())
-        .filter(Boolean),
-      networkIds: networkIds.value
-        .split(/[,\s]+/)
-        .map((v) => v.trim())
-        .filter(Boolean),
-      reason: reason.value.trim(),
+      regionCodes: selectedRegionCodes.value,
+      networkIds: selectedNetworkIds.value,
+      reason: reason.value.trim() || '运营调整服务范围',
     })
-    message.value = `已修订范围 revision=${result.data.revisionId} / v${result.data.aggregateVersion}`
+    message.value = `服务范围已保存（版本 ${result.data.aggregateVersion}）`
+    flowOpen.value = false
     await loadDetail()
   } catch (err) {
-    error.value = err instanceof Error ? err.message : '修订范围失败'
+    const facing = toUserFacingError(err)
+    error.value = facing.message
+    errorCode.value = facing.errorCode
   } finally {
     busy.value = false
   }
 }
 
-const revisionRows = computed(() =>
-  (revisions.value?.items ?? []).map((item) => ({
-    revisionId: item.revisionId,
-    aggregateVersion: item.aggregateVersion,
-    revisedAt: item.revisedAt,
-    reason: item.reason,
-    regionCodes: item.regionCodes.join(', '),
-    networkIds: item.networkIds.join(', '),
-  })),
-)
-
 watch(projectId, () => {
   if (projectId.value) void loadDetail()
 })
 onMounted(() => {
+  void loadNetworks()
   if (projectId.value) void loadDetail()
 })
 </script>
 
 <template>
-  <section class="detail">
-    <header class="top">
-      <div>
-        <h2>项目详情</h2>
-        <p class="meta">{{ projectId }}</p>
-      </div>
-      <button type="button" :disabled="loading" @click="loadDetail">刷新</button>
-    </header>
-
-    <p v-if="error" class="error">{{ error }}</p>
-    <p v-else-if="loading">加载中…</p>
-
-    <template v-else-if="detail">
-      <article class="card">
-        <h3>{{ detail.project.name }}</h3>
-        <dl>
-          <div><dt>code</dt><dd>{{ detail.project.code }}</dd></div>
-          <div><dt>clientId</dt><dd>{{ detail.project.clientId }}</dd></div>
-          <div><dt>状态</dt><dd><StatusBadge :status="detail.project.status" /></dd></div>
-          <div><dt>startsOn</dt><dd>{{ detail.project.startsOn }}</dd></div>
-          <div><dt>endsOn</dt><dd>{{ detail.project.endsOn || '—' }}</dd></div>
-          <div><dt>version</dt><dd>{{ detail.project.version }}</dd></div>
-          <div><dt>asOf</dt><dd>{{ detail.asOf }}</dd></div>
-        </dl>
-      </article>
-
-      <article class="card form">
-        <h3>整组修订 REGION/NETWORK</h3>
-        <p class="hint">空数组表示终止该类型全部当前关系；If-Match 使用当前 scope aggregateVersion。</p>
-        <label>regionCodes<input v-model="regionCodes" placeholder="R1,R2" /></label>
-        <label>networkIds<input v-model="networkIds" placeholder="N1,N2" /></label>
-        <label>reason<input v-model="reason" /></label>
-        <button type="button" :disabled="busy" @click="reviseScope">revise-scope-relations</button>
-        <p v-if="message" class="ok">{{ message }}</p>
-      </article>
-
-      <QueueTable
-        title="范围修订历史"
-        :columns="['revisionId', 'aggregateVersion', 'revisedAt', 'reason', 'regionCodes', 'networkIds']"
-        :rows="revisionRows"
-        :loading="false"
-        :error="null"
-        :as-of="revisions?.asOf"
-        :next-cursor="revisionCursor ?? null"
-        @refresh="loadRevisions()"
-        @next="loadRevisions(revisionCursor)"
-      />
+  <DedicatedFlowLayout
+    v-if="flowOpen && detail"
+    title="确认服务范围调整"
+    description="请确认新增/移除的区域与网点影响后再保存。此操作不可用普通确认框替代。"
+    step-label="步骤 2 / 2：影响确认"
+    sticky-note="保存将调用服务端范围修订命令，并携带版本条件。"
+  >
+    <template #back>
+      <Button type="text" @click="flowOpen = false">返回编辑</Button>
     </template>
-  </section>
+    <template #feedback>
+      <Alert v-if="error" type="error" show-icon :message="error" :description="errorCode ? `问题编号：${errorCode}` : undefined" />
+    </template>
+    <Descriptions bordered :column="1" size="small">
+      <Descriptions.Item label="新增区域">
+        {{ addedRegions.length ? addedRegions.join('、') : presentEmptyValue('no_records') }}
+      </Descriptions.Item>
+      <Descriptions.Item label="移除区域">
+        {{ removedRegions.length ? removedRegions.join('、') : presentEmptyValue('no_records') }}
+      </Descriptions.Item>
+      <Descriptions.Item label="新增网点">
+        {{
+          addedNetworks.length
+            ? addedNetworks.map((id) => presentEntityName({ id, loaded: true }).label).join('、')
+            : presentEmptyValue('no_records')
+        }}
+      </Descriptions.Item>
+      <Descriptions.Item label="移除网点">
+        {{
+          removedNetworks.length
+            ? removedNetworks.map((id) => presentEntityName({ id, loaded: true }).label).join('、')
+            : presentEmptyValue('no_records')
+        }}
+      </Descriptions.Item>
+      <Descriptions.Item label="现有工单影响">
+        服务端未返回影响试算；保存后请在工单中心核对相关项目工单（UI_DATA_GAP）。
+      </Descriptions.Item>
+      <Descriptions.Item label="调整原因">
+        <Input v-model:value="reason" aria-label="服务范围调整原因" />
+      </Descriptions.Item>
+    </Descriptions>
+    <template #sticky-secondary>
+      <Button @click="flowOpen = false">取消</Button>
+    </template>
+    <template #sticky-actions>
+      <Button type="primary" :loading="busy" @click="confirmReviseScope">确认保存服务范围调整</Button>
+    </template>
+  </DedicatedFlowLayout>
+
+  <DetailPageLayout
+    v-else
+    title="项目详情"
+    :eyebrow="detail ? `项目编码 ${detail.project.code}` : undefined"
+  >
+    <template #back>
+      <Button type="text" aria-label="返回项目目录" @click="router.push({ name: 'ADMIN.PROJECT.LIST' })">
+        <template #icon><ArrowLeftOutlined /></template>
+        返回项目目录
+      </Button>
+    </template>
+    <template #status>
+      <SemanticStatusTag v-if="detail" :presentation="statusPresentation" />
+    </template>
+    <template #secondary-actions>
+      <Button :loading="loading" @click="loadDetail">刷新</Button>
+      <Button v-if="showDevTools" type="link" @click="diagnostics.openDrawer()">技术诊断</Button>
+    </template>
+    <template #primary-action>
+      <Button type="primary" :disabled="!detail || !hasScopeChanges" @click="openImpactFlow">
+        保存服务范围调整
+      </Button>
+    </template>
+    <template #feedback>
+      <Alert v-if="error" type="error" show-icon :message="error" :description="errorCode ? `问题编号：${errorCode}` : undefined" />
+      <Alert v-else-if="loading && !detail" type="info" show-icon message="正在加载项目…" />
+      <Alert v-if="message" type="success" show-icon :message="message" />
+    </template>
+
+    <template v-if="detail" #summary>
+      <Descriptions :column="3" size="small">
+        <Descriptions.Item label="项目名称">{{ detail.project.name }}</Descriptions.Item>
+        <Descriptions.Item label="项目编码">{{ detail.project.code }}</Descriptions.Item>
+        <Descriptions.Item label="所属车企">
+          {{ presentEntityName({ id: detail.project.clientId, loaded: true }).label }}
+        </Descriptions.Item>
+        <Descriptions.Item label="生效日期">{{ detail.project.startsOn || presentEmptyValue('not_provided') }}</Descriptions.Item>
+        <Descriptions.Item label="失效日期">{{ detail.project.endsOn || presentEmptyValue('not_provided') }}</Descriptions.Item>
+        <Descriptions.Item label="服务区域数量">{{ selectedRegionCodes.length }}</Descriptions.Item>
+        <Descriptions.Item label="合作网点数量">{{ selectedNetworkIds.length }}</Descriptions.Item>
+        <Descriptions.Item label="当前版本">{{ detail.project.version }}</Descriptions.Item>
+        <Descriptions.Item label="最近更新时间">{{ formatDateTimeDisplay(detail.asOf) }}</Descriptions.Item>
+      </Descriptions>
+    </template>
+
+    <Tabs v-if="detail" v-model:activeKey="activeTab">
+      <TabPane key="basic" tab="基本信息">
+        <Descriptions bordered :column="2" size="small">
+          <Descriptions.Item label="项目名称">{{ detail.project.name }}</Descriptions.Item>
+          <Descriptions.Item label="项目编码">{{ detail.project.code }}</Descriptions.Item>
+          <Descriptions.Item label="状态">
+            <SemanticStatusTag :presentation="statusPresentation" />
+          </Descriptions.Item>
+          <Descriptions.Item label="所属车企">
+            {{ presentEntityName({ id: detail.project.clientId, loaded: true }).label }}
+          </Descriptions.Item>
+        </Descriptions>
+      </TabPane>
+
+      <TabPane key="regions" tab="服务范围">
+        <Alert
+          type="info"
+          show-icon
+          message="区域名称字典未提供"
+          description="当前仅能维护区域编码；完整区域树/搜索名称属于 UI_DATA_GAP。"
+          style="margin-bottom: 12px"
+        />
+        <label class="field">
+          <span>已选区域编码</span>
+          <Select
+            v-model:value="selectedRegionCodes"
+            mode="tags"
+            style="width: 100%"
+            placeholder="输入区域编码后回车"
+            aria-label="服务区域编码"
+          />
+        </label>
+        <p class="muted">已选 {{ selectedRegionCodes.length }} 个区域</p>
+      </TabPane>
+
+      <TabPane key="networks" tab="合作网点">
+        <label class="field">
+          <span>合作网点</span>
+          <Select
+            v-model:value="selectedNetworkIds"
+            mode="multiple"
+            show-search
+            style="width: 100%"
+            placeholder="搜索网点名称"
+            aria-label="合作网点"
+            :options="networkOptions"
+            :filter-option="(input, option) => String(option?.label ?? '').includes(input)"
+          />
+        </label>
+        <p class="muted">已选 {{ selectedNetworkIds.length }} 个网点</p>
+        <Space wrap>
+          <Tag
+            v-for="id in selectedNetworkIds"
+            :key="id"
+            closable
+            @close="selectedNetworkIds = selectedNetworkIds.filter((x) => x !== id)"
+          >
+            {{ presentEntityName({ id, loaded: true }).label }}
+          </Tag>
+        </Space>
+      </TabPane>
+
+      <TabPane key="fulfillment" tab="履约配置">
+        <p class="muted">履约配置资产编辑请使用配置设计器；本页仅展示项目摘要。</p>
+      </TabPane>
+
+      <TabPane key="sla" tab="审核与 SLA">
+        <p class="muted">审核与 SLA 策略绑定未随项目详情返回（UI_DATA_GAP）。</p>
+      </TabPane>
+
+      <TabPane key="history" tab="变更记录">
+        <Table
+          size="middle"
+          row-key="key"
+          :pagination="false"
+          :columns="[
+            { title: '调整时间', dataIndex: 'revisedAt' },
+            { title: '原因', dataIndex: 'reason' },
+            { title: '服务区域', dataIndex: 'regions' },
+            { title: '合作网点', dataIndex: 'networks' },
+          ]"
+          :data-source="revisionRows"
+        />
+        <Button
+          v-if="revisionCursor"
+          style="margin-top: 12px"
+          @click="loadRevisions(revisionCursor)"
+        >
+          加载更多
+        </Button>
+      </TabPane>
+    </Tabs>
+  </DetailPageLayout>
 </template>
 
 <style scoped>
-.detail {
+.field {
   display: grid;
-  gap: 1rem;
+  gap: 6px;
+  margin-bottom: 12px;
+  font-size: 13px;
 }
-.top {
-  display: flex;
-  justify-content: space-between;
-}
-.meta {
-  margin: 0.25rem 0 0;
-  color: #627d98;
-  font-family: ui-monospace, monospace;
-  font-size: 0.85rem;
-}
-.card {
-  background: #fff;
-  border-radius: 12px;
-  padding: 1rem 1.15rem;
-  box-shadow: 0 1px 3px rgb(16 42 67 / 8%);
-}
-.form {
-  display: grid;
-  gap: 0.55rem;
-}
-.hint {
-  margin: 0;
-  color: #627d98;
-  font-size: 0.85rem;
-}
-label {
-  display: grid;
-  gap: 0.25rem;
-  font-size: 0.85rem;
-  color: #486581;
-}
-input {
-  border: 1px solid #bcccdc;
-  border-radius: 6px;
-  padding: 0.4rem 0.65rem;
-  font-family: ui-monospace, monospace;
-}
-dl {
-  margin: 0;
-  display: grid;
-  gap: 0.5rem;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-}
-dt {
-  font-size: 0.78rem;
-  color: #627d98;
-}
-dd {
-  margin: 0.1rem 0 0;
-}
-.error {
-  color: #9b1c1c;
-}
-.ok {
-  color: #054e31;
-  margin: 0;
-}
-button {
-  border: 1px solid #bcccdc;
-  background: #243b53;
-  color: #fff;
-  border-color: #243b53;
-  border-radius: 6px;
-  padding: 0.4rem 0.75rem;
-  cursor: pointer;
+.muted {
+  color: var(--sos-color-text-tertiary, #7b8494);
+  font-size: 13px;
 }
 </style>
