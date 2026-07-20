@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test'
 import { mockProductizationApis, seedLocalSession } from './productization-fixtures'
 
-test.describe('M402 Admin 用户登记与目录摘要', () => {
-  test('用户目录展示组织/角色摘要，并可进入新建流程', async ({ page }) => {
+test.describe('M402/M403 Admin 用户登记、目录摘要与最近登录', () => {
+  test('用户目录摘要与最近登录，并可进入新建/详情', async ({ page }) => {
     await seedLocalSession(page)
     await mockProductizationApis(page)
 
@@ -14,6 +14,7 @@ test.describe('M402 Admin 用户登记与目录摘要', () => {
     await expect(page.getByTestId('user-directory-table')).toContainText('演示用户')
     await expect(page.getByTestId('user-org-summary').first()).toHaveText('演示总部')
     await expect(page.getByTestId('user-role-summary').first()).toHaveText('OPS')
+    await expect(page.getByTestId('user-last-login').first()).toContainText('2026-07-20')
     await expect(page.getByTestId('user-directory-create')).toBeEnabled()
 
     await page.getByTestId('user-directory-create').click()
@@ -31,6 +32,16 @@ test.describe('M402 Admin 用户登记与目录摘要', () => {
     await expect(page.getByTestId('user-directory-table')).toBeVisible()
     await page.screenshot({
       path: 'tests/e2e/__screenshots__/admin-user-directory-product-1440.png',
+      fullPage: true,
+    })
+
+    await page.getByRole('link', { name: '打开' }).first().click()
+    await expect(page.getByRole('tab', { name: '登录与安全' })).toBeVisible({ timeout: 20_000 })
+    await page.getByRole('tab', { name: '登录与安全' }).click()
+    await expect(page.getByTestId('section-recent-logins')).toBeVisible()
+    await expect(page.getByTestId('user-recent-login-list')).toContainText('admin-web')
+    await page.screenshot({
+      path: 'tests/e2e/__screenshots__/admin-user-recent-logins-1440.png',
       fullPage: true,
     })
   })

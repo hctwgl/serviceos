@@ -17,7 +17,8 @@ public record AdminUserDirectoryItem(
         Instant createdAt,
         Instant updatedAt,
         String organizationSummary,
-        String roleSummary
+        String roleSummary,
+        Instant lastLoginAt
 ) {
     public AdminUserDirectoryItem {
         Objects.requireNonNull(id, "id");

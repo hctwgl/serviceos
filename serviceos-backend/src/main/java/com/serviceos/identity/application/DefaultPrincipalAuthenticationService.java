@@ -52,7 +52,9 @@ final class DefaultPrincipalAuthenticationService implements PrincipalAuthentica
         var existing = directory.findByExternalIdentity(
                 identity.tenantId(), identity.issuer(), identity.subject());
         if (existing.isPresent()) {
-            return existing.orElseThrow().requireActive().id().toString();
+            SecurityPrincipal principal = existing.orElseThrow().requireActive();
+            recordSuccessfulLogin(identity, principal.id(), correlationId, requestDigest);
+            return principal.id().toString();
         }
 
         if (identity.principalType() != CurrentPrincipal.PrincipalType.USER
@@ -77,6 +79,33 @@ final class DefaultPrincipalAuthenticationService implements PrincipalAuthentica
                 "PRINCIPAL_REGISTERED", "identity.jitRegister", "SecurityPrincipal",
                 principalId.toString(), "ALLOW", List.of(), "oidc-resource-server",
                 "SUCCEEDED", null, requestDigest, correlationId, now));
+        recordSuccessfulLogin(identity, principalId, correlationId, requestDigest);
         return principalId.toString();
+    }
+
+    /**
+     * 成功解析后写入登录事实并裁剪超额行；与认证同事务，失败则整次登录回滚。
+     */
+    private void recordSuccessfulLogin(
+            AuthenticatedIdentity identity,
+            UUID principalId,
+            String correlationId,
+            String requestDigest
+    ) {
+        Instant now = clock.instant();
+        directory.insertLoginEvent(
+                UUID.randomUUID(),
+                identity.tenantId(),
+                principalId,
+                identity.clientId(),
+                identity.issuer(),
+                correlationId == null || correlationId.isBlank() ? "missing-correlation" : correlationId,
+                now);
+        directory.trimLoginEvents(identity.tenantId(), principalId, 50);
+        audit.append(new AuditEntry(
+                UUID.randomUUID(), identity.tenantId(), principalId.toString(),
+                "PRINCIPAL_LOGIN_SUCCEEDED", "identity.authenticate", "SecurityPrincipal",
+                principalId.toString(), "ALLOW", List.of(), "oidc-resource-server",
+                "SUCCEEDED", null, requestDigest, correlationId, now));
     }
 }

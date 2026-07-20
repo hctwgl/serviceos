@@ -2,6 +2,7 @@ package com.serviceos.identity.web;
 
 import com.serviceos.identity.api.CurrentPrincipalProvider;
 import com.serviceos.identity.api.IdentityLinkView;
+import com.serviceos.identity.api.PrincipalLoginEventPage;
 import com.serviceos.identity.api.PrincipalPersonaView;
 import com.serviceos.identity.api.SecurityPrincipalCommandService;
 import com.serviceos.identity.api.SecurityPrincipalDetail;
@@ -98,6 +99,17 @@ final class SecurityPrincipalController {
             @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
     ) {
         return response(queries.identities(principals.current(), correlationId, principalId), correlationId);
+    }
+
+    @GetMapping("/{principalId}/recent-logins")
+    ResponseEntity<PrincipalLoginEventPage> recentLogins(
+            @PathVariable UUID principalId,
+            @RequestParam(required = false) Integer limit,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        return response(
+                queries.recentLogins(principals.current(), correlationId, principalId, limit),
+                correlationId);
     }
 
     @PostMapping("/{principalId}/identity-links")

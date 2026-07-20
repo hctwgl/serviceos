@@ -325,7 +325,7 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 最近登录列表读模型（新建用户与组织/角色摘要已由 M402 关闭主路径）
+  - UI_DATA_GAP: 失败登录/设备指纹（成功最近登录已由 M403 交付）
 ```
 
 ```yaml
@@ -447,7 +447,25 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 最近登录列表读模型
+  - UI_DATA_GAP: 最近登录列表读模型（已由 M403 关闭）
+```
+
+### 9.9 M403 记录（最近登录）
+
+```yaml
+pageId: ADMIN.USER.DETAIL
+route: /users/:id
+visualProfile: CLASSIC_PROFESSIONAL
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: 失败登录与设备指纹尚未交付
 ```
 
 ## 10. GAP 规则

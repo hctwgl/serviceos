@@ -8,8 +8,10 @@ import {
   enableSecurityPrincipal,
   getSecurityPrincipal,
   listPrincipalIdentityLinks,
+  listPrincipalRecentLogins,
   updateSecurityPrincipalProfile,
   type IdentityLink,
+  type PrincipalLoginEvent,
   type SecurityPrincipalDetail,
 } from '../api/securityPrincipals'
 import { listRoleGrants, type RoleGrant } from '../api/authorizationGovernance'
@@ -34,6 +36,8 @@ const message = ref<string | null>(null)
 const detail = ref<SecurityPrincipalDetail | null>(null)
 const etag = ref<string | null>(null)
 const identities = ref<IdentityLink[] | null>(null)
+const recentLogins = ref<PrincipalLoginEvent[] | null>(null)
+const recentLoginsError = ref<string | null>(null)
 const grants = ref<RoleGrant[]>([])
 const reassignments = ref<ReassignmentWorkItem[]>([])
 const displayName = ref('')
@@ -67,6 +71,14 @@ async function load() {
       identities.value = await listPrincipalIdentityLinks(principalId.value)
     } catch {
       identities.value = null
+    }
+    try {
+      const loginPage = await listPrincipalRecentLogins(principalId.value, 20)
+      recentLogins.value = loginPage.items
+      recentLoginsError.value = null
+    } catch (err) {
+      recentLogins.value = null
+      recentLoginsError.value = safeAccessDeniedMessage(err)
     }
     try {
       const grantPage = await listRoleGrants({ principalId: principalId.value })
@@ -296,6 +308,21 @@ onMounted(() => {
         </TabPane>
 
         <TabPane key="security" tab="登录与安全">
+          <article class="card" data-testid="section-recent-logins">
+            <h3>最近登录</h3>
+            <p v-if="recentLoginsError" class="muted">{{ recentLoginsError }}</p>
+            <ul v-else-if="recentLogins && recentLogins.length" data-testid="user-recent-login-list">
+              <li v-for="item in recentLogins" :key="item.loginEventId">
+                {{ formatDateTimeDisplay(item.occurredAt) }}
+                · 客户端 {{ item.clientId }}
+                · {{ item.authChannel }}
+                · {{ statusLabel(item.outcome) }}
+                <span class="muted"> · 发行方 {{ item.issuer }}</span>
+              </li>
+            </ul>
+            <p v-else class="muted">尚无成功登录记录（仅记录 OIDC 成功解析）</p>
+          </article>
+
           <article class="card" data-testid="section-identity-links">
             <h3>身份绑定</h3>
             <p v-if="identities === null" class="muted">无 identity.readSensitive，不展示敏感绑定</p>

@@ -3,6 +3,7 @@ package com.serviceos.identity.application;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.identity.api.IdentityAuthorizationPort;
 import com.serviceos.identity.api.IdentityLinkView;
+import com.serviceos.identity.api.PrincipalLoginEventPage;
 import com.serviceos.identity.api.SecurityPrincipalDetail;
 import com.serviceos.identity.api.SecurityPrincipalPage;
 import com.serviceos.identity.api.SecurityPrincipalQueryService;
@@ -82,6 +83,22 @@ final class DefaultSecurityPrincipalQueryService implements SecurityPrincipalQue
         require(actor, correlationId, "identity.readSensitive", principalId.toString());
         requirePrincipal(actor.tenantId(), principalId);
         return directory.findIdentityLinks(actor.tenantId(), principalId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PrincipalLoginEventPage recentLogins(
+            CurrentPrincipal actor, String correlationId, UUID principalId, Integer limit
+    ) {
+        require(actor, correlationId, "identity.read", principalId.toString());
+        requirePrincipal(actor.tenantId(), principalId);
+        int effective = limit == null ? 20 : limit;
+        if (effective < 1 || effective > 50) {
+            throw new IllegalArgumentException("limit must be between 1 and 50");
+        }
+        return new PrincipalLoginEventPage(
+                directory.listLoginEvents(actor.tenantId(), principalId, effective),
+                clock.instant());
     }
 
     private void require(CurrentPrincipal actor, String correlationId, String capability, String resourceId) {

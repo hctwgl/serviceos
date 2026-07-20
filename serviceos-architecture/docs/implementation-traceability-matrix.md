@@ -491,4 +491,5 @@ Feature gate/authority: if applicable
 | M400 | 项目车企/区域/网点实体选择器 | 411-m400-* + 394-m400-*；OpenAPI 1.0.66；PostgresIT + ArchitectureTest + Playwright | 行政区名称树；车企主数据；关注项目；人工视觉批准 |
 | M401 | Admin 关注项目读模型 | 412-m401-* + 395-m401-*；OpenAPI 1.0.67；Flyway V139；PostgresIT + ArchitectureTest + Playwright | 关注角标聚合；行政区名称树；人工视觉批准 |
 | M402 | Admin 用户登记与目录组织/角色摘要 | 413-m402-* + 396-m402-*；OpenAPI 1.0.68；Flyway V140；PostgresIT + ArchitectureTest + Playwright | 最近登录；组织树任职编辑；人工视觉批准 |
+| M403 | Admin 主体最近登录读模型 | 414-m403-* + 397-m403-*；OpenAPI 1.0.69；Flyway V141；PostgresIT + ArchitectureTest + Playwright | 失败登录；设备指纹；组织树任职；人工视觉批准 |
 

@@ -1,6 +1,7 @@
 package com.serviceos.identity.infrastructure;
 
 import com.serviceos.identity.api.IdentityLinkView;
+import com.serviceos.identity.api.PrincipalLoginEventView;
 import com.serviceos.identity.api.PrincipalPersonaView;
 import com.serviceos.identity.application.IdentityDirectoryRepository;
 import com.serviceos.identity.domain.SecurityPrincipal;
@@ -284,6 +285,96 @@ final class JdbcIdentityDirectoryRepository implements IdentityDirectoryReposito
                         rs.getString("personaStatus"),
                         rs.getObject("validFrom", OffsetDateTime.class).toInstant(),
                         instantOrNull(rs.getObject("validTo")), rs.getLong("personaVersion")))
+                .optional();
+    }
+
+    @Override
+    public void insertLoginEvent(
+            UUID loginEventId,
+            String tenantId,
+            UUID principalId,
+            String clientId,
+            String issuer,
+            String correlationId,
+            Instant occurredAt
+    ) {
+        jdbc.sql("""
+                INSERT INTO idn_principal_login_event (
+                    login_event_id, tenant_id, principal_id, client_id, issuer,
+                    auth_channel, outcome, correlation_id, occurred_at
+                ) VALUES (
+                    :id, :tenant, :principalId, :clientId, :issuer,
+                    'OIDC', 'SUCCEEDED', :correlationId, :now
+                )
+                """)
+                .param("id", loginEventId)
+                .param("tenant", tenantId)
+                .param("principalId", principalId)
+                .param("clientId", clientId)
+                .param("issuer", issuer)
+                .param("correlationId", correlationId)
+                .param("now", dbTime(occurredAt))
+                .update();
+    }
+
+    @Override
+    public void trimLoginEvents(String tenantId, UUID principalId, int keepLatest) {
+        jdbc.sql("""
+                DELETE FROM idn_principal_login_event AS e
+                 WHERE e.tenant_id = :tenant
+                   AND e.principal_id = :principalId
+                   AND e.login_event_id NOT IN (
+                        SELECT x.login_event_id
+                          FROM idn_principal_login_event x
+                         WHERE x.tenant_id = :tenant
+                           AND x.principal_id = :principalId
+                         ORDER BY x.occurred_at DESC, x.login_event_id DESC
+                         LIMIT :keep
+                   )
+                """)
+                .param("tenant", tenantId)
+                .param("principalId", principalId)
+                .param("keep", keepLatest)
+                .update();
+    }
+
+    @Override
+    public List<PrincipalLoginEventView> listLoginEvents(String tenantId, UUID principalId, int limit) {
+        return jdbc.sql("""
+                SELECT login_event_id, principal_id, client_id, issuer, auth_channel, outcome, occurred_at
+                  FROM idn_principal_login_event
+                 WHERE tenant_id = :tenant
+                   AND principal_id = :principalId
+                 ORDER BY occurred_at DESC, login_event_id DESC
+                 LIMIT :limit
+                """)
+                .param("tenant", tenantId)
+                .param("principalId", principalId)
+                .param("limit", limit)
+                .query((rs, row) -> new PrincipalLoginEventView(
+                        rs.getObject("login_event_id", UUID.class),
+                        rs.getObject("principal_id", UUID.class),
+                        rs.getString("client_id"),
+                        rs.getString("issuer"),
+                        rs.getString("auth_channel"),
+                        rs.getString("outcome"),
+                        rs.getObject("occurred_at", OffsetDateTime.class).toInstant()))
+                .list();
+    }
+
+    @Override
+    public Optional<Instant> findLatestLoginAt(String tenantId, UUID principalId) {
+        return jdbc.sql("""
+                SELECT occurred_at
+                  FROM idn_principal_login_event
+                 WHERE tenant_id = :tenant
+                   AND principal_id = :principalId
+                 ORDER BY occurred_at DESC, login_event_id DESC
+                 LIMIT 1
+                """)
+                .param("tenant", tenantId)
+                .param("principalId", principalId)
+                .query((rs, row) -> rs.getObject("occurred_at", OffsetDateTime.class).toInstant())
                 .optional();
     }
 

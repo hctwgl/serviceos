@@ -10,4 +10,8 @@ public interface SecurityPrincipalQueryService {
     SecurityPrincipalDetail get(CurrentPrincipal actor, String correlationId, UUID principalId);
 
     List<IdentityLinkView> identities(CurrentPrincipal actor, String correlationId, UUID principalId);
+
+    /** 最近成功登录；需要 identity.read。不含 subject/密码。 */
+    PrincipalLoginEventPage recentLogins(
+            CurrentPrincipal actor, String correlationId, UUID principalId, Integer limit);
 }

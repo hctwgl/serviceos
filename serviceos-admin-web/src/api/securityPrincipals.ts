@@ -41,6 +41,22 @@ export type SecurityPrincipalPage = {
 export type AdminUserDirectoryItem = SecurityPrincipal & {
   organizationSummary: string | null
   roleSummary: string | null
+  lastLoginAt: string | null
+}
+
+export type PrincipalLoginEvent = {
+  loginEventId: string
+  principalId: string
+  clientId: string
+  issuer: string
+  authChannel: 'OIDC'
+  outcome: 'SUCCEEDED'
+  occurredAt: string
+}
+
+export type PrincipalLoginEventPage = {
+  items: PrincipalLoginEvent[]
+  asOf: string
 }
 
 export type AdminUserDirectoryPage = {
@@ -88,6 +104,12 @@ export function getSecurityPrincipal(principalId: string) {
 
 export function listPrincipalIdentityLinks(principalId: string) {
   return apiGet<IdentityLink[]>(`/security-principals/${principalId}/identities`)
+}
+
+export function listPrincipalRecentLogins(principalId: string, limit = 20) {
+  return apiGet<PrincipalLoginEventPage>(`/security-principals/${principalId}/recent-logins`, {
+    limit: String(limit),
+  })
 }
 
 export function disableSecurityPrincipal(

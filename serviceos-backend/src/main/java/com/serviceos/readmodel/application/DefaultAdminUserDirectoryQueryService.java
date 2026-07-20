@@ -70,9 +70,25 @@ class DefaultAdminUserDirectoryQueryService implements AdminUserDirectoryQuerySe
                     principal.createdAt(),
                     principal.updatedAt(),
                     organizationSummary(actor, correlationId, principal.id(), orgNames),
-                    roleSummary(actor, correlationId, principal.id())));
+                    roleSummary(actor, correlationId, principal.id()),
+                    lastLoginAt(actor, correlationId, principal.id())));
         }
         return new AdminUserDirectoryPage(items, page.nextCursor(), page.asOf());
+    }
+
+    private java.time.Instant lastLoginAt(
+            CurrentPrincipal actor, String correlationId, UUID principalId
+    ) {
+        try {
+            var page = principals.recentLogins(actor, correlationId, principalId, 1);
+            return page.items().isEmpty() ? null : page.items().getFirst().occurredAt();
+        } catch (BusinessProblem problem) {
+            if (problem.code() == ProblemCode.ACCESS_DENIED
+                    || problem.code() == ProblemCode.RESOURCE_NOT_FOUND) {
+                return null;
+            }
+            throw problem;
+        }
     }
 
     private Map<UUID, String> loadOrganizationNames(CurrentPrincipal actor, String correlationId) {

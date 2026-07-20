@@ -513,9 +513,27 @@ export async function mockProductizationApis(
             updatedAt: '2026-07-20T04:00:00Z',
             organizationSummary: '演示总部',
             roleSummary: 'OPS',
+            lastLoginAt: '2026-07-20T03:30:00Z',
           },
         ],
         nextCursor: null,
+        asOf: '2026-07-20T04:00:00Z',
+      })
+      return
+    }
+    if (url.includes('/recent-logins')) {
+      await fulfillJson(route, {
+        items: [
+          {
+            loginEventId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            principalId: '66666666-6666-4666-8666-666666666666',
+            clientId: 'admin-web',
+            issuer: 'https://idp.example.com/realms/serviceos',
+            authChannel: 'OIDC',
+            outcome: 'SUCCEEDED',
+            occurredAt: '2026-07-20T03:30:00Z',
+          },
+        ],
         asOf: '2026-07-20T04:00:00Z',
       })
       return
@@ -536,6 +554,35 @@ export async function mockProductizationApis(
           },
           201,
         )
+        return
+      }
+      if (url.includes('/security-principals/66666666-6666-4666-8666-666666666666')
+        && !url.includes('/identities')
+        && !url.includes('/recent-logins')
+        && method === 'GET') {
+        await fulfillJson(route, {
+          principal: {
+            id: '66666666-6666-4666-8666-666666666666',
+            type: 'USER',
+            status: 'ACTIVE',
+            displayName: '演示用户',
+            employeeNumber: 'DEMO-001',
+            version: 1,
+            createdAt: '2026-07-01T00:00:00Z',
+            updatedAt: '2026-07-20T04:00:00Z',
+          },
+          personas: [
+            {
+              id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+              personaType: 'INTERNAL_EMPLOYEE',
+              status: 'ACTIVE',
+              validFrom: '2026-07-01T00:00:00Z',
+              validTo: null,
+              version: 1,
+            },
+          ],
+          asOf: '2026-07-20T04:00:00Z',
+        })
         return
       }
       await fulfillJson(route, {

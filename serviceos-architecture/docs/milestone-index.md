@@ -409,6 +409,7 @@ title: ServiceOS 里程碑索引
 | M400 | M400 项目车企/区域/网点实体选择器 | [411-m400-project-entity-selectors.md](../architecture/411-m400-project-entity-selectors.md) | [394-m400-project-entity-selectors-acceptance.md](../testing/394-m400-project-entity-selectors-acceptance.md) |
 | M401 | M401 Admin 关注项目读模型 | [412-m401-admin-followed-projects.md](../architecture/412-m401-admin-followed-projects.md) | [395-m401-admin-followed-projects-acceptance.md](../testing/395-m401-admin-followed-projects-acceptance.md) |
 | M402 | M402 Admin 用户登记与目录组织/角色摘要 | [413-m402-admin-user-register-directory-summaries.md](../architecture/413-m402-admin-user-register-directory-summaries.md) | [396-m402-admin-user-register-directory-acceptance.md](../testing/396-m402-admin-user-register-directory-acceptance.md) |
+| M403 | M403 Admin 主体最近登录读模型 | [414-m403-admin-principal-recent-logins.md](../architecture/414-m403-admin-principal-recent-logins.md) | [397-m403-admin-principal-recent-logins-acceptance.md](../testing/397-m403-admin-principal-recent-logins-acceptance.md) |
 
 ## 未关联里程碑的文档
 

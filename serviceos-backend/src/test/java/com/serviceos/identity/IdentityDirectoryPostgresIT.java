@@ -75,7 +75,7 @@ class IdentityDirectoryPostgresIT {
     @BeforeEach
     void cleanAndAuthorizeActor() {
         jdbc.sql("""
-                TRUNCATE TABLE idn_principal_lifecycle_event, idn_principal_persona,
+                TRUNCATE TABLE idn_principal_login_event, idn_principal_lifecycle_event, idn_principal_persona,
                     idn_identity_link, idn_person_profile, idn_security_principal,
                     rel_idempotency_record, aud_audit_record,
                     auth_role_grant, auth_role_capability, auth_role CASCADE
@@ -165,6 +165,24 @@ class IdentityDirectoryPostgresIT {
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.IDENTITY_PROFILE_CONFLICT));
 
         assertThat(queries.get(actor(), "corr-read-second", second).principal().version()).isEqualTo(1);
+    }
+
+    @Test
+    void successfulAuthenticationRecordsRecentLoginWithoutSubject() {
+        UUID principalId = UUID.fromString(authentication.resolveOrRegister(
+                identity("subject-login-a", "登录用户"), "corr-login-1"));
+        authentication.resolveOrRegister(identity("subject-login-a", "登录用户"), "corr-login-2");
+
+        var page = queries.recentLogins(actor(), "corr-login-list", principalId, 10);
+        assertThat(page.items()).hasSize(2);
+        assertThat(page.items().getFirst().clientId()).isEqualTo(CLIENT);
+        assertThat(page.items().getFirst().authChannel()).isEqualTo("OIDC");
+        assertThat(page.items().getFirst().outcome()).isEqualTo("SUCCEEDED");
+        assertThat(page.items().getFirst().issuer()).isEqualTo(ISSUER);
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM information_schema.columns
+                 WHERE table_name='idn_principal_login_event' AND column_name='subject'
+                """).query(Long.class).single()).isZero();
     }
 
     @Test

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.68
+  version: 1.0.69
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -98,6 +98,29 @@ paths:
             ETag: { required: true, schema: { type: string } }
             X-Correlation-Id: { required: true, schema: { type: string } }
           content: { application/json: { schema: { $ref: '#/components/schemas/SecurityPrincipalDetail' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /security-principals/{principalId}/recent-logins:
+    get:
+      operationId: listPrincipalRecentLogins
+      summary: 查询主体最近成功登录
+      description: |
+        M403：需要 identity.read。仅返回成功 OIDC 解析事实；不含 subject/密码。
+        issuer 仅作登录渠道展示，不能替代 identity.readSensitive 绑定详情。
+      parameters:
+        - $ref: '#/components/parameters/PrincipalId'
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 最近登录页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/PrincipalLoginEventPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
@@ -6995,6 +7018,26 @@ components:
         updatedAt: { type: string, format: date-time }
         organizationSummary: { type: [string, 'null'], maxLength: 200 }
         roleSummary: { type: [string, 'null'], maxLength: 200 }
+        lastLoginAt: { type: [string, 'null'], format: date-time }
+    PrincipalLoginEvent:
+      type: object
+      additionalProperties: false
+      required: [loginEventId, principalId, clientId, issuer, authChannel, outcome, occurredAt]
+      properties:
+        loginEventId: { type: string, format: uuid }
+        principalId: { type: string, format: uuid }
+        clientId: { type: string, minLength: 1, maxLength: 128 }
+        issuer: { type: string, minLength: 1, maxLength: 512 }
+        authChannel: { type: string, enum: [OIDC] }
+        outcome: { type: string, enum: [SUCCEEDED] }
+        occurredAt: { type: string, format: date-time }
+    PrincipalLoginEventPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/PrincipalLoginEvent' } }
+        asOf: { type: string, format: date-time }
     AdminUserDirectoryPage:
       type: object
       additionalProperties: false

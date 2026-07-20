@@ -46,6 +46,7 @@ const columns = [
   { title: '登录账号 / 工号', dataIndex: 'employeeNumber', key: 'employeeNumber' },
   { title: '所属组织', key: 'organizationSummary' },
   { title: '角色摘要', key: 'roleSummary' },
+  { title: '最近登录', key: 'lastLoginAt' },
   { title: '状态', key: 'status' },
   { title: '类型', key: 'type' },
   { title: '更新时间', key: 'updatedAt' },
@@ -205,7 +206,7 @@ onMounted(() => {
         <Alert
           type="info"
           show-icon
-          message="最近登录列表读模型尚未交付。组织/角色摘要缺权时显示「—」，不伪造任职。"
+          message="组织/角色摘要与最近登录缺权时显示「—」。登录仅记录成功 OIDC 解析，不保存密码。"
           style="margin-bottom: 12px"
         />
       </template>
@@ -257,6 +258,11 @@ onMounted(() => {
           </template>
           <template v-else-if="column.key === 'roleSummary'">
             <span data-testid="user-role-summary">{{ record.roleSummary ?? '—' }}</span>
+          </template>
+          <template v-else-if="column.key === 'lastLoginAt'">
+            <span data-testid="user-last-login">
+              {{ record.lastLoginAt ? formatDateTimeDisplay(record.lastLoginAt) : '—' }}
+            </span>
           </template>
           <template v-else-if="column.key === 'status'">
             <Tag :color="record.status === 'ACTIVE' ? 'success' : 'default'">
