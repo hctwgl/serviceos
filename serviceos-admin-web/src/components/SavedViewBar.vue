@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { Button, Select, Space, Modal, Input, Radio, Tag } from 'ant-design-vue'
 import { listRoles, type Role } from '../api/authorizationGovernance'
 import {
   astToFilters,
@@ -36,10 +37,19 @@ const shareRoleId = ref('')
 const busy = ref(false)
 const message = ref<string | null>(null)
 const autoAppliedDefault = ref(false)
+const saveOpen = ref(false)
+const shareOpen = ref(false)
 
 const selected = computed(() => views.value.find((v) => v.id === selectedId.value) ?? null)
 const selectedIsShared = computed(
   () => selected.value != null && selected.value.visibility !== 'PRIVATE',
+)
+
+const pickerOptions = computed(() =>
+  views.value.map((view) => ({
+    value: view.id,
+    label: optionLabel(view),
+  })),
 )
 
 function optionLabel(view: SavedView): string {
@@ -77,7 +87,6 @@ async function loadRolesForShare() {
   }
 }
 
-/** 可选：打开页面时按 UI Preference defaultSavedViews 自动应用默认视图一次。 */
 async function maybeApplyDefaultFromPreference() {
   if (autoAppliedDefault.value) {
     return
@@ -130,6 +139,7 @@ async function saveCurrent() {
     })
     saveName.value = ''
     selectedId.value = created.data.id
+    saveOpen.value = false
     await refresh()
     message.value = `已保存：${created.data.name}`
   } catch (err) {
@@ -176,6 +186,7 @@ async function shareSelected() {
       sharedScopeRef,
     })
     selectedId.value = shared.data.id
+    shareOpen.value = false
     await refresh()
     message.value = `已共享：${visibilityLabel(shared.data.visibility)}`
   } catch (err) {
@@ -187,17 +198,17 @@ async function shareSelected() {
 
 async function unshareSelected() {
   const view = selected.value
-  if (!view || view.visibility === 'PRIVATE') {
+  if (!view) {
     return
   }
   busy.value = true
   message.value = null
   try {
-    const result = await shareSavedView(view.id, view.aggregateVersion, {
+    const shared = await shareSavedView(view.id, view.aggregateVersion, {
       visibility: 'PRIVATE',
       sharedScopeRef: null,
     })
-    selectedId.value = result.data.id
+    selectedId.value = shared.data.id
     await refresh()
     message.value = '已取消共享'
   } catch (err) {
@@ -210,9 +221,9 @@ async function unshareSelected() {
 watch(
   () => props.pageId,
   () => {
-    selectedId.value = ''
     autoAppliedDefault.value = false
-    return refresh()
+    selectedId.value = ''
+    void refresh()
   },
 )
 
@@ -223,174 +234,154 @@ onMounted(async () => {
 
 <template>
   <div class="saved-view-bar" data-testid="saved-view-bar">
-    <label>
-      保存的视图
-      <select
-        v-model="selectedId"
+    <Space wrap>
+      <span class="label">视图</span>
+      <Select
+        v-model:value="selectedId"
+        allow-clear
+        show-search
+        style="min-width: 220px"
+        placeholder="选择已保存视图"
         aria-label="saved view picker"
         data-testid="saved-view-picker"
         :disabled="busy"
-      >
-        <option value="">（未选择）</option>
-        <option v-for="view in views" :key="view.id" :value="view.id">
-          {{ optionLabel(view) }}
-        </option>
-      </select>
-    </label>
-    <span
-      v-if="selected"
-      class="badge"
-      :data-visibility="selected.visibility"
-      data-testid="saved-view-visibility-badge"
-    >
-      {{ visibilityLabel(selected.visibility) }}
-    </span>
-    <button
-      type="button"
-      data-testid="saved-view-apply"
-      :disabled="busy || !selectedId"
-      @click="applySelected"
-    >
-      应用
-    </button>
-    <button
-      type="button"
-      data-testid="saved-view-delete"
-      :disabled="busy || !selectedId"
-      @click="removeSelected"
-    >
-      删除
-    </button>
-    <label class="save-name">
-      新视图名称
-      <input
-        v-model="saveName"
-        aria-label="saved view name"
-        data-testid="saved-view-name"
-        placeholder="例如：READY 任务"
-        :disabled="busy"
+        :options="pickerOptions"
+        :filter-option="
+          (input, option) =>
+            String(option?.label ?? '')
+              .toLowerCase()
+              .includes(input.toLowerCase())
+        "
       />
-    </label>
-    <button
-      type="button"
-      data-testid="saved-view-save"
-      :disabled="busy"
-      @click="saveCurrent"
-    >
-      保存当前筛选
-    </button>
-
-    <div class="share-row" data-testid="saved-view-share-panel">
-      <label>
-        共享范围
-        <select
-          v-model="shareMode"
-          aria-label="saved view share mode"
-          data-testid="saved-view-share-mode"
-          :disabled="busy"
-        >
-          <option value="TENANT">租户</option>
-          <option value="ROLE">角色</option>
-        </select>
-      </label>
-      <label v-if="shareMode === 'ROLE'">
-        角色
-        <select
-          v-model="shareRoleId"
-          aria-label="saved view share role"
-          data-testid="saved-view-share-role"
-          :disabled="busy || roles.length === 0"
-        >
-          <option v-if="roles.length === 0" value="">（无可用角色）</option>
-          <option v-for="role in roles" :key="role.roleId" :value="role.roleId">
-            {{ role.roleName }} ({{ role.roleCode }})
-          </option>
-        </select>
-      </label>
-      <button
-        type="button"
+      <Tag
+        v-if="selected"
+        :data-visibility="selected.visibility"
+        data-testid="saved-view-visibility-badge"
+      >
+        {{ visibilityLabel(selected.visibility) }}
+      </Tag>
+      <Button
+        data-testid="saved-view-apply"
+        :disabled="busy || !selectedId"
+        @click="applySelected"
+      >
+        应用
+      </Button>
+      <Button data-testid="saved-view-save" :disabled="busy" @click="saveOpen = true">
+        保存当前
+      </Button>
+      <Button
         data-testid="saved-view-share"
         :disabled="busy || !selectedId"
-        @click="shareSelected"
+        @click="shareOpen = true"
       >
-        共享
-      </button>
-      <button
-        type="button"
+        分享
+      </Button>
+      <Button
+        danger
+        data-testid="saved-view-delete"
+        :disabled="busy || !selectedId"
+        @click="removeSelected"
+      >
+        删除
+      </Button>
+      <Button
+        type="link"
         data-testid="saved-view-unshare"
         :disabled="busy || !selectedId || !selectedIsShared"
         @click="unshareSelected"
       >
         取消共享
-      </button>
-    </div>
-
+      </Button>
+    </Space>
     <p v-if="message" class="msg" data-testid="saved-view-message">{{ message }}</p>
+
+    <Modal
+      v-model:open="saveOpen"
+      title="保存当前筛选为视图"
+      ok-text="保存"
+      cancel-text="取消"
+      :confirm-loading="busy"
+      data-testid="saved-view-save-modal"
+      @ok="saveCurrent"
+    >
+      <label class="field">
+        视图名称
+        <Input
+          v-model:value="saveName"
+          aria-label="saved view name"
+          data-testid="saved-view-name"
+          placeholder="例如：待处理安装工单"
+          :disabled="busy"
+        />
+      </label>
+    </Modal>
+
+    <Modal
+      v-model:open="shareOpen"
+      title="分享视图"
+      ok-text="确认分享"
+      cancel-text="取消"
+      :confirm-loading="busy"
+      data-testid="saved-view-share-modal"
+      @ok="shareSelected"
+    >
+      <div class="share-panel" data-testid="saved-view-share-panel">
+        <div class="field">
+          <span>共享范围</span>
+          <Radio.Group
+            v-model:value="shareMode"
+            aria-label="saved view share mode"
+            data-testid="saved-view-share-mode"
+            :disabled="busy"
+          >
+            <Radio value="TENANT">租户</Radio>
+            <Radio value="ROLE">角色</Radio>
+          </Radio.Group>
+        </div>
+        <label v-if="shareMode === 'ROLE'" class="field">
+          角色
+          <Select
+            v-model:value="shareRoleId"
+            aria-label="saved view share role"
+            data-testid="saved-view-share-role"
+            style="width: 100%"
+            :disabled="busy || roles.length === 0"
+            :options="
+              roles.map((role) => ({
+                value: role.roleId,
+                label: `${role.roleName} (${role.roleCode})`,
+              }))
+            "
+          />
+        </label>
+      </div>
+    </Modal>
   </div>
 </template>
 
 <style scoped>
 .saved-view-bar {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.65rem;
-  align-items: end;
-  margin-bottom: 0.85rem;
-  padding: 0.65rem 0.75rem;
-  border: 1px solid #d9e2ec;
-  border-radius: 6px;
-  background: #f0f4f8;
+  flex-direction: column;
+  gap: 6px;
 }
-.share-row {
-  flex-basis: 100%;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.65rem;
-  align-items: end;
-}
-label {
-  display: grid;
-  gap: 0.25rem;
-  font-size: 0.85rem;
-  color: #486581;
-}
-.save-name {
-  min-width: 12rem;
-}
-select,
-input,
-button {
-  border: 1px solid #bcccdc;
-  border-radius: 6px;
-  padding: 0.4rem 0.65rem;
-}
-button {
-  background: #243b53;
-  color: #fff;
-  border-color: #243b53;
-  cursor: pointer;
-}
-button:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-.badge {
-  align-self: center;
-  font-size: 0.75rem;
-  padding: 0.2rem 0.45rem;
-  border-radius: 4px;
-  background: #d9e2ec;
-  color: #243b53;
-}
-.badge[data-visibility='TENANT'],
-.badge[data-visibility='ROLE'] {
-  background: #d9f0e6;
-  color: #147d64;
+.label {
+  font-size: 13px;
+  color: var(--sos-color-text-secondary, #4b5563);
 }
 .msg {
-  flex-basis: 100%;
   margin: 0;
-  font-size: 0.85rem;
-  color: #334e68;
+  font-size: 12px;
+  color: var(--sos-color-text-secondary, #4b5563);
+}
+.field {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.share-panel {
+  display: grid;
+  gap: 8px;
 }
 </style>
