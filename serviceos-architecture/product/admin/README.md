@@ -29,6 +29,8 @@ lastUpdated: 2026-07-20
 8. [产品验收与里程碑状态](08-product-acceptance.md)
 9. [实施路线图](09-roadmap.md)
 10. [当前路由到目标产品映射](10-current-to-target-matrix.md)
+11. [M383 项目履约配置产品审查](11-m383-product-review.md)
+12. [M384 项目履约配置逐路由验收矩阵](12-m384-fulfillment-route-acceptance-matrix.md)
 
 ## 规范优先级
 
