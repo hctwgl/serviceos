@@ -415,9 +415,9 @@ class DispatchTaskReassignmentSagaPostgresIT {
                 """).update();
 
         assertThatThrownBy(timeoutScanner::detectNextTimeout)
-                // ADR-091：jOOQ 路径下 PL/pgSQL RAISE（SQLState P0001）不在 Spring 错误码映射内，
-                // 以 jOOQ 原生 DataAccessException 上浮并触发同事务回滚（等价原 UncategorizedSQLException）。
-                .isInstanceOf(org.jooq.exception.DataAccessException.class);
+                // PL/pgSQL RAISE（SQLState P0001）不在 Spring 错误码映射内，由 bootstrap 的
+                // uncategorizedJooqExceptionTranslator 统一包装为 UncategorizedSQLException 上浮。
+                .isInstanceOf(org.springframework.dao.DataAccessException.class);
         assertThat(jdbc.sql("SELECT count(*) FROM dsp_service_assignment_saga_timeout")
                 .query(Long.class).single()).isZero();
         assertThat(jdbc.sql("""
