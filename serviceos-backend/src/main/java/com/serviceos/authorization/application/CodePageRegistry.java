@@ -12,7 +12,7 @@ import java.util.List;
  */
 @Component
 final class CodePageRegistry {
-    static final String CATALOG_VERSION = "page-registry-v19";
+    static final String CATALOG_VERSION = "page-registry-v20";
 
     private final List<RegisteredPage> pages = List.of(
             // ADMIN — section = 产品一级菜单
@@ -41,6 +41,8 @@ final class CodePageRegistry {
             page("ADMIN.CONFIGURATION.DESIGNER", "ADMIN", "configuration/designer", "配置设计器", 110, "配置中心",
                     List.of("configuration.draft.write"), null),
             page("ADMIN.WORKFLOW.DESIGNER", "ADMIN", "configuration/workflows", "工作流设计器", 111, "配置中心",
+                    List.of("configuration.draft.write"), null),
+            page("ADMIN.TASK_TEMPLATE.CENTER", "ADMIN", "configuration/task-templates", "任务模板中心", 112, "配置中心",
                     List.of("configuration.draft.write"), null),
             page("ADMIN.USER.DIRECTORY", "ADMIN", "users", "用户管理", 200, "系统管理",
                     List.of("identity.read"), null),

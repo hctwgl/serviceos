@@ -39,6 +39,7 @@ import FulfillmentPreviewPage from './pages/FulfillmentPreviewPage.vue'
 import FulfillmentProfileEditorPage from './pages/FulfillmentProfileEditorPage.vue'
 import FulfillmentPublishFlowPage from './pages/FulfillmentPublishFlowPage.vue'
 import WorkflowDesignerPage from './pages/WorkflowDesignerPage.vue'
+import TaskTemplateCenterPage from './pages/TaskTemplateCenterPage.vue'
 import WorkOrderFulfillmentSnapshotPage from './pages/WorkOrderFulfillmentSnapshotPage.vue'
 import OidcCallbackPage from './pages/OidcCallbackPage.vue'
 import UserDirectoryPage from './pages/UserDirectoryPage.vue'
@@ -193,6 +194,12 @@ export const router = createRouter({
           name: 'ADMIN.WORKFLOW.DESIGNER',
           component: WorkflowDesignerPage,
           meta: { pageId: 'ADMIN.WORKFLOW.DESIGNER' },
+        },
+        {
+          path: 'configuration/task-templates',
+          name: 'ADMIN.TASK_TEMPLATE.CENTER',
+          component: TaskTemplateCenterPage,
+          meta: { pageId: 'ADMIN.TASK_TEMPLATE.CENTER' },
         },
         { path: 'work-orders', name: 'ADMIN.WORKORDER.LIST', component: WorkOrderDirectoryPage },
         { path: 'work-orders/lookup', name: 'ADMIN.WORKORDER.LOOKUP', component: WorkOrderLookupPage },

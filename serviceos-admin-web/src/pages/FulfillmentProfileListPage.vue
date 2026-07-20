@@ -52,7 +52,7 @@ const navItems = computed<ConfigurationNavItem[]>(() => [
   { key: 'basics', label: '基础信息' },
   { key: 'work-order-types', label: '工单类型', badge: String(items.value.length) },
   { key: 'workflow', label: '工作流', badge: '后续' },
-  { key: 'task-templates', label: '任务模板', badge: '后续' },
+  { key: 'task-templates', label: '任务模板' },
   { key: 'forms', label: '表单模板', badge: '后续' },
   { key: 'evidence', label: '资料要求', badge: '后续' },
   { key: 'sla', label: 'SLA 规则', badge: '后续' },
@@ -203,6 +203,10 @@ function statusPresentation(status: string) {
 function onNavSelect(key: string) {
   if (key === 'workflow') {
     router.push({ name: 'ADMIN.WORKFLOW.DESIGNER' })
+    return
+  }
+  if (key === 'task-templates') {
+    router.push({ name: 'ADMIN.TASK_TEMPLATE.CENTER' })
     return
   }
   activeNavKey.value = key

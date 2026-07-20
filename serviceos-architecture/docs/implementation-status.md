@@ -4,7 +4,7 @@ version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-20
 baselineCommit: "9a05be9b9e22be216542260f0979d85ee2cf2bab"
-latestMilestone: M386
+latestMilestone: M387
 ---
 
 # ServiceOS 实施状态总览
@@ -39,13 +39,13 @@ latestMilestone: M386
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M386 Admin 工作流设计器产品化（承接 M385/M388） |
-| 基线提交 | `9a05be9b9e22be216542260f0979d85ee2cf2bab`（历史基线；M385～M388/M386 合入 master 后回填） |
+| 最新实施里程碑 | M387 Admin 任务模板中心产品化（承接 M385/M386/M388） |
+| 基线提交 | `9a05be9b9e22be216542260f0979d85ee2cf2bab`（历史基线；合入 master 后回填） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts`、`@serviceos/web-core`、`ServiceOSIOSCore`、独立且可部署的 `serviceos-network-web` 与 `serviceos-technician-web`、Swift 6 `TechnicianIOSFoundation`，以及已在 iPhone 17 Pro Simulator 安装启动、实跑 XCTest/XCUITest、形成 Production arm64 archive/dSYM，并接入当前任务、在线 Visit、冻结基础表单、前台 Evidence 采集上传、Snapshot/Task 完成与多轮资料整改的原生 `TechnicianIOS` SwiftUI App；由同一 Core OpenAPI 生成并经独立消费者门禁验证的 `@serviceos/core-client` 与 `ServiceOSCoreClient` |
 | 前端工程 | `serviceos-admin-web` 独立承载总部运营；**M370～M377** 完成设计系统 Presenter、产品化 AppShell（ScopeBar/Freshness/诊断抽屉）、标准页模板、工单中心/详情、项目详情与主导航页壳迁移及视觉关闭；仍消费服务端 Navigation 与 allowed-actions；M256 后 Network 正式产品由独立 `serviceos-network-web` 承载，M257 后 Technician 正式产品由独立移动优先 `serviceos-technician-web` 承载；两套独立 Web 均实际接入共享 Core、OIDC PKCE、服务端 Context/Capability/导航、Playwright 回归和独立容器镜像 |
 | 数据库 | PostgreSQL + Flyway（当前版本 **138**；M378 V136/V137 + M383 V138 effective_to 关闭窗口） |
-| 契约 | Core OpenAPI **1.0.63** + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含项目履约 Profile Runbook/Compare-Impact/结构化 Draft Document、`TaskBlockedAction`；`workorder.cancelled@v1`、`workorder.reopened@v1`、`workorder.external-details-updated@v1`、project.created@v3、project.scope-relations-revised@v1、`task.handling-completed@v1`、recovered/resolved 与 SLA started/breached/met@v1；ConfigurationDraft.clientCompatibility/`supportedClientKinds`；Feed/整改 `clientCapabilityUnsupportedDetail`；整改/主 Evidence/`Manual assign`/Network on-behalf `CLIENT_CAPABILITY_UNSUPPORTED`；`ReviewCase.reviewTaskId`；`TechnicianProfile.supportedClientKinds` / declare） |
+| 契约 | Core OpenAPI **1.0.64** + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含项目履约 Profile Runbook/Compare-Impact/结构化 Draft Document/任务模板读模型、`TaskBlockedAction`；`workorder.cancelled@v1`、`workorder.reopened@v1`、`workorder.external-details-updated@v1`、project.created@v3、project.scope-relations-revised@v1、`task.handling-completed@v1`、recovered/resolved 与 SLA started/breached/met@v1；ConfigurationDraft.clientCompatibility/`supportedClientKinds`；Feed/整改 `clientCapabilityUnsupportedDetail`；整改/主 Evidence/`Manual assign`/Network on-behalf `CLIENT_CAPABILITY_UNSUPPORTED`；`ReviewCase.reviewTaskId`；`TechnicianProfile.supportedClientKinds` / declare） |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -162,7 +162,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | 通知 | 通知策略运行时与投递 | `PARTIAL` | **M307** 冻结 Bundle `NotificationRuntime`；**M326** `task.created`/`task.completed` 自动订阅 → Inbox + RoleGrant 收件人 → resolveAndDispatch → Intent/Delivery/Attempt 持久化；LocalReference SENT 本地 ACK，UNKNOWN/FAILED 人工接管 | 模板渲染、真实短信/邮件/Push 供应商、Admin 投递工作台、网络 I/O 移出事务与业务重试 Task 时钟 | M307、M326、`architecture/14-*` |
 | 履约事实与试算 | 事实提取和双向试算 | `PARTIAL` | **M309** `PricingRuntime`；**M327** `workorder.fulfilled` → 最小履约事实 + SHADOW `CalculationSnapshot`（不落账） | 完整 FactDefinition/CalculationRun、应收/应付双轨、对账结算、Admin 计价工作台、AUTHORITATIVE | M309、M327、M5 设计 |
 | 对账结算 | 对账、结算、争议与调整 | `PROPOSED` | 已有边界设计 | 正式运行时和页面 | `architecture/16-*` |
-| Admin Portal | 总部运营后台 | `PARTIAL` | **M284/M287/M289/M291/M292/M294/M295/M296** 配置设计器；M101～M193 运营基线；**M328** UNKNOWN 人工确认/放弃与批量 Replay；**M351** 终审工作区；**M370～M377** 设计系统/AppShell；**M384** 产品蓝图与经典专业风基线；**M385/M388** 履约配置中心与结构化 Draft；**M386** 工作流设计器产品页（`READY_FOR_REVIEW`） | Task 模板中心、其余母版逐页验收、正式企业 OIDC/BFF、批量压测/MFA；不得宣称 PRODUCT_ACCEPTED | M7 设计、M101～M193、M284～M296、M328、M351、M370～M377、M384～M388、M386、Admin 试点基线 |
+| Admin Portal | 总部运营后台 | `PARTIAL` | **M284/M287/M289/M291/M292/M294/M295/M296** 配置设计器；M101～M193 运营基线；**M328** UNKNOWN 人工确认/放弃与批量 Replay；**M351** 终审工作区；**M370～M377** 设计系统/AppShell；**M384** 产品蓝图与经典专业风基线；**M385/M388** 履约配置中心与结构化 Draft；**M386** 工作流设计器；**M387** 任务模板中心（`READY_FOR_REVIEW`） | 其余母版逐页验收、正式企业 OIDC/BFF、批量压测/MFA；不得宣称 PRODUCT_ACCEPTED | M7 设计、M101～M193、M284～M296、M328、M351、M370～M377、M384～M388、M386～M387、Admin 试点基线 |
 | Network Portal | 网点协作端 | `PARTIAL` | M194～M242 已交付 workbench、工单/任务、限定工作区、师傅关系/资质、产能、整改和运营异常等受控读写切片；M256 将全部正式产品页迁入独立 `serviceos-network-web`，接入 OIDC PKCE、`/me` NETWORK 上下文、Capability/服务端导航、跨网点失败关闭、76 项 Playwright 回归与独立容器镜像；Admin 不再承载正式 `/network-portal/*` 路由 | 槽位策略表、完整 product/03 设计系统、评分/容量策略引擎、Portal ACK/resolve/decide、产能申请、notifications/消息页、生产 IdP 与集群发布 | M7 设计、M194～M242、M255～M256 |
 | Technician App / Portal | 师傅移动端与 Feed | `PARTIAL` | M195/M218/M219/M243～M246 只读安全切片；M257 独立 H5；M258～M261 iOS 基础；M262 在线 Visit；M263 冻结基础表单；**M349/M350** H5 条件执行器 + 工单/区域权威头 + validationRules；M264 Evidence 采集上传；M265 Snapshot 与 Task 完成；M266 在线整改；**M357～M363** 运行时能力拒单、定向目标外拒单、Feed/详情头预检、整改路径门禁、列表预检与领取/启动硬拒 | 联系/预约、完整表单草稿、editableWhen/默认值（未接受）、iOS 共用执行器、真实 operationRefs 签退；弱网/后台/Track F 离线；签名真机/真实 IdP/VoiceOver/崩溃采集/TestFlight | M7 设计、M195、M218～M219、M243～M246、M257～M266、M349、M350、M357～M363 |
 | External Portal | 用户/车企受控页面 | `PROPOSED` | 最小边界规划 | 二期页面和工程实现 | M7 设计 |
@@ -181,12 +181,13 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 - **M385 Implemented（切片 A）**：共享经典专业风基础 + 项目履约配置中心母版 + 新建向导 + Runbook/Compare-Impact API + Playwright/截图；产品状态 **`READY_FOR_REVIEW`**。
 - **M388 Implemented**：结构化 `ProjectFulfillmentDocument` Draft 读写；编辑器去产品路径 `documentJson`（OpenAPI **1.0.63**）；产品状态仍 **`READY_FOR_REVIEW`**。
 - **M386 Implemented**：Admin 工作流设计器产品页 `/configuration/workflows`；真实 WORKFLOW Draft API；无 JSON 主编辑；`READY_FOR_REVIEW`。
+- **M387 Implemented**：任务模板中心读模型 + 产品页（OpenAPI **1.0.64**）；`READY_FOR_REVIEW`。
 - **M383** 长链路 test 7/8 仍未闭合，不阻塞本切片。
 
 建议下一批（按优先级）：
 
-1. **M387**：任务模板中心；
-2. 其余 Admin 母版与 Network/Technician 黄金链路产品化。
+1. **M389**：其余 Admin 母版（工作台/用户/项目/工单中心/工单详情深化）；
+2. Network/Technician 黄金链路产品化。
 
 仍为 **硬门禁 / 外部阻塞**（不可发明推进）：
 

@@ -393,6 +393,7 @@ title: ServiceOS 里程碑索引
 | M384 | M384 Admin 产品蓝图接受与 M383 产品状态纠正 | [395-m384-admin-product-baseline.md](../architecture/395-m384-admin-product-baseline.md) |  |
 | M385 | M385 项目履约配置中心产品化（切片 A） | [396-m385-fulfillment-config-center-productization.md](../architecture/396-m385-fulfillment-config-center-productization.md) | [379-m385-fulfillment-config-center-acceptance.md](../testing/379-m385-fulfillment-config-center-acceptance.md) |
 | M386 | M386 Admin 工作流设计器产品化 | [398-m386-workflow-designer-productization.md](../architecture/398-m386-workflow-designer-productization.md) | [381-m386-workflow-designer-acceptance.md](../testing/381-m386-workflow-designer-acceptance.md) |
+| M387 | M387 Admin 任务模板中心产品化 | [399-m387-task-template-center.md](../architecture/399-m387-task-template-center.md) | [382-m387-task-template-center-acceptance.md](../testing/382-m387-task-template-center-acceptance.md) |
 | M388 | M388 履约配置结构化 Draft DTO | [397-m388-structured-fulfillment-draft.md](../architecture/397-m388-structured-fulfillment-draft.md) | [380-m388-structured-fulfillment-draft-acceptance.md](../testing/380-m388-structured-fulfillment-draft-acceptance.md) |
 
 ## 未关联里程碑的文档
