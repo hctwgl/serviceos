@@ -7,13 +7,11 @@ lastUpdated: 2026-07-20
 
 ## 当前
 
-- **状态**：**IMPLEMENTING / Draft PR**
-- 进行中 Draft PR：M364 REVIEW_TASK 分离（Accepted ADR-087 → Implemented）
-- PR：https://github.com/hctwgl/serviceos/pull/191
+- **状态**：**READY_FOR_REVIEW**（M364 本地门禁已过）
+- Draft PR：https://github.com/hctwgl/serviceos/pull/191
 - 分支：`cursor/m364-review-task-separation-design-6a78`
-  （base：`cursor/m363-correction-lifecycle-capability-hard-reject-6a78`）
-- 工程基线目标：**M364**（OpenAPI 1.0.57 / Flyway 132）
-- 决策包：`decisions/ADR-087-review-task-template-separation.md`（**Accepted**：A1-R～A5-R）
+- 工程基线：**M364**（OpenAPI 1.0.57 / Flyway 132）
+- ADR-087：**Accepted**（A1-R～A5-R）
 
 ## 负责人已确认
 
@@ -23,8 +21,8 @@ Accept ADR-087 with: A1-R, A2-R, A3-R, A4-R, A5-R
 
 ## 已闭环
 
-- M356～M363（#183～#190）：Technician 客户端能力门禁垂直切片
-- M364（#191）：独立审核 HUMAN Task / REVIEW_TASK 模板分离
+- M356～M363：Technician 客户端能力门禁垂直切片
+- M364：独立审核 HUMAN Task / REVIEW_TASK 模板分离
 
 ## 下一候选（需选型；不得发明）
 
