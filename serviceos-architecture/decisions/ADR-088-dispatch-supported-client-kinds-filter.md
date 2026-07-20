@@ -21,6 +21,11 @@ accepted:
   - A4-R
   - A5-R
 acceptedAt: 2026-07-20
+amendments:
+  - id: A1-B
+    acceptedAt: 2026-07-20
+    milestone: M367
+    note: Manual + Network Portal assign/reassign 硬拒绝不兼容师傅（422 + DENY 审计）
 ---
 
 # ADR-088：派单级 supportedClientKinds 硬过滤

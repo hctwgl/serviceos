@@ -35,7 +35,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -309,7 +308,8 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
         List<DispatchCandidate> candidates = new ArrayList<>();
         for (NetworkPortalTechnicianView tech : techViews) {
             if (kindTarget.applyFilter()
-                    && !matchesDeclaredClientKinds(tech.supportedClientKinds(), kindTarget.targetKinds())) {
+                    && !DispatchClientKindCompatibility.matchesDeclaredClientKinds(
+                            tech.supportedClientKinds(), kindTarget.targetKinds())) {
                 continue;
             }
             String assigneeId = tech.technicianProfileId().toString();
@@ -391,25 +391,6 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
         inbox.complete(message.tenantId(), CONSUMER, message.eventId(),
                 Sha256.digest(taskId + "|APPLIED|" + networkPolicyEvidence + "|"
                         + policyEvidence + "|" + top.candidateId()));
-    }
-
-    /**
-     * A2-R/A4-R：师傅声明与有效目标非空交集才可通过；未声明在定向任务上失败关闭。
-     */
-    static boolean matchesDeclaredClientKinds(List<String> declared, List<String> targetKinds) {
-        if (declared == null || declared.isEmpty()) {
-            return false;
-        }
-        if (targetKinds == null || targetKinds.isEmpty()) {
-            return false;
-        }
-        Set<String> targets = new HashSet<>(targetKinds);
-        for (String kind : declared) {
-            if (kind != null && targets.contains(kind)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private void auditManual(

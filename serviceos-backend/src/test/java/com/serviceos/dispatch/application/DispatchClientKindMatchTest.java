@@ -9,29 +9,29 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DispatchClientKindMatchTest {
     @Test
     void undeclaredFailsWhenFilterApplies() {
-        assertThat(DefaultTaskDispatchPolicyEventConsumer.matchesDeclaredClientKinds(
+        assertThat(DispatchClientKindCompatibility.matchesDeclaredClientKinds(
                 null, List.of("TECHNICIAN_WEB"))).isFalse();
-        assertThat(DefaultTaskDispatchPolicyEventConsumer.matchesDeclaredClientKinds(
+        assertThat(DispatchClientKindCompatibility.matchesDeclaredClientKinds(
                 List.of(), List.of("TECHNICIAN_WEB"))).isFalse();
     }
 
     @Test
     void matchingKindPasses() {
-        assertThat(DefaultTaskDispatchPolicyEventConsumer.matchesDeclaredClientKinds(
+        assertThat(DispatchClientKindCompatibility.matchesDeclaredClientKinds(
                 List.of("TECHNICIAN_IOS", "TECHNICIAN_WEB"), List.of("TECHNICIAN_WEB")))
                 .isTrue();
     }
 
     @Test
     void disjointKindsFail() {
-        assertThat(DefaultTaskDispatchPolicyEventConsumer.matchesDeclaredClientKinds(
+        assertThat(DispatchClientKindCompatibility.matchesDeclaredClientKinds(
                 List.of("TECHNICIAN_IOS"), List.of("TECHNICIAN_WEB")))
                 .isFalse();
     }
 
     @Test
     void emptyTargetFailsClosed() {
-        assertThat(DefaultTaskDispatchPolicyEventConsumer.matchesDeclaredClientKinds(
+        assertThat(DispatchClientKindCompatibility.matchesDeclaredClientKinds(
                 List.of("TECHNICIAN_WEB"), List.of()))
                 .isFalse();
     }

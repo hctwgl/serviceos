@@ -33,7 +33,7 @@ flywayVersion: "134"
 
 ## 明确未实现
 
-- Manual / Network Portal assign/reassign 硬拒绝（A1-B）；
+- Manual / Network Portal assign/reassign 硬拒绝（A1-B）→ 见 **M367**；
 - Network Portal on-behalf / `NETWORK_WEB` 代师傅语义；
 - iOS 条件执行器全量硬阻断；
 - clientVersion 下限；跨区回退；改写 ADR-009 评分模型。
