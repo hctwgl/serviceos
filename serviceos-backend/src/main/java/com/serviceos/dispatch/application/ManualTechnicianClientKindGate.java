@@ -91,7 +91,8 @@ final class ManualTechnicianClientKindGate {
     ) {
         String evidence = "client-kind|" + String.join(",", target.targetKinds())
                 + "|" + technicianAssigneeId;
-        audit.append(new AuditEntry(
+        // REQUIRES_NEW：外层 manualAssign 因 BusinessProblem 回滚时仍保留拒绝审计。
+        denialAudit.appendDenied(new AuditEntry(
                 UUID.randomUUID(),
                 principal.tenantId(),
                 principal.principalId(),

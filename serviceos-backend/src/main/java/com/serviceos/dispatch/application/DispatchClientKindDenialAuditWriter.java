@@ -10,7 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 派单 kind 硬拒绝审计使用独立事务，确保外层 ManualAssign 回滚后仍保留 DENY 证据。
  */
 @Component
-final class DispatchClientKindDenialAuditWriter {
+class DispatchClientKindDenialAuditWriter {
     private final AuditAppender audit;
 
     DispatchClientKindDenialAuditWriter(AuditAppender audit) {
