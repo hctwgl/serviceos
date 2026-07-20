@@ -4,7 +4,7 @@
 @org.springframework.modulith.ApplicationModule(
         displayName = "Workflow Runtime",
         allowedDependencies = {
-                "shared", "reliability::api", "reliability::spi",
+                "shared", "jooq", "reliability::api", "reliability::spi",
                 "configuration::api", "workorder::api", "task::api", "identity::api"
         }
 )

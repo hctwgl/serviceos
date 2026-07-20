@@ -14,7 +14,7 @@ relatedMilestones: [M18, M19, M268]
 
 ## 范围与非目标
 
-- 范围：`WorkflowDefinitionParser` 网关解析、`WorkflowTaskCompletedHandler` 注入工单表达式上下文、PostgreSQL IT。
+- 范围：`WorkflowDefinitionParser` 网关解析、`JooqWorkflowTaskCompletedHandler` 注入工单表达式上下文、PostgreSQL IT。
 - 明确不做：PARALLEL_GATEWAY、WAIT_EVENT、默认边语义、网关 NodeInstance 落库审计增强、人工跳转。
 
 ## 已实现

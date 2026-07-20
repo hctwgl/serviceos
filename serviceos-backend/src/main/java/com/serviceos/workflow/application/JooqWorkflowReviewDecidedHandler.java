@@ -1,5 +1,6 @@
 package com.serviceos.workflow.application;
 
+import com.serviceos.jooq.generated.tables.WflReviewGateEarlySignal;
 import com.serviceos.reliability.api.InboxDecision;
 import com.serviceos.reliability.api.InboxService;
 import com.serviceos.reliability.spi.OutboxMessage;
@@ -10,7 +11,7 @@ import com.serviceos.task.api.TaskFulfillmentContextService;
 import com.serviceos.workflow.api.ReviewGateWait;
 import com.serviceos.workflow.api.SignalWorkflowWaitCommand;
 import com.serviceos.workflow.api.WorkflowWaitSignalService;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import org.jooq.DSLContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
@@ -22,6 +23,10 @@ import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
 
+import static com.serviceos.jooq.generated.tables.WflReviewGateEarlySignal.WFL_REVIEW_GATE_EARLY_SIGNAL;
+import static com.serviceos.jooq.generated.tables.WflWaitSubscription.WFL_WAIT_SUBSCRIPTION;
+import static org.jooq.impl.DSL.excluded;
+
 /**
  * M365 A5-B：消费 {@code evidence.review-decided}，在 APPROVED / FORCE_APPROVED 时
  * 唤醒 REVIEW_TASK 编排门闸（或写入早期信号供门闸激活时消费）。
@@ -29,26 +34,26 @@ import java.util.UUID;
  * <p>REJECTED 不推进（整改/复审仍停留在门闸）。不修改 ReviewCase.reviewTaskId 绑定语义。</p>
  */
 @Service
-final class WorkflowReviewDecidedHandler implements OutboxMessageHandler {
+final class JooqWorkflowReviewDecidedHandler implements OutboxMessageHandler {
     private static final String CONSUMER = "workflow.evidence-review-decided.v1";
     private static final Set<String> PASSING = Set.of("APPROVED", "FORCE_APPROVED");
 
-    private final JdbcClient jdbc;
+    private final DSLContext dsl;
     private final InboxService inbox;
     private final TaskFulfillmentContextService taskContexts;
     private final WorkflowWaitSignalService waitSignals;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
-    WorkflowReviewDecidedHandler(
-            JdbcClient jdbc,
+    JooqWorkflowReviewDecidedHandler(
+            DSLContext dsl,
             InboxService inbox,
             TaskFulfillmentContextService taskContexts,
             WorkflowWaitSignalService waitSignals,
             ObjectMapper objectMapper,
             Clock clock
     ) {
-        this.jdbc = jdbc;
+        this.dsl = dsl;
         this.inbox = inbox;
         this.taskContexts = taskContexts;
         this.waitSignals = waitSignals;
@@ -89,43 +94,31 @@ final class WorkflowReviewDecidedHandler implements OutboxMessageHandler {
 
         Instant now = clock.instant();
         String signalId = decided.reviewDecisionId().toString();
-        // 先落早期信号，再尝试唤醒；门闸尚未激活时保留 token，激活时由 WorkflowTaskCompletedHandler 消费。
+        // 先落早期信号，再尝试唤醒；门闸尚未激活时保留 token，激活时由 JooqWorkflowTaskCompletedHandler 消费。
         upsertEarlySignal(
                 message.tenantId(), sourceTask.workOrderId(), decided.reviewCaseId(),
                 decided.reviewDecisionId(), decided.decision(), signalId,
                 message.correlationId(), now);
 
         String correlationKey = "workOrder:" + sourceTask.workOrderId();
-        boolean waiting = jdbc.sql("""
-                        SELECT 1
-                          FROM wfl_wait_subscription
-                         WHERE tenant_id = :tenantId
-                           AND wait_event_type = :waitEventType
-                           AND correlation_key = :correlationKey
-                           AND status = 'WAITING'
-                         LIMIT 1
-                        """)
-                .param("tenantId", message.tenantId())
-                .param("waitEventType", ReviewGateWait.WAIT_EVENT_TYPE)
-                .param("correlationKey", correlationKey)
-                .query(Integer.class)
-                .optional()
-                .isPresent();
+        boolean waiting = dsl.fetchExists(
+                dsl.selectOne()
+                        .from(WFL_WAIT_SUBSCRIPTION)
+                        .where(WFL_WAIT_SUBSCRIPTION.TENANT_ID.eq(message.tenantId()))
+                        .and(WFL_WAIT_SUBSCRIPTION.WAIT_EVENT_TYPE.eq(ReviewGateWait.WAIT_EVENT_TYPE))
+                        .and(WFL_WAIT_SUBSCRIPTION.CORRELATION_KEY.eq(correlationKey))
+                        .and(WFL_WAIT_SUBSCRIPTION.STATUS.eq("WAITING")));
         if (waiting) {
             waitSignals.signal(new SignalWorkflowWaitCommand(
                     message.tenantId(), ReviewGateWait.WAIT_EVENT_TYPE, correlationKey,
                     signalId, message.correlationId()));
-            jdbc.sql("""
-                            UPDATE wfl_review_gate_early_signal
-                               SET consumed_at = :consumedAt
-                             WHERE tenant_id = :tenantId
-                               AND work_order_id = :workOrderId
-                               AND consumed_at IS NULL
-                            """)
-                    .param("consumedAt", java.sql.Timestamp.from(now))
-                    .param("tenantId", message.tenantId())
-                    .param("workOrderId", sourceTask.workOrderId())
-                    .update();
+            WflReviewGateEarlySignal signal = WFL_REVIEW_GATE_EARLY_SIGNAL;
+            dsl.update(signal)
+                    .set(signal.CONSUMED_AT, now)
+                    .where(signal.TENANT_ID.eq(message.tenantId()))
+                    .and(signal.WORK_ORDER_ID.eq(sourceTask.workOrderId()))
+                    .and(signal.CONSUMED_AT.isNull())
+                    .execute();
             inbox.complete(message.tenantId(), CONSUMER, message.eventId(),
                     Sha256.digest("WOKE|" + sourceTask.workOrderId()));
             return;
@@ -145,32 +138,28 @@ final class WorkflowReviewDecidedHandler implements OutboxMessageHandler {
             String correlationId,
             Instant createdAt
     ) {
-        jdbc.sql("""
-                        INSERT INTO wfl_review_gate_early_signal (
-                            tenant_id, work_order_id, review_case_id, review_decision_id,
-                            decision, signal_id, correlation_id, created_at, consumed_at
-                        ) VALUES (
-                            :tenantId, :workOrderId, :reviewCaseId, :reviewDecisionId,
-                            :decision, :signalId, :correlationId, :createdAt, NULL
-                        )
-                        ON CONFLICT (tenant_id, work_order_id) DO UPDATE
-                           SET review_case_id = EXCLUDED.review_case_id,
-                               review_decision_id = EXCLUDED.review_decision_id,
-                               decision = EXCLUDED.decision,
-                               signal_id = EXCLUDED.signal_id,
-                               correlation_id = EXCLUDED.correlation_id,
-                               created_at = EXCLUDED.created_at,
-                               consumed_at = NULL
-                        """)
-                .param("tenantId", tenantId)
-                .param("workOrderId", workOrderId)
-                .param("reviewCaseId", reviewCaseId)
-                .param("reviewDecisionId", reviewDecisionId)
-                .param("decision", decision)
-                .param("signalId", signalId)
-                .param("correlationId", correlationId)
-                .param("createdAt", java.sql.Timestamp.from(createdAt))
-                .update();
+        WflReviewGateEarlySignal signal = WFL_REVIEW_GATE_EARLY_SIGNAL;
+        // 冲突即同工单已有早期信号：整行替换为最新决定，并重新置为未消费。
+        dsl.insertInto(signal)
+                .set(signal.TENANT_ID, tenantId)
+                .set(signal.WORK_ORDER_ID, workOrderId)
+                .set(signal.REVIEW_CASE_ID, reviewCaseId)
+                .set(signal.REVIEW_DECISION_ID, reviewDecisionId)
+                .set(signal.DECISION, decision)
+                .set(signal.SIGNAL_ID, signalId)
+                .set(signal.CORRELATION_ID, correlationId)
+                .set(signal.CREATED_AT, createdAt)
+                .setNull(signal.CONSUMED_AT)
+                .onConflict(signal.TENANT_ID, signal.WORK_ORDER_ID)
+                .doUpdate()
+                .set(signal.REVIEW_CASE_ID, excluded(signal.REVIEW_CASE_ID))
+                .set(signal.REVIEW_DECISION_ID, excluded(signal.REVIEW_DECISION_ID))
+                .set(signal.DECISION, excluded(signal.DECISION))
+                .set(signal.SIGNAL_ID, excluded(signal.SIGNAL_ID))
+                .set(signal.CORRELATION_ID, excluded(signal.CORRELATION_ID))
+                .set(signal.CREATED_AT, excluded(signal.CREATED_AT))
+                .setNull(signal.CONSUMED_AT)
+                .execute();
     }
 
     private ReviewDecidedPayload readPayload(String json) {

@@ -16,7 +16,7 @@ import com.serviceos.task.spi.TaskExecutionContext;
 import com.serviceos.task.spi.TaskExecutionResult;
 import com.serviceos.workorder.api.ReceiveExternalWorkOrderCommand;
 import com.serviceos.workorder.api.WorkOrderCommandService;
-import com.serviceos.workflow.application.WorkflowTimerWorker;
+import com.serviceos.workflow.application.JooqWorkflowTimerWorker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -63,7 +63,7 @@ class WorkflowTimerPostgresIT {
     @Autowired ConfigurationService configurations;
     @Autowired TaskExecutionQueue taskQueue;
     @Autowired OutboxWorker outboxWorker;
-    @Autowired WorkflowTimerWorker timerWorker;
+    @Autowired JooqWorkflowTimerWorker timerWorker;
     @Autowired JdbcClient jdbc;
 
     @BeforeEach
@@ -95,7 +95,7 @@ class WorkflowTimerPostgresIT {
                 .query(String.class).single()).isEqualTo("WAITING");
 
         jdbc.sql("UPDATE wfl_timer_subscription SET fire_at = now() - interval '1 second'").update();
-        assertThat(timerWorker.runOnce()).isEqualTo(WorkflowTimerWorker.RunResult.FIRED);
+        assertThat(timerWorker.runOnce()).isEqualTo(JooqWorkflowTimerWorker.RunResult.FIRED);
 
         assertThat(jdbc.sql("SELECT status FROM wfl_timer_subscription")
                 .query(String.class).single()).isEqualTo("FIRED");
@@ -104,7 +104,7 @@ class WorkflowTimerPostgresIT {
                  WHERE node_id IN ('WAIT_TIMER', 'AFTER_TIMER') ORDER BY node_id
                 """).query(String.class).list())
                 .containsExactly("AFTER_TIMER:ACTIVE", "WAIT_TIMER:COMPLETED");
-        assertThat(timerWorker.runOnce()).isEqualTo(WorkflowTimerWorker.RunResult.EMPTY);
+        assertThat(timerWorker.runOnce()).isEqualTo(JooqWorkflowTimerWorker.RunResult.EMPTY);
     }
 
     private Scope scope(String workflowDefinition) {
