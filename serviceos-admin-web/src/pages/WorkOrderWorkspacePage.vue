@@ -1122,7 +1122,10 @@ onMounted(() => {
       <Descriptions :column="3" size="small">
         <Descriptions.Item label="车企">{{ clientLabel }}</Descriptions.Item>
         <Descriptions.Item label="项目">
-          <RouterLink :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: workspace.header.projectId } }">
+          <RouterLink
+            :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: workspace.header.projectId } }"
+            :aria-label="`打开项目 ${workspace.header.projectId}`"
+          >
             {{ projectPresentation.label }}
           </RouterLink>
         </Descriptions.Item>
