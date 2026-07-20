@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageContainer from '../patterns/PageContainer.vue'
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, type RouteLocationRaw } from 'vue-router'
 import QueueTable from './QueueTable.vue'
@@ -168,13 +169,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section>
-    <header class="page-head">
-      <h1>异常中心</h1>
-      <p class="desc">
-        处理运营异常与自动化失败。默认展示待处理异常，可按严重程度、类别、项目或关联工单筛选。
-      </p>
-    </header>
+  <PageContainer title="运营异常" description="确认并处理需要人工介入的运营异常。">
     <form class="filters" @submit.prevent="search">
       <label>
         异常状态
@@ -334,7 +329,7 @@ onMounted(() => {
         打开人工接管任务 {{ item.handlingTaskId }}
       </RouterLink>
     </p>
-  </section>
+  </PageContainer>
 </template>
 
 <style scoped>

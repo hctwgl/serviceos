@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageContainer from '../patterns/PageContainer.vue'
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, type RouteLocationRaw } from 'vue-router'
 import QueueTable from './QueueTable.vue'
@@ -127,7 +128,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="page">
+  <PageContainer title="项目目录" description="管理车企项目、服务范围与合作网点。">
     <form class="filters" @submit.prevent="search">
       <label>
         status
@@ -199,7 +200,7 @@ onMounted(() => {
         {{ item.code }}
       </RouterLink>
     </p>
-  </section>
+  </PageContainer>
 </template>
 
 <style scoped>

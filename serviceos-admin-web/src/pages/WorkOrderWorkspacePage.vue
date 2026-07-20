@@ -1,6 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { Button, Tabs, TabPane, Alert, Select, Input, Descriptions, Space, Card } from 'ant-design-vue'
+import { ArrowLeftOutlined } from '@ant-design/icons-vue'
+import DetailPageLayout from '../patterns/templates/DetailPageLayout.vue'
+import SemanticStatusTag from '../components/business/SemanticStatusTag.vue'
+import { presentWorkOrderStatus } from '../presentation/work-order-status.presenter'
+import { presentPricingStatus } from '../presentation/pricing-status.presenter'
+import { labelClientCode, labelServiceProduct } from '../presentation/enum-labels'
+import { presentEntityName } from '../presentation/entity-name.presenter'
+import { formatDateTimeDisplay } from '../presentation/date-time.presenter'
+import { presentEmptyValue } from '../presentation/empty-value.presenter'
+import { labelAction } from '../presentation/action-labels'
+import { useDeveloperDiagnostics } from '../composables/useDeveloperDiagnostics'
+import { listServiceNetworks, type ServiceNetwork } from '../api/networks'
 import {
   getWorkOrderActivitySummary,
   getWorkOrderWorkspace,
@@ -33,11 +46,32 @@ import StatusBadge from '../components/StatusBadge.vue'
 import FinalReviewWorkspace from '../features/work-orders/components/final-review/FinalReviewWorkspace.vue'
 import { recordRecentVisit } from '../recent/recordRecentVisit'
 import { statusLabel } from '../product/statusLabels'
-import { formatDateTime } from '../product/formatTime'
 import QueueTable from './QueueTable.vue'
 
 const route = useRoute()
+const router = useRouter()
+const diagnostics = useDeveloperDiagnostics()
 const workOrderId = computed(() => String(route.params.id ?? ''))
+const networkOptions = ref<ServiceNetwork[]>([])
+const showTechTab = import.meta.env.DEV
+const productTab = ref('overview')
+
+async function loadNetworks() {
+  try {
+    const page = await listServiceNetworks()
+    networkOptions.value = page.items.filter((n) => n.status === 'ACTIVE')
+  } catch {
+    networkOptions.value = []
+  }
+}
+
+function onProductTabChange(key: string | number) {
+  const k = String(key)
+  productTab.value = k
+  if (k === 'TASKS' || k === 'FORMS_EVIDENCE' || k === 'REVIEWS_CORRECTIONS' || k === 'FINAL_REVIEW' || k === 'TIMELINE_AUDIT' || k === 'INTEGRATION' || k === 'APPOINTMENTS_VISITS') {
+    void loadSection(k as SectionCode)
+  }
+}
 
 const loading = ref(false)
 const error = ref<string | null>(null)
@@ -259,7 +293,18 @@ async function loadWorkspace() {
       (code) => ws.sectionAvailability[code] === 'AVAILABLE' || ws.sectionAvailability[code] === 'EMPTY',
     )
     activeSection.value = tabSection ?? firstAvailable ?? 'TASKS'
+    productTab.value = tabSection === 'FINAL_REVIEW' ? 'FINAL_REVIEW' : (tabSection ?? 'overview')
     await loadSection(activeSection.value)
+    diagnostics.pushDiagnostic({
+      title: '工单工作区技术上下文',
+      fields: {
+        workOrderId: workOrderId.value,
+        allowedActionLink: ws.allowedActionLink,
+        asOf: ws.meta.asOf,
+        timelineFreshnessStatus: ws.timelineFreshnessStatus,
+        resourceVersion: allowedActions.value?.resourceVersion,
+      },
+    })
     recordRecentVisit({
       resourceType: 'WORK_ORDER',
       resourceId: workOrderId.value,
@@ -315,6 +360,9 @@ const sectionPreview = computed(() => {
     data.integration
   return JSON.stringify(payload, null, 2)
 })
+
+// 供技术诊断与深链保留，避免未使用告警删除运行时能力。
+void sectionLabels
 
 type InboundEnvelopeLink = {
   inboundEnvelopeId: string
@@ -983,6 +1031,29 @@ const currentActionBanner = computed(() => {
   return `工单${woStatus} · 当前任务：${taskName}${stageHint}（${taskStatus}）`
 })
 
+
+const orderCode = computed(() => workspace.value?.header.externalOrderCode || presentEmptyValue('not_provided'))
+const workOrderPresentation = computed(() => presentWorkOrderStatus(workspace.value?.header.status))
+const projectPresentation = computed(() =>
+  presentEntityName({ id: workspace.value?.header.projectId, loaded: !!workspace.value }),
+)
+const clientLabel = computed(() => labelClientCode(workOrderDetail.value?.workOrder.clientCode ?? workspace.value?.header.clientCode as string | undefined))
+const networkSelectOptions = computed(() =>
+  networkOptions.value.map((n) => ({
+    value: n.id,
+    label: `${n.networkName}（${n.networkCode}）`,
+  })),
+)
+const slaSummaryText = computed(() => {
+  const sla = workspace.value?.slaSummary
+  if (!sla) return presentEmptyValue('no_permission')
+  const open = Number(sla.openCount ?? 0)
+  const breached = Number(sla.breachedCount ?? 0)
+  if (breached > 0) return `已超时 ${breached} 项，进行中 ${open} 项`
+  if (open > 0) return `进行中 ${open} 项`
+  return '暂无进行中的时效'
+})
+
 watch(workOrderId, () => {
   if (workOrderId.value) {
     void loadWorkspace()
@@ -990,287 +1061,486 @@ watch(workOrderId, () => {
 })
 
 onMounted(() => {
+  void loadNetworks()
   if (workOrderId.value) {
     void loadWorkspace()
   }
 })
 </script>
 
+
 <template>
-  <section class="workspace">
-    <header class="top">
-      <div>
-        <h2>工单工作区</h2>
-        <p class="meta">{{ workOrderId }}</p>
-      </div>
-      <button type="button" :disabled="loading" @click="loadWorkspace">刷新</button>
-    </header>
+  <DetailPageLayout
+    title="工单详情"
+    :eyebrow="orderCode !== '未提供' ? `工单编号 ${orderCode}` : undefined"
+    :show-sticky="!!workspace"
+    sticky-note="主操作来自服务端允许动作；复杂改派请使用专用流程。"
+  >
+    <template #back>
+      <Button type="text" aria-label="返回工单中心" @click="router.push({ name: 'ADMIN.WORKORDER.LIST' })">
+        <template #icon><ArrowLeftOutlined /></template>
+        返回工单中心
+      </Button>
+    </template>
+    <template #status>
+      <SemanticStatusTag v-if="workspace" :presentation="workOrderPresentation" />
+    </template>
+    <template #secondary-actions>
+      <Button :loading="loading" @click="loadWorkspace">刷新</Button>
+      <Button v-if="showTechTab" type="link" @click="productTab = 'tech'; diagnostics.openDrawer()">技术诊断</Button>
+    </template>
+    <template #primary-action>
+      <Button
+        v-if="workspace?.currentTaskSummary && allowedActions?.actions?.length"
+        type="primary"
+        @click="productTab = 'TASKS'; onProductTabChange('TASKS')"
+      >
+        {{ labelAction(allowedActions.actions[0]?.code, allowedActions.actions[0]?.label) }}
+      </Button>
+    </template>
+    <template #feedback>
+      <Alert v-if="error" type="error" show-icon :message="error" />
+      <Alert v-else-if="loading && !workspace" type="info" show-icon message="正在加载工单…" />
+      <Alert v-if="currentActionBanner" type="info" show-icon :message="currentActionBanner" />
+    </template>
 
-    <p v-if="error" class="error">{{ error }}</p>
-    <p v-else-if="loading">加载中…</p>
+    <template v-if="workspace" #summary>
+      <Descriptions :column="3" size="small">
+        <Descriptions.Item label="车企">{{ clientLabel }}</Descriptions.Item>
+        <Descriptions.Item label="项目">
+          <RouterLink :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: workspace.header.projectId } }">
+            {{ projectPresentation.label }}
+          </RouterLink>
+        </Descriptions.Item>
+        <Descriptions.Item label="客户">{{ presentEmptyValue('not_provided') }}</Descriptions.Item>
+        <Descriptions.Item label="手机号">{{ presentEmptyValue('not_provided') }}</Descriptions.Item>
+        <Descriptions.Item label="地址">{{ presentEmptyValue('not_provided') }}</Descriptions.Item>
+        <Descriptions.Item label="服务网点">
+          <template v-if="workspace.serviceAssignmentSummary">
+            {{ presentEntityName({ id: String(workspace.serviceAssignmentSummary.networkId ?? ''), loaded: true }).label }}
+          </template>
+          <template v-else>{{ presentEmptyValue('not_provided') }}</template>
+        </Descriptions.Item>
+        <Descriptions.Item label="服务师傅">
+          <template v-if="workspace.serviceAssignmentSummary">
+            {{ presentEntityName({ id: String(workspace.serviceAssignmentSummary.technicianId ?? ''), loaded: true }).label }}
+          </template>
+          <template v-else>{{ presentEmptyValue('not_provided') }}</template>
+        </Descriptions.Item>
+        <Descriptions.Item label="当前责任人">
+          <template v-if="workspace.currentTaskSummary">
+            {{ statusLabel(workspace.currentTaskSummary.taskType) }}
+            <SemanticStatusTag
+              :presentation="{ label: statusLabel(workspace.currentTaskSummary.status), semantic: 'info', icon: 'info' }"
+            />
+          </template>
+          <template v-else>{{ presentEmptyValue('not_provided') }}</template>
+        </Descriptions.Item>
+        <Descriptions.Item label="SLA">{{ slaSummaryText }}</Descriptions.Item>
+        <Descriptions.Item label="下一步">{{ currentActionBanner || presentEmptyValue('not_generated') }}</Descriptions.Item>
+      </Descriptions>
+    </template>
 
-    <template v-else-if="workspace">
-      <div v-if="currentActionBanner" class="action-banner">
-        <strong>当前动作</strong>
-        <span>{{ currentActionBanner }}</span>
-      </div>
-      <div class="grid">
-        <article class="card">
-          <h3>概览</h3>
-          <dl>
-            <div>
-              <dt>状态</dt>
-              <dd><StatusBadge :status="workspace.header.status" /></dd>
-            </div>
-            <div>
-              <dt>项目</dt>
-              <dd>
-                <RouterLink
-                  :to="{
-                    name: 'ADMIN.PROJECT.DETAIL',
-                    params: { id: workspace.header.projectId },
-                  }"
-                >
-                  {{ workspace.header.projectId }}
-                </RouterLink>
-              </dd>
-            </div>
-            <div><dt>外部单号</dt><dd>{{ workspace.header.externalOrderCode || '—' }}</dd></div>
-            <div><dt>时间线 freshness</dt><dd>{{ workspace.timelineFreshnessStatus }}</dd></div>
-            <div><dt>统计时间</dt><dd>{{ formatDateTime(workspace.meta.asOf) }}</dd></div>
-            <div><dt>allowed-actions</dt><dd>{{ workspace.allowedActionLink || '—' }}</dd></div>
-          </dl>
-        </article>
+    <template v-if="workspace" #progress>
+      <p v-if="stages?.workflow" class="muted">
+        履约流程：{{ stages.workflow.workflowKey || '未命名流程' }} ·
+        {{ stages.workflow.status ? statusLabel(stages.workflow.status) : '未初始化' }}
+      </p>
+      <p v-else class="muted">履约阶段投影暂未加载</p>
+    </template>
 
-        <article class="card" data-testid="pricing-shadow-panel">
-          <h3>影子试算（非结算）</h3>
-          <p class="handoff-hint">
-            只读 SHADOW 定价试算；不提供进入结算、落账或 Statement 写命令。
-          </p>
-          <p v-if="pricingSnapshotsError" class="error">{{ pricingSnapshotsError }}</p>
-          <template v-else-if="pricingSnapshots">
-            <p v-if="pricingSnapshots.emptyHint && !pricingSnapshots.items.length" class="muted">
-              {{ pricingSnapshots.emptyHint }}
-            </p>
-            <ul v-if="pricingSnapshots.items.length" class="pricing-list">
+    <template v-if="workspace" #risk>
+      <Alert
+        v-if="Number(workspace.exceptionSummary?.openCount ?? 0) > 0"
+        type="warning"
+        show-icon
+        :message="`存在 ${workspace.exceptionSummary?.openCount} 条待处理运营异常`"
+      >
+        <template #action>
+          <RouterLink :to="{ name: 'ADMIN.EXCEPTION.QUEUE', query: { workOrderId, status: 'OPEN' } }">
+            打开异常队列
+          </RouterLink>
+        </template>
+      </Alert>
+    </template>
+
+    <Tabs v-if="workspace" v-model:activeKey="productTab" @change="onProductTabChange">
+      <TabPane key="overview" tab="概览">
+        <Space direction="vertical" style="width: 100%" :size="16">
+          <Card title="分配服务网点" size="small">
+            <p class="muted">系统推荐：当前目录未返回推荐原因时，请搜索并确认网点（UI_DATA_GAP）。</p>
+            <label class="field">
+              <span>服务网点</span>
+              <Select
+                v-model:value="networkAssigneeId"
+                show-search
+                allow-clear
+                style="width: 100%; max-width: 420px"
+                placeholder="搜索网点名称"
+                :options="networkSelectOptions"
+                :filter-option="(input, option) => String(option?.label ?? '').includes(input)"
+              />
+              <!-- 保留 smoke 使用的可访问名称；值与上方选择同步 -->
+              <Input
+                v-model:value="networkAssigneeId"
+                aria-label="assign-network networkAssigneeId"
+                class="sr-sync"
+              />
+            </label>
+            <label class="field">
+              <span>业务类型</span>
+              <Input v-model:value="assignBusinessType" aria-label="assign-network businessType" />
+            </label>
+            <Space>
+              <Button
+                type="primary"
+                data-testid="assign-network"
+                :disabled="assignNetworkBusy || !workspace.currentTaskSummary"
+                @click="runAssignNetwork"
+              >
+                {{ assignNetworkBusy ? '分配中…' : '确认分配网点' }}
+              </Button>
+              <a v-if="networkAcceptHandoffUrl" class="handoff-link" :href="networkAcceptHandoffUrl" target="_blank" rel="noreferrer">打开网点端</a>
+              <Button :disabled="!workspace.currentTaskSummary" @click="copyTaskHandoff">
+                {{ handoffCopied ? '已复制' : '复制交接信息' }}
+              </Button>
+            </Space>
+            <Alert v-if="assignNetworkError" type="error" show-icon :message="assignNetworkError" style="margin-top: 8px" />
+            <Alert v-if="assignNetworkMessage" type="success" show-icon :message="assignNetworkMessage" style="margin-top: 8px" />
+            <details class="assign-advanced">
+              <summary>高级：一次分配网点与师傅（跳过网点接单）</summary>
+              <label class="field">
+                <span>服务师傅</span>
+                <Input v-model:value="technicianAssigneeId" aria-label="manual-assign technicianAssigneeId" />
+              </label>
+              <Button :disabled="manualAssignBusy || !workspace.currentTaskSummary" @click="runManualAssign">
+                确认双责任分配
+              </Button>
+              <Alert v-if="manualAssignError" type="error" show-icon :message="manualAssignError" />
+              <Alert v-if="manualAssignMessage" type="success" show-icon :message="manualAssignMessage" />
+            </details>
+          </Card>
+
+          <Card title="影子试算（非正式）" size="small" data-testid="pricing-shadow-panel">
+            <SemanticStatusTag :presentation="presentPricingStatus('SHADOW')" />
+            <p class="muted">只读影子试算，不提供结算落账。</p>
+            <Alert v-if="pricingSnapshotsError" type="error" show-icon :message="pricingSnapshotsError" />
+            <ul v-if="pricingSnapshots?.items?.length" class="pricing-list">
               <li v-for="item in pricingSnapshots.items" :key="item.snapshotId">
                 {{ item.pricingKey }} · {{ item.currency }}
-                {{ (item.totalAmountMinor / 100).toFixed(2) }} · {{ item.mode }}
-                <small>{{ formatDateTime(item.createdAt) }}</small>
+                {{ (item.totalAmountMinor / 100).toFixed(2) }}
+                <SemanticStatusTag :presentation="presentPricingStatus(item.mode)" />
+                <small>{{ formatDateTimeDisplay(item.createdAt) }}</small>
               </li>
             </ul>
-            <p v-else-if="!pricingSnapshots.emptyHint" class="muted">暂无影子试算快照。</p>
-          </template>
-          <p v-else class="muted">加载中…</p>
-        </article>
+            <p v-else class="muted">{{ pricingSnapshots?.emptyHint || '暂无影子试算快照。' }}</p>
+          </Card>
 
-        <article class="card">
-          <h3>当前任务 / 责任 / SLA / 异常</h3>
+          <Card title="当前任务命令" size="small">
+            <Alert v-if="allowedActionsError" type="error" show-icon :message="allowedActionsError" />
+            <p v-else-if="!workspace.currentTaskSummary">无当前任务</p>
+            <TaskCommandPanel
+              v-else-if="allowedActions"
+              :task-id="workspace.currentTaskSummary.taskId"
+              :allowed-actions="allowedActions"
+              @executed="loadWorkspace"
+            />
+            <p v-else>暂无允许动作或无权读取</p>
+          </Card>
+        </Space>
+      </TabPane>
+
+      <TabPane key="TASKS" tab="履约任务">
+        <QueueTable
+          title="工单任务"
+          :columns="['id', 'taskType', 'taskKind', 'status', 'stageCode', 'priority']"
+          :column-labels="{ id: '任务', taskType: '任务类型', taskKind: '任务种类', status: '状态', stageCode: '阶段', priority: '优先级' }"
+          :rows="taskRows"
+          :loading="false"
+          :error="null"
+          :as-of="taskPage?.asOf"
+          :next-cursor="taskPage?.nextCursor ?? null"
+          @refresh="loadAuthorityProjections"
+          @next="() => undefined"
+        />
+        <p v-if="taskPage?.items?.length" class="links">
+          <RouterLink
+            v-for="item in taskPage.items"
+            :key="item.id"
+            :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: item.id } }"
+          >
+            {{ statusLabel(item.taskType) }}
+          </RouterLink>
+        </p>
+        <div v-if="activeSection === 'TASKS'">
+          <p v-if="sectionError" class="error">{{ sectionError }}</p>
+          <p v-else-if="sectionLoading">区块加载中…</p>
+        </div>
+      </TabPane>
+
+      <TabPane key="FORMS_EVIDENCE" tab="勘测与安装资料">
+        <p v-if="sectionError" class="error">{{ sectionError }}</p>
+        <p v-else-if="sectionLoading">区块加载中…</p>
+        <p v-else class="muted">资料与表单明细见下方关联链接；缺字段时显示「未提供」。</p>
+        <p v-if="formSubmissionDetailLinks.length" class="links">
+          <RouterLink
+            v-for="item in formSubmissionDetailLinks"
+            :key="item.submissionId"
+            :to="{ name: 'ADMIN.FORM_SUBMISSION.DETAIL', params: { id: item.submissionId } }"
+          >
+            {{ item.formKey }} / {{ statusLabel(item.validationStatus) }}
+          </RouterLink>
+        </p>
+        <p v-if="evidenceItemDetailLinks.length" class="links">
+          <RouterLink
+            v-for="item in evidenceItemDetailLinks"
+            :key="item.evidenceItemId"
+            :to="{ name: 'ADMIN.EVIDENCE_ITEM.DETAIL', params: { id: item.evidenceItemId } }"
+          >
+            {{ statusLabel(item.status) }}
+          </RouterLink>
+        </p>
+      </TabPane>
+
+      <TabPane key="REVIEWS_CORRECTIONS" tab="审核整改">
+        <p v-if="sectionError" class="error">{{ sectionError }}</p>
+        <p v-else-if="sectionLoading">区块加载中…</p>
+        <p v-if="reviewCaseLinks.length" class="links">
+          <RouterLink
+            v-for="item in reviewCaseLinks"
+            :key="item.reviewCaseId"
+            :to="{ name: 'ADMIN.REVIEW.DETAIL', params: { id: item.reviewCaseId } }"
+          >
+            {{ statusLabel(item.origin) }} / {{ statusLabel(item.status) }}
+          </RouterLink>
+        </p>
+        <p v-if="correctionCaseLinks.length" class="links">
+          <RouterLink
+            v-for="item in correctionCaseLinks"
+            :key="item.correctionCaseId"
+            :to="{ name: 'ADMIN.CORRECTION.DETAIL', params: { id: item.correctionCaseId } }"
+          >
+            {{ statusLabel(item.status) }}
+          </RouterLink>
+        </p>
+      </TabPane>
+
+      <TabPane key="FINAL_REVIEW" tab="平台终审">
+        <FinalReviewWorkspace :work-order-id="workOrderId" />
+      </TabPane>
+
+      <TabPane key="sla" tab="SLA 与异常">
+        <QueueTable
+          title="工单 SLA 实例"
+          :columns="['slaInstanceId', 'slaRef', 'status', 'deadlineAt', 'remainingSeconds', 'overdueSeconds', 'taskId']"
+          :column-labels="{
+            slaInstanceId: '时效单',
+            slaRef: '策略',
+            status: '状态',
+            deadlineAt: '截止时间',
+            remainingSeconds: '剩余时间',
+            overdueSeconds: '超时时长',
+            taskId: '关联任务',
+          }"
+          :rows="slaRows"
+          :loading="false"
+          :error="slaError"
+          :as-of="slaPage?.asOf"
+          :next-cursor="slaPage?.nextCursor ?? null"
+          @refresh="loadSlaInstances"
+          @next="() => undefined"
+        />
+        <p v-if="slaPage?.items?.length" class="links">
+          <RouterLink
+            v-for="item in slaPage.items"
+            :key="item.slaInstanceId"
+            :to="{ name: 'ADMIN.SLA.DETAIL', params: { id: item.slaInstanceId } }"
+          >
+            {{ item.slaRef || '时效详情' }}
+          </RouterLink>
+        </p>
+        <p v-if="slaPage?.items?.length" class="links sla-task-links">
+          <RouterLink
+            v-for="item in slaPage.items"
+            :key="`sla-task-${item.slaInstanceId}`"
+            :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: item.taskId } }"
+          >
+            SLA / {{ item.slaRef || '时效' }} / 任务
+          </RouterLink>
+        </p>
+      </TabPane>
+
+      <TabPane key="TIMELINE_AUDIT" tab="活动记录">
+        <ul v-if="activity?.items?.length">
+          <li v-for="(item, index) in activity.items" :key="index">
+            <strong>{{ statusLabel(String(item.eventType || item.type || 'UNKNOWN')) }}</strong>
+            <span>{{ formatDateTimeDisplay(item.occurredAt) }}</span>
+          </li>
+        </ul>
+        <p v-else>暂无活动摘要</p>
+        <QueueTable
+          title="核心时间线"
+          :columns="['category', 'eventType', 'occurredAt', 'resourceType', 'outcomeCode']"
+          :column-labels="{
+            category: '类别',
+            eventType: '事件',
+            occurredAt: '发生时间',
+            resourceType: '资源类型',
+            outcomeCode: '结果',
+          }"
+          :rows="timelineRows"
+          :loading="false"
+          :error="null"
+          :as-of="timelinePage?.asOf"
+          :next-cursor="timelinePage?.nextCursor ?? null"
+          @refresh="loadAuthorityProjections"
+          @next="() => undefined"
+        />
+      </TabPane>
+
+      <TabPane v-if="showTechTab" key="tech" tab="技术诊断">
+        <Alert
+          type="warning"
+          show-icon
+          message="技术诊断仅开发或授权可见"
+          description="正式运营界面不应展示 UUID、allowed-actions 链接、resourceVersion 等字段。"
+        />
+        <Descriptions bordered size="small" :column="1" style="margin-top: 12px">
+          <Descriptions.Item label="workOrderId">{{ workOrderId }}</Descriptions.Item>
+          <Descriptions.Item label="allowed-actions">{{ workspace.allowedActionLink || '—' }}</Descriptions.Item>
+          <Descriptions.Item label="asOf">{{ workspace.meta.asOf }}</Descriptions.Item>
+          <Descriptions.Item label="timelineFreshness">{{ workspace.timelineFreshnessStatus }}</Descriptions.Item>
+          <Descriptions.Item label="resourceVersion">{{ allowedActions?.resourceVersion ?? '—' }}</Descriptions.Item>
+        </Descriptions>
+        <Button style="margin-top: 12px" @click="diagnostics.openDrawer()">打开诊断抽屉</Button>
+        <pre v-if="sectionPreview !== '—'" class="muted" style="max-height: 200px; overflow: auto">{{ sectionPreview }}</pre>
+        <article v-if="workOrderDetail" class="card" style="margin-top: 12px">
+          <h3>工单权威事实（诊断）</h3>
           <dl>
-            <div>
-              <dt>当前任务</dt>
-              <dd v-if="workspace.currentTaskSummary">
-                {{ statusLabel(workspace.currentTaskSummary.taskType) }}
-                <StatusBadge :status="workspace.currentTaskSummary.status" />
-                <small>
-                  <RouterLink
-                    :to="{
-                      name: 'ADMIN.TASK.DETAIL',
-                      params: { id: workspace.currentTaskSummary.taskId },
-                    }"
-                  >
-                    {{ workspace.currentTaskSummary.taskId }}
-                  </RouterLink>
-                </small>
-              </dd>
-              <dd v-else>—</dd>
-            </div>
-            <div>
-              <dt>服务责任</dt>
-              <dd v-if="workspace.serviceAssignmentSummary">
-                network {{ String(workspace.serviceAssignmentSummary.networkId ?? '—') }} /
-                tech {{ String(workspace.serviceAssignmentSummary.technicianId ?? '—') }}
-              </dd>
-              <dd v-else>不可用或缺失权</dd>
-            </div>
-            <div class="manual-assign">
-              <dt>初审 → 派网点</dt>
-              <dd>
-                <p class="handoff-hint">
-                  主路径：平台确认后将当前任务派给服务网点（仅 NETWORK 责任）。派成功后网点端列表可见，再由网点确认接单或指派师傅。
-                </p>
-                <label>
-                  服务网点
-                  <input
-                    v-model="networkAssigneeId"
-                    aria-label="assign-network networkAssigneeId"
-                  />
-                </label>
-                <label>
-                  业务类型
-                  <input
-                    v-model="assignBusinessType"
-                    aria-label="assign-network businessType"
-                  />
-                </label>
-                <div class="handoff-actions">
-                  <button
-                    type="button"
-                    data-testid="assign-network"
-                    :disabled="assignNetworkBusy || !workspace.currentTaskSummary"
-                    @click="runAssignNetwork"
-                  >
-                    {{ assignNetworkBusy ? '派网点中…' : '初审通过：派给服务网点' }}
-                  </button>
-                  <a
-                    v-if="networkAcceptHandoffUrl"
-                    class="handoff-link"
-                    :href="networkAcceptHandoffUrl"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    打开网点端
-                  </a>
-                  <button
-                    type="button"
-                    :disabled="!workspace.currentTaskSummary"
-                    @click="copyTaskHandoff"
-                  >
-                    {{ handoffCopied ? '已复制' : '复制交接信息' }}
-                  </button>
-                </div>
-                <p v-if="assignNetworkError" class="error">{{ assignNetworkError }}</p>
-                <p v-if="assignNetworkMessage" class="meta">{{ assignNetworkMessage }}</p>
-                <details class="assign-advanced">
-                  <summary>高级：一次初派网点+师傅（跳过网点接单）</summary>
-                  <label>
-                    服务师傅档案编号
-                    <input
-                      v-model="technicianAssigneeId"
-                      aria-label="manual-assign technicianAssigneeId"
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    :disabled="manualAssignBusy || !workspace.currentTaskSummary"
-                    @click="runManualAssign"
-                  >
-                    确认双责任初派
-                  </button>
-                  <p v-if="manualAssignError" class="error">{{ manualAssignError }}</p>
-                  <p v-if="manualAssignMessage" class="meta">{{ manualAssignMessage }}</p>
-                </details>
-              </dd>
-            </div>
-            <div>
-              <dt>SLA</dt>
-              <dd v-if="workspace.slaSummary">
-                open {{ Number(workspace.slaSummary.openCount ?? 0) }} /
-                breached {{ Number(workspace.slaSummary.breachedCount ?? 0) }}
-              </dd>
-              <dd v-else>不可用或缺失权</dd>
-            </div>
-            <div>
-              <dt>异常</dt>
-              <dd v-if="workspace.exceptionSummary" class="exception-summary-links">
-                open {{ Number(workspace.exceptionSummary.openCount ?? 0) }}
-                <RouterLink
-                  :to="{
-                    name: 'ADMIN.EXCEPTION.QUEUE',
-                    query: {
-                      workOrderId,
-                      status: 'OPEN',
-                    },
-                  }"
-                >
-                  打开运营异常队列
-                </RouterLink>
-              </dd>
-              <dd v-else>不可用或缺失权</dd>
-            </div>
+            <div><dt>状态</dt><dd><StatusBadge :status="workOrderDetail.workOrder.status" domain="work-order" /></dd></div>
+            <div><dt>车企</dt><dd>{{ labelClientCode(workOrderDetail.workOrder.clientCode) }}</dd></div>
+            <div><dt>服务产品</dt><dd>{{ labelServiceProduct(workOrderDetail.workOrder.serviceProductCode) }}</dd></div>
+            <div><dt>version</dt><dd>{{ workOrderDetail.workOrder.version }}</dd></div>
           </dl>
         </article>
+      </TabPane>
+    </Tabs>
 
-        <article class="card">
-          <h3>最近活动</h3>
-          <ul v-if="activity?.items?.length">
-            <li v-for="(item, index) in activity.items" :key="index">
-              <strong>{{ item.eventType || item.type || 'event' }}</strong>
-              <span>{{ item.occurredAt || '—' }}</span>
-              <small>{{ item.resourceType }} {{ item.resourceId }}</small>
-            </li>
-          </ul>
-          <p v-else>暂无活动摘要</p>
-          <p v-if="activityResourceLinks.length" class="links activity-resource-links">
-            打开最近活动资源：
-            <RouterLink
-              v-for="item in activityResourceLinks"
-              :key="item.key"
-              :to="{
-                name: item.routeName,
-                params: { id: item.resourceId },
-              }"
-            >
-              {{ item.label }}
-            </RouterLink>
-          </p>
-        </article>
-
-        <article class="card">
-          <h3>当前任务命令</h3>
-          <p class="meta">按钮仅来自服务端 allowed-actions；执行后重新拉取工作区。</p>
-          <p v-if="allowedActionsError" class="error">{{ allowedActionsError }}</p>
-          <p v-else-if="!workspace.currentTaskSummary">无当前任务</p>
-          <TaskCommandPanel
-            v-else-if="allowedActions"
-            :task-id="workspace.currentTaskSummary.taskId"
-            :allowed-actions="allowedActions"
-            @executed="loadWorkspace"
-          />
-          <p v-else>暂无允许动作或无权读取</p>
-          <ul v-if="allowedActions?.actions?.length" class="action-list">
-            <li v-for="action in allowedActions.actions" :key="action.code">
-              <strong>{{ action.label }}</strong>
-              <span>{{ action.code }}</span>
-              <small>
-                obligations:
-                {{ action.obligations.length ? action.obligations.join(', ') : 'none' }}
-              </small>
-            </li>
-          </ul>
-          <p v-if="allowedActions" class="meta">
-            asOf {{ allowedActions.asOf }} / v{{ allowedActions.resourceVersion }}
-          </p>
-        </article>
-      </div>
-
-      <article v-if="workOrderDetail" class="card">
-        <h3>工单权威事实</h3>
-        <dl>
-          <div>
-            <dt>状态</dt>
-            <dd><StatusBadge :status="workOrderDetail.workOrder.status" /></dd>
-          </div>
-          <div><dt>clientCode</dt><dd>{{ workOrderDetail.workOrder.clientCode }}</dd></div>
-          <div><dt>brandCode</dt><dd>{{ workOrderDetail.workOrder.brandCode }}</dd></div>
-          <div><dt>serviceProductCode</dt><dd>{{ workOrderDetail.workOrder.serviceProductCode }}</dd></div>
-          <div><dt>externalOrderCode</dt><dd>{{ workOrderDetail.workOrder.externalOrderCode }}</dd></div>
-          <div><dt>version</dt><dd>{{ workOrderDetail.workOrder.version }}</dd></div>
-          <div><dt>asOf</dt><dd>{{ workOrderDetail.asOf }}</dd></div>
-        </dl>
-      </article>
-      <p v-if="authorityError" class="error">{{ authorityError }}</p>
-
-      <article v-if="stages" class="card">
-        <h3>Workflow / Stage</h3>
-        <p class="meta">
-          workflow={{ stages.workflow?.workflowKey || '—' }} /
-          {{ stages.workflow?.status ? statusLabel(stages.workflow.status) : '未初始化' }} /
-          asOf {{ stages.asOf }}
-        </p>
-      </article>
+    <!-- 保留集成/预约等深链区块：在非终审产品页签时按需渲染原 section 内容 -->
+    <div v-if="workspace && productTab !== 'FINAL_REVIEW' && productTab !== 'overview' && productTab !== 'tech' && productTab !== 'sla'" class="legacy-section-links">
+      <p v-if="inboundEnvelopeLinks.length" class="links inbound-links">
+        打开入站 Envelope：
+        <RouterLink
+          v-for="item in inboundEnvelopeLinks"
+          :key="item.inboundEnvelopeId"
+          :to="{ name: 'ADMIN.INTEGRATION.INBOUND.DETAIL', params: { id: item.inboundEnvelopeId } }"
+        >
+          {{ item.messageType }} / {{ statusLabel(item.processingStatus) }}
+        </RouterLink>
+      </p>
+      <p v-if="outboundDeliveryLinks.length" class="links outbound-links">
+        打开外发交付：
+        <RouterLink
+          v-for="item in outboundDeliveryLinks"
+          :key="item.deliveryId"
+          :to="{ name: 'ADMIN.INTEGRATION.DETAIL', params: { id: item.deliveryId } }"
+        >
+          {{ item.businessMessageType }} / {{ statusLabel(item.status) }} / {{ item.externalOrderCode }}
+        </RouterLink>
+      </p>
+      <p v-if="reviewCorrectionCrossLinks.length" class="links review-cross-links">
+        <RouterLink
+          v-for="item in reviewCorrectionCrossLinks"
+          :key="item.key"
+          :to="{ name: item.routeName, params: { id: item.resourceId } }"
+        >
+          {{ item.label }}
+        </RouterLink>
+      </p>
+      <p v-if="canonicalMessageLinks.length" class="links canonical-links">
+        <RouterLink
+          v-for="item in canonicalMessageLinks"
+          :key="item.canonicalMessageId"
+          :to="{ name: 'ADMIN.INTEGRATION.CANONICAL.DETAIL', params: { id: item.canonicalMessageId } }"
+        >
+          {{ item.messageType }} / {{ statusLabel(item.processingStatus) }}
+        </RouterLink>
+      </p>
+      <p v-if="outboundCrossLinks.length" class="links outbound-cross-links">
+        <RouterLink
+          v-for="item in outboundCrossLinks"
+          :key="item.key"
+          :to="{ name: item.routeName, params: { id: item.resourceId } }"
+        >
+          {{ item.label }}
+        </RouterLink>
+      </p>
+      <p v-if="taskSectionLinks.length" class="links">
+        <RouterLink
+          v-for="item in taskSectionLinks"
+          :key="item.taskId"
+          :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: item.taskId } }"
+        >
+          {{ statusLabel(item.taskType) }} / {{ statusLabel(item.status) }}
+        </RouterLink>
+      </p>
+      <p v-if="appointmentDetailLinks.length" class="links">
+        <RouterLink
+          v-for="item in appointmentDetailLinks"
+          :key="item.appointmentId"
+          :to="{ name: 'ADMIN.APPOINTMENT.DETAIL', params: { id: item.appointmentId } }"
+        >
+          {{ statusLabel(item.status) }}
+        </RouterLink>
+      </p>
+      <p v-if="visitDetailLinks.length" class="links">
+        <RouterLink
+          v-for="item in visitDetailLinks"
+          :key="item.visitId"
+          :to="{ name: 'ADMIN.VISIT.DETAIL', params: { id: item.visitId } }"
+        >
+          {{ statusLabel(item.status) }}
+        </RouterLink>
+      </p>
+      <p v-if="contactAttemptDetailLinks.length" class="links">
+        <RouterLink
+          v-for="item in contactAttemptDetailLinks"
+          :key="item.contactAttemptId"
+          :to="{ name: 'ADMIN.CONTACT_ATTEMPT.DETAIL', params: { id: item.contactAttemptId } }"
+        >
+          {{ statusLabel(item.resultCode) }}
+        </RouterLink>
+      </p>
+      <p v-if="appointmentVisitTaskLinks.length" class="links">
+        <RouterLink
+          v-for="item in appointmentVisitTaskLinks"
+          :key="item.key"
+          :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: item.taskId } }"
+        >
+          {{ item.label }}
+        </RouterLink>
+      </p>
+      <p v-if="formsEvidenceTaskLinks.length" class="links">
+        <RouterLink
+          v-for="item in formsEvidenceTaskLinks"
+          :key="item.key"
+          :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: item.taskId } }"
+        >
+          {{ item.label }}
+        </RouterLink>
+      </p>
+      <p v-if="timelineResourceLinks.length" class="links">
+        <RouterLink
+          v-for="item in timelineResourceLinks"
+          :key="item.key"
+          :to="{ name: item.routeName, params: { id: item.resourceId } }"
+        >
+          {{ item.label }}
+        </RouterLink>
+      </p>
       <QueueTable
-        title="Stage 投影"
+        v-if="showTechTab"
+        title="Stage 投影（诊断）"
         :columns="['id', 'stageCode', 'sequenceNo', 'status', 'activatedAt', 'completedAt']"
         :rows="stageRows"
         :loading="false"
@@ -1280,520 +1550,37 @@ onMounted(() => {
         @refresh="loadAuthorityProjections"
         @next="() => undefined"
       />
-
-      <QueueTable
-        title="工单 Task 摘要"
-        :columns="['id', 'taskType', 'taskKind', 'status', 'stageCode', 'priority', 'version']"
-        :rows="taskRows"
-        :loading="false"
-        :error="null"
-        :as-of="taskPage?.asOf"
-        :next-cursor="taskPage?.nextCursor ?? null"
-        @refresh="loadAuthorityProjections"
-        @next="() => undefined"
-      />
-      <p v-if="taskPage?.items?.length" class="links">
-        打开任务：
+      <p v-if="activityResourceLinks.length" class="links activity-resource-links">
         <RouterLink
-          v-for="item in taskPage.items"
-          :key="item.id"
-          :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: item.id } }"
-        >
-          {{ statusLabel(item.taskType) }} / {{ item.id }}
-        </RouterLink>
-      </p>
-
-      <QueueTable
-        title="核心时间线"
-        :columns="['id', 'category', 'eventType', 'occurredAt', 'resourceType', 'resourceId', 'outcomeCode']"
-        :rows="timelineRows"
-        :loading="false"
-        :error="null"
-        :as-of="timelinePage?.asOf"
-        :next-cursor="timelinePage?.nextCursor ?? null"
-        @refresh="loadAuthorityProjections"
-        @next="() => undefined"
-      />
-      <p v-if="coreTimelineResourceLinks.length" class="links core-timeline-resource-links">
-        打开核心时间线资源：
-        <RouterLink
-          v-for="item in coreTimelineResourceLinks"
+          v-for="item in activityResourceLinks"
           :key="item.key"
-          :to="{
-            name: item.routeName,
-            params: { id: item.resourceId },
-          }"
+          :to="{ name: item.routeName, params: { id: item.resourceId } }"
         >
           {{ item.label }}
         </RouterLink>
       </p>
-      <p v-if="timelinePage" class="meta">
-        freshness={{ timelinePage.freshnessStatus }} / resourceVersion={{ timelinePage.resourceVersion }} /
-        lastProjectedAt={{ timelinePage.lastProjectedAt || '—' }}
-      </p>
-
-      <QueueTable
-        title="工单 SLA 实例"
-        :columns="['slaInstanceId', 'slaRef', 'status', 'deadlineAt', 'remainingSeconds', 'overdueSeconds', 'taskId']"
-        :rows="slaRows"
-        :loading="false"
-        :error="slaError"
-        :as-of="slaPage?.asOf"
-        :next-cursor="slaPage?.nextCursor ?? null"
-        @refresh="loadSlaInstances"
-        @next="() => undefined"
-      />
-      <p v-if="slaPage?.items?.length" class="links">
-        打开 SLA 详情：
+      <p v-if="coreTimelineResourceLinks.length" class="links core-timeline-resource-links">
         <RouterLink
-          v-for="item in slaPage.items"
-          :key="item.slaInstanceId"
-          :to="{ name: 'ADMIN.SLA.DETAIL', params: { id: item.slaInstanceId } }"
+          v-for="item in coreTimelineResourceLinks"
+          :key="item.key"
+          :to="{ name: item.routeName, params: { id: item.resourceId } }"
         >
-          {{ item.slaRef || item.slaInstanceId }}
+          {{ item.label }}
         </RouterLink>
       </p>
-      <p v-if="slaPage?.items?.length" class="links sla-task-links">
-        打开 SLA 关联任务：
-        <RouterLink
-          v-for="item in slaPage.items"
-          :key="`sla-task-${item.slaInstanceId}`"
-          :to="{ name: 'ADMIN.TASK.DETAIL', params: { id: item.taskId } }"
-        >
-          <!-- 三段标签：避免与权威区「taskType / taskId」strict 冲突 -->
-          SLA / {{ item.slaRef || item.slaInstanceId }} / {{ item.taskId }}
-        </RouterLink>
-      </p>
-
-      <article class="card sections">
-        <h3>按需区块</h3>
-        <div class="tabs">
-          <button
-            v-for="code in sections"
-            :key="code"
-            type="button"
-            :class="{ active: activeSection === code }"
-            :disabled="workspace.sectionAvailability[code] === 'UNAVAILABLE'"
-            @click="loadSection(code)"
-          >
-            {{ sectionLabels[code] }}
-            <em>{{ workspace.sectionAvailability[code] || '?' }}</em>
-          </button>
-        </div>
-        <FinalReviewWorkspace
-          v-if="activeSection === 'FINAL_REVIEW'"
-          :work-order-id="workOrderId"
-        />
-        <p v-else-if="sectionError" class="error">{{ sectionError }}</p>
-        <p v-else-if="sectionLoading">区块加载中…</p>
-        <template v-else>
-          <p v-if="inboundEnvelopeLinks.length" class="links inbound-links">
-            打开入站 Envelope：
-            <RouterLink
-              v-for="item in inboundEnvelopeLinks"
-              :key="item.inboundEnvelopeId"
-              :to="{
-                name: 'ADMIN.INTEGRATION.INBOUND.DETAIL',
-                params: { id: item.inboundEnvelopeId },
-              }"
-            >
-              {{ item.messageType }} / {{ statusLabel(item.processingStatus) }}
-              <template v-if="item.resultCode"> / {{ item.resultCode }}</template>
-            </RouterLink>
-          </p>
-          <p v-if="canonicalMessageLinks.length" class="links canonical-links">
-            打开 Canonical Message：
-            <RouterLink
-              v-for="item in canonicalMessageLinks"
-              :key="item.canonicalMessageId"
-              :to="{
-                name: 'ADMIN.INTEGRATION.CANONICAL.DETAIL',
-                params: { id: item.canonicalMessageId },
-              }"
-            >
-              {{ item.messageType }} / {{ statusLabel(item.processingStatus) }} /
-              {{ item.canonicalMessageId }}
-            </RouterLink>
-          </p>
-          <p v-if="outboundDeliveryLinks.length" class="links outbound-links">
-            打开外发交付：
-            <RouterLink
-              v-for="item in outboundDeliveryLinks"
-              :key="item.deliveryId"
-              :to="{
-                name: 'ADMIN.INTEGRATION.DETAIL',
-                params: { id: item.deliveryId },
-              }"
-            >
-              {{ item.businessMessageType }} / {{ statusLabel(item.status) }} / {{ item.externalOrderCode }}
-            </RouterLink>
-          </p>
-          <p v-if="outboundCrossLinks.length" class="links outbound-cross-links">
-            打开外发关联资源：
-            <RouterLink
-              v-for="item in outboundCrossLinks"
-              :key="item.key"
-              :to="{
-                name: item.routeName,
-                params: { id: item.resourceId },
-              }"
-            >
-              {{ item.label }}
-            </RouterLink>
-          </p>
-          <p v-if="reviewCaseLinks.length" class="links review-links">
-            打开审核案例：
-            <RouterLink
-              v-for="item in reviewCaseLinks"
-              :key="item.reviewCaseId"
-              :to="{
-                name: 'ADMIN.REVIEW.DETAIL',
-                params: { id: item.reviewCaseId },
-              }"
-            >
-              {{ statusLabel(item.origin) }} / {{ statusLabel(item.status) }} / {{ item.reviewCaseId }}
-            </RouterLink>
-          </p>
-          <p v-if="correctionCaseLinks.length" class="links correction-links">
-            打开整改案例：
-            <RouterLink
-              v-for="item in correctionCaseLinks"
-              :key="item.correctionCaseId"
-              :to="{
-                name: 'ADMIN.CORRECTION.DETAIL',
-                params: { id: item.correctionCaseId },
-              }"
-            >
-              {{ statusLabel(item.status) }} / {{ item.correctionCaseId }}
-            </RouterLink>
-          </p>
-          <p
-            v-if="reviewCorrectionCrossLinks.length"
-            class="links review-correction-cross-links"
-          >
-            打开审核/整改关联资源：
-            <RouterLink
-              v-for="item in reviewCorrectionCrossLinks"
-              :key="item.key"
-              :to="{
-                name: item.routeName,
-                params: { id: item.resourceId },
-              }"
-            >
-              {{ item.label }}
-            </RouterLink>
-          </p>
-          <p v-if="taskSectionLinks.length" class="links task-section-links">
-            打开区块任务：
-            <RouterLink
-              v-for="item in taskSectionLinks"
-              :key="item.taskId"
-              :to="{
-                name: 'ADMIN.TASK.DETAIL',
-                params: { id: item.taskId },
-              }"
-            >
-              {{ statusLabel(item.taskType) }} / {{ statusLabel(item.taskKind) }} / {{ statusLabel(item.status) }} / {{ item.taskId }}
-            </RouterLink>
-          </p>
-          <p v-if="timelineResourceLinks.length" class="links timeline-resource-links">
-            打开时间线资源：
-            <RouterLink
-              v-for="item in timelineResourceLinks"
-              :key="item.key"
-              :to="{
-                name: item.routeName,
-                params: { id: item.resourceId },
-              }"
-            >
-              {{ item.label }}
-            </RouterLink>
-          </p>
-          <p v-if="appointmentDetailLinks.length" class="links appointment-detail-links">
-            打开预约详情：
-            <RouterLink
-              v-for="item in appointmentDetailLinks"
-              :key="item.appointmentId"
-              :to="{
-                name: 'ADMIN.APPOINTMENT.DETAIL',
-                params: { id: item.appointmentId },
-              }"
-            >
-              {{ statusLabel(item.type) }} / {{ statusLabel(item.status) }} / {{ item.appointmentId }}
-            </RouterLink>
-          </p>
-          <p v-if="visitDetailLinks.length" class="links visit-detail-links">
-            打开上门详情：
-            <RouterLink
-              v-for="item in visitDetailLinks"
-              :key="item.visitId"
-              :to="{
-                name: 'ADMIN.VISIT.DETAIL',
-                params: { id: item.visitId },
-              }"
-            >
-              {{ statusLabel(item.status) }} / seq={{ item.visitSequence }} / {{ item.visitId }}
-            </RouterLink>
-          </p>
-          <p v-if="contactAttemptDetailLinks.length" class="links contact-attempt-detail-links">
-            打开联系详情：
-            <RouterLink
-              v-for="item in contactAttemptDetailLinks"
-              :key="item.contactAttemptId"
-              :to="{
-                name: 'ADMIN.CONTACT_ATTEMPT.DETAIL',
-                params: { id: item.contactAttemptId },
-              }"
-            >
-              {{ item.channel }} / {{ item.resultCode }} / {{ item.contactAttemptId }}
-            </RouterLink>
-          </p>
-          <p v-if="appointmentVisitTaskLinks.length" class="links appointment-visit-task-links">
-            打开预约上门关联任务：
-            <RouterLink
-              v-for="item in appointmentVisitTaskLinks"
-              :key="item.key"
-              :to="{
-                name: 'ADMIN.TASK.DETAIL',
-                params: { id: item.taskId },
-              }"
-            >
-              {{ item.label }}
-            </RouterLink>
-          </p>
-          <p v-if="formSubmissionDetailLinks.length" class="links form-submission-detail-links">
-            打开表单提交详情：
-            <RouterLink
-              v-for="item in formSubmissionDetailLinks"
-              :key="item.submissionId"
-              :to="{
-                name: 'ADMIN.FORM_SUBMISSION.DETAIL',
-                params: { id: item.submissionId },
-              }"
-            >
-              {{ item.formKey }} / {{ statusLabel(item.validationStatus) }} / {{ item.submissionId }}
-            </RouterLink>
-          </p>
-          <p v-if="evidenceItemDetailLinks.length" class="links evidence-item-detail-links">
-            打开资料项详情：
-            <RouterLink
-              v-for="item in evidenceItemDetailLinks"
-              :key="item.evidenceItemId"
-              :to="{
-                name: 'ADMIN.EVIDENCE_ITEM.DETAIL',
-                params: { id: item.evidenceItemId },
-              }"
-            >
-              #{{ item.itemOrdinal }} / {{ statusLabel(item.status) }} / {{ item.evidenceItemId }}
-            </RouterLink>
-          </p>
-          <p v-if="formsEvidenceTaskLinks.length" class="links forms-evidence-task-links">
-            打开表单资料关联任务：
-            <RouterLink
-              v-for="item in formsEvidenceTaskLinks"
-              :key="item.key"
-              :to="{
-                name: 'ADMIN.TASK.DETAIL',
-                params: { id: item.taskId },
-              }"
-            >
-              {{ item.label }}
-            </RouterLink>
-          </p>
-          <pre>{{ sectionPreview }}</pre>
-        </template>
-      </article>
-    </template>
-  </section>
+    </div>
+  </DetailPageLayout>
 </template>
 
 <style scoped>
-.workspace {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-.top {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-}
-.action-banner {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem 0.75rem;
-  padding: 0.75rem 1rem;
-  background: #eef4ff;
-  border: 1px solid #c3dafe;
-  border-radius: 10px;
-  color: #243b53;
-  font-size: 0.95rem;
-}
-.action-banner strong {
-  color: #1864ab;
-}
-.meta {
-  margin: 0.25rem 0 0;
-  color: #627d98;
-  font-family: ui-monospace, monospace;
-  font-size: 0.85rem;
-}
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 1rem;
-}
-.card {
-  background: #fff;
-  border-radius: 12px;
-  padding: 1rem 1.15rem;
-  box-shadow: 0 1px 3px rgb(16 42 67 / 8%);
-}
-h2,
-h3 {
-  margin: 0 0 0.75rem;
-}
-dl {
-  margin: 0;
-  display: grid;
-  gap: 0.55rem;
-}
-dt {
-  font-size: 0.78rem;
-  color: #627d98;
-}
-dd {
-  margin: 0.1rem 0 0;
-}
-dd small {
-  display: block;
-  color: #829ab1;
-  font-family: ui-monospace, monospace;
-}
-ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 0.55rem;
-}
-li {
-  display: grid;
-  gap: 0.15rem;
-}
-li span,
-li small {
-  color: #627d98;
-  font-size: 0.85rem;
-}
-.tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-bottom: 0.75rem;
-}
-.tabs button {
-  border: 1px solid #bcccdc;
-  background: #f0f4f8;
-  border-radius: 999px;
-  padding: 0.35rem 0.7rem;
-  cursor: pointer;
-}
-.tabs button.active {
-  background: #243b53;
-  color: #fff;
-  border-color: #243b53;
-}
-.tabs button em {
-  font-style: normal;
-  margin-left: 0.35rem;
-  opacity: 0.75;
-  font-size: 0.75rem;
-}
-.tabs button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-pre {
-  margin: 0;
-  max-height: 420px;
-  overflow: auto;
-  background: #f0f4f8;
-  border-radius: 8px;
-  padding: 0.75rem;
-  font-size: 0.8rem;
-}
-.error {
-  color: #9b1c1c;
-}
-.action-list {
-  list-style: none;
-  margin: 0.75rem 0 0;
-  padding: 0;
-  display: grid;
-  gap: 0.35rem;
-}
-.action-list small {
-  display: block;
-  color: #829ab1;
-}
-.links {
-  margin: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  font-size: 0.9rem;
-}
-.exception-summary-links {
-  display: grid;
-  gap: 0.35rem;
-}
-button {
-  border: 1px solid #bcccdc;
-  background: #f0f4f8;
-  border-radius: 6px;
-  padding: 0.4rem 0.75rem;
-  cursor: pointer;
-}
-.manual-assign dd {
-  display: grid;
-  gap: 0.4rem;
-}
-.manual-assign label {
-  display: grid;
-  gap: 0.15rem;
-  font-size: 0.8rem;
-  color: #627d98;
-}
-.manual-assign input {
-  border: 1px solid #bcccdc;
-  border-radius: 6px;
-  padding: 0.35rem 0.5rem;
-  font-family: ui-monospace, monospace;
-}
-.handoff-hint {
-  margin: 0;
-  color: #486581;
-  font-size: 0.85rem;
-  line-height: 1.4;
-}
-.handoff-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: center;
-}
-.handoff-link {
-  color: #0b6e4f;
-  font-weight: 600;
-}
-.assign-advanced {
-  margin-top: 0.35rem;
-}
-.assign-advanced summary {
-  cursor: pointer;
-  color: #627d98;
-  font-size: 0.85rem;
-}
+.muted { margin: 0 0 8px; color: var(--sos-color-text-tertiary, #7b8494); font-size: 13px; }
+.field { display: grid; gap: 6px; margin-bottom: 12px; font-size: 13px; }
+.links { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+.pricing-list { margin: 8px 0 0; padding-left: 18px; }
+.assign-advanced { margin-top: 12px; }
+.handoff-link { font-size: 13px; }
+.error { color: var(--sos-color-status-critical-fg); }
+.sr-sync { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.card { background: #fff; padding: 12px; border-radius: 8px; }
+.legacy-section-links { margin-top: 12px; }
 </style>

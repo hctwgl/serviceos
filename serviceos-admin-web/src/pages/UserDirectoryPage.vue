@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageContainer from '../patterns/PageContainer.vue'
 import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { listSecurityPrincipals, type SecurityPrincipalPage } from '../api/securityPrincipals'
@@ -36,12 +37,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="page" data-testid="user-directory-page">
-    <header>
-      <h2>用户目录</h2>
-      <p class="hint">按姓名/工号搜索选择人员；UUID 不是主要操作方式。</p>
-    </header>
-    <form class="filters" @submit.prevent="load()">
+  <div data-testid="user-directory-page">
+  <PageContainer title="用户目录" description="查询平台用户与主体档案。"><form class="filters" @submit.prevent="load()">
       <label>
         搜索
         <input
@@ -95,7 +92,8 @@ onMounted(() => {
     >
       下一页
     </button>
-  </section>
+  </PageContainer>
+  </div>
 </template>
 
 <style scoped>
@@ -105,7 +103,7 @@ onMounted(() => {
 }
 .hint {
   margin: 0.25rem 0 0;
-  color: #627d98;
+  color: var(--sos-color-text-secondary, #4b5563);
 }
 .filters {
   display: flex;
@@ -117,7 +115,7 @@ label {
   display: grid;
   gap: 0.25rem;
   font-size: 0.85rem;
-  color: #486581;
+  color: var(--sos-color-text-secondary, #4b5563);
 }
 input,
 select {

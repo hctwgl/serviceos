@@ -1,4 +1,10 @@
+/**
+ * ServiceOS Design Tokens v1.0.0
+ * 语义 Token 唯一事实源；业务组件禁止硬编码色值表达状态。
+ * 破坏性变更见 docs/design-tokens.md
+ */
 :root {
+  /* —— Brand (surface of identity, never success/danger) —— */
   --sos-primary-900: #0b2f49;
   --sos-primary-800: #103b5b;
   --sos-primary-700: #174a6e;
@@ -13,33 +19,174 @@
   --sos-accent-100: #dff7f3;
   --sos-accent-050: #f0fbf9;
 
-  --sos-success: #2f9461;
-  --sos-success-bg: #eaf7f0;
-  --sos-warning: #c97b13;
-  --sos-warning-bg: #fff6e6;
-  --sos-danger: #d14343;
-  --sos-danger-bg: #fff0f0;
-  --sos-info: #3578c6;
-  --sos-info-bg: #edf5ff;
+  /* —— Semantic status —— */
+  --sos-color-status-neutral-fg: #4b5563;
+  --sos-color-status-neutral-bg: #eef1f4;
+  --sos-color-status-neutral-border: #dfe3e8;
 
-  --sos-text-primary: #1f2937;
-  --sos-text-secondary: #4b5563;
-  --sos-text-tertiary: #7b8494;
-  --sos-text-disabled: #a7adb7;
+  --sos-color-status-info-fg: #16457a;
+  --sos-color-status-info-bg: #edf5ff;
+  --sos-color-status-info-border: #9ec5f0;
 
-  --sos-border-default: #dfe3e8;
-  --sos-border-light: #eaedf0;
-  --sos-divider: #edf0f2;
+  --sos-color-status-success-fg: #17633f;
+  --sos-color-status-success-bg: #eaf7f0;
+  --sos-color-status-success-border: #8fceb0;
 
-  --sos-bg-page: #f4f6f8;
-  --sos-bg-card: #ffffff;
-  --sos-bg-muted: #f8f9fa;
-  --sos-bg-hover: #f2f6f9;
+  --sos-color-status-warning-fg: #7a4800;
+  --sos-color-status-warning-bg: #fff6e6;
+  --sos-color-status-warning-border: #e0b56a;
 
+  --sos-color-status-critical-fg: #9b1717;
+  --sos-color-status-critical-bg: #fff0f0;
+  --sos-color-status-critical-border: #e09090;
+
+  --sos-color-status-stale-fg: #5b4b2e;
+  --sos-color-status-stale-bg: #f7f1e6;
+  --sos-color-status-stale-border: #d9c7a3;
+
+  --sos-color-status-offline-fg: #3f4a5a;
+  --sos-color-status-offline-bg: #e8ecf1;
+  --sos-color-status-offline-border: #c5ced9;
+
+  --sos-color-status-shadow-fg: #5a4570;
+  --sos-color-status-shadow-bg: #f3eef8;
+  --sos-color-status-shadow-border: #c9b6de;
+
+  /* legacy aliases used by existing pages during migration */
+  --sos-success: var(--sos-color-status-success-fg);
+  --sos-success-bg: var(--sos-color-status-success-bg);
+  --sos-warning: var(--sos-color-status-warning-fg);
+  --sos-warning-bg: var(--sos-color-status-warning-bg);
+  --sos-danger: var(--sos-color-status-critical-fg);
+  --sos-danger-bg: var(--sos-color-status-critical-bg);
+  --sos-info: var(--sos-color-status-info-fg);
+  --sos-info-bg: var(--sos-color-status-info-bg);
+
+  /* —— Surface / text / border / action —— */
+  --sos-color-surface-page: #f4f6f8;
+  --sos-color-surface-card: #ffffff;
+  --sos-color-surface-muted: #f8f9fa;
+  --sos-color-surface-hover: #f2f6f9;
+  --sos-color-surface-sunken: #eef1f4;
+
+  --sos-color-text-primary: #1f2937;
+  --sos-color-text-secondary: #4b5563;
+  /* AA 对比：相对白底需 ≥4.5:1（原 #7b8494 ≈3.76，不达标） */
+  --sos-color-text-tertiary: #5f6b7a;
+  --sos-color-text-disabled: #a7adb7;
+  --sos-color-text-inverse: #ffffff;
+
+  --sos-color-border-default: #dfe3e8;
+  --sos-color-border-light: #eaedf0;
+  --sos-color-border-strong: #c5ced9;
+  --sos-color-divider: #edf0f2;
+
+  --sos-color-action-primary: var(--sos-primary-600);
+  --sos-color-action-primary-hover: var(--sos-primary-700);
+  --sos-color-action-danger: var(--sos-color-status-critical-fg);
+
+  --sos-text-primary: var(--sos-color-text-primary);
+  --sos-text-secondary: var(--sos-color-text-secondary);
+  --sos-text-tertiary: var(--sos-color-text-tertiary);
+  --sos-text-disabled: var(--sos-color-text-disabled);
+  --sos-border-default: var(--sos-color-border-default);
+  --sos-border-light: var(--sos-color-border-light);
+  --sos-divider: var(--sos-color-divider);
+  --sos-bg-page: var(--sos-color-surface-page);
+  --sos-bg-card: var(--sos-color-surface-card);
+  --sos-bg-muted: var(--sos-color-surface-muted);
+  --sos-bg-hover: var(--sos-color-surface-hover);
+
+  /* —— Typography —— */
+  --sos-font-stack: Inter, 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', Arial, sans-serif;
+  --sos-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sos-font-size-xs: 12px;
+  --sos-font-size-sm: 13px;
+  --sos-font-size-md: 14px;
+  --sos-font-size-lg: 16px;
+  --sos-font-size-xl: 20px;
+  --sos-font-size-title: 20px;
+  --sos-font-weight-regular: 400;
+  --sos-font-weight-medium: 500;
+  --sos-font-weight-semibold: 600;
+  --sos-line-height-tight: 1.35;
+  --sos-line-height-normal: 1.5;
+
+  /* —— Spacing (4px grid) —— */
+  --sos-space-0: 0;
+  --sos-space-1: 4px;
+  --sos-space-2: 8px;
+  --sos-space-3: 12px;
+  --sos-space-4: 16px;
+  --sos-space-5: 20px;
+  --sos-space-6: 24px;
+  --sos-space-8: 32px;
+  --sos-space-10: 40px;
+  --sos-space-12: 48px;
+
+  /* —— Radius / elevation —— */
+  --sos-radius-sm: 4px;
+  --sos-radius-md: 8px;
+  --sos-radius-lg: 12px;
+  --sos-radius-pill: 999px;
+  --sos-elevation-0: none;
+  --sos-elevation-1: 0 1px 2px rgb(16 42 67 / 6%);
+  --sos-elevation-2: 0 2px 8px rgb(16 42 67 / 8%);
+  --sos-elevation-3: 0 8px 24px rgb(16 42 67 / 12%);
+
+  /* —— Motion —— */
+  --sos-motion-duration-fast: 120ms;
+  --sos-motion-duration-normal: 200ms;
+  --sos-motion-duration-slow: 320ms;
+  --sos-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --sos-motion-easing-emphasized: cubic-bezier(0.2, 0, 0, 1);
+
+  /* —— Layout / density —— */
   --sos-header-height: 56px;
   --sos-sider-width: 216px;
   --sos-sider-collapsed: 64px;
   --sos-content-padding-x: 24px;
   --sos-content-padding-y: 16px;
-  --sos-font-stack: Inter, 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', Arial, sans-serif;
+  --sos-control-height: 32px;
+  --sos-control-height-lg: 36px;
+  --sos-touch-target-min: 44px;
+
+  /* —— Breakpoint —— */
+  --sos-breakpoint-sm: 768px;
+  --sos-breakpoint-md: 1024px;
+  --sos-breakpoint-lg: 1280px;
+  --sos-breakpoint-xl: 1440px;
+
+  /* —— Safe area —— */
+  --sos-safe-top: env(safe-area-inset-top, 0px);
+  --sos-safe-right: env(safe-area-inset-right, 0px);
+  --sos-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --sos-safe-left: env(safe-area-inset-left, 0px);
+
+  /* —— Z-index —— */
+  --sos-z-base: 0;
+  --sos-z-sticky: 100;
+  --sos-z-dropdown: 1000;
+  --sos-z-header: 1100;
+  --sos-z-drawer: 1200;
+  --sos-z-modal: 1300;
+  --sos-z-popover: 1400;
+  --sos-z-toast: 1500;
+  --sos-z-diagnostics: 1600;
+
+  /* —— Chart palette (non-status) —— */
+  --sos-chart-1: #1e5b84;
+  --sos-chart-2: #0b9485;
+  --sos-chart-3: #3578c6;
+  --sos-chart-4: #c97b13;
+  --sos-chart-5: #6b5b95;
+  --sos-chart-6: #7b8494;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --sos-motion-duration-fast: 0.01ms;
+    --sos-motion-duration-normal: 0.01ms;
+    --sos-motion-duration-slow: 0.01ms;
+  }
 }

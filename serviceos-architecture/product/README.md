@@ -7,5 +7,6 @@
 - [网点协作 Portal 产品规格](03-network-portal-spec.md)
 - [师傅移动端产品与离线交互规格](04-technician-mobile-app-spec.md)
 - [跨 Portal 协作、命令反馈与状态交互](05-cross-portal-interaction-state-spec.md)
-- [设计系统与可访问性规格](06-design-system-accessibility-spec.md)
+- [设计系统与可访问性规格](06-design-system-accessibility-spec.md)（status: Proposed）
+- [06 → Admin 实施映射（M370）](06-admin-implementation-mapping-m370.md)（不改变 06 规范状态）
 - [页面、动作、能力与数据范围矩阵](07-page-action-permission-matrix.md)

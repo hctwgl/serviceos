@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageContainer from '../patterns/PageContainer.vue'
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, type RouteLocationRaw } from 'vue-router'
 import SavedViewBar from '../components/SavedViewBar.vue'
@@ -135,13 +136,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section>
-    <header class="page-head">
-      <h1>任务中心</h1>
-      <p class="desc">
-        浏览授权范围内的任务。可按任务状态、类型、项目筛选，或仅查看分配给我的任务。
-      </p>
-    </header>
+  <PageContainer title="任务目录" description="查询履约任务并进入任务详情处理。">
     <SavedViewBar
       page-id="ADMIN.TASK.QUEUE"
       :schema-version="1"
@@ -240,7 +235,7 @@ onMounted(() => {
         打开项目 {{ item.projectId }}
       </RouterLink>
     </p>
-  </section>
+  </PageContainer>
 </template>
 
 <style scoped>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageContainer from '../patterns/PageContainer.vue'
 import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
@@ -63,13 +64,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="page" data-testid="organization-directory-page">
-    <header>
-      <h2>企业组织</h2>
-      <p class="hint">组织树与任职治理；EXTERNAL_AUTHORITATIVE 来源字段只读。</p>
-    </header>
-
-    <article class="card form">
+  <PageContainer title="企业组织" description="管理企业内部组织架构。"><article class="card form">
       <h3>创建组织</h3>
       <label>code<input v-model="code" aria-label="organization code" /></label>
       <label>name<input v-model="name" aria-label="organization name" /></label>
@@ -121,7 +116,7 @@ onMounted(() => {
         </tr>
       </tbody>
     </table>
-  </section>
+  </PageContainer>
 </template>
 
 <style scoped>

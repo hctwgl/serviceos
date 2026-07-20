@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageContainer from '../patterns/PageContainer.vue'
 import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
@@ -25,9 +26,11 @@ async function load() {
   error.value = null
   try {
     page.value = await listRoles()
-    capabilities.value = await listCapabilities()
+    const caps = await listCapabilities()
+    capabilities.value = Array.isArray(caps) ? caps : []
   } catch (err) {
     page.value = null
+    capabilities.value = []
     error.value = safeAccessDeniedMessage(err)
   } finally {
     loading.value = false
@@ -65,13 +68,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="page" data-testid="role-directory-page">
-    <header>
-      <h2>角色与 Capability</h2>
-      <p class="hint">只能引用目录能力，不能改写风险级别。</p>
-    </header>
-
-    <article class="card form">
+  <PageContainer title="角色与 Capability" description="管理角色定义与 Capability 绑定。"><article class="card form">
       <h3>创建租户角色</h3>
       <label>roleCode<input v-model="roleCode" aria-label="role code" /></label>
       <label>roleName<input v-model="roleName" aria-label="role name" /></label>
@@ -112,7 +109,7 @@ onMounted(() => {
         </tr>
       </tbody>
     </table>
-  </section>
+  </PageContainer>
 </template>
 
 <style scoped>
@@ -122,7 +119,7 @@ onMounted(() => {
 }
 .hint {
   margin: 0.25rem 0 0;
-  color: #627d98;
+  color: var(--sos-color-text-secondary, #4b5563);
 }
 .card {
   background: #fff;
@@ -139,7 +136,7 @@ label {
   display: grid;
   gap: 0.25rem;
   font-size: 0.85rem;
-  color: #486581;
+  color: var(--sos-color-text-secondary, #4b5563);
 }
 .check {
   grid-template-columns: auto 1fr;

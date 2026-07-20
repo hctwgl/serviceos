@@ -106,61 +106,11 @@ const STATUS_LABELS: Record<string, string> = {
   DOCUMENT: '文档',
 }
 
-/** 状态语义色：success / warning / danger / info / neutral */
+/**
+ * @deprecated M370：禁止跨领域状态色映射。请使用 src/presentation/* 分领域 Presenter
+ * 与 SemanticStatusTag。保留类型仅供迁移期兼容。
+ */
 export type StatusTone = 'success' | 'warning' | 'danger' | 'info' | 'neutral'
-
-const STATUS_TONES: Record<string, StatusTone> = {
-  FULFILLED: 'success',
-  COMPLETED: 'success',
-  APPROVED: 'success',
-  MET: 'success',
-  FORCE_APPROVED: 'success',
-  INTERNAL: 'info',
-  CLIENT: 'info',
-  EXTERNAL: 'neutral',
-  SUCCEEDED: 'success',
-  CLEAN: 'success',
-  RESOLVED: 'success',
-  CONFIRMED: 'success',
-  ACTIVE: 'info',
-  IN_PROGRESS: 'info',
-  RUNNING: 'info',
-  ASSIGNED: 'info',
-  CLAIMED: 'info',
-  PILOT_SURVEY: 'info',
-  PILOT_COMPLETION: 'info',
-  INSTALLATION: 'info',
-  SURVEY: 'info',
-  PENDING: 'warning',
-  READY: 'warning',
-  OPEN: 'warning',
-  RECEIVED: 'warning',
-  WAITING_REVIEW: 'warning',
-  WAITING_CORRECTION: 'warning',
-  RESUBMITTED: 'warning',
-  PROPOSED: 'warning',
-  UNASSIGNED: 'warning',
-  MISSING: 'warning',
-  RETRY_WAIT: 'warning',
-  REOPENED: 'warning',
-  MET_LATE: 'warning',
-  DRAFT: 'warning',
-  PENDING_APPROVAL: 'warning',
-  REJECTED: 'danger',
-  CANCELLED: 'danger',
-  MANUAL_INTERVENTION: 'danger',
-  BREACHED: 'danger',
-  FAILED: 'danger',
-  NO_SHOW: 'danger',
-  INTERRUPTED: 'danger',
-  INFECTED: 'danger',
-  SUSPENDED: 'neutral',
-  CLOSED: 'neutral',
-  WAIVED: 'neutral',
-  DISABLED: 'neutral',
-  TERMINATED: 'neutral',
-  EXPIRED: 'neutral',
-}
 
 export function statusLabel(code: string | null | undefined): string {
   if (code == null || code === '') {
@@ -170,11 +120,12 @@ export function statusLabel(code: string | null | undefined): string {
   return STATUS_LABELS[normalized] ?? `未知状态（${code}）`
 }
 
-export function statusTone(code: string | null | undefined): StatusTone {
-  if (code == null || code === '') {
-    return 'neutral'
-  }
-  return STATUS_TONES[code.trim().toUpperCase()] ?? 'neutral'
+/**
+ * @deprecated M370：始终返回 neutral，避免跨领域猜色。
+ * 新代码必须使用对应领域 Presenter。
+ */
+export function statusTone(_code: string | null | undefined): StatusTone {
+  return 'neutral'
 }
 
 export function statusOptions(

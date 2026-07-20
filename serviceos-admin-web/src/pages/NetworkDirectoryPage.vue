@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageContainer from '../patterns/PageContainer.vue'
 import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
@@ -91,13 +92,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="page" data-testid="network-directory-page">
-    <header>
-      <h2>合作组织与网点</h2>
-      <p class="hint">网点人员邀请通过目录选择器完成，不要求粘贴 UUID。</p>
-    </header>
-
-    <article class="card form">
+  <PageContainer title="合作组织与网点" description="管理合作组织与服务网点。"><article class="card form">
       <h3>创建合作组织</h3>
       <label>code<input v-model="partnerCode" aria-label="partner code" /></label>
       <label>name<input v-model="partnerName" aria-label="partner name" /></label>
@@ -148,7 +143,7 @@ onMounted(() => {
         </tr>
       </tbody>
     </table>
-  </section>
+  </PageContainer>
 </template>
 
 <style scoped>

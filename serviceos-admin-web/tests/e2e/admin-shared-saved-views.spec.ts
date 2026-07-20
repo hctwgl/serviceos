@@ -33,7 +33,6 @@ test.describe('M191 Admin 共享 SavedView', () => {
 
     await page.getByLabel('task status filter').selectOption('READY')
     const viewName = `e2e-shared-${Date.now()}`
-    await page.getByTestId('saved-view-name').fill(viewName)
 
     const createPromise = page.waitForResponse(
       (response) =>
@@ -41,10 +40,12 @@ test.describe('M191 Admin 共享 SavedView', () => {
         response.url().includes('/api/v1/me/saved-views'),
     )
     await page.getByTestId('saved-view-save').click()
+    await expect(page.getByTestId('saved-view-name')).toBeVisible()
+    await page.getByTestId('saved-view-name').fill(viewName)
+    await page.getByRole('button', { name: '保存' }).click()
     expect((await createPromise).status()).toBe(200)
     await expect(page.getByTestId('saved-view-message')).toContainText('已保存')
 
-    await page.getByTestId('saved-view-share-mode').selectOption('TENANT')
     const sharePromise = page.waitForResponse(
       (response) =>
         response.request().method() === 'POST' &&
@@ -52,12 +53,16 @@ test.describe('M191 Admin 共享 SavedView', () => {
         response.url().includes(':share'),
     )
     await page.getByTestId('saved-view-share').click()
+    await expect(page.getByTestId('saved-view-share-panel')).toBeVisible()
+    await page.getByTestId('saved-view-share-mode').getByText('租户').click()
+    await page.getByRole('button', { name: '确认分享' }).click()
     expect((await sharePromise).status()).toBe(200)
     await expect(page.getByTestId('saved-view-message')).toContainText('已共享')
     await expect(page.getByTestId('saved-view-visibility-badge')).toContainText('租户共享')
 
-    const picker = page.getByTestId('saved-view-picker')
-    await expect(picker.locator('option', { hasText: viewName })).toContainText('租户共享')
+    await page.getByTestId('saved-view-picker').click()
+    await expect(page.getByRole('option', { name: new RegExp(viewName) })).toContainText('租户共享')
+    await page.keyboard.press('Escape')
 
     const unsharePromise = page.waitForResponse(
       (response) =>
@@ -70,7 +75,6 @@ test.describe('M191 Admin 共享 SavedView', () => {
     await expect(page.getByTestId('saved-view-message')).toContainText('已取消共享')
     await expect(page.getByTestId('saved-view-visibility-badge')).toContainText('私有')
 
-    // 清理：删除测试视图（若仍选中）
     const deletePromise = page.waitForResponse(
       (response) =>
         response.request().method() === 'DELETE' &&

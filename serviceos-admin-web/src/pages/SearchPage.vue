@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageContainer from '../patterns/PageContainer.vue'
 import { ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
@@ -67,13 +68,7 @@ function typeLabel(type: SearchResourceType): string {
 </script>
 
 <template>
-  <section class="page" data-testid="admin-search-page">
-    <header>
-      <h2>全局搜索</h2>
-      <p class="hint">受控精确/前缀搜索；不授予额外能力；手机号仅末四位。</p>
-    </header>
-
-    <form class="search-form" @submit.prevent="runSearch">
+  <PageContainer title="全局搜索" description="按授权范围检索工单、任务与项目等资源。"><form class="search-form" @submit.prevent="runSearch">
       <label>
         关键词
         <input
@@ -119,7 +114,7 @@ function typeLabel(type: SearchResourceType): string {
         </RouterLink>
       </li>
     </ul>
-  </section>
+  </PageContainer>
 </template>
 
 <style scoped>
