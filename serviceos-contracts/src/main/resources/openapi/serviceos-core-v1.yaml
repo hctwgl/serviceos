@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.63
+  version: 1.0.64
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -5778,6 +5778,26 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /configuration/task-templates:
+    get:
+      operationId: listConfigurationTaskTemplates
+      summary: 列出任务模板产品读模型
+      description: |
+        M387：从已发布与在编 WORKFLOW 资产投影任务模板摘要。
+        需要 configuration.draft.write。前端不得自行解析 Workflow JSON 形成第二套解释。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 任务模板列表
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ConfigurationTaskTemplateItem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
   /configuration/drafts:
     get:
       operationId: listConfigurationDrafts
@@ -6678,6 +6698,43 @@ components:
         draftLabel: { type: string }
         unifiedDiff: { type: string }
         identical: { type: boolean }
+    ConfigurationTaskTemplateItem:
+      type: object
+      required:
+        - templateKey
+        - templateName
+        - taskTypeCode
+        - category
+        - categoryLabel
+        - executionRoleLabel
+        - status
+        - statusLabel
+        - referencedWorkflowCount
+        - referencedWorkflowNames
+        - gaps
+      properties:
+        templateKey: { type: string }
+        templateName: { type: string }
+        taskTypeCode: { type: string }
+        category:
+          enum: [INTAKE, DISPATCH, APPOINTMENT, SURVEY, INSTALL, REVIEW, CORRECTION, FOLLOW_UP, SYSTEM]
+        categoryLabel: { type: string }
+        executionRoleLabel: { type: string }
+        assignmentStrategyLabel: { type: string, nullable: true }
+        formSummary: { type: string, nullable: true }
+        evidenceSummary: { type: string, nullable: true }
+        slaSummary: { type: string, nullable: true }
+        status: { enum: [DRAFT, PUBLISHED] }
+        statusLabel: { type: string }
+        referencedWorkflowCount: { type: integer, minimum: 0 }
+        referencedWorkflowNames:
+          type: array
+          items: { type: string }
+        lastUpdatedAt: { type: string, format: date-time, nullable: true }
+        gaps:
+          type: array
+          items: { type: string }
+          description: 仍缺服务端产品字段时的诚实缺口说明
     ConfigurationDraft:
       type: object
       additionalProperties: false
