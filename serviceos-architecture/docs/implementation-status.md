@@ -175,14 +175,18 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M368**（Network Portal on-behalf NETWORK_WEB 能力门禁 / ADR-089；承接 M367）。
-OpenAPI **1.0.59**；Flyway **135**。
-Technician 能力门禁（M356～M363）、审核 handling Task（M364）、工作流门闸（M365）、派单自动池过滤（M366）、人工指派硬拒绝（M367）与 Network on-behalf `NETWORK_WEB` 门禁（M368）已闭环。
+ServiceOS 可靠纵向切片已推进到 **M369**（BUSINESS 日历 SLA 截止时间 / ADR-090 D1-R/D2-R/D4-R；承接 M368）。
+OpenAPI **仍 1.0.59**；Flyway **135**。
+Technician 能力门禁（M356～M363）、审核 handling Task（M364）、工作流门闸（M365）、派单自动池过滤（M366）、人工指派硬拒绝（M367）、Network on-behalf `NETWORK_WEB` 门禁（M368）与 BUSINESS 截止切片（M369）已闭环。
 
-下一阶段（均需负责人确认后才能推进，不得发明规则）：
+**状态：`AWAITING_OWNER_SELECTION`** — 下一切片须负责人在交接文档中选型（A–F），未选型不得开 M370。
+
+下一阶段候选（均需负责人确认后才能推进，不得发明规则）：
 
 1. iOS 条件执行器全量硬阻断（本 Linux 环境多为 BLOCKED_EXTERNAL）；
-2. 既有硬门禁：吉利联调 / AMOUNT/加权；BUSINESS 暂停/预警/升级仍未交付（截止切片见 M369）。
+2. 吉利联调 / AMOUNT/加权（硬门禁）；
+3. BUSINESS 暂停/恢复/预警/升级（需另接受 ADR-090 D1-B 或 ARCH-12 子集）；
+4. OpenAPI 放宽 `clockMode`/`CALENDAR`（闭合 M369 HTTP 契约缺口；需批准破坏性演进或新主版本）。
 
 仍为 **硬门禁 / 外部阻塞**（不可发明推进）：
 
