@@ -1,6 +1,5 @@
 package com.serviceos.dispatch.application;
 
-import com.serviceos.audit.api.AuditAppender;
 import com.serviceos.audit.api.AuditEntry;
 import com.serviceos.configuration.api.EffectiveDispatchClientKinds;
 import com.serviceos.configuration.api.FrozenBundleClientCapabilityProbe;
@@ -30,18 +29,18 @@ final class ManualTechnicianClientKindGate {
 
     private final FrozenBundleClientCapabilityProbe clientCapabilityProbe;
     private final TechnicianDeclaredClientKindsQuery technicianKinds;
-    private final AuditAppender audit;
+    private final DispatchClientKindDenialAuditWriter denialAudit;
     private final Clock clock;
 
     ManualTechnicianClientKindGate(
             FrozenBundleClientCapabilityProbe clientCapabilityProbe,
             TechnicianDeclaredClientKindsQuery technicianKinds,
-            AuditAppender audit,
+            DispatchClientKindDenialAuditWriter denialAudit,
             Clock clock
     ) {
         this.clientCapabilityProbe = clientCapabilityProbe;
         this.technicianKinds = technicianKinds;
-        this.audit = audit;
+        this.denialAudit = denialAudit;
         this.clock = clock;
     }
 
