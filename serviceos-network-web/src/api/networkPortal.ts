@@ -367,6 +367,9 @@ export type NetworkPortalAssignCandidateItem = {
   approvedQualificationCount: number
   pendingQualificationCount: number
   qualificationSummary: string
+  upcomingAppointmentCount: number
+  scheduleConflictSummary: string
+  scheduleOverlap: boolean
   capacityAvailableUnits: number | null
   capacityMaxUnits: number | null
   warnings: string[]

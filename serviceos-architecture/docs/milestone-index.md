@@ -414,6 +414,7 @@ title: ServiceOS 里程碑索引
 | M405 | M405 Admin 主体变更时间线 | [416-m405-admin-principal-change-timeline.md](../architecture/416-m405-admin-principal-change-timeline.md) | [399-m405-admin-principal-change-timeline-acceptance.md](../testing/399-m405-admin-principal-change-timeline-acceptance.md) |
 | M406 | M406 车企主数据与行政区名称目录 | [417-m406-client-region-catalog.md](../architecture/417-m406-client-region-catalog.md) | [400-m406-client-region-catalog-acceptance.md](../testing/400-m406-client-region-catalog-acceptance.md) |
 | M407 | M407 Network 分配师傅候选摘要 | [418-m407-network-assign-candidate-summary.md](../architecture/418-m407-network-assign-candidate-summary.md) | [401-m407-network-assign-candidate-acceptance.md](../testing/401-m407-network-assign-candidate-acceptance.md) |
+| M408 | M408 Network 分配候选预约日程冲突摘要 | [419-m408-network-assign-schedule-conflict.md](../architecture/419-m408-network-assign-schedule-conflict.md) | [402-m408-network-assign-schedule-conflict-acceptance.md](../testing/402-m408-network-assign-schedule-conflict-acceptance.md) |
 
 ## 未关联里程碑的文档
 

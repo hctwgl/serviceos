@@ -14,11 +14,14 @@ class NetworkPortalAssignCandidateItemTest {
         UUID id = UUID.randomUUID();
         var item = new NetworkPortalAssignCandidateItem(
                 id, "张师傅", "ACTIVE", "ACTIVE", 1, 2, 0,
-                "已通过资质 2 项", 7, 10, List.of("提示"), true);
+                "已通过资质 2 项", 1, "另有 1 个未完成预约", false,
+                7, 10, List.of("提示"), true);
         assertThat(item.warnings()).containsExactly("提示");
+        assertThat(item.scheduleConflictSummary()).contains("未完成预约");
         assertThat(item.assignable()).isTrue();
         assertThatThrownBy(() -> new NetworkPortalAssignCandidateItem(
-                id, "张师傅", "ACTIVE", "ACTIVE", -1, 0, 0, "x", null, null, List.of(), true))
+                id, "张师傅", "ACTIVE", "ACTIVE", -1, 0, 0, "x",
+                0, "无近期预约", false, null, null, List.of(), true))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

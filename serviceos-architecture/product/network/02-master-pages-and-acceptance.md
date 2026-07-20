@@ -618,7 +618,7 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 距离/日程冲突/推荐解释读模型未就绪（开放任务数与资质摘要已由 M407 关闭）
+  - UI_DATA_GAP: 距离/推荐解释读模型未就绪（开放任务/资质已由 M407、预约日程冲突已由 M408 关闭）
   - CONTENT_GAP: 今日预约时间轴产品块未交付
 ```
 
@@ -635,7 +635,7 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 距离与日程冲突仍诚实声明缺口；产能/资质/开放任务已由 M407 候选摘要交付
+  - UI_DATA_GAP: 距离仍诚实声明缺口；产能/资质/开放任务/预约日程冲突已由 M407～M408 交付
 ```
 
 ## 46. M391 验收记录（工单工作区 + 预约协同）

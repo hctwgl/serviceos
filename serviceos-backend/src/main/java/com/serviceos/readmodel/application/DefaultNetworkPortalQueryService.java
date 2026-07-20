@@ -2,6 +2,8 @@ package com.serviceos.readmodel.application;
 
 import com.serviceos.appointment.api.AppointmentRevisionView;
 import com.serviceos.appointment.api.AppointmentService;
+import com.serviceos.appointment.api.TechnicianScheduleAppointmentQuery;
+import com.serviceos.appointment.api.TechnicianScheduleAppointmentView;
 import com.serviceos.appointment.api.AppointmentView;
 import com.serviceos.appointment.api.AppointmentWindow;
 import com.serviceos.appointment.api.ContactAttemptView;
@@ -143,6 +145,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     private final EvidenceSlotQueryService evidenceSlots;
     private final EvidenceItemQueryService evidenceItems;
     private final AppointmentService appointments;
+    private final TechnicianScheduleAppointmentQuery scheduleAppointments;
     private final WorkOrderDirectoryHeaderQuery workOrderHeaders;
     private final Clock clock;
 
@@ -165,6 +168,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
             EvidenceSlotQueryService evidenceSlots,
             EvidenceItemQueryService evidenceItems,
             AppointmentService appointments,
+            TechnicianScheduleAppointmentQuery scheduleAppointments,
             WorkOrderDirectoryHeaderQuery workOrderHeaders,
             Clock clock
     ) {
@@ -186,6 +190,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         this.evidenceSlots = evidenceSlots;
         this.evidenceItems = evidenceItems;
         this.appointments = appointments;
+        this.scheduleAppointments = scheduleAppointments;
         this.workOrderHeaders = workOrderHeaders;
         this.clock = clock;
     }
@@ -1077,6 +1082,35 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
             }
         }
 
+        // 预约日程：对本网点 ACTIVE 任务 fan-in；按 technicianId 归属统计近期预约与窗口重叠。
+        Map<UUID, String> taskTechnician = new LinkedHashMap<>();
+        Set<UUID> scheduleTaskIds = new LinkedHashSet<>();
+        scheduleTaskIds.add(taskId);
+        for (NetworkActiveAssignmentView row : active) {
+            scheduleTaskIds.add(row.taskId());
+            if (row.technicianId() != null && !row.technicianId().isBlank()) {
+                taskTechnician.put(row.taskId(), row.technicianId());
+            }
+        }
+        List<TechnicianScheduleAppointmentView> scheduleRows =
+                scheduleAppointments.listForTasks(actor.tenantId(), scheduleTaskIds);
+        TechnicianScheduleAppointmentView currentTaskAppointment = null;
+        Map<String, List<TechnicianScheduleAppointmentView>> appointmentsByTechnician = new LinkedHashMap<>();
+        Instant now = clock.instant();
+        for (TechnicianScheduleAppointmentView row : scheduleRows) {
+            if (taskId.equals(row.taskId())) {
+                currentTaskAppointment = row;
+            }
+            String technicianKey = taskTechnician.get(row.taskId());
+            if (technicianKey == null) {
+                continue;
+            }
+            if (row.windowEnd() != null && row.windowEnd().isBefore(now)) {
+                continue;
+            }
+            appointmentsByTechnician.computeIfAbsent(technicianKey, ignored -> new ArrayList<>()).add(row);
+        }
+
         List<NetworkPortalAssignCandidateItem> items = new ArrayList<>();
         for (NetworkPortalTechnicianView tech : technicians.listActiveTechnicians(
                 actor.tenantId(), networkId)) {
@@ -1106,6 +1140,40 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
             if (capacityHint != null && capacityHint.availableUnits() <= 0) {
                 warnings.add("当前业务类型网点产能已满，提交可能被拒绝");
             }
+
+            List<TechnicianScheduleAppointmentView> techAppointments =
+                    appointmentsByTechnician.getOrDefault(tech.technicianProfileId().toString(), List.of());
+            int upcomingAppointments = techAppointments.size();
+            boolean scheduleOverlap = false;
+            if (currentTaskAppointment != null
+                    && currentTaskAppointment.windowStart() != null
+                    && currentTaskAppointment.windowEnd() != null) {
+                for (TechnicianScheduleAppointmentView existing : techAppointments) {
+                    if (existing.taskId().equals(taskId)) {
+                        continue;
+                    }
+                    if (existing.windowStart() == null || existing.windowEnd() == null) {
+                        continue;
+                    }
+                    boolean overlaps = existing.windowStart().isBefore(currentTaskAppointment.windowEnd())
+                            && currentTaskAppointment.windowStart().isBefore(existing.windowEnd());
+                    if (overlaps) {
+                        scheduleOverlap = true;
+                        break;
+                    }
+                }
+            }
+            String scheduleConflictSummary;
+            if (scheduleOverlap) {
+                scheduleConflictSummary = "与现有预约窗口重叠";
+                warnings.add("预约窗口可能冲突，请先协调改期");
+            } else if (upcomingAppointments > 0) {
+                scheduleConflictSummary = "另有 " + upcomingAppointments + " 个未完成预约";
+                warnings.add("师傅另有未完成预约，请确认负载");
+            } else {
+                scheduleConflictSummary = "无近期预约";
+            }
+
             items.add(new NetworkPortalAssignCandidateItem(
                     tech.technicianProfileId(),
                     tech.displayName(),
@@ -1115,6 +1183,9 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                     approved,
                     pending,
                     qualificationSummary,
+                    upcomingAppointments,
+                    scheduleConflictSummary,
+                    scheduleOverlap,
                     capacityHint == null ? null : capacityHint.availableUnits(),
                     capacityHint == null ? null : capacityHint.maxUnits(),
                     warnings,

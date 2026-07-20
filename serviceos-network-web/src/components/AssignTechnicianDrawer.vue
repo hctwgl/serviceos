@@ -58,6 +58,7 @@ const impactSummary = computed(() => {
     parts.push(`将指派给 ${selected.value.displayName}`)
     parts.push(`当前开放任务 ${selected.value.openTaskCount} 个`)
     parts.push(selected.value.qualificationSummary)
+    parts.push(selected.value.scheduleConflictSummary)
     if (
       selected.value.capacityAvailableUnits != null &&
       selected.value.capacityMaxUnits != null
@@ -72,7 +73,7 @@ const impactSummary = computed(() => {
   } else {
     parts.push('请选择一名可分配师傅')
   }
-  parts.push('距离与日程冲突读模型尚未交付，不在前端猜测')
+  parts.push('距离读模型尚未交付，不在前端猜测')
   return parts
 })
 
@@ -151,6 +152,13 @@ async function submit() {
           </span>
           <span class="muted" data-testid="assign-candidate-qualification">
             {{ tech.qualificationSummary }}
+          </span>
+          <span
+            class="muted"
+            :class="{ warn: tech.scheduleOverlap }"
+            data-testid="assign-candidate-schedule"
+          >
+            {{ tech.scheduleConflictSummary }}
           </span>
           <span
             v-if="tech.capacityAvailableUnits != null && tech.capacityMaxUnits != null"

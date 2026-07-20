@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.73
+  version: 1.0.74
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -1830,8 +1830,8 @@ paths:
       summary: Network Portal 任务分配师傅候选摘要
       description: |
         M407：X-Network-Context + networkTask.read + technician.readOwnNetwork。
-        返回本网点 ACTIVE 师傅的开放任务数、资质摘要、网点产能口径与可分配警告。
-        距离与日程冲突未建模，不返回伪造字段。任务须属于本网点 ACTIVE NETWORK 责任。
+        返回本网点 ACTIVE 师傅的开放任务数、资质摘要、预约日程冲突摘要、网点产能口径与可分配警告。
+        距离未建模，不返回伪造字段。任务须属于本网点 ACTIVE NETWORK 责任。
       parameters:
         - name: taskId
           in: path
@@ -7888,6 +7888,9 @@ components:
         - approvedQualificationCount
         - pendingQualificationCount
         - qualificationSummary
+        - upcomingAppointmentCount
+        - scheduleConflictSummary
+        - scheduleOverlap
         - warnings
         - assignable
       properties:
@@ -7899,6 +7902,9 @@ components:
         approvedQualificationCount: { type: integer, minimum: 0 }
         pendingQualificationCount: { type: integer, minimum: 0 }
         qualificationSummary: { type: string, minLength: 1 }
+        upcomingAppointmentCount: { type: integer, minimum: 0 }
+        scheduleConflictSummary: { type: string, minLength: 1 }
+        scheduleOverlap: { type: boolean }
         capacityAvailableUnits: { type: [integer, 'null'], minimum: 0 }
         capacityMaxUnits: { type: [integer, 'null'], minimum: 0 }
         warnings: { type: array, items: { type: string } }
