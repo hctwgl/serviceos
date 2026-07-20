@@ -458,3 +458,4 @@ Feature gate/authority: if applicable
 | M361 | 整改路径客户端能力门禁对齐 | OpenAPI 1.0.54 + Correction Service/Controller clientKind + RuntimeGate/定向目标复检 + Unit/Security + 374-m361-* + 358-m361-* | iOS 条件执行器、派单过滤、REVIEW_TASK 模板分离 |
 | M362 | 整改列表/头级客户端能力预检 | OpenAPI 1.0.55 + Correction list/claim/start 注解 clientCapabilityUnsupportedDetail + Probe 复用 + H5 阻断 + Unit/Security + 375-m362-* + 359-m362-* | claim/start 硬 422（见 M363）、Network Portal on-behalf、iOS 执行器、派单过滤、REVIEW_TASK |
 | M363 | 整改领取/启动能力硬拒单 | OpenAPI 1.0.56 + claim/start Probe.requireCompatible 状态迁移前 422 + Unit/Security + 376-m363-* + 360-m363-* | Network Portal on-behalf、iOS 执行器、派单过滤、REVIEW_TASK |
+| M364 | 独立审核 REVIEW_TASK 模板分离 | ADR-087 Accepted + Flyway V132 `review_task_id` + create/reopen/decide/forceApprove/Correction.close 绑定与 completeHandlingTask + 试点模板 REVIEW_TASK + OpenAPI 1.0.57 + Final Review 投影 + ReviewCase/CorrectionCase IT + 377-m364-* + 361-m364-* | CLIENT reviewTaskId、A5-B 工作流节点推进、全量模板、审核移动端 |

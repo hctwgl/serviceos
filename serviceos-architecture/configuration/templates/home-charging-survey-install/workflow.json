@@ -55,6 +55,14 @@
       "slaRef": "platform.home-charging.task-elapsed"
     },
     {
+      "nodeId": "REVIEW_TASK",
+      "nodeType": "REVIEW_TASK",
+      "name": "资料审核",
+      "stageCode": "REVIEW",
+      "taskType": "evidence.review",
+      "slaRef": "platform.home-charging.task-elapsed"
+    },
+    {
       "nodeId": "WAIT_OEM_ACK",
       "nodeType": "WAIT_EVENT",
       "name": "等待车企确认",

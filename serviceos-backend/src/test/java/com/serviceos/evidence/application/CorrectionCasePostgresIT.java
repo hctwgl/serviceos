@@ -244,10 +244,25 @@ class CorrectionCasePostgresIT {
                 SELECT count(*) FROM tsk_task_assignment
                  WHERE task_id=:task AND status='ACTIVE'
                 """).param("task", opened.correctionTaskId()).query(Long.class).single()).isZero();
+        // REJECTED 完成审核 handling Task + CLOSED 完成整改 handling Task，各一条。
         assertThat(jdbc.sql("SELECT count(*) FROM rel_outbox_event WHERE event_type='task.handling-completed'")
-                .query(Long.class).single()).isOne();
+                .query(Long.class).single()).isEqualTo(2);
         assertThat(jdbc.sql("SELECT status FROM tsk_task WHERE task_id=:task")
                 .param("task", taskId).query(String.class).single()).isEqualTo("COMPLETED");
+
+        // M364 A4-R：CLOSED 后为最新补传 Snapshot 打开新 INTERNAL ReviewCase + reviewTaskId。
+        ReviewCaseView reopenedReview = reviews.listForTask(reviewer(), "corr-after-close", taskId).stream()
+                .filter(item -> third.evidenceSetSnapshotId().equals(item.evidenceSetSnapshotId()))
+                .filter(item -> "OPEN".equals(item.status()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(reopenedReview.reviewTaskId()).isNotNull();
+        assertThat(jdbc.sql("SELECT status, task_type FROM tsk_task WHERE task_id=:task")
+                .param("task", reopenedReview.reviewTaskId()).query().singleRow())
+                .satisfies(row -> {
+                    assertThat(row.get("status")).isEqualTo("READY");
+                    assertThat(row.get("task_type")).isEqualTo("evidence.review");
+                });
 
         assertThatThrownBy(() -> corrections.resubmit(technician(), metadata("resubmit-after-close"),
                 new ResubmitCorrectionCaseCommand(correctionId, second.evidenceSetSnapshotId())))

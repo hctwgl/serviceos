@@ -4,11 +4,17 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-/** 审核案例投影。 */
+/**
+ * 审核案例投影。
+ *
+ * <p>M364：{@code taskId} 仍为源提交 Task；{@code reviewTaskId} 为独立审核 HUMAN Task
+ * （可空：CLIENT Case 或迁移前历史行）。</p>
+ */
 public record ReviewCaseView(
         UUID reviewCaseId,
         UUID projectId,
         UUID taskId,
+        UUID reviewTaskId,
         UUID evidenceSetSnapshotId,
         String snapshotContentDigest,
         String scopeType,
@@ -27,7 +33,7 @@ public record ReviewCaseView(
         List<ReviewDecisionView> decisions,
         long aggregateVersion
 ) {
-    /** 兼容旧测试构造：默认 aggregateVersion=1。 */
+    /** 兼容旧测试构造：无 reviewTaskId，默认 aggregateVersion=1。 */
     public ReviewCaseView(
             UUID reviewCaseId,
             UUID projectId,
@@ -50,7 +56,7 @@ public record ReviewCaseView(
             List<ReviewDecisionView> decisions
     ) {
         this(
-                reviewCaseId, projectId, taskId, evidenceSetSnapshotId, snapshotContentDigest,
+                reviewCaseId, projectId, taskId, null, evidenceSetSnapshotId, snapshotContentDigest,
                 scopeType, origin, policyVersion, status, createdBy, createdAt, decidedAt,
                 sourceReviewCaseId, externalSubmissionRef, callbackBatchRef, mappingVersionId,
                 reopenedFromReviewCaseId, reopenTriggerRef, decisions, 1L);

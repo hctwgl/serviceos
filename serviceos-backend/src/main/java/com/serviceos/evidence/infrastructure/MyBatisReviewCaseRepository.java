@@ -36,6 +36,8 @@ final class MyBatisReviewCaseRepository implements ReviewCaseRepository {
         values.put("tenantId", tenantId);
         values.put("projectId", reviewCase.projectId().toString());
         values.put("taskId", reviewCase.taskId().toString());
+        values.put("reviewTaskId", reviewCase.reviewTaskId() == null
+                ? null : reviewCase.reviewTaskId().toString());
         values.put("evidenceSetSnapshotId", reviewCase.evidenceSetSnapshotId().toString());
         values.put("snapshotContentDigest", reviewCase.snapshotContentDigest());
         values.put("scopeType", reviewCase.scopeType());
@@ -222,6 +224,7 @@ final class MyBatisReviewCaseRepository implements ReviewCaseRepository {
     private ReviewCaseView caseView(Map<String, Object> row, List<ReviewDecisionView> decisions) {
         return new ReviewCaseView(
                 uuid(row, "reviewCaseId"), uuid(row, "projectId"), uuid(row, "taskId"),
+                nullableUuid(row, "reviewTaskId"),
                 uuid(row, "evidenceSetSnapshotId"), text(row, "snapshotContentDigest"),
                 text(row, "scopeType"), text(row, "origin"), text(row, "policyVersion"), text(row, "status"),
                 text(row, "createdBy"), instant(row.get("createdAt")),
@@ -251,6 +254,7 @@ final class MyBatisReviewCaseRepository implements ReviewCaseRepository {
     private ReviewCaseQueueItem queueItem(Map<String, Object> row) {
         return new ReviewCaseQueueItem(
                 uuid(row, "reviewCaseId"), uuid(row, "projectId"), uuid(row, "taskId"),
+                nullableUuid(row, "reviewTaskId"),
                 uuid(row, "evidenceSetSnapshotId"), text(row, "scopeType"), text(row, "origin"),
                 text(row, "policyVersion"), text(row, "status"), instant(row.get("createdAt")),
                 row.get("decidedAt") == null ? null : instant(row.get("decidedAt")),

@@ -147,6 +147,7 @@ final class ReviewCaseController {
                 : reviewCase.status();
         return new ReviewCaseResponse(
                 reviewCase.reviewCaseId(), reviewCase.projectId(), reviewCase.taskId(),
+                reviewCase.reviewTaskId(),
                 reviewCase.evidenceSetSnapshotId(), reviewCase.snapshotContentDigest(),
                 reviewCase.scopeType(), reviewCase.origin(), reviewCase.policyVersion(), reviewCase.status(),
                 reviewCase.createdBy(), reviewCase.createdAt(), reviewCase.decidedAt(),
@@ -208,6 +209,7 @@ final class ReviewCaseController {
             UUID reviewCaseId,
             UUID projectId,
             UUID taskId,
+            UUID reviewTaskId,
             UUID evidenceSetSnapshotId,
             String snapshotContentDigest,
             String scopeType,

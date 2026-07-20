@@ -155,26 +155,37 @@ final class DefaultFinalReviewWorkspaceQueryService implements FinalReviewWorksp
         boolean evidenceReadable = true;
 
         if (reviewCase != null) {
+            // M364：动作面优先独立审核 Task；证据/Snapshot 扇入仍用源提交 taskId。
+            UUID actionTaskId = reviewCase.reviewTaskId() != null
+                    ? reviewCase.reviewTaskId()
+                    : reviewCase.taskId();
             WorkOrderTaskSummary taskRow = tasks.stream()
-                    .filter(task -> task.id().equals(reviewCase.taskId()))
+                    .filter(task -> task.id().equals(actionTaskId))
                     .findFirst()
                     .orElse(null);
             TaskFulfillmentContext taskContext = taskContexts
-                    .find(principal.tenantId(), reviewCase.taskId())
+                    .find(principal.tenantId(), actionTaskId)
                     .orElse(null);
             String assigneeDisplay = resolveAssigneeDisplay(principal, correlationId, taskRow, taskContext);
             boolean guarded = taskContext != null && taskContext.executionGuarded();
-            long version = taskRow == null ? 1L : taskRow.version();
-            String taskStatus = taskRow == null ? "UNKNOWN" : taskRow.status();
+            long version = taskContext != null
+                    ? taskContext.version()
+                    : (taskRow == null ? 1L : taskRow.version());
+            String taskStatus = taskContext != null
+                    ? taskContext.status()
+                    : (taskRow == null ? "UNKNOWN" : taskRow.status());
             reviewTask = new FinalReviewTaskSummary(
-                    reviewCase.taskId(),
+                    actionTaskId,
                     taskStatus,
                     taskStatusLabel(taskStatus),
                     assigneeDisplay,
                     version,
                     guarded);
 
-            sla = loadSla(principal, correlationId, workOrderId, reviewCase.taskId());
+            sla = loadSla(principal, correlationId, workOrderId, actionTaskId);
+            if (sla == null && !actionTaskId.equals(reviewCase.taskId())) {
+                sla = loadSla(principal, correlationId, workOrderId, reviewCase.taskId());
+            }
 
             try {
                 EvidenceSetSnapshotView snapshot = snapshots.get(
