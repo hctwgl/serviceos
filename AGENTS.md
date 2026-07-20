@@ -136,7 +136,12 @@ Spring Modulith 模块边界失败是阻断问题，不得通过扩大 `allowedD
 
 ## 6. 持久化与数据库
 
-详细规范见 `serviceos-architecture/architecture/36-persistence-engineering-guideline.md`。
+> 方向变更：ADR-091（Accepted，2026-07-20）已决定将业务数据访问层统一收敛为 jOOQ，
+> 取代规范 36 的 MyBatis 默认条款。切换为一次性到位：合并主干前当场删除全部旧实现，
+> 不设双轨期、兼容层或兜底回退；迁移启动前存量代码维持现状、新增功能沿用模块内主导
+> 模式，详见 `serviceos-architecture/decisions/ADR-091-jooq-unified-data-access.md` §5。
+
+详细规范见 `serviceos-architecture/architecture/36-persistence-engineering-guideline.md`（选型条款已被 ADR-091 取代，工程约束条款继续有效）。
 
 - 业务持久化默认 MyBatis，复杂查询默认 MyBatis XML；
 - Domain/Application 通过 Repository 端口访问数据，不直接依赖 Mapper、JdbcTemplate 或 JdbcClient；
