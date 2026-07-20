@@ -1,5 +1,6 @@
 package com.serviceos.workorder.application;
 
+import com.serviceos.jooq.generated.tables.WoWorkOrder;
 import com.serviceos.reliability.api.OutboxAppender;
 import com.serviceos.reliability.api.OutboxEvent;
 import com.serviceos.shared.Sha256;
@@ -23,8 +24,10 @@ import com.serviceos.workorder.api.WorkOrderReceivedPayload;
 import com.serviceos.workorder.api.WorkOrderReopenReceipt;
 import com.serviceos.workorder.api.WorkOrderReopenedPayload;
 import com.serviceos.workorder.api.WorkOrderUpdateReceipt;
+import org.jooq.DSLContext;
+import org.jooq.Record;
+import org.jooq.impl.DSL;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
@@ -34,9 +37,11 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
 
-/** WorkOrder 当前事实、业务幂等以及领域事件原子提交的唯一命令实现。 */
+import static com.serviceos.jooq.generated.tables.WoWorkOrder.WO_WORK_ORDER;
+
+/** WorkOrder 当前事实、业务幂等以及领域事件原子提交的唯一命令实现（jOOQ 实现）。 */
 @Service
-final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
+final class JooqWorkOrderCommandService implements WorkOrderCommandService {
     private static final String RECEIVED_EVENT = "workorder.received";
     private static final String ACTIVATED_EVENT = "workorder.activated";
     private static final String FULFILLED_EVENT = "workorder.fulfilled";
@@ -44,23 +49,23 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
     private static final String REOPENED_EVENT = "workorder.reopened";
     private static final String EXTERNAL_DETAILS_UPDATED_EVENT = "workorder.external-details-updated";
 
-    private final JdbcClient jdbc;
+    private final DSLContext dsl;
     private final OutboxAppender outbox;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
     @Autowired
-    JdbcWorkOrderCommandService(JdbcClient jdbc, OutboxAppender outbox, ObjectMapper objectMapper) {
-        this(jdbc, outbox, objectMapper, Clock.systemUTC());
+    JooqWorkOrderCommandService(DSLContext dsl, OutboxAppender outbox, ObjectMapper objectMapper) {
+        this(dsl, outbox, objectMapper, Clock.systemUTC());
     }
 
-    JdbcWorkOrderCommandService(
-            JdbcClient jdbc,
+    JooqWorkOrderCommandService(
+            DSLContext dsl,
             OutboxAppender outbox,
             ObjectMapper objectMapper,
             Clock clock
     ) {
-        this.jdbc = jdbc;
+        this.dsl = dsl;
         this.outbox = outbox;
         this.objectMapper = objectMapper;
         this.clock = clock;
@@ -71,44 +76,36 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
     public WorkOrderReceipt receive(ReceiveExternalWorkOrderCommand command) {
         UUID id = UUID.randomUUID();
         Instant receivedAt = clock.instant();
-        int inserted = jdbc.sql("""
-                INSERT INTO wo_work_order (
-                    id, tenant_id, project_id, client_code, brand_code, service_product_code,
-                    external_order_code, payload_digest, status, configuration_bundle_id,
-                    configuration_bundle_code, configuration_bundle_version,
-                    configuration_bundle_digest, province_code, city_code, district_code,
-                    customer_name, customer_mobile, service_address, vehicle_vin,
-                    external_dispatched_at, received_at, version
-                ) VALUES (
-                    :id, :tenantId, :projectId, :clientCode, :brandCode, :serviceProductCode,
-                    :externalOrderCode, :payloadDigest, 'RECEIVED', :bundleId,
-                    :bundleCode, :bundleVersion, :bundleDigest,
-                    :provinceCode, :cityCode, :districtCode, :customerName, :customerMobile,
-                    :serviceAddress, :vehicleVin, :externalDispatchedAt, :receivedAt, 1
-                ) ON CONFLICT (tenant_id, client_code, external_order_code) DO NOTHING
-                """)
-                .param("id", id)
-                .param("tenantId", command.tenantId())
-                .param("projectId", command.projectId())
-                .param("clientCode", command.clientCode())
-                .param("brandCode", command.brandCode())
-                .param("serviceProductCode", command.serviceProductCode())
-                .param("externalOrderCode", command.externalOrderCode())
-                .param("payloadDigest", command.payloadDigest())
-                .param("bundleId", command.configurationBundleId())
-                .param("bundleCode", command.configurationBundleCode())
-                .param("bundleVersion", command.configurationBundleVersion())
-                .param("bundleDigest", command.configurationBundleDigest())
-                .param("provinceCode", command.provinceCode())
-                .param("cityCode", command.cityCode())
-                .param("districtCode", command.districtCode())
-                .param("customerName", command.customerName())
-                .param("customerMobile", command.customerMobile())
-                .param("serviceAddress", command.serviceAddress())
-                .param("vehicleVin", command.vehicleVin())
-                .param("externalDispatchedAt", command.externalDispatchedAt())
-                .param("receivedAt", java.sql.Timestamp.from(receivedAt))
-                .update();
+        WoWorkOrder wo = WO_WORK_ORDER;
+        // 以 (tenant_id, client_code, external_order_code) 唯一约束实现业务幂等：
+        // 插入成功即首次接收；冲突（影响行数 0）再回读既有工单判定重放或失败关闭。
+        int inserted = dsl.insertInto(wo)
+                .set(wo.ID, id)
+                .set(wo.TENANT_ID, command.tenantId())
+                .set(wo.PROJECT_ID, command.projectId())
+                .set(wo.CLIENT_CODE, command.clientCode())
+                .set(wo.BRAND_CODE, command.brandCode())
+                .set(wo.SERVICE_PRODUCT_CODE, command.serviceProductCode())
+                .set(wo.EXTERNAL_ORDER_CODE, command.externalOrderCode())
+                .set(wo.PAYLOAD_DIGEST, command.payloadDigest())
+                .set(wo.STATUS, "RECEIVED")
+                .set(wo.CONFIGURATION_BUNDLE_ID, command.configurationBundleId())
+                .set(wo.CONFIGURATION_BUNDLE_CODE, command.configurationBundleCode())
+                .set(wo.CONFIGURATION_BUNDLE_VERSION, command.configurationBundleVersion())
+                .set(wo.CONFIGURATION_BUNDLE_DIGEST, command.configurationBundleDigest())
+                .set(wo.PROVINCE_CODE, command.provinceCode())
+                .set(wo.CITY_CODE, command.cityCode())
+                .set(wo.DISTRICT_CODE, command.districtCode())
+                .set(wo.CUSTOMER_NAME, command.customerName())
+                .set(wo.CUSTOMER_MOBILE, command.customerMobile())
+                .set(wo.SERVICE_ADDRESS, command.serviceAddress())
+                .set(wo.VEHICLE_VIN, command.vehicleVin())
+                .set(wo.EXTERNAL_DISPATCHED_AT, command.externalDispatchedAt())
+                .set(wo.RECEIVED_AT, receivedAt)
+                .set(wo.VERSION, 1L)
+                .onConflict(wo.TENANT_ID, wo.CLIENT_CODE, wo.EXTERNAL_ORDER_CODE)
+                .doNothing()
+                .execute();
 
         if (inserted == 1) {
             appendReceivedEvent(id, command, receivedAt);
@@ -138,17 +135,16 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
     @Transactional
     public WorkOrderActivationReceipt activate(ActivateWorkOrderCommand command) {
         Instant activatedAt = clock.instant();
-        int updated = jdbc.sql("""
-                UPDATE wo_work_order
-                   SET status = 'ACTIVE', activated_at = :activatedAt,
-                       version = version + 1
-                 WHERE tenant_id = :tenantId AND id = :workOrderId
-                   AND status = 'RECEIVED'
-                """)
-                .param("activatedAt", java.sql.Timestamp.from(activatedAt))
-                .param("tenantId", command.tenantId())
-                .param("workOrderId", command.workOrderId())
-                .update();
+        WoWorkOrder wo = WO_WORK_ORDER;
+        // 条件更新：仅允许 RECEIVED -> ACTIVE，影响行数 0 说明已迁移或状态非法，回读判定。
+        int updated = dsl.update(wo)
+                .set(wo.STATUS, "ACTIVE")
+                .set(wo.ACTIVATED_AT, activatedAt)
+                .set(wo.VERSION, wo.VERSION.plus(1))
+                .where(wo.TENANT_ID.eq(command.tenantId()))
+                .and(wo.ID.eq(command.workOrderId()))
+                .and(wo.STATUS.eq("RECEIVED"))
+                .execute();
 
         ActivationRow row = findActivation(command.tenantId(), command.workOrderId());
         if (updated == 0) {
@@ -161,7 +157,7 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
         }
 
         // 载荷 activatedAt 与信封 occurredAt 必须同源 Instant（写入前 clock）。
-        // 禁止把 JDBC 回读的 row.activatedAt() 写入载荷：Timestamp↔Instant 往返可能产生纳秒级偏差，
+        // 禁止把持久化回读的 row.activatedAt() 写入载荷：时间精度往返可能产生纳秒级偏差，
         // 导致时间线消费者拒绝「发生时间与载荷不一致」。回执仍返回持久化时间，保证幂等重放一致。
         WorkOrderActivatedPayload payload = new WorkOrderActivatedPayload(
                 row.workOrderId(), activatedAt);
@@ -176,17 +172,16 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
     @Transactional
     public WorkOrderFulfillmentReceipt fulfill(FulfillWorkOrderCommand command) {
         Instant fulfilledAt = clock.instant();
-        int updated = jdbc.sql("""
-                UPDATE wo_work_order
-                   SET status = 'FULFILLED', fulfilled_at = :fulfilledAt,
-                       version = version + 1
-                 WHERE tenant_id = :tenantId AND id = :workOrderId
-                   AND status = 'ACTIVE'
-                """)
-                .param("fulfilledAt", java.sql.Timestamp.from(fulfilledAt))
-                .param("tenantId", command.tenantId())
-                .param("workOrderId", command.workOrderId())
-                .update();
+        WoWorkOrder wo = WO_WORK_ORDER;
+        // 条件更新：仅允许 ACTIVE -> FULFILLED，影响行数 0 说明已迁移或状态非法，回读判定。
+        int updated = dsl.update(wo)
+                .set(wo.STATUS, "FULFILLED")
+                .set(wo.FULFILLED_AT, fulfilledAt)
+                .set(wo.VERSION, wo.VERSION.plus(1))
+                .where(wo.TENANT_ID.eq(command.tenantId()))
+                .and(wo.ID.eq(command.workOrderId()))
+                .and(wo.STATUS.eq("ACTIVE"))
+                .execute();
 
         FulfillmentRow row = findFulfillment(command.tenantId(), command.workOrderId());
         if (updated == 0) {
@@ -213,36 +208,27 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
     @Transactional
     public WorkOrderUpdateReceipt updateExternalDetails(UpdateExternalWorkOrderCommand command) {
         Instant updatedAt = clock.instant();
+        WoWorkOrder wo = WO_WORK_ORDER;
         UpdateRow current = findUpdateRow(command.tenantId(), command.workOrderId());
         if (command.updateDigest().equals(current.lastExternalUpdateDigest())) {
             return new WorkOrderUpdateReceipt(
                     current.workOrderId(), current.status(), current.version(), true, updatedAt);
         }
-        int updated = jdbc.sql("""
-                UPDATE wo_work_order
-                   SET customer_name = :customerName,
-                       customer_mobile = :customerMobile,
-                       service_address = :serviceAddress,
-                       province_code = :provinceCode,
-                       city_code = :cityCode,
-                       district_code = :districtCode,
-                       last_external_update_digest = :updateDigest,
-                       version = version + 1
-                 WHERE tenant_id = :tenantId AND id = :workOrderId
-                   AND status IN ('RECEIVED', 'ACTIVE')
-                   AND version = :expectedVersion
-                """)
-                .param("customerName", command.customerName())
-                .param("customerMobile", command.customerMobile())
-                .param("serviceAddress", command.serviceAddress())
-                .param("provinceCode", command.provinceCode())
-                .param("cityCode", command.cityCode())
-                .param("districtCode", command.districtCode())
-                .param("updateDigest", command.updateDigest())
-                .param("tenantId", command.tenantId())
-                .param("workOrderId", command.workOrderId())
-                .param("expectedVersion", command.expectedVersion())
-                .update();
+        // 乐观并发：状态必须在可更新集合内且 version 匹配期望值，影响行数 0 即并发或状态冲突。
+        int updated = dsl.update(wo)
+                .set(wo.CUSTOMER_NAME, command.customerName())
+                .set(wo.CUSTOMER_MOBILE, command.customerMobile())
+                .set(wo.SERVICE_ADDRESS, command.serviceAddress())
+                .set(wo.PROVINCE_CODE, command.provinceCode())
+                .set(wo.CITY_CODE, command.cityCode())
+                .set(wo.DISTRICT_CODE, command.districtCode())
+                .set(wo.LAST_EXTERNAL_UPDATE_DIGEST, command.updateDigest())
+                .set(wo.VERSION, wo.VERSION.plus(1))
+                .where(wo.TENANT_ID.eq(command.tenantId()))
+                .and(wo.ID.eq(command.workOrderId()))
+                .and(wo.STATUS.in("RECEIVED", "ACTIVE"))
+                .and(wo.VERSION.eq(command.expectedVersion()))
+                .execute();
         UpdateRow row = findUpdateRow(command.tenantId(), command.workOrderId());
         if (updated == 0) {
             if (command.updateDigest().equals(row.lastExternalUpdateDigest())) {
@@ -267,24 +253,19 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
     @Transactional
     public WorkOrderCancellationReceipt cancel(CancelWorkOrderCommand command) {
         Instant cancelledAt = clock.instant();
-        int updated = jdbc.sql("""
-                UPDATE wo_work_order
-                   SET status = 'CANCELLED',
-                       cancelled_at = :cancelledAt,
-                       cancel_reason_code = :reasonCode,
-                       cancel_approval_ref = :approvalRef,
-                       version = version + 1
-                 WHERE tenant_id = :tenantId AND id = :workOrderId
-                   AND status IN ('RECEIVED', 'ACTIVE')
-                   AND version = :expectedVersion
-                """)
-                .param("cancelledAt", java.sql.Timestamp.from(cancelledAt))
-                .param("reasonCode", command.reasonCode())
-                .param("approvalRef", command.approvalRef())
-                .param("tenantId", command.tenantId())
-                .param("workOrderId", command.workOrderId())
-                .param("expectedVersion", command.expectedVersion())
-                .update();
+        WoWorkOrder wo = WO_WORK_ORDER;
+        // 乐观并发：仅允许 RECEIVED/ACTIVE -> CANCELLED 且 version 匹配，影响行数 0 回读判定重放或冲突。
+        int updated = dsl.update(wo)
+                .set(wo.STATUS, "CANCELLED")
+                .set(wo.CANCELLED_AT, cancelledAt)
+                .set(wo.CANCEL_REASON_CODE, command.reasonCode())
+                .set(wo.CANCEL_APPROVAL_REF, command.approvalRef())
+                .set(wo.VERSION, wo.VERSION.plus(1))
+                .where(wo.TENANT_ID.eq(command.tenantId()))
+                .and(wo.ID.eq(command.workOrderId()))
+                .and(wo.STATUS.in("RECEIVED", "ACTIVE"))
+                .and(wo.VERSION.eq(command.expectedVersion()))
+                .execute();
 
         CancellationRow row = findCancellation(command.tenantId(), command.workOrderId());
         if (updated == 0) {
@@ -312,23 +293,19 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
     @Transactional
     public WorkOrderReopenReceipt reopen(ReopenWorkOrderCommand command) {
         Instant reopenedAt = clock.instant();
-        int updated = jdbc.sql("""
-                UPDATE wo_work_order
-                   SET status = 'ACTIVE',
-                       reopened_at = :reopenedAt,
-                       reopen_approval_ref = :approvalRef,
-                       activated_at = COALESCE(activated_at, :reopenedAt),
-                       version = version + 1
-                 WHERE tenant_id = :tenantId AND id = :workOrderId
-                   AND status = 'CANCELLED'
-                   AND version = :expectedVersion
-                """)
-                .param("reopenedAt", java.sql.Timestamp.from(reopenedAt))
-                .param("approvalRef", command.approvalRef())
-                .param("tenantId", command.tenantId())
-                .param("workOrderId", command.workOrderId())
-                .param("expectedVersion", command.expectedVersion())
-                .update();
+        WoWorkOrder wo = WO_WORK_ORDER;
+        // 乐观并发：仅允许 CANCELLED -> ACTIVE 且 version 匹配；activated_at 缺失时以重开时间补齐。
+        int updated = dsl.update(wo)
+                .set(wo.STATUS, "ACTIVE")
+                .set(wo.REOPENED_AT, reopenedAt)
+                .set(wo.REOPEN_APPROVAL_REF, command.approvalRef())
+                .set(wo.ACTIVATED_AT, DSL.coalesce(wo.ACTIVATED_AT, reopenedAt))
+                .set(wo.VERSION, wo.VERSION.plus(1))
+                .where(wo.TENANT_ID.eq(command.tenantId()))
+                .and(wo.ID.eq(command.workOrderId()))
+                .and(wo.STATUS.eq("CANCELLED"))
+                .and(wo.VERSION.eq(command.expectedVersion()))
+                .execute();
 
         ReopenRow row = findReopen(command.tenantId(), command.workOrderId());
         if (updated == 0) {
@@ -406,123 +383,108 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
     }
 
     private Existing findExisting(String tenantId, String clientCode, String externalOrderCode) {
-        return jdbc.sql("""
-                SELECT id, tenant_id, project_id, payload_digest, status, configuration_bundle_id,
-                       configuration_bundle_code, configuration_bundle_version,
-                       configuration_bundle_digest, received_at
-                  FROM wo_work_order
-                 WHERE tenant_id = :tenantId AND client_code = :clientCode
-                   AND external_order_code = :externalOrderCode
-                """)
-                .param("tenantId", tenantId)
-                .param("clientCode", clientCode)
-                .param("externalOrderCode", externalOrderCode)
-                .query((rs, rowNum) -> new Existing(
-                        rs.getObject("id", UUID.class),
-                        rs.getString("tenant_id"),
-                        rs.getObject("project_id", UUID.class),
-                        rs.getString("payload_digest"),
-                        rs.getString("status"),
-                        rs.getObject("configuration_bundle_id", UUID.class),
-                        rs.getString("configuration_bundle_code"),
-                        rs.getString("configuration_bundle_version"),
-                        rs.getString("configuration_bundle_digest"),
-                        rs.getTimestamp("received_at").toInstant()))
-                .single();
+        WoWorkOrder wo = WO_WORK_ORDER;
+        // fetchSingle 空结果抛 NoDataFoundException：唯一约束冲突后必能回读到行，读不到即数据损坏。
+        Record row = dsl.select(wo.ID, wo.TENANT_ID, wo.PROJECT_ID, wo.PAYLOAD_DIGEST, wo.STATUS,
+                        wo.CONFIGURATION_BUNDLE_ID, wo.CONFIGURATION_BUNDLE_CODE,
+                        wo.CONFIGURATION_BUNDLE_VERSION, wo.CONFIGURATION_BUNDLE_DIGEST, wo.RECEIVED_AT)
+                .from(wo)
+                .where(wo.TENANT_ID.eq(tenantId))
+                .and(wo.CLIENT_CODE.eq(clientCode))
+                .and(wo.EXTERNAL_ORDER_CODE.eq(externalOrderCode))
+                .fetchSingle();
+        return new Existing(
+                row.get(wo.ID),
+                row.get(wo.TENANT_ID),
+                row.get(wo.PROJECT_ID),
+                row.get(wo.PAYLOAD_DIGEST),
+                row.get(wo.STATUS),
+                row.get(wo.CONFIGURATION_BUNDLE_ID),
+                row.get(wo.CONFIGURATION_BUNDLE_CODE),
+                row.get(wo.CONFIGURATION_BUNDLE_VERSION),
+                row.get(wo.CONFIGURATION_BUNDLE_DIGEST),
+                row.get(wo.RECEIVED_AT));
     }
 
     private ActivationRow findActivation(String tenantId, UUID workOrderId) {
-        return jdbc.sql("""
-                SELECT id, status, version, activated_at
-                  FROM wo_work_order
-                 WHERE tenant_id = :tenantId AND id = :workOrderId
-                """)
-                .param("tenantId", tenantId)
-                .param("workOrderId", workOrderId)
-                .query((rs, rowNum) -> new ActivationRow(
-                        rs.getObject("id", UUID.class),
-                        rs.getString("status"),
-                        rs.getLong("version"),
-                        rs.getTimestamp("activated_at") == null
-                                ? null : rs.getTimestamp("activated_at").toInstant()))
-                .single();
+        WoWorkOrder wo = WO_WORK_ORDER;
+        Record row = dsl.select(wo.ID, wo.STATUS, wo.VERSION, wo.ACTIVATED_AT)
+                .from(wo)
+                .where(wo.TENANT_ID.eq(tenantId))
+                .and(wo.ID.eq(workOrderId))
+                .fetchSingle();
+        return new ActivationRow(
+                row.get(wo.ID),
+                row.get(wo.STATUS),
+                row.get(wo.VERSION),
+                row.get(wo.ACTIVATED_AT));
     }
 
     private FulfillmentRow findFulfillment(String tenantId, UUID workOrderId) {
-        return jdbc.sql("""
-                SELECT id, status, version, fulfilled_at
-                  FROM wo_work_order
-                 WHERE tenant_id = :tenantId AND id = :workOrderId
-                """)
-                .param("tenantId", tenantId)
-                .param("workOrderId", workOrderId)
-                .query((rs, rowNum) -> new FulfillmentRow(
-                        rs.getObject("id", UUID.class),
-                        rs.getString("status"),
-                        rs.getLong("version"),
-                        rs.getTimestamp("fulfilled_at") == null
-                                ? null : rs.getTimestamp("fulfilled_at").toInstant()))
-                .single();
+        WoWorkOrder wo = WO_WORK_ORDER;
+        Record row = dsl.select(wo.ID, wo.STATUS, wo.VERSION, wo.FULFILLED_AT)
+                .from(wo)
+                .where(wo.TENANT_ID.eq(tenantId))
+                .and(wo.ID.eq(workOrderId))
+                .fetchSingle();
+        return new FulfillmentRow(
+                row.get(wo.ID),
+                row.get(wo.STATUS),
+                row.get(wo.VERSION),
+                row.get(wo.FULFILLED_AT));
     }
 
     private CancellationRow findCancellation(String tenantId, UUID workOrderId) {
-        return jdbc.sql("""
-                SELECT id, status, version, cancelled_at, cancel_reason_code, cancel_approval_ref
-                  FROM wo_work_order
-                 WHERE tenant_id = :tenantId AND id = :workOrderId
-                """)
-                .param("tenantId", tenantId)
-                .param("workOrderId", workOrderId)
-                .query((rs, rowNum) -> new CancellationRow(
-                        rs.getObject("id", UUID.class),
-                        rs.getString("status"),
-                        rs.getLong("version"),
-                        rs.getTimestamp("cancelled_at") == null
-                                ? null : rs.getTimestamp("cancelled_at").toInstant(),
-                        rs.getString("cancel_reason_code"),
-                        rs.getString("cancel_approval_ref")))
-                .single();
+        WoWorkOrder wo = WO_WORK_ORDER;
+        Record row = dsl.select(wo.ID, wo.STATUS, wo.VERSION, wo.CANCELLED_AT,
+                        wo.CANCEL_REASON_CODE, wo.CANCEL_APPROVAL_REF)
+                .from(wo)
+                .where(wo.TENANT_ID.eq(tenantId))
+                .and(wo.ID.eq(workOrderId))
+                .fetchSingle();
+        return new CancellationRow(
+                row.get(wo.ID),
+                row.get(wo.STATUS),
+                row.get(wo.VERSION),
+                row.get(wo.CANCELLED_AT),
+                row.get(wo.CANCEL_REASON_CODE),
+                row.get(wo.CANCEL_APPROVAL_REF));
     }
 
     private UpdateRow findUpdateRow(String tenantId, UUID workOrderId) {
-        return jdbc.sql("""
-                SELECT id, status, version, last_external_update_digest
-                  FROM wo_work_order
-                 WHERE tenant_id = :tenantId AND id = :workOrderId
-                """)
-                .param("tenantId", tenantId)
-                .param("workOrderId", workOrderId)
-                .query((rs, rowNum) -> new UpdateRow(
-                        rs.getObject("id", UUID.class),
-                        rs.getString("status"),
-                        rs.getLong("version"),
-                        rs.getString("last_external_update_digest")))
-                .single();
+        WoWorkOrder wo = WO_WORK_ORDER;
+        Record row = dsl.select(wo.ID, wo.STATUS, wo.VERSION, wo.LAST_EXTERNAL_UPDATE_DIGEST)
+                .from(wo)
+                .where(wo.TENANT_ID.eq(tenantId))
+                .and(wo.ID.eq(workOrderId))
+                .fetchSingle();
+        return new UpdateRow(
+                row.get(wo.ID),
+                row.get(wo.STATUS),
+                row.get(wo.VERSION),
+                row.get(wo.LAST_EXTERNAL_UPDATE_DIGEST));
     }
 
     private ReopenRow findReopen(String tenantId, UUID workOrderId) {
-        return jdbc.sql("""
-                SELECT id, project_id, status, version, reopened_at, reopen_approval_ref,
-                       configuration_bundle_id, configuration_bundle_code,
-                       configuration_bundle_version, configuration_bundle_digest
-                  FROM wo_work_order
-                 WHERE tenant_id = :tenantId AND id = :workOrderId
-                """)
-                .param("tenantId", tenantId)
-                .param("workOrderId", workOrderId)
-                .query((rs, rowNum) -> new ReopenRow(
-                        rs.getObject("id", UUID.class),
-                        rs.getObject("project_id", UUID.class),
-                        rs.getString("status"),
-                        rs.getLong("version"),
-                        rs.getTimestamp("reopened_at") == null
-                                ? null : rs.getTimestamp("reopened_at").toInstant(),
-                        rs.getString("reopen_approval_ref"),
-                        rs.getObject("configuration_bundle_id", UUID.class),
-                        rs.getString("configuration_bundle_code"),
-                        rs.getString("configuration_bundle_version"),
-                        rs.getString("configuration_bundle_digest")))
-                .single();
+        WoWorkOrder wo = WO_WORK_ORDER;
+        Record row = dsl.select(wo.ID, wo.PROJECT_ID, wo.STATUS, wo.VERSION, wo.REOPENED_AT,
+                        wo.REOPEN_APPROVAL_REF, wo.CONFIGURATION_BUNDLE_ID, wo.CONFIGURATION_BUNDLE_CODE,
+                        wo.CONFIGURATION_BUNDLE_VERSION, wo.CONFIGURATION_BUNDLE_DIGEST)
+                .from(wo)
+                .where(wo.TENANT_ID.eq(tenantId))
+                .and(wo.ID.eq(workOrderId))
+                .fetchSingle();
+        return new ReopenRow(
+                row.get(wo.ID),
+                row.get(wo.PROJECT_ID),
+                row.get(wo.STATUS),
+                row.get(wo.VERSION),
+                row.get(wo.REOPENED_AT),
+                row.get(wo.REOPEN_APPROVAL_REF),
+                row.get(wo.CONFIGURATION_BUNDLE_ID),
+                row.get(wo.CONFIGURATION_BUNDLE_CODE),
+                row.get(wo.CONFIGURATION_BUNDLE_VERSION),
+                row.get(wo.CONFIGURATION_BUNDLE_DIGEST));
     }
 
     private static WorkOrderReceipt receipt(
