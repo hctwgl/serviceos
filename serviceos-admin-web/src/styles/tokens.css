@@ -1,17 +1,18 @@
 /**
- * ServiceOS Design Tokens v1.0.0
+ * ServiceOS Design Tokens v1.1.0
  * 语义 Token 唯一事实源；业务组件禁止硬编码色值表达状态。
+ * 对齐 product/admin/12-classic-professional-visual-baseline.md（方案 A｜经典专业风）。
  * 破坏性变更见 docs/design-tokens.md
  */
 :root {
-  /* —— Brand (surface of identity, never success/danger) —— */
-  --sos-primary-900: #0b2f49;
-  --sos-primary-800: #103b5b;
-  --sos-primary-700: #174a6e;
-  --sos-primary-600: #1e5b84;
-  --sos-primary-500: #276d99;
-  --sos-primary-100: #e9f2f8;
-  --sos-primary-050: #f3f8fb;
+  /* —— Brand：标准企业蓝（不得表示成功/危险） —— */
+  --sos-primary-900: #003a8c;
+  --sos-primary-800: #0050b3;
+  --sos-primary-700: #0958d9;
+  --sos-primary-600: #1677ff;
+  --sos-primary-500: #4096ff;
+  --sos-primary-100: #e6f4ff;
+  --sos-primary-050: #f0f7ff;
 
   --sos-accent-700: #087f73;
   --sos-accent-600: #0b9485;
@@ -22,23 +23,23 @@
   /* —— Semantic status —— */
   --sos-color-status-neutral-fg: #4b5563;
   --sos-color-status-neutral-bg: #eef1f4;
-  --sos-color-status-neutral-border: #dfe3e8;
+  --sos-color-status-neutral-border: #e5e7eb;
 
-  --sos-color-status-info-fg: #16457a;
-  --sos-color-status-info-bg: #edf5ff;
-  --sos-color-status-info-border: #9ec5f0;
+  --sos-color-status-info-fg: #0958d9;
+  --sos-color-status-info-bg: #e6f4ff;
+  --sos-color-status-info-border: #91caff;
 
-  --sos-color-status-success-fg: #17633f;
-  --sos-color-status-success-bg: #eaf7f0;
-  --sos-color-status-success-border: #8fceb0;
+  --sos-color-status-success-fg: #15803d;
+  --sos-color-status-success-bg: #ecfdf3;
+  --sos-color-status-success-border: #86efac;
 
-  --sos-color-status-warning-fg: #7a4800;
-  --sos-color-status-warning-bg: #fff6e6;
-  --sos-color-status-warning-border: #e0b56a;
+  --sos-color-status-warning-fg: #b45309;
+  --sos-color-status-warning-bg: #fffbeb;
+  --sos-color-status-warning-border: #fcd34d;
 
-  --sos-color-status-critical-fg: #9b1717;
-  --sos-color-status-critical-bg: #fff0f0;
-  --sos-color-status-critical-border: #e09090;
+  --sos-color-status-critical-fg: #b91c1c;
+  --sos-color-status-critical-bg: #fef2f2;
+  --sos-color-status-critical-border: #fca5a5;
 
   --sos-color-status-stale-fg: #5b4b2e;
   --sos-color-status-stale-bg: #f7f1e6;
@@ -62,27 +63,27 @@
   --sos-info: var(--sos-color-status-info-fg);
   --sos-info-bg: var(--sos-color-status-info-bg);
 
-  /* —— Surface / text / border / action —— */
-  --sos-color-surface-page: #f4f6f8;
+  /* —— Surface / text / border / action（经典专业风） —— */
+  --sos-color-surface-page: #f5f7fa;
   --sos-color-surface-card: #ffffff;
-  --sos-color-surface-muted: #f8f9fa;
-  --sos-color-surface-hover: #f2f6f9;
+  --sos-color-surface-muted: #fafafa;
+  --sos-color-surface-hover: #f0f7ff;
   --sos-color-surface-sunken: #eef1f4;
+  --sos-color-surface-subtle: #fafafa;
 
-  --sos-color-text-primary: #1f2937;
+  --sos-color-text-primary: #111827;
   --sos-color-text-secondary: #4b5563;
-  /* AA 对比：相对白底需 ≥4.5:1（原 #7b8494 ≈3.76，不达标） */
-  --sos-color-text-tertiary: #5f6b7a;
+  --sos-color-text-tertiary: #6b7280;
   --sos-color-text-disabled: #a7adb7;
   --sos-color-text-inverse: #ffffff;
 
-  --sos-color-border-default: #dfe3e8;
-  --sos-color-border-light: #eaedf0;
-  --sos-color-border-strong: #c5ced9;
+  --sos-color-border-default: #e5e7eb;
+  --sos-color-border-light: #e5e7eb;
+  --sos-color-border-strong: #d1d5db;
   --sos-color-divider: #edf0f2;
 
   --sos-color-action-primary: var(--sos-primary-600);
-  --sos-color-action-primary-hover: var(--sos-primary-700);
+  --sos-color-action-primary-hover: var(--sos-primary-500);
   --sos-color-action-danger: var(--sos-color-status-critical-fg);
 
   --sos-text-primary: var(--sos-color-text-primary);
@@ -98,14 +99,15 @@
   --sos-bg-hover: var(--sos-color-surface-hover);
 
   /* —— Typography —— */
-  --sos-font-stack: Inter, 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', Arial, sans-serif;
+  --sos-font-stack: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif;
   --sos-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --sos-font-size-xs: 12px;
   --sos-font-size-sm: 13px;
   --sos-font-size-md: 14px;
   --sos-font-size-lg: 16px;
   --sos-font-size-xl: 20px;
-  --sos-font-size-title: 20px;
+  --sos-font-size-title: 24px;
   --sos-font-weight-regular: 400;
   --sos-font-weight-medium: 500;
   --sos-font-weight-semibold: 600;
@@ -124,15 +126,15 @@
   --sos-space-10: 40px;
   --sos-space-12: 48px;
 
-  /* —— Radius / elevation —— */
+  /* —— Radius / elevation（细边框、克制阴影） —— */
   --sos-radius-sm: 4px;
-  --sos-radius-md: 8px;
-  --sos-radius-lg: 12px;
+  --sos-radius-md: 6px;
+  --sos-radius-lg: 8px;
   --sos-radius-pill: 999px;
   --sos-elevation-0: none;
-  --sos-elevation-1: 0 1px 2px rgb(16 42 67 / 6%);
-  --sos-elevation-2: 0 2px 8px rgb(16 42 67 / 8%);
-  --sos-elevation-3: 0 8px 24px rgb(16 42 67 / 12%);
+  --sos-elevation-1: 0 1px 2px rgb(17 24 39 / 4%);
+  --sos-elevation-2: 0 2px 6px rgb(17 24 39 / 6%);
+  --sos-elevation-3: 0 8px 20px rgb(17 24 39 / 8%);
 
   /* —— Motion —— */
   --sos-motion-duration-fast: 120ms;
@@ -175,12 +177,12 @@
   --sos-z-diagnostics: 1600;
 
   /* —— Chart palette (non-status) —— */
-  --sos-chart-1: #1e5b84;
+  --sos-chart-1: #1677ff;
   --sos-chart-2: #0b9485;
-  --sos-chart-3: #3578c6;
-  --sos-chart-4: #c97b13;
+  --sos-chart-3: #4096ff;
+  --sos-chart-4: #d97706;
   --sos-chart-5: #6b5b95;
-  --sos-chart-6: #7b8494;
+  --sos-chart-6: #6b7280;
 }
 
 @media (prefers-reduced-motion: reduce) {

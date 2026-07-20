@@ -1,9 +1,10 @@
 # ServiceOS Admin Design Tokens
 
-- **版本**：`1.0.0`（见 `src/app/token-version.ts`）
+- **版本**：`1.1.0`（见 `src/app/token-version.ts`）
 - **事实源**：`src/styles/tokens.css`
 - **Ant 映射**：`src/app/app-theme.ts` → `ConfigProvider`
-- **上位规范**：`serviceos-architecture/product/06-design-system-accessibility-spec.md`（Proposed；本文件为实施映射，不改变规范状态）
+- **视觉基线**：`serviceos-architecture/product/admin/12-classic-professional-visual-baseline.md`（Accepted｜方案 A 经典专业风）
+- **上位规范**：`serviceos-architecture/product/06-design-system-accessibility-spec.md`（本文件为实施映射，不改变规范状态）
 
 ## 语义分组
 
@@ -28,6 +29,7 @@
 
 | 版本 | 变更 | 迁移 |
 |---|---|---|
+| 1.1.0 | 主色切换为经典专业风企业蓝 `#1677FF`；画布 `#F5F7FA`；文本/边框对齐 Accepted 视觉基线 | 业务页继续使用语义变量，勿回写旧深海蓝硬编码 |
 | 1.0.0 | 初版语义 Token 与 Ant 映射 | 新建 |
 
 扫描：`npm run check:tokens`

@@ -46,22 +46,11 @@ import { useDeveloperDiagnostics } from '../composables/useDeveloperDiagnostics'
 
 const { Header, Sider, Content } = Layout
 
-/** 将服务端导航按运营场景分组；技术菜单收入「运维工具」。 */
-const SECTION_RULES: Array<{ title: string; match: RegExp }> = [
-  { title: '工作台', match: /WORKBENCH|SEARCH/i },
-  { title: '工单运营', match: /WORK_?ORDER|REVIEW|CORRECTION/i },
-  { title: '服务履约', match: /TASK|APPOINTMENT|VISIT|SLA/i },
-  { title: '质量与时效', match: /EXCEPTION|SLA/i },
-  { title: '基础资料', match: /PROJECT|NETWORK|TECHNICIAN|ORGANIZATION|USER/i },
-  { title: '系统管理', match: /ROLE|GRANT|CONFIGURATION|PREFERENCE/i },
-]
-
-const DEVOPS_PAGE_IDS = new Set([
-  'ADMIN.INTEGRATION.OUTBOUND',
-  'ADMIN.INTEGRATION.INBOUND',
-  'ADMIN.INTEGRATION.DETAIL',
-  'ADMIN.INTEGRATION.INBOUND.DETAIL',
-  'ADMIN.INTEGRATION.CANONICAL.DETAIL',
+/**
+ * 正式导航只消费服务端 section/pageId/route/order。
+ * 开发诊断入口不进入正式侧栏；不得用正则或角色名猜测菜单归属。
+ */
+const NON_PRODUCT_PAGE_IDS = new Set([
   'ADMIN.PORTAL.STUBS',
   'ADMIN.TOKEN',
 ])
@@ -109,10 +98,10 @@ const router = useRouter()
 
 const groupedNav = computed(() => {
   const groups = new Map<string, typeof nav.value.items>()
-  for (const item of nav.value.items) {
-    if (DEVOPS_PAGE_IDS.has(item.pageId)) continue
-    const section =
-      SECTION_RULES.find((rule) => rule.match.test(item.pageId))?.title ?? '其他'
+  const orderedItems = [...nav.value.items].sort((a, b) => a.order - b.order)
+  for (const item of orderedItems) {
+    if (NON_PRODUCT_PAGE_IDS.has(item.pageId)) continue
+    const section = item.section?.trim() || '未分组'
     const list = groups.get(section) ?? []
     list.push(item)
     groups.set(section, list)
