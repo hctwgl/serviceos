@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.59
+  version: 1.0.60
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -3474,6 +3474,375 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+
+  /projects/{projectId}/fulfillment-profiles:
+    get:
+      operationId: listProjectFulfillmentProfiles
+      summary: 查询项目工单类型与履约配置列表
+      description: 需要 project.fulfillment.read；按项目 scope 鉴权。
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 履约配置摘要列表
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ProjectFulfillmentProfileSummary' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: createProjectFulfillmentProfile
+      summary: 创建项目工单类型履约配置
+      description: 需要 project.fulfillment.create；同一项目+服务产品唯一。
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateProjectFulfillmentProfileRequest' }
+      responses:
+        '201':
+          description: 已创建履约配置与草稿
+          headers:
+            Location: { schema: { type: string } }
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectFulfillmentProfileDetail' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /projects/{projectId}/fulfillment-profiles/{profileId}:
+    get:
+      operationId: getProjectFulfillmentProfile
+      summary: 读取项目履约配置详情
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: profileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 履约配置详情
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectFulfillmentProfileDetail' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /projects/{projectId}/fulfillment-profiles/{profileId}/draft:
+    get:
+      operationId: getProjectFulfillmentDraft
+      summary: 读取履约配置草稿
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: profileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 草稿
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectFulfillmentDraft' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    put:
+      operationId: updateProjectFulfillmentDraft
+      summary: 更新履约配置草稿
+      description: 需要 project.fulfillment.draft.write；必须携带 If-Match。
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: profileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateProjectFulfillmentDraftRequest' }
+      responses:
+        '200':
+          description: 草稿已更新
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectFulfillmentDraft' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /projects/{projectId}/fulfillment-profiles/{profileId}:validate:
+    post:
+      operationId: validateProjectFulfillmentDraft
+      summary: 校验履约配置草稿
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: profileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 结构化校验问题列表
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ProjectFulfillmentValidationIssue' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /projects/{projectId}/fulfillment-profiles/{profileId}:compile-preview:
+    post:
+      operationId: compileProjectFulfillmentPreview
+      summary: 编译履约运行说明书预览
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: profileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 服务端编译 Manifest
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectFulfillmentManifest' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /projects/{projectId}/fulfillment-profiles/{profileId}:publish:
+    post:
+      operationId: publishProjectFulfillmentRevision
+      summary: 发布不可变履约配置版本
+      description: 需要 project.fulfillment.publish；存量工单不受影响。
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: profileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PublishProjectFulfillmentRevisionRequest' }
+      responses:
+        '200':
+          description: 已发布 Revision
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectFulfillmentRevision' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /projects/{projectId}/fulfillment-profiles/{profileId}/revisions:
+    get:
+      operationId: listProjectFulfillmentRevisions
+      summary: 查询履约配置已发布版本
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: profileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 已发布版本列表
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ProjectFulfillmentRevision' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /projects/{projectId}/fulfillment-profiles/{profileId}/revisions/{revisionId}:
+    get:
+      operationId: getProjectFulfillmentRevision
+      summary: 读取履约配置发布版本详情
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: profileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: revisionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 版本详情
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectFulfillmentRevision' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /projects/{projectId}/fulfillment-profiles/{profileId}:suspend:
+    post:
+      operationId: suspendProjectFulfillmentProfile
+      summary: 暂停履约配置（禁止新建该类型工单）
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: profileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 已暂停
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectFulfillmentProfileDetail' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /projects/{projectId}/fulfillment-profiles/{profileId}:resume:
+    post:
+      operationId: resumeProjectFulfillmentProfile
+      summary: 恢复履约配置
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: profileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 已恢复
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectFulfillmentProfileDetail' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /work-orders/{workOrderId}/fulfillment-snapshot:
+    get:
+      operationId: getWorkOrderFulfillmentSnapshot
+      summary: 读取工单冻结的履约配置快照
+      description: 需要 project.fulfillment.snapshot.read；历史 LEGACY_BUNDLE 工单返回说明文案。
+      parameters:
+        - name: workOrderId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 工单履约快照
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkOrderFulfillmentSnapshot' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
   /tasks:
     get:
       operationId: listAuthorizedTasks
@@ -11093,6 +11462,142 @@ components:
         allowedActions:
           type: array
           items: { enum: [visit.checkOut, visit.interrupt] }
+    ProjectFulfillmentProfileSummary:
+      type: object
+      required: [profileId, projectId, serviceProductCode, profileName, status, aggregateVersion, updatedAt]
+      properties:
+        profileId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        serviceProductCode: { type: string, minLength: 1, maxLength: 96 }
+        profileName: { type: string, minLength: 1, maxLength: 200 }
+        status: { enum: [DRAFT, ACTIVE, SUSPENDED, RETIRED] }
+        stageCount: { type: integer, minimum: 0 }
+        formCount: { type: integer, minimum: 0 }
+        evidenceCount: { type: integer, minimum: 0 }
+        activeVersion: { type: string, nullable: true }
+        effectiveFrom: { type: string, format: date-time, nullable: true }
+        workflowSummary: { type: string, nullable: true }
+        slaSummary: { type: string, nullable: true }
+        aggregateVersion: { type: integer, format: int64, minimum: 1 }
+        updatedAt: { type: string, format: date-time }
+    ProjectFulfillmentProfileDetail:
+      type: object
+      required: [profileId, projectId, serviceProductCode, profileName, status, allowedActions, aggregateVersion, createdAt, updatedAt, asOf]
+      properties:
+        profileId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        serviceProductCode: { type: string }
+        profileName: { type: string }
+        description: { type: string, nullable: true }
+        status: { enum: [DRAFT, ACTIVE, SUSPENDED, RETIRED] }
+        draftRevisionId: { type: string, format: uuid, nullable: true }
+        activeRevisionId: { type: string, format: uuid, nullable: true }
+        activeVersion: { type: string, nullable: true }
+        activeEffectiveFrom: { type: string, format: date-time, nullable: true }
+        allowedActions:
+          type: array
+          items: { type: string }
+        aggregateVersion: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        asOf: { type: string, format: date-time }
+    ProjectFulfillmentDraft:
+      type: object
+      required: [profileId, revisionId, serviceProductCode, profileName, documentJson, aggregateVersion, updatedAt]
+      properties:
+        profileId: { type: string, format: uuid }
+        revisionId: { type: string, format: uuid }
+        serviceProductCode: { type: string }
+        profileName: { type: string }
+        description: { type: string, nullable: true }
+        documentJson: { type: string, minLength: 2 }
+        workflowAssetVersionId: { type: string, format: uuid, nullable: true }
+        sourceBundleId: { type: string, format: uuid, nullable: true }
+        validationJson: { type: string, nullable: true }
+        aggregateVersion: { type: integer, format: int64, minimum: 1 }
+        updatedAt: { type: string, format: date-time }
+    ProjectFulfillmentRevision:
+      type: object
+      required: [revisionId, profileId, versionNo, revisionStatus, documentJson, createdAt]
+      properties:
+        revisionId: { type: string, format: uuid }
+        profileId: { type: string, format: uuid }
+        versionNo: { type: integer, minimum: 0 }
+        revisionStatus: { enum: [DRAFT, PUBLISHED] }
+        documentJson: { type: string }
+        manifestJson: { type: string, nullable: true }
+        validationJson: { type: string, nullable: true }
+        contentDigest: { type: string, nullable: true, pattern: '^[0-9a-f]{64}$' }
+        sourceBundleId: { type: string, format: uuid, nullable: true }
+        workflowAssetVersionId: { type: string, format: uuid, nullable: true }
+        effectiveFrom: { type: string, format: date-time, nullable: true }
+        effectiveTo: { type: string, format: date-time, nullable: true }
+        supersedesRevisionId: { type: string, format: uuid, nullable: true }
+        publishedBy: { type: string, nullable: true }
+        publishedAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+    ProjectFulfillmentManifest:
+      type: object
+      required: [manifestJson, contentDigest]
+      properties:
+        manifestJson: { type: string, minLength: 2 }
+        contentDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
+    ProjectFulfillmentValidationIssue:
+      type: object
+      required: [severity, errorCode, userMessage]
+      properties:
+        severity: { enum: [ERROR, WARNING, INFO] }
+        errorCode: { type: string }
+        profileId: { type: string, nullable: true }
+        stageCode: { type: string, nullable: true }
+        assetType: { type: string, nullable: true }
+        assetRef: { type: string, nullable: true }
+        fieldPath: { type: string, nullable: true }
+        userMessage: { type: string }
+        technicalMessage: { type: string, nullable: true }
+        suggestion: { type: string, nullable: true }
+    CreateProjectFulfillmentProfileRequest:
+      type: object
+      required: [serviceProductCode, profileName]
+      properties:
+        serviceProductCode: { type: string, minLength: 1, maxLength: 96 }
+        profileName: { type: string, minLength: 1, maxLength: 200 }
+        description: { type: string, maxLength: 2000 }
+        templateCode: { type: string, enum: [HOME_CHARGING_SURVEY_INSTALL, BLANK] }
+        copyFromProfileId: { type: string, format: uuid }
+    UpdateProjectFulfillmentDraftRequest:
+      type: object
+      required: [documentJson]
+      properties:
+        profileName: { type: string, maxLength: 200 }
+        description: { type: string, maxLength: 2000 }
+        documentJson: { type: string, minLength: 2 }
+        workflowAssetVersionId: { type: string, format: uuid }
+        sourceBundleId: { type: string, format: uuid }
+    PublishProjectFulfillmentRevisionRequest:
+      type: object
+      properties:
+        effectiveFrom: { type: string, format: date-time }
+        publishNote: { type: string, maxLength: 500 }
+    WorkOrderFulfillmentSnapshot:
+      type: object
+      required: [workOrderId, projectId, serviceProductCode, configKind]
+      properties:
+        workOrderId: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        serviceProductCode: { type: string }
+        configKind: { enum: [PROFILE_REVISION, LEGACY_BUNDLE] }
+        profileId: { type: string, format: uuid, nullable: true }
+        profileName: { type: string, nullable: true }
+        revisionId: { type: string, format: uuid, nullable: true }
+        fulfillmentVersion: { type: string, nullable: true }
+        configurationBundleId: { type: string, format: uuid, nullable: true }
+        configurationBundleVersion: { type: string, nullable: true }
+        configurationBundleDigest: { type: string, nullable: true }
+        manifestJson: { type: string, nullable: true }
+        contentDigest: { type: string, nullable: true }
+        frozenAt: { type: string, format: date-time, nullable: true }
+        legacyExplanation: { type: string, nullable: true }
     Problem:
       type: object
       required: [type, title, status, errorCode]
@@ -11169,6 +11674,7 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ReleasedHumanTaskReceipt' }
+
     Problem:
       description: RFC 9457 Problem Details
       content:
