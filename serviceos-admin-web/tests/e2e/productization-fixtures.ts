@@ -499,7 +499,45 @@ export async function mockProductizationApis(
       })
       return
     }
+    if (url.includes('/admin/user-directory')) {
+      await fulfillJson(route, {
+        items: [
+          {
+            id: '66666666-6666-4666-8666-666666666666',
+            type: 'USER',
+            status: 'ACTIVE',
+            displayName: '演示用户',
+            employeeNumber: 'DEMO-001',
+            version: 1,
+            createdAt: '2026-07-01T00:00:00Z',
+            updatedAt: '2026-07-20T04:00:00Z',
+            organizationSummary: '演示总部',
+            roleSummary: 'OPS',
+          },
+        ],
+        nextCursor: null,
+        asOf: '2026-07-20T04:00:00Z',
+      })
+      return
+    }
     if (url.includes('/security-principals') || url.includes('/security/principals')) {
+      if (method === 'POST' && !url.includes('/security-principals/')) {
+        await fulfillJson(
+          route,
+          {
+            id: '66666666-6666-4666-8666-666666666666',
+            type: 'USER',
+            status: 'ACTIVE',
+            displayName: '演示用户',
+            employeeNumber: 'DEMO-001',
+            version: 1,
+            createdAt: '2026-07-01T00:00:00Z',
+            updatedAt: '2026-07-20T04:00:00Z',
+          },
+          201,
+        )
+        return
+      }
       await fulfillJson(route, {
         items: [
           {

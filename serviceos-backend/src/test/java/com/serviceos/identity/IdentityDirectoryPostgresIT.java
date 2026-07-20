@@ -87,7 +87,7 @@ class IdentityDirectoryPostgresIT {
                 """).param("roleId", roleId).param("tenant", TENANT).update();
         for (String capability : List.of(
                 "identity.read", "identity.readSensitive", "identity.manageLinks",
-                "identity.manageLifecycle", "identity.manageProfile")) {
+                "identity.manageLifecycle", "identity.manageProfile", "identity.register")) {
             jdbc.sql("""
                     INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
                     VALUES (:roleId, :capability, now())
@@ -165,6 +165,31 @@ class IdentityDirectoryPostgresIT {
                         problem -> assertThat(problem.code()).isEqualTo(ProblemCode.IDENTITY_PROFILE_CONFLICT));
 
         assertThat(queries.get(actor(), "corr-read-second", second).principal().version()).isEqualTo(1);
+    }
+
+    @Test
+    void adminRegisterCreatesPrincipalWithPersonaWithoutPassword() {
+        var created = commands.register(
+                actor(), metadata("register-user"), "登记用户", "EMP-REG-1", "INTERNAL_EMPLOYEE");
+        assertThat(created.displayName()).isEqualTo("登记用户");
+        assertThat(created.employeeNumber()).isEqualTo("EMP-REG-1");
+        assertThat(created.status()).isEqualTo("ACTIVE");
+
+        var detail = queries.get(actor(), "corr-register-read", created.id());
+        assertThat(detail.personas()).extracting(item -> item.personaType())
+                .contains("INTERNAL_EMPLOYEE");
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM idn_identity_link WHERE principal_id=:id
+                """).param("id", created.id()).query(Long.class).single()).isZero();
+
+        var replay = commands.register(
+                actor(), metadata("register-user"), "登记用户", "EMP-REG-1", "INTERNAL_EMPLOYEE");
+        assertThat(replay.id()).isEqualTo(created.id());
+
+        assertThatThrownBy(() -> commands.register(
+                actor(), metadata("register-dup"), "另一个", "EMP-REG-1", null))
+                .isInstanceOfSatisfying(BusinessProblem.class,
+                        problem -> assertThat(problem.code()).isEqualTo(ProblemCode.IDENTITY_PROFILE_CONFLICT));
     }
 
     @Test

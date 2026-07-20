@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.67
+  version: 1.0.68
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -34,6 +34,53 @@ paths:
           description: displayName/principalId 正序的主体页
           headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
           content: { application/json: { schema: { $ref: '#/components/schemas/SecurityPrincipalPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: registerSecurityPrincipal
+      summary: 登记统一主体（不保存密码）
+      description: |
+        M402：需要 identity.register。创建 USER 主体与可选 Persona；不接受密码字段。
+        登录仍依赖后续 OIDC IdentityLink（identity.manageLinks）。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterSecurityPrincipalRequest' }
+      responses:
+        '201':
+          description: 已登记主体
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            Location: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/SecurityPrincipal' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /admin/user-directory:
+    get:
+      operationId: listAdminUserDirectory
+      summary: Admin 用户目录（含组织/角色摘要）
+      description: |
+        M402：基于 identity.read 列出主体；organizationSummary / roleSummary 分别依赖
+        organization.read / authorization.read，缺权时对应字段为 null（soft-gate）。
+      parameters:
+        - { name: query, in: query, schema: { type: string, minLength: 1, maxLength: 200 } }
+        - { name: status, in: query, schema: { enum: [ACTIVE, DISABLED] } }
+        - { name: cursor, in: query, schema: { type: string, minLength: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 用户目录页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/AdminUserDirectoryPage' } } }
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
@@ -6921,6 +6968,39 @@ components:
       required: [items, nextCursor, asOf]
       properties:
         items: { type: array, items: { $ref: '#/components/schemas/SecurityPrincipal' } }
+        nextCursor: { type: [string, 'null'] }
+        asOf: { type: string, format: date-time }
+    RegisterSecurityPrincipalRequest:
+      type: object
+      additionalProperties: false
+      required: [displayName]
+      properties:
+        displayName: { type: string, minLength: 1, maxLength: 200 }
+        employeeNumber: { type: [string, 'null'], minLength: 1, maxLength: 128 }
+        personaType:
+          type: [string, 'null']
+          enum: [INTERNAL_EMPLOYEE, NETWORK_MEMBER, TECHNICIAN, CONSUMER, SERVICE_ACCOUNT]
+    AdminUserDirectoryItem:
+      type: object
+      additionalProperties: false
+      required: [id, type, status, displayName, employeeNumber, version, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        type: { enum: [USER, SERVICE] }
+        status: { enum: [ACTIVE, DISABLED] }
+        displayName: { type: string, minLength: 1, maxLength: 200 }
+        employeeNumber: { type: [string, 'null'], minLength: 1, maxLength: 128 }
+        version: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        organizationSummary: { type: [string, 'null'], maxLength: 200 }
+        roleSummary: { type: [string, 'null'], maxLength: 200 }
+    AdminUserDirectoryPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/AdminUserDirectoryItem' } }
         nextCursor: { type: [string, 'null'] }
         asOf: { type: string, format: date-time }
     PrincipalPersona:

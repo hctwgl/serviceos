@@ -38,6 +38,17 @@ export type SecurityPrincipalPage = {
   asOf: string
 }
 
+export type AdminUserDirectoryItem = SecurityPrincipal & {
+  organizationSummary: string | null
+  roleSummary: string | null
+}
+
+export type AdminUserDirectoryPage = {
+  items: AdminUserDirectoryItem[]
+  nextCursor: string | null
+  asOf: string
+}
+
 export type SecurityPrincipalDetail = {
   principal: SecurityPrincipal
   personas: PrincipalPersona[]
@@ -54,6 +65,21 @@ export type IdentityLink = {
 
 export function listSecurityPrincipals(query: Record<string, string | undefined> = {}) {
   return apiGet<SecurityPrincipalPage>('/security-principals', query)
+}
+
+export function listAdminUserDirectory(query: Record<string, string | undefined> = {}) {
+  return apiGet<AdminUserDirectoryPage>('/admin/user-directory', query)
+}
+
+export function registerSecurityPrincipal(body: {
+  displayName: string
+  employeeNumber?: string | null
+  personaType?: PrincipalPersona['personaType'] | null
+}): Promise<ApiResult<SecurityPrincipal>> {
+  return apiPost('/security-principals', {
+    idempotencyKey: newIdempotencyKey('principal-register'),
+    body,
+  })
 }
 
 export function getSecurityPrincipal(principalId: string) {

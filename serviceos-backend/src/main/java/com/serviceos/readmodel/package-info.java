@@ -9,7 +9,7 @@
                 "workorder::api", "workflow::api", "task::api", "integration::api",
                 "operations::api", "evidence::api", "sla::api",
                 "fieldwork::api", "appointment::api", "forms::api", "dispatch::api",
-                "network::api", "project::api", "configuration::api"
+                "network::api", "project::api", "configuration::api", "organization::api"
         }
 )
 package com.serviceos.readmodel;

@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.net.URI;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -58,6 +59,27 @@ final class SecurityPrincipalController {
             @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
     ) {
         return response(queries.list(principals.current(), correlationId, query, status, cursor, limit), correlationId);
+    }
+
+    /**
+     * 登记主体：不接受密码；登录依赖后续 IdentityLink / OIDC。
+     */
+    @PostMapping
+    ResponseEntity<SecurityPrincipalView> register(
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @Valid @RequestBody RegisterPrincipalRequest request
+    ) {
+        SecurityPrincipalView created = commands.register(
+                principals.current(),
+                metadata(correlationId, idempotencyKey),
+                request.displayName(),
+                request.employeeNumber(),
+                request.personaType());
+        return ResponseEntity.created(URI.create("/api/v1/security-principals/" + created.id()))
+                .eTag(Long.toString(created.version()))
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(created);
     }
 
     @GetMapping("/{principalId}")
@@ -160,6 +182,12 @@ final class SecurityPrincipalController {
                 .header(CorrelationIds.HEADER_NAME, correlationId).body(body);
     }
 }
+
+record RegisterPrincipalRequest(
+        @NotBlank @Size(max = 200) String displayName,
+        @Size(max = 128) String employeeNumber,
+        @Size(max = 40) String personaType
+) {}
 
 record LinkIdentityRequest(
         @NotBlank @Size(max = 512) String issuer,

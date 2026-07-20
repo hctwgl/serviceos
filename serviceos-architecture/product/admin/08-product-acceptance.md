@@ -325,7 +325,7 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 新建用户写流程、组织/角色摘要、最近登录列表读模型
+  - UI_DATA_GAP: 最近登录列表读模型（新建用户与组织/角色摘要已由 M402 关闭主路径）
 ```
 
 ```yaml
@@ -430,6 +430,24 @@ qualityStatus:
 productOwnerDecision: null
 knownGaps:
   - UI_DATA_GAP: 关注项目上的待办/SLA 角标聚合
+```
+
+### 9.8 M402 记录（用户登记与目录摘要）
+
+```yaml
+pageId: ADMIN.USER.DIRECTORY
+route: /users
+visualProfile: CLASSIC_PROFESSIONAL
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: 最近登录列表读模型
 ```
 
 ## 10. GAP 规则
