@@ -2084,26 +2084,14 @@ test('真实 OIDC 登录后可完成预约提议确认与上门签到签退', as
   await page.goto(`/tasks/${taskId}`)
   await expect(page.getByRole('heading', { name: '联系 / 预约 / 上门' })).toBeVisible()
 
-  // M155：工作区 APPOINTMENTS_VISITS → 预约详情（包装 GET /appointments/{id}）。
-  await page.getByRole('link', { name: '工单目录' }).click()
-  await page.getByRole('main').getByRole('table').getByRole('link', { name: workOrderCode!, exact: true }).click()
-  await expect(page.getByRole('heading', { name: /工单工作区|工单详情/, level: 1 })).toBeVisible()
-  await page.getByRole('tab', { name: '预约到场' }).click()
-  await expect(page.getByText('区块加载中…')).toHaveCount(0)
-  await expect(page.getByText('打开预约详情：')).toBeVisible()
+  // M155：产品化侧链文案移除；预约详情路由直达。
   const workspaceAppointmentDetailPromise = page.waitForResponse(
     (response) =>
       response.request().method() === 'GET' &&
       new URL(response.url()).pathname ===
         `/api/v1/appointments/${proposed.appointmentId}`,
   )
-  await page
-    .getByRole('link', {
-      name: new RegExp(
-        `(INSTALLATION|安装)\\s*/\\s*(CONFIRMED|已确认)\\s*/\\s*${proposed.appointmentId}`,
-      ),
-    })
-    .click()
+  await page.goto(`/appointments/${proposed.appointmentId}`)
   expect((await workspaceAppointmentDetailPromise).status()).toBe(200)
   await expect(page.getByRole('heading', { name: '预约详情' })).toBeVisible()
   await expect(page).toHaveURL(new RegExp(`/appointments/${proposed.appointmentId}$`))
@@ -2124,27 +2112,9 @@ test('真实 OIDC 登录后可完成预约提议确认与上门签到签退', as
   await page.goto(new URL(`/appointments/${proposed.appointmentId}`, page.url()).toString())
   await expect(page.getByRole('heading', { name: '预约详情' })).toBeVisible()
 
-  // M154：同区块 Task 旁路仍可用（现场操作入口）。
-  await page.getByRole('link', { name: '工单工作区' }).click()
-  await expect(page.getByRole('heading', { name: /工单工作区|工单详情/, level: 1 })).toBeVisible()
-  await page.getByRole('tab', { name: '预约到场' }).click()
-  await expect(page.getByText('区块加载中…')).toHaveCount(0)
-  await expect(page.getByText('打开预约上门关联任务：')).toBeVisible()
-  const workspaceAvTaskPromise = page.waitForResponse(
-    (response) =>
-      response.request().method() === 'GET' &&
-      new URL(response.url()).pathname === `/api/v1/tasks/${taskId}`,
-  )
-  await page
-    .getByRole('link', {
-      name: new RegExp(
-        `appointment\\s*/\\s*(INSTALLATION|安装)\\s*/\\s*(CONFIRMED|已确认)\\s*/\\s*${taskId}`,
-      ),
-    })
-    .click()
-  expect((await workspaceAvTaskPromise).status()).toBe(200)
+  // M154：产品化侧链移除；任务详情路由直达后继续签到。
+  await page.goto(`/tasks/${taskId}`)
   await expect(page.getByRole('heading', { name: '任务详情' })).toBeVisible()
-  await expect(page).toHaveURL(new RegExp(`/tasks/${taskId}$`))
   await expect(page.getByRole('heading', { name: '联系 / 预约 / 上门' })).toBeVisible()
 
   const checkInPromise = page.waitForResponse(
@@ -2197,47 +2167,25 @@ test('真实 OIDC 登录后可完成预约提议确认与上门签到签退', as
   await page.goto(`/tasks/${taskId}`)
   await expect(page.getByRole('heading', { name: '联系 / 预约 / 上门' })).toBeVisible()
 
-  // M159：工作区 APPOINTMENTS_VISITS → 上门详情（GET /visits/{id}）。
-  await page.getByRole('link', { name: '工单目录' }).click()
-  await page.getByRole('main').getByRole('table').getByRole('link', { name: workOrderCode!, exact: true }).click()
-  await expect(page.getByRole('heading', { name: /工单工作区|工单详情/, level: 1 })).toBeVisible()
-  await page.getByRole('tab', { name: '预约到场' }).click()
-  await expect(page.getByText('区块加载中…')).toHaveCount(0)
-  await expect(page.getByText('打开上门详情：')).toBeVisible()
+  // M159：上门详情路由直达。
   const workspaceVisitDetailPromise = page.waitForResponse(
     (response) =>
       response.request().method() === 'GET' &&
       new URL(response.url()).pathname === `/api/v1/visits/${checkedIn.visitId}`,
   )
-  await page
-    .getByRole('link', {
-      name: new RegExp(`(COMPLETED|已完成)\\s*/\\s*seq=\\d+\\s*/\\s*${checkedIn.visitId}`),
-    })
-    .click()
+  await page.goto(`/visits/${checkedIn.visitId}`)
   expect((await workspaceVisitDetailPromise).status()).toBe(200)
   await expect(page.getByRole('heading', { name: '上门详情' })).toBeVisible()
   await expect(page).toHaveURL(new RegExp(`/visits/${checkedIn.visitId}$`))
 
-  // M160：工作区 APPOINTMENTS_VISITS → 联系详情（GET /contact-attempts/{id}）。
-  await page.getByRole('link', { name: '工单目录' }).click()
-  await page.getByRole('main').getByRole('table').getByRole('link', { name: workOrderCode!, exact: true }).click()
-  await expect(page.getByRole('heading', { name: /工单工作区|工单详情/, level: 1 })).toBeVisible()
-  await page.getByRole('tab', { name: '预约到场' }).click()
-  await expect(page.getByText('区块加载中…')).toHaveCount(0)
-  await expect(page.getByText('打开联系详情：')).toBeVisible()
+  // M160：联系详情路由直达。
   const workspaceContactDetailPromise = page.waitForResponse(
     (response) =>
       response.request().method() === 'GET' &&
       new URL(response.url()).pathname ===
         `/api/v1/contact-attempts/${recordedContact.contactAttemptId}`,
   )
-  await page
-    .getByRole('link', {
-      name: new RegExp(
-        `${recordedContact.channel}\\s*/\\s*${recordedContact.resultCode}\\s*/\\s*${recordedContact.contactAttemptId}`,
-      ),
-    })
-    .click()
+  await page.goto(`/contact-attempts/${recordedContact.contactAttemptId}`)
   expect((await workspaceContactDetailPromise).status()).toBe(200)
   await expect(page.getByRole('heading', { name: '联系详情' })).toBeVisible()
   await expect(page).toHaveURL(
