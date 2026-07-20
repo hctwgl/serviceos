@@ -456,3 +456,4 @@ Feature gate/authority: if applicable
 | M359 | Feed/详情头客户端能力拒单 | OpenAPI 1.0.53 + FrozenBundleClientCapabilityProbe + Feed `clientCapabilityUnsupportedDetail` + 详情 422 + H5 阻断深链 + Unit/Security + 372-m359-* + 356-m359-* | 派单级过滤、iOS 条件全量硬阻断、UNKNOWN 强制升级、整改头级专用增强 |
 | M360 | 终审 8 态视觉基线与 admin-pilot 冒烟加固 | Mock Playwright 8 态金标 + stale-draft + empty 失败关闭修正 + verify-admin-smoke 纳入 visual；无 OpenAPI/Flyway；373-m360-* + 357-m360-* | iOS 执行器、派单过滤、REVIEW_TASK 模板分离 |
 | M361 | 整改路径客户端能力门禁对齐 | OpenAPI 1.0.54 + Correction Service/Controller clientKind + RuntimeGate/定向目标复检 + Unit/Security + 374-m361-* + 358-m361-* | iOS 条件执行器、派单过滤、REVIEW_TASK 模板分离 |
+| M362 | 整改列表/头级客户端能力预检 | OpenAPI 1.0.55 + Correction list/claim/start 注解 clientCapabilityUnsupportedDetail + Probe 复用 + H5 阻断 + Unit/Security + 375-m362-* + 359-m362-* | claim/start 硬 422、Network Portal on-behalf、iOS 执行器、派单过滤、REVIEW_TASK |

@@ -370,6 +370,7 @@ title: ServiceOS 里程碑索引
 | M359 | M359 Feed/详情头客户端能力拒单 | [372-m359-portal-header-client-capability-reject.md](../architecture/372-m359-portal-header-client-capability-reject.md) | [356-m359-portal-header-client-capability-reject-acceptance.md](../testing/356-m359-portal-header-client-capability-reject-acceptance.md) |
 | M360 | M360 终审 8 态视觉基线与 admin-pilot 冒烟加固 | [373-m360-final-review-visual-admin-pilot.md](../architecture/373-m360-final-review-visual-admin-pilot.md) | [357-m360-final-review-visual-admin-pilot-acceptance.md](../testing/357-m360-final-review-visual-admin-pilot-acceptance.md) |
 | M361 | M361 整改路径客户端能力门禁对齐 | [374-m361-correction-client-capability-gate.md](../architecture/374-m361-correction-client-capability-gate.md) | [358-m361-correction-client-capability-gate-acceptance.md](../testing/358-m361-correction-client-capability-gate-acceptance.md) |
+| M362 | M362 整改列表/头级客户端能力预检 | [375-m362-correction-header-capability-reject.md](../architecture/375-m362-correction-header-capability-reject.md) | [359-m362-correction-header-capability-reject-acceptance.md](../testing/359-m362-correction-header-capability-reject-acceptance.md) |
 
 ## 未关联里程碑的文档
 
