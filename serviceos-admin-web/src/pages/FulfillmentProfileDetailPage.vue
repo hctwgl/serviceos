@@ -113,12 +113,33 @@ onMounted(load)
         <Button
           @click="
             router.push({
+              name: 'ADMIN.PROJECT.FULFILLMENT.EDIT',
+              params: { id: projectId, profileId },
+            })
+          "
+        >
+          编辑草稿
+        </Button>
+        <Button
+          @click="
+            router.push({
               name: 'ADMIN.PROJECT.FULFILLMENT.PREVIEW',
               params: { id: projectId, profileId },
             })
           "
         >
           运行预览
+        </Button>
+        <Button
+          type="primary"
+          @click="
+            router.push({
+              name: 'ADMIN.PROJECT.FULFILLMENT.PUBLISH',
+              params: { id: projectId, profileId },
+            })
+          "
+        >
+          发布
         </Button>
       </Space>
     </template>

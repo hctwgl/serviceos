@@ -4,7 +4,7 @@ version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-20
 baselineCommit: "9a05be9b9e22be216542260f0979d85ee2cf2bab"
-latestMilestone: M379
+latestMilestone: M382
 ---
 
 # ServiceOS 实施状态总览
@@ -39,7 +39,7 @@ latestMilestone: M379
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M379 项目履约只读总览与 Admin 入口（承接 M378） |
+| 最新实施里程碑 | M382 履约编辑/发布/建单冻结（承接 M378～M381） |
 | 基线提交 | `9a05be9b9e22be216542260f0979d85ee2cf2bab`（待 M378～M383 合并后回填；承接 M377 Admin 产品化） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts`、`@serviceos/web-core`、`ServiceOSIOSCore`、独立且可部署的 `serviceos-network-web` 与 `serviceos-technician-web`、Swift 6 `TechnicianIOSFoundation`，以及已在 iPhone 17 Pro Simulator 安装启动、实跑 XCTest/XCUITest、形成 Production arm64 archive/dSYM，并接入当前任务、在线 Visit、冻结基础表单、前台 Evidence 采集上传、Snapshot/Task 完成与多轮资料整改的原生 `TechnicianIOS` SwiftUI App；由同一 Core OpenAPI 生成并经独立消费者门禁验证的 `@serviceos/core-client` 与 `ServiceOSCoreClient` |
@@ -175,12 +175,15 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 
 ## 5. 下一实施方向
 
-当前序列 **M378～M383**（项目工单类型与履约配置产品化）进行中：
-- **M378 Implemented**：ADR-091、Flyway 136/137、OpenAPI 1.0.60、Profile/Revision/Manifest/Resolver 与 PostgresIT。
-- **M379 Implemented**：Admin 履约列表/详情/运行说明书；项目详情去空壳并展示工单类型摘要。
-- 下一步：M380 草稿阶段编排 → M381 校验发布 → M382 建单冻结 → M383 收口。
+当前序列 **M378～M383**（项目工单类型与履约配置产品化）接近收口：
+- **M378 Implemented**：ADR-091、Flyway 136/137、OpenAPI 1.0.60、Profile/Revision/Manifest/Resolver + PostgresIT。
+- **M379 Implemented**：Admin 履约列表/详情/运行说明书；项目详情去空壳。
+- **M380 Implemented**：三栏草稿阶段编排工作区。
+- **M381 Implemented**：DedicatedFlow 四步发布。
+- **M382 Implemented**：建单 Resolver 接入、工单冻结、快照 API。
+- **M383 Pending**：Playwright/a11y/OIDC、core-client 替换、阻塞原因产品化、无 Profile 强制失败收紧。
 
-OpenAPI **1.0.60**；Flyway **137**。Admin Web 产品化基线仍含 M370～M377。
+OpenAPI **1.0.60**；Flyway **137**。
 
 仍为 **硬门禁 / 外部阻塞**（不可发明推进）：
 

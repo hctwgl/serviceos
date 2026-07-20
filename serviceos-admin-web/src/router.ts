@@ -35,6 +35,8 @@ import ProjectDetailPage from './pages/ProjectDetailPage.vue'
 import FulfillmentProfileListPage from './pages/FulfillmentProfileListPage.vue'
 import FulfillmentProfileDetailPage from './pages/FulfillmentProfileDetailPage.vue'
 import FulfillmentPreviewPage from './pages/FulfillmentPreviewPage.vue'
+import FulfillmentProfileEditorPage from './pages/FulfillmentProfileEditorPage.vue'
+import FulfillmentPublishFlowPage from './pages/FulfillmentPublishFlowPage.vue'
 import OidcCallbackPage from './pages/OidcCallbackPage.vue'
 import UserDirectoryPage from './pages/UserDirectoryPage.vue'
 import UserDetailPage from './pages/UserDetailPage.vue'
@@ -158,6 +160,18 @@ export const router = createRouter({
           name: 'ADMIN.PROJECT.FULFILLMENT.PREVIEW',
           component: FulfillmentPreviewPage,
           meta: { pageId: 'ADMIN.PROJECT.FULFILLMENT.PREVIEW' },
+        },
+        {
+          path: 'projects/:id/fulfillment-profiles/:profileId/edit',
+          name: 'ADMIN.PROJECT.FULFILLMENT.EDIT',
+          component: FulfillmentProfileEditorPage,
+          meta: { pageId: 'ADMIN.PROJECT.FULFILLMENT.EDIT' },
+        },
+        {
+          path: 'projects/:id/fulfillment-profiles/:profileId/publish',
+          name: 'ADMIN.PROJECT.FULFILLMENT.PUBLISH',
+          component: FulfillmentPublishFlowPage,
+          meta: { pageId: 'ADMIN.PROJECT.FULFILLMENT.PUBLISH' },
         },
         {
           path: 'configuration/designer',
