@@ -571,6 +571,25 @@ H5 通过不代表 iOS 离线生产能力完成。
 - TestFlight 试点；
 - 隐私和本地保留策略验收。
 
+## 46.1 M393 验收记录（今日任务 H5）
+
+```yaml
+pageId: TECHNICIAN.TASK.LIST
+route: /technician-portal/task-feed
+visualProfile: CLASSIC_PROFESSIONAL_MOBILE
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: 客户脱敏姓名/电话、地址摘要、距离与 SLA 倒计时尚未由 Feed 正式读模型交付
+  - DOMAIN_GAP: H5 不承诺原生离线/后台上传；完整作业闭环待后续里程碑
+```
+
 ## 47. 黄金链路验收
 
 真实师傅必须在真机独立完成：

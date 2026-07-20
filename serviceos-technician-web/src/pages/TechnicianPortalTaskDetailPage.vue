@@ -575,22 +575,38 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
 </script>
 
 <template>
-  <section data-testid="technician-portal-task-detail" data-page-id="TECHNICIAN.TASK.DETAIL">
+  <section data-testid="technician-portal-task-detail" data-page-id="TECHNICIAN.TASK.DETAIL" class="detail-page">
     <header class="top">
       <div>
-        <RouterLink to="/technician-portal/task-feed">← 返回任务 Feed</RouterLink>
-        <h2>任务详情</h2>
-        <p class="hint">M246：当前 ACTIVE 责任任务的在线非 PII 详情与协作历史；表单摘要另受 form.read 门禁。</p>
+        <RouterLink to="/technician-portal/task-feed">← 返回今日任务</RouterLink>
+        <p class="eyebrow">任务详情</p>
+        <h2>{{ detail?.taskType ? statusLabel(detail.taskType) : '当前任务' }}</h2>
+        <p class="hint">完成当前步骤所需的最小信息；下一步动作固定在底部。</p>
       </div>
       <button type="button" data-testid="technician-task-detail-refresh" @click="load">刷新</button>
     </header>
 
     <p v-if="error" class="error" data-testid="technician-task-detail-error">{{ error }}</p>
     <template v-else-if="detail">
+      <section class="next-step" data-testid="technician-task-next-step">
+        <p>
+          当前状态 <strong>{{ statusLabel(detail.taskStatus) }}</strong>
+          · 阶段 {{ statusLabel(detail.stageCode) }}
+        </p>
+        <p class="hint">
+          {{
+            detail.executionGuarded
+              ? '执行已保护，请先解除阻塞后再操作。'
+              : detail.appointments.length
+                ? '可继续签到、填写表单或上传资料。'
+                : '请先确认预约或联系安排，再进入现场作业。'
+          }}
+        </p>
+      </section>
       <dl class="summary" data-testid="technician-task-detail-summary">
-        <div><dt>taskId</dt><dd data-testid="technician-task-detail-task-id">{{ detail.taskId }}</dd></div>
-        <div><dt>workOrderId</dt><dd>{{ detail.workOrderId }}</dd></div>
-        <div><dt>projectId</dt><dd>{{ detail.projectId ?? '—' }}</dd></div>
+        <div><dt>任务编号</dt><dd data-testid="technician-task-detail-task-id">{{ detail.taskId }}</dd></div>
+        <div><dt>关联工单</dt><dd>{{ detail.workOrderId }}</dd></div>
+        <div><dt>所属项目</dt><dd>{{ detail.projectId ?? '—' }}</dd></div>
         <div><dt>状态</dt><dd data-testid="technician-task-detail-status">{{ statusLabel(detail.taskStatus) }}</dd></div>
         <div><dt>阶段</dt><dd>{{ statusLabel(detail.stageCode) }}</dd></div>
         <div><dt>任务类型</dt><dd>{{ statusLabel(detail.taskType) }} / {{ statusLabel(detail.taskKind) }}</dd></div>
@@ -898,12 +914,32 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
 </template>
 
 <style scoped>
+.detail-page {
+  display: grid;
+  gap: 12px;
+  padding-bottom: 72px;
+}
 .top,
 .section-title {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 1rem;
+}
+.eyebrow {
+  margin: 0.35rem 0 0.2rem;
+  color: var(--sos-primary-600);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+.next-step {
+  border: 1px solid var(--sos-primary-500, #4096ff);
+  background: var(--sos-primary-100, #e6f4ff);
+  border-radius: 12px;
+  padding: 12px;
+}
+.next-step p {
+  margin: 0 0 4px;
 }
 .hint,
 .boundary {
