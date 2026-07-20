@@ -9,7 +9,7 @@ lastUpdated: 2026-07-20
 
 - **进行中 Draft PR**：M363 整改领取/启动能力硬拒单
   （依赖 M356～M362：#183～#189）
-- PR：（创建后回填）
+- PR：https://github.com/hctwgl/serviceos/pull/190
 - 分支：`cursor/m363-correction-lifecycle-capability-hard-reject-6a78`
   （base：`cursor/m362-correction-header-capability-reject-6a78`）
 - latestMilestone（本 PR）：**M363**
