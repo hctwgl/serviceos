@@ -7,6 +7,8 @@ import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import PageState from '../components/PageState.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import WorkbenchPageLayout from '../patterns/templates/WorkbenchPageLayout.vue'
+import { Button } from 'ant-design-vue'
 import { listReviewCases, listCorrectionCases, listOperationalExceptions } from '../api/queues'
 import { listAuthorizedWorkOrders } from '../api/workOrders'
 import { listSlaInstances } from '../api/sla'
@@ -186,28 +188,71 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="workbench" data-testid="admin-workbench">
-    <header class="hero">
-      <div>
-        <h1>运营工作台</h1>
-        <p class="subtitle">
-          查看待办与风险，明确下一步动作。任一卡片失败不会影响其他卡片。
-        </p>
-      </div>
-      <div class="hero-actions">
-        <button type="button" data-testid="workbench-reload" @click="loadAll">刷新全部</button>
-        <RouterLink class="link-btn" to="/work-orders/golden-path" data-testid="workbench-golden-path">
-          工单全流程演练
-        </RouterLink>
-        <RouterLink class="link-btn" to="/system/demo-data" data-testid="workbench-demo-data">
-          演示数据
-        </RouterLink>
-      </div>
-    </header>
+  <div data-testid="admin-workbench">
+  <WorkbenchPageLayout
+    title="运营工作台"
+    description="优先处理待办、即将超时与已超时事项。任一队列失败不会拖垮整页。"
+  >
+    <template #secondary-actions>
+      <Button data-testid="workbench-reload" @click="loadAll">刷新全部</Button>
+      <RouterLink class="link-btn" to="/work-orders/golden-path" data-testid="workbench-golden-path">
+        工单全流程演练
+      </RouterLink>
+      <RouterLink class="link-btn" to="/system/demo-data" data-testid="workbench-demo-data">
+        演示数据
+      </RouterLink>
+    </template>
+    <template #feedback>
+      <PageState v-if="pageBootError" kind="error" :description="pageBootError" @reload="loadAll" />
+    </template>
 
-    <PageState v-if="pageBootError" kind="error" :description="pageBootError" @reload="loadAll" />
+    <template #primary-queue>
+      <section class="todo" data-testid="workbench-todos">
+        <PageState
+          v-if="!reviews.loading && !corrections.loading && !slaRisk.loading
+            && !(reviews.data?.items.length || corrections.data?.items.length || slaRisk.data?.items.length)"
+          kind="empty"
+          compact
+          guide="当前没有待办。可到「演示数据」初始化演示工单，或打开「工单全流程演练」按步骤操作。"
+        />
+        <table v-else-if="reviews.data || corrections.data || slaRisk.data">
+          <thead>
+            <tr>
+              <th>业务编号</th>
+              <th>项目/车企</th>
+              <th>当前环节</th>
+              <th>状态</th>
+              <th>剩余处理时间</th>
+              <th>下一步动作</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="item in [
+                ...(reviews.data?.items ?? []),
+                ...(corrections.data?.items ?? []),
+                ...(slaRisk.data?.items ?? []),
+              ]"
+              :key="item.id"
+            >
+              <td>{{ item.workOrderLabel }}</td>
+              <td>{{ item.projectLabel }}</td>
+              <td>{{ item.stage }}</td>
+              <td><StatusBadge :status="item.status" /></td>
+              <td>{{ item.remaining }}</td>
+              <td>{{ item.nextAction }}</td>
+              <td>
+                <RouterLink :to="item.to">处理</RouterLink>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </template>
 
-    <div class="cards" data-testid="workbench-cards">
+    <template #risk-queue>
+      <div class="cards" data-testid="workbench-cards">
       <article class="card" data-testid="workbench-card-reviews">
         <h2>待审核资料</h2>
         <PageState v-if="reviews.loading" kind="loading" compact />
@@ -305,78 +350,48 @@ onMounted(() => {
           <p class="hint">查看并确认需要人工介入的异常</p>
         </template>
       </article>
-    </div>
+      </div>
+    </template>
 
-    <section class="todo" data-testid="workbench-todos">
-      <h2>我的待办</h2>
-      <PageState
-        v-if="!reviews.loading && !corrections.loading && !slaRisk.loading
-          && !(reviews.data?.items.length || corrections.data?.items.length || slaRisk.data?.items.length)"
-        kind="empty"
-        compact
-        guide="当前没有待办。可到「演示数据」初始化演示工单，或打开「工单全流程演练」按步骤操作。"
-      />
-      <table v-else-if="reviews.data || corrections.data || slaRisk.data">
-        <thead>
-          <tr>
-            <th>业务编号</th>
-            <th>项目/车企</th>
-            <th>当前环节</th>
-            <th>状态</th>
-            <th>剩余处理时间</th>
-            <th>下一步动作</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="item in [
-              ...(reviews.data?.items ?? []),
-              ...(corrections.data?.items ?? []),
-              ...(slaRisk.data?.items ?? []),
-            ]"
-            :key="item.id"
-          >
-            <td>{{ item.workOrderLabel }}</td>
-            <td>{{ item.projectLabel }}</td>
-            <td>{{ item.stage }}</td>
-            <td><StatusBadge :status="item.status" /></td>
-            <td>{{ item.remaining }}</td>
-            <td>{{ item.nextAction }}</td>
-            <td>
-              <RouterLink :to="item.to">处理</RouterLink>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </section>
+    <template #today-queue>
+      <article class="card" data-testid="workbench-card-work-orders-today">
+        <p class="metric">
+          <RouterLink to="/work-orders?status=ACTIVE">
+            {{ workOrders.data?.countLabel ?? '—' }}
+          </RouterLink>
+        </p>
+        <p class="hint">今日继续跟进的处理中工单</p>
+      </article>
+    </template>
 
-    <section class="recent" data-testid="workbench-recent">
-      <h2>最近工单</h2>
-      <PageState v-if="recent.loading" kind="loading" compact />
-      <PageState
-        v-else-if="recent.error"
-        kind="error"
-        compact
-        :description="recent.error"
-        :error-code="recent.errorCode ?? undefined"
-        @reload="loadRecent"
-      />
-      <PageState
-        v-else-if="recent.data && recent.data.items.length === 0"
-        kind="empty"
-        compact
-        guide="还没有工单。请先初始化演示数据，或等待车企入站创建工单。"
-      />
-      <ul v-else-if="recent.data">
-        <li v-for="item in recent.data.items" :key="item.id">
-          <RouterLink :to="item.to">{{ item.workOrderLabel }}</RouterLink>
-          <StatusBadge :status="item.status" />
-          <span class="muted">{{ statusLabel(item.status) }} · {{ item.remaining }}</span>
-        </li>
-      </ul>
-    </section>
-  </section>
+    <template #recent-activity>
+      <section class="recent" data-testid="workbench-recent">
+        <PageState v-if="recent.loading" kind="loading" compact />
+        <PageState
+          v-else-if="recent.error"
+          kind="error"
+          compact
+          :description="recent.error"
+          :error-code="recent.errorCode ?? undefined"
+          @reload="loadRecent"
+        />
+        <PageState
+          v-else-if="recent.data && recent.data.items.length === 0"
+          kind="empty"
+          compact
+          guide="还没有工单。请先初始化演示数据，或等待车企入站创建工单。"
+        />
+        <ul v-else-if="recent.data">
+          <li v-for="item in recent.data.items" :key="item.id">
+            <RouterLink :to="item.to">{{ item.workOrderLabel }}</RouterLink>
+            <StatusBadge :status="item.status" />
+            <span class="muted">{{ statusLabel(item.status) }} · {{ item.remaining }}</span>
+          </li>
+        </ul>
+      </section>
+    </template>
+  </WorkbenchPageLayout>
+  </div>
 </template>
 
 <style scoped>

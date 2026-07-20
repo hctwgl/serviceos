@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageContainer from '../patterns/PageContainer.vue'
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, type RouteLocationRaw } from 'vue-router'
 import QueueTable from './QueueTable.vue'
@@ -94,13 +95,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section>
-    <header class="page-head">
-      <h1>时效中心</h1>
-      <p class="desc">
-        监控服务时效（SLA）达标与超时情况。默认展示已超时实例，可按状态与项目筛选。
-      </p>
-    </header>
+  <PageContainer title="SLA 工作台" description="查看计时中与已超时的服务时效实例。">
     <form class="filters" @submit.prevent="search">
       <label>
         时效状态
@@ -199,7 +194,7 @@ onMounted(() => {
         打开项目 {{ item.projectId }}
       </RouterLink>
     </p>
-  </section>
+  </PageContainer>
 </template>
 
 <style scoped>

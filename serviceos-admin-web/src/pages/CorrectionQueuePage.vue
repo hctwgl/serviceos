@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageContainer from '../patterns/PageContainer.vue'
 import { onMounted, ref } from 'vue'
 import { RouterLink, useRoute, type RouteLocationRaw } from 'vue-router'
 import SavedViewBar from '../components/SavedViewBar.vue'
@@ -183,13 +184,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section>
-    <header class="page-head">
-      <h1>整改中心</h1>
-      <p class="desc">
-        跟踪审核驳回后的整改单。可按整改状态、项目、工单编号、客户或整改单号筛选，无需手工粘贴内部 ID。
-      </p>
-    </header>
+  <PageContainer title="整改跟踪" description="跟踪整改回传、豁免与复审进度。">
     <SavedViewBar
       page-id="ADMIN.CORRECTION.QUEUE"
       :schema-version="1"
@@ -322,7 +317,7 @@ onMounted(() => {
         打开来源任务 {{ item.taskId }}
       </RouterLink>
     </p>
-  </section>
+  </PageContainer>
 </template>
 
 <style scoped>

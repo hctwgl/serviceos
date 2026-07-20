@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageContainer from '../patterns/PageContainer.vue'
 import { onMounted, ref } from 'vue'
 import {
   createDelegation,
@@ -223,16 +224,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="page" data-testid="grant-directory-page">
-    <header class="top">
-      <div>
-        <h2>用户授权与委托</h2>
-        <p class="hint">申请、批准、撤销与 Delegation；写动作展示影响并重读权威结果。</p>
-      </div>
-      <button type="button" :disabled="loading" @click="load">刷新</button>
-    </header>
-
-    <p v-if="error" class="error" data-testid="access-denied">{{ error }}</p>
+  <PageContainer title="授权与委托" description="管理角色授权、范围与委托关系。"><p v-if="error" class="error" data-testid="access-denied">{{ error }}</p>
     <p v-if="message" class="ok" data-testid="command-message">{{ message }}</p>
 
     <article class="card form">
@@ -331,7 +323,7 @@ onMounted(() => {
       <button type="button" :disabled="busy" @click="runExplain">解释</button>
       <pre v-if="explainResult" data-testid="explain-result">{{ explainResult }}</pre>
     </article>
-  </section>
+  </PageContainer>
 </template>
 
 <style scoped>

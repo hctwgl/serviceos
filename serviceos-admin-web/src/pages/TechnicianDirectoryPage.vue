@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageContainer from '../patterns/PageContainer.vue'
 import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
@@ -60,13 +61,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="page" data-testid="technician-directory-page">
-    <header>
-      <h2>师傅档案</h2>
-      <p class="hint">师傅档案与 Principal 一对一；资质与网点关系在详情维护。</p>
-    </header>
-
-    <article class="card form">
+  <PageContainer title="师傅档案" description="查询服务师傅档案与资质。"><article class="card form">
       <h3>创建师傅档案</h3>
       <PrincipalPicker v-model="principalId" />
       <label>displayName<input v-model="displayName" aria-label="technician displayName" /></label>
@@ -96,7 +91,7 @@ onMounted(() => {
         </tr>
       </tbody>
     </table>
-  </section>
+  </PageContainer>
 </template>
 
 <style scoped>

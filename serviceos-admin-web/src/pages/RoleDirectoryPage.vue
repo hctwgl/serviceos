@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageContainer from '../patterns/PageContainer.vue'
 import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
@@ -65,13 +66,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="page" data-testid="role-directory-page">
-    <header>
-      <h2>角色与 Capability</h2>
-      <p class="hint">只能引用目录能力，不能改写风险级别。</p>
-    </header>
-
-    <article class="card form">
+  <PageContainer title="角色与 Capability" description="管理角色定义与 Capability 绑定。"><article class="card form">
       <h3>创建租户角色</h3>
       <label>roleCode<input v-model="roleCode" aria-label="role code" /></label>
       <label>roleName<input v-model="roleName" aria-label="role name" /></label>
@@ -112,7 +107,7 @@ onMounted(() => {
         </tr>
       </tbody>
     </table>
-  </section>
+  </PageContainer>
 </template>
 
 <style scoped>

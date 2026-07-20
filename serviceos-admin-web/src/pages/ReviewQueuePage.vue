@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageContainer from '../patterns/PageContainer.vue'
 import { onMounted, ref } from 'vue'
 import { RouterLink, useRoute, type RouteLocationRaw } from 'vue-router'
 import QueueTable from './QueueTable.vue'
@@ -107,13 +108,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section>
-    <header class="page-head">
-      <h1>审核中心</h1>
-      <p class="desc">
-        查看待审与已审资料。可按审核状态、来源、项目或关联任务筛选，第一列展示审核单号。
-      </p>
-    </header>
+  <PageContainer title="审核队列" description="处理待审与已审资料，跟踪平台与车企审核结论。">
     <form class="filters" @submit.prevent="search">
       <label>
         审核状态
@@ -224,7 +219,7 @@ onMounted(() => {
         打开重开来源 {{ item.reopenedFromReviewCaseId }}
       </RouterLink>
     </p>
-  </section>
+  </PageContainer>
 </template>
 
 <style scoped>
