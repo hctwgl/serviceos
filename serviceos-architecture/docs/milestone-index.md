@@ -390,6 +390,8 @@ title: ServiceOS 里程碑索引
 | M379 | M379 项目履约只读总览与 Admin 入口 | [392-m379-project-fulfillment-overview-ui.md](../architecture/392-m379-project-fulfillment-overview-ui.md) | [376-m379-project-fulfillment-overview-ui-acceptance.md](../testing/376-m379-project-fulfillment-overview-ui-acceptance.md) |
 | M382 | M380–M382 履约编辑、发布与建单冻结 | [393-m380-m382-fulfillment-editor-publish-freeze.md](../architecture/393-m380-m382-fulfillment-editor-publish-freeze.md) | [377-m380-m382-fulfillment-editor-publish-freeze-acceptance.md](../testing/377-m380-m382-fulfillment-editor-publish-freeze-acceptance.md) |
 | M383 | M383 项目履约产品化收口（部分） | [394-m383-project-fulfillment-closeout-partial.md](../architecture/394-m383-project-fulfillment-closeout-partial.md) | [378-m383-project-fulfillment-closeout-partial-acceptance.md](../testing/378-m383-project-fulfillment-closeout-partial-acceptance.md) |
+| M384 | M384 Admin 产品蓝图接受与 M383 产品状态纠正 | [395-m384-admin-product-baseline.md](../architecture/395-m384-admin-product-baseline.md) |  |
+| M385 | M385 项目履约配置中心产品化（切片 A） | [396-m385-fulfillment-config-center-productization.md](../architecture/396-m385-fulfillment-config-center-productization.md) | [379-m385-fulfillment-config-center-acceptance.md](../testing/379-m385-fulfillment-config-center-acceptance.md) |
 
 ## 未关联里程碑的文档
 

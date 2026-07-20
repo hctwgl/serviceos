@@ -221,6 +221,10 @@ export async function mockProductizationApis(
       ])
       return
     }
+    if (url.includes('/fulfillment-profiles/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:validate')) {
+      await fulfillJson(route, [])
+      return
+    }
     if (url.includes('/fulfillment-profiles/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:compile-preview')) {
       await fulfillJson(route, {
         manifestJson: JSON.stringify({
@@ -239,6 +243,60 @@ export async function mockProductizationApis(
           ],
         }),
         contentDigest: 'a'.repeat(64),
+        runbook: {
+          profileName: '标准家充履约方案',
+          serviceProductCode: 'HOME_CHARGING_SURVEY_INSTALL',
+          serviceProductLabel: '家充勘测安装',
+          orderTypeName: '勘测安装',
+          versionLabel: 'draft-preview',
+          stageCount: 1,
+          stages: [
+            {
+              stageName: '现场勘测',
+              sequence: 1,
+              ownerTypeLabel: '师傅',
+              taskTypeLabel: '勘测任务',
+              formCount: 0,
+              formSummary: '未配置表单',
+              evidenceCount: 0,
+              evidenceSummary: '未配置必传资料槽位',
+              actionCount: 1,
+              actionSummary: '允许动作 1 项',
+              nextStageSummary: '结束',
+              exceptionSummary: '无异常出口',
+              slaSummary: '未绑定 SLA',
+              terminal: false,
+            },
+          ],
+          clientSupportSummary: '支持客户端：Admin Web、师傅 H5',
+          impactSummary: '发布后仅影响生效时间之后的新工单；存量工单继续使用创建时冻结的配置版本。',
+        },
+      })
+      return
+    }
+    if (url.includes('/fulfillment-profiles/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/compare-impact')) {
+      await fulfillJson(route, {
+        profileId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        draftRevisionId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        baselineKind: 'PUBLISHED',
+        baselineRevisionId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        baselineVersionLabel: 'v1',
+        changeCount: 1,
+        changes: [
+          {
+            category: 'STAGE',
+            changeType: 'MODIFIED',
+            summary: '阶段「现场勘测」责任或顺序已调整',
+            detail: null,
+          },
+        ],
+        impact: {
+          newWorkOrdersScope: '生效时间之后创建的新工单将使用本次发布版本',
+          existingWorkOrdersScope: '已创建工单继续使用各自冻结的履约配置版本，不会自动迁移',
+          effectiveFromHint: '请在发布确认页设置生效时间',
+        },
+        risks: [],
+        asOf: '2026-07-20T04:00:00Z',
       })
       return
     }
@@ -283,6 +341,7 @@ export async function mockProductizationApis(
       url.includes('/fulfillment-profiles/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')
       && !url.includes('/draft')
       && !url.includes('/revisions')
+      && !url.includes('/compare-impact')
       && !url.includes(':')
     ) {
       await fulfillJson(route, {

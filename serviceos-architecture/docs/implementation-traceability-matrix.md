@@ -472,4 +472,6 @@ Feature gate/authority: if applicable
 | M375 | 项目详情产品化 + 范围调整 DedicatedFlow | 无 UUID/命令按钮主文案；388-m375-* + 372-m375-* | 其余导航页 |
 | M376 | 主导航其余页面迁移到产品壳 | WorkbenchPageLayout + PageContainer；389-m376-* + 373-m376-* | 视觉/a11y 关闭 |
 | M377 | Admin 产品化视觉/a11y/回归关闭 | Playwright 产品化截图 + 文档收口；390-m377-* + 374-m377-* | 真实 OIDC 冒烟、全量视觉态人工补齐 |
+| M384 | Admin 产品蓝图与经典专业风基线事实源；纠正 M383 产品状态 | 395-m384-*；无运行语义变更 | M385 履约配置中心产品化 |
+| M385 | 经典专业风共享基础 + 履约配置中心母版 + 新建向导 + Runbook/Compare-Impact（OpenAPI 1.0.62） | 396-m385-* + 379-m385-*；Admin Playwright/截图；PostgresIT | M385b 结构化 Draft；M386/M387 |
 

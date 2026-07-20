@@ -35,6 +35,7 @@ lastUpdated: 2026-07-20
 10. [当前路由到目标产品映射](10-current-to-target-matrix.md)
 11. [M383 项目履约配置产品审查](11-m383-product-review.md)
 12. [经典专业风视觉与页面基线](12-classic-professional-visual-baseline.md)（`Accepted`）
+13. [履约配置逐路由验收矩阵](12-m384-fulfillment-route-acceptance-matrix.md)
 
 ## 规范优先级
 
