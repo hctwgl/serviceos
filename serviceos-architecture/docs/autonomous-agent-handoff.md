@@ -8,7 +8,7 @@ lastUpdated: 2026-07-20
 ## 当前
 
 - **状态**：**AWAITING_OWNER_SELECTION**（M369 已 Implemented；下一切片需选型）
-- 已合并候选栈 tip：`cursor/m369-business-calendar-sla-6a78`（Draft PR #198）
+- 已合入 `master`：`fc4074ae559d5591b47320475ef78b1a6d8cbfc7`（#199；含 M356～M369）
 - 工程基线：**M369**（OpenAPI 仍 1.0.59 / Flyway 135；ADR-090 Accepted：D1-R/D2-R/D4-R）
 
 ## 请选型下一切片（回复字母或改写）
