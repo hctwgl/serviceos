@@ -23,6 +23,12 @@
             <artifactId>spring-boot-starter-jdbc</artifactId>
         </dependency>
         <dependency>
+            <!-- ADR-091：业务数据访问收敛为 jOOQ。Boot 自动装配以 TransactionAwareDataSourceProxy
+                 包装 DataSource，jOOQ 与现有 JdbcClient/MyBatis 共享同一 Spring 事务。 -->
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jooq</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.mybatis.spring.boot</groupId>
             <artifactId>mybatis-spring-boot-starter</artifactId>
         </dependency>
@@ -122,10 +128,55 @@
             <artifactId>testcontainers-postgresql</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <!-- ADR-091 P0：jOOQ 代码生成器只在 test classpath 运行（scripts/generate-jooq.sh），
+                 复用 testcontainers/postgresql/flyway 依赖，不进入运行时镜像。 -->
+            <groupId>org.jooq</groupId>
+            <artifactId>jooq-codegen</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
         <plugins>
+            <plugin>
+                <!-- ADR-091：jOOQ 生成物提交进 git，作为额外 main source root 参与编译。 -->
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>add-jooq-generated-sources</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>src/generated/java</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <!-- 仅由 scripts/generate-jooq.sh 显式调用：mvn test-compile exec:java。
+                     serviceos.basedir 让生成器无论从哪个目录启动都能定位模块输出目录。 -->
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <configuration>
+                    <mainClass>com.serviceos.codegen.JooqCodegen</mainClass>
+                    <classpathScope>test</classpathScope>
+                    <!-- Testcontainers 的 Ryuk 回收线程是 daemon 线程；默认的线程清理会在 main
+                         返回后中断它并抛出 InterruptedException，把成功的生成误判为构建失败。 -->
+                    <cleanupDaemonThreads>false</cleanupDaemonThreads>
+                    <systemProperties>
+                        <systemProperty>
+                            <key>serviceos.basedir</key>
+                            <value>${project.basedir}</value>
+                        </systemProperty>
+                    </systemProperties>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>

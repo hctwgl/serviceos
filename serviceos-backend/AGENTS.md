@@ -39,6 +39,7 @@ com.serviceos.<module>/
 | organization | 企业组织、OrgUnit closure、任职与目录同步收据 | `org_` | api |
 | network | 合作组织、ServiceNetwork、网点成员、师傅档案与资质 | `net_` | api |
 | integration | BYD CPIM 入站 Envelope/Canonical、OutboundDelivery/Attempt/Ack；M267 入站 SPI；M297 出站提审 SPI/`OutboundSubmissionPipeline` | `int_` | api、spi；`byd`/`referenceoem` 为模块内 OEM 适配器 |
+| jooq | ADR-091 jOOQ 生成物宿主（OPEN）：`generated` 包由 `scripts/generate-jooq.sh` 从 Flyway 基线生成，禁止手改；仅供各模块 infrastructure 适配器引用 | 无自有表（生成类型映射全部业务表） | OPEN（generated） |
 | operations | OperationalException 运营异常工作台 | `ops_` | api |
 | project | Project 核心事实、REGION/NETWORK 范围关系与修订收据 | `prj_` | api |
 | readmodel | 工单时间线/工作区/专项队列只读投影（不回写领域事实） | `rdm_` | api |
