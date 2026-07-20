@@ -30,10 +30,11 @@ import java.util.UUID;
 import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timestamptz;
 
 /**
- * M61 Task 自然时长 SLA。
+ * M61 Task ELAPSED SLA；M369 扩展 BUSINESS 日历截止（ADR-090 D1-R）。
  *
  * <p>Task 创建/完成、SLA 状态、里程碑、Inbox 与 Outbox 分别在消费者本地事务中提交。到期扫描同时
- * 锁定 SLA、里程碑和 Task，避免“Task 已完成但完成事件尚未消费”被误判为超时。</p>
+ * 锁定 SLA、里程碑和 Task，避免“Task 已完成但完成事件尚未消费”被误判为超时。
+ * BUSINESS 在 start 时锁定日历版本并用纯函数预计算 deadlineAt。</p>
  */
 @Service
 final class DefaultSlaClockService implements SlaClockService, TaskSlaEventConsumer {
@@ -85,9 +86,18 @@ final class DefaultSlaClockService implements SlaClockService, TaskSlaEventConsu
         if (!policy.taskTypes().contains(task.taskType())) {
             throw new IllegalStateException("Frozen SLA policy does not cover Task type");
         }
+        ConfigurationAssetDefinition calendarAsset = null;
+        BusinessCalendar calendar = null;
+        if ("BUSINESS".equals(policy.clockMode())) {
+            calendarAsset = requireCalendar(message.tenantId(), task, policy.calendarRef());
+            calendar = BusinessCalendar.parse(readTree(calendarAsset.definitionJson()));
+        }
         Instant deadlineAt;
         try {
-            deadlineAt = startedAt.plusSeconds(policy.targetDurationSeconds());
+            deadlineAt = "BUSINESS".equals(policy.clockMode())
+                    ? BusinessCalendarDeadlineCalculator.addBusinessSeconds(
+                            startedAt, policy.targetDurationSeconds(), calendar)
+                    : startedAt.plusSeconds(policy.targetDurationSeconds());
         } catch (RuntimeException exception) {
             throw new IllegalArgumentException("SLA deadline exceeds supported Instant range", exception);
         }
@@ -97,21 +107,29 @@ final class DefaultSlaClockService implements SlaClockService, TaskSlaEventConsu
                             sla_instance_id, tenant_id, project_id, work_order_id, task_id,
                             sla_ref, policy_version_id, policy_semantic_version, policy_content_digest,
                             clock_mode, target_duration_seconds, start_event_id, started_at, deadline_at,
-                            status, aggregate_version, correlation_id, created_at, updated_at)
+                            status, aggregate_version, correlation_id, created_at, updated_at,
+                            calendar_ref, calendar_version_id, calendar_semantic_version, calendar_content_digest)
                         VALUES (
                             :instanceId, :tenantId, :projectId, :workOrderId, :taskId,
                             :slaRef, :policyVersionId, :policyVersion, :policyDigest,
-                            'ELAPSED', :duration, :eventId, :startedAt, :deadlineAt,
-                            'RUNNING', 1, :correlationId, :startedAt, :startedAt)
+                            :clockMode, :duration, :eventId, :startedAt, :deadlineAt,
+                            'RUNNING', 1, :correlationId, :startedAt, :startedAt,
+                            :calendarRef, :calendarVersionId, :calendarVersion, :calendarDigest)
                         ON CONFLICT (tenant_id, task_id) DO NOTHING
                         """)
                 .param("instanceId", instanceId).param("tenantId", message.tenantId())
                 .param("projectId", task.projectId()).param("workOrderId", task.workOrderId())
                 .param("taskId", taskId).param("slaRef", task.slaRef())
                 .param("policyVersionId", asset.versionId()).param("policyVersion", asset.semanticVersion())
-                .param("policyDigest", asset.contentDigest()).param("duration", policy.targetDurationSeconds())
+                .param("policyDigest", asset.contentDigest())
+                .param("clockMode", policy.clockMode())
+                .param("duration", policy.targetDurationSeconds())
                 .param("eventId", message.eventId()).param("startedAt", timestamptz(startedAt))
                 .param("deadlineAt", timestamptz(deadlineAt)).param("correlationId", message.correlationId())
+                .param("calendarRef", calendarAsset == null ? null : calendarAsset.assetKey())
+                .param("calendarVersionId", calendarAsset == null ? null : calendarAsset.versionId())
+                .param("calendarVersion", calendarAsset == null ? null : calendarAsset.semanticVersion())
+                .param("calendarDigest", calendarAsset == null ? null : calendarAsset.contentDigest())
                 .update();
         if (inserted != 1) {
             throw new IllegalStateException("Task is already bound to another SLA start fact");
@@ -132,7 +150,7 @@ final class DefaultSlaClockService implements SlaClockService, TaskSlaEventConsu
                         """)
                 .param("milestoneId", UUID.randomUUID()).param("tenantId", message.tenantId())
                 .param("instanceId", instanceId).param("deadlineAt", timestamptz(deadlineAt)).update();
-        appendStarted(message, instanceId, task, asset, policy.targetDurationSeconds(), startedAt, deadlineAt);
+        appendStarted(message, instanceId, task, asset, policy, calendarAsset, startedAt, deadlineAt);
         inbox.complete(message.tenantId(), START_CONSUMER, message.eventId(),
                 Sha256.digest(instanceId + "|RUNNING|" + deadlineAt));
     }
@@ -170,7 +188,7 @@ final class DefaultSlaClockService implements SlaClockService, TaskSlaEventConsu
         } else if (!late) {
             cancelMilestone(message.tenantId(), state.slaInstanceId());
         }
-        long elapsedSeconds = Duration.between(state.startedAt(), completedAt).getSeconds();
+        long elapsedSeconds = elapsedSeconds(message.tenantId(), task, state, completedAt);
         String terminalStatus = late ? "MET_LATE" : "MET";
         int updated = jdbc.sql("""
                         UPDATE sla_instance
@@ -234,7 +252,8 @@ final class DefaultSlaClockService implements SlaClockService, TaskSlaEventConsu
                         SELECT instance_row.sla_instance_id, instance_row.tenant_id, instance_row.task_id,
                                instance_row.started_at, instance_row.deadline_at,
                                instance_row.status, instance_row.aggregate_version,
-                               instance_row.correlation_id, milestone.milestone_id,
+                               instance_row.correlation_id, instance_row.clock_mode,
+                               instance_row.calendar_ref, milestone.milestone_id,
                                milestone.trigger_event_id
                           FROM sla_instance instance_row
                           JOIN sla_milestone milestone
@@ -257,6 +276,7 @@ final class DefaultSlaClockService implements SlaClockService, TaskSlaEventConsu
                         rs.getString("tenant_id"), rs.getObject("task_id", UUID.class), instant(rs, "started_at"),
                         instant(rs, "deadline_at"), rs.getString("status"),
                         rs.getLong("aggregate_version"), rs.getString("correlation_id"),
+                        rs.getString("clock_mode"), rs.getString("calendar_ref"),
                         rs.getObject("milestone_id", UUID.class),
                         rs.getObject("trigger_event_id", UUID.class)))
                 .optional();
@@ -290,7 +310,8 @@ final class DefaultSlaClockService implements SlaClockService, TaskSlaEventConsu
         return new InstanceState(
                 state.slaInstanceId(), state.tenantId(), state.taskId(), state.startedAt(),
                 state.deadlineAt(), "BREACHED", state.aggregateVersion() + 1,
-                state.correlationId(), state.milestoneId(), breachEventId);
+                state.correlationId(), state.clockMode(), state.calendarRef(),
+                state.milestoneId(), breachEventId);
     }
 
     private UUID triggerMilestone(
@@ -356,7 +377,8 @@ final class DefaultSlaClockService implements SlaClockService, TaskSlaEventConsu
                         SELECT instance_row.sla_instance_id, instance_row.tenant_id, instance_row.task_id,
                                instance_row.started_at, instance_row.deadline_at,
                                instance_row.status, instance_row.aggregate_version,
-                               instance_row.correlation_id, milestone.milestone_id,
+                               instance_row.correlation_id, instance_row.clock_mode,
+                               instance_row.calendar_ref, milestone.milestone_id,
                                milestone.trigger_event_id
                           FROM sla_instance instance_row
                           JOIN sla_milestone milestone
@@ -372,6 +394,7 @@ final class DefaultSlaClockService implements SlaClockService, TaskSlaEventConsu
                         rs.getString("tenant_id"), rs.getObject("task_id", UUID.class), instant(rs, "started_at"),
                         instant(rs, "deadline_at"), rs.getString("status"),
                         rs.getLong("aggregate_version"), rs.getString("correlation_id"),
+                        rs.getString("clock_mode"), rs.getString("calendar_ref"),
                         rs.getObject("milestone_id", UUID.class),
                         rs.getObject("trigger_event_id", UUID.class)))
                 .optional();
@@ -393,15 +416,38 @@ final class DefaultSlaClockService implements SlaClockService, TaskSlaEventConsu
         return matches.getFirst();
     }
 
+    private ConfigurationAssetDefinition requireCalendar(
+            String tenantId, TaskFulfillmentContext task, String calendarRef
+    ) {
+        if (calendarRef == null || calendarRef.isBlank()) {
+            throw new IllegalStateException("BUSINESS SLA requires calendarRef");
+        }
+        List<ConfigurationAssetDefinition> matches = configurations.listBundleAssets(
+                        tenantId, task.configurationBundleId(), task.configurationBundleDigest(),
+                        ConfigurationAssetType.CALENDAR).stream()
+                .filter(asset -> calendarRef.equals(asset.assetKey())).toList();
+        if (matches.size() != 1) {
+            throw new IllegalStateException(
+                    "BUSINESS SLA calendarRef must resolve to exactly one frozen CALENDAR");
+        }
+        return matches.getFirst();
+    }
+
     private TaskSlaPolicy policy(ConfigurationAssetDefinition asset) {
         try {
             TaskSlaPolicy policy = objectMapper.readValue(asset.definitionJson(), TaskSlaPolicy.class);
+            boolean business = "BUSINESS".equals(policy.clockMode());
+            boolean elapsed = "ELAPSED".equals(policy.clockMode());
+            boolean calendarOk = business
+                    ? policy.calendarRef() != null && !policy.calendarRef().isBlank()
+                    : policy.calendarRef() == null || policy.calendarRef().isBlank();
             if (!asset.assetKey().equals(policy.policyKey())
                     || !asset.semanticVersion().equals(policy.version())
                     || !"TASK".equals(policy.subjectType())
                     || !"TASK_CREATED".equals(policy.startEvent())
                     || !"TASK_COMPLETED".equals(policy.stopEvent())
-                    || !"ELAPSED".equals(policy.clockMode())
+                    || !(elapsed || business)
+                    || !calendarOk
                     || policy.taskTypes() == null || policy.taskTypes().isEmpty()
                     || policy.targetDurationSeconds() < 1 || policy.targetDurationSeconds() > 31536000) {
                 throw new IllegalStateException("Frozen SLA policy identity or semantics are invalid");
@@ -412,21 +458,48 @@ final class DefaultSlaClockService implements SlaClockService, TaskSlaEventConsu
         }
     }
 
+    private long elapsedSeconds(
+            String tenantId, TaskFulfillmentContext task, InstanceState state, Instant completedAt
+    ) {
+        if (!"BUSINESS".equals(state.clockMode())) {
+            return Duration.between(state.startedAt(), completedAt).getSeconds();
+        }
+        ConfigurationAssetDefinition calendarAsset = requireCalendar(
+                tenantId, task, state.calendarRef());
+        BusinessCalendar calendar = BusinessCalendar.parse(readTree(calendarAsset.definitionJson()));
+        return BusinessCalendarDeadlineCalculator.businessSecondsBetween(
+                state.startedAt(), completedAt, calendar);
+    }
+
+    private tools.jackson.databind.JsonNode readTree(String json) {
+        try {
+            return objectMapper.readTree(json);
+        } catch (JacksonException exception) {
+            throw new IllegalStateException("Frozen calendar cannot be decoded", exception);
+        }
+    }
+
     private void appendStarted(
             OutboxMessage source,
             UUID instanceId,
             TaskFulfillmentContext task,
             ConfigurationAssetDefinition asset,
-            long duration,
+            TaskSlaPolicy policy,
+            ConfigurationAssetDefinition calendarAsset,
             Instant startedAt,
             Instant deadlineAt
     ) {
         String payload = json(new SlaStartedPayload(
                 instanceId, task.taskId(), task.projectId(), task.workOrderId(), task.slaRef(),
-                asset.versionId(), asset.semanticVersion(), asset.contentDigest(), "ELAPSED",
-                duration, startedAt, deadlineAt));
+                asset.versionId(), asset.semanticVersion(), asset.contentDigest(), policy.clockMode(),
+                policy.targetDurationSeconds(), startedAt, deadlineAt,
+                calendarAsset == null ? null : calendarAsset.assetKey(),
+                calendarAsset == null ? null : calendarAsset.versionId(),
+                calendarAsset == null ? null : calendarAsset.semanticVersion(),
+                calendarAsset == null ? null : calendarAsset.contentDigest()));
+        // M369：BUSINESS 需冻结日历字段；ELAPSED 日历字段为 null。已发布 v1 不可变，故统一发 @v2。
         outbox.append(new OutboxEvent(
-                UUID.randomUUID(), UUID.randomUUID(), "sla", "sla.started", 1,
+                UUID.randomUUID(), UUID.randomUUID(), "sla", "sla.started", 2,
                 "SlaInstance", instanceId.toString(), 1,
                 source.tenantId(), source.correlationId(), source.eventId().toString(),
                 instanceId.toString(), payload, Sha256.digest(payload), startedAt));
@@ -485,7 +558,8 @@ final class DefaultSlaClockService implements SlaClockService, TaskSlaEventConsu
             String startEvent,
             String stopEvent,
             String clockMode,
-            long targetDurationSeconds
+            long targetDurationSeconds,
+            String calendarRef
     ) {
     }
 
@@ -498,6 +572,8 @@ final class DefaultSlaClockService implements SlaClockService, TaskSlaEventConsu
             String status,
             long aggregateVersion,
             String correlationId,
+            String clockMode,
+            String calendarRef,
             UUID milestoneId,
             UUID milestoneTriggerEventId
     ) {
@@ -515,7 +591,11 @@ final class DefaultSlaClockService implements SlaClockService, TaskSlaEventConsu
             String clockMode,
             long targetDurationSeconds,
             Instant startedAt,
-            Instant deadlineAt
+            Instant deadlineAt,
+            String calendarRef,
+            UUID calendarVersionId,
+            String calendarSemanticVersion,
+            String calendarContentDigest
     ) {
     }
 

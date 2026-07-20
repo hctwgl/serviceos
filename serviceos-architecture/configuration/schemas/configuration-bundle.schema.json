@@ -52,7 +52,7 @@
       "required": ["assetType", "assetId", "versionId", "semanticVersion"],
       "properties": {
         "assetType": {
-          "enum": ["WORKFLOW", "FORM", "EVIDENCE", "RULE", "SLA", "DISPATCH", "PRICING", "INTEGRATION", "ASSIGNEE_POLICY", "NOTIFICATION"]
+          "enum": ["WORKFLOW", "FORM", "EVIDENCE", "RULE", "SLA", "DISPATCH", "PRICING", "INTEGRATION", "ASSIGNEE_POLICY", "NOTIFICATION", "CALENDAR"]
         },
         "assetId": {"type": "string", "minLength": 1, "maxLength": 100},
         "versionId": {"type": "string", "minLength": 1, "maxLength": 100},

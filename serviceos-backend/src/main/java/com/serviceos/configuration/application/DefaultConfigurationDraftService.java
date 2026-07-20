@@ -58,7 +58,8 @@ final class DefaultConfigurationDraftService implements ConfigurationDraftServic
             ConfigurationAssetType.NOTIFICATION,
             ConfigurationAssetType.ASSIGNEE_POLICY,
             ConfigurationAssetType.INTEGRATION,
-            ConfigurationAssetType.PRICING);
+            ConfigurationAssetType.PRICING,
+            ConfigurationAssetType.CALENDAR);
 
     private final JdbcClient jdbc;
     private final AuthorizationService authorization;

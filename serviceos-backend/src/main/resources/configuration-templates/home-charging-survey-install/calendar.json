@@ -1,0 +1,20 @@
+{
+  "calendarKey": "cn.workdays.sample",
+  "version": "1.0.0",
+  "timeZone": "Asia/Shanghai",
+  "weeklyWindows": [
+    {"dayOfWeek": "MONDAY", "start": "09:00", "end": "18:00"},
+    {"dayOfWeek": "TUESDAY", "start": "09:00", "end": "18:00"},
+    {"dayOfWeek": "WEDNESDAY", "start": "09:00", "end": "18:00"},
+    {"dayOfWeek": "THURSDAY", "start": "09:00", "end": "18:00"},
+    {"dayOfWeek": "FRIDAY", "start": "09:00", "end": "18:00"}
+  ],
+  "holidays": [
+    "2026-01-01",
+    "2026-01-02",
+    "2026-01-03"
+  ],
+  "extraWorkdays": [
+    "2026-01-04"
+  ]
+}

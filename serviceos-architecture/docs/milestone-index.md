@@ -377,6 +377,7 @@ title: ServiceOS 里程碑索引
 | M366 | M366 派单级 supportedClientKinds 过滤 | [379-m366-dispatch-supported-client-kinds-filter.md](../architecture/379-m366-dispatch-supported-client-kinds-filter.md) | [363-m366-dispatch-supported-client-kinds-filter-acceptance.md](../testing/363-m366-dispatch-supported-client-kinds-filter-acceptance.md) |
 | M367 | M367 Manual/Network assign supportedClientKinds 硬拒绝 | [380-m367-manual-network-assign-client-kind-reject.md](../architecture/380-m367-manual-network-assign-client-kind-reject.md) | [364-m367-manual-network-assign-client-kind-reject-acceptance.md](../testing/364-m367-manual-network-assign-client-kind-reject-acceptance.md) |
 | M368 | M368 Network Portal on-behalf NETWORK_WEB 能力门禁 | [381-m368-network-portal-onbehalf-network-web-capability.md](../architecture/381-m368-network-portal-onbehalf-network-web-capability.md) | [365-m368-network-portal-onbehalf-network-web-capability-acceptance.md](../testing/365-m368-network-portal-onbehalf-network-web-capability-acceptance.md) |
+| M369 | M369 BUSINESS 日历 SLA 截止时间（ADR-090 D1-R/D2-R/D4-R） | [382-m369-business-calendar-sla.md](../architecture/382-m369-business-calendar-sla.md) | [366-m369-business-calendar-sla-acceptance.md](../testing/366-m369-business-calendar-sla-acceptance.md) |
 
 ## 未关联里程碑的文档
 

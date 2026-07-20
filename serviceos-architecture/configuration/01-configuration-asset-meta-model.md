@@ -16,7 +16,8 @@ related_adrs:
 
 ## 1. 目标
 
-统一描述 Workflow、Form、Evidence、Rule、SLA、Dispatch、Pricing、Integration、Assignee Policy 和 Notification 等业务配置资产，使其可验证、可依赖、可审批、可发布、可锁定、可回滚和可审计。
+统一描述 Workflow、Form、Evidence、Rule、SLA、Dispatch、Pricing、Integration、Assignee Policy、
+Notification 和 Calendar 等业务配置资产，使其可验证、可依赖、可审批、可发布、可锁定、可回滚和可审计。
 
 ## 2. 核心对象
 
@@ -58,6 +59,7 @@ PRICING
 INTEGRATION
 ASSIGNEE_POLICY
 NOTIFICATION
+CALENDAR
 ```
 
 ## 4. 生命周期

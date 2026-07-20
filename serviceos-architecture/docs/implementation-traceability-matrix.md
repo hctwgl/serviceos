@@ -463,3 +463,5 @@ Feature gate/authority: if applicable
 | M366 | 派单级 supportedClientKinds 过滤（A1-R～A5-R） | ADR-088 Accepted + V134 师傅声明 + OpenAPI 1.0.58 declare/create + Bundle FORM∩EVIDENCE 求交 + 自动 TECHNICIAN 池硬过滤 + MANUAL/`CLIENT_KIND_TARGET_EMPTY` + DispatchClientKindFilterPostgresIT + 379-m366-* + 363-m366-* | on-behalf、iOS 执行器 |
 | M367 | Manual/Network assign kind 硬拒绝（A1-B） | ADR-088 A1-B + ManualTechnicianClientKindGate + Manual assign/reassign 422/DENY + TechnicianDeclaredClientKindsQuery + ManualAssignClientKindRejectPostgresIT + 380-m367-* + 364-m367-* | on-behalf、iOS 执行器 |
 | M368 | Network Portal on-behalf NETWORK_WEB 能力门禁 | ADR-089 Accepted + Catalog/RuntimeGate/Probe NETWORK_WEB + Portal begin/finalize/snapshot/resubmit 硬校验 + OpenAPI 1.0.59 422 + Unit/Security/PostgresIT + 381-m368-* + 365-m368-* | iOS 执行器、表单代改、Visit |
+| M369 | BUSINESS `clockMode` + Bundle 锁定 `CALENDAR`；纯函数 `deadlineAt` 与业务已用时长；`sla.started@v2`；保留 ELAPSED；无暂停/预警 | ADR-090 D1-R/D2-R/D4-R + OpenAPI 1.0.60 + V135 + sla/calendar schema + SlaClockPostgresIT/单元/Contract/ArchitectureTest | 暂停/恢复、预警/升级/通知、外部节假日 API、非 Task subject、结算落账 |
+

@@ -279,6 +279,13 @@ class ContractValidationTest {
     }
 
     @Test
+    void slaStartedV2BusinessExampleMustMatchPublishedSchema() throws Exception {
+        assertValidEvent(
+                "/events/sla-started-v2.schema.json",
+                "/events/sla-started-v2.valid.json");
+    }
+
+    @Test
     void slaBreachedExampleMustMatchPublishedSchema() throws Exception {
         assertValidEvent(
                 "/events/sla-breached-v1.schema.json",

@@ -167,8 +167,58 @@ class SlaClockPostgresIT {
         assertThat(jdbc.sql("SELECT elapsed_seconds FROM sla_clock_segment")
                 .query(Long.class).single()).isEqualTo(60);
         assertThat(slaEventTypes()).containsExactly("sla.started", "sla.met");
+        assertThat(jdbc.sql("""
+                SELECT schema_version FROM rel_outbox_event
+                 WHERE event_type='sla.started'
+                """).query(Integer.class).single()).isEqualTo(2);
         assertThat(jdbc.sql("SELECT count(*) FROM rel_inbox_record WHERE consumer_name LIKE 'sla.%'")
                 .query(Long.class).single()).isEqualTo(2);
+    }
+
+    @Test
+    void businessClockLocksCalendarAndSkipsNonBusinessTime() {
+        publishBusinessBundle();
+        Instant fridayAfternoon = Instant.parse("2026-07-17T08:00:00Z"); // 周五 16:00 CST
+        clock.set(fridayAfternoon);
+        ScheduledTaskView task = createTask("survey-response-business");
+        OutboxMessage created = taskCreated(task.taskId());
+        handler.handle(created);
+
+        var view = clocks.findByTask(TENANT, task.taskId()).orElseThrow();
+        assertThat(view.status()).isEqualTo("RUNNING");
+        // 2 业务小时：周五 16:00→18:00 CST，不计入周末。
+        assertThat(view.deadlineAt()).isEqualTo(Instant.parse("2026-07-17T10:00:00Z"));
+        assertThat(jdbc.sql("""
+                SELECT clock_mode, calendar_ref, calendar_semantic_version
+                  FROM sla_instance WHERE task_id=:taskId
+                """).param("taskId", task.taskId())
+                .query((rs, row) -> rs.getString("clock_mode") + "|" + rs.getString("calendar_ref")
+                        + "|" + rs.getString("calendar_semantic_version"))
+                .single()).isEqualTo("BUSINESS|cn.workdays.sample|1.0.0");
+
+        Instant mondayMorning = Instant.parse("2026-07-20T02:30:00Z"); // 周一 10:30 CST
+        handler.handle(completed(task.taskId(), mondayMorning));
+        var met = clocks.findByTask(TENANT, task.taskId()).orElseThrow();
+        assertThat(met.status()).isEqualTo("MET_LATE");
+        // 周五 16-18 = 2h 已用尽目标；周末不计；周一 09:00-10:30 = 1.5h 业务逾期。
+        assertThat(met.elapsedSeconds()).isEqualTo(2 * 3600L + 90 * 60L);
+    }
+
+    @Test
+    void businessOnTimeStopUsesBusinessElapsedOnly() {
+        publishBusinessBundle();
+        Instant fridayStart = Instant.parse("2026-07-17T08:00:00Z"); // 周五 16:00 CST
+        clock.set(fridayStart);
+        ScheduledTaskView task = createTask("survey-response-business-ontime");
+        OutboxMessage created = taskCreated(task.taskId());
+        handler.handle(created);
+        Instant fridayEnd = Instant.parse("2026-07-17T09:30:00Z"); // 周五 17:30 CST
+        handler.handle(completed(task.taskId(), fridayEnd));
+
+        var met = clocks.findByTask(TENANT, task.taskId()).orElseThrow();
+        assertThat(met.status()).isEqualTo("MET");
+        assertThat(met.elapsedSeconds()).isEqualTo(90 * 60L);
+        assertThat(met.deadlineAt()).isEqualTo(Instant.parse("2026-07-17T10:00:00Z"));
     }
 
     @Test
@@ -524,6 +574,40 @@ class SlaClockPostgresIT {
                 TENANT, projectId, "SLA-IT-BUNDLE", "1.0.0", "BYD_OCEAN",
                 "HOME_CHARGING", null, BASE_TIME.minusSeconds(60), null,
                 List.of(workflowVersionId, slaVersionId)));
+    }
+
+    /** M369：同一项目发布含 CALENDAR 的 BUSINESS Bundle；替换 setUp 默认 ELAPSED Bundle。 */
+    private void publishBusinessBundle() {
+        workflowDigest = Sha256.digest(workflowDefinition());
+        workflowVersionId = configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.WORKFLOW, "survey.workflow", "1.0.1", "1.0.0",
+                workflowDefinition(), workflowDigest)).versionId();
+        String calendar = """
+                {"calendarKey":"cn.workdays.sample","version":"1.0.0","timeZone":"Asia/Shanghai",
+                 "weeklyWindows":[
+                   {"dayOfWeek":"MONDAY","start":"09:00","end":"18:00"},
+                   {"dayOfWeek":"TUESDAY","start":"09:00","end":"18:00"},
+                   {"dayOfWeek":"WEDNESDAY","start":"09:00","end":"18:00"},
+                   {"dayOfWeek":"THURSDAY","start":"09:00","end":"18:00"},
+                   {"dayOfWeek":"FRIDAY","start":"09:00","end":"18:00"}],
+                 "holidays":[],"extraWorkdays":[]}
+                """.trim();
+        UUID calendarVersionId = configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.CALENDAR, "cn.workdays.sample", "1.0.0", "1.0.0",
+                calendar, Sha256.digest(calendar))).versionId();
+        String sla = """
+                {"policyKey":"survey.response.sla","version":"1.0.1","subjectType":"TASK",
+                 "taskTypes":["SURVEY_RESPONSE"],"startEvent":"TASK_CREATED",
+                 "stopEvent":"TASK_COMPLETED","clockMode":"BUSINESS","targetDurationSeconds":7200,
+                 "calendarRef":"cn.workdays.sample"}
+                """.trim();
+        UUID slaVersionId = configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.SLA, "survey.response.sla", "1.0.1", "1.0.0",
+                sla, Sha256.digest(sla))).versionId();
+        bundle = configurations.publishBundle(new PublishConfigurationBundleCommand(
+                TENANT, projectId, "SLA-IT-BUSINESS-BUNDLE", "1.0.0", "BYD_OCEAN",
+                "HOME_CHARGING", null, BASE_TIME.minusSeconds(60), null,
+                List.of(workflowVersionId, slaVersionId, calendarVersionId)));
     }
 
     private String workflowDefinition() {

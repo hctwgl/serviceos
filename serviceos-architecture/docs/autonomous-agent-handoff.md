@@ -7,25 +7,25 @@ lastUpdated: 2026-07-20
 
 ## 当前
 
-- **状态**：**READY_FOR_REVIEW**（M368 实现完成，待负责人选型下一切片）
-- 进行中 Draft PR：M368 Network Portal on-behalf NETWORK_WEB 能力门禁（**Implemented**）
-- 分支：`cursor/m368-onbehalf-network-web-capability-6a78`
-  （base：`cursor/m367-manual-network-assign-kind-reject-6a78`）
-- 工程基线：**M368**（OpenAPI 1.0.59 / Flyway 134；ADR-089 Accepted）
+- **状态**：**READY_FOR_REVIEW**（M369 实现完成，待负责人选型下一切片）
+- 进行中 Draft PR：M369 BUSINESS 日历 SLA 截止时间（**Implemented**）
+- 分支：`cursor/m369-business-calendar-sla-6a78`
+  （base：`cursor/m368-onbehalf-network-web-capability-6a78`）
+- 工程基线：**M369**（OpenAPI 1.0.60 / Flyway 135；ADR-090 Accepted：D1-R/D2-R/D4-R）
 
 ## 已接受并实现（本切片）
 
 ```text
-Accept M368 = ADR-089: Network Portal on-behalf capability gate uses
-NETWORK_WEB (not act-as technician kind); require X-ServiceOS-Client-Kind=NETWORK_WEB;
-enforce evidence slot capabilities; skip supportedClientKinds directed targets for
-NETWORK_WEB; 422 CLIENT_CAPABILITY_UNSUPPORTED.
+Accept ADR-090 with: D1-R, D2-R, D4-R
+(M369 = BUSINESS clockMode + Bundle-locked sample BusinessCalendarVersion;
+deadline pure function; no pause/resume/warning/escalation/recalc; keep ELAPSED)
 ```
 
 ## 下一切片候选（需负责人选型，不得发明）
 
 1. iOS 条件执行器全量硬阻断（本 Linux 环境多为 `BLOCKED_EXTERNAL`）；
-2. 吉利联调 / AMOUNT/加权 / BUSINESS 日历 SLA（硬门禁）。
+2. 吉利联调 / AMOUNT/加权（硬门禁）；
+3. BUSINESS 暂停/恢复/预警/升级（需另接受 D1-B 或 ARCH-12 子集）。
 
 ## 已闭环
 
@@ -34,4 +34,5 @@ NETWORK_WEB; 422 CLIENT_CAPABILITY_UNSUPPORTED.
 - M365：REVIEW_TASK 工作流门闸（A5-B）— #192
 - M366：派单级 supportedClientKinds 过滤（A1-R～A5-R）— #193
 - M367：Manual/Network assign kind 硬拒绝（A1-B）— #195
-- M368：Network Portal on-behalf NETWORK_WEB 能力门禁 — 本 PR
+- M368：Network Portal on-behalf NETWORK_WEB 能力门禁 — #196
+- M369：BUSINESS 日历 SLA 截止时间 — 本 PR
