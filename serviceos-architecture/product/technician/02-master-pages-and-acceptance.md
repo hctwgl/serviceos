@@ -609,6 +609,40 @@ knownGaps:
   - DOMAIN_GAP: 原生签退 FieldOperation、离线草稿与后台上传不在 H5 承诺范围
 ```
 
+## 46.3 M395 验收记录（整改 + 同步冲突中心 H5）
+
+```yaml
+pageId: TECHNICIAN.CORRECTION.DETAIL
+route: /technician-portal/corrections/:id
+visualProfile: CLASSIC_PROFESSIONAL_MOBILE
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: 正确示例图读模型未交付
+```
+
+```yaml
+pageId: TECHNICIAN.SYNC.SUMMARY
+route: /technician-portal/sync-summary
+visualProfile: CLASSIC_PROFESSIONAL_MOBILE
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: OfflineCommand 队列明细与冲突命令结果绑定未对 H5 交付
+```
+
 ## 47. 黄金链路验收
 
 真实师傅必须在真机独立完成：

@@ -483,4 +483,5 @@ Feature gate/authority: if applicable
 | M392 | Network 整改/异常队列产品化 + 建议动作深链 | 403-m392-* + 386-m392-*；Playwright + M220 回归 | 代补允许标志/正确示例读模型；ACK/resolve；人工视觉批准 |
 | M393 | Technician H5 今日任务：移动壳/概览/任务卡片 | 404-m393-* + 387-m393-*；Playwright 390 截图 | Feed PII/距离/SLA 读模型；作业闭环；人工视觉批准 |
 | M394 | Technician H5 任务详情作业闭环：步骤条/签到/提交前检查/底部主操作 | 405-m394-* + 388-m394-*；Playwright + M262～M265 | 客户地址导航读模型；原生签退；离线；人工视觉批准 |
+| M395 | Technician H5 整改详情 + 同步冲突中心产品化 | 406-m395-* + 389-m395-*；Playwright + correction 回归 | OfflineCommand 队列读模型；正确示例；人工视觉批准 |
 
