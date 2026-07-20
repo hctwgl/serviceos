@@ -464,4 +464,12 @@ Feature gate/authority: if applicable
 | M367 | Manual/Network assign kind 硬拒绝（A1-B） | ADR-088 A1-B + ManualTechnicianClientKindGate + Manual assign/reassign 422/DENY + TechnicianDeclaredClientKindsQuery + ManualAssignClientKindRejectPostgresIT + 380-m367-* + 364-m367-* | on-behalf、iOS 执行器 |
 | M368 | Network Portal on-behalf NETWORK_WEB 能力门禁 | ADR-089 Accepted + Catalog/RuntimeGate/Probe NETWORK_WEB + Portal begin/finalize/snapshot/resubmit 硬校验 + OpenAPI 1.0.59 422 + Unit/Security/PostgresIT + 381-m368-* + 365-m368-* | iOS 执行器、表单代改、Visit |
 | M369 | BUSINESS `clockMode` + Bundle 锁定 `CALENDAR`；纯函数 `deadlineAt` 与业务已用时长；`sla.started@v2`；保留 ELAPSED；无暂停/预警 | ADR-090 D1-R/D2-R/D4-R + OpenAPI 仍 1.0.59 + V135 + sla/calendar schema + SlaClockPostgresIT/单元/Contract/ArchitectureTest | 暂停/恢复、预警/升级/通知、外部节假日 API、非 Task subject、结算落账 |
+| M370 | Admin 设计系统实施对齐：Token v1.0.0、分领域 Presenter、SemanticStatusTag、组件文档、禁止硬编码色扫描 | 纯前端；06 仍 Proposed；383-m370-* + 367-m370-* + `npm run check:tokens/test:unit/build` | AppShell/业务页产品化 |
+| M371 | Admin AppShell 产品化：顶栏/侧栏/ScopeBar/Freshness/用户菜单/诊断抽屉 | 服务端 Navigation 不变；384-m371-* + 368-m371-* | 标准页模板填充 |
+| M372 | 标准页面模板 List/Detail/Workbench/Form/Config/Flow + SavedView 工具栏化 | 385-m372-* + 369-m372-* | 基准业务页 |
+| M373 | 工单中心产品化 ListPage + Ant Table + Presenter | UI_DATA_GAP 诚实展示；386-m373-* + 370-m373-* | 工单详情 |
+| M374 | 工单详情产品化 DetailTabs + 诊断隔离 + 网点分配产品化 | FinalReview/allowed-actions 保留；387-m374-* + 371-m374-* | 项目详情 |
+| M375 | 项目详情产品化 + 范围调整 DedicatedFlow | 无 UUID/命令按钮主文案；388-m375-* + 372-m375-* | 其余导航页 |
+| M376 | 主导航其余页面迁移到产品壳 | WorkbenchPageLayout + PageContainer；389-m376-* + 373-m376-* | 视觉/a11y 关闭 |
+| M377 | Admin 产品化视觉/a11y/回归关闭 | Playwright 产品化截图 + 文档收口；390-m377-* + 374-m377-* | 真实 OIDC 冒烟、全量视觉态人工补齐 |
 

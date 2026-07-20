@@ -674,7 +674,7 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M369 BUSINESS 日历 SLA 截止时间**（见 `implementation-status.md`；
+当前工程基线为 **M377 Admin 产品化视觉/可访问性/回归关闭**（Admin Web M370～M377；后端能力基线仍含 **M369 BUSINESS 日历 SLA**；见 `implementation-status.md`；
 OpenAPI 1.0.59；Flyway 135 / 137；承接 M368；ADR-090）。
 
 当前已具备多 OEM SPI、远端查询、UNKNOWN/批量重放、复杂流程、十大资产设计器、六类 Runtime，
