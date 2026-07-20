@@ -197,6 +197,30 @@ export async function mockProductizationApis(
       await fulfillJson(route, { items: [], nextCursor: null, asOf: '2026-07-20T04:00:00Z' })
       return
     }
+    if (
+      url.includes('/projects/22222222-2222-4222-8222-222222222222/fulfillment-profiles')
+      && !url.includes('/fulfillment-profiles/')
+    ) {
+      await fulfillJson(route, [
+        {
+          profileId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          projectId: '22222222-2222-4222-8222-222222222222',
+          serviceProductCode: 'HOME_CHARGING_SURVEY_INSTALL',
+          profileName: '标准家充履约方案',
+          status: 'ACTIVE',
+          stageCount: 4,
+          formCount: 0,
+          evidenceCount: 0,
+          activeVersion: '1',
+          effectiveFrom: '2026-07-20T00:00:00Z',
+          workflowSummary: '4 个阶段',
+          slaSummary: null,
+          aggregateVersion: 2,
+          updatedAt: '2026-07-20T04:00:00Z',
+        },
+      ])
+      return
+    }
     if (url.includes('/projects/22222222-2222-4222-8222-222222222222')) {
       await fulfillJson(route, {
         project: {

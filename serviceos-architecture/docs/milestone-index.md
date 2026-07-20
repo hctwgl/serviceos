@@ -389,6 +389,7 @@ title: ServiceOS 里程碑索引
 | M378 | M378 项目履约配置领域基础（Profile/Revision/OpenAPI/Flyway） | [391-m378-project-fulfillment-profile-foundation.md](../architecture/391-m378-project-fulfillment-profile-foundation.md) | [375-m378-project-fulfillment-profile-foundation-acceptance.md](../testing/375-m378-project-fulfillment-profile-foundation-acceptance.md) |
 | M379 | M379 项目履约只读总览与 Admin 入口 | [392-m379-project-fulfillment-overview-ui.md](../architecture/392-m379-project-fulfillment-overview-ui.md) | [376-m379-project-fulfillment-overview-ui-acceptance.md](../testing/376-m379-project-fulfillment-overview-ui-acceptance.md) |
 | M382 | M380–M382 履约编辑、发布与建单冻结 | [393-m380-m382-fulfillment-editor-publish-freeze.md](../architecture/393-m380-m382-fulfillment-editor-publish-freeze.md) | [377-m380-m382-fulfillment-editor-publish-freeze-acceptance.md](../testing/377-m380-m382-fulfillment-editor-publish-freeze-acceptance.md) |
+| M383 | M383 项目履约产品化收口（部分） | [394-m383-project-fulfillment-closeout-partial.md](../architecture/394-m383-project-fulfillment-closeout-partial.md) | [378-m383-project-fulfillment-closeout-partial-acceptance.md](../testing/378-m383-project-fulfillment-closeout-partial-acceptance.md) |
 
 ## 未关联里程碑的文档
 
