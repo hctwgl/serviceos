@@ -33,6 +33,7 @@ import ExternalReviewReceiptDetailPage from './pages/ExternalReviewReceiptDetail
 import ProjectDirectoryPage from './pages/ProjectDirectoryPage.vue'
 import ProjectDetailPage from './pages/ProjectDetailPage.vue'
 import FulfillmentProfileListPage from './pages/FulfillmentProfileListPage.vue'
+import FulfillmentProfileCreatePage from './pages/FulfillmentProfileCreatePage.vue'
 import FulfillmentProfileDetailPage from './pages/FulfillmentProfileDetailPage.vue'
 import FulfillmentPreviewPage from './pages/FulfillmentPreviewPage.vue'
 import FulfillmentProfileEditorPage from './pages/FulfillmentProfileEditorPage.vue'
@@ -149,6 +150,12 @@ export const router = createRouter({
           name: 'ADMIN.PROJECT.FULFILLMENT.LIST',
           component: FulfillmentProfileListPage,
           meta: { pageId: 'ADMIN.PROJECT.FULFILLMENT.LIST' },
+        },
+        {
+          path: 'projects/:id/fulfillment-profiles/create',
+          name: 'ADMIN.PROJECT.FULFILLMENT.CREATE',
+          component: FulfillmentProfileCreatePage,
+          meta: { pageId: 'ADMIN.PROJECT.FULFILLMENT.CREATE' },
         },
         {
           path: 'projects/:id/fulfillment-profiles/:profileId',

@@ -20,6 +20,7 @@ import StickyActionBar from '../patterns/StickyActionBar.vue'
 import {
   getProjectFulfillmentDraft,
   getProjectFulfillmentProfile,
+  hasAllowedAction,
   updateProjectFulfillmentDraft,
   validateProjectFulfillmentDraft,
   type ProjectFulfillmentDraft,
@@ -255,8 +256,15 @@ onMounted(load)
     </template>
     <template #primary-action>
       <Space>
-        <Button :loading="validating" @click="validate">验证配置</Button>
         <Button
+          v-if="hasAllowedAction(detail, 'VALIDATE')"
+          :loading="validating"
+          @click="validate"
+        >
+          验证配置
+        </Button>
+        <Button
+          v-if="hasAllowedAction(detail, 'COMPILE_PREVIEW') || hasAllowedAction(detail, 'VIEW')"
           @click="
             router.push({
               name: 'ADMIN.PROJECT.FULFILLMENT.PREVIEW',
@@ -267,6 +275,7 @@ onMounted(load)
           预览
         </Button>
         <Button
+          v-if="hasAllowedAction(detail, 'PUBLISH')"
           type="primary"
           @click="
             router.push({

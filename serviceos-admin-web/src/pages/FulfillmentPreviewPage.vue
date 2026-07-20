@@ -1,77 +1,49 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Alert, Button, Table } from 'ant-design-vue'
+import { Alert, Button } from 'ant-design-vue'
 import { ArrowLeftOutlined } from '@ant-design/icons-vue'
 import DetailPageLayout from '../patterns/templates/DetailPageLayout.vue'
-import { compileProjectFulfillmentPreview } from '../api/fulfillmentProfiles'
+import FulfillmentRunbookTable from '../components/fulfillment/FulfillmentRunbookTable.vue'
+import {
+  compileProjectFulfillmentPreview,
+  getProjectFulfillmentProfile,
+  type ProjectFulfillmentManifest,
+  type ProjectFulfillmentProfileDetail,
+} from '../api/fulfillmentProfiles'
 import { toUserFacingError } from '../product/errorMessages'
+import { useDeveloperDiagnostics } from '../composables/useDeveloperDiagnostics'
 
 const route = useRoute()
 const router = useRouter()
+const diagnostics = useDeveloperDiagnostics()
 const projectId = computed(() => String(route.params.id ?? ''))
 const profileId = computed(() => String(route.params.profileId ?? ''))
 
 const loading = ref(false)
 const error = ref<string | null>(null)
-const digest = ref<string | null>(null)
-const rows = ref<
-  Array<{
-    stageName: string
-    owner: string
-    forms: string
-    evidence: string
-    actions: string
-    nextStage: string
-    exceptions: string
-    sla: string
-  }>
->([])
+const detail = ref<ProjectFulfillmentProfileDetail | null>(null)
+const manifest = ref<ProjectFulfillmentManifest | null>(null)
 
 async function load() {
   loading.value = true
   error.value = null
   try {
-    const manifest = (
+    detail.value = (await getProjectFulfillmentProfile(projectId.value, profileId.value)).data
+    manifest.value = (
       await compileProjectFulfillmentPreview(projectId.value, profileId.value)
     ).data
-    digest.value = manifest.contentDigest.slice(0, 12) + '…'
-    const parsed = JSON.parse(manifest.manifestJson) as {
-      stages?: Array<Record<string, unknown>>
+    if (manifest.value?.manifestJson) {
+      diagnostics.pushDiagnostic({
+        title: '履约 Manifest（仅诊断）',
+        fields: {
+          contentDigest: manifest.value.contentDigest,
+          manifestJson: manifest.value.manifestJson.slice(0, 4000),
+        },
+      })
     }
-    rows.value = (parsed.stages ?? []).map((stage) => {
-      const actions = Array.isArray(stage.actions)
-        ? stage.actions
-            .map((a) => String((a as { actionLabel?: string }).actionLabel ?? ''))
-            .filter(Boolean)
-            .join('、')
-        : '—'
-      const forms = Array.isArray(stage.formRefs) ? `${stage.formRefs.length} 项` : '—'
-      const evidence = Array.isArray(stage.evidenceRefs)
-        ? `${stage.evidenceRefs.length} 项`
-        : '—'
-      const exceptions = Array.isArray(stage.exceptionPaths)
-        ? `${stage.exceptionPaths.length} 条`
-        : '—'
-      const transitions = Array.isArray(stage.transitions) ? stage.transitions : []
-      const next = transitions.length
-        ? String((transitions[0] as { targetStage?: string }).targetStage ?? '—')
-        : '—'
-      const owner = stage.ownerType ? String(stage.ownerType) : '—'
-      return {
-        stageName: String(stage.stageName ?? stage.stageCode ?? '—'),
-        owner,
-        forms,
-        evidence,
-        actions: actions || '—',
-        nextStage: next,
-        exceptions,
-        sla: stage.slaRef ? String(stage.slaRef) : '未绑定',
-      }
-    })
   } catch (err) {
     error.value = toUserFacingError(err).message
-    rows.value = []
   } finally {
     loading.value = false
   }
@@ -82,8 +54,8 @@ onMounted(load)
 
 <template>
   <DetailPageLayout
-    title="工单运行说明书"
-    description="预览数据来自服务端 Compile Preview，前端不得自行拼装流程。"
+    :title="detail?.profileName || '运行说明书预览'"
+    description="服务端编译的业务运行说明。普通页面不展示 Manifest JSON。"
     :loading="loading"
   >
     <template #secondary-actions>
@@ -96,36 +68,20 @@ onMounted(load)
         "
       >
         <template #icon><ArrowLeftOutlined /></template>
-        返回配置
+        返回详情
       </Button>
     </template>
     <template #feedback>
       <Alert v-if="error" type="error" show-icon :message="error" style="margin-bottom: 12px" />
       <Alert
-        v-else-if="digest"
+        v-if="manifest?.runbook?.impactSummary"
         type="info"
         show-icon
-        :message="`服务端 Manifest 摘要：${digest}`"
+        :message="manifest.runbook.impactSummary"
         style="margin-bottom: 12px"
       />
     </template>
 
-    <Table
-      size="middle"
-      row-key="stageName"
-      :pagination="false"
-      :loading="loading"
-      :data-source="rows"
-      :columns="[
-        { title: '阶段', dataIndex: 'stageName' },
-        { title: '责任人', dataIndex: 'owner' },
-        { title: '表单', dataIndex: 'forms' },
-        { title: '必传资料', dataIndex: 'evidence' },
-        { title: '可执行动作', dataIndex: 'actions' },
-        { title: '正常下一阶段', dataIndex: 'nextStage' },
-        { title: '异常路径', dataIndex: 'exceptions' },
-        { title: 'SLA', dataIndex: 'sla' },
-      ]"
-    />
+    <FulfillmentRunbookTable :runbook="manifest?.runbook" :loading="loading" />
   </DetailPageLayout>
 </template>

@@ -3,21 +3,25 @@
  */
 import { createCoreApi, fromRaw, newIdempotencyKey, quotedVersion, type ApiResult } from './coreApi'
 import type {
+  ProjectFulfillmentCompareImpact,
   ProjectFulfillmentDraft,
   ProjectFulfillmentManifest,
   ProjectFulfillmentProfileDetail,
   ProjectFulfillmentProfileSummary,
   ProjectFulfillmentRevision,
+  ProjectFulfillmentRunbook,
   ProjectFulfillmentValidationIssue,
   WorkOrderFulfillmentSnapshot,
 } from '@serviceos/core-client'
 
 export type {
+  ProjectFulfillmentCompareImpact,
   ProjectFulfillmentDraft,
   ProjectFulfillmentManifest,
   ProjectFulfillmentProfileDetail,
   ProjectFulfillmentProfileSummary,
   ProjectFulfillmentRevision,
+  ProjectFulfillmentRunbook,
   ProjectFulfillmentValidationIssue,
   WorkOrderFulfillmentSnapshot,
 }
@@ -98,6 +102,10 @@ export function compileProjectFulfillmentPreview(projectId: string, profileId: s
   )
 }
 
+export function compareProjectFulfillmentImpact(projectId: string, profileId: string) {
+  return api().compareProjectFulfillmentImpact({ projectId, profileId })
+}
+
 export function listProjectFulfillmentRevisions(projectId: string, profileId: string) {
   return api().listProjectFulfillmentRevisions({ projectId, profileId })
 }
@@ -112,4 +120,11 @@ export function getProjectFulfillmentRevision(
 
 export function getWorkOrderFulfillmentSnapshot(workOrderId: string) {
   return api().getWorkOrderFulfillmentSnapshot({ workOrderId })
+}
+
+export function hasAllowedAction(
+  detail: ProjectFulfillmentProfileDetail | null | undefined,
+  action: string,
+): boolean {
+  return !!detail?.allowedActions?.includes(action)
 }

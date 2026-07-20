@@ -62,7 +62,7 @@ test('statusTone cross-domain map removed from product/statusLabels', () => {
 })
 
 test('token version and docs exist', () => {
-  assert.match(src('src/app/token-version.ts'), /1\.0\.0/)
-  assert.match(src('docs/design-tokens.md'), /1\.0\.0/)
+  assert.match(src('src/app/token-version.ts'), /1\.1\.0/)
+  assert.match(src('docs/design-tokens.md'), /1\.1\.0/)
   assert.match(src('docs/components/SemanticStatusTag.md'), /SemanticStatusTag/)
 })
