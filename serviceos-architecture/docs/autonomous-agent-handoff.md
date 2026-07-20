@@ -13,13 +13,14 @@ lastUpdated: 2026-07-20
 
 ## 最新追加
 
-- Admin 履约 API 经 `@serviceos/core-client`（`prebuild` 生成）；禁止页面手写 URL
-- `ProjectFulfillmentWorkOrderFreezePostgresIT`：工单 A 冻 v1、B 冻 v2
-- Playwright 列表/键盘聚焦 + axe a11y（mock）
+- Admin 履约 API 经 `@serviceos/core-client`（`prebuild` 生成）
+- 工单 A/B 冻结 IT；Playwright + a11y mock
+- **表单/资料级 blockingReasons**：`HumanTaskCompletionValidator.explainBlockingReasons`（缺表单 VALIDATED、缺必传资料槽位名）
+- Admin Pilot seed 补齐履约 Profile；入站 CREATE 已在真实 Keycloak/Postgres 下 `ACCEPTED`
+- 完整 Admin OIDC Playwright 套件：本环境曾因 5173 被非 OIDC Vite 占用导致找不到登录按钮 → 记 **BLOCKED_EXTERNAL / env conflict**（见 `oidc-smoke-probe.md`）；种子修复后可在干净端口重跑
 
 ## 仍未闭合
 
-1. 真实 Keycloak OIDC smoke（可能 `BLOCKED_EXTERNAL`）
-2. 真实后端驱动的发布→建单 Playwright（非 mock）
-3. 表单字段/资料槽位级 `blockingReasons`
-4. Admin 其他页面迁移到 core-client（仅履约模块已切换）
+1. 干净环境完整 `verify-admin-smoke.sh` 绿（OIDC UI 全套）
+2. Admin 其他页面迁移到 core-client
+3. 资料快照是否已创建的完成门禁投影（当前仅槽位 MISSING/条件变更）

@@ -12,6 +12,7 @@ import com.serviceos.task.api.TaskFulfillmentContext;
 import com.serviceos.task.api.TaskFulfillmentContextService;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -63,6 +64,29 @@ final class EvidenceSetSnapshotTaskCompletionValidator implements HumanTaskCompl
             return;
         }
         validateDualInput(principal, task, command);
+    }
+
+
+    @Override
+    public List<String> explainBlockingReasons(String tenantId, UUID taskId) {
+        if (!slots.resolutionExists(tenantId, taskId)) {
+            return List.of();
+        }
+        List<String> reasons = new ArrayList<>();
+        if (slots.hasPendingDisposition(tenantId, taskId)) {
+            reasons.add("存在未处置的资料条件变化，请先处理资料要求变更");
+            return reasons;
+        }
+        List<EvidenceSlotView> taskSlots = slots.listSlots(tenantId, taskId);
+        for (EvidenceSlotView slot : taskSlots) {
+            if (!slot.active()) {
+                continue;
+            }
+            if (slot.required() && !"SATISFIED".equals(slot.status())) {
+                reasons.add("缺少必传资料：" + slot.requirementName());
+            }
+        }
+        return reasons;
     }
 
     private void validateEvidenceOnly(

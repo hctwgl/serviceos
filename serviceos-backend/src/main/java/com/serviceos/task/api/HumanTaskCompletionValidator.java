@@ -2,6 +2,9 @@ package com.serviceos.task.api;
 
 import com.serviceos.identity.api.CurrentPrincipal;
 
+import java.util.List;
+import java.util.UUID;
+
 /**
  * 人工任务完成前的可插拔领域结果校验器。
  *
@@ -17,5 +20,13 @@ public interface HumanTaskCompletionValidator {
             CurrentPrincipal principal, String correlationId, CompleteHumanTaskCommand command
     ) {
         validate(principal, command);
+    }
+
+    /**
+     * 解释当前为何尚不能完成任务（用于 allowed-actions 阻塞原因投影）。
+     * 不得依赖客户端提交的 resultRef；只读取服务端已有事实。
+     */
+    default List<String> explainBlockingReasons(String tenantId, UUID taskId) {
+        return List.of();
     }
 }

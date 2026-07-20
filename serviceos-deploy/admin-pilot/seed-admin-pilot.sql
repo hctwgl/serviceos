@@ -151,6 +151,62 @@ INSERT INTO cfg_configuration_bundle_item (
 ALTER TABLE cfg_configuration_bundle_item ENABLE TRIGGER trg_cfg_bundle_item_immutable;
 ALTER TABLE cfg_configuration_asset_version ENABLE TRIGGER trg_cfg_asset_version_immutable;
 
+-- 已发布 Revision 不可 DELETE；仅清理草稿后幂等 upsert。
+DELETE FROM cfg_project_fulfillment_revision
+ WHERE tenant_id = 'tenant-local' AND revision_status = 'DRAFT';
+
+-- M383：项目履约 Profile（正式建单失败关闭所需）
+INSERT INTO cfg_project_fulfillment_profile (
+    profile_id, tenant_id, project_id, service_product_code, profile_name,
+    description, status, active_revision_id, draft_revision_id,
+    aggregate_version, created_by, updated_by, created_at, updated_at
+) VALUES (
+    '31000000-0000-4000-8000-000000000001', 'tenant-local',
+    '10000000-0000-4000-8000-000000000001', 'HOME_CHARGING_SURVEY_INSTALL',
+    'Admin Pilot 标准家充履约', 'smoke seed', 'ACTIVE', NULL, NULL,
+    1, 'seed', 'seed', now(), now()
+) ON CONFLICT (tenant_id, project_id, service_product_code) DO UPDATE
+SET profile_name = EXCLUDED.profile_name,
+    status = 'ACTIVE',
+    updated_at = now();
+
+INSERT INTO cfg_project_fulfillment_revision (
+    revision_id, tenant_id, profile_id, version_no, revision_status,
+    document_json, created_at
+) VALUES (
+    '32000000-0000-4000-8000-000000000001', 'tenant-local',
+    '31000000-0000-4000-8000-000000000001', 0, 'DRAFT',
+    '{"schemaVersion":"1.0.0","orderTypeName":"勘测安装","stages":[{"stageCode":"SURVEY","stageName":"勘测","sequence":1,"ownerType":"TECHNICIAN","terminal":false},{"stageCode":"END","stageName":"完成","sequence":2,"ownerType":"PLATFORM","terminal":true,"stageType":"END"}]}'::jsonb,
+    now()
+) ON CONFLICT DO NOTHING;
+
+INSERT INTO cfg_project_fulfillment_revision (
+    revision_id, tenant_id, profile_id, version_no, revision_status,
+    document_json, source_bundle_id, workflow_asset_version_id,
+    manifest_json, validation_json, content_digest,
+    effective_from, effective_to, supersedes_revision_id,
+    published_by, published_at, created_at
+) VALUES (
+    '32000000-0000-4000-8000-000000000002', 'tenant-local',
+    '31000000-0000-4000-8000-000000000001', 1, 'PUBLISHED',
+    '{"schemaVersion":"1.0.0","orderTypeName":"勘测安装","stages":[{"stageCode":"SURVEY","stageName":"勘测","sequence":1,"ownerType":"TECHNICIAN","terminal":false},{"stageCode":"END","stageName":"完成","sequence":2,"ownerType":"PLATFORM","terminal":true,"stageType":"END"}]}'::jsonb,
+    '30000000-0000-4000-8000-000000000001',
+    '20000000-0000-4000-8000-000000000001',
+    '{"profileId":"31000000-0000-4000-8000-000000000001","revisionId":"32000000-0000-4000-8000-000000000002","projectId":"10000000-0000-4000-8000-000000000001","serviceProductCode":"HOME_CHARGING_SURVEY_INSTALL","profileName":"Admin Pilot 标准家充履约","version":"1","bundleRef":{"bundleId":"30000000-0000-4000-8000-000000000001","bundleVersion":"1.0.0"},"workflowRef":{"assetVersionId":"20000000-0000-4000-8000-000000000001"},"stages":[]}'::jsonb,
+    '[]'::jsonb,
+    repeat('e', 64),
+    now() - interval '1 hour', NULL, NULL,
+    'seed', now(), now()
+) ON CONFLICT DO NOTHING;
+
+UPDATE cfg_project_fulfillment_profile
+   SET draft_revision_id = '32000000-0000-4000-8000-000000000001',
+       active_revision_id = '32000000-0000-4000-8000-000000000002',
+       status = 'ACTIVE',
+       updated_at = now()
+ WHERE profile_id = '31000000-0000-4000-8000-000000000001';
+
+
 INSERT INTO wo_work_order (
     id, tenant_id, project_id, client_code, brand_code, service_product_code,
     external_order_code, payload_digest, status, configuration_bundle_id,

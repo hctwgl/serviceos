@@ -10,6 +10,7 @@ import com.serviceos.task.api.TaskAllowedAction;
 import com.serviceos.task.api.TaskAllowedActionQueryService;
 import com.serviceos.task.api.TaskAllowedActions;
 import com.serviceos.task.api.TaskBlockedAction;
+import com.serviceos.task.api.HumanTaskCompletionValidator;
 import com.serviceos.task.api.TaskDirectoryQueryService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,17 +38,20 @@ final class DefaultTaskAllowedActionQueryService implements TaskAllowedActionQue
     private final TaskDirectoryQueryService taskDirectory;
     private final TaskDirectoryQueryRepository taskQueries;
     private final AuthorizationService authorization;
+    private final List<HumanTaskCompletionValidator> completionValidators;
     private final Clock clock;
 
     DefaultTaskAllowedActionQueryService(
             TaskDirectoryQueryService taskDirectory,
             TaskDirectoryQueryRepository taskQueries,
             AuthorizationService authorization,
+            List<HumanTaskCompletionValidator> completionValidators,
             Clock clock
     ) {
         this.taskDirectory = taskDirectory;
         this.taskQueries = taskQueries;
         this.authorization = authorization;
+        this.completionValidators = List.copyOf(completionValidators);
         this.clock = clock;
     }
 
@@ -113,7 +117,9 @@ final class DefaultTaskAllowedActionQueryService implements TaskAllowedActionQue
             }
             blocked.add(blocked(COMPLETE, "完成任务", List.of("当前状态不允许提交，请先启动任务")));
         } else if ("RUNNING".equals(state.status())) {
-            if (currentOwner && state.workflowNodeInstanceId() != null && canComplete) {
+            List<String> readiness = explainCompletionReadiness(principal.tenantId(), taskId);
+            if (currentOwner && state.workflowNodeInstanceId() != null && canComplete
+                    && readiness.isEmpty()) {
                 actions.add(action(
                         COMPLETE,
                         "完成任务",
@@ -130,6 +136,7 @@ final class DefaultTaskAllowedActionQueryService implements TaskAllowedActionQue
                 if (!canComplete) {
                     reasons.add("当前用户没有完成权限");
                 }
+                reasons.addAll(readiness);
                 if (reasons.isEmpty()) {
                     reasons.add("完成条件尚未满足，请检查表单与必传资料");
                 }
@@ -155,6 +162,14 @@ final class DefaultTaskAllowedActionQueryService implements TaskAllowedActionQue
     private static TaskAllowedAction action(
             String code, String label, String schemaRef, List<String> obligations) {
         return new TaskAllowedAction(code, label, schemaRef, obligations);
+    }
+
+    private List<String> explainCompletionReadiness(String tenantId, UUID taskId) {
+        List<String> reasons = new ArrayList<>();
+        for (HumanTaskCompletionValidator validator : completionValidators) {
+            reasons.addAll(validator.explainBlockingReasons(tenantId, taskId));
+        }
+        return reasons;
     }
 
     private static TaskBlockedAction blocked(String code, String label, List<String> reasons) {
