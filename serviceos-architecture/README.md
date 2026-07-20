@@ -674,13 +674,13 @@ serviceos-architecture/
 
 ## 当前基线
 
-当前工程基线为 **M362 整改列表/头级客户端能力预检**（见 `implementation-status.md`；
-OpenAPI 1.0.55；Flyway 131；承接 M357～M361）。
+当前工程基线为 **M363 整改领取/启动能力硬拒单**（见 `implementation-status.md`；
+OpenAPI 1.0.56；Flyway 131；承接 M357～M362）。
 
 当前已具备多 OEM SPI、远端查询、UNKNOWN/批量重放、复杂流程、十大资产设计器、六类 Runtime，
 入站/出站 Mapping（M321～M339）、FORM/EVIDENCE ConditionBuilder（M340～M349）、
 ASSIGNEE/DISPATCH/RULE/NOTIFICATION/PRICING SHADOW、**M351～M355 终审工作台**，以及
-**M356～M362 客户端能力门禁序列**（含整改路径对齐与列表头级预检）；**M360 终审 8 态视觉基线**。
+**M356～M363 客户端能力门禁序列**（含整改路径对齐、列表预检与领取/启动硬拒）；**M360 终审 8 态视觉基线**。
 下一主线需负责人选型：iOS 条件执行器 / 派单过滤 / Network Portal on-behalf 门禁 /
 REVIEW_TASK 模板分离；吉利联调 / AMOUNT/加权 / BUSINESS 日历 SLA 仍为硬门禁；
 Track F/G 仍为 `BLOCKED_EXTERNAL`。
@@ -694,6 +694,8 @@ Track F/G 仍为 `BLOCKED_EXTERNAL`。
 - [M361 验收矩阵](testing/358-m361-correction-client-capability-gate-acceptance.md)
 - [M362 实现文档](architecture/375-m362-correction-header-capability-reject.md)
 - [M362 验收矩阵](testing/359-m362-correction-header-capability-reject-acceptance.md)
+- [M363 实现文档](architecture/376-m363-correction-lifecycle-capability-hard-reject.md)
+- [M363 验收矩阵](testing/360-m363-correction-lifecycle-capability-hard-reject-acceptance.md)
 - [M360 实现文档](architecture/373-m360-final-review-visual-admin-pilot.md)
 - [M360 验收矩阵](testing/357-m360-final-review-visual-admin-pilot-acceptance.md)
 - [M359 实现文档](architecture/372-m359-portal-header-client-capability-reject.md)
