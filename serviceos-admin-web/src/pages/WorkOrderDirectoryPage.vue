@@ -361,6 +361,7 @@ onMounted(() => {
           style="width: 180px"
           aria-label="所属项目筛选"
           placeholder="项目名称或编号"
+          @pressEnter="search"
         />
       </label>
       <label class="filter-field">
