@@ -179,10 +179,13 @@ ServiceOS 可靠纵向切片已推进到 **M368**（Network Portal on-behalf NET
 OpenAPI **1.0.59**；Flyway **134**。
 Technician 能力门禁（M356～M363）、审核 handling Task（M364）、工作流门闸（M365）、派单自动池过滤（M366）、人工指派硬拒绝（M367）与 Network on-behalf `NETWORK_WEB` 门禁（M368）已闭环。
 
-下一阶段（均需负责人确认后才能推进，不得发明规则）：
+下一阶段（**AWAITING_OWNER_SELECTION**；均需负责人确认后才能推进，不得发明规则）：
 
 1. iOS 条件执行器全量硬阻断（本 Linux 环境多为 BLOCKED_EXTERNAL）；
-2. 既有硬门禁：吉利联调 / AMOUNT/加权 / BUSINESS 日历 SLA。
+2. 既有硬门禁：吉利联调 / AMOUNT/加权 / BUSINESS 日历 SLA；
+3. 其他已登记未实现项（如 CLIENT `reviewTaskId`）须负责人点名后开切片。
+
+选型入口：[自主 Agent 交接](autonomous-agent-handoff.md)。
 
 仍为 **硬门禁 / 外部阻塞**（不可发明推进）：
 
