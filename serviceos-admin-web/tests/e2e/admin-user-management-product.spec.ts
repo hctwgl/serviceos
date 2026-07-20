@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test'
 import { mockProductizationApis, seedLocalSession } from './productization-fixtures'
 
-test.describe('M402–M404 Admin 用户登记、摘要、最近登录与组织任职', () => {
-  test('用户目录与详情组织任职/最近登录产品化', async ({ page }) => {
+test.describe('M402–M405 Admin 用户登记到变更时间线', () => {
+  test('用户目录与详情任职/登录/变更时间线产品化', async ({ page }) => {
     await seedLocalSession(page)
     await mockProductizationApis(page)
 
@@ -53,6 +53,15 @@ test.describe('M402–M404 Admin 用户登记、摘要、最近登录与组织�
     await expect(page.getByTestId('user-org-membership-create-submit')).toBeVisible()
     await page.screenshot({
       path: 'tests/e2e/__screenshots__/admin-user-org-memberships-1440.png',
+      fullPage: true,
+    })
+
+    await page.getByRole('tab', { name: '变更记录' }).click()
+    await expect(page.getByTestId('section-change-timeline')).toBeVisible()
+    await expect(page.getByTestId('user-change-timeline')).toContainText('OIDC 登录成功')
+    await expect(page.getByTestId('user-change-timeline')).toContainText('主体已登记')
+    await page.screenshot({
+      path: 'tests/e2e/__screenshots__/admin-user-change-timeline-1440.png',
       fullPage: true,
     })
   })

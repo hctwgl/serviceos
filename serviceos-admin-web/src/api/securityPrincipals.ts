@@ -112,6 +112,30 @@ export function listPrincipalRecentLogins(principalId: string, limit = 20) {
   })
 }
 
+export type PrincipalChangeTimelineItem = {
+  source: 'LIFECYCLE' | 'AUDIT' | 'LOGIN'
+  eventCode: string
+  summary: string
+  actorId: string
+  result: string
+  correlationId: string
+  principalVersion: number | null
+  occurredAt: string
+  refId: string
+}
+
+export type PrincipalChangeTimelinePage = {
+  items: PrincipalChangeTimelineItem[]
+  asOf: string
+}
+
+export function listPrincipalChangeTimeline(principalId: string, limit = 50) {
+  return apiGet<PrincipalChangeTimelinePage>(
+    `/security-principals/${principalId}/change-timeline`,
+    { limit: String(limit) },
+  )
+}
+
 export function disableSecurityPrincipal(
   principalId: string,
   version: number,

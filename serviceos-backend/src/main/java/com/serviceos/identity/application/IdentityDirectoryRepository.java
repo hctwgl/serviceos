@@ -71,4 +71,17 @@ public interface IdentityDirectoryRepository {
             String tenantId, UUID principalId, int limit);
 
     Optional<Instant> findLatestLoginAt(String tenantId, UUID principalId);
+
+    List<LifecycleEventRecord> listLifecycleEvents(String tenantId, UUID principalId, int limit);
+
+    record LifecycleEventRecord(
+            UUID eventId,
+            String eventType,
+            long principalVersion,
+            String reason,
+            String actorId,
+            String correlationId,
+            Instant occurredAt
+    ) {
+    }
 }

@@ -14,4 +14,8 @@ public interface SecurityPrincipalQueryService {
     /** 最近成功登录；需要 identity.read。不含 subject/密码。 */
     PrincipalLoginEventPage recentLogins(
             CurrentPrincipal actor, String correlationId, UUID principalId, Integer limit);
+
+    /** 主体变更时间线（生命周期 + 审计 + 登录）；需要 identity.read。 */
+    PrincipalChangeTimelinePage changeTimeline(
+            CurrentPrincipal actor, String correlationId, UUID principalId, Integer limit);
 }

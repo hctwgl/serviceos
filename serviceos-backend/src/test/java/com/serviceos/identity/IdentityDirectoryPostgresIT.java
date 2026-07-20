@@ -186,6 +186,24 @@ class IdentityDirectoryPostgresIT {
     }
 
     @Test
+    void changeTimelineMergesLifecycleAndLoginWithoutRedundantAudits() {
+        UUID principalId = UUID.fromString(authentication.resolveOrRegister(
+                identity("subject-timeline", "时间线用户"), "corr-timeline-1"));
+        commands.updateProfile(actor(), metadata("timeline-profile"), principalId, 1, "时间线用户", "EMP-TL-1");
+        authentication.resolveOrRegister(identity("subject-timeline", "时间线用户"), "corr-timeline-2");
+
+        var timeline = queries.changeTimeline(actor(), "corr-timeline-list", principalId, 20);
+        assertThat(timeline.items()).extracting(item -> item.source())
+                .contains("LIFECYCLE", "LOGIN");
+        assertThat(timeline.items()).extracting(item -> item.eventCode())
+                .contains("REGISTERED", "PROFILE_UPDATED", "LOGIN_SUCCEEDED");
+        assertThat(timeline.items()).noneMatch(item ->
+                "PRINCIPAL_REGISTERED".equals(item.eventCode())
+                        || "PRINCIPAL_LOGIN_SUCCEEDED".equals(item.eventCode()));
+        assertThat(timeline.items().getFirst().summary()).isNotBlank();
+    }
+
+    @Test
     void adminRegisterCreatesPrincipalWithPersonaWithoutPassword() {
         var created = commands.register(
                 actor(), metadata("register-user"), "登记用户", "EMP-REG-1", "INTERNAL_EMPLOYEE");

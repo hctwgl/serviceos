@@ -660,6 +660,36 @@ export async function mockProductizationApis(
       })
       return
     }
+    if (url.includes('/change-timeline')) {
+      await fulfillJson(route, {
+        items: [
+          {
+            source: 'LOGIN',
+            eventCode: 'LOGIN_SUCCEEDED',
+            summary: 'OIDC 登录成功 · 客户端 admin-web',
+            actorId: '66666666-6666-4666-8666-666666666666',
+            result: 'SUCCEEDED',
+            correlationId: 'corr-login',
+            principalVersion: null,
+            occurredAt: '2026-07-20T03:30:00Z',
+            refId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          },
+          {
+            source: 'LIFECYCLE',
+            eventCode: 'REGISTERED',
+            summary: '主体已登记 · OIDC_JIT',
+            actorId: 'jit-registration',
+            result: 'SUCCEEDED',
+            correlationId: 'corr-register',
+            principalVersion: 1,
+            occurredAt: '2026-07-01T00:00:00Z',
+            refId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          },
+        ],
+        asOf: '2026-07-20T04:00:00Z',
+      })
+      return
+    }
     if (url.includes('/security-principals') || url.includes('/security/principals')) {
       if (method === 'POST' && !url.includes('/security-principals/')) {
         await fulfillJson(

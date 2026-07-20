@@ -378,6 +378,31 @@ final class JdbcIdentityDirectoryRepository implements IdentityDirectoryReposito
                 .optional();
     }
 
+    @Override
+    public List<LifecycleEventRecord> listLifecycleEvents(String tenantId, UUID principalId, int limit) {
+        return jdbc.sql("""
+                SELECT lifecycle_event_id, event_type, principal_version, reason,
+                       actor_id, correlation_id, occurred_at
+                  FROM idn_principal_lifecycle_event
+                 WHERE tenant_id = :tenant
+                   AND principal_id = :principalId
+                 ORDER BY occurred_at DESC, lifecycle_event_id DESC
+                 LIMIT :limit
+                """)
+                .param("tenant", tenantId)
+                .param("principalId", principalId)
+                .param("limit", limit)
+                .query((rs, row) -> new LifecycleEventRecord(
+                        rs.getObject("lifecycle_event_id", UUID.class),
+                        rs.getString("event_type"),
+                        rs.getLong("principal_version"),
+                        rs.getString("reason"),
+                        rs.getString("actor_id"),
+                        rs.getString("correlation_id"),
+                        rs.getObject("occurred_at", OffsetDateTime.class).toInstant()))
+                .list();
+    }
+
     private SecurityPrincipal mapPrincipal(java.sql.ResultSet rs, int row) throws java.sql.SQLException {
         return new SecurityPrincipal(
                 rs.getObject("principal_id", UUID.class), rs.getString("tenant_id"),

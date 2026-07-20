@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.70
+  version: 1.0.71
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -120,6 +120,28 @@ paths:
           description: 最近登录页
           headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
           content: { application/json: { schema: { $ref: '#/components/schemas/PrincipalLoginEventPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /security-principals/{principalId}/change-timeline:
+    get:
+      operationId: listPrincipalChangeTimeline
+      summary: 查询主体变更时间线
+      description: |
+        M405：需要 identity.read。聚合生命周期事实、非冗余审计与成功登录事件。
+      parameters:
+        - $ref: '#/components/parameters/PrincipalId'
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 变更时间线
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/PrincipalChangeTimelinePage' } } }
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
@@ -7061,6 +7083,27 @@ components:
       required: [items, asOf]
       properties:
         items: { type: array, items: { $ref: '#/components/schemas/PrincipalLoginEvent' } }
+        asOf: { type: string, format: date-time }
+    PrincipalChangeTimelineItem:
+      type: object
+      additionalProperties: false
+      required: [source, eventCode, summary, actorId, result, correlationId, occurredAt, refId]
+      properties:
+        source: { enum: [LIFECYCLE, AUDIT, LOGIN] }
+        eventCode: { type: string, minLength: 1, maxLength: 100 }
+        summary: { type: string, minLength: 1, maxLength: 500 }
+        actorId: { type: string, minLength: 1, maxLength: 128 }
+        result: { type: string, minLength: 1, maxLength: 40 }
+        correlationId: { type: string, minLength: 1, maxLength: 128 }
+        principalVersion: { type: [integer, 'null'], format: int64, minimum: 1 }
+        occurredAt: { type: string, format: date-time }
+        refId: { type: string, format: uuid }
+    PrincipalChangeTimelinePage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/PrincipalChangeTimelineItem' } }
         asOf: { type: string, format: date-time }
     AdminUserDirectoryPage:
       type: object

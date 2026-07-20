@@ -1,9 +1,14 @@
 package com.serviceos.identity.application;
 
+import com.serviceos.audit.api.AuditQueryService;
+import com.serviceos.audit.api.AuditRecordView;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.identity.api.IdentityAuthorizationPort;
 import com.serviceos.identity.api.IdentityLinkView;
+import com.serviceos.identity.api.PrincipalChangeTimelineItem;
+import com.serviceos.identity.api.PrincipalChangeTimelinePage;
 import com.serviceos.identity.api.PrincipalLoginEventPage;
+import com.serviceos.identity.api.PrincipalLoginEventView;
 import com.serviceos.identity.api.SecurityPrincipalDetail;
 import com.serviceos.identity.api.SecurityPrincipalPage;
 import com.serviceos.identity.api.SecurityPrincipalQueryService;
@@ -16,7 +21,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -28,17 +35,20 @@ final class DefaultSecurityPrincipalQueryService implements SecurityPrincipalQue
     private final IdentityDirectoryRepository directory;
     private final IdentityDirectoryQueryRepository queries;
     private final IdentityAuthorizationPort authorization;
+    private final AuditQueryService audits;
     private final Clock clock;
 
     DefaultSecurityPrincipalQueryService(
             IdentityDirectoryRepository directory,
             IdentityDirectoryQueryRepository queries,
             IdentityAuthorizationPort authorization,
+            AuditQueryService audits,
             Clock clock
     ) {
         this.directory = directory;
         this.queries = queries;
         this.authorization = authorization;
+        this.audits = audits;
         this.clock = clock;
     }
 
@@ -99,6 +109,103 @@ final class DefaultSecurityPrincipalQueryService implements SecurityPrincipalQue
         return new PrincipalLoginEventPage(
                 directory.listLoginEvents(actor.tenantId(), principalId, effective),
                 clock.instant());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PrincipalChangeTimelinePage changeTimeline(
+            CurrentPrincipal actor, String correlationId, UUID principalId, Integer limit
+    ) {
+        require(actor, correlationId, "identity.read", principalId.toString());
+        requirePrincipal(actor.tenantId(), principalId);
+        int effective = limit == null ? 50 : limit;
+        if (effective < 1 || effective > 100) {
+            throw new IllegalArgumentException("limit must be between 1 and 100");
+        }
+        int fetch = Math.min(100, effective * 2);
+        List<PrincipalChangeTimelineItem> merged = new ArrayList<>();
+        for (IdentityDirectoryRepository.LifecycleEventRecord event : directory.listLifecycleEvents(
+                actor.tenantId(), principalId, fetch)) {
+            merged.add(new PrincipalChangeTimelineItem(
+                    "LIFECYCLE",
+                    event.eventType(),
+                    lifecycleSummary(event.eventType(), event.reason()),
+                    event.actorId(),
+                    "SUCCEEDED",
+                    event.correlationId(),
+                    event.principalVersion(),
+                    event.occurredAt(),
+                    event.eventId()));
+        }
+        for (AuditRecordView audit : audits.listByTarget(
+                actor.tenantId(), "SecurityPrincipal", principalId.toString(), fetch).items()) {
+            // 生命周期与登录已有专用源；审计只补充授权拒绝等旁路事实，避免重复 PROFILE/LOGIN。
+            if (isRedundantAudit(audit.actionName())) {
+                continue;
+            }
+            merged.add(new PrincipalChangeTimelineItem(
+                    "AUDIT",
+                    audit.actionName(),
+                    auditSummary(audit),
+                    audit.actorId(),
+                    audit.resultCode(),
+                    audit.correlationId(),
+                    null,
+                    audit.occurredAt(),
+                    audit.auditId()));
+        }
+        for (PrincipalLoginEventView login : directory.listLoginEvents(
+                actor.tenantId(), principalId, fetch)) {
+            merged.add(new PrincipalChangeTimelineItem(
+                    "LOGIN",
+                    "LOGIN_SUCCEEDED",
+                    "OIDC 登录成功 · 客户端 " + login.clientId(),
+                    principalId.toString(),
+                    login.outcome(),
+                    "login",
+                    null,
+                    login.occurredAt(),
+                    login.loginEventId()));
+        }
+        merged.sort(Comparator
+                .comparing(PrincipalChangeTimelineItem::occurredAt).reversed()
+                .thenComparing(item -> item.refId().toString()));
+        if (merged.size() > effective) {
+            merged = merged.subList(0, effective);
+        }
+        return new PrincipalChangeTimelinePage(merged, clock.instant());
+    }
+
+    private static boolean isRedundantAudit(String actionName) {
+        return "PRINCIPAL_REGISTERED".equals(actionName)
+                || "IDENTITY_LINKED".equals(actionName)
+                || "PROFILE_UPDATED".equals(actionName)
+                || "PERSONA_ADDED".equals(actionName)
+                || "DISABLED".equals(actionName)
+                || "ENABLED".equals(actionName)
+                || "PRINCIPAL_LOGIN_SUCCEEDED".equals(actionName);
+    }
+
+    private static String lifecycleSummary(String eventType, String reason) {
+        String base = switch (eventType) {
+            case "REGISTERED" -> "主体已登记";
+            case "IDENTITY_LINKED" -> "已绑定外部身份";
+            case "PROFILE_UPDATED" -> "档案已更新";
+            case "PERSONA_ADDED" -> "已添加 Persona";
+            case "DISABLED" -> "主体已停用";
+            case "ENABLED" -> "主体已启用";
+            default -> eventType;
+        };
+        if (reason == null || reason.isBlank()) {
+            return base;
+        }
+        return base + " · " + reason.trim();
+    }
+
+    private static String auditSummary(AuditRecordView audit) {
+        String decision = audit.decisionCode() == null ? "" : " · " + audit.decisionCode();
+        String capability = audit.capabilityCode() == null ? "" : " · " + audit.capabilityCode();
+        return audit.actionName() + decision + capability;
     }
 
     private void require(CurrentPrincipal actor, String correlationId, String capability, String resourceId) {

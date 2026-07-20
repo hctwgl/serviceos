@@ -341,7 +341,7 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 完整变更审计时间线（组织任职编辑已由 M404 关闭主路径）
+  - UI_DATA_GAP: 跨聚合业务时间线与操作者显示名（主体变更时间线已由 M405 关闭主路径）
 ```
 
 ### 9.4 M398 记录（项目管理 / 工作台）
@@ -483,7 +483,25 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 完整变更审计时间线
+  - UI_DATA_GAP: 完整变更审计时间线（已由 M405 关闭主体范围）
+```
+
+### 9.11 M405 记录（变更时间线）
+
+```yaml
+pageId: ADMIN.USER.DETAIL
+route: /users/:id
+visualProfile: CLASSIC_PROFESSIONAL
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: 跨聚合业务时间线与操作者显示名
 ```
 
 ## 10. GAP 规则

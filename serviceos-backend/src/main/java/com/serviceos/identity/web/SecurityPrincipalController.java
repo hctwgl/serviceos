@@ -2,6 +2,7 @@ package com.serviceos.identity.web;
 
 import com.serviceos.identity.api.CurrentPrincipalProvider;
 import com.serviceos.identity.api.IdentityLinkView;
+import com.serviceos.identity.api.PrincipalChangeTimelinePage;
 import com.serviceos.identity.api.PrincipalLoginEventPage;
 import com.serviceos.identity.api.PrincipalPersonaView;
 import com.serviceos.identity.api.SecurityPrincipalCommandService;
@@ -109,6 +110,17 @@ final class SecurityPrincipalController {
     ) {
         return response(
                 queries.recentLogins(principals.current(), correlationId, principalId, limit),
+                correlationId);
+    }
+
+    @GetMapping("/{principalId}/change-timeline")
+    ResponseEntity<PrincipalChangeTimelinePage> changeTimeline(
+            @PathVariable UUID principalId,
+            @RequestParam(required = false) Integer limit,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        return response(
+                queries.changeTimeline(principals.current(), correlationId, principalId, limit),
                 correlationId);
     }
 

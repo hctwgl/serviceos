@@ -7,10 +7,12 @@ import {
   disableSecurityPrincipal,
   enableSecurityPrincipal,
   getSecurityPrincipal,
+  listPrincipalChangeTimeline,
   listPrincipalIdentityLinks,
   listPrincipalRecentLogins,
   updateSecurityPrincipalProfile,
   type IdentityLink,
+  type PrincipalChangeTimelineItem,
   type PrincipalLoginEvent,
   type SecurityPrincipalDetail,
 } from '../api/securityPrincipals'
@@ -50,6 +52,8 @@ const etag = ref<string | null>(null)
 const identities = ref<IdentityLink[] | null>(null)
 const recentLogins = ref<PrincipalLoginEvent[] | null>(null)
 const recentLoginsError = ref<string | null>(null)
+const changeTimeline = ref<PrincipalChangeTimelineItem[]>([])
+const changeTimelineError = ref<string | null>(null)
 const grants = ref<RoleGrant[]>([])
 const reassignments = ref<ReassignmentWorkItem[]>([])
 const memberships = ref<OrgMembershipSummary[]>([])
@@ -130,6 +134,14 @@ async function load() {
     } catch (err) {
       recentLogins.value = null
       recentLoginsError.value = safeAccessDeniedMessage(err)
+    }
+    try {
+      const timeline = await listPrincipalChangeTimeline(principalId.value, 50)
+      changeTimeline.value = timeline.items
+      changeTimelineError.value = null
+    } catch (err) {
+      changeTimeline.value = []
+      changeTimelineError.value = safeAccessDeniedMessage(err)
     }
     try {
       const grantPage = await listRoleGrants({ principalId: principalId.value })
@@ -377,6 +389,19 @@ async function useStaleVersionForTest() {
   } finally {
     busy.value = false
   }
+}
+
+function sourceLabel(source: PrincipalChangeTimelineItem['source']) {
+  if (source === 'LIFECYCLE') return '生命周期'
+  if (source === 'LOGIN') return '登录'
+  return '审计'
+}
+
+function presentActor(actorId: string) {
+  if (!actorId) return '—'
+  if (actorId === 'jit-registration') return '系统登记'
+  if (actorId.length > 12) return `${actorId.slice(0, 8)}…`
+  return actorId
 }
 
 watch(principalId, () => {
@@ -657,6 +682,33 @@ onMounted(() => {
         </TabPane>
 
         <TabPane key="changes" tab="变更记录">
+          <article class="card" data-testid="section-change-timeline">
+            <h3>变更时间线</h3>
+            <Alert
+              v-if="changeTimelineError"
+              type="error"
+              show-icon
+              :message="changeTimelineError"
+              style="margin-bottom: 12px"
+            />
+            <ol v-else-if="changeTimeline.length" class="timeline" data-testid="user-change-timeline">
+              <li v-for="item in changeTimeline" :key="item.refId">
+                <div class="timeline__time">{{ formatDateTimeDisplay(item.occurredAt) }}</div>
+                <div class="timeline__body">
+                  <strong>{{ item.summary }}</strong>
+                  <p class="muted">
+                    {{ sourceLabel(item.source) }}
+                    · {{ item.eventCode }}
+                    · 结果 {{ statusLabel(item.result) }}
+                    <span v-if="item.principalVersion"> · v{{ item.principalVersion }}</span>
+                    · 操作者 {{ presentActor(item.actorId) }}
+                  </p>
+                </div>
+              </li>
+            </ol>
+            <p v-else class="muted">暂无变更记录</p>
+          </article>
+
           <article class="card" data-testid="section-reassignment">
             <h3>待重分配</h3>
             <ul v-if="reassignments.length">
@@ -666,7 +718,6 @@ onMounted(() => {
               </li>
             </ul>
             <p v-else class="muted">无 OPEN 待重分配项</p>
-            <p class="muted">UI_DATA_GAP：完整变更审计时间线读模型尚未产品化接入本页。</p>
           </article>
         </TabPane>
       </Tabs>
@@ -737,5 +788,35 @@ input {
 .membership-form h4 {
   margin: 0;
   font-size: 14px;
+}
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.timeline li {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--sos-color-border-light, #e5e7eb);
+}
+.timeline__time {
+  font-size: 12px;
+  color: var(--sos-color-text-tertiary, #6b7280);
+}
+.timeline__body strong {
+  display: block;
+  margin-bottom: 4px;
+}
+.timeline__body p {
+  margin: 0;
+}
+@media (max-width: 768px) {
+  .timeline li {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
