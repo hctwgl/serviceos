@@ -18,12 +18,21 @@ test('发布页面不得向普通用户展示 Manifest JSON 或 Digest', async (
   assert.doesNotMatch(text, /<pre/i)
   assert.doesNotMatch(text, /contentDigest/)
   assert.doesNotMatch(text, /Manifest 摘要/)
+  assert.doesNotMatch(text, /JSON\.parse\s*\(/)
   assert.match(text, /FulfillmentRunbookTable/)
 })
 
-test('运行说明页面不得展示原始技术摘要', async () => {
+test('运行说明页面不得展示原始技术摘要或自行解释 Manifest', async () => {
   const text = await source('src/pages/FulfillmentPreviewPage.vue')
   assert.doesNotMatch(text, /contentDigest/)
   assert.doesNotMatch(text, /Manifest 摘要/)
+  assert.doesNotMatch(text, /JSON\.parse\s*\(/)
   assert.match(text, /工单运行说明书/)
+})
+
+test('临时 Manifest 解析只能集中在有明确删除计划的适配器', async () => {
+  const adapter = await source('src/components/fulfillment/FulfillmentRunbookTable.vue')
+  assert.match(adapter, /M385 过渡展示适配器/)
+  assert.match(adapter, /JSON\.parse\s*\(/)
+  assert.match(adapter, /必须删除/)
 })
