@@ -376,6 +376,7 @@ title: ServiceOS 里程碑索引
 | M365 | M365 REVIEW_TASK 工作流门闸推进（A5-B） | [378-m365-review-task-workflow-gate.md](../architecture/378-m365-review-task-workflow-gate.md) | [362-m365-review-task-workflow-gate-acceptance.md](../testing/362-m365-review-task-workflow-gate-acceptance.md) |
 | M366 | M366 派单级 supportedClientKinds 过滤 | [379-m366-dispatch-supported-client-kinds-filter.md](../architecture/379-m366-dispatch-supported-client-kinds-filter.md) | [363-m366-dispatch-supported-client-kinds-filter-acceptance.md](../testing/363-m366-dispatch-supported-client-kinds-filter-acceptance.md) |
 | M367 | M367 Manual/Network assign supportedClientKinds 硬拒绝 | [380-m367-manual-network-assign-client-kind-reject.md](../architecture/380-m367-manual-network-assign-client-kind-reject.md) | [364-m367-manual-network-assign-client-kind-reject-acceptance.md](../testing/364-m367-manual-network-assign-client-kind-reject-acceptance.md) |
+| M368 | M368 Network Portal on-behalf NETWORK_WEB 能力门禁 | [381-m368-network-portal-onbehalf-network-web-capability.md](../architecture/381-m368-network-portal-onbehalf-network-web-capability.md) | [365-m368-network-portal-onbehalf-network-web-capability-acceptance.md](../testing/365-m368-network-portal-onbehalf-network-web-capability-acceptance.md) |
 
 ## 未关联里程碑的文档
 

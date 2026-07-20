@@ -20,8 +20,8 @@ import java.util.UUID;
 /**
  * 冻结 Bundle FORM/EVIDENCE 预检。复用运行时门禁与定向目标（M357/M358）。
  *
- * <p>UNKNOWN/非师傅端在此短路，避免 Feed 列表为每个任务无谓读 Bundle；
- * 与 {@link ClientCapabilityRuntimeGate} 的强制范围保持一致。</p>
+ * <p>UNKNOWN/非强制端在此短路，避免 Feed 列表为每个任务无谓读 Bundle；
+ * 与 {@link ClientCapabilityRuntimeGate} 的强制范围保持一致（含 M368 {@code NETWORK_WEB}）。</p>
  */
 @Service
 final class DefaultFrozenBundleClientCapabilityProbe implements FrozenBundleClientCapabilityProbe {
@@ -138,6 +138,7 @@ final class DefaultFrozenBundleClientCapabilityProbe implements FrozenBundleClie
 
     private static boolean enforceable(String clientKind) {
         return ClientCapabilityCatalog.TECHNICIAN_WEB.equals(clientKind)
-                || ClientCapabilityCatalog.TECHNICIAN_IOS.equals(clientKind);
+                || ClientCapabilityCatalog.TECHNICIAN_IOS.equals(clientKind)
+                || ClientCapabilityCatalog.NETWORK_WEB.equals(clientKind);
     }
 }

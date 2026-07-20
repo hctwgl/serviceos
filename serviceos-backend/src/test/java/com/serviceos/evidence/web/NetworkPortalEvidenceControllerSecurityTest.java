@@ -24,13 +24,14 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** M201：network-portal evidence on-behalf 未认证 401；缺能力 403；成功 201。 */
+/** M201/M368：network-portal evidence on-behalf 未认证 401；缺能力 403；透传 NETWORK_WEB；成功 201。 */
 @WebMvcTest(NetworkPortalEvidenceController.class)
 @Import(SecurityConfiguration.class)
 class NetworkPortalEvidenceControllerSecurityTest {
@@ -63,7 +64,8 @@ class NetworkPortalEvidenceControllerSecurityTest {
         CurrentPrincipal actor = actor();
         when(principals.current()).thenReturn(actor);
         when(portalEvidence.beginUploadOnBehalf(
-                eq(actor), any(), eq("NETWORK|NETWORK|" + NETWORK_ID), eq(TASK_ID), eq(SLOT_ID), any()))
+                eq(actor), any(), eq("NETWORK|NETWORK|" + NETWORK_ID), eq("NETWORK_WEB"),
+                eq(TASK_ID), eq(SLOT_ID), any()))
                 .thenThrow(new BusinessProblem(ProblemCode.ACCESS_DENIED, "The action is not allowed"));
 
         mvc.perform(post("/api/v1/network-portal/tasks/{taskId}/evidence-slots/{slotId}/upload-sessions",
@@ -72,6 +74,8 @@ class NetworkPortalEvidenceControllerSecurityTest {
                                 .claim("tenant_id", "tenant-a")))
                         .header("X-Correlation-Id", "corr-deny")
                         .header("X-Network-Context", "NETWORK|NETWORK|" + NETWORK_ID)
+                        .header("X-ServiceOS-Client-Kind", "NETWORK_WEB")
+                        .header("X-ServiceOS-Client-Version", "1.0.0")
                         .header("Idempotency-Key", "m201-deny")
                         .contentType("application/json")
                         .content(beginBody()))
@@ -80,11 +84,12 @@ class NetworkPortalEvidenceControllerSecurityTest {
     }
 
     @Test
-    void authenticatedBeginReturnsCreated() throws Exception {
+    void authenticatedBeginReturnsCreatedAndPassesNetworkWeb() throws Exception {
         CurrentPrincipal actor = actor();
         when(principals.current()).thenReturn(actor);
         when(portalEvidence.beginUploadOnBehalf(
-                eq(actor), any(), eq("NETWORK|NETWORK|" + NETWORK_ID), eq(TASK_ID), eq(SLOT_ID), any()))
+                eq(actor), any(), eq("NETWORK|NETWORK|" + NETWORK_ID), eq("NETWORK_WEB"),
+                eq(TASK_ID), eq(SLOT_ID), any()))
                 .thenReturn(new EvidenceUploadSessionView(
                         SESSION_ID, FILE_ID, TASK_ID, SLOT_ID, null, "CREATED", "PUT",
                         "https://example.local/upload", Map.of("Content-Type", "image/png"),
@@ -96,11 +101,40 @@ class NetworkPortalEvidenceControllerSecurityTest {
                                 .claim("tenant_id", "tenant-a")))
                         .header("X-Correlation-Id", "corr-ok")
                         .header("X-Network-Context", "NETWORK|NETWORK|" + NETWORK_ID)
+                        .header("X-ServiceOS-Client-Kind", "NETWORK_WEB")
+                        .header("X-ServiceOS-Client-Version", "1.0.0")
                         .header("Idempotency-Key", "m201-ok")
                         .contentType("application/json")
                         .content(beginBody()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.uploadSessionId").value(SESSION_ID.toString()));
+        verify(portalEvidence).beginUploadOnBehalf(
+                eq(actor), any(), eq("NETWORK|NETWORK|" + NETWORK_ID), eq("NETWORK_WEB"),
+                eq(TASK_ID), eq(SLOT_ID), any());
+    }
+
+    @Test
+    void capabilityUnsupportedReturnsUnprocessableEntity() throws Exception {
+        CurrentPrincipal actor = actor();
+        when(principals.current()).thenReturn(actor);
+        when(portalEvidence.beginUploadOnBehalf(
+                eq(actor), any(), eq("NETWORK|NETWORK|" + NETWORK_ID), eq("UNKNOWN"),
+                eq(TASK_ID), eq(SLOT_ID), any()))
+                .thenThrow(new BusinessProblem(
+                        ProblemCode.CLIENT_CAPABILITY_UNSUPPORTED,
+                        "网点资料代补要求 X-ServiceOS-Client-Kind=NETWORK_WEB；当前为 UNKNOWN"));
+
+        mvc.perform(post("/api/v1/network-portal/tasks/{taskId}/evidence-slots/{slotId}/upload-sessions",
+                        TASK_ID, SLOT_ID)
+                        .with(jwt().jwt(token -> token.subject("external-subject")
+                                .claim("tenant_id", "tenant-a")))
+                        .header("X-Correlation-Id", "corr-cap")
+                        .header("X-Network-Context", "NETWORK|NETWORK|" + NETWORK_ID)
+                        .header("Idempotency-Key", "m368-cap")
+                        .contentType("application/json")
+                        .content(beginBody()))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errorCode").value("CLIENT_CAPABILITY_UNSUPPORTED"));
     }
 
     @Test
@@ -108,7 +142,8 @@ class NetworkPortalEvidenceControllerSecurityTest {
         CurrentPrincipal actor = actor();
         when(principals.current()).thenReturn(actor);
         when(portalEvidence.createSnapshotOnBehalf(
-                eq(actor), any(), eq("NETWORK|NETWORK|" + NETWORK_ID), eq(CORRECTION_ID), any()))
+                eq(actor), any(), eq("NETWORK|NETWORK|" + NETWORK_ID), eq("NETWORK_WEB"),
+                eq(CORRECTION_ID), any()))
                 .thenReturn(new EvidenceSetSnapshotView(
                         SNAPSHOT_ID, TASK_ID, UUID.randomUUID(), UUID.randomUUID(),
                         "TASK_SUBMISSION", 1, "d".repeat(64), "{}",
@@ -120,6 +155,8 @@ class NetworkPortalEvidenceControllerSecurityTest {
                                 .claim("tenant_id", "tenant-a")))
                         .header("X-Correlation-Id", "corr-snapshot")
                         .header("X-Network-Context", "NETWORK|NETWORK|" + NETWORK_ID)
+                        .header("X-ServiceOS-Client-Kind", "NETWORK_WEB")
+                        .header("X-ServiceOS-Client-Version", "1.0.0")
                         .header("Idempotency-Key", "m201-snapshot")
                         .contentType("application/json")
                         .content("{\"memberRevisionIds\":[\"" + UUID.randomUUID() + "\"]}"))
@@ -132,7 +169,8 @@ class NetworkPortalEvidenceControllerSecurityTest {
         CurrentPrincipal actor = actor();
         when(principals.current()).thenReturn(actor);
         when(portalEvidence.resubmit(
-                eq(actor), any(), eq("NETWORK|NETWORK|" + NETWORK_ID), eq(CORRECTION_ID), eq(SNAPSHOT_ID)))
+                eq(actor), any(), eq("NETWORK|NETWORK|" + NETWORK_ID), eq("NETWORK_WEB"),
+                eq(CORRECTION_ID), eq(SNAPSHOT_ID)))
                 .thenReturn(new CorrectionCaseView(
                         CORRECTION_ID, UUID.randomUUID(), TASK_ID, UUID.randomUUID(), UUID.randomUUID(),
                         UUID.randomUUID(), "d".repeat(64), List.of("IMAGE.BLUR"), null, "RESUBMITTED",
@@ -145,6 +183,8 @@ class NetworkPortalEvidenceControllerSecurityTest {
                                 .claim("tenant_id", "tenant-a")))
                         .header("X-Correlation-Id", "corr-resubmit")
                         .header("X-Network-Context", "NETWORK|NETWORK|" + NETWORK_ID)
+                        .header("X-ServiceOS-Client-Kind", "NETWORK_WEB")
+                        .header("X-ServiceOS-Client-Version", "1.0.0")
                         .header("Idempotency-Key", "m201-resubmit")
                         .contentType("application/json")
                         .content("{\"evidenceSetSnapshotId\":\"" + SNAPSHOT_ID + "\"}"))

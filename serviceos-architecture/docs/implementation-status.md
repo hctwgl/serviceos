@@ -4,7 +4,7 @@ version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-20
 baselineCommit: "PENDING_MERGE"
-latestMilestone: M367
+latestMilestone: M368
 ---
 
 # ServiceOS 实施状态总览
@@ -39,13 +39,13 @@ latestMilestone: M367
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M367 Manual/Network assign kind 硬拒绝（ADR-088 A1-B） |
-| 基线提交 | `PENDING_MERGE`（合并后回填；依赖 M366） |
+| 最新实施里程碑 | M368 Network Portal on-behalf NETWORK_WEB 能力门禁（ADR-089） |
+| 基线提交 | `PENDING_MERGE`（合并后回填；依赖 M367） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts`、`@serviceos/web-core`、`ServiceOSIOSCore`、独立且可部署的 `serviceos-network-web` 与 `serviceos-technician-web`、Swift 6 `TechnicianIOSFoundation`，以及已在 iPhone 17 Pro Simulator 安装启动、实跑 XCTest/XCUITest、形成 Production arm64 archive/dSYM，并接入当前任务、在线 Visit、冻结基础表单、前台 Evidence 采集上传、Snapshot/Task 完成与多轮资料整改的原生 `TechnicianIOS` SwiftUI App；由同一 Core OpenAPI 生成并经独立消费者门禁验证的 `@serviceos/core-client` 与 `ServiceOSCoreClient` |
 | 前端工程 | `serviceos-admin-web` 独立承载总部运营、统一用户中心、`/me` 导航、SavedView、UI Preference、受控搜索与最近访问；M256 后 Network 正式产品由独立 `serviceos-network-web` 承载，M257 后 Technician 正式产品由独立移动优先 `serviceos-technician-web` 承载，M262～M266 依次增加在线 Visit、冻结表单、Evidence 三段式上传、Snapshot/Task 完成与独立整改 Task 多轮补传/重新提交；Admin 仅保留可配置外链和 M188 诊断；两套独立 Web 均实际接入共享 Core、OIDC PKCE、服务端 Context/Capability/导航、Playwright 回归和独立容器镜像 |
 | 数据库 | PostgreSQL + Flyway（当前版本 134） |
-| 契约 | Core OpenAPI 1.0.58 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 `workorder.cancelled@v1`、`workorder.reopened@v1`、`workorder.external-details-updated@v1`、project.created@v3、project.scope-relations-revised@v1、`task.handling-completed@v1`、recovered/resolved 与 SLA started/breached/met@v1；ConfigurationDraft.clientCompatibility/`supportedClientKinds`；Feed/整改 `clientCapabilityUnsupportedDetail`；整改/主 Evidence/`Manual assign` `CLIENT_CAPABILITY_UNSUPPORTED`；`ReviewCase.reviewTaskId`；`TechnicianProfile.supportedClientKinds` / declare） |
+| 契约 | Core OpenAPI 1.0.59 + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 `workorder.cancelled@v1`、`workorder.reopened@v1`、`workorder.external-details-updated@v1`、project.created@v3、project.scope-relations-revised@v1、`task.handling-completed@v1`、recovered/resolved 与 SLA started/breached/met@v1；ConfigurationDraft.clientCompatibility/`supportedClientKinds`；Feed/整改 `clientCapabilityUnsupportedDetail`；整改/主 Evidence/`Manual assign`/Network on-behalf `CLIENT_CAPABILITY_UNSUPPORTED`；`ReviewCase.reviewTaskId`；`TechnicianProfile.supportedClientKinds` / declare） |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -94,7 +94,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | Network Portal 只读查询 | 网点协作只读列表与工作台 | `IMPLEMENTED` | API-06 §10 子集；`X-Network-Context`；ACTIVE NETWORK assignment 工单/任务；ACTIVE 师傅；capacity；M256 起由独立 Network Web 正式承载 | 完整 product/03、评分引擎；其余写命令 | M194、M256 |
 | Network Portal 指派师傅 | 网点协作写命令（指派） | `IMPLEMENTED` | `POST .../tasks/{taskId}:assign-technician`；强制 networkAssigneeId；委托 ManualAssign；`networkPortal.assignTechnician`；Admin Web 表单 | 评分/硬过滤、资料 Network 写（改派见 M200） | M196 |
 | Network Portal 改派师傅 | 网点协作写命令（改派） | `IMPLEMENTED` | `POST .../tasks/{taskId}:reassign-technician`；supersedes ACTIVE TECHNICIAN；`networkPortal.reassignTechnician`；委托 ManualReassign；Admin Web 动作 | 跨网点改派、资料补传、评分 | M200 |
-| Network Portal 资料代补 | 网点协作写命令（onBehalf） | `IMPLEMENTED` | begin/finalize on-behalf + correction resubmit；`evidence.submitOnBehalf`；CaptureMetadata 服务端写入；Page Registry `NETWORK.EVIDENCE.SUPPLEMENT`；Admin Web 控件 | 槽位 allowOnBehalf、表单代改、Visit | M201 |
+| Network Portal 资料代补 | 网点协作写命令（onBehalf） | `IMPLEMENTED` | begin/finalize on-behalf + correction resubmit；`evidence.submitOnBehalf`；CaptureMetadata 服务端写入；Page Registry `NETWORK.EVIDENCE.SUPPLEMENT`；Admin Web 控件；M368 `NETWORK_WEB` 能力门禁（ADR-089） | 槽位 allowOnBehalf、表单代改、Visit | M201、M368 |
 | Network Portal 整改队列 | 网点协作只读整改发现面 | `IMPLEMENTED` | list/get correction-cases；复用 `evidence.read` NETWORK；Page Registry `NETWORK.CORRECTION.QUEUE`；Admin Web `/network-portal/corrections` | Admin cursor 队列、资质/产能写、异常队列 | M202 |
 | Network Portal 整改详情 | 网点协作只读整改详情 UI | `IMPLEMENTED` | 复用 M202 GET correction-cases/{id}（`CorrectionCase`）；Admin Web `/network-portal/corrections/:id`（source snapshot + resubmissions）；列表深链；catalog 仍 v15；OpenAPI 仍 0.99.0；Flyway 仍 100/102 | Portal close/waive/ACK、新 pageId | M209 |
 | Network Portal 运营异常详情 | 网点协作只读异常详情 UI | `IMPLEMENTED` | 复用 M203 GET operational-exceptions/{id}（`NetworkPortalExceptionItem`）；Admin Web `/network-portal/exceptions/:id`；列表深链；allowedActions=[]；catalog 仍 v15；OpenAPI 仍 0.99.0；Flyway 仍 100/102 | Portal ACK/resolve、新 pageId | M210 |
@@ -175,15 +175,14 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M367**（Manual/Network assign kind 硬拒绝 / ADR-088 A1-B；承接 M366）。
-OpenAPI **1.0.58**；Flyway **134**。
-Technician 能力门禁（M356～M363）、审核 handling Task（M364）、工作流门闸（M365）、派单自动池过滤（M366）与人工指派硬拒绝（M367）已闭环。
+ServiceOS 可靠纵向切片已推进到 **M368**（Network Portal on-behalf NETWORK_WEB 能力门禁 / ADR-089；承接 M367）。
+OpenAPI **1.0.59**；Flyway **134**。
+Technician 能力门禁（M356～M363）、审核 handling Task（M364）、工作流门闸（M365）、派单自动池过滤（M366）、人工指派硬拒绝（M367）与 Network on-behalf `NETWORK_WEB` 门禁（M368）已闭环。
 
 下一阶段（均需负责人确认后才能推进，不得发明规则）：
 
-1. Network Portal on-behalf 整改/代补能力门禁（需确认 `NETWORK_WEB` vs 代师傅端 clientKind 语义）；
-2. iOS 条件执行器全量硬阻断（本 Linux 环境多为 BLOCKED_EXTERNAL）；
-3. 既有硬门禁：吉利联调 / AMOUNT/加权 / BUSINESS 日历 SLA。
+1. iOS 条件执行器全量硬阻断（本 Linux 环境多为 BLOCKED_EXTERNAL）；
+2. 既有硬门禁：吉利联调 / AMOUNT/加权 / BUSINESS 日历 SLA。
 
 仍为 **硬门禁 / 外部阻塞**（不可发明推进）：
 

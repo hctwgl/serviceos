@@ -75,4 +75,26 @@ class DefaultClientCapabilityRuntimeGateTest {
                     assertThat(problem.getMessage()).contains("定向发布目标");
                 });
     }
+
+    @Test
+    void networkWebAcceptsPhotoAndSkipsDirectedTechnicianTarget() {
+        assertThatCode(() -> gate.requireCompatibleEvidenceSlots(
+                "NETWORK_WEB",
+                List.of("PHOTO"),
+                List.of("{\"mediaType\":\"PHOTO\",\"capture\":{}}"),
+                List.of("TECHNICIAN_WEB")))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void networkWebRejectsSignatureSlot() {
+        assertThatThrownBy(() -> gate.requireCompatibleEvidenceSlots(
+                "NETWORK_WEB",
+                List.of("SIGNATURE"),
+                List.of("{\"mediaType\":\"SIGNATURE\",\"capture\":{}}")))
+                .isInstanceOfSatisfying(BusinessProblem.class, problem -> {
+                    assertThat(problem.code()).isEqualTo(ProblemCode.CLIENT_CAPABILITY_UNSUPPORTED);
+                    assertThat(problem.getMessage()).contains("网点 Web");
+                });
+    }
 }

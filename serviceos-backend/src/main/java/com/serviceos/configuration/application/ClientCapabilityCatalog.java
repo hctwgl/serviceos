@@ -5,14 +5,15 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 生产师傅端静态能力目录。
+ * 生产端静态能力目录。
  *
- * <p>反映当前已验收的 H5/iOS 在线履约能力，不得用目录伪造尚未交付的运行时。
- * 条件类能力：H5（M349/M350）已支持；iOS 尚无共用执行器，故仅 WEB 登记。</p>
+ * <p>反映当前已验收的 H5/iOS/Network Web 在线能力，不得用目录伪造尚未交付的运行时。
+ * 条件类能力：师傅 H5（M349/M350）与 Network Web 代补（M368）已支持；iOS 尚无共用执行器，故仅 WEB 登记。</p>
  */
 final class ClientCapabilityCatalog {
     static final String TECHNICIAN_WEB = "TECHNICIAN_WEB";
     static final String TECHNICIAN_IOS = "TECHNICIAN_IOS";
+    static final String NETWORK_WEB = "NETWORK_WEB";
 
     private static final Set<String> SCALAR_FIELD_TYPES = Set.of(
             "STRING", "TEXT", "INTEGER", "DECIMAL", "BOOLEAN", "DATE", "DATETIME");
@@ -23,6 +24,8 @@ final class ClientCapabilityCatalog {
     static {
         PROFILES.put(TECHNICIAN_WEB, buildWeb());
         PROFILES.put(TECHNICIAN_IOS, buildIos());
+        // Network Web 代补与师傅 H5 同属 Web 运行时；签名等未交付能力不得登记。
+        PROFILES.put(NETWORK_WEB, buildWeb());
     }
 
     private ClientCapabilityCatalog() {

@@ -2,6 +2,7 @@ package com.serviceos.evidence.application;
 
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
+import com.serviceos.configuration.api.ClientCapabilityRuntimeGate;
 import com.serviceos.dispatch.api.ActiveServiceResponsibility;
 import com.serviceos.dispatch.api.ActiveServiceResponsibilityService;
 import com.serviceos.evidence.api.BeginEvidenceUploadOnBehalfCommand;
@@ -11,6 +12,8 @@ import com.serviceos.evidence.api.EvidenceCommandService;
 import com.serviceos.evidence.api.EvidenceItemView;
 import com.serviceos.evidence.api.EvidenceSetSnapshotService;
 import com.serviceos.evidence.api.EvidenceSetSnapshotView;
+import com.serviceos.evidence.api.EvidenceSlotQueryService;
+import com.serviceos.evidence.api.EvidenceSlotView;
 import com.serviceos.evidence.api.EvidenceUploadSessionView;
 import com.serviceos.evidence.api.FinalizeEvidenceUploadCommand;
 import com.serviceos.evidence.api.NetworkPortalEvidenceService;
@@ -21,6 +24,7 @@ import com.serviceos.network.api.NetworkPortalTechnicianQuery;
 import com.serviceos.network.api.NetworkPortalTechnicianView;
 import com.serviceos.network.api.PrincipalNetworkAffiliationQuery;
 import com.serviceos.shared.BusinessProblem;
+import com.serviceos.shared.ClientMetadata;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.ProblemCode;
 import org.springframework.stereotype.Service;
@@ -28,20 +32,23 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
 /**
- * M201 Network Portal 资料代补适配器。
+ * M201 Network Portal 资料代补适配器；M368 叠加 NETWORK_WEB 客户端能力门禁。
  * <p>
  * 事务边界：门禁预检与 Evidence/Correction 命令同事务；聚合、幂等、审计与 Outbox 由领域服务保证。
- * 失败关闭：伪造上下文、非成员、无未关闭整改、onBehalfOf 非 ACTIVE TECHNICIAN、跨网点。
+ * 失败关闭：伪造上下文、非成员、无未关闭整改、onBehalfOf 非 ACTIVE TECHNICIAN、跨网点、
+ * 非 NETWORK_WEB ClientKind、网点端能力不兼容。
  */
 @Service
 final class DefaultNetworkPortalEvidenceService implements NetworkPortalEvidenceService {
     private static final String CAPABILITY = "evidence.submitOnBehalf";
     private static final String CONTEXT_PREFIX = "NETWORK|NETWORK|";
+    private static final String REQUIRED_CLIENT_KIND = "NETWORK_WEB";
     private static final Set<String> OPEN_CORRECTION_STATUSES = Set.of(
             "OPEN", "IN_PROGRESS", "RESUBMITTED");
 
@@ -50,8 +57,10 @@ final class DefaultNetworkPortalEvidenceService implements NetworkPortalEvidence
     private final ActiveServiceResponsibilityService responsibilities;
     private final NetworkPortalTechnicianQuery technicians;
     private final EvidenceCommandService evidence;
+    private final EvidenceSlotQueryService slots;
     private final EvidenceSetSnapshotService snapshots;
     private final CorrectionCaseService corrections;
+    private final ClientCapabilityRuntimeGate clientCapabilityRuntimeGate;
     private final Clock clock;
 
     DefaultNetworkPortalEvidenceService(
@@ -60,8 +69,10 @@ final class DefaultNetworkPortalEvidenceService implements NetworkPortalEvidence
             ActiveServiceResponsibilityService responsibilities,
             NetworkPortalTechnicianQuery technicians,
             EvidenceCommandService evidence,
+            EvidenceSlotQueryService slots,
             EvidenceSetSnapshotService snapshots,
             CorrectionCaseService corrections,
+            ClientCapabilityRuntimeGate clientCapabilityRuntimeGate,
             Clock clock
     ) {
         this.affiliations = affiliations;
@@ -69,8 +80,10 @@ final class DefaultNetworkPortalEvidenceService implements NetworkPortalEvidence
         this.responsibilities = responsibilities;
         this.technicians = technicians;
         this.evidence = evidence;
+        this.slots = slots;
         this.snapshots = snapshots;
         this.corrections = corrections;
+        this.clientCapabilityRuntimeGate = clientCapabilityRuntimeGate;
         this.clock = clock;
     }
 
@@ -80,6 +93,7 @@ final class DefaultNetworkPortalEvidenceService implements NetworkPortalEvidence
             CurrentPrincipal principal,
             CommandMetadata metadata,
             String networkContextHeader,
+            String clientKind,
             UUID taskId,
             UUID slotId,
             BeginEvidenceUploadOnBehalfCommand command
@@ -96,6 +110,7 @@ final class DefaultNetworkPortalEvidenceService implements NetworkPortalEvidence
         requireOpenCorrection(principal, metadata.correlationId(), taskId);
         String onBehalfOf = requireText(command.onBehalfOf(), "onBehalfOf", 128);
         requireActiveTechnicianAssignee(principal.tenantId(), networkId, responsibility, onBehalfOf);
+        requireNetworkWebCapable(principal, metadata.correlationId(), clientKind, taskId);
 
         BeginEvidenceUploadOnBehalfCommand scoped = new BeginEvidenceUploadOnBehalfCommand(
                 command.taskId(), command.slotId(), command.evidenceItemId(),
@@ -112,6 +127,7 @@ final class DefaultNetworkPortalEvidenceService implements NetworkPortalEvidence
             CurrentPrincipal principal,
             CommandMetadata metadata,
             String networkContextHeader,
+            String clientKind,
             UUID taskId,
             UUID slotId,
             UUID uploadSessionId,
@@ -129,6 +145,7 @@ final class DefaultNetworkPortalEvidenceService implements NetworkPortalEvidence
         UUID networkId = requireAuthorizedNetwork(principal, metadata.correlationId(), networkContextHeader);
         requireNetworkOwnedTask(principal.tenantId(), taskId, networkId);
         requireOpenCorrection(principal, metadata.correlationId(), taskId);
+        requireNetworkWebCapable(principal, metadata.correlationId(), clientKind, taskId);
         return evidence.finalizeUploadOnBehalf(principal, metadata, command, networkId);
     }
 
@@ -138,6 +155,7 @@ final class DefaultNetworkPortalEvidenceService implements NetworkPortalEvidence
             CurrentPrincipal principal,
             CommandMetadata metadata,
             String networkContextHeader,
+            String clientKind,
             UUID correctionCaseId,
             java.util.List<UUID> memberRevisionIds
     ) {
@@ -146,6 +164,7 @@ final class DefaultNetworkPortalEvidenceService implements NetworkPortalEvidence
         CorrectionCaseView current = corrections.get(principal, metadata.correlationId(), correctionCaseId);
         requireNetworkOwnedTask(principal.tenantId(), current.taskId(), networkId);
         requireOpenCorrection(principal, metadata.correlationId(), current.taskId());
+        requireNetworkWebCapable(principal, metadata.correlationId(), clientKind, current.taskId());
         return snapshots.createOnBehalf(
                 principal, metadata, correctionCaseId, memberRevisionIds, networkId);
     }
@@ -156,6 +175,7 @@ final class DefaultNetworkPortalEvidenceService implements NetworkPortalEvidence
             CurrentPrincipal principal,
             CommandMetadata metadata,
             String networkContextHeader,
+            String clientKind,
             UUID correctionCaseId,
             UUID evidenceSetSnapshotId
     ) {
@@ -164,8 +184,30 @@ final class DefaultNetworkPortalEvidenceService implements NetworkPortalEvidence
         UUID networkId = requireAuthorizedNetwork(principal, metadata.correlationId(), networkContextHeader);
         CorrectionCaseView current = corrections.get(principal, metadata.correlationId(), correctionCaseId);
         requireNetworkOwnedTask(principal.tenantId(), current.taskId(), networkId);
+        requireNetworkWebCapable(principal, metadata.correlationId(), clientKind, current.taskId());
         return corrections.resubmit(principal, metadata,
                 new ResubmitCorrectionCaseCommand(correctionCaseId, evidenceSetSnapshotId));
+    }
+
+    /**
+     * ADR-089：代补按网点端 NETWORK_WEB 评估能力；定向 supportedClientKinds 不参与（传空列表）。
+     */
+    private void requireNetworkWebCapable(
+            CurrentPrincipal principal, String correlationId, String clientKind, UUID taskId
+    ) {
+        String kind = clientKind == null || clientKind.isBlank()
+                ? ClientMetadata.UNKNOWN_KIND : clientKind.trim();
+        if (!REQUIRED_CLIENT_KIND.equals(kind)) {
+            throw new BusinessProblem(ProblemCode.CLIENT_CAPABILITY_UNSUPPORTED,
+                    "网点资料代补要求 X-ServiceOS-Client-Kind=NETWORK_WEB；当前为 " + kind
+                            + "。请使用网点 Web 客户端，或由兼容端处理。");
+        }
+        List<EvidenceSlotView> resolved = slots.listForTask(principal, correlationId, taskId);
+        clientCapabilityRuntimeGate.requireCompatibleEvidenceSlots(
+                kind,
+                resolved.stream().map(EvidenceSlotView::mediaType).toList(),
+                resolved.stream().map(EvidenceSlotView::requirementDefinitionJson).toList(),
+                List.of());
     }
 
     private void requireOpenCorrection(CurrentPrincipal principal, String correlationId, UUID taskId) {

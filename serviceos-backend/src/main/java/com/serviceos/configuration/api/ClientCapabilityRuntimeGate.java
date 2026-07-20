@@ -3,11 +3,13 @@ package com.serviceos.configuration.api;
 import java.util.List;
 
 /**
- * 师傅端运行时客户端能力门禁。
+ * 运行时客户端能力门禁。
  *
- * <p>对已知 {@code TECHNICIAN_WEB}/{@code TECHNICIAN_IOS} 校验冻结 FORM/EVIDENCE 定义所需能力；
- * 不兼容时抛出 {@code CLIENT_CAPABILITY_UNSUPPORTED}。{@code UNKNOWN} 与非师傅端跳过，
- * 以保留 M253 旧客户端 Header 迁移窗口，不得借此绕过已知师傅端判断。</p>
+ * <p>对已知 {@code TECHNICIAN_WEB}/{@code TECHNICIAN_IOS}/{@code NETWORK_WEB} 校验冻结
+ * FORM/EVIDENCE 定义所需能力；不兼容时抛出 {@code CLIENT_CAPABILITY_UNSUPPORTED}。
+ * {@code UNKNOWN}/{@code ADMIN_WEB} 跳过，以保留 M253 旧客户端 Header 迁移窗口，
+ * 不得借此绕过已知强制端判断。定向 {@code supportedClientKinds} 对 {@code NETWORK_WEB}
+ * 不生效（ADR-089：代补权威来自网点责任与能力授予）。</p>
  */
 public interface ClientCapabilityRuntimeGate {
     void requireCompatible(

@@ -19,6 +19,9 @@ import java.util.stream.Collectors;
 /**
  * 运行时能力门禁实现。与发布门禁共用能力目录与提取器，但按单一 clientKind 失败关闭；
  * 若资产声明了 supportedClientKinds，则先校验客户端是否在目标集合内。
+ *
+ * <p>M368：{@code NETWORK_WEB} 可强制（能力码），但定向目标仅约束师傅执行/派单，
+ * 对 {@code NETWORK_WEB} 跳过 {@code supportedClientKinds} 集合校验（ADR-089）。</p>
  */
 @Service
 final class DefaultClientCapabilityRuntimeGate implements ClientCapabilityRuntimeGate {
@@ -82,6 +85,10 @@ final class DefaultClientCapabilityRuntimeGate implements ClientCapabilityRuntim
 
     private void denyIfOutsideTarget(String clientKind, List<String> supportedClientKinds) {
         if (supportedClientKinds == null || supportedClientKinds.isEmpty()) {
+            return;
+        }
+        // 定向目标约束师傅执行端；网点代补权威不来自 supportedClientKinds（ADR-089）。
+        if (ClientCapabilityCatalog.NETWORK_WEB.equals(clientKind)) {
             return;
         }
         if (supportedClientKinds.contains(clientKind)) {
@@ -148,7 +155,8 @@ final class DefaultClientCapabilityRuntimeGate implements ClientCapabilityRuntim
 
     private static boolean enforceable(String clientKind) {
         return ClientCapabilityCatalog.TECHNICIAN_WEB.equals(clientKind)
-                || ClientCapabilityCatalog.TECHNICIAN_IOS.equals(clientKind);
+                || ClientCapabilityCatalog.TECHNICIAN_IOS.equals(clientKind)
+                || ClientCapabilityCatalog.NETWORK_WEB.equals(clientKind);
     }
 
     private static String clientKindLabel(String clientKind) {
@@ -157,6 +165,9 @@ final class DefaultClientCapabilityRuntimeGate implements ClientCapabilityRuntim
         }
         if (ClientCapabilityCatalog.TECHNICIAN_IOS.equals(clientKind)) {
             return "师傅 iOS";
+        }
+        if (ClientCapabilityCatalog.NETWORK_WEB.equals(clientKind)) {
+            return "网点 Web";
         }
         return clientKind == null ? ClientMetadata.UNKNOWN_KIND : clientKind;
     }

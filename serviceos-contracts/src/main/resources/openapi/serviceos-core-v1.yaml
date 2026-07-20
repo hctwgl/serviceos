@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.58
+  version: 1.0.59
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -2172,6 +2172,8 @@ paths:
         onBehalfOf/delegationRef/onBehalfReason 仍失败关闭。
         要求任务存在未关闭 CorrectionCase，且 onBehalfOf = ACTIVE TECHNICIAN 且为本网点 ACTIVE 师傅。
         上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+        M368 / ADR-089：要求 X-ServiceOS-Client-Kind=NETWORK_WEB，并对源 Task EVIDENCE 槽位做
+        网点端能力门禁；不兼容或非 NETWORK_WEB 返回 422 CLIENT_CAPABILITY_UNSUPPORTED。
       parameters:
         - $ref: '#/components/parameters/TaskId'
         - name: slotId
@@ -2179,6 +2181,8 @@ paths:
           required: true
           schema: { type: string, format: uuid }
         - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/ClientKind'
+        - $ref: '#/components/parameters/ClientVersion'
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/CorrelationId'
       requestBody:
@@ -2199,6 +2203,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /network-portal/tasks/{taskId}/evidence-slots/{slotId}/upload-sessions/{uploadSessionId}:finalize:
     post:
       operationId: finalizeNetworkPortalEvidenceUploadOnBehalf
@@ -2207,6 +2212,7 @@ paths:
         M201：X-Network-Context + NETWORK scope evidence.submitOnBehalf。
         Body 与 FinalizeEvidenceUploadRequest 同形；会话 createdBy 必须为当前主体。
         上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+        M368 / ADR-089：要求 NETWORK_WEB 客户端能力门禁；不兼容返回 422 CLIENT_CAPABILITY_UNSUPPORTED。
       parameters:
         - $ref: '#/components/parameters/TaskId'
         - name: slotId
@@ -2218,6 +2224,8 @@ paths:
           required: true
           schema: { type: string, format: uuid }
         - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/ClientKind'
+        - $ref: '#/components/parameters/ClientVersion'
         - $ref: '#/components/parameters/CorrelationId'
       requestBody:
         required: true
@@ -2358,12 +2366,15 @@ paths:
         M201：X-Network-Context + NETWORK scope evidence.submitOnBehalf 门禁后，
         委托 CorrectionCase.resubmit（底层另需 evidence.submit）；整改任务须为本网点 ACTIVE NETWORK。
         上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+        M368 / ADR-089：要求 NETWORK_WEB 客户端能力门禁；不兼容返回 422 CLIENT_CAPABILITY_UNSUPPORTED。
       parameters:
         - name: correctionCaseId
           in: path
           required: true
           schema: { type: string, format: uuid }
         - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/ClientKind'
+        - $ref: '#/components/parameters/ClientVersion'
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/CorrelationId'
       requestBody:
@@ -2384,6 +2395,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /network-portal/correction-cases/{correctionCaseId}/evidence-set-snapshots:
     post:
       operationId: createNetworkPortalCorrectionEvidenceSetSnapshot
@@ -2392,12 +2404,15 @@ paths:
         M201 扩展：X-Network-Context + NETWORK scope evidence.submitOnBehalf 门禁后，
         冻结整改源 Task 当前可提交资料集合并创建 EvidenceSetSnapshot；不要求师傅 correction Task 认领。
         上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
+        M368 / ADR-089：要求 NETWORK_WEB 客户端能力门禁；不兼容返回 422 CLIENT_CAPABILITY_UNSUPPORTED。
       parameters:
         - name: correctionCaseId
           in: path
           required: true
           schema: { type: string, format: uuid }
         - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/ClientKind'
+        - $ref: '#/components/parameters/ClientVersion'
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/CorrelationId'
       requestBody:
@@ -2424,6 +2439,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /technician/me/task-feed:
     get:
       operationId: listTechnicianTaskFeed
@@ -5986,7 +6002,9 @@ components:
       name: X-ServiceOS-Client-Kind
       in: header
       required: false
-      description: 仅用于版本兼容与低基数可观测性，不参与身份、Capability 或 Scope 判断。
+      description: |
+        用于客户端兼容门禁与低基数可观测性；不参与身份认证或 Tenant/Project Scope 判定。
+        已知 TECHNICIAN_* / NETWORK_WEB 在对应 Portal 写路径上参与 ClientCapability 校验。
       schema: { enum: [ADMIN_WEB, NETWORK_WEB, TECHNICIAN_WEB, TECHNICIAN_IOS] }
     ClientVersion:
       name: X-ServiceOS-Client-Version
