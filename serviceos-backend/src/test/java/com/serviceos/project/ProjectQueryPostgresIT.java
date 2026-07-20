@@ -68,7 +68,7 @@ class ProjectQueryPostgresIT {
     @BeforeEach
     void cleanAndSeedOperator() {
         jdbc.sql("""
-                        TRUNCATE TABLE prj_project, aud_audit_record,
+                        TRUNCATE TABLE prj_client_directory, prj_project, aud_audit_record,
                             rel_outbox_publish_attempt, rel_outbox_event,
                             rel_inbox_record, rel_idempotency_record,
                             auth_role_field_policy, auth_role_grant,
@@ -117,6 +117,34 @@ class ProjectQueryPostgresIT {
                 new ProjectQuery(null, null, null, null, 0)))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("limit");
         assertThat(charlie.clientId()).isEqualTo("client-b");
+    }
+
+    @Test
+    void regionCatalogReturnsSeededNamesAndClientDirectoryRegisters() {
+        var regions = queries.listRegionCatalog(operator(), "corr-m406-regions", "*", "青岛", null, 20);
+        assertThat(regions.items()).extracting(item -> item.regionCode())
+                .contains("CN-3702", "370200");
+        assertThat(regions.items()).allSatisfy(item -> assertThat(item.regionName()).contains("青岛"));
+
+        var registered = commands.registerClient(
+                operator(), metadata("register-client"), "client-geely", "吉利汽车");
+        assertThat(registered.displayName()).isEqualTo("吉利汽车");
+        var directory = queries.listClientDirectory(operator(), "corr-m406-clients");
+        assertThat(directory.items()).extracting(item -> item.clientCode()).contains("client-geely");
+
+        create("CAT-A", "client-geely", "Catalog A", LocalDate.of(2026, 1, 1), null,
+                List.of("CN-3702"), List.of());
+        var options = queries.referenceOptions(operator(), "corr-m406-options");
+        assertThat(options.clients()).filteredOn(item -> item.clientId().equals("client-geely"))
+                .singleElement()
+                .satisfies(item -> {
+                    assertThat(item.displayName()).isEqualTo("吉利汽车");
+                    assertThat(item.projectCount()).isEqualTo(1);
+                });
+        assertThat(options.regions()).filteredOn(item -> item.regionCode().equals("CN-3702"))
+                .singleElement()
+                .extracting(item -> item.regionName())
+                .isEqualTo("青岛市");
     }
 
     @Test

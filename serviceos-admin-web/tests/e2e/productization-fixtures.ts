@@ -177,10 +177,47 @@ export async function mockProductizationApis(
       })
       return
     }
+    if (url.includes('/project-clients')) {
+      if (method === 'POST') {
+        await fulfillJson(
+          route,
+          { clientCode: 'client-geely', displayName: '吉利汽车', status: 'ACTIVE' },
+          201,
+        )
+        return
+      }
+      await fulfillJson(route, {
+        items: [{ clientCode: 'client-geely', displayName: '吉利汽车', status: 'ACTIVE' }],
+        asOf: '2026-07-20T04:00:00Z',
+      })
+      return
+    }
+    if (url.includes('/region-catalog')) {
+      await fulfillJson(route, {
+        items: [
+          {
+            regionCode: 'CN-3702',
+            parentCode: 'CN-3700',
+            regionName: '青岛市',
+            regionLevel: 'CITY',
+            sortOrder: 3702,
+          },
+          {
+            regionCode: 'CN-3700',
+            parentCode: null,
+            regionName: '山东省',
+            regionLevel: 'PROVINCE',
+            sortOrder: 3700,
+          },
+        ],
+        asOf: '2026-07-20T04:00:00Z',
+      })
+      return
+    }
     if (url.includes('/projects/reference-options')) {
       await fulfillJson(route, {
-        clients: [{ clientId: 'client-geely', projectCount: 1 }],
-        regions: [{ regionCode: 'CN-3702', projectCount: 1 }],
+        clients: [{ clientId: 'client-geely', displayName: '吉利汽车', projectCount: 1 }],
+        regions: [{ regionCode: 'CN-3702', regionName: '青岛市', projectCount: 1 }],
         asOf: '2026-07-20T04:00:00Z',
       })
       return

@@ -20,6 +20,8 @@ test.describe('M398 Admin 项目管理与工作台母版产品化', () => {
     await expect(page.getByTestId('project-client-picker')).toBeVisible()
     await expect(page.getByTestId('project-region-picker')).toBeVisible()
     await expect(page.getByTestId('network-entity-picker')).toBeVisible()
+    await expect(page.getByTestId('project-client-picker')).toContainText('车企主数据目录')
+    await expect(page.getByTestId('project-region-picker')).toContainText('行政区名称目录')
 
     await page.setViewportSize({ width: 1440, height: 1024 })
     await page.screenshot({

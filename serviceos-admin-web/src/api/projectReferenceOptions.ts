@@ -2,11 +2,13 @@ import { apiGet } from './client'
 
 export type ProjectClientOption = {
   clientId: string
+  displayName: string
   projectCount: number
 }
 
 export type ProjectRegionOption = {
   regionCode: string
+  regionName: string
   projectCount: number
 }
 

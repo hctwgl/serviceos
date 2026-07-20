@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { Select } from 'ant-design-vue'
+import { listProjectClients, type ProjectClientDirectoryItem } from '../api/projectCatalog'
 import { getProjectReferenceOptions, type ProjectClientOption } from '../api/projectReferenceOptions'
-import { labelClientCode } from '../presentation/enum-labels'
 import { safeAccessDeniedMessage } from '../api/client'
 
 defineProps<{
@@ -16,23 +16,40 @@ const emit = defineEmits<{
 
 const loading = ref(false)
 const error = ref<string | null>(null)
-const clients = ref<ProjectClientOption[]>([])
+const directory = ref<ProjectClientDirectoryItem[]>([])
+const usage = ref<ProjectClientOption[]>([])
 
-const options = computed(() =>
-  clients.value.map((item) => ({
-    value: item.clientId,
-    label: `${labelClientCode(item.clientId)}（${item.clientId}）· ${item.projectCount} 个项目`,
-  })),
-)
+const options = computed(() => {
+  const usageMap = new Map(usage.value.map((item) => [item.clientId, item.projectCount]))
+  const fromDirectory = directory.value.map((item) => ({
+    value: item.clientCode,
+    label: `${item.displayName}（${item.clientCode}）${
+      usageMap.has(item.clientCode) ? ` · ${usageMap.get(item.clientCode)} 个项目` : ''
+    }`,
+  }))
+  const known = new Set(fromDirectory.map((item) => item.value))
+  const fromUsageOnly = usage.value
+    .filter((item) => !known.has(item.clientId))
+    .map((item) => ({
+      value: item.clientId,
+      label: `${item.displayName}（${item.clientId}）· ${item.projectCount} 个项目`,
+    }))
+  return [...fromDirectory, ...fromUsageOnly]
+})
 
 async function load() {
   loading.value = true
   error.value = null
   try {
-    const page = await getProjectReferenceOptions()
-    clients.value = page.clients
+    const [clients, refs] = await Promise.all([
+      listProjectClients(),
+      getProjectReferenceOptions(),
+    ])
+    directory.value = clients.items
+    usage.value = refs.clients
   } catch (err) {
-    clients.value = []
+    directory.value = []
+    usage.value = []
     error.value = safeAccessDeniedMessage(err)
   } finally {
     loading.value = false
@@ -60,12 +77,10 @@ onMounted(() => {
       @update:value="(value) => emit('update:modelValue', String(value ?? ''))"
     />
     <p v-if="error" class="error">{{ error }}</p>
-    <p v-else-if="!loading && clients.length === 0" class="hint">
-      当前授权范围内尚无可选车企；请先用已有项目建立车企事实，或联系管理员开通目录。
+    <p v-else-if="!loading && options.length === 0" class="hint">
+      当前无可选车企。请先登记车企主数据，或创建项目时自动登记编码。
     </p>
-    <p v-else class="hint">
-      选项来自已授权项目中的车企聚合；完整车企主数据目录尚未单独交付。
-    </p>
+    <p v-else class="hint">选项来自车企主数据目录，并标注授权范围内的项目使用数。</p>
   </div>
 </template>
 

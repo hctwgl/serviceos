@@ -494,4 +494,5 @@ Feature gate/authority: if applicable
 | M403 | Admin 主体最近登录读模型 | 414-m403-* + 397-m403-*；OpenAPI 1.0.69；Flyway V141；PostgresIT + ArchitectureTest + Playwright | 失败登录；设备指纹；组织树任职；人工视觉批准 |
 | M404 | Admin 用户详情组织任职编辑 | 415-m404-* + 398-m404-*；OpenAPI 1.0.70；PostgresIT + ArchitectureTest + Playwright | 审计时间线；树形拖拽；人工视觉批准 |
 | M405 | Admin 主体变更时间线 | 416-m405-* + 399-m405-*；OpenAPI 1.0.71；PostgresIT + ArchitectureTest + Playwright | 跨聚合时间线；操作者显示名；人工视觉批准 |
+| M406 | 车企主数据与行政区名称目录 | 417-m406-* + 400-m406-*；OpenAPI 1.0.72；Flyway V142；PostgresIT + ArchitectureTest + Playwright | 全量国标树；品牌树 UI；人工视觉批准 |
 

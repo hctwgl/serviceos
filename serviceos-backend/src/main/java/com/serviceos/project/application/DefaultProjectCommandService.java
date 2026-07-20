@@ -7,6 +7,7 @@ import com.serviceos.authorization.api.AuthorizationDecision;
 import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.project.api.CreateProjectCommand;
+import com.serviceos.project.api.ProjectClientDirectoryItem;
 import com.serviceos.project.api.ProjectCommandService;
 import com.serviceos.project.api.ProjectScopeRelationRevisionView;
 import com.serviceos.project.api.ProjectView;
@@ -50,6 +51,7 @@ final class DefaultProjectCommandService implements ProjectCommandService {
             .build();
 
     private final ProjectRepository projects;
+    private final ProjectCatalogRepository catalogs;
     private final AuthorizationService authorization;
     private final IdempotencyService idempotency;
     private final AuditAppender audit;
@@ -58,6 +60,7 @@ final class DefaultProjectCommandService implements ProjectCommandService {
 
     DefaultProjectCommandService(
             ProjectRepository projects,
+            ProjectCatalogRepository catalogs,
             AuthorizationService authorization,
             IdempotencyService idempotency,
             AuditAppender audit,
@@ -65,6 +68,7 @@ final class DefaultProjectCommandService implements ProjectCommandService {
             Clock clock
     ) {
         this.projects = projects;
+        this.catalogs = catalogs;
         this.authorization = authorization;
         this.idempotency = idempotency;
         this.audit = audit;
@@ -97,6 +101,7 @@ final class DefaultProjectCommandService implements ProjectCommandService {
 
         Instant now = clock.instant();
         Project project = Project.create(context.tenantId(), command, UUID.randomUUID(), now);
+        catalogs.ensureClient(context.tenantId(), project.clientId(), project.clientId(), now);
         projects.insert(project);
         projects.insertRegionBindings(project, context.actorId());
         projects.insertNetworkBindings(project, context.actorId());
@@ -124,6 +129,53 @@ final class DefaultProjectCommandService implements ProjectCommandService {
         ProjectView result = project.toView();
         idempotency.complete(context, OPERATION_TYPE, project.id().toString(), Sha256.digest(canonicalJson(result)));
         return result;
+    }
+
+    @Override
+    @Transactional
+    public ProjectClientDirectoryItem registerClient(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            String clientCode,
+            String displayName
+    ) {
+        String code = requireText(clientCode, "clientCode", 128);
+        String name = requireText(displayName, "displayName", 200);
+        CommandContext context = new CommandContext(
+                principal.tenantId(), principal.principalId(),
+                metadata.correlationId(), metadata.idempotencyKey());
+        AuthorizationDecision authorizationDecision = authorization.require(
+                principal,
+                AuthorizationRequest.tenantCapability(
+                        "project.create", context.tenantId(), "ProjectClient", code),
+                context.correlationId());
+        String requestDigest = Sha256.digest(canonicalJson(new ClientRegisterPayload(code, name)));
+        IdempotencyDecision decision = idempotency.begin(context, "project.registerClient", requestDigest);
+        if (decision.kind() == IdempotencyDecision.Kind.REPLAY) {
+            return catalogs.findClient(context.tenantId(), code)
+                    .orElseThrow(() -> new IllegalStateException("Idempotency result missing client"));
+        }
+        Instant now = clock.instant();
+        catalogs.upsertClient(context.tenantId(), code, name, "ACTIVE", now);
+        ProjectClientDirectoryItem item = catalogs.findClient(context.tenantId(), code)
+                .orElseThrow(() -> new IllegalStateException("Client upsert did not persist"));
+        audit.append(new AuditEntry(
+                UUID.randomUUID(), context.tenantId(), context.actorId(), "PROJECT_CLIENT_REGISTERED",
+                "project.create", "ProjectClient", code, "ALLOW", authorizationDecision.matchedGrantIds(),
+                authorizationDecision.policyVersion(), "SUCCEEDED", null, requestDigest,
+                context.correlationId(), now));
+        idempotency.complete(context, "project.registerClient", code, Sha256.digest(code + "|" + name));
+        return item;
+    }
+
+    private static String requireText(String value, String field, int max) {
+        if (value == null || value.isBlank() || !value.equals(value.trim()) || value.length() > max) {
+            throw new IllegalArgumentException(field + " is invalid");
+        }
+        return value;
+    }
+
+    private record ClientRegisterPayload(String clientCode, String displayName) {
     }
 
     /**

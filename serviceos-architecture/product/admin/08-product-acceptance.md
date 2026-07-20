@@ -359,7 +359,7 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 完整行政区名称树 / 独立车企主数据目录
+  - UI_DATA_GAP: 完整国标行政区全量树与车企品牌树治理 UI（常用目录已由 M406 交付）
 ```
 
 ```yaml
@@ -411,7 +411,7 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 完整行政区名称树 / 独立车企主数据目录（聚合选择器已交付）
+  - UI_DATA_GAP: 完整国标行政区全量树与车企品牌树治理 UI（M406 已交付常用目录）
 ```
 
 ### 9.7 M401 记录（关注项目）
@@ -502,6 +502,24 @@ qualityStatus:
 productOwnerDecision: null
 knownGaps:
   - UI_DATA_GAP: 跨聚合业务时间线与操作者显示名
+```
+
+### 9.12 M406 记录（车企/行政区目录）
+
+```yaml
+pageId: ADMIN.PROJECT.LIST
+route: /projects
+visualProfile: CLASSIC_PROFESSIONAL
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: 完整国标行政区全量树与车企品牌树治理 UI
 ```
 
 ## 10. GAP 规则

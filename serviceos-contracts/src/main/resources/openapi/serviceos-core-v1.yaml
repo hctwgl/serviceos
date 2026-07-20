@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.71
+  version: 1.0.72
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -3600,13 +3600,90 @@ paths:
           $ref: '#/components/responses/Problem'
         '422':
           $ref: '#/components/responses/Problem'
+  /project-clients:
+    get:
+      operationId: listProjectClients
+      summary: 查询租户车企主数据目录
+      description: M406：需要 project.read。返回 ACTIVE 车企编码与显示名。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 车企目录
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectClientDirectoryPage' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: registerProjectClient
+      summary: 登记或更新车企主数据
+      description: M406：需要 project.create。同 tenant+clientCode 幂等更新显示名。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterProjectClientRequest' }
+      responses:
+        '201':
+          description: 已登记车企
+          headers:
+            Location: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectClientDirectoryItem' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /region-catalog:
+    get:
+      operationId: listRegionCatalog
+      summary: 查询行政区名称目录
+      description: |
+        M406：需要 project.read。parentCode 缺省返回根级；传 * 表示不限父级；
+        query 支持编码/名称模糊搜索。
+      parameters:
+        - name: parentCode
+          in: query
+          required: false
+          schema: { type: string, maxLength: 32 }
+        - name: query
+          in: query
+          required: false
+          schema: { type: string, maxLength: 100 }
+        - name: level
+          in: query
+          required: false
+          schema: { enum: [PROVINCE, CITY, DISTRICT] }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200, default: 100 }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 行政区目录页
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegionCatalogPage' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
   /projects/reference-options:
     get:
       operationId: getProjectReferenceOptions
       summary: 查询项目创建/范围编辑用的车企与区域选项
       description: >-
-        按实时 project.read 授权范围聚合已有项目的 clientId 与生效 REGION 编码。
-        网点选项请使用 /service-networks。不含臆造的区域名称字典。
+        按实时 project.read 授权范围聚合已有项目的 clientId 与生效 REGION 编码，
+        并附带车企/行政区目录显示名。网点选项请使用 /service-networks。
       parameters:
         - $ref: '#/components/parameters/CorrelationId'
       responses:
@@ -10494,17 +10571,58 @@ components:
     ProjectClientOption:
       type: object
       additionalProperties: false
-      required: [clientId, projectCount]
+      required: [clientId, displayName, projectCount]
       properties:
         clientId: { type: string, minLength: 1, maxLength: 128 }
+        displayName: { type: string, minLength: 1, maxLength: 200 }
         projectCount: { type: integer, minimum: 0 }
     ProjectRegionOption:
       type: object
       additionalProperties: false
-      required: [regionCode, projectCount]
+      required: [regionCode, regionName, projectCount]
       properties:
         regionCode: { type: string, minLength: 1, maxLength: 128 }
+        regionName: { type: string, minLength: 1, maxLength: 100 }
         projectCount: { type: integer, minimum: 0 }
+    ProjectClientDirectoryItem:
+      type: object
+      additionalProperties: false
+      required: [clientCode, displayName, status]
+      properties:
+        clientCode: { type: string, minLength: 1, maxLength: 128 }
+        displayName: { type: string, minLength: 1, maxLength: 200 }
+        status: { enum: [ACTIVE, DISABLED] }
+    ProjectClientDirectoryPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/ProjectClientDirectoryItem' } }
+        asOf: { type: string, format: date-time }
+    RegisterProjectClientRequest:
+      type: object
+      additionalProperties: false
+      required: [clientCode, displayName]
+      properties:
+        clientCode: { type: string, minLength: 1, maxLength: 128 }
+        displayName: { type: string, minLength: 1, maxLength: 200 }
+    RegionCatalogItem:
+      type: object
+      additionalProperties: false
+      required: [regionCode, regionName, regionLevel, sortOrder]
+      properties:
+        regionCode: { type: string, minLength: 1, maxLength: 32 }
+        parentCode: { type: [string, 'null'], maxLength: 32 }
+        regionName: { type: string, minLength: 1, maxLength: 100 }
+        regionLevel: { enum: [PROVINCE, CITY, DISTRICT] }
+        sortOrder: { type: integer }
+    RegionCatalogPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/RegionCatalogItem' } }
+        asOf: { type: string, format: date-time }
     ProjectReferenceOptions:
       type: object
       additionalProperties: false

@@ -412,6 +412,7 @@ title: ServiceOS 里程碑索引
 | M403 | M403 Admin 主体最近登录读模型 | [414-m403-admin-principal-recent-logins.md](../architecture/414-m403-admin-principal-recent-logins.md) | [397-m403-admin-principal-recent-logins-acceptance.md](../testing/397-m403-admin-principal-recent-logins-acceptance.md) |
 | M404 | M404 Admin 用户详情组织任职编辑 | [415-m404-admin-user-org-membership-editing.md](../architecture/415-m404-admin-user-org-membership-editing.md) | [398-m404-admin-user-org-membership-acceptance.md](../testing/398-m404-admin-user-org-membership-acceptance.md) |
 | M405 | M405 Admin 主体变更时间线 | [416-m405-admin-principal-change-timeline.md](../architecture/416-m405-admin-principal-change-timeline.md) | [399-m405-admin-principal-change-timeline-acceptance.md](../testing/399-m405-admin-principal-change-timeline-acceptance.md) |
+| M406 | M406 车企主数据与行政区名称目录 | [417-m406-client-region-catalog.md](../architecture/417-m406-client-region-catalog.md) | [400-m406-client-region-catalog-acceptance.md](../testing/400-m406-client-region-catalog-acceptance.md) |
 
 ## 未关联里程碑的文档
 

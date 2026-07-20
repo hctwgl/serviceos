@@ -36,7 +36,7 @@ final class JdbcProjectReferenceOptionsRepository implements ProjectReferenceOpt
                     """)
                     .param("tenantId", tenantId)
                     .query((rs, rowNum) -> new ProjectClientOption(
-                            rs.getString("client_id"), rs.getInt("project_count")))
+                            rs.getString("client_id"), rs.getString("client_id"), rs.getInt("project_count")))
                     .list();
         }
         return jdbc.sql("""
@@ -50,7 +50,7 @@ final class JdbcProjectReferenceOptionsRepository implements ProjectReferenceOpt
                 .param("tenantId", tenantId)
                 .param("projectIds", projectIds)
                 .query((rs, rowNum) -> new ProjectClientOption(
-                        rs.getString("client_id"), rs.getInt("project_count")))
+                        rs.getString("client_id"), rs.getString("client_id"), rs.getInt("project_count")))
                 .list();
     }
 
@@ -70,7 +70,7 @@ final class JdbcProjectReferenceOptionsRepository implements ProjectReferenceOpt
                     """)
                     .param("tenantId", tenantId)
                     .query((rs, rowNum) -> new ProjectRegionOption(
-                            rs.getString("region_code"), rs.getInt("project_count")))
+                            rs.getString("region_code"), rs.getString("region_code"), rs.getInt("project_count")))
                     .list();
         }
         return jdbc.sql("""
@@ -85,7 +85,7 @@ final class JdbcProjectReferenceOptionsRepository implements ProjectReferenceOpt
                 .param("tenantId", tenantId)
                 .param("projectIds", projectIds)
                 .query((rs, rowNum) -> new ProjectRegionOption(
-                        rs.getString("region_code"), rs.getInt("project_count")))
+                        rs.getString("region_code"), rs.getString("region_code"), rs.getInt("project_count")))
                 .list();
     }
 }

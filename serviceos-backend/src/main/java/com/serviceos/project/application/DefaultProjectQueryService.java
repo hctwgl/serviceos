@@ -7,13 +7,17 @@ import com.serviceos.authorization.api.ProjectScopeAuthorizationService;
 import com.serviceos.configuration.api.ProjectFulfillmentProfileService;
 import com.serviceos.configuration.api.ProjectFulfillmentSchemeCount;
 import com.serviceos.identity.api.CurrentPrincipal;
+import com.serviceos.project.api.ProjectClientDirectoryPage;
+import com.serviceos.project.api.ProjectClientOption;
 import com.serviceos.project.api.ProjectDetail;
 import com.serviceos.project.api.ProjectPage;
 import com.serviceos.project.api.ProjectQuery;
 import com.serviceos.project.api.ProjectQueryService;
 import com.serviceos.project.api.ProjectReferenceOptions;
+import com.serviceos.project.api.ProjectRegionOption;
 import com.serviceos.project.api.ProjectScopeRelationRevisionPage;
 import com.serviceos.project.api.ProjectView;
+import com.serviceos.project.api.RegionCatalogPage;
 import com.serviceos.project.domain.Project;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
@@ -49,6 +53,7 @@ final class DefaultProjectQueryService implements ProjectQueryService {
     private final ProjectScopeAuthorizationService projectScopes;
     private final ProjectFulfillmentProfileService fulfillmentProfiles;
     private final ProjectReferenceOptionsRepository referenceOptions;
+    private final ProjectCatalogRepository catalogs;
     private final Clock clock;
 
     DefaultProjectQueryService(
@@ -58,6 +63,7 @@ final class DefaultProjectQueryService implements ProjectQueryService {
             ProjectScopeAuthorizationService projectScopes,
             ProjectFulfillmentProfileService fulfillmentProfiles,
             ProjectReferenceOptionsRepository referenceOptions,
+            ProjectCatalogRepository catalogs,
             Clock clock
     ) {
         this.projects = projects;
@@ -66,6 +72,7 @@ final class DefaultProjectQueryService implements ProjectQueryService {
         this.projectScopes = projectScopes;
         this.fulfillmentProfiles = fulfillmentProfiles;
         this.referenceOptions = referenceOptions;
+        this.catalogs = catalogs;
         this.clock = clock;
     }
 
@@ -122,10 +129,60 @@ final class DefaultProjectQueryService implements ProjectQueryService {
     @Transactional(readOnly = true)
     public ProjectReferenceOptions referenceOptions(CurrentPrincipal principal, String correlationId) {
         AuthorizedProjectScope scope = projectScopes.require(principal, READ, "Project", correlationId);
+        List<ProjectClientOption> clients = referenceOptions.listClients(
+                principal.tenantId(), scope.tenantWide(), scope.projectIds());
+        List<ProjectRegionOption> regions = referenceOptions.listRegions(
+                principal.tenantId(), scope.tenantWide(), scope.projectIds());
+        Map<String, String> clientNames = catalogs.findClientDisplayNames(
+                principal.tenantId(),
+                clients.stream().map(ProjectClientOption::clientId).toList());
+        Map<String, String> regionNames = catalogs.findRegionNames(
+                regions.stream().map(ProjectRegionOption::regionCode).toList());
         return new ProjectReferenceOptions(
-                referenceOptions.listClients(principal.tenantId(), scope.tenantWide(), scope.projectIds()),
-                referenceOptions.listRegions(principal.tenantId(), scope.tenantWide(), scope.projectIds()),
+                clients.stream()
+                        .map(item -> new ProjectClientOption(
+                                item.clientId(),
+                                clientNames.getOrDefault(item.clientId(), item.displayName()),
+                                item.projectCount()))
+                        .toList(),
+                regions.stream()
+                        .map(item -> new ProjectRegionOption(
+                                item.regionCode(),
+                                regionNames.getOrDefault(item.regionCode(), item.regionName()),
+                                item.projectCount()))
+                        .toList(),
                 clock.instant());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ProjectClientDirectoryPage listClientDirectory(CurrentPrincipal principal, String correlationId) {
+        projectScopes.require(principal, READ, "Project", correlationId);
+        return new ProjectClientDirectoryPage(
+                catalogs.listClients(principal.tenantId(), true), clock.instant());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public RegionCatalogPage listRegionCatalog(
+            CurrentPrincipal principal,
+            String correlationId,
+            String parentCode,
+            String query,
+            String level,
+            Integer limit
+    ) {
+        projectScopes.require(principal, READ, "Project", correlationId);
+        int effective = limit == null ? 100 : limit;
+        if (effective < 1 || effective > 200) {
+            throw new IllegalArgumentException("limit must be between 1 and 200");
+        }
+        if (level != null && !level.isBlank()
+                && !"PROVINCE".equals(level) && !"CITY".equals(level) && !"DISTRICT".equals(level)) {
+            throw new IllegalArgumentException("level is invalid");
+        }
+        return new RegionCatalogPage(
+                catalogs.listRegions(parentCode, query, level, effective), clock.instant());
     }
 
     @Override

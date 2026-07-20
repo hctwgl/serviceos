@@ -204,8 +204,8 @@ class ProjectControllerSecurityTest {
                 "admin-web", Set.of("project.read"));
         when(principals.current()).thenReturn(principal);
         when(queries.referenceOptions(eq(principal), any())).thenReturn(new ProjectReferenceOptions(
-                java.util.List.of(new ProjectClientOption("client-byd", 1)),
-                java.util.List.of(new ProjectRegionOption("CN-3702", 1)),
+                java.util.List.of(new ProjectClientOption("client-byd", "比亚迪", 1)),
+                java.util.List.of(new ProjectRegionOption("CN-3702", "青岛市", 1)),
                 Instant.parse("2026-07-20T00:00:00Z")));
 
         mvc.perform(get("/api/v1/projects/reference-options")

@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { Select } from 'ant-design-vue'
+import { listRegionCatalog, type RegionCatalogItem } from '../api/projectCatalog'
 import { getProjectReferenceOptions, type ProjectRegionOption } from '../api/projectReferenceOptions'
 import { safeAccessDeniedMessage } from '../api/client'
 
-const props = defineProps<{
+defineProps<{
   modelValue: string[]
   disabled?: boolean
 }>()
@@ -15,23 +16,40 @@ const emit = defineEmits<{
 
 const loading = ref(false)
 const error = ref<string | null>(null)
-const regions = ref<ProjectRegionOption[]>([])
+const catalog = ref<RegionCatalogItem[]>([])
+const usage = ref<ProjectRegionOption[]>([])
 
-const options = computed(() =>
-  regions.value.map((item) => ({
+const options = computed(() => {
+  const usageMap = new Map(usage.value.map((item) => [item.regionCode, item.projectCount]))
+  const fromCatalog = catalog.value.map((item) => ({
     value: item.regionCode,
-    label: `${item.regionCode} · ${item.projectCount} 个项目使用`,
-  })),
-)
+    label: `${item.regionName}（${item.regionCode}）${
+      usageMap.has(item.regionCode) ? ` · ${usageMap.get(item.regionCode)} 个项目` : ''
+    }`,
+  }))
+  const known = new Set(fromCatalog.map((item) => item.value))
+  const fromUsageOnly = usage.value
+    .filter((item) => !known.has(item.regionCode))
+    .map((item) => ({
+      value: item.regionCode,
+      label: `${item.regionName}（${item.regionCode}）· ${item.projectCount} 个项目`,
+    }))
+  return [...fromCatalog, ...fromUsageOnly]
+})
 
 async function load() {
   loading.value = true
   error.value = null
   try {
-    const page = await getProjectReferenceOptions()
-    regions.value = page.regions
+    const [regions, refs] = await Promise.all([
+      listRegionCatalog({ parentCode: '*', limit: 200 }),
+      getProjectReferenceOptions(),
+    ])
+    catalog.value = regions.items
+    usage.value = refs.regions
   } catch (err) {
-    regions.value = []
+    catalog.value = []
+    usage.value = []
     error.value = safeAccessDeniedMessage(err)
   } finally {
     loading.value = false
@@ -53,7 +71,7 @@ onMounted(() => {
       style="width: 100%"
       :disabled="disabled"
       :loading="loading"
-      placeholder="选择或输入区域编码"
+      placeholder="搜索并选择服务区域"
       aria-label="服务区域编码"
       :options="options"
       :filter-option="(input, option) => String(option?.label ?? '').includes(input)"
@@ -61,7 +79,7 @@ onMounted(() => {
     />
     <p v-if="error" class="error">{{ error }}</p>
     <p v-else class="hint">
-      选项来自已授权项目生效 REGION；完整行政区名称树仍属 UI_DATA_GAP，可继续手工输入编码。
+      选项来自行政区名称目录；可按名称/编码搜索。未收录编码仍可通过项目范围修订录入。
     </p>
   </div>
 </template>
