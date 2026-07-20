@@ -18,7 +18,7 @@ lastUpdated: 2026-07-20
 | M369-07 | BUSINESS 无/错 `calendarRef` | 资产 schema 或 Bundle 校验失败关闭 | `ConfigurationAssetSchemaValidatorTest` |
 | M369-08 | ELAPSED 携带 `calendarRef` | 发布失败关闭 | Schema validator |
 | M369-09 | 无效时区/窗 end≤start | CALENDAR 发布失败关闭 | Schema validator |
-| M369-10 | OpenAPI 1.0.60 + `sla.started@v2` | 契约兼容与探针通过 | contracts |
+| M369-10 | OpenAPI 仍 1.0.59（不放宽 clockMode const）+ `sla.started@v2` | 契约兼容与探针通过 | contracts |
 | M369-11 | ArchitectureTest | 模块边界保持 | ArchitectureTest |
 
 ## 明确不验收

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.60
+  version: 1.0.59
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -5386,7 +5386,7 @@ paths:
       parameters:
         - name: assetType
           in: query
-          schema: { type: string, enum: [WORKFLOW, FORM, EVIDENCE, SLA, RULE, DISPATCH, NOTIFICATION, ASSIGNEE_POLICY, INTEGRATION, PRICING, CALENDAR], default: WORKFLOW }
+          schema: { type: string, enum: [WORKFLOW, FORM, EVIDENCE, SLA, RULE, DISPATCH, NOTIFICATION, ASSIGNEE_POLICY, INTEGRATION, PRICING], default: WORKFLOW }
         - $ref: '#/components/parameters/CorrelationId'
       responses:
         '200':
@@ -6051,7 +6051,7 @@ components:
       additionalProperties: false
       required: [assetType, assetKey, intendedSemanticVersion, schemaVersion, definitionJson]
       properties:
-        assetType: { type: string, enum: [WORKFLOW, FORM, EVIDENCE, SLA, RULE, DISPATCH, NOTIFICATION, ASSIGNEE_POLICY, INTEGRATION, PRICING, CALENDAR] }
+        assetType: { type: string, enum: [WORKFLOW, FORM, EVIDENCE, SLA, RULE, DISPATCH, NOTIFICATION, ASSIGNEE_POLICY, INTEGRATION, PRICING] }
         assetKey: { type: string, minLength: 1, maxLength: 128 }
         intendedSemanticVersion: { type: string, minLength: 1, maxLength: 64 }
         schemaVersion: { type: string, minLength: 1, maxLength: 64 }
@@ -6170,7 +6170,7 @@ components:
         sourceNodeId: { type: [string, 'null'] }
         expectedAssetType:
           type: string
-          enum: [WORKFLOW, FORM, EVIDENCE, RULE, SLA, DISPATCH, PRICING, INTEGRATION, ASSIGNEE_POLICY, NOTIFICATION, CALENDAR]
+          enum: [WORKFLOW, FORM, EVIDENCE, RULE, SLA, DISPATCH, PRICING, INTEGRATION, ASSIGNEE_POLICY, NOTIFICATION]
         status: { type: string, enum: [SATISFIED, MISSING, UNKNOWN_TYPE] }
         satisfiedVersionId: { type: [string, 'null'], format: uuid }
         detail: { type: string }
@@ -6286,7 +6286,7 @@ components:
                  createdBy, updatedBy, createdAt, updatedAt]
       properties:
         draftId: { type: string, format: uuid }
-        assetType: { type: string, enum: [WORKFLOW, FORM, EVIDENCE, SLA, RULE, DISPATCH, NOTIFICATION, ASSIGNEE_POLICY, INTEGRATION, PRICING, CALENDAR] }
+        assetType: { type: string, enum: [WORKFLOW, FORM, EVIDENCE, SLA, RULE, DISPATCH, NOTIFICATION, ASSIGNEE_POLICY, INTEGRATION, PRICING] }
         assetKey: { type: string }
         intendedSemanticVersion: { type: string }
         schemaVersion: { type: string }
@@ -9151,7 +9151,7 @@ components:
         policyVersionId: { type: string, format: uuid }
         policySemanticVersion: { type: string, minLength: 1, maxLength: 64 }
         policyContentDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
-        clockMode: { enum: [ELAPSED, BUSINESS] }
+        clockMode: { const: ELAPSED }
         targetDurationSeconds: { type: integer, format: int64, minimum: 1, maximum: 31536000 }
         startedAt: { type: string, format: date-time }
         deadlineAt: { type: string, format: date-time }

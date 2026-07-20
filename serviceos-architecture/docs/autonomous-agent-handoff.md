@@ -11,7 +11,7 @@ lastUpdated: 2026-07-20
 - 进行中 Draft PR：M369 BUSINESS 日历 SLA 截止时间（**Implemented**）
 - 分支：`cursor/m369-business-calendar-sla-6a78`
   （base：`cursor/m368-onbehalf-network-web-capability-6a78`）
-- 工程基线：**M369**（OpenAPI 1.0.60 / Flyway 135；ADR-090 Accepted：D1-R/D2-R/D4-R）
+- 工程基线：**M369**（OpenAPI 仍 1.0.59 / Flyway 135；ADR-090 Accepted：D1-R/D2-R/D4-R）
 
 ## 已接受并实现（本切片）
 

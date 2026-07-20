@@ -576,11 +576,18 @@ class SlaClockPostgresIT {
                 List.of(workflowVersionId, slaVersionId)));
     }
 
-    /** M369：同一项目发布含 CALENDAR 的 BUSINESS Bundle；替换 setUp 默认 ELAPSED Bundle。 */
+    /**
+     * M369：用 TRUNCATE 清掉 setUp 的 ELAPSED Bundle（绕过 published 不可变触发器），
+     * 再发布含 CALENDAR 的 BUSINESS Bundle。
+     */
     private void publishBusinessBundle() {
+        jdbc.sql("""
+                TRUNCATE TABLE cfg_configuration_bundle_item, cfg_configuration_bundle,
+                    cfg_configuration_asset_version CASCADE
+                """).update();
         workflowDigest = Sha256.digest(workflowDefinition());
         workflowVersionId = configurations.publishAsset(new PublishConfigurationAssetCommand(
-                TENANT, ConfigurationAssetType.WORKFLOW, "survey.workflow", "1.0.1", "1.0.0",
+                TENANT, ConfigurationAssetType.WORKFLOW, "survey.workflow", "1.0.0", "1.0.0",
                 workflowDefinition(), workflowDigest)).versionId();
         String calendar = """
                 {"calendarKey":"cn.workdays.sample","version":"1.0.0","timeZone":"Asia/Shanghai",
@@ -596,13 +603,13 @@ class SlaClockPostgresIT {
                 TENANT, ConfigurationAssetType.CALENDAR, "cn.workdays.sample", "1.0.0", "1.0.0",
                 calendar, Sha256.digest(calendar))).versionId();
         String sla = """
-                {"policyKey":"survey.response.sla","version":"1.0.1","subjectType":"TASK",
+                {"policyKey":"survey.response.sla","version":"1.0.0","subjectType":"TASK",
                  "taskTypes":["SURVEY_RESPONSE"],"startEvent":"TASK_CREATED",
                  "stopEvent":"TASK_COMPLETED","clockMode":"BUSINESS","targetDurationSeconds":7200,
                  "calendarRef":"cn.workdays.sample"}
                 """.trim();
         UUID slaVersionId = configurations.publishAsset(new PublishConfigurationAssetCommand(
-                TENANT, ConfigurationAssetType.SLA, "survey.response.sla", "1.0.1", "1.0.0",
+                TENANT, ConfigurationAssetType.SLA, "survey.response.sla", "1.0.0", "1.0.0",
                 sla, Sha256.digest(sla))).versionId();
         bundle = configurations.publishBundle(new PublishConfigurationBundleCommand(
                 TENANT, projectId, "SLA-IT-BUSINESS-BUNDLE", "1.0.0", "BYD_OCEAN",

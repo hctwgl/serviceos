@@ -4,7 +4,7 @@ status: Implemented
 milestone: M369
 lastUpdated: 2026-07-20
 relatedMilestones: [M61, M62, M75]
-openapiVersion: "1.0.60"
+openapiVersion: "1.0.59"
 flywayVersion: "135"
 ---
 
@@ -30,7 +30,7 @@ flywayVersion: "135"
 4. `BusinessCalendar` / `BusinessCalendarDeadlineCalculator`：跳过周末/节假日，调休日复用周一窗；
 5. `DefaultSlaClockService`：start 锁定日历版本并预计算 deadline；stop 对 BUSINESS 记业务秒；
    发出 `sla.started@v2`（含日历冻结字段；ELAPSED 日历字段为 null）；
-6. OpenAPI **1.0.60**：`SlaInstanceItem.clockMode` 枚举 + 配置 `assetType` 含 `CALENDAR`；
+6. OpenAPI 仍 **1.0.59**：`clockMode` 保持 `const: ELAPSED`（oasdiff 禁止原地去掉 const）；BUSINESS/CALENDAR 的 HTTP 枚举扩展留待显式主版本或已批准的破坏性演进；运行时与 `sla.started@v2` 已表达 BUSINESS；
 7. 工单时间线消费 `sla.started@v2`；设计器可起草 `CALENDAR`；
 8. 单元测试 + `SlaClockPostgresIT` BUSINESS 路径 + 契约探针。
 
@@ -40,6 +40,7 @@ flywayVersion: "135"
 - 外部节假日 API、租户级独立日历目录；
 - WorkOrder/Dispatch 等非 Task subject；
 - SLA 查询 DTO 暴露日历冻结字段；
+- OpenAPI `clockMode`/`assetType` 枚举放宽（需新主版本或已批准破坏性演进；oasdiff 阻断原地去 const）；
 - 结算落账 / 考核处罚金额。
 
 ## 验证
@@ -48,6 +49,6 @@ flywayVersion: "135"
 bash scripts/agent-verify.sh test BusinessCalendarDeadlineCalculatorTest,ConfigurationAssetSchemaValidatorTest
 bash scripts/agent-verify.sh it SlaClockPostgresIT
 bash scripts/agent-verify.sh arch
-bash scripts/agent-verify.sh contracts
+bash scripts/agent-verify.sh contracts  # OpenAPI 相对 master 无破坏；事件新增 v2
 bash scripts/agent-verify.sh docs
 ```
