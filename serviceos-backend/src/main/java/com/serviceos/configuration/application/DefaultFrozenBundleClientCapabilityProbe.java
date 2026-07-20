@@ -4,13 +4,17 @@ import com.serviceos.configuration.api.ClientCapabilityRuntimeGate;
 import com.serviceos.configuration.api.ConfigurationAssetDefinition;
 import com.serviceos.configuration.api.ConfigurationAssetType;
 import com.serviceos.configuration.api.ConfigurationService;
+import com.serviceos.configuration.api.EffectiveDispatchClientKinds;
 import com.serviceos.configuration.api.FrozenBundleClientCapabilityProbe;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -90,6 +94,46 @@ final class DefaultFrozenBundleClientCapabilityProbe implements FrozenBundleClie
             }
             throw problem;
         }
+    }
+
+    @Override
+    public EffectiveDispatchClientKinds resolveDispatchTargetClientKinds(
+            String tenantId,
+            UUID configurationBundleId,
+            String configurationBundleDigest,
+            String formAssetKey
+    ) {
+        if (configurationBundleId == null
+                || configurationBundleDigest == null
+                || configurationBundleDigest.isBlank()) {
+            return EffectiveDispatchClientKinds.unfiltered();
+        }
+        List<List<String>> directed = new ArrayList<>();
+        if (formAssetKey != null && !formAssetKey.isBlank()) {
+            configurations.listBundleAssets(
+                            tenantId, configurationBundleId, configurationBundleDigest,
+                            ConfigurationAssetType.FORM)
+                    .stream()
+                    .filter(asset -> formAssetKey.equals(asset.assetKey()))
+                    .map(ConfigurationAssetDefinition::supportedClientKinds)
+                    .filter(kinds -> kinds != null && !kinds.isEmpty())
+                    .forEach(directed::add);
+        }
+        configurations.listBundleAssets(
+                        tenantId, configurationBundleId, configurationBundleDigest,
+                        ConfigurationAssetType.EVIDENCE)
+                .stream()
+                .map(ConfigurationAssetDefinition::supportedClientKinds)
+                .filter(kinds -> kinds != null && !kinds.isEmpty())
+                .forEach(directed::add);
+        if (directed.isEmpty()) {
+            return EffectiveDispatchClientKinds.unfiltered();
+        }
+        Set<String> intersection = new LinkedHashSet<>(directed.getFirst());
+        for (int i = 1; i < directed.size(); i++) {
+            intersection.retainAll(directed.get(i));
+        }
+        return EffectiveDispatchClientKinds.directed(List.copyOf(intersection));
     }
 
     private static boolean enforceable(String clientKind) {

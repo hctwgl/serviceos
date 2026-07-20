@@ -37,6 +37,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -224,10 +225,12 @@ final class DefaultNetworkCommandService implements NetworkCommandService {
     @Override
     @Transactional
     public TechnicianProfileView createTechnicianProfile(
-            CurrentPrincipal actor, CommandMetadata metadata, UUID principalId, String displayName
+            CurrentPrincipal actor, CommandMetadata metadata, UUID principalId, String displayName,
+            List<String> supportedClientKinds
     ) {
         displayName = requireText(displayName, "displayName", 200);
-        var input = new CreateTechnicianInput(principalId, displayName);
+        List<String> kinds = TechnicianProfile.normalizeSupportedClientKinds(supportedClientKinds);
+        var input = new CreateTechnicianInput(principalId, displayName, kinds);
         CommandExecution execution = begin(actor, metadata, "network.createTechnician", "network.manageTechnician",
                 principalId.toString(), input);
         if (execution.replay()) {
@@ -241,11 +244,40 @@ final class DefaultNetworkCommandService implements NetworkCommandService {
         Instant now = clock.instant();
         UUID profileId = UUID.randomUUID();
         TechnicianProfile profile = new TechnicianProfile(profileId, actor.tenantId(), principalId,
-                displayName, TechnicianProfile.Status.ACTIVE, 1, now, now, null, null, null);
+                displayName, TechnicianProfile.Status.ACTIVE, kinds, 1, now, now, null, null, null);
         directory.insertTechnicianProfile(profile);
         complete(actor, metadata, execution, profileId, 1, "TECHNICIAN_CREATED", "TechnicianProfile",
                 "network.manageTechnician", null, now);
         return profile.toView();
+    }
+
+    @Override
+    @Transactional
+    public TechnicianProfileView declareTechnicianSupportedClientKinds(
+            CurrentPrincipal actor, CommandMetadata metadata,
+            UUID profileId, long expectedVersion, List<String> supportedClientKinds
+    ) {
+        requireExpectedVersion(expectedVersion);
+        // null = 清除声明；非空 = 规范化子集。空列表非法（与资产定向语义一致）。
+        List<String> kinds = supportedClientKinds == null
+                ? null
+                : TechnicianProfile.normalizeSupportedClientKinds(supportedClientKinds);
+        var input = new DeclareTechnicianKindsInput(profileId, expectedVersion, kinds);
+        CommandExecution execution = begin(actor, metadata, "network.declareTechnicianClientKinds",
+                "network.manageTechnician", profileId.toString(), input);
+        if (execution.replay()) {
+            return requireTechnician(actor.tenantId(), profileId).toView();
+        }
+        lockedTechnician(actor.tenantId(), profileId, expectedVersion);
+        Instant now = clock.instant();
+        if (!directory.declareTechnicianSupportedClientKinds(
+                actor.tenantId(), profileId, expectedVersion, kinds, now)) {
+            throw versionConflict();
+        }
+        complete(actor, metadata, execution, profileId, expectedVersion + 1,
+                "TECHNICIAN_CLIENT_KINDS_DECLARED", "TechnicianProfile",
+                "network.manageTechnician", null, now);
+        return requireTechnician(actor.tenantId(), profileId).toView();
     }
 
     @Override
@@ -628,7 +660,8 @@ final class DefaultNetworkCommandService implements NetworkCommandService {
     private record InviteMemberInput(UUID networkId, Long expectedNetworkVersion, UUID principalId, String role, Instant validFrom) {}
     private record TerminateMemberInput(UUID membershipId, long expectedVersion, String reason) {}
     private record DeactivateNetworkInput(UUID networkId, long expectedVersion, String reason) {}
-    private record CreateTechnicianInput(UUID principalId, String displayName) {}
+    private record CreateTechnicianInput(UUID principalId, String displayName, List<String> supportedClientKinds) {}
+    private record DeclareTechnicianKindsInput(UUID profileId, long expectedVersion, List<String> supportedClientKinds) {}
     private record DisableTechnicianInput(UUID profileId, long expectedVersion, String reason) {}
     private record EnableTechnicianInput(UUID profileId, long expectedVersion) {}
     private record CreateTechMembershipInput(UUID networkId, UUID technicianProfileId, Instant validFrom) {}

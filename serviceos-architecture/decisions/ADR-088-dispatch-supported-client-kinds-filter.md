@@ -1,6 +1,6 @@
 ---
 title: ADR-088：派单级 supportedClientKinds 硬过滤
-status: Proposed
+status: Accepted
 date: 2026-07-20
 owner: Product Architecture
 reviewers:
@@ -14,14 +14,21 @@ related_docs:
   - architecture/372-m359-portal-header-client-capability-reject.md
   - architecture/345-m332-dispatch-technician-auto-assign.md
   - product/08-technician-multi-client-strategy.md
+accepted:
+  - A1-R
+  - A2-R
+  - A3-R
+  - A4-R
+  - A5-R
+acceptedAt: 2026-07-20
 ---
 
 # ADR-088：派单级 supportedClientKinds 硬过滤
 
 ## 1. 状态
 
-**Proposed（待负责人接受）**。在本 ADR 被标为 `Accepted` 且 A1～A5 全部勾选前，
-**禁止**编写改变派单候选/指派语义的生产代码，也不得把 `latestMilestone` 推进到 M366。
+**Accepted**（负责人确认：`A1-R, A2-R, A3-R, A4-R, A5-R`）。
+实现切片为 **M366**；Manual/Network assign 硬拒绝（A1-B）不在首切片范围。
 
 背景：M358 已实现 FORM/EVIDENCE 资产级 `supportedClientKinds` 定向发布与运行时目标外拒单；
 M359 覆盖 Feed/详情头预检。派单（自动 TECHNICIAN 池、人工/网点指派）**仍不**读取

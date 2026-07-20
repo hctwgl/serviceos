@@ -1,6 +1,7 @@
 package com.serviceos.network.api;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -16,6 +17,10 @@ public record NetworkPortalTechnicianView(
         String membershipStatus,
         Instant validFrom,
         Instant validTo,
-        long membershipVersion
+        long membershipVersion,
+        List<String> supportedClientKinds
 ) {
+    public NetworkPortalTechnicianView {
+        supportedClientKinds = supportedClientKinds == null ? null : List.copyOf(supportedClientKinds);
+    }
 }

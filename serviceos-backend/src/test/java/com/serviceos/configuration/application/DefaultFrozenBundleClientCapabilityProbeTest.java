@@ -44,6 +44,42 @@ class DefaultFrozenBundleClientCapabilityProbeTest {
     }
 
     @Test
+    void resolveDispatchTargetIntersectsDirectedFormAndEvidence() {
+        ConfigurationAssetDefinition form = new ConfigurationAssetDefinition(
+                UUID.randomUUID(), ConfigurationAssetType.FORM, "survey", "1.0.0", "1.0.0",
+                "{\"formKey\":\"survey\"}", "b".repeat(64),
+                List.of("TECHNICIAN_WEB", "TECHNICIAN_IOS"));
+        ConfigurationAssetDefinition evidence = new ConfigurationAssetDefinition(
+                UUID.randomUUID(), ConfigurationAssetType.EVIDENCE, "ev", "1.0.0", "1.0.0",
+                "{\"templateKey\":\"ev\"}", "c".repeat(64), List.of("TECHNICIAN_WEB"));
+        when(configurations.listBundleAssets(eq("tenant"), eq(bundleId), any(), eq(ConfigurationAssetType.FORM)))
+                .thenReturn(List.of(form));
+        when(configurations.listBundleAssets(eq("tenant"), eq(bundleId), any(), eq(ConfigurationAssetType.EVIDENCE)))
+                .thenReturn(List.of(evidence));
+
+        var target = probe.resolveDispatchTargetClientKinds(
+                "tenant", bundleId, "a".repeat(64), "survey");
+        assertThat(target.applyFilter()).isTrue();
+        assertThat(target.targetKinds()).containsExactly("TECHNICIAN_WEB");
+    }
+
+    @Test
+    void resolveDispatchTargetSkipsWhenAllAssetsUndirected() {
+        ConfigurationAssetDefinition form = new ConfigurationAssetDefinition(
+                UUID.randomUUID(), ConfigurationAssetType.FORM, "survey", "1.0.0", "1.0.0",
+                "{\"formKey\":\"survey\"}", "b".repeat(64), List.of());
+        when(configurations.listBundleAssets(eq("tenant"), eq(bundleId), any(), eq(ConfigurationAssetType.FORM)))
+                .thenReturn(List.of(form));
+        when(configurations.listBundleAssets(eq("tenant"), eq(bundleId), any(), eq(ConfigurationAssetType.EVIDENCE)))
+                .thenReturn(List.of());
+
+        var target = probe.resolveDispatchTargetClientKinds(
+                "tenant", bundleId, "a".repeat(64), "survey");
+        assertThat(target.applyFilter()).isFalse();
+        assertThat(target.targetKinds()).isEmpty();
+    }
+
+    @Test
     void iosRejectsWhenRuntimeGateDeniesForm() {
         ConfigurationAssetDefinition form = new ConfigurationAssetDefinition(
                 UUID.randomUUID(), ConfigurationAssetType.FORM, "survey", "1.0.0", "1.0.0",

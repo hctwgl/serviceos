@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.57
+  version: 1.0.58
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -685,6 +685,35 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+  /technician-profiles/{profileId}:declare-supported-client-kinds:
+    post:
+      operationId: declareTechnicianSupportedClientKinds
+      summary: 声明或清除师傅履约端能力
+      description: |
+        M366 / ADR-088 A2-R：更新师傅档案 `supportedClientKinds` 声明，供自动 TECHNICIAN 派单硬过滤。
+        需要 network.manageTechnician；请求体 `supportedClientKinds` 为 null 表示清除为未声明。
+      parameters:
+        - $ref: '#/components/parameters/TechnicianProfileId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeclareTechnicianSupportedClientKindsRequest' }
+      responses:
+        '200':
+          description: 已更新声明
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/TechnicianProfile' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
   /technician-profiles/{profileId}:disable:
     post:
       operationId: disableTechnicianProfile
@@ -7645,13 +7674,21 @@ components:
     TechnicianProfile:
       type: object
       additionalProperties: false
-      required: [id, principalId, displayName, status, version, createdAt, updatedAt,
+      required: [id, principalId, displayName, status, supportedClientKinds, version, createdAt, updatedAt,
         disabledAt, disabledBy, disabledReason]
       properties:
         id: { type: string, format: uuid }
         principalId: { type: string, format: uuid }
         displayName: { type: string, minLength: 1, maxLength: 200 }
         status: { enum: [ACTIVE, DISABLED] }
+        supportedClientKinds:
+          type: [array, 'null']
+          description: |
+            M366 / ADR-088 A2-R：师傅履约端声明。null=未声明（定向发布任务自动派单剔除）；
+            非空=可被派往的 TECHNICIAN_WEB / TECHNICIAN_IOS 子集。
+          minItems: 1
+          uniqueItems: true
+          items: { type: string, enum: [TECHNICIAN_WEB, TECHNICIAN_IOS] }
         version: { type: integer, format: int64, minimum: 1 }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
@@ -7971,6 +8008,25 @@ components:
       properties:
         principalId: { type: string, format: uuid }
         displayName: { type: string, minLength: 1, maxLength: 200 }
+        supportedClientKinds:
+          type: [array, 'null']
+          description: |
+            可选创建时声明履约端；省略或 null 表示未声明。
+          minItems: 1
+          uniqueItems: true
+          items: { type: string, enum: [TECHNICIAN_WEB, TECHNICIAN_IOS] }
+    DeclareTechnicianSupportedClientKindsRequest:
+      type: object
+      additionalProperties: false
+      required: [supportedClientKinds]
+      properties:
+        supportedClientKinds:
+          type: [array, 'null']
+          description: |
+            null 清除为未声明；非空覆盖声明子集。空数组非法。
+          minItems: 1
+          uniqueItems: true
+          items: { type: string, enum: [TECHNICIAN_WEB, TECHNICIAN_IOS] }
     CreateNetworkTechnicianMembershipRequest:
       type: object
       additionalProperties: false

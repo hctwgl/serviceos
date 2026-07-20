@@ -1,5 +1,7 @@
 package com.serviceos.network.infrastructure;
 
+import com.fasterxml.jackson.core.JacksonException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.serviceos.network.api.ClearanceWorkItemView;
 import com.serviceos.network.application.NetworkDirectoryRepository;
 import com.serviceos.network.domain.NetworkMembership;
@@ -48,6 +50,7 @@ final class JdbcNetworkDirectoryRepository implements NetworkDirectoryRepository
             """;
     private static final String TECHNICIAN_SELECT = """
             SELECT technician_profile_id, tenant_id, principal_id, display_name, profile_status,
+                   supported_client_kinds::text AS supported_client_kinds,
                    aggregate_version, created_at, updated_at, disabled_at, disabled_by, disabled_reason
               FROM net_technician_profile
             """;
@@ -65,9 +68,11 @@ final class JdbcNetworkDirectoryRepository implements NetworkDirectoryRepository
             """;
 
     private final JdbcClient jdbc;
+    private final ObjectMapper objectMapper;
 
-    JdbcNetworkDirectoryRepository(JdbcClient jdbc) {
+    JdbcNetworkDirectoryRepository(JdbcClient jdbc, ObjectMapper objectMapper) {
         this.jdbc = jdbc;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -282,19 +287,46 @@ final class JdbcNetworkDirectoryRepository implements NetworkDirectoryRepository
             jdbc.sql("""
                     INSERT INTO net_technician_profile (
                         technician_profile_id, tenant_id, principal_id, display_name, profile_status,
-                        aggregate_version, created_at, updated_at
+                        supported_client_kinds, aggregate_version, created_at, updated_at
                     ) VALUES (
-                        :id, :tenant, :principalId, :displayName, :status, :version, :createdAt, :updatedAt
+                        :id, :tenant, :principalId, :displayName, :status,
+                        CAST(:supportedClientKinds AS jsonb), :version, :createdAt, :updatedAt
                     )
                     """)
                     .param("id", profile.id()).param("tenant", profile.tenantId())
                     .param("principalId", profile.principalId()).param("displayName", profile.displayName())
-                    .param("status", profile.status().name()).param("version", profile.version())
+                    .param("status", profile.status().name())
+                    .param("supportedClientKinds", writeKindsJson(profile.supportedClientKinds()))
+                    .param("version", profile.version())
                     .param("createdAt", dbTime(profile.createdAt())).param("updatedAt", dbTime(profile.updatedAt()))
                     .update();
         } catch (DuplicateKeyException exception) {
             throw new BusinessProblem(ProblemCode.NETWORK_TECHNICIAN_CONFLICT, "该主体已有师傅档案");
         }
+    }
+
+    @Override
+    public boolean declareTechnicianSupportedClientKinds(
+            String tenantId,
+            UUID profileId,
+            long expectedVersion,
+            List<String> supportedClientKinds,
+            Instant now
+    ) {
+        return jdbc.sql("""
+                UPDATE net_technician_profile
+                   SET supported_client_kinds = CAST(:supportedClientKinds AS jsonb),
+                       aggregate_version = aggregate_version + 1,
+                       updated_at = :now
+                 WHERE tenant_id = :tenant AND technician_profile_id = :id
+                   AND aggregate_version = :expected
+                """)
+                .param("supportedClientKinds", writeKindsJson(supportedClientKinds))
+                .param("now", dbTime(now))
+                .param("tenant", tenantId)
+                .param("id", profileId)
+                .param("expected", expectedVersion)
+                .update() == 1;
     }
 
     @Override
@@ -615,12 +647,37 @@ final class JdbcNetworkDirectoryRepository implements NetworkDirectoryRepository
                 rs.getObject("principal_id", UUID.class),
                 rs.getString("display_name"),
                 TechnicianProfile.Status.valueOf(rs.getString("profile_status")),
+                readKinds(rs.getString("supported_client_kinds")),
                 rs.getLong("aggregate_version"),
                 toInstant(rs.getTimestamp("created_at")),
                 toInstant(rs.getTimestamp("updated_at")),
                 toInstant(rs.getTimestamp("disabled_at")),
                 rs.getString("disabled_by"),
                 rs.getString("disabled_reason"));
+    }
+
+    private List<String> readKinds(String json) {
+        if (json == null || json.isBlank() || "null".equals(json)) {
+            return null;
+        }
+        try {
+            List<String> kinds = objectMapper.readValue(json,
+                    objectMapper.getTypeFactory().constructCollectionType(List.class, String.class));
+            return kinds == null || kinds.isEmpty() ? null : List.copyOf(kinds);
+        } catch (JacksonException exception) {
+            throw new IllegalStateException("supported_client_kinds 无法解码", exception);
+        }
+    }
+
+    private String writeKindsJson(List<String> kinds) {
+        if (kinds == null) {
+            return null;
+        }
+        try {
+            return objectMapper.writeValueAsString(kinds);
+        } catch (JacksonException exception) {
+            throw new IllegalStateException("supported_client_kinds 无法编码", exception);
+        }
     }
 
     private NetworkTechnicianMembership mapTechMembership(ResultSet rs, int rowNum) throws SQLException {

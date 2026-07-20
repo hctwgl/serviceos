@@ -31,4 +31,15 @@ public interface FrozenBundleClientCapabilityProbe {
             UUID configurationBundleId,
             String configurationBundleDigest,
             String formAssetKey);
+
+    /**
+     * M366 / ADR-088 A4-R：解析派单级有效目标客户端（FORM∩EVIDENCE 定向交集）。
+     *
+     * @param formAssetKey Task.formRef；无表单时传 null（仅看 EVIDENCE）
+     */
+    EffectiveDispatchClientKinds resolveDispatchTargetClientKinds(
+            String tenantId,
+            UUID configurationBundleId,
+            String configurationBundleDigest,
+            String formAssetKey);
 }
