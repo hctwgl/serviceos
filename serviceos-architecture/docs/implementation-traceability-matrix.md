@@ -480,4 +480,5 @@ Feature gate/authority: if applicable
 | M389 | 工单详情履约工作区：BusinessProgress/AllowedActionBar/当前任务卡/右轨 | 400-m389-* + 383-m389-*；Playwright 截图 | PII 读模型；资料缩略图；人工视觉批准 |
 | M390 | Network 工作台 SummaryStrip + 待分配表 + AssignTechnicianDrawer | 401-m390-* + 384-m390-*；Playwright 截图 | 师傅个人负载/冲突读模型；工作区抽屉联动；人工视觉批准 |
 | M391 | Network 工单工作区产品外壳 + AppointmentCollaborationPanel | 402-m391-* + 385-m391-*；Playwright 截图 | PII 读模型；预约日历；冲突推荐；人工视觉批准 |
+| M392 | Network 整改/异常队列产品化 + 建议动作深链 | 403-m392-* + 386-m392-*；Playwright + M220 回归 | 代补允许标志/正确示例读模型；ACK/resolve；人工视觉批准 |
 

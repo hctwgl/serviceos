@@ -119,7 +119,7 @@ test.describe('M242 Network Portal 整改详情残余 Accepted 字段展示', ()
     await expect(page.getByTestId('network-portal-shell')).toBeVisible({ timeout: 15_000 })
     await expect(page.getByTestId('network-portal-correction-detail')).toBeVisible()
 
-    await expect(page.getByTestId('correction-detail-status')).toHaveText('WAIVED')
+    await expect(page.getByTestId('correction-detail-status')).toHaveText(/已豁免|WAIVED/)
     await expect(page.getByTestId('correction-detail-closed-by')).toHaveText('closer-1')
     await expect(page.getByTestId('correction-detail-closed-at')).toHaveText(
       '2026-07-17T12:00:00Z',

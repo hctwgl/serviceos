@@ -59,6 +59,7 @@ watch(
   >
     <header class="top">
       <div>
+        <p class="eyebrow">资料整改</p>
         <h2>整改详情</h2>
         <p class="meta" data-testid="correction-detail-id">{{ correctionCaseId }}</p>
       </div>
@@ -66,14 +67,20 @@ watch(
         <RouterLink to="/network-portal/corrections" data-testid="correction-back-to-queue">
           返回队列
         </RouterLink>
+        <RouterLink
+          v-if="detail?.taskId"
+          :to="{ path: '/network-portal/tasks', query: { taskId: detail.taskId } }"
+          data-testid="correction-detail-primary-supplement"
+        >
+          去任务页代补
+        </RouterLink>
         <button type="button" :disabled="loading" data-testid="correction-detail-refresh" @click="load">
           刷新
         </button>
       </div>
     </header>
     <p class="hint">
-      只读详情（复用 M202 GET）；展示 Accepted CorrectionCase 非 PII 字段含 closed/waived 操作者与
-      补传 submittedBy；写操作请经任务页资料代补，不提供 close/waive。
+      查看驳回原因与补传历史；代补须经任务页 on-behalf 流程。不提供 close/waive 空操作。
     </p>
     <p v-if="error" data-testid="network-portal-error">{{ error }}</p>
     <p v-else-if="loading" data-testid="correction-detail-loading">加载中…</p>
@@ -198,10 +205,17 @@ watch(
   color: #5b6573;
   font-size: 0.9rem;
 }
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--sos-primary-600);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
 .actions {
   display: flex;
   gap: 0.75rem;
   align-items: center;
+  flex-wrap: wrap;
 }
 dl {
   display: grid;

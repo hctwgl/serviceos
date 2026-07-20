@@ -656,3 +656,37 @@ knownGaps:
   - UI_DATA_GAP: 客户/地址脱敏读模型、师傅日程冲突与推荐解释未就绪
   - CONTENT_GAP: 预约日历视图未交付
 ```
+
+## 47. M392 验收记录（资料整改 + 异常中心）
+
+```yaml
+pageId: NETWORK.CORRECTION.QUEUE
+route: /network-portal/corrections
+visualProfile: CLASSIC_PROFESSIONAL_COLLABORATION
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: 正确示例图、代补允许标志、整改截止 SLA 专用读模型
+```
+
+```yaml
+pageId: NETWORK.EXCEPTION.QUEUE
+route: /network-portal/exceptions
+visualProfile: CLASSIC_PROFESSIONAL_COLLABORATION
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - DOMAIN_GAP: Portal ACK/resolve/decide 仍未批准交付
+```
