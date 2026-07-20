@@ -144,7 +144,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | Consumer Identity | CustomerProfile、用户资源关系和 C 端身份 | `ACCEPTED` | Principal/IdentityLink/API Schema 已预留 Consumer Persona | 身份治理序列之后的独立 Epic；待登录、隐私、客户主数据与注销策略确认；不得宣称已实现 | 后续正式 Epic |
 | 项目治理 | Project 核心事实、范围关系与授权目录 | `PARTIAL` | 项目创建；REGION/NETWORK 当前关系整组修订和不可变历史；`project.read` 授权目录、详情及历史查询 | owners、品牌/服务产品/配置绑定、生命周期、计划修订审批、目录治理 UI | M8、M64～M67 |
 | 可靠消息 | Inbox、Outbox、Worker claim/lease/retry | `IMPLEMENTED` | 本地可靠发布消费、恢复和人工接管基础 | 正式 Broker 和跨服务运行 | M9～M10 |
-| 配置中心 | 不可变配置资产、Bundle 发布、设计器与灰度通道 | `PARTIAL` | M282～M296 设计器/治理 + **M303～M309** 六类运行时 + **M310～M315** 设计器 + **M321～M350** 配置驱动履约主链路（含 Mapping DSL Admin UI + DISPATCH 编辑器 + FORM/EVIDENCE ConditionBuilder + Technician 条件/规则执行器）；**M356～M362** 客户端能力发布门禁、运行时拒单、定向发布、Feed/详情头拒单、整改路径对齐与整改列表头级预检 | AMOUNT/加权（待确认）、BUSINESS 日历 SLA、editableWhen/defaultExpression、iOS 条件全量硬阻断、派单级目标过滤 | M16、M33、M36、M52～M53、M61、M268、M271、M281～M296、M303～M315、M321～M350、M356～M361 |
+| 配置中心 | 不可变配置资产、Bundle 发布、设计器与灰度通道 | `PARTIAL` | M282～M296 设计器/治理 + **M303～M309** 六类运行时 + **M310～M315** 设计器 + **M321～M350** 配置驱动履约主链路（含 Mapping DSL Admin UI + DISPATCH 编辑器 + FORM/EVIDENCE ConditionBuilder + Technician 条件/规则执行器）；**M356～M362** 客户端能力发布门禁、运行时拒单、定向发布、Feed/详情头拒单、整改路径对齐与整改列表头级预检 | AMOUNT/加权（待确认）、BUSINESS 日历 SLA、editableWhen/defaultExpression、iOS 条件全量硬阻断、派单级目标过滤 | M16、M33、M36、M52～M53、M61、M268、M271、M281～M296、M303～M315、M321～M350、M356～M362 |
 | 外部接入 | BYD CPIM + REFERENCE_OEM SAMPLE + Geely 本地切片 | `PARTIAL` | BYD 入站建单/更新/取消、提审、回调；**M267/M297～M302** 通用 SPI；**M311/M314/M316/M320** 吉利本地 + 三 OEM 并行冒烟 + **M317～M319** 远端查询/人工处置/批量重放；**M321～M347** 冻结 Mapping（含 REFERENCE_OEM SAMPLE CREATE/UPDATE/CANCEL + Admin Mapping DSL UI） | 吉利 Sandbox/OpenAPI 签名联调（BLOCKED_EXTERNAL）、生产凭据/对象存储 | M16、M56～M60、M77～M79、M99、M158、M267、M272、M311、M314、M316、M317、M318、M319、M320、M321～M347、M273、M297～M302 |
 | 工单 | WorkOrder 接收、激活、履约完成与授权工作区投影 | `PARTIAL` | 权威工单、工作流启动、跨阶段和 END 完结；授权目录、非 PII 详情、Stage/Task 执行骨架及核心执行+现场履约时间线 | 完整取消、暂停、恢复、客户敏感详情审计、跨域完整时间线/动作与全部业务分支 | M16～M19、M68～M69、M73～M74 |
 | 工作流 | 线性 + 网关 + WAIT/TIMER + SUB_PROCESS + 多实例 + 取消/重开/跳转/补偿 + 标准模板 | `PARTIAL` | 上项 + **M281** 维修/移机/巡检标准模板（含家充勘安） | HTTP 命令面、表单/资料完整模板包、设计器 | M17～M19、M61、M69、M268～M271、M275～M281 |
@@ -164,7 +164,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | 对账结算 | 对账、结算、争议与调整 | `PROPOSED` | 已有边界设计 | 正式运行时和页面 | `architecture/16-*` |
 | Admin Portal | 总部运营后台 | `PARTIAL` | **M284/M287/M289/M291/M292/M294/M295/M296** 配置设计器；M101～M193 运营基线；**M328** UNKNOWN 人工确认/放弃与批量 Replay 工作台接入 Admin 外发队列/详情；**M351** 终审工作区 API（UI 见 M352） | Ant Design 定型与终审三栏 UI、targetDecisions 提交、整改深链、真实 E2E；正式企业 OIDC/BFF、批量压测/MFA | M7 设计、M101～M193、M284～M296、M328、M351、Admin 试点基线 |
 | Network Portal | 网点协作端 | `PARTIAL` | M194～M242 已交付 workbench、工单/任务、限定工作区、师傅关系/资质、产能、整改和运营异常等受控读写切片；M256 将全部正式产品页迁入独立 `serviceos-network-web`，接入 OIDC PKCE、`/me` NETWORK 上下文、Capability/服务端导航、跨网点失败关闭、76 项 Playwright 回归与独立容器镜像；Admin 不再承载正式 `/network-portal/*` 路由 | 槽位策略表、完整 product/03 设计系统、评分/容量策略引擎、Portal ACK/resolve/decide、产能申请、notifications/消息页、生产 IdP 与集群发布 | M7 设计、M194～M242、M255～M256 |
-| Technician App / Portal | 师傅移动端与 Feed | `PARTIAL` | M195/M218/M219/M243～M246 只读安全切片；M257 独立 H5；M258～M261 iOS 基础；M262 在线 Visit；M263 冻结基础表单；**M349/M350** H5 条件执行器 + 工单/区域权威头 + validationRules；M264 Evidence 采集上传；M265 Snapshot 与 Task 完成；M266 在线整改；**M357～M361** 运行时能力拒单、定向目标外拒单、Feed/详情头预检与整改路径门禁对齐 | 联系/预约、完整表单草稿、editableWhen/默认值（未接受）、iOS 共用执行器、真实 operationRefs 签退；弱网/后台/Track F 离线；签名真机/真实 IdP/VoiceOver/崩溃采集/TestFlight | M7 设计、M195、M218～M219、M243～M246、M257～M266、M349、M350、M357～M361 |
+| Technician App / Portal | 师傅移动端与 Feed | `PARTIAL` | M195/M218/M219/M243～M246 只读安全切片；M257 独立 H5；M258～M261 iOS 基础；M262 在线 Visit；M263 冻结基础表单；**M349/M350** H5 条件执行器 + 工单/区域权威头 + validationRules；M264 Evidence 采集上传；M265 Snapshot 与 Task 完成；M266 在线整改；**M357～M362** 运行时能力拒单、定向目标外拒单、Feed/详情头预检、整改路径门禁与整改列表头级预检 | 联系/预约、完整表单草稿、editableWhen/默认值（未接受）、iOS 共用执行器、真实 operationRefs 签退；弱网/后台/Track F 离线；签名真机/真实 IdP/VoiceOver/崩溃采集/TestFlight | M7 设计、M195、M218～M219、M243～M246、M257～M266、M349、M350、M357～M362 |
 | External Portal | 用户/车企受控页面 | `PROPOSED` | 最小边界规划 | 二期页面和工程实现 | M7 设计 |
 
 ## 4. 里程碑历史摘要
@@ -175,14 +175,16 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 
 ## 5. 下一实施方向
 
-ServiceOS 可靠纵向切片已推进到 **M361**（整改路径客户端能力门禁对齐；承接 M357～M360）。
-OpenAPI **1.0.54**；Flyway **131**。
+ServiceOS 可靠纵向切片已推进到 **M362**（整改列表/头级客户端能力预检；承接 M356～M361）。
+OpenAPI **1.0.55**；Flyway **131**。
+Technician 客户端能力门禁垂直切片（发布门禁→运行时拒单→定向发布→Feed/详情头→整改路径→整改列表预检）已闭环。
 
-下一阶段：
+下一阶段（均需负责人确认后才能推进，不得发明规则）：
 
-1. 客户端能力协商后续：iOS 条件执行器对齐后的全量硬阻断、派单过滤（iOS 执行器在本 Linux 环境为 BLOCKED_EXTERNAL；派单过滤需独立 Accepted 设计）；
-2. 独立审核 HUMAN Task 与提交 Task 分离的工作流模板（需 Accepted 设计，R3）；
-3. 既有硬门禁：吉利联调 / AMOUNT/加权 / BUSINESS 日历 SLA。
+1. iOS 条件执行器对齐后的全量硬阻断、派单级 `supportedClientKinds` 过滤（iOS 执行器在本 Linux 环境为 BLOCKED_EXTERNAL；派单过滤需独立 Accepted 设计）；
+2. Network Portal on-behalf 整改/代补能力门禁（需确认 `NETWORK_WEB` vs 代师傅端 clientKind 语义）；
+3. 独立审核 HUMAN Task 与提交 Task 分离的工作流模板（需 Accepted 设计：taskId 绑定/触发/模板范围，R3）；
+4. 既有硬门禁：吉利联调 / AMOUNT/加权 / BUSINESS 日历 SLA。
 
 仍为 **硬门禁 / 外部阻塞**（不可发明推进）：
 

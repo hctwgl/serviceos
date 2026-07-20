@@ -681,8 +681,9 @@ OpenAPI 1.0.55；Flyway 131；承接 M357～M361）。
 入站/出站 Mapping（M321～M339）、FORM/EVIDENCE ConditionBuilder（M340～M349）、
 ASSIGNEE/DISPATCH/RULE/NOTIFICATION/PRICING SHADOW、**M351～M355 终审工作台**，以及
 **M356～M362 客户端能力门禁序列**（含整改路径对齐与列表头级预检）；**M360 终审 8 态视觉基线**。
-下一主线：iOS 条件执行器对齐、Feed/详情头拒单；吉利联调 / AMOUNT/加权 / BUSINESS 日历 SLA
-仍为硬门禁；Track F/G 仍为 `BLOCKED_EXTERNAL`。
+下一主线需负责人选型：iOS 条件执行器 / 派单过滤 / Network Portal on-behalf 门禁 /
+REVIEW_TASK 模板分离；吉利联调 / AMOUNT/加权 / BUSINESS 日历 SLA 仍为硬门禁；
+Track F/G 仍为 `BLOCKED_EXTERNAL`。
 
 权威进度入口：
 
