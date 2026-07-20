@@ -105,6 +105,35 @@ async function stubWorkbenchProduct(page: Page) {
     })
   })
   await page.route('**/api/v1/network-portal/tasks**', async (route: Route) => {
+    if (route.request().url().includes('/assign-candidates')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          networkId: NETWORK_ID,
+          taskId: TASK_ID,
+          businessType: 'INSTALLATION',
+          items: [
+            {
+              technicianProfileId: TECH_ID,
+              displayName: '张师傅',
+              membershipStatus: 'ACTIVE',
+              profileStatus: 'ACTIVE',
+              openTaskCount: 1,
+              approvedQualificationCount: 2,
+              pendingQualificationCount: 0,
+              qualificationSummary: '已通过资质 2 项',
+              capacityAvailableUnits: 7,
+              capacityMaxUnits: 10,
+              warnings: [],
+              assignable: true,
+            },
+          ],
+          asOf: '2026-07-20T04:00:00Z',
+        }),
+      })
+      return
+    }
     if (route.request().url().includes(':assign-technician')) {
       await route.fulfill({
         status: 200,
@@ -169,7 +198,7 @@ async function stubWorkbenchProduct(page: Page) {
   })
 }
 
-test.describe('M390 网点工作台产品化 + 分配师傅抽屉', () => {
+test.describe('M390/M407 网点工作台产品化 + 分配候选摘要', () => {
   test('展示 SummaryStrip、待分配表并完成分配', async ({ page }) => {
     await stubWorkbenchProduct(page)
     await loginWithLocalKeycloak(page)
@@ -183,8 +212,12 @@ test.describe('M390 网点工作台产品化 + 分配师傅抽屉', () => {
 
     await page.getByTestId(`assign-open-${TASK_ID}`).click()
     await expect(page.getByTestId('assign-technician-drawer')).toBeVisible()
-    await expect(page.getByTestId('assign-drawer-impact')).toContainText('产能口径')
+    await expect(page.getByTestId(`assign-candidate-${TECH_ID}`)).toBeVisible()
+    await expect(page.getByTestId('assign-candidate-open-tasks')).toContainText('开放任务 1')
+    await expect(page.getByTestId('assign-candidate-qualification')).toContainText('已通过资质')
     await page.getByTestId(`assign-candidate-${TECH_ID}`).click()
+    await expect(page.getByTestId('assign-drawer-impact')).toContainText('网点产能可用')
+    await expect(page.getByTestId('assign-drawer-impact')).toContainText('已通过资质')
     await page.getByTestId('assign-drawer-submit').click()
     await expect(page.getByTestId('assign-drawer-message')).toContainText('指派已生效')
 

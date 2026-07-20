@@ -26,6 +26,16 @@ public interface NetworkPortalQueryService {
     NetworkPortalPage<NetworkPortalTechnicianItem> listTechnicians(
             CurrentPrincipal actor, String correlationId, String networkContextHeader);
 
+    /**
+     * 本网点任务分配候选摘要。需要 networkTask.read + technician.readOwnNetwork；
+     * 任务必须对本网点存在 ACTIVE NETWORK 责任。
+     */
+    NetworkPortalAssignCandidatePage listAssignCandidates(
+            CurrentPrincipal actor,
+            String correlationId,
+            String networkContextHeader,
+            UUID taskId);
+
     NetworkPortalPage<NetworkPortalCapacityItem> listCapacity(
             CurrentPrincipal actor, String correlationId, String networkContextHeader);
 

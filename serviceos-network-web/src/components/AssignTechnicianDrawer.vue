@@ -3,9 +3,8 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
   assignNetworkPortalTechnician,
-  type NetworkPortalCapacityItem,
+  type NetworkPortalAssignCandidateItem,
   type NetworkPortalTaskItem,
-  type NetworkPortalTechnicianItem,
 } from '../api/networkPortal'
 import { statusLabel } from '../product/labels'
 import { safeProblemMessage } from '@serviceos/web-core'
@@ -14,8 +13,8 @@ const props = defineProps<{
   open: boolean
   networkContextId: string
   task: NetworkPortalTaskItem | null
-  technicians: NetworkPortalTechnicianItem[]
-  capacity: NetworkPortalCapacityItem[]
+  candidates: NetworkPortalAssignCandidateItem[]
+  loadingCandidates?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -42,49 +41,47 @@ watch(
   },
 )
 
-const capacityHint = computed(() => {
-  const businessType = props.task?.businessType
-  if (!businessType) {
-    return props.capacity[0] ?? null
-  }
-  return props.capacity.find((row) => row.businessType === businessType) ?? props.capacity[0] ?? null
-})
-
-const filteredTechnicians = computed(() => {
+const filteredCandidates = computed(() => {
   const q = search.value.trim()
-  const list = props.technicians.filter(
-    (tech) => tech.membershipStatus === 'ACTIVE' && tech.profileStatus === 'ACTIVE',
-  )
+  const list = props.candidates
   if (!q) return list
   return list.filter((tech) => tech.displayName.includes(q))
 })
 
 const selected = computed(() =>
-  filteredTechnicians.value.find((tech) => tech.technicianProfileId === selectedTechnicianId.value),
+  filteredCandidates.value.find((tech) => tech.technicianProfileId === selectedTechnicianId.value),
 )
 
 const impactSummary = computed(() => {
-  const cap = capacityHint.value
   const parts: string[] = []
   if (selected.value) {
     parts.push(`将指派给 ${selected.value.displayName}`)
-  }
-  if (cap) {
-    parts.push(
-      `产能口径（${statusLabel(cap.businessType)}）：占用 ${cap.occupiedUnits}/${cap.maxUnits}，可用 ${cap.availableUnits}`,
-    )
-    if (cap.availableUnits <= 0) {
-      parts.push('当前业务类型产能已满，提交可能被服务端拒绝')
+    parts.push(`当前开放任务 ${selected.value.openTaskCount} 个`)
+    parts.push(selected.value.qualificationSummary)
+    if (
+      selected.value.capacityAvailableUnits != null &&
+      selected.value.capacityMaxUnits != null
+    ) {
+      parts.push(
+        `网点产能可用 ${selected.value.capacityAvailableUnits}/${selected.value.capacityMaxUnits}`,
+      )
+    }
+    for (const warning of selected.value.warnings) {
+      parts.push(warning)
     }
   } else {
-    parts.push('UI_DATA_GAP：服务端未返回对应业务类型产能明细')
+    parts.push('请选择一名可分配师傅')
   }
-  parts.push('距离、日程冲突与推荐解释读模型尚未正式交付，不在前端猜测')
+  parts.push('距离与日程冲突读模型尚未交付，不在前端猜测')
   return parts
 })
 
 async function submit() {
   if (!props.task || !selectedTechnicianId.value || !props.networkContextId) return
+  if (selected.value && !selected.value.assignable) {
+    error.value = '所选师傅当前不可分配'
+    return
+  }
   busy.value = true
   error.value = null
   message.value = null
@@ -131,24 +128,46 @@ async function submit() {
       </label>
 
       <div class="candidate-list" data-testid="assign-drawer-candidates">
+        <p v-if="loadingCandidates" class="muted">正在加载候选摘要…</p>
         <button
-          v-for="tech in filteredTechnicians"
+          v-for="tech in filteredCandidates"
           :key="tech.technicianProfileId"
           type="button"
           class="candidate-card"
-          :class="{ selected: selectedTechnicianId === tech.technicianProfileId }"
+          :class="{
+            selected: selectedTechnicianId === tech.technicianProfileId,
+            blocked: !tech.assignable,
+          }"
           :data-testid="`assign-candidate-${tech.technicianProfileId}`"
+          :disabled="!tech.assignable"
           @click="selectedTechnicianId = tech.technicianProfileId"
         >
           <strong>{{ tech.displayName }}</strong>
           <span class="muted">
             {{ statusLabel(tech.profileStatus) }} · 关系 {{ statusLabel(tech.membershipStatus) }}
           </span>
-          <span v-if="capacityHint" class="muted">
-            网点产能可用 {{ capacityHint.availableUnits }} / {{ capacityHint.maxUnits }}
+          <span class="muted" data-testid="assign-candidate-open-tasks">
+            开放任务 {{ tech.openTaskCount }}
+          </span>
+          <span class="muted" data-testid="assign-candidate-qualification">
+            {{ tech.qualificationSummary }}
+          </span>
+          <span
+            v-if="tech.capacityAvailableUnits != null && tech.capacityMaxUnits != null"
+            class="muted"
+            data-testid="assign-candidate-capacity"
+          >
+            网点产能可用 {{ tech.capacityAvailableUnits }} / {{ tech.capacityMaxUnits }}
+          </span>
+          <span v-if="tech.warnings.length" class="warn">
+            {{ tech.warnings[0] }}
           </span>
         </button>
-        <p v-if="!filteredTechnicians.length" class="muted" data-testid="assign-drawer-empty">
+        <p
+          v-if="!loadingCandidates && !filteredCandidates.length"
+          class="muted"
+          data-testid="assign-drawer-empty"
+        >
           当前无可分配师傅。请确认师傅关系为 ACTIVE，或检查资质与产能。
         </p>
       </div>
@@ -166,7 +185,7 @@ async function submit() {
           type="button"
           class="primary"
           data-testid="assign-drawer-submit"
-          :disabled="busy || !selectedTechnicianId || !task"
+          :disabled="busy || !selectedTechnicianId || !task || (selected && !selected.assignable)"
           @click="submit"
         >
           {{ busy ? '分配处理中…' : '确认分配' }}
@@ -236,6 +255,10 @@ async function submit() {
   border-color: var(--sos-primary-600);
   background: var(--sos-primary-100);
 }
+.candidate-card.blocked {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
 .impact {
   border: 1px solid var(--sos-color-border-light);
   border-radius: var(--sos-radius-md);
@@ -280,6 +303,10 @@ button.ghost {
   color: var(--sos-color-text-tertiary);
   font-size: 12px;
   margin: 0;
+}
+.warn {
+  color: var(--sos-color-status-warning-fg, #ad6800);
+  font-size: 12px;
 }
 .error {
   color: var(--sos-color-status-critical-fg);

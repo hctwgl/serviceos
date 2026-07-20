@@ -125,6 +125,34 @@ async function stubWorkspaceProduct(page: Page) {
       })
     },
   )
+  await page.route('**/api/v1/network-portal/tasks/**/assign-candidates**', async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        networkId: NETWORK_ID,
+        taskId: TASK_ID,
+        businessType: 'INSTALLATION',
+        items: [
+          {
+            technicianProfileId: TECH_ID,
+            displayName: '张师傅',
+            membershipStatus: 'ACTIVE',
+            profileStatus: 'ACTIVE',
+            openTaskCount: 0,
+            approvedQualificationCount: 1,
+            pendingQualificationCount: 0,
+            qualificationSummary: '已通过资质 1 项',
+            capacityAvailableUnits: 5,
+            capacityMaxUnits: 8,
+            warnings: [],
+            assignable: true,
+          },
+        ],
+        asOf: '2026-07-20T04:00:00Z',
+      }),
+    })
+  })
   await page.route('**/api/v1/network-portal/technicians**', async (route: Route) => {
     await route.fulfill({
       status: 200,

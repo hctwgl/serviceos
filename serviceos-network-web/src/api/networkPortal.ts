@@ -358,6 +358,40 @@ export function listNetworkPortalTechnicians(networkContextId: string) {
   )
 }
 
+export type NetworkPortalAssignCandidateItem = {
+  technicianProfileId: string
+  displayName: string
+  membershipStatus: string
+  profileStatus: string
+  openTaskCount: number
+  approvedQualificationCount: number
+  pendingQualificationCount: number
+  qualificationSummary: string
+  capacityAvailableUnits: number | null
+  capacityMaxUnits: number | null
+  warnings: string[]
+  assignable: boolean
+}
+
+export type NetworkPortalAssignCandidatePage = {
+  networkId: string
+  taskId: string
+  businessType: string | null
+  items: NetworkPortalAssignCandidateItem[]
+  asOf: string
+}
+
+export function listNetworkPortalAssignCandidates(
+  networkContextId: string,
+  taskId: string,
+) {
+  return apiGet<NetworkPortalAssignCandidatePage>(
+    `/network-portal/tasks/${taskId}/assign-candidates`,
+    {},
+    networkHeaders(networkContextId),
+  )
+}
+
 export type NetworkTechnicianMembership = {
   id: string
   serviceNetworkId: string

@@ -3,10 +3,10 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
   getNetworkPortalWorkbench,
+  listNetworkPortalAssignCandidates,
   listNetworkPortalTasks,
-  listNetworkPortalTechnicians,
+  type NetworkPortalAssignCandidateItem,
   type NetworkPortalTaskItem,
-  type NetworkPortalTechnicianItem,
   type NetworkPortalWorkbench,
 } from '../api/networkPortal'
 import { formatDateTime, safeProblemMessage } from '@serviceos/web-core'
@@ -18,11 +18,12 @@ import { statusLabel } from '../product/labels'
 const props = defineProps<{ networkContextId: string | null }>()
 const data = ref<NetworkPortalWorkbench | null>(null)
 const unassignedTasks = ref<NetworkPortalTaskItem[]>([])
-const technicians = ref<NetworkPortalTechnicianItem[]>([])
+const assignCandidates = ref<NetworkPortalAssignCandidateItem[]>([])
 const loading = ref(false)
+const loadingCandidates = ref(false)
 const error = ref<string | null>(null)
 const tasksError = ref<string | null>(null)
-const techniciansError = ref<string | null>(null)
+const candidatesError = ref<string | null>(null)
 const drawerOpen = ref(false)
 const assignTask = ref<NetworkPortalTaskItem | null>(null)
 
@@ -97,7 +98,7 @@ async function load() {
   if (!props.networkContextId) {
     data.value = null
     unassignedTasks.value = []
-    technicians.value = []
+    assignCandidates.value = []
     error.value = '请选择网点上下文'
     loading.value = false
     return
@@ -112,7 +113,7 @@ async function load() {
   } finally {
     loading.value = false
   }
-  await Promise.all([loadUnassignedTasks(), loadTechnicians()])
+  await loadUnassignedTasks()
 }
 
 async function loadUnassignedTasks() {
@@ -128,21 +129,25 @@ async function loadUnassignedTasks() {
   }
 }
 
-async function loadTechnicians() {
+async function loadAssignCandidates(taskId: string) {
   if (!props.networkContextId) return
+  loadingCandidates.value = true
   try {
-    const page = await listNetworkPortalTechnicians(props.networkContextId)
-    technicians.value = page.items
-    techniciansError.value = null
+    const page = await listNetworkPortalAssignCandidates(props.networkContextId, taskId)
+    assignCandidates.value = page.items
+    candidatesError.value = null
   } catch (err) {
-    technicians.value = []
-    techniciansError.value = safeProblemMessage(err)
+    assignCandidates.value = []
+    candidatesError.value = safeProblemMessage(err)
+  } finally {
+    loadingCandidates.value = false
   }
 }
 
 function openAssign(task: NetworkPortalTaskItem) {
   assignTask.value = task
   drawerOpen.value = true
+  void loadAssignCandidates(task.taskId)
 }
 
 async function onAssigned() {
@@ -257,9 +262,8 @@ watch(
             kind="empty"
             guide="暂无容量计数。完成网点容量配置后将在此显示师傅负载。"
           />
-          <p v-if="techniciansError" class="error">师傅目录加载失败：{{ techniciansError }}</p>
           <p class="muted gap-note">
-            UI_DATA_GAP：按师傅个人的今日已接/资质风险/最近预约卡片仍待正式读模型；当前仅展示服务端产能计数。
+            分配抽屉已接入开放任务数与资质摘要。距离与日程冲突读模型尚未交付。
           </p>
         </section>
       </div>
@@ -274,13 +278,14 @@ watch(
       </p>
     </template>
 
+    <p v-if="candidatesError" class="error">{{ candidatesError }}</p>
     <AssignTechnicianDrawer
       v-if="networkContextId"
       :open="drawerOpen"
       :network-context-id="networkContextId"
       :task="assignTask"
-      :technicians="technicians"
-      :capacity="data?.capacity ?? []"
+      :candidates="assignCandidates"
+      :loading-candidates="loadingCandidates"
       @close="drawerOpen = false"
       @assigned="onAssigned"
     />

@@ -35,6 +35,8 @@ import com.serviceos.network.api.PrincipalNetworkAffiliationQuery;
 import com.serviceos.network.api.TechnicianQualificationView;
 import com.serviceos.operations.api.OperationalExceptionItem;
 import com.serviceos.operations.api.OperationalExceptionWorkbenchService;
+import com.serviceos.readmodel.api.NetworkPortalAssignCandidateItem;
+import com.serviceos.readmodel.api.NetworkPortalAssignCandidatePage;
 import com.serviceos.readmodel.api.NetworkPortalCapacityItem;
 import com.serviceos.readmodel.api.NetworkPortalCorrectionItem;
 import com.serviceos.readmodel.api.NetworkPortalDirectorySlaRiskSummary;
@@ -1014,6 +1016,116 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                         row.membershipVersion()))
                 .toList();
         return new NetworkPortalPage<>(networkId, items, clock.instant());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public NetworkPortalAssignCandidatePage listAssignCandidates(
+            CurrentPrincipal actor,
+            String correlationId,
+            String networkContextHeader,
+            UUID taskId
+    ) {
+        Objects.requireNonNull(taskId, "taskId");
+        UUID networkId = requireAuthorizedNetwork(actor, correlationId, networkContextHeader, NETWORK_TASK_READ);
+        requireAuthorizedNetwork(actor, correlationId, networkContextHeader, TECHNICIAN_READ_OWN);
+
+        List<NetworkActiveAssignmentView> active = assignments.listActiveForNetwork(
+                actor.tenantId(), networkId.toString());
+        NetworkActiveAssignmentView taskAssignment = null;
+        Map<String, Integer> openTaskCounts = new LinkedHashMap<>();
+        for (NetworkActiveAssignmentView row : active) {
+            if (taskId.equals(row.taskId())) {
+                taskAssignment = row;
+            }
+            if (row.technicianId() != null && !row.technicianId().isBlank()) {
+                openTaskCounts.merge(row.technicianId(), 1, Integer::sum);
+            }
+        }
+        if (taskAssignment == null) {
+            throw new BusinessProblem(ProblemCode.ACCESS_DENIED, "任务不在本网点 ACTIVE 责任范围内");
+        }
+
+        String businessType = null;
+        for (NetworkPortalTaskItem task : listTasks(actor, correlationId, networkContextHeader).items()) {
+            if (taskId.equals(task.taskId())) {
+                businessType = task.businessType();
+                break;
+            }
+        }
+
+        Map<UUID, int[]> qualificationCounts = new LinkedHashMap<>();
+        for (TechnicianQualificationView row : qualifications.listForActiveTechnicians(
+                actor.tenantId(), networkId)) {
+            int[] counts = qualificationCounts.computeIfAbsent(
+                    row.technicianProfileId(), ignored -> new int[2]);
+            if ("APPROVED".equals(row.status()) || "VALID".equals(row.status()) || "ACTIVE".equals(row.status())) {
+                counts[0]++;
+            } else if ("PENDING".equals(row.status())) {
+                counts[1]++;
+            }
+        }
+
+        NetworkPortalCapacityItem capacityHint = null;
+        for (NetworkPortalCapacityItem row : capacityItems(actor.tenantId(), networkId)) {
+            if (businessType != null && businessType.equals(row.businessType())) {
+                capacityHint = row;
+                break;
+            }
+            if (capacityHint == null) {
+                capacityHint = row;
+            }
+        }
+
+        List<NetworkPortalAssignCandidateItem> items = new ArrayList<>();
+        for (NetworkPortalTechnicianView tech : technicians.listActiveTechnicians(
+                actor.tenantId(), networkId)) {
+            int openTasks = openTaskCounts.getOrDefault(tech.technicianProfileId().toString(), 0);
+            int[] quals = qualificationCounts.getOrDefault(tech.technicianProfileId(), new int[2]);
+            int approved = quals[0];
+            int pending = quals[1];
+            List<String> warnings = new ArrayList<>();
+            boolean assignable = "ACTIVE".equals(tech.membershipStatus())
+                    && "ACTIVE".equals(tech.profileStatus());
+            if (!assignable) {
+                warnings.add("师傅关系或档案非 ACTIVE，不可分配");
+            }
+            String qualificationSummary;
+            if (approved > 0 && pending == 0) {
+                qualificationSummary = "已通过资质 " + approved + " 项";
+            } else if (approved > 0) {
+                qualificationSummary = "已通过 " + approved + " 项，待审 " + pending + " 项";
+                warnings.add("存在待审资质，请确认业务是否允许分配");
+            } else if (pending > 0) {
+                qualificationSummary = "仅有待审资质 " + pending + " 项";
+                warnings.add("尚无已通过资质");
+            } else {
+                qualificationSummary = "无资质记录";
+                warnings.add("无资质记录");
+            }
+            if (capacityHint != null && capacityHint.availableUnits() <= 0) {
+                warnings.add("当前业务类型网点产能已满，提交可能被拒绝");
+            }
+            items.add(new NetworkPortalAssignCandidateItem(
+                    tech.technicianProfileId(),
+                    tech.displayName(),
+                    tech.membershipStatus(),
+                    tech.profileStatus(),
+                    openTasks,
+                    approved,
+                    pending,
+                    qualificationSummary,
+                    capacityHint == null ? null : capacityHint.availableUnits(),
+                    capacityHint == null ? null : capacityHint.maxUnits(),
+                    warnings,
+                    assignable));
+        }
+        items.sort(Comparator
+                .comparing(NetworkPortalAssignCandidateItem::assignable).reversed()
+                .thenComparing(NetworkPortalAssignCandidateItem::openTaskCount)
+                .thenComparing(NetworkPortalAssignCandidateItem::displayName));
+        return new NetworkPortalAssignCandidatePage(
+                networkId, taskId, businessType, items, clock.instant());
     }
 
     @Override

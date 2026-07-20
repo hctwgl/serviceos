@@ -3,6 +3,7 @@ package com.serviceos.readmodel.web;
 import com.serviceos.evidence.api.CorrectionCaseView;
 import com.serviceos.evidence.api.CorrectionResubmissionView;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
+import com.serviceos.readmodel.api.NetworkPortalAssignCandidatePage;
 import com.serviceos.readmodel.api.NetworkPortalCapacityItem;
 import com.serviceos.readmodel.api.NetworkPortalCorrectionItem;
 import com.serviceos.readmodel.api.NetworkPortalExceptionItem;
@@ -79,6 +80,19 @@ final class NetworkPortalController {
             @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
     ) {
         return response(queries.listTechnicians(principals.current(), correlationId, networkContext), correlationId);
+    }
+
+    @GetMapping("/tasks/{taskId}/assign-candidates")
+    ResponseEntity<NetworkPortalAssignCandidatePage> assignCandidates(
+            @PathVariable("taskId") UUID taskId,
+            @RequestHeader(value = "X-Network-Context", required = false) String networkContext,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        NetworkPortalAssignCandidatePage body = queries.listAssignCandidates(
+                principals.current(), correlationId, networkContext, taskId);
+        return ResponseEntity.ok()
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(body);
     }
 
     @GetMapping("/capacity")

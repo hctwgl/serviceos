@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.72
+  version: 1.0.73
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -1821,6 +1821,29 @@ paths:
           description: 本网点 ACTIVE 师傅列表
           headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
           content: { application/json: { schema: { $ref: '#/components/schemas/NetworkPortalTechnicianPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /network-portal/tasks/{taskId}/assign-candidates:
+    get:
+      operationId: listNetworkPortalAssignCandidates
+      summary: Network Portal 任务分配师傅候选摘要
+      description: |
+        M407：X-Network-Context + networkTask.read + technician.readOwnNetwork。
+        返回本网点 ACTIVE 师傅的开放任务数、资质摘要、网点产能口径与可分配警告。
+        距离与日程冲突未建模，不返回伪造字段。任务须属于本网点 ACTIVE NETWORK 责任。
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 分配候选摘要页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkPortalAssignCandidatePage' } } }
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
@@ -7852,6 +7875,43 @@ components:
       properties:
         networkId: { type: string, format: uuid }
         items: { type: array, items: { $ref: '#/components/schemas/NetworkPortalTechnicianItem' } }
+        asOf: { type: string, format: date-time }
+    NetworkPortalAssignCandidateItem:
+      type: object
+      additionalProperties: false
+      required:
+        - technicianProfileId
+        - displayName
+        - membershipStatus
+        - profileStatus
+        - openTaskCount
+        - approvedQualificationCount
+        - pendingQualificationCount
+        - qualificationSummary
+        - warnings
+        - assignable
+      properties:
+        technicianProfileId: { type: string, format: uuid }
+        displayName: { type: string, minLength: 1 }
+        membershipStatus: { type: string }
+        profileStatus: { type: string }
+        openTaskCount: { type: integer, minimum: 0 }
+        approvedQualificationCount: { type: integer, minimum: 0 }
+        pendingQualificationCount: { type: integer, minimum: 0 }
+        qualificationSummary: { type: string, minLength: 1 }
+        capacityAvailableUnits: { type: [integer, 'null'], minimum: 0 }
+        capacityMaxUnits: { type: [integer, 'null'], minimum: 0 }
+        warnings: { type: array, items: { type: string } }
+        assignable: { type: boolean }
+    NetworkPortalAssignCandidatePage:
+      type: object
+      additionalProperties: false
+      required: [networkId, taskId, items, asOf]
+      properties:
+        networkId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        businessType: { type: [string, 'null'] }
+        items: { type: array, items: { $ref: '#/components/schemas/NetworkPortalAssignCandidateItem' } }
         asOf: { type: string, format: date-time }
     NetworkPortalCapacityItem:
       type: object

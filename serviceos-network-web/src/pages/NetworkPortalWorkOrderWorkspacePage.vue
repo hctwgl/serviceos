@@ -6,9 +6,9 @@ import { safeProblemMessage } from '@serviceos/web-core'
 
 import {
   getNetworkPortalWorkOrderWorkspace,
-  listNetworkPortalTechnicians,
+  listNetworkPortalAssignCandidates,
   type NetworkPortalTaskItem,
-  type NetworkPortalTechnicianItem,
+  type NetworkPortalAssignCandidateItem,
   type NetworkPortalWorkOrderWorkspace,
   type NetworkPortalWorkspaceAppointmentSummary,
 } from '../api/networkPortal'
@@ -23,7 +23,8 @@ const error = ref<string | null>(null)
 const loading = ref(false)
 const assignDrawerOpen = ref(false)
 const assignTask = ref<NetworkPortalTaskItem | null>(null)
-const assignCandidates = ref<NetworkPortalTechnicianItem[]>([])
+const assignCandidates = ref<NetworkPortalAssignCandidateItem[]>([])
+const loadingCandidates = ref(false)
 const showTechnicalDetails = ref(import.meta.env.DEV)
 
 function hasAppointmentWindow(item: NetworkPortalWorkspaceAppointmentSummary) {
@@ -105,23 +106,28 @@ const nextStepHint = computed(() => {
   return '继续跟踪上门与资料完成情况'
 })
 
-async function loadAssignCandidates() {
+async function loadAssignCandidates(taskId: string) {
   if (!props.networkContextId) {
     assignCandidates.value = []
     return
   }
+  loadingCandidates.value = true
   try {
-    const page = await listNetworkPortalTechnicians(props.networkContextId)
+    const page = await listNetworkPortalAssignCandidates(props.networkContextId, taskId)
     assignCandidates.value = page.items
   } catch {
-    assignCandidates.value = detail.value?.technicians ?? []
+    assignCandidates.value = []
+  } finally {
+    loadingCandidates.value = false
   }
 }
 
 function openAssign(task?: NetworkPortalTaskItem | null) {
   assignTask.value = task ?? currentTask.value
   assignDrawerOpen.value = true
-  void loadAssignCandidates()
+  if (assignTask.value) {
+    void loadAssignCandidates(assignTask.value.taskId)
+  }
 }
 
 async function onAssigned() {
@@ -892,8 +898,8 @@ watch(
       :open="assignDrawerOpen"
       :network-context-id="networkContextId"
       :task="assignTask"
-      :technicians="assignCandidates"
-      :capacity="[]"
+      :candidates="assignCandidates"
+      :loading-candidates="loadingCandidates"
       @close="assignDrawerOpen = false"
       @assigned="onAssigned"
     />
