@@ -937,8 +937,11 @@ test('真实 OIDC 登录后可完成 Task 并可靠推进 Workflow 与 WorkOrder
     validationStatus: string
   }
   expect(submission.validationStatus).toBe('VALIDATED')
+  // prepared-complete 会刷新 allowed-actions；等待 complete 面板出现再断言回填。
+  await expect(page.getByLabel('resultRef')).toBeVisible({ timeout: 30_000 })
   await expect(page.getByLabel('resultRef')).toHaveValue(
     `form-submission://${submission.submissionId}`,
+    { timeout: 30_000 },
   )
   await expect(page.getByLabel('resultDigest')).toHaveValue(submission.contentDigest)
 
