@@ -122,7 +122,9 @@ const columns = [
     <template #bodyCell="{ column, record }">
       <template v-if="column.key === 'actions'">
         <span v-if="record.actionLabels.length === 0">未配置</span>
-        <Tag v-for="label in record.actionLabels" v-else :key="label">{{ label }}</Tag>
+        <template v-else>
+          <Tag v-for="label in record.actionLabels" :key="label">{{ label }}</Tag>
+        </template>
       </template>
     </template>
   </Table>
