@@ -14,6 +14,7 @@ import com.serviceos.task.api.TaskFulfillmentContext;
 import com.serviceos.task.api.TaskFulfillmentContextService;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -99,4 +100,23 @@ final class FormSubmissionTaskCompletionValidator implements HumanTaskCompletion
         return new BusinessProblem(ProblemCode.FORM_SUBMISSION_NOT_VALIDATED,
                 "Task completion requires an exact VALIDATED FormSubmission reference and content digest");
     }
+
+    @Override
+    public List<String> explainBlockingReasons(String tenantId, UUID taskId) {
+        TaskFulfillmentContext task = tasks.find(tenantId, taskId).orElse(null);
+        if (task == null || task.formRef() == null) {
+            return List.of();
+        }
+        boolean validated = submissions.listSummariesByTask(tenantId, taskId).stream()
+                .anyMatch(summary -> "VALIDATED".equals(summary.validationStatus())
+                        && task.formRef().equals(summary.formKey()));
+        if (validated) {
+            return List.of();
+        }
+        List<String> reasons = new ArrayList<>();
+        reasons.add("表单尚未完成校验提交（" + task.formRef() + "）");
+        reasons.add("请先填写并提交安装/勘测记录表后再完成任务");
+        return reasons;
+    }
+
 }

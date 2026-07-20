@@ -32,6 +32,12 @@ import EvidenceSetSnapshotDetailPage from './pages/EvidenceSetSnapshotDetailPage
 import ExternalReviewReceiptDetailPage from './pages/ExternalReviewReceiptDetailPage.vue'
 import ProjectDirectoryPage from './pages/ProjectDirectoryPage.vue'
 import ProjectDetailPage from './pages/ProjectDetailPage.vue'
+import FulfillmentProfileListPage from './pages/FulfillmentProfileListPage.vue'
+import FulfillmentProfileDetailPage from './pages/FulfillmentProfileDetailPage.vue'
+import FulfillmentPreviewPage from './pages/FulfillmentPreviewPage.vue'
+import FulfillmentProfileEditorPage from './pages/FulfillmentProfileEditorPage.vue'
+import FulfillmentPublishFlowPage from './pages/FulfillmentPublishFlowPage.vue'
+import WorkOrderFulfillmentSnapshotPage from './pages/WorkOrderFulfillmentSnapshotPage.vue'
 import OidcCallbackPage from './pages/OidcCallbackPage.vue'
 import UserDirectoryPage from './pages/UserDirectoryPage.vue'
 import UserDetailPage from './pages/UserDetailPage.vue'
@@ -139,6 +145,36 @@ export const router = createRouter({
         { path: 'projects', name: 'ADMIN.PROJECT.LIST', component: ProjectDirectoryPage },
         { path: 'projects/:id', name: 'ADMIN.PROJECT.DETAIL', component: ProjectDetailPage },
         {
+          path: 'projects/:id/fulfillment-profiles',
+          name: 'ADMIN.PROJECT.FULFILLMENT.LIST',
+          component: FulfillmentProfileListPage,
+          meta: { pageId: 'ADMIN.PROJECT.FULFILLMENT.LIST' },
+        },
+        {
+          path: 'projects/:id/fulfillment-profiles/:profileId',
+          name: 'ADMIN.PROJECT.FULFILLMENT.DETAIL',
+          component: FulfillmentProfileDetailPage,
+          meta: { pageId: 'ADMIN.PROJECT.FULFILLMENT.DETAIL' },
+        },
+        {
+          path: 'projects/:id/fulfillment-profiles/:profileId/preview',
+          name: 'ADMIN.PROJECT.FULFILLMENT.PREVIEW',
+          component: FulfillmentPreviewPage,
+          meta: { pageId: 'ADMIN.PROJECT.FULFILLMENT.PREVIEW' },
+        },
+        {
+          path: 'projects/:id/fulfillment-profiles/:profileId/edit',
+          name: 'ADMIN.PROJECT.FULFILLMENT.EDIT',
+          component: FulfillmentProfileEditorPage,
+          meta: { pageId: 'ADMIN.PROJECT.FULFILLMENT.EDIT' },
+        },
+        {
+          path: 'projects/:id/fulfillment-profiles/:profileId/publish',
+          name: 'ADMIN.PROJECT.FULFILLMENT.PUBLISH',
+          component: FulfillmentPublishFlowPage,
+          meta: { pageId: 'ADMIN.PROJECT.FULFILLMENT.PUBLISH' },
+        },
+        {
           path: 'configuration/designer',
           name: 'ADMIN.CONFIGURATION.DESIGNER',
           component: ConfigurationDesignerPage,
@@ -156,6 +192,12 @@ export const router = createRouter({
           path: 'work-orders/:id',
           name: 'ADMIN.WORKORDER.WORKSPACE',
           component: WorkOrderWorkspacePage,
+        },
+        {
+          path: 'work-orders/:id/configuration-snapshot',
+          name: 'ADMIN.WORKORDER.FULFILLMENT_SNAPSHOT',
+          component: WorkOrderFulfillmentSnapshotPage,
+          meta: { pageId: 'ADMIN.WORKORDER.FULFILLMENT_SNAPSHOT' },
         },
         {
           path: 'system/demo-data',

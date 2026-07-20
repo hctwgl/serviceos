@@ -3,6 +3,8 @@ package com.serviceos.integration.geely;
 import com.serviceos.ServiceOsApplication;
 import com.serviceos.configuration.api.ConfigurationAssetType;
 import com.serviceos.configuration.api.ConfigurationService;
+import com.serviceos.configuration.ProjectFulfillmentTestSupport;
+import com.serviceos.configuration.api.ConfigurationBundleReference;
 import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
 import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
 import com.serviceos.integration.geely.infrastructure.GeelyAesCipher;
@@ -85,6 +87,7 @@ class GeelyInboundCancelUpdatePostgresIT {
     void clean() throws Exception {
         jdbc.sql("""
                 TRUNCATE TABLE rel_outbox_publish_attempt, rel_outbox_event, wo_work_order,
+                    cfg_project_fulfillment_revision, cfg_project_fulfillment_profile,
                     cfg_configuration_bundle_item, cfg_configuration_bundle,
                     cfg_configuration_asset_version, prj_project,
                     int_canonical_message, int_inbound_envelope CASCADE
@@ -159,10 +162,13 @@ class GeelyInboundCancelUpdatePostgresIT {
         UUID cancelId = configurations.publishAsset(new PublishConfigurationAssetCommand(
                 TENANT, ConfigurationAssetType.INTEGRATION, "geely-cu-cancel", "1.0.0", "1.0.0",
                 cancelIntegration, Sha256.digest(cancelIntegration))).versionId();
-        configurations.publishBundle(new PublishConfigurationBundleCommand(
+        ConfigurationBundleReference fulfillmentBundle = configurations.publishBundle(new PublishConfigurationBundleCommand(
                 TENANT, projectId, "GEELY-CU-BUNDLE", "1.0.0", "GEELY",
                 "HOME_CHARGING_SURVEY_INSTALL", "370000", Instant.now().minusSeconds(60),
                 null, List.of(workflowId, createId, updateId, cancelId)));
+        ProjectFulfillmentTestSupport.seedPublishedProfile(
+                jdbc, TENANT, projectId, "HOME_CHARGING_SURVEY_INSTALL",
+                fulfillmentBundle, workflowId, Instant.now().minusSeconds(30));
     }
 
     @Test

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, h, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, h, onMounted, ref, watch } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Table, Select, Input, Button, Space, Alert, Tooltip } from 'ant-design-vue'
 import type { TableColumnsType } from 'ant-design-vue'
 import SavedViewBar from '../components/SavedViewBar.vue'
@@ -174,11 +174,10 @@ const columns = computed((): TableColumnsType<Row> => [
     width: 160,
     customRender: ({ record }) =>
       h(
-        Button,
+        RouterLink,
         {
-          type: 'link',
-          onClick: () =>
-            router.push({ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: record.id } }),
+          to: { name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: record.id } },
+          class: 'work-order-link',
         },
         () => record.externalOrderCode || presentEmptyValue('not_provided'),
       ),
@@ -221,14 +220,12 @@ const columns = computed((): TableColumnsType<Row> => [
         { title: import.meta.env.DEV ? name.technicalId : '项目名称暂未随目录返回' },
         () =>
           h(
-            Button,
+            RouterLink,
             {
-              type: 'link',
-              onClick: () =>
-                router.push({
-                  name: 'ADMIN.PROJECT.DETAIL',
-                  params: { id: record.projectId },
-                }),
+              // 真实链接：键盘可达，且可访问名称带项目标识供冒烟与跨页跳转定位。
+              to: { name: 'ADMIN.PROJECT.DETAIL', params: { id: record.projectId } },
+              'aria-label': `打开项目 ${record.projectId}`,
+              class: 'project-link',
             },
             () => name.label,
           ),
@@ -305,6 +302,21 @@ onMounted(() => {
   hydrateFiltersFromRoute()
   return load()
 })
+
+// 同组件复用时（例如从工作区返回目录深链）必须重新水合并查询，否则 route.query 失效。
+watch(
+  () =>
+    [
+      firstRouteQuery(route, 'projectId'),
+      firstRouteQuery(route, 'status'),
+      firstRouteQuery(route, 'clientCode'),
+      firstRouteQuery(route, 'q'),
+    ] as const,
+  () => {
+    hydrateFiltersFromRoute()
+    return search()
+  },
+)
 </script>
 
 <template>
@@ -338,6 +350,7 @@ onMounted(() => {
           allow-clear
           placeholder="不限"
           style="width: 160px"
+          aria-label="工单状态筛选"
           :options="statusChoices.map((o) => ({ value: o.value, label: o.label }))"
         />
       </label>
@@ -348,6 +361,7 @@ onMounted(() => {
           allow-clear
           placeholder="选择车企"
           style="width: 160px"
+          aria-label="车企筛选"
           :options="[
             { value: 'GEELY', label: '吉利汽车' },
             { value: 'BYD', label: '比亚迪' },
@@ -362,6 +376,7 @@ onMounted(() => {
           style="width: 180px"
           aria-label="所属项目筛选"
           placeholder="项目名称或编号"
+          @pressEnter="search"
         />
       </label>
       <label class="filter-field">

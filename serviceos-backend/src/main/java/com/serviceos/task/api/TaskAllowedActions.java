@@ -7,12 +7,22 @@ import java.util.List;
 public record TaskAllowedActions(
         long resourceVersion,
         List<TaskAllowedAction> actions,
+        List<TaskBlockedAction> blockedActions,
         Instant asOf
 ) {
+    public TaskAllowedActions(
+            long resourceVersion,
+            List<TaskAllowedAction> actions,
+            Instant asOf
+    ) {
+        this(resourceVersion, actions, List.of(), asOf);
+    }
+
     public TaskAllowedActions {
         if (resourceVersion < 1) {
             throw new IllegalArgumentException("resourceVersion must be positive");
         }
         actions = List.copyOf(actions);
+        blockedActions = List.copyOf(blockedActions == null ? List.of() : blockedActions);
     }
 }

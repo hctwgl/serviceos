@@ -68,5 +68,13 @@ public enum ProblemCode {
     UI_PREFERENCE_KEY_NOT_ALLOWED,
     SEARCH_TERM_NOT_ALLOWED,
     PORTAL_CONTEXT_INVALID,
+    /** 项目未配置对应工单类型的履约 Profile。 */
+    PROJECT_FULFILLMENT_PROFILE_NOT_FOUND,
+    /** 建单时刻没有唯一生效的履约发布版本。 */
+    PROJECT_FULFILLMENT_REVISION_NOT_EFFECTIVE,
+    /** 履约 Profile 已暂停，禁止创建新工单。 */
+    PROJECT_FULFILLMENT_PROFILE_SUSPENDED,
+    /** 客户端类型不被当前履约配置支持。 */
+    PROJECT_FULFILLMENT_CLIENT_NOT_SUPPORTED,
     INTERNAL_ERROR
 }

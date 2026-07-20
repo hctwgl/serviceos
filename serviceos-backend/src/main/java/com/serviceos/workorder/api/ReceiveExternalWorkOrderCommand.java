@@ -7,6 +7,8 @@ import java.util.UUID;
 /**
  * 外部车企订单进入 ServiceOS 的统一命令。payloadDigest 用于业务幂等冲突检测，
  * configurationBundleVersion 必须是接单时解析出的精确版本，历史工单默认不漂移。
+ *
+ * <p>M382：正式建单应冻结 Profile Revision；未提供时默认为 {@code LEGACY_BUNDLE}。</p>
  */
 public record ReceiveExternalWorkOrderCommand(
         String tenantId,
@@ -29,8 +31,45 @@ public record ReceiveExternalWorkOrderCommand(
         String vehicleVin,
         LocalDateTime externalDispatchedAt,
         String correlationId,
-        String causationId
+        String causationId,
+        String fulfillmentConfigKind,
+        UUID fulfillmentProfileId,
+        UUID fulfillmentRevisionId,
+        String fulfillmentVersion
 ) {
+    /** 兼容历史调用：默认 LEGACY_BUNDLE。 */
+    public ReceiveExternalWorkOrderCommand(
+            String tenantId,
+            UUID projectId,
+            String clientCode,
+            String brandCode,
+            String serviceProductCode,
+            String externalOrderCode,
+            String payloadDigest,
+            UUID configurationBundleId,
+            String configurationBundleCode,
+            String configurationBundleVersion,
+            String configurationBundleDigest,
+            String provinceCode,
+            String cityCode,
+            String districtCode,
+            String customerName,
+            String customerMobile,
+            String serviceAddress,
+            String vehicleVin,
+            LocalDateTime externalDispatchedAt,
+            String correlationId,
+            String causationId
+    ) {
+        this(
+                tenantId, projectId, clientCode, brandCode, serviceProductCode, externalOrderCode,
+                payloadDigest, configurationBundleId, configurationBundleCode,
+                configurationBundleVersion, configurationBundleDigest, provinceCode, cityCode,
+                districtCode, customerName, customerMobile, serviceAddress, vehicleVin,
+                externalDispatchedAt, correlationId, causationId,
+                "LEGACY_BUNDLE", null, null, null);
+    }
+
     public ReceiveExternalWorkOrderCommand {
         tenantId = text(tenantId, "tenantId", 64);
         projectId = Objects.requireNonNull(projectId, "projectId");
@@ -61,6 +100,26 @@ public record ReceiveExternalWorkOrderCommand(
         Objects.requireNonNull(externalDispatchedAt, "externalDispatchedAt");
         correlationId = text(correlationId, "correlationId", 128);
         causationId = text(causationId, "causationId", 160);
+        if (fulfillmentConfigKind == null || fulfillmentConfigKind.isBlank()) {
+            fulfillmentConfigKind = "LEGACY_BUNDLE";
+        } else {
+            fulfillmentConfigKind = fulfillmentConfigKind.trim();
+        }
+        if (!"LEGACY_BUNDLE".equals(fulfillmentConfigKind)
+                && !"PROFILE_REVISION".equals(fulfillmentConfigKind)) {
+            throw new IllegalArgumentException("fulfillmentConfigKind is invalid");
+        }
+        if ("LEGACY_BUNDLE".equals(fulfillmentConfigKind)) {
+            fulfillmentProfileId = null;
+            fulfillmentRevisionId = null;
+            fulfillmentVersion = null;
+        } else {
+            fulfillmentProfileId = Objects.requireNonNull(
+                    fulfillmentProfileId, "fulfillmentProfileId");
+            fulfillmentRevisionId = Objects.requireNonNull(
+                    fulfillmentRevisionId, "fulfillmentRevisionId");
+            fulfillmentVersion = text(fulfillmentVersion, "fulfillmentVersion", 64);
+        }
     }
 
     private static String text(String value, String field, int maxLength) {

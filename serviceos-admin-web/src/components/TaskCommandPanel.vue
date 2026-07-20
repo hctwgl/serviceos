@@ -151,14 +151,21 @@ async function assignCandidates() {
       </label>
     </div>
 
-    <div v-if="actions.some((a) => a.code === 'task.complete')" class="fields">
+    <div
+      v-if="actions.some((a) => a.code === 'task.complete') || (preparedInputs?.length ?? 0) > 0"
+      class="fields"
+    >
       <label>
         resultRef
-        <input v-model="resultRef" placeholder="form-submission://... 或 evidence-set-snapshot://..." />
+        <input
+          v-model="resultRef"
+          aria-label="resultRef"
+          placeholder="form-submission://... 或 evidence-set-snapshot://..."
+        />
       </label>
       <label>
         resultDigest
-        <input v-model="resultDigest" placeholder="64 hex digest" />
+        <input v-model="resultDigest" aria-label="resultDigest" placeholder="64 hex digest" />
       </label>
       <label>
         inputVersionRefs JSON（双引用可选）

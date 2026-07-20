@@ -3,6 +3,8 @@ package com.serviceos.integration;
 import com.serviceos.ServiceOsApplication;
 import com.serviceos.configuration.api.ConfigurationAssetType;
 import com.serviceos.configuration.api.ConfigurationService;
+import com.serviceos.configuration.ProjectFulfillmentTestSupport;
+import com.serviceos.configuration.api.ConfigurationBundleReference;
 import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
 import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
 import com.serviceos.integration.byd.infrastructure.BydCpimSignatureVerifier;
@@ -112,6 +114,7 @@ class MultiOemParallelCreateSmokePostgresIT {
     void setUp() throws Exception {
         jdbc.sql("""
                 TRUNCATE TABLE rel_outbox_publish_attempt, rel_outbox_event, wo_work_order,
+                    cfg_project_fulfillment_revision, cfg_project_fulfillment_profile,
                     cfg_configuration_bundle_item, cfg_configuration_bundle,
                     cfg_configuration_asset_version, int_canonical_message, int_inbound_envelope,
                     int_inbound_replay_guard, prj_project CASCADE
@@ -337,9 +340,12 @@ class MultiOemParallelCreateSmokePostgresIT {
         var integrationAsset = configurations.publishAsset(new PublishConfigurationAssetCommand(
                 tenantId, ConfigurationAssetType.INTEGRATION, mappingKey,
                 "1.0.0", "1.0.0", integration, Sha256.digest(integration)));
-        configurations.publishBundle(new PublishConfigurationBundleCommand(
+        ConfigurationBundleReference fulfillmentBundle = configurations.publishBundle(new PublishConfigurationBundleCommand(
                 tenantId, projectId, projectCode + "-BUNDLE", "1.0.0", brandCode,
                 "HOME_CHARGING_SURVEY_INSTALL", "370000", Instant.now().minusSeconds(60),
                 null, List.of(workflowAsset.versionId(), integrationAsset.versionId())));
+        ProjectFulfillmentTestSupport.seedPublishedProfile(
+                jdbc, tenantId, projectId, "HOME_CHARGING_SURVEY_INSTALL",
+                fulfillmentBundle, workflowAsset.versionId(), Instant.now().minusSeconds(30));
     }
 }

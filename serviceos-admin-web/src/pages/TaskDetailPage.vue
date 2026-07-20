@@ -32,13 +32,25 @@ const preparedInputList = computed(() =>
   ),
 )
 
-function onPreparedComplete(payload: InputVersionRef) {
+async function refreshAllowedActions() {
+  try {
+    const actions = await getTaskAllowedActions(taskId.value)
+    allowedActions.value = actions.data
+    allowedError.value = null
+  } catch (err) {
+    allowedError.value = err instanceof Error ? err.message : '加载允许动作失败'
+  }
+}
+
+async function onPreparedComplete(payload: InputVersionRef) {
   // 表单与资料可先后独立产生不可变版本。按 kind 保存两份权威引用，
   // 避免后产生的 Snapshot 覆盖 FormSubmission，导致双输入 complete 使用错误主引用。
   preparedInputs.value = {
     ...preparedInputs.value,
     [payload.kind]: payload,
   }
+  // 完成门禁变化后必须刷新 allowed-actions，否则 complete 与 resultRef 面板不会出现。
+  await refreshAllowedActions()
 }
 
 async function load() {

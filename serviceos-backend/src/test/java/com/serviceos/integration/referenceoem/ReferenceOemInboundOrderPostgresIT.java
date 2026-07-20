@@ -3,6 +3,8 @@ package com.serviceos.integration.referenceoem;
 import com.serviceos.ServiceOsApplication;
 import com.serviceos.configuration.api.ConfigurationAssetType;
 import com.serviceos.configuration.api.ConfigurationService;
+import com.serviceos.configuration.ProjectFulfillmentTestSupport;
+import com.serviceos.configuration.api.ConfigurationBundleReference;
 import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
 import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
 import com.serviceos.integration.referenceoem.infrastructure.ReferenceOemSampleSignature;
@@ -85,6 +87,7 @@ class ReferenceOemInboundOrderPostgresIT {
     void clean() throws Exception {
         jdbc.sql("""
                 TRUNCATE TABLE rel_outbox_publish_attempt, rel_outbox_event, wo_work_order,
+                    cfg_project_fulfillment_revision, cfg_project_fulfillment_profile,
                     cfg_configuration_bundle_item, cfg_configuration_bundle,
                     cfg_configuration_asset_version, prj_project,
                     int_canonical_message, int_inbound_envelope CASCADE
@@ -138,10 +141,13 @@ class ReferenceOemInboundOrderPostgresIT {
         UUID integrationId = configurations.publishAsset(new PublishConfigurationAssetCommand(
                 TENANT, ConfigurationAssetType.INTEGRATION, "ref-create", "1.0.0", "1.0.0",
                 integration, Sha256.digest(integration))).versionId();
-        configurations.publishBundle(new PublishConfigurationBundleCommand(
+        ConfigurationBundleReference fulfillmentBundle = configurations.publishBundle(new PublishConfigurationBundleCommand(
                 TENANT, projectId, "REFERENCE-OEM-BUNDLE", "1.0.0", "REFERENCE_BRAND",
                 "HOME_CHARGING_SURVEY_INSTALL", "370000", Instant.now().minusSeconds(60),
                 null, java.util.List.of(workflowId, integrationId)));
+        ProjectFulfillmentTestSupport.seedPublishedProfile(
+                jdbc, TENANT, projectId, "HOME_CHARGING_SURVEY_INSTALL",
+                fulfillmentBundle, workflowId, Instant.now().minusSeconds(30));
     }
 
     @Test
@@ -199,6 +205,7 @@ class ReferenceOemInboundOrderPostgresIT {
     void rejectsWhenFrozenBundleHasNoInboundMapping() throws Exception {
         jdbc.sql("""
                 TRUNCATE TABLE rel_outbox_publish_attempt, rel_outbox_event, wo_work_order,
+                    cfg_project_fulfillment_revision, cfg_project_fulfillment_profile,
                     cfg_configuration_bundle_item, cfg_configuration_bundle,
                     cfg_configuration_asset_version, int_inbound_replay_guard,
                     int_canonical_message, int_inbound_envelope CASCADE
@@ -216,10 +223,13 @@ class ReferenceOemInboundOrderPostgresIT {
         UUID workflowId = configurations.publishAsset(new PublishConfigurationAssetCommand(
                 TENANT, ConfigurationAssetType.WORKFLOW, "ref.oem.nomap", "1.0.0", "1.0.0",
                 workflow, Sha256.digest(workflow))).versionId();
-        configurations.publishBundle(new PublishConfigurationBundleCommand(
+        ConfigurationBundleReference fulfillmentBundle = configurations.publishBundle(new PublishConfigurationBundleCommand(
                 TENANT, projectId, "REFERENCE-OEM-NOMAP", "1.0.0", "REFERENCE_BRAND",
                 "HOME_CHARGING_SURVEY_INSTALL", "370000", Instant.now().minusSeconds(60),
                 null, java.util.List.of(workflowId)));
+        ProjectFulfillmentTestSupport.seedPublishedProfile(
+                jdbc, TENANT, projectId, "HOME_CHARGING_SURVEY_INSTALL",
+                fulfillmentBundle, workflowId, Instant.now().minusSeconds(30));
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("externalOrderCode", "REF-OEM-NOMAP-1");

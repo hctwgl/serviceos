@@ -78,13 +78,17 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
                     configuration_bundle_code, configuration_bundle_version,
                     configuration_bundle_digest, province_code, city_code, district_code,
                     customer_name, customer_mobile, service_address, vehicle_vin,
-                    external_dispatched_at, received_at, version
+                    external_dispatched_at, received_at, version,
+                    fulfillment_config_kind, fulfillment_profile_id, fulfillment_revision_id,
+                    fulfillment_version
                 ) VALUES (
                     :id, :tenantId, :projectId, :clientCode, :brandCode, :serviceProductCode,
                     :externalOrderCode, :payloadDigest, 'RECEIVED', :bundleId,
                     :bundleCode, :bundleVersion, :bundleDigest,
                     :provinceCode, :cityCode, :districtCode, :customerName, :customerMobile,
-                    :serviceAddress, :vehicleVin, :externalDispatchedAt, :receivedAt, 1
+                    :serviceAddress, :vehicleVin, :externalDispatchedAt, :receivedAt, 1,
+                    :fulfillmentKind, :fulfillmentProfileId, :fulfillmentRevisionId,
+                    :fulfillmentVersion
                 ) ON CONFLICT (tenant_id, client_code, external_order_code) DO NOTHING
                 """)
                 .param("id", id)
@@ -108,6 +112,10 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
                 .param("vehicleVin", command.vehicleVin())
                 .param("externalDispatchedAt", command.externalDispatchedAt())
                 .param("receivedAt", java.sql.Timestamp.from(receivedAt))
+                .param("fulfillmentKind", command.fulfillmentConfigKind())
+                .param("fulfillmentProfileId", command.fulfillmentProfileId())
+                .param("fulfillmentRevisionId", command.fulfillmentRevisionId())
+                .param("fulfillmentVersion", command.fulfillmentVersion())
                 .update();
 
         if (inserted == 1) {

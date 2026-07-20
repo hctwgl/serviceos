@@ -38,6 +38,10 @@ import {
 } from '../api/workOrderDetail'
 import { getTaskAllowedActions, type TaskAllowedActions } from '../api/tasks'
 import {
+  getWorkOrderFulfillmentSnapshot,
+  type WorkOrderFulfillmentSnapshot,
+} from '../api/fulfillmentProfiles'
+import {
   manualAssignNetworkServiceAssignment,
   manualAssignServiceAssignments,
 } from '../api/dispatch'
@@ -55,6 +59,7 @@ const workOrderId = computed(() => String(route.params.id ?? ''))
 const networkOptions = ref<ServiceNetwork[]>([])
 const showTechTab = import.meta.env.DEV
 const productTab = ref('overview')
+const fulfillmentSnapshot = ref<WorkOrderFulfillmentSnapshot | null>(null)
 
 async function loadNetworks() {
   try {
@@ -271,6 +276,14 @@ async function loadPricingSnapshots() {
   }
 }
 
+async function loadFulfillmentSnapshot() {
+  try {
+    fulfillmentSnapshot.value = await getWorkOrderFulfillmentSnapshot(workOrderId.value)
+  } catch {
+    fulfillmentSnapshot.value = null
+  }
+}
+
 async function loadWorkspace() {
   loading.value = true
   error.value = null
@@ -286,6 +299,7 @@ async function loadWorkspace() {
       loadSlaInstances(),
       loadAuthorityProjections(),
       loadPricingSnapshots(),
+      loadFulfillmentSnapshot(),
     ])
     const requestedTab = String(route.query.tab ?? '')
     const tabSection = sections.find((code) => code === requestedTab)
@@ -293,7 +307,8 @@ async function loadWorkspace() {
       (code) => ws.sectionAvailability[code] === 'AVAILABLE' || ws.sectionAvailability[code] === 'EMPTY',
     )
     activeSection.value = tabSection ?? firstAvailable ?? 'TASKS'
-    productTab.value = tabSection === 'FINAL_REVIEW' ? 'FINAL_REVIEW' : (tabSection ?? 'overview')
+    // 产品页签与区块码对齐：INTEGRATION / APPOINTMENTS_VISITS 等可直接作为 tab。
+    productTab.value = tabSection ?? 'overview'
     await loadSection(activeSection.value)
     diagnostics.pushDiagnostic({
       title: '工单工作区技术上下文',
@@ -1108,7 +1123,10 @@ onMounted(() => {
       <Descriptions :column="3" size="small">
         <Descriptions.Item label="车企">{{ clientLabel }}</Descriptions.Item>
         <Descriptions.Item label="项目">
-          <RouterLink :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: workspace.header.projectId } }">
+          <RouterLink
+            :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: workspace.header.projectId } }"
+            :aria-label="`打开项目 ${workspace.header.projectId}`"
+          >
             {{ projectPresentation.label }}
           </RouterLink>
         </Descriptions.Item>
@@ -1167,6 +1185,43 @@ onMounted(() => {
     <Tabs v-if="workspace" v-model:activeKey="productTab" @change="onProductTabChange">
       <TabPane key="overview" tab="概览">
         <Space direction="vertical" style="width: 100%" :size="16">
+          <Card title="配置来源" size="small">
+            <template v-if="fulfillmentSnapshot">
+              <Descriptions bordered size="small" :column="2">
+                <Descriptions.Item label="工单类型">
+                  {{ labelServiceProduct(fulfillmentSnapshot.serviceProductCode) }}
+                </Descriptions.Item>
+                <Descriptions.Item label="履约方案">
+                  {{ fulfillmentSnapshot.profileName || '历史 Bundle 冻结' }}
+                </Descriptions.Item>
+                <Descriptions.Item label="履约版本">
+                  {{ fulfillmentSnapshot.fulfillmentVersion || '—' }}
+                </Descriptions.Item>
+                <Descriptions.Item label="Bundle 版本">
+                  {{ fulfillmentSnapshot.configurationBundleVersion || '—' }}
+                </Descriptions.Item>
+              </Descriptions>
+              <Alert
+                v-if="fulfillmentSnapshot.legacyExplanation"
+                type="warning"
+                show-icon
+                :message="fulfillmentSnapshot.legacyExplanation"
+                style="margin-top: 12px"
+              />
+              <Button
+                style="margin-top: 12px"
+                @click="
+                  router.push({
+                    name: 'ADMIN.WORKORDER.FULFILLMENT_SNAPSHOT',
+                    params: { id: workOrderId },
+                  })
+                "
+              >
+                查看本工单配置快照
+              </Button>
+            </template>
+            <p v-else class="muted">配置来源暂不可用（可能缺少 snapshot 读权限）。</p>
+          </Card>
           <Card title="分配服务网点" size="small">
             <p class="muted">系统推荐：当前目录未返回推荐原因时，请搜索并确认网点（UI_DATA_GAP）。</p>
             <label class="field">
@@ -1396,6 +1451,28 @@ onMounted(() => {
           @refresh="loadAuthorityProjections"
           @next="() => undefined"
         />
+      </TabPane>
+
+      <TabPane key="APPOINTMENTS_VISITS" tab="预约到场">
+        <Alert
+          type="info"
+          show-icon
+          message="预约与上门"
+          description="预约、联系记录与上门签到详情可通过下方关联链接打开；完整编排仍在任务工作区完成。"
+        />
+        <p v-if="sectionLoading">区块加载中…</p>
+        <p v-else-if="sectionError" class="error">{{ sectionError }}</p>
+      </TabPane>
+
+      <TabPane key="INTEGRATION" tab="集成">
+        <Alert
+          type="info"
+          show-icon
+          message="车企集成"
+          description="入站 Envelope、外发交付与 Canonical 详情通过下方关联链接打开。"
+        />
+        <p v-if="sectionLoading">区块加载中…</p>
+        <p v-else-if="sectionError" class="error">{{ sectionError }}</p>
       </TabPane>
 
       <TabPane v-if="showTechTab" key="tech" tab="技术诊断">

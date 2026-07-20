@@ -17,7 +17,7 @@ test.describe('M352/M353 Final Review workspace (mocked API)', () => {
 
     const workspace = page.getByTestId('final-review-workspace')
     await expect(workspace).toBeVisible({ timeout: 20_000 })
-    await expect(page.getByRole('button', { name: '平台终审' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: '平台终审' })).toBeVisible()
     await expect(workspace.getByText('审核案例待审')).toBeVisible({ timeout: 15_000 })
     await expect(workspace.getByTestId('review-target-list')).toContainText('立柱安装照片')
     await expect(workspace.getByTestId('review-target-list')).toContainText('设备铭牌照片')

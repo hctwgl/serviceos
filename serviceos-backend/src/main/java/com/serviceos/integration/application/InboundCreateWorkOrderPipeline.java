@@ -7,6 +7,9 @@ import com.serviceos.configuration.api.ConfigurationResolutionException;
 import com.serviceos.configuration.api.ConfigurationService;
 import com.serviceos.configuration.api.IntegrationMappingResult;
 import com.serviceos.configuration.api.IntegrationMappingRuntime;
+import com.serviceos.configuration.api.ProjectFulfillmentResolveQuery;
+import com.serviceos.configuration.api.ProjectFulfillmentResolveResult;
+import com.serviceos.configuration.api.ProjectFulfillmentResolver;
 import com.serviceos.configuration.api.ResolveConfigurationBundleQuery;
 import com.serviceos.files.spi.ObjectStorageGateway;
 import com.serviceos.integration.api.CanonicalMessageView;
@@ -41,9 +44,13 @@ import java.util.UUID;
  * CREATE_WORK_ORDER 通用入站管道。
  *
  * <p>适配器完成协议验签、transport Envelope 登记与薄兼容映射后进入本管道。管道负责：
- * Bundle 唯一解析 → 强制冻结 INTEGRATION Mapping 应用并物化为领域命令 →
+ * ProjectFulfillmentResolver（若项目已配置履约 Profile）或 Bundle 解析 →
+ * 强制冻结 INTEGRATION Mapping 应用并物化为领域命令 →
  * Canonical 私有存储 → CanonicalMessage 登记 → 领域建单命令 → Envelope/Canonical 完成 →
  * Outbox/审计。适配器不得直接写工单表。</p>
+ *
+ * <p>M382/M383：正式建单必须命中有效履约 Profile Revision 并冻结 PROFILE_REVISION；
+ * 无 Profile / 暂停 / 无生效版本失败关闭。LEGACY_BUNDLE 仅用于迁移前已存在工单，不得用于新建。</p>
  *
  * <p>M335/M336：CREATE_WORK_ORDER 必须命中 connector 唯一 INBOUND Mapping；缺失则失败关闭。
  * 适配器只提交 {@link CreateWorkOrderRouteHint}（Bundle 路由 + businessKey 基底）；
@@ -55,6 +62,7 @@ import java.util.UUID;
 @Service
 public class InboundCreateWorkOrderPipeline {
     private final ConfigurationService configurationService;
+    private final ProjectFulfillmentResolver fulfillmentResolver;
     private final IntegrationMappingRuntime integrationMappingRuntime;
     private final InboundMessageRepository messages;
     private final ObjectStorageGateway storage;
@@ -67,6 +75,7 @@ public class InboundCreateWorkOrderPipeline {
 
     public InboundCreateWorkOrderPipeline(
             ConfigurationService configurationService,
+            ProjectFulfillmentResolver fulfillmentResolver,
             IntegrationMappingRuntime integrationMappingRuntime,
             InboundMessageRepository messages,
             ObjectStorageGateway storage,
@@ -78,6 +87,7 @@ public class InboundCreateWorkOrderPipeline {
             Clock clock
     ) {
         this.configurationService = configurationService;
+        this.fulfillmentResolver = fulfillmentResolver;
         this.integrationMappingRuntime = integrationMappingRuntime;
         this.messages = messages;
         this.storage = storage;
@@ -120,16 +130,21 @@ public class InboundCreateWorkOrderPipeline {
         }
 
         final ConfigurationBundleReference bundle;
+        final ProjectFulfillmentResolveResult fulfillment;
         try {
-            bundle = configurationService.resolve(new ResolveConfigurationBundleQuery(
-                    safeTenant, safeProjectCode, routeHint.brandCode(), routeHint.serviceProductCode(),
-                    routeHint.provinceCode(), envelope.receivedAt(), false,
-                    routeHint.externalOrderCode()));
+            ResolvedConfiguration resolved = resolveFulfillmentOrBundle(
+                    safeTenant, safeProjectCode, routeHint, envelope.receivedAt());
+            bundle = resolved.bundle();
+            fulfillment = resolved.fulfillment();
         } catch (ConfigurationResolutionException exception) {
             String code = "CONFIGURATION_" + exception.reason().name();
             return reject(
                     envelope, safeTenant, null, null, null,
                     "INVALID_ORDER", code + ": " + exception.getMessage(), auditContext);
+        } catch (BusinessProblem exception) {
+            return reject(
+                    envelope, safeTenant, null, null, null,
+                    exception.code().name(), exception.getMessage(), auditContext);
         }
 
         final IntegrationMappingResult mappingResult;
@@ -156,7 +171,8 @@ public class InboundCreateWorkOrderPipeline {
         try {
             return Objects.requireNonNull(transactions.execute(status -> {
                 InboundCreateWorkOrderResult result = completeCreateWorkOrder(
-                        envelope, connector, safeTenant, effectiveMapped, bundle, canonicalObjectRef,
+                        envelope, connector, safeTenant, effectiveMapped, bundle, fulfillment,
+                        canonicalObjectRef,
                         canonicalPayloadDigest, auditContext, safeCorrelationId);
                 appendMappingAudit(
                         safeTenant, auditContext, envelope.inboundEnvelopeId(), bundle.projectId(),
@@ -264,6 +280,7 @@ public class InboundCreateWorkOrderPipeline {
             String tenantId,
             CreateWorkOrderMappedInbound mapped,
             ConfigurationBundleReference bundle,
+            ProjectFulfillmentResolveResult fulfillment,
             String canonicalObjectRef,
             String canonicalPayloadDigest,
             InboundConnectorAuditContext auditContext,
@@ -303,13 +320,23 @@ public class InboundCreateWorkOrderPipeline {
                     canonical.connectorVersionId(), canonical.mappingVersionId(), true);
         }
 
+        Objects.requireNonNull(fulfillment, "fulfillment");
         WorkOrderReceipt receipt = workOrderCommandService.receive(new ReceiveExternalWorkOrderCommand(
                 tenantId, bundle.projectId(), mapped.clientCode(), mapped.brandCode(),
-                mapped.serviceProductCode(), mapped.externalOrderCode(), auditContext.requestDigest(),
-                bundle.bundleId(), bundle.bundleCode(), bundle.bundleVersion(), bundle.manifestDigest(),
-                mapped.provinceCode(), mapped.cityCode(), mapped.districtCode(), mapped.customerName(),
-                mapped.customerMobile(), mapped.serviceAddress(), mapped.vehicleVin(), mapped.dispatchedAt(),
-                correlationId, "canonical-message:" + canonical.canonicalMessageId()));
+                mapped.serviceProductCode(), mapped.externalOrderCode(),
+                auditContext.requestDigest(),
+                fulfillment.configurationBundleId(),
+                fulfillment.configurationBundleCode(),
+                fulfillment.configurationBundleVersion(),
+                fulfillment.configurationBundleDigest(),
+                mapped.provinceCode(), mapped.cityCode(), mapped.districtCode(),
+                mapped.customerName(), mapped.customerMobile(), mapped.serviceAddress(),
+                mapped.vehicleVin(), mapped.dispatchedAt(),
+                correlationId, "canonical-message:" + canonical.canonicalMessageId(),
+                "PROFILE_REVISION",
+                fulfillment.profileId(),
+                fulfillment.revisionId(),
+                fulfillment.fulfillmentVersion()));
 
         String resultId = receipt.workOrderId().toString();
         messages.completeCanonical(
@@ -401,11 +428,50 @@ public class InboundCreateWorkOrderPipeline {
         }
     }
 
+    /**
+     * 先解析 Bundle 得到 projectId，再强制命中有效履约 Profile Revision。
+     * 无 Profile / 暂停 / 无生效版本一律失败关闭，不得回退草稿或任意 Bundle。
+     */
+    private ResolvedConfiguration resolveFulfillmentOrBundle(
+            String tenantId,
+            String projectCode,
+            CreateWorkOrderRouteHint routeHint,
+            Instant receivedAt
+    ) {
+        ConfigurationBundleReference bundle = configurationService.resolve(
+                new ResolveConfigurationBundleQuery(
+                        tenantId, projectCode, routeHint.brandCode(),
+                        routeHint.serviceProductCode(), routeHint.provinceCode(),
+                        receivedAt, false, routeHint.externalOrderCode()));
+        ProjectFulfillmentResolveResult fulfillment = fulfillmentResolver.resolve(
+                new ProjectFulfillmentResolveQuery(
+                        tenantId,
+                        bundle.projectId(),
+                        routeHint.serviceProductCode(),
+                        receivedAt,
+                        null,
+                        routeHint.brandCode(),
+                        routeHint.provinceCode()));
+        ConfigurationBundleReference frozenBundle = new ConfigurationBundleReference(
+                fulfillment.configurationBundleId(),
+                bundle.projectId(),
+                fulfillment.configurationBundleCode(),
+                fulfillment.configurationBundleVersion(),
+                fulfillment.configurationBundleDigest());
+        return new ResolvedConfiguration(frozenBundle, fulfillment);
+    }
+
     private static String requiredText(String value, String field) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(field + " must not be blank");
         }
         return value.trim();
+    }
+
+    private record ResolvedConfiguration(
+            ConfigurationBundleReference bundle,
+            ProjectFulfillmentResolveResult fulfillment
+    ) {
     }
 
     private record CanonicalMessageProcessedPayload(
