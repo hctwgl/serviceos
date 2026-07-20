@@ -15,7 +15,7 @@ import com.serviceos.task.api.TaskSchedulingService;
 import com.serviceos.workflow.api.StageActivatedPayload;
 import com.serviceos.workflow.api.WorkflowStartedPayload;
 import com.serviceos.workorder.api.WorkOrderReopenedPayload;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import org.jooq.DSLContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
@@ -23,19 +23,22 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.util.Map;
 import java.util.UUID;
 
+import static com.serviceos.jooq.generated.tables.WflNodeInstance.WFL_NODE_INSTANCE;
+import static com.serviceos.jooq.generated.tables.WflStageInstance.WFL_STAGE_INSTANCE;
+import static com.serviceos.jooq.generated.tables.WflWorkflowInstance.WFL_WORKFLOW_INSTANCE;
+
 /**
- * workorder.reopened 的可靠消费者：按冻结 Bundle 新建 ROOT 流程实例。
+ * workorder.reopened 的可靠消费者（jOOQ 实现）：按冻结 Bundle 新建 ROOT 流程实例。
  *
  * <p>前提：取消级联已关闭旧根流程，`uq_wfl_root_work_order_open` 仅约束 ACTIVE/SUSPENDED。</p>
  */
 @Service
-final class WorkflowWorkOrderReopenedHandler implements OutboxMessageHandler {
+final class JooqWorkflowWorkOrderReopenedHandler implements OutboxMessageHandler {
     private static final String CONSUMER = "workflow.work-order-reopened.v1";
 
-    private final JdbcClient jdbc;
+    private final DSLContext dsl;
     private final InboxService inbox;
     private final ConfigurationService configurations;
     private final WorkflowDefinitionParser parser;
@@ -44,8 +47,8 @@ final class WorkflowWorkOrderReopenedHandler implements OutboxMessageHandler {
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
-    WorkflowWorkOrderReopenedHandler(
-            JdbcClient jdbc,
+    JooqWorkflowWorkOrderReopenedHandler(
+            DSLContext dsl,
             InboxService inbox,
             ConfigurationService configurations,
             WorkflowDefinitionParser parser,
@@ -54,7 +57,7 @@ final class WorkflowWorkOrderReopenedHandler implements OutboxMessageHandler {
             ObjectMapper objectMapper,
             Clock clock
     ) {
-        this.jdbc = jdbc;
+        this.dsl = dsl;
         this.inbox = inbox;
         this.configurations = configurations;
         this.parser = parser;
@@ -87,18 +90,13 @@ final class WorkflowWorkOrderReopenedHandler implements OutboxMessageHandler {
             throw new IllegalArgumentException("WorkOrderReopened aggregateId does not match payload");
         }
 
-        boolean openRootExists = jdbc.sql("""
-                        SELECT COUNT(1)
-                          FROM wfl_workflow_instance
-                         WHERE tenant_id = :tenantId
-                           AND work_order_id = :workOrderId
-                           AND instance_role = 'ROOT'
-                           AND status IN ('ACTIVE', 'SUSPENDED')
-                        """)
-                .param("tenantId", message.tenantId())
-                .param("workOrderId", reopened.workOrderId())
-                .query(Integer.class)
-                .single() > 0;
+        boolean openRootExists = dsl.selectCount()
+                .from(WFL_WORKFLOW_INSTANCE)
+                .where(WFL_WORKFLOW_INSTANCE.TENANT_ID.eq(message.tenantId()))
+                .and(WFL_WORKFLOW_INSTANCE.WORK_ORDER_ID.eq(reopened.workOrderId()))
+                .and(WFL_WORKFLOW_INSTANCE.INSTANCE_ROLE.eq("ROOT"))
+                .and(WFL_WORKFLOW_INSTANCE.STATUS.in("ACTIVE", "SUSPENDED"))
+                .fetchSingleInto(Integer.class) > 0;
         if (openRootExists) {
             throw new IllegalStateException(
                     "cannot reopen workflow while an open ROOT instance still exists");
@@ -114,52 +112,37 @@ final class WorkflowWorkOrderReopenedHandler implements OutboxMessageHandler {
         UUID stageId = UUID.randomUUID();
         UUID nodeInstanceId = UUID.randomUUID();
 
-        jdbc.sql("""
-                INSERT INTO wfl_workflow_instance (
-                    workflow_instance_id, tenant_id, project_id, work_order_id,
-                    configuration_bundle_id, configuration_bundle_digest,
-                    workflow_definition_version_id,
-                    workflow_key, workflow_version, definition_digest, status,
-                    instance_role, start_event_id, correlation_id, version, started_at
-                ) VALUES (
-                    :workflowId, :tenantId, :projectId, :workOrderId,
-                    :bundleId, :bundleDigest, :definitionVersionId, :workflowKey, :workflowVersion,
-                    :definitionDigest, 'ACTIVE', 'ROOT', :startEventId, :correlationId, 1, :startedAt
-                )
-                """)
-                .param("workflowId", workflowId)
-                .param("tenantId", message.tenantId())
-                .param("projectId", reopened.projectId())
-                .param("workOrderId", reopened.workOrderId())
-                .param("bundleId", reopened.bundleRef().bundleId())
-                .param("bundleDigest", reopened.bundleRef().manifestDigest())
-                .param("definitionVersionId", asset.versionId())
-                .param("workflowKey", definition.workflowKey())
-                .param("workflowVersion", definition.workflowVersion())
-                .param("definitionDigest", asset.contentDigest())
-                .param("startEventId", message.eventId())
-                .param("correlationId", message.correlationId())
-                .param("startedAt", java.sql.Timestamp.from(now))
-                .update();
+        dsl.insertInto(WFL_WORKFLOW_INSTANCE)
+                .set(WFL_WORKFLOW_INSTANCE.WORKFLOW_INSTANCE_ID, workflowId)
+                .set(WFL_WORKFLOW_INSTANCE.TENANT_ID, message.tenantId())
+                .set(WFL_WORKFLOW_INSTANCE.PROJECT_ID, reopened.projectId())
+                .set(WFL_WORKFLOW_INSTANCE.WORK_ORDER_ID, reopened.workOrderId())
+                .set(WFL_WORKFLOW_INSTANCE.CONFIGURATION_BUNDLE_ID, reopened.bundleRef().bundleId())
+                .set(WFL_WORKFLOW_INSTANCE.CONFIGURATION_BUNDLE_DIGEST, reopened.bundleRef().manifestDigest())
+                .set(WFL_WORKFLOW_INSTANCE.WORKFLOW_DEFINITION_VERSION_ID, asset.versionId())
+                .set(WFL_WORKFLOW_INSTANCE.WORKFLOW_KEY, definition.workflowKey())
+                .set(WFL_WORKFLOW_INSTANCE.WORKFLOW_VERSION, definition.workflowVersion())
+                .set(WFL_WORKFLOW_INSTANCE.DEFINITION_DIGEST, asset.contentDigest())
+                .set(WFL_WORKFLOW_INSTANCE.STATUS, "ACTIVE")
+                .set(WFL_WORKFLOW_INSTANCE.INSTANCE_ROLE, "ROOT")
+                .set(WFL_WORKFLOW_INSTANCE.START_EVENT_ID, message.eventId())
+                .set(WFL_WORKFLOW_INSTANCE.CORRELATION_ID, message.correlationId())
+                .set(WFL_WORKFLOW_INSTANCE.VERSION, 1L)
+                .set(WFL_WORKFLOW_INSTANCE.STARTED_AT, now)
+                .execute();
 
-        jdbc.sql("""
-                INSERT INTO wfl_stage_instance (
-                    stage_instance_id, tenant_id, workflow_instance_id, work_order_id,
-                    stage_code, sequence_no, status, activation_event_id, version, activated_at
-                ) VALUES (
-                    :stageId, :tenantId, :workflowId, :workOrderId,
-                    :stageCode, 1, 'ACTIVE', :activationEventId, 1, :activatedAt
-                )
-                """)
-                .params(Map.of(
-                        "stageId", stageId,
-                        "tenantId", message.tenantId(),
-                        "workflowId", workflowId,
-                        "workOrderId", reopened.workOrderId(),
-                        "stageCode", definition.firstStageCode(),
-                        "activationEventId", message.eventId(),
-                        "activatedAt", java.sql.Timestamp.from(now)))
-                .update();
+        dsl.insertInto(WFL_STAGE_INSTANCE)
+                .set(WFL_STAGE_INSTANCE.STAGE_INSTANCE_ID, stageId)
+                .set(WFL_STAGE_INSTANCE.TENANT_ID, message.tenantId())
+                .set(WFL_STAGE_INSTANCE.WORKFLOW_INSTANCE_ID, workflowId)
+                .set(WFL_STAGE_INSTANCE.WORK_ORDER_ID, reopened.workOrderId())
+                .set(WFL_STAGE_INSTANCE.STAGE_CODE, definition.firstStageCode())
+                .set(WFL_STAGE_INSTANCE.SEQUENCE_NO, 1)
+                .set(WFL_STAGE_INSTANCE.STATUS, "ACTIVE")
+                .set(WFL_STAGE_INSTANCE.ACTIVATION_EVENT_ID, message.eventId())
+                .set(WFL_STAGE_INSTANCE.VERSION, 1L)
+                .set(WFL_STAGE_INSTANCE.ACTIVATED_AT, now)
+                .execute();
 
         ScheduledTaskView firstTask = tasks.createWorkflowTask(new CreateWorkflowTaskCommand(
                 message.tenantId(), reopened.projectId(), reopened.workOrderId(), workflowId, stageId,
@@ -172,25 +155,19 @@ final class WorkflowWorkOrderReopenedHandler implements OutboxMessageHandler {
                 message.payloadDigest(), 100, now, 3,
                 message.correlationId(), message.eventId().toString()));
 
-        jdbc.sql("""
-                INSERT INTO wfl_node_instance (
-                    workflow_node_instance_id, tenant_id, workflow_instance_id, stage_instance_id,
-                    work_order_id, node_id, task_id, status, activation_event_id, version, activated_at
-                ) VALUES (
-                    :nodeInstanceId, :tenantId, :workflowId, :stageId,
-                    :workOrderId, :nodeId, :taskId, 'ACTIVE', :activationEventId, 1, :activatedAt
-                )
-                """)
-                .param("nodeInstanceId", nodeInstanceId)
-                .param("tenantId", message.tenantId())
-                .param("workflowId", workflowId)
-                .param("stageId", stageId)
-                .param("workOrderId", reopened.workOrderId())
-                .param("nodeId", definition.firstNodeId())
-                .param("taskId", firstTask.taskId())
-                .param("activationEventId", message.eventId())
-                .param("activatedAt", java.sql.Timestamp.from(now))
-                .update();
+        dsl.insertInto(WFL_NODE_INSTANCE)
+                .set(WFL_NODE_INSTANCE.WORKFLOW_NODE_INSTANCE_ID, nodeInstanceId)
+                .set(WFL_NODE_INSTANCE.TENANT_ID, message.tenantId())
+                .set(WFL_NODE_INSTANCE.WORKFLOW_INSTANCE_ID, workflowId)
+                .set(WFL_NODE_INSTANCE.STAGE_INSTANCE_ID, stageId)
+                .set(WFL_NODE_INSTANCE.WORK_ORDER_ID, reopened.workOrderId())
+                .set(WFL_NODE_INSTANCE.NODE_ID, definition.firstNodeId())
+                .set(WFL_NODE_INSTANCE.TASK_ID, firstTask.taskId())
+                .set(WFL_NODE_INSTANCE.STATUS, "ACTIVE")
+                .set(WFL_NODE_INSTANCE.ACTIVATION_EVENT_ID, message.eventId())
+                .set(WFL_NODE_INSTANCE.VERSION, 1L)
+                .set(WFL_NODE_INSTANCE.ACTIVATED_AT, now)
+                .execute();
 
         String startedJson = write(new WorkflowStartedPayload(
                 workflowId, reopened.projectId(), reopened.workOrderId(),

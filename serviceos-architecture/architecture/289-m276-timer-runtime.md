@@ -17,7 +17,7 @@ relatedMilestones: [M270, M275]
 - schema：`TIMER` + `durationSeconds`
 - Flyway V103：`wfl_timer_subscription`
 - 推进时创建 WAITING 节点与定时订阅
-- `WorkflowTimerWorker` + `WorkflowTimerFireService` 幂等点火
+- `JooqWorkflowTimerWorker` + `WorkflowTimerFireService` 幂等点火
 - PostgreSQL IT
 
 ## 明确未实现

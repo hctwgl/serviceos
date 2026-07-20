@@ -25,7 +25,7 @@ M364 的 A2-R（ReviewCase 驱动 `reviewTaskId` handling Task）不被破坏。
    `INSTALL_TASK → REVIEW_TASK → WAIT_OEM_ACK`；
 2. 解析器：`REVIEW_TASK` 激活为 **WAITING 门闸**（`serviceos.review.approved` /
    `workOrder:{workOrderId}`），**不** `createWorkflowTask`；
-3. `WorkflowReviewDecidedHandler` 消费 `evidence.review-decided`：
+3. `JooqWorkflowReviewDecidedHandler` 消费 `evidence.review-decided`：
    - APPROVED / FORCE_APPROVED → 唤醒门闸或写入早期信号；
    - REJECTED → 忽略（留在门闸，等待整改复审）；
 4. Flyway V133：`wfl_review_gate_early_signal`（先审后到闸）；
