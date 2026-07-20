@@ -187,7 +187,10 @@ async function loginWithLocalKeycloak(page: import('@playwright/test').Page) {
 
 
 async function fillWorkOrderProjectFilter(page: import('@playwright/test').Page, projectId: string) {
-  await page.getByLabel('所属项目筛选').fill(projectId)
+  const input = page.getByLabel('所属项目筛选')
+  await input.click()
+  await input.fill(projectId)
+  await expect(input).toHaveValue(projectId)
 }
 
 async function selectWorkOrderStatus(page: import('@playwright/test').Page, statusLabel: string) {
@@ -200,6 +203,10 @@ async function expectWorkOrderStatusSelected(
   statusLabel: string,
 ) {
   await expect(page.getByLabel('工单状态筛选')).toContainText(statusLabel)
+}
+
+async function clickWorkOrderQuery(page: import('@playwright/test').Page) {
+  await page.getByTestId('query-panel').getByRole('button', { name: '查询' }).click()
 }
 
 async function prepareOpenReviewCase(
@@ -424,7 +431,8 @@ test('真实 OIDC 登录后可读取核心投影并完成 Task 分配领取释�
       new URL(response.url()).pathname === '/api/v1/work-orders' &&
       new URL(response.url()).searchParams.get('projectId') === pilotProjectId,
   )
-  await page.getByRole('button', { name: '查询' }).click()
+  await fillWorkOrderProjectFilter(page, pilotProjectId)
+  await clickWorkOrderQuery(page)
   expect((await workOrderFilterPromise).status()).toBe(200)
 
   // M178：工单目录关联资源 → 项目详情（表格所属项目列）。
@@ -436,7 +444,7 @@ test('真实 OIDC 登录后可读取核心投影并完成 Task 分配领取释�
   await page
     .getByRole('main')
     .getByRole('table')
-    .getByRole('link', { name: pilotProjectId, exact: true })
+    .getByRole('link', { name: new RegExp(`打开项目\\s+${pilotProjectId}`) })
     .first()
     .click()
   expect((await workOrderDirectoryProjectPromise).status()).toBe(200)
@@ -544,7 +552,8 @@ test('真实 OIDC 登录后可读取核心投影并完成 Task 分配领取释�
       new URL(response.url()).pathname === '/api/v1/work-orders' &&
       new URL(response.url()).searchParams.get('projectId') === pilotProjectId,
   )
-  await page.getByRole('button', { name: '查询' }).click()
+  await fillWorkOrderProjectFilter(page, pilotProjectId)
+  await clickWorkOrderQuery(page)
   expect((await pilotDirectoryPromise).status()).toBe(200)
 
   const pilotLink = page.getByRole('main').getByRole('table').getByRole('link', { name: 'ADMIN-PILOT-001', exact: true })

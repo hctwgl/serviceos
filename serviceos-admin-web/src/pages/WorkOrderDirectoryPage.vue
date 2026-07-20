@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, h, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Table, Select, Input, Button, Space, Alert, Tooltip } from 'ant-design-vue'
 import type { TableColumnsType } from 'ant-design-vue'
 import SavedViewBar from '../components/SavedViewBar.vue'
@@ -221,14 +221,12 @@ const columns = computed((): TableColumnsType<Row> => [
         { title: import.meta.env.DEV ? name.technicalId : '项目名称暂未随目录返回' },
         () =>
           h(
-            Button,
+            RouterLink,
             {
-              type: 'link',
-              onClick: () =>
-                router.push({
-                  name: 'ADMIN.PROJECT.DETAIL',
-                  params: { id: record.projectId },
-                }),
+              // 真实链接：键盘可达，且可访问名称带项目标识供冒烟与跨页跳转定位。
+              to: { name: 'ADMIN.PROJECT.DETAIL', params: { id: record.projectId } },
+              'aria-label': `打开项目 ${record.projectId}`,
+              class: 'project-link',
             },
             () => name.label,
           ),
