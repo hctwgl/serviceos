@@ -201,6 +201,10 @@ function statusPresentation(status: string) {
 }
 
 function onNavSelect(key: string) {
+  if (key === 'workflow') {
+    router.push({ name: 'ADMIN.WORKFLOW.DESIGNER' })
+    return
+  }
   activeNavKey.value = key
 }
 

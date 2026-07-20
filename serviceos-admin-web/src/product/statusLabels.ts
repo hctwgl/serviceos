@@ -83,6 +83,7 @@ const STATUS_LABELS: Record<string, string> = {
   INFECTED: '扫描未通过',
   STORED: '已存储',
   VALIDATED: '已校验',
+  DISCARDED: '已废弃',
   WITHIN_GEOFENCE: '围栏内',
   OUTSIDE_GEOFENCE: '围栏外',
   INTERNAL_EMPLOYEE: '内部员工',
