@@ -127,7 +127,7 @@ class ProjectFulfillmentWorkOrderFreezePostgresIT {
         profiles.updateDraft(principal(), meta("u1"),
                 new UpdateProjectFulfillmentDraftCommand(
                         created.profileId(), draft.aggregateVersion(),
-                        "冻结方案", null, draft.documentJson(),
+                        "冻结方案", null, draft.document(),
                         workflowVersionId, bundle.bundleId()));
         ProjectFulfillmentProfileDetail ready = profiles.get(
                 principal(), "g1", projectId, created.profileId());
@@ -152,7 +152,7 @@ class ProjectFulfillmentWorkOrderFreezePostgresIT {
         profiles.updateDraft(principal(), meta("u2"),
                 new UpdateProjectFulfillmentDraftCommand(
                         created.profileId(), draft2.aggregateVersion(),
-                        "冻结方案 v2", "资料加严", draft2.documentJson(),
+                        "冻结方案 v2", "资料加严", draft2.document(),
                         workflowVersionId, bundle.bundleId()));
         ProjectFulfillmentProfileDetail ready2 = profiles.get(
                 principal(), "g3", projectId, created.profileId());

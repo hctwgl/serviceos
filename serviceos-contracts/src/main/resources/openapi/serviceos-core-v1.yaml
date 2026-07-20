@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.62
+  version: 1.0.63
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -11549,16 +11549,69 @@ components:
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
         asOf: { type: string, format: date-time }
+    ProjectFulfillmentDocument:
+      type: object
+      description: 履约草稿结构化文档。产品 UI 必须读写本对象，不得自行解析底层 JSON。
+      required: [schemaVersion, stages]
+      properties:
+        schemaVersion: { type: string, minLength: 1, maxLength: 32 }
+        orderTypeName: { type: string, nullable: true }
+        supportedClientKinds:
+          type: array
+          items:
+            type: string
+            enum: [ADMIN_WEB, NETWORK_WEB, TECHNICIAN_WEB, TECHNICIAN_IOS]
+        stages:
+          type: array
+          items: { $ref: '#/components/schemas/ProjectFulfillmentStageDraft' }
+    ProjectFulfillmentStageDraft:
+      type: object
+      required: [stageCode, stageName, sequence, ownerType, terminal]
+      properties:
+        stageCode: { type: string, minLength: 1, maxLength: 64 }
+        stageName: { type: string, minLength: 1, maxLength: 120 }
+        sequence: { type: integer, minimum: 1 }
+        stageType: { type: string, nullable: true }
+        taskType: { type: string, nullable: true }
+        ownerType: { enum: [PLATFORM, NETWORK, TECHNICIAN, SYSTEM] }
+        description: { type: string, nullable: true }
+        formRefs:
+          type: array
+          items: { type: string }
+        evidenceRefs:
+          type: array
+          items: { type: string }
+        actions:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        transitions:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        exceptionPaths:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        slaRef: { type: string, nullable: true }
+        terminal: { type: boolean }
     ProjectFulfillmentDraft:
       type: object
-      required: [profileId, revisionId, serviceProductCode, profileName, documentJson, aggregateVersion, updatedAt]
+      required: [profileId, revisionId, serviceProductCode, profileName, document, aggregateVersion, updatedAt]
       properties:
         profileId: { type: string, format: uuid }
         revisionId: { type: string, format: uuid }
         serviceProductCode: { type: string }
         profileName: { type: string }
         description: { type: string, nullable: true }
-        documentJson: { type: string, minLength: 2 }
+        document: { $ref: '#/components/schemas/ProjectFulfillmentDocument' }
+        documentJson:
+          type: string
+          nullable: true
+          description: 仅供开发诊断；产品页面不得作为主读写路径
         workflowAssetVersionId: { type: string, format: uuid, nullable: true }
         sourceBundleId: { type: string, format: uuid, nullable: true }
         validationJson: { type: string, nullable: true }
@@ -11700,11 +11753,11 @@ components:
         copyFromProfileId: { type: string, format: uuid }
     UpdateProjectFulfillmentDraftRequest:
       type: object
-      required: [documentJson]
+      required: [document]
       properties:
         profileName: { type: string, maxLength: 200 }
         description: { type: string, maxLength: 2000 }
-        documentJson: { type: string, minLength: 2 }
+        document: { $ref: '#/components/schemas/ProjectFulfillmentDocument' }
         workflowAssetVersionId: { type: string, format: uuid }
         sourceBundleId: { type: string, format: uuid }
     PublishProjectFulfillmentRevisionRequest:

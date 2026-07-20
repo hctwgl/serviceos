@@ -6,10 +6,12 @@ import com.serviceos.configuration.api.ConfigurationBundleReference;
 import com.serviceos.configuration.api.ConfigurationService;
 import com.serviceos.configuration.api.CreateProjectFulfillmentProfileCommand;
 import com.serviceos.configuration.api.ProjectFulfillmentCompareImpact;
+import com.serviceos.configuration.api.ProjectFulfillmentDocument;
 import com.serviceos.configuration.api.ProjectFulfillmentDraftView;
 import com.serviceos.configuration.api.ProjectFulfillmentManifestView;
 import com.serviceos.configuration.api.ProjectFulfillmentProfileDetail;
 import com.serviceos.configuration.api.ProjectFulfillmentProfileService;
+import com.serviceos.configuration.api.ProjectFulfillmentStageDraft;
 import com.serviceos.configuration.api.ProjectFulfillmentResolveQuery;
 import com.serviceos.configuration.api.ProjectFulfillmentResolver;
 import com.serviceos.configuration.api.ProjectFulfillmentRevisionView;
@@ -36,6 +38,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -138,18 +141,21 @@ class ProjectFulfillmentProfilePostgresIT {
 
         ProjectFulfillmentDraftView draft = profiles.getDraft(
                 principal(), "corr-draft", projectId, created.profileId());
+        assertThat(draft.document()).isNotNull();
+        assertThat(draft.document().stages()).isNotEmpty();
         ProjectFulfillmentDraftView updated = profiles.updateDraft(principal(), meta("u1"),
                 new UpdateProjectFulfillmentDraftCommand(
                         created.profileId(), draft.aggregateVersion(),
-                        "标准家充履约 v2", "更新说明", draft.documentJson(),
+                        "标准家充履约 v2", "更新说明", draft.document(),
                         workflowVersionId, bundle.bundleId()));
         assertThat(updated.aggregateVersion()).isEqualTo(draft.aggregateVersion() + 1);
         assertThat(updated.workflowAssetVersionId()).isEqualTo(workflowVersionId);
+        assertThat(updated.document().stages()).hasSize(draft.document().stages().size());
 
         assertThatThrownBy(() -> profiles.updateDraft(principal(), meta("u-conflict"),
                 new UpdateProjectFulfillmentDraftCommand(
                         created.profileId(), draft.aggregateVersion(),
-                        "冲突", null, draft.documentJson(), workflowVersionId, bundle.bundleId())))
+                        "冲突", null, draft.document(), workflowVersionId, bundle.bundleId())))
                 .isInstanceOf(BusinessProblem.class)
                 .extracting(ex -> ((BusinessProblem) ex).code())
                 .isEqualTo(ProblemCode.VERSION_CONFLICT);
@@ -196,8 +202,9 @@ class ProjectFulfillmentProfilePostgresIT {
 
         ProjectFulfillmentDraftView afterPublishDraft = profiles.getDraft(
                 principal(), "corr-draft-2", projectId, created.profileId());
-        String mutated = afterPublishDraft.documentJson().replace("现场勘测", "现场勘测修订版");
-        assertThat(mutated).isNotEqualTo(afterPublishDraft.documentJson());
+        ProjectFulfillmentDocument mutated = renameStage(
+                afterPublishDraft.document(), "现场勘测", "现场勘测修订版");
+        assertThat(mutated).isNotEqualTo(afterPublishDraft.document());
         profiles.updateDraft(principal(), meta("u-diff"),
                 new UpdateProjectFulfillmentDraftCommand(
                         created.profileId(), afterPublishDraft.aggregateVersion(),
@@ -223,7 +230,7 @@ class ProjectFulfillmentProfilePostgresIT {
         profiles.updateDraft(principal(), meta("u-iso"),
                 new UpdateProjectFulfillmentDraftCommand(
                         created.profileId(), draft.aggregateVersion(),
-                        "隔离测试", null, draft.documentJson(),
+                        "隔离测试", null, draft.document(),
                         workflowVersionId, bundle.bundleId()));
         ProjectFulfillmentProfileDetail ready = profiles.get(
                 principal(), "corr-iso2", projectId, created.profileId());
@@ -243,7 +250,7 @@ class ProjectFulfillmentProfilePostgresIT {
         profiles.updateDraft(principal(), meta("u-iso2"),
                 new UpdateProjectFulfillmentDraftCommand(
                         created.profileId(), draft2.aggregateVersion(),
-                        "隔离测试 v2", "变更说明", draft2.documentJson(),
+                        "隔离测试 v2", "变更说明", draft2.document(),
                         workflowVersionId, bundle.bundleId()));
         ProjectFulfillmentProfileDetail ready2 = profiles.get(
                 principal(), "corr-iso5", projectId, created.profileId());
@@ -366,5 +373,33 @@ class ProjectFulfillmentProfilePostgresIT {
 
     private static CommandMetadata meta(String key) {
         return new CommandMetadata("corr-" + key, "idem-" + key);
+    }
+
+    private static ProjectFulfillmentDocument renameStage(
+            ProjectFulfillmentDocument source, String fromName, String toName
+    ) {
+        return new ProjectFulfillmentDocument(
+                source.schemaVersion(),
+                source.orderTypeName(),
+                source.supportedClientKinds(),
+                source.stages().stream()
+                        .map(stage -> Objects.equals(stage.stageName(), fromName)
+                                ? new ProjectFulfillmentStageDraft(
+                                        stage.stageCode(),
+                                        toName,
+                                        stage.sequence(),
+                                        stage.stageType(),
+                                        stage.taskType(),
+                                        stage.ownerType(),
+                                        stage.description(),
+                                        stage.formRefs(),
+                                        stage.evidenceRefs(),
+                                        stage.actions(),
+                                        stage.transitions(),
+                                        stage.exceptionPaths(),
+                                        stage.slaRef(),
+                                        stage.terminal())
+                                : stage)
+                        .toList());
     }
 }

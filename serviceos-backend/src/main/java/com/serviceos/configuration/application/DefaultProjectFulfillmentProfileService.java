@@ -64,6 +64,7 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
     private final ProjectFulfillmentManifestCompiler compiler;
     private final ProjectFulfillmentRunbookAssembler runbookAssembler;
     private final ProjectFulfillmentCompareAnalyzer compareAnalyzer;
+    private final ProjectFulfillmentDocumentMapper documentMapper;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
@@ -75,6 +76,7 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
             ProjectFulfillmentManifestCompiler compiler,
             ProjectFulfillmentRunbookAssembler runbookAssembler,
             ProjectFulfillmentCompareAnalyzer compareAnalyzer,
+            ProjectFulfillmentDocumentMapper documentMapper,
             ObjectMapper objectMapper,
             Clock clock
     ) {
@@ -85,6 +87,7 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
         this.compiler = compiler;
         this.runbookAssembler = runbookAssembler;
         this.compareAnalyzer = compareAnalyzer;
+        this.documentMapper = documentMapper;
         this.objectMapper = objectMapper;
         this.clock = clock;
     }
@@ -274,18 +277,22 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
                 """)
                 .param("tenantId", principal.tenantId())
                 .param("revisionId", profile.draftRevisionId())
-                .query((rs, n) -> new ProjectFulfillmentDraftView(
-                        profile.profileId(),
-                        rs.getObject("revision_id", UUID.class),
-                        profile.serviceProductCode(),
-                        profile.profileName(),
-                        profile.description(),
-                        rs.getString("document_json"),
-                        rs.getObject("workflow_asset_version_id", UUID.class),
-                        rs.getObject("source_bundle_id", UUID.class),
-                        rs.getString("validation_json"),
-                        profile.aggregateVersion(),
-                        profile.updatedAt()))
+                .query((rs, n) -> {
+                    String documentJson = rs.getString("document_json");
+                    return new ProjectFulfillmentDraftView(
+                            profile.profileId(),
+                            rs.getObject("revision_id", UUID.class),
+                            profile.serviceProductCode(),
+                            profile.profileName(),
+                            profile.description(),
+                            documentMapper.fromJson(documentJson),
+                            documentJson,
+                            rs.getObject("workflow_asset_version_id", UUID.class),
+                            rs.getObject("source_bundle_id", UUID.class),
+                            rs.getString("validation_json"),
+                            profile.aggregateVersion(),
+                            profile.updatedAt());
+                })
                 .optional()
                 .orElseThrow(() -> new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "履约配置草稿不存在"));
     }
@@ -310,7 +317,7 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
         if (profile.draftRevisionId() == null) {
             throw new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "履约配置草稿不存在");
         }
-        parseDocument(command.documentJson());
+        String documentJson = documentMapper.toJson(command.document());
         Instant now = clock.instant();
         String name = command.profileName() == null || command.profileName().isBlank()
                 ? profile.profileName() : command.profileName().trim();
@@ -325,7 +332,7 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
                    AND revision_id = :revisionId
                    AND revision_status = 'DRAFT'
                 """)
-                .param("document", command.documentJson())
+                .param("document", documentJson)
                 .param("workflowVersionId", command.workflowAssetVersionId())
                 .param("bundleId", command.sourceBundleId())
                 .param("tenantId", principal.tenantId())
