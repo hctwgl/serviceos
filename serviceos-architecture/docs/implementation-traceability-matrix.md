@@ -489,7 +489,7 @@ Feature gate/authority: if applicable
 | M398 | Admin 项目管理列表+新建流程、工作台 SummaryStrip | 409-m398-* + 392-m398-*；Playwright 截图 | 方案聚合列；关注项目读模型；实体选择器；人工视觉批准 |
 | M399 | 项目列表 publishedSchemeCount/draftSchemeCount 服务端聚合 | 410-m399-* + 393-m399-*；OpenAPI 1.0.65；PostgresIT + ArchitectureTest + Playwright | 关注项目；实体选择器；人工视觉批准 |
 | M400 | 项目车企/区域/网点实体选择器 | 411-m400-* + 394-m400-*；OpenAPI 1.0.66；PostgresIT + ArchitectureTest + Playwright | 行政区名称树；车企主数据；关注项目；人工视觉批准 |
-| M401 | Admin 关注项目读模型 | 412-m401-* + 395-m401-*；OpenAPI 1.0.67；Flyway V139；PostgresIT + ArchitectureTest + Playwright | 关注角标聚合；行政区名称树；人工视觉批准 |
+| M401 | Admin 关注项目读模型 | 412-m401-* + 395-m401-*；OpenAPI 1.0.67；Flyway V139；PostgresIT + ArchitectureTest + Playwright | 行政区名称树；人工视觉批准（角标已由 M409 关闭） |
 | M402 | Admin 用户登记与目录组织/角色摘要 | 413-m402-* + 396-m402-*；OpenAPI 1.0.68；Flyway V140；PostgresIT + ArchitectureTest + Playwright | 最近登录；组织树任职编辑；人工视觉批准 |
 | M403 | Admin 主体最近登录读模型 | 414-m403-* + 397-m403-*；OpenAPI 1.0.69；Flyway V141；PostgresIT + ArchitectureTest + Playwright | 失败登录；设备指纹；组织树任职；人工视觉批准 |
 | M404 | Admin 用户详情组织任职编辑 | 415-m404-* + 398-m404-*；OpenAPI 1.0.70；PostgresIT + ArchitectureTest + Playwright | 审计时间线；树形拖拽；人工视觉批准 |
@@ -497,4 +497,5 @@ Feature gate/authority: if applicable
 | M406 | 车企主数据与行政区名称目录 | 417-m406-* + 400-m406-*；OpenAPI 1.0.72；Flyway V142；PostgresIT + ArchitectureTest + Playwright | 全量国标树；品牌树 UI；人工视觉批准 |
 | M407 | Network 分配师傅候选摘要 | 418-m407-* + 401-m407-*；OpenAPI 1.0.73；ArchitectureTest + Playwright | 距离/日程冲突；推荐评分；人工视觉批准 |
 | M408 | Network 分配候选预约日程冲突摘要 | 419-m408-* + 402-m408-*；OpenAPI 1.0.74；ArchitectureTest + Playwright | 距离读模型；推荐评分；人工视觉批准 |
+| M409 | Admin 关注项目待办/SLA 角标聚合 | 420-m409-* + 403-m409-*；OpenAPI 1.0.75；PostgresIT + Playwright | 距离读模型；全量国标树；人工视觉批准 |
 

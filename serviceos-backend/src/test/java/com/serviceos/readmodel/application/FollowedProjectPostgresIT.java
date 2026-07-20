@@ -90,12 +90,50 @@ class FollowedProjectPostgresIT {
         FollowedProjectPage page = queries.list(operator(), "c5", "ADMIN", 10);
         assertThat(page.items()).extracting(FollowedProjectItem::projectId)
                 .containsExactly(alpha.id(), bravo.id());
+        // 仅 project.read 时角标 soft-gate 为 null，不伪造 0
+        assertThat(page.items()).allSatisfy(item -> {
+            assertThat(item.activeWorkOrderCount()).isNull();
+            assertThat(item.openReviewCount()).isNull();
+            assertThat(item.openCorrectionCount()).isNull();
+            assertThat(item.slaBreachedCount()).isNull();
+            assertThat(item.openTodoCount()).isNull();
+        });
 
         long rows = jdbc.sql("""
                 SELECT count(*) FROM rdm_followed_project
                  WHERE tenant_id='tenant-test' AND principal_id='operator'
                 """).query(Long.class).single();
         assertThat(rows).isEqualTo(2L);
+    }
+
+    @Test
+    void listEnrichesZeroBadgesWhenReadCapabilitiesPresent() {
+        ProjectView project = create("FOLLOW-BADGE", "client-a", "Badge Project");
+        commands.follow(operator(), "c-badge-1", "ADMIN", project.id(), null);
+
+        seedRole(
+                "badge-reader",
+                "follow-badge",
+                "TENANT",
+                "tenant-test",
+                List.of(
+                        "project.read",
+                        "workOrder.read",
+                        "evidence.review",
+                        "evidence.read",
+                        "sla.read"));
+        CurrentPrincipal reader = principal("badge-reader");
+        commands.follow(reader, "c-badge-2", "ADMIN", project.id(), null);
+
+        FollowedProjectPage page = queries.list(reader, "c-badge-3", "ADMIN", 10);
+        assertThat(page.items()).hasSize(1);
+        FollowedProjectItem item = page.items().getFirst();
+        assertThat(item.activeWorkOrderCount()).isZero();
+        assertThat(item.activeWorkOrderCountTruncated()).isFalse();
+        assertThat(item.openReviewCount()).isZero();
+        assertThat(item.openCorrectionCount()).isZero();
+        assertThat(item.slaBreachedCount()).isZero();
+        assertThat(item.openTodoCount()).isZero();
     }
 
     @Test

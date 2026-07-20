@@ -14,6 +14,7 @@ import { listReviewCases, listCorrectionCases, listOperationalExceptions } from 
 import { listAuthorizedWorkOrders } from '../api/workOrders'
 import { listSlaInstances } from '../api/sla'
 import {
+  formatFollowedBadgeCount,
   listFollowedProjects,
   unfollowProject,
   type FollowedProjectItem,
@@ -201,6 +202,23 @@ async function removeFollow(projectId: string) {
   } finally {
     unfollowBusyId.value = null
   }
+}
+
+function followedBadgeAria(item: FollowedProjectItem): string {
+  const parts: string[] = []
+  const todo = formatFollowedBadgeCount(item.openTodoCount, null)
+  if (todo != null) {
+    parts.push(`待办 ${todo}`)
+  }
+  const sla = formatFollowedBadgeCount(item.slaBreachedCount, item.slaBreachedCountTruncated)
+  if (sla != null) {
+    parts.push(`SLA 超时 ${sla}`)
+  }
+  const wo = formatFollowedBadgeCount(item.activeWorkOrderCount, item.activeWorkOrderCountTruncated)
+  if (wo != null) {
+    parts.push(`进行中工单 ${wo}`)
+  }
+  return parts.length > 0 ? parts.join('，') : '暂无角标'
 }
 
 async function loadAll() {
@@ -490,6 +508,27 @@ onMounted(() => {
               {{ item.projectCode || '—' }}
               · {{ labelClientCode(item.clientId) }}
             </span>
+            <span
+              class="followed-badges"
+              data-testid="workbench-followed-badges"
+              :aria-label="followedBadgeAria(item)"
+            >
+              <span
+                v-if="formatFollowedBadgeCount(item.openTodoCount, null) != null"
+                class="badge badge-todo"
+                data-testid="workbench-followed-todo"
+              >待办 {{ formatFollowedBadgeCount(item.openTodoCount, null) }}</span>
+              <span
+                v-if="formatFollowedBadgeCount(item.slaBreachedCount, item.slaBreachedCountTruncated) != null"
+                class="badge badge-sla"
+                data-testid="workbench-followed-sla"
+              >SLA {{ formatFollowedBadgeCount(item.slaBreachedCount, item.slaBreachedCountTruncated) }}</span>
+              <span
+                v-if="formatFollowedBadgeCount(item.activeWorkOrderCount, item.activeWorkOrderCountTruncated) != null"
+                class="badge badge-wo"
+                data-testid="workbench-followed-work-orders"
+              >工单 {{ formatFollowedBadgeCount(item.activeWorkOrderCount, item.activeWorkOrderCountTruncated) }}</span>
+            </span>
             <Button
               size="small"
               type="link"
@@ -577,6 +616,37 @@ button,
   border-radius: 0;
   padding: 0;
   box-shadow: none;
+}
+.followed-badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+.followed-badges .badge {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  border: 1px solid #d0d7de;
+  background: #f6f8fa;
+  color: #24292f;
+}
+.followed-badges .badge-todo {
+  border-color: #9ec5fe;
+  background: #eef5ff;
+  color: #0b69a3;
+}
+.followed-badges .badge-sla {
+  border-color: #f1aeb5;
+  background: #fff5f5;
+  color: #b42318;
+}
+.followed-badges .badge-wo {
+  border-color: #c4cdd5;
+  background: #f8fafc;
+  color: #334155;
 }
 table {
   width: 100%;

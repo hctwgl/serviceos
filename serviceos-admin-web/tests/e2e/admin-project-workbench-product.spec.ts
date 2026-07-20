@@ -48,6 +48,10 @@ test.describe('M398 Admin 项目管理与工作台母版产品化', () => {
     await expect(page.getByTestId('workbench-primary')).toContainText('我的待办')
     await expect(page.getByTestId('workbench-followed-projects')).toBeVisible()
     await expect(page.getByTestId('workbench-followed-list')).toContainText('演示家充项目')
+    await expect(page.getByTestId('workbench-followed-badges')).toBeVisible()
+    await expect(page.getByTestId('workbench-followed-todo')).toContainText('待办 2')
+    await expect(page.getByTestId('workbench-followed-sla')).toContainText('SLA 1')
+    await expect(page.getByTestId('workbench-followed-work-orders')).toContainText('工单 2')
     await expect(page.getByTestId('workbench-followed-unfollow')).toBeVisible()
 
     await page.setViewportSize({ width: 1440, height: 1024 })

@@ -69,7 +69,8 @@ class DefaultFollowedProjectCommandService implements FollowedProjectCommandServ
                 now,
                 createdAt));
 
-        return new FollowedProjectItem(
+        // 关注写路径只回写身份与深链；角标由列表读模型实时聚合。
+        return FollowedProjectItem.withoutBadges(
                 projectId,
                 displayRef,
                 detail.project().code(),

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.74
+  version: 1.0.75
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -7520,6 +7520,32 @@ components:
         status: { type: [string, 'null'] }
         followedAt: { type: string, format: date-time }
         deepLink: { type: string, minLength: 1 }
+        activeWorkOrderCount:
+          type: [integer, 'null']
+          minimum: 0
+          description: ACTIVE 工单数；缺 workOrder.read 时为 null
+        activeWorkOrderCountTruncated:
+          type: [boolean, 'null']
+          description: true 表示至少 activeWorkOrderCount，仍有下一页
+        openReviewCount:
+          type: [integer, 'null']
+          minimum: 0
+          description: OPEN 审核案例数；缺审核读能力时为 null
+        openReviewCountTruncated: { type: [boolean, 'null'] }
+        openCorrectionCount:
+          type: [integer, 'null']
+          minimum: 0
+          description: OPEN 整改案例数；缺整改读能力时为 null
+        openCorrectionCountTruncated: { type: [boolean, 'null'] }
+        slaBreachedCount:
+          type: [integer, 'null']
+          minimum: 0
+          description: BREACHED SLA 实例数；缺 sla.read 时为 null
+        slaBreachedCountTruncated: { type: [boolean, 'null'] }
+        openTodoCount:
+          type: [integer, 'null']
+          minimum: 0
+          description: 可见角标合计（审核+整改+SLA 超时）；全部 soft-gate 时为 null
     FollowedProjectPage:
       type: object
       additionalProperties: false

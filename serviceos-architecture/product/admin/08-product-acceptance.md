@@ -375,7 +375,7 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 关注项目待办/SLA 角标聚合（关注列表本身已由 M401 交付）
+  - UI_DATA_GAP: 关注项目待办/SLA 角标聚合（已由 M409 关闭主路径）
 ```
 
 ### 9.5 M399 记录（项目列表方案聚合）
@@ -429,7 +429,25 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 关注项目上的待办/SLA 角标聚合
+  - UI_DATA_GAP: 关注项目上的待办/SLA 角标聚合（已由 M409 关闭主路径）
+```
+
+### 9.7b M409 记录（关注项目角标）
+
+```yaml
+pageId: ADMIN.WORKBENCH
+route: /workbench
+visualProfile: CLASSIC_PROFESSIONAL
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: 超过 100 条时的精确全量 COUNT（当前 *Truncated）
 ```
 
 ### 9.8 M402 记录（用户登记与目录摘要）

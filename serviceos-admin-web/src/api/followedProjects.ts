@@ -8,6 +8,15 @@ export type FollowedProjectItem = {
   status: string | null
   followedAt: string
   deepLink: string
+  activeWorkOrderCount: number | null
+  activeWorkOrderCountTruncated: boolean | null
+  openReviewCount: number | null
+  openReviewCountTruncated: boolean | null
+  openCorrectionCount: number | null
+  openCorrectionCountTruncated: boolean | null
+  slaBreachedCount: number | null
+  slaBreachedCountTruncated: boolean | null
+  openTodoCount: number | null
 }
 
 export type FollowedProjectPage = {
@@ -41,4 +50,15 @@ export function followProject(body: { projectId: string; displayRef?: string }) 
 
 export function unfollowProject(projectId: string) {
   return apiDelete(`/me/followed-projects/${projectId}?portal=ADMIN`)
+}
+
+/** 角标文案：缺权限时不展示该段；截断时后缀 +。 */
+export function formatFollowedBadgeCount(
+  count: number | null | undefined,
+  truncated: boolean | null | undefined,
+): string | null {
+  if (count == null) {
+    return null
+  }
+  return truncated ? `${count}+` : String(count)
 }
