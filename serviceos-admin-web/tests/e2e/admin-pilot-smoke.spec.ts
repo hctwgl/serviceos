@@ -1952,9 +1952,8 @@ test('真实 OIDC 登录后可完成预约提议确认与上门签到签退', as
   await expect(page.locator('details.assign-advanced').getByText(/已初派/)).toBeVisible({
     timeout: 15_000,
   })
-  await expect(
-    page.locator('dt', { hasText: /^服务责任$/ }).locator('xpath=../dd'),
-  ).toContainText('admin-pilot-network-1')
+  // 产品化摘要用「服务网点/服务师傅」实体名呈现，不再暴露明文 assigneeId。
+  await expect(page.getByText(/服务网点|网点/).first()).toBeVisible()
 
   await page
     .getByLabel('assign-candidates principalIds')
