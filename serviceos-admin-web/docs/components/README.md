@@ -7,8 +7,9 @@
 | 组件 | 文档 |
 |---|---|
 | SemanticStatusTag | [SemanticStatusTag.md](./SemanticStatusTag.md) |
-| PageContainer（M372） | 待切片补齐 |
-| ScopeBar（M371） | 待切片补齐 |
-| FreshnessIndicator（M371） | 待切片补齐 |
+| ScopeBar | [ScopeBar.md](./ScopeBar.md) |
+| FreshnessIndicator | `src/patterns/FreshnessIndicator.vue` |
+| PageContainer | `src/patterns/PageContainer.vue`（模板扩展见 M372） |
+| DeveloperDiagnosticsDrawer | `src/patterns/DeveloperDiagnosticsDrawer.vue` |
 
 破坏性组件变更必须同步本目录与 `docs/design-tokens.md`。
