@@ -477,4 +477,5 @@ Feature gate/authority: if applicable
 | M388 | 履约 Draft 结构化 Document/StageDraft；编辑器去 documentJson 产品路径（OpenAPI 1.0.63） | 397-m388-* + 380-m388-*；DocumentMapperTest + PostgresIT + Playwright | M386/M387 |
 | M386 | Admin 工作流设计器产品页；ConfigurationDraft WORKFLOW API；无 JSON 主编辑 | 398-m386-* + 381-m386-*；Playwright + 截图；Page Registry v19 | M387 Task 模板中心；结构化 Workflow DTO |
 | M387 | 任务模板中心读模型 GET /configuration/task-templates + 产品页 | 399-m387-* + 382-m387-*；PostgresIT + Playwright；Page Registry v20 | 独立写聚合/升级策略；其余母版 |
+| M389 | 工单详情履约工作区：BusinessProgress/AllowedActionBar/当前任务卡/右轨 | 400-m389-* + 383-m389-*；Playwright 截图 | PII 读模型；资料缩略图；人工视觉批准 |
 

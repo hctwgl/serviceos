@@ -4,6 +4,9 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Button, Tabs, TabPane, Alert, Select, Input, Descriptions, Space, Card } from 'ant-design-vue'
 import { ArrowLeftOutlined } from '@ant-design/icons-vue'
 import DetailPageLayout from '../patterns/templates/DetailPageLayout.vue'
+import BusinessProgress, { type BusinessProgressStep } from '../patterns/BusinessProgress.vue'
+import AllowedActionBar, { type AllowedActionItem } from '../patterns/AllowedActionBar.vue'
+import RightContextRail from '../patterns/RightContextRail.vue'
 import SemanticStatusTag from '../components/business/SemanticStatusTag.vue'
 import { presentWorkOrderStatus } from '../presentation/work-order-status.presenter'
 import { presentPricingStatus } from '../presentation/pricing-status.presenter'
@@ -65,8 +68,14 @@ async function loadNetworks() {
   try {
     const page = await listServiceNetworks()
     networkOptions.value = page.items.filter((n) => n.status === 'ACTIVE')
-  } catch {
+  } catch (err) {
     networkOptions.value = []
+    diagnostics.pushDiagnostic({
+      title: '网点目录加载失败',
+      fields: {
+        message: err instanceof Error ? err.message : 'unknown',
+      },
+    })
   }
 }
 
@@ -1069,6 +1078,48 @@ const slaSummaryText = computed(() => {
   return '暂无进行中的时效'
 })
 
+const businessProgressSteps = computed<BusinessProgressStep[]>(() => {
+  const list = [...(stages.value?.stages ?? [])].sort((a, b) => a.sequenceNo - b.sequenceNo)
+  const currentStageCode = workspace.value?.currentTaskSummary?.stageCode
+  return list.map((stage) => {
+    const label = statusLabel(stage.stageCode) || stage.stageCode
+    let status: BusinessProgressStep['status'] = 'upcoming'
+    if (stage.status === 'COMPLETED' || stage.completedAt) status = 'done'
+    else if (
+      stage.stageCode === currentStageCode ||
+      stage.status === 'ACTIVE' ||
+      stage.status === 'IN_PROGRESS'
+    ) {
+      status = 'current'
+    }
+    return {
+      key: stage.id,
+      label,
+      status,
+      hint:
+        stage.stageCode === currentStageCode && workspace.value?.currentTaskSummary
+          ? statusLabel(workspace.value.currentTaskSummary.taskType)
+          : undefined,
+    }
+  })
+})
+
+const allowedActionItems = computed<AllowedActionItem[]>(() => {
+  const actions = allowedActions.value?.actions ?? []
+  return actions.slice(0, 5).map((action, index) => ({
+    code: action.code,
+    label: labelAction(action.code, action.label),
+    primary: index === 0,
+  }))
+})
+
+const recentTimelineItems = computed(() => (timelinePage.value?.items ?? []).slice(0, 5))
+
+function onAllowedActionSelect(_code: string) {
+  productTab.value = 'TASKS'
+  onProductTabChange('TASKS')
+}
+
 watch(workOrderId, () => {
   if (workOrderId.value) {
     void loadWorkspace()
@@ -1086,8 +1137,9 @@ onMounted(() => {
 
 <template>
   <DetailPageLayout
-    title="工单详情"
-    :eyebrow="orderCode !== '未提供' ? `工单编号 ${orderCode}` : undefined"
+    :title="orderCode !== '未提供' ? orderCode : '工单详情'"
+    description="统一履约工作区：阶段进度、当前任务、资料审核与外部回传。"
+    :eyebrow="workspace ? labelServiceProduct(workOrderDetail?.workOrder.serviceProductCode) : undefined"
     :show-sticky="!!workspace"
     sticky-note="主操作来自服务端允许动作；复杂改派请使用专用流程。"
   >
@@ -1105,13 +1157,12 @@ onMounted(() => {
       <Button v-if="showTechTab" type="link" @click="productTab = 'tech'; diagnostics.openDrawer()">技术诊断</Button>
     </template>
     <template #primary-action>
-      <Button
-        v-if="workspace?.currentTaskSummary && allowedActions?.actions?.length"
-        type="primary"
-        @click="productTab = 'TASKS'; onProductTabChange('TASKS')"
-      >
-        {{ labelAction(allowedActions.actions[0]?.code, allowedActions.actions[0]?.label) }}
-      </Button>
+      <AllowedActionBar
+        v-if="workspace"
+        :actions="allowedActionItems"
+        empty-text="当前无可执行动作"
+        @select="onAllowedActionSelect"
+      />
     </template>
     <template #feedback>
       <Alert v-if="error" type="error" show-icon :message="error" />
@@ -1160,11 +1211,10 @@ onMounted(() => {
     </template>
 
     <template v-if="workspace" #progress>
-      <p v-if="stages?.workflow" class="muted">
-        履约流程：{{ stages.workflow.workflowKey || '未命名流程' }} ·
-        {{ stages.workflow.status ? statusLabel(stages.workflow.status) : '未初始化' }}
+      <BusinessProgress title="履约进度" :steps="businessProgressSteps" />
+      <p v-if="stages?.workflow" class="muted" style="margin-top: 8px">
+        流程状态：{{ stages.workflow.status ? statusLabel(stages.workflow.status) : '未初始化' }}
       </p>
-      <p v-else class="muted">履约阶段投影暂未加载</p>
     </template>
 
     <template v-if="workspace" #risk>
@@ -1182,8 +1232,74 @@ onMounted(() => {
       </Alert>
     </template>
 
-    <Tabs v-if="workspace" v-model:activeKey="productTab" @change="onProductTabChange">
-      <TabPane key="overview" tab="概览">
+    <div v-if="workspace" class="wo-workspace-body" data-testid="work-order-fulfillment-workspace">
+      <div class="wo-workspace-body__main">
+        <Card
+          v-if="workspace.currentTaskSummary"
+          title="当前任务"
+          size="small"
+          class="current-task-card"
+          data-testid="current-task-card"
+        >
+          <Descriptions :column="2" size="small">
+            <Descriptions.Item label="任务">
+              {{ statusLabel(workspace.currentTaskSummary.taskType) }}
+            </Descriptions.Item>
+            <Descriptions.Item label="状态">
+              <SemanticStatusTag
+                :presentation="{
+                  label: statusLabel(workspace.currentTaskSummary.status),
+                  semantic: 'info',
+                  icon: 'info',
+                }"
+              />
+            </Descriptions.Item>
+            <Descriptions.Item label="阶段">
+              {{ statusLabel(workspace.currentTaskSummary.stageCode || '') || '—' }}
+            </Descriptions.Item>
+            <Descriptions.Item label="服务网点">
+              <template v-if="workspace.serviceAssignmentSummary">
+                {{
+                  presentEntityName({
+                    id: String(workspace.serviceAssignmentSummary.networkId ?? ''),
+                    loaded: true,
+                  }).label
+                }}
+              </template>
+              <template v-else>—</template>
+            </Descriptions.Item>
+            <Descriptions.Item label="服务师傅">
+              <template v-if="workspace.serviceAssignmentSummary">
+                {{
+                  presentEntityName({
+                    id: String(workspace.serviceAssignmentSummary.technicianId ?? ''),
+                    loaded: true,
+                  }).label
+                }}
+              </template>
+              <template v-else>—</template>
+            </Descriptions.Item>
+            <Descriptions.Item label="SLA">{{ slaSummaryText }}</Descriptions.Item>
+          </Descriptions>
+          <div style="margin-top: 12px">
+            <TaskCommandPanel
+              v-if="allowedActions"
+              :task-id="workspace.currentTaskSummary.taskId"
+              :allowed-actions="allowedActions"
+              @executed="loadWorkspace"
+            />
+            <Alert
+              v-else-if="allowedActionsError"
+              type="error"
+              show-icon
+              :message="allowedActionsError"
+            />
+            <p v-else class="muted">暂无允许动作或无权读取</p>
+          </div>
+        </Card>
+
+    <Tabs v-model:activeKey="productTab" @change="onProductTabChange">
+      <TabPane key="overview" tab="基本信息">
         <Space direction="vertical" style="width: 100%" :size="16">
           <Card title="配置来源" size="small">
             <template v-if="fulfillmentSnapshot">
@@ -1291,21 +1407,10 @@ onMounted(() => {
             <p v-else class="muted">{{ pricingSnapshots?.emptyHint || '暂无影子试算快照。' }}</p>
           </Card>
 
-          <Card title="当前任务命令" size="small">
-            <Alert v-if="allowedActionsError" type="error" show-icon :message="allowedActionsError" />
-            <p v-else-if="!workspace.currentTaskSummary">无当前任务</p>
-            <TaskCommandPanel
-              v-else-if="allowedActions"
-              :task-id="workspace.currentTaskSummary.taskId"
-              :allowed-actions="allowedActions"
-              @executed="loadWorkspace"
-            />
-            <p v-else>暂无允许动作或无权读取</p>
-          </Card>
         </Space>
       </TabPane>
 
-      <TabPane key="TASKS" tab="履约任务">
+      <TabPane key="TASKS" tab="任务记录">
         <QueueTable
           title="工单任务"
           :columns="['id', 'taskType', 'taskKind', 'status', 'stageCode', 'priority']"
@@ -1333,7 +1438,13 @@ onMounted(() => {
         </div>
       </TabPane>
 
-      <TabPane key="FORMS_EVIDENCE" tab="勘测与安装资料">
+      <TabPane key="APPOINTMENTS_VISITS" tab="预约与上门">
+        <p v-if="sectionError" class="error">{{ sectionError }}</p>
+        <p v-else-if="sectionLoading">区块加载中…</p>
+        <p v-else class="muted">预约、联系尝试与上门记录见关联明细；缺字段显示「未提供」。</p>
+      </TabPane>
+
+      <TabPane key="FORMS_EVIDENCE" tab="表单资料">
         <p v-if="sectionError" class="error">{{ sectionError }}</p>
         <p v-else-if="sectionLoading">区块加载中…</p>
         <p v-else class="muted">资料与表单明细见下方关联链接；缺字段时显示「未提供」。</p>
@@ -1357,7 +1468,7 @@ onMounted(() => {
         </p>
       </TabPane>
 
-      <TabPane key="REVIEWS_CORRECTIONS" tab="审核整改">
+      <TabPane key="REVIEWS_CORRECTIONS" tab="审核与整改">
         <p v-if="sectionError" class="error">{{ sectionError }}</p>
         <p v-else-if="sectionLoading">区块加载中…</p>
         <p v-if="reviewCaseLinks.length" class="links">
@@ -1425,7 +1536,7 @@ onMounted(() => {
         </p>
       </TabPane>
 
-      <TabPane key="TIMELINE_AUDIT" tab="活动记录">
+      <TabPane key="TIMELINE_AUDIT" tab="操作日志">
         <ul v-if="activity?.items?.length">
           <li v-for="(item, index) in activity.items" :key="index">
             <strong>{{ statusLabel(String(item.eventType || item.type || 'UNKNOWN')) }}</strong>
@@ -1453,22 +1564,11 @@ onMounted(() => {
         />
       </TabPane>
 
-      <TabPane key="APPOINTMENTS_VISITS" tab="预约到场">
+      <TabPane key="INTEGRATION" tab="外部回传">
         <Alert
           type="info"
           show-icon
-          message="预约与上门"
-          description="预约、联系记录与上门签到详情可通过下方关联链接打开；完整编排仍在任务工作区完成。"
-        />
-        <p v-if="sectionLoading">区块加载中…</p>
-        <p v-else-if="sectionError" class="error">{{ sectionError }}</p>
-      </TabPane>
-
-      <TabPane key="INTEGRATION" tab="集成">
-        <Alert
-          type="info"
-          show-icon
-          message="车企集成"
+          message="车企集成与外部回传"
           description="入站 Envelope、外发交付与 Canonical 详情通过下方关联链接打开。"
         />
         <p v-if="sectionLoading">区块加载中…</p>
@@ -1504,7 +1604,7 @@ onMounted(() => {
     </Tabs>
 
     <!-- 保留集成/预约等深链区块：在非终审产品页签时按需渲染原 section 内容 -->
-    <div v-if="workspace && productTab !== 'FINAL_REVIEW' && productTab !== 'overview' && productTab !== 'tech' && productTab !== 'sla'" class="legacy-section-links">
+    <div v-if="productTab !== 'FINAL_REVIEW' && productTab !== 'overview' && productTab !== 'tech' && productTab !== 'sla'" class="legacy-section-links">
       <p v-if="inboundEnvelopeLinks.length" class="links inbound-links">
         打开入站 Envelope：
         <RouterLink
@@ -1646,10 +1746,90 @@ onMounted(() => {
         </RouterLink>
       </p>
     </div>
+      </div>
+
+      <RightContextRail title="决策上下文" data-testid="work-order-context-rail">
+        <section>
+          <h3>风险与提醒</h3>
+          <p v-if="Number(workspace.exceptionSummary?.openCount ?? 0) > 0">
+            待处理异常 {{ workspace.exceptionSummary?.openCount }} 条
+          </p>
+          <p v-else>暂无待处理运营异常</p>
+          <p>SLA：{{ slaSummaryText }}</p>
+        </section>
+        <section>
+          <h3>当前责任链</h3>
+          <p>
+            网点：
+            <template v-if="workspace.serviceAssignmentSummary">
+              {{
+                presentEntityName({
+                  id: String(workspace.serviceAssignmentSummary.networkId ?? ''),
+                  loaded: true,
+                }).label
+              }}
+            </template>
+            <template v-else>—</template>
+          </p>
+          <p>
+            师傅：
+            <template v-if="workspace.serviceAssignmentSummary">
+              {{
+                presentEntityName({
+                  id: String(workspace.serviceAssignmentSummary.technicianId ?? ''),
+                  loaded: true,
+                }).label
+              }}
+            </template>
+            <template v-else>—</template>
+          </p>
+          <p>
+            当前任务：
+            {{
+              workspace.currentTaskSummary
+                ? statusLabel(workspace.currentTaskSummary.taskType)
+                : '—'
+            }}
+          </p>
+        </section>
+        <section>
+          <h3>外部集成</h3>
+          <p>来源：{{ clientLabel }}</p>
+          <p>配置版本：{{ fulfillmentSnapshot?.fulfillmentVersion || '—' }}</p>
+        </section>
+        <section>
+          <h3>最近时间线</h3>
+          <ul v-if="recentTimelineItems.length">
+            <li v-for="(item, index) in recentTimelineItems" :key="index">
+              {{ statusLabel(String(item.eventType || 'UNKNOWN')) }}
+              · {{ formatDateTimeDisplay(item.occurredAt) }}
+            </li>
+          </ul>
+          <p v-else class="muted">暂无时间线</p>
+        </section>
+      </RightContextRail>
+    </div>
   </DetailPageLayout>
 </template>
 
 <style scoped>
+.wo-workspace-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 16px;
+  align-items: start;
+}
+.wo-workspace-body__main {
+  min-width: 0;
+}
+.current-task-card {
+  margin-bottom: 16px;
+}
+@media (max-width: 1280px) {
+  .wo-workspace-body {
+    grid-template-columns: 1fr;
+  }
+}
 .muted { margin: 0 0 8px; color: var(--sos-color-text-tertiary, #7b8494); font-size: 13px; }
 .field { display: grid; gap: 6px; margin-bottom: 12px; font-size: 13px; }
 .links { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
@@ -1657,6 +1837,13 @@ onMounted(() => {
 .assign-advanced { margin-top: 12px; }
 .handoff-link { font-size: 13px; }
 .error { color: var(--sos-color-status-critical-fg); }
+.wo-workspace-body :deep(h3) {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+.wo-workspace-body section + section {
+  margin-top: 14px;
+}
 .sr-sync { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .card { background: #fff; padding: 12px; border-radius: 8px; }
 .legacy-section-links { margin-top: 12px; }

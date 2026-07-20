@@ -503,15 +503,24 @@ export async function mockProductizationApis(
           clientCode: 'GEELY',
           receivedAt: '2026-07-20T03:00:00Z',
         },
-        currentTaskSummary: null,
-        serviceAssignmentSummary: null,
-        slaSummary: { openCount: 0, breachedCount: 0 },
+        currentTaskSummary: {
+          taskId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          taskType: 'INSTALL',
+          status: 'IN_PROGRESS',
+          stageCode: 'INSTALLATION',
+        },
+        serviceAssignmentSummary: {
+          networkId: '55555555-5555-4555-8555-555555555555',
+          technicianId: '66666666-6666-4666-8666-666666666666',
+        },
+        slaSummary: { openCount: 1, breachedCount: 0 },
         exceptionSummary: { openCount: 0 },
         timelineFreshnessStatus: 'FRESH',
-        allowedActionLink: '/api/v1/tasks/x/allowed-actions',
+        allowedActionLink:
+          '/api/v1/tasks/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/allowed-actions',
         sectionAvailability: {
-          TASKS: 'EMPTY',
-          TIMELINE_AUDIT: 'EMPTY',
+          TASKS: 'AVAILABLE',
+          TIMELINE_AUDIT: 'AVAILABLE',
           APPOINTMENTS_VISITS: 'EMPTY',
           FORMS_EVIDENCE: 'EMPTY',
           REVIEWS_CORRECTIONS: 'EMPTY',
@@ -519,6 +528,72 @@ export async function mockProductizationApis(
           INTEGRATION: 'EMPTY',
         },
         meta: { asOf: '2026-07-20T04:00:00Z' },
+      })
+      return
+    }
+    if (
+      url.includes('/tasks/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/allowed-actions')
+    ) {
+      await fulfillJson(route, {
+        taskId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        resourceVersion: 1,
+        asOf: '2026-07-20T04:00:00Z',
+        actions: [
+          { code: 'complete', label: '完成任务' },
+          { code: 'release', label: '释放任务' },
+        ],
+      })
+      return
+    }
+    if (url.includes('/work-orders/11111111-1111-4111-8111-111111111111/stages')) {
+      await fulfillJson(route, {
+        workflow: {
+          id: 'wf-1',
+          projectId: '22222222-2222-4222-8222-222222222222',
+          workOrderId: '11111111-1111-4111-8111-111111111111',
+          workflowKey: 'home-charging',
+          workflowVersion: '1.0.0',
+          status: 'ACTIVE',
+          version: 1,
+          startedAt: '2026-07-20T03:00:00Z',
+          completedAt: null,
+        },
+        stages: [
+          {
+            id: 'st-1',
+            workflowInstanceId: 'wf-1',
+            workOrderId: '11111111-1111-4111-8111-111111111111',
+            stageCode: 'INTAKE',
+            sequenceNo: 1,
+            status: 'COMPLETED',
+            version: 1,
+            activatedAt: '2026-07-20T03:00:00Z',
+            completedAt: '2026-07-20T03:10:00Z',
+          },
+          {
+            id: 'st-2',
+            workflowInstanceId: 'wf-1',
+            workOrderId: '11111111-1111-4111-8111-111111111111',
+            stageCode: 'INSTALLATION',
+            sequenceNo: 2,
+            status: 'ACTIVE',
+            version: 1,
+            activatedAt: '2026-07-20T03:10:00Z',
+            completedAt: null,
+          },
+          {
+            id: 'st-3',
+            workflowInstanceId: 'wf-1',
+            workOrderId: '11111111-1111-4111-8111-111111111111',
+            stageCode: 'FINAL_REVIEW',
+            sequenceNo: 3,
+            status: 'PENDING',
+            version: 1,
+            activatedAt: '2026-07-20T03:10:00Z',
+            completedAt: null,
+          },
+        ],
+        asOf: '2026-07-20T04:00:00Z',
       })
       return
     }
@@ -551,6 +626,7 @@ export async function mockProductizationApis(
         asOf: '2026-07-20T04:00:00Z',
         emptyHint: null,
         workflow: null,
+        stages: [],
       })
       return
     }
