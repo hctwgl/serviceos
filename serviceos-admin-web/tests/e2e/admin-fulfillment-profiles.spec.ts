@@ -36,7 +36,7 @@ test.describe('M379/M385 项目履约配置入口', () => {
     await page.getByRole('button', { name: '新增工单类型' }).click()
     await expect(page).toHaveURL(/\/fulfillment-profiles\/new$/)
     await expect(page.getByRole('heading', { name: '新增工单类型配置' })).toBeVisible()
-    await expect(page.getText('选择工单类型')).toBeVisible()
+    await expect(page.getByText('选择工单类型', { exact: true }).first()).toBeVisible()
   })
 
   test('向导可选择工单类型和空白方案并创建草稿', async ({ page }) => {
@@ -83,7 +83,7 @@ test.describe('M379/M385 项目履约配置入口', () => {
     await page.getByText('维修服务', { exact: true }).click()
     await page.getByRole('button', { name: '下一步' }).click()
 
-    await page.getByLabel('方案名称').fill('维修履约方案')
+    await page.locator('input[placeholder="例如：山东家充勘测安装方案"]').fill('维修履约方案')
     await expect(page.getByRole('radio', { name: '从空白方案开始' })).toBeChecked()
     await page.getByRole('button', { name: '下一步' }).click()
 
