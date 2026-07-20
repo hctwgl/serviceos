@@ -6,6 +6,8 @@ import com.serviceos.authorization.api.AuthorizationDecision;
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.identity.api.CurrentPrincipal;
+import com.serviceos.jooq.generated.tables.TskTask;
+import com.serviceos.jooq.generated.tables.TskTaskExecutionGuard;
 import com.serviceos.reliability.api.IdempotencyDecision;
 import com.serviceos.reliability.api.IdempotencyService;
 import com.serviceos.reliability.api.OutboxAppender;
@@ -20,7 +22,9 @@ import com.serviceos.task.api.AssignmentSourceType;
 import com.serviceos.task.api.TaskAssignedPayload;
 import com.serviceos.task.api.TaskAssignmentBatchReceipt;
 import com.serviceos.task.api.TaskAssignmentService;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import org.jooq.Condition;
+import org.jooq.DSLContext;
+import org.jooq.impl.DSL;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
@@ -31,7 +35,10 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timestamptz;
+import static com.serviceos.jooq.generated.tables.TskTask.TSK_TASK;
+import static com.serviceos.jooq.generated.tables.TskTaskAssignment.TSK_TASK_ASSIGNMENT;
+import static com.serviceos.jooq.generated.tables.TskTaskAssignmentBatch.TSK_TASK_ASSIGNMENT_BATCH;
+import static com.serviceos.jooq.generated.tables.TskTaskExecutionGuard.TSK_TASK_EXECUTION_GUARD;
 
 /**
  * 人工 Task 候选责任快照命令。
@@ -43,12 +50,12 @@ import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timesta
  * 后写入候选；不暴露 HTTP，审计 actor 为 system:assignee-policy。</p>
  */
 @Service
-final class DefaultTaskAssignmentService implements TaskAssignmentService {
+final class JooqTaskAssignmentService implements TaskAssignmentService {
     private static final String OPERATION = "task.assignment.assign-candidates";
     private static final String POLICY_OPERATION = "task.assignment.assign-candidates-from-policy";
     private static final String SYSTEM_ACTOR = "system:assignee-policy";
 
-    private final JdbcClient jdbc;
+    private final DSLContext dsl;
     private final AuthorizationService authorization;
     private final IdempotencyService idempotency;
     private final AuditAppender audit;
@@ -56,8 +63,8 @@ final class DefaultTaskAssignmentService implements TaskAssignmentService {
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
-    DefaultTaskAssignmentService(
-            JdbcClient jdbc,
+    JooqTaskAssignmentService(
+            DSLContext dsl,
             AuthorizationService authorization,
             IdempotencyService idempotency,
             AuditAppender audit,
@@ -65,7 +72,7 @@ final class DefaultTaskAssignmentService implements TaskAssignmentService {
             ObjectMapper objectMapper,
             Clock clock
     ) {
-        this.jdbc = jdbc;
+        this.dsl = dsl;
         this.authorization = authorization;
         this.idempotency = idempotency;
         this.audit = audit;
@@ -139,76 +146,62 @@ final class DefaultTaskAssignmentService implements TaskAssignmentService {
             String auditAction
     ) {
         Instant assignedAt = clock.instant();
-        int updated = jdbc.sql("""
-                        UPDATE tsk_task
-                           SET version = version + 1, updated_at = :assignedAt
-                         WHERE tenant_id = :tenantId AND task_id = :taskId
-                           AND task_kind = 'HUMAN' AND status = 'READY'
-                           AND version = :expectedVersion
-                           AND NOT EXISTS (
-                               SELECT 1 FROM tsk_task_execution_guard guard_row
-                                WHERE guard_row.tenant_id = tsk_task.tenant_id
-                                  AND guard_row.task_id = tsk_task.task_id
-                                  AND guard_row.status = 'ACTIVE'
-                           )
-                        """)
-                .param("assignedAt", timestamptz(assignedAt))
-                .param("tenantId", context.tenantId())
-                .param("taskId", command.taskId())
-                .param("expectedVersion", command.expectedVersion())
-                .update();
+        TskTask task = TSK_TASK;
+        int updated = dsl.update(task)
+                .set(task.VERSION, task.VERSION.plus(1))
+                .set(task.UPDATED_AT, assignedAt)
+                .where(task.TENANT_ID.eq(context.tenantId()))
+                .and(task.TASK_ID.eq(command.taskId()))
+                .and(task.TASK_KIND.eq("HUMAN"))
+                .and(task.STATUS.eq("READY"))
+                .and(task.VERSION.eq(command.expectedVersion()))
+                .and(noActiveGuard())
+                .execute();
         if (updated != 1) {
             throwAssignmentConflict(context.tenantId(), command.taskId(), command.expectedVersion());
         }
 
         // 新快照先关闭旧候选，再写入同一批次；事务失败时旧候选不会被提前撤销。
-        jdbc.sql("""
-                        UPDATE tsk_task_assignment
-                           SET status = 'REVOKED', effective_to = :assignedAt,
-                               revoked_by = :actorId, revoke_reason_code = 'ASSIGNMENT_REPLACED'
-                         WHERE tenant_id = :tenantId AND task_id = :taskId
-                           AND assignment_kind = 'CANDIDATE' AND status = 'ACTIVE'
-                        """)
-                .param("assignedAt", timestamptz(assignedAt))
-                .param("actorId", context.actorId())
-                .param("tenantId", context.tenantId())
-                .param("taskId", command.taskId())
-                .update();
+        dsl.update(TSK_TASK_ASSIGNMENT)
+                .set(TSK_TASK_ASSIGNMENT.STATUS, "REVOKED")
+                .set(TSK_TASK_ASSIGNMENT.EFFECTIVE_TO, assignedAt)
+                .set(TSK_TASK_ASSIGNMENT.REVOKED_BY, context.actorId())
+                .set(TSK_TASK_ASSIGNMENT.REVOKE_REASON_CODE, "ASSIGNMENT_REPLACED")
+                .where(TSK_TASK_ASSIGNMENT.TENANT_ID.eq(context.tenantId()))
+                .and(TSK_TASK_ASSIGNMENT.TASK_ID.eq(command.taskId()))
+                .and(TSK_TASK_ASSIGNMENT.ASSIGNMENT_KIND.eq("CANDIDATE"))
+                .and(TSK_TASK_ASSIGNMENT.STATUS.eq("ACTIVE"))
+                .execute();
 
         UUID batchId = UUID.randomUUID();
         long taskVersion = command.expectedVersion() + 1;
-        jdbc.sql("""
-                        INSERT INTO tsk_task_assignment_batch (
-                            assignment_batch_id, tenant_id, task_id, source_type, source_id,
-                            candidate_count, task_version, assigned_by, assigned_at
-                        ) VALUES (
-                            :batchId, :tenantId, :taskId, :sourceType, :sourceId,
-                            :candidateCount, :taskVersion, :actorId, :assignedAt
-                        )
-                        """)
-                .param("batchId", batchId).param("tenantId", context.tenantId())
-                .param("taskId", command.taskId()).param("sourceType", command.sourceType().name())
-                .param("sourceId", command.sourceId())
-                .param("candidateCount", command.candidatePrincipalIds().size())
-                .param("taskVersion", taskVersion).param("actorId", context.actorId())
-                .param("assignedAt", timestamptz(assignedAt)).update();
+        dsl.insertInto(TSK_TASK_ASSIGNMENT_BATCH)
+                .set(TSK_TASK_ASSIGNMENT_BATCH.ASSIGNMENT_BATCH_ID, batchId)
+                .set(TSK_TASK_ASSIGNMENT_BATCH.TENANT_ID, context.tenantId())
+                .set(TSK_TASK_ASSIGNMENT_BATCH.TASK_ID, command.taskId())
+                .set(TSK_TASK_ASSIGNMENT_BATCH.SOURCE_TYPE, command.sourceType().name())
+                .set(TSK_TASK_ASSIGNMENT_BATCH.SOURCE_ID, command.sourceId())
+                .set(TSK_TASK_ASSIGNMENT_BATCH.CANDIDATE_COUNT, command.candidatePrincipalIds().size())
+                .set(TSK_TASK_ASSIGNMENT_BATCH.TASK_VERSION, taskVersion)
+                .set(TSK_TASK_ASSIGNMENT_BATCH.ASSIGNED_BY, context.actorId())
+                .set(TSK_TASK_ASSIGNMENT_BATCH.ASSIGNED_AT, assignedAt)
+                .execute();
         for (String candidateId : command.candidatePrincipalIds()) {
-            jdbc.sql("""
-                            INSERT INTO tsk_task_assignment (
-                                task_assignment_id, tenant_id, task_id, assignment_batch_id,
-                                assignment_kind, principal_type, principal_id, status,
-                                source_type, source_id, effective_from, created_by, created_at
-                            ) VALUES (
-                                :assignmentId, :tenantId, :taskId, :batchId,
-                                'CANDIDATE', 'USER', :candidateId, 'ACTIVE',
-                                :sourceType, :sourceId, :assignedAt, :actorId, :assignedAt
-                            )
-                            """)
-                    .param("assignmentId", UUID.randomUUID()).param("tenantId", context.tenantId())
-                    .param("taskId", command.taskId()).param("batchId", batchId)
-                    .param("candidateId", candidateId).param("sourceType", command.sourceType().name())
-                    .param("sourceId", command.sourceId()).param("assignedAt", timestamptz(assignedAt))
-                    .param("actorId", context.actorId()).update();
+            dsl.insertInto(TSK_TASK_ASSIGNMENT)
+                    .set(TSK_TASK_ASSIGNMENT.TASK_ASSIGNMENT_ID, UUID.randomUUID())
+                    .set(TSK_TASK_ASSIGNMENT.TENANT_ID, context.tenantId())
+                    .set(TSK_TASK_ASSIGNMENT.TASK_ID, command.taskId())
+                    .set(TSK_TASK_ASSIGNMENT.ASSIGNMENT_BATCH_ID, batchId)
+                    .set(TSK_TASK_ASSIGNMENT.ASSIGNMENT_KIND, "CANDIDATE")
+                    .set(TSK_TASK_ASSIGNMENT.PRINCIPAL_TYPE, "USER")
+                    .set(TSK_TASK_ASSIGNMENT.PRINCIPAL_ID, candidateId)
+                    .set(TSK_TASK_ASSIGNMENT.STATUS, "ACTIVE")
+                    .set(TSK_TASK_ASSIGNMENT.SOURCE_TYPE, command.sourceType().name())
+                    .set(TSK_TASK_ASSIGNMENT.SOURCE_ID, command.sourceId())
+                    .set(TSK_TASK_ASSIGNMENT.EFFECTIVE_FROM, assignedAt)
+                    .set(TSK_TASK_ASSIGNMENT.CREATED_BY, context.actorId())
+                    .set(TSK_TASK_ASSIGNMENT.CREATED_AT, assignedAt)
+                    .execute();
         }
 
         TaskAssignedPayload payload = new TaskAssignedPayload(
@@ -230,6 +223,15 @@ final class DefaultTaskAssignmentService implements TaskAssignmentService {
                 batchId, command.taskId(), command.candidatePrincipalIds().size(), taskVersion, assignedAt);
     }
 
+    private static Condition noActiveGuard() {
+        TskTaskExecutionGuard guard = TSK_TASK_EXECUTION_GUARD.as("guard_row");
+        return DSL.notExists(DSL.selectOne()
+                .from(guard)
+                .where(guard.TENANT_ID.eq(TSK_TASK.TENANT_ID))
+                .and(guard.TASK_ID.eq(TSK_TASK.TASK_ID))
+                .and(guard.STATUS.eq("ACTIVE")));
+    }
+
     private static String requestDigest(AssignTaskCandidatesCommand command) {
         return Sha256.digest(
                 command.taskId() + "|" + command.expectedVersion() + "|"
@@ -238,19 +240,21 @@ final class DefaultTaskAssignmentService implements TaskAssignmentService {
     }
 
     private void throwAssignmentConflict(String tenantId, UUID taskId, long expectedVersion) {
-        TaskState state = jdbc.sql("""
-                        SELECT task_kind, status, version,
-                               EXISTS (
-                                   SELECT 1 FROM tsk_task_execution_guard guard_row
-                                    WHERE guard_row.tenant_id = tsk_task.tenant_id
-                                      AND guard_row.task_id = tsk_task.task_id
-                                      AND guard_row.status = 'ACTIVE'
-                               ) AS active_guard
-                          FROM tsk_task
-                         WHERE tenant_id = :tenantId AND task_id = :taskId
-                        """)
-                .param("tenantId", tenantId).param("taskId", taskId)
-                .query(TaskState.class).optional()
+        TskTask task = TSK_TASK;
+        TskTaskExecutionGuard guard = TSK_TASK_EXECUTION_GUARD.as("guard_row");
+        TaskState state = dsl.select(task.TASK_KIND, task.STATUS, task.VERSION,
+                        DSL.exists(DSL.selectOne()
+                                        .from(guard)
+                                        .where(guard.TENANT_ID.eq(task.TENANT_ID))
+                                        .and(guard.TASK_ID.eq(task.TASK_ID))
+                                        .and(guard.STATUS.eq("ACTIVE")))
+                                .as("active_guard"))
+                .from(task)
+                .where(task.TENANT_ID.eq(tenantId))
+                .and(task.TASK_ID.eq(taskId))
+                .fetchOptional(record -> new TaskState(
+                        record.get(task.TASK_KIND), record.get(task.STATUS), record.get(task.VERSION),
+                        record.get("active_guard", Boolean.class)))
                 .orElseThrow(() -> new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "Task does not exist"));
         if (state.activeGuard()) {
             throw new BusinessProblem(
@@ -267,14 +271,17 @@ final class DefaultTaskAssignmentService implements TaskAssignmentService {
     }
 
     private TaskAssignmentBatchReceipt findBatch(String tenantId, UUID batchId) {
-        return jdbc.sql("""
-                        SELECT assignment_batch_id, task_id, candidate_count,
-                               task_version, assigned_at
-                          FROM tsk_task_assignment_batch
-                         WHERE tenant_id = :tenantId AND assignment_batch_id = :batchId
-                        """)
-                .param("tenantId", tenantId).param("batchId", batchId)
-                .query(TaskAssignmentBatchReceipt.class).single();
+        return dsl.select(TSK_TASK_ASSIGNMENT_BATCH.ASSIGNMENT_BATCH_ID,
+                        TSK_TASK_ASSIGNMENT_BATCH.TASK_ID,
+                        TSK_TASK_ASSIGNMENT_BATCH.CANDIDATE_COUNT,
+                        TSK_TASK_ASSIGNMENT_BATCH.TASK_VERSION,
+                        TSK_TASK_ASSIGNMENT_BATCH.ASSIGNED_AT)
+                .from(TSK_TASK_ASSIGNMENT_BATCH)
+                .where(TSK_TASK_ASSIGNMENT_BATCH.TENANT_ID.eq(tenantId))
+                .and(TSK_TASK_ASSIGNMENT_BATCH.ASSIGNMENT_BATCH_ID.eq(batchId))
+                .fetchSingle(record -> new TaskAssignmentBatchReceipt(
+                        record.value1(), record.value2(), record.value3(),
+                        record.value4(), record.value5()));
     }
 
     private String serialize(Object value) {

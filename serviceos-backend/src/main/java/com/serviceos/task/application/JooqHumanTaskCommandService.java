@@ -6,6 +6,9 @@ import com.serviceos.authorization.api.AuthorizationDecision;
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.identity.api.CurrentPrincipal;
+import com.serviceos.jooq.generated.tables.TskTask;
+import com.serviceos.jooq.generated.tables.TskTaskAssignment;
+import com.serviceos.jooq.generated.tables.TskTaskExecutionGuard;
 import com.serviceos.reliability.api.IdempotencyDecision;
 import com.serviceos.reliability.api.IdempotencyService;
 import com.serviceos.reliability.api.OutboxAppender;
@@ -26,7 +29,11 @@ import com.serviceos.task.api.TaskClaimedPayload;
 import com.serviceos.task.api.TaskCompletedPayload;
 import com.serviceos.task.api.TaskStartedPayload;
 import com.serviceos.task.api.TaskReleasedPayload;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import org.jooq.Condition;
+import org.jooq.DSLContext;
+import org.jooq.Field;
+import org.jooq.Record;
+import org.jooq.impl.DSL;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
@@ -37,7 +44,10 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timestamptz;
+import static com.serviceos.jooq.generated.tables.TskHumanTaskCommandResult.TSK_HUMAN_TASK_COMMAND_RESULT;
+import static com.serviceos.jooq.generated.tables.TskTask.TSK_TASK;
+import static com.serviceos.jooq.generated.tables.TskTaskAssignment.TSK_TASK_ASSIGNMENT;
+import static com.serviceos.jooq.generated.tables.TskTaskExecutionGuard.TSK_TASK_EXECUTION_GUARD;
 
 /**
  * 人工工作流 Task 的命令状态机。
@@ -46,13 +56,13 @@ import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timesta
  * 请求体不能自报执行人；expectedVersion 同时保护 UI 陈旧操作与并发领取。</p>
  */
 @Service
-final class DefaultHumanTaskCommandService implements HumanTaskCommandService {
+final class JooqHumanTaskCommandService implements HumanTaskCommandService {
     private static final String CLAIM = "task.human.claim";
     private static final String START = "task.human.start";
     private static final String COMPLETE = "task.human.complete";
     private static final String RELEASE = "task.human.release";
 
-    private final JdbcClient jdbc;
+    private final DSLContext dsl;
     private final AuthorizationService authorization;
     private final IdempotencyService idempotency;
     private final AuditAppender audit;
@@ -61,8 +71,8 @@ final class DefaultHumanTaskCommandService implements HumanTaskCommandService {
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
-    DefaultHumanTaskCommandService(
-            JdbcClient jdbc,
+    JooqHumanTaskCommandService(
+            DSLContext dsl,
             AuthorizationService authorization,
             IdempotencyService idempotency,
             AuditAppender audit,
@@ -71,7 +81,7 @@ final class DefaultHumanTaskCommandService implements HumanTaskCommandService {
             ObjectMapper objectMapper,
             Clock clock
     ) {
-        this.jdbc = jdbc;
+        this.dsl = dsl;
         this.authorization = authorization;
         this.idempotency = idempotency;
         this.audit = audit;
@@ -199,128 +209,104 @@ final class DefaultHumanTaskCommandService implements HumanTaskCommandService {
             ReleaseHumanTaskCommand release,
             Instant now
     ) {
+        TskTask task = TSK_TASK;
         if (completion != null) {
-            return jdbc.sql("""
-                            UPDATE tsk_task
-                               SET status = 'COMPLETED', result_ref = :resultRef,
-                                   result_digest = :resultDigest,
-                                   input_version_refs = CAST(:inputVersionRefs AS jsonb),
-                                   completed_at = :now,
-                                   version = version + 1, updated_at = :now
-                             WHERE tenant_id = :tenantId AND task_id = :taskId
-                               AND task_kind = 'HUMAN' AND status = :expectedStatus
-                               AND claimed_by = :actorId AND version = :expectedVersion
-                               AND workflow_node_instance_id IS NOT NULL
-                               AND NOT EXISTS (
-                                   SELECT 1 FROM tsk_task_execution_guard guard_row
-                                    WHERE guard_row.tenant_id = tsk_task.tenant_id
-                                      AND guard_row.task_id = tsk_task.task_id
-                                      AND guard_row.status = 'ACTIVE'
-                               )
-                               AND EXISTS (
-                                   SELECT 1 FROM tsk_task_assignment assignment
-                                    WHERE assignment.tenant_id = tsk_task.tenant_id
-                                      AND assignment.task_id = tsk_task.task_id
-                                      AND assignment.assignment_kind = 'RESPONSIBLE'
-                                      AND assignment.principal_type = 'USER'
-                                      AND assignment.principal_id = :actorId
-                                      AND assignment.status = 'ACTIVE'
-                               )
-                            """)
-                    .param("resultRef", completion.resultRef())
-                    .param("resultDigest", completion.resultDigest())
-                    .param("inputVersionRefs", serialize(completion.inputVersionRefs()))
-                    .param("now", timestamptz(now))
-                    .param("tenantId", context.tenantId())
-                    .param("taskId", taskId)
-                    .param("expectedStatus", expectedStatus)
-                    .param("actorId", context.actorId())
-                    .param("expectedVersion", expectedVersion)
-                    .update();
+            // input_version_refs 生成类型即 String（jsonb 绑定由公共 Converter 完成，无需显式 CAST）。
+            return dsl.update(task)
+                    .set(task.STATUS, "COMPLETED")
+                    .set(task.RESULT_REF, completion.resultRef())
+                    .set(task.RESULT_DIGEST, completion.resultDigest())
+                    .set(task.INPUT_VERSION_REFS, serialize(completion.inputVersionRefs()))
+                    .set(task.COMPLETED_AT, now)
+                    .set(task.VERSION, task.VERSION.plus(1))
+                    .set(task.UPDATED_AT, now)
+                    .where(task.TENANT_ID.eq(context.tenantId()))
+                    .and(task.TASK_ID.eq(taskId))
+                    .and(task.TASK_KIND.eq("HUMAN"))
+                    .and(task.STATUS.eq(expectedStatus))
+                    .and(task.CLAIMED_BY.eq(context.actorId()))
+                    .and(task.VERSION.eq(expectedVersion))
+                    .and(task.WORKFLOW_NODE_INSTANCE_ID.isNotNull())
+                    .and(noActiveGuard())
+                    .and(assignmentExists("RESPONSIBLE", context.actorId(), true))
+                    .execute();
         }
         if (release != null) {
-            return jdbc.sql("""
-                            UPDATE tsk_task
-                               SET status = 'READY', claimed_by = NULL, claimed_at = NULL,
-                                   version = version + 1, updated_at = :now
-                             WHERE tenant_id = :tenantId AND task_id = :taskId
-                               AND task_kind = 'HUMAN' AND status = :expectedStatus
-                               AND claimed_by = :actorId AND version = :expectedVersion
-                               AND NOT EXISTS (
-                                   SELECT 1 FROM tsk_task_execution_guard guard_row
-                                    WHERE guard_row.tenant_id = tsk_task.tenant_id
-                                      AND guard_row.task_id = tsk_task.task_id
-                                      AND guard_row.status = 'ACTIVE'
-                               )
-                               AND EXISTS (
-                                   SELECT 1 FROM tsk_task_assignment assignment
-                                    WHERE assignment.tenant_id = tsk_task.tenant_id
-                                      AND assignment.task_id = tsk_task.task_id
-                                      AND assignment.assignment_kind = 'RESPONSIBLE'
-                                      AND assignment.principal_id = :actorId
-                                      AND assignment.status = 'ACTIVE'
-                               )
-                            """)
-                    .param("now", timestamptz(now)).param("tenantId", context.tenantId())
-                    .param("taskId", taskId).param("expectedStatus", expectedStatus)
-                    .param("actorId", context.actorId()).param("expectedVersion", expectedVersion)
-                    .update();
+            return dsl.update(task)
+                    .set(task.STATUS, "READY")
+                    .setNull(task.CLAIMED_BY)
+                    .setNull(task.CLAIMED_AT)
+                    .set(task.VERSION, task.VERSION.plus(1))
+                    .set(task.UPDATED_AT, now)
+                    .where(task.TENANT_ID.eq(context.tenantId()))
+                    .and(task.TASK_ID.eq(taskId))
+                    .and(task.TASK_KIND.eq("HUMAN"))
+                    .and(task.STATUS.eq(expectedStatus))
+                    .and(task.CLAIMED_BY.eq(context.actorId()))
+                    .and(task.VERSION.eq(expectedVersion))
+                    .and(noActiveGuard())
+                    .and(assignmentExists("RESPONSIBLE", context.actorId(), false))
+                    .execute();
         }
         if ("CLAIMED".equals(nextStatus)) {
-            return jdbc.sql("""
-                            UPDATE tsk_task
-                               SET status = 'CLAIMED', claimed_by = :actorId, claimed_at = :now,
-                                   version = version + 1, updated_at = :now
-                             WHERE tenant_id = :tenantId AND task_id = :taskId
-                               AND task_kind = 'HUMAN' AND status = :expectedStatus
-                               AND version = :expectedVersion
-                               AND NOT EXISTS (
-                                   SELECT 1 FROM tsk_task_execution_guard guard_row
-                                    WHERE guard_row.tenant_id = tsk_task.tenant_id
-                                      AND guard_row.task_id = tsk_task.task_id
-                                      AND guard_row.status = 'ACTIVE'
-                               )
-                               AND EXISTS (
-                                   SELECT 1 FROM tsk_task_assignment assignment
-                                    WHERE assignment.tenant_id = tsk_task.tenant_id
-                                      AND assignment.task_id = tsk_task.task_id
-                                      AND assignment.assignment_kind = 'CANDIDATE'
-                                      AND assignment.principal_type = 'USER'
-                                      AND assignment.principal_id = :actorId
-                                      AND assignment.status = 'ACTIVE'
-                               )
-                            """)
-                    .param("actorId", context.actorId()).param("now", timestamptz(now))
-                    .param("tenantId", context.tenantId()).param("taskId", taskId)
-                    .param("expectedStatus", expectedStatus).param("expectedVersion", expectedVersion)
-                    .update();
+            return dsl.update(task)
+                    .set(task.STATUS, "CLAIMED")
+                    .set(task.CLAIMED_BY, context.actorId())
+                    .set(task.CLAIMED_AT, now)
+                    .set(task.VERSION, task.VERSION.plus(1))
+                    .set(task.UPDATED_AT, now)
+                    .where(task.TENANT_ID.eq(context.tenantId()))
+                    .and(task.TASK_ID.eq(taskId))
+                    .and(task.TASK_KIND.eq("HUMAN"))
+                    .and(task.STATUS.eq(expectedStatus))
+                    .and(task.VERSION.eq(expectedVersion))
+                    .and(noActiveGuard())
+                    .and(assignmentExists("CANDIDATE", context.actorId(), true))
+                    .execute();
         }
-        return jdbc.sql("""
-                        UPDATE tsk_task
-                           SET status = 'RUNNING', started_at = :now,
-                               version = version + 1, updated_at = :now
-                         WHERE tenant_id = :tenantId AND task_id = :taskId
-                           AND task_kind = 'HUMAN' AND status = :expectedStatus
-                           AND claimed_by = :actorId AND version = :expectedVersion
-                           AND NOT EXISTS (
-                               SELECT 1 FROM tsk_task_execution_guard guard_row
-                                WHERE guard_row.tenant_id = tsk_task.tenant_id
-                                  AND guard_row.task_id = tsk_task.task_id
-                                  AND guard_row.status = 'ACTIVE'
-                           )
-                           AND EXISTS (
-                               SELECT 1 FROM tsk_task_assignment assignment
-                                WHERE assignment.tenant_id = tsk_task.tenant_id
-                                  AND assignment.task_id = tsk_task.task_id
-                                  AND assignment.assignment_kind = 'RESPONSIBLE'
-                                  AND assignment.principal_id = :actorId
-                                  AND assignment.status = 'ACTIVE'
-                           )
-                        """)
-                .param("now", timestamptz(now)).param("tenantId", context.tenantId())
-                .param("taskId", taskId).param("expectedStatus", expectedStatus)
-                .param("actorId", context.actorId()).param("expectedVersion", expectedVersion)
-                .update();
+        return dsl.update(task)
+                .set(task.STATUS, "RUNNING")
+                .set(task.STARTED_AT, now)
+                .set(task.VERSION, task.VERSION.plus(1))
+                .set(task.UPDATED_AT, now)
+                .where(task.TENANT_ID.eq(context.tenantId()))
+                .and(task.TASK_ID.eq(taskId))
+                .and(task.TASK_KIND.eq("HUMAN"))
+                .and(task.STATUS.eq(expectedStatus))
+                .and(task.CLAIMED_BY.eq(context.actorId()))
+                .and(task.VERSION.eq(expectedVersion))
+                .and(noActiveGuard())
+                .and(assignmentExists("RESPONSIBLE", context.actorId(), false))
+                .execute();
+    }
+
+    /** 与原 SQL 一致：ACTIVE guard 存在即拒绝命令，子查询按别名 guard_row 关联外层任务行。 */
+    private static Condition noActiveGuard() {
+        TskTaskExecutionGuard guard = TSK_TASK_EXECUTION_GUARD.as("guard_row");
+        return DSL.notExists(DSL.selectOne()
+                .from(guard)
+                .where(guard.TENANT_ID.eq(TSK_TASK.TENANT_ID))
+                .and(guard.TASK_ID.eq(TSK_TASK.TASK_ID))
+                .and(guard.STATUS.eq("ACTIVE")));
+    }
+
+    /**
+     * 与原 SQL 一致：CLAIM/COMPLETE 检查 principal_type = 'USER'；START/RELEASE 不检查。
+     * 差异来自原状态机 SQL，不得擅自对齐。
+     */
+    private static Condition assignmentExists(String kind, String actorId, boolean withPrincipalType) {
+        TskTaskAssignment assignment = TSK_TASK_ASSIGNMENT.as("assignment");
+        var select = DSL.selectOne()
+                .from(assignment)
+                .where(assignment.TENANT_ID.eq(TSK_TASK.TENANT_ID))
+                .and(assignment.TASK_ID.eq(TSK_TASK.TASK_ID))
+                .and(assignment.ASSIGNMENT_KIND.eq(kind))
+                .and(assignment.PRINCIPAL_ID.eq(actorId))
+                .and(assignment.STATUS.eq("ACTIVE"));
+        if (withPrincipalType) {
+            select = select.and(assignment.PRINCIPAL_TYPE.eq("USER"));
+        }
+        return DSL.exists(select);
     }
 
     private void throwConflict(
@@ -409,70 +395,86 @@ final class DefaultHumanTaskCommandService implements HumanTaskCommandService {
     }
 
     private HumanTaskRow findTask(String tenantId, UUID taskId, String actorId) {
-        return jdbc.sql("""
-                        SELECT task.task_id, task.task_type, task.task_kind, task.status,
-                               task.claimed_by, task.version,
-                               project_id, work_order_id, workflow_instance_id, stage_instance_id,
-                               workflow_node_instance_id, workflow_node_id,
-                               workflow_definition_version_id, workflow_definition_digest,
-                               EXISTS (
-                                   SELECT 1 FROM tsk_task_execution_guard guard_row
-                                    WHERE guard_row.tenant_id = task.tenant_id
-                                      AND guard_row.task_id = task.task_id
-                                      AND guard_row.status = 'ACTIVE'
-                               ) AS active_guard,
-                               EXISTS (
-                                   SELECT 1 FROM tsk_task_assignment candidate
-                                    WHERE candidate.tenant_id = task.tenant_id
-                                      AND candidate.task_id = task.task_id
-                                      AND candidate.assignment_kind = 'CANDIDATE'
-                                      AND candidate.principal_id = :actorId
-                                      AND candidate.status = 'ACTIVE'
-                               ) AS actor_candidate,
-                               EXISTS (
-                                   SELECT 1 FROM tsk_task_assignment responsible
-                                    WHERE responsible.tenant_id = task.tenant_id
-                                      AND responsible.task_id = task.task_id
-                                      AND responsible.assignment_kind = 'RESPONSIBLE'
-                                      AND responsible.principal_id = :actorId
-                                      AND responsible.status = 'ACTIVE'
-                               ) AS actor_responsible
-                          FROM tsk_task task
-                         WHERE task.tenant_id = :tenantId AND task.task_id = :taskId
-                        """)
-                .param("tenantId", tenantId).param("taskId", taskId).param("actorId", actorId)
-                .query(HumanTaskRow.class).optional()
+        TskTask task = TSK_TASK;
+        TskTaskExecutionGuard guard = TSK_TASK_EXECUTION_GUARD.as("guard_row");
+        TskTaskAssignment candidate = TSK_TASK_ASSIGNMENT.as("candidate");
+        TskTaskAssignment responsible = TSK_TASK_ASSIGNMENT.as("responsible");
+        Field<Boolean> activeGuard = DSL.exists(dsl.selectOne()
+                        .from(guard)
+                        .where(guard.TENANT_ID.eq(task.TENANT_ID))
+                        .and(guard.TASK_ID.eq(task.TASK_ID))
+                        .and(guard.STATUS.eq("ACTIVE")))
+                .as("active_guard");
+        Field<Boolean> actorCandidate = DSL.exists(dsl.selectOne()
+                        .from(candidate)
+                        .where(candidate.TENANT_ID.eq(task.TENANT_ID))
+                        .and(candidate.TASK_ID.eq(task.TASK_ID))
+                        .and(candidate.ASSIGNMENT_KIND.eq("CANDIDATE"))
+                        .and(candidate.PRINCIPAL_ID.eq(actorId))
+                        .and(candidate.STATUS.eq("ACTIVE")))
+                .as("actor_candidate");
+        Field<Boolean> actorResponsible = DSL.exists(dsl.selectOne()
+                        .from(responsible)
+                        .where(responsible.TENANT_ID.eq(task.TENANT_ID))
+                        .and(responsible.TASK_ID.eq(task.TASK_ID))
+                        .and(responsible.ASSIGNMENT_KIND.eq("RESPONSIBLE"))
+                        .and(responsible.PRINCIPAL_ID.eq(actorId))
+                        .and(responsible.STATUS.eq("ACTIVE")))
+                .as("actor_responsible");
+        return dsl.select(task.TASK_ID, task.TASK_TYPE, task.TASK_KIND, task.STATUS,
+                        task.CLAIMED_BY, task.VERSION,
+                        task.PROJECT_ID, task.WORK_ORDER_ID, task.WORKFLOW_INSTANCE_ID,
+                        task.STAGE_INSTANCE_ID, task.WORKFLOW_NODE_INSTANCE_ID, task.WORKFLOW_NODE_ID,
+                        task.WORKFLOW_DEFINITION_VERSION_ID, task.WORKFLOW_DEFINITION_DIGEST,
+                        activeGuard, actorCandidate, actorResponsible)
+                .from(task)
+                .where(task.TENANT_ID.eq(tenantId))
+                .and(task.TASK_ID.eq(taskId))
+                .fetchOptional(record -> mapHumanTaskRow(record, activeGuard, actorCandidate, actorResponsible))
                 .orElseThrow(() -> new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "Task does not exist"));
+    }
+
+    private static HumanTaskRow mapHumanTaskRow(
+            Record record, Field<Boolean> activeGuard, Field<Boolean> actorCandidate,
+            Field<Boolean> actorResponsible) {
+        TskTask task = TSK_TASK;
+        return new HumanTaskRow(
+                record.get(task.TASK_ID), record.get(task.TASK_TYPE), record.get(task.TASK_KIND),
+                record.get(task.STATUS), record.get(task.CLAIMED_BY), record.get(task.VERSION),
+                record.get(task.PROJECT_ID), record.get(task.WORK_ORDER_ID),
+                record.get(task.WORKFLOW_INSTANCE_ID), record.get(task.STAGE_INSTANCE_ID),
+                record.get(task.WORKFLOW_NODE_INSTANCE_ID), record.get(task.WORKFLOW_NODE_ID),
+                record.get(task.WORKFLOW_DEFINITION_VERSION_ID),
+                record.get(task.WORKFLOW_DEFINITION_DIGEST),
+                record.get(activeGuard), record.get(actorCandidate), record.get(actorResponsible));
     }
 
     private void insertFrozenReceipt(
             CommandContext context, String operation, HumanTaskCommandReceipt receipt) {
-        jdbc.sql("""
-                        INSERT INTO tsk_human_task_command_result (
-                            tenant_id, operation_type, idempotency_key, task_id,
-                            status, actor_id, task_version, occurred_at
-                        ) VALUES (
-                            :tenantId, :operation, :idempotencyKey, :taskId,
-                            :status, :actorId, :version, :occurredAt
-                        )
-                        """)
-                .param("tenantId", context.tenantId()).param("operation", operation)
-                .param("idempotencyKey", context.idempotencyKey()).param("taskId", receipt.taskId())
-                .param("status", receipt.status()).param("actorId", receipt.actorId())
-                .param("version", receipt.version()).param("occurredAt", timestamptz(receipt.occurredAt()))
-                .update();
+        dsl.insertInto(TSK_HUMAN_TASK_COMMAND_RESULT)
+                .set(TSK_HUMAN_TASK_COMMAND_RESULT.TENANT_ID, context.tenantId())
+                .set(TSK_HUMAN_TASK_COMMAND_RESULT.OPERATION_TYPE, operation)
+                .set(TSK_HUMAN_TASK_COMMAND_RESULT.IDEMPOTENCY_KEY, context.idempotencyKey())
+                .set(TSK_HUMAN_TASK_COMMAND_RESULT.TASK_ID, receipt.taskId())
+                .set(TSK_HUMAN_TASK_COMMAND_RESULT.STATUS, receipt.status())
+                .set(TSK_HUMAN_TASK_COMMAND_RESULT.ACTOR_ID, receipt.actorId())
+                .set(TSK_HUMAN_TASK_COMMAND_RESULT.TASK_VERSION, receipt.version())
+                .set(TSK_HUMAN_TASK_COMMAND_RESULT.OCCURRED_AT, receipt.occurredAt())
+                .execute();
     }
 
     private HumanTaskCommandReceipt frozenReceipt(CommandContext context, String operation) {
-        return jdbc.sql("""
-                        SELECT task_id, status, actor_id, task_version AS version, occurred_at
-                          FROM tsk_human_task_command_result
-                         WHERE tenant_id = :tenantId AND operation_type = :operation
-                           AND idempotency_key = :idempotencyKey
-                        """)
-                .param("tenantId", context.tenantId()).param("operation", operation)
-                .param("idempotencyKey", context.idempotencyKey())
-                .query(HumanTaskCommandReceipt.class).single();
+        return dsl.select(TSK_HUMAN_TASK_COMMAND_RESULT.TASK_ID,
+                        TSK_HUMAN_TASK_COMMAND_RESULT.STATUS,
+                        TSK_HUMAN_TASK_COMMAND_RESULT.ACTOR_ID,
+                        TSK_HUMAN_TASK_COMMAND_RESULT.TASK_VERSION,
+                        TSK_HUMAN_TASK_COMMAND_RESULT.OCCURRED_AT)
+                .from(TSK_HUMAN_TASK_COMMAND_RESULT)
+                .where(TSK_HUMAN_TASK_COMMAND_RESULT.TENANT_ID.eq(context.tenantId()))
+                .and(TSK_HUMAN_TASK_COMMAND_RESULT.OPERATION_TYPE.eq(operation))
+                .and(TSK_HUMAN_TASK_COMMAND_RESULT.IDEMPOTENCY_KEY.eq(context.idempotencyKey()))
+                .fetchSingle(record -> new HumanTaskCommandReceipt(
+                        record.value1(), record.value2(), record.value3(), record.value4(), record.value5()));
     }
 
     private String serialize(Object value) {
@@ -484,45 +486,46 @@ final class DefaultHumanTaskCommandService implements HumanTaskCommandService {
     }
 
     private void activateResponsibility(CommandContext context, UUID taskId, Instant claimedAt) {
-        CandidateAssignment candidate = jdbc.sql("""
-                        SELECT task_assignment_id, assignment_batch_id
-                          FROM tsk_task_assignment
-                         WHERE tenant_id = :tenantId AND task_id = :taskId
-                           AND assignment_kind = 'CANDIDATE' AND principal_type = 'USER'
-                           AND principal_id = :actorId AND status = 'ACTIVE'
-                        """)
-                .param("tenantId", context.tenantId()).param("taskId", taskId)
-                .param("actorId", context.actorId()).query(CandidateAssignment.class).single();
-        jdbc.sql("""
-                        INSERT INTO tsk_task_assignment (
-                            task_assignment_id, tenant_id, task_id, assignment_batch_id,
-                            assignment_kind, principal_type, principal_id, status,
-                            source_type, source_id, effective_from, created_by, created_at
-                        ) VALUES (
-                            :assignmentId, :tenantId, :taskId, :batchId,
-                            'RESPONSIBLE', 'USER', :actorId, 'ACTIVE',
-                            'CANDIDATE_CLAIM', :sourceId, :claimedAt, :actorId, :claimedAt
-                        )
-                        """)
-                .param("assignmentId", UUID.randomUUID()).param("tenantId", context.tenantId())
-                .param("taskId", taskId).param("batchId", candidate.assignmentBatchId())
-                .param("actorId", context.actorId()).param("sourceId", candidate.taskAssignmentId().toString())
-                .param("claimedAt", timestamptz(claimedAt)).update();
+        CandidateAssignment candidate = dsl
+                .select(TSK_TASK_ASSIGNMENT.TASK_ASSIGNMENT_ID, TSK_TASK_ASSIGNMENT.ASSIGNMENT_BATCH_ID)
+                .from(TSK_TASK_ASSIGNMENT)
+                .where(TSK_TASK_ASSIGNMENT.TENANT_ID.eq(context.tenantId()))
+                .and(TSK_TASK_ASSIGNMENT.TASK_ID.eq(taskId))
+                .and(TSK_TASK_ASSIGNMENT.ASSIGNMENT_KIND.eq("CANDIDATE"))
+                .and(TSK_TASK_ASSIGNMENT.PRINCIPAL_TYPE.eq("USER"))
+                .and(TSK_TASK_ASSIGNMENT.PRINCIPAL_ID.eq(context.actorId()))
+                .and(TSK_TASK_ASSIGNMENT.STATUS.eq("ACTIVE"))
+                .fetchSingle(record -> new CandidateAssignment(record.value1(), record.value2()));
+        dsl.insertInto(TSK_TASK_ASSIGNMENT)
+                .set(TSK_TASK_ASSIGNMENT.TASK_ASSIGNMENT_ID, UUID.randomUUID())
+                .set(TSK_TASK_ASSIGNMENT.TENANT_ID, context.tenantId())
+                .set(TSK_TASK_ASSIGNMENT.TASK_ID, taskId)
+                .set(TSK_TASK_ASSIGNMENT.ASSIGNMENT_BATCH_ID, candidate.assignmentBatchId())
+                .set(TSK_TASK_ASSIGNMENT.ASSIGNMENT_KIND, "RESPONSIBLE")
+                .set(TSK_TASK_ASSIGNMENT.PRINCIPAL_TYPE, "USER")
+                .set(TSK_TASK_ASSIGNMENT.PRINCIPAL_ID, context.actorId())
+                .set(TSK_TASK_ASSIGNMENT.STATUS, "ACTIVE")
+                .set(TSK_TASK_ASSIGNMENT.SOURCE_TYPE, "CANDIDATE_CLAIM")
+                .set(TSK_TASK_ASSIGNMENT.SOURCE_ID, candidate.taskAssignmentId().toString())
+                .set(TSK_TASK_ASSIGNMENT.EFFECTIVE_FROM, claimedAt)
+                .set(TSK_TASK_ASSIGNMENT.CREATED_BY, context.actorId())
+                .set(TSK_TASK_ASSIGNMENT.CREATED_AT, claimedAt)
+                .execute();
     }
 
     private void revokeResponsibility(
             CommandContext context, UUID taskId, String reasonCode, Instant releasedAt) {
-        int updated = jdbc.sql("""
-                        UPDATE tsk_task_assignment
-                           SET status = 'REVOKED', effective_to = :releasedAt,
-                               revoked_by = :actorId, revoke_reason_code = :reasonCode
-                         WHERE tenant_id = :tenantId AND task_id = :taskId
-                           AND assignment_kind = 'RESPONSIBLE' AND principal_id = :actorId
-                           AND status = 'ACTIVE'
-                        """)
-                .param("releasedAt", timestamptz(releasedAt)).param("actorId", context.actorId())
-                .param("reasonCode", reasonCode).param("tenantId", context.tenantId())
-                .param("taskId", taskId).update();
+        int updated = dsl.update(TSK_TASK_ASSIGNMENT)
+                .set(TSK_TASK_ASSIGNMENT.STATUS, "REVOKED")
+                .set(TSK_TASK_ASSIGNMENT.EFFECTIVE_TO, releasedAt)
+                .set(TSK_TASK_ASSIGNMENT.REVOKED_BY, context.actorId())
+                .set(TSK_TASK_ASSIGNMENT.REVOKE_REASON_CODE, reasonCode)
+                .where(TSK_TASK_ASSIGNMENT.TENANT_ID.eq(context.tenantId()))
+                .and(TSK_TASK_ASSIGNMENT.TASK_ID.eq(taskId))
+                .and(TSK_TASK_ASSIGNMENT.ASSIGNMENT_KIND.eq("RESPONSIBLE"))
+                .and(TSK_TASK_ASSIGNMENT.PRINCIPAL_ID.eq(context.actorId()))
+                .and(TSK_TASK_ASSIGNMENT.STATUS.eq("ACTIVE"))
+                .execute();
         if (updated != 1) {
             throw new BusinessProblem(
                     ProblemCode.TASK_ASSIGNMENT_CONFLICT,
@@ -531,15 +534,15 @@ final class DefaultHumanTaskCommandService implements HumanTaskCommandService {
     }
 
     private void expireAssignments(CommandContext context, UUID taskId, Instant completedAt) {
-        int updated = jdbc.sql("""
-                        UPDATE tsk_task_assignment
-                           SET status = 'EXPIRED', effective_to = :completedAt,
-                               revoked_by = :actorId, revoke_reason_code = 'TASK_COMPLETED'
-                         WHERE tenant_id = :tenantId AND task_id = :taskId
-                           AND status = 'ACTIVE'
-                        """)
-                .param("completedAt", timestamptz(completedAt)).param("actorId", context.actorId())
-                .param("tenantId", context.tenantId()).param("taskId", taskId).update();
+        int updated = dsl.update(TSK_TASK_ASSIGNMENT)
+                .set(TSK_TASK_ASSIGNMENT.STATUS, "EXPIRED")
+                .set(TSK_TASK_ASSIGNMENT.EFFECTIVE_TO, completedAt)
+                .set(TSK_TASK_ASSIGNMENT.REVOKED_BY, context.actorId())
+                .set(TSK_TASK_ASSIGNMENT.REVOKE_REASON_CODE, "TASK_COMPLETED")
+                .where(TSK_TASK_ASSIGNMENT.TENANT_ID.eq(context.tenantId()))
+                .and(TSK_TASK_ASSIGNMENT.TASK_ID.eq(taskId))
+                .and(TSK_TASK_ASSIGNMENT.STATUS.eq("ACTIVE"))
+                .execute();
         if (updated < 2) {
             throw new BusinessProblem(
                     ProblemCode.TASK_ASSIGNMENT_CONFLICT,

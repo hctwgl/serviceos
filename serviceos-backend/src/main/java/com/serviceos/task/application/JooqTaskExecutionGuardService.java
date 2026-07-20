@@ -6,6 +6,9 @@ import com.serviceos.authorization.api.AuthorizationDecision;
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.identity.api.CurrentPrincipal;
+import com.serviceos.jooq.generated.tables.TskTask;
+import com.serviceos.jooq.generated.tables.TskTaskAssignment;
+import com.serviceos.jooq.generated.tables.TskTaskExecutionGuard;
 import com.serviceos.reliability.api.IdempotencyDecision;
 import com.serviceos.reliability.api.IdempotencyService;
 import com.serviceos.reliability.api.OutboxAppender;
@@ -20,7 +23,10 @@ import com.serviceos.task.api.ReleaseTaskExecutionGuardCommand;
 import com.serviceos.task.api.TaskExecutionGuardChangedPayload;
 import com.serviceos.task.api.TaskExecutionGuardReceipt;
 import com.serviceos.task.api.TaskExecutionGuardService;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import org.jooq.DSLContext;
+import org.jooq.Record;
+import org.jooq.ResultQuery;
+import org.jooq.impl.DSL;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
@@ -30,7 +36,9 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
 
-import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timestamptz;
+import static com.serviceos.jooq.generated.tables.TskTask.TSK_TASK;
+import static com.serviceos.jooq.generated.tables.TskTaskAssignment.TSK_TASK_ASSIGNMENT;
+import static com.serviceos.jooq.generated.tables.TskTaskExecutionGuard.TSK_TASK_EXECUTION_GUARD;
 
 /**
  * Task 执行保护窗的权威实现。
@@ -39,13 +47,13 @@ import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timesta
  * ServiceAssignment 激活者必须在自身责任和容量事实已经原子切换后才能调用 release。</p>
  */
 @Service
-final class DefaultTaskExecutionGuardService implements TaskExecutionGuardService {
+final class JooqTaskExecutionGuardService implements TaskExecutionGuardService {
     private static final String ACQUIRE = "task.execution-guard.acquire";
     private static final String RELEASE = "task.execution-guard.release";
     private static final String CAPABILITY = "task.guard.manage";
     private static final String GUARD_TYPE = "REASSIGNMENT";
 
-    private final JdbcClient jdbc;
+    private final DSLContext dsl;
     private final AuthorizationService authorization;
     private final IdempotencyService idempotency;
     private final AuditAppender audit;
@@ -53,8 +61,8 @@ final class DefaultTaskExecutionGuardService implements TaskExecutionGuardServic
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
-    DefaultTaskExecutionGuardService(
-            JdbcClient jdbc,
+    JooqTaskExecutionGuardService(
+            DSLContext dsl,
             AuthorizationService authorization,
             IdempotencyService idempotency,
             AuditAppender audit,
@@ -62,7 +70,7 @@ final class DefaultTaskExecutionGuardService implements TaskExecutionGuardServic
             ObjectMapper objectMapper,
             Clock clock
     ) {
-        this.jdbc = jdbc;
+        this.dsl = dsl;
         this.authorization = authorization;
         this.idempotency = idempotency;
         this.audit = audit;
@@ -88,42 +96,39 @@ final class DefaultTaskExecutionGuardService implements TaskExecutionGuardServic
         }
 
         Instant now = clock.instant();
-        int updated = jdbc.sql("""
-                        UPDATE tsk_task
-                           SET version = version + 1, updated_at = :now
-                         WHERE tenant_id = :tenantId AND task_id = :taskId
-                           AND task_kind = 'HUMAN'
-                           AND status IN ('READY', 'CLAIMED', 'RUNNING')
-                           AND version = :expectedVersion
-                           AND NOT EXISTS (
-                               SELECT 1 FROM tsk_task_execution_guard guard_row
-                                WHERE guard_row.tenant_id = tsk_task.tenant_id
-                                  AND guard_row.task_id = tsk_task.task_id
-                                  AND guard_row.status = 'ACTIVE'
-                           )
-                        """)
-                .param("now", timestamptz(now)).param("tenantId", context.tenantId())
-                .param("taskId", command.taskId()).param("expectedVersion", command.expectedVersion())
-                .update();
+        TskTask task = TSK_TASK;
+        TskTaskExecutionGuard guardRow = TSK_TASK_EXECUTION_GUARD.as("guard_row");
+        int updated = dsl.update(task)
+                .set(task.VERSION, task.VERSION.plus(1))
+                .set(task.UPDATED_AT, now)
+                .where(task.TENANT_ID.eq(context.tenantId()))
+                .and(task.TASK_ID.eq(command.taskId()))
+                .and(task.TASK_KIND.eq("HUMAN"))
+                .and(task.STATUS.in("READY", "CLAIMED", "RUNNING"))
+                .and(task.VERSION.eq(command.expectedVersion()))
+                .and(DSL.notExists(DSL.selectOne()
+                        .from(guardRow)
+                        .where(guardRow.TENANT_ID.eq(task.TENANT_ID))
+                        .and(guardRow.TASK_ID.eq(task.TASK_ID))
+                        .and(guardRow.STATUS.eq("ACTIVE"))))
+                .execute();
         if (updated != 1) {
             throwAcquireConflict(context.tenantId(), command.taskId(), command.expectedVersion());
         }
 
         UUID guardId = UUID.randomUUID();
-        jdbc.sql("""
-                        INSERT INTO tsk_task_execution_guard (
-                            task_execution_guard_id, tenant_id, task_id, guard_type, guard_key,
-                            reason_code, status, activated_task_version, activated_by, activated_at
-                        ) VALUES (
-                            :guardId, :tenantId, :taskId, :guardType, :guardKey,
-                            :reasonCode, 'ACTIVE', :taskVersion, :actorId, :now
-                        )
-                        """)
-                .param("guardId", guardId).param("tenantId", context.tenantId())
-                .param("taskId", command.taskId()).param("guardType", GUARD_TYPE)
-                .param("guardKey", command.guardKey()).param("reasonCode", command.reasonCode())
-                .param("taskVersion", command.expectedVersion() + 1)
-                .param("actorId", context.actorId()).param("now", timestamptz(now)).update();
+        dsl.insertInto(TSK_TASK_EXECUTION_GUARD)
+                .set(TSK_TASK_EXECUTION_GUARD.TASK_EXECUTION_GUARD_ID, guardId)
+                .set(TSK_TASK_EXECUTION_GUARD.TENANT_ID, context.tenantId())
+                .set(TSK_TASK_EXECUTION_GUARD.TASK_ID, command.taskId())
+                .set(TSK_TASK_EXECUTION_GUARD.GUARD_TYPE, GUARD_TYPE)
+                .set(TSK_TASK_EXECUTION_GUARD.GUARD_KEY, command.guardKey())
+                .set(TSK_TASK_EXECUTION_GUARD.REASON_CODE, command.reasonCode())
+                .set(TSK_TASK_EXECUTION_GUARD.STATUS, "ACTIVE")
+                .set(TSK_TASK_EXECUTION_GUARD.ACTIVATED_TASK_VERSION, command.expectedVersion() + 1)
+                .set(TSK_TASK_EXECUTION_GUARD.ACTIVATED_BY, context.actorId())
+                .set(TSK_TASK_EXECUTION_GUARD.ACTIVATED_AT, now)
+                .execute();
 
         long taskVersion = command.expectedVersion() + 1;
         TaskExecutionGuardReceipt receipt = new TaskExecutionGuardReceipt(
@@ -152,44 +157,42 @@ final class DefaultTaskExecutionGuardService implements TaskExecutionGuardServic
         }
 
         Instant now = clock.instant();
-        int taskUpdated = jdbc.sql("""
-                        UPDATE tsk_task
-                           SET version = version + 1, updated_at = :now
-                         WHERE tenant_id = :tenantId AND task_id = :taskId
-                           AND version = :expectedVersion
-                           AND EXISTS (
-                               SELECT 1 FROM tsk_task_execution_guard guard_row
-                                WHERE guard_row.tenant_id = tsk_task.tenant_id
-                                  AND guard_row.task_id = tsk_task.task_id
-                                  AND guard_row.task_execution_guard_id = :guardId
-                                  AND guard_row.status = 'ACTIVE'
-                           )
-                           AND NOT EXISTS (
-                               SELECT 1 FROM tsk_task_assignment prepared
-                                WHERE prepared.tenant_id = tsk_task.tenant_id
-                                  AND prepared.task_id = tsk_task.task_id
-                                  AND prepared.task_execution_guard_id = :guardId
-                                  AND prepared.status = 'PREPARED'
-                           )
-                        """)
-                .param("now", timestamptz(now)).param("tenantId", context.tenantId())
-                .param("taskId", command.taskId()).param("guardId", command.guardId())
-                .param("expectedVersion", command.expectedVersion()).update();
+        TskTask task = TSK_TASK;
+        TskTaskExecutionGuard guardRow = TSK_TASK_EXECUTION_GUARD.as("guard_row");
+        TskTaskAssignment prepared = TSK_TASK_ASSIGNMENT.as("prepared");
+        int taskUpdated = dsl.update(task)
+                .set(task.VERSION, task.VERSION.plus(1))
+                .set(task.UPDATED_AT, now)
+                .where(task.TENANT_ID.eq(context.tenantId()))
+                .and(task.TASK_ID.eq(command.taskId()))
+                .and(task.VERSION.eq(command.expectedVersion()))
+                .and(DSL.exists(DSL.selectOne()
+                        .from(guardRow)
+                        .where(guardRow.TENANT_ID.eq(task.TENANT_ID))
+                        .and(guardRow.TASK_ID.eq(task.TASK_ID))
+                        .and(guardRow.TASK_EXECUTION_GUARD_ID.eq(command.guardId()))
+                        .and(guardRow.STATUS.eq("ACTIVE"))))
+                .and(DSL.notExists(DSL.selectOne()
+                        .from(prepared)
+                        .where(prepared.TENANT_ID.eq(task.TENANT_ID))
+                        .and(prepared.TASK_ID.eq(task.TASK_ID))
+                        .and(prepared.TASK_EXECUTION_GUARD_ID.eq(command.guardId()))
+                        .and(prepared.STATUS.eq("PREPARED"))))
+                .execute();
         if (taskUpdated != 1) {
             throwReleaseConflict(context.tenantId(), command.taskId(), command.guardId(), command.expectedVersion());
         }
-        jdbc.sql("""
-                        UPDATE tsk_task_execution_guard
-                           SET status = 'RELEASED', released_task_version = :taskVersion,
-                               released_by = :actorId,
-                               released_at = :now, release_reason_code = :reasonCode
-                         WHERE tenant_id = :tenantId AND task_id = :taskId
-                           AND task_execution_guard_id = :guardId AND status = 'ACTIVE'
-                        """)
-                .param("actorId", context.actorId()).param("now", timestamptz(now))
-                .param("taskVersion", command.expectedVersion() + 1)
-                .param("reasonCode", command.reasonCode()).param("tenantId", context.tenantId())
-                .param("taskId", command.taskId()).param("guardId", command.guardId()).update();
+        dsl.update(TSK_TASK_EXECUTION_GUARD)
+                .set(TSK_TASK_EXECUTION_GUARD.STATUS, "RELEASED")
+                .set(TSK_TASK_EXECUTION_GUARD.RELEASED_TASK_VERSION, command.expectedVersion() + 1)
+                .set(TSK_TASK_EXECUTION_GUARD.RELEASED_BY, context.actorId())
+                .set(TSK_TASK_EXECUTION_GUARD.RELEASED_AT, now)
+                .set(TSK_TASK_EXECUTION_GUARD.RELEASE_REASON_CODE, command.reasonCode())
+                .where(TSK_TASK_EXECUTION_GUARD.TENANT_ID.eq(context.tenantId()))
+                .and(TSK_TASK_EXECUTION_GUARD.TASK_ID.eq(command.taskId()))
+                .and(TSK_TASK_EXECUTION_GUARD.TASK_EXECUTION_GUARD_ID.eq(command.guardId()))
+                .and(TSK_TASK_EXECUTION_GUARD.STATUS.eq("ACTIVE"))
+                .execute();
 
         GuardIdentity identity = guardIdentity(context.tenantId(), command.guardId());
         TaskExecutionGuardReceipt receipt = new TaskExecutionGuardReceipt(
@@ -230,29 +233,21 @@ final class DefaultTaskExecutionGuardService implements TaskExecutionGuardServic
         if (task.version() != expectedVersion) {
             throw new BusinessProblem(ProblemCode.VERSION_CONFLICT, "Task version changed");
         }
-        boolean prepared = jdbc.sql("""
-                        SELECT EXISTS (
-                            SELECT 1 FROM tsk_task_assignment
-                             WHERE tenant_id = :tenantId AND task_id = :taskId
-                               AND task_execution_guard_id = :guardId AND status = 'PREPARED'
-                        )
-                        """)
-                .param("tenantId", tenantId).param("taskId", taskId).param("guardId", guardId)
-                .query(Boolean.class).single();
+        boolean prepared = dsl.fetchExists(TSK_TASK_ASSIGNMENT,
+                TSK_TASK_ASSIGNMENT.TENANT_ID.eq(tenantId)
+                        .and(TSK_TASK_ASSIGNMENT.TASK_ID.eq(taskId))
+                        .and(TSK_TASK_ASSIGNMENT.TASK_EXECUTION_GUARD_ID.eq(guardId))
+                        .and(TSK_TASK_ASSIGNMENT.STATUS.eq("PREPARED")));
         if (prepared) {
             throw new BusinessProblem(
                     ProblemCode.TASK_ASSIGNMENT_CONFLICT,
                     "A guard with PREPARED responsibility must be closed by activate or abort");
         }
-        boolean active = jdbc.sql("""
-                        SELECT EXISTS (
-                            SELECT 1 FROM tsk_task_execution_guard
-                             WHERE tenant_id = :tenantId AND task_id = :taskId
-                               AND task_execution_guard_id = :guardId AND status = 'ACTIVE'
-                        )
-                        """)
-                .param("tenantId", tenantId).param("taskId", taskId).param("guardId", guardId)
-                .query(Boolean.class).single();
+        boolean active = dsl.fetchExists(TSK_TASK_EXECUTION_GUARD,
+                TSK_TASK_EXECUTION_GUARD.TENANT_ID.eq(tenantId)
+                        .and(TSK_TASK_EXECUTION_GUARD.TASK_ID.eq(taskId))
+                        .and(TSK_TASK_EXECUTION_GUARD.TASK_EXECUTION_GUARD_ID.eq(guardId))
+                        .and(TSK_TASK_EXECUTION_GUARD.STATUS.eq("ACTIVE")));
         if (!active) {
             throw new BusinessProblem(ProblemCode.TASK_EXECUTION_GUARDED,
                     "The requested ACTIVE execution guard does not exist");
@@ -261,47 +256,58 @@ final class DefaultTaskExecutionGuardService implements TaskExecutionGuardServic
     }
 
     private GuardedTask task(String tenantId, UUID taskId) {
-        return jdbc.sql("""
-                        SELECT task.version,
-                               EXISTS (SELECT 1 FROM tsk_task_execution_guard guard_row
-                                        WHERE guard_row.tenant_id = task.tenant_id
-                                          AND guard_row.task_id = task.task_id
-                                          AND guard_row.status = 'ACTIVE') AS active_guard
-                          FROM tsk_task task
-                         WHERE task.tenant_id = :tenantId AND task.task_id = :taskId
-                        """)
-                .param("tenantId", tenantId).param("taskId", taskId)
-                .query(GuardedTask.class).optional()
+        TskTask task = TSK_TASK;
+        TskTaskExecutionGuard guardRow = TSK_TASK_EXECUTION_GUARD.as("guard_row");
+        return dsl.select(task.VERSION,
+                        DSL.exists(DSL.selectOne()
+                                        .from(guardRow)
+                                        .where(guardRow.TENANT_ID.eq(task.TENANT_ID))
+                                        .and(guardRow.TASK_ID.eq(task.TASK_ID))
+                                        .and(guardRow.STATUS.eq("ACTIVE")))
+                                .as("active_guard"))
+                .from(task)
+                .where(task.TENANT_ID.eq(tenantId))
+                .and(task.TASK_ID.eq(taskId))
+                .fetchOptional(record -> new GuardedTask(
+                        record.get(task.VERSION), record.get("active_guard", Boolean.class)))
                 .orElseThrow(() -> new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "Task does not exist"));
     }
 
     private GuardIdentity guardIdentity(String tenantId, UUID guardId) {
-        return jdbc.sql("""
-                        SELECT guard_key FROM tsk_task_execution_guard
-                         WHERE tenant_id = :tenantId AND task_execution_guard_id = :guardId
-                        """)
-                .param("tenantId", tenantId).param("guardId", guardId)
-                .query(GuardIdentity.class).single();
+        return dsl.select(TSK_TASK_EXECUTION_GUARD.GUARD_KEY)
+                .from(TSK_TASK_EXECUTION_GUARD)
+                .where(TSK_TASK_EXECUTION_GUARD.TENANT_ID.eq(tenantId))
+                .and(TSK_TASK_EXECUTION_GUARD.TASK_EXECUTION_GUARD_ID.eq(guardId))
+                .fetchSingle(record -> new GuardIdentity(record.value1()));
     }
 
     private TaskExecutionGuardReceipt receipt(String tenantId, UUID guardId, boolean released) {
-        String sql = released
-                ? """
-                  SELECT task_execution_guard_id AS guard_id, task_id, guard_key, status,
-                         released_task_version AS task_version,
-                         released_at AS occurred_at
-                    FROM tsk_task_execution_guard guard_row
-                   WHERE tenant_id = :tenantId AND task_execution_guard_id = :guardId
-                  """
-                : """
-                  SELECT task_execution_guard_id AS guard_id, task_id, guard_key, 'ACTIVE' AS status,
-                         activated_task_version AS task_version,
-                         activated_at AS occurred_at
-                    FROM tsk_task_execution_guard guard_row
-                   WHERE tenant_id = :tenantId AND task_execution_guard_id = :guardId
-                  """;
-        return jdbc.sql(sql).param("tenantId", tenantId).param("guardId", guardId)
-                .query(TaskExecutionGuardReceipt.class).single();
+        TskTaskExecutionGuard guardRow = TSK_TASK_EXECUTION_GUARD;
+        ResultQuery<?> query = released
+                ? dsl.select(guardRow.TASK_EXECUTION_GUARD_ID, guardRow.TASK_ID, guardRow.GUARD_KEY,
+                        guardRow.STATUS.as("status"), guardRow.RELEASED_TASK_VERSION.as("task_version"),
+                        guardRow.RELEASED_AT.as("occurred_at"))
+                        .from(guardRow)
+                        .where(guardRow.TENANT_ID.eq(tenantId))
+                        .and(guardRow.TASK_EXECUTION_GUARD_ID.eq(guardId))
+                : dsl.select(guardRow.TASK_EXECUTION_GUARD_ID, guardRow.TASK_ID, guardRow.GUARD_KEY,
+                        DSL.inline("ACTIVE").as("status"), guardRow.ACTIVATED_TASK_VERSION.as("task_version"),
+                        guardRow.ACTIVATED_AT.as("occurred_at"))
+                        .from(guardRow)
+                        .where(guardRow.TENANT_ID.eq(tenantId))
+                        .and(guardRow.TASK_EXECUTION_GUARD_ID.eq(guardId));
+        return query.fetchSingle(JooqTaskExecutionGuardService::mapReceipt);
+    }
+
+    private static TaskExecutionGuardReceipt mapReceipt(Record record) {
+        TskTaskExecutionGuard guardRow = TSK_TASK_EXECUTION_GUARD;
+        return new TaskExecutionGuardReceipt(
+                record.get(guardRow.TASK_EXECUTION_GUARD_ID),
+                record.get(guardRow.TASK_ID),
+                record.get(guardRow.GUARD_KEY),
+                record.get("status", String.class),
+                record.get("task_version", Long.class),
+                record.get("occurred_at", Instant.class));
     }
 
     private void appendEvent(
