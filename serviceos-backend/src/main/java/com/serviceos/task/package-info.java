@@ -4,7 +4,7 @@
 @org.springframework.modulith.ApplicationModule(
         displayName = "Task Execution",
         allowedDependencies = {
-                "shared", "identity::api", "authorization::api",
+                "shared", "jooq", "identity::api", "authorization::api",
                 "audit::api", "reliability::api", "reliability::spi", "workorder::api",
                 "configuration::api"
         }

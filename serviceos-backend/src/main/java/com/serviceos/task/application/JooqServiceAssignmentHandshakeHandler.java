@@ -12,7 +12,7 @@ import com.serviceos.task.api.AbortPreparedTaskAssignmentCommand;
 import com.serviceos.task.api.PrepareTaskReassignmentCommand;
 import com.serviceos.task.api.TaskReassignmentReceipt;
 import com.serviceos.task.api.TaskReassignmentService;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import org.jooq.DSLContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
@@ -22,6 +22,8 @@ import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
 
+import static com.serviceos.jooq.generated.tables.TskTask.TSK_TASK;
+
 /**
  * M25 Task 侧改派 Inbox 编排器。
  *
@@ -29,23 +31,23 @@ import java.util.UUID;
  * 重新经过 task.reassignment.manage 授权，因此授权撤销会让消息失败关闭而不是绕过门禁。</p>
  */
 @Service
-final class ServiceAssignmentHandshakeHandler implements OutboxMessageHandler {
+final class JooqServiceAssignmentHandshakeHandler implements OutboxMessageHandler {
     private static final String PREPARE_CONSUMER = "task.service-assignment-pending.v2";
     private static final String ACTIVATE_CONSUMER = "task.service-assignment-activated.v2";
     private static final String ABORT_CONSUMER = "task.service-assignment-aborted.v2";
 
-    private final JdbcClient jdbc;
+    private final DSLContext dsl;
     private final InboxService inbox;
     private final TaskReassignmentService reassignments;
     private final ObjectMapper objectMapper;
 
-    ServiceAssignmentHandshakeHandler(
-            JdbcClient jdbc,
+    JooqServiceAssignmentHandshakeHandler(
+            DSLContext dsl,
             InboxService inbox,
             TaskReassignmentService reassignments,
             ObjectMapper objectMapper
     ) {
-        this.jdbc = jdbc;
+        this.dsl = dsl;
         this.inbox = inbox;
         this.reassignments = reassignments;
         this.objectMapper = objectMapper;
@@ -132,9 +134,12 @@ final class ServiceAssignmentHandshakeHandler implements OutboxMessageHandler {
     }
 
     private long taskVersion(String tenantId, UUID taskId) {
-        return jdbc.sql("SELECT version FROM tsk_task WHERE tenant_id = :tenantId AND task_id = :taskId")
-                .param("tenantId", tenantId).param("taskId", taskId)
-                .query(Long.class).single();
+        return dsl.select(TSK_TASK.VERSION)
+                .from(TSK_TASK)
+                .where(TSK_TASK.TENANT_ID.eq(tenantId))
+                .and(TSK_TASK.TASK_ID.eq(taskId))
+                .fetchSingle()
+                .value1();
     }
 
     private HandshakePayload read(String payload) {
