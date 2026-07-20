@@ -234,7 +234,7 @@ class DispatchClientKindFilterPostgresIT {
                 """.replaceAll("\\s+", "");
         String evidence = """
                 {"templateKey":"m366.evidence","version":"1.0.0","title":"现场",
-                 "stage":"DISPATCH","items":[{"evidenceKey":"site.photo","name":"现场照",
+                 "stage":"SURVEY","items":[{"evidenceKey":"site.photo","name":"现场照",
                    "mediaType":"PHOTO","required":true,
                    "capture":{"allowCamera":true,"allowGallery":true,"minCount":1,"maxCount":3},
                    "reviewPolicy":{"reviewRequired":false,"allowItemLevelReject":false}}]}
