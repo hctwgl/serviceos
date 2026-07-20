@@ -340,24 +340,36 @@ export async function mockProductizationApis(
       return
     }
     if (url.includes('/fulfillment-profiles/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/draft')) {
+      const document = {
+        schemaVersion: '1.0.0',
+        orderTypeName: '勘测安装',
+        supportedClientKinds: ['ADMIN_WEB', 'TECHNICIAN_WEB'],
+        stages: [
+          {
+            stageCode: 'SURVEY',
+            stageName: '现场勘测',
+            sequence: 1,
+            stageType: 'USER_TASK',
+            taskType: 'SURVEY',
+            ownerType: 'TECHNICIAN',
+            description: '上门勘测',
+            formRefs: [],
+            evidenceRefs: [],
+            actions: [],
+            transitions: [],
+            exceptionPaths: [],
+            slaRef: null,
+            terminal: false,
+          },
+        ],
+      }
       await fulfillJson(route, {
         profileId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
         revisionId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
         serviceProductCode: 'HOME_CHARGING_SURVEY_INSTALL',
         profileName: '标准家充履约方案',
-        documentJson: JSON.stringify({
-          stages: [
-            {
-              stageCode: 'SURVEY',
-              stageName: '现场勘测',
-              sequence: 1,
-              ownerType: 'TECHNICIAN',
-              formRefs: [],
-              evidenceRefs: [],
-              actions: [],
-            },
-          ],
-        }),
+        document,
+        documentJson: JSON.stringify(document),
         aggregateVersion: 2,
         updatedAt: '2026-07-20T04:00:00Z',
       })

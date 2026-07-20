@@ -4,24 +4,28 @@
 import { createCoreApi, fromRaw, newIdempotencyKey, quotedVersion, type ApiResult } from './coreApi'
 import type {
   ProjectFulfillmentCompareImpact,
+  ProjectFulfillmentDocument,
   ProjectFulfillmentDraft,
   ProjectFulfillmentManifest,
   ProjectFulfillmentProfileDetail,
   ProjectFulfillmentProfileSummary,
   ProjectFulfillmentRevision,
   ProjectFulfillmentRunbook,
+  ProjectFulfillmentStageDraft,
   ProjectFulfillmentValidationIssue,
   WorkOrderFulfillmentSnapshot,
 } from '@serviceos/core-client'
 
 export type {
   ProjectFulfillmentCompareImpact,
+  ProjectFulfillmentDocument,
   ProjectFulfillmentDraft,
   ProjectFulfillmentManifest,
   ProjectFulfillmentProfileDetail,
   ProjectFulfillmentProfileSummary,
   ProjectFulfillmentRevision,
   ProjectFulfillmentRunbook,
+  ProjectFulfillmentStageDraft,
   ProjectFulfillmentValidationIssue,
   WorkOrderFulfillmentSnapshot,
 }
@@ -66,7 +70,7 @@ export function updateProjectFulfillmentDraft(
   body: {
     profileName?: string
     description?: string
-    documentJson: string
+    document: ProjectFulfillmentDocument
     workflowAssetVersionId?: string
     sourceBundleId?: string
   },

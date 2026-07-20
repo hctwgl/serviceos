@@ -24,7 +24,7 @@ flywayVersion: "138"
 
 ## 明确未实现
 
-- 完整结构化 Draft DTO 替换 `documentJson` 编辑器（后续 M385b）；
+- 完整结构化 Draft DTO 替换 `documentJson` 编辑器（后续 M388）；
 - 工作流设计器 / 任务模板中心完整页（M386/M387）；
 - 使用中工单数跨模块读模型（页面诚实标注 UI_DATA_GAP）；
 - 左二级导航中工作流/表单/SLA 等分区的产品编辑器；

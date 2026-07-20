@@ -392,6 +392,7 @@ title: ServiceOS 里程碑索引
 | M383 | M383 项目履约产品化收口（部分） | [394-m383-project-fulfillment-closeout-partial.md](../architecture/394-m383-project-fulfillment-closeout-partial.md) | [378-m383-project-fulfillment-closeout-partial-acceptance.md](../testing/378-m383-project-fulfillment-closeout-partial-acceptance.md) |
 | M384 | M384 Admin 产品蓝图接受与 M383 产品状态纠正 | [395-m384-admin-product-baseline.md](../architecture/395-m384-admin-product-baseline.md) |  |
 | M385 | M385 项目履约配置中心产品化（切片 A） | [396-m385-fulfillment-config-center-productization.md](../architecture/396-m385-fulfillment-config-center-productization.md) | [379-m385-fulfillment-config-center-acceptance.md](../testing/379-m385-fulfillment-config-center-acceptance.md) |
+| M388 | M388 履约配置结构化 Draft DTO | [397-m388-structured-fulfillment-draft.md](../architecture/397-m388-structured-fulfillment-draft.md) | [380-m388-structured-fulfillment-draft-acceptance.md](../testing/380-m388-structured-fulfillment-draft-acceptance.md) |
 
 ## 未关联里程碑的文档
 

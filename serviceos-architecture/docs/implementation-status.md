@@ -4,7 +4,7 @@ version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-20
 baselineCommit: "9a05be9b9e22be216542260f0979d85ee2cf2bab"
-latestMilestone: M385
+latestMilestone: M388
 ---
 
 # ServiceOS 实施状态总览
@@ -39,13 +39,13 @@ latestMilestone: M385
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M385 项目履约配置中心产品化（切片 A；承接 M383/M384） |
-| 基线提交 | `9a05be9b9e22be216542260f0979d85ee2cf2bab`（历史基线；M385 合入 master 后回填） |
+| 最新实施里程碑 | M388 履约配置结构化 Draft DTO（承接 M385 切片 A） |
+| 基线提交 | `9a05be9b9e22be216542260f0979d85ee2cf2bab`（历史基线；M385/M388 合入 master 后回填） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts`、`@serviceos/web-core`、`ServiceOSIOSCore`、独立且可部署的 `serviceos-network-web` 与 `serviceos-technician-web`、Swift 6 `TechnicianIOSFoundation`，以及已在 iPhone 17 Pro Simulator 安装启动、实跑 XCTest/XCUITest、形成 Production arm64 archive/dSYM，并接入当前任务、在线 Visit、冻结基础表单、前台 Evidence 采集上传、Snapshot/Task 完成与多轮资料整改的原生 `TechnicianIOS` SwiftUI App；由同一 Core OpenAPI 生成并经独立消费者门禁验证的 `@serviceos/core-client` 与 `ServiceOSCoreClient` |
 | 前端工程 | `serviceos-admin-web` 独立承载总部运营；**M370～M377** 完成设计系统 Presenter、产品化 AppShell（ScopeBar/Freshness/诊断抽屉）、标准页模板、工单中心/详情、项目详情与主导航页壳迁移及视觉关闭；仍消费服务端 Navigation 与 allowed-actions；M256 后 Network 正式产品由独立 `serviceos-network-web` 承载，M257 后 Technician 正式产品由独立移动优先 `serviceos-technician-web` 承载；两套独立 Web 均实际接入共享 Core、OIDC PKCE、服务端 Context/Capability/导航、Playwright 回归和独立容器镜像 |
 | 数据库 | PostgreSQL + Flyway（当前版本 **138**；M378 V136/V137 + M383 V138 effective_to 关闭窗口） |
-| 契约 | Core OpenAPI **1.0.62** + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含项目履约 Profile Runbook/Compare-Impact、`TaskBlockedAction`；`workorder.cancelled@v1`、`workorder.reopened@v1`、`workorder.external-details-updated@v1`、project.created@v3、project.scope-relations-revised@v1、`task.handling-completed@v1`、recovered/resolved 与 SLA started/breached/met@v1；ConfigurationDraft.clientCompatibility/`supportedClientKinds`；Feed/整改 `clientCapabilityUnsupportedDetail`；整改/主 Evidence/`Manual assign`/Network on-behalf `CLIENT_CAPABILITY_UNSUPPORTED`；`ReviewCase.reviewTaskId`；`TechnicianProfile.supportedClientKinds` / declare） |
+| 契约 | Core OpenAPI **1.0.63** + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含项目履约 Profile Runbook/Compare-Impact/结构化 Draft Document、`TaskBlockedAction`；`workorder.cancelled@v1`、`workorder.reopened@v1`、`workorder.external-details-updated@v1`、project.created@v3、project.scope-relations-revised@v1、`task.handling-completed@v1`、recovered/resolved 与 SLA started/breached/met@v1；ConfigurationDraft.clientCompatibility/`supportedClientKinds`；Feed/整改 `clientCapabilityUnsupportedDetail`；整改/主 Evidence/`Manual assign`/Network on-behalf `CLIENT_CAPABILITY_UNSUPPORTED`；`ReviewCase.reviewTaskId`；`TechnicianProfile.supportedClientKinds` / declare） |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -144,7 +144,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | Consumer Identity | CustomerProfile、用户资源关系和 C 端身份 | `ACCEPTED` | Principal/IdentityLink/API Schema 已预留 Consumer Persona | 身份治理序列之后的独立 Epic；待登录、隐私、客户主数据与注销策略确认；不得宣称已实现 | 后续正式 Epic |
 | 项目治理 | Project 核心事实、范围关系与授权目录 | `PARTIAL` | 项目创建；REGION/NETWORK 当前关系整组修订和不可变历史；`project.read` 授权目录、详情及历史查询 | owners、品牌/服务产品/配置绑定、生命周期、计划修订审批、目录治理 UI | M8、M64～M67 |
 | 可靠消息 | Inbox、Outbox、Worker claim/lease/retry | `IMPLEMENTED` | 本地可靠发布消费、恢复和人工接管基础 | 正式 Broker 和跨服务运行 | M9～M10 |
-| 配置中心 | 不可变配置资产、Bundle 发布、设计器与灰度通道 | `PARTIAL` | M282～M296 设计器/治理 + **M303～M309** 六类运行时 + **M310～M315** 设计器 + **M321～M350** 配置驱动履约主链路；**M356～M363** 客户端能力门禁；**M366** Bundle 定向目标派单求交；**M378～M383** Profile/Revision/Manifest/Resolver/发布/冻结；**M385** 配置中心母版 + Runbook/Compare-Impact（OpenAPI 1.0.62） | 结构化 Draft 编辑器替换 documentJson（M385b）；Workflow/Task 模板中心（M386/M387）；完整校验 30 条；AMOUNT/加权、editableWhen、iOS 条件全量硬阻断；BUSINESS 暂停/预警 | M16、M33、M36、M52～M53、M61、M268、M271、M281～M296、M303～M315、M321～M350、M356～M363、M366、M378～M385 |
+| 配置中心 | 不可变配置资产、Bundle 发布、设计器与灰度通道 | `PARTIAL` | M282～M296 设计器/治理 + **M303～M309** 六类运行时 + **M310～M315** 设计器 + **M321～M350** 配置驱动履约主链路；**M356～M363** 客户端能力门禁；**M366** Bundle 定向目标派单求交；**M378～M383** Profile/Revision/Manifest/Resolver/发布/冻结；**M385** 配置中心母版 + Runbook/Compare-Impact；**M388** 结构化 Draft Document（OpenAPI 1.0.63） | Workflow/Task 模板中心（M386/M387）；完整校验 30 条；AMOUNT/加权、editableWhen、iOS 条件全量硬阻断；BUSINESS 暂停/预警 | M16、M33、M36、M52～M53、M61、M268、M271、M281～M296、M303～M315、M321～M350、M356～M363、M366、M378～M388 |
 | 外部接入 | BYD CPIM + REFERENCE_OEM SAMPLE + Geely 本地切片 | `PARTIAL` | BYD 入站建单/更新/取消、提审、回调；**M267/M297～M302** 通用 SPI；**M311/M314/M316/M320** 吉利本地 + 三 OEM 并行冒烟 + **M317～M319** 远端查询/人工处置/批量重放；**M321～M347** 冻结 Mapping（含 REFERENCE_OEM SAMPLE CREATE/UPDATE/CANCEL + Admin Mapping DSL UI） | 吉利 Sandbox/OpenAPI 签名联调（BLOCKED_EXTERNAL）、生产凭据/对象存储 | M16、M56～M60、M77～M79、M99、M158、M267、M272、M311、M314、M316、M317、M318、M319、M320、M321～M347、M273、M297～M302 |
 | 工单 | WorkOrder 接收、激活、履约完成与授权工作区投影 | `PARTIAL` | 权威工单、工作流启动、跨阶段和 END 完结；授权目录、非 PII 详情、Stage/Task 执行骨架及核心执行+现场履约时间线 | 完整取消、暂停、恢复、客户敏感详情审计、跨域完整时间线/动作与全部业务分支 | M16～M19、M68～M69、M73～M74 |
 | 工作流 | 线性 + 网关 + WAIT/TIMER + SUB_PROCESS + 多实例 + 取消/重开/跳转/补偿 + 标准模板 | `PARTIAL` | 上项 + **M281** 维修/移机/巡检标准模板（含家充勘安） | HTTP 命令面、表单/资料完整模板包、设计器 | M17～M19、M61、M69、M268～M271、M275～M281 |
@@ -178,15 +178,15 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 当前序列：
 
 - **M384 Implemented（文档）**：Admin 产品蓝图与经典专业风事实源；纠正 M383 产品状态。
-- **M385 Implemented（切片 A）**：共享经典专业风基础 + 项目履约配置中心母版 + 新建向导 + Runbook/Compare-Impact API（OpenAPI **1.0.62**）+ Playwright/截图；产品状态 **`READY_FOR_REVIEW`**（非 ACCEPTED）。
+- **M385 Implemented（切片 A）**：共享经典专业风基础 + 项目履约配置中心母版 + 新建向导 + Runbook/Compare-Impact API + Playwright/截图；产品状态 **`READY_FOR_REVIEW`**。
+- **M388 Implemented**：结构化 `ProjectFulfillmentDocument` Draft 读写；编辑器去产品路径 `documentJson`（OpenAPI **1.0.63**）；产品状态仍 **`READY_FOR_REVIEW`**。
 - **M383** 长链路 test 7/8 仍未闭合，不阻塞本切片。
 
 建议下一批（按优先级）：
 
-1. **M385b**：结构化 Draft DTO，编辑器去普通路径 `documentJson`；
-2. **M386**：工作流设计器；
-3. **M387**：任务模板中心；
-4. 其余 Admin 母版与 Network/Technician 黄金链路产品化。
+1. **M386**：工作流设计器；
+2. **M387**：任务模板中心；
+3. 其余 Admin 母版与 Network/Technician 黄金链路产品化。
 
 仍为 **硬门禁 / 外部阻塞**（不可发明推进）：
 

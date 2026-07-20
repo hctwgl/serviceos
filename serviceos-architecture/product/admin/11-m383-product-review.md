@@ -86,9 +86,9 @@ SummaryStrip
 
 `compile-preview` 返回产品化 `runbook`；前端只渲染 DTO。
 
-### 4.4 编辑器仍以技术文档结构为中心 — **仍开放（M385b）**
+### 4.4 编辑器仍以技术文档结构为中心 — **M388 已关闭（声明范围）**
 
-编辑页仍读写 `documentJson`。M385 仅做动作门禁与诊断隔离；结构化 Draft 留后续切片。
+Draft GET/PUT 以结构化 `document` 为主；编辑器读写 `document.stages`。`documentJson` 仅诊断抽屉。完整 Workflow/Task 实体选择器仍属 M386/M387。
 
 ### 4.5 发布“影响分析”不是实际差异 — **M385 已关闭**
 

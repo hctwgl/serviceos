@@ -13,5 +13,5 @@ lastUpdated: 2026-07-20
 | `/projects/:id/fulfillment-profiles/create` | 新建向导 | RUNTIME_CONNECTED | FRONTEND_COMPLETE | READY_FOR_REVIEW | VISUAL_NOT_REVIEWED | M385 |
 | `/projects/:id/fulfillment-profiles/:id` | 详情 | RUNTIME_CONNECTED | FRONTEND_COMPLETE | READY_FOR_REVIEW | VISUAL_NOT_REVIEWED | Runbook |
 | `/projects/:id/fulfillment-profiles/:id/preview` | 运行说明 | RUNTIME_CONNECTED | FRONTEND_COMPLETE | READY_FOR_REVIEW | VISUAL_NOT_REVIEWED | 去 JSON |
-| `/projects/:id/fulfillment-profiles/:id/edit` | 编辑器 | RUNTIME_CONNECTED | FRONTEND_CONNECTED | PRODUCT_REJECTED→部分修正 | VISUAL_NOT_REVIEWED | 仍用 documentJson；M385b |
+| `/projects/:id/fulfillment-profiles/:id/edit` | 编辑器 | RUNTIME_CONNECTED | FRONTEND_COMPLETE | READY_FOR_REVIEW | VISUAL_NOT_REVIEWED | M388 结构化 document |
 | `/projects/:id/fulfillment-profiles/:id/publish` | 发布流 | RUNTIME_CONNECTED | FRONTEND_COMPLETE | READY_FOR_REVIEW | VISUAL_NOT_REVIEWED | Runbook+Compare |

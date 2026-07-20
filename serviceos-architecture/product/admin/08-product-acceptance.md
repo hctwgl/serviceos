@@ -280,15 +280,15 @@ pageId: ADMIN.PROJECT.FULFILLMENT.EDIT
 route: /projects/:id/fulfillment-profiles/:profileId/edit
 visualProfile: CLASSIC_PROFESSIONAL
 technicalStatus: RUNTIME_CONNECTED
-frontendStatus: FRONTEND_CONNECTED
-productStatus: PRODUCT_REJECTED # 仍以 documentJson 为中心；M385b
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
 qualityStatus:
   test: TEST_PASSED
   visual: VISUAL_NOT_REVIEWED
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - DOMAIN_GAP: 结构化 Draft DTO 未替换 documentJson
+  - DOMAIN_GAP: Workflow/Task 实体选择器与可视化设计器仍待 M386/M387
 ```
 
 ## 10. GAP 规则

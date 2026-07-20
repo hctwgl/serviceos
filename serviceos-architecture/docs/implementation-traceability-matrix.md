@@ -473,5 +473,6 @@ Feature gate/authority: if applicable
 | M376 | 主导航其余页面迁移到产品壳 | WorkbenchPageLayout + PageContainer；389-m376-* + 373-m376-* | 视觉/a11y 关闭 |
 | M377 | Admin 产品化视觉/a11y/回归关闭 | Playwright 产品化截图 + 文档收口；390-m377-* + 374-m377-* | 真实 OIDC 冒烟、全量视觉态人工补齐 |
 | M384 | Admin 产品蓝图与经典专业风基线事实源；纠正 M383 产品状态 | 395-m384-*；无运行语义变更 | M385 履约配置中心产品化 |
-| M385 | 经典专业风共享基础 + 履约配置中心母版 + 新建向导 + Runbook/Compare-Impact（OpenAPI 1.0.62） | 396-m385-* + 379-m385-*；Admin Playwright/截图；PostgresIT | M385b 结构化 Draft；M386/M387 |
+| M385 | 经典专业风共享基础 + 履约配置中心母版 + 新建向导 + Runbook/Compare-Impact（OpenAPI 1.0.62） | 396-m385-* + 379-m385-*；Admin Playwright/截图；PostgresIT | M388 结构化 Draft；M386/M387 |
+| M388 | 履约 Draft 结构化 Document/StageDraft；编辑器去 documentJson 产品路径（OpenAPI 1.0.63） | 397-m385b-* + 380-m385b-*；DocumentMapperTest + PostgresIT + Playwright | M386/M387 |
 

@@ -51,6 +51,22 @@ test.describe('M385 项目履约配置中心', () => {
     await expect(page.getByRole('button', { name: '新增工单类型' }).first()).toBeVisible()
   })
 
+  test('编辑器加载结构化草稿且不依赖 documentJson 主路径', async ({ page }) => {
+    await seedLocalSession(page)
+    await mockProductizationApis(page)
+    await page.goto(
+      '/projects/22222222-2222-4222-8222-222222222222/fulfillment-profiles/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/edit',
+    )
+    await expect(page.getByRole('heading', { name: '履约配置编辑工作区' })).toBeVisible({
+      timeout: 20_000,
+    })
+    await expect(page.getByRole('button', { name: '1. 现场勘测' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: '阶段规则' })).toBeVisible()
+    await expect(page.getByRole('combobox').first()).toBeVisible()
+    await expect(page.locator('pre')).toHaveCount(0)
+    await expect(page.getByText('documentJson', { exact: true })).toHaveCount(0)
+  })
+
   test('发布页展示运行说明书且不渲染 Manifest JSON', async ({ page }) => {
     await seedLocalSession(page)
     await mockProductizationApis(page)

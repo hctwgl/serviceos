@@ -53,3 +53,11 @@ test('create wizard page exists with product start modes', () => {
   assert.match(source, /BLANK/)
   assert.match(source, /createProjectFulfillmentProfile/)
 })
+
+test('editor product path uses structured document not JSON.parse', () => {
+  const source = read(new URL('FulfillmentProfileEditorPage.vue', pagesDir))
+  assert.doesNotMatch(source, /JSON\.parse\(\s*draft\.value\.documentJson/)
+  assert.doesNotMatch(source, /documentJson:\s*buildDocumentJson/)
+  assert.match(source, /document:\s*buildDocument\(\)/)
+  assert.match(source, /draft\.value\.document/)
+})

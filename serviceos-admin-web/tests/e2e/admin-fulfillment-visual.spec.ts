@@ -92,4 +92,21 @@ test.describe('M385 fulfillment visual evidence', () => {
       fullPage: true,
     })
   })
+
+  test('capture structured draft editor screenshot', async ({ page }) => {
+    await seedLocalSession(page)
+    await mockProductizationApis(page)
+    await page.setViewportSize({ width: 1440, height: 1024 })
+    await page.goto(
+      '/projects/22222222-2222-4222-8222-222222222222/fulfillment-profiles/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/edit',
+    )
+    await expect(page.getByRole('heading', { name: '履约配置编辑工作区' })).toBeVisible({
+      timeout: 20_000,
+    })
+    await expect(page.getByRole('button', { name: '1. 现场勘测' })).toBeVisible()
+    await page.screenshot({
+      path: 'tests/e2e/__screenshots__/fulfillment-editor-structured-1440.png',
+      fullPage: true,
+    })
+  })
 })
