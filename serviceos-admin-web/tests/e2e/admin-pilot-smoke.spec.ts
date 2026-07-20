@@ -2533,18 +2533,15 @@ test('真实 OIDC 登录后可通过审核外发并经厂端回调关闭 CLIENT 
     )
     .toMatch(/^(CLIENT|客户):(APPROVED|已通过)$/)
 
-  // M163：厂端回调后核心时间线 → ExternalReviewReceipt 详情（GET /internal/...）。
-  // Inbox 投影可能晚于 CLIENT:APPROVED；轮询刷新工作区直至回执链接出现。
+  // M163：产品化后核心时间线侧链移除；轮询活动记录页签中的回执深链。
   await reviewPage.getByRole('link', { name: '工单目录' }).click()
   await expect(reviewPage.getByRole('heading', { name: '工单中心', level: 1 })).toBeVisible()
   await reviewPage.getByRole('link', { name: workOrderCode!, exact: true }).click()
   await expect(reviewPage.getByRole('heading', { name: /工单工作区|工单详情/, level: 1 })).toBeVisible()
-  const workspaceRefresh = reviewPage
-    .locator('header')
-    .filter({ hasText: '工单工作区' })
-    .getByRole('button', { name: '刷新' })
-  const receiptLink = reviewPage.locator('.core-timeline-resource-links').getByRole('link', {
-    name: /core\s*\/\s*evidence\.external-review-receipt-recorded\s*\/\s*ExternalReviewReceipt/,
+  await reviewPage.getByRole('tab', { name: '活动记录' }).click()
+  const workspaceRefresh = reviewPage.getByRole('button', { name: '刷新' }).first()
+  const receiptLink = reviewPage.getByRole('link', {
+    name: /ExternalReviewReceipt|外部审核回执|evidence\.external-review-receipt-recorded/,
   })
   await expect
     .poll(
@@ -2563,7 +2560,7 @@ test('真实 OIDC 登录后可通过审核外发并经厂端回调关闭 CLIENT 
         '/api/v1/internal/external-review-receipts/',
       ),
   )
-  await receiptLink.click()
+  await receiptLink.first().click()
   const receiptDetailResponse = await receiptDetailPromise
   expect(receiptDetailResponse.status()).toBe(200)
   const receiptBody = (await receiptDetailResponse.json()) as {
