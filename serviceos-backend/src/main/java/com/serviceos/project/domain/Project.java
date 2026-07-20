@@ -50,7 +50,12 @@ public record Project(
 
     public ProjectView toView() {
         return new ProjectView(id, tenantId, code, clientId, name, startsOn, endsOn, regionCodes, networkIds,
-                status.name(), version, createdAt);
+                status.name(), version, createdAt, null, null);
+    }
+
+    public ProjectView toView(Integer publishedSchemeCount, Integer draftSchemeCount) {
+        return new ProjectView(id, tenantId, code, clientId, name, startsOn, endsOn, regionCodes, networkIds,
+                status.name(), version, createdAt, publishedSchemeCount, draftSchemeCount);
     }
 
     /**

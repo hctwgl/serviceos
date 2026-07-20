@@ -11,6 +11,8 @@ test.describe('M398 Admin 项目管理与工作台母版产品化', () => {
     await expect(page.getByRole('heading', { name: '项目管理' })).toBeVisible()
     await expect(page.getByTestId('summary-strip')).toBeVisible()
     await expect(page.getByTestId('project-directory-table')).toBeVisible()
+    await expect(page.getByTestId('project-published-scheme-count').first()).toHaveText('1')
+    await expect(page.getByTestId('project-draft-scheme-count').first()).toHaveText('1')
 
     await page.getByTestId('project-directory-create').click()
     await expect(page.getByRole('heading', { name: '新建项目' })).toBeVisible()

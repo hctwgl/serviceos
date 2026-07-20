@@ -4,12 +4,15 @@ import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.authorization.api.AuthorizedProjectScope;
 import com.serviceos.authorization.api.ProjectScopeAuthorizationService;
+import com.serviceos.configuration.api.ProjectFulfillmentProfileService;
+import com.serviceos.configuration.api.ProjectFulfillmentSchemeCount;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.project.api.ProjectDetail;
 import com.serviceos.project.api.ProjectPage;
 import com.serviceos.project.api.ProjectQuery;
 import com.serviceos.project.api.ProjectQueryService;
 import com.serviceos.project.api.ProjectScopeRelationRevisionPage;
+import com.serviceos.project.api.ProjectView;
 import com.serviceos.project.domain.Project;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
@@ -23,9 +26,12 @@ import java.time.LocalDate;
 import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * 项目授权目录查询。集合只解析一次实时授权范围并执行一条范围化 SQL；详情先按 tenant 隔离读取，
@@ -40,6 +46,7 @@ final class DefaultProjectQueryService implements ProjectQueryService {
     private final ProjectQueryRepository queries;
     private final AuthorizationService authorization;
     private final ProjectScopeAuthorizationService projectScopes;
+    private final ProjectFulfillmentProfileService fulfillmentProfiles;
     private final Clock clock;
 
     DefaultProjectQueryService(
@@ -47,12 +54,14 @@ final class DefaultProjectQueryService implements ProjectQueryService {
             ProjectQueryRepository queries,
             AuthorizationService authorization,
             ProjectScopeAuthorizationService projectScopes,
+            ProjectFulfillmentProfileService fulfillmentProfiles,
             Clock clock
     ) {
         this.projects = projects;
         this.queries = queries;
         this.authorization = authorization;
         this.projectScopes = projectScopes;
+        this.fulfillmentProfiles = fulfillmentProfiles;
         this.clock = clock;
     }
 
@@ -74,7 +83,26 @@ final class DefaultProjectQueryService implements ProjectQueryService {
         boolean more = fetched.size() > query.limit();
         List<Project> selected = more ? fetched.subList(0, query.limit()) : fetched;
         Project last = more ? selected.getLast() : null;
-        return new ProjectPage(selected.stream().map(Project::toView).toList(),
+        List<ProjectFulfillmentSchemeCount> schemeCounts = fulfillmentProfiles.summarizeSchemeCounts(
+                principal,
+                correlationId,
+                selected.stream().map(Project::id).toList());
+        // DENY → 空列表 → 字段 null；ALLOW → 每个项目都有计数（可为 0）。
+        Map<UUID, ProjectFulfillmentSchemeCount> byProject = schemeCounts.stream()
+                .collect(Collectors.toMap(ProjectFulfillmentSchemeCount::projectId, Function.identity()));
+        boolean enrich = !schemeCounts.isEmpty() || selected.isEmpty();
+        List<ProjectView> views = selected.stream()
+                .map(project -> {
+                    if (!enrich) {
+                        return project.toView();
+                    }
+                    ProjectFulfillmentSchemeCount count = byProject.get(project.id());
+                    int published = count == null ? 0 : count.publishedSchemeCount();
+                    int draft = count == null ? 0 : count.draftSchemeCount();
+                    return project.toView(published, draft);
+                })
+                .toList();
+        return new ProjectPage(views,
                 last == null ? null : encodeListCursor(
                         scope.scopeDigest(), filterDigest, last.code(), last.id()), clock.instant());
     }

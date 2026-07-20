@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.64
+  version: 1.0.65
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -10096,6 +10096,16 @@ components:
           enum: [DRAFT, ACTIVE, SUSPENDED, CLOSED]
         version: { type: integer, format: int64, minimum: 1 }
         createdAt: { type: string, format: date-time }
+        publishedSchemeCount:
+          type: [integer, 'null']
+          minimum: 0
+          description: |
+            已发布履约方案数（active_revision 非空）。缺 project.fulfillment.read 时为 null。
+        draftSchemeCount:
+          type: [integer, 'null']
+          minimum: 0
+          description: |
+            存在草稿修订的履约方案数（draft_revision 非空）。缺 project.fulfillment.read 时为 null。
     ProjectPage:
       type: object
       additionalProperties: false

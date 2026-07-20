@@ -83,7 +83,7 @@ class ProjectControllerSecurityTest {
                 "tenant-trusted", "BYD-2026", "client-byd", "比亚迪项目",
                 LocalDate.of(2026, 1, 1), null, java.util.List.of("CN-3702"),
                 java.util.List.of("network-qingdao-a"), "DRAFT", 1,
-                Instant.parse("2026-07-13T03:30:00Z"));
+                Instant.parse("2026-07-13T03:30:00Z"), null, null);
         when(principals.current()).thenReturn(principal);
         when(commands.create(eq(principal), any(), any())).thenReturn(result);
 
@@ -117,7 +117,7 @@ class ProjectControllerSecurityTest {
                 projectId, "tenant-trusted", "BYD-2026", "client-byd", "比亚迪项目",
                 LocalDate.of(2026, 1, 1), null, java.util.List.of("CN-3702"),
                 java.util.List.of("network-qingdao-a"), "DRAFT", 3,
-                Instant.parse("2026-07-13T03:30:00Z"));
+                Instant.parse("2026-07-13T03:30:00Z"), 1, 0);
         when(principals.current()).thenReturn(principal);
         when(queries.list(eq(principal), eq("corr-m67-list"), any()))
                 .thenReturn(new ProjectPage(java.util.List.of(project), null,

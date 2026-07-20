@@ -359,7 +359,7 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 已发布/草稿方案聚合列、车企/区域/网点实体选择器
+  - UI_DATA_GAP: 车企/区域/网点实体选择器
 ```
 
 ```yaml
@@ -376,6 +376,24 @@ qualityStatus:
 productOwnerDecision: null
 knownGaps:
   - UI_DATA_GAP: 关注项目读模型尚未交付
+```
+
+### 9.5 M399 记录（项目列表方案聚合）
+
+```yaml
+pageId: ADMIN.PROJECT.LIST
+route: /projects
+visualProfile: CLASSIC_PROFESSIONAL
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: 车企/区域/网点实体选择器（方案聚合已由 M399 关闭）
 ```
 
 ## 10. GAP 规则

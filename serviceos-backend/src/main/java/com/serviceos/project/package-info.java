@@ -5,7 +5,7 @@
         displayName = "Project Directory",
         allowedDependencies = {
                 "shared", "identity::api", "authorization::api",
-                "reliability::api", "audit::api"
+                "reliability::api", "audit::api", "configuration::api"
         }
 )
 package com.serviceos.project;

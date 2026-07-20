@@ -62,6 +62,8 @@ const columns = [
   { title: '结束日期', key: 'endsOn' },
   { title: '服务区域', key: 'regions' },
   { title: '合作网点', key: 'networks' },
+  { title: '已发布方案', key: 'publishedSchemes' },
+  { title: '草稿方案', key: 'draftSchemes' },
   { title: '操作', key: 'actions' },
 ]
 
@@ -342,6 +344,16 @@ onMounted(() => {
           </template>
           <template v-else-if="column.key === 'networks'">
             {{ record.networkIds?.length ?? 0 }}
+          </template>
+          <template v-else-if="column.key === 'publishedSchemes'">
+            <span data-testid="project-published-scheme-count">
+              {{ record.publishedSchemeCount == null ? '—' : record.publishedSchemeCount }}
+            </span>
+          </template>
+          <template v-else-if="column.key === 'draftSchemes'">
+            <span data-testid="project-draft-scheme-count">
+              {{ record.draftSchemeCount == null ? '—' : record.draftSchemeCount }}
+            </span>
           </template>
           <template v-else-if="column.key === 'actions'">
             <Space>

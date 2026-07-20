@@ -13,6 +13,10 @@ export type Project = {
   status: 'DRAFT' | 'ACTIVE' | 'SUSPENDED' | 'CLOSED'
   version: number
   createdAt: string
+  /** soft-gate：缺 project.fulfillment.read 时为 null */
+  publishedSchemeCount?: number | null
+  /** soft-gate：缺 project.fulfillment.read 时为 null */
+  draftSchemeCount?: number | null
 }
 
 export type ProjectPage = {

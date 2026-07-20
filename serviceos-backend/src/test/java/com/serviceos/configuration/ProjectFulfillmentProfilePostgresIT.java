@@ -15,6 +15,7 @@ import com.serviceos.configuration.api.ProjectFulfillmentStageDraft;
 import com.serviceos.configuration.api.ProjectFulfillmentResolveQuery;
 import com.serviceos.configuration.api.ProjectFulfillmentResolver;
 import com.serviceos.configuration.api.ProjectFulfillmentRevisionView;
+import com.serviceos.configuration.api.ProjectFulfillmentSchemeCount;
 import com.serviceos.configuration.api.ProjectFulfillmentValidationIssue;
 import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
 import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
@@ -122,6 +123,28 @@ class ProjectFulfillmentProfilePostgresIT {
                 "HOME_CHARGING_SURVEY_INSTALL", "370000",
                 Instant.now().minusSeconds(60), null,
                 List.of(workflowVersionId)));
+    }
+
+    @Test
+    void summarizeSchemeCountsSoftGateAndZeros() {
+        ProjectFulfillmentProfileDetail created = profiles.create(principal(), meta("sum-c1"),
+                new CreateProjectFulfillmentProfileCommand(
+                        projectId, "HOME_CHARGING_SURVEY_INSTALL", "方案计数",
+                        "试点", "HOME_CHARGING_SURVEY_INSTALL", null));
+        assertThat(created.draftRevisionId()).isNotNull();
+
+        List<ProjectFulfillmentSchemeCount> allowed = profiles.summarizeSchemeCounts(
+                principal(), "corr-sum", List.of(projectId));
+        assertThat(allowed).hasSize(1);
+        assertThat(allowed.getFirst().projectId()).isEqualTo(projectId);
+        assertThat(allowed.getFirst().publishedSchemeCount()).isZero();
+        assertThat(allowed.getFirst().draftSchemeCount()).isEqualTo(1);
+
+        CurrentPrincipal unauthorized = new CurrentPrincipal(
+                "pfp-sum-no-grant", TENANT, CurrentPrincipal.PrincipalType.USER,
+                "admin-web", Set.of());
+        assertThat(profiles.summarizeSchemeCounts(unauthorized, "corr-sum-deny", List.of(projectId)))
+                .isEmpty();
     }
 
     @Test

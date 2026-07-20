@@ -4,7 +4,7 @@ version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-20
 baselineCommit: "9a05be9b9e22be216542260f0979d85ee2cf2bab"
-latestMilestone: M398
+latestMilestone: M399
 ---
 
 # ServiceOS 实施状态总览
@@ -39,13 +39,13 @@ latestMilestone: M398
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M398 Admin 项目管理与工作台母版产品化 |
+| 最新实施里程碑 | M399 项目列表履约方案聚合计数 |
 | 基线提交 | `9a05be9b9e22be216542260f0979d85ee2cf2bab`（历史基线；合入 master 后回填） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts`、`@serviceos/web-core`、`ServiceOSIOSCore`、独立且可部署的 `serviceos-network-web` 与 `serviceos-technician-web`、Swift 6 `TechnicianIOSFoundation`，以及已在 iPhone 17 Pro Simulator 安装启动、实跑 XCTest/XCUITest、形成 Production arm64 archive/dSYM，并接入当前任务、在线 Visit、冻结基础表单、前台 Evidence 采集上传、Snapshot/Task 完成与多轮资料整改的原生 `TechnicianIOS` SwiftUI App；由同一 Core OpenAPI 生成并经独立消费者门禁验证的 `@serviceos/core-client` 与 `ServiceOSCoreClient` |
 | 前端工程 | `serviceos-admin-web` 独立承载总部运营；**M370～M377** 完成设计系统 Presenter、产品化 AppShell（ScopeBar/Freshness/诊断抽屉）、标准页模板、工单中心/详情、项目详情与主导航页壳迁移及视觉关闭；仍消费服务端 Navigation 与 allowed-actions；M256 后 Network 正式产品由独立 `serviceos-network-web` 承载，M257 后 Technician 正式产品由独立移动优先 `serviceos-technician-web` 承载；两套独立 Web 均实际接入共享 Core、OIDC PKCE、服务端 Context/Capability/导航、Playwright 回归和独立容器镜像 |
 | 数据库 | PostgreSQL + Flyway（当前版本 **138**；M378 V136/V137 + M383 V138 effective_to 关闭窗口） |
-| 契约 | Core OpenAPI **1.0.64** + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含项目履约 Profile Runbook/Compare-Impact/结构化 Draft Document/任务模板读模型、`TaskBlockedAction`；`workorder.cancelled@v1`、`workorder.reopened@v1`、`workorder.external-details-updated@v1`、project.created@v3、project.scope-relations-revised@v1、`task.handling-completed@v1`、recovered/resolved 与 SLA started/breached/met@v1；ConfigurationDraft.clientCompatibility/`supportedClientKinds`；Feed/整改 `clientCapabilityUnsupportedDetail`；整改/主 Evidence/`Manual assign`/Network on-behalf `CLIENT_CAPABILITY_UNSUPPORTED`；`ReviewCase.reviewTaskId`；`TechnicianProfile.supportedClientKinds` / declare） |
+| 契约 | Core OpenAPI **1.0.65** + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含项目列表 `publishedSchemeCount`/`draftSchemeCount`、项目履约 Profile Runbook/Compare-Impact/结构化 Draft Document/任务模板读模型、`TaskBlockedAction`；`workorder.cancelled@v1`、`workorder.reopened@v1`、`workorder.external-details-updated@v1`、project.created@v3、project.scope-relations-revised@v1、`task.handling-completed@v1`、recovered/resolved 与 SLA started/breached/met@v1；ConfigurationDraft.clientCompatibility/`supportedClientKinds`；Feed/整改 `clientCapabilityUnsupportedDetail`；整改/主 Evidence/`Manual assign`/Network on-behalf `CLIENT_CAPABILITY_UNSUPPORTED`；`ReviewCase.reviewTaskId`；`TechnicianProfile.supportedClientKinds` / declare） |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -192,12 +192,13 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 - **M396 Implemented**：Network 师傅与产能产品化；`READY_FOR_REVIEW`。本轮曾评估 Technician iOS，但当前环境无 Xcode，改为本切片。
 - **M397 Implemented**：Admin 用户管理母版产品化（目录 ListPageLayout + 详情 Tabs）；`READY_FOR_REVIEW`。
 - **M398 Implemented**：Admin 项目管理列表+新建专用流程、工作台风险 SummaryStrip；`READY_FOR_REVIEW`。
+- **M399 Implemented**：项目列表履约方案聚合计数（OpenAPI **1.0.65** + soft-gate）；关闭对应 UI_DATA_GAP。
 - **M383** 长链路 test 7/8 仍未闭合，不阻塞本切片。
 
 建议下一批（按优先级）：
 
 1. Technician iOS 正式离线闭环（需 macOS/Xcode 环境）；
-2. 项目列表方案聚合列 / 关注项目读模型 / 实体选择器；
+2. 关注项目读模型 / 车企区域网点实体选择器；
 3. 新建用户写流程 / 组织角色列表读模型。
 
 仍为 **硬门禁 / 外部阻塞**（不可发明推进）：

@@ -2,6 +2,7 @@ package com.serviceos.configuration.application;
 
 import com.serviceos.audit.api.AuditAppender;
 import com.serviceos.audit.api.AuditEntry;
+import com.serviceos.authorization.api.AuthorizationDecision;
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.configuration.api.CreateProjectFulfillmentProfileCommand;
@@ -14,6 +15,7 @@ import com.serviceos.configuration.api.ProjectFulfillmentProfileStatus;
 import com.serviceos.configuration.api.ProjectFulfillmentProfileSummary;
 import com.serviceos.configuration.api.ProjectFulfillmentRevisionStatus;
 import com.serviceos.configuration.api.ProjectFulfillmentRevisionView;
+import com.serviceos.configuration.api.ProjectFulfillmentSchemeCount;
 import com.serviceos.configuration.api.ProjectFulfillmentValidationIssue;
 import com.serviceos.configuration.api.UpdateProjectFulfillmentDraftCommand;
 import com.serviceos.identity.api.CurrentPrincipal;
@@ -32,11 +34,13 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * 项目履约配置应用服务。
@@ -218,6 +222,57 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
                             toInstant(rs.getObject("updated_at", OffsetDateTime.class)));
                 })
                 .list();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProjectFulfillmentSchemeCount> summarizeSchemeCounts(
+            CurrentPrincipal principal, String correlationId, Collection<UUID> projectIds
+    ) {
+        Objects.requireNonNull(principal, "principal");
+        if (projectIds == null || projectIds.isEmpty()) {
+            return List.of();
+        }
+        List<UUID> ids = projectIds.stream().filter(Objects::nonNull).distinct().toList();
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        // soft-gate：任选一个项目探测 fulfillment.read；缺能力返回空，目录列显示「—」。
+        UUID probeProjectId = ids.getFirst();
+        AuthorizationDecision decision = authorization.authorize(
+                principal,
+                AuthorizationRequest.projectCapability(
+                        READ,
+                        principal.tenantId(),
+                        RESOURCE,
+                        probeProjectId.toString(),
+                        probeProjectId.toString()),
+                correlationId);
+        if (decision.effect() != AuthorizationDecision.Effect.ALLOW) {
+            return List.of();
+        }
+        Map<UUID, ProjectFulfillmentSchemeCount> found = jdbc.sql("""
+                SELECT project_id,
+                       COUNT(*) FILTER (WHERE active_revision_id IS NOT NULL)::int AS published_count,
+                       COUNT(*) FILTER (WHERE draft_revision_id IS NOT NULL)::int AS draft_count
+                  FROM cfg_project_fulfillment_profile
+                 WHERE tenant_id = :tenantId
+                   AND project_id IN (:projectIds)
+                 GROUP BY project_id
+                """)
+                .param("tenantId", principal.tenantId())
+                .param("projectIds", ids)
+                .query((rs, rowNum) -> new ProjectFulfillmentSchemeCount(
+                        rs.getObject("project_id", UUID.class),
+                        rs.getInt("published_count"),
+                        rs.getInt("draft_count")))
+                .list()
+                .stream()
+                .collect(Collectors.toMap(ProjectFulfillmentSchemeCount::projectId, row -> row, (a, b) -> a, LinkedHashMap::new));
+        // ALLOW 时对请求中的每个项目补齐 0，便于目录与 DENY（空列表）区分。
+        return ids.stream()
+                .map(id -> found.getOrDefault(id, new ProjectFulfillmentSchemeCount(id, 0, 0)))
+                .toList();
     }
 
     @Override

@@ -190,6 +190,8 @@ export async function mockProductizationApis(
             status: 'ACTIVE',
             version: 3,
             createdAt: '2026-01-01T00:00:00Z',
+            publishedSchemeCount: 1,
+            draftSchemeCount: 1,
           },
         ],
         nextCursor: null,
