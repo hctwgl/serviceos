@@ -5,7 +5,9 @@ import com.serviceos.configuration.api.ConfigurationAssetType;
 import com.serviceos.configuration.api.ConfigurationBundleReference;
 import com.serviceos.configuration.api.ConfigurationService;
 import com.serviceos.configuration.api.CreateProjectFulfillmentProfileCommand;
+import com.serviceos.configuration.api.ProjectFulfillmentCompareImpact;
 import com.serviceos.configuration.api.ProjectFulfillmentDraftView;
+import com.serviceos.configuration.api.ProjectFulfillmentManifestView;
 import com.serviceos.configuration.api.ProjectFulfillmentProfileDetail;
 import com.serviceos.configuration.api.ProjectFulfillmentProfileService;
 import com.serviceos.configuration.api.ProjectFulfillmentResolveQuery;
@@ -156,6 +158,19 @@ class ProjectFulfillmentProfilePostgresIT {
                 principal(), meta("v1"), projectId, created.profileId());
         assertThat(issues.stream().noneMatch(i -> "ERROR".equals(i.severity()))).isTrue();
 
+        ProjectFulfillmentManifestView preview = profiles.compilePreview(
+                principal(), meta("preview-1"), projectId, created.profileId());
+        assertThat(preview.runbook()).isNotNull();
+        assertThat(preview.runbook().serviceProductLabel()).isEqualTo("家充勘测安装");
+        assertThat(preview.runbook().stageCount()).isGreaterThanOrEqualTo(1);
+        assertThat(preview.runbook().stages().getFirst().ownerTypeLabel()).isNotBlank();
+        assertThat(preview.manifestJson()).contains("stages");
+
+        ProjectFulfillmentCompareImpact beforeBaseline = profiles.compareImpact(
+                principal(), "corr-compare-none", projectId, created.profileId());
+        assertThat(beforeBaseline.baselineKind()).isEqualTo("NONE");
+        assertThat(beforeBaseline.impact().existingWorkOrdersScope()).contains("冻结");
+
         ProjectFulfillmentProfileDetail beforePublish = profiles.get(
                 principal(), "corr-get", projectId, created.profileId());
         ProjectFulfillmentRevisionView published = profiles.publish(
@@ -178,6 +193,23 @@ class ProjectFulfillmentProfilePostgresIT {
                 Instant.now().plusSeconds(10), "ADMIN_WEB", "BYD_OCEAN", "370000"));
         assertThat(resolved.revisionId()).isEqualTo(published.revisionId());
         assertThat(resolved.configurationBundleId()).isEqualTo(bundle.bundleId());
+
+        ProjectFulfillmentDraftView afterPublishDraft = profiles.getDraft(
+                principal(), "corr-draft-2", projectId, created.profileId());
+        String mutated = afterPublishDraft.documentJson().replace("现场勘测", "现场勘测修订版");
+        assertThat(mutated).isNotEqualTo(afterPublishDraft.documentJson());
+        profiles.updateDraft(principal(), meta("u-diff"),
+                new UpdateProjectFulfillmentDraftCommand(
+                        created.profileId(), afterPublishDraft.aggregateVersion(),
+                        "标准家充履约 v2", "差异测试", mutated,
+                        workflowVersionId, bundle.bundleId()));
+        ProjectFulfillmentCompareImpact withBaseline = profiles.compareImpact(
+                principal(), "corr-compare-pub", projectId, created.profileId());
+        assertThat(withBaseline.baselineKind()).isEqualTo("PUBLISHED");
+        assertThat(withBaseline.baselineVersionLabel()).isEqualTo("v1");
+        assertThat(withBaseline.changeCount()).isGreaterThanOrEqualTo(1);
+        assertThat(withBaseline.changes()).anyMatch(change ->
+                change.summary().contains("现场勘测") || "STAGE".equals(change.category()));
     }
 
     @Test

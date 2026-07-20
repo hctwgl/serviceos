@@ -5,6 +5,7 @@ import com.serviceos.audit.api.AuditEntry;
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.configuration.api.CreateProjectFulfillmentProfileCommand;
+import com.serviceos.configuration.api.ProjectFulfillmentCompareImpact;
 import com.serviceos.configuration.api.ProjectFulfillmentDraftView;
 import com.serviceos.configuration.api.ProjectFulfillmentManifestView;
 import com.serviceos.configuration.api.ProjectFulfillmentProfileDetail;
@@ -61,6 +62,8 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
     private final AuditAppender audit;
     private final ProjectFulfillmentDraftValidator validator;
     private final ProjectFulfillmentManifestCompiler compiler;
+    private final ProjectFulfillmentRunbookAssembler runbookAssembler;
+    private final ProjectFulfillmentCompareAnalyzer compareAnalyzer;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
@@ -70,6 +73,8 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
             AuditAppender audit,
             ProjectFulfillmentDraftValidator validator,
             ProjectFulfillmentManifestCompiler compiler,
+            ProjectFulfillmentRunbookAssembler runbookAssembler,
+            ProjectFulfillmentCompareAnalyzer compareAnalyzer,
             ObjectMapper objectMapper,
             Clock clock
     ) {
@@ -78,6 +83,8 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
         this.audit = audit;
         this.validator = validator;
         this.compiler = compiler;
+        this.runbookAssembler = runbookAssembler;
+        this.compareAnalyzer = compareAnalyzer;
         this.objectMapper = objectMapper;
         this.clock = clock;
     }
@@ -426,7 +433,55 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
                 draft.workflowAssetVersionId(),
                 clock.instant(),
                 document);
-        return new ProjectFulfillmentManifestView(compiled.json(), compiled.contentDigest());
+        return new ProjectFulfillmentManifestView(
+                compiled.json(),
+                compiled.contentDigest(),
+                runbookAssembler.fromManifestJson(compiled.json()));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ProjectFulfillmentCompareImpact compareImpact(
+            CurrentPrincipal principal, String correlationId, UUID projectId, UUID profileId
+    ) {
+        ProfileRow profile = loadProfile(principal.tenantId(), projectId, profileId);
+        authorization.require(principal, AuthorizationRequest.projectCapability(
+                READ, principal.tenantId(), RESOURCE, profileId.toString(), projectId.toString()),
+                correlationId);
+        DraftRow draft = loadDraft(principal.tenantId(), profile.draftRevisionId());
+        UUID baselineRevisionId = profile.activeRevisionId();
+        String baselineVersionLabel = null;
+        String baselineDocumentJson = null;
+        if (baselineRevisionId != null) {
+            var baseline = jdbc.sql("""
+                    SELECT version_no, document_json::text AS document_json
+                      FROM cfg_project_fulfillment_revision
+                     WHERE tenant_id = :tenantId AND revision_id = :id
+                       AND revision_status = 'PUBLISHED'
+                    """)
+                    .param("tenantId", principal.tenantId())
+                    .param("id", baselineRevisionId)
+                    .query((rs, n) -> new Object[] {
+                            rs.getInt("version_no"),
+                            rs.getString("document_json")
+                    })
+                    .optional()
+                    .orElse(null);
+            if (baseline != null) {
+                baselineVersionLabel = "v" + baseline[0];
+                baselineDocumentJson = (String) baseline[1];
+            } else {
+                baselineRevisionId = null;
+            }
+        }
+        return compareAnalyzer.analyze(
+                profile.profileId(),
+                draft.revisionId(),
+                draft.documentJson(),
+                baselineRevisionId,
+                baselineVersionLabel,
+                baselineDocumentJson,
+                clock.instant());
     }
 
     @Override

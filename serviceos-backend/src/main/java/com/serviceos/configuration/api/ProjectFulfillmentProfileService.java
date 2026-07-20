@@ -37,6 +37,9 @@ public interface ProjectFulfillmentProfileService {
     ProjectFulfillmentManifestView compilePreview(
             CurrentPrincipal principal, CommandMetadata metadata, UUID projectId, UUID profileId);
 
+    ProjectFulfillmentCompareImpact compareImpact(
+            CurrentPrincipal principal, String correlationId, UUID projectId, UUID profileId);
+
     ProjectFulfillmentRevisionView publish(
             CurrentPrincipal principal,
             CommandMetadata metadata,

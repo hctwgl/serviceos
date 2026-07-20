@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.61
+  version: 1.0.62
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -3649,6 +3649,9 @@ paths:
     post:
       operationId: compileProjectFulfillmentPreview
       summary: 编译履约运行说明书预览
+      description: |
+        返回产品化 Runbook 与诊断用 manifestJson。
+        普通产品 UI 必须只渲染 runbook；不得把 manifestJson 作为主内容展示。
       parameters:
         - name: projectId
           in: path
@@ -3662,12 +3665,40 @@ paths:
         - $ref: '#/components/parameters/CorrelationId'
       responses:
         '200':
-          description: 服务端编译 Manifest
+          description: 服务端编译的运行说明书与诊断 Manifest
           headers:
             X-Correlation-Id: { required: true, schema: { type: string } }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProjectFulfillmentManifest' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /projects/{projectId}/fulfillment-profiles/{profileId}/compare-impact:
+    get:
+      operationId: compareProjectFulfillmentImpact
+      summary: 比较草稿与当前发布版的差异与影响
+      description: |
+        只读读模型。对比当前草稿与 ACTIVE 已发布 Revision；
+        无发布基线时 baselineKind=NONE。前端不得用固定文案伪造差异。
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: profileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 版本差异与影响说明
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectFulfillmentCompareImpact' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
@@ -11555,10 +11586,95 @@ components:
         createdAt: { type: string, format: date-time }
     ProjectFulfillmentManifest:
       type: object
-      required: [manifestJson, contentDigest]
+      required: [manifestJson, contentDigest, runbook]
       properties:
-        manifestJson: { type: string, minLength: 2 }
+        manifestJson:
+          type: string
+          minLength: 2
+          description: 仅供开发诊断；普通产品页面不得作为主内容渲染
         contentDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
+        runbook: { $ref: '#/components/schemas/ProjectFulfillmentRunbook' }
+    ProjectFulfillmentRunbook:
+      type: object
+      required:
+        - profileName
+        - serviceProductCode
+        - serviceProductLabel
+        - stageCount
+        - stages
+        - impactSummary
+      properties:
+        profileName: { type: string }
+        serviceProductCode: { type: string }
+        serviceProductLabel: { type: string }
+        orderTypeName: { type: string, nullable: true }
+        versionLabel: { type: string, nullable: true }
+        stageCount: { type: integer, minimum: 0 }
+        stages:
+          type: array
+          items: { $ref: '#/components/schemas/ProjectFulfillmentRunbookStage' }
+        clientSupportSummary: { type: string, nullable: true }
+        impactSummary: { type: string }
+    ProjectFulfillmentRunbookStage:
+      type: object
+      required: [stageName, sequence, ownerTypeLabel, terminal]
+      properties:
+        stageName: { type: string }
+        sequence: { type: integer }
+        ownerTypeLabel: { type: string }
+        taskTypeLabel: { type: string, nullable: true }
+        formCount: { type: integer, minimum: 0 }
+        formSummary: { type: string, nullable: true }
+        evidenceCount: { type: integer, minimum: 0 }
+        evidenceSummary: { type: string, nullable: true }
+        actionCount: { type: integer, minimum: 0 }
+        actionSummary: { type: string, nullable: true }
+        nextStageSummary: { type: string, nullable: true }
+        exceptionSummary: { type: string, nullable: true }
+        slaSummary: { type: string, nullable: true }
+        terminal: { type: boolean }
+    ProjectFulfillmentCompareImpact:
+      type: object
+      required:
+        - profileId
+        - draftRevisionId
+        - baselineKind
+        - changeCount
+        - changes
+        - impact
+        - risks
+        - asOf
+      properties:
+        profileId: { type: string, format: uuid }
+        draftRevisionId: { type: string, format: uuid }
+        baselineKind: { enum: [NONE, PUBLISHED] }
+        baselineRevisionId: { type: string, format: uuid, nullable: true }
+        baselineVersionLabel: { type: string, nullable: true }
+        changeCount: { type: integer, minimum: 0 }
+        changes:
+          type: array
+          items: { $ref: '#/components/schemas/ProjectFulfillmentCompareChange' }
+        impact: { $ref: '#/components/schemas/ProjectFulfillmentImpactSummary' }
+        risks:
+          type: array
+          items: { type: string }
+        asOf: { type: string, format: date-time }
+    ProjectFulfillmentCompareChange:
+      type: object
+      required: [category, changeType, summary]
+      properties:
+        category:
+          enum: [STAGE, TASK, FORM, EVIDENCE, ACTION, SLA, DISPATCH, NOTIFICATION, OTHER]
+        changeType: { enum: [ADDED, REMOVED, MODIFIED] }
+        summary: { type: string }
+        detail: { type: string, nullable: true }
+    ProjectFulfillmentImpactSummary:
+      type: object
+      required: [newWorkOrdersScope, existingWorkOrdersScope]
+      properties:
+        newWorkOrdersScope: { type: string }
+        existingWorkOrdersScope: { type: string }
+        effectiveFromHint: { type: string, nullable: true }
     ProjectFulfillmentValidationIssue:
       type: object
       required: [severity, errorCode, userMessage]
