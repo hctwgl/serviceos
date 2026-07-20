@@ -11,6 +11,7 @@ import com.serviceos.project.api.ProjectDetail;
 import com.serviceos.project.api.ProjectPage;
 import com.serviceos.project.api.ProjectQuery;
 import com.serviceos.project.api.ProjectQueryService;
+import com.serviceos.project.api.ProjectReferenceOptions;
 import com.serviceos.project.api.ProjectScopeRelationRevisionPage;
 import com.serviceos.project.api.ProjectView;
 import com.serviceos.project.domain.Project;
@@ -47,6 +48,7 @@ final class DefaultProjectQueryService implements ProjectQueryService {
     private final AuthorizationService authorization;
     private final ProjectScopeAuthorizationService projectScopes;
     private final ProjectFulfillmentProfileService fulfillmentProfiles;
+    private final ProjectReferenceOptionsRepository referenceOptions;
     private final Clock clock;
 
     DefaultProjectQueryService(
@@ -55,6 +57,7 @@ final class DefaultProjectQueryService implements ProjectQueryService {
             AuthorizationService authorization,
             ProjectScopeAuthorizationService projectScopes,
             ProjectFulfillmentProfileService fulfillmentProfiles,
+            ProjectReferenceOptionsRepository referenceOptions,
             Clock clock
     ) {
         this.projects = projects;
@@ -62,6 +65,7 @@ final class DefaultProjectQueryService implements ProjectQueryService {
         this.authorization = authorization;
         this.projectScopes = projectScopes;
         this.fulfillmentProfiles = fulfillmentProfiles;
+        this.referenceOptions = referenceOptions;
         this.clock = clock;
     }
 
@@ -112,6 +116,16 @@ final class DefaultProjectQueryService implements ProjectQueryService {
     public ProjectDetail get(CurrentPrincipal principal, String correlationId, UUID projectId) {
         Project project = requireProject(principal, correlationId, projectId);
         return new ProjectDetail(project.toView(), clock.instant());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ProjectReferenceOptions referenceOptions(CurrentPrincipal principal, String correlationId) {
+        AuthorizedProjectScope scope = projectScopes.require(principal, READ, "Project", correlationId);
+        return new ProjectReferenceOptions(
+                referenceOptions.listClients(principal.tenantId(), scope.tenantWide(), scope.projectIds()),
+                referenceOptions.listRegions(principal.tenantId(), scope.tenantWide(), scope.projectIds()),
+                clock.instant());
     }
 
     @Override

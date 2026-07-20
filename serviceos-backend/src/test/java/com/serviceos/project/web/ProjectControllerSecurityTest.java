@@ -5,9 +5,12 @@ import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
 import com.serviceos.project.api.ProjectCommandService;
 import com.serviceos.project.api.ProjectDetail;
+import com.serviceos.project.api.ProjectClientOption;
 import com.serviceos.project.api.ProjectPage;
 import com.serviceos.project.api.ProjectQuery;
 import com.serviceos.project.api.ProjectQueryService;
+import com.serviceos.project.api.ProjectReferenceOptions;
+import com.serviceos.project.api.ProjectRegionOption;
 import com.serviceos.project.api.ProjectScopeRelationRevisionView;
 import com.serviceos.project.api.ReviseProjectScopeRelationsCommand;
 import com.serviceos.project.api.ProjectView;
@@ -192,6 +195,28 @@ class ProjectControllerSecurityTest {
                                 && command.expectedVersion() == 1
                                 && command.regionCodes().equals(java.util.List.of("CN-4403"))
                                 && command.networkIds().equals(java.util.List.of("network-shenzhen-a"))));
+    }
+
+    @Test
+    void referenceOptionsUsesTrustedPrincipalAndDoesNotTreatPathAsProjectId() throws Exception {
+        CurrentPrincipal principal = new CurrentPrincipal(
+                "user-1", "tenant-trusted", CurrentPrincipal.PrincipalType.USER,
+                "admin-web", Set.of("project.read"));
+        when(principals.current()).thenReturn(principal);
+        when(queries.referenceOptions(eq(principal), any())).thenReturn(new ProjectReferenceOptions(
+                java.util.List.of(new ProjectClientOption("client-byd", 1)),
+                java.util.List.of(new ProjectRegionOption("CN-3702", 1)),
+                Instant.parse("2026-07-20T00:00:00Z")));
+
+        mvc.perform(get("/api/v1/projects/reference-options")
+                        .with(jwt().jwt(token -> token.subject("user-1").claim("tenant_id", "tenant-trusted")))
+                        .header("X-Correlation-Id", "corr-m400-options"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("X-Correlation-Id", "corr-m400-options"))
+                .andExpect(jsonPath("$.clients[0].clientId").value("client-byd"))
+                .andExpect(jsonPath("$.regions[0].regionCode").value("CN-3702"));
+
+        verify(queries).referenceOptions(eq(principal), eq("corr-m400-options"));
     }
 
     @Test

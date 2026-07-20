@@ -17,6 +17,9 @@ test.describe('M398 Admin 项目管理与工作台母版产品化', () => {
     await page.getByTestId('project-directory-create').click()
     await expect(page.getByRole('heading', { name: '新建项目' })).toBeVisible()
     await expect(page.getByTestId('project-create-submit')).toBeVisible()
+    await expect(page.getByTestId('project-client-picker')).toBeVisible()
+    await expect(page.getByTestId('project-region-picker')).toBeVisible()
+    await expect(page.getByTestId('network-entity-picker')).toBeVisible()
 
     await page.setViewportSize({ width: 1440, height: 1024 })
     await page.screenshot({

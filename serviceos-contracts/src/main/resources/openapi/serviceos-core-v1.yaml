@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.65
+  version: 1.0.66
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -3386,6 +3386,25 @@ paths:
           $ref: '#/components/responses/Problem'
         '422':
           $ref: '#/components/responses/Problem'
+  /projects/reference-options:
+    get:
+      operationId: getProjectReferenceOptions
+      summary: 查询项目创建/范围编辑用的车企与区域选项
+      description: >-
+        按实时 project.read 授权范围聚合已有项目的 clientId 与生效 REGION 编码。
+        网点选项请使用 /service-networks。不含臆造的区域名称字典。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 选择器选项
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectReferenceOptions' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
   /projects/{projectId}:
     get:
       operationId: getAuthorizedProject
@@ -10115,6 +10134,32 @@ components:
           type: array
           items: { $ref: '#/components/schemas/Project' }
         nextCursor: { type: [string, 'null'] }
+        asOf: { type: string, format: date-time }
+    ProjectClientOption:
+      type: object
+      additionalProperties: false
+      required: [clientId, projectCount]
+      properties:
+        clientId: { type: string, minLength: 1, maxLength: 128 }
+        projectCount: { type: integer, minimum: 0 }
+    ProjectRegionOption:
+      type: object
+      additionalProperties: false
+      required: [regionCode, projectCount]
+      properties:
+        regionCode: { type: string, minLength: 1, maxLength: 128 }
+        projectCount: { type: integer, minimum: 0 }
+    ProjectReferenceOptions:
+      type: object
+      additionalProperties: false
+      required: [clients, regions, asOf]
+      properties:
+        clients:
+          type: array
+          items: { $ref: '#/components/schemas/ProjectClientOption' }
+        regions:
+          type: array
+          items: { $ref: '#/components/schemas/ProjectRegionOption' }
         asOf: { type: string, format: date-time }
     ProjectDetail:
       type: object

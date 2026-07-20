@@ -359,7 +359,7 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 车企/区域/网点实体选择器
+  - UI_DATA_GAP: 完整行政区名称树 / 独立车企主数据目录
 ```
 
 ```yaml
@@ -393,7 +393,25 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 车企/区域/网点实体选择器（方案聚合已由 M399 关闭）
+  - UI_DATA_GAP: 车企/区域/网点实体选择器（方案聚合已由 M399 关闭；选择器由 M400 关闭主路径）
+```
+
+### 9.6 M400 记录（项目实体选择器）
+
+```yaml
+pageId: ADMIN.PROJECT.LIST
+route: /projects
+visualProfile: CLASSIC_PROFESSIONAL
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: 完整行政区名称树 / 独立车企主数据目录（聚合选择器已交付）
 ```
 
 ## 10. GAP 规则

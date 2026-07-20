@@ -120,6 +120,36 @@ class ProjectQueryPostgresIT {
     }
 
     @Test
+    void referenceOptionsAggregateAuthorizedClientsAndRegions() {
+        create("OPT-A", "client-a", "Opt A", LocalDate.of(2026, 1, 1), null,
+                List.of("CN-3702"), List.of("network-a"));
+        create("OPT-B", "client-a", "Opt B", LocalDate.of(2026, 1, 1), null,
+                List.of("CN-3702", "CN-3100"), List.of("network-b"));
+        create("OPT-C", "client-b", "Opt C", LocalDate.of(2026, 1, 1), null,
+                List.of("CN-4403"), List.of("network-c"));
+
+        var options = queries.referenceOptions(operator(), "corr-m400-options");
+        assertThat(options.clients()).extracting(item -> item.clientId())
+                .containsExactly("client-a", "client-b");
+        assertThat(options.clients()).filteredOn(item -> item.clientId().equals("client-a"))
+                .singleElement()
+                .extracting(item -> item.projectCount())
+                .isEqualTo(2);
+        assertThat(options.regions()).extracting(item -> item.regionCode())
+                .containsExactly("CN-3100", "CN-3702", "CN-4403");
+        assertThat(options.asOf()).isNotNull();
+
+        seedRole("opt-reader", "opt-region-role", "REGION", "CN-3702", List.of("project.read"));
+        var scoped = queries.referenceOptions(
+                principal("opt-reader", "tenant-test"), "corr-m400-scoped");
+        // REGION 授权可见含该区域的项目；选项展示这些项目上的全部生效 REGION（含同项目其他区域）。
+        assertThat(scoped.clients()).extracting(item -> item.clientId())
+                .containsExactly("client-a");
+        assertThat(scoped.regions()).extracting(item -> item.regionCode())
+                .containsExactly("CN-3100", "CN-3702");
+    }
+
+    @Test
     void projectRegionAndNetworkGrantsResolveAsOneExactUnion() {
         ProjectView direct = create("UNION-A", "client-a", "Direct", LocalDate.of(2026, 1, 1), null,
                 List.of("CN-1100"), List.of("network-a"));

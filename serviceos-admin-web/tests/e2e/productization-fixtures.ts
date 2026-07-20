@@ -176,6 +176,14 @@ export async function mockProductizationApis(
       })
       return
     }
+    if (url.includes('/projects/reference-options')) {
+      await fulfillJson(route, {
+        clients: [{ clientId: 'client-geely', projectCount: 1 }],
+        regions: [{ regionCode: 'CN-3702', projectCount: 1 }],
+        asOf: '2026-07-20T04:00:00Z',
+      })
+      return
+    }
     if (url.includes('/projects') && !url.includes('/projects/')) {
       await fulfillJson(route, {
         items: [

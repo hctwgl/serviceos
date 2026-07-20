@@ -10,6 +10,9 @@ import { firstRouteQuery } from '../routeQuery'
 import { statusLabel } from '../product/statusLabels'
 import { formatDateTimeDisplay } from '../presentation/date-time.presenter'
 import { labelClientCode } from '../presentation/enum-labels'
+import ProjectClientPicker from '../components/ProjectClientPicker.vue'
+import ProjectRegionPicker from '../components/ProjectRegionPicker.vue'
+import NetworkEntityPicker from '../components/NetworkEntityPicker.vue'
 
 const route = useRoute()
 
@@ -31,8 +34,8 @@ const createClientId = ref('client-demo')
 const createName = ref('')
 const createStartsOn = ref(new Date().toISOString().slice(0, 10))
 const createEndsOn = ref('')
-const createRegionCodes = ref('')
-const createNetworkIds = ref('')
+const createRegionCodes = ref<string[]>([])
+const createNetworkIds = ref<string[]>([])
 const createdProjectId = ref('')
 
 const summaryItems = computed<SummaryStripItem[]>(() => {
@@ -135,22 +138,14 @@ async function create() {
     if (!createCode.value.trim() || !createName.value.trim()) {
       throw new Error('请填写项目编码与名称')
     }
-    const regionCodes = createRegionCodes.value
-      .split(/[,\s]+/)
-      .map((v) => v.trim())
-      .filter(Boolean)
-    const networkIds = createNetworkIds.value
-      .split(/[,\s]+/)
-      .map((v) => v.trim())
-      .filter(Boolean)
     const created = await createProject({
       code: createCode.value.trim(),
       clientId: createClientId.value.trim(),
       name: createName.value.trim(),
       startsOn: createStartsOn.value,
       endsOn: createEndsOn.value.trim() || null,
-      regionCodes,
-      networkIds,
+      regionCodes: [...createRegionCodes.value],
+      networkIds: [...createNetworkIds.value],
     })
     createdProjectId.value = created.data.id
     message.value = `已创建项目 ${created.data.name}（${created.data.code}）`
@@ -201,7 +196,7 @@ onMounted(() => {
         </label>
         <label>
           <span>所属车企</span>
-          <Input v-model:value="createClientId" aria-label="project clientId" />
+          <ProjectClientPicker v-model="createClientId" />
         </label>
         <label class="wide">
           <span>项目名称</span>
@@ -216,16 +211,16 @@ onMounted(() => {
           <Input v-model:value="createEndsOn" type="date" aria-label="project endsOn" />
         </label>
         <label class="wide">
-          <span>服务区域编码（逗号分隔，可选）</span>
-          <Input v-model:value="createRegionCodes" aria-label="project regionCodes" />
+          <span>服务区域</span>
+          <ProjectRegionPicker v-model="createRegionCodes" />
         </label>
         <label class="wide">
-          <span>合作网点（逗号分隔 ID，可选）</span>
-          <Input v-model:value="createNetworkIds" aria-label="project networkIds" />
+          <span>合作网点</span>
+          <NetworkEntityPicker v-model="createNetworkIds" />
         </label>
       </div>
       <p class="muted">
-        UI_DATA_GAP：车企/区域/网点实体选择器尚未完整交付，当前仍接受编码输入，不猜测显示名。
+        车企/区域选项来自已授权项目聚合；网点来自服务网点目录。完整行政区名称树仍属 UI_DATA_GAP。
       </p>
     </DedicatedFlowLayout>
 

@@ -488,4 +488,5 @@ Feature gate/authority: if applicable
 | M397 | Admin 用户管理目录/详情母版产品化 | 408-m397-* + 391-m397-*；Playwright 截图 | 新建用户写流程；组织/角色/最近登录读模型；人工视觉批准 |
 | M398 | Admin 项目管理列表+新建流程、工作台 SummaryStrip | 409-m398-* + 392-m398-*；Playwright 截图 | 方案聚合列；关注项目读模型；实体选择器；人工视觉批准 |
 | M399 | 项目列表 publishedSchemeCount/draftSchemeCount 服务端聚合 | 410-m399-* + 393-m399-*；OpenAPI 1.0.65；PostgresIT + ArchitectureTest + Playwright | 关注项目；实体选择器；人工视觉批准 |
+| M400 | 项目车企/区域/网点实体选择器 | 411-m400-* + 394-m400-*；OpenAPI 1.0.66；PostgresIT + ArchitectureTest + Playwright | 行政区名称树；车企主数据；关注项目；人工视觉批准 |
 

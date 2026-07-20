@@ -17,4 +17,9 @@ public interface ProjectQueryService {
             String cursor,
             int limit
     );
+
+    /**
+     * 项目创建与范围编辑用的车企/区域选择选项（按实时授权范围聚合）。
+     */
+    ProjectReferenceOptions referenceOptions(CurrentPrincipal principal, String correlationId);
 }

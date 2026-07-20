@@ -6,7 +6,6 @@ import {
   Button,
   Descriptions,
   Input,
-  Select,
   Space,
   Tabs,
   TabPane,
@@ -36,6 +35,8 @@ import { presentEntityName } from '../presentation/entity-name.presenter'
 import { useDeveloperDiagnostics } from '../composables/useDeveloperDiagnostics'
 import { statusLabel } from '../product/statusLabels'
 import { toUserFacingError } from '../product/errorMessages'
+import ProjectRegionPicker from '../components/ProjectRegionPicker.vue'
+import NetworkEntityPicker from '../components/NetworkEntityPicker.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -79,8 +80,14 @@ async function loadNetworks() {
   try {
     const page = await listServiceNetworks()
     networks.value = page.items
-  } catch {
+  } catch (err) {
     networks.value = []
+    diagnostics.pushDiagnostic({
+      title: '网点目录加载失败',
+      fields: {
+        message: err instanceof Error ? err.message : 'unknown',
+      },
+    })
   }
 }
 
@@ -354,19 +361,13 @@ onMounted(() => {
         <Alert
           type="info"
           show-icon
-          message="区域名称字典未提供"
-          description="当前仅能维护区域编码；完整区域树/搜索名称属于 UI_DATA_GAP。"
+          message="区域选项来自已授权项目生效 REGION"
+          description="完整行政区名称树仍属 UI_DATA_GAP；可从选项选择或继续输入编码。"
           style="margin-bottom: 12px"
         />
         <label class="field">
-          <span>已选区域编码</span>
-          <Select
-            v-model:value="selectedRegionCodes"
-            mode="tags"
-            style="width: 100%"
-            placeholder="输入区域编码后回车"
-            aria-label="服务区域编码"
-          />
+          <span>服务区域</span>
+          <ProjectRegionPicker v-model="selectedRegionCodes" />
         </label>
         <p class="muted">已选 {{ selectedRegionCodes.length }} 个区域</p>
       </TabPane>
@@ -374,16 +375,7 @@ onMounted(() => {
       <TabPane key="networks" tab="合作网点">
         <label class="field">
           <span>合作网点</span>
-          <Select
-            v-model:value="selectedNetworkIds"
-            mode="multiple"
-            show-search
-            style="width: 100%"
-            placeholder="搜索网点名称"
-            aria-label="合作网点"
-            :options="networkOptions"
-            :filter-option="(input, option) => String(option?.label ?? '').includes(input)"
-          />
+          <NetworkEntityPicker v-model="selectedNetworkIds" />
         </label>
         <p class="muted">已选 {{ selectedNetworkIds.length }} 个网点</p>
         <Space wrap>
@@ -393,7 +385,10 @@ onMounted(() => {
             closable
             @close="selectedNetworkIds = selectedNetworkIds.filter((x) => x !== id)"
           >
-            {{ presentEntityName({ id, loaded: true }).label }}
+            {{
+              networkOptions.find((option) => option.value === id)?.label ||
+              presentEntityName({ id, loaded: true }).label
+            }}
           </Tag>
         </Space>
       </TabPane>
