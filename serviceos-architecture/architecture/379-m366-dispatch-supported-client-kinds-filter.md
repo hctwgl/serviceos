@@ -26,7 +26,7 @@ flywayVersion: "134"
    `declareTechnicianSupportedClientKinds`）；
 2. **A4-R** `FrozenBundleClientCapabilityProbe.resolveDispatchTargetClientKinds`：
    FORM（`formRef`）∩ 全部 EVIDENCE 定向交集；全未定向 → 不施加派单 kind 过滤；
-3. **A1-R/A3-R** `DefaultTaskDispatchPolicyEventConsumer.activateTechnician`：
+3. **A1-R/A3-R** `JooqTaskDispatchPolicyEventConsumer.activateTechnician`：
    仅自动池硬过滤；过滤后为空 → `SERVICE_DISPATCH_TECHNICIAN_POLICY_MANUAL` +
    `error_code=CLIENT_KIND_TARGET_EMPTY`；保留 NETWORK；
 4. **A5-R** 不删除 M357～M363 执行门禁。

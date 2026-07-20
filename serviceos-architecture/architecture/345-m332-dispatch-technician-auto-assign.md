@@ -17,7 +17,7 @@ relatedMilestones: [M324, M306, M331]
 
 - 范围：
   - `ActivateTechnicianFromFrozenDispatchCommand` + `activateTechnicianFromFrozenDispatchPolicy`
-  - `DefaultTaskDispatchPolicyEventConsumer`：NETWORK 成功后解析 `NetworkPortalTechnicianQuery`
+  - `JooqTaskDispatchPolicyEventConsumer`：NETWORK 成功后解析 `NetworkPortalTechnicianQuery`
   - 容量：`dsp_capacity_counter` responsibility=`TECHNICIAN`，assignee=`technicianProfileId`
   - 审计：`SERVICE_DISPATCH_TECHNICIAN_POLICY_APPLIED` / `_MANUAL`
   - PostgreSQL IT 扩展：`DispatchPolicyServiceAssignmentPostgresIT`

@@ -2,9 +2,11 @@ package com.serviceos.dispatch.application;
 
 import com.serviceos.network.api.NetworkAssignedWorkImpactPort;
 import com.serviceos.network.api.NetworkWorkImpact;
+import org.jooq.DSLContext;
 import org.springframework.context.annotation.Primary;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
+
+import static com.serviceos.jooq.generated.tables.DspServiceAssignment.DSP_SERVICE_ASSIGNMENT;
 
 /**
  * 清退影响统计：当前仅统计 dispatch 模块拥有的 ACTIVE ServiceAssignment。
@@ -12,11 +14,11 @@ import org.springframework.stereotype.Component;
  */
 @Primary
 @Component
-final class DefaultNetworkAssignedWorkImpactAdapter implements NetworkAssignedWorkImpactPort {
-    private final JdbcClient jdbc;
+final class JooqNetworkAssignedWorkImpactAdapter implements NetworkAssignedWorkImpactPort {
+    private final DSLContext dsl;
 
-    DefaultNetworkAssignedWorkImpactAdapter(JdbcClient jdbc) {
-        this.jdbc = jdbc;
+    JooqNetworkAssignedWorkImpactAdapter(DSLContext dsl) {
+        this.dsl = dsl;
     }
 
     @Override
@@ -33,14 +35,10 @@ final class DefaultNetworkAssignedWorkImpactAdapter implements NetworkAssignedWo
     }
 
     private int countAssignments(String tenantId, String level, String assigneeId) {
-        Integer count = jdbc.sql("""
-                        SELECT count(*)::int
-                          FROM dsp_service_assignment
-                         WHERE tenant_id=:tenant AND responsibility_level=:level
-                           AND assignee_id=:assigneeId AND status='ACTIVE'
-                        """)
-                .param("tenant", tenantId).param("level", level).param("assigneeId", assigneeId)
-                .query(Integer.class).single();
-        return count == null ? 0 : count;
+        return dsl.fetchCount(DSP_SERVICE_ASSIGNMENT,
+                DSP_SERVICE_ASSIGNMENT.TENANT_ID.eq(tenantId)
+                        .and(DSP_SERVICE_ASSIGNMENT.RESPONSIBILITY_LEVEL.eq(level))
+                        .and(DSP_SERVICE_ASSIGNMENT.ASSIGNEE_ID.eq(assigneeId))
+                        .and(DSP_SERVICE_ASSIGNMENT.STATUS.eq("ACTIVE")));
     }
 }

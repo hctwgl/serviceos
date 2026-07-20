@@ -27,7 +27,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -416,7 +415,9 @@ class DispatchTaskReassignmentSagaPostgresIT {
                 """).update();
 
         assertThatThrownBy(timeoutScanner::detectNextTimeout)
-                .isInstanceOf(DataAccessException.class);
+                // ADR-091：jOOQ 路径下 PL/pgSQL RAISE（SQLState P0001）不在 Spring 错误码映射内，
+                // 以 jOOQ 原生 DataAccessException 上浮并触发同事务回滚（等价原 UncategorizedSQLException）。
+                .isInstanceOf(org.jooq.exception.DataAccessException.class);
         assertThat(jdbc.sql("SELECT count(*) FROM dsp_service_assignment_saga_timeout")
                 .query(Long.class).single()).isZero();
         assertThat(jdbc.sql("""

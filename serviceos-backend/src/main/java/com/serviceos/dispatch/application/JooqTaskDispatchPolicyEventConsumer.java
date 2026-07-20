@@ -14,6 +14,8 @@ import com.serviceos.dispatch.api.ActivateTechnicianFromFrozenDispatchCommand;
 import com.serviceos.dispatch.api.NetworkAllocationActualQuery;
 import com.serviceos.dispatch.api.NetworkAllocationTargetQuery;
 import com.serviceos.dispatch.api.ServiceAssignmentService;
+import com.serviceos.jooq.generated.tables.DspCapacityCounter;
+import com.serviceos.jooq.generated.tables.DspServiceAssignment;
 import com.serviceos.network.api.NetworkPortalTechnicianQuery;
 import com.serviceos.network.api.NetworkPortalTechnicianView;
 import com.serviceos.network.api.ServiceNetworkCoverageQuery;
@@ -28,7 +30,8 @@ import com.serviceos.task.api.TaskFulfillmentContext;
 import com.serviceos.task.api.TaskFulfillmentContextService;
 import com.serviceos.workorder.api.WorkOrderExpressionContext;
 import com.serviceos.workorder.api.WorkOrderExpressionContextQuery;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import org.jooq.DSLContext;
+import org.jooq.Record2;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,6 +45,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import static com.serviceos.jooq.generated.tables.DspCapacityCounter.DSP_CAPACITY_COUNTER;
+import static com.serviceos.jooq.generated.tables.DspServiceAssignment.DSP_SERVICE_ASSIGNMENT;
+
 /**
  * M324/M332/M337/M338：task.created → 冻结 DISPATCH → ACTIVE NETWORK，再 → ACTIVE TECHNICIAN。
  *
@@ -53,7 +59,7 @@ import java.util.UUID;
  * M366/ADR-088：自动 TECHNICIAN 池按冻结 Bundle FORM∩EVIDENCE 定向目标硬过滤师傅声明。</p>
  */
 @Service
-final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicyEventConsumer {
+final class JooqTaskDispatchPolicyEventConsumer implements TaskDispatchPolicyEventConsumer {
     private static final String CONSUMER = "task.dispatch-policy.created.v1";
     private static final String SYSTEM_ACTOR = "system:dispatch-policy";
     private static final String CLIENT_KIND_TARGET_EMPTY = "CLIENT_KIND_TARGET_EMPTY";
@@ -71,10 +77,10 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
     private final ServiceAssignmentService assignments;
     private final InboxService inbox;
     private final AuditAppender audit;
-    private final JdbcClient jdbc;
+    private final DSLContext dsl;
     private final Clock clock;
 
-    DefaultTaskDispatchPolicyEventConsumer(
+    JooqTaskDispatchPolicyEventConsumer(
             TaskFulfillmentContextService tasks,
             WorkOrderExpressionContextQuery workOrderContexts,
             ProjectNetworkDirectoryQuery projectNetworks,
@@ -88,7 +94,7 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
             ServiceAssignmentService assignments,
             InboxService inbox,
             AuditAppender audit,
-            JdbcClient jdbc,
+            DSLContext dsl,
             Clock clock
     ) {
         this.tasks = tasks;
@@ -104,7 +110,7 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
         this.assignments = assignments;
         this.inbox = inbox;
         this.audit = audit;
-        this.jdbc = jdbc;
+        this.dsl = dsl;
         this.clock = clock;
     }
 
@@ -411,54 +417,38 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
     }
 
     private boolean hasActiveAssignment(String tenantId, UUID taskId, String level) {
-        return jdbc.sql("""
-                SELECT EXISTS (
-                    SELECT 1 FROM dsp_service_assignment
-                     WHERE tenant_id = :tenantId AND task_id = :taskId
-                       AND responsibility_level = :level AND status = 'ACTIVE'
-                )
-                """)
-                .param("tenantId", tenantId)
-                .param("taskId", taskId)
-                .param("level", level)
-                .query(Boolean.class)
-                .single();
+        DspServiceAssignment assignment = DSP_SERVICE_ASSIGNMENT;
+        return dsl.fetchExists(assignment,
+                assignment.TENANT_ID.eq(tenantId)
+                        .and(assignment.TASK_ID.eq(taskId))
+                        .and(assignment.RESPONSIBILITY_LEVEL.eq(level))
+                        .and(assignment.STATUS.eq("ACTIVE")));
     }
 
     private String activeAssigneeId(String tenantId, UUID taskId, String level) {
-        return jdbc.sql("""
-                SELECT assignee_id FROM dsp_service_assignment
-                 WHERE tenant_id = :tenantId AND task_id = :taskId
-                   AND responsibility_level = :level AND status = 'ACTIVE'
-                 ORDER BY created_at
-                 LIMIT 1
-                """)
-                .param("tenantId", tenantId)
-                .param("taskId", taskId)
-                .param("level", level)
-                .query(String.class)
-                .single();
+        DspServiceAssignment assignment = DSP_SERVICE_ASSIGNMENT;
+        return dsl.select(assignment.ASSIGNEE_ID)
+                .from(assignment)
+                .where(assignment.TENANT_ID.eq(tenantId))
+                .and(assignment.TASK_ID.eq(taskId))
+                .and(assignment.RESPONSIBILITY_LEVEL.eq(level))
+                .and(assignment.STATUS.eq("ACTIVE"))
+                .orderBy(assignment.CREATED_AT)
+                .limit(1)
+                .fetchSingle(assignment.ASSIGNEE_ID);
     }
 
     private CapacitySnapshot capacitySnapshot(
             String tenantId, String level, String assigneeId, String businessType
     ) {
-        return jdbc.sql("""
-                SELECT version, max_units AS "maxUnits", occupied_units AS "occupiedUnits"
-                  FROM dsp_capacity_counter
-                 WHERE tenant_id = :tenantId
-                   AND responsibility_level = :level
-                   AND assignee_id = :assigneeId
-                   AND business_type = :businessType
-                """)
-                .param("tenantId", tenantId)
-                .param("level", level)
-                .param("assigneeId", assigneeId)
-                .param("businessType", businessType)
-                .query((rs, rowNum) -> new CapacitySnapshot(
-                        rs.getLong("version"),
-                        rs.getInt("maxUnits") - rs.getInt("occupiedUnits")))
-                .optional()
+        DspCapacityCounter counter = DSP_CAPACITY_COUNTER;
+        return dsl.select(counter.VERSION, counter.MAX_UNITS, counter.OCCUPIED_UNITS)
+                .from(counter)
+                .where(counter.TENANT_ID.eq(tenantId))
+                .and(counter.RESPONSIBILITY_LEVEL.eq(level))
+                .and(counter.ASSIGNEE_ID.eq(assigneeId))
+                .and(counter.BUSINESS_TYPE.eq(businessType))
+                .fetchOptional(JooqTaskDispatchPolicyEventConsumer::mapSnapshot)
                 .orElse(null);
     }
 
@@ -532,6 +522,11 @@ final class DefaultTaskDispatchPolicyEventConsumer implements TaskDispatchPolicy
 
     private static String clipped(String explanation) {
         return explanation.length() > 1800 ? explanation.substring(0, 1800) : explanation;
+    }
+
+    private static CapacitySnapshot mapSnapshot(
+            org.jooq.Record3<Long, Integer, Integer> row) {
+        return new CapacitySnapshot(row.value1(), row.value2() - row.value3());
     }
 
     private record CapacitySnapshot(long version, int remaining) {

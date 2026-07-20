@@ -6,12 +6,13 @@ import com.serviceos.dispatch.api.ManualServiceAssignmentService;
 import com.serviceos.dispatch.api.NetworkPortalAcceptAssignmentReceipt;
 import com.serviceos.dispatch.api.NetworkPortalAcceptAssignmentService;
 import com.serviceos.identity.api.CurrentPrincipal;
+import com.serviceos.jooq.generated.tables.DspServiceAssignment;
 import com.serviceos.network.api.NetworkMembershipView;
 import com.serviceos.network.api.PrincipalNetworkAffiliationQuery;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.ProblemCode;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import org.jooq.DSLContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +22,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
+import static com.serviceos.jooq.generated.tables.DspServiceAssignment.DSP_SERVICE_ASSIGNMENT;
+
 /**
  * Network Portal 网点接单适配器。
  * <p>
@@ -29,27 +32,27 @@ import java.util.UUID;
  * 失败关闭：伪造上下文、非成员、其他网点已 ACTIVE NETWORK。
  */
 @Service
-final class DefaultNetworkPortalAcceptAssignmentService implements NetworkPortalAcceptAssignmentService {
+final class JooqNetworkPortalAcceptAssignmentService implements NetworkPortalAcceptAssignmentService {
     private static final String CAPABILITY = "networkPortal.acceptAssignment";
     private static final String CONTEXT_PREFIX = "NETWORK|NETWORK|";
 
     private final PrincipalNetworkAffiliationQuery affiliations;
     private final AuthorizationService authorization;
     private final ManualServiceAssignmentService manualAssignments;
-    private final JdbcClient jdbc;
+    private final DSLContext dsl;
     private final Clock clock;
 
-    DefaultNetworkPortalAcceptAssignmentService(
+    JooqNetworkPortalAcceptAssignmentService(
             PrincipalNetworkAffiliationQuery affiliations,
             AuthorizationService authorization,
             ManualServiceAssignmentService manualAssignments,
-            JdbcClient jdbc,
+            DSLContext dsl,
             Clock clock
     ) {
         this.affiliations = affiliations;
         this.authorization = authorization;
         this.manualAssignments = manualAssignments;
-        this.jdbc = jdbc;
+        this.dsl = dsl;
         this.clock = clock;
     }
 
@@ -93,18 +96,16 @@ final class DefaultNetworkPortalAcceptAssignmentService implements NetworkPortal
     }
 
     private void rejectForeignActiveNetwork(String tenantId, UUID taskId, String networkAssigneeId) {
-        Optional<String> activeNetwork = jdbc.sql("""
-                        SELECT assignee_id
-                          FROM dsp_service_assignment
-                         WHERE tenant_id = :tenantId AND task_id = :taskId
-                           AND responsibility_level = 'NETWORK' AND status = 'ACTIVE'
-                         ORDER BY created_at
-                         LIMIT 1
-                        """)
-                .param("tenantId", tenantId)
-                .param("taskId", taskId)
-                .query(String.class)
-                .optional();
+        DspServiceAssignment assignment = DSP_SERVICE_ASSIGNMENT;
+        Optional<String> activeNetwork = dsl.select(assignment.ASSIGNEE_ID)
+                .from(assignment)
+                .where(assignment.TENANT_ID.eq(tenantId))
+                .and(assignment.TASK_ID.eq(taskId))
+                .and(assignment.RESPONSIBILITY_LEVEL.eq("NETWORK"))
+                .and(assignment.STATUS.eq("ACTIVE"))
+                .orderBy(assignment.CREATED_AT)
+                .limit(1)
+                .fetchOptional(assignment.ASSIGNEE_ID);
         if (activeNetwork.isPresent() && !activeNetwork.get().equals(networkAssigneeId)) {
             throw new BusinessProblem(ProblemCode.SERVICE_ASSIGNMENT_CONFLICT,
                     "任务已有其他网点的 ACTIVE NETWORK 责任，Network Portal 不支持跨网点接单");

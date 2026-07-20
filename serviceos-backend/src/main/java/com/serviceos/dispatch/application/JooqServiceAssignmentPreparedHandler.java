@@ -4,13 +4,16 @@ import com.serviceos.dispatch.api.ActivateServiceAssignmentCommand;
 import com.serviceos.dispatch.api.ServiceAssignmentReceipt;
 import com.serviceos.dispatch.api.ServiceAssignmentService;
 import com.serviceos.identity.api.CurrentPrincipal;
+import com.serviceos.jooq.generated.tables.DspServiceAssignment;
+import com.serviceos.jooq.generated.tables.DspServiceAssignmentActivationSaga;
 import com.serviceos.reliability.api.InboxDecision;
 import com.serviceos.reliability.api.InboxService;
 import com.serviceos.reliability.spi.OutboxMessage;
 import com.serviceos.reliability.spi.OutboxMessageHandler;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.Sha256;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import org.jooq.DSLContext;
+import org.jooq.Record12;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
@@ -20,6 +23,9 @@ import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
 
+import static com.serviceos.jooq.generated.tables.DspServiceAssignment.DSP_SERVICE_ASSIGNMENT;
+import static com.serviceos.jooq.generated.tables.DspServiceAssignmentActivationSaga.DSP_SERVICE_ASSIGNMENT_ACTIVATION_SAGA;
+
 /**
  * M26 Dispatch 侧 TASK_PREPARED 检查点推进器。
  *
@@ -28,21 +34,21 @@ import java.util.UUID;
  * 视为已被后续事实取代并安全确认，绝不重新激活已失败的 ServiceAssignment。</p>
  */
 @Service
-final class ServiceAssignmentPreparedHandler implements OutboxMessageHandler {
+final class JooqServiceAssignmentPreparedHandler implements OutboxMessageHandler {
     private static final String CONSUMER = "dispatch.service-assignment-task-prepared.v2";
 
-    private final JdbcClient jdbc;
+    private final DSLContext dsl;
     private final InboxService inbox;
     private final ServiceAssignmentService assignments;
     private final ObjectMapper objectMapper;
 
-    ServiceAssignmentPreparedHandler(
-            JdbcClient jdbc,
+    JooqServiceAssignmentPreparedHandler(
+            DSLContext dsl,
             InboxService inbox,
             ServiceAssignmentService assignments,
             ObjectMapper objectMapper
     ) {
-        this.jdbc = jdbc;
+        this.dsl = dsl;
         this.inbox = inbox;
         this.assignments = assignments;
         this.objectMapper = objectMapper;
@@ -96,27 +102,31 @@ final class ServiceAssignmentPreparedHandler implements OutboxMessageHandler {
     }
 
     private ActivationState state(String tenantId, UUID assignmentId) {
-        return jdbc.sql("""
-                        SELECT assignment.service_assignment_id,
-                               assignment.activation_saga_id AS saga_id,
-                               assignment.task_id, assignment.created_by,
-                               assignment.pending_authority_assignment_id AS authority_assignment_id,
-                               assignment.pending_authority_version AS authority_version,
-                               assignment.pending_fence_decision_id AS fence_decision_id,
-                               assignment.pending_fence_policy_version AS fence_policy_version,
-                               assignment.task_execution_guard_id AS guard_id,
-                               assignment.prepared_task_assignment_id,
-                               saga.stage, saga.version AS saga_version
-                          FROM dsp_service_assignment assignment
-                          JOIN dsp_service_assignment_activation_saga saga
-                            ON saga.activation_saga_id = assignment.activation_saga_id
-                           AND saga.tenant_id = assignment.tenant_id
-                         WHERE assignment.tenant_id = :tenantId
-                           AND assignment.service_assignment_id = :assignmentId
-                           AND assignment.activation_protocol_version = 2
-                        """)
-                .param("tenantId", tenantId).param("assignmentId", assignmentId)
-                .query(ActivationState.class).single();
+        DspServiceAssignment assignment = DSP_SERVICE_ASSIGNMENT.as("assignment");
+        DspServiceAssignmentActivationSaga saga = DSP_SERVICE_ASSIGNMENT_ACTIVATION_SAGA.as("saga");
+        // pending_authority_* / pending_fence_* 即激活命令所需的 authority/fence 参数；
+        // 与原查询别名 authority_assignment_id 等一一对应。
+        return dsl.select(
+                        assignment.SERVICE_ASSIGNMENT_ID,
+                        assignment.ACTIVATION_SAGA_ID,
+                        assignment.TASK_ID,
+                        assignment.CREATED_BY,
+                        assignment.PENDING_AUTHORITY_ASSIGNMENT_ID,
+                        assignment.PENDING_AUTHORITY_VERSION,
+                        assignment.PENDING_FENCE_DECISION_ID,
+                        assignment.PENDING_FENCE_POLICY_VERSION,
+                        assignment.TASK_EXECUTION_GUARD_ID,
+                        assignment.PREPARED_TASK_ASSIGNMENT_ID,
+                        saga.STAGE,
+                        saga.VERSION)
+                .from(assignment)
+                .join(saga)
+                .on(saga.ACTIVATION_SAGA_ID.eq(assignment.ACTIVATION_SAGA_ID))
+                .and(saga.TENANT_ID.eq(assignment.TENANT_ID))
+                .where(assignment.TENANT_ID.eq(tenantId))
+                .and(assignment.SERVICE_ASSIGNMENT_ID.eq(assignmentId))
+                .and(assignment.ACTIVATION_PROTOCOL_VERSION.eq(2))
+                .fetchSingle(JooqServiceAssignmentPreparedHandler::mapState);
     }
 
     private HandshakePayload read(String payload) {
@@ -146,6 +156,15 @@ final class ServiceAssignmentPreparedHandler implements OutboxMessageHandler {
     private static String digest(ServiceAssignmentReceipt receipt) {
         return Sha256.digest(receipt.serviceAssignmentId() + "|" + receipt.sagaId() + "|"
                 + receipt.assignmentStatus() + "|" + receipt.sagaStage() + "|" + receipt.sagaVersion());
+    }
+
+    private static ActivationState mapState(Record12<
+            UUID, UUID, UUID, String, String, Long, String, String, UUID, UUID, String, Long> row) {
+        return new ActivationState(
+                row.value1(), row.value2(), row.value3(), row.value4(),
+                row.value5(), row.value6() == null ? 0L : row.value6(),
+                row.value7(), row.value8(), row.value9(), row.value10(),
+                row.value11(), row.value12());
     }
 
     private record ActivationState(

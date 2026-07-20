@@ -4,7 +4,7 @@
 @org.springframework.modulith.ApplicationModule(
         displayName = "Dispatch and Service Assignment",
         allowedDependencies = {
-                "shared", "identity::api", "authorization::api",
+                "shared", "jooq", "identity::api", "authorization::api",
                 "audit::api", "reliability::api", "reliability::spi", "task::api",
                 "network::api", "project::api", "configuration::api", "workorder::api"
         }

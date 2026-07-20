@@ -19,6 +19,11 @@ import com.serviceos.dispatch.api.ServiceAssignmentHandshakePayload;
 import com.serviceos.dispatch.api.ServiceAssignmentReceipt;
 import com.serviceos.dispatch.api.ServiceAssignmentService;
 import com.serviceos.identity.api.CurrentPrincipal;
+import com.serviceos.jooq.generated.tables.DspAssignmentCommandResult;
+import com.serviceos.jooq.generated.tables.DspCapacityCounter;
+import com.serviceos.jooq.generated.tables.DspCapacityReservation;
+import com.serviceos.jooq.generated.tables.DspServiceAssignment;
+import com.serviceos.jooq.generated.tables.DspServiceAssignmentActivationSaga;
 import com.serviceos.reliability.api.IdempotencyDecision;
 import com.serviceos.reliability.api.IdempotencyService;
 import com.serviceos.reliability.api.OutboxAppender;
@@ -28,8 +33,15 @@ import com.serviceos.shared.CommandContext;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.shared.Sha256;
+import org.jooq.DSLContext;
+import org.jooq.Record;
+import org.jooq.Record2;
+import org.jooq.Record4;
+import org.jooq.Record5;
+import org.jooq.Record6;
+import org.jooq.Record8;
+import org.jooq.impl.DSL;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
@@ -42,7 +54,11 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timestamptz;
+import static com.serviceos.jooq.generated.tables.DspAssignmentCommandResult.DSP_ASSIGNMENT_COMMAND_RESULT;
+import static com.serviceos.jooq.generated.tables.DspCapacityCounter.DSP_CAPACITY_COUNTER;
+import static com.serviceos.jooq.generated.tables.DspCapacityReservation.DSP_CAPACITY_RESERVATION;
+import static com.serviceos.jooq.generated.tables.DspServiceAssignment.DSP_SERVICE_ASSIGNMENT;
+import static com.serviceos.jooq.generated.tables.DspServiceAssignmentActivationSaga.DSP_SERVICE_ASSIGNMENT_ACTIVATION_SAGA;
 
 /**
  * Dispatch 侧 ServiceAssignment/CapacityReservation 权威事务。
@@ -51,7 +67,7 @@ import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timesta
  * Task 模块的 guard/assignment 引用只作为握手证明保存，本模块不跨边界写 Task 表。</p>
  */
 @Service
-final class DefaultServiceAssignmentService implements ServiceAssignmentService {
+final class JooqServiceAssignmentService implements ServiceAssignmentService {
     private static final String PREPARE = "dispatch.assignment.prepare";
     private static final String CONFIRM_TASK = "dispatch.assignment.confirm-task-prepared";
     private static final String ACTIVATE = "dispatch.assignment.activate";
@@ -63,7 +79,7 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
     private static final String POLICY_OPERATION = "dispatch.assignment.activate-from-policy";
     private static final String POLICY_TECH_OPERATION = "dispatch.assignment.activate-tech-from-policy";
 
-    private final JdbcClient jdbc;
+    private final DSLContext dsl;
     private final AuthorizationService authorization;
     private final IdempotencyService idempotency;
     private final AuditAppender audit;
@@ -72,8 +88,8 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
     private final Clock clock;
     private final Duration activationStageTimeout;
 
-    DefaultServiceAssignmentService(
-            JdbcClient jdbc,
+    JooqServiceAssignmentService(
+            DSLContext dsl,
             AuthorizationService authorization,
             IdempotencyService idempotency,
             AuditAppender audit,
@@ -82,7 +98,7 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
             Clock clock,
             @Value("${serviceos.dispatch.activation-stage-timeout:PT15M}") Duration activationStageTimeout
     ) {
-        this.jdbc = jdbc;
+        this.dsl = dsl;
         this.authorization = authorization;
         this.idempotency = idempotency;
         this.audit = audit;
@@ -119,29 +135,7 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
             return frozenReceipt(context, POLICY_OPERATION);
         }
 
-        var existing = jdbc.sql("""
-                        SELECT a.service_assignment_id AS "serviceAssignmentId",
-                               a.activation_saga_id AS "sagaId",
-                               a.assignee_id AS "assigneeId",
-                               r.capacity_reservation_id AS "reservationId",
-                               coalesce(s.version, 0) AS "sagaVersion"
-                          FROM dsp_service_assignment a
-                          JOIN dsp_capacity_reservation r
-                            ON r.tenant_id = a.tenant_id
-                           AND r.service_assignment_id = a.service_assignment_id
-                           AND r.status = 'CONFIRMED'
-                          LEFT JOIN dsp_service_assignment_activation_saga s
-                            ON s.tenant_id = a.tenant_id
-                           AND s.activation_saga_id = a.activation_saga_id
-                         WHERE a.tenant_id = :tenantId AND a.task_id = :taskId
-                           AND a.responsibility_level = 'NETWORK' AND a.status = 'ACTIVE'
-                         ORDER BY a.created_at
-                         LIMIT 1
-                        """)
-                .param("tenantId", tenantId)
-                .param("taskId", command.taskId())
-                .query(ActiveNetworkRow.class)
-                .optional();
+        var existing = findActiveWithConfirmedReservation(tenantId, command.taskId(), "NETWORK");
         ServiceAssignmentReceipt completed;
         if (existing.isPresent()) {
             ActiveNetworkRow row = existing.get();
@@ -207,29 +201,7 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
             return frozenReceipt(context, POLICY_TECH_OPERATION);
         }
 
-        var existing = jdbc.sql("""
-                        SELECT a.service_assignment_id AS "serviceAssignmentId",
-                               a.activation_saga_id AS "sagaId",
-                               a.assignee_id AS "assigneeId",
-                               r.capacity_reservation_id AS "reservationId",
-                               coalesce(s.version, 0) AS "sagaVersion"
-                          FROM dsp_service_assignment a
-                          JOIN dsp_capacity_reservation r
-                            ON r.tenant_id = a.tenant_id
-                           AND r.service_assignment_id = a.service_assignment_id
-                           AND r.status = 'CONFIRMED'
-                          LEFT JOIN dsp_service_assignment_activation_saga s
-                            ON s.tenant_id = a.tenant_id
-                           AND s.activation_saga_id = a.activation_saga_id
-                         WHERE a.tenant_id = :tenantId AND a.task_id = :taskId
-                           AND a.responsibility_level = 'TECHNICIAN' AND a.status = 'ACTIVE'
-                         ORDER BY a.created_at
-                         LIMIT 1
-                        """)
-                .param("tenantId", tenantId)
-                .param("taskId", command.taskId())
-                .query(ActiveNetworkRow.class)
-                .optional();
+        var existing = findActiveWithConfirmedReservation(tenantId, command.taskId(), "TECHNICIAN");
         ServiceAssignmentReceipt completed;
         if (existing.isPresent()) {
             ActiveNetworkRow row = existing.get();
@@ -299,63 +271,53 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
         CapacityCounter counter = reserveCapacity(context, command, now);
         UUID assignmentId = UUID.randomUUID();
         UUID reservationId = UUID.randomUUID();
-        jdbc.sql("""
-                        INSERT INTO dsp_service_assignment (
-                            service_assignment_id, tenant_id, work_order_id, task_id,
-                            responsibility_level, assignee_id, business_type, source_decision_id,
-                            status, activation_saga_id, supersedes_service_assignment_id,
-                            reassignment_reason_code, created_by, created_at,
-                            activation_protocol_version, pending_authority_assignment_id,
-                            pending_authority_version, pending_fence_decision_id,
-                            pending_fence_policy_version
-                        ) VALUES (
-                            :assignmentId, :tenantId, :workOrderId, :taskId,
-                            :level, :assigneeId, :businessType, :decisionId,
-                            'PENDING_ACTIVATION', :sagaId, :supersedesId,
-                            :reasonCode, :actorId, :now,
-                            :protocolVersion, :authorityAssignmentId,
-                            :authorityVersion, :fenceDecisionId, :fencePolicyVersion
-                        )
-                        """)
-                .param("assignmentId", assignmentId).param("tenantId", context.tenantId())
-                .param("workOrderId", command.workOrderId()).param("taskId", command.taskId())
-                .param("level", command.responsibilityLevel().name())
-                .param("assigneeId", command.assigneeId()).param("businessType", command.businessType())
-                .param("decisionId", command.sourceDecisionId()).param("sagaId", command.sagaId())
-                .param("supersedesId", command.supersedesServiceAssignmentId())
-                .param("reasonCode", command.reasonCode()).param("actorId", context.actorId())
-                .param("protocolVersion", command.usesReliableReassignmentProtocol() ? 2 : 1)
-                .param("authorityAssignmentId", command.authorityAssignmentId())
-                .param("authorityVersion", command.authorityVersion() == 0 ? null : command.authorityVersion())
-                .param("fenceDecisionId", command.fenceDecisionId())
-                .param("fencePolicyVersion", command.fencePolicyVersion())
-                .param("now", timestamptz(now)).update();
-        jdbc.sql("""
-                        INSERT INTO dsp_capacity_reservation (
-                            capacity_reservation_id, tenant_id, service_assignment_id,
-                            capacity_counter_id, units, status, held_at
-                        ) VALUES (
-                            :reservationId, :tenantId, :assignmentId,
-                            :counterId, 1, 'HELD', :now
-                        )
-                        """)
-                .param("reservationId", reservationId).param("tenantId", context.tenantId())
-                .param("assignmentId", assignmentId).param("counterId", counter.capacityCounterId())
-                .param("now", timestamptz(now)).update();
-        jdbc.sql("""
-                        INSERT INTO dsp_service_assignment_activation_saga (
-                            activation_saga_id, tenant_id, task_id, new_service_assignment_id,
-                            old_service_assignment_id, stage, version, started_at, updated_at, deadline_at
-                        ) VALUES (
-                            :sagaId, :tenantId, :taskId, :assignmentId,
-                            :oldAssignmentId, 'PENDING', 1, :now, :now, :deadlineAt
-                        )
-                        """)
-                .param("sagaId", command.sagaId()).param("tenantId", context.tenantId())
-                .param("taskId", command.taskId()).param("assignmentId", assignmentId)
-                .param("oldAssignmentId", command.supersedesServiceAssignmentId())
-                .param("now", timestamptz(now))
-                .param("deadlineAt", timestamptz(deadline(now))).update();
+        DspServiceAssignment assignment = DSP_SERVICE_ASSIGNMENT;
+        dsl.insertInto(assignment)
+                .set(assignment.SERVICE_ASSIGNMENT_ID, assignmentId)
+                .set(assignment.TENANT_ID, context.tenantId())
+                .set(assignment.WORK_ORDER_ID, command.workOrderId())
+                .set(assignment.TASK_ID, command.taskId())
+                .set(assignment.RESPONSIBILITY_LEVEL, command.responsibilityLevel().name())
+                .set(assignment.ASSIGNEE_ID, command.assigneeId())
+                .set(assignment.BUSINESS_TYPE, command.businessType())
+                .set(assignment.SOURCE_DECISION_ID, command.sourceDecisionId())
+                .set(assignment.STATUS, "PENDING_ACTIVATION")
+                .set(assignment.ACTIVATION_SAGA_ID, command.sagaId())
+                .set(assignment.SUPERSEDES_SERVICE_ASSIGNMENT_ID, command.supersedesServiceAssignmentId())
+                .set(assignment.REASSIGNMENT_REASON_CODE, command.reasonCode())
+                .set(assignment.CREATED_BY, context.actorId())
+                .set(assignment.CREATED_AT, now)
+                .set(assignment.ACTIVATION_PROTOCOL_VERSION,
+                        command.usesReliableReassignmentProtocol() ? 2 : 1)
+                .set(assignment.PENDING_AUTHORITY_ASSIGNMENT_ID, command.authorityAssignmentId())
+                .set(assignment.PENDING_AUTHORITY_VERSION,
+                        command.authorityVersion() == 0 ? null : command.authorityVersion())
+                .set(assignment.PENDING_FENCE_DECISION_ID, command.fenceDecisionId())
+                .set(assignment.PENDING_FENCE_POLICY_VERSION, command.fencePolicyVersion())
+                .execute();
+        DspCapacityReservation reservation = DSP_CAPACITY_RESERVATION;
+        dsl.insertInto(reservation)
+                .set(reservation.CAPACITY_RESERVATION_ID, reservationId)
+                .set(reservation.TENANT_ID, context.tenantId())
+                .set(reservation.SERVICE_ASSIGNMENT_ID, assignmentId)
+                .set(reservation.CAPACITY_COUNTER_ID, counter.capacityCounterId())
+                .set(reservation.UNITS, 1)
+                .set(reservation.STATUS, "HELD")
+                .set(reservation.HELD_AT, now)
+                .execute();
+        DspServiceAssignmentActivationSaga saga = DSP_SERVICE_ASSIGNMENT_ACTIVATION_SAGA;
+        dsl.insertInto(saga)
+                .set(saga.ACTIVATION_SAGA_ID, command.sagaId())
+                .set(saga.TENANT_ID, context.tenantId())
+                .set(saga.TASK_ID, command.taskId())
+                .set(saga.NEW_SERVICE_ASSIGNMENT_ID, assignmentId)
+                .set(saga.OLD_SERVICE_ASSIGNMENT_ID, command.supersedesServiceAssignmentId())
+                .set(saga.STAGE, "PENDING")
+                .set(saga.VERSION, 1L)
+                .set(saga.STARTED_AT, now)
+                .set(saga.UPDATED_AT, now)
+                .set(saga.DEADLINE_AT, deadline(now))
+                .execute();
 
         ServiceAssignmentReceipt receipt = new ServiceAssignmentReceipt(
                 assignmentId, command.sagaId(), command.taskId(), reservationId,
@@ -383,37 +345,35 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
         }
 
         Instant now = clock.instant();
-        int sagaUpdated = jdbc.sql("""
-                        UPDATE dsp_service_assignment_activation_saga
-                           SET stage = 'TASK_PREPARED', version = version + 1,
-                               prepared_task_assignment_id = :preparedId,
-                               task_execution_guard_id = :guardId, updated_at = :now,
-                               deadline_at = :deadlineAt
-                         WHERE tenant_id = :tenantId AND activation_saga_id = :sagaId
-                           AND new_service_assignment_id = :assignmentId AND task_id = :taskId
-                           AND stage = 'PENDING' AND version = :expectedVersion
-                        """)
-                .param("preparedId", command.preparedTaskAssignmentId())
-                .param("guardId", command.guardId()).param("now", timestamptz(now))
-                .param("deadlineAt", timestamptz(deadline(now)))
-                .param("tenantId", context.tenantId()).param("sagaId", command.sagaId())
-                .param("assignmentId", command.serviceAssignmentId()).param("taskId", command.taskId())
-                .param("expectedVersion", command.expectedSagaVersion()).update();
+        DspServiceAssignmentActivationSaga saga = DSP_SERVICE_ASSIGNMENT_ACTIVATION_SAGA;
+        // 乐观并发：stage 与 version 双条件，影响行数不为 1 即视为 saga 已被并发推进。
+        int sagaUpdated = dsl.update(saga)
+                .set(saga.STAGE, "TASK_PREPARED")
+                .set(saga.VERSION, saga.VERSION.plus(1))
+                .set(saga.PREPARED_TASK_ASSIGNMENT_ID, command.preparedTaskAssignmentId())
+                .set(saga.TASK_EXECUTION_GUARD_ID, command.guardId())
+                .set(saga.UPDATED_AT, now)
+                .set(saga.DEADLINE_AT, deadline(now))
+                .where(saga.TENANT_ID.eq(context.tenantId()))
+                .and(saga.ACTIVATION_SAGA_ID.eq(command.sagaId()))
+                .and(saga.NEW_SERVICE_ASSIGNMENT_ID.eq(command.serviceAssignmentId()))
+                .and(saga.TASK_ID.eq(command.taskId()))
+                .and(saga.STAGE.eq("PENDING"))
+                .and(saga.VERSION.eq(command.expectedSagaVersion()))
+                .execute();
         if (sagaUpdated != 1) {
             throwSagaConflict(context.tenantId(), command.sagaId(), command.serviceAssignmentId(),
                     command.expectedSagaVersion(), "PENDING");
         }
-        int assignmentUpdated = jdbc.sql("""
-                        UPDATE dsp_service_assignment
-                           SET prepared_task_assignment_id = :preparedId,
-                               task_execution_guard_id = :guardId
-                         WHERE tenant_id = :tenantId AND service_assignment_id = :assignmentId
-                           AND task_id = :taskId AND status = 'PENDING_ACTIVATION'
-                        """)
-                .param("preparedId", command.preparedTaskAssignmentId())
-                .param("guardId", command.guardId()).param("tenantId", context.tenantId())
-                .param("assignmentId", command.serviceAssignmentId()).param("taskId", command.taskId())
-                .update();
+        DspServiceAssignment assignment = DSP_SERVICE_ASSIGNMENT;
+        int assignmentUpdated = dsl.update(assignment)
+                .set(assignment.PREPARED_TASK_ASSIGNMENT_ID, command.preparedTaskAssignmentId())
+                .set(assignment.TASK_EXECUTION_GUARD_ID, command.guardId())
+                .where(assignment.TENANT_ID.eq(context.tenantId()))
+                .and(assignment.SERVICE_ASSIGNMENT_ID.eq(command.serviceAssignmentId()))
+                .and(assignment.TASK_ID.eq(command.taskId()))
+                .and(assignment.STATUS.eq("PENDING_ACTIVATION"))
+                .execute();
         if (assignmentUpdated != 1) {
             throw new BusinessProblem(
                     ProblemCode.SERVICE_ASSIGNMENT_CONFLICT,
@@ -452,18 +412,18 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
         }
 
         Instant now = clock.instant();
-        int sagaUpdated = jdbc.sql("""
-                        UPDATE dsp_service_assignment_activation_saga
-                           SET stage = 'SERVICE_SWITCHED', version = version + 1,
-                               updated_at = :now, deadline_at = :deadlineAt
-                         WHERE tenant_id = :tenantId AND activation_saga_id = :sagaId
-                           AND new_service_assignment_id = :assignmentId
-                           AND stage = 'TASK_PREPARED' AND version = :expectedVersion
-                        """)
-                .param("now", timestamptz(now)).param("deadlineAt", timestamptz(deadline(now)))
-                .param("tenantId", context.tenantId())
-                .param("sagaId", command.sagaId()).param("assignmentId", command.serviceAssignmentId())
-                .param("expectedVersion", command.expectedSagaVersion()).update();
+        DspServiceAssignmentActivationSaga saga = DSP_SERVICE_ASSIGNMENT_ACTIVATION_SAGA;
+        int sagaUpdated = dsl.update(saga)
+                .set(saga.STAGE, "SERVICE_SWITCHED")
+                .set(saga.VERSION, saga.VERSION.plus(1))
+                .set(saga.UPDATED_AT, now)
+                .set(saga.DEADLINE_AT, deadline(now))
+                .where(saga.TENANT_ID.eq(context.tenantId()))
+                .and(saga.ACTIVATION_SAGA_ID.eq(command.sagaId()))
+                .and(saga.NEW_SERVICE_ASSIGNMENT_ID.eq(command.serviceAssignmentId()))
+                .and(saga.STAGE.eq("TASK_PREPARED"))
+                .and(saga.VERSION.eq(command.expectedSagaVersion()))
+                .execute();
         if (sagaUpdated != 1) {
             throwSagaConflict(context.tenantId(), command.sagaId(), command.serviceAssignmentId(),
                     command.expectedSagaVersion(), "TASK_PREPARED");
@@ -477,36 +437,32 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
                     ProblemCode.SERVICE_ASSIGNMENT_CONFLICT,
                     "Initial activation found an existing ACTIVE ServiceAssignment");
         }
-        int assignmentUpdated = jdbc.sql("""
-                        UPDATE dsp_service_assignment
-                           SET status = 'ACTIVE', effective_from = :now,
-                               authority_assignment_id = :authorityAssignmentId,
-                               authority_version = :authorityVersion,
-                               fence_decision_id = :fenceDecisionId,
-                               fence_policy_version = :fencePolicyVersion
-                         WHERE tenant_id = :tenantId AND service_assignment_id = :assignmentId
-                           AND activation_saga_id = :sagaId AND status = 'PENDING_ACTIVATION'
-                        """)
-                .param("now", timestamptz(now))
-                .param("authorityAssignmentId", command.authorityAssignmentId())
-                .param("authorityVersion", command.authorityVersion())
-                .param("fenceDecisionId", command.fenceDecisionId())
-                .param("fencePolicyVersion", command.fencePolicyVersion())
-                .param("tenantId", context.tenantId()).param("assignmentId", command.serviceAssignmentId())
-                .param("sagaId", command.sagaId()).update();
+        DspServiceAssignment assignment = DSP_SERVICE_ASSIGNMENT;
+        int assignmentUpdated = dsl.update(assignment)
+                .set(assignment.STATUS, "ACTIVE")
+                .set(assignment.EFFECTIVE_FROM, now)
+                .set(assignment.AUTHORITY_ASSIGNMENT_ID, command.authorityAssignmentId())
+                .set(assignment.AUTHORITY_VERSION, command.authorityVersion())
+                .set(assignment.FENCE_DECISION_ID, command.fenceDecisionId())
+                .set(assignment.FENCE_POLICY_VERSION, command.fencePolicyVersion())
+                .where(assignment.TENANT_ID.eq(context.tenantId()))
+                .and(assignment.SERVICE_ASSIGNMENT_ID.eq(command.serviceAssignmentId()))
+                .and(assignment.ACTIVATION_SAGA_ID.eq(command.sagaId()))
+                .and(assignment.STATUS.eq("PENDING_ACTIVATION"))
+                .execute();
         if (assignmentUpdated != 1) {
             throw new BusinessProblem(
                     ProblemCode.SERVICE_ASSIGNMENT_CONFLICT,
                     "PENDING ServiceAssignment could not be activated");
         }
-        int reservationUpdated = jdbc.sql("""
-                        UPDATE dsp_capacity_reservation
-                           SET status = 'CONFIRMED', confirmed_at = :now
-                         WHERE tenant_id = :tenantId AND service_assignment_id = :assignmentId
-                           AND status = 'HELD'
-                        """)
-                .param("now", timestamptz(now)).param("tenantId", context.tenantId())
-                .param("assignmentId", command.serviceAssignmentId()).update();
+        DspCapacityReservation reservation = DSP_CAPACITY_RESERVATION;
+        int reservationUpdated = dsl.update(reservation)
+                .set(reservation.STATUS, "CONFIRMED")
+                .set(reservation.CONFIRMED_AT, now)
+                .where(reservation.TENANT_ID.eq(context.tenantId()))
+                .and(reservation.SERVICE_ASSIGNMENT_ID.eq(command.serviceAssignmentId()))
+                .and(reservation.STATUS.eq("HELD"))
+                .execute();
         if (reservationUpdated != 1) {
             throw new BusinessProblem(
                     ProblemCode.DISPATCH_CAPACITY_CONFLICT,
@@ -542,47 +498,41 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
         Instant now = clock.instant();
         boolean requiresTaskAck = state.protocolVersion() == 2
                 && state.preparedTaskAssignmentId() != null;
-        int sagaUpdated = jdbc.sql("""
-                        UPDATE dsp_service_assignment_activation_saga
-                           SET stage = CASE
-                                   WHEN :requiresTaskAck THEN 'ABORTING'
-                                   ELSE 'ABORTED'
-                               END,
-                               version = version + 1,
-                               last_error_code = :reasonCode, updated_at = :now,
-                               completed_at = CASE
-                                   WHEN :requiresTaskAck THEN NULL
-                                   ELSE :now
-                               END,
-                               deadline_at = CASE
-                                   WHEN :requiresTaskAck THEN :deadlineAt
-                                   ELSE NULL
-                               END
-                         WHERE tenant_id = :tenantId AND activation_saga_id = :sagaId
-                           AND new_service_assignment_id = :assignmentId
-                           AND stage IN ('PENDING', 'TASK_PREPARED')
-                           AND version = :expectedVersion
-                        """)
-                .param("reasonCode", command.reasonCode()).param("now", timestamptz(now))
-                .param("deadlineAt", timestamptz(deadline(now)))
-                .param("requiresTaskAck", requiresTaskAck)
-                .param("tenantId", context.tenantId()).param("sagaId", command.sagaId())
-                .param("assignmentId", command.serviceAssignmentId())
-                .param("expectedVersion", command.expectedSagaVersion()).update();
+        DspServiceAssignmentActivationSaga saga = DSP_SERVICE_ASSIGNMENT_ACTIVATION_SAGA;
+        // 与原 CASE WHEN :requiresTaskAck 等价：该标志对单条语句是常量，直接在 Java 侧分支。
+        // requiresTaskAck -> ABORTING（等待 Task 确认）；否则直接 ABORTED 并清空 deadline。
+        var sagaUpdate = dsl.update(saga)
+                .set(saga.STAGE, requiresTaskAck ? "ABORTING" : "ABORTED")
+                .set(saga.VERSION, saga.VERSION.plus(1))
+                .set(saga.LAST_ERROR_CODE, command.reasonCode())
+                .set(saga.UPDATED_AT, now);
+        if (requiresTaskAck) {
+            sagaUpdate.setNull(saga.COMPLETED_AT)
+                    .set(saga.DEADLINE_AT, deadline(now));
+        } else {
+            sagaUpdate.set(saga.COMPLETED_AT, now)
+                    .setNull(saga.DEADLINE_AT);
+        }
+        int sagaUpdated = sagaUpdate
+                .where(saga.TENANT_ID.eq(context.tenantId()))
+                .and(saga.ACTIVATION_SAGA_ID.eq(command.sagaId()))
+                .and(saga.NEW_SERVICE_ASSIGNMENT_ID.eq(command.serviceAssignmentId()))
+                .and(saga.STAGE.in("PENDING", "TASK_PREPARED"))
+                .and(saga.VERSION.eq(command.expectedSagaVersion()))
+                .execute();
         if (sagaUpdated != 1) {
             throwSagaConflict(context.tenantId(), command.sagaId(), command.serviceAssignmentId(),
                     command.expectedSagaVersion(), "PENDING_OR_TASK_PREPARED");
         }
-        int assignmentUpdated = jdbc.sql("""
-                        UPDATE dsp_service_assignment
-                           SET status = 'FAILED_ACTIVATION', ended_by = :actorId,
-                               end_reason_code = :reasonCode
-                         WHERE tenant_id = :tenantId AND service_assignment_id = :assignmentId
-                           AND status = 'PENDING_ACTIVATION'
-                        """)
-                .param("actorId", context.actorId()).param("reasonCode", command.reasonCode())
-                .param("tenantId", context.tenantId()).param("assignmentId", command.serviceAssignmentId())
-                .update();
+        DspServiceAssignment assignment = DSP_SERVICE_ASSIGNMENT;
+        int assignmentUpdated = dsl.update(assignment)
+                .set(assignment.STATUS, "FAILED_ACTIVATION")
+                .set(assignment.ENDED_BY, context.actorId())
+                .set(assignment.END_REASON_CODE, command.reasonCode())
+                .where(assignment.TENANT_ID.eq(context.tenantId()))
+                .and(assignment.SERVICE_ASSIGNMENT_ID.eq(command.serviceAssignmentId()))
+                .and(assignment.STATUS.eq("PENDING_ACTIVATION"))
+                .execute();
         if (assignmentUpdated != 1) {
             throw new BusinessProblem(
                     ProblemCode.SERVICE_ASSIGNMENT_CONFLICT,
@@ -618,19 +568,20 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
         }
 
         Instant now = clock.instant();
-        int sagaUpdated = jdbc.sql("""
-                        UPDATE dsp_service_assignment_activation_saga
-                           SET stage = 'ABORTED', version = version + 1,
-                               updated_at = :now, completed_at = :now, deadline_at = NULL
-                         WHERE tenant_id = :tenantId AND activation_saga_id = :sagaId
-                           AND new_service_assignment_id = :assignmentId
-                           AND prepared_task_assignment_id = :preparedId
-                           AND stage = 'ABORTING' AND version = :expectedVersion
-                        """)
-                .param("now", timestamptz(now)).param("tenantId", context.tenantId())
-                .param("sagaId", command.sagaId()).param("assignmentId", command.serviceAssignmentId())
-                .param("preparedId", command.preparedTaskAssignmentId())
-                .param("expectedVersion", command.expectedSagaVersion()).update();
+        DspServiceAssignmentActivationSaga saga = DSP_SERVICE_ASSIGNMENT_ACTIVATION_SAGA;
+        int sagaUpdated = dsl.update(saga)
+                .set(saga.STAGE, "ABORTED")
+                .set(saga.VERSION, saga.VERSION.plus(1))
+                .set(saga.UPDATED_AT, now)
+                .set(saga.COMPLETED_AT, now)
+                .setNull(saga.DEADLINE_AT)
+                .where(saga.TENANT_ID.eq(context.tenantId()))
+                .and(saga.ACTIVATION_SAGA_ID.eq(command.sagaId()))
+                .and(saga.NEW_SERVICE_ASSIGNMENT_ID.eq(command.serviceAssignmentId()))
+                .and(saga.PREPARED_TASK_ASSIGNMENT_ID.eq(command.preparedTaskAssignmentId()))
+                .and(saga.STAGE.eq("ABORTING"))
+                .and(saga.VERSION.eq(command.expectedSagaVersion()))
+                .execute();
         if (sagaUpdated != 1) {
             throwSagaConflict(context.tenantId(), command.sagaId(), command.serviceAssignmentId(),
                     command.expectedSagaVersion(), "ABORTING");
@@ -664,19 +615,20 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
         }
 
         Instant now = clock.instant();
-        int sagaUpdated = jdbc.sql("""
-                        UPDATE dsp_service_assignment_activation_saga
-                           SET stage = 'COMPLETED', version = version + 1,
-                               updated_at = :now, completed_at = :now, deadline_at = NULL
-                         WHERE tenant_id = :tenantId AND activation_saga_id = :sagaId
-                           AND new_service_assignment_id = :assignmentId
-                           AND prepared_task_assignment_id = :preparedId
-                           AND stage = 'SERVICE_SWITCHED' AND version = :expectedVersion
-                        """)
-                .param("now", timestamptz(now)).param("tenantId", context.tenantId())
-                .param("sagaId", command.sagaId()).param("assignmentId", command.serviceAssignmentId())
-                .param("preparedId", command.preparedTaskAssignmentId())
-                .param("expectedVersion", command.expectedSagaVersion()).update();
+        DspServiceAssignmentActivationSaga saga = DSP_SERVICE_ASSIGNMENT_ACTIVATION_SAGA;
+        int sagaUpdated = dsl.update(saga)
+                .set(saga.STAGE, "COMPLETED")
+                .set(saga.VERSION, saga.VERSION.plus(1))
+                .set(saga.UPDATED_AT, now)
+                .set(saga.COMPLETED_AT, now)
+                .setNull(saga.DEADLINE_AT)
+                .where(saga.TENANT_ID.eq(context.tenantId()))
+                .and(saga.ACTIVATION_SAGA_ID.eq(command.sagaId()))
+                .and(saga.NEW_SERVICE_ASSIGNMENT_ID.eq(command.serviceAssignmentId()))
+                .and(saga.PREPARED_TASK_ASSIGNMENT_ID.eq(command.preparedTaskAssignmentId()))
+                .and(saga.STAGE.eq("SERVICE_SWITCHED"))
+                .and(saga.VERSION.eq(command.expectedSagaVersion()))
+                .execute();
         if (sagaUpdated != 1) {
             throwSagaConflict(context.tenantId(), command.sagaId(), command.serviceAssignmentId(),
                     command.expectedSagaVersion(), "SERVICE_SWITCHED");
@@ -729,6 +681,38 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
         return new CommandMetadata(correlationId, idempotencyKey);
     }
 
+    /**
+     * ACTIVE 责任 + CONFIRMED reservation 的复合读取；saga version 缺失时按 0 处理
+     * （与原 coalesce(s.version, 0) 一致）。
+     */
+    private java.util.Optional<ActiveNetworkRow> findActiveWithConfirmedReservation(
+            String tenantId, UUID taskId, String level) {
+        DspServiceAssignment a = DSP_SERVICE_ASSIGNMENT.as("a");
+        DspCapacityReservation r = DSP_CAPACITY_RESERVATION.as("r");
+        DspServiceAssignmentActivationSaga s = DSP_SERVICE_ASSIGNMENT_ACTIVATION_SAGA.as("s");
+        return dsl.select(
+                        a.SERVICE_ASSIGNMENT_ID,
+                        a.ACTIVATION_SAGA_ID,
+                        a.ASSIGNEE_ID,
+                        r.CAPACITY_RESERVATION_ID,
+                        DSL.coalesce(s.VERSION, 0L))
+                .from(a)
+                .join(r)
+                .on(r.TENANT_ID.eq(a.TENANT_ID))
+                .and(r.SERVICE_ASSIGNMENT_ID.eq(a.SERVICE_ASSIGNMENT_ID))
+                .and(r.STATUS.eq("CONFIRMED"))
+                .leftJoin(s)
+                .on(s.TENANT_ID.eq(a.TENANT_ID))
+                .and(s.ACTIVATION_SAGA_ID.eq(a.ACTIVATION_SAGA_ID))
+                .where(a.TENANT_ID.eq(tenantId))
+                .and(a.TASK_ID.eq(taskId))
+                .and(a.RESPONSIBILITY_LEVEL.eq(level))
+                .and(a.STATUS.eq("ACTIVE"))
+                .orderBy(a.CREATED_AT)
+                .limit(1)
+                .fetchOptional(JooqServiceAssignmentService::mapActiveNetworkRow);
+    }
+
     private record ActiveNetworkRow(
             UUID serviceAssignmentId,
             UUID sagaId,
@@ -747,15 +731,18 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
             }
             return;
         }
-        OldAssignment old = jdbc.sql("""
-                        SELECT work_order_id, task_id, responsibility_level,
-                               assignee_id, business_type, status
-                          FROM dsp_service_assignment
-                         WHERE tenant_id = :tenantId AND service_assignment_id = :assignmentId
-                        """)
-                .param("tenantId", tenantId)
-                .param("assignmentId", command.supersedesServiceAssignmentId())
-                .query(OldAssignment.class).optional()
+        DspServiceAssignment assignment = DSP_SERVICE_ASSIGNMENT;
+        OldAssignment old = dsl.select(
+                        assignment.WORK_ORDER_ID,
+                        assignment.TASK_ID,
+                        assignment.RESPONSIBILITY_LEVEL,
+                        assignment.ASSIGNEE_ID,
+                        assignment.BUSINESS_TYPE,
+                        assignment.STATUS)
+                .from(assignment)
+                .where(assignment.TENANT_ID.eq(tenantId))
+                .and(assignment.SERVICE_ASSIGNMENT_ID.eq(command.supersedesServiceAssignmentId()))
+                .fetchOptional(JooqServiceAssignmentService::mapOldAssignment)
                 .orElseThrow(() -> new BusinessProblem(
                         ProblemCode.RESOURCE_NOT_FOUND, "Superseded ServiceAssignment does not exist"));
         if (!"ACTIVE".equals(old.status())
@@ -775,29 +762,31 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
             PrepareServiceAssignmentCommand command,
             Instant now
     ) {
-        CapacityCounter counter = jdbc.sql("""
-                        SELECT capacity_counter_id, occupied_units, max_units, version
-                          FROM dsp_capacity_counter
-                         WHERE tenant_id = :tenantId AND responsibility_level = :level
-                           AND assignee_id = :assigneeId AND business_type = :businessType
-                        """)
-                .param("tenantId", context.tenantId())
-                .param("level", command.responsibilityLevel().name())
-                .param("assigneeId", command.assigneeId())
-                .param("businessType", command.businessType())
-                .query(CapacityCounter.class).optional()
+        DspCapacityCounter counterTable = DSP_CAPACITY_COUNTER;
+        CapacityCounter counter = dsl.select(
+                        counterTable.CAPACITY_COUNTER_ID,
+                        counterTable.OCCUPIED_UNITS,
+                        counterTable.MAX_UNITS,
+                        counterTable.VERSION)
+                .from(counterTable)
+                .where(counterTable.TENANT_ID.eq(context.tenantId()))
+                .and(counterTable.RESPONSIBILITY_LEVEL.eq(command.responsibilityLevel().name()))
+                .and(counterTable.ASSIGNEE_ID.eq(command.assigneeId()))
+                .and(counterTable.BUSINESS_TYPE.eq(command.businessType()))
+                .fetchOptional(JooqServiceAssignmentService::mapCapacityCounter)
                 .orElseThrow(() -> new BusinessProblem(
                         ProblemCode.RESOURCE_NOT_FOUND, "Capacity counter does not exist"));
-        int updated = jdbc.sql("""
-                        UPDATE dsp_capacity_counter
-                           SET occupied_units = occupied_units + 1,
-                               version = version + 1, updated_by = :actorId, updated_at = :now
-                         WHERE capacity_counter_id = :counterId AND tenant_id = :tenantId
-                           AND version = :expectedVersion AND occupied_units < max_units
-                        """)
-                .param("actorId", context.actorId()).param("now", timestamptz(now))
-                .param("counterId", counter.capacityCounterId()).param("tenantId", context.tenantId())
-                .param("expectedVersion", command.expectedCapacityVersion()).update();
+        // 乐观并发：版本条件 + 占用不得超过上限，影响行数不为 1 即失败关闭。
+        int updated = dsl.update(counterTable)
+                .set(counterTable.OCCUPIED_UNITS, counterTable.OCCUPIED_UNITS.plus(1))
+                .set(counterTable.VERSION, counterTable.VERSION.plus(1))
+                .set(counterTable.UPDATED_BY, context.actorId())
+                .set(counterTable.UPDATED_AT, now)
+                .where(counterTable.CAPACITY_COUNTER_ID.eq(counter.capacityCounterId()))
+                .and(counterTable.TENANT_ID.eq(context.tenantId()))
+                .and(counterTable.VERSION.eq(command.expectedCapacityVersion()))
+                .and(counterTable.OCCUPIED_UNITS.lt(counterTable.MAX_UNITS))
+                .execute();
         if (updated != 1) {
             CapacityCounter current = capacityCounter(context.tenantId(), counter.capacityCounterId());
             if (current.version() != command.expectedCapacityVersion()) {
@@ -811,30 +800,32 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
     }
 
     private CapacityCounter capacityCounter(String tenantId, UUID counterId) {
-        return jdbc.sql("""
-                        SELECT capacity_counter_id, occupied_units, max_units, version
-                          FROM dsp_capacity_counter
-                         WHERE tenant_id = :tenantId AND capacity_counter_id = :counterId
-                        """)
-                .param("tenantId", tenantId).param("counterId", counterId)
-                .query(CapacityCounter.class).single();
+        DspCapacityCounter counterTable = DSP_CAPACITY_COUNTER;
+        return dsl.select(
+                        counterTable.CAPACITY_COUNTER_ID,
+                        counterTable.OCCUPIED_UNITS,
+                        counterTable.MAX_UNITS,
+                        counterTable.VERSION)
+                .from(counterTable)
+                .where(counterTable.TENANT_ID.eq(tenantId))
+                .and(counterTable.CAPACITY_COUNTER_ID.eq(counterId))
+                .fetchSingle(JooqServiceAssignmentService::mapCapacityCounter);
     }
 
     private void endOldAssignmentAndReleaseCapacity(
             CommandContext context, AssignmentState newAssignment, Instant now) {
-        int ended = jdbc.sql("""
-                        UPDATE dsp_service_assignment
-                           SET status = 'ENDED', effective_to = :now,
-                               ended_by = :actorId, end_reason_code = 'REASSIGNED'
-                         WHERE tenant_id = :tenantId AND service_assignment_id = :oldAssignmentId
-                           AND task_id = :taskId AND responsibility_level = :level
-                           AND status = 'ACTIVE'
-                        """)
-                .param("now", timestamptz(now)).param("actorId", context.actorId())
-                .param("tenantId", context.tenantId())
-                .param("oldAssignmentId", newAssignment.supersedesServiceAssignmentId())
-                .param("taskId", newAssignment.taskId())
-                .param("level", newAssignment.responsibilityLevel()).update();
+        DspServiceAssignment assignment = DSP_SERVICE_ASSIGNMENT;
+        int ended = dsl.update(assignment)
+                .set(assignment.STATUS, "ENDED")
+                .set(assignment.EFFECTIVE_TO, now)
+                .set(assignment.ENDED_BY, context.actorId())
+                .set(assignment.END_REASON_CODE, "REASSIGNED")
+                .where(assignment.TENANT_ID.eq(context.tenantId()))
+                .and(assignment.SERVICE_ASSIGNMENT_ID.eq(newAssignment.supersedesServiceAssignmentId()))
+                .and(assignment.TASK_ID.eq(newAssignment.taskId()))
+                .and(assignment.RESPONSIBILITY_LEVEL.eq(newAssignment.responsibilityLevel()))
+                .and(assignment.STATUS.eq("ACTIVE"))
+                .execute();
         if (ended != 1) {
             throw new BusinessProblem(
                     ProblemCode.SERVICE_ASSIGNMENT_CONFLICT,
@@ -846,31 +837,31 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
 
     private void releaseReservationAndCapacity(
             CommandContext context, AssignmentState state, String reasonCode, Instant now) {
-        int reservationUpdated = jdbc.sql("""
-                        UPDATE dsp_capacity_reservation
-                           SET status = 'RELEASED', released_at = :now,
-                               released_by = :actorId, release_reason_code = :reasonCode
-                         WHERE tenant_id = :tenantId AND capacity_reservation_id = :reservationId
-                           AND status IN ('HELD', 'CONFIRMED')
-                        """)
-                .param("now", timestamptz(now)).param("actorId", context.actorId())
-                .param("reasonCode", reasonCode).param("tenantId", context.tenantId())
-                .param("reservationId", state.capacityReservationId()).update();
+        DspCapacityReservation reservation = DSP_CAPACITY_RESERVATION;
+        int reservationUpdated = dsl.update(reservation)
+                .set(reservation.STATUS, "RELEASED")
+                .set(reservation.RELEASED_AT, now)
+                .set(reservation.RELEASED_BY, context.actorId())
+                .set(reservation.RELEASE_REASON_CODE, reasonCode)
+                .where(reservation.TENANT_ID.eq(context.tenantId()))
+                .and(reservation.CAPACITY_RESERVATION_ID.eq(state.capacityReservationId()))
+                .and(reservation.STATUS.in("HELD", "CONFIRMED"))
+                .execute();
         if (reservationUpdated != 1) {
             throw new BusinessProblem(
                     ProblemCode.DISPATCH_CAPACITY_CONFLICT,
                     "Capacity reservation was already released");
         }
-        int counterUpdated = jdbc.sql("""
-                        UPDATE dsp_capacity_counter
-                           SET occupied_units = occupied_units - :units,
-                               version = version + 1, updated_by = :actorId, updated_at = :now
-                         WHERE tenant_id = :tenantId AND capacity_counter_id = :counterId
-                           AND occupied_units >= :units
-                        """)
-                .param("units", state.reservationUnits()).param("actorId", context.actorId())
-                .param("now", timestamptz(now)).param("tenantId", context.tenantId())
-                .param("counterId", state.capacityCounterId()).update();
+        DspCapacityCounter counterTable = DSP_CAPACITY_COUNTER;
+        int counterUpdated = dsl.update(counterTable)
+                .set(counterTable.OCCUPIED_UNITS, counterTable.OCCUPIED_UNITS.minus(state.reservationUnits()))
+                .set(counterTable.VERSION, counterTable.VERSION.plus(1))
+                .set(counterTable.UPDATED_BY, context.actorId())
+                .set(counterTable.UPDATED_AT, now)
+                .where(counterTable.TENANT_ID.eq(context.tenantId()))
+                .and(counterTable.CAPACITY_COUNTER_ID.eq(state.capacityCounterId()))
+                .and(counterTable.OCCUPIED_UNITS.ge(state.reservationUnits()))
+                .execute();
         if (counterUpdated != 1) {
             throw new BusinessProblem(
                     ProblemCode.DISPATCH_CAPACITY_CONFLICT,
@@ -879,45 +870,68 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
     }
 
     private boolean activeAssignmentExists(String tenantId, UUID taskId, String level) {
-        return jdbc.sql("""
-                        SELECT EXISTS (
-                            SELECT 1 FROM dsp_service_assignment
-                             WHERE tenant_id = :tenantId AND task_id = :taskId
-                               AND responsibility_level = :level AND status = 'ACTIVE'
-                        )
-                        """)
-                .param("tenantId", tenantId).param("taskId", taskId).param("level", level)
-                .query(Boolean.class).single();
+        DspServiceAssignment assignment = DSP_SERVICE_ASSIGNMENT;
+        return dsl.fetchExists(assignment,
+                assignment.TENANT_ID.eq(tenantId)
+                        .and(assignment.TASK_ID.eq(taskId))
+                        .and(assignment.RESPONSIBILITY_LEVEL.eq(level))
+                        .and(assignment.STATUS.eq("ACTIVE")));
     }
 
     private AssignmentState assignment(String tenantId, UUID assignmentId) {
-        return jdbc.sql("""
-                        SELECT assignment.service_assignment_id,
-                               assignment.activation_saga_id AS saga_id,
-                               assignment.work_order_id, assignment.task_id,
-                               assignment.responsibility_level, assignment.assignee_id,
-                               assignment.business_type, assignment.status,
-                               assignment.supersedes_service_assignment_id,
-                               assignment.task_execution_guard_id AS guard_id,
-                               assignment.prepared_task_assignment_id,
-                               assignment.created_by,
-                               assignment.activation_protocol_version AS protocol_version,
-                               assignment.pending_authority_assignment_id,
-                               assignment.pending_authority_version,
-                               assignment.pending_fence_decision_id,
-                               assignment.pending_fence_policy_version,
-                               reservation.capacity_reservation_id,
-                               reservation.capacity_counter_id, reservation.units AS reservation_units
-                          FROM dsp_service_assignment assignment
-                          JOIN dsp_capacity_reservation reservation
-                            ON reservation.service_assignment_id = assignment.service_assignment_id
-                         WHERE assignment.tenant_id = :tenantId
-                           AND assignment.service_assignment_id = :assignmentId
-                        """)
-                .param("tenantId", tenantId).param("assignmentId", assignmentId)
-                .query(AssignmentState.class).optional()
+        DspServiceAssignment assignment = DSP_SERVICE_ASSIGNMENT.as("assignment");
+        DspCapacityReservation reservation = DSP_CAPACITY_RESERVATION.as("reservation");
+        // 与原查询一致：reservation JOIN 仅按 service_assignment_id，不加 tenant 条件。
+        Record row = dsl.select(
+                        assignment.SERVICE_ASSIGNMENT_ID,
+                        assignment.ACTIVATION_SAGA_ID,
+                        assignment.WORK_ORDER_ID,
+                        assignment.TASK_ID,
+                        assignment.RESPONSIBILITY_LEVEL,
+                        assignment.ASSIGNEE_ID,
+                        assignment.BUSINESS_TYPE,
+                        assignment.STATUS,
+                        assignment.SUPERSEDES_SERVICE_ASSIGNMENT_ID,
+                        assignment.TASK_EXECUTION_GUARD_ID,
+                        assignment.PREPARED_TASK_ASSIGNMENT_ID,
+                        assignment.CREATED_BY,
+                        assignment.ACTIVATION_PROTOCOL_VERSION,
+                        assignment.PENDING_AUTHORITY_ASSIGNMENT_ID,
+                        assignment.PENDING_AUTHORITY_VERSION,
+                        assignment.PENDING_FENCE_DECISION_ID,
+                        assignment.PENDING_FENCE_POLICY_VERSION,
+                        reservation.CAPACITY_RESERVATION_ID,
+                        reservation.CAPACITY_COUNTER_ID,
+                        reservation.UNITS)
+                .from(assignment)
+                .join(reservation)
+                .on(reservation.SERVICE_ASSIGNMENT_ID.eq(assignment.SERVICE_ASSIGNMENT_ID))
+                .where(assignment.TENANT_ID.eq(tenantId))
+                .and(assignment.SERVICE_ASSIGNMENT_ID.eq(assignmentId))
+                .fetchOptional()
                 .orElseThrow(() -> new BusinessProblem(
                         ProblemCode.RESOURCE_NOT_FOUND, "ServiceAssignment does not exist"));
+        return new AssignmentState(
+                row.get(assignment.SERVICE_ASSIGNMENT_ID),
+                row.get(assignment.ACTIVATION_SAGA_ID),
+                row.get(assignment.WORK_ORDER_ID),
+                row.get(assignment.TASK_ID),
+                row.get(assignment.RESPONSIBILITY_LEVEL),
+                row.get(assignment.ASSIGNEE_ID),
+                row.get(assignment.BUSINESS_TYPE),
+                row.get(assignment.STATUS),
+                row.get(assignment.SUPERSEDES_SERVICE_ASSIGNMENT_ID),
+                row.get(assignment.TASK_EXECUTION_GUARD_ID),
+                row.get(assignment.PREPARED_TASK_ASSIGNMENT_ID),
+                row.get(assignment.CREATED_BY),
+                row.get(assignment.ACTIVATION_PROTOCOL_VERSION),
+                row.get(assignment.PENDING_AUTHORITY_ASSIGNMENT_ID),
+                row.get(assignment.PENDING_AUTHORITY_VERSION),
+                row.get(assignment.PENDING_FENCE_DECISION_ID),
+                row.get(assignment.PENDING_FENCE_POLICY_VERSION),
+                row.get(reservation.CAPACITY_RESERVATION_ID),
+                row.get(reservation.CAPACITY_COUNTER_ID),
+                row.get(reservation.UNITS));
     }
 
     private void throwSagaConflict(
@@ -927,21 +941,21 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
             long expectedVersion,
             String expectedStage
     ) {
-        SagaState saga = jdbc.sql("""
-                        SELECT stage, version FROM dsp_service_assignment_activation_saga
-                         WHERE tenant_id = :tenantId AND activation_saga_id = :sagaId
-                           AND new_service_assignment_id = :assignmentId
-                        """)
-                .param("tenantId", tenantId).param("sagaId", sagaId)
-                .param("assignmentId", assignmentId).query(SagaState.class).optional()
+        DspServiceAssignmentActivationSaga saga = DSP_SERVICE_ASSIGNMENT_ACTIVATION_SAGA;
+        SagaState state = dsl.select(saga.STAGE, saga.VERSION)
+                .from(saga)
+                .where(saga.TENANT_ID.eq(tenantId))
+                .and(saga.ACTIVATION_SAGA_ID.eq(sagaId))
+                .and(saga.NEW_SERVICE_ASSIGNMENT_ID.eq(assignmentId))
+                .fetchOptional(JooqServiceAssignmentService::mapSagaState)
                 .orElseThrow(() -> new BusinessProblem(
                         ProblemCode.RESOURCE_NOT_FOUND, "ServiceAssignment activation saga does not exist"));
-        if (saga.version() != expectedVersion) {
+        if (state.version() != expectedVersion) {
             throw new BusinessProblem(ProblemCode.VERSION_CONFLICT, "Activation saga version changed");
         }
         throw new BusinessProblem(
                 ProblemCode.SERVICE_ASSIGNMENT_CONFLICT,
-                "Activation saga requires stage " + expectedStage + " but was " + saga.stage());
+                "Activation saga requires stage " + expectedStage + " but was " + state.stage());
     }
 
     private ServiceAssignmentReceipt receipt(
@@ -974,40 +988,38 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
 
     private void insertFrozenReceipt(
             CommandContext context, String operation, ServiceAssignmentReceipt receipt) {
-        jdbc.sql("""
-                        INSERT INTO dsp_assignment_command_result (
-                            tenant_id, operation_type, idempotency_key,
-                            service_assignment_id, activation_saga_id, task_id,
-                            capacity_reservation_id, assignment_status, saga_stage,
-                            saga_version, occurred_at
-                        ) VALUES (
-                            :tenantId, :operation, :idempotencyKey,
-                            :assignmentId, :sagaId, :taskId,
-                            :reservationId, :assignmentStatus, :sagaStage,
-                            :sagaVersion, :occurredAt
-                        )
-                        """)
-                .param("tenantId", context.tenantId()).param("operation", operation)
-                .param("idempotencyKey", context.idempotencyKey())
-                .param("assignmentId", receipt.serviceAssignmentId()).param("sagaId", receipt.sagaId())
-                .param("taskId", receipt.taskId()).param("reservationId", receipt.capacityReservationId())
-                .param("assignmentStatus", receipt.assignmentStatus())
-                .param("sagaStage", receipt.sagaStage()).param("sagaVersion", receipt.sagaVersion())
-                .param("occurredAt", timestamptz(receipt.occurredAt())).update();
+        DspAssignmentCommandResult result = DSP_ASSIGNMENT_COMMAND_RESULT;
+        dsl.insertInto(result)
+                .set(result.TENANT_ID, context.tenantId())
+                .set(result.OPERATION_TYPE, operation)
+                .set(result.IDEMPOTENCY_KEY, context.idempotencyKey())
+                .set(result.SERVICE_ASSIGNMENT_ID, receipt.serviceAssignmentId())
+                .set(result.ACTIVATION_SAGA_ID, receipt.sagaId())
+                .set(result.TASK_ID, receipt.taskId())
+                .set(result.CAPACITY_RESERVATION_ID, receipt.capacityReservationId())
+                .set(result.ASSIGNMENT_STATUS, receipt.assignmentStatus())
+                .set(result.SAGA_STAGE, receipt.sagaStage())
+                .set(result.SAGA_VERSION, receipt.sagaVersion())
+                .set(result.OCCURRED_AT, receipt.occurredAt())
+                .execute();
     }
 
     private ServiceAssignmentReceipt frozenReceipt(CommandContext context, String operation) {
-        return jdbc.sql("""
-                        SELECT service_assignment_id, activation_saga_id AS saga_id,
-                               task_id, capacity_reservation_id, assignment_status,
-                               saga_stage, saga_version, occurred_at
-                          FROM dsp_assignment_command_result
-                         WHERE tenant_id = :tenantId AND operation_type = :operation
-                           AND idempotency_key = :idempotencyKey
-                        """)
-                .param("tenantId", context.tenantId()).param("operation", operation)
-                .param("idempotencyKey", context.idempotencyKey())
-                .query(ServiceAssignmentReceipt.class).single();
+        DspAssignmentCommandResult result = DSP_ASSIGNMENT_COMMAND_RESULT;
+        return dsl.select(
+                        result.SERVICE_ASSIGNMENT_ID,
+                        result.ACTIVATION_SAGA_ID,
+                        result.TASK_ID,
+                        result.CAPACITY_RESERVATION_ID,
+                        result.ASSIGNMENT_STATUS,
+                        result.SAGA_STAGE,
+                        result.SAGA_VERSION,
+                        result.OCCURRED_AT)
+                .from(result)
+                .where(result.TENANT_ID.eq(context.tenantId()))
+                .and(result.OPERATION_TYPE.eq(operation))
+                .and(result.IDEMPOTENCY_KEY.eq(context.idempotencyKey()))
+                .fetchSingle(JooqServiceAssignmentService::mapReceipt);
     }
 
     private void appendEvent(
@@ -1050,6 +1062,31 @@ final class DefaultServiceAssignmentService implements ServiceAssignmentService 
         } catch (JacksonException exception) {
             throw new IllegalArgumentException("ServiceAssignment payload cannot be serialized", exception);
         }
+    }
+
+    private static ActiveNetworkRow mapActiveNetworkRow(Record5<UUID, UUID, String, UUID, Long> row) {
+        return new ActiveNetworkRow(row.value1(), row.value2(), row.value3(), row.value4(), row.value5());
+    }
+
+    private static OldAssignment mapOldAssignment(
+            Record6<UUID, UUID, String, String, String, String> row) {
+        return new OldAssignment(
+                row.value1(), row.value2(), row.value3(), row.value4(), row.value5(), row.value6());
+    }
+
+    private static CapacityCounter mapCapacityCounter(Record4<UUID, Integer, Integer, Long> row) {
+        return new CapacityCounter(row.value1(), row.value2(), row.value3(), row.value4());
+    }
+
+    private static SagaState mapSagaState(Record2<String, Long> row) {
+        return new SagaState(row.value1(), row.value2());
+    }
+
+    private static ServiceAssignmentReceipt mapReceipt(Record8<
+            UUID, UUID, UUID, UUID, String, String, Long, Instant> row) {
+        return new ServiceAssignmentReceipt(
+                row.value1(), row.value2(), row.value3(), row.value4(),
+                row.value5(), row.value6(), row.value7(), row.value8());
     }
 
     private record CapacityCounter(
