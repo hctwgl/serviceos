@@ -20,17 +20,20 @@ defineProps<{
     </template>
 
     <div class="workbench">
+      <section v-if="$slots.summary" class="workbench__summary" data-testid="workbench-summary">
+        <slot name="summary" />
+      </section>
       <section class="workbench__primary" data-testid="workbench-primary">
-        <h2>待我处理</h2>
+        <h2>我的待办</h2>
         <slot name="primary-queue" />
       </section>
       <div class="workbench__risk-row">
         <section class="workbench__panel workbench__panel--risk" data-testid="workbench-risk">
-          <h2>即将超时 / 已超时</h2>
+          <h2>风险摘要（P0/P1 · SLA · 重大异常）</h2>
           <slot name="risk-queue" />
         </section>
         <section class="workbench__panel" data-testid="workbench-today">
-          <h2>今日队列</h2>
+          <h2>今日跟进</h2>
           <slot name="today-queue" />
         </section>
       </div>
@@ -48,6 +51,9 @@ defineProps<{
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+.workbench__summary {
+  margin: 0;
 }
 .workbench__primary {
   background: var(--sos-color-surface-card, #fff);

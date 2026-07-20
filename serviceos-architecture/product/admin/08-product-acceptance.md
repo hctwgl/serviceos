@@ -344,6 +344,40 @@ knownGaps:
   - UI_DATA_GAP: 组织树任职与完整变更审计时间线
 ```
 
+### 9.4 M398 记录（项目管理 / 工作台）
+
+```yaml
+pageId: ADMIN.PROJECT.LIST
+route: /projects
+visualProfile: CLASSIC_PROFESSIONAL
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: 已发布/草稿方案聚合列、车企/区域/网点实体选择器
+```
+
+```yaml
+pageId: ADMIN.WORKBENCH
+route: /workbench
+visualProfile: CLASSIC_PROFESSIONAL
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: 关注项目读模型尚未交付
+```
+
 ## 10. GAP 规则
 
 - `UI_DATA_GAP`：后端缺少显示名、聚合摘要、total、差异、影响、引用关系或 allowed-actions 等页面需要的数据；

@@ -337,7 +337,7 @@ onMounted(() => {
     </template>
 
     <Tabs v-if="detail" v-model:activeKey="activeTab">
-      <TabPane key="basic" tab="基本信息">
+      <TabPane key="basic" tab="项目概览">
         <Descriptions bordered :column="2" size="small">
           <Descriptions.Item label="项目名称">{{ detail.project.name }}</Descriptions.Item>
           <Descriptions.Item label="项目编码">{{ detail.project.code }}</Descriptions.Item>

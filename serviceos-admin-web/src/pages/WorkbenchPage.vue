@@ -3,11 +3,12 @@
  * ADMIN.WORKBENCH — 平台运营工作台。
  * 每张卡片独立请求：单卡失败不影响整页，禁止整体白屏。
  */
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import PageState from '../components/PageState.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import WorkbenchPageLayout from '../patterns/templates/WorkbenchPageLayout.vue'
+import SummaryStrip, { type SummaryStripItem } from '../patterns/SummaryStrip.vue'
 import { Button } from 'ant-design-vue'
 import { listReviewCases, listCorrectionCases, listOperationalExceptions } from '../api/queues'
 import { listAuthorizedWorkOrders } from '../api/workOrders'
@@ -182,6 +183,37 @@ async function loadAll() {
   ])
 }
 
+const summaryItems = computed<SummaryStripItem[]>(() => [
+  {
+    key: 'todos',
+    label: '我的待办',
+    value: String(
+      (reviews.value.data?.count ?? 0) +
+        (corrections.value.data?.count ?? 0) +
+        (slaRisk.value.data?.breached ?? 0),
+    ),
+    hint: '审核 + 整改 + 已超时',
+    tone: 'info',
+  },
+  {
+    key: 'breached',
+    label: '已超时',
+    value: String(slaRisk.value.data?.breached ?? '—'),
+    tone: (slaRisk.value.data?.breached ?? 0) > 0 ? 'critical' : 'default',
+  },
+  {
+    key: 'exceptions',
+    label: '重大异常',
+    value: String(exceptions.value.data?.count ?? '—'),
+    tone: (exceptions.value.data?.count ?? 0) > 0 ? 'warning' : 'default',
+  },
+  {
+    key: 'active',
+    label: '处理中工单',
+    value: workOrders.value.data?.countLabel ?? '—',
+  },
+])
+
 onMounted(() => {
   void loadAll()
 })
@@ -204,6 +236,10 @@ onMounted(() => {
     </template>
     <template #feedback>
       <PageState v-if="pageBootError" kind="error" :description="pageBootError" @reload="loadAll" />
+    </template>
+
+    <template #summary>
+      <SummaryStrip :items="summaryItems" />
     </template>
 
     <template #primary-queue>
