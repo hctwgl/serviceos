@@ -307,7 +307,8 @@ async function loadWorkspace() {
       (code) => ws.sectionAvailability[code] === 'AVAILABLE' || ws.sectionAvailability[code] === 'EMPTY',
     )
     activeSection.value = tabSection ?? firstAvailable ?? 'TASKS'
-    productTab.value = tabSection === 'FINAL_REVIEW' ? 'FINAL_REVIEW' : (tabSection ?? 'overview')
+    // 产品页签与区块码对齐：INTEGRATION / APPOINTMENTS_VISITS 等可直接作为 tab。
+    productTab.value = tabSection ?? 'overview'
     await loadSection(activeSection.value)
     diagnostics.pushDiagnostic({
       title: '工单工作区技术上下文',
@@ -1450,6 +1451,28 @@ onMounted(() => {
           @refresh="loadAuthorityProjections"
           @next="() => undefined"
         />
+      </TabPane>
+
+      <TabPane key="APPOINTMENTS_VISITS" tab="预约到场">
+        <Alert
+          type="info"
+          show-icon
+          message="预约与上门"
+          description="预约、联系记录与上门签到详情可通过下方关联链接打开；完整编排仍在任务工作区完成。"
+        />
+        <p v-if="sectionLoading">区块加载中…</p>
+        <p v-else-if="sectionError" class="error">{{ sectionError }}</p>
+      </TabPane>
+
+      <TabPane key="INTEGRATION" tab="集成">
+        <Alert
+          type="info"
+          show-icon
+          message="车企集成"
+          description="入站 Envelope、外发交付与 Canonical 详情通过下方关联链接打开。"
+        />
+        <p v-if="sectionLoading">区块加载中…</p>
+        <p v-else-if="sectionError" class="error">{{ sectionError }}</p>
       </TabPane>
 
       <TabPane v-if="showTechTab" key="tech" tab="技术诊断">
