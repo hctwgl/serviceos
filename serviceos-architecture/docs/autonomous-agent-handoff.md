@@ -9,7 +9,7 @@ lastUpdated: 2026-07-19
 
 - **进行中 Draft PR**：M362 整改列表/头级客户端能力预检
   （依赖 M356～M361：#183～#188）
-- PR：（创建后回填）
+- PR：https://github.com/hctwgl/serviceos/pull/189
 - 分支：`cursor/m362-correction-header-capability-reject-6a78`
   （base：`cursor/m361-correction-capability-gate-6a78`）
 - latestMilestone（本 PR）：**M362**
