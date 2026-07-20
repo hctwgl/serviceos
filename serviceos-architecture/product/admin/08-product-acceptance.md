@@ -288,7 +288,26 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - DOMAIN_GAP: Workflow/Task 实体选择器与可视化设计器仍待 M386/M387
+  - DOMAIN_GAP: Workflow/Task 实体选择器可继续深化与设计器联动
+```
+
+### 9.2 M389 记录（工单详情统一履约工作区）
+
+```yaml
+pageId: ADMIN.WORKORDER.WORKSPACE
+route: /work-orders/:id
+visualProfile: CLASSIC_PROFESSIONAL
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: 客户/地址/联系方式正式脱敏读模型仍缺
+  - UI_DATA_GAP: 表单资料缩略图与完整审核记录产品化未完成
 ```
 
 ## 10. GAP 规则
