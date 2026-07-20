@@ -1,19 +1,103 @@
 <script setup lang="ts">
-import { statusLabel } from '../product/labels'
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { getNetworkPortalWorkbench, type NetworkPortalWorkbench } from '../api/networkPortal'
-import {formatDateTime, safeProblemMessage} from '@serviceos/web-core'
+import {
+  getNetworkPortalWorkbench,
+  listNetworkPortalTasks,
+  listNetworkPortalTechnicians,
+  type NetworkPortalTaskItem,
+  type NetworkPortalTechnicianItem,
+  type NetworkPortalWorkbench,
+} from '../api/networkPortal'
+import { formatDateTime, safeProblemMessage } from '@serviceos/web-core'
 import PageState from '../components/PageState.vue'
+import SummaryStrip, { type SummaryStripItem } from '../components/SummaryStrip.vue'
+import AssignTechnicianDrawer from '../components/AssignTechnicianDrawer.vue'
+import { statusLabel } from '../product/labels'
 
 const props = defineProps<{ networkContextId: string | null }>()
 const data = ref<NetworkPortalWorkbench | null>(null)
+const unassignedTasks = ref<NetworkPortalTaskItem[]>([])
+const technicians = ref<NetworkPortalTechnicianItem[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
+const tasksError = ref<string | null>(null)
+const techniciansError = ref<string | null>(null)
+const drawerOpen = ref(false)
+const assignTask = ref<NetworkPortalTaskItem | null>(null)
+
+const summaryItems = computed<SummaryStripItem[]>(() => {
+  if (!data.value) return []
+  const slaOpen = data.value.slaSummary?.openCount
+  const slaBreached = data.value.slaSummary?.breachedCount ?? 0
+  return [
+    {
+      key: 'unassigned',
+      label: '待分配工单',
+      value: data.value.unassignedTechnicianTaskCount ?? 0,
+      hint: '下一步：选择师傅',
+      to: '/network-portal/tasks',
+      testId: 'workbench-unassigned-count',
+      tone: (data.value.unassignedTechnicianTaskCount ?? 0) > 0 ? 'warning' : 'default',
+    },
+    {
+      key: 'active-wo',
+      label: '进行中工单',
+      value: data.value.activeWorkOrderCount,
+      to: '/network-portal/work-orders',
+      testId: 'workbench-active-work-orders',
+    },
+    {
+      key: 'active-tasks',
+      label: '进行中任务',
+      value: data.value.activeTaskCount,
+      to: '/network-portal/tasks',
+      testId: 'workbench-active-tasks',
+    },
+    {
+      key: 'sla',
+      label: '即将超时 / 已超时',
+      value:
+        typeof slaOpen === 'number' ? `${slaOpen} / ${slaBreached}` : '无权限',
+      hint: typeof slaOpen === 'number' ? '优先处理已超时' : '缺少 sla.read',
+      testId: 'workbench-sla-summary',
+      tone: slaBreached > 0 ? 'critical' : 'default',
+    },
+    {
+      key: 'corrections',
+      label: '待整改',
+      value: data.value.openCorrectionCaseCount ?? '—',
+      to:
+        typeof data.value.openCorrectionCaseCount === 'number'
+          ? '/network-portal/corrections'
+          : undefined,
+      testId: 'workbench-correction-count',
+    },
+    {
+      key: 'exceptions',
+      label: '异常待处理',
+      value: data.value.openOperationalExceptionCount ?? '—',
+      to:
+        typeof data.value.openOperationalExceptionCount === 'number'
+          ? '/network-portal/exceptions'
+          : undefined,
+      testId: 'workbench-exception-count',
+    },
+    {
+      key: 'technicians',
+      label: '可接单师傅',
+      value: data.value.activeTechnicianCount,
+      to: '/network-portal/technicians',
+      testId: 'workbench-active-technicians',
+    },
+  ]
+})
 
 async function load() {
   if (!props.networkContextId) {
     data.value = null
+    unassignedTasks.value = []
+    technicians.value = []
     error.value = '请选择网点上下文'
     loading.value = false
     return
@@ -28,154 +112,270 @@ async function load() {
   } finally {
     loading.value = false
   }
+  await Promise.all([loadUnassignedTasks(), loadTechnicians()])
+}
+
+async function loadUnassignedTasks() {
+  if (!props.networkContextId) return
+  try {
+    const page = await listNetworkPortalTasks(props.networkContextId)
+    // 服务端 ACTIVE 任务列表中 technicianId 为空 = 待指派；与 workbench 计数同源字段。
+    unassignedTasks.value = page.items.filter((item) => !item.technicianId)
+    tasksError.value = null
+  } catch (err) {
+    unassignedTasks.value = []
+    tasksError.value = safeProblemMessage(err)
+  }
+}
+
+async function loadTechnicians() {
+  if (!props.networkContextId) return
+  try {
+    const page = await listNetworkPortalTechnicians(props.networkContextId)
+    technicians.value = page.items
+    techniciansError.value = null
+  } catch (err) {
+    technicians.value = []
+    techniciansError.value = safeProblemMessage(err)
+  }
+}
+
+function openAssign(task: NetworkPortalTaskItem) {
+  assignTask.value = task
+  drawerOpen.value = true
+}
+
+async function onAssigned() {
+  await load()
 }
 
 onMounted(() => {
   void load()
 })
-watch(() => props.networkContextId, () => {
-  void load()
-})
+watch(
+  () => props.networkContextId,
+  () => {
+    void load()
+  },
+)
 </script>
 
 <template>
-  <section data-testid="network-portal-workbench">
+  <section data-testid="network-portal-workbench" class="workbench">
     <header class="hero">
       <div>
+        <p class="eyebrow">网点协作</p>
         <h2>本网点工作台</h2>
-        <p class="subtitle">今天需要安排什么：接单、派师傅、预约、复核与整改。</p>
+        <p class="subtitle">今天要处理什么、由谁负责、何时完成、有什么风险。</p>
       </div>
       <button type="button" data-testid="network-workbench-reload" @click="load">刷新</button>
     </header>
 
     <PageState v-if="loading" kind="loading" />
-    <PageState
-      v-else-if="error"
-      kind="error"
-      :description="error"
-      @reload="load"
-    />
+    <PageState v-else-if="error" kind="error" :description="error" @reload="load" />
     <template v-else-if="data">
-      <p class="as-of" data-testid="network-workbench-as-of">
-        统计时间：{{ formatDateTime(data.asOf) }}
-      </p>
-      <ul data-testid="network-workbench-counts" class="cards">
-        <li>
-          <RouterLink to="/network-portal/work-orders" data-testid="workbench-active-work-orders">
-            处理中工单：{{ data.activeWorkOrderCount }}
-          </RouterLink>
-          <p class="hint">下一步：查看待安排工单</p>
-        </li>
-        <li>
-          <RouterLink to="/network-portal/tasks" data-testid="workbench-active-tasks">
-            处理中任务：{{ data.activeTaskCount }}
-          </RouterLink>
-          <p class="hint">下一步：指派师傅或跟踪预约</p>
-        </li>
-        <li>
-          <RouterLink to="/network-portal/technicians" data-testid="workbench-active-technicians">
-            可接单师傅：{{ data.activeTechnicianCount }}
-          </RouterLink>
-        </li>
-        <li v-if="typeof data.unassignedTechnicianTaskCount === 'number'">
-          <RouterLink to="/network-portal/tasks" data-testid="workbench-unassigned-count">
-            待指派师傅：{{ data.unassignedTechnicianTaskCount }}
-          </RouterLink>
-          <p class="hint">下一步：为任务选择服务师傅</p>
-        </li>
-        <li v-if="typeof data.openCorrectionCaseCount === 'number'">
-          <RouterLink to="/network-portal/corrections" data-testid="workbench-correction-count">
-            待处理整改：{{ data.openCorrectionCaseCount }}
-          </RouterLink>
-        </li>
-        <li v-if="typeof data.openOperationalExceptionCount === 'number'">
-          <RouterLink to="/network-portal/exceptions" data-testid="workbench-exception-count">
-            网点异常：{{ data.openOperationalExceptionCount }}
-          </RouterLink>
-        </li>
-        <li v-if="typeof data.pendingQualificationCount === 'number'">
-          <RouterLink
-            to="/network-portal/qualifications"
-            data-testid="workbench-qualification-count"
-          >
-            待审资质：{{ data.pendingQualificationCount }}
-          </RouterLink>
-        </li>
-        <li v-if="data.slaSummary" data-testid="workbench-sla-summary">
-          <span data-testid="workbench-sla-open-count">
-            服务时效风险：{{ data.slaSummary.openCount }}
-          </span>
-          <span class="muted"> / </span>
-          <span data-testid="workbench-sla-breached-count">
-            已超时：{{ data.slaSummary.breachedCount }}
-          </span>
-          <p class="hint">优先处理已超时任务</p>
-        </li>
-      </ul>
-      <div data-testid="network-workbench-capacity">
-        <h3>
-          <RouterLink to="/network-portal/capacity" data-testid="workbench-capacity-deeplink">
-            师傅当前负载
-          </RouterLink>
-        </h3>
-        <ul v-if="data.capacity.length">
-          <li
-            v-for="row in data.capacity"
-            :key="row.capacityCounterId"
-            :data-testid="`workbench-capacity-${row.businessType}`"
-          >
-            {{ row.businessType ? statusLabel(row.businessType) : '—' }}：占用 {{ row.occupiedUnits }} / 上限 {{ row.maxUnits }}
-            （可用 {{ row.availableUnits }}）
-            <span class="muted" data-testid="workbench-capacity-updated-at">
-              · 更新时间 {{ formatDateTime(row.updatedAt) }}
-            </span>
-          </li>
-        </ul>
-        <PageState
-          v-else
-          kind="empty"
-          guide="暂无容量计数。完成网点容量配置后将在此显示师傅负载。"
-        />
+      <SummaryStrip
+        :items="summaryItems"
+        :as-of="formatDateTime(data.asOf)"
+      />
+
+      <div class="workbench-grid">
+        <section class="panel" data-testid="workbench-unassigned-table">
+          <header class="panel__head">
+            <h3>待分配工单</h3>
+            <RouterLink to="/network-portal/tasks">全部任务</RouterLink>
+          </header>
+          <p v-if="tasksError" class="error">{{ tasksError }}</p>
+          <table v-else-if="unassignedTasks.length">
+            <thead>
+              <tr>
+                <th>工单</th>
+                <th>服务类型</th>
+                <th>当前任务</th>
+                <th>阶段</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="task in unassignedTasks" :key="task.taskId">
+                <td>
+                  <RouterLink
+                    :to="`/network-portal/work-orders/${task.workOrderId}`"
+                    :data-testid="`unassigned-wo-${task.workOrderId}`"
+                  >
+                    打开工作区
+                  </RouterLink>
+                </td>
+                <td>{{ statusLabel(task.serviceProductCode || task.businessType || '') || '—' }}</td>
+                <td>{{ statusLabel(task.taskType || '') || '—' }}</td>
+                <td>{{ statusLabel(task.stageCode || '') || '—' }}</td>
+                <td>
+                  <button
+                    type="button"
+                    class="primary"
+                    :data-testid="`assign-open-${task.taskId}`"
+                    @click="openAssign(task)"
+                  >
+                    分配师傅
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <PageState
+            v-else
+            kind="empty"
+            guide="当前没有待指派师傅的任务。新工单到达或网点接单后将出现在此。"
+          />
+        </section>
+
+        <section class="panel" data-testid="network-workbench-capacity">
+          <header class="panel__head">
+            <h3>
+              <RouterLink to="/network-portal/capacity" data-testid="workbench-capacity-deeplink">
+                师傅状态与负载
+              </RouterLink>
+            </h3>
+          </header>
+          <ul v-if="data.capacity.length" class="capacity-list">
+            <li
+              v-for="row in data.capacity"
+              :key="row.capacityCounterId"
+              :data-testid="`workbench-capacity-${row.businessType}`"
+            >
+              <strong>{{ row.businessType ? statusLabel(row.businessType) : '—' }}</strong>
+              <span>
+                占用 {{ row.occupiedUnits }} / 上限 {{ row.maxUnits }}（可用 {{ row.availableUnits }}）
+              </span>
+              <span class="muted" data-testid="workbench-capacity-updated-at">
+                更新 {{ formatDateTime(row.updatedAt) }}
+              </span>
+            </li>
+          </ul>
+          <PageState
+            v-else
+            kind="empty"
+            guide="暂无容量计数。完成网点容量配置后将在此显示师傅负载。"
+          />
+          <p v-if="techniciansError" class="error">师傅目录加载失败：{{ techniciansError }}</p>
+          <p class="muted gap-note">
+            UI_DATA_GAP：按师傅个人的今日已接/资质风险/最近预约卡片仍待正式读模型；当前仅展示服务端产能计数。
+          </p>
+        </section>
       </div>
+
+      <p
+        v-if="typeof data.pendingQualificationCount === 'number'"
+        class="muted"
+        data-testid="workbench-qualification-count"
+      >
+        待审资质 {{ data.pendingQualificationCount }} ·
+        <RouterLink to="/network-portal/qualifications">查看资质</RouterLink>
+      </p>
     </template>
+
+    <AssignTechnicianDrawer
+      v-if="networkContextId"
+      :open="drawerOpen"
+      :network-context-id="networkContextId"
+      :task="assignTask"
+      :technicians="technicians"
+      :capacity="data?.capacity ?? []"
+      @close="drawerOpen = false"
+      @assigned="onAssigned"
+    />
   </section>
 </template>
 
 <style scoped>
+.workbench {
+  display: grid;
+  gap: 16px;
+}
 .hero {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
   align-items: flex-start;
 }
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--sos-primary-600);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+.hero h2 {
+  margin: 0 0 6px;
+  font-size: 22px;
+}
 .subtitle,
-.as-of,
 .muted,
-.hint {
-  color: #5b6573;
-  font-size: 0.9rem;
+.gap-note {
+  color: var(--sos-color-text-tertiary);
+  font-size: 13px;
 }
-.hint {
-  margin: 0.25rem 0 0;
+.workbench-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(260px, 1fr);
+  gap: 14px;
+  align-items: start;
 }
-.cards {
+.panel {
+  border: 1px solid var(--sos-color-border-default);
+  border-radius: var(--sos-radius-md);
+  background: var(--sos-color-surface-card);
+  padding: 14px 16px;
+}
+.panel__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.panel__head h3 {
+  margin: 0;
+  font-size: 15px;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+th,
+td {
+  text-align: left;
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--sos-color-border-light);
+}
+.capacity-list {
   list-style: none;
+  margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 0.75rem;
+  gap: 10px;
 }
-.cards li {
-  background: #fff;
-  border-radius: 10px;
-  padding: 0.85rem;
-  box-shadow: 0 1px 2px rgb(16 42 67 / 8%);
+.capacity-list li {
+  display: grid;
+  gap: 2px;
 }
 button {
-  border: 1px solid #bcccdc;
-  background: #f0f4f8;
+  border: 1px solid var(--sos-color-border-default);
+  background: var(--sos-color-surface-subtle);
   border-radius: 6px;
   padding: 0.4rem 0.75rem;
   cursor: pointer;
+}
+button.primary {
+  background: var(--sos-primary-600);
+  border-color: var(--sos-primary-600);
+  color: #fff;
+}
+.error {
+  color: var(--sos-color-status-critical-fg);
+}
+@media (max-width: 1100px) {
+  .workbench-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

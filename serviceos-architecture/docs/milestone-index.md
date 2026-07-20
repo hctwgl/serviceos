@@ -396,6 +396,7 @@ title: ServiceOS 里程碑索引
 | M387 | M387 Admin 任务模板中心产品化 | [399-m387-task-template-center.md](../architecture/399-m387-task-template-center.md) | [382-m387-task-template-center-acceptance.md](../testing/382-m387-task-template-center-acceptance.md) |
 | M388 | M388 履约配置结构化 Draft DTO | [397-m388-structured-fulfillment-draft.md](../architecture/397-m388-structured-fulfillment-draft.md) | [380-m388-structured-fulfillment-draft-acceptance.md](../testing/380-m388-structured-fulfillment-draft-acceptance.md) |
 | M389 | M389 工单详情统一履约工作区产品化 | [400-m389-work-order-detail-fulfillment-workspace.md](../architecture/400-m389-work-order-detail-fulfillment-workspace.md) | [383-m389-work-order-detail-fulfillment-workspace-acceptance.md](../testing/383-m389-work-order-detail-fulfillment-workspace-acceptance.md) |
+| M390 | M390 Network 工作台与分配师傅产品化 | [401-m390-network-workbench-assign-productization.md](../architecture/401-m390-network-workbench-assign-productization.md) | [384-m390-network-workbench-assign-acceptance.md](../testing/384-m390-network-workbench-assign-acceptance.md) |
 
 ## 未关联里程碑的文档
 

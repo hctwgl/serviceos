@@ -1,0 +1,197 @@
+import { expect, test, type Page, type Route } from './support/fixture'
+import { navigateNetwork } from './support/fixture'
+
+const NETWORK_ID = '019f84a0-2222-7f8c-9505-36fe5c0e8803'
+const CONTEXT_ID = `NETWORK|NETWORK|${NETWORK_ID}`
+const TASK_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+const TECH_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+const WO_ID = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+
+async function loginWithLocalKeycloak(page: Page) {
+  await page.goto('/settings/token')
+  await page.getByRole('button', { name: '使用本地 Keycloak 登录' }).click()
+  await page.locator('input[name="username"]').fill('developer')
+  await page.locator('input[name="password"]').fill('local-dev-change-me')
+  await page.locator('input[type="submit"], button[type="submit"]').click()
+  if (page.url().includes('execution=VERIFY_PROFILE')) {
+    await page.locator('input[name="email"]').fill('developer@serviceos.local')
+    await page.locator('input[type="submit"], button[type="submit"]').click()
+  }
+  await expect(page).toHaveURL(/\/work-orders$/)
+}
+
+async function stubWorkbenchProduct(page: Page) {
+  await page.route('**/api/v1/me/contexts**', async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        contextVersion: 'ctx-v1',
+        contexts: [
+          {
+            contextId: CONTEXT_ID,
+            portal: 'NETWORK',
+            scopeRef: NETWORK_ID,
+            version: 'ctx-v1',
+          },
+        ],
+      }),
+    })
+  })
+  await page.route('**/api/v1/me/capabilities**', async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        portal: 'NETWORK',
+        contextVersion: 'ctx-v1',
+        capabilityCodes: [
+          'networkTask.read',
+          'technician.readOwnNetwork',
+          'networkPortal.assignTechnician',
+          'sla.read',
+          'evidence.read',
+          'operations.exception.read',
+        ],
+      }),
+    })
+  })
+  await page.route('**/api/v1/me/navigation**', async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        portal: 'NETWORK',
+        contextVersion: 'ctx-v1',
+        items: [
+          {
+            pageId: 'NETWORK.WORKBENCH',
+            routeKey: 'workbench',
+            title: '本网点工作台',
+            order: 10,
+            section: '核心',
+            requiredCapabilities: [],
+          },
+        ],
+      }),
+    })
+  })
+  await page.route('**/api/v1/network-portal/workbench**', async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        networkId: NETWORK_ID,
+        activeWorkOrderCount: 3,
+        activeTaskCount: 4,
+        activeTechnicianCount: 2,
+        unassignedTechnicianTaskCount: 1,
+        openCorrectionCaseCount: 0,
+        openOperationalExceptionCount: 0,
+        slaSummary: { openCount: 1, breachedCount: 0 },
+        capacity: [
+          {
+            capacityCounterId: 'cap-1',
+            businessType: 'INSTALLATION',
+            maxUnits: 10,
+            occupiedUnits: 3,
+            availableUnits: 7,
+            version: 1,
+            updatedAt: '2026-07-20T04:00:00Z',
+          },
+        ],
+        asOf: '2026-07-20T04:00:00Z',
+      }),
+    })
+  })
+  await page.route('**/api/v1/network-portal/tasks**', async (route: Route) => {
+    if (route.request().url().includes(':assign-technician')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          taskId: TASK_ID,
+          workOrderId: WO_ID,
+          networkServiceAssignmentId: 'nsa-1',
+          technicianServiceAssignmentId: 'tsa-12345678-xxxx',
+          networkAssigneeId: NETWORK_ID,
+          technicianAssigneeId: TECH_ID,
+          occurredAt: '2026-07-20T04:05:00Z',
+        }),
+      })
+      return
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        items: [
+          {
+            taskId: TASK_ID,
+            workOrderId: WO_ID,
+            projectId: null,
+            taskType: 'INSTALL',
+            taskKind: 'HUMAN',
+            stageCode: 'INSTALLATION',
+            status: 'READY',
+            businessType: 'INSTALLATION',
+            technicianId: null,
+            effectiveFrom: '2026-07-20T03:00:00Z',
+            serviceProductCode: 'INSTALLATION',
+          },
+        ],
+        nextCursor: null,
+        asOf: '2026-07-20T04:00:00Z',
+      }),
+    })
+  })
+  await page.route('**/api/v1/network-portal/technicians**', async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        items: [
+          {
+            membershipId: 'mem-1',
+            technicianProfileId: TECH_ID,
+            principalId: 'prin-1',
+            displayName: '张师傅',
+            profileStatus: 'ACTIVE',
+            membershipStatus: 'ACTIVE',
+            validFrom: '2026-01-01T00:00:00Z',
+            validTo: null,
+          },
+        ],
+        nextCursor: null,
+        asOf: '2026-07-20T04:00:00Z',
+      }),
+    })
+  })
+}
+
+test.describe('M390 网点工作台产品化 + 分配师傅抽屉', () => {
+  test('展示 SummaryStrip、待分配表并完成分配', async ({ page }) => {
+    await stubWorkbenchProduct(page)
+    await loginWithLocalKeycloak(page)
+    await navigateNetwork(page, '/network-portal/workbench')
+
+    await expect(page.getByTestId('network-portal-workbench')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByTestId('network-summary-strip')).toBeVisible()
+    await expect(page.getByTestId('workbench-unassigned-count')).toContainText('1')
+    await expect(page.getByTestId('workbench-unassigned-table')).toBeVisible()
+    await expect(page.getByTestId(`assign-open-${TASK_ID}`)).toBeVisible()
+
+    await page.getByTestId(`assign-open-${TASK_ID}`).click()
+    await expect(page.getByTestId('assign-technician-drawer')).toBeVisible()
+    await expect(page.getByTestId('assign-drawer-impact')).toContainText('产能口径')
+    await page.getByTestId(`assign-candidate-${TECH_ID}`).click()
+    await page.getByTestId('assign-drawer-submit').click()
+    await expect(page.getByTestId('assign-drawer-message')).toContainText('指派已生效')
+
+    await page.setViewportSize({ width: 1440, height: 1024 })
+    await page.screenshot({
+      path: 'tests/e2e/__screenshots__/network-workbench-product-1440.png',
+      fullPage: true,
+    })
+  })
+})
