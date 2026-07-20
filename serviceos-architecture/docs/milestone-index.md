@@ -387,6 +387,7 @@ title: ServiceOS 里程碑索引
 | M376 | M376 Admin 主导航其余页面迁移 | [389-m376-admin-remaining-pages-migration.md](../architecture/389-m376-admin-remaining-pages-migration.md) | [373-m376-admin-remaining-pages-migration-acceptance.md](../testing/373-m376-admin-remaining-pages-migration-acceptance.md) |
 | M377 | M377 Admin 产品化视觉可访问性与回归关闭 | [390-m377-admin-productization-visual-a11y-closeout.md](../architecture/390-m377-admin-productization-visual-a11y-closeout.md) | [374-m377-admin-productization-visual-a11y-closeout-acceptance.md](../testing/374-m377-admin-productization-visual-a11y-closeout-acceptance.md) |
 | M378 | M378 项目履约配置领域基础（Profile/Revision/OpenAPI/Flyway） | [391-m378-project-fulfillment-profile-foundation.md](../architecture/391-m378-project-fulfillment-profile-foundation.md) | [375-m378-project-fulfillment-profile-foundation-acceptance.md](../testing/375-m378-project-fulfillment-profile-foundation-acceptance.md) |
+| M379 | M379 项目履约只读总览与 Admin 入口 | [392-m379-project-fulfillment-overview-ui.md](../architecture/392-m379-project-fulfillment-overview-ui.md) | [376-m379-project-fulfillment-overview-ui-acceptance.md](../testing/376-m379-project-fulfillment-overview-ui-acceptance.md) |
 
 ## 未关联里程碑的文档
 

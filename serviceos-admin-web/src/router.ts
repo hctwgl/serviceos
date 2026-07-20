@@ -32,6 +32,9 @@ import EvidenceSetSnapshotDetailPage from './pages/EvidenceSetSnapshotDetailPage
 import ExternalReviewReceiptDetailPage from './pages/ExternalReviewReceiptDetailPage.vue'
 import ProjectDirectoryPage from './pages/ProjectDirectoryPage.vue'
 import ProjectDetailPage from './pages/ProjectDetailPage.vue'
+import FulfillmentProfileListPage from './pages/FulfillmentProfileListPage.vue'
+import FulfillmentProfileDetailPage from './pages/FulfillmentProfileDetailPage.vue'
+import FulfillmentPreviewPage from './pages/FulfillmentPreviewPage.vue'
 import OidcCallbackPage from './pages/OidcCallbackPage.vue'
 import UserDirectoryPage from './pages/UserDirectoryPage.vue'
 import UserDetailPage from './pages/UserDetailPage.vue'
@@ -138,6 +141,24 @@ export const router = createRouter({
         { path: 'sla/:id', name: 'ADMIN.SLA.DETAIL', component: SlaInstanceDetailPage },
         { path: 'projects', name: 'ADMIN.PROJECT.LIST', component: ProjectDirectoryPage },
         { path: 'projects/:id', name: 'ADMIN.PROJECT.DETAIL', component: ProjectDetailPage },
+        {
+          path: 'projects/:id/fulfillment-profiles',
+          name: 'ADMIN.PROJECT.FULFILLMENT.LIST',
+          component: FulfillmentProfileListPage,
+          meta: { pageId: 'ADMIN.PROJECT.FULFILLMENT.LIST' },
+        },
+        {
+          path: 'projects/:id/fulfillment-profiles/:profileId',
+          name: 'ADMIN.PROJECT.FULFILLMENT.DETAIL',
+          component: FulfillmentProfileDetailPage,
+          meta: { pageId: 'ADMIN.PROJECT.FULFILLMENT.DETAIL' },
+        },
+        {
+          path: 'projects/:id/fulfillment-profiles/:profileId/preview',
+          name: 'ADMIN.PROJECT.FULFILLMENT.PREVIEW',
+          component: FulfillmentPreviewPage,
+          meta: { pageId: 'ADMIN.PROJECT.FULFILLMENT.PREVIEW' },
+        },
         {
           path: 'configuration/designer',
           name: 'ADMIN.CONFIGURATION.DESIGNER',

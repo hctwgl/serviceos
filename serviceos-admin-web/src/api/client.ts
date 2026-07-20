@@ -96,6 +96,7 @@ export async function apiPut<T>(
   options: {
     body?: unknown
     ifMatch?: string
+    idempotencyKey?: string
   } = {},
 ): Promise<ApiResult<T>> {
   return apiWrite<T>('PUT', path, options)

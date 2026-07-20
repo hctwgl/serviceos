@@ -21,6 +21,10 @@ import {
   type ProjectDetail,
   type ProjectScopeRelationRevisionPage,
 } from '../api/projectDetail'
+import {
+  listProjectFulfillmentProfiles,
+  type ProjectFulfillmentProfileSummary,
+} from '../api/fulfillmentProfiles'
 import { listServiceNetworks, type ServiceNetwork } from '../api/networks'
 import { recordRecentVisit } from '../recent/recordRecentVisit'
 import DetailPageLayout from '../patterns/templates/DetailPageLayout.vue'
@@ -56,6 +60,20 @@ const showDevTools = import.meta.env.DEV
 
 const baselineRegionCodes = ref<string[]>([])
 const baselineNetworkIds = ref<string[]>([])
+const fulfillmentProfiles = ref<ProjectFulfillmentProfileSummary[]>([])
+
+const fulfillmentPublishedCount = computed(
+  () => fulfillmentProfiles.value.filter((p) => p.status === 'ACTIVE').length,
+)
+const fulfillmentDraftCount = computed(
+  () => fulfillmentProfiles.value.filter((p) => p.status === 'DRAFT').length,
+)
+const latestFulfillmentVersion = computed(() => {
+  const versions = fulfillmentProfiles.value
+    .map((p) => p.activeVersion)
+    .filter((v): v is string => !!v)
+  return versions[0] ?? '—'
+})
 
 async function loadNetworks() {
   try {
@@ -72,6 +90,11 @@ async function loadDetail() {
   errorCode.value = null
   try {
     detail.value = await getAuthorizedProject(projectId.value)
+    try {
+      fulfillmentProfiles.value = await listProjectFulfillmentProfiles(projectId.value)
+    } catch {
+      fulfillmentProfiles.value = []
+    }
     await loadRevisions()
     const latest = revisions.value?.items?.[0]
     const regions = latest?.regionCodes ?? detail.value.project.regionCodes ?? []
@@ -304,6 +327,10 @@ onMounted(() => {
         <Descriptions.Item label="失效日期">{{ detail.project.endsOn || presentEmptyValue('not_provided') }}</Descriptions.Item>
         <Descriptions.Item label="服务区域数量">{{ selectedRegionCodes.length }}</Descriptions.Item>
         <Descriptions.Item label="合作网点数量">{{ selectedNetworkIds.length }}</Descriptions.Item>
+        <Descriptions.Item label="支持工单类型">{{ fulfillmentProfiles.length }}</Descriptions.Item>
+        <Descriptions.Item label="已发布方案">{{ fulfillmentPublishedCount }}</Descriptions.Item>
+        <Descriptions.Item label="草稿方案">{{ fulfillmentDraftCount }}</Descriptions.Item>
+        <Descriptions.Item label="最近发布版本">{{ latestFulfillmentVersion }}</Descriptions.Item>
         <Descriptions.Item label="当前版本">{{ detail.project.version }}</Descriptions.Item>
         <Descriptions.Item label="最近更新时间">{{ formatDateTimeDisplay(detail.asOf) }}</Descriptions.Item>
       </Descriptions>
@@ -371,12 +398,29 @@ onMounted(() => {
         </Space>
       </TabPane>
 
-      <TabPane key="fulfillment" tab="履约配置">
-        <p class="muted">履约配置资产编辑请使用配置设计器；本页仅展示项目摘要。</p>
-      </TabPane>
-
-      <TabPane key="sla" tab="审核与 SLA">
-        <p class="muted">审核与 SLA 策略绑定未随项目详情返回（UI_DATA_GAP）。</p>
+      <TabPane key="fulfillment" tab="工单类型与履约配置">
+        <Alert
+          type="info"
+          show-icon
+          message="按工单类型配置流程、表单、资料、动作、审核与 SLA"
+          description="审核、表单、资料与 SLA 归入具体工单类型配置，不再作为脱离工单类型的孤立标签。"
+          style="margin-bottom: 12px"
+        />
+        <p class="muted">
+          已配置 {{ fulfillmentProfiles.length }} 种工单类型；已发布
+          {{ fulfillmentPublishedCount }}，草稿 {{ fulfillmentDraftCount }}。
+        </p>
+        <Button
+          type="primary"
+          @click="
+            router.push({
+              name: 'ADMIN.PROJECT.FULFILLMENT.LIST',
+              params: { id: projectId },
+            })
+          "
+        >
+          打开工单类型与履约配置
+        </Button>
       </TabPane>
 
       <TabPane key="history" tab="变更记录">
