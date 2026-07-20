@@ -28,6 +28,7 @@ lastUpdated: 2026-07-20
 7. [技术能力到产品能力的映射](07-technical-to-product-mapping.md)
 8. [产品验收与里程碑状态](08-product-acceptance.md)
 9. [实施路线图](09-roadmap.md)
+10. [当前路由到目标产品映射](10-current-to-target-matrix.md)
 
 ## 规范优先级
 
