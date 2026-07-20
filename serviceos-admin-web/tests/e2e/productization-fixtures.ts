@@ -21,6 +21,10 @@ export type ProductizationMockOptions = {
   workOrdersEmpty?: boolean
   workOrdersError?: boolean
   reviewsEmpty?: boolean
+  /** M385：履约配置中心空列表 */
+  fulfillmentEmpty?: boolean
+  /** M385：详情页展示 SUSPENDED 只读态 */
+  fulfillmentSuspended?: boolean
 }
 
 export async function mockProductizationApis(
@@ -201,13 +205,17 @@ export async function mockProductizationApis(
       url.includes('/projects/22222222-2222-4222-8222-222222222222/fulfillment-profiles')
       && !url.includes('/fulfillment-profiles/')
     ) {
+      if (options.fulfillmentEmpty) {
+        await fulfillJson(route, [])
+        return
+      }
       await fulfillJson(route, [
         {
           profileId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
           projectId: '22222222-2222-4222-8222-222222222222',
           serviceProductCode: 'HOME_CHARGING_SURVEY_INSTALL',
           profileName: '标准家充履约方案',
-          status: 'ACTIVE',
+          status: options.fulfillmentSuspended ? 'SUSPENDED' : 'ACTIVE',
           stageCount: 4,
           formCount: 0,
           evidenceCount: 0,
@@ -221,11 +229,29 @@ export async function mockProductizationApis(
       ])
       return
     }
-    if (url.includes('/fulfillment-profiles/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:validate')) {
+    const fulfillmentProfileBase =
+      '/fulfillment-profiles/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    const isFulfillmentAction = (action: string) =>
+      url.includes(`${fulfillmentProfileBase}:${action}`) ||
+      url.includes(`${fulfillmentProfileBase}%3A${action}`) ||
+      url.includes(`${fulfillmentProfileBase}%3a${action}`)
+
+    if (isFulfillmentAction('publish')) {
+      await fulfillJson(route, {
+        revisionId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        profileId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        versionNo: 2,
+        revisionStatus: 'PUBLISHED',
+        documentJson: '{"stages":[]}',
+        createdAt: '2026-07-20T04:10:00Z',
+      })
+      return
+    }
+    if (isFulfillmentAction('validate')) {
       await fulfillJson(route, [])
       return
     }
-    if (url.includes('/fulfillment-profiles/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:compile-preview')) {
+    if (isFulfillmentAction('compile-preview')) {
       await fulfillJson(route, {
         manifestJson: JSON.stringify({
           profileName: '标准家充履约方案',
@@ -338,11 +364,15 @@ export async function mockProductizationApis(
       return
     }
     if (
-      url.includes('/fulfillment-profiles/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')
-      && !url.includes('/draft')
-      && !url.includes('/revisions')
-      && !url.includes('/compare-impact')
-      && !url.includes(':')
+      url.includes(fulfillmentProfileBase) &&
+      !url.includes('/draft') &&
+      !url.includes('/revisions') &&
+      !url.includes('/compare-impact') &&
+      !isFulfillmentAction('publish') &&
+      !isFulfillmentAction('validate') &&
+      !isFulfillmentAction('compile-preview') &&
+      !isFulfillmentAction('suspend') &&
+      !isFulfillmentAction('resume')
     ) {
       await fulfillJson(route, {
         profileId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
@@ -350,12 +380,14 @@ export async function mockProductizationApis(
         serviceProductCode: 'HOME_CHARGING_SURVEY_INSTALL',
         profileName: '标准家充履约方案',
         description: '演示方案',
-        status: 'ACTIVE',
+        status: options.fulfillmentSuspended ? 'SUSPENDED' : 'ACTIVE',
         draftRevisionId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
         activeRevisionId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
         activeVersion: '1',
         activeEffectiveFrom: '2026-07-20T00:00:00Z',
-        allowedActions: ['VIEW', 'EDIT_DRAFT', 'COMPILE_PREVIEW', 'PUBLISH'],
+        allowedActions: options.fulfillmentSuspended
+          ? ['VIEW', 'VIEW_REVISIONS', 'RESUME']
+          : ['VIEW', 'EDIT_DRAFT', 'COMPILE_PREVIEW', 'PUBLISH', 'VALIDATE'],
         aggregateVersion: 2,
         createdAt: '2026-07-19T00:00:00Z',
         updatedAt: '2026-07-20T04:00:00Z',
