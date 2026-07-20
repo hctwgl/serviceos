@@ -151,7 +151,10 @@ async function assignCandidates() {
       </label>
     </div>
 
-    <div v-if="actions.some((a) => a.code === 'task.complete')" class="fields">
+    <div
+      v-if="actions.some((a) => a.code === 'task.complete') || (preparedInputs?.length ?? 0) > 0"
+      class="fields"
+    >
       <label>
         resultRef
         <input
