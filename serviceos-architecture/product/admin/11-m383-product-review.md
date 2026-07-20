@@ -122,22 +122,15 @@ Draft GET/PUT 以结构化 `document` 为主；编辑器读写 `document.stages`
 - 建立项目履约配置、Workflow 和 Task 逐路由验收矩阵；
 - 不修改后端运行语义。
 
-### M385：项目履约配置中心产品化修正
+### M385：项目履约配置中心产品化修正 — **切片 A 已交付（READY_FOR_REVIEW）**
 
-必须完成：
+已完成：配置中心母版、新建向导、Runbook、Compare/Impact、allowed-actions、发布去 JSON。
 
-- 按批准效果实现项目履约配置中心页面骨架；
-- 新增工单类型向导；
-- 服务端产品化 Preview DTO；
-- 服务端 Revision Compare/Impact DTO；
-- Profile allowed-actions；
-- 结构化 Draft DTO；
-- 发布流程移除 JSON；
-- 工单快照解释能力；
-- 完整页面状态；
-- 经典专业风视觉和人工产品验收。
+### M388：结构化 Draft DTO — **已交付（READY_FOR_REVIEW）**
 
-### M386：工作流设计器
+已完成：`ProjectFulfillmentDocument` 读写主契约；编辑器去 `documentJson` 产品路径。
+
+### M386：工作流设计器 — **下一步**
 
 必须完成：
 
@@ -163,11 +156,9 @@ Draft GET/PUT 以结构化 `document` 为主；编辑器读写 `document.stages`
 - 草稿、复制、比较和发布；
 - 1440×1024 和 1280px 验收。
 
-### M388：其余母版
+### M389：其余母版
 
 依次完成运营工作台、用户管理、项目管理、工单中心和工单详情，并逐张产品负责人验收。
-
-上述里程碑编号需在正式开工时与仓库当前 milestone index 再确认，避免冲突；本文件表达产品实施顺序，不提前宣称编号已登记。
 
 ## 7. 视觉验收清单
 
