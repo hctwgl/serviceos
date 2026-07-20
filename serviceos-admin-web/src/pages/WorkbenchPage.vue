@@ -413,7 +413,7 @@ h1 {
 .subtitle,
 .hint,
 .muted {
-  color: #627d98;
+  color: var(--sos-color-text-secondary, #4b5563);
   font-size: 0.92rem;
 }
 .hero-actions {

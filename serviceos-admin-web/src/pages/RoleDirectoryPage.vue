@@ -26,9 +26,11 @@ async function load() {
   error.value = null
   try {
     page.value = await listRoles()
-    capabilities.value = await listCapabilities()
+    const caps = await listCapabilities()
+    capabilities.value = Array.isArray(caps) ? caps : []
   } catch (err) {
     page.value = null
+    capabilities.value = []
     error.value = safeAccessDeniedMessage(err)
   } finally {
     loading.value = false
@@ -117,7 +119,7 @@ onMounted(() => {
 }
 .hint {
   margin: 0.25rem 0 0;
-  color: #627d98;
+  color: var(--sos-color-text-secondary, #4b5563);
 }
 .card {
   background: #fff;
@@ -134,7 +136,7 @@ label {
   display: grid;
   gap: 0.25rem;
   font-size: 0.85rem;
-  color: #486581;
+  color: var(--sos-color-text-secondary, #4b5563);
 }
 .check {
   grid-template-columns: auto 1fr;

@@ -103,7 +103,7 @@ onMounted(() => {
 }
 .hint {
   margin: 0.25rem 0 0;
-  color: #627d98;
+  color: var(--sos-color-text-secondary, #4b5563);
 }
 .filters {
   display: flex;
@@ -115,7 +115,7 @@ label {
   display: grid;
   gap: 0.25rem;
   font-size: 0.85rem;
-  color: #486581;
+  color: var(--sos-color-text-secondary, #4b5563);
 }
 input,
 select {

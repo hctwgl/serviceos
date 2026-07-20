@@ -105,7 +105,7 @@ const asOfTip = computed(() => presentDateTime(props.asOf)?.tooltip)
   font-size: var(--sos-font-size-sm, 13px);
 }
 .scope-bar__k {
-  color: var(--sos-color-text-tertiary, #7b8494);
+  color: var(--sos-color-text-tertiary, var(--sos-color-text-tertiary, #5f6b7a));
   margin-right: 4px;
 }
 .scope-bar__v {

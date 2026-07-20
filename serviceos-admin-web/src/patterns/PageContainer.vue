@@ -72,7 +72,7 @@ defineProps<{
 .page-container__eyebrow {
   margin: 0 0 4px;
   font-size: 12px;
-  color: var(--sos-color-text-tertiary, #7b8494);
+  color: var(--sos-color-text-tertiary, var(--sos-color-text-tertiary, #5f6b7a));
 }
 .page-container__title-row {
   display: flex;

@@ -24,21 +24,21 @@
   --sos-color-status-neutral-bg: #eef1f4;
   --sos-color-status-neutral-border: #dfe3e8;
 
-  --sos-color-status-info-fg: #1d4f8c;
+  --sos-color-status-info-fg: #16457a;
   --sos-color-status-info-bg: #edf5ff;
-  --sos-color-status-info-border: #b6d4fe;
+  --sos-color-status-info-border: #9ec5f0;
 
-  --sos-color-status-success-fg: #1f6b45;
+  --sos-color-status-success-fg: #17633f;
   --sos-color-status-success-bg: #eaf7f0;
-  --sos-color-status-success-border: #9fd9b8;
+  --sos-color-status-success-border: #8fceb0;
 
-  --sos-color-status-warning-fg: #8a5300;
+  --sos-color-status-warning-fg: #7a4800;
   --sos-color-status-warning-bg: #fff6e6;
-  --sos-color-status-warning-border: #f0c987;
+  --sos-color-status-warning-border: #e0b56a;
 
-  --sos-color-status-critical-fg: #a61b1b;
+  --sos-color-status-critical-fg: #9b1717;
   --sos-color-status-critical-bg: #fff0f0;
-  --sos-color-status-critical-border: #f0a8a8;
+  --sos-color-status-critical-border: #e09090;
 
   --sos-color-status-stale-fg: #5b4b2e;
   --sos-color-status-stale-bg: #f7f1e6;
@@ -71,7 +71,8 @@
 
   --sos-color-text-primary: #1f2937;
   --sos-color-text-secondary: #4b5563;
-  --sos-color-text-tertiary: #7b8494;
+  /* AA 对比：相对白底需 ≥4.5:1（原 #7b8494 ≈3.76，不达标） */
+  --sos-color-text-tertiary: #5f6b7a;
   --sos-color-text-disabled: #a7adb7;
   --sos-color-text-inverse: #ffffff;
 

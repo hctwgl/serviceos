@@ -61,7 +61,7 @@ const diagnostics = useDeveloperDiagnostics()
 <style scoped>
 .hint {
   margin: 0 0 12px;
-  color: var(--sos-color-text-tertiary, #7b8494);
+  color: var(--sos-color-text-tertiary, var(--sos-color-text-tertiary, #5f6b7a));
   font-size: 12px;
 }
 .corr {
@@ -79,6 +79,6 @@ const diagnostics = useDeveloperDiagnostics()
   margin-bottom: 8px;
 }
 .entry small {
-  color: var(--sos-color-text-tertiary, #7b8494);
+  color: var(--sos-color-text-tertiary, var(--sos-color-text-tertiary, #5f6b7a));
 }
 </style>

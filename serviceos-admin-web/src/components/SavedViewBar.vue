@@ -236,23 +236,18 @@ onMounted(async () => {
   <div class="saved-view-bar" data-testid="saved-view-bar">
     <Space wrap>
       <span class="label">视图</span>
-      <Select
-        v-model:value="selectedId"
-        allow-clear
-        show-search
-        style="min-width: 220px"
-        placeholder="选择已保存视图"
-        aria-label="saved view picker"
-        data-testid="saved-view-picker"
-        :disabled="busy"
-        :options="pickerOptions"
-        :filter-option="
-          (input, option) =>
-            String(option?.label ?? '')
-              .toLowerCase()
-              .includes(input.toLowerCase())
-        "
-      />
+      <label class="picker-label">
+        <span class="sr-only">已保存视图</span>
+        <Select
+          v-model:value="selectedId"
+          allow-clear
+          style="min-width: 220px"
+          placeholder="选择已保存视图"
+          data-testid="saved-view-picker"
+          :disabled="busy"
+          :options="pickerOptions"
+        />
+      </label>
       <Tag
         v-if="selected"
         :data-visibility="selected.visibility"
@@ -383,5 +378,20 @@ onMounted(async () => {
 .share-panel {
   display: grid;
   gap: 8px;
+}
+.picker-label {
+  display: inline-flex;
+  align-items: center;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 </style>

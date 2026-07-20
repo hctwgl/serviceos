@@ -338,7 +338,6 @@ onMounted(() => {
           allow-clear
           placeholder="不限"
           style="width: 160px"
-          aria-label="工单状态筛选"
           :options="statusChoices.map((o) => ({ value: o.value, label: o.label }))"
         />
       </label>
@@ -347,10 +346,8 @@ onMounted(() => {
         <Select
           v-model:value="clientCode"
           allow-clear
-          show-search
           placeholder="选择车企"
           style="width: 160px"
-          aria-label="车企筛选"
           :options="[
             { value: 'GEELY', label: '吉利汽车' },
             { value: 'BYD', label: '比亚迪' },
@@ -439,17 +436,19 @@ onMounted(() => {
     <template #pagination>
       <Space>
         <span>每页</span>
-        <Select
-          v-model:value="pageSize"
-          style="width: 88px"
-          aria-label="每页条数"
-          :options="[
-            { value: 20, label: '20' },
-            { value: 50, label: '50' },
-            { value: 100, label: '100' },
-          ]"
-          @change="search"
-        />
+        <label class="filter-field">
+          <span class="sr-only">每页条数</span>
+          <Select
+            v-model:value="pageSize"
+            style="width: 88px"
+            :options="[
+              { value: 20, label: '20' },
+              { value: 50, label: '50' },
+              { value: 100, label: '100' },
+            ]"
+            @change="search"
+          />
+        </label>
         <Button :disabled="loading || !cursor" @click="load(cursor)">下一页</Button>
       </Space>
     </template>
@@ -462,5 +461,16 @@ onMounted(() => {
   gap: 4px;
   font-size: 13px;
   color: var(--sos-color-text-secondary, #4b5563);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 </style>

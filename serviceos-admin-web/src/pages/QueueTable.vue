@@ -163,7 +163,7 @@ h2 {
 }
 .meta {
   margin: 0.25rem 0 0;
-  color: #627d98;
+  color: var(--sos-color-text-secondary, #4b5563);
   font-size: 0.85rem;
 }
 .actions {
@@ -194,7 +194,7 @@ td {
   vertical-align: top;
 }
 th {
-  color: #486581;
+  color: var(--sos-color-text-secondary, #4b5563);
   font-weight: 600;
 }
 .queue-cell-link {

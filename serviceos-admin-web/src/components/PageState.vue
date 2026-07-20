@@ -149,7 +149,7 @@ h2 {
 .guide,
 .meta {
   margin: 0.35rem 0;
-  color: #486581;
+  color: var(--sos-color-text-secondary, #4b5563);
   font-size: 0.92rem;
 }
 .guide {

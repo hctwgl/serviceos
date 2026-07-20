@@ -87,7 +87,7 @@ h2 {
   color: #243b53;
 }
 .meta {
-  color: #627d98;
+  color: var(--sos-color-text-secondary, #4b5563);
   font-size: 0.9rem;
 }
 .dev {

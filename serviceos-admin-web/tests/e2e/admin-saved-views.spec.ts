@@ -17,6 +17,11 @@ async function loginWithLocalKeycloak(
   await expect(page).toHaveURL(/\/work-orders$/)
 }
 
+async function chooseSavedView(page: Page, viewName: string) {
+  await page.getByTestId('saved-view-picker').click()
+  await page.getByRole('option', { name: new RegExp(viewName) }).click()
+}
+
 test.describe('M189 Admin 个人 SavedView', () => {
   test('登录 → 任务目录保存筛选 → 重载应用 → 删除', async ({ page }) => {
     await loginWithLocalKeycloak(page)
@@ -33,7 +38,6 @@ test.describe('M189 Admin 个人 SavedView', () => {
 
     await page.getByLabel('task status filter').selectOption('READY')
     const viewName = `e2e-ready-${Date.now()}`
-    await page.getByTestId('saved-view-name').fill(viewName)
 
     const createPromise = page.waitForResponse(
       (response) =>
@@ -41,6 +45,9 @@ test.describe('M189 Admin 个人 SavedView', () => {
         response.url().includes('/api/v1/me/saved-views'),
     )
     await page.getByTestId('saved-view-save').click()
+    await expect(page.getByTestId('saved-view-name')).toBeVisible()
+    await page.getByTestId('saved-view-name').fill(viewName)
+    await page.getByRole('button', { name: '保存' }).click()
     expect((await createPromise).status()).toBe(200)
     await expect(page.getByTestId('saved-view-message')).toContainText('已保存')
 
@@ -48,7 +55,7 @@ test.describe('M189 Admin 个人 SavedView', () => {
     await page.getByLabel('task status filter').selectOption('')
     await page.reload()
     await expect(page.getByTestId('saved-view-picker')).toBeVisible({ timeout: 15_000 })
-    await page.getByTestId('saved-view-picker').selectOption({ label: viewName })
+    await chooseSavedView(page, viewName)
     await page.getByTestId('saved-view-apply').click()
     await expect(page.getByLabel('task status filter')).toHaveValue('READY')
     await expect(page.getByTestId('saved-view-message')).toContainText('已应用')
