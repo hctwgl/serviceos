@@ -21,10 +21,14 @@ export type UserFacingError = {
   detailDev?: string
 }
 
+/** 面向用户的问题编号，例如 ERR-20260720-A83K；完整 correlationId 仅在诊断抽屉。 */
 function newErrorCode(): string {
-  const stamp = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14)
+  const d = new Date()
+  const stamp =
+    `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}` +
+    `${String(d.getDate()).padStart(2, '0')}`
   const rand = Math.random().toString(36).slice(2, 6).toUpperCase()
-  return `SOS-${stamp}-${rand}`
+  return `ERR-${stamp}-${rand}`
 }
 
 export function toUserFacingError(err: unknown): UserFacingError {

@@ -44,3 +44,20 @@ html.reduce-motion *::after {
   animation-iteration-count: 1 !important;
   transition-duration: 0.01ms !important;
 }
+
+/* 可访问焦点：不得移除 outline */
+:focus-visible {
+  outline: 2px solid var(--sos-primary-600);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:not(.allow-motion) *,
+  html:not(.allow-motion) *::before,
+  html:not(.allow-motion) *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
