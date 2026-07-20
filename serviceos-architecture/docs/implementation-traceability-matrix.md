@@ -482,4 +482,5 @@ Feature gate/authority: if applicable
 | M391 | Network 工单工作区产品外壳 + AppointmentCollaborationPanel | 402-m391-* + 385-m391-*；Playwright 截图 | PII 读模型；预约日历；冲突推荐；人工视觉批准 |
 | M392 | Network 整改/异常队列产品化 + 建议动作深链 | 403-m392-* + 386-m392-*；Playwright + M220 回归 | 代补允许标志/正确示例读模型；ACK/resolve；人工视觉批准 |
 | M393 | Technician H5 今日任务：移动壳/概览/任务卡片 | 404-m393-* + 387-m393-*；Playwright 390 截图 | Feed PII/距离/SLA 读模型；作业闭环；人工视觉批准 |
+| M394 | Technician H5 任务详情作业闭环：步骤条/签到/提交前检查/底部主操作 | 405-m394-* + 388-m394-*；Playwright + M262～M265 | 客户地址导航读模型；原生签退；离线；人工视觉批准 |
 

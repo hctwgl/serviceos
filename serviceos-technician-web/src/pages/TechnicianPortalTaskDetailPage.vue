@@ -236,6 +236,188 @@ const confirmedAppointment = computed(() =>
 const activeVisit = computed(() =>
   detail.value?.visits.find((visit) => visit.status === 'IN_PROGRESS') ?? null,
 )
+const hasCheckedIn = computed(
+  () =>
+    Boolean(activeVisit.value) ||
+    (detail.value?.visits.some((visit) => visit.checkInCapturedAt) ?? false),
+)
+const hasValidatedForm = computed(() => {
+  const submissions = detail.value?.formSubmissions
+  if (submissions === null) return false
+  if (!activeForm.value) return true
+  return (submissions ?? []).some((row) => row.validationStatus === 'VALIDATED')
+})
+const requiredEvidenceReady = computed(() => {
+  if (evidenceSlots.value.length === 0) return true
+  return evidenceSlots.value.every((slot) => {
+    if (!slot.required) return true
+    const count = evidenceItems.value
+      .filter((item) => item.evidenceSlotId === slot.slotId && item.status === 'ACTIVE')
+      .filter((item) => (item.revisions ?? []).some((revision) => revision.status === 'VALIDATED'))
+      .length
+    return count >= Math.max(slot.minCount ?? 0, 1)
+  })
+})
+
+type WorkStepKey = 'appointment' | 'checkin' | 'form' | 'evidence' | 'presubmit'
+type WorkStep = { key: WorkStepKey; label: string; status: 'done' | 'current' | 'upcoming' | 'blocked' }
+
+const workSteps = computed<WorkStep[]>(() => {
+  const guarded = Boolean(detail.value?.executionGuarded)
+  const appointmentDone = (detail.value?.appointments.length ?? 0) > 0
+  const checkinDone = hasCheckedIn.value
+  const formDone = hasValidatedForm.value
+  const evidenceDone = requiredEvidenceReady.value
+  const steps: WorkStep[] = [
+    {
+      key: 'appointment',
+      label: '预约确认',
+      status: appointmentDone ? 'done' : guarded ? 'blocked' : 'current',
+    },
+    {
+      key: 'checkin',
+      label: '到场签到',
+      status: checkinDone ? 'done' : appointmentDone ? (guarded ? 'blocked' : 'current') : 'upcoming',
+    },
+    {
+      key: 'form',
+      label: '现场表单',
+      status: formDone
+        ? 'done'
+        : checkinDone
+          ? guarded || unsupportedFormReasons.value.length > 0
+            ? 'blocked'
+            : 'current'
+          : 'upcoming',
+    },
+    {
+      key: 'evidence',
+      label: '资料上传',
+      status: evidenceDone
+        ? 'done'
+        : formDone
+          ? guarded
+            ? 'blocked'
+            : 'current'
+          : 'upcoming',
+    },
+    {
+      key: 'presubmit',
+      label: '提交前检查',
+      status:
+        appointmentDone && checkinDone && formDone && evidenceDone
+          ? guarded
+            ? 'blocked'
+            : 'current'
+          : 'upcoming',
+    },
+  ]
+  let sawCurrent = false
+  return steps.map((step) => {
+    if (step.status === 'current') {
+      if (sawCurrent) return { ...step, status: 'upcoming' as const }
+      sawCurrent = true
+      return step
+    }
+    return step
+  })
+})
+
+const currentWorkStep = computed(
+  () => workSteps.value.find((step) => step.status === 'current') ?? workSteps.value.at(-1)!,
+)
+
+const preSubmitChecks = computed(() => [
+  {
+    key: 'appointment',
+    label: '已有预约安排',
+    ok: (detail.value?.appointments.length ?? 0) > 0,
+  },
+  {
+    key: 'checkin',
+    label: '已完成到场签到',
+    ok: hasCheckedIn.value,
+  },
+  {
+    key: 'form',
+    label: activeForm.value ? '表单已通过服务器校验' : '无锁定表单（跳过）',
+    ok: hasValidatedForm.value,
+  },
+  {
+    key: 'evidence',
+    label: '必需资料均已 VALIDATED',
+    ok: requiredEvidenceReady.value,
+  },
+  {
+    key: 'running',
+    label: '任务处于可执行状态',
+    ok: detail.value?.taskStatus === 'RUNNING' && !detail.value.executionGuarded,
+  },
+])
+
+const canCompleteTask = computed(() => preSubmitChecks.value.every((item) => item.ok))
+
+const stickyAction = computed(() => {
+  const step = currentWorkStep.value.key
+  if (detail.value?.executionGuarded) {
+    return { kind: 'disabled' as const, label: '任务已保护，暂不可执行', disabled: true }
+  }
+  if (step === 'appointment') {
+    return {
+      kind: 'link' as const,
+      label: '查看日程 / 预约',
+      to: '/technician-portal/schedule',
+      disabled: false,
+    }
+  }
+  if (step === 'checkin') {
+    return {
+      kind: 'checkin' as const,
+      label: visitActionBusy.value ? '签到处理中…' : '到场签到',
+      disabled: !confirmedAppointment.value || visitActionBusy.value,
+    }
+  }
+  if (step === 'form') {
+    return {
+      kind: 'anchor' as const,
+      label: '去填写表单',
+      target: 'technician-online-form',
+      disabled: false,
+    }
+  }
+  if (step === 'evidence') {
+    return {
+      kind: 'anchor' as const,
+      label: '去上传资料',
+      target: 'technician-online-evidence',
+      disabled: false,
+    }
+  }
+  return {
+    kind: 'complete' as const,
+    label: taskSubmitting.value ? '服务器复核并完成中…' : '冻结资料并完成任务',
+    disabled: !canCompleteTask.value || taskSubmitting.value,
+  }
+})
+
+function scrollToTarget(target: string) {
+  document.querySelector(`[data-testid="${target}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+async function onStickyAction() {
+  const action = stickyAction.value
+  if (action.kind === 'checkin') {
+    await checkIn()
+    return
+  }
+  if (action.kind === 'anchor') {
+    scrollToTarget(action.target)
+    return
+  }
+  if (action.kind === 'complete') {
+    await completeTask()
+  }
+}
 
 function browserDeviceId() {
   const key = 'serviceos-technician-web-device-id'
@@ -594,14 +776,33 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
           · 阶段 {{ statusLabel(detail.stageCode) }}
         </p>
         <p class="hint">
+          当前步骤：<strong>{{ currentWorkStep.label }}</strong>
+          ·
           {{
             detail.executionGuarded
               ? '执行已保护，请先解除阻塞后再操作。'
-              : detail.appointments.length
-                ? '可继续签到、填写表单或上传资料。'
-                : '请先确认预约或联系安排，再进入现场作业。'
+              : currentWorkStep.key === 'appointment'
+                ? '请先确认预约安排，再进入现场。'
+                : currentWorkStep.key === 'checkin'
+                  ? '到达现场后进行到场签到。'
+                  : currentWorkStep.key === 'form'
+                    ? '按冻结表单完成现场填写。'
+                    : currentWorkStep.key === 'evidence'
+                      ? '上传必需资料并等待服务器校验。'
+                      : '完成提交前检查后冻结资料并提交。'
           }}
         </p>
+        <ol class="work-steps" data-testid="technician-work-steps" aria-label="作业步骤">
+          <li
+            v-for="step in workSteps"
+            :key="step.key"
+            :data-status="step.status"
+            :data-testid="`technician-work-step-${step.key}`"
+          >
+            {{ step.label }}
+            <span v-if="step.status === 'current'" class="badge">当前</span>
+          </li>
+        </ol>
       </section>
       <dl class="summary" data-testid="technician-task-detail-summary">
         <div><dt>任务编号</dt><dd data-testid="technician-task-detail-task-id">{{ detail.taskId }}</dd></div>
@@ -641,6 +842,69 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
           </tbody>
         </table>
         <p v-else>暂无预约</p>
+      </section>
+
+      <section class="visits" data-testid="technician-work-section-checkin">
+        <div class="section-title">
+          <h3>到场签到</h3>
+          <span>不含定位与设备明细</span>
+        </div>
+        <table v-if="detail.visits.length > 0" data-testid="technician-task-detail-visits">
+          <thead>
+            <tr><th>序次</th><th>状态</th><th>到场</th><th>围栏</th><th>策略</th><th>结果/异常</th><th>版本</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="visit in detail.visits" :key="visit.visitId">
+              <td>{{ visit.visitSequence }}</td>
+              <td>{{ statusLabel(visit.status) }}</td>
+              <td>{{ formatDateTime(visit.checkInCapturedAt) }}</td>
+              <td>{{ statusLabel(visit.geofenceResult) }}</td>
+              <td>{{ statusLabel(visit.policyDecision) }}</td>
+              <td>{{ statusLabel(visit.resultCode ?? visit.exceptionCode) }}</td>
+              <td>{{ visit.aggregateVersion }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-else data-testid="technician-task-detail-no-visits">暂无上门记录</p>
+
+        <div class="visit-actions" data-testid="technician-visit-online-actions">
+          <h4>在线现场操作</h4>
+          <p class="hint">
+            到场需要一次用户授权的浏览器定位；H5 不持续跟踪、不后台定位，也不宣称具备原生可信度。
+          </p>
+          <button
+            type="button"
+            :disabled="visitActionBusy || !confirmedAppointment || Boolean(activeVisit) || detail.executionGuarded"
+            data-testid="technician-visit-check-in"
+            @click="checkIn"
+          >
+            {{ visitActionBusy ? '处理中…' : '到场签到' }}
+          </button>
+          <form v-if="activeVisit" class="interrupt-form" data-testid="technician-visit-interrupt-form" @submit.prevent="interrupt">
+            <label>
+              无法施工原因
+              <select v-model="interruptCode" data-testid="technician-visit-interrupt-code">
+                <option value="CUSTOMER_NOT_HOME">客户不在</option>
+                <option value="SITE_NOT_READY">现场不具备施工条件</option>
+                <option value="SAFETY_RISK">安全风险</option>
+                <option value="OTHER">其他</option>
+              </select>
+            </label>
+            <label>
+              说明（可选）
+              <textarea v-model="interruptNote" maxlength="500" data-testid="technician-visit-interrupt-note" />
+            </label>
+            <button type="submit" :disabled="visitActionBusy" data-testid="technician-visit-interrupt">
+              记录无法施工
+            </button>
+          </form>
+          <p v-if="activeVisit" class="hint" data-testid="technician-visit-checkout-boundary">
+            离场签退需原生 FieldOperation 能力；H5 当前不提供伪造签退。
+          </p>
+          <p v-if="visitActionMessage" class="action-message" role="status" data-testid="technician-visit-action-message">
+            {{ visitActionMessage }}
+          </p>
+        </div>
       </section>
 
       <section class="forms">
@@ -810,78 +1074,39 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
 
       <section class="task-submission" data-testid="technician-task-submission">
         <div class="section-title">
-          <h3>冻结资料并完成任务</h3>
+          <h3>提交前检查</h3>
           <span>Snapshot → 服务端复核 → Complete</span>
         </div>
+        <ul class="presubmit-checks" data-testid="technician-presubmit-checks">
+          <li
+            v-for="check in preSubmitChecks"
+            :key="check.key"
+            :data-ok="check.ok"
+            :data-testid="`technician-presubmit-${check.key}`"
+          >
+            <span>{{ check.ok ? '已满足' : '未满足' }}</span>
+            {{ check.label }}
+          </li>
+        </ul>
         <p class="hint">
           客户端只选择每个 ACTIVE Item 的最新 VALIDATED Revision；不可变引用、摘要和输入版本均由服务器重新读取并冻结。
         </p>
         <button
           type="button"
-          :disabled="taskSubmitting || evidenceLoading || evidenceUploadingSlotId !== null || detail.executionGuarded || detail.taskStatus !== 'RUNNING'"
+          :disabled="
+            taskSubmitting
+              || evidenceLoading
+              || evidenceUploadingSlotId !== null
+              || detail.executionGuarded
+              || detail.taskStatus !== 'RUNNING'
+              || !canCompleteTask
+          "
           data-testid="technician-task-complete"
           @click="completeTask"
         >{{ taskSubmitting ? '服务器复核并完成中…' : '冻结资料并完成任务' }}</button>
         <p v-if="taskSubmissionMessage" role="status" data-testid="technician-task-submission-message">
           {{ taskSubmissionMessage }}
         </p>
-      </section>
-
-      <section class="visits">
-        <div class="section-title">
-          <h3>上门历史</h3>
-          <span>不含定位与设备明细</span>
-        </div>
-        <table v-if="detail.visits.length > 0" data-testid="technician-task-detail-visits">
-          <thead>
-            <tr><th>序次</th><th>状态</th><th>到场</th><th>围栏</th><th>策略</th><th>结果/异常</th><th>版本</th></tr>
-          </thead>
-          <tbody>
-            <tr v-for="visit in detail.visits" :key="visit.visitId">
-              <td>{{ visit.visitSequence }}</td>
-              <td>{{ statusLabel(visit.status) }}</td>
-              <td>{{ formatDateTime(visit.checkInCapturedAt) }}</td>
-              <td>{{ statusLabel(visit.geofenceResult) }}</td>
-              <td>{{ statusLabel(visit.policyDecision) }}</td>
-              <td>{{ statusLabel(visit.resultCode ?? visit.exceptionCode) }}</td>
-              <td>{{ visit.aggregateVersion }}</td>
-            </tr>
-          </tbody>
-        </table>
-        <p v-else data-testid="technician-task-detail-no-visits">暂无上门记录</p>
-
-        <div class="visit-actions" data-testid="technician-visit-online-actions">
-          <h4>在线现场操作</h4>
-          <p class="hint">浏览器只在你点击时采集一次位置；不会后台定位，也不代表原生设备可信度。</p>
-          <button
-            v-if="confirmedAppointment && !activeVisit"
-            type="button"
-            :disabled="visitActionBusy || detail.executionGuarded"
-            data-testid="technician-visit-check-in"
-            @click="checkIn"
-          >{{ visitActionBusy ? '处理中…' : '主动定位并签到' }}</button>
-
-          <form v-if="activeVisit" class="interrupt-form" data-testid="technician-visit-interrupt-form" @submit.prevent="interrupt">
-            <label>无法施工原因
-              <select v-model="interruptCode" data-testid="technician-visit-interrupt-code">
-                <option value="SITE_UNSAFE">现场不安全</option>
-                <option value="MATERIAL_MISSING">物料缺失</option>
-              </select>
-            </label>
-            <label>说明（可选）
-              <textarea v-model="interruptNote" maxlength="500" data-testid="technician-visit-interrupt-note" />
-            </label>
-            <button type="submit" :disabled="visitActionBusy" data-testid="technician-visit-interrupt">
-              {{ visitActionBusy ? '处理中…' : '确认无法施工' }}
-            </button>
-          </form>
-          <p v-if="activeVisit" class="hint" data-testid="technician-visit-checkout-boundary">
-            签退必须引用已完成现场操作；表单和资料上传已接入，但结构化作业引用尚未形成前不会生成占位 operationRefs。
-          </p>
-          <p v-if="visitActionMessage" class="action-message" role="status" data-testid="technician-visit-action-message">
-            {{ visitActionMessage }}
-          </p>
-        </div>
       </section>
 
       <section class="contacts">
@@ -909,6 +1134,28 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
       <p class="boundary" data-testid="technician-task-detail-boundary">
         任务详情摘要不返回地址、联系人、联系对象引用、录音、GPS、设备、离线命令、文件对象或提交人；在线表单只读取任务冻结定义，资料只返回安全状态摘要；均不提供草稿、后台恢复或离线工作包。
       </p>
+
+      <footer class="sticky-action" data-testid="technician-sticky-action">
+        <RouterLink
+          v-if="stickyAction.kind === 'link'"
+          class="primary"
+          :to="{ path: stickyAction.to, query: { taskId: detail.taskId } }"
+          data-testid="technician-sticky-action-button"
+        >
+          {{ stickyAction.label }}
+        </RouterLink>
+        <button
+          v-else-if="stickyAction.kind !== 'disabled'"
+          type="button"
+          class="primary"
+          :disabled="stickyAction.disabled"
+          data-testid="technician-sticky-action-button"
+          @click="onStickyAction"
+        >
+          {{ stickyAction.label }}
+        </button>
+        <p v-else class="muted" data-testid="technician-sticky-action-button">{{ stickyAction.label }}</p>
+      </footer>
     </template>
   </section>
 </template>
@@ -917,7 +1164,115 @@ watch([() => props.technicianContextId, () => route.params.id], () => {
 .detail-page {
   display: grid;
   gap: 12px;
-  padding-bottom: 72px;
+  padding-bottom: 96px;
+}
+.work-steps {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.work-steps li {
+  border: 1px solid var(--sos-color-border-default, #e5e7eb);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  background: #fff;
+  color: var(--sos-color-text-secondary, #4b5563);
+}
+.work-steps li[data-status='done'] {
+  border-color: #b7eb8f;
+  background: #f6ffed;
+  color: #389e0d;
+}
+.work-steps li[data-status='current'] {
+  border-color: var(--sos-primary-600, #1677ff);
+  background: var(--sos-primary-100, #e6f4ff);
+  color: var(--sos-primary-800, #003eb3);
+  font-weight: 600;
+}
+.work-steps li[data-status='blocked'] {
+  border-color: #ffccc7;
+  background: #fff2f0;
+  color: #cf1322;
+}
+.work-steps .badge {
+  margin-left: 4px;
+  font-size: 11px;
+  background: var(--sos-primary-600, #1677ff);
+  color: #fff;
+  border-radius: 999px;
+  padding: 0 6px;
+}
+.presubmit-checks {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.presubmit-checks li {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--sos-color-border-default, #e5e7eb);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fff;
+  font-size: 14px;
+}
+.presubmit-checks li span {
+  font-size: 12px;
+  font-weight: 700;
+  min-width: 48px;
+}
+.presubmit-checks li[data-ok='true'] {
+  border-color: #b7eb8f;
+  background: #f6ffed;
+}
+.presubmit-checks li[data-ok='false'] {
+  border-color: #ffe58f;
+  background: #fffbe6;
+}
+.sticky-action {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  z-index: 25;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.96);
+  border-top: 1px solid var(--sos-color-border-default, #e5e7eb);
+}
+.sticky-action .primary,
+.sticky-action a.primary,
+.sticky-action button.primary {
+  display: flex;
+  width: 100%;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: var(--sos-primary-600, #1677ff);
+  border: 1px solid var(--sos-primary-600, #1677ff);
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+.sticky-action button.primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+@media (min-width: 900px) {
+  .sticky-action {
+    bottom: 0;
+    left: calc(260px + 48px);
+    right: 24px;
+    border-radius: 12px 12px 0 0;
+  }
 }
 .top,
 .section-title {

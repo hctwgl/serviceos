@@ -400,6 +400,7 @@ title: ServiceOS 里程碑索引
 | M391 | M391 Network 工单工作区与预约协同产品化 | [402-m391-network-work-order-workspace-appointment.md](../architecture/402-m391-network-work-order-workspace-appointment.md) | [385-m391-network-work-order-workspace-appointment-acceptance.md](../testing/385-m391-network-work-order-workspace-appointment-acceptance.md) |
 | M392 | M392 Network 资料整改与异常中心产品化 | [403-m392-network-corrections-exceptions-productization.md](../architecture/403-m392-network-corrections-exceptions-productization.md) | [386-m392-network-corrections-exceptions-acceptance.md](../testing/386-m392-network-corrections-exceptions-acceptance.md) |
 | M393 | M393 Technician H5 今日任务产品化 | [404-m393-technician-h5-today-tasks-productization.md](../architecture/404-m393-technician-h5-today-tasks-productization.md) | [387-m393-technician-h5-today-tasks-acceptance.md](../testing/387-m393-technician-h5-today-tasks-acceptance.md) |
+| M394 | M394 Technician H5 任务详情作业闭环产品化 | [405-m394-technician-h5-task-detail-workloop.md](../architecture/405-m394-technician-h5-task-detail-workloop.md) | [388-m394-technician-h5-task-detail-workloop-acceptance.md](../testing/388-m394-technician-h5-task-detail-workloop-acceptance.md) |
 
 ## 未关联里程碑的文档
 

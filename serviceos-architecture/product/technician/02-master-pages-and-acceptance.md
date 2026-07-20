@@ -590,6 +590,25 @@ knownGaps:
   - DOMAIN_GAP: H5 不承诺原生离线/后台上传；完整作业闭环待后续里程碑
 ```
 
+## 46.2 M394 验收记录（任务详情作业闭环 H5）
+
+```yaml
+pageId: TECHNICIAN.TASK.DETAIL
+route: /technician-portal/tasks/:id
+visualProfile: CLASSIC_PROFESSIONAL_MOBILE
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: 客户/地址/导航正式读模型未交付
+  - DOMAIN_GAP: 原生签退 FieldOperation、离线草稿与后台上传不在 H5 承诺范围
+```
+
 ## 47. 黄金链路验收
 
 真实师傅必须在真机独立完成：

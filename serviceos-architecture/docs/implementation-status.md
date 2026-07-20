@@ -4,7 +4,7 @@ version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-20
 baselineCommit: "9a05be9b9e22be216542260f0979d85ee2cf2bab"
-latestMilestone: M393
+latestMilestone: M394
 ---
 
 # ServiceOS 实施状态总览
@@ -39,7 +39,7 @@ latestMilestone: M393
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M393 Technician H5 今日任务产品化 |
+| 最新实施里程碑 | M394 Technician H5 任务详情作业闭环产品化 |
 | 基线提交 | `9a05be9b9e22be216542260f0979d85ee2cf2bab`（历史基线；合入 master 后回填） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts`、`@serviceos/web-core`、`ServiceOSIOSCore`、独立且可部署的 `serviceos-network-web` 与 `serviceos-technician-web`、Swift 6 `TechnicianIOSFoundation`，以及已在 iPhone 17 Pro Simulator 安装启动、实跑 XCTest/XCUITest、形成 Production arm64 archive/dSYM，并接入当前任务、在线 Visit、冻结基础表单、前台 Evidence 采集上传、Snapshot/Task 完成与多轮资料整改的原生 `TechnicianIOS` SwiftUI App；由同一 Core OpenAPI 生成并经独立消费者门禁验证的 `@serviceos/core-client` 与 `ServiceOSCoreClient` |
@@ -187,13 +187,14 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 - **M391 Implemented**：Network 工单工作区产品外壳 + 预约协同面板；`READY_FOR_REVIEW`。
 - **M392 Implemented**：Network 资料整改与异常中心产品化；`READY_FOR_REVIEW`。
 - **M393 Implemented**：Technician H5 今日任务产品化（移动壳/卡片/概览）；`READY_FOR_REVIEW`。
+- **M394 Implemented**：Technician H5 任务详情作业闭环产品化（步骤条/签到前置/提交前检查/底部主操作）；`READY_FOR_REVIEW`。
 - **M383** 长链路 test 7/8 仍未闭合，不阻塞本切片。
 
 建议下一批（按优先级）：
 
-1. Technician H5 任务详情作业闭环（签到/表单/资料/提交前检查）；
-2. Network 师傅与资质 / 产能状态产品深化；
-3. Admin 工作台/用户/项目母版深化。
+1. Technician H5 整改任务产品化 / 同步冲突中心；
+2. Technician iOS 正式离线闭环（在 H5 契约稳定后）；
+3. Network 师傅与资质 / 产能状态产品深化。
 
 仍为 **硬门禁 / 外部阻塞**（不可发明推进）：
 
