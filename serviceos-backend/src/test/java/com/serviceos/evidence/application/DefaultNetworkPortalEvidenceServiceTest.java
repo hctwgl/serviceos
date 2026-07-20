@@ -85,7 +85,7 @@ class DefaultNetworkPortalEvidenceServiceTest {
                         UUID.randomUUID(), "d".repeat(64), List.of("IMAGE.BLUR"), null, "OPEN",
                         PRINCIPAL.toString(), NOW, null,
                         null, null, null, null, null, null, List.of())));
-        when(slots.listForTask(eq(principal()), any(), eq(TASK))).thenReturn(List.of(
+        when(slots.listForTaskOnNetwork(eq(principal()), any(), eq(TASK), eq(NETWORK))).thenReturn(List.of(
                 new EvidenceSlotView(
                         SLOT, UUID.randomUUID(), TASK, PROJECT, UUID.randomUUID(),
                         "survey.site", "1.0.0", "b".repeat(64), "site.photo", "default",

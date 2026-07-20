@@ -110,7 +110,7 @@ final class DefaultNetworkPortalEvidenceService implements NetworkPortalEvidence
         requireOpenCorrection(principal, metadata.correlationId(), taskId);
         String onBehalfOf = requireText(command.onBehalfOf(), "onBehalfOf", 128);
         requireActiveTechnicianAssignee(principal.tenantId(), networkId, responsibility, onBehalfOf);
-        requireNetworkWebCapable(principal, metadata.correlationId(), clientKind, taskId);
+        requireNetworkWebCapable(principal, metadata.correlationId(), clientKind, taskId, networkId);
 
         BeginEvidenceUploadOnBehalfCommand scoped = new BeginEvidenceUploadOnBehalfCommand(
                 command.taskId(), command.slotId(), command.evidenceItemId(),
@@ -145,7 +145,7 @@ final class DefaultNetworkPortalEvidenceService implements NetworkPortalEvidence
         UUID networkId = requireAuthorizedNetwork(principal, metadata.correlationId(), networkContextHeader);
         requireNetworkOwnedTask(principal.tenantId(), taskId, networkId);
         requireOpenCorrection(principal, metadata.correlationId(), taskId);
-        requireNetworkWebCapable(principal, metadata.correlationId(), clientKind, taskId);
+        requireNetworkWebCapable(principal, metadata.correlationId(), clientKind, taskId, networkId);
         return evidence.finalizeUploadOnBehalf(principal, metadata, command, networkId);
     }
 
@@ -164,7 +164,8 @@ final class DefaultNetworkPortalEvidenceService implements NetworkPortalEvidence
         CorrectionCaseView current = corrections.get(principal, metadata.correlationId(), correctionCaseId);
         requireNetworkOwnedTask(principal.tenantId(), current.taskId(), networkId);
         requireOpenCorrection(principal, metadata.correlationId(), current.taskId());
-        requireNetworkWebCapable(principal, metadata.correlationId(), clientKind, current.taskId());
+        requireNetworkWebCapable(
+                principal, metadata.correlationId(), clientKind, current.taskId(), networkId);
         return snapshots.createOnBehalf(
                 principal, metadata, correctionCaseId, memberRevisionIds, networkId);
     }
@@ -184,16 +185,22 @@ final class DefaultNetworkPortalEvidenceService implements NetworkPortalEvidence
         UUID networkId = requireAuthorizedNetwork(principal, metadata.correlationId(), networkContextHeader);
         CorrectionCaseView current = corrections.get(principal, metadata.correlationId(), correctionCaseId);
         requireNetworkOwnedTask(principal.tenantId(), current.taskId(), networkId);
-        requireNetworkWebCapable(principal, metadata.correlationId(), clientKind, current.taskId());
+        requireNetworkWebCapable(
+                principal, metadata.correlationId(), clientKind, current.taskId(), networkId);
         return corrections.resubmit(principal, metadata,
                 new ResubmitCorrectionCaseCommand(correctionCaseId, evidenceSetSnapshotId));
     }
 
     /**
      * ADR-089：代补按网点端 NETWORK_WEB 评估能力；定向 supportedClientKinds 不参与（传空列表）。
+     * 槽位读取走 NETWORK scope evidence.read（listForTaskOnNetwork），避免项目 scope 旁路。
      */
     private void requireNetworkWebCapable(
-            CurrentPrincipal principal, String correlationId, String clientKind, UUID taskId
+            CurrentPrincipal principal,
+            String correlationId,
+            String clientKind,
+            UUID taskId,
+            UUID networkId
     ) {
         String kind = clientKind == null || clientKind.isBlank()
                 ? ClientMetadata.UNKNOWN_KIND : clientKind.trim();
@@ -202,7 +209,8 @@ final class DefaultNetworkPortalEvidenceService implements NetworkPortalEvidence
                     "网点资料代补要求 X-ServiceOS-Client-Kind=NETWORK_WEB；当前为 " + kind
                             + "。请使用网点 Web 客户端，或由兼容端处理。");
         }
-        List<EvidenceSlotView> resolved = slots.listForTask(principal, correlationId, taskId);
+        List<EvidenceSlotView> resolved = slots.listForTaskOnNetwork(
+                principal, correlationId, taskId, networkId);
         clientCapabilityRuntimeGate.requireCompatibleEvidenceSlots(
                 kind,
                 resolved.stream().map(EvidenceSlotView::mediaType).toList(),

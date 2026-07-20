@@ -294,16 +294,54 @@ class NetworkPortalEvidenceOnBehalfPostgresIT {
 
     @Test
     void m368_02_signatureSlotRejectedForNetworkWeb() {
+        // 槽位定义不可变；发布 SIGNATURE 资产并插入额外槽位以证明 NETWORK_WEB 目录拒单。
+        String definition = """
+                {"templateKey":"survey.sign","version":"1.0.0","stage":"INSTALLATION",
+                 "items":[{"evidenceKey":"site.sign","name":"现场签名","mediaType":"SIGNATURE","required":true,
+                   "capture":{"minCount":1,"maxCount":1}}]}
+                """;
+        UUID assetId = configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.EVIDENCE, "survey.sign", "1.0.0", "1.0.0",
+                definition.trim(), Sha256.digest(definition.trim()))).versionId();
+        UUID signatureSlot = UUID.randomUUID();
+        String templateDigest = Sha256.digest(definition.trim());
         jdbc.sql("""
-                UPDATE evd_evidence_slot
-                   SET media_type='SIGNATURE',
-                       requirement_definition=CAST(:definition AS jsonb)
-                 WHERE tenant_id=:tenant AND slot_id=:slot
+                INSERT INTO evd_evidence_slot (
+                    slot_id, tenant_id, project_id, task_id, resolution_id, template_version_id,
+                    template_key, template_version, template_digest, requirement_code, occurrence_key,
+                    requirement_name, media_type, required_flag, min_count, max_count,
+                    condition_input_digest, resolution_explanation, requirement_definition,
+                    requirement_digest, status_projection, resolved_at, slot_generation)
+                VALUES (
+                    :slot, :tenant, :project, :task, :resolution, :template,
+                    'survey.sign', '1.0.0', :templateDigest, 'site.sign', 'default',
+                    '现场签名', 'SIGNATURE', true, 1, 1, :conditionDigest,
+                    CAST('{"kind":"FIXED"}' AS jsonb), CAST(:definition AS jsonb),
+                    :reqDigest, 'MISSING', now(), 1)
                 """)
-                .param("tenant", TENANT).param("slot", slotId)
+                .param("slot", signatureSlot).param("tenant", TENANT).param("project", PROJECT)
+                .param("task", TASK).param("resolution", resolutionId)
+                .param("template", assetId)
+                .param("templateDigest", templateDigest)
+                .param("conditionDigest", "e".repeat(64))
                 .param("definition",
                         "{\"evidenceKey\":\"site.sign\",\"mediaType\":\"SIGNATURE\",\"required\":true}")
-                .update();
+                .param("reqDigest", "f".repeat(64)).update();
+        jdbc.sql("""
+                INSERT INTO evd_evidence_resolution_member (
+                    member_id, tenant_id, project_id, task_id, resolution_id, template_version_id,
+                    requirement_code, occurrence_key, condition_result, active_slot_id,
+                    previous_slot_id, transition, required_disposition, counting_item_count,
+                    condition_input_digest, resolution_explanation, created_at)
+                VALUES (
+                    :slot, :tenant, :project, :task, :resolution, :template,
+                    'site.sign', 'default', true, :slot, NULL, 'ACTIVATED', 'NONE', 0,
+                    :conditionDigest, CAST('{"kind":"FIXED"}' AS jsonb), now())
+                """)
+                .param("slot", signatureSlot).param("tenant", TENANT).param("project", PROJECT)
+                .param("task", TASK).param("resolution", resolutionId)
+                .param("template", assetId)
+                .param("conditionDigest", "e".repeat(64)).update();
         assertThatThrownBy(() -> portalEvidence.beginUploadOnBehalf(
                 actor(PRINCIPAL), metadata("m368-sign"), "NETWORK|NETWORK|" + NETWORK_A, "NETWORK_WEB", TASK, slotId,
                 beginCommand("b".repeat(64), 10, TECH_A.toString(), "signature")))
