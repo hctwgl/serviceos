@@ -13,9 +13,9 @@ test.describe('M385 项目履约配置中心', () => {
 
     await page.getByRole('tab', { name: '工单类型与履约配置' }).click()
     await expect(page.getByText('履约配置资产编辑请使用配置设计器')).toHaveCount(0)
-    await expect(page.getByRole('button', { name: '打开工单类型与履约配置' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '打开项目履约配置中心' })).toBeVisible()
 
-    await page.getByRole('button', { name: '打开工单类型与履约配置' }).click()
+    await page.getByRole('button', { name: '打开项目履约配置中心' }).click()
     await expect(page.getByRole('heading', { name: '项目履约配置中心' })).toBeVisible()
     await expect(page.getByRole('cell', { name: '标准家充履约方案' })).toBeVisible()
     await expect(page.getByRole('cell', { name: '家充勘测安装' })).toBeVisible()

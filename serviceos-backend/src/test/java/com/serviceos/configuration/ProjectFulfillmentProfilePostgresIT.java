@@ -287,6 +287,30 @@ class ProjectFulfillmentProfilePostgresIT {
                 .isEqualTo(ProblemCode.VALIDATION_FAILED);
     }
 
+    @Test
+    void compareImpactRejectsCrossProjectAndUnauthorizedPrincipal() {
+        ProjectFulfillmentProfileDetail created = profiles.create(principal(), meta("c-cmp-auth"),
+                new CreateProjectFulfillmentProfileCommand(
+                        projectId, "HOME_CHARGING_SURVEY_INSTALL", "鉴权测试",
+                        null, "HOME_CHARGING_SURVEY_INSTALL", null));
+
+        UUID foreignProjectId = UUID.randomUUID();
+        assertThatThrownBy(() -> profiles.compareImpact(
+                principal(), "corr-cross-project", foreignProjectId, created.profileId()))
+                .isInstanceOf(BusinessProblem.class)
+                .extracting(ex -> ((BusinessProblem) ex).code())
+                .isEqualTo(ProblemCode.RESOURCE_NOT_FOUND);
+
+        CurrentPrincipal unauthorized = new CurrentPrincipal(
+                "pfp-no-grant", TENANT, CurrentPrincipal.PrincipalType.USER,
+                "admin-web", Set.of());
+        assertThatThrownBy(() -> profiles.compareImpact(
+                unauthorized, "corr-no-grant", projectId, created.profileId()))
+                .isInstanceOf(BusinessProblem.class)
+                .extracting(ex -> ((BusinessProblem) ex).code())
+                .isEqualTo(ProblemCode.ACCESS_DENIED);
+    }
+
     private void seedGrants() {
         UUID roleId = UUID.randomUUID();
         jdbc.sql("""

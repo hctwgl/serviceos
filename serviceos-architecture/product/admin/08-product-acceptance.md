@@ -226,6 +226,71 @@ productOwnerDecision: null
 knownGaps: []
 ```
 
+### 9.1 M385 切片 A 记录（项目履约配置）
+
+```yaml
+pageId: ADMIN.PROJECT.FULFILLMENT.LIST
+route: /projects/:id/fulfillment-profiles
+visualProfile: CLASSIC_PROFESSIONAL
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: 使用中工单数跨模块读模型未就绪
+  - DOMAIN_GAP: 左导航工作流/任务模板等分区仍为占位
+```
+
+```yaml
+pageId: ADMIN.PROJECT.FULFILLMENT.CREATE
+route: /projects/:id/fulfillment-profiles/create
+visualProfile: CLASSIC_PROFESSIONAL
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps: []
+```
+
+```yaml
+pageId: ADMIN.PROJECT.FULFILLMENT.PUBLISH
+route: /projects/:id/fulfillment-profiles/:profileId/publish
+visualProfile: CLASSIC_PROFESSIONAL
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps: []
+```
+
+```yaml
+pageId: ADMIN.PROJECT.FULFILLMENT.EDIT
+route: /projects/:id/fulfillment-profiles/:profileId/edit
+visualProfile: CLASSIC_PROFESSIONAL
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_CONNECTED
+productStatus: PRODUCT_REJECTED # 仍以 documentJson 为中心；M385b
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - DOMAIN_GAP: 结构化 Draft DTO 未替换 documentJson
+```
+
 ## 10. GAP 规则
 
 - `UI_DATA_GAP`：后端缺少显示名、聚合摘要、total、差异、影响、引用关系或 allowed-actions 等页面需要的数据；

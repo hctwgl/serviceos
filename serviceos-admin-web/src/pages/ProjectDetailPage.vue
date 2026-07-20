@@ -402,8 +402,8 @@ onMounted(() => {
         <Alert
           type="info"
           show-icon
-          message="按工单类型配置流程、表单、资料、动作、审核与 SLA"
-          description="审核、表单、资料与 SLA 归入具体工单类型配置，不再作为脱离工单类型的孤立标签。"
+          message="进入项目履约配置中心"
+          description="按工单类型维护流程、表单、资料、动作、审核与 SLA；发布使用服务端运行说明书与真实差异分析。"
           style="margin-bottom: 12px"
         />
         <p class="muted">
@@ -419,7 +419,7 @@ onMounted(() => {
             })
           "
         >
-          打开工单类型与履约配置
+          打开项目履约配置中心
         </Button>
       </TabPane>
 
