@@ -3,7 +3,7 @@ title: ServiceOS 实施状态总览
 version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-20
-baselineCommit: "PENDING_M377_SHA"
+baselineCommit: "9a05be9b9e22be216542260f0979d85ee2cf2bab"
 latestMilestone: M377
 ---
 
@@ -40,7 +40,7 @@ latestMilestone: M377
 | 项目 | 当前值 |
 |---|---|
 | 最新实施里程碑 | M377 Admin 产品化视觉/可访问性/回归关闭（承接 M370～M376 纯前端产品化） |
-| 基线提交 | `PENDING_M377_SHA`（Admin 产品化分支；master 后端基线仍含 M369 / #199） |
+| 基线提交 | `9a05be9b9e22be216542260f0979d85ee2cf2bab`（Admin 产品化分支；master 后端基线仍含 M369 / #199） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts`、`@serviceos/web-core`、`ServiceOSIOSCore`、独立且可部署的 `serviceos-network-web` 与 `serviceos-technician-web`、Swift 6 `TechnicianIOSFoundation`，以及已在 iPhone 17 Pro Simulator 安装启动、实跑 XCTest/XCUITest、形成 Production arm64 archive/dSYM，并接入当前任务、在线 Visit、冻结基础表单、前台 Evidence 采集上传、Snapshot/Task 完成与多轮资料整改的原生 `TechnicianIOS` SwiftUI App；由同一 Core OpenAPI 生成并经独立消费者门禁验证的 `@serviceos/core-client` 与 `ServiceOSCoreClient` |
 | 前端工程 | `serviceos-admin-web` 独立承载总部运营；**M370～M377** 完成设计系统 Presenter、产品化 AppShell（ScopeBar/Freshness/诊断抽屉）、标准页模板、工单中心/详情、项目详情与主导航页壳迁移及视觉关闭；仍消费服务端 Navigation 与 allowed-actions；M256 后 Network 正式产品由独立 `serviceos-network-web` 承载，M257 后 Technician 正式产品由独立移动优先 `serviceos-technician-web` 承载；两套独立 Web 均实际接入共享 Core、OIDC PKCE、服务端 Context/Capability/导航、Playwright 回归和独立容器镜像 |
