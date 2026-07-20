@@ -58,7 +58,7 @@ async function openInProgressCorrectionFromFilteredQueue(
 ) {
   const correctionPage = await hostPage.context().newPage()
   await correctionPage.goto(new URL('/corrections', hostPage.url()).toString())
-  await expect(correctionPage.getByRole('heading', { name: '整改中心', level: 1 })).toBeVisible()
+  await expect(correctionPage.getByRole('heading', { name: /整改中心|整改跟踪/, level: 1 })).toBeVisible()
   await correctionPage.getByLabel('correction status filter').selectOption('IN_PROGRESS')
   await correctionPage
     .getByLabel('correction sourceReviewCaseId filter')
@@ -107,7 +107,7 @@ async function openInProgressCorrectionFromFilteredQueue(
   expect((await queueSourceReviewPromise).status()).toBe(200)
   await expect(correctionPage.getByRole('heading', { name: '审核案例' })).toBeVisible()
   await correctionPage.goBack()
-  await expect(correctionPage.getByRole('heading', { name: '整改中心', level: 1 })).toBeVisible()
+  await expect(correctionPage.getByRole('heading', { name: /整改中心|整改跟踪/, level: 1 })).toBeVisible()
 
   const queueCorrectionTaskPromise = correctionPage.waitForResponse(
     (response) =>
@@ -124,7 +124,7 @@ async function openInProgressCorrectionFromFilteredQueue(
   expect((await queueCorrectionTaskPromise).status()).toBe(200)
   await expect(correctionPage.getByRole('heading', { name: '任务详情' })).toBeVisible()
   await correctionPage.goBack()
-  await expect(correctionPage.getByRole('heading', { name: '整改中心', level: 1 })).toBeVisible()
+  await expect(correctionPage.getByRole('heading', { name: /整改中心|整改跟踪/, level: 1 })).toBeVisible()
 
   // M180：整改队列剩余 Accepted 关联字段（项目 / 来源任务）。
   const queueProjectPromise = correctionPage.waitForResponse(
@@ -142,7 +142,7 @@ async function openInProgressCorrectionFromFilteredQueue(
   expect((await queueProjectPromise).status()).toBe(200)
   await expect(correctionPage.getByRole('heading', { name: '项目详情' })).toBeVisible()
   await correctionPage.goBack()
-  await expect(correctionPage.getByRole('heading', { name: '整改中心', level: 1 })).toBeVisible()
+  await expect(correctionPage.getByRole('heading', { name: /整改中心|整改跟踪/, level: 1 })).toBeVisible()
 
   const queueSourceTaskPromise = correctionPage.waitForResponse(
     (response) =>
@@ -158,7 +158,7 @@ async function openInProgressCorrectionFromFilteredQueue(
   expect((await queueSourceTaskPromise).status()).toBe(200)
   await expect(correctionPage.getByRole('heading', { name: '任务详情' })).toBeVisible()
   await correctionPage.goBack()
-  await expect(correctionPage.getByRole('heading', { name: '整改中心', level: 1 })).toBeVisible()
+  await expect(correctionPage.getByRole('heading', { name: /整改中心|整改跟踪/, level: 1 })).toBeVisible()
 
   await correctionPage
     .getByRole('link', { name: `打开整改案例 ${correction!.correctionCaseId}` })
@@ -220,7 +220,7 @@ async function prepareOpenReviewCase(
 ) {
   await loginWithLocalKeycloak(page)
   await page.getByRole('link', { name: workOrderCode }).click()
-  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /工单工作区|工单详情/ })).toBeVisible()
 
   await page
     .getByLabel('assign-candidates principalIds')
@@ -573,8 +573,8 @@ test('真实 OIDC 登录后可读取核心投影并完成 Task 分配领取释�
   await expect(pilotLink).toBeVisible()
   await pilotLink.click()
 
-  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: '工单权威事实' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /工单工作区|工单详情/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /工单权威事实|配置来源/ })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Workflow / Stage' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Stage 投影' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '工单 Task 摘要' })).toBeVisible()
@@ -679,7 +679,7 @@ test('真实 OIDC 登录后可读取核心投影并完成 Task 分配领取释�
   )
   await page.goto(`/corrections?status=IN_PROGRESS&taskId=${pilotTaskIdForQueue}`)
   expect((await correctionHydratePromise).status()).toBe(200)
-  await expect(page.getByRole('heading', { name: '整改中心', level: 1 })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /整改中心|整改跟踪/, level: 1 })).toBeVisible()
   await expect(page.getByLabel('correction status filter')).toHaveValue('IN_PROGRESS')
   await expect(page.getByLabel('correction taskId filter')).toHaveValue(pilotTaskIdForQueue)
 
@@ -768,7 +768,7 @@ test('真实 OIDC 登录后可读取核心投影并完成 Task 分配领取释�
   await expect(page.getByLabel('project status filter')).toHaveValue('ACTIVE')
 
   await page.goto(`/work-orders/${pilotWorkOrderId}`)
-  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /工单工作区|工单详情/ })).toBeVisible()
 
   // M162：最近活动摘要 → 已有资源详情深链（与核心时间线同构白名单）。
   const taskId = '70000000-0000-4000-8000-000000000001'
@@ -788,7 +788,7 @@ test('真实 OIDC 登录后可读取核心投影并完成 Task 分配领取释�
   await expect(page.getByRole('heading', { name: '任务详情' })).toBeVisible()
   await expect(page).toHaveURL(new RegExp(`/tasks/${taskId}$`))
   await page.goto('/work-orders/40000000-0000-4000-8000-000000000001')
-  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /工单工作区|工单详情/ })).toBeVisible()
 
   // M157：工作区概览项目深链 → 已有项目详情。
   const workspaceProjectPromise = page.waitForResponse(
@@ -801,7 +801,7 @@ test('真实 OIDC 登录后可读取核心投影并完成 Task 分配领取释�
   await expect(page.getByRole('heading', { name: '项目详情' })).toBeVisible()
   await expect(page).toHaveURL(new RegExp(`/projects/${pilotProjectId}$`))
   await page.goto('/work-orders/40000000-0000-4000-8000-000000000001')
-  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /工单工作区|工单详情/ })).toBeVisible()
 
   // M157：工作区 SLA 关联任务深链。
   await expect(page.getByText('打开 SLA 关联任务：')).toBeVisible()
@@ -819,7 +819,7 @@ test('真实 OIDC 登录后可读取核心投影并完成 Task 分配领取释�
   await expect(page.getByRole('heading', { name: '任务详情' })).toBeVisible()
   await expect(page).toHaveURL(new RegExp(`/tasks/${taskId}$`))
   await page.goto('/work-orders/40000000-0000-4000-8000-000000000001')
-  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /工单工作区|工单详情/ })).toBeVisible()
 
   // M152：工作区 TASKS 按需区块 → 任务详情深链（与权威 Task 表「打开任务」并列）。
   await page.getByRole('button', { name: /TASKS|任务/ }).click()
@@ -839,7 +839,7 @@ test('真实 OIDC 登录后可读取核心投影并完成 Task 分配领取释�
   await expect(page.getByRole('heading', { name: '任务详情' })).toBeVisible()
   await expect(page).toHaveURL(new RegExp(`/tasks/${taskId}$`))
   await page.goto('/work-orders/40000000-0000-4000-8000-000000000001')
-  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /工单工作区|工单详情/ })).toBeVisible()
 
   // M153：工作区 TIMELINE_AUDIT → 已有资源详情深链（仅 allow-listed resourceType）。
   // 限定 .timeline-resource-links，避免与 M161 核心时间线「core / … / Task / …」冲突。
@@ -861,7 +861,7 @@ test('真实 OIDC 登录后可读取核心投影并完成 Task 分配领取释�
   await expect(page.getByRole('heading', { name: '任务详情' })).toBeVisible()
   await expect(page).toHaveURL(new RegExp(`/tasks/${taskId}$`))
   await page.goto('/work-orders/40000000-0000-4000-8000-000000000001')
-  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /工单工作区|工单详情/ })).toBeVisible()
 
   // 夹具不预置 ACTIVE 候选；先通过 Admin 页面调用 MANUAL assign-candidates，
   // 再由服务端刷新 allowed-actions，使后续 claim 真正依赖本轮候选快照。
@@ -923,7 +923,7 @@ test('真实 OIDC 登录后可完成 Task 并可靠推进 Workflow 与 WorkOrder
 
   await loginWithLocalKeycloak(page)
   await page.getByRole('main').getByRole('table').getByRole('link', { name: workOrderCode!, exact: true }).click()
-  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /工单工作区|工单详情/ })).toBeVisible()
   await expect(page.getByRole('cell', { name: /PILOT_COMPLETION|试点完工/ }).first()).toBeVisible()
 
   // 每轮使用全新 Task，按服务端 allowed-actions 依次推进，避免通过 SQL 重置终态事实。
@@ -1189,7 +1189,7 @@ test('真实 OIDC 登录后可完成 Task 并可靠推进 Workflow 与 WorkOrder
   // M155 / M154：完结后证明表单提交详情与 Task 旁路（不得打断上方双输入 complete 面板状态）。
   await page.getByRole('link', { name: '工单目录' }).click()
   await page.getByRole('main').getByRole('table').getByRole('link', { name: workOrderCode!, exact: true }).click()
-  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /工单工作区|工单详情/ })).toBeVisible()
 
   // M161：权威核心时间线 → FormSubmission / EvidenceSetSnapshot 详情深链。
   await expect(page.getByText('打开核心时间线资源：')).toBeVisible({ timeout: 30_000 })
@@ -1213,7 +1213,7 @@ test('真实 OIDC 登录后可完成 Task 并可靠推进 Workflow 与 WorkOrder
   )
   await page.getByRole('link', { name: '工单目录' }).click()
   await page.getByRole('main').getByRole('table').getByRole('link', { name: workOrderCode!, exact: true }).click()
-  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /工单工作区|工单详情/ })).toBeVisible()
   await expect(page.getByText('打开核心时间线资源：')).toBeVisible()
   const coreTimelineSnapshotPromise = page.waitForResponse(
     (response) =>
@@ -1236,7 +1236,7 @@ test('真实 OIDC 登录后可完成 Task 并可靠推进 Workflow 与 WorkOrder
 
   await page.getByRole('link', { name: '工单目录' }).click()
   await page.getByRole('main').getByRole('table').getByRole('link', { name: workOrderCode!, exact: true }).click()
-  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /工单工作区|工单详情/ })).toBeVisible()
   await page.getByRole('button', { name: /FORMS_EVIDENCE|表单资料/ }).click()
   await expect(page.getByText('区块加载中…')).toHaveCount(0)
   await expect(page.getByText('打开表单提交详情：')).toBeVisible()
@@ -1261,7 +1261,7 @@ test('真实 OIDC 登录后可完成 Task 并可靠推进 Workflow 与 WorkOrder
 
   await page.getByRole('link', { name: '工单目录' }).click()
   await page.getByRole('main').getByRole('table').getByRole('link', { name: workOrderCode!, exact: true }).click()
-  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /工单工作区|工单详情/ })).toBeVisible()
   await page.getByRole('button', { name: /FORMS_EVIDENCE|表单资料/ }).click()
   await expect(page.getByText('区块加载中…')).toHaveCount(0)
   await expect(page.getByText('打开表单资料关联任务：')).toBeVisible()
@@ -1284,7 +1284,7 @@ test('真实 OIDC 登录后可完成 Task 并可靠推进 Workflow 与 WorkOrder
   // M156：工作区 FORMS_EVIDENCE → 资料项详情。
   await page.getByRole('link', { name: '工单目录' }).click()
   await page.getByRole('main').getByRole('table').getByRole('link', { name: workOrderCode!, exact: true }).click()
-  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /工单工作区|工单详情/ })).toBeVisible()
   await page.getByRole('button', { name: /FORMS_EVIDENCE|表单资料/ }).click()
   await expect(page.getByText('区块加载中…')).toHaveCount(0)
   await expect(page.getByText('打开资料项详情：')).toBeVisible()
@@ -1390,7 +1390,7 @@ test('真实 OIDC 登录后审核驳回可进入整改队列并授权豁免整�
   await page.getByRole('link', { name: '工单目录' }).click()
   await expect(page.getByRole('heading', { name: '工单中心', level: 1 })).toBeVisible()
   await page.getByRole('main').getByRole('table').getByRole('link', { name: workOrderCode!, exact: true }).click()
-  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /工单工作区|工单详情/ })).toBeVisible()
   await page.getByRole('button', { name: /REVIEWS_CORRECTIONS|审核整改/ }).click()
   await expect(page.getByText('区块加载中…')).toHaveCount(0)
 
@@ -1414,7 +1414,7 @@ test('真实 OIDC 登录后审核驳回可进入整改队列并授权豁免整�
   await expect(page.getByRole('heading', { name: '资料快照详情' })).toBeVisible()
   await page.getByRole('link', { name: '工单目录' }).click()
   await page.getByRole('main').getByRole('table').getByRole('link', { name: workOrderCode!, exact: true }).click()
-  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /工单工作区|工单详情/ })).toBeVisible()
   await page.getByRole('button', { name: /REVIEWS_CORRECTIONS|审核整改/ }).click()
   await expect(page.getByText('区块加载中…')).toHaveCount(0)
 
@@ -1474,7 +1474,7 @@ test('真实 OIDC 登录后审核驳回可进入整改队列并授权豁免整�
 
   await page.getByRole('link', { name: '工单目录' }).click()
   await page.getByRole('main').getByRole('table').getByRole('link', { name: workOrderCode!, exact: true }).click()
-  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /工单工作区|工单详情/ })).toBeVisible()
   await page.getByRole('button', { name: /REVIEWS_CORRECTIONS|审核整改/ }).click()
   await expect(page.getByText('区块加载中…')).toHaveCount(0)
   const sectionPreview = await page.locator('article.sections pre').innerText()
@@ -1507,7 +1507,7 @@ test('真实 OIDC 登录后审核驳回可进入整改队列并授权豁免整�
   await expect(page.getByRole('heading', { name: '审核案例' })).toBeVisible()
   await page.getByRole('link', { name: '工单目录' }).click()
   await page.getByRole('main').getByRole('table').getByRole('link', { name: workOrderCode!, exact: true }).click()
-  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /工单工作区|工单详情/ })).toBeVisible()
   await page.getByRole('button', { name: /REVIEWS_CORRECTIONS|审核整改/ }).click()
   await expect(page.getByText('区块加载中…')).toHaveCount(0)
 
@@ -1719,7 +1719,7 @@ test('真实 OIDC 登录后可强制通过并导航到重开的后继审核案�
   await page.getByRole('link', { name: '工单目录' }).click()
   await expect(page.getByRole('heading', { name: '工单中心', level: 1 })).toBeVisible()
   await page.getByRole('main').getByRole('table').getByRole('link', { name: workOrderCode!, exact: true }).click()
-  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /工单工作区|工单详情/ })).toBeVisible()
   await page.getByRole('button', { name: /REVIEWS_CORRECTIONS|审核整改/ }).click()
   await expect(page.getByText('区块加载中…')).toHaveCount(0)
   const workspaceSourceReviewPromise = page.waitForResponse(
@@ -1751,7 +1751,7 @@ test('真实 OIDC 登录后审核驳回可经补传关闭并复审通过后完�
 
   await loginWithLocalKeycloak(page)
   await page.getByRole('main').getByRole('table').getByRole('link', { name: workOrderCode!, exact: true }).click()
-  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /工单工作区|工单详情/ })).toBeVisible()
 
   await page
     .getByLabel('assign-candidates principalIds')
@@ -2073,7 +2073,7 @@ test('真实 OIDC 登录后可完成预约提议确认与上门签到签退', as
 
   await loginWithLocalKeycloak(page)
   await page.getByRole('main').getByRole('table').getByRole('link', { name: workOrderCode!, exact: true }).click()
-  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /工单工作区|工单详情/ })).toBeVisible()
 
   // M144：Admin HTTP 人工初派 Visit 所需 NETWORK/TECHNICIAN（高级双责任初派）。
   await page.locator('summary', { hasText: '高级：一次初派网点+师傅' }).click()
@@ -2229,7 +2229,7 @@ test('真实 OIDC 登录后可完成预约提议确认与上门签到签退', as
   // M155：工作区 APPOINTMENTS_VISITS → 预约详情（包装 GET /appointments/{id}）。
   await page.getByRole('link', { name: '工单目录' }).click()
   await page.getByRole('main').getByRole('table').getByRole('link', { name: workOrderCode!, exact: true }).click()
-  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /工单工作区|工单详情/ })).toBeVisible()
   await page.getByRole('button', { name: /APPOINTMENTS_VISITS|预约到场/ }).click()
   await expect(page.getByText('区块加载中…')).toHaveCount(0)
   await expect(page.getByText('打开预约详情：')).toBeVisible()
@@ -2268,7 +2268,7 @@ test('真实 OIDC 登录后可完成预约提议确认与上门签到签退', as
 
   // M154：同区块 Task 旁路仍可用（现场操作入口）。
   await page.getByRole('link', { name: '工单工作区' }).click()
-  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /工单工作区|工单详情/ })).toBeVisible()
   await page.getByRole('button', { name: /APPOINTMENTS_VISITS|预约到场/ }).click()
   await expect(page.getByText('区块加载中…')).toHaveCount(0)
   await expect(page.getByText('打开预约上门关联任务：')).toBeVisible()
@@ -2342,7 +2342,7 @@ test('真实 OIDC 登录后可完成预约提议确认与上门签到签退', as
   // M159：工作区 APPOINTMENTS_VISITS → 上门详情（GET /visits/{id}）。
   await page.getByRole('link', { name: '工单目录' }).click()
   await page.getByRole('main').getByRole('table').getByRole('link', { name: workOrderCode!, exact: true }).click()
-  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /工单工作区|工单详情/ })).toBeVisible()
   await page.getByRole('button', { name: /APPOINTMENTS_VISITS|预约到场/ }).click()
   await expect(page.getByText('区块加载中…')).toHaveCount(0)
   await expect(page.getByText('打开上门详情：')).toBeVisible()
@@ -2363,7 +2363,7 @@ test('真实 OIDC 登录后可完成预约提议确认与上门签到签退', as
   // M160：工作区 APPOINTMENTS_VISITS → 联系详情（GET /contact-attempts/{id}）。
   await page.getByRole('link', { name: '工单目录' }).click()
   await page.getByRole('main').getByRole('table').getByRole('link', { name: workOrderCode!, exact: true }).click()
-  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /工单工作区|工单详情/ })).toBeVisible()
   await page.getByRole('button', { name: /APPOINTMENTS_VISITS|预约到场/ }).click()
   await expect(page.getByText('区块加载中…')).toHaveCount(0)
   await expect(page.getByText('打开联系详情：')).toBeVisible()
@@ -2581,7 +2581,7 @@ test('真实 OIDC 登录后可通过审核外发并经厂端回调关闭 CLIENT 
   await reviewPage.goto(
     new URL(`/work-orders/${sourceWorkOrderId}`, page.url()).toString(),
   )
-  await expect(reviewPage.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await expect(reviewPage.getByRole('heading', { name: /工单工作区|工单详情/ })).toBeVisible()
   await reviewPage.getByRole('button', { name: /INTEGRATION|集成/ }).click()
   await expect(reviewPage.getByText('区块加载中…')).toHaveCount(0)
 
@@ -2601,7 +2601,7 @@ test('真实 OIDC 登录后可通过审核外发并经厂端回调关闭 CLIENT 
   await reviewPage.goto(
     new URL(`/work-orders/${sourceWorkOrderId}`, page.url()).toString(),
   )
-  await expect(reviewPage.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await expect(reviewPage.getByRole('heading', { name: /工单工作区|工单详情/ })).toBeVisible()
   await reviewPage.getByRole('button', { name: /INTEGRATION|集成/ }).click()
   await expect(reviewPage.getByText('区块加载中…')).toHaveCount(0)
 
@@ -2743,7 +2743,7 @@ test('真实 OIDC 登录后可通过审核外发并经厂端回调关闭 CLIENT 
   await reviewPage.getByRole('link', { name: '工单目录' }).click()
   await expect(reviewPage.getByRole('heading', { name: '工单中心', level: 1 })).toBeVisible()
   await reviewPage.getByRole('link', { name: workOrderCode!, exact: true }).click()
-  await expect(reviewPage.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await expect(reviewPage.getByRole('heading', { name: /工单工作区|工单详情/ })).toBeVisible()
   const workspaceRefresh = reviewPage
     .locator('header')
     .filter({ hasText: '工单工作区' })
@@ -2824,7 +2824,7 @@ test('真实 OIDC 登录后可在入站工单上完成领取、预约上门、�
     timeout: 30_000,
   })
   await page.getByRole('main').getByRole('table').getByRole('link', { name: orderCode!, exact: true }).click()
-  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /工单工作区|工单详情/ })).toBeVisible()
   await expect(page.locator('dt', { hasText: /^状态$/ }).first().locator('xpath=../dd')).toHaveText(/ACTIVE|处理中/)
   await expect(
     page.locator('dt', { hasText: /^外部单号$/ }).locator('xpath=../dd'),
@@ -2873,7 +2873,7 @@ test('真实 OIDC 登录后可在入站工单上完成领取、预约上门、�
   await expect(page).toHaveURL(/\/integration\/canonical\/[0-9a-f-]+$/)
   await expect(page.getByText(/BYD:INSTALL:/)).toBeVisible()
   await page.getByRole('link', { name: '工单工作区' }).click()
-  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /工单工作区|工单详情/ })).toBeVisible()
 
   // M168：工作区 INTEGRATION → Canonical 独立详情深链。
   await page.getByRole('button', { name: /INTEGRATION|集成/ }).click()
@@ -2892,7 +2892,7 @@ test('真实 OIDC 登录后可在入站工单上完成领取、预约上门、�
   await expect(page.getByRole('heading', { name: 'Canonical Message' })).toBeVisible()
   await expect(page).toHaveURL(/\/integration\/canonical\/[0-9a-f-]+$/)
   await page.getByRole('link', { name: '工单工作区' }).click()
-  await expect(page.getByRole('heading', { name: '工单工作区' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /工单工作区|工单详情/ })).toBeVisible()
 
   const inboundManualAssignPromise = page.waitForResponse(
     (response) =>
