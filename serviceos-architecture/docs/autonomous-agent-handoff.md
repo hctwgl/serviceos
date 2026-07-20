@@ -7,24 +7,37 @@ lastUpdated: 2026-07-20
 
 ## 当前
 
-- **状态**：**PAUSED_AWAITING_OWNER**
-- 上一闭环：M365（Draft PR #192，本地门禁已过；叠在 #191 / M364）
-- 工程基线：**M365**（OpenAPI 1.0.57 / Flyway 133）
-- 原因：下一切片需负责人选型，不得发明推进
+- **状态**：**READY_FOR_REVIEW**（M366 实现完成，待负责人选型下一切片）
+- 进行中 Draft PR：M366 派单级 `supportedClientKinds` 过滤（**Implemented**）
+- 分支：`cursor/m366-dispatch-client-kinds-filter-design-6a78`
+  （base：`cursor/m365-review-task-workflow-gate-6a78`）
+- 工程基线：**M366**（OpenAPI 1.0.58 / Flyway 134）
+- 决策包：`decisions/ADR-088-dispatch-supported-client-kinds-filter.md`（**Accepted**：A1-R～A5-R）
+
+## 已接受并实现
+
+```text
+Accept ADR-088 with: A1-R, A2-R, A3-R, A4-R, A5-R
+```
+
+| 点 | 选择 | 实现要点 |
+|---|---|---|
+| A1-R | 仅自动 TECHNICIAN 池硬过滤 | `activateTechnician` |
+| A2-R | 师傅声明权威 | V134 + create/declare API |
+| A3-R | 空池 → MANUAL + `CLIENT_KIND_TARGET_EMPTY` | audit `error_code` |
+| A4-R | FORM∩EVIDENCE 交集 | `resolveDispatchTargetClientKinds` |
+| A5-R | 保留执行门禁 | 未改 M357～M363 |
+
+## 下一切片候选（需负责人选型，不得发明）
+
+1. Manual / Network assign 硬拒绝（A1-B，另案）；
+2. Network Portal on-behalf 整改/代补能力门禁（需确认 `NETWORK_WEB` vs 代师傅端）；
+3. iOS 条件执行器全量硬阻断（本 Linux 环境多为 `BLOCKED_EXTERNAL`）；
+4. 吉利联调 / AMOUNT/加权 / BUSINESS 日历 SLA（硬门禁）。
 
 ## 已闭环
 
-- M356～M363：Technician 客户端能力门禁垂直切片
-- M364：独立审核 handling Task（ADR-087 A1-R～A5-R）— #191
-- M365：REVIEW_TASK WAITING 门闸 + review-decided 唤醒（A5-B）— #192
-
-## 请选型（回复字母即可）
-
-| 选项 | 内容 | 风险/前置 |
-|---|---|---|
-| **A** | 派单级 `supportedClientKinds` 过滤 | 需 Accepted 设计包（过滤时机、失败关闭、与 M358 定向发布关系） |
-| **B** | Network Portal on-behalf 能力门禁 | 需确认 `NETWORK_WEB` vs 代师傅端 `clientKind` 语义 |
-| **C** | iOS 条件执行器全量硬阻断 | 本 Linux 环境多为 `BLOCKED_EXTERNAL`（需 Xcode/真机路径） |
-| **D** | 暂停，等吉利联调材料 / AMOUNT·加权口径 / BUSINESS SLA 批准 | 硬门禁，不可发明 |
-
-未选型前不开新里程碑 Draft PR，也不改 `latestMilestone`。
+- M356～M363：Technician 客户端能力门禁 — #183～#190
+- M364：独立审核 handling Task — #191
+- M365：REVIEW_TASK 工作流门闸（A5-B）— #192
+- M366：派单级 supportedClientKinds 过滤 — 本 PR

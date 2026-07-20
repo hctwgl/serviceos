@@ -80,7 +80,7 @@ class DefaultTechnicianCorrectionServiceTest {
                 sourceTasks, Clock.fixed(NOW, ZoneOffset.UTC));
         when(affiliations.findActiveTechnicianProfile("tenant-361", PRINCIPAL))
                 .thenReturn(Optional.of(new TechnicianProfileView(
-                        PROFILE, PRINCIPAL, "师傅", "ACTIVE", 1,
+                        PROFILE, PRINCIPAL, "师傅", "ACTIVE", null, 1,
                         Instant.EPOCH, Instant.EPOCH, null, null, null)));
         when(affiliations.listActiveTechnicianMemberships(eq("tenant-361"), eq(PROFILE), any()))
                 .thenReturn(List.of(new NetworkTechnicianMembershipView(

@@ -374,6 +374,7 @@ title: ServiceOS 里程碑索引
 | M363 | M363 整改领取/启动能力硬拒单 | [376-m363-correction-lifecycle-capability-hard-reject.md](../architecture/376-m363-correction-lifecycle-capability-hard-reject.md) | [360-m363-correction-lifecycle-capability-hard-reject-acceptance.md](../testing/360-m363-correction-lifecycle-capability-hard-reject-acceptance.md) |
 | M364 | M364 独立审核 REVIEW_TASK 模板分离 | [377-m364-review-task-template-separation.md](../architecture/377-m364-review-task-template-separation.md) | [361-m364-review-task-template-separation-acceptance.md](../testing/361-m364-review-task-template-separation-acceptance.md) |
 | M365 | M365 REVIEW_TASK 工作流门闸推进（A5-B） | [378-m365-review-task-workflow-gate.md](../architecture/378-m365-review-task-workflow-gate.md) | [362-m365-review-task-workflow-gate-acceptance.md](../testing/362-m365-review-task-workflow-gate-acceptance.md) |
+| M366 | M366 派单级 supportedClientKinds 过滤 | [379-m366-dispatch-supported-client-kinds-filter.md](../architecture/379-m366-dispatch-supported-client-kinds-filter.md) | [363-m366-dispatch-supported-client-kinds-filter-acceptance.md](../testing/363-m366-dispatch-supported-client-kinds-filter-acceptance.md) |
 
 ## 未关联里程碑的文档
 

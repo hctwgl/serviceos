@@ -57,7 +57,8 @@ final class DefaultNetworkPortalTechnicianQuery implements NetworkPortalTechnici
                     membership.status().name(),
                     membership.validFrom(),
                     membership.validTo(),
-                    membership.version()));
+                    membership.version(),
+                    p.supportedClientKinds()));
         }
         return List.copyOf(items);
     }

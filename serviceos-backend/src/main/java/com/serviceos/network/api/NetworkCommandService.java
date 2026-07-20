@@ -4,6 +4,7 @@ import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.shared.CommandMetadata;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 public interface NetworkCommandService {
@@ -29,7 +30,11 @@ public interface NetworkCommandService {
 
     TechnicianProfileView createTechnicianProfile(
             CurrentPrincipal actor, CommandMetadata metadata,
-            UUID principalId, String displayName);
+            UUID principalId, String displayName, List<String> supportedClientKinds);
+
+    TechnicianProfileView declareTechnicianSupportedClientKinds(
+            CurrentPrincipal actor, CommandMetadata metadata,
+            UUID profileId, long expectedVersion, List<String> supportedClientKinds);
 
     TechnicianProfileView disableTechnicianProfile(
             CurrentPrincipal actor, CommandMetadata metadata,

@@ -117,7 +117,7 @@ class ControlledSearchPostgresIT {
         jdbc.sql("UPDATE idn_person_profile SET employee_number='EMP9001' WHERE principal_id=:id")
                 .param("id", techPrincipal).update();
         var profile = networkCommands.createTechnicianProfile(
-                actor(SEARCHER, TENANT_A), meta("t1"), techPrincipal, "张三师傅");
+                actor(SEARCHER, TENANT_A), meta("t1"), techPrincipal, "张三师傅", null);
 
         ControlledSearchResult byCode = searches.search(
                 actor(SEARCHER, TENANT_A), "c-code", "SEARCH-ORDER-001",

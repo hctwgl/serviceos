@@ -25,7 +25,7 @@ flywayVersion: "131"
   - 单元 + PostgreSQL IT。
 - 明确不做：
   - Bundle CANARY / traffic_percent 轴变更；
-  - Feed/详情头拒单（见 **M359**）、派单过滤；
+  - Feed/详情头拒单（见 **M359**）；派单过滤见 **M366**；
   - iOS 条件执行器 / 全量默认硬阻断（未声明时仍为 M356 报告语义）；
   - UNKNOWN 强制升级；最低 clientVersion 策略表。
 
@@ -47,7 +47,7 @@ flywayVersion: "131"
 
 ## 明确未实现
 
-- 派单/Feed 级目标过滤；clientVersion 下限；动态 SupportedCapabilities 注册。
+- Feed 级目标过滤见 M359；派单级见 M366；clientVersion 下限；动态 SupportedCapabilities 注册。
 
 ## 验证命令
 
