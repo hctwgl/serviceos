@@ -174,11 +174,10 @@ const columns = computed((): TableColumnsType<Row> => [
     width: 160,
     customRender: ({ record }) =>
       h(
-        Button,
+        RouterLink,
         {
-          type: 'link',
-          onClick: () =>
-            router.push({ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: record.id } }),
+          to: { name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: record.id } },
+          class: 'work-order-link',
         },
         () => record.externalOrderCode || presentEmptyValue('not_provided'),
       ),
