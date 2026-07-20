@@ -21,6 +21,7 @@ title: ServiceOS Agent 任务导航
 - 通过 `scripts/find-milestone.sh` 查询里程碑号、模块名或关键词，不整份读取 `milestone-index.md`，也不批量通读 `architecture/`、`testing/` 目录；
 - 只读与任务直接相关的 Mxx 文档（通常是最近一次同模块切片）；历史摘要细节查 `implementation-status-archive.md`，不回读状态总览找；
 - 产品、Portal 和前端任务必须先读取决策基线，再读取对应 Portal 规格或 Admin 蓝图；不得只根据当前页面代码反推产品；
+- Admin 页面和组件任务必须读取 `product/admin/12-classic-professional-visual-baseline.md`，不得自行创造第二套视觉语言；
 - 冲突优先级按根 `AGENTS.md` §2.2；代码与文档冲突时不默认代码正确；
 - 探索阶段的 token 预算是「3～6 个文件」，超过就说明路由选错了，回到本表重新定位。
 
@@ -33,7 +34,7 @@ title: ServiceOS Agent 任务导航
 | 后端新里程碑（通用） | ① 若已有 Accepted 设计：对应 Mxx 实现文档 + 验收矩阵；② `serviceos-architecture/docs/implementation-traceability-matrix.md` §2 该模块行；③ `grep -i <模块或关键词> serviceos-architecture/docs/milestone-index.md` 找最近一次同模块里程碑的实现文档 + 验收矩阵；④ `serviceos-backend/AGENTS.md` 该模块行 | 领域总体设计（`serviceos-architecture/architecture/00`～`21` 编号文档）相关章节、相关 ADR（`serviceos-architecture/decisions/`） |
 | readmodel 时间线/工作区切片 | `serviceos-architecture/architecture/86-m73-work-order-core-execution-timeline.md`（投影基线）、`serviceos-architecture/architecture/97-m84-work-order-timeline-projection-checkpoint-rebuild.md`（checkpoint/重建）、index Grep `时间线\|工作区` 取最近一次同类切片、`serviceos-architecture/api/06-application-query-preference-http-api.md` 对应 Accepted 章节 | `serviceos-architecture/data/06-application-projection-preference-logical-model.md` |
 | 授权查询/队列切片 | `serviceos-architecture/architecture/80-m67-authorized-project-directory-query.md`、`serviceos-architecture/architecture/81-m68-authorized-work-order-query.md`、index Grep `队列` 取最近一次（如 M99/M158）、`serviceos-architecture/architecture/07-identity-authorization-audit.md` 授权章节 | `serviceos-architecture/data/02-authorization-audit-logical-model.md` |
-| Admin Web 切片 | `serviceos-architecture/product/00-serviceos-product-delivery-decision-baseline.md`、`serviceos-architecture/product/admin/README.md`、index Grep `Admin` 取最近一次里程碑实现文档、`serviceos-architecture/docs/admin-pilot-readiness-baseline.md`、`serviceos-admin-web/src` 相邻页面代码 | `serviceos-architecture/product/02-admin-operations-portal-spec.md`、`serviceos-architecture/product/07-page-action-permission-matrix.md` |
+| Admin Web 切片 | `serviceos-architecture/product/00-serviceos-product-delivery-decision-baseline.md`、`serviceos-architecture/product/admin/README.md`、`serviceos-architecture/product/admin/12-classic-professional-visual-baseline.md`、index Grep `Admin` 取最近一次里程碑实现文档、`serviceos-architecture/docs/admin-pilot-readiness-baseline.md`、`serviceos-admin-web/src` 相邻页面代码 | `serviceos-architecture/product/02-admin-operations-portal-spec.md`、`serviceos-architecture/product/admin/05-page-patterns.md`、`serviceos-architecture/product/admin/06-master-pages.md`、`serviceos-architecture/product/07-page-action-permission-matrix.md` |
 | Network Web 切片 | `serviceos-architecture/product/00-serviceos-product-delivery-decision-baseline.md`、`serviceos-architecture/product/03-network-portal-spec.md`、index Grep `Network` 取最近一次里程碑实现文档、相邻页面代码 | `serviceos-architecture/product/01-cross-portal-information-architecture.md`、`serviceos-architecture/product/07-page-action-permission-matrix.md` |
 | Technician H5/iOS 切片 | `serviceos-architecture/product/00-serviceos-product-delivery-decision-baseline.md`、`serviceos-architecture/product/04-technician-mobile-app-spec.md`、index Grep `Technician` 取最近一次里程碑实现文档、目标客户端相邻代码 | `serviceos-architecture/product/01-cross-portal-information-architecture.md`、`serviceos-architecture/product/05-cross-portal-interaction-state-spec.md` |
 | BYD/集成切片 | `serviceos-architecture/architecture/69-m56-inbound-envelope-canonical-message-runtime.md`（入站基线）、`serviceos-architecture/architecture/71-m58-byd-review-submission-outbound-delivery.md`（外发基线）、`serviceos-architecture/architecture/13-integration-reliability.md`、`serviceos-contracts/src/main/resources/openapi/byd-cpim-v731.yaml` | ADR-010/014、index Grep `BYD\|OutboundDelivery` 取最近切片 |
@@ -48,4 +49,4 @@ title: ServiceOS Agent 任务导航
 - 任何任务都不得因为「找上下文」而 `cat` 或全量 Read 整个 `architecture/`、`testing/`、`docs/` 目录；
 - 身份治理序列已重编号为 M183～M188；不得再使用与 Admin Pilot 历史冲突的旧 M135～M140 编号（见 `implementation-status.md` §2.1）；
 - 「候选下一方向」清单（status §5）中的条目在明确批准前不得当作任务直接实现；
-- 不得以当前前端页面、路由存在或自动测试通过作为产品需求和产品完成的唯一依据。
+- 不得以当前前端页面、路由存在、效果图相似或自动测试通过作为产品需求和产品完成的唯一依据。

@@ -1,6 +1,6 @@
 ---
 title: ServiceOS Admin 产品蓝图 v1.0
-version: 0.1.1
+version: 0.2.0
 status: Proposed
 lastUpdated: 2026-07-20
 ---
@@ -18,6 +18,8 @@ lastUpdated: 2026-07-20
 - 一级菜单：工作台、工单运营、服务履约、审核与整改、客户与项目、组织与资源、配置中心、系统管理、审计与监控。
 - 普通运营界面不得成为 API、领域命令或配置 JSON 调试器。
 - Ant Design Vue 是基础组件实现，不等同于产品信息架构；页面必须先满足业务任务，再映射技术能力。
+- Admin 视觉方向已批准为 **方案 A｜经典专业风**：浅色企业后台、白色导航、标准企业蓝、中高信息密度、清晰边框和克制装饰。
+- 项目履约配置中心、工作流设计器、任务模板中心和工单详情的概念效果方向已经批准，后续实现必须遵守 [经典专业风视觉与页面基线](12-classic-professional-visual-baseline.md)。
 
 ## 文档目录
 
@@ -32,6 +34,7 @@ lastUpdated: 2026-07-20
 9. [实施路线图](09-roadmap.md)
 10. [当前路由到目标产品映射](10-current-to-target-matrix.md)
 11. [M383 项目履约配置产品审查](11-m383-product-review.md)
+12. [经典专业风视觉与页面基线](12-classic-professional-visual-baseline.md)（`Accepted`）
 
 ## 规范优先级
 
@@ -40,8 +43,9 @@ lastUpdated: 2026-07-20
 3. `product/00-serviceos-product-delivery-decision-baseline.md`；
 4. `product/01-cross-portal-information-architecture.md`；
 5. `product/06-design-system-accessibility-spec.md`；
-6. 本 Admin 产品蓝图；
-7. 页面级实现说明与 Agent 提示词。
+6. `product/admin/12-classic-professional-visual-baseline.md`；
+7. 本 Admin 产品蓝图其他文档；
+8. 页面级实现说明与 Agent 提示词。
 
 出现冲突时，技术安全和领域事实不降低；产品层必须通过业务文案、渐进披露和专用工作区消化技术复杂度，不能把复杂度原样暴露给普通用户。
 
@@ -51,8 +55,8 @@ lastUpdated: 2026-07-20
 
 - 真实后端能力可用；
 - 前端已接入真实接口；
-- 页面符合本蓝图；
+- 页面符合本蓝图和经典专业风视觉基线；
 - 产品负责人完成页面审查；
 - 功能、视觉与可访问性验收通过。
 
-只有路由、PageContainer、接口调用或自动化测试通过，不构成产品完成。
+只有路由、PageContainer、接口调用、样式接近概念图或自动化测试通过，不构成产品完成。
