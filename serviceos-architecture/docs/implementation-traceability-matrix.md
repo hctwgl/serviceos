@@ -460,3 +460,4 @@ Feature gate/authority: if applicable
 | M363 | 整改领取/启动能力硬拒单 | OpenAPI 1.0.56 + claim/start Probe.requireCompatible 状态迁移前 422 + Unit/Security + 376-m363-* + 360-m363-* | Network Portal on-behalf、iOS 执行器、派单过滤、REVIEW_TASK |
 | M364 | 独立审核 REVIEW_TASK 模板分离 | ADR-087 Accepted + Flyway V132 `review_task_id` + create/reopen/decide/forceApprove/Correction.close 绑定与 completeHandlingTask + 试点模板 REVIEW_TASK + OpenAPI 1.0.57 + Final Review 投影 + ReviewCase/CorrectionCase IT + 377-m364-* + 361-m364-* | CLIENT reviewTaskId、全量模板、审核移动端 |
 | M365 | REVIEW_TASK 工作流门闸推进（A5-B） | 模板 1.1.0 主路径 INSTALL→REVIEW→OEM；REVIEW_TASK=WAITING 门闸；V133 early signal；WorkflowReviewDecidedHandler；HomeCharging IT + ParserTest + 378-m365-* + 362-m365-* | A2-B 工作流 HUMAN reviewTask、CLIENT 门闸、全量模板 |
+| M366 | 派单级 supportedClientKinds 过滤（设计提案） | ADR-088 Proposed（A1～A5）+ 379-m366-* + 363-m366-*；无代码/Flyway/OpenAPI | 实现待 Accept |
