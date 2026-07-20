@@ -373,6 +373,7 @@ title: ServiceOS 里程碑索引
 | M362 | M362 整改列表/头级客户端能力预检 | [375-m362-correction-header-capability-reject.md](../architecture/375-m362-correction-header-capability-reject.md) | [359-m362-correction-header-capability-reject-acceptance.md](../testing/359-m362-correction-header-capability-reject-acceptance.md) |
 | M363 | M363 整改领取/启动能力硬拒单 | [376-m363-correction-lifecycle-capability-hard-reject.md](../architecture/376-m363-correction-lifecycle-capability-hard-reject.md) | [360-m363-correction-lifecycle-capability-hard-reject-acceptance.md](../testing/360-m363-correction-lifecycle-capability-hard-reject-acceptance.md) |
 | M364 | M364 独立审核 REVIEW_TASK 模板分离 | [377-m364-review-task-template-separation.md](../architecture/377-m364-review-task-template-separation.md) | [361-m364-review-task-template-separation-acceptance.md](../testing/361-m364-review-task-template-separation-acceptance.md) |
+| M365 | M365 REVIEW_TASK 工作流门闸推进（A5-B） | [378-m365-review-task-workflow-gate.md](../architecture/378-m365-review-task-workflow-gate.md) | [362-m365-review-task-workflow-gate-acceptance.md](../testing/362-m365-review-task-workflow-gate-acceptance.md) |
 
 ## 未关联里程碑的文档
 

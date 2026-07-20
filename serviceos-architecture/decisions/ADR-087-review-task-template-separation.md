@@ -53,13 +53,19 @@ Accept ADR-087 with: A1-R, A2-R, A3-R, A4-R, A5-R
 | **A4-R** | `CorrectionCase.CLOSED` 后为最新补传 Snapshot 打开**新** INTERNAL ReviewCase + **新** `reviewTaskId`；旧决定只读。 |
 | **A5-R** | `decide`（APPROVED/REJECTED）与 `forceApprove` 仅 `completeHandlingTask` **`reviewTaskId`**；永不 complete 源提交 Task。 |
 
-## 4. 明确非目标（M364 仍不做）
+## 4. 明确非目标
 
 - 审核人移动端 / 多候选人转派策略；
 - CLIENT/车企 ReviewCase 的独立 REVIEW_TASK；
 - 自动 Evidence target 映射、SLA enrich；
 - 全量标准模板替换；
-- APPROVED 后推进工作流离开 `REVIEW_TASK` 节点（A5-B，可后续单列）。
+- 把 `reviewTaskId` 改为工作流 HUMAN Task（A2-B）。
+
+## 4.1 A5-B 后续切片（已实施）
+
+负责人选型 **C** 后由 **M365** 实施：`REVIEW_TASK` 作为 WAITING 编排门闸，
+由 `evidence.review-decided`（APPROVED/FORCE_APPROVED）唤醒；不改变 A2-R/A5-R。
+见 `architecture/378-m365-review-task-workflow-gate.md`。
 
 ## 5. 后果
 

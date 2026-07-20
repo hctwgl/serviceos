@@ -5,6 +5,7 @@ import com.serviceos.configuration.api.ExpressionContext;
 import com.serviceos.configuration.api.ExpressionDefinition;
 import com.serviceos.configuration.api.ExpressionEvaluator;
 import com.serviceos.task.api.WorkflowTaskKind;
+import com.serviceos.workflow.api.ReviewGateWait;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -143,6 +144,14 @@ final class WorkflowDefinitionParser {
         if ("END".equals(targetType)) {
             return ProgressionDefinition.end(targetNodeId);
         }
+        // M365 A5-B：REVIEW_TASK 是编排门闸（WAITING），禁止走 createWorkflowTask 双轨。
+        if ("REVIEW_TASK".equals(targetType)) {
+            return ProgressionDefinition.waiting(
+                    targetNodeId,
+                    requiredText(target, "stageCode"),
+                    ReviewGateWait.WAIT_EVENT_TYPE,
+                    ReviewGateWait.CORRELATION_KEY_TEMPLATE);
+        }
         if (TASK_NODE_TYPES.contains(targetType)) {
             TaskNode next = requireTaskNode(target, "next executable node");
             return ProgressionDefinition.task(
@@ -239,7 +248,7 @@ final class WorkflowDefinitionParser {
     }
 
     /**
-     * 从已唤醒的 WAIT_EVENT 节点推进到其唯一无条件后继。
+     * 从已唤醒的 WAIT_EVENT / REVIEW_TASK 门闸推进到其唯一无条件后继。
      */
     ProgressionDefinition progressionAfterWait(
             ConfigurationAssetDefinition asset,
@@ -250,10 +259,15 @@ final class WorkflowDefinitionParser {
         Graph graph = parseGraph(asset);
         String requiredNodeId = requiredValue(waitNodeId, "waitNodeId");
         JsonNode waitNode = graph.nodes().get(requiredNodeId);
-        if (waitNode == null || !"WAIT_EVENT".equals(requiredText(waitNode, "nodeType"))) {
-            throw new IllegalArgumentException("wait node must be WAIT_EVENT: " + requiredNodeId);
+        if (waitNode == null) {
+            throw new IllegalArgumentException("wait node does not exist: " + requiredNodeId);
         }
-        JsonNode target = requireSingleUnconditionalTarget(graph, requiredNodeId, "WAIT_EVENT node");
+        String waitType = requiredText(waitNode, "nodeType");
+        if (!"WAIT_EVENT".equals(waitType) && !"REVIEW_TASK".equals(waitType)) {
+            throw new IllegalArgumentException(
+                    "wait node must be WAIT_EVENT or REVIEW_TASK: " + requiredNodeId);
+        }
+        JsonNode target = requireSingleUnconditionalTarget(graph, requiredNodeId, waitType + " node");
         return resolveTarget(
                 graph, requiredText(target, "nodeId"), context, new HashSet<>(), requiredNodeId);
     }

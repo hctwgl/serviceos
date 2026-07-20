@@ -1,6 +1,6 @@
 {
   "workflowKey": "platform.home-charging.survey-install",
-  "semanticVersion": "1.0.0",
+  "semanticVersion": "1.1.0",
   "name": "标准家充勘测安装",
   "startNodeId": "START",
   "nodes": [
@@ -123,8 +123,13 @@
       "to": "INSTALL_TASK"
     },
     {
-      "transitionId": "t_install_oem_wait",
+      "transitionId": "t_install_review",
       "from": "INSTALL_TASK",
+      "to": "REVIEW_TASK"
+    },
+    {
+      "transitionId": "t_review_oem_wait",
+      "from": "REVIEW_TASK",
       "to": "WAIT_OEM_ACK"
     },
     {

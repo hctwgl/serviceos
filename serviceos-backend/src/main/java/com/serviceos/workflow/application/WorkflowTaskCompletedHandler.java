@@ -14,6 +14,7 @@ import com.serviceos.task.api.CreateWorkflowTaskCommand;
 import com.serviceos.task.api.ScheduledTaskView;
 import com.serviceos.task.api.TaskCompletedPayload;
 import com.serviceos.task.api.TaskSchedulingService;
+import com.serviceos.workflow.api.ReviewGateWait;
 import com.serviceos.workflow.api.SignalWorkflowWaitCommand;
 import com.serviceos.workflow.api.StageActivatedPayload;
 import com.serviceos.workflow.api.StageCompletedPayload;
@@ -415,6 +416,19 @@ final class WorkflowTaskCompletedHandler
                         .param("activationEventId", activationEventId)
                         .param("activatedAt", java.sql.Timestamp.from(activatedAt))
                         .update();
+                // M365：REVIEW_TASK 门闸激活时立即消费早期 APPROVED 信号，避免“先审后到闸”卡住。
+                if (ReviewGateWait.WAIT_EVENT_TYPE.equals(progression.waitEventType())) {
+                    EarlyReviewSignal early = findUnconsumedEarlyReviewSignal(
+                            tenantId, current.workOrderId());
+                    if (early != null) {
+                        WorkflowWaitSignalResult woke = signal(new SignalWorkflowWaitCommand(
+                                tenantId, ReviewGateWait.WAIT_EVENT_TYPE, correlationKey,
+                                early.signalId(), early.correlationId()));
+                        markEarlyReviewSignalConsumed(tenantId, current.workOrderId(), activatedAt);
+                        return Sha256.digest(current.workflowNodeInstanceId() + "|WAIT_EARLY|"
+                                + nextNodeInstanceId + "|" + woke.waitSubscriptionId());
+                    }
+                }
                 return Sha256.digest(current.workflowNodeInstanceId() + "|WAIT|" + nextNodeInstanceId
                         + "|" + correlationKey);
             }
@@ -1348,6 +1362,40 @@ final class WorkflowTaskCompletedHandler
             int arrivedTokens,
             String status
     ) {
+    }
+
+    private EarlyReviewSignal findUnconsumedEarlyReviewSignal(String tenantId, UUID workOrderId) {
+        return jdbc.sql("""
+                        SELECT signal_id, correlation_id
+                          FROM wfl_review_gate_early_signal
+                         WHERE tenant_id = :tenantId
+                           AND work_order_id = :workOrderId
+                           AND consumed_at IS NULL
+                         FOR UPDATE
+                        """)
+                .param("tenantId", tenantId)
+                .param("workOrderId", workOrderId)
+                .query((rs, rowNum) -> new EarlyReviewSignal(
+                        rs.getString("signal_id"), rs.getString("correlation_id")))
+                .optional()
+                .orElse(null);
+    }
+
+    private void markEarlyReviewSignalConsumed(String tenantId, UUID workOrderId, Instant consumedAt) {
+        jdbc.sql("""
+                        UPDATE wfl_review_gate_early_signal
+                           SET consumed_at = :consumedAt
+                         WHERE tenant_id = :tenantId
+                           AND work_order_id = :workOrderId
+                           AND consumed_at IS NULL
+                        """)
+                .param("consumedAt", java.sql.Timestamp.from(consumedAt))
+                .param("tenantId", tenantId)
+                .param("workOrderId", workOrderId)
+                .update();
+    }
+
+    private record EarlyReviewSignal(String signalId, String correlationId) {
     }
 
     private record WaitSubscription(

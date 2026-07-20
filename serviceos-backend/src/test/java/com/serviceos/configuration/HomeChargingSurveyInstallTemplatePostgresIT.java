@@ -17,6 +17,7 @@ import com.serviceos.task.spi.TaskExecutionResult;
 import com.serviceos.workorder.api.ReceiveExternalWorkOrderCommand;
 import com.serviceos.workorder.api.WorkOrderCommandService;
 import com.serviceos.workorder.api.WorkOrderReceipt;
+import com.serviceos.workflow.api.ReviewGateWait;
 import com.serviceos.workflow.api.SignalWorkflowWaitCommand;
 import com.serviceos.workflow.api.WorkflowWaitSignalService;
 import org.junit.jupiter.api.BeforeEach;
@@ -73,7 +74,8 @@ class HomeChargingSurveyInstallTemplatePostgresIT {
     void clean() {
         jdbc.sql("""
                 TRUNCATE TABLE rdm_work_order_timeline_entry, rel_outbox_publish_attempt, rel_outbox_event, rel_inbox_record,
-                    tsk_task_execution_attempt, tsk_task, wfl_wait_subscription, wfl_node_instance,
+                    tsk_task_execution_attempt, tsk_task, wfl_review_gate_early_signal,
+                    wfl_wait_subscription, wfl_node_instance,
                     wfl_stage_instance, wfl_workflow_instance, wo_work_order,
                     cfg_configuration_bundle_item, cfg_configuration_bundle,
                     cfg_configuration_asset_version, prj_project CASCADE
@@ -108,10 +110,10 @@ class HomeChargingSurveyInstallTemplatePostgresIT {
                 "1.0.0", "1.0.0", slaJson, Sha256.digest(slaJson))).versionId();
         UUID workflowId = configurations.publishAsset(new PublishConfigurationAssetCommand(
                 TENANT, ConfigurationAssetType.WORKFLOW, "platform.home-charging.survey-install",
-                "1.0.0", "1.0.0", workflowJson, Sha256.digest(workflowJson))).versionId();
+                "1.1.0", "1.1.0", workflowJson, Sha256.digest(workflowJson))).versionId();
         ConfigurationBundleReference bundle = configurations.publishBundle(
                 new PublishConfigurationBundleCommand(
-                        TENANT, projectId, "PLATFORM-HC-BUNDLE", "1.0.0", "PLATFORM_BRAND",
+                        TENANT, projectId, "PLATFORM-HC-BUNDLE", "1.1.0", "PLATFORM_BRAND",
                         "HOME_CHARGING_SURVEY_INSTALL", "370000", Instant.now().minusSeconds(60),
                         null, List.of(slaId, workflowId)));
 
@@ -143,6 +145,28 @@ class HomeChargingSurveyInstallTemplatePostgresIT {
                 TENANT, "platform.survey.confirmed", key, "sig-survey-1", "corr-m271-w1"));
         assertThat(runTask("FIELD_INSTALL")).isEqualTo(TaskExecutionWorker.RunResult.SUCCEEDED);
         publishUntil("task.completed");
+
+        // M365：INSTALL 之后进入 REVIEW_TASK 门闸（WAITING，无 HUMAN 工作流 Task）。
+        assertThat(jdbc.sql("""
+                SELECT node_id || ':' || status FROM wfl_node_instance
+                 WHERE node_id = 'REVIEW_TASK'
+                """).query(String.class).single()).isEqualTo("REVIEW_TASK:WAITING");
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM tsk_task
+                 WHERE task_type = 'evidence.review' AND workflow_node_instance_id IS NOT NULL
+                """).query(Long.class).single()).isZero();
+
+        waitSignals.signal(new SignalWorkflowWaitCommand(
+                TENANT, ReviewGateWait.WAIT_EVENT_TYPE, key, "sig-review-1", "corr-m365-review"));
+        assertThat(jdbc.sql("""
+                SELECT node_id || ':' || status FROM wfl_node_instance
+                 WHERE node_id = 'REVIEW_TASK'
+                """).query(String.class).single()).isEqualTo("REVIEW_TASK:COMPLETED");
+        assertThat(jdbc.sql("""
+                SELECT node_id || ':' || status FROM wfl_node_instance
+                 WHERE node_id = 'WAIT_OEM_ACK'
+                """).query(String.class).single()).isEqualTo("WAIT_OEM_ACK:WAITING");
+
         waitSignals.signal(new SignalWorkflowWaitCommand(
                 TENANT, "platform.oem.acknowledged", key, "sig-oem-1", "corr-m271-w2"));
 
@@ -150,6 +174,94 @@ class HomeChargingSurveyInstallTemplatePostgresIT {
                 .query(String.class).single()).isEqualTo("COMPLETED");
         assertThat(jdbc.sql("SELECT status FROM wo_work_order")
                 .query(String.class).single()).isEqualTo("FULFILLED");
+    }
+
+    @Test
+    void earlyReviewApproveSignalIsConsumedWhenReviewGateActivates() throws Exception {
+        String workflowJson = classpath("configuration-templates/home-charging-survey-install/workflow.json");
+        String slaJson = classpath("configuration-templates/home-charging-survey-install/sla.json");
+
+        UUID projectId = UUID.randomUUID();
+        jdbc.sql("""
+                INSERT INTO prj_project (
+                    project_id, tenant_id, project_code, client_id, project_name,
+                    starts_on, ends_on, project_status, aggregate_version, created_at
+                ) VALUES (
+                    :projectId, :tenantId, 'PLATFORM-HC-M365', 'PLATFORM', '早期审核门闸测试',
+                    :startsOn, NULL, 'ACTIVE', 1, :createdAt
+                )
+                """)
+                .param("projectId", projectId)
+                .param("tenantId", TENANT)
+                .param("startsOn", LocalDate.now().minusDays(1))
+                .param("createdAt", OffsetDateTime.now())
+                .update();
+
+        UUID slaId = configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.SLA, "platform.home-charging.task-elapsed",
+                "1.0.0", "1.0.0", slaJson, Sha256.digest(slaJson))).versionId();
+        UUID workflowId = configurations.publishAsset(new PublishConfigurationAssetCommand(
+                TENANT, ConfigurationAssetType.WORKFLOW, "platform.home-charging.survey-install",
+                "1.1.0", "1.1.0", workflowJson, Sha256.digest(workflowJson))).versionId();
+        ConfigurationBundleReference bundle = configurations.publishBundle(
+                new PublishConfigurationBundleCommand(
+                        TENANT, projectId, "PLATFORM-HC-BUNDLE-EARLY", "1.1.0", "PLATFORM_BRAND",
+                        "HOME_CHARGING_SURVEY_INSTALL", "370000", Instant.now().minusSeconds(60),
+                        null, List.of(slaId, workflowId)));
+
+        WorkOrderReceipt receipt = workOrders.receive(new ReceiveExternalWorkOrderCommand(
+                TENANT, projectId, "PLATFORM", "PLATFORM_BRAND", "HOME_CHARGING_SURVEY_INSTALL",
+                "PLATFORM-HC-ORDER-EARLY", "e".repeat(64), bundle.bundleId(), bundle.bundleCode(),
+                bundle.bundleVersion(), bundle.manifestDigest(),
+                "370000", "370100", "370102", "测试用户", "13800000001", "济南测试地址",
+                "VINM36500000000001", LocalDateTime.of(2026, 7, 18, 10, 0),
+                "corr-m365", "cause-m365"));
+
+        assertThat(outboxWorker.runOnce()).isEqualTo(OutboxWorker.RunResult.PUBLISHED);
+        drainOutbox();
+        assertThat(runTask("ASSIGN_COORDINATORS")).isEqualTo(TaskExecutionWorker.RunResult.SUCCEEDED);
+        publishUntil("task.completed");
+        assertThat(runTask("FIELD_SURVEY")).isEqualTo(TaskExecutionWorker.RunResult.SUCCEEDED);
+        publishUntil("task.completed");
+
+        String key = "workOrder:" + receipt.workOrderId();
+        waitSignals.signal(new SignalWorkflowWaitCommand(
+                TENANT, "platform.survey.confirmed", key, "sig-survey-early", "corr-m365-w1"));
+
+        // 审核先于 INSTALL 完成：写入早期信号，门闸激活时自动消费。
+        jdbc.sql("""
+                INSERT INTO wfl_review_gate_early_signal (
+                    tenant_id, work_order_id, review_case_id, review_decision_id,
+                    decision, signal_id, correlation_id, created_at, consumed_at
+                ) VALUES (
+                    :tenantId, :workOrderId, :reviewCaseId, :decisionId,
+                    'APPROVED', :signalId, 'corr-m365-early', :createdAt, NULL
+                )
+                """)
+                .param("tenantId", TENANT)
+                .param("workOrderId", receipt.workOrderId())
+                .param("reviewCaseId", UUID.randomUUID())
+                .param("decisionId", UUID.randomUUID())
+                .param("signalId", "sig-review-early")
+                .param("createdAt", OffsetDateTime.now())
+                .update();
+
+        assertThat(runTask("FIELD_INSTALL")).isEqualTo(TaskExecutionWorker.RunResult.SUCCEEDED);
+        publishUntil("task.completed");
+        drainOutbox();
+
+        assertThat(jdbc.sql("""
+                SELECT node_id || ':' || status FROM wfl_node_instance
+                 WHERE node_id = 'REVIEW_TASK'
+                """).query(String.class).single()).isEqualTo("REVIEW_TASK:COMPLETED");
+        assertThat(jdbc.sql("""
+                SELECT node_id || ':' || status FROM wfl_node_instance
+                 WHERE node_id = 'WAIT_OEM_ACK'
+                """).query(String.class).single()).isEqualTo("WAIT_OEM_ACK:WAITING");
+        assertThat(jdbc.sql("""
+                SELECT consumed_at IS NOT NULL FROM wfl_review_gate_early_signal
+                 WHERE work_order_id = :workOrderId
+                """).param("workOrderId", receipt.workOrderId()).query(Boolean.class).single()).isTrue();
     }
 
     private TaskExecutionWorker.RunResult runTask(String taskType) {
