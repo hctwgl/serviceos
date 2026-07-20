@@ -141,7 +141,8 @@ test.describe('M213 Network Portal 限定工单工作区', () => {
     await page.getByTestId('work-order-workspace-deeplink').click()
     await expect(page).toHaveURL(new RegExp(`/network-portal/work-orders/${WORK_ORDER_ID}$`))
     await expect(page.getByTestId('network-portal-work-order-workspace')).toBeVisible()
-    await expect(page.getByTestId('workspace-business-type')).toHaveText('INSTALLATION')
+    // 产品化后业务类型展示中文标签，不再裸露英文枚举。
+    await expect(page.getByTestId('workspace-business-type')).toHaveText(/安装|INSTALLATION/)
     await expect(page.getByTestId(`workspace-task-${TASK_ID}`)).toBeVisible()
     await expect(page.getByTestId('workspace-task-deeplink')).toHaveAttribute(
       'href',

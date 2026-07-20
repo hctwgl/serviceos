@@ -637,3 +637,22 @@ productOwnerDecision: null
 knownGaps:
   - UI_DATA_GAP: 冲突与推荐解释仍诚实声明缺口；产能使用服务端 capacity 口径
 ```
+
+## 46. M391 验收记录（工单工作区 + 预约协同）
+
+```yaml
+pageId: NETWORK.WORKORDER.WORKSPACE
+route: /network-portal/work-orders/:id
+visualProfile: CLASSIC_PROFESSIONAL_COLLABORATION
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: 客户/地址脱敏读模型、师傅日程冲突与推荐解释未就绪
+  - CONTENT_GAP: 预约日历视图未交付
+```
