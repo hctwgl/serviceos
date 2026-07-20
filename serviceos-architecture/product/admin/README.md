@@ -1,6 +1,6 @@
 ---
 title: ServiceOS Admin 产品蓝图 v1.0
-version: 0.1.0
+version: 0.1.1
 status: Proposed
 lastUpdated: 2026-07-20
 ---
@@ -8,6 +8,8 @@ lastUpdated: 2026-07-20
 # ServiceOS Admin 产品蓝图 v1.0
 
 本目录定义 ServiceOS 总部运营管理后台的产品事实源。它不替代领域模型、OpenAPI、Capability、Scope、allowed-actions 或服务端 Navigation，而是规定这些技术能力应如何以运营人员可理解的方式组织成产品。
+
+跨 Portal、身份授权、履约内核、配置中心、技术架构、完成状态与开放事项的上位决策见：[ServiceOS 产品、架构与交付决策基线](../00-serviceos-product-delivery-decision-baseline.md)。本蓝图必须在该基线范围内细化 Admin，不得形成平行产品定义。
 
 ## 已由产品负责人锁定
 
@@ -29,14 +31,17 @@ lastUpdated: 2026-07-20
 8. [产品验收与里程碑状态](08-product-acceptance.md)
 9. [实施路线图](09-roadmap.md)
 10. [当前路由到目标产品映射](10-current-to-target-matrix.md)
+11. [M383 项目履约配置产品审查](11-m383-product-review.md)
 
 ## 规范优先级
 
-1. 已接受的领域 ADR、数据库约束、OpenAPI 和安全边界；
-2. `product/01-cross-portal-information-architecture.md`；
-3. `product/06-design-system-accessibility-spec.md`；
-4. 本 Admin 产品蓝图；
-5. 页面级实现说明与 Agent 提示词。
+1. 当前任务中产品负责人明确批准的最新决策；
+2. 已接受的领域 ADR、数据库约束、OpenAPI 和安全边界；
+3. `product/00-serviceos-product-delivery-decision-baseline.md`；
+4. `product/01-cross-portal-information-architecture.md`；
+5. `product/06-design-system-accessibility-spec.md`；
+6. 本 Admin 产品蓝图；
+7. 页面级实现说明与 Agent 提示词。
 
 出现冲突时，技术安全和领域事实不降低；产品层必须通过业务文案、渐进披露和专用工作区消化技术复杂度，不能把复杂度原样暴露给普通用户。
 
