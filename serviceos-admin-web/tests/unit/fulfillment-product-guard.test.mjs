@@ -36,3 +36,15 @@ test('临时 Manifest 解析只能集中在有明确删除计划的适配器', a
   assert.match(adapter, /JSON\.parse\s*\(/)
   assert.match(adapter, /必须删除/)
 })
+
+test('履约编辑器使用业务选择器而不是原生按钮和资产键文本框', async () => {
+  const text = await source('src/pages/FulfillmentProfileEditorPage.vue')
+  assert.doesNotMatch(text, /<button\b/i)
+  assert.doesNotMatch(text, /表单引用（每行一个资产键）/)
+  assert.doesNotMatch(text, /资料模板引用（每行一个资产键）/)
+  assert.doesNotMatch(text, /SLA 策略资产键/)
+  assert.doesNotMatch(text, /聚合版本/)
+  assert.match(text, /FulfillmentStageNavigation/)
+  assert.match(text, /listConfigurationDrafts/)
+  assert.match(text, /选择已发布的表单模板/)
+})
