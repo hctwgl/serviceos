@@ -1,53 +1,54 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { useRoute, type RouteLocationRaw } from 'vue-router'
+import { computed, h, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { Table, Select, Input, Button, Space, Alert, Tooltip } from 'ant-design-vue'
+import type { TableColumnsType } from 'ant-design-vue'
 import SavedViewBar from '../components/SavedViewBar.vue'
-import QueueTable from './QueueTable.vue'
+import ListPageLayout from '../patterns/templates/ListPageLayout.vue'
+import SemanticStatusTag from '../components/business/SemanticStatusTag.vue'
+import AsyncContent from '../components/feedback/AsyncContent.vue'
 import { listAuthorizedWorkOrders, type WorkOrderPage } from '../api/workOrders'
-import { firstRouteQuery, uuidRoute } from '../routeQuery'
+import { firstRouteQuery } from '../routeQuery'
 import { statusOptions } from '../product/statusLabels'
 import { toUserFacingError } from '../product/errorMessages'
+import { presentWorkOrderStatus } from '../presentation/work-order-status.presenter'
+import { labelClientCode } from '../presentation/enum-labels'
+import { presentEntityName } from '../presentation/entity-name.presenter'
+import { formatDateTimeDisplay } from '../presentation/date-time.presenter'
+import { presentEmptyValue } from '../presentation/empty-value.presenter'
 
 const statusChoices = statusOptions(['RECEIVED', 'ACTIVE', 'FULFILLED', 'CANCELLED'])
 
-const linkColumns: Record<
-  string,
-  (row: Record<string, unknown>) => RouteLocationRaw | null
-> = {
-  externalOrderCode: (row) => uuidRoute(row.id, 'ADMIN.WORKORDER.WORKSPACE'),
-  projectId: (row) => uuidRoute(row.projectId, 'ADMIN.PROJECT.DETAIL'),
-}
-
 const route = useRoute()
+const router = useRouter()
 
 const loading = ref(false)
 const error = ref<string | null>(null)
 const errorCode = ref<string | null>(null)
 const page = ref<WorkOrderPage | null>(null)
 const cursor = ref<string | undefined>()
-/** 默认不限；显式 route.query 可覆盖。 */
-const status = ref('')
-const clientCode = ref('')
+const pageSize = ref(20)
+const status = ref<string | undefined>(undefined)
+const clientCode = ref<string | undefined>(undefined)
 const projectKeyword = ref('')
 const keyword = ref('')
 
+/** 更多筛选：当前列表 API 未提供对应查询参数，仅展示缺口说明。 */
+const moreRegion = ref('')
+const moreNetwork = ref('')
+const moreTechnician = ref('')
+const moreStage = ref('')
+const moreSla = ref<string | undefined>(undefined)
+
 function hydrateFiltersFromRoute() {
   const nextStatus = firstRouteQuery(route, 'status')
-  if (nextStatus !== undefined) {
-    status.value = nextStatus
-  }
+  if (nextStatus !== undefined) status.value = nextStatus || undefined
   const nextClientCode = firstRouteQuery(route, 'clientCode')
-  if (nextClientCode !== undefined) {
-    clientCode.value = nextClientCode
-  }
+  if (nextClientCode !== undefined) clientCode.value = nextClientCode || undefined
   const nextProjectId = firstRouteQuery(route, 'projectId')
-  if (nextProjectId !== undefined) {
-    projectKeyword.value = nextProjectId
-  }
+  if (nextProjectId !== undefined) projectKeyword.value = nextProjectId
   const nextKeyword = firstRouteQuery(route, 'q')
-  if (nextKeyword !== undefined) {
-    keyword.value = nextKeyword
-  }
+  if (nextKeyword !== undefined) keyword.value = nextKeyword
 }
 
 function looksLikeUuid(value: string): boolean {
@@ -63,9 +64,9 @@ async function load(next?: string) {
   try {
     page.value = await listAuthorizedWorkOrders({
       cursor: next,
-      limit: '20',
+      limit: String(pageSize.value),
       status: status.value || undefined,
-      clientCode: clientCode.value.trim() || undefined,
+      clientCode: clientCode.value?.trim() || undefined,
       projectId: looksLikeUuid(projectKeyword.value)
         ? projectKeyword.value.trim()
         : undefined,
@@ -75,6 +76,8 @@ async function load(next?: string) {
     const facing = toUserFacingError(err)
     error.value = facing.message
     errorCode.value = facing.errorCode
+    page.value = null
+    cursor.value = undefined
   } finally {
     loading.value = false
   }
@@ -88,7 +91,7 @@ function search() {
 function currentFilters() {
   return {
     status: status.value || undefined,
-    clientCode: clientCode.value.trim() || undefined,
+    clientCode: clientCode.value?.trim() || undefined,
     projectId: looksLikeUuid(projectKeyword.value)
       ? projectKeyword.value.trim()
       : undefined,
@@ -96,47 +99,207 @@ function currentFilters() {
 }
 
 function applySavedView(filters: Record<string, string>) {
-  status.value = filters.status ?? ''
-  clientCode.value = filters.clientCode ?? ''
+  status.value = filters.status || undefined
+  clientCode.value = filters.clientCode || undefined
   projectKeyword.value = filters.projectId ?? ''
   return search()
 }
 
 function resetFilters() {
-  status.value = ''
-  clientCode.value = ''
+  status.value = undefined
+  clientCode.value = undefined
   projectKeyword.value = ''
   keyword.value = ''
+  moreRegion.value = ''
+  moreNetwork.value = ''
+  moreTechnician.value = ''
+  moreStage.value = ''
+  moreSla.value = undefined
   return search()
 }
 
-const rows = computed(() => {
+type Row = {
+  key: string
+  id: string
+  externalOrderCode: string
+  status: string
+  clientCode: string
+  projectId: string
+  receivedAt: string
+}
+
+const rows = computed((): Row[] => {
   const q = keyword.value.trim().toLowerCase()
   const project = projectKeyword.value.trim().toLowerCase()
   return (page.value?.items ?? [])
     .filter((item) => {
       if (q) {
-        const hay = `${item.externalOrderCode} ${item.clientCode} ${item.id}`.toLowerCase()
-        if (!hay.includes(q)) {
-          return false
-        }
+        const hay = `${item.externalOrderCode} ${item.clientCode}`.toLowerCase()
+        if (!hay.includes(q)) return false
       }
       if (project && !looksLikeUuid(projectKeyword.value)) {
-        if (!item.projectId.toLowerCase().includes(project) && !item.clientCode.toLowerCase().includes(project)) {
+        if (
+          !item.projectId.toLowerCase().includes(project) &&
+          !item.clientCode.toLowerCase().includes(project)
+        ) {
           return false
         }
       }
       return true
     })
     .map((item) => ({
+      key: item.id,
+      id: item.id,
       externalOrderCode: item.externalOrderCode,
       status: item.status,
       clientCode: item.clientCode,
       projectId: item.projectId,
       receivedAt: item.receivedAt,
-      id: item.id,
     }))
 })
+
+const countLabel = computed(() => {
+  if (error.value) return undefined
+  const n = rows.value.length
+  if (cursor.value) return `已加载 ${n} 条，还有更多（列表无总数，UI_DATA_GAP）`
+  return `已加载 ${n} 条`
+})
+
+const columns = computed((): TableColumnsType<Row> => [
+  {
+    title: '工单编号',
+    dataIndex: 'externalOrderCode',
+    key: 'externalOrderCode',
+    fixed: 'left',
+    width: 160,
+    customRender: ({ record }) =>
+      h(
+        Button,
+        {
+          type: 'link',
+          onClick: () =>
+            router.push({ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: record.id } }),
+        },
+        () => record.externalOrderCode || presentEmptyValue('not_provided'),
+      ),
+  },
+  {
+    title: '当前状态',
+    dataIndex: 'status',
+    key: 'status',
+    width: 120,
+    customRender: ({ record }) =>
+      h(SemanticStatusTag, { presentation: presentWorkOrderStatus(record.status) }),
+  },
+  {
+    title: '当前阶段',
+    key: 'stage',
+    width: 120,
+    customRender: () =>
+      h(
+        Tooltip,
+        { title: '工单目录投影未提供阶段字段（UI_DATA_GAP）' },
+        () => presentEmptyValue('not_loaded'),
+      ),
+  },
+  {
+    title: '车企',
+    dataIndex: 'clientCode',
+    key: 'clientCode',
+    width: 120,
+    customRender: ({ record }) => labelClientCode(record.clientCode),
+  },
+  {
+    title: '所属项目',
+    dataIndex: 'projectId',
+    key: 'projectId',
+    width: 140,
+    customRender: ({ record }) => {
+      const name = presentEntityName({ id: record.projectId, loaded: true })
+      return h(
+        Tooltip,
+        { title: import.meta.env.DEV ? name.technicalId : '项目名称暂未随目录返回' },
+        () =>
+          h(
+            Button,
+            {
+              type: 'link',
+              onClick: () =>
+                router.push({
+                  name: 'ADMIN.PROJECT.DETAIL',
+                  params: { id: record.projectId },
+                }),
+            },
+            () => name.label,
+          ),
+      )
+    },
+  },
+  {
+    title: '客户',
+    key: 'customer',
+    width: 100,
+    customRender: () =>
+      h(Tooltip, { title: '目录投影未提供客户字段（UI_DATA_GAP）' }, () =>
+        presentEmptyValue('not_provided'),
+      ),
+  },
+  {
+    title: '服务区域',
+    key: 'region',
+    width: 100,
+    customRender: () =>
+      h(Tooltip, { title: '目录投影未提供服务区域（UI_DATA_GAP）' }, () =>
+        presentEmptyValue('not_provided'),
+      ),
+  },
+  {
+    title: '当前责任人',
+    key: 'assignee',
+    width: 110,
+    customRender: () =>
+      h(Tooltip, { title: '目录投影未提供责任人（UI_DATA_GAP）' }, () =>
+        presentEmptyValue('not_provided'),
+      ),
+  },
+  {
+    title: 'SLA',
+    key: 'sla',
+    width: 90,
+    customRender: () =>
+      h(Tooltip, { title: '目录投影未提供 SLA 摘要（UI_DATA_GAP）' }, () =>
+        presentEmptyValue('not_provided'),
+      ),
+  },
+  {
+    title: '更新时间',
+    dataIndex: 'receivedAt',
+    key: 'receivedAt',
+    width: 150,
+    customRender: ({ record }) =>
+      h(
+        Tooltip,
+        { title: '列表当前返回接收时间，非独立 updatedAt（UI_DATA_GAP）' },
+        () => formatDateTimeDisplay(record.receivedAt),
+      ),
+  },
+  {
+    title: '操作',
+    key: 'actions',
+    fixed: 'right',
+    width: 100,
+    customRender: ({ record }) =>
+      h(
+        Button,
+        {
+          type: 'link',
+          onClick: () =>
+            router.push({ name: 'ADMIN.WORKORDER.WORKSPACE', params: { id: record.id } }),
+        },
+        () => '打开详情',
+      ),
+  },
+])
 
 onMounted(() => {
   hydrateFiltersFromRoute()
@@ -145,124 +308,159 @@ onMounted(() => {
 </script>
 
 <template>
-  <section>
-    <header class="page-head">
-      <h1>工单中心</h1>
-      <p class="desc">按状态与关键字查找工单，第一列展示业务工单编号而非内部 ID。</p>
-    </header>
-    <SavedViewBar
-      page-id="ADMIN.WORKORDER.LIST"
-      :schema-version="1"
-      :current-filters="currentFilters()"
-      @apply="applySavedView"
-    />
-    <form class="filters" @submit.prevent="search">
-      <label>
-        工单状态
-        <select v-model="status" aria-label="workOrder status filter">
-          <option value="">（不限）</option>
-          <option v-for="opt in statusChoices" :key="opt.value" :value="opt.value">
-            {{ opt.label }}
-          </option>
-        </select>
-      </label>
-      <label>
-        车企
-        <input
-          v-model="clientCode"
-          aria-label="workOrder clientCode filter"
-          placeholder="如 GEELY / BYD"
+  <ListPageLayout
+    title="工单中心"
+    description="统一查询和处理家充勘测、安装、整改与审核工单。"
+    :loading="loading"
+    :count-label="countLabel"
+    @search="search"
+    @reset="resetFilters"
+  >
+    <template #secondary-actions>
+      <Button :loading="loading" @click="load()">刷新</Button>
+    </template>
+
+    <template #feedback>
+      <Alert
+        v-if="error"
+        type="error"
+        show-icon
+        :message="error"
+        :description="errorCode ? `问题编号：${errorCode}` : undefined"
+      />
+    </template>
+
+    <template #filters>
+      <label class="filter-field">
+        <span>工单状态</span>
+        <Select
+          v-model:value="status"
+          allow-clear
+          placeholder="不限"
+          style="width: 160px"
+          aria-label="工单状态筛选"
+          :options="statusChoices.map((o) => ({ value: o.value, label: o.label }))"
         />
       </label>
-      <label>
-        所属项目
-        <input
-          v-model="projectKeyword"
-          aria-label="workOrder projectId filter"
+      <label class="filter-field">
+        <span>车企</span>
+        <Select
+          v-model:value="clientCode"
+          allow-clear
+          show-search
+          placeholder="选择车企"
+          style="width: 160px"
+          aria-label="车企筛选"
+          :options="[
+            { value: 'GEELY', label: '吉利汽车' },
+            { value: 'BYD', label: '比亚迪' },
+          ]"
+        />
+      </label>
+      <label class="filter-field">
+        <span>所属项目</span>
+        <Input
+          v-model:value="projectKeyword"
+          allow-clear
+          style="width: 180px"
+          aria-label="所属项目筛选"
           placeholder="项目名称或编号"
         />
       </label>
-      <label>
-        关键字
-        <input
-          v-model="keyword"
-          aria-label="workOrder keyword filter"
-          placeholder="工单编号 / 车企"
+      <label class="filter-field">
+        <span>关键词</span>
+        <Input
+          v-model:value="keyword"
+          allow-clear
+          style="width: 280px"
+          aria-label="工单关键词筛选"
+          placeholder="搜索工单编号、客户、手机号后四位或地址"
         />
       </label>
-      <button type="submit" :disabled="loading">查询</button>
-      <button type="button" :disabled="loading" @click="resetFilters">重置筛选</button>
-    </form>
+    </template>
 
-    <QueueTable
-      title="工单列表"
-      :columns="['externalOrderCode', 'status', 'clientCode', 'projectId', 'receivedAt']"
-      :column-labels="{
-        externalOrderCode: '工单编号',
-        status: '当前状态',
-        clientCode: '车企',
-        projectId: '所属项目',
-        receivedAt: '创建时间',
-      }"
-      :rows="rows"
-      :link-columns="linkColumns"
-      :loading="loading"
-      :error="error"
-      :error-code="errorCode"
-      :as-of="page?.asOf"
-      :next-cursor="cursor ?? null"
-      empty-guide="当前没有工单。可到「演示数据管理」初始化演示工单，或调整筛选条件。"
-      @refresh="load()"
-      @next="load(cursor)"
-    />
+    <template #more-filters>
+      <Alert
+        type="info"
+        show-icon
+        message="更多筛选暂不可用"
+        description="服务区域、网点、师傅、阶段、SLA、创建时间等条件尚未由工单目录查询 API 提供（UI_DATA_GAP），不会假装可筛。"
+      />
+      <label class="filter-field">
+        <span>服务区域</span>
+        <Input v-model:value="moreRegion" disabled placeholder="暂未提供" />
+      </label>
+      <label class="filter-field">
+        <span>服务网点</span>
+        <Input v-model:value="moreNetwork" disabled placeholder="暂未提供" />
+      </label>
+      <label class="filter-field">
+        <span>服务师傅</span>
+        <Input v-model:value="moreTechnician" disabled placeholder="暂未提供" />
+      </label>
+      <label class="filter-field">
+        <span>当前阶段</span>
+        <Input v-model:value="moreStage" disabled placeholder="暂未提供" />
+      </label>
+      <label class="filter-field">
+        <span>SLA 状态</span>
+        <Select
+          v-model:value="moreSla"
+          disabled
+          placeholder="暂未提供"
+          style="width: 160px"
+          :options="[]"
+        />
+      </label>
+    </template>
 
-  </section>
+    <template #toolbar-views>
+      <SavedViewBar
+        page-id="ADMIN.WORKORDER.LIST"
+        :schema-version="1"
+        :current-filters="currentFilters()"
+        @apply="applySavedView"
+      />
+    </template>
+
+    <AsyncContent :loading="loading && !page" :error="null" :empty="!loading && !error && rows.length === 0" empty-description="当前没有工单。可调整筛选，或到演示数据管理初始化演示工单。">
+      <Table
+        size="middle"
+        row-key="key"
+        :columns="columns"
+        :data-source="rows"
+        :pagination="false"
+        :scroll="{ x: 1400 }"
+        :loading="loading"
+        data-testid="work-order-table"
+      />
+    </AsyncContent>
+
+    <template #pagination>
+      <Space>
+        <span>每页</span>
+        <Select
+          v-model:value="pageSize"
+          style="width: 88px"
+          aria-label="每页条数"
+          :options="[
+            { value: 20, label: '20' },
+            { value: 50, label: '50' },
+            { value: 100, label: '100' },
+          ]"
+          @change="search"
+        />
+        <Button :disabled="loading || !cursor" @click="load(cursor)">下一页</Button>
+      </Space>
+    </template>
+  </ListPageLayout>
 </template>
 
 <style scoped>
-.page-head {
-  margin-bottom: 0.75rem;
-}
-.page-head h1 {
-  margin: 0;
-  font-size: 1.35rem;
-}
-.desc {
-  margin: 0.35rem 0 0;
-  color: #627d98;
-  font-size: 0.92rem;
-}
-.filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-  align-items: end;
-}
-label {
+.filter-field {
   display: grid;
-  gap: 0.25rem;
-  font-size: 0.85rem;
-  color: #486581;
-}
-input,
-select,
-button {
-  border: 1px solid #bcccdc;
-  border-radius: 6px;
-  padding: 0.4rem 0.65rem;
-}
-button {
-  background: #243b53;
-  color: #fff;
-  border-color: #243b53;
-  cursor: pointer;
-}
-.links {
-  margin-top: 0.75rem;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  font-size: 0.9rem;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--sos-color-text-secondary, #4b5563);
 }
 </style>

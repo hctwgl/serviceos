@@ -49,7 +49,7 @@ test('entity name presenter never returns full UUID as label', () => {
 
 test('empty value kinds are distinct', () => {
   const empty = src('src/presentation/empty-value.presenter.ts')
-  for (const label of ['未提供', '不适用', '未知', '尚未生成', '无相关记录', '无权限查看']) {
+  for (const label of ['未提供', '不适用', '未知', '尚未生成', '无相关记录', '无权限查看', '暂未加载']) {
     assert.match(empty, new RegExp(label))
   }
 })

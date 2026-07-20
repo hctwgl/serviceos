@@ -9,6 +9,7 @@ export type EmptyValueKind =
   | 'not_generated'
   | 'no_records'
   | 'no_permission'
+  | 'not_loaded'
 
 const LABELS: Record<EmptyValueKind, string> = {
   not_provided: '未提供',
@@ -17,6 +18,7 @@ const LABELS: Record<EmptyValueKind, string> = {
   not_generated: '尚未生成',
   no_records: '无相关记录',
   no_permission: '无权限查看',
+  not_loaded: '暂未加载',
 }
 
 export function presentEmptyValue(kind: EmptyValueKind): string {
