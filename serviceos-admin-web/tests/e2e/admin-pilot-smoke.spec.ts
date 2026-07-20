@@ -215,37 +215,39 @@ async function clickTaskCommandButton(
   page: import('@playwright/test').Page,
   name: string | RegExp,
 ) {
-  const scoped = [
-    page.locator('.ant-card').filter({ hasText: '当前任务命令' }).getByRole('button', { name }),
-    page.locator('article.card').filter({ hasText: '命令' }).getByRole('button', { name }),
-    page.getByRole('main').getByRole('button', { name }),
-  ]
-  for (const locator of scoped) {
-    if ((await locator.count()) > 0) {
-      // 页头主操作与命令面板可能同名；优先作用域内最后一个（命令面板）。
-      await locator.last().click()
-      return
-    }
+  const workspaceBtn = page
+    .locator('.ant-card')
+    .filter({ hasText: '当前任务命令' })
+    .getByRole('button', { name })
+  await workspaceBtn.last().waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined)
+  if ((await workspaceBtn.count()) > 0) {
+    await workspaceBtn.last().click()
+    return
   }
-  throw new Error(`未找到任务命令按钮: ${String(name)}`)
+  const detailBtn = page.locator('article.card').filter({ hasText: '命令' }).getByRole('button', { name })
+  if ((await detailBtn.count()) > 0) {
+    await detailBtn.last().click()
+    return
+  }
+  // 最后回退：主内容区同名按钮取最后一个，避开页头主操作。
+  await page.getByRole('main').getByRole('button', { name }).last().click()
 }
 
 async function expectTaskCommandButton(
   page: import('@playwright/test').Page,
   name: string | RegExp,
 ) {
-  const scoped = page
+  const workspaceBtn = page
     .locator('.ant-card')
     .filter({ hasText: '当前任务命令' })
     .getByRole('button', { name })
-  if ((await scoped.count()) > 0) {
-    await expect(scoped.last()).toBeVisible()
+  if ((await workspaceBtn.count()) > 0) {
+    await expect(workspaceBtn.last()).toBeVisible()
     return
   }
-  await expect(
-    page.locator('article.card').filter({ hasText: '命令' }).getByRole('button', { name }).last(),
-  ).toBeVisible()
+  await expect(page.getByRole('main').getByRole('button', { name }).last()).toBeVisible()
 }
+
 
 
 
