@@ -377,3 +377,46 @@ RightDetailPanel
 - 可访问性和键盘操作证据。
 
 产品负责人明确批准后，才能标记 `PRODUCT_ACCEPTED` 和 `VISUAL_APPROVED`，并建立视觉金标。
+
+## 10. 配置子母版：高德省市服务覆盖
+
+服务覆盖页面必须读取 [高德省市行政区域服务覆盖决策与批准视觉基线](13-service-coverage-amap-visual-baseline.md) 及仓库四张批准视觉图。
+
+### 10.1 项目覆盖总览/分析
+
+```text
+PageHeader + Project/ServiceType/AsOf Context
+→ MainMap（全国/省级下钻）
+→ CoverageSummary / Risk / Ranking
+→ ProvinceOrCityCoverageTable
+→ SelectedRegionDetail
+```
+
+地图必须是主工作区，表格和风险面板负责解释地图，不能退化为“表格页面上方放一张装饰地图”。
+
+### 10.2 网点服务区域配置
+
+```text
+ObjectHeader：项目 + 网点 + 业务类型
+→ Left：省市树与搜索
+→ Center：高德行政区地图
+→ Right：已选区域 + 影响 + 校验
+→ Footer：取消 / 保存 / 查看变更影响 / 确认生效
+```
+
+区域树与地图使用同一 `amapAdcode`；选择省级后城市显示继承，不支持省内排除。
+
+### 10.3 变更审阅
+
+必须在确认生效前展示：
+
+- 当前有效与待生效区域；
+- 新增、保留和移除区域；
+- 重叠覆盖城市；
+- 对后续新派单的影响；
+- 不会自动改变的存量 `ServiceAssignment`；
+- 修改原因、版本和审计信息。
+
+### 10.4 视觉门禁
+
+实现 PR 必须把真实页面与四张批准参考图并排展示。核心布局未经产品负责人批准不得变更；缺少视觉对照只能进入 `IMPLEMENTED_PENDING_VISUAL_REVIEW`。

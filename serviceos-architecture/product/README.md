@@ -26,3 +26,7 @@
 | Technician H5/iOS | 方案 A｜经典专业移动作业风 | `technician/01-classic-professional-mobile-baseline.md` |
 
 三个 Portal 共享 ServiceOS 品牌 Token、状态语义、中文业务词汇和服务端权限动作模型，但不得复用同一页面布局或通过前端角色判断动态变形为一个应用。
+
+## 服务覆盖专项决策
+
+- [高德省市行政区域服务覆盖决策与批准视觉基线](admin/13-service-coverage-amap-visual-baseline.md)：项目默认全国、网点按高德省市 `adcode` 配置，并以四张仓库视觉图作为强制实施参考。

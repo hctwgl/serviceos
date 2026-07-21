@@ -1,0 +1,9 @@
+spring:
+  config:
+    activate:
+      on-profile: test
+
+# 测试使用普通文本日志并遵循全局策略；Maven verify 默认以开启态运行既有安全测试，
+# 专门的策略单测同时覆盖关闭态，手工运行仍可显式覆盖总开关。
+logging:
+  config: classpath:logback-local.xml

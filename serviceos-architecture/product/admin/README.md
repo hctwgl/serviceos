@@ -20,6 +20,7 @@ lastUpdated: 2026-07-20
 - Ant Design Vue 是基础组件实现，不等同于产品信息架构；页面必须先满足业务任务，再映射技术能力。
 - Admin 视觉方向已批准为 **方案 A｜经典专业风**：浅色企业后台、白色导航、标准企业蓝、中高信息密度、清晰边框和克制装饰。
 - 项目履约配置中心、工作流设计器、任务模板中心和工单详情的概念效果方向已经批准，后续实现必须遵守 [经典专业风视觉与页面基线](12-classic-professional-visual-baseline.md)。
+- 服务覆盖第一阶段已锁定为“项目默认全国 + 网点按项目/业务类型配置高德省市 `adcode`”，四张批准视觉图必须按 [高德省市行政区域服务覆盖决策与批准视觉基线](13-service-coverage-amap-visual-baseline.md) 实施和验收。
 
 ## 文档目录
 
@@ -36,6 +37,7 @@ lastUpdated: 2026-07-20
 11. [M383 项目履约配置产品审查](11-m383-product-review.md)
 12. [经典专业风视觉与页面基线](12-classic-professional-visual-baseline.md)（`Accepted`）
 13. [履约配置逐路由验收矩阵](12-m384-fulfillment-route-acceptance-matrix.md)
+14. [高德省市行政区域服务覆盖决策与批准视觉基线](13-service-coverage-amap-visual-baseline.md)（`Accepted`，含四张强制视觉参考）
 
 ## 规范优先级
 

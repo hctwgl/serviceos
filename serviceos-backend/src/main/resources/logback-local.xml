@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!--
+      本地和测试使用普通文本控制台。业务数据是否脱敏由 SERVICEOS_REDACTION_ENABLED 统一控制；
+      凭据、令牌和签名始终保护。消息和异常栈都经过同一策略，避免文本日志形成旁路。
+    -->
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <conversionRule conversionWord="serviceosMessage"
+                    class="com.serviceos.bootstrap.RedactingMessageConverter"/>
+    <conversionRule conversionWord="serviceosException"
+                    class="com.serviceos.bootstrap.RedactingThrowableProxyConverter"/>
+
+    <property name="CONSOLE_LOG_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] [traceId=%X{traceId:-}, spanId=%X{spanId:-}, correlationId=%X{correlationId:-}] %logger{40} - %serviceosMessage%n%serviceosException"/>
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>
