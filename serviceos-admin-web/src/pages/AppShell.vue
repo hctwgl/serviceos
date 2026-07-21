@@ -89,6 +89,7 @@ const TEST_IDS: Record<string, string> = {
   'ADMIN.TECHNICIAN.DIRECTORY': 'nav-technicians',
   'ADMIN.ROLE.DIRECTORY': 'nav-roles',
   'ADMIN.GRANT.DIRECTORY': 'nav-grants',
+  'ADMIN.MASTERDATA.CATALOG': 'nav-master-data',
 }
 
 const showDevTools = import.meta.env.DEV
@@ -145,6 +146,7 @@ function routeNameLabel(name: string): string {
     'ADMIN.WORKORDER.WORKSPACE': '工单详情',
     'ADMIN.PROJECT.DETAIL': '项目详情',
     'ADMIN.PROJECT.LIST': '项目目录',
+    'ADMIN.MASTERDATA.CATALOG': '主数据治理',
     'ADMIN.REVIEW.QUEUE': '审核队列',
     'ADMIN.CORRECTION.QUEUE': '整改跟踪',
     'ADMIN.TOKEN': '身份登录',

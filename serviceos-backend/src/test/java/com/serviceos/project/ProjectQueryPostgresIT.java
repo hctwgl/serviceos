@@ -124,12 +124,15 @@ class ProjectQueryPostgresIT {
         var regions = queries.listRegionCatalog(operator(), "corr-m406-regions", "*", "青岛", null, 20);
         assertThat(regions.items()).extracting(item -> item.regionCode())
                 .contains("CN-3702", "370200");
-        assertThat(regions.items()).allSatisfy(item -> assertThat(item.regionName()).contains("青岛"));
+        assertThat(regions.items()).allSatisfy(item -> {
+            assertThat(item.regionName()).contains("青岛");
+            assertThat(item.childCount()).isGreaterThanOrEqualTo(0);
+        });
 
         var registered = commands.registerClient(
                 operator(), metadata("register-client"), "client-geely", "吉利汽车");
         assertThat(registered.displayName()).isEqualTo("吉利汽车");
-        var directory = queries.listClientDirectory(operator(), "corr-m406-clients");
+        var directory = queries.listClientDirectory(operator(), "corr-m406-clients", null);
         assertThat(directory.items()).extracting(item -> item.clientCode()).contains("client-geely");
 
         create("CAT-A", "client-geely", "Catalog A", LocalDate.of(2026, 1, 1), null,
@@ -145,6 +148,48 @@ class ProjectQueryPostgresIT {
                 .singleElement()
                 .extracting(item -> item.regionName())
                 .isEqualTo("青岛市");
+    }
+
+    @Test
+    void masterDataGovernanceSupportsClientBrandLifecycleAndProvinceTree() {
+        var roots = queries.listRegionCatalog(operator(), "corr-m414-roots", null, null, "PROVINCE", 100);
+        assertThat(roots.items()).extracting(item -> item.regionCode())
+                .contains("110000", "440000", "370000", "810000");
+        assertThat(roots.items()).filteredOn(item -> item.regionCode().equals("440000"))
+                .singleElement()
+                .satisfies(item -> assertThat(item.childCount()).isGreaterThanOrEqualTo(2));
+
+        var shenzhenChildren = queries.listRegionCatalog(
+                operator(), "corr-m414-sz", "440300", null, null, 50);
+        assertThat(shenzhenChildren.items()).extracting(item -> item.regionName())
+                .contains("南山区", "福田区");
+
+        var client = commands.registerClient(
+                operator(), metadata("m414-client"), "client-byd", "比亚迪");
+        assertThat(client.status()).isEqualTo("ACTIVE");
+        var brand = commands.registerBrand(
+                operator(), metadata("m414-brand"), "client-byd", "brand-dynasty", "王朝网", 10);
+        assertThat(brand.displayName()).isEqualTo("王朝网");
+        assertThat(brand.status()).isEqualTo("ACTIVE");
+
+        var brands = queries.listClientBrands(operator(), "corr-m414-brands", "client-byd", "ALL");
+        assertThat(brands.items()).extracting(item -> item.brandCode()).containsExactly("brand-dynasty");
+
+        var disabledBrand = commands.setBrandStatus(
+                operator(), metadata("m414-brand-off"), "client-byd", "brand-dynasty", "DISABLED");
+        assertThat(disabledBrand.status()).isEqualTo("DISABLED");
+        assertThat(queries.listClientBrands(operator(), "corr-m414-brands-active", "client-byd", "ACTIVE")
+                .items()).isEmpty();
+
+        var disabledClient = commands.setClientStatus(
+                operator(), metadata("m414-client-off"), "client-byd", "DISABLED");
+        assertThat(disabledClient.status()).isEqualTo("DISABLED");
+        assertThat(queries.listClientDirectory(operator(), "corr-m414-active", "ACTIVE").items())
+                .extracting(item -> item.clientCode())
+                .doesNotContain("client-byd");
+        assertThat(queries.listClientDirectory(operator(), "corr-m414-all", "ALL").items())
+                .extracting(item -> item.clientCode())
+                .contains("client-byd");
     }
 
     @Test

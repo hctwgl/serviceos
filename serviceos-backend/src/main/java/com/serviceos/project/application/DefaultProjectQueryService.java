@@ -7,6 +7,7 @@ import com.serviceos.authorization.api.ProjectScopeAuthorizationService;
 import com.serviceos.configuration.api.ProjectFulfillmentProfileService;
 import com.serviceos.configuration.api.ProjectFulfillmentSchemeCount;
 import com.serviceos.identity.api.CurrentPrincipal;
+import com.serviceos.project.api.ProjectClientBrandPage;
 import com.serviceos.project.api.ProjectClientDirectoryPage;
 import com.serviceos.project.api.ProjectClientOption;
 import com.serviceos.project.api.ProjectDetail;
@@ -156,10 +157,27 @@ final class DefaultProjectQueryService implements ProjectQueryService {
 
     @Override
     @Transactional(readOnly = true)
-    public ProjectClientDirectoryPage listClientDirectory(CurrentPrincipal principal, String correlationId) {
+    public ProjectClientDirectoryPage listClientDirectory(
+            CurrentPrincipal principal, String correlationId, String status
+    ) {
         projectScopes.require(principal, READ, "Project", correlationId);
+        String filter = status == null || status.isBlank() ? "ACTIVE" : status.trim();
         return new ProjectClientDirectoryPage(
-                catalogs.listClients(principal.tenantId(), true), clock.instant());
+                catalogs.listClients(principal.tenantId(), filter), clock.instant());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ProjectClientBrandPage listClientBrands(
+            CurrentPrincipal principal, String correlationId, String clientCode, String status
+    ) {
+        projectScopes.require(principal, READ, "Project", correlationId);
+        String code = requireCatalogCode(clientCode, "clientCode");
+        catalogs.findClient(principal.tenantId(), code)
+                .orElseThrow(() -> new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "车企不存在"));
+        String filter = status == null || status.isBlank() ? "ALL" : status.trim();
+        return new ProjectClientBrandPage(
+                catalogs.listBrands(principal.tenantId(), code, filter), clock.instant());
     }
 
     @Override
@@ -183,6 +201,13 @@ final class DefaultProjectQueryService implements ProjectQueryService {
         }
         return new RegionCatalogPage(
                 catalogs.listRegions(parentCode, query, level, effective), clock.instant());
+    }
+
+    private static String requireCatalogCode(String value, String field) {
+        if (value == null || value.isBlank() || !value.equals(value.trim()) || value.length() > 128) {
+            throw new IllegalArgumentException(field + " is invalid");
+        }
+        return value;
     }
 
     @Override

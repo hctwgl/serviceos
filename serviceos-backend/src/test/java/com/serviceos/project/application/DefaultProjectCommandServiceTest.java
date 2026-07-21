@@ -152,7 +152,7 @@ class DefaultProjectCommandServiceTest {
     private static final class FakeCatalogRepository implements ProjectCatalogRepository {
         @Override
         public java.util.List<com.serviceos.project.api.ProjectClientDirectoryItem> listClients(
-                String tenantId, boolean activeOnly
+                String tenantId, String statusFilter
         ) {
             return java.util.List.of();
         }
@@ -172,6 +172,11 @@ class DefaultProjectCommandServiceTest {
         }
 
         @Override
+        public void updateClientStatus(String tenantId, String clientCode, String status, Instant now) {
+            // no-op
+        }
+
+        @Override
         public void ensureClient(String tenantId, String clientCode, String displayName, Instant now) {
             // no-op for create command unit test
         }
@@ -181,6 +186,40 @@ class DefaultProjectCommandServiceTest {
                 String tenantId, java.util.Collection<String> clientCodes
         ) {
             return java.util.Map.of();
+        }
+
+        @Override
+        public java.util.List<com.serviceos.project.api.ProjectClientBrandItem> listBrands(
+                String tenantId, String clientCode, String statusFilter
+        ) {
+            return java.util.List.of();
+        }
+
+        @Override
+        public Optional<com.serviceos.project.api.ProjectClientBrandItem> findBrand(
+                String tenantId, String clientCode, String brandCode
+        ) {
+            return Optional.empty();
+        }
+
+        @Override
+        public void upsertBrand(
+                String tenantId,
+                String clientCode,
+                String brandCode,
+                String displayName,
+                String status,
+                int sortOrder,
+                Instant now
+        ) {
+            // no-op
+        }
+
+        @Override
+        public void updateBrandStatus(
+                String tenantId, String clientCode, String brandCode, String status, Instant now
+        ) {
+            // no-op
         }
 
         @Override

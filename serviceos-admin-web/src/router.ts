@@ -32,6 +32,7 @@ import EvidenceSetSnapshotDetailPage from './pages/EvidenceSetSnapshotDetailPage
 import ExternalReviewReceiptDetailPage from './pages/ExternalReviewReceiptDetailPage.vue'
 import ProjectDirectoryPage from './pages/ProjectDirectoryPage.vue'
 import ProjectDetailPage from './pages/ProjectDetailPage.vue'
+import MasterDataCatalogPage from './pages/MasterDataCatalogPage.vue'
 import FulfillmentProfileListPage from './pages/FulfillmentProfileListPage.vue'
 import FulfillmentProfileCreatePage from './pages/FulfillmentProfileCreatePage.vue'
 import FulfillmentProfileDetailPage from './pages/FulfillmentProfileDetailPage.vue'
@@ -147,6 +148,12 @@ export const router = createRouter({
         { path: 'sla/:id', name: 'ADMIN.SLA.DETAIL', component: SlaInstanceDetailPage },
         { path: 'projects', name: 'ADMIN.PROJECT.LIST', component: ProjectDirectoryPage },
         { path: 'projects/:id', name: 'ADMIN.PROJECT.DETAIL', component: ProjectDetailPage },
+        {
+          path: 'master-data',
+          name: 'ADMIN.MASTERDATA.CATALOG',
+          component: MasterDataCatalogPage,
+          meta: { pageId: 'ADMIN.MASTERDATA.CATALOG' },
+        },
         {
           path: 'projects/:id/fulfillment-profiles',
           name: 'ADMIN.PROJECT.FULFILLMENT.LIST',

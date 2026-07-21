@@ -14,6 +14,33 @@ public interface ProjectCommandService {
             String displayName
     );
 
+    /** 启用/停用车企；需要 project.create。 */
+    ProjectClientDirectoryItem setClientStatus(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            String clientCode,
+            String status
+    );
+
+    /** 登记/更新车企品牌；需要 project.create。 */
+    ProjectClientBrandItem registerBrand(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            String clientCode,
+            String brandCode,
+            String displayName,
+            Integer sortOrder
+    );
+
+    /** 启用/停用品牌；需要 project.create。 */
+    ProjectClientBrandItem setBrandStatus(
+            CurrentPrincipal principal,
+            CommandMetadata metadata,
+            String clientCode,
+            String brandCode,
+            String status
+    );
+
     ProjectScopeRelationRevisionView reviseScopeRelations(
             CurrentPrincipal principal,
             CommandMetadata metadata,

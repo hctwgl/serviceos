@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.79
+  version: 1.0.80
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -3660,8 +3660,14 @@ paths:
     get:
       operationId: listProjectClients
       summary: 查询租户车企主数据目录
-      description: M406：需要 project.read。返回 ACTIVE 车企编码与显示名。
+      description: |
+        M406/M414：需要 project.read。
+        status 缺省 ACTIVE（选择器兼容）；治理台传 ALL/DISABLED。
       parameters:
+        - name: status
+          in: query
+          required: false
+          schema: { enum: [ACTIVE, DISABLED, ALL], default: ACTIVE }
         - $ref: '#/components/parameters/CorrelationId'
       responses:
         '200':
@@ -3671,12 +3677,13 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProjectClientDirectoryPage' }
+        '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
     post:
       operationId: registerProjectClient
       summary: 登记或更新车企主数据
-      description: M406：需要 project.create。同 tenant+clientCode 幂等更新显示名。
+      description: M406：需要 project.create。同 tenant+clientCode 幂等更新显示名并置为 ACTIVE。
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/CorrelationId'
@@ -3697,13 +3704,131 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+  /project-clients/{clientCode}/status:
+    post:
+      operationId: setProjectClientStatus
+      summary: 启用或停用车企主数据
+      description: M414：需要 project.create。停用后选择器默认不再返回该车企。
+      parameters:
+        - name: clientCode
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 128 }
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SetCatalogStatusRequest' }
+      responses:
+        '200':
+          description: 已更新状态
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectClientDirectoryItem' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /project-clients/{clientCode}/brands:
+    get:
+      operationId: listProjectClientBrands
+      summary: 查询车企下品牌目录
+      description: M414：需要 project.read。status 缺省 ALL。
+      parameters:
+        - name: clientCode
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 128 }
+        - name: status
+          in: query
+          required: false
+          schema: { enum: [ACTIVE, DISABLED, ALL], default: ALL }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 品牌目录
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectClientBrandPage' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: registerProjectClientBrand
+      summary: 登记或更新车企品牌
+      description: M414：需要 project.create。同 tenant+client+brand 幂等更新显示名并置为 ACTIVE。
+      parameters:
+        - name: clientCode
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 128 }
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterProjectClientBrandRequest' }
+      responses:
+        '201':
+          description: 已登记品牌
+          headers:
+            Location: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectClientBrandItem' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /project-clients/{clientCode}/brands/{brandCode}/status:
+    post:
+      operationId: setProjectClientBrandStatus
+      summary: 启用或停用车企品牌
+      description: M414：需要 project.create。
+      parameters:
+        - name: clientCode
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 128 }
+        - name: brandCode
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 128 }
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SetCatalogStatusRequest' }
+      responses:
+        '200':
+          description: 已更新品牌状态
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectClientBrandItem' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
   /region-catalog:
     get:
       operationId: listRegionCatalog
       summary: 查询行政区名称目录
       description: |
-        M406：需要 project.read。parentCode 缺省返回根级；传 * 表示不限父级；
-        query 支持编码/名称模糊搜索。
+        M406/M414：需要 project.read。parentCode 缺省返回根级；传 * 表示不限父级；
+        query 支持编码/名称模糊搜索；items 含 childCount 供树展开。
       parameters:
         - name: parentCode
           in: query
@@ -10857,16 +10982,51 @@ components:
       properties:
         clientCode: { type: string, minLength: 1, maxLength: 128 }
         displayName: { type: string, minLength: 1, maxLength: 200 }
+    SetCatalogStatusRequest:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: { enum: [ACTIVE, DISABLED] }
+    ProjectClientBrandItem:
+      type: object
+      additionalProperties: false
+      required: [clientCode, brandCode, displayName, status, sortOrder]
+      properties:
+        clientCode: { type: string, minLength: 1, maxLength: 128 }
+        brandCode: { type: string, minLength: 1, maxLength: 128 }
+        displayName: { type: string, minLength: 1, maxLength: 200 }
+        status: { enum: [ACTIVE, DISABLED] }
+        sortOrder: { type: integer }
+    ProjectClientBrandPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/ProjectClientBrandItem' } }
+        asOf: { type: string, format: date-time }
+    RegisterProjectClientBrandRequest:
+      type: object
+      additionalProperties: false
+      required: [brandCode, displayName]
+      properties:
+        brandCode: { type: string, minLength: 1, maxLength: 128 }
+        displayName: { type: string, minLength: 1, maxLength: 200 }
+        sortOrder: { type: integer, minimum: 0, maximum: 999999, default: 0 }
     RegionCatalogItem:
       type: object
       additionalProperties: false
-      required: [regionCode, regionName, regionLevel, sortOrder]
+      required: [regionCode, regionName, regionLevel, sortOrder, childCount]
       properties:
         regionCode: { type: string, minLength: 1, maxLength: 32 }
         parentCode: { type: [string, 'null'], maxLength: 32 }
         regionName: { type: string, minLength: 1, maxLength: 100 }
         regionLevel: { enum: [PROVINCE, CITY, DISTRICT] }
         sortOrder: { type: integer }
+        childCount:
+          type: integer
+          minimum: 0
+          description: 直接子级 ACTIVE 节点数；治理台树展开用
     RegionCatalogPage:
       type: object
       additionalProperties: false

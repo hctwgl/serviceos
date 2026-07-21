@@ -92,10 +92,18 @@ export async function mockProductizationApis(
             requiredCapabilities: [],
           },
           {
+            pageId: 'ADMIN.MASTERDATA.CATALOG',
+            routeKey: 'master-data',
+            title: '主数据治理',
+            order: 5,
+            section: '基础资料',
+            requiredCapabilities: [],
+          },
+          {
             pageId: 'ADMIN.USER.DIRECTORY',
             routeKey: 'users',
             title: '用户目录',
-            order: 5,
+            order: 6,
             section: '基础资料',
             requiredCapabilities: [],
           },
@@ -103,7 +111,7 @@ export async function mockProductizationApis(
             pageId: 'ADMIN.ROLE.DIRECTORY',
             routeKey: 'roles',
             title: '角色与 Capability',
-            order: 6,
+            order: 7,
             section: '系统管理',
             requiredCapabilities: [],
           },
@@ -177,6 +185,53 @@ export async function mockProductizationApis(
       })
       return
     }
+    if (url.includes('/project-clients') && url.includes('/brands') && url.includes('/status')) {
+      await fulfillJson(route, {
+        clientCode: 'client-geely',
+        brandCode: 'brand-geometry',
+        displayName: '几何',
+        status: 'DISABLED',
+        sortOrder: 1,
+      })
+      return
+    }
+    if (url.includes('/project-clients') && url.includes('/brands')) {
+      if (method === 'POST') {
+        await fulfillJson(
+          route,
+          {
+            clientCode: 'client-geely',
+            brandCode: 'brand-geometry',
+            displayName: '几何',
+            status: 'ACTIVE',
+            sortOrder: 1,
+          },
+          201,
+        )
+        return
+      }
+      await fulfillJson(route, {
+        items: [
+          {
+            clientCode: 'client-geely',
+            brandCode: 'brand-geometry',
+            displayName: '几何',
+            status: 'ACTIVE',
+            sortOrder: 1,
+          },
+        ],
+        asOf: '2026-07-20T04:00:00Z',
+      })
+      return
+    }
+    if (url.includes('/project-clients') && url.includes('/status')) {
+      await fulfillJson(route, {
+        clientCode: 'client-geely',
+        displayName: '吉利汽车',
+        status: 'DISABLED',
+      })
+      return
+    }
     if (url.includes('/project-clients')) {
       if (method === 'POST') {
         await fulfillJson(
@@ -193,6 +248,24 @@ export async function mockProductizationApis(
       return
     }
     if (url.includes('/region-catalog')) {
+      const parentMatch = url.match(/[?&]parentCode=([^&]*)/)
+      const parentCode = parentMatch ? decodeURIComponent(parentMatch[1]) : ''
+      if (parentCode === '440000') {
+        await fulfillJson(route, {
+          items: [
+            {
+              regionCode: '440300',
+              parentCode: '440000',
+              regionName: '深圳市',
+              regionLevel: 'CITY',
+              sortOrder: 440300,
+              childCount: 3,
+            },
+          ],
+          asOf: '2026-07-20T04:00:00Z',
+        })
+        return
+      }
       await fulfillJson(route, {
         items: [
           {
@@ -201,6 +274,7 @@ export async function mockProductizationApis(
             regionName: '青岛市',
             regionLevel: 'CITY',
             sortOrder: 3702,
+            childCount: 2,
           },
           {
             regionCode: 'CN-3700',
@@ -208,6 +282,15 @@ export async function mockProductizationApis(
             regionName: '山东省',
             regionLevel: 'PROVINCE',
             sortOrder: 3700,
+            childCount: 2,
+          },
+          {
+            regionCode: '440000',
+            parentCode: null,
+            regionName: '广东省',
+            regionLevel: 'PROVINCE',
+            sortOrder: 440000,
+            childCount: 3,
           },
         ],
         asOf: '2026-07-20T04:00:00Z',
@@ -806,6 +889,21 @@ export async function mockProductizationApis(
           },
         ],
         nextCursor: null,
+        asOf: '2026-07-20T04:00:00Z',
+      })
+      return
+    }
+    if (url.includes('/me/capabilities')) {
+      await fulfillJson(route, {
+        contextId: 'ctx-admin',
+        portal: 'ADMIN',
+        capabilityCodes: [
+          'workOrder.read',
+          'project.read',
+          'project.create',
+          'identity.read',
+        ],
+        contextVersion: '1',
         asOf: '2026-07-20T04:00:00Z',
       })
       return

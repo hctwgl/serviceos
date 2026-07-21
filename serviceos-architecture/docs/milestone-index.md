@@ -420,6 +420,7 @@ title: ServiceOS 里程碑索引
 | M411 | M411 Network 工作台今日预约时间轴 | [422-m411-network-workbench-today-appointments.md](../architecture/422-m411-network-workbench-today-appointments.md) | [405-m411-network-workbench-today-appointments-acceptance.md](../testing/405-m411-network-workbench-today-appointments-acceptance.md) |
 | M412 | M412 Network 分配候选推荐解释 | [423-m412-network-assign-candidate-recommendation.md](../architecture/423-m412-network-assign-candidate-recommendation.md) | [406-m412-network-assign-candidate-recommendation-acceptance.md](../testing/406-m412-network-assign-candidate-recommendation-acceptance.md) |
 | M413 | M413 Network 预约日历视图 | [424-m413-network-appointment-calendar.md](../architecture/424-m413-network-appointment-calendar.md) | [407-m413-network-appointment-calendar-acceptance.md](../testing/407-m413-network-appointment-calendar-acceptance.md) |
+| M414 | M414 Admin 主数据治理台（车企/品牌/行政区树） | [425-m414-admin-master-data-governance.md](../architecture/425-m414-admin-master-data-governance.md) | [408-m414-admin-master-data-governance-acceptance.md](../testing/408-m414-admin-master-data-governance-acceptance.md) |
 
 ## 未关联里程碑的文档
 

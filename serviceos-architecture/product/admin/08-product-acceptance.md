@@ -359,7 +359,7 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 完整国标行政区全量树与车企品牌树治理 UI（常用目录已由 M406 交付）
+  - UI_DATA_GAP: 全国区县全量树/拼音索引/多级子品牌（常用目录 M406；治理主路径 M414）
 ```
 
 ```yaml
@@ -411,7 +411,7 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 完整国标行政区全量树与车企品牌树治理 UI（M406 已交付常用目录）
+  - UI_DATA_GAP: 全国区县全量树/拼音索引/多级子品牌（常用目录 M406；治理主路径 M414）
 ```
 
 ### 9.7 M401 记录（关注项目）
@@ -537,7 +537,26 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 完整国标行政区全量树与车企品牌树治理 UI
+  - UI_DATA_GAP: 完整国标行政区全量树与车企品牌树治理 UI（治理主路径已由 M414 关闭）
+```
+
+### 9.13 M414 记录（主数据治理台）
+
+```yaml
+pageId: ADMIN.MASTERDATA.CATALOG
+route: /master-data
+visualProfile: CLASSIC_PROFESSIONAL
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: 全国区县级全量国标树与拼音索引
+  - UI_DATA_GAP: 多级子品牌树
 ```
 
 ## 10. GAP 规则
