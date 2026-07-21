@@ -4,7 +4,7 @@
 @org.springframework.modulith.ApplicationModule(
         displayName = "Appointment",
         allowedDependencies = {
-                "shared", "identity::api", "authorization::api", "audit::api",
+                "shared", "jooq", "identity::api", "authorization::api", "audit::api",
                 "reliability::api", "task::api", "dispatch::api", "network::api"
         }
 )

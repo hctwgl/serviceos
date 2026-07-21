@@ -28,7 +28,7 @@ flywayVersion: "135"
 3. Flyway **V135**：资产类型 CHECK、`sla_instance` 日历冻结列与 clock_mode/calendar 互锁、
    范围/身份校验函数；
 4. `BusinessCalendar` / `BusinessCalendarDeadlineCalculator`：跳过周末/节假日，调休日复用周一窗；
-5. `DefaultSlaClockService`：start 锁定日历版本并预计算 deadline；stop 对 BUSINESS 记业务秒；
+5. `JooqSlaClockService`：start 锁定日历版本并预计算 deadline；stop 对 BUSINESS 记业务秒；
    发出 `sla.started@v2`（含日历冻结字段；ELAPSED 日历字段为 null）；
 6. OpenAPI 仍 **1.0.59**：`clockMode` 保持 `const: ELAPSED`（oasdiff 禁止原地去掉 const）；BUSINESS/CALENDAR 的 HTTP 枚举扩展留待显式主版本或已批准的破坏性演进；运行时与 `sla.started@v2` 已表达 BUSINESS；
 7. 工单时间线消费 `sla.started@v2`；设计器可起草 `CALENDAR`；

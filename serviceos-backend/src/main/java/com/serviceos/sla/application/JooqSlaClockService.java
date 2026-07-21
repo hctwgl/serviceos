@@ -3,6 +3,9 @@ package com.serviceos.sla.application;
 import com.serviceos.configuration.api.ConfigurationAssetDefinition;
 import com.serviceos.configuration.api.ConfigurationAssetType;
 import com.serviceos.configuration.api.ConfigurationService;
+import com.serviceos.jooq.generated.tables.SlaInstance;
+import com.serviceos.jooq.generated.tables.SlaMilestone;
+import com.serviceos.jooq.generated.tables.TskTask;
 import com.serviceos.reliability.api.InboxDecision;
 import com.serviceos.reliability.api.InboxService;
 import com.serviceos.reliability.api.OutboxAppender;
@@ -13,7 +16,9 @@ import com.serviceos.sla.api.SlaClockService;
 import com.serviceos.sla.api.SlaInstanceView;
 import com.serviceos.task.api.TaskFulfillmentContext;
 import com.serviceos.task.api.TaskFulfillmentContextService;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import org.jooq.DSLContext;
+import org.jooq.Record;
+import org.jooq.impl.DSL;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
@@ -27,20 +32,23 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
-import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timestamptz;
+import static com.serviceos.jooq.generated.tables.SlaClockSegment.SLA_CLOCK_SEGMENT;
+import static com.serviceos.jooq.generated.tables.SlaInstance.SLA_INSTANCE;
+import static com.serviceos.jooq.generated.tables.SlaMilestone.SLA_MILESTONE;
+import static com.serviceos.jooq.generated.tables.TskTask.TSK_TASK;
 
 /**
- * M61 Task ELAPSED SLA；M369 扩展 BUSINESS 日历截止（ADR-090 D1-R）。
+ * M61 Task ELAPSED SLA；M369 扩展 BUSINESS 日历截止（ADR-090 D1-R）。ADR-091 jOOQ 实现。
  *
  * <p>Task 创建/完成、SLA 状态、里程碑、Inbox 与 Outbox 分别在消费者本地事务中提交。到期扫描同时
- * 锁定 SLA、里程碑和 Task，避免“Task 已完成但完成事件尚未消费”被误判为超时。
- * BUSINESS 在 start 时锁定日历版本并用纯函数预计算 deadlineAt。</p>
+ * 锁定 SLA、里程碑和 Task（FOR UPDATE OF ... SKIP LOCKED），避免“Task 已完成但完成事件尚未消费”
+ * 被误判为超时。BUSINESS 在 start 时锁定日历版本并用纯函数预计算 deadlineAt。</p>
  */
 @Service
-final class DefaultSlaClockService implements SlaClockService, TaskSlaEventConsumer {
+final class JooqSlaClockService implements SlaClockService, TaskSlaEventConsumer {
     private static final String START_CONSUMER = "sla.task-created.v1";
 
-    private final JdbcClient jdbc;
+    private final DSLContext dsl;
     private final TaskFulfillmentContextService tasks;
     private final ConfigurationService configurations;
     private final InboxService inbox;
@@ -48,8 +56,8 @@ final class DefaultSlaClockService implements SlaClockService, TaskSlaEventConsu
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
-    DefaultSlaClockService(
-            JdbcClient jdbc,
+    JooqSlaClockService(
+            DSLContext dsl,
             TaskFulfillmentContextService tasks,
             ConfigurationService configurations,
             InboxService inbox,
@@ -57,7 +65,7 @@ final class DefaultSlaClockService implements SlaClockService, TaskSlaEventConsu
             ObjectMapper objectMapper,
             Clock clock
     ) {
-        this.jdbc = jdbc;
+        this.dsl = dsl;
         this.tasks = tasks;
         this.configurations = configurations;
         this.inbox = inbox;
@@ -102,54 +110,56 @@ final class DefaultSlaClockService implements SlaClockService, TaskSlaEventConsu
             throw new IllegalArgumentException("SLA deadline exceeds supported Instant range", exception);
         }
         UUID instanceId = UUID.randomUUID();
-        int inserted = jdbc.sql("""
-                        INSERT INTO sla_instance (
-                            sla_instance_id, tenant_id, project_id, work_order_id, task_id,
-                            sla_ref, policy_version_id, policy_semantic_version, policy_content_digest,
-                            clock_mode, target_duration_seconds, start_event_id, started_at, deadline_at,
-                            status, aggregate_version, correlation_id, created_at, updated_at,
-                            calendar_ref, calendar_version_id, calendar_semantic_version, calendar_content_digest)
-                        VALUES (
-                            :instanceId, :tenantId, :projectId, :workOrderId, :taskId,
-                            :slaRef, :policyVersionId, :policyVersion, :policyDigest,
-                            :clockMode, :duration, :eventId, :startedAt, :deadlineAt,
-                            'RUNNING', 1, :correlationId, :startedAt, :startedAt,
-                            :calendarRef, :calendarVersionId, :calendarVersion, :calendarDigest)
-                        ON CONFLICT (tenant_id, task_id) DO NOTHING
-                        """)
-                .param("instanceId", instanceId).param("tenantId", message.tenantId())
-                .param("projectId", task.projectId()).param("workOrderId", task.workOrderId())
-                .param("taskId", taskId).param("slaRef", task.slaRef())
-                .param("policyVersionId", asset.versionId()).param("policyVersion", asset.semanticVersion())
-                .param("policyDigest", asset.contentDigest())
-                .param("clockMode", policy.clockMode())
-                .param("duration", policy.targetDurationSeconds())
-                .param("eventId", message.eventId()).param("startedAt", timestamptz(startedAt))
-                .param("deadlineAt", timestamptz(deadlineAt)).param("correlationId", message.correlationId())
-                .param("calendarRef", calendarAsset == null ? null : calendarAsset.assetKey())
-                .param("calendarVersionId", calendarAsset == null ? null : calendarAsset.versionId())
-                .param("calendarVersion", calendarAsset == null ? null : calendarAsset.semanticVersion())
-                .param("calendarDigest", calendarAsset == null ? null : calendarAsset.contentDigest())
-                .update();
+        SlaInstance instance = SLA_INSTANCE;
+        int inserted = dsl.insertInto(instance)
+                .set(instance.SLA_INSTANCE_ID, instanceId)
+                .set(instance.TENANT_ID, message.tenantId())
+                .set(instance.PROJECT_ID, task.projectId())
+                .set(instance.WORK_ORDER_ID, task.workOrderId())
+                .set(instance.TASK_ID, taskId)
+                .set(instance.SLA_REF, task.slaRef())
+                .set(instance.POLICY_VERSION_ID, asset.versionId())
+                .set(instance.POLICY_SEMANTIC_VERSION, asset.semanticVersion())
+                .set(instance.POLICY_CONTENT_DIGEST, asset.contentDigest())
+                .set(instance.CLOCK_MODE, policy.clockMode())
+                .set(instance.TARGET_DURATION_SECONDS, policy.targetDurationSeconds())
+                .set(instance.START_EVENT_ID, message.eventId())
+                .set(instance.STARTED_AT, startedAt)
+                .set(instance.DEADLINE_AT, deadlineAt)
+                .set(instance.STATUS, "RUNNING")
+                .set(instance.AGGREGATE_VERSION, 1L)
+                .set(instance.CORRELATION_ID, message.correlationId())
+                .set(instance.CREATED_AT, startedAt)
+                .set(instance.UPDATED_AT, startedAt)
+                .set(instance.CALENDAR_REF, calendarAsset == null ? null : calendarAsset.assetKey())
+                .set(instance.CALENDAR_VERSION_ID, calendarAsset == null ? null : calendarAsset.versionId())
+                .set(instance.CALENDAR_SEMANTIC_VERSION,
+                        calendarAsset == null ? null : calendarAsset.semanticVersion())
+                .set(instance.CALENDAR_CONTENT_DIGEST,
+                        calendarAsset == null ? null : calendarAsset.contentDigest())
+                .onConflict(instance.TENANT_ID, instance.TASK_ID)
+                .doNothing()
+                .execute();
         if (inserted != 1) {
             throw new IllegalStateException("Task is already bound to another SLA start fact");
         }
-        jdbc.sql("""
-                        INSERT INTO sla_clock_segment (
-                            segment_id, tenant_id, sla_instance_id, segment_no,
-                            segment_type, started_at, start_event_id)
-                        VALUES (:segmentId, :tenantId, :instanceId, 1, 'RUNNING', :startedAt, :eventId)
-                        """)
-                .param("segmentId", UUID.randomUUID()).param("tenantId", message.tenantId())
-                .param("instanceId", instanceId).param("startedAt", timestamptz(startedAt))
-                .param("eventId", message.eventId()).update();
-        jdbc.sql("""
-                        INSERT INTO sla_milestone (
-                            milestone_id, tenant_id, sla_instance_id, milestone_type, scheduled_at, status)
-                        VALUES (:milestoneId, :tenantId, :instanceId, 'TARGET_DUE', :deadlineAt, 'PENDING')
-                        """)
-                .param("milestoneId", UUID.randomUUID()).param("tenantId", message.tenantId())
-                .param("instanceId", instanceId).param("deadlineAt", timestamptz(deadlineAt)).update();
+        dsl.insertInto(SLA_CLOCK_SEGMENT)
+                .set(SLA_CLOCK_SEGMENT.SEGMENT_ID, UUID.randomUUID())
+                .set(SLA_CLOCK_SEGMENT.TENANT_ID, message.tenantId())
+                .set(SLA_CLOCK_SEGMENT.SLA_INSTANCE_ID, instanceId)
+                .set(SLA_CLOCK_SEGMENT.SEGMENT_NO, 1)
+                .set(SLA_CLOCK_SEGMENT.SEGMENT_TYPE, "RUNNING")
+                .set(SLA_CLOCK_SEGMENT.STARTED_AT, startedAt)
+                .set(SLA_CLOCK_SEGMENT.START_EVENT_ID, message.eventId())
+                .execute();
+        dsl.insertInto(SLA_MILESTONE)
+                .set(SLA_MILESTONE.MILESTONE_ID, UUID.randomUUID())
+                .set(SLA_MILESTONE.TENANT_ID, message.tenantId())
+                .set(SLA_MILESTONE.SLA_INSTANCE_ID, instanceId)
+                .set(SLA_MILESTONE.MILESTONE_TYPE, "TARGET_DUE")
+                .set(SLA_MILESTONE.SCHEDULED_AT, deadlineAt)
+                .set(SLA_MILESTONE.STATUS, "PENDING")
+                .execute();
         appendStarted(message, instanceId, task, asset, policy, calendarAsset, startedAt, deadlineAt);
         inbox.complete(message.tenantId(), START_CONSUMER, message.eventId(),
                 Sha256.digest(instanceId + "|RUNNING|" + deadlineAt));
@@ -190,23 +200,24 @@ final class DefaultSlaClockService implements SlaClockService, TaskSlaEventConsu
         }
         long elapsedSeconds = elapsedSeconds(message.tenantId(), task, state, completedAt);
         String terminalStatus = late ? "MET_LATE" : "MET";
-        int updated = jdbc.sql("""
-                        UPDATE sla_instance
-                           SET status=:status,
-                               breached_at=CASE WHEN :late THEN deadline_at ELSE NULL END,
-                               breach_detected_at=CASE
-                                   WHEN :late AND breach_detected_at IS NULL THEN :completedAt
-                                   ELSE breach_detected_at END,
-                               stop_event_id=:stopEventId, completed_at=:completedAt,
-                               elapsed_seconds=:elapsedSeconds,
-                               aggregate_version=aggregate_version+1,
-                               updated_at=GREATEST(updated_at, :completedAt)
-                         WHERE sla_instance_id=:instanceId
-                           AND status IN ('RUNNING','BREACHED')
-                        """)
-                .param("status", terminalStatus).param("late", late)
-                .param("completedAt", timestamptz(completedAt)).param("stopEventId", message.eventId())
-                .param("elapsedSeconds", elapsedSeconds).param("instanceId", state.slaInstanceId()).update();
+        SlaInstance instance = SLA_INSTANCE;
+        // 终态迁移必须带原状态条件并校验影响行数；CASE/GREATEST 表达式保持原 SQL 的单语句原子语义。
+        int updated = dsl.update(instance)
+                .set(instance.STATUS, terminalStatus)
+                .set(instance.BREACHED_AT, DSL.when(DSL.condition(DSL.val(late)), instance.DEADLINE_AT)
+                        .otherwise((Instant) null))
+                .set(instance.BREACH_DETECTED_AT, DSL.when(DSL.condition(DSL.val(late))
+                                .and(instance.BREACH_DETECTED_AT.isNull()), completedAt)
+                        .otherwise(instance.BREACH_DETECTED_AT))
+                .set(instance.STOP_EVENT_ID, message.eventId())
+                .set(instance.COMPLETED_AT, completedAt)
+                .set(instance.ELAPSED_SECONDS, elapsedSeconds)
+                .set(instance.AGGREGATE_VERSION, instance.AGGREGATE_VERSION.plus(1))
+                .set(instance.UPDATED_AT, DSL.greatest(instance.UPDATED_AT,
+                        DSL.val(completedAt, instance.UPDATED_AT)))
+                .where(instance.SLA_INSTANCE_ID.eq(state.slaInstanceId()))
+                .and(instance.STATUS.in("RUNNING", "BREACHED"))
+                .execute();
         if (updated != 1) {
             throw new IllegalStateException("SLA changed during Task completion");
         }
@@ -222,64 +233,61 @@ final class DefaultSlaClockService implements SlaClockService, TaskSlaEventConsu
     public Optional<SlaInstanceView> findByTask(String tenantId, UUID taskId) {
         requireText(tenantId, "tenantId");
         Objects.requireNonNull(taskId, "taskId must not be null");
-        return jdbc.sql("""
-                        SELECT sla_instance_id, project_id, work_order_id, task_id, sla_ref,
-                               policy_version_id, policy_semantic_version, policy_content_digest,
-                               clock_mode, target_duration_seconds, started_at, deadline_at, status,
-                               breached_at, breach_detected_at, completed_at, elapsed_seconds,
-                               aggregate_version
-                          FROM sla_instance WHERE tenant_id=:tenantId AND task_id=:taskId
-                        """)
-                .param("tenantId", tenantId).param("taskId", taskId)
-                .query((rs, row) -> new SlaInstanceView(
-                        rs.getObject("sla_instance_id", UUID.class),
-                        rs.getObject("project_id", UUID.class), rs.getObject("work_order_id", UUID.class),
-                        rs.getObject("task_id", UUID.class), rs.getString("sla_ref"),
-                        rs.getObject("policy_version_id", UUID.class), rs.getString("policy_semantic_version"),
-                        rs.getString("policy_content_digest"), rs.getString("clock_mode"),
-                        rs.getLong("target_duration_seconds"), instant(rs, "started_at"),
-                        instant(rs, "deadline_at"), rs.getString("status"), instant(rs, "breached_at"),
-                        instant(rs, "breach_detected_at"), instant(rs, "completed_at"),
-                        rs.getObject("elapsed_seconds", Long.class), rs.getLong("aggregate_version")))
-                .optional();
+        SlaInstance instance = SLA_INSTANCE;
+        return dsl.select(
+                        instance.SLA_INSTANCE_ID, instance.PROJECT_ID, instance.WORK_ORDER_ID,
+                        instance.TASK_ID, instance.SLA_REF, instance.POLICY_VERSION_ID,
+                        instance.POLICY_SEMANTIC_VERSION, instance.POLICY_CONTENT_DIGEST,
+                        instance.CLOCK_MODE, instance.TARGET_DURATION_SECONDS,
+                        instance.STARTED_AT, instance.DEADLINE_AT, instance.STATUS,
+                        instance.BREACHED_AT, instance.BREACH_DETECTED_AT, instance.COMPLETED_AT,
+                        instance.ELAPSED_SECONDS, instance.AGGREGATE_VERSION)
+                .from(instance)
+                .where(instance.TENANT_ID.eq(tenantId))
+                .and(instance.TASK_ID.eq(taskId))
+                .fetchOptional(row -> new SlaInstanceView(
+                        row.get(instance.SLA_INSTANCE_ID),
+                        row.get(instance.PROJECT_ID), row.get(instance.WORK_ORDER_ID),
+                        row.get(instance.TASK_ID), row.get(instance.SLA_REF),
+                        row.get(instance.POLICY_VERSION_ID), row.get(instance.POLICY_SEMANTIC_VERSION),
+                        row.get(instance.POLICY_CONTENT_DIGEST), row.get(instance.CLOCK_MODE),
+                        row.get(instance.TARGET_DURATION_SECONDS), row.get(instance.STARTED_AT),
+                        row.get(instance.DEADLINE_AT), row.get(instance.STATUS), row.get(instance.BREACHED_AT),
+                        row.get(instance.BREACH_DETECTED_AT), row.get(instance.COMPLETED_AT),
+                        row.get(instance.ELAPSED_SECONDS), row.get(instance.AGGREGATE_VERSION)));
     }
 
     @Override
     @Transactional
     public boolean detectNextBreach() {
         Instant detectedAt = clock.instant();
-        Optional<InstanceState> candidate = jdbc.sql("""
-                        SELECT instance_row.sla_instance_id, instance_row.tenant_id, instance_row.task_id,
-                               instance_row.started_at, instance_row.deadline_at,
-                               instance_row.status, instance_row.aggregate_version,
-                               instance_row.correlation_id, instance_row.clock_mode,
-                               instance_row.calendar_ref, milestone.milestone_id,
-                               milestone.trigger_event_id
-                          FROM sla_instance instance_row
-                          JOIN sla_milestone milestone
-                            ON milestone.tenant_id=instance_row.tenant_id
-                           AND milestone.sla_instance_id=instance_row.sla_instance_id
-                           AND milestone.milestone_type='TARGET_DUE'
-                          JOIN tsk_task task_row
-                            ON task_row.tenant_id=instance_row.tenant_id
-                           AND task_row.task_id=instance_row.task_id
-                         WHERE instance_row.status='RUNNING' AND milestone.status='PENDING'
-                           AND milestone.scheduled_at <= :detectedAt
-                           AND task_row.status <> 'COMPLETED'
-                         ORDER BY milestone.scheduled_at, milestone.milestone_id
-                         FOR UPDATE OF instance_row, milestone, task_row SKIP LOCKED
-                         LIMIT 1
-                        """)
-                .param("detectedAt", timestamptz(detectedAt))
-                .query((rs, row) -> new InstanceState(
-                        rs.getObject("sla_instance_id", UUID.class),
-                        rs.getString("tenant_id"), rs.getObject("task_id", UUID.class), instant(rs, "started_at"),
-                        instant(rs, "deadline_at"), rs.getString("status"),
-                        rs.getLong("aggregate_version"), rs.getString("correlation_id"),
-                        rs.getString("clock_mode"), rs.getString("calendar_ref"),
-                        rs.getObject("milestone_id", UUID.class),
-                        rs.getObject("trigger_event_id", UUID.class)))
-                .optional();
+        SlaInstance instanceRow = SLA_INSTANCE.as("instance_row");
+        SlaMilestone milestone = SLA_MILESTONE.as("milestone");
+        TskTask taskRow = TSK_TASK.as("task_row");
+        // limit 必须先于 forUpdate；FOR UPDATE OF 三表 + SKIP LOCKED 与原到期对账 SQL 等价。
+        Optional<InstanceState> candidate = dsl.select(
+                        instanceRow.SLA_INSTANCE_ID, instanceRow.TENANT_ID, instanceRow.TASK_ID,
+                        instanceRow.STARTED_AT, instanceRow.DEADLINE_AT,
+                        instanceRow.STATUS, instanceRow.AGGREGATE_VERSION,
+                        instanceRow.CORRELATION_ID, instanceRow.CLOCK_MODE,
+                        instanceRow.CALENDAR_REF, milestone.MILESTONE_ID,
+                        milestone.TRIGGER_EVENT_ID)
+                .from(instanceRow)
+                .join(milestone)
+                .on(milestone.TENANT_ID.eq(instanceRow.TENANT_ID))
+                .and(milestone.SLA_INSTANCE_ID.eq(instanceRow.SLA_INSTANCE_ID))
+                .and(milestone.MILESTONE_TYPE.eq("TARGET_DUE"))
+                .join(taskRow)
+                .on(taskRow.TENANT_ID.eq(instanceRow.TENANT_ID))
+                .and(taskRow.TASK_ID.eq(instanceRow.TASK_ID))
+                .where(instanceRow.STATUS.eq("RUNNING"))
+                .and(milestone.STATUS.eq("PENDING"))
+                .and(milestone.SCHEDULED_AT.le(detectedAt))
+                .and(taskRow.STATUS.ne("COMPLETED"))
+                .orderBy(milestone.SCHEDULED_AT, milestone.MILESTONE_ID)
+                .limit(1)
+                .forUpdate().of(instanceRow, milestone, taskRow).skipLocked()
+                .fetchOptional(row -> instanceState(row, instanceRow, milestone));
         if (candidate.isEmpty()) {
             return false;
         }
@@ -295,15 +303,16 @@ final class DefaultSlaClockService implements SlaClockService, TaskSlaEventConsu
      * 单调且互不重复的 aggregateVersion，重放方无需猜测同版本事件顺序。
      */
     private InstanceState markBreached(InstanceState state, Instant detectedAt, UUID breachEventId) {
-        int updated = jdbc.sql("""
-                        UPDATE sla_instance
-                           SET status='BREACHED', breached_at=deadline_at,
-                               breach_detected_at=:detectedAt,
-                               aggregate_version=aggregate_version+1, updated_at=:detectedAt
-                         WHERE sla_instance_id=:instanceId AND status='RUNNING'
-                        """)
-                .param("detectedAt", timestamptz(detectedAt))
-                .param("instanceId", state.slaInstanceId()).update();
+        SlaInstance instance = SLA_INSTANCE;
+        int updated = dsl.update(instance)
+                .set(instance.STATUS, "BREACHED")
+                .set(instance.BREACHED_AT, instance.DEADLINE_AT)
+                .set(instance.BREACH_DETECTED_AT, detectedAt)
+                .set(instance.AGGREGATE_VERSION, instance.AGGREGATE_VERSION.plus(1))
+                .set(instance.UPDATED_AT, detectedAt)
+                .where(instance.SLA_INSTANCE_ID.eq(state.slaInstanceId()))
+                .and(instance.STATUS.eq("RUNNING"))
+                .execute();
         if (updated != 1) {
             throw new IllegalStateException("SLA changed during breach reconciliation");
         }
@@ -322,15 +331,15 @@ final class DefaultSlaClockService implements SlaClockService, TaskSlaEventConsu
             String correlationId
     ) {
         UUID eventId = UUID.randomUUID();
-        int updated = jdbc.sql("""
-                        UPDATE sla_milestone
-                           SET status='TRIGGERED', triggered_at=scheduled_at,
-                               detected_at=:detectedAt, trigger_event_id=:eventId
-                         WHERE sla_instance_id=:instanceId
-                           AND milestone_type='TARGET_DUE' AND status='PENDING'
-                        """)
-                .param("detectedAt", timestamptz(detectedAt)).param("eventId", eventId)
-                .param("instanceId", state.slaInstanceId()).update();
+        int updated = dsl.update(SLA_MILESTONE)
+                .set(SLA_MILESTONE.STATUS, "TRIGGERED")
+                .set(SLA_MILESTONE.TRIGGERED_AT, SLA_MILESTONE.SCHEDULED_AT)
+                .set(SLA_MILESTONE.DETECTED_AT, detectedAt)
+                .set(SLA_MILESTONE.TRIGGER_EVENT_ID, eventId)
+                .where(SLA_MILESTONE.SLA_INSTANCE_ID.eq(state.slaInstanceId()))
+                .and(SLA_MILESTONE.MILESTONE_TYPE.eq("TARGET_DUE"))
+                .and(SLA_MILESTONE.STATUS.eq("PENDING"))
+                .execute();
         if (updated != 1) {
             throw new IllegalStateException("SLA TARGET_DUE milestone is no longer pending");
         }
@@ -345,12 +354,13 @@ final class DefaultSlaClockService implements SlaClockService, TaskSlaEventConsu
     }
 
     private void cancelMilestone(String tenantId, UUID instanceId) {
-        int updated = jdbc.sql("""
-                        UPDATE sla_milestone SET status='CANCELLED'
-                         WHERE tenant_id=:tenantId AND sla_instance_id=:instanceId
-                           AND milestone_type='TARGET_DUE' AND status='PENDING'
-                        """)
-                .param("tenantId", tenantId).param("instanceId", instanceId).update();
+        int updated = dsl.update(SLA_MILESTONE)
+                .set(SLA_MILESTONE.STATUS, "CANCELLED")
+                .where(SLA_MILESTONE.TENANT_ID.eq(tenantId))
+                .and(SLA_MILESTONE.SLA_INSTANCE_ID.eq(instanceId))
+                .and(SLA_MILESTONE.MILESTONE_TYPE.eq("TARGET_DUE"))
+                .and(SLA_MILESTONE.STATUS.eq("PENDING"))
+                .execute();
         if (updated != 1) {
             throw new IllegalStateException("On-time SLA TARGET_DUE milestone is not pending");
         }
@@ -359,45 +369,49 @@ final class DefaultSlaClockService implements SlaClockService, TaskSlaEventConsu
     private void closeSegment(
             String tenantId, UUID instanceId, UUID stopEventId, Instant completedAt, long elapsedSeconds
     ) {
-        int updated = jdbc.sql("""
-                        UPDATE sla_clock_segment
-                           SET ended_at=:completedAt, elapsed_seconds=:elapsedSeconds, end_event_id=:stopEventId
-                         WHERE tenant_id=:tenantId AND sla_instance_id=:instanceId AND ended_at IS NULL
-                        """)
-                .param("completedAt", timestamptz(completedAt)).param("elapsedSeconds", elapsedSeconds)
-                .param("stopEventId", stopEventId).param("tenantId", tenantId)
-                .param("instanceId", instanceId).update();
+        int updated = dsl.update(SLA_CLOCK_SEGMENT)
+                .set(SLA_CLOCK_SEGMENT.ENDED_AT, completedAt)
+                .set(SLA_CLOCK_SEGMENT.ELAPSED_SECONDS, elapsedSeconds)
+                .set(SLA_CLOCK_SEGMENT.END_EVENT_ID, stopEventId)
+                .where(SLA_CLOCK_SEGMENT.TENANT_ID.eq(tenantId))
+                .and(SLA_CLOCK_SEGMENT.SLA_INSTANCE_ID.eq(instanceId))
+                .and(SLA_CLOCK_SEGMENT.ENDED_AT.isNull())
+                .execute();
         if (updated != 1) {
             throw new IllegalStateException("SLA RUNNING segment is missing or already closed");
         }
     }
 
     private Optional<InstanceState> lockByTask(String tenantId, UUID taskId) {
-        return jdbc.sql("""
-                        SELECT instance_row.sla_instance_id, instance_row.tenant_id, instance_row.task_id,
-                               instance_row.started_at, instance_row.deadline_at,
-                               instance_row.status, instance_row.aggregate_version,
-                               instance_row.correlation_id, instance_row.clock_mode,
-                               instance_row.calendar_ref, milestone.milestone_id,
-                               milestone.trigger_event_id
-                          FROM sla_instance instance_row
-                          JOIN sla_milestone milestone
-                            ON milestone.tenant_id=instance_row.tenant_id
-                           AND milestone.sla_instance_id=instance_row.sla_instance_id
-                           AND milestone.milestone_type='TARGET_DUE'
-                         WHERE instance_row.tenant_id=:tenantId AND instance_row.task_id=:taskId
-                         FOR UPDATE OF instance_row, milestone
-                        """)
-                .param("tenantId", tenantId).param("taskId", taskId)
-                .query((rs, row) -> new InstanceState(
-                        rs.getObject("sla_instance_id", UUID.class),
-                        rs.getString("tenant_id"), rs.getObject("task_id", UUID.class), instant(rs, "started_at"),
-                        instant(rs, "deadline_at"), rs.getString("status"),
-                        rs.getLong("aggregate_version"), rs.getString("correlation_id"),
-                        rs.getString("clock_mode"), rs.getString("calendar_ref"),
-                        rs.getObject("milestone_id", UUID.class),
-                        rs.getObject("trigger_event_id", UUID.class)))
-                .optional();
+        SlaInstance instanceRow = SLA_INSTANCE.as("instance_row");
+        SlaMilestone milestone = SLA_MILESTONE.as("milestone");
+        return dsl.select(
+                        instanceRow.SLA_INSTANCE_ID, instanceRow.TENANT_ID, instanceRow.TASK_ID,
+                        instanceRow.STARTED_AT, instanceRow.DEADLINE_AT,
+                        instanceRow.STATUS, instanceRow.AGGREGATE_VERSION,
+                        instanceRow.CORRELATION_ID, instanceRow.CLOCK_MODE,
+                        instanceRow.CALENDAR_REF, milestone.MILESTONE_ID,
+                        milestone.TRIGGER_EVENT_ID)
+                .from(instanceRow)
+                .join(milestone)
+                .on(milestone.TENANT_ID.eq(instanceRow.TENANT_ID))
+                .and(milestone.SLA_INSTANCE_ID.eq(instanceRow.SLA_INSTANCE_ID))
+                .and(milestone.MILESTONE_TYPE.eq("TARGET_DUE"))
+                .where(instanceRow.TENANT_ID.eq(tenantId))
+                .and(instanceRow.TASK_ID.eq(taskId))
+                .forUpdate().of(instanceRow, milestone)
+                .fetchOptional(row -> instanceState(row, instanceRow, milestone));
+    }
+
+    private static InstanceState instanceState(Record row, SlaInstance instanceRow, SlaMilestone milestone) {
+        return new InstanceState(
+                row.get(instanceRow.SLA_INSTANCE_ID),
+                row.get(instanceRow.TENANT_ID), row.get(instanceRow.TASK_ID), row.get(instanceRow.STARTED_AT),
+                row.get(instanceRow.DEADLINE_AT), row.get(instanceRow.STATUS),
+                row.get(instanceRow.AGGREGATE_VERSION), row.get(instanceRow.CORRELATION_ID),
+                row.get(instanceRow.CLOCK_MODE), row.get(instanceRow.CALENDAR_REF),
+                row.get(milestone.MILESTONE_ID),
+                row.get(milestone.TRIGGER_EVENT_ID));
     }
 
     private TaskFulfillmentContext requireTask(String tenantId, UUID taskId) {
@@ -536,11 +550,6 @@ final class DefaultSlaClockService implements SlaClockService, TaskSlaEventConsu
         } catch (JacksonException exception) {
             throw new IllegalStateException("SLA event serialization failed", exception);
         }
-    }
-
-    private static Instant instant(java.sql.ResultSet rs, String column) throws java.sql.SQLException {
-        java.time.OffsetDateTime value = rs.getObject(column, java.time.OffsetDateTime.class);
-        return value == null ? null : value.toInstant();
     }
 
     private static String requireText(String value, String field) {
