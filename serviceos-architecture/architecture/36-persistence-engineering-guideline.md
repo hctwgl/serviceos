@@ -5,11 +5,10 @@ status: Superseded
 superseded_by: decisions/ADR-091-jooq-unified-data-access.md
 ---
 
-> **已被 ADR-091 取代（2026-07-20）**：数据访问层将统一收敛为 jOOQ，本规范的
-> "MyBatis 默认与 JDBC 受控例外"选型条款不再作为新增代码的长期方向。
-> 在 ADR-091 迁移分支合并前（过渡规则见 ADR-091 §5），存量代码维持现状模式；
-> 本规范中与技术选型无关的约束（Repository 语义、并发条件、多租户 Scope、
-> 事务边界、PostgreSQL 测试要求）由 ADR-091 §3.4 继承，继续有效。
+> **已被 ADR-091 取代（2026-07-20）**：数据访问层已一次性统一为 jOOQ，MyBatis/JdbcClient
+> 旧实现已删除。本规范的"MyBatis 默认与 JDBC 受控例外"选型条款失效；与技术选型无关的
+> 约束（Repository 语义、并发条件、多租户 Scope、事务边界、PostgreSQL 测试要求）由
+> ADR-091 §3.4 继承并继续有效。本文件保留为历史参考。
 
 # 持久化工程规范：MyBatis 默认与 JDBC 受控例外
 

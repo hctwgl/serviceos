@@ -13,8 +13,8 @@ com.serviceos.<module>/
 ├── api/              # 公开 API：跨模块只允许依赖这里（或 spi/）
 ├── spi/              # 显式 SPI（仅部分模块）
 ├── application/      # Application Service：编排用例与事务
-├── domain/ 或模型类   # 领域规则与不变量（不依赖 Web/MyBatis/外部 SDK）
-├── infrastructure/   # Mapper/Repository 适配器等技术实现
+├── domain/ 或模型类   # 领域规则与不变量（不依赖 Web/jOOQ/外部 SDK）
+├── infrastructure/   # jOOQ Repository 适配器等技术实现（ADR-091 后唯一数据访问层）
 ├── web/              # Controller（仅协议适配，仅对外 HTTP 的模块有）
 └── package-info.java # Spring Modulith 模块声明与 allowedDependencies
 ```

@@ -35,7 +35,7 @@ title: ServiceOS Agent 任务导航
 | Evidence/审核整改切片 | `serviceos-architecture/architecture/66-m53-form-condition-evidence-reresolution-proposal.md`、`serviceos-architecture/architecture/68-m55-client-review-case-origin-runtime.md`、`serviceos-architecture/architecture/10-evidence-review-correction.md` | ADR-008/018/022 |
 | SLA 切片 | `serviceos-architecture/architecture/74-m61-task-elapsed-sla-clock.md`、`serviceos-architecture/architecture/75-m62-sla-authorized-query-projection.md`、`serviceos-architecture/architecture/12-sla-clock-escalation.md` | index Grep `SLA` 取最近切片 |
 | 契约变更（OpenAPI/事件 Schema） | `serviceos-contracts/README.md`、目标 yaml/schema、根 `AGENTS.md` §7 | `serviceos-architecture/architecture/26-contract-ci-client-generation-implementation.md`（M12 门禁原理） |
-| Flyway/数据迁移/数据访问 | `serviceos-architecture/decisions/ADR-091-jooq-unified-data-access.md`（jOOQ 收敛方向与过渡规则）、`serviceos-architecture/architecture/36-persistence-engineering-guideline.md`（工程约束条款）、对应模块 `serviceos-backend/src/main/resources/db/migration/<module>/` 最新若干文件 | 相邻迁移的 PostgreSQL IT |
+| Flyway/数据迁移/数据访问 | `serviceos-architecture/decisions/ADR-091-jooq-unified-data-access.md`（jOOQ 统一数据访问与工程约束）、对应模块 `serviceos-backend/src/main/resources/db/migration/<module>/` 最新若干文件 | 相邻迁移的 PostgreSQL IT、`serviceos-architecture/architecture/36-persistence-engineering-guideline.md`（历史参考，选型条款已被 ADR-091 取代） |
 | 纯文档/状态维护 | 当前文件及直接引用、`serviceos-architecture/docs/implementation-status.md` §7 维护规则、`serviceos-architecture/docs/milestone-playbook.md` §文档同步 | 根 `AGENTS.md` §11 |
 
 ## 明确不做

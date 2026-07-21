@@ -8,7 +8,11 @@ import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 
 /**
- * PostgreSQL JDBC 参数适配器。
+ * PostgreSQL JDBC 参数适配器（仅供测试夹具使用）。
+ *
+ * <p>ADR-091 后生产数据访问统一为 jOOQ，生产侧 timestamptz 绑定由
+ * {@code TimestamptzInstantConverter} 承担；本类仅服务测试代码中仍用 JdbcClient
+ * 编写的 SQL 夹具。</p>
  *
  * <p>PostgreSQL JDBC 42.7 不会为 {@link Instant} 自动推断 SQL 类型。所有写入或比较
  * {@code timestamptz} 的参数都必须先转为驱动原生支持的 {@code OffsetDateTime}，并显式声明
