@@ -8,6 +8,7 @@ import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
 import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.readmodel.api.NetworkPortalQueryService;
+import com.serviceos.readmodel.api.NetworkPortalWorkbenchTimelineBucket;
 import com.serviceos.readmodel.api.NetworkPortalWorkbenchView;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderWorkspaceSlaSummary;
 import com.serviceos.shared.BusinessProblem;
@@ -109,8 +110,7 @@ class NetworkPortalWorkbenchEnrichmentPostgresIT {
                     prj_project,
                     rel_idempotency_record, aud_audit_record CASCADE
                 """).update();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("135");
-        assertThat(flyway.info().applied()).hasSize(137);
+        assertThat(flyway.info().current().getVersion().getVersion()).isGreaterThanOrEqualTo("142");
 
         jdbc.sql("""
                 INSERT INTO prj_project (
@@ -161,6 +161,11 @@ class NetworkPortalWorkbenchEnrichmentPostgresIT {
         assertThat(wb.openOperationalExceptionCount()).isNull();
         assertThat(wb.pendingQualificationCount()).isNull();
         assertThat(wb.slaSummary()).isNull();
+        assertThat(wb.todayAppointmentCount()).isNull();
+        assertThat(wb.todayAppointments()).isNull();
+        assertThat(wb.todayTimeline())
+                .extracting(NetworkPortalWorkbenchTimelineBucket::bucketCode)
+                .contains(NetworkPortalWorkbenchTimelineBucket.UNASSIGNED);
         assertThat(wb.capacity()).hasSize(1);
     }
 
