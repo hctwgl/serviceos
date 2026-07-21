@@ -6,7 +6,7 @@
 @org.springframework.modulith.ApplicationModule(
         displayName = "External Integration",
         allowedDependencies = {
-                "shared", "reliability::api", "reliability::spi", "audit::api", "authorization::api",
+                "shared", "jooq", "reliability::api", "reliability::spi", "audit::api", "authorization::api",
                 "identity::api", "files::spi", "project::api", "configuration::api",
                 "workorder::api", "evidence::api", "task::api", "task::spi"
         }

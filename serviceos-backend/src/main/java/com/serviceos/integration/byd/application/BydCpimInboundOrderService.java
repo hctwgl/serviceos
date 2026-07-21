@@ -11,7 +11,7 @@ import com.serviceos.integration.byd.api.BydCpimSignatureHeaders;
 import com.serviceos.integration.byd.infrastructure.BydCpimPayloadDigest;
 import com.serviceos.integration.byd.infrastructure.BydCpimReplayConflictException;
 import com.serviceos.integration.byd.infrastructure.BydCpimSignatureVerifier;
-import com.serviceos.integration.byd.infrastructure.JdbcBydCpimReplayGuard;
+import com.serviceos.integration.byd.infrastructure.JooqBydCpimReplayGuard;
 import com.serviceos.integration.spi.ConnectorIdentity;
 import com.serviceos.integration.spi.CreateWorkOrderMappedInbound;
 import com.serviceos.integration.spi.CreateWorkOrderRouteHint;
@@ -54,7 +54,7 @@ public class BydCpimInboundOrderService {
     private static final String OBJECT_NAMESPACE = "byd-cpim";
 
     private final ObjectMapper objectMapper;
-    private final JdbcBydCpimReplayGuard replayGuard;
+    private final JooqBydCpimReplayGuard replayGuard;
     private final InboundMessageRepository messages;
     private final ObjectStorageGateway storage;
     private final BydCpimOrderMapper mapper;
@@ -67,7 +67,7 @@ public class BydCpimInboundOrderService {
 
     public BydCpimInboundOrderService(
             ObjectMapper objectMapper,
-            JdbcBydCpimReplayGuard replayGuard,
+            JooqBydCpimReplayGuard replayGuard,
             InboundMessageRepository messages,
             ObjectStorageGateway storage,
             InboundCreateWorkOrderPipeline createWorkOrderPipeline,
