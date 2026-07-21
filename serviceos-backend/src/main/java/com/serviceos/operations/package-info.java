@@ -4,7 +4,7 @@
 @org.springframework.modulith.ApplicationModule(
         displayName = "Operational Exception",
         allowedDependencies = {
-                "shared", "identity::api", "authorization::api", "audit::api",
+                "shared", "jooq", "identity::api", "authorization::api", "audit::api",
                 "reliability::api", "reliability::spi", "task::api", "dispatch::api"
         }
 )

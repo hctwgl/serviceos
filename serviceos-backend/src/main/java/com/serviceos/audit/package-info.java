@@ -3,6 +3,6 @@
  */
 @org.springframework.modulith.ApplicationModule(
         displayName = "Audit",
-        allowedDependencies = "shared"
+        allowedDependencies = {"shared", "jooq"}
 )
 package com.serviceos.audit;

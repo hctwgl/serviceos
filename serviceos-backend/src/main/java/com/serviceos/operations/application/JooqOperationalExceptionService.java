@@ -1,5 +1,7 @@
 package com.serviceos.operations.application;
 
+import com.serviceos.jooq.generated.tables.OpsOperationalException;
+import com.serviceos.jooq.generated.tables.OpsTaskFailureRecovery;
 import com.serviceos.operations.api.OpenTaskFailureCommand;
 import com.serviceos.operations.api.OpenServiceAssignmentTimeoutCommand;
 import com.serviceos.operations.api.ResolveServiceAssignmentTimeoutCommand;
@@ -17,7 +19,9 @@ import com.serviceos.task.api.CancelHandlingTaskCommand;
 import com.serviceos.task.api.CreateHandlingTaskCommand;
 import com.serviceos.task.api.ScheduledTaskView;
 import com.serviceos.task.api.TaskSchedulingService;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import org.jooq.DSLContext;
+import org.jooq.Record;
+import org.jooq.impl.DSL;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
@@ -28,17 +32,18 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
-import static com.serviceos.shared.infrastructure.PostgresJdbcParameters.timestamptz;
+import static com.serviceos.jooq.generated.tables.OpsOperationalException.OPS_OPERATIONAL_EXCEPTION;
+import static com.serviceos.jooq.generated.tables.OpsTaskFailureRecovery.OPS_TASK_FAILURE_RECOVERY;
+import static org.jooq.impl.DSL.excluded;
 
 /**
  * 最终失败消费者：Inbox、异常记录和人工处理 Task 在同一事务提交。
  */
 @Service
-final class DefaultOperationalExceptionService implements OperationalExceptionService {
+final class JooqOperationalExceptionService implements OperationalExceptionService {
     private static final String CONSUMER_NAME = "operations.task-final-failure.v1";
     private static final String SAGA_TIMEOUT_CONSUMER = "operations.service-assignment-timeout.v1";
     private static final String SAGA_RECOVERY_CONSUMER =
@@ -50,22 +55,22 @@ final class DefaultOperationalExceptionService implements OperationalExceptionSe
 
     private final InboxService inbox;
     private final TaskSchedulingService tasks;
-    private final JdbcClient jdbc;
+    private final DSLContext dsl;
     private final Clock clock;
     private final OutboxAppender outbox;
     private final ObjectMapper objectMapper;
 
-    DefaultOperationalExceptionService(
+    JooqOperationalExceptionService(
             InboxService inbox,
             TaskSchedulingService tasks,
-            JdbcClient jdbc,
+            DSLContext dsl,
             Clock clock,
             OutboxAppender outbox,
             ObjectMapper objectMapper
     ) {
         this.inbox = inbox;
         this.tasks = tasks;
-        this.jdbc = jdbc;
+        this.dsl = dsl;
         this.clock = clock;
         this.outbox = outbox;
         this.objectMapper = objectMapper;
@@ -94,28 +99,25 @@ final class DefaultOperationalExceptionService implements OperationalExceptionSe
 
         Instant now = command.detectedAt();
         UUID exceptionId = UUID.randomUUID();
-        jdbc.sql("""
-                        INSERT INTO ops_operational_exception (
-                            exception_id, tenant_id, source_type, source_id, source_attempt_id, source_task_type,
-                            category_code, severity_code, error_code, status, correlation_id,
-                            opened_at, last_detected_at
-                        ) VALUES (
-                            :exceptionId, :tenantId, 'TASK', :sourceId, :sourceAttemptId, :sourceTaskType,
-                            'AUTOMATION_FINAL_FAILURE', 'P1', :errorCode, 'OPEN', :correlationId,
-                            :openedAt, :openedAt
-                        )
-                        ON CONFLICT (tenant_id, source_type, source_id, source_attempt_id) DO NOTHING
-                        """)
-                .params(Map.of(
-                        "exceptionId", exceptionId,
-                        "tenantId", command.tenantId(),
-                        "sourceId", command.sourceTaskId().toString(),
-                        "sourceAttemptId", command.sourceAttemptId(),
-                        "sourceTaskType", command.sourceTaskType(),
-                        "errorCode", truncate(command.errorCode(), 100),
-                        "correlationId", command.correlationId(),
-                        "openedAt", timestamptz(now)))
-                .update();
+        OpsOperationalException exception = OPS_OPERATIONAL_EXCEPTION;
+        dsl.insertInto(exception)
+                .set(exception.EXCEPTION_ID, exceptionId)
+                .set(exception.TENANT_ID, command.tenantId())
+                .set(exception.SOURCE_TYPE, "TASK")
+                .set(exception.SOURCE_ID, command.sourceTaskId().toString())
+                .set(exception.SOURCE_ATTEMPT_ID, command.sourceAttemptId())
+                .set(exception.SOURCE_TASK_TYPE, command.sourceTaskType())
+                .set(exception.CATEGORY_CODE, "AUTOMATION_FINAL_FAILURE")
+                .set(exception.SEVERITY_CODE, "P1")
+                .set(exception.ERROR_CODE, truncate(command.errorCode(), 100))
+                .set(exception.STATUS, "OPEN")
+                .set(exception.CORRELATION_ID, command.correlationId())
+                .set(exception.OPENED_AT, now)
+                .set(exception.LAST_DETECTED_AT, now)
+                .onConflict(exception.TENANT_ID, exception.SOURCE_TYPE,
+                        exception.SOURCE_ID, exception.SOURCE_ATTEMPT_ID)
+                .doNothing()
+                .execute();
 
         OperationalExceptionView opened = findBySource(
                 command.tenantId(), command.sourceTaskId(), command.sourceAttemptId());
@@ -125,15 +127,11 @@ final class DefaultOperationalExceptionService implements OperationalExceptionSe
                 command.tenantId(), HANDLING_TASK_TYPE, opened.exceptionId().toString(),
                 "operational-exception:" + opened.exceptionId(), handlingPayloadDigest,
                 900, now, command.correlationId()));
-        jdbc.sql("""
-                        UPDATE ops_operational_exception
-                           SET handling_task_id = :handlingTaskId
-                         WHERE exception_id = :exceptionId AND handling_task_id IS NULL
-                        """)
-                .params(Map.of(
-                        "handlingTaskId", handlingTask.taskId(),
-                        "exceptionId", opened.exceptionId()))
-                .update();
+        dsl.update(exception)
+                .set(exception.HANDLING_TASK_ID, handlingTask.taskId())
+                .where(exception.EXCEPTION_ID.eq(opened.exceptionId()))
+                .and(exception.HANDLING_TASK_ID.isNull())
+                .execute();
         inbox.complete(
                 command.tenantId(), CONSUMER_NAME, command.eventId(),
                 Sha256.digest(opened.exceptionId() + "|" + handlingTask.taskId()));
@@ -178,20 +176,17 @@ final class DefaultOperationalExceptionService implements OperationalExceptionSe
                         command.tenantId(), state.handlingTaskId(), HANDLING_TASK_TYPE,
                         state.exceptionId().toString(), resolutionCode,
                         command.eventId(), command.recoveredAt(), command.correlationId()));
-                int updated = jdbc.sql("""
-                                UPDATE ops_operational_exception
-                                   SET status='RESOLVED', resolved_at=:resolvedAt,
-                                       resolution_code=:resolutionCode,
-                                       resolution_action_ref=:actionRef,
-                                       resolution_event_id=:resolutionEventId,
-                                       aggregate_version=aggregate_version+1
-                                 WHERE exception_id=:exceptionId
-                                   AND status IN ('OPEN','ACKNOWLEDGED')
-                                """)
-                        .param("resolvedAt", timestamptz(command.recoveredAt()))
-                        .param("resolutionCode", resolutionCode).param("actionRef", actionRef)
-                        .param("resolutionEventId", command.eventId())
-                        .param("exceptionId", state.exceptionId()).update();
+                OpsOperationalException exception = OPS_OPERATIONAL_EXCEPTION;
+                int updated = dsl.update(exception)
+                        .set(exception.STATUS, "RESOLVED")
+                        .set(exception.RESOLVED_AT, command.recoveredAt())
+                        .set(exception.RESOLUTION_CODE, resolutionCode)
+                        .set(exception.RESOLUTION_ACTION_REF, actionRef)
+                        .set(exception.RESOLUTION_EVENT_ID, command.eventId())
+                        .set(exception.AGGREGATE_VERSION, exception.AGGREGATE_VERSION.plus(1))
+                        .where(exception.EXCEPTION_ID.eq(state.exceptionId()))
+                        .and(exception.STATUS.in("OPEN", "ACKNOWLEDGED"))
+                        .execute();
                 if (updated != 1) {
                     throw new IllegalStateException("Task failure exception changed during recovery");
                 }
@@ -222,42 +217,43 @@ final class DefaultOperationalExceptionService implements OperationalExceptionSe
 
         Instant now = clock.instant();
         UUID exceptionId = UUID.randomUUID();
-        jdbc.sql("""
-                        INSERT INTO ops_operational_exception (
-                            exception_id, tenant_id, source_type, source_id, source_attempt_id,
-                            source_task_type, category_code, severity_code, error_code, status,
-                            work_order_id, task_id, correlation_id, opened_at, last_detected_at
-                        ) VALUES (
-                            :exceptionId, :tenantId, 'SERVICE_ASSIGNMENT_ACTIVATION_SAGA',
-                            :sourceId, :sourceAttemptId, :sourceTaskType, 'DISPATCH', 'P1',
-                            :errorCode, 'OPEN', :workOrderId, :taskId, :correlationId,
-                            :openedAt, :detectedAt
-                        )
-                        ON CONFLICT (tenant_id, source_type, source_id, source_attempt_id)
-                        DO UPDATE SET occurrence_count = ops_operational_exception.occurrence_count + 1,
-                                      last_detected_at = GREATEST(
-                                          ops_operational_exception.last_detected_at,
-                                          EXCLUDED.last_detected_at),
-                                      error_code = EXCLUDED.error_code,
-                                      status = 'OPEN', resolved_at = NULL,
-                                      acknowledged_at = NULL,
-                                      acknowledged_by = NULL,
-                                      acknowledgement_note = NULL,
-                                      resolution_code = NULL,
-                                      resolution_action_ref = NULL,
-                                      resolution_event_id = NULL,
-                                      aggregate_version = ops_operational_exception.aggregate_version + 1
-                        """)
-                .param("exceptionId", exceptionId).param("tenantId", command.tenantId())
-                .param("sourceId", command.sagaId().toString())
+        OpsOperationalException exception = OPS_OPERATIONAL_EXCEPTION;
+        // 冲突即同一 saga 另一阶段超时再次到达：发生次数 +1、最后检测时间取较大值，
+        // 已解决/已确认字段清空并重新回到 OPEN，版本 +1。
+        dsl.insertInto(exception)
+                .set(exception.EXCEPTION_ID, exceptionId)
+                .set(exception.TENANT_ID, command.tenantId())
+                .set(exception.SOURCE_TYPE, "SERVICE_ASSIGNMENT_ACTIVATION_SAGA")
+                .set(exception.SOURCE_ID, command.sagaId().toString())
                 // 现有唯一键要求 occurrence UUID；以 sagaId 聚合同一 saga 的多阶段超时。
-                .param("sourceAttemptId", command.sagaId())
-                .param("sourceTaskType", DISPATCH_TIMEOUT_TASK_TYPE)
-                .param("errorCode", truncate(command.errorCode(), 100))
-                .param("workOrderId", command.workOrderId()).param("taskId", command.taskId())
-                .param("correlationId", command.correlationId())
-                .param("openedAt", timestamptz(now))
-                .param("detectedAt", timestamptz(command.detectedAt())).update();
+                .set(exception.SOURCE_ATTEMPT_ID, command.sagaId())
+                .set(exception.SOURCE_TASK_TYPE, DISPATCH_TIMEOUT_TASK_TYPE)
+                .set(exception.CATEGORY_CODE, "DISPATCH")
+                .set(exception.SEVERITY_CODE, "P1")
+                .set(exception.ERROR_CODE, truncate(command.errorCode(), 100))
+                .set(exception.STATUS, "OPEN")
+                .set(exception.WORK_ORDER_ID, command.workOrderId())
+                .set(exception.TASK_ID, command.taskId())
+                .set(exception.CORRELATION_ID, command.correlationId())
+                .set(exception.OPENED_AT, now)
+                .set(exception.LAST_DETECTED_AT, command.detectedAt())
+                .onConflict(exception.TENANT_ID, exception.SOURCE_TYPE,
+                        exception.SOURCE_ID, exception.SOURCE_ATTEMPT_ID)
+                .doUpdate()
+                .set(exception.OCCURRENCE_COUNT, exception.OCCURRENCE_COUNT.plus(1))
+                .set(exception.LAST_DETECTED_AT, DSL.greatest(
+                        exception.LAST_DETECTED_AT, excluded(exception.LAST_DETECTED_AT)))
+                .set(exception.ERROR_CODE, excluded(exception.ERROR_CODE))
+                .set(exception.STATUS, "OPEN")
+                .setNull(exception.RESOLVED_AT)
+                .setNull(exception.ACKNOWLEDGED_AT)
+                .setNull(exception.ACKNOWLEDGED_BY)
+                .setNull(exception.ACKNOWLEDGEMENT_NOTE)
+                .setNull(exception.RESOLUTION_CODE)
+                .setNull(exception.RESOLUTION_ACTION_REF)
+                .setNull(exception.RESOLUTION_EVENT_ID)
+                .set(exception.AGGREGATE_VERSION, exception.AGGREGATE_VERSION.plus(1))
+                .execute();
 
         OperationalExceptionView opened = findSagaTimeout(command.tenantId(), command.sagaId());
         String handlingPayloadDigest = Sha256.digest(
@@ -266,13 +262,11 @@ final class DefaultOperationalExceptionService implements OperationalExceptionSe
                 command.tenantId(), DISPATCH_TIMEOUT_TASK_TYPE, opened.exceptionId().toString(),
                 "service-assignment-saga:" + command.sagaId(), handlingPayloadDigest,
                 950, now, command.correlationId()));
-        jdbc.sql("""
-                        UPDATE ops_operational_exception
-                           SET handling_task_id = :handlingTaskId
-                         WHERE exception_id = :exceptionId AND handling_task_id IS NULL
-                        """)
-                .param("handlingTaskId", handlingTask.taskId())
-                .param("exceptionId", opened.exceptionId()).update();
+        dsl.update(exception)
+                .set(exception.HANDLING_TASK_ID, handlingTask.taskId())
+                .where(exception.EXCEPTION_ID.eq(opened.exceptionId()))
+                .and(exception.HANDLING_TASK_ID.isNull())
+                .execute();
         inbox.complete(
                 command.tenantId(), SAGA_TIMEOUT_CONSUMER, command.eventId(),
                 Sha256.digest(opened.exceptionId() + "|" + handlingTask.taskId()
@@ -291,18 +285,19 @@ final class DefaultOperationalExceptionService implements OperationalExceptionSe
             return;
         }
 
-        SagaTimeoutException state = jdbc.sql("""
-                        SELECT exception_id, work_order_id, task_id, handling_task_id,
-                               status, occurrence_count, aggregate_version, resolution_event_id
-                          FROM ops_operational_exception
-                         WHERE tenant_id = :tenantId
-                           AND source_type = 'SERVICE_ASSIGNMENT_ACTIVATION_SAGA'
-                           AND source_id = :sourceId AND source_attempt_id = :sourceAttemptId
-                         FOR UPDATE
-                        """)
-                .param("tenantId", command.tenantId()).param("sourceId", command.sagaId().toString())
-                .param("sourceAttemptId", command.sagaId())
-                .query(SagaTimeoutException.class).optional().orElse(null);
+        OpsOperationalException exception = OPS_OPERATIONAL_EXCEPTION;
+        SagaTimeoutException state = dsl.select(
+                        exception.EXCEPTION_ID, exception.WORK_ORDER_ID, exception.TASK_ID,
+                        exception.HANDLING_TASK_ID, exception.STATUS, exception.OCCURRENCE_COUNT,
+                        exception.AGGREGATE_VERSION, exception.RESOLUTION_EVENT_ID)
+                .from(exception)
+                .where(exception.TENANT_ID.eq(command.tenantId()))
+                .and(exception.SOURCE_TYPE.eq("SERVICE_ASSIGNMENT_ACTIVATION_SAGA"))
+                .and(exception.SOURCE_ID.eq(command.sagaId().toString()))
+                .and(exception.SOURCE_ATTEMPT_ID.eq(command.sagaId()))
+                .forUpdate()
+                .fetchOptional(this::mapSagaTimeoutException)
+                .orElse(null);
         // 未发生过超时是合法正常路径；仍冻结 Inbox，阻止同一恢复事件被变造重放。
         if (state == null) {
             inbox.complete(command.tenantId(), SAGA_RECOVERY_CONSUMER, command.eventId(),
@@ -331,19 +326,16 @@ final class DefaultOperationalExceptionService implements OperationalExceptionSe
                 command.tenantId(), state.handlingTaskId(), DISPATCH_TIMEOUT_TASK_TYPE,
                 state.exceptionId().toString(), resolutionCode,
                 command.eventId(), command.completedAt(), command.correlationId()));
-        int updated = jdbc.sql("""
-                        UPDATE ops_operational_exception
-                           SET status = 'RESOLVED', resolved_at = :resolvedAt,
-                               resolution_code = :resolutionCode,
-                               resolution_action_ref = :actionRef,
-                               resolution_event_id = :resolutionEventId,
-                               aggregate_version = aggregate_version + 1
-                         WHERE exception_id = :exceptionId AND status IN ('OPEN', 'ACKNOWLEDGED')
-                        """)
-                .param("resolvedAt", timestamptz(command.completedAt()))
-                .param("resolutionCode", resolutionCode).param("actionRef", actionRef)
-                .param("resolutionEventId", command.eventId())
-                .param("exceptionId", state.exceptionId()).update();
+        int updated = dsl.update(exception)
+                .set(exception.STATUS, "RESOLVED")
+                .set(exception.RESOLVED_AT, command.completedAt())
+                .set(exception.RESOLUTION_CODE, resolutionCode)
+                .set(exception.RESOLUTION_ACTION_REF, actionRef)
+                .set(exception.RESOLUTION_EVENT_ID, command.eventId())
+                .set(exception.AGGREGATE_VERSION, exception.AGGREGATE_VERSION.plus(1))
+                .where(exception.EXCEPTION_ID.eq(state.exceptionId()))
+                .and(exception.STATUS.in("OPEN", "ACKNOWLEDGED"))
+                .execute();
         if (updated != 1) {
             throw new IllegalStateException("OperationalException changed during automatic recovery");
         }
@@ -369,29 +361,29 @@ final class DefaultOperationalExceptionService implements OperationalExceptionSe
         UUID exceptionId = UUID.randomUUID();
         String resolutionCode = "OUTBOUND_DELIVERY_RECOVERED";
         String actionRef = recoveryActionRef(recovery.recoveryEventId());
-        int inserted = jdbc.sql("""
-                        INSERT INTO ops_operational_exception (
-                            exception_id, tenant_id, source_type, source_id, source_attempt_id,
-                            source_task_type, category_code, severity_code, error_code, status,
-                            correlation_id, opened_at, last_detected_at, resolved_at,
-                            resolution_code, resolution_action_ref, resolution_event_id)
-                        VALUES (
-                            :exceptionId, :tenantId, 'TASK', :sourceId, :sourceAttemptId,
-                            :sourceTaskType, 'AUTOMATION_FINAL_FAILURE', 'P1', :errorCode, 'RESOLVED',
-                            :correlationId, :detectedAt, :detectedAt, :resolvedAt,
-                            :resolutionCode, :actionRef, :resolutionEventId)
-                        ON CONFLICT (tenant_id, source_type, source_id, source_attempt_id) DO NOTHING
-                        """)
-                .param("exceptionId", exceptionId).param("tenantId", command.tenantId())
-                .param("sourceId", command.sourceTaskId().toString())
-                .param("sourceAttemptId", command.sourceAttemptId())
-                .param("sourceTaskType", command.sourceTaskType())
-                .param("errorCode", truncate(command.errorCode(), 100))
-                .param("correlationId", command.correlationId())
-                .param("detectedAt", timestamptz(command.detectedAt()))
-                .param("resolvedAt", timestamptz(recovery.recoveredAt()))
-                .param("resolutionCode", resolutionCode).param("actionRef", actionRef)
-                .param("resolutionEventId", recovery.recoveryEventId()).update();
+        OpsOperationalException exception = OPS_OPERATIONAL_EXCEPTION;
+        int inserted = dsl.insertInto(exception)
+                .set(exception.EXCEPTION_ID, exceptionId)
+                .set(exception.TENANT_ID, command.tenantId())
+                .set(exception.SOURCE_TYPE, "TASK")
+                .set(exception.SOURCE_ID, command.sourceTaskId().toString())
+                .set(exception.SOURCE_ATTEMPT_ID, command.sourceAttemptId())
+                .set(exception.SOURCE_TASK_TYPE, command.sourceTaskType())
+                .set(exception.CATEGORY_CODE, "AUTOMATION_FINAL_FAILURE")
+                .set(exception.SEVERITY_CODE, "P1")
+                .set(exception.ERROR_CODE, truncate(command.errorCode(), 100))
+                .set(exception.STATUS, "RESOLVED")
+                .set(exception.CORRELATION_ID, command.correlationId())
+                .set(exception.OPENED_AT, command.detectedAt())
+                .set(exception.LAST_DETECTED_AT, command.detectedAt())
+                .set(exception.RESOLVED_AT, recovery.recoveredAt())
+                .set(exception.RESOLUTION_CODE, resolutionCode)
+                .set(exception.RESOLUTION_ACTION_REF, actionRef)
+                .set(exception.RESOLUTION_EVENT_ID, recovery.recoveryEventId())
+                .onConflict(exception.TENANT_ID, exception.SOURCE_TYPE,
+                        exception.SOURCE_ID, exception.SOURCE_ATTEMPT_ID)
+                .doNothing()
+                .execute();
         OperationalExceptionView resolved = findBySource(
                 command.tenantId(), command.sourceTaskId(), command.sourceAttemptId());
         if (inserted == 1) {
@@ -410,21 +402,19 @@ final class DefaultOperationalExceptionService implements OperationalExceptionSe
             ResolveTaskFailureExceptionsCommand command,
             UUID sourceTaskId
     ) {
-        int inserted = jdbc.sql("""
-                        INSERT INTO ops_task_failure_recovery (
-                            tenant_id, source_task_id, source_task_type, recovery_type,
-                            recovery_ref, recovery_event_id, recovered_at, correlation_id)
-                        VALUES (
-                            :tenantId, :sourceTaskId, :sourceTaskType, :recoveryType,
-                            :recoveryRef, :recoveryEventId, :recoveredAt, :correlationId)
-                        ON CONFLICT (tenant_id, source_task_id) DO NOTHING
-                        """)
-                .param("tenantId", command.tenantId()).param("sourceTaskId", sourceTaskId)
-                .param("sourceTaskType", command.sourceTaskType())
-                .param("recoveryType", command.recoveryType()).param("recoveryRef", command.recoveryRef())
-                .param("recoveryEventId", command.eventId())
-                .param("recoveredAt", timestamptz(command.recoveredAt()))
-                .param("correlationId", command.correlationId()).update();
+        OpsTaskFailureRecovery recovery = OPS_TASK_FAILURE_RECOVERY;
+        int inserted = dsl.insertInto(recovery)
+                .set(recovery.TENANT_ID, command.tenantId())
+                .set(recovery.SOURCE_TASK_ID, sourceTaskId)
+                .set(recovery.SOURCE_TASK_TYPE, command.sourceTaskType())
+                .set(recovery.RECOVERY_TYPE, command.recoveryType())
+                .set(recovery.RECOVERY_REF, command.recoveryRef())
+                .set(recovery.RECOVERY_EVENT_ID, command.eventId())
+                .set(recovery.RECOVERED_AT, command.recoveredAt())
+                .set(recovery.CORRELATION_ID, command.correlationId())
+                .onConflict(recovery.TENANT_ID, recovery.SOURCE_TASK_ID)
+                .doNothing()
+                .execute();
         TaskFailureRecovery stored = findTaskFailureRecovery(command.tenantId(), sourceTaskId);
         if (stored == null) {
             throw new IllegalStateException("Task failure recovery marker was not persisted");
@@ -439,18 +429,20 @@ final class DefaultOperationalExceptionService implements OperationalExceptionSe
     }
 
     private TaskFailureRecovery findTaskFailureRecovery(String tenantId, UUID sourceTaskId) {
-        return jdbc.sql("""
-                        SELECT source_task_type, recovery_type, recovery_ref,
-                               recovery_event_id, recovered_at
-                          FROM ops_task_failure_recovery
-                         WHERE tenant_id=:tenantId AND source_task_id=:sourceTaskId
-                        """)
-                .param("tenantId", tenantId).param("sourceTaskId", sourceTaskId)
-                .query((rs, row) -> new TaskFailureRecovery(
-                        rs.getString("source_task_type"), rs.getString("recovery_type"),
-                        rs.getString("recovery_ref"), rs.getObject("recovery_event_id", UUID.class),
-                        rs.getObject("recovered_at", java.time.OffsetDateTime.class).toInstant()))
-                .optional().orElse(null);
+        OpsTaskFailureRecovery recovery = OPS_TASK_FAILURE_RECOVERY;
+        return dsl.select(
+                        recovery.SOURCE_TASK_TYPE, recovery.RECOVERY_TYPE, recovery.RECOVERY_REF,
+                        recovery.RECOVERY_EVENT_ID, recovery.RECOVERED_AT)
+                .from(recovery)
+                .where(recovery.TENANT_ID.eq(tenantId))
+                .and(recovery.SOURCE_TASK_ID.eq(sourceTaskId))
+                .fetchOptional(row -> new TaskFailureRecovery(
+                        row.get(recovery.SOURCE_TASK_TYPE),
+                        row.get(recovery.RECOVERY_TYPE),
+                        row.get(recovery.RECOVERY_REF),
+                        row.get(recovery.RECOVERY_EVENT_ID),
+                        row.get(recovery.RECOVERED_AT)))
+                .orElse(null);
     }
 
     private List<TaskFailureExceptionState> findTaskFailureExceptions(
@@ -458,31 +450,29 @@ final class DefaultOperationalExceptionService implements OperationalExceptionSe
             UUID sourceTaskId,
             String sourceTaskType
     ) {
-        return jdbc.sql("""
-                        SELECT exception_id, handling_task_id, status, aggregate_version
-                          FROM ops_operational_exception
-                         WHERE tenant_id=:tenantId AND source_type='TASK'
-                           AND source_id=:sourceId AND source_task_type=:sourceTaskType
-                         ORDER BY opened_at, exception_id
-                         FOR UPDATE
-                        """)
-                .param("tenantId", tenantId).param("sourceId", sourceTaskId.toString())
-                .param("sourceTaskType", sourceTaskType)
-                .query((rs, row) -> new TaskFailureExceptionState(
-                        rs.getObject("exception_id", UUID.class),
-                        rs.getObject("handling_task_id", UUID.class),
-                        rs.getString("status"), rs.getLong("aggregate_version")))
-                .list();
+        OpsOperationalException exception = OPS_OPERATIONAL_EXCEPTION;
+        return dsl.select(
+                        exception.EXCEPTION_ID, exception.HANDLING_TASK_ID,
+                        exception.STATUS, exception.AGGREGATE_VERSION)
+                .from(exception)
+                .where(exception.TENANT_ID.eq(tenantId))
+                .and(exception.SOURCE_TYPE.eq("TASK"))
+                .and(exception.SOURCE_ID.eq(sourceTaskId.toString()))
+                .and(exception.SOURCE_TASK_TYPE.eq(sourceTaskType))
+                .orderBy(exception.OPENED_AT, exception.EXCEPTION_ID)
+                .forUpdate()
+                .fetch(row -> new TaskFailureExceptionState(
+                        row.get(exception.EXCEPTION_ID),
+                        row.get(exception.HANDLING_TASK_ID),
+                        row.get(exception.STATUS),
+                        row.get(exception.AGGREGATE_VERSION)));
     }
 
     private void lockTaskFailureStream(String tenantId, UUID sourceTaskId) {
-        jdbc.sql("""
-                        SELECT 1
-                          FROM (SELECT pg_advisory_xact_lock(
-                                   hashtextextended(:lockKey, 0))) AS acquired
-                        """)
-                .param("lockKey", tenantId + "|TASK_FAILURE|" + sourceTaskId)
-                .query(Integer.class).single();
+        // advisory lock 随事务释放；锁键与失败流一一对应。
+        dsl.select(DSL.field("pg_advisory_xact_lock(hashtextextended({0}, {1}))", Object.class,
+                        DSL.val(tenantId + "|TASK_FAILURE|" + sourceTaskId), DSL.val(0L)))
+                .fetchSingle();
     }
 
     private void appendTaskFailureResolvedEvent(
@@ -522,46 +512,58 @@ final class DefaultOperationalExceptionService implements OperationalExceptionSe
             UUID sourceTaskId,
             UUID sourceAttemptId
     ) {
-        return jdbc.sql("""
-                        SELECT exception_id, tenant_id, source_id, source_attempt_id, source_task_type,
-                               error_code, status, handling_task_id, opened_at
-                          FROM ops_operational_exception
-                         WHERE tenant_id = :tenantId AND source_type = 'TASK'
-                           AND source_id = :sourceId AND source_attempt_id = :sourceAttemptId
-                        """)
-                .params(Map.of(
-                        "tenantId", tenantId,
-                        "sourceId", sourceTaskId.toString(),
-                        "sourceAttemptId", sourceAttemptId))
-                .query((rs, rowNum) -> new OperationalExceptionView(
-                        rs.getObject("exception_id", UUID.class), rs.getString("tenant_id"),
-                        UUID.fromString(rs.getString("source_id")),
-                        rs.getObject("source_attempt_id", UUID.class), rs.getString("source_task_type"),
-                        rs.getString("error_code"),
-                        rs.getString("status"), rs.getObject("handling_task_id", UUID.class),
-                        rs.getTimestamp("opened_at").toInstant()))
-                .single();
+        OpsOperationalException exception = OPS_OPERATIONAL_EXCEPTION;
+        return dsl.select(
+                        exception.EXCEPTION_ID, exception.TENANT_ID, exception.SOURCE_ID,
+                        exception.SOURCE_ATTEMPT_ID, exception.SOURCE_TASK_TYPE, exception.ERROR_CODE,
+                        exception.STATUS, exception.HANDLING_TASK_ID, exception.OPENED_AT)
+                .from(exception)
+                .where(exception.TENANT_ID.eq(tenantId))
+                .and(exception.SOURCE_TYPE.eq("TASK"))
+                .and(exception.SOURCE_ID.eq(sourceTaskId.toString()))
+                .and(exception.SOURCE_ATTEMPT_ID.eq(sourceAttemptId))
+                .fetchSingle(this::mapExceptionView);
     }
 
     private OperationalExceptionView findSagaTimeout(String tenantId, UUID sagaId) {
-        return jdbc.sql("""
-                        SELECT exception_id, tenant_id, source_id, source_attempt_id, source_task_type,
-                               error_code, status, handling_task_id, opened_at
-                          FROM ops_operational_exception
-                         WHERE tenant_id = :tenantId
-                           AND source_type = 'SERVICE_ASSIGNMENT_ACTIVATION_SAGA'
-                           AND source_id = :sourceId AND source_attempt_id = :sourceAttemptId
-                        """)
-                .param("tenantId", tenantId).param("sourceId", sagaId.toString())
-                .param("sourceAttemptId", sagaId)
-                .query((rs, rowNum) -> new OperationalExceptionView(
-                        rs.getObject("exception_id", UUID.class), rs.getString("tenant_id"),
-                        UUID.fromString(rs.getString("source_id")),
-                        rs.getObject("source_attempt_id", UUID.class), rs.getString("source_task_type"),
-                        rs.getString("error_code"), rs.getString("status"),
-                        rs.getObject("handling_task_id", UUID.class),
-                        rs.getTimestamp("opened_at").toInstant()))
-                .single();
+        OpsOperationalException exception = OPS_OPERATIONAL_EXCEPTION;
+        return dsl.select(
+                        exception.EXCEPTION_ID, exception.TENANT_ID, exception.SOURCE_ID,
+                        exception.SOURCE_ATTEMPT_ID, exception.SOURCE_TASK_TYPE, exception.ERROR_CODE,
+                        exception.STATUS, exception.HANDLING_TASK_ID, exception.OPENED_AT)
+                .from(exception)
+                .where(exception.TENANT_ID.eq(tenantId))
+                .and(exception.SOURCE_TYPE.eq("SERVICE_ASSIGNMENT_ACTIVATION_SAGA"))
+                .and(exception.SOURCE_ID.eq(sagaId.toString()))
+                .and(exception.SOURCE_ATTEMPT_ID.eq(sagaId))
+                .fetchSingle(this::mapExceptionView);
+    }
+
+    private OperationalExceptionView mapExceptionView(Record row) {
+        OpsOperationalException exception = OPS_OPERATIONAL_EXCEPTION;
+        return new OperationalExceptionView(
+                row.get(exception.EXCEPTION_ID),
+                row.get(exception.TENANT_ID),
+                UUID.fromString(row.get(exception.SOURCE_ID)),
+                row.get(exception.SOURCE_ATTEMPT_ID),
+                row.get(exception.SOURCE_TASK_TYPE),
+                row.get(exception.ERROR_CODE),
+                row.get(exception.STATUS),
+                row.get(exception.HANDLING_TASK_ID),
+                row.get(exception.OPENED_AT));
+    }
+
+    private SagaTimeoutException mapSagaTimeoutException(Record row) {
+        OpsOperationalException exception = OPS_OPERATIONAL_EXCEPTION;
+        return new SagaTimeoutException(
+                row.get(exception.EXCEPTION_ID),
+                row.get(exception.WORK_ORDER_ID),
+                row.get(exception.TASK_ID),
+                row.get(exception.HANDLING_TASK_ID),
+                row.get(exception.STATUS),
+                row.get(exception.OCCURRENCE_COUNT),
+                row.get(exception.AGGREGATE_VERSION),
+                row.get(exception.RESOLUTION_EVENT_ID));
     }
 
     private static void validate(OpenTaskFailureCommand command) {

@@ -56,7 +56,7 @@ M60 延续 M28、M58、M59、ARCH-13、ADR-010/014 和 API-04。它只使用 M59
 主要入口：
 
 - `OutboundDeliveryCompletionService`、`OutboundDeliveryRecoveryHandler`；
-- `DefaultOperationalExceptionService#resolveTaskFailures`；
+- `JooqOperationalExceptionService#resolveTaskFailures`；
 - V060、两个 v1/v2 事件 Schema；
 - `ReviewCasePostgresIT`、`TaskExecutionPostgresIT`、Handler/Contract 与 ArchitectureTest。
 
