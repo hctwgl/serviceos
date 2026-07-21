@@ -25,6 +25,8 @@ interface WorkOrderQueryMapper {
             @Param("technicianWorkOrderIds") List<String> technicianWorkOrderIds,
             @Param("applySlaRiskFilter") boolean applySlaRiskFilter,
             @Param("slaRiskWorkOrderIds") List<String> slaRiskWorkOrderIds,
+            @Param("applyReviewCorrectionFilter") boolean applyReviewCorrectionFilter,
+            @Param("reviewCorrectionWorkOrderIds") List<String> reviewCorrectionWorkOrderIds,
             @Param("receivedFromInclusive") Instant receivedFromInclusive,
             @Param("receivedToExclusive") Instant receivedToExclusive,
             @Param("cursorReceivedAt") Instant cursorReceivedAt,
@@ -46,6 +48,8 @@ interface WorkOrderQueryMapper {
             @Param("technicianWorkOrderIds") List<String> technicianWorkOrderIds,
             @Param("applySlaRiskFilter") boolean applySlaRiskFilter,
             @Param("slaRiskWorkOrderIds") List<String> slaRiskWorkOrderIds,
+            @Param("applyReviewCorrectionFilter") boolean applyReviewCorrectionFilter,
+            @Param("reviewCorrectionWorkOrderIds") List<String> reviewCorrectionWorkOrderIds,
             @Param("receivedFromInclusive") Instant receivedFromInclusive,
             @Param("receivedToExclusive") Instant receivedToExclusive);
 

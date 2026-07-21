@@ -47,6 +47,8 @@ const regionFilterCode = ref<string | undefined>(undefined)
 const stageFilterCode = ref<string | undefined>(undefined)
 /** M446：当前任务状态筛选（与目录列同口径）。 */
 const taskStatusFilterCode = ref<string | undefined>(undefined)
+/** M447：审核/整改运营桶筛选。 */
+const reviewCorrectionFilter = ref<string | undefined>(undefined)
 /** M440：服务网点筛选（与目录 currentNetworkId 同口径）。 */
 const networkFilterId = ref<string | undefined>(undefined)
 const networkOptions = ref<ServiceNetwork[]>([])
@@ -111,6 +113,11 @@ const slaRiskFilterOptions = [
   { value: 'NEAR', label: '即将超时' },
 ]
 
+const reviewCorrectionFilterOptions = [
+  { value: 'REVIEW_OPEN', label: '待审核' },
+  { value: 'CORRECTION_ACTIVE', label: '整改中' },
+]
+
 function regionQueryParams(): {
   provinceCode?: string
   cityCode?: string
@@ -146,6 +153,9 @@ function hydrateFiltersFromRoute() {
   if (nextStage !== undefined) stageFilterCode.value = nextStage || undefined
   const nextTaskStatus = firstRouteQuery(route, 'currentTaskStatus')
   if (nextTaskStatus !== undefined) taskStatusFilterCode.value = nextTaskStatus || undefined
+  const nextReviewCorrection = firstRouteQuery(route, 'reviewCorrectionStatus')
+  if (nextReviewCorrection !== undefined)
+    reviewCorrectionFilter.value = nextReviewCorrection || undefined
   const nextNetwork = firstRouteQuery(route, 'currentNetworkId')
   if (nextNetwork !== undefined) networkFilterId.value = nextNetwork || undefined
   const nextTechnician = firstRouteQuery(route, 'currentTechnicianId')
@@ -182,6 +192,7 @@ async function load(next?: string) {
         : undefined,
       currentStageCode: stageFilterCode.value || undefined,
       currentTaskStatus: taskStatusFilterCode.value || undefined,
+      reviewCorrectionStatus: reviewCorrectionFilter.value || undefined,
       currentNetworkId: networkFilterId.value || undefined,
       currentTechnicianId: technicianFilterId.value || undefined,
       slaRisk: slaRiskFilter.value || undefined,
@@ -216,6 +227,7 @@ function currentFilters() {
       : undefined,
     currentStageCode: stageFilterCode.value || undefined,
     currentTaskStatus: taskStatusFilterCode.value || undefined,
+    reviewCorrectionStatus: reviewCorrectionFilter.value || undefined,
     currentNetworkId: networkFilterId.value || undefined,
     currentTechnicianId: technicianFilterId.value || undefined,
     slaRisk: slaRiskFilter.value || undefined,
@@ -233,6 +245,7 @@ function applySavedView(filters: Record<string, string>) {
     filters.districtCode || filters.cityCode || filters.provinceCode || undefined
   stageFilterCode.value = filters.currentStageCode || undefined
   taskStatusFilterCode.value = filters.currentTaskStatus || undefined
+  reviewCorrectionFilter.value = filters.reviewCorrectionStatus || undefined
   networkFilterId.value = filters.currentNetworkId || undefined
   technicianFilterId.value = filters.currentTechnicianId || undefined
   slaRiskFilter.value = filters.slaRisk || undefined
@@ -254,6 +267,7 @@ function resetFilters() {
   regionFilterCode.value = undefined
   stageFilterCode.value = undefined
   taskStatusFilterCode.value = undefined
+  reviewCorrectionFilter.value = undefined
   networkFilterId.value = undefined
   technicianFilterId.value = undefined
   slaRiskFilter.value = undefined
@@ -833,6 +847,19 @@ watch(
           placeholder="按当前任务状态筛选"
           :options="taskStatusFilterOptions"
           :filter-option="(input, option) => String(option?.label ?? '').includes(input)"
+          @change="search"
+        />
+      </label>
+      <label class="filter-field">
+        <span>审核/整改状态</span>
+        <Select
+          v-model:value="reviewCorrectionFilter"
+          allow-clear
+          style="width: 180px"
+          aria-label="审核整改状态筛选"
+          data-testid="work-order-review-correction-filter"
+          placeholder="按审核/整改状态筛选"
+          :options="reviewCorrectionFilterOptions"
           @change="search"
         />
       </label>

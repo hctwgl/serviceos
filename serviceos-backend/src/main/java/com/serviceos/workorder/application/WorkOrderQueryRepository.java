@@ -17,6 +17,7 @@ public interface WorkOrderQueryRepository {
             boolean applyNetworkFilter, List<UUID> networkWorkOrderIds,
             boolean applyTechnicianFilter, List<UUID> technicianWorkOrderIds,
             boolean applySlaRiskFilter, List<UUID> slaRiskWorkOrderIds,
+            boolean applyReviewCorrectionFilter, List<UUID> reviewCorrectionWorkOrderIds,
             Instant receivedFromInclusive, Instant receivedToExclusive,
             Instant cursorReceivedAt, UUID cursorId, int fetchSize);
 
@@ -31,6 +32,7 @@ public interface WorkOrderQueryRepository {
             boolean applyNetworkFilter, List<UUID> networkWorkOrderIds,
             boolean applyTechnicianFilter, List<UUID> technicianWorkOrderIds,
             boolean applySlaRiskFilter, List<UUID> slaRiskWorkOrderIds,
+            boolean applyReviewCorrectionFilter, List<UUID> reviewCorrectionWorkOrderIds,
             Instant receivedFromInclusive, Instant receivedToExclusive);
 
     Optional<WorkOrderView> findById(String tenantId, UUID workOrderId);

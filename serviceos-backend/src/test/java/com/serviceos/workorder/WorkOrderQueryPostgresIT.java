@@ -124,14 +124,14 @@ class WorkOrderQueryPostgresIT {
   seedRole("reader","PROJECT",a.projectId().toString());
   CurrentPrincipal reader=principal("reader","tenant-test");
   var byDistrict=queries.list(reader,"corr-region-district",
-    new WorkOrderQuery(null,null,null,null,null,null,"370102",null,null,null,null,null,null,null,null,20));
+    new WorkOrderQuery(null,null,null,null,null,null,"370102",null,null,null,null,null,null,null,null,null,20));
   assertThat(byDistrict.items()).extracting(WorkOrderView::id).containsExactly(hangzhou);
   assertThat(byDistrict.totalCount()).isEqualTo(1);
   var byProvince=queries.list(reader,"corr-region-province",
-    new WorkOrderQuery(null,null,null,null,"440000",null,null,null,null,null,null,null,null,null,null,20));
+    new WorkOrderQuery(null,null,null,null,"440000",null,null,null,null,null,null,null,null,null,null,null,20));
   assertThat(byProvince.items()).extracting(WorkOrderView::externalOrderCode).containsExactly("ORDER-SZ");
   var none=queries.list(reader,"corr-region-none",
-    new WorkOrderQuery(null,null,null,null,"110000",null,null,null,null,null,null,null,null,null,null,20));
+    new WorkOrderQuery(null,null,null,null,"110000",null,null,null,null,null,null,null,null,null,null,null,20));
   assertThat(none.items()).isEmpty();
   assertThat(none.totalCount()).isZero();
  }
@@ -167,19 +167,19 @@ class WorkOrderQueryPostgresIT {
   seedRole("reader","PROJECT",a.projectId().toString());
   CurrentPrincipal reader=principal("reader","tenant-test");
   var bySurvey=queries.list(reader,"corr-stage-filter",
-    new WorkOrderQuery(null,null,null,null,null,null,null,"SURVEY",null,null,null,null,null,null,null,20));
+    new WorkOrderQuery(null,null,null,null,null,null,null,"SURVEY",null,null,null,null,null,null,null,null,20));
   assertThat(bySurvey.items()).extracting(WorkOrderView::id).containsExactly(survey);
   assertThat(bySurvey.items().getFirst().currentStageCode()).isEqualTo("SURVEY");
   assertThat(bySurvey.totalCount()).isEqualTo(1);
   var byInstall=queries.list(reader,"corr-stage-install",
-    new WorkOrderQuery(null,null,null,null,null,null,null,"INSTALLATION",null,null,null,null,null,null,null,20));
+    new WorkOrderQuery(null,null,null,null,null,null,null,"INSTALLATION",null,null,null,null,null,null,null,null,20));
   assertThat(byInstall.items()).extracting(WorkOrderView::id).containsExactly(install);
   var none=queries.list(reader,"corr-stage-none",
-    new WorkOrderQuery(null,null,null,null,null,null,null,"REPAIR",null,null,null,null,null,null,null,20));
+    new WorkOrderQuery(null,null,null,null,null,null,null,"REPAIR",null,null,null,null,null,null,null,null,20));
   assertThat(none.items()).isEmpty();
   assertThat(none.totalCount()).isZero();
   assertThatThrownBy(()->queries.list(reader,"corr-stage-invalid",
-    new WorkOrderQuery(null,null,null,null,null,null,null,"survey",null,null,null,null,null,null,null,20)))
+    new WorkOrderQuery(null,null,null,null,null,null,null,"survey",null,null,null,null,null,null,null,null,20)))
     .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("currentStageCode");
  }
 
@@ -195,17 +195,48 @@ class WorkOrderQueryPostgresIT {
   seedRole("reader","PROJECT",a.projectId().toString());
   CurrentPrincipal reader=principal("reader","tenant-test");
   var byReady=queries.list(reader,"corr-task-status-ready",
-    new WorkOrderQuery(null,null,null,null,null,null,null,null,"READY",null,null,null,null,null,null,20));
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,"READY",null,null,null,null,null,null,null,20));
   assertThat(byReady.items()).extracting(WorkOrderView::id).containsExactly(ready);
   assertThat(byReady.items().getFirst().currentTaskStatus()).isEqualTo("READY");
   assertThat(byReady.totalCount()).isEqualTo(1);
   var byRunning=queries.list(reader,"corr-task-status-running",
-    new WorkOrderQuery(null,null,null,null,null,null,null,null,"RUNNING",null,null,null,null,null,null,20));
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,"RUNNING",null,null,null,null,null,null,null,20));
   assertThat(byRunning.items()).extracting(WorkOrderView::id).containsExactly(running);
   assertThat(byRunning.items().getFirst().currentTaskStatus()).isEqualTo("RUNNING");
   assertThatThrownBy(()->queries.list(reader,"corr-task-status-invalid",
-    new WorkOrderQuery(null,null,null,null,null,null,null,null,"SUCCEEDED",null,null,null,null,null,null,20)))
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,"SUCCEEDED",null,null,null,null,null,null,null,20)))
     .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("currentTaskStatus");
+ }
+
+ @Test void listFiltersByReviewCorrectionStatus(){
+  Scope a=scope("tenant-test","A");
+  UUID reviewOpenWo=receive(a,"ORDER-REV-OPEN","1".repeat(64));
+  UUID correctionWo=receive(a,"ORDER-CORR-ACTIVE","2".repeat(64));
+  UUID noneWo=receive(a,"ORDER-REV-NONE","3".repeat(64));
+  UUID reviewTask=seedActiveTask(a,reviewOpenWo,"SURVEY",null,null);
+  UUID correctionTask=seedActiveTask(a,correctionWo,"SURVEY",null,null);
+  seedActiveTask(a,noneWo,"SURVEY",null,null);
+  seedOpenReviewCase(a,reviewTask);
+  seedOpenCorrectionCase(a,correctionTask);
+  seedRole("reader","PROJECT",a.projectId().toString(),"workOrder.read","evidence.read");
+  CurrentPrincipal reader=principal("reader","tenant-test");
+  var byReview=queries.list(reader,"corr-rev-open",
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,null,null,null,null,"REVIEW_OPEN",null,20));
+  assertThat(byReview.items()).extracting(WorkOrderView::id).containsExactly(reviewOpenWo);
+  assertThat(byReview.totalCount()).isEqualTo(1);
+  var byCorrection=queries.list(reader,"corr-corr-active",
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,null,null,null,null,"CORRECTION_ACTIVE",null,20));
+  assertThat(byCorrection.items()).extracting(WorkOrderView::id).containsExactly(correctionWo);
+  assertThatThrownBy(()->queries.list(reader,"corr-rev-invalid",
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,null,null,null,null,"OPEN",null,20)))
+    .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("reviewCorrectionStatus");
+  // 缺 evidence.read → 空集失败关闭，不泄露审核/整改事实
+  seedRole("wo-only","PROJECT",a.projectId().toString(),"workOrder.read");
+  CurrentPrincipal woOnly=principal("wo-only","tenant-test");
+  var denied=queries.list(woOnly,"corr-rev-denied",
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,null,null,null,null,"REVIEW_OPEN",null,20));
+  assertThat(denied.items()).isEmpty();
+  assertThat(denied.totalCount()).isZero();
  }
 
  @Test void listFiltersByCurrentNetworkId(){
@@ -225,12 +256,12 @@ class WorkOrderQueryPostgresIT {
   seedRole("reader","PROJECT",a.projectId().toString());
   CurrentPrincipal reader=principal("reader","tenant-test");
   var byNetwork=queries.list(reader,"corr-network-filter",
-    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,networkA,null,null,null,null,null,20));
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,networkA,null,null,null,null,null,null,20));
   assertThat(byNetwork.items()).extracting(WorkOrderView::id).containsExactly(matched);
   assertThat(byNetwork.items().getFirst().currentNetworkId()).isEqualTo(networkA.toString());
   assertThat(byNetwork.totalCount()).isEqualTo(1);
   var none=queries.list(reader,"corr-network-none",
-    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,UUID.randomUUID(),null,null,null,null,null,20));
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,UUID.randomUUID(),null,null,null,null,null,null,20));
   assertThat(none.items()).isEmpty();
   assertThat(none.totalCount()).isZero();
  }
@@ -251,12 +282,12 @@ class WorkOrderQueryPostgresIT {
   seedRole("reader","PROJECT",a.projectId().toString());
   CurrentPrincipal reader=principal("reader","tenant-test");
   var byTech=queries.list(reader,"corr-tech-filter",
-    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,techA,null,null,null,null,20));
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,techA,null,null,null,null,null,20));
   assertThat(byTech.items()).extracting(WorkOrderView::id).containsExactly(matched);
   assertThat(byTech.items().getFirst().currentTechnicianId()).isEqualTo(techA.toString());
   assertThat(byTech.totalCount()).isEqualTo(1);
   var none=queries.list(reader,"corr-tech-none",
-    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,UUID.randomUUID(),null,null,null,null,20));
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,UUID.randomUUID(),null,null,null,null,null,20));
   assertThat(none.items()).isEmpty();
   assertThat(none.totalCount()).isZero();
  }
@@ -319,21 +350,17 @@ class WorkOrderQueryPostgresIT {
   seedRole("reader","PROJECT",a.projectId().toString());
   CurrentPrincipal reader=principal("reader","tenant-test");
   var range=queries.list(reader,"corr-recv-range",
-    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,null,null,
-      LocalDate.of(2026,3,1),LocalDate.of(2026,3,3),null,20));
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,null,null,LocalDate.of(2026,3,1),LocalDate.of(2026,3,3),null,null,20));
   assertThat(range.items()).extracting(WorkOrderView::id).containsExactlyInAnyOrder(early,late);
   assertThat(range.totalCount()).isEqualTo(2);
   var singleDay=queries.list(reader,"corr-recv-day",
-    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,null,null,
-      LocalDate.of(2026,3,1),LocalDate.of(2026,3,1),null,20));
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,null,null,LocalDate.of(2026,3,1),LocalDate.of(2026,3,1),null,null,20));
   assertThat(singleDay.items()).extracting(WorkOrderView::id).containsExactly(early);
   var none=queries.list(reader,"corr-recv-none",
-    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,null,null,
-      LocalDate.of(2026,3,10),LocalDate.of(2026,3,11),null,20));
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,null,null,LocalDate.of(2026,3,10),LocalDate.of(2026,3,11),null,null,20));
   assertThat(none.items()).isEmpty();
   assertThatThrownBy(()->queries.list(reader,"corr-recv-invalid",
-    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,null,null,
-      LocalDate.of(2026,3,5),LocalDate.of(2026,3,1),null,20)))
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,null,null,LocalDate.of(2026,3,5),LocalDate.of(2026,3,1),null,null,20)))
     .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("receivedTo");
  }
 
@@ -352,15 +379,15 @@ class WorkOrderQueryPostgresIT {
   seedRole("reader","PROJECT",a.projectId().toString(),"workOrder.read","sla.read");
   CurrentPrincipal reader=principal("reader","tenant-test");
   var byOpen=queries.list(reader,"corr-sla-open",
-    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,null,"OPEN",null,null,null,20));
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,null,"OPEN",null,null,null,null,20));
   assertThat(byOpen.items()).extracting(WorkOrderView::id).containsExactlyInAnyOrder(openWo,breachedWo);
   assertThat(byOpen.totalCount()).isEqualTo(2);
   var byBreach=queries.list(reader,"corr-sla-breach",
-    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,null,"BREACHED",null,null,null,20));
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,null,"BREACHED",null,null,null,null,20));
   assertThat(byBreach.items()).extracting(WorkOrderView::id).containsExactly(breachedWo);
   assertThat(byBreach.totalCount()).isEqualTo(1);
   assertThatThrownBy(()->queries.list(reader,"corr-sla-invalid",
-    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,null,"WARN",null,null,null,20)))
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,null,"WARN",null,null,null,null,20)))
     .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("slaRisk");
  }
 
@@ -381,7 +408,7 @@ class WorkOrderQueryPostgresIT {
   seedRole("reader","PROJECT",a.projectId().toString(),"workOrder.read","sla.read");
   CurrentPrincipal reader=principal("reader","tenant-test");
   var byNear=queries.list(reader,"corr-sla-near",
-    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,null,"NEAR",null,null,null,20));
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,null,"NEAR",null,null,null,null,20));
   assertThat(byNear.items()).extracting(WorkOrderView::id).containsExactly(nearWo);
   assertThat(byNear.totalCount()).isEqualTo(1);
  }
@@ -519,6 +546,132 @@ class WorkOrderQueryPostgresIT {
    .param("startedAt","RUNNING".equals(taskStatus)?java.sql.Timestamp.from(now):null)
    .update();
   return taskId;
+ }
+ /** M447：最小 OPEN ReviewCase（经 snapshot → task → work_order）。 */
+ private void seedOpenReviewCase(Scope s,UUID taskId){
+  UUID snapshotId=seedEvidenceSnapshot(s,taskId,"open-review");
+  String digest=Sha256.digest("open-review:"+snapshotId);
+  jdbc.sql("""
+   INSERT INTO evd_review_case (
+     review_case_id, tenant_id, project_id, task_id, evidence_set_snapshot_id,
+     snapshot_content_digest, scope_type, origin, policy_version, status,
+     created_by, created_at, decided_at
+   ) VALUES (
+     :id, :tenant, :project, :task, :snapshot, :digest,
+     'EVIDENCE_SET_SNAPSHOT', 'INTERNAL', 'POLICY_V1', 'OPEN',
+     'fixture', now(), NULL)
+   """)
+   .param("id",UUID.randomUUID())
+   .param("tenant",s.tenant())
+   .param("project",s.projectId())
+   .param("task",taskId)
+   .param("snapshot",snapshotId)
+   .param("digest",digest)
+   .update();
+ }
+ /** M447：REJECTED Review + OPEN CorrectionCase。 */
+ private void seedOpenCorrectionCase(Scope s,UUID taskId){
+  UUID snapshotId=seedEvidenceSnapshot(s,taskId,"open-correction");
+  String digest=Sha256.digest("open-correction:"+snapshotId);
+  UUID reviewCaseId=UUID.randomUUID();
+  UUID reviewDecisionId=UUID.randomUUID();
+  jdbc.sql("""
+   INSERT INTO evd_review_case (
+     review_case_id, tenant_id, project_id, task_id, evidence_set_snapshot_id,
+     snapshot_content_digest, scope_type, origin, policy_version, status,
+     created_by, created_at, decided_at
+   ) VALUES (
+     :id, :tenant, :project, :task, :snapshot, :digest,
+     'EVIDENCE_SET_SNAPSHOT', 'INTERNAL', 'POLICY_V1', 'REJECTED',
+     'fixture', now(), now())
+   """)
+   .param("id",reviewCaseId)
+   .param("tenant",s.tenant())
+   .param("project",s.projectId())
+   .param("task",taskId)
+   .param("snapshot",snapshotId)
+   .param("digest",digest)
+   .update();
+  jdbc.sql("""
+   INSERT INTO evd_review_decision (
+     review_decision_id, tenant_id, project_id, review_case_id,
+     decision_ordinal, decision, decision_source, reason_codes,
+     note, approval_ref, decided_by, decided_at
+   ) VALUES (
+     :id, :tenant, :project, :review,
+     1, 'REJECTED', 'INTERNAL', '["MISSING_PHOTO"]'::jsonb,
+     NULL, NULL, 'fixture', now())
+   """)
+   .param("id",reviewDecisionId)
+   .param("tenant",s.tenant())
+   .param("project",s.projectId())
+   .param("review",reviewCaseId)
+   .update();
+  jdbc.sql("""
+   INSERT INTO evd_correction_case (
+     correction_case_id, tenant_id, project_id, task_id,
+     source_review_case_id, source_review_decision_id,
+     source_evidence_set_snapshot_id, source_snapshot_content_digest,
+     reason_codes, status, created_by, created_at
+   ) VALUES (
+     :id, :tenant, :project, :task,
+     :review, :decision, :snapshot, :digest,
+     '["MISSING_PHOTO"]'::jsonb, 'OPEN', 'fixture', now())
+   """)
+   .param("id",UUID.randomUUID())
+   .param("tenant",s.tenant())
+   .param("project",s.projectId())
+   .param("task",taskId)
+   .param("review",reviewCaseId)
+   .param("decision",reviewDecisionId)
+   .param("snapshot",snapshotId)
+   .param("digest",digest)
+   .update();
+ }
+ private UUID seedEvidenceSnapshot(Scope s,UUID taskId,String marker){
+  UUID resolutionId=UUID.randomUUID();
+  String eventDigest=Sha256.digest(taskId+marker);
+  jdbc.sql("""
+   INSERT INTO evd_task_evidence_resolution (
+     resolution_id, tenant_id, project_id, task_id, configuration_bundle_id,
+     configuration_bundle_digest, stage_code, source_event_id, source_event_digest,
+     resolver_version, condition_input_digest, resolution_explanation,
+     generation_no, condition_fact_type, condition_fact_ref, condition_fact_revision,
+     slot_count, resolved_at)
+   VALUES (
+     :id, :tenant, :project, :task, :bundle, :digest, 'SURVEY', :event,
+     :eventDigest, 'FIXED_EVIDENCE_V1',
+     '44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a',
+     CAST('{"kind":"TEST_FIXED_CONTEXT"}' AS jsonb),
+     1, 'TASK_CREATED', CAST(:event AS varchar), 0, 0, now())
+   """)
+   .param("id",resolutionId)
+   .param("tenant",s.tenant())
+   .param("project",s.projectId())
+   .param("task",taskId)
+   .param("bundle",s.bundle().bundleId())
+   .param("digest",s.bundle().manifestDigest())
+   .param("event",UUID.randomUUID())
+   .param("eventDigest",eventDigest)
+   .update();
+  UUID snapshotId=UUID.randomUUID();
+  String snapshotDigest=Sha256.digest(marker+":"+snapshotId);
+  jdbc.sql("""
+   INSERT INTO evd_evidence_set_snapshot (
+     evidence_set_snapshot_id, tenant_id, project_id, task_id, resolution_id,
+     purpose, member_count, content_digest, eligibility_summary, created_by, created_at
+   ) VALUES (
+     :id, :tenant, :project, :task, :resolution,
+     'TASK_SUBMISSION', 0, :digest, '{}'::jsonb, 'fixture', now())
+   """)
+   .param("id",snapshotId)
+   .param("tenant",s.tenant())
+   .param("project",s.projectId())
+   .param("task",taskId)
+   .param("resolution",resolutionId)
+   .param("digest",snapshotDigest)
+   .update();
+  return snapshotId;
  }
  private void seedNetworkAndTechnician(String tenant,UUID networkId,String networkName,
          UUID techProfileId,UUID techPrincipal,String techName){

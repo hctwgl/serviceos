@@ -689,6 +689,24 @@ knownGaps:
   - UI_DATA_GAP: 审核/整改状态筛选、服务端关键词检索未交付（任务状态已由 M446 关闭主路径）
 ```
 
+### 9.41 M447 记录（工单目录审核/整改状态筛选）
+
+```yaml
+pageId: ADMIN.WORKORDER.LIST
+route: /work-orders
+visualProfile: CLASSIC_PROFESSIONAL
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: 服务端关键词检索未交付（审核/整改状态筛选已由 M447 关闭主路径）
+```
+
 ### 9.3 M397 记录（用户管理）
 
 ```yaml

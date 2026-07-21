@@ -17,6 +17,7 @@ import com.serviceos.workorder.api.WorkOrderDirectoryServiceResponsibilityQuery;
 import com.serviceos.workorder.api.WorkOrderDirectorySlaRiskQuery;
 import com.serviceos.workorder.api.WorkOrderDirectorySlaRiskSummary;
 import com.serviceos.workorder.api.WorkOrderDirectoryStageQuery;
+import com.serviceos.workorder.api.WorkOrderDirectoryReviewCorrectionQuery;
 import com.serviceos.workorder.api.WorkOrderMaskedContactView;
 import com.serviceos.workorder.api.WorkOrderPage;
 import com.serviceos.workorder.api.WorkOrderQuery;
@@ -48,6 +49,7 @@ import java.util.UUID;
 final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
     private static final String READ = "workOrder.read";
     private static final String SLA_READ = "sla.read";
+    private static final String EVIDENCE_READ = "evidence.read";
     private static final String NETWORK_TASK_READ = "networkTask.read";
     /** 目录创建日筛选使用运营时区自然日，与 Network 预约日历一致。 */
     private static final ZoneId RECEIVED_DAY_ZONE = ZoneId.of("Asia/Shanghai");
@@ -57,6 +59,9 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
     /** M446：与目录当前任务旁载一致的 ACTIVE 任务状态集。 */
     private static final Set<String> ACTIVE_TASK_STATUSES = Set.of(
             "READY", "PENDING", "CLAIMED", "RUNNING", "RETRY_WAIT", "MANUAL_INTERVENTION");
+    /** M447：审核/整改运营桶。 */
+    private static final Set<String> REVIEW_CORRECTION_STATUSES = Set.of(
+            "REVIEW_OPEN", "CORRECTION_ACTIVE");
     private final WorkOrderQueryRepository queries;
     private final AuthorizationService authorization;
     private final ProjectScopeAuthorizationService projectScopes;
@@ -64,6 +69,7 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
     private final ObjectProvider<WorkOrderDirectoryAssigneeQuery> assigneeQuery;
     private final ObjectProvider<WorkOrderDirectoryServiceResponsibilityQuery> responsibilityQuery;
     private final ObjectProvider<WorkOrderDirectorySlaRiskQuery> slaRiskQuery;
+    private final ObjectProvider<WorkOrderDirectoryReviewCorrectionQuery> reviewCorrectionQuery;
     private final PrincipalPersonaQuery personas;
     private final Clock clock;
 
@@ -73,11 +79,13 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
             ObjectProvider<WorkOrderDirectoryAssigneeQuery> assigneeQuery,
             ObjectProvider<WorkOrderDirectoryServiceResponsibilityQuery> responsibilityQuery,
             ObjectProvider<WorkOrderDirectorySlaRiskQuery> slaRiskQuery,
+            ObjectProvider<WorkOrderDirectoryReviewCorrectionQuery> reviewCorrectionQuery,
             PrincipalPersonaQuery personas, Clock clock) {
         this.queries = queries; this.authorization = authorization;
         this.projectScopes = projectScopes; this.stageQuery = stageQuery;
         this.assigneeQuery = assigneeQuery; this.responsibilityQuery = responsibilityQuery;
         this.slaRiskQuery = slaRiskQuery;
+        this.reviewCorrectionQuery = reviewCorrectionQuery;
         this.personas = personas; this.clock = clock;
     }
 
@@ -103,6 +111,8 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
         String slaRisk = normalizeSlaRisk(query.slaRisk());
         // M443：创建日闭区间 → Asia/Shanghai 半开时间窗；非法跨度失败关闭。
         ReceivedBounds receivedBounds = normalizeReceivedBounds(query.receivedFrom(), query.receivedTo());
+        // M447：审核/整改运营桶；非法枚举失败关闭。
+        String reviewCorrectionStatus = normalizeReviewCorrectionStatus(query.reviewCorrectionStatus());
         AuthorizedProjectScope scope = projectScopes.require(principal, READ, "WorkOrder", correlationId);
         if (query.projectId() != null && !scope.tenantWide() && !scope.projectIds().contains(query.projectId())) {
             authorization.require(principal, AuthorizationRequest.projectCapability(READ, principal.tenantId(),
@@ -121,7 +131,8 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 + "|currentTechnicianId=" + nullable(currentTechnicianId)
                 + "|slaRisk=" + nullable(slaRisk)
                 + "|receivedFrom=" + nullable(query.receivedFrom())
-                + "|receivedTo=" + nullable(query.receivedTo()));
+                + "|receivedTo=" + nullable(query.receivedTo())
+                + "|reviewCorrectionStatus=" + nullable(reviewCorrectionStatus));
         Cursor cursor = decodeCursor(query.cursor(), scope.scopeDigest(), filterDigest);
         List<UUID> projectIds = scope.projectIds().stream()
                 .sorted(Comparator.comparing(UUID::toString)).toList();
@@ -189,6 +200,28 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 }
             }
         }
+        // M447：审核/整改筛选仅在具备 evidence.read 的范围内解析；无权限 → 空集失败关闭。
+        boolean applyReviewCorrectionFilter = reviewCorrectionStatus != null;
+        List<UUID> reviewCorrectionWorkOrderIds = List.of();
+        if (applyReviewCorrectionFilter) {
+            WorkOrderDirectoryReviewCorrectionQuery evidencePort = reviewCorrectionQuery.getIfAvailable();
+            if (evidencePort == null) {
+                throw new IllegalStateException("工单目录审核/整改筛选端口不可用");
+            }
+            if (scope.tenantWide() && hasTenantEvidenceRead(principal, correlationId)) {
+                reviewCorrectionWorkOrderIds = evidencePort.findWorkOrderIdsByReviewCorrectionStatus(
+                        principal.tenantId(), reviewCorrectionStatus, true, List.of());
+            } else {
+                List<UUID> evidenceReadableProjects = projectsWithEvidenceRead(
+                        principal, correlationId, projectIds);
+                if (evidenceReadableProjects.isEmpty()) {
+                    reviewCorrectionWorkOrderIds = List.of();
+                } else {
+                    reviewCorrectionWorkOrderIds = evidencePort.findWorkOrderIdsByReviewCorrectionStatus(
+                            principal.tenantId(), reviewCorrectionStatus, false, evidenceReadableProjects);
+                }
+            }
+        }
         List<WorkOrderView> fetched = queries.findPage(principal.tenantId(), scope.tenantWide(), projectIds,
                 clientCode, query.projectId(), status, externalOrderCode,
                 provinceCode, cityCode, districtCode,
@@ -197,6 +230,7 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 applyNetworkFilter, networkWorkOrderIds,
                 applyTechnicianFilter, technicianWorkOrderIds,
                 applySlaRiskFilter, slaRiskWorkOrderIds,
+                applyReviewCorrectionFilter, reviewCorrectionWorkOrderIds,
                 receivedBounds.fromInclusive(), receivedBounds.toExclusive(),
                 cursor == null ? null : cursor.receivedAt(),
                 cursor == null ? null : cursor.id(), query.limit() + 1);
@@ -222,6 +256,7 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 applyNetworkFilter, networkWorkOrderIds,
                 applyTechnicianFilter, technicianWorkOrderIds,
                 applySlaRiskFilter, slaRiskWorkOrderIds,
+                applyReviewCorrectionFilter, reviewCorrectionWorkOrderIds,
                 receivedBounds.fromInclusive(), receivedBounds.toExclusive());
         return new WorkOrderPage(
                 enriched,
@@ -508,6 +543,17 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
         return value;
     }
 
+    /** M447：审核/整改运营桶枚举。 */
+    private static String normalizeReviewCorrectionStatus(String value) {
+        if (value == null) {
+            return null;
+        }
+        if (!REVIEW_CORRECTION_STATUSES.contains(value)) {
+            throw new IllegalArgumentException("reviewCorrectionStatus is invalid");
+        }
+        return value;
+    }
+
     /**
      * M443：自然日闭区间转为 timestamptz 半开区间。
      * from 日 00:00 Asia/Shanghai ≤ received_at &lt; to 日次日 00:00。
@@ -551,6 +597,36 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                             SLA_READ,
                             principal.tenantId(),
                             "SlaInstance",
+                            projectId.toString(),
+                            projectId.toString()),
+                    correlationId);
+            if (decision.effect() == AuthorizationDecision.Effect.ALLOW) {
+                allowed.add(projectId);
+            }
+        }
+        return List.copyOf(allowed);
+    }
+
+    private boolean hasTenantEvidenceRead(CurrentPrincipal principal, String correlationId) {
+        AuthorizationDecision decision = authorization.authorize(
+                principal,
+                AuthorizationRequest.tenantCapability(
+                        EVIDENCE_READ, principal.tenantId(), "CorrectionCase", principal.tenantId()),
+                correlationId);
+        return decision.effect() == AuthorizationDecision.Effect.ALLOW;
+    }
+
+    private List<UUID> projectsWithEvidenceRead(
+            CurrentPrincipal principal, String correlationId, List<UUID> projectIds
+    ) {
+        List<UUID> allowed = new ArrayList<>();
+        for (UUID projectId : projectIds) {
+            AuthorizationDecision decision = authorization.authorize(
+                    principal,
+                    AuthorizationRequest.projectCapability(
+                            EVIDENCE_READ,
+                            principal.tenantId(),
+                            "CorrectionCase",
                             projectId.toString(),
                             projectId.toString()),
                     correlationId);

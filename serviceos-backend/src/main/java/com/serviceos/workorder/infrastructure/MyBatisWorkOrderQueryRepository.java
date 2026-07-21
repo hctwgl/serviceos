@@ -24,6 +24,7 @@ final class MyBatisWorkOrderQueryRepository implements WorkOrderQueryRepository 
             boolean applyNetworkFilter, List<UUID> networkWorkOrderIds,
             boolean applyTechnicianFilter, List<UUID> technicianWorkOrderIds,
             boolean applySlaRiskFilter, List<UUID> slaRiskWorkOrderIds,
+            boolean applyReviewCorrectionFilter, List<UUID> reviewCorrectionWorkOrderIds,
             Instant receivedFromInclusive, Instant receivedToExclusive,
             Instant cursorReceivedAt, UUID cursorId, int fetchSize) {
         return mapper.findPage(tenantId, tenantWide, projectIds.stream().map(UUID::toString).toList(),
@@ -33,6 +34,7 @@ final class MyBatisWorkOrderQueryRepository implements WorkOrderQueryRepository 
                 applyNetworkFilter, networkWorkOrderIds.stream().map(UUID::toString).toList(),
                 applyTechnicianFilter, technicianWorkOrderIds.stream().map(UUID::toString).toList(),
                 applySlaRiskFilter, slaRiskWorkOrderIds.stream().map(UUID::toString).toList(),
+                applyReviewCorrectionFilter, reviewCorrectionWorkOrderIds.stream().map(UUID::toString).toList(),
                 receivedFromInclusive, receivedToExclusive,
                 cursorReceivedAt, cursorId, fetchSize)
                 .stream().map(MyBatisWorkOrderQueryRepository::view).toList();
@@ -47,6 +49,7 @@ final class MyBatisWorkOrderQueryRepository implements WorkOrderQueryRepository 
             boolean applyNetworkFilter, List<UUID> networkWorkOrderIds,
             boolean applyTechnicianFilter, List<UUID> technicianWorkOrderIds,
             boolean applySlaRiskFilter, List<UUID> slaRiskWorkOrderIds,
+            boolean applyReviewCorrectionFilter, List<UUID> reviewCorrectionWorkOrderIds,
             Instant receivedFromInclusive, Instant receivedToExclusive) {
         return mapper.countMatching(tenantId, tenantWide, projectIds.stream().map(UUID::toString).toList(),
                 clientCode, projectId, status, externalOrderCode, provinceCode, cityCode, districtCode,
@@ -55,6 +58,7 @@ final class MyBatisWorkOrderQueryRepository implements WorkOrderQueryRepository 
                 applyNetworkFilter, networkWorkOrderIds.stream().map(UUID::toString).toList(),
                 applyTechnicianFilter, technicianWorkOrderIds.stream().map(UUID::toString).toList(),
                 applySlaRiskFilter, slaRiskWorkOrderIds.stream().map(UUID::toString).toList(),
+                applyReviewCorrectionFilter, reviewCorrectionWorkOrderIds.stream().map(UUID::toString).toList(),
                 receivedFromInclusive, receivedToExclusive);
     }
 
