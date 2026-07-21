@@ -39,6 +39,9 @@ test.describe('M377 Admin productization visual baselines', () => {
     await expect(page.getByTestId('work-order-current-stage')).toContainText('勘测')
     // M433：目录当前责任人（Persona 显示名）
     await expect(page.getByTestId('work-order-current-assignee')).toContainText('演示师傅')
+    // M439：目录网点/师傅列
+    await expect(page.getByTestId('work-order-network-technician')).toContainText('杭州西湖网点')
+    await expect(page.getByTestId('work-order-network-technician')).toContainText('现场师傅甲')
     // M434：目录 SLA 风险旁载
     await expect(page.getByTestId('work-order-sla-risk')).toContainText('开放 1 / 超时 0')
     // M435：目录独立 updatedAt（非 receivedAt MVP 映射）
@@ -87,6 +90,11 @@ test.describe('M377 Admin productization visual baselines', () => {
     await page.getByTestId('work-order-stage-filter').scrollIntoViewIfNeeded()
     await page.screenshot({
       path: 'tests/e2e/__screenshots__/work-order-directory-stage-filter-1440.png',
+      fullPage: true,
+    })
+    await page.getByTestId('work-order-network-technician').scrollIntoViewIfNeeded()
+    await page.screenshot({
+      path: 'tests/e2e/__screenshots__/work-order-directory-network-technician-1440.png',
       fullPage: true,
     })
   })

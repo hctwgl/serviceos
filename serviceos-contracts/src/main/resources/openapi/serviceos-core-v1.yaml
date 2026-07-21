@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.100
+  version: 1.0.101
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -9699,7 +9699,8 @@ components:
         status, configurationBundleId, configurationBundleCode, configurationBundleVersion,
         configurationBundleDigest, provinceCode, cityCode, districtCode, externalDispatchedAt,
         receivedAt, updatedAt, version, maskedCustomerName, maskedCustomerPhone, maskedServiceAddress,
-        currentStageCode, currentClaimedBy, currentAssigneeDisplayName]
+        currentStageCode, currentClaimedBy, currentAssigneeDisplayName,
+        currentNetworkId, currentNetworkDisplayName, currentTechnicianId, currentTechnicianDisplayName]
       properties:
         id: { type: string, format: uuid }
         tenantId: { type: string }
@@ -9756,6 +9757,26 @@ components:
           maxLength: 128
           description: >
             M433：认领主体 Persona 显示名；无认领或无 PersonProfile 时为 null，不发明名称。
+        currentNetworkId:
+          type: [string, 'null']
+          maxLength: 128
+          description: >
+            M439：工单 ACTIVE NETWORK ServiceAssignment.assignee_id；无 ACTIVE 网点责任时为 null。
+        currentNetworkDisplayName:
+          type: [string, 'null']
+          maxLength: 200
+          description: >
+            M439：网点 networkName；无责任或目录缺档时为 null，不发明名称。
+        currentTechnicianId:
+          type: [string, 'null']
+          maxLength: 128
+          description: >
+            M439：工单 ACTIVE TECHNICIAN ServiceAssignment.assignee_id（师傅档案 ID）；无 ACTIVE 师傅责任时为 null。
+        currentTechnicianDisplayName:
+          type: [string, 'null']
+          maxLength: 200
+          description: >
+            M439：师傅档案 displayName；无责任或档案缺档时为 null，不发明名称。
     WorkOrderPage:
       type: object
       additionalProperties: false

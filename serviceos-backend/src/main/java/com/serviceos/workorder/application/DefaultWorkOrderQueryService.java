@@ -12,6 +12,8 @@ import com.serviceos.shared.ProblemCode;
 import com.serviceos.shared.Sha256;
 import com.serviceos.workorder.api.WorkOrderDetail;
 import com.serviceos.workorder.api.WorkOrderDirectoryAssigneeQuery;
+import com.serviceos.workorder.api.WorkOrderDirectoryServiceResponsibility;
+import com.serviceos.workorder.api.WorkOrderDirectoryServiceResponsibilityQuery;
 import com.serviceos.workorder.api.WorkOrderDirectorySlaRiskQuery;
 import com.serviceos.workorder.api.WorkOrderDirectorySlaRiskSummary;
 import com.serviceos.workorder.api.WorkOrderDirectoryStageQuery;
@@ -51,6 +53,7 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
     private final ProjectScopeAuthorizationService projectScopes;
     private final ObjectProvider<WorkOrderDirectoryStageQuery> stageQuery;
     private final ObjectProvider<WorkOrderDirectoryAssigneeQuery> assigneeQuery;
+    private final ObjectProvider<WorkOrderDirectoryServiceResponsibilityQuery> responsibilityQuery;
     private final ObjectProvider<WorkOrderDirectorySlaRiskQuery> slaRiskQuery;
     private final PrincipalPersonaQuery personas;
     private final Clock clock;
@@ -59,11 +62,13 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
             ProjectScopeAuthorizationService projectScopes,
             ObjectProvider<WorkOrderDirectoryStageQuery> stageQuery,
             ObjectProvider<WorkOrderDirectoryAssigneeQuery> assigneeQuery,
+            ObjectProvider<WorkOrderDirectoryServiceResponsibilityQuery> responsibilityQuery,
             ObjectProvider<WorkOrderDirectorySlaRiskQuery> slaRiskQuery,
             PrincipalPersonaQuery personas, Clock clock) {
         this.queries = queries; this.authorization = authorization;
         this.projectScopes = projectScopes; this.stageQuery = stageQuery;
-        this.assigneeQuery = assigneeQuery; this.slaRiskQuery = slaRiskQuery;
+        this.assigneeQuery = assigneeQuery; this.responsibilityQuery = responsibilityQuery;
+        this.slaRiskQuery = slaRiskQuery;
         this.personas = personas; this.clock = clock;
     }
 
@@ -201,8 +206,8 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
     }
 
     /**
-     * M429/M432/M433/M435：在已授权的 WorkOrderView 上附着脱敏联系、阶段与责任人，并透传独立 updatedAt；
-     * 原文不进入视图。旁载字段由调用方批量查询后传入，缺任务/认领/档案时保持 null。
+     * M429/M432/M433/M435/M439：在已授权的 WorkOrderView 上附着脱敏联系、阶段、责任人与网点/师傅，
+     * 并透传独立 updatedAt；原文不进入视图。旁载字段由调用方批量查询后传入，缺任务/认领/档案/责任时保持 null。
      */
     private WorkOrderView withDirectoryEnrichment(
             String tenantId, WorkOrderView view, DirectoryEnrichment enrichment
@@ -235,7 +240,11 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 contact.maskedServiceAddress(),
                 enrichment.currentStageCode(),
                 enrichment.currentClaimedBy(),
-                enrichment.currentAssigneeDisplayName());
+                enrichment.currentAssigneeDisplayName(),
+                enrichment.currentNetworkId(),
+                enrichment.currentNetworkDisplayName(),
+                enrichment.currentTechnicianId(),
+                enrichment.currentTechnicianDisplayName());
     }
 
     private DirectorySideCars loadDirectorySideCars(String tenantId, List<UUID> workOrderIds) {
@@ -262,7 +271,13 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
         Map<UUID, String> displayNames = principalIds.isEmpty()
                 ? Map.of()
                 : personas.displayNames(tenantId, new ArrayList<>(principalIds));
-        return new DirectorySideCars(stages, claimedBy, displayNames);
+        Map<UUID, WorkOrderDirectoryServiceResponsibility> responsibilities = Map.of();
+        WorkOrderDirectoryServiceResponsibilityQuery responsibilityPort =
+                responsibilityQuery.getIfAvailable();
+        if (responsibilityPort != null) {
+            responsibilities = responsibilityPort.findActive(tenantId, workOrderIds);
+        }
+        return new DirectorySideCars(stages, claimedBy, displayNames, responsibilities);
     }
 
     /**
@@ -320,16 +335,21 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
     private record DirectoryEnrichment(
             String currentStageCode,
             String currentClaimedBy,
-            String currentAssigneeDisplayName
+            String currentAssigneeDisplayName,
+            String currentNetworkId,
+            String currentNetworkDisplayName,
+            String currentTechnicianId,
+            String currentTechnicianDisplayName
     ) {}
 
     private record DirectorySideCars(
             Map<UUID, String> stages,
             Map<UUID, String> claimedBy,
-            Map<UUID, String> displayNames
+            Map<UUID, String> displayNames,
+            Map<UUID, WorkOrderDirectoryServiceResponsibility> responsibilities
     ) {
         static DirectorySideCars empty() {
-            return new DirectorySideCars(Map.of(), Map.of(), Map.of());
+            return new DirectorySideCars(Map.of(), Map.of(), Map.of(), Map.of());
         }
 
         DirectoryEnrichment forWorkOrder(UUID workOrderId) {
@@ -339,7 +359,15 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
             if (principalId != null) {
                 displayName = displayNames.get(principalId);
             }
-            return new DirectoryEnrichment(stages.get(workOrderId), claimed, displayName);
+            WorkOrderDirectoryServiceResponsibility responsibility = responsibilities.get(workOrderId);
+            return new DirectoryEnrichment(
+                    stages.get(workOrderId),
+                    claimed,
+                    displayName,
+                    responsibility == null ? null : responsibility.networkId(),
+                    responsibility == null ? null : responsibility.networkDisplayName(),
+                    responsibility == null ? null : responsibility.technicianId(),
+                    responsibility == null ? null : responsibility.technicianDisplayName());
         }
     }
 

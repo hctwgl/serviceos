@@ -194,6 +194,10 @@ type Row = {
   currentStageCode: string | null
   currentClaimedBy: string | null
   currentAssigneeDisplayName: string | null
+  currentNetworkId: string | null
+  currentNetworkDisplayName: string | null
+  currentTechnicianId: string | null
+  currentTechnicianDisplayName: string | null
 }
 
 /** M430/M431：优先展示目录中文名，未命中则回退国标码（不发明名称）。 */
@@ -274,6 +278,10 @@ const rows = computed((): Row[] => {
       currentStageCode: item.currentStageCode,
       currentClaimedBy: item.currentClaimedBy,
       currentAssigneeDisplayName: item.currentAssigneeDisplayName,
+      currentNetworkId: item.currentNetworkId,
+      currentNetworkDisplayName: item.currentNetworkDisplayName,
+      currentTechnicianId: item.currentTechnicianId,
+      currentTechnicianDisplayName: item.currentTechnicianDisplayName,
     }))
 })
 
@@ -456,6 +464,41 @@ const columns = computed((): TableColumnsType<Row> => {
             { 'data-testid': 'work-order-current-assignee' },
             presentEmptyValue('not_provided'),
           ),
+      )
+    },
+  },
+  {
+    title: '网点/师傅',
+    key: 'networkTechnician',
+    width: 160,
+    customRender: ({ record }: { record: Row }) => {
+      const network =
+        record.currentNetworkDisplayName?.trim() ||
+        (record.currentNetworkId ? presentEmptyValue('not_provided') : null)
+      const technician =
+        record.currentTechnicianDisplayName?.trim() ||
+        (record.currentTechnicianId ? presentEmptyValue('not_provided') : null)
+      if (!network && !technician) {
+        return h(
+          Tooltip,
+          { title: '无 ACTIVE 网点或师傅服务责任' },
+          () =>
+            h(
+              'span',
+              { 'data-testid': 'work-order-network-technician' },
+              presentEmptyValue('not_provided'),
+            ),
+        )
+      }
+      const label = [network, technician].filter(Boolean).join(' / ')
+      const tipParts = [
+        record.currentNetworkId ? `网点：${record.currentNetworkId}` : null,
+        record.currentTechnicianId ? `师傅档案：${record.currentTechnicianId}` : null,
+      ].filter(Boolean)
+      return h(
+        Tooltip,
+        { title: tipParts.length > 0 ? tipParts.join('；') : '当前服务责任' },
+        () => h('span', { 'data-testid': 'work-order-network-technician' }, label),
       )
     },
   },

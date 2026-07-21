@@ -35,7 +35,9 @@ class WorkOrderQueryPostgresIT {
 
  @BeforeEach void clean(){jdbc.sql("""
   TRUNCATE TABLE aud_audit_record, rel_outbox_publish_attempt, rel_outbox_event,
-  sla_instance, tsk_task, wo_work_order,cfg_configuration_bundle_item,cfg_configuration_bundle,cfg_configuration_asset_version,
+  sla_instance, dsp_service_assignment, tsk_task, wo_work_order,
+  net_technician_profile, net_service_network, net_partner_organization,
+  cfg_configuration_bundle_item,cfg_configuration_bundle,cfg_configuration_asset_version,
   prj_project,auth_role_field_policy,auth_role_grant,auth_role_capability,auth_role,
   idn_person_profile, idn_security_principal CASCADE
   """).update();}
@@ -57,6 +59,8 @@ class WorkOrderQueryPostgresIT {
   assertThat(page.items().getFirst().currentStageCode()).isNull();
   assertThat(page.items().getFirst().currentClaimedBy()).isNull();
   assertThat(page.items().getFirst().currentAssigneeDisplayName()).isNull();
+  assertThat(page.items().getFirst().currentNetworkId()).isNull();
+  assertThat(page.items().getFirst().currentTechnicianId()).isNull();
   // M435：新建时 updatedAt 与 receivedAt 同源，且二者均非 null。
   assertThat(page.items().getFirst().updatedAt()).isEqualTo(page.items().getFirst().receivedAt());
   var detail=queries.get(reader,"corr-get",wa).workOrder();
@@ -66,6 +70,8 @@ class WorkOrderQueryPostgresIT {
   assertThat(detail.currentStageCode()).isNull();
   assertThat(detail.currentClaimedBy()).isNull();
   assertThat(detail.currentAssigneeDisplayName()).isNull();
+  assertThat(detail.currentNetworkDisplayName()).isNull();
+  assertThat(detail.currentTechnicianDisplayName()).isNull();
   assertThat(detail.updatedAt()).isEqualTo(detail.receivedAt());
   // M434：无 sla.read 时页级旁载省略（null），不伪造 []/0。
   assertThat(page.slaRiskSummaries()).isNull();
@@ -128,6 +134,28 @@ class WorkOrderQueryPostgresIT {
     new WorkOrderQuery(null,null,null,null,"110000",null,null,null,null,20));
   assertThat(none.items()).isEmpty();
   assertThat(none.totalCount()).isZero();
+ }
+
+ @Test void listAndDetailExposeCurrentNetworkAndTechnicianFromActiveAssignment(){
+  Scope a=scope("tenant-test","A");
+  UUID wa=receive(a,"ORDER-NET-TECH","7".repeat(64));
+  UUID taskId=seedActiveTask(a,wa,"SURVEY",null,null);
+  UUID networkId=UUID.randomUUID();
+  UUID techProfileId=UUID.randomUUID();
+  UUID techPrincipal=UUID.randomUUID();
+  seedNetworkAndTechnician(a.tenant(),networkId,"青岛服务网点",techProfileId,techPrincipal,"青岛师傅甲");
+  seedActiveAssignment(a,wa,taskId,"NETWORK",networkId.toString());
+  seedActiveAssignment(a,wa,taskId,"TECHNICIAN",techProfileId.toString());
+  seedRole("reader","PROJECT",a.projectId().toString());
+  CurrentPrincipal reader=principal("reader","tenant-test");
+  var page=queries.list(reader,"corr-net-tech-list",new WorkOrderQuery(null,null,null,null,20));
+  assertThat(page.items().getFirst().currentNetworkId()).isEqualTo(networkId.toString());
+  assertThat(page.items().getFirst().currentNetworkDisplayName()).isEqualTo("青岛服务网点");
+  assertThat(page.items().getFirst().currentTechnicianId()).isEqualTo(techProfileId.toString());
+  assertThat(page.items().getFirst().currentTechnicianDisplayName()).isEqualTo("青岛师傅甲");
+  var detail=queries.get(reader,"corr-net-tech-get",wa).workOrder();
+  assertThat(detail.currentNetworkDisplayName()).isEqualTo("青岛服务网点");
+  assertThat(detail.currentTechnicianDisplayName()).isEqualTo("青岛师傅甲");
  }
 
  @Test void listFiltersByCurrentStageCode(){
@@ -331,6 +359,65 @@ class WorkOrderQueryPostgresIT {
    .param("startedAt","RUNNING".equals(taskStatus)?java.sql.Timestamp.from(now):null)
    .update();
   return taskId;
+ }
+ private void seedNetworkAndTechnician(String tenant,UUID networkId,String networkName,
+         UUID techProfileId,UUID techPrincipal,String techName){
+  UUID partner=UUID.randomUUID();
+  jdbc.sql("""
+   INSERT INTO net_partner_organization (
+     partner_organization_id, tenant_id, partner_code, partner_name,
+     partner_status, aggregate_version, created_at, updated_at
+   ) VALUES (:id,:tenant,'P-M439','Partner M439','ACTIVE',1,now(),now())
+   """).param("id",partner).param("tenant",tenant).update();
+  jdbc.sql("""
+   INSERT INTO net_service_network (
+     service_network_id, tenant_id, partner_organization_id, network_code,
+     network_name, network_status, aggregate_version, created_at, updated_at
+   ) VALUES (:id,:tenant,:partner,'N-M439',:name,'ACTIVE',1,now(),now())
+   """).param("id",networkId).param("tenant",tenant).param("partner",partner).param("name",networkName).update();
+  jdbc.sql("""
+   INSERT INTO idn_security_principal (
+     principal_id,tenant_id,principal_type,principal_status,
+     aggregate_version,created_at,updated_at
+   ) VALUES (:id,:tenant,'USER','ACTIVE',1,now(),now())
+   """).param("id",techPrincipal).param("tenant",tenant).update();
+  jdbc.sql("""
+   INSERT INTO net_technician_profile (
+     technician_profile_id, tenant_id, principal_id, display_name, profile_status,
+     aggregate_version, created_at, updated_at
+   ) VALUES (:id,:tenant,:principal,:name,'ACTIVE',1,now(),now())
+   """).param("id",techProfileId).param("tenant",tenant).param("principal",techPrincipal).param("name",techName).update();
+ }
+ private void seedActiveAssignment(Scope s,UUID workOrderId,UUID taskId,String level,String assigneeId){
+  Instant now=Instant.parse("2026-07-15T05:00:00Z");
+  jdbc.sql("""
+   INSERT INTO dsp_service_assignment (
+     service_assignment_id, tenant_id, work_order_id, task_id,
+     responsibility_level, assignee_id, business_type, source_decision_id,
+     status, activation_saga_id, effective_from, created_by, created_at,
+     authority_assignment_id, authority_version,
+     fence_decision_id, fence_policy_version
+   ) VALUES (
+     :id, :tenant, :workOrderId, :taskId,
+     :level, :assignee, 'INSTALLATION', :decision,
+     'ACTIVE', :saga, :now, 'test', :now,
+     :authorityId, 1,
+     :fenceDecision, :fencePolicy
+   )
+   """)
+   .param("id",UUID.randomUUID())
+   .param("tenant",s.tenant())
+   .param("workOrderId",workOrderId)
+   .param("taskId",taskId)
+   .param("level",level)
+   .param("assignee",assigneeId)
+   .param("decision","decision://"+level)
+   .param("saga",UUID.randomUUID())
+   .param("now",java.sql.Timestamp.from(now))
+   .param("authorityId","authority://"+level)
+   .param("fenceDecision","fence://"+level)
+   .param("fencePolicy","fence-policy-v1")
+   .update();
  }
  private void seedRunningSla(Scope s,UUID workOrderId,UUID taskId){
   Objects.requireNonNull(s.slaPolicyVersionId(),"scope must include SLA policy");

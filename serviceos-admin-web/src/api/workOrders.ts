@@ -26,6 +26,14 @@ export type WorkOrder = {
   currentClaimedBy: string | null
   /** M433：Persona 显示名；无档案为 null，不发明名称。 */
   currentAssigneeDisplayName: string | null
+  /** M439：ACTIVE NETWORK 责任 ID；无责任为 null。 */
+  currentNetworkId: string | null
+  /** M439：网点显示名。 */
+  currentNetworkDisplayName: string | null
+  /** M439：ACTIVE TECHNICIAN 师傅档案 ID。 */
+  currentTechnicianId: string | null
+  /** M439：师傅显示名。 */
+  currentTechnicianDisplayName: string | null
 }
 
 /** M434：页级 SLA 风险摘要；缺 sla.read 时响应省略本字段。 */
