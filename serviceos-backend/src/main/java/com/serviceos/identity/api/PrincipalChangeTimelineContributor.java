@@ -10,7 +10,7 @@ import java.util.UUID;
  * 避免 identity 反向依赖业务模块内部包。</p>
  */
 public interface PrincipalChangeTimelineContributor {
-    /** 来源码，如 MEMBERSHIP / ROLE_GRANT。 */
+    /** 来源码，如 MEMBERSHIP / ROLE_GRANT / NETWORK_MEMBERSHIP。 */
     String source();
 
     /** soft-gate 所需租户能力；缺权时 identity 记入 omittedSources，不失败关闭整页。 */

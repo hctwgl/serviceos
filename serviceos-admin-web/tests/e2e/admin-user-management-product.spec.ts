@@ -62,6 +62,8 @@ test.describe('M402–M405 Admin 用户登记到变更时间线', () => {
     await expect(page.getByTestId('user-change-timeline')).toContainText('主体已登记')
     await expect(page.getByTestId('user-change-timeline')).toContainText('任职已创建')
     await expect(page.getByTestId('user-change-timeline')).toContainText('角色授权已批准')
+    await expect(page.getByTestId('user-change-timeline')).toContainText('网点任职已邀请')
+    await expect(page.getByTestId('user-change-timeline')).toContainText('演示服务网点')
     await expect(page.getByTestId('user-change-timeline')).toContainText('审批运营')
     await page.screenshot({
       path: 'tests/e2e/__screenshots__/admin-user-change-timeline-1440.png',

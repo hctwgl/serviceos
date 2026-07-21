@@ -399,12 +399,14 @@ function sourceLabel(source: PrincipalChangeTimelineItem['source']) {
   if (source === 'LOGIN') return '登录'
   if (source === 'MEMBERSHIP') return '任职'
   if (source === 'ROLE_GRANT') return '角色授权'
+  if (source === 'NETWORK_MEMBERSHIP') return '网点任职'
   return '审计'
 }
 
-function omittedSourceLabel(source: 'MEMBERSHIP' | 'ROLE_GRANT') {
+function omittedSourceLabel(source: 'MEMBERSHIP' | 'ROLE_GRANT' | 'NETWORK_MEMBERSHIP') {
   if (source === 'MEMBERSHIP') return '任职（需 organization.read）'
-  return '角色授权（需 authorization.read）'
+  if (source === 'ROLE_GRANT') return '角色授权（需 authorization.read）'
+  return '网点任职（需 network.read）'
 }
 
 function presentActor(item: PrincipalChangeTimelineItem) {

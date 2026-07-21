@@ -7,6 +7,7 @@ import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.identity.api.PrincipalAuthenticationService;
 import com.serviceos.identity.api.SecurityPrincipalCommandService;
 import com.serviceos.identity.api.SecurityPrincipalQueryService;
+import com.serviceos.network.api.NetworkCommandService;
 import com.serviceos.organization.api.OrganizationCommandService;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.CommandMetadata;
@@ -78,6 +79,9 @@ class IdentityDirectoryPostgresIT {
     AuthorizationGovernanceCommandService authorizationGovernance;
 
     @Autowired
+    NetworkCommandService networks;
+
+    @Autowired
     JdbcClient jdbc;
 
     @BeforeEach
@@ -86,6 +90,10 @@ class IdentityDirectoryPostgresIT {
                 TRUNCATE TABLE org_structure_event, org_reassignment_work_item,
                     org_directory_sync_item, org_directory_sync_batch,
                     org_membership, org_unit_closure, org_unit, org_organization,
+                    net_directory_event, net_clearance_work_item,
+                    net_technician_qualification, net_network_technician_membership,
+                    net_technician_profile, net_network_membership, net_service_network,
+                    net_partner_organization,
                     idn_principal_login_event, idn_principal_lifecycle_event, idn_principal_persona,
                     idn_identity_link, idn_person_profile, idn_security_principal,
                     rel_idempotency_record, aud_audit_record,
@@ -101,7 +109,9 @@ class IdentityDirectoryPostgresIT {
                 "identity.manageLifecycle", "identity.manageProfile", "identity.register",
                 "organization.read", "organization.manageStructure", "organization.manageMembership",
                 "authorization.read", "authorization.manageRoles", "authorization.requestGrant",
-                "authorization.approveGrant")) {
+                "authorization.approveGrant",
+                "network.read", "network.managePartner", "network.manageNetwork",
+                "network.manageMembership")) {
             jdbc.sql("""
                     INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
                     VALUES (:roleId, :capability, now())
@@ -270,6 +280,51 @@ class IdentityDirectoryPostgresIT {
         assertThat(omitted.omittedSources()).containsExactly("MEMBERSHIP", "ROLE_GRANT");
         assertThat(omitted.items()).noneMatch(item ->
                 "MEMBERSHIP".equals(item.source()) || "ROLE_GRANT".equals(item.source()));
+        assertThat(omitted.items()).extracting(item -> item.source())
+                .contains("LIFECYCLE");
+    }
+
+    @Test
+    void changeTimelineMergesNetworkMembershipWithSoftOmit() {
+        UUID principalId = UUID.fromString(authentication.resolveOrRegister(
+                identity("subject-net-mem", "网点任职用户"), "corr-net-mem-1"));
+        commands.updateProfile(actor(), metadata("net-mem-profile"), principalId, 1, "网点任职用户", "EMP-NET-1");
+
+        var partner = networks.createPartnerOrganization(
+                actor(), metadata("net-mem-partner"), "NETMEM", "网点任职合作方");
+        var network = networks.createServiceNetwork(
+                actor(), metadata("net-mem-network"), partner.id(), "NET-MEM-1", "演示服务网点");
+        var membership = networks.inviteNetworkMember(
+                actor(), metadata("net-mem-invite"), network.id(), null,
+                principalId, "STAFF", Instant.now().minusSeconds(60));
+        networks.terminateNetworkMembership(
+                actor(), metadata("net-mem-terminate"), membership.id(), membership.version(),
+                "轮岗退出");
+
+        var timeline = queries.changeTimeline(actor(), "corr-net-mem-timeline", principalId, 50);
+        assertThat(timeline.omittedSources()).isEmpty();
+        assertThat(timeline.items()).extracting(item -> item.source())
+                .contains("LIFECYCLE", "NETWORK_MEMBERSHIP");
+        assertThat(timeline.items()).extracting(item -> item.eventCode())
+                .contains("MEMBERSHIP_INVITED", "MEMBERSHIP_TERMINATED");
+        assertThat(timeline.items()).filteredOn(item -> "MEMBERSHIP_INVITED".equals(item.eventCode()))
+                .singleElement()
+                .satisfies(item -> assertThat(item.summary()).contains("演示服务网点").contains("STAFF"));
+        assertThat(timeline.items()).filteredOn(item -> "MEMBERSHIP_TERMINATED".equals(item.eventCode()))
+                .singleElement()
+                .satisfies(item -> assertThat(item.summary()).contains("轮岗退出"));
+
+        jdbc.sql("""
+                DELETE FROM auth_role_capability
+                 WHERE capability_code = 'network.read'
+                   AND role_id IN (
+                     SELECT role_id FROM auth_role
+                      WHERE tenant_id = :tenant AND role_code = 'identity-admin'
+                   )
+                """).param("tenant", TENANT).update();
+        var omitted = queries.changeTimeline(actor(), "corr-net-mem-omit", principalId, 50);
+        assertThat(omitted.omittedSources()).containsExactly("NETWORK_MEMBERSHIP");
+        assertThat(omitted.items()).noneMatch(item -> "NETWORK_MEMBERSHIP".equals(item.source()));
         assertThat(omitted.items()).extracting(item -> item.source())
                 .contains("LIFECYCLE");
     }

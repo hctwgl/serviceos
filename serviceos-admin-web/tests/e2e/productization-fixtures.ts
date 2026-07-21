@@ -802,6 +802,18 @@ export async function mockProductizationApis(
       await fulfillJson(route, {
         items: [
           {
+            source: 'NETWORK_MEMBERSHIP',
+            eventCode: 'MEMBERSHIP_INVITED',
+            summary: '网点任职已邀请 · 演示服务网点 · STAFF',
+            actorId: '77777777-7777-4777-8777-777777777777',
+            actorDisplayName: '审批运营',
+            result: 'SUCCEEDED',
+            correlationId: 'corr-network-membership',
+            principalVersion: 1,
+            occurredAt: '2026-07-20T03:45:00Z',
+            refId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+          },
+          {
             source: 'ROLE_GRANT',
             eventCode: 'ROLE_GRANT_APPROVED',
             summary: '角色授权已批准 · OPS · ALLOW · TENANT=tenant-demo',

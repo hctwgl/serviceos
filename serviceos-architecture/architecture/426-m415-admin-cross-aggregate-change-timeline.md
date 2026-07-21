@@ -30,6 +30,6 @@ lastUpdated: 2026-07-21
 
 ## 4. 明确未实现
 
-- 网点任职（Network membership）并入主体时间线
+- 网点任职（Network membership）并入主体时间线（已由 **M416** 关闭主路径）
 - 通用 AUTHORIZATION_DENIED 作为主体活动流
 - 产品负责人视觉金标（`READY_FOR_REVIEW`）

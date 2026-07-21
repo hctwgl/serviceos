@@ -503,5 +503,6 @@ Feature gate/authority: if applicable
 | M412 | Network 分配候选推荐解释 | 423-m412-* + 406-m412-*；OpenAPI 1.0.78；EvaluatorTest + PostgresIT + Playwright | 经纬度/路网距离；数值评分；完整预约日历；人工视觉批准 |
 | M413 | Network 预约日历视图 | 424-m413-* + 407-m413-*；OpenAPI 1.0.79；PostgresIT + Playwright；page-registry-v21 | 客户脱敏 PII；月视图拖拽改约；数值评分；人工视觉批准 |
 | M414 | Admin 主数据治理台 | 425-m414-* + 408-m414-*；OpenAPI 1.0.80；Flyway V143；PostgresIT + Playwright；page-registry-v22 | 全国区县全量；拼音索引；多级子品牌；人工视觉批准 |
-| M415 | Admin 跨聚合主体变更时间线 | 426-m415-* + 409-m415-*；OpenAPI 1.0.81；Contributor SPI + PostgresIT + Playwright | 网点任职并入；AUTHORIZATION_DENIED 活动流；人工视觉批准 |
+| M415 | Admin 跨聚合主体变更时间线 | 426-m415-* + 409-m415-*；OpenAPI 1.0.81；Contributor SPI + PostgresIT + Playwright | 网点任职并入（M416）；AUTHORIZATION_DENIED 活动流；人工视觉批准 |
+| M416 | Admin 网点任职并入主体变更时间线 | 427-m416-* + 410-m416-*；OpenAPI 1.0.82；`NETWORK_MEMBERSHIP` Contributor + PostgresIT + Playwright | 师傅服务关系；AUTHORIZATION_DENIED 活动流；人工视觉批准 |
 
