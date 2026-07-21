@@ -140,10 +140,23 @@
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <!-- 既有安全/投影测试以开启态运行；关闭态由专门的策略单测覆盖。 -->
+                    <systemPropertyVariables>
+                        <serviceos.redaction.enabled>true</serviceos.redaction.enabled>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
                 <configuration>
                     <!-- Boot repackage 会在 package 阶段替换主 artifact；集成测试必须直接使用编译输出。 -->
                     <classesDirectory>${project.build.outputDirectory}</classesDirectory>
+                    <systemPropertyVariables>
+                        <serviceos.redaction.enabled>true</serviceos.redaction.enabled>
+                    </systemPropertyVariables>
                 </configuration>
                 <executions>
                     <execution>
