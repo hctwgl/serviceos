@@ -291,7 +291,7 @@ class FormSubmissionPostgresIT {
                     task_assignment_id, tenant_id, task_id, assignment_kind, principal_type,
                     principal_id, status, source_type, source_id, effective_from, created_by, created_at)
                 VALUES (:id, :tenant, :task, 'RESPONSIBLE', 'USER', :responsible, 'ACTIVE',
-                    'MANUAL', 'M34-FIXTURE', now(), 'fixture', now())
+                    'MANUAL', 'M34-FIXTURE', now() - interval '1 minute', 'fixture', now())
                 """).param("id", UUID.randomUUID()).param("tenant", TENANT).param("task", taskId)
                 .param("responsible", responsible).update();
         jdbc.sql("""
@@ -299,7 +299,7 @@ class FormSubmissionPostgresIT {
                     task_assignment_id, tenant_id, task_id, assignment_kind, principal_type,
                     principal_id, status, source_type, source_id, effective_from, created_by, created_at)
                 VALUES (:id, :tenant, :task, 'CANDIDATE', 'USER', :responsible, 'ACTIVE',
-                    'MANUAL', 'M35-COMPLETION-FIXTURE', now(), 'fixture', now())
+                    'MANUAL', 'M35-COMPLETION-FIXTURE', now() - interval '1 minute', 'fixture', now())
                 """).param("id", UUID.randomUUID()).param("tenant", TENANT).param("task", taskId)
                 .param("responsible", responsible).update();
         return taskId;
