@@ -43,6 +43,7 @@ import {
   type WorkflowExecutionProjection,
 } from '../api/workOrderDetail'
 import { getTaskAllowedActions, type TaskAllowedActions } from '../api/tasks'
+import { authorizeEvidenceRevisionDownload } from '../api/finalReview'
 import {
   getWorkOrderFulfillmentSnapshot,
   type WorkOrderFulfillmentSnapshot,
@@ -515,6 +516,9 @@ type EvidenceItemDetailLink = {
   evidenceItemId: string
   status: string
   itemOrdinal: string
+  /** M426：最新 revision 指针；无修订时为 null。 */
+  latestRevisionId: string | null
+  latestMimeType: string | null
 }
 
 /** 仅映射已有 Admin 详情路由；无对等页的 resourceType 不渲染。 */
@@ -1040,14 +1044,81 @@ const evidenceItemDetailLinks = computed((): EvidenceItemDetailLink[] => {
       const row = item as Record<string, unknown>
       const id = row.evidenceItemId
       if (typeof id !== 'string' || !id) return null
+      const latestRevisionId =
+        typeof row.latestRevisionId === 'string' && row.latestRevisionId
+          ? row.latestRevisionId
+          : null
+      const latestMimeType =
+        typeof row.latestMimeType === 'string' && row.latestMimeType
+          ? row.latestMimeType
+          : null
       return {
         evidenceItemId: id,
         status: String(row.status ?? '—'),
         itemOrdinal: String(row.itemOrdinal ?? '—'),
+        latestRevisionId,
+        latestMimeType,
       }
     })
     .filter((item): item is EvidenceItemDetailLink => item != null)
 })
+
+/** M426：图片型资料的短时授权预览 URL（purpose=WORKSPACE_EVIDENCE_PREVIEW）。 */
+const evidencePreviewUrls = ref<Record<string, string>>({})
+const evidencePreviewErrors = ref<Record<string, string>>({})
+const evidencePreviewLoading = ref(false)
+
+const imageEvidenceItems = computed(() =>
+  evidenceItemDetailLinks.value.filter(
+    (item) =>
+      item.latestRevisionId != null &&
+      item.latestMimeType != null &&
+      item.latestMimeType.startsWith('image/'),
+  ),
+)
+
+async function loadEvidencePreviews() {
+  evidencePreviewUrls.value = {}
+  evidencePreviewErrors.value = {}
+  if (activeSection.value !== 'FORMS_EVIDENCE' || imageEvidenceItems.value.length === 0) {
+    evidencePreviewLoading.value = false
+    return
+  }
+  evidencePreviewLoading.value = true
+  try {
+    await Promise.all(
+      imageEvidenceItems.value.map(async (item) => {
+        const revisionId = item.latestRevisionId
+        if (!revisionId) return
+        try {
+          const auth = await authorizeEvidenceRevisionDownload(
+            revisionId,
+            'WORKSPACE_EVIDENCE_PREVIEW',
+          )
+          evidencePreviewUrls.value = {
+            ...evidencePreviewUrls.value,
+            [item.evidenceItemId]: auth.downloadUrl,
+          }
+        } catch (err) {
+          evidencePreviewErrors.value = {
+            ...evidencePreviewErrors.value,
+            [item.evidenceItemId]:
+              err instanceof Error ? err.message : '预览授权失败',
+          }
+        }
+      }),
+    )
+  } finally {
+    evidencePreviewLoading.value = false
+  }
+}
+
+watch(
+  () => [activeSection.value, evidenceItemDetailLinks.value.map((item) => item.evidenceItemId).join('|')],
+  () => {
+    void loadEvidencePreviews()
+  },
+)
 
 /**
  * 表单定义/资料槽位仍无独立详情页；旁路到 Task。
@@ -1543,25 +1614,73 @@ onMounted(() => {
       <TabPane key="FORMS_EVIDENCE" tab="表单资料">
         <p v-if="sectionError" class="error">{{ sectionError }}</p>
         <p v-else-if="sectionLoading">区块加载中…</p>
-        <p v-else class="muted">资料与表单明细见下方关联链接；缺字段时显示「未提供」。</p>
-        <p v-if="formSubmissionDetailLinks.length" class="links">
-          <RouterLink
-            v-for="item in formSubmissionDetailLinks"
-            :key="item.submissionId"
-            :to="{ name: 'ADMIN.FORM_SUBMISSION.DETAIL', params: { id: item.submissionId } }"
+        <template v-else>
+          <p class="muted">
+            图片资料通过短时授权预览展示；非图片仅保留详情深链。不得缓存永久 URL。
+          </p>
+          <section
+            v-if="evidenceItemDetailLinks.length"
+            class="evidence-preview-grid"
+            data-testid="workspace-evidence-previews"
+            aria-label="资料预览"
           >
-            {{ item.formKey }} / {{ statusLabel(item.validationStatus) }}
-          </RouterLink>
-        </p>
-        <p v-if="evidenceItemDetailLinks.length" class="links">
-          <RouterLink
-            v-for="item in evidenceItemDetailLinks"
-            :key="item.evidenceItemId"
-            :to="{ name: 'ADMIN.EVIDENCE_ITEM.DETAIL', params: { id: item.evidenceItemId } }"
-          >
-            {{ statusLabel(item.status) }}
-          </RouterLink>
-        </p>
+            <article
+              v-for="item in evidenceItemDetailLinks"
+              :key="item.evidenceItemId"
+              class="evidence-preview-card"
+              data-testid="workspace-evidence-preview-card"
+            >
+              <header class="evidence-preview-card__head">
+                <span>#{{ item.itemOrdinal }} · {{ statusLabel(item.status) }}</span>
+                <RouterLink
+                  :to="{ name: 'ADMIN.EVIDENCE_ITEM.DETAIL', params: { id: item.evidenceItemId } }"
+                  data-testid="workspace-evidence-item-link"
+                >
+                  打开资料详情
+                </RouterLink>
+              </header>
+              <template v-if="item.latestRevisionId && item.latestMimeType?.startsWith('image/')">
+                <p v-if="evidencePreviewLoading && !evidencePreviewUrls[item.evidenceItemId]" class="muted">
+                  预览授权中…
+                </p>
+                <p
+                  v-else-if="evidencePreviewErrors[item.evidenceItemId]"
+                  class="error"
+                  data-testid="workspace-evidence-preview-error"
+                >
+                  {{ evidencePreviewErrors[item.evidenceItemId] }}
+                </p>
+                <img
+                  v-else-if="evidencePreviewUrls[item.evidenceItemId]"
+                  class="evidence-preview-card__thumb"
+                  data-testid="workspace-evidence-preview-image"
+                  :src="evidencePreviewUrls[item.evidenceItemId]"
+                  :alt="`资料预览 ${item.itemOrdinal}`"
+                />
+                <p v-else class="muted">暂无预览</p>
+              </template>
+              <p v-else class="muted" data-testid="workspace-evidence-preview-non-image">
+                {{
+                  item.latestMimeType
+                    ? `非图片类型（${item.latestMimeType}），请打开详情`
+                    : '尚无最新修订，请打开详情'
+                }}
+              </p>
+            </article>
+          </section>
+          <p v-else class="muted" data-testid="workspace-evidence-previews-empty">
+            暂无资料项摘要
+          </p>
+          <p v-if="formSubmissionDetailLinks.length" class="links">
+            <RouterLink
+              v-for="item in formSubmissionDetailLinks"
+              :key="item.submissionId"
+              :to="{ name: 'ADMIN.FORM_SUBMISSION.DETAIL', params: { id: item.submissionId } }"
+            >
+              {{ item.formKey }} / {{ statusLabel(item.validationStatus) }}
+            </RouterLink>
+          </p>
+        </template>
       </TabPane>
 
       <TabPane key="REVIEWS_CORRECTIONS" tab="审核与整改">
@@ -2080,6 +2199,34 @@ onMounted(() => {
 .decision-table th {
   color: var(--sos-color-text-secondary, #5b6575);
   font-weight: 600;
+}
+.evidence-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 12px 0 16px;
+}
+.evidence-preview-card {
+  border: 1px solid var(--sos-color-border-default, #d9dee7);
+  border-radius: var(--sos-radius-md, 8px);
+  background: var(--sos-color-surface-card, #fff);
+  padding: 10px 12px;
+  display: grid;
+  gap: 8px;
+}
+.evidence-preview-card__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+.evidence-preview-card__thumb {
+  width: 100%;
+  max-height: 180px;
+  object-fit: contain;
+  background: var(--sos-color-surface-subtle, #f5f7fa);
+  border-radius: 6px;
 }
 .pricing-list { margin: 8px 0 0; padding-left: 18px; }
 .assign-advanced { margin-top: 12px; }

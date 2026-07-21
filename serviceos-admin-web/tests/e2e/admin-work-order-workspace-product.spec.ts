@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import { mockProductizationApis, seedLocalSession } from './productization-fixtures'
 
 test.describe('M389 工单详情统一履约工作区', () => {
-  test('展示履约进度、当前任务与决策上下文', async ({ page }) => {
+  test('展示履约进度、审核记录与资料预览', async ({ page }) => {
     await seedLocalSession(page)
     await mockProductizationApis(page)
 
@@ -32,9 +32,20 @@ test.describe('M389 工单详情统一履约工作区', () => {
     await expect(page.getByTestId('workspace-review-decision-row')).toContainText('内部')
     await expect(page.getByTestId('workspace-correction-resubmission-row')).toBeVisible()
 
+    await page.getByRole('tab', { name: '表单资料' }).click()
+    await expect(page.getByTestId('workspace-evidence-previews')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByTestId('workspace-evidence-preview-card')).toBeVisible()
+    await expect(page.getByTestId('workspace-evidence-preview-image')).toBeVisible({
+      timeout: 10_000,
+    })
+    await expect(page.getByTestId('workspace-evidence-preview-image')).toHaveAttribute(
+      'src',
+      /workspace-evidence-preview\.jpg/,
+    )
+
     await page.setViewportSize({ width: 1440, height: 1024 })
     await page.screenshot({
-      path: 'tests/e2e/__screenshots__/work-order-workspace-review-records-1440.png',
+      path: 'tests/e2e/__screenshots__/work-order-workspace-evidence-preview-1440.png',
       fullPage: true,
     })
   })

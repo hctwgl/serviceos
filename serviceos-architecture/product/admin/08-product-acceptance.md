@@ -306,7 +306,7 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 表单资料缩略图未完成（完整审核决策记录已由 M425 关闭主路径）
+  - UI_DATA_GAP: 表单资料缩略图未完成（完整审核决策记录已由 M425、授权预览主路径已由 M426 关闭）
   # 客户/地址/联系方式脱敏摘要已由 M423 交付
 ```
 
@@ -325,7 +325,7 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 表单资料缩略图未完成（完整审核决策记录已由 M425 关闭主路径）
+  - UI_DATA_GAP: 表单资料缩略图未完成（完整审核决策记录已由 M425、授权预览主路径已由 M426 关闭）
   - CONTENT_GAP: Network 工作区脱敏客户联系已由 M424 交付；工单目录客户字段未交付
 ```
 
@@ -344,7 +344,25 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 表单资料缩略图 / Evidence revision 授权预览未完成
+  - UI_DATA_GAP: 表单资料缩略图 / Evidence revision 授权预览未完成（已由 M426 关闭主路径）
+```
+
+### 9.22 M426 记录（工单工作区表单资料授权预览）
+
+```yaml
+pageId: ADMIN.WORKORDER.WORKSPACE
+route: /work-orders/:id
+visualProfile: CLASSIC_PROFESSIONAL
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - CONTENT_GAP: Network Portal 资料缩略图 UI、非图片内联预览器未交付
 ```
 
 ### 9.3 M397 记录（用户管理）

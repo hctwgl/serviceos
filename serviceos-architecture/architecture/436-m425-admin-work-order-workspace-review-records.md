@@ -31,6 +31,6 @@ openapiVersion: "1.0.90"
 
 ## 4. 明确未实现
 
-- 表单资料缩略图 / Evidence revision 预览（需 summary 扩 `latestRevisionId`/`mimeType` + 授权下载）
+- 表单资料缩略图 / Evidence revision 预览（已由 **M426** 交付主路径）
 - 决策备注与操作者显示名并入工作区摘要
 - 产品负责人视觉金标（`READY_FOR_REVIEW`）

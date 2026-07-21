@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.90
+  version: 1.0.91
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -5167,7 +5167,9 @@ paths:
       summary: 申请资料版本短时下载授权
       description: >-
         M351：实时校验 evidence.read 与项目范围；解析 Revision 关联 fileObjectId 后委托安全文件签发短时 URL。
-        终审预览 purpose 使用 FINAL_REVIEW_PREVIEW。响应不含 objectKey；日志不得打印 downloadUrl。
+        终审预览 purpose 使用 FINAL_REVIEW_PREVIEW；
+        M426 工作区资料预览 purpose 使用 WORKSPACE_EVIDENCE_PREVIEW。
+        响应不含 objectKey；日志不得打印 downloadUrl。
       parameters:
         - name: revisionId
           in: path
@@ -10218,8 +10220,18 @@ components:
     WorkOrderWorkspaceEvidenceItemSummary:
       type: object
       additionalProperties: false
-      required: [evidenceItemId, taskId, projectId, evidenceSlotId, itemOrdinal, status,
-        revisionCount, latestRevisionNumber, latestRevisionStatus]
+      required:
+        - evidenceItemId
+        - taskId
+        - projectId
+        - evidenceSlotId
+        - itemOrdinal
+        - status
+        - revisionCount
+        - latestRevisionNumber
+        - latestRevisionStatus
+        - latestRevisionId
+        - latestMimeType
       properties:
         evidenceItemId: { type: string, format: uuid }
         taskId: { type: string, format: uuid }
@@ -10232,6 +10244,16 @@ components:
         latestRevisionStatus:
           type: [string, 'null']
           enum: [STORED, VALIDATING, VALIDATED, VALIDATION_FAILED, QUARANTINED, INVALIDATED, null]
+        latestRevisionId:
+          type: [string, 'null']
+          format: uuid
+          description: |
+            M426：最新 revision 指针，供客户端发起受控 download-authorization 预览；
+            不得内嵌永久 URL 或 fileObjectId。
+        latestMimeType:
+          type: [string, 'null']
+          maxLength: 128
+          description: M426：最新 revision MIME；图片才做内联缩略预览
     WorkOrderWorkspaceFormsEvidenceSectionData:
       type: object
       additionalProperties: false

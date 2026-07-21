@@ -638,7 +638,9 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                 item.status(),
                 item.revisionCount(),
                 item.latestRevisionNumber(),
-                item.latestRevisionStatus());
+                item.latestRevisionStatus(),
+                item.latestRevisionId(),
+                item.latestMimeType());
     }
 
     /** M236：为本页 workOrderIds 装载非 PII 工单头；缺失静默跳过。 */

@@ -432,6 +432,7 @@ title: ServiceOS 里程碑索引
 | M423 | M423 Admin 工单工作区脱敏客户联系摘要 | [434-m423-admin-work-order-workspace-masked-contact.md](../architecture/434-m423-admin-work-order-workspace-masked-contact.md) | [417-m423-admin-work-order-workspace-masked-contact-acceptance.md](../testing/417-m423-admin-work-order-workspace-masked-contact-acceptance.md) |
 | M424 | M424 Network 工单工作区脱敏客户联系摘要 | [435-m424-network-work-order-workspace-masked-contact.md](../architecture/435-m424-network-work-order-workspace-masked-contact.md) | [418-m424-network-work-order-workspace-masked-contact-acceptance.md](../testing/418-m424-network-work-order-workspace-masked-contact-acceptance.md) |
 | M425 | M425 Admin 工单工作区完整审核决策记录产品化 | [436-m425-admin-work-order-workspace-review-records.md](../architecture/436-m425-admin-work-order-workspace-review-records.md) | [419-m425-admin-work-order-workspace-review-records-acceptance.md](../testing/419-m425-admin-work-order-workspace-review-records-acceptance.md) |
+| M426 | M426 Admin 工单工作区表单资料授权预览 | [437-m426-admin-work-order-workspace-evidence-preview.md](../architecture/437-m426-admin-work-order-workspace-evidence-preview.md) | [420-m426-admin-work-order-workspace-evidence-preview-acceptance.md](../testing/420-m426-admin-work-order-workspace-evidence-preview-acceptance.md) |
 
 ## 未关联里程碑的文档
 

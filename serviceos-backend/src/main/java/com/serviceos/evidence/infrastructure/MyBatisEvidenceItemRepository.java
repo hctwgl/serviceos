@@ -121,7 +121,9 @@ final class MyBatisEvidenceItemRepository implements EvidenceItemRepository {
                         uuid(row, "slotId"), number(row, "itemOrdinal").intValue(),
                         text(row, "status"), number(row, "revisionCount").intValue(),
                         nullableInteger(row, "latestRevisionNumber"),
-                        text(row, "latestRevisionStatus")))
+                        text(row, "latestRevisionStatus"),
+                        nullableUuid(row, "latestRevisionId"),
+                        text(row, "latestMimeType")))
                 .toList();
     }
 

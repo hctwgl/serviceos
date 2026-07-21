@@ -840,7 +840,8 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
         return new WorkOrderWorkspaceEvidenceItemSummary(
                 item.evidenceItemId(), item.taskId(), item.projectId(), item.evidenceSlotId(),
                 item.itemOrdinal(), item.status(), item.revisionCount(),
-                item.latestRevisionNumber(), item.latestRevisionStatus());
+                item.latestRevisionNumber(), item.latestRevisionStatus(),
+                item.latestRevisionId(), item.latestMimeType());
     }
 
     private WorkOrderWorkspaceReviewCaseSummary toReviewCaseSummary(ReviewCaseView review) {

@@ -1042,7 +1042,60 @@ export async function mockProductizationApis(
       return
     }
     // 工单详情最小壳：避免页面硬失败
+    if (url.includes('/evidence-revisions/') && url.includes('/download-authorizations')) {
+      await fulfillJson(route, {
+        authorizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa01',
+        fileId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa02',
+        method: 'GET',
+        downloadUrl: 'https://files.example.test/workspace-evidence-preview.jpg',
+        requiredHeaders: {},
+        expiresAt: '2026-07-20T05:00:00Z',
+      }, 201)
+      return
+    }
     if (url.includes('/work-orders/11111111-1111-4111-8111-111111111111/workspace')) {
+      if (url.includes('/sections/FORMS_EVIDENCE')) {
+        await fulfillJson(route, {
+          sectionCode: 'FORMS_EVIDENCE',
+          formsEvidence: {
+            forms: [],
+            formSubmissions: [
+              {
+                submissionId: '11111111-2222-4333-8444-555555555555',
+                taskId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+                projectId: '22222222-2222-4222-8222-222222222222',
+                formVersionId: '33333333-3333-4333-8333-333333333333',
+                formKey: 'survey.execution',
+                formVersion: '1.0.0',
+                submissionVersion: 1,
+                validationStatus: 'VALIDATED',
+                errorCount: 0,
+                warningCount: 0,
+                contentDigest: 'a'.repeat(64),
+                submittedAt: '2026-07-20T03:20:00Z',
+              },
+            ],
+            evidenceSlots: [],
+            evidenceItems: [
+              {
+                evidenceItemId: '44444444-4444-4444-8444-444444444444',
+                taskId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+                projectId: '22222222-2222-4222-8222-222222222222',
+                evidenceSlotId: '55555555-5555-4555-8555-555555555501',
+                itemOrdinal: 1,
+                status: 'SUBMITTED',
+                revisionCount: 1,
+                latestRevisionNumber: 1,
+                latestRevisionStatus: 'STORED',
+                latestRevisionId: '66666666-6666-4666-8666-666666666666',
+                latestMimeType: 'image/jpeg',
+              },
+            ],
+            nextCursor: null,
+          },
+        })
+        return
+      }
       if (url.includes('/sections/REVIEWS_CORRECTIONS')) {
         await fulfillJson(route, {
           sectionCode: 'REVIEWS_CORRECTIONS',
@@ -1138,7 +1191,7 @@ export async function mockProductizationApis(
           TASKS: 'AVAILABLE',
           TIMELINE_AUDIT: 'AVAILABLE',
           APPOINTMENTS_VISITS: 'EMPTY',
-          FORMS_EVIDENCE: 'EMPTY',
+          FORMS_EVIDENCE: 'AVAILABLE',
           REVIEWS_CORRECTIONS: 'AVAILABLE',
           FINAL_REVIEW: 'EMPTY',
           INTEGRATION: 'EMPTY',
