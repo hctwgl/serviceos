@@ -16,6 +16,7 @@ import com.serviceos.configuration.api.ProjectFulfillmentProfileSummary;
 import com.serviceos.configuration.api.ProjectFulfillmentRevisionStatus;
 import com.serviceos.configuration.api.ProjectFulfillmentRevisionView;
 import com.serviceos.configuration.api.ProjectFulfillmentSchemeCount;
+import com.serviceos.configuration.api.ProjectFulfillmentUsageSummary;
 import com.serviceos.configuration.api.ProjectFulfillmentValidationIssue;
 import com.serviceos.configuration.api.UpdateProjectFulfillmentDraftCommand;
 import com.serviceos.identity.api.CurrentPrincipal;
@@ -23,6 +24,8 @@ import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.shared.infrastructure.PostgresJdbcParameters;
+import com.serviceos.workorder.api.WorkOrderQuery;
+import com.serviceos.workorder.api.WorkOrderQueryService;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
@@ -60,6 +63,8 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
     private static final String REVISION_READ = "project.fulfillment.revision.read";
     private static final String RESOURCE = "ProjectFulfillmentProfile";
     private static final String TEMPLATE_SURVEY_INSTALL = "HOME_CHARGING_SURVEY_INSTALL";
+    /** 与关注项目角标（M409）一致：超过上限只声明 truncated，不返回精确 COUNT(*)。 */
+    private static final int ACTIVE_WORK_ORDER_LIMIT = 100;
 
     private final JdbcClient jdbc;
     private final AuthorizationService authorization;
@@ -69,6 +74,7 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
     private final ProjectFulfillmentRunbookAssembler runbookAssembler;
     private final ProjectFulfillmentCompareAnalyzer compareAnalyzer;
     private final ProjectFulfillmentDocumentMapper documentMapper;
+    private final WorkOrderQueryService workOrders;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
@@ -81,6 +87,7 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
             ProjectFulfillmentRunbookAssembler runbookAssembler,
             ProjectFulfillmentCompareAnalyzer compareAnalyzer,
             ProjectFulfillmentDocumentMapper documentMapper,
+            WorkOrderQueryService workOrders,
             ObjectMapper objectMapper,
             Clock clock
     ) {
@@ -92,6 +99,7 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
         this.runbookAssembler = runbookAssembler;
         this.compareAnalyzer = compareAnalyzer;
         this.documentMapper = documentMapper;
+        this.workOrders = workOrders;
         this.objectMapper = objectMapper;
         this.clock = clock;
     }
@@ -175,6 +183,37 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
                 profileId.toString(), metadata.correlationId(), now));
 
         return get(principal, metadata.correlationId(), command.projectId(), profileId);
+    }
+
+    @Override
+    public ProjectFulfillmentUsageSummary usageSummary(
+            CurrentPrincipal principal, String correlationId, UUID projectId
+    ) {
+        // 不包外层事务：workOrder 授权拒绝以 BusinessProblem 抛出，需可 catch soft-omit，
+        // 避免嵌套只读事务被标记 rollback-only（同 M409 关注项目角标编排）。
+        Objects.requireNonNull(projectId, "projectId");
+        requireProject(principal.tenantId(), projectId);
+        authorization.require(principal, AuthorizationRequest.projectCapability(
+                READ, principal.tenantId(), RESOURCE, projectId.toString(), projectId.toString()),
+                correlationId);
+        Instant asOf = clock.instant();
+        try {
+            var page = workOrders.list(
+                    principal,
+                    correlationId,
+                    new WorkOrderQuery(null, projectId, "ACTIVE", null, ACTIVE_WORK_ORDER_LIMIT));
+            return new ProjectFulfillmentUsageSummary(
+                    projectId,
+                    page.items().size(),
+                    page.nextCursor() != null,
+                    asOf);
+        } catch (BusinessProblem problem) {
+            // soft-gate：缺 workOrder.read 时省略计数，页面显示「不可用」而非伪造 0
+            if (problem.code() == ProblemCode.ACCESS_DENIED) {
+                return new ProjectFulfillmentUsageSummary(projectId, null, null, asOf);
+            }
+            throw problem;
+        }
     }
 
     @Override

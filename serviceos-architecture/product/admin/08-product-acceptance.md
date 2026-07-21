@@ -241,8 +241,8 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 使用中工单数跨模块读模型未就绪
   - DOMAIN_GAP: 左导航工作流/任务模板等分区仍为占位
+  - CONTENT_GAP: 使用中工单按服务产品分拆与精确 COUNT>100 未交付（项目级 ACTIVE 摘要已由 M422 交付）
 ```
 
 ```yaml

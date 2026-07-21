@@ -18,6 +18,8 @@ defineProps<{
       v-for="item in items"
       :key="item.key"
       class="sos-summary-strip__item"
+      :data-key="item.key"
+      :data-testid="`summary-strip-${item.key}`"
       :data-tone="item.tone || 'default'"
     >
       <div class="sos-summary-strip__label">{{ item.label }}</div>

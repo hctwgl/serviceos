@@ -390,6 +390,15 @@ export async function mockProductizationApis(
       await fulfillJson(route, { items: [], nextCursor: null, asOf: '2026-07-20T04:00:00Z' })
       return
     }
+    if (url.includes('/fulfillment-usage-summary')) {
+      await fulfillJson(route, {
+        projectId: '22222222-2222-4222-8222-222222222222',
+        activeWorkOrderCount: 3,
+        activeWorkOrderCountTruncated: false,
+        asOf: '2026-07-20T04:00:00Z',
+      })
+      return
+    }
     if (
       url.includes('/projects/22222222-2222-4222-8222-222222222222/fulfillment-profiles')
       && !url.includes('/fulfillment-profiles/')

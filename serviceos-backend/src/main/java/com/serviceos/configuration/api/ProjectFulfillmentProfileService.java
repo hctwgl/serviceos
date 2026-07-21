@@ -22,6 +22,15 @@ public interface ProjectFulfillmentProfileService {
             CurrentPrincipal principal, String correlationId, UUID projectId);
 
     /**
+     * M422：项目履约配置中心「使用中工单」摘要。
+     *
+     * <p>硬门禁 {@code project.fulfillment.read}；{@code workOrder.read} soft-gate：
+     * 缺能力时 count 字段为 null，不得伪装为 0。</p>
+     */
+    ProjectFulfillmentUsageSummary usageSummary(
+            CurrentPrincipal principal, String correlationId, UUID projectId);
+
+    /**
      * 批量汇总项目履约方案数。调用方应已完成项目目录授权；本方法再按
      * {@code project.fulfillment.read} soft-gate：缺能力返回空列表，不抛 ACCESS_DENIED。
      */

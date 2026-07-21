@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.87
+  version: 1.0.88
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -3995,6 +3995,31 @@ paths:
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
 
+  /projects/{projectId}/fulfillment-usage-summary:
+    get:
+      operationId: getProjectFulfillmentUsageSummary
+      summary: 项目履约配置中心使用中工单摘要
+      description: |
+        M422：硬门禁 project.fulfillment.read。
+        activeWorkOrderCount 对 workOrder.read soft-gate：缺能力时为 null（不得伪装为 0）。
+        计数口径为项目下 status=ACTIVE 工单，上限 100；超出时 activeWorkOrderCountTruncated=true。
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 使用中工单摘要
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectFulfillmentUsageSummary' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
   /projects/{projectId}/fulfillment-profiles:
     get:
       operationId: listProjectFulfillmentProfiles
@@ -12600,6 +12625,23 @@ components:
         allowedActions:
           type: array
           items: { enum: [visit.checkOut, visit.interrupt] }
+    ProjectFulfillmentUsageSummary:
+      type: object
+      additionalProperties: false
+      required: [projectId, asOf]
+      description: |
+        M422：履约配置中心使用中工单摘要。
+        activeWorkOrderCount / activeWorkOrderCountTruncated 在缺 workOrder.read 时同时省略。
+      properties:
+        projectId: { type: string, format: uuid }
+        activeWorkOrderCount:
+          type: [integer, 'null']
+          minimum: 0
+          description: 项目 ACTIVE 工单数（上限 100）；缺 workOrder.read 时为 null
+        activeWorkOrderCountTruncated:
+          type: [boolean, 'null']
+          description: 超过上限时为 true；缺能力时与 count 同时为 null
+        asOf: { type: string, format: date-time }
     ProjectFulfillmentProfileSummary:
       type: object
       required: [profileId, projectId, serviceProductCode, profileName, status, aggregateVersion, updatedAt]

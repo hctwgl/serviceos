@@ -10,9 +10,11 @@ import SemanticStatusTag from '../components/business/SemanticStatusTag.vue'
 import FulfillmentCompareImpactPanel from '../components/fulfillment/FulfillmentCompareImpactPanel.vue'
 import {
   compareProjectFulfillmentImpact,
+  getProjectFulfillmentUsageSummary,
   listProjectFulfillmentProfiles,
   type ProjectFulfillmentCompareImpact,
   type ProjectFulfillmentProfileSummary,
+  type ProjectFulfillmentUsageSummary,
 } from '../api/fulfillmentProfiles'
 import { getAuthorizedProject, type ProjectDetail } from '../api/projectDetail'
 import { formatDateTimeDisplay } from '../presentation/date-time.presenter'
@@ -30,6 +32,7 @@ const error = ref<string | null>(null)
 const railError = ref<string | null>(null)
 const project = ref<ProjectDetail | null>(null)
 const items = ref<ProjectFulfillmentProfileSummary[]>([])
+const usageSummary = ref<ProjectFulfillmentUsageSummary | null>(null)
 const activeNavKey = ref('work-order-types')
 const compareImpact = ref<ProjectFulfillmentCompareImpact | null>(null)
 const selectedProfileId = ref<string | null>(null)
@@ -100,11 +103,29 @@ const summaryItems = computed<SummaryStripItem[]>(() => {
     {
       key: 'in-use',
       label: '使用中工单',
-      value: '待服务端计数',
-      hint: 'UI_DATA_GAP：跨模块工单计数读模型未就绪',
+      value: formatActiveWorkOrderCount(usageSummary.value),
+      hint: activeWorkOrderHint(usageSummary.value),
     },
   ]
 })
+
+function formatActiveWorkOrderCount(summary: ProjectFulfillmentUsageSummary | null): string {
+  if (!summary || summary.activeWorkOrderCount == null) {
+    return '不可用'
+  }
+  const base = String(summary.activeWorkOrderCount)
+  return summary.activeWorkOrderCountTruncated ? `${base}+` : base
+}
+
+function activeWorkOrderHint(summary: ProjectFulfillmentUsageSummary | null): string | undefined {
+  if (!summary || summary.activeWorkOrderCount == null) {
+    return '缺少 workOrder.read，计数已省略'
+  }
+  if (summary.activeWorkOrderCountTruncated) {
+    return '超过 100 仅显示上限'
+  }
+  return undefined
+}
 
 const columns = [
   { title: '工单类型', dataIndex: 'serviceProductLabel', key: 'serviceProduct' },
@@ -153,7 +174,12 @@ async function load() {
   error.value = null
   try {
     project.value = await getAuthorizedProject(projectId.value)
-    items.value = await listProjectFulfillmentProfiles(projectId.value)
+    const [profiles, usage] = await Promise.all([
+      listProjectFulfillmentProfiles(projectId.value),
+      getProjectFulfillmentUsageSummary(projectId.value).catch(() => null),
+    ])
+    items.value = profiles
+    usageSummary.value = usage
     const first = items.value[0]
     if (first) {
       await loadCompare(first.profileId)
@@ -164,6 +190,7 @@ async function load() {
   } catch (err) {
     error.value = toUserFacingError(err).message
     items.value = []
+    usageSummary.value = null
   } finally {
     loading.value = false
   }
@@ -353,7 +380,7 @@ onMounted(load)
         <p v-else class="muted">暂无版本记录</p>
       </section>
       <p class="rail-hint">
-        点击左侧工单类型行可刷新该方案相对当前发布版的真实差异。使用中工单计数仍为 UI_DATA_GAP。
+        点击左侧工单类型行可刷新该方案相对当前发布版的真实差异。使用中工单数为项目 ACTIVE 工单摘要。
       </p>
     </template>
   </ConfigurationWorkspaceLayout>

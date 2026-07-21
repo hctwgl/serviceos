@@ -16,6 +16,7 @@ import com.serviceos.configuration.api.ProjectFulfillmentResolveQuery;
 import com.serviceos.configuration.api.ProjectFulfillmentResolver;
 import com.serviceos.configuration.api.ProjectFulfillmentRevisionView;
 import com.serviceos.configuration.api.ProjectFulfillmentSchemeCount;
+import com.serviceos.configuration.api.ProjectFulfillmentUsageSummary;
 import com.serviceos.configuration.api.ProjectFulfillmentValidationIssue;
 import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
 import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
@@ -77,6 +78,7 @@ class ProjectFulfillmentProfilePostgresIT {
     UUID projectId;
     UUID workflowVersionId;
     ConfigurationBundleReference bundle;
+    UUID fulfillmentRoleId;
 
     @BeforeEach
     void setUp() {
@@ -123,6 +125,31 @@ class ProjectFulfillmentProfilePostgresIT {
                 "HOME_CHARGING_SURVEY_INSTALL", "370000",
                 Instant.now().minusSeconds(60), null,
                 List.of(workflowVersionId)));
+    }
+
+    @Test
+    void usageSummaryCountsActiveWorkOrdersAndSoftOmitsWithoutWorkOrderRead() {
+        Instant receivedAt = Instant.parse("2026-07-20T02:00:00Z");
+        seedActiveWorkOrder(UUID.randomUUID(), receivedAt);
+        seedActiveWorkOrder(UUID.randomUUID(), receivedAt.plusSeconds(60));
+
+        // 默认角色无 workOrder.read → soft-omit，不得伪装为 0
+        ProjectFulfillmentUsageSummary omitted = profiles.usageSummary(
+                principal(), "corr-usage-omit", projectId);
+        assertThat(omitted.projectId()).isEqualTo(projectId);
+        assertThat(omitted.activeWorkOrderCount()).isNull();
+        assertThat(omitted.activeWorkOrderCountTruncated()).isNull();
+
+        grantCapability("workOrder.read");
+        CurrentPrincipal withWorkOrderRead = new CurrentPrincipal(
+                ACTOR, TENANT, CurrentPrincipal.PrincipalType.USER,
+                "admin-web", Set.of(
+                "project.fulfillment.read",
+                "workOrder.read"));
+        ProjectFulfillmentUsageSummary counted = profiles.usageSummary(
+                withWorkOrderRead, "corr-usage-count", projectId);
+        assertThat(counted.activeWorkOrderCount()).isEqualTo(2);
+        assertThat(counted.activeWorkOrderCountTruncated()).isFalse();
     }
 
     @Test
@@ -342,11 +369,11 @@ class ProjectFulfillmentProfilePostgresIT {
     }
 
     private void seedGrants() {
-        UUID roleId = UUID.randomUUID();
+        fulfillmentRoleId = UUID.randomUUID();
         jdbc.sql("""
                 INSERT INTO auth_role (role_id, tenant_id, role_code, role_name, role_status, created_at)
                 VALUES (:id, :tenant, 'pfp-m378', '履约配置M378', 'ACTIVE', now())
-                """).param("id", roleId).param("tenant", TENANT).update();
+                """).param("id", fulfillmentRoleId).param("tenant", TENANT).update();
         for (String capability : List.of(
                 "project.fulfillment.read",
                 "project.fulfillment.create",
@@ -361,7 +388,7 @@ class ProjectFulfillmentProfilePostgresIT {
             jdbc.sql("""
                     INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
                     VALUES (:id, :cap, now())
-                    """).param("id", roleId).param("cap", capability).update();
+                    """).param("id", fulfillmentRoleId).param("cap", capability).update();
         }
         jdbc.sql("""
                 INSERT INTO auth_role_grant (
@@ -375,7 +402,46 @@ class ProjectFulfillmentProfilePostgresIT {
                 .param("grant", UUID.randomUUID())
                 .param("tenant", TENANT)
                 .param("principal", ACTOR)
-                .param("role", roleId)
+                .param("role", fulfillmentRoleId)
+                .update();
+    }
+
+    private void grantCapability(String capability) {
+        jdbc.sql("""
+                INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
+                VALUES (:id, :cap, now())
+                ON CONFLICT DO NOTHING
+                """)
+                .param("id", fulfillmentRoleId)
+                .param("cap", capability)
+                .update();
+    }
+
+    private void seedActiveWorkOrder(UUID workOrderId, Instant receivedAt) {
+        jdbc.sql("""
+                INSERT INTO wo_work_order (
+                    id, tenant_id, project_id, client_code, brand_code, service_product_code,
+                    external_order_code, payload_digest, status,
+                    configuration_bundle_id, configuration_bundle_code, configuration_bundle_version,
+                    configuration_bundle_digest, province_code, city_code, district_code,
+                    customer_name, customer_mobile, service_address, vehicle_vin,
+                    external_dispatched_at, received_at, activated_at, version
+                ) VALUES (
+                    :id, :tenantId, :projectId, 'BYD', 'BYD_OCEAN', 'HOME_CHARGING_SURVEY_INSTALL',
+                    :externalOrderCode, :payloadDigest, 'ACTIVE',
+                    :bundleId, 'PFP-BUNDLE', '1.0.0', :bundleDigest,
+                    '370000', '370100', '370102',
+                    '测试客户', '13800000000', '测试地址', 'VINPFP000000000001',
+                    :receivedAt, :receivedAt, :receivedAt, 1)
+                """)
+                .param("id", workOrderId)
+                .param("tenantId", TENANT)
+                .param("projectId", projectId)
+                .param("externalOrderCode", "PFP-" + workOrderId)
+                .param("payloadDigest", Sha256.digest(workOrderId.toString()))
+                .param("bundleId", bundle.bundleId())
+                .param("bundleDigest", bundle.manifestDigest())
+                .param("receivedAt", java.sql.Timestamp.from(receivedAt))
                 .update();
     }
 

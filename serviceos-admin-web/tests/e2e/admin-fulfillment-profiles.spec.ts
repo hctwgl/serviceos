@@ -51,6 +51,19 @@ test.describe('M385 项目履约配置中心', () => {
     await expect(page.getByRole('button', { name: '新增工单类型' }).first()).toBeVisible()
   })
 
+  test('M422 使用中工单摘要来自服务端计数', async ({ page }) => {
+    await seedLocalSession(page)
+    await mockProductizationApis(page)
+    await page.goto('/projects/22222222-2222-4222-8222-222222222222/fulfillment-profiles')
+    await expect(page.getByRole('heading', { name: '项目履约配置中心' })).toBeVisible({
+      timeout: 20_000,
+    })
+    await expect(page.getByTestId('summary-strip-in-use')).toContainText('使用中工单')
+    await expect(page.getByTestId('summary-strip-in-use')).toContainText('3')
+    await expect(page.getByText('待服务端计数')).toHaveCount(0)
+    await expect(page.getByText(/UI_DATA_GAP：跨模块工单计数/)).toHaveCount(0)
+  })
+
   test('编辑器加载结构化草稿且不依赖 documentJson 主路径', async ({ page }) => {
     await seedLocalSession(page)
     await mockProductizationApis(page)

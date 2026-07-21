@@ -26,7 +26,7 @@ flywayVersion: "138"
 
 - 完整结构化 Draft DTO 替换 `documentJson` 编辑器（后续 M388）；
 - 工作流设计器 / 任务模板中心完整页（M386/M387）；
-- 使用中工单数跨模块读模型（页面诚实标注 UI_DATA_GAP）；
+- 使用中工单数跨模块读模型（已由 **M422** 交付项目级 ACTIVE 摘要）；
 - 左二级导航中工作流/表单/SLA 等分区的产品编辑器；
 - 产品负责人人工视觉批准（`READY_FOR_REVIEW`，非 `PRODUCT_ACCEPTED` / `VISUAL_APPROVED`）；
 - OIDC Playwright test 7/8。
