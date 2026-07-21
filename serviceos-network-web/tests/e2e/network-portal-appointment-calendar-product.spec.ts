@@ -119,7 +119,10 @@ test.describe('M413 网点预约日历产品化', () => {
     await navigateNetwork(page, '/network-portal/appointments')
 
     await expect(page.getByTestId('network-portal-appointments')).toBeVisible({ timeout: 15_000 })
-    await expect(page.locator('[data-page-id="NETWORK.APPOINTMENT"]')).toBeVisible()
+    await expect(page.getByTestId('network-portal-appointments')).toHaveAttribute(
+      'data-page-id',
+      'NETWORK.APPOINTMENT',
+    )
     await expect(page.getByTestId('appointment-calendar-total')).toContainText('1')
     await expect(page.getByTestId('appointment-calendar-day-2026-07-21')).toContainText('1')
     await expect(page.getByTestId(`appointment-calendar-item-${APPOINTMENT_ID}`)).toContainText('张师傅')
