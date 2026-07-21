@@ -3,6 +3,6 @@
  */
 @org.springframework.modulith.ApplicationModule(
         displayName = "Network and Technician Directory",
-        allowedDependencies = {"shared", "identity :: api", "reliability :: api", "audit :: api"}
+        allowedDependencies = {"shared", "jooq", "identity :: api", "reliability :: api", "audit :: api"}
 )
 package com.serviceos.network;

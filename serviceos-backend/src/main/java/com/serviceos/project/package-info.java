@@ -4,7 +4,7 @@
 @org.springframework.modulith.ApplicationModule(
         displayName = "Project Directory",
         allowedDependencies = {
-                "shared", "identity::api", "authorization::api",
+                "shared", "jooq", "identity::api", "authorization::api",
                 "reliability::api", "audit::api"
         }
 )
