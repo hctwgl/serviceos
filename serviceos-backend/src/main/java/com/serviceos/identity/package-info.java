@@ -3,6 +3,6 @@
  */
 @org.springframework.modulith.ApplicationModule(
         displayName = "Identity",
-        allowedDependencies = {"shared", "audit :: api", "reliability :: api"}
+        allowedDependencies = {"shared", "jooq", "audit :: api", "reliability :: api"}
 )
 package com.serviceos.identity;

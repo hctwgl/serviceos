@@ -102,7 +102,7 @@ RoleGrant 终止与待重分配清单。
 
 - `db/migration/organization/V087__create_organization_directory.sql`
 - `organization/application/DefaultOrganizationCommandService.java`
-- `organization/infrastructure/JdbcOrganizationDirectoryRepository.java`
+- `organization/infrastructure/JooqOrganizationDirectoryRepository.java`
 - `organization/web/OrganizationController.java`
 - `identity/api/PrincipalEmploymentLifecyclePort.java`
 - `authorization/application/JooqOrganizationRoleGrantAdapter.java`
