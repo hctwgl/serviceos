@@ -1,5 +1,6 @@
 package com.serviceos.workorder.application;
 
+import com.serviceos.authorization.api.AuthorizationDecision;
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.authorization.api.AuthorizedProjectScope;
@@ -11,6 +12,8 @@ import com.serviceos.shared.ProblemCode;
 import com.serviceos.shared.Sha256;
 import com.serviceos.workorder.api.WorkOrderDetail;
 import com.serviceos.workorder.api.WorkOrderDirectoryAssigneeQuery;
+import com.serviceos.workorder.api.WorkOrderDirectorySlaRiskQuery;
+import com.serviceos.workorder.api.WorkOrderDirectorySlaRiskSummary;
 import com.serviceos.workorder.api.WorkOrderDirectoryStageQuery;
 import com.serviceos.workorder.api.WorkOrderMaskedContactView;
 import com.serviceos.workorder.api.WorkOrderPage;
@@ -28,6 +31,7 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -38,6 +42,7 @@ import java.util.UUID;
 @Service
 final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
     private static final String READ = "workOrder.read";
+    private static final String SLA_READ = "sla.read";
     private static final String NETWORK_TASK_READ = "networkTask.read";
     private static final Set<String> STATUSES = Set.of(
             "RECEIVED", "ACTIVE", "SUSPENDED", "FULFILLED", "CANCELLED", "CLOSED");
@@ -46,6 +51,7 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
     private final ProjectScopeAuthorizationService projectScopes;
     private final ObjectProvider<WorkOrderDirectoryStageQuery> stageQuery;
     private final ObjectProvider<WorkOrderDirectoryAssigneeQuery> assigneeQuery;
+    private final ObjectProvider<WorkOrderDirectorySlaRiskQuery> slaRiskQuery;
     private final PrincipalPersonaQuery personas;
     private final Clock clock;
 
@@ -53,10 +59,12 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
             ProjectScopeAuthorizationService projectScopes,
             ObjectProvider<WorkOrderDirectoryStageQuery> stageQuery,
             ObjectProvider<WorkOrderDirectoryAssigneeQuery> assigneeQuery,
+            ObjectProvider<WorkOrderDirectorySlaRiskQuery> slaRiskQuery,
             PrincipalPersonaQuery personas, Clock clock) {
         this.queries = queries; this.authorization = authorization;
         this.projectScopes = projectScopes; this.stageQuery = stageQuery;
-        this.assigneeQuery = assigneeQuery; this.personas = personas; this.clock = clock;
+        this.assigneeQuery = assigneeQuery; this.slaRiskQuery = slaRiskQuery;
+        this.personas = personas; this.clock = clock;
     }
 
     @Override @Transactional(readOnly = true)
@@ -91,8 +99,15 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 .map(item -> withDirectoryEnrichment(principal.tenantId(), item, sideCars.forWorkOrder(item.id())))
                 .toList();
         WorkOrderView last = more ? enriched.getLast() : null;
-        return new WorkOrderPage(enriched, last == null ? null : encodeCursor(scope.scopeDigest(),
-                filterDigest, last.receivedAt(), last.id()), clock.instant());
+        // M434：页级 SLA 风险旁载；缺 sla.read 时省略属性（null），不伪造空成功 0。
+        List<WorkOrderDirectorySlaRiskSummary> slaRiskSummaries = loadSlaRiskSummaries(
+                principal, correlationId, enriched);
+        return new WorkOrderPage(
+                enriched,
+                last == null ? null : encodeCursor(scope.scopeDigest(),
+                        filterDigest, last.receivedAt(), last.id()),
+                clock.instant(),
+                slaRiskSummaries);
     }
 
     @Override @Transactional(readOnly = true)
@@ -213,6 +228,47 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 ? Map.of()
                 : personas.displayNames(tenantId, new ArrayList<>(principalIds));
         return new DirectorySideCars(stages, claimedBy, displayNames);
+    }
+
+    /**
+     * M434：按本页工单所属项目 soft-gate PROJECT sla.read（authorize，不抛 ACCESS_DENIED）。
+     * 本页任一项目允许则返回摘要列表（可空）；全部拒绝则返回 null 以省略属性。
+     */
+    private List<WorkOrderDirectorySlaRiskSummary> loadSlaRiskSummaries(
+            CurrentPrincipal principal, String correlationId, List<WorkOrderView> items
+    ) {
+        if (items.isEmpty()) {
+            return List.of();
+        }
+        Set<UUID> allowedProjects = new HashSet<>();
+        for (UUID projectId : items.stream()
+                .map(WorkOrderView::projectId)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new))) {
+            AuthorizationDecision decision = authorization.authorize(
+                    principal,
+                    AuthorizationRequest.projectCapability(
+                            SLA_READ,
+                            principal.tenantId(),
+                            "SlaInstance",
+                            projectId.toString(),
+                            projectId.toString()),
+                    correlationId);
+            if (decision.effect() == AuthorizationDecision.Effect.ALLOW) {
+                allowedProjects.add(projectId);
+            }
+        }
+        if (allowedProjects.isEmpty()) {
+            return null;
+        }
+        WorkOrderDirectorySlaRiskQuery query = slaRiskQuery.getIfAvailable();
+        if (query == null) {
+            return List.of();
+        }
+        List<UUID> eligibleIds = items.stream()
+                .filter(item -> allowedProjects.contains(item.projectId()))
+                .map(WorkOrderView::id)
+                .toList();
+        return query.findOpenRisks(principal.tenantId(), eligibleIds);
     }
 
     private static UUID tryParseUuid(String value) {

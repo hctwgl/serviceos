@@ -171,6 +171,15 @@ export async function mockProductizationApis(
             ],
         nextCursor: null,
         asOf: '2026-07-20T04:00:00Z',
+        slaRiskSummaries: options.workOrdersEmpty
+          ? []
+          : [
+              {
+                workOrderId: '11111111-1111-4111-8111-111111111111',
+                openCount: 1,
+                breachedCount: 0,
+              },
+            ],
       })
       return
     }

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.95
+  version: 1.0.96
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -3387,6 +3387,8 @@ paths:
         workOrder.read 实时项目范围在 SQL 中收敛；cursor 绑定范围摘要和全部筛选条件。
         M429：items 含服务端脱敏客户联系 `maskedCustomerName` / `maskedCustomerPhone` /
         `maskedServiceAddress`（随基座返回，不 soft-omit；无原文）。
+        M434：可选页级 `slaRiskSummaries`；需 PROJECT `sla.read` soft-gate，缺能力时省略属性；
+        有能力且本页无开放风险时返回 []；仅含 openCount>0 行。
       parameters:
         - { name: clientCode, in: query, schema: { type: string, minLength: 1, maxLength: 128 } }
         - { name: projectId, in: query, schema: { type: string, format: uuid } }
@@ -9741,6 +9743,27 @@ components:
         items: { type: array, items: { $ref: '#/components/schemas/WorkOrder' } }
         nextCursor: { type: [string, 'null'] }
         asOf: { type: string, format: date-time }
+        slaRiskSummaries:
+          description: |
+            M434：需 PROJECT sla.read；缺能力时省略本属性；有能力且无开放风险时返回 []。
+            按本页工单聚合 RUNNING∪BREACHED；仅含 openCount>0 行。不伪造 0 伪装无权限。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderDirectorySlaRiskSummary' }
+    WorkOrderDirectorySlaRiskSummary:
+      type: object
+      additionalProperties: false
+      required: [workOrderId, openCount, breachedCount]
+      properties:
+        workOrderId: { type: string, format: uuid }
+        openCount:
+          type: integer
+          minimum: 0
+          description: RUNNING∪BREACHED 实例数
+        breachedCount:
+          type: integer
+          minimum: 0
+          description: BREACHED 实例数（⊆ openCount）
     WorkOrderDetail:
       type: object
       additionalProperties: false

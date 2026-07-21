@@ -521,5 +521,6 @@ Feature gate/authority: if applicable
 | M430 | Admin 工单目录服务区域列 | 441-m430-* + 424-m430-*；OpenAPI 1.0.93（无 bump）；省市区码列 + Playwright | 行政区中文名（M431）；按区域筛选；阶段/责任人/SLA；人工视觉批准 |
 | M431 | Admin 工单目录服务区域中文名 | 442-m431-* + 425-m431-*；OpenAPI 1.0.93（无 bump）；region-catalog 名解析 + Playwright | 全国全量树/拼音；按区域筛选；责任人/SLA；人工视觉批准 |
 | M432 | Admin 工单目录当前阶段列 | 443-m432-* + 426-m432-*；OpenAPI 1.0.94；`currentStageCode` + PostgresIT + Playwright | SLA；按阶段筛选；人工视觉批准 |
-| M433 | Admin 工单目录当前责任人列 | 444-m433-* + 427-m433-*；OpenAPI 1.0.95；`currentClaimedBy`/`currentAssigneeDisplayName` + PostgresIT + Playwright | SLA；网点/师傅列；按责任人筛选；人工视觉批准 |
+| M433 | Admin 工单目录当前责任人列 | 444-m433-* + 427-m433-*；OpenAPI 1.0.95；`currentClaimedBy`/`currentAssigneeDisplayName` + PostgresIT + Playwright | 网点/师傅列；按责任人筛选；人工视觉批准 |
+| M434 | Admin 工单目录 SLA 风险旁载 | 445-m434-* + 428-m434-*；OpenAPI 1.0.96；页级 `slaRiskSummaries` + soft-gate + PostgresIT + Playwright | 即将超时窗口；按 SLA 筛选；人工视觉批准 |
 

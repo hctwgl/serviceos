@@ -39,6 +39,8 @@ test.describe('M377 Admin productization visual baselines', () => {
     await expect(page.getByTestId('work-order-current-stage')).toContainText('勘测')
     // M433：目录当前责任人（Persona 显示名）
     await expect(page.getByTestId('work-order-current-assignee')).toContainText('演示师傅')
+    // M434：目录 SLA 风险旁载
+    await expect(page.getByTestId('work-order-sla-risk')).toContainText('开放 1 / 超时 0')
     await shot(page, 'work-order-directory-productized')
     await page.screenshot({
       path: 'tests/e2e/__screenshots__/work-order-directory-region-names-1440.png',
@@ -50,6 +52,10 @@ test.describe('M377 Admin productization visual baselines', () => {
     })
     await page.screenshot({
       path: 'tests/e2e/__screenshots__/work-order-directory-current-assignee-1440.png',
+      fullPage: true,
+    })
+    await page.screenshot({
+      path: 'tests/e2e/__screenshots__/work-order-directory-sla-risk-1440.png',
       fullPage: true,
     })
   })

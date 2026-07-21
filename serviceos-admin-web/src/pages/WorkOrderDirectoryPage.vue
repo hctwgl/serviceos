@@ -223,9 +223,28 @@ const countLabel = computed(() => {
   return `已加载 ${n} 条`
 })
 
+function slaRiskLabel(workOrderId: string) {
+  const summaries = page.value?.slaRiskSummaries
+  if (summaries === undefined || summaries === null) {
+    return {
+      text: presentEmptyValue('not_provided'),
+      tooltip: '无 sla.read 或 SLA 旁载未返回（soft-omit）',
+    }
+  }
+  const matched = summaries.find((row) => row.workOrderId === workOrderId)
+  if (!matched) {
+    return { text: '暂无', tooltip: '本页无开放 SLA 风险' }
+  }
+  return {
+    text: `开放 ${matched.openCount} / 超时 ${matched.breachedCount}`,
+    tooltip: `openCount=${matched.openCount}, breachedCount=${matched.breachedCount}`,
+  }
+}
+
 const columns = computed((): TableColumnsType<Row> => {
-  // 依赖 region-catalog 映射，避免异步加载完成后列不刷新。
+  // 依赖 region-catalog 映射与 SLA 旁载，避免异步加载完成后列不刷新。
   void regionNameByCode.value
+  void page.value?.slaRiskSummaries
   return [
   {
     title: '工单编号',
@@ -381,11 +400,15 @@ const columns = computed((): TableColumnsType<Row> => {
   {
     title: 'SLA',
     key: 'sla',
-    width: 90,
-    customRender: () =>
-      h(Tooltip, { title: '目录投影未提供 SLA 摘要（UI_DATA_GAP）' }, () =>
-        presentEmptyValue('not_provided'),
-      ),
+    width: 120,
+    customRender: ({ record }: { record: Row }) => {
+      const presentation = slaRiskLabel(record.id)
+      return h(
+        Tooltip,
+        { title: presentation.tooltip },
+        () => h('span', { 'data-testid': 'work-order-sla-risk' }, presentation.text),
+      )
+    },
   },
   {
     title: '更新时间',

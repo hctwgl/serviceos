@@ -26,10 +26,19 @@ export type WorkOrder = {
   currentAssigneeDisplayName: string | null
 }
 
+/** M434：页级 SLA 风险摘要；缺 sla.read 时响应省略本字段。 */
+export type WorkOrderDirectorySlaRiskSummary = {
+  workOrderId: string
+  openCount: number
+  breachedCount: number
+}
+
 export type WorkOrderPage = {
   items: WorkOrder[]
   nextCursor: string | null
   asOf: string
+  /** soft-omit：缺 PROJECT sla.read 时为 undefined */
+  slaRiskSummaries?: WorkOrderDirectorySlaRiskSummary[] | null
 }
 
 export function listAuthorizedWorkOrders(query: Record<string, string | undefined> = {}) {

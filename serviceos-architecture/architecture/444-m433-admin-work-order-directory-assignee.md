@@ -32,6 +32,6 @@ openapiVersion: "1.0.95"
 
 ## 4. 明确未实现
 
-- SLA 列 / sla.read soft-gate
+- SLA 列（已由 **M434** 关闭主路径）/ sla.read soft-gate
 - 网点/师傅列、按责任人筛选
 - 产品负责人视觉金标（`READY_FOR_REVIEW`）

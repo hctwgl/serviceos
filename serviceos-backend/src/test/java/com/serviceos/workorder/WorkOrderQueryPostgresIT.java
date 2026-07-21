@@ -35,7 +35,7 @@ class WorkOrderQueryPostgresIT {
 
  @BeforeEach void clean(){jdbc.sql("""
   TRUNCATE TABLE aud_audit_record, rel_outbox_publish_attempt, rel_outbox_event,
-  tsk_task, wo_work_order,cfg_configuration_bundle_item,cfg_configuration_bundle,cfg_configuration_asset_version,
+  sla_instance, tsk_task, wo_work_order,cfg_configuration_bundle_item,cfg_configuration_bundle,cfg_configuration_asset_version,
   prj_project,auth_role_field_policy,auth_role_grant,auth_role_capability,auth_role,
   idn_person_profile, idn_security_principal CASCADE
   """).update();}
@@ -64,6 +64,8 @@ class WorkOrderQueryPostgresIT {
   assertThat(detail.currentStageCode()).isNull();
   assertThat(detail.currentClaimedBy()).isNull();
   assertThat(detail.currentAssigneeDisplayName()).isNull();
+  // M434：无 sla.read 时页级旁载省略（null），不伪造 []/0。
+  assertThat(page.slaRiskSummaries()).isNull();
   assertThatThrownBy(()->queries.get(reader,"corr-deny",wb)).isInstanceOfSatisfying(BusinessProblem.class,
     p->assertThat(p.code()).isEqualTo(ProblemCode.ACCESS_DENIED));
   assertThat(jdbc.sql("SELECT decision_code FROM aud_audit_record ORDER BY occurred_at DESC LIMIT 1").query(String.class).single()).isEqualTo("DENY");
@@ -103,6 +105,22 @@ class WorkOrderQueryPostgresIT {
   assertThat(detail.currentAssigneeDisplayName()).isEqualTo("演示师傅");
  }
 
+ @Test void listExposesSlaRiskSummariesWhenSlaReadGranted(){
+  Scope a=scopeWithSla("tenant-test","A");
+  UUID wa=receive(a,"ORDER-SLA","f".repeat(64));
+  UUID taskId=seedActiveTask(a,wa,"SURVEY",null,null);
+  jdbc.sql("UPDATE tsk_task SET sla_ref='survey.response.sla' WHERE task_id=:id").param("id",taskId).update();
+  seedRunningSla(a,wa,taskId);
+  seedRole("reader","PROJECT",a.projectId().toString(),"workOrder.read","sla.read");
+  CurrentPrincipal reader=principal("reader","tenant-test");
+  var page=queries.list(reader,"corr-sla-list",new WorkOrderQuery(null,null,null,null,20));
+  assertThat(page.slaRiskSummaries()).isNotNull();
+  assertThat(page.slaRiskSummaries()).hasSize(1);
+  assertThat(page.slaRiskSummaries().getFirst().workOrderId()).isEqualTo(wa);
+  assertThat(page.slaRiskSummaries().getFirst().openCount()).isEqualTo(1);
+  assertThat(page.slaRiskSummaries().getFirst().breachedCount()).isEqualTo(0);
+ }
+
  @Test void crossTenantIsHiddenAndMigrationIsCurrent(){
   Scope a=scope("tenant-test","A"); UUID id=receive(a,"ORDER-A","c".repeat(64)); seedRole("reader","TENANT","tenant-test");
   assertThatThrownBy(()->queries.get(principal("reader","tenant-other"),"corr-cross",id))
@@ -113,17 +131,34 @@ class WorkOrderQueryPostgresIT {
   assertThat(flyway.info().applied()).hasSize(147);
  }
 
- private Scope scope(String tenant,String code){UUID project=UUID.randomUUID();jdbc.sql("""
+ private Scope scope(String tenant,String code){return scope(tenant,code,false);}
+ private Scope scopeWithSla(String tenant,String code){return scope(tenant,code,true);}
+ private Scope scope(String tenant,String code,boolean withSla){
+  UUID project=UUID.randomUUID();
+  jdbc.sql("""
   INSERT INTO prj_project
   (project_id,tenant_id,project_code,client_id,project_name,starts_on,project_status,aggregate_version,created_at)
   VALUES (:id,:tenant,:code,'BYD',:name,current_date,'ACTIVE',1,now())
   """).param("id",project).param("tenant",tenant).param("code",code).param("name","项目"+code).update();
-  String definition="{\"workflowCode\":\""+code+"\"}"; UUID asset=configurations.publishAsset(new PublishConfigurationAssetCommand(tenant,ConfigurationAssetType.WORKFLOW,code+"-WF","1.0.0","1.0.0",definition,Sha256.digest(definition))).versionId();
-  var bundle=configurations.publishBundle(new PublishConfigurationBundleCommand(tenant,project,code+"-B","1.0.0","BYD_OCEAN","HOME_CHARGING_SURVEY_INSTALL","370000",Instant.now().minusSeconds(60),null,List.of(asset))); return new Scope(tenant,project,bundle);}
+  String definition="{\"workflowCode\":\""+code+"\"}";
+  UUID workflowAsset=configurations.publishAsset(new PublishConfigurationAssetCommand(tenant,ConfigurationAssetType.WORKFLOW,code+"-WF","1.0.0","1.0.0",definition,Sha256.digest(definition))).versionId();
+  List<UUID> assets=new ArrayList<>(List.of(workflowAsset));
+  UUID slaPolicyVersionId=null;
+  String slaPolicyDigest=null;
+  if(withSla){
+   String slaDefinition="{\"policyKey\":\"survey.response.sla\",\"version\":\"1.0.0\",\"subjectType\":\"TASK\",\"taskTypes\":[\"SITE_SURVEY\"],\"startEvent\":\"TASK_CREATED\",\"stopEvent\":\"TASK_COMPLETED\",\"clockMode\":\"ELAPSED\",\"targetDurationSeconds\":3600}";
+   slaPolicyDigest=Sha256.digest(slaDefinition);
+   slaPolicyVersionId=configurations.publishAsset(new PublishConfigurationAssetCommand(tenant,ConfigurationAssetType.SLA,"survey.response.sla","1.0.0","1.0.0",slaDefinition,slaPolicyDigest)).versionId();
+   assets.add(slaPolicyVersionId);
+  }
+  var bundle=configurations.publishBundle(new PublishConfigurationBundleCommand(tenant,project,code+"-B","1.0.0","BYD_OCEAN","HOME_CHARGING_SURVEY_INSTALL","370000",Instant.now().minusSeconds(60),null,assets));
+  return new Scope(tenant,project,bundle,slaPolicyVersionId,slaPolicyDigest);
+ }
  private UUID receive(Scope s,String external,String digest){return commands.receive(new ReceiveExternalWorkOrderCommand(s.tenant(),s.projectId(),"BYD","BYD_OCEAN","HOME_CHARGING_SURVEY_INSTALL",external,digest,s.bundle().bundleId(),s.bundle().bundleCode(),s.bundle().bundleVersion(),s.bundle().manifestDigest(),"370000","370100","370102","敏感姓名","13800000000","敏感地址","VIN123456789",LocalDateTime.of(2026,7,15,10,0),"corr","cause")).workOrderId();}
- private void seedActiveTask(Scope s,UUID workOrderId,String stageCode,String status,String claimedBy){
+ private UUID seedActiveTask(Scope s,UUID workOrderId,String stageCode,String status,String claimedBy){
   Instant now=Instant.parse("2026-07-15T04:00:00Z");
   String taskStatus=status==null?"READY":status;
+  UUID taskId=UUID.randomUUID();
   jdbc.sql("""
    INSERT INTO tsk_task (
      task_id,tenant_id,task_type,task_kind,business_key,payload_digest,
@@ -141,7 +176,7 @@ class WorkOrderQueryPostgresIT {
      :claimedBy,:claimedAt,:startedAt
    )
    """)
-   .param("id",UUID.randomUUID())
+   .param("id",taskId)
    .param("tenantId",s.tenant())
    .param("businessKey","m432:"+workOrderId)
    .param("digest","a".repeat(64))
@@ -162,6 +197,35 @@ class WorkOrderQueryPostgresIT {
    // CLAIMED 要求 started_at IS NULL；RUNNING 才填 started_at。
    .param("startedAt","RUNNING".equals(taskStatus)?java.sql.Timestamp.from(now):null)
    .update();
+  return taskId;
+ }
+ private void seedRunningSla(Scope s,UUID workOrderId,UUID taskId){
+  Objects.requireNonNull(s.slaPolicyVersionId(),"scope must include SLA policy");
+  Instant now=Instant.parse("2026-07-15T04:00:00Z");
+  jdbc.sql("""
+   INSERT INTO sla_instance (
+     sla_instance_id,tenant_id,project_id,work_order_id,task_id,sla_ref,
+     policy_version_id,policy_semantic_version,policy_content_digest,
+     clock_mode,target_duration_seconds,start_event_id,started_at,deadline_at,
+     status,aggregate_version,correlation_id,created_at,updated_at
+   ) VALUES (
+     :id,:tenantId,:projectId,:workOrderId,:taskId,'survey.response.sla',
+     :policyVersionId,'1.0.0',:policyDigest,
+     'ELAPSED',3600,:eventId,:now,:deadline,
+     'RUNNING',1,'corr-sla',:now,:now
+   )
+   """)
+   .param("id",UUID.randomUUID())
+   .param("tenantId",s.tenant())
+   .param("projectId",s.projectId())
+   .param("workOrderId",workOrderId)
+   .param("taskId",taskId)
+   .param("policyVersionId",s.slaPolicyVersionId())
+   .param("policyDigest",s.slaPolicyDigest())
+   .param("eventId",UUID.randomUUID())
+   .param("now",java.sql.Timestamp.from(now))
+   .param("deadline",java.sql.Timestamp.from(now.plusSeconds(3600)))
+   .update();
  }
  private void seedPerson(String tenant,UUID principalId,String displayName){
   jdbc.sql("""
@@ -177,7 +241,18 @@ class WorkOrderQueryPostgresIT {
    ) VALUES (:id,:tenant,:name,NULL,1,now(),now(),'test')
    """).param("id",principalId).param("tenant",tenant).param("name",displayName).update();
  }
- private void seedRole(String principal,String scope,String ref){UUID role=UUID.randomUUID();jdbc.sql("INSERT INTO auth_role(role_id,tenant_id,role_code,role_name,role_status,created_at) VALUES(:id,'tenant-test',:code,:code,'ACTIVE',now())").param("id",role).param("code",principal+"-role").update();jdbc.sql("INSERT INTO auth_role_capability(role_id,capability_code,granted_at) VALUES(:id,'workOrder.read',now())").param("id",role).update();jdbc.sql("INSERT INTO auth_role_grant(grant_id,tenant_id,principal_id,role_id,scope_type,scope_ref,valid_from,source_code,approval_ref,created_at) VALUES(:grant,'tenant-test',:principal,:role,:scope,:ref,now()-interval '1 day','TEST','m68',now())").param("grant",UUID.randomUUID()).param("principal",principal).param("role",role).param("scope",scope).param("ref",ref).update();}
+ private void seedRole(String principal,String scope,String ref,String... capabilities){
+  UUID role=UUID.randomUUID();
+  jdbc.sql("INSERT INTO auth_role(role_id,tenant_id,role_code,role_name,role_status,created_at) VALUES(:id,'tenant-test',:code,:code,'ACTIVE',now())")
+    .param("id",role).param("code",principal+"-role").update();
+  String[] caps=capabilities==null||capabilities.length==0?new String[]{"workOrder.read"}:capabilities;
+  for(String capability:caps){
+   jdbc.sql("INSERT INTO auth_role_capability(role_id,capability_code,granted_at) VALUES(:id,:cap,now())")
+     .param("id",role).param("cap",capability).update();
+  }
+  jdbc.sql("INSERT INTO auth_role_grant(grant_id,tenant_id,principal_id,role_id,scope_type,scope_ref,valid_from,source_code,approval_ref,created_at) VALUES(:grant,'tenant-test',:principal,:role,:scope,:ref,now()-interval '1 day','TEST','m68',now())")
+    .param("grant",UUID.randomUUID()).param("principal",principal).param("role",role).param("scope",scope).param("ref",ref).update();
+ }
  private static CurrentPrincipal principal(String id,String tenant){return new CurrentPrincipal(id,tenant,CurrentPrincipal.PrincipalType.USER,"m68-test",Set.of());}
- private record Scope(String tenant,UUID projectId,ConfigurationBundleReference bundle){}
+ private record Scope(String tenant,UUID projectId,ConfigurationBundleReference bundle,UUID slaPolicyVersionId,String slaPolicyDigest){}
 }
