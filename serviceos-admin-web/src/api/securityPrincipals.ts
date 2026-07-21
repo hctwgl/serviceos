@@ -121,6 +121,7 @@ export type PrincipalChangeTimelineItem = {
     | 'ROLE_GRANT'
     | 'NETWORK_MEMBERSHIP'
     | 'TECHNICIAN_MEMBERSHIP'
+    | 'TECHNICIAN_PROFILE'
   eventCode: string
   summary: string
   actorId: string
@@ -134,7 +135,9 @@ export type PrincipalChangeTimelineItem = {
 
 export type PrincipalChangeTimelinePage = {
   items: PrincipalChangeTimelineItem[]
-  omittedSources: Array<'MEMBERSHIP' | 'ROLE_GRANT' | 'NETWORK_MEMBERSHIP' | 'TECHNICIAN_MEMBERSHIP'>
+  omittedSources: Array<
+    'MEMBERSHIP' | 'ROLE_GRANT' | 'NETWORK_MEMBERSHIP' | 'TECHNICIAN_MEMBERSHIP' | 'TECHNICIAN_PROFILE'
+  >
   asOf: string
 }
 

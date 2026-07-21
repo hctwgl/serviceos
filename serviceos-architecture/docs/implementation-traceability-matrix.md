@@ -505,5 +505,6 @@ Feature gate/authority: if applicable
 | M414 | Admin 主数据治理台 | 425-m414-* + 408-m414-*；OpenAPI 1.0.80；Flyway V143；PostgresIT + Playwright；page-registry-v22 | 全国区县全量；拼音索引；多级子品牌；人工视觉批准 |
 | M415 | Admin 跨聚合主体变更时间线 | 426-m415-* + 409-m415-*；OpenAPI 1.0.81；Contributor SPI + PostgresIT + Playwright | 网点任职并入（M416）；AUTHORIZATION_DENIED 活动流；人工视觉批准 |
 | M416 | Admin 网点任职并入主体变更时间线 | 427-m416-* + 410-m416-*；OpenAPI 1.0.82；`NETWORK_MEMBERSHIP` Contributor + PostgresIT + Playwright | 师傅服务关系（M417）；AUTHORIZATION_DENIED 活动流；人工视觉批准 |
-| M417 | Admin 师傅服务关系并入主体变更时间线 | 428-m417-* + 411-m417-*；OpenAPI 1.0.83；`TECHNICIAN_MEMBERSHIP` Contributor + PostgresIT + Playwright | AUTHORIZATION_DENIED 独立活动流；师傅档案生命周期；人工视觉批准 |
+| M417 | Admin 师傅服务关系并入主体变更时间线 | 428-m417-* + 411-m417-*；OpenAPI 1.0.83；`TECHNICIAN_MEMBERSHIP` Contributor + PostgresIT + Playwright | 师傅档案生命周期（M418）；AUTHORIZATION_DENIED 独立活动流；人工视觉批准 |
+| M418 | Admin 师傅档案生命周期并入主体变更时间线 | 429-m418-* + 412-m418-*；OpenAPI 1.0.84；`TECHNICIAN_PROFILE` Contributor + PostgresIT + Playwright | CLIENT_KINDS_DECLARED；AUTHORIZATION_DENIED 独立活动流；人工视觉批准 |
 

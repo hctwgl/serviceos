@@ -802,6 +802,18 @@ export async function mockProductizationApis(
       await fulfillJson(route, {
         items: [
           {
+            source: 'TECHNICIAN_PROFILE',
+            eventCode: 'TECHNICIAN_CREATED',
+            summary: '师傅档案已创建 · 演示用户',
+            actorId: '77777777-7777-4777-8777-777777777777',
+            actorDisplayName: '审批运营',
+            result: 'SUCCEEDED',
+            correlationId: 'corr-technician-profile',
+            principalVersion: 1,
+            occurredAt: '2026-07-20T03:55:00Z',
+            refId: '11111111-1111-4111-8111-111111111111',
+          },
+          {
             source: 'TECHNICIAN_MEMBERSHIP',
             eventCode: 'TECHNICIAN_MEMBERSHIP_CREATED',
             summary: '师傅服务关系已建立 · 演示师傅网点',

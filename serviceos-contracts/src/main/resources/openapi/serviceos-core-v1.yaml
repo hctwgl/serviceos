@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.83
+  version: 1.0.84
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -129,9 +129,9 @@ paths:
       operationId: listPrincipalChangeTimeline
       summary: 查询主体变更时间线
       description: |
-        M405/M415/M416/M417：需要 identity.read。
+        M405/M415/M416/M417/M418：需要 identity.read。
         聚合生命周期、非冗余审计、成功登录；并 soft-gate 合并组织任职（organization.read）、
-        RoleGrant（authorization.read）、网点任职与师傅服务关系（network.read）事实。
+        RoleGrant（authorization.read）、网点任职/师傅服务关系/师傅档案生命周期（network.read）事实。
         缺权来源列入 omittedSources，不伪造空成功。
       parameters:
         - $ref: '#/components/parameters/PrincipalId'
@@ -7350,7 +7350,7 @@ components:
       additionalProperties: false
       required: [source, eventCode, summary, actorId, result, correlationId, occurredAt, refId]
       properties:
-        source: { enum: [LIFECYCLE, AUDIT, LOGIN, MEMBERSHIP, ROLE_GRANT, NETWORK_MEMBERSHIP, TECHNICIAN_MEMBERSHIP] }
+        source: { enum: [LIFECYCLE, AUDIT, LOGIN, MEMBERSHIP, ROLE_GRANT, NETWORK_MEMBERSHIP, TECHNICIAN_MEMBERSHIP, TECHNICIAN_PROFILE] }
         eventCode: { type: string, minLength: 1, maxLength: 100 }
         summary: { type: string, minLength: 1, maxLength: 500 }
         actorId: { type: string, minLength: 1, maxLength: 128 }
@@ -7371,8 +7371,8 @@ components:
         items: { type: array, items: { $ref: '#/components/schemas/PrincipalChangeTimelineItem' } }
         omittedSources:
           type: array
-          description: soft-gate 缺权而未合并的来源（如 MEMBERSHIP、ROLE_GRANT、NETWORK_MEMBERSHIP、TECHNICIAN_MEMBERSHIP）
-          items: { enum: [MEMBERSHIP, ROLE_GRANT, NETWORK_MEMBERSHIP, TECHNICIAN_MEMBERSHIP] }
+          description: soft-gate 缺权而未合并的来源（如 MEMBERSHIP、ROLE_GRANT、NETWORK_*、TECHNICIAN_*）
+          items: { enum: [MEMBERSHIP, ROLE_GRANT, NETWORK_MEMBERSHIP, TECHNICIAN_MEMBERSHIP, TECHNICIAN_PROFILE] }
         asOf: { type: string, format: date-time }
     AdminUserDirectoryPage:
       type: object

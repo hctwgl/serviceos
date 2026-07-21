@@ -576,7 +576,26 @@ qualityStatus:
 productOwnerDecision: null
 knownGaps:
   - UI_DATA_GAP: 通用 AUTHORIZATION_DENIED 宜独立安全活动流，不宜直接混入变更时间线
-  - UI_DATA_GAP: 师傅档案创建/停用生命周期事件并入
+  - UI_DATA_GAP: 师傅档案创建/停用生命周期事件并入（已由 M418 关闭主路径）
+```
+
+### 9.17 M418 记录（师傅档案生命周期并入主体时间线）
+
+```yaml
+pageId: ADMIN.USER.DETAIL
+route: /users/:id
+visualProfile: CLASSIC_PROFESSIONAL
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: 通用 AUTHORIZATION_DENIED 宜独立安全活动流，不宜直接混入变更时间线
+  - UI_DATA_GAP: TECHNICIAN_CLIENT_KINDS_DECLARED 并入主体时间线
 ```
 
 ### 9.12 M406 记录（车企/行政区目录）
