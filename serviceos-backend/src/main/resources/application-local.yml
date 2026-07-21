@@ -1,0 +1,9 @@
+spring:
+  config:
+    activate:
+      on-profile: local
+
+# 本地开发明确使用普通文本 Logback 配置。
+# 该输出不经过 SensitiveLogJsonCustomizer，日志消息与异常栈原样输出。
+logging:
+  config: classpath:logback-local.xml
