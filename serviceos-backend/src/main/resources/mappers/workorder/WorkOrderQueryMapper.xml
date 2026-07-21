@@ -70,6 +70,9 @@
         <otherwise>AND FALSE</otherwise>
       </choose>
     </if>
+    <!-- M443：创建日（receivedAt）Asia/Shanghai 自然日闭区间；上界用半开区间 &lt; exclusive。 -->
+    <if test="receivedFromInclusive != null">AND received_at &gt;= #{receivedFromInclusive}</if>
+    <if test="receivedToExclusive != null">AND received_at &lt; #{receivedToExclusive}</if>
   </sql>
   <select id="findPage" resultType="map">
     SELECT <include refid="columns"/> FROM wo_work_order

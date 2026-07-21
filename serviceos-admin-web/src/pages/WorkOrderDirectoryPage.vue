@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, h, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { Table, Select, Input, Button, Space, Alert, Tooltip } from 'ant-design-vue'
+import { Table, Select, Input, Button, Space, Alert, Tooltip, DatePicker } from 'ant-design-vue'
 import type { TableColumnsType } from 'ant-design-vue'
+import dayjs, { type Dayjs } from 'dayjs'
 import SavedViewBar from '../components/SavedViewBar.vue'
 import ListPageLayout from '../patterns/templates/ListPageLayout.vue'
 import SemanticStatusTag from '../components/business/SemanticStatusTag.vue'
@@ -52,6 +53,8 @@ const technicianFilterId = ref<string | undefined>(undefined)
 const technicianOptions = ref<TechnicianProfile[]>([])
 /** M442：SLA 风险筛选（与目录列 OPEN/BREACHED 同口径）。 */
 const slaRiskFilter = ref<string | undefined>(undefined)
+/** M443：创建日闭区间（Asia/Shanghai；按 receivedAt）。 */
+const receivedRange = ref<[Dayjs, Dayjs] | undefined>(undefined)
 
 /** 常用履约阶段；未知码由服务端校验失败关闭，不在此发明业务阶段。 */
 const stageFilterOptions = statusOptions([
@@ -135,6 +138,13 @@ function hydrateFiltersFromRoute() {
   if (nextTechnician !== undefined) technicianFilterId.value = nextTechnician || undefined
   const nextSlaRisk = firstRouteQuery(route, 'slaRisk')
   if (nextSlaRisk !== undefined) slaRiskFilter.value = nextSlaRisk || undefined
+  const nextReceivedFrom = firstRouteQuery(route, 'receivedFrom')
+  const nextReceivedTo = firstRouteQuery(route, 'receivedTo')
+  if (nextReceivedFrom || nextReceivedTo) {
+    const from = dayjs(nextReceivedFrom || nextReceivedTo)
+    const to = dayjs(nextReceivedTo || nextReceivedFrom)
+    receivedRange.value = from.isValid() && to.isValid() ? [from, to] : undefined
+  }
 }
 
 function looksLikeUuid(value: string): boolean {
@@ -160,6 +170,8 @@ async function load(next?: string) {
       currentNetworkId: networkFilterId.value || undefined,
       currentTechnicianId: technicianFilterId.value || undefined,
       slaRisk: slaRiskFilter.value || undefined,
+      receivedFrom: receivedRange.value?.[0]?.format('YYYY-MM-DD'),
+      receivedTo: receivedRange.value?.[1]?.format('YYYY-MM-DD'),
       ...regionQueryParams(),
     })
     cursor.value = page.value.nextCursor ?? undefined
@@ -191,6 +203,8 @@ function currentFilters() {
     currentNetworkId: networkFilterId.value || undefined,
     currentTechnicianId: technicianFilterId.value || undefined,
     slaRisk: slaRiskFilter.value || undefined,
+    receivedFrom: receivedRange.value?.[0]?.format('YYYY-MM-DD'),
+    receivedTo: receivedRange.value?.[1]?.format('YYYY-MM-DD'),
     ...region,
   }
 }
@@ -205,6 +219,13 @@ function applySavedView(filters: Record<string, string>) {
   networkFilterId.value = filters.currentNetworkId || undefined
   technicianFilterId.value = filters.currentTechnicianId || undefined
   slaRiskFilter.value = filters.slaRisk || undefined
+  if (filters.receivedFrom || filters.receivedTo) {
+    const from = dayjs(filters.receivedFrom || filters.receivedTo)
+    const to = dayjs(filters.receivedTo || filters.receivedFrom)
+    receivedRange.value = from.isValid() && to.isValid() ? [from, to] : undefined
+  } else {
+    receivedRange.value = undefined
+  }
   return search()
 }
 
@@ -218,6 +239,7 @@ function resetFilters() {
   networkFilterId.value = undefined
   technicianFilterId.value = undefined
   slaRiskFilter.value = undefined
+  receivedRange.value = undefined
   return search()
 }
 
@@ -713,12 +735,17 @@ watch(
     </template>
 
     <template #more-filters>
-      <Alert
-        type="info"
-        show-icon
-        message="部分更多筛选暂不可用"
-        description="创建时间筛选尚未由工单目录查询 API 提供（UI_DATA_GAP）。服务区域、当前阶段、服务网点、服务师傅与 SLA 风险已支持精确筛选。"
-      />
+      <label class="filter-field" data-testid="work-order-received-range-filter">
+        <span>创建时间</span>
+        <DatePicker.RangePicker
+          v-model:value="receivedRange"
+          allow-clear
+          style="width: 260px"
+          aria-label="创建时间筛选"
+          :placeholder="['开始日期', '结束日期']"
+          @change="search"
+        />
+      </label>
       <label class="filter-field">
         <span>服务区域</span>
         <Select

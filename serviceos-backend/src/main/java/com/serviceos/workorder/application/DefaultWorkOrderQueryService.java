@@ -29,6 +29,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Comparator;
@@ -46,6 +49,9 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
     private static final String READ = "workOrder.read";
     private static final String SLA_READ = "sla.read";
     private static final String NETWORK_TASK_READ = "networkTask.read";
+    /** 目录创建日筛选使用运营时区自然日，与 Network 预约日历一致。 */
+    private static final ZoneId RECEIVED_DAY_ZONE = ZoneId.of("Asia/Shanghai");
+    private static final int MAX_RECEIVED_RANGE_DAYS = 366;
     private static final Set<String> STATUSES = Set.of(
             "RECEIVED", "ACTIVE", "SUSPENDED", "FULFILLED", "CANCELLED", "CLOSED");
     private final WorkOrderQueryRepository queries;
@@ -90,6 +96,8 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
         UUID currentTechnicianId = query.currentTechnicianId();
         // M442：SLA 风险口径与目录列一致；非法枚举失败关闭。
         String slaRisk = normalizeSlaRisk(query.slaRisk());
+        // M443：创建日闭区间 → Asia/Shanghai 半开时间窗；非法跨度失败关闭。
+        ReceivedBounds receivedBounds = normalizeReceivedBounds(query.receivedFrom(), query.receivedTo());
         AuthorizedProjectScope scope = projectScopes.require(principal, READ, "WorkOrder", correlationId);
         if (query.projectId() != null && !scope.tenantWide() && !scope.projectIds().contains(query.projectId())) {
             authorization.require(principal, AuthorizationRequest.projectCapability(READ, principal.tenantId(),
@@ -105,7 +113,9 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 + "|currentStageCode=" + nullable(currentStageCode)
                 + "|currentNetworkId=" + nullable(currentNetworkId)
                 + "|currentTechnicianId=" + nullable(currentTechnicianId)
-                + "|slaRisk=" + nullable(slaRisk));
+                + "|slaRisk=" + nullable(slaRisk)
+                + "|receivedFrom=" + nullable(query.receivedFrom())
+                + "|receivedTo=" + nullable(query.receivedTo()));
         Cursor cursor = decodeCursor(query.cursor(), scope.scopeDigest(), filterDigest);
         List<UUID> projectIds = scope.projectIds().stream()
                 .sorted(Comparator.comparing(UUID::toString)).toList();
@@ -169,6 +179,7 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 applyNetworkFilter, networkWorkOrderIds,
                 applyTechnicianFilter, technicianWorkOrderIds,
                 applySlaRiskFilter, slaRiskWorkOrderIds,
+                receivedBounds.fromInclusive(), receivedBounds.toExclusive(),
                 cursor == null ? null : cursor.receivedAt(),
                 cursor == null ? null : cursor.id(), query.limit() + 1);
         boolean more = fetched.size() > query.limit();
@@ -192,6 +203,7 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 applyNetworkFilter, networkWorkOrderIds,
                 applyTechnicianFilter, technicianWorkOrderIds,
                 applySlaRiskFilter, slaRiskWorkOrderIds,
+                receivedBounds.fromInclusive(), receivedBounds.toExclusive(),
                 WorkOrderPage.TOTAL_COUNT_LIMIT + 1);
         boolean totalTruncated = matched > WorkOrderPage.TOTAL_COUNT_LIMIT;
         int totalCount = totalTruncated ? WorkOrderPage.TOTAL_COUNT_LIMIT : matched;
@@ -474,6 +486,29 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
         return value;
     }
 
+    /**
+     * M443：自然日闭区间转为 timestamptz 半开区间。
+     * from 日 00:00 Asia/Shanghai ≤ received_at &lt; to 日次日 00:00。
+     */
+    private static ReceivedBounds normalizeReceivedBounds(LocalDate receivedFrom, LocalDate receivedTo) {
+        if (receivedFrom != null && receivedTo != null) {
+            if (receivedTo.isBefore(receivedFrom)) {
+                throw new IllegalArgumentException("receivedTo must not be before receivedFrom");
+            }
+            long days = ChronoUnit.DAYS.between(receivedFrom, receivedTo) + 1;
+            if (days > MAX_RECEIVED_RANGE_DAYS) {
+                throw new IllegalArgumentException("received date range must not exceed 366 days");
+            }
+        }
+        Instant fromInclusive = receivedFrom == null
+                ? null
+                : receivedFrom.atStartOfDay(RECEIVED_DAY_ZONE).toInstant();
+        Instant toExclusive = receivedTo == null
+                ? null
+                : receivedTo.plusDays(1).atStartOfDay(RECEIVED_DAY_ZONE).toInstant();
+        return new ReceivedBounds(fromInclusive, toExclusive);
+    }
+
     private boolean hasTenantSlaRead(CurrentPrincipal principal, String correlationId) {
         AuthorizationDecision decision = authorization.authorize(
                 principal,
@@ -553,4 +588,5 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
     }
     private static String nullable(Object value) { return value == null ? "-" : value.toString(); }
     private record Cursor(Instant receivedAt, UUID id) {}
+    private record ReceivedBounds(Instant fromInclusive, Instant toExclusive) {}
 }

@@ -23,6 +23,7 @@ final class MyBatisWorkOrderQueryRepository implements WorkOrderQueryRepository 
             boolean applyNetworkFilter, List<UUID> networkWorkOrderIds,
             boolean applyTechnicianFilter, List<UUID> technicianWorkOrderIds,
             boolean applySlaRiskFilter, List<UUID> slaRiskWorkOrderIds,
+            Instant receivedFromInclusive, Instant receivedToExclusive,
             Instant cursorReceivedAt, UUID cursorId, int fetchSize) {
         return mapper.findPage(tenantId, tenantWide, projectIds.stream().map(UUID::toString).toList(),
                 clientCode, projectId, status, externalOrderCode, provinceCode, cityCode, districtCode,
@@ -30,6 +31,7 @@ final class MyBatisWorkOrderQueryRepository implements WorkOrderQueryRepository 
                 applyNetworkFilter, networkWorkOrderIds.stream().map(UUID::toString).toList(),
                 applyTechnicianFilter, technicianWorkOrderIds.stream().map(UUID::toString).toList(),
                 applySlaRiskFilter, slaRiskWorkOrderIds.stream().map(UUID::toString).toList(),
+                receivedFromInclusive, receivedToExclusive,
                 cursorReceivedAt, cursorId, fetchSize)
                 .stream().map(MyBatisWorkOrderQueryRepository::view).toList();
     }
@@ -41,13 +43,15 @@ final class MyBatisWorkOrderQueryRepository implements WorkOrderQueryRepository 
             boolean applyStageFilter, List<UUID> stageWorkOrderIds,
             boolean applyNetworkFilter, List<UUID> networkWorkOrderIds,
             boolean applyTechnicianFilter, List<UUID> technicianWorkOrderIds,
-            boolean applySlaRiskFilter, List<UUID> slaRiskWorkOrderIds, int fetchSize) {
+            boolean applySlaRiskFilter, List<UUID> slaRiskWorkOrderIds,
+            Instant receivedFromInclusive, Instant receivedToExclusive, int fetchSize) {
         return mapper.countMatching(tenantId, tenantWide, projectIds.stream().map(UUID::toString).toList(),
                 clientCode, projectId, status, externalOrderCode, provinceCode, cityCode, districtCode,
                 applyStageFilter, stageWorkOrderIds.stream().map(UUID::toString).toList(),
                 applyNetworkFilter, networkWorkOrderIds.stream().map(UUID::toString).toList(),
                 applyTechnicianFilter, technicianWorkOrderIds.stream().map(UUID::toString).toList(),
-                applySlaRiskFilter, slaRiskWorkOrderIds.stream().map(UUID::toString).toList(), fetchSize);
+                applySlaRiskFilter, slaRiskWorkOrderIds.stream().map(UUID::toString).toList(),
+                receivedFromInclusive, receivedToExclusive, fetchSize);
     }
 
     @Override public Optional<WorkOrderView> findById(String tenantId, UUID workOrderId) {

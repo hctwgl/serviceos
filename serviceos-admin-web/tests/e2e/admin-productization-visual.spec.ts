@@ -60,6 +60,8 @@ test.describe('M377 Admin productization visual baselines', () => {
     await expect(page.getByTestId('work-order-technician-filter')).toBeVisible()
     // M442：更多筛选中启用 SLA 风险
     await expect(page.getByTestId('work-order-sla-risk-filter')).toBeVisible()
+    // M443：更多筛选中启用创建时间
+    await expect(page.getByTestId('work-order-received-range-filter')).toBeVisible()
     await shot(page, 'work-order-directory-productized')
     await page.screenshot({
       path: 'tests/e2e/__screenshots__/work-order-directory-region-names-1440.png',
@@ -111,6 +113,11 @@ test.describe('M377 Admin productization visual baselines', () => {
     await page.getByTestId('work-order-sla-risk-filter').scrollIntoViewIfNeeded()
     await page.screenshot({
       path: 'tests/e2e/__screenshots__/work-order-directory-sla-risk-filter-1440.png',
+      fullPage: true,
+    })
+    await page.getByTestId('work-order-received-range-filter').scrollIntoViewIfNeeded()
+    await page.screenshot({
+      path: 'tests/e2e/__screenshots__/work-order-directory-received-range-filter-1440.png',
       fullPage: true,
     })
     await page.getByTestId('work-order-network-technician').scrollIntoViewIfNeeded()

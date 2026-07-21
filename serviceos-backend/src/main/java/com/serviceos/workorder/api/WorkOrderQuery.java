@@ -1,5 +1,6 @@
 package com.serviceos.workorder.api;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 /**
@@ -18,6 +19,9 @@ import java.util.UUID;
  *
  * <p>M442：可选 {@code slaRisk}（{@code OPEN}/{@code BREACHED}）与目录 SLA 列同口径精确匹配，
  * 写入 cursor filterDigest；仅在具备 PROJECT {@code sla.read} 的项目范围内解析。</p>
+ *
+ * <p>M443：可选 {@code receivedFrom}/{@code receivedTo}（Asia/Shanghai 自然日闭区间）按
+ * {@code receivedAt} 精确匹配，写入 cursor filterDigest。</p>
  */
 public record WorkOrderQuery(
         String clientCode,
@@ -31,19 +35,21 @@ public record WorkOrderQuery(
         UUID currentNetworkId,
         UUID currentTechnicianId,
         String slaRisk,
+        LocalDate receivedFrom,
+        LocalDate receivedTo,
         String cursor,
         int limit
 ) {
-    /** 无区域/阶段/网点/师傅/SLA 筛选的常用构造。 */
+    /** 无区域/阶段/网点/师傅/SLA/创建日筛选的常用构造。 */
     public WorkOrderQuery(String clientCode, UUID projectId, String status, String cursor, int limit) {
-        this(clientCode, projectId, status, null, null, null, null, null, null, null, null, cursor, limit);
+        this(clientCode, projectId, status, null, null, null, null, null, null, null, null, null, null, cursor, limit);
     }
 
-    /** 含 externalOrderCode、无区域/阶段/网点/师傅/SLA 筛选（受控搜索等）。 */
+    /** 含 externalOrderCode、无区域/阶段/网点/师傅/SLA/创建日筛选（受控搜索等）。 */
     public WorkOrderQuery(
             String clientCode, UUID projectId, String status, String externalOrderCode,
             String cursor, int limit
     ) {
-        this(clientCode, projectId, status, externalOrderCode, null, null, null, null, null, null, null, cursor, limit);
+        this(clientCode, projectId, status, externalOrderCode, null, null, null, null, null, null, null, null, null, cursor, limit);
     }
 }
