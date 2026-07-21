@@ -1,0 +1,8 @@
+spring:
+  config:
+    activate:
+      on-profile: test
+
+# 测试输出同样面向开发者和 CI 诊断，不经过结构化 JSON 脱敏。
+logging:
+  config: classpath:logback-local.xml
