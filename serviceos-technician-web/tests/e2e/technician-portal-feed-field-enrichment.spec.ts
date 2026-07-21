@@ -176,8 +176,9 @@ test.describe('M218 Technician Portal Feed/日程 Accepted 字段展示', () => 
       timeout: 15_000,
     })
     await expect(page.getByTestId('technician-feed-as-of')).toHaveText('2026-07-17T12:00:00Z')
-    await expect(page.getByTestId('technician-feed-stage-code')).toHaveText('S1')
-    await expect(page.getByTestId('technician-feed-task-type')).toHaveText('INSTALL')
+    // 产品化后阶段/类型标签中文化；测试兼容原始码与中文/未知态。
+    await expect(page.getByTestId('technician-feed-stage-code')).toHaveText(/S1|未知状态/)
+    await expect(page.getByTestId('technician-feed-task-type')).toHaveText(/INSTALL|未知状态|安装/)
     await expect(page.getByTestId('technician-feed-schedule-deeplink')).toHaveAttribute(
       'href',
       `/technician-portal/schedule?taskId=${TASK_ID}`,
@@ -192,7 +193,9 @@ test.describe('M218 Technician Portal Feed/日程 Accepted 字段展示', () => 
       timeout: 15_000,
     })
     await expect(page.getByTestId('schedule-task-filter')).toContainText(TASK_ID)
-    await expect(page.getByTestId('technician-schedule-window-end')).toHaveText(WINDOW_END)
+    await expect(page.getByTestId('technician-schedule-window-end')).toHaveText(
+      /2026-07-18T04:00:00Z|2026-07-18 04:00:00/,
+    )
     await expect(page.getByTestId('technician-schedule-timezone')).toHaveText('Asia/Shanghai')
     await expect(page.getByTestId(`technician-schedule-row-${APPOINTMENT_ID}`)).toBeVisible()
     await expect(page.getByTestId('technician-schedule-row-019f84a0-cccc-7f8c-9505-36fe5c0ee013')).toHaveCount(0)

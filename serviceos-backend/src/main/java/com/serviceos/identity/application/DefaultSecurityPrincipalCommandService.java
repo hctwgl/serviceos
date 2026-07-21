@@ -64,6 +64,58 @@ final class DefaultSecurityPrincipalCommandService implements SecurityPrincipalC
 
     @Override
     @Transactional
+    public SecurityPrincipalView register(
+            CurrentPrincipal actor,
+            CommandMetadata metadata,
+            String displayName,
+            String employeeNumber,
+            String personaType
+    ) {
+        displayName = requireText(displayName, "displayName", 200);
+        employeeNumber = normalizeOptional(employeeNumber, "employeeNumber", 128);
+        String normalizedPersona = personaType == null || personaType.isBlank()
+                ? null
+                : requirePersonaType(personaType);
+        UUID principalId = UUID.randomUUID();
+        var input = new RegisterInput(displayName, employeeNumber, normalizedPersona);
+        CommandExecution execution = begin(actor, metadata, "identity.register", "identity.register",
+                principalId, input);
+        if (execution.replay()) {
+            String resourceId = execution.decision().resourceId()
+                    .orElseThrow(() -> new BusinessProblem(
+                            ProblemCode.IDENTITY_PROFILE_CONFLICT, "登记幂等重放缺少资源标识"));
+            return requirePrincipal(actor.tenantId(), UUID.fromString(resourceId)).toView();
+        }
+
+        Instant now = clock.instant();
+        SecurityPrincipal principal = SecurityPrincipal.register(
+                principalId, actor.tenantId(), SecurityPrincipal.Type.USER,
+                displayName, employeeNumber, now);
+        try {
+            directory.insertPrincipal(principal, actor.principalId());
+        } catch (RuntimeException exception) {
+            if (isUniqueViolation(exception)) {
+                throw new BusinessProblem(ProblemCode.IDENTITY_PROFILE_CONFLICT, "工号已存在于本租户");
+            }
+            throw exception;
+        }
+        long version = 1L;
+        if (normalizedPersona != null) {
+            UUID personaId = UUID.randomUUID();
+            if (!directory.addPersonaAndAdvance(
+                    actor.tenantId(), principalId, 1L, personaId, normalizedPersona,
+                    now, null, actor.principalId(), now)) {
+                throw versionConflict();
+            }
+            version = 2L;
+        }
+        complete(actor, metadata, execution, principalId, version,
+                "REGISTERED", "identity.register", "admin-register", now);
+        return requirePrincipal(actor.tenantId(), principalId).toView();
+    }
+
+    @Override
+    @Transactional
     public SecurityPrincipalView linkIdentity(
             CurrentPrincipal actor, CommandMetadata metadata, UUID principalId, long expectedVersion,
             String issuer, String subject, String clientId
@@ -285,6 +337,19 @@ final class DefaultSecurityPrincipalCommandService implements SecurityPrincipalC
         }
     }
 
+    private static boolean isUniqueViolation(Throwable exception) {
+        Throwable cursor = exception;
+        while (cursor != null) {
+            String name = cursor.getClass().getName();
+            String message = cursor.getMessage() == null ? "" : cursor.getMessage();
+            if (name.contains("DuplicateKey") || message.contains("uq_idn_person_profile_employee")) {
+                return true;
+            }
+            cursor = cursor.getCause();
+        }
+        return false;
+    }
+
     private static BusinessProblem versionConflict() {
         return new BusinessProblem(ProblemCode.VERSION_CONFLICT, "主体版本已被并发修改");
     }
@@ -299,6 +364,7 @@ final class DefaultSecurityPrincipalCommandService implements SecurityPrincipalC
 
     private enum PersonaType { INTERNAL_EMPLOYEE, NETWORK_MEMBER, TECHNICIAN, CONSUMER, SERVICE_ACCOUNT }
 
+    private record RegisterInput(String displayName, String employeeNumber, String personaType) {}
     private record LinkInput(UUID principalId, long expectedVersion, String issuer, String subject, String clientId) {}
     private record LifecycleInput(UUID principalId, long expectedVersion, String reason) {}
     private record ProfileInput(UUID principalId, long expectedVersion, String displayName, String employeeNumber) {}

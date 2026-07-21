@@ -120,8 +120,8 @@ class NetworkPortalReadPostgresIT {
                     idn_person_profile, idn_security_principal,
                     rel_idempotency_record, aud_audit_record CASCADE
                 """).update();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("135");
-        assertThat(flyway.info().applied()).hasSize(137);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("145");
+        assertThat(flyway.info().applied()).hasSize(147);
 
         seedPrincipal(PRINCIPAL, "Portal Member");
         seedPrincipal(OTHER_PRINCIPAL, "Other Member");
@@ -194,6 +194,24 @@ class NetworkPortalReadPostgresIT {
         NetworkPortalPage<NetworkPortalWorkOrderItem> byUuid =
                 portal.listWorkOrders(actor(PRINCIPAL), "corr-uuid", NETWORK_A.toString());
         assertThat(byUuid.items()).hasSize(1);
+        // M428：目录基座返回脱敏客户联系；夹具原文为 测试客户 / 13800000000 / 测试地址
+        NetworkPortalWorkOrderItem directoryItem = byUuid.items().getFirst();
+        assertThat(directoryItem.maskedCustomerName()).isEqualTo("测***");
+        assertThat(directoryItem.maskedCustomerPhone()).isEqualTo("*******0000");
+        assertThat(directoryItem.maskedServiceAddress()).isEqualTo("测***");
+        assertThat(directoryItem.maskedCustomerPhone()).doesNotContain("138");
+        assertThat(directoryItem.maskedServiceAddress()).doesNotContain("测试地址");
+
+        NetworkPortalPage<NetworkPortalTaskItem> taskPage =
+                portal.listTasks(actor(PRINCIPAL), "corr-task-masked", context);
+        assertThat(taskPage.items()).isNotEmpty();
+        assertThat(taskPage.items())
+                .allSatisfy(task -> {
+                    assertThat(task.maskedCustomerName()).isEqualTo("测***");
+                    assertThat(task.maskedCustomerPhone()).isEqualTo("*******0000");
+                    assertThat(task.maskedServiceAddress()).isEqualTo("测***");
+                    assertThat(task.maskedCustomerPhone()).doesNotContain("138");
+                });
     }
 
     @Test
@@ -208,6 +226,12 @@ class NetworkPortalReadPostgresIT {
                 .containsExactlyInAnyOrder(TASK_A, TASK_A2);
         assertThat(workspace.tasks().getFirst().status()).isEqualTo("READY");
         assertThat(workspace.technicianId()).isEqualTo(TECH_PROFILE.toString());
+        // M424：基座返回脱敏客户联系；夹具原文为 测试客户 / 13800000000 / 测试地址
+        assertThat(workspace.maskedCustomerName()).isEqualTo("测***");
+        assertThat(workspace.maskedCustomerPhone()).isEqualTo("*******0000");
+        assertThat(workspace.maskedServiceAddress()).isEqualTo("测***");
+        assertThat(workspace.maskedCustomerPhone()).doesNotContain("138");
+        assertThat(workspace.maskedServiceAddress()).doesNotContain("测试地址");
 
         assertThatThrownBy(() -> portal.getWorkOrderWorkspace(
                 actor(PRINCIPAL), "corr-ws-foreign", context, WO_B))
@@ -646,6 +670,8 @@ class NetworkPortalReadPostgresIT {
                 .containsExactly(TECH_PROFILE);
         assertThat(withData.technicians().getFirst().displayName()).isEqualTo("网点师傅甲");
         assertThat(withData.technicians().getFirst().membershipStatus()).isEqualTo("ACTIVE");
+        assertThat(withData.technicians().getFirst().openTaskCount()).isEqualTo(2);
+        assertThat(withData.technicians().getFirst().qualificationSummary()).isEqualTo("无资质记录");
     }
 
     @Test
@@ -840,12 +866,57 @@ class NetworkPortalReadPostgresIT {
 
     @Test
     void techniciansAndCapacityAreNetworkScoped() {
+        Instant submittedAt = Instant.parse("2026-07-20T00:00:00Z");
+        jdbc.sql("""
+                INSERT INTO net_technician_qualification (
+                    qualification_id, tenant_id, technician_profile_id, qualification_code,
+                    qualification_status, valid_from, valid_to, submitted_by, submitted_at,
+                    decided_by, decided_at, decision_reason, aggregate_version
+                ) VALUES (
+                    :id, :tenant, :profile, 'EV-INSTALL', 'APPROVED',
+                    :validFrom, :validTo, 'submitter', :submittedAt,
+                    'approver', :decidedAt, 'ok', 1
+                )
+                """)
+                .param("id", UUID.randomUUID())
+                .param("tenant", TENANT)
+                .param("profile", TECH_PROFILE)
+                .param("validFrom", java.sql.Timestamp.from(submittedAt))
+                .param("validTo", java.sql.Timestamp.from(submittedAt.plusSeconds(86400L * 365)))
+                .param("submittedAt", java.sql.Timestamp.from(submittedAt))
+                .param("decidedAt", java.sql.Timestamp.from(submittedAt.plusSeconds(3600)))
+                .update();
+        jdbc.sql("""
+                INSERT INTO net_technician_qualification (
+                    qualification_id, tenant_id, technician_profile_id, qualification_code,
+                    qualification_status, valid_from, valid_to, submitted_by, submitted_at,
+                    decided_by, decided_at, decision_reason, aggregate_version
+                ) VALUES (
+                    :id, :tenant, :profile, 'EV-COMMISSION', 'PENDING',
+                    :validFrom, :validTo, 'submitter', :submittedAt,
+                    NULL, NULL, NULL, 1
+                )
+                """)
+                .param("id", UUID.randomUUID())
+                .param("tenant", TENANT)
+                .param("profile", TECH_PROFILE)
+                .param("validFrom", java.sql.Timestamp.from(submittedAt))
+                .param("validTo", java.sql.Timestamp.from(submittedAt.plusSeconds(86400L * 365)))
+                .param("submittedAt", java.sql.Timestamp.from(submittedAt))
+                .update();
+
         String contextA = "NETWORK|NETWORK|" + NETWORK_A;
         NetworkPortalPage<NetworkPortalTechnicianItem> techs =
                 portal.listTechnicians(actor(PRINCIPAL), "corr-techs", contextA);
         assertThat(techs.items()).hasSize(1);
-        assertThat(techs.items().getFirst().technicianProfileId()).isEqualTo(TECH_PROFILE);
-        assertThat(techs.items().getFirst().displayName()).isEqualTo("网点师傅甲");
+        NetworkPortalTechnicianItem tech = techs.items().getFirst();
+        assertThat(tech.technicianProfileId()).isEqualTo(TECH_PROFILE);
+        assertThat(tech.displayName()).isEqualTo("网点师傅甲");
+        // 基线种子：NETWORK_A 上 TECH_PROFILE 有 TASK_A + TASK_A2 两条 ACTIVE 责任
+        assertThat(tech.openTaskCount()).isEqualTo(2);
+        assertThat(tech.approvedQualificationCount()).isEqualTo(1);
+        assertThat(tech.pendingQualificationCount()).isEqualTo(1);
+        assertThat(tech.qualificationSummary()).isEqualTo("已通过 1 项，待审 1 项");
 
         NetworkPortalPage<NetworkPortalCapacityItem> capacity =
                 portal.listCapacity(actor(PRINCIPAL), "corr-cap", contextA);

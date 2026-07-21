@@ -3,18 +3,26 @@
  * ADMIN.WORKBENCH — 平台运营工作台。
  * 每张卡片独立请求：单卡失败不影响整页，禁止整体白屏。
  */
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import PageState from '../components/PageState.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import WorkbenchPageLayout from '../patterns/templates/WorkbenchPageLayout.vue'
+import SummaryStrip, { type SummaryStripItem } from '../patterns/SummaryStrip.vue'
 import { Button } from 'ant-design-vue'
 import { listReviewCases, listCorrectionCases, listOperationalExceptions } from '../api/queues'
 import { listAuthorizedWorkOrders } from '../api/workOrders'
 import { listSlaInstances } from '../api/sla'
+import {
+  formatFollowedBadgeCount,
+  listFollowedProjects,
+  unfollowProject,
+  type FollowedProjectItem,
+} from '../api/followedProjects'
 import { toUserFacingError } from '../product/errorMessages'
 import { formatDateTime, formatRemainingSeconds } from '../product/formatTime'
 import { statusLabel } from '../product/statusLabels'
+import { labelClientCode } from '../presentation/enum-labels'
 
 type CardState<T> = {
   loading: boolean
@@ -45,6 +53,8 @@ const corrections = ref(emptyCard<{ count: number; items: TodoItem[] }>())
 const slaRisk = ref(emptyCard<{ running: number; breached: number; items: TodoItem[] }>())
 const exceptions = ref(emptyCard<{ count: number }>())
 const recent = ref(emptyCard<{ items: TodoItem[] }>())
+const followed = ref(emptyCard<{ items: FollowedProjectItem[] }>())
+const unfollowBusyId = ref<string | null>(null)
 
 async function loadCard<T>(
   target: { value: CardState<T> },
@@ -170,6 +180,47 @@ async function loadRecent() {
   })
 }
 
+async function loadFollowed() {
+  await loadCard(followed, async () => {
+    const page = await listFollowedProjects(10)
+    return { items: page.items }
+  })
+}
+
+async function removeFollow(projectId: string) {
+  unfollowBusyId.value = projectId
+  try {
+    await unfollowProject(projectId)
+    await loadFollowed()
+  } catch (err) {
+    const facing = toUserFacingError(err)
+    followed.value = {
+      ...followed.value,
+      error: facing.message,
+      errorCode: facing.errorCode,
+    }
+  } finally {
+    unfollowBusyId.value = null
+  }
+}
+
+function followedBadgeAria(item: FollowedProjectItem): string {
+  const parts: string[] = []
+  const todo = formatFollowedBadgeCount(item.openTodoCount, null)
+  if (todo != null) {
+    parts.push(`待办 ${todo}`)
+  }
+  const sla = formatFollowedBadgeCount(item.slaBreachedCount, item.slaBreachedCountTruncated)
+  if (sla != null) {
+    parts.push(`SLA 超时 ${sla}`)
+  }
+  const wo = formatFollowedBadgeCount(item.activeWorkOrderCount, item.activeWorkOrderCountTruncated)
+  if (wo != null) {
+    parts.push(`进行中工单 ${wo}`)
+  }
+  return parts.length > 0 ? parts.join('，') : '暂无角标'
+}
+
 async function loadAll() {
   pageBootError.value = null
   await Promise.allSettled([
@@ -179,8 +230,40 @@ async function loadAll() {
     loadSla(),
     loadExceptions(),
     loadRecent(),
+    loadFollowed(),
   ])
 }
+
+const summaryItems = computed<SummaryStripItem[]>(() => [
+  {
+    key: 'todos',
+    label: '我的待办',
+    value: String(
+      (reviews.value.data?.count ?? 0) +
+        (corrections.value.data?.count ?? 0) +
+        (slaRisk.value.data?.breached ?? 0),
+    ),
+    hint: '审核 + 整改 + 已超时',
+    tone: 'info',
+  },
+  {
+    key: 'breached',
+    label: '已超时',
+    value: String(slaRisk.value.data?.breached ?? '—'),
+    tone: (slaRisk.value.data?.breached ?? 0) > 0 ? 'critical' : 'default',
+  },
+  {
+    key: 'exceptions',
+    label: '重大异常',
+    value: String(exceptions.value.data?.count ?? '—'),
+    tone: (exceptions.value.data?.count ?? 0) > 0 ? 'warning' : 'default',
+  },
+  {
+    key: 'active',
+    label: '处理中工单',
+    value: workOrders.value.data?.countLabel ?? '—',
+  },
+])
 
 onMounted(() => {
   void loadAll()
@@ -204,6 +287,10 @@ onMounted(() => {
     </template>
     <template #feedback>
       <PageState v-if="pageBootError" kind="error" :description="pageBootError" @reload="loadAll" />
+    </template>
+
+    <template #summary>
+      <SummaryStrip :items="summaryItems" />
     </template>
 
     <template #primary-queue>
@@ -365,7 +452,7 @@ onMounted(() => {
     </template>
 
     <template #recent-activity>
-      <section class="recent" data-testid="workbench-recent">
+      <section class="recent" data-testid="workbench-recent-list">
         <PageState v-if="recent.loading" kind="loading" compact />
         <PageState
           v-else-if="recent.error"
@@ -386,6 +473,71 @@ onMounted(() => {
             <RouterLink :to="item.to">{{ item.workOrderLabel }}</RouterLink>
             <StatusBadge :status="item.status" />
             <span class="muted">{{ statusLabel(item.status) }} · {{ item.remaining }}</span>
+          </li>
+        </ul>
+      </section>
+    </template>
+
+    <template #followed-projects>
+      <section class="followed" data-testid="workbench-followed-list">
+        <PageState v-if="followed.loading" kind="loading" compact />
+        <PageState
+          v-else-if="followed.error"
+          kind="error"
+          compact
+          :description="followed.error"
+          :error-code="followed.errorCode ?? undefined"
+          @reload="loadFollowed"
+        />
+        <PageState
+          v-else-if="followed.data && followed.data.items.length === 0"
+          kind="empty"
+          compact
+          guide="尚未关注项目。打开项目详情后可点击「关注项目」。"
+        />
+        <ul v-else-if="followed.data">
+          <li v-for="item in followed.data.items" :key="item.projectId">
+            <RouterLink
+              :to="{ name: 'ADMIN.PROJECT.DETAIL', params: { id: item.projectId } }"
+              data-testid="workbench-followed-link"
+            >
+              {{ item.displayRef }}
+            </RouterLink>
+            <StatusBadge v-if="item.status" :status="item.status" />
+            <span class="muted">
+              {{ item.projectCode || '—' }}
+              · {{ labelClientCode(item.clientId) }}
+            </span>
+            <span
+              class="followed-badges"
+              data-testid="workbench-followed-badges"
+              :aria-label="followedBadgeAria(item)"
+            >
+              <span
+                v-if="formatFollowedBadgeCount(item.openTodoCount, null) != null"
+                class="badge badge-todo"
+                data-testid="workbench-followed-todo"
+              >待办 {{ formatFollowedBadgeCount(item.openTodoCount, null) }}</span>
+              <span
+                v-if="formatFollowedBadgeCount(item.slaBreachedCount, item.slaBreachedCountTruncated) != null"
+                class="badge badge-sla"
+                data-testid="workbench-followed-sla"
+              >SLA {{ formatFollowedBadgeCount(item.slaBreachedCount, item.slaBreachedCountTruncated) }}</span>
+              <span
+                v-if="formatFollowedBadgeCount(item.activeWorkOrderCount, item.activeWorkOrderCountTruncated) != null"
+                class="badge badge-wo"
+                data-testid="workbench-followed-work-orders"
+              >工单 {{ formatFollowedBadgeCount(item.activeWorkOrderCount, item.activeWorkOrderCountTruncated) }}</span>
+            </span>
+            <Button
+              size="small"
+              type="link"
+              :loading="unfollowBusyId === item.projectId"
+              data-testid="workbench-followed-unfollow"
+              @click="removeFollow(item.projectId)"
+            >
+              取消关注
+            </Button>
           </li>
         </ul>
       </section>
@@ -458,11 +610,43 @@ button,
   text-decoration: none;
 }
 .todo,
-.recent {
-  background: #fff;
-  border-radius: 12px;
-  padding: 1rem 1.25rem;
-  box-shadow: 0 1px 3px rgb(16 42 67 / 8%);
+.recent,
+.followed {
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+}
+.followed-badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+.followed-badges .badge {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  border: 1px solid #d0d7de;
+  background: #f6f8fa;
+  color: #24292f;
+}
+.followed-badges .badge-todo {
+  border-color: #9ec5fe;
+  background: #eef5ff;
+  color: #0b69a3;
+}
+.followed-badges .badge-sla {
+  border-color: #f1aeb5;
+  background: #fff5f5;
+  color: #b42318;
+}
+.followed-badges .badge-wo {
+  border-color: #c4cdd5;
+  background: #f8fafc;
+  color: #334155;
 }
 table {
   width: 100%;

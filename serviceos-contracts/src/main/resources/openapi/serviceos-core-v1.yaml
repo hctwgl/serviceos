@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.61
+  version: 1.0.113
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -37,6 +37,53 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: registerSecurityPrincipal
+      summary: 登记统一主体（不保存密码）
+      description: |
+        M402：需要 identity.register。创建 USER 主体与可选 Persona；不接受密码字段。
+        登录仍依赖后续 OIDC IdentityLink（identity.manageLinks）。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterSecurityPrincipalRequest' }
+      responses:
+        '201':
+          description: 已登记主体
+          headers:
+            ETag: { required: true, schema: { type: string } }
+            Location: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/SecurityPrincipal' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /admin/user-directory:
+    get:
+      operationId: listAdminUserDirectory
+      summary: Admin 用户目录（含组织/角色摘要）
+      description: |
+        M402：基于 identity.read 列出主体；organizationSummary / roleSummary 分别依赖
+        organization.read / authorization.read，缺权时对应字段为 null（soft-gate）。
+      parameters:
+        - { name: query, in: query, schema: { type: string, minLength: 1, maxLength: 200 } }
+        - { name: status, in: query, schema: { enum: [ACTIVE, DISABLED] } }
+        - { name: cursor, in: query, schema: { type: string, minLength: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 用户目录页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/AdminUserDirectoryPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
   /security-principals/{principalId}:
     get:
       operationId: getSecurityPrincipal
@@ -51,6 +98,79 @@ paths:
             ETag: { required: true, schema: { type: string } }
             X-Correlation-Id: { required: true, schema: { type: string } }
           content: { application/json: { schema: { $ref: '#/components/schemas/SecurityPrincipalDetail' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /security-principals/{principalId}/recent-logins:
+    get:
+      operationId: listPrincipalRecentLogins
+      summary: 查询主体最近成功登录
+      description: |
+        M403：需要 identity.read。仅返回成功 OIDC 解析事实；不含 subject/密码。
+        issuer 仅作登录渠道展示，不能替代 identity.readSensitive 绑定详情。
+      parameters:
+        - $ref: '#/components/parameters/PrincipalId'
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 最近登录页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/PrincipalLoginEventPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /security-principals/{principalId}/authorization-denials:
+    get:
+      operationId: listPrincipalAuthorizationDenials
+      summary: 查询主体授权拒绝安全活动流
+      description: |
+        M419：硬门禁 identity.read；soft-gate authorization.read。
+        按被拒主体（actor）读取 AUTHORIZATION_DENIED 审计，不并入 change-timeline。
+        缺 authorization.read 时返回 items=[] 且 omitted=true，不伪造“近期无拒绝”。
+      parameters:
+        - $ref: '#/components/parameters/PrincipalId'
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 授权拒绝安全活动页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/PrincipalAuthorizationDenialPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /security-principals/{principalId}/change-timeline:
+    get:
+      operationId: listPrincipalChangeTimeline
+      summary: 查询主体变更时间线
+      description: |
+        M405/M415/M416/M417/M418/M420：需要 identity.read。
+        聚合生命周期、非冗余审计、成功登录；并 soft-gate 合并组织任职（organization.read）、
+        RoleGrant（authorization.read）、网点任职/师傅服务关系/师傅档案生命周期与客户端种类声明
+        （network.read）事实。缺权来源列入 omittedSources，不伪造空成功。
+        不包含 AUTHORIZATION_DENIED（见独立安全活动流）。
+      parameters:
+        - $ref: '#/components/parameters/PrincipalId'
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 变更时间线
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/PrincipalChangeTimelinePage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
@@ -334,6 +454,30 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /org-memberships:
+    get:
+      operationId: listOrgMembershipSummaries
+      summary: 按主体查询组织任职摘要
+      description: |
+        M404：需要 organization.read。返回组织/单元显示名，供 Admin 用户详情组织归属使用。
+      parameters:
+        - name: principalId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+        - name: status
+          in: query
+          required: false
+          schema: { enum: [ACTIVE, TERMINATED] }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 任职摘要页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/OrgMembershipSummaryPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
   /org-memberships/{membershipId}:transfer:
     post:
       operationId: transferOrganizationMembership
@@ -1468,6 +1612,106 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '422': { $ref: '#/components/responses/Problem' }
+
+  /me/followed-projects:
+    get:
+      operationId: listMyFollowedProjects
+      summary: 列出当前主体的 Admin 关注项目
+      description: |
+        M401：仅 Portal=ADMIN。任意已认证主体可读自己的关注项目；不要求新 capability。
+        服务端对每项经 project.read 重新鉴权，失权项省略并清理；不整列表 403。
+        M409：可选角标计数字段 soft-gate。
+        M452：角标改为精确 COUNT；具备能力时 `*Truncated` 恒为 false。
+      parameters:
+        - name: portal
+          in: query
+          required: false
+          schema: { type: string, enum: [ADMIN], default: ADMIN }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 已按当前授权过滤的关注项目列表
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/FollowedProjectPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+    put:
+      operationId: followMyProject
+      summary: 关注一个项目（幂等 upsert）
+      description: |
+        M401：先经 project.read 鉴权再写入本人关注行。同 projectId 覆盖 followedAt/displayRef。
+        portal 必须为 ADMIN。不要求新 capability。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FollowProjectRequest' }
+      responses:
+        '200':
+          description: 已关注项目项
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/FollowedProjectItem' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /me/followed-projects/{projectId}/status:
+    get:
+      operationId: getMyFollowedProjectStatus
+      summary: 查询当前主体是否已关注指定项目
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: portal
+          in: query
+          required: false
+          schema: { type: string, enum: [ADMIN], default: ADMIN }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 关注状态
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [projectId, followed]
+                properties:
+                  projectId: { type: string, format: uuid }
+                  followed: { type: boolean }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+  /me/followed-projects/{projectId}:
+    delete:
+      operationId: unfollowMyProject
+      summary: 取消关注项目
+      description: 即使已失权也可清理本人关注行；幂等成功。
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: portal
+          in: query
+          required: false
+          schema: { type: string, enum: [ADMIN], default: ADMIN }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '204':
+          description: 已取消关注
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
   /network-portal/work-orders:
     get:
       operationId: listNetworkPortalWorkOrders
@@ -1496,6 +1740,8 @@ paths:
         覆盖本页 items[].taskIds。
         M236：items 含非 PII 工单头字段 brandCode/serviceProductCode/provinceCode/
         cityCode/districtCode/receivedAt（对齐 Admin WorkOrder 子集；工单缺失时为 null）。
+        M428：items 含服务端脱敏客户联系 `maskedCustomerName` / `maskedCustomerPhone` /
+        `maskedServiceAddress`（复用 M424 网点脱敏端口；随基座返回，不 soft-omit；无原文）。
       parameters:
         - $ref: '#/components/parameters/NetworkContext'
         - $ref: '#/components/parameters/CorrelationId'
@@ -1539,6 +1785,9 @@ paths:
         M229：可选 `reviews`（复用 Admin WorkOrderWorkspaceReviewCaseSummary）；
         需 NETWORK `evidence.read`，缺能力时省略（不得用空数组伪装）；
         仅覆盖 ACTIVE taskIds；含全部状态。
+        M424：顶层 `maskedCustomerName` / `maskedCustomerPhone` / `maskedServiceAddress`
+        随基座返回（复用 workorder 脱敏端口的网点授权路径）；不得返回客户联系原文；
+        不 soft-omit（缺值为 null）。
         上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
       parameters:
         - name: workOrderId
@@ -1582,6 +1831,8 @@ paths:
         覆盖本页 items[].taskId。
         M236：items 含非 PII 工单头字段 brandCode/serviceProductCode/provinceCode/
         cityCode/districtCode/receivedAt（对齐 Admin WorkOrder 子集；工单缺失时为 null）。
+        M428：items 含所属工单服务端脱敏客户联系 `maskedCustomerName` / `maskedCustomerPhone` /
+        `maskedServiceAddress`（复用 M424 网点脱敏端口；随基座返回，不 soft-omit；无原文）。
       parameters:
         - $ref: '#/components/parameters/NetworkContext'
         - $ref: '#/components/parameters/CorrelationId'
@@ -1599,6 +1850,7 @@ paths:
       summary: Network Portal 本网点师傅列表
       description: |
         M194：X-Network-Context + technician.readOwnNetwork。仅 ACTIVE NetworkTechnicianMembership。
+        M421：items 含开放任务数与资质计数/摘要（口径对齐 assign-candidates；不伪造技能/服务区域）。
       parameters:
         - $ref: '#/components/parameters/NetworkContext'
         - $ref: '#/components/parameters/CorrelationId'
@@ -1607,6 +1859,31 @@ paths:
           description: 本网点 ACTIVE 师傅列表
           headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
           content: { application/json: { schema: { $ref: '#/components/schemas/NetworkPortalTechnicianPage' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /network-portal/tasks/{taskId}/assign-candidates:
+    get:
+      operationId: listNetworkPortalAssignCandidates
+      summary: Network Portal 任务分配师傅候选摘要
+      description: |
+        M407/M408/M410/M412：X-Network-Context + networkTask.read + technician.readOwnNetwork。
+        返回本网点 ACTIVE 师傅的开放任务数、资质摘要、预约日程冲突摘要、行政区距离亲和、
+        推荐解释档位/摘要、网点产能口径与可分配警告。距离以工单省市区与网点 Coverage 亲和表达，
+        不伪造经纬度路网距离；推荐解释依据可见运营事实，不含内部评分公式。
+        任务须属于本网点 ACTIVE NETWORK 责任。
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 分配候选摘要页
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkPortalAssignCandidatePage' } } }
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
@@ -1826,6 +2103,8 @@ paths:
         unassignedTechnicianTaskCount 在基座成功时始终返回。
         M224：可选 `slaSummary`（openCount/breachedCount，语义同 M221）；需 NETWORK `sla.read`，
         缺能力时省略该属性（不得用 0 伪装无权限）；按本网点全部 ACTIVE taskIds 聚合。
+        M411：可选 `todayAppointmentCount` / `todayAppointments` 需 NETWORK `networkPortal.manageAppointment`；
+        运营日按 Asia/Shanghai；不含客户 PII。`todayTimeline` 始终返回（至少含待分配桶）。
       parameters:
         - $ref: '#/components/parameters/NetworkContext'
         - $ref: '#/components/parameters/CorrelationId'
@@ -1834,6 +2113,35 @@ paths:
           description: 工作台摘要
           headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
           content: { application/json: { schema: { $ref: '#/components/schemas/NetworkPortalWorkbenchView' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /network-portal/appointment-calendar:
+    get:
+      operationId: getNetworkPortalAppointmentCalendar
+      summary: Network Portal 本网点预约日历
+      description: |
+        M413：X-Network-Context + NETWORK `networkPortal.manageAppointment`（硬门禁）。
+        返回运营日 Asia/Shanghai 闭区间内与 ACTIVE 任务重叠的 PROPOSED/CONFIRMED 预约；
+        按窗口开始日落日；不含客户 PII。默认 from=今天、to=from+13；跨度不得超过 31 天。
+      parameters:
+        - name: from
+          in: query
+          required: false
+          schema: { type: string, format: date }
+          description: 含当日；省略时为 Asia/Shanghai 今天
+        - name: to
+          in: query
+          required: false
+          schema: { type: string, format: date }
+          description: 含当日；省略时为 from+13 天
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 预约日历
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkPortalAppointmentCalendarView' } } }
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
@@ -3077,11 +3385,71 @@ paths:
     get:
       operationId: listAuthorizedWorkOrders
       summary: 查询当前主体有权读取的工单目录
-      description: workOrder.read 实时项目范围在 SQL 中收敛；cursor 绑定范围摘要和全部筛选条件。
+      description: |
+        workOrder.read 实时项目范围在 SQL 中收敛；cursor 绑定范围摘要和全部筛选条件。
+        M429：items 含服务端脱敏客户联系 `maskedCustomerName` / `maskedCustomerPhone` /
+        `maskedServiceAddress`（随基座返回，不 soft-omit；无原文）。
+        M434：可选页级 `slaRiskSummaries`；需 PROJECT `sla.read` soft-gate，缺能力时省略属性；
+        有能力且本页无开放风险时返回 []；仅含 openCount>0 行。
+        M450：可选页级 `exceptionSummaries`；需 PROJECT `operations.exception.read` soft-gate，
+        缺能力时省略属性；有能力且本页无 OPEN 异常时返回 []；仅含 openCount>0 行。
+        M436/M444：页级 `totalCount` / `totalCountTruncated`（当前筛选、无 cursor）；
+        M444 起 `totalCount` 为精确全量 COUNT(*)，`totalCountTruncated` 恒为 false。
+        M437：可选 `provinceCode` / `cityCode` / `districtCode` 国标码精确匹配（AND）；
+        写入 cursor filterDigest；不发明名称解析。
+        M438：可选 `currentStageCode` 与目录列同口径（最早 ACTIVE 任务 stageCode）精确匹配；
+        经 task SPI 解析后以工单 ID IN 收敛；写入 cursor filterDigest。
+        M446：可选 `currentTaskStatus` 与目录列同口径（最早 ACTIVE 任务 status）精确匹配；
+        经 task SPI 解析后以工单 ID IN 收敛；写入 cursor filterDigest。
+        M440：可选 `currentNetworkId` 与目录网点列同口径（ACTIVE NETWORK assignee）精确匹配；
+        经 dispatch SPI 解析后以工单 ID IN 收敛；写入 cursor filterDigest。
+        M441：可选 `currentTechnicianId` 与目录师傅列同口径（ACTIVE TECHNICIAN assignee）精确匹配；
+        经 dispatch SPI 解析后以工单 ID IN 收敛；写入 cursor filterDigest。
+        M442：可选 `slaRisk`（OPEN/BREACHED）与目录 SLA 列同口径精确匹配；
+        仅在具备 PROJECT/TENANT `sla.read` 的范围内经 sla SPI 解析后 IN 收敛；写入 cursor filterDigest。
+        M445：`slaRisk=NEAR` 为 RUNNING 且 `now < deadline_at ≤ now+30m` 的即将超时窗口（固定 30 分钟 MVP）。
+        M443：可选 `receivedFrom` / `receivedTo`（`format: date`）按 `receivedAt` 筛选；
+        Asia/Shanghai 自然日闭区间，写入 cursor filterDigest；跨度上限 366 天。
+        M447：可选 `reviewCorrectionStatus`（`REVIEW_OPEN`/`CORRECTION_ACTIVE`）按审核/整改运营桶筛选；
+        经 evidence SPI 解析后以工单 ID IN 收敛；仅在具备 PROJECT `evidence.read` 的范围内解析；写入 cursor filterDigest。
+        M448：可选 `q` 服务端关键词（工单编号/客户名/手机后四位/地址 OR）；完整手机号失败关闭；写入 cursor filterDigest。
       parameters:
         - { name: clientCode, in: query, schema: { type: string, minLength: 1, maxLength: 128 } }
         - { name: projectId, in: query, schema: { type: string, format: uuid } }
         - { name: status, in: query, schema: { enum: [RECEIVED, ACTIVE, FULFILLED] } }
+        - { name: provinceCode, in: query, schema: { type: string, minLength: 1, maxLength: 16 },
+            description: M437：省国标码精确匹配 }
+        - { name: cityCode, in: query, schema: { type: string, minLength: 1, maxLength: 16 },
+            description: M437：市国标码精确匹配 }
+        - { name: districtCode, in: query, schema: { type: string, minLength: 1, maxLength: 16 },
+            description: M437：区县国标码精确匹配 }
+        - { name: currentStageCode, in: query,
+            schema: { type: string, minLength: 1, maxLength: 64, pattern: '^[A-Z][A-Z0-9_]*$' },
+            description: M438：当前阶段码精确匹配（与 currentStageCode 列同口径） }
+        - { name: currentTaskStatus, in: query,
+            schema: { type: string, enum: [READY, PENDING, CLAIMED, RUNNING, RETRY_WAIT, MANUAL_INTERVENTION] },
+            description: M446：当前 ACTIVE 任务状态精确匹配（与 currentTaskStatus 列同口径） }
+        - { name: currentNetworkId, in: query, schema: { type: string, format: uuid },
+            description: M440：当前 ACTIVE NETWORK 网点 ID 精确匹配（与 currentNetworkId 列同口径） }
+        - { name: currentTechnicianId, in: query, schema: { type: string, format: uuid },
+            description: M441：当前 ACTIVE TECHNICIAN 师傅档案 ID 精确匹配（与 currentTechnicianId 列同口径） }
+        - { name: slaRisk, in: query, schema: { type: string, enum: [OPEN, BREACHED, NEAR] },
+            description: >
+              M442/M445：SLA 风险精确匹配；OPEN=RUNNING∪BREACHED，BREACHED=仅已超时，
+              NEAR=RUNNING 且截止时间落在 now 后 30 分钟内 }
+        - { name: receivedFrom, in: query, schema: { type: string, format: date },
+            description: M443：创建日下界（含当日，Asia/Shanghai；按 receivedAt） }
+        - { name: receivedTo, in: query, schema: { type: string, format: date },
+            description: M443：创建日上界（含当日，Asia/Shanghai；按 receivedAt） }
+        - { name: reviewCorrectionStatus, in: query,
+            schema: { type: string, enum: [REVIEW_OPEN, CORRECTION_ACTIVE] },
+            description: >
+              M447：审核/整改运营桶精确匹配；REVIEW_OPEN=存在 OPEN ReviewCase，
+              CORRECTION_ACTIVE=存在 OPEN|IN_PROGRESS|RESUBMITTED CorrectionCase }
+        - { name: q, in: query, schema: { type: string, minLength: 1, maxLength: 200 },
+            description: >
+              M448：关键词；4 位数字匹配手机后四位；其余对 external_order_code/customer_name/service_address
+              做 ILIKE 子串（最短 2）；完整手机号形态失败关闭 }
         - { name: cursor, in: query, schema: { type: string, minLength: 1 } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
         - $ref: '#/components/parameters/CorrelationId'
@@ -3096,13 +3464,13 @@ paths:
   /work-orders/{workOrderId}:
     get:
       operationId: getAuthorizedWorkOrder
-      summary: 读取不含客户 PII 的工单当前权威事实
+      summary: 读取工单当前权威事实（含服务端脱敏客户联系，无原文 PII）
       parameters:
         - { name: workOrderId, in: path, required: true, schema: { type: string, format: uuid } }
         - $ref: '#/components/parameters/CorrelationId'
       responses:
         '200':
-          description: 工单当前事实
+          description: 工单当前事实（M429：含 masked* 脱敏联系）
           headers:
             ETag: { required: true, schema: { type: string } }
             X-Correlation-Id: { required: true, schema: { type: string } }
@@ -3244,7 +3612,9 @@ paths:
       summary: 查询工单工作区顶层组合快照
       description: >-
         复用 workOrder.read 实时鉴权，组合 Task/时间线 freshness、可选 SLA/异常摘要，
-        以及 APPOINTMENTS_VISITS 等 sectionAvailability。不含客户 PII；大区块按需加载见
+        以及 APPOINTMENTS_VISITS 等 sectionAvailability。
+        M423：含服务端脱敏客户联系字段（maskedCustomerName/Phone/ServiceAddress），
+        不含完整手机号或完整地址原文；大区块按需加载见
         workspace/sections（M87～M94：TASKS/TIMELINE_AUDIT/APPOINTMENTS_VISITS/FORMS_EVIDENCE/
         REVIEWS_CORRECTIONS/INTEGRATION）。
       parameters:
@@ -3386,6 +3756,227 @@ paths:
           $ref: '#/components/responses/Problem'
         '422':
           $ref: '#/components/responses/Problem'
+  /project-clients:
+    get:
+      operationId: listProjectClients
+      summary: 查询租户车企主数据目录
+      description: |
+        M406/M414：需要 project.read。
+        status 缺省 ACTIVE（选择器兼容）；治理台传 ALL/DISABLED。
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema: { enum: [ACTIVE, DISABLED, ALL], default: ACTIVE }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 车企目录
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectClientDirectoryPage' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: registerProjectClient
+      summary: 登记或更新车企主数据
+      description: M406：需要 project.create。同 tenant+clientCode 幂等更新显示名并置为 ACTIVE。
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterProjectClientRequest' }
+      responses:
+        '201':
+          description: 已登记车企
+          headers:
+            Location: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectClientDirectoryItem' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /project-clients/{clientCode}/status:
+    post:
+      operationId: setProjectClientStatus
+      summary: 启用或停用车企主数据
+      description: M414：需要 project.create。停用后选择器默认不再返回该车企。
+      parameters:
+        - name: clientCode
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 128 }
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SetCatalogStatusRequest' }
+      responses:
+        '200':
+          description: 已更新状态
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectClientDirectoryItem' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /project-clients/{clientCode}/brands:
+    get:
+      operationId: listProjectClientBrands
+      summary: 查询车企下品牌目录
+      description: M414：需要 project.read。status 缺省 ALL。
+      parameters:
+        - name: clientCode
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 128 }
+        - name: status
+          in: query
+          required: false
+          schema: { enum: [ACTIVE, DISABLED, ALL], default: ALL }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 品牌目录
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectClientBrandPage' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: registerProjectClientBrand
+      summary: 登记或更新车企品牌
+      description: M414：需要 project.create。同 tenant+client+brand 幂等更新显示名并置为 ACTIVE。
+      parameters:
+        - name: clientCode
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 128 }
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterProjectClientBrandRequest' }
+      responses:
+        '201':
+          description: 已登记品牌
+          headers:
+            Location: { required: true, schema: { type: string } }
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectClientBrandItem' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /project-clients/{clientCode}/brands/{brandCode}/status:
+    post:
+      operationId: setProjectClientBrandStatus
+      summary: 启用或停用车企品牌
+      description: M414：需要 project.create。
+      parameters:
+        - name: clientCode
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 128 }
+        - name: brandCode
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 128 }
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SetCatalogStatusRequest' }
+      responses:
+        '200':
+          description: 已更新品牌状态
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectClientBrandItem' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /region-catalog:
+    get:
+      operationId: listRegionCatalog
+      summary: 查询行政区名称目录
+      description: |
+        M406/M414：需要 project.read。parentCode 缺省返回根级；传 * 表示不限父级；
+        query 支持编码/名称模糊搜索；items 含 childCount 供树展开。
+      parameters:
+        - name: parentCode
+          in: query
+          required: false
+          schema: { type: string, maxLength: 32 }
+        - name: query
+          in: query
+          required: false
+          schema: { type: string, maxLength: 100 }
+        - name: level
+          in: query
+          required: false
+          schema: { enum: [PROVINCE, CITY, DISTRICT] }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200, default: 100 }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 行政区目录页
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegionCatalogPage' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /projects/reference-options:
+    get:
+      operationId: getProjectReferenceOptions
+      summary: 查询项目创建/范围编辑用的车企与区域选项
+      description: >-
+        按实时 project.read 授权范围聚合已有项目的 clientId 与生效 REGION 编码，
+        并附带车企/行政区目录显示名。网点选项请使用 /service-networks。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 选择器选项
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectReferenceOptions' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
   /projects/{projectId}:
     get:
       operationId: getAuthorizedProject
@@ -3475,6 +4066,31 @@ paths:
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
 
+  /projects/{projectId}/fulfillment-usage-summary:
+    get:
+      operationId: getProjectFulfillmentUsageSummary
+      summary: 项目履约配置中心使用中工单摘要
+      description: |
+        M422：硬门禁 project.fulfillment.read。
+        activeWorkOrderCount 对 workOrder.read soft-gate：缺能力时为 null（不得伪装为 0）。
+        计数口径为项目下 status=ACTIVE 工单，上限 100；超出时 activeWorkOrderCountTruncated=true。
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 使用中工单摘要
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectFulfillmentUsageSummary' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
   /projects/{projectId}/fulfillment-profiles:
     get:
       operationId: listProjectFulfillmentProfiles
@@ -3649,6 +4265,9 @@ paths:
     post:
       operationId: compileProjectFulfillmentPreview
       summary: 编译履约运行说明书预览
+      description: |
+        返回产品化 Runbook 与诊断用 manifestJson。
+        普通产品 UI 必须只渲染 runbook；不得把 manifestJson 作为主内容展示。
       parameters:
         - name: projectId
           in: path
@@ -3662,12 +4281,40 @@ paths:
         - $ref: '#/components/parameters/CorrelationId'
       responses:
         '200':
-          description: 服务端编译 Manifest
+          description: 服务端编译的运行说明书与诊断 Manifest
           headers:
             X-Correlation-Id: { required: true, schema: { type: string } }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProjectFulfillmentManifest' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /projects/{projectId}/fulfillment-profiles/{profileId}/compare-impact:
+    get:
+      operationId: compareProjectFulfillmentImpact
+      summary: 比较草稿与当前发布版的差异与影响
+      description: |
+        只读读模型。对比当前草稿与 ACTIVE 已发布 Revision；
+        无发布基线时 baselineKind=NONE。前端不得用固定文案伪造差异。
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: profileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 版本差异与影响说明
+          headers:
+            X-Correlation-Id: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectFulfillmentCompareImpact' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
@@ -4586,7 +5233,9 @@ paths:
       summary: 申请资料版本短时下载授权
       description: >-
         M351：实时校验 evidence.read 与项目范围；解析 Revision 关联 fileObjectId 后委托安全文件签发短时 URL。
-        终审预览 purpose 使用 FINAL_REVIEW_PREVIEW。响应不含 objectKey；日志不得打印 downloadUrl。
+        终审预览 purpose 使用 FINAL_REVIEW_PREVIEW；
+        M426 工作区资料预览 purpose 使用 WORKSPACE_EVIDENCE_PREVIEW。
+        响应不含 objectKey；日志不得打印 downloadUrl。
       parameters:
         - name: revisionId
           in: path
@@ -5747,6 +6396,26 @@ paths:
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /configuration/task-templates:
+    get:
+      operationId: listConfigurationTaskTemplates
+      summary: 列出任务模板产品读模型
+      description: |
+        M387：从已发布与在编 WORKFLOW 资产投影任务模板摘要。
+        需要 configuration.draft.write。前端不得自行解析 Workflow JSON 形成第二套解释。
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 任务模板列表
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ConfigurationTaskTemplateItem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
   /configuration/drafts:
     get:
       operationId: listConfigurationDrafts
@@ -6647,6 +7316,43 @@ components:
         draftLabel: { type: string }
         unifiedDiff: { type: string }
         identical: { type: boolean }
+    ConfigurationTaskTemplateItem:
+      type: object
+      required:
+        - templateKey
+        - templateName
+        - taskTypeCode
+        - category
+        - categoryLabel
+        - executionRoleLabel
+        - status
+        - statusLabel
+        - referencedWorkflowCount
+        - referencedWorkflowNames
+        - gaps
+      properties:
+        templateKey: { type: string }
+        templateName: { type: string }
+        taskTypeCode: { type: string }
+        category:
+          enum: [INTAKE, DISPATCH, APPOINTMENT, SURVEY, INSTALL, REVIEW, CORRECTION, FOLLOW_UP, SYSTEM]
+        categoryLabel: { type: string }
+        executionRoleLabel: { type: string }
+        assignmentStrategyLabel: { type: string, nullable: true }
+        formSummary: { type: string, nullable: true }
+        evidenceSummary: { type: string, nullable: true }
+        slaSummary: { type: string, nullable: true }
+        status: { enum: [DRAFT, PUBLISHED] }
+        statusLabel: { type: string }
+        referencedWorkflowCount: { type: integer, minimum: 0 }
+        referencedWorkflowNames:
+          type: array
+          items: { type: string }
+        lastUpdatedAt: { type: string, format: date-time, nullable: true }
+        gaps:
+          type: array
+          items: { type: string }
+          description: 仍缺服务端产品字段时的诚实缺口说明
     ConfigurationDraft:
       type: object
       additionalProperties: false
@@ -6716,6 +7422,113 @@ components:
       required: [items, nextCursor, asOf]
       properties:
         items: { type: array, items: { $ref: '#/components/schemas/SecurityPrincipal' } }
+        nextCursor: { type: [string, 'null'] }
+        asOf: { type: string, format: date-time }
+    RegisterSecurityPrincipalRequest:
+      type: object
+      additionalProperties: false
+      required: [displayName]
+      properties:
+        displayName: { type: string, minLength: 1, maxLength: 200 }
+        employeeNumber: { type: [string, 'null'], minLength: 1, maxLength: 128 }
+        personaType:
+          type: [string, 'null']
+          enum: [INTERNAL_EMPLOYEE, NETWORK_MEMBER, TECHNICIAN, CONSUMER, SERVICE_ACCOUNT]
+    AdminUserDirectoryItem:
+      type: object
+      additionalProperties: false
+      required: [id, type, status, displayName, employeeNumber, version, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        type: { enum: [USER, SERVICE] }
+        status: { enum: [ACTIVE, DISABLED] }
+        displayName: { type: string, minLength: 1, maxLength: 200 }
+        employeeNumber: { type: [string, 'null'], minLength: 1, maxLength: 128 }
+        version: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        organizationSummary: { type: [string, 'null'], maxLength: 200 }
+        roleSummary: { type: [string, 'null'], maxLength: 200 }
+        lastLoginAt: { type: [string, 'null'], format: date-time }
+    PrincipalLoginEvent:
+      type: object
+      additionalProperties: false
+      required: [loginEventId, principalId, clientId, issuer, authChannel, outcome, occurredAt]
+      properties:
+        loginEventId: { type: string, format: uuid }
+        principalId: { type: string, format: uuid }
+        clientId: { type: string, minLength: 1, maxLength: 128 }
+        issuer: { type: string, minLength: 1, maxLength: 512 }
+        authChannel: { type: string, enum: [OIDC] }
+        outcome: { type: string, enum: [SUCCEEDED] }
+        occurredAt: { type: string, format: date-time }
+    PrincipalLoginEventPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/PrincipalLoginEvent' } }
+        asOf: { type: string, format: date-time }
+    PrincipalAuthorizationDenialItem:
+      type: object
+      additionalProperties: false
+      required: [auditId, principalId, capabilityCode, targetType, targetId, decisionCode, resultCode, correlationId, occurredAt]
+      properties:
+        auditId: { type: string, format: uuid }
+        principalId: { type: string, format: uuid }
+        capabilityCode: { type: string, minLength: 1, maxLength: 120 }
+        targetType: { type: string, minLength: 1, maxLength: 100 }
+        targetId: { type: string, minLength: 1, maxLength: 128 }
+        decisionCode: { type: string, minLength: 1, maxLength: 24 }
+        resultCode: { type: string, minLength: 1, maxLength: 40 }
+        errorCode: { type: [string, 'null'], maxLength: 100 }
+        correlationId: { type: string, minLength: 1, maxLength: 128 }
+        occurredAt: { type: string, format: date-time }
+    PrincipalAuthorizationDenialPage:
+      type: object
+      additionalProperties: false
+      required: [items, omitted, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/PrincipalAuthorizationDenialItem' } }
+        omitted:
+          type: boolean
+          description: true 表示缺 authorization.read，条目被诚实省略
+        asOf: { type: string, format: date-time }
+    PrincipalChangeTimelineItem:
+      type: object
+      additionalProperties: false
+      required: [source, eventCode, summary, actorId, result, correlationId, occurredAt, refId]
+      properties:
+        source: { enum: [LIFECYCLE, AUDIT, LOGIN, MEMBERSHIP, ROLE_GRANT, NETWORK_MEMBERSHIP, TECHNICIAN_MEMBERSHIP, TECHNICIAN_PROFILE] }
+        eventCode: { type: string, minLength: 1, maxLength: 100 }
+        summary: { type: string, minLength: 1, maxLength: 500 }
+        actorId: { type: string, minLength: 1, maxLength: 128 }
+        actorDisplayName:
+          type: [string, 'null']
+          maxLength: 200
+          description: 操作者显示名；无法解析时为 null，前端回退短截断 actorId
+        result: { type: string, minLength: 1, maxLength: 40 }
+        correlationId: { type: string, minLength: 1, maxLength: 128 }
+        principalVersion: { type: [integer, 'null'], format: int64, minimum: 1 }
+        occurredAt: { type: string, format: date-time }
+        refId: { type: string, format: uuid }
+    PrincipalChangeTimelinePage:
+      type: object
+      additionalProperties: false
+      required: [items, omittedSources, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/PrincipalChangeTimelineItem' } }
+        omittedSources:
+          type: array
+          description: soft-gate 缺权而未合并的来源（如 MEMBERSHIP、ROLE_GRANT、NETWORK_*、TECHNICIAN_*）
+          items: { enum: [MEMBERSHIP, ROLE_GRANT, NETWORK_MEMBERSHIP, TECHNICIAN_MEMBERSHIP, TECHNICIAN_PROFILE] }
+        asOf: { type: string, format: date-time }
+    AdminUserDirectoryPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/AdminUserDirectoryItem' } }
         nextCursor: { type: [string, 'null'] }
         asOf: { type: string, format: date-time }
     PrincipalPersona:
@@ -7013,10 +7826,76 @@ components:
       properties:
         items: { type: array, items: { $ref: '#/components/schemas/RecentResourceItem' } }
         asOf: { type: string, format: date-time }
+    FollowedProjectItem:
+      type: object
+      additionalProperties: false
+      required: [projectId, displayRef, followedAt, deepLink]
+      properties:
+        projectId: { type: string, format: uuid }
+        displayRef: { type: string, minLength: 1, maxLength: 120 }
+        projectCode: { type: [string, 'null'] }
+        clientId: { type: [string, 'null'] }
+        status: { type: [string, 'null'] }
+        followedAt: { type: string, format: date-time }
+        deepLink: { type: string, minLength: 1 }
+        activeWorkOrderCount:
+          type: [integer, 'null']
+          minimum: 0
+          description: ACTIVE 工单精确数；缺 workOrder.read 时为 null
+        activeWorkOrderCountTruncated:
+          type: [boolean, 'null']
+          description: >
+            M452：具备能力时恒为 false（精确 COUNT；字段保留兼容）。
+            缺能力时与 count 一并省略。
+        openReviewCount:
+          type: [integer, 'null']
+          minimum: 0
+          description: OPEN 审核案例精确数；缺审核读能力时为 null
+        openReviewCountTruncated:
+          type: [boolean, 'null']
+          description: M452：具备能力时恒为 false（精确 COUNT；字段保留兼容）
+        openCorrectionCount:
+          type: [integer, 'null']
+          minimum: 0
+          description: OPEN 整改案例精确数；缺整改读能力时为 null
+        openCorrectionCountTruncated:
+          type: [boolean, 'null']
+          description: M452：具备能力时恒为 false（精确 COUNT；字段保留兼容）
+        slaBreachedCount:
+          type: [integer, 'null']
+          minimum: 0
+          description: BREACHED SLA 实例精确数；缺 sla.read 时为 null
+        slaBreachedCountTruncated:
+          type: [boolean, 'null']
+          description: M452：具备能力时恒为 false（精确 COUNT；字段保留兼容）
+        openTodoCount:
+          type: [integer, 'null']
+          minimum: 0
+          description: 可见角标合计（审核+整改+SLA 超时）；全部 soft-gate 时为 null
+    FollowedProjectPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/FollowedProjectItem' } }
+        asOf: { type: string, format: date-time }
+    FollowProjectRequest:
+      type: object
+      additionalProperties: false
+      required: [projectId]
+      properties:
+        portal: { type: string, enum: [ADMIN], default: ADMIN }
+        projectId: { type: string, format: uuid }
+        displayRef: { type: [string, 'null'], maxLength: 120 }
     NetworkPortalWorkOrderItem:
       type: object
       additionalProperties: false
-      required: [workOrderId, taskIds]
+      required:
+        - workOrderId
+        - taskIds
+        - maskedCustomerName
+        - maskedCustomerPhone
+        - maskedServiceAddress
       properties:
         workOrderId: { type: string, format: uuid }
         projectId: { type: [string, 'null'], format: uuid }
@@ -7048,6 +7927,18 @@ components:
           type: [string, 'null']
           format: date-time
           description: M236：工单接收时间（Admin 对齐；产品「更新时间」MVP 映射）
+        maskedCustomerName:
+          type: [string, 'null']
+          maxLength: 64
+          description: M428：服务端脱敏客户姓名；随目录基座返回，不 soft-omit
+        maskedCustomerPhone:
+          type: [string, 'null']
+          maxLength: 32
+          description: M428：服务端脱敏手机号；不得返回完整号码
+        maskedServiceAddress:
+          type: [string, 'null']
+          maxLength: 256
+          description: M428：服务端脱敏服务地址；不得返回完整地址
     NetworkPortalWorkOrderPage:
       type: object
       additionalProperties: false
@@ -7144,7 +8035,15 @@ components:
     NetworkPortalWorkOrderWorkspace:
       type: object
       additionalProperties: false
-      required: [networkId, workOrderId, taskIds, tasks, asOf]
+      required:
+        - networkId
+        - workOrderId
+        - taskIds
+        - tasks
+        - maskedCustomerName
+        - maskedCustomerPhone
+        - maskedServiceAddress
+        - asOf
       properties:
         networkId: { type: string, format: uuid }
         workOrderId: { type: string, format: uuid }
@@ -7235,11 +8134,28 @@ components:
           type: array
           maxItems: 100
           items: { $ref: '#/components/schemas/NetworkPortalTechnicianItem' }
+        maskedCustomerName:
+          type: [string, 'null']
+          maxLength: 64
+          description: M424：服务端脱敏客户姓名；随工作区基座返回，不 soft-omit
+        maskedCustomerPhone:
+          type: [string, 'null']
+          maxLength: 32
+          description: M424：服务端脱敏手机号；不得返回完整号码
+        maskedServiceAddress:
+          type: [string, 'null']
+          maxLength: 256
+          description: M424：服务端脱敏服务地址；不得返回完整地址
         asOf: { type: string, format: date-time }
     NetworkPortalTaskItem:
       type: object
       additionalProperties: false
-      required: [taskId, workOrderId]
+      required:
+        - taskId
+        - workOrderId
+        - maskedCustomerName
+        - maskedCustomerPhone
+        - maskedServiceAddress
       properties:
         taskId: { type: string, format: uuid }
         workOrderId: { type: string, format: uuid }
@@ -7266,6 +8182,18 @@ components:
           type: [string, 'null']
           format: date-time
           description: M236：所属工单接收时间
+        maskedCustomerName:
+          type: [string, 'null']
+          maxLength: 64
+          description: M428：所属工单服务端脱敏客户姓名；随目录/任务基座返回，不 soft-omit
+        maskedCustomerPhone:
+          type: [string, 'null']
+          maxLength: 32
+          description: M428：所属工单服务端脱敏手机号；不得返回完整号码
+        maskedServiceAddress:
+          type: [string, 'null']
+          maxLength: 256
+          description: M428：所属工单服务端脱敏服务地址；不得返回完整地址
     NetworkPortalTaskPage:
       type: object
       additionalProperties: false
@@ -7331,7 +8259,19 @@ components:
     NetworkPortalTechnicianItem:
       type: object
       additionalProperties: false
-      required: [membershipId, technicianProfileId, principalId, displayName, profileStatus, membershipStatus, validFrom, membershipVersion]
+      required:
+        - membershipId
+        - technicianProfileId
+        - principalId
+        - displayName
+        - profileStatus
+        - membershipStatus
+        - validFrom
+        - membershipVersion
+        - openTaskCount
+        - approvedQualificationCount
+        - pendingQualificationCount
+        - qualificationSummary
       properties:
         membershipId: { type: string, format: uuid }
         technicianProfileId: { type: string, format: uuid }
@@ -7346,6 +8286,25 @@ components:
           format: int64
           minimum: 1
           description: M206 附加：ACTIVE 关系乐观版本，可供 terminate If-Match
+        openTaskCount:
+          type: integer
+          minimum: 0
+          description: |
+            M421：本网点 ACTIVE NETWORK 责任任务中已指派该师傅的开放任务数；
+            口径与 assign-candidates.openTaskCount 一致。
+        approvedQualificationCount:
+          type: integer
+          minimum: 0
+          description: M421：已通过资质数（APPROVED/VALID/ACTIVE）
+        pendingQualificationCount:
+          type: integer
+          minimum: 0
+          description: M421：待审资质数（PENDING）
+        qualificationSummary:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: M421：中文资质摘要（与分配候选同源格式化）
     NetworkPortalTechnicianPage:
       type: object
       additionalProperties: false
@@ -7354,6 +8313,93 @@ components:
         networkId: { type: string, format: uuid }
         items: { type: array, items: { $ref: '#/components/schemas/NetworkPortalTechnicianItem' } }
         asOf: { type: string, format: date-time }
+    NetworkPortalAssignCandidateItem:
+      type: object
+      additionalProperties: false
+      required:
+        - technicianProfileId
+        - displayName
+        - membershipStatus
+        - profileStatus
+        - openTaskCount
+        - approvedQualificationCount
+        - pendingQualificationCount
+        - qualificationSummary
+        - upcomingAppointmentCount
+        - scheduleConflictSummary
+        - scheduleOverlap
+        - distanceTier
+        - distanceSummary
+        - coverageMatched
+        - warnings
+        - assignable
+        - recommendationTier
+        - recommendationSummary
+        - recommendationReasons
+      properties:
+        technicianProfileId: { type: string, format: uuid }
+        displayName: { type: string, minLength: 1 }
+        membershipStatus: { type: string }
+        profileStatus: { type: string }
+        openTaskCount: { type: integer, minimum: 0 }
+        approvedQualificationCount: { type: integer, minimum: 0 }
+        pendingQualificationCount: { type: integer, minimum: 0 }
+        qualificationSummary: { type: string, minLength: 1 }
+        upcomingAppointmentCount: { type: integer, minimum: 0 }
+        scheduleConflictSummary: { type: string, minLength: 1 }
+        scheduleOverlap: { type: boolean }
+        distanceTier:
+          type: string
+          description: |
+            行政区距离亲和档位（非路网米制距离）：
+            SAME_DISTRICT / SAME_CITY / SAME_PROVINCE / OUTSIDE_COVERAGE / UNKNOWN
+          enum: [SAME_DISTRICT, SAME_CITY, SAME_PROVINCE, OUTSIDE_COVERAGE, UNKNOWN]
+        distanceSummary:
+          type: string
+          minLength: 1
+          description: 中文距离亲和摘要，可含当前任务区域提示
+        coverageMatched:
+          type: boolean
+          description: 网点 ACTIVE Coverage 是否命中工单省/市/区编码
+        capacityAvailableUnits: { type: [integer, 'null'], minimum: 0 }
+        capacityMaxUnits: { type: [integer, 'null'], minimum: 0 }
+        warnings: { type: array, items: { type: string } }
+        assignable: { type: boolean }
+        recommendationTier:
+          type: string
+          description: |
+            M412：推荐解释档位（非数值评分）：
+            RECOMMENDED / ACCEPTABLE / CAUTION / NOT_ASSIGNABLE
+          enum: [RECOMMENDED, ACCEPTABLE, CAUTION, NOT_ASSIGNABLE]
+        recommendationSummary:
+          type: string
+          minLength: 1
+          description: 面向网点调度的中文推荐解释；依据可见事实，不含内部评分公式
+        recommendationReasons:
+          type: array
+          maxItems: 12
+          items: { type: string, minLength: 1 }
+          description: 构成推荐解释的有序事实短语
+    NetworkPortalAssignCandidatePage:
+      type: object
+      additionalProperties: false
+      required: [networkId, taskId, items, asOf, rankingExplanation]
+      properties:
+        networkId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        businessType: { type: [string, 'null'] }
+        workOrderRegionSummary:
+          type: [string, 'null']
+          description: 目标工单行政区中文摘要（市·区）；无区域事实时为 null
+        items: { type: array, items: { $ref: '#/components/schemas/NetworkPortalAssignCandidateItem' } }
+        asOf: { type: string, format: date-time }
+        rankingExplanation:
+          type: string
+          minLength: 1
+          description: M412：候选排序策略的中文说明（不含内部评分公式）
+        emptyReason:
+          type: [string, 'null']
+          description: M412：无候选时的服务端原因；有候选时省略或为 null
     NetworkPortalCapacityItem:
       type: object
       additionalProperties: false
@@ -7374,10 +8420,72 @@ components:
         networkId: { type: string, format: uuid }
         items: { type: array, items: { $ref: '#/components/schemas/NetworkPortalCapacityItem' } }
         asOf: { type: string, format: date-time }
+    NetworkPortalAppointmentCalendarDay:
+      type: object
+      additionalProperties: false
+      required: [date, appointmentCount, items]
+      properties:
+        date: { type: string, format: date }
+        appointmentCount: { type: integer, minimum: 0 }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/NetworkPortalWorkbenchAppointmentItem' }
+    NetworkPortalAppointmentCalendarView:
+      type: object
+      additionalProperties: false
+      required: [networkId, timezone, rangeStart, rangeEnd, totalAppointmentCount, truncated, days, asOf]
+      properties:
+        networkId: { type: string, format: uuid }
+        timezone:
+          type: string
+          description: 运营时区；当前固定 Asia/Shanghai
+        rangeStart: { type: string, format: date }
+        rangeEnd: { type: string, format: date }
+        totalAppointmentCount:
+          type: integer
+          minimum: 0
+          description: 范围内命中预约总数；truncated=true 时可能大于 days 内条目合计
+        truncated:
+          type: boolean
+          description: 是否因上限截断展示条目（上限 200）
+        days:
+          type: array
+          minItems: 1
+          maxItems: 31
+          items: { $ref: '#/components/schemas/NetworkPortalAppointmentCalendarDay' }
+        asOf: { type: string, format: date-time }
+    NetworkPortalWorkbenchAppointmentItem:
+      type: object
+      additionalProperties: false
+      required: [appointmentId, taskId, workOrderId, type, status]
+      properties:
+        appointmentId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        workOrderId: { type: string, format: uuid }
+        type: { type: string, minLength: 1 }
+        status: { type: string, minLength: 1 }
+        windowStart: { type: [string, 'null'], format: date-time }
+        windowEnd: { type: [string, 'null'], format: date-time }
+        timezone: { type: [string, 'null'] }
+        technicianId: { type: [string, 'null'] }
+        technicianDisplayName:
+          type: [string, 'null']
+          description: 需 NETWORK technician.readOwnNetwork；缺能力时为 null
+    NetworkPortalWorkbenchTimelineBucket:
+      type: object
+      additionalProperties: false
+      required: [bucketCode, label, count, summary]
+      properties:
+        bucketCode:
+          type: string
+          enum: [UNASSIGNED, AM_APPOINTMENTS, PM_APPOINTMENTS, EVENING_APPOINTMENTS, OPEN_CORRECTIONS, SLA_AT_RISK]
+        label: { type: string, minLength: 1 }
+        count: { type: integer, minimum: 0 }
+        summary: { type: string, minLength: 1 }
     NetworkPortalWorkbenchView:
       type: object
       additionalProperties: false
-      required: [networkId, activeWorkOrderCount, activeTaskCount, activeTechnicianCount, capacity, asOf]
+      required: [networkId, activeWorkOrderCount, activeTaskCount, activeTechnicianCount, capacity, asOf, todayTimeline]
       properties:
         networkId: { type: string, format: uuid }
         activeWorkOrderCount: { type: integer, minimum: 0 }
@@ -7414,6 +8522,26 @@ components:
             M224：需 NETWORK sla.read；缺能力时省略本属性；有能力且无实例时返回 0/0。
             字段语义同 NetworkPortalWorkOrderWorkspaceSlaSummary（跨本网点全部 ACTIVE taskIds）。
           $ref: '#/components/schemas/NetworkPortalWorkOrderWorkspaceSlaSummary'
+        todayAppointmentCount:
+          type: integer
+          minimum: 0
+          description: |
+            M411：Asia/Shanghai 运营日内与 ACTIVE 任务窗口重叠的 PROPOSED/CONFIRMED 预约数；
+            需 NETWORK networkPortal.manageAppointment；缺能力时省略。
+        todayAppointments:
+          type: array
+          maxItems: 50
+          description: |
+            M411：今日预约非 PII 列表（时间/任务/师傅/状态）；需 manageAppointment；缺能力时省略。
+          items: { $ref: '#/components/schemas/NetworkPortalWorkbenchAppointmentItem' }
+        todayTimeline:
+          type: array
+          minItems: 1
+          maxItems: 8
+          description: |
+            M411：当日运营节奏桶。至少含待分配；预约桶需 manageAppointment；
+            整改/SLA 桶随对应 soft-gate 出现。
+          items: { $ref: '#/components/schemas/NetworkPortalWorkbenchTimelineBucket' }
     NetworkPortalCorrectionItem:
       type: object
       additionalProperties: false
@@ -7864,6 +8992,47 @@ components:
       required: [items, asOf]
       properties:
         items: { type: array, items: { $ref: '#/components/schemas/OrgMembership' } }
+        asOf: { type: string, format: date-time }
+    OrgMembershipSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - organizationId
+        - organizationCode
+        - organizationName
+        - organizationAuthorityMode
+        - orgUnitId
+        - unitCode
+        - unitName
+        - principalId
+        - membershipType
+        - status
+        - validFrom
+        - version
+        - createdAt
+      properties:
+        id: { type: string, format: uuid }
+        organizationId: { type: string, format: uuid }
+        organizationCode: { type: string, minLength: 1 }
+        organizationName: { type: string, minLength: 1 }
+        organizationAuthorityMode: { enum: [LOCAL, EXTERNAL_AUTHORITATIVE] }
+        orgUnitId: { type: string, format: uuid }
+        unitCode: { type: string, minLength: 1 }
+        unitName: { type: string, minLength: 1 }
+        principalId: { type: string, format: uuid }
+        membershipType: { enum: [PRIMARY, SECONDARY, MANAGER] }
+        status: { enum: [ACTIVE, TERMINATED] }
+        validFrom: { type: string, format: date-time }
+        validTo: { type: [string, 'null'], format: date-time }
+        version: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+    OrgMembershipSummaryPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/OrgMembershipSummary' } }
         asOf: { type: string, format: date-time }
     DirectorySyncItem:
       type: object
@@ -8579,7 +9748,9 @@ components:
       required: [id, tenantId, projectId, clientCode, brandCode, serviceProductCode, externalOrderCode,
         status, configurationBundleId, configurationBundleCode, configurationBundleVersion,
         configurationBundleDigest, provinceCode, cityCode, districtCode, externalDispatchedAt,
-        receivedAt, version]
+        receivedAt, updatedAt, version, maskedCustomerName, maskedCustomerPhone, maskedServiceAddress,
+        currentStageCode, currentTaskType, currentTaskStatus, currentClaimedBy, currentAssigneeDisplayName,
+        currentNetworkId, currentNetworkDisplayName, currentTechnicianId, currentTechnicianDisplayName]
       properties:
         id: { type: string, format: uuid }
         tenantId: { type: string }
@@ -8598,17 +9769,131 @@ components:
         districtCode: { type: string }
         externalDispatchedAt: { type: string, format: date-time }
         receivedAt: { type: string, format: date-time }
+        updatedAt:
+          type: string
+          format: date-time
+          description: >
+            M435：工单聚合最近一次写路径更新时间（wo_work_order.updated_at），与 receivedAt 独立。
+            目录「更新时间」列使用本字段，不得再映射 receivedAt。
         activatedAt: { type: [string, 'null'], format: date-time }
         fulfilledAt: { type: [string, 'null'], format: date-time }
         version: { type: integer, format: int64, minimum: 1 }
+        maskedCustomerName:
+          type: [string, 'null']
+          maxLength: 64
+          description: M429：服务端脱敏客户姓名；随目录/详情基座返回，不 soft-omit
+        maskedCustomerPhone:
+          type: [string, 'null']
+          maxLength: 32
+          description: M429：服务端脱敏手机号；不得返回完整号码
+        maskedServiceAddress:
+          type: [string, 'null']
+          maxLength: 200
+          description: M429：服务端脱敏服务地址；不得返回完整地址
+        currentStageCode:
+          type: [string, 'null']
+          maxLength: 100
+          description: >
+            M432：当前阶段码，与工作区 currentTaskSummary.stageCode 同口径
+            （首个 ACTIVE 任务：READY/PENDING/CLAIMED/RUNNING/RETRY_WAIT/MANUAL_INTERVENTION）。
+            无 ACTIVE 任务时为 null；不发明阶段名。
+        currentTaskType:
+          type: [string, 'null']
+          maxLength: 120
+          description: >
+            M449：当前 ACTIVE 任务 task_type，与工作区 currentTaskSummary.taskType 同口径；
+            无 ACTIVE 任务时为 null；不发明任务名称。
+        currentTaskStatus:
+          type: [string, 'null']
+          description: >
+            M446：当前 ACTIVE 任务 status，与阶段旁载同口径
+            （READY/PENDING/CLAIMED/RUNNING/RETRY_WAIT/MANUAL_INTERVENTION）；无 ACTIVE 任务时为 null。
+        currentClaimedBy:
+          type: [string, 'null']
+          maxLength: 128
+          description: >
+            M433：当前 ACTIVE 任务认领主体 ID（tsk_task.claimed_by）；未认领或无 ACTIVE 任务时为 null。
+        currentAssigneeDisplayName:
+          type: [string, 'null']
+          maxLength: 128
+          description: >
+            M433：认领主体 Persona 显示名；无认领或无 PersonProfile 时为 null，不发明名称。
+        currentNetworkId:
+          type: [string, 'null']
+          maxLength: 128
+          description: >
+            M439：工单 ACTIVE NETWORK ServiceAssignment.assignee_id；无 ACTIVE 网点责任时为 null。
+        currentNetworkDisplayName:
+          type: [string, 'null']
+          maxLength: 200
+          description: >
+            M439：网点 networkName；无责任或目录缺档时为 null，不发明名称。
+        currentTechnicianId:
+          type: [string, 'null']
+          maxLength: 128
+          description: >
+            M439：工单 ACTIVE TECHNICIAN ServiceAssignment.assignee_id（师傅档案 ID）；无 ACTIVE 师傅责任时为 null。
+        currentTechnicianDisplayName:
+          type: [string, 'null']
+          maxLength: 200
+          description: >
+            M439：师傅档案 displayName；无责任或档案缺档时为 null，不发明名称。
     WorkOrderPage:
       type: object
       additionalProperties: false
-      required: [items, nextCursor, asOf]
+      required: [items, nextCursor, asOf, totalCount, totalCountTruncated]
       properties:
         items: { type: array, items: { $ref: '#/components/schemas/WorkOrder' } }
         nextCursor: { type: [string, 'null'] }
         asOf: { type: string, format: date-time }
+        totalCount:
+          type: integer
+          minimum: 0
+          description: >
+            M444：当前筛选条件下授权工单精确总数（不含 cursor）。
+            与本页 items 长度无关。
+        totalCountTruncated:
+          type: boolean
+          description: >
+            M444：目录路径恒为 false（字段保留兼容；不再封顶截断）。
+        slaRiskSummaries:
+          description: |
+            M434：需 PROJECT sla.read；缺能力时省略本属性；有能力且无开放风险时返回 []。
+            按本页工单聚合 RUNNING∪BREACHED；仅含 openCount>0 行。不伪造 0 伪装无权限。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderDirectorySlaRiskSummary' }
+        exceptionSummaries:
+          description: |
+            M450：需 PROJECT operations.exception.read；缺能力时省略本属性；有能力且无 OPEN 异常时返回 []。
+            按本页工单聚合 status=OPEN；仅含 openCount>0 行。不伪造 0 伪装无权限。
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/WorkOrderDirectoryExceptionSummary' }
+    WorkOrderDirectorySlaRiskSummary:
+      type: object
+      additionalProperties: false
+      required: [workOrderId, openCount, breachedCount]
+      properties:
+        workOrderId: { type: string, format: uuid }
+        openCount:
+          type: integer
+          minimum: 0
+          description: RUNNING∪BREACHED 实例数
+        breachedCount:
+          type: integer
+          minimum: 0
+          description: BREACHED 实例数（⊆ openCount）
+    WorkOrderDirectoryExceptionSummary:
+      type: object
+      additionalProperties: false
+      required: [workOrderId, openCount]
+      properties:
+        workOrderId: { type: string, format: uuid }
+        openCount:
+          type: integer
+          minimum: 1
+          description: OPEN 运营异常数（仅 >0 行出现在旁载中）
     WorkOrderDetail:
       type: object
       additionalProperties: false
@@ -8958,7 +10243,7 @@ components:
       additionalProperties: false
       required: [header, currentTaskSummary, sectionAvailability, allowedActionLink,
         serviceAssignmentSummary, slaSummary, exceptionSummary, timelineFreshnessStatus,
-        sourceVersions, meta]
+        sourceVersions, meta, maskedCustomerName, maskedCustomerPhone, maskedServiceAddress]
       properties:
         header: { $ref: '#/components/schemas/WorkOrder' }
         currentTaskSummary:
@@ -8985,6 +10270,18 @@ components:
         timelineFreshnessStatus: { enum: [FRESH, LAGGING, UNKNOWN, REBUILDING] }
         sourceVersions: { $ref: '#/components/schemas/WorkOrderWorkspaceSourceVersions' }
         meta: { $ref: '#/components/schemas/WorkOrderWorkspaceMeta' }
+        maskedCustomerName:
+          type: [string, 'null']
+          maxLength: 64
+          description: M423：服务端脱敏客户姓名；不得返回原文
+        maskedCustomerPhone:
+          type: [string, 'null']
+          maxLength: 32
+          description: M423：服务端脱敏手机号；不得返回完整号码
+        maskedServiceAddress:
+          type: [string, 'null']
+          maxLength: 200
+          description: M423：服务端脱敏服务地址；不得返回完整地址
     WorkOrderWorkspaceTasksSectionData:
       type: object
       additionalProperties: false
@@ -9147,8 +10444,18 @@ components:
     WorkOrderWorkspaceEvidenceItemSummary:
       type: object
       additionalProperties: false
-      required: [evidenceItemId, taskId, projectId, evidenceSlotId, itemOrdinal, status,
-        revisionCount, latestRevisionNumber, latestRevisionStatus]
+      required:
+        - evidenceItemId
+        - taskId
+        - projectId
+        - evidenceSlotId
+        - itemOrdinal
+        - status
+        - revisionCount
+        - latestRevisionNumber
+        - latestRevisionStatus
+        - latestRevisionId
+        - latestMimeType
       properties:
         evidenceItemId: { type: string, format: uuid }
         taskId: { type: string, format: uuid }
@@ -9161,6 +10468,16 @@ components:
         latestRevisionStatus:
           type: [string, 'null']
           enum: [STORED, VALIDATING, VALIDATED, VALIDATION_FAILED, QUARANTINED, INVALIDATED, null]
+        latestRevisionId:
+          type: [string, 'null']
+          format: uuid
+          description: |
+            M426：最新 revision 指针，供客户端发起受控 download-authorization 预览；
+            不得内嵌永久 URL 或 fileObjectId。
+        latestMimeType:
+          type: [string, 'null']
+          maxLength: 128
+          description: M426：最新 revision MIME；图片才做内联缩略预览
     WorkOrderWorkspaceFormsEvidenceSectionData:
       type: object
       additionalProperties: false
@@ -10008,6 +11325,16 @@ components:
           enum: [DRAFT, ACTIVE, SUSPENDED, CLOSED]
         version: { type: integer, format: int64, minimum: 1 }
         createdAt: { type: string, format: date-time }
+        publishedSchemeCount:
+          type: [integer, 'null']
+          minimum: 0
+          description: |
+            已发布履约方案数（active_revision 非空）。缺 project.fulfillment.read 时为 null。
+        draftSchemeCount:
+          type: [integer, 'null']
+          minimum: 0
+          description: |
+            存在草稿修订的履约方案数（draft_revision 非空）。缺 project.fulfillment.read 时为 null。
     ProjectPage:
       type: object
       additionalProperties: false
@@ -10017,6 +11344,108 @@ components:
           type: array
           items: { $ref: '#/components/schemas/Project' }
         nextCursor: { type: [string, 'null'] }
+        asOf: { type: string, format: date-time }
+    ProjectClientOption:
+      type: object
+      additionalProperties: false
+      required: [clientId, displayName, projectCount]
+      properties:
+        clientId: { type: string, minLength: 1, maxLength: 128 }
+        displayName: { type: string, minLength: 1, maxLength: 200 }
+        projectCount: { type: integer, minimum: 0 }
+    ProjectRegionOption:
+      type: object
+      additionalProperties: false
+      required: [regionCode, regionName, projectCount]
+      properties:
+        regionCode: { type: string, minLength: 1, maxLength: 128 }
+        regionName: { type: string, minLength: 1, maxLength: 100 }
+        projectCount: { type: integer, minimum: 0 }
+    ProjectClientDirectoryItem:
+      type: object
+      additionalProperties: false
+      required: [clientCode, displayName, status]
+      properties:
+        clientCode: { type: string, minLength: 1, maxLength: 128 }
+        displayName: { type: string, minLength: 1, maxLength: 200 }
+        status: { enum: [ACTIVE, DISABLED] }
+    ProjectClientDirectoryPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/ProjectClientDirectoryItem' } }
+        asOf: { type: string, format: date-time }
+    RegisterProjectClientRequest:
+      type: object
+      additionalProperties: false
+      required: [clientCode, displayName]
+      properties:
+        clientCode: { type: string, minLength: 1, maxLength: 128 }
+        displayName: { type: string, minLength: 1, maxLength: 200 }
+    SetCatalogStatusRequest:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: { enum: [ACTIVE, DISABLED] }
+    ProjectClientBrandItem:
+      type: object
+      additionalProperties: false
+      required: [clientCode, brandCode, displayName, status, sortOrder]
+      properties:
+        clientCode: { type: string, minLength: 1, maxLength: 128 }
+        brandCode: { type: string, minLength: 1, maxLength: 128 }
+        displayName: { type: string, minLength: 1, maxLength: 200 }
+        status: { enum: [ACTIVE, DISABLED] }
+        sortOrder: { type: integer }
+    ProjectClientBrandPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/ProjectClientBrandItem' } }
+        asOf: { type: string, format: date-time }
+    RegisterProjectClientBrandRequest:
+      type: object
+      additionalProperties: false
+      required: [brandCode, displayName]
+      properties:
+        brandCode: { type: string, minLength: 1, maxLength: 128 }
+        displayName: { type: string, minLength: 1, maxLength: 200 }
+        sortOrder: { type: integer, minimum: 0, maximum: 999999, default: 0 }
+    RegionCatalogItem:
+      type: object
+      additionalProperties: false
+      required: [regionCode, regionName, regionLevel, sortOrder, childCount]
+      properties:
+        regionCode: { type: string, minLength: 1, maxLength: 32 }
+        parentCode: { type: [string, 'null'], maxLength: 32 }
+        regionName: { type: string, minLength: 1, maxLength: 100 }
+        regionLevel: { enum: [PROVINCE, CITY, DISTRICT] }
+        sortOrder: { type: integer }
+        childCount:
+          type: integer
+          minimum: 0
+          description: 直接子级 ACTIVE 节点数；治理台树展开用
+    RegionCatalogPage:
+      type: object
+      additionalProperties: false
+      required: [items, asOf]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/RegionCatalogItem' } }
+        asOf: { type: string, format: date-time }
+    ProjectReferenceOptions:
+      type: object
+      additionalProperties: false
+      required: [clients, regions, asOf]
+      properties:
+        clients:
+          type: array
+          items: { $ref: '#/components/schemas/ProjectClientOption' }
+        regions:
+          type: array
+          items: { $ref: '#/components/schemas/ProjectRegionOption' }
         asOf: { type: string, format: date-time }
     ProjectDetail:
       type: object
@@ -11479,6 +12908,23 @@ components:
         allowedActions:
           type: array
           items: { enum: [visit.checkOut, visit.interrupt] }
+    ProjectFulfillmentUsageSummary:
+      type: object
+      additionalProperties: false
+      required: [projectId, asOf]
+      description: |
+        M422：履约配置中心使用中工单摘要。
+        activeWorkOrderCount / activeWorkOrderCountTruncated 在缺 workOrder.read 时同时省略。
+      properties:
+        projectId: { type: string, format: uuid }
+        activeWorkOrderCount:
+          type: [integer, 'null']
+          minimum: 0
+          description: 项目 ACTIVE 工单数（上限 100）；缺 workOrder.read 时为 null
+        activeWorkOrderCountTruncated:
+          type: [boolean, 'null']
+          description: 超过上限时为 true；缺能力时与 count 同时为 null
+        asOf: { type: string, format: date-time }
     ProjectFulfillmentProfileSummary:
       type: object
       required: [profileId, projectId, serviceProductCode, profileName, status, aggregateVersion, updatedAt]
@@ -11518,16 +12964,69 @@ components:
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
         asOf: { type: string, format: date-time }
+    ProjectFulfillmentDocument:
+      type: object
+      description: 履约草稿结构化文档。产品 UI 必须读写本对象，不得自行解析底层 JSON。
+      required: [schemaVersion, stages]
+      properties:
+        schemaVersion: { type: string, minLength: 1, maxLength: 32 }
+        orderTypeName: { type: string, nullable: true }
+        supportedClientKinds:
+          type: array
+          items:
+            type: string
+            enum: [ADMIN_WEB, NETWORK_WEB, TECHNICIAN_WEB, TECHNICIAN_IOS]
+        stages:
+          type: array
+          items: { $ref: '#/components/schemas/ProjectFulfillmentStageDraft' }
+    ProjectFulfillmentStageDraft:
+      type: object
+      required: [stageCode, stageName, sequence, ownerType, terminal]
+      properties:
+        stageCode: { type: string, minLength: 1, maxLength: 64 }
+        stageName: { type: string, minLength: 1, maxLength: 120 }
+        sequence: { type: integer, minimum: 1 }
+        stageType: { type: string, nullable: true }
+        taskType: { type: string, nullable: true }
+        ownerType: { enum: [PLATFORM, NETWORK, TECHNICIAN, SYSTEM] }
+        description: { type: string, nullable: true }
+        formRefs:
+          type: array
+          items: { type: string }
+        evidenceRefs:
+          type: array
+          items: { type: string }
+        actions:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        transitions:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        exceptionPaths:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        slaRef: { type: string, nullable: true }
+        terminal: { type: boolean }
     ProjectFulfillmentDraft:
       type: object
-      required: [profileId, revisionId, serviceProductCode, profileName, documentJson, aggregateVersion, updatedAt]
+      required: [profileId, revisionId, serviceProductCode, profileName, document, aggregateVersion, updatedAt]
       properties:
         profileId: { type: string, format: uuid }
         revisionId: { type: string, format: uuid }
         serviceProductCode: { type: string }
         profileName: { type: string }
         description: { type: string, nullable: true }
-        documentJson: { type: string, minLength: 2 }
+        document: { $ref: '#/components/schemas/ProjectFulfillmentDocument' }
+        documentJson:
+          type: string
+          nullable: true
+          description: 仅供开发诊断；产品页面不得作为主读写路径
         workflowAssetVersionId: { type: string, format: uuid, nullable: true }
         sourceBundleId: { type: string, format: uuid, nullable: true }
         validationJson: { type: string, nullable: true }
@@ -11555,10 +13054,95 @@ components:
         createdAt: { type: string, format: date-time }
     ProjectFulfillmentManifest:
       type: object
-      required: [manifestJson, contentDigest]
+      required: [manifestJson, contentDigest, runbook]
       properties:
-        manifestJson: { type: string, minLength: 2 }
+        manifestJson:
+          type: string
+          minLength: 2
+          description: 仅供开发诊断；普通产品页面不得作为主内容渲染
         contentDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
+        runbook: { $ref: '#/components/schemas/ProjectFulfillmentRunbook' }
+    ProjectFulfillmentRunbook:
+      type: object
+      required:
+        - profileName
+        - serviceProductCode
+        - serviceProductLabel
+        - stageCount
+        - stages
+        - impactSummary
+      properties:
+        profileName: { type: string }
+        serviceProductCode: { type: string }
+        serviceProductLabel: { type: string }
+        orderTypeName: { type: string, nullable: true }
+        versionLabel: { type: string, nullable: true }
+        stageCount: { type: integer, minimum: 0 }
+        stages:
+          type: array
+          items: { $ref: '#/components/schemas/ProjectFulfillmentRunbookStage' }
+        clientSupportSummary: { type: string, nullable: true }
+        impactSummary: { type: string }
+    ProjectFulfillmentRunbookStage:
+      type: object
+      required: [stageName, sequence, ownerTypeLabel, terminal]
+      properties:
+        stageName: { type: string }
+        sequence: { type: integer }
+        ownerTypeLabel: { type: string }
+        taskTypeLabel: { type: string, nullable: true }
+        formCount: { type: integer, minimum: 0 }
+        formSummary: { type: string, nullable: true }
+        evidenceCount: { type: integer, minimum: 0 }
+        evidenceSummary: { type: string, nullable: true }
+        actionCount: { type: integer, minimum: 0 }
+        actionSummary: { type: string, nullable: true }
+        nextStageSummary: { type: string, nullable: true }
+        exceptionSummary: { type: string, nullable: true }
+        slaSummary: { type: string, nullable: true }
+        terminal: { type: boolean }
+    ProjectFulfillmentCompareImpact:
+      type: object
+      required:
+        - profileId
+        - draftRevisionId
+        - baselineKind
+        - changeCount
+        - changes
+        - impact
+        - risks
+        - asOf
+      properties:
+        profileId: { type: string, format: uuid }
+        draftRevisionId: { type: string, format: uuid }
+        baselineKind: { enum: [NONE, PUBLISHED] }
+        baselineRevisionId: { type: string, format: uuid, nullable: true }
+        baselineVersionLabel: { type: string, nullable: true }
+        changeCount: { type: integer, minimum: 0 }
+        changes:
+          type: array
+          items: { $ref: '#/components/schemas/ProjectFulfillmentCompareChange' }
+        impact: { $ref: '#/components/schemas/ProjectFulfillmentImpactSummary' }
+        risks:
+          type: array
+          items: { type: string }
+        asOf: { type: string, format: date-time }
+    ProjectFulfillmentCompareChange:
+      type: object
+      required: [category, changeType, summary]
+      properties:
+        category:
+          enum: [STAGE, TASK, FORM, EVIDENCE, ACTION, SLA, DISPATCH, NOTIFICATION, OTHER]
+        changeType: { enum: [ADDED, REMOVED, MODIFIED] }
+        summary: { type: string }
+        detail: { type: string, nullable: true }
+    ProjectFulfillmentImpactSummary:
+      type: object
+      required: [newWorkOrdersScope, existingWorkOrdersScope]
+      properties:
+        newWorkOrdersScope: { type: string }
+        existingWorkOrdersScope: { type: string }
+        effectiveFromHint: { type: string, nullable: true }
     ProjectFulfillmentValidationIssue:
       type: object
       required: [severity, errorCode, userMessage]
@@ -11584,11 +13168,11 @@ components:
         copyFromProfileId: { type: string, format: uuid }
     UpdateProjectFulfillmentDraftRequest:
       type: object
-      required: [documentJson]
+      required: [document]
       properties:
         profileName: { type: string, maxLength: 200 }
         description: { type: string, maxLength: 2000 }
-        documentJson: { type: string, minLength: 2 }
+        document: { $ref: '#/components/schemas/ProjectFulfillmentDocument' }
         workflowAssetVersionId: { type: string, format: uuid }
         sourceBundleId: { type: string, format: uuid }
     PublishProjectFulfillmentRevisionRequest:

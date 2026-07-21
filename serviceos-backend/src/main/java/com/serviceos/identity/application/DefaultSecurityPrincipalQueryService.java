@@ -1,8 +1,18 @@
 package com.serviceos.identity.application;
 
+import com.serviceos.audit.api.AuditQueryService;
+import com.serviceos.audit.api.AuditRecordView;
 import com.serviceos.identity.api.CurrentPrincipal;
 import com.serviceos.identity.api.IdentityAuthorizationPort;
 import com.serviceos.identity.api.IdentityLinkView;
+import com.serviceos.identity.api.PrincipalAuthorizationDenialItem;
+import com.serviceos.identity.api.PrincipalAuthorizationDenialPage;
+import com.serviceos.identity.api.PrincipalChangeTimelineContributor;
+import com.serviceos.identity.api.PrincipalChangeTimelineItem;
+import com.serviceos.identity.api.PrincipalChangeTimelinePage;
+import com.serviceos.identity.api.PrincipalLoginEventPage;
+import com.serviceos.identity.api.PrincipalLoginEventView;
+import com.serviceos.identity.api.PrincipalPersonaQuery;
 import com.serviceos.identity.api.SecurityPrincipalDetail;
 import com.serviceos.identity.api.SecurityPrincipalPage;
 import com.serviceos.identity.api.SecurityPrincipalQueryService;
@@ -15,8 +25,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -27,17 +42,26 @@ final class DefaultSecurityPrincipalQueryService implements SecurityPrincipalQue
     private final IdentityDirectoryRepository directory;
     private final IdentityDirectoryQueryRepository queries;
     private final IdentityAuthorizationPort authorization;
+    private final AuditQueryService audits;
+    private final PrincipalPersonaQuery personas;
+    private final List<PrincipalChangeTimelineContributor> timelineContributors;
     private final Clock clock;
 
     DefaultSecurityPrincipalQueryService(
             IdentityDirectoryRepository directory,
             IdentityDirectoryQueryRepository queries,
             IdentityAuthorizationPort authorization,
+            AuditQueryService audits,
+            PrincipalPersonaQuery personas,
+            List<PrincipalChangeTimelineContributor> timelineContributors,
             Clock clock
     ) {
         this.directory = directory;
         this.queries = queries;
         this.authorization = authorization;
+        this.audits = audits;
+        this.personas = personas;
+        this.timelineContributors = List.copyOf(timelineContributors);
         this.clock = clock;
     }
 
@@ -82,6 +106,200 @@ final class DefaultSecurityPrincipalQueryService implements SecurityPrincipalQue
         require(actor, correlationId, "identity.readSensitive", principalId.toString());
         requirePrincipal(actor.tenantId(), principalId);
         return directory.findIdentityLinks(actor.tenantId(), principalId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PrincipalLoginEventPage recentLogins(
+            CurrentPrincipal actor, String correlationId, UUID principalId, Integer limit
+    ) {
+        require(actor, correlationId, "identity.read", principalId.toString());
+        requirePrincipal(actor.tenantId(), principalId);
+        int effective = limit == null ? 20 : limit;
+        if (effective < 1 || effective > 50) {
+            throw new IllegalArgumentException("limit must be between 1 and 50");
+        }
+        return new PrincipalLoginEventPage(
+                directory.listLoginEvents(actor.tenantId(), principalId, effective),
+                clock.instant());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PrincipalAuthorizationDenialPage authorizationDenials(
+            CurrentPrincipal actor, String correlationId, UUID principalId, Integer limit
+    ) {
+        require(actor, correlationId, "identity.read", principalId.toString());
+        requirePrincipal(actor.tenantId(), principalId);
+        int effective = limit == null ? 20 : limit;
+        if (effective < 1 || effective > 50) {
+            throw new IllegalArgumentException("limit must be between 1 and 50");
+        }
+        // soft-gate：缺 authorization.read 时诚实省略，不伪造“近期无拒绝”。
+        if (!authorization.allowsTenantCapability(
+                actor, "authorization.read", principalId.toString(), correlationId)) {
+            return new PrincipalAuthorizationDenialPage(List.of(), true, clock.instant());
+        }
+        List<PrincipalAuthorizationDenialItem> items = audits
+                .listAuthorizationDenialsByActor(actor.tenantId(), principalId.toString(), effective)
+                .items()
+                .stream()
+                .map(record -> toDenialItem(principalId, record))
+                .toList();
+        return new PrincipalAuthorizationDenialPage(items, false, clock.instant());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PrincipalChangeTimelinePage changeTimeline(
+            CurrentPrincipal actor, String correlationId, UUID principalId, Integer limit
+    ) {
+        require(actor, correlationId, "identity.read", principalId.toString());
+        requirePrincipal(actor.tenantId(), principalId);
+        int effective = limit == null ? 50 : limit;
+        if (effective < 1 || effective > 100) {
+            throw new IllegalArgumentException("limit must be between 1 and 100");
+        }
+        int fetch = Math.min(100, effective * 2);
+        List<PrincipalChangeTimelineItem> merged = new ArrayList<>();
+        List<String> omittedSources = new ArrayList<>();
+        for (IdentityDirectoryRepository.LifecycleEventRecord event : directory.listLifecycleEvents(
+                actor.tenantId(), principalId, fetch)) {
+            merged.add(PrincipalChangeTimelineItem.of(
+                    "LIFECYCLE",
+                    event.eventType(),
+                    lifecycleSummary(event.eventType(), event.reason()),
+                    event.actorId(),
+                    "SUCCEEDED",
+                    event.correlationId(),
+                    event.principalVersion(),
+                    event.occurredAt(),
+                    event.eventId()));
+        }
+        for (AuditRecordView audit : audits.listByTarget(
+                actor.tenantId(), "SecurityPrincipal", principalId.toString(), fetch).items()) {
+            // 生命周期与登录已有专用源；审计只补充授权拒绝等旁路事实，避免重复 PROFILE/LOGIN。
+            if (isRedundantAudit(audit.actionName())) {
+                continue;
+            }
+            merged.add(PrincipalChangeTimelineItem.of(
+                    "AUDIT",
+                    audit.actionName(),
+                    auditSummary(audit),
+                    audit.actorId(),
+                    audit.resultCode(),
+                    audit.correlationId(),
+                    null,
+                    audit.occurredAt(),
+                    audit.auditId()));
+        }
+        for (PrincipalLoginEventView login : directory.listLoginEvents(
+                actor.tenantId(), principalId, fetch)) {
+            merged.add(PrincipalChangeTimelineItem.of(
+                    "LOGIN",
+                    "LOGIN_SUCCEEDED",
+                    "OIDC 登录成功 · 客户端 " + login.clientId(),
+                    principalId.toString(),
+                    login.outcome(),
+                    "login",
+                    null,
+                    login.occurredAt(),
+                    login.loginEventId()));
+        }
+        // 跨聚合贡献源：缺权 soft-omit，不因缺 organization/authorization 读权而失败关闭整页。
+        for (PrincipalChangeTimelineContributor contributor : timelineContributors) {
+            if (!authorization.allowsTenantCapability(
+                    actor, contributor.requiredCapability(), principalId.toString(), correlationId)) {
+                omittedSources.add(contributor.source());
+                continue;
+            }
+            merged.addAll(contributor.listForPrincipal(actor.tenantId(), principalId, fetch));
+        }
+        merged.sort(Comparator
+                .comparing(PrincipalChangeTimelineItem::occurredAt).reversed()
+                .thenComparing(item -> item.refId().toString()));
+        if (merged.size() > effective) {
+            merged = new ArrayList<>(merged.subList(0, effective));
+        }
+        return new PrincipalChangeTimelinePage(
+                resolveActorDisplayNames(actor.tenantId(), merged),
+                omittedSources.stream().distinct().sorted().toList(),
+                clock.instant());
+    }
+
+    private List<PrincipalChangeTimelineItem> resolveActorDisplayNames(
+            String tenantId, List<PrincipalChangeTimelineItem> items
+    ) {
+        Set<UUID> actorIds = new HashSet<>();
+        for (PrincipalChangeTimelineItem item : items) {
+            parseUuid(item.actorId()).ifPresent(actorIds::add);
+        }
+        Map<UUID, String> names = personas.displayNames(tenantId, actorIds);
+        List<PrincipalChangeTimelineItem> resolved = new ArrayList<>(items.size());
+        for (PrincipalChangeTimelineItem item : items) {
+            String display = parseUuid(item.actorId()).map(names::get).orElse(null);
+            resolved.add(item.withActorDisplayName(display));
+        }
+        return resolved;
+    }
+
+    private static java.util.Optional<UUID> parseUuid(String value) {
+        if (value == null || value.isBlank()) {
+            return java.util.Optional.empty();
+        }
+        try {
+            return java.util.Optional.of(UUID.fromString(value.trim()));
+        } catch (IllegalArgumentException ignored) {
+            return java.util.Optional.empty();
+        }
+    }
+
+    private static boolean isRedundantAudit(String actionName) {
+        return "PRINCIPAL_REGISTERED".equals(actionName)
+                || "IDENTITY_LINKED".equals(actionName)
+                || "PROFILE_UPDATED".equals(actionName)
+                || "PERSONA_ADDED".equals(actionName)
+                || "DISABLED".equals(actionName)
+                || "ENABLED".equals(actionName)
+                || "PRINCIPAL_LOGIN_SUCCEEDED".equals(actionName);
+    }
+
+    private static String lifecycleSummary(String eventType, String reason) {
+        String base = switch (eventType) {
+            case "REGISTERED" -> "主体已登记";
+            case "IDENTITY_LINKED" -> "已绑定外部身份";
+            case "PROFILE_UPDATED" -> "档案已更新";
+            case "PERSONA_ADDED" -> "已添加 Persona";
+            case "DISABLED" -> "主体已停用";
+            case "ENABLED" -> "主体已启用";
+            default -> eventType;
+        };
+        if (reason == null || reason.isBlank()) {
+            return base;
+        }
+        return base + " · " + reason.trim();
+    }
+
+    private static PrincipalAuthorizationDenialItem toDenialItem(
+            UUID principalId, AuditRecordView record
+    ) {
+        return new PrincipalAuthorizationDenialItem(
+                record.auditId(),
+                principalId,
+                Objects.requireNonNullElse(record.capabilityCode(), "UNKNOWN"),
+                record.targetType(),
+                record.targetId(),
+                Objects.requireNonNullElse(record.decisionCode(), "DENY"),
+                record.resultCode(),
+                record.errorCode(),
+                record.correlationId(),
+                record.occurredAt());
+    }
+
+    private static String auditSummary(AuditRecordView audit) {
+        String decision = audit.decisionCode() == null ? "" : " · " + audit.decisionCode();
+        String capability = audit.capabilityCode() == null ? "" : " · " + audit.capabilityCode();
+        return audit.actionName() + decision + capability;
     }
 
     private void require(CurrentPrincipal actor, String correlationId, String capability, String resourceId) {

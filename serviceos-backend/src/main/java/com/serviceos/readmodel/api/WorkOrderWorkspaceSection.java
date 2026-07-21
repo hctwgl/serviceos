@@ -187,7 +187,11 @@ public record WorkOrderWorkspaceSection(
     ) {
     }
 
-    /** 不含 Revision、文件引用、采集元数据与操作者。 */
+    /**
+     * 不含 Revision 图、文件引用、采集元数据与操作者。
+     *
+     * <p>M426：{@code latestRevisionId}/{@code latestMimeType} 仅作授权预览指针。</p>
+     */
     public record WorkOrderWorkspaceEvidenceItemSummary(
             UUID evidenceItemId,
             UUID taskId,
@@ -197,7 +201,9 @@ public record WorkOrderWorkspaceSection(
             String status,
             int revisionCount,
             Integer latestRevisionNumber,
-            String latestRevisionStatus
+            String latestRevisionStatus,
+            UUID latestRevisionId,
+            String latestMimeType
     ) {
     }
 

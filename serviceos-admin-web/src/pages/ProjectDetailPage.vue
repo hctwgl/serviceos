@@ -6,7 +6,6 @@ import {
   Button,
   Descriptions,
   Input,
-  Select,
   Space,
   Tabs,
   TabPane,
@@ -36,6 +35,13 @@ import { presentEntityName } from '../presentation/entity-name.presenter'
 import { useDeveloperDiagnostics } from '../composables/useDeveloperDiagnostics'
 import { statusLabel } from '../product/statusLabels'
 import { toUserFacingError } from '../product/errorMessages'
+import ProjectRegionPicker from '../components/ProjectRegionPicker.vue'
+import NetworkEntityPicker from '../components/NetworkEntityPicker.vue'
+import {
+  followProject,
+  getFollowedProjectStatus,
+  unfollowProject,
+} from '../api/followedProjects'
 
 const route = useRoute()
 const router = useRouter()
@@ -61,6 +67,8 @@ const showDevTools = import.meta.env.DEV
 const baselineRegionCodes = ref<string[]>([])
 const baselineNetworkIds = ref<string[]>([])
 const fulfillmentProfiles = ref<ProjectFulfillmentProfileSummary[]>([])
+const followed = ref(false)
+const followBusy = ref(false)
 
 const fulfillmentPublishedCount = computed(
   () => fulfillmentProfiles.value.filter((p) => p.status === 'ACTIVE').length,
@@ -79,8 +87,14 @@ async function loadNetworks() {
   try {
     const page = await listServiceNetworks()
     networks.value = page.items
-  } catch {
+  } catch (err) {
     networks.value = []
+    diagnostics.pushDiagnostic({
+      title: '网点目录加载失败',
+      fields: {
+        message: err instanceof Error ? err.message : 'unknown',
+      },
+    })
   }
 }
 
@@ -109,6 +123,12 @@ async function loadDetail() {
       pageId: 'ADMIN.PROJECT.DETAIL',
       displayRef: detail.value.project.name || detail.value.project.code,
     })
+    try {
+      const status = await getFollowedProjectStatus(projectId.value)
+      followed.value = status.followed
+    } catch {
+      followed.value = false
+    }
     diagnostics.pushDiagnostic({
       title: '项目详情技术上下文',
       fields: {
@@ -136,6 +156,36 @@ async function loadRevisions(next?: string) {
   })
   revisions.value = page
   revisionCursor.value = page.nextCursor ?? undefined
+}
+
+async function toggleFollow() {
+  if (!detail.value) {
+    return
+  }
+  followBusy.value = true
+  error.value = null
+  errorCode.value = null
+  message.value = null
+  try {
+    if (followed.value) {
+      await unfollowProject(projectId.value)
+      followed.value = false
+      message.value = '已取消关注'
+    } else {
+      await followProject({
+        projectId: projectId.value,
+        displayRef: detail.value.project.name || detail.value.project.code,
+      })
+      followed.value = true
+      message.value = '已关注项目，可在运营工作台查看'
+    }
+  } catch (err) {
+    const facing = toUserFacingError(err)
+    error.value = facing.message
+    errorCode.value = facing.errorCode
+  } finally {
+    followBusy.value = false
+  }
 }
 
 const addedRegions = computed(() =>
@@ -303,6 +353,15 @@ onMounted(() => {
     </template>
     <template #secondary-actions>
       <Button :loading="loading" @click="loadDetail">刷新</Button>
+      <Button
+        data-testid="project-follow-toggle"
+        :loading="followBusy"
+        :type="followed ? 'default' : 'primary'"
+        ghost
+        @click="toggleFollow"
+      >
+        {{ followed ? '取消关注' : '关注项目' }}
+      </Button>
       <Button v-if="showDevTools" type="link" @click="diagnostics.openDrawer()">技术诊断</Button>
     </template>
     <template #primary-action>
@@ -337,7 +396,7 @@ onMounted(() => {
     </template>
 
     <Tabs v-if="detail" v-model:activeKey="activeTab">
-      <TabPane key="basic" tab="基本信息">
+      <TabPane key="basic" tab="项目概览">
         <Descriptions bordered :column="2" size="small">
           <Descriptions.Item label="项目名称">{{ detail.project.name }}</Descriptions.Item>
           <Descriptions.Item label="项目编码">{{ detail.project.code }}</Descriptions.Item>
@@ -354,19 +413,13 @@ onMounted(() => {
         <Alert
           type="info"
           show-icon
-          message="区域名称字典未提供"
-          description="当前仅能维护区域编码；完整区域树/搜索名称属于 UI_DATA_GAP。"
+          message="区域选项来自已授权项目生效 REGION"
+          description="完整行政区名称树仍属 UI_DATA_GAP；可从选项选择或继续输入编码。"
           style="margin-bottom: 12px"
         />
         <label class="field">
-          <span>已选区域编码</span>
-          <Select
-            v-model:value="selectedRegionCodes"
-            mode="tags"
-            style="width: 100%"
-            placeholder="输入区域编码后回车"
-            aria-label="服务区域编码"
-          />
+          <span>服务区域</span>
+          <ProjectRegionPicker v-model="selectedRegionCodes" />
         </label>
         <p class="muted">已选 {{ selectedRegionCodes.length }} 个区域</p>
       </TabPane>
@@ -374,16 +427,7 @@ onMounted(() => {
       <TabPane key="networks" tab="合作网点">
         <label class="field">
           <span>合作网点</span>
-          <Select
-            v-model:value="selectedNetworkIds"
-            mode="multiple"
-            show-search
-            style="width: 100%"
-            placeholder="搜索网点名称"
-            aria-label="合作网点"
-            :options="networkOptions"
-            :filter-option="(input, option) => String(option?.label ?? '').includes(input)"
-          />
+          <NetworkEntityPicker v-model="selectedNetworkIds" />
         </label>
         <p class="muted">已选 {{ selectedNetworkIds.length }} 个网点</p>
         <Space wrap>
@@ -393,7 +437,10 @@ onMounted(() => {
             closable
             @close="selectedNetworkIds = selectedNetworkIds.filter((x) => x !== id)"
           >
-            {{ presentEntityName({ id, loaded: true }).label }}
+            {{
+              networkOptions.find((option) => option.value === id)?.label ||
+              presentEntityName({ id, loaded: true }).label
+            }}
           </Tag>
         </Space>
       </TabPane>
@@ -402,8 +449,8 @@ onMounted(() => {
         <Alert
           type="info"
           show-icon
-          message="按工单类型配置流程、表单、资料、动作、审核与 SLA"
-          description="审核、表单、资料与 SLA 归入具体工单类型配置，不再作为脱离工单类型的孤立标签。"
+          message="进入项目履约配置中心"
+          description="按工单类型维护流程、表单、资料、动作、审核与 SLA；发布使用服务端运行说明书与真实差异分析。"
           style="margin-bottom: 12px"
         />
         <p class="muted">
@@ -419,7 +466,7 @@ onMounted(() => {
             })
           "
         >
-          打开工单类型与履约配置
+          打开项目履约配置中心
         </Button>
       </TabPane>
 

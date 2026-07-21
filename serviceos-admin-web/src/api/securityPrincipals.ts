@@ -38,6 +38,33 @@ export type SecurityPrincipalPage = {
   asOf: string
 }
 
+export type AdminUserDirectoryItem = SecurityPrincipal & {
+  organizationSummary: string | null
+  roleSummary: string | null
+  lastLoginAt: string | null
+}
+
+export type PrincipalLoginEvent = {
+  loginEventId: string
+  principalId: string
+  clientId: string
+  issuer: string
+  authChannel: 'OIDC'
+  outcome: 'SUCCEEDED'
+  occurredAt: string
+}
+
+export type PrincipalLoginEventPage = {
+  items: PrincipalLoginEvent[]
+  asOf: string
+}
+
+export type AdminUserDirectoryPage = {
+  items: AdminUserDirectoryItem[]
+  nextCursor: string | null
+  asOf: string
+}
+
 export type SecurityPrincipalDetail = {
   principal: SecurityPrincipal
   personas: PrincipalPersona[]
@@ -56,12 +83,95 @@ export function listSecurityPrincipals(query: Record<string, string | undefined>
   return apiGet<SecurityPrincipalPage>('/security-principals', query)
 }
 
+export function listAdminUserDirectory(query: Record<string, string | undefined> = {}) {
+  return apiGet<AdminUserDirectoryPage>('/admin/user-directory', query)
+}
+
+export function registerSecurityPrincipal(body: {
+  displayName: string
+  employeeNumber?: string | null
+  personaType?: PrincipalPersona['personaType'] | null
+}): Promise<ApiResult<SecurityPrincipal>> {
+  return apiPost('/security-principals', {
+    idempotencyKey: newIdempotencyKey('principal-register'),
+    body,
+  })
+}
+
 export function getSecurityPrincipal(principalId: string) {
   return apiGetWithMeta<SecurityPrincipalDetail>(`/security-principals/${principalId}`)
 }
 
 export function listPrincipalIdentityLinks(principalId: string) {
   return apiGet<IdentityLink[]>(`/security-principals/${principalId}/identities`)
+}
+
+export function listPrincipalRecentLogins(principalId: string, limit = 20) {
+  return apiGet<PrincipalLoginEventPage>(`/security-principals/${principalId}/recent-logins`, {
+    limit: String(limit),
+  })
+}
+
+export type PrincipalAuthorizationDenialItem = {
+  auditId: string
+  principalId: string
+  capabilityCode: string
+  targetType: string
+  targetId: string
+  decisionCode: string
+  resultCode: string
+  errorCode: string | null
+  correlationId: string
+  occurredAt: string
+}
+
+export type PrincipalAuthorizationDenialPage = {
+  items: PrincipalAuthorizationDenialItem[]
+  omitted: boolean
+  asOf: string
+}
+
+export function listPrincipalAuthorizationDenials(principalId: string, limit = 20) {
+  return apiGet<PrincipalAuthorizationDenialPage>(
+    `/security-principals/${principalId}/authorization-denials`,
+    { limit: String(limit) },
+  )
+}
+
+export type PrincipalChangeTimelineItem = {
+  source:
+    | 'LIFECYCLE'
+    | 'AUDIT'
+    | 'LOGIN'
+    | 'MEMBERSHIP'
+    | 'ROLE_GRANT'
+    | 'NETWORK_MEMBERSHIP'
+    | 'TECHNICIAN_MEMBERSHIP'
+    | 'TECHNICIAN_PROFILE'
+  eventCode: string
+  summary: string
+  actorId: string
+  actorDisplayName: string | null
+  result: string
+  correlationId: string
+  principalVersion: number | null
+  occurredAt: string
+  refId: string
+}
+
+export type PrincipalChangeTimelinePage = {
+  items: PrincipalChangeTimelineItem[]
+  omittedSources: Array<
+    'MEMBERSHIP' | 'ROLE_GRANT' | 'NETWORK_MEMBERSHIP' | 'TECHNICIAN_MEMBERSHIP' | 'TECHNICIAN_PROFILE'
+  >
+  asOf: string
+}
+
+export function listPrincipalChangeTimeline(principalId: string, limit = 50) {
+  return apiGet<PrincipalChangeTimelinePage>(
+    `/security-principals/${principalId}/change-timeline`,
+    { limit: String(limit) },
+  )
 }
 
 export function disableSecurityPrincipal(

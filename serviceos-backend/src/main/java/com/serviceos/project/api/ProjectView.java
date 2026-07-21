@@ -17,6 +17,10 @@ public record ProjectView(
         List<String> networkIds,
         String status,
         long version,
-        Instant createdAt
+        Instant createdAt,
+        /** soft-gate：缺 project.fulfillment.read 时为 null，前端显示「—」。 */
+        Integer publishedSchemeCount,
+        /** soft-gate：缺 project.fulfillment.read 时为 null，前端显示「—」。 */
+        Integer draftSchemeCount
 ) {
 }

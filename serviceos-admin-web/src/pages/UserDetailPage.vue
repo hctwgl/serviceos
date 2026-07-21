@@ -1,24 +1,47 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { Alert, Button, Input, Select, Space, Tabs, TabPane, Tag } from 'ant-design-vue'
+import { ArrowLeftOutlined } from '@ant-design/icons-vue'
 import {
   disableSecurityPrincipal,
   enableSecurityPrincipal,
   getSecurityPrincipal,
+  listPrincipalAuthorizationDenials,
+  listPrincipalChangeTimeline,
   listPrincipalIdentityLinks,
+  listPrincipalRecentLogins,
   updateSecurityPrincipalProfile,
   type IdentityLink,
+  type PrincipalAuthorizationDenialItem,
+  type PrincipalChangeTimelineItem,
+  type PrincipalLoginEvent,
   type SecurityPrincipalDetail,
 } from '../api/securityPrincipals'
 import { listRoleGrants, type RoleGrant } from '../api/authorizationGovernance'
-import { listOpenReassignmentWorkItems, type ReassignmentWorkItem } from '../api/organizations'
+import {
+  createOrganizationMembership,
+  getOrganization,
+  listOpenReassignmentWorkItems,
+  listOrganizations,
+  listOrgMembershipSummaries,
+  terminateOrganizationMembership,
+  transferOrganizationMembership,
+  type Organization,
+  type OrgMembershipSummary,
+  type OrgUnit,
+  type ReassignmentWorkItem,
+} from '../api/organizations'
 import { isConflictError, safeAccessDeniedMessage } from '../api/client'
 import ImpactPanel from '../components/ImpactPanel.vue'
 import VersionedCommandForm from '../components/VersionedCommandForm.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import DetailPageLayout from '../patterns/templates/DetailPageLayout.vue'
 import { statusLabel } from '../product/statusLabels'
+import { formatDateTimeDisplay } from '../presentation/date-time.presenter'
 
 const route = useRoute()
+const router = useRouter()
 const principalId = computed(() => String(route.params.id ?? ''))
 
 const loading = ref(false)
@@ -29,12 +52,62 @@ const message = ref<string | null>(null)
 const detail = ref<SecurityPrincipalDetail | null>(null)
 const etag = ref<string | null>(null)
 const identities = ref<IdentityLink[] | null>(null)
+const recentLogins = ref<PrincipalLoginEvent[] | null>(null)
+const recentLoginsError = ref<string | null>(null)
+const authorizationDenials = ref<PrincipalAuthorizationDenialItem[]>([])
+const authorizationDenialsOmitted = ref(false)
+const authorizationDenialsError = ref<string | null>(null)
+const changeTimeline = ref<PrincipalChangeTimelineItem[]>([])
+const changeTimelineOmitted = ref<
+  Array<'MEMBERSHIP' | 'ROLE_GRANT' | 'NETWORK_MEMBERSHIP' | 'TECHNICIAN_MEMBERSHIP' | 'TECHNICIAN_PROFILE'>
+>([])
+const changeTimelineError = ref<string | null>(null)
 const grants = ref<RoleGrant[]>([])
 const reassignments = ref<ReassignmentWorkItem[]>([])
+const memberships = ref<OrgMembershipSummary[]>([])
+const membershipsError = ref<string | null>(null)
+const organizations = ref<Organization[]>([])
+const createOrgId = ref<string | undefined>(undefined)
+const createUnits = ref<OrgUnit[]>([])
+const createUnitId = ref<string | undefined>(undefined)
+const createMembershipType = ref<'PRIMARY' | 'SECONDARY' | 'MANAGER'>('PRIMARY')
+const selectedMembershipId = ref<string | undefined>(undefined)
+const transferUnitId = ref<string | undefined>(undefined)
+const transferUnits = ref<OrgUnit[]>([])
+const terminateReason = ref('用户详情调整任职')
 const displayName = ref('')
 const employeeNumber = ref('')
 const lifecycleReason = ref('ADMIN_USER_CENTER')
 const staleVersion = ref<number | null>(null)
+const activeTab = ref('basic')
+
+const selectedMembership = computed(() =>
+  memberships.value.find((item) => item.id === selectedMembershipId.value) ?? null,
+)
+const createOrgOptions = computed(() =>
+  organizations.value
+    .filter((item) => item.status === 'ACTIVE')
+    .map((item) => ({
+      value: item.id,
+      label: `${item.name}（${item.code}）${item.authorityMode === 'EXTERNAL_AUTHORITATIVE' ? ' · 外部权威只读结构' : ''}`,
+    })),
+)
+const createUnitOptions = computed(() =>
+  createUnits.value
+    .filter((item) => item.status === 'ACTIVE')
+    .map((item) => ({
+      value: item.id,
+      label: `${item.unitName}（${item.unitCode}）`,
+    })),
+)
+const transferUnitOptions = computed(() =>
+  transferUnits.value
+    .filter((item) => item.status === 'ACTIVE' && item.id !== selectedMembership.value?.orgUnitId)
+    .map((item) => ({
+      value: item.id,
+      label: `${item.unitName}（${item.unitCode}）`,
+    })),
+)
 
 const impactItems = computed(() => {
   if (!detail.value) return []
@@ -63,6 +136,34 @@ async function load() {
       identities.value = null
     }
     try {
+      const loginPage = await listPrincipalRecentLogins(principalId.value, 20)
+      recentLogins.value = loginPage.items
+      recentLoginsError.value = null
+    } catch (err) {
+      recentLogins.value = null
+      recentLoginsError.value = safeAccessDeniedMessage(err)
+    }
+    try {
+      const denialPage = await listPrincipalAuthorizationDenials(principalId.value, 20)
+      authorizationDenials.value = denialPage.items
+      authorizationDenialsOmitted.value = denialPage.omitted
+      authorizationDenialsError.value = null
+    } catch (err) {
+      authorizationDenials.value = []
+      authorizationDenialsOmitted.value = false
+      authorizationDenialsError.value = safeAccessDeniedMessage(err)
+    }
+    try {
+      const timeline = await listPrincipalChangeTimeline(principalId.value, 50)
+      changeTimeline.value = timeline.items
+      changeTimelineOmitted.value = timeline.omittedSources ?? []
+      changeTimelineError.value = null
+    } catch (err) {
+      changeTimeline.value = []
+      changeTimelineOmitted.value = []
+      changeTimelineError.value = safeAccessDeniedMessage(err)
+    }
+    try {
       const grantPage = await listRoleGrants({ principalId: principalId.value })
       grants.value = grantPage.items
     } catch {
@@ -74,6 +175,7 @@ async function load() {
     } catch {
       reassignments.value = []
     }
+    await loadMembershipContext()
   } catch (err) {
     detail.value = null
     denied.value = true
@@ -82,6 +184,154 @@ async function load() {
     loading.value = false
   }
 }
+
+async function loadMembershipContext() {
+  membershipsError.value = null
+  try {
+    const [orgPage, membershipPage] = await Promise.all([
+      listOrganizations(),
+      listOrgMembershipSummaries({ principalId: principalId.value, status: 'ACTIVE' }),
+    ])
+    organizations.value = orgPage.items
+    memberships.value = membershipPage.items
+    if (!createOrgId.value && orgPage.items[0]) {
+      createOrgId.value = orgPage.items[0].id
+      await loadCreateUnits()
+    }
+  } catch (err) {
+    organizations.value = []
+    memberships.value = []
+    membershipsError.value = safeAccessDeniedMessage(err)
+  }
+}
+
+async function loadCreateUnits() {
+  createUnits.value = []
+  createUnitId.value = undefined
+  if (!createOrgId.value) return
+  try {
+    const detailResult = await getOrganization(createOrgId.value)
+    createUnits.value = detailResult.data.units
+    createUnitId.value = detailResult.data.units.find((item) => item.status === 'ACTIVE')?.id
+  } catch (err) {
+    membershipsError.value = safeAccessDeniedMessage(err)
+  }
+}
+
+async function loadTransferUnits(organizationId: string) {
+  transferUnits.value = []
+  transferUnitId.value = undefined
+  try {
+    const detailResult = await getOrganization(organizationId)
+    transferUnits.value = detailResult.data.units
+  } catch (err) {
+    membershipsError.value = safeAccessDeniedMessage(err)
+  }
+}
+
+async function createMembership() {
+  if (!createOrgId.value || !createUnitId.value) {
+    membershipsError.value = '请选择组织与组织单元'
+    return
+  }
+  busy.value = true
+  membershipsError.value = null
+  message.value = null
+  try {
+    await createOrganizationMembership(createOrgId.value, {
+      unitId: createUnitId.value,
+      principalId: principalId.value,
+      membershipType: createMembershipType.value,
+      validFrom: new Date().toISOString(),
+    })
+    message.value = '任职已创建'
+    selectedMembershipId.value = undefined
+    await loadMembershipContext()
+  } catch (err) {
+    membershipsError.value = safeAccessDeniedMessage(err)
+  } finally {
+    busy.value = false
+  }
+}
+
+async function transferSelectedMembership() {
+  if (!selectedMembership.value || !transferUnitId.value) {
+    membershipsError.value = '请选择任职与目标单元'
+    return
+  }
+  if (selectedMembership.value.organizationAuthorityMode === 'EXTERNAL_AUTHORITATIVE') {
+    membershipsError.value = '外部权威组织结构不可在此调动任职'
+    return
+  }
+  busy.value = true
+  membershipsError.value = null
+  message.value = null
+  try {
+    await transferOrganizationMembership(
+      selectedMembership.value.id,
+      selectedMembership.value.version,
+      { targetUnitId: transferUnitId.value },
+    )
+    message.value = '任职已调动'
+    selectedMembershipId.value = undefined
+    await loadMembershipContext()
+  } catch (err) {
+    if (isConflictError(err)) {
+      membershipsError.value = '版本冲突（409），请刷新后重试'
+      await loadMembershipContext()
+    } else {
+      membershipsError.value = safeAccessDeniedMessage(err)
+    }
+  } finally {
+    busy.value = false
+  }
+}
+
+async function terminateSelectedMembership() {
+  if (!selectedMembership.value) {
+    membershipsError.value = '请先选择任职'
+    return
+  }
+  busy.value = true
+  membershipsError.value = null
+  message.value = null
+  try {
+    await terminateOrganizationMembership(
+      selectedMembership.value.id,
+      selectedMembership.value.version,
+      {
+        reason: terminateReason.value.trim() || '用户详情调整任职',
+        disablePrincipal: false,
+      },
+    )
+    message.value = '任职已终止'
+    selectedMembershipId.value = undefined
+    await loadMembershipContext()
+  } catch (err) {
+    if (isConflictError(err)) {
+      membershipsError.value = '版本冲突（409），请刷新后重试'
+      await loadMembershipContext()
+    } else {
+      membershipsError.value = safeAccessDeniedMessage(err)
+    }
+  } finally {
+    busy.value = false
+  }
+}
+
+watch(createOrgId, () => {
+  void loadCreateUnits()
+})
+
+watch(selectedMembershipId, (id) => {
+  const membership = memberships.value.find((item) => item.id === id)
+  if (membership) {
+    void loadTransferUnits(membership.organizationId)
+  } else {
+    transferUnits.value = []
+    transferUnitId.value = undefined
+  }
+})
 
 async function saveProfile() {
   if (!detail.value) return
@@ -161,6 +411,41 @@ async function useStaleVersionForTest() {
   }
 }
 
+function sourceLabel(source: PrincipalChangeTimelineItem['source']) {
+  if (source === 'LIFECYCLE') return '生命周期'
+  if (source === 'LOGIN') return '登录'
+  if (source === 'MEMBERSHIP') return '任职'
+  if (source === 'ROLE_GRANT') return '角色授权'
+  if (source === 'NETWORK_MEMBERSHIP') return '网点任职'
+  if (source === 'TECHNICIAN_MEMBERSHIP') return '师傅服务关系'
+  if (source === 'TECHNICIAN_PROFILE') return '师傅档案'
+  return '审计'
+}
+
+function omittedSourceLabel(
+  source:
+    | 'MEMBERSHIP'
+    | 'ROLE_GRANT'
+    | 'NETWORK_MEMBERSHIP'
+    | 'TECHNICIAN_MEMBERSHIP'
+    | 'TECHNICIAN_PROFILE',
+) {
+  if (source === 'MEMBERSHIP') return '任职（需 organization.read）'
+  if (source === 'ROLE_GRANT') return '角色授权（需 authorization.read）'
+  if (source === 'NETWORK_MEMBERSHIP') return '网点任职（需 network.read）'
+  if (source === 'TECHNICIAN_MEMBERSHIP') return '师傅服务关系（需 network.read）'
+  return '师傅档案（需 network.read）'
+}
+
+function presentActor(item: PrincipalChangeTimelineItem) {
+  if (item.actorDisplayName?.trim()) return item.actorDisplayName.trim()
+  const actorId = item.actorId
+  if (!actorId) return '—'
+  if (actorId === 'jit-registration') return '系统登记'
+  if (actorId.length > 12) return `${actorId.slice(0, 8)}…`
+  return actorId
+}
+
 watch(principalId, () => {
   if (principalId.value) void load()
 })
@@ -170,130 +455,360 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="page" data-testid="user-detail-page">
-    <header class="top">
-      <div>
-        <h2>主体详情</h2>
-        <p class="meta">分区显示身份、Persona、任职/网点关系与授权来源</p>
-      </div>
-      <button type="button" :disabled="loading" @click="load">刷新</button>
-    </header>
+  <div data-testid="user-detail-page">
+    <DetailPageLayout
+      :title="detail?.principal.displayName || '用户详情'"
+      description="基本信息、组织归属、角色权限、登录与安全及变更相关分区。"
+      :eyebrow="detail ? statusLabel(detail.principal.type) : undefined"
+    >
+      <template #back>
+        <Button type="text" aria-label="返回用户目录" @click="router.push({ name: 'ADMIN.USER.DIRECTORY' })">
+          <template #icon><ArrowLeftOutlined /></template>
+          返回用户目录
+        </Button>
+      </template>
+      <template #status>
+        <StatusBadge v-if="detail" :status="detail.principal.status" />
+      </template>
+      <template #secondary-actions>
+        <Button :loading="loading" @click="load">刷新</Button>
+      </template>
+      <template #feedback>
+        <Alert v-if="denied" type="error" show-icon :message="error" data-testid="access-denied" />
+        <Alert v-else-if="loading && !detail" type="info" show-icon message="正在加载用户…" />
+        <Alert v-else-if="!detail && error" type="error" show-icon :message="error" />
+        <Alert v-if="message" type="success" show-icon :message="message" data-testid="command-message" />
+        <Alert
+          v-if="detail && error && !denied"
+          type="error"
+          show-icon
+          :message="error"
+          style="margin-top: 8px"
+        />
+      </template>
 
-    <p v-if="denied" class="error" data-testid="access-denied">{{ error }}</p>
-    <p v-else-if="loading && !detail">加载中…</p>
-    <p v-else-if="!detail && error" class="error">{{ error }}</p>
+      <template v-if="detail" #summary>
+        <p>
+          工号 {{ detail.principal.employeeNumber || '—' }} · Persona
+          {{ detail.personas.filter((x) => x.status === 'ACTIVE').length }} · 授权
+          {{ grants.length }} · 聚合版本 {{ detail.principal.version }}
+        </p>
+      </template>
 
-    <template v-else-if="detail">
-      <p v-if="error" class="error">{{ error }}</p>
-      <p v-if="message" class="ok" data-testid="command-message">{{ message }}</p>
+      <Tabs v-if="detail" v-model:activeKey="activeTab">
+        <TabPane key="basic" tab="基本信息">
+          <article class="card" data-testid="section-identity">
+            <h3>基本信息</h3>
+            <dl>
+              <div>
+                <dt>姓名</dt>
+                <dd data-testid="principal-display-name">{{ detail.principal.displayName }}</dd>
+              </div>
+              <div>
+                <dt>工号</dt>
+                <dd>{{ detail.principal.employeeNumber || '—' }}</dd>
+              </div>
+              <div>
+                <dt>状态</dt>
+                <dd data-testid="principal-status"><StatusBadge :status="detail.principal.status" /></dd>
+              </div>
+              <div>
+                <dt>类型</dt>
+                <dd>{{ statusLabel(detail.principal.type) }}</dd>
+              </div>
+              <div>
+                <dt>版本</dt>
+                <dd data-testid="principal-version">{{ detail.principal.version }}</dd>
+              </div>
+            </dl>
+          </article>
 
-      <article class="card" data-testid="section-identity">
-        <h3>身份</h3>
-        <dl>
-          <div><dt>displayName</dt><dd data-testid="principal-display-name">{{ detail.principal.displayName }}</dd></div>
-          <div><dt>employeeNumber</dt><dd>{{ detail.principal.employeeNumber || '—' }}</dd></div>
-          <div><dt>状态</dt><dd data-testid="principal-status"><StatusBadge :status="detail.principal.status" /></dd></div>
-          <div><dt>类型</dt><dd>{{ statusLabel(detail.principal.type) }}</dd></div>
-          <div><dt>version</dt><dd data-testid="principal-version">{{ detail.principal.version }}</dd></div>
-        </dl>
-      </article>
+          <VersionedCommandForm
+            title="编辑档案"
+            :version="detail.principal.version"
+            :busy="busy"
+            submit-label="保存档案"
+            hint="成功后重读权威 API；并发冲突返回 409。"
+            @submit="saveProfile"
+          >
+            <label>姓名<input v-model="displayName" aria-label="profile displayName" /></label>
+            <label>工号<input v-model="employeeNumber" aria-label="profile employeeNumber" /></label>
+            <button
+              type="button"
+              data-testid="prepare-stale-if-match"
+              :disabled="busy"
+              @click="() => void useStaleVersionForTest()"
+            >
+              准备过期 If-Match（E2E）
+            </button>
+          </VersionedCommandForm>
+        </TabPane>
 
-      <article class="card" data-testid="section-personas">
-        <h3>Persona</h3>
-        <ul v-if="detail.personas.length">
-          <li v-for="persona in detail.personas" :key="persona.id">
-            {{ statusLabel(persona.personaType) }} · <StatusBadge :status="persona.status" /> · {{ persona.validFrom }}
-            <span v-if="persona.validTo"> → {{ persona.validTo }}</span>
-          </li>
-        </ul>
-        <p v-else class="muted">无 Persona</p>
-      </article>
+        <TabPane key="org" tab="组织归属">
+          <article class="card" data-testid="section-personas">
+            <h3>Persona</h3>
+            <ul v-if="detail.personas.length">
+              <li v-for="persona in detail.personas" :key="persona.id">
+                {{ statusLabel(persona.personaType) }} ·
+                <StatusBadge :status="persona.status" /> ·
+                {{ formatDateTimeDisplay(persona.validFrom) }}
+                <span v-if="persona.validTo"> → {{ formatDateTimeDisplay(persona.validTo) }}</span>
+              </li>
+            </ul>
+            <p v-else class="muted">无 Persona</p>
+          </article>
 
-      <article class="card" data-testid="section-identity-links">
-        <h3>身份绑定</h3>
-        <p v-if="identities === null" class="muted">无 identity.readSensitive，不展示敏感绑定</p>
-        <ul v-else-if="identities.length">
-          <li v-for="link in identities" :key="link.id">
-            issuer={{ link.issuer }} · linkedAt={{ link.linkedAt }}
-          </li>
-        </ul>
-        <p v-else class="muted">无绑定</p>
-      </article>
+          <article class="card" data-testid="section-org-memberships">
+            <h3>组织任职</h3>
+            <Alert
+              v-if="membershipsError"
+              type="error"
+              show-icon
+              :message="membershipsError"
+              style="margin-bottom: 12px"
+            />
+            <ul v-if="memberships.length" data-testid="user-org-membership-list">
+              <li v-for="item in memberships" :key="item.id">
+                <label class="membership-row">
+                  <input
+                    v-model="selectedMembershipId"
+                    type="radio"
+                    name="user-membership"
+                    :value="item.id"
+                  />
+                  <span>
+                    {{ item.organizationName }} / {{ item.unitName }}
+                    （{{ item.unitCode }}）
+                    · {{ statusLabel(item.membershipType) }}
+                    · <StatusBadge :status="item.status" />
+                    <Tag
+                      v-if="item.organizationAuthorityMode === 'EXTERNAL_AUTHORITATIVE'"
+                      color="default"
+                    >
+                      外部权威
+                    </Tag>
+                  </span>
+                </label>
+              </li>
+            </ul>
+            <p v-else class="muted">当前无有效组织任职</p>
 
-      <article class="card" data-testid="section-grants">
-        <h3>授权来源</h3>
-        <ul v-if="grants.length">
-          <li v-for="grant in grants" :key="grant.grantId">
-            {{ grant.roleCode }} · {{ grant.grantStatus }}/{{ grant.grantEffect }} ·
-            {{ grant.scopeType }}={{ grant.scopeRef }}
-          </li>
-        </ul>
-        <p v-else class="muted">无授权记录或无权读取</p>
-      </article>
+            <div class="membership-form" data-testid="user-org-membership-create">
+              <h4>创建任职</h4>
+              <label>
+                <span>组织</span>
+                <Select
+                  v-model:value="createOrgId"
+                  style="width: 100%"
+                  :options="createOrgOptions"
+                  aria-label="membership organization"
+                />
+              </label>
+              <label>
+                <span>组织单元</span>
+                <Select
+                  v-model:value="createUnitId"
+                  style="width: 100%"
+                  :options="createUnitOptions"
+                  aria-label="membership unit"
+                />
+              </label>
+              <label>
+                <span>任职类型</span>
+                <Select
+                  v-model:value="createMembershipType"
+                  style="width: 100%"
+                  :options="[
+                    { value: 'PRIMARY', label: '主任职' },
+                    { value: 'SECONDARY', label: '兼任' },
+                    { value: 'MANAGER', label: '管理者' },
+                  ]"
+                  aria-label="membership type"
+                />
+              </label>
+              <Button type="primary" :loading="busy" data-testid="user-org-membership-create-submit" @click="createMembership">
+                创建任职
+              </Button>
+            </div>
 
-      <article class="card" data-testid="section-reassignment">
-        <h3>待重分配</h3>
-        <ul v-if="reassignments.length">
-          <li v-for="item in reassignments" :key="item.id">
-            {{ item.workItemStatus }} · {{ item.reason }} · {{ item.createdAt }}
-          </li>
-        </ul>
-        <p v-else class="muted">无 OPEN 待重分配项</p>
-      </article>
+            <div class="membership-form" data-testid="user-org-membership-actions">
+              <h4>调动 / 终止选中任职</h4>
+              <label>
+                <span>目标单元</span>
+                <Select
+                  v-model:value="transferUnitId"
+                  style="width: 100%"
+                  :options="transferUnitOptions"
+                  :disabled="!selectedMembership"
+                  aria-label="transfer target unit"
+                />
+              </label>
+              <label>
+                <span>终止原因</span>
+                <Input v-model:value="terminateReason" aria-label="terminate reason" />
+              </label>
+              <Space wrap>
+                <Button
+                  :loading="busy"
+                  :disabled="!selectedMembership"
+                  data-testid="user-org-membership-transfer"
+                  @click="transferSelectedMembership"
+                >
+                  调动到目标单元
+                </Button>
+                <Button
+                  danger
+                  :loading="busy"
+                  :disabled="!selectedMembership"
+                  data-testid="user-org-membership-terminate"
+                  @click="terminateSelectedMembership"
+                >
+                  终止任职
+                </Button>
+              </Space>
+            </div>
+          </article>
+        </TabPane>
 
-      <VersionedCommandForm
-        title="更新 PersonProfile"
-        :version="detail.principal.version"
-        :busy="busy"
-        submit-label="保存档案"
-        hint="成功后重读权威 API；并发冲突返回 409。"
-        @submit="saveProfile"
-      >
-        <label>displayName<input v-model="displayName" aria-label="profile displayName" /></label>
-        <label>employeeNumber<input v-model="employeeNumber" aria-label="profile employeeNumber" /></label>
-        <button
-          type="button"
-          data-testid="prepare-stale-if-match"
-          :disabled="busy"
-          @click="() => void useStaleVersionForTest()"
-        >
-          准备过期 If-Match（E2E）
-        </button>
-      </VersionedCommandForm>
+        <TabPane key="roles" tab="角色与权限">
+          <article class="card" data-testid="section-grants">
+            <h3>角色与权限</h3>
+            <ul v-if="grants.length">
+              <li v-for="grant in grants" :key="grant.grantId">
+                {{ grant.roleCode }} · {{ statusLabel(grant.grantStatus) }} /
+                {{ statusLabel(grant.grantEffect) }} ·
+                {{ statusLabel(grant.scopeType) }}={{ grant.scopeRef }}
+              </li>
+            </ul>
+            <p v-else class="muted">无授权记录或无权读取</p>
+          </article>
+        </TabPane>
 
-      <VersionedCommandForm
-        :title="detail.principal.status === 'ACTIVE' ? '停用主体' : '启用主体'"
-        :version="detail.principal.version"
-        :busy="busy"
-        :submit-label="detail.principal.status === 'ACTIVE' ? '确认停用' : '确认启用'"
-        @submit="toggleLifecycle"
-      >
-        <ImpactPanel :items="impactItems" :obligations="['记录审计原因', '确认未完成工作已交接']" />
-        <label>reason<input v-model="lifecycleReason" aria-label="lifecycle reason" /></label>
-      </VersionedCommandForm>
-    </template>
-  </section>
+        <TabPane key="security" tab="登录与安全">
+          <article class="card" data-testid="section-recent-logins">
+            <h3>最近登录</h3>
+            <p v-if="recentLoginsError" class="muted">{{ recentLoginsError }}</p>
+            <ul v-else-if="recentLogins && recentLogins.length" data-testid="user-recent-login-list">
+              <li v-for="item in recentLogins" :key="item.loginEventId">
+                {{ formatDateTimeDisplay(item.occurredAt) }}
+                · 客户端 {{ item.clientId }}
+                · {{ item.authChannel }}
+                · {{ statusLabel(item.outcome) }}
+                <span class="muted"> · 发行方 {{ item.issuer }}</span>
+              </li>
+            </ul>
+            <p v-else class="muted">尚无成功登录记录（仅记录 OIDC 成功解析）</p>
+          </article>
+
+          <article class="card" data-testid="section-authorization-denials">
+            <h3>授权拒绝</h3>
+            <p v-if="authorizationDenialsError" class="muted">{{ authorizationDenialsError }}</p>
+            <p v-else-if="authorizationDenialsOmitted" class="muted" data-testid="authorization-denials-omitted">
+              无 authorization.read，不展示授权拒绝
+            </p>
+            <ul
+              v-else-if="authorizationDenials.length"
+              data-testid="user-authorization-denial-list"
+            >
+              <li v-for="item in authorizationDenials" :key="item.auditId">
+                {{ formatDateTimeDisplay(item.occurredAt) }}
+                · {{ item.capabilityCode }}
+                · {{ item.targetType }}/{{ item.targetId }}
+                · {{ item.errorCode || '—' }}
+                <span class="muted"> · {{ item.correlationId }}</span>
+              </li>
+            </ul>
+            <p v-else class="muted">近期无授权拒绝</p>
+          </article>
+
+          <article class="card" data-testid="section-identity-links">
+            <h3>身份绑定</h3>
+            <p v-if="identities === null" class="muted">无 identity.readSensitive，不展示敏感绑定</p>
+            <ul v-else-if="identities.length">
+              <li v-for="link in identities" :key="link.id">
+                发行方 {{ link.issuer }} · 绑定于 {{ formatDateTimeDisplay(link.linkedAt) }}
+              </li>
+            </ul>
+            <p v-else class="muted">无绑定</p>
+          </article>
+
+          <VersionedCommandForm
+            :title="detail.principal.status === 'ACTIVE' ? '停用用户' : '启用用户'"
+            :version="detail.principal.version"
+            :busy="busy"
+            :submit-label="detail.principal.status === 'ACTIVE' ? '确认停用' : '确认启用'"
+            @submit="toggleLifecycle"
+          >
+            <ImpactPanel :items="impactItems" :obligations="['记录审计原因', '确认未完成工作已交接']" />
+            <label>原因<input v-model="lifecycleReason" aria-label="lifecycle reason" /></label>
+          </VersionedCommandForm>
+        </TabPane>
+
+        <TabPane key="changes" tab="变更记录">
+          <article class="card" data-testid="section-change-timeline">
+            <h3>变更时间线</h3>
+            <Alert
+              v-if="changeTimelineError"
+              type="error"
+              show-icon
+              :message="changeTimelineError"
+              style="margin-bottom: 12px"
+            />
+            <template v-else>
+              <Alert
+                v-if="changeTimelineOmitted.length"
+                type="info"
+                show-icon
+                data-testid="change-timeline-omitted"
+                :message="`以下来源因缺权未合并：${changeTimelineOmitted.map(omittedSourceLabel).join('、')}`"
+                style="margin-bottom: 12px"
+              />
+              <ol v-if="changeTimeline.length" class="timeline" data-testid="user-change-timeline">
+                <li v-for="item in changeTimeline" :key="item.refId">
+                  <div class="timeline__time">{{ formatDateTimeDisplay(item.occurredAt) }}</div>
+                  <div class="timeline__body">
+                    <strong>{{ item.summary }}</strong>
+                    <p class="muted">
+                      {{ sourceLabel(item.source) }}
+                      · {{ item.eventCode }}
+                      · 结果 {{ statusLabel(item.result) }}
+                      <span v-if="item.principalVersion"> · v{{ item.principalVersion }}</span>
+                      · 操作者 {{ presentActor(item) }}
+                    </p>
+                  </div>
+                </li>
+              </ol>
+              <p v-else class="muted">暂无变更记录</p>
+            </template>
+          </article>
+
+          <article class="card" data-testid="section-reassignment">
+            <h3>待重分配</h3>
+            <ul v-if="reassignments.length">
+              <li v-for="item in reassignments" :key="item.id">
+                {{ statusLabel(item.workItemStatus) }} · {{ item.reason }} ·
+                {{ formatDateTimeDisplay(item.createdAt) }}
+              </li>
+            </ul>
+            <p v-else class="muted">无 OPEN 待重分配项</p>
+          </article>
+        </TabPane>
+      </Tabs>
+    </DetailPageLayout>
+  </div>
 </template>
 
 <style scoped>
-.page {
-  display: grid;
-  gap: 1rem;
-}
-.top {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-}
-.meta {
-  margin: 0.25rem 0 0;
-  color: #627d98;
-}
 .card {
   background: #fff;
-  border-radius: 12px;
+  border: 1px solid var(--sos-color-border-default, #e5e7eb);
+  border-radius: 8px;
   padding: 1rem 1.15rem;
-  box-shadow: 0 1px 3px rgb(16 42 67 / 8%);
+  margin-bottom: 12px;
+}
+.card h3 {
+  margin: 0 0 12px;
+  font-size: 15px;
 }
 dl {
   margin: 0;
@@ -306,7 +821,7 @@ dl div {
   gap: 0.5rem;
 }
 dt {
-  color: #627d98;
+  color: var(--sos-color-text-tertiary, #6b7280);
 }
 dd {
   margin: 0;
@@ -326,20 +841,55 @@ input {
   border-radius: 6px;
   padding: 0.4rem 0.65rem;
 }
-button {
-  border: 1px solid #bcccdc;
-  background: #243b53;
-  color: #fff;
-  border-radius: 6px;
-  padding: 0.45rem 0.9rem;
-}
-.error {
-  color: #b42318;
-}
-.ok {
-  color: #054e31;
-}
 .muted {
-  color: #627d98;
+  color: var(--sos-color-text-tertiary, #6b7280);
+}
+.membership-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+.membership-form {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--sos-color-border-light, #e5e7eb);
+  display: grid;
+  gap: 10px;
+  max-width: 520px;
+}
+.membership-form h4 {
+  margin: 0;
+  font-size: 14px;
+}
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.timeline li {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--sos-color-border-light, #e5e7eb);
+}
+.timeline__time {
+  font-size: 12px;
+  color: var(--sos-color-text-tertiary, #6b7280);
+}
+.timeline__body strong {
+  display: block;
+  margin-bottom: 4px;
+}
+.timeline__body p {
+  margin: 0;
+}
+@media (max-width: 768px) {
+  .timeline li {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

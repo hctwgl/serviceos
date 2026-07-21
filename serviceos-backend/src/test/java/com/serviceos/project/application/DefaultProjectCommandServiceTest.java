@@ -36,7 +36,8 @@ class DefaultProjectCommandServiceTest {
         Clock clock = Clock.fixed(Instant.parse("2026-07-13T03:30:00Z"), ZoneOffset.UTC);
         AuthorizationService authorization = allowAuthorization();
         DefaultProjectCommandService service = new DefaultProjectCommandService(
-                projects, authorization, idempotency, audits::add, events::add, clock);
+                projects, new FakeCatalogRepository(), authorization, idempotency,
+                audits::add, events::add, clock);
         CurrentPrincipal principal = new CurrentPrincipal(
                 "trusted-user", "trusted-tenant", CurrentPrincipal.PrincipalType.USER,
                 "admin-web", Set.of("project.create"));
@@ -145,6 +146,92 @@ class DefaultProjectCommandServiceTest {
         @Override
         public Optional<ProjectScopeRevision> findScopeRevision(String tenantId, UUID revisionId) {
             return Optional.empty();
+        }
+    }
+
+    private static final class FakeCatalogRepository implements ProjectCatalogRepository {
+        @Override
+        public java.util.List<com.serviceos.project.api.ProjectClientDirectoryItem> listClients(
+                String tenantId, String statusFilter
+        ) {
+            return java.util.List.of();
+        }
+
+        @Override
+        public Optional<com.serviceos.project.api.ProjectClientDirectoryItem> findClient(
+                String tenantId, String clientCode
+        ) {
+            return Optional.empty();
+        }
+
+        @Override
+        public void upsertClient(
+                String tenantId, String clientCode, String displayName, String status, Instant now
+        ) {
+            // no-op
+        }
+
+        @Override
+        public void updateClientStatus(String tenantId, String clientCode, String status, Instant now) {
+            // no-op
+        }
+
+        @Override
+        public void ensureClient(String tenantId, String clientCode, String displayName, Instant now) {
+            // no-op for create command unit test
+        }
+
+        @Override
+        public java.util.Map<String, String> findClientDisplayNames(
+                String tenantId, java.util.Collection<String> clientCodes
+        ) {
+            return java.util.Map.of();
+        }
+
+        @Override
+        public java.util.List<com.serviceos.project.api.ProjectClientBrandItem> listBrands(
+                String tenantId, String clientCode, String statusFilter
+        ) {
+            return java.util.List.of();
+        }
+
+        @Override
+        public Optional<com.serviceos.project.api.ProjectClientBrandItem> findBrand(
+                String tenantId, String clientCode, String brandCode
+        ) {
+            return Optional.empty();
+        }
+
+        @Override
+        public void upsertBrand(
+                String tenantId,
+                String clientCode,
+                String brandCode,
+                String displayName,
+                String status,
+                int sortOrder,
+                Instant now
+        ) {
+            // no-op
+        }
+
+        @Override
+        public void updateBrandStatus(
+                String tenantId, String clientCode, String brandCode, String status, Instant now
+        ) {
+            // no-op
+        }
+
+        @Override
+        public java.util.List<com.serviceos.project.api.RegionCatalogItem> listRegions(
+                String parentCode, String query, String level, int limit
+        ) {
+            return java.util.List.of();
+        }
+
+        @Override
+        public java.util.Map<String, String> findRegionNames(java.util.Collection<String> regionCodes) {
+            return java.util.Map.of();
         }
     }
 

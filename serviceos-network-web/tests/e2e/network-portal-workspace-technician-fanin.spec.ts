@@ -158,6 +158,10 @@ async function stubPortal(page: Page, options?: { denyTechnicians?: boolean }) {
             validFrom: '2026-01-01T00:00:00Z',
             validTo: null,
             membershipVersion: 1,
+            openTaskCount: 0,
+            approvedQualificationCount: 0,
+            pendingQualificationCount: 0,
+            qualificationSummary: '无资质记录',
           },
         ]
       }
@@ -194,6 +198,10 @@ async function stubPortal(page: Page, options?: { denyTechnicians?: boolean }) {
             validFrom: '2026-01-01T00:00:00Z',
             validTo: null,
             membershipVersion: 1,
+            openTaskCount: 0,
+            approvedQualificationCount: 0,
+            pendingQualificationCount: 0,
+            qualificationSummary: '无资质记录',
           },
         ],
       }),

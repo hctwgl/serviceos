@@ -8,6 +8,12 @@ import java.util.UUID;
 public interface SlaQueryService {
     SlaInstancePage list(CurrentPrincipal principal, String correlationId, SlaInstanceQuery query);
 
+    /**
+     * M452：与 {@link #list} 同授权与筛选口径的精确 COUNT（无 cursor）。
+     * {@code query.limit}/{@code query.cursor} 忽略。
+     */
+    int count(CurrentPrincipal principal, String correlationId, SlaInstanceQuery query);
+
     SlaInstancePage listForWorkOrder(
             CurrentPrincipal principal, String correlationId, UUID workOrderId, String cursor, int limit);
 

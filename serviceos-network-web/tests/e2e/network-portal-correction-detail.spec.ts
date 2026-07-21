@@ -143,7 +143,7 @@ test.describe('M209 Network Portal 整改详情', () => {
     await page.getByTestId('correction-case-deeplink').click()
     await expect(page).toHaveURL(new RegExp(`/network-portal/corrections/${CORRECTION_ID}`))
     await expect(page.getByTestId('network-portal-correction-detail')).toBeVisible()
-    await expect(page.getByTestId('correction-detail-status')).toHaveText('OPEN')
+    await expect(page.getByTestId('correction-detail-status')).toHaveText(/待处理|OPEN/)
     await expect(page.getByTestId('correction-detail-source-snapshot')).toContainText(
       '019f84a0-ffff-7f8c-9505-36fe5c0e8806',
     )

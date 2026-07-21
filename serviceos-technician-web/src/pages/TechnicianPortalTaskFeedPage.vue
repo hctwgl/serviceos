@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { statusLabel } from '../product/labels'
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
   listTechnicianCorrections,
@@ -9,7 +9,7 @@ import {
   type TechnicianPortalFeedItem,
 } from '../api/technicianPortal'
 import { userFacingError } from '../api/client'
-import {formatDateTime} from '@serviceos/web-core'
+import { formatDateTime } from '@serviceos/web-core'
 
 const props = defineProps<{ technicianContextId: string | null }>()
 const items = ref<TechnicianPortalFeedItem[]>([])
@@ -21,6 +21,24 @@ const loading = ref(false)
 const loadingMore = ref(false)
 const corrections = ref<TechnicianCorrection[]>([])
 const correctionError = ref<string | null>(null)
+
+const assignmentItems = computed(() => items.value.filter((item) => item.itemType === 'ASSIGNMENT'))
+const urgentCount = computed(
+  () =>
+    assignmentItems.value.filter((item) =>
+      ['WAITING_CORRECTION', 'READY', 'ASSIGNED'].includes(String(item.taskStatus || '')),
+    ).length,
+)
+
+function nextActionLabel(item: TechnicianPortalFeedItem) {
+  if (item.clientCapabilityUnsupportedDetail) return '更换客户端'
+  if (item.itemType !== 'ASSIGNMENT') return '查看说明'
+  const status = String(item.taskStatus || '')
+  if (status === 'WAITING_CORRECTION') return '处理整改'
+  if (status === 'IN_PROGRESS' || status === 'CHECKED_IN') return '继续作业'
+  if (status === 'READY' || status === 'ASSIGNED' || status === 'PENDING') return '开始处理'
+  return '打开任务'
+}
 
 async function loadCorrections() {
   if (!props.technicianContextId) {
@@ -50,10 +68,7 @@ async function load(options?: { append?: boolean; sinceCursor?: string }) {
     loading.value = true
   }
   try {
-    const page = await listTechnicianTaskFeed(
-      props.technicianContextId,
-      options?.sinceCursor,
-    )
+    const page = await listTechnicianTaskFeed(props.technicianContextId, options?.sinceCursor)
     items.value = options?.append ? [...items.value, ...page.items] : page.items
     networkId.value = page.networkId
     asOf.value = page.asOf
@@ -90,30 +105,53 @@ onMounted(() => {
   void load()
   void loadCorrections()
 })
-watch(() => props.technicianContextId, () => {
-  void load()
-  void loadCorrections()
-})
+watch(
+  () => props.technicianContextId,
+  () => {
+    void load()
+    void loadCorrections()
+  },
+)
 </script>
 
 <template>
   <section
     data-testid="technician-portal-task-feed"
     data-page-id="TECHNICIAN.TASK.LIST"
+    class="feed-page"
   >
     <header class="top">
       <div>
-        <h2>今日任务</h2>
-        <p class="hint">我下一步需要做什么：联系客户、预约、上门、上传资料、处理整改。</p>
+        <p class="eyebrow">今日任务</p>
+        <h2>我的作业</h2>
+        <p class="hint">当前任务、紧急事项和下一步动作。</p>
       </div>
-      <button type="button" data-testid="technician-feed-refresh" @click="load()">
+      <button type="button" class="ghost" data-testid="technician-feed-refresh" @click="load()">
         刷新
       </button>
     </header>
+
+    <section class="summary" data-testid="technician-feed-summary" aria-label="今日概览">
+      <article>
+        <span>今日任务</span>
+        <strong data-testid="technician-feed-count-today">{{ assignmentItems.length }}</strong>
+      </article>
+      <article data-tone="warning">
+        <span>待处理 / 紧急</span>
+        <strong data-testid="technician-feed-count-urgent">{{ urgentCount }}</strong>
+      </article>
+      <article data-tone="critical">
+        <span>待整改</span>
+        <strong data-testid="technician-feed-count-corrections">{{ corrections.length }}</strong>
+      </article>
+    </section>
+
     <section class="corrections" data-testid="technician-corrections">
       <div class="correction-heading">
         <h3>待整改任务</h3>
-        <button type="button" data-testid="technician-corrections-refresh" @click="loadCorrections">刷新整改</button>
+        <button type="button" class="ghost" data-testid="technician-corrections-refresh" @click="loadCorrections">
+          刷新整改
+        </button>
       </div>
       <p v-if="correctionError" data-testid="technician-corrections-error">{{ correctionError }}</p>
       <p v-else-if="corrections.length === 0" data-testid="technician-corrections-empty">
@@ -143,6 +181,7 @@ watch(() => props.technicianContextId, () => {
         </div>
         <RouterLink
           v-if="!correction.clientCapabilityUnsupportedDetail"
+          class="primary-link"
           :to="`/technician-portal/corrections/${correction.correctionCaseId}`"
         >
           查看整改要求
@@ -156,6 +195,7 @@ watch(() => props.technicianContextId, () => {
         </span>
       </article>
     </section>
+
     <p v-if="loading" data-testid="technician-feed-loading">正在加载数据，请稍候……</p>
     <p v-else-if="error" data-testid="technician-portal-error">{{ error }}</p>
     <template v-else>
@@ -172,120 +212,157 @@ watch(() => props.technicianContextId, () => {
           </dd>
         </div>
       </dl>
-      <table data-testid="technician-feed-table">
-        <thead>
-          <tr>
-            <th>事项</th>
-            <th>任务</th>
-            <th>关联工单</th>
-            <th>所属项目</th>
-            <th>状态</th>
-            <th>当前阶段</th>
-            <th>任务类型</th>
-            <th>任务种类</th>
-            <th>业务类型</th>
-            <th>生效时间</th>
-            <th>说明</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="item in items"
-            :key="item.cursor"
-            :data-testid="`technician-feed-row-${item.taskId}`"
+
+      <div class="card-list" data-testid="technician-feed-table">
+        <article
+          v-for="item in items"
+          :key="item.cursor"
+          class="task-card"
+          :data-testid="`technician-feed-row-${item.taskId}`"
+        >
+          <header>
+            <span class="badge">{{ item.itemType === 'ASSIGNMENT' ? '责任任务' : statusLabel(item.itemType) }}</span>
+            <span class="status">{{ statusLabel(item.taskStatus) }}</span>
+          </header>
+          <h3>
+            {{ item.taskType ? statusLabel(item.taskType) : '现场任务' }}
+            <small data-testid="technician-feed-task-type">{{ item.taskType || '—' }}</small>
+          </h3>
+          <p class="line">
+            阶段
+            <span data-testid="technician-feed-stage-code">{{ item.stageCode || '—' }}</span>
+            · 种类
+            <span data-testid="technician-feed-task-kind">{{ item.taskKind || '—' }}</span>
+            · 业务
+            <span data-testid="technician-feed-business-type">{{ item.businessType || '—' }}</span>
+          </p>
+          <p class="line">
+            生效
+            <span data-testid="technician-feed-effective-from">{{ formatDateTime(item.effectiveFrom) }}</span>
+          </p>
+          <p class="line muted">
+            项目 <span data-testid="technician-feed-project-id">{{ item.projectId ?? '—' }}</span>
+            · {{ item.workOrderId ? '已关联工单' : '无关联工单' }}
+          </p>
+          <p
+            v-if="item.clientCapabilityUnsupportedDetail"
+            class="capability-block"
+            :data-testid="`technician-feed-capability-unsupported-${item.taskId}`"
           >
-            <td>{{ item.itemType === 'ASSIGNMENT' ? '责任任务' : statusLabel(item.itemType) }}</td>
-            <td>
+            {{ item.clientCapabilityUnsupportedDetail }}
+          </p>
+          <p v-else-if="item.invalidationReason" class="muted">{{ item.invalidationReason }}</p>
+
+          <footer class="card-actions">
+            <template v-if="item.itemType === 'ASSIGNMENT' && item.clientCapabilityUnsupportedDetail">
+              <span class="capability-blocked" data-testid="technician-feed-capability-blocked">
+                当前客户端无法履约
+              </span>
+              <span data-testid="technician-feed-task-detail-blocked">不可打开</span>
+            </template>
+            <template v-else-if="item.itemType === 'ASSIGNMENT'">
               <RouterLink
-                v-if="item.itemType === 'ASSIGNMENT' && !item.clientCapabilityUnsupportedDetail"
+                class="primary"
                 :to="`/technician-portal/tasks/${item.taskId}`"
                 data-testid="technician-feed-task-detail-deeplink"
               >
-                打开任务
+                {{ nextActionLabel(item) }}
               </RouterLink>
-              <span
-                v-else-if="item.itemType === 'ASSIGNMENT'"
-                data-testid="technician-feed-task-detail-blocked"
-              >不可打开</span>
-              <span v-else>查看</span>
-            </td>
-            <td>{{ item.workOrderId ? '关联工单' : '—' }}</td>
-            <td data-testid="technician-feed-project-id">{{ item.projectId ?? '—' }}</td>
-            <td>{{ statusLabel(item.taskStatus) }}</td>
-            <td data-testid="technician-feed-stage-code">{{ item.stageCode ? statusLabel(item.stageCode) : '—' }}</td>
-            <td data-testid="technician-feed-task-type">{{ item.taskType ? statusLabel(item.taskType) : '—' }}</td>
-            <td data-testid="technician-feed-task-kind">{{ item.taskKind ? statusLabel(item.taskKind) : '—' }}</td>
-            <td data-testid="technician-feed-business-type">{{ item.businessType ? statusLabel(item.businessType) : '—' }}</td>
-            <td data-testid="technician-feed-effective-from">
-              {{ formatDateTime(item.effectiveFrom) }}
-            </td>
-            <td>
-              <span
-                v-if="item.clientCapabilityUnsupportedDetail"
-                class="capability-block"
-                :data-testid="`technician-feed-capability-unsupported-${item.taskId}`"
+              <RouterLink
+                :to="{ path: '/technician-portal/schedule', query: { taskId: item.taskId } }"
+                data-testid="technician-feed-schedule-deeplink"
               >
-                {{ item.clientCapabilityUnsupportedDetail }}
-              </span>
-              <template v-else>{{ item.invalidationReason ?? '—' }}</template>
-            </td>
-            <td>
-              <template v-if="item.itemType === 'ASSIGNMENT' && item.clientCapabilityUnsupportedDetail">
-                <span
-                  class="capability-blocked"
-                  data-testid="technician-feed-capability-blocked"
-                >当前客户端无法履约</span>
-              </template>
-              <template v-else-if="item.itemType === 'ASSIGNMENT'">
-                <RouterLink :to="`/technician-portal/tasks/${item.taskId}`">
-                  开始处理
-                </RouterLink>
-                <RouterLink
-                  :to="{ path: '/technician-portal/schedule', query: { taskId: item.taskId } }"
-                  data-testid="technician-feed-schedule-deeplink"
-                >
-                  查看日程
-                </RouterLink>
-              </template>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+                查看日程
+              </RouterLink>
+            </template>
+            <span v-else>查看</span>
+          </footer>
+        </article>
+      </div>
+
       <p v-if="items.length === 0" data-testid="technician-feed-empty">
         当前没有待办任务。请等待网点指派，或刷新后重试。
       </p>
       <button
         v-if="nextCursor"
         type="button"
+        class="ghost"
         :disabled="loadingMore"
         data-testid="technician-feed-load-more"
         @click="loadMore"
       >
         加载增量
       </button>
+      <p class="muted gap-note">
+        UI_DATA_GAP：客户脱敏姓名/电话、地址摘要、距离与 SLA 倒计时尚未由 Feed 正式读模型交付；H5 不伪造这些字段。
+      </p>
     </template>
   </section>
 </template>
 
 <style scoped>
+.feed-page {
+  display: grid;
+  gap: 12px;
+}
 .top {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
   align-items: flex-start;
 }
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--sos-primary-600);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+.top h2 {
+  margin: 0 0 4px;
+  font-size: 22px;
+}
 .hint,
-.meta {
-  color: #5b6573;
+.meta,
+.muted,
+.gap-note,
+.line {
+  color: var(--sos-color-text-tertiary);
   font-size: 0.9rem;
 }
+.summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.summary article {
+  border: 1px solid var(--sos-color-border-default);
+  border-radius: 12px;
+  background: #fff;
+  padding: 10px;
+  display: grid;
+  gap: 4px;
+}
+.summary article span {
+  font-size: 12px;
+  color: var(--sos-color-text-secondary);
+}
+.summary article strong {
+  font-size: 22px;
+}
+.summary article[data-tone='warning'] {
+  border-color: var(--sos-color-status-warning-border);
+  background: var(--sos-color-status-warning-bg);
+}
+.summary article[data-tone='critical'] {
+  border-color: var(--sos-color-status-critical-border);
+  background: var(--sos-color-status-critical-bg);
+}
 .corrections {
-  margin: 1rem 0;
+  margin: 0;
   padding: 0.9rem;
-  border: 1px solid #f3c780;
+  border: 1px solid var(--sos-color-status-warning-border);
   border-radius: 0.75rem;
-  background: #fffaf0;
+  background: var(--sos-color-status-warning-bg);
 }
 .correction-heading,
 .correction-card {
@@ -295,47 +372,104 @@ watch(() => props.technicianContextId, () => {
   gap: 1rem;
 }
 .correction-heading h3,
-.correction-card p { margin: 0; }
-.correction-card { padding: 0.7rem 0; border-top: 1px solid #f3dfbd; }
-.capability-warn {
-  margin-top: 0.4rem;
-  color: #9a3412;
-  font-size: 0.88rem;
+.correction-card p {
+  margin: 0;
 }
+.correction-card {
+  padding: 0.7rem 0;
+  border-top: 1px solid #f3dfbd;
+}
+.capability-warn,
+.capability-block,
 .capability-blocked {
   color: #9a3412;
   font-size: 0.88rem;
-  white-space: nowrap;
 }
 .meta {
   display: grid;
   gap: 0.25rem;
-  margin: 0.75rem 0;
+  margin: 0;
 }
 .meta dd {
   margin: 0 0 0.25rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.85rem;
   word-break: break-all;
 }
-table {
-  width: 100%;
-  border-collapse: collapse;
+.card-list {
+  display: grid;
+  gap: 10px;
 }
-th,
-td {
-  border-bottom: 1px solid #e5e7eb;
-  padding: 0.45rem 0.35rem;
-  text-align: left;
-  font-size: 0.8rem;
+.task-card {
+  border: 1px solid var(--sos-color-border-default);
+  border-radius: 12px;
+  background: #fff;
+  padding: 12px;
+  display: grid;
+  gap: 6px;
 }
-.capability-block {
-  color: #9a3412;
-  font-size: 0.78rem;
-  line-height: 1.35;
+.task-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
 }
-.capability-blocked {
-  color: #9a3412;
-  font-size: 0.78rem;
+.badge,
+.status {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--sos-primary-100);
+  color: var(--sos-primary-800);
+}
+.task-card h3 {
+  margin: 0;
+  font-size: 17px;
+}
+.task-card h3 small {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--sos-color-text-tertiary);
+  font-weight: 500;
+}
+.card-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 6px;
+}
+.card-actions a,
+.primary-link {
+  min-height: var(--sos-touch-min);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  text-decoration: none;
+  border: 1px solid var(--sos-color-border-default);
+  color: var(--sos-color-text-primary);
+  font-weight: 600;
+}
+.card-actions a.primary {
+  background: var(--sos-primary-600);
+  border-color: var(--sos-primary-600);
+  color: #fff;
+}
+button.ghost {
+  border: 1px solid var(--sos-color-border-default);
+  background: #fff;
+  border-radius: 10px;
+  min-height: 40px;
+  padding: 0 12px;
+  cursor: pointer;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
 }
 </style>

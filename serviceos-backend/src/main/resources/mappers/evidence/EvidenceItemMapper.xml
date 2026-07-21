@@ -146,12 +146,16 @@
                item.status AS "status",
                COALESCE(latest.revision_count, 0) AS "revisionCount",
                latest.revision_number AS "latestRevisionNumber",
-               latest.status AS "latestRevisionStatus"
+               latest.status AS "latestRevisionStatus",
+               latest.evidence_revision_id AS "latestRevisionId",
+               latest.mime_type AS "latestMimeType"
           FROM evd_evidence_item item
           LEFT JOIN LATERAL (
               SELECT count(*) OVER ()::integer AS revision_count,
                      revision_number,
-                     status
+                     status,
+                     evidence_revision_id,
+                     mime_type
                 FROM evd_evidence_revision revision
                WHERE revision.tenant_id = item.tenant_id
                  AND revision.evidence_item_id = item.evidence_item_id

@@ -2,6 +2,8 @@ package com.serviceos.readmodel.application;
 
 import com.serviceos.appointment.api.AppointmentRevisionView;
 import com.serviceos.appointment.api.AppointmentService;
+import com.serviceos.appointment.api.TechnicianScheduleAppointmentQuery;
+import com.serviceos.appointment.api.TechnicianScheduleAppointmentView;
 import com.serviceos.appointment.api.AppointmentView;
 import com.serviceos.appointment.api.AppointmentWindow;
 import com.serviceos.appointment.api.ContactAttemptView;
@@ -32,9 +34,16 @@ import com.serviceos.network.api.NetworkPortalTechnicianQuery;
 import com.serviceos.network.api.NetworkPortalTechnicianView;
 import com.serviceos.network.api.NetworkTechnicianMembershipView;
 import com.serviceos.network.api.PrincipalNetworkAffiliationQuery;
+import com.serviceos.network.api.ServiceNetworkCoverageQuery;
+import com.serviceos.network.api.ServiceNetworkCoverageView;
 import com.serviceos.network.api.TechnicianQualificationView;
+import com.serviceos.project.api.RegionCatalogNameQuery;
 import com.serviceos.operations.api.OperationalExceptionItem;
 import com.serviceos.operations.api.OperationalExceptionWorkbenchService;
+import com.serviceos.readmodel.api.NetworkPortalAppointmentCalendarDay;
+import com.serviceos.readmodel.api.NetworkPortalAppointmentCalendarView;
+import com.serviceos.readmodel.api.NetworkPortalAssignCandidateItem;
+import com.serviceos.readmodel.api.NetworkPortalAssignCandidatePage;
 import com.serviceos.readmodel.api.NetworkPortalCapacityItem;
 import com.serviceos.readmodel.api.NetworkPortalCorrectionItem;
 import com.serviceos.readmodel.api.NetworkPortalDirectorySlaRiskSummary;
@@ -45,6 +54,8 @@ import com.serviceos.readmodel.api.NetworkPortalQualificationItem;
 import com.serviceos.readmodel.api.NetworkPortalQueryService;
 import com.serviceos.readmodel.api.NetworkPortalTaskItem;
 import com.serviceos.readmodel.api.NetworkPortalTechnicianItem;
+import com.serviceos.readmodel.api.NetworkPortalWorkbenchAppointmentItem;
+import com.serviceos.readmodel.api.NetworkPortalWorkbenchTimelineBucket;
 import com.serviceos.readmodel.api.NetworkPortalWorkbenchView;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderItem;
 import com.serviceos.readmodel.api.NetworkPortalWorkOrderWorkspace;
@@ -71,11 +82,15 @@ import com.serviceos.task.api.TaskFulfillmentContext;
 import com.serviceos.task.api.TaskFulfillmentContextService;
 import com.serviceos.workorder.api.WorkOrderDirectoryHeader;
 import com.serviceos.workorder.api.WorkOrderDirectoryHeaderQuery;
+import com.serviceos.workorder.api.WorkOrderMaskedContactView;
+import com.serviceos.workorder.api.WorkOrderQueryService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -121,6 +136,12 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     private static final int WORKSPACE_EXCEPTION_LIMIT = 100;
     private static final int WORKSPACE_APPOINTMENT_LIMIT = 100;
     private static final int WORKSPACE_CONTACT_LIMIT = 100;
+    private static final int WORKBENCH_TODAY_APPOINTMENT_LIMIT = 50;
+    private static final int CALENDAR_DEFAULT_SPAN_DAYS = 14;
+    private static final int CALENDAR_MAX_SPAN_DAYS = 31;
+    private static final int CALENDAR_APPOINTMENT_LIMIT = 200;
+    /** Network 工作台运营日边界；现场履约首批区域为中国时区，不得按浏览器本地日猜测。 */
+    private static final ZoneId NETWORK_OPERATIONAL_ZONE = ZoneId.of("Asia/Shanghai");
     private static final Set<String> OPEN_SLA_STATUSES = Set.of("RUNNING", "BREACHED");
 
     private final PrincipalNetworkAffiliationQuery affiliations;
@@ -141,7 +162,11 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     private final EvidenceSlotQueryService evidenceSlots;
     private final EvidenceItemQueryService evidenceItems;
     private final AppointmentService appointments;
+    private final TechnicianScheduleAppointmentQuery scheduleAppointments;
     private final WorkOrderDirectoryHeaderQuery workOrderHeaders;
+    private final WorkOrderQueryService workOrders;
+    private final ServiceNetworkCoverageQuery coverages;
+    private final RegionCatalogNameQuery regionNames;
     private final Clock clock;
 
     DefaultNetworkPortalQueryService(
@@ -163,7 +188,11 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
             EvidenceSlotQueryService evidenceSlots,
             EvidenceItemQueryService evidenceItems,
             AppointmentService appointments,
+            TechnicianScheduleAppointmentQuery scheduleAppointments,
             WorkOrderDirectoryHeaderQuery workOrderHeaders,
+            WorkOrderQueryService workOrders,
+            ServiceNetworkCoverageQuery coverages,
+            RegionCatalogNameQuery regionNames,
             Clock clock
     ) {
         this.affiliations = affiliations;
@@ -184,7 +213,11 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         this.evidenceSlots = evidenceSlots;
         this.evidenceItems = evidenceItems;
         this.appointments = appointments;
+        this.scheduleAppointments = scheduleAppointments;
         this.workOrderHeaders = workOrderHeaders;
+        this.workOrders = workOrders;
+        this.coverages = coverages;
+        this.regionNames = regionNames;
         this.clock = clock;
     }
 
@@ -225,8 +258,12 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         }
         Map<UUID, WorkOrderDirectoryHeader> headers = loadWorkOrderHeaders(
                 actor.tenantId(), byWorkOrder.keySet());
+        // M428：基座已证明 ACTIVE NETWORK 责任；再取网点范围脱敏联系（不 soft-omit）。
+        Map<UUID, WorkOrderMaskedContactView> contacts = loadMaskedContactsForNetwork(
+                actor, correlationId, networkId, byWorkOrder.keySet());
         List<NetworkPortalWorkOrderItem> workOrderItems = byWorkOrder.values().stream()
                 .map(item -> withWorkOrderHeader(item, headers.get(item.workOrderId())))
+                .map(item -> withWorkOrderMaskedContact(item, contacts.get(item.workOrderId())))
                 .toList();
         List<NetworkPortalTechnicianItem> technicianSummaries = null;
         if (hasNetworkCapability(actor, correlationId, TECHNICIAN_READ_OWN, networkId)) {
@@ -379,6 +416,9 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
             technicianSummaries = loadTechnicianSummaries(
                     actor.tenantId(), networkId, wantedTechnicianIds);
         }
+        // M424：基座门禁（membership + networkTask.read + ACTIVE）已通过；再取网点范围脱敏联系。
+        WorkOrderMaskedContactView contact = workOrders.getMaskedContactForNetwork(
+                actor, correlationId, networkId, workOrderId);
         return new NetworkPortalWorkOrderWorkspace(
                 networkId,
                 workOrderId,
@@ -399,6 +439,9 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                 appointmentSummaries,
                 contactAttemptSummaries,
                 technicianSummaries,
+                contact.maskedCustomerName(),
+                contact.maskedCustomerPhone(),
+                contact.maskedServiceAddress(),
                 clock.instant());
     }
 
@@ -599,7 +642,9 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                 item.status(),
                 item.revisionCount(),
                 item.latestRevisionNumber(),
-                item.latestRevisionStatus());
+                item.latestRevisionStatus(),
+                item.latestRevisionId(),
+                item.latestMimeType());
     }
 
     /** M236：为本页 workOrderIds 装载非 PII 工单头；缺失静默跳过。 */
@@ -613,6 +658,27 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                     .ifPresent(header -> headers.put(workOrderId, header));
         }
         return headers;
+    }
+
+    /**
+     * M428：为本页 ACTIVE 责任 workOrderIds 装载网点范围脱敏联系。
+     *
+     * <p>调用方必须已证明 ACTIVE NETWORK 责任；端口再次强制 networkTask.read。
+     * 工单缺失时端口返回 null 字段视图，目录项仍序列化 masked* = null。</p>
+     */
+    private Map<UUID, WorkOrderMaskedContactView> loadMaskedContactsForNetwork(
+            CurrentPrincipal actor,
+            String correlationId,
+            UUID networkId,
+            Set<UUID> workOrderIds
+    ) {
+        Map<UUID, WorkOrderMaskedContactView> contacts = new LinkedHashMap<>();
+        for (UUID workOrderId : workOrderIds) {
+            contacts.put(
+                    workOrderId,
+                    workOrders.getMaskedContactForNetwork(actor, correlationId, networkId, workOrderId));
+        }
+        return contacts;
     }
 
     private static NetworkPortalWorkOrderItem withWorkOrderHeader(
@@ -634,7 +700,35 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                 header.provinceCode(),
                 header.cityCode(),
                 header.districtCode(),
-                header.receivedAt());
+                header.receivedAt(),
+                item.maskedCustomerName(),
+                item.maskedCustomerPhone(),
+                item.maskedServiceAddress());
+    }
+
+    private static NetworkPortalWorkOrderItem withWorkOrderMaskedContact(
+            NetworkPortalWorkOrderItem item,
+            WorkOrderMaskedContactView contact
+    ) {
+        if (contact == null) {
+            return item;
+        }
+        return new NetworkPortalWorkOrderItem(
+                item.workOrderId(),
+                item.projectId(),
+                item.taskIds(),
+                item.businessType(),
+                item.technicianId(),
+                item.effectiveFrom(),
+                item.brandCode(),
+                item.serviceProductCode(),
+                item.provinceCode(),
+                item.cityCode(),
+                item.districtCode(),
+                item.receivedAt(),
+                contact.maskedCustomerName(),
+                contact.maskedCustomerPhone(),
+                contact.maskedServiceAddress());
     }
 
     private static NetworkPortalTaskItem withTaskHeader(
@@ -660,7 +754,39 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                 header.provinceCode(),
                 header.cityCode(),
                 header.districtCode(),
-                header.receivedAt());
+                header.receivedAt(),
+                item.maskedCustomerName(),
+                item.maskedCustomerPhone(),
+                item.maskedServiceAddress());
+    }
+
+    private static NetworkPortalTaskItem withTaskMaskedContact(
+            NetworkPortalTaskItem item,
+            WorkOrderMaskedContactView contact
+    ) {
+        if (contact == null) {
+            return item;
+        }
+        return new NetworkPortalTaskItem(
+                item.taskId(),
+                item.workOrderId(),
+                item.projectId(),
+                item.taskType(),
+                item.taskKind(),
+                item.stageCode(),
+                item.status(),
+                item.businessType(),
+                item.technicianId(),
+                item.effectiveFrom(),
+                item.brandCode(),
+                item.serviceProductCode(),
+                item.provinceCode(),
+                item.cityCode(),
+                item.districtCode(),
+                item.receivedAt(),
+                contact.maskedCustomerName(),
+                contact.maskedCustomerPhone(),
+                contact.maskedServiceAddress());
     }
 
     /**
@@ -823,6 +949,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
 
     /**
      * M228：NETWORK technician.readOwnNetwork 已 soft-gate；仅返回工作区 technicianId 命中项。
+     * M421：摘要复用开放任务/资质计数，避免列表与 fan-in 口径分裂。
      */
     private List<NetworkPortalTechnicianItem> loadTechnicianSummaries(
             String tenantId,
@@ -832,23 +959,88 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         if (wantedTechnicianIds.isEmpty()) {
             return List.of();
         }
+        Map<String, Integer> openTaskCounts = openTaskCountsForNetwork(tenantId, networkId);
+        Map<UUID, int[]> qualificationCounts = qualificationCountsForNetwork(tenantId, networkId);
         return technicians.listActiveTechnicians(tenantId, networkId).stream()
                 .filter(row -> wantedTechnicianIds.contains(row.technicianProfileId().toString()))
-                .map(row -> new NetworkPortalTechnicianItem(
-                        row.membershipId(),
-                        row.technicianProfileId(),
-                        row.principalId(),
-                        row.displayName(),
-                        row.profileStatus(),
-                        row.membershipStatus(),
-                        row.validFrom(),
-                        row.validTo(),
-                        row.membershipVersion()))
+                .map(row -> toTechnicianItem(row, openTaskCounts, qualificationCounts))
                 .sorted(Comparator
                         .comparing(NetworkPortalTechnicianItem::displayName,
                                 Comparator.nullsLast(String::compareTo))
                         .thenComparing(NetworkPortalTechnicianItem::technicianProfileId))
                 .toList();
+    }
+
+    /**
+     * 本网点 ACTIVE NETWORK 责任任务上已指派师傅的开放任务计数；键为 technicianProfileId 字符串。
+     */
+    private Map<String, Integer> openTaskCountsForNetwork(String tenantId, UUID networkId) {
+        Map<String, Integer> openTaskCounts = new LinkedHashMap<>();
+        for (NetworkActiveAssignmentView row : assignments.listActiveForNetwork(
+                tenantId, networkId.toString())) {
+            if (row.technicianId() != null && !row.technicianId().isBlank()) {
+                openTaskCounts.merge(row.technicianId(), 1, Integer::sum);
+            }
+        }
+        return openTaskCounts;
+    }
+
+    /**
+     * 本网点 ACTIVE 师傅资质计数：index0=已通过（APPROVED/VALID/ACTIVE），index1=PENDING。
+     */
+    private Map<UUID, int[]> qualificationCountsForNetwork(String tenantId, UUID networkId) {
+        Map<UUID, int[]> qualificationCounts = new LinkedHashMap<>();
+        for (TechnicianQualificationView row : qualifications.listForActiveTechnicians(
+                tenantId, networkId)) {
+            int[] counts = qualificationCounts.computeIfAbsent(
+                    row.technicianProfileId(), ignored -> new int[2]);
+            if ("APPROVED".equals(row.status())
+                    || "VALID".equals(row.status())
+                    || "ACTIVE".equals(row.status())) {
+                counts[0]++;
+            } else if ("PENDING".equals(row.status())) {
+                counts[1]++;
+            }
+        }
+        return qualificationCounts;
+    }
+
+    private static String formatQualificationSummary(int approved, int pending) {
+        if (approved > 0 && pending == 0) {
+            return "已通过资质 " + approved + " 项";
+        }
+        if (approved > 0) {
+            return "已通过 " + approved + " 项，待审 " + pending + " 项";
+        }
+        if (pending > 0) {
+            return "仅有待审资质 " + pending + " 项";
+        }
+        return "无资质记录";
+    }
+
+    private static NetworkPortalTechnicianItem toTechnicianItem(
+            NetworkPortalTechnicianView row,
+            Map<String, Integer> openTaskCounts,
+            Map<UUID, int[]> qualificationCounts
+    ) {
+        int openTasks = openTaskCounts.getOrDefault(row.technicianProfileId().toString(), 0);
+        int[] quals = qualificationCounts.getOrDefault(row.technicianProfileId(), new int[2]);
+        int approved = quals[0];
+        int pending = quals[1];
+        return new NetworkPortalTechnicianItem(
+                row.membershipId(),
+                row.technicianProfileId(),
+                row.principalId(),
+                row.displayName(),
+                row.profileStatus(),
+                row.membershipStatus(),
+                row.validFrom(),
+                row.validTo(),
+                row.membershipVersion(),
+                openTasks,
+                approved,
+                pending,
+                formatQualificationSummary(approved, pending));
     }
 
     private NetworkPortalWorkspaceCorrectionCaseSummary toCorrectionCaseSummary(
@@ -947,8 +1139,12 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         }
         Map<UUID, WorkOrderDirectoryHeader> headers = loadWorkOrderHeaders(
                 actor.tenantId(), workOrderIds);
+        // M428：任务目录投影所属工单脱敏联系（口径对齐工单目录）。
+        Map<UUID, WorkOrderMaskedContactView> contacts = loadMaskedContactsForNetwork(
+                actor, correlationId, networkId, workOrderIds);
         List<NetworkPortalTaskItem> taskItems = items.stream()
                 .map(item -> withTaskHeader(item, headers.get(item.workOrderId())))
+                .map(item -> withTaskMaskedContact(item, contacts.get(item.workOrderId())))
                 .toList();
         List<NetworkPortalTechnicianItem> technicianSummaries = null;
         if (hasNetworkCapability(actor, correlationId, TECHNICIAN_READ_OWN, networkId)) {
@@ -1000,20 +1196,277 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
             CurrentPrincipal actor, String correlationId, String networkContextHeader
     ) {
         UUID networkId = requireAuthorizedNetwork(actor, correlationId, networkContextHeader, TECHNICIAN_READ_OWN);
-        List<NetworkPortalTechnicianView> rows = technicians.listActiveTechnicians(actor.tenantId(), networkId);
-        List<NetworkPortalTechnicianItem> items = rows.stream()
-                .map(row -> new NetworkPortalTechnicianItem(
-                        row.membershipId(),
-                        row.technicianProfileId(),
-                        row.principalId(),
-                        row.displayName(),
-                        row.profileStatus(),
-                        row.membershipStatus(),
-                        row.validFrom(),
-                        row.validTo(),
-                        row.membershipVersion()))
+        Map<String, Integer> openTaskCounts = openTaskCountsForNetwork(actor.tenantId(), networkId);
+        Map<UUID, int[]> qualificationCounts = qualificationCountsForNetwork(actor.tenantId(), networkId);
+        List<NetworkPortalTechnicianItem> items = technicians.listActiveTechnicians(actor.tenantId(), networkId)
+                .stream()
+                .map(row -> toTechnicianItem(row, openTaskCounts, qualificationCounts))
                 .toList();
         return new NetworkPortalPage<>(networkId, items, clock.instant());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public NetworkPortalAssignCandidatePage listAssignCandidates(
+            CurrentPrincipal actor,
+            String correlationId,
+            String networkContextHeader,
+            UUID taskId
+    ) {
+        Objects.requireNonNull(taskId, "taskId");
+        UUID networkId = requireAuthorizedNetwork(actor, correlationId, networkContextHeader, NETWORK_TASK_READ);
+        requireAuthorizedNetwork(actor, correlationId, networkContextHeader, TECHNICIAN_READ_OWN);
+
+        List<NetworkActiveAssignmentView> active = assignments.listActiveForNetwork(
+                actor.tenantId(), networkId.toString());
+        NetworkActiveAssignmentView taskAssignment = null;
+        Map<String, Integer> openTaskCounts = openTaskCountsForNetwork(actor.tenantId(), networkId);
+        for (NetworkActiveAssignmentView row : active) {
+            if (taskId.equals(row.taskId())) {
+                taskAssignment = row;
+                break;
+            }
+        }
+        if (taskAssignment == null) {
+            throw new BusinessProblem(ProblemCode.ACCESS_DENIED, "任务不在本网点 ACTIVE 责任范围内");
+        }
+
+        String businessType = null;
+        for (NetworkPortalTaskItem task : listTasks(actor, correlationId, networkContextHeader).items()) {
+            if (taskId.equals(task.taskId())) {
+                businessType = task.businessType();
+                break;
+            }
+        }
+
+        Map<UUID, int[]> qualificationCounts = qualificationCountsForNetwork(actor.tenantId(), networkId);
+
+        NetworkPortalCapacityItem capacityHint = null;
+        for (NetworkPortalCapacityItem row : capacityItems(actor.tenantId(), networkId)) {
+            if (businessType != null && businessType.equals(row.businessType())) {
+                capacityHint = row;
+                break;
+            }
+            if (capacityHint == null) {
+                capacityHint = row;
+            }
+        }
+
+        // 预约日程：对本网点 ACTIVE 任务 fan-in；按 technicianId 归属统计近期预约与窗口重叠。
+        Map<UUID, String> taskTechnician = new LinkedHashMap<>();
+        Set<UUID> scheduleTaskIds = new LinkedHashSet<>();
+        scheduleTaskIds.add(taskId);
+        for (NetworkActiveAssignmentView row : active) {
+            scheduleTaskIds.add(row.taskId());
+            if (row.technicianId() != null && !row.technicianId().isBlank()) {
+                taskTechnician.put(row.taskId(), row.technicianId());
+            }
+        }
+        List<TechnicianScheduleAppointmentView> scheduleRows =
+                scheduleAppointments.listForTasks(actor.tenantId(), scheduleTaskIds);
+        TechnicianScheduleAppointmentView currentTaskAppointment = null;
+        Map<String, List<TechnicianScheduleAppointmentView>> appointmentsByTechnician = new LinkedHashMap<>();
+        Instant now = clock.instant();
+        for (TechnicianScheduleAppointmentView row : scheduleRows) {
+            if (taskId.equals(row.taskId())) {
+                currentTaskAppointment = row;
+            }
+            String technicianKey = taskTechnician.get(row.taskId());
+            if (technicianKey == null) {
+                continue;
+            }
+            if (row.windowEnd() != null && row.windowEnd().isBefore(now)) {
+                continue;
+            }
+            appointmentsByTechnician.computeIfAbsent(technicianKey, ignored -> new ArrayList<>()).add(row);
+        }
+
+        // 距离：工单省市区 + 网点 Coverage 行政区亲和；再按师傅当前开放任务区域细化。
+        WorkOrderDirectoryHeader targetHeader = workOrderHeaders
+                .find(actor.tenantId(), taskAssignment.workOrderId())
+                .orElse(null);
+        Map<UUID, WorkOrderDirectoryHeader> openTaskHeadersByWorkOrder = new LinkedHashMap<>();
+        Set<UUID> openWorkOrderIds = new LinkedHashSet<>();
+        openWorkOrderIds.add(taskAssignment.workOrderId());
+        for (NetworkActiveAssignmentView row : active) {
+            openWorkOrderIds.add(row.workOrderId());
+        }
+        for (UUID workOrderId : openWorkOrderIds) {
+            workOrderHeaders.find(actor.tenantId(), workOrderId)
+                    .ifPresent(header -> openTaskHeadersByWorkOrder.put(workOrderId, header));
+        }
+        Set<String> regionCodesNeeded = new LinkedHashSet<>();
+        for (WorkOrderDirectoryHeader header : openTaskHeadersByWorkOrder.values()) {
+            if (header.provinceCode() != null && !header.provinceCode().isBlank()) {
+                regionCodesNeeded.add(header.provinceCode().trim());
+            }
+            if (header.cityCode() != null && !header.cityCode().isBlank()) {
+                regionCodesNeeded.add(header.cityCode().trim());
+            }
+            if (header.districtCode() != null && !header.districtCode().isBlank()) {
+                regionCodesNeeded.add(header.districtCode().trim());
+            }
+        }
+        Map<String, String> regionNameMap = regionNames.findNames(regionCodesNeeded);
+
+        // Coverage 与 DISPATCH 地图一致：brandCode + serviceProductCode；勿用任务 businessType 猜测。
+        String brandCode = targetHeader == null ? null : targetHeader.brandCode();
+        String coverageProduct = targetHeader == null ? null : targetHeader.serviceProductCode();
+        List<ServiceNetworkCoverageView> coverageRows = List.of();
+        if (brandCode != null && !brandCode.isBlank()
+                && coverageProduct != null && !coverageProduct.isBlank()) {
+            coverageRows = coverages.listActiveCoverage(
+                    actor.tenantId(),
+                    List.of(networkId.toString()),
+                    brandCode,
+                    coverageProduct,
+                    now);
+        }
+
+        Map<String, List<WorkOrderDirectoryHeader>> openHeadersByTechnician = new LinkedHashMap<>();
+        for (NetworkActiveAssignmentView row : active) {
+            if (row.technicianId() == null || row.technicianId().isBlank()) {
+                continue;
+            }
+            WorkOrderDirectoryHeader header = openTaskHeadersByWorkOrder.get(row.workOrderId());
+            if (header == null) {
+                continue;
+            }
+            openHeadersByTechnician
+                    .computeIfAbsent(row.technicianId(), ignored -> new ArrayList<>())
+                    .add(header);
+        }
+
+        String workOrderRegionSummary = AssignCandidateDistanceEvaluator.formatWorkOrderRegion(
+                targetHeader, regionNameMap);
+
+        List<NetworkPortalAssignCandidateItem> items = new ArrayList<>();
+        for (NetworkPortalTechnicianView tech : technicians.listActiveTechnicians(
+                actor.tenantId(), networkId)) {
+            int openTasks = openTaskCounts.getOrDefault(tech.technicianProfileId().toString(), 0);
+            int[] quals = qualificationCounts.getOrDefault(tech.technicianProfileId(), new int[2]);
+            int approved = quals[0];
+            int pending = quals[1];
+            List<String> warnings = new ArrayList<>();
+            boolean assignable = "ACTIVE".equals(tech.membershipStatus())
+                    && "ACTIVE".equals(tech.profileStatus());
+            if (!assignable) {
+                warnings.add("师傅关系或档案非 ACTIVE，不可分配");
+            }
+            String qualificationSummary = formatQualificationSummary(approved, pending);
+            if (approved > 0 && pending > 0) {
+                warnings.add("存在待审资质，请确认业务是否允许分配");
+            } else if (approved == 0 && pending > 0) {
+                warnings.add("尚无已通过资质");
+            } else if (approved == 0) {
+                warnings.add("无资质记录");
+            }
+            if (capacityHint != null && capacityHint.availableUnits() <= 0) {
+                warnings.add("当前业务类型网点产能已满，提交可能被拒绝");
+            }
+
+            List<TechnicianScheduleAppointmentView> techAppointments =
+                    appointmentsByTechnician.getOrDefault(tech.technicianProfileId().toString(), List.of());
+            int upcomingAppointments = techAppointments.size();
+            boolean scheduleOverlap = false;
+            if (currentTaskAppointment != null
+                    && currentTaskAppointment.windowStart() != null
+                    && currentTaskAppointment.windowEnd() != null) {
+                for (TechnicianScheduleAppointmentView existing : techAppointments) {
+                    if (existing.taskId().equals(taskId)) {
+                        continue;
+                    }
+                    if (existing.windowStart() == null || existing.windowEnd() == null) {
+                        continue;
+                    }
+                    boolean overlaps = existing.windowStart().isBefore(currentTaskAppointment.windowEnd())
+                            && currentTaskAppointment.windowStart().isBefore(existing.windowEnd());
+                    if (overlaps) {
+                        scheduleOverlap = true;
+                        break;
+                    }
+                }
+            }
+            String scheduleConflictSummary;
+            if (scheduleOverlap) {
+                scheduleConflictSummary = "与现有预约窗口重叠";
+                warnings.add("预约窗口可能冲突，请先协调改期");
+            } else if (upcomingAppointments > 0) {
+                scheduleConflictSummary = "另有 " + upcomingAppointments + " 个未完成预约";
+                warnings.add("师傅另有未完成预约，请确认负载");
+            } else {
+                scheduleConflictSummary = "无近期预约";
+            }
+
+            AssignCandidateDistanceEvaluator.DistanceProjection distance =
+                    AssignCandidateDistanceEvaluator.evaluate(
+                            targetHeader,
+                            coverageRows,
+                            openHeadersByTechnician.getOrDefault(
+                                    tech.technicianProfileId().toString(), List.of()),
+                            regionNameMap);
+            if (AssignCandidateDistanceEvaluator.TIER_OUTSIDE_COVERAGE.equals(distance.distanceTier())) {
+                warnings.add("网点覆盖未命中工单行政区，请确认是否允许跨区派单");
+            } else if (AssignCandidateDistanceEvaluator.TIER_UNKNOWN.equals(distance.distanceTier())) {
+                warnings.add("服务区域未知，无法给出可靠距离亲和");
+            }
+
+            Integer capacityAvailable = capacityHint == null ? null : capacityHint.availableUnits();
+            Integer capacityMax = capacityHint == null ? null : capacityHint.maxUnits();
+            AssignCandidateRecommendationEvaluator.RecommendationProjection recommendation =
+                    AssignCandidateRecommendationEvaluator.evaluate(
+                            assignable,
+                            approved,
+                            pending,
+                            openTasks,
+                            scheduleOverlap,
+                            upcomingAppointments,
+                            distance.distanceTier(),
+                            distance.coverageMatched(),
+                            capacityAvailable);
+
+            items.add(new NetworkPortalAssignCandidateItem(
+                    tech.technicianProfileId(),
+                    tech.displayName(),
+                    tech.membershipStatus(),
+                    tech.profileStatus(),
+                    openTasks,
+                    approved,
+                    pending,
+                    qualificationSummary,
+                    upcomingAppointments,
+                    scheduleConflictSummary,
+                    scheduleOverlap,
+                    distance.distanceTier(),
+                    distance.distanceSummary(),
+                    distance.coverageMatched(),
+                    capacityAvailable,
+                    capacityMax,
+                    warnings,
+                    assignable,
+                    recommendation.recommendationTier(),
+                    recommendation.recommendationSummary(),
+                    recommendation.recommendationReasons()));
+        }
+        items.sort(Comparator
+                .comparing(NetworkPortalAssignCandidateItem::assignable).reversed()
+                .thenComparing(item -> AssignCandidateRecommendationEvaluator.tierRank(
+                        item.recommendationTier()))
+                .thenComparing(item -> AssignCandidateDistanceEvaluator.tierRank(item.distanceTier()))
+                .thenComparing(NetworkPortalAssignCandidateItem::openTaskCount)
+                .thenComparing(NetworkPortalAssignCandidateItem::displayName));
+        String emptyReason = items.isEmpty()
+                ? AssignCandidateRecommendationEvaluator.EMPTY_NO_TECHNICIANS
+                : null;
+        return new NetworkPortalAssignCandidatePage(
+                networkId,
+                taskId,
+                businessType,
+                workOrderRegionSummary,
+                items,
+                clock.instant(),
+                AssignCandidateRecommendationEvaluator.RANKING_EXPLANATION,
+                emptyReason);
     }
 
     @Override
@@ -1071,6 +1524,21 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                     actor, correlationId, networkId, workOrders, activeTaskIds);
         }
 
+        Integer todayAppointmentCount = null;
+        List<NetworkPortalWorkbenchAppointmentItem> todayAppointments = null;
+        Map<UUID, String> technicianNames = Map.of();
+        if (hasNetworkCapability(actor, correlationId, MANAGE_APPOINTMENT, networkId)) {
+            if (hasNetworkCapability(actor, correlationId, TECHNICIAN_READ_OWN, networkId)) {
+                technicianNames = loadTechnicianDisplayNames(actor.tenantId(), networkId);
+            }
+            todayAppointments = loadWorkbenchTodayAppointments(
+                    actor.tenantId(), active, asOf, technicianNames);
+            todayAppointmentCount = todayAppointments.size();
+        }
+
+        List<NetworkPortalWorkbenchTimelineBucket> todayTimeline = buildWorkbenchTodayTimeline(
+                unassigned, todayAppointments, openCorrectionCaseCount, slaSummary);
+
         return new NetworkPortalWorkbenchView(
                 networkId,
                 workOrders.size(),
@@ -1082,7 +1550,242 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                 openCorrectionCaseCount,
                 openOperationalExceptionCount,
                 pendingQualificationCount,
-                slaSummary);
+                slaSummary,
+                todayAppointmentCount,
+                todayAppointments,
+                todayTimeline);
+    }
+
+    /**
+     * M413：本网点预约日历。硬门禁 manageAppointment；运营日 Asia/Shanghai；默认今天起 14 天。
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public NetworkPortalAppointmentCalendarView appointmentCalendar(
+            CurrentPrincipal actor,
+            String correlationId,
+            String networkContextHeader,
+            LocalDate fromInclusive,
+            LocalDate toInclusive
+    ) {
+        UUID networkId = requireAuthorizedNetwork(
+                actor, correlationId, networkContextHeader, MANAGE_APPOINTMENT);
+        Instant asOf = clock.instant();
+        LocalDate today = asOf.atZone(NETWORK_OPERATIONAL_ZONE).toLocalDate();
+        LocalDate rangeStart = fromInclusive == null ? today : fromInclusive;
+        LocalDate rangeEnd = toInclusive == null
+                ? rangeStart.plusDays(CALENDAR_DEFAULT_SPAN_DAYS - 1L)
+                : toInclusive;
+        if (rangeEnd.isBefore(rangeStart)) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, "预约日历结束日不得早于开始日");
+        }
+        long spanDays = rangeStart.datesUntil(rangeEnd.plusDays(1)).count();
+        if (spanDays > CALENDAR_MAX_SPAN_DAYS) {
+            throw new BusinessProblem(
+                    ProblemCode.VALIDATION_FAILED,
+                    "预约日历跨度不得超过 " + CALENDAR_MAX_SPAN_DAYS + " 天");
+        }
+
+        List<NetworkActiveAssignmentView> active = assignments.listActiveForNetwork(
+                actor.tenantId(), networkId.toString());
+        Map<UUID, String> technicianNames = Map.of();
+        if (hasNetworkCapability(actor, correlationId, TECHNICIAN_READ_OWN, networkId)) {
+            technicianNames = loadTechnicianDisplayNames(actor.tenantId(), networkId);
+        }
+        List<NetworkPortalWorkbenchAppointmentItem> flat = loadCalendarAppointments(
+                actor.tenantId(), active, rangeStart, rangeEnd, technicianNames);
+        int totalAppointmentCount = flat.size();
+        boolean truncated = totalAppointmentCount > CALENDAR_APPOINTMENT_LIMIT;
+        List<NetworkPortalWorkbenchAppointmentItem> visible = truncated
+                ? List.copyOf(flat.subList(0, CALENDAR_APPOINTMENT_LIMIT))
+                : flat;
+
+        Map<LocalDate, List<NetworkPortalWorkbenchAppointmentItem>> byDay = new LinkedHashMap<>();
+        for (LocalDate day = rangeStart; !day.isAfter(rangeEnd); day = day.plusDays(1)) {
+            byDay.put(day, new ArrayList<>());
+        }
+        for (NetworkPortalWorkbenchAppointmentItem item : visible) {
+            if (item.windowStart() == null) {
+                continue;
+            }
+            LocalDate day = item.windowStart().atZone(NETWORK_OPERATIONAL_ZONE).toLocalDate();
+            List<NetworkPortalWorkbenchAppointmentItem> bucket = byDay.get(day);
+            if (bucket != null) {
+                bucket.add(item);
+            }
+        }
+
+        List<NetworkPortalAppointmentCalendarDay> days = new ArrayList<>();
+        for (Map.Entry<LocalDate, List<NetworkPortalWorkbenchAppointmentItem>> entry : byDay.entrySet()) {
+            List<NetworkPortalWorkbenchAppointmentItem> items = List.copyOf(entry.getValue());
+            days.add(new NetworkPortalAppointmentCalendarDay(entry.getKey(), items.size(), items));
+        }
+        return new NetworkPortalAppointmentCalendarView(
+                networkId,
+                NETWORK_OPERATIONAL_ZONE.getId(),
+                rangeStart,
+                rangeEnd,
+                totalAppointmentCount,
+                truncated,
+                days,
+                asOf);
+    }
+
+    /**
+     * M411：本网点 ACTIVE 任务上 PROPOSED/CONFIRMED 预约，按 Asia/Shanghai 运营日过滤窗口重叠。
+     */
+    private List<NetworkPortalWorkbenchAppointmentItem> loadWorkbenchTodayAppointments(
+            String tenantId,
+            List<NetworkActiveAssignmentView> active,
+            Instant asOf,
+            Map<UUID, String> technicianNames
+    ) {
+        LocalDate today = asOf.atZone(NETWORK_OPERATIONAL_ZONE).toLocalDate();
+        List<NetworkPortalWorkbenchAppointmentItem> items = loadCalendarAppointments(
+                tenantId, active, today, today, technicianNames);
+        if (items.size() <= WORKBENCH_TODAY_APPOINTMENT_LIMIT) {
+            return items;
+        }
+        return List.copyOf(items.subList(0, WORKBENCH_TODAY_APPOINTMENT_LIMIT));
+    }
+
+    /**
+     * M413：按运营日闭区间过滤 PROPOSED/CONFIRMED 预约窗口；不含客户 PII。
+     */
+    private List<NetworkPortalWorkbenchAppointmentItem> loadCalendarAppointments(
+            String tenantId,
+            List<NetworkActiveAssignmentView> active,
+            LocalDate rangeStart,
+            LocalDate rangeEnd,
+            Map<UUID, String> technicianNames
+    ) {
+        if (active.isEmpty()) {
+            return List.of();
+        }
+        Map<UUID, String> taskTechnician = new LinkedHashMap<>();
+        Set<UUID> taskIds = new LinkedHashSet<>();
+        for (NetworkActiveAssignmentView row : active) {
+            taskIds.add(row.taskId());
+            if (row.technicianId() != null && !row.technicianId().isBlank()) {
+                taskTechnician.put(row.taskId(), row.technicianId());
+            }
+        }
+        Instant rangeInstantStart = rangeStart.atStartOfDay(NETWORK_OPERATIONAL_ZONE).toInstant();
+        Instant rangeInstantEnd = rangeEnd.plusDays(1).atStartOfDay(NETWORK_OPERATIONAL_ZONE).toInstant();
+        List<NetworkPortalWorkbenchAppointmentItem> items = new ArrayList<>();
+        for (TechnicianScheduleAppointmentView row : scheduleAppointments.listForTasks(tenantId, taskIds)) {
+            if (row.windowStart() == null || row.windowEnd() == null) {
+                continue;
+            }
+            boolean overlaps = row.windowStart().isBefore(rangeInstantEnd)
+                    && row.windowEnd().isAfter(rangeInstantStart);
+            if (!overlaps) {
+                continue;
+            }
+            String technicianId = taskTechnician.get(row.taskId());
+            String displayName = null;
+            if (technicianId != null) {
+                try {
+                    displayName = technicianNames.get(UUID.fromString(technicianId));
+                } catch (IllegalArgumentException ignored) {
+                    displayName = null;
+                }
+            }
+            items.add(new NetworkPortalWorkbenchAppointmentItem(
+                    row.appointmentId(),
+                    row.taskId(),
+                    row.workOrderId(),
+                    row.type(),
+                    row.status(),
+                    row.windowStart(),
+                    row.windowEnd(),
+                    row.timezone(),
+                    technicianId,
+                    displayName));
+        }
+        items.sort(Comparator
+                .comparing(NetworkPortalWorkbenchAppointmentItem::windowStart,
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(NetworkPortalWorkbenchAppointmentItem::appointmentId));
+        return List.copyOf(items);
+    }
+
+    private Map<UUID, String> loadTechnicianDisplayNames(String tenantId, UUID networkId) {
+        Map<UUID, String> names = new LinkedHashMap<>();
+        for (NetworkPortalTechnicianView tech : technicians.listActiveTechnicians(tenantId, networkId)) {
+            names.put(tech.technicianProfileId(), tech.displayName());
+        }
+        return names;
+    }
+
+    private static List<NetworkPortalWorkbenchTimelineBucket> buildWorkbenchTodayTimeline(
+            int unassigned,
+            List<NetworkPortalWorkbenchAppointmentItem> todayAppointments,
+            Integer openCorrectionCaseCount,
+            NetworkPortalWorkOrderWorkspaceSlaSummary slaSummary
+    ) {
+        List<NetworkPortalWorkbenchTimelineBucket> buckets = new ArrayList<>();
+        buckets.add(new NetworkPortalWorkbenchTimelineBucket(
+                NetworkPortalWorkbenchTimelineBucket.UNASSIGNED,
+                "待分配",
+                unassigned,
+                unassigned == 0 ? "暂无待指派师傅任务" : "待指派师傅任务 " + unassigned + " 个"));
+
+        if (todayAppointments != null) {
+            int am = 0;
+            int pm = 0;
+            int evening = 0;
+            for (NetworkPortalWorkbenchAppointmentItem item : todayAppointments) {
+                if (item.windowStart() == null) {
+                    continue;
+                }
+                int hour = item.windowStart().atZone(NETWORK_OPERATIONAL_ZONE).getHour();
+                if (hour < 12) {
+                    am++;
+                } else if (hour < 18) {
+                    pm++;
+                } else {
+                    evening++;
+                }
+            }
+            buckets.add(new NetworkPortalWorkbenchTimelineBucket(
+                    NetworkPortalWorkbenchTimelineBucket.AM_APPOINTMENTS,
+                    "上午预约",
+                    am,
+                    am == 0 ? "上午无预约窗口" : "上午预约 " + am + " 个"));
+            buckets.add(new NetworkPortalWorkbenchTimelineBucket(
+                    NetworkPortalWorkbenchTimelineBucket.PM_APPOINTMENTS,
+                    "下午预约",
+                    pm,
+                    pm == 0 ? "下午无预约窗口" : "下午预约 " + pm + " 个"));
+            buckets.add(new NetworkPortalWorkbenchTimelineBucket(
+                    NetworkPortalWorkbenchTimelineBucket.EVENING_APPOINTMENTS,
+                    "晚间预约",
+                    evening,
+                    evening == 0 ? "晚间无预约窗口" : "晚间预约 " + evening + " 个"));
+        }
+
+        if (openCorrectionCaseCount != null) {
+            buckets.add(new NetworkPortalWorkbenchTimelineBucket(
+                    NetworkPortalWorkbenchTimelineBucket.OPEN_CORRECTIONS,
+                    "资料整改",
+                    openCorrectionCaseCount,
+                    openCorrectionCaseCount == 0
+                            ? "无开放整改"
+                            : "开放整改 " + openCorrectionCaseCount + " 件"));
+        }
+        if (slaSummary != null) {
+            int atRisk = slaSummary.openCount();
+            buckets.add(new NetworkPortalWorkbenchTimelineBucket(
+                    NetworkPortalWorkbenchTimelineBucket.SLA_AT_RISK,
+                    "SLA 风险",
+                    atRisk,
+                    atRisk == 0
+                            ? "无运行中/已超时 SLA"
+                            : "SLA 风险 " + atRisk + " 项（已超时 "
+                                    + slaSummary.breachedCount() + "）"));
+        }
+        return List.copyOf(buckets);
     }
 
     /**

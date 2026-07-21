@@ -1,15 +1,19 @@
 <script setup lang="ts">
 import { computed, h, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { Table, Select, Input, Button, Space, Alert, Tooltip } from 'ant-design-vue'
+import { Table, Select, Input, Button, Space, Alert, Tooltip, DatePicker } from 'ant-design-vue'
 import type { TableColumnsType } from 'ant-design-vue'
+import dayjs, { type Dayjs } from 'dayjs'
 import SavedViewBar from '../components/SavedViewBar.vue'
 import ListPageLayout from '../patterns/templates/ListPageLayout.vue'
 import SemanticStatusTag from '../components/business/SemanticStatusTag.vue'
 import AsyncContent from '../components/feedback/AsyncContent.vue'
 import { listAuthorizedWorkOrders, type WorkOrderPage } from '../api/workOrders'
+import { listRegionCatalog, type RegionCatalogItem } from '../api/projectCatalog'
+import { listServiceNetworks, type ServiceNetwork } from '../api/networks'
+import { listTechnicianProfiles, type TechnicianProfile } from '../api/technicians'
 import { firstRouteQuery } from '../routeQuery'
-import { statusOptions } from '../product/statusLabels'
+import { statusLabel, statusOptions } from '../product/statusLabels'
 import { toUserFacingError } from '../product/errorMessages'
 import { presentWorkOrderStatus } from '../presentation/work-order-status.presenter'
 import { labelClientCode } from '../presentation/enum-labels'
@@ -32,13 +36,102 @@ const status = ref<string | undefined>(undefined)
 const clientCode = ref<string | undefined>(undefined)
 const projectKeyword = ref('')
 const keyword = ref('')
+/** M431：region-catalog 编码→名称；未命中时区域列回退国标码。 */
+const regionNameByCode = ref<Map<string, string>>(new Map())
+/** M437：region-catalog 编码→级别，用于选择服务区域后映射查询参数。 */
+const regionLevelByCode = ref<Map<string, RegionCatalogItem['regionLevel']>>(new Map())
 
-/** 更多筛选：当前列表 API 未提供对应查询参数，仅展示缺口说明。 */
-const moreRegion = ref('')
-const moreNetwork = ref('')
-const moreTechnician = ref('')
-const moreStage = ref('')
-const moreSla = ref<string | undefined>(undefined)
+/** M437：服务区域筛选（国标码）。 */
+const regionFilterCode = ref<string | undefined>(undefined)
+/** M438：当前阶段筛选（与目录列同口径）。 */
+const stageFilterCode = ref<string | undefined>(undefined)
+/** M446：当前任务状态筛选（与目录列同口径）。 */
+const taskStatusFilterCode = ref<string | undefined>(undefined)
+/** M447：审核/整改运营桶筛选。 */
+const reviewCorrectionFilter = ref<string | undefined>(undefined)
+/** M440：服务网点筛选（与目录 currentNetworkId 同口径）。 */
+const networkFilterId = ref<string | undefined>(undefined)
+const networkOptions = ref<ServiceNetwork[]>([])
+/** M441：服务师傅筛选（与目录 currentTechnicianId 同口径）。 */
+const technicianFilterId = ref<string | undefined>(undefined)
+const technicianOptions = ref<TechnicianProfile[]>([])
+/** M442：SLA 风险筛选（与目录列 OPEN/BREACHED 同口径）。 */
+const slaRiskFilter = ref<string | undefined>(undefined)
+/** M443：创建日闭区间（Asia/Shanghai；按 receivedAt）。 */
+const receivedRange = ref<[Dayjs, Dayjs] | undefined>(undefined)
+
+/** 常用履约阶段；未知码由服务端校验失败关闭，不在此发明业务阶段。 */
+const stageFilterOptions = statusOptions([
+  'SURVEY',
+  'INSTALLATION',
+  'REPAIR',
+  'CORRECTION',
+  'SECOND_VISIT',
+  'PILOT_SURVEY',
+  'PILOT_INSTALL',
+  'PILOT_COMPLETION',
+  'HOME_CHARGING_SURVEY_INSTALL',
+])
+
+const taskStatusFilterOptions = statusOptions([
+  'READY',
+  'PENDING',
+  'CLAIMED',
+  'RUNNING',
+  'RETRY_WAIT',
+  'MANUAL_INTERVENTION',
+])
+
+const regionFilterOptions = computed(() =>
+  [...regionNameByCode.value.entries()].map(([code, name]) => ({
+    value: code,
+    label: `${name}（${code}）`,
+  })),
+)
+
+const networkFilterOptions = computed(() =>
+  networkOptions.value
+    .filter((item) => item.status === 'ACTIVE')
+    .map((item) => ({
+      value: item.id,
+      label: `${item.networkName}（${item.networkCode}）`,
+    })),
+)
+
+const technicianFilterOptions = computed(() =>
+  technicianOptions.value
+    .filter((item) => item.status === 'ACTIVE')
+    .map((item) => ({
+      value: item.id,
+      label: item.displayName?.trim() || item.id,
+    })),
+)
+
+const slaRiskFilterOptions = [
+  { value: 'OPEN', label: '有开放风险' },
+  { value: 'BREACHED', label: '已超时' },
+  { value: 'NEAR', label: '即将超时' },
+]
+
+const reviewCorrectionFilterOptions = [
+  { value: 'REVIEW_OPEN', label: '待审核' },
+  { value: 'CORRECTION_ACTIVE', label: '整改中' },
+]
+
+function regionQueryParams(): {
+  provinceCode?: string
+  cityCode?: string
+  districtCode?: string
+} {
+  const code = regionFilterCode.value?.trim()
+  if (!code) return {}
+  const level = regionLevelByCode.value.get(code)
+  if (level === 'PROVINCE') return { provinceCode: code }
+  if (level === 'CITY') return { cityCode: code }
+  if (level === 'DISTRICT') return { districtCode: code }
+  // 目录未命中时按区县精确匹配，不猜测层级。
+  return { districtCode: code }
+}
 
 function hydrateFiltersFromRoute() {
   const nextStatus = firstRouteQuery(route, 'status')
@@ -49,6 +142,33 @@ function hydrateFiltersFromRoute() {
   if (nextProjectId !== undefined) projectKeyword.value = nextProjectId
   const nextKeyword = firstRouteQuery(route, 'q')
   if (nextKeyword !== undefined) keyword.value = nextKeyword
+  const nextProvince = firstRouteQuery(route, 'provinceCode')
+  const nextCity = firstRouteQuery(route, 'cityCode')
+  const nextDistrict = firstRouteQuery(route, 'districtCode')
+  // 路由优先最细粒度；与 API AND 语义一致时 UI 只保留一个选择值。
+  if (nextDistrict) regionFilterCode.value = nextDistrict
+  else if (nextCity) regionFilterCode.value = nextCity
+  else if (nextProvince) regionFilterCode.value = nextProvince
+  const nextStage = firstRouteQuery(route, 'currentStageCode')
+  if (nextStage !== undefined) stageFilterCode.value = nextStage || undefined
+  const nextTaskStatus = firstRouteQuery(route, 'currentTaskStatus')
+  if (nextTaskStatus !== undefined) taskStatusFilterCode.value = nextTaskStatus || undefined
+  const nextReviewCorrection = firstRouteQuery(route, 'reviewCorrectionStatus')
+  if (nextReviewCorrection !== undefined)
+    reviewCorrectionFilter.value = nextReviewCorrection || undefined
+  const nextNetwork = firstRouteQuery(route, 'currentNetworkId')
+  if (nextNetwork !== undefined) networkFilterId.value = nextNetwork || undefined
+  const nextTechnician = firstRouteQuery(route, 'currentTechnicianId')
+  if (nextTechnician !== undefined) technicianFilterId.value = nextTechnician || undefined
+  const nextSlaRisk = firstRouteQuery(route, 'slaRisk')
+  if (nextSlaRisk !== undefined) slaRiskFilter.value = nextSlaRisk || undefined
+  const nextReceivedFrom = firstRouteQuery(route, 'receivedFrom')
+  const nextReceivedTo = firstRouteQuery(route, 'receivedTo')
+  if (nextReceivedFrom || nextReceivedTo) {
+    const from = dayjs(nextReceivedFrom || nextReceivedTo)
+    const to = dayjs(nextReceivedTo || nextReceivedFrom)
+    receivedRange.value = from.isValid() && to.isValid() ? [from, to] : undefined
+  }
 }
 
 function looksLikeUuid(value: string): boolean {
@@ -70,6 +190,16 @@ async function load(next?: string) {
       projectId: looksLikeUuid(projectKeyword.value)
         ? projectKeyword.value.trim()
         : undefined,
+      currentStageCode: stageFilterCode.value || undefined,
+      currentTaskStatus: taskStatusFilterCode.value || undefined,
+      reviewCorrectionStatus: reviewCorrectionFilter.value || undefined,
+      q: keyword.value.trim() || undefined,
+      currentNetworkId: networkFilterId.value || undefined,
+      currentTechnicianId: technicianFilterId.value || undefined,
+      slaRisk: slaRiskFilter.value || undefined,
+      receivedFrom: receivedRange.value?.[0]?.format('YYYY-MM-DD'),
+      receivedTo: receivedRange.value?.[1]?.format('YYYY-MM-DD'),
+      ...regionQueryParams(),
     })
     cursor.value = page.value.nextCursor ?? undefined
   } catch (err) {
@@ -89,12 +219,23 @@ function search() {
 }
 
 function currentFilters() {
+  const region = regionQueryParams()
   return {
     status: status.value || undefined,
     clientCode: clientCode.value?.trim() || undefined,
     projectId: looksLikeUuid(projectKeyword.value)
       ? projectKeyword.value.trim()
       : undefined,
+    currentStageCode: stageFilterCode.value || undefined,
+    currentTaskStatus: taskStatusFilterCode.value || undefined,
+    reviewCorrectionStatus: reviewCorrectionFilter.value || undefined,
+    q: keyword.value.trim() || undefined,
+    currentNetworkId: networkFilterId.value || undefined,
+    currentTechnicianId: technicianFilterId.value || undefined,
+    slaRisk: slaRiskFilter.value || undefined,
+    receivedFrom: receivedRange.value?.[0]?.format('YYYY-MM-DD'),
+    receivedTo: receivedRange.value?.[1]?.format('YYYY-MM-DD'),
+    ...region,
   }
 }
 
@@ -102,6 +243,22 @@ function applySavedView(filters: Record<string, string>) {
   status.value = filters.status || undefined
   clientCode.value = filters.clientCode || undefined
   projectKeyword.value = filters.projectId ?? ''
+  regionFilterCode.value =
+    filters.districtCode || filters.cityCode || filters.provinceCode || undefined
+  stageFilterCode.value = filters.currentStageCode || undefined
+  taskStatusFilterCode.value = filters.currentTaskStatus || undefined
+  reviewCorrectionFilter.value = filters.reviewCorrectionStatus || undefined
+  keyword.value = filters.q ?? ''
+  networkFilterId.value = filters.currentNetworkId || undefined
+  technicianFilterId.value = filters.currentTechnicianId || undefined
+  slaRiskFilter.value = filters.slaRisk || undefined
+  if (filters.receivedFrom || filters.receivedTo) {
+    const from = dayjs(filters.receivedFrom || filters.receivedTo)
+    const to = dayjs(filters.receivedTo || filters.receivedFrom)
+    receivedRange.value = from.isValid() && to.isValid() ? [from, to] : undefined
+  } else {
+    receivedRange.value = undefined
+  }
   return search()
 }
 
@@ -110,11 +267,14 @@ function resetFilters() {
   clientCode.value = undefined
   projectKeyword.value = ''
   keyword.value = ''
-  moreRegion.value = ''
-  moreNetwork.value = ''
-  moreTechnician.value = ''
-  moreStage.value = ''
-  moreSla.value = undefined
+  regionFilterCode.value = undefined
+  stageFilterCode.value = undefined
+  taskStatusFilterCode.value = undefined
+  reviewCorrectionFilter.value = undefined
+  networkFilterId.value = undefined
+  technicianFilterId.value = undefined
+  slaRiskFilter.value = undefined
+  receivedRange.value = undefined
   return search()
 }
 
@@ -125,18 +285,91 @@ type Row = {
   status: string
   clientCode: string
   projectId: string
+  provinceCode: string
+  cityCode: string
+  districtCode: string
   receivedAt: string
+  updatedAt: string
+  maskedCustomerName: string | null
+  maskedCustomerPhone: string | null
+  maskedServiceAddress: string | null
+  currentStageCode: string | null
+  currentTaskType: string | null
+  currentTaskStatus: string | null
+  currentClaimedBy: string | null
+  currentAssigneeDisplayName: string | null
+  currentNetworkId: string | null
+  currentNetworkDisplayName: string | null
+  currentTechnicianId: string | null
+  currentTechnicianDisplayName: string | null
+}
+
+/** M430/M431：优先展示目录中文名，未命中则回退国标码（不发明名称）。 */
+function regionPartLabel(code: string | null | undefined) {
+  if (code == null || String(code).trim() === '') {
+    return null
+  }
+  const trimmed = String(code).trim()
+  return regionNameByCode.value.get(trimmed) ?? trimmed
+}
+
+function regionLabel(row: Pick<Row, 'provinceCode' | 'cityCode' | 'districtCode'>) {
+  const parts = [row.provinceCode, row.cityCode, row.districtCode]
+    .map((code) => regionPartLabel(code))
+    .filter((part): part is string => part != null)
+  return parts.length ? parts.join('/') : '—'
+}
+
+function regionCodesTooltip(row: Pick<Row, 'provinceCode' | 'cityCode' | 'districtCode'>) {
+  const codes = [row.provinceCode, row.cityCode, row.districtCode].filter(
+    (part) => part != null && String(part).trim() !== '',
+  )
+  return codes.length ? `区域编码：${codes.join('/')}` : '无区域编码'
+}
+
+async function loadRegionNames() {
+  try {
+    const page = await listRegionCatalog({ parentCode: '*', limit: 200 })
+    const names = new Map<string, string>()
+    const levels = new Map<string, RegionCatalogItem['regionLevel']>()
+    for (const item of page.items) {
+      names.set(item.regionCode, item.regionName)
+      levels.set(item.regionCode, item.regionLevel)
+    }
+    regionNameByCode.value = names
+    regionLevelByCode.value = levels
+  } catch {
+    // 缺 project.read 或目录失败时保持码展示，不阻断工单目录主路径。
+    regionNameByCode.value = new Map()
+    regionLevelByCode.value = new Map()
+  }
+}
+
+async function loadNetworkOptions() {
+  try {
+    const page = await listServiceNetworks()
+    networkOptions.value = page.items
+  } catch {
+    // 缺 network.read 时筛选下拉为空；不阻断目录主路径。
+    networkOptions.value = []
+  }
+}
+
+async function loadTechnicianOptions() {
+  try {
+    const page = await listTechnicianProfiles()
+    technicianOptions.value = page.items
+  } catch {
+    // 缺 technician 目录能力时筛选下拉为空；不阻断目录主路径。
+    technicianOptions.value = []
+  }
 }
 
 const rows = computed((): Row[] => {
-  const q = keyword.value.trim().toLowerCase()
   const project = projectKeyword.value.trim().toLowerCase()
   return (page.value?.items ?? [])
     .filter((item) => {
-      if (q) {
-        const hay = `${item.externalOrderCode} ${item.clientCode}`.toLowerCase()
-        if (!hay.includes(q)) return false
-      }
+      // M448：关键词已由服务端 q 收敛；此处仅保留非 UUID 项目关键字的客户端辅助过滤。
       if (project && !looksLikeUuid(projectKeyword.value)) {
         if (
           !item.projectId.toLowerCase().includes(project) &&
@@ -154,18 +387,78 @@ const rows = computed((): Row[] => {
       status: item.status,
       clientCode: item.clientCode,
       projectId: item.projectId,
+      provinceCode: item.provinceCode,
+      cityCode: item.cityCode,
+      districtCode: item.districtCode,
       receivedAt: item.receivedAt,
+      updatedAt: item.updatedAt,
+      maskedCustomerName: item.maskedCustomerName,
+      maskedCustomerPhone: item.maskedCustomerPhone,
+      maskedServiceAddress: item.maskedServiceAddress,
+      currentStageCode: item.currentStageCode,
+      currentTaskType: item.currentTaskType,
+      currentTaskStatus: item.currentTaskStatus,
+      currentClaimedBy: item.currentClaimedBy,
+      currentAssigneeDisplayName: item.currentAssigneeDisplayName,
+      currentNetworkId: item.currentNetworkId,
+      currentNetworkDisplayName: item.currentNetworkDisplayName,
+      currentTechnicianId: item.currentTechnicianId,
+      currentTechnicianDisplayName: item.currentTechnicianDisplayName,
     }))
 })
 
 const countLabel = computed(() => {
-  if (error.value) return undefined
-  const n = rows.value.length
-  if (cursor.value) return `已加载 ${n} 条，还有更多（列表无总数，UI_DATA_GAP）`
-  return `已加载 ${n} 条`
+  if (error.value || page.value == null) return undefined
+  const total = page.value.totalCount
+  const truncated = page.value.totalCountTruncated
+  // M444：服务端精确总数；truncatedated 防御分支保留；客户端关键词不改变 total。
+  return truncated ? `共 ${total}+ 条` : `共 ${total} 条`
 })
 
-const columns = computed((): TableColumnsType<Row> => [
+function slaRiskLabel(workOrderId: string) {
+  const summaries = page.value?.slaRiskSummaries
+  if (summaries === undefined || summaries === null) {
+    return {
+      text: presentEmptyValue('not_provided'),
+      tooltip: '无 sla.read 或 SLA 旁载未返回（soft-omit）',
+    }
+  }
+  const matched = summaries.find((row) => row.workOrderId === workOrderId)
+  if (!matched) {
+    return { text: '暂无', tooltip: '本页无开放 SLA 风险' }
+  }
+  return {
+    text: `开放 ${matched.openCount} / 超时 ${matched.breachedCount}`,
+    tooltip: `openCount=${matched.openCount}, breachedCount=${matched.breachedCount}`,
+  }
+}
+
+function exceptionSummaryLabel(workOrderId: string) {
+  const summaries = page.value?.exceptionSummaries
+  if (summaries === undefined || summaries === null) {
+    return {
+      text: presentEmptyValue('not_provided'),
+      tooltip: '无 operations.exception.read 或异常旁载未返回（soft-omit）',
+      linkable: false as const,
+    }
+  }
+  const matched = summaries.find((row) => row.workOrderId === workOrderId)
+  if (!matched) {
+    return { text: '暂无', tooltip: '本页无 OPEN 运营异常', linkable: false as const }
+  }
+  return {
+    text: `待处理 ${matched.openCount}`,
+    tooltip: `openCount=${matched.openCount}；点击打开该工单 OPEN 异常队列`,
+    linkable: true as const,
+  }
+}
+
+const columns = computed((): TableColumnsType<Row> => {
+  // 依赖 region-catalog 映射与 SLA/异常旁载，避免异步加载完成后列不刷新。
+  void regionNameByCode.value
+  void page.value?.slaRiskSummaries
+  void page.value?.exceptionSummaries
+  return [
   {
     title: '工单编号',
     dataIndex: 'externalOrderCode',
@@ -194,12 +487,76 @@ const columns = computed((): TableColumnsType<Row> => [
     title: '当前阶段',
     key: 'stage',
     width: 120,
-    customRender: () =>
-      h(
+    customRender: ({ record }: { record: Row }) => {
+      const code = record.currentStageCode
+      if (code == null || String(code).trim() === '') {
+        return h(
+          'span',
+          { 'data-testid': 'work-order-current-stage' },
+          presentEmptyValue('not_provided'),
+        )
+      }
+      return h(
         Tooltip,
-        { title: '工单目录投影未提供阶段字段（UI_DATA_GAP）' },
-        () => presentEmptyValue('not_loaded'),
-      ),
+        { title: `阶段编码：${code}` },
+        () =>
+          h(
+            'span',
+            { 'data-testid': 'work-order-current-stage' },
+            statusLabel(code),
+          ),
+      )
+    },
+  },
+  {
+    title: '当前任务',
+    key: 'taskType',
+    width: 130,
+    customRender: ({ record }: { record: Row }) => {
+      const code = record.currentTaskType
+      if (code == null || String(code).trim() === '') {
+        return h(
+          'span',
+          { 'data-testid': 'work-order-current-task-type' },
+          presentEmptyValue('not_provided'),
+        )
+      }
+      return h(
+        Tooltip,
+        { title: `任务类型：${code}` },
+        () =>
+          h(
+            'span',
+            { 'data-testid': 'work-order-current-task-type' },
+            statusLabel(code),
+          ),
+      )
+    },
+  },
+  {
+    title: '任务状态',
+    key: 'taskStatus',
+    width: 110,
+    customRender: ({ record }: { record: Row }) => {
+      const code = record.currentTaskStatus
+      if (code == null || String(code).trim() === '') {
+        return h(
+          'span',
+          { 'data-testid': 'work-order-current-task-status' },
+          presentEmptyValue('not_provided'),
+        )
+      }
+      return h(
+        Tooltip,
+        { title: `任务状态：${code}` },
+        () =>
+          h(
+            'span',
+            { 'data-testid': 'work-order-current-task-status' },
+            statusLabel(code),
+          ),
+      )
+    },
   },
   {
     title: '车企',
@@ -235,49 +592,165 @@ const columns = computed((): TableColumnsType<Row> => [
   {
     title: '客户',
     key: 'customer',
-    width: 100,
-    customRender: () =>
-      h(Tooltip, { title: '目录投影未提供客户字段（UI_DATA_GAP）' }, () =>
-        presentEmptyValue('not_provided'),
+    width: 160,
+    customRender: ({ record }: { record: Row }) =>
+      h(
+        'div',
+        { class: 'masked-customer-cell', 'data-testid': 'work-order-masked-customer' },
+        [
+          h(
+            'div',
+            { 'data-testid': 'work-order-masked-customer-name' },
+            record.maskedCustomerName || '—',
+          ),
+          h(
+            'div',
+            { class: 'masked-customer-sub', 'data-testid': 'work-order-masked-customer-phone' },
+            record.maskedCustomerPhone || '—',
+          ),
+          h(
+            'div',
+            { class: 'masked-customer-sub', 'data-testid': 'work-order-masked-service-address' },
+            record.maskedServiceAddress || '—',
+          ),
+        ],
       ),
   },
   {
     title: '服务区域',
     key: 'region',
-    width: 100,
-    customRender: () =>
-      h(Tooltip, { title: '目录投影未提供服务区域（UI_DATA_GAP）' }, () =>
-        presentEmptyValue('not_provided'),
+    width: 160,
+    customRender: ({ record }: { record: Row }) =>
+      h(
+        Tooltip,
+        { title: regionCodesTooltip(record) },
+        () => h('span', { 'data-testid': 'work-order-region' }, regionLabel(record)),
       ),
   },
   {
     title: '当前责任人',
     key: 'assignee',
     width: 110,
-    customRender: () =>
-      h(Tooltip, { title: '目录投影未提供责任人（UI_DATA_GAP）' }, () =>
-        presentEmptyValue('not_provided'),
-      ),
+    customRender: ({ record }: { record: Row }) => {
+      const name = record.currentAssigneeDisplayName?.trim()
+      if (name) {
+        return h(
+          Tooltip,
+          {
+            title: record.currentClaimedBy
+              ? `责任主体：${record.currentClaimedBy}`
+              : '当前认领责任人',
+          },
+          () => h('span', { 'data-testid': 'work-order-current-assignee' }, name),
+        )
+      }
+      return h(
+        Tooltip,
+        {
+          title: record.currentClaimedBy
+            ? `已认领但无显示名（主体：${record.currentClaimedBy}）`
+            : '无 ACTIVE 任务认领人',
+        },
+        () =>
+          h(
+            'span',
+            { 'data-testid': 'work-order-current-assignee' },
+            presentEmptyValue('not_provided'),
+          ),
+      )
+    },
+  },
+  {
+    title: '网点/师傅',
+    key: 'networkTechnician',
+    width: 160,
+    customRender: ({ record }: { record: Row }) => {
+      const network =
+        record.currentNetworkDisplayName?.trim() ||
+        (record.currentNetworkId ? presentEmptyValue('not_provided') : null)
+      const technician =
+        record.currentTechnicianDisplayName?.trim() ||
+        (record.currentTechnicianId ? presentEmptyValue('not_provided') : null)
+      if (!network && !technician) {
+        return h(
+          Tooltip,
+          { title: '无 ACTIVE 网点或师傅服务责任' },
+          () =>
+            h(
+              'span',
+              { 'data-testid': 'work-order-network-technician' },
+              presentEmptyValue('not_provided'),
+            ),
+        )
+      }
+      const label = [network, technician].filter(Boolean).join(' / ')
+      const tipParts = [
+        record.currentNetworkId ? `网点：${record.currentNetworkId}` : null,
+        record.currentTechnicianId ? `师傅档案：${record.currentTechnicianId}` : null,
+      ].filter(Boolean)
+      return h(
+        Tooltip,
+        { title: tipParts.length > 0 ? tipParts.join('；') : '当前服务责任' },
+        () => h('span', { 'data-testid': 'work-order-network-technician' }, label),
+      )
+    },
   },
   {
     title: 'SLA',
     key: 'sla',
-    width: 90,
-    customRender: () =>
-      h(Tooltip, { title: '目录投影未提供 SLA 摘要（UI_DATA_GAP）' }, () =>
-        presentEmptyValue('not_provided'),
-      ),
+    width: 120,
+    customRender: ({ record }: { record: Row }) => {
+      const presentation = slaRiskLabel(record.id)
+      return h(
+        Tooltip,
+        { title: presentation.tooltip },
+        () => h('span', { 'data-testid': 'work-order-sla-risk' }, presentation.text),
+      )
+    },
+  },
+  {
+    title: '异常摘要',
+    key: 'exception',
+    width: 110,
+    customRender: ({ record }: { record: Row }) => {
+      const presentation = exceptionSummaryLabel(record.id)
+      // M451：有 OPEN 异常时深链异常队列（与工作区 exceptionSummary 同口径水合）。
+      const cell = presentation.linkable
+        ? h(
+            RouterLink,
+            {
+              to: {
+                name: 'ADMIN.EXCEPTION.QUEUE',
+                query: { workOrderId: record.id, status: 'OPEN' },
+              },
+              class: 'work-order-link',
+              'data-testid': 'work-order-exception-summary',
+            },
+            () => presentation.text,
+          )
+        : h(
+            'span',
+            { 'data-testid': 'work-order-exception-summary' },
+            presentation.text,
+          )
+      return h(Tooltip, { title: presentation.tooltip }, () => cell)
+    },
   },
   {
     title: '更新时间',
-    dataIndex: 'receivedAt',
-    key: 'receivedAt',
+    dataIndex: 'updatedAt',
+    key: 'updatedAt',
     width: 150,
-    customRender: ({ record }) =>
+    customRender: ({ record }: { record: Row }) =>
       h(
         Tooltip,
-        { title: '列表当前返回接收时间，非独立 updatedAt（UI_DATA_GAP）' },
-        () => formatDateTimeDisplay(record.receivedAt),
+        { title: '工单聚合更新时间（独立于接收时间）' },
+        () =>
+          h(
+            'span',
+            { 'data-testid': 'work-order-updated-at' },
+            formatDateTimeDisplay(record.updatedAt),
+          ),
       ),
   },
   {
@@ -296,10 +769,14 @@ const columns = computed((): TableColumnsType<Row> => [
         () => '打开详情',
       ),
   },
-])
+]
+})
 
 onMounted(() => {
   hydrateFiltersFromRoute()
+  void loadRegionNames()
+  void loadNetworkOptions()
+  void loadTechnicianOptions()
   return load()
 })
 
@@ -386,42 +863,125 @@ watch(
           allow-clear
           style="width: 280px"
           aria-label="工单关键词筛选"
+          data-testid="work-order-keyword-filter"
           placeholder="搜索工单编号、客户、手机号后四位或地址"
+          @pressEnter="search"
+          @change="search"
         />
       </label>
     </template>
 
     <template #more-filters>
-      <Alert
-        type="info"
-        show-icon
-        message="更多筛选暂不可用"
-        description="服务区域、网点、师傅、阶段、SLA、创建时间等条件尚未由工单目录查询 API 提供（UI_DATA_GAP），不会假装可筛。"
-      />
+      <label class="filter-field" data-testid="work-order-received-range-filter">
+        <span>创建时间</span>
+        <DatePicker.RangePicker
+          v-model:value="receivedRange"
+          allow-clear
+          style="width: 260px"
+          aria-label="创建时间筛选"
+          :placeholder="['开始日期', '结束日期']"
+          @change="search"
+        />
+      </label>
       <label class="filter-field">
         <span>服务区域</span>
-        <Input v-model:value="moreRegion" disabled placeholder="暂未提供" />
-      </label>
-      <label class="filter-field">
-        <span>服务网点</span>
-        <Input v-model:value="moreNetwork" disabled placeholder="暂未提供" />
-      </label>
-      <label class="filter-field">
-        <span>服务师傅</span>
-        <Input v-model:value="moreTechnician" disabled placeholder="暂未提供" />
+        <Select
+          v-model:value="regionFilterCode"
+          allow-clear
+          show-search
+          style="width: 240px"
+          aria-label="服务区域筛选"
+          data-testid="work-order-region-filter"
+          placeholder="按省/市/区县筛选"
+          :options="regionFilterOptions"
+          :filter-option="(input, option) => String(option?.label ?? '').includes(input)"
+          @change="search"
+        />
       </label>
       <label class="filter-field">
         <span>当前阶段</span>
-        <Input v-model:value="moreStage" disabled placeholder="暂未提供" />
+        <Select
+          v-model:value="stageFilterCode"
+          allow-clear
+          show-search
+          style="width: 200px"
+          aria-label="当前阶段筛选"
+          data-testid="work-order-stage-filter"
+          placeholder="按当前阶段筛选"
+          :options="stageFilterOptions"
+          :filter-option="(input, option) => String(option?.label ?? '').includes(input)"
+          @change="search"
+        />
       </label>
       <label class="filter-field">
-        <span>SLA 状态</span>
+        <span>任务状态</span>
         <Select
-          v-model:value="moreSla"
-          disabled
-          placeholder="暂未提供"
+          v-model:value="taskStatusFilterCode"
+          allow-clear
+          show-search
+          style="width: 180px"
+          aria-label="任务状态筛选"
+          data-testid="work-order-task-status-filter"
+          placeholder="按当前任务状态筛选"
+          :options="taskStatusFilterOptions"
+          :filter-option="(input, option) => String(option?.label ?? '').includes(input)"
+          @change="search"
+        />
+      </label>
+      <label class="filter-field">
+        <span>审核/整改状态</span>
+        <Select
+          v-model:value="reviewCorrectionFilter"
+          allow-clear
+          style="width: 180px"
+          aria-label="审核整改状态筛选"
+          data-testid="work-order-review-correction-filter"
+          placeholder="按审核/整改状态筛选"
+          :options="reviewCorrectionFilterOptions"
+          @change="search"
+        />
+      </label>
+      <label class="filter-field">
+        <span>服务网点</span>
+        <Select
+          v-model:value="networkFilterId"
+          allow-clear
+          show-search
+          style="width: 240px"
+          aria-label="服务网点筛选"
+          data-testid="work-order-network-filter"
+          placeholder="按 ACTIVE 责任网点筛选"
+          :options="networkFilterOptions"
+          :filter-option="(input, option) => String(option?.label ?? '').includes(input)"
+          @change="search"
+        />
+      </label>
+      <label class="filter-field">
+        <span>服务师傅</span>
+        <Select
+          v-model:value="technicianFilterId"
+          allow-clear
+          show-search
+          style="width: 200px"
+          aria-label="服务师傅筛选"
+          data-testid="work-order-technician-filter"
+          placeholder="按 ACTIVE 责任师傅筛选"
+          :options="technicianFilterOptions"
+          :filter-option="(input, option) => String(option?.label ?? '').includes(input)"
+          @change="search"
+        />
+      </label>
+      <label class="filter-field">
+        <span>SLA 风险</span>
+        <Select
+          v-model:value="slaRiskFilter"
+          allow-clear
           style="width: 160px"
-          :options="[]"
+          aria-label="SLA 风险筛选"
+          data-testid="work-order-sla-risk-filter"
+          placeholder="按 SLA 风险筛选"
+          :options="slaRiskFilterOptions"
+          @change="search"
         />
       </label>
     </template>
@@ -487,5 +1047,16 @@ watch(
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+.masked-customer-cell {
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+.masked-customer-sub {
+  color: var(--sos-color-text-secondary, #5b6575);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 </style>

@@ -33,6 +33,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:definitionJson': [value: string]
+  'select-node': [node: WorkflowNode | null]
 }>()
 
 const NODE_W = 160
@@ -184,6 +185,14 @@ watch(
       }
     }
   },
+)
+
+watch(
+  selectedNode,
+  (node) => {
+    emit('select-node', node)
+  },
+  { immediate: true },
 )
 
 function pushHistory(previousJson: string) {

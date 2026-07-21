@@ -844,6 +844,9 @@ watch(selectedTaskId, () => {
         <tr>
           <th>任务</th>
           <th>关联工单</th>
+          <th>客户</th>
+          <th>联系电话</th>
+          <th>服务地址</th>
           <th>服务产品</th>
           <th>区域</th>
           <th>状态</th>
@@ -870,6 +873,15 @@ watch(selectedTaskId, () => {
             >
               打开工单
             </RouterLink>
+          </td>
+          <td data-testid="task-masked-customer-name">
+            {{ item.maskedCustomerName || '—' }}
+          </td>
+          <td data-testid="task-masked-customer-phone">
+            {{ item.maskedCustomerPhone || '—' }}
+          </td>
+          <td data-testid="task-masked-service-address">
+            {{ item.maskedServiceAddress || '—' }}
           </td>
           <td data-testid="task-service-product">{{ item.serviceProductCode ?? '—' }}</td>
           <td data-testid="task-region">{{ taskRegionLabel(item) }}</td>
@@ -1022,10 +1034,9 @@ watch(selectedTaskId, () => {
     <form
       class="assign"
       data-testid="network-appointment-form"
-      data-page-id="NETWORK.APPOINTMENT"
       @submit.prevent="submitPropose"
     >
-      <h3>本网点预约</h3>
+      <h3>本网点预约操作</h3>
       <p class="hint">
         调用 Network Portal 预约 propose/confirm/reschedule/cancel/mark-no-show 与联系尝试；
         确认方固定为 NETWORK_MEMBER + 当前主体；改约/取消/爽约使用列表 If-Match 版本。

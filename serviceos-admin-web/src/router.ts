@@ -32,11 +32,15 @@ import EvidenceSetSnapshotDetailPage from './pages/EvidenceSetSnapshotDetailPage
 import ExternalReviewReceiptDetailPage from './pages/ExternalReviewReceiptDetailPage.vue'
 import ProjectDirectoryPage from './pages/ProjectDirectoryPage.vue'
 import ProjectDetailPage from './pages/ProjectDetailPage.vue'
+import MasterDataCatalogPage from './pages/MasterDataCatalogPage.vue'
 import FulfillmentProfileListPage from './pages/FulfillmentProfileListPage.vue'
+import FulfillmentProfileCreatePage from './pages/FulfillmentProfileCreatePage.vue'
 import FulfillmentProfileDetailPage from './pages/FulfillmentProfileDetailPage.vue'
 import FulfillmentPreviewPage from './pages/FulfillmentPreviewPage.vue'
 import FulfillmentProfileEditorPage from './pages/FulfillmentProfileEditorPage.vue'
 import FulfillmentPublishFlowPage from './pages/FulfillmentPublishFlowPage.vue'
+import WorkflowDesignerPage from './pages/WorkflowDesignerPage.vue'
+import TaskTemplateCenterPage from './pages/TaskTemplateCenterPage.vue'
 import WorkOrderFulfillmentSnapshotPage from './pages/WorkOrderFulfillmentSnapshotPage.vue'
 import OidcCallbackPage from './pages/OidcCallbackPage.vue'
 import UserDirectoryPage from './pages/UserDirectoryPage.vue'
@@ -145,10 +149,22 @@ export const router = createRouter({
         { path: 'projects', name: 'ADMIN.PROJECT.LIST', component: ProjectDirectoryPage },
         { path: 'projects/:id', name: 'ADMIN.PROJECT.DETAIL', component: ProjectDetailPage },
         {
+          path: 'master-data',
+          name: 'ADMIN.MASTERDATA.CATALOG',
+          component: MasterDataCatalogPage,
+          meta: { pageId: 'ADMIN.MASTERDATA.CATALOG' },
+        },
+        {
           path: 'projects/:id/fulfillment-profiles',
           name: 'ADMIN.PROJECT.FULFILLMENT.LIST',
           component: FulfillmentProfileListPage,
           meta: { pageId: 'ADMIN.PROJECT.FULFILLMENT.LIST' },
+        },
+        {
+          path: 'projects/:id/fulfillment-profiles/create',
+          name: 'ADMIN.PROJECT.FULFILLMENT.CREATE',
+          component: FulfillmentProfileCreatePage,
+          meta: { pageId: 'ADMIN.PROJECT.FULFILLMENT.CREATE' },
         },
         {
           path: 'projects/:id/fulfillment-profiles/:profileId',
@@ -179,6 +195,18 @@ export const router = createRouter({
           name: 'ADMIN.CONFIGURATION.DESIGNER',
           component: ConfigurationDesignerPage,
           meta: { pageId: 'ADMIN.CONFIGURATION.DESIGNER' },
+        },
+        {
+          path: 'configuration/workflows',
+          name: 'ADMIN.WORKFLOW.DESIGNER',
+          component: WorkflowDesignerPage,
+          meta: { pageId: 'ADMIN.WORKFLOW.DESIGNER' },
+        },
+        {
+          path: 'configuration/task-templates',
+          name: 'ADMIN.TASK_TEMPLATE.CENTER',
+          component: TaskTemplateCenterPage,
+          meta: { pageId: 'ADMIN.TASK_TEMPLATE.CENTER' },
         },
         { path: 'work-orders', name: 'ADMIN.WORKORDER.LIST', component: WorkOrderDirectoryPage },
         { path: 'work-orders/lookup', name: 'ADMIN.WORKORDER.LOOKUP', component: WorkOrderLookupPage },

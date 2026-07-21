@@ -74,6 +74,7 @@ import com.serviceos.task.api.WorkOrderTaskPage;
 import com.serviceos.task.api.WorkOrderTaskQueryService;
 import com.serviceos.task.api.WorkOrderTaskSummary;
 import com.serviceos.workorder.api.WorkOrderDetail;
+import com.serviceos.workorder.api.WorkOrderMaskedContactView;
 import com.serviceos.workorder.api.WorkOrderQueryService;
 import org.springframework.stereotype.Service;
 
@@ -168,6 +169,9 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
             UUID workOrderId
     ) {
         WorkOrderDetail detail = workOrders.get(principal, correlationId, workOrderId);
+        // M423：与终审工作区同源脱敏端口；同 workOrder.read，不返回原文 PII。
+        WorkOrderMaskedContactView contact = workOrders.getMaskedContact(
+                principal, correlationId, workOrderId);
         List<WorkOrderTaskSummary> tasks = workOrderTasks.list(
                 principal, correlationId, workOrderId, null, 100).items();
         WorkOrderTaskSummary current = tasks.stream()
@@ -217,7 +221,10 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
                 exceptionSummary,
                 timelineFreshness,
                 new WorkOrderWorkspaceSourceVersions(detail.workOrder().version()),
-                meta(timelineFreshness));
+                meta(timelineFreshness),
+                contact.maskedCustomerName(),
+                contact.maskedCustomerPhone(),
+                contact.maskedServiceAddress());
     }
 
     @Override
@@ -833,7 +840,8 @@ final class DefaultWorkOrderWorkspaceQueryService implements WorkOrderWorkspaceQ
         return new WorkOrderWorkspaceEvidenceItemSummary(
                 item.evidenceItemId(), item.taskId(), item.projectId(), item.evidenceSlotId(),
                 item.itemOrdinal(), item.status(), item.revisionCount(),
-                item.latestRevisionNumber(), item.latestRevisionStatus());
+                item.latestRevisionNumber(), item.latestRevisionStatus(),
+                item.latestRevisionId(), item.latestMimeType());
     }
 
     private WorkOrderWorkspaceReviewCaseSummary toReviewCaseSummary(ReviewCaseView review) {

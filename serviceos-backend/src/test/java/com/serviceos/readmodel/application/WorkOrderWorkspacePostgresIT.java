@@ -160,9 +160,17 @@ class WorkOrderWorkspacePostgresIT {
         assertThat(workspace.meta().freshnessStatus()).isEqualTo("UNKNOWN");
         assertThat(workspace.meta().projectionCheckpoint()).startsWith("work-order-core-timeline.v1:gen:");
         assertThat(workspace.sourceVersions().workOrderVersion()).isEqualTo(1);
+        // M423：顶层脱敏联系字段；不得夹带原文手机号/完整地址
+        assertThat(workspace.maskedCustomerName()).isNotBlank();
+        assertThat(workspace.maskedCustomerPhone()).isNotBlank();
+        assertThat(workspace.maskedCustomerPhone()).doesNotContain("138");
+        assertThat(workspace.maskedServiceAddress()).isNotBlank();
+        assertThat(workspace.maskedServiceAddress()).endsWith("***");
 
         String json = workspace.toString();
-        assertThat(json).doesNotContain("customerName", "customerMobile", "serviceAddress", "vehicleVin");
+        assertThat(json).doesNotContain("vehicleVin");
+        assertThat(json).doesNotContain("13800000000");
+        assertThat(json).doesNotContain("山东省济南市历下区测试路1号");
     }
 
     @Test
@@ -284,6 +292,7 @@ class WorkOrderWorkspacePostgresIT {
         UUID slotId = seedEvidenceSlot(taskId);
         UUID submissionId = seedFormSubmission(taskId);
         UUID evidenceItemId = seedEvidenceItem(taskId, slotId);
+        UUID revisionId = seedEvidenceRevision(taskId, slotId, evidenceItemId, "image/jpeg");
 
         var section = workspaces.getSection(
                 principal("forms-reader"), "corr-fe", workOrderId, "FORMS_EVIDENCE", null, 50);
@@ -304,7 +313,12 @@ class WorkOrderWorkspacePostgresIT {
         assertThat(section.formsEvidence().evidenceItems())
                 .extracting(item -> item.evidenceItemId())
                 .containsExactly(evidenceItemId);
-        assertThat(section.formsEvidence().evidenceItems().getFirst().revisionCount()).isZero();
+        var evidenceItem = section.formsEvidence().evidenceItems().getFirst();
+        assertThat(evidenceItem.revisionCount()).isOne();
+        assertThat(evidenceItem.latestRevisionId()).isEqualTo(revisionId);
+        assertThat(evidenceItem.latestMimeType()).isEqualTo("image/jpeg");
+        assertThat(evidenceItem.latestRevisionNumber()).isOne();
+        assertThat(evidenceItem.latestRevisionStatus()).isEqualTo("STORED");
         assertThat(section.toString()).doesNotContain(
                 "definitionJson", "requirementDefinition", "resolutionExplanation",
                 "survey.conclusion", "requireGps", "valuesJson", "submittedBy",
@@ -789,6 +803,100 @@ class WorkOrderWorkspacePostgresIT {
                         Instant.parse("2026-07-16T04:31:00Z")))
                 .update();
         return itemId;
+    }
+
+    /** M426：为摘要投影提供最新 revision 指针；故意写入 fileObjectId 以证明摘要不泄漏。 */
+    private UUID seedEvidenceRevision(UUID taskId, UUID slotId, UUID itemId, String mimeType) {
+        UUID revisionId = UUID.randomUUID();
+        UUID fileObjectId = UUID.randomUUID();
+        UUID uploadSessionId = UUID.randomUUID();
+        String digest = Sha256.digest(revisionId.toString());
+        String objectKey = "m426/" + fileObjectId;
+        Instant createdAt = Instant.parse("2026-07-16T04:32:00Z");
+        jdbc.sql("""
+                INSERT INTO fil_upload_session (
+                    upload_session_id, file_id, tenant_id, object_key, business_context_type,
+                    business_context_id, original_file_name, declared_mime_type, expected_size,
+                    expected_sha256, status, expires_at, created_by, created_at, updated_at, completed_at)
+                VALUES (
+                    :uploadId, :fileId, :tenantId, :objectKey, 'EvidenceSlot', :slotId,
+                    'm426.jpg', :mimeType, 100, :digest, 'COMPLETED', :expiresAt,
+                    'evidence-creator-should-not-leak', :createdAt, :createdAt, :createdAt)
+                """)
+                .param("uploadId", uploadSessionId)
+                .param("fileId", fileObjectId)
+                .param("tenantId", TENANT)
+                .param("objectKey", objectKey)
+                .param("slotId", slotId.toString())
+                .param("mimeType", mimeType)
+                .param("digest", digest)
+                .param("expiresAt", java.sql.Timestamp.from(createdAt.plusSeconds(3600)))
+                .param("createdAt", java.sql.Timestamp.from(createdAt))
+                .update();
+        jdbc.sql("""
+                INSERT INTO fil_stored_file (
+                    file_id, tenant_id, upload_session_id, object_key, original_file_name,
+                    checksum_sha256, size_bytes, declared_mime_type, detected_mime_type,
+                    lifecycle_status, created_by, created_at, updated_at, version)
+                VALUES (
+                    :fileId, :tenantId, :uploadId, :objectKey, 'm426.jpg', :digest, 100,
+                    :mimeType, :mimeType, 'AVAILABLE', 'evidence-creator-should-not-leak',
+                    :createdAt, :createdAt, 1)
+                """)
+                .param("fileId", fileObjectId)
+                .param("tenantId", TENANT)
+                .param("uploadId", uploadSessionId)
+                .param("objectKey", objectKey)
+                .param("digest", digest)
+                .param("mimeType", mimeType)
+                .param("createdAt", java.sql.Timestamp.from(createdAt))
+                .update();
+        jdbc.sql("""
+                INSERT INTO evd_evidence_upload_session (
+                    upload_session_id, tenant_id, project_id, task_id, slot_id, file_id,
+                    expected_sha256, declared_mime_type, expected_size_bytes, original_file_name,
+                    capture_metadata, status, created_by, created_at)
+                VALUES (
+                    :uploadId, :tenantId, :projectId, :taskId, :slotId, :fileId, :digest,
+                    :mimeType, 100, 'm426.jpg', '{"gps":"should-not-leak"}'::jsonb, 'FINALIZED',
+                    'evidence-creator-should-not-leak', :createdAt)
+                """)
+                .param("uploadId", uploadSessionId)
+                .param("tenantId", TENANT)
+                .param("projectId", projectId)
+                .param("taskId", taskId)
+                .param("slotId", slotId)
+                .param("fileId", fileObjectId)
+                .param("digest", digest)
+                .param("mimeType", mimeType)
+                .param("createdAt", java.sql.Timestamp.from(createdAt))
+                .update();
+        jdbc.sql("""
+                INSERT INTO evd_evidence_revision (
+                    evidence_revision_id, tenant_id, project_id, task_id, slot_id, evidence_item_id,
+                    revision_number, file_object_id, content_digest, mime_type, size_bytes,
+                    capture_metadata, status, source_upload_session_id, finalize_command_id,
+                    created_by, created_at
+                ) VALUES (
+                    :revisionId, :tenantId, :projectId, :taskId, :slotId, :itemId,
+                    1, :fileId, :digest, :mimeType, 100, '{"gps":"should-not-leak"}'::jsonb, 'STORED',
+                    :uploadId, :finalizeCommandId, 'evidence-creator-should-not-leak', :createdAt
+                )
+                """)
+                .param("revisionId", revisionId)
+                .param("tenantId", TENANT)
+                .param("projectId", projectId)
+                .param("taskId", taskId)
+                .param("slotId", slotId)
+                .param("itemId", itemId)
+                .param("fileId", fileObjectId)
+                .param("digest", digest)
+                .param("mimeType", mimeType)
+                .param("uploadId", uploadSessionId)
+                .param("finalizeCommandId", "m426-" + revisionId)
+                .param("createdAt", java.sql.Timestamp.from(createdAt))
+                .update();
+        return revisionId;
     }
 
     private UUID seedContactAttempt(UUID taskId) {

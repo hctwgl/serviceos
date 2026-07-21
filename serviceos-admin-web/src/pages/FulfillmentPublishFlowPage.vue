@@ -5,19 +5,26 @@ import { Alert, Button, DatePicker, Input, Result, Space, Steps, Table } from 'a
 import { ArrowLeftOutlined } from '@ant-design/icons-vue'
 import dayjs, { type Dayjs } from 'dayjs'
 import DedicatedFlowLayout from '../patterns/templates/DedicatedFlowLayout.vue'
+import FulfillmentRunbookTable from '../components/fulfillment/FulfillmentRunbookTable.vue'
+import FulfillmentCompareImpactPanel from '../components/fulfillment/FulfillmentCompareImpactPanel.vue'
 import {
+  compareProjectFulfillmentImpact,
   compileProjectFulfillmentPreview,
   getProjectFulfillmentProfile,
+  hasAllowedAction,
   validateProjectFulfillmentDraft,
+  type ProjectFulfillmentCompareImpact,
   type ProjectFulfillmentManifest,
   type ProjectFulfillmentProfileDetail,
   type ProjectFulfillmentValidationIssue,
 } from '../api/fulfillmentProfiles'
 import { createCoreApi, fromRaw, newIdempotencyKey, quotedVersion } from '../api/coreApi'
 import { toUserFacingError } from '../product/errorMessages'
+import { useDeveloperDiagnostics } from '../composables/useDeveloperDiagnostics'
 
 const route = useRoute()
 const router = useRouter()
+const diagnostics = useDeveloperDiagnostics()
 const projectId = computed(() => String(route.params.id ?? ''))
 const profileId = computed(() => String(route.params.profileId ?? ''))
 
@@ -28,13 +35,18 @@ const error = ref<string | null>(null)
 const detail = ref<ProjectFulfillmentProfileDetail | null>(null)
 const issues = ref<ProjectFulfillmentValidationIssue[]>([])
 const manifest = ref<ProjectFulfillmentManifest | null>(null)
+const compareImpact = ref<ProjectFulfillmentCompareImpact | null>(null)
 const effectiveFrom = ref<Dayjs | undefined>(dayjs().add(5, 'minute'))
 const publishNote = ref('')
 const publishedVersion = ref<number | null>(null)
 
 const blockingErrors = computed(() => issues.value.filter((i) => i.severity === 'ERROR'))
 const canPublish = computed(
-  () => blockingErrors.value.length === 0 && !!manifest.value && !!effectiveFrom.value,
+  () =>
+    hasAllowedAction(detail.value, 'PUBLISH') &&
+    blockingErrors.value.length === 0 &&
+    !!manifest.value?.runbook &&
+    !!effectiveFrom.value,
 )
 
 async function loadStepData() {
@@ -42,10 +54,23 @@ async function loadStepData() {
   error.value = null
   try {
     detail.value = (await getProjectFulfillmentProfile(projectId.value, profileId.value)).data
+    if (!hasAllowedAction(detail.value, 'PUBLISH') && !hasAllowedAction(detail.value, 'COMPILE_PREVIEW')) {
+      error.value = '当前状态不允许发布或预览该履约配置'
+    }
     issues.value = (await validateProjectFulfillmentDraft(projectId.value, profileId.value)).data
     manifest.value = (
       await compileProjectFulfillmentPreview(projectId.value, profileId.value)
     ).data
+    compareImpact.value = await compareProjectFulfillmentImpact(projectId.value, profileId.value)
+    if (manifest.value?.manifestJson) {
+      diagnostics.pushDiagnostic({
+        title: '履约 Manifest（仅诊断）',
+        fields: {
+          contentDigest: manifest.value.contentDigest,
+          manifestJson: manifest.value.manifestJson.slice(0, 4000),
+        },
+      })
+    }
   } catch (err) {
     error.value = toUserFacingError(err).message
   } finally {
@@ -54,7 +79,7 @@ async function loadStepData() {
 }
 
 async function publish() {
-  if (!detail.value || !effectiveFrom.value) return
+  if (!detail.value || !effectiveFrom.value || !canPublish.value) return
   publishing.value = true
   error.value = null
   try {
@@ -73,7 +98,10 @@ async function publish() {
     publishedVersion.value = revision.data.versionNo ?? null
     step.value = 4
   } catch (err) {
-    error.value = toUserFacingError(err).message
+    const problem = toUserFacingError(err)
+    error.value = /冲突|If-Match|version|VERSION_CONFLICT/i.test(problem.message)
+      ? '配置已被其他人更新。请返回配置页刷新后重新发布。'
+      : problem.message
   } finally {
     publishing.value = false
   }
@@ -102,6 +130,14 @@ onMounted(loadStepData)
     </template>
     <template #feedback>
       <Alert v-if="error" type="error" show-icon :message="error" style="margin-bottom: 12px" />
+      <Alert
+        v-if="detail && !hasAllowedAction(detail, 'PUBLISH')"
+        type="warning"
+        show-icon
+        message="当前配置处于只读或不可发布状态"
+        description="请确认配置未被暂停/停用，并具备发布能力。"
+        style="margin-bottom: 12px"
+      />
     </template>
 
     <Steps
@@ -150,29 +186,18 @@ onMounted(loadStepData)
       <Alert
         type="info"
         show-icon
-        :message="`Manifest 摘要 ${manifest?.contentDigest?.slice(0, 16) ?? ''}…`"
+        :message="manifest?.runbook?.impactSummary || '运行说明书由服务端生成'"
         style="margin-bottom: 12px"
       />
-      <pre class="manifest-preview">{{ manifest?.manifestJson }}</pre>
+      <FulfillmentRunbookTable :runbook="manifest?.runbook" :loading="loading" />
       <Space style="margin-top: 16px">
         <Button @click="step = 0">上一步</Button>
-        <Button type="primary" @click="step = 2">下一步</Button>
+        <Button type="primary" :disabled="!manifest?.runbook" @click="step = 2">下一步</Button>
       </Space>
     </div>
 
     <div v-else-if="step === 2">
-      <Alert
-        type="warning"
-        show-icon
-        message="存量工单继续使用创建时冻结版本，不受本次发布影响。"
-        description="新工单在生效时间后命中本版本。不会自动迁移历史工单阶段、表单或资料要求。"
-        style="margin-bottom: 12px"
-      />
-      <ul>
-        <li>相比当前版本：发布新的不可变 Revision</li>
-        <li>受影响对象：仅新建工单</li>
-        <li>既有工单：保持原 Bundle / Profile Revision 冻结</li>
-      </ul>
+      <FulfillmentCompareImpactPanel :impact="compareImpact" :loading="loading" />
       <Space style="margin-top: 16px">
         <Button @click="step = 1">上一步</Button>
         <Button type="primary" @click="step = 3">下一步</Button>
@@ -236,13 +261,5 @@ onMounted(loadStepData)
   flex-direction: column;
   gap: 6px;
   margin-bottom: 12px;
-}
-.manifest-preview {
-  max-height: 360px;
-  overflow: auto;
-  padding: 12px;
-  background: var(--sos-color-surface-subtle, #f7f8fa);
-  border-radius: 8px;
-  font-size: 12px;
 }
 </style>

@@ -571,6 +571,78 @@ H5 通过不代表 iOS 离线生产能力完成。
 - TestFlight 试点；
 - 隐私和本地保留策略验收。
 
+## 46.1 M393 验收记录（今日任务 H5）
+
+```yaml
+pageId: TECHNICIAN.TASK.LIST
+route: /technician-portal/task-feed
+visualProfile: CLASSIC_PROFESSIONAL_MOBILE
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: 客户脱敏姓名/电话、地址摘要、距离与 SLA 倒计时尚未由 Feed 正式读模型交付
+  - DOMAIN_GAP: H5 不承诺原生离线/后台上传；完整作业闭环待后续里程碑
+```
+
+## 46.2 M394 验收记录（任务详情作业闭环 H5）
+
+```yaml
+pageId: TECHNICIAN.TASK.DETAIL
+route: /technician-portal/tasks/:id
+visualProfile: CLASSIC_PROFESSIONAL_MOBILE
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: 客户/地址/导航正式读模型未交付
+  - DOMAIN_GAP: 原生签退 FieldOperation、离线草稿与后台上传不在 H5 承诺范围
+```
+
+## 46.3 M395 验收记录（整改 + 同步冲突中心 H5）
+
+```yaml
+pageId: TECHNICIAN.CORRECTION.DETAIL
+route: /technician-portal/corrections/:id
+visualProfile: CLASSIC_PROFESSIONAL_MOBILE
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: 正确示例图读模型未交付
+```
+
+```yaml
+pageId: TECHNICIAN.SYNC.SUMMARY
+route: /technician-portal/sync-summary
+visualProfile: CLASSIC_PROFESSIONAL_MOBILE
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: OfflineCommand 队列明细与冲突命令结果绑定未对 H5 交付
+```
+
 ## 47. 黄金链路验收
 
 真实师傅必须在真机独立完成：

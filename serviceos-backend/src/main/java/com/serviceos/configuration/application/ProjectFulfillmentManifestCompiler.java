@@ -57,6 +57,9 @@ final class ProjectFulfillmentManifestCompiler {
         workflowRef.put("assetKey", document.get("workflowAssetKey"));
         manifest.put("workflowRef", workflowRef);
         manifest.put("effectiveFrom", effectiveFrom == null ? null : effectiveFrom.toString());
+        if (document.get("supportedClientKinds") != null) {
+            manifest.put("supportedClientKinds", document.get("supportedClientKinds"));
+        }
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> stages = (List<Map<String, Object>>) document.getOrDefault(
                 "stages", List.of());

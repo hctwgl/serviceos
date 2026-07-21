@@ -204,6 +204,9 @@ watch(() => props.networkContextId, () => {
       <thead>
         <tr>
           <th>工单</th>
+          <th>客户</th>
+          <th>联系电话</th>
+          <th>服务地址</th>
           <th>项目</th>
           <th>服务产品</th>
           <th>区域</th>
@@ -232,6 +235,15 @@ watch(() => props.networkContextId, () => {
             >
               {{ item.workOrderId }}
             </RouterLink>
+          </td>
+          <td data-testid="work-order-masked-customer-name">
+            {{ item.maskedCustomerName || '—' }}
+          </td>
+          <td data-testid="work-order-masked-customer-phone">
+            {{ item.maskedCustomerPhone || '—' }}
+          </td>
+          <td data-testid="work-order-masked-service-address">
+            {{ item.maskedServiceAddress || '—' }}
           </td>
           <td data-testid="work-order-project-id">{{ item.projectId ?? '—' }}</td>
           <td data-testid="work-order-service-product">{{ item.serviceProductCode ?? '—' }}</td>

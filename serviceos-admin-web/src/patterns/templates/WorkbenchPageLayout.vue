@@ -20,24 +20,33 @@ defineProps<{
     </template>
 
     <div class="workbench">
+      <section v-if="$slots.summary" class="workbench__summary" data-testid="workbench-summary">
+        <slot name="summary" />
+      </section>
       <section class="workbench__primary" data-testid="workbench-primary">
-        <h2>待我处理</h2>
+        <h2>我的待办</h2>
         <slot name="primary-queue" />
       </section>
       <div class="workbench__risk-row">
         <section class="workbench__panel workbench__panel--risk" data-testid="workbench-risk">
-          <h2>即将超时 / 已超时</h2>
+          <h2>风险摘要（P0/P1 · SLA · 重大异常）</h2>
           <slot name="risk-queue" />
         </section>
         <section class="workbench__panel" data-testid="workbench-today">
-          <h2>今日队列</h2>
+          <h2>今日跟进</h2>
           <slot name="today-queue" />
         </section>
       </div>
-      <section class="workbench__panel" data-testid="workbench-recent">
-        <h2>最近处理</h2>
-        <slot name="recent-activity" />
-      </section>
+      <div class="workbench__bottom-row">
+        <section class="workbench__panel" data-testid="workbench-recent">
+          <h2>最近处理</h2>
+          <slot name="recent-activity" />
+        </section>
+        <section class="workbench__panel" data-testid="workbench-followed-projects">
+          <h2>关注项目</h2>
+          <slot name="followed-projects" />
+        </section>
+      </div>
       <slot />
     </div>
   </PageContainer>
@@ -48,6 +57,9 @@ defineProps<{
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+.workbench__summary {
+  margin: 0;
 }
 .workbench__primary {
   background: var(--sos-color-surface-card, #fff);
@@ -78,5 +90,15 @@ defineProps<{
 }
 .workbench__panel--risk {
   border-color: var(--sos-color-status-warning-border);
+}
+.workbench__bottom-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 1024px) {
+  .workbench__bottom-row {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

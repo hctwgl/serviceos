@@ -56,6 +56,7 @@ watch(
   >
     <header class="top">
       <div>
+        <p class="eyebrow">异常中心</p>
         <h2>异常详情</h2>
         <p class="meta" data-testid="exception-detail-id">{{ exceptionId }}</p>
       </div>
@@ -63,13 +64,20 @@ watch(
         <RouterLink to="/network-portal/exceptions" data-testid="exception-back-to-queue">
           返回队列
         </RouterLink>
+        <RouterLink
+          v-if="detail?.workOrderId"
+          :to="`/network-portal/work-orders/${detail.workOrderId}`"
+          data-testid="exception-detail-primary-workspace"
+        >
+          打开工单工作区
+        </RouterLink>
         <button type="button" :disabled="loading" data-testid="exception-detail-refresh" @click="load">
           刷新
         </button>
       </div>
     </header>
     <p class="hint">
-      只读详情（复用 M203 GET）；Portal <code>allowedActions</code> 恒为空，不提供 ACK/resolve。
+      深链到可执行业务动作；Portal 不提供 ACK/resolve 空操作。
     </p>
     <p v-if="error" data-testid="network-portal-error">{{ error }}</p>
     <p v-else-if="loading" data-testid="exception-detail-loading">加载中…</p>
@@ -146,10 +154,17 @@ watch(
   color: #5b6573;
   font-size: 0.9rem;
 }
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--sos-primary-600);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
 .actions {
   display: flex;
   gap: 0.75rem;
   align-items: center;
+  flex-wrap: wrap;
 }
 dl {
   display: grid;

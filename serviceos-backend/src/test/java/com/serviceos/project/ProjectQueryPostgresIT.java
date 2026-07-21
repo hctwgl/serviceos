@@ -68,7 +68,7 @@ class ProjectQueryPostgresIT {
     @BeforeEach
     void cleanAndSeedOperator() {
         jdbc.sql("""
-                        TRUNCATE TABLE prj_project, aud_audit_record,
+                        TRUNCATE TABLE prj_client_directory, prj_project, aud_audit_record,
                             rel_outbox_publish_attempt, rel_outbox_event,
                             rel_inbox_record, rel_idempotency_record,
                             auth_role_field_policy, auth_role_grant,
@@ -117,6 +117,109 @@ class ProjectQueryPostgresIT {
                 new ProjectQuery(null, null, null, null, 0)))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("limit");
         assertThat(charlie.clientId()).isEqualTo("client-b");
+    }
+
+    @Test
+    void regionCatalogReturnsSeededNamesAndClientDirectoryRegisters() {
+        var regions = queries.listRegionCatalog(operator(), "corr-m406-regions", "*", "青岛", null, 20);
+        assertThat(regions.items()).extracting(item -> item.regionCode())
+                .contains("CN-3702", "370200");
+        assertThat(regions.items()).allSatisfy(item -> {
+            assertThat(item.regionName()).contains("青岛");
+            assertThat(item.childCount()).isGreaterThanOrEqualTo(0);
+        });
+
+        var registered = commands.registerClient(
+                operator(), metadata("register-client"), "client-geely", "吉利汽车");
+        assertThat(registered.displayName()).isEqualTo("吉利汽车");
+        var directory = queries.listClientDirectory(operator(), "corr-m406-clients", null);
+        assertThat(directory.items()).extracting(item -> item.clientCode()).contains("client-geely");
+
+        create("CAT-A", "client-geely", "Catalog A", LocalDate.of(2026, 1, 1), null,
+                List.of("CN-3702"), List.of());
+        var options = queries.referenceOptions(operator(), "corr-m406-options");
+        assertThat(options.clients()).filteredOn(item -> item.clientId().equals("client-geely"))
+                .singleElement()
+                .satisfies(item -> {
+                    assertThat(item.displayName()).isEqualTo("吉利汽车");
+                    assertThat(item.projectCount()).isEqualTo(1);
+                });
+        assertThat(options.regions()).filteredOn(item -> item.regionCode().equals("CN-3702"))
+                .singleElement()
+                .extracting(item -> item.regionName())
+                .isEqualTo("青岛市");
+    }
+
+    @Test
+    void masterDataGovernanceSupportsClientBrandLifecycleAndProvinceTree() {
+        var roots = queries.listRegionCatalog(operator(), "corr-m414-roots", null, null, "PROVINCE", 100);
+        assertThat(roots.items()).extracting(item -> item.regionCode())
+                .contains("110000", "440000", "370000", "810000");
+        assertThat(roots.items()).filteredOn(item -> item.regionCode().equals("440000"))
+                .singleElement()
+                .satisfies(item -> assertThat(item.childCount()).isGreaterThanOrEqualTo(2));
+
+        var shenzhenChildren = queries.listRegionCatalog(
+                operator(), "corr-m414-sz", "440300", null, null, 50);
+        assertThat(shenzhenChildren.items()).extracting(item -> item.regionName())
+                .contains("南山区", "福田区");
+
+        var client = commands.registerClient(
+                operator(), metadata("m414-client"), "client-byd", "比亚迪");
+        assertThat(client.status()).isEqualTo("ACTIVE");
+        var brand = commands.registerBrand(
+                operator(), metadata("m414-brand"), "client-byd", "brand-dynasty", "王朝网", 10);
+        assertThat(brand.displayName()).isEqualTo("王朝网");
+        assertThat(brand.status()).isEqualTo("ACTIVE");
+
+        var brands = queries.listClientBrands(operator(), "corr-m414-brands", "client-byd", "ALL");
+        assertThat(brands.items()).extracting(item -> item.brandCode()).containsExactly("brand-dynasty");
+
+        var disabledBrand = commands.setBrandStatus(
+                operator(), metadata("m414-brand-off"), "client-byd", "brand-dynasty", "DISABLED");
+        assertThat(disabledBrand.status()).isEqualTo("DISABLED");
+        assertThat(queries.listClientBrands(operator(), "corr-m414-brands-active", "client-byd", "ACTIVE")
+                .items()).isEmpty();
+
+        var disabledClient = commands.setClientStatus(
+                operator(), metadata("m414-client-off"), "client-byd", "DISABLED");
+        assertThat(disabledClient.status()).isEqualTo("DISABLED");
+        assertThat(queries.listClientDirectory(operator(), "corr-m414-active", "ACTIVE").items())
+                .extracting(item -> item.clientCode())
+                .doesNotContain("client-byd");
+        assertThat(queries.listClientDirectory(operator(), "corr-m414-all", "ALL").items())
+                .extracting(item -> item.clientCode())
+                .contains("client-byd");
+    }
+
+    @Test
+    void referenceOptionsAggregateAuthorizedClientsAndRegions() {
+        create("OPT-A", "client-a", "Opt A", LocalDate.of(2026, 1, 1), null,
+                List.of("CN-3702"), List.of("network-a"));
+        create("OPT-B", "client-a", "Opt B", LocalDate.of(2026, 1, 1), null,
+                List.of("CN-3702", "CN-3100"), List.of("network-b"));
+        create("OPT-C", "client-b", "Opt C", LocalDate.of(2026, 1, 1), null,
+                List.of("CN-4403"), List.of("network-c"));
+
+        var options = queries.referenceOptions(operator(), "corr-m400-options");
+        assertThat(options.clients()).extracting(item -> item.clientId())
+                .containsExactly("client-a", "client-b");
+        assertThat(options.clients()).filteredOn(item -> item.clientId().equals("client-a"))
+                .singleElement()
+                .extracting(item -> item.projectCount())
+                .isEqualTo(2);
+        assertThat(options.regions()).extracting(item -> item.regionCode())
+                .containsExactly("CN-3100", "CN-3702", "CN-4403");
+        assertThat(options.asOf()).isNotNull();
+
+        seedRole("opt-reader", "opt-region-role", "REGION", "CN-3702", List.of("project.read"));
+        var scoped = queries.referenceOptions(
+                principal("opt-reader", "tenant-test"), "corr-m400-scoped");
+        // REGION 授权可见含该区域的项目；选项展示这些项目上的全部生效 REGION（含同项目其他区域）。
+        assertThat(scoped.clients()).extracting(item -> item.clientId())
+                .containsExactly("client-a");
+        assertThat(scoped.regions()).extracting(item -> item.regionCode())
+                .containsExactly("CN-3100", "CN-3702");
     }
 
     @Test
@@ -223,7 +326,7 @@ class ProjectQueryPostgresIT {
                 .query(String.class).single()).isEqualTo("NORMAL");
         assertThat(jdbc.sql("SELECT count(*) FROM pg_indexes WHERE indexname='ix_prj_project_directory_cursor'")
                 .query(Long.class).single()).isOne();
-        assertThat(flyway.info().applied()).hasSize(137);
+        assertThat(flyway.info().applied()).hasSize(147);
         assertThat(flyway.migrate().migrationsExecuted).isZero();
     }
 

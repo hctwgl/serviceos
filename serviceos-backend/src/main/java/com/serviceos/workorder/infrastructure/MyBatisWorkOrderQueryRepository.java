@@ -18,11 +18,54 @@ final class MyBatisWorkOrderQueryRepository implements WorkOrderQueryRepository 
     MyBatisWorkOrderQueryRepository(WorkOrderQueryMapper mapper) { this.mapper = mapper; }
     @Override public List<WorkOrderView> findPage(String tenantId, boolean tenantWide,
             List<UUID> projectIds, String clientCode, UUID projectId, String status,
-            String externalOrderCode, Instant cursorReceivedAt, UUID cursorId, int fetchSize) {
+            String externalOrderCode, String provinceCode, String cityCode, String districtCode,
+            boolean applyStageFilter, List<UUID> stageWorkOrderIds,
+            boolean applyTaskStatusFilter, List<UUID> taskStatusWorkOrderIds,
+            boolean applyNetworkFilter, List<UUID> networkWorkOrderIds,
+            boolean applyTechnicianFilter, List<UUID> technicianWorkOrderIds,
+            boolean applySlaRiskFilter, List<UUID> slaRiskWorkOrderIds,
+            boolean applyReviewCorrectionFilter, List<UUID> reviewCorrectionWorkOrderIds,
+            String keywordPhoneLast4, String keywordLikePattern,
+            Instant receivedFromInclusive, Instant receivedToExclusive,
+            Instant cursorReceivedAt, UUID cursorId, int fetchSize) {
         return mapper.findPage(tenantId, tenantWide, projectIds.stream().map(UUID::toString).toList(),
-                clientCode, projectId, status, externalOrderCode, cursorReceivedAt, cursorId, fetchSize)
+                clientCode, projectId, status, externalOrderCode, provinceCode, cityCode, districtCode,
+                applyStageFilter, stageWorkOrderIds.stream().map(UUID::toString).toList(),
+                applyTaskStatusFilter, taskStatusWorkOrderIds.stream().map(UUID::toString).toList(),
+                applyNetworkFilter, networkWorkOrderIds.stream().map(UUID::toString).toList(),
+                applyTechnicianFilter, technicianWorkOrderIds.stream().map(UUID::toString).toList(),
+                applySlaRiskFilter, slaRiskWorkOrderIds.stream().map(UUID::toString).toList(),
+                applyReviewCorrectionFilter, reviewCorrectionWorkOrderIds.stream().map(UUID::toString).toList(),
+                keywordPhoneLast4, keywordLikePattern,
+                receivedFromInclusive, receivedToExclusive,
+                cursorReceivedAt, cursorId, fetchSize)
                 .stream().map(MyBatisWorkOrderQueryRepository::view).toList();
     }
+
+    @Override
+    public int countMatching(String tenantId, boolean tenantWide, List<UUID> projectIds,
+            String clientCode, UUID projectId, String status, String externalOrderCode,
+            String provinceCode, String cityCode, String districtCode,
+            boolean applyStageFilter, List<UUID> stageWorkOrderIds,
+            boolean applyTaskStatusFilter, List<UUID> taskStatusWorkOrderIds,
+            boolean applyNetworkFilter, List<UUID> networkWorkOrderIds,
+            boolean applyTechnicianFilter, List<UUID> technicianWorkOrderIds,
+            boolean applySlaRiskFilter, List<UUID> slaRiskWorkOrderIds,
+            boolean applyReviewCorrectionFilter, List<UUID> reviewCorrectionWorkOrderIds,
+            String keywordPhoneLast4, String keywordLikePattern,
+            Instant receivedFromInclusive, Instant receivedToExclusive) {
+        return mapper.countMatching(tenantId, tenantWide, projectIds.stream().map(UUID::toString).toList(),
+                clientCode, projectId, status, externalOrderCode, provinceCode, cityCode, districtCode,
+                applyStageFilter, stageWorkOrderIds.stream().map(UUID::toString).toList(),
+                applyTaskStatusFilter, taskStatusWorkOrderIds.stream().map(UUID::toString).toList(),
+                applyNetworkFilter, networkWorkOrderIds.stream().map(UUID::toString).toList(),
+                applyTechnicianFilter, technicianWorkOrderIds.stream().map(UUID::toString).toList(),
+                applySlaRiskFilter, slaRiskWorkOrderIds.stream().map(UUID::toString).toList(),
+                applyReviewCorrectionFilter, reviewCorrectionWorkOrderIds.stream().map(UUID::toString).toList(),
+                keywordPhoneLast4, keywordLikePattern,
+                receivedFromInclusive, receivedToExclusive);
+    }
+
     @Override public Optional<WorkOrderView> findById(String tenantId, UUID workOrderId) {
         return Optional.ofNullable(mapper.findById(tenantId, workOrderId)).map(MyBatisWorkOrderQueryRepository::view);
     }
@@ -46,7 +89,8 @@ final class MyBatisWorkOrderQueryRepository implements WorkOrderQueryRepository 
                 string(r,"configurationBundleCode"), string(r,"configurationBundleVersion"),
                 string(r,"configurationBundleDigest"), string(r,"provinceCode"), string(r,"cityCode"),
                 string(r,"districtCode"), instant(r,"externalDispatchedAt"), instant(r,"receivedAt"),
-                instant(r,"activatedAt"), instant(r,"fulfilledAt"), ((Number)r.get("version")).longValue());
+                instant(r,"updatedAt"), instant(r,"activatedAt"), instant(r,"fulfilledAt"),
+                ((Number)r.get("version")).longValue());
     }
     private static String string(Map<String,Object> r,String k) { Object v=r.get(k); return v==null?null:v.toString(); }
     private static UUID uuid(Map<String,Object> r,String k) { Object v=r.get(k); return v instanceof UUID u?u:UUID.fromString(v.toString()); }

@@ -9,4 +9,11 @@ package com.serviceos.identity.api;
 public interface IdentityAuthorizationPort {
     IdentityAuthorizationEvidence requireTenantCapability(
             CurrentPrincipal principal, String capability, String resourceId, String correlationId);
+
+    /**
+     * soft-gate 判定：不写拒绝审计、不抛 ACCESS_DENIED。
+     * 用于跨聚合时间线贡献源等“缺权则省略”场景。
+     */
+    boolean allowsTenantCapability(
+            CurrentPrincipal principal, String capability, String resourceId, String correlationId);
 }

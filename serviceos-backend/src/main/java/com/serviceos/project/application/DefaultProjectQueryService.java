@@ -4,12 +4,21 @@ import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.authorization.api.AuthorizedProjectScope;
 import com.serviceos.authorization.api.ProjectScopeAuthorizationService;
+import com.serviceos.configuration.api.ProjectFulfillmentProfileService;
+import com.serviceos.configuration.api.ProjectFulfillmentSchemeCount;
 import com.serviceos.identity.api.CurrentPrincipal;
+import com.serviceos.project.api.ProjectClientBrandPage;
+import com.serviceos.project.api.ProjectClientDirectoryPage;
+import com.serviceos.project.api.ProjectClientOption;
 import com.serviceos.project.api.ProjectDetail;
 import com.serviceos.project.api.ProjectPage;
 import com.serviceos.project.api.ProjectQuery;
 import com.serviceos.project.api.ProjectQueryService;
+import com.serviceos.project.api.ProjectReferenceOptions;
+import com.serviceos.project.api.ProjectRegionOption;
 import com.serviceos.project.api.ProjectScopeRelationRevisionPage;
+import com.serviceos.project.api.ProjectView;
+import com.serviceos.project.api.RegionCatalogPage;
 import com.serviceos.project.domain.Project;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
@@ -23,9 +32,12 @@ import java.time.LocalDate;
 import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * 项目授权目录查询。集合只解析一次实时授权范围并执行一条范围化 SQL；详情先按 tenant 隔离读取，
@@ -40,6 +52,9 @@ final class DefaultProjectQueryService implements ProjectQueryService {
     private final ProjectQueryRepository queries;
     private final AuthorizationService authorization;
     private final ProjectScopeAuthorizationService projectScopes;
+    private final ProjectFulfillmentProfileService fulfillmentProfiles;
+    private final ProjectReferenceOptionsRepository referenceOptions;
+    private final ProjectCatalogRepository catalogs;
     private final Clock clock;
 
     DefaultProjectQueryService(
@@ -47,12 +62,18 @@ final class DefaultProjectQueryService implements ProjectQueryService {
             ProjectQueryRepository queries,
             AuthorizationService authorization,
             ProjectScopeAuthorizationService projectScopes,
+            ProjectFulfillmentProfileService fulfillmentProfiles,
+            ProjectReferenceOptionsRepository referenceOptions,
+            ProjectCatalogRepository catalogs,
             Clock clock
     ) {
         this.projects = projects;
         this.queries = queries;
         this.authorization = authorization;
         this.projectScopes = projectScopes;
+        this.fulfillmentProfiles = fulfillmentProfiles;
+        this.referenceOptions = referenceOptions;
+        this.catalogs = catalogs;
         this.clock = clock;
     }
 
@@ -74,7 +95,26 @@ final class DefaultProjectQueryService implements ProjectQueryService {
         boolean more = fetched.size() > query.limit();
         List<Project> selected = more ? fetched.subList(0, query.limit()) : fetched;
         Project last = more ? selected.getLast() : null;
-        return new ProjectPage(selected.stream().map(Project::toView).toList(),
+        List<ProjectFulfillmentSchemeCount> schemeCounts = fulfillmentProfiles.summarizeSchemeCounts(
+                principal,
+                correlationId,
+                selected.stream().map(Project::id).toList());
+        // DENY → 空列表 → 字段 null；ALLOW → 每个项目都有计数（可为 0）。
+        Map<UUID, ProjectFulfillmentSchemeCount> byProject = schemeCounts.stream()
+                .collect(Collectors.toMap(ProjectFulfillmentSchemeCount::projectId, Function.identity()));
+        boolean enrich = !schemeCounts.isEmpty() || selected.isEmpty();
+        List<ProjectView> views = selected.stream()
+                .map(project -> {
+                    if (!enrich) {
+                        return project.toView();
+                    }
+                    ProjectFulfillmentSchemeCount count = byProject.get(project.id());
+                    int published = count == null ? 0 : count.publishedSchemeCount();
+                    int draft = count == null ? 0 : count.draftSchemeCount();
+                    return project.toView(published, draft);
+                })
+                .toList();
+        return new ProjectPage(views,
                 last == null ? null : encodeListCursor(
                         scope.scopeDigest(), filterDigest, last.code(), last.id()), clock.instant());
     }
@@ -84,6 +124,90 @@ final class DefaultProjectQueryService implements ProjectQueryService {
     public ProjectDetail get(CurrentPrincipal principal, String correlationId, UUID projectId) {
         Project project = requireProject(principal, correlationId, projectId);
         return new ProjectDetail(project.toView(), clock.instant());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ProjectReferenceOptions referenceOptions(CurrentPrincipal principal, String correlationId) {
+        AuthorizedProjectScope scope = projectScopes.require(principal, READ, "Project", correlationId);
+        List<ProjectClientOption> clients = referenceOptions.listClients(
+                principal.tenantId(), scope.tenantWide(), scope.projectIds());
+        List<ProjectRegionOption> regions = referenceOptions.listRegions(
+                principal.tenantId(), scope.tenantWide(), scope.projectIds());
+        Map<String, String> clientNames = catalogs.findClientDisplayNames(
+                principal.tenantId(),
+                clients.stream().map(ProjectClientOption::clientId).toList());
+        Map<String, String> regionNames = catalogs.findRegionNames(
+                regions.stream().map(ProjectRegionOption::regionCode).toList());
+        return new ProjectReferenceOptions(
+                clients.stream()
+                        .map(item -> new ProjectClientOption(
+                                item.clientId(),
+                                clientNames.getOrDefault(item.clientId(), item.displayName()),
+                                item.projectCount()))
+                        .toList(),
+                regions.stream()
+                        .map(item -> new ProjectRegionOption(
+                                item.regionCode(),
+                                regionNames.getOrDefault(item.regionCode(), item.regionName()),
+                                item.projectCount()))
+                        .toList(),
+                clock.instant());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ProjectClientDirectoryPage listClientDirectory(
+            CurrentPrincipal principal, String correlationId, String status
+    ) {
+        projectScopes.require(principal, READ, "Project", correlationId);
+        String filter = status == null || status.isBlank() ? "ACTIVE" : status.trim();
+        return new ProjectClientDirectoryPage(
+                catalogs.listClients(principal.tenantId(), filter), clock.instant());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ProjectClientBrandPage listClientBrands(
+            CurrentPrincipal principal, String correlationId, String clientCode, String status
+    ) {
+        projectScopes.require(principal, READ, "Project", correlationId);
+        String code = requireCatalogCode(clientCode, "clientCode");
+        catalogs.findClient(principal.tenantId(), code)
+                .orElseThrow(() -> new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "车企不存在"));
+        String filter = status == null || status.isBlank() ? "ALL" : status.trim();
+        return new ProjectClientBrandPage(
+                catalogs.listBrands(principal.tenantId(), code, filter), clock.instant());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public RegionCatalogPage listRegionCatalog(
+            CurrentPrincipal principal,
+            String correlationId,
+            String parentCode,
+            String query,
+            String level,
+            Integer limit
+    ) {
+        projectScopes.require(principal, READ, "Project", correlationId);
+        int effective = limit == null ? 100 : limit;
+        if (effective < 1 || effective > 200) {
+            throw new IllegalArgumentException("limit must be between 1 and 200");
+        }
+        if (level != null && !level.isBlank()
+                && !"PROVINCE".equals(level) && !"CITY".equals(level) && !"DISTRICT".equals(level)) {
+            throw new IllegalArgumentException("level is invalid");
+        }
+        return new RegionCatalogPage(
+                catalogs.listRegions(parentCode, query, level, effective), clock.instant());
+    }
+
+    private static String requireCatalogCode(String value, String field) {
+        if (value == null || value.isBlank() || !value.equals(value.trim()) || value.length() > 128) {
+            throw new IllegalArgumentException(field + " is invalid");
+        }
+        return value;
     }
 
     @Override

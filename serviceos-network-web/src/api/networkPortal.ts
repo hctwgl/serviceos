@@ -12,6 +12,14 @@ export type NetworkPortalTechnicianItem = {
   validTo: string | null
   /** M206：ACTIVE 关系乐观版本（附加字段，terminate 亦可从 memberships 列表取） */
   membershipVersion?: number
+  /** M421：本网点 ACTIVE 责任开放任务数（对齐 assign-candidates） */
+  openTaskCount: number
+  /** M421：已通过资质数 */
+  approvedQualificationCount: number
+  /** M421：待审资质数 */
+  pendingQualificationCount: number
+  /** M421：中文资质摘要 */
+  qualificationSummary: string
 }
 
 /** M227/M231：预约摘要（对齐 Admin WorkOrderWorkspaceAppointmentSummary）。 */
@@ -88,6 +96,10 @@ export type NetworkPortalWorkOrderItem = {
   districtCode?: string | null
   /** M236：工单接收时间（产品「更新时间」MVP 映射）。 */
   receivedAt?: string | null
+  /** M428：服务端脱敏客户联系；随基座返回。 */
+  maskedCustomerName: string | null
+  maskedCustomerPhone: string | null
+  maskedServiceAddress: string | null
 }
 
 export type NetworkPortalTaskItem = {
@@ -108,6 +120,10 @@ export type NetworkPortalTaskItem = {
   cityCode?: string | null
   districtCode?: string | null
   receivedAt?: string | null
+  /** M428：所属工单服务端脱敏客户联系。 */
+  maskedCustomerName: string | null
+  maskedCustomerPhone: string | null
+  maskedServiceAddress: string | null
 }
 
 export type NetworkPortalMembershipItem = {
@@ -133,6 +149,32 @@ export type NetworkPortalCapacityItem = {
   updatedAt: string
 }
 
+export type NetworkPortalWorkbenchAppointmentItem = {
+  appointmentId: string
+  taskId: string
+  workOrderId: string
+  type: string
+  status: string
+  windowStart: string | null
+  windowEnd: string | null
+  timezone: string | null
+  technicianId: string | null
+  technicianDisplayName: string | null
+}
+
+export type NetworkPortalWorkbenchTimelineBucket = {
+  bucketCode:
+    | 'UNASSIGNED'
+    | 'AM_APPOINTMENTS'
+    | 'PM_APPOINTMENTS'
+    | 'EVENING_APPOINTMENTS'
+    | 'OPEN_CORRECTIONS'
+    | 'SLA_AT_RISK'
+  label: string
+  count: number
+  summary: string
+}
+
 export type NetworkPortalWorkbench = {
   networkId: string
   activeWorkOrderCount: number
@@ -150,6 +192,11 @@ export type NetworkPortalWorkbench = {
   pendingQualificationCount?: number
   /** Soft-gated；缺 NETWORK `sla.read` 时省略，不得用 0 伪装无权限。 */
   slaSummary?: NetworkPortalWorkOrderWorkspaceSlaSummary
+  /** Soft-gated；缺 NETWORK `networkPortal.manageAppointment` 时省略。 */
+  todayAppointmentCount?: number
+  todayAppointments?: NetworkPortalWorkbenchAppointmentItem[]
+  /** 始终返回；至少含待分配桶。 */
+  todayTimeline: NetworkPortalWorkbenchTimelineBucket[]
 }
 
 function networkHeaders(networkContextId: string): Record<string, string> {
@@ -238,6 +285,27 @@ export type NetworkPortalWorkspaceEvidenceItemSummary = {
   revisionCount: number
   latestRevisionNumber: number | null
   latestRevisionStatus: string | null
+  /** M426/M427：最新 revision 指针，供短时授权预览。 */
+  latestRevisionId: string | null
+  latestMimeType: string | null
+}
+
+export type DownloadAuthorization = {
+  authorizationId: string
+  fileId: string
+  method: string
+  downloadUrl: string
+  requiredHeaders: Record<string, string>
+  expiresAt: string
+}
+
+/** M427：申请资料版本短时下载授权（工作区预览 purpose=WORKSPACE_EVIDENCE_PREVIEW）。 */
+export async function authorizeEvidenceRevisionDownload(revisionId: string, purpose: string) {
+  const result = await apiPost<DownloadAuthorization>(
+    `/evidence-revisions/${revisionId}/download-authorizations`,
+    { body: { purpose } },
+  )
+  return result.data
 }
 
 /** M225：字段对齐 Admin WorkOrderWorkspaceCorrectionResubmissionSummary。 */
@@ -328,6 +396,12 @@ export type NetworkPortalWorkOrderWorkspace = {
   contactAttempts?: NetworkPortalWorkspaceContactAttemptSummary[]
   /** Soft-gated；缺 NETWORK `technician.readOwnNetwork` 时省略，不得用空数组伪装无权限。 */
   technicians?: NetworkPortalTechnicianItem[]
+  /** M424：服务端脱敏客户姓名；随基座返回，不 soft-omit。 */
+  maskedCustomerName: string | null
+  /** M424：服务端脱敏手机号。 */
+  maskedCustomerPhone: string | null
+  /** M424：服务端脱敏服务地址。 */
+  maskedServiceAddress: string | null
   asOf: string
 }
 
@@ -353,6 +427,65 @@ export function listNetworkPortalTasks(networkContextId: string) {
 export function listNetworkPortalTechnicians(networkContextId: string) {
   return apiGet<NetworkPortalPage<NetworkPortalTechnicianItem>>(
     '/network-portal/technicians',
+    {},
+    networkHeaders(networkContextId),
+  )
+}
+
+export type NetworkPortalAssignDistanceTier =
+  | 'SAME_DISTRICT'
+  | 'SAME_CITY'
+  | 'SAME_PROVINCE'
+  | 'OUTSIDE_COVERAGE'
+  | 'UNKNOWN'
+
+export type NetworkPortalAssignRecommendationTier =
+  | 'RECOMMENDED'
+  | 'ACCEPTABLE'
+  | 'CAUTION'
+  | 'NOT_ASSIGNABLE'
+
+export type NetworkPortalAssignCandidateItem = {
+  technicianProfileId: string
+  displayName: string
+  membershipStatus: string
+  profileStatus: string
+  openTaskCount: number
+  approvedQualificationCount: number
+  pendingQualificationCount: number
+  qualificationSummary: string
+  upcomingAppointmentCount: number
+  scheduleConflictSummary: string
+  scheduleOverlap: boolean
+  distanceTier: NetworkPortalAssignDistanceTier
+  distanceSummary: string
+  coverageMatched: boolean
+  capacityAvailableUnits: number | null
+  capacityMaxUnits: number | null
+  warnings: string[]
+  assignable: boolean
+  recommendationTier: NetworkPortalAssignRecommendationTier
+  recommendationSummary: string
+  recommendationReasons: string[]
+}
+
+export type NetworkPortalAssignCandidatePage = {
+  networkId: string
+  taskId: string
+  businessType: string | null
+  workOrderRegionSummary: string | null
+  items: NetworkPortalAssignCandidateItem[]
+  asOf: string
+  rankingExplanation: string
+  emptyReason?: string | null
+}
+
+export function listNetworkPortalAssignCandidates(
+  networkContextId: string,
+  taskId: string,
+) {
+  return apiGet<NetworkPortalAssignCandidatePage>(
+    `/network-portal/tasks/${taskId}/assign-candidates`,
     {},
     networkHeaders(networkContextId),
   )
@@ -434,6 +567,38 @@ export function getNetworkPortalWorkbench(networkContextId: string) {
   return apiGet<NetworkPortalWorkbench>(
     '/network-portal/workbench',
     {},
+    networkHeaders(networkContextId),
+  )
+}
+
+export type NetworkPortalAppointmentCalendarDay = {
+  date: string
+  appointmentCount: number
+  items: NetworkPortalWorkbenchAppointmentItem[]
+}
+
+export type NetworkPortalAppointmentCalendar = {
+  networkId: string
+  timezone: string
+  rangeStart: string
+  rangeEnd: string
+  totalAppointmentCount: number
+  truncated: boolean
+  days: NetworkPortalAppointmentCalendarDay[]
+  asOf: string
+}
+
+/** M413：本网点预约日历；硬门禁 manageAppointment。 */
+export function getNetworkPortalAppointmentCalendar(
+  networkContextId: string,
+  range?: { from?: string; to?: string },
+) {
+  const query: Record<string, string> = {}
+  if (range?.from) query.from = range.from
+  if (range?.to) query.to = range.to
+  return apiGet<NetworkPortalAppointmentCalendar>(
+    '/network-portal/appointment-calendar',
+    query,
     networkHeaders(networkContextId),
   )
 }

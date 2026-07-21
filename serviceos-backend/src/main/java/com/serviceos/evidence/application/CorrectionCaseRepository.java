@@ -62,6 +62,15 @@ public interface CorrectionCaseRepository {
             UUID cursorId,
             int fetchSize);
 
+    /** M452：与 findQueuePage 同筛选口径的精确 COUNT（无 cursor）。 */
+    int countQueue(
+            String tenantId,
+            boolean tenantWide,
+            List<UUID> projectIds,
+            String status,
+            UUID taskId,
+            UUID sourceReviewCaseId);
+
     Optional<UUID> findBySourceDecision(String tenantId, UUID reviewDecisionId);
 
     Optional<UUID> findCommandResult(String tenantId, String operationType, String idempotencyKey);

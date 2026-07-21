@@ -33,7 +33,7 @@ test.describe('M187 Admin 统一用户中心', () => {
 
     await expect(page.getByTestId('nav-users')).toBeVisible({ timeout: 15_000 })
     await page.getByTestId('nav-users').click()
-    await expect(page.getByRole('heading', { name: '用户目录' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /用户管理|用户目录/ })).toBeVisible()
 
     const searchResponse = page.waitForResponse(
       (response) =>

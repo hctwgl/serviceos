@@ -2,9 +2,11 @@ package com.serviceos.configuration.application;
 
 import com.serviceos.audit.api.AuditAppender;
 import com.serviceos.audit.api.AuditEntry;
+import com.serviceos.authorization.api.AuthorizationDecision;
 import com.serviceos.authorization.api.AuthorizationRequest;
 import com.serviceos.authorization.api.AuthorizationService;
 import com.serviceos.configuration.api.CreateProjectFulfillmentProfileCommand;
+import com.serviceos.configuration.api.ProjectFulfillmentCompareImpact;
 import com.serviceos.configuration.api.ProjectFulfillmentDraftView;
 import com.serviceos.configuration.api.ProjectFulfillmentManifestView;
 import com.serviceos.configuration.api.ProjectFulfillmentProfileDetail;
@@ -13,6 +15,8 @@ import com.serviceos.configuration.api.ProjectFulfillmentProfileStatus;
 import com.serviceos.configuration.api.ProjectFulfillmentProfileSummary;
 import com.serviceos.configuration.api.ProjectFulfillmentRevisionStatus;
 import com.serviceos.configuration.api.ProjectFulfillmentRevisionView;
+import com.serviceos.configuration.api.ProjectFulfillmentSchemeCount;
+import com.serviceos.configuration.api.ProjectFulfillmentUsageSummary;
 import com.serviceos.configuration.api.ProjectFulfillmentValidationIssue;
 import com.serviceos.configuration.api.UpdateProjectFulfillmentDraftCommand;
 import com.serviceos.identity.api.CurrentPrincipal;
@@ -20,6 +24,8 @@ import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.CommandMetadata;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.shared.infrastructure.PostgresJdbcParameters;
+import com.serviceos.workorder.api.WorkOrderQuery;
+import com.serviceos.workorder.api.WorkOrderQueryService;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
@@ -31,11 +37,13 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * 项目履约配置应用服务。
@@ -55,12 +63,18 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
     private static final String REVISION_READ = "project.fulfillment.revision.read";
     private static final String RESOURCE = "ProjectFulfillmentProfile";
     private static final String TEMPLATE_SURVEY_INSTALL = "HOME_CHARGING_SURVEY_INSTALL";
+    /** 与关注项目角标（M409）一致：超过上限只声明 truncated，不返回精确 COUNT(*)。 */
+    private static final int ACTIVE_WORK_ORDER_LIMIT = 100;
 
     private final JdbcClient jdbc;
     private final AuthorizationService authorization;
     private final AuditAppender audit;
     private final ProjectFulfillmentDraftValidator validator;
     private final ProjectFulfillmentManifestCompiler compiler;
+    private final ProjectFulfillmentRunbookAssembler runbookAssembler;
+    private final ProjectFulfillmentCompareAnalyzer compareAnalyzer;
+    private final ProjectFulfillmentDocumentMapper documentMapper;
+    private final WorkOrderQueryService workOrders;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
@@ -70,6 +84,10 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
             AuditAppender audit,
             ProjectFulfillmentDraftValidator validator,
             ProjectFulfillmentManifestCompiler compiler,
+            ProjectFulfillmentRunbookAssembler runbookAssembler,
+            ProjectFulfillmentCompareAnalyzer compareAnalyzer,
+            ProjectFulfillmentDocumentMapper documentMapper,
+            WorkOrderQueryService workOrders,
             ObjectMapper objectMapper,
             Clock clock
     ) {
@@ -78,6 +96,10 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
         this.audit = audit;
         this.validator = validator;
         this.compiler = compiler;
+        this.runbookAssembler = runbookAssembler;
+        this.compareAnalyzer = compareAnalyzer;
+        this.documentMapper = documentMapper;
+        this.workOrders = workOrders;
         this.objectMapper = objectMapper;
         this.clock = clock;
     }
@@ -164,6 +186,37 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
     }
 
     @Override
+    public ProjectFulfillmentUsageSummary usageSummary(
+            CurrentPrincipal principal, String correlationId, UUID projectId
+    ) {
+        // 不包外层事务：workOrder 授权拒绝以 BusinessProblem 抛出，需可 catch soft-omit，
+        // 避免嵌套只读事务被标记 rollback-only（同 M409 关注项目角标编排）。
+        Objects.requireNonNull(projectId, "projectId");
+        requireProject(principal.tenantId(), projectId);
+        authorization.require(principal, AuthorizationRequest.projectCapability(
+                READ, principal.tenantId(), RESOURCE, projectId.toString(), projectId.toString()),
+                correlationId);
+        Instant asOf = clock.instant();
+        try {
+            var page = workOrders.list(
+                    principal,
+                    correlationId,
+                    new WorkOrderQuery(null, projectId, "ACTIVE", null, ACTIVE_WORK_ORDER_LIMIT));
+            return new ProjectFulfillmentUsageSummary(
+                    projectId,
+                    page.items().size(),
+                    page.nextCursor() != null,
+                    asOf);
+        } catch (BusinessProblem problem) {
+            // soft-gate：缺 workOrder.read 时省略计数，页面显示「不可用」而非伪造 0
+            if (problem.code() == ProblemCode.ACCESS_DENIED) {
+                return new ProjectFulfillmentUsageSummary(projectId, null, null, asOf);
+            }
+            throw problem;
+        }
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public List<ProjectFulfillmentProfileSummary> list(
             CurrentPrincipal principal, String correlationId, UUID projectId
@@ -208,6 +261,57 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
                             toInstant(rs.getObject("updated_at", OffsetDateTime.class)));
                 })
                 .list();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProjectFulfillmentSchemeCount> summarizeSchemeCounts(
+            CurrentPrincipal principal, String correlationId, Collection<UUID> projectIds
+    ) {
+        Objects.requireNonNull(principal, "principal");
+        if (projectIds == null || projectIds.isEmpty()) {
+            return List.of();
+        }
+        List<UUID> ids = projectIds.stream().filter(Objects::nonNull).distinct().toList();
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        // soft-gate：任选一个项目探测 fulfillment.read；缺能力返回空，目录列显示「—」。
+        UUID probeProjectId = ids.getFirst();
+        AuthorizationDecision decision = authorization.authorize(
+                principal,
+                AuthorizationRequest.projectCapability(
+                        READ,
+                        principal.tenantId(),
+                        RESOURCE,
+                        probeProjectId.toString(),
+                        probeProjectId.toString()),
+                correlationId);
+        if (decision.effect() != AuthorizationDecision.Effect.ALLOW) {
+            return List.of();
+        }
+        Map<UUID, ProjectFulfillmentSchemeCount> found = jdbc.sql("""
+                SELECT project_id,
+                       COUNT(*) FILTER (WHERE active_revision_id IS NOT NULL)::int AS published_count,
+                       COUNT(*) FILTER (WHERE draft_revision_id IS NOT NULL)::int AS draft_count
+                  FROM cfg_project_fulfillment_profile
+                 WHERE tenant_id = :tenantId
+                   AND project_id IN (:projectIds)
+                 GROUP BY project_id
+                """)
+                .param("tenantId", principal.tenantId())
+                .param("projectIds", ids)
+                .query((rs, rowNum) -> new ProjectFulfillmentSchemeCount(
+                        rs.getObject("project_id", UUID.class),
+                        rs.getInt("published_count"),
+                        rs.getInt("draft_count")))
+                .list()
+                .stream()
+                .collect(Collectors.toMap(ProjectFulfillmentSchemeCount::projectId, row -> row, (a, b) -> a, LinkedHashMap::new));
+        // ALLOW 时对请求中的每个项目补齐 0，便于目录与 DENY（空列表）区分。
+        return ids.stream()
+                .map(id -> found.getOrDefault(id, new ProjectFulfillmentSchemeCount(id, 0, 0)))
+                .toList();
     }
 
     @Override
@@ -267,18 +371,22 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
                 """)
                 .param("tenantId", principal.tenantId())
                 .param("revisionId", profile.draftRevisionId())
-                .query((rs, n) -> new ProjectFulfillmentDraftView(
-                        profile.profileId(),
-                        rs.getObject("revision_id", UUID.class),
-                        profile.serviceProductCode(),
-                        profile.profileName(),
-                        profile.description(),
-                        rs.getString("document_json"),
-                        rs.getObject("workflow_asset_version_id", UUID.class),
-                        rs.getObject("source_bundle_id", UUID.class),
-                        rs.getString("validation_json"),
-                        profile.aggregateVersion(),
-                        profile.updatedAt()))
+                .query((rs, n) -> {
+                    String documentJson = rs.getString("document_json");
+                    return new ProjectFulfillmentDraftView(
+                            profile.profileId(),
+                            rs.getObject("revision_id", UUID.class),
+                            profile.serviceProductCode(),
+                            profile.profileName(),
+                            profile.description(),
+                            documentMapper.fromJson(documentJson),
+                            documentJson,
+                            rs.getObject("workflow_asset_version_id", UUID.class),
+                            rs.getObject("source_bundle_id", UUID.class),
+                            rs.getString("validation_json"),
+                            profile.aggregateVersion(),
+                            profile.updatedAt());
+                })
                 .optional()
                 .orElseThrow(() -> new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "履约配置草稿不存在"));
     }
@@ -303,7 +411,7 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
         if (profile.draftRevisionId() == null) {
             throw new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "履约配置草稿不存在");
         }
-        parseDocument(command.documentJson());
+        String documentJson = documentMapper.toJson(command.document());
         Instant now = clock.instant();
         String name = command.profileName() == null || command.profileName().isBlank()
                 ? profile.profileName() : command.profileName().trim();
@@ -318,7 +426,7 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
                    AND revision_id = :revisionId
                    AND revision_status = 'DRAFT'
                 """)
-                .param("document", command.documentJson())
+                .param("document", documentJson)
                 .param("workflowVersionId", command.workflowAssetVersionId())
                 .param("bundleId", command.sourceBundleId())
                 .param("tenantId", principal.tenantId())
@@ -426,7 +534,55 @@ final class DefaultProjectFulfillmentProfileService implements ProjectFulfillmen
                 draft.workflowAssetVersionId(),
                 clock.instant(),
                 document);
-        return new ProjectFulfillmentManifestView(compiled.json(), compiled.contentDigest());
+        return new ProjectFulfillmentManifestView(
+                compiled.json(),
+                compiled.contentDigest(),
+                runbookAssembler.fromManifestJson(compiled.json()));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ProjectFulfillmentCompareImpact compareImpact(
+            CurrentPrincipal principal, String correlationId, UUID projectId, UUID profileId
+    ) {
+        ProfileRow profile = loadProfile(principal.tenantId(), projectId, profileId);
+        authorization.require(principal, AuthorizationRequest.projectCapability(
+                READ, principal.tenantId(), RESOURCE, profileId.toString(), projectId.toString()),
+                correlationId);
+        DraftRow draft = loadDraft(principal.tenantId(), profile.draftRevisionId());
+        UUID baselineRevisionId = profile.activeRevisionId();
+        String baselineVersionLabel = null;
+        String baselineDocumentJson = null;
+        if (baselineRevisionId != null) {
+            var baseline = jdbc.sql("""
+                    SELECT version_no, document_json::text AS document_json
+                      FROM cfg_project_fulfillment_revision
+                     WHERE tenant_id = :tenantId AND revision_id = :id
+                       AND revision_status = 'PUBLISHED'
+                    """)
+                    .param("tenantId", principal.tenantId())
+                    .param("id", baselineRevisionId)
+                    .query((rs, n) -> new Object[] {
+                            rs.getInt("version_no"),
+                            rs.getString("document_json")
+                    })
+                    .optional()
+                    .orElse(null);
+            if (baseline != null) {
+                baselineVersionLabel = "v" + baseline[0];
+                baselineDocumentJson = (String) baseline[1];
+            } else {
+                baselineRevisionId = null;
+            }
+        }
+        return compareAnalyzer.analyze(
+                profile.profileId(),
+                draft.revisionId(),
+                draft.documentJson(),
+                baselineRevisionId,
+                baselineVersionLabel,
+                baselineDocumentJson,
+                clock.instant());
     }
 
     @Override

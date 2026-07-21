@@ -7,7 +7,10 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * 工单工作区顶层快照。不含客户 PII；大区块按需加载不在本响应内。
+ * 工单工作区顶层快照。
+ *
+ * <p>M423：含服务端脱敏客户联系字段（masked*）；不得返回完整手机号/地址原文。
+ * 大区块按需加载不在本响应内。</p>
  */
 public record WorkOrderWorkspace(
         WorkOrderView header,
@@ -19,7 +22,10 @@ public record WorkOrderWorkspace(
         WorkOrderWorkspaceExceptionSummary exceptionSummary,
         String timelineFreshnessStatus,
         WorkOrderWorkspaceSourceVersions sourceVersions,
-        WorkOrderWorkspaceMeta meta
+        WorkOrderWorkspaceMeta meta,
+        String maskedCustomerName,
+        String maskedCustomerPhone,
+        String maskedServiceAddress
 ) {
     public WorkOrderWorkspace {
         sectionAvailability = Map.copyOf(sectionAvailability);

@@ -8,9 +8,9 @@
     configuration_bundle_version AS "configurationBundleVersion", configuration_bundle_digest AS "configurationBundleDigest",
     province_code AS "provinceCode", city_code AS "cityCode", district_code AS "districtCode",
     external_dispatched_at AS "externalDispatchedAt", received_at AS "receivedAt",
-    activated_at AS "activatedAt", fulfilled_at AS "fulfilledAt", version AS "version"</sql>
-  <select id="findPage" resultType="map">
-    SELECT <include refid="columns"/> FROM wo_work_order
+    updated_at AS "updatedAt", activated_at AS "activatedAt", fulfilled_at AS "fulfilledAt",
+    version AS "version"</sql>
+  <sql id="authorizedFilters">
      WHERE tenant_id=#{tenantId}
     <if test="!tenantWide"><choose><when test="projectIds != null and !projectIds.isEmpty()">
       AND project_id IN <foreach collection="projectIds" item="id" open="(" separator="," close=")">CAST(#{id} AS uuid)</foreach>
@@ -19,8 +19,106 @@
     <if test="projectId != null">AND project_id=#{projectId}</if>
     <if test="status != null">AND status=#{status}</if>
     <if test="externalOrderCode != null">AND external_order_code=#{externalOrderCode}</if>
+    <if test="provinceCode != null">AND province_code=#{provinceCode}</if>
+    <if test="cityCode != null">AND city_code=#{cityCode}</if>
+    <if test="districtCode != null">AND district_code=#{districtCode}</if>
+    <!-- M438：阶段筛选由 task SPI 解析为工单 ID 后在此收敛；空集失败关闭为无结果。 -->
+    <if test="applyStageFilter">
+      <choose>
+        <when test="stageWorkOrderIds != null and !stageWorkOrderIds.isEmpty()">
+          AND id IN
+          <foreach collection="stageWorkOrderIds" item="id" open="(" separator="," close=")">
+            CAST(#{id} AS uuid)
+          </foreach>
+        </when>
+        <otherwise>AND FALSE</otherwise>
+      </choose>
+    </if>
+    <!-- M446：任务状态筛选由 task SPI 解析为工单 ID 后在此收敛；空集失败关闭为无结果。 -->
+    <if test="applyTaskStatusFilter">
+      <choose>
+        <when test="taskStatusWorkOrderIds != null and !taskStatusWorkOrderIds.isEmpty()">
+          AND id IN
+          <foreach collection="taskStatusWorkOrderIds" item="id" open="(" separator="," close=")">
+            CAST(#{id} AS uuid)
+          </foreach>
+        </when>
+        <otherwise>AND FALSE</otherwise>
+      </choose>
+    </if>
+    <!-- M440：网点筛选由 dispatch SPI 解析为工单 ID 后在此收敛；空集失败关闭为无结果。 -->
+    <if test="applyNetworkFilter">
+      <choose>
+        <when test="networkWorkOrderIds != null and !networkWorkOrderIds.isEmpty()">
+          AND id IN
+          <foreach collection="networkWorkOrderIds" item="id" open="(" separator="," close=")">
+            CAST(#{id} AS uuid)
+          </foreach>
+        </when>
+        <otherwise>AND FALSE</otherwise>
+      </choose>
+    </if>
+    <!-- M441：师傅筛选由 dispatch SPI 解析为工单 ID 后在此收敛；空集失败关闭为无结果。 -->
+    <if test="applyTechnicianFilter">
+      <choose>
+        <when test="technicianWorkOrderIds != null and !technicianWorkOrderIds.isEmpty()">
+          AND id IN
+          <foreach collection="technicianWorkOrderIds" item="id" open="(" separator="," close=")">
+            CAST(#{id} AS uuid)
+          </foreach>
+        </when>
+        <otherwise>AND FALSE</otherwise>
+      </choose>
+    </if>
+    <!-- M442：SLA 风险筛选由 sla SPI 解析为工单 ID 后在此收敛；空集失败关闭为无结果。 -->
+    <if test="applySlaRiskFilter">
+      <choose>
+        <when test="slaRiskWorkOrderIds != null and !slaRiskWorkOrderIds.isEmpty()">
+          AND id IN
+          <foreach collection="slaRiskWorkOrderIds" item="id" open="(" separator="," close=")">
+            CAST(#{id} AS uuid)
+          </foreach>
+        </when>
+        <otherwise>AND FALSE</otherwise>
+      </choose>
+    </if>
+    <!-- M447：审核/整改筛选由 evidence SPI 解析为工单 ID 后在此收敛；空集失败关闭为无结果。 -->
+    <if test="applyReviewCorrectionFilter">
+      <choose>
+        <when test="reviewCorrectionWorkOrderIds != null and !reviewCorrectionWorkOrderIds.isEmpty()">
+          AND id IN
+          <foreach collection="reviewCorrectionWorkOrderIds" item="id" open="(" separator="," close=")">
+            CAST(#{id} AS uuid)
+          </foreach>
+        </when>
+        <otherwise>AND FALSE</otherwise>
+      </choose>
+    </if>
+    <!-- M443：创建日（receivedAt）Asia/Shanghai 自然日闭区间；上界用半开区间 &lt; exclusive。 -->
+    <if test="receivedFromInclusive != null">AND received_at &gt;= #{receivedFromInclusive}</if>
+    <if test="receivedToExclusive != null">AND received_at &lt; #{receivedToExclusive}</if>
+    <!-- M448：关键词；后四位精确或编号/姓名/地址 ILIKE（ESCAPE \）。 -->
+    <if test="keywordPhoneLast4 != null">
+      AND right(regexp_replace(coalesce(customer_mobile, ''), '[^0-9]', '', 'g'), 4) = #{keywordPhoneLast4}
+    </if>
+    <if test="keywordLikePattern != null">
+      AND (
+        external_order_code ILIKE #{keywordLikePattern} ESCAPE '\'
+        OR customer_name ILIKE #{keywordLikePattern} ESCAPE '\'
+        OR service_address ILIKE #{keywordLikePattern} ESCAPE '\'
+      )
+    </if>
+  </sql>
+  <select id="findPage" resultType="map">
+    SELECT <include refid="columns"/> FROM wo_work_order
+    <include refid="authorizedFilters"/>
     <if test="cursorReceivedAt != null">AND (received_at,id) &lt; (#{cursorReceivedAt},#{cursorId})</if>
     ORDER BY received_at DESC,id DESC LIMIT #{fetchSize}
+  </select>
+  <!-- M444：无 cursor 的精确全量计数（同授权筛选）。 -->
+  <select id="countMatching" resultType="int">
+    SELECT COUNT(*)::int FROM wo_work_order
+    <include refid="authorizedFilters"/>
   </select>
   <select id="findById" resultType="map">
     SELECT <include refid="columns"/> FROM wo_work_order WHERE tenant_id=#{tenantId} AND id=#{workOrderId}

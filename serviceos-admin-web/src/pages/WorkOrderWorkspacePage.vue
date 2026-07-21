@@ -4,9 +4,15 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Button, Tabs, TabPane, Alert, Select, Input, Descriptions, Space, Card } from 'ant-design-vue'
 import { ArrowLeftOutlined } from '@ant-design/icons-vue'
 import DetailPageLayout from '../patterns/templates/DetailPageLayout.vue'
+import BusinessProgress, { type BusinessProgressStep } from '../patterns/BusinessProgress.vue'
+import AllowedActionBar, { type AllowedActionItem } from '../patterns/AllowedActionBar.vue'
+import RightContextRail from '../patterns/RightContextRail.vue'
 import SemanticStatusTag from '../components/business/SemanticStatusTag.vue'
+import SensitiveText from '../components/business/SensitiveText.vue'
 import { presentWorkOrderStatus } from '../presentation/work-order-status.presenter'
 import { presentPricingStatus } from '../presentation/pricing-status.presenter'
+import { presentReviewStatus } from '../presentation/review-status.presenter'
+import { presentCorrectionStatus } from '../presentation/correction-status.presenter'
 import { labelClientCode, labelServiceProduct } from '../presentation/enum-labels'
 import { presentEntityName } from '../presentation/entity-name.presenter'
 import { formatDateTimeDisplay } from '../presentation/date-time.presenter'
@@ -37,6 +43,7 @@ import {
   type WorkflowExecutionProjection,
 } from '../api/workOrderDetail'
 import { getTaskAllowedActions, type TaskAllowedActions } from '../api/tasks'
+import { authorizeEvidenceRevisionDownload } from '../api/finalReview'
 import {
   getWorkOrderFulfillmentSnapshot,
   type WorkOrderFulfillmentSnapshot,
@@ -65,8 +72,14 @@ async function loadNetworks() {
   try {
     const page = await listServiceNetworks()
     networkOptions.value = page.items.filter((n) => n.status === 'ACTIVE')
-  } catch {
+  } catch (err) {
     networkOptions.value = []
+    diagnostics.pushDiagnostic({
+      title: '网点目录加载失败',
+      fields: {
+        message: err instanceof Error ? err.message : 'unknown',
+      },
+    })
   }
 }
 
@@ -411,12 +424,30 @@ type OutboundCrossLink = {
   label: string
 }
 
+type ReviewDecisionRow = {
+  reviewDecisionId: string
+  decisionOrdinal: number
+  decision: string
+  decisionSource: string
+  reasonCodes: string[]
+  decidedAt: string
+}
+
 type ReviewCaseLink = {
   reviewCaseId: string
   origin: string
   status: string
   evidenceSetSnapshotId: string
   reopenedFromReviewCaseId: string
+  /** M425：工作区已投影的完整决策记录（无 note/decidedBy）。 */
+  decisions: ReviewDecisionRow[]
+}
+
+type CorrectionResubmissionRow = {
+  correctionResubmissionId: string
+  resubmissionOrdinal: number
+  evidenceSetSnapshotId: string
+  submittedAt: string
 }
 
 type CorrectionCaseLink = {
@@ -424,6 +455,8 @@ type CorrectionCaseLink = {
   status: string
   sourceReviewCaseId: string
   latestResubmissionSnapshotId: string
+  /** M425：补传轮次摘要（与决策记录同屏产品化）。 */
+  resubmissions: CorrectionResubmissionRow[]
 }
 
 type ReviewCorrectionCrossLink = {
@@ -483,6 +516,9 @@ type EvidenceItemDetailLink = {
   evidenceItemId: string
   status: string
   itemOrdinal: string
+  /** M426：最新 revision 指针；无修订时为 null。 */
+  latestRevisionId: string | null
+  latestMimeType: string | null
 }
 
 /** 仅映射已有 Admin 详情路由；无对等页的 resourceType 不渲染。 */
@@ -652,6 +688,59 @@ const outboundCrossLinks = computed((): OutboundCrossLink[] => {
   return links
 })
 
+function parseReviewDecisions(raw: unknown): ReviewDecisionRow[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null
+      const row = item as Record<string, unknown>
+      const id = row.reviewDecisionId
+      if (typeof id !== 'string' || !id) return null
+      const ordinal = Number(row.decisionOrdinal)
+      if (!Number.isFinite(ordinal) || ordinal < 1) return null
+      const decidedAt = typeof row.decidedAt === 'string' ? row.decidedAt : ''
+      if (!decidedAt) return null
+      const reasonCodes = Array.isArray(row.reasonCodes)
+        ? row.reasonCodes.filter((code): code is string => typeof code === 'string' && code.length > 0)
+        : []
+      return {
+        reviewDecisionId: id,
+        decisionOrdinal: ordinal,
+        decision: String(row.decision ?? ''),
+        decisionSource: String(row.decisionSource ?? ''),
+        reasonCodes,
+        decidedAt,
+      }
+    })
+    .filter((item): item is ReviewDecisionRow => item != null)
+    .sort((a, b) => a.decisionOrdinal - b.decisionOrdinal)
+}
+
+function parseCorrectionResubmissions(raw: unknown): CorrectionResubmissionRow[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null
+      const row = item as Record<string, unknown>
+      const id = row.correctionResubmissionId
+      const snapshotId = row.evidenceSetSnapshotId
+      if (typeof id !== 'string' || !id) return null
+      if (typeof snapshotId !== 'string' || !snapshotId) return null
+      const ordinal = Number(row.resubmissionOrdinal)
+      if (!Number.isFinite(ordinal) || ordinal < 1) return null
+      const submittedAt = typeof row.submittedAt === 'string' ? row.submittedAt : ''
+      if (!submittedAt) return null
+      return {
+        correctionResubmissionId: id,
+        resubmissionOrdinal: ordinal,
+        evidenceSetSnapshotId: snapshotId,
+        submittedAt,
+      }
+    })
+    .filter((item): item is CorrectionResubmissionRow => item != null)
+    .sort((a, b) => a.resubmissionOrdinal - b.resubmissionOrdinal)
+}
+
 /** 复用已 Implemented Review/Correction 详情路由；投影缺权时数组为 null。 */
 const reviewCaseLinks = computed((): ReviewCaseLink[] => {
   const section = sectionData.value?.reviewsCorrections
@@ -674,6 +763,7 @@ const reviewCaseLinks = computed((): ReviewCaseLink[] => {
         status: String(row.status ?? '—'),
         evidenceSetSnapshotId: snapshotId,
         reopenedFromReviewCaseId: reopenedFrom,
+        decisions: parseReviewDecisions(row.decisions),
       }
     })
     .filter((item): item is ReviewCaseLink => item != null)
@@ -701,6 +791,7 @@ const correctionCaseLinks = computed((): CorrectionCaseLink[] => {
         status: String(row.status ?? '—'),
         sourceReviewCaseId,
         latestResubmissionSnapshotId: latestSnapshot,
+        resubmissions: parseCorrectionResubmissions(row.resubmissions),
       }
     })
     .filter((item): item is CorrectionCaseLink => item != null)
@@ -953,14 +1044,81 @@ const evidenceItemDetailLinks = computed((): EvidenceItemDetailLink[] => {
       const row = item as Record<string, unknown>
       const id = row.evidenceItemId
       if (typeof id !== 'string' || !id) return null
+      const latestRevisionId =
+        typeof row.latestRevisionId === 'string' && row.latestRevisionId
+          ? row.latestRevisionId
+          : null
+      const latestMimeType =
+        typeof row.latestMimeType === 'string' && row.latestMimeType
+          ? row.latestMimeType
+          : null
       return {
         evidenceItemId: id,
         status: String(row.status ?? '—'),
         itemOrdinal: String(row.itemOrdinal ?? '—'),
+        latestRevisionId,
+        latestMimeType,
       }
     })
     .filter((item): item is EvidenceItemDetailLink => item != null)
 })
+
+/** M426：图片型资料的短时授权预览 URL（purpose=WORKSPACE_EVIDENCE_PREVIEW）。 */
+const evidencePreviewUrls = ref<Record<string, string>>({})
+const evidencePreviewErrors = ref<Record<string, string>>({})
+const evidencePreviewLoading = ref(false)
+
+const imageEvidenceItems = computed(() =>
+  evidenceItemDetailLinks.value.filter(
+    (item) =>
+      item.latestRevisionId != null &&
+      item.latestMimeType != null &&
+      item.latestMimeType.startsWith('image/'),
+  ),
+)
+
+async function loadEvidencePreviews() {
+  evidencePreviewUrls.value = {}
+  evidencePreviewErrors.value = {}
+  if (activeSection.value !== 'FORMS_EVIDENCE' || imageEvidenceItems.value.length === 0) {
+    evidencePreviewLoading.value = false
+    return
+  }
+  evidencePreviewLoading.value = true
+  try {
+    await Promise.all(
+      imageEvidenceItems.value.map(async (item) => {
+        const revisionId = item.latestRevisionId
+        if (!revisionId) return
+        try {
+          const auth = await authorizeEvidenceRevisionDownload(
+            revisionId,
+            'WORKSPACE_EVIDENCE_PREVIEW',
+          )
+          evidencePreviewUrls.value = {
+            ...evidencePreviewUrls.value,
+            [item.evidenceItemId]: auth.downloadUrl,
+          }
+        } catch (err) {
+          evidencePreviewErrors.value = {
+            ...evidencePreviewErrors.value,
+            [item.evidenceItemId]:
+              err instanceof Error ? err.message : '预览授权失败',
+          }
+        }
+      }),
+    )
+  } finally {
+    evidencePreviewLoading.value = false
+  }
+}
+
+watch(
+  () => [activeSection.value, evidenceItemDetailLinks.value.map((item) => item.evidenceItemId).join('|')],
+  () => {
+    void loadEvidencePreviews()
+  },
+)
 
 /**
  * 表单定义/资料槽位仍无独立详情页；旁路到 Task。
@@ -1069,6 +1227,48 @@ const slaSummaryText = computed(() => {
   return '暂无进行中的时效'
 })
 
+const businessProgressSteps = computed<BusinessProgressStep[]>(() => {
+  const list = [...(stages.value?.stages ?? [])].sort((a, b) => a.sequenceNo - b.sequenceNo)
+  const currentStageCode = workspace.value?.currentTaskSummary?.stageCode
+  return list.map((stage) => {
+    const label = statusLabel(stage.stageCode) || stage.stageCode
+    let status: BusinessProgressStep['status'] = 'upcoming'
+    if (stage.status === 'COMPLETED' || stage.completedAt) status = 'done'
+    else if (
+      stage.stageCode === currentStageCode ||
+      stage.status === 'ACTIVE' ||
+      stage.status === 'IN_PROGRESS'
+    ) {
+      status = 'current'
+    }
+    return {
+      key: stage.id,
+      label,
+      status,
+      hint:
+        stage.stageCode === currentStageCode && workspace.value?.currentTaskSummary
+          ? statusLabel(workspace.value.currentTaskSummary.taskType)
+          : undefined,
+    }
+  })
+})
+
+const allowedActionItems = computed<AllowedActionItem[]>(() => {
+  const actions = allowedActions.value?.actions ?? []
+  return actions.slice(0, 5).map((action, index) => ({
+    code: action.code,
+    label: labelAction(action.code, action.label),
+    primary: index === 0,
+  }))
+})
+
+const recentTimelineItems = computed(() => (timelinePage.value?.items ?? []).slice(0, 5))
+
+function onAllowedActionSelect(_code: string) {
+  productTab.value = 'TASKS'
+  onProductTabChange('TASKS')
+}
+
 watch(workOrderId, () => {
   if (workOrderId.value) {
     void loadWorkspace()
@@ -1086,8 +1286,9 @@ onMounted(() => {
 
 <template>
   <DetailPageLayout
-    title="工单详情"
-    :eyebrow="orderCode !== '未提供' ? `工单编号 ${orderCode}` : undefined"
+    :title="orderCode !== '未提供' ? orderCode : '工单详情'"
+    description="统一履约工作区：阶段进度、当前任务、资料审核与外部回传。"
+    :eyebrow="workspace ? labelServiceProduct(workOrderDetail?.workOrder.serviceProductCode) : undefined"
     :show-sticky="!!workspace"
     sticky-note="主操作来自服务端允许动作；复杂改派请使用专用流程。"
   >
@@ -1105,13 +1306,12 @@ onMounted(() => {
       <Button v-if="showTechTab" type="link" @click="productTab = 'tech'; diagnostics.openDrawer()">技术诊断</Button>
     </template>
     <template #primary-action>
-      <Button
-        v-if="workspace?.currentTaskSummary && allowedActions?.actions?.length"
-        type="primary"
-        @click="productTab = 'TASKS'; onProductTabChange('TASKS')"
-      >
-        {{ labelAction(allowedActions.actions[0]?.code, allowedActions.actions[0]?.label) }}
-      </Button>
+      <AllowedActionBar
+        v-if="workspace"
+        :actions="allowedActionItems"
+        empty-text="当前无可执行动作"
+        @select="onAllowedActionSelect"
+      />
     </template>
     <template #feedback>
       <Alert v-if="error" type="error" show-icon :message="error" />
@@ -1130,9 +1330,27 @@ onMounted(() => {
             {{ projectPresentation.label }}
           </RouterLink>
         </Descriptions.Item>
-        <Descriptions.Item label="客户">{{ presentEmptyValue('not_provided') }}</Descriptions.Item>
-        <Descriptions.Item label="手机号">{{ presentEmptyValue('not_provided') }}</Descriptions.Item>
-        <Descriptions.Item label="地址">{{ presentEmptyValue('not_provided') }}</Descriptions.Item>
+        <Descriptions.Item label="客户">
+          <SensitiveText
+            data-testid="workspace-masked-customer-name"
+            :value="workspace.maskedCustomerName"
+            :empty-text="presentEmptyValue('not_provided')"
+          />
+        </Descriptions.Item>
+        <Descriptions.Item label="手机号">
+          <SensitiveText
+            data-testid="workspace-masked-customer-phone"
+            :value="workspace.maskedCustomerPhone"
+            :empty-text="presentEmptyValue('not_provided')"
+          />
+        </Descriptions.Item>
+        <Descriptions.Item label="地址">
+          <SensitiveText
+            data-testid="workspace-masked-service-address"
+            :value="workspace.maskedServiceAddress"
+            :empty-text="presentEmptyValue('not_provided')"
+          />
+        </Descriptions.Item>
         <Descriptions.Item label="服务网点">
           <template v-if="workspace.serviceAssignmentSummary">
             {{ presentEntityName({ id: String(workspace.serviceAssignmentSummary.networkId ?? ''), loaded: true }).label }}
@@ -1160,11 +1378,10 @@ onMounted(() => {
     </template>
 
     <template v-if="workspace" #progress>
-      <p v-if="stages?.workflow" class="muted">
-        履约流程：{{ stages.workflow.workflowKey || '未命名流程' }} ·
-        {{ stages.workflow.status ? statusLabel(stages.workflow.status) : '未初始化' }}
+      <BusinessProgress title="履约进度" :steps="businessProgressSteps" />
+      <p v-if="stages?.workflow" class="muted" style="margin-top: 8px">
+        流程状态：{{ stages.workflow.status ? statusLabel(stages.workflow.status) : '未初始化' }}
       </p>
-      <p v-else class="muted">履约阶段投影暂未加载</p>
     </template>
 
     <template v-if="workspace" #risk>
@@ -1182,8 +1399,74 @@ onMounted(() => {
       </Alert>
     </template>
 
-    <Tabs v-if="workspace" v-model:activeKey="productTab" @change="onProductTabChange">
-      <TabPane key="overview" tab="概览">
+    <div v-if="workspace" class="wo-workspace-body" data-testid="work-order-fulfillment-workspace">
+      <div class="wo-workspace-body__main">
+        <Card
+          v-if="workspace.currentTaskSummary"
+          title="当前任务"
+          size="small"
+          class="current-task-card"
+          data-testid="current-task-card"
+        >
+          <Descriptions :column="2" size="small">
+            <Descriptions.Item label="任务">
+              {{ statusLabel(workspace.currentTaskSummary.taskType) }}
+            </Descriptions.Item>
+            <Descriptions.Item label="状态">
+              <SemanticStatusTag
+                :presentation="{
+                  label: statusLabel(workspace.currentTaskSummary.status),
+                  semantic: 'info',
+                  icon: 'info',
+                }"
+              />
+            </Descriptions.Item>
+            <Descriptions.Item label="阶段">
+              {{ statusLabel(workspace.currentTaskSummary.stageCode || '') || '—' }}
+            </Descriptions.Item>
+            <Descriptions.Item label="服务网点">
+              <template v-if="workspace.serviceAssignmentSummary">
+                {{
+                  presentEntityName({
+                    id: String(workspace.serviceAssignmentSummary.networkId ?? ''),
+                    loaded: true,
+                  }).label
+                }}
+              </template>
+              <template v-else>—</template>
+            </Descriptions.Item>
+            <Descriptions.Item label="服务师傅">
+              <template v-if="workspace.serviceAssignmentSummary">
+                {{
+                  presentEntityName({
+                    id: String(workspace.serviceAssignmentSummary.technicianId ?? ''),
+                    loaded: true,
+                  }).label
+                }}
+              </template>
+              <template v-else>—</template>
+            </Descriptions.Item>
+            <Descriptions.Item label="SLA">{{ slaSummaryText }}</Descriptions.Item>
+          </Descriptions>
+          <div style="margin-top: 12px">
+            <TaskCommandPanel
+              v-if="allowedActions"
+              :task-id="workspace.currentTaskSummary.taskId"
+              :allowed-actions="allowedActions"
+              @executed="loadWorkspace"
+            />
+            <Alert
+              v-else-if="allowedActionsError"
+              type="error"
+              show-icon
+              :message="allowedActionsError"
+            />
+            <p v-else class="muted">暂无允许动作或无权读取</p>
+          </div>
+        </Card>
+
+    <Tabs v-model:activeKey="productTab" @change="onProductTabChange">
+      <TabPane key="overview" tab="基本信息">
         <Space direction="vertical" style="width: 100%" :size="16">
           <Card title="配置来源" size="small">
             <template v-if="fulfillmentSnapshot">
@@ -1291,21 +1574,10 @@ onMounted(() => {
             <p v-else class="muted">{{ pricingSnapshots?.emptyHint || '暂无影子试算快照。' }}</p>
           </Card>
 
-          <Card title="当前任务命令" size="small">
-            <Alert v-if="allowedActionsError" type="error" show-icon :message="allowedActionsError" />
-            <p v-else-if="!workspace.currentTaskSummary">无当前任务</p>
-            <TaskCommandPanel
-              v-else-if="allowedActions"
-              :task-id="workspace.currentTaskSummary.taskId"
-              :allowed-actions="allowedActions"
-              @executed="loadWorkspace"
-            />
-            <p v-else>暂无允许动作或无权读取</p>
-          </Card>
         </Space>
       </TabPane>
 
-      <TabPane key="TASKS" tab="履约任务">
+      <TabPane key="TASKS" tab="任务记录">
         <QueueTable
           title="工单任务"
           :columns="['id', 'taskType', 'taskKind', 'status', 'stageCode', 'priority']"
@@ -1333,51 +1605,222 @@ onMounted(() => {
         </div>
       </TabPane>
 
-      <TabPane key="FORMS_EVIDENCE" tab="勘测与安装资料">
+      <TabPane key="APPOINTMENTS_VISITS" tab="预约与上门">
         <p v-if="sectionError" class="error">{{ sectionError }}</p>
         <p v-else-if="sectionLoading">区块加载中…</p>
-        <p v-else class="muted">资料与表单明细见下方关联链接；缺字段时显示「未提供」。</p>
-        <p v-if="formSubmissionDetailLinks.length" class="links">
-          <RouterLink
-            v-for="item in formSubmissionDetailLinks"
-            :key="item.submissionId"
-            :to="{ name: 'ADMIN.FORM_SUBMISSION.DETAIL', params: { id: item.submissionId } }"
-          >
-            {{ item.formKey }} / {{ statusLabel(item.validationStatus) }}
-          </RouterLink>
-        </p>
-        <p v-if="evidenceItemDetailLinks.length" class="links">
-          <RouterLink
-            v-for="item in evidenceItemDetailLinks"
-            :key="item.evidenceItemId"
-            :to="{ name: 'ADMIN.EVIDENCE_ITEM.DETAIL', params: { id: item.evidenceItemId } }"
-          >
-            {{ statusLabel(item.status) }}
-          </RouterLink>
-        </p>
+        <p v-else class="muted">预约、联系尝试与上门记录见关联明细；缺字段显示「未提供」。</p>
       </TabPane>
 
-      <TabPane key="REVIEWS_CORRECTIONS" tab="审核整改">
+      <TabPane key="FORMS_EVIDENCE" tab="表单资料">
         <p v-if="sectionError" class="error">{{ sectionError }}</p>
         <p v-else-if="sectionLoading">区块加载中…</p>
-        <p v-if="reviewCaseLinks.length" class="links">
-          <RouterLink
-            v-for="item in reviewCaseLinks"
-            :key="item.reviewCaseId"
-            :to="{ name: 'ADMIN.REVIEW.DETAIL', params: { id: item.reviewCaseId } }"
+        <template v-else>
+          <p class="muted">
+            图片资料通过短时授权预览展示；非图片仅保留详情深链。不得缓存永久 URL。
+          </p>
+          <section
+            v-if="evidenceItemDetailLinks.length"
+            class="evidence-preview-grid"
+            data-testid="workspace-evidence-previews"
+            aria-label="资料预览"
           >
-            {{ statusLabel(item.origin) }} / {{ statusLabel(item.status) }}
-          </RouterLink>
-        </p>
-        <p v-if="correctionCaseLinks.length" class="links">
-          <RouterLink
-            v-for="item in correctionCaseLinks"
-            :key="item.correctionCaseId"
-            :to="{ name: 'ADMIN.CORRECTION.DETAIL', params: { id: item.correctionCaseId } }"
+            <article
+              v-for="item in evidenceItemDetailLinks"
+              :key="item.evidenceItemId"
+              class="evidence-preview-card"
+              data-testid="workspace-evidence-preview-card"
+            >
+              <header class="evidence-preview-card__head">
+                <span>#{{ item.itemOrdinal }} · {{ statusLabel(item.status) }}</span>
+                <RouterLink
+                  :to="{ name: 'ADMIN.EVIDENCE_ITEM.DETAIL', params: { id: item.evidenceItemId } }"
+                  data-testid="workspace-evidence-item-link"
+                >
+                  打开资料详情
+                </RouterLink>
+              </header>
+              <template v-if="item.latestRevisionId && item.latestMimeType?.startsWith('image/')">
+                <p v-if="evidencePreviewLoading && !evidencePreviewUrls[item.evidenceItemId]" class="muted">
+                  预览授权中…
+                </p>
+                <p
+                  v-else-if="evidencePreviewErrors[item.evidenceItemId]"
+                  class="error"
+                  data-testid="workspace-evidence-preview-error"
+                >
+                  {{ evidencePreviewErrors[item.evidenceItemId] }}
+                </p>
+                <img
+                  v-else-if="evidencePreviewUrls[item.evidenceItemId]"
+                  class="evidence-preview-card__thumb"
+                  data-testid="workspace-evidence-preview-image"
+                  :src="evidencePreviewUrls[item.evidenceItemId]"
+                  :alt="`资料预览 ${item.itemOrdinal}`"
+                />
+                <p v-else class="muted">暂无预览</p>
+              </template>
+              <p v-else class="muted" data-testid="workspace-evidence-preview-non-image">
+                {{
+                  item.latestMimeType
+                    ? `非图片类型（${item.latestMimeType}），请打开详情`
+                    : '尚无最新修订，请打开详情'
+                }}
+              </p>
+            </article>
+          </section>
+          <p v-else class="muted" data-testid="workspace-evidence-previews-empty">
+            暂无资料项摘要
+          </p>
+          <p v-if="formSubmissionDetailLinks.length" class="links">
+            <RouterLink
+              v-for="item in formSubmissionDetailLinks"
+              :key="item.submissionId"
+              :to="{ name: 'ADMIN.FORM_SUBMISSION.DETAIL', params: { id: item.submissionId } }"
+            >
+              {{ item.formKey }} / {{ statusLabel(item.validationStatus) }}
+            </RouterLink>
+          </p>
+        </template>
+      </TabPane>
+
+      <TabPane key="REVIEWS_CORRECTIONS" tab="审核与整改">
+        <p v-if="sectionError" class="error">{{ sectionError }}</p>
+        <p v-else-if="sectionLoading">区块加载中…</p>
+        <template v-else>
+          <section
+            v-if="reviewCaseLinks.length"
+            class="review-records"
+            data-testid="workspace-review-records"
+            aria-label="审核决策记录"
           >
-            {{ statusLabel(item.status) }}
-          </RouterLink>
-        </p>
+            <article
+              v-for="item in reviewCaseLinks"
+              :key="item.reviewCaseId"
+              class="review-case-card"
+              data-testid="workspace-review-case"
+            >
+              <header class="review-case-card__head">
+                <div>
+                  <strong>{{ statusLabel(item.origin) }}</strong>
+                  ·
+                  <SemanticStatusTag :presentation="presentReviewStatus(item.status)" />
+                </div>
+                <RouterLink
+                  :to="{ name: 'ADMIN.REVIEW.DETAIL', params: { id: item.reviewCaseId } }"
+                  data-testid="workspace-review-case-link"
+                >
+                  打开审核详情
+                </RouterLink>
+              </header>
+              <table
+                v-if="item.decisions.length"
+                class="decision-table"
+                data-testid="workspace-review-decisions"
+              >
+                <thead>
+                  <tr>
+                    <th scope="col">轮次</th>
+                    <th scope="col">裁决</th>
+                    <th scope="col">来源</th>
+                    <th scope="col">原因码</th>
+                    <th scope="col">裁决时间</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="decision in item.decisions"
+                    :key="decision.reviewDecisionId"
+                    data-testid="workspace-review-decision-row"
+                  >
+                    <td>{{ decision.decisionOrdinal }}</td>
+                    <td>
+                      <SemanticStatusTag
+                        :presentation="presentReviewStatus(decision.decision)"
+                      />
+                    </td>
+                    <td>{{ statusLabel(decision.decisionSource) }}</td>
+                    <td>
+                      {{
+                        decision.reasonCodes.length
+                          ? decision.reasonCodes.map((code) => statusLabel(code)).join('、')
+                          : presentEmptyValue('not_provided')
+                      }}
+                    </td>
+                    <td>{{ formatDateTimeDisplay(decision.decidedAt) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <p v-else class="muted" data-testid="workspace-review-decisions-empty">
+                暂无决策记录
+              </p>
+            </article>
+          </section>
+          <p v-else class="muted" data-testid="workspace-review-records-empty">
+            暂无审核案例摘要
+          </p>
+
+          <section
+            v-if="correctionCaseLinks.length"
+            class="correction-records"
+            data-testid="workspace-correction-records"
+            aria-label="整改补传记录"
+          >
+            <article
+              v-for="item in correctionCaseLinks"
+              :key="item.correctionCaseId"
+              class="review-case-card"
+              data-testid="workspace-correction-case"
+            >
+              <header class="review-case-card__head">
+                <div>
+                  <strong>整改</strong>
+                  ·
+                  <SemanticStatusTag :presentation="presentCorrectionStatus(item.status)" />
+                </div>
+                <RouterLink
+                  :to="{ name: 'ADMIN.CORRECTION.DETAIL', params: { id: item.correctionCaseId } }"
+                  data-testid="workspace-correction-case-link"
+                >
+                  打开整改详情
+                </RouterLink>
+              </header>
+              <table
+                v-if="item.resubmissions.length"
+                class="decision-table"
+                data-testid="workspace-correction-resubmissions"
+              >
+                <thead>
+                  <tr>
+                    <th scope="col">轮次</th>
+                    <th scope="col">资料快照</th>
+                    <th scope="col">提交时间</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="resubmission in item.resubmissions"
+                    :key="resubmission.correctionResubmissionId"
+                    data-testid="workspace-correction-resubmission-row"
+                  >
+                    <td>{{ resubmission.resubmissionOrdinal }}</td>
+                    <td>
+                      <RouterLink
+                        :to="{
+                          name: 'ADMIN.EVIDENCE_SET_SNAPSHOT.DETAIL',
+                          params: { id: resubmission.evidenceSetSnapshotId },
+                        }"
+                      >
+                        快照 {{ resubmission.evidenceSetSnapshotId.slice(0, 8) }}
+                      </RouterLink>
+                    </td>
+                    <td>{{ formatDateTimeDisplay(resubmission.submittedAt) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <p v-else class="muted">暂无补传记录</p>
+            </article>
+          </section>
+        </template>
       </TabPane>
 
       <TabPane key="FINAL_REVIEW" tab="平台终审">
@@ -1425,7 +1868,7 @@ onMounted(() => {
         </p>
       </TabPane>
 
-      <TabPane key="TIMELINE_AUDIT" tab="活动记录">
+      <TabPane key="TIMELINE_AUDIT" tab="操作日志">
         <ul v-if="activity?.items?.length">
           <li v-for="(item, index) in activity.items" :key="index">
             <strong>{{ statusLabel(String(item.eventType || item.type || 'UNKNOWN')) }}</strong>
@@ -1453,22 +1896,11 @@ onMounted(() => {
         />
       </TabPane>
 
-      <TabPane key="APPOINTMENTS_VISITS" tab="预约到场">
+      <TabPane key="INTEGRATION" tab="外部回传">
         <Alert
           type="info"
           show-icon
-          message="预约与上门"
-          description="预约、联系记录与上门签到详情可通过下方关联链接打开；完整编排仍在任务工作区完成。"
-        />
-        <p v-if="sectionLoading">区块加载中…</p>
-        <p v-else-if="sectionError" class="error">{{ sectionError }}</p>
-      </TabPane>
-
-      <TabPane key="INTEGRATION" tab="集成">
-        <Alert
-          type="info"
-          show-icon
-          message="车企集成"
+          message="车企集成与外部回传"
           description="入站 Envelope、外发交付与 Canonical 详情通过下方关联链接打开。"
         />
         <p v-if="sectionLoading">区块加载中…</p>
@@ -1504,7 +1936,7 @@ onMounted(() => {
     </Tabs>
 
     <!-- 保留集成/预约等深链区块：在非终审产品页签时按需渲染原 section 内容 -->
-    <div v-if="workspace && productTab !== 'FINAL_REVIEW' && productTab !== 'overview' && productTab !== 'tech' && productTab !== 'sla'" class="legacy-section-links">
+    <div v-if="productTab !== 'FINAL_REVIEW' && productTab !== 'overview' && productTab !== 'tech' && productTab !== 'sla'" class="legacy-section-links">
       <p v-if="inboundEnvelopeLinks.length" class="links inbound-links">
         打开入站 Envelope：
         <RouterLink
@@ -1646,17 +2078,167 @@ onMounted(() => {
         </RouterLink>
       </p>
     </div>
+      </div>
+
+      <RightContextRail title="决策上下文" data-testid="work-order-context-rail">
+        <section>
+          <h3>风险与提醒</h3>
+          <p v-if="Number(workspace.exceptionSummary?.openCount ?? 0) > 0">
+            待处理异常 {{ workspace.exceptionSummary?.openCount }} 条
+          </p>
+          <p v-else>暂无待处理运营异常</p>
+          <p>SLA：{{ slaSummaryText }}</p>
+        </section>
+        <section>
+          <h3>当前责任链</h3>
+          <p>
+            网点：
+            <template v-if="workspace.serviceAssignmentSummary">
+              {{
+                presentEntityName({
+                  id: String(workspace.serviceAssignmentSummary.networkId ?? ''),
+                  loaded: true,
+                }).label
+              }}
+            </template>
+            <template v-else>—</template>
+          </p>
+          <p>
+            师傅：
+            <template v-if="workspace.serviceAssignmentSummary">
+              {{
+                presentEntityName({
+                  id: String(workspace.serviceAssignmentSummary.technicianId ?? ''),
+                  loaded: true,
+                }).label
+              }}
+            </template>
+            <template v-else>—</template>
+          </p>
+          <p>
+            当前任务：
+            {{
+              workspace.currentTaskSummary
+                ? statusLabel(workspace.currentTaskSummary.taskType)
+                : '—'
+            }}
+          </p>
+        </section>
+        <section>
+          <h3>外部集成</h3>
+          <p>来源：{{ clientLabel }}</p>
+          <p>配置版本：{{ fulfillmentSnapshot?.fulfillmentVersion || '—' }}</p>
+        </section>
+        <section>
+          <h3>最近时间线</h3>
+          <ul v-if="recentTimelineItems.length">
+            <li v-for="(item, index) in recentTimelineItems" :key="index">
+              {{ statusLabel(String(item.eventType || 'UNKNOWN')) }}
+              · {{ formatDateTimeDisplay(item.occurredAt) }}
+            </li>
+          </ul>
+          <p v-else class="muted">暂无时间线</p>
+        </section>
+      </RightContextRail>
+    </div>
   </DetailPageLayout>
 </template>
 
 <style scoped>
+.wo-workspace-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 16px;
+  align-items: start;
+}
+.wo-workspace-body__main {
+  min-width: 0;
+}
+.current-task-card {
+  margin-bottom: 16px;
+}
+@media (max-width: 1280px) {
+  .wo-workspace-body {
+    grid-template-columns: 1fr;
+  }
+}
 .muted { margin: 0 0 8px; color: var(--sos-color-text-tertiary, #7b8494); font-size: 13px; }
 .field { display: grid; gap: 6px; margin-bottom: 12px; font-size: 13px; }
 .links { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+.review-records,
+.correction-records {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.review-case-card {
+  border: 1px solid var(--sos-color-border-default, #d9dee7);
+  border-radius: var(--sos-radius-md, 8px);
+  background: var(--sos-color-surface-card, #fff);
+  padding: 12px 14px;
+}
+.review-case-card__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.decision-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.decision-table th,
+.decision-table td {
+  border-top: 1px solid var(--sos-color-border-default, #e5e9f0);
+  padding: 8px 6px;
+  text-align: left;
+  vertical-align: top;
+}
+.decision-table th {
+  color: var(--sos-color-text-secondary, #5b6575);
+  font-weight: 600;
+}
+.evidence-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 12px 0 16px;
+}
+.evidence-preview-card {
+  border: 1px solid var(--sos-color-border-default, #d9dee7);
+  border-radius: var(--sos-radius-md, 8px);
+  background: var(--sos-color-surface-card, #fff);
+  padding: 10px 12px;
+  display: grid;
+  gap: 8px;
+}
+.evidence-preview-card__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+.evidence-preview-card__thumb {
+  width: 100%;
+  max-height: 180px;
+  object-fit: contain;
+  background: var(--sos-color-surface-subtle, #f5f7fa);
+  border-radius: 6px;
+}
 .pricing-list { margin: 8px 0 0; padding-left: 18px; }
 .assign-advanced { margin-top: 12px; }
 .handoff-link { font-size: 13px; }
 .error { color: var(--sos-color-status-critical-fg); }
+.wo-workspace-body :deep(h3) {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+.wo-workspace-body section + section {
+  margin-top: 14px;
+}
 .sr-sync { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .card { background: #fff; padding: 12px; border-radius: 8px; }
 .legacy-section-links { margin-top: 12px; }

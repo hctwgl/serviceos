@@ -136,9 +136,9 @@ test('师傅领取启动整改、补传资料并以权威 Snapshot 多轮重提'
   await expect(page.getByTestId('technician-correction-detail')).toBeVisible()
   await expect(page.getByTestId('technician-correction-reasons')).toContainText('IMAGE.BLUR')
   await page.getByTestId('technician-correction-lifecycle').click()
-  await expect(page.getByTestId('technician-correction-task-status')).toHaveText('CLAIMED')
+  await expect(page.getByTestId('technician-correction-task-status')).toHaveText(/已认领|CLAIMED/)
   await page.getByTestId('technician-correction-lifecycle').click()
-  await expect(page.getByTestId('technician-correction-task-status')).toHaveText('RUNNING')
+  await expect(page.getByTestId('technician-correction-task-status')).toHaveText(/处理中|计时中|RUNNING/)
 
   await page.getByTestId(`technician-correction-file-${SLOT}`).setInputFiles({
     name: 'fix.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('correction-image'),
@@ -148,10 +148,10 @@ test('师傅领取启动整改、补传资料并以权威 Snapshot 多轮重提'
 
   revisionStatus = 'VALIDATED'
   await page.getByTestId('technician-correction-refresh').click()
-  await expect(page.getByTestId(`technician-correction-slot-${SLOT}`)).toContainText('VALIDATED')
+  await expect(page.getByTestId(`technician-correction-slot-${SLOT}`)).toContainText(/已校验|VALIDATED/)
   await page.getByTestId('technician-correction-resubmit').click()
   await expect(page.getByTestId('technician-correction-message')).toContainText('第 1 次重提')
-  await expect(page.getByTestId('technician-correction-task-status')).toHaveText('RUNNING')
+  await expect(page.getByTestId('technician-correction-task-status')).toHaveText(/处理中|计时中|RUNNING/)
 
   // 第二轮不能突破 Slot maxCount 创建新 Item，必须在既有整改 Item 上追加 Revision。
   revisionStatus = 'STORED'
@@ -161,5 +161,5 @@ test('师傅领取启动整改、补传资料并以权威 Snapshot 多轮重提'
   await page.getByTestId(`technician-correction-upload-${SLOT}`).click()
   await expect.poll(() => commandBodies.length).toBe(4)
   expect(commandBodies[2]).toMatchObject({ evidenceItemId: ITEM })
-  await expect(page.getByTestId('technician-correction-task-status')).toHaveText('RUNNING')
+  await expect(page.getByTestId('technician-correction-task-status')).toHaveText(/处理中|计时中|RUNNING/)
 })

@@ -274,9 +274,13 @@ final class DefaultNetworkCommandService implements NetworkCommandService {
                 actor.tenantId(), profileId, expectedVersion, kinds, now)) {
             throw versionConflict();
         }
+        // reason 写入声明快照，供主体变更时间线诚实展示（清除时不猜测旧值）。
+        String declareReason = kinds == null || kinds.isEmpty()
+                ? "已清除客户端种类声明"
+                : "声明=" + String.join(",", kinds);
         complete(actor, metadata, execution, profileId, expectedVersion + 1,
                 "TECHNICIAN_CLIENT_KINDS_DECLARED", "TechnicianProfile",
-                "network.manageTechnician", null, now);
+                "network.manageTechnician", declareReason, now);
         return requireTechnician(actor.tenantId(), profileId).toView();
     }
 

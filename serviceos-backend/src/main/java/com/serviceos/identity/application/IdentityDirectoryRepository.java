@@ -1,6 +1,7 @@
 package com.serviceos.identity.application;
 
 import com.serviceos.identity.api.IdentityLinkView;
+import com.serviceos.identity.api.PrincipalLoginEventView;
 import com.serviceos.identity.api.PrincipalPersonaView;
 import com.serviceos.identity.domain.SecurityPrincipal;
 
@@ -53,4 +54,34 @@ public interface IdentityDirectoryRepository {
     List<PrincipalPersonaView> findPersonas(String tenantId, UUID principalId);
 
     Optional<PrincipalPersonaView> findPersona(String tenantId, UUID personaId);
+
+    void insertLoginEvent(
+            UUID loginEventId,
+            String tenantId,
+            UUID principalId,
+            String clientId,
+            String issuer,
+            String correlationId,
+            Instant occurredAt
+    );
+
+    void trimLoginEvents(String tenantId, UUID principalId, int keepLatest);
+
+    List<PrincipalLoginEventView> listLoginEvents(
+            String tenantId, UUID principalId, int limit);
+
+    Optional<Instant> findLatestLoginAt(String tenantId, UUID principalId);
+
+    List<LifecycleEventRecord> listLifecycleEvents(String tenantId, UUID principalId, int limit);
+
+    record LifecycleEventRecord(
+            UUID eventId,
+            String eventType,
+            long principalVersion,
+            String reason,
+            String actorId,
+            String correlationId,
+            Instant occurredAt
+    ) {
+    }
 }

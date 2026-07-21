@@ -97,6 +97,25 @@ final class DefaultCorrectionCaseQueryService implements CorrectionCaseQueryServ
                 clock.instant());
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public int count(
+            CurrentPrincipal principal, String correlationId, CorrectionCaseQueueQuery query
+    ) {
+        Objects.requireNonNull(query, "query must not be null");
+        String status = normalize(query.status(), STATUSES, "status", "OPEN");
+        QueryScope scope = query.projectId() == null
+                ? collectionScope(principal, correlationId)
+                : projectScope(principal, correlationId, query.projectId());
+        return corrections.countQueue(
+                principal.tenantId(),
+                scope.tenantWide(),
+                scope.projectIds(),
+                status,
+                query.taskId(),
+                query.sourceReviewCaseId());
+    }
+
     private QueryScope projectScope(
             CurrentPrincipal principal, String correlationId, UUID projectId
     ) {

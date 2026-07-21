@@ -1,6 +1,8 @@
 package com.serviceos.configuration.web;
 
 import com.serviceos.configuration.api.CreateProjectFulfillmentProfileCommand;
+import com.serviceos.configuration.api.ProjectFulfillmentCompareImpact;
+import com.serviceos.configuration.api.ProjectFulfillmentDocument;
 import com.serviceos.configuration.api.ProjectFulfillmentDraftView;
 import com.serviceos.configuration.api.ProjectFulfillmentManifestView;
 import com.serviceos.configuration.api.ProjectFulfillmentProfileDetail;
@@ -123,7 +125,7 @@ final class ProjectFulfillmentProfileController {
                         version(ifMatch),
                         request.profileName(),
                         request.description(),
-                        request.documentJson(),
+                        request.document(),
                         request.workflowAssetVersionId(),
                         request.sourceBundleId()));
         return ResponseEntity.ok()
@@ -160,6 +162,18 @@ final class ProjectFulfillmentProfileController {
                         principals.current(),
                         new CommandMetadata(correlationId, idempotencyKey == null ? correlationId : idempotencyKey),
                         projectId, profileId));
+    }
+
+    @GetMapping("/{profileId}/compare-impact")
+    ResponseEntity<ProjectFulfillmentCompareImpact> compareImpact(
+            @PathVariable UUID projectId,
+            @PathVariable UUID profileId,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        return ResponseEntity.ok()
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(profiles.compareImpact(
+                        principals.current(), correlationId, projectId, profileId));
     }
 
     @PostMapping("/{profileId}:publish")
@@ -264,7 +278,7 @@ final class ProjectFulfillmentProfileController {
     record UpdateDraftRequest(
             String profileName,
             String description,
-            String documentJson,
+            ProjectFulfillmentDocument document,
             UUID workflowAssetVersionId,
             UUID sourceBundleId
     ) {

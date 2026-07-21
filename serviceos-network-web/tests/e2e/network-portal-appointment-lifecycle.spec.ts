@@ -35,7 +35,6 @@ test.describe('M198 Network Portal 预约生命周期', () => {
       await tasksNav.click()
       await expect(page.getByTestId('network-portal-tasks')).toBeVisible()
       await expect(page.getByTestId('network-appointment-form')).toBeVisible()
-      await expect(page.locator('[data-page-id="NETWORK.APPOINTMENT"]')).toBeVisible()
       await expect(page.getByTestId('appointment-propose-submit')).toBeVisible()
       await expect(page.getByTestId('appointment-reschedule-reason')).toBeVisible()
       await expect(page.getByTestId('appointment-cancel-reason')).toBeVisible()

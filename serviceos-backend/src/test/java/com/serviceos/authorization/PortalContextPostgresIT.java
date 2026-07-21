@@ -72,8 +72,8 @@ class PortalContextPostgresIT {
                     idn_person_profile, idn_security_principal,
                     rel_idempotency_record, aud_audit_record CASCADE
                 """).update();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("135");
-        assertThat(flyway.info().applied()).hasSize(137);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("145");
+        assertThat(flyway.info().applied()).hasSize(147);
 
         seedPrincipal();
         seedPersona("INTERNAL_EMPLOYEE");
@@ -86,6 +86,7 @@ class PortalContextPostgresIT {
         seedTechnician(NETWORK_A);
         seedGrant(PRINCIPAL.toString(), "identity.read", "TENANT", TENANT);
         seedGrant(PRINCIPAL.toString(), "authorization.read", "TENANT", TENANT);
+        seedGrant(PRINCIPAL.toString(), "project.read", "TENANT", TENANT);
         seedGrant(PRINCIPAL.toString(), "networkTask.read", "NETWORK", NETWORK_A.toString());
         seedGrant(PRINCIPAL.toString(), "technician.readOwnNetwork", "NETWORK", NETWORK_A.toString());
         seedGrant(PRINCIPAL.toString(), "task.readAssigned", "NETWORK", NETWORK_A.toString());
@@ -119,7 +120,7 @@ class PortalContextPostgresIT {
         assertThat(contexts.contexts()).extracting(c -> c.contextId()).contains(networkA, networkB);
 
         MeNavigationView navA = portal.navigation(actor(), "corr-nav-a", networkA, null);
-        assertThat(navA.navigationCatalogVersion()).isEqualTo("page-registry-v17");
+        assertThat(navA.navigationCatalogVersion()).isEqualTo("page-registry-v22");
         assertThat(navA.items()).extracting(i -> i.pageId())
                 .contains("NETWORK.TASK.QUEUE", "NETWORK.CAPACITY", "NETWORK.WORKORDER.WORKSPACE");
 
@@ -138,9 +139,9 @@ class PortalContextPostgresIT {
     void m188_03_navigationUsesPageRegistryAndCapabilityGate() {
         String adminContext = "ADMIN|TENANT|" + TENANT;
         MeNavigationView nav = portal.navigation(actor(), "corr-nav", adminContext, null);
-        assertThat(nav.navigationCatalogVersion()).isEqualTo("page-registry-v17");
+        assertThat(nav.navigationCatalogVersion()).isEqualTo("page-registry-v22");
         assertThat(nav.items()).extracting(i -> i.pageId())
-                .contains("ADMIN.USER.DIRECTORY", "ADMIN.GRANT.DIRECTORY");
+                .contains("ADMIN.USER.DIRECTORY", "ADMIN.GRANT.DIRECTORY", "ADMIN.MASTERDATA.CATALOG");
         assertThat(nav.items()).noneMatch(i -> i.pageId().startsWith("NETWORK."));
         assertThat(nav.items()).noneMatch(i -> i.pageId().startsWith("TECHNICIAN."));
 

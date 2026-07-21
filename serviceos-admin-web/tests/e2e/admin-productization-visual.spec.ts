@@ -23,8 +23,144 @@ test.describe('M377 Admin productization visual baselines', () => {
     await expect(page.getByTestId('scope-bar')).toBeVisible()
     await expect(page.getByRole('heading', { name: '工单中心' })).toBeVisible()
     await expect(page.getByText('吉利汽车')).toBeVisible()
+    // M448：默认区关键词服务端检索入口
+    await expect(page.getByTestId('work-order-keyword-filter')).toBeVisible()
     await expect(page.getByText(/11111111-1111-4111-8111-111111111111/)).toHaveCount(0)
+    // M429：目录客户脱敏列
+    await expect(page.getByTestId('work-order-masked-customer-name')).toContainText('王*')
+    await expect(page.getByTestId('work-order-masked-customer-phone')).toContainText('*******5678')
+    await expect(page.getByTestId('work-order-masked-service-address')).toContainText(
+      '杭州市西湖区***',
+    )
+    await expect(page.getByTestId('work-order-masked-customer-phone')).not.toContainText('138')
+    // M431：目录服务区域中文名（region-catalog）；未命中仍回退国标码
+    await expect(page.getByTestId('work-order-region')).toContainText('浙江省/杭州市/西湖区', {
+      timeout: 10_000,
+    })
+    // M432：目录当前阶段（currentStageCode → statusLabel）
+    await expect(page.getByTestId('work-order-current-stage')).toContainText('勘测')
+    // M449：目录当前任务类型（currentTaskType → statusLabel）
+    await expect(page.getByTestId('work-order-current-task-type')).toContainText('现场勘测')
+    // M433：目录当前责任人（Persona 显示名）
+    await expect(page.getByTestId('work-order-current-assignee')).toContainText('演示师傅')
+    // M439：目录网点/师傅列
+    await expect(page.getByTestId('work-order-network-technician')).toContainText('杭州西湖网点')
+    await expect(page.getByTestId('work-order-network-technician')).toContainText('现场师傅甲')
+    // M434：目录 SLA 风险旁载
+    await expect(page.getByTestId('work-order-sla-risk')).toContainText('开放 1 / 超时 0')
+    // M450：目录 OPEN 异常摘要旁载
+    await expect(page.getByTestId('work-order-exception-summary')).toContainText('待处理 2')
+    // M451：异常摘要深链 → 异常队列（workOrderId + status=OPEN）
+    await expect(
+      page.getByRole('link', { name: '待处理 2' }),
+    ).toHaveAttribute(
+      'href',
+      /\/exceptions\?.*workOrderId=11111111-1111-4111-8111-111111111111.*status=OPEN|\/exceptions\?.*status=OPEN.*workOrderId=11111111-1111-4111-8111-111111111111/,
+    )
+    // M435：目录独立 updatedAt（非 receivedAt MVP 映射）
+    const updatedAtCell = page.getByTestId('work-order-updated-at')
+    await expect(updatedAtCell).toContainText('2026-07-21')
+    // M436：目录列表封顶总数
+    await expect(page.getByTestId('list-toolbar-count')).toContainText('共 1 条')
+    // M437：更多筛选中启用服务区域
+    await page.getByRole('button', { name: '更多筛选' }).click()
+    await expect(page.getByTestId('work-order-region-filter')).toBeVisible()
+    // M438：更多筛选中启用当前阶段
+    await expect(page.getByTestId('work-order-stage-filter')).toBeVisible()
+    // M446：更多筛选中启用任务状态
+    await expect(page.getByTestId('work-order-task-status-filter')).toBeVisible()
+    await expect(page.getByTestId('work-order-current-task-status')).toBeVisible()
+    // M447：更多筛选中启用审核/整改状态
+    await expect(page.getByTestId('work-order-review-correction-filter')).toBeVisible()
+    // M440：更多筛选中启用服务网点
+    await expect(page.getByTestId('work-order-network-filter')).toBeVisible()
+    // M441：更多筛选中启用服务师傅
+    await expect(page.getByTestId('work-order-technician-filter')).toBeVisible()
+    // M442/M445：更多筛选中启用 SLA 风险（含即将超时）
+    await expect(page.getByTestId('work-order-sla-risk-filter')).toBeVisible()
+    await page.getByTestId('work-order-sla-risk-filter').click()
+    await expect(page.getByText('即将超时')).toBeVisible()
+    await page.keyboard.press('Escape')
+    // M443：更多筛选中启用创建时间
+    await expect(page.getByTestId('work-order-received-range-filter')).toBeVisible()
     await shot(page, 'work-order-directory-productized')
+    await page.screenshot({
+      path: 'tests/e2e/__screenshots__/work-order-directory-region-names-1440.png',
+      fullPage: true,
+    })
+    await page.screenshot({
+      path: 'tests/e2e/__screenshots__/work-order-directory-current-stage-1440.png',
+      fullPage: true,
+    })
+    await page.getByTestId('work-order-current-task-type').scrollIntoViewIfNeeded()
+    await page.screenshot({
+      path: 'tests/e2e/__screenshots__/work-order-directory-current-task-type-1440.png',
+      fullPage: true,
+    })
+    await page.screenshot({
+      path: 'tests/e2e/__screenshots__/work-order-directory-current-assignee-1440.png',
+      fullPage: true,
+    })
+    await page.getByTestId('work-order-sla-risk').scrollIntoViewIfNeeded()
+    await page.screenshot({
+      path: 'tests/e2e/__screenshots__/work-order-directory-sla-risk-1440.png',
+      fullPage: true,
+    })
+    await updatedAtCell.scrollIntoViewIfNeeded()
+    await page.screenshot({
+      path: 'tests/e2e/__screenshots__/work-order-directory-updated-at-1440.png',
+      fullPage: true,
+    })
+    await page.getByTestId('list-toolbar-count').scrollIntoViewIfNeeded()
+    await page.screenshot({
+      path: 'tests/e2e/__screenshots__/work-order-directory-list-total-1440.png',
+      fullPage: true,
+    })
+    await page.getByTestId('work-order-region-filter').scrollIntoViewIfNeeded()
+    await page.screenshot({
+      path: 'tests/e2e/__screenshots__/work-order-directory-region-filter-1440.png',
+      fullPage: true,
+    })
+    await page.getByTestId('work-order-stage-filter').scrollIntoViewIfNeeded()
+    await page.screenshot({
+      path: 'tests/e2e/__screenshots__/work-order-directory-stage-filter-1440.png',
+      fullPage: true,
+    })
+    await page.getByTestId('work-order-task-status-filter').scrollIntoViewIfNeeded()
+    await page.screenshot({
+      path: 'tests/e2e/__screenshots__/work-order-directory-task-status-filter-1440.png',
+      fullPage: true,
+    })
+    await page.getByTestId('work-order-review-correction-filter').scrollIntoViewIfNeeded()
+    await page.screenshot({
+      path: 'tests/e2e/__screenshots__/work-order-directory-review-correction-filter-1440.png',
+      fullPage: true,
+    })
+    await page.getByTestId('work-order-network-filter').scrollIntoViewIfNeeded()
+    await page.screenshot({
+      path: 'tests/e2e/__screenshots__/work-order-directory-network-filter-1440.png',
+      fullPage: true,
+    })
+    await page.getByTestId('work-order-technician-filter').scrollIntoViewIfNeeded()
+    await page.screenshot({
+      path: 'tests/e2e/__screenshots__/work-order-directory-technician-filter-1440.png',
+      fullPage: true,
+    })
+    await page.getByTestId('work-order-sla-risk-filter').scrollIntoViewIfNeeded()
+    await page.screenshot({
+      path: 'tests/e2e/__screenshots__/work-order-directory-sla-risk-filter-1440.png',
+      fullPage: true,
+    })
+    await page.getByTestId('work-order-received-range-filter').scrollIntoViewIfNeeded()
+    await page.screenshot({
+      path: 'tests/e2e/__screenshots__/work-order-directory-received-range-filter-1440.png',
+      fullPage: true,
+    })
+    await page.getByTestId('work-order-network-technician').scrollIntoViewIfNeeded()
+    await page.screenshot({
+      path: 'tests/e2e/__screenshots__/work-order-directory-network-technician-1440.png',
+      fullPage: true,
+    })
   })
 
   test('工单中心 Empty', async ({ page }) => {

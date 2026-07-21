@@ -472,4 +472,73 @@ Feature gate/authority: if applicable
 | M375 | 项目详情产品化 + 范围调整 DedicatedFlow | 无 UUID/命令按钮主文案；388-m375-* + 372-m375-* | 其余导航页 |
 | M376 | 主导航其余页面迁移到产品壳 | WorkbenchPageLayout + PageContainer；389-m376-* + 373-m376-* | 视觉/a11y 关闭 |
 | M377 | Admin 产品化视觉/a11y/回归关闭 | Playwright 产品化截图 + 文档收口；390-m377-* + 374-m377-* | 真实 OIDC 冒烟、全量视觉态人工补齐 |
+| M384 | Admin 产品蓝图与经典专业风基线事实源；纠正 M383 产品状态 | 395-m384-*；无运行语义变更 | M385 履约配置中心产品化 |
+| M385 | 经典专业风共享基础 + 履约配置中心母版 + 新建向导 + Runbook/Compare-Impact（OpenAPI 1.0.62） | 396-m385-* + 379-m385-*；Admin Playwright/截图；PostgresIT | M388 结构化 Draft；M386/M387 |
+| M388 | 履约 Draft 结构化 Document/StageDraft；编辑器去 documentJson 产品路径（OpenAPI 1.0.63） | 397-m388-* + 380-m388-*；DocumentMapperTest + PostgresIT + Playwright | M386/M387 |
+| M386 | Admin 工作流设计器产品页；ConfigurationDraft WORKFLOW API；无 JSON 主编辑 | 398-m386-* + 381-m386-*；Playwright + 截图；Page Registry v19 | M387 Task 模板中心；结构化 Workflow DTO |
+| M387 | 任务模板中心读模型 GET /configuration/task-templates + 产品页 | 399-m387-* + 382-m387-*；PostgresIT + Playwright；Page Registry v20 | 独立写聚合/升级策略；其余母版 |
+| M389 | 工单详情履约工作区：BusinessProgress/AllowedActionBar/当前任务卡/右轨 | 400-m389-* + 383-m389-*；Playwright 截图 | PII 读模型；资料缩略图；人工视觉批准 |
+| M390 | Network 工作台 SummaryStrip + 待分配表 + AssignTechnicianDrawer | 401-m390-* + 384-m390-*；Playwright 截图 | 师傅个人负载/冲突读模型；工作区抽屉联动；人工视觉批准 |
+| M391 | Network 工单工作区产品外壳 + AppointmentCollaborationPanel | 402-m391-* + 385-m391-*；Playwright 截图 | PII 读模型；预约日历；冲突推荐；人工视觉批准 |
+| M392 | Network 整改/异常队列产品化 + 建议动作深链 | 403-m392-* + 386-m392-*；Playwright + M220 回归 | 代补允许标志/正确示例读模型；ACK/resolve；人工视觉批准 |
+| M393 | Technician H5 今日任务：移动壳/概览/任务卡片 | 404-m393-* + 387-m393-*；Playwright 390 截图 | Feed PII/距离/SLA 读模型；作业闭环；人工视觉批准 |
+| M394 | Technician H5 任务详情作业闭环：步骤条/签到/提交前检查/底部主操作 | 405-m394-* + 388-m394-*；Playwright + M262～M265 | 客户地址导航读模型；原生签退；离线；人工视觉批准 |
+| M395 | Technician H5 整改详情 + 同步冲突中心产品化 | 406-m395-* + 389-m395-*；Playwright + correction 回归 | OfflineCommand 队列读模型；正确示例；人工视觉批准 |
+| M396 | Network 师傅列表 + 产能状态产品化 | 407-m396-* + 390-m396-*；Playwright + M220 字段兼容 | 技能/服务区域/最近同步（任务量与资质摘要见 M421）；产能申请写；人工视觉批准 |
+| M397 | Admin 用户管理目录/详情母版产品化 | 408-m397-* + 391-m397-*；Playwright 截图 | 新建用户写流程；组织/角色/最近登录读模型；人工视觉批准 |
+| M398 | Admin 项目管理列表+新建流程、工作台 SummaryStrip | 409-m398-* + 392-m398-*；Playwright 截图 | 方案聚合列；关注项目读模型；实体选择器；人工视觉批准 |
+| M399 | 项目列表 publishedSchemeCount/draftSchemeCount 服务端聚合 | 410-m399-* + 393-m399-*；OpenAPI 1.0.65；PostgresIT + ArchitectureTest + Playwright | 关注项目；实体选择器；人工视觉批准 |
+| M400 | 项目车企/区域/网点实体选择器 | 411-m400-* + 394-m400-*；OpenAPI 1.0.66；PostgresIT + ArchitectureTest + Playwright | 行政区名称树；车企主数据；关注项目；人工视觉批准 |
+| M401 | Admin 关注项目读模型 | 412-m401-* + 395-m401-*；OpenAPI 1.0.67；Flyway V139；PostgresIT + ArchitectureTest + Playwright | 行政区名称树；人工视觉批准（角标已由 M409 关闭） |
+| M402 | Admin 用户登记与目录组织/角色摘要 | 413-m402-* + 396-m402-*；OpenAPI 1.0.68；Flyway V140；PostgresIT + ArchitectureTest + Playwright | 最近登录；组织树任职编辑；人工视觉批准 |
+| M403 | Admin 主体最近登录读模型 | 414-m403-* + 397-m403-*；OpenAPI 1.0.69；Flyway V141；PostgresIT + ArchitectureTest + Playwright | 失败登录；设备指纹；组织树任职；人工视觉批准 |
+| M404 | Admin 用户详情组织任职编辑 | 415-m404-* + 398-m404-*；OpenAPI 1.0.70；PostgresIT + ArchitectureTest + Playwright | 审计时间线；树形拖拽；人工视觉批准 |
+| M405 | Admin 主体变更时间线 | 416-m405-* + 399-m405-*；OpenAPI 1.0.71；PostgresIT + ArchitectureTest + Playwright | 跨聚合时间线；操作者显示名；人工视觉批准 |
+| M406 | 车企主数据与行政区名称目录 | 417-m406-* + 400-m406-*；OpenAPI 1.0.72；Flyway V142；PostgresIT + ArchitectureTest + Playwright | 全量国标树；品牌树 UI；人工视觉批准 |
+| M407 | Network 分配师傅候选摘要 | 418-m407-* + 401-m407-*；OpenAPI 1.0.73；ArchitectureTest + Playwright | 推荐评分；人工视觉批准（日程/距离已由 M408/M410 关闭） |
+| M408 | Network 分配候选预约日程冲突摘要 | 419-m408-* + 402-m408-*；OpenAPI 1.0.74；ArchitectureTest + Playwright | 推荐评分；人工视觉批准（距离已由 M410 关闭） |
+| M409 | Admin 关注项目待办/SLA 角标聚合 | 420-m409-* + 403-m409-*；OpenAPI 1.0.75；PostgresIT + Playwright | 全量国标树；人工视觉批准 |
+| M410 | Network 分配候选行政区距离亲和 | 421-m410-* + 404-m410-*；OpenAPI 1.0.76；单元测试 + PostgresIT + Playwright | 经纬度/路网米制距离；推荐评分；人工视觉批准 |
+| M411 | Network 工作台今日预约时间轴 | 422-m411-* + 405-m411-*；OpenAPI 1.0.77；PostgresIT + Playwright | 客户脱敏 PII；完整预约日历；推荐评分；人工视觉批准 |
+| M412 | Network 分配候选推荐解释 | 423-m412-* + 406-m412-*；OpenAPI 1.0.78；EvaluatorTest + PostgresIT + Playwright | 经纬度/路网距离；数值评分；完整预约日历；人工视觉批准 |
+| M413 | Network 预约日历视图 | 424-m413-* + 407-m413-*；OpenAPI 1.0.79；PostgresIT + Playwright；page-registry-v21 | 客户脱敏 PII；月视图拖拽改约；数值评分；人工视觉批准 |
+| M414 | Admin 主数据治理台 | 425-m414-* + 408-m414-*；OpenAPI 1.0.80；Flyway V143；PostgresIT + Playwright；page-registry-v22 | 全国区县全量；拼音索引；多级子品牌；人工视觉批准 |
+| M415 | Admin 跨聚合主体变更时间线 | 426-m415-* + 409-m415-*；OpenAPI 1.0.81；Contributor SPI + PostgresIT + Playwright | 网点任职并入（M416）；AUTHORIZATION_DENIED 活动流；人工视觉批准 |
+| M416 | Admin 网点任职并入主体变更时间线 | 427-m416-* + 410-m416-*；OpenAPI 1.0.82；`NETWORK_MEMBERSHIP` Contributor + PostgresIT + Playwright | 师傅服务关系（M417）；AUTHORIZATION_DENIED 活动流；人工视觉批准 |
+| M417 | Admin 师傅服务关系并入主体变更时间线 | 428-m417-* + 411-m417-*；OpenAPI 1.0.83；`TECHNICIAN_MEMBERSHIP` Contributor + PostgresIT + Playwright | 师傅档案生命周期（M418）；AUTHORIZATION_DENIED 独立活动流；人工视觉批准 |
+| M418 | Admin 师傅档案生命周期并入主体变更时间线 | 429-m418-* + 412-m418-*；OpenAPI 1.0.84；`TECHNICIAN_PROFILE` Contributor + PostgresIT + Playwright | CLIENT_KINDS_DECLARED；AUTHORIZATION_DENIED 独立活动流（M419）；人工视觉批准 |
+| M419 | Admin 主体授权拒绝安全活动流 | 430-m419-* + 413-m419-*；OpenAPI 1.0.85；Flyway V144；actor 索引 + soft-gate + Playwright | 失败登录/设备指纹；混入 change-timeline（禁止）；人工视觉批准 |
+| M420 | Admin 师傅客户端种类声明并入主体变更时间线 | 431-m420-* + 414-m420-*；OpenAPI 1.0.86；Flyway V145；CLIENT_KINDS 事件投影 + PostgresIT + Playwright | 失败登录/设备指纹；全国区县全量；人工视觉批准 |
+| M421 | Network 师傅列表资质与开放任务摘要 | 432-m421-* + 415-m421-*；OpenAPI 1.0.87；listTechnicians 开放任务/资质摘要 + PostgresIT + Playwright | 技能 taxonomy/服务区域/最近同步/资质到期；人工视觉批准 |
+| M422 | Admin 履约配置中心使用中工单摘要 | 433-m422-* + 416-m422-*；OpenAPI 1.0.88；fulfillment-usage-summary + PostgresIT + Playwright | 按服务产品分拆/精确 COUNT>100；失败登录；人工视觉批准 |
+| M423 | Admin 工单工作区脱敏客户联系摘要 | 434-m423-* + 417-m423-*；OpenAPI 1.0.89；workspace masked* + PostgresIT + Playwright | Network 脱敏联系（M424）；表单缩略图/完整审核记录；人工视觉批准 |
+| M424 | Network 工单工作区脱敏客户联系摘要 | 435-m424-* + 418-m424-*；OpenAPI 1.0.90；NP workspace masked* + PostgresIT + Playwright | 目录客户字段；表单缩略图；人工视觉批准 |
+| M425 | Admin 工单工作区完整审核决策记录产品化 | 436-m425-* + 419-m425-*；OpenAPI 1.0.90（无 bump）；REVIEWS_CORRECTIONS decisions UI + Playwright | 表单资料缩略图/revision 预览（M426）；人工视觉批准 |
+| M426 | Admin 工单工作区表单资料授权预览 | 437-m426-* + 420-m426-*；OpenAPI 1.0.91；latestRevisionId/mimeType + PostgresIT + Playwright | Network 资料缩略图 UI（M427）；非图片内联预览；人工视觉批准 |
+| M427 | Network 工单工作区表单资料授权预览 | 438-m427-* + 421-m427-*；OpenAPI 1.0.91（无 bump）；NP workspace 图片短时授权预览 + Playwright | 非图片内联预览；目录缩略图列；人工视觉批准 |
+| M428 | Network Portal 目录页脱敏客户联系 | 439-m428-* + 422-m428-*；OpenAPI 1.0.92；工单/任务目录 masked* + PostgresIT + Playwright | Admin 目录客户列（M429）；独立 updatedAt；人工视觉批准 |
+| M429 | Admin 工单目录脱敏客户联系 | 440-m429-* + 423-m429-*；OpenAPI 1.0.93；WorkOrder masked* + PostgresIT + Playwright | 服务端客户关键词检索；阶段/责任人/SLA 列；人工视觉批准 |
+| M430 | Admin 工单目录服务区域列 | 441-m430-* + 424-m430-*；OpenAPI 1.0.93（无 bump）；省市区码列 + Playwright | 行政区中文名（M431）；按区域筛选；阶段/责任人/SLA；人工视觉批准 |
+| M431 | Admin 工单目录服务区域中文名 | 442-m431-* + 425-m431-*；OpenAPI 1.0.93（无 bump）；region-catalog 名解析 + Playwright | 全国全量树/拼音；按区域筛选；责任人/SLA；人工视觉批准 |
+| M432 | Admin 工单目录当前阶段列 | 443-m432-* + 426-m432-*；OpenAPI 1.0.94；`currentStageCode` + PostgresIT + Playwright | SLA；按阶段筛选；人工视觉批准 |
+| M433 | Admin 工单目录当前责任人列 | 444-m433-* + 427-m433-*；OpenAPI 1.0.95；`currentClaimedBy`/`currentAssigneeDisplayName` + PostgresIT + Playwright | 网点/师傅列；按责任人筛选；人工视觉批准 |
+| M434 | Admin 工单目录 SLA 风险旁载 | 445-m434-* + 428-m434-*；OpenAPI 1.0.96；页级 `slaRiskSummaries` + soft-gate + PostgresIT + Playwright | 即将超时窗口；按 SLA 筛选；人工视觉批准 |
+| M435 | Admin 工单目录独立 updatedAt | 446-m435-* + 429-m435-*；OpenAPI 1.0.97；Flyway V146；`WorkOrder.updatedAt` + 写路径 bump + PostgresIT + Playwright | 列表 total；筛选扩展；Network 独立 updatedAt；人工视觉批准 |
+| M436 | Admin 工单目录列表 total | 447-m436-* + 430-m436-*；OpenAPI 1.0.98；`totalCount`/`totalCountTruncated`（上限 100）+ PostgresIT + Playwright | 精确全量 COUNT；筛选扩展；人工视觉批准 |
+| M437 | Admin 工单目录按区域筛选 | 448-m437-* + 431-m437-*；OpenAPI 1.0.99；省市区码精确过滤 + PostgresIT + Playwright | 网点/师傅/阶段/SLA 筛选；全国区县全量树；人工视觉批准 |
+| M438 | Admin 工单目录按阶段筛选 | 449-m438-* + 432-m438-*；OpenAPI 1.0.100；`currentStageCode` + task SPI IN 收敛 + PostgresIT + Playwright | 网点/师傅/SLA 筛选；网点/师傅列；人工视觉批准 |
+| M439 | Admin 工单目录网点/师傅列 | 450-m439-* + 433-m439-*；OpenAPI 1.0.101；ACTIVE NETWORK/TECHNICIAN + 显示名 + PostgresIT + Playwright | 按网点/师傅筛选；人工视觉批准 |
+| M440 | Admin 工单目录按网点筛选 | 451-m440-* + 434-m440-*；OpenAPI 1.0.102；`currentNetworkId` + dispatch SPI IN 收敛 + PostgresIT + Playwright | 师傅/SLA/创建时间筛选；人工视觉批准 |
+| M441 | Admin 工单目录按师傅筛选 | 452-m441-* + 435-m441-*；OpenAPI 1.0.103；`currentTechnicianId` + dispatch SPI IN 收敛 + PostgresIT + Playwright | SLA/创建时间筛选；人工视觉批准 |
+| M442 | Admin 工单目录按 SLA 风险筛选 | 453-m442-* + 436-m442-*；OpenAPI 1.0.104；`slaRisk` OPEN/BREACHED + sla SPI IN + PostgresIT + Playwright | 创建时间筛选；即将超时窗口；人工视觉批准 |
+| M443 | Admin 工单目录按创建时间筛选 | 454-m443-* + 437-m443-*；OpenAPI 1.0.105；`receivedFrom`/`receivedTo` + Asia/Shanghai 自然日 + PostgresIT + Playwright | 即将超时窗口（COUNT 已由 M444 关闭）；人工视觉批准 |
+| M444 | Admin 工单目录精确全量 COUNT | 455-m444-* + 438-m444-*；OpenAPI 1.0.106；精确 COUNT(*) + truncated 恒 false + PostgresIT + Playwright | 即将超时窗口（已由 M445 关闭）；人工视觉批准 |
+| M445 | Admin 工单目录即将超时筛选 | 456-m445-* + 439-m445-*；OpenAPI 1.0.107；`slaRisk=NEAR` 30m + sla SPI + PostgresIT + Playwright | 策略化预警阈值；Network Portal NEAR；人工视觉批准 |
+| M446 | Admin 工单目录按任务状态筛选 | 457-m446-* + 440-m446-*；OpenAPI 1.0.108；`currentTaskStatus` + task SPI + PostgresIT + Playwright | 审核/整改筛选；服务端关键词；人工视觉批准 |
+| M447 | Admin 工单目录审核/整改状态筛选 | 458-m447-* + 441-m447-*；OpenAPI 1.0.109；`reviewCorrectionStatus` + evidence SPI + evidence.read soft-gate + PostgresIT + Playwright | 服务端关键词；旁载列；人工视觉批准 |
+| M448 | Admin 工单目录服务端关键词检索 | 459-m448-* + 442-m448-*；OpenAPI 1.0.110；`q` + ILIKE/后四位 + PostgresIT + Playwright | 当前任务名/类型列；异常摘要列；人工视觉批准 |
+| M449 | Admin 工单目录当前任务列 | 460-m449-* + 443-m449-*；OpenAPI 1.0.111；`currentTaskType` + task SPI sidecar + PostgresIT + Playwright | 异常摘要列；人工视觉批准 |
+| M450 | Admin 工单目录异常摘要列 | 461-m450-* + 444-m450-*；OpenAPI 1.0.112；页级 `exceptionSummaries` + soft-gate + PostgresIT + Playwright | 异常筛选；人工视觉批准 |
+| M451 | Admin 工单目录异常摘要深链 | 462-m451-* + 445-m451-*；OpenAPI 仍 1.0.112；列链接 → 异常队列 query 水合 + Playwright | 异常筛选；单异常详情直达；人工视觉批准 |
+| M452 | Admin 关注项目角标精确 COUNT | 463-m452-* + 446-m452-*；OpenAPI 1.0.113；精确 COUNT + `*Truncated=false` + PostgresIT | 履约使用中摘要精确 COUNT；人工视觉批准 |
 

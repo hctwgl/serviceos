@@ -20,35 +20,31 @@ import StickyActionBar from '../patterns/StickyActionBar.vue'
 import {
   getProjectFulfillmentDraft,
   getProjectFulfillmentProfile,
+  hasAllowedAction,
   updateProjectFulfillmentDraft,
   validateProjectFulfillmentDraft,
+  type ProjectFulfillmentDocument,
   type ProjectFulfillmentDraft,
   type ProjectFulfillmentProfileDetail,
+  type ProjectFulfillmentStageDraft,
   type ProjectFulfillmentValidationIssue,
 } from '../api/fulfillmentProfiles'
 import { isConflictError } from '../api/client'
 import { toUserFacingError } from '../product/errorMessages'
 import { labelServiceProduct } from '../presentation/enum-labels'
+import { useDeveloperDiagnostics } from '../composables/useDeveloperDiagnostics'
 
-type StageDoc = {
-  stageCode: string
-  stageName: string
-  sequence: number
-  stageType?: string
-  taskType?: string
-  ownerType?: string
-  description?: string
-  formRefs?: string[]
-  evidenceRefs?: string[]
-  actions?: Array<Record<string, unknown>>
-  transitions?: Array<Record<string, unknown>>
-  exceptionPaths?: Array<Record<string, unknown>>
-  slaRef?: string | null
-  terminal?: boolean
+type StageDoc = ProjectFulfillmentStageDraft & {
+  formRefs: string[]
+  evidenceRefs: string[]
+  actions: Array<Record<string, unknown>>
+  transitions: Array<Record<string, unknown>>
+  exceptionPaths: Array<Record<string, unknown>>
 }
 
 const route = useRoute()
 const router = useRouter()
+const diagnostics = useDeveloperDiagnostics()
 const projectId = computed(() => String(route.params.id ?? ''))
 const profileId = computed(() => String(route.params.profileId ?? ''))
 
@@ -81,26 +77,32 @@ const stageErrors = computed(() => {
   return map
 })
 
-function parseStages(documentJson: string): StageDoc[] {
-  try {
-    const doc = JSON.parse(documentJson) as { stages?: StageDoc[] }
-    return [...(doc.stages ?? [])].sort((a, b) => a.sequence - b.sequence)
-  } catch {
-    return []
+function normalizeStage(stage: ProjectFulfillmentStageDraft, index: number): StageDoc {
+  return {
+    ...stage,
+    sequence: stage.sequence || index + 1,
+    formRefs: [...(stage.formRefs ?? [])],
+    evidenceRefs: [...(stage.evidenceRefs ?? [])],
+    actions: [...((stage.actions as Array<Record<string, unknown>> | undefined) ?? [])],
+    transitions: [...((stage.transitions as Array<Record<string, unknown>> | undefined) ?? [])],
+    exceptionPaths: [
+      ...((stage.exceptionPaths as Array<Record<string, unknown>> | undefined) ?? []),
+    ],
+    terminal: !!stage.terminal,
   }
 }
 
-function buildDocumentJson(): string {
-  const base = draft.value?.documentJson
-    ? (JSON.parse(draft.value.documentJson) as Record<string, unknown>)
-    : { schemaVersion: '1.0.0' }
-  return JSON.stringify({
-    ...base,
+function buildDocument(): ProjectFulfillmentDocument {
+  const base = draft.value?.document
+  return {
+    schemaVersion: base?.schemaVersion || '1.0.0',
+    orderTypeName: base?.orderTypeName ?? undefined,
+    supportedClientKinds: base?.supportedClientKinds ?? undefined,
     stages: stages.value.map((stage, index) => ({
       ...stage,
       sequence: index + 1,
     })),
-  })
+  }
 }
 
 async function load() {
@@ -112,9 +114,20 @@ async function load() {
     draft.value = (await getProjectFulfillmentDraft(projectId.value, profileId.value)).data
     profileName.value = draft.value.profileName
     description.value = draft.value.description ?? ''
-    stages.value = parseStages(draft.value.documentJson)
+    stages.value = [...(draft.value.document?.stages ?? [])]
+      .sort((a, b) => a.sequence - b.sequence)
+      .map((stage, index) => normalizeStage(stage, index))
     selectedStageCode.value = stages.value[0]?.stageCode ?? null
     dirty.value = false
+    if (draft.value.documentJson) {
+      diagnostics.pushDiagnostic({
+        title: '履约草稿 JSON（仅诊断）',
+        fields: {
+          revisionId: draft.value.revisionId,
+          documentJson: draft.value.documentJson.slice(0, 4000),
+        },
+      })
+    }
   } catch (err) {
     error.value = toUserFacingError(err).message
   } finally {
@@ -148,6 +161,7 @@ function addStage() {
     actions: [],
     transitions: [],
     exceptionPaths: [],
+    terminal: false,
   })
   selectedStageCode.value = code
   markDirty()
@@ -185,7 +199,7 @@ async function saveDraft() {
       {
         profileName: profileName.value,
         description: description.value,
-        documentJson: buildDocumentJson(),
+        document: buildDocument(),
         workflowAssetVersionId: draft.value.workflowAssetVersionId ?? undefined,
         sourceBundleId: draft.value.sourceBundleId ?? undefined,
       },
@@ -255,8 +269,15 @@ onMounted(load)
     </template>
     <template #primary-action>
       <Space>
-        <Button :loading="validating" @click="validate">验证配置</Button>
         <Button
+          v-if="hasAllowedAction(detail, 'VALIDATE')"
+          :loading="validating"
+          @click="validate"
+        >
+          验证配置
+        </Button>
+        <Button
+          v-if="hasAllowedAction(detail, 'COMPILE_PREVIEW') || hasAllowedAction(detail, 'VIEW')"
           @click="
             router.push({
               name: 'ADMIN.PROJECT.FULFILLMENT.PREVIEW',
@@ -267,6 +288,7 @@ onMounted(load)
           预览
         </Button>
         <Button
+          v-if="hasAllowedAction(detail, 'PUBLISH')"
           type="primary"
           @click="
             router.push({
@@ -510,7 +532,7 @@ onMounted(load)
                   placeholder="例如 task.elapsed.standard"
                   @change="
                     (e: Event) => {
-                      const value = (e.target as HTMLInputElement).value.trim() || null
+                      const value = (e.target as HTMLInputElement).value.trim() || undefined
                       updateSelectedStage((stage) => {
                         stage.slaRef = value
                       })

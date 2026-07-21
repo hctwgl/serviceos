@@ -8,6 +8,7 @@ import com.serviceos.project.api.ProjectDetail;
 import com.serviceos.project.api.ProjectPage;
 import com.serviceos.project.api.ProjectQuery;
 import com.serviceos.project.api.ProjectQueryService;
+import com.serviceos.project.api.ProjectReferenceOptions;
 import com.serviceos.project.api.ProjectScopeRelationRevisionPage;
 import com.serviceos.project.api.ProjectScopeRelationRevisionView;
 import com.serviceos.project.api.ProjectView;
@@ -68,6 +69,19 @@ final class ProjectController {
         return ResponseEntity.ok()
                 .header(CorrelationIds.HEADER_NAME, correlationId)
                 .body(page);
+    }
+
+    /**
+     * 必须注册在 /{projectId} 之前，避免把 reference-options 解析为 UUID。
+     */
+    @GetMapping("/reference-options")
+    ResponseEntity<ProjectReferenceOptions> referenceOptions(
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
+    ) {
+        ProjectReferenceOptions options = queries.referenceOptions(principals.current(), correlationId);
+        return ResponseEntity.ok()
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(options);
     }
 
     @GetMapping("/{projectId}")

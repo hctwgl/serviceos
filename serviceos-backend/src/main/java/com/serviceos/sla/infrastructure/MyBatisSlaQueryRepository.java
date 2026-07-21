@@ -33,6 +33,18 @@ final class MyBatisSlaQueryRepository implements SlaQueryRepository {
     }
 
     @Override
+    public int countPage(
+            String tenantId, boolean tenantWide, List<UUID> projectIds, UUID workOrderId, String status
+    ) {
+        return mapper.countPage(
+                tenantId,
+                tenantWide,
+                projectIds.stream().map(UUID::toString).toList(),
+                workOrderId,
+                status);
+    }
+
+    @Override
     public Optional<SlaStoredInstance> findById(String tenantId, UUID slaInstanceId) {
         return Optional.ofNullable(mapper.findById(tenantId, slaInstanceId)).map(this::instance);
     }

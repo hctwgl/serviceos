@@ -5,11 +5,13 @@ import { Alert, Button, Descriptions, Space, Table, Tabs, TabPane } from 'ant-de
 import { ArrowLeftOutlined } from '@ant-design/icons-vue'
 import DetailPageLayout from '../patterns/templates/DetailPageLayout.vue'
 import SemanticStatusTag from '../components/business/SemanticStatusTag.vue'
+import FulfillmentRunbookTable from '../components/fulfillment/FulfillmentRunbookTable.vue'
 import {
-  getProjectFulfillmentDraft,
+  compileProjectFulfillmentPreview,
   getProjectFulfillmentProfile,
+  hasAllowedAction,
   listProjectFulfillmentRevisions,
-  type ProjectFulfillmentDraft,
+  type ProjectFulfillmentManifest,
   type ProjectFulfillmentProfileDetail,
   type ProjectFulfillmentRevision,
 } from '../api/fulfillmentProfiles'
@@ -26,41 +28,20 @@ const profileId = computed(() => String(route.params.profileId ?? ''))
 const loading = ref(false)
 const error = ref<string | null>(null)
 const detail = ref<ProjectFulfillmentProfileDetail | null>(null)
-const draft = ref<ProjectFulfillmentDraft | null>(null)
 const revisions = ref<ProjectFulfillmentRevision[]>([])
+const manifest = ref<ProjectFulfillmentManifest | null>(null)
 const activeTab = ref('overview')
 
-type StageRow = {
-  stageCode: string
-  stageName: string
-  sequence: number
-  ownerType: string
-  formCount: number
-  evidenceCount: number
-  actionCount: number
-  slaRef: string
-}
-
-const stageRows = computed<StageRow[]>(() => {
-  if (!draft.value?.documentJson) return []
-  try {
-    const doc = JSON.parse(draft.value.documentJson) as {
-      stages?: Array<Record<string, unknown>>
-    }
-    return (doc.stages ?? []).map((stage) => ({
-      stageCode: String(stage.stageCode ?? ''),
-      stageName: String(stage.stageName ?? ''),
-      sequence: Number(stage.sequence ?? 0),
-      ownerType: String(stage.ownerType ?? '—'),
-      formCount: Array.isArray(stage.formRefs) ? stage.formRefs.length : 0,
-      evidenceCount: Array.isArray(stage.evidenceRefs) ? stage.evidenceRefs.length : 0,
-      actionCount: Array.isArray(stage.actions) ? stage.actions.length : 0,
-      slaRef: stage.slaRef ? String(stage.slaRef) : '未绑定',
-    }))
-  } catch {
-    return []
-  }
-})
+const canEdit = computed(() => hasAllowedAction(detail.value, 'EDIT_DRAFT'))
+const canPreview = computed(
+  () =>
+    hasAllowedAction(detail.value, 'COMPILE_PREVIEW') ||
+    hasAllowedAction(detail.value, 'VIEW'),
+)
+const canPublish = computed(() => hasAllowedAction(detail.value, 'PUBLISH'))
+const readonly = computed(
+  () => detail.value?.status === 'SUSPENDED' || detail.value?.status === 'RETIRED',
+)
 
 async function load() {
   if (!projectId.value || !profileId.value) return
@@ -69,10 +50,14 @@ async function load() {
   try {
     const result = await getProjectFulfillmentProfile(projectId.value, profileId.value)
     detail.value = result.data
-    draft.value = (
-      await getProjectFulfillmentDraft(projectId.value, profileId.value)
-    ).data
     revisions.value = await listProjectFulfillmentRevisions(projectId.value, profileId.value)
+    if (canPreview.value || hasAllowedAction(detail.value, 'VALIDATE')) {
+      manifest.value = (
+        await compileProjectFulfillmentPreview(projectId.value, profileId.value)
+      ).data
+    } else {
+      manifest.value = null
+    }
   } catch (err) {
     error.value = toUserFacingError(err).message
   } finally {
@@ -105,12 +90,13 @@ onMounted(load)
         @click="router.push({ name: 'ADMIN.PROJECT.FULFILLMENT.LIST', params: { id: projectId } })"
       >
         <template #icon><ArrowLeftOutlined /></template>
-        返回列表
+        返回配置中心
       </Button>
     </template>
     <template #primary-action>
       <Space>
         <Button
+          v-if="canEdit"
           @click="
             router.push({
               name: 'ADMIN.PROJECT.FULFILLMENT.EDIT',
@@ -121,6 +107,7 @@ onMounted(load)
           编辑草稿
         </Button>
         <Button
+          v-if="canPreview"
           @click="
             router.push({
               name: 'ADMIN.PROJECT.FULFILLMENT.PREVIEW',
@@ -128,9 +115,10 @@ onMounted(load)
             })
           "
         >
-          运行预览
+          运行说明
         </Button>
         <Button
+          v-if="canPublish"
           type="primary"
           @click="
             router.push({
@@ -145,6 +133,14 @@ onMounted(load)
     </template>
     <template #feedback>
       <Alert v-if="error" type="error" show-icon :message="error" style="margin-bottom: 12px" />
+      <Alert
+        v-if="readonly"
+        type="warning"
+        show-icon
+        message="当前配置为只读状态"
+        :description="`状态：${statusLabel(detail?.status || '')}。可查看历史版本，写操作已由服务端关闭。`"
+        style="margin-bottom: 12px"
+      />
     </template>
 
     <template v-if="detail">
@@ -171,22 +167,8 @@ onMounted(load)
       </Descriptions>
 
       <Tabs v-model:activeKey="activeTab">
-        <TabPane key="overview" tab="阶段总览">
-          <Table
-            size="middle"
-            row-key="stageCode"
-            :pagination="false"
-            :data-source="stageRows"
-            :columns="[
-              { title: '顺序', dataIndex: 'sequence', width: 80 },
-              { title: '阶段', dataIndex: 'stageName' },
-              { title: '责任类型', dataIndex: 'ownerType' },
-              { title: '表单', dataIndex: 'formCount', width: 80 },
-              { title: '资料', dataIndex: 'evidenceCount', width: 80 },
-              { title: '动作', dataIndex: 'actionCount', width: 80 },
-              { title: 'SLA', dataIndex: 'slaRef' },
-            ]"
-          />
+        <TabPane key="overview" tab="运行说明书">
+          <FulfillmentRunbookTable :runbook="manifest?.runbook" :loading="loading" />
         </TabPane>
         <TabPane key="revisions" tab="发布版本">
           <Table

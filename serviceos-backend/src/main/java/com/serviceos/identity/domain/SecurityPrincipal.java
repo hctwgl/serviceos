@@ -50,8 +50,14 @@ public record SecurityPrincipal(
     public static SecurityPrincipal register(
             UUID id, String tenantId, Type type, String displayName, Instant now
     ) {
+        return register(id, tenantId, type, displayName, null, now);
+    }
+
+    public static SecurityPrincipal register(
+            UUID id, String tenantId, Type type, String displayName, String employeeNumber, Instant now
+    ) {
         return new SecurityPrincipal(id, tenantId, type, Status.ACTIVE, 1, now, now,
-                null, null, null, displayName, null, 1);
+                null, null, null, displayName, employeeNumber, 1);
     }
 
     public SecurityPrincipal requireActive() {

@@ -1,7 +1,9 @@
 package com.serviceos.identity.api;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -12,6 +14,9 @@ public interface PrincipalPersonaQuery {
     boolean isActive(String tenantId, UUID principalId);
 
     Optional<String> displayName(String tenantId, UUID principalId);
+
+    /** 批量解析显示名；缺失主体不出现在结果中。 */
+    Map<UUID, String> displayNames(String tenantId, Collection<UUID> principalIds);
 
     List<PrincipalPersonaView> listEffectivePersonas(String tenantId, UUID principalId, Instant at);
 }

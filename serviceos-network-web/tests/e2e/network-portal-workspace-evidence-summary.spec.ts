@@ -134,6 +134,8 @@ async function stubWorkspaceEvidence(
             revisionCount: 0,
             latestRevisionNumber: null,
             latestRevisionStatus: null,
+            latestRevisionId: null,
+            latestMimeType: null,
           },
         ]
       }

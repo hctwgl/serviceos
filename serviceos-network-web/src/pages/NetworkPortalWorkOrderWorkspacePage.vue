@@ -2,12 +2,20 @@
 import { statusLabel } from '../product/labels'
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+import { safeProblemMessage } from '@serviceos/web-core'
 
 import {
+  authorizeEvidenceRevisionDownload,
   getNetworkPortalWorkOrderWorkspace,
+  listNetworkPortalAssignCandidates,
+  type NetworkPortalTaskItem,
+  type NetworkPortalAssignCandidateItem,
   type NetworkPortalWorkOrderWorkspace,
   type NetworkPortalWorkspaceAppointmentSummary,
+  type NetworkPortalWorkspaceEvidenceItemSummary,
 } from '../api/networkPortal'
+import AssignTechnicianDrawer from '../components/AssignTechnicianDrawer.vue'
+import AppointmentCollaborationPanel from '../components/AppointmentCollaborationPanel.vue'
 
 const props = defineProps<{ networkContextId: string | null }>()
 const route = useRoute()
@@ -15,9 +23,67 @@ const workOrderId = computed(() => String(route.params.id ?? ''))
 const detail = ref<NetworkPortalWorkOrderWorkspace | null>(null)
 const error = ref<string | null>(null)
 const loading = ref(false)
+const assignDrawerOpen = ref(false)
+const assignTask = ref<NetworkPortalTaskItem | null>(null)
+const assignCandidates = ref<NetworkPortalAssignCandidateItem[]>([])
+const workOrderRegionSummary = ref<string | null>(null)
+const rankingExplanation = ref<string | null>(null)
+const assignEmptyReason = ref<string | null>(null)
+const loadingCandidates = ref(false)
+const candidatesError = ref<string | null>(null)
+const showTechnicalDetails = ref(import.meta.env.DEV)
+/** M427：图片资料短时授权预览 URL（purpose=WORKSPACE_EVIDENCE_PREVIEW）。 */
+const evidencePreviewUrls = ref<Record<string, string>>({})
+const evidencePreviewErrors = ref<Record<string, string>>({})
+const evidencePreviewLoading = ref(false)
 
 function hasAppointmentWindow(item: NetworkPortalWorkspaceAppointmentSummary) {
   return item.windowStart != null && item.windowEnd != null
+}
+
+function isImageEvidenceItem(item: NetworkPortalWorkspaceEvidenceItemSummary) {
+  return (
+    item.latestRevisionId != null &&
+    item.latestMimeType != null &&
+    item.latestMimeType.startsWith('image/')
+  )
+}
+
+async function loadEvidencePreviews(items: NetworkPortalWorkspaceEvidenceItemSummary[] | null | undefined) {
+  evidencePreviewUrls.value = {}
+  evidencePreviewErrors.value = {}
+  const imageItems = (items ?? []).filter(isImageEvidenceItem)
+  if (imageItems.length === 0) {
+    evidencePreviewLoading.value = false
+    return
+  }
+  evidencePreviewLoading.value = true
+  try {
+    await Promise.all(
+      imageItems.map(async (item) => {
+        const revisionId = item.latestRevisionId
+        if (!revisionId) return
+        try {
+          const auth = await authorizeEvidenceRevisionDownload(
+            revisionId,
+            'WORKSPACE_EVIDENCE_PREVIEW',
+          )
+          evidencePreviewUrls.value = {
+            ...evidencePreviewUrls.value,
+            [item.evidenceItemId]: auth.downloadUrl,
+          }
+        } catch (err) {
+          evidencePreviewErrors.value = {
+            ...evidencePreviewErrors.value,
+            [item.evidenceItemId]:
+              err instanceof Error ? err.message : '预览授权失败',
+          }
+        }
+      }),
+    )
+  } finally {
+    evidencePreviewLoading.value = false
+  }
 }
 
 function resolveTechnician(technicianId: string | null | undefined) {
@@ -38,6 +104,103 @@ const unassignedTaskIds = computed(() => {
     .map((task) => task.taskId)
 })
 
+const currentTask = computed(() => detail.value?.tasks[0] ?? null)
+
+const progressSteps = computed(() => {
+  const tasks = detail.value?.tasks ?? []
+  const hasTech = Boolean(detail.value?.technicianId || tasks.some((t) => t.technicianId))
+  const hasAppt = (detail.value?.appointments?.length ?? 0) > 0
+  const hasVisit = (detail.value?.visits?.length ?? 0) > 0
+  const hasCorrection = (detail.value?.corrections?.some((c) => c.status === 'OPEN') ?? false)
+  const steps: { key: string; label: string; status: 'done' | 'current' | 'upcoming' }[] = [
+    { key: 'intake', label: '已接入', status: 'done' },
+    {
+      key: 'assign',
+      label: '待分配',
+      status: hasTech ? 'done' : 'current',
+    },
+    {
+      key: 'appointment',
+      label: '已预约',
+      status: hasAppt ? 'done' : hasTech ? 'current' : 'upcoming',
+    },
+    {
+      key: 'visit',
+      label: '上门中',
+      status: hasVisit ? 'done' : hasAppt ? 'current' : 'upcoming',
+    },
+    {
+      key: 'review',
+      label: hasCorrection ? '资料整改' : '资料审核',
+      status: hasCorrection ? 'current' : hasVisit ? 'current' : 'upcoming',
+    },
+    { key: 'done', label: '完成', status: 'upcoming' },
+  ]
+  // 保证仅一个 current：取第一个 current，其后 upcoming。
+  let sawCurrent = false
+  return steps.map((step) => {
+    if (step.status === 'current') {
+      if (sawCurrent) return { ...step, status: 'upcoming' as const }
+      sawCurrent = true
+      return step
+    }
+    if (step.status === 'done' && !sawCurrent) return step
+    if (step.status === 'done' && sawCurrent) return { ...step, status: 'upcoming' as const }
+    return step
+  })
+})
+
+const nextStepHint = computed(() => {
+  if (!detail.value) return '加载工作区后将给出下一步'
+  if (unassignedTaskIds.value.length) return '下一步：为待分配任务选择师傅'
+  if (!(detail.value.appointments?.length)) return '下一步：联系客户并确认预约窗口'
+  if ((detail.value.corrections ?? []).some((c) => c.status === 'OPEN')) {
+    return '下一步：处理资料整改'
+  }
+  if ((detail.value.slaSummary?.breachedCount ?? 0) > 0) return '下一步：优先处理已超时 SLA'
+  return '继续跟踪上门与资料完成情况'
+})
+
+async function loadAssignCandidates(taskId: string) {
+  if (!props.networkContextId) {
+    assignCandidates.value = []
+    workOrderRegionSummary.value = null
+    rankingExplanation.value = null
+    assignEmptyReason.value = null
+    return
+  }
+  loadingCandidates.value = true
+  try {
+    const page = await listNetworkPortalAssignCandidates(props.networkContextId, taskId)
+    assignCandidates.value = page.items
+    workOrderRegionSummary.value = page.workOrderRegionSummary
+    rankingExplanation.value = page.rankingExplanation
+    assignEmptyReason.value = page.emptyReason ?? null
+    candidatesError.value = null
+  } catch (err) {
+    assignCandidates.value = []
+    workOrderRegionSummary.value = null
+    rankingExplanation.value = null
+    assignEmptyReason.value = null
+    candidatesError.value = safeProblemMessage(err)
+  } finally {
+    loadingCandidates.value = false
+  }
+}
+
+function openAssign(task?: NetworkPortalTaskItem | null) {
+  assignTask.value = task ?? currentTask.value
+  assignDrawerOpen.value = true
+  if (assignTask.value) {
+    void loadAssignCandidates(assignTask.value.taskId)
+  }
+}
+
+async function onAssigned() {
+  assignDrawerOpen.value = false
+  await load()
+}
+
 async function load() {
   if (!props.networkContextId) {
     detail.value = null
@@ -46,7 +209,7 @@ async function load() {
   }
   if (!workOrderId.value) {
     detail.value = null
-    error.value = '缺少 workOrderId'
+    error.value = '缺少工单编号'
     return
   }
   loading.value = true
@@ -56,9 +219,12 @@ async function load() {
       workOrderId.value,
     )
     error.value = null
+    void loadEvidencePreviews(detail.value.evidenceItems)
   } catch (err) {
     detail.value = null
-    error.value = err instanceof Error ? err.message : '工单工作区加载失败'
+    error.value = safeProblemMessage(err)
+    evidencePreviewUrls.value = {}
+    evidencePreviewErrors.value = {}
   } finally {
     loading.value = false
   }
@@ -79,10 +245,12 @@ watch(
   <section
     data-testid="network-portal-work-order-workspace"
     data-page-id="NETWORK.WORKORDER.WORKSPACE"
+    class="workspace-page"
   >
     <header class="top">
       <div>
-        <h2>限定工单工作区</h2>
+        <p class="eyebrow">网点工单工作区</p>
+        <h2>履约协作</h2>
         <p class="meta" data-testid="workspace-work-order-id">{{ workOrderId }}</p>
       </div>
       <div class="actions">
@@ -95,12 +263,131 @@ watch(
       </div>
     </header>
     <p class="hint">
-      只读薄快照（M213）+ 协作深链（M214）+ 服务端摘要 enrichment（M221～M228）：缺能力时省略相关区块。
+      围绕当前任务、预约、师傅、资料与 SLA 完成网点侧协作；缺能力时相关区块省略，不伪装为空。
     </p>
     <p v-if="error" data-testid="network-portal-error">{{ error }}</p>
-    <p v-else-if="loading" data-testid="workspace-loading">加载中…</p>
-    <template v-else-if="detail">
-      <dl data-testid="workspace-header-fields">
+    <p v-else-if="loading && !detail" data-testid="workspace-loading">加载中…</p>
+    <template v-if="detail">
+      <section class="product-shell" data-testid="workspace-product-shell">
+        <div class="object-head">
+          <div>
+            <h3>
+              {{ detail.businessType ? statusLabel(detail.businessType) : '本网点工单' }}
+            </h3>
+            <p class="muted">{{ nextStepHint }}</p>
+            <dl class="masked-contact" data-testid="workspace-masked-contact">
+              <div>
+                <dt>客户</dt>
+                <dd data-testid="workspace-masked-customer-name">
+                  {{ detail.maskedCustomerName || '—' }}
+                </dd>
+              </div>
+              <div>
+                <dt>手机号</dt>
+                <dd data-testid="workspace-masked-customer-phone">
+                  {{ detail.maskedCustomerPhone || '—' }}
+                </dd>
+              </div>
+              <div>
+                <dt>地址</dt>
+                <dd data-testid="workspace-masked-service-address">
+                  {{ detail.maskedServiceAddress || '—' }}
+                </dd>
+              </div>
+            </dl>
+          </div>
+          <div class="primary-actions" data-testid="workspace-primary-actions">
+            <button
+              v-if="unassignedTaskIds.length"
+              type="button"
+              class="primary"
+              data-testid="workspace-action-assign"
+              @click="openAssign(currentTask)"
+            >
+              分配师傅
+            </button>
+            <button
+              type="button"
+              data-testid="workspace-action-appointment"
+              @click="showTechnicalDetails = true"
+            >
+              联系 / 预约
+            </button>
+            <RouterLink
+              v-if="(detail.corrections?.length ?? 0) > 0"
+              to="/network-portal/corrections"
+              data-testid="workspace-action-corrections"
+            >
+              查看整改
+            </RouterLink>
+          </div>
+        </div>
+
+        <ol class="progress" data-testid="workspace-business-progress" aria-label="履约进度">
+          <li
+            v-for="step in progressSteps"
+            :key="step.key"
+            :data-status="step.status"
+          >
+            {{ step.label }}
+            <span v-if="step.status === 'current'" class="badge">当前</span>
+          </li>
+        </ol>
+
+        <div class="card-grid">
+          <article class="card" data-testid="workspace-current-task-card">
+            <h4>当前任务</h4>
+            <template v-if="currentTask">
+              <p>
+                <strong>{{ statusLabel(currentTask.taskType || '') || '现场任务' }}</strong>
+                · {{ statusLabel(currentTask.status || '') }}
+              </p>
+              <p class="muted">
+                阶段 {{ statusLabel(currentTask.stageCode || '') || '—' }} · 师傅
+                {{
+                  resolveTechnician(currentTask.technicianId)?.displayName ||
+                  currentTask.technicianId ||
+                  '未指派'
+                }}
+              </p>
+              <button
+                v-if="!currentTask.technicianId"
+                type="button"
+                class="primary"
+                data-testid="workspace-current-task-assign"
+                @click="openAssign(currentTask)"
+              >
+                分配师傅
+              </button>
+            </template>
+            <p v-else class="muted">暂无 ACTIVE 任务</p>
+          </article>
+
+          <article class="card" data-testid="workspace-risk-card">
+            <h4>风险与提醒</h4>
+            <p v-if="detail.slaSummary">
+              SLA 进行中 {{ detail.slaSummary.openCount }} · 已超时
+              {{ detail.slaSummary.breachedCount }}
+            </p>
+            <p v-else class="muted">SLA 摘要不可用（可能缺少 sla.read）</p>
+            <p v-if="(detail.exceptions?.length ?? 0) > 0">
+              运营异常 {{ detail.exceptions!.length }} 条
+            </p>
+            <p v-else class="muted">暂无待处理异常摘要</p>
+          </article>
+        </div>
+
+        <AppointmentCollaborationPanel
+          v-if="networkContextId"
+          :network-context-id="networkContextId"
+          :tasks="detail.tasks"
+          :appointments="detail.appointments"
+          :contact-attempts="detail.contactAttempts"
+          @changed="load"
+        />
+      </section>
+
+      <dl data-testid="workspace-header-fields" class="header-fields">
         <div><dt>networkId</dt><dd>{{ detail.networkId }}</dd></div>
         <div><dt>projectId</dt><dd>{{ detail.projectId ?? '—' }}</dd></div>
         <div>
@@ -278,33 +565,66 @@ watch(
         aria-label="Evidence item summaries"
       >
         <h3>资料项摘要</h3>
-        <ul v-if="detail.evidenceItems.length">
-          <li
+        <div v-if="detail.evidenceItems.length" class="evidence-preview-grid">
+          <article
             v-for="item in detail.evidenceItems"
             :key="item.evidenceItemId"
+            class="evidence-preview-card"
             :data-testid="`workspace-evidence-item-${item.evidenceItemId}`"
           >
-            <strong>{{ item.evidenceItemId }}</strong>
-            <span class="muted">
-              （slot {{ item.evidenceSlotId }} · #{{ item.itemOrdinal }} · {{ item.status ? statusLabel(item.status) : '—' }} ·
-              rev {{ item.revisionCount }}
+            <header class="evidence-preview-card__head">
+              <strong>
+                #{{ item.itemOrdinal }} · {{ item.status ? statusLabel(item.status) : '—' }}
+              </strong>
+              <span class="muted" data-testid="workspace-evidence-item-project">
+                project {{ item.projectId }}
+              </span>
+            </header>
+            <p class="muted">
+              slot {{ item.evidenceSlotId }} · rev {{ item.revisionCount }}
               <template v-if="item.latestRevisionNumber != null">
                 / #{{ item.latestRevisionNumber }}
               </template>
               <template v-if="item.latestRevisionStatus">
                 / {{ statusLabel(item.latestRevisionStatus) }}
               </template>
-              ）
-            </span>
-            <span class="muted" data-testid="workspace-evidence-item-project">
-              · project {{ item.projectId }}
-            </span>
-          </li>
-        </ul>
+            </p>
+            <template v-if="isImageEvidenceItem(item)">
+              <p
+                v-if="evidencePreviewLoading && !evidencePreviewUrls[item.evidenceItemId]"
+                class="muted"
+              >
+                预览授权中…
+              </p>
+              <p
+                v-else-if="evidencePreviewErrors[item.evidenceItemId]"
+                class="error"
+                data-testid="workspace-evidence-preview-error"
+              >
+                {{ evidencePreviewErrors[item.evidenceItemId] }}
+              </p>
+              <img
+                v-else-if="evidencePreviewUrls[item.evidenceItemId]"
+                class="evidence-preview-card__thumb"
+                data-testid="workspace-evidence-preview-image"
+                :src="evidencePreviewUrls[item.evidenceItemId]"
+                :alt="`资料预览 ${item.itemOrdinal}`"
+              />
+              <p v-else class="muted">暂无预览</p>
+            </template>
+            <p v-else class="muted" data-testid="workspace-evidence-preview-non-image">
+              {{
+                item.latestMimeType
+                  ? `非图片类型（${item.latestMimeType}）`
+                  : '尚无最新修订'
+              }}
+            </p>
+          </article>
+        </div>
         <p v-else data-testid="workspace-evidence-items-empty">暂无资料项</p>
         <p class="hint">
-          需 NETWORK <code>evidence.read</code>。展示 Accepted 非 PII 资料项摘要；不含
-          Revision 图/file/captureMetadata。
+          需 NETWORK <code>evidence.read</code> 与 <code>file.download</code>。图片经短时授权预览
+          （purpose=<code>WORKSPACE_EVIDENCE_PREVIEW</code>）；不含 fileObjectId/永久 URL/captureMetadata。
         </p>
       </section>
 
@@ -694,26 +1014,156 @@ watch(
         </p>
       </section>
     </template>
+
+    <p v-if="candidatesError" class="error" data-testid="assign-candidates-error">{{ candidatesError }}</p>
+    <AssignTechnicianDrawer
+      v-if="networkContextId"
+      :open="assignDrawerOpen"
+      :network-context-id="networkContextId"
+      :task="assignTask"
+      :candidates="assignCandidates"
+      :work-order-region-summary="workOrderRegionSummary"
+      :ranking-explanation="rankingExplanation"
+      :empty-reason="assignEmptyReason"
+      :loading-candidates="loadingCandidates"
+      @close="assignDrawerOpen = false"
+      @assigned="onAssigned"
+    />
   </section>
 </template>
 
 <style scoped>
+.workspace-page {
+  display: grid;
+  gap: 14px;
+}
 .top {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
   align-items: flex-start;
 }
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--sos-primary-600);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+.top h2 {
+  margin: 0 0 4px;
+  font-size: 22px;
+}
 .meta,
 .hint,
 .muted {
-  color: #5b6573;
+  color: var(--sos-color-text-tertiary);
   font-size: 0.9rem;
 }
-.actions {
+.actions,
+.primary-actions {
   display: flex;
   gap: 0.75rem;
   align-items: center;
+  flex-wrap: wrap;
+}
+.product-shell {
+  display: grid;
+  gap: 14px;
+}
+.object-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  border: 1px solid var(--sos-color-border-default);
+  border-radius: var(--sos-radius-md);
+  background: var(--sos-color-surface-card);
+  padding: 14px 16px;
+}
+.object-head h3 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+.masked-contact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  margin: 10px 0 0;
+}
+.masked-contact > div {
+  display: grid;
+  gap: 2px;
+}
+.masked-contact dt {
+  margin: 0;
+  font-size: 12px;
+  color: var(--sos-color-text-secondary);
+}
+.masked-contact dd {
+  margin: 0;
+  font-size: 14px;
+  color: var(--sos-color-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.progress {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.progress li {
+  border: 1px solid var(--sos-color-border-default);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  background: var(--sos-color-surface-subtle);
+  color: var(--sos-color-text-secondary);
+}
+.progress li[data-status='done'] {
+  border-color: var(--sos-color-status-success-border);
+  background: var(--sos-color-status-success-bg);
+  color: var(--sos-color-status-success-fg);
+}
+.progress li[data-status='current'] {
+  border-color: var(--sos-primary-600);
+  background: var(--sos-primary-100);
+  color: var(--sos-primary-800);
+  font-weight: 600;
+}
+.badge {
+  margin-left: 6px;
+  font-size: 11px;
+  background: var(--sos-primary-600);
+  color: #fff;
+  border-radius: 999px;
+  padding: 0 6px;
+}
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.card {
+  border: 1px solid var(--sos-color-border-default);
+  border-radius: var(--sos-radius-md);
+  background: var(--sos-color-surface-card);
+  padding: 14px;
+}
+.card h4 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+button.primary {
+  background: var(--sos-primary-600);
+  border-color: var(--sos-primary-600);
+  color: #fff;
+}
+@media (max-width: 900px) {
+  .card-grid {
+    grid-template-columns: 1fr;
+  }
 }
 dl {
   display: grid;
@@ -763,5 +1213,37 @@ td {
   margin-top: 0.2rem;
   color: #374151;
   font-size: 0.8rem;
+}
+.evidence-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 12px 0 16px;
+}
+.evidence-preview-card {
+  border: 1px solid var(--sos-color-border-default, #d9dee7);
+  border-radius: var(--sos-radius-md, 8px);
+  background: var(--sos-color-surface-card, #fff);
+  padding: 10px 12px;
+  display: grid;
+  gap: 8px;
+}
+.evidence-preview-card__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+.evidence-preview-card__thumb {
+  width: 100%;
+  max-height: 180px;
+  object-fit: contain;
+  background: var(--sos-color-surface-subtle, #f5f7fa);
+  border-radius: 6px;
+}
+.error {
+  color: var(--sos-color-status-critical-fg, #b42318);
+  font-size: 0.85rem;
 }
 </style>
