@@ -430,6 +430,7 @@ title: ServiceOS 里程碑索引
 | M421 | M421 Network 师傅列表资质与开放任务摘要 | [432-m421-network-technician-list-load-qualification-summary.md](../architecture/432-m421-network-technician-list-load-qualification-summary.md) | [415-m421-network-technician-list-load-qualification-summary-acceptance.md](../testing/415-m421-network-technician-list-load-qualification-summary-acceptance.md) |
 | M422 | M422 Admin 履约配置中心使用中工单摘要 | [433-m422-admin-fulfillment-active-work-order-usage-summary.md](../architecture/433-m422-admin-fulfillment-active-work-order-usage-summary.md) | [416-m422-admin-fulfillment-active-work-order-usage-summary-acceptance.md](../testing/416-m422-admin-fulfillment-active-work-order-usage-summary-acceptance.md) |
 | M423 | M423 Admin 工单工作区脱敏客户联系摘要 | [434-m423-admin-work-order-workspace-masked-contact.md](../architecture/434-m423-admin-work-order-workspace-masked-contact.md) | [417-m423-admin-work-order-workspace-masked-contact-acceptance.md](../testing/417-m423-admin-work-order-workspace-masked-contact-acceptance.md) |
+| M424 | M424 Network 工单工作区脱敏客户联系摘要 | [435-m424-network-work-order-workspace-masked-contact.md](../architecture/435-m424-network-work-order-workspace-masked-contact.md) | [418-m424-network-work-order-workspace-masked-contact-acceptance.md](../testing/418-m424-network-work-order-workspace-masked-contact-acceptance.md) |
 
 ## 未关联里程碑的文档
 

@@ -156,6 +156,9 @@ class NetworkPortalControllerSecurityTest {
                         null,
                         null,
                         null,
+                        "王*",
+                        "*******5678",
+                        "杭州市西湖区***",
                         now));
 
         mvc.perform(get("/api/v1/network-portal/work-orders/" + WORK_ORDER_ID + "/workspace")
@@ -165,7 +168,10 @@ class NetworkPortalControllerSecurityTest {
                         .header("X-Network-Context", "NETWORK|NETWORK|" + NETWORK_ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.workOrderId").value(WORK_ORDER_ID.toString()))
-                .andExpect(jsonPath("$.tasks[0].taskId").value(taskId.toString()));
+                .andExpect(jsonPath("$.tasks[0].taskId").value(taskId.toString()))
+                .andExpect(jsonPath("$.maskedCustomerName").value("王*"))
+                .andExpect(jsonPath("$.maskedCustomerPhone").value("*******5678"))
+                .andExpect(jsonPath("$.maskedServiceAddress").value("杭州市西湖区***"));
     }
 
     @Test

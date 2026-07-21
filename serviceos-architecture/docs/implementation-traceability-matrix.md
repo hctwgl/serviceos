@@ -511,5 +511,6 @@ Feature gate/authority: if applicable
 | M420 | Admin 师傅客户端种类声明并入主体变更时间线 | 431-m420-* + 414-m420-*；OpenAPI 1.0.86；Flyway V145；CLIENT_KINDS 事件投影 + PostgresIT + Playwright | 失败登录/设备指纹；全国区县全量；人工视觉批准 |
 | M421 | Network 师傅列表资质与开放任务摘要 | 432-m421-* + 415-m421-*；OpenAPI 1.0.87；listTechnicians 开放任务/资质摘要 + PostgresIT + Playwright | 技能 taxonomy/服务区域/最近同步/资质到期；人工视觉批准 |
 | M422 | Admin 履约配置中心使用中工单摘要 | 433-m422-* + 416-m422-*；OpenAPI 1.0.88；fulfillment-usage-summary + PostgresIT + Playwright | 按服务产品分拆/精确 COUNT>100；失败登录；人工视觉批准 |
-| M423 | Admin 工单工作区脱敏客户联系摘要 | 434-m423-* + 417-m423-*；OpenAPI 1.0.89；workspace masked* + PostgresIT + Playwright | Network 脱敏联系；表单缩略图/完整审核记录；人工视觉批准 |
+| M423 | Admin 工单工作区脱敏客户联系摘要 | 434-m423-* + 417-m423-*；OpenAPI 1.0.89；workspace masked* + PostgresIT + Playwright | Network 脱敏联系（M424）；表单缩略图/完整审核记录；人工视觉批准 |
+| M424 | Network 工单工作区脱敏客户联系摘要 | 435-m424-* + 418-m424-*；OpenAPI 1.0.90；NP workspace masked* + PostgresIT + Playwright | 目录客户字段；表单缩略图/完整审核记录；人工视觉批准 |
 

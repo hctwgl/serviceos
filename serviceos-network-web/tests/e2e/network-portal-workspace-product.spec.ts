@@ -100,6 +100,9 @@ async function stubWorkspaceProduct(page: Page) {
           technicianId: null,
           effectiveFrom: '2026-07-20T03:00:00Z',
           asOf: '2026-07-20T04:00:00Z',
+          maskedCustomerName: '王*',
+          maskedCustomerPhone: '*******5678',
+          maskedServiceAddress: '杭州市西湖区***',
           slaSummary: { openCount: 1, breachedCount: 0 },
           appointments: [],
           contactAttempts: [],
@@ -251,6 +254,10 @@ test.describe('M391 网点工单工作区产品化 + 预约协同', () => {
     await expect(page.getByTestId('workspace-current-task-card')).toBeVisible()
     await expect(page.getByTestId('workspace-appointment-collaboration')).toBeVisible()
     await expect(page.getByTestId('workspace-header-fields')).toBeVisible()
+    await expect(page.getByTestId('workspace-masked-customer-name')).toContainText('王*')
+    await expect(page.getByTestId('workspace-masked-customer-phone')).toContainText('*******5678')
+    await expect(page.getByTestId('workspace-masked-service-address')).toContainText('杭州市西湖区***')
+    await expect(page.getByTestId('workspace-masked-customer-phone')).not.toContainText('138')
 
     await page.getByTestId('workspace-action-assign').click()
     await expect(page.getByTestId('assign-technician-drawer')).toBeVisible()

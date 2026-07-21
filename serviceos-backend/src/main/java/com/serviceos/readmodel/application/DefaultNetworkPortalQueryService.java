@@ -82,6 +82,8 @@ import com.serviceos.task.api.TaskFulfillmentContext;
 import com.serviceos.task.api.TaskFulfillmentContextService;
 import com.serviceos.workorder.api.WorkOrderDirectoryHeader;
 import com.serviceos.workorder.api.WorkOrderDirectoryHeaderQuery;
+import com.serviceos.workorder.api.WorkOrderMaskedContactView;
+import com.serviceos.workorder.api.WorkOrderQueryService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -162,6 +164,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     private final AppointmentService appointments;
     private final TechnicianScheduleAppointmentQuery scheduleAppointments;
     private final WorkOrderDirectoryHeaderQuery workOrderHeaders;
+    private final WorkOrderQueryService workOrders;
     private final ServiceNetworkCoverageQuery coverages;
     private final RegionCatalogNameQuery regionNames;
     private final Clock clock;
@@ -187,6 +190,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
             AppointmentService appointments,
             TechnicianScheduleAppointmentQuery scheduleAppointments,
             WorkOrderDirectoryHeaderQuery workOrderHeaders,
+            WorkOrderQueryService workOrders,
             ServiceNetworkCoverageQuery coverages,
             RegionCatalogNameQuery regionNames,
             Clock clock
@@ -211,6 +215,7 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         this.appointments = appointments;
         this.scheduleAppointments = scheduleAppointments;
         this.workOrderHeaders = workOrderHeaders;
+        this.workOrders = workOrders;
         this.coverages = coverages;
         this.regionNames = regionNames;
         this.clock = clock;
@@ -407,6 +412,9 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
             technicianSummaries = loadTechnicianSummaries(
                     actor.tenantId(), networkId, wantedTechnicianIds);
         }
+        // M424：基座门禁（membership + networkTask.read + ACTIVE）已通过；再取网点范围脱敏联系。
+        WorkOrderMaskedContactView contact = workOrders.getMaskedContactForNetwork(
+                actor, correlationId, networkId, workOrderId);
         return new NetworkPortalWorkOrderWorkspace(
                 networkId,
                 workOrderId,
@@ -427,6 +435,9 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                 appointmentSummaries,
                 contactAttemptSummaries,
                 technicianSummaries,
+                contact.maskedCustomerName(),
+                contact.maskedCustomerPhone(),
+                contact.maskedServiceAddress(),
                 clock.instant());
     }
 

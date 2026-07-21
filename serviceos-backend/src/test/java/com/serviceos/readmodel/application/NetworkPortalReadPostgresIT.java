@@ -208,6 +208,12 @@ class NetworkPortalReadPostgresIT {
                 .containsExactlyInAnyOrder(TASK_A, TASK_A2);
         assertThat(workspace.tasks().getFirst().status()).isEqualTo("READY");
         assertThat(workspace.technicianId()).isEqualTo(TECH_PROFILE.toString());
+        // M424：基座返回脱敏客户联系；夹具原文为 测试客户 / 13800000000 / 测试地址
+        assertThat(workspace.maskedCustomerName()).isEqualTo("测***");
+        assertThat(workspace.maskedCustomerPhone()).isEqualTo("*******0000");
+        assertThat(workspace.maskedServiceAddress()).isEqualTo("测***");
+        assertThat(workspace.maskedCustomerPhone()).doesNotContain("138");
+        assertThat(workspace.maskedServiceAddress()).doesNotContain("测试地址");
 
         assertThatThrownBy(() -> portal.getWorkOrderWorkspace(
                 actor(PRINCIPAL), "corr-ws-foreign", context, WO_B))

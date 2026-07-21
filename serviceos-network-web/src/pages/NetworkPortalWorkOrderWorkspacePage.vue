@@ -221,6 +221,26 @@ watch(
               {{ detail.businessType ? statusLabel(detail.businessType) : '本网点工单' }}
             </h3>
             <p class="muted">{{ nextStepHint }}</p>
+            <dl class="masked-contact" data-testid="workspace-masked-contact">
+              <div>
+                <dt>客户</dt>
+                <dd data-testid="workspace-masked-customer-name">
+                  {{ detail.maskedCustomerName || '—' }}
+                </dd>
+              </div>
+              <div>
+                <dt>手机号</dt>
+                <dd data-testid="workspace-masked-customer-phone">
+                  {{ detail.maskedCustomerPhone || '—' }}
+                </dd>
+              </div>
+              <div>
+                <dt>地址</dt>
+                <dd data-testid="workspace-masked-service-address">
+                  {{ detail.maskedServiceAddress || '—' }}
+                </dd>
+              </div>
+            </dl>
           </div>
           <div class="primary-actions" data-testid="workspace-primary-actions">
             <button
@@ -976,6 +996,27 @@ watch(
 .object-head h3 {
   margin: 0 0 4px;
   font-size: 18px;
+}
+.masked-contact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  margin: 10px 0 0;
+}
+.masked-contact > div {
+  display: grid;
+  gap: 2px;
+}
+.masked-contact dt {
+  margin: 0;
+  font-size: 12px;
+  color: var(--sos-color-text-secondary);
+}
+.masked-contact dd {
+  margin: 0;
+  font-size: 14px;
+  color: var(--sos-color-text-primary);
+  font-variant-numeric: tabular-nums;
 }
 .progress {
   list-style: none;

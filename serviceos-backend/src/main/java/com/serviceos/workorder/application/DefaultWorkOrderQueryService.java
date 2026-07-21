@@ -31,6 +31,7 @@ import java.util.UUID;
 @Service
 final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
     private static final String READ = "workOrder.read";
+    private static final String NETWORK_TASK_READ = "networkTask.read";
     private static final Set<String> STATUSES = Set.of(
             "RECEIVED", "ACTIVE", "SUSPENDED", "FULFILLED", "CANCELLED", "CLOSED");
     private final WorkOrderQueryRepository queries;
@@ -95,8 +96,29 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 .orElseThrow(() -> new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "工单不存在"));
         authorization.require(principal, AuthorizationRequest.projectCapability(READ, principal.tenantId(),
                 "WorkOrder", workOrder.id().toString(), workOrder.projectId().toString()), correlationId);
+        return maskRawContact(principal.tenantId(), workOrderId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public WorkOrderMaskedContactView getMaskedContactForNetwork(
+            CurrentPrincipal principal, String correlationId, UUID networkId, UUID workOrderId
+    ) {
+        Objects.requireNonNull(networkId, "networkId must not be null");
+        Objects.requireNonNull(workOrderId, "workOrderId must not be null");
+        // 网点范围：强制 NETWORK networkTask.read；ACTIVE 责任由 Network Portal 编排层先证明。
+        authorization.require(principal, AuthorizationRequest.networkCapability(
+                NETWORK_TASK_READ,
+                principal.tenantId(),
+                "ServiceNetwork",
+                networkId.toString(),
+                networkId.toString()), correlationId);
+        return maskRawContact(principal.tenantId(), workOrderId);
+    }
+
+    private WorkOrderMaskedContactView maskRawContact(String tenantId, UUID workOrderId) {
         WorkOrderQueryRepository.RawCustomerContact raw = queries
-                .findRawCustomerContact(principal.tenantId(), workOrderId)
+                .findRawCustomerContact(tenantId, workOrderId)
                 .orElseThrow(() -> new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "工单不存在"));
         return new WorkOrderMaskedContactView(
                 raw.workOrderId(),

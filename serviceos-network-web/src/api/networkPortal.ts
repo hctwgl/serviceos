@@ -367,6 +367,12 @@ export type NetworkPortalWorkOrderWorkspace = {
   contactAttempts?: NetworkPortalWorkspaceContactAttemptSummary[]
   /** Soft-gated；缺 NETWORK `technician.readOwnNetwork` 时省略，不得用空数组伪装无权限。 */
   technicians?: NetworkPortalTechnicianItem[]
+  /** M424：服务端脱敏客户姓名；随基座返回，不 soft-omit。 */
+  maskedCustomerName: string | null
+  /** M424：服务端脱敏手机号。 */
+  maskedCustomerPhone: string | null
+  /** M424：服务端脱敏服务地址。 */
+  maskedServiceAddress: string | null
   asOf: string
 }
 

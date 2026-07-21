@@ -33,6 +33,9 @@ import java.util.UUID;
  *
  * <p>M229：可选 {@code reviews} 在无 NETWORK {@code evidence.read} 时为 null（省略）；
  * 有能力时可为空列表。</p>
+ *
+ * <p>M424：顶层脱敏客户联系字段随工作区基座（ACTIVE + {@code networkTask.read}）返回；
+ * 可为空串位的 null，但必须序列化（{@link JsonInclude.Include#ALWAYS}），不得 soft-omit。</p>
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record NetworkPortalWorkOrderWorkspace(
@@ -55,6 +58,9 @@ public record NetworkPortalWorkOrderWorkspace(
         List<NetworkPortalWorkspaceAppointmentSummary> appointments,
         List<NetworkPortalWorkspaceContactAttemptSummary> contactAttempts,
         List<NetworkPortalTechnicianItem> technicians,
+        @JsonInclude(JsonInclude.Include.ALWAYS) String maskedCustomerName,
+        @JsonInclude(JsonInclude.Include.ALWAYS) String maskedCustomerPhone,
+        @JsonInclude(JsonInclude.Include.ALWAYS) String maskedServiceAddress,
         Instant asOf
 ) {
     public NetworkPortalWorkOrderWorkspace {

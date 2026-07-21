@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.89
+  version: 1.0.90
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -1781,6 +1781,9 @@ paths:
         M229：可选 `reviews`（复用 Admin WorkOrderWorkspaceReviewCaseSummary）；
         需 NETWORK `evidence.read`，缺能力时省略（不得用空数组伪装）；
         仅覆盖 ACTIVE taskIds；含全部状态。
+        M424：顶层 `maskedCustomerName` / `maskedCustomerPhone` / `maskedServiceAddress`
+        随基座返回（复用 workorder 脱敏端口的网点授权路径）；不得返回客户联系原文；
+        不 soft-omit（缺值为 null）。
         上下文缺失/伪造/非成员返回 PORTAL_CONTEXT_INVALID（403）。
       parameters:
         - name: workOrderId
@@ -7939,7 +7942,15 @@ components:
     NetworkPortalWorkOrderWorkspace:
       type: object
       additionalProperties: false
-      required: [networkId, workOrderId, taskIds, tasks, asOf]
+      required:
+        - networkId
+        - workOrderId
+        - taskIds
+        - tasks
+        - maskedCustomerName
+        - maskedCustomerPhone
+        - maskedServiceAddress
+        - asOf
       properties:
         networkId: { type: string, format: uuid }
         workOrderId: { type: string, format: uuid }
@@ -8030,6 +8041,18 @@ components:
           type: array
           maxItems: 100
           items: { $ref: '#/components/schemas/NetworkPortalTechnicianItem' }
+        maskedCustomerName:
+          type: [string, 'null']
+          maxLength: 64
+          description: M424：服务端脱敏客户姓名；随工作区基座返回，不 soft-omit
+        maskedCustomerPhone:
+          type: [string, 'null']
+          maxLength: 32
+          description: M424：服务端脱敏手机号；不得返回完整号码
+        maskedServiceAddress:
+          type: [string, 'null']
+          maxLength: 256
+          description: M424：服务端脱敏服务地址；不得返回完整地址
         asOf: { type: string, format: date-time }
     NetworkPortalTaskItem:
       type: object
