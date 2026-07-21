@@ -30,7 +30,7 @@ soft-gate 合并 `TechnicianProfile` 不可变目录事件。
 
 ## 4. 明确未实现
 
-- `TECHNICIAN_CLIENT_KINDS_DECLARED` 并入主体时间线
+- `TECHNICIAN_CLIENT_KINDS_DECLARED` 并入主体时间线（已由 **M420** 关闭主路径）
 - 独立安全活动流承载 `AUTHORIZATION_DENIED`（已由 **M419** 关闭主路径）
 - 全国区县全量树 / 拼音索引 / 多级子品牌
 - 产品负责人视觉金标（`READY_FOR_REVIEW`）

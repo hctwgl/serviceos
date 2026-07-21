@@ -74,6 +74,8 @@ test.describe('M402–M405 Admin 用户登记到变更时间线', () => {
     await expect(page.getByTestId('user-change-timeline')).toContainText('师傅服务关系已建立')
     await expect(page.getByTestId('user-change-timeline')).toContainText('演示师傅网点')
     await expect(page.getByTestId('user-change-timeline')).toContainText('师傅档案已创建')
+    await expect(page.getByTestId('user-change-timeline')).toContainText('师傅客户端种类已声明')
+    await expect(page.getByTestId('user-change-timeline')).toContainText('TECHNICIAN_WEB')
     await expect(page.getByTestId('user-change-timeline')).toContainText('审批运营')
     await page.screenshot({
       path: 'tests/e2e/__screenshots__/admin-user-change-timeline-1440.png',

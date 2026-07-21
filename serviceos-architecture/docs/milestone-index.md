@@ -426,6 +426,7 @@ title: ServiceOS 里程碑索引
 | M417 | M417 Admin 师傅服务关系并入主体变更时间线 | [428-m417-admin-technician-membership-change-timeline.md](../architecture/428-m417-admin-technician-membership-change-timeline.md) | [411-m417-admin-technician-membership-change-timeline-acceptance.md](../testing/411-m417-admin-technician-membership-change-timeline-acceptance.md) |
 | M418 | M418 Admin 师傅档案生命周期并入主体变更时间线 | [429-m418-admin-technician-profile-change-timeline.md](../architecture/429-m418-admin-technician-profile-change-timeline.md) | [412-m418-admin-technician-profile-change-timeline-acceptance.md](../testing/412-m418-admin-technician-profile-change-timeline-acceptance.md) |
 | M419 | M419 Admin 主体授权拒绝安全活动流 | [430-m419-admin-principal-authorization-denial-activity.md](../architecture/430-m419-admin-principal-authorization-denial-activity.md) | [413-m419-admin-principal-authorization-denial-activity-acceptance.md](../testing/413-m419-admin-principal-authorization-denial-activity-acceptance.md) |
+| M420 | M420 Admin 师傅客户端种类声明并入主体变更时间线 | [431-m420-admin-technician-client-kinds-change-timeline.md](../architecture/431-m420-admin-technician-client-kinds-change-timeline.md) | [414-m420-admin-technician-client-kinds-change-timeline-acceptance.md](../testing/414-m420-admin-technician-client-kinds-change-timeline-acceptance.md) |
 
 ## 未关联里程碑的文档
 

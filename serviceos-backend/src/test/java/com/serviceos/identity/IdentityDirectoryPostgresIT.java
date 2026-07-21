@@ -400,21 +400,32 @@ class IdentityDirectoryPostgresIT {
         var disabled = networks.disableTechnicianProfile(
                 actor(), metadata("tech-profile-disable"), profile.id(), profile.version(),
                 "临时停用");
-        networks.enableTechnicianProfile(
+        var enabled = networks.enableTechnicianProfile(
                 actor(), metadata("tech-profile-enable"), disabled.id(), disabled.version());
+        networks.declareTechnicianSupportedClientKinds(
+                actor(), metadata("tech-profile-kinds"), enabled.id(), enabled.version(),
+                List.of("TECHNICIAN_WEB"));
 
         var timeline = queries.changeTimeline(actor(), "corr-tech-profile-timeline", principalId, 50);
         assertThat(timeline.omittedSources()).isEmpty();
         assertThat(timeline.items()).extracting(item -> item.source())
                 .contains("LIFECYCLE", "TECHNICIAN_PROFILE");
         assertThat(timeline.items()).extracting(item -> item.eventCode())
-                .contains("TECHNICIAN_CREATED", "TECHNICIAN_DISABLED", "TECHNICIAN_ENABLED");
+                .contains(
+                        "TECHNICIAN_CREATED", "TECHNICIAN_DISABLED", "TECHNICIAN_ENABLED",
+                        "TECHNICIAN_CLIENT_KINDS_DECLARED");
         assertThat(timeline.items()).filteredOn(item -> "TECHNICIAN_CREATED".equals(item.eventCode()))
                 .singleElement()
                 .satisfies(item -> assertThat(item.summary()).contains("师傅档案用户"));
         assertThat(timeline.items()).filteredOn(item -> "TECHNICIAN_DISABLED".equals(item.eventCode()))
                 .singleElement()
                 .satisfies(item -> assertThat(item.summary()).contains("临时停用"));
+        assertThat(timeline.items())
+                .filteredOn(item -> "TECHNICIAN_CLIENT_KINDS_DECLARED".equals(item.eventCode()))
+                .singleElement()
+                .satisfies(item -> assertThat(item.summary())
+                        .contains("师傅客户端种类已声明")
+                        .contains("TECHNICIAN_WEB"));
 
         jdbc.sql("""
                 DELETE FROM auth_role_capability

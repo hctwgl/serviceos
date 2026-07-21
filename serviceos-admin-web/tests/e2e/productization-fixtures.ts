@@ -824,6 +824,18 @@ export async function mockProductizationApis(
         items: [
           {
             source: 'TECHNICIAN_PROFILE',
+            eventCode: 'TECHNICIAN_CLIENT_KINDS_DECLARED',
+            summary: '师傅客户端种类已声明 · 演示用户 · 声明=TECHNICIAN_WEB',
+            actorId: '77777777-7777-4777-8777-777777777777',
+            actorDisplayName: '审批运营',
+            result: 'SUCCEEDED',
+            correlationId: 'corr-technician-kinds',
+            principalVersion: 2,
+            occurredAt: '2026-07-20T03:56:00Z',
+            refId: '33333333-3333-4333-8333-333333333333',
+          },
+          {
+            source: 'TECHNICIAN_PROFILE',
             eventCode: 'TECHNICIAN_CREATED',
             summary: '师傅档案已创建 · 演示用户',
             actorId: '77777777-7777-4777-8777-777777777777',

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.85
+  version: 1.0.86
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -153,10 +153,11 @@ paths:
       operationId: listPrincipalChangeTimeline
       summary: 查询主体变更时间线
       description: |
-        M405/M415/M416/M417/M418：需要 identity.read。
+        M405/M415/M416/M417/M418/M420：需要 identity.read。
         聚合生命周期、非冗余审计、成功登录；并 soft-gate 合并组织任职（organization.read）、
-        RoleGrant（authorization.read）、网点任职/师傅服务关系/师傅档案生命周期（network.read）事实。
-        缺权来源列入 omittedSources，不伪造空成功。不包含 AUTHORIZATION_DENIED（见独立安全活动流）。
+        RoleGrant（authorization.read）、网点任职/师傅服务关系/师傅档案生命周期与客户端种类声明
+        （network.read）事实。缺权来源列入 omittedSources，不伪造空成功。
+        不包含 AUTHORIZATION_DENIED（见独立安全活动流）。
       parameters:
         - $ref: '#/components/parameters/PrincipalId'
         - name: limit

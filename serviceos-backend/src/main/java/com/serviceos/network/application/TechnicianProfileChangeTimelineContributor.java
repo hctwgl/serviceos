@@ -10,10 +10,9 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * 将 net_directory_event 中的师傅档案生命周期事实贡献到主体变更时间线。
+ * 将 net_directory_event 中的师傅档案事实贡献到主体变更时间线。
  *
- * <p>只投影挂在 TechnicianProfile 上的创建/停用/启用事件；
- * 不投影客户端种类声明，也不混入服务关系或网点任职事件。</p>
+ * <p>投影创建/停用/启用与客户端种类声明；不混入服务关系或网点任职事件。</p>
  */
 @Component
 final class TechnicianProfileChangeTimelineContributor implements PrincipalChangeTimelineContributor {
@@ -54,7 +53,8 @@ final class TechnicianProfileChangeTimelineContributor implements PrincipalChang
                    AND p.principal_id = :principalId
                    AND e.resource_type = 'TechnicianProfile'
                    AND e.event_type IN (
-                        'TECHNICIAN_CREATED', 'TECHNICIAN_DISABLED', 'TECHNICIAN_ENABLED'
+                        'TECHNICIAN_CREATED', 'TECHNICIAN_DISABLED', 'TECHNICIAN_ENABLED',
+                        'TECHNICIAN_CLIENT_KINDS_DECLARED'
                    )
                  ORDER BY e.occurred_at DESC, e.directory_event_id DESC
                  LIMIT :limit
@@ -86,11 +86,25 @@ final class TechnicianProfileChangeTimelineContributor implements PrincipalChang
             case "TECHNICIAN_CREATED" -> "师傅档案已创建 · " + name;
             case "TECHNICIAN_DISABLED" -> "师傅档案已停用 · " + name;
             case "TECHNICIAN_ENABLED" -> "师傅档案已启用 · " + name;
+            case "TECHNICIAN_CLIENT_KINDS_DECLARED" -> clientKindsSummary(name, reason);
             default -> eventType + " · " + name;
         };
+        if ("TECHNICIAN_CLIENT_KINDS_DECLARED".equals(eventType)) {
+            return base;
+        }
         if (reason == null || reason.isBlank()) {
             return base;
         }
         return base + " · " + reason.trim();
+    }
+
+    private static String clientKindsSummary(String name, String reason) {
+        if (reason != null && reason.contains("已清除")) {
+            return "师傅客户端种类已清除 · " + name;
+        }
+        if (reason == null || reason.isBlank()) {
+            return "师傅客户端种类已声明 · " + name;
+        }
+        return "师傅客户端种类已声明 · " + name + " · " + reason.trim();
     }
 }

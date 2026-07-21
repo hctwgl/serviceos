@@ -508,4 +508,5 @@ Feature gate/authority: if applicable
 | M417 | Admin 师傅服务关系并入主体变更时间线 | 428-m417-* + 411-m417-*；OpenAPI 1.0.83；`TECHNICIAN_MEMBERSHIP` Contributor + PostgresIT + Playwright | 师傅档案生命周期（M418）；AUTHORIZATION_DENIED 独立活动流；人工视觉批准 |
 | M418 | Admin 师傅档案生命周期并入主体变更时间线 | 429-m418-* + 412-m418-*；OpenAPI 1.0.84；`TECHNICIAN_PROFILE` Contributor + PostgresIT + Playwright | CLIENT_KINDS_DECLARED；AUTHORIZATION_DENIED 独立活动流（M419）；人工视觉批准 |
 | M419 | Admin 主体授权拒绝安全活动流 | 430-m419-* + 413-m419-*；OpenAPI 1.0.85；Flyway V144；actor 索引 + soft-gate + Playwright | 失败登录/设备指纹；混入 change-timeline（禁止）；人工视觉批准 |
+| M420 | Admin 师傅客户端种类声明并入主体变更时间线 | 431-m420-* + 414-m420-*；OpenAPI 1.0.86；Flyway V145；CLIENT_KINDS 事件投影 + PostgresIT + Playwright | 失败登录/设备指纹；全国区县全量；人工视觉批准 |
 
