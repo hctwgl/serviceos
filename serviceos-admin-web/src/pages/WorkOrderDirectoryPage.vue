@@ -8,6 +8,7 @@ import ListPageLayout from '../patterns/templates/ListPageLayout.vue'
 import SemanticStatusTag from '../components/business/SemanticStatusTag.vue'
 import AsyncContent from '../components/feedback/AsyncContent.vue'
 import { listAuthorizedWorkOrders, type WorkOrderPage } from '../api/workOrders'
+import { listRegionCatalog } from '../api/projectCatalog'
 import { firstRouteQuery } from '../routeQuery'
 import { statusOptions } from '../product/statusLabels'
 import { toUserFacingError } from '../product/errorMessages'
@@ -32,6 +33,8 @@ const status = ref<string | undefined>(undefined)
 const clientCode = ref<string | undefined>(undefined)
 const projectKeyword = ref('')
 const keyword = ref('')
+/** M431：region-catalog 编码→名称；未命中时区域列回退国标码。 */
+const regionNameByCode = ref<Map<string, string>>(new Map())
 
 /** 更多筛选：当前列表 API 未提供对应查询参数，仅展示缺口说明。 */
 const moreRegion = ref('')
@@ -134,12 +137,41 @@ type Row = {
   maskedServiceAddress: string | null
 }
 
-/** M430：目录服务区域以既有国标码拼接展示（与 Network 目录口径一致）。 */
+/** M430/M431：优先展示目录中文名，未命中则回退国标码（不发明名称）。 */
+function regionPartLabel(code: string | null | undefined) {
+  if (code == null || String(code).trim() === '') {
+    return null
+  }
+  const trimmed = String(code).trim()
+  return regionNameByCode.value.get(trimmed) ?? trimmed
+}
+
 function regionLabel(row: Pick<Row, 'provinceCode' | 'cityCode' | 'districtCode'>) {
-  const parts = [row.provinceCode, row.cityCode, row.districtCode].filter(
+  const parts = [row.provinceCode, row.cityCode, row.districtCode]
+    .map((code) => regionPartLabel(code))
+    .filter((part): part is string => part != null)
+  return parts.length ? parts.join('/') : '—'
+}
+
+function regionCodesTooltip(row: Pick<Row, 'provinceCode' | 'cityCode' | 'districtCode'>) {
+  const codes = [row.provinceCode, row.cityCode, row.districtCode].filter(
     (part) => part != null && String(part).trim() !== '',
   )
-  return parts.length ? parts.join('/') : '—'
+  return codes.length ? `区域编码：${codes.join('/')}` : '无区域编码'
+}
+
+async function loadRegionNames() {
+  try {
+    const page = await listRegionCatalog({ parentCode: '*', limit: 200 })
+    const next = new Map<string, string>()
+    for (const item of page.items) {
+      next.set(item.regionCode, item.regionName)
+    }
+    regionNameByCode.value = next
+  } catch {
+    // 缺 project.read 或目录失败时保持码展示，不阻断工单目录主路径。
+    regionNameByCode.value = new Map()
+  }
 }
 
 const rows = computed((): Row[] => {
@@ -185,7 +217,10 @@ const countLabel = computed(() => {
   return `已加载 ${n} 条`
 })
 
-const columns = computed((): TableColumnsType<Row> => [
+const columns = computed((): TableColumnsType<Row> => {
+  // 依赖 region-catalog 映射，避免异步加载完成后列不刷新。
+  void regionNameByCode.value
+  return [
   {
     title: '工单编号',
     dataIndex: 'externalOrderCode',
@@ -282,9 +317,13 @@ const columns = computed((): TableColumnsType<Row> => [
   {
     title: '服务区域',
     key: 'region',
-    width: 140,
+    width: 160,
     customRender: ({ record }: { record: Row }) =>
-      h('span', { 'data-testid': 'work-order-region' }, regionLabel(record)),
+      h(
+        Tooltip,
+        { title: regionCodesTooltip(record) },
+        () => h('span', { 'data-testid': 'work-order-region' }, regionLabel(record)),
+      ),
   },
   {
     title: '当前责任人',
@@ -332,10 +371,12 @@ const columns = computed((): TableColumnsType<Row> => [
         () => '打开详情',
       ),
   },
-])
+]
+})
 
 onMounted(() => {
   hydrateFiltersFromRoute()
+  void loadRegionNames()
   return load()
 })
 

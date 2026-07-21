@@ -19,7 +19,7 @@ flywayVersion: unchanged
 
 ## UI_DATA_GAP
 
-阶段、客户（已由 **M429** 关闭主路径）、区域（已由 **M430** 关闭码展示主路径）、责任人、SLA、独立 updatedAt、筛选条件扩展、列表 total。
+阶段、客户（已由 **M429** 关闭主路径）、区域（已由 **M430** 关闭码展示、**M431** 关闭中文名主路径）、责任人、SLA、独立 updatedAt、筛选条件扩展、列表 total。
 
 ## 验证
 

@@ -518,5 +518,6 @@ Feature gate/authority: if applicable
 | M427 | Network 工单工作区表单资料授权预览 | 438-m427-* + 421-m427-*；OpenAPI 1.0.91（无 bump）；NP workspace 图片短时授权预览 + Playwright | 非图片内联预览；目录缩略图列；人工视觉批准 |
 | M428 | Network Portal 目录页脱敏客户联系 | 439-m428-* + 422-m428-*；OpenAPI 1.0.92；工单/任务目录 masked* + PostgresIT + Playwright | Admin 目录客户列（M429）；独立 updatedAt；人工视觉批准 |
 | M429 | Admin 工单目录脱敏客户联系 | 440-m429-* + 423-m429-*；OpenAPI 1.0.93；WorkOrder masked* + PostgresIT + Playwright | 服务端客户关键词检索；阶段/责任人/SLA 列；人工视觉批准 |
-| M430 | Admin 工单目录服务区域列 | 441-m430-* + 424-m430-*；OpenAPI 1.0.93（无 bump）；省市区码列 + Playwright | 行政区中文名；按区域筛选；阶段/责任人/SLA；人工视觉批准 |
+| M430 | Admin 工单目录服务区域列 | 441-m430-* + 424-m430-*；OpenAPI 1.0.93（无 bump）；省市区码列 + Playwright | 行政区中文名（M431）；按区域筛选；阶段/责任人/SLA；人工视觉批准 |
+| M431 | Admin 工单目录服务区域中文名 | 442-m431-* + 425-m431-*；OpenAPI 1.0.93（无 bump）；region-catalog 名解析 + Playwright | 全国全量树/拼音；按区域筛选；阶段/责任人/SLA；人工视觉批准 |
 
