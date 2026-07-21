@@ -7,9 +7,9 @@
     <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
 
     <conversionRule conversionWord="serviceosMessage"
-                    converterClass="com.serviceos.bootstrap.RedactingMessageConverter"/>
+                    class="com.serviceos.bootstrap.RedactingMessageConverter"/>
     <conversionRule conversionWord="serviceosException"
-                    converterClass="com.serviceos.bootstrap.RedactingThrowableProxyConverter"/>
+                    class="com.serviceos.bootstrap.RedactingThrowableProxyConverter"/>
 
     <property name="CONSOLE_LOG_PATTERN"
               value="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] [traceId=%X{traceId:-}, spanId=%X{spanId:-}, correlationId=%X{correlationId:-}] %logger{40} - %serviceosMessage%n%serviceosException"/>
