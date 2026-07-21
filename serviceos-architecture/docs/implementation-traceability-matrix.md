@@ -501,4 +501,5 @@ Feature gate/authority: if applicable
 | M410 | Network 分配候选行政区距离亲和 | 421-m410-* + 404-m410-*；OpenAPI 1.0.76；单元测试 + PostgresIT + Playwright | 经纬度/路网米制距离；推荐评分；人工视觉批准 |
 | M411 | Network 工作台今日预约时间轴 | 422-m411-* + 405-m411-*；OpenAPI 1.0.77；PostgresIT + Playwright | 客户脱敏 PII；完整预约日历；推荐评分；人工视觉批准 |
 | M412 | Network 分配候选推荐解释 | 423-m412-* + 406-m412-*；OpenAPI 1.0.78；EvaluatorTest + PostgresIT + Playwright | 经纬度/路网距离；数值评分；完整预约日历；人工视觉批准 |
+| M413 | Network 预约日历视图 | 424-m413-* + 407-m413-*；OpenAPI 1.0.79；PostgresIT + Playwright；page-registry-v21 | 客户脱敏 PII；月视图拖拽改约；数值评分；人工视觉批准 |
 

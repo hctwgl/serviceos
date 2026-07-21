@@ -3,6 +3,7 @@ package com.serviceos.readmodel.web;
 import com.serviceos.evidence.api.CorrectionCaseView;
 import com.serviceos.evidence.api.CorrectionResubmissionView;
 import com.serviceos.identity.api.CurrentPrincipalProvider;
+import com.serviceos.readmodel.api.NetworkPortalAppointmentCalendarView;
 import com.serviceos.readmodel.api.NetworkPortalAssignCandidatePage;
 import com.serviceos.readmodel.api.NetworkPortalCapacityItem;
 import com.serviceos.readmodel.api.NetworkPortalCorrectionItem;
@@ -24,9 +25,11 @@ import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -109,6 +112,22 @@ final class NetworkPortalController {
             @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId
     ) {
         NetworkPortalWorkbenchView body = queries.workbench(principals.current(), correlationId, networkContext);
+        return ResponseEntity.ok()
+                .header(CorrelationIds.HEADER_NAME, correlationId)
+                .body(body);
+    }
+
+    @GetMapping("/appointment-calendar")
+    ResponseEntity<NetworkPortalAppointmentCalendarView> appointmentCalendar(
+            @RequestHeader(value = "X-Network-Context", required = false) String networkContext,
+            @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId,
+            @RequestParam(value = "from", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(value = "to", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+    ) {
+        NetworkPortalAppointmentCalendarView body = queries.appointmentCalendar(
+                principals.current(), correlationId, networkContext, from, to);
         return ResponseEntity.ok()
                 .header(CorrelationIds.HEADER_NAME, correlationId)
                 .body(body);

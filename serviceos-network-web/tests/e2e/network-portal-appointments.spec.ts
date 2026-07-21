@@ -35,7 +35,6 @@ test.describe('M197 Network Portal 预约协作', () => {
       await tasksNav.click()
       await expect(page.getByTestId('network-portal-tasks')).toBeVisible()
       await expect(page.getByTestId('network-appointment-form')).toBeVisible()
-      await expect(page.locator('[data-page-id="NETWORK.APPOINTMENT"]')).toBeVisible()
       await expect(page.getByTestId('appointment-propose-submit')).toBeVisible()
     } else {
       await expect(navError).toBeVisible()

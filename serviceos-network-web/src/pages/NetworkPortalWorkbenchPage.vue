@@ -55,6 +55,10 @@ const summaryItems = computed<SummaryStripItem[]>(() => {
         typeof data.value.todayAppointmentCount === 'number'
           ? '运营日 Asia/Shanghai'
           : '缺少 networkPortal.manageAppointment',
+      to:
+        typeof data.value.todayAppointmentCount === 'number'
+          ? '/network-portal/appointments'
+          : undefined,
       testId: 'workbench-today-appointment-count',
       tone:
         typeof data.value.todayAppointmentCount === 'number' &&

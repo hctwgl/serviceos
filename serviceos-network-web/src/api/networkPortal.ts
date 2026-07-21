@@ -528,6 +528,38 @@ export function getNetworkPortalWorkbench(networkContextId: string) {
   )
 }
 
+export type NetworkPortalAppointmentCalendarDay = {
+  date: string
+  appointmentCount: number
+  items: NetworkPortalWorkbenchAppointmentItem[]
+}
+
+export type NetworkPortalAppointmentCalendar = {
+  networkId: string
+  timezone: string
+  rangeStart: string
+  rangeEnd: string
+  totalAppointmentCount: number
+  truncated: boolean
+  days: NetworkPortalAppointmentCalendarDay[]
+  asOf: string
+}
+
+/** M413：本网点预约日历；硬门禁 manageAppointment。 */
+export function getNetworkPortalAppointmentCalendar(
+  networkContextId: string,
+  range?: { from?: string; to?: string },
+) {
+  const query: Record<string, string> = {}
+  if (range?.from) query.from = range.from
+  if (range?.to) query.to = range.to
+  return apiGet<NetworkPortalAppointmentCalendar>(
+    '/network-portal/appointment-calendar',
+    query,
+    networkHeaders(networkContextId),
+  )
+}
+
 /** M208：独立产能页；复用 M194 GET /network-portal/capacity。 */
 export function listNetworkPortalCapacity(networkContextId: string) {
   return apiGet<NetworkPortalPage<NetworkPortalCapacityItem>>(

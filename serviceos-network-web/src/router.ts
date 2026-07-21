@@ -9,6 +9,7 @@ import NetworkPortalMembershipDetailPage from './pages/NetworkPortalMembershipDe
 import NetworkPortalQualificationsPage from './pages/NetworkPortalQualificationsPage.vue'
 import NetworkPortalQualificationDetailPage from './pages/NetworkPortalQualificationDetailPage.vue'
 import NetworkPortalCapacityPage from './pages/NetworkPortalCapacityPage.vue'
+import NetworkPortalAppointmentsPage from './pages/NetworkPortalAppointmentsPage.vue'
 import NetworkPortalCorrectionsPage from './pages/NetworkPortalCorrectionsPage.vue'
 import NetworkPortalCorrectionDetailPage from './pages/NetworkPortalCorrectionDetailPage.vue'
 import NetworkPortalExceptionsPage from './pages/NetworkPortalExceptionsPage.vue'
@@ -34,6 +35,7 @@ export const router = createRouter({ history: createWebHistory(), routes: [
   { path: '/network-portal/qualifications', component: NetworkPortalQualificationsPage },
   { path: '/network-portal/qualifications/:id', component: NetworkPortalQualificationDetailPage },
   { path: '/network-portal/capacity', component: NetworkPortalCapacityPage },
+  { path: '/network-portal/appointments', component: NetworkPortalAppointmentsPage },
   { path: '/network-portal/corrections', component: NetworkPortalCorrectionsPage },
   { path: '/network-portal/corrections/:id', component: NetworkPortalCorrectionDetailPage },
   { path: '/network-portal/exceptions', component: NetworkPortalExceptionsPage },
@@ -46,7 +48,8 @@ export function routeForPage(pageId: string) {
     'NETWORK.WORKBENCH': '/network-portal/workbench', 'NETWORK.WORKORDER.LIST': '/network-portal/work-orders',
     'NETWORK.WORKORDER.WORKSPACE': '/network-portal/work-orders', 'NETWORK.TASK.QUEUE': '/network-portal/tasks',
     'NETWORK.TECHNICIAN.LIST': '/network-portal/technicians', 'NETWORK.QUALIFICATION': '/network-portal/qualifications',
-    'NETWORK.TECHNICIAN.ASSIGN': '/network-portal/tasks', 'NETWORK.APPOINTMENT': '/network-portal/tasks',
+    'NETWORK.TECHNICIAN.ASSIGN': '/network-portal/tasks',
+    'NETWORK.APPOINTMENT': '/network-portal/appointments',
     'NETWORK.EVIDENCE.SUPPLEMENT': '/network-portal/tasks', 'NETWORK.CORRECTION.QUEUE': '/network-portal/corrections',
     'NETWORK.EXCEPTION.QUEUE': '/network-portal/exceptions', 'NETWORK.CAPACITY': '/network-portal/capacity',
   }

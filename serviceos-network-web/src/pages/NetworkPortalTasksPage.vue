@@ -1022,10 +1022,9 @@ watch(selectedTaskId, () => {
     <form
       class="assign"
       data-testid="network-appointment-form"
-      data-page-id="NETWORK.APPOINTMENT"
       @submit.prevent="submitPropose"
     >
-      <h3>本网点预约</h3>
+      <h3>本网点预约操作</h3>
       <p class="hint">
         调用 Network Portal 预约 propose/confirm/reschedule/cancel/mark-no-show 与联系尝试；
         确认方固定为 NETWORK_MEMBER + 当前主体；改约/取消/爽约使用列表 If-Match 版本。

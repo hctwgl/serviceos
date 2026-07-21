@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.78
+  version: 1.0.79
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -2075,6 +2075,35 @@ paths:
           description: 工作台摘要
           headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
           content: { application/json: { schema: { $ref: '#/components/schemas/NetworkPortalWorkbenchView' } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /network-portal/appointment-calendar:
+    get:
+      operationId: getNetworkPortalAppointmentCalendar
+      summary: Network Portal 本网点预约日历
+      description: |
+        M413：X-Network-Context + NETWORK `networkPortal.manageAppointment`（硬门禁）。
+        返回运营日 Asia/Shanghai 闭区间内与 ACTIVE 任务重叠的 PROPOSED/CONFIRMED 预约；
+        按窗口开始日落日；不含客户 PII。默认 from=今天、to=from+13；跨度不得超过 31 天。
+      parameters:
+        - name: from
+          in: query
+          required: false
+          schema: { type: string, format: date }
+          description: 含当日；省略时为 Asia/Shanghai 今天
+        - name: to
+          in: query
+          required: false
+          schema: { type: string, format: date }
+          description: 含当日；省略时为 from+13 天
+        - $ref: '#/components/parameters/NetworkContext'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: 预约日历
+          headers: { X-Correlation-Id: { required: true, schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NetworkPortalAppointmentCalendarView' } } }
         '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
@@ -8012,6 +8041,40 @@ components:
       properties:
         networkId: { type: string, format: uuid }
         items: { type: array, items: { $ref: '#/components/schemas/NetworkPortalCapacityItem' } }
+        asOf: { type: string, format: date-time }
+    NetworkPortalAppointmentCalendarDay:
+      type: object
+      additionalProperties: false
+      required: [date, appointmentCount, items]
+      properties:
+        date: { type: string, format: date }
+        appointmentCount: { type: integer, minimum: 0 }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/NetworkPortalWorkbenchAppointmentItem' }
+    NetworkPortalAppointmentCalendarView:
+      type: object
+      additionalProperties: false
+      required: [networkId, timezone, rangeStart, rangeEnd, totalAppointmentCount, truncated, days, asOf]
+      properties:
+        networkId: { type: string, format: uuid }
+        timezone:
+          type: string
+          description: 运营时区；当前固定 Asia/Shanghai
+        rangeStart: { type: string, format: date }
+        rangeEnd: { type: string, format: date }
+        totalAppointmentCount:
+          type: integer
+          minimum: 0
+          description: 范围内命中预约总数；truncated=true 时可能大于 days 内条目合计
+        truncated:
+          type: boolean
+          description: 是否因上限截断展示条目（上限 200）
+        days:
+          type: array
+          minItems: 1
+          maxItems: 31
+          items: { $ref: '#/components/schemas/NetworkPortalAppointmentCalendarDay' }
         asOf: { type: string, format: date-time }
     NetworkPortalWorkbenchAppointmentItem:
       type: object

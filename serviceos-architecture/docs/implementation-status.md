@@ -4,7 +4,7 @@ version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-21
 baselineCommit: "9a05be9b9e22be216542260f0979d85ee2cf2bab"
-latestMilestone: M412
+latestMilestone: M413
 ---
 
 # ServiceOS 实施状态总览
@@ -39,13 +39,13 @@ latestMilestone: M412
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M412 Network 分配候选推荐解释 |
+| 最新实施里程碑 | M413 Network 预约日历视图 |
 | 基线提交 | `9a05be9b9e22be216542260f0979d85ee2cf2bab`（历史基线；合入 master 后回填） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts`、`@serviceos/web-core`、`ServiceOSIOSCore`、独立且可部署的 `serviceos-network-web` 与 `serviceos-technician-web`、Swift 6 `TechnicianIOSFoundation`，以及已在 iPhone 17 Pro Simulator 安装启动、实跑 XCTest/XCUITest、形成 Production arm64 archive/dSYM，并接入当前任务、在线 Visit、冻结基础表单、前台 Evidence 采集上传、Snapshot/Task 完成与多轮资料整改的原生 `TechnicianIOS` SwiftUI App；由同一 Core OpenAPI 生成并经独立消费者门禁验证的 `@serviceos/core-client` 与 `ServiceOSCoreClient` |
 | 前端工程 | `serviceos-admin-web` 独立承载总部运营；**M370～M377** 完成设计系统 Presenter、产品化 AppShell（ScopeBar/Freshness/诊断抽屉）、标准页模板、工单中心/详情、项目详情与主导航页壳迁移及视觉关闭；仍消费服务端 Navigation 与 allowed-actions；M256 后 Network 正式产品由独立 `serviceos-network-web` 承载，M257 后 Technician 正式产品由独立移动优先 `serviceos-technician-web` 承载；两套独立 Web 均实际接入共享 Core、OIDC PKCE、服务端 Context/Capability/导航、Playwright 回归和独立容器镜像 |
 | 数据库 | PostgreSQL + Flyway（当前版本 **142**；M406 车企/行政区目录；M403 登录事件；M402 `identity.register`；M401 关注项目） |
-| 契约 | Core OpenAPI **1.0.78** + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含分配候选推荐解释、工作台今日预约时间轴、分配候选距离亲和、关注项目角标、`/project-clients`、`/region-catalog`、`change-timeline`、`org-memberships`、`recent-logins`、用户目录等既有契约） |
+| 契约 | Core OpenAPI **1.0.79** + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含预约日历、分配候选推荐解释、工作台今日预约时间轴、分配候选距离亲和、关注项目角标、`/project-clients`、`/region-catalog`、`change-timeline`、`org-memberships`、`recent-logins`、用户目录等既有契约） |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -163,7 +163,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | 履约事实与试算 | 事实提取和双向试算 | `PARTIAL` | **M309** `PricingRuntime`；**M327** `workorder.fulfilled` → 最小履约事实 + SHADOW `CalculationSnapshot`（不落账） | 完整 FactDefinition/CalculationRun、应收/应付双轨、对账结算、Admin 计价工作台、AUTHORITATIVE | M309、M327、M5 设计 |
 | 对账结算 | 对账、结算、争议与调整 | `PROPOSED` | 已有边界设计 | 正式运行时和页面 | `architecture/16-*` |
 | Admin Portal | 总部运营后台 | `PARTIAL` | **M284/M287/M289/M291/M292/M294/M295/M296** 配置设计器；M101～M193 运营基线；**M328** UNKNOWN；**M351** 终审；**M370～M377** 设计系统；**M384～M389** 配置四核与工单详情；**M397～M406** 用户管理、项目选择器主数据、关注项目；**M409** 关注项目待办/SLA 角标（`READY_FOR_REVIEW`） | 完整国标行政区/车企品牌树、跨聚合业务时间线、正式企业 OIDC/BFF；不得宣称 PRODUCT_ACCEPTED | M7 设计、M101～M193、M284～M296、M328、M351、M370～M377、M384～M389、M397～M406、M409、Admin 试点基线 |
-| Network Portal | 网点协作端 | `PARTIAL` | M194～M242 读写切片；M256 独立 `serviceos-network-web`；**M390～M392** 工作台/工作区/整改异常；**M396** 师傅与产能；**M407～M412** 分配候选/距离亲和/推荐解释/工作台今日预约时间轴（`READY_FOR_REVIEW`） | 经纬度/路网距离、数值推荐评分、完整预约日历、产能申请写、Portal ACK/resolve/decide、notifications、生产 IdP | M7 设计、M194～M242、M255～M256、M390～M392、M396、M407～M412 |
+| Network Portal | 网点协作端 | `PARTIAL` | M194～M242 读写切片；M256 独立 `serviceos-network-web`；**M390～M392** 工作台/工作区/整改异常；**M396** 师傅与产能；**M407～M413** 分配候选/距离亲和/推荐解释/今日时间轴/预约日历（`READY_FOR_REVIEW`） | 经纬度/路网距离、数值推荐评分、月视图拖拽改约、产能申请写、Portal ACK/resolve/decide、notifications、生产 IdP | M7 设计、M194～M242、M255～M256、M390～M392、M396、M407～M413 |
 | Technician App / Portal | 师傅移动端与 Feed | `PARTIAL` | M195/M218/M219/M243～M246 只读安全切片；M257 独立 H5；M258～M261 iOS 基础；M262 在线 Visit；M263 冻结基础表单；**M349/M350** H5 条件执行器 + 工单/区域权威头 + validationRules；M264 Evidence 采集上传；M265 Snapshot 与 Task 完成；M266 在线整改；**M357～M363** 运行时能力拒单、定向目标外拒单、Feed/详情头预检、整改路径门禁、列表预检与领取/启动硬拒 | 联系/预约、完整表单草稿、editableWhen/默认值（未接受）、iOS 共用执行器、真实 operationRefs 签退；弱网/后台/Track F 离线；签名真机/真实 IdP/VoiceOver/崩溃采集/TestFlight | M7 设计、M195、M218～M219、M243～M246、M257～M266、M349、M350、M357～M363 |
 | External Portal | 用户/车企受控页面 | `PROPOSED` | 最小边界规划 | 二期页面和工程实现 | M7 设计 |
 
@@ -206,13 +206,14 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 - **M410 Implemented**：Network 分配候选行政区距离亲和（OpenAPI **1.0.76**：`distanceTier`/`distanceSummary`/`coverageMatched` + 工单区域摘要；不伪造经纬度）。
 - **M411 Implemented**：Network 工作台今日预约时间轴（OpenAPI **1.0.77**：`todayTimeline`/`todayAppointments`；Asia/Shanghai 运营日；manageAppointment soft-gate）。
 - **M412 Implemented**：Network 分配候选推荐解释（OpenAPI **1.0.78**：`recommendationTier`/`recommendationSummary`/`rankingExplanation`；无内部评分公式）。
+- **M413 Implemented**：Network 预约日历视图（OpenAPI **1.0.79**：`/appointment-calendar`；Page Registry v21；默认 14 天运营日）。
 - **M383** 长链路 test 7/8 仍未闭合，不阻塞本切片。
 
 建议下一批（按优先级）：
 
 1. Technician iOS 正式离线闭环（需 macOS/Xcode 环境）；
-2. Network 完整预约日历视图；
-3. 完整国标行政区全量树 / 车企品牌树治理 UI。
+2. 完整国标行政区全量树 / 车企品牌树治理 UI；
+3. Admin 跨聚合业务时间线深化。
 
 仍为 **硬门禁 / 外部阻塞**（不可发明推进）：
 

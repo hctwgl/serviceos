@@ -40,6 +40,8 @@ import com.serviceos.network.api.TechnicianQualificationView;
 import com.serviceos.project.api.RegionCatalogNameQuery;
 import com.serviceos.operations.api.OperationalExceptionItem;
 import com.serviceos.operations.api.OperationalExceptionWorkbenchService;
+import com.serviceos.readmodel.api.NetworkPortalAppointmentCalendarDay;
+import com.serviceos.readmodel.api.NetworkPortalAppointmentCalendarView;
 import com.serviceos.readmodel.api.NetworkPortalAssignCandidateItem;
 import com.serviceos.readmodel.api.NetworkPortalAssignCandidatePage;
 import com.serviceos.readmodel.api.NetworkPortalCapacityItem;
@@ -133,6 +135,9 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     private static final int WORKSPACE_APPOINTMENT_LIMIT = 100;
     private static final int WORKSPACE_CONTACT_LIMIT = 100;
     private static final int WORKBENCH_TODAY_APPOINTMENT_LIMIT = 50;
+    private static final int CALENDAR_DEFAULT_SPAN_DAYS = 14;
+    private static final int CALENDAR_MAX_SPAN_DAYS = 31;
+    private static final int CALENDAR_APPOINTMENT_LIMIT = 200;
     /** Network 工作台运营日边界；现场履约首批区域为中国时区，不得按浏览器本地日猜测。 */
     private static final ZoneId NETWORK_OPERATIONAL_ZONE = ZoneId.of("Asia/Shanghai");
     private static final Set<String> OPEN_SLA_STATUSES = Set.of("RUNNING", "BREACHED");
@@ -1408,12 +1413,106 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
     }
 
     /**
+     * M413：本网点预约日历。硬门禁 manageAppointment；运营日 Asia/Shanghai；默认今天起 14 天。
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public NetworkPortalAppointmentCalendarView appointmentCalendar(
+            CurrentPrincipal actor,
+            String correlationId,
+            String networkContextHeader,
+            LocalDate fromInclusive,
+            LocalDate toInclusive
+    ) {
+        UUID networkId = requireAuthorizedNetwork(
+                actor, correlationId, networkContextHeader, MANAGE_APPOINTMENT);
+        Instant asOf = clock.instant();
+        LocalDate today = asOf.atZone(NETWORK_OPERATIONAL_ZONE).toLocalDate();
+        LocalDate rangeStart = fromInclusive == null ? today : fromInclusive;
+        LocalDate rangeEnd = toInclusive == null
+                ? rangeStart.plusDays(CALENDAR_DEFAULT_SPAN_DAYS - 1L)
+                : toInclusive;
+        if (rangeEnd.isBefore(rangeStart)) {
+            throw new BusinessProblem(ProblemCode.VALIDATION_FAILED, "预约日历结束日不得早于开始日");
+        }
+        long spanDays = rangeStart.datesUntil(rangeEnd.plusDays(1)).count();
+        if (spanDays > CALENDAR_MAX_SPAN_DAYS) {
+            throw new BusinessProblem(
+                    ProblemCode.VALIDATION_FAILED,
+                    "预约日历跨度不得超过 " + CALENDAR_MAX_SPAN_DAYS + " 天");
+        }
+
+        List<NetworkActiveAssignmentView> active = assignments.listActiveForNetwork(
+                actor.tenantId(), networkId.toString());
+        Map<UUID, String> technicianNames = Map.of();
+        if (hasNetworkCapability(actor, correlationId, TECHNICIAN_READ_OWN, networkId)) {
+            technicianNames = loadTechnicianDisplayNames(actor.tenantId(), networkId);
+        }
+        List<NetworkPortalWorkbenchAppointmentItem> flat = loadCalendarAppointments(
+                actor.tenantId(), active, rangeStart, rangeEnd, technicianNames);
+        int totalAppointmentCount = flat.size();
+        boolean truncated = totalAppointmentCount > CALENDAR_APPOINTMENT_LIMIT;
+        List<NetworkPortalWorkbenchAppointmentItem> visible = truncated
+                ? List.copyOf(flat.subList(0, CALENDAR_APPOINTMENT_LIMIT))
+                : flat;
+
+        Map<LocalDate, List<NetworkPortalWorkbenchAppointmentItem>> byDay = new LinkedHashMap<>();
+        for (LocalDate day = rangeStart; !day.isAfter(rangeEnd); day = day.plusDays(1)) {
+            byDay.put(day, new ArrayList<>());
+        }
+        for (NetworkPortalWorkbenchAppointmentItem item : visible) {
+            if (item.windowStart() == null) {
+                continue;
+            }
+            LocalDate day = item.windowStart().atZone(NETWORK_OPERATIONAL_ZONE).toLocalDate();
+            List<NetworkPortalWorkbenchAppointmentItem> bucket = byDay.get(day);
+            if (bucket != null) {
+                bucket.add(item);
+            }
+        }
+
+        List<NetworkPortalAppointmentCalendarDay> days = new ArrayList<>();
+        for (Map.Entry<LocalDate, List<NetworkPortalWorkbenchAppointmentItem>> entry : byDay.entrySet()) {
+            List<NetworkPortalWorkbenchAppointmentItem> items = List.copyOf(entry.getValue());
+            days.add(new NetworkPortalAppointmentCalendarDay(entry.getKey(), items.size(), items));
+        }
+        return new NetworkPortalAppointmentCalendarView(
+                networkId,
+                NETWORK_OPERATIONAL_ZONE.getId(),
+                rangeStart,
+                rangeEnd,
+                totalAppointmentCount,
+                truncated,
+                days,
+                asOf);
+    }
+
+    /**
      * M411：本网点 ACTIVE 任务上 PROPOSED/CONFIRMED 预约，按 Asia/Shanghai 运营日过滤窗口重叠。
      */
     private List<NetworkPortalWorkbenchAppointmentItem> loadWorkbenchTodayAppointments(
             String tenantId,
             List<NetworkActiveAssignmentView> active,
             Instant asOf,
+            Map<UUID, String> technicianNames
+    ) {
+        LocalDate today = asOf.atZone(NETWORK_OPERATIONAL_ZONE).toLocalDate();
+        List<NetworkPortalWorkbenchAppointmentItem> items = loadCalendarAppointments(
+                tenantId, active, today, today, technicianNames);
+        if (items.size() <= WORKBENCH_TODAY_APPOINTMENT_LIMIT) {
+            return items;
+        }
+        return List.copyOf(items.subList(0, WORKBENCH_TODAY_APPOINTMENT_LIMIT));
+    }
+
+    /**
+     * M413：按运营日闭区间过滤 PROPOSED/CONFIRMED 预约窗口；不含客户 PII。
+     */
+    private List<NetworkPortalWorkbenchAppointmentItem> loadCalendarAppointments(
+            String tenantId,
+            List<NetworkActiveAssignmentView> active,
+            LocalDate rangeStart,
+            LocalDate rangeEnd,
             Map<UUID, String> technicianNames
     ) {
         if (active.isEmpty()) {
@@ -1427,16 +1526,16 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                 taskTechnician.put(row.taskId(), row.technicianId());
             }
         }
-        LocalDate today = asOf.atZone(NETWORK_OPERATIONAL_ZONE).toLocalDate();
-        Instant dayStart = today.atStartOfDay(NETWORK_OPERATIONAL_ZONE).toInstant();
-        Instant dayEnd = today.plusDays(1).atStartOfDay(NETWORK_OPERATIONAL_ZONE).toInstant();
+        Instant rangeInstantStart = rangeStart.atStartOfDay(NETWORK_OPERATIONAL_ZONE).toInstant();
+        Instant rangeInstantEnd = rangeEnd.plusDays(1).atStartOfDay(NETWORK_OPERATIONAL_ZONE).toInstant();
         List<NetworkPortalWorkbenchAppointmentItem> items = new ArrayList<>();
         for (TechnicianScheduleAppointmentView row : scheduleAppointments.listForTasks(tenantId, taskIds)) {
             if (row.windowStart() == null || row.windowEnd() == null) {
                 continue;
             }
-            boolean overlapsToday = row.windowStart().isBefore(dayEnd) && row.windowEnd().isAfter(dayStart);
-            if (!overlapsToday) {
+            boolean overlaps = row.windowStart().isBefore(rangeInstantEnd)
+                    && row.windowEnd().isAfter(rangeInstantStart);
+            if (!overlaps) {
                 continue;
             }
             String technicianId = taskTechnician.get(row.taskId());
@@ -1459,9 +1558,6 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                     row.timezone(),
                     technicianId,
                     displayName));
-            if (items.size() >= WORKBENCH_TODAY_APPOINTMENT_LIMIT) {
-                break;
-            }
         }
         items.sort(Comparator
                 .comparing(NetworkPortalWorkbenchAppointmentItem::windowStart,

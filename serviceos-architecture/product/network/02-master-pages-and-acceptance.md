@@ -619,7 +619,7 @@ qualityStatus:
 productOwnerDecision: null
 knownGaps:
   - UI_DATA_GAP: 经纬度/路网米制距离与数值推荐评分未就绪（开放任务/资质 M407、日程冲突 M408、行政区距离亲和 M410、事实型推荐解释 M412 已交付）
-  - CONTENT_GAP: 完整预约日历视图未交付（今日预约时间轴/列表已由 M411 交付）
+  - CONTENT_GAP: 月视图拖拽改约未交付（今日/未来预约日历列表已由 M413 交付；今日时间轴已由 M411 交付）
 ```
 
 ```yaml
@@ -654,7 +654,7 @@ qualityStatus:
 productOwnerDecision: null
 knownGaps:
   - UI_DATA_GAP: 客户/地址脱敏读模型未就绪（师傅日程冲突已由 M408、事实型推荐解释已由 M412 在分配抽屉交付）
-  - CONTENT_GAP: 预约日历视图未交付
+  - CONTENT_GAP: 月视图拖拽改约未交付（预约日历列表已由 M413 交付）
 ```
 
 ## 47. M392 验收记录（资料整改 + 异常中心）
