@@ -423,6 +423,7 @@ title: ServiceOS 里程碑索引
 | M414 | M414 Admin 主数据治理台（车企/品牌/行政区树） | [425-m414-admin-master-data-governance.md](../architecture/425-m414-admin-master-data-governance.md) | [408-m414-admin-master-data-governance-acceptance.md](../testing/408-m414-admin-master-data-governance-acceptance.md) |
 | M415 | M415 Admin 跨聚合主体变更时间线 | [426-m415-admin-cross-aggregate-change-timeline.md](../architecture/426-m415-admin-cross-aggregate-change-timeline.md) | [409-m415-admin-cross-aggregate-change-timeline-acceptance.md](../testing/409-m415-admin-cross-aggregate-change-timeline-acceptance.md) |
 | M416 | M416 Admin 网点任职并入主体变更时间线 | [427-m416-admin-network-membership-change-timeline.md](../architecture/427-m416-admin-network-membership-change-timeline.md) | [410-m416-admin-network-membership-change-timeline-acceptance.md](../testing/410-m416-admin-network-membership-change-timeline-acceptance.md) |
+| M417 | M417 Admin 师傅服务关系并入主体变更时间线 | [428-m417-admin-technician-membership-change-timeline.md](../architecture/428-m417-admin-technician-membership-change-timeline.md) | [411-m417-admin-technician-membership-change-timeline-acceptance.md](../testing/411-m417-admin-technician-membership-change-timeline-acceptance.md) |
 
 ## 未关联里程碑的文档
 

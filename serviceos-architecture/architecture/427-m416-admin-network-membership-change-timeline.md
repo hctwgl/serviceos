@@ -30,7 +30,7 @@ lastUpdated: 2026-07-21
 
 ## 4. 明确未实现
 
-- 师傅服务关系（`TECHNICIAN_MEMBERSHIP_*`）并入主体时间线
+- 师傅服务关系（`TECHNICIAN_MEMBERSHIP_*`）并入主体时间线（已由 **M417** 关闭主路径）
 - 通用 `AUTHORIZATION_DENIED` 作为主体活动流
 - 全国区县全量树 / 拼音索引 / 多级子品牌（缺权威数据集，另立里程碑）
 - 产品负责人视觉金标（`READY_FOR_REVIEW`）

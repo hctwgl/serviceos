@@ -5,7 +5,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * 主体变更时间线条目：生命周期 / 审计 / 登录 / 组织任职 / RoleGrant / 网点任职 的统一投影。
+ * 主体变更时间线条目：生命周期 / 审计 / 登录 / 组织任职 / RoleGrant / 网点任职 / 师傅服务关系 的统一投影。
  */
 public record PrincipalChangeTimelineItem(
         String source,

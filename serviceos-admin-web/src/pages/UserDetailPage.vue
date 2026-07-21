@@ -400,13 +400,17 @@ function sourceLabel(source: PrincipalChangeTimelineItem['source']) {
   if (source === 'MEMBERSHIP') return '任职'
   if (source === 'ROLE_GRANT') return '角色授权'
   if (source === 'NETWORK_MEMBERSHIP') return '网点任职'
+  if (source === 'TECHNICIAN_MEMBERSHIP') return '师傅服务关系'
   return '审计'
 }
 
-function omittedSourceLabel(source: 'MEMBERSHIP' | 'ROLE_GRANT' | 'NETWORK_MEMBERSHIP') {
+function omittedSourceLabel(
+  source: 'MEMBERSHIP' | 'ROLE_GRANT' | 'NETWORK_MEMBERSHIP' | 'TECHNICIAN_MEMBERSHIP',
+) {
   if (source === 'MEMBERSHIP') return '任职（需 organization.read）'
   if (source === 'ROLE_GRANT') return '角色授权（需 authorization.read）'
-  return '网点任职（需 network.read）'
+  if (source === 'NETWORK_MEMBERSHIP') return '网点任职（需 network.read）'
+  return '师傅服务关系（需 network.read）'
 }
 
 function presentActor(item: PrincipalChangeTimelineItem) {

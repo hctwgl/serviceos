@@ -111,7 +111,7 @@ class IdentityDirectoryPostgresIT {
                 "authorization.read", "authorization.manageRoles", "authorization.requestGrant",
                 "authorization.approveGrant",
                 "network.read", "network.managePartner", "network.manageNetwork",
-                "network.manageMembership")) {
+                "network.manageMembership", "network.manageTechnician")) {
             jdbc.sql("""
                     INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
                     VALUES (:roleId, :capability, now())
@@ -323,8 +323,62 @@ class IdentityDirectoryPostgresIT {
                    )
                 """).param("tenant", TENANT).update();
         var omitted = queries.changeTimeline(actor(), "corr-net-mem-omit", principalId, 50);
-        assertThat(omitted.omittedSources()).containsExactly("NETWORK_MEMBERSHIP");
-        assertThat(omitted.items()).noneMatch(item -> "NETWORK_MEMBERSHIP".equals(item.source()));
+        // NETWORK_MEMBERSHIP 与 TECHNICIAN_MEMBERSHIP 共用 network.read soft-gate。
+        assertThat(omitted.omittedSources())
+                .containsExactly("NETWORK_MEMBERSHIP", "TECHNICIAN_MEMBERSHIP");
+        assertThat(omitted.items()).noneMatch(item ->
+                "NETWORK_MEMBERSHIP".equals(item.source())
+                        || "TECHNICIAN_MEMBERSHIP".equals(item.source()));
+        assertThat(omitted.items()).extracting(item -> item.source())
+                .contains("LIFECYCLE");
+    }
+
+    @Test
+    void changeTimelineMergesTechnicianMembershipWithSoftOmit() {
+        UUID principalId = UUID.fromString(authentication.resolveOrRegister(
+                identity("subject-tech-mem", "师傅服务用户"), "corr-tech-mem-1"));
+        commands.updateProfile(actor(), metadata("tech-mem-profile"), principalId, 1, "师傅服务用户", "EMP-TECH-1");
+
+        var partner = networks.createPartnerOrganization(
+                actor(), metadata("tech-mem-partner"), "TECHMEM", "师傅服务合作方");
+        var network = networks.createServiceNetwork(
+                actor(), metadata("tech-mem-network"), partner.id(), "TECH-MEM-1", "演示师傅网点");
+        var profile = networks.createTechnicianProfile(
+                actor(), metadata("tech-mem-profile-create"), principalId, "师傅服务用户", null);
+        var membership = networks.createNetworkTechnicianMembership(
+                actor(), metadata("tech-mem-create"), network.id(), profile.id(),
+                Instant.now().minusSeconds(60));
+        networks.terminateNetworkTechnicianMembership(
+                actor(), metadata("tech-mem-terminate"), membership.id(), membership.version(),
+                "退出服务");
+
+        var timeline = queries.changeTimeline(actor(), "corr-tech-mem-timeline", principalId, 50);
+        assertThat(timeline.omittedSources()).isEmpty();
+        assertThat(timeline.items()).extracting(item -> item.source())
+                .contains("LIFECYCLE", "TECHNICIAN_MEMBERSHIP");
+        assertThat(timeline.items()).extracting(item -> item.eventCode())
+                .contains("TECHNICIAN_MEMBERSHIP_CREATED", "TECHNICIAN_MEMBERSHIP_TERMINATED");
+        assertThat(timeline.items())
+                .filteredOn(item -> "TECHNICIAN_MEMBERSHIP_CREATED".equals(item.eventCode()))
+                .singleElement()
+                .satisfies(item -> assertThat(item.summary()).contains("演示师傅网点"));
+        assertThat(timeline.items())
+                .filteredOn(item -> "TECHNICIAN_MEMBERSHIP_TERMINATED".equals(item.eventCode()))
+                .singleElement()
+                .satisfies(item -> assertThat(item.summary()).contains("退出服务"));
+
+        jdbc.sql("""
+                DELETE FROM auth_role_capability
+                 WHERE capability_code = 'network.read'
+                   AND role_id IN (
+                     SELECT role_id FROM auth_role
+                      WHERE tenant_id = :tenant AND role_code = 'identity-admin'
+                   )
+                """).param("tenant", TENANT).update();
+        var omitted = queries.changeTimeline(actor(), "corr-tech-mem-omit", principalId, 50);
+        assertThat(omitted.omittedSources())
+                .containsExactly("NETWORK_MEMBERSHIP", "TECHNICIAN_MEMBERSHIP");
+        assertThat(omitted.items()).noneMatch(item -> "TECHNICIAN_MEMBERSHIP".equals(item.source()));
         assertThat(omitted.items()).extracting(item -> item.source())
                 .contains("LIFECYCLE");
     }
