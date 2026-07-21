@@ -138,6 +138,9 @@ async function stubWorkbenchProduct(page: Page) {
           taskId: TASK_ID,
           businessType: 'INSTALLATION',
           workOrderRegionSummary: '青岛市',
+          rankingExplanation:
+            '排序：可分配优先 → 推荐档位 → 行政区亲和 → 开放任务少 → 姓名；依据可见运营事实，不含内部评分公式。',
+          emptyReason: null,
           items: [
             {
               technicianProfileId: TECH_ID,
@@ -158,6 +161,9 @@ async function stubWorkbenchProduct(page: Page) {
               capacityMaxUnits: 10,
               warnings: [],
               assignable: true,
+              recommendationTier: 'RECOMMENDED',
+              recommendationSummary: '建议优先：同城覆盖 + 已通过资质 2 项 + 网点产能可用',
+              recommendationReasons: ['同城覆盖', '已通过资质 2 项', '网点产能可用'],
             },
           ],
           asOf: '2026-07-20T04:00:00Z',
@@ -229,7 +235,7 @@ async function stubWorkbenchProduct(page: Page) {
   })
 }
 
-test.describe('M390/M407/M408/M410/M411 网点工作台产品化 + 分配候选 + 今日预约', () => {
+test.describe('M390/M407/M408/M410/M411/M412 网点工作台产品化 + 分配候选 + 今日预约', () => {
   test('展示 SummaryStrip、今日时间轴/预约、待分配表并完成分配', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 1024 })
     await stubWorkbenchProduct(page)
@@ -251,16 +257,20 @@ test.describe('M390/M407/M408/M410/M411 网点工作台产品化 + 分配候选 
     await page.getByTestId(`assign-open-${TASK_ID}`).click()
     await expect(page.getByTestId('assign-technician-drawer')).toBeVisible()
     await expect(page.getByTestId(`assign-candidate-${TECH_ID}`)).toBeVisible()
+    await expect(page.getByTestId('assign-candidate-recommendation')).toContainText('建议优先')
     await expect(page.getByTestId('assign-candidate-open-tasks')).toContainText('开放任务 1')
     await expect(page.getByTestId('assign-candidate-qualification')).toContainText('已通过资质')
     await expect(page.getByTestId('assign-candidate-schedule')).toContainText('未完成预约')
     await expect(page.getByTestId('assign-candidate-distance')).toContainText('同城')
     await page.getByTestId(`assign-candidate-${TECH_ID}`).click()
+    await expect(page.getByTestId('assign-drawer-impact')).toContainText('不含内部评分公式')
+    await expect(page.getByTestId('assign-drawer-impact')).toContainText('建议优先')
     await expect(page.getByTestId('assign-drawer-impact')).toContainText('网点产能可用')
     await expect(page.getByTestId('assign-drawer-impact')).toContainText('已通过资质')
     await expect(page.getByTestId('assign-drawer-impact')).toContainText('未完成预约')
     await expect(page.getByTestId('assign-drawer-impact')).toContainText('同城')
     await expect(page.getByTestId('assign-drawer-impact')).not.toContainText('距离读模型尚未交付')
+    await expect(page.getByTestId('assign-drawer-impact')).not.toContainText('推荐解释读模型未就绪')
     await page.getByTestId('assign-drawer-submit').click()
     await expect(page.getByTestId('assign-drawer-message')).toContainText('指派已生效')
 

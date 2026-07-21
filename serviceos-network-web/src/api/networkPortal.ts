@@ -396,6 +396,12 @@ export type NetworkPortalAssignDistanceTier =
   | 'OUTSIDE_COVERAGE'
   | 'UNKNOWN'
 
+export type NetworkPortalAssignRecommendationTier =
+  | 'RECOMMENDED'
+  | 'ACCEPTABLE'
+  | 'CAUTION'
+  | 'NOT_ASSIGNABLE'
+
 export type NetworkPortalAssignCandidateItem = {
   technicianProfileId: string
   displayName: string
@@ -415,6 +421,9 @@ export type NetworkPortalAssignCandidateItem = {
   capacityMaxUnits: number | null
   warnings: string[]
   assignable: boolean
+  recommendationTier: NetworkPortalAssignRecommendationTier
+  recommendationSummary: string
+  recommendationReasons: string[]
 }
 
 export type NetworkPortalAssignCandidatePage = {
@@ -424,6 +433,8 @@ export type NetworkPortalAssignCandidatePage = {
   workOrderRegionSummary: string | null
   items: NetworkPortalAssignCandidateItem[]
   asOf: string
+  rankingExplanation: string
+  emptyReason?: string | null
 }
 
 export function listNetworkPortalAssignCandidates(

@@ -1262,6 +1262,20 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                 warnings.add("服务区域未知，无法给出可靠距离亲和");
             }
 
+            Integer capacityAvailable = capacityHint == null ? null : capacityHint.availableUnits();
+            Integer capacityMax = capacityHint == null ? null : capacityHint.maxUnits();
+            AssignCandidateRecommendationEvaluator.RecommendationProjection recommendation =
+                    AssignCandidateRecommendationEvaluator.evaluate(
+                            assignable,
+                            approved,
+                            pending,
+                            openTasks,
+                            scheduleOverlap,
+                            upcomingAppointments,
+                            distance.distanceTier(),
+                            distance.coverageMatched(),
+                            capacityAvailable);
+
             items.add(new NetworkPortalAssignCandidateItem(
                     tech.technicianProfileId(),
                     tech.displayName(),
@@ -1277,18 +1291,33 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                     distance.distanceTier(),
                     distance.distanceSummary(),
                     distance.coverageMatched(),
-                    capacityHint == null ? null : capacityHint.availableUnits(),
-                    capacityHint == null ? null : capacityHint.maxUnits(),
+                    capacityAvailable,
+                    capacityMax,
                     warnings,
-                    assignable));
+                    assignable,
+                    recommendation.recommendationTier(),
+                    recommendation.recommendationSummary(),
+                    recommendation.recommendationReasons()));
         }
         items.sort(Comparator
                 .comparing(NetworkPortalAssignCandidateItem::assignable).reversed()
+                .thenComparing(item -> AssignCandidateRecommendationEvaluator.tierRank(
+                        item.recommendationTier()))
                 .thenComparing(item -> AssignCandidateDistanceEvaluator.tierRank(item.distanceTier()))
                 .thenComparing(NetworkPortalAssignCandidateItem::openTaskCount)
                 .thenComparing(NetworkPortalAssignCandidateItem::displayName));
+        String emptyReason = items.isEmpty()
+                ? AssignCandidateRecommendationEvaluator.EMPTY_NO_TECHNICIANS
+                : null;
         return new NetworkPortalAssignCandidatePage(
-                networkId, taskId, businessType, workOrderRegionSummary, items, clock.instant());
+                networkId,
+                taskId,
+                businessType,
+                workOrderRegionSummary,
+                items,
+                clock.instant(),
+                AssignCandidateRecommendationEvaluator.RANKING_EXPLANATION,
+                emptyReason);
     }
 
     @Override

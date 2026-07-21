@@ -500,4 +500,5 @@ Feature gate/authority: if applicable
 | M409 | Admin 关注项目待办/SLA 角标聚合 | 420-m409-* + 403-m409-*；OpenAPI 1.0.75；PostgresIT + Playwright | 全量国标树；人工视觉批准 |
 | M410 | Network 分配候选行政区距离亲和 | 421-m410-* + 404-m410-*；OpenAPI 1.0.76；单元测试 + PostgresIT + Playwright | 经纬度/路网米制距离；推荐评分；人工视觉批准 |
 | M411 | Network 工作台今日预约时间轴 | 422-m411-* + 405-m411-*；OpenAPI 1.0.77；PostgresIT + Playwright | 客户脱敏 PII；完整预约日历；推荐评分；人工视觉批准 |
+| M412 | Network 分配候选推荐解释 | 423-m412-* + 406-m412-*；OpenAPI 1.0.78；EvaluatorTest + PostgresIT + Playwright | 经纬度/路网距离；数值评分；完整预约日历；人工视觉批准 |
 

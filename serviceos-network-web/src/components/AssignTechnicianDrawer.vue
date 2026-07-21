@@ -15,6 +15,8 @@ const props = defineProps<{
   task: NetworkPortalTaskItem | null
   candidates: NetworkPortalAssignCandidateItem[]
   workOrderRegionSummary?: string | null
+  rankingExplanation?: string | null
+  emptyReason?: string | null
   loadingCandidates?: boolean
 }>()
 
@@ -53,13 +55,24 @@ const selected = computed(() =>
   filteredCandidates.value.find((tech) => tech.technicianProfileId === selectedTechnicianId.value),
 )
 
+const recommendationTierLabel: Record<string, string> = {
+  RECOMMENDED: '建议优先',
+  ACCEPTABLE: '可用',
+  CAUTION: '谨慎',
+  NOT_ASSIGNABLE: '不可分配',
+}
+
 const impactSummary = computed(() => {
   const parts: string[] = []
+  if (props.rankingExplanation) {
+    parts.push(props.rankingExplanation)
+  }
   if (props.workOrderRegionSummary) {
     parts.push(`工单服务区域 ${props.workOrderRegionSummary}`)
   }
   if (selected.value) {
     parts.push(`将指派给 ${selected.value.displayName}`)
+    parts.push(selected.value.recommendationSummary)
     parts.push(`当前开放任务 ${selected.value.openTaskCount} 个`)
     parts.push(selected.value.qualificationSummary)
     parts.push(selected.value.scheduleConflictSummary)
@@ -151,6 +164,18 @@ async function submit() {
           @click="selectedTechnicianId = tech.technicianProfileId"
         >
           <strong>{{ tech.displayName }}</strong>
+          <span
+            class="reco"
+            :class="{
+              'reco--recommended': tech.recommendationTier === 'RECOMMENDED',
+              'reco--caution': tech.recommendationTier === 'CAUTION',
+              'reco--blocked': tech.recommendationTier === 'NOT_ASSIGNABLE',
+            }"
+            data-testid="assign-candidate-recommendation"
+          >
+            {{ recommendationTierLabel[tech.recommendationTier] || tech.recommendationTier }}
+            · {{ tech.recommendationSummary }}
+          </span>
           <span class="muted">
             {{ statusLabel(tech.profileStatus) }} · 关系 {{ statusLabel(tech.membershipStatus) }}
           </span>
@@ -190,7 +215,7 @@ async function submit() {
           class="muted"
           data-testid="assign-drawer-empty"
         >
-          当前无可分配师傅。请确认师傅关系为 ACTIVE，或检查资质与产能。
+          {{ emptyReason || '当前无可分配师傅。请确认师傅关系为 ACTIVE，或检查资质与产能。' }}
         </p>
       </div>
 
@@ -329,6 +354,22 @@ button.ghost {
 .warn {
   color: var(--sos-color-status-warning-fg, #ad6800);
   font-size: 12px;
+}
+.reco {
+  font-size: 12px;
+  color: var(--sos-color-text-secondary);
+}
+.reco--recommended {
+  color: var(--sos-color-status-success-fg, #237804);
+  font-weight: 600;
+}
+.reco--caution {
+  color: var(--sos-color-status-warning-fg, #ad6800);
+  font-weight: 600;
+}
+.reco--blocked {
+  color: var(--sos-color-status-critical-fg);
+  font-weight: 600;
 }
 .error {
   color: var(--sos-color-status-critical-fg);

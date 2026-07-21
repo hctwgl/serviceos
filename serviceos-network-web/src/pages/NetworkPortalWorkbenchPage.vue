@@ -20,6 +20,8 @@ const data = ref<NetworkPortalWorkbench | null>(null)
 const unassignedTasks = ref<NetworkPortalTaskItem[]>([])
 const assignCandidates = ref<NetworkPortalAssignCandidateItem[]>([])
 const workOrderRegionSummary = ref<string | null>(null)
+const rankingExplanation = ref<string | null>(null)
+const assignEmptyReason = ref<string | null>(null)
 const loading = ref(false)
 const loadingCandidates = ref(false)
 const error = ref<string | null>(null)
@@ -119,6 +121,8 @@ async function load() {
     unassignedTasks.value = []
     assignCandidates.value = []
     workOrderRegionSummary.value = null
+    rankingExplanation.value = null
+    assignEmptyReason.value = null
     error.value = '请选择网点上下文'
     loading.value = false
     return
@@ -156,10 +160,14 @@ async function loadAssignCandidates(taskId: string) {
     const page = await listNetworkPortalAssignCandidates(props.networkContextId, taskId)
     assignCandidates.value = page.items
     workOrderRegionSummary.value = page.workOrderRegionSummary
+    rankingExplanation.value = page.rankingExplanation
+    assignEmptyReason.value = page.emptyReason ?? null
     candidatesError.value = null
   } catch (err) {
     assignCandidates.value = []
     workOrderRegionSummary.value = null
+    rankingExplanation.value = null
+    assignEmptyReason.value = null
     candidatesError.value = safeProblemMessage(err)
   } finally {
     loadingCandidates.value = false
@@ -378,6 +386,8 @@ watch(
       :task="assignTask"
       :candidates="assignCandidates"
       :work-order-region-summary="workOrderRegionSummary"
+      :ranking-explanation="rankingExplanation"
+      :empty-reason="assignEmptyReason"
       :loading-candidates="loadingCandidates"
       @close="drawerOpen = false"
       @assigned="onAssigned"

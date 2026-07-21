@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.77
+  version: 1.0.78
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -1829,9 +1829,10 @@ paths:
       operationId: listNetworkPortalAssignCandidates
       summary: Network Portal 任务分配师傅候选摘要
       description: |
-        M407/M408/M410：X-Network-Context + networkTask.read + technician.readOwnNetwork。
+        M407/M408/M410/M412：X-Network-Context + networkTask.read + technician.readOwnNetwork。
         返回本网点 ACTIVE 师傅的开放任务数、资质摘要、预约日程冲突摘要、行政区距离亲和、
-        网点产能口径与可分配警告。距离以工单省市区与网点 Coverage 亲和表达，不伪造经纬度路网距离。
+        推荐解释档位/摘要、网点产能口径与可分配警告。距离以工单省市区与网点 Coverage 亲和表达，
+        不伪造经纬度路网距离；推荐解释依据可见运营事实，不含内部评分公式。
         任务须属于本网点 ACTIVE NETWORK 责任。
       parameters:
         - name: taskId
@@ -7925,6 +7926,9 @@ components:
         - coverageMatched
         - warnings
         - assignable
+        - recommendationTier
+        - recommendationSummary
+        - recommendationReasons
       properties:
         technicianProfileId: { type: string, format: uuid }
         displayName: { type: string, minLength: 1 }
@@ -7954,10 +7958,25 @@ components:
         capacityMaxUnits: { type: [integer, 'null'], minimum: 0 }
         warnings: { type: array, items: { type: string } }
         assignable: { type: boolean }
+        recommendationTier:
+          type: string
+          description: |
+            M412：推荐解释档位（非数值评分）：
+            RECOMMENDED / ACCEPTABLE / CAUTION / NOT_ASSIGNABLE
+          enum: [RECOMMENDED, ACCEPTABLE, CAUTION, NOT_ASSIGNABLE]
+        recommendationSummary:
+          type: string
+          minLength: 1
+          description: 面向网点调度的中文推荐解释；依据可见事实，不含内部评分公式
+        recommendationReasons:
+          type: array
+          maxItems: 12
+          items: { type: string, minLength: 1 }
+          description: 构成推荐解释的有序事实短语
     NetworkPortalAssignCandidatePage:
       type: object
       additionalProperties: false
-      required: [networkId, taskId, items, asOf]
+      required: [networkId, taskId, items, asOf, rankingExplanation]
       properties:
         networkId: { type: string, format: uuid }
         taskId: { type: string, format: uuid }
@@ -7967,6 +7986,13 @@ components:
           description: 目标工单行政区中文摘要（市·区）；无区域事实时为 null
         items: { type: array, items: { $ref: '#/components/schemas/NetworkPortalAssignCandidateItem' } }
         asOf: { type: string, format: date-time }
+        rankingExplanation:
+          type: string
+          minLength: 1
+          description: M412：候选排序策略的中文说明（不含内部评分公式）
+        emptyReason:
+          type: [string, 'null']
+          description: M412：无候选时的服务端原因；有候选时省略或为 null
     NetworkPortalCapacityItem:
       type: object
       additionalProperties: false

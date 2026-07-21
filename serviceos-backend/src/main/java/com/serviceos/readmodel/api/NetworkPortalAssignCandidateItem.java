@@ -7,8 +7,8 @@ import java.util.UUID;
 /**
  * Network Portal 分配师傅候选摘要。
  *
- * <p>开放任务、资质、产能、预约日程冲突与行政区距离亲和来自本网点 ACTIVE 责任与 Coverage 事实；
- * 不返回伪造经纬度路网距离。</p>
+ * <p>开放任务、资质、产能、预约日程冲突、行政区距离亲和与推荐解释均来自本网点可证明事实；
+ * 不返回伪造经纬度路网距离或内部评分公式。</p>
  */
 public record NetworkPortalAssignCandidateItem(
         UUID technicianProfileId,
@@ -28,7 +28,10 @@ public record NetworkPortalAssignCandidateItem(
         Integer capacityAvailableUnits,
         Integer capacityMaxUnits,
         List<String> warnings,
-        boolean assignable
+        boolean assignable,
+        String recommendationTier,
+        String recommendationSummary,
+        List<String> recommendationReasons
 ) {
     public NetworkPortalAssignCandidateItem {
         Objects.requireNonNull(technicianProfileId, "technicianProfileId");
@@ -39,7 +42,11 @@ public record NetworkPortalAssignCandidateItem(
         Objects.requireNonNull(scheduleConflictSummary, "scheduleConflictSummary");
         Objects.requireNonNull(distanceTier, "distanceTier");
         Objects.requireNonNull(distanceSummary, "distanceSummary");
+        Objects.requireNonNull(recommendationTier, "recommendationTier");
+        Objects.requireNonNull(recommendationSummary, "recommendationSummary");
         warnings = List.copyOf(Objects.requireNonNull(warnings, "warnings"));
+        recommendationReasons = List.copyOf(
+                Objects.requireNonNull(recommendationReasons, "recommendationReasons"));
         if (openTaskCount < 0
                 || approvedQualificationCount < 0
                 || pendingQualificationCount < 0

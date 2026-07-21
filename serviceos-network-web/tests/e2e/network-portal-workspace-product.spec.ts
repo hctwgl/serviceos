@@ -134,6 +134,9 @@ async function stubWorkspaceProduct(page: Page) {
         taskId: TASK_ID,
         businessType: 'INSTALLATION',
         workOrderRegionSummary: '青岛市',
+        rankingExplanation:
+          '排序：可分配优先 → 推荐档位 → 行政区亲和 → 开放任务少 → 姓名；依据可见运营事实，不含内部评分公式。',
+        emptyReason: null,
         items: [
           {
             technicianProfileId: TECH_ID,
@@ -154,6 +157,9 @@ async function stubWorkspaceProduct(page: Page) {
             capacityMaxUnits: 8,
             warnings: [],
             assignable: true,
+            recommendationTier: 'RECOMMENDED',
+            recommendationSummary: '建议优先：同城覆盖 + 已通过资质 1 项 + 网点产能可用',
+            recommendationReasons: ['同城覆盖', '已通过资质 1 项', '网点产能可用'],
           },
         ],
         asOf: '2026-07-20T04:00:00Z',

@@ -25,6 +25,8 @@ const assignDrawerOpen = ref(false)
 const assignTask = ref<NetworkPortalTaskItem | null>(null)
 const assignCandidates = ref<NetworkPortalAssignCandidateItem[]>([])
 const workOrderRegionSummary = ref<string | null>(null)
+const rankingExplanation = ref<string | null>(null)
+const assignEmptyReason = ref<string | null>(null)
 const loadingCandidates = ref(false)
 const candidatesError = ref<string | null>(null)
 const showTechnicalDetails = ref(import.meta.env.DEV)
@@ -112,6 +114,8 @@ async function loadAssignCandidates(taskId: string) {
   if (!props.networkContextId) {
     assignCandidates.value = []
     workOrderRegionSummary.value = null
+    rankingExplanation.value = null
+    assignEmptyReason.value = null
     return
   }
   loadingCandidates.value = true
@@ -119,10 +123,14 @@ async function loadAssignCandidates(taskId: string) {
     const page = await listNetworkPortalAssignCandidates(props.networkContextId, taskId)
     assignCandidates.value = page.items
     workOrderRegionSummary.value = page.workOrderRegionSummary
+    rankingExplanation.value = page.rankingExplanation
+    assignEmptyReason.value = page.emptyReason ?? null
     candidatesError.value = null
   } catch (err) {
     assignCandidates.value = []
     workOrderRegionSummary.value = null
+    rankingExplanation.value = null
+    assignEmptyReason.value = null
     candidatesError.value = safeProblemMessage(err)
   } finally {
     loadingCandidates.value = false
@@ -908,6 +916,8 @@ watch(
       :task="assignTask"
       :candidates="assignCandidates"
       :work-order-region-summary="workOrderRegionSummary"
+      :ranking-explanation="rankingExplanation"
+      :empty-reason="assignEmptyReason"
       :loading-candidates="loadingCandidates"
       @close="assignDrawerOpen = false"
       @assigned="onAssigned"
