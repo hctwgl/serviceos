@@ -9,11 +9,13 @@ import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
 import com.serviceos.shared.Sha256;
 import com.serviceos.workorder.api.WorkOrderDetail;
+import com.serviceos.workorder.api.WorkOrderDirectoryStageQuery;
 import com.serviceos.workorder.api.WorkOrderMaskedContactView;
 import com.serviceos.workorder.api.WorkOrderPage;
 import com.serviceos.workorder.api.WorkOrderQuery;
 import com.serviceos.workorder.api.WorkOrderQueryService;
 import com.serviceos.workorder.api.WorkOrderView;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +25,7 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -37,12 +40,14 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
     private final WorkOrderQueryRepository queries;
     private final AuthorizationService authorization;
     private final ProjectScopeAuthorizationService projectScopes;
+    private final ObjectProvider<WorkOrderDirectoryStageQuery> stageQuery;
     private final Clock clock;
 
     DefaultWorkOrderQueryService(WorkOrderQueryRepository queries, AuthorizationService authorization,
-            ProjectScopeAuthorizationService projectScopes, Clock clock) {
+            ProjectScopeAuthorizationService projectScopes,
+            ObjectProvider<WorkOrderDirectoryStageQuery> stageQuery, Clock clock) {
         this.queries = queries; this.authorization = authorization;
-        this.projectScopes = projectScopes; this.clock = clock;
+        this.projectScopes = projectScopes; this.stageQuery = stageQuery; this.clock = clock;
     }
 
     @Override @Transactional(readOnly = true)
@@ -70,9 +75,12 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 cursor == null ? null : cursor.id(), query.limit() + 1);
         boolean more = fetched.size() > query.limit();
         List<WorkOrderView> selected = more ? fetched.subList(0, query.limit()) : fetched;
-        // M429：列表项已通过项目范围授权；补齐服务端脱敏客户联系（不 soft-omit）。
+        // M429/M432：列表项已通过项目范围授权；补齐脱敏联系与当前阶段码（阶段由 task SPI 旁载）。
+        Map<UUID, String> stages = loadCurrentStageCodes(
+                principal.tenantId(), selected.stream().map(WorkOrderView::id).toList());
         List<WorkOrderView> enriched = selected.stream()
-                .map(item -> withMaskedContact(principal.tenantId(), item))
+                .map(item -> withDirectoryEnrichment(
+                        principal.tenantId(), item, stages.get(item.id())))
                 .toList();
         WorkOrderView last = more ? enriched.getLast() : null;
         return new WorkOrderPage(enriched, last == null ? null : encodeCursor(scope.scopeDigest(),
@@ -86,8 +94,11 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 .orElseThrow(() -> new BusinessProblem(ProblemCode.RESOURCE_NOT_FOUND, "工单不存在"));
         authorization.require(principal, AuthorizationRequest.projectCapability(READ, principal.tenantId(),
                 "WorkOrder", workOrder.id().toString(), workOrder.projectId().toString()), correlationId);
-        // M429：详情与目录契约对齐，返回脱敏联系、不含原文。
-        return new WorkOrderDetail(withMaskedContact(principal.tenantId(), workOrder), clock.instant());
+        // M429/M432：详情与目录契约对齐，返回脱敏联系与当前阶段码、不含原文。
+        Map<UUID, String> stages = loadCurrentStageCodes(principal.tenantId(), List.of(workOrderId));
+        return new WorkOrderDetail(
+                withDirectoryEnrichment(principal.tenantId(), workOrder, stages.get(workOrderId)),
+                clock.instant());
     }
 
     @Override
@@ -132,8 +143,13 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 maskAddress(raw.serviceAddress()));
     }
 
-    /** M429：在已授权的 WorkOrderView 上附着脱敏联系；原文不进入视图。 */
-    private WorkOrderView withMaskedContact(String tenantId, WorkOrderView view) {
+    /**
+     * M429/M432：在已授权的 WorkOrderView 上附着脱敏联系与当前阶段码；原文不进入视图。
+     * 阶段码由调用方批量查询后传入，缺任务时保持 null。
+     */
+    private WorkOrderView withDirectoryEnrichment(
+            String tenantId, WorkOrderView view, String currentStageCode
+    ) {
         WorkOrderMaskedContactView contact = maskRawContact(tenantId, view.id());
         return new WorkOrderView(
                 view.id(),
@@ -158,7 +174,16 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 view.version(),
                 contact.maskedCustomerName(),
                 contact.maskedCustomerPhone(),
-                contact.maskedServiceAddress());
+                contact.maskedServiceAddress(),
+                currentStageCode);
+    }
+
+    private Map<UUID, String> loadCurrentStageCodes(String tenantId, List<UUID> workOrderIds) {
+        WorkOrderDirectoryStageQuery query = stageQuery.getIfAvailable();
+        if (query == null || workOrderIds.isEmpty()) {
+            return Map.of();
+        }
+        return query.findCurrentStageCodes(tenantId, workOrderIds);
     }
 
     /** 姓名仅保留首字，其余以 * 代替。 */

@@ -417,7 +417,25 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 全国区县全量树/拼音索引、按区域筛选 API、阶段/责任人/SLA 列未交付
+  - UI_DATA_GAP: 全国区县全量树/拼音索引、按区域筛选 API、责任人/SLA 列未交付（阶段已由 M432 关闭主路径）
+```
+
+### 9.26 M432 记录（工单目录当前阶段列）
+
+```yaml
+pageId: ADMIN.WORKORDER.LIST
+route: /work-orders
+visualProfile: CLASSIC_PROFESSIONAL
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: 责任人/SLA 列、按阶段筛选、独立 updatedAt、列表 total 未交付
 ```
 
 ### 9.3 M397 记录（用户管理）

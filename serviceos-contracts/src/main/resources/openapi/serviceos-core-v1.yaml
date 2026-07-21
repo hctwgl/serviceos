@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.93
+  version: 1.0.94
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -9681,7 +9681,8 @@ components:
       required: [id, tenantId, projectId, clientCode, brandCode, serviceProductCode, externalOrderCode,
         status, configurationBundleId, configurationBundleCode, configurationBundleVersion,
         configurationBundleDigest, provinceCode, cityCode, districtCode, externalDispatchedAt,
-        receivedAt, version, maskedCustomerName, maskedCustomerPhone, maskedServiceAddress]
+        receivedAt, version, maskedCustomerName, maskedCustomerPhone, maskedServiceAddress,
+        currentStageCode]
       properties:
         id: { type: string, format: uuid }
         tenantId: { type: string }
@@ -9715,6 +9716,13 @@ components:
           type: [string, 'null']
           maxLength: 200
           description: M429：服务端脱敏服务地址；不得返回完整地址
+        currentStageCode:
+          type: [string, 'null']
+          maxLength: 100
+          description: >
+            M432：当前阶段码，与工作区 currentTaskSummary.stageCode 同口径
+            （首个 ACTIVE 任务：READY/PENDING/CLAIMED/RUNNING/RETRY_WAIT/MANUAL_INTERVENTION）。
+            无 ACTIVE 任务时为 null；不发明阶段名。
     WorkOrderPage:
       type: object
       additionalProperties: false

@@ -10,7 +10,7 @@ import AsyncContent from '../components/feedback/AsyncContent.vue'
 import { listAuthorizedWorkOrders, type WorkOrderPage } from '../api/workOrders'
 import { listRegionCatalog } from '../api/projectCatalog'
 import { firstRouteQuery } from '../routeQuery'
-import { statusOptions } from '../product/statusLabels'
+import { statusLabel, statusOptions } from '../product/statusLabels'
 import { toUserFacingError } from '../product/errorMessages'
 import { presentWorkOrderStatus } from '../presentation/work-order-status.presenter'
 import { labelClientCode } from '../presentation/enum-labels'
@@ -135,6 +135,7 @@ type Row = {
   maskedCustomerName: string | null
   maskedCustomerPhone: string | null
   maskedServiceAddress: string | null
+  currentStageCode: string | null
 }
 
 /** M430/M431：优先展示目录中文名，未命中则回退国标码（不发明名称）。 */
@@ -207,6 +208,7 @@ const rows = computed((): Row[] => {
       maskedCustomerName: item.maskedCustomerName,
       maskedCustomerPhone: item.maskedCustomerPhone,
       maskedServiceAddress: item.maskedServiceAddress,
+      currentStageCode: item.currentStageCode,
     }))
 })
 
@@ -249,12 +251,26 @@ const columns = computed((): TableColumnsType<Row> => {
     title: '当前阶段',
     key: 'stage',
     width: 120,
-    customRender: () =>
-      h(
+    customRender: ({ record }: { record: Row }) => {
+      const code = record.currentStageCode
+      if (code == null || String(code).trim() === '') {
+        return h(
+          'span',
+          { 'data-testid': 'work-order-current-stage' },
+          presentEmptyValue('not_provided'),
+        )
+      }
+      return h(
         Tooltip,
-        { title: '工单目录投影未提供阶段字段（UI_DATA_GAP）' },
-        () => presentEmptyValue('not_loaded'),
-      ),
+        { title: `阶段编码：${code}` },
+        () =>
+          h(
+            'span',
+            { 'data-testid': 'work-order-current-stage' },
+            statusLabel(code),
+          ),
+      )
+    },
   },
   {
     title: '车企',

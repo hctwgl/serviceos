@@ -164,6 +164,7 @@ export async function mockProductizationApis(
                 maskedCustomerName: '王*',
                 maskedCustomerPhone: '*******5678',
                 maskedServiceAddress: '杭州市西湖区***',
+                currentStageCode: 'SURVEY',
               },
             ],
         nextCursor: null,

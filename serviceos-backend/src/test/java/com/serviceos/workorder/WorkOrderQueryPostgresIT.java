@@ -35,7 +35,7 @@ class WorkOrderQueryPostgresIT {
 
  @BeforeEach void clean(){jdbc.sql("""
   TRUNCATE TABLE aud_audit_record, rel_outbox_publish_attempt, rel_outbox_event,
-  wo_work_order,cfg_configuration_bundle_item,cfg_configuration_bundle,cfg_configuration_asset_version,
+  tsk_task, wo_work_order,cfg_configuration_bundle_item,cfg_configuration_bundle,cfg_configuration_asset_version,
   prj_project,auth_role_field_policy,auth_role_grant,auth_role_capability,auth_role CASCADE
   """).update();}
 
@@ -52,10 +52,13 @@ class WorkOrderQueryPostgresIT {
   assertThat(page.items().getFirst().maskedServiceAddress()).isEqualTo("敏***");
   assertThat(page.items().getFirst().maskedCustomerPhone()).doesNotContain("138");
   assertThat(page.items().getFirst().maskedServiceAddress()).doesNotContain("敏感地址");
+  // M432：无 ACTIVE 任务时阶段码为 null，不发明值。
+  assertThat(page.items().getFirst().currentStageCode()).isNull();
   var detail=queries.get(reader,"corr-get",wa).workOrder();
   assertThat(detail.configurationBundleId()).isEqualTo(a.bundle().bundleId());
   assertThat(detail.maskedCustomerName()).isEqualTo("敏***");
   assertThat(detail.maskedCustomerPhone()).isEqualTo("*******0000");
+  assertThat(detail.currentStageCode()).isNull();
   assertThatThrownBy(()->queries.get(reader,"corr-deny",wb)).isInstanceOfSatisfying(BusinessProblem.class,
     p->assertThat(p.code()).isEqualTo(ProblemCode.ACCESS_DENIED));
   assertThat(jdbc.sql("SELECT decision_code FROM aud_audit_record ORDER BY occurred_at DESC LIMIT 1").query(String.class).single()).isEqualTo("DENY");
@@ -64,6 +67,18 @@ class WorkOrderQueryPostgresIT {
   assertThat(first.nextCursor()).isNotBlank();
   assertThatThrownBy(()->queries.list(principal("tenant-reader","tenant-test"),"corr-cursor",
     new WorkOrderQuery("BYD",null,"ACTIVE",first.nextCursor(),1))).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("cursor");
+ }
+
+ @Test void listAndDetailExposeCurrentStageCodeFromActiveTask(){
+  Scope a=scope("tenant-test","A");
+  UUID wa=receive(a,"ORDER-STAGE","d".repeat(64));
+  seedActiveTask(a,wa,"SURVEY");
+  seedRole("reader","PROJECT",a.projectId().toString());
+  CurrentPrincipal reader=principal("reader","tenant-test");
+  var page=queries.list(reader,"corr-stage-list",new WorkOrderQuery(null,null,null,null,20));
+  assertThat(page.items()).extracting(WorkOrderView::id).containsExactly(wa);
+  assertThat(page.items().getFirst().currentStageCode()).isEqualTo("SURVEY");
+  assertThat(queries.get(reader,"corr-stage-get",wa).workOrder().currentStageCode()).isEqualTo("SURVEY");
  }
 
  @Test void crossTenantIsHiddenAndMigrationIsCurrent(){
@@ -84,6 +99,40 @@ class WorkOrderQueryPostgresIT {
   String definition="{\"workflowCode\":\""+code+"\"}"; UUID asset=configurations.publishAsset(new PublishConfigurationAssetCommand(tenant,ConfigurationAssetType.WORKFLOW,code+"-WF","1.0.0","1.0.0",definition,Sha256.digest(definition))).versionId();
   var bundle=configurations.publishBundle(new PublishConfigurationBundleCommand(tenant,project,code+"-B","1.0.0","BYD_OCEAN","HOME_CHARGING_SURVEY_INSTALL","370000",Instant.now().minusSeconds(60),null,List.of(asset))); return new Scope(tenant,project,bundle);}
  private UUID receive(Scope s,String external,String digest){return commands.receive(new ReceiveExternalWorkOrderCommand(s.tenant(),s.projectId(),"BYD","BYD_OCEAN","HOME_CHARGING_SURVEY_INSTALL",external,digest,s.bundle().bundleId(),s.bundle().bundleCode(),s.bundle().bundleVersion(),s.bundle().manifestDigest(),"370000","370100","370102","敏感姓名","13800000000","敏感地址","VIN123456789",LocalDateTime.of(2026,7,15,10,0),"corr","cause")).workOrderId();}
+ private void seedActiveTask(Scope s,UUID workOrderId,String stageCode){
+  Instant now=Instant.parse("2026-07-15T04:00:00Z");
+  jdbc.sql("""
+   INSERT INTO tsk_task (
+     task_id,tenant_id,task_type,task_kind,business_key,payload_digest,
+     priority,status,next_run_at,attempt_count,max_attempts,correlation_id,
+     version,created_at,updated_at,project_id,work_order_id,
+     workflow_instance_id,stage_instance_id,workflow_node_instance_id,
+     workflow_node_id,workflow_definition_version_id,workflow_definition_digest,
+     form_ref,configuration_bundle_id,configuration_bundle_digest,stage_code
+   ) VALUES (
+     :id,:tenantId,'SITE_SURVEY','HUMAN',:businessKey,:digest,
+     500,'READY',:now,0,3,'corr-stage',1,:now,:now,:projectId,:workOrderId,
+     :workflowId,:stageId,:nodeId,'SURVEY_NODE',:definitionId,:definitionDigest,
+     'FORM',:bundleId,:bundleDigest,:stageCode
+   )
+   """)
+   .param("id",UUID.randomUUID())
+   .param("tenantId",s.tenant())
+   .param("businessKey","m432:"+workOrderId)
+   .param("digest","a".repeat(64))
+   .param("now",java.sql.Timestamp.from(now))
+   .param("projectId",s.projectId())
+   .param("workOrderId",workOrderId)
+   .param("workflowId",UUID.randomUUID())
+   .param("stageId",UUID.randomUUID())
+   .param("nodeId",UUID.randomUUID())
+   .param("definitionId",UUID.randomUUID())
+   .param("definitionDigest","b".repeat(64))
+   .param("bundleId",s.bundle().bundleId())
+   .param("bundleDigest",s.bundle().manifestDigest())
+   .param("stageCode",stageCode)
+   .update();
+ }
  private void seedRole(String principal,String scope,String ref){UUID role=UUID.randomUUID();jdbc.sql("INSERT INTO auth_role(role_id,tenant_id,role_code,role_name,role_status,created_at) VALUES(:id,'tenant-test',:code,:code,'ACTIVE',now())").param("id",role).param("code",principal+"-role").update();jdbc.sql("INSERT INTO auth_role_capability(role_id,capability_code,granted_at) VALUES(:id,'workOrder.read',now())").param("id",role).update();jdbc.sql("INSERT INTO auth_role_grant(grant_id,tenant_id,principal_id,role_id,scope_type,scope_ref,valid_from,source_code,approval_ref,created_at) VALUES(:grant,'tenant-test',:principal,:role,:scope,:ref,now()-interval '1 day','TEST','m68',now())").param("grant",UUID.randomUUID()).param("principal",principal).param("role",role).param("scope",scope).param("ref",ref).update();}
  private static CurrentPrincipal principal(String id,String tenant){return new CurrentPrincipal(id,tenant,CurrentPrincipal.PrincipalType.USER,"m68-test",Set.of());}
  private record Scope(String tenant,UUID projectId,ConfigurationBundleReference bundle){}

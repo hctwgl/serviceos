@@ -31,5 +31,5 @@ openapiVersion: "1.0.93"
 ## 4. 明确未实现
 
 - 全国区县全量树 / 拼音索引
-- 阶段、责任人、SLA、独立 updatedAt
+- 阶段（已由 **M432** 关闭主路径）、责任人、SLA、独立 updatedAt
 - 产品负责人视觉金标（`READY_FOR_REVIEW`）

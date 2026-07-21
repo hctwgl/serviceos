@@ -18,6 +18,8 @@ export type WorkOrder = {
   maskedCustomerName: string | null
   maskedCustomerPhone: string | null
   maskedServiceAddress: string | null
+  /** M432：当前阶段码；无 ACTIVE 任务时为 null。 */
+  currentStageCode: string | null
 }
 
 export type WorkOrderPage = {

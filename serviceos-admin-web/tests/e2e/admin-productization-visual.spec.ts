@@ -35,9 +35,15 @@ test.describe('M377 Admin productization visual baselines', () => {
     await expect(page.getByTestId('work-order-region')).toContainText('浙江省/杭州市/西湖区', {
       timeout: 10_000,
     })
+    // M432：目录当前阶段（currentStageCode → statusLabel）
+    await expect(page.getByTestId('work-order-current-stage')).toContainText('勘测')
     await shot(page, 'work-order-directory-productized')
     await page.screenshot({
       path: 'tests/e2e/__screenshots__/work-order-directory-region-names-1440.png',
+      fullPage: true,
+    })
+    await page.screenshot({
+      path: 'tests/e2e/__screenshots__/work-order-directory-current-stage-1440.png',
       fullPage: true,
     })
   })
