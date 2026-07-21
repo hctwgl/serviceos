@@ -3,6 +3,6 @@ spring:
     activate:
       on-profile: test
 
-# 测试输出同样面向开发者和 CI 诊断，不经过结构化 JSON 脱敏。
+# 测试使用普通文本日志，但仍遵循全局脱敏策略：默认业务数据原样，显式开启后统一脱敏。
 logging:
   config: classpath:logback-local.xml
