@@ -91,7 +91,7 @@ class NetworkPortalAssignCandidateDistancePostgresIT {
         seedGrant(PRINCIPAL, "networkTask.read", "NETWORK", NETWORK.toString());
         seedGrant(PRINCIPAL, "technician.readOwnNetwork", "NETWORK", NETWORK.toString());
         seedHumanTask(TASK, WO);
-        seedWorkOrderHeader(WO, TASK, "BYD_OCEAN", "HOME_CHARGING", "370000", "370200", null);
+        seedWorkOrderHeader(WO, TASK, "BYD_OCEAN", "HOME_CHARGING", "370000", "370200", "370203");
         seedActiveNetworkOnly(NETWORK, WO, TASK);
         seedCoverage(NETWORK, "BYD_OCEAN", "HOME_CHARGING", "370200");
         jdbc.sql("""
