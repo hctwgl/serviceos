@@ -3,7 +3,8 @@ spring:
     activate:
       on-profile: local
 
-# 本地开发明确使用普通文本 Logback 配置。
-# 该输出不经过 SensitiveLogJsonCustomizer，日志消息与异常栈原样输出。
+# 本地开发使用普通文本 Logback 配置。
+# SERVICEOS_REDACTION_ENABLED=false（默认）时业务数据原样输出；设为 true 后统一脱敏。
+# 凭据、令牌和签名不受业务开关影响，始终保护。
 logging:
   config: classpath:logback-local.xml
