@@ -4,7 +4,7 @@
         allowedDependencies = {
                 "audit::api", "authorization::api", "configuration::api", "dispatch::api",
                 "files::api", "forms::api", "identity::api", "network::api",
-                "reliability::api", "reliability::spi", "shared",
+                "reliability::api", "reliability::spi", "shared", "jooq",
                 "task::api", "task::spi", "workorder::api"
         })
 package com.serviceos.evidence;
