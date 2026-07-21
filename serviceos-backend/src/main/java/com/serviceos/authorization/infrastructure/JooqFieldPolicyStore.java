@@ -4,7 +4,11 @@ import com.serviceos.authorization.api.FieldAccessDecision;
 import com.serviceos.authorization.api.FieldPermission;
 import com.serviceos.authorization.application.FieldPolicyMatch;
 import com.serviceos.authorization.application.FieldPolicyStore;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import com.serviceos.jooq.generated.tables.AuthFieldPolicy;
+import com.serviceos.jooq.generated.tables.AuthFieldPolicyRule;
+import com.serviceos.jooq.generated.tables.AuthRoleFieldPolicy;
+import com.serviceos.jooq.generated.tables.AuthRoleGrant;
+import org.jooq.DSLContext;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
@@ -14,6 +18,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static com.serviceos.jooq.generated.tables.AuthFieldPolicy.AUTH_FIELD_POLICY;
+import static com.serviceos.jooq.generated.tables.AuthFieldPolicyRule.AUTH_FIELD_POLICY_RULE;
+import static com.serviceos.jooq.generated.tables.AuthRoleFieldPolicy.AUTH_ROLE_FIELD_POLICY;
+import static com.serviceos.jooq.generated.tables.AuthRoleGrant.AUTH_ROLE_GRANT;
+
 /**
  * 已发布字段策略查询与确定性合并。
  *
@@ -21,7 +30,7 @@ import java.util.Set;
  * 该顺序可防止某个高权限角色意外绕过面向特定资源的显式隐藏策略。</p>
  */
 @Repository
-final class JdbcFieldPolicyStore implements FieldPolicyStore {
+final class JooqFieldPolicyStore implements FieldPolicyStore {
     private static final String POLICY_VERSION = "field-policy-v1";
     private static final Map<FieldPermission, Integer> PERMISSION_RANK = Map.of(
             FieldPermission.MASKED, 1,
@@ -30,10 +39,10 @@ final class JdbcFieldPolicyStore implements FieldPolicyStore {
             FieldPermission.EXPORT, 4,
             FieldPermission.HIDDEN, 100);
 
-    private final JdbcClient jdbc;
+    private final DSLContext dsl;
 
-    JdbcFieldPolicyStore(JdbcClient jdbc) {
-        this.jdbc = jdbc;
+    JooqFieldPolicyStore(DSLContext dsl) {
+        this.dsl = dsl;
     }
 
     @Override
@@ -48,36 +57,31 @@ final class JdbcFieldPolicyStore implements FieldPolicyStore {
             return new FieldPolicyMatch(Map.of(), POLICY_VERSION);
         }
 
-        List<FieldRuleRow> rows = jdbc.sql("""
-                        SELECT rule.field_code, rule.access_level, rule.mask_code,
-                               policy.policy_code, policy.policy_version
-                          FROM auth_role_grant grant_record
-                          JOIN auth_role_field_policy role_policy
-                            ON role_policy.role_id = grant_record.role_id
-                          JOIN auth_field_policy policy
-                            ON policy.policy_id = role_policy.policy_id
-                          JOIN auth_field_policy_rule rule
-                            ON rule.policy_id = policy.policy_id
-                         WHERE grant_record.tenant_id = :tenantId
-                           AND grant_record.grant_id::text IN (:grantIds)
-                           AND policy.tenant_id = :tenantId
-                           AND policy.resource_type = :resourceType
-                           AND policy.policy_status = 'PUBLISHED'
-                           AND rule.capability_code = :capability
-                           AND rule.field_code IN (:fieldCodes)
-                         ORDER BY rule.field_code, policy.policy_code, policy.policy_version
-                        """)
-                .param("tenantId", tenantId)
-                .param("grantIds", matchedGrantIds)
-                .param("resourceType", resourceType)
-                .param("capability", capability)
-                .param("fieldCodes", fieldCodes)
-                .query((rs, rowNum) -> new FieldRuleRow(
-                        rs.getString("field_code"),
-                        FieldPermission.valueOf(rs.getString("access_level")),
-                        rs.getString("mask_code"),
-                        rs.getString("policy_code") + ":v" + rs.getInt("policy_version")))
-                .list();
+        AuthRoleGrant grantRecord = AUTH_ROLE_GRANT.as("grant_record");
+        AuthRoleFieldPolicy rolePolicy = AUTH_ROLE_FIELD_POLICY.as("role_policy");
+        AuthFieldPolicy policy = AUTH_FIELD_POLICY.as("policy");
+        AuthFieldPolicyRule rule = AUTH_FIELD_POLICY_RULE.as("rule");
+        // matchedGrantIds 为 policyVersion 查询输出的 grant_id 文本形式；保持原 ::text 比较语义。
+        List<FieldRuleRow> rows = dsl.select(
+                        rule.FIELD_CODE, rule.ACCESS_LEVEL, rule.MASK_CODE,
+                        policy.POLICY_CODE, policy.POLICY_VERSION)
+                .from(grantRecord)
+                .join(rolePolicy).on(rolePolicy.ROLE_ID.eq(grantRecord.ROLE_ID))
+                .join(policy).on(policy.POLICY_ID.eq(rolePolicy.POLICY_ID))
+                .join(rule).on(rule.POLICY_ID.eq(policy.POLICY_ID))
+                .where(grantRecord.TENANT_ID.eq(tenantId))
+                .and(grantRecord.GRANT_ID.cast(String.class).in(matchedGrantIds))
+                .and(policy.TENANT_ID.eq(tenantId))
+                .and(policy.RESOURCE_TYPE.eq(resourceType))
+                .and(policy.POLICY_STATUS.eq("PUBLISHED"))
+                .and(rule.CAPABILITY_CODE.eq(capability))
+                .and(rule.FIELD_CODE.in(fieldCodes))
+                .orderBy(rule.FIELD_CODE, policy.POLICY_CODE, policy.POLICY_VERSION)
+                .fetch(row -> new FieldRuleRow(
+                        row.get(rule.FIELD_CODE),
+                        FieldPermission.valueOf(row.get(rule.ACCESS_LEVEL)),
+                        row.get(rule.MASK_CODE),
+                        row.get(policy.POLICY_CODE) + ":v" + row.get(policy.POLICY_VERSION)));
 
         Map<String, List<FieldRuleRow>> grouped = new LinkedHashMap<>();
         rows.forEach(row -> grouped.computeIfAbsent(row.fieldCode(), ignored -> new ArrayList<>()).add(row));

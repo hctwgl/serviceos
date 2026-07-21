@@ -105,7 +105,7 @@ RoleGrant 终止与待重分配清单。
 - `organization/infrastructure/JdbcOrganizationDirectoryRepository.java`
 - `organization/web/OrganizationController.java`
 - `identity/api/PrincipalEmploymentLifecyclePort.java`
-- `authorization/application/OrganizationRoleGrantAdapter.java`
+- `authorization/application/JooqOrganizationRoleGrantAdapter.java`
 - `serviceos-core-v1.yaml` 0.77.0
 - `OrganizationDirectoryPostgresIT`
 - `OrganizationControllerSecurityTest`
