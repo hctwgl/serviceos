@@ -110,7 +110,7 @@ class WorkOrderQueryPostgresIT {
 
  @Test void listAndDetailExposeIndependentUpdatedAtAfterActivate(){
   Scope a=scope("tenant-test","A");
-  UUID wa=receive(a,"ORDER-UPDATED","g".repeat(64));
+  UUID wa=receive(a,"ORDER-UPDATED","9".repeat(64));
   Instant receivedAt=jdbc.sql("SELECT received_at FROM wo_work_order WHERE id=:id")
     .param("id",wa).query(Instant.class).single();
   Instant beforeActivate=jdbc.sql("SELECT updated_at FROM wo_work_order WHERE id=:id")
