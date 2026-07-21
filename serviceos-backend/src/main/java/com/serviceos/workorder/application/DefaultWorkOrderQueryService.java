@@ -167,8 +167,8 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
     }
 
     /**
-     * M429/M432/M433：在已授权的 WorkOrderView 上附着脱敏联系、阶段与责任人；原文不进入视图。
-     * 旁载字段由调用方批量查询后传入，缺任务/认领/档案时保持 null。
+     * M429/M432/M433/M435：在已授权的 WorkOrderView 上附着脱敏联系、阶段与责任人，并透传独立 updatedAt；
+     * 原文不进入视图。旁载字段由调用方批量查询后传入，缺任务/认领/档案时保持 null。
      */
     private WorkOrderView withDirectoryEnrichment(
             String tenantId, WorkOrderView view, DirectoryEnrichment enrichment
@@ -192,6 +192,7 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 view.districtCode(),
                 view.externalDispatchedAt(),
                 view.receivedAt(),
+                view.updatedAt(),
                 view.activatedAt(),
                 view.fulfilledAt(),
                 view.version(),

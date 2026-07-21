@@ -57,6 +57,8 @@ class WorkOrderQueryPostgresIT {
   assertThat(page.items().getFirst().currentStageCode()).isNull();
   assertThat(page.items().getFirst().currentClaimedBy()).isNull();
   assertThat(page.items().getFirst().currentAssigneeDisplayName()).isNull();
+  // M435：新建时 updatedAt 与 receivedAt 同源，且二者均非 null。
+  assertThat(page.items().getFirst().updatedAt()).isEqualTo(page.items().getFirst().receivedAt());
   var detail=queries.get(reader,"corr-get",wa).workOrder();
   assertThat(detail.configurationBundleId()).isEqualTo(a.bundle().bundleId());
   assertThat(detail.maskedCustomerName()).isEqualTo("敏***");
@@ -64,6 +66,7 @@ class WorkOrderQueryPostgresIT {
   assertThat(detail.currentStageCode()).isNull();
   assertThat(detail.currentClaimedBy()).isNull();
   assertThat(detail.currentAssigneeDisplayName()).isNull();
+  assertThat(detail.updatedAt()).isEqualTo(detail.receivedAt());
   // M434：无 sla.read 时页级旁载省略（null），不伪造 []/0。
   assertThat(page.slaRiskSummaries()).isNull();
   assertThatThrownBy(()->queries.get(reader,"corr-deny",wb)).isInstanceOfSatisfying(BusinessProblem.class,
@@ -105,6 +108,30 @@ class WorkOrderQueryPostgresIT {
   assertThat(detail.currentAssigneeDisplayName()).isEqualTo("演示师傅");
  }
 
+ @Test void listAndDetailExposeIndependentUpdatedAtAfterActivate(){
+  Scope a=scope("tenant-test","A");
+  UUID wa=receive(a,"ORDER-UPDATED","g".repeat(64));
+  Instant receivedAt=jdbc.sql("SELECT received_at FROM wo_work_order WHERE id=:id")
+    .param("id",wa).query(Instant.class).single();
+  Instant beforeActivate=jdbc.sql("SELECT updated_at FROM wo_work_order WHERE id=:id")
+    .param("id",wa).query(Instant.class).single();
+  assertThat(beforeActivate).isEqualTo(receivedAt);
+  commands.activate(new ActivateWorkOrderCommand(
+    a.tenant(),wa,UUID.randomUUID(),"corr-activate"));
+  Instant afterActivate=jdbc.sql("SELECT updated_at FROM wo_work_order WHERE id=:id")
+    .param("id",wa).query(Instant.class).single();
+  assertThat(afterActivate).isAfter(receivedAt);
+  seedRole("reader","PROJECT",a.projectId().toString());
+  CurrentPrincipal reader=principal("reader","tenant-test");
+  var page=queries.list(reader,"corr-updated-list",new WorkOrderQuery(null,null,null,null,20));
+  assertThat(page.items().getFirst().updatedAt()).isEqualTo(afterActivate);
+  assertThat(page.items().getFirst().receivedAt()).isEqualTo(receivedAt);
+  assertThat(page.items().getFirst().updatedAt()).isNotEqualTo(page.items().getFirst().receivedAt());
+  var detail=queries.get(reader,"corr-updated-get",wa).workOrder();
+  assertThat(detail.updatedAt()).isEqualTo(afterActivate);
+  assertThat(detail.receivedAt()).isEqualTo(receivedAt);
+ }
+
  @Test void listExposesSlaRiskSummariesWhenSlaReadGranted(){
   Scope a=scopeWithSla("tenant-test","A");
   UUID wa=receive(a,"ORDER-SLA","f".repeat(64));
@@ -127,8 +154,8 @@ class WorkOrderQueryPostgresIT {
     .isInstanceOfSatisfying(BusinessProblem.class,p->assertThat(p.code()).isEqualTo(ProblemCode.RESOURCE_NOT_FOUND));
   assertThat(jdbc.sql("SELECT risk_level FROM auth_capability WHERE capability_code='workOrder.read'").query(String.class).single()).isEqualTo("NORMAL");
   assertThat(jdbc.sql("SELECT count(*) FROM pg_indexes WHERE indexname='ix_wo_work_order_tenant_project_received'").query(Long.class).single()).isOne();
-  assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("145");
-  assertThat(flyway.info().applied()).hasSize(147);
+  assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("146");
+  assertThat(flyway.info().applied()).hasSize(148);
  }
 
  private Scope scope(String tenant,String code){return scope(tenant,code,false);}

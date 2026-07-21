@@ -132,6 +132,7 @@ type Row = {
   cityCode: string
   districtCode: string
   receivedAt: string
+  updatedAt: string
   maskedCustomerName: string | null
   maskedCustomerPhone: string | null
   maskedServiceAddress: string | null
@@ -207,6 +208,7 @@ const rows = computed((): Row[] => {
       cityCode: item.cityCode,
       districtCode: item.districtCode,
       receivedAt: item.receivedAt,
+      updatedAt: item.updatedAt,
       maskedCustomerName: item.maskedCustomerName,
       maskedCustomerPhone: item.maskedCustomerPhone,
       maskedServiceAddress: item.maskedServiceAddress,
@@ -412,14 +414,19 @@ const columns = computed((): TableColumnsType<Row> => {
   },
   {
     title: '更新时间',
-    dataIndex: 'receivedAt',
-    key: 'receivedAt',
+    dataIndex: 'updatedAt',
+    key: 'updatedAt',
     width: 150,
-    customRender: ({ record }) =>
+    customRender: ({ record }: { record: Row }) =>
       h(
         Tooltip,
-        { title: '列表当前返回接收时间，非独立 updatedAt（UI_DATA_GAP）' },
-        () => formatDateTimeDisplay(record.receivedAt),
+        { title: '工单聚合更新时间（独立于接收时间）' },
+        () =>
+          h(
+            'span',
+            { 'data-testid': 'work-order-updated-at' },
+            formatDateTimeDisplay(record.updatedAt),
+          ),
       ),
   },
   {

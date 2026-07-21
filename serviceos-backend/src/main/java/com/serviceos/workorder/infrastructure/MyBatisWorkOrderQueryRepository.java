@@ -46,7 +46,8 @@ final class MyBatisWorkOrderQueryRepository implements WorkOrderQueryRepository 
                 string(r,"configurationBundleCode"), string(r,"configurationBundleVersion"),
                 string(r,"configurationBundleDigest"), string(r,"provinceCode"), string(r,"cityCode"),
                 string(r,"districtCode"), instant(r,"externalDispatchedAt"), instant(r,"receivedAt"),
-                instant(r,"activatedAt"), instant(r,"fulfilledAt"), ((Number)r.get("version")).longValue());
+                instant(r,"updatedAt"), instant(r,"activatedAt"), instant(r,"fulfilledAt"),
+                ((Number)r.get("version")).longValue());
     }
     private static String string(Map<String,Object> r,String k) { Object v=r.get(k); return v==null?null:v.toString(); }
     private static UUID uuid(Map<String,Object> r,String k) { Object v=r.get(k); return v instanceof UUID u?u:UUID.fromString(v.toString()); }

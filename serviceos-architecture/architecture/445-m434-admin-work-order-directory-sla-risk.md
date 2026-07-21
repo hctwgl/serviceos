@@ -32,4 +32,5 @@ openapiVersion: "1.0.96"
 ## 4. 明确未实现
 
 - 即将超时窗口、按 SLA 筛选、完整实例详情深链
+- 独立 updatedAt（已由 **M435** 关闭主路径）
 - 产品负责人视觉金标（`READY_FOR_REVIEW`）

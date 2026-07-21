@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.96
+  version: 1.0.97
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -9683,7 +9683,7 @@ components:
       required: [id, tenantId, projectId, clientCode, brandCode, serviceProductCode, externalOrderCode,
         status, configurationBundleId, configurationBundleCode, configurationBundleVersion,
         configurationBundleDigest, provinceCode, cityCode, districtCode, externalDispatchedAt,
-        receivedAt, version, maskedCustomerName, maskedCustomerPhone, maskedServiceAddress,
+        receivedAt, updatedAt, version, maskedCustomerName, maskedCustomerPhone, maskedServiceAddress,
         currentStageCode, currentClaimedBy, currentAssigneeDisplayName]
       properties:
         id: { type: string, format: uuid }
@@ -9703,6 +9703,12 @@ components:
         districtCode: { type: string }
         externalDispatchedAt: { type: string, format: date-time }
         receivedAt: { type: string, format: date-time }
+        updatedAt:
+          type: string
+          format: date-time
+          description: >
+            M435：工单聚合最近一次写路径更新时间（wo_work_order.updated_at），与 receivedAt 独立。
+            目录「更新时间」列使用本字段，不得再映射 receivedAt。
         activatedAt: { type: [string, 'null'], format: date-time }
         fulfilledAt: { type: [string, 'null'], format: date-time }
         version: { type: integer, format: int64, minimum: 1 }

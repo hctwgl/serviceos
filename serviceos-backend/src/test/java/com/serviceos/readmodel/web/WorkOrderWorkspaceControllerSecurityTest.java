@@ -83,7 +83,7 @@ class WorkOrderWorkspaceControllerSecurityTest {
                 "HOME_CHARGING_SURVEY_INSTALL", "EXT-1", "ACTIVE",
                 UUID.randomUUID(), "BUNDLE", "1.0.0", "a".repeat(64),
                 "370000", "370100", "370102", now.minusSeconds(100), now.minusSeconds(90),
-                now.minusSeconds(80), null, 3);
+                now.minusSeconds(85), now.minusSeconds(80), null, 3);
         WorkOrderWorkspace workspace = new WorkOrderWorkspace(
                 header,
                 new WorkOrderWorkspaceTaskSummary(

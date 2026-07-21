@@ -13,6 +13,8 @@ export type WorkOrder = {
   cityCode: string
   districtCode: string
   receivedAt: string
+  /** M435：工单聚合独立更新时间；目录「更新时间」列使用本字段。 */
+  updatedAt: string
   version: number
   /** M429：服务端脱敏客户联系。 */
   maskedCustomerName: string | null

@@ -8,7 +8,8 @@
     configuration_bundle_version AS "configurationBundleVersion", configuration_bundle_digest AS "configurationBundleDigest",
     province_code AS "provinceCode", city_code AS "cityCode", district_code AS "districtCode",
     external_dispatched_at AS "externalDispatchedAt", received_at AS "receivedAt",
-    activated_at AS "activatedAt", fulfilled_at AS "fulfilledAt", version AS "version"</sql>
+    updated_at AS "updatedAt", activated_at AS "activatedAt", fulfilled_at AS "fulfilledAt",
+    version AS "version"</sql>
   <select id="findPage" resultType="map">
     SELECT <include refid="columns"/> FROM wo_work_order
      WHERE tenant_id=#{tenantId}

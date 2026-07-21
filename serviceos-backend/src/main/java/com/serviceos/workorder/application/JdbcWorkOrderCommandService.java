@@ -78,7 +78,7 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
                     configuration_bundle_code, configuration_bundle_version,
                     configuration_bundle_digest, province_code, city_code, district_code,
                     customer_name, customer_mobile, service_address, vehicle_vin,
-                    external_dispatched_at, received_at, version,
+                    external_dispatched_at, received_at, updated_at, version,
                     fulfillment_config_kind, fulfillment_profile_id, fulfillment_revision_id,
                     fulfillment_version
                 ) VALUES (
@@ -86,7 +86,7 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
                     :externalOrderCode, :payloadDigest, 'RECEIVED', :bundleId,
                     :bundleCode, :bundleVersion, :bundleDigest,
                     :provinceCode, :cityCode, :districtCode, :customerName, :customerMobile,
-                    :serviceAddress, :vehicleVin, :externalDispatchedAt, :receivedAt, 1,
+                    :serviceAddress, :vehicleVin, :externalDispatchedAt, :receivedAt, :updatedAt, 1,
                     :fulfillmentKind, :fulfillmentProfileId, :fulfillmentRevisionId,
                     :fulfillmentVersion
                 ) ON CONFLICT (tenant_id, client_code, external_order_code) DO NOTHING
@@ -112,6 +112,7 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
                 .param("vehicleVin", command.vehicleVin())
                 .param("externalDispatchedAt", command.externalDispatchedAt())
                 .param("receivedAt", java.sql.Timestamp.from(receivedAt))
+                .param("updatedAt", java.sql.Timestamp.from(receivedAt))
                 .param("fulfillmentKind", command.fulfillmentConfigKind())
                 .param("fulfillmentProfileId", command.fulfillmentProfileId())
                 .param("fulfillmentRevisionId", command.fulfillmentRevisionId())
@@ -149,6 +150,7 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
         int updated = jdbc.sql("""
                 UPDATE wo_work_order
                    SET status = 'ACTIVE', activated_at = :activatedAt,
+                       updated_at = :activatedAt,
                        version = version + 1
                  WHERE tenant_id = :tenantId AND id = :workOrderId
                    AND status = 'RECEIVED'
@@ -187,6 +189,7 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
         int updated = jdbc.sql("""
                 UPDATE wo_work_order
                    SET status = 'FULFILLED', fulfilled_at = :fulfilledAt,
+                       updated_at = :fulfilledAt,
                        version = version + 1
                  WHERE tenant_id = :tenantId AND id = :workOrderId
                    AND status = 'ACTIVE'
@@ -235,6 +238,7 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
                        city_code = :cityCode,
                        district_code = :districtCode,
                        last_external_update_digest = :updateDigest,
+                       updated_at = :updatedAt,
                        version = version + 1
                  WHERE tenant_id = :tenantId AND id = :workOrderId
                    AND status IN ('RECEIVED', 'ACTIVE')
@@ -247,6 +251,7 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
                 .param("cityCode", command.cityCode())
                 .param("districtCode", command.districtCode())
                 .param("updateDigest", command.updateDigest())
+                .param("updatedAt", java.sql.Timestamp.from(updatedAt))
                 .param("tenantId", command.tenantId())
                 .param("workOrderId", command.workOrderId())
                 .param("expectedVersion", command.expectedVersion())
@@ -281,6 +286,7 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
                        cancelled_at = :cancelledAt,
                        cancel_reason_code = :reasonCode,
                        cancel_approval_ref = :approvalRef,
+                       updated_at = :cancelledAt,
                        version = version + 1
                  WHERE tenant_id = :tenantId AND id = :workOrderId
                    AND status IN ('RECEIVED', 'ACTIVE')
@@ -326,6 +332,7 @@ final class JdbcWorkOrderCommandService implements WorkOrderCommandService {
                        reopened_at = :reopenedAt,
                        reopen_approval_ref = :approvalRef,
                        activated_at = COALESCE(activated_at, :reopenedAt),
+                       updated_at = :reopenedAt,
                        version = version + 1
                  WHERE tenant_id = :tenantId AND id = :workOrderId
                    AND status = 'CANCELLED'

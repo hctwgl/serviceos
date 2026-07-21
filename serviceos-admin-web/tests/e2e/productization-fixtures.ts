@@ -160,6 +160,7 @@ export async function mockProductizationApis(
                 cityCode: '330100',
                 districtCode: '330106',
                 receivedAt: '2026-07-20T03:00:00Z',
+                updatedAt: '2026-07-21T08:15:00Z',
                 version: 1,
                 maskedCustomerName: '王*',
                 maskedCustomerPhone: '*******5678',
