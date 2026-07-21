@@ -708,6 +708,23 @@ export async function mockProductizationApis(
       })
       return
     }
+    if (url.includes('/technician-profiles')) {
+      await fulfillJson(route, {
+        items: [
+          {
+            id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+            principalId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            displayName: '现场师傅甲',
+            status: 'ACTIVE',
+            version: 1,
+            createdAt: '2026-01-01T00:00:00Z',
+            updatedAt: '2026-01-01T00:00:00Z',
+          },
+        ],
+        asOf: '2026-07-20T04:00:00Z',
+      })
+      return
+    }
     if (url.includes('/admin/user-directory')) {
       await fulfillJson(route, {
         items: [

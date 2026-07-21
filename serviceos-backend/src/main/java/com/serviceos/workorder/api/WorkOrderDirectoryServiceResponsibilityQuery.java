@@ -25,4 +25,11 @@ public interface WorkOrderDirectoryServiceResponsibilityQuery {
      * @return 匹配工单 ID；无匹配时为空列表（调用方应失败关闭为无结果，不得忽略筛选）
      */
     List<UUID> findWorkOrderIdsByActiveNetworkId(String tenantId, UUID networkId);
+
+    /**
+     * M441：解析 ACTIVE TECHNICIAN assignee 等于给定师傅档案 ID 的工单集合（与目录列同口径）。
+     *
+     * @return 匹配工单 ID；无匹配时为空列表（调用方应失败关闭为无结果，不得忽略筛选）
+     */
+    List<UUID> findWorkOrderIdsByActiveTechnicianId(String tenantId, UUID technicianProfileId);
 }

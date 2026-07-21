@@ -124,14 +124,14 @@ class WorkOrderQueryPostgresIT {
   seedRole("reader","PROJECT",a.projectId().toString());
   CurrentPrincipal reader=principal("reader","tenant-test");
   var byDistrict=queries.list(reader,"corr-region-district",
-    new WorkOrderQuery(null,null,null,null,null,null,"370102",null,null,null,20));
+    new WorkOrderQuery(null,null,null,null,null,null,"370102",null,null,null,null,20));
   assertThat(byDistrict.items()).extracting(WorkOrderView::id).containsExactly(hangzhou);
   assertThat(byDistrict.totalCount()).isEqualTo(1);
   var byProvince=queries.list(reader,"corr-region-province",
-    new WorkOrderQuery(null,null,null,null,"440000",null,null,null,null,null,20));
+    new WorkOrderQuery(null,null,null,null,"440000",null,null,null,null,null,null,20));
   assertThat(byProvince.items()).extracting(WorkOrderView::externalOrderCode).containsExactly("ORDER-SZ");
   var none=queries.list(reader,"corr-region-none",
-    new WorkOrderQuery(null,null,null,null,"110000",null,null,null,null,null,20));
+    new WorkOrderQuery(null,null,null,null,"110000",null,null,null,null,null,null,20));
   assertThat(none.items()).isEmpty();
   assertThat(none.totalCount()).isZero();
  }
@@ -167,19 +167,19 @@ class WorkOrderQueryPostgresIT {
   seedRole("reader","PROJECT",a.projectId().toString());
   CurrentPrincipal reader=principal("reader","tenant-test");
   var bySurvey=queries.list(reader,"corr-stage-filter",
-    new WorkOrderQuery(null,null,null,null,null,null,null,"SURVEY",null,null,20));
+    new WorkOrderQuery(null,null,null,null,null,null,null,"SURVEY",null,null,null,20));
   assertThat(bySurvey.items()).extracting(WorkOrderView::id).containsExactly(survey);
   assertThat(bySurvey.items().getFirst().currentStageCode()).isEqualTo("SURVEY");
   assertThat(bySurvey.totalCount()).isEqualTo(1);
   var byInstall=queries.list(reader,"corr-stage-install",
-    new WorkOrderQuery(null,null,null,null,null,null,null,"INSTALLATION",null,null,20));
+    new WorkOrderQuery(null,null,null,null,null,null,null,"INSTALLATION",null,null,null,20));
   assertThat(byInstall.items()).extracting(WorkOrderView::id).containsExactly(install);
   var none=queries.list(reader,"corr-stage-none",
-    new WorkOrderQuery(null,null,null,null,null,null,null,"REPAIR",null,null,20));
+    new WorkOrderQuery(null,null,null,null,null,null,null,"REPAIR",null,null,null,20));
   assertThat(none.items()).isEmpty();
   assertThat(none.totalCount()).isZero();
   assertThatThrownBy(()->queries.list(reader,"corr-stage-invalid",
-    new WorkOrderQuery(null,null,null,null,null,null,null,"survey",null,null,20)))
+    new WorkOrderQuery(null,null,null,null,null,null,null,"survey",null,null,null,20)))
     .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("currentStageCode");
  }
 
@@ -200,12 +200,38 @@ class WorkOrderQueryPostgresIT {
   seedRole("reader","PROJECT",a.projectId().toString());
   CurrentPrincipal reader=principal("reader","tenant-test");
   var byNetwork=queries.list(reader,"corr-network-filter",
-    new WorkOrderQuery(null,null,null,null,null,null,null,null,networkA,null,20));
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,networkA,null,null,20));
   assertThat(byNetwork.items()).extracting(WorkOrderView::id).containsExactly(matched);
   assertThat(byNetwork.items().getFirst().currentNetworkId()).isEqualTo(networkA.toString());
   assertThat(byNetwork.totalCount()).isEqualTo(1);
   var none=queries.list(reader,"corr-network-none",
-    new WorkOrderQuery(null,null,null,null,null,null,null,null,UUID.randomUUID(),null,20));
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,UUID.randomUUID(),null,null,20));
+  assertThat(none.items()).isEmpty();
+  assertThat(none.totalCount()).isZero();
+ }
+
+ @Test void listFiltersByCurrentTechnicianId(){
+  Scope a=scope("tenant-test","A");
+  UUID matched=receive(a,"ORDER-TECH-MATCH","c".repeat(64));
+  UUID other=receive(a,"ORDER-TECH-OTHER","d".repeat(64));
+  UUID matchedTask=seedActiveTask(a,matched,"SURVEY",null,null);
+  UUID otherTask=seedActiveTask(a,other,"SURVEY",null,null);
+  UUID network=UUID.randomUUID();
+  UUID techA=UUID.randomUUID();
+  UUID techB=UUID.randomUUID();
+  seedNetworkAndTechnician(a.tenant(),network,"师傅筛选网点",techA,UUID.randomUUID(),"筛选师傅甲");
+  seedNetworkAndTechnician(a.tenant(),UUID.randomUUID(),"师傅筛选网点乙",techB,UUID.randomUUID(),"筛选师傅乙");
+  seedActiveAssignment(a,matched,matchedTask,"TECHNICIAN",techA.toString());
+  seedActiveAssignment(a,other,otherTask,"TECHNICIAN",techB.toString());
+  seedRole("reader","PROJECT",a.projectId().toString());
+  CurrentPrincipal reader=principal("reader","tenant-test");
+  var byTech=queries.list(reader,"corr-tech-filter",
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,techA,null,20));
+  assertThat(byTech.items()).extracting(WorkOrderView::id).containsExactly(matched);
+  assertThat(byTech.items().getFirst().currentTechnicianId()).isEqualTo(techA.toString());
+  assertThat(byTech.totalCount()).isEqualTo(1);
+  var none=queries.list(reader,"corr-tech-none",
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,UUID.randomUUID(),null,20));
   assertThat(none.items()).isEmpty();
   assertThat(none.totalCount()).isZero();
  }

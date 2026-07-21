@@ -46,6 +46,18 @@
         <otherwise>AND FALSE</otherwise>
       </choose>
     </if>
+    <!-- M441：师傅筛选由 dispatch SPI 解析为工单 ID 后在此收敛；空集失败关闭为无结果。 -->
+    <if test="applyTechnicianFilter">
+      <choose>
+        <when test="technicianWorkOrderIds != null and !technicianWorkOrderIds.isEmpty()">
+          AND id IN
+          <foreach collection="technicianWorkOrderIds" item="id" open="(" separator="," close=")">
+            CAST(#{id} AS uuid)
+          </foreach>
+        </when>
+        <otherwise>AND FALSE</otherwise>
+      </choose>
+    </if>
   </sql>
   <select id="findPage" resultType="map">
     SELECT <include refid="columns"/> FROM wo_work_order

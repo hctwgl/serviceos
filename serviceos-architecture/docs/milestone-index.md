@@ -447,6 +447,7 @@ title: ServiceOS 里程碑索引
 | M438 | M438 Admin 工单目录按阶段筛选 | [449-m438-admin-work-order-directory-stage-filter.md](../architecture/449-m438-admin-work-order-directory-stage-filter.md) | [432-m438-admin-work-order-directory-stage-filter-acceptance.md](../testing/432-m438-admin-work-order-directory-stage-filter-acceptance.md) |
 | M439 | M439 Admin 工单目录网点/师傅列 | [450-m439-admin-work-order-directory-network-technician.md](../architecture/450-m439-admin-work-order-directory-network-technician.md) | [433-m439-admin-work-order-directory-network-technician-acceptance.md](../testing/433-m439-admin-work-order-directory-network-technician-acceptance.md) |
 | M440 | M440 Admin 工单目录按网点筛选 | [451-m440-admin-work-order-directory-network-filter.md](../architecture/451-m440-admin-work-order-directory-network-filter.md) | [434-m440-admin-work-order-directory-network-filter-acceptance.md](../testing/434-m440-admin-work-order-directory-network-filter-acceptance.md) |
+| M441 | M441 Admin 工单目录按师傅筛选 | [452-m441-admin-work-order-directory-technician-filter.md](../architecture/452-m441-admin-work-order-directory-technician-filter.md) | [435-m441-admin-work-order-directory-technician-filter-acceptance.md](../testing/435-m441-admin-work-order-directory-technician-filter-acceptance.md) |
 
 ## 未关联里程碑的文档
 

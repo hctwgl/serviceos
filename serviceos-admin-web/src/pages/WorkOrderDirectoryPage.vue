@@ -10,6 +10,7 @@ import AsyncContent from '../components/feedback/AsyncContent.vue'
 import { listAuthorizedWorkOrders, type WorkOrderPage } from '../api/workOrders'
 import { listRegionCatalog, type RegionCatalogItem } from '../api/projectCatalog'
 import { listServiceNetworks, type ServiceNetwork } from '../api/networks'
+import { listTechnicianProfiles, type TechnicianProfile } from '../api/technicians'
 import { firstRouteQuery } from '../routeQuery'
 import { statusLabel, statusOptions } from '../product/statusLabels'
 import { toUserFacingError } from '../product/errorMessages'
@@ -46,7 +47,9 @@ const stageFilterCode = ref<string | undefined>(undefined)
 /** M440：服务网点筛选（与目录 currentNetworkId 同口径）。 */
 const networkFilterId = ref<string | undefined>(undefined)
 const networkOptions = ref<ServiceNetwork[]>([])
-const moreTechnician = ref('')
+/** M441：服务师傅筛选（与目录 currentTechnicianId 同口径）。 */
+const technicianFilterId = ref<string | undefined>(undefined)
+const technicianOptions = ref<TechnicianProfile[]>([])
 const moreSla = ref<string | undefined>(undefined)
 
 /** 常用履约阶段；未知码由服务端校验失败关闭，不在此发明业务阶段。 */
@@ -75,6 +78,15 @@ const networkFilterOptions = computed(() =>
     .map((item) => ({
       value: item.id,
       label: `${item.networkName}（${item.networkCode}）`,
+    })),
+)
+
+const technicianFilterOptions = computed(() =>
+  technicianOptions.value
+    .filter((item) => item.status === 'ACTIVE')
+    .map((item) => ({
+      value: item.id,
+      label: item.displayName?.trim() || item.id,
     })),
 )
 
@@ -113,6 +125,8 @@ function hydrateFiltersFromRoute() {
   if (nextStage !== undefined) stageFilterCode.value = nextStage || undefined
   const nextNetwork = firstRouteQuery(route, 'currentNetworkId')
   if (nextNetwork !== undefined) networkFilterId.value = nextNetwork || undefined
+  const nextTechnician = firstRouteQuery(route, 'currentTechnicianId')
+  if (nextTechnician !== undefined) technicianFilterId.value = nextTechnician || undefined
 }
 
 function looksLikeUuid(value: string): boolean {
@@ -136,6 +150,7 @@ async function load(next?: string) {
         : undefined,
       currentStageCode: stageFilterCode.value || undefined,
       currentNetworkId: networkFilterId.value || undefined,
+      currentTechnicianId: technicianFilterId.value || undefined,
       ...regionQueryParams(),
     })
     cursor.value = page.value.nextCursor ?? undefined
@@ -165,6 +180,7 @@ function currentFilters() {
       : undefined,
     currentStageCode: stageFilterCode.value || undefined,
     currentNetworkId: networkFilterId.value || undefined,
+    currentTechnicianId: technicianFilterId.value || undefined,
     ...region,
   }
 }
@@ -177,6 +193,7 @@ function applySavedView(filters: Record<string, string>) {
     filters.districtCode || filters.cityCode || filters.provinceCode || undefined
   stageFilterCode.value = filters.currentStageCode || undefined
   networkFilterId.value = filters.currentNetworkId || undefined
+  technicianFilterId.value = filters.currentTechnicianId || undefined
   return search()
 }
 
@@ -188,7 +205,7 @@ function resetFilters() {
   regionFilterCode.value = undefined
   stageFilterCode.value = undefined
   networkFilterId.value = undefined
-  moreTechnician.value = ''
+  technicianFilterId.value = undefined
   moreSla.value = undefined
   return search()
 }
@@ -265,6 +282,16 @@ async function loadNetworkOptions() {
   } catch {
     // 缺 network.read 时筛选下拉为空；不阻断目录主路径。
     networkOptions.value = []
+  }
+}
+
+async function loadTechnicianOptions() {
+  try {
+    const page = await listTechnicianProfiles()
+    technicianOptions.value = page.items
+  } catch {
+    // 缺 technician 目录能力时筛选下拉为空；不阻断目录主路径。
+    technicianOptions.value = []
   }
 }
 
@@ -582,6 +609,7 @@ onMounted(() => {
   hydrateFiltersFromRoute()
   void loadRegionNames()
   void loadNetworkOptions()
+  void loadTechnicianOptions()
   return load()
 })
 
@@ -678,7 +706,7 @@ watch(
         type="info"
         show-icon
         message="部分更多筛选暂不可用"
-        description="师傅、SLA、创建时间等筛选条件尚未由工单目录查询 API 提供（UI_DATA_GAP）。服务区域、当前阶段与服务网点已支持精确筛选。"
+        description="SLA、创建时间等筛选条件尚未由工单目录查询 API 提供（UI_DATA_GAP）。服务区域、当前阶段、服务网点与服务师傅已支持精确筛选。"
       />
       <label class="filter-field">
         <span>服务区域</span>
@@ -727,7 +755,18 @@ watch(
       </label>
       <label class="filter-field">
         <span>服务师傅</span>
-        <Input v-model:value="moreTechnician" disabled placeholder="暂未提供" />
+        <Select
+          v-model:value="technicianFilterId"
+          allow-clear
+          show-search
+          style="width: 200px"
+          aria-label="服务师傅筛选"
+          data-testid="work-order-technician-filter"
+          placeholder="按 ACTIVE 责任师傅筛选"
+          :options="technicianFilterOptions"
+          :filter-option="(input, option) => String(option?.label ?? '').includes(input)"
+          @change="search"
+        />
       </label>
       <label class="filter-field">
         <span>SLA 状态</span>

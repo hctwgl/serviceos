@@ -57,6 +57,23 @@ final class JdbcWorkOrderDirectoryServiceResponsibilityQuery
              WHERE assignee_id = :networkAssigneeId
             """;
 
+    private static final String FILTER_BY_TECHNICIAN_SQL = """
+            SELECT work_order_id
+              FROM (
+                    SELECT DISTINCT ON (work_order_id)
+                           work_order_id AS work_order_id,
+                           assignee_id AS assignee_id
+                      FROM dsp_service_assignment
+                     WHERE tenant_id = :tenantId
+                       AND work_order_id IS NOT NULL
+                       AND status = 'ACTIVE'
+                       AND responsibility_level = 'TECHNICIAN'
+                     ORDER BY work_order_id, effective_from DESC NULLS LAST,
+                              service_assignment_id DESC
+                   ) current_technician
+             WHERE assignee_id = :technicianAssigneeId
+            """;
+
     private final JdbcClient jdbc;
     private final NetworkDirectoryLabelQuery labels;
 
@@ -75,6 +92,25 @@ final class JdbcWorkOrderDirectoryServiceResponsibilityQuery
         jdbc.sql(FILTER_BY_NETWORK_SQL)
                 .param("tenantId", tenantId)
                 .param("networkAssigneeId", networkId.toString())
+                .query((rs, rowNum) -> {
+                    UUID workOrderId = rs.getObject("work_order_id", UUID.class);
+                    if (workOrderId != null) {
+                        ids.add(workOrderId);
+                    }
+                    return null;
+                })
+                .list();
+        return List.copyOf(ids);
+    }
+
+    @Override
+    public List<UUID> findWorkOrderIdsByActiveTechnicianId(String tenantId, UUID technicianProfileId) {
+        Objects.requireNonNull(tenantId, "tenantId must not be null");
+        Objects.requireNonNull(technicianProfileId, "technicianProfileId must not be null");
+        List<UUID> ids = new ArrayList<>();
+        jdbc.sql(FILTER_BY_TECHNICIAN_SQL)
+                .param("tenantId", tenantId)
+                .param("technicianAssigneeId", technicianProfileId.toString())
                 .query((rs, rowNum) -> {
                     UUID workOrderId = rs.getObject("work_order_id", UUID.class);
                     if (workOrderId != null) {

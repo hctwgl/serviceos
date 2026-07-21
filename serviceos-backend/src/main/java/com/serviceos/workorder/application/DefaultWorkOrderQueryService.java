@@ -85,8 +85,9 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
         String districtCode = normalizeRegionCode(query.districtCode(), "districtCode");
         // M438：当前阶段码与目录列同口径；非法码失败关闭。
         String currentStageCode = normalizeStageCode(query.currentStageCode());
-        // M440：网点 ID 与目录列同口径；非法 UUID 由绑定层失败，此处仅参与 digest。
+        // M440/M441：网点/师傅 ID 与目录列同口径；非法 UUID 由绑定层失败，此处仅参与 digest。
         UUID currentNetworkId = query.currentNetworkId();
+        UUID currentTechnicianId = query.currentTechnicianId();
         AuthorizedProjectScope scope = projectScopes.require(principal, READ, "WorkOrder", correlationId);
         if (query.projectId() != null && !scope.tenantWide() && !scope.projectIds().contains(query.projectId())) {
             authorization.require(principal, AuthorizationRequest.projectCapability(READ, principal.tenantId(),
@@ -100,7 +101,8 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 + "|cityCode=" + nullable(cityCode)
                 + "|districtCode=" + nullable(districtCode)
                 + "|currentStageCode=" + nullable(currentStageCode)
-                + "|currentNetworkId=" + nullable(currentNetworkId));
+                + "|currentNetworkId=" + nullable(currentNetworkId)
+                + "|currentTechnicianId=" + nullable(currentTechnicianId));
         Cursor cursor = decodeCursor(query.cursor(), scope.scopeDigest(), filterDigest);
         List<UUID> projectIds = scope.projectIds().stream()
                 .sorted(Comparator.comparing(UUID::toString)).toList();
@@ -115,23 +117,32 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
             stageWorkOrderIds = stagesPort.findWorkOrderIdsByCurrentStageCode(
                     principal.tenantId(), currentStageCode, scope.tenantWide(), projectIds);
         }
-        // M440：网点筛选经 dispatch SPI 解析为工单 ID；项目范围仍由授权 SQL 收敛。
+        // M440/M441：网点/师傅筛选经 dispatch SPI 解析为工单 ID；项目范围仍由授权 SQL 收敛。
         boolean applyNetworkFilter = currentNetworkId != null;
+        boolean applyTechnicianFilter = currentTechnicianId != null;
         List<UUID> networkWorkOrderIds = List.of();
-        if (applyNetworkFilter) {
+        List<UUID> technicianWorkOrderIds = List.of();
+        if (applyNetworkFilter || applyTechnicianFilter) {
             WorkOrderDirectoryServiceResponsibilityQuery responsibilityPort =
                     responsibilityQuery.getIfAvailable();
             if (responsibilityPort == null) {
-                throw new IllegalStateException("工单目录网点筛选端口不可用");
+                throw new IllegalStateException("工单目录网点/师傅筛选端口不可用");
             }
-            networkWorkOrderIds = responsibilityPort.findWorkOrderIdsByActiveNetworkId(
-                    principal.tenantId(), currentNetworkId);
+            if (applyNetworkFilter) {
+                networkWorkOrderIds = responsibilityPort.findWorkOrderIdsByActiveNetworkId(
+                        principal.tenantId(), currentNetworkId);
+            }
+            if (applyTechnicianFilter) {
+                technicianWorkOrderIds = responsibilityPort.findWorkOrderIdsByActiveTechnicianId(
+                        principal.tenantId(), currentTechnicianId);
+            }
         }
         List<WorkOrderView> fetched = queries.findPage(principal.tenantId(), scope.tenantWide(), projectIds,
                 clientCode, query.projectId(), status, externalOrderCode,
                 provinceCode, cityCode, districtCode,
                 applyStageFilter, stageWorkOrderIds,
                 applyNetworkFilter, networkWorkOrderIds,
+                applyTechnicianFilter, technicianWorkOrderIds,
                 cursor == null ? null : cursor.receivedAt(),
                 cursor == null ? null : cursor.id(), query.limit() + 1);
         boolean more = fetched.size() > query.limit();
@@ -153,6 +164,7 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 provinceCode, cityCode, districtCode,
                 applyStageFilter, stageWorkOrderIds,
                 applyNetworkFilter, networkWorkOrderIds,
+                applyTechnicianFilter, technicianWorkOrderIds,
                 WorkOrderPage.TOTAL_COUNT_LIMIT + 1);
         boolean totalTruncated = matched > WorkOrderPage.TOTAL_COUNT_LIMIT;
         int totalCount = totalTruncated ? WorkOrderPage.TOTAL_COUNT_LIMIT : matched;

@@ -561,7 +561,7 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 师傅/SLA/创建时间筛选、即将超时窗口、超过 100 的精确全量 COUNT 未交付（按网点筛选已由 M440 关闭主路径）
+  - UI_DATA_GAP: SLA/创建时间筛选、即将超时窗口、超过 100 的精确全量 COUNT 未交付（按网点筛选已由 M440 关闭主路径；按师傅筛选已由 M441 关闭主路径）
 ```
 
 ### 9.34 M440 记录（工单目录按网点筛选）
@@ -579,7 +579,25 @@ qualityStatus:
   accessibility: A11Y_NOT_REVIEWED
 productOwnerDecision: null
 knownGaps:
-  - UI_DATA_GAP: 师傅/SLA/创建时间筛选、即将超时窗口、超过 100 的精确全量 COUNT 未交付（按网点筛选已由 M440 关闭主路径）
+  - UI_DATA_GAP: SLA/创建时间筛选、即将超时窗口、超过 100 的精确全量 COUNT 未交付（按网点筛选已由 M440 关闭主路径；按师傅筛选已由 M441 关闭主路径）
+```
+
+### 9.35 M441 记录（工单目录按师傅筛选）
+
+```yaml
+pageId: ADMIN.WORKORDER.LIST
+route: /work-orders
+visualProfile: CLASSIC_PROFESSIONAL
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - UI_DATA_GAP: SLA/创建时间筛选、即将超时窗口、超过 100 的精确全量 COUNT 未交付
 ```
 
 ### 9.3 M397 记录（用户管理）
