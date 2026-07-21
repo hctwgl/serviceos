@@ -58,8 +58,11 @@ test.describe('M377 Admin productization visual baselines', () => {
     await expect(page.getByTestId('work-order-network-filter')).toBeVisible()
     // M441：更多筛选中启用服务师傅
     await expect(page.getByTestId('work-order-technician-filter')).toBeVisible()
-    // M442：更多筛选中启用 SLA 风险
+    // M442/M445：更多筛选中启用 SLA 风险（含即将超时）
     await expect(page.getByTestId('work-order-sla-risk-filter')).toBeVisible()
+    await page.getByTestId('work-order-sla-risk-filter').click()
+    await expect(page.getByText('即将超时')).toBeVisible()
+    await page.keyboard.press('Escape')
     // M443：更多筛选中启用创建时间
     await expect(page.getByTestId('work-order-received-range-filter')).toBeVisible()
     await shot(page, 'work-order-directory-productized')

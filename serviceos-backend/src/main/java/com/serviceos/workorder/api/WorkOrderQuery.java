@@ -20,6 +20,8 @@ import java.util.UUID;
  * <p>M442：可选 {@code slaRisk}（{@code OPEN}/{@code BREACHED}）与目录 SLA 列同口径精确匹配，
  * 写入 cursor filterDigest；仅在具备 PROJECT {@code sla.read} 的项目范围内解析。</p>
  *
+ * <p>M445：{@code slaRisk=NEAR} 为 RUNNING 且 deadline 落在 now 后 30 分钟内的即将超时窗口。</p>
+ *
  * <p>M443：可选 {@code receivedFrom}/{@code receivedTo}（Asia/Shanghai 自然日闭区间）按
  * {@code receivedAt} 精确匹配，写入 cursor filterDigest。</p>
  */

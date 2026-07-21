@@ -335,8 +335,30 @@ class WorkOrderQueryPostgresIT {
   assertThat(byBreach.items()).extracting(WorkOrderView::id).containsExactly(breachedWo);
   assertThat(byBreach.totalCount()).isEqualTo(1);
   assertThatThrownBy(()->queries.list(reader,"corr-sla-invalid",
-    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,"NEAR",null,null,null,20)))
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,"WARN",null,null,null,20)))
     .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("slaRisk");
+ }
+
+ @Test void listFiltersByNearSlaRiskWithinThirtyMinutes(){
+  Scope a=scopeWithSla("tenant-test","A");
+  UUID nearWo=receive(a,"ORDER-SLA-NEAR","a".repeat(64));
+  UUID farWo=receive(a,"ORDER-SLA-FAR","b".repeat(64));
+  UUID breachedWo=receive(a,"ORDER-SLA-NEAR-BREACH","c".repeat(64));
+  UUID nearTask=seedActiveTask(a,nearWo,"SURVEY",null,null);
+  UUID farTask=seedActiveTask(a,farWo,"SURVEY",null,null);
+  UUID breachTask=seedActiveTask(a,breachedWo,"SURVEY",null,null);
+  jdbc.sql("UPDATE tsk_task SET sla_ref='survey.response.sla' WHERE task_id IN (:a,:b,:c)")
+    .param("a",nearTask).param("b",farTask).param("c",breachTask).update();
+  Instant now=Instant.now();
+  seedSla(a,nearWo,nearTask,"RUNNING",now,now.plusSeconds(15*60));
+  seedSla(a,farWo,farTask,"RUNNING",now,now.plusSeconds(60*60));
+  seedSla(a,breachedWo,breachTask,"BREACHED",now.minusSeconds(3600),now.minusSeconds(60));
+  seedRole("reader","PROJECT",a.projectId().toString(),"workOrder.read","sla.read");
+  CurrentPrincipal reader=principal("reader","tenant-test");
+  var byNear=queries.list(reader,"corr-sla-near",
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,"NEAR",null,null,null,20));
+  assertThat(byNear.items()).extracting(WorkOrderView::id).containsExactly(nearWo);
+  assertThat(byNear.totalCount()).isEqualTo(1);
  }
 
  @Test void listExposesSlaRiskSummariesWhenSlaReadGranted(){
@@ -536,15 +558,16 @@ class WorkOrderQueryPostgresIT {
    .update();
  }
  private void seedRunningSla(Scope s,UUID workOrderId,UUID taskId){
-  seedSla(s,workOrderId,taskId,"RUNNING");
+  Instant now=Instant.parse("2026-07-15T04:00:00Z");
+  seedSla(s,workOrderId,taskId,"RUNNING",now,now.plusSeconds(3600));
  }
  private void seedBreachedSla(Scope s,UUID workOrderId,UUID taskId){
-  seedSla(s,workOrderId,taskId,"BREACHED");
- }
- private void seedSla(Scope s,UUID workOrderId,UUID taskId,String status){
-  Objects.requireNonNull(s.slaPolicyVersionId(),"scope must include SLA policy");
   Instant now=Instant.parse("2026-07-15T04:00:00Z");
   Instant deadline=now.plusSeconds(3600);
+  seedSla(s,workOrderId,taskId,"BREACHED",now,deadline);
+ }
+ private void seedSla(Scope s,UUID workOrderId,UUID taskId,String status,Instant startedAt,Instant deadline){
+  Objects.requireNonNull(s.slaPolicyVersionId(),"scope must include SLA policy");
   boolean breached="BREACHED".equals(status);
   jdbc.sql("""
    INSERT INTO sla_instance (
@@ -567,7 +590,7 @@ class WorkOrderQueryPostgresIT {
    .param("policyVersionId",s.slaPolicyVersionId())
    .param("policyDigest",s.slaPolicyDigest())
    .param("eventId",UUID.randomUUID())
-   .param("now",java.sql.Timestamp.from(now))
+   .param("now",java.sql.Timestamp.from(startedAt))
    .param("deadline",java.sql.Timestamp.from(deadline))
    .param("status",status)
    .param("breachedAt",breached?java.sql.Timestamp.from(deadline):null)

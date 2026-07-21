@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.106
+  version: 1.0.107
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -3401,6 +3401,7 @@ paths:
         经 dispatch SPI 解析后以工单 ID IN 收敛；写入 cursor filterDigest。
         M442：可选 `slaRisk`（OPEN/BREACHED）与目录 SLA 列同口径精确匹配；
         仅在具备 PROJECT/TENANT `sla.read` 的范围内经 sla SPI 解析后 IN 收敛；写入 cursor filterDigest。
+        M445：`slaRisk=NEAR` 为 RUNNING 且 `now < deadline_at ≤ now+30m` 的即将超时窗口（固定 30 分钟 MVP）。
         M443：可选 `receivedFrom` / `receivedTo`（`format: date`）按 `receivedAt` 筛选；
         Asia/Shanghai 自然日闭区间，写入 cursor filterDigest；跨度上限 366 天。
       parameters:
@@ -3420,8 +3421,10 @@ paths:
             description: M440：当前 ACTIVE NETWORK 网点 ID 精确匹配（与 currentNetworkId 列同口径） }
         - { name: currentTechnicianId, in: query, schema: { type: string, format: uuid },
             description: M441：当前 ACTIVE TECHNICIAN 师傅档案 ID 精确匹配（与 currentTechnicianId 列同口径） }
-        - { name: slaRisk, in: query, schema: { type: string, enum: [OPEN, BREACHED] },
-            description: M442：SLA 风险精确匹配；OPEN=RUNNING∪BREACHED，BREACHED=仅已超时 }
+        - { name: slaRisk, in: query, schema: { type: string, enum: [OPEN, BREACHED, NEAR] },
+            description: >
+              M442/M445：SLA 风险精确匹配；OPEN=RUNNING∪BREACHED，BREACHED=仅已超时，
+              NEAR=RUNNING 且截止时间落在 now 后 30 分钟内 }
         - { name: receivedFrom, in: query, schema: { type: string, format: date },
             description: M443：创建日下界（含当日，Asia/Shanghai；按 receivedAt） }
         - { name: receivedTo, in: query, schema: { type: string, format: date },

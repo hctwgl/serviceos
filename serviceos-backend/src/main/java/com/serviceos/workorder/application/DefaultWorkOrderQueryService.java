@@ -160,7 +160,7 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
             }
             if (scope.tenantWide() && hasTenantSlaRead(principal, correlationId)) {
                 slaRiskWorkOrderIds = slaPort.findWorkOrderIdsBySlaRisk(
-                        principal.tenantId(), slaRisk, true, List.of());
+                        principal.tenantId(), slaRisk, true, List.of(), clock.instant());
             } else {
                 List<UUID> slaReadableProjects = projectsWithSlaRead(
                         principal, correlationId, projectIds);
@@ -168,7 +168,7 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                     slaRiskWorkOrderIds = List.of();
                 } else {
                     slaRiskWorkOrderIds = slaPort.findWorkOrderIdsBySlaRisk(
-                            principal.tenantId(), slaRisk, false, slaReadableProjects);
+                            principal.tenantId(), slaRisk, false, slaReadableProjects, clock.instant());
                 }
             }
         }
@@ -472,12 +472,12 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
         return trimmed.substring(0, 6) + "***";
     }
 
-    /** M442：SLA 风险筛选枚举（与目录列 OPEN/BREACHED 口径一致）。 */
+    /** M442/M445：SLA 风险筛选枚举（OPEN/BREACHED/NEAR）。 */
     private static String normalizeSlaRisk(String value) {
         if (value == null) {
             return null;
         }
-        if (!"OPEN".equals(value) && !"BREACHED".equals(value)) {
+        if (!"OPEN".equals(value) && !"BREACHED".equals(value) && !"NEAR".equals(value)) {
             throw new IllegalArgumentException("slaRisk is invalid");
         }
         return value;

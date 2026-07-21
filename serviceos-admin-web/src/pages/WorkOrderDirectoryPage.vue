@@ -97,6 +97,7 @@ const technicianFilterOptions = computed(() =>
 const slaRiskFilterOptions = [
   { value: 'OPEN', label: '有开放风险' },
   { value: 'BREACHED', label: '已超时' },
+  { value: 'NEAR', label: '即将超时' },
 ]
 
 function regionQueryParams(): {
