@@ -17,6 +17,8 @@ interface WorkOrderQueryMapper {
             @Param("districtCode") String districtCode,
             @Param("applyStageFilter") boolean applyStageFilter,
             @Param("stageWorkOrderIds") List<String> stageWorkOrderIds,
+            @Param("applyNetworkFilter") boolean applyNetworkFilter,
+            @Param("networkWorkOrderIds") List<String> networkWorkOrderIds,
             @Param("cursorReceivedAt") Instant cursorReceivedAt,
             @Param("cursorId") UUID cursorId, @Param("fetchSize") int fetchSize);
 
@@ -28,6 +30,8 @@ interface WorkOrderQueryMapper {
             @Param("districtCode") String districtCode,
             @Param("applyStageFilter") boolean applyStageFilter,
             @Param("stageWorkOrderIds") List<String> stageWorkOrderIds,
+            @Param("applyNetworkFilter") boolean applyNetworkFilter,
+            @Param("networkWorkOrderIds") List<String> networkWorkOrderIds,
             @Param("fetchSize") int fetchSize);
 
     Map<String,Object> findById(@Param("tenantId") String tenantId, @Param("workOrderId") UUID workOrderId);

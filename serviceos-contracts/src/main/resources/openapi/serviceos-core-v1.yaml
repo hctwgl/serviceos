@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.101
+  version: 1.0.102
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -3395,6 +3395,8 @@ paths:
         写入 cursor filterDigest；不发明名称解析。
         M438：可选 `currentStageCode` 与目录列同口径（最早 ACTIVE 任务 stageCode）精确匹配；
         经 task SPI 解析后以工单 ID IN 收敛；写入 cursor filterDigest。
+        M440：可选 `currentNetworkId` 与目录网点列同口径（ACTIVE NETWORK assignee）精确匹配；
+        经 dispatch SPI 解析后以工单 ID IN 收敛；写入 cursor filterDigest。
       parameters:
         - { name: clientCode, in: query, schema: { type: string, minLength: 1, maxLength: 128 } }
         - { name: projectId, in: query, schema: { type: string, format: uuid } }
@@ -3408,6 +3410,8 @@ paths:
         - { name: currentStageCode, in: query,
             schema: { type: string, minLength: 1, maxLength: 64, pattern: '^[A-Z][A-Z0-9_]*$' },
             description: M438：当前阶段码精确匹配（与 currentStageCode 列同口径） }
+        - { name: currentNetworkId, in: query, schema: { type: string, format: uuid },
+            description: M440：当前 ACTIVE NETWORK 网点 ID 精确匹配（与 currentNetworkId 列同口径） }
         - { name: cursor, in: query, schema: { type: string, minLength: 1 } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
         - $ref: '#/components/parameters/CorrelationId'

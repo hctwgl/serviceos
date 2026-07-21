@@ -13,6 +13,7 @@ public interface WorkOrderQueryRepository {
             String clientCode, UUID projectId, String status, String externalOrderCode,
             String provinceCode, String cityCode, String districtCode,
             boolean applyStageFilter, List<UUID> stageWorkOrderIds,
+            boolean applyNetworkFilter, List<UUID> networkWorkOrderIds,
             Instant cursorReceivedAt, UUID cursorId, int fetchSize);
 
     /**
@@ -23,6 +24,7 @@ public interface WorkOrderQueryRepository {
             String clientCode, UUID projectId, String status, String externalOrderCode,
             String provinceCode, String cityCode, String districtCode,
             boolean applyStageFilter, List<UUID> stageWorkOrderIds,
+            boolean applyNetworkFilter, List<UUID> networkWorkOrderIds,
             int fetchSize);
 
     Optional<WorkOrderView> findById(String tenantId, UUID workOrderId);

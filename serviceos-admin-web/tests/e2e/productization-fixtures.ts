@@ -678,6 +678,19 @@ export async function mockProductizationApis(
       await fulfillJson(route, {
         items: [
           {
+            id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+            partnerOrganizationId: 'po1',
+            networkCode: 'HZ-XH-01',
+            networkName: '杭州西湖网点',
+            status: 'ACTIVE',
+            version: 1,
+            createdAt: '2026-01-01T00:00:00Z',
+            updatedAt: '2026-01-01T00:00:00Z',
+            deactivatedAt: null,
+            deactivatedBy: null,
+            deactivateReason: null,
+          },
+          {
             id: '55555555-5555-4555-8555-555555555555',
             partnerOrganizationId: 'po1',
             networkCode: 'JN-01',

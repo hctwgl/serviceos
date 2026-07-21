@@ -6,6 +6,7 @@ import com.serviceos.workorder.api.WorkOrderDirectoryServiceResponsibilityQuery;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -16,9 +17,10 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * M439：按工单批量解析 ACTIVE NETWORK / TECHNICIAN 责任及显示名。
+ * M439/M440：按工单批量解析 ACTIVE NETWORK / TECHNICIAN 责任及显示名，并按 ACTIVE NETWORK 筛选工单。
  *
- * <p>同级别多条 ACTIVE 时取 effective_from 最新；显示名经 network 目录标签端口解析。</p>
+ * <p>同级别多条 ACTIVE 时取 effective_from 最新；显示名经 network 目录标签端口解析。
+ * 筛选不读 wo_work_order；项目范围由调用方授权 SQL 收敛。</p>
  */
 @Component
 final class JdbcWorkOrderDirectoryServiceResponsibilityQuery
@@ -38,6 +40,23 @@ final class JdbcWorkOrderDirectoryServiceResponsibilityQuery
                       service_assignment_id DESC
             """;
 
+    private static final String FILTER_BY_NETWORK_SQL = """
+            SELECT work_order_id
+              FROM (
+                    SELECT DISTINCT ON (work_order_id)
+                           work_order_id AS work_order_id,
+                           assignee_id AS assignee_id
+                      FROM dsp_service_assignment
+                     WHERE tenant_id = :tenantId
+                       AND work_order_id IS NOT NULL
+                       AND status = 'ACTIVE'
+                       AND responsibility_level = 'NETWORK'
+                     ORDER BY work_order_id, effective_from DESC NULLS LAST,
+                              service_assignment_id DESC
+                   ) current_network
+             WHERE assignee_id = :networkAssigneeId
+            """;
+
     private final JdbcClient jdbc;
     private final NetworkDirectoryLabelQuery labels;
 
@@ -46,6 +65,25 @@ final class JdbcWorkOrderDirectoryServiceResponsibilityQuery
     ) {
         this.jdbc = jdbc;
         this.labels = labels;
+    }
+
+    @Override
+    public List<UUID> findWorkOrderIdsByActiveNetworkId(String tenantId, UUID networkId) {
+        Objects.requireNonNull(tenantId, "tenantId must not be null");
+        Objects.requireNonNull(networkId, "networkId must not be null");
+        List<UUID> ids = new ArrayList<>();
+        jdbc.sql(FILTER_BY_NETWORK_SQL)
+                .param("tenantId", tenantId)
+                .param("networkAssigneeId", networkId.toString())
+                .query((rs, rowNum) -> {
+                    UUID workOrderId = rs.getObject("work_order_id", UUID.class);
+                    if (workOrderId != null) {
+                        ids.add(workOrderId);
+                    }
+                    return null;
+                })
+                .list();
+        return List.copyOf(ids);
     }
 
     @Override

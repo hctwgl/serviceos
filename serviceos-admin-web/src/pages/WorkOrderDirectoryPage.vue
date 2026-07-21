@@ -9,6 +9,7 @@ import SemanticStatusTag from '../components/business/SemanticStatusTag.vue'
 import AsyncContent from '../components/feedback/AsyncContent.vue'
 import { listAuthorizedWorkOrders, type WorkOrderPage } from '../api/workOrders'
 import { listRegionCatalog, type RegionCatalogItem } from '../api/projectCatalog'
+import { listServiceNetworks, type ServiceNetwork } from '../api/networks'
 import { firstRouteQuery } from '../routeQuery'
 import { statusLabel, statusOptions } from '../product/statusLabels'
 import { toUserFacingError } from '../product/errorMessages'
@@ -42,7 +43,9 @@ const regionLevelByCode = ref<Map<string, RegionCatalogItem['regionLevel']>>(new
 const regionFilterCode = ref<string | undefined>(undefined)
 /** M438：当前阶段筛选（与目录列同口径）。 */
 const stageFilterCode = ref<string | undefined>(undefined)
-const moreNetwork = ref('')
+/** M440：服务网点筛选（与目录 currentNetworkId 同口径）。 */
+const networkFilterId = ref<string | undefined>(undefined)
+const networkOptions = ref<ServiceNetwork[]>([])
 const moreTechnician = ref('')
 const moreSla = ref<string | undefined>(undefined)
 
@@ -64,6 +67,15 @@ const regionFilterOptions = computed(() =>
     value: code,
     label: `${name}（${code}）`,
   })),
+)
+
+const networkFilterOptions = computed(() =>
+  networkOptions.value
+    .filter((item) => item.status === 'ACTIVE')
+    .map((item) => ({
+      value: item.id,
+      label: `${item.networkName}（${item.networkCode}）`,
+    })),
 )
 
 function regionQueryParams(): {
@@ -99,6 +111,8 @@ function hydrateFiltersFromRoute() {
   else if (nextProvince) regionFilterCode.value = nextProvince
   const nextStage = firstRouteQuery(route, 'currentStageCode')
   if (nextStage !== undefined) stageFilterCode.value = nextStage || undefined
+  const nextNetwork = firstRouteQuery(route, 'currentNetworkId')
+  if (nextNetwork !== undefined) networkFilterId.value = nextNetwork || undefined
 }
 
 function looksLikeUuid(value: string): boolean {
@@ -121,6 +135,7 @@ async function load(next?: string) {
         ? projectKeyword.value.trim()
         : undefined,
       currentStageCode: stageFilterCode.value || undefined,
+      currentNetworkId: networkFilterId.value || undefined,
       ...regionQueryParams(),
     })
     cursor.value = page.value.nextCursor ?? undefined
@@ -149,6 +164,7 @@ function currentFilters() {
       ? projectKeyword.value.trim()
       : undefined,
     currentStageCode: stageFilterCode.value || undefined,
+    currentNetworkId: networkFilterId.value || undefined,
     ...region,
   }
 }
@@ -160,6 +176,7 @@ function applySavedView(filters: Record<string, string>) {
   regionFilterCode.value =
     filters.districtCode || filters.cityCode || filters.provinceCode || undefined
   stageFilterCode.value = filters.currentStageCode || undefined
+  networkFilterId.value = filters.currentNetworkId || undefined
   return search()
 }
 
@@ -170,7 +187,7 @@ function resetFilters() {
   keyword.value = ''
   regionFilterCode.value = undefined
   stageFilterCode.value = undefined
-  moreNetwork.value = ''
+  networkFilterId.value = undefined
   moreTechnician.value = ''
   moreSla.value = undefined
   return search()
@@ -238,6 +255,16 @@ async function loadRegionNames() {
     // 缺 project.read 或目录失败时保持码展示，不阻断工单目录主路径。
     regionNameByCode.value = new Map()
     regionLevelByCode.value = new Map()
+  }
+}
+
+async function loadNetworkOptions() {
+  try {
+    const page = await listServiceNetworks()
+    networkOptions.value = page.items
+  } catch {
+    // 缺 network.read 时筛选下拉为空；不阻断目录主路径。
+    networkOptions.value = []
   }
 }
 
@@ -554,6 +581,7 @@ const columns = computed((): TableColumnsType<Row> => {
 onMounted(() => {
   hydrateFiltersFromRoute()
   void loadRegionNames()
+  void loadNetworkOptions()
   return load()
 })
 
@@ -650,7 +678,7 @@ watch(
         type="info"
         show-icon
         message="部分更多筛选暂不可用"
-        description="网点、师傅、SLA、创建时间等筛选条件尚未由工单目录查询 API 提供（UI_DATA_GAP）。服务区域与当前阶段已支持精确筛选。"
+        description="师傅、SLA、创建时间等筛选条件尚未由工单目录查询 API 提供（UI_DATA_GAP）。服务区域、当前阶段与服务网点已支持精确筛选。"
       />
       <label class="filter-field">
         <span>服务区域</span>
@@ -684,7 +712,18 @@ watch(
       </label>
       <label class="filter-field">
         <span>服务网点</span>
-        <Input v-model:value="moreNetwork" disabled placeholder="暂未提供" />
+        <Select
+          v-model:value="networkFilterId"
+          allow-clear
+          show-search
+          style="width: 240px"
+          aria-label="服务网点筛选"
+          data-testid="work-order-network-filter"
+          placeholder="按 ACTIVE 责任网点筛选"
+          :options="networkFilterOptions"
+          :filter-option="(input, option) => String(option?.label ?? '').includes(input)"
+          @change="search"
+        />
       </label>
       <label class="filter-field">
         <span>服务师傅</span>

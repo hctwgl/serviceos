@@ -34,6 +34,18 @@
         <otherwise>AND FALSE</otherwise>
       </choose>
     </if>
+    <!-- M440：网点筛选由 dispatch SPI 解析为工单 ID 后在此收敛；空集失败关闭为无结果。 -->
+    <if test="applyNetworkFilter">
+      <choose>
+        <when test="networkWorkOrderIds != null and !networkWorkOrderIds.isEmpty()">
+          AND id IN
+          <foreach collection="networkWorkOrderIds" item="id" open="(" separator="," close=")">
+            CAST(#{id} AS uuid)
+          </foreach>
+        </when>
+        <otherwise>AND FALSE</otherwise>
+      </choose>
+    </if>
   </sql>
   <select id="findPage" resultType="map">
     SELECT <include refid="columns"/> FROM wo_work_order

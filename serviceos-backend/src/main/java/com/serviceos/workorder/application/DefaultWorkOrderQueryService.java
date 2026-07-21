@@ -85,6 +85,8 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
         String districtCode = normalizeRegionCode(query.districtCode(), "districtCode");
         // M438：当前阶段码与目录列同口径；非法码失败关闭。
         String currentStageCode = normalizeStageCode(query.currentStageCode());
+        // M440：网点 ID 与目录列同口径；非法 UUID 由绑定层失败，此处仅参与 digest。
+        UUID currentNetworkId = query.currentNetworkId();
         AuthorizedProjectScope scope = projectScopes.require(principal, READ, "WorkOrder", correlationId);
         if (query.projectId() != null && !scope.tenantWide() && !scope.projectIds().contains(query.projectId())) {
             authorization.require(principal, AuthorizationRequest.projectCapability(READ, principal.tenantId(),
@@ -97,7 +99,8 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 + "|provinceCode=" + nullable(provinceCode)
                 + "|cityCode=" + nullable(cityCode)
                 + "|districtCode=" + nullable(districtCode)
-                + "|currentStageCode=" + nullable(currentStageCode));
+                + "|currentStageCode=" + nullable(currentStageCode)
+                + "|currentNetworkId=" + nullable(currentNetworkId));
         Cursor cursor = decodeCursor(query.cursor(), scope.scopeDigest(), filterDigest);
         List<UUID> projectIds = scope.projectIds().stream()
                 .sorted(Comparator.comparing(UUID::toString)).toList();
@@ -112,10 +115,23 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
             stageWorkOrderIds = stagesPort.findWorkOrderIdsByCurrentStageCode(
                     principal.tenantId(), currentStageCode, scope.tenantWide(), projectIds);
         }
+        // M440：网点筛选经 dispatch SPI 解析为工单 ID；项目范围仍由授权 SQL 收敛。
+        boolean applyNetworkFilter = currentNetworkId != null;
+        List<UUID> networkWorkOrderIds = List.of();
+        if (applyNetworkFilter) {
+            WorkOrderDirectoryServiceResponsibilityQuery responsibilityPort =
+                    responsibilityQuery.getIfAvailable();
+            if (responsibilityPort == null) {
+                throw new IllegalStateException("工单目录网点筛选端口不可用");
+            }
+            networkWorkOrderIds = responsibilityPort.findWorkOrderIdsByActiveNetworkId(
+                    principal.tenantId(), currentNetworkId);
+        }
         List<WorkOrderView> fetched = queries.findPage(principal.tenantId(), scope.tenantWide(), projectIds,
                 clientCode, query.projectId(), status, externalOrderCode,
                 provinceCode, cityCode, districtCode,
                 applyStageFilter, stageWorkOrderIds,
+                applyNetworkFilter, networkWorkOrderIds,
                 cursor == null ? null : cursor.receivedAt(),
                 cursor == null ? null : cursor.id(), query.limit() + 1);
         boolean more = fetched.size() > query.limit();
@@ -136,6 +152,7 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 clientCode, query.projectId(), status, externalOrderCode,
                 provinceCode, cityCode, districtCode,
                 applyStageFilter, stageWorkOrderIds,
+                applyNetworkFilter, networkWorkOrderIds,
                 WorkOrderPage.TOTAL_COUNT_LIMIT + 1);
         boolean totalTruncated = matched > WorkOrderPage.TOTAL_COUNT_LIMIT;
         int totalCount = totalTruncated ? WorkOrderPage.TOTAL_COUNT_LIMIT : matched;

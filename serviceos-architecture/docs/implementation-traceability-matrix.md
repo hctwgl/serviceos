@@ -528,4 +528,5 @@ Feature gate/authority: if applicable
 | M437 | Admin 工单目录按区域筛选 | 448-m437-* + 431-m437-*；OpenAPI 1.0.99；省市区码精确过滤 + PostgresIT + Playwright | 网点/师傅/阶段/SLA 筛选；全国区县全量树；人工视觉批准 |
 | M438 | Admin 工单目录按阶段筛选 | 449-m438-* + 432-m438-*；OpenAPI 1.0.100；`currentStageCode` + task SPI IN 收敛 + PostgresIT + Playwright | 网点/师傅/SLA 筛选；网点/师傅列；人工视觉批准 |
 | M439 | Admin 工单目录网点/师傅列 | 450-m439-* + 433-m439-*；OpenAPI 1.0.101；ACTIVE NETWORK/TECHNICIAN + 显示名 + PostgresIT + Playwright | 按网点/师傅筛选；人工视觉批准 |
+| M440 | Admin 工单目录按网点筛选 | 451-m440-* + 434-m440-*；OpenAPI 1.0.102；`currentNetworkId` + dispatch SPI IN 收敛 + PostgresIT + Playwright | 师傅/SLA/创建时间筛选；人工视觉批准 |
 
