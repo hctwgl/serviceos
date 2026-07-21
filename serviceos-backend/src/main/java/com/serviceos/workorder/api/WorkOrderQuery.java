@@ -11,6 +11,9 @@ import java.util.UUID;
  *
  * <p>M438：可选 {@code currentStageCode} 与目录列同口径精确匹配，写入 cursor filterDigest。</p>
  *
+ * <p>M446：可选 {@code currentTaskStatus} 与目录列同口径（最早 ACTIVE 任务 status）精确匹配，
+ * 写入 cursor filterDigest。</p>
+ *
  * <p>M440：可选 {@code currentNetworkId} 与目录网点列同口径（ACTIVE NETWORK assignee）精确匹配，
  * 写入 cursor filterDigest。</p>
  *
@@ -34,6 +37,7 @@ public record WorkOrderQuery(
         String cityCode,
         String districtCode,
         String currentStageCode,
+        String currentTaskStatus,
         UUID currentNetworkId,
         UUID currentTechnicianId,
         String slaRisk,
@@ -42,16 +46,16 @@ public record WorkOrderQuery(
         String cursor,
         int limit
 ) {
-    /** 无区域/阶段/网点/师傅/SLA/创建日筛选的常用构造。 */
+    /** 无区域/阶段/任务状态/网点/师傅/SLA/创建日筛选的常用构造。 */
     public WorkOrderQuery(String clientCode, UUID projectId, String status, String cursor, int limit) {
-        this(clientCode, projectId, status, null, null, null, null, null, null, null, null, null, null, cursor, limit);
+        this(clientCode, projectId, status, null, null, null, null, null, null, null, null, null, null, null, cursor, limit);
     }
 
-    /** 含 externalOrderCode、无区域/阶段/网点/师傅/SLA/创建日筛选（受控搜索等）。 */
+    /** 含 externalOrderCode、无区域/阶段/任务状态/网点/师傅/SLA/创建日筛选（受控搜索等）。 */
     public WorkOrderQuery(
             String clientCode, UUID projectId, String status, String externalOrderCode,
             String cursor, int limit
     ) {
-        this(clientCode, projectId, status, externalOrderCode, null, null, null, null, null, null, null, null, null, cursor, limit);
+        this(clientCode, projectId, status, externalOrderCode, null, null, null, null, null, null, null, null, null, null, cursor, limit);
     }
 }

@@ -34,6 +34,18 @@
         <otherwise>AND FALSE</otherwise>
       </choose>
     </if>
+    <!-- M446：任务状态筛选由 task SPI 解析为工单 ID 后在此收敛；空集失败关闭为无结果。 -->
+    <if test="applyTaskStatusFilter">
+      <choose>
+        <when test="taskStatusWorkOrderIds != null and !taskStatusWorkOrderIds.isEmpty()">
+          AND id IN
+          <foreach collection="taskStatusWorkOrderIds" item="id" open="(" separator="," close=")">
+            CAST(#{id} AS uuid)
+          </foreach>
+        </when>
+        <otherwise>AND FALSE</otherwise>
+      </choose>
+    </if>
     <!-- M440：网点筛选由 dispatch SPI 解析为工单 ID 后在此收敛；空集失败关闭为无结果。 -->
     <if test="applyNetworkFilter">
       <choose>

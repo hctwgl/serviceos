@@ -45,6 +45,8 @@ const regionLevelByCode = ref<Map<string, RegionCatalogItem['regionLevel']>>(new
 const regionFilterCode = ref<string | undefined>(undefined)
 /** M438：当前阶段筛选（与目录列同口径）。 */
 const stageFilterCode = ref<string | undefined>(undefined)
+/** M446：当前任务状态筛选（与目录列同口径）。 */
+const taskStatusFilterCode = ref<string | undefined>(undefined)
 /** M440：服务网点筛选（与目录 currentNetworkId 同口径）。 */
 const networkFilterId = ref<string | undefined>(undefined)
 const networkOptions = ref<ServiceNetwork[]>([])
@@ -67,6 +69,15 @@ const stageFilterOptions = statusOptions([
   'PILOT_INSTALL',
   'PILOT_COMPLETION',
   'HOME_CHARGING_SURVEY_INSTALL',
+])
+
+const taskStatusFilterOptions = statusOptions([
+  'READY',
+  'PENDING',
+  'CLAIMED',
+  'RUNNING',
+  'RETRY_WAIT',
+  'MANUAL_INTERVENTION',
 ])
 
 const regionFilterOptions = computed(() =>
@@ -133,6 +144,8 @@ function hydrateFiltersFromRoute() {
   else if (nextProvince) regionFilterCode.value = nextProvince
   const nextStage = firstRouteQuery(route, 'currentStageCode')
   if (nextStage !== undefined) stageFilterCode.value = nextStage || undefined
+  const nextTaskStatus = firstRouteQuery(route, 'currentTaskStatus')
+  if (nextTaskStatus !== undefined) taskStatusFilterCode.value = nextTaskStatus || undefined
   const nextNetwork = firstRouteQuery(route, 'currentNetworkId')
   if (nextNetwork !== undefined) networkFilterId.value = nextNetwork || undefined
   const nextTechnician = firstRouteQuery(route, 'currentTechnicianId')
@@ -168,6 +181,7 @@ async function load(next?: string) {
         ? projectKeyword.value.trim()
         : undefined,
       currentStageCode: stageFilterCode.value || undefined,
+      currentTaskStatus: taskStatusFilterCode.value || undefined,
       currentNetworkId: networkFilterId.value || undefined,
       currentTechnicianId: technicianFilterId.value || undefined,
       slaRisk: slaRiskFilter.value || undefined,
@@ -201,6 +215,7 @@ function currentFilters() {
       ? projectKeyword.value.trim()
       : undefined,
     currentStageCode: stageFilterCode.value || undefined,
+    currentTaskStatus: taskStatusFilterCode.value || undefined,
     currentNetworkId: networkFilterId.value || undefined,
     currentTechnicianId: technicianFilterId.value || undefined,
     slaRisk: slaRiskFilter.value || undefined,
@@ -217,6 +232,7 @@ function applySavedView(filters: Record<string, string>) {
   regionFilterCode.value =
     filters.districtCode || filters.cityCode || filters.provinceCode || undefined
   stageFilterCode.value = filters.currentStageCode || undefined
+  taskStatusFilterCode.value = filters.currentTaskStatus || undefined
   networkFilterId.value = filters.currentNetworkId || undefined
   technicianFilterId.value = filters.currentTechnicianId || undefined
   slaRiskFilter.value = filters.slaRisk || undefined
@@ -237,6 +253,7 @@ function resetFilters() {
   keyword.value = ''
   regionFilterCode.value = undefined
   stageFilterCode.value = undefined
+  taskStatusFilterCode.value = undefined
   networkFilterId.value = undefined
   technicianFilterId.value = undefined
   slaRiskFilter.value = undefined
@@ -260,6 +277,7 @@ type Row = {
   maskedCustomerPhone: string | null
   maskedServiceAddress: string | null
   currentStageCode: string | null
+  currentTaskStatus: string | null
   currentClaimedBy: string | null
   currentAssigneeDisplayName: string | null
   currentNetworkId: string | null
@@ -364,6 +382,7 @@ const rows = computed((): Row[] => {
       maskedCustomerPhone: item.maskedCustomerPhone,
       maskedServiceAddress: item.maskedServiceAddress,
       currentStageCode: item.currentStageCode,
+      currentTaskStatus: item.currentTaskStatus,
       currentClaimedBy: item.currentClaimedBy,
       currentAssigneeDisplayName: item.currentAssigneeDisplayName,
       currentNetworkId: item.currentNetworkId,
@@ -448,6 +467,31 @@ const columns = computed((): TableColumnsType<Row> => {
           h(
             'span',
             { 'data-testid': 'work-order-current-stage' },
+            statusLabel(code),
+          ),
+      )
+    },
+  },
+  {
+    title: '任务状态',
+    key: 'taskStatus',
+    width: 110,
+    customRender: ({ record }: { record: Row }) => {
+      const code = record.currentTaskStatus
+      if (code == null || String(code).trim() === '') {
+        return h(
+          'span',
+          { 'data-testid': 'work-order-current-task-status' },
+          presentEmptyValue('not_provided'),
+        )
+      }
+      return h(
+        Tooltip,
+        { title: `任务状态：${code}` },
+        () =>
+          h(
+            'span',
+            { 'data-testid': 'work-order-current-task-status' },
             statusLabel(code),
           ),
       )
@@ -773,6 +817,21 @@ watch(
           data-testid="work-order-stage-filter"
           placeholder="按当前阶段筛选"
           :options="stageFilterOptions"
+          :filter-option="(input, option) => String(option?.label ?? '').includes(input)"
+          @change="search"
+        />
+      </label>
+      <label class="filter-field">
+        <span>任务状态</span>
+        <Select
+          v-model:value="taskStatusFilterCode"
+          allow-clear
+          show-search
+          style="width: 180px"
+          aria-label="任务状态筛选"
+          data-testid="work-order-task-status-filter"
+          placeholder="按当前任务状态筛选"
+          :options="taskStatusFilterOptions"
           :filter-option="(input, option) => String(option?.label ?? '').includes(input)"
           @change="search"
         />

@@ -534,4 +534,5 @@ Feature gate/authority: if applicable
 | M443 | Admin 工单目录按创建时间筛选 | 454-m443-* + 437-m443-*；OpenAPI 1.0.105；`receivedFrom`/`receivedTo` + Asia/Shanghai 自然日 + PostgresIT + Playwright | 即将超时窗口（COUNT 已由 M444 关闭）；人工视觉批准 |
 | M444 | Admin 工单目录精确全量 COUNT | 455-m444-* + 438-m444-*；OpenAPI 1.0.106；精确 COUNT(*) + truncated 恒 false + PostgresIT + Playwright | 即将超时窗口（已由 M445 关闭）；人工视觉批准 |
 | M445 | Admin 工单目录即将超时筛选 | 456-m445-* + 439-m445-*；OpenAPI 1.0.107；`slaRisk=NEAR` 30m + sla SPI + PostgresIT + Playwright | 策略化预警阈值；Network Portal NEAR；人工视觉批准 |
+| M446 | Admin 工单目录按任务状态筛选 | 457-m446-* + 440-m446-*；OpenAPI 1.0.108；`currentTaskStatus` + task SPI + PostgresIT + Playwright | 审核/整改筛选；服务端关键词；人工视觉批准 |
 

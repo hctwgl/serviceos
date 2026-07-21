@@ -124,14 +124,14 @@ class WorkOrderQueryPostgresIT {
   seedRole("reader","PROJECT",a.projectId().toString());
   CurrentPrincipal reader=principal("reader","tenant-test");
   var byDistrict=queries.list(reader,"corr-region-district",
-    new WorkOrderQuery(null,null,null,null,null,null,"370102",null,null,null,null,null,null,null,20));
+    new WorkOrderQuery(null,null,null,null,null,null,"370102",null,null,null,null,null,null,null,null,20));
   assertThat(byDistrict.items()).extracting(WorkOrderView::id).containsExactly(hangzhou);
   assertThat(byDistrict.totalCount()).isEqualTo(1);
   var byProvince=queries.list(reader,"corr-region-province",
-    new WorkOrderQuery(null,null,null,null,"440000",null,null,null,null,null,null,null,null,null,20));
+    new WorkOrderQuery(null,null,null,null,"440000",null,null,null,null,null,null,null,null,null,null,20));
   assertThat(byProvince.items()).extracting(WorkOrderView::externalOrderCode).containsExactly("ORDER-SZ");
   var none=queries.list(reader,"corr-region-none",
-    new WorkOrderQuery(null,null,null,null,"110000",null,null,null,null,null,null,null,null,null,20));
+    new WorkOrderQuery(null,null,null,null,"110000",null,null,null,null,null,null,null,null,null,null,20));
   assertThat(none.items()).isEmpty();
   assertThat(none.totalCount()).isZero();
  }
@@ -167,20 +167,45 @@ class WorkOrderQueryPostgresIT {
   seedRole("reader","PROJECT",a.projectId().toString());
   CurrentPrincipal reader=principal("reader","tenant-test");
   var bySurvey=queries.list(reader,"corr-stage-filter",
-    new WorkOrderQuery(null,null,null,null,null,null,null,"SURVEY",null,null,null,null,null,null,20));
+    new WorkOrderQuery(null,null,null,null,null,null,null,"SURVEY",null,null,null,null,null,null,null,20));
   assertThat(bySurvey.items()).extracting(WorkOrderView::id).containsExactly(survey);
   assertThat(bySurvey.items().getFirst().currentStageCode()).isEqualTo("SURVEY");
   assertThat(bySurvey.totalCount()).isEqualTo(1);
   var byInstall=queries.list(reader,"corr-stage-install",
-    new WorkOrderQuery(null,null,null,null,null,null,null,"INSTALLATION",null,null,null,null,null,null,20));
+    new WorkOrderQuery(null,null,null,null,null,null,null,"INSTALLATION",null,null,null,null,null,null,null,20));
   assertThat(byInstall.items()).extracting(WorkOrderView::id).containsExactly(install);
   var none=queries.list(reader,"corr-stage-none",
-    new WorkOrderQuery(null,null,null,null,null,null,null,"REPAIR",null,null,null,null,null,null,20));
+    new WorkOrderQuery(null,null,null,null,null,null,null,"REPAIR",null,null,null,null,null,null,null,20));
   assertThat(none.items()).isEmpty();
   assertThat(none.totalCount()).isZero();
   assertThatThrownBy(()->queries.list(reader,"corr-stage-invalid",
-    new WorkOrderQuery(null,null,null,null,null,null,null,"survey",null,null,null,null,null,null,20)))
+    new WorkOrderQuery(null,null,null,null,null,null,null,"survey",null,null,null,null,null,null,null,20)))
     .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("currentStageCode");
+ }
+
+ @Test void listFiltersByCurrentTaskStatus(){
+  Scope a=scope("tenant-test","A");
+  UUID ready=receive(a,"ORDER-TASK-READY","7".repeat(64));
+  UUID running=receive(a,"ORDER-TASK-RUNNING","8".repeat(64));
+  UUID runner=UUID.randomUUID();
+  seedPerson(a.tenant(),runner,"执行师傅");
+  seedActiveTask(a,ready,"SURVEY","READY",null);
+  // RUNNING 须满足 ck_tsk_human_lifecycle：claimed_by/claimed_at/started_at 均非空。
+  seedActiveTask(a,running,"SURVEY","RUNNING",runner.toString());
+  seedRole("reader","PROJECT",a.projectId().toString());
+  CurrentPrincipal reader=principal("reader","tenant-test");
+  var byReady=queries.list(reader,"corr-task-status-ready",
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,"READY",null,null,null,null,null,null,20));
+  assertThat(byReady.items()).extracting(WorkOrderView::id).containsExactly(ready);
+  assertThat(byReady.items().getFirst().currentTaskStatus()).isEqualTo("READY");
+  assertThat(byReady.totalCount()).isEqualTo(1);
+  var byRunning=queries.list(reader,"corr-task-status-running",
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,"RUNNING",null,null,null,null,null,null,20));
+  assertThat(byRunning.items()).extracting(WorkOrderView::id).containsExactly(running);
+  assertThat(byRunning.items().getFirst().currentTaskStatus()).isEqualTo("RUNNING");
+  assertThatThrownBy(()->queries.list(reader,"corr-task-status-invalid",
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,"SUCCEEDED",null,null,null,null,null,null,20)))
+    .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("currentTaskStatus");
  }
 
  @Test void listFiltersByCurrentNetworkId(){
@@ -200,12 +225,12 @@ class WorkOrderQueryPostgresIT {
   seedRole("reader","PROJECT",a.projectId().toString());
   CurrentPrincipal reader=principal("reader","tenant-test");
   var byNetwork=queries.list(reader,"corr-network-filter",
-    new WorkOrderQuery(null,null,null,null,null,null,null,null,networkA,null,null,null,null,null,20));
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,networkA,null,null,null,null,null,20));
   assertThat(byNetwork.items()).extracting(WorkOrderView::id).containsExactly(matched);
   assertThat(byNetwork.items().getFirst().currentNetworkId()).isEqualTo(networkA.toString());
   assertThat(byNetwork.totalCount()).isEqualTo(1);
   var none=queries.list(reader,"corr-network-none",
-    new WorkOrderQuery(null,null,null,null,null,null,null,null,UUID.randomUUID(),null,null,null,null,null,20));
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,UUID.randomUUID(),null,null,null,null,null,20));
   assertThat(none.items()).isEmpty();
   assertThat(none.totalCount()).isZero();
  }
@@ -226,12 +251,12 @@ class WorkOrderQueryPostgresIT {
   seedRole("reader","PROJECT",a.projectId().toString());
   CurrentPrincipal reader=principal("reader","tenant-test");
   var byTech=queries.list(reader,"corr-tech-filter",
-    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,techA,null,null,null,null,20));
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,techA,null,null,null,null,20));
   assertThat(byTech.items()).extracting(WorkOrderView::id).containsExactly(matched);
   assertThat(byTech.items().getFirst().currentTechnicianId()).isEqualTo(techA.toString());
   assertThat(byTech.totalCount()).isEqualTo(1);
   var none=queries.list(reader,"corr-tech-none",
-    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,UUID.randomUUID(),null,null,null,null,20));
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,UUID.randomUUID(),null,null,null,null,20));
   assertThat(none.items()).isEmpty();
   assertThat(none.totalCount()).isZero();
  }
@@ -294,20 +319,20 @@ class WorkOrderQueryPostgresIT {
   seedRole("reader","PROJECT",a.projectId().toString());
   CurrentPrincipal reader=principal("reader","tenant-test");
   var range=queries.list(reader,"corr-recv-range",
-    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,null,
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,null,null,
       LocalDate.of(2026,3,1),LocalDate.of(2026,3,3),null,20));
   assertThat(range.items()).extracting(WorkOrderView::id).containsExactlyInAnyOrder(early,late);
   assertThat(range.totalCount()).isEqualTo(2);
   var singleDay=queries.list(reader,"corr-recv-day",
-    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,null,
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,null,null,
       LocalDate.of(2026,3,1),LocalDate.of(2026,3,1),null,20));
   assertThat(singleDay.items()).extracting(WorkOrderView::id).containsExactly(early);
   var none=queries.list(reader,"corr-recv-none",
-    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,null,
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,null,null,
       LocalDate.of(2026,3,10),LocalDate.of(2026,3,11),null,20));
   assertThat(none.items()).isEmpty();
   assertThatThrownBy(()->queries.list(reader,"corr-recv-invalid",
-    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,null,
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,null,null,
       LocalDate.of(2026,3,5),LocalDate.of(2026,3,1),null,20)))
     .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("receivedTo");
  }
@@ -327,15 +352,15 @@ class WorkOrderQueryPostgresIT {
   seedRole("reader","PROJECT",a.projectId().toString(),"workOrder.read","sla.read");
   CurrentPrincipal reader=principal("reader","tenant-test");
   var byOpen=queries.list(reader,"corr-sla-open",
-    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,"OPEN",null,null,null,20));
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,null,"OPEN",null,null,null,20));
   assertThat(byOpen.items()).extracting(WorkOrderView::id).containsExactlyInAnyOrder(openWo,breachedWo);
   assertThat(byOpen.totalCount()).isEqualTo(2);
   var byBreach=queries.list(reader,"corr-sla-breach",
-    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,"BREACHED",null,null,null,20));
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,null,"BREACHED",null,null,null,20));
   assertThat(byBreach.items()).extracting(WorkOrderView::id).containsExactly(breachedWo);
   assertThat(byBreach.totalCount()).isEqualTo(1);
   assertThatThrownBy(()->queries.list(reader,"corr-sla-invalid",
-    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,"WARN",null,null,null,20)))
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,null,"WARN",null,null,null,20)))
     .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("slaRisk");
  }
 
@@ -356,7 +381,7 @@ class WorkOrderQueryPostgresIT {
   seedRole("reader","PROJECT",a.projectId().toString(),"workOrder.read","sla.read");
   CurrentPrincipal reader=principal("reader","tenant-test");
   var byNear=queries.list(reader,"corr-sla-near",
-    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,"NEAR",null,null,null,20));
+    new WorkOrderQuery(null,null,null,null,null,null,null,null,null,null,null,"NEAR",null,null,null,20));
   assertThat(byNear.items()).extracting(WorkOrderView::id).containsExactly(nearWo);
   assertThat(byNear.totalCount()).isEqualTo(1);
  }

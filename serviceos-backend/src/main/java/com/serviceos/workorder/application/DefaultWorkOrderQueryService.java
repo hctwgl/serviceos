@@ -54,6 +54,9 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
     private static final int MAX_RECEIVED_RANGE_DAYS = 366;
     private static final Set<String> STATUSES = Set.of(
             "RECEIVED", "ACTIVE", "SUSPENDED", "FULFILLED", "CANCELLED", "CLOSED");
+    /** M446：与目录当前任务旁载一致的 ACTIVE 任务状态集。 */
+    private static final Set<String> ACTIVE_TASK_STATUSES = Set.of(
+            "READY", "PENDING", "CLAIMED", "RUNNING", "RETRY_WAIT", "MANUAL_INTERVENTION");
     private final WorkOrderQueryRepository queries;
     private final AuthorizationService authorization;
     private final ProjectScopeAuthorizationService projectScopes;
@@ -91,6 +94,8 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
         String districtCode = normalizeRegionCode(query.districtCode(), "districtCode");
         // M438：当前阶段码与目录列同口径；非法码失败关闭。
         String currentStageCode = normalizeStageCode(query.currentStageCode());
+        // M446：当前任务状态与目录列同口径；非法枚举失败关闭。
+        String currentTaskStatus = normalizeTaskStatus(query.currentTaskStatus());
         // M440/M441：网点/师傅 ID 与目录列同口径；非法 UUID 由绑定层失败，此处仅参与 digest。
         UUID currentNetworkId = query.currentNetworkId();
         UUID currentTechnicianId = query.currentTechnicianId();
@@ -111,6 +116,7 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 + "|cityCode=" + nullable(cityCode)
                 + "|districtCode=" + nullable(districtCode)
                 + "|currentStageCode=" + nullable(currentStageCode)
+                + "|currentTaskStatus=" + nullable(currentTaskStatus)
                 + "|currentNetworkId=" + nullable(currentNetworkId)
                 + "|currentTechnicianId=" + nullable(currentTechnicianId)
                 + "|slaRisk=" + nullable(slaRisk)
@@ -129,6 +135,17 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
             }
             stageWorkOrderIds = stagesPort.findWorkOrderIdsByCurrentStageCode(
                     principal.tenantId(), currentStageCode, scope.tenantWide(), projectIds);
+        }
+        // M446：任务状态筛选经同一 task SPI，口径为最早 ACTIVE 任务 status。
+        boolean applyTaskStatusFilter = currentTaskStatus != null;
+        List<UUID> taskStatusWorkOrderIds = List.of();
+        if (applyTaskStatusFilter) {
+            WorkOrderDirectoryStageQuery stagesPort = stageQuery.getIfAvailable();
+            if (stagesPort == null) {
+                throw new IllegalStateException("工单目录任务状态筛选端口不可用");
+            }
+            taskStatusWorkOrderIds = stagesPort.findWorkOrderIdsByCurrentTaskStatus(
+                    principal.tenantId(), currentTaskStatus, scope.tenantWide(), projectIds);
         }
         // M440/M441：网点/师傅筛选经 dispatch SPI 解析为工单 ID；项目范围仍由授权 SQL 收敛。
         boolean applyNetworkFilter = currentNetworkId != null;
@@ -176,6 +193,7 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 clientCode, query.projectId(), status, externalOrderCode,
                 provinceCode, cityCode, districtCode,
                 applyStageFilter, stageWorkOrderIds,
+                applyTaskStatusFilter, taskStatusWorkOrderIds,
                 applyNetworkFilter, networkWorkOrderIds,
                 applyTechnicianFilter, technicianWorkOrderIds,
                 applySlaRiskFilter, slaRiskWorkOrderIds,
@@ -200,6 +218,7 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 clientCode, query.projectId(), status, externalOrderCode,
                 provinceCode, cityCode, districtCode,
                 applyStageFilter, stageWorkOrderIds,
+                applyTaskStatusFilter, taskStatusWorkOrderIds,
                 applyNetworkFilter, networkWorkOrderIds,
                 applyTechnicianFilter, technicianWorkOrderIds,
                 applySlaRiskFilter, slaRiskWorkOrderIds,
@@ -304,6 +323,7 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 contact.maskedCustomerPhone(),
                 contact.maskedServiceAddress(),
                 enrichment.currentStageCode(),
+                enrichment.currentTaskStatus(),
                 enrichment.currentClaimedBy(),
                 enrichment.currentAssigneeDisplayName(),
                 enrichment.currentNetworkId(),
@@ -317,9 +337,11 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
             return DirectorySideCars.empty();
         }
         Map<UUID, String> stages = Map.of();
+        Map<UUID, String> taskStatuses = Map.of();
         WorkOrderDirectoryStageQuery stagesPort = stageQuery.getIfAvailable();
         if (stagesPort != null) {
             stages = stagesPort.findCurrentStageCodes(tenantId, workOrderIds);
+            taskStatuses = stagesPort.findCurrentTaskStatuses(tenantId, workOrderIds);
         }
         Map<UUID, String> claimedBy = Map.of();
         WorkOrderDirectoryAssigneeQuery assigneesPort = assigneeQuery.getIfAvailable();
@@ -342,7 +364,7 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
         if (responsibilityPort != null) {
             responsibilities = responsibilityPort.findActive(tenantId, workOrderIds);
         }
-        return new DirectorySideCars(stages, claimedBy, displayNames, responsibilities);
+        return new DirectorySideCars(stages, taskStatuses, claimedBy, displayNames, responsibilities);
     }
 
     /**
@@ -399,6 +421,7 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
 
     private record DirectoryEnrichment(
             String currentStageCode,
+            String currentTaskStatus,
             String currentClaimedBy,
             String currentAssigneeDisplayName,
             String currentNetworkId,
@@ -409,12 +432,13 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
 
     private record DirectorySideCars(
             Map<UUID, String> stages,
+            Map<UUID, String> taskStatuses,
             Map<UUID, String> claimedBy,
             Map<UUID, String> displayNames,
             Map<UUID, WorkOrderDirectoryServiceResponsibility> responsibilities
     ) {
         static DirectorySideCars empty() {
-            return new DirectorySideCars(Map.of(), Map.of(), Map.of(), Map.of());
+            return new DirectorySideCars(Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
         }
 
         DirectoryEnrichment forWorkOrder(UUID workOrderId) {
@@ -427,6 +451,7 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
             WorkOrderDirectoryServiceResponsibility responsibility = responsibilities.get(workOrderId);
             return new DirectoryEnrichment(
                     stages.get(workOrderId),
+                    taskStatuses.get(workOrderId),
                     claimed,
                     displayName,
                     responsibility == null ? null : responsibility.networkId(),
@@ -560,6 +585,18 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
         }
         return value;
     }
+
+    /** M446：当前 ACTIVE 任务状态枚举。 */
+    private static String normalizeTaskStatus(String value) {
+        if (value == null) {
+            return null;
+        }
+        if (!ACTIVE_TASK_STATUSES.contains(value)) {
+            throw new IllegalArgumentException("currentTaskStatus is invalid");
+        }
+        return value;
+    }
+
     private static String normalizeStatus(String value) {
         if (value == null) return null;
         if (!STATUSES.contains(value)) throw new IllegalArgumentException("status is invalid");

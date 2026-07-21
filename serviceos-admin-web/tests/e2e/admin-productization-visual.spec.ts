@@ -54,6 +54,9 @@ test.describe('M377 Admin productization visual baselines', () => {
     await expect(page.getByTestId('work-order-region-filter')).toBeVisible()
     // M438：更多筛选中启用当前阶段
     await expect(page.getByTestId('work-order-stage-filter')).toBeVisible()
+    // M446：更多筛选中启用任务状态
+    await expect(page.getByTestId('work-order-task-status-filter')).toBeVisible()
+    await expect(page.getByTestId('work-order-current-task-status')).toBeVisible()
     // M440：更多筛选中启用服务网点
     await expect(page.getByTestId('work-order-network-filter')).toBeVisible()
     // M441：更多筛选中启用服务师傅
@@ -101,6 +104,11 @@ test.describe('M377 Admin productization visual baselines', () => {
     await page.getByTestId('work-order-stage-filter').scrollIntoViewIfNeeded()
     await page.screenshot({
       path: 'tests/e2e/__screenshots__/work-order-directory-stage-filter-1440.png',
+      fullPage: true,
+    })
+    await page.getByTestId('work-order-task-status-filter').scrollIntoViewIfNeeded()
+    await page.screenshot({
+      path: 'tests/e2e/__screenshots__/work-order-directory-task-status-filter-1440.png',
       fullPage: true,
     })
     await page.getByTestId('work-order-network-filter').scrollIntoViewIfNeeded()
