@@ -635,8 +635,6 @@ knownGaps:
   - UI_DATA_GAP: 失败登录与设备指纹尚未交付
 ```
 
-Also update M418 section gap:
-
 ### 9.12 M406 记录（车企/行政区目录）
 
 ```yaml
