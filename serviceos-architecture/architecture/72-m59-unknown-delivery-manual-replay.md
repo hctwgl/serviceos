@@ -61,7 +61,7 @@ M59 延续 M58、ARCH-13、ADR-010/014 和 API-04。项目负责人于 2026-07-1
 主要入口：
 
 - `DefaultOutboundDeliveryService#retryUnknown`、`BydReviewSubmissionTaskHandler`；
-- `JdbcOutboundDeliveryRepository`、V059；
+- `JooqOutboundDeliveryRepository`、V059；
 - Core OpenAPI 0.32.0 与 replay-requested 事件 Schema；
 - `ReviewCasePostgresIT`、MVC Security、契约/客户端、Flyway 与 ArchitectureTest。
 

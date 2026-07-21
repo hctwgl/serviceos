@@ -9,7 +9,7 @@ import com.serviceos.integration.byd.api.BydCpimSignatureHeaders;
 import com.serviceos.integration.byd.infrastructure.BydCpimPayloadDigest;
 import com.serviceos.integration.byd.infrastructure.BydCpimReplayConflictException;
 import com.serviceos.integration.byd.infrastructure.BydCpimSignatureVerifier;
-import com.serviceos.integration.byd.infrastructure.JdbcBydCpimReplayGuard;
+import com.serviceos.integration.byd.infrastructure.JooqBydCpimReplayGuard;
 import com.serviceos.integration.spi.ConnectorIdentity;
 import com.serviceos.integration.spi.InboundConnectorAuditContext;
 import com.serviceos.integration.spi.InboundUpdateWorkOrderResult;
@@ -47,7 +47,7 @@ public class BydCpimUpdateOrderService {
     private static final String UPDATE_BUSINESS_PREFIX = "BYD:INSTALL-UPDATE:";
 
     private final ObjectMapper objectMapper;
-    private final JdbcBydCpimReplayGuard replayGuard;
+    private final JooqBydCpimReplayGuard replayGuard;
     private final InboundMessageRepository messages;
     private final ObjectStorageGateway storage;
     private final InboundUpdateWorkOrderPipeline updatePipeline;
@@ -59,7 +59,7 @@ public class BydCpimUpdateOrderService {
 
     public BydCpimUpdateOrderService(
             ObjectMapper objectMapper,
-            JdbcBydCpimReplayGuard replayGuard,
+            JooqBydCpimReplayGuard replayGuard,
             InboundMessageRepository messages,
             ObjectStorageGateway storage,
             InboundUpdateWorkOrderPipeline updatePipeline,

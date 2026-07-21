@@ -9,7 +9,7 @@ import com.serviceos.integration.byd.api.BydCpimSignatureHeaders;
 import com.serviceos.integration.byd.infrastructure.BydCpimPayloadDigest;
 import com.serviceos.integration.byd.infrastructure.BydCpimReplayConflictException;
 import com.serviceos.integration.byd.infrastructure.BydCpimSignatureVerifier;
-import com.serviceos.integration.byd.infrastructure.JdbcBydCpimReplayGuard;
+import com.serviceos.integration.byd.infrastructure.JooqBydCpimReplayGuard;
 import com.serviceos.integration.spi.CancelWorkOrderMappedInbound;
 import com.serviceos.integration.spi.CancelWorkOrderRouteHint;
 import com.serviceos.integration.spi.ConnectorIdentity;
@@ -53,7 +53,7 @@ public class BydCpimCancelOrderService {
             .ofPattern("uuuu-MM-dd HH:mm:ss").withResolverStyle(ResolverStyle.STRICT);
 
     private final ObjectMapper objectMapper;
-    private final JdbcBydCpimReplayGuard replayGuard;
+    private final JooqBydCpimReplayGuard replayGuard;
     private final InboundMessageRepository messages;
     private final ObjectStorageGateway storage;
     private final InboundCancelWorkOrderPipeline cancelPipeline;
@@ -65,7 +65,7 @@ public class BydCpimCancelOrderService {
 
     public BydCpimCancelOrderService(
             ObjectMapper objectMapper,
-            JdbcBydCpimReplayGuard replayGuard,
+            JooqBydCpimReplayGuard replayGuard,
             InboundMessageRepository messages,
             ObjectStorageGateway storage,
             InboundCancelWorkOrderPipeline cancelPipeline,

@@ -38,7 +38,7 @@ class BydCpimReplayGuardPostgresIT {
     }
 
     @Autowired
-    JdbcBydCpimReplayGuard guard;
+    JooqBydCpimReplayGuard guard;
 
     @Autowired
     JdbcClient jdbc;
