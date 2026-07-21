@@ -13,6 +13,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -63,6 +65,7 @@ class NetworkPortalWorkbenchTodayAppointmentsPostgresIT {
     @Autowired NetworkPortalQueryService portal;
     @Autowired JdbcClient jdbc;
     @Autowired Flyway flyway;
+    @Autowired PlatformTransactionManager transactionManager;
 
     @BeforeEach
     void cleanAndSeed() {
@@ -141,50 +144,53 @@ class NetworkPortalWorkbenchTodayAppointmentsPostgresIT {
 
     private void seedTodayAppointment() {
         // 固定在 Asia/Shanghai 当日上午，避免随测试运行时刻漂移到昨日。
+        // appointment ↔ revision 循环外键为 DEFERRABLE，必须同事务写入。
         Instant windowStart = Instant.now().atZone(java.time.ZoneId.of("Asia/Shanghai"))
                 .toLocalDate().atTime(10, 0).atZone(java.time.ZoneId.of("Asia/Shanghai")).toInstant();
         Instant windowEnd = windowStart.plusSeconds(3600);
-        jdbc.sql("""
-                INSERT INTO apt_appointment (
-                    appointment_id, tenant_id, project_id, work_order_id, task_id,
-                    appointment_type, status, current_revision_id, current_revision_no,
-                    assigned_network_id, technician_id, aggregate_version, created_by, created_at
-                ) VALUES (
-                    :id, :tenant, :project, :wo, :task,
-                    'INSTALLATION', 'CONFIRMED', :revision, 1,
-                    :network, :tech, 1, 'test', now()
-                )
-                """)
-                .param("id", APPOINTMENT)
-                .param("tenant", TENANT)
-                .param("project", PROJECT)
-                .param("wo", WO)
-                .param("task", TASK)
-                .param("network", NETWORK.toString())
-                .param("tech", TECH_PROFILE.toString())
-                .param("revision", REVISION)
-                .update();
-        jdbc.sql("""
-                INSERT INTO apt_appointment_revision (
-                    revision_id, tenant_id, appointment_id, revision_no, previous_revision_id,
-                    window_start, window_end, timezone, estimated_duration_minutes,
-                    address_ref, address_version,
-                    confirmed_party_type, confirmed_party_ref, confirmation_channel, confirmed_at,
-                    reason_code, note, revision_kind, created_by, created_at
-                ) VALUES (
-                    :id, :tenant, :appointment, 1, NULL,
-                    :start, :end, 'Asia/Shanghai', 60,
-                    'address-ref', 'address-v1',
-                    'CUSTOMER', 'customer-ref', 'PHONE', now(),
-                    NULL, NULL, 'CONFIRM', 'test', now()
-                )
-                """)
-                .param("id", REVISION)
-                .param("appointment", APPOINTMENT)
-                .param("tenant", TENANT)
-                .param("start", java.sql.Timestamp.from(windowStart))
-                .param("end", java.sql.Timestamp.from(windowEnd))
-                .update();
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            jdbc.sql("""
+                    INSERT INTO apt_appointment (
+                        appointment_id, tenant_id, project_id, work_order_id, task_id,
+                        appointment_type, status, current_revision_id, current_revision_no,
+                        assigned_network_id, technician_id, aggregate_version, created_by, created_at
+                    ) VALUES (
+                        :id, :tenant, :project, :wo, :task,
+                        'INSTALLATION', 'CONFIRMED', :revision, 1,
+                        :network, :tech, 1, 'test', now()
+                    )
+                    """)
+                    .param("id", APPOINTMENT)
+                    .param("tenant", TENANT)
+                    .param("project", PROJECT)
+                    .param("wo", WO)
+                    .param("task", TASK)
+                    .param("network", NETWORK.toString())
+                    .param("tech", TECH_PROFILE.toString())
+                    .param("revision", REVISION)
+                    .update();
+            jdbc.sql("""
+                    INSERT INTO apt_appointment_revision (
+                        revision_id, tenant_id, appointment_id, revision_no, previous_revision_id,
+                        window_start, window_end, timezone, estimated_duration_minutes,
+                        address_ref, address_version,
+                        confirmed_party_type, confirmed_party_ref, confirmation_channel, confirmed_at,
+                        reason_code, note, revision_kind, created_by, created_at
+                    ) VALUES (
+                        :id, :tenant, :appointment, 1, NULL,
+                        :start, :end, 'Asia/Shanghai', 60,
+                        'address-ref', 'address-v1',
+                        'CUSTOMER', 'customer-ref', 'PHONE', now(),
+                        NULL, NULL, 'CONFIRM', 'test', now()
+                    )
+                    """)
+                    .param("id", REVISION)
+                    .param("appointment", APPOINTMENT)
+                    .param("tenant", TENANT)
+                    .param("start", java.sql.Timestamp.from(windowStart))
+                    .param("end", java.sql.Timestamp.from(windowEnd))
+                    .update();
+        });
     }
 
     private void seedPrincipal(UUID principalId, String displayName) {

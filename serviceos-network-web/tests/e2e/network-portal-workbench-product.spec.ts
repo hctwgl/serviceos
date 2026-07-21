@@ -231,6 +231,7 @@ async function stubWorkbenchProduct(page: Page) {
 
 test.describe('M390/M407/M408/M410/M411 网点工作台产品化 + 分配候选 + 今日预约', () => {
   test('展示 SummaryStrip、今日时间轴/预约、待分配表并完成分配', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 1024 })
     await stubWorkbenchProduct(page)
     await loginWithLocalKeycloak(page)
     await navigateNetwork(page, '/network-portal/workbench')
@@ -246,6 +247,7 @@ test.describe('M390/M407/M408/M410/M411 网点工作台产品化 + 分配候选 
     await expect(page.getByTestId('workbench-unassigned-table')).toBeVisible()
     await expect(page.getByTestId(`assign-open-${TASK_ID}`)).toBeVisible()
 
+    await page.getByTestId('workbench-unassigned-table').scrollIntoViewIfNeeded()
     await page.getByTestId(`assign-open-${TASK_ID}`).click()
     await expect(page.getByTestId('assign-technician-drawer')).toBeVisible()
     await expect(page.getByTestId(`assign-candidate-${TECH_ID}`)).toBeVisible()
@@ -262,7 +264,6 @@ test.describe('M390/M407/M408/M410/M411 网点工作台产品化 + 分配候选 
     await page.getByTestId('assign-drawer-submit').click()
     await expect(page.getByTestId('assign-drawer-message')).toContainText('指派已生效')
 
-    await page.setViewportSize({ width: 1440, height: 1024 })
     await page.screenshot({
       path: 'tests/e2e/__screenshots__/network-workbench-product-1440.png',
       fullPage: true,

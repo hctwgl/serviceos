@@ -418,15 +418,25 @@ watch(
   gap: 14px;
   align-items: start;
 }
+.workbench-grid > .panel {
+  min-width: 0;
+  overflow: auto;
+}
+.workbench-grid > [data-testid='workbench-today-appointments'] {
+  grid-column: 1 / -1;
+}
 .timeline {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 10px;
 }
 .timeline li {
+  flex: 1 1 140px;
+  min-width: 140px;
+  max-width: 220px;
   border: 1px solid var(--sos-color-border-light);
   border-radius: var(--sos-radius-md);
   background: var(--sos-color-surface-subtle);
