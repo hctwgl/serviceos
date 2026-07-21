@@ -844,6 +844,9 @@ watch(selectedTaskId, () => {
         <tr>
           <th>任务</th>
           <th>关联工单</th>
+          <th>客户</th>
+          <th>联系电话</th>
+          <th>服务地址</th>
           <th>服务产品</th>
           <th>区域</th>
           <th>状态</th>
@@ -870,6 +873,15 @@ watch(selectedTaskId, () => {
             >
               打开工单
             </RouterLink>
+          </td>
+          <td data-testid="task-masked-customer-name">
+            {{ item.maskedCustomerName || '—' }}
+          </td>
+          <td data-testid="task-masked-customer-phone">
+            {{ item.maskedCustomerPhone || '—' }}
+          </td>
+          <td data-testid="task-masked-service-address">
+            {{ item.maskedServiceAddress || '—' }}
           </td>
           <td data-testid="task-service-product">{{ item.serviceProductCode ?? '—' }}</td>
           <td data-testid="task-region">{{ taskRegionLabel(item) }}</td>

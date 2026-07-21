@@ -434,6 +434,7 @@ title: ServiceOS 里程碑索引
 | M425 | M425 Admin 工单工作区完整审核决策记录产品化 | [436-m425-admin-work-order-workspace-review-records.md](../architecture/436-m425-admin-work-order-workspace-review-records.md) | [419-m425-admin-work-order-workspace-review-records-acceptance.md](../testing/419-m425-admin-work-order-workspace-review-records-acceptance.md) |
 | M426 | M426 Admin 工单工作区表单资料授权预览 | [437-m426-admin-work-order-workspace-evidence-preview.md](../architecture/437-m426-admin-work-order-workspace-evidence-preview.md) | [420-m426-admin-work-order-workspace-evidence-preview-acceptance.md](../testing/420-m426-admin-work-order-workspace-evidence-preview-acceptance.md) |
 | M427 | M427 Network 工单工作区表单资料授权预览 | [438-m427-network-work-order-workspace-evidence-preview.md](../architecture/438-m427-network-work-order-workspace-evidence-preview.md) | [421-m427-network-work-order-workspace-evidence-preview-acceptance.md](../testing/421-m427-network-work-order-workspace-evidence-preview-acceptance.md) |
+| M428 | M428 Network Portal 目录页脱敏客户联系 | [439-m428-network-portal-directory-masked-contact.md](../architecture/439-m428-network-portal-directory-masked-contact.md) | [422-m428-network-portal-directory-masked-contact-acceptance.md](../testing/422-m428-network-portal-directory-masked-contact-acceptance.md) |
 
 ## 未关联里程碑的文档
 

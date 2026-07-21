@@ -4,7 +4,7 @@ version: 0.1.0
 status: Implemented
 lastUpdated: 2026-07-21
 baselineCommit: "9a05be9b9e22be216542260f0979d85ee2cf2bab"
-latestMilestone: M427
+latestMilestone: M428
 ---
 
 # ServiceOS 实施状态总览
@@ -39,13 +39,13 @@ latestMilestone: M427
 
 | 项目 | 当前值 |
 |---|---|
-| 最新实施里程碑 | M427 Network 工单工作区表单资料授权预览 |
+| 最新实施里程碑 | M428 Network Portal 目录页脱敏客户联系 |
 | 基线提交 | `9a05be9b9e22be216542260f0979d85ee2cf2bab`（历史基线；合入 master 后回填） |
 | 后端形态 | Java 21 + Spring Boot + Spring Modulith 模块化单体 |
 | 当前可构建工程 | `serviceos-backend`、`serviceos-contracts`、`@serviceos/web-core`、`ServiceOSIOSCore`、独立且可部署的 `serviceos-network-web` 与 `serviceos-technician-web`、Swift 6 `TechnicianIOSFoundation`，以及已在 iPhone 17 Pro Simulator 安装启动、实跑 XCTest/XCUITest、形成 Production arm64 archive/dSYM，并接入当前任务、在线 Visit、冻结基础表单、前台 Evidence 采集上传、Snapshot/Task 完成与多轮资料整改的原生 `TechnicianIOS` SwiftUI App；由同一 Core OpenAPI 生成并经独立消费者门禁验证的 `@serviceos/core-client` 与 `ServiceOSCoreClient` |
 | 前端工程 | `serviceos-admin-web` 独立承载总部运营；**M370～M377** 完成设计系统 Presenter、产品化 AppShell（ScopeBar/Freshness/诊断抽屉）、标准页模板、工单中心/详情、项目详情与主导航页壳迁移及视觉关闭；仍消费服务端 Navigation 与 allowed-actions；M256 后 Network 正式产品由独立 `serviceos-network-web` 承载，M257 后 Technician 正式产品由独立移动优先 `serviceos-technician-web` 承载；两套独立 Web 均实际接入共享 Core、OIDC PKCE、服务端 Context/Capability/导航、Playwright 回归和独立容器镜像 |
 | 数据库 | PostgreSQL + Flyway（当前版本 **145**；M420 师傅客户端种类声明事件；M419 授权拒绝 actor 索引；M414 品牌目录/省级骨架；M406 车企/行政区目录；M403 登录事件；M402 `identity.register`；M401 关注项目） |
-| 契约 | Core OpenAPI **1.0.91** + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含工作区资料预览指针、Network/Admin 脱敏客户联系、履约使用中工单摘要、师傅列表开放任务/资质摘要、CLIENT_KINDS 时间线、authorization-denials、师傅档案/服务关系/网点任职 change-timeline、跨聚合 change-timeline、主数据治理、预约日历、分配候选推荐解释、工作台今日预约时间轴、分配候选距离亲和、关注项目角标、`/project-clients`、`/region-catalog`、`org-memberships`、`recent-logins`、用户目录等既有契约） |
+| 契约 | Core OpenAPI **1.0.92** + BYD CPIM OpenAPI 0.3.0 + 外部/事件 JSON Schema（含 Network 目录/工作区脱敏客户联系、工作区资料预览指针、履约使用中工单摘要、师傅列表开放任务/资质摘要、CLIENT_KINDS 时间线、authorization-denials、师傅档案/服务关系/网点任职 change-timeline、跨聚合 change-timeline、主数据治理、预约日历、分配候选推荐解释、工作台今日预约时间轴、分配候选距离亲和、关注项目角标、`/project-clients`、`/region-catalog`、`org-memberships`、`recent-logins`、用户目录等既有契约） |
 
 每次完成新里程碑时，Agent 必须更新本节的最新里程碑、基线提交和更新时间。
 
@@ -100,7 +100,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | Network Portal 运营异常详情 | 网点协作只读异常详情 UI | `IMPLEMENTED` | 复用 M203 GET operational-exceptions/{id}（`NetworkPortalExceptionItem`）；Admin Web `/network-portal/exceptions/:id`；列表深链；allowedActions=[]；catalog 仍 v15；OpenAPI 仍 0.99.0；Flyway 仍 100/102 | Portal ACK/resolve、新 pageId | M210 |
 | Network Portal 资质详情 | 网点协作只读资质详情 UI | `IMPLEMENTED` | 复用 M205 GET technician-qualifications/{id}；Admin Web `/network-portal/qualifications/:id`（decided*/version）；列表深链；catalog 仍 v15；OpenAPI 仍 0.99.0；Flyway 仍 100/102 | Portal decide、FileObject、新 pageId | M211 |
 | Network Portal 师傅关系详情 | 网点协作只读关系详情 UI | `IMPLEMENTED` | 复用 M206 GET technician-memberships/{id}；Admin Web `/network-portal/technicians/memberships/:id`（version）；列表深链；catalog 仍 v15；OpenAPI 仍 0.99.0；Flyway 仍 100/102 | 操作员 NetworkMembership、Portal decide、新 pageId | M212 |
-| Network Portal 限定工单工作区 | 网点协作限定工作区薄快照 | `IMPLEMENTED` | `GET /network-portal/work-orders/{id}/workspace`；ACTIVE NETWORK 门禁；薄 DTO（头+任务）；**M424** 顶层脱敏客户联系；**M427** 资料项短时授权预览；Page Registry `NETWORK.WORKORDER.WORKSPACE`；独立 Network Web；OpenAPI **1.0.91** | Admin workspace 复用、完整 §6.1 区块、目录客户列、非图片内联预览、Portal ACK | M213、M424、M427 |
+| Network Portal 限定工单工作区 | 网点协作限定工作区薄快照 | `IMPLEMENTED` | `GET /network-portal/work-orders/{id}/workspace`；ACTIVE NETWORK 门禁；薄 DTO（头+任务）；**M424** 顶层脱敏客户联系；**M427** 资料项短时授权预览；Page Registry `NETWORK.WORKORDER.WORKSPACE`；独立 Network Web；OpenAPI **1.0.92** | Admin workspace 复用、完整 §6.1 区块、非图片内联预览、Portal ACK | M213、M424、M427 |
 | Network Portal 工作区协作深链 | 工作区→整改/异常/任务 query 水合 | `IMPLEMENTED` | UI-only：任务行深链 + corrections/exceptions/tasks 水合 `taskId`；工作区 fan-in OPEN 整改/异常摘要（缺能力省略）；OpenAPI 仍 1.0.0；catalog 仍 v16；Flyway 仍 100/102 | SLA/Visit/表单 DTO、PII、Portal ACK、notifications | M214 |
 | Network Portal 工作区预约联系 | 工作区预约/联系尝试客户端 fan-in | `IMPLEMENTED` | UI-only：按 taskIds fan-in M197/M199 appointments/contact-attempts；缺 manageAppointment 省略；OpenAPI 仍 1.0.0；catalog 仍 v16；Flyway 仍 100/102 | SLA/Visit/表单 DTO、PII、写控件 | M215 |
 | Network Portal 工作区当前师傅 | 工作区师傅 displayName fan-in | `IMPLEMENTED` | UI-only：fan-in M194 technicians 解析 displayName/membershipId + 预约 window 只读；缺 technician.readOwnNetwork 省略；OpenAPI 仍 1.0.0；catalog 仍 v16；Flyway 仍 100/102 | SLA/Visit/表单 DTO、Admin workspace 复用、addressRef/PII | M216 |
@@ -124,7 +124,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | Network Portal 目录整改摘要 | 工单/任务目录页资料整改服务端摘要 | `IMPLEMENTED` | 扩展 work-orders/tasks 页可选 `corrections`；NETWORK `evidence.read` soft-gate；复用 Admin/NP 整改摘要；OpenAPI 1.0.13；catalog 仍 v16；Flyway 仍 100/102；Admin Web + IT/E2E | 目录 SLA 风险、目录 evidence、独立 NP Correction CRUD、notifications、Portal ACK | M233 |
 | Network Portal 目录 SLA 风险 | 工单/任务目录页 SLA 风险服务端摘要 | `IMPLEMENTED` | 扩展 work-orders/tasks 页可选 `slaRiskSummaries`；NETWORK `sla.read` soft-gate；keyed 薄计数；OpenAPI 1.0.14；catalog 仍 v16；Flyway 仍 100/102；Admin Web + IT/E2E | 即将超时窗口、完整 SlaInstance、notifications、Portal ACK | M234 |
 | Network Portal 目录资料摘要 | 工单/任务目录页资料 Evidence 服务端摘要 | `IMPLEMENTED` | 扩展 work-orders/tasks 页可选 `evidenceSlots`/`evidenceItems`；NETWORK `evidence.read` soft-gate；复用 Admin/NP 工作区摘要；OpenAPI 1.0.15；catalog 仍 v16；Flyway 仍 100/102；Admin Web + IT/E2E | 缩略图/下载、Revision 图、definition JSON、独立 NP Evidence API、notifications、Portal ACK、用户脱敏 | M235 |
-| Network Portal 目录工单头 | 工单/任务目录页服务产品/区域/接收时间 | `IMPLEMENTED` | 扩展 items 非 PII 头字段；`WorkOrderDirectoryHeaderQuery`；OpenAPI 1.0.16；catalog 仍 v16；Flyway 仍 100/102；Admin Web + IT/E2E | 用户脱敏 PII、独立 updatedAt、目录 reviews、notifications、Portal ACK | M236 |
+| Network Portal 目录工单头 | 工单/任务目录页服务产品/区域/接收时间 | `IMPLEMENTED` | 扩展 items 非 PII 头字段；`WorkOrderDirectoryHeaderQuery`；OpenAPI 1.0.16；catalog 仍 v16；Flyway 仍 100/102；Admin Web + IT/E2E；**M428** 脱敏客户联系 | 独立 updatedAt、目录 reviews、notifications、Portal ACK、Admin 目录客户列 | M236、M428 |
 | Network Portal 工作台统计时间 | 工作台 asOf/capacity.updatedAt 展示 | `IMPLEMENTED` | UI-only：页级「统计时间」=`asOf` + 容量行 `updatedAt`；OpenAPI 仍 1.0.16；catalog 仍 v16；Flyway 仍 100/102；Admin Web E2E | 今日/明日预约计数、签约比例/评分、PII、notifications、Portal ACK、产能申请 | M237 |
 | Network Portal 预约联系历史字段 | 任务页预约/联系历史操作者与渠道 | `IMPLEMENTED` | UI-only：Appointment.createdBy + revision channel/party/window；ContactAttempt.actorId/channel；禁止 addressRef/note；OpenAPI 仍 1.0.16；catalog 仍 v16；Flyway 仍 100/102；Admin Web E2E | 工作区/目录摘要扩 actor、今日/明日预约计数、notifications、Portal ACK、PII | M238 |
 | Network Portal 工作区现场摘要字段 | 工作区 Visit/表单/Evidence Accepted 字段展示 | `IMPLEMENTED` | UI-only：补齐 M222/M223 非 PII 摘要字段；OpenAPI 仍 1.0.16；catalog 仍 v16；Flyway 仍 100/102；Admin Web E2E | GPS/note/values/definition/file、Admin workspace 复用、notifications、Portal ACK、PII | M239 |
@@ -163,7 +163,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 | 履约事实与试算 | 事实提取和双向试算 | `PARTIAL` | **M309** `PricingRuntime`；**M327** `workorder.fulfilled` → 最小履约事实 + SHADOW `CalculationSnapshot`（不落账） | 完整 FactDefinition/CalculationRun、应收/应付双轨、对账结算、Admin 计价工作台、AUTHORITATIVE | M309、M327、M5 设计 |
 | 对账结算 | 对账、结算、争议与调整 | `PROPOSED` | 已有边界设计 | 正式运行时和页面 | `architecture/16-*` |
 | Admin Portal | 总部运营后台 | `PARTIAL` | **M284/M287/M289/M291/M292/M294/M295/M296** 配置设计器；M101～M193 运营基线；**M328** UNKNOWN；**M351** 终审；**M370～M377** 设计系统；**M384～M389** 配置四核与工单详情；**M397～M406** 用户管理、项目选择器主数据、关注项目；**M409** 关注项目待办/SLA 角标；**M414** 主数据治理台；**M415～M420** 主体变更时间线与授权拒绝安全活动流；**M422** 履约使用中工单摘要；**M423** 工单工作区脱敏客户联系；**M425** 工作区完整审核决策记录；**M426** 表单资料授权预览（`READY_FOR_REVIEW`） | 全国区县全量树/拼音索引/多级子品牌、失败登录/设备指纹、正式企业 OIDC/BFF；不得宣称 PRODUCT_ACCEPTED | M7 设计、M101～M193、M284～M296、M328、M351、M370～M377、M384～M389、M397～M406、M409、M414～M420、M422～M423、M425～M426、Admin 试点基线 |
-| Network Portal | 网点协作端 | `PARTIAL` | M194～M242 读写切片；M256 独立 `serviceos-network-web`；**M390～M392** 工作台/工作区/整改异常；**M396** 师傅与产能；**M407～M413** 分配候选/距离亲和/推荐解释/今日时间轴/预约日历；**M421** 师傅列表开放任务/资质摘要；**M424** 工作区脱敏客户联系；**M427** 工作区资料授权预览（`READY_FOR_REVIEW`） | 技能 taxonomy/服务区域/最近同步/资质到期、经纬度/路网距离、数值推荐评分、月视图拖拽改约、目录客户字段、非图片内联预览、产能申请写、Portal ACK/resolve/decide、notifications、生产 IdP | M7 设计、M194～M242、M255～M256、M390～M392、M396、M407～M413、M421、M424、M427 |
+| Network Portal | 网点协作端 | `PARTIAL` | M194～M242 读写切片；M256 独立 `serviceos-network-web`；**M390～M392** 工作台/工作区/整改异常；**M396** 师傅与产能；**M407～M413** 分配候选/距离亲和/推荐解释/今日时间轴/预约日历；**M421** 师傅列表开放任务/资质摘要；**M424** 工作区脱敏客户联系；**M427** 工作区资料授权预览；**M428** 目录页脱敏客户联系（`READY_FOR_REVIEW`） | 技能 taxonomy/服务区域/最近同步/资质到期、经纬度/路网距离、数值推荐评分、月视图拖拽改约、非图片内联预览、产能申请写、Portal ACK/resolve/decide、notifications、生产 IdP | M7 设计、M194～M242、M255～M256、M390～M392、M396、M407～M413、M421、M424、M427、M428 |
 | Technician App / Portal | 师傅移动端与 Feed | `PARTIAL` | M195/M218/M219/M243～M246 只读安全切片；M257 独立 H5；M258～M261 iOS 基础；M262 在线 Visit；M263 冻结基础表单；**M349/M350** H5 条件执行器 + 工单/区域权威头 + validationRules；M264 Evidence 采集上传；M265 Snapshot 与 Task 完成；M266 在线整改；**M357～M363** 运行时能力拒单、定向目标外拒单、Feed/详情头预检、整改路径门禁、列表预检与领取/启动硬拒 | 联系/预约、完整表单草稿、editableWhen/默认值（未接受）、iOS 共用执行器、真实 operationRefs 签退；弱网/后台/Track F 离线；签名真机/真实 IdP/VoiceOver/崩溃采集/TestFlight | M7 设计、M195、M218～M219、M243～M246、M257～M266、M349、M350、M357～M363 |
 | External Portal | 用户/车企受控页面 | `PROPOSED` | 最小边界规划 | 二期页面和工程实现 | M7 设计 |
 
@@ -221,6 +221,7 @@ Consumer Identity/CustomerProfile 是身份治理序列之后的已接受后续 
 - **M425 Implemented**：Admin 工单工作区完整审核决策记录产品化（复用 OpenAPI **1.0.90** `decisions[]`/`resubmissions[]`；无契约 bump）。
 - **M426 Implemented**：Admin 工单工作区表单资料授权预览（OpenAPI **1.0.91**：`latestRevisionId`/`latestMimeType` + `WORKSPACE_EVIDENCE_PREVIEW`）。
 - **M427 Implemented**：Network 工单工作区表单资料授权预览（复用 OpenAPI **1.0.91** 预览指针；无契约 bump）。
+- **M428 Implemented**：Network Portal 目录页脱敏客户联系（OpenAPI **1.0.92**：工单/任务目录 items `masked*`）。
 - **M383** 长链路 test 7/8 仍未闭合，不阻塞本切片。
 
 建议下一批（按优先级）：

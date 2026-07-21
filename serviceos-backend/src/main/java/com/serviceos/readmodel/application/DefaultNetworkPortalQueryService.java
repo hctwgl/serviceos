@@ -258,8 +258,12 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         }
         Map<UUID, WorkOrderDirectoryHeader> headers = loadWorkOrderHeaders(
                 actor.tenantId(), byWorkOrder.keySet());
+        // M428：基座已证明 ACTIVE NETWORK 责任；再取网点范围脱敏联系（不 soft-omit）。
+        Map<UUID, WorkOrderMaskedContactView> contacts = loadMaskedContactsForNetwork(
+                actor, correlationId, networkId, byWorkOrder.keySet());
         List<NetworkPortalWorkOrderItem> workOrderItems = byWorkOrder.values().stream()
                 .map(item -> withWorkOrderHeader(item, headers.get(item.workOrderId())))
+                .map(item -> withWorkOrderMaskedContact(item, contacts.get(item.workOrderId())))
                 .toList();
         List<NetworkPortalTechnicianItem> technicianSummaries = null;
         if (hasNetworkCapability(actor, correlationId, TECHNICIAN_READ_OWN, networkId)) {
@@ -656,6 +660,27 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         return headers;
     }
 
+    /**
+     * M428：为本页 ACTIVE 责任 workOrderIds 装载网点范围脱敏联系。
+     *
+     * <p>调用方必须已证明 ACTIVE NETWORK 责任；端口再次强制 networkTask.read。
+     * 工单缺失时端口返回 null 字段视图，目录项仍序列化 masked* = null。</p>
+     */
+    private Map<UUID, WorkOrderMaskedContactView> loadMaskedContactsForNetwork(
+            CurrentPrincipal actor,
+            String correlationId,
+            UUID networkId,
+            Set<UUID> workOrderIds
+    ) {
+        Map<UUID, WorkOrderMaskedContactView> contacts = new LinkedHashMap<>();
+        for (UUID workOrderId : workOrderIds) {
+            contacts.put(
+                    workOrderId,
+                    workOrders.getMaskedContactForNetwork(actor, correlationId, networkId, workOrderId));
+        }
+        return contacts;
+    }
+
     private static NetworkPortalWorkOrderItem withWorkOrderHeader(
             NetworkPortalWorkOrderItem item,
             WorkOrderDirectoryHeader header
@@ -675,7 +700,35 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                 header.provinceCode(),
                 header.cityCode(),
                 header.districtCode(),
-                header.receivedAt());
+                header.receivedAt(),
+                item.maskedCustomerName(),
+                item.maskedCustomerPhone(),
+                item.maskedServiceAddress());
+    }
+
+    private static NetworkPortalWorkOrderItem withWorkOrderMaskedContact(
+            NetworkPortalWorkOrderItem item,
+            WorkOrderMaskedContactView contact
+    ) {
+        if (contact == null) {
+            return item;
+        }
+        return new NetworkPortalWorkOrderItem(
+                item.workOrderId(),
+                item.projectId(),
+                item.taskIds(),
+                item.businessType(),
+                item.technicianId(),
+                item.effectiveFrom(),
+                item.brandCode(),
+                item.serviceProductCode(),
+                item.provinceCode(),
+                item.cityCode(),
+                item.districtCode(),
+                item.receivedAt(),
+                contact.maskedCustomerName(),
+                contact.maskedCustomerPhone(),
+                contact.maskedServiceAddress());
     }
 
     private static NetworkPortalTaskItem withTaskHeader(
@@ -701,7 +754,39 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
                 header.provinceCode(),
                 header.cityCode(),
                 header.districtCode(),
-                header.receivedAt());
+                header.receivedAt(),
+                item.maskedCustomerName(),
+                item.maskedCustomerPhone(),
+                item.maskedServiceAddress());
+    }
+
+    private static NetworkPortalTaskItem withTaskMaskedContact(
+            NetworkPortalTaskItem item,
+            WorkOrderMaskedContactView contact
+    ) {
+        if (contact == null) {
+            return item;
+        }
+        return new NetworkPortalTaskItem(
+                item.taskId(),
+                item.workOrderId(),
+                item.projectId(),
+                item.taskType(),
+                item.taskKind(),
+                item.stageCode(),
+                item.status(),
+                item.businessType(),
+                item.technicianId(),
+                item.effectiveFrom(),
+                item.brandCode(),
+                item.serviceProductCode(),
+                item.provinceCode(),
+                item.cityCode(),
+                item.districtCode(),
+                item.receivedAt(),
+                contact.maskedCustomerName(),
+                contact.maskedCustomerPhone(),
+                contact.maskedServiceAddress());
     }
 
     /**
@@ -1054,8 +1139,12 @@ final class DefaultNetworkPortalQueryService implements NetworkPortalQueryServic
         }
         Map<UUID, WorkOrderDirectoryHeader> headers = loadWorkOrderHeaders(
                 actor.tenantId(), workOrderIds);
+        // M428：任务目录投影所属工单脱敏联系（口径对齐工单目录）。
+        Map<UUID, WorkOrderMaskedContactView> contacts = loadMaskedContactsForNetwork(
+                actor, correlationId, networkId, workOrderIds);
         List<NetworkPortalTaskItem> taskItems = items.stream()
                 .map(item -> withTaskHeader(item, headers.get(item.workOrderId())))
+                .map(item -> withTaskMaskedContact(item, contacts.get(item.workOrderId())))
                 .toList();
         List<NetworkPortalTechnicianItem> technicianSummaries = null;
         if (hasNetworkCapability(actor, correlationId, TECHNICIAN_READ_OWN, networkId)) {

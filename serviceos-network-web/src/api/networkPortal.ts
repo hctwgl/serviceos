@@ -96,6 +96,10 @@ export type NetworkPortalWorkOrderItem = {
   districtCode?: string | null
   /** M236：工单接收时间（产品「更新时间」MVP 映射）。 */
   receivedAt?: string | null
+  /** M428：服务端脱敏客户联系；随基座返回。 */
+  maskedCustomerName: string | null
+  maskedCustomerPhone: string | null
+  maskedServiceAddress: string | null
 }
 
 export type NetworkPortalTaskItem = {
@@ -116,6 +120,10 @@ export type NetworkPortalTaskItem = {
   cityCode?: string | null
   districtCode?: string | null
   receivedAt?: string | null
+  /** M428：所属工单服务端脱敏客户联系。 */
+  maskedCustomerName: string | null
+  maskedCustomerPhone: string | null
+  maskedServiceAddress: string | null
 }
 
 export type NetworkPortalMembershipItem = {

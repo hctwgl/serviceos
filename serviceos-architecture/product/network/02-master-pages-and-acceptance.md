@@ -676,6 +676,24 @@ knownGaps:
   - CONTENT_GAP: 非图片类型内联预览器、目录列表缩略图列未交付
 ```
 
+## 46.2 M428 验收记录（工单/任务目录脱敏客户联系）
+
+```yaml
+pageId: NETWORK.WORKORDER.LIST
+route: /network-portal/work-orders
+visualProfile: CLASSIC_PROFESSIONAL_COLLABORATION
+technicalStatus: RUNTIME_CONNECTED
+frontendStatus: FRONTEND_COMPLETE
+productStatus: READY_FOR_REVIEW
+qualityStatus:
+  test: TEST_PASSED
+  visual: VISUAL_NOT_REVIEWED
+  accessibility: A11Y_NOT_REVIEWED
+productOwnerDecision: null
+knownGaps:
+  - CONTENT_GAP: Admin 工单目录客户列、独立 updatedAt 未交付
+```
+
 ## 47. M392 验收记录（资料整改 + 异常中心）
 
 ```yaml

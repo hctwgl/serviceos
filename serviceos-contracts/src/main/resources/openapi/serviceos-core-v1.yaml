@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.91
+  version: 1.0.92
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -1738,6 +1738,8 @@ paths:
         覆盖本页 items[].taskIds。
         M236：items 含非 PII 工单头字段 brandCode/serviceProductCode/provinceCode/
         cityCode/districtCode/receivedAt（对齐 Admin WorkOrder 子集；工单缺失时为 null）。
+        M428：items 含服务端脱敏客户联系 `maskedCustomerName` / `maskedCustomerPhone` /
+        `maskedServiceAddress`（复用 M424 网点脱敏端口；随基座返回，不 soft-omit；无原文）。
       parameters:
         - $ref: '#/components/parameters/NetworkContext'
         - $ref: '#/components/parameters/CorrelationId'
@@ -1827,6 +1829,8 @@ paths:
         覆盖本页 items[].taskId。
         M236：items 含非 PII 工单头字段 brandCode/serviceProductCode/provinceCode/
         cityCode/districtCode/receivedAt（对齐 Admin WorkOrder 子集；工单缺失时为 null）。
+        M428：items 含所属工单服务端脱敏客户联系 `maskedCustomerName` / `maskedCustomerPhone` /
+        `maskedServiceAddress`（复用 M424 网点脱敏端口；随基座返回，不 soft-omit；无原文）。
       parameters:
         - $ref: '#/components/parameters/NetworkContext'
         - $ref: '#/components/parameters/CorrelationId'
@@ -7816,7 +7820,12 @@ components:
     NetworkPortalWorkOrderItem:
       type: object
       additionalProperties: false
-      required: [workOrderId, taskIds]
+      required:
+        - workOrderId
+        - taskIds
+        - maskedCustomerName
+        - maskedCustomerPhone
+        - maskedServiceAddress
       properties:
         workOrderId: { type: string, format: uuid }
         projectId: { type: [string, 'null'], format: uuid }
@@ -7848,6 +7857,18 @@ components:
           type: [string, 'null']
           format: date-time
           description: M236：工单接收时间（Admin 对齐；产品「更新时间」MVP 映射）
+        maskedCustomerName:
+          type: [string, 'null']
+          maxLength: 64
+          description: M428：服务端脱敏客户姓名；随目录基座返回，不 soft-omit
+        maskedCustomerPhone:
+          type: [string, 'null']
+          maxLength: 32
+          description: M428：服务端脱敏手机号；不得返回完整号码
+        maskedServiceAddress:
+          type: [string, 'null']
+          maxLength: 256
+          description: M428：服务端脱敏服务地址；不得返回完整地址
     NetworkPortalWorkOrderPage:
       type: object
       additionalProperties: false
@@ -8059,7 +8080,12 @@ components:
     NetworkPortalTaskItem:
       type: object
       additionalProperties: false
-      required: [taskId, workOrderId]
+      required:
+        - taskId
+        - workOrderId
+        - maskedCustomerName
+        - maskedCustomerPhone
+        - maskedServiceAddress
       properties:
         taskId: { type: string, format: uuid }
         workOrderId: { type: string, format: uuid }
@@ -8086,6 +8112,18 @@ components:
           type: [string, 'null']
           format: date-time
           description: M236：所属工单接收时间
+        maskedCustomerName:
+          type: [string, 'null']
+          maxLength: 64
+          description: M428：所属工单服务端脱敏客户姓名；随目录/任务基座返回，不 soft-omit
+        maskedCustomerPhone:
+          type: [string, 'null']
+          maxLength: 32
+          description: M428：所属工单服务端脱敏手机号；不得返回完整号码
+        maskedServiceAddress:
+          type: [string, 'null']
+          maxLength: 256
+          description: M428：所属工单服务端脱敏服务地址；不得返回完整地址
     NetworkPortalTaskPage:
       type: object
       additionalProperties: false

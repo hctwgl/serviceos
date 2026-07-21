@@ -194,6 +194,24 @@ class NetworkPortalReadPostgresIT {
         NetworkPortalPage<NetworkPortalWorkOrderItem> byUuid =
                 portal.listWorkOrders(actor(PRINCIPAL), "corr-uuid", NETWORK_A.toString());
         assertThat(byUuid.items()).hasSize(1);
+        // M428：目录基座返回脱敏客户联系；夹具原文为 测试客户 / 13800000000 / 测试地址
+        NetworkPortalWorkOrderItem directoryItem = byUuid.items().getFirst();
+        assertThat(directoryItem.maskedCustomerName()).isEqualTo("测***");
+        assertThat(directoryItem.maskedCustomerPhone()).isEqualTo("*******0000");
+        assertThat(directoryItem.maskedServiceAddress()).isEqualTo("测***");
+        assertThat(directoryItem.maskedCustomerPhone()).doesNotContain("138");
+        assertThat(directoryItem.maskedServiceAddress()).doesNotContain("测试地址");
+
+        NetworkPortalPage<NetworkPortalTaskItem> taskPage =
+                portal.listTasks(actor(PRINCIPAL), "corr-task-masked", context);
+        assertThat(taskPage.items()).isNotEmpty();
+        assertThat(taskPage.items())
+                .allSatisfy(task -> {
+                    assertThat(task.maskedCustomerName()).isEqualTo("测***");
+                    assertThat(task.maskedCustomerPhone()).isEqualTo("*******0000");
+                    assertThat(task.maskedServiceAddress()).isEqualTo("测***");
+                    assertThat(task.maskedCustomerPhone()).doesNotContain("138");
+                });
     }
 
     @Test
