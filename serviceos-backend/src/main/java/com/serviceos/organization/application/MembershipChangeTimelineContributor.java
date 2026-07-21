@@ -55,7 +55,7 @@ final class MembershipChangeTimelineContributor implements PrincipalChangeTimeli
                    AND o.organization_id = m.organization_id
                   LEFT JOIN org_unit u
                     ON u.tenant_id = m.tenant_id
-                   AND u.unit_id = m.unit_id
+                   AND u.org_unit_id = m.org_unit_id
                  WHERE e.tenant_id = :tenantId
                    AND m.principal_id = :principalId
                    AND e.resource_type = 'OrgMembership'

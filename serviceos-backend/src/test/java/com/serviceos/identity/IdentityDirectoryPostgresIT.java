@@ -227,6 +227,8 @@ class IdentityDirectoryPostgresIT {
                 identity("subject-cross", "跨聚合用户"), "corr-cross-1"));
         commands.updateProfile(actor(), metadata("cross-profile"), principalId, 1, "跨聚合用户", "EMP-CROSS-1");
         seedApprover("grant-approver");
+        // 审批者需具备不窄于目标 RoleGrant 的可授予范围。
+        seedDirectActiveGrant("grant-approver", "identity.read", "TENANT", TENANT);
 
         var org = organizations.createOrganization(
                 actor(), metadata("cross-org"), "CROSS", "跨聚合组织", "LOCAL", null, null);
@@ -294,6 +296,40 @@ class IdentityDirectoryPostgresIT {
                 )
                 """).param("grantId", UUID.randomUUID()).param("tenant", TENANT)
                 .param("actor", principalId).param("roleId", roleId).update();
+    }
+
+    private void seedDirectActiveGrant(
+            String principalId, String capability, String scopeType, String scopeRef
+    ) {
+        UUID roleId = UUID.randomUUID();
+        jdbc.sql("""
+                INSERT INTO auth_role (role_id, tenant_id, role_code, role_name, role_status, created_at)
+                VALUES (:roleId, :tenant, :code, :code, 'ACTIVE', now())
+                """)
+                .param("roleId", roleId)
+                .param("tenant", TENANT)
+                .param("code", "direct-" + capability + "-" + UUID.randomUUID())
+                .update();
+        jdbc.sql("""
+                INSERT INTO auth_role_capability (role_id, capability_code, granted_at)
+                VALUES (:roleId, :capability, now())
+                """).param("roleId", roleId).param("capability", capability).update();
+        jdbc.sql("""
+                INSERT INTO auth_role_grant (
+                    grant_id, tenant_id, principal_id, role_id, scope_type, scope_ref,
+                    valid_from, source_code, grant_status, grant_effect, created_at, updated_at
+                ) VALUES (
+                    :grantId, :tenant, :principal, :roleId, :scopeType, :scopeRef,
+                    now() - interval '1 day', 'TEST_FIXTURE', 'ACTIVE', 'ALLOW', now(), now()
+                )
+                """)
+                .param("grantId", UUID.randomUUID())
+                .param("tenant", TENANT)
+                .param("principal", principalId)
+                .param("roleId", roleId)
+                .param("scopeType", scopeType)
+                .param("scopeRef", scopeRef)
+                .update();
     }
 
     private static CurrentPrincipal approver() {

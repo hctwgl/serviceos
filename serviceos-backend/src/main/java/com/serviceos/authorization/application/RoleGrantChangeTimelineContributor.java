@@ -66,7 +66,8 @@ final class RoleGrantChangeTimelineContributor implements PrincipalChangeTimelin
                  LIMIT :limit
                 """)
                 .param("tenantId", tenantId)
-                .param("principalId", principalId)
+                // auth_role_grant.principal_id 为 varchar，避免 uuid=varchar 运算符错误。
+                .param("principalId", principalId.toString())
                 .param("limit", limit)
                 .query((rs, rowNum) -> PrincipalChangeTimelineItem.of(
                         "ROLE_GRANT",
