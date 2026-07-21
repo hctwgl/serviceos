@@ -88,6 +88,8 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
         // M440/M441：网点/师傅 ID 与目录列同口径；非法 UUID 由绑定层失败，此处仅参与 digest。
         UUID currentNetworkId = query.currentNetworkId();
         UUID currentTechnicianId = query.currentTechnicianId();
+        // M442：SLA 风险口径与目录列一致；非法枚举失败关闭。
+        String slaRisk = normalizeSlaRisk(query.slaRisk());
         AuthorizedProjectScope scope = projectScopes.require(principal, READ, "WorkOrder", correlationId);
         if (query.projectId() != null && !scope.tenantWide() && !scope.projectIds().contains(query.projectId())) {
             authorization.require(principal, AuthorizationRequest.projectCapability(READ, principal.tenantId(),
@@ -102,7 +104,8 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 + "|districtCode=" + nullable(districtCode)
                 + "|currentStageCode=" + nullable(currentStageCode)
                 + "|currentNetworkId=" + nullable(currentNetworkId)
-                + "|currentTechnicianId=" + nullable(currentTechnicianId));
+                + "|currentTechnicianId=" + nullable(currentTechnicianId)
+                + "|slaRisk=" + nullable(slaRisk));
         Cursor cursor = decodeCursor(query.cursor(), scope.scopeDigest(), filterDigest);
         List<UUID> projectIds = scope.projectIds().stream()
                 .sorted(Comparator.comparing(UUID::toString)).toList();
@@ -137,12 +140,35 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                         principal.tenantId(), currentTechnicianId);
             }
         }
+        // M442：SLA 筛选仅在具备 sla.read 的范围内解析；无权限 → 空集失败关闭，不泄露 SLA 事实。
+        boolean applySlaRiskFilter = slaRisk != null;
+        List<UUID> slaRiskWorkOrderIds = List.of();
+        if (applySlaRiskFilter) {
+            WorkOrderDirectorySlaRiskQuery slaPort = slaRiskQuery.getIfAvailable();
+            if (slaPort == null) {
+                throw new IllegalStateException("工单目录 SLA 筛选端口不可用");
+            }
+            if (scope.tenantWide() && hasTenantSlaRead(principal, correlationId)) {
+                slaRiskWorkOrderIds = slaPort.findWorkOrderIdsBySlaRisk(
+                        principal.tenantId(), slaRisk, true, List.of());
+            } else {
+                List<UUID> slaReadableProjects = projectsWithSlaRead(
+                        principal, correlationId, projectIds);
+                if (slaReadableProjects.isEmpty()) {
+                    slaRiskWorkOrderIds = List.of();
+                } else {
+                    slaRiskWorkOrderIds = slaPort.findWorkOrderIdsBySlaRisk(
+                            principal.tenantId(), slaRisk, false, slaReadableProjects);
+                }
+            }
+        }
         List<WorkOrderView> fetched = queries.findPage(principal.tenantId(), scope.tenantWide(), projectIds,
                 clientCode, query.projectId(), status, externalOrderCode,
                 provinceCode, cityCode, districtCode,
                 applyStageFilter, stageWorkOrderIds,
                 applyNetworkFilter, networkWorkOrderIds,
                 applyTechnicianFilter, technicianWorkOrderIds,
+                applySlaRiskFilter, slaRiskWorkOrderIds,
                 cursor == null ? null : cursor.receivedAt(),
                 cursor == null ? null : cursor.id(), query.limit() + 1);
         boolean more = fetched.size() > query.limit();
@@ -165,6 +191,7 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 applyStageFilter, stageWorkOrderIds,
                 applyNetworkFilter, networkWorkOrderIds,
                 applyTechnicianFilter, technicianWorkOrderIds,
+                applySlaRiskFilter, slaRiskWorkOrderIds,
                 WorkOrderPage.TOTAL_COUNT_LIMIT + 1);
         boolean totalTruncated = matched > WorkOrderPage.TOTAL_COUNT_LIMIT;
         int totalCount = totalTruncated ? WorkOrderPage.TOTAL_COUNT_LIMIT : matched;
@@ -434,6 +461,47 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
             return trimmed.charAt(0) + "***";
         }
         return trimmed.substring(0, 6) + "***";
+    }
+
+    /** M442：SLA 风险筛选枚举（与目录列 OPEN/BREACHED 口径一致）。 */
+    private static String normalizeSlaRisk(String value) {
+        if (value == null) {
+            return null;
+        }
+        if (!"OPEN".equals(value) && !"BREACHED".equals(value)) {
+            throw new IllegalArgumentException("slaRisk is invalid");
+        }
+        return value;
+    }
+
+    private boolean hasTenantSlaRead(CurrentPrincipal principal, String correlationId) {
+        AuthorizationDecision decision = authorization.authorize(
+                principal,
+                AuthorizationRequest.tenantCapability(
+                        SLA_READ, principal.tenantId(), "SlaInstance", principal.tenantId()),
+                correlationId);
+        return decision.effect() == AuthorizationDecision.Effect.ALLOW;
+    }
+
+    private List<UUID> projectsWithSlaRead(
+            CurrentPrincipal principal, String correlationId, List<UUID> projectIds
+    ) {
+        List<UUID> allowed = new ArrayList<>();
+        for (UUID projectId : projectIds) {
+            AuthorizationDecision decision = authorization.authorize(
+                    principal,
+                    AuthorizationRequest.projectCapability(
+                            SLA_READ,
+                            principal.tenantId(),
+                            "SlaInstance",
+                            projectId.toString(),
+                            projectId.toString()),
+                    correlationId);
+            if (decision.effect() == AuthorizationDecision.Effect.ALLOW) {
+                allowed.add(projectId);
+            }
+        }
+        return List.copyOf(allowed);
     }
 
     private static String normalizeCode(String value, String field) {

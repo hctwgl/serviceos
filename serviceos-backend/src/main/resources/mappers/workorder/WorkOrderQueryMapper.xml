@@ -58,6 +58,18 @@
         <otherwise>AND FALSE</otherwise>
       </choose>
     </if>
+    <!-- M442：SLA 风险筛选由 sla SPI 解析为工单 ID 后在此收敛；空集失败关闭为无结果。 -->
+    <if test="applySlaRiskFilter">
+      <choose>
+        <when test="slaRiskWorkOrderIds != null and !slaRiskWorkOrderIds.isEmpty()">
+          AND id IN
+          <foreach collection="slaRiskWorkOrderIds" item="id" open="(" separator="," close=")">
+            CAST(#{id} AS uuid)
+          </foreach>
+        </when>
+        <otherwise>AND FALSE</otherwise>
+      </choose>
+    </if>
   </sql>
   <select id="findPage" resultType="map">
     SELECT <include refid="columns"/> FROM wo_work_order

@@ -50,7 +50,8 @@ const networkOptions = ref<ServiceNetwork[]>([])
 /** M441：服务师傅筛选（与目录 currentTechnicianId 同口径）。 */
 const technicianFilterId = ref<string | undefined>(undefined)
 const technicianOptions = ref<TechnicianProfile[]>([])
-const moreSla = ref<string | undefined>(undefined)
+/** M442：SLA 风险筛选（与目录列 OPEN/BREACHED 同口径）。 */
+const slaRiskFilter = ref<string | undefined>(undefined)
 
 /** 常用履约阶段；未知码由服务端校验失败关闭，不在此发明业务阶段。 */
 const stageFilterOptions = statusOptions([
@@ -90,6 +91,11 @@ const technicianFilterOptions = computed(() =>
     })),
 )
 
+const slaRiskFilterOptions = [
+  { value: 'OPEN', label: '有开放风险' },
+  { value: 'BREACHED', label: '已超时' },
+]
+
 function regionQueryParams(): {
   provinceCode?: string
   cityCode?: string
@@ -127,6 +133,8 @@ function hydrateFiltersFromRoute() {
   if (nextNetwork !== undefined) networkFilterId.value = nextNetwork || undefined
   const nextTechnician = firstRouteQuery(route, 'currentTechnicianId')
   if (nextTechnician !== undefined) technicianFilterId.value = nextTechnician || undefined
+  const nextSlaRisk = firstRouteQuery(route, 'slaRisk')
+  if (nextSlaRisk !== undefined) slaRiskFilter.value = nextSlaRisk || undefined
 }
 
 function looksLikeUuid(value: string): boolean {
@@ -151,6 +159,7 @@ async function load(next?: string) {
       currentStageCode: stageFilterCode.value || undefined,
       currentNetworkId: networkFilterId.value || undefined,
       currentTechnicianId: technicianFilterId.value || undefined,
+      slaRisk: slaRiskFilter.value || undefined,
       ...regionQueryParams(),
     })
     cursor.value = page.value.nextCursor ?? undefined
@@ -181,6 +190,7 @@ function currentFilters() {
     currentStageCode: stageFilterCode.value || undefined,
     currentNetworkId: networkFilterId.value || undefined,
     currentTechnicianId: technicianFilterId.value || undefined,
+    slaRisk: slaRiskFilter.value || undefined,
     ...region,
   }
 }
@@ -194,6 +204,7 @@ function applySavedView(filters: Record<string, string>) {
   stageFilterCode.value = filters.currentStageCode || undefined
   networkFilterId.value = filters.currentNetworkId || undefined
   technicianFilterId.value = filters.currentTechnicianId || undefined
+  slaRiskFilter.value = filters.slaRisk || undefined
   return search()
 }
 
@@ -206,7 +217,7 @@ function resetFilters() {
   stageFilterCode.value = undefined
   networkFilterId.value = undefined
   technicianFilterId.value = undefined
-  moreSla.value = undefined
+  slaRiskFilter.value = undefined
   return search()
 }
 
@@ -706,7 +717,7 @@ watch(
         type="info"
         show-icon
         message="部分更多筛选暂不可用"
-        description="SLA、创建时间等筛选条件尚未由工单目录查询 API 提供（UI_DATA_GAP）。服务区域、当前阶段、服务网点与服务师傅已支持精确筛选。"
+        description="创建时间筛选尚未由工单目录查询 API 提供（UI_DATA_GAP）。服务区域、当前阶段、服务网点、服务师傅与 SLA 风险已支持精确筛选。"
       />
       <label class="filter-field">
         <span>服务区域</span>
@@ -769,13 +780,16 @@ watch(
         />
       </label>
       <label class="filter-field">
-        <span>SLA 状态</span>
+        <span>SLA 风险</span>
         <Select
-          v-model:value="moreSla"
-          disabled
-          placeholder="暂未提供"
+          v-model:value="slaRiskFilter"
+          allow-clear
           style="width: 160px"
-          :options="[]"
+          aria-label="SLA 风险筛选"
+          data-testid="work-order-sla-risk-filter"
+          placeholder="按 SLA 风险筛选"
+          :options="slaRiskFilterOptions"
+          @change="search"
         />
       </label>
     </template>

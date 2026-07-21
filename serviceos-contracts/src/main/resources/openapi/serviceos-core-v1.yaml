@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.103
+  version: 1.0.104
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -3399,6 +3399,8 @@ paths:
         经 dispatch SPI 解析后以工单 ID IN 收敛；写入 cursor filterDigest。
         M441：可选 `currentTechnicianId` 与目录师傅列同口径（ACTIVE TECHNICIAN assignee）精确匹配；
         经 dispatch SPI 解析后以工单 ID IN 收敛；写入 cursor filterDigest。
+        M442：可选 `slaRisk`（OPEN/BREACHED）与目录 SLA 列同口径精确匹配；
+        仅在具备 PROJECT/TENANT `sla.read` 的范围内经 sla SPI 解析后 IN 收敛；写入 cursor filterDigest。
       parameters:
         - { name: clientCode, in: query, schema: { type: string, minLength: 1, maxLength: 128 } }
         - { name: projectId, in: query, schema: { type: string, format: uuid } }
@@ -3416,6 +3418,8 @@ paths:
             description: M440：当前 ACTIVE NETWORK 网点 ID 精确匹配（与 currentNetworkId 列同口径） }
         - { name: currentTechnicianId, in: query, schema: { type: string, format: uuid },
             description: M441：当前 ACTIVE TECHNICIAN 师傅档案 ID 精确匹配（与 currentTechnicianId 列同口径） }
+        - { name: slaRisk, in: query, schema: { type: string, enum: [OPEN, BREACHED] },
+            description: M442：SLA 风险精确匹配；OPEN=RUNNING∪BREACHED，BREACHED=仅已超时 }
         - { name: cursor, in: query, schema: { type: string, minLength: 1 } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
         - $ref: '#/components/parameters/CorrelationId'

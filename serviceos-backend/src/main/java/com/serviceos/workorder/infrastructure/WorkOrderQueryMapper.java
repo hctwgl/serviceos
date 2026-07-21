@@ -21,6 +21,8 @@ interface WorkOrderQueryMapper {
             @Param("networkWorkOrderIds") List<String> networkWorkOrderIds,
             @Param("applyTechnicianFilter") boolean applyTechnicianFilter,
             @Param("technicianWorkOrderIds") List<String> technicianWorkOrderIds,
+            @Param("applySlaRiskFilter") boolean applySlaRiskFilter,
+            @Param("slaRiskWorkOrderIds") List<String> slaRiskWorkOrderIds,
             @Param("cursorReceivedAt") Instant cursorReceivedAt,
             @Param("cursorId") UUID cursorId, @Param("fetchSize") int fetchSize);
 
@@ -36,6 +38,8 @@ interface WorkOrderQueryMapper {
             @Param("networkWorkOrderIds") List<String> networkWorkOrderIds,
             @Param("applyTechnicianFilter") boolean applyTechnicianFilter,
             @Param("technicianWorkOrderIds") List<String> technicianWorkOrderIds,
+            @Param("applySlaRiskFilter") boolean applySlaRiskFilter,
+            @Param("slaRiskWorkOrderIds") List<String> slaRiskWorkOrderIds,
             @Param("fetchSize") int fetchSize);
 
     Map<String,Object> findById(@Param("tenantId") String tenantId, @Param("workOrderId") UUID workOrderId);

@@ -24,12 +24,13 @@ final class WorkOrderController {
             @RequestParam(required=false) String currentStageCode,
             @RequestParam(required=false) UUID currentNetworkId,
             @RequestParam(required=false) UUID currentTechnicianId,
+            @RequestParam(required=false) String slaRisk,
             @RequestParam(required=false) String cursor, @RequestParam(defaultValue="50") int limit,
             @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId) {
         return ResponseEntity.ok().header(CorrelationIds.HEADER_NAME,correlationId).body(
                 queries.list(principals.current(),correlationId,new WorkOrderQuery(
                         clientCode, projectId, status, null, provinceCode, cityCode, districtCode,
-                        currentStageCode, currentNetworkId, currentTechnicianId, cursor, limit)));
+                        currentStageCode, currentNetworkId, currentTechnicianId, slaRisk, cursor, limit)));
     }
     @GetMapping("/{workOrderId}") ResponseEntity<WorkOrderDetail> get(@PathVariable UUID workOrderId,
             @RequestAttribute(CorrelationIds.REQUEST_ATTRIBUTE) String correlationId) {

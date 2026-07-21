@@ -12,14 +12,14 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * M434：批量聚合本页工单的开放 SLA 风险计数。
+ * M434/M442：批量聚合开放 SLA 风险，并按 OPEN/BREACHED 口径筛选工单。
  *
- * <p>open = RUNNING∪BREACHED；breached ⊆ open。仅返回 openCount&gt;0 的行。</p>
+ * <p>open = RUNNING∪BREACHED；breached ⊆ open。旁载仅返回 openCount&gt;0 的行。</p>
  */
 @Component
 final class JdbcWorkOrderDirectorySlaRiskQuery implements WorkOrderDirectorySlaRiskQuery {
 
-    private static final String SQL = """
+    private static final String SIDE_CAR_SQL = """
             SELECT work_order_id AS work_order_id,
                    COUNT(*) FILTER (WHERE status IN ('RUNNING', 'BREACHED')) AS open_count,
                    COUNT(*) FILTER (WHERE status = 'BREACHED') AS breached_count
@@ -29,6 +29,40 @@ final class JdbcWorkOrderDirectorySlaRiskQuery implements WorkOrderDirectorySlaR
                AND status IN ('RUNNING', 'BREACHED')
              GROUP BY work_order_id
             HAVING COUNT(*) FILTER (WHERE status IN ('RUNNING', 'BREACHED')) > 0
+            """;
+
+    private static final String FILTER_OPEN_TENANT_WIDE = """
+            SELECT DISTINCT work_order_id
+              FROM sla_instance
+             WHERE tenant_id = :tenantId
+               AND work_order_id IS NOT NULL
+               AND status IN ('RUNNING', 'BREACHED')
+            """;
+
+    private static final String FILTER_OPEN_PROJECT_SCOPED = """
+            SELECT DISTINCT work_order_id
+              FROM sla_instance
+             WHERE tenant_id = :tenantId
+               AND work_order_id IS NOT NULL
+               AND project_id IN (:projectIds)
+               AND status IN ('RUNNING', 'BREACHED')
+            """;
+
+    private static final String FILTER_BREACHED_TENANT_WIDE = """
+            SELECT DISTINCT work_order_id
+              FROM sla_instance
+             WHERE tenant_id = :tenantId
+               AND work_order_id IS NOT NULL
+               AND status = 'BREACHED'
+            """;
+
+    private static final String FILTER_BREACHED_PROJECT_SCOPED = """
+            SELECT DISTINCT work_order_id
+              FROM sla_instance
+             WHERE tenant_id = :tenantId
+               AND work_order_id IS NOT NULL
+               AND project_id IN (:projectIds)
+               AND status = 'BREACHED'
             """;
 
     private final JdbcClient jdbc;
@@ -48,7 +82,7 @@ final class JdbcWorkOrderDirectorySlaRiskQuery implements WorkOrderDirectorySlaR
         }
         List<UUID> ids = List.copyOf(workOrderIds);
         List<WorkOrderDirectorySlaRiskSummary> result = new ArrayList<>();
-        jdbc.sql(SQL)
+        jdbc.sql(SIDE_CAR_SQL)
                 .param("tenantId", tenantId)
                 .param("workOrderIds", ids)
                 .query((rs, rowNum) -> {
@@ -62,5 +96,39 @@ final class JdbcWorkOrderDirectorySlaRiskQuery implements WorkOrderDirectorySlaR
                 })
                 .list();
         return List.copyOf(result);
+    }
+
+    @Override
+    public List<UUID> findWorkOrderIdsBySlaRisk(
+            String tenantId,
+            String slaRisk,
+            boolean tenantWide,
+            Collection<UUID> projectIds
+    ) {
+        Objects.requireNonNull(tenantId, "tenantId must not be null");
+        Objects.requireNonNull(slaRisk, "slaRisk must not be null");
+        Objects.requireNonNull(projectIds, "projectIds must not be null");
+        if (!tenantWide && projectIds.isEmpty()) {
+            return List.of();
+        }
+        String sql = switch (slaRisk) {
+            case "OPEN" -> tenantWide ? FILTER_OPEN_TENANT_WIDE : FILTER_OPEN_PROJECT_SCOPED;
+            case "BREACHED" -> tenantWide ? FILTER_BREACHED_TENANT_WIDE : FILTER_BREACHED_PROJECT_SCOPED;
+            default -> throw new IllegalArgumentException("slaRisk is invalid");
+        };
+        List<UUID> ids = new ArrayList<>();
+        var spec = jdbc.sql(sql).param("tenantId", tenantId);
+        if (!tenantWide) {
+            spec = spec.param("projectIds", List.copyOf(projectIds));
+        }
+        spec.query((rs, rowNum) -> {
+                    UUID workOrderId = rs.getObject("work_order_id", UUID.class);
+                    if (workOrderId != null) {
+                        ids.add(workOrderId);
+                    }
+                    return null;
+                })
+                .list();
+        return List.copyOf(ids);
     }
 }
