@@ -62,6 +62,7 @@ const STATUS_LABELS: Record<string, string> = {
   PILOT_COMPLETION: '试点完工',
   PILOT_INSTALL: '试点安装',
   SURVEY: '勘测',
+  SITE_SURVEY: '现场勘测',
   INSTALLATION: '安装',
   REPAIR: '维修',
   CORRECTION: '整改',

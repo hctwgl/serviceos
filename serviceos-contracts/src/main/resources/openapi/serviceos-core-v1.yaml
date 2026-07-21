@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.110
+  version: 1.0.111
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -9737,7 +9737,7 @@ components:
         status, configurationBundleId, configurationBundleCode, configurationBundleVersion,
         configurationBundleDigest, provinceCode, cityCode, districtCode, externalDispatchedAt,
         receivedAt, updatedAt, version, maskedCustomerName, maskedCustomerPhone, maskedServiceAddress,
-        currentStageCode, currentTaskStatus, currentClaimedBy, currentAssigneeDisplayName,
+        currentStageCode, currentTaskType, currentTaskStatus, currentClaimedBy, currentAssigneeDisplayName,
         currentNetworkId, currentNetworkDisplayName, currentTechnicianId, currentTechnicianDisplayName]
       properties:
         id: { type: string, format: uuid }
@@ -9785,6 +9785,12 @@ components:
             M432：当前阶段码，与工作区 currentTaskSummary.stageCode 同口径
             （首个 ACTIVE 任务：READY/PENDING/CLAIMED/RUNNING/RETRY_WAIT/MANUAL_INTERVENTION）。
             无 ACTIVE 任务时为 null；不发明阶段名。
+        currentTaskType:
+          type: [string, 'null']
+          maxLength: 120
+          description: >
+            M449：当前 ACTIVE 任务 task_type，与工作区 currentTaskSummary.taskType 同口径；
+            无 ACTIVE 任务时为 null；不发明任务名称。
         currentTaskStatus:
           type: [string, 'null']
           description: >

@@ -6,7 +6,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * 工单目录当前阶段/任务状态旁载与筛选端口。
+ * 工单目录当前阶段/任务类型/任务状态旁载与筛选端口。
  *
  * <p>由 task 模块实现。调用方（工单授权目录）已完成 {@code workOrder.read} 项目范围授权，
  * 本端口不再二次鉴权，也不穿越租户。</p>
@@ -23,6 +23,11 @@ public interface WorkOrderDirectoryStageQuery {
      * @return workOrderId → stageCode；缺任务的工单不出现
      */
     Map<UUID, String> findCurrentStageCodes(String tenantId, Collection<UUID> workOrderIds);
+
+    /**
+     * M449：当前 ACTIVE 任务 task_type；缺任务的工单不出现。
+     */
+    Map<UUID, String> findCurrentTaskTypes(String tenantId, Collection<UUID> workOrderIds);
 
     /**
      * M446：当前 ACTIVE 任务 status；缺任务的工单不出现。

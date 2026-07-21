@@ -22,6 +22,8 @@ export type WorkOrder = {
   maskedServiceAddress: string | null
   /** M432：当前阶段码；无 ACTIVE 任务时为 null。 */
   currentStageCode: string | null
+  /** M449：当前 ACTIVE 任务类型；无 ACTIVE 任务时为 null。 */
+  currentTaskType: string | null
   /** M446：当前 ACTIVE 任务状态；无 ACTIVE 任务时为 null。 */
   currentTaskStatus: string | null
   /** M433：当前 ACTIVE 任务认领主体；未认领为 null。 */

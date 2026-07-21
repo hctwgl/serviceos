@@ -294,6 +294,7 @@ type Row = {
   maskedCustomerPhone: string | null
   maskedServiceAddress: string | null
   currentStageCode: string | null
+  currentTaskType: string | null
   currentTaskStatus: string | null
   currentClaimedBy: string | null
   currentAssigneeDisplayName: string | null
@@ -395,6 +396,7 @@ const rows = computed((): Row[] => {
       maskedCustomerPhone: item.maskedCustomerPhone,
       maskedServiceAddress: item.maskedServiceAddress,
       currentStageCode: item.currentStageCode,
+      currentTaskType: item.currentTaskType,
       currentTaskStatus: item.currentTaskStatus,
       currentClaimedBy: item.currentClaimedBy,
       currentAssigneeDisplayName: item.currentAssigneeDisplayName,
@@ -480,6 +482,31 @@ const columns = computed((): TableColumnsType<Row> => {
           h(
             'span',
             { 'data-testid': 'work-order-current-stage' },
+            statusLabel(code),
+          ),
+      )
+    },
+  },
+  {
+    title: '当前任务',
+    key: 'taskType',
+    width: 130,
+    customRender: ({ record }: { record: Row }) => {
+      const code = record.currentTaskType
+      if (code == null || String(code).trim() === '') {
+        return h(
+          'span',
+          { 'data-testid': 'work-order-current-task-type' },
+          presentEmptyValue('not_provided'),
+        )
+      }
+      return h(
+        Tooltip,
+        { title: `任务类型：${code}` },
+        () =>
+          h(
+            'span',
+            { 'data-testid': 'work-order-current-task-type' },
             statusLabel(code),
           ),
       )

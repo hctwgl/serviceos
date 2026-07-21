@@ -97,8 +97,10 @@ class WorkOrderQueryPostgresIT {
   var page=queries.list(reader,"corr-stage-list",new WorkOrderQuery(null,null,null,null,20));
   assertThat(page.items()).extracting(WorkOrderView::id).containsExactly(wa);
   assertThat(page.items().getFirst().currentStageCode()).isEqualTo("SURVEY");
+  assertThat(page.items().getFirst().currentTaskType()).isEqualTo("SITE_SURVEY");
   assertThat(page.items().getFirst().currentClaimedBy()).isNull();
   assertThat(queries.get(reader,"corr-stage-get",wa).workOrder().currentStageCode()).isEqualTo("SURVEY");
+  assertThat(queries.get(reader,"corr-stage-get",wa).workOrder().currentTaskType()).isEqualTo("SITE_SURVEY");
  }
 
  @Test void listAndDetailExposeCurrentAssigneeFromClaimedTask(){

@@ -365,6 +365,7 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 contact.maskedCustomerPhone(),
                 contact.maskedServiceAddress(),
                 enrichment.currentStageCode(),
+                enrichment.currentTaskType(),
                 enrichment.currentTaskStatus(),
                 enrichment.currentClaimedBy(),
                 enrichment.currentAssigneeDisplayName(),
@@ -379,10 +380,12 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
             return DirectorySideCars.empty();
         }
         Map<UUID, String> stages = Map.of();
+        Map<UUID, String> taskTypes = Map.of();
         Map<UUID, String> taskStatuses = Map.of();
         WorkOrderDirectoryStageQuery stagesPort = stageQuery.getIfAvailable();
         if (stagesPort != null) {
             stages = stagesPort.findCurrentStageCodes(tenantId, workOrderIds);
+            taskTypes = stagesPort.findCurrentTaskTypes(tenantId, workOrderIds);
             taskStatuses = stagesPort.findCurrentTaskStatuses(tenantId, workOrderIds);
         }
         Map<UUID, String> claimedBy = Map.of();
@@ -406,7 +409,8 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
         if (responsibilityPort != null) {
             responsibilities = responsibilityPort.findActive(tenantId, workOrderIds);
         }
-        return new DirectorySideCars(stages, taskStatuses, claimedBy, displayNames, responsibilities);
+        return new DirectorySideCars(
+                stages, taskTypes, taskStatuses, claimedBy, displayNames, responsibilities);
     }
 
     /**
@@ -463,6 +467,7 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
 
     private record DirectoryEnrichment(
             String currentStageCode,
+            String currentTaskType,
             String currentTaskStatus,
             String currentClaimedBy,
             String currentAssigneeDisplayName,
@@ -474,13 +479,14 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
 
     private record DirectorySideCars(
             Map<UUID, String> stages,
+            Map<UUID, String> taskTypes,
             Map<UUID, String> taskStatuses,
             Map<UUID, String> claimedBy,
             Map<UUID, String> displayNames,
             Map<UUID, WorkOrderDirectoryServiceResponsibility> responsibilities
     ) {
         static DirectorySideCars empty() {
-            return new DirectorySideCars(Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
+            return new DirectorySideCars(Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
         }
 
         DirectoryEnrichment forWorkOrder(UUID workOrderId) {
@@ -493,6 +499,7 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
             WorkOrderDirectoryServiceResponsibility responsibility = responsibilities.get(workOrderId);
             return new DirectoryEnrichment(
                     stages.get(workOrderId),
+                    taskTypes.get(workOrderId),
                     taskStatuses.get(workOrderId),
                     claimed,
                     displayName,

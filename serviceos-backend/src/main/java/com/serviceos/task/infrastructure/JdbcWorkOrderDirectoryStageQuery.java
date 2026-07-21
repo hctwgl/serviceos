@@ -14,7 +14,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * M432/M433/M438/M446：批量解析工单当前阶段码、任务状态、认领主体，以及按阶段/任务状态筛选。
+ * M432/M433/M438/M446/M449：批量解析工单当前阶段码、任务类型、任务状态、认领主体，以及按阶段/任务状态筛选。
  *
  * <p>使用 PostgreSQL {@code DISTINCT ON}，按 created_at/task_id 取最早 ACTIVE 任务，
  * 与工作区 currentTaskSummary 在列表顺序下的 findFirst 口径一致。</p>
@@ -32,6 +32,7 @@ final class JdbcWorkOrderDirectoryStageQuery
             SELECT DISTINCT ON (work_order_id)
                    work_order_id AS work_order_id,
                    stage_code AS stage_code,
+                   task_type AS task_type,
                    status AS task_status,
                    claimed_by AS claimed_by
               FROM tsk_task
@@ -132,6 +133,18 @@ final class JdbcWorkOrderDirectoryStageQuery
     }
 
     @Override
+    public Map<UUID, String> findCurrentTaskTypes(String tenantId, Collection<UUID> workOrderIds) {
+        Map<UUID, String> types = new HashMap<>();
+        for (var entry : loadCurrentTasks(tenantId, workOrderIds).entrySet()) {
+            String taskType = entry.getValue().taskType();
+            if (taskType != null && !taskType.isBlank()) {
+                types.put(entry.getKey(), taskType.trim());
+            }
+        }
+        return Map.copyOf(types);
+    }
+
+    @Override
     public Map<UUID, String> findCurrentTaskStatuses(String tenantId, Collection<UUID> workOrderIds) {
         Map<UUID, String> statuses = new HashMap<>();
         for (var entry : loadCurrentTasks(tenantId, workOrderIds).entrySet()) {
@@ -227,6 +240,7 @@ final class JdbcWorkOrderDirectoryStageQuery
                     if (workOrderId != null) {
                         result.put(workOrderId, new CurrentTaskRow(
                                 rs.getString("stage_code"),
+                                rs.getString("task_type"),
                                 rs.getString("task_status"),
                                 rs.getString("claimed_by")));
                     }
@@ -236,5 +250,5 @@ final class JdbcWorkOrderDirectoryStageQuery
         return result;
     }
 
-    private record CurrentTaskRow(String stageCode, String taskStatus, String claimedBy) {}
+    private record CurrentTaskRow(String stageCode, String taskType, String taskStatus, String claimedBy) {}
 }
