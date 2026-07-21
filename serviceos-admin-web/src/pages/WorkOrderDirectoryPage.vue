@@ -193,6 +193,7 @@ async function load(next?: string) {
       currentStageCode: stageFilterCode.value || undefined,
       currentTaskStatus: taskStatusFilterCode.value || undefined,
       reviewCorrectionStatus: reviewCorrectionFilter.value || undefined,
+      q: keyword.value.trim() || undefined,
       currentNetworkId: networkFilterId.value || undefined,
       currentTechnicianId: technicianFilterId.value || undefined,
       slaRisk: slaRiskFilter.value || undefined,
@@ -228,6 +229,7 @@ function currentFilters() {
     currentStageCode: stageFilterCode.value || undefined,
     currentTaskStatus: taskStatusFilterCode.value || undefined,
     reviewCorrectionStatus: reviewCorrectionFilter.value || undefined,
+    q: keyword.value.trim() || undefined,
     currentNetworkId: networkFilterId.value || undefined,
     currentTechnicianId: technicianFilterId.value || undefined,
     slaRisk: slaRiskFilter.value || undefined,
@@ -246,6 +248,7 @@ function applySavedView(filters: Record<string, string>) {
   stageFilterCode.value = filters.currentStageCode || undefined
   taskStatusFilterCode.value = filters.currentTaskStatus || undefined
   reviewCorrectionFilter.value = filters.reviewCorrectionStatus || undefined
+  keyword.value = filters.q ?? ''
   networkFilterId.value = filters.currentNetworkId || undefined
   technicianFilterId.value = filters.currentTechnicianId || undefined
   slaRiskFilter.value = filters.slaRisk || undefined
@@ -362,14 +365,10 @@ async function loadTechnicianOptions() {
 }
 
 const rows = computed((): Row[] => {
-  const q = keyword.value.trim().toLowerCase()
   const project = projectKeyword.value.trim().toLowerCase()
   return (page.value?.items ?? [])
     .filter((item) => {
-      if (q) {
-        const hay = `${item.externalOrderCode} ${item.clientCode} ${item.maskedCustomerName ?? ''} ${item.maskedCustomerPhone ?? ''} ${item.provinceCode} ${item.cityCode} ${item.districtCode}`.toLowerCase()
-        if (!hay.includes(q)) return false
-      }
+      // M448：关键词已由服务端 q 收敛；此处仅保留非 UUID 项目关键字的客户端辅助过滤。
       if (project && !looksLikeUuid(projectKeyword.value)) {
         if (
           !item.projectId.toLowerCase().includes(project) &&
@@ -788,7 +787,10 @@ watch(
           allow-clear
           style="width: 280px"
           aria-label="工单关键词筛选"
+          data-testid="work-order-keyword-filter"
           placeholder="搜索工单编号、客户、手机号后四位或地址"
+          @pressEnter="search"
+          @change="search"
         />
       </label>
     </template>

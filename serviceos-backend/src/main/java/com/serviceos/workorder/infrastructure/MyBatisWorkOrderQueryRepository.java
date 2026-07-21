@@ -25,6 +25,7 @@ final class MyBatisWorkOrderQueryRepository implements WorkOrderQueryRepository 
             boolean applyTechnicianFilter, List<UUID> technicianWorkOrderIds,
             boolean applySlaRiskFilter, List<UUID> slaRiskWorkOrderIds,
             boolean applyReviewCorrectionFilter, List<UUID> reviewCorrectionWorkOrderIds,
+            String keywordPhoneLast4, String keywordLikePattern,
             Instant receivedFromInclusive, Instant receivedToExclusive,
             Instant cursorReceivedAt, UUID cursorId, int fetchSize) {
         return mapper.findPage(tenantId, tenantWide, projectIds.stream().map(UUID::toString).toList(),
@@ -35,6 +36,7 @@ final class MyBatisWorkOrderQueryRepository implements WorkOrderQueryRepository 
                 applyTechnicianFilter, technicianWorkOrderIds.stream().map(UUID::toString).toList(),
                 applySlaRiskFilter, slaRiskWorkOrderIds.stream().map(UUID::toString).toList(),
                 applyReviewCorrectionFilter, reviewCorrectionWorkOrderIds.stream().map(UUID::toString).toList(),
+                keywordPhoneLast4, keywordLikePattern,
                 receivedFromInclusive, receivedToExclusive,
                 cursorReceivedAt, cursorId, fetchSize)
                 .stream().map(MyBatisWorkOrderQueryRepository::view).toList();
@@ -50,6 +52,7 @@ final class MyBatisWorkOrderQueryRepository implements WorkOrderQueryRepository 
             boolean applyTechnicianFilter, List<UUID> technicianWorkOrderIds,
             boolean applySlaRiskFilter, List<UUID> slaRiskWorkOrderIds,
             boolean applyReviewCorrectionFilter, List<UUID> reviewCorrectionWorkOrderIds,
+            String keywordPhoneLast4, String keywordLikePattern,
             Instant receivedFromInclusive, Instant receivedToExclusive) {
         return mapper.countMatching(tenantId, tenantWide, projectIds.stream().map(UUID::toString).toList(),
                 clientCode, projectId, status, externalOrderCode, provinceCode, cityCode, districtCode,
@@ -59,6 +62,7 @@ final class MyBatisWorkOrderQueryRepository implements WorkOrderQueryRepository 
                 applyTechnicianFilter, technicianWorkOrderIds.stream().map(UUID::toString).toList(),
                 applySlaRiskFilter, slaRiskWorkOrderIds.stream().map(UUID::toString).toList(),
                 applyReviewCorrectionFilter, reviewCorrectionWorkOrderIds.stream().map(UUID::toString).toList(),
+                keywordPhoneLast4, keywordLikePattern,
                 receivedFromInclusive, receivedToExclusive);
     }
 

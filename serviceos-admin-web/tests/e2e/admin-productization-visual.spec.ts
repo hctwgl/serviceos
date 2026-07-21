@@ -23,6 +23,8 @@ test.describe('M377 Admin productization visual baselines', () => {
     await expect(page.getByTestId('scope-bar')).toBeVisible()
     await expect(page.getByRole('heading', { name: '工单中心' })).toBeVisible()
     await expect(page.getByText('吉利汽车')).toBeVisible()
+    // M448：默认区关键词服务端检索入口
+    await expect(page.getByTestId('work-order-keyword-filter')).toBeVisible()
     await expect(page.getByText(/11111111-1111-4111-8111-111111111111/)).toHaveCount(0)
     // M429：目录客户脱敏列
     await expect(page.getByTestId('work-order-masked-customer-name')).toContainText('王*')

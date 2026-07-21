@@ -27,6 +27,8 @@ interface WorkOrderQueryMapper {
             @Param("slaRiskWorkOrderIds") List<String> slaRiskWorkOrderIds,
             @Param("applyReviewCorrectionFilter") boolean applyReviewCorrectionFilter,
             @Param("reviewCorrectionWorkOrderIds") List<String> reviewCorrectionWorkOrderIds,
+            @Param("keywordPhoneLast4") String keywordPhoneLast4,
+            @Param("keywordLikePattern") String keywordLikePattern,
             @Param("receivedFromInclusive") Instant receivedFromInclusive,
             @Param("receivedToExclusive") Instant receivedToExclusive,
             @Param("cursorReceivedAt") Instant cursorReceivedAt,
@@ -50,6 +52,8 @@ interface WorkOrderQueryMapper {
             @Param("slaRiskWorkOrderIds") List<String> slaRiskWorkOrderIds,
             @Param("applyReviewCorrectionFilter") boolean applyReviewCorrectionFilter,
             @Param("reviewCorrectionWorkOrderIds") List<String> reviewCorrectionWorkOrderIds,
+            @Param("keywordPhoneLast4") String keywordPhoneLast4,
+            @Param("keywordLikePattern") String keywordLikePattern,
             @Param("receivedFromInclusive") Instant receivedFromInclusive,
             @Param("receivedToExclusive") Instant receivedToExclusive);
 

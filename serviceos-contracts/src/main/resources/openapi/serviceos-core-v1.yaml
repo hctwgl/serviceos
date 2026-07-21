@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.109
+  version: 1.0.110
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -3408,6 +3408,7 @@ paths:
         Asia/Shanghai 自然日闭区间，写入 cursor filterDigest；跨度上限 366 天。
         M447：可选 `reviewCorrectionStatus`（`REVIEW_OPEN`/`CORRECTION_ACTIVE`）按审核/整改运营桶筛选；
         经 evidence SPI 解析后以工单 ID IN 收敛；仅在具备 PROJECT `evidence.read` 的范围内解析；写入 cursor filterDigest。
+        M448：可选 `q` 服务端关键词（工单编号/客户名/手机后四位/地址 OR）；完整手机号失败关闭；写入 cursor filterDigest。
       parameters:
         - { name: clientCode, in: query, schema: { type: string, minLength: 1, maxLength: 128 } }
         - { name: projectId, in: query, schema: { type: string, format: uuid } }
@@ -3441,6 +3442,10 @@ paths:
             description: >
               M447：审核/整改运营桶精确匹配；REVIEW_OPEN=存在 OPEN ReviewCase，
               CORRECTION_ACTIVE=存在 OPEN|IN_PROGRESS|RESUBMITTED CorrectionCase }
+        - { name: q, in: query, schema: { type: string, minLength: 1, maxLength: 200 },
+            description: >
+              M448：关键词；4 位数字匹配手机后四位；其余对 external_order_code/customer_name/service_address
+              做 ILIKE 子串（最短 2）；完整手机号形态失败关闭 }
         - { name: cursor, in: query, schema: { type: string, minLength: 1 } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
         - $ref: '#/components/parameters/CorrelationId'

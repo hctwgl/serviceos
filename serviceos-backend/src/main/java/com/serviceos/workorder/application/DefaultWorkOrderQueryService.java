@@ -113,6 +113,8 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
         ReceivedBounds receivedBounds = normalizeReceivedBounds(query.receivedFrom(), query.receivedTo());
         // M447：审核/整改运营桶；非法枚举失败关闭。
         String reviewCorrectionStatus = normalizeReviewCorrectionStatus(query.reviewCorrectionStatus());
+        // M448：服务端关键词；完整手机号失败关闭。
+        KeywordFilter keyword = normalizeKeyword(query.q());
         AuthorizedProjectScope scope = projectScopes.require(principal, READ, "WorkOrder", correlationId);
         if (query.projectId() != null && !scope.tenantWide() && !scope.projectIds().contains(query.projectId())) {
             authorization.require(principal, AuthorizationRequest.projectCapability(READ, principal.tenantId(),
@@ -132,7 +134,8 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 + "|slaRisk=" + nullable(slaRisk)
                 + "|receivedFrom=" + nullable(query.receivedFrom())
                 + "|receivedTo=" + nullable(query.receivedTo())
-                + "|reviewCorrectionStatus=" + nullable(reviewCorrectionStatus));
+                + "|reviewCorrectionStatus=" + nullable(reviewCorrectionStatus)
+                + "|q=" + nullable(keyword == null ? null : keyword.digestToken()));
         Cursor cursor = decodeCursor(query.cursor(), scope.scopeDigest(), filterDigest);
         List<UUID> projectIds = scope.projectIds().stream()
                 .sorted(Comparator.comparing(UUID::toString)).toList();
@@ -231,6 +234,8 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 applyTechnicianFilter, technicianWorkOrderIds,
                 applySlaRiskFilter, slaRiskWorkOrderIds,
                 applyReviewCorrectionFilter, reviewCorrectionWorkOrderIds,
+                keyword == null ? null : keyword.phoneLast4(),
+                keyword == null ? null : keyword.likePattern(),
                 receivedBounds.fromInclusive(), receivedBounds.toExclusive(),
                 cursor == null ? null : cursor.receivedAt(),
                 cursor == null ? null : cursor.id(), query.limit() + 1);
@@ -257,6 +262,8 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 applyTechnicianFilter, technicianWorkOrderIds,
                 applySlaRiskFilter, slaRiskWorkOrderIds,
                 applyReviewCorrectionFilter, reviewCorrectionWorkOrderIds,
+                keyword == null ? null : keyword.phoneLast4(),
+                keyword == null ? null : keyword.likePattern(),
                 receivedBounds.fromInclusive(), receivedBounds.toExclusive());
         return new WorkOrderPage(
                 enriched,
@@ -555,6 +562,36 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
     }
 
     /**
+     * M448：目录关键词。
+     * 4 位数字 → 手机后四位精确；其余 → 编号/姓名/地址 ILIKE；完整手机号失败关闭。
+     */
+    private static KeywordFilter normalizeKeyword(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        if (!value.equals(value.trim()) || value.length() > 200) {
+            throw new IllegalArgumentException("q is invalid");
+        }
+        String trimmed = value.trim();
+        String digits = trimmed.replaceAll("[\\s\\-()]", "");
+        if (digits.matches("^1\\d{10}$")
+                || (digits.matches("^\\d+$") && digits.length() > 4 && digits.length() >= 8)) {
+            throw new IllegalArgumentException("q must not be a full phone number");
+        }
+        if (digits.matches("^\\d{4}$") && trimmed.matches("^\\d{4}$")) {
+            return KeywordFilter.phoneLast4(trimmed);
+        }
+        if (trimmed.length() < 2) {
+            throw new IllegalArgumentException("q is too short");
+        }
+        return KeywordFilter.like(escapeLike(trimmed));
+    }
+
+    private static String escapeLike(String raw) {
+        return "%" + raw.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
+    }
+
+    /**
      * M443：自然日闭区间转为 timestamptz 半开区间。
      * from 日 00:00 Asia/Shanghai ≤ received_at &lt; to 日次日 00:00。
      */
@@ -699,4 +736,19 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
     private static String nullable(Object value) { return value == null ? "-" : value.toString(); }
     private record Cursor(Instant receivedAt, UUID id) {}
     private record ReceivedBounds(Instant fromInclusive, Instant toExclusive) {}
+
+    /** M448：归一化后的关键词谓词；digestToken 仅用于 filterDigest，不含通配符。 */
+    private record KeywordFilter(String phoneLast4, String likePattern, String digestToken) {
+        static KeywordFilter phoneLast4(String digits) {
+            return new KeywordFilter(digits, null, "phone4:" + digits);
+        }
+
+        static KeywordFilter like(String pattern) {
+            // digest 用去通配后的原文片段，避免 ESCAPE 形态进入游标绑定。
+            String token = pattern.length() >= 2
+                    ? pattern.substring(1, pattern.length() - 1)
+                    : pattern;
+            return new KeywordFilter(null, pattern, "like:" + token);
+        }
+    }
 }
