@@ -236,7 +236,7 @@ class WorkOrderQueryPostgresIT {
   assertThat(none.totalCount()).isZero();
  }
 
- @Test void listExposesTotalCountAcrossPagesAndCapsAtLimit(){
+ @Test void listExposesExactTotalCountAcrossPagesBeyondFormerCap(){
   Scope a=scope("tenant-test","A");
   receive(a,"ORDER-TOTAL-1","1".repeat(64));
   receive(a,"ORDER-TOTAL-2","2".repeat(64));
@@ -250,9 +250,10 @@ class WorkOrderQueryPostgresIT {
   for(int i=0;i<99;i++){
    seedWorkOrderRow(a,"ORDER-CAP-"+i,"c".repeat(64));
   }
-  var capped=queries.list(reader,"corr-total-cap",new WorkOrderQuery(null,null,null,null,20));
-  assertThat(capped.totalCount()).isEqualTo(100);
-  assertThat(capped.totalCountTruncated()).isTrue();
+  // M444：超过原 100 封顶后仍返回精确全量；truncatedated 恒 false。
+  var exact=queries.list(reader,"corr-total-exact",new WorkOrderQuery(null,null,null,null,20));
+  assertThat(exact.totalCount()).isEqualTo(101);
+  assertThat(exact.totalCountTruncated()).isFalse();
  }
 
  @Test void listAndDetailExposeIndependentUpdatedAtAfterActivate(){

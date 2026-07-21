@@ -376,7 +376,7 @@ const countLabel = computed(() => {
   if (error.value || page.value == null) return undefined
   const total = page.value.totalCount
   const truncated = page.value.totalCountTruncated
-  // M436：服务端封顶总数；客户端关键词筛选不改变 total。
+  // M444：服务端精确总数；truncatedated 防御分支保留；客户端关键词不改变 total。
   return truncated ? `共 ${total}+ 条` : `共 ${total} 条`
 })
 

@@ -531,5 +531,6 @@ Feature gate/authority: if applicable
 | M440 | Admin 工单目录按网点筛选 | 451-m440-* + 434-m440-*；OpenAPI 1.0.102；`currentNetworkId` + dispatch SPI IN 收敛 + PostgresIT + Playwright | 师傅/SLA/创建时间筛选；人工视觉批准 |
 | M441 | Admin 工单目录按师傅筛选 | 452-m441-* + 435-m441-*；OpenAPI 1.0.103；`currentTechnicianId` + dispatch SPI IN 收敛 + PostgresIT + Playwright | SLA/创建时间筛选；人工视觉批准 |
 | M442 | Admin 工单目录按 SLA 风险筛选 | 453-m442-* + 436-m442-*；OpenAPI 1.0.104；`slaRisk` OPEN/BREACHED + sla SPI IN + PostgresIT + Playwright | 创建时间筛选；即将超时窗口；人工视觉批准 |
-| M443 | Admin 工单目录按创建时间筛选 | 454-m443-* + 437-m443-*；OpenAPI 1.0.105；`receivedFrom`/`receivedTo` + Asia/Shanghai 自然日 + PostgresIT + Playwright | 即将超时窗口；精确全量 COUNT>100；人工视觉批准 |
+| M443 | Admin 工单目录按创建时间筛选 | 454-m443-* + 437-m443-*；OpenAPI 1.0.105；`receivedFrom`/`receivedTo` + Asia/Shanghai 自然日 + PostgresIT + Playwright | 即将超时窗口（COUNT 已由 M444 关闭）；人工视觉批准 |
+| M444 | Admin 工单目录精确全量 COUNT | 455-m444-* + 438-m444-*；OpenAPI 1.0.106；精确 COUNT(*) + truncated 恒 false + PostgresIT + Playwright | 即将超时窗口；人工视觉批准 |
 

@@ -20,8 +20,7 @@ public interface WorkOrderQueryRepository {
             Instant cursorReceivedAt, UUID cursorId, int fetchSize);
 
     /**
-     * M436：当前筛选（无 cursor）匹配行数，最多扫描 {@code fetchSize} 行。
-     * 调用方用 fetchSize=limit+1 判断 truncated，避免精确全量 COUNT(*)。
+     * M444：当前筛选（无 cursor）精确匹配行数；与分页 cursor/limit 无关。
      */
     int countMatching(String tenantId, boolean tenantWide, List<UUID> authorizedProjectIds,
             String clientCode, UUID projectId, String status, String externalOrderCode,
@@ -30,8 +29,7 @@ public interface WorkOrderQueryRepository {
             boolean applyNetworkFilter, List<UUID> networkWorkOrderIds,
             boolean applyTechnicianFilter, List<UUID> technicianWorkOrderIds,
             boolean applySlaRiskFilter, List<UUID> slaRiskWorkOrderIds,
-            Instant receivedFromInclusive, Instant receivedToExclusive,
-            int fetchSize);
+            Instant receivedFromInclusive, Instant receivedToExclusive);
 
     Optional<WorkOrderView> findById(String tenantId, UUID workOrderId);
 

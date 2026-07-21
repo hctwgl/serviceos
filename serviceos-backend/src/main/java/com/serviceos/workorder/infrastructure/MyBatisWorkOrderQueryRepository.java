@@ -44,14 +44,14 @@ final class MyBatisWorkOrderQueryRepository implements WorkOrderQueryRepository 
             boolean applyNetworkFilter, List<UUID> networkWorkOrderIds,
             boolean applyTechnicianFilter, List<UUID> technicianWorkOrderIds,
             boolean applySlaRiskFilter, List<UUID> slaRiskWorkOrderIds,
-            Instant receivedFromInclusive, Instant receivedToExclusive, int fetchSize) {
+            Instant receivedFromInclusive, Instant receivedToExclusive) {
         return mapper.countMatching(tenantId, tenantWide, projectIds.stream().map(UUID::toString).toList(),
                 clientCode, projectId, status, externalOrderCode, provinceCode, cityCode, districtCode,
                 applyStageFilter, stageWorkOrderIds.stream().map(UUID::toString).toList(),
                 applyNetworkFilter, networkWorkOrderIds.stream().map(UUID::toString).toList(),
                 applyTechnicianFilter, technicianWorkOrderIds.stream().map(UUID::toString).toList(),
                 applySlaRiskFilter, slaRiskWorkOrderIds.stream().map(UUID::toString).toList(),
-                receivedFromInclusive, receivedToExclusive, fetchSize);
+                receivedFromInclusive, receivedToExclusive);
     }
 
     @Override public Optional<WorkOrderView> findById(String tenantId, UUID workOrderId) {

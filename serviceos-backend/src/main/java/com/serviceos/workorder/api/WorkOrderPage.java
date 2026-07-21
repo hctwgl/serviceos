@@ -9,7 +9,8 @@ import java.util.List;
  * receivedAt/id 倒序的授权工单页。
  *
  * <p>M434：可选 {@code slaRiskSummaries}；缺 PROJECT {@code sla.read} 时为 null（经 NON_NULL 省略）。
- * M436：{@code totalCount}/{@code totalCountTruncated} 随基座返回（上限 100，超出只声明 truncated）。</p>
+ * M436/M444：{@code totalCount}/{@code totalCountTruncated} 随基座返回；
+ * M444 起 {@code totalCount} 为当前筛选精确全量，{@code totalCountTruncated} 恒为 false。</p>
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record WorkOrderPage(
@@ -20,18 +21,15 @@ public record WorkOrderPage(
         int totalCount,
         boolean totalCountTruncated
 ) {
-    public static final int TOTAL_COUNT_LIMIT = 100;
-
     public WorkOrderPage {
         items = List.copyOf(items);
         slaRiskSummaries = slaRiskSummaries == null ? null : List.copyOf(slaRiskSummaries);
-        if (totalCount < 0 || totalCount > TOTAL_COUNT_LIMIT) {
-            throw new IllegalArgumentException(
-                    "totalCount must be between 0 and " + TOTAL_COUNT_LIMIT);
+        if (totalCount < 0) {
+            throw new IllegalArgumentException("totalCount must not be negative");
         }
-        if (totalCountTruncated && totalCount != TOTAL_COUNT_LIMIT) {
-            throw new IllegalArgumentException(
-                    "truncatedated totalCount must equal " + TOTAL_COUNT_LIMIT);
+        // M444：目录路径不再产生 truncated；保留字段兼容，true 视为契约违例。
+        if (totalCountTruncated) {
+            throw new IllegalArgumentException("totalCountTruncated must be false");
         }
     }
 

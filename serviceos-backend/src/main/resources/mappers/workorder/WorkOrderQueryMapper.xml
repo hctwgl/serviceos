@@ -80,13 +80,10 @@
     <if test="cursorReceivedAt != null">AND (received_at,id) &lt; (#{cursorReceivedAt},#{cursorId})</if>
     ORDER BY received_at DESC,id DESC LIMIT #{fetchSize}
   </select>
-  <!-- M436：无 cursor 的封顶计数；fetchSize=limit+1 用于判断 truncated。 -->
+  <!-- M444：无 cursor 的精确全量计数（同授权筛选）。 -->
   <select id="countMatching" resultType="int">
-    SELECT COUNT(*)::int FROM (
-      SELECT 1 FROM wo_work_order
-      <include refid="authorizedFilters"/>
-      LIMIT #{fetchSize}
-    ) capped
+    SELECT COUNT(*)::int FROM wo_work_order
+    <include refid="authorizedFilters"/>
   </select>
   <select id="findById" resultType="map">
     SELECT <include refid="columns"/> FROM wo_work_order WHERE tenant_id=#{tenantId} AND id=#{workOrderId}

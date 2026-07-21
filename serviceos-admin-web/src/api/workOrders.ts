@@ -47,9 +47,9 @@ export type WorkOrderPage = {
   items: WorkOrder[]
   nextCursor: string | null
   asOf: string
-  /** M436：当前筛选授权总数（上限 100）。 */
+  /** M444：当前筛选授权精确总数。 */
   totalCount: number
-  /** M436：超过 100 时为 true。 */
+  /** M444：目录路径恒为 false（兼容字段）。 */
   totalCountTruncated: boolean
   /** soft-omit：缺 PROJECT sla.read 时为 undefined */
   slaRiskSummaries?: WorkOrderDirectorySlaRiskSummary[] | null

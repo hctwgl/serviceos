@@ -43,8 +43,7 @@ interface WorkOrderQueryMapper {
             @Param("applySlaRiskFilter") boolean applySlaRiskFilter,
             @Param("slaRiskWorkOrderIds") List<String> slaRiskWorkOrderIds,
             @Param("receivedFromInclusive") Instant receivedFromInclusive,
-            @Param("receivedToExclusive") Instant receivedToExclusive,
-            @Param("fetchSize") int fetchSize);
+            @Param("receivedToExclusive") Instant receivedToExclusive);
 
     Map<String,Object> findById(@Param("tenantId") String tenantId, @Param("workOrderId") UUID workOrderId);
 

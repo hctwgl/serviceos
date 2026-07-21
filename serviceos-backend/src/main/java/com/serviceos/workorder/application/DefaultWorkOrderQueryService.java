@@ -194,8 +194,8 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
         // M434：页级 SLA 风险旁载；缺 sla.read 时省略属性（null），不伪造空成功 0。
         List<WorkOrderDirectorySlaRiskSummary> slaRiskSummaries = loadSlaRiskSummaries(
                 principal, correlationId, enriched);
-        // M436：同筛选封顶计数（无 cursor）；超过 100 只声明 truncated，不做精确全量 COUNT(*)。
-        int matched = queries.countMatching(
+        // M444：同筛选精确全量 COUNT（无 cursor）；totalCountTruncated 恒 false。
+        int totalCount = queries.countMatching(
                 principal.tenantId(), scope.tenantWide(), projectIds,
                 clientCode, query.projectId(), status, externalOrderCode,
                 provinceCode, cityCode, districtCode,
@@ -203,10 +203,7 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 applyNetworkFilter, networkWorkOrderIds,
                 applyTechnicianFilter, technicianWorkOrderIds,
                 applySlaRiskFilter, slaRiskWorkOrderIds,
-                receivedBounds.fromInclusive(), receivedBounds.toExclusive(),
-                WorkOrderPage.TOTAL_COUNT_LIMIT + 1);
-        boolean totalTruncated = matched > WorkOrderPage.TOTAL_COUNT_LIMIT;
-        int totalCount = totalTruncated ? WorkOrderPage.TOTAL_COUNT_LIMIT : matched;
+                receivedBounds.fromInclusive(), receivedBounds.toExclusive());
         return new WorkOrderPage(
                 enriched,
                 last == null ? null : encodeCursor(scope.scopeDigest(),
@@ -214,7 +211,7 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
                 clock.instant(),
                 slaRiskSummaries,
                 totalCount,
-                totalTruncated);
+                false);
     }
 
     @Override @Transactional(readOnly = true)
