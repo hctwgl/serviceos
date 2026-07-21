@@ -39,7 +39,7 @@ flywayVersion: "131"
 ## 已实现
 
 - `ConfigurationClientCapabilityGate.evaluate(..., supportedClientKinds)`
-- `DefaultConfigurationDraftService` 持久化/发布侧表写入
+- `JooqConfigurationDraftService` 持久化/发布侧表写入
 - `ConfigurationAssetDefinition.supportedClientKinds` + Bundle 读取
 - `DefaultClientCapabilityRuntimeGate` 目标外拒单
 - Admin `ConfigurationDesignerPage` 定向目标控件

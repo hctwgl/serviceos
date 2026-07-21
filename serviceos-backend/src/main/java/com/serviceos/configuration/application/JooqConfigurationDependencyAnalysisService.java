@@ -11,9 +11,12 @@ import com.serviceos.configuration.api.ConfigurationDependencyStatus;
 import com.serviceos.configuration.api.ConfigurationDraftService;
 import com.serviceos.configuration.api.ConfigurationDraftView;
 import com.serviceos.identity.api.CurrentPrincipal;
+import com.serviceos.jooq.generated.tables.CfgConfigurationAssetDraft;
+import com.serviceos.jooq.generated.tables.CfgConfigurationAssetVersion;
+import com.serviceos.jooq.generated.tables.CfgConfigurationBundleItem;
 import com.serviceos.shared.BusinessProblem;
 import com.serviceos.shared.ProblemCode;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import org.jooq.DSLContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
@@ -26,13 +29,17 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
+import static com.serviceos.jooq.generated.tables.CfgConfigurationAssetDraft.CFG_CONFIGURATION_ASSET_DRAFT;
+import static com.serviceos.jooq.generated.tables.CfgConfigurationAssetVersion.CFG_CONFIGURATION_ASSET_VERSION;
+import static com.serviceos.jooq.generated.tables.CfgConfigurationBundleItem.CFG_CONFIGURATION_BUNDLE_ITEM;
+
 /**
- * WORKFLOW 依赖扫描。
+ * WORKFLOW 依赖扫描（jOOQ）。
  *
  * <p>只做确定性引用提取与存在性核对；不执行表达式、不猜测默认依赖。</p>
  */
 @Service
-final class DefaultConfigurationDependencyAnalysisService implements ConfigurationDependencyAnalysisService {
+final class JooqConfigurationDependencyAnalysisService implements ConfigurationDependencyAnalysisService {
     private static final String WRITE = "configuration.draft.write";
     private static final String RESOURCE = "ConfigurationDependency";
 
@@ -46,18 +53,18 @@ final class DefaultConfigurationDependencyAnalysisService implements Configurati
             Map.entry("dispatchPolicyRef", ConfigurationAssetType.DISPATCH),
             Map.entry("ruleRef", ConfigurationAssetType.RULE));
 
-    private final JdbcClient jdbc;
+    private final DSLContext dsl;
     private final AuthorizationService authorization;
     private final ConfigurationDraftService drafts;
     private final ObjectMapper objectMapper;
 
-    DefaultConfigurationDependencyAnalysisService(
-            JdbcClient jdbc,
+    JooqConfigurationDependencyAnalysisService(
+            DSLContext dsl,
             AuthorizationService authorization,
             ConfigurationDraftService drafts,
             ObjectMapper objectMapper
     ) {
-        this.jdbc = jdbc;
+        this.dsl = dsl;
         this.authorization = authorization;
         this.drafts = drafts;
         this.objectMapper = objectMapper;
@@ -164,21 +171,16 @@ final class DefaultConfigurationDependencyAnalysisService implements Configurati
     }
 
     private UUID findPublished(String tenantId, ConfigurationAssetType type, String assetKey) {
-        return jdbc.sql("""
-                        SELECT version_id
-                          FROM cfg_configuration_asset_version
-                         WHERE tenant_id = :tenantId
-                           AND asset_type = :assetType
-                           AND asset_key = :assetKey
-                           AND status = 'PUBLISHED'
-                         ORDER BY published_at DESC
-                         LIMIT 1
-                        """)
-                .param("tenantId", tenantId)
-                .param("assetType", type.name())
-                .param("assetKey", assetKey)
-                .query(UUID.class)
-                .optional()
+        CfgConfigurationAssetVersion v = CFG_CONFIGURATION_ASSET_VERSION;
+        return dsl.select(v.VERSION_ID)
+                .from(v)
+                .where(v.TENANT_ID.eq(tenantId))
+                .and(v.ASSET_TYPE.eq(type.name()))
+                .and(v.ASSET_KEY.eq(assetKey))
+                .and(v.STATUS.eq("PUBLISHED"))
+                .orderBy(v.PUBLISHED_AT.desc())
+                .limit(1)
+                .fetchOptional(v.VERSION_ID)
                 .orElse(null);
     }
 
@@ -188,43 +190,30 @@ final class DefaultConfigurationDependencyAnalysisService implements Configurati
             ConfigurationAssetType type,
             String assetKey
     ) {
-        return jdbc.sql("""
-                        SELECT v.version_id
-                          FROM cfg_configuration_bundle_item i
-                          JOIN cfg_configuration_asset_version v
-                            ON v.tenant_id = i.tenant_id
-                           AND v.version_id = i.asset_version_id
-                         WHERE i.tenant_id = :tenantId
-                           AND i.bundle_id = :bundleId
-                           AND i.asset_type = :assetType
-                           AND v.asset_key = :assetKey
-                           AND v.status = 'PUBLISHED'
-                         LIMIT 1
-                        """)
-                .param("tenantId", tenantId)
-                .param("bundleId", bundleId)
-                .param("assetType", type.name())
-                .param("assetKey", assetKey)
-                .query(UUID.class)
-                .optional()
+        CfgConfigurationBundleItem i = CFG_CONFIGURATION_BUNDLE_ITEM;
+        CfgConfigurationAssetVersion v = CFG_CONFIGURATION_ASSET_VERSION;
+        return dsl.select(v.VERSION_ID)
+                .from(i)
+                .join(v)
+                .on(v.TENANT_ID.eq(i.TENANT_ID))
+                .and(v.VERSION_ID.eq(i.ASSET_VERSION_ID))
+                .where(i.TENANT_ID.eq(tenantId))
+                .and(i.BUNDLE_ID.eq(bundleId))
+                .and(i.ASSET_TYPE.eq(type.name()))
+                .and(v.ASSET_KEY.eq(assetKey))
+                .and(v.STATUS.eq("PUBLISHED"))
+                .limit(1)
+                .fetchOptional(v.VERSION_ID)
                 .orElse(null);
     }
 
     private boolean existsOpenDraft(String tenantId, ConfigurationAssetType type, String assetKey) {
-        Integer count = jdbc.sql("""
-                        SELECT COUNT(1)
-                          FROM cfg_configuration_asset_draft
-                         WHERE tenant_id = :tenantId
-                           AND asset_type = :assetType
-                           AND asset_key = :assetKey
-                           AND status IN ('DRAFT', 'VALIDATED', 'APPROVED')
-                        """)
-                .param("tenantId", tenantId)
-                .param("assetType", type.name())
-                .param("assetKey", assetKey)
-                .query(Integer.class)
-                .single();
-        return count != null && count > 0;
+        CfgConfigurationAssetDraft d = CFG_CONFIGURATION_ASSET_DRAFT;
+        return dsl.fetchExists(d,
+                d.TENANT_ID.eq(tenantId),
+                d.ASSET_TYPE.eq(type.name()),
+                d.ASSET_KEY.eq(assetKey),
+                d.STATUS.in("DRAFT", "VALIDATED", "APPROVED"));
     }
 
     private JsonNode parse(String definitionJson) {

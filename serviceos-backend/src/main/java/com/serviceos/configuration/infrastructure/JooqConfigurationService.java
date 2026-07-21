@@ -10,10 +10,17 @@ import com.serviceos.configuration.api.ConfigurationService;
 import com.serviceos.configuration.api.PublishConfigurationAssetCommand;
 import com.serviceos.configuration.api.PublishConfigurationBundleCommand;
 import com.serviceos.configuration.api.ResolveConfigurationBundleQuery;
+import com.serviceos.jooq.generated.tables.CfgBundleChannelActivation;
+import com.serviceos.jooq.generated.tables.CfgConfigurationAssetClientTarget;
+import com.serviceos.jooq.generated.tables.CfgConfigurationAssetVersion;
+import com.serviceos.jooq.generated.tables.CfgConfigurationBundle;
+import com.serviceos.jooq.generated.tables.CfgConfigurationBundleItem;
+import com.serviceos.jooq.generated.tables.PrjProject;
 import com.serviceos.shared.Sha256;
-import com.serviceos.shared.infrastructure.PostgresJdbcParameters;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import org.jooq.impl.DSL;
+import org.jooq.DSLContext;
+import org.jooq.Field;
+import org.jooq.Record7;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,35 +35,32 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+import static com.serviceos.jooq.generated.tables.CfgBundleChannelActivation.CFG_BUNDLE_CHANNEL_ACTIVATION;
+import static com.serviceos.jooq.generated.tables.CfgConfigurationAssetClientTarget.CFG_CONFIGURATION_ASSET_CLIENT_TARGET;
+import static com.serviceos.jooq.generated.tables.CfgConfigurationAssetVersion.CFG_CONFIGURATION_ASSET_VERSION;
+import static com.serviceos.jooq.generated.tables.CfgConfigurationBundle.CFG_CONFIGURATION_BUNDLE;
+import static com.serviceos.jooq.generated.tables.CfgConfigurationBundleItem.CFG_CONFIGURATION_BUNDLE_ITEM;
+import static com.serviceos.jooq.generated.tables.PrjProject.PRJ_PROJECT;
+
 /**
- * PostgreSQL 配置发布与解析参考实现。
+ * PostgreSQL 配置发布与解析参考实现（jOOQ）。
  *
  * <p>发布操作用 scope advisory lock 串行化同一作用域，避免并发发布出重叠有效期。
  * 解析时区域精确配置优先于省级通配配置；同一优先级出现多条必须失败关闭。</p>
  */
 @Service
-final class JdbcConfigurationService implements ConfigurationService {
-    private final JdbcClient jdbc;
+final class JooqConfigurationService implements ConfigurationService {
+    private final DSLContext dsl;
     private final Clock clock;
     private final ConfigurationAssetSchemaValidator schemaValidator;
     private final ObjectMapper definitionMapper = new ObjectMapper();
 
-    @Autowired
-    JdbcConfigurationService(JdbcClient jdbc, ConfigurationAssetSchemaValidator schemaValidator) {
-        this(jdbc, Clock.systemUTC(), schemaValidator);
-    }
-
-    JdbcConfigurationService(JdbcClient jdbc, Clock clock) {
-        this(jdbc, clock, new ConfigurationAssetSchemaValidator(
-                new com.fasterxml.jackson.databind.ObjectMapper()));
-    }
-
-    JdbcConfigurationService(
-            JdbcClient jdbc,
+    JooqConfigurationService(
+            DSLContext dsl,
             Clock clock,
             ConfigurationAssetSchemaValidator schemaValidator
     ) {
-        this.jdbc = jdbc;
+        this.dsl = dsl;
         this.clock = clock;
         this.schemaValidator = schemaValidator;
     }
@@ -72,25 +76,22 @@ final class JdbcConfigurationService implements ConfigurationService {
 
         UUID versionId = UUID.randomUUID();
         Instant publishedAt = clock.instant();
-        int inserted = jdbc.sql("""
-                INSERT INTO cfg_configuration_asset_version (
-                    version_id, tenant_id, asset_type, asset_key, semantic_version,
-                    schema_version, definition, content_digest, status, published_at
-                ) VALUES (
-                    :versionId, :tenantId, :assetType, :assetKey, :semanticVersion,
-                    :schemaVersion, CAST(:definition AS jsonb), :contentDigest, 'PUBLISHED', :publishedAt
-                ) ON CONFLICT (tenant_id, asset_type, asset_key, semantic_version) DO NOTHING
-                """)
-                .param("versionId", versionId)
-                .param("tenantId", command.tenantId())
-                .param("assetType", command.assetType().name())
-                .param("assetKey", command.assetKey())
-                .param("semanticVersion", command.semanticVersion())
-                .param("schemaVersion", command.schemaVersion())
-                .param("definition", command.definitionJson())
-                .param("contentDigest", command.contentDigest())
-                .param("publishedAt", PostgresJdbcParameters.timestamptz(publishedAt))
-                .update();
+        CfgConfigurationAssetVersion t = CFG_CONFIGURATION_ASSET_VERSION;
+        // definition 列经 JsonbStringConverter 直接绑定 String，无需手写 CAST。
+        int inserted = dsl.insertInto(t)
+                .set(t.VERSION_ID, versionId)
+                .set(t.TENANT_ID, command.tenantId())
+                .set(t.ASSET_TYPE, command.assetType().name())
+                .set(t.ASSET_KEY, command.assetKey())
+                .set(t.SEMANTIC_VERSION, command.semanticVersion())
+                .set(t.SCHEMA_VERSION, command.schemaVersion())
+                .set(t.DEFINITION, command.definitionJson())
+                .set(t.CONTENT_DIGEST, command.contentDigest())
+                .set(t.STATUS, "PUBLISHED")
+                .set(t.PUBLISHED_AT, publishedAt)
+                .onConflict(t.TENANT_ID, t.ASSET_TYPE, t.ASSET_KEY, t.SEMANTIC_VERSION)
+                .doNothing()
+                .execute();
 
         AssetRow row = inserted == 1
                 ? new AssetRow(versionId, command.assetType(), command.assetKey(),
@@ -118,10 +119,10 @@ final class JdbcConfigurationService implements ConfigurationService {
 
         String scopeKey = String.join("|", command.tenantId(), command.projectId().toString(),
                 command.brandCode(), command.serviceProductCode(), nullToEmpty(command.provinceCode()));
-        jdbc.sql("SELECT pg_advisory_xact_lock(hashtextextended(:scopeKey, 0))")
-                .param("scopeKey", scopeKey)
-                .query((rs, rowNum) -> 0)
-                .single();
+        // advisory lock 随事务释放；锁键与解析作用域一一对应。
+        dsl.select(DSL.field("pg_advisory_xact_lock(hashtextextended({0}, {1}))", Object.class,
+                        DSL.val(scopeKey), DSL.val(0L)))
+                .fetchSingle();
 
         ExistingBundle version = findBundleVersion(command.tenantId(), command.bundleCode(),
                 command.bundleVersion());
@@ -139,43 +140,32 @@ final class JdbcConfigurationService implements ConfigurationService {
 
         UUID bundleId = UUID.randomUUID();
         Instant publishedAt = clock.instant();
-        jdbc.sql("""
-                INSERT INTO cfg_configuration_bundle (
-                    bundle_id, tenant_id, project_id, bundle_code, bundle_version,
-                    brand_code, service_product_code, province_code, effective_from,
-                    effective_until, manifest_digest, status, published_at
-                ) VALUES (
-                    :bundleId, :tenantId, :projectId, :bundleCode, :bundleVersion,
-                    :brandCode, :serviceProductCode, :provinceCode, :effectiveFrom,
-                    :effectiveUntil, :manifestDigest, 'PUBLISHED', :publishedAt
-                )
-                """)
-                .param("bundleId", bundleId)
-                .param("tenantId", command.tenantId())
-                .param("projectId", project.projectId())
-                .param("bundleCode", command.bundleCode())
-                .param("bundleVersion", command.bundleVersion())
-                .param("brandCode", command.brandCode())
-                .param("serviceProductCode", command.serviceProductCode())
-                .param("provinceCode", command.provinceCode(), java.sql.Types.VARCHAR)
-                .param("effectiveFrom", PostgresJdbcParameters.timestamptz(command.effectiveFrom()))
-                .param("effectiveUntil", PostgresJdbcParameters.timestamptz(command.effectiveUntil()))
-                .param("manifestDigest", actualManifestDigest)
-                .param("publishedAt", PostgresJdbcParameters.timestamptz(publishedAt))
-                .update();
+        CfgConfigurationBundle b = CFG_CONFIGURATION_BUNDLE;
+        dsl.insertInto(b)
+                .set(b.BUNDLE_ID, bundleId)
+                .set(b.TENANT_ID, command.tenantId())
+                .set(b.PROJECT_ID, project.projectId())
+                .set(b.BUNDLE_CODE, command.bundleCode())
+                .set(b.BUNDLE_VERSION, command.bundleVersion())
+                .set(b.BRAND_CODE, command.brandCode())
+                .set(b.SERVICE_PRODUCT_CODE, command.serviceProductCode())
+                .set(b.PROVINCE_CODE, command.provinceCode())
+                .set(b.EFFECTIVE_FROM, command.effectiveFrom())
+                .set(b.EFFECTIVE_UNTIL, command.effectiveUntil())
+                .set(b.MANIFEST_DIGEST, actualManifestDigest)
+                .set(b.STATUS, "PUBLISHED")
+                .set(b.PUBLISHED_AT, publishedAt)
+                .execute();
 
+        CfgConfigurationBundleItem item = CFG_CONFIGURATION_BUNDLE_ITEM;
         for (AssetRow asset : assets) {
-            jdbc.sql("""
-                    INSERT INTO cfg_configuration_bundle_item (
-                        tenant_id, bundle_id, asset_type, asset_version_id, content_digest
-                    ) VALUES (:tenantId, :bundleId, :assetType, :assetVersionId, :contentDigest)
-                    """)
-                    .param("tenantId", command.tenantId())
-                    .param("bundleId", bundleId)
-                    .param("assetType", asset.assetType().name())
-                    .param("assetVersionId", asset.versionId())
-                    .param("contentDigest", asset.contentDigest())
-                    .update();
+            dsl.insertInto(item)
+                    .set(item.TENANT_ID, command.tenantId())
+                    .set(item.BUNDLE_ID, bundleId)
+                    .set(item.ASSET_TYPE, asset.assetType().name())
+                    .set(item.ASSET_VERSION_ID, asset.versionId())
+                    .set(item.CONTENT_DIGEST, asset.contentDigest())
+                    .execute();
         }
         return new ConfigurationBundleReference(bundleId, project.projectId(), command.bundleCode(),
                 command.bundleVersion(), actualManifestDigest);
@@ -216,34 +206,28 @@ final class JdbcConfigurationService implements ConfigurationService {
                     "project uses bundle channel activations but no ACTIVE STABLE/CANARY matches");
         }
 
-        List<ResolvedBundle> candidates = jdbc.sql("""
-                SELECT bundle_id, project_id, bundle_code, bundle_version, manifest_digest,
-                       CASE WHEN province_code = :provinceCode THEN 1 ELSE 0 END AS region_rank
-                  FROM cfg_configuration_bundle
-                 WHERE tenant_id = :tenantId
-                   AND project_id = :projectId
-                   AND brand_code = :brandCode
-                   AND service_product_code = :serviceProductCode
-                   AND (province_code = :provinceCode OR province_code IS NULL)
-                   AND status = 'PUBLISHED'
-                   AND effective_from <= :effectiveAt
-                   AND (effective_until IS NULL OR effective_until > :effectiveAt)
-                 ORDER BY region_rank DESC, bundle_code, bundle_version
-                """)
-                .param("provinceCode", query.provinceCode())
-                .param("tenantId", query.tenantId())
-                .param("projectId", project.projectId())
-                .param("brandCode", query.brandCode())
-                .param("serviceProductCode", query.serviceProductCode())
-                .param("effectiveAt", PostgresJdbcParameters.timestamptz(query.effectiveAt()))
-                .query((rs, rowNum) -> new ResolvedBundle(
-                        rs.getObject("bundle_id", UUID.class),
-                        rs.getObject("project_id", UUID.class),
-                        rs.getString("bundle_code"),
-                        rs.getString("bundle_version"),
-                        rs.getString("manifest_digest"),
-                        rs.getInt("region_rank")))
-                .list();
+        CfgConfigurationBundle b = CFG_CONFIGURATION_BUNDLE;
+        // 区域精确（province 命中）优先于省级通配；region_rank 与旧 CASE WHEN 语义一致。
+        Field<Integer> regionRank = DSL.case_()
+                .when(b.PROVINCE_CODE.eq(query.provinceCode()), 1)
+                .otherwise(0)
+                .as("region_rank");
+        List<ResolvedBundle> candidates = dsl.select(
+                        b.BUNDLE_ID, b.PROJECT_ID, b.BUNDLE_CODE, b.BUNDLE_VERSION,
+                        b.MANIFEST_DIGEST, regionRank)
+                .from(b)
+                .where(b.TENANT_ID.eq(query.tenantId()))
+                .and(b.PROJECT_ID.eq(project.projectId()))
+                .and(b.BRAND_CODE.eq(query.brandCode()))
+                .and(b.SERVICE_PRODUCT_CODE.eq(query.serviceProductCode()))
+                .and(b.PROVINCE_CODE.eq(query.provinceCode()).or(b.PROVINCE_CODE.isNull()))
+                .and(b.STATUS.eq("PUBLISHED"))
+                .and(b.EFFECTIVE_FROM.le(query.effectiveAt()))
+                .and(b.EFFECTIVE_UNTIL.isNull().or(b.EFFECTIVE_UNTIL.gt(query.effectiveAt())))
+                .orderBy(regionRank.desc(), b.BUNDLE_CODE, b.BUNDLE_VERSION)
+                .fetch(record -> new ResolvedBundle(
+                        record.value1(), record.value2(), record.value3(),
+                        record.value4(), record.value5(), record.value6()));
 
         if (candidates.isEmpty()) {
             throw new ConfigurationResolutionException(
@@ -263,17 +247,10 @@ final class JdbcConfigurationService implements ConfigurationService {
     }
 
     private boolean isChannelManagedProject(String tenantId, UUID projectId) {
-        Integer count = jdbc.sql("""
-                        SELECT COUNT(1)
-                          FROM cfg_bundle_channel_activation
-                         WHERE tenant_id = :tenantId
-                           AND project_id = :projectId
-                        """)
-                .param("tenantId", tenantId)
-                .param("projectId", projectId)
-                .query(Integer.class)
-                .single();
-        return count != null && count > 0;
+        CfgBundleChannelActivation a = CFG_BUNDLE_CHANNEL_ACTIVATION;
+        return dsl.fetchExists(a,
+                a.TENANT_ID.eq(tenantId),
+                a.PROJECT_ID.eq(projectId));
     }
 
     private List<ChannelBundle> resolveActiveChannels(
@@ -282,36 +259,27 @@ final class JdbcConfigurationService implements ConfigurationService {
             String channel
     ) {
         // 通道激活是项目级发布指针：命中后不再做 province/时间窗扫描，避免与兼容扫描的互斥生效窗冲突。
-        return jdbc.sql("""
-                        SELECT b.bundle_id, b.project_id, b.bundle_code, b.bundle_version, b.manifest_digest,
-                               a.traffic_percent, a.slot_code
-                          FROM cfg_bundle_channel_activation a
-                          JOIN cfg_configuration_bundle b
-                            ON b.tenant_id = a.tenant_id AND b.bundle_id = a.bundle_id
-                         WHERE a.tenant_id = :tenantId
-                           AND a.project_id = :projectId
-                           AND a.channel = :channel
-                           AND a.status = 'ACTIVE'
-                           AND b.status = 'PUBLISHED'
-                           AND b.brand_code = :brandCode
-                           AND b.service_product_code = :serviceProductCode
-                         ORDER BY a.slot_code
-                        """)
-                .param("tenantId", query.tenantId())
-                .param("projectId", projectId)
-                .param("channel", channel)
-                .param("brandCode", query.brandCode())
-                .param("serviceProductCode", query.serviceProductCode())
-                .query((rs, rowNum) -> new ChannelBundle(
+        CfgBundleChannelActivation a = CFG_BUNDLE_CHANNEL_ACTIVATION;
+        CfgConfigurationBundle b = CFG_CONFIGURATION_BUNDLE;
+        return dsl.select(b.BUNDLE_ID, b.PROJECT_ID, b.BUNDLE_CODE, b.BUNDLE_VERSION,
+                        b.MANIFEST_DIGEST, a.TRAFFIC_PERCENT, a.SLOT_CODE)
+                .from(a)
+                .join(b)
+                .on(b.TENANT_ID.eq(a.TENANT_ID))
+                .and(b.BUNDLE_ID.eq(a.BUNDLE_ID))
+                .where(a.TENANT_ID.eq(query.tenantId()))
+                .and(a.PROJECT_ID.eq(projectId))
+                .and(a.CHANNEL.eq(channel))
+                .and(a.STATUS.eq("ACTIVE"))
+                .and(b.STATUS.eq("PUBLISHED"))
+                .and(b.BRAND_CODE.eq(query.brandCode()))
+                .and(b.SERVICE_PRODUCT_CODE.eq(query.serviceProductCode()))
+                .orderBy(a.SLOT_CODE)
+                .fetch(record -> new ChannelBundle(
                         new ConfigurationBundleReference(
-                                rs.getObject("bundle_id", UUID.class),
-                                rs.getObject("project_id", UUID.class),
-                                rs.getString("bundle_code"),
-                                rs.getString("bundle_version"),
-                                rs.getString("manifest_digest")),
-                        rs.getInt("traffic_percent"),
-                        rs.getString("slot_code")))
-                .list();
+                                record.value1(), record.value2(), record.value3(),
+                                record.value4(), record.value5()),
+                        record.value6(), record.value7()));
     }
 
     private static ChannelBundle selectCanaryByTraffic(
@@ -410,45 +378,39 @@ final class JdbcConfigurationService implements ConfigurationService {
         UUID requiredBundle = java.util.Objects.requireNonNull(bundleId, "bundleId");
         String requiredManifestDigest = requiredText(expectedManifestDigest, "expectedManifestDigest", 64);
         ConfigurationAssetType requiredType = java.util.Objects.requireNonNull(assetType, "assetType");
-        return jdbc.sql("""
-                SELECT asset.version_id, asset.asset_type, asset.asset_key,
-                       asset.semantic_version, asset.schema_version,
-                       asset.definition::text AS definition_json, asset.content_digest,
-                       target.supported_client_kinds::text AS supported_client_kinds
-                  FROM cfg_configuration_bundle bundle
-                  JOIN cfg_configuration_bundle_item item
-                    ON item.tenant_id = bundle.tenant_id
-                   AND item.bundle_id = bundle.bundle_id
-                  JOIN cfg_configuration_asset_version asset
-                    ON asset.tenant_id = item.tenant_id
-                   AND asset.version_id = item.asset_version_id
-                   AND asset.asset_type = item.asset_type
-                   AND asset.content_digest = item.content_digest
-                  LEFT JOIN cfg_configuration_asset_client_target target
-                    ON target.version_id = asset.version_id
-                   AND target.tenant_id = asset.tenant_id
-                 WHERE bundle.tenant_id = :tenantId
-                   AND bundle.bundle_id = :bundleId
-                   AND bundle.manifest_digest = :manifestDigest
-                   AND bundle.status = 'PUBLISHED'
-                   AND item.asset_type = :assetType
-                   AND asset.status = 'PUBLISHED'
-                 ORDER BY asset.asset_key, asset.semantic_version, asset.version_id
-                """)
-                .param("tenantId", requiredTenant)
-                .param("bundleId", requiredBundle)
-                .param("manifestDigest", requiredManifestDigest)
-                .param("assetType", requiredType.name())
-                .query((rs, rowNum) -> new ConfigurationAssetDefinition(
-                        rs.getObject("version_id", UUID.class),
-                        ConfigurationAssetType.valueOf(rs.getString("asset_type")),
-                        rs.getString("asset_key"),
-                        rs.getString("semantic_version"),
-                        rs.getString("schema_version"),
-                        rs.getString("definition_json"),
-                        rs.getString("content_digest"),
-                        readSupportedClientKinds(rs.getString("supported_client_kinds"))))
-                .list();
+        CfgConfigurationBundle bundle = CFG_CONFIGURATION_BUNDLE;
+        CfgConfigurationBundleItem item = CFG_CONFIGURATION_BUNDLE_ITEM;
+        CfgConfigurationAssetVersion asset = CFG_CONFIGURATION_ASSET_VERSION;
+        CfgConfigurationAssetClientTarget target = CFG_CONFIGURATION_ASSET_CLIENT_TARGET;
+        // definition/supported_client_kinds 经 JsonbStringConverter 直接映射为 String，无需 ::text。
+        return dsl.select(asset.VERSION_ID, asset.ASSET_TYPE, asset.ASSET_KEY,
+                        asset.SEMANTIC_VERSION, asset.SCHEMA_VERSION, asset.DEFINITION,
+                        asset.CONTENT_DIGEST, target.SUPPORTED_CLIENT_KINDS)
+                .from(bundle)
+                .join(item)
+                .on(item.TENANT_ID.eq(bundle.TENANT_ID))
+                .and(item.BUNDLE_ID.eq(bundle.BUNDLE_ID))
+                .join(asset)
+                .on(asset.TENANT_ID.eq(item.TENANT_ID))
+                .and(asset.VERSION_ID.eq(item.ASSET_VERSION_ID))
+                .and(asset.ASSET_TYPE.eq(item.ASSET_TYPE))
+                .and(asset.CONTENT_DIGEST.eq(item.CONTENT_DIGEST))
+                .leftJoin(target)
+                .on(target.VERSION_ID.eq(asset.VERSION_ID))
+                .and(target.TENANT_ID.eq(asset.TENANT_ID))
+                .where(bundle.TENANT_ID.eq(requiredTenant))
+                .and(bundle.BUNDLE_ID.eq(requiredBundle))
+                .and(bundle.MANIFEST_DIGEST.eq(requiredManifestDigest))
+                .and(bundle.STATUS.eq("PUBLISHED"))
+                .and(item.ASSET_TYPE.eq(requiredType.name()))
+                .and(asset.STATUS.eq("PUBLISHED"))
+                .orderBy(asset.ASSET_KEY, asset.SEMANTIC_VERSION, asset.VERSION_ID)
+                .fetch(record -> new ConfigurationAssetDefinition(
+                        record.value1(),
+                        ConfigurationAssetType.valueOf(record.value2()),
+                        record.value3(), record.value4(), record.value5(), record.value6(),
+                        record.value7(),
+                        readSupportedClientKinds(record.value8())));
     }
 
     @Override
@@ -463,31 +425,26 @@ final class JdbcConfigurationService implements ConfigurationService {
         UUID requiredVersion = java.util.Objects.requireNonNull(versionId, "versionId");
         ConfigurationAssetType requiredType = java.util.Objects.requireNonNull(assetType, "assetType");
         String requiredDigest = requiredText(expectedContentDigest, "expectedContentDigest", 64);
-        return jdbc.sql("""
-                SELECT asset.version_id, asset.asset_type, asset.asset_key,
-                       asset.semantic_version, asset.schema_version,
-                       asset.definition::text AS definition_json, asset.content_digest,
-                       target.supported_client_kinds::text AS supported_client_kinds
-                  FROM cfg_configuration_asset_version asset
-                  LEFT JOIN cfg_configuration_asset_client_target target
-                    ON target.version_id = asset.version_id
-                   AND target.tenant_id = asset.tenant_id
-                 WHERE asset.tenant_id = :tenantId AND asset.version_id = :versionId
-                   AND asset.asset_type = :assetType AND asset.content_digest = :contentDigest
-                   AND asset.status = 'PUBLISHED'
-                """)
-                .param("tenantId", requiredTenant)
-                .param("versionId", requiredVersion)
-                .param("assetType", requiredType.name())
-                .param("contentDigest", requiredDigest)
-                .query((rs, rowNum) -> new ConfigurationAssetDefinition(
-                        rs.getObject("version_id", UUID.class),
-                        ConfigurationAssetType.valueOf(rs.getString("asset_type")),
-                        rs.getString("asset_key"), rs.getString("semantic_version"),
-                        rs.getString("schema_version"), rs.getString("definition_json"),
-                        rs.getString("content_digest"),
-                        readSupportedClientKinds(rs.getString("supported_client_kinds"))))
-                .optional()
+        CfgConfigurationAssetVersion asset = CFG_CONFIGURATION_ASSET_VERSION;
+        CfgConfigurationAssetClientTarget target = CFG_CONFIGURATION_ASSET_CLIENT_TARGET;
+        return dsl.select(asset.VERSION_ID, asset.ASSET_TYPE, asset.ASSET_KEY,
+                        asset.SEMANTIC_VERSION, asset.SCHEMA_VERSION, asset.DEFINITION,
+                        asset.CONTENT_DIGEST, target.SUPPORTED_CLIENT_KINDS)
+                .from(asset)
+                .leftJoin(target)
+                .on(target.VERSION_ID.eq(asset.VERSION_ID))
+                .and(target.TENANT_ID.eq(asset.TENANT_ID))
+                .where(asset.TENANT_ID.eq(requiredTenant))
+                .and(asset.VERSION_ID.eq(requiredVersion))
+                .and(asset.ASSET_TYPE.eq(requiredType.name()))
+                .and(asset.CONTENT_DIGEST.eq(requiredDigest))
+                .and(asset.STATUS.eq("PUBLISHED"))
+                .fetchOptional(record -> new ConfigurationAssetDefinition(
+                        record.value1(),
+                        ConfigurationAssetType.valueOf(record.value2()),
+                        record.value3(), record.value4(), record.value5(), record.value6(),
+                        record.value7(),
+                        readSupportedClientKinds(record.value8())))
                 .orElseThrow(() -> new ConfigurationResolutionException(
                         ConfigurationResolutionException.Reason.NO_MATCH,
                         "published configuration asset version does not match the frozen identity"));
@@ -515,59 +472,39 @@ final class JdbcConfigurationService implements ConfigurationService {
     }
 
     private AssetRow findAsset(PublishConfigurationAssetCommand command) {
-        return jdbc.sql("""
-                SELECT version_id, asset_type, asset_key, semantic_version,
-                       schema_version, definition::text AS definition_json, content_digest
-                  FROM cfg_configuration_asset_version
-                 WHERE tenant_id = :tenantId AND asset_type = :assetType
-                   AND asset_key = :assetKey AND semantic_version = :semanticVersion
-                """)
-                .param("tenantId", command.tenantId())
-                .param("assetType", command.assetType().name())
-                .param("assetKey", command.assetKey())
-                .param("semanticVersion", command.semanticVersion())
-                .query(JdbcConfigurationService::assetRow)
-                .single();
+        CfgConfigurationAssetVersion t = CFG_CONFIGURATION_ASSET_VERSION;
+        return dsl.select(t.VERSION_ID, t.ASSET_TYPE, t.ASSET_KEY, t.SEMANTIC_VERSION,
+                        t.SCHEMA_VERSION, t.DEFINITION, t.CONTENT_DIGEST)
+                .from(t)
+                .where(t.TENANT_ID.eq(command.tenantId()))
+                .and(t.ASSET_TYPE.eq(command.assetType().name()))
+                .and(t.ASSET_KEY.eq(command.assetKey()))
+                .and(t.SEMANTIC_VERSION.eq(command.semanticVersion()))
+                .fetchSingle(JooqConfigurationService::assetRow);
     }
 
     private List<AssetRow> findAssets(String tenantId, List<UUID> versionIds) {
-        return jdbc.sql("""
-                SELECT version_id, asset_type, asset_key, semantic_version,
-                       schema_version, definition::text AS definition_json, content_digest
-                  FROM cfg_configuration_asset_version
-                 WHERE tenant_id = :tenantId AND status = 'PUBLISHED'
-                   AND version_id IN (:versionIds)
-                """)
-                .param("tenantId", tenantId)
-                .param("versionIds", versionIds)
-                .query(JdbcConfigurationService::assetRow)
-                .list();
+        CfgConfigurationAssetVersion t = CFG_CONFIGURATION_ASSET_VERSION;
+        return dsl.select(t.VERSION_ID, t.ASSET_TYPE, t.ASSET_KEY, t.SEMANTIC_VERSION,
+                        t.SCHEMA_VERSION, t.DEFINITION, t.CONTENT_DIGEST)
+                .from(t)
+                .where(t.TENANT_ID.eq(tenantId))
+                .and(t.STATUS.eq("PUBLISHED"))
+                .and(t.VERSION_ID.in(versionIds))
+                .fetch(JooqConfigurationService::assetRow);
     }
 
-    private static AssetRow assetRow(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {
+    private static AssetRow assetRow(
+            Record7<UUID, String, String, String, String, String, String> record
+    ) {
         return new AssetRow(
-                rs.getObject("version_id", UUID.class),
-                ConfigurationAssetType.valueOf(rs.getString("asset_type")),
-                rs.getString("asset_key"),
-                rs.getString("semantic_version"),
-                rs.getString("schema_version"),
-                rs.getString("definition_json"),
-                rs.getString("content_digest"));
+                record.value1(),
+                ConfigurationAssetType.valueOf(record.value2()),
+                record.value3(), record.value4(), record.value5(), record.value6(), record.value7());
     }
 
     private ProjectRow requireActiveProject(String tenantId, UUID projectId) {
-        ProjectRow project = jdbc.sql("""
-                SELECT project_id, project_code FROM prj_project
-                 WHERE tenant_id = :tenantId AND project_id = :projectId
-                   AND project_status = 'ACTIVE'
-                   AND starts_on <= CURRENT_DATE
-                   AND (ends_on IS NULL OR ends_on >= CURRENT_DATE)
-                """)
-                .param("tenantId", tenantId)
-                .param("projectId", projectId)
-                .query((rs, rowNum) -> new ProjectRow(
-                        rs.getObject("project_id", UUID.class), rs.getString("project_code")))
-                .optional().orElse(null);
+        ProjectRow project = findActiveProjectRow(tenantId, projectId, null);
         if (project == null) {
             throw new ConfigurationPublicationException("configuration bundle requires an active project");
         }
@@ -575,61 +512,55 @@ final class JdbcConfigurationService implements ConfigurationService {
     }
 
     private ProjectRow findActiveProject(String tenantId, String projectCode) {
-        return jdbc.sql("""
-                SELECT project_id, project_code FROM prj_project
-                 WHERE tenant_id = :tenantId AND project_code = :projectCode
-                   AND project_status = 'ACTIVE'
-                   AND starts_on <= CURRENT_DATE
-                   AND (ends_on IS NULL OR ends_on >= CURRENT_DATE)
-                """)
-                .param("tenantId", tenantId)
-                .param("projectCode", projectCode)
-                .query((rs, rowNum) -> new ProjectRow(
-                        rs.getObject("project_id", UUID.class), rs.getString("project_code")))
-                .optional().orElse(null);
+        return findActiveProjectRow(tenantId, null, projectCode);
+    }
+
+    private ProjectRow findActiveProjectRow(String tenantId, UUID projectId, String projectCode) {
+        PrjProject p = PRJ_PROJECT;
+        org.jooq.Condition keyCondition = projectId != null
+                ? p.PROJECT_ID.eq(projectId)
+                : p.PROJECT_CODE.eq(projectCode);
+        return dsl.select(p.PROJECT_ID, p.PROJECT_CODE)
+                .from(p)
+                .where(p.TENANT_ID.eq(tenantId))
+                .and(keyCondition)
+                .and(p.PROJECT_STATUS.eq("ACTIVE"))
+                .and(p.STARTS_ON.le(DSL.currentLocalDate()))
+                .and(p.ENDS_ON.isNull().or(p.ENDS_ON.ge(DSL.currentLocalDate())))
+                .fetchOptional(record -> new ProjectRow(record.value1(), record.value2()))
+                .orElse(null);
     }
 
     private ExistingBundle findBundleVersion(String tenantId, String bundleCode, String bundleVersion) {
-        return jdbc.sql("""
-                SELECT bundle_id, project_id, bundle_code, bundle_version, manifest_digest
-                  FROM cfg_configuration_bundle
-                 WHERE tenant_id = :tenantId AND bundle_code = :bundleCode
-                   AND bundle_version = :bundleVersion
-                """)
-                .param("tenantId", tenantId)
-                .param("bundleCode", bundleCode)
-                .param("bundleVersion", bundleVersion)
-                .query((rs, rowNum) -> new ExistingBundle(
-                        rs.getObject("bundle_id", UUID.class),
-                        rs.getObject("project_id", UUID.class),
-                        rs.getString("bundle_code"),
-                        rs.getString("bundle_version"),
-                        rs.getString("manifest_digest")))
-                .optional().orElse(null);
+        CfgConfigurationBundle b = CFG_CONFIGURATION_BUNDLE;
+        return dsl.select(b.BUNDLE_ID, b.PROJECT_ID, b.BUNDLE_CODE, b.BUNDLE_VERSION, b.MANIFEST_DIGEST)
+                .from(b)
+                .where(b.TENANT_ID.eq(tenantId))
+                .and(b.BUNDLE_CODE.eq(bundleCode))
+                .and(b.BUNDLE_VERSION.eq(bundleVersion))
+                .fetchOptional(record -> new ExistingBundle(
+                        record.value1(), record.value2(), record.value3(),
+                        record.value4(), record.value5()))
+                .orElse(null);
     }
 
     private boolean hasOverlappingBundle(PublishConfigurationBundleCommand command) {
-        return jdbc.sql("""
-                SELECT EXISTS (
-                    SELECT 1 FROM cfg_configuration_bundle
-                     WHERE tenant_id = :tenantId AND project_id = :projectId
-                       AND brand_code = :brandCode
-                       AND service_product_code = :serviceProductCode
-                       AND COALESCE(province_code, '') = COALESCE(:provinceCode, '')
-                       AND status = 'PUBLISHED'
-                       AND effective_from < COALESCE(:effectiveUntil, 'infinity'::timestamptz)
-                       AND :effectiveFrom < COALESCE(effective_until, 'infinity'::timestamptz)
-                )
-                """)
-                .param("tenantId", command.tenantId())
-                .param("projectId", command.projectId())
-                .param("brandCode", command.brandCode())
-                .param("serviceProductCode", command.serviceProductCode())
-                .param("provinceCode", command.provinceCode(), java.sql.Types.VARCHAR)
-                .param("effectiveUntil", PostgresJdbcParameters.timestamptz(command.effectiveUntil()))
-                .param("effectiveFrom", PostgresJdbcParameters.timestamptz(command.effectiveFrom()))
-                .query(Boolean.class)
-                .single();
+        CfgConfigurationBundle b = CFG_CONFIGURATION_BUNDLE;
+        // 生效窗开区间重叠判定；effective_until 为空按 'infinity' 处理，与旧 SQL COALESCE 语义一致。
+        Field<Instant> infinity = DSL.field("'infinity'::timestamptz", b.EFFECTIVE_UNTIL.getDataType());
+        return dsl.fetchExists(dsl.selectOne()
+                .from(b)
+                .where(b.TENANT_ID.eq(command.tenantId()))
+                .and(b.PROJECT_ID.eq(command.projectId()))
+                .and(b.BRAND_CODE.eq(command.brandCode()))
+                .and(b.SERVICE_PRODUCT_CODE.eq(command.serviceProductCode()))
+                .and(DSL.coalesce(b.PROVINCE_CODE, "")
+                        .eq(DSL.coalesce(DSL.val(command.provinceCode(), b.PROVINCE_CODE), "")))
+                .and(b.STATUS.eq("PUBLISHED"))
+                .and(b.EFFECTIVE_FROM.lt(DSL.coalesce(
+                        DSL.val(command.effectiveUntil(), b.EFFECTIVE_UNTIL), infinity)))
+                .and(DSL.val(command.effectiveFrom(), b.EFFECTIVE_FROM)
+                        .lt(DSL.coalesce(b.EFFECTIVE_UNTIL, infinity))));
     }
 
     private static String bundleDigest(PublishConfigurationBundleCommand command, List<AssetRow> assets) {

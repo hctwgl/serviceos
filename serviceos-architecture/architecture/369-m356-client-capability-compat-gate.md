@@ -56,7 +56,7 @@ flywayVersion: "130"
 ## 已实现
 
 - `ConfigurationClientCapabilityGate` / `ClientCapabilityCatalog` / Analyzer
-- `DefaultConfigurationDraftService.validate/publish` 接入门禁与审计
+- `JooqConfigurationDraftService.validate/publish` 接入门禁与审计
 - OpenAPI 1.0.50 `clientCompatibility`
 - Admin `ConfigurationDesignerPage` 兼容报告面板
 - `ConfigurationClientCapabilityGateTest`（5）
