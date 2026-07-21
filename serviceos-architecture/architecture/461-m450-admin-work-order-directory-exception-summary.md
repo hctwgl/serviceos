@@ -31,7 +31,7 @@ openapiVersion: "1.0.112"
 
 ## 4. 明确未实现
 
-- 异常筛选 query 参数
-- 完整异常 DTO 列表 / 异常详情深链
+- 异常筛选 query 参数（母版未列；可选后续）
+- 完整异常 DTO 列表（目录深链已由 **M451** 进队列）
 - Network Portal 变更
 - 产品负责人视觉金标（`READY_FOR_REVIEW`）

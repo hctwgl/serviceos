@@ -439,15 +439,17 @@ function exceptionSummaryLabel(workOrderId: string) {
     return {
       text: presentEmptyValue('not_provided'),
       tooltip: '无 operations.exception.read 或异常旁载未返回（soft-omit）',
+      linkable: false as const,
     }
   }
   const matched = summaries.find((row) => row.workOrderId === workOrderId)
   if (!matched) {
-    return { text: '暂无', tooltip: '本页无 OPEN 运营异常' }
+    return { text: '暂无', tooltip: '本页无 OPEN 运营异常', linkable: false as const }
   }
   return {
     text: `待处理 ${matched.openCount}`,
-    tooltip: `openCount=${matched.openCount}`,
+    tooltip: `openCount=${matched.openCount}；点击打开该工单 OPEN 异常队列`,
+    linkable: true as const,
   }
 }
 
@@ -712,12 +714,26 @@ const columns = computed((): TableColumnsType<Row> => {
     width: 110,
     customRender: ({ record }: { record: Row }) => {
       const presentation = exceptionSummaryLabel(record.id)
-      return h(
-        Tooltip,
-        { title: presentation.tooltip },
-        () =>
-          h('span', { 'data-testid': 'work-order-exception-summary' }, presentation.text),
-      )
+      // M451：有 OPEN 异常时深链异常队列（与工作区 exceptionSummary 同口径水合）。
+      const cell = presentation.linkable
+        ? h(
+            RouterLink,
+            {
+              to: {
+                name: 'ADMIN.EXCEPTION.QUEUE',
+                query: { workOrderId: record.id, status: 'OPEN' },
+              },
+              class: 'work-order-link',
+              'data-testid': 'work-order-exception-summary',
+            },
+            () => presentation.text,
+          )
+        : h(
+            'span',
+            { 'data-testid': 'work-order-exception-summary' },
+            presentation.text,
+          )
+      return h(Tooltip, { title: presentation.tooltip }, () => cell)
     },
   },
   {
