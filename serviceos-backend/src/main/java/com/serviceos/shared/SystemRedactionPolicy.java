@@ -6,9 +6,8 @@ import java.util.regex.Pattern;
 /**
  * ServiceOS 全局数据脱敏策略。
  *
- * <p>业务数据脱敏由 {@code SERVICEOS_REDACTION_ENABLED}（或 JVM 系统属性
- * {@code serviceos.redaction.enabled}）统一控制，默认关闭。凭据、令牌和签名属于安全边界，
- * 无论业务脱敏开关是否开启都必须保护。</p>
+ * <p>业务数据脱敏由 {@code serviceos.redaction.enabled} / {@code SERVICEOS_REDACTION_ENABLED}
+ * 统一控制，默认关闭。凭据、令牌和签名属于安全边界，无论业务脱敏开关是否开启都必须保护。</p>
  *
  * <p>该策略只作用于日志、API 展示、导出、通知和外部交付等输出边界；数据库、领域对象、
  * 事务事件和审计事实仍保存权威原值，避免不可逆修改业务数据。</p>
@@ -17,6 +16,7 @@ public final class SystemRedactionPolicy {
     public static final String PROPERTY_NAME = "serviceos.redaction.enabled";
     public static final String ENVIRONMENT_VARIABLE = "SERVICEOS_REDACTION_ENABLED";
     private static final String MASK = "[REDACTED]";
+    private static volatile Boolean applicationConfiguredValue;
 
     private static final List<Replacement> ALWAYS_PROTECTED = List.of(
             replacement("(?i)\\bBearer\\s+[A-Za-z0-9._~+\\-/=]{8,}", "Bearer " + MASK),
@@ -34,23 +34,26 @@ public final class SystemRedactionPolicy {
     private SystemRedactionPolicy() {
     }
 
-    /** 是否启用业务数据脱敏。系统属性优先于环境变量，未配置时默认关闭。 */
+    /** 由 Spring Environment 在应用上下文创建后同步普通配置文件/命令行参数。 */
+    public static void configureApplicationValue(boolean enabled) {
+        applicationConfiguredValue = enabled;
+    }
+
+    /**
+     * 是否启用业务数据脱敏。JVM 系统属性优先，其次是 Spring Environment 同步值，
+     * 启动早期回退到环境变量；全部未配置时默认关闭。
+     */
     public static boolean businessDataRedactionEnabled() {
-        String configured = System.getProperty(PROPERTY_NAME);
-        if (configured == null || configured.isBlank()) {
-            configured = System.getenv(ENVIRONMENT_VARIABLE);
+        String systemProperty = System.getProperty(PROPERTY_NAME);
+        if (systemProperty != null && !systemProperty.isBlank()) {
+            return parse(systemProperty);
         }
-        if (configured == null || configured.isBlank()) {
-            return false;
+        Boolean configuredByApplication = applicationConfiguredValue;
+        if (configuredByApplication != null) {
+            return configuredByApplication;
         }
-        if ("true".equalsIgnoreCase(configured)) {
-            return true;
-        }
-        if ("false".equalsIgnoreCase(configured)) {
-            return false;
-        }
-        throw new IllegalStateException(
-                PROPERTY_NAME + " / " + ENVIRONMENT_VARIABLE + " must be true or false");
+        String environmentValue = System.getenv(ENVIRONMENT_VARIABLE);
+        return environmentValue == null || environmentValue.isBlank() ? false : parse(environmentValue);
     }
 
     /**
@@ -95,6 +98,17 @@ public final class SystemRedactionPolicy {
             return trimmed.charAt(0) + "***";
         }
         return trimmed.substring(0, 6) + "***";
+    }
+
+    private static boolean parse(String value) {
+        if ("true".equalsIgnoreCase(value)) {
+            return true;
+        }
+        if ("false".equalsIgnoreCase(value)) {
+            return false;
+        }
+        throw new IllegalStateException(
+                PROPERTY_NAME + " / " + ENVIRONMENT_VARIABLE + " must be true or false");
     }
 
     private static String apply(String value, List<Replacement> replacements) {
