@@ -14,9 +14,10 @@ ServiceOS 使用一个总开关控制业务数据脱敏：
 SERVICEOS_REDACTION_ENABLED=false
 ```
 
-也可通过 JVM 系统属性设置：
+也可使用 Spring 配置属性或 JVM 系统属性：
 
 ```text
+--serviceos.redaction.enabled=true
 -Dserviceos.redaction.enabled=true
 ```
 
