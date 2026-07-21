@@ -2,14 +2,26 @@ package com.serviceos.bootstrap;
 
 import com.serviceos.shared.SystemRedactionPolicy;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class SensitiveDataRedactorTest {
+    private String previousValue;
+
+    @BeforeEach
+    void rememberSwitch() {
+        previousValue = System.getProperty(SystemRedactionPolicy.PROPERTY_NAME);
+    }
+
     @AfterEach
-    void clearSwitch() {
-        System.clearProperty(SystemRedactionPolicy.PROPERTY_NAME);
+    void restoreSwitch() {
+        if (previousValue == null) {
+            System.clearProperty(SystemRedactionPolicy.PROPERTY_NAME);
+        } else {
+            System.setProperty(SystemRedactionPolicy.PROPERTY_NAME, previousValue);
+        }
     }
 
     @Test
