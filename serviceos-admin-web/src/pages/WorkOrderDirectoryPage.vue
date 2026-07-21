@@ -219,10 +219,11 @@ const rows = computed((): Row[] => {
 })
 
 const countLabel = computed(() => {
-  if (error.value) return undefined
-  const n = rows.value.length
-  if (cursor.value) return `已加载 ${n} 条，还有更多（列表无总数，UI_DATA_GAP）`
-  return `已加载 ${n} 条`
+  if (error.value || page.value == null) return undefined
+  const total = page.value.totalCount
+  const truncated = page.value.totalCountTruncated
+  // M436：服务端封顶总数；客户端关键词筛选不改变 total。
+  return truncated ? `共 ${total}+ 条` : `共 ${total} 条`
 })
 
 function slaRiskLabel(workOrderId: string) {

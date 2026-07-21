@@ -102,12 +102,21 @@ final class DefaultWorkOrderQueryService implements WorkOrderQueryService {
         // M434：页级 SLA 风险旁载；缺 sla.read 时省略属性（null），不伪造空成功 0。
         List<WorkOrderDirectorySlaRiskSummary> slaRiskSummaries = loadSlaRiskSummaries(
                 principal, correlationId, enriched);
+        // M436：同筛选封顶计数（无 cursor）；超过 100 只声明 truncated，不做精确全量 COUNT(*)。
+        int matched = queries.countMatching(
+                principal.tenantId(), scope.tenantWide(), projectIds,
+                clientCode, query.projectId(), status, externalOrderCode,
+                WorkOrderPage.TOTAL_COUNT_LIMIT + 1);
+        boolean totalTruncated = matched > WorkOrderPage.TOTAL_COUNT_LIMIT;
+        int totalCount = totalTruncated ? WorkOrderPage.TOTAL_COUNT_LIMIT : matched;
         return new WorkOrderPage(
                 enriched,
                 last == null ? null : encodeCursor(scope.scopeDigest(),
                         filterDigest, last.receivedAt(), last.id()),
                 clock.instant(),
-                slaRiskSummaries);
+                slaRiskSummaries,
+                totalCount,
+                totalTruncated);
     }
 
     @Override @Transactional(readOnly = true)

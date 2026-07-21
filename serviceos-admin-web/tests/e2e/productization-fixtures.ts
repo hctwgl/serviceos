@@ -172,6 +172,8 @@ export async function mockProductizationApis(
             ],
         nextCursor: null,
         asOf: '2026-07-20T04:00:00Z',
+        totalCount: options.workOrdersEmpty ? 0 : 1,
+        totalCountTruncated: false,
         slaRiskSummaries: options.workOrdersEmpty
           ? []
           : [

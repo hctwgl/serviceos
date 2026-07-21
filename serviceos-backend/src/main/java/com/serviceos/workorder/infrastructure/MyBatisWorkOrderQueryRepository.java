@@ -23,6 +23,14 @@ final class MyBatisWorkOrderQueryRepository implements WorkOrderQueryRepository 
                 clientCode, projectId, status, externalOrderCode, cursorReceivedAt, cursorId, fetchSize)
                 .stream().map(MyBatisWorkOrderQueryRepository::view).toList();
     }
+
+    @Override
+    public int countMatching(String tenantId, boolean tenantWide, List<UUID> projectIds,
+            String clientCode, UUID projectId, String status, String externalOrderCode, int fetchSize) {
+        return mapper.countMatching(tenantId, tenantWide, projectIds.stream().map(UUID::toString).toList(),
+                clientCode, projectId, status, externalOrderCode, fetchSize);
+    }
+
     @Override public Optional<WorkOrderView> findById(String tenantId, UUID workOrderId) {
         return Optional.ofNullable(mapper.findById(tenantId, workOrderId)).map(MyBatisWorkOrderQueryRepository::view);
     }

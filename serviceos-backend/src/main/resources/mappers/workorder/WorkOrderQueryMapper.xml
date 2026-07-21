@@ -10,8 +10,7 @@
     external_dispatched_at AS "externalDispatchedAt", received_at AS "receivedAt",
     updated_at AS "updatedAt", activated_at AS "activatedAt", fulfilled_at AS "fulfilledAt",
     version AS "version"</sql>
-  <select id="findPage" resultType="map">
-    SELECT <include refid="columns"/> FROM wo_work_order
+  <sql id="authorizedFilters">
      WHERE tenant_id=#{tenantId}
     <if test="!tenantWide"><choose><when test="projectIds != null and !projectIds.isEmpty()">
       AND project_id IN <foreach collection="projectIds" item="id" open="(" separator="," close=")">CAST(#{id} AS uuid)</foreach>
@@ -20,8 +19,20 @@
     <if test="projectId != null">AND project_id=#{projectId}</if>
     <if test="status != null">AND status=#{status}</if>
     <if test="externalOrderCode != null">AND external_order_code=#{externalOrderCode}</if>
+  </sql>
+  <select id="findPage" resultType="map">
+    SELECT <include refid="columns"/> FROM wo_work_order
+    <include refid="authorizedFilters"/>
     <if test="cursorReceivedAt != null">AND (received_at,id) &lt; (#{cursorReceivedAt},#{cursorId})</if>
     ORDER BY received_at DESC,id DESC LIMIT #{fetchSize}
+  </select>
+  <!-- M436：无 cursor 的封顶计数；fetchSize=limit+1 用于判断 truncated。 -->
+  <select id="countMatching" resultType="int">
+    SELECT COUNT(*)::int FROM (
+      SELECT 1 FROM wo_work_order
+      <include refid="authorizedFilters"/>
+      LIMIT #{fetchSize}
+    ) capped
   </select>
   <select id="findById" resultType="map">
     SELECT <include refid="columns"/> FROM wo_work_order WHERE tenant_id=#{tenantId} AND id=#{workOrderId}

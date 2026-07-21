@@ -44,6 +44,8 @@ test.describe('M377 Admin productization visual baselines', () => {
     // M435：目录独立 updatedAt（非 receivedAt MVP 映射）
     const updatedAtCell = page.getByTestId('work-order-updated-at')
     await expect(updatedAtCell).toContainText('2026-07-21')
+    // M436：目录列表封顶总数
+    await expect(page.getByTestId('list-toolbar-count')).toContainText('共 1 条')
     await shot(page, 'work-order-directory-productized')
     await page.screenshot({
       path: 'tests/e2e/__screenshots__/work-order-directory-region-names-1440.png',
@@ -65,6 +67,11 @@ test.describe('M377 Admin productization visual baselines', () => {
     await updatedAtCell.scrollIntoViewIfNeeded()
     await page.screenshot({
       path: 'tests/e2e/__screenshots__/work-order-directory-updated-at-1440.png',
+      fullPage: true,
+    })
+    await page.getByTestId('list-toolbar-count').scrollIntoViewIfNeeded()
+    await page.screenshot({
+      path: 'tests/e2e/__screenshots__/work-order-directory-list-total-1440.png',
       fullPage: true,
     })
   })

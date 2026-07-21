@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ServiceOS Core API
-  version: 1.0.97
+  version: 1.0.98
   description: 首条工程纵向切片的机器可读契约；实现与客户端均不得绕过本契约自行猜测字段。
 x-serviceos-client-metadata:
   requiredForNewClients: true
@@ -3389,6 +3389,8 @@ paths:
         `maskedServiceAddress`（随基座返回，不 soft-omit；无原文）。
         M434：可选页级 `slaRiskSummaries`；需 PROJECT `sla.read` soft-gate，缺能力时省略属性；
         有能力且本页无开放风险时返回 []；仅含 openCount>0 行。
+        M436：页级 `totalCount` / `totalCountTruncated`（当前筛选、无 cursor）；
+        上限 100，超出只声明 truncated，不返回精确全量 COUNT(*)。
       parameters:
         - { name: clientCode, in: query, schema: { type: string, minLength: 1, maxLength: 128 } }
         - { name: projectId, in: query, schema: { type: string, format: uuid } }
@@ -9744,11 +9746,22 @@ components:
     WorkOrderPage:
       type: object
       additionalProperties: false
-      required: [items, nextCursor, asOf]
+      required: [items, nextCursor, asOf, totalCount, totalCountTruncated]
       properties:
         items: { type: array, items: { $ref: '#/components/schemas/WorkOrder' } }
         nextCursor: { type: [string, 'null'] }
         asOf: { type: string, format: date-time }
+        totalCount:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: >
+            M436：当前筛选条件下授权工单总数（不含 cursor）；上限 100。
+            与本页 items 长度无关；超过上限时为 100 且 totalCountTruncated=true。
+        totalCountTruncated:
+          type: boolean
+          description: >
+            M436：匹配数超过 100 时为 true；不返回精确全量 COUNT(*)。
         slaRiskSummaries:
           description: |
             M434：需 PROJECT sla.read；缺能力时省略本属性；有能力且无开放风险时返回 []。

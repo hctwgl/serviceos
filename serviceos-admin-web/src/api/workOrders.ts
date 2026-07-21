@@ -39,6 +39,10 @@ export type WorkOrderPage = {
   items: WorkOrder[]
   nextCursor: string | null
   asOf: string
+  /** M436：当前筛选授权总数（上限 100）。 */
+  totalCount: number
+  /** M436：超过 100 时为 true。 */
+  totalCountTruncated: boolean
   /** soft-omit：缺 PROJECT sla.read 时为 undefined */
   slaRiskSummaries?: WorkOrderDirectorySlaRiskSummary[] | null
 }

@@ -10,7 +10,9 @@ defineProps<{
 <template>
   <div class="list-toolbar" data-testid="list-toolbar">
     <div class="list-toolbar__left">
-      <span v-if="countLabel" class="list-toolbar__count">{{ countLabel }}</span>
+      <span v-if="countLabel" class="list-toolbar__count" data-testid="list-toolbar-count">{{
+        countLabel
+      }}</span>
       <slot name="leading" />
     </div>
     <Space class="list-toolbar__right" wrap>

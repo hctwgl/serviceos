@@ -34,6 +34,6 @@ flywayVersion: "146"
 
 ## 4. 明确未实现
 
-- 列表 total / 筛选扩展
+- 列表 total（已由 **M436** 关闭主路径）/ 筛选扩展
 - Network Portal 独立 updatedAt
 - 产品负责人视觉金标（`READY_FOR_REVIEW`）

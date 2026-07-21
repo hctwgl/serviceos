@@ -69,6 +69,9 @@ class WorkOrderQueryPostgresIT {
   assertThat(detail.updatedAt()).isEqualTo(detail.receivedAt());
   // M434：无 sla.read 时页级旁载省略（null），不伪造 []/0。
   assertThat(page.slaRiskSummaries()).isNull();
+  // M436：同筛选总数；本页仅 A 项目 1 条（status=RECEIVED）。
+  assertThat(page.totalCount()).isEqualTo(1);
+  assertThat(page.totalCountTruncated()).isFalse();
   assertThatThrownBy(()->queries.get(reader,"corr-deny",wb)).isInstanceOfSatisfying(BusinessProblem.class,
     p->assertThat(p.code()).isEqualTo(ProblemCode.ACCESS_DENIED));
   assertThat(jdbc.sql("SELECT decision_code FROM aud_audit_record ORDER BY occurred_at DESC LIMIT 1").query(String.class).single()).isEqualTo("DENY");
@@ -106,6 +109,25 @@ class WorkOrderQueryPostgresIT {
   var detail=queries.get(reader,"corr-assignee-get",wa).workOrder();
   assertThat(detail.currentClaimedBy()).isEqualTo(claimant.toString());
   assertThat(detail.currentAssigneeDisplayName()).isEqualTo("演示师傅");
+ }
+
+ @Test void listExposesTotalCountAcrossPagesAndCapsAtLimit(){
+  Scope a=scope("tenant-test","A");
+  receive(a,"ORDER-TOTAL-1","1".repeat(64));
+  receive(a,"ORDER-TOTAL-2","2".repeat(64));
+  seedRole("reader","PROJECT",a.projectId().toString());
+  CurrentPrincipal reader=principal("reader","tenant-test");
+  var first=queries.list(reader,"corr-total-page",new WorkOrderQuery(null,null,null,null,1));
+  assertThat(first.items()).hasSize(1);
+  assertThat(first.nextCursor()).isNotBlank();
+  assertThat(first.totalCount()).isEqualTo(2);
+  assertThat(first.totalCountTruncated()).isFalse();
+  for(int i=0;i<99;i++){
+   seedWorkOrderRow(a,"ORDER-CAP-"+i,"c".repeat(64));
+  }
+  var capped=queries.list(reader,"corr-total-cap",new WorkOrderQuery(null,null,null,null,20));
+  assertThat(capped.totalCount()).isEqualTo(100);
+  assertThat(capped.totalCountTruncated()).isTrue();
  }
 
  @Test void listAndDetailExposeIndependentUpdatedAtAfterActivate(){
@@ -182,6 +204,39 @@ class WorkOrderQueryPostgresIT {
   return new Scope(tenant,project,bundle,slaPolicyVersionId,slaPolicyDigest);
  }
  private UUID receive(Scope s,String external,String digest){return commands.receive(new ReceiveExternalWorkOrderCommand(s.tenant(),s.projectId(),"BYD","BYD_OCEAN","HOME_CHARGING_SURVEY_INSTALL",external,digest,s.bundle().bundleId(),s.bundle().bundleCode(),s.bundle().bundleVersion(),s.bundle().manifestDigest(),"370000","370100","370102","敏感姓名","13800000000","敏感地址","VIN123456789",LocalDateTime.of(2026,7,15,10,0),"corr","cause")).workOrderId();}
+ /** M436：批量夹具，跳过命令事件路径以快速铺满封顶计数。 */
+ private void seedWorkOrderRow(Scope s,String external,String digest){
+  Instant receivedAt=Instant.parse("2026-07-15T03:00:00Z");
+  jdbc.sql("""
+   INSERT INTO wo_work_order (
+     id, tenant_id, project_id, client_code, brand_code, service_product_code,
+     external_order_code, payload_digest, status,
+     configuration_bundle_id, configuration_bundle_code, configuration_bundle_version,
+     configuration_bundle_digest, province_code, city_code, district_code,
+     customer_name, customer_mobile, service_address, vehicle_vin,
+     external_dispatched_at, received_at, updated_at, version
+   ) VALUES (
+     :id, :tenantId, :projectId, 'BYD', 'BYD_OCEAN', 'HOME_CHARGING_SURVEY_INSTALL',
+     :external, :digest, 'RECEIVED',
+     :bundleId, :bundleCode, :bundleVersion, :bundleDigest,
+     '370000', '370100', '370102',
+     '敏感姓名', '13800000000', '敏感地址', 'VIN123456789',
+     :dispatchedAt, :receivedAt, :receivedAt, 1
+   )
+   """)
+   .param("id",UUID.randomUUID())
+   .param("tenantId",s.tenant())
+   .param("projectId",s.projectId())
+   .param("external",external)
+   .param("digest",digest)
+   .param("bundleId",s.bundle().bundleId())
+   .param("bundleCode",s.bundle().bundleCode())
+   .param("bundleVersion",s.bundle().bundleVersion())
+   .param("bundleDigest",s.bundle().manifestDigest())
+   .param("dispatchedAt",LocalDateTime.of(2026,7,15,10,0))
+   .param("receivedAt",java.sql.Timestamp.from(receivedAt))
+   .update();
+ }
  private UUID seedActiveTask(Scope s,UUID workOrderId,String stageCode,String status,String claimedBy){
   Instant now=Instant.parse("2026-07-15T04:00:00Z");
   String taskStatus=status==null?"READY":status;
