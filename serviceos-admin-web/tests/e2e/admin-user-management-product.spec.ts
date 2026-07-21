@@ -35,7 +35,7 @@ test.describe('M402–M405 Admin 用户登记到变更时间线', () => {
       fullPage: true,
     })
 
-    await page.getByRole('link', { name: '打开' }).first().click()
+    await page.getByTestId('user-directory-table').getByRole('link', { name: '打开' }).first().click()
     await expect(page.getByRole('tab', { name: '登录与安全' })).toBeVisible({ timeout: 20_000 })
     await page.getByRole('tab', { name: '登录与安全' }).click()
     await expect(page.getByTestId('section-recent-logins')).toBeVisible()
